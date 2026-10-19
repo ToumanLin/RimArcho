@@ -148,3 +148,7 @@ game version, it can pass `game_version`.
 ## Licence
 
 See the repository.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
