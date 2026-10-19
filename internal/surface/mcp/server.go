@@ -111,10 +111,6 @@ func argv(words ...string) *builder { return &builder{a: append([]string{}, word
 
 // ---- tool arguments ----
 
-type GameVersion struct {
-	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
-}
-
 type StatusIn struct{}
 
 type FindIn struct {
@@ -129,32 +125,32 @@ type RefIn struct {
 }
 
 type DefIn struct {
-	Def string `json:"def,omitempty" jsonschema:"Type/defName (ThingDef/Gun_Revolver), Type@Name for abstract parents, def:… or a bare defName"`
-	Mod string `json:"mod,omitempty" jsonschema:"list the defs of this mod instead (#id, pkg:…)"`
-	All bool   `json:"all,omitempty"`
-	GameVersion
+	Def         string `json:"def,omitempty" jsonschema:"Type/defName (ThingDef/Gun_Revolver), Type@Name for abstract parents, def:… or a bare defName"`
+	Mod         string `json:"mod,omitempty" jsonschema:"list the defs of this mod instead (#id, pkg:…)"`
+	All         bool   `json:"all,omitempty"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
 }
 
 type PatchesIn struct {
-	Mod    string `json:"mod,omitempty" jsonschema:"only this mod's operations (#id, pkg:…)"`
-	Target string `json:"target,omitempty" jsonschema:"Type/defName of a touched def, or part of an XPath"`
-	Failed bool   `json:"failed,omitempty" jsonschema:"only operations that matched nothing (patch.no-match), with reasons"`
-	All    bool   `json:"all,omitempty"`
-	GameVersion
+	Mod         string `json:"mod,omitempty" jsonschema:"only this mod's operations (#id, pkg:…)"`
+	Target      string `json:"target,omitempty" jsonschema:"Type/defName of a touched def, or part of an XPath"`
+	Failed      bool   `json:"failed,omitempty" jsonschema:"only operations that matched nothing (patch.no-match), with reasons"`
+	All         bool   `json:"all,omitempty"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
 }
 
 type HarmonyIn struct {
-	Mod    string `json:"mod,omitempty" jsonschema:"this mod's assemblies and patches (#id, pkg:…)"`
-	Target string `json:"target,omitempty" jsonschema:"patched method, e.g. Verse.Pawn.Tick; partial names search"`
-	Shared bool   `json:"shared,omitempty" jsonschema:"methods patched by several mods (with mod: those involving it)"`
-	All    bool   `json:"all,omitempty"`
-	GameVersion
+	Mod         string `json:"mod,omitempty" jsonschema:"this mod's assemblies and patches (#id, pkg:…)"`
+	Target      string `json:"target,omitempty" jsonschema:"patched method, e.g. Verse.Pawn.Tick; partial names search"`
+	Shared      bool   `json:"shared,omitempty" jsonschema:"methods patched by several mods (with mod: those involving it)"`
+	All         bool   `json:"all,omitempty"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
 }
 
 type WhyIn struct {
-	A string `json:"a" jsonschema:"first mod reference"`
-	B string `json:"b" jsonschema:"second mod reference"`
-	GameVersion
+	A           string `json:"a" jsonschema:"first mod reference"`
+	B           string `json:"b" jsonschema:"second mod reference"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
 }
 
 type ProblemsIn struct {
@@ -166,7 +162,7 @@ type ProblemsIn struct {
 	All         bool   `json:"all,omitempty" jsonschema:"no truncation and no folding; include def.override / patch.contested"`
 	Detail      bool   `json:"detail,omitempty" jsonschema:"evidence and fix commands for every problem"`
 	Ignored     bool   `json:"ignored,omitempty" jsonschema:"list the problems the player ignored"`
-	GameVersion
+	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
 }
 
 type ChangesIn struct {
@@ -176,19 +172,20 @@ type ChangesIn struct {
 }
 
 type LogIn struct {
-	Cluster string `json:"cluster,omitempty" jsonschema:"one cluster in full (E3 or log:E3): frames, Harmony lines, attribution, next steps"`
-	Text    string `json:"text,omitempty" jsonschema:"analyse this pasted log excerpt or stack trace instead of Player.log"`
-	File    string `json:"file,omitempty" jsonschema:"another log file path"`
-	Prev    bool   `json:"prev,omitempty" jsonschema:"Player-prev.log (the run before the last)"`
-	All     bool   `json:"all,omitempty" jsonschema:"include informational clusters"`
-	GameVersion
+	Cluster     string `json:"cluster,omitempty" jsonschema:"one cluster in full (E3 or log:E3): frames, Harmony lines, attribution, next steps"`
+	Text        string `json:"text,omitempty" jsonschema:"analyse this pasted log excerpt or stack trace instead of Player.log"`
+	File        string `json:"file,omitempty" jsonschema:"another log file path"`
+	Prev        bool   `json:"prev,omitempty" jsonschema:"Player-prev.log (the run before the last)"`
+	All         bool   `json:"all,omitempty" jsonschema:"include informational clusters"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
 }
 
 type FilesIn struct {
-	Pattern string `json:"pattern" jsonschema:"text to find (case-insensitive) in the effective XML/TXT of enabled mods"`
-	Mod     string `json:"mod,omitempty" jsonschema:"only this mod"`
-	Regex   bool   `json:"regex,omitempty"`
-	All     bool   `json:"all,omitempty"`
+	Pattern   string `json:"pattern" jsonschema:"text to find (case-insensitive) in the effective XML/TXT of enabled mods"`
+	Mod       string `json:"mod,omitempty" jsonschema:"only this mod"`
+	Regex     bool   `json:"regex,omitempty"`
+	Languages bool   `json:"languages,omitempty" jsonschema:"also search Languages/ (translations)"`
+	All       bool   `json:"all,omitempty"`
 }
 
 type SourceIn struct {
@@ -224,7 +221,7 @@ type RuleIn struct {
 	Note   string `json:"note,omitempty"`
 }
 
-func gv(b *builder, g GameVersion) []string { return b.str("game-version", g.GameVersion).a }
+func gv(b *builder, mm string) []string { return b.str("game-version", mm).a }
 
 func toolList() []tool {
 	return []tool{
@@ -256,7 +253,7 @@ func toolList() []tool {
 			return gv(argv("log").str("cluster", in.Cluster).str("text", in.Text).str("file", in.File).flag("prev", in.Prev).flag("all", in.All), in.GameVersion)
 		}),
 		reg("search_files", true, false, descFiles, func(in FilesIn) []string {
-			return argv("files", "search", in.Pattern).str("mod", in.Mod).flag("regex", in.Regex).flag("all", in.All).a
+			return argv("files", "search", in.Pattern).str("mod", in.Mod).flag("regex", in.Regex).flag("languages", in.Languages).flag("all", in.All).a
 		}),
 		reg("read_source", true, false, descSource, func(in SourceIn) []string { return SourceArgv(in) }),
 		reg("edit_loadout", false, false, descEdit, func(in EditIn) []string { return EditArgv(in) }),

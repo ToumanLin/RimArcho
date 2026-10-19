@@ -27,7 +27,7 @@ func init() {
 		Flags: []Flag{{Name: "mod", Value: "<ref>"}, {Name: "target", Value: "<xpath part | Type/defName>"}, {Name: "failed"}, {Name: "all"}, gameVersionFlag}})
 	register(&Command{Name: "why", Args: "<A> <B>", Summary: "how two mods relate: order, dependencies, conflicts, overrides, shared patches", MinArgs: 2, MaxArgs: 2, Run: whyCmd, Flags: []Flag{gameVersionFlag}})
 	register(&Command{Name: "files search", Args: "<pattern>", Summary: "search the effective content of enabled mods", MinArgs: 1, MaxArgs: 1, Run: filesSearchCmd,
-		Flags: []Flag{{Name: "mod", Value: "<ref>"}, {Name: "regex"}, {Name: "all"}}})
+		Flags: []Flag{{Name: "mod", Value: "<ref>"}, {Name: "regex"}, {Name: "languages", Help: "also search Languages/ (translations; excluded by default)"}, {Name: "all"}}})
 }
 
 // analysed brings the analysis up to date and returns the run (an error if none exists).
@@ -505,6 +505,7 @@ func filesSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return strings.Contains(strings.ToLower(line), lower)
 	}
 	limit := boolLimit(a, render.DefaultLimit)
+	langs := a.Bool("languages")
 	var hits []string
 	files, total := 0, 0
 	for _, m := range mods {
@@ -517,6 +518,10 @@ func filesSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 					return nil
 				}
 				if de.IsDir() {
+					// Translations repeat every key and drown the Defs/Patches evidence.
+					if strings.EqualFold(de.Name(), "Languages") && !langs {
+						return filepath.SkipDir
+					}
 					// The mod root is a load folder too; its version folders are handled by Resolve.
 					if p != folder && folder == dir && (isVersionDir(de.Name()) || strings.EqualFold(de.Name(), "Common")) {
 						return filepath.SkipDir
