@@ -186,3 +186,58 @@ func TestImportRimCrow(t *testing.T) {
 		t.Fatalf("temp copies left behind: %v", ents)
 	}
 }
+
+// 05 §3: loadout export / import round-trips through a text list and a ModsConfig.xml,
+// and reads a save's mod list; import is one undoable step and never writes the game file.
+func TestLoadoutExchange(t *testing.T) {
+	e := testkit.New(t)
+	e.AddWorkshop("3000000002", testkit.Sample("tester.alpha", "Alpha"))
+	e.AddWorkshop("3000000003", testkit.Sample("tester.beta", "Beta"))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Gamma"), testkit.Sample("tester.gamma", "Gamma"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.alpha", "tester.beta")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	cfg := e.ReadModsConfig()
+	text := e.MustRun("loadout", "export")
+	if !strings.HasPrefix(text, "# RimArcho loadout") || !strings.Contains(text, "tester.beta  # Beta\n") {
+		t.Fatalf("text export:\n%s", text)
+	}
+	dir := t.TempDir()
+	tf := filepath.Join(dir, "list.txt")
+	e.MustRun("loadout", "export", "--out", tf)
+	if _, code := e.Run("loadout", "export", "--out", tf); code != 1 {
+		t.Fatal("export overwrote a file")
+	}
+	mf := filepath.Join(dir, "ModsConfig.xml")
+	e.MustRun("loadout", "export", "--format", "modsconfig", "--out", mf)
+
+	// A save from another run: Gamma first, Beta, and a mod that is not installed.
+	save := filepath.Join(dir, "Colony.rws")
+	os.WriteFile(save, []byte(`<?xml version="1.0" encoding="utf-8"?>
+<savegame><meta><gameVersion>1.6.4633 rev1261</gameVersion>
+<modIds><li>ludeon.rimworld</li><li>tester.gamma</li><li>Tester.Beta</li><li>tester.gone</li></modIds>
+<modSteamIds><li>0</li><li>0</li><li>3000000003</li><li>99</li></modSteamIds>
+<modNames><li>Core</li><li>Gamma</li><li>Beta</li><li>Gone Mod</li></modNames></meta>
+<game><huge>…</huge></game></savegame>`), 0o644)
+	out := e.MustRun("loadout", "import", save)
+	if !strings.Contains(out, "imported 4 entries from a save, game 1.6.4633 rev1261") || !strings.Contains(out, "not installed: 1") || !strings.Contains(out, "tester.gone (Gone Mod)") {
+		t.Fatalf("save import:\n%s", out)
+	}
+	if e.ReadModsConfig() != cfg {
+		t.Fatal("import wrote ModsConfig.xml")
+	}
+	e.MustRun("undo")
+	if again := e.MustRun("loadout", "export"); again[strings.Index(again, "\nludeon"):] != text[strings.Index(text, "\nludeon"):] {
+		t.Fatalf("undo did not restore the list:\n%s", again)
+	}
+	e.MustRun("loadout", "import", save)
+	for _, f := range []string{tf, mf} {
+		if out := e.MustRun("loadout", "import", f); !strings.Contains(out, "imported 3 entries") {
+			t.Fatalf("%s:\n%s", f, out)
+		}
+		if again := e.MustRun("loadout", "export"); again[strings.Index(again, "\nludeon"):] != text[strings.Index(text, "\nludeon"):] {
+			t.Fatalf("%s did not round-trip:\n%s", f, again)
+		}
+		e.MustRun("loadout", "import", save)
+	}
+}

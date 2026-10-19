@@ -39,6 +39,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     loadout diff [<v>] [<v>]                  differences between versions (default: newest version → workspace)
     loadout checkout <v>                      load a version into the workspace (save to apply)
     loadout tag <v> <name>                    name a version
+    loadout export                            write the workspace as a text list or a ModsConfig.xml
+    loadout import <file>                     replace the workspace with a text list, a ModsConfig.xml or a save's mod list (.rws); undoable
     copy-local <ref>                          copy a mod into the local Mods folder with an origin marker (the Loadout is not changed)
     import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)

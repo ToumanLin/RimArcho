@@ -27,6 +27,8 @@ type Node struct {
 type Doc struct {
 	Nodes []*Node
 	Next  []string
+	// Raw replaces the outline with file content (loadout export to stdout).
+	Raw string
 }
 
 // New starts a document with a subject line.
@@ -76,6 +78,9 @@ func (d *Doc) AddNext(cmds ...string) { d.Next = append(d.Next, cmds...) }
 
 // String renders the document; every line ends with "\n".
 func (d *Doc) String() string {
+	if d.Raw != "" {
+		return d.Raw
+	}
 	var sb strings.Builder
 	var walk func(n *Node, depth int)
 	walk = func(n *Node, depth int) {
