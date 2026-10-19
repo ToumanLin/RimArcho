@@ -108,6 +108,7 @@ next:
 | | `files search <模式> [--mod <引用>]` | 在生效内容中搜索文本 |
 | Loadout | `enable` / `disable` / `move` / `swap` / `sort` | 编辑工作区（04 §2） |
 | | `save` / `loadout log` / `loadout diff` / `loadout checkout` / `loadout tag` | 保存与历史（04 §3） |
+| | `undo` / `redo`；`sort --dry-run`、`save --dry-run`、`launch --dry-run` / `--force`；`list --active` | 撤销与重做工作区编辑（04 §3，对应 TUI 的 `u` / `Ctrl+r`）；预览而不改动（M2 补充） |
 | | `loadout export [--format text]` / `loadout import <文件>` | 文本列表、ModsConfig.xml、存档文件 |
 | 规则 | `rule add` / `rule list` / `rule remove` | 用户规则（04 §5） |
 | 玩家数据 | `alias` / `tag` / `note` | 别名、标签、备注 |
