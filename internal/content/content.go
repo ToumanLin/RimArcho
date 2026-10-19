@@ -269,7 +269,10 @@ type Asset struct {
 // de-duplicated by path relative to the load folder. Order approximates .NET
 // GetFiles(AllDirectories): files of a directory in name order, then subdirectories
 // breadth-first.
-func Assets(root string, folders []string, sub string) []Asset {
+func Assets(root string, folders []string, sub string) []Asset { return Files(root, folders, sub, ".xml") }
+
+// Files is Assets for another extension (".dll" for Assemblies).
+func Files(root string, folders []string, sub, ext string) []Asset {
 	seen := map[string]bool{}
 	var out []Asset
 	for _, f := range folders {
@@ -289,7 +292,7 @@ func Assets(root string, folders []string, sub string) []Asset {
 					continue
 				}
 				n := e.Name()
-				if !strings.EqualFold(filepath.Ext(n), ".xml") || strings.HasPrefix(n, ".") {
+				if !strings.EqualFold(filepath.Ext(n), ext) || strings.HasPrefix(n, ".") {
 					continue
 				}
 				key := strings.ToLower(p[len(f):])

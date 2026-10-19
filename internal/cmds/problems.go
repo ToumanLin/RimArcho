@@ -40,6 +40,7 @@ func analyzeCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	d, root := render.New(fmt.Sprintf("analysis a:%d for %s: %d active mods, %s", r.ID, r.MM, s.ActiveMods, app.Elapsed(s.TotalMs)))
 	root.KV("defs", fmt.Sprintf("%d from %d files (%d installed mods indexed, %d from cache)", s.Defs, s.DefFiles, s.InstalledMods, s.CachedMods))
 	root.KV("patches", fmt.Sprintf("%d operations in %d files: %d failed, %d of mod-defined classes", s.TopOps, s.PatchFiles, s.Failed, s.UnknownOps))
+	root.KV("harmony", fmt.Sprintf("%d patches in %d assemblies (%d types indexed)", s.HarmonyPatches, s.Assemblies, s.Types))
 	if s.ParseErrors > 0 {
 		root.KV("xml-errors", fmt.Sprint(s.ParseErrors))
 	}

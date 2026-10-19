@@ -169,6 +169,10 @@ func (s *Store) DeleteEnv(envID string) error {
 		for _, q := range []string{
 			`DELETE FROM snapshot_file WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id IN ` + inst + `)`,
 			`DELETE FROM def_fact WHERE instance_id IN ` + inst,
+			`DELETE FROM assembly_fact WHERE instance_id IN ` + inst,
+			`DELETE FROM type_fact WHERE instance_id IN ` + inst,
+			`DELETE FROM harmony_fact WHERE instance_id IN ` + inst,
+			`DELETE FROM harmony_id WHERE instance_id IN ` + inst,
 			`DELETE FROM content_state WHERE instance_id IN ` + inst,
 			`DELETE FROM patch_fact WHERE analysis_id IN (SELECT id FROM analysis WHERE environment_id=?)`,
 			`DELETE FROM finding WHERE analysis_id IN (SELECT id FROM analysis WHERE environment_id=?)`,

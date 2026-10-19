@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 4
+const SchemaVersion = 5
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -125,6 +125,26 @@ ALTER TABLE def_fact ADD COLUMN may_require_any TEXT NOT NULL DEFAULT '';
 DELETE FROM content_state;
 `
 
+// schemaV5 (M4): the Harmony layer per active instance (03 §2): effective assemblies,
+// TypeDef names (stack frame attribution), declared patches and Harmony ID candidates.
+const schemaV5 = `
+CREATE TABLE assembly_fact(
+  instance_id TEXT NOT NULL, file TEXT NOT NULL, skipped INTEGER NOT NULL DEFAULT 0, manual INTEGER NOT NULL DEFAULT 0,
+  uses_harmony INTEGER NOT NULL DEFAULT 0, types INTEGER NOT NULL DEFAULT 0, patches INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '');
+CREATE INDEX assembly_fact_instance ON assembly_fact(instance_id);
+CREATE TABLE type_fact(instance_id TEXT NOT NULL, file TEXT NOT NULL, type_name TEXT NOT NULL);
+CREATE INDEX type_fact_name ON type_fact(type_name);
+CREATE INDEX type_fact_instance ON type_fact(instance_id);
+CREATE TABLE harmony_fact(
+  instance_id TEXT NOT NULL, file TEXT NOT NULL, patch_type TEXT NOT NULL, patch_method TEXT NOT NULL, kind TEXT NOT NULL,
+  target TEXT NOT NULL, target_type TEXT NOT NULL DEFAULT '', target_method TEXT NOT NULL DEFAULT '', args TEXT NOT NULL DEFAULT '',
+  skips INTEGER NOT NULL DEFAULT 0, dynamic INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX harmony_fact_target ON harmony_fact(target);
+CREATE INDEX harmony_fact_instance ON harmony_fact(instance_id);
+CREATE TABLE harmony_id(instance_id TEXT NOT NULL, file TEXT NOT NULL, id TEXT NOT NULL COLLATE NOCASE);
+CREATE INDEX harmony_id_id ON harmony_id(id);
+`
+
 // Store wraps the database handle.
 type Store struct {
 	DB   *sql.DB
@@ -164,7 +184,7 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {

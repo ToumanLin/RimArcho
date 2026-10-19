@@ -179,6 +179,9 @@ func (s *Store) SaveAnalysis(envID, runKey, mm string, out *analyze.Output, star
 				return err
 			}
 		}
+		if err := saveHarmony(tx, out.Assemblies); err != nil {
+			return err
+		}
 		fins, err := tx.Prepare(`INSERT INTO finding(analysis_id, layer, code, severity, key, subject_instance, data) VALUES(?,?,?,?,?,?,?)`)
 		if err != nil {
 			return err
@@ -359,4 +362,204 @@ func (s *Store) DefCount(instanceID string) int {
 func (s *Store) PatchCount(analysisID int64, instanceID string) (ops, failed int) {
 	s.DB.QueryRow(`SELECT count(*), coalesce(sum(result='failed'), 0) FROM patch_fact WHERE analysis_id=? AND instance_id=?`, analysisID, instanceID).Scan(&ops, &failed)
 	return
+}
+
+func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts) error {
+	seen := map[string]bool{}
+	for _, a := range asms {
+		if seen[a.Instance] {
+			continue
+		}
+		seen[a.Instance] = true
+		for _, t := range []string{"assembly_fact", "type_fact", "harmony_fact", "harmony_id"} {
+			if _, err := tx.Exec(`DELETE FROM `+t+` WHERE instance_id=?`, a.Instance); err != nil {
+				return err
+			}
+		}
+	}
+	insA, err := tx.Prepare(`INSERT INTO assembly_fact(instance_id, file, skipped, manual, uses_harmony, types, patches, error) VALUES(?,?,?,?,?,?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer insA.Close()
+	insT, err := tx.Prepare(`INSERT INTO type_fact(instance_id, file, type_name) VALUES(?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer insT.Close()
+	insH, err := tx.Prepare(`INSERT INTO harmony_fact(instance_id, file, patch_type, patch_method, kind, target, target_type, target_method, args, skips, dynamic) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer insH.Close()
+	insI, err := tx.Prepare(`INSERT INTO harmony_id(instance_id, file, id) VALUES(?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer insI.Close()
+	b := func(v bool) int {
+		if v {
+			return 1
+		}
+		return 0
+	}
+	for _, a := range asms {
+		if _, err := insA.Exec(a.Instance, a.File, b(a.Skipped), b(a.Manual), b(a.UsesHarm), len(a.Types), len(a.Patches), a.Err); err != nil {
+			return err
+		}
+		for _, t := range a.Types {
+			if _, err := insT.Exec(a.Instance, a.File, t); err != nil {
+				return err
+			}
+		}
+		for _, p := range a.Patches {
+			if _, err := insH.Exec(a.Instance, a.File, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)); err != nil {
+				return err
+			}
+		}
+		for _, id := range a.IDs {
+			if _, err := insI.Exec(a.Instance, a.File, id); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// HarmonyRow is a stored Harmony patch.
+type HarmonyRow struct {
+	Instance, File, PatchType, PatchMethod, Kind, Target string
+	Skips, Dynamic                                     bool
+}
+
+// HarmonyFilter selects Harmony patches.
+type HarmonyFilter struct {
+	Instance string
+	Target   string // exact target (any overload), or with Like a case-insensitive substring
+	Like     bool
+}
+
+// HarmonyPatches returns stored patches ordered by target.
+func (s *Store) HarmonyPatches(f HarmonyFilter) ([]*HarmonyRow, error) {
+	q := `SELECT instance_id, file, patch_type, patch_method, kind, target, skips, dynamic FROM harmony_fact WHERE 1=1`
+	var args []any
+	if f.Instance != "" {
+		q += ` AND instance_id=?`
+		args = append(args, f.Instance)
+	}
+	if f.Target != "" {
+		if f.Like {
+			q += ` AND instr(lower(target), lower(?)) > 0`
+			args = append(args, f.Target)
+		} else {
+			q += ` AND (target=? OR substr(target, 1, length(?)+1)=? || '(')`
+			args = append(args, f.Target, f.Target, f.Target)
+		}
+	}
+	rows, err := s.DB.Query(q+` ORDER BY target, rowid`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*HarmonyRow
+	for rows.Next() {
+		var h HarmonyRow
+		var sk, dy int
+		if err := rows.Scan(&h.Instance, &h.File, &h.PatchType, &h.PatchMethod, &h.Kind, &h.Target, &sk, &dy); err != nil {
+			return nil, err
+		}
+		h.Skips, h.Dynamic = sk != 0, dy != 0
+		out = append(out, &h)
+	}
+	return out, rows.Err()
+}
+
+// AssemblyRow is a stored assembly.
+type AssemblyRow struct {
+	Instance, File          string
+	Skipped, Manual, UsesHm bool
+	Types, Patches          int
+	Err                     string
+}
+
+// Assemblies returns the stored assemblies of an instance.
+func (s *Store) Assemblies(instanceID string) ([]*AssemblyRow, error) {
+	rows, err := s.DB.Query(`SELECT instance_id, file, skipped, manual, uses_harmony, types, patches, error FROM assembly_fact WHERE instance_id=? ORDER BY rowid`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*AssemblyRow
+	for rows.Next() {
+		var a AssemblyRow
+		var sk, ma, uh int
+		if err := rows.Scan(&a.Instance, &a.File, &sk, &ma, &uh, &a.Types, &a.Patches, &a.Err); err != nil {
+			return nil, err
+		}
+		a.Skipped, a.Manual, a.UsesHm = sk != 0, ma != 0, uh != 0
+		out = append(out, &a)
+	}
+	return out, rows.Err()
+}
+
+// TypeOwners returns the (instance, file) pairs defining a type full name. Nested types are
+// stored with '+'; stack frames may print either.
+func (s *Store) TypeOwners(name string) ([][2]string, error) {
+	alt := strings.ReplaceAll(name, ".", "+")
+	rows, err := s.DB.Query(`SELECT DISTINCT instance_id, file FROM type_fact WHERE type_name IN (?, ?)`, name, alt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out [][2]string
+	for rows.Next() {
+		var a, b string
+		rows.Scan(&a, &b)
+		out = append(out, [2]string{a, b})
+	}
+	if len(out) == 0 && strings.Contains(name, ".") {
+		// Nested types: try replacing the last dot(s) with '+' one at a time.
+		parts := strings.Split(name, ".")
+		for k := len(parts) - 1; k > 1 && len(out) == 0; k-- {
+			cand := strings.Join(parts[:k], ".") + "+" + strings.Join(parts[k:], "+")
+			r, err := s.TypeOwners0(cand)
+			if err != nil {
+				return nil, err
+			}
+			out = r
+		}
+	}
+	return out, rows.Err()
+}
+
+// TypeOwners0 is TypeOwners for an exact stored name.
+func (s *Store) TypeOwners0(name string) ([][2]string, error) {
+	rows, err := s.DB.Query(`SELECT DISTINCT instance_id, file FROM type_fact WHERE type_name=?`, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out [][2]string
+	for rows.Next() {
+		var a, b string
+		rows.Scan(&a, &b)
+		out = append(out, [2]string{a, b})
+	}
+	return out, rows.Err()
+}
+
+// HarmonyIDOwners returns the instances whose assemblies contain the Harmony ID string.
+func (s *Store) HarmonyIDOwners(id string) ([]string, error) {
+	rows, err := s.DB.Query(`SELECT DISTINCT instance_id FROM harmony_id WHERE id=?`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var a string
+		rows.Scan(&a)
+		out = append(out, a)
+	}
+	return out, rows.Err()
 }

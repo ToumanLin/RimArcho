@@ -14,12 +14,13 @@ import (
 	"time"
 
 	"github.com/rimarcho/rimarcho/internal/content"
+	"github.com/rimarcho/rimarcho/internal/harmony"
 	"github.com/rimarcho/rimarcho/internal/scan"
 	"github.com/rimarcho/rimarcho/internal/xdoc"
 )
 
 // Version of the analyzers; facts written by another version are rebuilt (03 §2).
-const Version = 2
+const Version = 3
 
 // Mod is one installed instance.
 type Mod struct {
@@ -80,6 +81,8 @@ type Input struct {
 	// Progress receives one line per phase step (may be nil).
 	Progress func(string)
 	Workers  int
+	// HarmonySkip lists library DLLs (globs) whose Harmony facts are skipped; nil = default.
+	HarmonySkip []string
 	// AfterSimulation is called with the merged document still live (diagnostics).
 	AfterSimulation func()
 }
@@ -95,26 +98,30 @@ type ContentState struct {
 
 // Output of Run.
 type Output struct {
-	Content  map[string]*ContentState // by instance
-	NewDefs  map[string][]DefFact     // instances whose facts were (re)built
-	Patches  []*PatchFact
-	Findings []*Finding
-	Stats    Stats
+	Content    map[string]*ContentState // by instance
+	NewDefs    map[string][]DefFact     // instances whose facts were (re)built
+	Patches    []*PatchFact
+	Assemblies []*AssemblyFacts
+	Findings   []*Finding
+	Stats      Stats
 }
 
 // Stats summarise a run.
 type Stats struct {
-	ActiveMods, InstalledMods int
-	DefFiles, PatchFiles      int
-	Defs, TopOps, UnknownOps  int
-	Failed                    int
-	ParseErrors               int
-	Nodes, TextMB             int
-	IndexHits, IndexRebuilds  int
-	Evaluations               int
-	DefsMs, PatchMs, TotalMs  int64
-	CachedMods                int
-	PeakHeapMB, LiveHeapMB    int
+	ActiveMods, InstalledMods  int
+	DefFiles, PatchFiles       int
+	Defs, TopOps, UnknownOps   int
+	Failed                     int
+	ParseErrors                int
+	Nodes, TextMB              int
+	IndexHits, IndexRebuilds   int
+	Evaluations                int
+	DefsMs, PatchMs, TotalMs   int64
+	CachedMods                 int
+	PeakHeapMB, LiveHeapMB     int
+	Assemblies, AssemblyErrors int
+	HarmonyPatches, Types      int
+	HarmonyMs                  int64
 }
 
 func (in *Input) progress(f string, a ...any) {
@@ -325,6 +332,24 @@ func Run(in Input) (*Output, error) {
 	out.Findings = append(out.Findings, sim.parentFindings(origin, tops, isActive)...)
 	out.Findings = append(out.Findings, sim.findings(tops, out.Patches)...)
 	out.Stats.PatchMs = time.Since(t1).Milliseconds()
+
+	// Harmony layer (independent of the others).
+	t2 := time.Now()
+	skip := in.HarmonySkip
+	if skip == nil {
+		skip = harmony.DefaultSkip
+	}
+	out.Assemblies = harmonyLayer(active, folders, skip, in.Workers)
+	for _, a := range out.Assemblies {
+		out.Stats.Assemblies++
+		out.Stats.HarmonyPatches += len(a.Patches)
+		out.Stats.Types += len(a.Types)
+		if a.Err != "" {
+			out.Stats.AssemblyErrors++
+		}
+	}
+	out.Findings = append(out.Findings, harmonyFindings(active, out.Assemblies)...)
+	out.Stats.HarmonyMs = time.Since(t2).Milliseconds()
 	out.Stats.TotalMs = time.Since(t0).Milliseconds()
 	in.progress("done: %d failed operations, %d findings, %v", out.Stats.Failed, len(out.Findings), time.Since(t0).Round(time.Millisecond))
 	runtime.KeepAlive(doc)
