@@ -460,3 +460,40 @@ func versionRow(vs []*app.Problem, st *app.LoadoutState, mm string) *app.Problem
 	}
 	return &app.Problem{Finding: f, Ref: "p:version"}
 }
+
+// chooseLog picks Player.log or Player-prev.log; its clusters join the Problems view as
+// log.* problems (06 §4, §7.3).
+func (m *model) chooseLog() tea.Cmd {
+	if m.st == nil {
+		return nil
+	}
+	cur, prev := m.app.LogPaths(m.st)
+	if cur == "" {
+		m.status = T("no Player.log found")
+		return nil
+	}
+	p := &panel{title: T("analyze which log? (enter)"), choices: []string{cur}}
+	if prev != "" {
+		p.choices = append(p.choices, prev)
+	}
+	p.onPick = func(m *model, path string) tea.Cmd {
+		if err := m.app.SelectLog(m.st, path); err != nil {
+			m.openPanel(T("error: "), err.Error(), nil)
+			return nil
+		}
+		m.newLog = false
+		m.tab = tabProblems
+		m.prob.cursor, m.prob.off = 0, 0
+		m.loadProblems()
+		n := 0
+		for _, x := range m.prob.list {
+			if strings.HasPrefix(x.Code, "log.") {
+				n++
+			}
+		}
+		m.status = Tf("log analyzed: %d problems", n)
+		return m.ensureProblems()
+	}
+	m.panel = p
+	return nil
+}

@@ -67,7 +67,7 @@ func sourceCmd(c *Ctx, a *Args) (*render.Doc, error) {
 				code.Addf("… %d more lines (archo source %s --type %s --all)", len(lines)-limit, st.Ix.Ref(m.ID), t)
 				break
 			}
-			code.Addf("%4d  %s", i+1, strings.TrimRight(l, "\r"))
+			code.Addf("%4d  %s", i+1, strings.ReplaceAll(strings.TrimRight(l, "\r"), "\t", "    "))
 		}
 		return d, nil
 	}

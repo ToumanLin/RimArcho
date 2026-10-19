@@ -132,6 +132,10 @@ var zhText = map[string]string{
 	"problems":                              "问题",
 	"rules":                                 "规则",
 	"history":                               "历史",
+	"new log (l)":                           "新日志（l）",
+	"no Player.log found":                   "未找到 Player.log",
+	"analyze which log? (enter)":            "分析哪个日志？（enter）",
+	"log analyzed: %d problems":             "日志分析完成：%d 个问题",
 	helpText:                                helpTextZh,
 }
 
@@ -144,7 +148,7 @@ const helpTextZh = `列表视图（06 §3）
   x        同谱系切换副本     L              启动游戏
   enter    检查               r              为此 Mod 添加规则
   /        搜索               f              筛选：全部/已启用/未启用/不可加载
-  R        重新扫描（子进程）
+  R        重新扫描（子进程）    l              分析 Player.log（或上一次的）
 问题视图：enter 展开 / 检查   a 运行建议命令（tab 选择）   i 忽略
           I 显示已忽略   s 级别   o 检查该 Mod   A 重新分析（子进程）
 视图：1 列表 · 2 问题 · 3 变更      E 切换环境

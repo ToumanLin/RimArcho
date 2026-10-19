@@ -121,6 +121,7 @@ type model struct {
 	inspHist []*inspectView
 
 	prob        probState
+	newLog      bool
 	analyzing   bool
 	analyzeWait func() tea.Msg
 
@@ -285,6 +286,7 @@ func (m *model) reload() {
 			delete(m.marked, id)
 		}
 	}
+	_, m.newLog = m.app.NewLog(st)
 	if qs, err := m.app.Store.Questions(st.Ix.Env.ID, false); err == nil {
 		m.question = len(qs)
 	}

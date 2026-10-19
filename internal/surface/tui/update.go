@@ -20,7 +20,7 @@ const helpText = `list view (06 §3)
   x        swap within lineage L             launch the game
   enter    inspect            r              add a rule for this mod
   /        search             f              filter: all/enabled/disabled/unloadable
-  R        rescan (child process)
+  R        rescan (child process)        l              analyze Player.log (or the previous one)
 problems view: enter expand / inspect   a run the suggested command (tab picks)   i ignore
                I show ignored   s severity   o inspect the mod   A re-analyze (child process)
 views: 1 list · 2 problems · 3 changes      E switch environment
@@ -133,6 +133,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return nil
 	case "E":
 		return m.chooseEnv()
+	case "l":
+		return m.chooseLog()
 	case "R":
 		return m.startScan()
 	}

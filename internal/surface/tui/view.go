@@ -124,6 +124,9 @@ func (m *model) statusLine() string {
 	if m.scanning {
 		parts = append(parts, T("scanning…"))
 	}
+	if m.newLog {
+		parts = append(parts, stWarn.Render(T("new log (l)")))
+	}
 	return fit(strings.Join(parts, " · "), m.w)
 }
 
