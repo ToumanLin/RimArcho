@@ -154,3 +154,15 @@ CLI 命令：`env list|detect|add|set|use|rebind`、`scan [--full]`、`status`�
 7. **UTF-16 编码的 About.xml**：未处理，真实环境中没有遇到。
 8. **macOS 和 Linux**：只验证了能编译，没有运行测试；junction 测试在这两个平台上改用符号链接。
 9. `spikes/` 保留在仓库中，`go vet ./...` 会包含它们。
+
+## 6. 主会话裁定（2026-10-19，M1 核对后）
+
+| 遗留问题 | 裁定 | 落实位置 |
+| --- | --- | --- |
+| 1 相似度定义 | 改为 `max(J(路径), J(哈希))`，删除 `J(路径, 哈希)` 项 | 02 §4.3；在 M2 中实现并补测试（重组目录、只改内容） |
+| 2 RimCrow 停用的工坊 Mod | 读取 `About.xml.disabled` 建 Instance，标记 `unloadable: about-disabled`，不能加入 Loadout，RimArcho 不改回文件名 | 02 §4.1；在 M2 中实现 |
+| 3 TUI 内存 | TUI 以子进程调用 `archo scan`，主进程不做扫描 | M2 |
+| 4 移除来源和环境 | 补 `env remove` 和移除 `steamcmd`/`extra` 来源的命令，并补进 05 §3 | M2 |
+| 5–9 | 维持现状，不阻塞 M2 | — |
+
+另外：04 §2.2 第 5 条改为保存时写入当前游戏版本，并在版本不一致时提示、阻止启动（玩家当前就是 1.6 列表对 1.7 游戏的情况）。
