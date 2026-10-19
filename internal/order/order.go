@@ -96,6 +96,44 @@ type Edge struct {
 type Cycle struct {
 	Members []int
 	Edges   []Edge
+	Suggest int // index into Edges of the edge suggested for an ignore rule; -1: none
+}
+
+// suggestRank orders constraint kinds by how readily an ignore rule should drop them
+// (04 §4.2): community rules, then About.xml load rules, then dependencies. User rules
+// are never suggested — the user removes them instead.
+func suggestRank(k string) int {
+	switch k {
+	case KindCommunity:
+		return 0
+	case KindLoadAfter, KindLoadBefore, KindForceAft, KindForceBef:
+		return 1
+	case KindDependency:
+		return 2
+	case KindOfficial:
+		return 3
+	}
+	return -1
+}
+
+// suggest picks the edge to ignore: the best-ranked kind, and among equals the edge that
+// conflicts with the current order (From currently after To), then the first.
+func suggest(edges []Edge) int {
+	best, bestKey := -1, 0
+	for i, e := range edges {
+		r := suggestRank(e.C.Kind)
+		if r < 0 || e.C.Ref == "" {
+			continue
+		}
+		key := r * 2
+		if e.From < e.To {
+			key++ // agrees with the current order
+		}
+		if best < 0 || key < bestKey {
+			best, bestKey = i, key
+		}
+	}
+	return best
 }
 
 // Result of Sort.
@@ -313,6 +351,7 @@ func Sort(in Input) Result {
 				cy.Edges = append(cy.Edges, e)
 			}
 		}
+		cy.Suggest = suggest(cy.Edges)
 		res.Cycles = append(res.Cycles, cy)
 	}
 	sort.Slice(res.Cycles, func(a, b int) bool { return res.Cycles[a].Members[0] < res.Cycles[b].Members[0] })

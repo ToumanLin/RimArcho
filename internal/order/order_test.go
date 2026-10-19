@@ -80,6 +80,11 @@ func TestS2CycleAndS3Ignore(t *testing.T) {
 	if !slices.Equal(fields, []string{"x.one:loadAfter->y.two", "y.two:loadAfter->x.one"}) {
 		t.Fatalf("cycle edges = %v", fields)
 	}
+	// Suggested ignore: same kind on both edges, so the one against the current order
+	// (x.one loadAfter y.two, while x.one is listed first).
+	if sg := r.Cycles[0].Suggest; sg < 0 || in.Nodes[r.Cycles[0].Edges[sg].C.Owner].PackageID != "x.one" {
+		t.Fatalf("suggest = %d", sg)
+	}
 	// Cycle members keep their relative order; the rest still sorts.
 	if got := pkgs(in, r); !slices.Equal(got, []string{"ludeon.rimworld", "x.one", "y.two", "z.free"}) && !slices.Equal(got, []string{"ludeon.rimworld", "x.one", "z.free", "y.two"}) {
 		t.Fatalf("order = %v", got)
@@ -90,6 +95,27 @@ func TestS2CycleAndS3Ignore(t *testing.T) {
 	got := pkgs(in, r)
 	if len(r.Cycles) != 0 || r.Ignored != 1 || slices.Index(got, "y.two") > slices.Index(got, "x.one") {
 		t.Fatalf("with ignore: %v cycles %d ignored %d", got, len(r.Cycles), r.Ignored)
+	}
+}
+
+type fakeCommunity map[string][]string
+
+func (f fakeCommunity) Rules(pkg string) ([]string, []string) { return f[pkg], nil }
+
+func TestCycleSuggestPrefersCommunity(t *testing.T) {
+	nodes := []Node{
+		node("a.mod", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "b.mod"}}}),
+		node("b.mod", scan.Decl{}),
+	}
+	// Dependency: b before a (conflicts with current order); community: a before b.
+	in := Input{Nodes: nodes, Community: fakeCommunity{"b.mod": {"a.mod"}}}
+	r := Sort(in)
+	if len(r.Cycles) != 1 {
+		t.Fatalf("cycles = %+v", r.Cycles)
+	}
+	cy := r.Cycles[0]
+	if cy.Suggest < 0 || cy.Edges[cy.Suggest].C.Kind != KindCommunity {
+		t.Fatalf("suggest = %+v", cy)
 	}
 }
 

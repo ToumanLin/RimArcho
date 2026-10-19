@@ -257,9 +257,9 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 					refs = append(refs, st.Ix.Ref(nd.Instance))
 				}
 			}
-			p := pr.Addf("error order.cycle  %s  (kept in current order)", strings.Join(refs, " "))
+			p := pr.Addf("warning order.cycle  %s  (kept in current order)", strings.Join(refs, " "))
 			seen := map[string]bool{}
-			for _, e := range cy.Edges {
+			for i, e := range cy.Edges {
 				ev, ig := constraintText(st, r.Input, e)
 				if seen[ev] {
 					continue
@@ -271,19 +271,16 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 				} else {
 					line += "  (ignore: " + ig + ")"
 				}
+				if i == cy.Suggest {
+					line += "  [suggested]"
+				}
 				p.Add(line)
 			}
 			p.Truncate(12, "")
 		}
-		var first string
-		for _, e := range r.Result.Cycles[0].Edges {
-			if _, ig := constraintText(st, r.Input, e); !strings.HasPrefix(ig, "archo ") {
-				first = ig
-				break
-			}
-		}
-		if first != "" {
-			d.AddNext("archo rule add ignore " + first)
+		if cy := r.Result.Cycles[0]; cy.Suggest >= 0 {
+			_, ig := constraintText(st, r.Input, cy.Edges[cy.Suggest])
+			d.AddNext("archo rule add ignore " + ig)
 		}
 	}
 	root.KV("constraints", fmt.Sprintf("%d edges, %d ignored by rules", len(r.Result.Edges), r.Result.Ignored))
