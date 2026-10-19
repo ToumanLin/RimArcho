@@ -23,6 +23,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     problems ignore <p:ref>                   ignore a problem until its mod changes
     problems unignore <p:ref>                 stop ignoring a problem
     files search <pattern>                    search the effective content of enabled mods
+    source <ref>                              decompile a mod's assemblies on demand (ilspycmd; cached per DLL hash)
+    source search <pattern>                   search decompiled C# (uncached assemblies are decompiled first)
     analyze                                   rebuild the Def and Patch facts (normally run on demand as a child process)
     changes [<ref>]                           change events (default: the last scan)
     enable <ref…>                             add mods to the workspace Loadout

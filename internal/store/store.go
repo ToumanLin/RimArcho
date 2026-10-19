@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 5
+const SchemaVersion = 6
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -145,6 +145,13 @@ CREATE TABLE harmony_id(instance_id TEXT NOT NULL, file TEXT NOT NULL, id TEXT N
 CREATE INDEX harmony_id_id ON harmony_id(id);
 `
 
+// schemaV6 (M4): decompile history per DLL hash (survives a deleted source cache).
+const schemaV6 = `
+CREATE TABLE source_cache(
+  dll_hash TEXT NOT NULL, instance_id TEXT NOT NULL, file TEXT NOT NULL, status TEXT NOT NULL,
+  error TEXT NOT NULL DEFAULT '', decompiled_at INTEGER NOT NULL, PRIMARY KEY(dll_hash, instance_id));
+`
+
 // Store wraps the database handle.
 type Store struct {
 	DB   *sql.DB
@@ -184,7 +191,7 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {

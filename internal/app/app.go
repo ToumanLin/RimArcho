@@ -48,6 +48,8 @@ type App struct {
 	// AnalyzeRunner brings the Def/Patch analysis up to date; nil means the `archo analyze`
 	// child process (03 §3). Tests run it in-process.
 	AnalyzeRunner func(envName string, progress func(string)) error
+	// Decompile replaces ilspycmd (tests); nil means ILSpyDecompiler.
+	Decompile Decompiler
 	// GameVersion ("X.Y") overrides the environment's game version for analysis commands.
 	GameVersion string
 
@@ -58,7 +60,8 @@ type App struct {
 	prCache *ProblemSet
 	prKey   string
 
-	logCache *logCacheEntry
+	logCache   *logCacheEntry
+	harmonyDir string
 }
 
 // Open opens (creating if needed) the data directory home.
