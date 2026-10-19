@@ -32,8 +32,9 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	defer ap.Close()
 	ap.EnvName = envName
-	if len(rest) == 0 {
-		// No command: the TUI (06). Scans run as a child process of this executable.
+	if len(rest) == 0 || (len(rest) == 1 && rest[0] == "tui") {
+		// No command, or `archo tui` (what the WezTerm host runs, 06 §1.1): the TUI.
+		// Scans run as a child process of this executable.
 		if err := tui.Run(tui.Options{App: ap, ScanOnStart: true}); err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return cmds.ExitError
