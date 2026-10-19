@@ -696,6 +696,7 @@ func TestColumnSearch(t *testing.T) {
 		"hmy":                      "Harmony | ", // the fallback: letters in order
 		`"alpha"`:                  "Alpha | ",
 	} {
+		m.content = nil // each query loads what it needs itself
 		if got := all(q); got != want {
 			t.Errorf("%q: got %q, want %q", q, got, want)
 		}

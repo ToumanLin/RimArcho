@@ -55,11 +55,14 @@ func parseQuery(q string) []term {
 	return out
 }
 
+// contentTypes are the type: values answered from the file lists.
+var contentTypes = map[string]bool{"assembly": true, "xml": true, "xml-only": true, "language": true, "language-pack": true, "lang": true}
+
 // needsContent reports whether a query uses the content kinds (one query over the file
 // lists, made only then).
 func needsContent(ts []term) bool {
 	for _, t := range ts {
-		if t.field == "type" && (t.value == "assembly" || t.value == "xml" || t.value == "language") {
+		if t.field == "type" && contentTypes[t.value] {
 			return true
 		}
 	}
