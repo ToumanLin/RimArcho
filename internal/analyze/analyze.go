@@ -55,6 +55,8 @@ type Input struct {
 	// Progress receives one line per phase step (may be nil).
 	Progress func(string)
 	Workers  int
+	// AfterSimulation is called with the merged document still live (diagnostics).
+	AfterSimulation func()
 }
 
 // ContentState is the effective content of one instance.
@@ -87,7 +89,7 @@ type Stats struct {
 	Evaluations               int
 	DefsMs, PatchMs, TotalMs  int64
 	CachedMods                int
-	PeakHeapMB                int
+	PeakHeapMB, LiveHeapMB    int
 }
 
 func (in *Input) progress(f string, a ...any) {
@@ -100,7 +102,7 @@ func (in *Input) progress(f string, a ...any) {
 func Run(in Input) (*Output, error) {
 	t0 := time.Now()
 	if in.Workers <= 0 {
-		in.Workers = max(2, runtime.NumCPU())
+		in.Workers = min(max(2, runtime.NumCPU()), 8)
 	}
 	var active, inactive []*Mod
 	for _, m := range in.Mods {
@@ -271,6 +273,12 @@ func Run(in Input) (*Output, error) {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	out.Stats.PeakHeapMB = int(ms.HeapInuse >> 20)
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	out.Stats.LiveHeapMB = int(ms.HeapInuse >> 20)
+	if in.AfterSimulation != nil {
+		in.AfterSimulation()
+	}
 
 	// Facts and findings.
 	kb := newKnowledge(in.Mods, allDefs)
@@ -295,7 +303,7 @@ func Run(in Input) (*Output, error) {
 func defFact(d *xdoc.Doc, t int32, file string, line int) DefFact {
 	f := DefFact{Type: d.Name(t), File: file, Line: line}
 	if c := d.Child(t, "defName"); c != xdoc.None {
-		f.DefName = strings.TrimSpace(d.InnerText(c))
+		f.DefName = strings.Clone(strings.TrimSpace(d.InnerText(c))) // detach from the doc's text pages
 	}
 	f.Name, _ = d.Attr(t, "Name")
 	f.Parent, _ = d.Attr(t, "ParentName")
@@ -306,7 +314,7 @@ func defFact(d *xdoc.Doc, t int32, file string, line int) DefFact {
 }
 
 // parseOrdered reads and tokenises files on several goroutines and calls fn for each in
-// order. At most 4×workers files are held in memory at once.
+// order. At most 2×workers files are held in memory at once.
 func parseOrdered(paths []string, workers int, fn func(i int, evs []xdoc.Event, err error)) {
 	type res struct {
 		evs []xdoc.Event
@@ -316,7 +324,7 @@ func parseOrdered(paths []string, workers int, fn func(i int, evs []xdoc.Event, 
 	for i := range slots {
 		slots[i] = make(chan res, 1)
 	}
-	sem := make(chan struct{}, workers*4)
+	sem := make(chan struct{}, workers*2)
 	next := make(chan int)
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {

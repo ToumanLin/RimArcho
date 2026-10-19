@@ -1,6 +1,6 @@
 // Package xdoc is a compact, mutable XML node store for the Patch simulation (07 §6.1
 // item 2): nodes live in chunked arenas linked by int32 indices, element and attribute
-// names are interned, and text is appended to one byte buffer. It implements
+// names are interned, and text is appended to fixed-size pages. It implements
 // xpath.NodeNavigator, so antchfx/xpath evaluates expressions over it directly.
 //
 // Parsing follows the game's LoadableXmlAsset: comments, processing instructions and
@@ -44,7 +44,9 @@ const chunkSize = 1 << chunkBits
 type Doc struct {
 	chunks [][]node
 	n      int32
-	text   []byte
+	pages  [][]byte // text pages, append-only; strings never span pages
+	big    []string // texts too large for a page
+	tbytes int
 	names  *Names
 	attrs  [][]Attr // attrs[0] is unused
 
@@ -108,17 +110,58 @@ func (d *Doc) Names() *Names { return d.names }
 func (d *Doc) Len() int { return int(d.n) }
 
 // TextBytes is the size of the text buffer.
-func (d *Doc) TextBytes() int { return len(d.text) }
+func (d *Doc) TextBytes() int { return d.tbytes }
+
+const (
+	pageBits = 20
+	pageSize = 1 << pageBits
+	bigFlag  = 1 << 31
+)
+
+// putText stores s and returns its offset code. Pages are never reallocated, so strings
+// returned by Text stay valid and keep only their own page alive.
+func (d *Doc) putText(s string) uint32 {
+	d.tbytes += len(s)
+	if len(s) >= pageSize/16 {
+		d.big = append(d.big, s)
+		return uint32(len(d.big)-1) | bigFlag
+	}
+	if len(d.pages) == 0 || len(d.pages[len(d.pages)-1])+len(s) > cap(d.pages[len(d.pages)-1]) {
+		size := pageSize
+		if len(d.pages) == 0 {
+			size = 4096 // small documents stay small
+		} else if c := cap(d.pages[len(d.pages)-1]); c < pageSize {
+			size = min(c*4, pageSize)
+		}
+		d.pages = append(d.pages, make([]byte, 0, size))
+	}
+	pg := len(d.pages) - 1
+	off := len(d.pages[pg])
+	d.pages[pg] = append(d.pages[pg], s...)
+	return uint32(pg)<<pageBits | uint32(off)
+}
 
 func (d *Doc) at(i int32) *node { return &d.chunks[i>>chunkBits][i&(chunkSize-1)] }
 
+// alloc appends a node. The first chunk grows like a slice (small documents stay small);
+// later chunks are allocated at full size. Pointers from at() are invalid after alloc.
 func (d *Doc) alloc(k Kind) int32 {
 	i := d.n
-	if int(i>>chunkBits) == len(d.chunks) {
+	nd := node{parent: None, first: None, last: None, next: None, prev: None, name: -1, kind: k}
+	c := int(i >> chunkBits)
+	switch {
+	case c == len(d.chunks) && c == 0:
+		d.chunks = append(d.chunks, make([]node, 0, 16))
+		fallthrough
+	case c == 0:
+		d.chunks[0] = append(d.chunks[0], nd)
+	case c == len(d.chunks):
 		d.chunks = append(d.chunks, make([]node, chunkSize))
+		fallthrough
+	default:
+		d.chunks[c][i&(chunkSize-1)] = nd
 	}
 	d.n++
-	*d.at(i) = node{parent: None, first: None, last: None, next: None, prev: None, name: -1, kind: k}
 	return i
 }
 
@@ -133,8 +176,7 @@ func (d *Doc) NewElement(name string) int32 {
 func (d *Doc) NewText(s string) int32 {
 	i := d.alloc(KindText)
 	n := d.at(i)
-	n.textOff, n.textLen = uint32(len(d.text)), uint32(len(s))
-	d.text = append(d.text, s...)
+	n.textOff, n.textLen = d.putText(s), uint32(len(s))
 	return i
 }
 
@@ -177,7 +219,11 @@ func (d *Doc) Text(i int32) string {
 	if n.textLen == 0 {
 		return ""
 	}
-	return unsafe.String(&d.text[n.textOff], int(n.textLen))
+	if n.textOff&bigFlag != 0 {
+		return d.big[n.textOff&^bigFlag]
+	}
+	pg := d.pages[n.textOff>>pageBits]
+	return unsafe.String(&pg[n.textOff&(pageSize-1)], int(n.textLen))
 }
 
 // InnerText concatenates the text of i's descendants (XmlNode.InnerText).
@@ -340,7 +386,7 @@ func (d *Doc) InsertAfter(ref, c int32) {
 
 // Clone deep-copies node i of src into d (detached) and returns the copy.
 func (d *Doc) Clone(src *Doc, i int32) int32 {
-	sn := src.at(i)
+	sn := *src.at(i) // a copy: allocation below may move src's nodes when src == d
 	var c int32
 	switch sn.kind {
 	case KindText:
@@ -389,9 +435,9 @@ func (d *Doc) Normalize(p int32) {
 		}
 		if cn.kind == KindText && d.at(nx).kind == KindText {
 			s := d.Text(c) + d.Text(nx)
+			off := d.putText(s)
 			cn = d.at(c)
-			cn.textOff, cn.textLen = uint32(len(d.text)), uint32(len(s))
-			d.text = append(d.text, s...)
+			cn.textOff, cn.textLen = off, uint32(len(s))
 			d.Detach(nx)
 			continue
 		}

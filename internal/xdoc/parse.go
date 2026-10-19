@@ -29,7 +29,7 @@ func Parse(b []byte) ([]Event, error) {
 	b = bytes.TrimPrefix(b, []byte{0xEF, 0xBB, 0xBF})
 	dec := xml.NewDecoder(bytes.NewReader(b))
 	dec.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }
-	evs := make([]Event, 0, len(b)/24)
+	evs := make([]Event, 0, len(b)/64)
 	depth := 0
 	var text strings.Builder
 	textLine := int32(0)
