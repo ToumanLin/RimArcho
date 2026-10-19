@@ -165,3 +165,47 @@ shown), §5.5 (search), §5.6 (tags), §6.1 (the detail), and §6.4 (description
 Screenshots (gitignored), WezTerm on the data copy, zh:
 `spikes/wezterm-v0/shots/info-desc-column.png`, `info-desc-full.png`, `info-search.png`,
 `info-tags-prompt.png`.
+
+# V3: layered details, thumbnail, full-screen details
+
+06 §10 V3: the layered detail, wrapping, the thumbnail and the full-screen detail (T6, T7).
+Parts of the detail (the non-technical section, the description, inline images) came
+with the previous round; V3 adds the rest.
+
+## Decisions
+
+1. **Thumbnail** (06 §6.2): `About/Preview.png` (any case; JPEG content is accepted) is scaled to
+   360 px wide and cached as PNG under `<home>/cache/previews/<snapshot hash>.png`. The mod folder is
+   only read. In the column the block is 18×9 cells, always reserved; the image takes the fewest
+   rows that hold it (16:9 → 5), padded to exactly 18×N cells, `preserveAspectRatio=0`.
+   - It is drawn only after the cursor has rested 150 ms on the mod.
+   - On any selection change it disappears in the next frame, and the whole 18×9 block is erased
+     with ECH in the same write.
+   - A mod without Preview.png shows a faint "无预览" in the block.
+   - Below 16 text cells beside the block there is no block.
+   - The compatibility mode has no block, and the name starts at the top (§1.3 updated to match §6.1).
+2. **Image cache**: encoded images (thumbnails and description images) are kept for at most 24
+   entries; the ones not on screen are dropped first. This bounds the TUI's largest allocations.
+3. **Full-screen detail** (06 §6.3): `enter`, 36×18 thumbnail, and five numbered sub-sections.
+   - The sub-sections are Def, 补丁, Harmony, 规则 and 完整历史; `1`–`5` jump to them.
+   - Def, patches and Harmony come from the CLI commands' text, with `#refs` replaced by names.
+     Each shows at most 60 lines; `tab` opens the technical pages for the rest.
+   - 规则 is About.xml's declared order plus the player's rules that name the mod, written in words.
+   - 完整历史 is every change event of the mod, newest first.
+   - The column shows a one-line history: the three newest events, e.g. "10 月 19 日首次发现".
+4. **Wrapping** (T7): every text in the detail wraps by display width.
+   - `wrap()` now shares the description's token wrapper. It breaks at spaces and between CJK
+     characters, never inside a Latin word.
+   - It follows the kinsoku rules, breaks over-long paths after `\` or `/`, and keeps a line's indent.
+   - Status lines, description headers, long dependency names and the footer wrap instead of being
+     cut. Only the column's "… enter shows all" and BBCode tables (wide columns) still use "…".
+
+## Verification
+
+| Test | Result |
+| --- | --- |
+| T6 thumbnail after 150 ms, no ghost on fast scroll | `TestT6Thumbnail`: nothing before the dwell, the dwell tick waits ≥ 150 ms, then `width=18;height=5;preserveAspectRatio=0`. Moving on removes it and erases all 9 rows (`ECH 18`) in the same write. 20 fast moves with stale ticks never draw it. No Preview.png shows "无预览". One cache file. `TestPreview` covers the app side (case-insensitive name, 360 px, no upscaling, cache hit without the source) |
+| T7 long description, long path, mixed CJK and English | `TestT7Wrapping`: widths 24–80, column and full screen, with and without the block, technical information open and folded. No line wider than the column, nothing cut with "…". `TestWrap` adds the mid-word, indent and path cases |
+| Sub-sections | `TestFullSections`: five headers with counts, the player's rule in words, the history, `1`–`5` jumps, no `#ref`, every line within the width |
+| T5 memory (gate ≤ 80 MB) | `spikes/tuiv2-v0/v3mem.ps1` on the data copy: rest 400 ms on each of 40 mods (41 thumbnails cached), open one full-screen detail, idle 60 s. archo working set **45.7 MB** idle, peak 53.5 MB. wezterm-gui 161 MB (V0: 91 MB; not investigated, possibly image textures) |
+| T1 after V3 | real-size copy: max 7.6 ms per key (was 1.75 ms; the token wrapper costs more), first frame 105 ms |

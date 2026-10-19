@@ -54,12 +54,12 @@
 
 在其他终端中运行时（RimArcho 无法控制别的终端用什么字体）：
 - 图标换成 §3 表格中的 Unicode 备用字符；如果玩家自己的终端已经在用 Nerd Font，可以用 `archo config set ui.icons nerd` 打开图标；
-- 不显示缩略图，详情顶部改为一行淡色的“无预览”；
+- 不显示缩略图，也不预留缩略图区，名称顶格（§6.1；V3 裁定：与 §6.1 统一，不再加一行“无预览”）。WezTerm 中没有 Preview.png 的 Mod 在预留区中央显示淡色的“无预览”；
 - 其余布局和交互完全相同。
 
 ### 1.4 资源
 
-WezTerm 是独立进程，有自己的 GPU 和内存开销。V0 实测（07 §6.2）：承载 archo 空闲时 wezterm-gui 工作集约 91 MB，OpenConsole 约 12 MB；启动到窗口可见约 0.5 秒（首次约 1.2 秒）。01 §5.2 的“TUI ≤ 80 MB”仍然只约束 archo 进程本身。
+WezTerm 是独立进程，有自己的 GPU 和内存开销。V0 实测（07 §6.2）：承载 archo 空闲时 wezterm-gui 工作集约 91 MB，OpenConsole 约 12 MB；启动到窗口可见约 0.5 秒（首次约 1.2 秒）。01 §5.2 的“TUI ≤ 80 MB”仍然只约束 archo 进程本身。V3 实测（数据目录副本，依次停留 40 个 Mod 显示缩略图并打开一次全屏详情后空闲 60 秒）：archo 工作集 45.7 MB，峰值 53.5 MB；wezterm-gui 约 161 MB，比 V0 的 91 MB 高，原因未查（可能是图片纹理）。
 
 WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI 套接字和日志，这个位置不能通过配置改变；RimArcho 的说明和卸载说明要提到它。
 
@@ -293,6 +293,11 @@ WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI �
 ### 6.3 全屏详情
 
 在详情列按 `enter`（窄终端下在列表里按），打开全屏详情，结构与 §6.1 相同，缩略图更大，并增加子区：Def、补丁、Harmony、规则、完整历史。全屏详情整体可滚动（`↑↓` `PgUp` `PgDn` `g` `G`），简介显示全文。
+
+- 缩略图在全屏详情中预留 36×18 格，规则同 §6.2。
+- 子区按 1–5 编号，按数字键跳到对应子区。每个子区最多显示 60 行，其余用 `tab` 打开技术页面查看。
+- 规则子区列出 About.xml 声明的排序（loadAfter、loadBefore、incompatibleWith）和玩家自己写的、涉及这个 Mod 的规则，都写成人话。完整历史按时间倒序列出这个 Mod 的全部变化事件。
+- 顶部是面包屑：`RimArcho › 列名 › Mod 名`。
 
 ### 6.4 简介的来源（2026-10-19 调研）
 
