@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>netstandard2.0</TargetFramework><AssemblyName>ModManual</AssemblyName><Deterministic>true</Deterministic></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../FakeHarmony/FakeHarmony.csproj" /><ProjectReference Include="../FakeGame/FakeGame.csproj" /></ItemGroup>
+</Project>

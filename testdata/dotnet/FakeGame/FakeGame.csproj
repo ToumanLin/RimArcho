@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>netstandard2.0</TargetFramework><AssemblyName>Assembly-CSharp</AssemblyName><Deterministic>true</Deterministic></PropertyGroup>
+</Project>
