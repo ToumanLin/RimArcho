@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -63,7 +64,11 @@ type App struct {
 	// LogCacheOnly makes Problems use a stored log report only, never parse the log
 	// (status and mod: commands that are not about the log).
 	LogCacheOnly bool
-	analyzing    *pendingAnalysis
+	// HTTP and SteamAPI reach the Steam Workshop for descriptions (06 §6.4); nil and ""
+	// mean a 15-second client and the public endpoint. Tests replace both.
+	HTTP      *http.Client
+	SteamAPI  string
+	analyzing *pendingAnalysis
 
 	ixCache *Index
 	ixKey   string

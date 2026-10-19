@@ -13,6 +13,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     list                                      list mods
     find <words…>                             search by name, package id, author, workshop id, folder
     mod <ref>                                 mod details
+    describe <ref>                            a mod's description: About.xml and the Workshop page (fetched on demand, cached)
     def [<Type/defName>]                      who defines and patches a Def; or the Defs of a mod
     patches                                   Patch operations and their simulated outcome
     harmony                                   Harmony patches: of a mod, on a target method, or shared between mods
@@ -60,7 +61,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     lineage merge <ref> <ref>                 merge the second lineage into the first
     gc                                        remove expired tombstones and superseded snapshots
     config get [<key>]                        show settings
-    config set <key> <value>                  change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off)
+    config set <key> <value>                  change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off)
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     version                                   print the RimArcho version
   references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>

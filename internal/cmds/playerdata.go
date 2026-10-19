@@ -15,7 +15,8 @@ func init() {
 		Flags: []Flag{{Name: "clear"}}})
 	register(&Command{Name: "note", Args: "<ref> [<text>]", Summary: "attach a plain-text note to a mod (all its copies)", MinArgs: 1, MaxArgs: 2, Run: noteCmd,
 		Flags: []Flag{{Name: "clear"}}})
-	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list", Summary: "tags for filtering (list --filter tag:<tag>)", MinArgs: 1, MaxArgs: -1, Run: tagCmd})
+	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list", Summary: "tags for filtering (list --filter tag:<tag>)", MinArgs: 1, MaxArgs: -1, Run: tagCmd,
+		Flags: []Flag{{Name: "mod", Value: "<ref>", Multi: true, Help: "more mods to tag (add/remove)"}}})
 }
 
 func playerTarget(c *Ctx, ref string) (*store.Mod, string, error) {
@@ -97,37 +98,59 @@ func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return d, nil
 	case "add", "remove":
 		if len(a.Pos) < 3 {
-			return nil, &UsageError{Msg: "tag " + a.Pos[0] + " <ref> <tag…>"}
+			return nil, &UsageError{Msg: "tag " + a.Pos[0] + " <ref> <tag…> [--mod <ref>]…"}
 		}
-		m, err := ix.ResolveOne(a.Pos[1])
-		if err != nil {
-			return nil, err
-		}
-		var changed, same []string
-		for _, t := range a.Pos[2:] {
-			t = strings.TrimSpace(t)
-			if t == "" {
-				continue
-			}
-			var ok bool
-			if a.Pos[0] == "add" {
-				ok, err = c.App.Store.AddTag(ix.Env.ID, m.LineageID, t)
-			} else {
-				ok, err = c.App.Store.RemoveTag(ix.Env.ID, m.LineageID, t)
-			}
+		var mods []*store.Mod
+		for _, r := range append([]string{a.Pos[1]}, a.List("mod")...) {
+			m, err := ix.ResolveOne(r)
 			if err != nil {
 				return nil, err
 			}
-			if ok {
-				changed = append(changed, t)
-			} else {
-				same = append(same, t)
+			mods = append(mods, m)
+		}
+		var tags []string
+		for _, t := range a.Pos[2:] {
+			if t = strings.TrimSpace(t); t != "" {
+				tags = append(tags, t)
 			}
 		}
 		verb := map[string]string{"add": "tagged", "remove": "untagged"}[a.Pos[0]]
-		d, root := render.New(fmt.Sprintf("%s %s: %s", verb, modLabel(ix, m.ID), strings.Join(changed, ", ")))
-		if len(same) > 0 {
-			root.KV("unchanged", strings.Join(same, ", "))
+		var d *render.Doc
+		var root *render.Node
+		if len(mods) == 1 {
+			d, root = render.New(fmt.Sprintf("%s %s: %s", verb, modLabel(ix, mods[0].ID), strings.Join(tags, ", ")))
+		} else {
+			d, root = render.New(fmt.Sprintf("%s %s: %s", verb, render.Plural(len(mods), "mod"), strings.Join(tags, ", ")))
+		}
+		seen := map[string]bool{} // copies of one lineage share tags
+		for _, m := range mods {
+			if seen[m.LineageID] {
+				continue
+			}
+			seen[m.LineageID] = true
+			var same []string
+			for _, t := range tags {
+				var ok bool
+				var err error
+				if a.Pos[0] == "add" {
+					ok, err = c.App.Store.AddTag(ix.Env.ID, m.LineageID, t)
+				} else {
+					ok, err = c.App.Store.RemoveTag(ix.Env.ID, m.LineageID, t)
+				}
+				if err != nil {
+					return nil, err
+				}
+				if !ok {
+					same = append(same, t)
+				}
+			}
+			if len(same) > 0 {
+				k := "unchanged"
+				if len(mods) > 1 {
+					k = "unchanged for " + modLabel(ix, m.ID)
+				}
+				root.KV(k, strings.Join(same, ", "))
+			}
 		}
 		return d, nil
 	}

@@ -92,7 +92,7 @@ Example: read_source {"ref": "#ipv5", "type": "yayoCombat.HarmonyPatches.Pawn_Ti
     file: …\cache\source\8612…\yayoCombat.HarmonyPatches\Pawn_Tick.cs
     source:`
 
-const descEdit = `Change RimArcho's workspace Loadout (not the game's file): action=enable|disable (refs), move (refs[0] with at / before / after / up / down), swap (refs[0] → another instance of its lineage, optional refs[1]), sort (dry_run=true previews), undo, redo. Every change can be undone; nothing reaches the game until save_loadout. Refs as in get_mod.
+const descEdit = `Change RimArcho's workspace Loadout (not the game's file): action=enable|disable (refs), move (refs[0] with at / before / after / up / down), swap (refs[0] → another instance of its lineage, optional refs[1]), sort (dry_run=true previews), undo, redo; staging (RimArcho's own side list, 06 §5.4): stage (refs leave the Loadout and remember their place), unstage (out of staging, stays disabled), restore (refs, or all when empty, go back to their old place; at / before / after for one mod). Every change can be undone; nothing reaches the game until save_loadout. Refs as in get_mod.
 Example: edit_loadout {"action": "enable", "refs": ["#b21c"], "before": "#a3f9"}
   workspace: 213 active, 1 change unsaved (env:main)
     added  #b21c  Harmony  at 1
@@ -115,3 +115,16 @@ Example: copy_local {"ref": "#ipv5", "git": true}
   #ipv5 Yayo's Combat 3 copied to D:\Games\RimWorld\Mods\2854006492_local
     copy: #k2v8  (same lineage, origin marker .rimarcho/origin.json)
     files: 130 (1.5 MB)`
+
+const descDescribe = `A mod's description: About.xml and the Steam Workshop page (BBCode rendered as plain text; images as [image: url]). The Workshop text is fetched for this one mod on demand and cached until the item is updated; offline=true uses the cache only, and the user can turn fetching off (config workshop.fetch). source=auto shows the Workshop text when About.xml is short or the same, both otherwise. Use it to learn what a mod does before suggesting it.
+Example: get_description {"ref": "#uuhe"}
+  description of #uuhe Vehicle Framework
+    workshop: 3014915404 (fetched, updated 2026-10-02)
+    Workshop page:
+      Vehicle Framework
+      [image: https://i.imgur.com/abc.png]
+      Adds vehicles to RimWorld …`
+
+const descPlayer = `Change the player's own data on mods (shared by all copies of a mod): action=tag_add / tag_remove (tags on one or more refs; tags are what list --filter tag:<t> and the TUI's tag: search use), alias (the name RimArcho shows; text "" clears), note (free text; "" clears). Nothing reaches the game.
+Example: set_player_data {"action": "tag_add", "refs": ["#uuhe", "#vpcd"], "tags": ["vehicles"]}
+  tagged 2 mods: vehicles`

@@ -58,6 +58,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
 		"read_source": "ro", "edit_loadout": "write", "copy_local": "write", "save_loadout": "destructive", "add_rule": "write",
+		"get_description": "ro", "set_player_data": "write",
 	}
 	seen := map[string]bool{}
 	for _, tl := range res.Tools {
@@ -123,6 +124,7 @@ func TestCLIParity(t *testing.T) {
 		{"search_files", map[string]any{"pattern": "Lib_Gun"}, []string{"files", "search", "Lib_Gun"}},
 		{"save_loadout", map[string]any{"dry_run": true}, []string{"save", "--dry-run"}},
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},
+		{"get_description", map[string]any{"ref": modA, "offline": true}, []string{"describe", modA, "--offline"}},
 	}
 	for _, c := range cases {
 		got, isErr := call(t, cs, c.tool, c.args)

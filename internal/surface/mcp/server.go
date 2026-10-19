@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,7 +66,8 @@ func New(a *app.App) *Server {
 	}
 	s.srv = sdk.NewServer(&sdk.Implementation{Name: "rimarcho", Version: buildinfo.Version}, &sdk.ServerOptions{Instructions: Instructions})
 	for _, t := range Tools() {
-		ann := &sdk.ToolAnnotations{ReadOnlyHint: t.readOnly, OpenWorldHint: ptr(false)}
+		// get_description reaches the Steam Workshop (06 §6.4); everything else stays local.
+		ann := &sdk.ToolAnnotations{ReadOnlyHint: t.readOnly, OpenWorldHint: ptr(t.name == "get_description")}
 		if !t.readOnly {
 			ann.DestructiveHint = ptr(t.destructive)
 		}
@@ -226,7 +228,7 @@ type SourceIn struct {
 
 type EditIn struct {
 	Env    string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action string   `json:"action" jsonschema:"enable, disable, move, swap, sort, undo or redo"`
+	Action string   `json:"action" jsonschema:"enable, disable, move, swap, sort, undo, redo, stage, unstage or restore"`
 	Refs   []string `json:"refs,omitempty" jsonschema:"mods to enable/disable; for move and swap the first is the mod (swap: optional second = the instance to use)"`
 	At     int      `json:"at,omitempty" jsonschema:"enable at / move to this 1-based position"`
 	Before string   `json:"before,omitempty"`
@@ -234,6 +236,22 @@ type EditIn struct {
 	Up     bool     `json:"up,omitempty"`
 	Down   bool     `json:"down,omitempty"`
 	DryRun bool     `json:"dry_run,omitempty" jsonschema:"sort only: show the result without changing the workspace"`
+}
+
+type DescribeIn struct {
+	Env     string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Ref     string `json:"ref" jsonschema:"a mod reference (#id, pkg:…, ws:…)"`
+	Source  string `json:"source,omitempty" jsonschema:"auto (default), about, workshop or both"`
+	Refresh bool   `json:"refresh,omitempty" jsonschema:"fetch the Workshop page again"`
+	Offline bool   `json:"offline,omitempty" jsonschema:"use the cache only"`
+}
+
+type PlayerIn struct {
+	Env    string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note"`
+	Refs   []string `json:"refs" jsonschema:"the mods (tag actions: one or more; alias and note: exactly one)"`
+	Tags   []string `json:"tags,omitempty" jsonschema:"tag_add / tag_remove: the tags"`
+	Text   string   `json:"text,omitempty" jsonschema:"alias / note: the text; empty clears it"`
 }
 
 type CopyIn struct {
@@ -269,6 +287,9 @@ func toolList() []tool {
 			return argv("list").flag("active", in.Active).str("filter", in.Filter).flag("all", in.All).a
 		}),
 		reg("get_mod", true, false, descMod, func(in RefIn) []string { return []string{"mod", in.Ref} }),
+		reg("get_description", true, false, descDescribe, func(in DescribeIn) []string {
+			return argv("describe", in.Ref).str("source", in.Source).flag("refresh", in.Refresh).flag("offline", in.Offline).a
+		}),
 		reg("get_def", true, false, descDef, func(in DefIn) []string {
 			return gv(argv("def").pos(in.Def).str("mod", in.Mod).flag("all", in.All), in.GameVersion)
 		}),
@@ -297,6 +318,7 @@ func toolList() []tool {
 		reg("copy_local", false, false, descCopy, func(in CopyIn) []string {
 			return argv("copy-local", in.Ref).str("name", in.Name).flag("git", in.Git).a
 		}),
+		reg("set_player_data", false, false, descPlayer, func(in PlayerIn) []string { return PlayerArgv(in) }),
 		reg("add_rule", false, false, descRule, func(in RuleIn) []string {
 			b := argv("rule", "add", in.Kind)
 			if in.Kind == "ignore" {
@@ -375,6 +397,38 @@ func EditArgv(in EditIn) []string {
 		return argv("sort").flag("dry-run", in.DryRun).a
 	case "undo", "redo":
 		return []string{in.Action}
+	case "stage":
+		return append([]string{"stage", "add"}, in.Refs...)
+	case "unstage":
+		return append([]string{"stage", "drop"}, in.Refs...)
+	case "restore":
+		b := argv(append([]string{"stage", "restore"}, in.Refs...)...)
+		if in.At > 0 {
+			b.str("at", strconv.Itoa(in.At))
+		}
+		return b.str("before", in.Before).str("after", in.After).a
 	}
 	return []string{"edit_loadout: unknown action " + fmt.Sprintf("%q", in.Action)}
+}
+
+// PlayerArgv maps set_player_data to tag / alias / note.
+func PlayerArgv(in PlayerIn) []string {
+	first := ""
+	if len(in.Refs) > 0 {
+		first = in.Refs[0]
+	}
+	switch in.Action {
+	case "tag_add", "tag_remove":
+		b := argv(append([]string{"tag", strings.TrimPrefix(in.Action, "tag_"), first}, in.Tags...)...)
+		for _, r := range in.Refs[min(1, len(in.Refs)):] {
+			b.str("mod", r)
+		}
+		return b.a
+	case "alias", "note":
+		if in.Text == "" {
+			return []string{in.Action, first, "--clear"}
+		}
+		return []string{in.Action, first, in.Text}
+	}
+	return []string{"set_player_data: unknown action " + fmt.Sprintf("%q", in.Action)}
 }
