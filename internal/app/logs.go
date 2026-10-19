@@ -159,7 +159,7 @@ func (a *App) logState(st *LoadoutState, rep *LogReport) (*LoadoutState, func(),
 	prev := a.GameVersion
 	rep.AnalysedAs, rep.EnvMM = mm, st.GameMM()
 	a.GameVersion = mm
-	restore := func() { a.GameVersion = prev }
+	restore := func() { a.GameVersion = prev; a.Store.MM = st.GameMM() }
 	s2, err := a.Loadout()
 	if err != nil {
 		restore()
@@ -176,7 +176,7 @@ func (a *App) EnsureLogAnalysis(st *LoadoutState, version string, progress func(
 		return nil
 	}
 	a.GameVersion = mm
-	defer func() { a.GameVersion = "" }()
+	defer func() { a.GameVersion = ""; a.Store.MM = st.GameMM() }()
 	_, err := a.EnsureAnalysis(progress)
 	return err
 }

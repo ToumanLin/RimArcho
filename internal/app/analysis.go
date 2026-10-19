@@ -133,6 +133,7 @@ type AnalysisState struct {
 
 // Analysis returns the stored run and whether it is current.
 func (a *App) Analysis(st *LoadoutState) (*AnalysisState, error) {
+	a.Store.MM = st.GameMM()
 	r, err := a.Store.LatestAnalysis(st.Ix.Env.ID)
 	if err != nil {
 		return nil, err

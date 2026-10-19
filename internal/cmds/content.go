@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/rimarcho/rimarcho/internal/analyze"
 	"github.com/rimarcho/rimarcho/internal/app"
@@ -536,40 +537,42 @@ func filesSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	langs := a.Bool("languages")
 	var hits []string
 	files, total := 0, 0
-	for _, m := range mods {
-		dir := ix.ModDir(m)
-		r := content.Resolve(dir, m.Decl().LoadFolders, st.GameMM(), func(p string) bool { return activePkg[strings.TrimSuffix(strings.ToLower(p), "_steam")] })
-		seen := map[string]bool{}
-		for _, folder := range r.Folders {
-			filepath.WalkDir(folder, func(p string, de os.DirEntry, err error) error {
-				if err != nil {
-					return nil
-				}
-				if de.IsDir() {
-					// Translations repeat every key and drown the Defs/Patches evidence.
-					if strings.EqualFold(de.Name(), "Languages") && !langs {
-						return filepath.SkipDir
-					}
-					// The mod root is a load folder too; its version folders are handled by Resolve.
-					if p != folder && folder == dir && (isVersionDir(de.Name()) || strings.EqualFold(de.Name(), "Common")) {
-						return filepath.SkipDir
-					}
-					return nil
-				}
-				ext := strings.ToLower(filepath.Ext(p))
-				if ext != ".xml" && ext != ".txt" {
-					return nil
-				}
-				rel, _ := filepath.Rel(folder, p)
-				key := strings.ToLower(rel)
-				if seen[key] {
-					return nil // overridden by a higher-priority load folder
-				}
-				seen[key] = true
-				files++
-				b, err := os.ReadFile(p)
+	// Walk the mods in parallel; each keeps its own file list, joined in mod order.
+	perMod := make([][]fileJob, len(mods))
+	var wwg sync.WaitGroup
+	sem := make(chan struct{}, 8)
+	for mi, m := range mods {
+		wwg.Add(1)
+		sem <- struct{}{}
+		go func(mi int, m *store.Mod) {
+			defer func() { <-sem; wwg.Done() }()
+			perMod[mi] = walkMod(ix, st, m, activePkg, langs)
+		}(mi, m)
+	}
+	wwg.Wait()
+	var jobs []fileJob
+	for _, l := range perMod {
+		jobs = append(jobs, l...)
+	}
+	files = len(jobs)
+	// Read and match in parallel (the walk is cheap; reading 4–5k files is not), then
+	// report in walk order.
+	type result struct {
+		n     int
+		lines []string
+	}
+	results := make([]result, len(jobs))
+	var wg sync.WaitGroup
+	next := make(chan int)
+	for w := 0; w < 8; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range next {
+				j := jobs[i]
+				b, err := os.ReadFile(j.path)
 				if err != nil || (re == nil && !bytes.Contains(bytes.ToLower(b), []byte(lower))) {
-					return nil
+					continue
 				}
 				sc := bufio.NewScanner(bytes.NewReader(b))
 				sc.Buffer(make([]byte, 64<<10), 4<<20)
@@ -577,19 +580,31 @@ func filesSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 				for sc.Scan() {
 					n++
 					if line := sc.Text(); match(line) {
-						total++
-						if limit == 0 || len(hits) < limit {
-							relMod, _ := filepath.Rel(dir, p)
+						results[i].n++
+						if limit == 0 || len(results[i].lines) < limit {
+							relMod, _ := filepath.Rel(j.dir, j.path)
 							snippet := strings.TrimSpace(line)
 							if len(snippet) > 120 {
 								snippet = snippet[:117] + "..."
 							}
-							hits = append(hits, fmt.Sprintf("%s  %s:%d  %s", ix.Ref(m.ID), filepath.ToSlash(relMod), n, snippet))
+							results[i].lines = append(results[i].lines, fmt.Sprintf("%s  %s:%d  %s", j.ref, filepath.ToSlash(relMod), n, snippet))
 						}
 					}
 				}
-				return nil
-			})
+			}
+		}()
+	}
+	for i := range jobs {
+		next <- i
+	}
+	close(next)
+	wg.Wait()
+	for _, r := range results {
+		total += r.n
+		for _, l := range r.lines {
+			if limit == 0 || len(hits) < limit {
+				hits = append(hits, l)
+			}
 		}
 	}
 	d, root := render.New(fmt.Sprintf("files search %q: %d matches in %d files of %d mods", pat, total, files, len(mods)))
@@ -609,3 +624,46 @@ func filesSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 var versionDirRe = regexp.MustCompile(`^[vV]?\d+\.\d+$`)
 
 func isVersionDir(s string) bool { return versionDirRe.MatchString(s) }
+
+type fileJob struct{ ref, dir, path string }
+
+// walkMod lists the effective .xml/.txt files of one mod (higher-priority load folders
+// shadow lower ones; Languages/ only with langs).
+func walkMod(ix *app.Index, st *app.LoadoutState, m *store.Mod, activePkg map[string]bool, langs bool) []fileJob {
+	dir := ix.ModDir(m)
+	r := content.Resolve(dir, m.Decl().LoadFolders, st.GameMM(), func(p string) bool { return activePkg[strings.TrimSuffix(strings.ToLower(p), "_steam")] })
+	seen := map[string]bool{}
+	ref := ix.Ref(m.ID)
+	var out []fileJob
+	for _, folder := range r.Folders {
+		filepath.WalkDir(folder, func(p string, de os.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if de.IsDir() {
+				// Translations repeat every key and drown the Defs/Patches evidence.
+				if strings.EqualFold(de.Name(), "Languages") && !langs {
+					return filepath.SkipDir
+				}
+				// The mod root is a load folder too; its version folders are handled by Resolve.
+				if p != folder && folder == dir && (isVersionDir(de.Name()) || strings.EqualFold(de.Name(), "Common")) {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			ext := strings.ToLower(filepath.Ext(p))
+			if ext != ".xml" && ext != ".txt" {
+				return nil
+			}
+			rel, _ := filepath.Rel(folder, p)
+			key := strings.ToLower(rel)
+			if seen[key] {
+				return nil // overridden by a higher-priority load folder
+			}
+			seen[key] = true
+			out = append(out, fileJob{ref: ref, dir: dir, path: p})
+			return nil
+		})
+	}
+	return out
+}

@@ -132,6 +132,7 @@ func (a *App) Loadout() (*LoadoutState, error) {
 		c.List = c.List.Clone()
 		ws := *c.WS
 		c.WS = &ws
+		a.Store.MM = c.GameMM()
 		return &c, nil
 	}
 	st, err := a.loadLoadout(ix)
@@ -139,6 +140,7 @@ func (a *App) Loadout() (*LoadoutState, error) {
 		return nil, err
 	}
 	st.MM = a.GameVersion
+	a.Store.MM = st.GameMM() // fact queries read this game version's analysis
 	// Syncing may have written; key the cache on the state after it.
 	key = a.Store.ChangeKey() + key[strings.Index(key, "|"):]
 	if ix2, err := a.Index(); err == nil && ix2 == ix {

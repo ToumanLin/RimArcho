@@ -241,3 +241,32 @@ func TestLoadoutExchange(t *testing.T) {
 		e.MustRun("loadout", "import", save)
 	}
 }
+
+// decisions-m5: the environment's analysis and one for the log's game version coexist;
+// alternating problems and log does not re-run either.
+func TestAnalysisPerGameVersion(t *testing.T) {
+	e := testkit.New(t)
+	log := e.HarmonyLogFixture()
+	os.WriteFile(filepath.Join(e.UserData, "Player.log"), []byte(strings.Replace(log, "RimWorld 1.6.4633 rev1261", "RimWorld 1.5.4409 rev1118", 1)), 0o644)
+	runs := 0
+	inner := e.App.AnalyzeRunner
+	e.App.AnalyzeRunner = func(env string, p func(string)) error { runs++; return inner(env, p) }
+	e.MustRun("problems")
+	if runs != 2 {
+		t.Fatalf("first problems: %d analysis runs, want 2 (1.6 and the log's 1.5)", runs)
+	}
+	for i := 0; i < 3; i++ {
+		e.MustRun("log", "--cluster", "E1")
+		e.MustRun("problems")
+		e.MustRun("harmony", "--target", "Verse.Pawn.Tick")
+	}
+	if runs != 2 {
+		t.Fatalf("alternating commands re-ran the analysis: %d runs", runs)
+	}
+	if out := e.MustRun("harmony", "--target", "Verse.Pawn.Tick"); !strings.Contains(out, "4 patches from 3 mods") {
+		t.Fatalf("facts of the environment's version:\n%s", out)
+	}
+	if out := e.MustRun("log", "--cluster", "E1"); !strings.Contains(out, "analysed: as 1.5") || !strings.Contains(out, "patch.no-match: target-inactive") {
+		t.Fatalf("the 1.5 analysis is used for the 1.5 log:\n%s", out)
+	}
+}

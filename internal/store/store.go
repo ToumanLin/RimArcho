@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 7
+const SchemaVersion = 8
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -162,10 +162,35 @@ CREATE TABLE lineage_tag(
   PRIMARY KEY(environment_id, lineage_id, tag));
 `
 
+// schemaV8 (M5): analysis runs and the per-instance facts are kept per game major.minor,
+// so an analysis for the log's version does not evict the environment's (decisions-m5).
+// The facts are a cache: they are dropped and rebuilt on the next analysis.
+const schemaV8 = `
+DROP TABLE content_state;
+CREATE TABLE content_state(
+  instance_id TEXT NOT NULL, game_mm TEXT NOT NULL DEFAULT '', content_key TEXT NOT NULL, folders TEXT NOT NULL DEFAULT '',
+  def_files INTEGER NOT NULL DEFAULT 0, patch_files INTEGER NOT NULL DEFAULT 0, parse_errors TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY(instance_id, game_mm));
+ALTER TABLE def_fact ADD COLUMN game_mm TEXT NOT NULL DEFAULT '';
+ALTER TABLE assembly_fact ADD COLUMN game_mm TEXT NOT NULL DEFAULT '';
+ALTER TABLE type_fact ADD COLUMN game_mm TEXT NOT NULL DEFAULT '';
+ALTER TABLE harmony_fact ADD COLUMN game_mm TEXT NOT NULL DEFAULT '';
+ALTER TABLE harmony_id ADD COLUMN game_mm TEXT NOT NULL DEFAULT '';
+DELETE FROM def_fact; DELETE FROM assembly_fact; DELETE FROM type_fact; DELETE FROM harmony_fact; DELETE FROM harmony_id;
+DELETE FROM patch_fact; DELETE FROM finding; DELETE FROM analysis;
+CREATE INDEX def_fact_mm ON def_fact(game_mm, instance_id);
+CREATE INDEX def_fact_mm_name ON def_fact(game_mm, def_name);
+CREATE INDEX type_fact_mm ON type_fact(game_mm, type_name);
+CREATE INDEX harmony_fact_mm ON harmony_fact(game_mm, target);
+`
+
 // Store wraps the database handle.
 type Store struct {
 	DB   *sql.DB
 	Path string
+	// MM is the game major.minor whose analysis facts the fact queries read (the app sets
+	// it from the Loadout it works on).
+	MM string
 }
 
 // Open opens (creating if needed) the database at path and applies migrations.
@@ -201,7 +226,7 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {
