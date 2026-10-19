@@ -336,7 +336,7 @@ func TestA7LocalRename(t *testing.T) {
 	}
 	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvMoved: 1})
 	// Rename plus an edit in the same scan is still a move (similarity ≥ 0.85 on paths).
-	e.WriteFile(filepath.Join(e.Game, "Mods", "My Mod v2", "Defs", "ThingDefs", "mymod.xml"), "<Defs><!-- edited --></Defs>" + nl)
+	e.WriteFile(filepath.Join(e.Game, "Mods", "My Mod v2", "Defs", "ThingDefs", "mymod.xml"), "<Defs><!-- edited --></Defs>"+nl)
 	e.Move(filepath.Join(e.Game, "Mods", "My Mod v2"), filepath.Join(e.Game, "Mods", "My Mod v3"))
 	sid = scanNow(t, e)
 	if one(t, e, "My Mod").ID != before.ID {
@@ -345,7 +345,7 @@ func TestA7LocalRename(t *testing.T) {
 	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvMoved: 1, identity.EvUpdated: 1})
 	// Rename plus a new semantic file in a 4-file mod drops path similarity to 0.8: below
 	// R3's 0.85, so RimArcho asks (R6) instead of guessing.
-	e.WriteFile(filepath.Join(e.Game, "Mods", "My Mod v3", "Defs", "Extra.xml"), "<Defs/>" + nl)
+	e.WriteFile(filepath.Join(e.Game, "Mods", "My Mod v3", "Defs", "Extra.xml"), "<Defs/>"+nl)
 	e.Move(filepath.Join(e.Game, "Mods", "My Mod v3"), filepath.Join(e.Game, "Mods", "My Mod v4"))
 	sid = scanNow(t, e)
 	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvDiscovered: 1, identity.EvDisappeared: 1})

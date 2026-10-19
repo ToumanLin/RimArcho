@@ -121,7 +121,7 @@ func populate(e *testkit.Env) {
 	e.AddWorkshop("3000000002", testkit.Sample("tester.alpha", "Alpha"))
 	e.AddWorkshop("3000000003", testkit.Sample("tester.beta", "Beta"))
 	e.WriteMod(filepath.Join(e.Workshop, "3000000009"), testkit.Sample("tester.leftover", "Leftover")) // unsubscribed
-	e.WriteFile(filepath.Join(e.Workshop, "3000000010", "Textures", "x.png"), "x")                   // residue without About.xml
+	e.WriteFile(filepath.Join(e.Workshop, "3000000010", "Textures", "x.png"), "x")                     // residue without About.xml
 	e.CopyTemplate("legacy", filepath.Join(e.Game, "Mods", "OldMod"))
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Gamma"), testkit.Sample("tester.gamma", "Gamma"))
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Twin"), testkit.Sample("tester.alpha", "Alpha Fork"))

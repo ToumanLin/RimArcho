@@ -124,7 +124,7 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 			h, ok := prevHash[l.Key()]
 			return h, ok
 		},
-		Known:     func(l scan.Location) bool { return knownLoc[l.Key()] },
+		Known: func(l scan.Location) bool { return knownLoc[l.Key()] },
 	})
 	prev, prevHash = nil, nil // release the caches before reconciliation
 	lineages, err := a.Store.LineageIDs(e.ID)

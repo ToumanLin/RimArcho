@@ -23,12 +23,12 @@ type Dependency struct {
 // Decl is the normalised declaration of a mod: About.xml, PublishedFileId.txt and
 // LoadFolders.xml (02 §4.2). It is stored as snapshot.decl_blob for the analysis layer.
 type Decl struct {
-	PackageIDRaw     string `json:"package_id_raw,omitempty"`
-	PackageID        string `json:"package_id,omitempty"` // lower case
-	PackageIDDerived bool   `json:"package_id_derived,omitempty"`
-	Name             string `json:"name,omitempty"`
-	Authors          []string `json:"authors,omitempty"`
-	ModVersion       string   `json:"mod_version,omitempty"`
+	PackageIDRaw      string   `json:"package_id_raw,omitempty"`
+	PackageID         string   `json:"package_id,omitempty"` // lower case
+	PackageIDDerived  bool     `json:"package_id_derived,omitempty"`
+	Name              string   `json:"name,omitempty"`
+	Authors           []string `json:"authors,omitempty"`
+	ModVersion        string   `json:"mod_version,omitempty"`
 	SupportedVersions []string `json:"supported_versions,omitempty"`
 
 	Dependencies          []Dependency            `json:"dependencies,omitempty"`

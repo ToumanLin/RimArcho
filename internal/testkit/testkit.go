@@ -275,10 +275,10 @@ func Sample(pkg, name string) Mod {
 	return Mod{
 		PackageID: pkg, Name: name, Author: "Tester",
 		Files: map[string]string{
-			"Defs/ThingDefs/" + slug + ".xml":      fmt.Sprintf("<Defs><ThingDef><defName>%s_Thing</defName></ThingDef></Defs>\n", slug),
-			"Defs/RecipeDefs/" + slug + ".xml":     fmt.Sprintf("<Defs><RecipeDef><defName>%s_Recipe</defName></RecipeDef></Defs>\n", slug),
-			"Patches/" + slug + ".xml":             fmt.Sprintf("<Patch><Operation Class=\"PatchOperationAdd\"><xpath>Defs/ThingDef[defName=\"%s\"]</xpath></Operation></Patch>\n", slug),
-			"Textures/Things/" + slug + "/a.png":   strings.Repeat("x", 64),
+			"Defs/ThingDefs/" + slug + ".xml":          fmt.Sprintf("<Defs><ThingDef><defName>%s_Thing</defName></ThingDef></Defs>\n", slug),
+			"Defs/RecipeDefs/" + slug + ".xml":         fmt.Sprintf("<Defs><RecipeDef><defName>%s_Recipe</defName></RecipeDef></Defs>\n", slug),
+			"Patches/" + slug + ".xml":                 fmt.Sprintf("<Patch><Operation Class=\"PatchOperationAdd\"><xpath>Defs/ThingDef[defName=\"%s\"]</xpath></Operation></Patch>\n", slug),
+			"Textures/Things/" + slug + "/a.png":       strings.Repeat("x", 64),
 			"Languages/English/Keyed/" + slug + ".xml": "<LanguageData/>\n",
 		},
 	}

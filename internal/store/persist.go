@@ -203,8 +203,8 @@ func recomputePrimaries(tx *sql.Tx, envID string) error {
 	}
 	type row struct {
 		id, lineage, status string
-		kind            source.Kind
-		first           int64
+		kind                source.Kind
+		first               int64
 	}
 	byLineage := map[string][]row{}
 	for rows.Next() {
