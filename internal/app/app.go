@@ -57,6 +57,8 @@ type App struct {
 	stKey   string
 	prCache *ProblemSet
 	prKey   string
+
+	logCache *logCacheEntry
 }
 
 // Open opens (creating if needed) the data directory home.

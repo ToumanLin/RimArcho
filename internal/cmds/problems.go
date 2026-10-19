@@ -297,6 +297,17 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 		if failed > 0 {
 			line += fmt.Sprintf(" (%d failed)", failed)
 		}
+		if asms, _ := c.App.Store.Assemblies(m.ID); len(asms) > 0 {
+			hp, manual := 0, false
+			for _, a := range asms {
+				hp += a.Patches
+				manual = manual || a.Manual
+			}
+			line += fmt.Sprintf(", assemblies %d, harmony patches %d", len(asms), hp)
+			if manual {
+				line += " (+ manual Harmony.Patch)"
+			}
+		}
 		if !s.Fresh {
 			line += "  [analysis stale]"
 		}

@@ -429,7 +429,7 @@ func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts) error {
 // HarmonyRow is a stored Harmony patch.
 type HarmonyRow struct {
 	Instance, File, PatchType, PatchMethod, Kind, Target string
-	Skips, Dynamic                                     bool
+	Skips, Dynamic                                       bool
 }
 
 // HarmonyFilter selects Harmony patches.

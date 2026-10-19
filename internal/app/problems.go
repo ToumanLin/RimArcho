@@ -52,6 +52,9 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	key := ""
 	if a.stCache != nil && a.stCache.Ix == st.Ix {
 		key = a.stKey + "|" + a.GameVersion
+		if p := a.SelectedLog(st); p != "" {
+			key += "|" + p + "|" + logStamp(p)
+		}
 	}
 	if key != "" && a.prCache != nil && a.prKey == key && ps.AnalysisErr == nil {
 		c := *a.prCache
@@ -86,6 +89,7 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 			all = append(all, f)
 		}
 	}
+	all = append(all, a.logFindings(st)...)
 	ignores, err := a.Store.Ignores(st.Ix.Env.ID)
 	if err != nil {
 		return nil, err

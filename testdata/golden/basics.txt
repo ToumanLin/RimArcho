@@ -15,7 +15,9 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     mod <ref>                                 mod details
     def [<Type/defName>]                      who defines and patches a Def; or the Defs of a mod
     patches                                   Patch operations and their simulated outcome
+    harmony                                   Harmony patches: of a mod, on a target method, or shared between mods
     why <A> <B>                               how two mods relate: order, dependencies, conflicts, overrides, shared patches
+    log                                       attribute Player.log errors to mods (clusters, roles, evidence, next steps)
     problems                                  problems: declarations, Defs, Patches (03 §4)
     problems show <p:ref>                     one problem with its evidence
     problems ignore <p:ref>                   ignore a problem until its mod changes
