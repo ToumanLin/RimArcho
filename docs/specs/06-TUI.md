@@ -231,7 +231,7 @@ WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI �
 | `词` | 名称、别名或作者包含它（不分大小写）；整个查询都没有结果时，自由词再按名称的字母顺序匹配（`hsl` 找到 “Hair Style Lib”） |
 | `name:词` / `author:词` / `tag:词` | 只看名称（含别名）/ 作者 / 标签；`tag:` 要求标签等于这个词 |
 | `id:值` | 包名包含它、工坊 ID 等于它，或者是 `#引用` |
-| `type:值` | 来源 `official` `workshop` `local` `copy` `git`；内容 `assembly`（带 DLL）、`xml`（没有 DLL）、`language`（只有语言文件） |
+| `type:值` | 来源 `official` `workshop` `local` `copy` `git`；内容 `assembly`（带 DLL）、`xml`（没有 DLL，也可写 `xml-only`）、`language`（只有语言文件，也可写 `language-pack`） |
 | `has:problem` / `has:error` | 有需要处理的问题 / 有会导致加载失败的问题；还有 `has:tag` `has:note` `has:alias` |
 | `-词`、`-tag:x` | 取反 |
 | `"带 空格"` | 引号内是一个词 |

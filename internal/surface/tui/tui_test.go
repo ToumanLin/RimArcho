@@ -675,24 +675,26 @@ func TestColumnSearch(t *testing.T) {
 		return names(cActive) + " | " + names(cInactive)
 	}
 	for q, want := range map[string]string{
-		"":                        "Core,Alpha,Harmony | Beta,中文汉化补丁（简体）加长的名字用来测试截断",
-		"alp":                     "Alpha | ",
-		"tag:core-lib":            "Harmony | Beta",
-		"-tag:core-lib":           "Core,Alpha | 中文汉化补丁（简体）加长的名字用来测试截断",
-		"tag:core-lib type:local": " | Beta",
-		"type:workshop":           "Alpha,Harmony | ",
-		"type:official":           "Core | ",
-		"id:tester.":              "Alpha | Beta,中文汉化补丁（简体）加长的名字用来测试截断",
-		"id:1001":                 "Alpha | ",
-		"author:nobody":           " | ",
-		"has:tag":                 "Harmony | Beta",
-		"has:note":                " | Beta",
-		"type:assembly":           " | Beta",
-		"type:language":           " | 中文汉化补丁（简体）加长的名字用来测试截断",
-		"-type:assembly type:xml": "Core,Alpha,Harmony | 中文汉化补丁（简体）加长的名字用来测试截断",
-		"中文":                      " | 中文汉化补丁（简体）加长的名字用来测试截断",
-		"hmy":                     "Harmony | ", // the fallback: letters in order
-		`"alpha"`:                 "Alpha | ",
+		"":                         "Core,Alpha,Harmony | Beta,中文汉化补丁（简体）加长的名字用来测试截断",
+		"alp":                      "Alpha | ",
+		"tag:core-lib":             "Harmony | Beta",
+		"-tag:core-lib":            "Core,Alpha | 中文汉化补丁（简体）加长的名字用来测试截断",
+		"tag:core-lib type:local":  " | Beta",
+		"type:workshop":            "Alpha,Harmony | ",
+		"type:official":            "Core | ",
+		"id:tester.":               "Alpha | Beta,中文汉化补丁（简体）加长的名字用来测试截断",
+		"id:1001":                  "Alpha | ",
+		"author:nobody":            " | ",
+		"has:tag":                  "Harmony | Beta",
+		"has:note":                 " | Beta",
+		"type:assembly":            " | Beta",
+		"type:language":            " | 中文汉化补丁（简体）加长的名字用来测试截断",
+		"type:language-pack":       " | 中文汉化补丁（简体）加长的名字用来测试截断",
+		"type:xml-only -id:ludeon": "Alpha,Harmony | 中文汉化补丁（简体）加长的名字用来测试截断",
+		"-type:assembly type:xml":  "Core,Alpha,Harmony | 中文汉化补丁（简体）加长的名字用来测试截断",
+		"中文":                       " | 中文汉化补丁（简体）加长的名字用来测试截断",
+		"hmy":                      "Harmony | ", // the fallback: letters in order
+		`"alpha"`:                  "Alpha | ",
 	} {
 		if got := all(q); got != want {
 			t.Errorf("%q: got %q, want %q", q, got, want)

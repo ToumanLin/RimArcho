@@ -139,4 +139,12 @@ func TestT1KeyLatencyReal(t *testing.T) {
 	if worst := report(t, keyLatency(t, m)); worst > 50*time.Millisecond {
 		t.Fatalf("slowest key %v > 50 ms", worst)
 	}
+	// search (06 §5.5): the first content term loads the content kinds once
+	for _, q := range []string{"type:assembly", "type:xml-only has:problem", "harmony", "author:oskar -tag:ui", "id:2009463077", "hrmny"} {
+		c := &m.cols[cInactive]
+		c.filter = q
+		t0 := time.Now()
+		m.refilterCol(cInactive, "")
+		t.Logf("search %-28q %4d of %d in %v", q, len(c.view), len(c.items), time.Since(t0))
+	}
 }

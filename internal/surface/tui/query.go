@@ -86,6 +86,12 @@ func (m *model) termMatch(t term, it *item) bool {
 	case "id":
 		return v != "" && (strings.Contains(it.pkg, v) || it.ws == v || strings.EqualFold(it.ref, v) || strings.EqualFold(strings.TrimPrefix(it.ref, "#"), v))
 	case "type":
+		switch v { // the long forms are the names in the request (xml-only, language-pack)
+		case "xml-only":
+			v = "xml"
+		case "language-pack", "lang":
+			v = "language"
+		}
 		switch v {
 		case "official", "workshop", "local", "copy", "git":
 			return it.kind == v
