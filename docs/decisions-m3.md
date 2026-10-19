@@ -224,3 +224,15 @@ Problems on the real environment: 1 error, 322 warnings, 339 info.
 6. `config` is a new command (§3). Keep it, or fold the setting into `env set` / config.toml?
 7. Analysis runs against the game's major.minor (1.7), while the user's ModsConfig.xml and Player.log are from 1.6.
    `RIMARCHO_LOG_VERSION` exists only for the replay test. Should `analyze --version` be exposed?
+
+## 12. Main-session rulings (2026-10-19, after M3 review)
+
+| # | Ruling | Where |
+|---|---|---|
+| 1 | `version.unsupported` severity becomes info when the mod lists the previous minor version (game 1.7, mod lists 1.6), warning otherwise. TUI and default CLI/MCP output fold these into one summary row per game version, which can be expanded. | 03 §4.3; implement in M4 |
+| 2 | `def.override` and `patch.contested` are hidden by default in the TUI Problems view and in default `problems` output; they show under the `s` filter / `--all`, and always in Inspect and in `def` / `patches` output. MCP `list_problems` defaults to warning+ and takes a severity parameter. | 06 §4, 05 §3; M4 |
+| 3 | ParentName resolution after patching is correct (the game resolves inheritance after applying patches). Spec text corrected. | 03 §5.1 |
+| 4 | The `target-later` reinterpretation is correct (all defs are merged before patches run). `node-absent` is added to the spec. | 03 §4.4 |
+| 5 | Working set is the T5 metric. Private bytes are recorded but not gated. Do not switch to cgo SQLite unless working set exceeds 65 MB. | 06 §8 |
+| 6 | Keep `config`, and add it to 05 §3. | M4 |
+| 7 | Expose `--game-version X.Y` on analysis commands (`analyze`, `problems`, `def`, `patches`, `why`, `log`) to override the environment version; it is needed for exactly this user's 1.6-list-on-1.7-game situation. Also make it an MCP tool parameter. | 05 §3; M4 |
