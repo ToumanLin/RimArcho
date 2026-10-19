@@ -263,11 +263,15 @@ func TestGoldenLoadout(t *testing.T) {
 		cmd("status"),
 		cmd("list", "--active"),
 		cmd("sort", "--dry-run"),
-		func(e *testkit.Env) []string { return []string{"rule", "add", "ignore", "decl:" + ref(e, "Y") + ":loadafter:tester.x", "--note", "fine either way"} },
+		func(e *testkit.Env) []string {
+			return []string{"rule", "add", "ignore", "decl:" + ref(e, "Y") + ":loadafter:tester.x", "--note", "fine either way"}
+		},
 		cmd("rule", "list"),
 		cmd("sort"),
 		cmd("list", "--active"),
-		func(e *testkit.Env) []string { return []string{"enable", ref(e, "Gamma"), "--after", ref(e, "Harmony")} },
+		func(e *testkit.Env) []string {
+			return []string{"enable", ref(e, "Gamma"), "--after", ref(e, "Harmony")}
+		},
 		func(e *testkit.Env) []string { return []string{"move", ref(e, "Beta"), "--to", "3"} },
 		func(e *testkit.Env) []string { return []string{"enable", ref(e, "Beta")} },
 		func(e *testkit.Env) []string { return []string{"enable", ref(e, "Leftover")} },

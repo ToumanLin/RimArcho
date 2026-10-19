@@ -10,6 +10,7 @@ import (
 	"github.com/rimarcho/rimarcho/internal/app"
 	"github.com/rimarcho/rimarcho/internal/cmds"
 	"github.com/rimarcho/rimarcho/internal/env"
+	"github.com/rimarcho/rimarcho/internal/surface/tui"
 )
 
 // Run executes argv (without the program name) and returns the exit code.
@@ -26,6 +27,14 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	defer ap.Close()
 	ap.EnvName = envName
+	if len(rest) == 0 {
+		// No command: the TUI (06). Scans run as a child process of this executable.
+		if err := tui.Run(tui.Options{App: ap, ScanOnStart: true}); err != nil {
+			fmt.Fprintln(stderr, "error:", err)
+			return cmds.ExitError
+		}
+		return cmds.ExitOK
+	}
 	out, code := cmds.Execute(ap, rest)
 	if code == cmds.ExitError || code == cmds.ExitUsage {
 		io.WriteString(stderr, out)

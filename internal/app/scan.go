@@ -44,8 +44,8 @@ type ScanStats struct {
 
 // ScanReport is the result of Scan.
 type ScanReport struct {
-	Env    *env.Environment
-	ScanID int64
+	Env     *env.Environment
+	ScanID  int64
 	Full    bool
 	Stats   ScanStats
 	Notices []string // Loadout sync messages

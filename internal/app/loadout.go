@@ -580,19 +580,19 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 
 // SaveResult describes a save (04 §2.2).
 type SaveResult struct {
-	State       *LoadoutState
-	Path        string
-	Backup      string
-	Version     int // new version number (0 on dry run)
-	Source      string
-	OldVersion  string // ModsConfig.xml <version> before
-	NewVersion  string
-	Tokens      []string
-	Changes     []loadout.Change // newest version → saved list
-	DryRun      bool
-	Restores    int // source "undo": the version the workspace was checked out from
-	Missing     int
-	Unchanged   bool
+	State      *LoadoutState
+	Path       string
+	Backup     string
+	Version    int // new version number (0 on dry run)
+	Source     string
+	OldVersion string // ModsConfig.xml <version> before
+	NewVersion string
+	Tokens     []string
+	Changes    []loadout.Change // newest version → saved list
+	DryRun     bool
+	Restores   int // source "undo": the version the workspace was checked out from
+	Missing    int
+	Unchanged  bool
 }
 
 // Save writes the workspace to ModsConfig.xml: backup, atomic replace, version (04 §2.2).

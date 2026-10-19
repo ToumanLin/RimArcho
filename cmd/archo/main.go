@@ -1,5 +1,5 @@
-// Command archo is RimArcho: a RimWorld mod manager. M1 ships the CLI only; the TUI (no
-// arguments) and `archo mcp` arrive in later milestones.
+// Command archo is RimArcho, a RimWorld mod manager: `archo` starts the TUI, `archo <command>`
+// runs one CLI command (`archo help`). `archo mcp` arrives with M4.
 package main
 
 import (
@@ -11,10 +11,6 @@ import (
 )
 
 func main() {
-	if len(os.Args) == 1 {
-		fmt.Fprintln(os.Stderr, "archo: the TUI is not built yet (milestone M2); run `archo help` for the CLI")
-		os.Exit(2)
-	}
 	code := cli.Run(os.Args[1:], os.Stdout, os.Stderr)
 	if os.Getenv("ARCHO_MEMSTATS") != "" {
 		ws, priv, peak := procmem.MB()
