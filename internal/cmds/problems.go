@@ -1,6 +1,7 @@
 package cmds
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -97,6 +98,10 @@ func severityCounts(ps []*app.Problem) string {
 // analysisText describes the stored analysis.
 func analysisText(c *Ctx, s *app.AnalysisState, err error) string {
 	switch {
+	case errors.Is(err, app.ErrStillComputing) && s != nil && s.Run != nil:
+		return fmt.Sprintf("a:%d %s is stale; the new analysis is still computing in the background (call again in a few seconds)", s.Run.ID, c.App.FormatTime(s.Run.Finished))
+	case errors.Is(err, app.ErrStillComputing):
+		return "still computing in the background (declaration problems only; call again in a few seconds)"
 	case err != nil:
 		return "failed: " + err.Error() + " (declaration problems only)"
 	case s == nil || s.Run == nil:

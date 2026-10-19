@@ -52,6 +52,11 @@ type App struct {
 	Decompile Decompiler
 	// GameVersion ("X.Y") overrides the environment's game version for analysis commands.
 	GameVersion string
+	// AnalyzeWait bounds how long a command waits for an out-of-date analysis (05 §4.1:
+	// MCP returns the finished part after 10 s and the analysis continues in the
+	// background). 0 waits until it is done (CLI).
+	AnalyzeWait time.Duration
+	analyzing   *pendingAnalysis
 
 	ixCache *Index
 	ixKey   string

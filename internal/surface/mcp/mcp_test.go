@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -271,5 +272,47 @@ func TestWriteTools(t *testing.T) {
 	}
 	if out, isErr := call(t, cs, "edit_loadout", map[string]any{"action": "bogus"}); !isErr {
 		t.Fatalf("unknown action is an error:\n%s", out)
+	}
+}
+
+// 05 §4.1: a tool can name another environment.
+func TestEnvParameter(t *testing.T) {
+	e := testkit.New(t)
+	e.HarmonyLogFixture()
+	e.MustRun("env", "add", "other", "--game", e.Game, "--user-data", e.UserData, "--workshop", e.Workshop)
+	e.MustRun("env", "use", "main")
+	cs := connect(t, e)
+	if out, _ := call(t, cs, "status", nil); !strings.HasPrefix(out, "env:main") {
+		t.Fatalf("default env:\n%s", out)
+	}
+	if out, _ := call(t, cs, "status", map[string]any{"env": "other"}); !strings.HasPrefix(out, "env:other") {
+		t.Fatalf("env=other:\n%s", out)
+	}
+	if out, _ := call(t, cs, "status", nil); !strings.HasPrefix(out, "env:main") {
+		t.Fatalf("env is per call:\n%s", out)
+	}
+	if out, isErr := call(t, cs, "status", map[string]any{"env": "nope"}); !isErr || !strings.Contains(out, `no environment named "nope"`) {
+		t.Fatalf("unknown env:\n%s", out)
+	}
+}
+
+// 05 §4.1: when the analysis takes longer than the wait, the call returns the declaration
+// problems with a note, and a later call gets the finished analysis.
+func TestStillComputing(t *testing.T) {
+	e := testkit.New(t)
+	e.HarmonyLogFixture()
+	inner := e.App.AnalyzeRunner
+	release := make(chan bool)
+	e.App.AnalyzeRunner = func(env string, p func(string)) error { <-release; return inner(env, p) }
+	e.App.AnalyzeWait = 50 * time.Millisecond
+	cs := connect(t, e)
+	out, isErr := call(t, cs, "list_problems", nil)
+	if isErr || !strings.Contains(out, "analysis: still computing in the background") {
+		t.Fatalf("first call:\n%s", out)
+	}
+	close(release)
+	time.Sleep(500 * time.Millisecond)
+	if out, _ := call(t, cs, "list_problems", map[string]any{"code": "harmony"}); !strings.Contains(out, "analysis: a:1") || !strings.Contains(out, "harmony.multi-transpiler") {
+		t.Fatalf("second call:\n%s", out)
 	}
 }

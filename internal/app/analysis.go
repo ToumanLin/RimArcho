@@ -3,12 +3,14 @@ package app
 import (
 	"bufio"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/rimarcho/rimarcho/internal/analyze"
 	"github.com/rimarcho/rimarcho/internal/store"
@@ -192,6 +194,15 @@ func InProcessAnalyze(a *App) func(string, func(string)) error {
 	}
 }
 
+// ErrStillComputing: the analysis did not finish within App.AnalyzeWait; it goes on in
+// the background and a later call picks up the result.
+var ErrStillComputing = errors.New("the Def/Patch/Harmony analysis is still computing in the background; call again in a few seconds")
+
+type pendingAnalysis struct {
+	key  string
+	done chan error
+}
+
 // EnsureAnalysis brings the stored analysis up to date (03 §3: on demand), using the
 // configured runner — by default the `archo analyze` child process.
 func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
@@ -207,8 +218,27 @@ func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
 	if run == nil {
 		run = func(envName string, p func(string)) error { return ChildAnalyze(a.Home, envName, a.GameVersion, p) }
 	}
-	if err := run(st.Ix.Env.Name, progress); err != nil {
-		return s, err
+	if a.AnalyzeWait <= 0 {
+		if err := run(st.Ix.Env.Name, progress); err != nil {
+			return s, err
+		}
+	} else {
+		key := st.Ix.Env.ID + "|" + st.GameMM()
+		if a.analyzing == nil || a.analyzing.key != key {
+			p := &pendingAnalysis{key: key, done: make(chan error, 1)}
+			a.analyzing = p
+			name := st.Ix.Env.Name
+			go func() { p.done <- run(name, nil) }()
+		}
+		select {
+		case err := <-a.analyzing.done:
+			a.analyzing = nil
+			if err != nil {
+				return s, err
+			}
+		case <-time.After(a.AnalyzeWait):
+			return s, ErrStillComputing
+		}
 	}
 	st, err = a.Loadout()
 	if err != nil {
