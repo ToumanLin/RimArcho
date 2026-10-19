@@ -1,0 +1,34 @@
+workshop folders with About.xml: 1274; Workshop details returned: 1274 (result=1: 1264)
+About.xml with descriptionsByVersion: 5
+
+plain-text length (characters, BBCode and images stripped):
+  bucket        About   Workshop
+  empty            25          1
+  1–79            355         19
+  80–299          376        108
+  300–999         276        345
+  ≥1000           242        791
+
+Workshop descriptions with [img]: 696 of 1264 (55%); images in total: 7981
+Workshop description mostly images (< 80 chars of text, ≥ 1 image): 1
+About.xml short (< 80) but Workshop rich (≥ 300): 305
+both rich (≥ 300): 513
+neither (both < 80, no images): 18
+mean Workshop description size: 2615 bytes
+
+image hosts:
+   5738  i.imgur.com
+    772  raw.githubusercontent.com
+    562  img.litet.net
+    235  imgur.com
+    185  i.postimg.cc
+    138  images.steamusercontent.com
+    109  i.ibb.co
+     65  img.shields.io
+     38  steamuserimages-a.akamaihd.net
+     29  erinmhidni.github.io
+
+About and Workshop start with the same text (both ≥ 80): 504
+image-heavy (≥ 3 images, < 100 text chars per image): 139
+BBCode tags: img 8065, * 5371, url 4705, b 2664, h1 1683, list 1268, h2 1185, td 1005, h3 571, i 485, tr 363, hr 294, th 160, u 110, table 106, code 65, nl 57, strike 49, olist 24, quote 18
+image formats: .png 7351, .gif 323, (none) 244, .jpg 42, .jpeg 13, .webp 6, .png] 2
