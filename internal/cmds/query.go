@@ -17,7 +17,7 @@ func init() {
 		Flags: []Flag{{Name: "full", Help: "re-hash every semantic file"}}, Run: scanCmd})
 	register(&Command{Name: "status", Summary: "overview of the current environment", MaxArgs: 0, Run: statusCmd})
 	register(&Command{Name: "list", Summary: "list mods", MaxArgs: 0,
-		Flags: []Flag{{Name: "filter", Value: "<expr>", Help: "terms: source:<label|kind> status:live|tombstone|all residue copies pkg:<id> ws:<id> or words"},
+		Flags: []Flag{{Name: "filter", Value: "<expr>", Help: "terms: source:<label|kind> status:live|tombstone|all residue unloadable copies pkg:<id> ws:<id> or words"},
 			{Name: "all", Help: "no truncation"}}, Run: listCmd})
 	register(&Command{Name: "find", Args: "<words…>", Summary: "search by name, package id, author, workshop id, folder", MinArgs: 1, MaxArgs: -1,
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: findCmd})
@@ -95,6 +95,9 @@ func sourceSummary(s app.SourceStat) string {
 	}
 	if s.Residue > 0 {
 		extra = append(extra, fmt.Sprintf("%d residue", s.Residue))
+	}
+	if s.Disabled > 0 {
+		extra = append(extra, fmt.Sprintf("%d about-disabled", s.Disabled))
 	}
 	if n := s.NoAbout + s.ResidueNoAbout; n > 0 {
 		extra = append(extra, fmt.Sprintf("%d without About.xml", n))
@@ -220,6 +223,8 @@ func filterMods(ix *app.Index, expr string) ([]*store.Mod, error) {
 			preds = append(preds, func(m *store.Mod) bool { return m.WorkshopID() == v })
 		case !hasKV && strings.ToLower(t) == "residue":
 			preds = append(preds, func(m *store.Mod) bool { return m.Residue })
+		case !hasKV && strings.ToLower(t) == "unloadable":
+			preds = append(preds, func(m *store.Mod) bool { return m.Unloadable != "" })
 		case !hasKV && strings.ToLower(t) == "copies":
 			preds = append(preds, func(m *store.Mod) bool { return len(ix.ByLineage[m.LineageID]) > 1 })
 		case hasKV && k == "lineage":

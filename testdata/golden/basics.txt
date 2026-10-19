@@ -7,6 +7,7 @@ archo — RimWorld mod manager (M1: environments, scanning, identity)
     env set <name>                            change an environment's paths (re-binds moved sources)
     env use <name>                            select the current environment
     env rebind <src:label> yes|no             answer a pending source re-binding
+    env remove <name>                         forget an environment (RimArcho data only; no game files)
     scan                                      scan sources and reconcile identities
     status                                    overview of the current environment
     list                                      list mods

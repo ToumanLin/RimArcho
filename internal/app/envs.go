@@ -21,6 +21,8 @@ type EnvSpec struct {
 	Launch       string
 	SteamCMD     []string
 	Extra        []string
+	// RemoveSources lists steamcmd/extra source labels to retire (env set only).
+	RemoveSources []string
 }
 
 // SourceChange reports what happened to one source.
@@ -262,10 +264,44 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 			changes = append(changes, SourceChange{Source: s, Action: "added"})
 		}
 	}
+	for _, label := range spec.RemoveSources {
+		label = strings.TrimPrefix(label, "src:")
+		var s *source.Source
+		for _, x := range srcs {
+			if x.Label == label && x.Status != source.StatusRetired {
+				s = x
+			}
+		}
+		if s == nil {
+			return nil, nil, fmt.Errorf("no active source src:%s in env:%s", label, e.Name)
+		}
+		if s.Kind != source.SteamCMD && s.Kind != source.Extra {
+			return nil, nil, fmt.Errorf("src:%s is a %s source; only steamcmd and extra sources can be removed (change --game/--workshop instead)", label, s.Kind)
+		}
+		s.Status = source.StatusRetired
+		s.Label = nextLabel(srcs, source.Kind(label+"-removed"))
+		if err := a.Store.UpdateSource(s); err != nil {
+			return nil, nil, err
+		}
+		changes = append(changes, SourceChange{Source: s, Action: "removed"})
+	}
 	if err := a.Store.UpdateEnv(e); err != nil {
 		return nil, nil, err
 	}
 	return e, changes, nil
+}
+
+// EnvRemove deletes an environment from RimArcho's database (instances, history, rules).
+// Game and mod files are not touched.
+func (a *App) EnvRemove(name string) (*env.Environment, error) {
+	e, err := a.Store.EnvByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, fmt.Errorf("no environment named %q (archo env list)", name)
+	}
+	return e, a.Store.DeleteEnv(e.ID)
 }
 
 // rebind evaluates moving source s to newRoot and applies it when the sample matches.

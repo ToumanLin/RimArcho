@@ -102,11 +102,13 @@ func TestSimilarity(t *testing.T) {
 	edited := SemanticSet{"about/about.xml": h(9), "defs/a.xml": h(9), "defs/b.xml": h(3), "patches/p.xml": h(4)}
 	grown := SemanticSet{"about/about.xml": h(1), "defs/a.xml": h(2), "defs/b.xml": h(3), "patches/p.xml": h(4), "defs/c.xml": h(5)}
 	other := SemanticSet{"about/about.xml": h(7), "defs/x.xml": h(8)}
+	// Restructured: same contents moved into a version folder.
+	moved := SemanticSet{"about/about.xml": h(1), "1.6/defs/a.xml": h(2), "1.6/defs/b.xml": h(3), "1.6/patches/p.xml": h(4)}
 	for _, c := range []struct {
 		name string
 		b    SemanticSet
 		want float64
-	}{{"same", same, 1}, {"edited (paths match)", edited, 1}, {"grown", grown, 0.8}, {"other", other, 0.2}} {
+	}{{"same", same, 1}, {"edited (paths match)", edited, 1}, {"grown", grown, 0.8}, {"other", other, 0.2}, {"restructured", moved, 1}} {
 		if got := Similarity(a, c.b); got < c.want-1e-9 || got > c.want+1e-9 {
 			t.Errorf("%s: %v, want %v", c.name, got, c.want)
 		}

@@ -24,6 +24,9 @@ type Origin struct {
 	CopiedAt     string `json:"copied_at,omitempty"`
 }
 
+// UnloadableAboutDisabled marks a folder with only About/About.xml.disabled (02 §4.1).
+const UnloadableAboutDisabled = "about-disabled"
+
 // OriginFile is the marker's path relative to a mod folder.
 const OriginFile = ".rimarcho/origin.json"
 
@@ -54,7 +57,8 @@ type Observation struct {
 	Origin     *Origin
 	ACF        *ACFItem
 	GitHead    string
-	Residue    bool // workshop folder that Steam no longer lists as subscribed
+	Residue    bool   // workshop folder that Steam no longer lists as subscribed
+	Unloadable string // why the game cannot load the folder at all, e.g. "about-disabled"
 	Err        string
 }
 
@@ -63,6 +67,7 @@ type SourceStats struct {
 	Folders        int
 	Mods           int
 	Residue        int
+	Disabled       int // mods with only About.xml.disabled
 	NoAbout        int // folders without About/About.xml (not mods)
 	ResidueNoAbout int // unsubscribed workshop folders without About.xml: counted only
 	Aliases        int
@@ -96,6 +101,7 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 		loc      Location
 		real     string
 		residue  bool
+		disabled bool
 		acf      *ACFItem
 		srcOrder int
 	}
@@ -124,7 +130,8 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 				// folders are never loaded directly, so residue applies to workshop only.
 				residue = s.Kind == source.Workshop && (item == nil || !item.Subscribed)
 			}
-			if !source.HasAbout(e.Path) {
+			about := source.AboutState(e.Path)
+			if about == source.AboutNone {
 				if residue {
 					st.ResidueNoAbout++
 				} else {
@@ -136,6 +143,7 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 				loc:      Location{SourceID: s.ID, Kind: s.Kind, Label: s.Label, Rel: e.Name, Path: e.Path, IsLink: e.IsLink},
 				real:     e.RealPath,
 				residue:  residue,
+				disabled: about == source.AboutDisabled,
 				acf:      item,
 				srcOrder: si,
 			}
@@ -170,6 +178,9 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 		})
 		p := g[0]
 		ob := &Observation{Loc: p.loc, RealPath: p.real, Residue: p.residue, ACF: p.acf}
+		if p.disabled {
+			ob.Unloadable = UnloadableAboutDisabled
+		}
 		for _, a := range g[1:] {
 			ob.Aliases = append(ob.Aliases, a.loc)
 			stats[a.loc.SourceID].Aliases++
@@ -179,6 +190,9 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 		st.Mods++
 		if p.residue {
 			st.Residue++
+		}
+		if p.disabled {
+			st.Disabled++
 		}
 	}
 

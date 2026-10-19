@@ -134,6 +134,13 @@ func parseXML(b []byte) (*node, error) {
 func ReadDecl(dir string, official bool) Decl {
 	var d Decl
 	aboutPath := findCI(dir, "About", "About.xml")
+	if _, err := os.Stat(aboutPath); err != nil {
+		if p := findCI(dir, "About", "About.xml.disabled"); p != "" {
+			if _, err := os.Stat(p); err == nil {
+				aboutPath = p // RimCrow-disabled: the declaration is still valid (02 §4.1)
+			}
+		}
+	}
 	b, err := os.ReadFile(aboutPath)
 	var root *node
 	if err == nil {

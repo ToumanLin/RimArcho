@@ -145,28 +145,41 @@ func List(root string) (entries []Entry, realRoot string, err error) {
 	return entries, realRoot, nil
 }
 
-// HasAbout reports whether dir is a mod folder (has About/About.xml, any case).
-func HasAbout(dir string) bool {
+// About file states of a folder.
+const (
+	AboutNone     = 0 // not a mod folder
+	AboutPresent  = 1 // About/About.xml
+	AboutDisabled = 2 // only About/About.xml.disabled (how RimCrow disables a mod, 02 §4.1)
+)
+
+// AboutState reports whether dir is a mod folder; names compare case-insensitively.
+func AboutState(dir string) int {
 	if _, err := os.Stat(filepath.Join(dir, "About", "About.xml")); err == nil {
-		return true
+		return AboutPresent
 	}
-	// Case-insensitive fallback for case-sensitive file systems.
+	state := AboutNone
 	des, err := os.ReadDir(dir)
 	if err != nil {
-		return false
+		return AboutNone
 	}
 	for _, d := range des {
 		if strings.EqualFold(d.Name(), "About") {
 			fs, _ := os.ReadDir(filepath.Join(dir, d.Name()))
 			for _, f := range fs {
-				if strings.EqualFold(f.Name(), "About.xml") {
-					return true
+				switch {
+				case strings.EqualFold(f.Name(), "About.xml"):
+					return AboutPresent
+				case strings.EqualFold(f.Name(), "About.xml.disabled"):
+					state = AboutDisabled
 				}
 			}
 		}
 	}
-	return false
+	return state
 }
+
+// HasAbout reports whether dir has an About/About.xml (any case).
+func HasAbout(dir string) bool { return AboutState(dir) == AboutPresent }
 
 // Within reports whether p is inside (or equal to) root, comparing resolved keys.
 func Within(p, root string) bool {

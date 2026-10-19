@@ -20,6 +20,9 @@ func tags(c *Ctx, ix *app.Index, m *store.Mod) string {
 	if m.Residue {
 		parts = append(parts, "residue")
 	}
+	if m.Unloadable != "" {
+		parts = append(parts, "unloadable: "+m.Unloadable)
+	}
 	if b := app.Basis(m.LineageBasis); b != "" && b != "manual" && len(ix.ByLineage[m.LineageID]) > 1 {
 		parts = append(parts, "copy "+b)
 	}

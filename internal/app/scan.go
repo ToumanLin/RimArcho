@@ -19,6 +19,7 @@ type SourceStat struct {
 	Folders        int    `json:"folders"`
 	Mods           int    `json:"mods"`
 	Residue        int    `json:"residue,omitempty"`
+	Disabled       int    `json:"disabled,omitempty"`
 	NoAbout        int    `json:"no_about,omitempty"`
 	ResidueNoAbout int    `json:"residue_no_about,omitempty"`
 	Aliases        int    `json:"aliases,omitempty"`
@@ -153,8 +154,8 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 	for _, s := range srcs {
 		ss := SourceStat{Label: s.Label, Kind: string(s.Kind), Status: s.Status}
 		if x := sstats[s.ID]; x != nil {
-			ss.Folders, ss.Mods, ss.Residue, ss.NoAbout, ss.ResidueNoAbout, ss.Aliases, ss.HasACF, ss.Err =
-				x.Folders, x.Mods, x.Residue, x.NoAbout, x.ResidueNoAbout, x.Aliases, x.HasACF, x.Err
+			ss.Folders, ss.Mods, ss.Residue, ss.Disabled, ss.NoAbout, ss.ResidueNoAbout, ss.Aliases, ss.HasACF, ss.Err =
+				x.Folders, x.Mods, x.Residue, x.Disabled, x.NoAbout, x.ResidueNoAbout, x.Aliases, x.HasACF, x.Err
 		}
 		st.Sources = append(st.Sources, ss)
 	}

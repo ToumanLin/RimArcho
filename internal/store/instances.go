@@ -23,6 +23,7 @@ type Mod struct {
 	RealPath     string
 	Status       string
 	Residue      bool
+	Unloadable   string // "about-disabled" etc.
 	FirstSeen    time.Time
 	LastSeen     time.Time
 	TombstoneAt  time.Time
@@ -69,7 +70,7 @@ func (m *Mod) Decl() scan.Decl {
 	return d
 }
 
-const modCols = `i.id, i.lineage_id, i.lineage_basis, i.source_id, s.label, s.kind, i.rel_path, i.real_path, i.status, i.residue,
+const modCols = `i.id, i.lineage_id, i.lineage_basis, i.source_id, s.label, s.kind, i.rel_path, i.real_path, i.status, i.residue, i.unloadable,
 	i.first_seen, i.last_seen, coalesce(i.tombstone_at, 0),
 	coalesce(n.id, 0), coalesce(n.snapshot_hash, x''), coalesce(n.package_id, ''), coalesce(n.package_id_raw, ''), coalesce(n.name, ''),
 	coalesce(n.authors, ''), coalesce(n.workshop_id_declared, ''), coalesce(n.supported_versions, ''), coalesce(n.decl_blob, '{}'),
@@ -83,7 +84,7 @@ func scanMod(row interface{ Scan(...any) error }) (*Mod, error) {
 	var kind string
 	var first, last, tomb int64
 	var residue int
-	err := row.Scan(&m.ID, &m.LineageID, &m.LineageBasis, &m.SourceID, &m.SourceLabel, &kind, &m.Rel, &m.RealPath, &m.Status, &residue,
+	err := row.Scan(&m.ID, &m.LineageID, &m.LineageBasis, &m.SourceID, &m.SourceLabel, &kind, &m.Rel, &m.RealPath, &m.Status, &residue, &m.Unloadable,
 		&first, &last, &tomb, &m.SnapID, &m.SnapHash, &m.PackageID, &m.PackageIDRaw, &m.Name, &m.Authors, &m.DeclaredWorkshop,
 		&m.SupportedVersions, &m.DeclBlob, &m.ACFManifest, &m.ACFTimeUpdated, &m.ACFSize, &m.GitHead, &m.Origin,
 		&m.FileCount, &m.TotalSize, &m.SemanticCount)

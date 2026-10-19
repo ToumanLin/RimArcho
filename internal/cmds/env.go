@@ -19,13 +19,17 @@ var envFlags = []Flag{
 	{Name: "launch", Value: "direct|steam"},
 }
 
+var removeSourceFlag = Flag{Name: "remove-source", Value: "<src:label>", Multi: true, Help: "retire a steamcmd or extra source (env set)"}
+
 func init() {
 	register(&Command{Name: "env list", Summary: "list environments and their sources", MaxArgs: 0, Run: envList})
 	register(&Command{Name: "env detect", Summary: "detect game, user data and workshop paths (suggestion only)", MaxArgs: 0, Run: envDetect})
 	register(&Command{Name: "env add", Args: "<name>", Summary: "add an environment", MinArgs: 1, MaxArgs: 1,
 		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}}, envFlags...), Run: envAdd})
 	register(&Command{Name: "env set", Args: "<name>", Summary: "change an environment's paths (re-binds moved sources)", MinArgs: 1, MaxArgs: 1,
-		Flags: envFlags, Run: envSet})
+		Flags: append(append([]Flag(nil), envFlags...), removeSourceFlag), Run: envSet})
+	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget an environment (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
+		Flags: []Flag{{Name: "yes", Help: "confirm"}}, Run: envRemove})
 	register(&Command{Name: "env use", Args: "<name>", Summary: "select the current environment", MinArgs: 1, MaxArgs: 1, Run: envUse})
 	register(&Command{Name: "env rebind", Args: "<src:label> yes|no", Summary: "answer a pending source re-binding", MinArgs: 2, MaxArgs: 2, Run: envRebind})
 }
@@ -122,7 +126,21 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 
 func specFromArgs(a *Args) app.EnvSpec {
 	return app.EnvSpec{GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), WorkshopRoot: a.Str("workshop"),
-		Launch: a.Str("launch"), SteamCMD: a.List("steamcmd"), Extra: a.List("extra")}
+		Launch: a.Str("launch"), SteamCMD: a.List("steamcmd"), Extra: a.List("extra"), RemoveSources: a.List("remove-source")}
+}
+
+func envRemove(c *Ctx, a *Args) (*render.Doc, error) {
+	if !a.Bool("yes") {
+		return nil, &UsageError{Msg: fmt.Sprintf("this forgets env:%s and its instance IDs, history and rules; add --yes to confirm", a.Pos[0])}
+	}
+	e, err := c.App.EnvRemove(a.Pos[0])
+	if err != nil {
+		return nil, err
+	}
+	d, root := render.New(envRef(e) + "  removed")
+	root.KV("kept", "game, workshop and mod folders are untouched")
+	d.AddNext("archo env list")
+	return d, nil
 }
 
 func envAdd(c *Ctx, a *Args) (*render.Doc, error) {

@@ -91,6 +91,7 @@ next:
 | 分组 | 命令 | 说明 |
 | --- | --- | --- |
 | 环境 | `env list` / `env add` / `env use <名>` / `env detect` | 管理与探测环境 |
+| | `env set <名> [--game …] [--remove-source src:<标签>]` / `env rebind src:<标签> yes\|no` / `env remove <名> --yes` | 修改路径与重新绑定（02 §3.2）；移除 steamcmd/extra 来源；删除环境（只删 RimArcho 的数据）（M1 遗留问题 4） |
 | 扫描 | `scan [--full]` | 扫描并对账（02） |
 | 查询 | `status` | 当前环境概况：启用数量、问题数量、未保存修改、最近变化 |
 | | `list [--active] [--filter <表达式>]` | 列出 Mod |

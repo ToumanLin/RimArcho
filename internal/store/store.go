@@ -12,7 +12,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -62,6 +62,30 @@ CREATE TABLE identity_question(
   status TEXT NOT NULL DEFAULT 'open', resolution TEXT NOT NULL DEFAULT '', resolved_at INTEGER);
 `
 
+// schemaV2 (M2): unloadable instances, the workspace Loadout with undo/redo, saved
+// versions and tags, ModsConfig.xml write tracking, user rules and launches (04).
+const schemaV2 = `
+ALTER TABLE instance ADD COLUMN unloadable TEXT NOT NULL DEFAULT '';
+CREATE TABLE workspace(
+  environment_id TEXT PRIMARY KEY, entries TEXT NOT NULL, origin_version INTEGER NOT NULL DEFAULT 0,
+  origin_kind TEXT NOT NULL DEFAULT '', conflict_version INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL);
+CREATE TABLE workspace_undo(
+  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, stack TEXT NOT NULL, entries TEXT NOT NULL, op TEXT NOT NULL);
+CREATE INDEX workspace_undo_env ON workspace_undo(environment_id, stack, id);
+CREATE TABLE loadout_version(
+  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, n INTEGER NOT NULL, created_at INTEGER NOT NULL,
+  source TEXT NOT NULL, entries TEXT NOT NULL, game_version TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+  UNIQUE(environment_id, n));
+CREATE TABLE loadout_tag(environment_id TEXT NOT NULL, name TEXT NOT NULL, version_n INTEGER NOT NULL,
+  PRIMARY KEY(environment_id, name));
+CREATE TABLE modsconfig_state(environment_id TEXT PRIMARY KEY, written_hash BLOB, seen_hash BLOB, written_at INTEGER);
+CREATE TABLE user_rule(
+  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, kind TEXT NOT NULL, a_lineage TEXT NOT NULL DEFAULT '',
+  b_lineage TEXT NOT NULL DEFAULT '', target TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
+CREATE TABLE launch(
+  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, started_at INTEGER NOT NULL, method TEXT NOT NULL, command TEXT NOT NULL);
+`
+
 // Store wraps the database handle.
 type Store struct {
 	DB   *sql.DB
@@ -104,7 +128,7 @@ func (s *Store) migrate() error {
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(schemaV1); err != nil {
+		if _, err := tx.Exec(schemaV1 + schemaV2); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("store: create schema: %w", err)
 		}
@@ -115,6 +139,24 @@ func (s *Store) migrate() error {
 		return tx.Commit()
 	}
 	v := s.Meta("schema_version")
+	if v == "1" {
+		tx, err := s.DB.Begin()
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(schemaV2); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("store: migrate to v2: %w", err)
+		}
+		if _, err := tx.Exec(`UPDATE meta SET value='2' WHERE key='schema_version'`); err != nil {
+			tx.Rollback()
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		v = "2"
+	}
 	if v != fmt.Sprint(SchemaVersion) {
 		return fmt.Errorf("store: unsupported schema version %q (want %d)", v, SchemaVersion)
 	}

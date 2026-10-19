@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rimarcho/rimarcho/internal/source"
 	"github.com/zeebo/xxh3"
 )
 
@@ -76,6 +77,12 @@ func skipDir(name string) bool {
 func Compute(dir string, prev map[string]File) (Fingerprint, error) {
 	var fp Fingerprint
 	fp.Semantic = SemanticSet{}
+	if source.IsLink(dir) {
+		// WalkDir does not descend into a junction or symlink root; walk its target.
+		if real, err := source.RealPath(dir); err == nil {
+			dir = real
+		}
+	}
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if p == dir {
@@ -176,23 +183,32 @@ func SemanticOnly(dir string) (SemanticSet, error) {
 	return fp.Semantic, err
 }
 
-// Similarity of two semantic sets (02 §4.3): the Jaccard index over (path, hash) pairs and
-// the Jaccard index over paths alone; the larger of the two.
+// Similarity of two semantic sets (02 §4.3, revised after M1): the larger of
+//   - J(paths): Jaccard over relative paths only — "moved and updated" keeps its structure;
+//   - J(hashes): Jaccard over content hashes regardless of path (as multisets, so several
+//     identical files count once each) — "restructured" moves files into e.g. 1.6/.
 func Similarity(a, b SemanticSet) float64 {
 	if len(a) == 0 && len(b) == 0 {
 		return 0
 	}
-	pairs, paths := 0, 0
-	for k, ha := range a {
-		if hb, ok := b[k]; ok {
+	paths := 0
+	for k := range a {
+		if _, ok := b[k]; ok {
 			paths++
-			if ha == hb {
-				pairs++
-			}
 		}
 	}
-	union := len(a) + len(b) - paths
-	jPaths := float64(paths) / float64(union)
-	jPairs := float64(pairs) / float64(len(a)+len(b)-pairs)
-	return max(jPaths, jPairs)
+	jPaths := float64(paths) / float64(len(a)+len(b)-paths)
+	count := make(map[Hash]int, len(a))
+	for _, h := range a {
+		count[h]++
+	}
+	common := 0
+	for _, h := range b {
+		if count[h] > 0 {
+			count[h]--
+			common++
+		}
+	}
+	jHashes := float64(common) / float64(len(a)+len(b)-common)
+	return max(jPaths, jHashes)
 }

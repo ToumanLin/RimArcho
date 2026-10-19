@@ -79,7 +79,7 @@ var registry []*Command
 func register(c *Command) { registry = append(registry, c) }
 
 // order is the documented command order (05 §3); registration order depends on file names.
-var order = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "scan", "status", "list", "find",
+var order = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "env remove", "scan", "status", "list", "find",
 	"mod", "changes", "identity list", "identity resolve", "lineage split", "lineage merge", "gc"}
 
 // Commands returns the command table in documented order.

@@ -577,3 +577,88 @@ func TestTombstoneGC(t *testing.T) {
 		t.Fatal("Mod B tombstone removed despite an open question")
 	}
 }
+
+// 02 §4.3 (revised): files moved into a version folder with unchanged content still count
+// as the same mod (J(hash)); a content-only edit keeps J(path) = 1.
+func TestSimilarityRestructureAndContentOnly(t *testing.T) {
+	e := setup(t, false)
+	dir := filepath.Join(e.Game, "Mods", "Restructure")
+	e.WriteMod(dir, testkit.Sample("tester.re", "Restructure"))
+	scanNow(t, e)
+	before := one(t, e, "Restructure")
+	// Rename the folder and move Defs/ and Patches/ under 1.6/ in the same scan.
+	nd := filepath.Join(e.Game, "Mods", "Restructure 1.6")
+	e.Move(dir, nd)
+	e.Move(filepath.Join(nd, "Defs"), filepath.Join(nd, "1.6", "Defs"))
+	e.Move(filepath.Join(nd, "Patches"), filepath.Join(nd, "1.6", "Patches"))
+	sid := scanNow(t, e)
+	if one(t, e, "Restructure").ID != before.ID {
+		t.Fatal("restructure + rename lost identity")
+	}
+	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvMoved: 1, identity.EvUpdated: 1})
+	// Rename plus every semantic file edited: paths still match.
+	for _, f := range []string{"1.6/Defs/ThingDefs/restructure.xml", "1.6/Defs/RecipeDefs/restructure.xml", "1.6/Patches/restructure.xml"} {
+		e.WriteFile(filepath.Join(nd, filepath.FromSlash(f)), "<Defs><!-- rewritten --></Defs>")
+	}
+	e.Move(nd, filepath.Join(e.Game, "Mods", "Restructure final"))
+	sid = scanNow(t, e)
+	if one(t, e, "Restructure").ID != before.ID {
+		t.Fatal("content-only change + rename lost identity")
+	}
+	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvMoved: 1, identity.EvUpdated: 1})
+}
+
+// 02 §4.1: RimCrow disables a workshop mod by renaming About.xml and deploys a copy through
+// a junction outside every source. The disabled folder is an unloadable Instance, and the
+// deployed copy joins its lineage.
+func TestAboutDisabled(t *testing.T) {
+	e := setup(t, false)
+	ws := e.AddWorkshop("4001", testkit.Sample("tester.crow", "Crow Managed"))
+	deployed := filepath.Join(e.Root, "RimCrow", "mods", "4001")
+	e.CopyTree(ws, deployed)
+	e.Move(filepath.Join(ws, "About", "About.xml"), filepath.Join(ws, "About", "About.xml.disabled"))
+	e.Junction(filepath.Join(e.Game, "Mods", "_Link_4001"), deployed)
+	sid := scanNow(t, e)
+	ms := named(t, e, "Crow Managed")
+	if len(ms) != 2 || ms[0].LineageID != ms[1].LineageID {
+		t.Fatalf("want 2 instances in one lineage, got %d: %s", len(ms), e.MustRun("changes"))
+	}
+	for _, m := range ms {
+		want := ""
+		if m.Kind == source.Workshop {
+			want = scan.UnloadableAboutDisabled
+		}
+		if m.Unloadable != want || m.PackageID != "tester.crow" {
+			t.Fatalf("%s: unloadable %q pkg %q", m.SourceLabel, m.Unloadable, m.PackageID)
+		}
+	}
+	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvDiscovered: 2, identity.EvCopied: 1})
+	out := e.MustRun("list", "--filter", "unloadable")
+	if !strings.Contains(out, "unloadable: about-disabled") {
+		t.Fatal(out)
+	}
+}
+
+func TestEnvRemoveAndSourceRemove(t *testing.T) {
+	e := setup(t, true)
+	e.WriteMod(filepath.Join(e.SteamCMD, "5001"), testkit.Sample("tester.cmd", "Via SteamCMD"))
+	scanNow(t, e)
+	if _, code := e.Run("env", "set", "main", "--remove-source", "src:local"); code == 0 {
+		t.Fatal("removing the local source must be refused")
+	}
+	e.MustRun("env", "set", "main", "--remove-source", "src:steamcmd")
+	sid := scanNow(t, e)
+	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvDisappeared: 1})
+	if _, code := e.Run("env", "remove", "main"); code != 2 {
+		t.Fatal("env remove without --yes must be refused")
+	}
+	e.MustRun("env", "remove", "main", "--yes")
+	if out := e.MustRun("env", "list"); !strings.Contains(out, "environments: 0") {
+		t.Fatal(out)
+	}
+	var n int
+	e.App.Store.DB.QueryRow(`SELECT (SELECT count(*) FROM instance) + (SELECT count(*) FROM snapshot_file) + (SELECT count(*) FROM source)`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("%d rows left after env remove", n)
+	}
+}

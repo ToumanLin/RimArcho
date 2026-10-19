@@ -113,15 +113,16 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 		if ob.Residue {
 			residue = 1
 		}
+		unloadable := ob.Unloadable
 		if a.Known == nil {
 			if _, err = tx.Exec(`INSERT INTO instance(id, environment_id, lineage_id, lineage_basis, source_id, rel_path, real_path, status,
-				residue, first_seen, last_seen) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
-				a.InstanceID, envID, a.LineageID, a.LineageBasis, ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, residue, ts, ts); err != nil {
+				residue, unloadable, first_seen, last_seen) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+				a.InstanceID, envID, a.LineageID, a.LineageBasis, ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, residue, unloadable, ts, ts); err != nil {
 				return err
 			}
 		} else {
-			if _, err = tx.Exec(`UPDATE instance SET source_id=?, rel_path=?, real_path=?, status=?, residue=?, last_seen=?, tombstone_at=NULL WHERE id=?`,
-				ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, residue, ts, a.InstanceID); err != nil {
+			if _, err = tx.Exec(`UPDATE instance SET source_id=?, rel_path=?, real_path=?, status=?, residue=?, unloadable=?, last_seen=?, tombstone_at=NULL WHERE id=?`,
+				ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, residue, unloadable, ts, a.InstanceID); err != nil {
 				return err
 			}
 		}

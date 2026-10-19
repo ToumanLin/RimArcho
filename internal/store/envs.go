@@ -160,3 +160,36 @@ func (s *Store) SourceSemantics(sourceID string) (map[string]map[string][16]byte
 	}
 	return out, rows2.Err()
 }
+
+// DeleteEnv removes an environment and everything RimArcho stored for it. Only RimArcho's
+// own database is touched; no game or mod file is.
+func (s *Store) DeleteEnv(envID string) error {
+	return s.inTx(func(tx *sql.Tx) error {
+		inst := `(SELECT id FROM instance WHERE environment_id=?)`
+		for _, q := range []string{
+			`DELETE FROM snapshot_file WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id IN ` + inst + `)`,
+			`DELETE FROM snapshot WHERE instance_id IN ` + inst,
+			`DELETE FROM instance_alias WHERE instance_id IN ` + inst,
+			`DELETE FROM change_event WHERE scan_id IN (SELECT id FROM scan WHERE environment_id=?)`,
+			`DELETE FROM instance WHERE environment_id=?`,
+			`DELETE FROM lineage WHERE environment_id=?`,
+			`DELETE FROM identity_question WHERE environment_id=?`,
+			`DELETE FROM scan WHERE environment_id=?`,
+			`DELETE FROM source WHERE environment_id=?`,
+			`DELETE FROM workspace WHERE environment_id=?`,
+			`DELETE FROM workspace_undo WHERE environment_id=?`,
+			`DELETE FROM loadout_version WHERE environment_id=?`,
+			`DELETE FROM loadout_tag WHERE environment_id=?`,
+			`DELETE FROM modsconfig_state WHERE environment_id=?`,
+			`DELETE FROM user_rule WHERE environment_id=?`,
+			`DELETE FROM launch WHERE environment_id=?`,
+			`DELETE FROM environment WHERE id=?`,
+		} {
+			if _, err := tx.Exec(q, envID); err != nil {
+				return err
+			}
+		}
+		_, err := tx.Exec(`DELETE FROM meta WHERE key=? AND value=?`, metaCurrentEnv, envID)
+		return err
+	})
+}
