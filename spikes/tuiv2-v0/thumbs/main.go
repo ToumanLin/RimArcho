@@ -227,14 +227,21 @@ func (m *model) thumb(md mod) ([]byte, string) {
 		return nil, "decode: " + err.Error()
 	}
 	b := src.Bounds()
-	w := min(thumbPx, b.Dx())
-	h := b.Dy() * w / max(b.Dx(), 1)
-	dst := scale(src, w, h)
+	dst, rows := fitThumb(src)
 	var pb bytes.Buffer
 	(&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&pb, dst)
 	enc := base64.StdEncoding.EncodeToString(pb.Bytes())
-	seq := []byte(fmt.Sprintf("\x1b]1337;File=inline=1;size=%d;width=%d;height=%d;preserveAspectRatio=1;doNotMoveCursor=1:%s\x07", pb.Len(), rectW, rectH, enc))
-	info := fmt.Sprintf("%dx%d → %dx%d, %d KB png, %d ms", b.Dx(), b.Dy(), w, h, pb.Len()/1024, time.Since(t0).Milliseconds())
+	// preserveAspectRatio=0 with both sizes in cells: WezTerm covers exactly rectW x rows
+	// cells. (With preserveAspectRatio=1 it keeps the width and derives the height, so a
+	// tall preview runs far below the rect and the rect clear leaves it behind.)
+	seq := []byte(fmt.Sprintf("\x1b]1337;File=inline=1;size=%d;width=%d;height=%d;preserveAspectRatio=0;doNotMoveCursor=1:%s\x07", pb.Len(), rectW, rows, enc))
+	if os.Getenv("THUMBS_OLDFIT") != "" { // the V0 first version, to reproduce the ghost
+		pb.Reset()
+		w := min(thumbPx, b.Dx())
+		(&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&pb, scale(src, w, b.Dy()*w/max(b.Dx(), 1)))
+		seq = []byte(fmt.Sprintf("\x1b]1337;File=inline=1;size=%d;width=%d;height=%d;preserveAspectRatio=1;doNotMoveCursor=1:%s\x07", pb.Len(), rectW, rectH, base64.StdEncoding.EncodeToString(pb.Bytes())))
+	}
+	info := fmt.Sprintf("%dx%d → %dx%d (%d rows), %d KB png, %d ms", b.Dx(), b.Dy(), dst.Bounds().Dx(), dst.Bounds().Dy(), rows, pb.Len()/1024, time.Since(t0).Milliseconds())
 	m.cache[md.preview], m.cacheInfo[md.preview] = seq, info
 	return seq, info
 }
@@ -388,6 +395,50 @@ func drive(p *tea.Program, m *model) {
 		time.Sleep(2 * time.Second)
 	}
 	time.Sleep(2 * time.Second)
+	if os.Getenv("THUMBS_GHOST") != "" {
+		// tallest preview → the preview closest to 16:9 → a row without one
+		tall, wide, none, best, bestD := -1, -1, -1, 0.0, 9.0
+		for i, md := range m.mods {
+			if md.preview == "" {
+				if none < 0 {
+					none = i
+				}
+				continue
+			}
+			f, err := os.Open(md.preview)
+			if err != nil {
+				continue
+			}
+			c, _, err := image.DecodeConfig(f)
+			f.Close()
+			if err != nil || c.Width == 0 {
+				continue
+			}
+			r := float64(c.Height) / float64(c.Width)
+			if r > best {
+				best, tall = r, i
+			}
+			if d := r - 9.0/16; d*d < bestD {
+				bestD, wide = d*d, i
+			}
+		}
+		goTo := func(i int, name string) {
+			key("home")
+			for j := 0; j < i; j++ {
+				key("down")
+			}
+			time.Sleep(700 * time.Millisecond)
+			mark(fmt.Sprintf("ghost %s row %d", name, i+1))
+		}
+		m.log.Printf("ghost rows: tall=%d (h/w %.2f) wide=%d none=%d", tall+1, best, wide+1, none+1)
+		goTo(tall, "tallest")
+		goTo(wide, "16x9")
+		goTo(none, "no preview")
+		goTo(tall, "tallest again")
+		goTo(none, "no preview again")
+		key("q")
+		return
+	}
 	mark("start: first row")
 	for i := 0; i < 499; i++ { // fast scroll: 20 ms per row, faster than the dwell
 		key("down")
@@ -418,6 +469,31 @@ func drive(p *tea.Program, m *model) {
 	time.Sleep(400 * time.Millisecond)
 	mark("home")
 	key("q")
+}
+
+// cellAspect is cell width / cell height for the bundled font in WezTerm (13 x 30 px at
+// 11 pt, 150% scaling). It only affects how exactly the aspect ratio is kept, never which
+// cells the image covers.
+const cellAspect = 13.0 / 30.0
+
+// fitThumb scales src to fit rectW x rectH cells (thumbPx wide at most) and pads it with
+// transparent pixels to exactly the pixel aspect of rectW x rows cells, rows being the
+// fewest rows that hold it.
+func fitThumb(src image.Image) (*image.RGBA, int) {
+	b := src.Bounds()
+	cellW := float64(thumbPx) / rectW
+	cellH := cellW / cellAspect
+	boxW, boxH := float64(thumbPx), cellH*rectH
+	s := min(boxW/float64(b.Dx()), boxH/float64(b.Dy()))
+	w, h := max(int(float64(b.Dx())*s), 1), max(int(float64(b.Dy())*s), 1)
+	rows := min(max(int(float64(h)/cellH+0.999), 1), rectH)
+	canvas := image.NewRGBA(image.Rect(0, 0, thumbPx, int(cellH*float64(rows)+0.5)))
+	img := scale(src, w, h)
+	ox, oy := (canvas.Bounds().Dx()-w)/2, (canvas.Bounds().Dy()-h)/2
+	for y := 0; y < h; y++ {
+		copy(canvas.Pix[canvas.PixOffset(ox, oy+y):], img.Pix[img.PixOffset(0, y):img.PixOffset(w, y)])
+	}
+	return canvas, rows
 }
 
 // scale is a box filter (averages the source pixels under each target pixel).
