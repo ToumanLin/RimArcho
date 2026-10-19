@@ -46,6 +46,8 @@ func (m *model) View() string {
 		lines = m.inspectLines(body)
 	case m.tab == tabProblems:
 		lines = m.problemLines(body)
+	case m.tab == tabChanges:
+		lines = m.changeLines(body)
 	case m.tab != tabList:
 		lines = window(m.tabText, m.tabOff, body)
 	default:

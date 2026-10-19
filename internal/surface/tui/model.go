@@ -126,7 +126,10 @@ type model struct {
 	analyzeWait func() tea.Msg
 
 	tabText []string
-	tabOff  int
+	chg     chState
+	// afterPanel runs once after a confirmed panel command (the Changes view reloads).
+	afterPanel func(m *model)
+	tabOff     int
 
 	panel    *panel
 	prompt   *prompt
@@ -160,7 +163,11 @@ func TuneProcess(a *app.App) {
 func Run(o Options) error {
 	TuneProcess(o.App)
 	SetLang(o.App.Store.Meta("cfg:ui.lang"))
-	_, err := tea.NewProgram(New(o), tea.WithAltScreen()).Run()
+	opts := []tea.ProgramOption{tea.WithAltScreen()}
+	if o.App.Store.Meta("cfg:ui.mouse") != "off" {
+		opts = append(opts, tea.WithMouseCellMotion())
+	}
+	_, err := tea.NewProgram(New(o), opts...).Run()
 	return err
 }
 

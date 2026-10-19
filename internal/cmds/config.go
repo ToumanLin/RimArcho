@@ -11,12 +11,13 @@ import (
 // configKeys are the user settings stored in the database (meta "cfg:<key>"), with their
 // allowed values; the first is the default.
 var configKeys = map[string][]string{
-	"ui.lang": {"auto", "en", "zh"},
+	"ui.lang":  {"auto", "en", "zh"},
+	"ui.mouse": {"on", "off"},
 }
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh; ui.mouse: on|off)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.

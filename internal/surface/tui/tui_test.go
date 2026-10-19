@@ -83,6 +83,19 @@ func waitFor(t *testing.T, tm *teatest.TestModel, want string) {
 		teatest.WithDuration(5*time.Second), teatest.WithCheckInterval(20*time.Millisecond))
 }
 
+// waitAll waits for one frame that shows every string.
+func waitAll(t *testing.T, tm *teatest.TestModel, want ...string) {
+	t.Helper()
+	teatest.WaitFor(t, tm.Output(), func(b []byte) bool {
+		for _, w := range want {
+			if !bytes.Contains(b, []byte(w)) {
+				return false
+			}
+		}
+		return true
+	}, teatest.WithDuration(5*time.Second), teatest.WithCheckInterval(20*time.Millisecond))
+}
+
 func finish(t *testing.T, tm *teatest.TestModel) *model {
 	t.Helper()
 	keys(tm, "q")
@@ -302,5 +315,36 @@ func TestProblemsView(t *testing.T) {
 		if p.Code == "order.cycle" {
 			t.Fatal("cycle still reported after the ignore rule")
 		}
+	}
+}
+
+// 06 §5: the Changes view groups the scan's events, enter shows the file diff, an external
+// ModsConfig.xml change offers load / ignore; 06 §1: wheel and click work.
+func TestChangesViewAndMouse(t *testing.T) {
+	e, scans := fixture(t)
+	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Defs", "ThingDefs", "beta.xml"), "<Defs><ThingDef><defName>beta_Changed</defName></ThingDef></Defs>\n")
+	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Patches", "new.xml"), "<Patch/>\n")
+	e.Advance(time.Hour)
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:tester.b")                                         // an unsaved edit …
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony") // … and an external change
+	tm := start(t, e, scans, 120, 30)
+	waitFor(t, tm, "active")
+	keys(tm, "3")
+	waitAll(t, tm, "L load into the workspace", "scan:2", "updated")
+	keys(tm, "down", "enter") // the conflict row is selected first; the updated event is next
+	waitAll(t, tm, "~ defs/thingdefs/beta.xml", "+ patches/new.xml")
+	tm.Send(tea.MouseMsg{Button: tea.MouseButtonWheelUp, Action: tea.MouseActionPress})
+	keys(tm, "I")
+	waitFor(t, tm, "external ModsConfig.xml version ignored")
+	keys(tm, "1")
+	tm.Send(tea.MouseMsg{X: 10, Y: 4, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	m := finish(t, tm)
+	if m.cursor != 2 {
+		t.Fatalf("click on the third list row: cursor %d", m.cursor)
+	}
+	st, _ := e.App.Loadout()
+	if st.WS.Conflict != 0 {
+		t.Fatal("I did not dismiss the conflict")
 	}
 }

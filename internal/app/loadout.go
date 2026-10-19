@@ -882,3 +882,17 @@ func loadCommunity(path string) (order.Community, error) {
 	}
 	return c, nil
 }
+
+// DismissConflict drops the pointer to an external ModsConfig.xml version that was not
+// loaded (06 §5 "ignore"); the version stays in the history.
+func (a *App) DismissConflict() error {
+	st, err := a.Loadout()
+	if err != nil {
+		return err
+	}
+	if st.WS.Conflict == 0 {
+		return nil
+	}
+	st.WS.Conflict = 0
+	return a.Store.SetWorkspace(st.WS)
+}

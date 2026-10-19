@@ -136,6 +136,16 @@ var zhText = map[string]string{
 	"no Player.log found":                   "未找到 Player.log",
 	"analyze which log? (enter)":            "分析哪个日志？（enter）",
 	"log analyzed: %d problems":             "日志分析完成：%d 个问题",
+	"external ModsConfig.xml version ignored (it stays in loadout log)": "已忽略外部 ModsConfig.xml 版本（仍保留在 loadout log 中）",
+	"… %d more": "… 另有 %d 项",
+	"(semantic files unchanged: only other files changed)": "（语义文件未变，只有其他文件变化）",
+	"(snapshot no longer stored)":                          "（快照已不在库中）",
+	"(no file-level difference recorded for this event)":   "（此事件没有文件级差异记录）",
+	"no changes":            "无变化",
+	"no scan yet (R scans)": "尚未扫描（R 扫描）",
+	"changed outside RimArcho, kept as v%d — L load into the workspace · I ignore": "被外部修改，已存为 v%d — L 载入工作区 · I 忽略",
+	"score": "相似度",
+	"identity questions %d — s same · c copy · u unrelated":                "身份待确认 %d 项 — s 是同一个 · c 是副本 · u 无关",
 	"%d bool prefixes from %d mods can skip methods other mods also patch": "%d 个返回 bool 的前缀（来自 %d 个 mod）可能跳过其他 mod 也在补丁的方法",
 	helpText: helpTextZh,
 }
@@ -152,7 +162,8 @@ const helpTextZh = `列表视图（06 §3）
   R        重新扫描（子进程）    l              分析 Player.log（或上一次的）
 问题视图：enter 展开 / 检查   a 运行建议命令（tab 选择）   i 忽略
           I 显示已忽略   s 级别   o 检查该 Mod   A 重新分析（子进程）
-视图：1 列表 · 2 问题 · 3 变更      E 切换环境
+变更视图：enter 文件差异   s/c/u 回答身份问题   L 载入 / I 忽略外部 ModsConfig.xml
+视图：1 列表 · 2 问题 · 3 变更      E 切换环境      鼠标：滚轮滚动，点击选中
 :        运行任意 archo 命令                 ? 帮助   q 退出`
 
 // trFlags translates the space-joined row flags; multi-word flags are matched first.

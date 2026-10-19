@@ -23,7 +23,8 @@ const helpText = `list view (06 §3)
   R        rescan (child process)        l              analyze Player.log (or the previous one)
 problems view: enter expand / inspect   a run the suggested command (tab picks)   i ignore
                I show ignored   s severity   o inspect the mod   A re-analyze (child process)
-views: 1 list · 2 problems · 3 changes      E switch environment
+changes view: enter file diff   s/c/u answer an identity question   L load / I ignore an external ModsConfig.xml
+views: 1 list · 2 problems · 3 changes      E switch environment      mouse: wheel scrolls, click selects
 :        run any archo command               ? help   q quit`
 
 // idleAfter is how long the TUI waits without input before returning freed memory to the
@@ -77,8 +78,51 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.analyzeMsg(msg)
 	case tea.KeyMsg:
 		return m, m.key(msg)
+	case tea.MouseMsg:
+		return m, m.mouse(msg)
 	}
 	return m, nil
+}
+
+// mouse: the wheel scrolls like j/k, a left click selects the row under it (06 §1:
+// keyboard first, mouse optional). Panels and prompts take the keyboard only.
+func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
+	if m.prompt != nil || m.editing {
+		return nil
+	}
+	switch e.Button {
+	case tea.MouseButtonWheelDown:
+		return m.key(tea.KeyMsg{Type: tea.KeyDown})
+	case tea.MouseButtonWheelUp:
+		return m.key(tea.KeyMsg{Type: tea.KeyUp})
+	}
+	if e.Button != tea.MouseButtonLeft || e.Action != tea.MouseActionPress || m.panel != nil || m.insp != nil {
+		return nil
+	}
+	switch {
+	case m.tab == tabList:
+		if m.showDetail() && e.X >= m.w*55/100 {
+			return nil
+		}
+		if i := m.off + e.Y - 2; e.Y >= 2 && i < len(m.view) {
+			m.cursor = i
+			return m.requestDetail()
+		}
+	case m.tab == tabProblems && m.st != nil:
+		rows := m.probRows()
+		if i := m.prob.off + e.Y - 3; e.Y >= 3 && i < len(rows) && rows[i].main {
+			m.prob.cursor, m.prob.sug = rows[i].pi, 0
+		}
+	case m.tab == tabChanges:
+		c := &m.chg
+		if i := c.off + e.Y - 1; e.Y >= 1 && i < len(c.rows) && c.rows[i].selectable() {
+			if c.cursor == i {
+				return m.changesKey("enter") // a second click expands, like enter
+			}
+			c.cursor = i
+		}
+	}
+	return nil
 }
 
 func (m *model) key(k tea.KeyMsg) tea.Cmd {
@@ -140,6 +184,9 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	}
 	if m.tab == tabProblems {
 		return m.problemsKey(s)
+	}
+	if m.tab == tabChanges {
+		return m.changesKey(s)
 	}
 	if m.tab != tabList {
 		return m.tabKey(s)
@@ -402,11 +449,16 @@ func (m *model) panelKey(s string) tea.Cmd {
 			} else {
 				m.openPanel("archo "+strings.Join(p.confirm, " "), out, nil)
 			}
+			if f := m.afterPanel; f != nil {
+				m.afterPanel = nil
+				f(m)
+			}
 			m.detailRef = ""
 			return m.requestDetail()
 		}
 	case "n", "esc", "q", "enter":
 		m.panel = nil
+		m.afterPanel = nil
 		if p.confirm != nil {
 			m.status = T("cancelled")
 		}
@@ -436,16 +488,7 @@ func (m *model) loadTab() {
 	var parts []string
 	switch m.tab {
 	case tabChanges:
-		if m.question > 0 {
-			out, _ := cmds.Execute(m.app, []string{"identity", "list"})
-			parts = append(parts, strings.Split(strings.TrimRight(out, "\n"), "\n")...)
-			parts = append(parts, "")
-		}
-		out, _ := cmds.Execute(m.app, []string{"changes"})
-		parts = append(parts, strings.Split(strings.TrimRight(out, "\n"), "\n")...)
-		if m.st != nil && m.st.WS.Conflict != 0 {
-			parts = append(parts, "", Tf("ModsConfig.xml changed outside RimArcho (v%d) — :loadout checkout v%d to load it", m.st.WS.Conflict, m.st.WS.Conflict))
-		}
+		m.loadChanges()
 	}
 	m.tabText = parts
 }
