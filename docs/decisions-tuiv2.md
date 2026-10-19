@@ -108,3 +108,60 @@ Screenshots (gitignored), all in WezTerm on a copy of the data directory with it
 - The not-enabled column at 160 columns is 30 wide, so most names are cut. 06 §5.1 sets about 30;
   widening it narrows the detail column.
 - The needs-attention number (32 on the real data) is a stand-in until V4's groups.
+
+# Tags, per-column search, details (between V2 and V3)
+
+The user's review of V1+V2 asked for three things before V3: tags, search per column by field, and
+more information in the details, including the description. The spec is in 06 §2.1 rule 6 (package id
+shown), §5.5 (search), §5.6 (tags), §6.1 (the detail), and §6.4 (description sources, measured).
+
+## Decisions
+
+1. **Search** (`/`, 06 §5.5): free words match name, alias and author fuzzily. The fields are
+   `name:`, `author:`, `tag:`, `id:` (package id, Workshop id or `#ref`), `type:` (source
+   `official|workshop|local|copy|git|steamcmd`, content `assembly|xml|language`, with the long forms
+   `xml-only|language-pack`), and `has:problem|error|tag|note|alias`. `-` negates a term and terms
+   are ANDed. A single free word with no match falls back to letters in order. Each column keeps
+   its query until esc; the header shows the query and N/M.
+2. **Content kinds** (`type:assembly` etc.) come from one GROUP BY over the current snapshots' file
+   lists, loaded on the first such query and kept until the database changes. On the real-size copy
+   (1353 mods) that is 246 ms once; every later query takes under 1 ms.
+3. **Tags** (`#`, 06 §5.6): work on the selection (`v` marks); `word` or `+word` adds, `-word` removes;
+   tab completes from the tags in use, most used first. Rows show their tags as a faint suffix when
+   there is room. CLI: `tag add|remove <ref> <tags…> --mod <ref>…`. MCP: `set_player_data`.
+4. **Detail** (06 §6.1): a non-technical section by default with the package id, version, Workshop id
+   (`o` opens the page), tags, alias, note, what the mod requires (✓ enabled, ! not enabled,
+   ⨯ not installed), and the description. The technical information stays folded behind `i`.
+5. **Description source** (06 §6.4): About.xml is read on demand. The Workshop page is fetched for
+   the selected mod only, after a 400 ms dwell, and cached by Workshop id and time_updated.
+   `workshop.fetch off` keeps everything offline. Only the Workshop text is shown when About.xml is
+   under 300 characters or both start alike (images ignored); otherwise both are shown. Measured on
+   1274 mods: Workshop text is ≥ 300 characters for 90%, About.xml for 41%; 55% of Workshop texts
+   have images, 7981 in all.
+6. **Images**: drawn inline in WezTerm (OSC 1337), at most 60 columns wide; in the detail column at
+   most half of the 12 description lines, in the full view at most 20 rows. While loading an image
+   takes one line. Elsewhere (and with `workshop.images off`) it is a `[image · host]` placeholder.
+   Downloads are cached as PNG at 720 px; GIF shows its first frame; WebP is a placeholder.
+   `imgur.com/x.png` links go straight to `i.imgur.com`. Requests carry a RimArcho User-Agent.
+   No OCR.
+7. **Full-screen detail**: `enter` opens it, and it scrolls (↑↓ j k, PgUp PgDn, g G). `o` opens the
+   Workshop page, `r` re-fetches, `#` edits tags, `i` shows the technical information, `tab` opens the
+   older inspect pages, `esc` goes back.
+8. **Screenshots** are now taken with PrintWindow, so a covered WezTerm window is captured as itself
+   and the user's foreground window is never raised over or captured (the first try with
+   CopyFromScreen caught another window and was deleted).
+
+## Verification
+
+| Test | Result |
+| --- | --- |
+| Search syntax and per-column queries | `TestParseQuery`, `TestColumnSearch` (every field, negation, fallback, long type: forms, query kept per column) |
+| Tags | `TestTagEditing` (two marked mods, completion, add and `-` remove, row suffix); CLI and MCP tests |
+| Detail content | `TestDetailContent` (package, Workshop id, tags, alias, note, requires states, Workshop text through a fake Steam API, truncation, full-screen scrolling, `o`, offline note) |
+| Images | `TestImageWriter` (draw, ECH clear once), `TestImgRows`; live in WezTerm on HAR (screenshot) |
+| Description choice | `TestChooseAndImageURL`; `internal/app` describe tests with an httptest Steam |
+| Real-size latency | keys max 1.75 ms; search as in decision 2 |
+
+Screenshots (gitignored), WezTerm on the data copy, zh:
+`spikes/wezterm-v0/shots/info-desc-column.png`, `info-desc-full.png`, `info-search.png`,
+`info-tags-prompt.png`.
