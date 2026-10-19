@@ -28,7 +28,7 @@
   ├─ 找到了 WezTerm（PATH、Program Files、<数据目录>/wezterm/）
   │    → 用 RimArcho 的配置启动：wezterm-gui start --config-file <数据目录>/wezterm.lua -- archo tui
   └─ 没找到 → 在当前控制台询问：
-       “下载 WezTerm 便携版（约 40 MB）以显示图标和 Mod 预览图？[Y/n]”
+       “下载 WezTerm 便携版（约 66 MB）以显示图标和 Mod 预览图？[Y/n]”
        Y：从 WezTerm 的 GitHub Releases 下载 Windows 便携版 zip，校验发布页提供的 sha256，
           解压到 <数据目录>/wezterm/，然后按上一行启动
        n：记住选择，在当前终端以兼容模式运行（§1.3）
@@ -42,11 +42,13 @@
 
 | 项 | 设置 |
 | --- | --- |
-| 字体 | **随 RimArcho 自带** Maple Mono NF CN（Regular、Bold；SIL OFL 1.1，许可证文件一并分发），放在 `<程序目录>/fonts/`，通过 `font_dirs` 加载，不安装到系统。它同时包含 Nerd Font 图标和中文字形，所以图标、中英文的宽度和风格完全受控。WezTerm 内置的 Symbols Nerd Font 只作最后兜底 |
+| 字体 | **随 RimArcho 自带** Maple Mono NF CN（Regular、Bold；SIL OFL 1.1，许可证文件一并分发），放在 `<程序目录>/fonts/`，通过 `font_dirs` 加载，不安装到系统。它同时包含 Nerd Font 图标和中文字形，所以图标、中英文的宽度和风格完全受控。回退顺序为 Symbols Nerd Font Mono（WezTerm 内置）、Cascadia Mono、Segoe UI Symbol；不能设 `font_locator = 'ConfigDirsOnly'`，否则 Maple 没有的字形（如 `⬥`、`⇣`）会显示成方框 |
 | 配色 | 与 §2 的色板一致的深色方案；背景 `#0E0F12` |
 | 窗口 | 无标签栏、无滚动条，标题为 “RimArcho”，初始 160×46 |
 | 图片 | 启用 iTerm2 内联图片协议（WezTerm 原生支持） |
-| 其他 | 关闭响铃、关闭字体连字 |
+| 宽度 | `treat_east_asian_ambiguous_width_as_wide = false`，`unicode_version = 14`，与 RimArcho 的宽度计算一致 |
+| 退出 | `exit_behavior = 'CloseOnCleanExit'`：archo 正常退出时关窗；出错退出时保留窗口，错误信息可读 |
+| 其他 | 关闭响铃、关闭字体连字（`harfbuzz_features = { 'calt=0', 'clig=0', 'liga=0' }`）、关闭更新检查、关闭配置热加载、关闭窗口时不确认 |
 
 ### 1.3 兼容模式
 
@@ -57,7 +59,9 @@
 
 ### 1.4 资源
 
-WezTerm 是独立进程，有自己的 GPU 和内存开销，需要实测后记入 07。01 §5.2 的“TUI ≤ 80 MB”仍然只约束 archo 进程本身。
+WezTerm 是独立进程，有自己的 GPU 和内存开销。V0 实测（07 §6.2）：承载 archo 空闲时 wezterm-gui 工作集约 91 MB，OpenConsole 约 12 MB；启动到窗口可见约 0.5 秒（首次约 1.2 秒）。01 §5.2 的“TUI ≤ 80 MB”仍然只约束 archo 进程本身。
+
+WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI 套接字和日志，这个位置不能通过配置改变；RimArcho 的说明和卸载说明要提到它。
 
 ## 2. 视觉语言
 
@@ -94,31 +98,33 @@ WezTerm 是独立进程，有自己的 GPU 和内存开销，需要实测后记�
 
 ## 3. 图标
 
-图标采用 Nerd Font 中的 Font Awesome 4 区段（码位 U+F000–U+F2E0），所有 Nerd Font 都包含这一段，WezTerm 内置的符号字体也包含。兼容模式下改用右栏的 Unicode 字符；备用字符要避开东亚宽度不明确的字符，或者在 M0 式验证中确认宽度。
+图标采用 Nerd Font 中的 Font Awesome 4 区段（码位 U+F000–U+F2E0），所有 Nerd Font 都包含这一段，WezTerm 内置的符号字体也包含。兼容模式下改用右栏的 Unicode 字符。右栏全部是东亚宽度为“中性”（N）的字符：无论 runewidth 是否开启 `EastAsianWidth`，宽度都是 1，并且 Windows 默认字体 Cascadia Mono 都有字形、按 1 格绘制（V0 实测，见 07 §6.2）。Nerd Font 码位属于私用区，东亚宽度是“不明确”（A），所以 RimArcho 计算宽度时必须关闭 `EastAsianWidth`，WezTerm 配置中也关闭 `treat_east_asian_ambiguous_width_as_wide`。
 
 | 含义 | Nerd Font（码位） | 兼容模式 | 颜色 |
 | --- | --- | --- | --- |
-| 来源：官方（Core、DLC） | shield `U+F132` | `◆` | 淡色 |
-| 来源：工坊 | steam `U+F1B6` | `◎` | 淡色 |
-| 来源：本地 | folder `U+F07B` | `▢` | 淡色 |
-| 来源：本地副本（来自工坊） | clone `U+F24D` | `◇` | 淡色 |
-| 来源：Git | git `U+F1D3` | `±` | 淡色 |
-| 状态：错误（会导致加载失败） | times-circle `U+F057` | `✕` | 错误红 |
+| 来源：官方（Core、DLC） | shield `U+F132` | `⬥` U+2B25 | 淡色 |
+| 来源：工坊 | steam `U+F1B6` | `◉` U+25C9 | 淡色 |
+| 来源：本地 | folder `U+F07B` | `▢` U+25A2 | 淡色 |
+| 来源：本地副本（来自工坊） | clone `U+F24D` | `⬦` U+2B26 | 淡色 |
+| 来源：Git | git `U+F1D3` | `∆` U+2206 | 淡色 |
+| 状态：错误（会导致加载失败） | times-circle `U+F057` | `⨯` U+2A2F | 错误红 |
 | 状态：警告（可能有问题） | exclamation-triangle `U+F071` | `!` | 警告琥珀 |
-| 状态：上次运行报错 | bug `U+F188` | `※` | 错误红 |
-| 状态：不可加载（被停用的残留） | ban `U+F05E` | `⊘` | 淡色 |
+| 状态：上次运行报错 | bug `U+F188` | `◍` U+25CD | 错误红 |
+| 状态：不可加载（被停用的残留） | ban `U+F05E` | `◌` U+25CC | 淡色 |
 | 状态：无问题 | 不显示 | 不显示 | — |
-| 修改未保存 | `●`（U+25CF） | `●` | 强调色 |
+| 修改未保存 | circle `U+F111` | `⬤` U+2B24 | 强调色 |
 | 锁定（Core 不可移动） | lock `U+F023` | 不显示 | 淡色 |
-| 有更新 / 有变化 | refresh `U+F021` | `↻` | 次要 |
-| 前置依赖 | link `U+F0C1` | `→` | 次要 |
-| 暂存 | inbox `U+F01C` | `▤` | 次要 |
-| 启动游戏 | play `U+F04B` | `▶` | 文字 |
-| 保存 | floppy `U+F0C7` | `↓` | 文字 |
-| 自动排序 | sort-amount-asc `U+F160` | `⇅` | 文字 |
+| 有更新 / 有变化 | refresh `U+F021` | `⇣` U+21E3 | 次要 |
+| 前置依赖 | link `U+F0C1` | `›` U+203A | 次要 |
+| 暂存 | inbox `U+F01C` | `◫` U+25EB | 次要 |
+| 启动游戏 | play `U+F04B` | `►` U+25BA | 文字 |
+| 保存 | floppy `U+F0C7` | `↲` U+21B2 | 文字 |
+| 自动排序 | sort-amount-asc `U+F160` | `↨` U+21A8 | 文字 |
 | 搜索 | search `U+F002` | `/` | 次要 |
 
 规则：一行最多两个图标（来源和状态）；状态图标只有在有问题时才出现，“没有问题”就是没有图标。
+
+两种模式共用的标记：选中 `▸`、成功 `✓`、提示符 `❯`（都是中性宽度）；失败在完整模式用 times-circle，兼容模式用 `⨯`（`✗` 在 Cascadia Mono 中没有字形）。`…` 和 `·` 的东亚宽度不明确，但在两种终端中都按 1 格绘制，继续使用（前提同上：宽度计算关闭 `EastAsianWidth`）。
 
 ## 4. 信息架构
 
@@ -246,7 +252,8 @@ WezTerm 是独立进程，有自己的 GPU 和内存开销，需要实测后记�
 - 来源：Mod 的 `About/Preview.png`（大小写不敏感）。
 - 缓存：缩放到宽 360 像素的 PNG，按快照哈希存进 `<数据目录>/cache/previews/`。
 - 绘制：bubbletea 渲染完一帧后，用 iTerm2 内联图片协议，在详情区预留的矩形里单独绘制图片；光标离开时清除。要求光标停留 150 毫秒后再绘制，避免快速滚动时闪烁。
-- 这里与 bubbletea 渲染器的配合存在技术风险，需要先做验证（§10 V0）。
+- 与 bubbletea 渲染器的配合已在 V0 验证，做法见 07 §6.2：包装输出 writer，在同一次写入中帧后追加清除或绘制；绘制时必须临时显示光标（ConPTY 在光标隐藏时不转发定位）。
+- 16:9 的预览图在 18×9 的框里实际只占约 5 行（`preserveAspectRatio=1`），V3 时按实际比例决定行数。
 
 ### 6.3 全屏详情
 
