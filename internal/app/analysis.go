@@ -148,6 +148,11 @@ func ChildAnalyze(home, envName string, progress func(string)) error {
 	if err != nil {
 		return err
 	}
+	return ChildAnalyzeExe(exe, home, envName, progress)
+}
+
+// ChildAnalyzeExe is ChildAnalyze with an explicit archo executable.
+func ChildAnalyzeExe(exe, home, envName string, progress func(string)) error {
 	args := []string{"analyze"}
 	if envName != "" {
 		args = append(args, "--env", envName)

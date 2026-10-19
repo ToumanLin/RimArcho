@@ -48,6 +48,21 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	if err != nil {
 		return nil, err
 	}
+	// Cached until the database or ModsConfig.xml changes (the TUI asks often).
+	key := ""
+	if a.stCache != nil && a.stCache.Ix == st.Ix {
+		key = a.stKey
+	}
+	if key != "" && a.prCache != nil && a.prKey == key && ps.AnalysisErr == nil {
+		c := *a.prCache
+		c.State = st
+		return &c, nil
+	}
+	defer func() {
+		if key != "" && ps.AnalysisErr == nil && ps.State != nil {
+			a.prCache, a.prKey = ps, key
+		}
+	}()
 	ps.State = st
 	if ps.Analysis == nil {
 		if ps.Analysis, err = a.Analysis(st); err != nil {

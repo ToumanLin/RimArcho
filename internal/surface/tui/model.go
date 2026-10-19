@@ -146,9 +146,18 @@ func New(o Options) tea.Model {
 // ≥ 15 MB headroom). The GC works harder near the cap instead of growing the heap.
 const MemoryLimit = 40 << 20
 
+// TuneProcess applies the TUI process's memory settings (M3 measurements in
+// docs/decisions-m3.md): a soft heap cap, GOGC 50, and a 256 KiB SQLite page cache on the
+// single connection (the default 2 MB stays resident in modernc's allocator).
+func TuneProcess(a *app.App) {
+	debug.SetMemoryLimit(MemoryLimit)
+	debug.SetGCPercent(50)
+	a.Store.DB.Exec("PRAGMA cache_size=-256")
+}
+
 // Run starts the TUI on the terminal.
 func Run(o Options) error {
-	debug.SetMemoryLimit(MemoryLimit)
+	TuneProcess(o.App)
 	SetLang(o.App.Store.Meta("cfg:ui.lang"))
 	_, err := tea.NewProgram(New(o), tea.WithAltScreen()).Run()
 	return err

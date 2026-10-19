@@ -27,18 +27,27 @@ func main() {
 	exe := flag.String("exe", "", "archo binary for the child scan")
 	idle := flag.Duration("idle", 2*time.Minute, "idle time after browsing")
 	browse := flag.Bool("browse", true, "scan and browse before idling")
+	cache := flag.Int("cache", 0, "PRAGMA cache_size for the TUI connection (0: default)")
+	gc := flag.Int("gc", 0, "GOGC (0: default)")
+	problems := flag.Bool("problems", true, "open the Problems view (child analysis) and Inspect")
 	flag.Parse()
-	debug.SetMemoryLimit(tui.MemoryLimit)
 	a, err := app.Open(*home)
 	if err != nil {
 		panic(err)
 	}
+	tui.TuneProcess(a)
 	a.Launcher = func(string, []string, string) error { panic("launch attempted") }
 	report := func(what string) {
 		var ms runtime.MemStats
 		runtime.ReadMemStats(&ms)
 		ws, priv, peak := procmem.MB()
 		fmt.Printf("%-24s working set %5.1f MB  private %5.1f MB  peak %5.1f MB  (go heap in use %.1f MB)\n", what, ws, priv, peak, float64(ms.HeapInuse)/(1<<20))
+	}
+	if *cache != 0 {
+		a.Store.DB.Exec(fmt.Sprintf("PRAGMA cache_size=%d", *cache))
+	}
+	if *gc != 0 {
+		debug.SetGCPercent(*gc)
 	}
 	report("opened")
 	if _, err := a.Loadout(); err != nil {
@@ -48,6 +57,8 @@ func main() {
 	m := tui.New(tui.Options{App: a, Scan: func(string) (string, error) {
 		out, err := exec.Command(*exe, "scan").CombinedOutput()
 		return string(out), err
+	}, Analyze: func(env string, progress func(string)) error {
+		return app.ChildAnalyzeExe(*exe, a.Home, env, progress)
 	}})
 	p := tea.NewProgram(m, tea.WithInput(nil), tea.WithOutput(io.Discard))
 	go func() {
@@ -71,6 +82,27 @@ func main() {
 			}
 			time.Sleep(time.Second)
 			report("after scan + browsing")
+		}
+		if *problems {
+			key("2")
+			time.Sleep(15 * time.Second) // child analysis when stale
+			report("problems view shown")
+			for i := 0; i < 40; i++ {
+				key("j")
+				if i%5 == 0 {
+					p.Send(tea.KeyMsg{Type: tea.KeyEnter})
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+			key("o")
+			time.Sleep(500 * time.Millisecond)
+			p.Send(tea.KeyMsg{Type: tea.KeyTab})
+			p.Send(tea.KeyMsg{Type: tea.KeyTab})
+			time.Sleep(500 * time.Millisecond)
+			p.Send(tea.KeyMsg{Type: tea.KeyEsc})
+			key("1")
+			time.Sleep(time.Second)
+			report("after problems + inspect")
 		}
 		step := *idle / 4
 		for i := 1; i <= 4; i++ {

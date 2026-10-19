@@ -53,6 +53,8 @@ type App struct {
 	ixKey   string
 	stCache *LoadoutState
 	stKey   string
+	prCache *ProblemSet
+	prKey   string
 }
 
 // Open opens (creating if needed) the data directory home.
