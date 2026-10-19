@@ -569,7 +569,6 @@ func (s *sim) parentFindings(origin map[int32]defLoc, tops []*topOp, isActive fu
 	return out
 }
 
-
 func (s *sim) findings(tops []*topOp, facts []*PatchFact) []*Finding {
 	var out []*Finding
 	unknown := map[*Mod]map[string]int{}

@@ -18,8 +18,8 @@ type topOp struct {
 	op   *Op
 	// folderReq: packages required by the conditional load folder the file is in.
 	folderReq []string
-	ok   bool
-	err  bool
+	ok        bool
+	err       bool
 
 	allocFrom, allocTo int32 // node indices allocated by this operation
 }
@@ -32,7 +32,9 @@ type guard struct {
 	folder   []string // packageIds of the conditional load folder (LoadFolders IfModActive)
 }
 
-func (g guard) any() bool { return len(g.findMods) > 0 || len(g.mayReq) > 0 || g.cond || len(g.folder) > 0 }
+func (g guard) any() bool {
+	return len(g.findMods) > 0 || len(g.mayReq) > 0 || g.cond || len(g.folder) > 0
+}
 
 type sim struct {
 	doc       *xdoc.Doc

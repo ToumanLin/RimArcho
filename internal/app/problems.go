@@ -183,8 +183,8 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	for i, e := range st.List {
 		if e.Instance == "" {
 			add(&finding.Finding{Code: "entry.missing", Severity: finding.Warning, Key: e.Missing,
-				Subjects: []string{"pkg:" + e.Missing},
-				Claim:    fmt.Sprintf("pkg:%s in the Loadout matches no installed mod (kept in ModsConfig.xml)", e.Missing),
+				Subjects:    []string{"pkg:" + e.Missing},
+				Claim:       fmt.Sprintf("pkg:%s in the Loadout matches no installed mod (kept in ModsConfig.xml)", e.Missing),
 				Suggestions: []string{"archo find " + e.Missing, "archo disable pkg:" + e.Missing}})
 			continue
 		}
