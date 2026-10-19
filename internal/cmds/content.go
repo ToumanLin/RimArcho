@@ -205,7 +205,7 @@ func defsOfModCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("%s  %d defs", modLabel(st.Ix, m.ID), len(facts)))
+	d, root := render.New(fmt.Sprintf("%s  defs: %d", modLabel(st.Ix, m.ID), len(facts)))
 	byType := map[string][]analyze.DefFact{}
 	var types []string
 	for _, f := range facts {

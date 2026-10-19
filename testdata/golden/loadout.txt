@@ -7,6 +7,7 @@ env:main  RimWorld 1.6.4633 rev1261
   changes: 11 discovered (archo changes)
   loadout: 7 active (1 missing entries), same as v1 (import)
   warning: ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start. Saving once rewrites it for 1.6 (archo save)
+  problems: 1 error, 5 warning, 1 info in declarations; Defs and Patches not analysed yet (archo problems)
 
 $ archo list --active
 workspace: 7 active, saved (env:main)

@@ -1,0 +1,158 @@
+$ archo status
+env:main  RimWorld 1.6.4633 rev1261
+  mods: 6 live (official 1, local 5), 0 tombstones
+  lineages: 6 (0 with several instances)
+  last-scan: scan:1 2026-10-01 10:00, 0s
+  changes: 6 discovered (archo changes)
+  loadout: 5 active, same as v1 (import)
+  problems: 2 error, 0 warning, 0 info in declarations; Defs and Patches not analysed yet (archo problems)
+
+$ archo problems
+problems: 2 error, 1 warning, 2 info
+  analysis: a:1 2026-10-01 10:00
+  list:
+    error dep.missing  #z3bw Needy requires Absent Library (pkg:tester.absent), which is not installed  (p:c2a532)
+    error incompat.active  #z3bw Needy is incompatible with #i4uc, and both are enabled  (p:98551b)
+    warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
+    info def.override  def:ThingDef/Shared_Gun is defined by 2 mods; #iqmu Over Two loads last and wins  (p:b2563e)
+    info patch.contested  2 mods replace or remove ThingDef/Shared_Gun/label; #iqmu Over Two runs last  (p:9789a9)
+next:
+  archo problems show p:c2a532
+
+$ archo problems --code patch --detail
+problems: 0 error, 1 warning, 1 info
+  analysis: a:1 2026-10-01 10:00
+  list:
+    warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
+      evidence: inferred reason target-inactive
+      evidence: inferred reason unguarded-optional
+      evidence: inferred ThingDef/Lib_Gun is defined by #nyh3, which is not active; the patch is not wrapped in PatchOperationFindMod, a Conditional or a MayRequire list item
+      fix: archo enable #nyh3
+      fix: archo patches --mod #hnyg
+    info patch.contested  2 mods replace or remove ThingDef/Shared_Gun/label; #iqmu Over Two runs last  (p:9789a9)
+      evidence: declared #hnyg Patches/Compat.xml:6 PatchOperationReplace
+      evidence: declared #iqmu Patches/Label.xml:2 PatchOperationReplace
+next:
+  archo enable #nyh3
+
+$ archo problems show p:c2a532
+error dep.missing  #z3bw Needy requires Absent Library (pkg:tester.absent), which is not installed  (p:c2a532)
+  confidence: certain
+  layer: decl
+  subjects: #z3bw pkg:tester.absent
+  evidence: declared #z3bw About.xml modDependencies: tester.absent
+  fix: subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
+  fix: steam://url/CommunityFilePage/123456
+next:
+  subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
+
+$ archo def ThingDef/Shared_Gun
+def:ThingDef/Shared_Gun
+  defined-by (load order):
+    1. #i4uc Over One  Defs/Shared.xml:2
+    2. #iqmu Over Two  Defs/Weapons/Shared.xml:2  ← effective
+  patched-by:
+    #hnyg Compat  Patches/Compat.xml:6  Verse.PatchOperationReplace(Defs/ThingDef[defName="Shared_Gun"]/label)  hit 2
+    #iqmu Over Two  Patches/Label.xml:2  Verse.PatchOperationReplace(Defs/ThingDef[defName="Shared_Gun"]/label)  hit 2
+
+$ archo def --mod #i4uc
+#i4uc Over One  defs: 1
+  ThingDef (1):
+    Shared_Gun  Defs/Shared.xml:2
+
+$ archo patches --failed
+patches: 1 operations, 1 failed, 0 not simulated
+  list:
+    #hnyg Compat  Patches/Compat.xml:2  Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"])  hit 0  (patch.no-match: target-inactive, unguarded-optional)
+      detail: ThingDef/Lib_Gun is defined by #nyh3, which is not active; the patch is not wrapped in PatchOperationFindMod, a Conditional or a MayRequire list item
+
+$ archo why #i4uc #iqmu
+#i4uc Over One ↔ #iqmu Over Two
+  positions: enabled at 2 / enabled at 4
+  declared:
+    (nothing between them)
+  order-constraints:
+    (none)
+  both-define (1 defs; the later one wins):
+    def:ThingDef/Shared_Gun
+  #iqmu patches defs of #i4uc:
+    Patches/Label.xml:2  Verse.PatchOperationReplace(Defs/ThingDef[defName="Shared_Gun"]/label)  hit 2
+  shared-problems:
+    info def.override  def:ThingDef/Shared_Gun is defined by 2 mods; #iqmu loads last and wins
+
+$ archo why #z3bw #i4uc
+#z3bw Needy ↔ #i4uc Over One
+  positions: enabled at 5 / enabled at 2
+  declared:
+    #z3bw incompatibleWith #i4uc (About.xml)
+  order-constraints:
+    (none)
+
+$ archo files search shared_gun
+files search "shared_gun": 4 matches in 10 files of 5 mods
+  matches:
+    #i4uc  Defs/Shared.xml:3  <defName>Shared_Gun</defName>
+    #hnyg  Patches/Compat.xml:7  <xpath>Defs/ThingDef[defName="Shared_Gun"]/label</xpath>
+    #iqmu  Defs/Weapons/Shared.xml:3  <defName>Shared_Gun</defName>
+    #iqmu  Patches/Label.xml:3  <xpath>Defs/ThingDef[defName="Shared_Gun"]/label</xpath>
+
+$ archo problems ignore p:98551b
+ignored p:98551b incompat.active
+  #z3bw Needy is incompatible with #i4uc, and both are enabled
+  until: the mod changes (ignores are kept per lineage and expire when its files change)
+next:
+  archo problems unignore p:98551b
+
+$ archo problems --ignored
+ignored problems: 1 error, 0 warning, 0 info
+  analysis: a:1 2026-10-01 10:00
+  list:
+    error incompat.active  #z3bw Needy is incompatible with #i4uc, and both are enabled  (p:98551b)
+      evidence: declared #z3bw About.xml incompatibleWith: tester.over1
+      fix: archo disable #i4uc
+      fix: archo disable #z3bw
+      fix: archo why #z3bw #i4uc
+next:
+  archo disable #i4uc
+
+$ archo mod #hnyg
+#hnyg Compat  [active 3/5, local Compat]
+  status: live
+  package: tester.compat
+  lineage: L#u2mx
+  authors: Tester
+  supports: 1.6
+  content: defs 0, patches 2 (1 failed)
+  problems: 0 error, 1 warning, 1 info
+    warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
+    info patch.contested  2 mods replace or remove ThingDef/Shared_Gun/label; #iqmu Over Two runs last  (p:9789a9)
+  location: src:local Compat
+    path: $ROOT/Steam/steamapps/common/RimWorld/Mods/Compat
+  files: 2 (550 B), 2 semantic
+  seen: first 2026-10-01 10:00, last 2026-10-01 10:00
+  changes: 1, latest discovered 2026-10-01 (archo changes #hnyg)
+next:
+  archo changes #hnyg
+
+$ archo enable #nyh3 --before #hnyg
+workspace: 6 active, 1 change unsaved (env:main)
+  added  #nyh3  Lib  at 3
+next:
+  archo save
+
+$ archo status
+env:main  RimWorld 1.6.4633 rev1261
+  mods: 6 live (official 1, local 5), 0 tombstones
+  lineages: 6 (0 with several instances)
+  last-scan: scan:1 2026-10-01 10:00, 0s
+  changes: 6 discovered (archo changes)
+  loadout: 6 active, 1 change unsaved (archo loadout diff)
+  problems: 1 error, 1 warning, 2 info; Def/Patch analysis stale (archo problems)
+next:
+  archo save
+
+$ archo patches --failed
+patches: 0 operations, 0 failed, 0 not simulated
+  list:
+    (none)
+

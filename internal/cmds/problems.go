@@ -7,6 +7,7 @@ import (
 	"github.com/rimarcho/rimarcho/internal/app"
 	"github.com/rimarcho/rimarcho/internal/finding"
 	"github.com/rimarcho/rimarcho/internal/render"
+	"github.com/rimarcho/rimarcho/internal/store"
 )
 
 // Progress receives progress lines of long commands (analysis); the CLI points it at stderr.
@@ -247,4 +248,49 @@ func contains(l []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// addModProblems adds the "content:" and "problems:" lines of `archo mod` (05 §2.2). It
+// uses the stored analysis as is (no rebuild).
+func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) error {
+	st, err := c.App.Loadout()
+	if err != nil {
+		return nil // no workspace: nothing to report
+	}
+	s, err := c.App.Analysis(st)
+	if err != nil {
+		return err
+	}
+	if s.Run != nil {
+		defs := c.App.Store.DefCount(m.ID)
+		ops, failed := c.App.Store.PatchCount(s.Run.ID, m.ID)
+		line := fmt.Sprintf("defs %d, patches %d", defs, ops)
+		if failed > 0 {
+			line += fmt.Sprintf(" (%d failed)", failed)
+		}
+		if !s.Fresh {
+			line += "  [analysis stale]"
+		}
+		root.KV("content", line)
+	}
+	ps, err := c.App.Problems(false, nil)
+	if err != nil {
+		return err
+	}
+	tok := finding.Inst(m.ID)
+	var mine []*app.Problem
+	for _, p := range ps.List {
+		if contains(p.Subjects, tok) {
+			mine = append(mine, p)
+		}
+	}
+	if len(mine) == 0 {
+		return nil
+	}
+	n := root.KV("problems", severityCounts(mine))
+	for _, p := range mine {
+		n.Add(problemLine(ix, p))
+	}
+	n.Truncate(3, "archo problems --subject "+ix.Ref(m.ID))
+	return nil
 }

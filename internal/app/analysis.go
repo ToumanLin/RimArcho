@@ -23,7 +23,7 @@ func (ix *Index) ModDir(m *store.Mod) string {
 	if m.RealPath != "" {
 		return m.RealPath
 	}
-	if s := ix.Source(m.ID); s != nil {
+	if s := ix.Source(m.SourceID); s != nil {
 		return filepath.Join(s.Root, m.Rel)
 	}
 	return m.Rel

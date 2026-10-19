@@ -347,3 +347,16 @@ func (s *Store) RemoveIgnore(envID, lineageID, code, key string) (bool, error) {
 	n, _ := r.RowsAffected()
 	return n > 0, nil
 }
+
+// DefCount is the number of Def facts of an instance.
+func (s *Store) DefCount(instanceID string) int {
+	var n int
+	s.DB.QueryRow(`SELECT count(*) FROM def_fact WHERE instance_id=?`, instanceID).Scan(&n)
+	return n
+}
+
+// PatchCount returns an instance's operations and failures in a run.
+func (s *Store) PatchCount(analysisID int64, instanceID string) (ops, failed int) {
+	s.DB.QueryRow(`SELECT count(*), coalesce(sum(result='failed'), 0) FROM patch_fact WHERE analysis_id=? AND instance_id=?`, analysisID, instanceID).Scan(&ops, &failed)
+	return
+}

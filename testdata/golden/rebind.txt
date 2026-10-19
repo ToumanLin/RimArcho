@@ -18,6 +18,7 @@ env:main  RimWorld 1.6.4633 rev1261
   warning: src:official root missing: $ROOT/Steam/steamapps/common/RimWorld/Data (archo env set)
   warning: src:local root missing: $ROOT/Steam/steamapps/common/RimWorld/Mods (archo env set)
   loadout: 1 active, same as v1 (import)
+  problems: 0 error, 0 warning, 1 info in declarations; Defs and Patches not analysed yet (archo problems)
 
 $ archo env set main --game $ROOT/NewDrive/RimWorld
 env:main  updated  [current]

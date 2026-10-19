@@ -186,6 +186,15 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	loadoutStatus(c, root, d)
+	if ps, err := c.App.Problems(false, nil); err == nil && ps.State != nil {
+		line := severityCounts(ps.List) + " (archo problems)"
+		if ps.Analysis == nil || ps.Analysis.Run == nil {
+			line = severityCounts(ps.List) + " in declarations; Defs and Patches not analysed yet (archo problems)"
+		} else if !ps.Analysis.Fresh {
+			line = severityCounts(ps.List) + "; Def/Patch analysis stale (archo problems)"
+		}
+		root.KV("problems", line)
+	}
 	return d, nil
 }
 
@@ -448,6 +457,9 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 			}
 			root.KV(r.key, strings.Join(ps, " "))
 		}
+	}
+	if err := addModProblems(c, ix, m, root); err != nil {
+		return nil, err
 	}
 	loc := root.KV("location", fmt.Sprintf("src:%s %s", m.SourceLabel, m.Rel))
 	if s := ix.Source(m.SourceID); s != nil {

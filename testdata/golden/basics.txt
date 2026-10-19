@@ -109,6 +109,7 @@ env:main  RimWorld 1.6.4633 rev1261
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered (archo changes)
   loadout: 1 active, same as v1 (import)
+  problems: 0 error, 0 warning, 1 info in declarations; Defs and Patches not analysed yet (archo problems)
 
 $ archo list
 mods: 9 (env:main)
