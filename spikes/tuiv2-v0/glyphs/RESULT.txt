@@ -1,0 +1,110 @@
+glyph                        U+      EAW   rw   rwEA  MapleMono-NF-CN-Regular.ttf  CascadiaMono.ttf        seguisym.ttf          
+nf shield (official)         F132    A     1    2       adv 1.00             missing                 missing               
+nf steam (workshop)          F1B6    A     1    2       adv 1.00             missing                 missing               
+nf folder (local)            F07B    A     1    2       adv 1.00             missing                 missing               
+nf clone (local copy)        F24D    A     1    2       adv 1.00             missing                 missing               
+nf git                       F1D3    A     1    2       adv 1.00             missing                 missing               
+nf times-circle (error)      F057    A     1    2       adv 1.00             missing                 missing               
+nf exclamation-tri (warn)    F071    A     1    2       adv 1.00             missing                 missing               
+nf bug (log error)           F188    A     1    2       adv 1.00             missing                 missing               
+nf ban (unloadable)          F05E    A     1    2       adv 1.00             missing                 missing               
+unsaved ●                    25CF    A     1    2     ●  adv 1.00             ●  adv 1.00             ●  adv 0.96           
+nf lock                      F023    A     1    2       adv 1.00             missing                 missing               
+nf refresh                   F021    A     1    2       adv 1.00             missing                 missing               
+nf link (deps)               F0C1    A     1    2       adv 1.00             missing                 missing               
+nf inbox (staging)           F01C    A     1    2       adv 1.00             missing                 missing               
+nf play                      F04B    A     1    2       adv 1.00             missing                 missing               
+nf floppy (save)             F0C7    A     1    2       adv 1.00             missing                 missing               
+nf sort-amount-asc           F160    A     1    2       adv 1.00             missing                 missing               
+nf search                    F002    A     1    2       adv 1.00             missing                 missing               
+selected ▸                   25B8    N     1    1     ▸  adv 1.00             ▸  adv 1.00             ▸  adv 0.96           
+ok ✓                         2713    N     1    1     ✓  adv 1.00             ✓  adv 1.00             ✓  adv 0.83           
+fail ✗                       2717    N     1    1     ✗  adv 1.00             missing                 ✗  adv 0.91           
+busy …                       2026    A     1    2     …  adv 1.00             …  adv 1.00             …  adv 0.82           
+dot ·                        B7      A     1    2     ·  adv 1.00             ·  adv 1.00             ·  adv 0.24           
+prompt ❯                     276F    N     1    1     ❯  adv 1.00             ❯  adv 1.00             ❯  adv 0.57           
+compat official ◆            25C6    A     1    2     ◆  adv 1.00             ◆  adv 1.00             ◆  adv 0.96           
+compat workshop ◎            25CE    A     1    2     ◎  adv 1.00             ◎  adv 1.00             ◎  adv 0.96           
+compat local ▢               25A2    N     1    1     missing                 ▢  adv 1.00             ▢  adv 0.96           
+compat copy ◇                25C7    A     1    2     ◇  adv 1.00             ◇  adv 1.00             ◇  adv 0.96           
+compat git ±                 B1      A     1    2     ±  adv 1.00             ±  adv 1.00             ±  adv 0.76           
+compat error ✕               2715    N     1    1     ✕  adv 1.00             missing                 ✕  adv 0.91           
+compat warn !                21      Na    1    1     !  adv 1.00             !  adv 1.00             !  adv 0.32           
+compat log ※                 203B    A     1    2     missing                 missing                 ※  adv 1.11           
+compat unloadable ⊘          2298    N     1    1     missing                 missing                 ⊘  adv 0.94           
+compat unsaved ●             25CF    A     1    2     ●  adv 1.00             ●  adv 1.00             ●  adv 0.96           
+compat refresh ↻             21BB    N     1    1     missing                 missing                 ↻  adv 0.95           
+compat deps →                2192    A     1    2     →  adv 1.00             →  adv 1.00             →  adv 0.96           
+compat staging ▤             25A4    A     1    2     missing                 ▤  adv 1.00             ▤  adv 0.96           
+compat play ▶                25B6    A     1    2     ▶  adv 1.00             ▶  adv 1.00             ▶  adv 0.96           
+compat save ↓                2193    A     1    2     ↓  adv 1.00             ↓  adv 1.00             ↓  adv 0.53           
+compat sort ⇅                21C5    N     1    1     missing                 missing                 ⇅  adv 0.98           
+compat search /              2F      Na    1    1     /  adv 1.00             /  adv 1.00             /  adv 0.43           
+cand ◈ U+25C8                25C8    A     1    2     ◈  adv 1.00             ◈  adv 1.00             ◈  adv 0.96           
+cand ⬥ U+2B25                2B25    N     1    1     missing                 ⬥  adv 1.00             ⬥  adv 0.96           
+cand ♦ U+2666                2666    N     1    2     missing                 ♦  adv 1.00             ♦  adv 0.76           
+cand ⌂ U+2302                2302    N     1    1     missing                 ⌂  adv 1.00             ⌂  adv 0.97           
+cand ¤ U+00A4                A4      A     1    2     ¤  adv 1.00             ¤  adv 1.00             ¤  adv 0.62           
+cand ⊙ U+2299                2299    A     1    2     missing                 missing                 ⊙  adv 0.94           
+cand ⊚ U+229A                229A    N     1    1     missing                 missing                 ⊚  adv 0.94           
+cand ⊕ U+2295                2295    A     1    2     missing                 missing                 ⊕  adv 0.94           
+cand ∘ U+2218                2218    N     1    1     missing                 missing                 ∘  adv 0.55           
+cand ⌗ U+2317                2317    N     1    1     missing                 missing                 ⌗  adv 0.90           
+cand ⎘ U+2398                2398    N     1    1     missing                 missing                 ⎘  adv 0.87           
+cand ⧉ U+29C9                29C9    N     1    1     missing                 missing                 ⧉  adv 1.12           
+cand ⊞ U+229E                229E    N     1    1     missing                 missing                 ⊞  adv 0.90           
+cand ⊡ U+22A1                22A1    N     1    1     missing                 missing                 ⊡  adv 0.90           
+cand ⋄ U+22C4                22C4    N     1    1     missing                 missing                 ⋄  adv 0.61           
+cand ⟲ U+27F2                27F2    N     1    1     missing                 missing                 ⟲  adv 0.95           
+cand ⟳ U+27F3                27F3    N     1    1     missing                 missing                 ⟳  adv 0.95           
+cand ↺ U+21BA                21BA    N     1    1     missing                 missing                 ↺  adv 0.95           
+cand ⇢ U+21E2                21E2    N     1    1     missing                 missing                 ⇢  adv 0.96           
+cand › U+203A                203A    N     1    1     ›  adv 1.00             ›  adv 1.00             ›  adv 0.35           
+cand ⊳ U+22B3                22B3    N     1    1     missing                 missing                 ⊳  adv 0.76           
+cand ⏵ U+23F5                23F5    N     1    1     missing                 missing                 ⏵  adv 1.11           
+cand ⇩ U+21E9                21E9    N     1    1     ⇩  adv 1.00             missing                 ⇩  adv 0.72           
+cand ⤓ U+2913                2913    N     1    1     missing                 missing                 ⤓  adv 0.53           
+cand ⇵ U+21F5                21F5    N     1    1     missing                 missing                 ⇵  adv 0.89           
+cand ⇳ U+21F3                21F3    N     1    1     missing                 missing                 ⇳  adv 0.72           
+cand ⌕ U+2315                2315    N     1    1     missing                 missing                 ⌕  adv 0.85           
+cand ∅ U+2205                2205    N     1    1     missing                 missing                 ∅  adv 1.07           
+cand ⦸ U+29B8                29B8    N     1    1     missing                 missing                 ⦸  adv 0.94           
+cand ⊗ U+2297                2297    N     1    1     missing                 missing                 ⊗  adv 0.94           
+cand ✗ U+2717                2717    N     1    1     ✗  adv 1.00             missing                 ✗  adv 0.91           
+cand ⨯ U+2A2F                2A2F    N     1    1     missing                 ⨯  adv 1.00             ⨯  adv 0.74           
+cand × U+00D7                D7      A     1    2     ×  adv 1.00             ×  adv 1.00             ×  adv 0.76           
+cand ⚠ U+26A0                26A0    N     1    2     ⚠  adv 1.00             missing                 ⚠  adv 0.96           
+cand ‼ U+203C                203C    N     1    2     ‼  adv 1.00             ‼  adv 1.00             ‼  adv 0.53           
+cand ¡ U+00A1                A1      A     1    2     ¡  adv 1.00             ¡  adv 1.00             ¡  adv 0.32           
+cand ⁂ U+2042                2042    N     1    1     missing                 missing                 ⁂  adv 1.00           
+cand ⌁ U+2301                2301    N     1    1     missing                 missing                 ⌁  adv 0.94           
+cand ◌ U+25CC                25CC    N     1    1     ◌  adv 1.00             ◌  adv 1.00             ◌  adv 0.96           
+cand ⦁ U+2981                2981    N     1    1     missing                 missing                 ⦁  adv 0.49           
+cand • U+2022                2022    A     1    2     •  adv 1.00             •  adv 1.00             •  adv 0.45           
+cand ⬤ U+2B24                2B24    N     1    1     missing                 ⬤  adv 1.00             ⬤  adv 0.96           
+cand ⏺ U+23FA                23FA    N     1    2     missing                 missing                 ⏺  adv 0.96           
+cand ⊟ U+229F                229F    N     1    1     missing                 missing                 ⊟  adv 0.90           
+cand ⊠ U+22A0                22A0    N     1    1     missing                 missing                 ⊠  adv 0.90           
+cand ⌸ U+2338                2338    N     1    1     missing                 missing                 ⌸  adv 0.90           
+cand ⍐ U+2350                2350    N     1    1     missing                 missing                 ⍐  adv 0.90           
+cand ⇉ U+21C9                21C9    N     1    1     ⇉  adv 1.00             missing                 ⇉  adv 1.00           
+cand ⧖ U+29D6                29D6    N     1    1     missing                 missing                 ⧖  adv 0.90           
+cand ⌘ U+2318                2318    N     1    1     missing                 missing                 ⌘  adv 0.90           
+cand ⎇ U+2387                2387    N     1    1     missing                 missing                 ⎇  adv 1.11           
+cand ⑂ U+2442                2442    N     1    1     missing                 missing                 ⑂  adv 0.56           
+cand ∓ U+2213                2213    N     1    1     missing                 missing                 ∓  adv 0.76           
+cand ⌿ U+233F                233F    N     1    1     missing                 missing                 ⌿  adv 0.43           
+cand ↯ U+21AF                21AF    N     1    1     missing                 missing                 ↯  adv 0.76           
+cand ⁜ U+205C                205C    N     1    1     missing                 missing                 ⁜  adv 1.11           
+cand ¶ U+00B6                B6      A     1    2     ¶  adv 1.00             ¶  adv 1.00             ¶  adv 0.51           
+cand ⚑ U+2691                2691    N     1    1     missing                 missing                 ⚑  adv 0.80           
+cand ⬡ U+2B21                2B21    N     1    1     missing                 ⬡  adv 1.00             ⬡  adv 0.88           
+cand ⬢ U+2B22                2B22    N     1    1     missing                 ⬢  adv 1.00             ⬢  adv 0.88           
+cand ⏏ U+23CF                23CF    N     1    2     missing                 missing                 ⏏  adv 0.76           
+cand ⋯ U+22EF                22EF    N     1    1     missing                 missing                 ⋯  adv 1.06           
+cand ⇣ U+21E3                21E3    N     1    1     missing                 ⇣  adv 1.00             ⇣  adv 0.53           
+cand ⇡ U+21E1                21E1    N     1    1     missing                 ⇡  adv 1.00             ⇡  adv 0.53           
+cand ↕ U+2195                2195    A     1    2     ↕  adv 1.00             ↕  adv 1.00             ↕  adv 0.53           
+cand ⇕ U+21D5                21D5    N     1    1     missing                 missing                 ⇕  adv 0.66           
+cand ↧ U+21A7                21A7    N     1    1     ↧  adv 1.00             missing                 ↧  adv 0.53           
+cand ⌄ U+2304                2304    N     1    1     missing                 missing                 ⌄  adv 0.76           

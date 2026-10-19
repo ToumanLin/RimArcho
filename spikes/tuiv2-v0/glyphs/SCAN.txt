@@ -1,0 +1,491 @@
+glyph                        U+      EAW   rw   rwEA  CascadiaMono.ttf        MapleMono-NF-CN-Regular.ttf
+scan                         2008    N     1    1        adv 1.00             missing               
+scan ‑                       2011    N     1    1     ‑  adv 1.00             missing               
+scan ‗                       2017    N     1    1     ‗  adv 1.00             missing               
+scan ‚                       201A    N     1    1     ‚  adv 1.00             ‚  adv 1.00           
+scan ‛                       201B    N     1    1     ‛  adv 1.00             ‛  adv 1.00           
+scan „                       201E    N     1    1     „  adv 1.00             „  adv 1.00           
+scan ‹                       2039    N     1    1     ‹  adv 1.00             ‹  adv 1.00           
+scan ›                       203A    N     1    1     ›  adv 1.00             ›  adv 1.00           
+scan ⁄                       2044    N     1    1     ⁄  adv 1.00             ⁄  adv 1.00           
+scan ⁰                       2070    N     1    1     ⁰  adv 1.00             ⁰  adv 1.00           
+scan ⁵                       2075    N     1    1     ⁵  adv 1.00             ⁵  adv 1.00           
+scan ⁶                       2076    N     1    1     ⁶  adv 1.00             ⁶  adv 1.00           
+scan ⁷                       2077    N     1    1     ⁷  adv 1.00             ⁷  adv 1.00           
+scan ⁸                       2078    N     1    1     ⁸  adv 1.00             ⁸  adv 1.00           
+scan ⁹                       2079    N     1    1     ⁹  adv 1.00             ⁹  adv 1.00           
+scan ₀                       2080    N     1    1     ₀  adv 1.00             ₀  adv 1.00           
+scan ₅                       2085    N     1    1     ₅  adv 1.00             ₅  adv 1.00           
+scan ₆                       2086    N     1    1     ₆  adv 1.00             ₆  adv 1.00           
+scan ₇                       2087    N     1    1     ₇  adv 1.00             ₇  adv 1.00           
+scan ₈                       2088    N     1    1     ₈  adv 1.00             ₈  adv 1.00           
+scan ₉                       2089    N     1    1     ₉  adv 1.00             ₉  adv 1.00           
+scan ₠                       20A0    N     1    1     ₠  adv 1.00             missing               
+scan ₡                       20A1    N     1    1     ₡  adv 1.00             missing               
+scan ₣                       20A3    N     1    1     ₣  adv 1.00             missing               
+scan ₤                       20A4    N     1    1     ₤  adv 1.00             missing               
+scan ₦                       20A6    N     1    1     ₦  adv 1.00             missing               
+scan ₧                       20A7    N     1    1     ₧  adv 1.00             missing               
+scan ₨                       20A8    N     1    1     ₨  adv 1.00             missing               
+scan ₪                       20AA    N     1    1     ₪  adv 1.00             missing               
+scan ₫                       20AB    N     1    1     ₫  adv 1.00             missing               
+scan ₭                       20AD    N     1    1     ₭  adv 1.00             missing               
+scan ₮                       20AE    N     1    1     ₮  adv 1.00             missing               
+scan ₱                       20B1    N     1    1     ₱  adv 1.00             missing               
+scan ₲                       20B2    N     1    1     ₲  adv 1.00             missing               
+scan ₴                       20B4    N     1    1     ₴  adv 1.00             missing               
+scan ₵                       20B5    N     1    1     ₵  adv 1.00             missing               
+scan ₸                       20B8    N     1    1     ₸  adv 1.00             missing               
+scan ₹                       20B9    N     1    1     ₹  adv 1.00             ₹  adv 1.00           
+scan ₺                       20BA    N     1    1     ₺  adv 1.00             ₺  adv 1.00           
+scan ₼                       20BC    N     1    1     ₼  adv 1.00             missing               
+scan ₽                       20BD    N     1    1     ₽  adv 1.00             ₽  adv 1.00           
+scan ₾                       20BE    N     1    1     ₾  adv 1.00             missing               
+scan ℗                       2117    N     1    1     ℗  adv 1.00             missing               
+scan ℞                       211E    N     1    1     ℞  adv 1.00             missing               
+scan ℮                       212E    N     1    1     ℮  adv 1.00             ℮  adv 1.00           
+scan ↨                       21A8    N     1    1     ↨  adv 1.00             missing               
+scan ↲                       21B2    N     1    1     ↲  adv 1.00             ↲  adv 1.00           
+scan ⇡                       21E1    N     1    1     ⇡  adv 1.00             missing               
+scan ⇣                       21E3    N     1    1     ⇣  adv 1.00             missing               
+scan ∆                       2206    N     1    1     ∆  adv 1.00             missing               
+scan −                       2212    N     1    1     −  adv 1.00             −  adv 1.00           
+scan ∙                       2219    N     1    1     ∙  adv 1.00             missing               
+scan ≢                       2262    N     1    1     ≢  adv 1.00             missing               
+scan ≣                       2263    N     1    1     ≣  adv 1.00             missing               
+scan ⌂                       2302    N     1    1     ⌂  adv 1.00             missing               
+scan ⌐                       2310    N     1    1     ⌐  adv 1.00             missing               
+scan ⌠                       2320    N     1    1     ⌠  adv 1.00             missing               
+scan ⌡                       2321    N     1    1     ⌡  adv 1.00             missing               
+scan ⎯                       23AF    N     1    1     ⎯  adv 1.00             missing               
+scan ⏎                       23CE    N     1    1     ⏎  adv 1.00             missing               
+scan ␀                       2400    N     1    1     ␀  adv 1.00             missing               
+scan ␁                       2401    N     1    1     ␁  adv 1.00             missing               
+scan ␂                       2402    N     1    1     ␂  adv 1.00             missing               
+scan ␃                       2403    N     1    1     ␃  adv 1.00             missing               
+scan ␄                       2404    N     1    1     ␄  adv 1.00             missing               
+scan ␅                       2405    N     1    1     ␅  adv 1.00             missing               
+scan ␆                       2406    N     1    1     ␆  adv 1.00             missing               
+scan ␇                       2407    N     1    1     ␇  adv 1.00             missing               
+scan ␈                       2408    N     1    1     ␈  adv 1.00             missing               
+scan ␉                       2409    N     1    1     ␉  adv 1.00             missing               
+scan ␊                       240A    N     1    1     ␊  adv 1.00             missing               
+scan ␋                       240B    N     1    1     ␋  adv 1.00             missing               
+scan ␌                       240C    N     1    1     ␌  adv 1.00             missing               
+scan ␍                       240D    N     1    1     ␍  adv 1.00             missing               
+scan ␎                       240E    N     1    1     ␎  adv 1.00             missing               
+scan ␏                       240F    N     1    1     ␏  adv 1.00             missing               
+scan ␐                       2410    N     1    1     ␐  adv 1.00             missing               
+scan ␑                       2411    N     1    1     ␑  adv 1.00             missing               
+scan ␒                       2412    N     1    1     ␒  adv 1.00             missing               
+scan ␓                       2413    N     1    1     ␓  adv 1.00             missing               
+scan ␔                       2414    N     1    1     ␔  adv 1.00             missing               
+scan ␕                       2415    N     1    1     ␕  adv 1.00             missing               
+scan ␖                       2416    N     1    1     ␖  adv 1.00             missing               
+scan ␗                       2417    N     1    1     ␗  adv 1.00             missing               
+scan ␘                       2418    N     1    1     ␘  adv 1.00             missing               
+scan ␙                       2419    N     1    1     ␙  adv 1.00             missing               
+scan ␚                       241A    N     1    1     ␚  adv 1.00             missing               
+scan ␛                       241B    N     1    1     ␛  adv 1.00             missing               
+scan ␜                       241C    N     1    1     ␜  adv 1.00             missing               
+scan ␝                       241D    N     1    1     ␝  adv 1.00             missing               
+scan ␞                       241E    N     1    1     ␞  adv 1.00             missing               
+scan ␟                       241F    N     1    1     ␟  adv 1.00             missing               
+scan ␠                       2420    N     1    1     ␠  adv 1.00             missing               
+scan ␡                       2421    N     1    1     ␡  adv 1.00             missing               
+scan ␢                       2422    N     1    1     ␢  adv 1.00             missing               
+scan ␣                       2423    N     1    1     ␣  adv 1.00             missing               
+scan ␤                       2424    N     1    1     ␤  adv 1.00             missing               
+scan ␥                       2425    N     1    1     ␥  adv 1.00             missing               
+scan ␦                       2426    N     1    1     ␦  adv 1.00             missing               
+scan ╌                       254C    N     1    1     ╌  adv 1.00             ╌  adv 1.00           
+scan ╍                       254D    N     1    1     ╍  adv 1.00             ╍  adv 1.00           
+scan ╎                       254E    N     1    1     ╎  adv 1.00             ╎  adv 1.00           
+scan ╏                       254F    N     1    1     ╏  adv 1.00             ╏  adv 1.00           
+scan ╴                       2574    N     1    1     ╴  adv 1.00             ╴  adv 1.00           
+scan ╵                       2575    N     1    1     ╵  adv 1.00             ╵  adv 1.00           
+scan ╶                       2576    N     1    1     ╶  adv 1.00             ╶  adv 1.00           
+scan ╷                       2577    N     1    1     ╷  adv 1.00             ╷  adv 1.00           
+scan ╸                       2578    N     1    1     ╸  adv 1.00             ╸  adv 1.00           
+scan ╹                       2579    N     1    1     ╹  adv 1.00             ╹  adv 1.00           
+scan ╺                       257A    N     1    1     ╺  adv 1.00             ╺  adv 1.00           
+scan ╻                       257B    N     1    1     ╻  adv 1.00             ╻  adv 1.00           
+scan ╼                       257C    N     1    1     ╼  adv 1.00             ╼  adv 1.00           
+scan ╽                       257D    N     1    1     ╽  adv 1.00             ╽  adv 1.00           
+scan ╾                       257E    N     1    1     ╾  adv 1.00             ╾  adv 1.00           
+scan ╿                       257F    N     1    1     ╿  adv 1.00             ╿  adv 1.00           
+scan ▐                       2590    N     1    1     ▐  adv 1.00             ▐  adv 1.00           
+scan ░                       2591    N     1    1     ░  adv 1.00             ░  adv 1.00           
+scan ▖                       2596    N     1    1     ▖  adv 1.00             ▖  adv 1.00           
+scan ▗                       2597    N     1    1     ▗  adv 1.00             ▗  adv 1.00           
+scan ▘                       2598    N     1    1     ▘  adv 1.00             ▘  adv 1.00           
+scan ▙                       2599    N     1    1     ▙  adv 1.00             ▙  adv 1.00           
+scan ▚                       259A    N     1    1     ▚  adv 1.00             ▚  adv 1.00           
+scan ▛                       259B    N     1    1     ▛  adv 1.00             ▛  adv 1.00           
+scan ▜                       259C    N     1    1     ▜  adv 1.00             ▜  adv 1.00           
+scan ▝                       259D    N     1    1     ▝  adv 1.00             ▝  adv 1.00           
+scan ▞                       259E    N     1    1     ▞  adv 1.00             ▞  adv 1.00           
+scan ▟                       259F    N     1    1     ▟  adv 1.00             ▟  adv 1.00           
+scan ▢                       25A2    N     1    1     ▢  adv 1.00             missing               
+scan ▬                       25AC    N     1    1     ▬  adv 1.00             missing               
+scan ▭                       25AD    N     1    1     ▭  adv 1.00             missing               
+scan ▮                       25AE    N     1    1     ▮  adv 1.00             missing               
+scan ▯                       25AF    N     1    1     ▯  adv 1.00             missing               
+scan ▰                       25B0    N     1    1     ▰  adv 1.00             missing               
+scan ▱                       25B1    N     1    1     ▱  adv 1.00             missing               
+scan ▴                       25B4    N     1    1     ▴  adv 1.00             ▴  adv 1.00           
+scan ▵                       25B5    N     1    1     ▵  adv 1.00             ▵  adv 1.00           
+scan ▸                       25B8    N     1    1     ▸  adv 1.00             ▸  adv 1.00           
+scan ▹                       25B9    N     1    1     ▹  adv 1.00             ▹  adv 1.00           
+scan ►                       25BA    N     1    1     ►  adv 1.00             ►  adv 1.00           
+scan ▻                       25BB    N     1    1     ▻  adv 1.00             ▻  adv 1.00           
+scan ▾                       25BE    N     1    1     ▾  adv 1.00             ▾  adv 1.00           
+scan ▿                       25BF    N     1    1     ▿  adv 1.00             ▿  adv 1.00           
+scan ◂                       25C2    N     1    1     ◂  adv 1.00             ◂  adv 1.00           
+scan ◃                       25C3    N     1    1     ◃  adv 1.00             ◃  adv 1.00           
+scan ◄                       25C4    N     1    1     ◄  adv 1.00             ◄  adv 1.00           
+scan ◅                       25C5    N     1    1     ◅  adv 1.00             ◅  adv 1.00           
+scan ◉                       25C9    N     1    1     ◉  adv 1.00             ◉  adv 1.00           
+scan ◊                       25CA    N     1    1     ◊  adv 1.00             ◊  adv 1.00           
+scan ◌                       25CC    N     1    1     ◌  adv 1.00             ◌  adv 1.00           
+scan ◍                       25CD    N     1    1     ◍  adv 1.00             missing               
+scan ◒                       25D2    N     1    1     ◒  adv 1.00             missing               
+scan ◓                       25D3    N     1    1     ◓  adv 1.00             missing               
+scan ◔                       25D4    N     1    1     ◔  adv 1.00             ◔  adv 1.00           
+scan ◕                       25D5    N     1    1     ◕  adv 1.00             ◕  adv 1.00           
+scan ◖                       25D6    N     1    1     ◖  adv 1.00             missing               
+scan ◗                       25D7    N     1    1     ◗  adv 1.00             missing               
+scan ◘                       25D8    N     1    1     ◘  adv 1.00             missing               
+scan ◙                       25D9    N     1    1     ◙  adv 1.00             missing               
+scan ◚                       25DA    N     1    1     ◚  adv 1.00             missing               
+scan ◛                       25DB    N     1    1     ◛  adv 1.00             missing               
+scan ◜                       25DC    N     1    1     ◜  adv 1.00             missing               
+scan ◝                       25DD    N     1    1     ◝  adv 1.00             missing               
+scan ◞                       25DE    N     1    1     ◞  adv 1.00             missing               
+scan ◟                       25DF    N     1    1     ◟  adv 1.00             missing               
+scan ◠                       25E0    N     1    1     ◠  adv 1.00             missing               
+scan ◡                       25E1    N     1    1     ◡  adv 1.00             missing               
+scan ◦                       25E6    N     1    1     ◦  adv 1.00             ◦  adv 1.00           
+scan ◧                       25E7    N     1    1     ◧  adv 1.00             ◧  adv 1.00           
+scan ◨                       25E8    N     1    1     ◨  adv 1.00             ◨  adv 1.00           
+scan ◩                       25E9    N     1    1     ◩  adv 1.00             ◩  adv 1.00           
+scan ◪                       25EA    N     1    1     ◪  adv 1.00             ◪  adv 1.00           
+scan ◫                       25EB    N     1    1     ◫  adv 1.00             ◫  adv 1.00           
+scan ◬                       25EC    N     1    1     ◬  adv 1.00             missing               
+scan ◭                       25ED    N     1    1     ◭  adv 1.00             missing               
+scan ◮                       25EE    N     1    1     ◮  adv 1.00             missing               
+scan ◰                       25F0    N     1    1     ◰  adv 1.00             missing               
+scan ◱                       25F1    N     1    1     ◱  adv 1.00             missing               
+scan ◲                       25F2    N     1    1     ◲  adv 1.00             missing               
+scan ◳                       25F3    N     1    1     ◳  adv 1.00             missing               
+scan ◴                       25F4    N     1    1     ◴  adv 1.00             missing               
+scan ◵                       25F5    N     1    1     ◵  adv 1.00             missing               
+scan ◶                       25F6    N     1    1     ◶  adv 1.00             ◶  adv 1.00           
+scan ◷                       25F7    N     1    1     ◷  adv 1.00             missing               
+scan ◸                       25F8    N     1    1     ◸  adv 1.00             missing               
+scan ◹                       25F9    N     1    1     ◹  adv 1.00             missing               
+scan ◺                       25FA    N     1    1     ◺  adv 1.00             missing               
+scan ◿                       25FF    N     1    1     ◿  adv 1.00             missing               
+scan ☙                       2619    N     1    1     ☙  adv 1.00             missing               
+scan ☻                       263B    N     1    1     ☻  adv 1.00             missing               
+scan ☼                       263C    N     1    1     ☼  adv 1.00             missing               
+scan ♫                       266B    N     1    1     ♫  adv 1.00             missing               
+scan ✓                       2713    N     1    1     ✓  adv 1.00             ✓  adv 1.00           
+scan ❧                       2767    N     1    1     ❧  adv 1.00             missing               
+scan ❬                       276C    N     1    1     ❬  adv 1.00             missing               
+scan ❭                       276D    N     1    1     ❭  adv 1.00             missing               
+scan ❮                       276E    N     1    1     ❮  adv 1.00             ❮  adv 1.00           
+scan ❯                       276F    N     1    1     ❯  adv 1.00             ❯  adv 1.00           
+scan ❰                       2770    N     1    1     ❰  adv 1.00             ❰  adv 1.00           
+scan ❱                       2771    N     1    1     ❱  adv 1.00             ❱  adv 1.00           
+scan ⠀                       2800    N     1    1     ⠀  adv 1.00             missing               
+scan ⠁                       2801    N     1    1     ⠁  adv 1.00             missing               
+scan ⠂                       2802    N     1    1     ⠂  adv 1.00             missing               
+scan ⠃                       2803    N     1    1     ⠃  adv 1.00             missing               
+scan ⠄                       2804    N     1    1     ⠄  adv 1.00             missing               
+scan ⠅                       2805    N     1    1     ⠅  adv 1.00             missing               
+scan ⠆                       2806    N     1    1     ⠆  adv 1.00             missing               
+scan ⠇                       2807    N     1    1     ⠇  adv 1.00             missing               
+scan ⠈                       2808    N     1    1     ⠈  adv 1.00             missing               
+scan ⠉                       2809    N     1    1     ⠉  adv 1.00             missing               
+scan ⠊                       280A    N     1    1     ⠊  adv 1.00             missing               
+scan ⠋                       280B    N     1    1     ⠋  adv 1.00             missing               
+scan ⠌                       280C    N     1    1     ⠌  adv 1.00             missing               
+scan ⠍                       280D    N     1    1     ⠍  adv 1.00             missing               
+scan ⠎                       280E    N     1    1     ⠎  adv 1.00             missing               
+scan ⠏                       280F    N     1    1     ⠏  adv 1.00             missing               
+scan ⠐                       2810    N     1    1     ⠐  adv 1.00             missing               
+scan ⠑                       2811    N     1    1     ⠑  adv 1.00             missing               
+scan ⠒                       2812    N     1    1     ⠒  adv 1.00             missing               
+scan ⠓                       2813    N     1    1     ⠓  adv 1.00             missing               
+scan ⠔                       2814    N     1    1     ⠔  adv 1.00             missing               
+scan ⠕                       2815    N     1    1     ⠕  adv 1.00             missing               
+scan ⠖                       2816    N     1    1     ⠖  adv 1.00             missing               
+scan ⠗                       2817    N     1    1     ⠗  adv 1.00             missing               
+scan ⠘                       2818    N     1    1     ⠘  adv 1.00             missing               
+scan ⠙                       2819    N     1    1     ⠙  adv 1.00             missing               
+scan ⠚                       281A    N     1    1     ⠚  adv 1.00             missing               
+scan ⠛                       281B    N     1    1     ⠛  adv 1.00             missing               
+scan ⠜                       281C    N     1    1     ⠜  adv 1.00             missing               
+scan ⠝                       281D    N     1    1     ⠝  adv 1.00             missing               
+scan ⠞                       281E    N     1    1     ⠞  adv 1.00             missing               
+scan ⠟                       281F    N     1    1     ⠟  adv 1.00             missing               
+scan ⠠                       2820    N     1    1     ⠠  adv 1.00             missing               
+scan ⠡                       2821    N     1    1     ⠡  adv 1.00             missing               
+scan ⠢                       2822    N     1    1     ⠢  adv 1.00             missing               
+scan ⠣                       2823    N     1    1     ⠣  adv 1.00             missing               
+scan ⠤                       2824    N     1    1     ⠤  adv 1.00             missing               
+scan ⠥                       2825    N     1    1     ⠥  adv 1.00             missing               
+scan ⠦                       2826    N     1    1     ⠦  adv 1.00             missing               
+scan ⠧                       2827    N     1    1     ⠧  adv 1.00             missing               
+scan ⠨                       2828    N     1    1     ⠨  adv 1.00             missing               
+scan ⠩                       2829    N     1    1     ⠩  adv 1.00             missing               
+scan ⠪                       282A    N     1    1     ⠪  adv 1.00             missing               
+scan ⠫                       282B    N     1    1     ⠫  adv 1.00             missing               
+scan ⠬                       282C    N     1    1     ⠬  adv 1.00             missing               
+scan ⠭                       282D    N     1    1     ⠭  adv 1.00             missing               
+scan ⠮                       282E    N     1    1     ⠮  adv 1.00             missing               
+scan ⠯                       282F    N     1    1     ⠯  adv 1.00             missing               
+scan ⠰                       2830    N     1    1     ⠰  adv 1.00             missing               
+scan ⠱                       2831    N     1    1     ⠱  adv 1.00             missing               
+scan ⠲                       2832    N     1    1     ⠲  adv 1.00             missing               
+scan ⠳                       2833    N     1    1     ⠳  adv 1.00             missing               
+scan ⠴                       2834    N     1    1     ⠴  adv 1.00             missing               
+scan ⠵                       2835    N     1    1     ⠵  adv 1.00             missing               
+scan ⠶                       2836    N     1    1     ⠶  adv 1.00             missing               
+scan ⠷                       2837    N     1    1     ⠷  adv 1.00             missing               
+scan ⠸                       2838    N     1    1     ⠸  adv 1.00             missing               
+scan ⠹                       2839    N     1    1     ⠹  adv 1.00             missing               
+scan ⠺                       283A    N     1    1     ⠺  adv 1.00             missing               
+scan ⠻                       283B    N     1    1     ⠻  adv 1.00             missing               
+scan ⠼                       283C    N     1    1     ⠼  adv 1.00             missing               
+scan ⠽                       283D    N     1    1     ⠽  adv 1.00             missing               
+scan ⠾                       283E    N     1    1     ⠾  adv 1.00             missing               
+scan ⠿                       283F    N     1    1     ⠿  adv 1.00             missing               
+scan ⡀                       2840    N     1    1     ⡀  adv 1.00             missing               
+scan ⡁                       2841    N     1    1     ⡁  adv 1.00             missing               
+scan ⡂                       2842    N     1    1     ⡂  adv 1.00             missing               
+scan ⡃                       2843    N     1    1     ⡃  adv 1.00             missing               
+scan ⡄                       2844    N     1    1     ⡄  adv 1.00             missing               
+scan ⡅                       2845    N     1    1     ⡅  adv 1.00             missing               
+scan ⡆                       2846    N     1    1     ⡆  adv 1.00             missing               
+scan ⡇                       2847    N     1    1     ⡇  adv 1.00             missing               
+scan ⡈                       2848    N     1    1     ⡈  adv 1.00             missing               
+scan ⡉                       2849    N     1    1     ⡉  adv 1.00             missing               
+scan ⡊                       284A    N     1    1     ⡊  adv 1.00             missing               
+scan ⡋                       284B    N     1    1     ⡋  adv 1.00             missing               
+scan ⡌                       284C    N     1    1     ⡌  adv 1.00             missing               
+scan ⡍                       284D    N     1    1     ⡍  adv 1.00             missing               
+scan ⡎                       284E    N     1    1     ⡎  adv 1.00             missing               
+scan ⡏                       284F    N     1    1     ⡏  adv 1.00             missing               
+scan ⡐                       2850    N     1    1     ⡐  adv 1.00             missing               
+scan ⡑                       2851    N     1    1     ⡑  adv 1.00             missing               
+scan ⡒                       2852    N     1    1     ⡒  adv 1.00             missing               
+scan ⡓                       2853    N     1    1     ⡓  adv 1.00             missing               
+scan ⡔                       2854    N     1    1     ⡔  adv 1.00             missing               
+scan ⡕                       2855    N     1    1     ⡕  adv 1.00             missing               
+scan ⡖                       2856    N     1    1     ⡖  adv 1.00             missing               
+scan ⡗                       2857    N     1    1     ⡗  adv 1.00             missing               
+scan ⡘                       2858    N     1    1     ⡘  adv 1.00             missing               
+scan ⡙                       2859    N     1    1     ⡙  adv 1.00             missing               
+scan ⡚                       285A    N     1    1     ⡚  adv 1.00             missing               
+scan ⡛                       285B    N     1    1     ⡛  adv 1.00             missing               
+scan ⡜                       285C    N     1    1     ⡜  adv 1.00             missing               
+scan ⡝                       285D    N     1    1     ⡝  adv 1.00             missing               
+scan ⡞                       285E    N     1    1     ⡞  adv 1.00             missing               
+scan ⡟                       285F    N     1    1     ⡟  adv 1.00             missing               
+scan ⡠                       2860    N     1    1     ⡠  adv 1.00             missing               
+scan ⡡                       2861    N     1    1     ⡡  adv 1.00             missing               
+scan ⡢                       2862    N     1    1     ⡢  adv 1.00             missing               
+scan ⡣                       2863    N     1    1     ⡣  adv 1.00             missing               
+scan ⡤                       2864    N     1    1     ⡤  adv 1.00             missing               
+scan ⡥                       2865    N     1    1     ⡥  adv 1.00             missing               
+scan ⡦                       2866    N     1    1     ⡦  adv 1.00             missing               
+scan ⡧                       2867    N     1    1     ⡧  adv 1.00             missing               
+scan ⡨                       2868    N     1    1     ⡨  adv 1.00             missing               
+scan ⡩                       2869    N     1    1     ⡩  adv 1.00             missing               
+scan ⡪                       286A    N     1    1     ⡪  adv 1.00             missing               
+scan ⡫                       286B    N     1    1     ⡫  adv 1.00             missing               
+scan ⡬                       286C    N     1    1     ⡬  adv 1.00             missing               
+scan ⡭                       286D    N     1    1     ⡭  adv 1.00             missing               
+scan ⡮                       286E    N     1    1     ⡮  adv 1.00             missing               
+scan ⡯                       286F    N     1    1     ⡯  adv 1.00             missing               
+scan ⡰                       2870    N     1    1     ⡰  adv 1.00             missing               
+scan ⡱                       2871    N     1    1     ⡱  adv 1.00             missing               
+scan ⡲                       2872    N     1    1     ⡲  adv 1.00             missing               
+scan ⡳                       2873    N     1    1     ⡳  adv 1.00             missing               
+scan ⡴                       2874    N     1    1     ⡴  adv 1.00             missing               
+scan ⡵                       2875    N     1    1     ⡵  adv 1.00             missing               
+scan ⡶                       2876    N     1    1     ⡶  adv 1.00             missing               
+scan ⡷                       2877    N     1    1     ⡷  adv 1.00             missing               
+scan ⡸                       2878    N     1    1     ⡸  adv 1.00             missing               
+scan ⡹                       2879    N     1    1     ⡹  adv 1.00             missing               
+scan ⡺                       287A    N     1    1     ⡺  adv 1.00             missing               
+scan ⡻                       287B    N     1    1     ⡻  adv 1.00             missing               
+scan ⡼                       287C    N     1    1     ⡼  adv 1.00             missing               
+scan ⡽                       287D    N     1    1     ⡽  adv 1.00             missing               
+scan ⡾                       287E    N     1    1     ⡾  adv 1.00             missing               
+scan ⡿                       287F    N     1    1     ⡿  adv 1.00             missing               
+scan ⢀                       2880    N     1    1     ⢀  adv 1.00             missing               
+scan ⢁                       2881    N     1    1     ⢁  adv 1.00             missing               
+scan ⢂                       2882    N     1    1     ⢂  adv 1.00             missing               
+scan ⢃                       2883    N     1    1     ⢃  adv 1.00             missing               
+scan ⢄                       2884    N     1    1     ⢄  adv 1.00             missing               
+scan ⢅                       2885    N     1    1     ⢅  adv 1.00             missing               
+scan ⢆                       2886    N     1    1     ⢆  adv 1.00             missing               
+scan ⢇                       2887    N     1    1     ⢇  adv 1.00             missing               
+scan ⢈                       2888    N     1    1     ⢈  adv 1.00             missing               
+scan ⢉                       2889    N     1    1     ⢉  adv 1.00             missing               
+scan ⢊                       288A    N     1    1     ⢊  adv 1.00             missing               
+scan ⢋                       288B    N     1    1     ⢋  adv 1.00             missing               
+scan ⢌                       288C    N     1    1     ⢌  adv 1.00             missing               
+scan ⢍                       288D    N     1    1     ⢍  adv 1.00             missing               
+scan ⢎                       288E    N     1    1     ⢎  adv 1.00             missing               
+scan ⢏                       288F    N     1    1     ⢏  adv 1.00             missing               
+scan ⢐                       2890    N     1    1     ⢐  adv 1.00             missing               
+scan ⢑                       2891    N     1    1     ⢑  adv 1.00             missing               
+scan ⢒                       2892    N     1    1     ⢒  adv 1.00             missing               
+scan ⢓                       2893    N     1    1     ⢓  adv 1.00             missing               
+scan ⢔                       2894    N     1    1     ⢔  adv 1.00             missing               
+scan ⢕                       2895    N     1    1     ⢕  adv 1.00             missing               
+scan ⢖                       2896    N     1    1     ⢖  adv 1.00             missing               
+scan ⢗                       2897    N     1    1     ⢗  adv 1.00             missing               
+scan ⢘                       2898    N     1    1     ⢘  adv 1.00             missing               
+scan ⢙                       2899    N     1    1     ⢙  adv 1.00             missing               
+scan ⢚                       289A    N     1    1     ⢚  adv 1.00             missing               
+scan ⢛                       289B    N     1    1     ⢛  adv 1.00             missing               
+scan ⢜                       289C    N     1    1     ⢜  adv 1.00             missing               
+scan ⢝                       289D    N     1    1     ⢝  adv 1.00             missing               
+scan ⢞                       289E    N     1    1     ⢞  adv 1.00             missing               
+scan ⢟                       289F    N     1    1     ⢟  adv 1.00             missing               
+scan ⢠                       28A0    N     1    1     ⢠  adv 1.00             missing               
+scan ⢡                       28A1    N     1    1     ⢡  adv 1.00             missing               
+scan ⢢                       28A2    N     1    1     ⢢  adv 1.00             missing               
+scan ⢣                       28A3    N     1    1     ⢣  adv 1.00             missing               
+scan ⢤                       28A4    N     1    1     ⢤  adv 1.00             missing               
+scan ⢥                       28A5    N     1    1     ⢥  adv 1.00             missing               
+scan ⢦                       28A6    N     1    1     ⢦  adv 1.00             missing               
+scan ⢧                       28A7    N     1    1     ⢧  adv 1.00             missing               
+scan ⢨                       28A8    N     1    1     ⢨  adv 1.00             missing               
+scan ⢩                       28A9    N     1    1     ⢩  adv 1.00             missing               
+scan ⢪                       28AA    N     1    1     ⢪  adv 1.00             missing               
+scan ⢫                       28AB    N     1    1     ⢫  adv 1.00             missing               
+scan ⢬                       28AC    N     1    1     ⢬  adv 1.00             missing               
+scan ⢭                       28AD    N     1    1     ⢭  adv 1.00             missing               
+scan ⢮                       28AE    N     1    1     ⢮  adv 1.00             missing               
+scan ⢯                       28AF    N     1    1     ⢯  adv 1.00             missing               
+scan ⢰                       28B0    N     1    1     ⢰  adv 1.00             missing               
+scan ⢱                       28B1    N     1    1     ⢱  adv 1.00             missing               
+scan ⢲                       28B2    N     1    1     ⢲  adv 1.00             missing               
+scan ⢳                       28B3    N     1    1     ⢳  adv 1.00             missing               
+scan ⢴                       28B4    N     1    1     ⢴  adv 1.00             missing               
+scan ⢵                       28B5    N     1    1     ⢵  adv 1.00             missing               
+scan ⢶                       28B6    N     1    1     ⢶  adv 1.00             missing               
+scan ⢷                       28B7    N     1    1     ⢷  adv 1.00             missing               
+scan ⢸                       28B8    N     1    1     ⢸  adv 1.00             missing               
+scan ⢹                       28B9    N     1    1     ⢹  adv 1.00             missing               
+scan ⢺                       28BA    N     1    1     ⢺  adv 1.00             missing               
+scan ⢻                       28BB    N     1    1     ⢻  adv 1.00             missing               
+scan ⢼                       28BC    N     1    1     ⢼  adv 1.00             missing               
+scan ⢽                       28BD    N     1    1     ⢽  adv 1.00             missing               
+scan ⢾                       28BE    N     1    1     ⢾  adv 1.00             missing               
+scan ⢿                       28BF    N     1    1     ⢿  adv 1.00             missing               
+scan ⣀                       28C0    N     1    1     ⣀  adv 1.00             missing               
+scan ⣁                       28C1    N     1    1     ⣁  adv 1.00             missing               
+scan ⣂                       28C2    N     1    1     ⣂  adv 1.00             missing               
+scan ⣃                       28C3    N     1    1     ⣃  adv 1.00             missing               
+scan ⣄                       28C4    N     1    1     ⣄  adv 1.00             missing               
+scan ⣅                       28C5    N     1    1     ⣅  adv 1.00             missing               
+scan ⣆                       28C6    N     1    1     ⣆  adv 1.00             missing               
+scan ⣇                       28C7    N     1    1     ⣇  adv 1.00             missing               
+scan ⣈                       28C8    N     1    1     ⣈  adv 1.00             missing               
+scan ⣉                       28C9    N     1    1     ⣉  adv 1.00             missing               
+scan ⣊                       28CA    N     1    1     ⣊  adv 1.00             missing               
+scan ⣋                       28CB    N     1    1     ⣋  adv 1.00             missing               
+scan ⣌                       28CC    N     1    1     ⣌  adv 1.00             missing               
+scan ⣍                       28CD    N     1    1     ⣍  adv 1.00             missing               
+scan ⣎                       28CE    N     1    1     ⣎  adv 1.00             missing               
+scan ⣏                       28CF    N     1    1     ⣏  adv 1.00             missing               
+scan ⣐                       28D0    N     1    1     ⣐  adv 1.00             missing               
+scan ⣑                       28D1    N     1    1     ⣑  adv 1.00             missing               
+scan ⣒                       28D2    N     1    1     ⣒  adv 1.00             missing               
+scan ⣓                       28D3    N     1    1     ⣓  adv 1.00             missing               
+scan ⣔                       28D4    N     1    1     ⣔  adv 1.00             missing               
+scan ⣕                       28D5    N     1    1     ⣕  adv 1.00             missing               
+scan ⣖                       28D6    N     1    1     ⣖  adv 1.00             missing               
+scan ⣗                       28D7    N     1    1     ⣗  adv 1.00             missing               
+scan ⣘                       28D8    N     1    1     ⣘  adv 1.00             missing               
+scan ⣙                       28D9    N     1    1     ⣙  adv 1.00             missing               
+scan ⣚                       28DA    N     1    1     ⣚  adv 1.00             missing               
+scan ⣛                       28DB    N     1    1     ⣛  adv 1.00             missing               
+scan ⣜                       28DC    N     1    1     ⣜  adv 1.00             missing               
+scan ⣝                       28DD    N     1    1     ⣝  adv 1.00             missing               
+scan ⣞                       28DE    N     1    1     ⣞  adv 1.00             missing               
+scan ⣟                       28DF    N     1    1     ⣟  adv 1.00             missing               
+scan ⣠                       28E0    N     1    1     ⣠  adv 1.00             missing               
+scan ⣡                       28E1    N     1    1     ⣡  adv 1.00             missing               
+scan ⣢                       28E2    N     1    1     ⣢  adv 1.00             missing               
+scan ⣣                       28E3    N     1    1     ⣣  adv 1.00             missing               
+scan ⣤                       28E4    N     1    1     ⣤  adv 1.00             missing               
+scan ⣥                       28E5    N     1    1     ⣥  adv 1.00             missing               
+scan ⣦                       28E6    N     1    1     ⣦  adv 1.00             missing               
+scan ⣧                       28E7    N     1    1     ⣧  adv 1.00             missing               
+scan ⣨                       28E8    N     1    1     ⣨  adv 1.00             missing               
+scan ⣩                       28E9    N     1    1     ⣩  adv 1.00             missing               
+scan ⣪                       28EA    N     1    1     ⣪  adv 1.00             missing               
+scan ⣫                       28EB    N     1    1     ⣫  adv 1.00             missing               
+scan ⣬                       28EC    N     1    1     ⣬  adv 1.00             missing               
+scan ⣭                       28ED    N     1    1     ⣭  adv 1.00             missing               
+scan ⣮                       28EE    N     1    1     ⣮  adv 1.00             missing               
+scan ⣯                       28EF    N     1    1     ⣯  adv 1.00             missing               
+scan ⣰                       28F0    N     1    1     ⣰  adv 1.00             missing               
+scan ⣱                       28F1    N     1    1     ⣱  adv 1.00             missing               
+scan ⣲                       28F2    N     1    1     ⣲  adv 1.00             missing               
+scan ⣳                       28F3    N     1    1     ⣳  adv 1.00             missing               
+scan ⣴                       28F4    N     1    1     ⣴  adv 1.00             missing               
+scan ⣵                       28F5    N     1    1     ⣵  adv 1.00             missing               
+scan ⣶                       28F6    N     1    1     ⣶  adv 1.00             missing               
+scan ⣷                       28F7    N     1    1     ⣷  adv 1.00             missing               
+scan ⣸                       28F8    N     1    1     ⣸  adv 1.00             missing               
+scan ⣹                       28F9    N     1    1     ⣹  adv 1.00             missing               
+scan ⣺                       28FA    N     1    1     ⣺  adv 1.00             missing               
+scan ⣻                       28FB    N     1    1     ⣻  adv 1.00             missing               
+scan ⣼                       28FC    N     1    1     ⣼  adv 1.00             missing               
+scan ⣽                       28FD    N     1    1     ⣽  adv 1.00             missing               
+scan ⣾                       28FE    N     1    1     ⣾  adv 1.00             missing               
+scan ⣿                       28FF    N     1    1     ⣿  adv 1.00             missing               
+scan ⨯                       2A2F    N     1    1     ⨯  adv 1.00             missing               
+scan ⬒                       2B12    N     1    1     ⬒  adv 1.00             missing               
+scan ⬓                       2B13    N     1    1     ⬓  adv 1.00             missing               
+scan ⬔                       2B14    N     1    1     ⬔  adv 1.00             missing               
+scan ⬕                       2B15    N     1    1     ⬕  adv 1.00             missing               
+scan ⬖                       2B16    N     1    1     ⬖  adv 1.00             missing               
+scan ⬗                       2B17    N     1    1     ⬗  adv 1.00             missing               
+scan ⬘                       2B18    N     1    1     ⬘  adv 1.00             missing               
+scan ⬙                       2B19    N     1    1     ⬙  adv 1.00             missing               
+scan ⬚                       2B1A    N     1    1     ⬚  adv 1.00             missing               
+scan ⬝                       2B1D    N     1    1     ⬝  adv 1.00             missing               
+scan ⬞                       2B1E    N     1    1     ⬞  adv 1.00             missing               
+scan ⬟                       2B1F    N     1    1     ⬟  adv 1.00             missing               
+scan ⬠                       2B20    N     1    1     ⬠  adv 1.00             missing               
+scan ⬡                       2B21    N     1    1     ⬡  adv 1.00             missing               
+scan ⬢                       2B22    N     1    1     ⬢  adv 1.00             missing               
+scan ⬣                       2B23    N     1    1     ⬣  adv 1.00             missing               
+scan ⬤                       2B24    N     1    1     ⬤  adv 1.00             missing               
+scan ⬥                       2B25    N     1    1     ⬥  adv 1.00             missing               
+scan ⬦                       2B26    N     1    1     ⬦  adv 1.00             missing               
+scan ⬧                       2B27    N     1    1     ⬧  adv 1.00             missing               
+scan ⬨                       2B28    N     1    1     ⬨  adv 1.00             missing               
+scan ⬩                       2B29    N     1    1     ⬩  adv 1.00             missing               
+scan ⬪                       2B2A    N     1    1     ⬪  adv 1.00             missing               
+scan ⬫                       2B2B    N     1    1     ⬫  adv 1.00             missing               
+scan ⬬                       2B2C    N     1    1     ⬬  adv 1.00             missing               
+scan ⬭                       2B2D    N     1    1     ⬭  adv 1.00             missing               
+scan ⬮                       2B2E    N     1    1     ⬮  adv 1.00             missing               
+scan ⬯                       2B2F    N     1    1     ⬯  adv 1.00             missing               
+scan ⯅                       2BC5    N     1    1     ⯅  adv 1.00             missing               
+scan ⯆                       2BC6    N     1    1     ⯆  adv 1.00             missing               
+scan ⯇                       2BC7    N     1    1     ⯇  adv 1.00             missing               
+scan ⯈                       2BC8    N     1    1     ⯈  adv 1.00             missing               
+scan ⯊                       2BCA    N     1    1     ⯊  adv 1.00             missing               
+scan ⯋                       2BCB    N     1    1     ⯋  adv 1.00             missing               

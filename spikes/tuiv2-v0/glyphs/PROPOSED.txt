@@ -1,0 +1,25 @@
+glyph                        U+      EAW   rw   rwEA  CascadiaMono.ttf        MapleMono-NF-CN-Regular.ttf
+official ⬥                   2B25    N     1    1     ⬥  adv 1.00             missing               
+workshop ◉                   25C9    N     1    1     ◉  adv 1.00             ◉  adv 1.00           
+local ▢                      25A2    N     1    1     ▢  adv 1.00             missing               
+local copy ⬦                 2B26    N     1    1     ⬦  adv 1.00             missing               
+git ∆                        2206    N     1    1     ∆  adv 1.00             missing               
+error ⨯                      2A2F    N     1    1     ⨯  adv 1.00             missing               
+warn !                       21      Na    1    1     !  adv 1.00             !  adv 1.00           
+log error ◍                  25CD    N     1    1     ◍  adv 1.00             missing               
+unloadable ◌                 25CC    N     1    1     ◌  adv 1.00             ◌  adv 1.00           
+unsaved ⬤                    2B24    N     1    1     ⬤  adv 1.00             missing               
+unsaved (nerd) fa-circle     F111    A     1    2     missing                   adv 1.00           
+update ⇣                     21E3    N     1    1     ⇣  adv 1.00             missing               
+deps ›                       203A    N     1    1     ›  adv 1.00             ›  adv 1.00           
+staging ◫                    25EB    N     1    1     ◫  adv 1.00             ◫  adv 1.00           
+play ►                       25BA    N     1    1     ►  adv 1.00             ►  adv 1.00           
+save ↲                       21B2    N     1    1     ↲  adv 1.00             ↲  adv 1.00           
+sort ↨                       21A8    N     1    1     ↨  adv 1.00             missing               
+search /                     2F      Na    1    1     /  adv 1.00             /  adv 1.00           
+selected ▸                   25B8    N     1    1     ▸  adv 1.00             ▸  adv 1.00           
+ok ✓                         2713    N     1    1     ✓  adv 1.00             ✓  adv 1.00           
+fail (compat) ⨯              2A2F    N     1    1     ⨯  adv 1.00             missing               
+prompt ❯                     276F    N     1    1     ❯  adv 1.00             ❯  adv 1.00           
+busy … (ambiguous, kept)     2026    A     1    2     …  adv 1.00             …  adv 1.00           
+dot · (ambiguous, kept)      B7      A     1    2     ·  adv 1.00             ·  adv 1.00           

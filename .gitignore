@@ -11,3 +11,6 @@
 *.db
 *.db-wal
 *.db-shm
+
+# TUI v2 V0: WezTerm portable, copied fonts, screenshots (not redistributed from the repo)
+/spikes/wezterm-v0/
