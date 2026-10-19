@@ -1,0 +1,26 @@
+candidate DLLs referencing HarmonyPatch: 575 (harmony ref dir: D:\SteamLibrary\steamapps\workshop\content\294100\2009463077\1.4\Assemblies)
+reader: 20 DLLs, 560 HarmonyPatch attributes, 0 decode errors, 6ms total (0.3 ms/DLL)
+ilspycmd: 14s
+
+…bility assemblies\VREHighmate\Assemblies\VREHighmateCompatibility.dll attrs=2    ilspy=2    match=2    manual=false
+…5461\1.4\Patch_Gastronomy\Assemblies\OverheadMealPatch_Gastronomy.dll attrs=1    ilspy=1    match=1    manual=false
+3522893553\1.6\Assemblies\ProgressionGravship.dll                      attrs=2    ilspy=2    match=2    manual=false
+3656819555\1.2\Assemblies\CM_Party_Your_Ass_Off.dll                    attrs=2    ilspy=2    match=2    manual=false
+3345696149\1.6\Assemblies\MaterialSubMenu.dll                          attrs=2    ilspy=2    match=2    manual=true
+3280480860\1.5\Assemblies\TooManyAreas.dll                             attrs=1    ilspy=1    match=1    manual=false
+2937876372\1.5\Assemblies\ExportAndImportModSettings.dll               attrs=1    ilspy=1    match=1    manual=false
+2497907804\1.3\Assemblies\FlickableStorage.dll                         attrs=7    ilspy=7    match=7    manual=false
+3554040577\1.5\Assemblies\Atelier.dll                                  attrs=4    ilspy=4    match=4    manual=false
+2683622537\v1.4\Assemblies\TradeUI.dll                                 attrs=5    ilspy=5    match=5    manual=true
+3261311100\1.4\Assemblies\midsaversaver.dll                            attrs=8    ilspy=8    match=8    manual=false
+2980386195\1.5\Assemblies\DDJY_BED.dll                                 attrs=5    ilspy=5    match=5    manual=false
+3520130671\1.5\Assemblies\FloatSubMenu.dll                             attrs=10   ilspy=10   match=10   manual=false
+1662119905\1.3\Assemblies\DubsMintMinimap.dll                          attrs=3    ilspy=3    match=3    manual=true
+2138635288\1.3\Assemblies\TabSorting.dll                               attrs=1    ilspy=1    match=1    manual=false
+3612632140\1.6\Assemblies\RimTalkEventPlus.dll                         attrs=11   ilspy=11   match=11   manual=true
+2023507013\1.0\Assemblies\VFECore.dll                                  attrs=32   ilspy=32   match=32   manual=false
+1446523594\1.5\Assemblies\DubsMintMenus.dll                            attrs=17   ilspy=17   match=17   manual=true
+…\common\RimWorld\Mods\_2654432921_\1.4\Assemblies\RomanceOnTheRim.dll attrs=8    ilspy=8    match=8    manual=true
+2023507013\1.7\Assemblies\VEF.dll                                      attrs=438  ilspy=438  match=438  manual=true
+
+agreement: 560 / 560 = 100.00%

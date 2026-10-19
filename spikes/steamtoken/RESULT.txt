@@ -1,0 +1,13 @@
+game: D:\SteamLibrary\steamapps\common\RimWorld
+ModsConfig version: 1.6.4871 rev591, active: 485
+scanned mods: 1285 (rejected duplicates: 0)
+_steam entries in activeMods: 0
+
+packageIds present both locally and on workshop:
+total: 0
+
+rejected (same packageId, same source kind — game logs an error and ignores):
+  unresolved active entry: touman.vce.cannedfruitdessertpatch
+  unresolved active entry: touman.vce.soupvariantspatch
+  unresolved active entry: ab.beheading.alt.decapitate
+unresolved active entries: 3

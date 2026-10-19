@@ -1,0 +1,2 @@
+candidate DLLs referencing HarmonyPatch: 575 (harmony ref dir: D:\SteamLibrary\steamapps\workshop\content\294100\2009463077\1.4\Assemblies)
+reader: 575 DLLs, 6943 HarmonyPatch attributes, 0 decode errors, 116ms total (0.2 ms/DLL)

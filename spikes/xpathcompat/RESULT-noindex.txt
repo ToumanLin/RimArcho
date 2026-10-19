@@ -1,0 +1,21 @@
+active mods: 482, load-folder version: 1.6, log: C:\Users\Touman_Lin\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Player.log (2026-09-29T19:41:22-07:00)
+def files: 4592, top-level def nodes: 35257, patch files: 1155, xml parse errors: 0
+def files modified after the log: 74 (in 23 mods) — patches targeting them may legitimately differ
+top-level operations: 5433 (unknown/mod-defined classes: 269), nested ops evaluated: 8673, distinct xpaths: 5930, xpath compile errors: 0
+index fast path: false, hits 0, rebuilds 0
+xpath evaluations: 7044, runtime errors (attr-node parent etc.): 0
+time: defs 1.905s, +patch parse 2.104s, total 58.44s; heap in use after: 897 MB (Δ 892 MB), total alloc 6184 MB
+live heap after GC (merged doc retained): 642 MB, peak working set: 1076 MB
+
+simulated failures: 9, Player.log failures: 7, agreeing: 7
+mismatches: 2 (2 sim-only, 0 log-only; 0 involve files changed after the log)
+mismatch rate: 2 / 5433 = 0.037%   excluding stale files: 2 / 5433 = 0.037%
+
+== failed in simulation, not in log ==
+[Progression: Storage] Verse.PatchOperationAdd(Defs/ThingDef[@Name="sbzSmallGravshipShelfBase"])
+      file: D:\SteamLibrary\steamapps\common\RimWorld\Mods\_3292746186_\1.6\Mods and Shit\Gravship Storage\Patches\gravship storage general patch.xml
+[Progression: Storage] Verse.PatchOperationReplace(Defs/ThingDef[@Name="sbzSmallDisplayShelfBase"]/researchPrerequisites)
+      file: D:\SteamLibrary\steamapps\common\RimWorld\Mods\_3292746186_\1.6\Mods and Shit\Neat Storage\Patches\neat storage rebalances and descriptions patch.xml
+
+== failed in log, not in simulation ==
+

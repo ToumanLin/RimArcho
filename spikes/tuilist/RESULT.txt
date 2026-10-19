@@ -1,0 +1,25 @@
+=== 500 rows, window 120x40 ===
+scroll: mean=0.021 n=1334 p50=0.000 p95=0.000 p99=0.657 max=1.167 ms
+search: mean=0.075 n=27 p50=0.000 p95=0.507 p99=0.507 max=0.511 ms
+alignment: PASS (53079 rendered list lines checked, 0 offending)
+memory MiB: ws=16.0 private=55.1 peak_ws=16.7
+runewidth.EastAsianWidth=false
+
+=== 5000 rows, window 120x40 ===
+scroll: mean=0.021 n=1334 p50=0.000 p95=0.000 p99=1.003 max=1.694 ms
+search: mean=0.672 n=27 p50=1.002 p95=1.016 p99=1.508 max=1.510 ms
+alignment: PASS (53079 rendered list lines checked, 0 offending)
+memory MiB: ws=16.4 private=55.5 peak_ws=16.8
+runewidth.EastAsianWidth=false
+
+e2e (real renderer, piped input, 500 rows) key->frame: mean=16.666 n=104 p50=16.653 p95=16.992 p99=17.133 max=19.125 ms
+e2e (real renderer, piped input, 5000 rows) key->frame: mean=16.669 n=104 p50=16.667 p95=17.036 p99=17.115 max=17.256 ms
+Pass criterion: every p99/max <= 50 ms (Update+View).
+
+Notes:
+- Windows timer granularity is ~0.5 ms, so per-op values of 0.000 mean "<0.5 ms"; mean is the better figure.
+- e2e ~16.7 ms = Bubble Tea's fixed 60 fps renderer flush interval, not compute cost.
+- e2e CJK keys injected with p.Send: bubbletea on Windows mis-decodes UTF-8 bytes from a piped (non-console) reader.
+- runewidth.EastAsianWidth=false here. Windows Terminal renders East Asian Ambiguous chars (e.g. ' – ' en dash, '…', '·') as 1 cell by default;
+  if runewidth.EastAsianWidth/RUNEWIDTH_EASTASIAN=1 is set (CJK locale), ambiguous chars count 2 and truncation ellipsis '…' changes width
+  -> alignment must use the same setting as the terminal. Checked only against runewidth's own model, not a real terminal.

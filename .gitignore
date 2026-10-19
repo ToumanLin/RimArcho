@@ -1,0 +1,13 @@
+# build output
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+*.prof
+# caches / local data
+/.cache/
+/tmp/
+*.db
+*.db-wal
+*.db-shm
