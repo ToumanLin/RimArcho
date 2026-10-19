@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <packageId>Tester.Versioned</packageId>
+  <name>Versioned Mod 版本</name>
+  <author>Tester and Friend</author>
+  <modVersion>2.1</modVersion>
+  <supportedVersions><li>1.5</li><li>1.6</li></supportedVersions>
+  <modDependenciesByVersion>
+    <v1.6>
+      <li><packageId>brrainz.harmony</packageId><displayName>Harmony</displayName></li>
+    </v1.6>
+  </modDependenciesByVersion>
+  <loadAfter><li>brrainz.harmony</li></loadAfter>
+  <incompatibleWith><li>someone.else</li></incompatibleWith>
+</ModMetaData>

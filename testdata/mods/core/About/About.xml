@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Core</name>
+  <author>Ludeon Studios</author>
+  <packageId>Ludeon.RimWorld</packageId>
+  <forceLoadBefore>
+    <li>Ludeon.RimWorld.Royalty</li>
+  </forceLoadBefore>
+</ModMetaData>

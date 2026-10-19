@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <Name>Old Mod  </Name>
+  <Author>Someone</Author>
+  <Description>An old mod from 2018.</Description>
+  <SupportedVersions>
+    <li> 1.0 </li>
+  </SupportedVersions>
+</ModMetaData>
