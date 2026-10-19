@@ -14,14 +14,12 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/rimarcho/rimarcho/internal/app"
+	"github.com/rimarcho/rimarcho/internal/buildinfo"
 	"github.com/rimarcho/rimarcho/internal/cmds"
 )
 
 // AnalyzeWait is how long a tool call waits for an out-of-date analysis (05 §4.1).
 var AnalyzeWait = 10 * time.Second
-
-// Version of the MCP surface.
-const Version = "0.4.0"
 
 func ptr[T any](v T) *T { return &v }
 
@@ -65,7 +63,7 @@ func New(a *app.App) *Server {
 	if a.AnalyzeWait == 0 {
 		a.AnalyzeWait = AnalyzeWait
 	}
-	s.srv = sdk.NewServer(&sdk.Implementation{Name: "rimarcho", Version: Version}, &sdk.ServerOptions{Instructions: Instructions})
+	s.srv = sdk.NewServer(&sdk.Implementation{Name: "rimarcho", Version: buildinfo.Version}, &sdk.ServerOptions{Instructions: Instructions})
 	for _, t := range Tools() {
 		ann := &sdk.ToolAnnotations{ReadOnlyHint: t.readOnly, OpenWorldHint: ptr(false)}
 		if !t.readOnly {

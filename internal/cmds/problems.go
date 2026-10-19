@@ -18,7 +18,7 @@ var Progress func(string)
 func init() {
 	register(&Command{Name: "analyze", Summary: "rebuild the Def and Patch facts (normally run on demand as a child process)", MaxArgs: 0, Run: analyzeCmd,
 		Flags: []Flag{gameVersionFlag}})
-	register(&Command{Name: "problems", Summary: "problems: declarations, Defs, Patches (03 §4)", MaxArgs: 0, Run: problemsCmd,
+	register(&Command{Name: "problems", Summary: "problems: declarations, Defs, Patches, Harmony and the newest log", MaxArgs: 0, Run: problemsCmd,
 		Flags: []Flag{{Name: "subject", Value: "<ref>", Help: "only problems involving this mod"}, {Name: "code", Value: "<code>", Help: "code or prefix, e.g. dep or patch.no-match"},
 			{Name: "severity", Value: "<error|warning|info>"}, {Name: "all"}, {Name: "detail"}, {Name: "ignored"}, {Name: "no-analyze", Help: "do not rebuild a stale analysis"}, {Name: "min-severity", Value: "<error|warning|info>"}, gameVersionFlag}})
 	register(&Command{Name: "problems show", Args: "<p:ref>", Summary: "one problem with its evidence", MinArgs: 1, MaxArgs: 1, Run: problemShowCmd})

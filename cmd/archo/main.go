@@ -1,5 +1,5 @@
 // Command archo is RimArcho, a RimWorld mod manager: `archo` starts the TUI, `archo <command>`
-// runs one CLI command (`archo help`). `archo mcp` arrives with M4.
+// runs one CLI command (`archo help`), `archo mcp` serves MCP over stdio.
 package main
 
 import (

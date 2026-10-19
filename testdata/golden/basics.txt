@@ -18,7 +18,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     harmony                                   Harmony patches: of a mod, on a target method, or shared between mods
     why <A> <B>                               how two mods relate: order, dependencies, conflicts, overrides, shared patches
     log                                       attribute Player.log errors to mods (clusters, roles, evidence, next steps)
-    problems                                  problems: declarations, Defs, Patches (03 §4)
+    problems                                  problems: declarations, Defs, Patches, Harmony and the newest log
     problems show <p:ref>                     one problem with its evidence
     problems ignore <p:ref>                   ignore a problem until its mod changes
     problems unignore <p:ref>                 stop ignoring a problem
@@ -57,6 +57,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     gc                                        remove expired tombstones and superseded snapshots
     config get [<key>]                        show settings
     config set <key> <value>                  change a setting (ui.lang: auto|en|zh; ui.mouse: on|off)
+    mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
+    version                                   print the RimArcho version
   references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>
   global flags: --env <name> (use another environment for this command)
 

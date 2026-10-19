@@ -95,7 +95,7 @@ func register(c *Command) { registry = append(registry, c) }
 // order is the documented command order (05 §3); registration order depends on file names.
 var commandOrder = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "env remove", "scan", "status", "list", "find",
 	"mod", "def", "patches", "harmony", "why", "log", "problems", "problems show", "problems ignore", "problems unignore", "files search", "source", "source search", "analyze", "changes", "enable", "disable", "move", "swap", "sort", "undo", "redo", "save", "loadout log", "loadout diff",
-	"loadout checkout", "loadout tag", "loadout export", "loadout import", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule list", "rule remove", "launch", "identity list", "identity resolve", "lineage split", "lineage merge", "gc", "config get", "config set"}
+	"loadout checkout", "loadout tag", "loadout export", "loadout import", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule list", "rule remove", "launch", "identity list", "identity resolve", "lineage split", "lineage merge", "gc", "config get", "config set", "mcp", "version"}
 
 // Commands returns the command table in documented order.
 func Commands() []*Command {
@@ -219,6 +219,9 @@ func Execute(ap *app.App, argv []string) (string, int) {
 	if c == nil {
 		return fmt.Sprintf("error: unknown command %q (archo help)\n", strings.Join(argv, " ")), ExitUsage
 	}
+	if len(rest) > 0 && (rest[len(rest)-1] == "--help" || rest[len(rest)-1] == "-h") {
+		return CommandHelp(c).String(), ExitOK
+	}
 	a, err := parse(c, rest)
 	if err != nil {
 		return "error: " + err.Error() + "\n", ExitUsage
@@ -270,3 +273,23 @@ var gameVersionRe = regexp.MustCompile(`^\d+\.\d+$`)
 
 // gameVersionFlag is accepted by the analysis commands (decisions-m3 §12.7).
 var gameVersionFlag = Flag{Name: "game-version", Value: "<X.Y>", Help: "analyse for another game version than the environment's"}
+
+// CommandHelp is `archo <command> --help`: the usage line, the summary and each flag.
+func CommandHelp(c *Command) *render.Doc {
+	d, root := render.New(c.Usage())
+	root.Add(c.Summary)
+	if len(c.Flags) > 0 {
+		fl := root.Section("flags")
+		for _, f := range c.Flags {
+			l := "--" + f.Name
+			if f.Value != "" {
+				l += " " + f.Value
+			}
+			if f.Help != "" {
+				l += "  " + f.Help
+			}
+			fl.Add(l)
+		}
+	}
+	return d
+}

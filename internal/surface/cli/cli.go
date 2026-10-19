@@ -17,6 +17,9 @@ import (
 
 // Run executes argv (without the program name) and returns the exit code.
 func Run(argv []string, stdout, stderr io.Writer) int {
+	if len(argv) == 1 && (argv[0] == "--version" || argv[0] == "-v") {
+		argv = []string{"version"}
+	}
 	envName, rest, err := globalFlags(argv)
 	if err != nil {
 		fmt.Fprintln(stderr, "error:", err)
