@@ -146,6 +146,8 @@ func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, erro
 				`DELETE FROM snapshot_file WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id=?)`,
 				`DELETE FROM snapshot WHERE instance_id=?`,
 				`DELETE FROM instance_alias WHERE instance_id=?`,
+				`DELETE FROM def_fact WHERE instance_id=?`,
+				`DELETE FROM content_state WHERE instance_id=?`,
 				`DELETE FROM change_event WHERE instance_id=?`,
 				`DELETE FROM identity_question WHERE instance_id=? OR candidate_instance_id=?`,
 				`DELETE FROM instance WHERE id=?`,
