@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/rimarcho/rimarcho/internal/app"
@@ -63,10 +64,15 @@ func TestFilesSearchLanguages(t *testing.T) {
 }
 
 // fakeILSpy writes one .cs file per call and counts the calls.
-type fakeILSpy struct{ calls []string }
+type fakeILSpy struct {
+	mu    sync.Mutex // source search decompiles in parallel
+	calls []string
+}
 
 func (f *fakeILSpy) run(_ context.Context, dll, outDir, typ string, refs []string) error {
+	f.mu.Lock()
 	f.calls = append(f.calls, filepath.Base(dll)+"|"+typ)
+	f.mu.Unlock()
 	os.MkdirAll(filepath.Join(outDir, "ModA"), 0o755)
 	if typ != "" {
 		return os.WriteFile(filepath.Join(outDir, strings.ReplaceAll(typ, "+", ".")+".cs"), []byte("// "+typ+"\nclass X {\n\tvoid CompTick() { parent.AllComps.Remove(this); }\n}\n"), 0o644)
