@@ -97,6 +97,7 @@ next:
 | | `list [--active] [--filter <表达式>]` | 列出 Mod |
 | | `find <词>` | 按名称、包名、作者、工坊 ID、别名搜索 |
 | | `mod <引用>` | Mod 详情 |
+| | `describe <引用> [--source auto\|about\|workshop\|both] [--refresh] [--offline]` | Mod 简介：About.xml 的 description（按游戏版本取 descriptionsByVersion）和创意工坊页面的简介（BBCode 转纯文本，图片写成 `[image: URL]`）。`auto` 按 06 §6.4 选择来源；创意工坊简介按需联网获取并缓存（06 §6.4），`--offline` 只读缓存 |
 | | `def <类型/名>` / `def --mod <引用>` | Def 详情或某 Mod 的 Def |
 | | `patches [--mod <引用>] [--target <XPath 或 def 引用>]` | Patch 及命中情况 |
 | | `harmony [--mod <引用>] [--target <方法>] [--shared]` | Harmony 补丁 |
@@ -112,10 +113,10 @@ next:
 | | `loadout export [--format text]` / `loadout import <文件>` | 文本列表、ModsConfig.xml、存档文件 |
 | | `stage list` / `stage add <引用…>` / `stage drop <引用…>` / `stage restore [<引用…>] [--at\|--before\|--after]` | 暂存（06 §5.4）：每个环境一个、不写入游戏的列表。从已启用中暂存的 Mod 记住原位置（原序号和它前面的 Mod），`stage restore` 不带引用时全部放回原位置；`add` 和 `restore` 各是一步可撤销的工作区编辑。重新启用（含撤销）的 Mod 自动离开暂存 |
 | 规则 | `rule add` / `rule list` / `rule remove` | 用户规则（04 §5） |
-| 玩家数据 | `alias` / `tag` / `note` | 别名、标签、备注 |
+| 玩家数据 | `alias` / `tag add\|remove <引用> <标签…> [--mod <引用>]…` / `tag list` / `note` | 别名、标签、备注；`tag` 用重复的 `--mod` 一次给多个 Mod 加减标签（06 §5.6） |
 | 身份 | `identity list` / `identity resolve` / `lineage split` / `lineage merge` | 待确认项与家族（02 §5、§6） |
 | 其他 | `copy-local` / `launch` / `data update` / `import rimcrow` / `gc` | 见 04 和 02 |
-| 设置 | `config get [<键>]` / `config set <键> <值>` | 用户设置，例如 `ui.lang auto\|en\|zh`（M3 裁定 6）、`ui.icons auto\|nerd\|compat`（06 §1.3） |
+| 设置 | `config get [<键>]` / `config set <键> <值>` | 用户设置，例如 `ui.lang auto\|en\|zh`（M3 裁定 6）、`ui.icons auto\|nerd\|compat`（06 §1.3）、`workshop.fetch on\|off`（是否联网获取创意工坊简介）、`workshop.images on\|off`（是否下载并显示简介里的图片）（06 §6.4） |
 | 分析选项 | `--game-version X.Y` | 用于 `analyze`、`problems`、`def`、`patches`、`harmony`、`why`、`log`，覆盖环境的游戏版本（M3 裁定 7）；MCP 对应工具有同名参数 |
 
 ## 4. MCP（`archo mcp`）
@@ -135,6 +136,7 @@ next:
 | `status` | `status` | true | — |
 | `find_mods` | `find` / `list` | true | — |
 | `get_mod` | `mod` | true | — |
+| `get_description` | `describe`（openWorldHint: true，可能访问 Steam 公开 API） | true | — |
 | `get_def` | `def` | true | — |
 | `get_patches` | `patches` | true | — |
 | `get_harmony` | `harmony` | true | — |
@@ -144,7 +146,8 @@ next:
 | `analyze_log` | `log`；也可以直接传入一段堆栈文本 | true | — |
 | `search_files` | `files search` | true | — |
 | `read_source` | `source` / `source search` | true | — |
-| `edit_loadout` | `enable` / `disable` / `move` / `swap` / `sort`（只改工作区） | false | false |
+| `edit_loadout` | `enable` / `disable` / `move` / `swap` / `sort` / `stage add` / `stage drop` / `stage restore`（只改工作区；动作名 stage、unstage、restore） | false | false |
+| `set_player_data` | `tag add` / `tag remove` / `alias` / `note`（动作名 tag_add、tag_remove、alias、note） | false | false |
 | `save_loadout` | `save`（写入 ModsConfig.xml） | false | true |
 | `copy_local` | `copy-local` | false | false |
 | `add_rule` | `rule add` | false | false |
