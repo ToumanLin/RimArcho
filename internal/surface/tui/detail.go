@@ -87,6 +87,7 @@ type dline struct {
 	imgURL  string // first line of an image slot
 	imgRows int
 	imgCols int
+	imgMax  int // the rows the image may take (fewer in the column than in the full view)
 }
 
 type detailOpts struct {
@@ -418,18 +419,20 @@ func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 				continue
 			}
 			cols := min(bw, 60)
-			e := m.imgs[imgKey(b.URL, cols)]
+			// In the column an image takes at most half the description, so text stays visible.
+			maxR := 20
+			if o.descMax > 0 {
+				maxR = max(o.descMax/2, 3)
+			}
+			e := m.imgs[imgKey(b.URL, cols, maxR)]
 			switch {
 			case e == nil || e.state == imgLoading:
-				rows := imgRows(0, 0, cols, 20)
-				out = append(out, dline{text: strings.Repeat(" ", ind) + sDimS.Render(fit(T("image loading… ")+host, bw)), imgURL: b.URL, imgRows: rows, imgCols: cols})
-				for r := 1; r < rows; r++ {
-					add("")
-				}
+				// one line until the size is known
+				out = append(out, dline{text: strings.Repeat(" ", ind) + sDimS.Render(fit(T("image loading… ")+host, bw)), imgURL: b.URL, imgRows: 1, imgCols: cols, imgMax: maxR})
 			case e.state == imgFailed:
 				add(strings.Repeat(" ", ind) + sDimS.Render(fit("["+T("image")+" "+markDot+" "+host+" "+markDot+" "+e.err+"]", bw)))
 			default:
-				out = append(out, dline{text: "", imgURL: b.URL, imgRows: e.rows, imgCols: cols})
+				out = append(out, dline{text: "", imgURL: b.URL, imgRows: e.rows, imgCols: cols, imgMax: maxR})
 				for r := 1; r < e.rows; r++ {
 					add("")
 				}
@@ -591,13 +594,13 @@ func (m *model) imageCmds(lines []dline) tea.Cmd {
 		if l.imgURL == "" {
 			continue
 		}
-		key := imgKey(l.imgURL, l.imgCols)
+		key := imgKey(l.imgURL, l.imgCols, l.imgMax)
 		if _, ok := m.imgs[key]; ok {
 			continue
 		}
 		m.imgs[key] = &imgEntry{state: imgLoading}
 		m.imgLoading = key
-		f := loadImage(m.app, l.imgURL, l.imgCols, 20)
+		f := loadImage(m.app, l.imgURL, l.imgCols, l.imgMax)
 		return func() tea.Msg { return f() }
 	}
 	return nil
@@ -711,7 +714,7 @@ func (m *model) place(l dline, y, n, x int) (placement, bool) {
 	if l.imgURL == "" || y+l.imgRows > n {
 		return placement{}, false
 	}
-	e := m.imgs[imgKey(l.imgURL, l.imgCols)]
+	e := m.imgs[imgKey(l.imgURL, l.imgCols, l.imgMax)]
 	if e == nil || e.state != imgOK {
 		return placement{}, false
 	}

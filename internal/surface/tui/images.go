@@ -143,7 +143,7 @@ type imgLoadedMsg struct {
 // loadImage downloads (or reads from the cache) and encodes one image for cols columns.
 func loadImage(a *app.App, url string, cols, maxRows int) func() imgLoadedMsg {
 	return func() imgLoadedMsg {
-		key := imgKey(url, cols)
+		key := imgKey(url, cols, maxRows)
 		path, w, h, err := a.DescImage(url)
 		if err != nil {
 			return imgLoadedMsg{key, imgEntry{state: imgFailed, err: err.Error()}}
@@ -157,4 +157,4 @@ func loadImage(a *app.App, url string, cols, maxRows int) func() imgLoadedMsg {
 	}
 }
 
-func imgKey(url string, cols int) string { return fmt.Sprintf("%d|%s", cols, url) }
+func imgKey(url string, cols, maxRows int) string { return fmt.Sprintf("%d|%d|%s", cols, maxRows, url) }
