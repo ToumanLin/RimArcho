@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/rimarcho/rimarcho/internal/app"
@@ -17,7 +18,7 @@ func init() {
 		Flags: []Flag{{Name: "full", Help: "re-hash every semantic file"}}, Run: scanCmd})
 	register(&Command{Name: "status", Summary: "overview of the current environment", MaxArgs: 0, Run: statusCmd})
 	register(&Command{Name: "list", Summary: "list mods", MaxArgs: 0,
-		Flags: []Flag{{Name: "filter", Value: "<expr>", Help: "terms: source:<label|kind> status:live|tombstone|all residue unloadable copies pkg:<id> ws:<id> or words"},
+		Flags: []Flag{{Name: "filter", Value: "<expr>", Help: "terms: source:<label|kind> status:live|tombstone|all residue unloadable copies pkg:<id> ws:<id> tag:<tag> or words"},
 			{Name: "active", Help: "the workspace Loadout in load order"}, {Name: "all", Help: "no truncation"}}, Run: listCmd})
 	register(&Command{Name: "find", Args: "<words…>", Summary: "search by name, package id, author, workshop id, folder", MinArgs: 1, MaxArgs: -1,
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: findCmd})
@@ -227,6 +228,10 @@ func filterMods(ix *app.Index, expr string) ([]*store.Mod, error) {
 			preds = append(preds, func(m *store.Mod) bool { return m.Unloadable != "" })
 		case !hasKV && strings.ToLower(t) == "copies":
 			preds = append(preds, func(m *store.Mod) bool { return len(ix.ByLineage[m.LineageID]) > 1 })
+		case hasKV && k == "tag":
+			preds = append(preds, func(m *store.Mod) bool {
+				return slices.ContainsFunc(m.Tags, func(t string) bool { return strings.EqualFold(t, v) })
+			})
 		case hasKV && k == "lineage":
 			lin, err := ix.ResolveLineage("L#" + strings.TrimPrefix(strings.ToLower(v), "l#"))
 			if err != nil {
@@ -258,7 +263,7 @@ func filterMods(ix *app.Index, expr string) ([]*store.Mod, error) {
 }
 
 func matchWord(m *store.Mod, w string) bool {
-	for _, f := range []string{m.Name, m.PackageID, m.Authors, m.WorkshopID(), m.Rel} {
+	for _, f := range []string{m.Name, m.Alias, m.PackageID, m.Authors, m.WorkshopID(), m.Rel} {
 		if strings.Contains(strings.ToLower(f), w) {
 			return true
 		}
@@ -405,6 +410,15 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		pkg += " (declared " + m.PackageIDRaw + ")"
 	}
 	root.KV("package", pkg)
+	if m.Alias != "" {
+		root.KV("alias", fmt.Sprintf("%s (About.xml name: %s)", m.Alias, m.Name))
+	}
+	if len(m.Tags) > 0 {
+		root.KV("tags", strings.Join(m.Tags, ", "))
+	}
+	if m.Note != "" {
+		root.KV("note", m.Note)
+	}
 	lin := ix.LRef(m.LineageID)
 	if l := ix.Lineages[m.LineageID]; l != nil && l.PrimaryID != "" && l.PrimaryID != m.ID {
 		lin += ", primary " + ix.Ref(l.PrimaryID)

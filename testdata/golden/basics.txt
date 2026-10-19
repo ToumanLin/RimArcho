@@ -40,6 +40,10 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     loadout checkout <v>                      load a version into the workspace (save to apply)
     loadout tag <v> <name>                    name a version
     copy-local <ref>                          copy a mod into the local Mods folder with an origin marker (the Loadout is not changed)
+    import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
+    alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)
+    note <ref> [<text>]                       attach a plain-text note to a mod (all its copies)
+    tag add|remove <ref> <tag…> | list        tags for filtering (list --filter tag:<tag>)
     rule add after|before|incompatible|attach <A> <B> | ignore <constraint>  add a user rule
     rule list                                 list user rules
     rule remove <r:n>                         delete a user rule

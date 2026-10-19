@@ -58,6 +58,15 @@ func (a *App) loadIndex(e *env.Environment) (*Index, error) {
 	if err != nil {
 		return nil, err
 	}
+	pd, err := a.Store.PlayerDataAll(e.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range mods {
+		if p := pd[m.LineageID]; p != nil {
+			m.Alias, m.Note, m.Tags = p.Alias, p.Note, p.Tags
+		}
+	}
 	ix := &Index{Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs}
 	var iids, lids []string
 	for _, m := range mods {

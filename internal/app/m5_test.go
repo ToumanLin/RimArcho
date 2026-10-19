@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"database/sql"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -81,5 +82,107 @@ func TestCopyLocal(t *testing.T) {
 	}
 	if _, code := e.Run("copy-local", orig, "--name", `..\up`); code != 1 {
 		t.Fatal("--name must be a plain folder name")
+	}
+}
+
+// rimcrowDB writes a RimCrow-shaped database (the tables import rimcrow reads).
+func rimcrowDB(t *testing.T, path string, stmts ...string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	schema := []string{
+		`CREATE TABLE modasset (path_hash VARCHAR(255) PRIMARY KEY, package_id VARCHAR(255) NOT NULL, path VARCHAR(255) NOT NULL, source VARCHAR(255) NOT NULL, disabled INTEGER NOT NULL)`,
+		`CREATE TABLE modinterlock (id VARCHAR(255) PRIMARY KEY, chain TEXT NOT NULL)`,
+		`CREATE TABLE usermoddata (mod_id VARCHAR(255) NOT NULL PRIMARY KEY COLLATE NOCASE, alias_name VARCHAR(255), notes TEXT, tags TEXT NOT NULL, sign_color VARCHAR(255), user_mod_type VARCHAR(255), interlock_id VARCHAR(255), ignored_issues TEXT NOT NULL)`,
+		`CREATE TABLE groupdata (group_id TEXT PRIMARY KEY, name VARCHAR(255) NOT NULL, color VARCHAR(255) NOT NULL, sort_index INTEGER NOT NULL, is_expanded INTEGER NOT NULL)`,
+		`CREATE TABLE groupmod (group_id VARCHAR(255) NOT NULL, mod_id VARCHAR(255) NOT NULL, sort_index INTEGER NOT NULL, PRIMARY KEY (group_id, mod_id))`,
+	}
+	for _, s := range append(schema, stmts...) {
+		if _, err := db.Exec(s); err != nil {
+			t.Fatalf("%s: %v", s, err)
+		}
+	}
+}
+
+// U11 / 04 §7.2: path first, packageId second, ambiguous and missing reported, conflicts
+// kept, rules mapped, idempotent, and the RimCrow files are never written.
+func TestImportRimCrow(t *testing.T) {
+	e := testkit.New(t)
+	alpha := e.AddWorkshop("3000000002", testkit.Sample("tester.alpha", "Alpha"))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "AlphaFork"), testkit.Sample("tester.alpha", "Alpha Fork")) // second lineage, same package
+	e.AddWorkshop("3000000003", testkit.Sample("tester.beta", "Beta"))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Gamma"), testkit.Sample("tester.gamma", "Gamma"))
+	off := filepath.Join(e.Workshop, "3000000004")
+	e.Subscribe("3000000004")
+	e.WriteFile(filepath.Join(off, "About", "About.xml.disabled"), testkit.Mod{PackageID: "tester.off", Name: "Switched Off"}.AboutXML())
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.alpha", "tester.beta")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	e.MustRun("alias", ref(t, e, "Gamma"), "My Gamma")
+
+	crow := filepath.Join(e.Root, "RimCrow", "data")
+	os.MkdirAll(filepath.Join(crow, "rules"), 0o755)
+	dbPath := filepath.Join(crow, "mod_manager.db")
+	rimcrowDB(t, dbPath,
+		`INSERT INTO modasset VALUES ('h1','tester.alpha','`+alpha+`','workshop',0), ('h2','tester.beta','C:\gone\Beta','workshop',0), ('h3','tester.off','`+off+`','workshop',1)`,
+		`INSERT INTO usermoddata VALUES ('Tester.Alpha','Alpha (main)','keep this one','["combat"]','#ff0000',NULL,'ia','[]'),
+			('tester.beta',NULL,NULL,'[]',NULL,NULL,'ia','[]'), ('tester.gamma','Gamma Prime',NULL,'[]',NULL,NULL,NULL,'[]'),
+			('tester.missing','Ghost',NULL,'[]',NULL,NULL,NULL,'[]')`,
+		`INSERT INTO modinterlock VALUES ('ia','["tester.alpha","tester.beta"]')`,
+		`INSERT INTO groupdata VALUES ('g1','Weapons','#fff',0,1), ('g2','UI','#fff',1,1)`,
+		`INSERT INTO groupmod VALUES ('g1','tester.alpha',0), ('g1','tester.beta',1), ('g2','tester.beta',0)`)
+	os.WriteFile(filepath.Join(crow, "rules", "user_rules.json"), []byte(`{"settings": {"user_mod_rules_enabled": true},
+		"mod_rules": {"tester.beta": {"loadAfter": {"tester.gamma": {"name": ["Gamma"]}}, "loadBottom": {"value": true}},
+		              "tester.gamma": {"incompatibleWith": {"tester.nowhere": {}}}}}`), 0o644)
+	sum := func() string {
+		b, _ := os.ReadFile(dbPath)
+		r, _ := os.ReadFile(filepath.Join(crow, "rules", "user_rules.json"))
+		return string(b) + string(r)
+	}
+	before := sum()
+
+	dry := e.MustRun("import", "rimcrow", "--db", dbPath, "--dry-run")
+	for _, want := range []string{
+		"mods: 4 with data: 3 mapped (1 by path, 2 by packageId), 1 not mapped",
+		"aliases: 1 new, 0 already set", "notes: 1 new", "tags: 4 new, 0 already present (2 groups, 3 memberships)",
+		"rules: 3: 2 new, 0 already present, 1 skipped", "conflicts: 1", "pkg:tester.gamma  alias: RimArcho has \"My Gamma\", RimCrow \"Gamma Prime\"",
+		"pkg:tester.missing  not installed here", "tester.gamma incompatibleWith tester.nowhere  pkg:tester.nowhere not installed here",
+		"not-mapped: rule loadBottom 1, sign_color 1", "about-disabled: 1 folders", "Switched Off",
+	} {
+		if !strings.Contains(dry, want) {
+			t.Fatalf("dry run lacks %q:\n%s", want, dry)
+		}
+	}
+	if out := e.MustRun("tag", "list"); !strings.Contains(out, "tags: 0") {
+		t.Fatalf("dry run wrote tags:\n%s", out)
+	}
+	// Alpha's package has two lineages; the path picks the workshop one.
+	first := e.MustRun("import", "rimcrow", "--db", dbPath)
+	if !strings.Contains(first, "tags: 4 new") {
+		t.Fatalf("import:\n%s", first)
+	}
+	if out := e.MustRun("mod", "ws:3000000002"); !strings.Contains(out, "alias: Alpha (main) (About.xml name: Alpha)") || !strings.Contains(out, "tags: combat, Weapons") || !strings.Contains(out, "note: keep this one") {
+		t.Fatalf("alias/tags/note on the workshop Alpha:\n%s", out)
+	}
+	if out := e.MustRun("list", "--filter", "tag:ui"); !strings.Contains(out, "Beta") || strings.Contains(out, "Alpha") {
+		t.Fatalf("tag filter:\n%s", out)
+	}
+	if out := e.MustRun("rule", "list"); !strings.Contains(out, "attach") || !strings.Contains(out, "after") {
+		t.Fatalf("rules:\n%s", out)
+	}
+	again := e.MustRun("import", "rimcrow", "--db", dbPath)
+	for _, want := range []string{"aliases: 0 new, 1 already set", "tags: 0 new, 4 already present", "rules: 3: 0 new, 2 already present"} {
+		if !strings.Contains(again, want) {
+			t.Fatalf("second import is not a no-op (%q):\n%s", want, again)
+		}
+	}
+	if sum() != before {
+		t.Fatal("the RimCrow database or rules file changed")
+	}
+	if ents, _ := filepath.Glob(filepath.Join(e.Home, "rimcrow-*")); len(ents) > 0 {
+		t.Fatalf("temp copies left behind: %v", ents)
 	}
 }

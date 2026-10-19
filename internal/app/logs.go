@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -231,7 +232,10 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		if m == nil {
 			continue
 		}
-		cx.byName[strings.ToLower(m.DisplayName())] = append(cx.byName[strings.ToLower(m.DisplayName())], m)
+		// The game prints the About.xml name; an alias is the player's own name for it.
+		for _, n := range uniq(strings.ToLower(m.Name), strings.ToLower(m.Alias)) {
+			cx.byName[n] = append(cx.byName[n], m)
+		}
 		cx.byPkg[strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")] = append(cx.byPkg[strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")], m)
 	}
 	for _, m := range st.Ix.Mods {
@@ -932,4 +936,14 @@ func logStamp(path string) string {
 		return fmt.Sprintf("%d.%d", fi.Size(), fi.ModTime().UnixNano())
 	}
 	return ""
+}
+
+func uniq(xs ...string) []string {
+	var out []string
+	for _, x := range xs {
+		if x != "" && !slices.Contains(out, x) {
+			out = append(out, x)
+		}
+	}
+	return out
 }

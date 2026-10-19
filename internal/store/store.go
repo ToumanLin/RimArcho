@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 6
+const SchemaVersion = 7
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -152,6 +152,16 @@ CREATE TABLE source_cache(
   error TEXT NOT NULL DEFAULT '', decompiled_at INTEGER NOT NULL, PRIMARY KEY(dll_hash, instance_id));
 `
 
+// schemaV7 (M5): player data on lineages (04 §7.1): alias, note, tags.
+const schemaV7 = `
+CREATE TABLE lineage_data(
+  environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, alias TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY(environment_id, lineage_id));
+CREATE TABLE lineage_tag(
+  environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, tag TEXT NOT NULL COLLATE NOCASE,
+  PRIMARY KEY(environment_id, lineage_id, tag));
+`
+
 // Store wraps the database handle.
 type Store struct {
 	DB   *sql.DB
@@ -191,7 +201,7 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {

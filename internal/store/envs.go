@@ -192,6 +192,8 @@ func (s *Store) DeleteEnv(envID string) error {
 			`DELETE FROM loadout_tag WHERE environment_id=?`,
 			`DELETE FROM modsconfig_state WHERE environment_id=?`,
 			`DELETE FROM user_rule WHERE environment_id=?`,
+			`DELETE FROM lineage_data WHERE environment_id=?`,
+			`DELETE FROM lineage_tag WHERE environment_id=?`,
 			`DELETE FROM launch WHERE environment_id=?`,
 			`DELETE FROM environment WHERE id=?`,
 		} {
