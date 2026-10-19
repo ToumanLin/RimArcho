@@ -30,6 +30,7 @@ func main() {
 	cache := flag.Int("cache", 0, "PRAGMA cache_size for the TUI connection (0: default)")
 	gc := flag.Int("gc", 0, "GOGC (0: default)")
 	problems := flag.Bool("problems", true, "open the Problems view (child analysis) and Inspect")
+	logSel := flag.Bool("log", true, "press l and analyse the current Player.log in the TUI process (restored afterwards)")
 	flag.Parse()
 	a, err := app.Open(*home)
 	if err != nil {
@@ -54,6 +55,10 @@ func main() {
 		panic(err)
 	}
 	report("workspace loaded")
+	st0, _ := a.Loadout()
+	selKey, seenKey := "log.selected:"+st0.Ix.Env.ID, "log.seen:"+st0.Ix.Env.ID
+	sel0, seen0 := a.Store.Meta(selKey), a.Store.Meta(seenKey)
+	defer func() { a.Store.SetMeta(selKey, sel0); a.Store.SetMeta(seenKey, seen0) }()
 	m := tui.New(tui.Options{App: a, Scan: func(string) (string, error) {
 		out, err := exec.Command(*exe, "scan").CombinedOutput()
 		return string(out), err
@@ -103,6 +108,19 @@ func main() {
 			key("1")
 			time.Sleep(time.Second)
 			report("after problems + inspect")
+		}
+		if *logSel {
+			key("l")
+			time.Sleep(500 * time.Millisecond)
+			p.Send(tea.KeyMsg{Type: tea.KeyEnter})
+			time.Sleep(5 * time.Second)
+			report("log analysed (l)")
+			for i := 0; i < 20; i++ {
+				key("j")
+				time.Sleep(100 * time.Millisecond)
+			}
+			key("1")
+			time.Sleep(time.Second)
 		}
 		step := *idle / 4
 		for i := 1; i <= 4; i++ {
