@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"testing"
 	"time"
@@ -35,6 +36,7 @@ func TestRealIdleMemory(t *testing.T) {
 	defer a.Close()
 	a.Launcher = func(string, []string, string) error { t.Fatal("launch attempted during measurement"); return nil }
 
+	debug.SetMemoryLimit(MemoryLimit) // as Run does
 	ws0, _, _ := procmem.MB()
 	t.Logf("before TUI: working set %.1f MB", ws0)
 	if _, err := a.Loadout(); err != nil {
@@ -48,12 +50,15 @@ func TestRealIdleMemory(t *testing.T) {
 	}}
 	tm := teatest.NewTestModel(t, New(opts), teatest.WithInitialTermSize(120, 30))
 	waitFor(t, tm, "active 485/")
-	keys(tm, "R")
-	waitFor(t, tm, "scan:")
-	for i := 0; i < 60; i++ {
-		keys(tm, "j")
+	if os.Getenv("RIMARCHO_NO_BROWSE") == "" {
+		keys(tm, "R")
+		waitFor(t, tm, "scan:")
+		for i := 0; i < 60; i++ {
+			keys(tm, "j")
+			time.Sleep(150 * time.Millisecond) // let the detail pane load for every row
+		}
+		keys(tm, "/", "har", "enter", "esc", "G", "g", "f", "f", "f", "f")
 	}
-	keys(tm, "/", "har", "enter", "esc", "G", "g", "f", "f", "f", "f")
 	time.Sleep(2 * time.Second)
 	ws, priv, peak := procmem.MB()
 	t.Logf("TUI after load, child scan and browsing: working set %.1f MB, private %.1f MB, peak %.1f MB", ws, priv, peak)

@@ -104,12 +104,43 @@ func Candidates(ix *Index, aliases map[string][]store.Alias) []loadout.Candidate
 	return out
 }
 
-// Loadout loads the workspace, first syncing it with ModsConfig.xml (04 §2.3).
+// Loadout loads the workspace, first syncing it with ModsConfig.xml (04 §2.3). Like Index,
+// the result is cached until the database or ModsConfig.xml (size, mtime) changes; a cached
+// state carries no notices (they were reported when the sync happened).
 func (a *App) Loadout() (*LoadoutState, error) {
 	ix, err := a.Index()
 	if err != nil {
 		return nil, err
 	}
+	key := a.Store.ChangeKey() + "|" + ix.Env.ID
+	if ix.Env.UserDataRoot != "" {
+		if fi, err := os.Stat(env.ModsConfigPath(ix.Env.UserDataRoot)); err == nil {
+			key += fmt.Sprintf("|%d|%d", fi.Size(), fi.ModTime().UnixNano())
+		}
+	}
+	if a.stCache != nil && a.stKey == key && a.stCache.Ix == ix {
+		c := *a.stCache
+		c.Notices = nil
+		c.List = c.List.Clone()
+		ws := *c.WS
+		c.WS = &ws
+		return &c, nil
+	}
+	st, err := a.loadLoadout(ix)
+	if err != nil {
+		return nil, err
+	}
+	// Syncing may have written; key the cache on the state after it.
+	key = a.Store.ChangeKey() + key[strings.Index(key, "|"):]
+	if ix2, err := a.Index(); err == nil && ix2 == ix {
+		a.stCache, a.stKey = st, key
+	} else {
+		a.stCache = nil
+	}
+	return st, nil
+}
+
+func (a *App) loadLoadout(ix *Index) (*LoadoutState, error) {
 	aliases, err := a.Store.AllAliases(ix.Env.ID)
 	if err != nil {
 		return nil, err
@@ -497,6 +528,15 @@ func (a *App) Community() order.Community {
 // SortInput builds the constraint input for a list.
 func (a *App) SortInput(st *LoadoutState, l loadout.List) (order.Input, error) {
 	in := order.Input{GameMM: st.GameMM(), Community: a.Community()}
+	var enabled []*store.Mod
+	for _, e := range l {
+		if m := st.Ix.ByID[e.Instance]; m != nil {
+			enabled = append(enabled, m)
+		}
+	}
+	if err := a.Store.LoadDecls(enabled); err != nil {
+		return in, err
+	}
 	for _, e := range l {
 		if e.Instance == "" {
 			in.Nodes = append(in.Nodes, order.Node{PackageID: strings.TrimSuffix(e.Missing, "_steam")})

@@ -177,3 +177,12 @@ func (s *Store) SetMeta(key, value string) error {
 	_, err := s.DB.Exec(`INSERT INTO meta(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
 	return err
 }
+
+// ChangeKey changes whenever the database content may have changed: this connection's
+// writes (total_changes) or a commit by another connection or process (data_version).
+func (s *Store) ChangeKey() string {
+	var dv, tc int64
+	s.DB.QueryRow(`PRAGMA data_version`).Scan(&dv)
+	s.DB.QueryRow(`SELECT total_changes()`).Scan(&tc)
+	return fmt.Sprintf("%d.%d", dv, tc)
+}

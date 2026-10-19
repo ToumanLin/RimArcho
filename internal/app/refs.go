@@ -25,12 +25,27 @@ type Index struct {
 	inst, lin *ids.Shortener
 }
 
-// Index loads the environment's instances.
+// Index loads the environment's instances. The result is cached until the database changes
+// (this connection's total_changes() or another process's commit, PRAGMA data_version), so
+// a TUI issuing many read commands does not reload 1000+ rows each time.
 func (a *App) Index() (*Index, error) {
 	e, err := a.Env()
 	if err != nil {
 		return nil, err
 	}
+	key := a.Store.ChangeKey() + "|" + e.ID
+	if a.ixCache != nil && a.ixKey == key {
+		return a.ixCache, nil
+	}
+	ix, err := a.loadIndex(e)
+	if err != nil {
+		return nil, err
+	}
+	a.ixCache, a.ixKey = ix, key
+	return ix, nil
+}
+
+func (a *App) loadIndex(e *env.Environment) (*Index, error) {
 	mods, err := a.Store.Mods(e.ID)
 	if err != nil {
 		return nil, err

@@ -45,6 +45,11 @@ type App struct {
 	Detect env.DetectOptions
 	// Launcher starts the game; nil means ExecLauncher.
 	Launcher Launcher
+
+	ixCache *Index
+	ixKey   string
+	stCache *LoadoutState
+	stKey   string
 }
 
 // Open opens (creating if needed) the data directory home.

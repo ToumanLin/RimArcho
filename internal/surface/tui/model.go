@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"time"
@@ -135,8 +136,13 @@ func New(o Options) tea.Model {
 	return &model{opts: o, app: o.App, w: 120, h: 30, marked: map[string]bool{}}
 }
 
+// MemoryLimit is the Go heap soft cap of the TUI process (06 §8 T5: idle ≤ 80 MB with
+// ≥ 15 MB headroom). The GC works harder near the cap instead of growing the heap.
+const MemoryLimit = 40 << 20
+
 // Run starts the TUI on the terminal.
 func Run(o Options) error {
+	debug.SetMemoryLimit(MemoryLimit)
 	_, err := tea.NewProgram(New(o), tea.WithAltScreen()).Run()
 	return err
 }

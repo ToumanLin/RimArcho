@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -45,6 +46,8 @@ type Mod struct {
 	FileCount         int
 	TotalSize         int64
 	SemanticCount     int
+
+	store *Store // for loading DeclBlob on demand (lite queries)
 }
 
 // WorkshopID is the folder name under workshop-like sources, else the declared ID.
@@ -63,8 +66,11 @@ func (m *Mod) DisplayName() string {
 	return m.Rel
 }
 
-// Decl decodes the stored declaration.
+// Decl decodes the stored declaration, loading it first if the Mod came from a lite query.
 func (m *Mod) Decl() scan.Decl {
+	if m.DeclBlob == "" && m.store != nil && m.SnapID != 0 {
+		m.store.DB.QueryRow(`SELECT decl_blob FROM snapshot WHERE id=?`, m.SnapID).Scan(&m.DeclBlob)
+	}
 	var d scan.Decl
 	json.Unmarshal([]byte(m.DeclBlob), &d)
 	return d
@@ -73,7 +79,7 @@ func (m *Mod) Decl() scan.Decl {
 const modCols = `i.id, i.lineage_id, i.lineage_basis, i.source_id, s.label, s.kind, i.rel_path, i.real_path, i.status, i.residue, i.unloadable,
 	i.first_seen, i.last_seen, coalesce(i.tombstone_at, 0),
 	coalesce(n.id, 0), coalesce(n.snapshot_hash, x''), coalesce(n.package_id, ''), coalesce(n.package_id_raw, ''), coalesce(n.name, ''),
-	coalesce(n.authors, ''), coalesce(n.workshop_id_declared, ''), coalesce(n.supported_versions, ''), coalesce(n.decl_blob, '{}'),
+	coalesce(n.authors, ''), coalesce(n.workshop_id_declared, ''), coalesce(n.supported_versions, ''), %s,
 	coalesce(n.acf_manifest, ''), coalesce(n.acf_time_updated, 0), coalesce(n.acf_size, 0), coalesce(n.git_head, ''), coalesce(n.origin, ''),
 	coalesce(n.file_count, 0), coalesce(n.total_size, 0), coalesce(n.semantic_count, 0)`
 
@@ -100,9 +106,22 @@ func scanMod(row interface{ Scan(...any) error }) (*Mod, error) {
 	return &m, nil
 }
 
-// Mods returns every Instance of an environment (live and tombstones).
-func (s *Store) Mods(envID string) ([]*Mod, error) {
-	rows, err := s.DB.Query(`SELECT `+modCols+modFrom+` WHERE i.environment_id=? ORDER BY i.id`, envID)
+var (
+	modColsFull = fmt.Sprintf(modCols, "coalesce(n.decl_blob, '{}')")
+	// modColsLite leaves out decl_blob: listing every instance with its declaration churns
+	// SQLite's allocator, which never returns memory, so the TUI only loads it on demand.
+	modColsLite = fmt.Sprintf(modCols, "''")
+)
+
+// Mods returns every Instance of an environment (live and tombstones). Declarations are
+// loaded on demand by Mod.Decl (see LoadDecls for a batch).
+func (s *Store) Mods(envID string) ([]*Mod, error) { return s.mods(envID, modColsLite) }
+
+// ModsFull is Mods with declarations included.
+func (s *Store) ModsFull(envID string) ([]*Mod, error) { return s.mods(envID, modColsFull) }
+
+func (s *Store) mods(envID, cols string) ([]*Mod, error) {
+	rows, err := s.DB.Query(`SELECT `+cols+modFrom+` WHERE i.environment_id=? ORDER BY i.id`, envID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,14 +132,47 @@ func (s *Store) Mods(envID string) ([]*Mod, error) {
 		if err != nil {
 			return nil, err
 		}
+		m.store = s
 		out = append(out, m)
 	}
 	return out, rows.Err()
 }
 
+// LoadDecls fills DeclBlob for many instances in a few queries.
+func (s *Store) LoadDecls(ms []*Mod) error {
+	need := map[int64][]*Mod{}
+	var ids []any
+	for _, m := range ms {
+		if m.DeclBlob == "" && m.SnapID != 0 {
+			if need[m.SnapID] == nil {
+				ids = append(ids, m.SnapID)
+			}
+			need[m.SnapID] = append(need[m.SnapID], m)
+		}
+	}
+	for len(ids) > 0 {
+		n := min(len(ids), 400)
+		rows, err := s.DB.Query(`SELECT id, decl_blob FROM snapshot WHERE id IN (`+placeholders(n)+`)`, ids[:n]...)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var id int64
+			var blob string
+			rows.Scan(&id, &blob)
+			for _, m := range need[id] {
+				m.DeclBlob = blob
+			}
+		}
+		rows.Close()
+		ids = ids[n:]
+	}
+	return nil
+}
+
 // Mod returns one Instance, or nil.
 func (s *Store) Mod(id string) (*Mod, error) {
-	m, err := scanMod(s.DB.QueryRow(`SELECT `+modCols+modFrom+` WHERE i.id=?`, id))
+	m, err := scanMod(s.DB.QueryRow(`SELECT `+modColsFull+modFrom+` WHERE i.id=?`, id))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -160,7 +212,7 @@ func (s *Store) AliasCount(envID string) (int, error) {
 
 // Known loads every Instance of an environment in the shape reconciliation needs.
 func (s *Store) Known(envID string) ([]*identity.Known, error) {
-	mods, err := s.Mods(envID)
+	mods, err := s.ModsFull(envID)
 	if err != nil {
 		return nil, err
 	}
