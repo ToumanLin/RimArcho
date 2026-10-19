@@ -103,9 +103,9 @@ next:
 | | `why <A> <B>` | 解释 A 和 B 的关系：顺序约束、依赖、冲突、覆盖、共同补丁 |
 | | `problems [--subject <引用>] [--code <代码>] [--all]` | 问题列表 |
 | | `changes [<引用>] [--since <时间或扫描>]` | 变化事件 |
-| | `log [--cluster <ID>] [--file <路径>]` | 日志归因 |
-| | `source <引用> [--type <类型>]` / `source search <模式>` | 按需反编译与搜索（03 §5.3） |
-| | `files search <模式> [--mod <引用>]` | 在生效内容中搜索文本 |
+| | `log [--cluster <ID>] [--file <路径>] [--prev] [--text <文本>] [--select] [--all]` | 日志归因；`--prev` 读 Player-prev.log，`--text` 分析粘贴的堆栈，`--select` 让 `problems` 纳入该日志的 `log.*` 问题 |
+| | `source <引用> [--type <类型>] [--all]` / `source search <模式> [--in <引用>…] [--regex] [--budget <秒>]` | 按需反编译与搜索（03 §5.3）；`--budget` 限定本次反编译时长，未完成的程序集在文本中注明“仍在计算” |
+| | `files search <模式> [--mod <引用>] [--regex] [--languages]` | 在生效内容中搜索文本；默认不搜 `Languages/`（M4） |
 | Loadout | `enable` / `disable` / `move` / `swap` / `sort` | 编辑工作区（04 §2） |
 | | `save` / `loadout log` / `loadout diff` / `loadout checkout` / `loadout tag` | 保存与历史（04 §3） |
 | | `undo` / `redo`；`sort --dry-run`、`save --dry-run`、`launch --dry-run` / `--force`；`list --active` | 撤销与重做工作区编辑（04 §3，对应 TUI 的 `u` / `Ctrl+r`）；预览而不改动（M2 补充） |
@@ -115,7 +115,7 @@ next:
 | 身份 | `identity list` / `identity resolve` / `lineage split` / `lineage merge` | 待确认项与家族（02 §5、§6） |
 | 其他 | `copy-local` / `launch` / `data update` / `import rimcrow` / `gc` | 见 04 和 02 |
 | 设置 | `config get [<键>]` / `config set <键> <值>` | 用户设置，例如 `ui.lang auto\|en\|zh`（M3 裁定 6） |
-| 分析选项 | `--game-version X.Y` | 用于 `analyze`、`problems`、`def`、`patches`、`why`、`log`，覆盖环境的游戏版本（M3 裁定 7）；MCP 对应工具有同名参数 |
+| 分析选项 | `--game-version X.Y` | 用于 `analyze`、`problems`、`def`、`patches`、`harmony`、`why`、`log`，覆盖环境的游戏版本（M3 裁定 7）；MCP 对应工具有同名参数 |
 
 ## 4. MCP（`archo mcp`）
 

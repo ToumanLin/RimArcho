@@ -70,13 +70,16 @@ func (m *model) loadProblems() {
 	}
 	p.list = p.list[:0]
 	all := severities[p.sev] == ""
-	var versions []*app.Problem
+	var versions, skips []*app.Problem
 	for _, x := range src {
 		switch {
 		case all && app.NoisyCodes[x.Code]:
 			continue // shown under the info filter (decisions-m3 §12.2)
 		case all && x.Code == "version.unsupported":
 			versions = append(versions, x)
+			continue
+		case all && x.Code == "harmony.skip-prefix":
+			skips = append(skips, x)
 			continue
 		}
 		if all || x.Severity == severities[p.sev] {
@@ -85,6 +88,9 @@ func (m *model) loadProblems() {
 	}
 	if len(versions) > 0 {
 		p.list = append(p.list, versionRow(versions, m.st, ps.State.GameMM()))
+	}
+	if len(skips) > 0 {
+		p.list = append(p.list, skipRow(skips))
 	}
 	p.ignored = len(ps.Ignored)
 	p.never = ps.Analysis == nil || ps.Analysis.Run == nil
@@ -369,7 +375,7 @@ func (m *model) problemsKey(s string) tea.Cmd {
 		if x == nil {
 			return nil
 		}
-		if x.Ref == "p:version" {
+		if x.Ref == "p:version" || x.Ref == "p:skip-prefix" {
 			m.status = T("select single mods with the s filter to ignore them")
 			return nil
 		}
@@ -459,6 +465,20 @@ func versionRow(vs []*app.Problem, st *app.LoadoutState, mm string) *app.Problem
 		f.Claim += Tf(" (%d list %s, %d older only)", len(vs)-warn, prev, warn)
 	}
 	return &app.Problem{Finding: f, Ref: "p:version"}
+}
+
+// skipRow folds harmony.skip-prefix into one expandable row (decisions-m4 §3).
+func skipRow(vs []*app.Problem) *app.Problem {
+	f := &finding.Finding{Code: "harmony.skip-prefix", Severity: vs[0].Severity, Key: "*", Layer: "harmony", Confidence: finding.Possible}
+	mods := map[string]bool{}
+	for _, v := range vs {
+		if len(v.Subjects) > 0 {
+			mods[v.Subjects[0]] = true
+		}
+		f.Evidence = append(f.Evidence, finding.Evidence{Source: v.Severity, Text: v.Claim})
+	}
+	f.Claim = Tf("%d bool prefixes from %d mods can skip methods other mods also patch", len(vs), len(mods))
+	return &app.Problem{Finding: f, Ref: "p:skip-prefix"}
 }
 
 // chooseLog picks Player.log or Player-prev.log; its clusters join the Problems view as

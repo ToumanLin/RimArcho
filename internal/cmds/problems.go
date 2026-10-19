@@ -3,6 +3,7 @@ package cmds
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/rimarcho/rimarcho/internal/app"
@@ -134,7 +135,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	full := a.Bool("all") || code != "" || subj != "" || sev == finding.Info
 	var sel []*app.Problem
 	hidden := map[string]int{}
-	var versions []*app.Problem
+	var versions, skips []*app.Problem
 	for _, p := range list {
 		if subj != "" && !contains(p.Subjects, subj) {
 			continue
@@ -156,9 +157,13 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			versions = append(versions, p) // folded into one row below
 			continue
 		}
+		if !full && p.Code == "harmony.skip-prefix" {
+			skips = append(skips, p) // folded too (decisions-m4 §3)
+			continue
+		}
 		sel = append(sel, p)
 	}
-	counted := append(append([]*app.Problem{}, sel...), versions...)
+	counted := append(append(append([]*app.Problem{}, sel...), versions...), skips...)
 	head := "problems: " + severityCounts(counted)
 	if a.Bool("ignored") {
 		head = "ignored problems: " + severityCounts(counted)
@@ -177,15 +182,34 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if len(sel) == 0 {
 		lst.Add("(none)")
 	}
+	// Folded rows go first in their severity, so a truncated list still shows them.
+	type fold struct {
+		rank int
+		line string
+	}
+	var folds []fold
+	if len(versions) > 0 {
+		line := versionSummary(versions, ps.State.GameMM())
+		folds = append(folds, fold{sevRank(strings.Fields(line)[0]), line})
+	}
+	if len(skips) > 0 {
+		folds = append(folds, fold{sevRank(skips[0].Severity), skipSummary(skips)})
+	}
+	sort.SliceStable(folds, func(i, j int) bool { return folds[i].rank < folds[j].rank })
+	flush := func(rank int) {
+		for len(folds) > 0 && folds[0].rank <= rank {
+			lst.Add(folds[0].line)
+			folds = folds[1:]
+		}
+	}
 	for _, p := range sel {
+		flush(sevRank(p.Severity))
 		n := lst.Add(problemLine(ix, p))
 		if detail {
 			addProblemDetail(ix, n, p)
 		}
 	}
-	if len(versions) > 0 {
-		lst.Add(versionSummary(versions, ps.State.GameMM()))
-	}
+	flush(99)
 	expandCmd := "archo problems --all"
 	if a.Str("subject") != "" {
 		expandCmd = "archo problems --subject " + a.Str("subject") + " --all"
@@ -348,6 +372,18 @@ func sevRank(s string) int {
 		return 1
 	}
 	return 2
+}
+
+// skipSummary folds harmony.skip-prefix into one row: a bool prefix is common and usually
+// deliberate, so the rows matter only when a stack trace or another problem points there.
+func skipSummary(ps []*app.Problem) string {
+	mods := map[string]bool{}
+	for _, p := range ps {
+		if len(p.Subjects) > 0 {
+			mods[p.Subjects[0]] = true
+		}
+	}
+	return fmt.Sprintf("%s harmony.skip-prefix  %d bool prefixes from %d mods can skip methods other mods also patch  (archo problems --code harmony.skip-prefix)", ps[0].Severity, len(ps), len(mods))
 }
 
 // versionSummary folds version.unsupported into one row per game version (decisions-m3 §12.1).

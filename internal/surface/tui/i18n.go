@@ -136,7 +136,8 @@ var zhText = map[string]string{
 	"no Player.log found":                   "未找到 Player.log",
 	"analyze which log? (enter)":            "分析哪个日志？（enter）",
 	"log analyzed: %d problems":             "日志分析完成：%d 个问题",
-	helpText:                                helpTextZh,
+	"%d bool prefixes from %d mods can skip methods other mods also patch": "%d 个返回 bool 的前缀（来自 %d 个 mod）可能跳过其他 mod 也在补丁的方法",
+	helpText: helpTextZh,
 }
 
 const helpTextZh = `列表视图（06 §3）
