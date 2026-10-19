@@ -17,10 +17,10 @@ import (
 
 // Origin is the content of .rimarcho/origin.json, written by copy-local (00 §6.6).
 type Origin struct {
-	InstanceID   string `json:"instance_id"`
-	LineageID    string `json:"lineage_id,omitempty"`
+	InstanceID   string `json:"origin_instance"`
+	LineageID    string `json:"origin_lineage,omitempty"`
 	WorkshopID   string `json:"workshop_id,omitempty"`
-	SnapshotHash string `json:"snapshot_hash,omitempty"`
+	SnapshotHash string `json:"origin_snapshot,omitempty"`
 	CopiedAt     string `json:"copied_at,omitempty"`
 }
 

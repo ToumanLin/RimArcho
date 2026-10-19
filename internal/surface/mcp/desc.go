@@ -18,7 +18,7 @@ Diagnosis workflow (use the exact evidence, not paraphrases):
    - Mixed: confirm the XML side loaded (get_patches failed=true) before blaming code.
 4. list_problems gives the static picture (dependencies, incompatibilities, load order, def overrides, patch failures, Harmony conflicts); explain_relation explains two specific mods.
 5. Report: failure stage, XML/Assembly/Mixed, the exact mod instance and path, the file+line or class+method, why it fails, whether a named mod is cause, dependency or observer, and the smallest fix.
-Editing: edit_loadout only changes RimArcho's workspace; save_loadout writes the game's ModsConfig.xml (ask the user first). Never edit Workshop files in place.`
+Editing: copy_local first (never edit Workshop files in place), then edit the copy; edit_loadout only changes RimArcho's workspace; save_loadout writes the game's ModsConfig.xml (ask the user first).`
 
 const descStatus = `Overview of the current environment: game version, installed mods per source, last scan, the Loadout (enabled count, unsaved edits) and problem counts. Use first in a session; use get_mod for one mod and list_problems for the problems themselves.
 Example: status {}
@@ -109,3 +109,9 @@ Example: add_rule {"kind": "ignore", "target": "decl:#iqmu:loadafter:tester.y"}
   r:1 added
     r:1  ignore  decl:#iqmu:loadafter:tester.y
   next:`
+
+const descCopy = `Copy a mod (usually a Workshop item) into the game's Mods folder as an independent local copy before editing it: the copy gets .rimarcho/origin.json (origin instance, lineage, workshop id, snapshot) and stays in the same lineage; git=true adds a repository with a baseline commit so every edit can be diffed. Links that point outside the mod folder and the upstream .git are not copied; an existing folder is never overwritten. The Loadout is not changed: call edit_loadout action=swap refs=[original, copy] when the user wants the game to load the copy. Never edit Workshop files in place — Steam overwrites them.
+Example: copy_local {"ref": "#ipv5", "git": true}
+  #ipv5 Yayo's Combat 3 copied to D:\Games\RimWorld\Mods\2854006492_local
+    copy: #k2v8  (same lineage, origin marker .rimarcho/origin.json)
+    files: 130 (1.5 MB)`

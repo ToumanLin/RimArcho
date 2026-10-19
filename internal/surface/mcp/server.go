@@ -58,7 +58,7 @@ func (s *Server) run(env string, argv []string) (*sdk.CallToolResult, any, error
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: out}}, IsError: code == cmds.ExitError || code == cmds.ExitUsage}, nil, nil
 }
 
-// New builds the server with every tool of 05 §4.2 (copy_local arrives with copy-local in M5).
+// New builds the server with every tool of 05 §4.2.
 func New(a *app.App) *Server {
 	s := &Server{app: a}
 	// 05 §4.1: a first call that needs the analysis returns what is ready after 10 s.
@@ -238,6 +238,13 @@ type EditIn struct {
 	DryRun bool     `json:"dry_run,omitempty" jsonschema:"sort only: show the result without changing the workspace"`
 }
 
+type CopyIn struct {
+	Env  string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Ref  string `json:"ref" jsonschema:"the mod to copy (#id, pkg:…)"`
+	Name string `json:"name,omitempty" jsonschema:"folder name under Mods/ (default <folder>_local)"`
+	Git  bool   `json:"git,omitempty" jsonschema:"make the copy a git repository with a baseline commit, so edits can be diffed"`
+}
+
 type SaveIn struct {
 	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
 	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would be written without writing"`
@@ -289,6 +296,9 @@ func toolList() []tool {
 		reg("read_source", true, false, descSource, func(in SourceIn) []string { return SourceArgv(in) }),
 		reg("edit_loadout", false, false, descEdit, func(in EditIn) []string { return EditArgv(in) }),
 		reg("save_loadout", false, true, descSave, func(in SaveIn) []string { return argv("save").flag("dry-run", in.DryRun).a }),
+		reg("copy_local", false, false, descCopy, func(in CopyIn) []string {
+			return argv("copy-local", in.Ref).str("name", in.Name).flag("git", in.Git).a
+		}),
 		reg("add_rule", false, false, descRule, func(in RuleIn) []string {
 			b := argv("rule", "add", in.Kind)
 			if in.Kind == "ignore" {

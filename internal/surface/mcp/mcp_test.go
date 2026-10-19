@@ -57,7 +57,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 	want := map[string]string{ // name → expected annotation: ro, write, destructive
 		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
-		"read_source": "ro", "edit_loadout": "write", "save_loadout": "destructive", "add_rule": "write",
+		"read_source": "ro", "edit_loadout": "write", "copy_local": "write", "save_loadout": "destructive", "add_rule": "write",
 	}
 	seen := map[string]bool{}
 	for _, tl := range res.Tools {
