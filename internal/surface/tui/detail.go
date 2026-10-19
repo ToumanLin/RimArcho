@@ -445,7 +445,8 @@ func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 // wrapSpans wraps styled spans to w cells: at spaces, and between CJK characters.
 func wrapSpans(spans []bbcode.Span, w int, base lipgloss.Style) []string {
 	type tok struct {
-		s     string
+		s     string // the text
+		out   string // the text styled (several styles once glued)
 		st    lipgloss.Style
 		space bool
 	}
@@ -463,7 +464,7 @@ func wrapSpans(spans []bbcode.Span, w int, base lipgloss.Style) []string {
 		var word []rune
 		flush := func() {
 			if len(word) > 0 {
-				toks = append(toks, tok{s: string(word), st: st})
+				toks = append(toks, tok{s: string(word), out: st.Render(string(word)), st: st})
 				word = word[:0]
 			}
 		}
@@ -471,16 +472,29 @@ func wrapSpans(spans []bbcode.Span, w int, base lipgloss.Style) []string {
 			switch {
 			case r == ' ' || r == '\t':
 				flush()
-				toks = append(toks, tok{s: " ", st: st, space: true})
+				toks = append(toks, tok{s: " ", out: st.Render(" "), st: st, space: true})
 			case width.RuneWidth(r) == 2 || unicode.Is(unicode.Han, r):
 				flush()
-				toks = append(toks, tok{s: string(r), st: st})
+				toks = append(toks, tok{s: string(r), out: st.Render(string(r)), st: st})
 			default:
 				word = append(word, r)
 			}
 		}
 		flush()
 	}
+	// Kinsoku: closing punctuation is glued to the token before it and opening punctuation
+	// to the token after it, so no line starts with "。" or ends with "「"; a break there
+	// takes the previous character down with it.
+	glued := toks[:0:0]
+	for _, t := range toks {
+		if n := len(glued); n > 0 && !t.space && !glued[n-1].space && (allIn(t.s, closingPunct) || allIn(glued[n-1].s, openingPunct)) {
+			glued[n-1].s += t.s
+			glued[n-1].out += t.out
+			continue
+		}
+		glued = append(glued, t)
+	}
+	toks = glued
 	var lines []string
 	var cur strings.Builder
 	cw := 0
@@ -502,21 +516,41 @@ func wrapSpans(spans []bbcode.Span, w int, base lipgloss.Style) []string {
 				continue
 			}
 		}
-		for tw > w { // a word longer than the line
+		for tw > w { // a word longer than the line (its pieces take the first piece's style)
 			part := width.Truncate(t.s, w, "")
 			cur.WriteString(t.st.Render(part))
 			cw = width.StringWidth(part)
 			emit()
 			t.s = strings.TrimPrefix(t.s, part)
+			t.out = t.st.Render(t.s)
 			tw = width.StringWidth(t.s)
 		}
-		cur.WriteString(t.st.Render(t.s))
+		cur.WriteString(t.out)
 		cw += tw
 	}
 	if cw > 0 || len(lines) == 0 {
 		emit()
 	}
 	return lines
+}
+
+// Punctuation that must not start a line, and that must not end one (CJK and ASCII).
+const (
+	closingPunct = "。，、；：！？）」』】〉》〕］｝”’．・…ー,.;:!?)]}%"
+	openingPunct = "（「『【〈《〔［｛“‘([{"
+)
+
+// allIn reports whether s is non-empty and made only of runes in set.
+func allIn(s, set string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if !strings.ContainsRune(set, r) {
+			return false
+		}
+	}
+	return true
 }
 
 // tableLines aligns a table's columns; the first row is bold; wide columns are cut.

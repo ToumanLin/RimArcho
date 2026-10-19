@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/rimarcho/rimarcho/internal/bbcode"
 )
 
 // run a command returned by the model and feed its message back (no program in tests).
@@ -205,5 +206,43 @@ func TestTagEditing(t *testing.T) {
 	row := ansi.Strip(m.drawRow(c, 1, true, 60))
 	if !strings.Contains(row, "official-stuff") {
 		t.Fatalf("row without its tag: %q", row)
+	}
+}
+
+// Kinsoku: across every width, no wrapped line starts with closing punctuation or ends
+// with opening punctuation, nothing is lost, and every line fits.
+func TestWrapKinsoku(t *testing.T) {
+	texts := []string{
+		"RimCrow 的核心伴生模组。支持从游戏获取更加详细的日志。必须放在 Harmony 之后加载。最好放在列表最前端以便获取更加完整的加载日志。",
+		"他说：「这是《边缘世界》的模组（测试），好吗？」然后走了！",
+		"中文后面跟英文标点.还有(括号)和逗号,以及问号?结束",
+	}
+	for _, text := range texts {
+		for w := 8; w <= 40; w++ { // below that a glued group (吗？」) may not fit at all
+			lines := wrapSpans([]bbcode.Span{{Text: text}}, w, lipgloss.NewStyle())
+			var all strings.Builder
+			for i, l := range lines {
+				l = strings.TrimRight(ansi.Strip(l), " ")
+				if cw := lipgloss.Width(l); cw > w {
+					t.Fatalf("w=%d line %d is %d cells: %q", w, i, cw, l)
+				}
+				rs := []rune(l)
+				if len(rs) > 0 && i > 0 && strings.ContainsRune(closingPunct, rs[0]) {
+					t.Fatalf("w=%d line %d starts with %q: %q", w, i, rs[0], l)
+				}
+				if len(rs) > 0 && i < len(lines)-1 && strings.ContainsRune(openingPunct, rs[len(rs)-1]) {
+					t.Fatalf("w=%d line %d ends with %q: %q", w, i, rs[len(rs)-1], l)
+				}
+				all.WriteString(l)
+			}
+			if strip := func(s string) string { return strings.ReplaceAll(s, " ", "") }; strip(all.String()) != strip(text) {
+				t.Fatalf("w=%d lost text: %q", w, all.String())
+			}
+		}
+	}
+	// the case from the review: "…日志\n。必须…" becomes "…日\n志。必须…"
+	lines := wrapSpans([]bbcode.Span{{Text: "支持从游戏获取更加详细的日志。必须放在"}}, 28, lipgloss.NewStyle())
+	if got := strings.TrimRight(ansi.Strip(lines[1]), " "); !strings.HasPrefix(got, "志。") {
+		t.Fatalf("second line %q", got)
 	}
 }
