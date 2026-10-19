@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -34,5 +35,31 @@ func main() {
 	frame := mm.View()
 	rows := strings.Count(frame, "\n")
 	fmt.Printf("first frame after %d ms in-process (%d lines, list shown: %v)\n", time.Since(t0).Milliseconds(), rows, strings.Contains(frame, "Core"))
+	// T1 (06 §8): time each keypress (Update + View) over the whole list: scrolling, paging
+	// and typing a search.
+	var ds []time.Duration
+	press := func(k tea.KeyMsg) {
+		t := time.Now()
+		mm, _ = mm.Update(k)
+		mm.View()
+		ds = append(ds, time.Since(t))
+	}
+	run := func(r string) { press(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(r)}) }
+	for i := 0; i < 300; i++ {
+		press(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	for i := 0; i < 30; i++ {
+		press(tea.KeyMsg{Type: tea.KeyPgDown})
+	}
+	run("/")
+	for _, r := range "harmony" {
+		run(string(r))
+	}
+	press(tea.KeyMsg{Type: tea.KeyBackspace})
+	press(tea.KeyMsg{Type: tea.KeyEsc})
+	sort.Slice(ds, func(i, j int) bool { return ds[i] < ds[j] })
+	fmt.Printf("keypresses: %d, median %.1f ms, p95 %.1f ms, max %.1f ms\n", len(ds), ms(ds[len(ds)/2]), ms(ds[len(ds)*95/100]), ms(ds[len(ds)-1]))
 	os.Exit(0)
 }
+
+func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }
