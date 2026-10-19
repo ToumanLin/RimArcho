@@ -123,7 +123,7 @@ var zhText = map[string]string{
 	"technical information · i":                          "技术信息 · i 展开",
 	"technical information":                              "技术信息",
 	// details: facts, requirements, description (06 §6.1, §6.4)
-	"package": "包名", "version": "版本", "opens the page": "按 o 打开页面", "tags": "标签",
+	"package": "包名", "version": "版本", "opens the page": "打开页面", "tags": "标签",
 	"none · # adds": "无 · 按 # 添加", "alias": "别名", "note": "备注", "requires": "依赖",
 	" (not enabled)": "（未启用）", " (not installed)": "（未安装）",
 	"description": "简介", "loading…": "加载中…", "(empty)": "（空）",

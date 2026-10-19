@@ -76,6 +76,13 @@ func TestDetailContent(t *testing.T) {
 			t.Fatalf("detail lacks %q:\n%s", want, got)
 		}
 	}
+	// the key appears once: "1001 · o opens the page" (not "o 按 o 打开页面")
+	SetLang("zh")
+	zh := plainLines(m.detailLayout(detailOpts{width: 50, descMax: 12}))
+	SetLang("en")
+	if !strings.Contains(got, "1001 · o opens the page") || !strings.Contains(zh, "1001 · o 打开页面") {
+		t.Fatalf("workshop line:\n%s\n%s", got, zh)
+	}
 	for _, l := range m.detailLayout(detailOpts{width: 50, descMax: 12}) {
 		if w := lipgloss.Width(l.text); w > 50 {
 			t.Fatalf("line %d cells: %q", w, l.text)

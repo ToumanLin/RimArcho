@@ -170,7 +170,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		kvs = append(kvs, kv{T("version"), d.decl.ModVersion})
 	}
 	if ws := mod.WorkshopID(); ws != "" && isNumber(ws) {
-		kvs = append(kvs, kv{T("workshop"), ws + sDimS.Render("  o "+T("opens the page"))})
+		kvs = append(kvs, kv{T("workshop"), ws + sDimS.Render(" "+markDot+" o "+T("opens the page"))})
 	}
 	if len(mod.Tags) > 0 {
 		kvs = append(kvs, kv{T("tags"), strings.Join(mod.Tags, " "+markDot+" ")})
