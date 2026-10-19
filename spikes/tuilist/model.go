@@ -10,7 +10,7 @@ import (
 )
 
 type row struct {
-	idx             int
+	idx               int
 	name, pkg, status string
 }
 

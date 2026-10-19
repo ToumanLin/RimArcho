@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/finding"
-	"github.com/rimarcho/rimarcho/internal/render"
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Progress receives progress lines of long commands (analysis); the CLI points it at stderr.

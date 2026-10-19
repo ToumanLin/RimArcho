@@ -12,14 +12,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rimarcho/rimarcho/internal/analyze"
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/content"
-	"github.com/rimarcho/rimarcho/internal/finding"
-	"github.com/rimarcho/rimarcho/internal/order"
-	"github.com/rimarcho/rimarcho/internal/render"
-	"github.com/rimarcho/rimarcho/internal/scan"
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/analyze"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/content"
+	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/order"
+	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 func init() {

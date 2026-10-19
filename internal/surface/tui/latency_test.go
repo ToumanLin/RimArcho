@@ -10,8 +10,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 // keyLatency sends navigation and filter keys to a model and returns the time of each

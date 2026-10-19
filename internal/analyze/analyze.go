@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/content"
-	"github.com/rimarcho/rimarcho/internal/harmony"
-	"github.com/rimarcho/rimarcho/internal/scan"
-	"github.com/rimarcho/rimarcho/internal/xdoc"
+	"github.com/ToumanLin/RimArcho/internal/content"
+	"github.com/ToumanLin/RimArcho/internal/harmony"
+	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/xdoc"
 )
 
 // Version of the analyzers; facts written by another version are rebuilt (03 §2).

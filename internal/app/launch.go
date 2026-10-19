@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
 // Launcher starts a process without waiting for it. Tests replace it; nothing in the test

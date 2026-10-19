@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rimarcho/rimarcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
 // Inline images (06 §6.2 method, §6.4 item 6). bubbletea draws text only; this writer

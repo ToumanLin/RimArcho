@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/env"
-	"github.com/rimarcho/rimarcho/internal/loadout"
-	"github.com/rimarcho/rimarcho/internal/order"
-	"github.com/rimarcho/rimarcho/internal/render"
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/order"
+	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 var placeFlags = []Flag{

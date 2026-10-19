@@ -15,8 +15,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/surface/tui"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/surface/tui"
 )
 
 func main() {

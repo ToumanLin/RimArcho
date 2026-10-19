@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/analyze"
-	"github.com/rimarcho/rimarcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/analyze"
+	"github.com/ToumanLin/RimArcho/internal/finding"
 )
 
 // ContentKey returns an instance's stored effective-content key ("" if none).

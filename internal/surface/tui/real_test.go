@@ -15,8 +15,8 @@ import (
 
 	"github.com/charmbracelet/x/exp/teatest"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/procmem"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/procmem"
 )
 
 func TestRealIdleMemory(t *testing.T) {

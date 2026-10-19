@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 // U10 / 04 §6, and the inspector's test_copy_local_creates_clean_independent_git_baseline.

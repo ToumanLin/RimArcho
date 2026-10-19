@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rimarcho/rimarcho/internal/env"
-	"github.com/rimarcho/rimarcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 // Origin is the content of .rimarcho/origin.json, written by copy-local (00 §6.6).

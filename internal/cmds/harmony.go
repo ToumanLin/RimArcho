@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/render"
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 func init() {

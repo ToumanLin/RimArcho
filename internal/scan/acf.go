@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/rimarcho/rimarcho/internal/vdf"
+	"github.com/ToumanLin/RimArcho/internal/vdf"
 )
 
 // ACFItem is the Steam client's record of one workshop item.

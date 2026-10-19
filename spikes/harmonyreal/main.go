@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/harmony"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/harmony"
 )
 
 func main() {

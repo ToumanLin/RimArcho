@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 // B5 replays the rim_mod_inspector tests that apply to RimArcho (copy-local arrives in M5).

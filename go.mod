@@ -1,4 +1,4 @@
-module github.com/rimarcho/rimarcho
+module github.com/ToumanLin/RimArcho
 
 go 1.27.2
 

@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 // Entry is one position of a Loadout: an Instance, or an entry that matched nothing

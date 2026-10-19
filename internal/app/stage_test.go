@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 // stageEnv: Core plus 30 enabled local mods M01…M30 and 3 more that are not enabled.

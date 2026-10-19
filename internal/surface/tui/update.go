@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/rimarcho/rimarcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
 const helpText = `four columns (06 §5)

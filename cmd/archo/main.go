@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rimarcho/rimarcho/internal/procmem"
-	"github.com/rimarcho/rimarcho/internal/surface/cli"
+	"github.com/ToumanLin/RimArcho/internal/procmem"
+	"github.com/ToumanLin/RimArcho/internal/surface/cli"
 )
 
 func main() {

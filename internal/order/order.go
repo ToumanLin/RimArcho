@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/scan"
 )
 
 // Official is the built-in order of Core and the DLCs (by release).

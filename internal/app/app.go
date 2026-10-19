@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/env"
-	"github.com/rimarcho/rimarcho/internal/ids"
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/ids"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Config is config.toml (07 §3). Only keys used by M1 are read.

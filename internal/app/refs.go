@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/env"
-	"github.com/rimarcho/rimarcho/internal/identity"
-	"github.com/rimarcho/rimarcho/internal/ids"
-	"github.com/rimarcho/rimarcho/internal/source"
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/ids"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Index is an environment's instances with reference helpers (02 §7).

@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/store"
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")

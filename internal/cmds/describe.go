@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/bbcode"
-	"github.com/rimarcho/rimarcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/bbcode"
+	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
 // describe (06 §6.4): the mod's description from About.xml and the Steam Workshop page.

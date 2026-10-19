@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/spikes/internal/rwenv"
+	"github.com/ToumanLin/RimArcho/spikes/internal/rwenv"
 )
 
 func main() {

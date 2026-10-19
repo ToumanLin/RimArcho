@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/analyze"
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/analyze"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // AnalyzeMemoryLimit is the soft heap cap of the `archo analyze` child (01 §5.2 target:

@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
 // Kind is a source type (02 §3.1).

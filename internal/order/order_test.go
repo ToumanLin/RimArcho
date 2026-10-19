@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/scan"
 )
 
 func node(pkg string, d scan.Decl) Node {

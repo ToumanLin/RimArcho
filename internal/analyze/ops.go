@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/xdoc"
+	"github.com/ToumanLin/RimArcho/internal/xdoc"
 )
 
 // Op is a parsed PatchOperation (the DirectXmlToObject subset the game uses).

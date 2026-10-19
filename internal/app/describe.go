@@ -22,13 +22,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/bbcode"
-	"github.com/rimarcho/rimarcho/internal/env"
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/bbcode"
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // UserAgent is sent with Workshop and image requests.
-const UserAgent = "RimArcho (+https://github.com/rimarcho/rimarcho)"
+const UserAgent = "RimArcho (+https://github.com/ToumanLin/RimArcho)"
 
 // Descriptions (06 §6.4): About.xml from disk, the Steam Workshop description fetched on
 // demand for one mod and cached, and the images it embeds.

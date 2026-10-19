@@ -16,12 +16,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/analyze"
-	"github.com/rimarcho/rimarcho/internal/content"
-	"github.com/rimarcho/rimarcho/internal/env"
-	"github.com/rimarcho/rimarcho/internal/finding"
-	"github.com/rimarcho/rimarcho/internal/logs"
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/analyze"
+	"github.com/ToumanLin/RimArcho/internal/content"
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Attribution roles (03 §6.3).

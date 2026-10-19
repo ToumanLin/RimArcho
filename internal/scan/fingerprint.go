@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/zeebo/xxh3"
 )
 

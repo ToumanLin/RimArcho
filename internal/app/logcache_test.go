@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func logProblems(l []*app.Problem) int {

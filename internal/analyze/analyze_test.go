@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rimarcho/rimarcho/internal/finding"
-	"github.com/rimarcho/rimarcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/scan"
 )
 
 func write(t *testing.T, p, s string) {

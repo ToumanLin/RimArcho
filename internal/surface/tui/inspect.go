@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/rimarcho/rimarcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
 // Inspect (06 §6): a full-screen panel showing any reference with the same text as the CLI

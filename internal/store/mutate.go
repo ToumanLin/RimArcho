@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/identity"
 )
 
 func (s *Store) inTx(fn func(tx *sql.Tx) error) error {

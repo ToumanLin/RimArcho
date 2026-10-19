@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rimarcho/rimarcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 func reg() *Registry {

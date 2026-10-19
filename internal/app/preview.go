@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Thumbnails (06 §6.2): the mod's About/Preview.png, scaled to 360 px wide and cached by

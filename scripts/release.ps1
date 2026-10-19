@@ -36,7 +36,7 @@ $out = Join-Path "dist" $name
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
 New-Item -ItemType Directory -Force $out | Out-Null
 
-$pkg = "github.com/rimarcho/rimarcho/internal/buildinfo"
+$pkg = "github.com/ToumanLin/RimArcho/internal/buildinfo"
 $ldflags = "-s -w -X $pkg.Version=$Version -X $pkg.Commit=$commit -X $pkg.Date=$date"
 $exe = if ($GOOS -eq "windows") { "archo.exe" } else { "archo" }
 $env:CGO_ENABLED = "0"; $env:GOOS = $GOOS; $env:GOARCH = $GOARCH

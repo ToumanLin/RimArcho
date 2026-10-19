@@ -1,5 +1,5 @@
 // Package buildinfo carries the release version, set by scripts/release.ps1 through
-// -ldflags "-X github.com/rimarcho/rimarcho/internal/buildinfo.Version=…".
+// -ldflags "-X github.com/ToumanLin/RimArcho/internal/buildinfo.Version=…".
 package buildinfo
 
 import "runtime/debug"

@@ -11,9 +11,9 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/rimarcho/rimarcho/internal/cmds"
-	"github.com/rimarcho/rimarcho/internal/surface/mcp"
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 // connect serves e.App over in-memory transports and returns a client session.

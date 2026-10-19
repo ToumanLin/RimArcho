@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/identity"
-	"github.com/rimarcho/rimarcho/internal/scan"
-	"github.com/rimarcho/rimarcho/internal/source"
-	"github.com/rimarcho/rimarcho/internal/store"
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func setup(t *testing.T, steamcmd bool) *testkit.Env {

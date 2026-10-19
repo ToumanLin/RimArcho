@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/content"
-	"github.com/rimarcho/rimarcho/internal/finding"
-	"github.com/rimarcho/rimarcho/internal/xdoc"
+	"github.com/ToumanLin/RimArcho/internal/content"
+	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/xdoc"
 )
 
 // Finding is the shared problem type.

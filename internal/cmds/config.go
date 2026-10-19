@@ -5,7 +5,7 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/rimarcho/rimarcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
 // configKeys are the user settings stored in the database (meta "cfg:<key>"), with their

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/identity"
-	"github.com/rimarcho/rimarcho/internal/scan"
-	"github.com/rimarcho/rimarcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 // BeginScan records the start of a scan and returns its ID.

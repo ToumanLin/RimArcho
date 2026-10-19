@@ -7,7 +7,7 @@ package main
 import (
 	"os"
 
-	"github.com/rimarcho/rimarcho/internal/wezterm"
+	"github.com/ToumanLin/RimArcho/internal/wezterm"
 )
 
 func main() {

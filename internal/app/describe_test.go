@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 // fakeSteam answers GetPublishedFileDetails for any id, and serves /img.png (a 1500×500

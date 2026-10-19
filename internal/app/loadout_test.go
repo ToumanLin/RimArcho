@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/loadout"
-	"github.com/rimarcho/rimarcho/internal/source"
-	"github.com/rimarcho/rimarcho/internal/store"
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func refOf(t *testing.T, e *testkit.Env, name string, kind source.Kind) string {

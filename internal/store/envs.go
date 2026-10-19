@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/env"
-	"github.com/rimarcho/rimarcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 const metaCurrentEnv = "current_env"

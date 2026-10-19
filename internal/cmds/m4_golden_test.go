@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 // TestGoldenHarmonyLog covers the Harmony layer (C5 multi-transpiler, C6 manual-only) and

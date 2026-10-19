@@ -4,7 +4,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/rimarcho/rimarcho/spikes/internal/procmem"
+	"github.com/ToumanLin/RimArcho/spikes/internal/procmem"
 )
 
 func main() {

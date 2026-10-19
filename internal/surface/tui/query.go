@@ -3,7 +3,7 @@ package tui
 import (
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Column search (06 §5.5): words, field:value terms, - negation, "quoted words"; all

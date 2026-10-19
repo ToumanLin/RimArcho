@@ -17,9 +17,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/content"
-	"github.com/rimarcho/rimarcho/internal/harmony"
-	"github.com/rimarcho/rimarcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/content"
+	"github.com/ToumanLin/RimArcho/internal/harmony"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // On-demand decompilation with ilspycmd (03 §5.3). Output is cached per DLL hash under

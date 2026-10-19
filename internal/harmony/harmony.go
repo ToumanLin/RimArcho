@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/dotnet"
+	"github.com/ToumanLin/RimArcho/internal/dotnet"
 )
 
 // Patch kinds.

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rimarcho/rimarcho/internal/content"
-	"github.com/rimarcho/rimarcho/internal/finding"
-	"github.com/rimarcho/rimarcho/internal/harmony"
+	"github.com/ToumanLin/RimArcho/internal/content"
+	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/harmony"
 )
 
 // AssemblyFacts is the Harmony layer of one effective DLL of an instance.

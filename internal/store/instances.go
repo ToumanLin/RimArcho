@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/identity"
-	"github.com/rimarcho/rimarcho/internal/scan"
-	"github.com/rimarcho/rimarcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 // Mod is an Instance joined with its source and current snapshot, for queries and output.

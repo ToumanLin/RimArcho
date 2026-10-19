@@ -13,7 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattn/go-runewidth"
 
-	"github.com/rimarcho/rimarcho/spikes/internal/procmem"
+	"github.com/ToumanLin/RimArcho/spikes/internal/procmem"
 )
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)

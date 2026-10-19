@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/rimarcho/rimarcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/loadout"
 )
 
 // Staging (06 §5.4): one list per environment, kept by RimArcho and never written to the

@@ -3,8 +3,8 @@ package cmds
 import (
 	"fmt"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
 // Staging (06 §5.4): a per-environment list RimArcho keeps and never writes to the game.

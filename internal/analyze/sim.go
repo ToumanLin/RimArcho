@@ -8,7 +8,7 @@ import (
 
 	"github.com/antchfx/xpath"
 
-	"github.com/rimarcho/rimarcho/internal/xdoc"
+	"github.com/ToumanLin/RimArcho/internal/xdoc"
 )
 
 type topOp struct {

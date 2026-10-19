@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
 func main() {

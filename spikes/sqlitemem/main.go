@@ -17,8 +17,8 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/rimarcho/rimarcho/spikes/internal/procmem"
-	"github.com/rimarcho/rimarcho/spikes/internal/rwenv"
+	"github.com/ToumanLin/RimArcho/spikes/internal/procmem"
+	"github.com/ToumanLin/RimArcho/spikes/internal/rwenv"
 	_ "modernc.org/sqlite"
 )
 

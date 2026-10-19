@@ -8,11 +8,11 @@ import (
 	"io"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/cmds"
-	"github.com/rimarcho/rimarcho/internal/env"
-	"github.com/rimarcho/rimarcho/internal/surface/mcp"
-	"github.com/rimarcho/rimarcho/internal/surface/tui"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
+	"github.com/ToumanLin/RimArcho/internal/surface/tui"
 )
 
 // Run executes argv (without the program name) and returns the exit code.

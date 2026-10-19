@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/scan"
-	"github.com/rimarcho/rimarcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 // Instance status values.

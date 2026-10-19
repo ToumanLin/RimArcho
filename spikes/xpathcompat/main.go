@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/spikes/internal/procmem"
+	"github.com/ToumanLin/RimArcho/spikes/internal/rwenv"
 	"github.com/antchfx/xmlquery"
 	"github.com/antchfx/xpath"
-	"github.com/rimarcho/rimarcho/spikes/internal/procmem"
-	"github.com/rimarcho/rimarcho/spikes/internal/rwenv"
 )
 
 var (
@@ -154,7 +154,7 @@ func main() {
 	sim := &Sim{plans: map[string]*fastPlan{}, doc: doc, activeNoSuffix: activeNoSuffix, activeNames: activeNames, cache: map[string]*xpath.Expr{}}
 	type failRec struct {
 		key, mod, desc, file string
-		stale, unknown      bool
+		stale, unknown       bool
 	}
 	var simFails []failRec
 	opsTotal, opsUnknownTop := 0, 0
@@ -269,8 +269,8 @@ func main() {
 // ---- load folders (ModContentPack.InitLoadFolders) -------------------------
 
 type lfEntry struct {
-	folder                    string
-	anyOf, allOf, notAnyOf    []string
+	folder                 string
+	anyOf, allOf, notAnyOf []string
 }
 
 func loadFolders(root, version string, active map[string]bool) []string {
@@ -648,7 +648,9 @@ func failKey(file, desc string) string {
 	return normPath(file) + "|" + ws.ReplaceAllString(strings.TrimSpace(desc), " ")
 }
 
-func normPath(p string) string { return strings.ToLower(filepath.Clean(strings.ReplaceAll(p, "/", `\`))) }
+func normPath(p string) string {
+	return strings.ToLower(filepath.Clean(strings.ReplaceAll(p, "/", `\`)))
+}
 
 func must(err error) {
 	if err != nil {

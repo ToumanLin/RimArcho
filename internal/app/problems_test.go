@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/finding"
-	"github.com/rimarcho/rimarcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func problems(t *testing.T, e *testkit.Env) *app.ProblemSet {

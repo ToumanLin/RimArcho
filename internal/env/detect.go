@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/rimarcho/rimarcho/internal/vdf"
+	"github.com/ToumanLin/RimArcho/internal/vdf"
 )
 
 // WorkshopAppID is RimWorld's Steam app ID.

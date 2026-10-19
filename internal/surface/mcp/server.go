@@ -14,9 +14,9 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/buildinfo"
-	"github.com/rimarcho/rimarcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
+	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
 // AnalyzeWait is how long a tool call waits for an out-of-date analysis (05 §4.1).

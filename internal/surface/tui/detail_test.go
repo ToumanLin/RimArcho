@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/bbcode"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/rimarcho/rimarcho/internal/bbcode"
 )
 
 // run a command returned by the model and feed its message back (no program in tests).

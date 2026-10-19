@@ -17,10 +17,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/analyze"
-	"github.com/rimarcho/rimarcho/internal/app"
-	"github.com/rimarcho/rimarcho/internal/env"
-	"github.com/rimarcho/rimarcho/spikes/internal/procmem"
+	"github.com/ToumanLin/RimArcho/internal/analyze"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/spikes/internal/procmem"
 )
 
 func main() {

@@ -3,8 +3,8 @@ package cmds
 import (
 	"runtime"
 
-	"github.com/rimarcho/rimarcho/internal/buildinfo"
-	"github.com/rimarcho/rimarcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
+	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
 func init() {

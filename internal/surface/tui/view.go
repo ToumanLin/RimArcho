@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/rimarcho/rimarcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
 // Screen structure (06 §4.2): top bar, blank, body, blank, status line, hint line.
