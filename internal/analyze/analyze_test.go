@@ -214,3 +214,49 @@ func TestLoadFoldersConditions(t *testing.T) {
 		t.Fatal("content key of an unconditional mod changed with the Loadout")
 	}
 }
+
+func TestParentAfterPatchesMayRequireAndFolderGuard(t *testing.T) {
+	f := newFixture(t)
+	c := f.mods["modc"]
+	// Parent "Gun_A" is a defName; a patch gives it a Name before inheritance runs.
+	write(t, filepath.Join(c.Dir, "Defs", "Kids.xml"), defs(`
+  <ThingDef ParentName="Gun_A_Base"><defName>Kid_1</defName></ThingDef>
+  <ThingDef ParentName="Missing_Base" MayRequire="test.x"><defName>Kid_2</defName></ThingDef>`))
+	write(t, filepath.Join(c.Dir, "Patches", "Name.xml"), patch(
+		`<Operation Class="PatchOperationAttributeAdd"><xpath>Defs/ThingDef[defName="Gun_A"]</xpath><attribute>Name</attribute><value>Gun_A_Base</value></Operation>`))
+	// A patch in a LoadFolders folder conditional on test.x: guarded, and aimed at it.
+	c.Decl.LoadFolders = `<loadFolders><v1.6><li>/</li><li IfModActive="test.x">Compat/X</li></v1.6></loadFolders>`
+	f.mods["modx"].Pos = 9
+	write(t, filepath.Join(c.Dir, "Compat", "X", "Patches", "X.xml"), patch(
+		`<Operation Class="PatchOperationRemove"><xpath>Defs/ThingDef[defName="Other_Xy"]/label</xpath></Operation>`))
+	out, err := Run(f.in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, x := range findingsOf(out, "def.parent-missing") {
+		if strings.Contains(x.Claim, "Kid_1") {
+			t.Fatalf("parent added by a patch not seen: %s", x.Claim)
+		}
+	}
+	// test.x is active now, so Kid_2 loads and its parent is missing.
+	if pm := findingsOf(out, "def.parent-missing"); len(pm) != 2 {
+		t.Fatalf("parent-missing = %v", pm)
+	}
+	var p *PatchFact
+	for _, x := range out.Patches {
+		if x.Instance == "modc" && strings.Contains(x.Desc, "Other_Xy") {
+			p = x
+		}
+	}
+	if p == nil || !slices.Equal(p.Reasons, []string{ReasonStaleName}) || !strings.Contains(p.Detail, "similar: Other_X") {
+		t.Fatalf("folder-guarded patch: %+v", p)
+	}
+	// With test.x inactive, Kid_2 is skipped (MayRequire) and the folder is not loaded.
+	f.mods["modx"].Pos = 0
+	out, _ = Run(f.in)
+	for _, x := range findingsOf(out, "def.parent-missing") {
+		if strings.Contains(x.Claim, "Kid_2") {
+			t.Fatalf("MayRequire def reported: %s", x.Claim)
+		}
+	}
+}

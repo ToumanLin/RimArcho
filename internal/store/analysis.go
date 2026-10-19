@@ -26,7 +26,7 @@ func (s *Store) CachedDefs(instanceID, key string) ([]analyze.DefFact, bool) {
 	return fs, err == nil
 }
 
-const defCols = `instance_id, def_type, def_name, name, parent, abstract, file, line`
+const defCols = `instance_id, def_type, def_name, name, parent, abstract, file, line, may_require, may_require_any`
 
 func scanDefs(rows *sql.Rows) ([]analyze.DefFact, error) {
 	defer rows.Close()
@@ -34,7 +34,7 @@ func scanDefs(rows *sql.Rows) ([]analyze.DefFact, error) {
 	for rows.Next() {
 		var f analyze.DefFact
 		var abs int
-		if err := rows.Scan(&f.Instance, &f.Type, &f.DefName, &f.Name, &f.Parent, &abs, &f.File, &f.Line); err != nil {
+		if err := rows.Scan(&f.Instance, &f.Type, &f.DefName, &f.Name, &f.Parent, &abs, &f.File, &f.Line, &f.MayRequire, &f.MayRequireAny); err != nil {
 			return nil, err
 		}
 		f.Abstract = abs != 0
@@ -123,7 +123,7 @@ func (s *Store) SaveAnalysis(envID, runKey, mm string, out *analyze.Output, star
 			return err
 		}
 		defer del.Close()
-		ins, err := tx.Prepare(`INSERT INTO def_fact(` + defCols + `) VALUES(?,?,?,?,?,?,?,?)`)
+		ins, err := tx.Prepare(`INSERT INTO def_fact(` + defCols + `) VALUES(?,?,?,?,?,?,?,?,?,?)`)
 		if err != nil {
 			return err
 		}
@@ -137,7 +137,7 @@ func (s *Store) SaveAnalysis(envID, runKey, mm string, out *analyze.Output, star
 				if f.Abstract {
 					abs = 1
 				}
-				if _, err := ins.Exec(inst, f.Type, f.DefName, f.Name, f.Parent, abs, f.File, f.Line); err != nil {
+				if _, err := ins.Exec(inst, f.Type, f.DefName, f.Name, f.Parent, abs, f.File, f.Line, f.MayRequire, f.MayRequireAny); err != nil {
 					return err
 				}
 			}

@@ -27,6 +27,9 @@ type Resolved struct {
 	Conds string
 	// Tag is the LoadFolders version tag used ("" without LoadFolders.xml).
 	Tag string
+	// Requires maps a loaded conditional folder to the packageIds its IfModActive /
+	// IfModActiveAll condition names: content there targets those mods.
+	Requires map[string][]string
 }
 
 // Key is the effective-content cache key: snapshot hash + game version + condition results.
@@ -60,7 +63,14 @@ func Resolve(root, loadFoldersXML, mm string, active Active) Resolved {
 					conds = append(conds, e.condText+":"+b)
 				}
 				if ok {
-					r.Folders = append(r.Folders, filepath.Join(root, e.folder))
+					f := filepath.Join(root, e.folder)
+					r.Folders = append(r.Folders, f)
+					if req := append(append([]string{}, e.anyOf...), e.allOf...); len(req) > 0 {
+						if r.Requires == nil {
+							r.Requires = map[string][]string{}
+						}
+						r.Requires[f] = req
+					}
 				}
 			}
 			sort.Strings(conds)

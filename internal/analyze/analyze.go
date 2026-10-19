@@ -19,7 +19,7 @@ import (
 )
 
 // Version of the analyzers; facts written by another version are rebuilt (03 §2).
-const Version = 1
+const Version = 2
 
 // Mod is one installed instance.
 type Mod struct {
@@ -44,6 +44,31 @@ type DefFact struct {
 	Abstract bool   `json:"a,omitempty"`
 	File     string `json:"f"` // relative to the mod root
 	Line     int    `json:"l"`
+	// MayRequire / MayRequireAnyOf on the def: the game skips it unless they are active.
+	MayRequire    string `json:"mr,omitempty"`
+	MayRequireAny string `json:"mra,omitempty"`
+}
+
+// Loaded reports whether the game loads the def with the given packages active.
+func (f *DefFact) Loaded(active func(string) bool) bool {
+	return mayRequireOK(f.MayRequire, f.MayRequireAny, active)
+}
+
+func mayRequireOK(all, any string, active func(string) bool) bool {
+	for _, p := range splitPkgs(all) {
+		if !active(p) {
+			return false
+		}
+	}
+	if anyOf := splitPkgs(any); len(anyOf) > 0 {
+		for _, p := range anyOf {
+			if active(p) {
+				return true
+			}
+		}
+		return false
+	}
+	return true
 }
 
 // Input to Run.
@@ -122,9 +147,11 @@ func Run(in Input) (*Output, error) {
 	out := &Output{Content: map[string]*ContentState{}, NewDefs: map[string][]DefFact{}}
 	out.Stats.ActiveMods, out.Stats.InstalledMods = len(active), len(in.Mods)
 	folders := map[string][]string{}
+	requires := map[string]map[string][]string{}
 	for _, m := range in.Mods {
 		r := content.Resolve(m.Dir, m.Decl.LoadFolders, in.MM, isActive)
 		folders[m.Instance] = r.Folders
+		requires[m.Instance] = r.Requires
 		out.Content[m.Instance] = &ContentState{Key: r.Key(m.SnapHash, in.MM) + fmt.Sprintf("|a%d", Version), Folders: r.Folders}
 	}
 
@@ -134,6 +161,7 @@ func Run(in Input) (*Output, error) {
 	root := doc.NewElement("Defs")
 	doc.AppendChild(doc.Root(), root)
 	allDefs := map[string][]DefFact{}
+	origin := map[int32]defLoc{} // top-level node -> where the def came from
 	type fileJob struct {
 		mod   *Mod
 		asset content.Asset
@@ -160,7 +188,9 @@ func Run(in Input) (*Output, error) {
 		}
 		tops, lines := doc.Build(root, evs, true, false)
 		for k, t := range tops {
-			allDefs[j.mod.Instance] = append(allDefs[j.mod.Instance], defFact(doc, t, j.asset.Rel, int(lines[k])))
+			f := defFact(doc, t, j.asset.Rel, int(lines[k]))
+			allDefs[j.mod.Instance] = append(allDefs[j.mod.Instance], f)
+			origin[t] = defLoc{mod: j.mod, fact: f}
 		}
 		done++
 		if done%500 == 0 {
@@ -252,7 +282,7 @@ func Run(in Input) (*Output, error) {
 		}
 		for _, c := range pd.Children(de) {
 			if pd.Name(c) == "Operation" {
-				tops = append(tops, &topOp{mod: j.mod, file: j.asset.Rel, op: parseOp(pd, c)})
+				tops = append(tops, &topOp{mod: j.mod, file: j.asset.Rel, op: parseOp(pd, c), folderReq: folderRequires(requires[j.mod.Instance], j.asset.Path)})
 			}
 		}
 	})
@@ -291,7 +321,8 @@ func Run(in Input) (*Output, error) {
 			out.Stats.UnknownOps++
 		}
 	}
-	out.Findings = append(out.Findings, defFindings(active, allDefs)...)
+	out.Findings = append(out.Findings, defFindings(active, allDefs, isActive)...)
+	out.Findings = append(out.Findings, sim.parentFindings(origin, tops, isActive)...)
 	out.Findings = append(out.Findings, sim.findings(tops, out.Patches)...)
 	out.Stats.PatchMs = time.Since(t1).Milliseconds()
 	out.Stats.TotalMs = time.Since(t0).Milliseconds()
@@ -307,10 +338,24 @@ func defFact(d *xdoc.Doc, t int32, file string, line int) DefFact {
 	}
 	f.Name, _ = d.Attr(t, "Name")
 	f.Parent, _ = d.Attr(t, "ParentName")
+	f.MayRequire, _ = d.Attr(t, "MayRequire")
+	f.MayRequireAny, _ = d.Attr(t, "MayRequireAnyOf")
 	if a, ok := d.Attr(t, "Abstract"); ok && strings.EqualFold(strings.TrimSpace(a), "true") {
 		f.Abstract = true
 	}
 	return f
+}
+
+// folderRequires returns the packages a conditional load folder containing path requires.
+func folderRequires(req map[string][]string, path string) []string {
+	var out []string
+	lp := strings.ToLower(path)
+	for f, pkgs := range req {
+		if strings.HasPrefix(lp, strings.ToLower(f)+string(os.PathSeparator)) {
+			out = append(out, pkgs...)
+		}
+	}
+	return out
 }
 
 // parseOrdered reads and tokenises files on several goroutines and calls fn for each in

@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -118,6 +118,13 @@ CREATE TABLE finding_ignore(
   UNIQUE(environment_id, lineage_id, code, key));
 `
 
+// schemaV4: MayRequire attributes on Def facts (the game skips such defs unless active).
+const schemaV4 = `
+ALTER TABLE def_fact ADD COLUMN may_require TEXT NOT NULL DEFAULT '';
+ALTER TABLE def_fact ADD COLUMN may_require_any TEXT NOT NULL DEFAULT '';
+DELETE FROM content_state;
+`
+
 // Store wraps the database handle.
 type Store struct {
 	DB   *sql.DB
@@ -157,7 +164,7 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {

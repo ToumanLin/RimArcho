@@ -301,6 +301,9 @@ func (s *sim) intendedOwners(g guard, deps map[string]bool, k *knowledge) []*Mod
 	for _, p := range g.mayReq {
 		addAll(k.byPkg[p])
 	}
+	for _, p := range g.folder {
+		addAll(k.byPkg[p])
+	}
 	for p := range deps {
 		if !strings.HasPrefix(p, "brrainz.harmony") && !strings.HasPrefix(p, "ludeon.") {
 			addAll(k.byPkg[p])
@@ -424,7 +427,7 @@ func modTokens(ms []*Mod) string {
 
 // ---- findings ----
 
-func defFindings(active []*Mod, defs map[string][]DefFact) []*Finding {
+func defFindings(active []*Mod, defs map[string][]DefFact, isActive func(string) bool) []*Finding {
 	var out []*Finding
 	type loc struct {
 		m *Mod
@@ -436,6 +439,9 @@ func defFindings(active []*Mod, defs map[string][]DefFact) []*Finding {
 	var order []string
 	for _, m := range active {
 		for _, f := range defs[m.Instance] {
+			if !f.Loaded(isActive) {
+				continue
+			}
 			if f.DefName != "" && !f.Abstract {
 				k := f.Type + "/" + f.DefName
 				if byDef[k] == nil {
@@ -503,24 +509,66 @@ func defFindings(active []*Mod, defs map[string][]DefFact) []*Finding {
 		}
 		out = append(out, f)
 	}
-	for _, m := range active {
-		for _, d := range defs[m.Instance] {
-			if d.Parent == "" || names[d.Parent] {
-				continue
+	return out
+}
+
+// parentFindings checks ParentName against the patched document: patches run before
+// inheritance is resolved, and mods do add Name attributes to existing defs.
+func (s *sim) parentFindings(origin map[int32]defLoc, tops []*topOp, isActive func(string) bool) []*Finding {
+	d := s.doc
+	loaded := func(t int32) bool {
+		mr, _ := d.Attr(t, "MayRequire")
+		mra, _ := d.Attr(t, "MayRequireAnyOf")
+		return mayRequireOK(mr, mra, isActive)
+	}
+	names := map[string]bool{}
+	for t := d.FirstChild(s.root); t != xdoc.None; t = d.Next(t) {
+		if d.Kind(t) == xdoc.KindElement && loaded(t) {
+			if n, ok := d.Attr(t, "Name"); ok {
+				names[n] = true
 			}
-			id := d.DefName
-			if id == "" {
-				id = "@" + d.Name
-			}
-			k := d.Type + "/" + id + "<" + d.Parent
-			out = append(out, &Finding{Code: "def.parent-missing", Severity: finding.Error, Layer: "def", Key: k, Confidence: finding.Certain,
-				Subjects: []string{finding.Inst(m.Instance)},
-				Claim:    fmt.Sprintf("%s %s inherits ParentName=%q, which no active mod defines", d.Type, id, d.Parent),
-				Evidence: []finding.Evidence{{Source: finding.Declared, Ref: finding.Inst(m.Instance), Text: fmt.Sprintf("%s:%d", d.File, d.Line)}}})
 		}
+	}
+	var out []*Finding
+	for t := d.FirstChild(s.root); t != xdoc.None; t = d.Next(t) {
+		if d.Kind(t) != xdoc.KindElement || !loaded(t) {
+			continue
+		}
+		parent, ok := d.Attr(t, "ParentName")
+		if !ok || names[parent] {
+			continue
+		}
+		id := ""
+		if c := d.Child(t, "defName"); c != xdoc.None {
+			id = strings.TrimSpace(d.InnerText(c))
+		} else if n, ok := d.Attr(t, "Name"); ok {
+			id = "@" + n
+		}
+		typ := d.Name(t)
+		f := &Finding{Code: "def.parent-missing", Severity: finding.Error, Layer: "def", Confidence: finding.Likely,
+			Key:   typ + "/" + id + "<" + parent,
+			Claim: fmt.Sprintf("%s %s inherits ParentName=%q, which no loaded def has as its Name (after patches)", typ, id, parent)}
+		if o, ok := origin[t]; ok {
+			f.Subjects = []string{finding.Inst(o.mod.Instance)}
+			f.Evidence = []finding.Evidence{{Source: finding.Declared, Ref: finding.Inst(o.mod.Instance), Text: fmt.Sprintf("%s:%d", o.fact.File, o.fact.Line)}}
+		} else {
+			for _, o := range tops {
+				if t >= o.allocFrom && t < o.allocTo {
+					f.Subjects = []string{finding.Inst(o.mod.Instance)}
+					f.Evidence = []finding.Evidence{{Source: finding.Inferred, Ref: finding.Inst(o.mod.Instance), Text: fmt.Sprintf("added by the patch at %s:%d", o.file, o.op.Line)}}
+					break
+				}
+			}
+		}
+		if len(f.Subjects) == 0 {
+			continue
+		}
+		f.Suggestions = []string{"archo def " + typ + "@" + parent}
+		out = append(out, f)
 	}
 	return out
 }
+
 
 func (s *sim) findings(tops []*topOp, facts []*PatchFact) []*Finding {
 	var out []*Finding

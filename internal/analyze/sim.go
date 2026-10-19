@@ -16,6 +16,8 @@ type topOp struct {
 	file string
 	seq  int
 	op   *Op
+	// folderReq: packages required by the conditional load folder the file is in.
+	folderReq []string
 	ok   bool
 	err  bool
 
@@ -27,9 +29,10 @@ type guard struct {
 	findMods []string // inside FindMod(match)
 	mayReq   []string // packageIds from MayRequire on a Sequence item
 	cond     bool     // inside a Conditional
+	folder   []string // packageIds of the conditional load folder (LoadFolders IfModActive)
 }
 
-func (g guard) any() bool { return len(g.findMods) > 0 || len(g.mayReq) > 0 || g.cond }
+func (g guard) any() bool { return len(g.findMods) > 0 || len(g.mayReq) > 0 || g.cond || len(g.folder) > 0 }
 
 type sim struct {
 	doc       *xdoc.Doc
@@ -70,7 +73,7 @@ func newSim(doc *xdoc.Doc, root int32, active []*Mod, mm string, folders map[str
 func (s *sim) run(t *topOp) {
 	s.cur = t
 	t.allocFrom = int32(s.doc.Len())
-	ok, err := s.apply(t.op, guard{})
+	ok, err := s.apply(t.op, guard{folder: t.folderReq})
 	t.ok, t.err = ok && err == nil, err != nil
 	t.allocTo = int32(s.doc.Len())
 }
