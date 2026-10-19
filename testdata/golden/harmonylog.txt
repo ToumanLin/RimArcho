@@ -45,6 +45,20 @@ problems: 0 error, 2 warning, 2 info
 next:
   archo problems show p:9c9994
 
+$ archo why #gpto #xamx
+#gpto Mod B ↔ #xamx Mod C
+  positions: enabled at 4 / enabled at 5
+  declared:
+    (nothing between them)
+  order-constraints:
+    (none)
+  shared-harmony-targets:
+    Verse.Pawn.Tick  postfix+transpiler / transpiler
+  shared-problems:
+    info harmony.shared-target  3 mods patch Verse.Pawn.Tick
+    warning harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict
+    warning harmony.skip-prefix  #iqmu has a bool prefix on Verse.Pawn.Tick that can skip the original; 2 other mods patch it
+
 $ archo log
 log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Player.log

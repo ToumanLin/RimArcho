@@ -17,6 +17,7 @@ func TestGoldenHarmonyLog(t *testing.T) {
 		cmd("harmony", "--target", "Verse.Pawn.Tick"),
 		func(e *testkit.Env) []string { return []string{"harmony", "--mod", ref(e, "Manual Patcher")} },
 		cmd("problems", "--code", "harmony"),
+		func(e *testkit.Env) []string { return []string{"why", ref(e, "Mod B"), ref(e, "Mod C")} },
 		cmd("log"),
 		cmd("log", "--cluster", "E1"),
 		cmd("log", "--cluster", "E2"),

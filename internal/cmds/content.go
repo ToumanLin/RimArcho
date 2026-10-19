@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -427,6 +428,33 @@ func whyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		onto(ma, db)
 		onto(mb, da)
+		// Methods both mods patch with Harmony (05 §3: 共同补丁).
+		ha, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: ma.ID})
+		hb, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: mb.ID})
+		kinds := map[string][2][]string{}
+		for i, rows := range [][]*store.HarmonyRow{ha, hb} {
+			for _, r := range rows {
+				k := kinds[r.Target]
+				if !slices.Contains(k[i], r.Kind) {
+					k[i] = append(k[i], r.Kind)
+				}
+				kinds[r.Target] = k
+			}
+		}
+		var hshared []string
+		for t, k := range kinds {
+			if len(k[0]) > 0 && len(k[1]) > 0 {
+				hshared = append(hshared, fmt.Sprintf("%s  %s / %s", t, strings.Join(k[0], "+"), strings.Join(k[1], "+")))
+			}
+		}
+		if len(hshared) > 0 {
+			sort.Strings(hshared)
+			sec := root.Section("shared-harmony-targets")
+			for _, l := range hshared {
+				sec.Add(l)
+			}
+			sec.Truncate(8, "archo harmony --mod "+ix.Ref(ma.ID)+" --shared")
+		}
 		if fs, err := c.App.Store.Findings(s.Run.ID); err == nil {
 			ta, tb := finding.Inst(ma.ID), finding.Inst(mb.ID)
 			var both []*finding.Finding
