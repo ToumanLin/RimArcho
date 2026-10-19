@@ -31,6 +31,10 @@ type probState struct {
 	loaded      bool
 	counts      [3]int
 	countsKey   string
+	// status is each mod's row icon and need the top bar's "needs attention" count: errors
+	// and warnings a player can act on (06 §3, §7.3), the version warnings folded into one.
+	status map[string]int
+	need   int
 }
 
 // analysis progress plumbing
@@ -138,8 +142,52 @@ func (m *model) loadProblems() {
 			p.counts[2]++
 		}
 	}
+	p.status, p.need = map[string]int{}, 0
+	versionWarn := false
+	for _, x := range ps.List {
+		s := statusNone
+		switch {
+		case x.Severity != finding.Error && x.Severity != finding.Warning:
+		case x.Log != nil:
+			s = statusLog
+		case app.NoisyCodes[x.Code] || strings.HasPrefix(x.Code, "harmony."):
+			// Harmony warnings without log evidence stay in the technical information (06 §7.3).
+		case x.Code == "version.unsupported":
+			versionWarn = true
+		case x.Severity == finding.Error:
+			s = statusErr
+		default:
+			s = statusWarn
+		}
+		if s == statusNone {
+			continue
+		}
+		p.need++
+		if id := x.SubjectInstance(); id != "" && s > p.status[id] {
+			p.status[id] = s
+		}
+	}
+	if versionWarn {
+		p.need++
+	}
 	p.countsKey = m.app.Store.ChangeKey()
 	p.cursor = min(p.cursor, max(len(p.list)-1, 0))
+}
+
+// needCount is the top bar's "needs attention" number (06 §4.2): problems, identity
+// questions, an external change of the list, a list saved for another game version.
+func (m *model) needCount() int {
+	m.problemCounts()
+	n := m.prob.need + m.question
+	if m.st != nil {
+		if m.st.FileVersionMismatch() != "" {
+			n++
+		}
+		if m.st.WS.Conflict != 0 {
+			n++
+		}
+	}
+	return n
 }
 
 // problemCounts for the status bar; recomputed when the database changed.

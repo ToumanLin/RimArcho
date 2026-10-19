@@ -49,7 +49,7 @@ func TestRealIdleMemory(t *testing.T) {
 		return string(out), err
 	}}
 	tm := teatest.NewTestModel(t, New(opts), teatest.WithInitialTermSize(120, 30))
-	waitFor(t, tm, "active 485/")
+	waitFor(t, tm, "Enabled 485")
 	if os.Getenv("RIMARCHO_NO_BROWSE") == "" {
 		keys(tm, "R")
 		waitFor(t, tm, "scan:")
@@ -57,7 +57,7 @@ func TestRealIdleMemory(t *testing.T) {
 			keys(tm, "j")
 			time.Sleep(150 * time.Millisecond) // let the detail pane load for every row
 		}
-		keys(tm, "/", "har", "enter", "esc", "G", "g", "f", "f", "f", "f")
+		keys(tm, "/", "har", "enter", "esc", "G", "g", "h", "G", "g", "l")
 	}
 	time.Sleep(2 * time.Second)
 	ws, priv, peak := procmem.MB()

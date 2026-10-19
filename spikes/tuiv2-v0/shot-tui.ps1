@@ -1,8 +1,8 @@
 # Screenshots of `archo tui` in WezTerm at a given size, after an optional key script.
-#   pwsh -File shot-tui.ps1 -Cols 160 -Rows 46 -Name v1v2-160 [-Keys "j","j","l"] [-DataHome <dir>] [-Wait 5]
+#   pwsh -File shot-tui.ps1 -Cols 160 -Rows 46 -Name v1v2-160 [-Keys "j|j|l"] [-DataHome <dir>] [-Wait 5]
 # Keys go through `wezterm cli send-text --no-paste`; "<enter>", "<esc>", "<tab>", "<space>"
 # and "<sleep N>" (milliseconds) are understood. The TUI is quit with q at the end.
-param([int]$Cols = 160, [int]$Rows = 46, [Parameter(Mandatory)] [string]$Name, [string[]]$Keys = @(),
+param([int]$Cols = 160, [int]$Rows = 46, [Parameter(Mandatory)] [string]$Name, [string]$Keys = "",
   [string]$DataHome = "", [int]$Wait = 5, [string]$Lang = "", [string]$Icons = "")
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $wz = Join-Path $root "spikes\wezterm-v0"
@@ -15,7 +15,7 @@ $p = Start-Process -FilePath "$wdir\wezterm-gui.exe" -PassThru -ArgumentList @(
 Start-Sleep -Seconds $Wait
 $env:WEZTERM_UNIX_SOCKET = (Get-ChildItem "$env:USERPROFILE\.local\share\wezterm" -Filter "gui-sock-$($p.Id)").FullName
 function Send([string]$t) { & "$wdir\wezterm.exe" cli send-text --no-paste $t | Out-Null }
-foreach ($k in $Keys) {
+foreach ($k in ($Keys -split "\|" | Where-Object { $_ -ne "" })) {
   switch -regex ($k) {
     '^<enter>$' { Send "`r" }
     '^<esc>$' { Send "`e" }

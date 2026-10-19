@@ -41,146 +41,151 @@ func T(s string) string {
 func Tf(f string, a ...any) string { return fmt.Sprintf(T(f), a...) }
 
 var zhText = map[string]string{
-	// header / tabs / status
-	"no environment":      "无环境",
-	"env: ":               "环境：",
-	"[1]list":             "[1]列表",
-	"[2]problems":         "[2]问题",
-	"[3]changes":          "[3]变更",
-	"active %d/%d":        "启用 %d/%d",
-	"unsaved %d":          "未保存 %d",
-	"saved":               "已保存",
-	"problems —":          "问题 —",
-	"problems %d":         "问题 %d",
-	"changes %d":          "变更 %d",
-	"questions %d":        "待确认 %d",
-	"marked %d":           "已标记 %d",
-	"scanning…":           "扫描中…",
-	"external change v%d": "外部改动 v%d",
-	"list saved for %s: game resets it (w to save)": "列表按 %s 保存：游戏会重置它（w 保存）",
-	"search: ":       "搜索：",
-	"  (esc clears)": "  （esc 清除）",
-	": command   / search   space toggle   S sort   w save   L launch   ? help   q quit": ": 命令   / 搜索   空格 启停   S 排序   w 保存   L 启动   ? 帮助   q 退出",
-	"error: ": "错误：",
+	// top bar, columns, status and hint lines (06 §2.3: short, verb first)
+	"no environment":     "无环境",
+	"needs attention %d": "需要处理 %d",
+	"needs attention":    "需要处理",
+	"unsaved %d":         "未保存 %d",
+	"launch":             "启动",
+	"recent changes":     "最近变化",
+	"details":            "详情",
+	"Disabled":           "未启用",
+	"Enabled":            "已启用",
+	"Staging":            "暂存",
+	"(not installed)":    "（未安装）",
+	"nothing matches · esc clears the filter":         "没有匹配的 Mod · esc 清除筛选",
+	"staging is empty · t puts the selected mod here": "暂存是空的 · 按 t 把选中的 Mod 放进来",
+	"no mod is enabled · space enables one":           "还没有启用 Mod · 按 space 启用",
+	"every mod is enabled":                            "所有 Mod 都已启用",
+	"staging is empty":                                "暂存是空的",
+	"scanning…":                                       "扫描中…",
+	"analyzing…":                                      "分析中…",
+	"error: ":                                         "错误：",
 	"Set up an environment first: archo env detect, archo env add <name> --detected": "请先设置环境：archo env detect，archo env add <名称> --detected",
-	// list
-	"ref":    "引用",
-	"name":   "名称",
-	"source": "来源",
-	"ver":    "版本",
-	"flags":  "标记",
-	"  (nothing matches; esc clears the search, f changes the filter)": "  （无匹配；esc 清除搜索，f 切换筛选）",
-	"missing":            "缺失",
-	"residue":            "残留",
-	"not loaded by game": "游戏不加载",
-	"duplicate":          "重复",
-	"copies":             "多副本",
-	"about-disabled":     "About 已禁用",
-	"filter: ":           "筛选：",
-	"all":                "全部",
-	"enabled":            "已启用",
-	"disabled":           "未启用",
-	"unloadable":         "不可加载",
-	// panels / prompts
-	"(%d–%d of %d, ↑/↓)":             "（%d–%d / 共 %d，↑/↓）",
-	"enter/esc: close":               "enter/esc：关闭",
-	"    n: cancel":                  "    n：取消",
-	"help":                           "帮助",
-	"scan failed":                    "扫描失败",
-	"sort — preview":                 "排序 — 预览",
-	"save to game — preview":         "保存到游戏 — 预览",
-	"launch":                         "启动",
-	"cancelled":                      "已取消",
-	"only enabled mods can be moved": "只能移动已启用的 Mod",
-	"move %s to (position | before <ref> | after <ref>): ":                             "把 %s 移到（位置 | before <引用> | after <引用>）：",
-	"expected a position number":                                                       "需要一个位置数字",
-	"expected: <n>, before <ref> or after <ref>":                                       "应为：<n>、before <引用> 或 after <引用>",
-	"rule for %s (after|before|attach|incompatible <ref>): ":                           "为 %s 加规则（after|before|attach|incompatible <引用>）：",
-	"expected: <kind> <ref>":                                                           "应为：<类型> <引用>",
-	"no environments (archo env add)":                                                  "没有环境（archo env add）",
-	"switch environment (enter to choose)":                                             "切换环境（enter 选择）",
-	"problems: %s in the list (kept in ModsConfig.xml)\n":                              "问题：列表中有 %s（保留在 ModsConfig.xml 中）\n",
-	"warning: %s in the Loadout match no installed mod":                                "警告：Loadout 中有 %s 未匹配到已安装的 Mod",
-	"ModsConfig.xml changed outside RimArcho (v%d) — :loadout checkout v%d to load it": "ModsConfig.xml 在 RimArcho 之外被修改（v%d）— 用 :loadout checkout v%d 载入",
-	"missing entry":                       "缺失条目",
-	"entry":                               "条目",
-	"add ignore rule %s? (y/n)":           "添加屏蔽规则 %s？(y/n)",
-	"no suggested edge for this problem":  "此问题没有可屏蔽的建议边",
-	"no problems":                         "没有问题",
-	"analysis is stale — A to re-analyze": "分析结果已过期 — 按 A 重新分析",
+	// hint line
+	"done": "完成", "clear": "清除", "move": "移动", "choose": "选择", "confirm": "确认", "cancel": "取消",
+	"back": "返回", "scroll": "滚动", "section": "切换子页", "expand": "展开", "run the suggestion": "执行建议",
+	"ignore": "忽略", "choose a log": "选择日志", "re-analyze": "重新分析", "file changes": "文件变化",
+	"enable": "启用", "disable": "停用", "stage": "暂存", "unstage": "移出暂存", "put back": "放回",
+	"put all back": "全部放回", "filter": "筛选", "columns": "切换列", "lists": "切换列表", "sort": "排序",
+	"save": "保存", "undo": "撤销", "help": "帮助",
+	// results (status line)
+	"enabled %s":                                "启用了 %s",
+	"disabled %s":                               "停用了 %s",
+	"staged %s":                                 "暂存了 %s",
+	"took %s out of staging":                    "把 %s 移出了暂存",
+	"put %s back in place":                      "把 %s 放回了原位置",
+	"%s is back at number %d":                   "%s 放回了第 %d 个",
+	"%s is now number %d":                       "%s 现在是第 %d 个",
+	"enabled %s at number %d":                   "启用了 %s，放在第 %d 个",
+	"undid the last change":                     "撤销了上一步",
+	"redid the change":                          "重做了一步",
+	"sorted the list":                           "排好了顺序",
+	"saved to the game":                         "保存到了游戏",
+	"the game is starting":                      "正在启动游戏",
+	"rule added":                                "添加了规则",
+	"swapped %s for another copy":               "把 %s 换成了另一份副本",
+	"switched to %s":                            "切换到了 %s",
+	"cancelled":                                 "已取消",
+	"only enabled mods can be moved":            "只能移动已启用的 Mod",
+	"expected a number":                         "需要一个序号",
+	"expected: <kind> <ref>":                    "应为：<类型> <引用>",
+	"scan complete · %d changes · c shows them": "✓ 扫描完成 · %d 处变化 · 按 c 查看",
+	"scan complete · nothing changed":           "扫描完成 · 没有变化",
+	"scan failed":                               "扫描失败",
+	// drag (status line while dragging)
+	"move %s to number %d":   "把 %s 移到第 %d 个",
+	"move %s to the end":     "把 %s 移到最后",
+	"enable %s at number %d": "启用 %s，放在第 %d 个",
+	"enable %s":              "启用 %s",
+	"stage %s":               "暂存 %s",
+	"disable %s":             "停用 %s",
+	"take %s out of staging": "把 %s 移出暂存",
+	// prompts and secondary screens
+	"archo command: ":     "archo 命令：",
+	"move %s to number: ": "把 %s 移到第几个：",
+	"rule for %s (after|before|attach|incompatible <ref>): ": "为 %s 加规则（after|before|attach|incompatible <引用>）：",
+	"sort — preview":                  "自动排序",
+	"save to game — preview":          "保存到游戏",
+	"switch environment":              "切换环境",
+	"no environments (archo env add)": "没有环境（archo env add）",
+	"%d–%d of %d":                     "第 %d–%d 行，共 %d 行",
+	"mod":                             "Mod",
+	// detail column
+	"official": "官方", "workshop": "工坊", "local": "本地", "local copy": "本地副本",
+	"supports": "支持", "number %d": "第 %d 个", "staged": "暂存中", "not enabled": "未启用",
+	"no problems found":                                  "没有发现问题",
+	"needs attention · ! shows what":                     "需要处理 · 按 ! 查看",
+	"the game cannot load it":                            "游戏无法加载它",
+	"About.xml is renamed: the game cannot load it":      "About.xml 被改了名，游戏无法加载它",
+	"no longer subscribed: the game ignores this folder": "已取消订阅，游戏会忽略这个文件夹",
+	"listed in ModsConfig.xml, but not installed":        "ModsConfig.xml 里有它，但没有安装",
+	"technical information · i":                          "技术信息 · i 展开",
+	"technical information":                              "技术信息",
+	// Problems, Changes and Inspect screens (plain versions until V3/V4)
+	"(%d–%d of %d, ↑/↓)":                              "（%d–%d / 共 %d，↑/↓）",
+	"no problems":                                     "没有问题",
+	"analysis is stale — A to re-analyze":             "分析结果已过期 — 按 A 重新分析",
 	"not analyzed yet — A to analyze (child process)": "尚未分析 — 按 A 分析（子进程）",
-	"analyzing…":                            "分析中…",
-	"analysis failed":                       "分析失败",
-	"severity: ":                            "级别：",
-	"inspect":                               "检查",
-	"problems %d/%d/%d":                     "问题 %d/%d/%d",
-	"analysis done":                         "分析完成",
-	"[ignore expired]":                      "[忽略已失效]",
-	"evidence: ":                            "证据：",
-	"error":                                 "错误",
-	"warning":                               "警告",
-	"info":                                  "提示",
-	"showing ignored":                       "显示已忽略",
-	"ignored %d (I shows)":                  "已忽略 %d（I 显示）",
-	"no suggested command for this problem": "此问题没有建议命令",
-	"suggestion":                            "建议",
-	"(not a command; open it yourself)":     "（不是命令，请自行打开）",
-	"run this command?":                     "运行这条命令？",
-	"summary":                               "概要",
-	"defs":                                  "Def",
-	"patches":                               "Patch",
-	"problems":                              "问题",
-	"rules":                                 "规则",
-	"history":                               "历史",
-	"new log (l)":                           "新日志（l）",
-	"no Player.log found":                   "未找到 Player.log",
-	"analyze which log? (enter)":            "分析哪个日志？（enter）",
-	"log analyzed: %d problems":             "日志分析完成：%d 个问题",
-	"log analyzed: %d problems from a stale log, not counted": "日志分析完成：%d 个问题，来自过期日志，不计入",
+	"analysis failed":                                 "分析失败",
+	"severity: ":                                      "级别：",
+	"problems %d/%d/%d":                               "问题 %d/%d/%d",
+	"problems —":                                      "问题 —",
+	"analysis done":                                   "分析完成",
+	"[ignore expired]":                                "[忽略已失效]",
+	"evidence: ":                                      "证据：",
+	"error":                                           "错误",
+	"warning":                                         "警告",
+	"info":                                            "提示",
+	"all":                                             "全部",
+	"showing ignored":                                 "显示已忽略",
+	"ignored %d (I shows)":                            "已忽略 %d（I 显示）",
+	"no suggested command for this problem":           "此问题没有建议命令",
+	"select single mods with the s filter to ignore them": "请用 s 筛选出单个 Mod 再忽略",
+	"suggestion":                        "建议",
+	"(not a command; open it yourself)": "（不是命令，请自行打开）",
+	"run this command?":                 "运行这条命令？",
+	"summary":                           "概要",
+	"defs":                              "Def",
+	"patches":                           "补丁",
+	"problems":                          "问题",
+	"rules":                             "规则",
+	"history":                           "历史",
+	"no Player.log found":               "未找到 Player.log",
+	"analyze which log? (enter)":        "分析哪个日志？（enter）",
+	"log analyzed: %d problems":         "日志分析完成：%d 个问题",
+	"log analyzed: %d problems from a stale log, not counted": "日志分析完成：%d 个问题，来自旧日志，不计入",
 	"log":                                  "日志",
 	"current":                              "当前",
-	"stale: written by %s, the game is %s": "过期：由 %s 写入，游戏为 %s",
-	"stale: older than the Loadout's last change":                       "过期：早于 Loadout 最近一次改动",
+	"stale: written by %s, the game is %s": "旧日志：由 %s 写入，游戏为 %s",
+	"stale: older than the Loadout's last change":                       "旧日志：早于列表最近一次改动",
 	"%d error, %d warning from this log; not counted":                   "此日志 %d 个错误、%d 个警告；不计入",
-	"external ModsConfig.xml version ignored (it stays in loadout log)": "已忽略外部 ModsConfig.xml 版本（仍保留在 loadout log 中）",
+	"%d enabled mods do not list %s":                                    "%d 个已启用的 Mod 没有标明支持 %s",
+	" (%d list %s, %d older only)":                                      "（其中 %d 个支持 %s，%d 个只支持更早的版本）",
+	"external ModsConfig.xml version ignored (it stays in loadout log)": "已忽略外部修改的 ModsConfig.xml（仍保留在 loadout log 中）",
 	"… %d more": "… 另有 %d 项",
 	"(semantic files unchanged: only other files changed)": "（语义文件未变，只有其他文件变化）",
 	"(snapshot no longer stored)":                          "（快照已不在库中）",
 	"(no file-level difference recorded for this event)":   "（此事件没有文件级差异记录）",
-	"no changes":            "无变化",
+	"no changes":            "没有变化",
 	"no scan yet (R scans)": "尚未扫描（R 扫描）",
-	"changed outside RimArcho, kept as v%d — L load into the workspace · I ignore": "被外部修改，已存为 v%d — L 载入工作区 · I 忽略",
+	"changed outside RimArcho, kept as v%d — L load into the workspace · I ignore": "在 RimArcho 之外被修改，已存为 v%d — L 载入工作区 · I 忽略",
 	"score": "相似度",
 	"identity questions %d — s same · c copy · u unrelated":                "身份待确认 %d 项 — s 是同一个 · c 是副本 · u 无关",
-	"%d bool prefixes from %d mods can skip methods other mods also patch": "%d 个返回 bool 的前缀（来自 %d 个 mod）可能跳过其他 mod 也在补丁的方法",
+	"%d bool prefixes from %d mods can skip methods other mods also patch": "%d 个返回 bool 的前缀（来自 %d 个 Mod）可能跳过其他 Mod 也在补丁的方法",
 	helpText: helpTextZh,
 }
 
-const helpTextZh = `列表视图（06 §3）
-  ↑/↓ j/k  移动光标           PgUp/PgDn g/G  翻页 / 首尾
-  space    启用 / 停用        J / K          下移 / 上移
-  m        移动到 …           v              标记（多选）
-  S        排序（先看差异）   w              保存到游戏（先看差异）
-  u        撤销               ctrl+r         重做
-  x        同谱系切换副本     L              启动游戏
-  enter    检查               r              为此 Mod 添加规则
-  /        搜索               f              筛选：全部/已启用/未启用/不可加载
-  R        重新扫描（子进程）    l              分析 Player.log（或上一次的）
-问题视图：enter 展开 / 检查   a 运行建议命令（tab 选择）   i 忽略
-          I 显示已忽略   s 级别   o 检查该 Mod   A 重新分析（子进程）
-变更视图：enter 文件差异   s/c/u 回答身份问题   L 载入 / I 忽略外部 ModsConfig.xml
-视图：1 列表 · 2 问题 · 3 变更      E 切换环境      鼠标：滚轮滚动，点击选中
-:        运行任意 archo 命令                 ? 帮助   q 退出`
-
-// trFlags translates the space-joined row flags; multi-word flags are matched first.
-func trFlags(f string) string {
-	if lang != "zh" || f == "" {
-		return f
-	}
-	f = strings.ReplaceAll(f, "not loaded by game", T("not loaded by game"))
-	words := strings.Fields(f)
-	for i, w := range words {
-		words[i] = T(w)
-	}
-	return strings.Join(words, " ")
-}
+const helpTextZh = `四列（06 §5）
+  ↑↓ j k     移动光标         ←→ h l tab   切换列          [ ]   切换列表（窄终端）
+  space      启用 / 停用 / 从暂存放回
+  t          暂存 / 移出暂存          T     全部从暂存放回原位置
+  J K        上移 / 下移              m     移到第几个
+  S          自动排序（先看差异）     w     保存到游戏（先看差异）
+  u ctrl+r   撤销 / 重做              L     启动游戏
+  /          筛选这一列               v     多选
+  enter      详情                     i     技术信息
+  !          需要处理                 c     最近变化
+  R          重新扫描                 E     切换环境
+  :          运行 archo 命令          ? 帮助   q 退出
+鼠标：点击选中；在列之间拖动 = 启用、停用或暂存；在“已启用”内拖动 = 调整顺序；滚轮滚动`

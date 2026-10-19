@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -11,21 +12,20 @@ import (
 	"github.com/rimarcho/rimarcho/internal/cmds"
 )
 
-const helpText = `list view (06 §3)
-  ↑/↓ j/k  move cursor        PgUp/PgDn g/G  page / ends
-  space    enable / disable   J / K          move down / up
-  m        move to …          v              mark (multi-select)
-  S        sort (diff first)  w              save to game (diff first)
-  u        undo               ctrl+r         redo
-  x        swap within lineage L             launch the game
-  enter    inspect            r              add a rule for this mod
-  /        search             f              filter: all/enabled/disabled/unloadable
-  R        rescan (child process)        l              analyze Player.log (or the previous one)
-problems view: enter expand / inspect   a run the suggested command (tab picks)   i ignore
-               I show ignored   s severity   o inspect the mod   A re-analyze (child process)
-changes view: enter file diff   s/c/u answer an identity question   L load / I ignore an external ModsConfig.xml
-views: 1 list · 2 problems · 3 changes      E switch environment      mouse: wheel scrolls, click selects
-:        run any archo command               ? help   q quit`
+const helpText = `four columns (06 §5)
+  ↑↓ j k     move            ←→ h l tab   switch column      [ ]   switch list (narrow)
+  space      enable / disable / put back from staging
+  t          stage / unstage        T     put everything back from staging
+  J K        move up / down         m     move to a position
+  S          sort (preview first)   w     save to the game (preview first)
+  u ctrl+r   undo / redo            L     launch the game
+  /          filter this column     v     mark several
+  enter      details                i     technical information
+  !          needs attention        c     recent changes
+  R          rescan                 E     switch environment
+  :          run an archo command   ? help   q quit
+mouse: click selects; drag between columns enables, disables or stages; drag within
+"enabled" changes the order; the wheel scrolls`
 
 // idleAfter is how long the TUI waits without input before returning freed memory to the
 // OS, so the resident size stays near the live heap while idle (06 §8 T5).
@@ -49,7 +49,9 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
-		m.scroll()
+		for k := range m.cols {
+			m.cols[k].scroll(m.rowsShown() - 1)
+		}
 		return m, m.requestDetail()
 	case detailTick:
 		if msg.seq == m.detailSeq {
@@ -57,7 +59,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case detailMsg:
-		if r := m.current(); r != nil && r.ref == msg.ref {
+		if it := m.current(); it != nil && it.ref == msg.ref {
 			m.detailRef, m.detail = msg.ref, msg.lines
 		}
 		return m, nil
@@ -68,9 +70,9 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.openPanel(T("scan failed"), msg.out+"\n"+msg.err.Error(), nil)
 		} else {
-			m.status = firstLine(msg.out)
+			m.say(sayOK, m.scanSummary(msg.out))
 			if m.tab == tabChanges {
-				m.loadTab()
+				m.loadChanges()
 			}
 		}
 		return m, m.requestDetail()
@@ -84,45 +86,12 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// mouse: the wheel scrolls like j/k, a left click selects the row under it (06 §1:
-// keyboard first, mouse optional). Panels and prompts take the keyboard only.
-func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
-	if m.prompt != nil || m.editing {
-		return nil
+// scanSummary: "scan complete · 12 changes" (06 §4.1); the CLI line keeps the scan id.
+func (m *model) scanSummary(out string) string {
+	if m.changes > 0 {
+		return Tf("scan complete · %d changes · c shows them", m.changes)
 	}
-	switch e.Button {
-	case tea.MouseButtonWheelDown:
-		return m.key(tea.KeyMsg{Type: tea.KeyDown})
-	case tea.MouseButtonWheelUp:
-		return m.key(tea.KeyMsg{Type: tea.KeyUp})
-	}
-	if e.Button != tea.MouseButtonLeft || e.Action != tea.MouseActionPress || m.panel != nil || m.insp != nil {
-		return nil
-	}
-	switch {
-	case m.tab == tabList:
-		if m.showDetail() && e.X >= m.w*55/100 {
-			return nil
-		}
-		if i := m.off + e.Y - 2; e.Y >= 2 && i < len(m.view) {
-			m.cursor = i
-			return m.requestDetail()
-		}
-	case m.tab == tabProblems && m.st != nil:
-		rows := m.probRows()
-		if i := m.prob.off + e.Y - 3; e.Y >= 3 && i < len(rows) && rows[i].main {
-			m.prob.cursor, m.prob.sug = rows[i].pi, 0
-		}
-	case m.tab == tabChanges:
-		c := &m.chg
-		if i := c.off + e.Y - 1; e.Y >= 1 && i < len(c.rows) && c.rows[i].selectable() {
-			if c.cursor == i {
-				return m.changesKey("enter") // a second click expands, like enter
-			}
-			c.cursor = i
-		}
-	}
-	return nil
+	return T("scan complete · nothing changed") + " (" + firstLine(out) + ")"
 }
 
 func (m *model) key(k tea.KeyMsg) tea.Cmd {
@@ -130,6 +99,9 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	if s == "ctrl+c" {
 		m.quitting = true
 		return tea.Quit
+	}
+	if m.prompt == nil && !m.editing {
+		m.status, m.sayKind = "", sayNone // the status line lasts until the next key
 	}
 	switch {
 	case m.prompt != nil:
@@ -139,7 +111,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case m.insp != nil:
 		return m.inspectKey(s)
 	case m.editing:
-		return m.searchKey(k)
+		return m.filterKey(k)
 	}
 	switch s {
 	case "q":
@@ -148,18 +120,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case "?":
 		m.openPanel(T("help"), T(helpText), nil)
 		return nil
-	case "1":
-		m.tab = tabList
-		return m.requestDetail()
-	case "2":
-		m.tab = tabProblems
-		return m.ensureProblems()
-	case "3":
-		m.tab = tabChanges
-		m.loadTab()
-		return nil
 	case ":":
-		m.prompt = &prompt{label: ":", submit: func(m *model, text string) tea.Cmd {
+		m.prompt = &prompt{label: T("archo command: "), submit: func(m *model, text string) tea.Cmd {
 			argv := strings.Fields(text)
 			if len(argv) > 0 && argv[0] == "archo" {
 				argv = argv[1:]
@@ -177,96 +139,137 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return nil
 	case "E":
 		return m.chooseEnv()
-	case "l":
-		return m.chooseLog()
 	case "R":
 		return m.startScan()
 	}
-	if m.tab == tabProblems {
+	switch m.tab {
+	case tabProblems:
+		switch s {
+		case "esc":
+			m.tab = tabList
+			return m.requestDetail()
+		case "l":
+			return m.chooseLog()
+		}
 		return m.problemsKey(s)
-	}
-	if m.tab == tabChanges {
+	case tabChanges:
+		if s == "esc" {
+			m.tab = tabList
+			return m.requestDetail()
+		}
 		return m.changesKey(s)
-	}
-	if m.tab != tabList {
-		return m.tabKey(s)
 	}
 	return m.listKey(s)
 }
 
+// focusCycle: ←→ tab move between the list columns; staging is always reachable, also
+// when it is hidden (then it takes the first column's place, 06 §5.1).
+func (m *model) focusMove(d int) tea.Cmd {
+	m.focus = colKind((int(m.focus) + d + 3) % 3)
+	m.detailRef = ""
+	return m.requestDetail()
+}
+
 func (m *model) listKey(s string) tea.Cmd {
+	c := m.col()
+	page := m.rowsShown() - 1
 	switch s {
 	case "up", "k":
 		return m.moveCursor(-1)
 	case "down", "j":
 		return m.moveCursor(1)
 	case "pgup":
-		return m.moveCursor(-m.listHeight())
+		return m.moveCursor(-page)
 	case "pgdown":
-		return m.moveCursor(m.listHeight())
+		return m.moveCursor(page)
 	case "home", "g":
-		return m.moveCursor(-len(m.view))
+		return m.moveCursor(-len(c.view))
 	case "end", "G":
-		return m.moveCursor(len(m.view))
+		return m.moveCursor(len(c.view))
+	case "left", "h", "shift+tab":
+		return m.focusMove(-1)
+	case "right", "l", "tab":
+		return m.focusMove(1)
+	case "[":
+		return m.focusMove(-1)
+	case "]":
+		return m.focusMove(1)
 	case "/":
 		m.editing = true
 		return nil
 	case "esc":
-		if m.search != "" {
-			m.search = ""
-			m.refilter(m.curID())
+		if c.filter != "" {
+			c.filter = ""
+			c.refilter(c.curID())
 		}
 		m.marked = map[string]bool{}
 		return nil
-	case "f":
-		m.filter = (m.filter + 1) % len(filters)
-		m.refilter(m.curID())
-		m.status = T("filter: ") + T(filters[m.filter])
+	case "!":
+		m.tab = tabProblems
+		return m.ensureProblems()
+	case "c":
+		m.tab = tabChanges
+		m.loadChanges()
+		return nil
+	case "i":
+		m.detailTech = !m.detailTech
+		m.detailRef = ""
 		return m.requestDetail()
 	case "v":
-		if r := m.current(); r != nil && r.id != "" {
-			m.marked[r.id] = !m.marked[r.id]
-			if !m.marked[r.id] {
-				delete(m.marked, r.id)
+		if it := c.cur(); it != nil && it.id != "" {
+			if m.marked[it.id] {
+				delete(m.marked, it.id)
+			} else {
+				m.marked[it.id] = true
 			}
 			return m.moveCursor(1)
 		}
 		return nil
 	case " ":
-		return m.toggle()
+		return m.space()
+	case "t":
+		return m.stageKey()
+	case "T":
+		n := len(m.cols[cStaging].items)
+		if n == 0 {
+			m.say(sayInfo, T("staging is empty"))
+			return nil
+		}
+		m.act(Tf("put %s back in place", plural(n, "mod")), "stage", "restore")
+		return m.requestDetail()
 	case "J", "K":
-		r := m.current()
-		if r == nil || r.pos == 0 {
-			m.status = T("only enabled mods can be moved")
+		it := c.cur()
+		if m.focus != cActive || it == nil {
+			m.say(sayInfo, T("only enabled mods can be moved"))
 			return nil
 		}
 		dir := "--down"
 		if s == "K" {
 			dir = "--up"
 		}
-		m.runToStatus("move", r.ref, dir)
+		id, name := it.id, it.name // it points into the rows that the command rebuilds
+		if m.act("", "move", it.ref, dir) {
+			m.say(sayOK, Tf("%s is now number %d", name, m.st.Position(id)))
+		}
+		m.cols[cActive].refilter(id)
 		return m.requestDetail()
 	case "m":
-		r := m.current()
-		if r == nil || r.pos == 0 {
-			m.status = T("only enabled mods can be moved")
+		it := c.cur()
+		if m.focus != cActive || it == nil || it.id == "" {
+			m.say(sayInfo, T("only enabled mods can be moved"))
 			return nil
 		}
-		ref := r.ref
-		m.prompt = &prompt{label: Tf("move %s to (position | before <ref> | after <ref>): ", ref), submit: func(m *model, text string) tea.Cmd {
-			f := strings.Fields(text)
-			switch {
-			case len(f) == 1:
-				if _, err := strconv.Atoi(f[0]); err == nil {
-					m.runToStatus("move", ref, "--to", f[0])
-				} else {
-					m.status = T("expected a position number")
-				}
-			case len(f) == 2 && (f[0] == "before" || f[0] == "after"):
-				m.runToStatus("move", ref, "--"+f[0], f[1])
-			default:
-				m.status = T("expected: <n>, before <ref> or after <ref>")
+		ref, name, id := it.ref, it.name, it.id
+		m.prompt = &prompt{label: Tf("move %s to number: ", name), submit: func(m *model, text string) tea.Cmd {
+			n, err := strconv.Atoi(strings.TrimSpace(text))
+			if err != nil || n < 1 {
+				m.say(sayFail, T("expected a number"))
+				return nil
 			}
+			if m.act("", "move", ref, "--to", fmt.Sprint(n)) {
+				m.say(sayOK, Tf("%s is now number %d", name, m.st.Position(id)))
+			}
+			m.cols[cActive].refilter(id)
 			return m.requestDetail()
 		}}
 		return nil
@@ -283,17 +286,14 @@ func (m *model) listKey(s string) tea.Cmd {
 		var confirm []string
 		if code == cmds.ExitOK {
 			confirm = []string{"save"}
-			if m.missing > 0 {
-				out += Tf("problems: %s in the list (kept in ModsConfig.xml)\n", plural(m.missing, "missing entry"))
-			}
 		}
 		m.openPanel(T("save to game — preview"), out, confirm)
 		return nil
 	case "u":
-		m.runToStatus("undo")
+		m.act(T("undid the last change"), "undo")
 		return m.requestDetail()
 	case "ctrl+r":
-		m.runToStatus("redo")
+		m.act(T("redid the change"), "redo")
 		return m.requestDetail()
 	case "L":
 		out, code := m.run("launch", "--dry-run")
@@ -304,34 +304,29 @@ func (m *model) listKey(s string) tea.Cmd {
 		m.openPanel(T("launch"), out, confirm)
 		return nil
 	case "x":
-		if r := m.current(); r != nil && r.id != "" {
-			out, code := m.run("swap", r.ref)
-			if code == cmds.ExitOK {
-				m.status = firstLine(out)
-			} else {
-				m.openPanel("swap "+r.ref, out, nil)
-			}
+		if it := c.cur(); it != nil && it.id != "" {
+			m.act(Tf("swapped %s for another copy", it.name), "swap", it.ref)
 		}
 		return m.requestDetail()
 	case "enter":
-		if r := m.current(); r != nil && r.id != "" {
+		if it := c.cur(); it != nil && it.id != "" {
 			m.insp, m.inspHist = nil, nil
-			return m.openInspect([]string{"mod", r.ref})
+			return m.openInspect([]string{"mod", it.ref})
 		}
 		return nil
 	case "r":
-		r := m.current()
-		if r == nil || r.id == "" {
+		it := c.cur()
+		if it == nil || it.id == "" {
 			return nil
 		}
-		ref := r.ref
-		m.prompt = &prompt{label: Tf("rule for %s (after|before|attach|incompatible <ref>): ", ref), submit: func(m *model, text string) tea.Cmd {
+		ref, name := it.ref, it.name
+		m.prompt = &prompt{label: Tf("rule for %s (after|before|attach|incompatible <ref>): ", name), submit: func(m *model, text string) tea.Cmd {
 			f := strings.Fields(text)
 			if len(f) != 2 {
-				m.status = T("expected: <kind> <ref>")
+				m.say(sayFail, T("expected: <kind> <ref>"))
 				return nil
 			}
-			m.runToStatus("rule", "add", f[0], ref, f[1])
+			m.act(T("rule added"), "rule", "add", f[0], ref, f[1])
 			return nil
 		}}
 		return nil
@@ -339,52 +334,64 @@ func (m *model) listKey(s string) tea.Cmd {
 	return nil
 }
 
-func (m *model) curID() string {
-	if r := m.current(); r != nil {
-		return r.id
-	}
-	return ""
-}
-
-// toggle enables or disables the selection (space).
-func (m *model) toggle() tea.Cmd {
-	refs := m.selection()
-	if len(refs) == 0 {
+// space enables (not enabled), disables (enabled) or puts back (staging) the selection.
+func (m *model) space() tea.Cmd {
+	sel := m.selection()
+	if len(sel) == 0 {
 		return nil
 	}
-	r := m.current()
-	verb := "enable"
-	if r != nil && r.pos > 0 && len(m.marked) == 0 {
-		verb = "disable"
-	} else if len(m.marked) > 0 {
-		// Multi-select: disable when every marked mod is enabled.
-		all := true
-		for _, row := range m.rows {
-			if m.marked[row.id] && row.pos == 0 {
-				all = false
+	// sel points into the rows that the command rebuilds: take what the message needs first.
+	keep, what, first := sel[0].id, named(sel), sel[0].name
+	refs := refsOf(sel)
+	switch m.focus {
+	case cInactive:
+		m.act(Tf("enabled %s", what), append([]string{"enable"}, refs...)...)
+	case cActive:
+		m.act(Tf("disabled %s", what), append([]string{"disable"}, refs...)...)
+	case cStaging:
+		if m.act("", append([]string{"stage", "restore"}, refs...)...) {
+			if len(refs) == 1 {
+				m.say(sayOK, Tf("%s is back at number %d", first, m.st.Position(keep)))
+			} else {
+				m.say(sayOK, Tf("put %s back in place", what))
 			}
 		}
-		if all {
-			verb = "disable"
-		}
 	}
-	m.runToStatus(append([]string{verb}, refs...)...)
+	m.marked = map[string]bool{}
+	m.col().refilter("")
+	return m.requestDetail()
+}
+
+// stageKey: t stages the selection, or takes it out of staging.
+func (m *model) stageKey() tea.Cmd {
+	sel := m.selection()
+	if len(sel) == 0 || sel[0].id == "" {
+		return nil
+	}
+	if m.focus == cStaging {
+		m.act(Tf("took %s out of staging", named(sel)), append([]string{"stage", "drop"}, refsOf(sel)...)...)
+	} else {
+		m.act(Tf("staged %s", named(sel)), append([]string{"stage", "add"}, refsOf(sel)...)...)
+	}
 	m.marked = map[string]bool{}
 	return m.requestDetail()
 }
 
-func (m *model) searchKey(k tea.KeyMsg) tea.Cmd {
+func (m *model) filterKey(k tea.KeyMsg) tea.Cmd {
+	c := m.col()
+	keep := c.curID()
 	switch k.Type {
 	case tea.KeyEnter:
 		m.editing = false
+		return nil
 	case tea.KeyEsc:
-		m.editing, m.search = false, ""
+		m.editing, c.filter = false, ""
 	case tea.KeyBackspace:
-		if r := []rune(m.search); len(r) > 0 {
-			m.search = string(r[:len(r)-1])
+		if r := []rune(c.filter); len(r) > 0 {
+			c.filter = string(r[:len(r)-1])
 		}
 	case tea.KeyRunes, tea.KeySpace:
-		m.search += string(k.Runes)
+		c.filter += string(k.Runes)
 	case tea.KeyUp:
 		return m.moveCursor(-1)
 	case tea.KeyDown:
@@ -392,7 +399,8 @@ func (m *model) searchKey(k tea.KeyMsg) tea.Cmd {
 	default:
 		return nil
 	}
-	m.refilter(m.curID())
+	c.refilter(keep)
+	c.scroll(m.rowsShown() - 1)
 	return m.requestDetail()
 }
 
@@ -445,7 +453,7 @@ func (m *model) panelKey(s string) tea.Cmd {
 			m.panel = nil
 			out, code := m.run(p.confirm...)
 			if code == cmds.ExitOK {
-				m.status = firstLine(out)
+				m.say(sayOK, m.confirmedText(p.confirm, out))
 			} else {
 				m.openPanel("archo "+strings.Join(p.confirm, " "), out, nil)
 			}
@@ -460,46 +468,32 @@ func (m *model) panelKey(s string) tea.Cmd {
 		m.panel = nil
 		m.afterPanel = nil
 		if p.confirm != nil {
-			m.status = T("cancelled")
+			m.say(sayInfo, T("cancelled"))
 		}
 	}
 	return nil
 }
 
-func (m *model) tabKey(s string) tea.Cmd {
-	page := max(m.h-4, 1)
-	switch s {
-	case "down", "j":
-		m.tabOff = min(m.tabOff+1, max(len(m.tabText)-page, 0))
-	case "up", "k":
-		m.tabOff = max(m.tabOff-1, 0)
-	case "pgdown":
-		m.tabOff = min(m.tabOff+page, max(len(m.tabText)-page, 0))
-	case "pgup":
-		m.tabOff = max(m.tabOff-page, 0)
+// confirmedText words the result of a confirmed command.
+func (m *model) confirmedText(argv []string, out string) string {
+	switch argv[0] {
+	case "sort":
+		return T("sorted the list")
+	case "save":
+		return T("saved to the game")
+	case "launch":
+		return T("the game is starting")
 	}
-	return nil
-}
-
-// loadTab fills the Problems / Changes views. Problems are analysed in M3; until then the
-// view shows what the Loadout itself can tell (sort cycles, missing entries).
-func (m *model) loadTab() {
-	m.tabOff = 0
-	var parts []string
-	switch m.tab {
-	case tabChanges:
-		m.loadChanges()
-	}
-	m.tabText = parts
+	return m.humanize(firstLine(out))
 }
 
 func (m *model) chooseEnv() tea.Cmd {
 	envs, err := m.app.Store.Envs()
 	if err != nil || len(envs) == 0 {
-		m.status = T("no environments (archo env add)")
+		m.say(sayInfo, T("no environments (archo env add)"))
 		return nil
 	}
-	p := &panel{title: T("switch environment (enter to choose)")}
+	p := &panel{title: T("switch environment")}
 	for i, e := range envs {
 		p.choices = append(p.choices, e.Name)
 		if e.Name == m.envName {
@@ -508,10 +502,179 @@ func (m *model) chooseEnv() tea.Cmd {
 	}
 	p.onPick = func(m *model, name string) tea.Cmd {
 		m.app.EnvName = ""
-		m.runToStatus("env", "use", name)
-		m.cursor, m.off, m.detailRef = 0, 0, ""
+		if m.act(Tf("switched to %s", name), "env", "use", name) {
+			for k := range m.cols {
+				m.cols[k].cursor, m.cols[k].off, m.cols[k].filter = 0, 0, ""
+				m.cols[k].refilter("")
+			}
+			m.detailRef = ""
+			m.prob.loaded = false
+		}
 		return m.requestDetail()
 	}
 	m.panel = p
 	return nil
+}
+
+// ---- mouse (06 §5.3) ----
+
+// hit returns the column slot and view index under a point (index -1: the title row or
+// below the last row; ok false: not over a list column).
+func (m *model) hit(x, y int) (colKind, int, bool) {
+	l := m.layout()
+	for _, s := range l.slots {
+		if x < s.x || x >= s.x+s.w {
+			continue
+		}
+		c := &m.cols[s.kind]
+		if y < 3 || y >= 3+m.rowsShown()-1 {
+			return s.kind, -1, true
+		}
+		i := c.off + y - 3
+		if i >= len(c.view) {
+			i = -1
+		}
+		return s.kind, i, true
+	}
+	return 0, -1, false
+}
+
+func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
+	if m.prompt != nil || m.editing || m.panel != nil || m.insp != nil || m.tab != tabList {
+		switch e.Button {
+		case tea.MouseButtonWheelDown:
+			return m.key(tea.KeyMsg{Type: tea.KeyDown})
+		case tea.MouseButtonWheelUp:
+			return m.key(tea.KeyMsg{Type: tea.KeyUp})
+		}
+		return nil
+	}
+	k, i, ok := m.hit(e.X, e.Y)
+	switch e.Button {
+	case tea.MouseButtonWheelDown, tea.MouseButtonWheelUp:
+		if ok {
+			m.focus = k
+		}
+		d := 3
+		if e.Button == tea.MouseButtonWheelUp {
+			d = -3
+		}
+		return m.moveCursor(d)
+	}
+	switch e.Action {
+	case tea.MouseActionPress:
+		if e.Button != tea.MouseButtonLeft || !ok {
+			return nil
+		}
+		m.focus = k
+		if i >= 0 {
+			c := &m.cols[k]
+			c.cursor = i
+			if it := c.cur(); it != nil && it.id != "" {
+				m.drag = &drag{from: k, id: it.id, ref: it.ref, name: it.name}
+			}
+		}
+		return m.requestDetail()
+	case tea.MouseActionMotion:
+		if m.drag != nil {
+			m.drag.active = true
+			if ok {
+				m.say(sayBusy, m.dropText(m.drag, k, i))
+			}
+		}
+		return nil
+	case tea.MouseActionRelease:
+		d := m.drag
+		m.drag = nil
+		if d == nil || !d.active || !ok {
+			if d != nil && d.active {
+				m.status = ""
+			}
+			return nil
+		}
+		return m.drop(d, k, i)
+	}
+	return nil
+}
+
+// dropPos is the 1-based enabled position a drop on view index i means (0: the end).
+func (m *model) dropPos(i int) int {
+	c := &m.cols[cActive]
+	if i < 0 || i >= len(c.view) {
+		return 0
+	}
+	return c.items[c.view[i]].pos
+}
+
+func (m *model) dropText(d *drag, k colKind, i int) string {
+	switch {
+	case k == cActive && d.from == cActive:
+		if p := m.dropPos(i); p > 0 {
+			return Tf("move %s to number %d", d.name, p)
+		}
+		return Tf("move %s to the end", d.name)
+	case k == cActive:
+		if p := m.dropPos(i); p > 0 {
+			return Tf("enable %s at number %d", d.name, p)
+		}
+		return Tf("enable %s", d.name)
+	case k == cStaging && d.from != cStaging:
+		return Tf("stage %s", d.name)
+	case k == cInactive && d.from == cActive:
+		return Tf("disable %s", d.name)
+	case k == cInactive && d.from == cStaging:
+		return Tf("take %s out of staging", d.name)
+	}
+	return d.name
+}
+
+// drop performs a drag: between columns it enables, disables or stages; within "enabled"
+// it moves.
+func (m *model) drop(d *drag, k colKind, i int) tea.Cmd {
+	pos := 0
+	if k == cActive {
+		pos = m.dropPos(i)
+	}
+	at := func(flag string) []string {
+		if pos > 0 {
+			return []string{flag, fmt.Sprint(pos)}
+		}
+		return nil
+	}
+	switch {
+	case k == cActive && d.from == cActive:
+		if pos == 0 {
+			pos = len(m.st.List)
+		}
+		if pos == m.st.Position(d.id) {
+			m.status = ""
+			return nil
+		}
+		if m.act("", "move", d.ref, "--to", fmt.Sprint(pos)) {
+			m.say(sayOK, Tf("%s is now number %d", d.name, m.st.Position(d.id)))
+		}
+	case k == cActive && d.from == cInactive:
+		if m.act("", append([]string{"enable", d.ref}, at("--at")...)...) {
+			m.say(sayOK, Tf("enabled %s at number %d", d.name, m.st.Position(d.id)))
+		}
+	case k == cActive && d.from == cStaging:
+		if pos == 0 { // below the last row: the end, not the remembered place
+			pos = len(m.st.List) + 1
+		}
+		if m.act("", append([]string{"stage", "restore", d.ref}, at("--at")...)...) {
+			m.say(sayOK, Tf("%s is back at number %d", d.name, m.st.Position(d.id)))
+		}
+	case k == cStaging && d.from != cStaging:
+		m.act(Tf("staged %s", d.name), "stage", "add", d.ref)
+	case k == cInactive && d.from == cActive:
+		m.act(Tf("disabled %s", d.name), "disable", d.ref)
+	case k == cInactive && d.from == cStaging:
+		m.act(Tf("took %s out of staging", d.name), "stage", "drop", d.ref)
+	default:
+		m.status = ""
+		return nil
+	}
+	m.focus = k
+	m.cols[k].refilter(d.id)
+	return m.requestDetail()
 }
