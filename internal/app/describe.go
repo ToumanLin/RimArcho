@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -25,6 +26,9 @@ import (
 	"github.com/rimarcho/rimarcho/internal/env"
 	"github.com/rimarcho/rimarcho/internal/store"
 )
+
+// UserAgent is sent with Workshop and image requests.
+const UserAgent = "RimArcho (+https://github.com/rimarcho/rimarcho)"
 
 // Descriptions (06 §6.4): About.xml from disk, the Steam Workshop description fetched on
 // demand for one mod and cached, and the images it embeds.
@@ -176,12 +180,35 @@ func choose(about, ws string) string {
 	if bbcode.TextLen(ab) < 300 {
 		return "workshop"
 	}
-	pa, pw := strings.Join(strings.Fields(bbcode.Plain(ab)), " "), strings.Join(strings.Fields(bbcode.Plain(wb)), " ")
+	pa, pw := startText(ab), startText(wb)
 	n := min(60, len(pa), len(pw))
 	if n > 0 && pa[:n] == pw[:n] {
 		return "workshop"
 	}
 	return "both"
+}
+
+// startText is the text of a description without its images, spaces collapsed: what
+// choose compares (Workshop pages often open with a banner image).
+func startText(bs []bbcode.Block) string {
+	var keep []bbcode.Block
+	for _, b := range bs {
+		if b.Kind != bbcode.Image {
+			keep = append(keep, b)
+		}
+	}
+	return strings.Join(strings.Fields(bbcode.Plain(keep)), " ")
+}
+
+// imageURL is the address to download: imgur page-style links to an image file
+// (imgur.com/x.png) go straight to i.imgur.com instead of through a redirect.
+func imageURL(u *url.URL) string {
+	if (u.Host == "imgur.com" || u.Host == "www.imgur.com") && path.Ext(u.Path) != "" {
+		c := *u
+		c.Host = "i.imgur.com"
+		return c.String()
+	}
+	return u.String()
 }
 
 func isDigits(s string) bool {
@@ -199,7 +226,13 @@ func (a *App) fetchWorkshop(id string) (*workshopCache, error) {
 		api = SteamAPI
 	}
 	form := url.Values{"itemcount": {"1"}, "publishedfileids[0]": {id}}
-	resp, err := a.httpClient().PostForm(api, form)
+	req, err := http.NewRequest("POST", api, strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", UserAgent)
+	resp, err := a.httpClient().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("Steam unreachable: %v", shortErr(err))
 	}
@@ -258,7 +291,12 @@ func (a *App) DescImage(rawURL string) (path string, w, h int, err error) {
 	if !a.WorkshopImages() {
 		return "", 0, 0, errors.New("image downloads are off (workshop.images)")
 	}
-	resp, err := a.httpClient().Get(u.String())
+	req, err := http.NewRequest("GET", imageURL(u), nil)
+	if err != nil {
+		return "", 0, 0, err
+	}
+	req.Header.Set("User-Agent", UserAgent)
+	resp, err := a.httpClient().Do(req)
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("download failed: %v", shortErr(err))
 	}
