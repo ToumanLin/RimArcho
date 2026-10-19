@@ -58,10 +58,11 @@ var (
 	wrapperRe = regexp.MustCompile(`^\s*(?:at )?\(wrapper ([\w-]+)\) (.+?)(?:\s*\(.*)?$`)
 	patchRe   = regexp.MustCompile(`^\s*- (PREFIX|POSTFIX|TRANSPILER|FINALIZER|ILMANIPULATOR) ([^:]+): (?:\S+ )?([^\s:(]+):([\w<>.` + "`" + `]+)\(`)
 	// A frame without "at " (inner exception stacks): Ns.Type.Method(args) or Ns.Type..ctor(args)
-	bareFrameRe = regexp.MustCompile(`^([A-Za-z_][\w+<>` + "`" + `]*(?:\.[\w+<>` + "`" + `]+)*\.\.?[\w<>` + "`" + `]+) ?\([^()]*\)\s*$`)
-	refRe       = regexp.MustCompile(`^\[Ref ([0-9A-Fa-f]+)\]( Duplicate stacktrace)?`)
-	patchNumRe  = regexp.MustCompile(`_Patch\d+$`)
-	versionRe   = regexp.MustCompile(`RimWorld (\d+\.\d+\.\d+ rev\d+)`)
+	bareFrameRe   = regexp.MustCompile(`^([A-Za-z_][\w+<>` + "`" + `]*(?:\.[\w+<>` + "`" + `]+)*\.\.?[\w<>` + "`" + `]+) ?\([^()]*\)\s*$`)
+	refRe         = regexp.MustCompile(`^\[Ref ([0-9A-Fa-f]+)\]( Duplicate stacktrace)?`)
+	patchNumRe    = regexp.MustCompile(`_Patch\d+$`)
+	genericArgsRe = regexp.MustCompile(`\[[^\[\]]*\]`)
+	versionRe     = regexp.MustCompile(`RimWorld (\d+\.\d+\.\d+ rev\d+)`)
 )
 
 func isContinuation(l string) bool {
@@ -72,7 +73,9 @@ func isContinuation(l string) bool {
 	case l[0] == ' ' || l[0] == '\t':
 		return true
 	case strings.HasPrefix(l, "[Ref "), strings.HasPrefix(l, "(wrapper "), strings.HasPrefix(l, "Rethrow as "),
-		strings.HasPrefix(l, "--- End of"), strings.HasPrefix(l, "file: "), strings.HasPrefix(l, "Subnode:"):
+		strings.HasPrefix(l, "--- End of"), strings.HasPrefix(l, "file: "), strings.HasPrefix(l, "Subnode:"),
+		// .NET exception messages that span lines (ArgumentException and ObjectDisposedException).
+		strings.HasPrefix(l, "Parameter name: "), strings.HasPrefix(l, "Actual value was "), strings.HasPrefix(l, "Object name: "):
 		return true
 	}
 	return bareFrameRe.MatchString(l)
@@ -175,9 +178,7 @@ func splitMember(s string) (typ, method string) {
 	if i := strings.IndexByte(s, ' '); i >= 0 {
 		s = s[:i]
 	}
-	if i := strings.IndexByte(s, '['); i > 0 { // generic arguments: Foo.Bar[T]
-		s = s[:i]
-	}
+	s = genericArgsRe.ReplaceAllString(s, "") // generic arguments: List`1[T].get_Item, Foo.Bar[T]
 	i := strings.LastIndexByte(s, '.')
 	if i < 0 {
 		return "", s
