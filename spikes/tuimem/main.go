@@ -58,7 +58,7 @@ func main() {
 		out, err := exec.Command(*exe, "scan").CombinedOutput()
 		return string(out), err
 	}, Analyze: func(env string, progress func(string)) error {
-		return app.ChildAnalyzeExe(*exe, a.Home, env, progress)
+		return app.ChildAnalyzeExe(*exe, a.Home, env, "", progress)
 	}})
 	p := tea.NewProgram(m, tea.WithInput(nil), tea.WithOutput(io.Discard))
 	go func() {

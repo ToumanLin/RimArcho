@@ -14,10 +14,11 @@ import (
 var Progress func(string)
 
 func init() {
-	register(&Command{Name: "analyze", Summary: "rebuild the Def and Patch facts (normally run on demand as a child process)", MaxArgs: 0, Run: analyzeCmd})
+	register(&Command{Name: "analyze", Summary: "rebuild the Def and Patch facts (normally run on demand as a child process)", MaxArgs: 0, Run: analyzeCmd,
+		Flags: []Flag{gameVersionFlag}})
 	register(&Command{Name: "problems", Summary: "problems: declarations, Defs, Patches (03 §4)", MaxArgs: 0, Run: problemsCmd,
 		Flags: []Flag{{Name: "subject", Value: "<ref>", Help: "only problems involving this mod"}, {Name: "code", Value: "<code>", Help: "code or prefix, e.g. dep or patch.no-match"},
-			{Name: "severity", Value: "<error|warning|info>"}, {Name: "all"}, {Name: "detail"}, {Name: "ignored"}, {Name: "no-analyze", Help: "do not rebuild a stale analysis"}}})
+			{Name: "severity", Value: "<error|warning|info>"}, {Name: "all"}, {Name: "detail"}, {Name: "ignored"}, {Name: "no-analyze", Help: "do not rebuild a stale analysis"}, {Name: "min-severity", Value: "<error|warning|info>"}, gameVersionFlag}})
 	register(&Command{Name: "problems show", Args: "<p:ref>", Summary: "one problem with its evidence", MinArgs: 1, MaxArgs: 1, Run: problemShowCmd})
 	register(&Command{Name: "problems ignore", Args: "<p:ref>", Summary: "ignore a problem until its mod changes", MinArgs: 1, MaxArgs: 1, Run: problemIgnoreCmd})
 	register(&Command{Name: "problems unignore", Args: "<p:ref>", Summary: "stop ignoring a problem", MinArgs: 1, MaxArgs: 1, Run: problemUnignoreCmd})
@@ -123,8 +124,11 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		subj = finding.Inst(m.ID)
 	}
-	code, sev := a.Str("code"), a.Str("severity")
+	code, sev, minSev := a.Str("code"), a.Str("severity"), a.Str("min-severity")
+	full := a.Bool("all") || code != "" || subj != "" || sev == finding.Info
 	var sel []*app.Problem
+	hidden := map[string]int{}
+	var versions []*app.Problem
 	for _, p := range list {
 		if subj != "" && !contains(p.Subjects, subj) {
 			continue
@@ -135,11 +139,23 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		if sev != "" && p.Severity != sev {
 			continue
 		}
+		if minSev != "" && sevRank(p.Severity) > sevRank(minSev) {
+			continue
+		}
+		if !full && app.NoisyCodes[p.Code] {
+			hidden[p.Code]++
+			continue
+		}
+		if !full && p.Code == "version.unsupported" {
+			versions = append(versions, p) // folded into one row below
+			continue
+		}
 		sel = append(sel, p)
 	}
-	head := "problems: " + severityCounts(sel)
+	counted := append(append([]*app.Problem{}, sel...), versions...)
+	head := "problems: " + severityCounts(counted)
 	if a.Bool("ignored") {
-		head = "ignored problems: " + severityCounts(sel)
+		head = "ignored problems: " + severityCounts(counted)
 	}
 	d, root := render.New(head)
 	root.KV("analysis", analysisText(c, ps.Analysis, ps.AnalysisErr))
@@ -161,11 +177,23 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			addProblemDetail(ix, n, p)
 		}
 	}
+	if len(versions) > 0 {
+		lst.Add(versionSummary(versions, ps.State.GameMM()))
+	}
 	expandCmd := "archo problems --all"
 	if a.Str("subject") != "" {
 		expandCmd = "archo problems --subject " + a.Str("subject") + " --all"
 	}
 	lst.Truncate(limit, expandCmd)
+	if len(hidden) > 0 {
+		var hs []string
+		for _, k := range []string{"def.override", "patch.contested"} {
+			if hidden[k] > 0 {
+				hs = append(hs, fmt.Sprintf("%d %s", hidden[k], k))
+			}
+		}
+		root.KV("hidden", strings.Join(hs, ", ")+" (archo problems --all)")
+	}
 	if !a.Bool("ignored") && len(ps.Ignored) > 0 {
 		root.KV("ignored", fmt.Sprintf("%d (archo problems --ignored)", len(ps.Ignored)))
 	}
@@ -293,4 +321,31 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 	}
 	n.Truncate(3, "archo problems --subject "+ix.Ref(m.ID))
 	return nil
+}
+
+func sevRank(s string) int {
+	switch s {
+	case finding.Error:
+		return 0
+	case finding.Warning:
+		return 1
+	}
+	return 2
+}
+
+// versionSummary folds version.unsupported into one row per game version (decisions-m3 §12.1).
+func versionSummary(ps []*app.Problem, mm string) string {
+	sev := finding.Info
+	warn := 0
+	for _, p := range ps {
+		if p.Severity == finding.Warning {
+			sev = finding.Warning
+			warn++
+		}
+	}
+	line := fmt.Sprintf("%s version.unsupported  %d enabled mods do not list %s", sev, len(ps), mm)
+	if prev := app.PrevMinor(mm); prev != "" {
+		line += fmt.Sprintf(" (%d list %s, %d older only)", len(ps)-warn, prev, warn)
+	}
+	return line + "  (archo problems --code version.unsupported)"
 }

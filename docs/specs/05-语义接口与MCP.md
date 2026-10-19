@@ -114,6 +114,8 @@ next:
 | 玩家数据 | `alias` / `tag` / `note` | 别名、标签、备注 |
 | 身份 | `identity list` / `identity resolve` / `lineage split` / `lineage merge` | 待确认项与家族（02 §5、§6） |
 | 其他 | `copy-local` / `launch` / `data update` / `import rimcrow` / `gc` | 见 04 和 02 |
+| 设置 | `config get [<键>]` / `config set <键> <值>` | 用户设置，例如 `ui.lang auto\|en\|zh`（M3 裁定 6） |
+| 分析选项 | `--game-version X.Y` | 用于 `analyze`、`problems`、`def`、`patches`、`why`、`log`，覆盖环境的游戏版本（M3 裁定 7）；MCP 对应工具有同名参数 |
 
 ## 4. MCP（`archo mcp`）
 

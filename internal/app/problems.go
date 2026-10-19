@@ -51,7 +51,7 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	// Cached until the database or ModsConfig.xml changes (the TUI asks often).
 	key := ""
 	if a.stCache != nil && a.stCache.Ix == st.Ix {
-		key = a.stKey
+		key = a.stKey + "|" + a.GameVersion
 	}
 	if key != "" && a.prCache != nil && a.prKey == key && ps.AnalysisErr == nil {
 		c := *a.prCache
@@ -296,7 +296,17 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				}
 			}
 			if !ok {
-				add(&finding.Finding{Code: "version.unsupported", Severity: finding.Warning, Key: mm, Subjects: []string{inst(m.ID)},
+				// Listing the previous minor version only is the normal state right after a game
+				// update: info. Anything older: warning (decisions-m3 §12.1).
+				sev := finding.Warning
+				if prev := PrevMinor(mm); prev != "" {
+					for _, v := range d.SupportedVersions {
+						if strings.TrimSpace(v) == prev {
+							sev = finding.Info
+						}
+					}
+				}
+				add(&finding.Finding{Code: "version.unsupported", Severity: sev, Key: mm, Subjects: []string{inst(m.ID)},
 					Claim:    fmt.Sprintf("%s does not list %s in supportedVersions (%s)", inst(m.ID), mm, strings.Join(d.SupportedVersions, " ")),
 					Evidence: []finding.Evidence{{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml supportedVersions"}}})
 			}
@@ -478,3 +488,16 @@ func edgeText(st *LoadoutState, in order.Input, e order.Edge) (evidence, ignore 
 	}
 	return fmt.Sprintf("decl %s About.xml %s pkg:%s", owner, e.C.Field, e.C.Target), ig
 }
+
+// PrevMinor returns the previous minor version ("1.7" → "1.6"; "" for X.0 or bad input).
+func PrevMinor(mm string) string {
+	var a, b int
+	if n, _ := fmt.Sscanf(mm, "%d.%d", &a, &b); n != 2 || b == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d.%d", a, b-1)
+}
+
+// NoisyCodes are hidden from default problem lists (decisions-m3 §12.2); they show with
+// --all, an explicit --code or --subject, severity info, and in def / patches output.
+var NoisyCodes = map[string]bool{"def.override": true, "patch.contested": true}

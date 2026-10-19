@@ -5,6 +5,7 @@ package cmds
 
 import (
 	"errors"
+	"regexp"
 	"fmt"
 	"slices"
 	"strings"
@@ -222,6 +223,14 @@ func Execute(ap *app.App, argv []string) (string, int) {
 	if err != nil {
 		return "error: " + err.Error() + "\n", ExitUsage
 	}
+	if v := a.Str("game-version"); v != "" {
+		if !gameVersionRe.MatchString(v) {
+			return "error: --game-version must look like 1.6\n", ExitUsage
+		}
+		prev := ap.GameVersion
+		ap.GameVersion = v
+		defer func() { ap.GameVersion = prev }()
+	}
 	doc, err := c.Run(&Ctx{App: ap}, a)
 	if err != nil {
 		var amb *app.Ambiguous
@@ -256,3 +265,8 @@ func Help() *render.Doc {
 	root.KV("global flags", "--env <name> (use another environment for this command)")
 	return d
 }
+
+var gameVersionRe = regexp.MustCompile(`^\d+\.\d+$`)
+
+// gameVersionFlag is accepted by the analysis commands (decisions-m3 §12.7).
+var gameVersionFlag = Flag{Name: "game-version", Value: "<X.Y>", Help: "analyse for another game version than the environment's"}

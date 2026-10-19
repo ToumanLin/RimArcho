@@ -30,10 +30,17 @@ type LoadoutState struct {
 	FileErr  error
 	Notices  []string // what Sync did (import, external change, conflict)
 	Aliases  map[string][]store.Alias
+	// MM overrides the game's major.minor for analysis (--game-version, decisions-m3 §12.7).
+	MM string
 }
 
 // GameMM is the environment's game major.minor version.
-func (st *LoadoutState) GameMM() string { return env.MajorMinor(st.Ix.Env.GameVersion) }
+func (st *LoadoutState) GameMM() string {
+	if st.MM != "" {
+		return st.MM
+	}
+	return env.MajorMinor(st.Ix.Env.GameVersion)
+}
 
 // Baseline is the list of the newest version (empty if none).
 func (st *LoadoutState) Baseline() loadout.List {
@@ -120,6 +127,7 @@ func (a *App) Loadout() (*LoadoutState, error) {
 	}
 	if a.stCache != nil && a.stKey == key && a.stCache.Ix == ix {
 		c := *a.stCache
+		c.MM = a.GameVersion
 		c.Notices = nil
 		c.List = c.List.Clone()
 		ws := *c.WS
@@ -130,6 +138,7 @@ func (a *App) Loadout() (*LoadoutState, error) {
 	if err != nil {
 		return nil, err
 	}
+	st.MM = a.GameVersion
 	// Syncing may have written; key the cache on the state after it.
 	key = a.Store.ChangeKey() + key[strings.Index(key, "|"):]
 	if ix2, err := a.Index(); err == nil && ix2 == ix {

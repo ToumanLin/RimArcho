@@ -69,10 +69,22 @@ func (m *model) loadProblems() {
 		src = ps.Ignored
 	}
 	p.list = p.list[:0]
+	all := severities[p.sev] == ""
+	var versions []*app.Problem
 	for _, x := range src {
-		if severities[p.sev] == "" || x.Severity == severities[p.sev] {
+		switch {
+		case all && app.NoisyCodes[x.Code]:
+			continue // shown under the info filter (decisions-m3 §12.2)
+		case all && x.Code == "version.unsupported":
+			versions = append(versions, x)
+			continue
+		}
+		if all || x.Severity == severities[p.sev] {
 			p.list = append(p.list, x)
 		}
+	}
+	if len(versions) > 0 {
+		p.list = append(p.list, versionRow(versions, m.st, ps.State.GameMM()))
 	}
 	p.ignored = len(ps.Ignored)
 	p.never = ps.Analysis == nil || ps.Analysis.Run == nil
@@ -123,7 +135,7 @@ func (m *model) startAnalyze() tea.Cmd {
 	run, name := m.opts.Analyze, m.envName
 	if run == nil {
 		home := m.app.Home
-		run = func(env string, progress func(string)) error { return app.ChildAnalyze(home, env, progress) }
+		run = func(env string, progress func(string)) error { return app.ChildAnalyze(home, env, "", progress) }
 	}
 	ch := make(chan string, 16)
 	done := make(chan error, 1)
@@ -357,6 +369,10 @@ func (m *model) problemsKey(s string) tea.Cmd {
 		if x == nil {
 			return nil
 		}
+		if x.Ref == "p:version" {
+			m.status = T("select single mods with the s filter to ignore them")
+			return nil
+		}
 		verb := "ignore"
 		if p.showIgnored {
 			verb = "unignore"
@@ -426,3 +442,21 @@ func (m *model) statusProblems() string {
 }
 
 var _ = cmds.ExitOK
+
+// versionRow folds version.unsupported into one expandable row (decisions-m3 §12.1).
+func versionRow(vs []*app.Problem, st *app.LoadoutState, mm string) *app.Problem {
+	f := &finding.Finding{Code: "version.unsupported", Severity: finding.Info, Key: "*", Layer: "decl", Confidence: finding.Certain}
+	warn := 0
+	for _, v := range vs {
+		if v.Severity == finding.Warning {
+			f.Severity = finding.Warning
+			warn++
+		}
+		f.Evidence = append(f.Evidence, finding.Evidence{Source: v.Severity, Text: v.Claim})
+	}
+	f.Claim = Tf("%d enabled mods do not list %s", len(vs), mm)
+	if prev := app.PrevMinor(mm); prev != "" {
+		f.Claim += Tf(" (%d list %s, %d older only)", len(vs)-warn, prev, warn)
+	}
+	return &app.Problem{Finding: f, Ref: "p:version"}
+}

@@ -143,19 +143,22 @@ func (a *App) Analysis(st *LoadoutState) (*AnalysisState, error) {
 }
 
 // ChildAnalyze runs `<this executable> analyze --env <name>` and streams its output lines.
-func ChildAnalyze(home, envName string, progress func(string)) error {
+func ChildAnalyze(home, envName, mm string, progress func(string)) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	return ChildAnalyzeExe(exe, home, envName, progress)
+	return ChildAnalyzeExe(exe, home, envName, mm, progress)
 }
 
 // ChildAnalyzeExe is ChildAnalyze with an explicit archo executable.
-func ChildAnalyzeExe(exe, home, envName string, progress func(string)) error {
+func ChildAnalyzeExe(exe, home, envName, mm string, progress func(string)) error {
 	args := []string{"analyze"}
 	if envName != "" {
 		args = append(args, "--env", envName)
+	}
+	if mm != "" {
+		args = append(args, "--game-version", mm)
 	}
 	cmd := exec.Command(exe, args...)
 	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
@@ -202,7 +205,7 @@ func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
 	}
 	run := a.AnalyzeRunner
 	if run == nil {
-		run = func(envName string, p func(string)) error { return ChildAnalyze(a.Home, envName, p) }
+		run = func(envName string, p func(string)) error { return ChildAnalyze(a.Home, envName, a.GameVersion, p) }
 	}
 	if err := run(st.Ix.Env.Name, progress); err != nil {
 		return s, err

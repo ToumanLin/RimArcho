@@ -8,16 +8,27 @@ env:main  RimWorld 1.6.4633 rev1261
   problems: 2 error, 0 warning, 0 info in declarations; Defs and Patches not analysed yet (archo problems)
 
 $ archo problems
-problems: 2 error, 1 warning, 2 info
+problems: 2 error, 1 warning, 0 info
   analysis: a:1 2026-10-01 10:00
   list:
     error dep.missing  #z3bw Needy requires Absent Library (pkg:tester.absent), which is not installed  (p:c2a532)
+      evidence: declared #z3bw About.xml modDependencies: tester.absent
+      fix: subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
+      fix: steam://url/CommunityFilePage/123456
     error incompat.active  #z3bw Needy is incompatible with #i4uc, and both are enabled  (p:98551b)
+      evidence: declared #z3bw About.xml incompatibleWith: tester.over1
+      fix: archo disable #i4uc
+      fix: archo disable #z3bw
+      fix: archo why #z3bw #i4uc
     warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
-    info def.override  def:ThingDef/Shared_Gun is defined by 2 mods; #iqmu Over Two loads last and wins  (p:b2563e)
-    info patch.contested  2 mods replace or remove ThingDef/Shared_Gun/label; #iqmu Over Two runs last  (p:9789a9)
+      evidence: inferred reason target-inactive
+      evidence: inferred reason unguarded-optional
+      evidence: inferred ThingDef/Lib_Gun is defined by #nyh3, which is not active; the patch is not wrapped in PatchOperationFindMod, a Conditional or a MayRequire list item
+      fix: archo enable #nyh3
+      fix: archo patches --mod #hnyg
+  hidden: 1 def.override, 1 patch.contested (archo problems --all)
 next:
-  archo problems show p:c2a532
+  subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
 
 $ archo problems --code patch --detail
 problems: 0 error, 1 warning, 1 info
