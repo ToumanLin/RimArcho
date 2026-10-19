@@ -42,7 +42,22 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	seq := m.idleSeq
 	next := tea.Tick(idleAfter, func(time.Time) tea.Msg { return idleTick{seq} })
 	mm, cmd := m.update(msg)
-	return mm, tea.Batch(cmd, next)
+	return mm, tea.Batch(cmd, next, m.imageCmds(m.visibleDetail()))
+}
+
+// visibleDetail lays out the detail as the next frame will show it (for image loads).
+func (m *model) visibleDetail() []dline {
+	if !m.inlineImages() || m.tab != tabList || m.panel != nil || m.insp != nil {
+		return nil
+	}
+	if m.full {
+		return m.detailLayout(detailOpts{width: max(m.w-4, 20), full: true, images: true, techText: m.detail})
+	}
+	l := m.layout()
+	if l.detailW == 0 {
+		return nil
+	}
+	return m.detailLayout(detailOpts{width: l.detailW, descMax: m.descMax(), images: true, techText: m.detail})
 }
 
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -55,7 +70,25 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.requestDetail()
 	case detailTick:
 		if msg.seq == m.detailSeq {
-			return m, m.loadDetail()
+			var data tea.Cmd
+			if it := m.current(); it != nil && it.id != "" && (m.dd == nil || m.dd.id != it.id) {
+				data = m.loadData(it.id, false, false)
+			}
+			return m, tea.Batch(m.loadDetail(), data)
+		}
+		return m, nil
+	case detailDataMsg:
+		if m.status == T("fetching the Workshop page…") {
+			m.status, m.sayKind = "", sayNone
+		}
+		return m, m.onData(msg.d)
+	case fetchTick:
+		return m, m.onFetchTick(msg.id)
+	case imgLoadedMsg:
+		e := msg.e
+		m.imgs[msg.key] = &e
+		if m.imgLoading == msg.key {
+			m.imgLoading = ""
 		}
 		return m, nil
 	case detailMsg:
@@ -112,6 +145,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.inspectKey(s)
 	case m.editing:
 		return m.filterKey(k)
+	case m.full:
+		return m.fullKey(s)
 	}
 	switch s {
 	case "q":
@@ -229,6 +264,8 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.space()
 	case "t":
 		return m.stageKey()
+	case "#":
+		return m.tagKey()
 	case "T":
 		n := len(m.cols[cStaging].items)
 		if n == 0 {
@@ -310,10 +347,12 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.requestDetail()
 	case "enter":
 		if it := c.cur(); it != nil && it.id != "" {
-			m.insp, m.inspHist = nil, nil
-			return m.openInspect([]string{"mod", it.ref})
+			m.full, m.fullOff = true, 0
+			return m.requestDetail()
 		}
 		return nil
+	case "o":
+		return m.openWorkshop()
 	case "r":
 		it := c.cur()
 		if it == nil || it.id == "" {
@@ -410,7 +449,11 @@ func (m *model) promptKey(k tea.KeyMsg) tea.Cmd {
 		m.prompt = nil
 		return p.submit(m, strings.TrimSpace(p.text))
 	case tea.KeyEsc:
-		m.prompt = nil
+		m.prompt, m.tagging = nil, nil
+	case tea.KeyTab:
+		if m.tagging != nil {
+			p.text = m.tagging.complete(p.text)
+		}
 	case tea.KeyBackspace:
 		if r := []rune(p.text); len(r) > 0 {
 			p.text = string(r[:len(r)-1])

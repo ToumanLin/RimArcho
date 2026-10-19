@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/rimarcho/rimarcho/internal/env"
-	"github.com/rimarcho/rimarcho/internal/source"
 )
 
 // Screen structure (06 §4.2): top bar, blank, body, blank, status line, hint line.
@@ -21,6 +20,7 @@ func (m *model) View() string {
 	lines[0] = m.topBar()
 	body := h - 4 // rows 2 … h-3
 	var content []string
+	var ps []placement
 	switch {
 	case m.loadErr != nil:
 		content = []string{"", "  " + sErrS.Render(fit(T("error: ")+m.loadErr.Error(), m.w-2)),
@@ -34,8 +34,13 @@ func (m *model) View() string {
 		content = m.problemLines(body)
 	case m.tab == tabChanges:
 		content = m.changeLines(body)
+	case m.full:
+		content, ps = m.fullLines(body)
 	default:
-		content = m.columnLines(body)
+		content, ps = m.columnLines(body)
+	}
+	if m.images != nil {
+		m.images.set(ps) // an empty list clears the images of the previous screen
 	}
 	for i := 0; i < body && i < len(content); i++ {
 		lines[2+i] = content[i]
@@ -93,7 +98,7 @@ func (m *model) crumb() string {
 	switch {
 	case m.panel != nil:
 		return m.panel.title
-	case m.insp != nil:
+	case m.insp != nil || m.full:
 		if it := m.current(); it != nil {
 			return m.focus.title() + " › " + it.name
 		}
@@ -108,6 +113,9 @@ func (m *model) crumb() string {
 
 // statusLine: one sentence, ✓ done (green), ✗ failed (red), … in progress (06 §9).
 func (m *model) statusLine() string {
+	if m.tagging != nil && m.prompt != nil {
+		return sSecond.Render(fit(m.tagStatus(), m.w))
+	}
 	text, kind := m.status, m.sayKind
 	if text == "" && m.scanning {
 		text, kind = T("scanning…"), sayBusy
@@ -150,6 +158,8 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}}
 	case m.insp != nil:
 		pairs = [][2]string{{"esc", T("back")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
+	case m.full:
+		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"r", T("refresh")}, {"i", T("technical information")}, {"tab", T("technical pages")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"esc", T("back")}, {"enter", T("expand")}, {"a", T("run the suggestion")}, {"i", T("ignore")}, {"l", T("choose a log")}, {"A", T("re-analyze")}}
 	case m.tab == tabChanges:
@@ -223,84 +233,23 @@ func window(lines []string, off, n int) []string {
 	return lines[off:end]
 }
 
-// detailLines: the detail column (06 §6). V2 shows who the mod is and whether it has
-// problems; the layered detail with the thumbnail is V3.
-func (m *model) detailLines(w, n int) []string {
-	it := m.current()
+// descMax is how many description lines the detail column shows (06 §6.1).
+func (m *model) descMax() int { return 12 }
+
+// detailLines draws the detail column (w wide, n lines, starting at 0-based column x) and
+// returns its image placements.
+func (m *model) detailLines(w, n, x int) ([]string, []placement) {
+	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), images: m.inlineImages(), techText: m.detail})
+	m.lastLines = lines
 	var out []string
-	add := func(s string) { out = append(out, s) }
-	if it == nil {
-		return nil
-	}
-	if it.missing {
-		add(sBold.Render(fit(it.name, w)))
-		for _, l := range wrap(T("listed in ModsConfig.xml, but not installed"), w) {
-			add(sSecond.Render(fit(l, w)))
-		}
-		return out
-	}
-	mod := m.st.Ix.ByID[it.id]
-	if mod == nil {
-		return nil
-	}
-	for _, l := range wrap(it.name, w) {
-		add(sBold.Render(fit(l, w)))
-	}
-	if a := strings.TrimSpace(mod.Authors); a != "" {
-		add(sSecond.Render(fit(a, w)))
-	}
-	facts := []string{sourceText(mod)}
-	switch k := mod.Kind; {
-	case k == source.Official:
-	default:
-		if v := strings.Fields(mod.SupportedVersions); len(v) > 0 {
-			facts = append(facts, T("supports")+" "+strings.Join(v, " "))
+	var ps []placement
+	for i := 0; i < len(lines) && i < n; i++ {
+		out = append(out, lines[i].text)
+		if p, ok := m.place(lines[i], i, n, x+1); ok {
+			ps = append(ps, p)
 		}
 	}
-	switch m.focus {
-	case cActive:
-		facts = append(facts, Tf("number %d", it.pos))
-	case cStaging:
-		facts = append(facts, T("staged"))
-	default:
-		facts = append(facts, T("not enabled"))
-	}
-	line := it.icon + " " + strings.Join(facts, " "+markDot+" ")
-	for _, l := range wrap(line, w) {
-		add(sDimS.Render(fit(l, w)))
-	}
-	add("")
-	switch s := m.rowStatus(it); s {
-	case statusNone:
-		add(sOK.Render(markOK) + " " + sSecond.Render(fit(T("no problems found"), w-2)))
-	case statusUnloadable:
-		why := T("the game cannot load it")
-		if mod.Unloadable != "" {
-			why = T("About.xml is renamed: the game cannot load it")
-		} else if mod.Residue {
-			why = T("no longer subscribed: the game ignores this folder")
-		}
-		for _, l := range wrap(why, w-2) {
-			add(statusIcon(s) + " " + sSecond.Render(fit(l, w-2)))
-		}
-	default:
-		add(statusIcon(s) + " " + sText.Render(fit(T("needs attention · ! shows what"), w-2)))
-	}
-	add("")
-	if !m.detailTech {
-		add(sDimS.Render(fit(T("technical information · i"), w)))
-		return out
-	}
-	add(sDimS.Render(fit(T("technical information"), w)))
-	for _, l := range m.detail {
-		for _, x := range wrap(l, w-2) {
-			if len(out) >= n {
-				return out
-			}
-			add("  " + sSecond.Render(fit(x, w-2)))
-		}
-	}
-	return out
+	return out, ps
 }
 
 var _ = fmt.Sprint

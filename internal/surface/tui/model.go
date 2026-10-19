@@ -28,6 +28,8 @@ type Options struct {
 	// Analyze brings the Def/Patch analysis up to date; nil means the `archo analyze`
 	// child process (03 §3), so the merged document never lives in the TUI process.
 	Analyze AnalyzeRunner
+	// OpenURL opens the Workshop page (o); nil means the default browser.
+	OpenURL func(string) error
 }
 
 // ChildScan runs `<exe> scan --env <name>` as a separate process.
@@ -127,12 +129,21 @@ type model struct {
 
 	panel   *panel
 	prompt  *prompt
+	tagging *tagEdit // the prompt edits tags
 	status  string
 	sayKind int
 	drag    *drag
 
 	content    map[string]int // content kinds for type: (loaded on first use)
 	contentKey string
+
+	dd         *detailData          // the current mod's details beyond the row
+	imgs       map[string]*imgEntry // description images by url and width
+	imgLoading string               // the image being loaded ("" none)
+	images     *imgWriter           // the WezTerm host's output; nil: no inline images
+	full       bool                 // the full-screen detail
+	fullOff    int
+	lastLines  []dline
 
 	scanning bool
 	quitting bool
@@ -146,7 +157,7 @@ func New(o Options) tea.Model {
 	o.App.LazyLog = true // the newest log is parsed when the Problems view opens
 	// Until then the status-bar counts use a stored log report only, never a parse.
 	o.App.LogCacheOnly = true
-	return &model{opts: o, app: o.App, w: 120, h: 30, focus: cActive, marked: map[string]bool{}}
+	return &model{opts: o, app: o.App, w: 120, h: 30, focus: cActive, marked: map[string]bool{}, imgs: map[string]*imgEntry{}}
 }
 
 // MemoryLimit is the Go heap soft cap of the TUI process (06 §8 T5: idle ≤ 80 MB with
@@ -172,7 +183,12 @@ func Run(o Options) error {
 	if o.App.Store.Meta("cfg:ui.mouse") != "off" {
 		opts = append(opts, tea.WithMouseCellMotion())
 	}
-	_, err := tea.NewProgram(New(o), opts...).Run()
+	mdl := New(o).(*model)
+	if os.Getenv("TERM_PROGRAM") == "WezTerm" { // inline images in the host only (06 §1.3)
+		mdl.images = &imgWriter{Writer: os.Stdout}
+		opts = append(opts, tea.WithOutput(mdl.images))
+	}
+	_, err := tea.NewProgram(mdl, opts...).Run()
 	return err
 }
 

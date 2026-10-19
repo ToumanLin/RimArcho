@@ -275,8 +275,9 @@ func (m *model) rowStatus(it *item) int {
 
 // ---- drawing ----
 
-// columnLines draws the list columns and the detail column into rows 2…h-4.
-func (m *model) columnLines(n int) []string {
+// columnLines draws the list columns and the detail column into rows 2…h-4, and returns
+// the detail's image placements.
+func (m *model) columnLines(n int) ([]string, []placement) {
 	l := m.layout()
 	out := make([]string, n)
 	cells := make([][]string, len(l.slots))
@@ -284,8 +285,9 @@ func (m *model) columnLines(n int) []string {
 		cells[i] = m.drawColumn(s, n, l.tabs)
 	}
 	var detail []string
+	var ps []placement
 	if l.detailW > 0 {
-		detail = m.detailLines(l.detailW, n)
+		detail, ps = m.detailLines(l.detailW, n, l.detailX)
 	}
 	for y := 0; y < n; y++ {
 		var b strings.Builder
@@ -303,7 +305,7 @@ func (m *model) columnLines(n int) []string {
 		}
 		out[y] = b.String()
 	}
-	return out
+	return out, ps
 }
 
 // drawColumn returns n lines of exactly s.w cells: the title, then the rows.
@@ -447,6 +449,15 @@ func (m *model) drawRow(c *column, vi int, focused bool, w int) string {
 		b.WriteString(sAccent.Render(dot))
 	}
 	used += nw + width.StringWidth(dot)
+	// Tags: a faint suffix when the name leaves room (06 §5.6).
+	if len(it.tags) > 0 {
+		if avail := w - used - statusW; avail >= 6 {
+			t := "  " + strings.Join(it.tags, " ")
+			tw := min(width.StringWidth(t), avail)
+			b.WriteString(sDimS.Render(fit(t, tw)))
+			used += tw
+		}
+	}
 	b.WriteString(strings.Repeat(" ", max(w-used-statusW, 0)))
 	used = max(used, w-statusW)
 	b.WriteString(" " + statusIcon(st))

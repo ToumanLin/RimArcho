@@ -309,7 +309,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			// Details: the column, or enter for the full screen.
 			if !tc.detail {
 				press(m, "enter")
-				if m.insp == nil {
+				if !m.full {
 					t.Fatal("enter did not open the details")
 				}
 				check("details")
@@ -430,9 +430,11 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 	e.MustRun("env", "add", "second", "--game", other)
 	tm := start(t, e, scans, 120, 30)
 	waitFor(t, tm, " main ")
-	keys(tm, "g", "enter")
+	keys(tm, "g", "enter") // the full-screen detail, then tab: the technical pages
+	waitFor(t, tm, "ludeon.rimworld")
+	keys(tm, "tab")
 	waitFor(t, tm, "package: ludeon.rimworld")
-	keys(tm, "esc", "E", "down", "enter")
+	keys(tm, "esc", "esc", "E", "down", "enter")
 	waitFor(t, tm, "switched to second")
 	m := finish(t, tm)
 	if m.envName != "second" {
