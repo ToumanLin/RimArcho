@@ -386,3 +386,48 @@ func TestFullSections(t *testing.T) {
 		}
 	}
 }
+
+// T7 (06 §11): a long description, a long path and mixed Chinese and English all wrap
+// within the column at every width, in the column and the full screen, with or without
+// the thumbnail block; nothing is cut off with "…" except the column's "enter shows all".
+func TestT7Wrapping(t *testing.T) {
+	e, _ := fixture(t)
+	desc := "[h1]说明 Overview[/h1]\nRimCrow 的核心伴生模组。支持从游戏获取更加详细的日志。必须放在 Harmony 之后加载，最好放在列表最前端以便获取更加完整的加载日志（Player.log）。\n" +
+		"[list][*]Supports [b]CombatExtended[/b] and Vanilla Expanded Framework 的全部补丁[*]见 https://github.com/example/a-very-long-repository-name/blob/main/docs/compatibility.md[/list]" +
+		strings.Repeat("Long English text that keeps going without much punctuation ", 6)
+	e.MustRun("note", "pkg:tester.a", "放在 Harmony 之后；D:\\SteamLibrary\\steamapps\\workshop\\content\\294100\\1001\\About\\About.xml 里写错了版本")
+	e.MustRun("tag", "add", "pkg:tester.a", "a-really-long-tag-name-for-testing", "中文标签")
+	m := direct(t, e, 160, 40)
+	press(m, "g")
+	press(m, "down")
+	runCmd(m, m.loadData(m.current().id, false, false))
+	m.dd.ws = bbcode.Parse(desc)
+	m.dd.desc.Show = "both"
+	m.dd.about = bbcode.Parse("中文 English 混排的 About 简介，含一个很长的路径 C:\\Users\\Someone\\AppData\\Roaming\\RimArcho\\cache\\workshop\\1001.json 以及标点。")
+	m.detailTech = true
+	m.detail = []string{"#abcd Alpha", "  path: D:\\SteamLibrary\\steamapps\\workshop\\content\\294100\\1001\\Defs\\ThingDefs\\VeryLongFileNameForTesting.xml", "  files: 12 (34 KB)"}
+	var buf bytes.Buffer
+	for _, cfg := range []struct{ images, tech bool }{{false, true}, {true, true}, {false, false}, {true, false}} {
+		images := cfg.images
+		m.detailTech = cfg.tech
+		if images {
+			m.images = &imgWriter{Writer: &buf}
+		}
+		for w := 24; w <= 80; w++ {
+			for _, full := range []bool{false, true} {
+				o := detailOpts{width: w, descMax: 12, images: images, full: full, techText: m.detail}
+				if full {
+					o.descMax = 0
+				}
+				for i, l := range m.detailLayout(o) {
+					if cw := lipgloss.Width(l.text); cw > w {
+						t.Fatalf("images=%v full=%v w=%d line %d is %d cells: %q", images, full, w, i, cw, ansi.Strip(l.text))
+					}
+					if p := ansi.Strip(l.text); strings.Contains(p, "…") && !strings.Contains(p, T("… enter shows all")) {
+						t.Fatalf("images=%v full=%v w=%d line %d cut: %q", images, full, w, i, p)
+					}
+				}
+			}
+		}
+	}
+}

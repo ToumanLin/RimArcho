@@ -5,7 +5,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/rimarcho/rimarcho/internal/app"
+	"github.com/rimarcho/rimarcho/internal/bbcode"
 	"github.com/rimarcho/rimarcho/internal/identity"
 	"github.com/rimarcho/rimarcho/internal/source"
 	"github.com/rimarcho/rimarcho/internal/store"
@@ -486,40 +490,23 @@ func fit(s string, w int) string {
 	return width.FillRight(width.Truncate(s, w, "…"), w)
 }
 
-// wrap breaks s into lines of at most w cells, at spaces when it can and anywhere in CJK
-// text; a rune is never split.
+// wrap breaks s into lines of at most w cells, the same way as the description (wrapSpans):
+// at spaces, between CJK characters, never inside a rune or before closing punctuation,
+// and a word longer than the line after a path separator when it has one. A line's
+// leading spaces are kept on every line it wraps into (06 §6.1, T7).
 func wrap(s string, w int) []string {
 	if w < 1 {
 		return nil
 	}
 	var out []string
 	for _, para := range strings.Split(s, "\n") {
-		var line []rune
-		lw := 0
-		lastSpace := -1
-		for _, r := range para {
-			rw := width.RuneWidth(r)
-			if lw+rw > w && len(line) > 0 {
-				if lastSpace > 0 && r != ' ' {
-					out = append(out, strings.TrimRight(string(line[:lastSpace]), " "))
-					line = append([]rune{}, line[lastSpace+1:]...)
-				} else {
-					out = append(out, strings.TrimRight(string(line), " "))
-					line = line[:0]
-				}
-				lastSpace = -1
-				lw = width.StringWidth(string(line))
-				if r == ' ' && len(line) == 0 {
-					continue
-				}
-			}
-			if r == ' ' {
-				lastSpace = len(line)
-			}
-			line = append(line, r)
-			lw += rw
+		ind := min(len(para)-len(strings.TrimLeft(para, " ")), w/2)
+		pad := strings.Repeat(" ", ind)
+		for _, l := range wrapSpans([]bbcode.Span{{Text: para[ind:]}}, w-ind, plainStyle) {
+			out = append(out, pad+strings.TrimRight(ansi.Strip(l), " "))
 		}
-		out = append(out, strings.TrimRight(string(line), " "))
 	}
 	return out
 }
+
+var plainStyle = lipgloss.NewStyle()

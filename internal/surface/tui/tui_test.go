@@ -626,7 +626,9 @@ func TestWrap(t *testing.T) {
 		want string
 	}{
 		{"staging is empty · t puts the selected mod here", 20, "staging is empty · t|puts the selected|mod here"},
-		{"暂存是空的 · 按 t 把选中的 Mod 放进来", 12, "暂存是空的 ·|按 t|把选中的 Mod|放进来"},
+		{"暂存是空的 · 按 t 把选中的 Mod 放进来", 12, "暂存是空的 ·|按 t 把选中|的 Mod 放进|来"},                                        // CJK breaks between characters
+		{"使用Harmony库的模组", 10, "使用|Harmony库|的模组"},                                                              // never inside a Latin word
+		{`  path: D:\SteamLibrary\steamapps\workshop`, 20, `  path:|  D:\SteamLibrary\|  steamapps\workshop`}, // indent kept; paths break after \
 		{"中文中文中文", 5, "中文|中文|中文"},
 	} {
 		got := strings.Join(wrap(tc.in, tc.w), "|")

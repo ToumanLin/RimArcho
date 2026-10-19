@@ -142,9 +142,18 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	}
 	out = append(out, m.headerLines(it, mod, strings.Join(facts, " "+markDot+" "), w, o)...)
 	add("")
+	marked := func(mark, text string, st lipgloss.Style) {
+		for i, l := range wrap(text, w-2) {
+			if i == 0 {
+				add(mark + " " + st.Render(fit(l, w-2)))
+			} else {
+				add("  " + st.Render(fit(l, w-2)))
+			}
+		}
+	}
 	switch s := m.rowStatus(it); s {
 	case statusNone:
-		add(sOK.Render(markOK) + " " + sSecond.Render(fit(T("no problems found"), w-2)))
+		marked(sOK.Render(markOK), T("no problems found"), sSecond)
 	case statusUnloadable:
 		why := T("the game cannot load it")
 		if mod.Unloadable != "" {
@@ -152,11 +161,9 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		} else if mod.Residue {
 			why = T("no longer subscribed: the game ignores this folder")
 		}
-		for _, l := range wrap(why, w-2) {
-			add(statusIcon(s) + " " + sSecond.Render(fit(l, w-2)))
-		}
+		marked(statusIcon(s), why, sSecond)
 	default:
-		add(statusIcon(s) + " " + sText.Render(fit(T("needs attention · ! shows what"), w-2)))
+		marked(statusIcon(s), T("needs attention · ! shows what"), sText)
 	}
 	add("")
 	// facts
@@ -213,7 +220,16 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		if i == 0 {
 			label = sDimS.Render(fit(T("requires"), lw))
 		}
-		add(label + clip(l, w-lw))
+		if lipgloss.Width(l) <= w-lw {
+			add(label + clip(l, w-lw))
+			continue
+		}
+		for j, x := range wrap(stripANSIWidth(l), w-lw) {
+			if j > 0 {
+				label = strings.Repeat(" ", lw)
+			}
+			add(label + sText.Render(fit(x, w-lw)))
+		}
 	}
 	add("")
 	// description
@@ -228,15 +244,11 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		}
 		add("")
 	}
-	if !m.detailTech && !o.full {
-		add(sDimS.Render(fit(T("technical information · i"), w)))
-		return out
-	}
 	if !m.detailTech {
-		add(sDimS.Render(fit(T("technical information · i"), w)))
+		addWrapped(T("technical information · i"), sDimS, 0)
 		return out
 	}
-	add(sDimS.Render(fit(T("technical information"), w)))
+	addWrapped(T("technical information"), sDimS, 0)
 	for _, l := range o.techText {
 		for _, x := range wrap(l, w-2) {
 			add("  " + sSecond.Render(fit(x, w-2)))
@@ -378,11 +390,12 @@ func (m *model) depLines(d *detailData) []string {
 func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	var out []dline
 	head := func(title, note string) {
-		t := sDimS.Render(title)
 		if note != "" {
-			t += sDimS.Render("  " + markDot + "  " + note)
+			title += "  " + markDot + "  " + note
 		}
-		out = append(out, dline{text: clip(t, w)})
+		for _, l := range wrap(title, w) {
+			out = append(out, dline{text: sDimS.Render(fit(l, w))})
+		}
 	}
 	if d == nil {
 		head(T("description"), T("loading…"))
@@ -586,6 +599,9 @@ func wrapSpans(spans []bbcode.Span, w int, base lipgloss.Style) []string {
 		}
 		for tw > w { // a word longer than the line (its pieces take the first piece's style)
 			part := width.Truncate(t.s, w, "")
+			if i := strings.LastIndexAny(part, `/\`); i > 0 && i < len(part)-1 {
+				part = part[:i+1] // a path breaks after a separator
+			}
 			cur.WriteString(t.st.Render(part))
 			cw = width.StringWidth(part)
 			emit()
