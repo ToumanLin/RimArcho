@@ -21,7 +21,8 @@ const helpText = `list view (06 §3)
   enter    inspect            r              add a rule for this mod
   /        search             f              filter: all/enabled/disabled/unloadable
   R        rescan (child process)
-problems view: A analyze   i add the suggested ignore rule   enter inspect   s severity filter
+problems view: enter expand / inspect   a run the suggested command (tab picks)   i ignore
+               I show ignored   s severity   o inspect the mod   A re-analyze (child process)
 views: 1 list · 2 problems · 3 changes      E switch environment
 :        run any archo command               ? help   q quit`
 
@@ -72,6 +73,8 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, m.requestDetail()
+	case analyzeLineMsg, analyzeDoneMsg:
+		return m, m.analyzeMsg(msg)
 	case tea.KeyMsg:
 		return m, m.key(msg)
 	}
@@ -89,7 +92,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.promptKey(k)
 	case m.panel != nil:
 		return m.panelKey(s)
-	case m.inspect != nil:
+	case m.insp != nil:
 		return m.inspectKey(s)
 	case m.editing:
 		return m.searchKey(k)
@@ -104,11 +107,11 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case "1":
 		m.tab = tabList
 		return m.requestDetail()
-	case "2", "3":
+	case "2":
 		m.tab = tabProblems
-		if s == "3" {
-			m.tab = tabChanges
-		}
+		return m.ensureProblems()
+	case "3":
+		m.tab = tabChanges
 		m.loadTab()
 		return nil
 	case ":":
@@ -132,6 +135,9 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.chooseEnv()
 	case "R":
 		return m.startScan()
+	}
+	if m.tab == tabProblems {
+		return m.problemsKey(s)
 	}
 	if m.tab != tabList {
 		return m.tabKey(s)
@@ -260,9 +266,8 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.requestDetail()
 	case "enter":
 		if r := m.current(); r != nil && r.id != "" {
-			out, _ := cmds.Execute(m.app, []string{"mod", r.ref})
-			m.inspect = strings.Split(strings.TrimRight(out, "\n"), "\n")
-			m.inspectHist, m.inspectOff = nil, 0
+			m.insp, m.inspHist = nil, nil
+			return m.openInspect([]string{"mod", r.ref})
 		}
 		return nil
 	case "r":
@@ -407,43 +412,6 @@ func (m *model) panelKey(s string) tea.Cmd {
 	return nil
 }
 
-func (m *model) inspectKey(s string) tea.Cmd {
-	page := max(m.h-3, 1)
-	switch s {
-	case "esc", "backspace", "q":
-		if n := len(m.inspectHist); n > 0 {
-			m.inspect, m.inspectHist = m.inspectHist[n-1], m.inspectHist[:n-1]
-			m.inspectOff = 0
-		} else {
-			m.inspect = nil
-		}
-	case "down", "j":
-		m.inspectOff = min(m.inspectOff+1, max(len(m.inspect)-page, 0))
-	case "up", "k":
-		m.inspectOff = max(m.inspectOff-1, 0)
-	case "enter":
-		// Follow the first reference on the top visible line (e.g. lineage members).
-		if ref := firstRef(m.inspect[min(m.inspectOff+1, len(m.inspect)-1)]); ref != "" {
-			out, code := cmds.Execute(m.app, []string{"mod", ref})
-			if code == cmds.ExitOK || code == cmds.ExitAmbiguous {
-				m.inspectHist = append(m.inspectHist, m.inspect)
-				m.inspect, m.inspectOff = strings.Split(strings.TrimRight(out, "\n"), "\n"), 0
-			}
-		}
-	}
-	return nil
-}
-
-func firstRef(line string) string {
-	for _, f := range strings.Fields(line) {
-		f = strings.Trim(f, "(),[]")
-		if strings.HasPrefix(f, "#") && len(f) >= 5 {
-			return f
-		}
-	}
-	return ""
-}
-
 func (m *model) tabKey(s string) tea.Cmd {
 	page := max(m.h-4, 1)
 	switch s {
@@ -465,13 +433,6 @@ func (m *model) loadTab() {
 	m.tabOff = 0
 	var parts []string
 	switch m.tab {
-	case tabProblems:
-		parts = append(parts, "Problems — full analysis arrives with M3 (dependencies, incompatibilities, defs, patches).", "")
-		if m.missing > 0 {
-			parts = append(parts, Tf("warning: %s in the Loadout match no installed mod", plural(m.missing, "entry")), "")
-		}
-		out, _ := cmds.Execute(m.app, []string{"sort", "--dry-run"})
-		parts = append(parts, strings.Split(strings.TrimRight(out, "\n"), "\n")...)
 	case tabChanges:
 		if m.question > 0 {
 			out, _ := cmds.Execute(m.app, []string{"identity", "list"})

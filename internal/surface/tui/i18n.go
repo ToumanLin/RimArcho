@@ -109,11 +109,30 @@ var zhText = map[string]string{
 	"no problems":                         "没有问题",
 	"analysis is stale — A to re-analyze": "分析结果已过期 — 按 A 重新分析",
 	"not analyzed yet — A to analyze (child process)": "尚未分析 — 按 A 分析（子进程）",
-	"analyzing…":      "分析中…",
-	"analysis failed": "分析失败",
-	"severity: ":      "级别：",
-	"inspect":         "检查",
-	helpText:          helpTextZh,
+	"analyzing…":                            "分析中…",
+	"analysis failed":                       "分析失败",
+	"severity: ":                            "级别：",
+	"inspect":                               "检查",
+	"problems %d/%d/%d":                     "问题 %d/%d/%d",
+	"analysis done":                         "分析完成",
+	"[ignore expired]":                      "[忽略已失效]",
+	"evidence: ":                            "证据：",
+	"error":                                 "错误",
+	"warning":                               "警告",
+	"info":                                  "提示",
+	"showing ignored":                       "显示已忽略",
+	"ignored %d (I shows)":                  "已忽略 %d（I 显示）",
+	"no suggested command for this problem": "此问题没有建议命令",
+	"suggestion":                            "建议",
+	"(not a command; open it yourself)":     "（不是命令，请自行打开）",
+	"run this command?":                     "运行这条命令？",
+	"summary":                               "概要",
+	"defs":                                  "Def",
+	"patches":                               "Patch",
+	"problems":                              "问题",
+	"rules":                                 "规则",
+	"history":                               "历史",
+	helpText:                                helpTextZh,
 }
 
 const helpTextZh = `列表视图（06 §3）
@@ -126,7 +145,8 @@ const helpTextZh = `列表视图（06 §3）
   enter    检查               r              为此 Mod 添加规则
   /        搜索               f              筛选：全部/已启用/未启用/不可加载
   R        重新扫描（子进程）
-问题视图：A 分析   i 添加建议的屏蔽规则   enter 检查   s 级别筛选
+问题视图：enter 展开 / 检查   a 运行建议命令（tab 选择）   i 忽略
+          I 显示已忽略   s 级别   o 检查该 Mod   A 重新分析（子进程）
 视图：1 列表 · 2 问题 · 3 变更      E 切换环境
 :        运行任意 archo 命令                 ? 帮助   q 退出`
 

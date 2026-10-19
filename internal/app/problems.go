@@ -354,13 +354,17 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		return "pkg:" + in.Nodes[i].PackageID
 	}
 	var official []finding.Evidence
+	officialSubject := ""
 	for _, e := range r.Edges {
 		if e.From < e.To || inCycle[e.From] && inCycle[e.To] {
 			continue
 		}
 		ev, ig := edgeText(st, in, e)
 		if e.C.Kind == order.KindOfficial {
-			official = append(official, finding.Evidence{Source: finding.Inferred, Ref: nodeTok(e.To), Text: ev})
+			if officialSubject == "" {
+				officialSubject = nodeTok(e.To)
+			}
+			official = append(official, finding.Evidence{Source: finding.Inferred, Text: ev})
 			continue
 		}
 		src := finding.Declared
@@ -373,7 +377,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		key := in.Nodes[e.From].PackageID + ">" + in.Nodes[e.To].PackageID
 		f := &finding.Finding{Code: "order.violated", Severity: finding.Warning, Key: key, Subjects: []string{nodeTok(e.To), nodeTok(e.From)},
 			Claim:       fmt.Sprintf("%s should load after %s but is at %d, before %d", nodeTok(e.To), nodeTok(e.From), e.To+1, e.From+1),
-			Evidence:    []finding.Evidence{{Source: src, Ref: nodeTok(e.C.Owner), Text: ev}},
+			Evidence:    []finding.Evidence{{Source: src, Text: ev}},
 			Suggestions: []string{"archo sort --dry-run", "archo move " + nodeTok(e.To) + " --after " + nodeTok(e.From)}}
 		if !strings.HasPrefix(ig, "archo ") {
 			f.Suggestions = append(f.Suggestions, "archo rule add ignore "+ig)
@@ -381,7 +385,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		add(f)
 	}
 	if len(official) > 0 {
-		add(&finding.Finding{Code: "official.order", Severity: finding.Error, Key: "official", Subjects: []string{official[0].Ref},
+		add(&finding.Finding{Code: "official.order", Severity: finding.Error, Key: "official", Subjects: []string{officialSubject},
 			Claim:    "Core and the DLCs are not first in the list, in release order",
 			Evidence: official, Suggestions: []string{"archo sort --dry-run"}})
 	}
@@ -399,7 +403,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				t += "  [suggested to ignore]"
 				f.Suggestions = append([]string{"archo rule add ignore " + ig}, f.Suggestions...)
 			}
-			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Declared, Ref: nodeTok(e.C.Owner), Text: t})
+			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Declared, Text: t})
 		}
 		add(f)
 	}

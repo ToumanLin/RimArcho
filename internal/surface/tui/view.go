@@ -42,8 +42,10 @@ func (m *model) View() string {
 	switch {
 	case m.loadErr != nil:
 		lines = []string{stErr.Render(T("error: ") + m.loadErr.Error()), "", T("Set up an environment first: archo env detect, archo env add <name> --detected")}
-	case m.inspect != nil:
-		lines = window(m.inspect, m.inspectOff, body)
+	case m.insp != nil:
+		lines = m.inspectLines(body)
+	case m.tab == tabProblems:
+		lines = m.problemLines(body)
 	case m.tab != tabList:
 		lines = window(m.tabText, m.tabOff, body)
 	default:
@@ -103,7 +105,7 @@ func (m *model) statusLine() string {
 	} else {
 		parts = append(parts, T("saved"))
 	}
-	parts = append(parts, T("problems —"))
+	parts = append(parts, m.statusProblems())
 	parts = append(parts, Tf("changes %d", m.changes))
 	if m.question > 0 {
 		parts = append(parts, stWarn.Render(Tf("questions %d", m.question)))

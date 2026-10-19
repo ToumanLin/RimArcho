@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/muesli/termenv"
 
+	"github.com/rimarcho/rimarcho/internal/app"
 	"github.com/rimarcho/rimarcho/internal/cmds"
 	"github.com/rimarcho/rimarcho/internal/testkit"
 )
@@ -43,6 +44,16 @@ func start(t *testing.T, e *testkit.Env, scans *int, w, h int) *teatest.TestMode
 		// Stand-in for the child process: the same command, run by the test.
 		out, _ := cmds.Execute(e.App, []string{"scan"})
 		return out, nil
+	}, Analyze: func(env string, progress func(string)) error {
+		// Stand-in for the `archo analyze` child: its own connection to the same database.
+		a2, err := app.Open(e.Home)
+		if err != nil {
+			return err
+		}
+		defer a2.Close()
+		a2.EnvName, a2.Now = env, e.App.Now
+		_, err = a2.Analyze(progress)
+		return err
 	}}
 	return teatest.NewTestModel(t, New(opts), teatest.WithInitialTermSize(w, h))
 }
@@ -230,5 +241,66 @@ func TestChineseUI(t *testing.T) {
 	// Command output stays English (05 §1).
 	if out, _ := cmds.Execute(e.App, []string{"status"}); !strings.Contains(out, "lineages:") {
 		t.Fatalf("status output changed: %s", out)
+	}
+}
+
+func TestProblemsView(t *testing.T) {
+	e, scans := fixture(t)
+	// X and Y declare loadAfter each other: an order.cycle whose first suggestion is the
+	// ignore rule; Alpha's sample patch has no <value> and fails.
+	for _, p := range [][2]string{{"X", "tester.y"}, {"Y", "tester.x"}} {
+		m := testkit.Sample("tester."+strings.ToLower(p[0]), p[0])
+		dir := filepath.Join(e.Game, "Mods", p[0])
+		e.WriteMod(dir, m)
+		e.WriteFile(filepath.Join(dir, "About", "About.xml"), strings.Replace(m.AboutXML(), "</ModMetaData>",
+			"<loadAfter><li>"+p[1]+"</li></loadAfter></ModMetaData>", 1))
+	}
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:tester.x", "pkg:tester.y")
+	tm := start(t, e, scans, 140, 40)
+	waitFor(t, tm, "active 5/")
+	keys(tm, "2")
+	waitFor(t, tm, "patch.no-match")
+	time.Sleep(200 * time.Millisecond)
+	fm := finish(t, tm)
+	ci := -1
+	for i, p := range fm.prob.list {
+		if p.Code == "order.cycle" {
+			ci = i
+		}
+	}
+	if ci < 0 {
+		t.Fatalf("no order.cycle in %d problems", len(fm.prob.list))
+	}
+	if fm.prob.never || fm.prob.stale {
+		t.Fatal("analysis did not complete")
+	}
+	// Second session: the analysis is current; select the cycle, expand, a, y.
+	tm = start(t, e, scans, 140, 40)
+	waitFor(t, tm, "active 5/")
+	keys(tm, "2")
+	waitFor(t, tm, "order.cycle")
+	for i := 0; i < ci; i++ {
+		keys(tm, "down")
+	}
+	keys(tm, "enter")
+	waitFor(t, tm, "[a] archo rule add ignore decl:")
+	keys(tm, "a")
+	waitFor(t, tm, "run this command?")
+	keys(tm, "y")
+	waitFor(t, tm, "r:1 added")
+	keys(tm, "i") // ignore whatever is under the cursor now
+	time.Sleep(200 * time.Millisecond)
+	fm = finish(t, tm)
+	if out := e.MustRun("rule", "list"); !strings.Contains(out, "ignore") {
+		t.Fatalf("rule not added: %s", out)
+	}
+	if fm.prob.ignored != 1 {
+		t.Fatalf("ignored = %d", fm.prob.ignored)
+	}
+	for _, p := range fm.prob.list {
+		if p.Code == "order.cycle" {
+			t.Fatal("cycle still reported after the ignore rule")
+		}
 	}
 }

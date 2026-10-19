@@ -29,6 +29,9 @@ type Options struct {
 	Scan func(envName string) (string, error)
 	// ScanOnStart scans before showing the list if the environment was never scanned.
 	ScanOnStart bool
+	// Analyze brings the Def/Patch analysis up to date; nil means the `archo analyze`
+	// child process (03 §3), so the merged document never lives in the TUI process.
+	Analyze AnalyzeRunner
 }
 
 // ChildScan runs `<exe> scan --env <name>` as a separate process.
@@ -114,9 +117,12 @@ type model struct {
 	detail    []string
 	detailSeq int
 
-	inspect     []string
-	inspectHist [][]string
-	inspectOff  int
+	insp     *inspectView
+	inspHist []*inspectView
+
+	prob        probState
+	analyzing   bool
+	analyzeWait func() tea.Msg
 
 	tabText []string
 	tabOff  int
