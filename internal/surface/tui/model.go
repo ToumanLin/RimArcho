@@ -108,6 +108,7 @@ type model struct {
 	question int
 	missing  int
 
+	idleSeq   int
 	detailRef string
 	detail    []string
 	detailSeq int
@@ -148,6 +149,7 @@ type scanDoneMsg struct {
 	err error
 }
 type detailTick struct{ seq int }
+type idleTick struct{ seq int }
 type detailMsg struct {
 	ref   string
 	lines []string

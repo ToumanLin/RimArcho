@@ -7,6 +7,7 @@ package tui
 import (
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -34,6 +35,39 @@ func TestRealIdleMemory(t *testing.T) {
 	defer a.Close()
 	a.Launcher = func(string, []string, string) error { t.Fatal("launch attempted during measurement"); return nil }
 
+	ws0, _, _ := procmem.MB()
+	t.Logf("before TUI: working set %.1f MB", ws0)
+	if _, err := a.Loadout(); err != nil {
+		t.Fatal(err)
+	}
+	ws1, _, _ := procmem.MB()
+	t.Logf("after one workspace load: working set %.1f MB", ws1)
+	opts := Options{App: a, Scan: func(env string) (string, error) {
+		out, err := exec.Command(exe, "scan").CombinedOutput()
+		return string(out), err
+	}}
+	tm := teatest.NewTestModel(t, New(opts), teatest.WithInitialTermSize(120, 30))
+	waitFor(t, tm, "active 485/")
+	keys(tm, "R")
+	waitFor(t, tm, "scan:")
+	for i := 0; i < 60; i++ {
+		keys(tm, "j")
+	}
+	keys(tm, "/", "har", "enter", "esc", "G", "g", "f", "f", "f", "f")
+	time.Sleep(2 * time.Second)
+	ws, priv, peak := procmem.MB()
+	t.Logf("TUI after load, child scan and browsing: working set %.1f MB, private %.1f MB, peak %.1f MB", ws, priv, peak)
+	step := idle / 5
+	for i := 1; i <= 5; i++ {
+		time.Sleep(step)
+		ws, priv, peak = procmem.MB()
+		t.Logf("idle %v: working set %.1f MB, private %.1f MB, peak %.1f MB", time.Duration(i)*step, ws, priv, peak)
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+		t.Logf("  go heap in use %.1f MB, heap sys %.1f MB, total go sys %.1f MB", float64(ms.HeapInuse)/(1<<20), float64(ms.HeapSys)/(1<<20), float64(ms.Sys)/(1<<20))
+	}
+	finish(t, tm)
+
 	// Sort timing on the real workspace (dry run: nothing changes).
 	var best time.Duration
 	for i := 0; i < 10; i++ {
@@ -60,28 +94,4 @@ func TestRealIdleMemory(t *testing.T) {
 	}
 	t.Logf("sort (load workspace + build graph + sort + diff), best of 10: %v", best)
 
-	ws0, _, _ := procmem.MB()
-	t.Logf("before TUI: working set %.1f MB", ws0)
-	opts := Options{App: a, Scan: func(env string) (string, error) {
-		out, err := exec.Command(exe, "scan").CombinedOutput()
-		return string(out), err
-	}}
-	tm := teatest.NewTestModel(t, New(opts), teatest.WithInitialTermSize(120, 30))
-	waitFor(t, tm, "active 485/")
-	keys(tm, "R")
-	waitFor(t, tm, "scan:")
-	for i := 0; i < 60; i++ {
-		keys(tm, "j")
-	}
-	keys(tm, "/", "har", "enter", "esc", "G", "g", "f", "f", "f", "f")
-	time.Sleep(2 * time.Second)
-	ws, priv, peak := procmem.MB()
-	t.Logf("TUI after load, child scan and browsing: working set %.1f MB, private %.1f MB, peak %.1f MB", ws, priv, peak)
-	step := idle / 5
-	for i := 1; i <= 5; i++ {
-		time.Sleep(step)
-		ws, priv, peak = procmem.MB()
-		t.Logf("idle %v: working set %.1f MB, private %.1f MB, peak %.1f MB", time.Duration(i)*step, ws, priv, peak)
-	}
-	finish(t, tm)
 }

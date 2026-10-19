@@ -2,8 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strconv"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -23,7 +25,25 @@ const helpText = `list view (06 §3)
 views: 1 list · 2 problems · 3 changes      E switch environment
 :        run any archo command               ? help   q quit`
 
+// idleAfter is how long the TUI waits without input before returning freed memory to the
+// OS, so the resident size stays near the live heap while idle (06 §8 T5).
+const idleAfter = 2 * time.Second
+
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if t, ok := msg.(idleTick); ok {
+		if t.seq == m.idleSeq {
+			debug.FreeOSMemory()
+		}
+		return m, nil
+	}
+	m.idleSeq++
+	seq := m.idleSeq
+	next := tea.Tick(idleAfter, func(time.Time) tea.Msg { return idleTick{seq} })
+	mm, cmd := m.update(msg)
+	return mm, tea.Batch(cmd, next)
+}
+
+func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
