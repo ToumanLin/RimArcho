@@ -143,7 +143,7 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	root.KV("mods", fmt.Sprintf("%s, %d tombstones", mods, tomb))
 	if residue > 0 {
-		root.KV("residue", fmt.Sprintf("%d unsubscribed workshop folders still on disk; the game does not load them (archo list --filter residue)", residue))
+		root.KV("residue", fmt.Sprintf("%d (unsubscribed workshop folders still on disk; the game does not load them: archo list --filter residue)", residue))
 	}
 	withCopies := 0
 	for _, l := range ix.ByLineage {
@@ -454,7 +454,11 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 	if s := ix.Source(m.SourceID); s != nil {
 		path := s.Root + string(pathSep) + m.Rel
 		loc.KV("path", path)
-		if m.RealPath != "" && !strings.EqualFold(m.RealPath, path) {
+		realRoot, err := source.RealPath(s.Root)
+		if err != nil {
+			realRoot = s.Root
+		}
+		if m.RealPath != "" && !strings.EqualFold(m.RealPath, realRoot+string(pathSep)+m.Rel) {
 			loc.KV("links-to", m.RealPath)
 		}
 	}

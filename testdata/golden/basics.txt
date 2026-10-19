@@ -1,0 +1,223 @@
+$ archo help
+archo — RimWorld mod manager (M1: environments, scanning, identity)
+  commands:
+    env list                                  list environments and their sources
+    env detect                                detect game, user data and workshop paths (suggestion only)
+    env add <name>                            add an environment
+    env set <name>                            change an environment's paths (re-binds moved sources)
+    env use <name>                            select the current environment
+    env rebind <src:label> yes|no             answer a pending source re-binding
+    scan                                      scan sources and reconcile identities
+    status                                    overview of the current environment
+    list                                      list mods
+    find <words…>                             search by name, package id, author, workshop id, folder
+    mod <ref>                                 mod details
+    changes [<ref>]                           change events (default: the last scan)
+    identity list                             open identity questions ("is this #xxxx back?")
+    identity resolve <q:n> same|copy|unrelated  answer an identity question
+    lineage split <ref>                       move an instance into a lineage of its own
+    lineage merge <ref> <ref>                 merge the second lineage into the first
+    gc                                        remove expired tombstones and superseded snapshots
+  references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>
+  global flags: --env <name> (use another environment for this command)
+
+$ archo status
+error: no environment configured (archo env detect, then archo env add <name> --detected)
+[exit 1]
+
+$ archo env detect
+detected environment (suggestion, not saved)
+  game: $ROOT/Steam/steamapps/common/RimWorld
+  version: 1.6.4633 rev1261
+  launch: steam
+  steam-library: $ROOT/Steam
+  user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+  workshop: $ROOT/Steam/steamapps/workshop/content/294100
+next:
+  archo env add <name> --detected
+
+$ archo env add main --detected
+env:main  added  [current]
+  game: $ROOT/Steam/steamapps/common/RimWorld
+  version: 1.6.4633 rev1261
+  user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+  launch: steam
+  sources:
+    src:official  added  $ROOT/Steam/steamapps/common/RimWorld/Data
+    src:local  added  $ROOT/Steam/steamapps/common/RimWorld/Mods
+    src:workshop  added  $ROOT/Steam/steamapps/workshop/content/294100
+next:
+  archo scan
+
+$ archo env list
+environments: 1
+  env:main  1.6.4633 rev1261  [current]
+    game: $ROOT/Steam/steamapps/common/RimWorld
+    user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+    launch: steam
+    sources:
+      src:official  $ROOT/Steam/steamapps/common/RimWorld/Data
+      src:local     $ROOT/Steam/steamapps/common/RimWorld/Mods
+      src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
+
+$ archo scan
+scan:1  env:main  0s
+  sources:
+    src:official  1 mod
+    src:local     3 mods (4 folders, 1 without About.xml)
+    src:workshop  5 mods (6 folders, 1 residue, 1 without About.xml)
+  instances: 9 live, 0 tombstones
+  files: 43 (4.3 KB), semantic hashed 32, reused 0
+  changes: 9 discovered
+next:
+  archo changes
+
+$ archo status
+env:main  RimWorld 1.6.4633 rev1261
+  mods: 9 live (official 1, local 3, workshop 5), 0 tombstones
+  residue: 1 (unsubscribed workshop folders still on disk; the game does not load them: archo list --filter residue)
+  lineages: 9 (0 with several instances)
+  last-scan: scan:1 2026-10-01 10:00, 0s
+  changes: 9 discovered (archo changes)
+  modsconfig: 1 active entries, version 1.6.4633 rev1261
+
+$ archo list
+mods: 9 (env:main)
+  #nyh3  Alpha               [workshop ws:3000000002]
+  #lqj2  Alpha Fork          [local Twin]
+  #z3bw  Beta                [workshop ws:3000000003]
+  #iqmu  Core                [official Core]
+  #gpto  Gamma               [local Gamma]
+  #6olp  Harmony             [workshop ws:2009463077]
+  #i4uc  Leftover            [workshop ws:3000000009, residue]
+  #xamx  Old Mod             [local OldMod]
+  #hnyg  Versioned Mod 版本  [workshop ws:3000000001]
+
+$ archo list --filter residue
+mods: 1 (env:main, filter: residue)
+  #i4uc  Leftover  [workshop ws:3000000009, residue]
+
+$ archo list --filter source:local
+mods: 3 (env:main, filter: source:local)
+  #lqj2  Alpha Fork  [local Twin]
+  #gpto  Gamma       [local Gamma]
+  #xamx  Old Mod     [local OldMod]
+
+$ archo find harmony
+found: 1 for "harmony"
+  #6olp  Harmony  [workshop ws:2009463077]
+next:
+  archo mod #6olp
+
+$ archo find nothing-like-this
+found: 0 for "nothing-like-this"
+
+$ archo mod pkg:brrainz.harmony
+#6olp Harmony  [workshop ws:2009463077]
+  status: live
+  package: brrainz.harmony
+  lineage: L#l4xt
+  authors: Andreas Pardeike
+  supports: 1.5 1.6
+  load-before: pkg:ludeon.rimworld
+  location: src:workshop 2009463077
+    path: $ROOT/Steam/steamapps/workshop/content/294100/2009463077
+  workshop: ws:2009463077, manifest 9000, updated 2026-09-21
+  files: 4 (353 B), 4 semantic
+  seen: first 2026-10-01 10:00, last 2026-10-01 10:00
+  changes: 1, latest discovered 2026-10-01 (archo changes #6olp)
+next:
+  archo changes #6olp
+
+$ archo mod ws:3000000001
+#hnyg Versioned Mod 版本  [workshop ws:3000000001]
+  status: live
+  package: tester.versioned (declared Tester.Versioned)
+  lineage: L#u2mx
+  authors: Tester, Friend
+  version: 2.1
+  supports: 1.5 1.6
+  depends: pkg:brrainz.harmony (#6olp)
+  load-after: pkg:brrainz.harmony
+  incompatible: pkg:someone.else
+  location: src:workshop 3000000001
+    path: $ROOT/Steam/steamapps/workshop/content/294100/3000000001
+  workshop: ws:3000000001, manifest 9001, updated 2026-09-21
+  files: 5 (779 B), 4 semantic
+  seen: first 2026-10-01 10:00, last 2026-10-01 10:00
+  changes: 1, latest discovered 2026-10-01 (archo changes #hnyg)
+next:
+  archo changes #hnyg
+
+$ archo mod #xamx
+#xamx Old Mod  [local OldMod]
+  status: live
+  package: someone206.oldhmod (inferred: About.xml has no <packageId>)
+  lineage: L#np4v
+  authors: Someone
+  supports: 1.0
+  location: src:local OldMod
+    path: $ROOT/Steam/steamapps/common/RimWorld/Mods/OldMod
+  files: 2 (300 B), 2 semantic
+  seen: first 2026-10-01 10:00, last 2026-10-01 10:00
+  changes: 1, latest discovered 2026-10-01 (archo changes #xamx)
+next:
+  archo changes #xamx
+
+$ archo mod pkg:tester.alpha
+pkg:tester.alpha matches 2 instances; pick one
+  #nyh3  Alpha       [workshop ws:3000000002]
+  #lqj2  Alpha Fork  [local Twin]
+next:
+  archo mod #nyh3
+  archo mod #lqj2
+[exit 3]
+
+$ archo mod pkg:nope
+error: pkg:nope matches nothing (archo find <words>)
+[exit 1]
+
+$ archo mod Alpha
+error: Alpha matches nothing (archo find <words>)
+[exit 1]
+
+$ archo changes
+changes: 9 (scan:1)
+  scan:1  2026-10-01 10:00  9 discovered
+    discovered  #6olp  Harmony             src:workshop 2009463077
+    discovered  #hnyg  Versioned Mod 版本  src:workshop 3000000001
+    discovered  #nyh3  Alpha               src:workshop 3000000002
+    discovered  #z3bw  Beta                src:workshop 3000000003
+    discovered  #i4uc  Leftover            src:workshop 3000000009
+    discovered  #iqmu  Core                src:official Core
+    discovered  #gpto  Gamma               src:local Gamma
+    discovered  #xamx  Old Mod             src:local OldMod
+    discovered  #lqj2  Alpha Fork          src:local Twin
+
+$ archo scan
+scan:2  env:main  0s
+  sources:
+    src:official  1 mod
+    src:local     3 mods (4 folders, 1 without About.xml)
+    src:workshop  5 mods (6 folders, 1 residue, 1 without About.xml)
+  instances: 9 live, 0 tombstones
+  files: 43 (4.3 KB), semantic hashed 0, reused 32
+  changes: none
+
+$ archo changes
+changes: 0 (scan:2)
+next:
+  archo changes --since 30d
+
+$ archo identity list
+questions: 0 open
+
+$ archo frobnicate
+error: unknown command "frobnicate" (archo help)
+[exit 2]
+
+$ archo list --bogus
+error: unknown flag --bogus
+usage: archo list [--filter <expr>] [--all]
+[exit 2]
+

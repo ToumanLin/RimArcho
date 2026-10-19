@@ -18,6 +18,7 @@ import (
 	"github.com/rimarcho/rimarcho/internal/app"
 	"github.com/rimarcho/rimarcho/internal/cmds"
 	"github.com/rimarcho/rimarcho/internal/env"
+	"github.com/rimarcho/rimarcho/internal/source"
 )
 
 // Start is the fake clock's initial time.
@@ -51,7 +52,7 @@ func New(t testing.TB) *Env {
 	e.Game = filepath.Join(e.Steam, "steamapps", "common", "RimWorld")
 	e.Workshop = filepath.Join(e.Steam, "steamapps", "workshop", "content", env.WorkshopAppID)
 	e.SteamCMD = filepath.Join(root, "steamcmd", "steamapps", "workshop", "content", env.WorkshopAppID)
-	e.UserData = filepath.Join(root, "UserData")
+	e.UserData = filepath.Join(root, "AppData", "LocalLow", "Ludeon Studios", "RimWorld by Ludeon Studios")
 	e.Home = filepath.Join(root, "ArchoHome")
 	e.WriteFile(filepath.Join(e.Game, "RimWorldWin64.exe"), "")
 	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.6.4633 rev1261\n")
@@ -119,10 +120,11 @@ func (e *Env) AddEnv(steamcmd bool) string {
 
 // Scrub makes output path-independent: the temp root becomes $ROOT and separators "/".
 func (e *Env) Scrub(s string) string {
-	s = strings.ReplaceAll(s, e.Root, "$ROOT")
-	if real, err := filepath.EvalSymlinks(e.Root); err == nil {
+	// The temp dir may be spelled with 8.3 short names (TOUMAN~1) or expanded ones.
+	if real, err := source.RealPath(e.Root); err == nil {
 		s = strings.ReplaceAll(s, real, "$ROOT")
 	}
+	s = strings.ReplaceAll(s, e.Root, "$ROOT")
 	return strings.ReplaceAll(s, `\`, "/")
 }
 

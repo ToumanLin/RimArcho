@@ -228,7 +228,7 @@ func Reconcile(in Input) *Result {
 			rule = "R6"
 		}
 		a := r.create(ob, rule, "", BasisRoot)
-		r.event(a, EvDiscovered, "", 0)
+		r.event(a, EvDiscovered, "src:"+ob.Loc.Label+" "+ob.Loc.Rel, 0)
 		if k != nil {
 			r.res.Questions = append(r.res.Questions, &Question{New: a, Candidate: k, Score: score})
 		}
@@ -237,7 +237,7 @@ func Reconcile(in Input) *Result {
 	for _, k := range in.Known {
 		if !k.seen && k.Status == Live && !in.Skip[k.SourceID] {
 			r.res.Disappeared = append(r.res.Disappeared, k)
-			ev := &Event{InstanceID: k.ID, Kind: EvDisappeared, Detail: k.Label + " " + k.Rel}
+			ev := &Event{InstanceID: k.ID, Kind: EvDisappeared, Detail: "src:" + k.Label + " " + k.Rel}
 			if k.Snap != nil {
 				ev.Before = k.Snap.ID
 			}
@@ -330,10 +330,10 @@ func (r *reconciler) match(ob *scan.Observation, k *Known, rule string) *Assignm
 		before = k.Snap.ID
 	}
 	if k.Status == Tombstone {
-		r.event(a, EvReappeared, ob.Loc.Label+" "+ob.Loc.Rel, before)
+		r.event(a, EvReappeared, "src:"+ob.Loc.Label+" "+ob.Loc.Rel, before)
 	}
 	if rule != "R1" {
-		r.event(a, EvMoved, fmt.Sprintf("%s %s → %s %s", k.Label, k.Rel, ob.Loc.Label, ob.Loc.Rel), before)
+		r.event(a, EvMoved, fmt.Sprintf("src:%s %s → src:%s %s", k.Label, k.Rel, ob.Loc.Label, ob.Loc.Rel), before)
 	}
 	if k.Snap != nil && k.Snap.Hash != ob.FP.SnapshotHash {
 		r.event(a, EvUpdated, "", before)

@@ -137,7 +137,7 @@ func (ix *Index) Resolve(ref string) ([]*store.Mod, error) {
 	default:
 		p := strings.TrimPrefix(lower, "#")
 		if !ids.Valid(p) {
-			return nil, &RefError{Ref: ref, Hint: "use #id, L#id, pkg:<packageId> or ws:<workshopId>; search with archo find"}
+			return nil, &RefError{Ref: ref, Hint: "not a reference (#id, L#id, pkg:<packageId>, ws:<workshopId>); search with archo find " + ref}
 		}
 		for _, id := range ix.inst.Lookup(p) {
 			out = append(out, ix.ByID[id])

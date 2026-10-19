@@ -1,0 +1,155 @@
+$ archo status
+env:main  RimWorld 1.6.4633 rev1261
+  mods: 10 live (official 1, local 3, workshop 5, steamcmd 1), 0 tombstones
+  residue: 1 (unsubscribed workshop folders still on disk; the game does not load them: archo list --filter residue)
+  lineages: 9 (1 with several instances)
+  last-scan: scan:1 2026-10-01 10:00, 0s
+  changes: 9 discovered, 1 copied (archo changes)
+  modsconfig: 1 active entries, version 1.6.4633 rev1261
+
+$ archo scan
+scan:2  env:main  0s
+  sources:
+    src:official  1 mod
+    src:local     4 mods (5 folders, 1 without About.xml)
+    src:workshop  4 mods (5 folders, 1 without About.xml)
+    src:steamcmd  1 mod (no ACF)
+  instances: 10 live, 1 tombstones
+  files: 47 (4.9 KB), semantic hashed 9, reused 27
+  changes: 1 updated, 1 moved, 1 copied, 1 disappeared, 1 package-id-changed, 1 renamed, 1 author-changed, 1 version-support-changed, 1 dependencies-changed
+next:
+  archo changes
+
+$ archo changes
+changes: 9 (scan:2)
+  scan:2  2026-10-02 12:00  1 updated, 1 moved, 1 copied, 1 disappeared, 1 package-id-changed, 1 renamed, 1 author-changed, 1 version-support-changed, 1 dependencies-changed
+    updated                  #a6o7  Beta Reborn
+    package-id-changed       #a6o7  Beta Reborn  pkg:tester.beta → pkg:newauthor.beta
+    renamed                  #a6o7  Beta Reborn  "Beta" → "Beta Reborn"
+    author-changed           #a6o7  Beta Reborn  Tester → New Author
+    version-support-changed  #a6o7  Beta Reborn  1.6 → 1.5 1.6
+    dependencies-changed     #a6o7  Beta Reborn  +pkg:brrainz.harmony
+    moved                    #xamx  Gamma        src:local Gamma → src:local Gamma (renamed)
+    copied                   #tmxx  Alpha        inferred copy of #mdx4
+    disappeared              #ekgo  Leftover     src:workshop 3000000009
+
+$ archo changes #a6o7
+changes: 7 (#a6o7)
+  scan:1  2026-10-01 10:00  1 discovered
+    discovered  #a6o7  Beta Reborn  src:workshop 3000000003
+  scan:2  2026-10-02 12:00  1 updated, 1 package-id-changed, 1 renamed, 1 author-changed, 1 version-support-changed, 1 dependencies-changed
+    updated                  #a6o7  Beta Reborn
+    package-id-changed       #a6o7  Beta Reborn  pkg:tester.beta → pkg:newauthor.beta
+    renamed                  #a6o7  Beta Reborn  "Beta" → "Beta Reborn"
+    author-changed           #a6o7  Beta Reborn  Tester → New Author
+    version-support-changed  #a6o7  Beta Reborn  1.6 → 1.5 1.6
+    dependencies-changed     #a6o7  Beta Reborn  +pkg:brrainz.harmony
+
+$ archo mod pkg:tester.alpha
+pkg:tester.alpha matches 3 instances; pick one
+  #tmxx  Alpha       [local Alpha Local, copy inferred]
+  #mdx4  Alpha       [workshop ws:3000000002]
+  #qfph  Alpha Fork  [local Twin]
+next:
+  archo mod #tmxx
+  archo mod #mdx4
+  archo mod #qfph
+[exit 3]
+
+$ archo scan
+scan:3  env:main  0s
+  sources:
+    src:official  1 mod
+    src:local     5 mods (6 folders, 1 without About.xml)
+    src:workshop  4 mods (5 folders, 1 without About.xml)
+    src:steamcmd  1 mod (no ACF)
+  instances: 11 live, 1 tombstones
+  files: 53 (5.4 KB), semantic hashed 4, reused 36
+  changes: 1 discovered
+  questions: 1 new (archo identity list)
+next:
+  archo changes
+  archo identity list
+
+$ archo identity list
+questions: 1 open
+  q:1  score 1.00  scan:3
+    new:     #2ihw  Leftover  [local Leftover Again]
+    was it:  #ekgo  Leftover  [workshop ws:3000000009, tombstone since 2026-10-02, residue]
+next:
+  archo identity resolve q:1 same|copy|unrelated
+
+$ archo identity resolve q:1 same
+q:1  resolved: same
+  #2ihw merged into #ekgo; it keeps its ID, lineage and history
+  #ekgo  Leftover  [local Leftover Again]
+next:
+  archo mod #ekgo
+
+$ archo identity list --all
+questions: 0 open, 1 resolved
+  q:1  score 1.00  scan:3  [resolved: same]
+    new:     #2ihwr2ol  (gone)
+    was it:  #ekgo      Leftover  [local Leftover Again]
+
+$ archo changes #ekgo
+changes: 3 (#ekgo)
+  scan:1  2026-10-01 10:00  1 discovered
+    discovered  #ekgo  Leftover  src:workshop 3000000009
+  scan:2  2026-10-02 12:00  1 disappeared
+    disappeared  #ekgo  Leftover  src:workshop 3000000009
+  scan:3  2026-10-03 12:00  1 reappeared
+    reappeared  #ekgo  Leftover  confirmed by player (q:1)
+
+$ archo lineage split #tmxx
+#tmxx Alpha  split
+  lineage: L#vgoh (was L#z3bw)
+next:
+  archo mod #tmxx
+
+$ archo lineage merge L#z3bw #tmxx
+L#z3bw  merged L#vgoh into it
+  members:
+    #tmxx  Alpha  [local Alpha Local]
+    #mdx4  Alpha  [workshop ws:3000000002]
+
+$ archo mod pkg:brrainz.harmony
+pkg:brrainz.harmony matches 2 instances; pick one
+  #76gh  Harmony  [steamcmd ws:2009463077, copy inferred]
+  #l4xt  Harmony  [workshop ws:2009463077]
+next:
+  archo mod #76gh
+  archo mod #l4xt
+[exit 3]
+
+$ archo changes --since scan:2 --all
+changes: 10 (since scan:2)
+  scan:2  2026-10-02 12:00  1 updated, 1 moved, 1 copied, 1 disappeared, 1 package-id-changed, 1 renamed, 1 author-changed, 1 version-support-changed, 1 dependencies-changed
+    updated                  #a6o7  Beta Reborn
+    package-id-changed       #a6o7  Beta Reborn  pkg:tester.beta → pkg:newauthor.beta
+    renamed                  #a6o7  Beta Reborn  "Beta" → "Beta Reborn"
+    author-changed           #a6o7  Beta Reborn  Tester → New Author
+    version-support-changed  #a6o7  Beta Reborn  1.6 → 1.5 1.6
+    dependencies-changed     #a6o7  Beta Reborn  +pkg:brrainz.harmony
+    moved                    #xamx  Gamma        src:local Gamma → src:local Gamma (renamed)
+    copied                   #tmxx  Alpha        inferred copy of #mdx4
+    disappeared              #ekgo  Leftover     src:workshop 3000000009
+  scan:3  2026-10-03 12:00  1 reappeared
+    reappeared  #ekgo  Leftover  confirmed by player (q:1)
+
+$ archo gc --dry-run
+gc: would remove 0 tombstones (tombstones older than 90 days, before 2026-07-05)
+  snapshots: 0 superseded (0 file rows)
+
+$ archo gc
+gc: removed 0 tombstones (tombstones older than 90 days, before 2026-11-02)
+  snapshots: 0 superseded (0 file rows)
+
+$ archo status
+env:main  RimWorld 1.6.4633 rev1261
+  mods: 11 live (official 1, local 5, workshop 4, steamcmd 1), 0 tombstones
+  lineages: 9 (2 with several instances)
+  last-scan: scan:3 2026-10-03 12:00, 0s
+  changes: 1 discovered (archo changes)
+  modsconfig: 1 active entries, version 1.6.4633 rev1261
+

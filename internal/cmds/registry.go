@@ -6,6 +6,7 @@ package cmds
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/rimarcho/rimarcho/internal/app"
@@ -77,8 +78,27 @@ var registry []*Command
 
 func register(c *Command) { registry = append(registry, c) }
 
-// Commands returns the command table in registration order.
-func Commands() []*Command { return registry }
+// order is the documented command order (05 §3); registration order depends on file names.
+var order = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "scan", "status", "list", "find",
+	"mod", "changes", "identity list", "identity resolve", "lineage split", "lineage merge", "gc"}
+
+// Commands returns the command table in documented order.
+func Commands() []*Command {
+	out := make([]*Command, 0, len(registry))
+	for _, n := range order {
+		for _, c := range registry {
+			if c.Name == n {
+				out = append(out, c)
+			}
+		}
+	}
+	for _, c := range registry {
+		if !slices.Contains(order, c.Name) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
 
 // lookup finds the command with the longest name matching the leading words.
 func lookup(words []string) (*Command, []string) {
@@ -210,7 +230,7 @@ func Execute(ap *app.App, argv []string) (string, int) {
 func Help() *render.Doc {
 	d, root := render.New("archo — RimWorld mod manager (M1: environments, scanning, identity)")
 	var rows [][]string
-	for _, c := range registry {
+	for _, c := range Commands() {
 		u := c.Name
 		if c.Args != "" {
 			u += " " + c.Args

@@ -1,0 +1,109 @@
+$ archo scan
+scan:2  env:main  0s
+  sources:
+    src:official  missing (root not found; instances kept, not scanned)
+    src:local     missing (root not found; instances kept, not scanned)
+    src:workshop  5 mods (6 folders, 1 residue, 1 without About.xml)
+  instances: 9 live, 0 tombstones
+  files: 27 (2.7 KB), semantic hashed 0, reused 20
+  changes: none
+
+$ archo status
+env:main  RimWorld 1.6.4633 rev1261
+  mods: 9 live (official 1, local 3, workshop 5), 0 tombstones
+  residue: 1 (unsubscribed workshop folders still on disk; the game does not load them: archo list --filter residue)
+  lineages: 9 (0 with several instances)
+  last-scan: scan:2 2026-10-01 10:00, 0s
+  changes: none (archo changes)
+  warning: src:official root missing: $ROOT/Steam/steamapps/common/RimWorld/Data (archo env set)
+  warning: src:local root missing: $ROOT/Steam/steamapps/common/RimWorld/Mods (archo env set)
+  modsconfig: 1 active entries, version 1.6.4633 rev1261
+
+$ archo env set main --game $ROOT/NewDrive/RimWorld
+env:main  updated  [current]
+  game: $ROOT/NewDrive/RimWorld
+  version: 1.6.4633 rev1261
+  user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+  launch: steam
+  sources:
+    src:official  rebound  $ROOT/NewDrive/RimWorld/Data
+      from: $ROOT/Steam/steamapps/common/RimWorld/Data
+      sample: 1/1 matched (100%, need 80%)
+    src:local  rebound  $ROOT/NewDrive/RimWorld/Mods
+      from: $ROOT/Steam/steamapps/common/RimWorld/Mods
+      sample: 3/3 matched (100%, need 80%)
+next:
+  archo scan
+
+$ archo scan
+scan:3  env:main  0s
+  sources:
+    src:official  1 mod
+    src:local     3 mods (4 folders, 1 without About.xml)
+    src:workshop  5 mods (6 folders, 1 residue, 1 without About.xml)
+  instances: 9 live, 0 tombstones
+  files: 43 (4.3 KB), semantic hashed 0, reused 32
+  changes: none
+
+$ archo env set main --game $ROOT/Unrelated/RimWorld
+env:main  updated  [current]
+  game: $ROOT/Unrelated/RimWorld
+  version: unknown version
+  user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+  launch: steam
+  sources:
+    src:official  rebound  $ROOT/Unrelated/RimWorld/Data
+      from: $ROOT/NewDrive/RimWorld/Data
+      sample: 1/1 matched (100%, need 80%)
+    src:local  rebind-pending  $ROOT/Unrelated/RimWorld/Mods
+      from: $ROOT/NewDrive/RimWorld/Mods
+      sample: 0/1 matched (0%, need 80%)
+      examples:
+        Different  no old instance
+next:
+  archo env rebind src:local yes|no
+  archo scan
+
+$ archo env list
+environments: 1
+  env:main  unknown version  [current]
+    game: $ROOT/Unrelated/RimWorld
+    user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+    launch: steam
+    sources:
+      src:official  $ROOT/Unrelated/RimWorld/Data
+      src:local     $ROOT/NewDrive/RimWorld/Mods  [rebind-pending → $ROOT/Unrelated/RimWorld/Mods]
+      src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
+
+$ archo env rebind src:local no
+src:local  new source
+  root: $ROOT/Unrelated/RimWorld/Mods
+  retired: src:local-old $ROOT/NewDrive/RimWorld/Mods (its instances become tombstones on the next scan)
+next:
+  archo scan
+
+$ archo scan
+scan:4  env:main  0s
+  sources:
+    src:official   1 mod
+    src:local      1 mod
+    src:local-old  retired
+    src:workshop   5 mods (6 folders, 1 residue, 1 without About.xml)
+  instances: 7 live, 3 tombstones
+  files: 35 (3.5 KB), semantic hashed 6, reused 20
+  changes: 1 discovered, 3 disappeared
+next:
+  archo changes
+
+$ archo env list
+environments: 1
+  env:main  unknown version  [current]
+    game: $ROOT/Unrelated/RimWorld
+    user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+    launch: steam
+    sources:
+      src:official   $ROOT/Unrelated/RimWorld/Data
+      src:local      $ROOT/Unrelated/RimWorld/Mods
+      src:local-old  $ROOT/NewDrive/RimWorld/Mods  [retired]
+      src:workshop   $ROOT/Steam/steamapps/workshop/content/294100
+
