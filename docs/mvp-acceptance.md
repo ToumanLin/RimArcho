@@ -1,6 +1,7 @@
 # MVP acceptance (01 §2, §5)
 
-Status at the end of M5 (2026-10-19). Every claim below points to a test that runs in `go test ./...` or to a
+Status at the end of M5 (2026-10-19), updated after the post-review polish (stale logs, cached log
+attribution; `docs/decisions-m5.md` §7). Every claim below points to a test that runs in `go test ./...` or to a
 measurement on the real environment, which was used read-only. Where something is not met or was not
 verified, the row says so.
 
@@ -10,7 +11,7 @@ verified, the row says so.
 |---|---|
 | Game | RimWorld 1.7.4982 on Windows 11, SSD |
 | Mods | 1354 mod folders: 6 official, 74 local, 1274 Workshop. 485 are enabled (ModsConfig.xml is a 1.6 list) |
-| Player.log | 1.6 log, 5814 lines, 8.7 MB |
+| Player.log | 1.6 log, 5814 lines, 8.7 MB, written 2026-09-29 (before the 1.7 update). RimArcho treats it as a **stale log** (another game version): its 26 error and 86 warning clusters are folded under one row and not counted. `archo problems` on the real environment: 1 error, 46 warning |
 | RimCrow DB | `D:\Game\RimModManager\data\mod_manager.db` |
 
 **Test suite:** 15 packages, all passing (`go test ./...`).
@@ -24,7 +25,7 @@ verified, the row says so.
 | U3 | Enable, disable, move, save to the game | **Pass** | `app/loadout_test.go` (edits, backup, atomic write, `_steam` tokens), `loadout.TestWriteFileBackupAtomic`, TUI test (space / J / w). M5 adds `loadout export/import` (`TestLoadoutExchange`) |
 | U4 | One-key sort; show the conflicting constraints when it cannot sort | **Pass** | S1–S5 in `order/order_test.go` and the CLI golden `loadout`. A cycle names each About.xml; `rule add ignore` breaks it |
 | U5 | See missing deps, incompatibilities, unsupported versions, duplicate packages, and how to fix them | **Pass** | C1–C4 in `app/problems_test.go` and `analyze_test.go`; golden `problems`. Each problem has evidence and fix commands (`problems show`) |
-| U6 | After a game error, see which mod it is attributed to and the evidence | **Pass** | B1–B5: golden `harmonylog`, `app/m4_test.go`. Real log: 153 clusters, and patch failures map to file:line with a reason (`docs/m4-mcp-transcripts.md`) |
+| U6 | After a game error, see which mod it is attributed to and the evidence | **Pass** | B1–B5: golden `harmonylog`, `app/m4_test.go`. Real log: 153 clusters, and patch failures map to file:line with a reason (`docs/m4-mcp-transcripts.md`). Log problems are grouped per log; a log from another game version or older than the Loadout's last change is stale, folded and not counted (`TestStaleLog`, `tui.TestProblemsViewLogs`, golden `harmonylog`) |
 | U7 | Updates and author renames do not break lists and rules; I see what changed | **Pass** | A2 (update), A3 (packageId change keeps the Loadout and rules), A7 (rename) in `app/accept_test.go`. The M5 Changes view shows file-level diffs (`tui.TestChangesViewAndMouse`) |
 | U8 | Undo the last edit, or go back to a version | **Pass** | `app/loadout_test.go` (undo/redo, versions, checkout, tag); TUI `u` / `ctrl+r` |
 | U9 | Identities, rules and history survive a game path change | **Pass** | A4 `TestA4GameFolderMoved` (all instance IDs unchanged), `TestA4RebindRejected` |
@@ -74,7 +75,7 @@ matters.
 | First full scan | ≤ 60 s | 2.3 s with a warm OS file cache (M1 cold-cache measurement: 12.5 s) | Pass |
 | Incremental scan, no change | ≤ 3 s | 0.61 s, peak working set 109 MB | Pass |
 | Full Def + Patch (+ Harmony) analysis | ≤ 30 s, peak ≤ 400 MB, child process | 3.9 s wall (482 mods, 35 254 defs, 5433 operations, 2524 Harmony patches), peak working set 313 MB, child process | Pass |
-| MCP single query (index built) | ≤ 500 ms | ≤ 3 ms for status, find_mods, get_mod, get_def, get_patches, get_harmony, list_problems, list_changes and analyze_log (median of 5). search_files takes ~280 ms. The first call of a session takes 553 ms because it parses the 8.7 MB Player.log once | Pass, except the first call of a session (+53 ms) |
+| MCP single query (index built) | ≤ 500 ms | ≤ 3 ms for status, find_mods, get_mod, get_def, get_patches, get_harmony, list_problems, list_changes and analyze_log (median of 5). search_files takes ~310 ms. **First call of a session: 49–57 ms** (was 553 ms): the attributed log is read from the database. Only the first list_problems / analyze_log after the Player.log changes attributes it again: 568 ms, once, then stored | Pass. One exception: the first log call after a new Player.log (+68 ms) |
 | T1: keypress response, 500+ mod list | ≤ 50 ms | Update + render: median < 0.1 ms, p95 0.5 ms, max 1.6 ms over 340 keypresses (scrolling, paging, typing a search) on 1354 rows | Pass |
 | Sort, 500 mods (S5) | ≤ 1 s | 22 ms in-process (M2); 0.5 ms algorithm only | Pass |
 
@@ -111,8 +112,10 @@ no selected log, the TUI parsed the log only when the Problems view opened (the 
    Codex using the README config is still to do.
 3. **Inspector side-by-side on the real collection**: the inspector was not run (it writes its cache under the
    RimCrow folder). The comparison is against its tests and documented workflow.
-4. **MCP first call of a session**: 553 ms against the 500 ms target. It parses the 8.7 MB Player.log once;
-   later calls take ≤ 3 ms.
+4. **First log call after a new Player.log**: 568 ms against the 500 ms target, once per new log (not per
+   session). Most of it is the cross-reference referrer search (≈ 455 ms reading every enabled mod's Defs
+   and Patches), not parsing (≈ 60 ms). The report is then stored, and status, get_mod and the other
+   non-log tools never parse the log. The first call of a session now takes 49–57 ms.
 5. **First full scan with a cold OS cache** was not re-measured in M5 (M1: 12.5 s; target 60 s).
 6. **Packaging**: the release script builds an unsigned exe. There is no code signing and no Windows
    version resource (only `archo version` / `--version`).

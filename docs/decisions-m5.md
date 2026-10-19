@@ -99,8 +99,9 @@ The old inspector and the two skills are untouched.
 ## 4. Acceptance
 
 See `docs/mvp-acceptance.md`: U1–U14 pass, as do A1–A11, B1–B5, C1–C6, S1–S5, I1–I5 (I4 as a scripted
-self-check), T1–T3 and T5, and every 01 §5.2 metric. Exceptions: the first MCP call of a session takes
-553 ms, and T4 needs a usability test with a person.
+self-check), T1–T3 and T5, and every 01 §5.2 metric. Exceptions: T4 needs a usability test with a person,
+and the first log call after a new Player.log takes 568 ms once (§7; the first call of a session was 553 ms
+before §7).
 
 New tests in M5:
 - `TestCopyLocal`, `TestImportRimCrow`, `TestLoadoutExchange`
@@ -134,3 +135,40 @@ temp home):
    skills are still in place. Remove them once you have tried `archo mcp` with Claude Code or Codex?
 6. **T4 usability test**: someone who has not used RimArcho should try enable → sort → save → launch in the
    TUI without the README, to close T4.
+
+## 7. Post-review polish (stale logs, cached log attribution)
+
+Found in the final review: on the real environment `archo problems` showed 27 errors, and 26 came from the
+1.6 Player.log written before the 1.7 update. The first MCP call of a session took 553 ms.
+
+1. **Stale logs** (03 §6.3, 06 §4).
+   - Log problems are grouped under one row per log: file, game version, time, current or stale.
+   - A log is stale when another game version (major.minor) wrote it, or when it is older than the
+     Loadout's last change. That change is the last unsaved edit if there is one, else the ModsConfig.xml
+     mtime. The file time is used rather than the version's `created_at`, because an imported or external
+     version is recorded when RimArcho notices it, which can be after the game session that wrote the log.
+   - On the real environment the log is stale only because of the version. ModsConfig.xml (19:35) is older
+     than the log (19:41), so that session did run with this list.
+   - Stale problems live in `ProblemSet.Stale`. They are not counted in `problems`, `status` or the TUI
+     status bar, and they do not escalate `harmony.skip-prefix`. They are folded by default and listed with
+     `--code`, `--subject` or `--all`; `problems show` still finds them.
+   - Real result: 1 error and 46 warnings (was 27 and 132). The log row reads `26 error, 86 warning, not
+     counted`.
+2. **Cached log attribution** (schema v9, `log_cache`).
+   - Measured on the real log: parsing and clustering take about 60 ms. The cross-reference referrer
+     search during attribution takes about 455 ms. So caching only the parsed clusters would not have met
+     the target, and the whole attributed report is stored instead.
+   - The key is path, size and mtime, plus a fingerprint of the attribution inputs: game version, analysis
+     run, enabled list, and each installed mod's ID, snapshot, names and folder. One row per log path.
+   - `status` and `mod` (MCP `status`, `get_mod`) use the stored report only (`App.LogCacheOnly`) and never
+     parse. When nothing is stored, `status` says the log is not analysed yet.
+   - The TUI also uses the stored report for its status bar until the Problems view opens.
+   - First MCP call of a session: 49–57 ms. The first `list_problems` or `analyze_log` after a new log:
+     568 ms, once.
+3. **Incident.** Checking the real Problems view through a test harness set `log.selected` / `log.seen`
+   in `%APPDATA%\RimArcho\archo.db` again; this is the same mechanism as §3. Both were cleared afterwards.
+   For the cold-cache measurement, the `log_cache` row was deleted from that database. The game, Workshop,
+   `Mods/`, ModsConfig.xml (md5 `680ab615…` unchanged) and the RimCrow DB were not touched.
+
+New tests: `TestStaleLog`, `TestLogCache`, `tui.TestProblemsViewLogs`; the golden `harmonylog` gains the
+current → stale sequence.
