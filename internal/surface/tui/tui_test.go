@@ -639,21 +639,89 @@ func TestWrap(t *testing.T) {
 	}
 }
 
-func TestFilter(t *testing.T) {
-	c := &column{items: []item{
-		{id: "1", name: "Harmony", lower: "harmony brrainz brrainz.harmony 2009463077"},
-		{id: "2", name: "Hair Style Lib", lower: "hair style lib someone x.hairs 123"},
-		{id: "3", name: "Vehicle Framework", lower: "vehicle framework smash phil smashphil.vehicleframework 3014915404"},
-	}}
-	for q, want := range map[string]string{"harm": "1", "smash phil": "3", "hsl": "2", "zzz": "", "": "123"} {
-		c.filter = q
-		c.refilter("")
-		var got string
-		for _, i := range c.view {
-			got += c.items[i].id
+func TestParseQuery(t *testing.T) {
+	got := parseQuery(`har -tag:ui author:"Brrainz X" id:#abc type:workshop bogus:x -`)
+	want := []term{{"", "har", false}, {"tag", "ui", true}, {"author", "brrainz x", false}, {"id", "#abc", false}, {"type", "workshop", false}, {"", "bogus:x", false}, {"", "-", false}}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("got  %v\nwant %v", got, want)
+	}
+}
+
+// 06 §5.5 on the fixture: every field, negation, AND, the per-column query, the fallback.
+func TestColumnSearch(t *testing.T) {
+	e, _ := fixture(t)
+	e.MustRun("tag", "add", "pkg:brrainz.harmony", "core-lib", "--mod", "pkg:tester.b")
+	e.MustRun("note", "pkg:tester.b", "check later")
+	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Assemblies", "Beta.dll"), "MZ")
+	e.WriteFile(filepath.Join(e.Game, "Mods", "Zh", "Languages", "ChineseSimplified", "Keyed", "a.xml"), "<LanguageData/>")
+	e.Remove(filepath.Join(e.Game, "Mods", "Zh", "Defs")) // a language pack: only Languages/
+	e.Remove(filepath.Join(e.Game, "Mods", "Zh", "Patches"))
+	e.MustRun("scan")
+	m := direct(t, e, 160, 30)
+	names := func(k colKind) string {
+		var out []string
+		for _, i := range m.cols[k].view {
+			out = append(out, m.cols[k].items[i].name)
 		}
-		if got != want {
-			t.Errorf("filter %q: %q, want %q", q, got, want)
+		return strings.Join(out, ",")
+	}
+	all := func(q string) string {
+		for k := range m.cols {
+			m.cols[k].filter = q
+			m.refilterCol(colKind(k), "")
 		}
+		return names(cActive) + " | " + names(cInactive)
+	}
+	for q, want := range map[string]string{
+		"":                        "Core,Alpha,Harmony | Beta,中文汉化补丁（简体）加长的名字用来测试截断",
+		"alp":                     "Alpha | ",
+		"tag:core-lib":            "Harmony | Beta",
+		"-tag:core-lib":           "Core,Alpha | 中文汉化补丁（简体）加长的名字用来测试截断",
+		"tag:core-lib type:local": " | Beta",
+		"type:workshop":           "Alpha,Harmony | ",
+		"type:official":           "Core | ",
+		"id:tester.":              "Alpha | Beta,中文汉化补丁（简体）加长的名字用来测试截断",
+		"id:1001":                 "Alpha | ",
+		"author:nobody":           " | ",
+		"has:tag":                 "Harmony | Beta",
+		"has:note":                " | Beta",
+		"type:assembly":           " | Beta",
+		"type:language":           " | 中文汉化补丁（简体）加长的名字用来测试截断",
+		"-type:assembly type:xml": "Core,Alpha,Harmony | 中文汉化补丁（简体）加长的名字用来测试截断",
+		"中文":                      " | 中文汉化补丁（简体）加长的名字用来测试截断",
+		"hmy":                     "Harmony | ", // the fallback: letters in order
+		`"alpha"`:                 "Alpha | ",
+	} {
+		if got := all(q); got != want {
+			t.Errorf("%q: got %q, want %q", q, got, want)
+		}
+	}
+	// id:#ref
+	ref := m.cols[cActive].items[1].ref
+	if got := all("id:" + ref); got != "Alpha | " {
+		t.Errorf("id:%s: %q", ref, got)
+	}
+	// The query stays with its column until esc there; the header shows N/M and the query.
+	all("")
+	m.focus = cInactive
+	press(m, "/")
+	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("tag:core-lib")})
+	press(m, "enter")
+	press(m, "l") // to "enabled": its own query is empty
+	if names(cActive) != "Core,Alpha,Harmony" || names(cInactive) != "Beta" {
+		t.Fatalf("per column: %q / %q", names(cActive), names(cInactive))
+	}
+	title := m.columnTitle(&m.cols[cInactive], false, 40)
+	if !strings.Contains(title, "Disabled 1/2") || !strings.Contains(title, "tag:core-lib") {
+		t.Fatalf("title %q", title)
+	}
+	press(m, "esc") // in "enabled": nothing to clear there
+	if names(cInactive) != "Beta" {
+		t.Fatal("esc cleared another column's query")
+	}
+	press(m, "h")
+	press(m, "esc")
+	if names(cInactive) == "Beta" {
+		t.Fatal("esc did not clear the query")
 	}
 }

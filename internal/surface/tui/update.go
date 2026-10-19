@@ -200,7 +200,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	case "esc":
 		if c.filter != "" {
 			c.filter = ""
-			c.refilter(c.curID())
+			m.refilterCol(m.focus, c.curID())
 		}
 		m.marked = map[string]bool{}
 		return nil
@@ -251,7 +251,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		if m.act("", "move", it.ref, dir) {
 			m.say(sayOK, Tf("%s is now number %d", name, m.st.Position(id)))
 		}
-		m.cols[cActive].refilter(id)
+		m.refilterCol(cActive, id)
 		return m.requestDetail()
 	case "m":
 		it := c.cur()
@@ -269,7 +269,7 @@ func (m *model) listKey(s string) tea.Cmd {
 			if m.act("", "move", ref, "--to", fmt.Sprint(n)) {
 				m.say(sayOK, Tf("%s is now number %d", name, m.st.Position(id)))
 			}
-			m.cols[cActive].refilter(id)
+			m.refilterCol(cActive, id)
 			return m.requestDetail()
 		}}
 		return nil
@@ -358,7 +358,7 @@ func (m *model) space() tea.Cmd {
 		}
 	}
 	m.marked = map[string]bool{}
-	m.col().refilter("")
+	m.refilterCol(m.focus, "")
 	return m.requestDetail()
 }
 
@@ -399,8 +399,7 @@ func (m *model) filterKey(k tea.KeyMsg) tea.Cmd {
 	default:
 		return nil
 	}
-	c.refilter(keep)
-	c.scroll(m.rowsShown() - 1)
+	m.refilterCol(m.focus, keep)
 	return m.requestDetail()
 }
 
@@ -505,7 +504,7 @@ func (m *model) chooseEnv() tea.Cmd {
 		if m.act(Tf("switched to %s", name), "env", "use", name) {
 			for k := range m.cols {
 				m.cols[k].cursor, m.cols[k].off, m.cols[k].filter = 0, 0, ""
-				m.cols[k].refilter("")
+				m.refilterCol(colKind(k), "")
 			}
 			m.detailRef = ""
 			m.prob.loaded = false
@@ -675,6 +674,6 @@ func (m *model) drop(d *drag, k colKind, i int) tea.Cmd {
 		return nil
 	}
 	m.focus = k
-	m.cols[k].refilter(d.id)
+	m.refilterCol(k, d.id)
 	return m.requestDetail()
 }

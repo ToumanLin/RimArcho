@@ -131,6 +131,9 @@ type model struct {
 	sayKind int
 	drag    *drag
 
+	content    map[string]int // content kinds for type: (loaded on first use)
+	contentKey string
+
 	scanning bool
 	quitting bool
 }

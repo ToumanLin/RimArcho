@@ -7,6 +7,7 @@ import (
 
 	"github.com/rimarcho/rimarcho/internal/app"
 	"github.com/rimarcho/rimarcho/internal/identity"
+	"github.com/rimarcho/rimarcho/internal/source"
 	"github.com/rimarcho/rimarcho/internal/store"
 )
 
@@ -37,12 +38,18 @@ const (
 type item struct {
 	id, ref string
 	name    string
-	lower   string // name, alias, author, package, folder: what / matches
-	icon    string
-	pos     int  // 1-based load position (enabled column)
-	unsaved bool // changed since the last save
-	dim     bool // cannot be loaded
-	missing bool // a ModsConfig entry with no installed mod
+	lower   string // sort key
+	// search fields (06 §5.5), lower case
+	text, names, author, pkg, ws string
+	tags                         []string
+	kind                         string // official, workshop, local, copy, git
+	steamcmd, alias              bool
+	note                         string
+	icon                         string
+	pos                          int  // 1-based load position (enabled column)
+	unsaved                      bool // changed since the last save
+	dim                          bool // cannot be loaded
+	missing                      bool // a ModsConfig entry with no installed mod
 }
 
 type column struct {
@@ -65,44 +72,6 @@ func (c *column) curID() string {
 		return it.id
 	}
 	return ""
-}
-
-// refilter applies the filter and keeps the cursor on keepID when it is still shown.
-func (c *column) refilter(keepID string) {
-	c.view = c.view[:0]
-	q := strings.ToLower(strings.TrimSpace(c.filter))
-	for i := range c.items {
-		if q == "" || words(q, c.items[i].lower) {
-			c.view = append(c.view, i)
-		}
-	}
-	// Nothing contains the text: letters in order in the name ("hsl" finds "Hair Style").
-	if len(c.view) == 0 && q != "" && !strings.Contains(q, " ") {
-		for i := range c.items {
-			if subsequence(q, strings.ToLower(c.items[i].name)) {
-				c.view = append(c.view, i)
-			}
-		}
-	}
-	c.cursor = min(c.cursor, max(len(c.view)-1, 0))
-	if keepID != "" {
-		for i, vi := range c.view {
-			if c.items[vi].id == keepID {
-				c.cursor = i
-				break
-			}
-		}
-	}
-}
-
-// words: every word of q is a substring of s (name, alias, author, package, folder).
-func words(q, s string) bool {
-	for _, w := range strings.Fields(q) {
-		if !strings.Contains(s, w) {
-			return false
-		}
-	}
-	return true
 }
 
 // subsequence: the letters of q appear in s in order.
@@ -275,14 +244,19 @@ func (m *model) reload() {
 		}
 	}
 	for k := range m.cols {
-		m.cols[k].refilter(keep[k])
-		m.cols[k].scroll(m.rowsShown())
+		m.refilterCol(colKind(k), keep[k])
 	}
 }
 
 func modItem(st *app.LoadoutState, mod *store.Mod) item {
 	it := item{id: mod.ID, ref: st.Ix.Ref(mod.ID), name: mod.DisplayName(), icon: sourceIcon(mod)}
-	it.lower = strings.ToLower(it.name + " " + mod.Name + " " + mod.Authors + " " + mod.PackageID + " " + mod.Rel)
+	it.lower = strings.ToLower(it.name)
+	it.names = strings.ToLower(it.name + " " + mod.Name)
+	it.author = strings.ToLower(mod.Authors)
+	it.text = it.names + " " + it.author
+	it.pkg, it.ws = mod.PackageID, mod.WorkshopID()
+	it.tags, it.note, it.alias = mod.Tags, mod.Note, mod.Alias != ""
+	it.kind, it.steamcmd = sourceKind(mod), mod.Kind == source.SteamCMD
 	it.dim = mod.Unloadable != "" || mod.Residue || !st.Reg.Known(mod.ID) || !st.Reg.Loadable(mod.ID)
 	return it
 }
