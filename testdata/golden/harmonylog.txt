@@ -57,7 +57,7 @@ $ archo why #gpto #xamx
   shared-problems:
     info harmony.shared-target  3 mods patch Verse.Pawn.Tick
     warning harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict
-    warning harmony.skip-prefix  #iqmu has a bool prefix on Verse.Pawn.Tick that can skip the original; 2 other mods patch it
+    info harmony.skip-prefix  #iqmu has a bool prefix on Verse.Pawn.Tick that can skip the original; 2 other mods patch it
 
 $ archo log
 log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
@@ -122,8 +122,8 @@ log:E3 harmony-stack x500  first at Player.log:9
     also check ExposeData/PostExposeData, SpawnSetup, DeSpawn and Destroy of the mods that patch the method
 next:
   archo harmony --target Verse.Pawn.Tick
-  archo source search "AllComps.Remove(" --active
-  archo source search "AllComps.Add(" --active
+  archo source search "AllComps.Remove(" --in #iqmu --in #gpto --in #xamx
+  archo source search "AllComps.Add(" --in #iqmu --in #gpto --in #xamx
 
 $ archo log --cluster E4
 log:E4 harmony-stack x1  first at Player.log:18
@@ -145,8 +145,8 @@ log:E4 harmony-stack x1  first at Player.log:18
 next:
   archo source #iqmu --type ModA.CompBroken
   archo harmony --target Verse.Pawn.Tick
-  archo source search "AllComps.Remove(" --active
-  archo source search "AllComps.Add(" --active
+  archo source search "AllComps.Remove(" --in #iqmu
+  archo source search "AllComps.Add(" --in #iqmu
 
 $ archo log --select
 log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters

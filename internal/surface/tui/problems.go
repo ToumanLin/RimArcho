@@ -64,6 +64,13 @@ func (m *model) loadProblems() {
 		p.list, p.analysis = nil, T("error: ")+err.Error()
 		return
 	}
+	// The newest log was parsed into this list (decisions-m4 §7.2): it has been seen.
+	if m.newLog && m.st != nil {
+		if cur, _ := m.app.LogPaths(m.st); cur != "" && m.app.ProblemLog(m.st) == cur {
+			m.app.SelectLog(m.st, cur)
+			m.newLog = false
+		}
+	}
 	src := ps.List
 	if p.showIgnored {
 		src = ps.Ignored
@@ -78,7 +85,7 @@ func (m *model) loadProblems() {
 		case all && x.Code == "version.unsupported":
 			versions = append(versions, x)
 			continue
-		case all && x.Code == "harmony.skip-prefix":
+		case all && x.Code == "harmony.skip-prefix" && x.Severity == finding.Info:
 			skips = append(skips, x)
 			continue
 		}

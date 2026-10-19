@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -50,12 +51,15 @@ type LogCluster struct {
 
 // LogReport is an analysed log.
 type LogReport struct {
-	Path     string
-	Label    string // "Player.log", "Player-prev.log" or "<text>"
-	ModTime  time.Time
-	Lines    int
-	Version  string
-	Clusters []*LogCluster
+	Path    string
+	Label   string // "Player.log", "Player-prev.log" or "<text>"
+	ModTime time.Time
+	Lines   int
+	Version string
+	// AnalysedAs is the major.minor the log was attributed against when it differs from
+	// the environment's (EnvMM): the log's own version (decisions-m4 §7.3).
+	AnalysedAs, EnvMM string
+	Clusters          []*LogCluster
 }
 
 // LogPaths returns the current and previous Player.log for the environment's (or the
@@ -95,7 +99,7 @@ func (a *App) AnalyzeLog(path string) (*LogReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	key := fmt.Sprintf("%s|%d|%d|%s", path, fi.Size(), fi.ModTime().UnixNano(), a.Store.ChangeKey())
+	key := fmt.Sprintf("%s|%d|%d|%s|%s", path, fi.Size(), fi.ModTime().UnixNano(), a.Store.ChangeKey(), a.GameVersion)
 	if a.logCache != nil && a.logCache.key == key {
 		return a.logCache.rep, nil
 	}
@@ -110,6 +114,11 @@ func (a *App) AnalyzeLog(path string) (*LogReport, error) {
 	}
 	rep := &LogReport{Path: path, Label: filepath.Base(path), ModTime: fi.ModTime(), Lines: lf.Lines, Version: lf.Version}
 	fails, _ := analyze.ParseLogFailures(path)
+	st, restore, err := a.logState(st, rep)
+	if err != nil {
+		return nil, err
+	}
+	defer restore()
 	if err := a.attribute(st, rep, lf, fails); err != nil {
 		return nil, err
 	}
@@ -128,7 +137,73 @@ func (a *App) AnalyzeLogText(text string) (*LogReport, error) {
 		return nil, err
 	}
 	rep := &LogReport{Label: "<text>", Lines: lf.Lines, Version: lf.Version}
+	st, restore, err := a.logState(st, rep)
+	if err != nil {
+		return nil, err
+	}
+	defer restore()
 	return rep, a.attribute(st, rep, lf, nil)
+}
+
+// LogMM is the game major.minor a log was written by ("" if it does not say).
+func LogMM(version string) string { return env.MajorMinor(version) }
+
+// logState switches attribution to the log's own game version when it differs from the
+// environment's and no --game-version was given (decisions-m4 §7.3). restore undoes it.
+func (a *App) logState(st *LoadoutState, rep *LogReport) (*LoadoutState, func(), error) {
+	mm := LogMM(rep.Version)
+	if a.GameVersion != "" || mm == "" || mm == st.GameMM() {
+		return st, func() {}, nil
+	}
+	prev := a.GameVersion
+	rep.AnalysedAs, rep.EnvMM = mm, st.GameMM()
+	a.GameVersion = mm
+	restore := func() { a.GameVersion = prev }
+	s2, err := a.Loadout()
+	if err != nil {
+		restore()
+		return nil, nil, err
+	}
+	return s2, restore, nil
+}
+
+// EnsureLogAnalysis brings the analysis for a log's own game version up to date when it
+// differs from the environment's, so patch failures can be matched to the simulation.
+func (a *App) EnsureLogAnalysis(st *LoadoutState, version string, progress func(string)) error {
+	mm := LogMM(version)
+	if a.GameVersion != "" || mm == "" || mm == st.GameMM() {
+		return nil
+	}
+	a.GameVersion = mm
+	defer func() { a.GameVersion = "" }()
+	_, err := a.EnsureAnalysis(progress)
+	return err
+}
+
+// TextLogVersion is LogVersionOf for pasted text.
+func TextLogVersion(text string) string {
+	if len(text) > 64<<10 {
+		text = text[:64<<10]
+	}
+	lf, err := logs.Parse(strings.NewReader(text))
+	if err != nil {
+		return ""
+	}
+	return lf.Version
+}
+
+// LogVersionOf reads the game version a log file names in its first lines.
+func LogVersionOf(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	lf, err := logs.Parse(io.LimitReader(f, 64<<10))
+	if err != nil {
+		return ""
+	}
+	return lf.Version
 }
 
 type attrCtx struct {
@@ -205,9 +280,63 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		cx.xrefReferrers(xrefs)
 	}
 	for _, lc := range rep.Clusters {
+		// Source searches cover the cluster's candidates, not every enabled mod (decisions-m4 §7.4).
+		in := ""
+		for i, at := range lc.Attr {
+			if i == 4 {
+				break
+			}
+			in += " --in " + cx.st.Ix.Ref(at.Instance)
+		}
+		if in == "" {
+			in = " --implicated"
+		}
+		for i, n := range lc.Next {
+			lc.Next[i] = strings.Replace(n, " "+inPlaceholder, in, 1)
+		}
 		lc.Finding = cx.toFinding(lc)
 	}
 	return nil
+}
+
+const inPlaceholder = "<in>"
+
+// ImplicatedMods are the mods the newest log and the current problems point at: the
+// candidates of the problem log's error clusters, else the subjects of Harmony warnings.
+// MCP source searches default to them (decisions-m4 §7.4).
+func (a *App) ImplicatedMods(st *LoadoutState) []string {
+	seen := map[string]bool{}
+	var out []string
+	addID := func(id string) {
+		if id != "" && !seen[id] && st.Ix.ByID[id] != nil {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	if p := a.ProblemLog(st); p != "" {
+		if rep, err := a.AnalyzeLog(p); err == nil {
+			for _, lc := range rep.Clusters {
+				if lc.Class == logs.ClassOther {
+					continue
+				}
+				for _, at := range lc.Attr {
+					addID(at.Instance)
+				}
+			}
+		}
+	}
+	if len(out) == 0 {
+		if ps, err := a.Problems(false, nil); err == nil {
+			for _, p := range ps.List {
+				if p.Layer == "harmony" && p.Severity != finding.Info {
+					for _, s := range p.Subjects {
+						addID(finding.InstID(s))
+					}
+				}
+			}
+		}
+	}
+	return out
 }
 
 // gamePath is where the game sees an instance (the source root + folder, links unresolved).
@@ -403,7 +532,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		}
 	}
 	if hot {
-		lc.next(`archo source search "AllComps.Remove(" --active`, `archo source search "AllComps.Add(" --active`)
+		lc.next(`archo source search "AllComps.Remove(" `+inPlaceholder, `archo source search "AllComps.Add(" `+inPlaceholder)
 		lc.Checklist = append(lc.Checklist, tickChecklist...)
 	}
 	// 4. Type names in the message ("Error while instantiating a mod of type X").
@@ -711,23 +840,91 @@ func (a *App) NewLog(st *LoadoutState) (string, bool) {
 	return cur, true
 }
 
-// logFindings returns the selected log's clusters as findings (informational ones left out).
-func (a *App) logFindings(st *LoadoutState) []*finding.Finding {
-	path := a.SelectedLog(st)
+// ProblemLog is the log whose clusters join the problems (decisions-m4 §7.2): the
+// selected one, or the current Player.log when that is newer.
+func (a *App) ProblemLog(st *LoadoutState) string {
+	sel := a.SelectedLog(st)
+	cur, _ := a.LogPaths(st)
+	switch {
+	case cur == "":
+		return sel
+	case sel == "":
+		return cur
+	}
+	fc, err1 := os.Stat(cur)
+	fs, err2 := os.Stat(sel)
+	if err2 != nil || (err1 == nil && fc.ModTime().After(fs.ModTime())) {
+		return cur
+	}
+	return sel
+}
+
+// hotMethod is a method that appears in a log cluster (a frame, or the frame a Harmony
+// patch line belongs to), with the cluster that shows it.
+type hotMethod struct {
+	cluster string
+	count   int
+}
+
+// logFindings returns the problem log's clusters as findings (informational ones left out)
+// and the methods its error clusters pass through.
+func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotMethod) {
+	path := a.ProblemLog(st)
 	if path == "" {
-		return nil
+		return nil, nil
 	}
 	rep, err := a.AnalyzeLog(path)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	var out []*finding.Finding
+	hot := map[string]hotMethod{}
 	for _, lc := range rep.Clusters {
-		if lc.Class != logs.ClassOther && lc.Finding != nil {
+		if lc.Class == logs.ClassOther {
+			continue
+		}
+		if lc.Finding != nil {
 			out = append(out, lc.Finding)
 		}
+		for _, fr := range lc.First.Frames {
+			if fr.Type == "" || fr.Method == "" {
+				continue
+			}
+			m := strings.ReplaceAll(fr.Type, "+", ".") + "." + fr.Method
+			if _, ok := hot[m]; !ok {
+				hot[m] = hotMethod{"log:" + lc.ID, lc.Count}
+			}
+		}
 	}
-	return out
+	return out, hot
+}
+
+// escalateSkips raises harmony.skip-prefix to warning when its method is in a log cluster
+// (decisions-m4 §7.1): a bool prefix is ordinary until a stack trace passes through it.
+func escalateSkips(fs []*finding.Finding, hot map[string]hotMethod) []*finding.Finding {
+	if len(hot) == 0 {
+		return fs
+	}
+	for i, f := range fs {
+		if f.Code != "harmony.skip-prefix" {
+			continue
+		}
+		t, _, _ := strings.Cut(f.Key, "|")
+		if j := strings.IndexByte(t, '('); j >= 0 {
+			t = t[:j]
+		}
+		h, ok := hot[t]
+		if !ok {
+			continue
+		}
+		c := *f
+		c.Severity = finding.Warning
+		c.Evidence = append(append([]finding.Evidence{}, f.Evidence...), finding.Evidence{Source: finding.Log, Ref: h.cluster,
+			Text: fmt.Sprintf("%s is in the stack of %s (x%d)", t, h.cluster, h.count)})
+		c.Suggestions = append([]string{"archo log --cluster " + strings.TrimPrefix(h.cluster, "log:")}, f.Suggestions...)
+		fs[i] = &c
+	}
+	return fs
 }
 
 func logStamp(path string) string {

@@ -114,6 +114,14 @@ func analysisText(c *Ctx, s *app.AnalysisState, err error) string {
 }
 
 func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if !a.Bool("no-analyze") {
+		// The newest log is attributed against its own version (decisions-m4 §7.2, §7.3).
+		if st, err := c.App.Loadout(); err == nil {
+			if p := c.App.ProblemLog(st); p != "" {
+				c.App.EnsureLogAnalysis(st, app.LogVersionOf(p), progress())
+			}
+		}
+	}
 	ps, err := c.App.Problems(!a.Bool("no-analyze"), progress())
 	if err != nil {
 		return nil, err
@@ -157,7 +165,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			versions = append(versions, p) // folded into one row below
 			continue
 		}
-		if !full && p.Code == "harmony.skip-prefix" {
+		if !full && p.Code == "harmony.skip-prefix" && p.Severity == finding.Info {
 			skips = append(skips, p) // folded too (decisions-m4 §3)
 			continue
 		}
@@ -383,7 +391,7 @@ func skipSummary(ps []*app.Problem) string {
 			mods[p.Subjects[0]] = true
 		}
 	}
-	return fmt.Sprintf("%s harmony.skip-prefix  %d bool prefixes from %d mods can skip methods other mods also patch  (archo problems --code harmony.skip-prefix)", ps[0].Severity, len(ps), len(mods))
+	return fmt.Sprintf("%s harmony.skip-prefix  %d bool prefixes from %d mods can skip methods other mods also patch; none is in a log stack  (archo problems --code harmony.skip-prefix)", ps[0].Severity, len(ps), len(mods))
 }
 
 // versionSummary folds version.unsupported into one row per game version (decisions-m3 §12.1).

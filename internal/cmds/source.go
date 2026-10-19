@@ -20,7 +20,9 @@ func init() {
 	register(&Command{Name: "source", Args: "<ref>", Summary: "decompile a mod's assemblies on demand (ilspycmd; cached per DLL hash)", MinArgs: 1, MaxArgs: 1, Run: sourceCmd,
 		Flags: []Flag{{Name: "type", Value: "<Namespace.Type>"}, {Name: "all"}}})
 	register(&Command{Name: "source search", Args: "<pattern>", Summary: "search decompiled C# (uncached assemblies are decompiled first)", MinArgs: 1, MaxArgs: 1, Run: sourceSearchCmd,
-		Flags: []Flag{{Name: "in", Value: "<ref>", Multi: true}, {Name: "active"}, {Name: "regex"}, {Name: "all"}, {Name: "budget", Value: "<seconds>", Help: "stop decompiling after this long and search what is cached"}}})
+		Flags: []Flag{{Name: "in", Value: "<ref>", Multi: true}, {Name: "implicated", Help: "the mods the newest log and the Harmony warnings point at"},
+			{Name: "active", Help: "every enabled mod (prints an estimate first; needs --yes)"}, {Name: "yes", Help: "confirm decompiling every enabled mod"},
+			{Name: "regex"}, {Name: "all"}, {Name: "budget", Value: "<seconds>", Help: "stop decompiling after this long and search what is cached"}}})
 }
 
 func noILSpy(err error) error {
@@ -101,6 +103,36 @@ func sourceCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
+// activeEstimate prints what searching every enabled mod would decompile (decisions-m4
+// §7.4); nil when everything is cached already.
+func activeEstimate(c *Ctx, st *app.LoadoutState, mods []*store.Mod, pattern string) (*render.Doc, error) {
+	var total, todo int
+	var bytes int64
+	for _, m := range mods {
+		ds, err := c.App.SourceDLLs(st, m)
+		if err != nil {
+			return nil, err
+		}
+		for _, x := range ds {
+			total++
+			if !x.Cached {
+				todo++
+				if fi, err := os.Stat(x.Path); err == nil {
+					bytes += fi.Size()
+				}
+			}
+		}
+	}
+	if todo == 0 {
+		return nil, nil
+	}
+	d, root := render.New(fmt.Sprintf("source search --active: %d assemblies in %d enabled mods, %d not decompiled yet", total, len(mods), todo))
+	root.KV("estimate", fmt.Sprintf("%.0f MB of DLLs → about %.0f MB of cache, roughly %d min with ilspycmd", float64(bytes)/(1<<20), 3*float64(bytes)/(1<<20), (todo*3/2+59)/60))
+	root.Add("nothing was decompiled; confirm with --yes, or narrow the scope with --in / --implicated")
+	d.AddNext(fmt.Sprintf("archo source search %q --active --yes", pattern), fmt.Sprintf("archo source search %q --implicated", pattern))
+	return d, nil
+}
+
 func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	st, err := c.App.Loadout()
 	if err != nil {
@@ -115,13 +147,32 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		mods = append(mods, m)
 	}
 	scope := fmt.Sprintf("%d mods", len(mods))
-	if len(mods) == 0 {
+	switch {
+	case len(mods) > 0:
+	case a.Bool("implicated"):
+		for _, id := range c.App.ImplicatedMods(st) {
+			mods = append(mods, st.Ix.ByID[id])
+		}
+		scope = fmt.Sprintf("%d implicated mods", len(mods))
+		if len(mods) == 0 {
+			d, root := render.New("source search: no implicated mods (no error clusters in the newest log, no Harmony warnings)")
+			root.Add("name the mods with --in <ref>, or search every enabled mod with --active --yes")
+			return d, nil
+		}
+	case a.Bool("active"):
 		for _, e := range st.List {
 			if m := st.Ix.ByID[e.Instance]; m != nil {
 				mods = append(mods, m)
 			}
 		}
 		scope = "the enabled mods"
+		if !a.Bool("yes") {
+			if d, err := activeEstimate(c, st, mods, a.Pos[0]); d != nil || err != nil {
+				return d, err
+			}
+		}
+	default:
+		return nil, &UsageError{Msg: "source search needs a scope: --in <ref>, --implicated, or --active --yes"}
 	}
 	var re *regexp.Regexp
 	if a.Bool("regex") {

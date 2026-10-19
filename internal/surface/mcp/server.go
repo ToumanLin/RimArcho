@@ -219,7 +219,8 @@ type SourceIn struct {
 	Ref    string   `json:"ref,omitempty" jsonschema:"decompile this mod (with type: one type) — #id or pkg:…"`
 	Type   string   `json:"type,omitempty" jsonschema:"full type name to show, e.g. MyMod.HarmonyPatches.Pawn_Tick"`
 	Search string   `json:"search,omitempty" jsonschema:"search decompiled C# for this text instead"`
-	In     []string `json:"in,omitempty" jsonschema:"mods to search (default: every enabled mod)"`
+	In     []string `json:"in,omitempty" jsonschema:"mods to search (default: the mods the newest log and Harmony warnings implicate)"`
+	Scope  string   `json:"scope,omitempty" jsonschema:"active: search every enabled mod (decompiles everything not cached; can take many minutes)"`
 	Regex  bool     `json:"regex,omitempty"`
 	All    bool     `json:"all,omitempty"`
 	Budget int      `json:"budget,omitempty" jsonschema:"seconds to spend decompiling before searching what is cached (default 10)"`
@@ -322,6 +323,13 @@ func SourceArgv(in SourceIn) []string {
 		b := argv("source", "search", in.Search)
 		for _, r := range in.In {
 			b.str("in", r)
+		}
+		switch {
+		case len(in.In) > 0:
+		case in.Scope == "active":
+			b.flag("active", true).flag("yes", true)
+		default:
+			b.flag("implicated", true) // decisions-m4 §7.4
 		}
 		budget := in.Budget
 		if budget == 0 {

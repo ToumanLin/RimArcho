@@ -172,7 +172,7 @@ func harmonyFindings(active []*Mod, asms []*AssemblyFacts) []*Finding {
 					others++
 				}
 			}
-			f := &Finding{Code: "harmony.skip-prefix", Severity: finding.Warning, Layer: "harmony", Confidence: finding.Possible,
+			f := &Finding{Code: "harmony.skip-prefix", Severity: finding.Info, Layer: "harmony", Confidence: finding.Possible,
 				Key:      t + "|" + h.p.PatchType + "." + h.p.PatchMethod,
 				Subjects: []string{finding.Inst(h.mod.Instance)},
 				Claim:    fmt.Sprintf("%s has a bool prefix on %s that can skip the original; %d other mods patch it", finding.Inst(h.mod.Instance), t, others),

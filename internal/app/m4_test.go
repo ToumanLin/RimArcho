@@ -147,3 +147,83 @@ func ref(t *testing.T, e *testkit.Env, name string) string {
 	t.Fatalf("no mod %q", name)
 	return ""
 }
+
+// decisions-m4 §7.1/§7.2: skip-prefix is info until the newest log's stack passes through
+// the method; the newest Player.log joins the problems without --select.
+func TestSkipPrefixEscalation(t *testing.T) {
+	e := testkit.New(t)
+	e.HarmonyLogFixture()
+	sev := func() (string, string) {
+		ps := problems(t, e)
+		for _, p := range ps.List {
+			if p.Code == "harmony.skip-prefix" {
+				ev := ""
+				for _, x := range p.Evidence {
+					ev += x.Text + ";"
+				}
+				return p.Severity, ev
+			}
+		}
+		t.Fatal("no skip-prefix")
+		return "", ""
+	}
+	if s, ev := sev(); s != "warning" || !strings.Contains(ev, "Verse.Pawn.Tick is in the stack of log:E3 (x500)") {
+		t.Fatalf("with the log: %s %s", s, ev)
+	}
+	logs := 0
+	for _, p := range problems(t, e).List {
+		if strings.HasPrefix(p.Code, "log.") {
+			logs++
+		}
+	}
+	if logs != 4 {
+		t.Fatalf("newest log not included automatically: %d log problems", logs)
+	}
+	os.Remove(filepath.Join(e.UserData, "Player.log"))
+	if s, _ := sev(); s != "info" {
+		t.Fatalf("without a log: %s", s)
+	}
+}
+
+// decisions-m4 §7.3: a log from another game version is attributed against that version.
+func TestLogOwnVersion(t *testing.T) {
+	e := testkit.New(t)
+	log := e.HarmonyLogFixture()
+	p := filepath.Join(e.UserData, "Player.log")
+	os.WriteFile(p, []byte(strings.Replace(log, "RimWorld 1.6.4633 rev1261", "RimWorld 1.5.4409 rev1118", 1)), 0o644)
+	out := e.MustRun("log")
+	if !strings.Contains(out, "analysed: as 1.5 (log version); environment is 1.6") {
+		t.Fatalf("header:\n%s", out)
+	}
+	if out := e.MustRun("log", "--game-version", "1.6"); strings.Contains(out, "analysed:") {
+		t.Fatalf("explicit --game-version wins:\n%s", out)
+	}
+}
+
+// decisions-m4 §7.4: searching every enabled mod prints an estimate and needs --yes;
+// --implicated covers the newest log's candidates.
+func TestSourceSearchScope(t *testing.T) {
+	e := testkit.New(t)
+	e.HarmonyLogFixture()
+	f := &fakeILSpy{}
+	e.App.Decompile = f.run
+	if _, code := e.Run("source", "search", "AllComps"); code != 2 {
+		t.Fatalf("no scope is a usage error, exit %d", code)
+	}
+	out := e.MustRun("source", "search", "AllComps", "--active")
+	if !strings.Contains(out, "4 not decompiled yet") || !strings.Contains(out, "nothing was decompiled") || len(f.calls) != 0 {
+		t.Fatalf("estimate (calls %v):\n%s", f.calls, out)
+	}
+	out = e.MustRun("source", "search", "AllComps.Remove(", "--implicated")
+	if !strings.Contains(out, "implicated mods") || len(f.calls) == 0 || len(f.calls) > 3 {
+		t.Fatalf("implicated (calls %v):\n%s", f.calls, out)
+	}
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "ModManual.dll") {
+			t.Fatalf("Manual Patcher is not implicated by the log: %v", f.calls)
+		}
+	}
+	if out := e.MustRun("source", "search", "AllComps", "--active", "--yes"); !strings.Contains(out, "in the enabled mods") || len(f.calls) != 4 {
+		t.Fatalf("--yes decompiles the rest (calls %v):\n%s", f.calls, out)
+	}
+}

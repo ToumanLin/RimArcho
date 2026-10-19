@@ -1,6 +1,7 @@
 package cmds
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -23,6 +24,9 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 		return nil, nil, err
 	}
 	if t := a.Str("text"); t != "" {
+		if err := c.App.EnsureLogAnalysis(st, app.TextLogVersion(t), progress()); err != nil && !errors.Is(err, app.ErrStillComputing) {
+			return nil, nil, err
+		}
 		r, err := c.App.AnalyzeLogText(t)
 		return r, st, err
 	}
@@ -37,8 +41,18 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 			return nil, nil, fmt.Errorf("no Player.log found for %s under %s (archo log --file <path>)", st.GameMM(), st.Ix.Env.UserDataRoot)
 		}
 	}
+	if err := c.App.EnsureLogAnalysis(st, app.LogVersionOf(path), progress()); err != nil && !errors.Is(err, app.ErrStillComputing) {
+		return nil, nil, err
+	}
 	r, err := c.App.AnalyzeLog(path)
 	return r, st, err
+}
+
+// analysedAs says when a log was attributed against its own game version (decisions-m4 §7.3).
+func analysedAs(root *render.Node, r *app.LogReport) {
+	if r.AnalysedAs != "" {
+		root.KV("analysed", fmt.Sprintf("as %s (log version); environment is %s", r.AnalysedAs, r.EnvMM))
+	}
 }
 
 func roleLine(ix *app.Index, at *app.Attribution) string {
@@ -88,6 +102,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			classes = append(classes, fmt.Sprintf("%s %d", k, byClass[k]))
 		}
 	}
+	analysedAs(root, r)
 	root.KV("classes", strings.Join(classes, ", "))
 	lst := root.Section("list")
 	for _, lc := range r.Clusters {
@@ -141,6 +156,7 @@ func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc
 	if len(msg) > 300 {
 		msg = msg[:297] + "..."
 	}
+	analysedAs(root, r)
 	root.KV("message", msg)
 	for _, x := range lc.First.Extra {
 		if strings.HasPrefix(x, "file: ") {
