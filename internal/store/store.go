@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 8
+const SchemaVersion = 9
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -184,6 +184,14 @@ CREATE INDEX type_fact_mm ON type_fact(game_mm, type_name);
 CREATE INDEX harmony_fact_mm ON harmony_fact(game_mm, target);
 `
 
+// schemaV9: attributed Player.log reports, so a new process (an MCP session) does not
+// parse and attribute an unchanged log again. One row per log path.
+const schemaV9 = `
+CREATE TABLE log_cache(
+  path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime INTEGER NOT NULL, version TEXT NOT NULL DEFAULT '',
+  input_key TEXT NOT NULL, report BLOB NOT NULL);
+`
+
 // Store wraps the database handle.
 type Store struct {
 	DB   *sql.DB
@@ -226,7 +234,7 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {

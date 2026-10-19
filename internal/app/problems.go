@@ -17,14 +17,18 @@ type Problem struct {
 	*finding.Finding
 	Ref           string // p:<hex>
 	Ignored       bool
-	IgnoreExpired bool // ignored once, but the subject changed since (03 §4.2)
+	IgnoreExpired bool    // ignored once, but the subject changed since (03 §4.2)
+	Log           *LogRun // the log of a log.* problem
 }
 
 // ProblemSet is every current problem of the environment.
 type ProblemSet struct {
-	State    *LoadoutState
-	List     []*Problem // not ignored, sorted by severity then subject
-	Ignored  []*Problem
+	State   *LoadoutState
+	List    []*Problem // not ignored, sorted by severity then subject
+	Ignored []*Problem
+	// Stale holds the problems of stale logs (LogRun.Stale): shown apart, never counted.
+	Stale    []*Problem
+	Logs     []*LogRun // the logs whose clusters joined the problems
 	Analysis *AnalysisState
 	// AnalysisErr is set when the Def/Patch layers could not be brought up to date; the
 	// declaration layer is still complete.
@@ -53,7 +57,7 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	if a.stCache != nil && a.stCache.Ix == st.Ix {
 		key = a.stKey + "|" + a.GameVersion
 		if p := a.ProblemLog(st); p != "" {
-			key += "|" + p + "|" + logStamp(p)
+			key += "|" + p + "|" + logStamp(p) + fmt.Sprint(a.LogCacheOnly)
 		}
 	}
 	if key != "" && a.prCache != nil && a.prKey == key && ps.AnalysisErr == nil {
@@ -89,8 +93,18 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 			all = append(all, f)
 		}
 	}
-	lfs, hot := a.logFindings(st)
+	lfs, hot, run := a.logFindings(st)
+	if run != nil {
+		ps.Logs = append(ps.Logs, run)
+		if run.Stale() {
+			hot = nil // an old log does not raise current findings
+		}
+	}
 	all = escalateSkips(all, hot)
+	fromLog := map[*finding.Finding]bool{}
+	for _, f := range lfs {
+		fromLog[f] = true
+	}
 	all = append(all, lfs...)
 	ignores, err := a.Store.Ignores(st.Ix.Env.ID)
 	if err != nil {
@@ -103,6 +117,9 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	}
 	for _, f := range all {
 		p := &Problem{Finding: f}
+		if fromLog[f] {
+			p.Log = run
+		}
 		lin, snap := "", int64(0)
 		if m := st.Ix.ByID[f.SubjectInstance()]; m != nil {
 			lin, snap = m.LineageID, m.SnapID
@@ -115,9 +132,12 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 				p.IgnoreExpired = true
 			}
 		}
-		if p.Ignored {
+		switch {
+		case p.Ignored:
 			ps.Ignored = append(ps.Ignored, p)
-		} else {
+		case p.Log != nil && p.Log.Stale():
+			ps.Stale = append(ps.Stale, p)
+		default:
 			ps.List = append(ps.List, p)
 		}
 	}
@@ -129,6 +149,7 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	}
 	sortProblems(ps.List, order)
 	sortProblems(ps.Ignored, order)
+	sortProblems(ps.Stale, order)
 	return ps, nil
 }
 
@@ -145,13 +166,18 @@ func sortProblems(ps []*Problem, order func(*finding.Finding) string) {
 	}
 }
 
+// All is every problem: current, ignored and from stale logs.
+func (ps *ProblemSet) All() []*Problem {
+	return append(append(append([]*Problem{}, ps.List...), ps.Ignored...), ps.Stale...)
+}
+
 // IgnoreProblem records an ignore on the subject's lineage at its current snapshot.
 func (a *App) IgnoreProblem(ref string, undo bool) (*Problem, error) {
 	ps, err := a.Problems(false, nil)
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range append(append([]*Problem{}, ps.List...), ps.Ignored...) {
+	for _, p := range ps.All() {
 		if p.Ref != ref {
 			continue
 		}

@@ -187,7 +187,11 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	loadoutStatus(c, root, d)
-	if ps, err := c.App.Problems(false, nil); err == nil && ps.State != nil {
+	// Status never parses the log: it uses the stored report (logs are a problems command).
+	c.App.LogCacheOnly = true
+	ps, err := c.App.Problems(false, nil)
+	c.App.LogCacheOnly = false
+	if err == nil && ps.State != nil {
 		line := severityCounts(ps.List) + " (archo problems)"
 		if ps.Analysis == nil || ps.Analysis.Run == nil {
 			line = severityCounts(ps.List) + " in declarations; Defs and Patches not analysed yet (archo problems)"
@@ -195,6 +199,22 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			line = severityCounts(ps.List) + "; Def/Patch analysis stale (archo problems)"
 		}
 		root.KV("problems", line)
+		for _, r := range ps.Logs {
+			text := logRunText(c, r)
+			switch {
+			case r.Pending:
+				text += ": not analysed yet, so its errors are not in the counts (archo problems)"
+			case r.Stale():
+				var lp []*app.Problem
+				for _, p := range ps.Stale {
+					if p.Log == r {
+						lp = append(lp, p)
+					}
+				}
+				text += ": " + shortCounts(lp) + ", not counted (archo problems --code log --all)"
+			}
+			root.KV("log", text)
+		}
 	}
 	return d, nil
 }

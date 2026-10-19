@@ -127,7 +127,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	ix := ps.State.Ix
-	list := ps.List
+	list := append(append([]*app.Problem{}, ps.List...), ps.Stale...)
 	if a.Bool("ignored") {
 		list = ps.Ignored
 	}
@@ -144,6 +144,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	var sel []*app.Problem
 	hidden := map[string]int{}
 	var versions, skips []*app.Problem
+	byLog := map[*app.LogRun][]*app.Problem{} // log problems are grouped under their log (03 §6.3)
 	for _, p := range list {
 		if subj != "" && !contains(p.Subjects, subj) {
 			continue
@@ -169,16 +170,31 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			skips = append(skips, p) // folded too (decisions-m4 §3)
 			continue
 		}
+		if p.Log != nil {
+			byLog[p.Log] = append(byLog[p.Log], p)
+			continue
+		}
 		sel = append(sel, p)
 	}
 	counted := append(append(append([]*app.Problem{}, sel...), versions...), skips...)
+	for _, r := range ps.Logs {
+		if !r.Stale() {
+			counted = append(counted, byLog[r]...)
+		}
+	}
 	head := "problems: " + severityCounts(counted)
 	if a.Bool("ignored") {
 		head = "ignored problems: " + severityCounts(counted)
 	}
 	d, root := render.New(head)
 	root.KV("analysis", analysisText(c, ps.Analysis, ps.AnalysisErr))
-	detail := a.Bool("detail") || len(sel) <= 3
+	shown := len(sel)
+	for _, r := range ps.Logs {
+		if !r.Stale() || full {
+			shown += len(byLog[r])
+		}
+	}
+	detail := a.Bool("detail") || shown <= 3
 	limit := render.DefaultLimit
 	if detail {
 		limit = 8
@@ -187,7 +203,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		limit = 0
 	}
 	lst := root.Section("list")
-	if len(sel) == 0 {
+	if len(sel) == 0 && len(versions)+len(skips) == 0 {
 		lst.Add("(none)")
 	}
 	// Folded rows go first in their severity, so a truncated list still shows them.
@@ -235,6 +251,42 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if !a.Bool("ignored") && len(ps.Ignored) > 0 {
 		root.KV("ignored", fmt.Sprintf("%d (archo problems --ignored)", len(ps.Ignored)))
 	}
+	// Logs: one row per log with its clusters under it. A current log lists them (the
+	// first few unless --all); a stale log is folded unless the filters ask for its rows.
+	var logFirst *app.Problem
+	if len(byLog) > 0 {
+		lg := root.Section("logs")
+		for _, r := range ps.Logs {
+			lp := byLog[r]
+			if len(lp) == 0 {
+				continue
+			}
+			folded := r.Stale() && !full
+			n := lg.Add(logRunLine(c, r, lp, folded))
+			if folded {
+				continue
+			}
+			if !r.Stale() && logFirst == nil {
+				logFirst = lp[0]
+			}
+			for _, p := range lp {
+				pn := n.Add(problemLine(ix, p))
+				if detail {
+					addProblemDetail(ix, pn, p)
+				}
+			}
+			lim := 5
+			if a.Bool("all") {
+				lim = 0
+			} else if full {
+				lim = limit
+			}
+			n.Truncate(lim, logExpandCmd(r))
+		}
+	}
+	if len(sel) == 0 && logFirst != nil {
+		sel = append(sel, logFirst)
+	}
 	if len(sel) > 0 {
 		if !detail {
 			d.AddNext("archo problems show " + sel[0].Ref)
@@ -250,7 +302,7 @@ func findProblem(c *Ctx, ref string) (*app.ProblemSet, *app.Problem, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, p := range append(append([]*app.Problem{}, ps.List...), ps.Ignored...) {
+	for _, p := range ps.All() {
 		if p.Ref == ref {
 			return ps, p, nil
 		}
@@ -274,6 +326,9 @@ func problemShowCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	root.KV("subjects", strings.Join(subs, " "))
 	if p.Ignored {
 		root.KV("ignored", "yes (archo problems unignore "+p.Ref+")")
+	}
+	if p.Log != nil {
+		root.KV("log", logRunText(c, p.Log))
 	}
 	addProblemDetail(ix, root, p)
 	if len(p.Suggestions) > 0 {
@@ -350,7 +405,9 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 		}
 		root.KV("content", line)
 	}
+	c.App.LogCacheOnly = true // a mod page does not parse the log (stored report only)
 	ps, err := c.App.Problems(false, nil)
+	c.App.LogCacheOnly = false
 	if err != nil {
 		return err
 	}
@@ -409,4 +466,61 @@ func versionSummary(ps []*app.Problem, mm string) string {
 		line += fmt.Sprintf(" (%d list %s, %d older only)", len(ps)-warn, prev, warn)
 	}
 	return line + "  (archo problems --code version.unsupported)"
+}
+
+// logRunText describes a log: file, game version, time, and whether it is stale.
+func logRunText(c *Ctx, r *app.LogRun) string {
+	s := r.Label
+	if v := strings.Fields(r.Version); len(v) > 0 {
+		s += " " + v[0]
+	}
+	s += " " + c.App.FormatTime(r.ModTime)
+	var why []string
+	if r.OtherGame {
+		why = append(why, fmt.Sprintf("written by %s, the game is %s", r.MM, r.EnvMM))
+	}
+	if r.Before {
+		why = append(why, "older than the Loadout's last change at "+c.App.FormatTime(r.LoadoutAt))
+	}
+	if len(why) > 0 {
+		return s + ", stale log (" + strings.Join(why, "; ") + ")"
+	}
+	return s + ", current (written after the Loadout's last change)"
+}
+
+// shortCounts is severityCounts without the zero severities.
+func shortCounts(ps []*app.Problem) string {
+	n := map[string]int{}
+	for _, p := range ps {
+		n[p.Severity]++
+	}
+	var out []string
+	for _, s := range []string{finding.Error, finding.Warning, finding.Info} {
+		if n[s] > 0 {
+			out = append(out, fmt.Sprintf("%d %s", n[s], s))
+		}
+	}
+	if len(out) == 0 {
+		return "no problems"
+	}
+	return strings.Join(out, ", ")
+}
+
+// logRunLine is the header row of a log's problems; a folded row names its expand command.
+func logRunLine(c *Ctx, r *app.LogRun, ps []*app.Problem, folded bool) string {
+	line := "log " + logRunText(c, r) + ": " + shortCounts(ps)
+	if r.Stale() {
+		line += ", not counted"
+	}
+	if folded {
+		line += "  (" + logExpandCmd(r) + ")"
+	}
+	return line
+}
+
+func logExpandCmd(r *app.LogRun) string {
+	if r.Stale() {
+		return "archo problems --code log --all"
+	}
+	return "archo problems --code log"
 }

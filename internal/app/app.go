@@ -59,8 +59,11 @@ type App struct {
 	// LazyLog keeps the newest Player.log out of Problems until the player opens the
 	// Problems view (the TUI; decisions-m4 §7.2: parse lazily to keep idle memory down).
 	// An explicitly selected log is always included.
-	LazyLog   bool
-	analyzing *pendingAnalysis
+	LazyLog bool
+	// LogCacheOnly makes Problems use a stored log report only, never parse the log
+	// (status and mod: commands that are not about the log).
+	LogCacheOnly bool
+	analyzing    *pendingAnalysis
 
 	ixCache *Index
 	ixKey   string

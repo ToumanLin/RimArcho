@@ -2,6 +2,9 @@ package app
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -90,8 +93,22 @@ type logCacheEntry struct {
 	rep *LogReport
 }
 
-// AnalyzeLog parses and attributes a log file (cached by path, size and mtime).
-func (a *App) AnalyzeLog(path string) (*LogReport, error) {
+// ErrLogNotCached: a cache-only read found no stored report for the log as it is now.
+var ErrLogNotCached = errors.New("log not analysed yet")
+
+// logCacheVersion invalidates stored reports when attribution changes.
+const logCacheVersion = 1
+
+// AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
+// database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
+// new process does not parse and attribute an unchanged log again.
+func (a *App) AnalyzeLog(path string) (*LogReport, error) { return a.analyzeLog(path, false) }
+
+// CachedLog returns the stored report of a log without parsing it (ErrLogNotCached if the
+// log or the attribution inputs changed since it was stored).
+func (a *App) CachedLog(path string) (*LogReport, error) { return a.analyzeLog(path, true) }
+
+func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -104,27 +121,86 @@ func (a *App) AnalyzeLog(path string) (*LogReport, error) {
 	if a.logCache != nil && a.logCache.key == key {
 		return a.logCache.rep, nil
 	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
+	rep := &LogReport{Path: path, Label: filepath.Base(path), ModTime: fi.ModTime()}
+	var lf *logs.File
+	row, _ := a.Store.LogCache(path)
+	fresh := row != nil && row.Size == fi.Size() && row.MTime == fi.ModTime().UnixNano()
+	switch {
+	case fresh:
+		rep.Version = row.Version
+	case cacheOnly:
+		return nil, ErrLogNotCached
+	default:
+		if lf, err = parseLogFile(path); err != nil {
+			return nil, err
+		}
+		rep.Version = lf.Version
 	}
-	defer f.Close()
-	lf, err := logs.Parse(f)
-	if err != nil {
-		return nil, err
-	}
-	rep := &LogReport{Path: path, Label: filepath.Base(path), ModTime: fi.ModTime(), Lines: lf.Lines, Version: lf.Version}
-	fails, _ := analyze.ParseLogFailures(path)
 	st, restore, err := a.logState(st, rep)
 	if err != nil {
 		return nil, err
 	}
 	defer restore()
+	ik := a.logInputKey(st)
+	if fresh && row.InputKey == ik {
+		var stored LogReport
+		if err := json.Unmarshal(row.Report, &stored); err == nil {
+			stored.Path, stored.Label, stored.ModTime = rep.Path, rep.Label, rep.ModTime
+			a.logCache = &logCacheEntry{key: key, rep: &stored}
+			return &stored, nil
+		}
+	}
+	if cacheOnly {
+		return nil, ErrLogNotCached
+	}
+	if lf == nil {
+		if lf, err = parseLogFile(path); err != nil {
+			return nil, err
+		}
+	}
+	rep.Lines = lf.Lines
+	fails, _ := analyze.ParseLogFailures(path)
 	if err := a.attribute(st, rep, lf, fails); err != nil {
 		return nil, err
 	}
 	a.logCache = &logCacheEntry{key: key, rep: rep}
+	if b, err := json.Marshal(rep); err == nil {
+		a.Store.PutLogCache(&store.LogCache{Path: path, Size: fi.Size(), MTime: fi.ModTime().UnixNano(), Version: rep.Version, InputKey: ik, Report: b})
+	}
 	return rep, nil
+}
+
+func parseLogFile(path string) (*logs.File, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return logs.Parse(f)
+}
+
+// logInputKey fingerprints what attribution reads besides the log: the game version, the
+// analysis run, the enabled list and every installed mod (identity, snapshot, names, folder).
+func (a *App) logInputKey(st *LoadoutState) string {
+	h := sha1.New()
+	fmt.Fprintf(h, "v%d|%s|%s|", logCacheVersion, a.GameVersion, st.GameMM())
+	if s, err := a.Analysis(st); err == nil && s.Run != nil {
+		fmt.Fprintf(h, "a%d|", s.Run.ID)
+	}
+	for _, e := range st.List {
+		fmt.Fprintf(h, "%s;", e.Instance)
+	}
+	var mods []string
+	for _, m := range st.Ix.Mods {
+		if m.TombstoneAt.IsZero() {
+			mods = append(mods, fmt.Sprintf("%s %d %s %s %s %s", m.ID, m.SnapID, m.Name, m.Alias, m.PackageID, gamePath(st.Ix, m)))
+		}
+	}
+	sort.Strings(mods)
+	for _, m := range mods {
+		fmt.Fprintf(h, "|%s", m)
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
 // AnalyzeLogText attributes a pasted stack trace or log excerpt.
@@ -873,17 +949,74 @@ type hotMethod struct {
 	count   int
 }
 
-// logFindings returns the problem log's clusters as findings (informational ones left out)
-// and the methods its error clusters pass through.
-func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotMethod) {
+// LogRun is a log whose clusters join the problems, and whether it still describes the
+// current Loadout (03 §6.3). A stale log was written by another game version or before
+// the Loadout's last save or change: its problems are listed apart and not counted.
+type LogRun struct {
+	Path, Label string
+	Version     string
+	ModTime     time.Time
+	MM, EnvMM   string    // the log's and the environment's major.minor
+	LoadoutAt   time.Time // the Loadout's last save or change
+	OtherGame   bool      // written by another game version
+	Before      bool      // written before LoadoutAt
+	// Pending: a cache-only problem list (status, mod) found no stored report; the log's
+	// problems are not in the list until a log or problems command analyses it.
+	Pending bool
+}
+
+// Stale reports whether the log's problems describe an earlier state.
+func (r *LogRun) Stale() bool { return r.OtherGame || r.Before }
+
+// LoadoutChangedAt is when the Loadout last changed: the last unsaved edit, else when
+// ModsConfig.xml was written (by RimArcho, the game or another tool).
+func (a *App) LoadoutChangedAt(st *LoadoutState) time.Time {
+	if st.WS != nil && len(st.Changes()) > 0 {
+		return st.WS.Updated
+	}
+	if st.FilePath != "" {
+		if fi, err := os.Stat(st.FilePath); err == nil {
+			return fi.ModTime()
+		}
+	}
+	if st.Latest != nil {
+		return st.Latest.Created
+	}
+	return time.Time{}
+}
+
+func (a *App) logRun(st *LoadoutState, path, version string, mod time.Time) *LogRun {
+	r := &LogRun{Path: path, Label: filepath.Base(path), Version: version, ModTime: mod, MM: LogMM(version), EnvMM: st.GameMM(), LoadoutAt: a.LoadoutChangedAt(st)}
+	r.OtherGame = r.MM != "" && r.EnvMM != "" && r.MM != r.EnvMM
+	r.Before = !r.LoadoutAt.IsZero() && mod.Before(r.LoadoutAt)
+	return r
+}
+
+// logFindings returns the problem log's clusters as findings (informational ones left out),
+// the methods its error clusters pass through, and the log run. With LogCacheOnly the log
+// is not parsed: a log without a stored report comes back Pending.
+func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotMethod, *LogRun) {
 	path := a.ProblemLog(st)
 	if path == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
-	rep, err := a.AnalyzeLog(path)
+	var rep *LogReport
+	var err error
+	if a.LogCacheOnly {
+		rep, err = a.CachedLog(path)
+	} else {
+		rep, err = a.AnalyzeLog(path)
+	}
 	if err != nil {
-		return nil, nil
+		fi, serr := os.Stat(path)
+		if serr != nil || !errors.Is(err, ErrLogNotCached) {
+			return nil, nil, nil
+		}
+		r := a.logRun(st, path, LogVersionOf(path), fi.ModTime())
+		r.Pending = true
+		return nil, nil, r
 	}
+	run := a.logRun(st, path, rep.Version, rep.ModTime)
 	var out []*finding.Finding
 	hot := map[string]hotMethod{}
 	for _, lc := range rep.Clusters {
@@ -903,7 +1036,7 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 			}
 		}
 	}
-	return out, hot
+	return out, hot, run
 }
 
 // escalateSkips raises harmony.skip-prefix to warning when its method is in a log cluster

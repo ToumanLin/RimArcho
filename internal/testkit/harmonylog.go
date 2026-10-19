@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // DotnetBin is testdata/dotnet/bin: the fixture assemblies built by testdata/dotnet/build.ps1.
@@ -59,6 +60,8 @@ func (e *Env) HarmonyLogFixture() string {
 	e.WriteMod(filepath.Join(mods, "Refer"), plain("tester.refer", "Refer", map[string]string{
 		"Defs/Recipes.xml": "<Defs>\n  <RecipeDef>\n    <defName>Refer_Recipe</defName>\n    <products>\n      <Lib_Gun>1</Lib_Gun>\n    </products>\n  </RecipeDef>\n</Defs>\n"}))
 	e.WriteModsConfig("1.6.4633 rev1261", "brrainz.harmony", "ludeon.rimworld", "tester.moda", "tester.modb", "tester.modc", "tester.manual", "tester.compat", "tester.refer")
+	// The game wrote the list before the session that wrote the log (a current log).
+	os.Chtimes(e.ModsConfig, e.Now().Add(-time.Hour), e.Now().Add(-time.Hour))
 	e.AddEnv(false)
 	e.MustRun("scan")
 	log := FixtureLog(filepath.Join(mods, "Compat", "Patches", "Compat.xml"))
