@@ -348,3 +348,45 @@ func TestChangesViewAndMouse(t *testing.T) {
 		t.Fatal("I did not dismiss the conflict")
 	}
 }
+
+// 06 §4 / 03 §6.3: log problems sit under one heading per log; a stale log is one folded,
+// dimmed row and its problems are not in the counts.
+func TestProblemsViewLogs(t *testing.T) {
+	e := testkit.New(t)
+	e.HarmonyLogFixture()
+	scans := new(int)
+	tm := start(t, e, scans, 160, 50)
+	keys(tm, "2")
+	waitAll(t, tm, "Player.log 1.6.4633", "current (4)", "log.harmony-stack")
+	time.Sleep(200 * time.Millisecond)
+	fm := finish(t, tm)
+	logs := 0
+	for _, p := range fm.prob.list {
+		if p.Log != nil {
+			logs++
+		}
+	}
+	if logs != 4 || fm.prob.counts[0] != 3 {
+		t.Fatalf("current log: %d log rows, %d errors", logs, fm.prob.counts[0])
+	}
+
+	e.Advance(time.Hour)
+	e.MustRun("disable", "pkg:tester.manual")
+	tm = start(t, e, scans, 160, 50)
+	keys(tm, "2")
+	waitAll(t, tm, "stale: older than the Loadout's last change (4)", "log.stale")
+	time.Sleep(200 * time.Millisecond)
+	fm = finish(t, tm)
+	logs = 0
+	for _, p := range fm.prob.list {
+		if p.Log != nil {
+			logs++
+			if p.Ref != staleLogRef {
+				t.Fatalf("stale log row not folded: %s", p.Ref)
+			}
+		}
+	}
+	if logs != 1 || fm.prob.counts[0] != 1 {
+		t.Fatalf("stale log: %d log rows, %d errors", logs, fm.prob.counts[0])
+	}
+}

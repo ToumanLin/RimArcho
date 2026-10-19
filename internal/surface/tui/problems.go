@@ -45,7 +45,8 @@ type analyzeDoneMsg struct{ err error }
 type AnalyzeRunner func(envName string, progress func(string)) error
 
 func (m *model) ensureProblems() tea.Cmd {
-	m.app.LazyLog = false // the player looks at problems now: include the newest log
+	// The player looks at problems now: include the newest log, parsing it if needed.
+	m.app.LazyLog, m.app.LogCacheOnly = false, false
 	m.loadProblems()
 	if (m.prob.stale || m.prob.never) && !m.analyzing {
 		return m.startAnalyze()
@@ -72,15 +73,21 @@ func (m *model) loadProblems() {
 			m.newLog = false
 		}
 	}
-	src := ps.List
+	src := append(append([]*app.Problem{}, ps.List...), ps.Stale...)
 	if p.showIgnored {
 		src = ps.Ignored
 	}
 	p.list = p.list[:0]
 	all := severities[p.sev] == ""
 	var versions, skips []*app.Problem
+	byLog := map[*app.LogRun][]*app.Problem{} // log problems go under their log (03 §6.3)
 	for _, x := range src {
 		switch {
+		case x.Log != nil:
+			if all || x.Severity == severities[p.sev] {
+				byLog[x.Log] = append(byLog[x.Log], x)
+			}
+			continue
 		case all && app.NoisyCodes[x.Code]:
 			continue // shown under the info filter (decisions-m3 §12.2)
 		case all && x.Code == "version.unsupported":
@@ -99,6 +106,15 @@ func (m *model) loadProblems() {
 	}
 	if len(skips) > 0 {
 		p.list = append(p.list, skipRow(skips))
+	}
+	for _, r := range ps.Logs {
+		switch lp := byLog[r]; {
+		case len(lp) == 0:
+		case r.Stale() && all:
+			p.list = append(p.list, staleLogRow(r, lp))
+		default:
+			p.list = append(p.list, lp...)
+		}
 	}
 	p.ignored = len(ps.Ignored)
 	p.never = ps.Analysis == nil || ps.Analysis.Run == nil
@@ -204,17 +220,30 @@ func (m *model) probRows() []prow {
 	p := &m.prob
 	ix := m.st.Ix
 	var rows []prow
-	sev, subj := "", "?"
+	group := func(x *app.Problem) string {
+		if x.Log != nil {
+			return "log:" + x.Log.Path
+		}
+		return x.Severity
+	}
+	grp, subj := "?", "?"
 	for i, x := range p.list {
-		if x.Severity != sev {
-			sev, subj = x.Severity, "?"
+		if g := group(x); g != grp {
+			grp, subj = g, "?"
 			n := 0
 			for _, y := range p.list {
-				if y.Severity == sev {
+				if group(y) == grp {
 					n++
+					if y.Ref == staleLogRef {
+						n += len(y.Evidence) - 1
+					}
 				}
 			}
-			rows = append(rows, prow{text: fmt.Sprintf("── %s (%d) ──", T(sev), n), pi: -1, sug: -1, style: 1})
+			head := T(x.Severity)
+			if x.Log != nil {
+				head = m.logHeading(x.Log)
+			}
+			rows = append(rows, prow{text: fmt.Sprintf("── %s (%d) ──", head, n), pi: -1, sug: -1, style: 1})
 		}
 		if s := x.SubjectInstance(); s != subj {
 			subj = s
@@ -237,6 +266,9 @@ func (m *model) probRows() []prow {
 			st = 3
 		case finding.Warning:
 			st = 4
+		}
+		if x.Log != nil && x.Log.Stale() {
+			st = 2 // not counted: no alarm colour
 		}
 		claim := finding.Expand(x.Claim, func(id string) string { return ix.Ref(id) })
 		line := fmt.Sprintf("    %s %s  %s", mark, x.Code, claim)
@@ -383,7 +415,7 @@ func (m *model) problemsKey(s string) tea.Cmd {
 		if x == nil {
 			return nil
 		}
-		if x.Ref == "p:version" || x.Ref == "p:skip-prefix" {
+		if x.Ref == "p:version" || x.Ref == "p:skip-prefix" || x.Ref == staleLogRef {
 			m.status = T("select single mods with the s filter to ignore them")
 			return nil
 		}
@@ -513,15 +545,66 @@ func (m *model) chooseLog() tea.Cmd {
 		m.tab = tabProblems
 		m.prob.cursor, m.prob.off = 0, 0
 		m.loadProblems()
-		n := 0
+		n, stale := 0, false
 		for _, x := range m.prob.list {
-			if strings.HasPrefix(x.Code, "log.") {
-				n++
+			switch {
+			case x.Ref == staleLogRef:
+				n, stale = n+len(x.Evidence), true
+			case x.Log != nil:
+				n, stale = n+1, stale || x.Log.Stale()
 			}
 		}
 		m.status = Tf("log analyzed: %d problems", n)
+		if stale {
+			m.status = Tf("log analyzed: %d problems from a stale log, not counted", n)
+		}
 		return m.ensureProblems()
 	}
 	m.panel = p
 	return nil
+}
+
+const staleLogRef = "p:log-stale"
+
+// staleLogRow folds a stale log's problems into one expandable row (03 §6.3, 06 §4).
+func staleLogRow(r *app.LogRun, ps []*app.Problem) *app.Problem {
+	f := &finding.Finding{Code: "log.stale", Severity: finding.Info, Key: r.Path, Layer: "log", Confidence: finding.Certain,
+		Suggestions: []string{"archo problems --code log --all"}}
+	n := map[string]int{}
+	for _, p := range ps {
+		n[p.Severity]++
+		if sevOrder(p.Severity) < sevOrder(f.Severity) {
+			f.Severity = p.Severity
+		}
+		f.Evidence = append(f.Evidence, finding.Evidence{Source: p.Severity, Text: p.Claim})
+	}
+	f.Claim = Tf("%d error, %d warning from this log; not counted", n[finding.Error], n[finding.Warning])
+	return &app.Problem{Finding: f, Ref: staleLogRef, Log: r}
+}
+
+func sevOrder(s string) int {
+	switch s {
+	case finding.Error:
+		return 0
+	case finding.Warning:
+		return 1
+	}
+	return 2
+}
+
+// logHeading names a log group: file, game version, time, and why it is stale.
+func (m *model) logHeading(r *app.LogRun) string {
+	s := T("log") + " " + r.Label
+	if v := strings.Fields(r.Version); len(v) > 0 {
+		s += " " + v[0]
+	}
+	s += " · " + m.app.FormatTime(r.ModTime)
+	if r.OtherGame {
+		s += " · " + Tf("stale: written by %s, the game is %s", r.MM, r.EnvMM)
+	} else if r.Before {
+		s += " · " + T("stale: older than the Loadout's last change")
+	} else {
+		s += " · " + T("current")
+	}
+	return s
 }

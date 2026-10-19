@@ -144,6 +144,8 @@ func New(o Options) tea.Model {
 		o.Scan = ChildScan
 	}
 	o.App.LazyLog = true // the newest log is parsed when the Problems view opens
+	// Until then the status-bar counts use a stored log report only, never a parse.
+	o.App.LogCacheOnly = true
 	return &model{opts: o, app: o.App, w: 120, h: 30, marked: map[string]bool{}}
 }
 
