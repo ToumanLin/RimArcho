@@ -35,6 +35,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		}
 		return cmds.ExitOK
 	}
+	cmds.Progress = func(line string) { fmt.Fprintln(stderr, line) }
 	out, code := cmds.Execute(ap, rest)
 	if code == cmds.ExitError || code == cmds.ExitUsage {
 		io.WriteString(stderr, out)

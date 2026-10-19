@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -86,6 +88,36 @@ CREATE TABLE launch(
   id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, started_at INTEGER NOT NULL, method TEXT NOT NULL, command TEXT NOT NULL);
 `
 
+// schemaV3 (M3): effective content and Def facts per instance (cached by content key),
+// analysis runs with their Patch facts and Def/Patch-layer findings, and problem ignores.
+const schemaV3 = `
+CREATE TABLE content_state(
+  instance_id TEXT PRIMARY KEY, content_key TEXT NOT NULL, folders TEXT NOT NULL DEFAULT '',
+  def_files INTEGER NOT NULL DEFAULT 0, patch_files INTEGER NOT NULL DEFAULT 0, parse_errors TEXT NOT NULL DEFAULT '');
+CREATE TABLE def_fact(
+  instance_id TEXT NOT NULL, def_type TEXT NOT NULL, def_name TEXT NOT NULL DEFAULT '', name TEXT NOT NULL DEFAULT '',
+  parent TEXT NOT NULL DEFAULT '', abstract INTEGER NOT NULL DEFAULT 0, file TEXT NOT NULL, line INTEGER NOT NULL);
+CREATE INDEX def_fact_instance ON def_fact(instance_id);
+CREATE INDEX def_fact_name ON def_fact(def_name);
+CREATE TABLE analysis(
+  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, run_key TEXT NOT NULL, game_mm TEXT NOT NULL,
+  version INTEGER NOT NULL, started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL, stats TEXT NOT NULL DEFAULT '{}');
+CREATE INDEX analysis_env ON analysis(environment_id, id);
+CREATE TABLE patch_fact(
+  analysis_id INTEGER NOT NULL, instance_id TEXT NOT NULL, seq INTEGER NOT NULL, file TEXT NOT NULL, line INTEGER NOT NULL,
+  class TEXT NOT NULL, xpath TEXT NOT NULL DEFAULT '', descr TEXT NOT NULL, result TEXT NOT NULL, hits INTEGER NOT NULL,
+  reasons TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '', targets TEXT NOT NULL DEFAULT '', leaf TEXT NOT NULL DEFAULT '');
+CREATE INDEX patch_fact_analysis ON patch_fact(analysis_id, instance_id);
+CREATE TABLE finding(
+  analysis_id INTEGER NOT NULL, layer TEXT NOT NULL, code TEXT NOT NULL, severity TEXT NOT NULL, key TEXT NOT NULL,
+  subject_instance TEXT NOT NULL DEFAULT '', data TEXT NOT NULL);
+CREATE INDEX finding_analysis ON finding(analysis_id);
+CREATE TABLE finding_ignore(
+  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL DEFAULT '', code TEXT NOT NULL,
+  key TEXT NOT NULL, snapshot_id INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL,
+  UNIQUE(environment_id, lineage_id, code, key));
+`
+
 // Store wraps the database handle.
 type Store struct {
 	DB   *sql.DB
@@ -125,12 +157,13 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
+	steps := []string{schemaV1, schemaV2, schemaV3}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(schemaV1 + schemaV2); err != nil {
+		if _, err := tx.Exec(strings.Join(steps, "")); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("store: create schema: %w", err)
 		}
@@ -140,27 +173,26 @@ func (s *Store) migrate() error {
 		}
 		return tx.Commit()
 	}
-	v := s.Meta("schema_version")
-	if v == "1" {
+	v, _ := strconv.Atoi(s.Meta("schema_version"))
+	if v < 1 || v > SchemaVersion {
+		return fmt.Errorf("store: unsupported schema version %d (want %d)", v, SchemaVersion)
+	}
+	for ; v < SchemaVersion; v++ {
 		tx, err := s.DB.Begin()
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(schemaV2); err != nil {
+		if _, err := tx.Exec(steps[v]); err != nil {
 			tx.Rollback()
-			return fmt.Errorf("store: migrate to v2: %w", err)
+			return fmt.Errorf("store: migrate to v%d: %w", v+1, err)
 		}
-		if _, err := tx.Exec(`UPDATE meta SET value='2' WHERE key='schema_version'`); err != nil {
+		if _, err := tx.Exec(`UPDATE meta SET value=? WHERE key='schema_version'`, fmt.Sprint(v+1)); err != nil {
 			tx.Rollback()
 			return err
 		}
 		if err := tx.Commit(); err != nil {
 			return err
 		}
-		v = "2"
-	}
-	if v != fmt.Sprint(SchemaVersion) {
-		return fmt.Errorf("store: unsupported schema version %q (want %d)", v, SchemaVersion)
 	}
 	return nil
 }

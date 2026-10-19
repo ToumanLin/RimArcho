@@ -92,6 +92,8 @@ func (e *Env) Open() {
 		e.Launched = append(e.Launched, strings.Join(append([]string{exe}, args...), " "))
 		return nil
 	}
+	// The Def/Patch analysis runs in-process instead of an `archo analyze` child.
+	a.AnalyzeRunner = app.InProcessAnalyze(a)
 	e.App = a
 	e.T.Cleanup(func() { a.Close() })
 }

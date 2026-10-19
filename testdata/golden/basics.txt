@@ -13,6 +13,15 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     list                                      list mods
     find <words…>                             search by name, package id, author, workshop id, folder
     mod <ref>                                 mod details
+    def [<Type/defName>]                      who defines and patches a Def; or the Defs of a mod
+    patches                                   Patch operations and their simulated outcome
+    why <A> <B>                               how two mods relate: order, dependencies, conflicts, overrides, shared patches
+    problems                                  problems: declarations, Defs, Patches (03 §4)
+    problems show <p:ref>                     one problem with its evidence
+    problems ignore <p:ref>                   ignore a problem until its mod changes
+    problems unignore <p:ref>                 stop ignoring a problem
+    files search <pattern>                    search the effective content of enabled mods
+    analyze                                   rebuild the Def and Patch facts (normally run on demand as a child process)
     changes [<ref>]                           change events (default: the last scan)
     enable <ref…>                             add mods to the workspace Loadout
     disable <ref…>                            remove mods from the workspace Loadout

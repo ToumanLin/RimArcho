@@ -45,6 +45,9 @@ type App struct {
 	Detect env.DetectOptions
 	// Launcher starts the game; nil means ExecLauncher.
 	Launcher Launcher
+	// AnalyzeRunner brings the Def/Patch analysis up to date; nil means the `archo analyze`
+	// child process (03 §3). Tests run it in-process.
+	AnalyzeRunner func(envName string, progress func(string)) error
 
 	ixCache *Index
 	ixKey   string
