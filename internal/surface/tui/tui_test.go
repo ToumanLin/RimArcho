@@ -173,7 +173,7 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	keys(tm, ":", "list --active", "enter")
 	waitFor(t, tm, "archo list --active")
 	keys(tm, "esc", "3")
-	waitFor(t, tm, "changes: 0 (scan:3)")
+	waitFor(t, tm, "scan:3  2026-10-01 10:00  no changes")
 	m := finish(t, tm)
 	if *scans != 2 {
 		t.Fatalf("scans via the child-process hook: %d", *scans)
