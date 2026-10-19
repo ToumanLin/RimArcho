@@ -209,3 +209,26 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 
 // keep io imported for teatest's reader type in older toolchains
 var _ io.Reader
+
+func TestChineseUI(t *testing.T) {
+	e, scans := fixture(t)
+	e.MustRun("config", "set", "ui.lang", "zh")
+	t.Setenv("ARCHO_LANG", "")
+	SetLang(e.App.Store.Meta("cfg:ui.lang"))
+	t.Cleanup(func() { lang = "en" })
+	tm := start(t, e, scans, 100, 24)
+	waitFor(t, tm, "启用 3/")
+	keys(tm, "?")
+	waitFor(t, tm, "列表视图")
+	keys(tm, "esc")
+	m := finish(t, tm)
+	for _, l := range m.listLines(m.listHeight()) {
+		if w := lipgloss.Width(l); w > 100 {
+			t.Fatalf("line wider than the terminal (%d): %q", w, l)
+		}
+	}
+	// Command output stays English (05 §1).
+	if out, _ := cmds.Execute(e.App, []string{"status"}); !strings.Contains(out, "lineages:") {
+		t.Fatalf("status output changed: %s", out)
+	}
+}

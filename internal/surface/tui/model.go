@@ -143,6 +143,7 @@ const MemoryLimit = 40 << 20
 // Run starts the TUI on the terminal.
 func Run(o Options) error {
 	debug.SetMemoryLimit(MemoryLimit)
+	SetLang(o.App.Store.Meta("cfg:ui.lang"))
 	_, err := tea.NewProgram(New(o), tea.WithAltScreen()).Run()
 	return err
 }
@@ -412,7 +413,7 @@ func (m *model) startScan() tea.Cmd {
 		return nil
 	}
 	m.scanning = true
-	m.status = "scanning…"
+	m.status = T("scanning…")
 	scan, name := m.opts.Scan, m.envName
 	return func() tea.Msg {
 		out, err := scan(name)
@@ -436,6 +437,9 @@ func (m *model) selection() []string {
 }
 
 func plural(n int, w string) string {
+	if lang == "zh" {
+		return fmt.Sprintf("%d 个%s", n, T(w))
+	}
 	if n == 1 {
 		return fmt.Sprintf("%d %s", n, w)
 	}

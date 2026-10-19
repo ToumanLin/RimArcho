@@ -41,7 +41,7 @@ func (m *model) View() string {
 	var lines []string
 	switch {
 	case m.loadErr != nil:
-		lines = []string{stErr.Render("error: " + m.loadErr.Error()), "", "Set up an environment first: archo env detect, archo env add <name> --detected"}
+		lines = []string{stErr.Render(T("error: ") + m.loadErr.Error()), "", T("Set up an environment first: archo env detect, archo env add <name> --detected")}
 	case m.inspect != nil:
 		lines = window(m.inspect, m.inspectOff, body)
 	case m.tab != tabList:
@@ -74,11 +74,11 @@ func window(lines []string, off, n int) []string {
 }
 
 func (m *model) headerLine() string {
-	envPart := "no environment"
+	envPart := T("no environment")
 	if m.envName != "" {
-		envPart = "env: " + m.envName + " " + env.MajorMinor(m.gameVer)
+		envPart = T("env: ") + m.envName + " " + env.MajorMinor(m.gameVer)
 	}
-	tabs := []string{"[1]list", "[2]problems", "[3]changes"}
+	tabs := []string{T("[1]list"), T("[2]problems"), T("[3]changes")}
 	for i := range tabs {
 		if i == m.tab {
 			tabs[i] = stTabOn.Render(tabs[i])
@@ -97,30 +97,30 @@ func (m *model) statusLine() string {
 			active++
 		}
 	}
-	parts := []string{fmt.Sprintf("active %d/%d", active, len(m.rows))}
+	parts := []string{Tf("active %d/%d", active, len(m.rows))}
 	if m.unsaved > 0 {
-		parts = append(parts, stWarn.Render(fmt.Sprintf("unsaved %d", m.unsaved)))
+		parts = append(parts, stWarn.Render(Tf("unsaved %d", m.unsaved)))
 	} else {
-		parts = append(parts, "saved")
+		parts = append(parts, T("saved"))
 	}
-	parts = append(parts, "problems —")
-	parts = append(parts, fmt.Sprintf("changes %d", m.changes))
+	parts = append(parts, T("problems —"))
+	parts = append(parts, Tf("changes %d", m.changes))
 	if m.question > 0 {
-		parts = append(parts, stWarn.Render(fmt.Sprintf("questions %d", m.question)))
+		parts = append(parts, stWarn.Render(Tf("questions %d", m.question)))
 	}
 	if m.st != nil {
 		if v := m.st.FileVersionMismatch(); v != "" {
-			parts = append(parts, stErr.Render(fmt.Sprintf("list saved for %s: game resets it (w to save)", env.MajorMinor(v))))
+			parts = append(parts, stErr.Render(Tf("list saved for %s: game resets it (w to save)", env.MajorMinor(v))))
 		}
 		if m.st.WS.Conflict != 0 {
-			parts = append(parts, stWarn.Render(fmt.Sprintf("external change v%d", m.st.WS.Conflict)))
+			parts = append(parts, stWarn.Render(Tf("external change v%d", m.st.WS.Conflict)))
 		}
 	}
 	if len(m.marked) > 0 {
-		parts = append(parts, fmt.Sprintf("marked %d", len(m.marked)))
+		parts = append(parts, Tf("marked %d", len(m.marked)))
 	}
 	if m.scanning {
-		parts = append(parts, "scanning…")
+		parts = append(parts, T("scanning…"))
 	}
 	return fit(strings.Join(parts, " · "), m.w)
 }
@@ -134,9 +134,9 @@ func (m *model) footerLine() string {
 	case m.status != "":
 		return fit(m.status, m.w)
 	case m.search != "":
-		return fit("search: "+m.search+"  (esc clears)", m.w)
+		return fit(T("search: ")+m.search+T("  (esc clears)"), m.w)
 	}
-	return stDim.Render(fit(": command   / search   space toggle   S sort   w save   L launch   ? help   q quit", m.w))
+	return stDim.Render(fit(T(": command   / search   space toggle   S sort   w save   L launch   ? help   q quit"), m.w))
 }
 
 // listLines renders the list (and the detail pane when wide enough).
@@ -152,7 +152,7 @@ func (m *model) listLines(n int) []string {
 	line := func(mark, pos, ref, name, src, ver, flags string) string {
 		return mark + fit(pos, wPos) + " " + fit(ref, wRef) + " " + fit(name, wName) + " " + fit(src, wSrc) + " " + fit(ver, wVer) + " " + fit(flags, wFlags)
 	}
-	out := []string{stHeader.Render(line(" ", "#", "ref", "name", "source", "ver", "flags"))}
+	out := []string{stHeader.Render(line(" ", "#", T("ref"), T("name"), T("source"), T("ver"), T("flags")))}
 	end := min(m.off+n-1, len(m.view))
 	for i := m.off; i < end; i++ {
 		r := m.rows[m.view[i]]
@@ -167,7 +167,7 @@ func (m *model) listLines(n int) []string {
 		case r.unsaved:
 			mark = "*"
 		}
-		l := line(mark, pos+" "+dot, r.ref, r.name, r.source, r.version, r.flags)
+		l := line(mark, pos+" "+dot, r.ref, r.name, r.source, r.version, trFlags(r.flags))
 		switch {
 		case i == m.cursor:
 			l = stSel.Render(l)
@@ -181,7 +181,7 @@ func (m *model) listLines(n int) []string {
 		out = append(out, l)
 	}
 	if len(m.view) == 0 {
-		out = append(out, stDim.Render("  (nothing matches; esc clears the search, f changes the filter)"))
+		out = append(out, stDim.Render(T("  (nothing matches; esc clears the search, f changes the filter)")))
 	}
 	if !m.showDetail() {
 		return out
@@ -227,12 +227,12 @@ func (m *model) overlay(base string) string {
 			lines = append(lines, width.Truncate(l, inner, "…"))
 		}
 		if len(p.lines) > maxLines {
-			lines = append(lines, stDim.Render(fmt.Sprintf("(%d–%d of %d, ↑/↓)", p.off+1, min(p.off+maxLines, len(p.lines)), len(p.lines))))
+			lines = append(lines, stDim.Render(Tf("(%d–%d of %d, ↑/↓)", p.off+1, min(p.off+maxLines, len(p.lines)), len(p.lines))))
 		}
 		if p.confirm != nil {
-			lines = append(lines, "", stWarn.Render("y: archo "+strings.Join(p.confirm, " ")+"    n: cancel"))
+			lines = append(lines, "", stWarn.Render("y: archo "+strings.Join(p.confirm, " ")+T("    n: cancel")))
 		} else {
-			lines = append(lines, "", stDim.Render("enter/esc: close"))
+			lines = append(lines, "", stDim.Render(T("enter/esc: close")))
 		}
 	}
 	box := stPanelBox.Width(inner + 2).Render(strings.Join(lines, "\n"))

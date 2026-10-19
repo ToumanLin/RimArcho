@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -22,6 +21,7 @@ const helpText = `list view (06 §3)
   enter    inspect            r              add a rule for this mod
   /        search             f              filter: all/enabled/disabled/unloadable
   R        rescan (child process)
+problems view: A analyze   i add the suggested ignore rule   enter inspect   s severity filter
 views: 1 list · 2 problems · 3 changes      E switch environment
 :        run any archo command               ? help   q quit`
 
@@ -64,7 +64,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.reload()
 		m.detailRef = ""
 		if msg.err != nil {
-			m.openPanel("scan failed", msg.out+"\n"+msg.err.Error(), nil)
+			m.openPanel(T("scan failed"), msg.out+"\n"+msg.err.Error(), nil)
 		} else {
 			m.status = firstLine(msg.out)
 			if m.tab == tabChanges {
@@ -99,7 +99,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		m.quitting = true
 		return tea.Quit
 	case "?":
-		m.openPanel("help", helpText, nil)
+		m.openPanel(T("help"), T(helpText), nil)
 		return nil
 	case "1":
 		m.tab = tabList
@@ -166,7 +166,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	case "f":
 		m.filter = (m.filter + 1) % len(filters)
 		m.refilter(m.curID())
-		m.status = "filter: " + filters[m.filter]
+		m.status = T("filter: ") + T(filters[m.filter])
 		return m.requestDetail()
 	case "v":
 		if r := m.current(); r != nil && r.id != "" {
@@ -182,7 +182,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	case "J", "K":
 		r := m.current()
 		if r == nil || r.pos == 0 {
-			m.status = "only enabled mods can be moved"
+			m.status = T("only enabled mods can be moved")
 			return nil
 		}
 		dir := "--down"
@@ -194,23 +194,23 @@ func (m *model) listKey(s string) tea.Cmd {
 	case "m":
 		r := m.current()
 		if r == nil || r.pos == 0 {
-			m.status = "only enabled mods can be moved"
+			m.status = T("only enabled mods can be moved")
 			return nil
 		}
 		ref := r.ref
-		m.prompt = &prompt{label: "move " + ref + " to (position | before <ref> | after <ref>): ", submit: func(m *model, text string) tea.Cmd {
+		m.prompt = &prompt{label: Tf("move %s to (position | before <ref> | after <ref>): ", ref), submit: func(m *model, text string) tea.Cmd {
 			f := strings.Fields(text)
 			switch {
 			case len(f) == 1:
 				if _, err := strconv.Atoi(f[0]); err == nil {
 					m.runToStatus("move", ref, "--to", f[0])
 				} else {
-					m.status = "expected a position number"
+					m.status = T("expected a position number")
 				}
 			case len(f) == 2 && (f[0] == "before" || f[0] == "after"):
 				m.runToStatus("move", ref, "--"+f[0], f[1])
 			default:
-				m.status = "expected: <n>, before <ref> or after <ref>"
+				m.status = T("expected: <n>, before <ref> or after <ref>")
 			}
 			return m.requestDetail()
 		}}
@@ -221,7 +221,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		if code == cmds.ExitOK && !strings.HasPrefix(out, "sort: 0 moved") {
 			confirm = []string{"sort"}
 		}
-		m.openPanel("sort — preview", out, confirm)
+		m.openPanel(T("sort — preview"), out, confirm)
 		return nil
 	case "w":
 		out, code := m.run("save", "--dry-run")
@@ -229,10 +229,10 @@ func (m *model) listKey(s string) tea.Cmd {
 		if code == cmds.ExitOK {
 			confirm = []string{"save"}
 			if m.missing > 0 {
-				out += fmt.Sprintf("problems: %s in the list (kept in ModsConfig.xml)\n", plural(m.missing, "missing entry"))
+				out += Tf("problems: %s in the list (kept in ModsConfig.xml)\n", plural(m.missing, "missing entry"))
 			}
 		}
-		m.openPanel("save to game — preview", out, confirm)
+		m.openPanel(T("save to game — preview"), out, confirm)
 		return nil
 	case "u":
 		m.runToStatus("undo")
@@ -246,7 +246,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		if code == cmds.ExitOK {
 			confirm = []string{"launch"}
 		}
-		m.openPanel("launch", out, confirm)
+		m.openPanel(T("launch"), out, confirm)
 		return nil
 	case "x":
 		if r := m.current(); r != nil && r.id != "" {
@@ -271,10 +271,10 @@ func (m *model) listKey(s string) tea.Cmd {
 			return nil
 		}
 		ref := r.ref
-		m.prompt = &prompt{label: "rule for " + ref + " (after|before|attach|incompatible <ref>): ", submit: func(m *model, text string) tea.Cmd {
+		m.prompt = &prompt{label: Tf("rule for %s (after|before|attach|incompatible <ref>): ", ref), submit: func(m *model, text string) tea.Cmd {
 			f := strings.Fields(text)
 			if len(f) != 2 {
-				m.status = "expected: <kind> <ref>"
+				m.status = T("expected: <kind> <ref>")
 				return nil
 			}
 			m.runToStatus("rule", "add", f[0], ref, f[1])
@@ -401,7 +401,7 @@ func (m *model) panelKey(s string) tea.Cmd {
 	case "n", "esc", "q", "enter":
 		m.panel = nil
 		if p.confirm != nil {
-			m.status = "cancelled"
+			m.status = T("cancelled")
 		}
 	}
 	return nil
@@ -468,7 +468,7 @@ func (m *model) loadTab() {
 	case tabProblems:
 		parts = append(parts, "Problems — full analysis arrives with M3 (dependencies, incompatibilities, defs, patches).", "")
 		if m.missing > 0 {
-			parts = append(parts, fmt.Sprintf("warning: %s in the Loadout match no installed mod", plural(m.missing, "entry")), "")
+			parts = append(parts, Tf("warning: %s in the Loadout match no installed mod", plural(m.missing, "entry")), "")
 		}
 		out, _ := cmds.Execute(m.app, []string{"sort", "--dry-run"})
 		parts = append(parts, strings.Split(strings.TrimRight(out, "\n"), "\n")...)
@@ -481,7 +481,7 @@ func (m *model) loadTab() {
 		out, _ := cmds.Execute(m.app, []string{"changes"})
 		parts = append(parts, strings.Split(strings.TrimRight(out, "\n"), "\n")...)
 		if m.st != nil && m.st.WS.Conflict != 0 {
-			parts = append(parts, "", fmt.Sprintf("ModsConfig.xml changed outside RimArcho (v%d) — :loadout checkout v%d to load it", m.st.WS.Conflict, m.st.WS.Conflict))
+			parts = append(parts, "", Tf("ModsConfig.xml changed outside RimArcho (v%d) — :loadout checkout v%d to load it", m.st.WS.Conflict, m.st.WS.Conflict))
 		}
 	}
 	m.tabText = parts
@@ -490,10 +490,10 @@ func (m *model) loadTab() {
 func (m *model) chooseEnv() tea.Cmd {
 	envs, err := m.app.Store.Envs()
 	if err != nil || len(envs) == 0 {
-		m.status = "no environments (archo env add)"
+		m.status = T("no environments (archo env add)")
 		return nil
 	}
-	p := &panel{title: "switch environment (enter to choose)"}
+	p := &panel{title: T("switch environment (enter to choose)")}
 	for i, e := range envs {
 		p.choices = append(p.choices, e.Name)
 		if e.Name == m.envName {
