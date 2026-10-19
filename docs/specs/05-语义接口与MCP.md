@@ -110,6 +110,7 @@ next:
 | | `save` / `loadout log` / `loadout diff` / `loadout checkout` / `loadout tag` | 保存与历史（04 §3） |
 | | `undo` / `redo`；`sort --dry-run`、`save --dry-run`、`launch --dry-run` / `--force`；`list --active` | 撤销与重做工作区编辑（04 §3，对应 TUI 的 `u` / `Ctrl+r`）；预览而不改动（M2 补充） |
 | | `loadout export [--format text]` / `loadout import <文件>` | 文本列表、ModsConfig.xml、存档文件 |
+| | `stage list` / `stage add <引用…>` / `stage drop <引用…>` / `stage restore [<引用…>] [--at\|--before\|--after]` | 暂存（06 §5.4）：每个环境一个、不写入游戏的列表。从已启用中暂存的 Mod 记住原位置（原序号和它前面的 Mod），`stage restore` 不带引用时全部放回原位置；`add` 和 `restore` 各是一步可撤销的工作区编辑。重新启用（含撤销）的 Mod 自动离开暂存 |
 | 规则 | `rule add` / `rule list` / `rule remove` | 用户规则（04 §5） |
 | 玩家数据 | `alias` / `tag` / `note` | 别名、标签、备注 |
 | 身份 | `identity list` / `identity resolve` / `lineage split` / `lineage merge` | 待确认项与家族（02 §5、§6） |

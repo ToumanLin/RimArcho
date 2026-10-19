@@ -41,6 +41,10 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     loadout tag <v> <name>                    name a version
     loadout export                            write the workspace as a text list or a ModsConfig.xml
     loadout import <file>                     replace the workspace with a text list, a ModsConfig.xml or a save's mod list (.rws); undoable
+    stage list                                staged mods, with the place each one came from
+    stage add <ref…>                          stage mods (enabled ones leave the Loadout and remember their place)
+    stage drop <ref…>                         take mods out of staging without enabling them
+    stage restore [<ref…>]                    enable staged mods again at their old place (all when no ref)
     copy-local <ref>                          copy a mod into the local Mods folder with an origin marker (the Loadout is not changed)
     import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)
