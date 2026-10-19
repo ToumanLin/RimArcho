@@ -46,8 +46,9 @@ type ScanStats struct {
 type ScanReport struct {
 	Env    *env.Environment
 	ScanID int64
-	Full   bool
-	Stats  ScanStats
+	Full    bool
+	Stats   ScanStats
+	Notices []string // Loadout sync messages
 }
 
 // Scan runs 02 §4.1 for the current environment: enumerate → observe → reconcile → persist.
@@ -188,7 +189,14 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 	if err := a.Store.FinishScan(scanID, a.Now(), st); err != nil {
 		return nil, err
 	}
-	return &ScanReport{Env: e, ScanID: scanID, Full: full, Stats: st}, nil
+	rep := &ScanReport{Env: e, ScanID: scanID, Full: full, Stats: st}
+	// 04 §2.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
+	if ls, err := a.Loadout(); err == nil {
+		rep.Notices = ls.Notices
+	} else {
+		rep.Notices = []string{"loadout: " + err.Error()}
+	}
+	return rep, nil
 }
 
 // LastScan returns the newest finished scan of the environment, or nil.

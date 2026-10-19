@@ -243,3 +243,57 @@ func TestGoldenRebind(t *testing.T) {
 		cmd("env", "list"),
 	})
 }
+
+func TestGoldenLoadout(t *testing.T) {
+	e := testkit.New(t)
+	populate(e)
+	// X and Y declare loadAfter each other (S2); "Versioned" depends on Harmony.
+	for _, p := range [][2]string{{"X", "tester.y"}, {"Y", "tester.x"}} {
+		m := testkit.Sample("tester."+strings.ToLower(p[0]), p[0])
+		dir := filepath.Join(e.Game, "Mods", p[0])
+		e.WriteMod(dir, m)
+		e.WriteFile(filepath.Join(dir, "About", "About.xml"), strings.Replace(m.AboutXML(), "</ModMetaData>",
+			"<loadAfter><li>"+p[1]+"</li></loadAfter></ModMetaData>", 1))
+	}
+	e.WriteModsConfig("1.5.4409 rev1118", "tester.versioned", "ludeon.rimworld", "tester.alpha", "2009463077", "tester.x", "tester.y", "gone.mod")
+	e.WriteFile(filepath.Join(e.Steam, "steam.exe"), "")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	runGolden(t, "loadout", e, []step{
+		cmd("status"),
+		cmd("list", "--active"),
+		cmd("sort", "--dry-run"),
+		func(e *testkit.Env) []string { return []string{"rule", "add", "ignore", "decl:" + ref(e, "Y") + ":loadafter:tester.x", "--note", "fine either way"} },
+		cmd("rule", "list"),
+		cmd("sort"),
+		cmd("list", "--active"),
+		func(e *testkit.Env) []string { return []string{"enable", ref(e, "Gamma"), "--after", ref(e, "Harmony")} },
+		func(e *testkit.Env) []string { return []string{"move", ref(e, "Beta"), "--to", "3"} },
+		func(e *testkit.Env) []string { return []string{"enable", ref(e, "Beta")} },
+		func(e *testkit.Env) []string { return []string{"enable", ref(e, "Leftover")} },
+		func(e *testkit.Env) []string { return []string{"enable", ref(e, "Alpha Fork")} },
+		cmd("disable", "pkg:gone.mod"),
+		cmd("undo"),
+		cmd("redo"),
+		cmd("loadout", "diff"),
+		cmd("launch", "--dry-run"),
+		cmd("save", "--dry-run"),
+		cmd("save"),
+		cmd("loadout", "tag", "v2", "raid-night"),
+		func(e *testkit.Env) []string { return []string{"swap", ref(e, "Alpha"), ref(e, "Alpha Fork")} },
+		cmd("loadout", "log"),
+		cmd("loadout", "checkout", "v1"),
+		cmd("loadout", "diff", "raid-night", "workspace"),
+		cmd("launch", "--dry-run"),
+		cmd("undo"),
+		cmd("launch", "--dry-run"),
+		act(func(e *testkit.Env) {
+			e.Advance(time.Hour)
+			e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
+		}),
+		cmd("scan"),
+		cmd("loadout", "log"),
+		cmd("rule", "remove", "r:1"),
+		cmd("rule", "remove", "r:9"),
+	})
+}

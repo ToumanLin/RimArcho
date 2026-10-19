@@ -14,6 +14,11 @@ import (
 // tags is the bracketed status of an instance: source and location, then flags.
 func tags(c *Ctx, ix *app.Index, m *store.Mod) string {
 	parts := []string{location(m)}
+	if st := c.Loadout(); st != nil && st.Ix.Env.ID == ix.Env.ID {
+		if p := st.Position(m.ID); p > 0 {
+			parts = append([]string{fmt.Sprintf("active %d/%d", p, len(st.List))}, parts...)
+		}
+	}
 	if m.Status == identity.Tombstone {
 		parts = append(parts, "tombstone since "+c.App.FormatDate(m.TombstoneAt))
 	}

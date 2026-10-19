@@ -43,6 +43,8 @@ type App struct {
 	EnvName string
 	// Detect configures environment detection (tests point it at fixtures).
 	Detect env.DetectOptions
+	// Launcher starts the game; nil means ExecLauncher.
+	Launcher Launcher
 }
 
 // Open opens (creating if needed) the data directory home.

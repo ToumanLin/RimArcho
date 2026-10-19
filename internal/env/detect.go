@@ -191,3 +191,32 @@ func isDir(p string) bool {
 	st, err := os.Stat(p)
 	return err == nil && st.IsDir()
 }
+
+// DefaultUserDataRoot is where the game keeps user data when not told otherwise.
+func DefaultUserDataRoot() string {
+	h, _ := os.UserHomeDir()
+	return userDataCandidates(runtime.GOOS, h)[0]
+}
+
+// SteamExe locates the Steam client executable ("" if not found).
+func SteamExe(o DetectOptions) string {
+	if o.GOOS == "" {
+		o.GOOS = runtime.GOOS
+	}
+	if o.Home == "" {
+		o.Home, _ = os.UserHomeDir()
+	}
+	roots := o.SteamRoots
+	if roots == nil {
+		roots = defaultSteamRoots(o)
+	}
+	for _, r := range roots {
+		for _, name := range []string{"steam.exe", "steam.sh", "steam"} {
+			p := filepath.Join(r, name)
+			if st, err := os.Stat(p); err == nil && !st.IsDir() {
+				return p
+			}
+		}
+	}
+	return ""
+}

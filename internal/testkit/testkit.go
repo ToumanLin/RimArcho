@@ -27,15 +27,17 @@ var Start = time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
 // Env is a synthetic Steam install with RimWorld, a workshop folder, an optional SteamCMD
 // folder and a user data directory, plus an opened RimArcho data directory.
 type Env struct {
-	T        testing.TB
-	Root     string
-	Steam    string // Steam client root (= first library)
-	Game     string // <Steam>/steamapps/common/RimWorld
-	Workshop string // <Steam>/steamapps/workshop/content/294100
-	SteamCMD string // <Root>/steamcmd/steamapps/workshop/content/294100
-	UserData string
-	Home     string
-	App      *app.App
+	T          testing.TB
+	Root       string
+	Steam      string // Steam client root (= first library)
+	Game       string // <Steam>/steamapps/common/RimWorld
+	Workshop   string // <Steam>/steamapps/workshop/content/294100
+	SteamCMD   string // <Root>/steamcmd/steamapps/workshop/content/294100
+	UserData   string
+	ModsConfig string
+	Home       string
+	App        *app.App
+	Launched   []string // command lines the stub launcher received
 
 	now        time.Time
 	subscribed map[string]bool
@@ -54,6 +56,7 @@ func New(t testing.TB) *Env {
 	e.Workshop = filepath.Join(e.Steam, "steamapps", "workshop", "content", env.WorkshopAppID)
 	e.SteamCMD = filepath.Join(root, "steamcmd", "steamapps", "workshop", "content", env.WorkshopAppID)
 	e.UserData = filepath.Join(root, "AppData", "LocalLow", "Ludeon Studios", "RimWorld by Ludeon Studios")
+	e.ModsConfig = filepath.Join(e.UserData, "Config", "ModsConfig.xml")
 	e.Home = filepath.Join(root, "ArchoHome")
 	e.WriteFile(filepath.Join(e.Game, "RimWorldWin64.exe"), "")
 	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.6.4633 rev1261\n")
@@ -84,6 +87,11 @@ func (e *Env) Open() {
 	a.Rand = rand.NewChaCha8([32]byte{'r', 'i', 'm', 'a', 'r', 'c', 'h', 'o'})
 	a.Loc = time.UTC
 	a.Detect = env.DetectOptions{SteamRoots: []string{e.Steam}, ManualRoots: []string{}, Home: e.Root, GOOS: "windows", SkipRegistry: true}
+	// Never start a process from a test: launches are only recorded.
+	a.Launcher = func(exe string, args []string, dir string) error {
+		e.Launched = append(e.Launched, strings.Join(append([]string{exe}, args...), " "))
+		return nil
+	}
 	e.App = a
 	e.T.Cleanup(func() { a.Close() })
 }
@@ -325,3 +333,25 @@ func (e *Env) manifest(id string, i int) int {
 	}
 	return 9000 + i
 }
+
+// WriteModsConfig replaces the fixture's ModsConfig.xml (as the game or another tool would).
+func (e *Env) WriteModsConfig(version string, active ...string) {
+	var b strings.Builder
+	b.WriteString("<?xml version=\"1.0\" encoding=\"utf-8\"?>" + nl + "<ModsConfigData>" + nl + "  <version>" + version + "</version>" + nl + "  <activeMods>" + nl)
+	for _, a := range active {
+		b.WriteString("    <li>" + a + "</li>" + nl)
+	}
+	b.WriteString("  </activeMods>" + nl + "  <knownExpansions>" + nl + "    <li>ludeon.rimworld.royalty</li>" + nl + "  </knownExpansions>" + nl + "</ModsConfigData>" + nl)
+	e.WriteFile(e.ModsConfig, b.String())
+}
+
+// ReadModsConfig returns the fixture's ModsConfig.xml text.
+func (e *Env) ReadModsConfig() string {
+	b, err := os.ReadFile(e.ModsConfig)
+	if err != nil {
+		e.T.Fatal(err)
+	}
+	return string(b)
+}
+
+const nl = string(rune(10))

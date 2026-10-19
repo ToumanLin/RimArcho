@@ -208,18 +208,44 @@ func (r *Registry) FromTokens(tokens []string) (List, []Resolution) {
 	return l, res
 }
 
-// Tokens renders a list as activeMods identifiers; missing entries are written back as
-// they were so the list survives a mod being temporarily absent.
-func (r *Registry) Tokens(l List) []string {
+// Tokens renders a list as activeMods identifiers. Missing entries are written back as
+// they were, and an instance the game cannot register right now (deleted, disabled) is
+// written as fallback(id) — its packageId — so the list survives a mod being absent.
+func (r *Registry) Tokens(l List, fallback func(id string) string) []string {
 	out := make([]string, 0, len(l))
 	for _, e := range l {
 		if e.Instance != "" {
-			if t := r.Token(e.Instance); t != "" {
+			t := r.Token(e.Instance)
+			if t == "" && fallback != nil {
+				t = fallback(e.Instance)
+			}
+			if t != "" {
 				out = append(out, t)
 			}
 			continue
 		}
 		out = append(out, e.Missing)
+	}
+	return out
+}
+
+// Heal resolves missing entries that now match an instance (installed or scanned since),
+// unless that instance is already in the list.
+func (r *Registry) Heal(l List) List {
+	out := l
+	copied := false
+	for i, e := range l {
+		if e.Missing == "" {
+			continue
+		}
+		id := r.Resolve(e.Missing).Instance
+		if id == "" || l.Index(id) >= 0 {
+			continue
+		}
+		if !copied {
+			out, copied = l.Clone(), true
+		}
+		out[i] = Entry{Instance: id}
 	}
 	return out
 }

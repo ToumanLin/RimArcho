@@ -1,5 +1,5 @@
 $ archo help
-archo — RimWorld mod manager (M1: environments, scanning, identity)
+archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
   commands:
     env list                                  list environments and their sources
     env detect                                detect game, user data and workshop paths (suggestion only)
@@ -14,6 +14,22 @@ archo — RimWorld mod manager (M1: environments, scanning, identity)
     find <words…>                             search by name, package id, author, workshop id, folder
     mod <ref>                                 mod details
     changes [<ref>]                           change events (default: the last scan)
+    enable <ref…>                             add mods to the workspace Loadout
+    disable <ref…>                            remove mods from the workspace Loadout
+    move <ref>                                move an enabled mod
+    swap <ref> [<ref>]                        replace an enabled mod by another instance of its lineage
+    sort                                      sort the workspace by load-order constraints
+    undo                                      undo the last workspace edit
+    redo                                      redo an undone workspace edit
+    save                                      write the workspace to ModsConfig.xml (backup + atomic replace)
+    loadout log                               saved and imported Loadout versions
+    loadout diff [<v>] [<v>]                  differences between versions (default: newest version → workspace)
+    loadout checkout <v>                      load a version into the workspace (save to apply)
+    loadout tag <v> <name>                    name a version
+    rule add after|before|incompatible|attach <A> <B> | ignore <constraint>  add a user rule
+    rule list                                 list user rules
+    rule remove <r:n>                         delete a user rule
+    launch                                    start the game
     identity list                             open identity questions ("is this #xxxx back?")
     identity resolve <q:n> same|copy|unrelated  answer an identity question
     lineage split <ref>                       move an instance into a lineage of its own
@@ -70,6 +86,7 @@ scan:1  env:main  0s
   instances: 9 live, 0 tombstones
   files: 43 (4.3 KB), semantic hashed 32, reused 0
   changes: 9 discovered
+  loadout: imported ModsConfig.xml as v1: 1 entries
 next:
   archo changes
 
@@ -80,14 +97,14 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (0 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered (archo changes)
-  modsconfig: 1 active entries, version 1.6.4633 rev1261
+  loadout: 1 active, same as v1 (import)
 
 $ archo list
 mods: 9 (env:main)
   #nyh3  Alpha               [workshop ws:3000000002]
   #lqj2  Alpha Fork          [local Twin]
   #z3bw  Beta                [workshop ws:3000000003]
-  #iqmu  Core                [official Core]
+  #iqmu  Core                [active 1/1, official Core]
   #gpto  Gamma               [local Gamma]
   #6olp  Harmony             [workshop ws:2009463077]
   #i4uc  Leftover            [workshop ws:3000000009, residue]
@@ -219,6 +236,6 @@ error: unknown command "frobnicate" (archo help)
 
 $ archo list --bogus
 error: unknown flag --bogus
-usage: archo list [--filter <expr>] [--all]
+usage: archo list [--filter <expr>] [--active] [--all]
 [exit 2]
 

@@ -152,10 +152,13 @@ func Size(b int64) string {
 	return fmt.Sprintf("%d B", b)
 }
 
-// Plural returns "1 mod" / "2 mods".
+// Plural returns "1 mod" / "2 mods" ("1 entry" / "2 entries").
 func Plural(n int, word string) string {
 	if n == 1 {
 		return fmt.Sprintf("%d %s", n, word)
+	}
+	if strings.HasSuffix(word, "y") && !strings.HasSuffix(word, "ey") {
+		return fmt.Sprintf("%d %sies", n, word[:len(word)-1])
 	}
 	return fmt.Sprintf("%d %ss", n, word)
 }

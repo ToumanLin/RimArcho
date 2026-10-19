@@ -5,7 +5,7 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (1 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered, 1 copied (archo changes)
-  modsconfig: 1 active entries, version 1.6.4633 rev1261
+  loadout: 1 active, same as v1 (import)
 
 $ archo scan
 scan:2  env:main  0s
@@ -151,5 +151,5 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (2 with several instances)
   last-scan: scan:3 2026-10-03 12:00, 0s
   changes: 1 discovered (archo changes)
-  modsconfig: 1 active entries, version 1.6.4633 rev1261
+  loadout: 1 active, same as v1 (import)
 

@@ -81,7 +81,9 @@ func Diff(a, b List, lineage func(instance string) string) []Change {
 	stable := lcs(ca, cb)
 	for _, e := range b {
 		k := e.Key()
-		if posA[k] != 0 && !stable[k] {
+		// An entry outside the LCS that kept its absolute position is not reported: the
+		// entries that did move around it already describe the change.
+		if posA[k] != 0 && !stable[k] && posA[k] != posB[k] {
 			out = append(out, Change{Kind: Moved, Entry: e, From: posA[k], To: posB[k]})
 		}
 	}

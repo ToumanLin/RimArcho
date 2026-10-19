@@ -18,7 +18,7 @@ func init() {
 	register(&Command{Name: "status", Summary: "overview of the current environment", MaxArgs: 0, Run: statusCmd})
 	register(&Command{Name: "list", Summary: "list mods", MaxArgs: 0,
 		Flags: []Flag{{Name: "filter", Value: "<expr>", Help: "terms: source:<label|kind> status:live|tombstone|all residue unloadable copies pkg:<id> ws:<id> or words"},
-			{Name: "all", Help: "no truncation"}}, Run: listCmd})
+			{Name: "active", Help: "the workspace Loadout in load order"}, {Name: "all", Help: "no truncation"}}, Run: listCmd})
 	register(&Command{Name: "find", Args: "<words…>", Summary: "search by name, package id, author, workshop id, folder", MinArgs: 1, MaxArgs: -1,
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: findCmd})
 	register(&Command{Name: "mod", Args: "<ref>", Summary: "mod details", MinArgs: 1, MaxArgs: 1, Run: modCmd})
@@ -66,6 +66,9 @@ func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	root.KV("changes", eventSummary(st.Events))
 	if st.Questions > 0 {
 		root.KV("questions", fmt.Sprintf("%d new (archo identity list)", st.Questions))
+	}
+	for _, n := range r.Notices {
+		root.KV("loadout", n)
 	}
 	if len(st.Events) > 0 {
 		d.AddNext("archo changes")
@@ -182,19 +185,7 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			root.KV("warning", fmt.Sprintf("%s re-binding pending (archo env rebind %s yes|no)", s.Ref(), s.Ref()))
 		}
 	}
-	if e.UserDataRoot != "" {
-		mc, err := env.ReadModsConfig(env.ModsConfigPath(e.UserDataRoot))
-		switch {
-		case err != nil:
-			root.KV("modsconfig", "unreadable: "+err.Error())
-		default:
-			line := fmt.Sprintf("%d active entries, version %s", len(mc.ActiveMods), versionText(mc.Version))
-			if gv, cv := env.MajorMinor(e.GameVersion), env.MajorMinor(mc.Version); gv != "" && cv != "" && gv != cv {
-				line += fmt.Sprintf(" (game is %s: the game resets the list when it loads it)", gv)
-			}
-			root.KV("modsconfig", line)
-		}
-	}
+	loadoutStatus(c, root, d)
 	return d, nil
 }
 
@@ -267,6 +258,9 @@ func matchWord(m *store.Mod, w string) bool {
 }
 
 func listCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Bool("active") {
+		return activeList(c, a)
+	}
 	ix, err := c.App.Index()
 	if err != nil {
 		return nil, err
@@ -607,4 +601,102 @@ func changesCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo changes --since 30d")
 	}
 	return d, nil
+}
+
+// activeList is `list --active`: the workspace in load order, missing entries included.
+func activeList(c *Ctx, a *Args) (*render.Doc, error) {
+	st, err := c.App.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	c.st, c.stDone = st, true
+	expr := a.Str("filter")
+	var keep map[string]bool
+	if expr != "" {
+		ms, err := filterMods(st.Ix, "status:all "+expr)
+		if err != nil {
+			return nil, err
+		}
+		keep = map[string]bool{}
+		for _, m := range ms {
+			keep[m.ID] = true
+		}
+	}
+	d, root := render.New(workspaceLine(st))
+	var rows [][]string
+	for i, e := range st.List {
+		pos := fmt.Sprint(i + 1)
+		if e.Instance == "" {
+			if keep == nil {
+				rows = append(rows, []string{pos, "pkg:" + e.Missing, "(missing: no installed mod matches this entry)"})
+			}
+			continue
+		}
+		if keep != nil && !keep[e.Instance] {
+			continue
+		}
+		m := st.Ix.ByID[e.Instance]
+		if m == nil {
+			rows = append(rows, []string{pos, st.Ix.Ref(e.Instance), "(gone)"})
+			continue
+		}
+		rows = append(rows, []string{pos, st.Ix.Ref(m.ID), m.DisplayName(), tags(c, st.Ix, m)})
+	}
+	limit := render.DefaultLimit
+	if a.Bool("all") {
+		limit = 0
+	}
+	shown := rows
+	if limit > 0 && len(rows) > limit {
+		shown = rows[:limit]
+	}
+	root.AddColumns(shown)
+	if len(shown) < len(rows) {
+		root.Addf("… %d more (archo list --active --all)", len(rows)-len(shown))
+	}
+	if len(st.Changes()) > 0 {
+		d.AddNext("archo loadout diff", "archo save")
+	}
+	return d, nil
+}
+
+// loadoutStatus adds the workspace lines to status (04 §2.2, §2.3).
+func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
+	st := c.Loadout()
+	if st == nil {
+		if c.stErr != nil {
+			root.KV("loadout", "unavailable: "+c.stErr.Error())
+		}
+		return
+	}
+	missing := 0
+	for _, e := range st.List {
+		if e.Instance == "" {
+			missing++
+		}
+	}
+	line := fmt.Sprintf("%d active", len(st.List))
+	if missing > 0 {
+		line += fmt.Sprintf(" (%d missing entries)", missing)
+	}
+	if n := len(st.Changes()); n > 0 {
+		line += fmt.Sprintf(", %s unsaved (archo loadout diff)", render.Plural(n, "change"))
+		d.AddNext("archo save")
+	} else if st.Latest != nil {
+		line += fmt.Sprintf(", same as v%d (%s)", st.Latest.N, st.Latest.Source)
+	}
+	root.KV("loadout", line)
+	for _, n := range st.Notices {
+		root.KV("notice", n)
+	}
+	if st.WS.Conflict != 0 {
+		root.KV("pending", fmt.Sprintf("ModsConfig.xml changed outside RimArcho (v%d) while the workspace had unsaved edits: archo loadout diff v%d, archo loadout checkout v%d", st.WS.Conflict, st.WS.Conflict, st.WS.Conflict))
+	}
+	if v := st.FileVersionMismatch(); v != "" {
+		root.KV("warning", fmt.Sprintf("ModsConfig.xml was saved for %s; the game (%s) resets it on start. Saving once rewrites it for %s (archo save)",
+			env.MajorMinor(v), st.GameMM(), st.GameMM()))
+	}
+	if st.FileErr != nil {
+		root.KV("warning", "ModsConfig.xml unreadable: "+st.FileErr.Error())
+	}
 }

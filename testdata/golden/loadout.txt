@@ -1,0 +1,233 @@
+$ archo status
+env:main  RimWorld 1.6.4633 rev1261
+  mods: 11 live (official 1, local 5, workshop 5), 0 tombstones
+  residue: 1 (unsubscribed workshop folders still on disk; the game does not load them: archo list --filter residue)
+  lineages: 11 (0 with several instances)
+  last-scan: scan:1 2026-10-01 10:00, 0s
+  changes: 11 discovered (archo changes)
+  loadout: 7 active (1 missing entries), same as v1 (import)
+  warning: ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start. Saving once rewrites it for 1.6 (archo save)
+
+$ archo list --active
+workspace: 7 active, saved (env:main)
+  1  #hnyg         Versioned Mod 版本  [active 1/7, workshop ws:3000000001]
+  2  #iqmu         Core                [active 2/7, official Core]
+  3  #lqj2         Alpha Fork          [active 3/7, local Twin]
+  4  #6olp         Harmony             [active 4/7, workshop ws:2009463077]
+  5  #qfph         X                   [active 5/7, local X]
+  6  #tmxx         Y                   [active 6/7, local Y]
+  7  pkg:gone.mod  (missing: no installed mod matches this entry)
+
+$ archo sort --dry-run
+sort: 2 moved (dry run; the workspace is unchanged)
+  moved  #6olp  Harmony             4 → 1
+  moved  #hnyg  Versioned Mod 版本  1 → 3
+  problems:
+    error order.cycle  #qfph #tmxx  (kept in current order)
+      evidence: decl #qfph About.xml loadAfter pkg:tester.y  (ignore: decl:#qfph:loadafter:tester.y)
+      evidence: decl #tmxx About.xml loadAfter pkg:tester.x  (ignore: decl:#tmxx:loadafter:tester.x)
+  constraints: 10 edges, 0 ignored by rules
+next:
+  archo rule add ignore decl:#qfph:loadafter:tester.y
+  archo sort
+
+$ archo rule add ignore decl:#tmxx:loadafter:tester.x --note fine either way
+r:1 added
+  r:1  ignore  decl:#tmxx:loadafter:tester.x    fine either way
+next:
+  archo sort --dry-run
+
+$ archo rule list
+rules: 1 (env:main)
+  r:1  ignore  decl:#tmxx:loadafter:tester.x    fine either way
+
+$ archo sort
+sort: 3 moved (applied to the workspace; not saved)
+  moved  #6olp  Harmony             4 → 1
+  moved  #hnyg  Versioned Mod 版本  1 → 3
+  moved  #qfph  X                   5 → 6
+  constraints: 9 edges, 1 ignored by rules
+next:
+  archo save
+
+$ archo list --active
+workspace: 7 active, 3 changes unsaved (env:main)
+  1  #6olp         Harmony             [active 1/7, workshop ws:2009463077]
+  2  #iqmu         Core                [active 2/7, official Core]
+  3  #hnyg         Versioned Mod 版本  [active 3/7, workshop ws:3000000001]
+  4  #lqj2         Alpha Fork          [active 4/7, local Twin]
+  5  #tmxx         Y                   [active 5/7, local Y]
+  6  #qfph         X                   [active 6/7, local X]
+  7  pkg:gone.mod  (missing: no installed mod matches this entry)
+next:
+  archo loadout diff
+  archo save
+
+$ archo enable #gpto --after #6olp
+workspace: 8 active, 4 changes unsaved (env:main)
+  added  #gpto  Gamma  at 2
+next:
+  archo save
+
+$ archo move #z3bw --to 3
+error: #z3bw is not enabled (archo enable #z3bw)
+[exit 1]
+
+$ archo enable #z3bw
+workspace: 9 active, 5 changes unsaved (env:main)
+  added  #z3bw  Beta  at 9
+next:
+  archo save
+
+$ archo enable #i4uc
+error: cannot enable #i4uc: residue: the workshop folder is no longer subscribed, the game ignores it
+[exit 1]
+
+$ archo enable #lqj2
+workspace: 9 active, 5 changes unsaved (env:main)
+  no change
+  note: #lqj2 is already enabled
+next:
+  archo save
+
+$ archo disable pkg:gone.mod
+workspace: 8 active, 6 changes unsaved (env:main)
+  removed  pkg:gone.mod  (missing)  was 8
+next:
+  archo save
+
+$ archo undo
+workspace: 9 active, 5 changes unsaved (env:main)
+  undid: disable
+  added  pkg:gone.mod  (missing)  at 8
+next:
+  archo save
+
+$ archo redo
+workspace: 8 active, 6 changes unsaved (env:main)
+  redid: disable
+  removed  pkg:gone.mod  (missing)  was 8
+next:
+  archo save
+
+$ archo loadout diff
+diff v1 → workspace: 6 changes
+  moved    #6olp         Harmony             4 → 1
+  added    #gpto         Gamma               at 2
+  moved    #hnyg         Versioned Mod 版本  1 → 4
+  removed  pkg:gone.mod  (missing)           was 7
+  moved    #qfph         X                   5 → 7
+  added    #z3bw         Beta                at 8
+
+$ archo launch --dry-run
+error: launch blocked: ModsConfig.xml was saved for 1.5 but the game is 1.6, so the game would reset the mod list; run archo save first
+[exit 1]
+
+$ archo save --dry-run
+save: dry run, nothing written
+  path: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml
+  version: 1.5.4409 rev1118 → 1.6.4633 rev1261 (rewritten from 1.5 to 1.6; the game would otherwise reset the list)
+  entries: 8
+  changes: 6 since v1
+    moved    #6olp         Harmony             4 → 1
+    added    #gpto         Gamma               at 2
+    moved    #hnyg         Versioned Mod 版本  1 → 4
+    removed  pkg:gone.mod  (missing)           was 7
+    moved    #qfph         X                   5 → 7
+    added    #z3bw         Beta                at 8
+next:
+  archo save
+
+$ archo save
+saved v2 to ModsConfig.xml
+  path: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml
+  backup: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml.rimarcho.bak
+  version: 1.5.4409 rev1118 → 1.6.4633 rev1261 (rewritten from 1.5 to 1.6; the game would otherwise reset the list)
+  entries: 8
+  changes: 6 since v1
+    moved    #6olp         Harmony             4 → 1
+    added    #gpto         Gamma               at 2
+    moved    #hnyg         Versioned Mod 版本  1 → 4
+    removed  pkg:gone.mod  (missing)           was 7
+    moved    #qfph         X                   5 → 7
+    added    #z3bw         Beta                at 8
+next:
+  archo launch
+
+$ archo loadout tag v2 raid-night
+v2 tagged raid-night
+next:
+  archo loadout checkout raid-night
+
+$ archo swap #nyh3 #lqj2
+error: #lqj2 and #nyh3 are not in the same lineage (archo lineage merge, or disable + enable)
+[exit 1]
+
+$ archo loadout log
+versions: 2 (env:main)
+  workspace: 8 active, saved (env:main)
+  v2  2026-10-01 10:00  user    8 entries  1.6.4633 rev1261  [raid-night]
+  v1  2026-10-01 10:00  import  7 entries  1.5.4409 rev1118  ModsConfig.xml
+
+$ archo loadout checkout v1
+workspace: 7 active, 5 changes unsaved (env:main)
+  checked out v1 into the workspace (archo save writes it to the game)
+  removed  #gpto         Gamma      was 2
+  moved    #iqmu         Core       3 → 2
+  moved    #6olp         Harmony    1 → 4
+  added    pkg:gone.mod  (missing)  at 7
+  removed  #z3bw         Beta       was 8
+next:
+  archo save
+
+$ archo loadout diff raid-night workspace
+diff v2 → workspace: 5 changes
+  removed  #gpto         Gamma      was 2
+  moved    #iqmu         Core       3 → 2
+  moved    #6olp         Harmony    1 → 4
+  added    pkg:gone.mod  (missing)  at 7
+  removed  #z3bw         Beta       was 8
+
+$ archo launch --dry-run
+error: launch blocked: the workspace has 5 unsaved changes; run archo save first, or launch --force to play the saved list
+[exit 1]
+
+$ archo undo
+workspace: 8 active, saved (env:main)
+  undid: checkout
+  moved    #6olp         Harmony             4 → 1
+  added    #gpto         Gamma               at 2
+  moved    #hnyg         Versioned Mod 版本  1 → 4
+  removed  pkg:gone.mod  (missing)           was 7
+  moved    #qfph         X                   5 → 7
+  added    #z3bw         Beta                at 8
+
+$ archo launch --dry-run
+launch: dry run (steam)
+  command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+
+$ archo scan
+scan:2  env:main  0s
+  sources:
+    src:official  1 mod
+    src:local     5 mods (6 folders, 1 without About.xml)
+    src:workshop  5 mods (6 folders, 1 residue, 1 without About.xml)
+  instances: 11 live, 0 tombstones
+  files: 55 (5.4 KB), semantic hashed 0, reused 40
+  changes: none
+  loadout: ModsConfig.xml changed outside RimArcho: loaded as v3
+
+$ archo loadout log
+versions: 3 (env:main)
+  workspace: 2 active, saved (env:main)
+  v3  2026-10-01 11:00  external  2 entries  1.6.4633 rev1261  ModsConfig.xml changed outside RimArcho
+  v2  2026-10-01 10:00  user      8 entries  1.6.4633 rev1261  [raid-night]
+  v1  2026-10-01 10:00  import    7 entries  1.5.4409 rev1118  ModsConfig.xml
+
+$ archo rule remove r:1
+r:1 removed
+
+$ archo rule remove r:9
+error: no rule r:9 (archo rule list)
+[exit 1]
+

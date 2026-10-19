@@ -51,6 +51,19 @@ func (c *Command) Usage() string {
 // Ctx is passed to every command.
 type Ctx struct {
 	App *app.App
+
+	st     *app.LoadoutState
+	stErr  error
+	stDone bool
+}
+
+// Loadout returns the workspace, loaded once per command (nil if unavailable).
+func (c *Ctx) Loadout() *app.LoadoutState {
+	if !c.stDone {
+		c.st, c.stErr = c.App.Loadout()
+		c.stDone = true
+	}
+	return c.st
 }
 
 // Args are parsed positional arguments and flags.
@@ -79,13 +92,14 @@ var registry []*Command
 func register(c *Command) { registry = append(registry, c) }
 
 // order is the documented command order (05 §3); registration order depends on file names.
-var order = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "env remove", "scan", "status", "list", "find",
-	"mod", "changes", "identity list", "identity resolve", "lineage split", "lineage merge", "gc"}
+var commandOrder = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "env remove", "scan", "status", "list", "find",
+	"mod", "changes", "enable", "disable", "move", "swap", "sort", "undo", "redo", "save", "loadout log", "loadout diff",
+	"loadout checkout", "loadout tag", "rule add", "rule list", "rule remove", "launch", "identity list", "identity resolve", "lineage split", "lineage merge", "gc"}
 
 // Commands returns the command table in documented order.
 func Commands() []*Command {
 	out := make([]*Command, 0, len(registry))
-	for _, n := range order {
+	for _, n := range commandOrder {
 		for _, c := range registry {
 			if c.Name == n {
 				out = append(out, c)
@@ -93,7 +107,7 @@ func Commands() []*Command {
 		}
 	}
 	for _, c := range registry {
-		if !slices.Contains(order, c.Name) {
+		if !slices.Contains(commandOrder, c.Name) {
 			out = append(out, c)
 		}
 	}
@@ -228,7 +242,7 @@ func Execute(ap *app.App, argv []string) (string, int) {
 
 // Help lists every command.
 func Help() *render.Doc {
-	d, root := render.New("archo — RimWorld mod manager (M1: environments, scanning, identity)")
+	d, root := render.New("archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)")
 	var rows [][]string
 	for _, c := range Commands() {
 		u := c.Name

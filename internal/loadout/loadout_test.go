@@ -45,7 +45,7 @@ func TestRegistrySteamSuffix(t *testing.T) {
 	if len(l) != 3 || l[1].Missing != "gone.mod" || res[3].Via != "duplicate" {
 		t.Fatalf("list %+v res %+v", l, res)
 	}
-	if got := r.Tokens(l); !slices.Equal(got, []string{"ludeon.rimworld", "gone.mod", "brrainz.harmony"}) {
+	if got := r.Tokens(l, nil); !slices.Equal(got, []string{"ludeon.rimworld", "gone.mod", "brrainz.harmony"}) {
 		t.Fatalf("tokens %v", got)
 	}
 }
