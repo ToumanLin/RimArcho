@@ -320,3 +320,38 @@ func TestLaunchPlans(t *testing.T) {
 	}
 	_ = store.UndoLimit
 }
+
+// The ignore reference printed by sort must be accepted verbatim by rule add ignore, for
+// every constraint kind (a dependency edge once printed a field name that never matched).
+func TestPrintedIgnoreRefsRoundTrip(t *testing.T) {
+	e := setup(t, false)
+	p := testkit.Sample("tester.p", "P")
+	p.Deps = []string{"tester.q"}
+	e.WriteMod(filepath.Join(e.Game, "Mods", "P"), p)
+	q := testkit.Sample("tester.q", "Q")
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Q"), q)
+	e.WriteFile(filepath.Join(e.Game, "Mods", "Q", "About", "About.xml"), strings.Replace(q.AboutXML(), "</ModMetaData>", "<loadAfter><li>tester.p</li></loadAfter></ModMetaData>", 1))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.q", "tester.p")
+	scanNow(t, e)
+	out := e.MustRun("sort", "--dry-run")
+	var refs []string
+	for _, l := range strings.Split(out, "\n") {
+		if i := strings.Index(l, "(ignore: "); i >= 0 {
+			refs = append(refs, strings.TrimSuffix(l[i+len("(ignore: "):], ")"))
+		}
+	}
+	if len(refs) != 2 {
+		t.Fatalf("want 2 ignorable edges:\n%s", out)
+	}
+	for _, r := range refs {
+		e.MustRun("rule", "add", "ignore", r)
+		res, err := e.App.Sort(true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Result.Cycles) != 0 || res.Result.Ignored != 1 {
+			t.Fatalf("ignore %s: cycles %d ignored %d", r, len(res.Result.Cycles), res.Result.Ignored)
+		}
+		e.MustRun("rule", "remove", "r:"+map[bool]string{true: "1", false: "2"}[r == refs[0]])
+	}
+}

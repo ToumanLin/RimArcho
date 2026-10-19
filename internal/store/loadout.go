@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -210,15 +211,18 @@ type UserRule struct {
 	Created time.Time
 }
 
-// AddRule stores a rule and returns its ID.
+// AddRule stores a rule and returns its ID. IDs are never reused (r:<n> stays unambiguous
+// in notes and scripts after a rule is removed).
 func (s *Store) AddRule(envID string, r *UserRule) (int64, error) {
-	res, err := s.DB.Exec(`INSERT INTO user_rule(environment_id, kind, a_lineage, b_lineage, target, note, created_at) VALUES(?,?,?,?,?,?,?)`,
-		envID, r.Kind, r.A, r.B, r.Target, r.Note, r.Created.Unix())
-	if err != nil {
+	var seq, maxID int64
+	fmt.Sscan(s.Meta("rule_seq"), &seq)
+	s.DB.QueryRow(`SELECT coalesce(max(id), 0) FROM user_rule`).Scan(&maxID)
+	r.ID = max(seq, maxID) + 1
+	if _, err := s.DB.Exec(`INSERT INTO user_rule(id, environment_id, kind, a_lineage, b_lineage, target, note, created_at) VALUES(?,?,?,?,?,?,?,?)`,
+		r.ID, envID, r.Kind, r.A, r.B, r.Target, r.Note, r.Created.Unix()); err != nil {
 		return 0, err
 	}
-	r.ID, _ = res.LastInsertId()
-	return r.ID, nil
+	return r.ID, s.SetMeta("rule_seq", fmt.Sprint(r.ID))
 }
 
 // Rules lists an environment's user rules.

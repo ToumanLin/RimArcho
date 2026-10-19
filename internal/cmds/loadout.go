@@ -215,8 +215,13 @@ func constraintText(st *app.LoadoutState, in order.Input, e order.Edge) (evidenc
 	case order.KindUser:
 		return fmt.Sprintf("rule r:%d %s %s pkg:%s", e.C.RuleID, owner, e.C.Field, e.C.Target), fmt.Sprintf("archo rule remove r:%d", e.C.RuleID)
 	default:
-		return fmt.Sprintf("decl %s About.xml %s pkg:%s", owner, e.C.Field, e.C.Target),
-			fmt.Sprintf("decl:%s:%s:%s", owner, strings.ToLower(e.C.Field), e.C.Target)
+		// The stored reference is keyed by lineage; print it with the declaring instance,
+		// which `rule add ignore` resolves back to the same lineage.
+		ig := e.C.Ref
+		if parts := strings.Split(e.C.Ref, ":"); len(parts) == 4 {
+			ig = "decl:" + owner + ":" + parts[2] + ":" + parts[3]
+		}
+		return fmt.Sprintf("decl %s About.xml %s pkg:%s", owner, e.C.Field, e.C.Target), ig
 	}
 }
 
