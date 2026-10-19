@@ -3,12 +3,15 @@ package tui
 import (
 	"bytes"
 	"fmt"
+	"image"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -244,5 +247,99 @@ func TestWrapKinsoku(t *testing.T) {
 	lines := wrapSpans([]bbcode.Span{{Text: "支持从游戏获取更加详细的日志。必须放在"}}, 28, lipgloss.NewStyle())
 	if got := strings.TrimRight(ansi.Strip(lines[1]), " "); !strings.HasPrefix(got, "志。") {
 		t.Fatalf("second line %q", got)
+	}
+}
+
+func previewPNG(t *testing.T, path string, w, h int) {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for i := range img.Pix {
+		img.Pix[i] = 90
+	}
+	var b bytes.Buffer
+	png.Encode(&b, img)
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	if err := os.WriteFile(path, b.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// T6 (06 §11): a mod with Preview.png shows its thumbnail after a 150 ms rest; moving on
+// erases the whole 18×9 block at once; fast scrolling never draws a stale thumbnail.
+func TestT6Thumbnail(t *testing.T) {
+	e, _ := fixture(t)
+	previewPNG(t, filepath.Join(e.Workshop, "1001", "About", "Preview.png"), 1600, 900)
+	m := direct(t, e, 160, 40)
+	var buf bytes.Buffer
+	m.images = &imgWriter{Writer: &buf}
+	frame := func() string {
+		m.View()
+		buf.Reset()
+		m.images.Write([]byte("F"))
+		return buf.String()
+	}
+	press(m, "g")
+	press(m, "down") // Alpha, with a 16:9 Preview.png
+	id := m.current().id
+	if out := frame(); strings.Contains(out, "1337;File") {
+		t.Fatal("thumbnail drawn before the dwell")
+	}
+	// the dwell is a 150 ms tick carrying the selection
+	t0 := time.Now()
+	msg := m.thumbDwell()() // the tick press scheduled, made again
+	if d := time.Since(t0); d < 150*time.Millisecond || d > 600*time.Millisecond {
+		t.Fatalf("dwell %v", d)
+	}
+	m.update(msg)
+	if m.thumbShown != id {
+		t.Fatalf("shown %q", m.thumbShown)
+	}
+	runCmd(m, m.imageCmds(m.visibleDetail()))
+	out := frame()
+	if !strings.Contains(out, "1337;File=inline=1") || !strings.Contains(out, "width=18;height=5;preserveAspectRatio=0") {
+		t.Fatalf("thumbnail: %.200q", out)
+	}
+	m.View()
+	ps := m.images.cur
+	if len(ps) != 1 || ps[0].cols != 18 || ps[0].rows != 5 || ps[0].clr != 9 {
+		t.Fatalf("placement %+v", ps)
+	}
+	p := ps[0]
+	// the text beside it starts after the block
+	if l := ansi.Strip(m.lastLines[0].text); !strings.HasPrefix(l, strings.Repeat(" ", 20)+"Alpha") {
+		t.Fatalf("header %q", l)
+	}
+	// moving on: no image, and the whole 18×9 block erased in the same write
+	press(m, "down")
+	out = frame()
+	if strings.Contains(out, "1337;File") {
+		t.Fatal("thumbnail kept after moving on")
+	}
+	for r := 0; r < 9; r++ {
+		if want := fmt.Sprintf("\x1b[%d;%dH\x1b[18X", p.row+r, p.col); !strings.Contains(out, want) {
+			t.Fatalf("row %d of the block not erased: %q", r, out)
+		}
+	}
+	// fast scrolling: stale ticks change nothing, and no frame draws a thumbnail
+	old := m.thumbSeq
+	for i := 0; i < 20; i++ {
+		press(m, map[bool]string{true: "up", false: "down"}[i%2 == 0])
+		m.update(thumbTick{old, id})
+		if out := frame(); strings.Contains(out, "1337;File") {
+			t.Fatalf("stale thumbnail at step %d", i)
+		}
+	}
+	// a mod without Preview.png: after the dwell the block says so
+	press(m, "g")
+	press(m, "down")
+	press(m, "down") // Harmony
+	m.update(thumbTick{m.thumbSeq, m.current().id})
+	runCmd(m, m.imageCmds(m.visibleDetail()))
+	m.View()
+	if got := plainLines(m.lastLines); !strings.Contains(got, "no preview") {
+		t.Fatalf("no preview note:\n%s", got)
+	}
+	// the cache: one PNG under cache/previews
+	if fs, _ := filepath.Glob(filepath.Join(e.App.Home, "cache", "previews", "*.png")); len(fs) != 1 {
+		t.Fatalf("cache files %v", fs)
 	}
 }

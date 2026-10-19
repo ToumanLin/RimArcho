@@ -87,7 +87,9 @@ type dline struct {
 	imgURL  string // first line of an image slot
 	imgRows int
 	imgCols int
-	imgMax  int // the rows the image may take (fewer in the column than in the full view)
+	imgMax  int    // the rows the image may take (fewer in the column than in the full view)
+	imgInd  int    // cells from the start of the line to the image
+	thumb   string // the mod id, for a thumbnail slot (drawn only after the dwell)
 }
 
 type detailOpts struct {
@@ -121,10 +123,6 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	if mod == nil {
 		return nil
 	}
-	addWrapped(it.name, sBold, 0)
-	if a := strings.TrimSpace(mod.Authors); a != "" {
-		addWrapped(a, sSecond, 0)
-	}
 	facts := []string{sourceText(mod)}
 	if mod.Kind != source.Official {
 		if v := strings.Fields(mod.SupportedVersions); len(v) > 0 {
@@ -139,7 +137,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	default:
 		facts = append(facts, T("not enabled"))
 	}
-	addWrapped(it.icon+" "+strings.Join(facts, " "+markDot+" "), sDimS, 0)
+	out = append(out, m.headerLines(it, mod, strings.Join(facts, " "+markDot+" "), w, o)...)
 	add("")
 	switch s := m.rowStatus(it); s {
 	case statusNone:
@@ -232,6 +230,64 @@ func (m *model) detailLayout(o detailOpts) []dline {
 			add("  " + sSecond.Render(fit(x, w-2)))
 		}
 	}
+	return out
+}
+
+// Thumbnail block sizes in cells (06 §6.2, §6.3): the column and the full-screen detail.
+const (
+	thumbCols, thumbRows         = 18, 9
+	thumbFullCols, thumbFullRows = 36, 18
+	thumbMinText                 = 16 // text cells beside the block, else no block
+)
+
+// headerLines: name, authors and facts, beside the thumbnail block in the WezTerm host.
+// The block is always reserved at full size; the image takes the fewest rows that hold
+// it, and a mod without Preview.png shows a faint "no preview" in it (06 §6.1, §6.2).
+func (m *model) headerLines(it *item, mod *store.Mod, facts string, w int, o detailOpts) []dline {
+	tc, tr := thumbCols, thumbRows
+	if o.full {
+		tc, tr = thumbFullCols, thumbFullRows
+	}
+	block := o.images && w-tc-2 >= thumbMinText
+	tw := w
+	if block {
+		tw = w - tc - 2
+	}
+	var text []string
+	put := func(s string, st lipgloss.Style) {
+		for _, l := range wrap(s, tw) {
+			text = append(text, st.Render(fit(l, tw)))
+		}
+	}
+	put(it.name, sBold)
+	if a := strings.TrimSpace(mod.Authors); a != "" {
+		put(a, sSecond)
+	}
+	put(it.icon+" "+facts, sDimS)
+	if !block {
+		out := make([]dline, len(text))
+		for i, l := range text {
+			out[i] = dline{text: l}
+		}
+		return out
+	}
+	url := previewURL(mod.ID)
+	e := m.imgs[imgKey(url, tc, tr)]
+	empty := strings.Repeat(" ", tc)
+	n := max(tr, len(text))
+	out := make([]dline, n)
+	for i := range out {
+		left := empty
+		if i == tr/2 && e != nil && e.state == imgFailed {
+			left = sDimS.Render(fit(strings.Repeat(" ", (tc-width.StringWidth(T("no preview")))/2)+T("no preview"), tc))
+		}
+		right := strings.Repeat(" ", tw)
+		if i < len(text) {
+			right = text[i]
+		}
+		out[i] = dline{text: left + "  " + right}
+	}
+	out[0].imgURL, out[0].imgCols, out[0].imgMax, out[0].thumb = url, tc, tr, mod.ID
 	return out
 }
 
@@ -428,11 +484,11 @@ func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 			switch {
 			case e == nil || e.state == imgLoading:
 				// one line until the size is known
-				out = append(out, dline{text: strings.Repeat(" ", ind) + sDimS.Render(fit(T("image loading… ")+host, bw)), imgURL: b.URL, imgRows: 1, imgCols: cols, imgMax: maxR})
+				out = append(out, dline{text: strings.Repeat(" ", ind) + sDimS.Render(fit(T("image loading… ")+host, bw)), imgURL: b.URL, imgRows: 1, imgCols: cols, imgMax: maxR, imgInd: ind})
 			case e.state == imgFailed:
 				add(strings.Repeat(" ", ind) + sDimS.Render(fit("["+T("image")+" "+markDot+" "+host+" "+markDot+" "+e.err+"]", bw)))
 			default:
-				out = append(out, dline{text: "", imgURL: b.URL, imgRows: e.rows, imgCols: cols, imgMax: maxR})
+				out = append(out, dline{text: "", imgURL: b.URL, imgRows: e.rows, imgCols: cols, imgMax: maxR, imgInd: ind})
 				for r := 1; r < e.rows; r++ {
 					add("")
 				}
@@ -625,8 +681,8 @@ func (m *model) imageCmds(lines []dline) tea.Cmd {
 		return nil
 	}
 	for _, l := range lines {
-		if l.imgURL == "" {
-			continue
+		if l.imgURL == "" || (l.thumb != "" && m.thumbShown != l.thumb) {
+			continue // a thumbnail is loaded only once the cursor rests (06 §6.2)
 		}
 		key := imgKey(l.imgURL, l.imgCols, l.imgMax)
 		if _, ok := m.imgs[key]; ok {
@@ -634,7 +690,11 @@ func (m *model) imageCmds(lines []dline) tea.Cmd {
 		}
 		m.imgs[key] = &imgEntry{state: imgLoading}
 		m.imgLoading = key
-		f := loadImage(m.app, l.imgURL, l.imgCols, l.imgMax)
+		var ix *app.Index
+		if m.st != nil {
+			ix = m.st.Ix
+		}
+		f := loadImage(m.app, ix, l.imgURL, l.imgCols, l.imgMax)
 		return func() tea.Msg { return f() }
 	}
 	return nil
@@ -731,7 +791,7 @@ func (m *model) fullLines(n int) ([]string, []placement) {
 	for i := m.fullOff; i < len(lines) && len(out) < n; i++ {
 		l := lines[i]
 		out = append(out, "  "+l.text)
-		if p, ok := m.place(l, len(out)-1, n, 3); ok {
+		if p, ok := m.place(l, len(out)-1, n, 3); ok { // the line starts at column 3
 			ps = append(ps, p)
 		}
 	}
@@ -743,15 +803,19 @@ func (m *model) fullLines(n int) ([]string, []placement) {
 }
 
 // place returns the placement of an image slot starting at body line y when it fits
-// entirely in the n body lines; x is the 1-based column of the slot's text.
+// entirely in the n body lines; x is the 1-based screen column where the line starts.
 func (m *model) place(l dline, y, n, x int) (placement, bool) {
-	if l.imgURL == "" || y+l.imgRows > n {
+	if l.imgURL == "" || (l.thumb != "" && m.thumbShown != l.thumb) {
 		return placement{}, false
 	}
 	e := m.imgs[imgKey(l.imgURL, l.imgCols, l.imgMax)]
-	if e == nil || e.state != imgOK {
+	if e == nil || e.state != imgOK || y+e.rows > n {
 		return placement{}, false
 	}
 	// body line y is screen row 3+y (1-based): top bar, blank line, then the body
-	return placement{row: 3 + y, col: x + 2, cols: l.imgCols, rows: l.imgRows, seq: e.seq}, true
+	p := placement{row: 3 + y, col: x + l.imgInd, cols: l.imgCols, rows: e.rows, seq: e.seq}
+	if l.thumb != "" {
+		p.clr = l.imgMax // the whole reserved block is erased (06 §6.2)
+	}
+	return p, true
 }

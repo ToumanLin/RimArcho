@@ -245,7 +245,7 @@ func (m *model) detailLines(w, n, x int) ([]string, []placement) {
 	var ps []placement
 	for i := 0; i < len(lines) && i < n; i++ {
 		out = append(out, lines[i].text)
-		if p, ok := m.place(lines[i], i, n, x+1); ok {
+		if p, ok := m.place(lines[i], i, n, x+1); ok { // x is 0-based
 			ps = append(ps, p)
 		}
 	}

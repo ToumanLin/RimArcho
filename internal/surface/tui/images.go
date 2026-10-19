@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"io"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/rimarcho/rimarcho/internal/app"
@@ -27,6 +28,7 @@ const cellAspect = 13.0 / 30.0
 // placement is one image on screen (1-based cell position).
 type placement struct {
 	row, col, cols, rows int
+	clr                  int // rows to erase when it goes, if more than rows (a thumbnail's block)
 	seq                  []byte
 }
 
@@ -62,7 +64,7 @@ func (w *imgWriter) Write(frame []byte) (int, error) {
 			continue
 		}
 		b.WriteString("\x1b7")
-		for r := 0; r < p.rows; r++ {
+		for r := 0; r < max(p.rows, p.clr); r++ {
 			fmt.Fprintf(&b, "\x1b[%d;%dH\x1b[%dX", p.row+r, p.col, p.cols)
 		}
 		b.WriteString("\x1b8")
@@ -140,11 +142,26 @@ type imgLoadedMsg struct {
 	e   imgEntry
 }
 
-// loadImage downloads (or reads from the cache) and encodes one image for cols columns.
-func loadImage(a *app.App, url string, cols, maxRows int) func() imgLoadedMsg {
+// previewURL names a mod's thumbnail among the images (06 §6.2).
+func previewURL(id string) string { return "preview:" + id }
+
+// loadImage downloads (or reads from the cache) and encodes one image for cols columns;
+// a preview: URL is the mod's Preview.png thumbnail.
+func loadImage(a *app.App, ix *app.Index, url string, cols, maxRows int) func() imgLoadedMsg {
 	return func() imgLoadedMsg {
 		key := imgKey(url, cols, maxRows)
-		path, w, h, err := a.DescImage(url)
+		var path string
+		var w, h int
+		var err error
+		if id, ok := strings.CutPrefix(url, "preview:"); ok {
+			if ix == nil || ix.ByID[id] == nil {
+				err = app.ErrNoPreview
+			} else {
+				path, w, h, err = a.Preview(ix, ix.ByID[id])
+			}
+		} else {
+			path, w, h, err = a.DescImage(url)
+		}
 		if err != nil {
 			return imgLoadedMsg{key, imgEntry{state: imgFailed, err: err.Error()}}
 		}
@@ -156,5 +173,29 @@ func loadImage(a *app.App, url string, cols, maxRows int) func() imgLoadedMsg {
 		return imgLoadedMsg{key, imgEntry{state: imgOK, w: w, h: h, rows: rows, seq: seq}}
 	}
 }
+
+// evictImages keeps the image cache small (the encoded images are the TUI's largest
+// allocations, 06 §11 T5): beyond imgKeep entries, those not on screen go.
+func (m *model) evictImages() {
+	if len(m.imgs) <= imgKeep {
+		return
+	}
+	shown := map[string]bool{m.imgLoading: true}
+	for _, l := range m.lastLines {
+		if l.imgURL != "" {
+			shown[imgKey(l.imgURL, l.imgCols, l.imgMax)] = true
+		}
+	}
+	for k := range m.imgs {
+		if len(m.imgs) <= imgKeep*3/4 {
+			break
+		}
+		if !shown[k] {
+			delete(m.imgs, k)
+		}
+	}
+}
+
+const imgKeep = 24
 
 func imgKey(url string, cols, maxRows int) string { return fmt.Sprintf("%d|%d|%s", cols, maxRows, url) }

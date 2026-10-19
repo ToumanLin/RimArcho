@@ -122,6 +122,7 @@ var zhText = map[string]string{
 	"listed in ModsConfig.xml, but not installed":        "ModsConfig.xml 里有它，但没有安装",
 	"technical information · i":                          "技术信息 · i 展开",
 	"technical information":                              "技术信息",
+	"no preview":                                         "无预览",
 	// details: facts, requirements, description (06 §6.1, §6.4)
 	"package": "包名", "version": "版本", "opens the page": "打开页面", "tags": "标签",
 	"none · # adds": "无 · 按 # 添加", "alias": "别名", "note": "备注", "requires": "依赖",

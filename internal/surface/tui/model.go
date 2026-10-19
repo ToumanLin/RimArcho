@@ -140,8 +140,10 @@ type model struct {
 	dd         *detailData          // the current mod's details beyond the row
 	imgs       map[string]*imgEntry // description images by url and width
 	imgLoading string               // the image being loaded ("" none)
-	images     *imgWriter           // the WezTerm host's output; nil: no inline images
-	full       bool                 // the full-screen detail
+	thumbShown string               // the mod whose thumbnail may be drawn: the cursor rested on it (06 §6.2)
+	thumbSeq   int
+	images     *imgWriter // the WezTerm host's output; nil: no inline images
+	full       bool       // the full-screen detail
 	fullOff    int
 	lastLines  []dline
 
@@ -303,7 +305,32 @@ func (m *model) moveCursor(d int) tea.Cmd {
 func (m *model) requestDetail() tea.Cmd {
 	m.detailSeq++
 	seq := m.detailSeq
-	return tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg { return detailTick{seq} })
+	tick := tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg { return detailTick{seq} })
+	return tea.Batch(tick, m.thumbDwell())
+}
+
+// thumbDwell: when the selection changed, the thumbnail goes at once (the next frame erases
+// its block) and comes back once the cursor has rested 150 ms (06 §6.2).
+func (m *model) thumbDwell() tea.Cmd {
+	it := m.current()
+	if it == nil || it.id == "" {
+		m.thumbShown = ""
+		return nil
+	}
+	if it.id == m.thumbShown {
+		return nil
+	}
+	m.thumbShown = ""
+	m.thumbSeq++
+	seq, id := m.thumbSeq, it.id
+	return tea.Tick(thumbDwellTime, func(time.Time) tea.Msg { return thumbTick{seq, id} })
+}
+
+const thumbDwellTime = 150 * time.Millisecond
+
+type thumbTick struct {
+	seq int
+	id  string
 }
 
 func (m *model) loadDetail() tea.Cmd {

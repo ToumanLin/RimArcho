@@ -84,12 +84,18 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.onData(msg.d)
 	case fetchTick:
 		return m, m.onFetchTick(msg.id)
+	case thumbTick:
+		if it := m.current(); msg.seq == m.thumbSeq && it != nil && it.id == msg.id {
+			m.thumbShown = msg.id
+		}
+		return m, nil
 	case imgLoadedMsg:
 		e := msg.e
 		m.imgs[msg.key] = &e
 		if m.imgLoading == msg.key {
 			m.imgLoading = ""
 		}
+		m.evictImages()
 		return m, nil
 	case detailMsg:
 		if it := m.current(); it != nil && it.ref == msg.ref {
