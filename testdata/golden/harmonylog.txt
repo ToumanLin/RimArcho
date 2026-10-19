@@ -1,0 +1,160 @@
+$ archo analyze
+analysis a:1 for 1.6: 8 active mods, <dur>
+  defs: 2 from 2 files (9 installed mods indexed, 0 from cache)
+  patches: 1 operations in 1 files: 1 failed, 0 of mod-defined classes
+  harmony: 6 patches in 5 assemblies (16 types indexed)
+next:
+  archo problems
+
+$ archo harmony
+harmony: 6 patches in 5 assemblies
+  shared-targets:
+    Verse.Pawn.Tick  3 mods: #gpto #iqmu #xamx
+next:
+  archo harmony --target <Type.Method>
+  archo problems --code harmony
+
+$ archo harmony --target Verse.Pawn.Tick
+harmony:Verse.Pawn.Tick  4 patches from 3 mods
+  prefixes:
+    #iqmu Mod A  ModA.Pawn_Tick.Prefix  (returns bool: may skip the original)
+  postfixes:
+    #gpto Mod B  ModB.Pawn_Tick_B.Postfix
+  transpilers:
+    #gpto Mod B  ModB.Pawn_Tick_B.Transpiler
+    #xamx Mod C  ModC.Pawn_Tick_C.Rewrite
+next:
+  archo source #iqmu --type ModA.Pawn_Tick
+  archo source #gpto --type ModB.Pawn_Tick_B
+  archo source #xamx --type ModC.Pawn_Tick_C
+
+$ archo harmony --mod #i4uc
+#i4uc Manual Patcher  harmony: 0 patches
+  assemblies:
+    Assemblies/ModManual.dll  types 1, patches 0  (calls Harmony.Patch from code)
+  manual: targets patched from code are not statically known (archo source search ".Patch(" --in #i4uc)
+
+$ archo problems --code harmony
+problems: 0 error, 2 warning, 2 info
+  analysis: a:1 2026-10-01 10:00
+  list:
+    warning harmony.skip-prefix  #iqmu Mod A has a bool prefix on Verse.Pawn.Tick that can skip the original; 2 other mods patch it  (p:9c9994)
+    warning harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict  (p:cc6232)
+    info harmony.shared-target  3 mods patch Verse.Pawn.Tick  (p:280e07)
+    info harmony.manual  #i4uc Manual Patcher calls Harmony.Patch from code; those targets cannot be determined statically  (p:3b74ac)
+next:
+  archo problems show p:9c9994
+
+$ archo log
+log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Player.log
+  classes: harmony-stack 2, patch-failed 1, xref-missing 1
+  list:
+    log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)
+    log:E2 xref-missing x1  Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDe...  → #lqj2 (source, +1)
+    log:E3 harmony-stack x500  Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance o...  → #iqmu (patcher, +2)
+    log:E4 harmony-stack x1  Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  → #iqmu (source)
+next:
+  archo log --cluster E1
+
+$ archo log --cluster E1
+log:E1 patch-failed x1  first at Player.log:4
+  message: [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed
+  file: $ROOT/Steam/steamapps/common/RimWorld/Mods/Compat/Patches/Compat.xml
+  detail: simulation: Patches/Compat.xml:2 fails (patch.no-match: target-inactive, unguarded-optional)
+  detail: ThingDef/Lib_Gun is defined by #z3bw, which is not active; the patch is not wrapped in PatchOperationFindMod, a Conditional or a MayRequire list item
+  attribution:
+    #hnyg Compat  source  evidence: log message prefix [Compat]; log file Patches/Compat.xml; patch Patches/Compat.xml:2 PatchOperationAdd
+    #z3bw Lib  dependency  evidence: the patch targets a def it provides
+  confidence: certain
+next:
+  archo enable #z3bw
+  archo patches --mod #hnyg --failed
+  archo files search "Lib_Gun" --mod #hnyg
+
+$ archo log --cluster E2
+log:E2 xref-missing x1  first at Player.log:7
+  message: Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDefCountClass Verse.ThingDefCountClass
+  detail: missing: def:ThingDef/Lib_Gun
+  detail: providers: #z3bw (not enabled)
+  attribution:
+    #lqj2 Refer  source  evidence: references Lib_Gun at Defs/Recipes.xml:5
+    #z3bw Lib  dependency  evidence: defines ThingDef Lib_Gun at Defs/Lib.xml:2 but is not enabled
+  confidence: likely
+next:
+  archo enable #z3bw
+  archo def ThingDef/Lib_Gun
+  archo files search "Lib_Gun"
+
+$ archo log --cluster E3
+log:E3 harmony-stack x500  first at Player.log:9
+  message: Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object
+  top-frames:
+    Verse.Pawn.Tick  (patched by Harmony)
+      - PREFIX tester.moda.harmony: Boolean ModA.Pawn_Tick:Prefix(Verse.Pawn __instance)
+      - POSTFIX tester.modb: Void ModB.Pawn_Tick_B:Postfix()
+      - TRANSPILER tester.modb: IEnumerable`1 ModB.Pawn_Tick_B:Transpiler(IEnumerable`1 instructions)
+      - TRANSPILER tester.modc: IEnumerable`1 ModC.Pawn_Tick_C:Rewrite(IEnumerable`1 instructions)
+    Verse.TickList.Tick
+  attribution:
+    #iqmu Mod A  patcher  evidence: log harmony:Verse.Pawn.Tick#prefix "- PREFIX tester.moda.harmony" (type ModA.Pawn_Tick)
+    #gpto Mod B  patcher  evidence: log harmony:Verse.Pawn.Tick#postfix "- POSTFIX tester.modb" (type ModB.Pawn_Tick_B); log harmony:Verse.Pawn.Tick#transpiler "- TRANSPILER tester.modb" (type ModB.Pawn_Tick_B)
+    #xamx Mod C  patcher  evidence: log harmony:Verse.Pawn.Tick#transpiler "- TRANSPILER tester.modc" (type ModC.Pawn_Tick_C)
+  confidence: possible (no source identified)
+  checklist:
+    ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: removing or reordering comps during a tick throws ArgumentOutOfRangeException in List`1.get_Item
+    red flags: parent.AllComps.Remove(this) inside CompTick(); pawn.AllComps.Add/Remove for runtime comps without deferral; Swap or list surgery on AllComps; runtime ThingComps added without InitializeComps() invariants
+    a PREFIX/POSTFIX line only shows who touched the method last; it is not the cause without other evidence
+    also check ExposeData/PostExposeData, SpawnSetup, DeSpawn and Destroy of the mods that patch the method
+next:
+  archo harmony --target Verse.Pawn.Tick
+  archo source search "AllComps.Remove(" --active
+  archo source search "AllComps.Add(" --active
+
+$ archo log --cluster E4
+log:E4 harmony-stack x1  first at Player.log:18
+  message: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.
+  top-frames:
+    ModA.CompBroken.CompTick
+    Verse.ThingWithComps.Tick
+    Verse.Pawn.Tick  (patched by Harmony)
+      - PREFIX tester.moda.harmony: Boolean ModA.Pawn_Tick:Prefix(Verse.Pawn __instance)
+    Verse.TickList.Tick
+  attribution:
+    #iqmu Mod A  source  evidence: log frame 1 ModA.CompBroken.CompTick (topmost mod code in the stack); log harmony:Verse.Pawn.Tick#prefix "- PREFIX tester.moda.harmony" (type ModA.Pawn_Tick)
+  confidence: likely
+  checklist:
+    ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: removing or reordering comps during a tick throws ArgumentOutOfRangeException in List`1.get_Item
+    red flags: parent.AllComps.Remove(this) inside CompTick(); pawn.AllComps.Add/Remove for runtime comps without deferral; Swap or list surgery on AllComps; runtime ThingComps added without InitializeComps() invariants
+    a PREFIX/POSTFIX line only shows who touched the method last; it is not the cause without other evidence
+    also check ExposeData/PostExposeData, SpawnSetup, DeSpawn and Destroy of the mods that patch the method
+next:
+  archo source #iqmu --type ModA.CompBroken
+  archo harmony --target Verse.Pawn.Tick
+  archo source search "AllComps.Remove(" --active
+  archo source search "AllComps.Add(" --active
+
+$ archo log --select
+log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Player.log
+  selected: archo problems now includes these clusters as log.* problems
+  classes: harmony-stack 2, patch-failed 1, xref-missing 1
+  list:
+    log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)
+    log:E2 xref-missing x1  Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDe...  → #lqj2 (source, +1)
+    log:E3 harmony-stack x500  Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance o...  → #iqmu (patcher, +2)
+    log:E4 harmony-stack x1  Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  → #iqmu (source)
+next:
+  archo log --cluster E1
+
+$ archo problems --code log
+problems: 2 error, 2 warning, 0 info
+  analysis: a:1 2026-10-01 10:00
+  list:
+    error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  (p:4c087a)
+    error log.harmony-stack  log:E3 x500: Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object  (p:cfe9b5)
+    warning log.patch-failed  log:E1 x1: [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  (p:906d0c)
+    warning log.xref-missing  log:E2 x1: Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDefCountClass Verse.ThingDefCountClass  (p:56af37)
+next:
+  archo problems show p:4c087a
+

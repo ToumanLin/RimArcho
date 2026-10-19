@@ -558,9 +558,11 @@ func (cx *attrCtx) xrefReferrers(cs []*LogCluster) {
 			}
 		}
 	}
-	needles := make([][]byte, len(toks))
+	// A def is referenced as element text (<thingDef>X</thingDef>, <li>X</li>) or, in
+	// ThingDefCountClass lists such as costList and products, as an element name (<X>1</X>).
+	needles := make([][2][]byte, len(toks))
 	for i, t := range toks {
-		needles[i] = []byte(">" + t.name + "<")
+		needles[i] = [2][]byte{[]byte(">" + t.name + "<"), []byte("<" + t.name + ">")}
 	}
 	type hit struct {
 		t    int
@@ -582,7 +584,11 @@ func (cx *attrCtx) xrefReferrers(cs []*LogCluster) {
 					continue
 				}
 				for i, n := range needles {
-					if k := bytes.Index(b, n); k >= 0 {
+					k := bytes.Index(b, n[0])
+					if k2 := bytes.Index(b, n[1]); k2 >= 0 && (k < 0 || k2 < k) {
+						k = k2
+					}
+					if k >= 0 {
 						mu.Lock()
 						hits = append(hits, hit{i, j.m.ID, j.as.Rel, bytes.Count(b[:k], []byte{'\n'}) + 1})
 						mu.Unlock()
@@ -620,13 +626,24 @@ var logSeverity = map[string]string{
 	logs.ClassOther: finding.Info,
 }
 
-// ClusterKeyForIgnore: cluster keys stay stable across logs (normalised message + top frame).
+// findingKey keeps a log problem's ref (and an ignore of it) stable across logs and
+// install locations: the cluster key with each absolute path cut to its last three parts.
+func findingKey(key string) string {
+	return winPathRe.ReplaceAllStringFunc(key, func(p string) string {
+		parts := strings.FieldsFunc(p, func(r rune) bool { return r == '\\' || r == '/' })
+		if len(parts) > 3 {
+			parts = parts[len(parts)-3:]
+		}
+		return strings.ToLower(strings.Join(parts, "/"))
+	})
+}
+
 func (cx *attrCtx) toFinding(lc *LogCluster) *finding.Finding {
 	msg := lc.First.Message
 	if len(msg) > 160 {
 		msg = msg[:157] + "..."
 	}
-	f := &finding.Finding{Code: "log." + lc.Class, Severity: logSeverity[lc.Class], Layer: "log", Key: lc.Key, Confidence: lc.Confidence,
+	f := &finding.Finding{Code: "log." + lc.Class, Severity: logSeverity[lc.Class], Layer: "log", Key: findingKey(lc.Key), Confidence: lc.Confidence,
 		Claim: fmt.Sprintf("log:%s x%d: %s", lc.ID, lc.Count, msg)}
 	for _, at := range lc.Attr {
 		f.Subjects = append(f.Subjects, finding.Inst(at.Instance))

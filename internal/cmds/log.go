@@ -61,7 +61,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	when := ""
 	if !r.ModTime.IsZero() {
-		when = ", " + r.ModTime.Local().Format("2006-01-02 15:04")
+		when = ", " + r.ModTime.In(c.App.Loc).Format("2006-01-02 15:04")
 	}
 	ver := ""
 	if r.Version != "" {

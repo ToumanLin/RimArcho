@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -18,6 +19,9 @@ import (
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
+
+// msRe matches wall-clock durations (analysis timings), which vary between runs.
+var msRe = regexp.MustCompile(`(active mods, )[0-9.]+(?:ms|s|µs)`)
 
 type step func(e *testkit.Env) []string
 
@@ -67,7 +71,7 @@ func runGolden(t *testing.T, name string, e *testkit.Env, steps []step) {
 		}
 		out, code := e.Run(args...)
 		fmt.Fprintf(&sb, "$ archo %s\n", e.Scrub(strings.Join(args, " ")))
-		sb.WriteString(e.Scrub(out))
+		sb.WriteString(msRe.ReplaceAllString(e.Scrub(out), "${1}<dur>"))
 		if code != 0 {
 			fmt.Fprintf(&sb, "[exit %d]\n", code)
 		}

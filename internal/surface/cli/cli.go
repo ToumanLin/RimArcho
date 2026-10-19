@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/rimarcho/rimarcho/internal/app"
 	"github.com/rimarcho/rimarcho/internal/cmds"
 	"github.com/rimarcho/rimarcho/internal/env"
+	"github.com/rimarcho/rimarcho/internal/surface/mcp"
 	"github.com/rimarcho/rimarcho/internal/surface/tui"
 )
 
@@ -36,6 +38,14 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		return cmds.ExitOK
 	}
 	cmds.Progress = func(line string) { fmt.Fprintln(stderr, line) }
+	if rest[0] == "mcp" && len(rest) == 1 {
+		// MCP over stdio (05 §4): stdout carries only protocol messages.
+		if err := mcp.Run(context.Background(), ap); err != nil {
+			fmt.Fprintln(stderr, "error:", err)
+			return cmds.ExitError
+		}
+		return cmds.ExitOK
+	}
 	out, code := cmds.Execute(ap, rest)
 	if code == cmds.ExitError || code == cmds.ExitUsage {
 		io.WriteString(stderr, out)
