@@ -185,6 +185,12 @@ func TestSaveSteamSuffixVersionAndBackup(t *testing.T) {
 func TestExternalChangeAndConflict(t *testing.T) {
 	e := loadoutEnv(t)
 	scanNow(t, e)
+	// Same list, different formatting (the game re-saving it): no new version.
+	e.WriteFile(e.ModsConfig, strings.ReplaceAll(e.ReadModsConfig(), "    <li>", "\t\t<li>"))
+	scanNow(t, e)
+	if vs, _ := e.App.Store.Versions(mustEnv(t, e)); len(vs) != 1 {
+		t.Fatalf("a reformatted but identical file created %d versions", len(vs))
+	}
 	// Clean workspace: the external change is loaded.
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.a")
 	r, err := e.App.Scan(false)

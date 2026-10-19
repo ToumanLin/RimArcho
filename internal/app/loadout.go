@@ -174,6 +174,15 @@ func (a *App) sync(st *LoadoutState) error {
 			if err != nil {
 				return err
 			}
+			if latest != nil && latest.GameVersion == st.File.Version &&
+				st.Reg.Heal(loadout.Decode(latest.Entries)).Equal(fileList) {
+				// Rewritten by the game or another tool without a real change (formatting).
+				mcs.Seen = h
+				if err := a.Store.SetModsConfigState(e.ID, mcs); err != nil {
+					return err
+				}
+				goto done
+			}
 			clean := latest == nil || st.Reg.Heal(loadout.Decode(ws.Entries)).Equal(st.Reg.Heal(loadout.Decode(latest.Entries)))
 			n, err := a.Store.AddVersion(e.ID, &store.Version{Created: now, Source: "external", Entries: fileList.Encode(),
 				GameVersion: st.File.Version, Note: "ModsConfig.xml changed outside RimArcho"})
@@ -197,6 +206,7 @@ func (a *App) sync(st *LoadoutState) error {
 			return err
 		}
 	}
+done:
 	st.WS = ws
 	st.List = st.Reg.Heal(loadout.Decode(ws.Entries))
 	st.Latest, err = a.latest(e.ID)
