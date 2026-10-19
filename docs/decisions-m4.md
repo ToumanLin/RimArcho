@@ -119,3 +119,13 @@ selected log). It stays well under the gate, so cgo SQLite is still not needed (
    Pre-decompile in the background after analysis, or keep it on demand with the MCP budget?
 5. `harmony.manual` (97 mods) cannot say which methods are patched. A later step could scan IL for
    `ldtoken`/`GetMethod("X")` near `Harmony.Patch` calls. Worth it?
+
+## 7. Main-session rulings (2026-10-19, after M4 review)
+
+| # | Ruling |
+|---|---|
+| 1 | `harmony.skip-prefix` defaults to **info**. It escalates to warning only when the patched method shows up in a cluster of the selected log (stack frame or Harmony patch line). That gives 134 warnings → a handful with evidence. |
+| 2 | Yes: `problems` (CLI/MCP) includes the newest Player.log automatically when it is newer than the last analysed one. The TUI shows the "new log" badge and parses it lazily when the Problems view is opened, to keep idle memory down. |
+| 3 | When the log's game version differs from the environment's, attribute against the log's major.minor automatically (implicit `--game-version`), and say so in the log header: `analysed as 1.6 (log version); environment is 1.7`. |
+| 4 | Keep decompiling on demand; no background pre-decompile (resource principle 00 §2.5). `source search --active` stays, but it first prints the estimated assembly count and cache size, and needs `--yes` in CLI. In MCP it is capped to the mods implicated by the current problem/log unless `scope: "active"` is passed explicitly. |
+| 5 | IL scanning for manual Harmony targets goes to the post-MVP backlog (docs/backlog.md). |
