@@ -159,7 +159,7 @@ func (m *model) hintLine() string {
 	case m.insp != nil:
 		pairs = [][2]string{{"esc", T("back")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
 	case m.full:
-		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"r", T("refresh")}, {"i", T("technical information")}, {"tab", T("technical pages")}}
+		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}, {"1–5", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"r", T("refresh")}, {"i", T("technical information")}, {"tab", T("technical pages")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"esc", T("back")}, {"enter", T("expand")}, {"a", T("run the suggestion")}, {"i", T("ignore")}, {"l", T("choose a log")}, {"A", T("re-analyze")}}
 	case m.tab == tabChanges:

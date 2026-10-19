@@ -84,6 +84,11 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.onData(msg.d)
 	case fetchTick:
 		return m, m.onFetchTick(msg.id)
+	case fullSecsMsg:
+		if it := m.current(); it != nil && it.id == msg.s.id {
+			m.fsecs = msg.s
+		}
+		return m, nil
 	case thumbTick:
 		if it := m.current(); msg.seq == m.thumbSeq && it != nil && it.id == msg.id {
 			m.thumbShown = msg.id
@@ -354,7 +359,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	case "enter":
 		if it := c.cur(); it != nil && it.id != "" {
 			m.full, m.fullOff = true, 0
-			return m.requestDetail()
+			return tea.Batch(m.requestDetail(), m.loadFullSecs())
 		}
 		return nil
 	case "o":

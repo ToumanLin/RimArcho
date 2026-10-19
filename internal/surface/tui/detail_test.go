@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -341,5 +342,47 @@ func TestT6Thumbnail(t *testing.T) {
 	// the cache: one PNG under cache/previews
 	if fs, _ := filepath.Glob(filepath.Join(e.App.Home, "cache", "previews", "*.png")); len(fs) != 1 {
 		t.Fatalf("cache files %v", fs)
+	}
+}
+
+// 06 §6.3: the full-screen detail has Def, patches, Harmony, rules and the full history
+// as sub-sections, 1–5 jump to them; the column shows a one-line history.
+func TestFullSections(t *testing.T) {
+	e, _ := fixture(t)
+	e.MustRun("rule", "add", "after", "pkg:tester.a", "pkg:brrainz.harmony")
+	m := direct(t, e, 120, 40)
+	press(m, "g")
+	press(m, "down") // Alpha
+	id := m.current().id
+	runCmd(m, m.loadData(id, false, false))
+	col := plainLines(m.detailLayout(detailOpts{width: 50, descMax: 12}))
+	if !strings.Contains(col, "history") || !strings.Contains(col, "first seen") {
+		t.Fatalf("history line:\n%s", col)
+	}
+	press(m, "enter")
+	m.fsecs = nil
+	runCmd(m, m.loadFullSecs())
+	m.fullLines(36)
+	all := plainLines(m.lastLines)
+	t.Log(all)
+	for _, want := range []string{"1  Defs · ", "2  patches · ", "3  Harmony", "4  rules", "5  full history · 1", "Alpha loads after Harmony (your rule)", "first seen"} {
+		if !strings.Contains(all, want) {
+			t.Fatalf("full detail lacks %q:\n%s", want, all)
+		}
+	}
+	if strings.Contains(all, "#") && regexp.MustCompile(`#[a-z0-9]{4}\b`).MatchString(all) {
+		t.Fatalf("a #ref is shown:\n%s", all)
+	}
+	for k := 1; k <= 5; k++ {
+		press(m, fmt.Sprint(k))
+		m.fullLines(36)
+		if got := ansi.Strip(m.lastLines[m.fullOff].text); !strings.HasPrefix(got, fmt.Sprint(k)+"  ") && m.fullOff != max(len(m.lastLines)-36, 0) {
+			t.Fatalf("key %d: line %d is %q", k, m.fullOff, got)
+		}
+	}
+	for _, l := range m.lastLines {
+		if w := lipgloss.Width(l.text); w > m.w-4 {
+			t.Fatalf("line %d cells > %d: %q", w, m.w-4, l.text)
+		}
 	}
 }

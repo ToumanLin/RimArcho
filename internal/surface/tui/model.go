@@ -142,6 +142,7 @@ type model struct {
 	imgLoading string               // the image being loaded ("" none)
 	thumbShown string               // the mod whose thumbnail may be drawn: the cursor rested on it (06 §6.2)
 	thumbSeq   int
+	fsecs      *fullSecs  // the full-screen detail's sub-sections (06 §6.3)
 	images     *imgWriter // the WezTerm host's output; nil: no inline images
 	full       bool       // the full-screen detail
 	fullOff    int
@@ -335,7 +336,7 @@ type thumbTick struct {
 
 func (m *model) loadDetail() tea.Cmd {
 	it := m.current()
-	if it == nil || it.id == "" || !m.detailTech || m.layout().detailW == 0 {
+	if it == nil || it.id == "" || !m.detailTech || (m.layout().detailW == 0 && !m.full) {
 		m.detailRef, m.detail = "", nil
 		return nil
 	}

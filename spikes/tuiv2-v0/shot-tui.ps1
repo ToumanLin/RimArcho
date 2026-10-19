@@ -2,6 +2,7 @@
 #   pwsh -File shot-tui.ps1 -Cols 160 -Rows 46 -Name v1v2-160 [-Keys "j|j|l"] [-DataHome <dir>] [-Wait 5]
 # Keys go through `wezterm cli send-text --no-paste`; "<enter>", "<esc>", "<tab>", "<space>"
 # and "<sleep N>" (milliseconds) are understood. The TUI is quit with q at the end.
+# The pane's text is saved next to the PNG (<Name>.txt), as a check independent of the capture.
 param([int]$Cols = 160, [int]$Rows = 46, [Parameter(Mandatory)] [string]$Name, [string]$Keys = "",
   [string]$DataHome = "", [int]$Wait = 5, [string]$Lang = "", [string]$Icons = "")
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -27,6 +28,7 @@ foreach ($k in ($Keys -split "\|" | Where-Object { $_ -ne "" })) {
   Start-Sleep -Milliseconds 120
 }
 Start-Sleep -Milliseconds 800
+& "$wdir\wezterm.exe" cli get-text | Set-Content -Encoding utf8 (Join-Path $wz "shots\$Name.txt")
 pwsh -NoProfile -File (Join-Path $PSScriptRoot "shot.ps1") -ProcessId $p.Id -Out (Join-Path $wz "shots\$Name.png") -DelayMs 200
 Send "q"
 Start-Sleep -Milliseconds 800

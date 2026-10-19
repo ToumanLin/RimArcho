@@ -31,6 +31,7 @@ type detailData struct {
 	desc     *app.Description
 	about    []bbcode.Block
 	ws       []bbcode.Block
+	events   []*store.Event // the mod's change events, oldest first
 	fetching bool
 }
 
@@ -54,6 +55,7 @@ func (m *model) loadData(id string, fetch, refresh bool) tea.Cmd {
 		d := &detailData{id: id, decl: mod.Decl()}
 		d.desc = a.Describe(ix, mod, fetch, refresh)
 		d.about, d.ws = bbcode.Parse(d.desc.About), bbcode.Parse(d.desc.Workshop)
+		d.events, _ = a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, InstanceIDs: []string{id}})
 		return detailDataMsg{d}
 	}
 }
@@ -90,6 +92,7 @@ type dline struct {
 	imgMax  int    // the rows the image may take (fewer in the column than in the full view)
 	imgInd  int    // cells from the start of the line to the image
 	thumb   string // the mod id, for a thumbnail slot (drawn only after the dwell)
+	sec     int    // 1–5 on a sub-section's header in the full-screen detail
 }
 
 type detailOpts struct {
@@ -216,6 +219,15 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	// description
 	out = append(out, m.descLines(d, o, w)...)
 	add("")
+	if o.full {
+		out = append(out, m.secLines(w)...)
+	} else if d != nil && len(d.events) > 0 {
+		add(sDimS.Render(fit(T("history"), w)))
+		for _, l := range wrap(historyLine(d.events), w-2) {
+			add("  " + sSecond.Render(fit(l, w-2)))
+		}
+		add("")
+	}
 	if !m.detailTech && !o.full {
 		add(sDimS.Render(fit(T("technical information · i"), w)))
 		return out
@@ -734,6 +746,12 @@ func (m *model) fullKey(s string) tea.Cmd {
 		m.fullOff = 0
 	case "end", "G":
 		m.fullOff = 1 << 30
+	case "1", "2", "3", "4", "5":
+		for i, l := range m.lastLines {
+			if l.sec == int(s[0]-'0') {
+				m.fullOff = i
+			}
+		}
 	case "i":
 		m.detailTech = !m.detailTech
 		m.detailRef = ""
