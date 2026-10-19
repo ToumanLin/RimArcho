@@ -848,6 +848,9 @@ func (a *App) NewLog(st *LoadoutState) (string, bool) {
 // selected one, or the current Player.log when that is newer.
 func (a *App) ProblemLog(st *LoadoutState) string {
 	sel := a.SelectedLog(st)
+	if a.LazyLog {
+		return sel
+	}
 	cur, _ := a.LogPaths(st)
 	switch {
 	case cur == "":

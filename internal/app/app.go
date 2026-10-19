@@ -56,6 +56,10 @@ type App struct {
 	// MCP returns the finished part after 10 s and the analysis continues in the
 	// background). 0 waits until it is done (CLI).
 	AnalyzeWait time.Duration
+	// LazyLog keeps the newest Player.log out of Problems until the player opens the
+	// Problems view (the TUI; decisions-m4 §7.2: parse lazily to keep idle memory down).
+	// An explicitly selected log is always included.
+	LazyLog bool
 	analyzing   *pendingAnalysis
 
 	ixCache *Index

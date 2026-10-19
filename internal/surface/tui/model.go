@@ -143,6 +143,7 @@ func New(o Options) tea.Model {
 	if o.Scan == nil {
 		o.Scan = ChildScan
 	}
+	o.App.LazyLog = true // the newest log is parsed when the Problems view opens
 	return &model{opts: o, app: o.App, w: 120, h: 30, marked: map[string]bool{}}
 }
 

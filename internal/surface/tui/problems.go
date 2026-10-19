@@ -45,6 +45,7 @@ type analyzeDoneMsg struct{ err error }
 type AnalyzeRunner func(envName string, progress func(string)) error
 
 func (m *model) ensureProblems() tea.Cmd {
+	m.app.LazyLog = false // the player looks at problems now: include the newest log
 	m.loadProblems()
 	if (m.prob.stale || m.prob.never) && !m.analyzing {
 		return m.startAnalyze()
@@ -66,7 +67,7 @@ func (m *model) loadProblems() {
 	}
 	// The newest log was parsed into this list (decisions-m4 §7.2): it has been seen.
 	if m.newLog && m.st != nil {
-		if cur, _ := m.app.LogPaths(m.st); cur != "" && m.app.ProblemLog(m.st) == cur {
+		if cur, _ := m.app.LogPaths(m.st); cur != "" && !m.app.LazyLog && m.app.ProblemLog(m.st) == cur {
 			m.app.SelectLog(m.st, cur)
 			m.newLog = false
 		}
