@@ -219,11 +219,33 @@ func (s *Store) SemanticSet(snapshotID int64) (scan.SemanticSet, error) {
 	return out, rows.Err()
 }
 
-// CurrentFiles loads the current manifests of all Instances of an environment, keyed by
-// location (scan.LocKey) and lower-cased file path, for incremental hashing.
+// CurrentHashes returns the current snapshot hash of every Instance, keyed by location.
+func (s *Store) CurrentHashes(envID string) (map[string]scan.Hash, error) {
+	rows, err := s.DB.Query(`SELECT i.source_id, i.rel_path, n.snapshot_hash FROM instance i
+		JOIN snapshot n ON n.id = i.current_snapshot_id WHERE i.environment_id=?`, envID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]scan.Hash{}
+	for rows.Next() {
+		var src, rel string
+		var h []byte
+		if err := rows.Scan(&src, &rel, &h); err != nil {
+			return nil, err
+		}
+		var hh scan.Hash
+		copy(hh[:], h)
+		out[scan.LocKey(src, rel)] = hh
+	}
+	return out, rows.Err()
+}
+
+// CurrentFiles loads the current semantic files (the only ones with hashes to reuse) of all
+// Instances of an environment, keyed by location (scan.LocKey) and lower-cased file path.
 func (s *Store) CurrentFiles(envID string) (map[string]map[string]scan.File, error) {
 	rows, err := s.DB.Query(`SELECT i.source_id, i.rel_path, f.rel_path, f.size, f.mtime, f.hash FROM instance i
-		JOIN snapshot_file f ON f.snapshot_id = i.current_snapshot_id WHERE i.environment_id=?`, envID)
+		JOIN snapshot_file f ON f.snapshot_id = i.current_snapshot_id WHERE i.environment_id=? AND f.hash IS NOT NULL`, envID)
 	if err != nil {
 		return nil, err
 	}

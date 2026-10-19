@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/rimarcho/rimarcho/internal/procmem"
 	"github.com/rimarcho/rimarcho/internal/surface/cli"
 )
 
@@ -14,5 +15,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "archo: the TUI is not built yet (milestone M2); run `archo help` for the CLI")
 		os.Exit(2)
 	}
-	os.Exit(cli.Run(os.Args[1:], os.Stdout, os.Stderr))
+	code := cli.Run(os.Args[1:], os.Stdout, os.Stderr)
+	if os.Getenv("ARCHO_MEMSTATS") != "" {
+		ws, priv, peak := procmem.MB()
+		fmt.Fprintln(os.Stderr, fmt.Sprintf("memstats: working set %.1f MB, private %.1f MB, peak working set %.1f MB", ws, priv, peak))
+	}
+	os.Exit(code)
 }

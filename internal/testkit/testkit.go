@@ -39,6 +39,7 @@ type Env struct {
 
 	now        time.Time
 	subscribed map[string]bool
+	manifests  map[string]int
 }
 
 // New creates the fixture layout: Core in Data/, empty Mods/, an empty workshop library with
@@ -47,7 +48,7 @@ type Env struct {
 func New(t testing.TB) *Env {
 	t.Helper()
 	root := t.TempDir()
-	e := &Env{T: t, Root: root, now: Start, subscribed: map[string]bool{}}
+	e := &Env{T: t, Root: root, now: Start, subscribed: map[string]bool{}, manifests: map[string]int{}}
 	e.Steam = filepath.Join(root, "Steam")
 	e.Game = filepath.Join(e.Steam, "steamapps", "common", "RimWorld")
 	e.Workshop = filepath.Join(e.Steam, "steamapps", "workshop", "content", env.WorkshopAppID)
@@ -308,9 +309,19 @@ func (e *Env) writeACF() {
 	sort.Strings(ids)
 	var inst, det strings.Builder
 	for i, id := range ids {
-		fmt.Fprintf(&inst, "\t\t%q\n\t\t{\n\t\t\t\"size\"\t\t\"100\"\n\t\t\t\"timeupdated\"\t\t\"%d\"\n\t\t\t\"manifest\"\t\t\"%d\"\n\t\t}\n", id, 1790000000+i, 9000+i)
-		fmt.Fprintf(&det, "\t\t%q\n\t\t{\n\t\t\t\"manifest\"\t\t\"%d\"\n\t\t\t\"subscribedby\"\t\t\"1\"\n\t\t}\n", id, 9000+i)
+		fmt.Fprintf(&inst, "\t\t%q\n\t\t{\n\t\t\t\"size\"\t\t\"100\"\n\t\t\t\"timeupdated\"\t\t\"%d\"\n\t\t\t\"manifest\"\t\t\"%d\"\n\t\t}\n", id, 1790000000+i, e.manifest(id, i))
+		fmt.Fprintf(&det, "\t\t%q\n\t\t{\n\t\t\t\"manifest\"\t\t\"%d\"\n\t\t\t\"subscribedby\"\t\t\"1\"\n\t\t}\n", id, e.manifest(id, i))
 	}
 	e.WriteFile(filepath.Join(e.Steam, "steamapps", "workshop", "appworkshop_294100.acf"), fmt.Sprintf(
 		"\"AppWorkshop\"\n{\n\t\"appid\"\t\t\"294100\"\n\t\"WorkshopItemsInstalled\"\n\t{\n%s\t}\n\t\"WorkshopItemDetails\"\n\t{\n%s\t}\n}\n", inst.String(), det.String()))
+}
+
+// SetManifest overrides the ACF manifest ID of an item (Steam re-downloaded it).
+func (e *Env) SetManifest(id string, manifest int) { e.manifests[id] = manifest; e.writeACF() }
+
+func (e *Env) manifest(id string, i int) int {
+	if m, ok := e.manifests[id]; ok {
+		return m
+	}
+	return 9000 + i
 }

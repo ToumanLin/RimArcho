@@ -104,8 +104,12 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 		knownLoc[scan.LocKey(k.SourceID, k.Rel)] = true
 	}
 	var prev map[string]map[string]scan.File
+	var prevHash map[string]scan.Hash
 	if !full {
 		if prev, err = a.Store.CurrentFiles(e.ID); err != nil {
+			return nil, err
+		}
+		if prevHash, err = a.Store.CurrentHashes(e.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -115,9 +119,13 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 	}
 	obs, sstats := scan.Collect(active, scan.Options{
 		PrevFiles: func(l scan.Location) map[string]scan.File { return prev[l.Key()] },
+		PrevHash: func(l scan.Location) (scan.Hash, bool) {
+			h, ok := prevHash[l.Key()]
+			return h, ok
+		},
 		Known:     func(l scan.Location) bool { return knownLoc[l.Key()] },
 	})
-	prev = nil // release the cache before reconciliation
+	prev, prevHash = nil, nil // release the caches before reconciliation
 	lineages, err := a.Store.LineageIDs(e.ID)
 	if err != nil {
 		return nil, err
@@ -154,7 +162,7 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 		st.Events[ev.Kind]++
 	}
 	for _, ob := range obs {
-		st.Files += len(ob.FP.Files)
+		st.Files += ob.FP.Count
 		st.Bytes += ob.FP.TotalSize
 		st.Hashed += ob.FP.Hashed
 		st.Reused += ob.FP.Reused

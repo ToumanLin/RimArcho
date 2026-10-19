@@ -29,7 +29,8 @@ type SemanticSet = map[string]Hash
 
 // Fingerprint is the layered content fingerprint of one mod folder.
 type Fingerprint struct {
-	Files        []File // sorted by lower-cased Rel
+	Files        []File // sorted by lower-cased Rel; nil once released (see Options.PrevHash)
+	Count        int    // number of files, kept when Files is released
 	SnapshotHash Hash
 	Semantic     SemanticSet
 	TotalSize    int64
@@ -120,6 +121,7 @@ func Compute(dir string, prev map[string]File) (Fingerprint, error) {
 	}
 	SortFiles(fp.Files)
 	fp.SnapshotHash = SnapshotHash(fp.Files)
+	fp.Count = len(fp.Files)
 	return fp, nil
 }
 

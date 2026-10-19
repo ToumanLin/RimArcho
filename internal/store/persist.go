@@ -36,8 +36,9 @@ type execer interface {
 	Exec(query string, args ...any) (sql.Result, error)
 }
 
-// insertSnapshot writes a snapshot and its manifest; returns the snapshot ID.
-func insertSnapshot(tx *sql.Tx, instanceID string, scanID int64, ob *scan.Observation) (int64, error) {
+// insertSnapshot writes a snapshot and its manifest; returns the snapshot ID. A released
+// manifest (unchanged content, new external state) is copied from prevSnap.
+func insertSnapshot(tx *sql.Tx, instanceID string, scanID int64, ob *scan.Observation, prevSnap int64) (int64, error) {
 	d := ob.Decl
 	blob, _ := json.Marshal(d)
 	origin := ""
@@ -56,11 +57,16 @@ func insertSnapshot(tx *sql.Tx, instanceID string, scanID int64, ob *scan.Observ
 		file_count, total_size, semantic_count) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		instanceID, scanID, h[:], d.PackageID, d.PackageIDRaw, d.Name, strings.Join(d.Authors, ", "), d.PublishedFileID,
 		strings.Join(d.SupportedVersions, " "), string(blob), manifest, acfTime, acfSize, ob.GitHead, origin,
-		len(ob.FP.Files), ob.FP.TotalSize, len(ob.FP.Semantic))
+		ob.FP.Count, ob.FP.TotalSize, len(ob.FP.Semantic))
 	if err != nil {
 		return 0, err
 	}
 	id, _ := res.LastInsertId()
+	if ob.FP.Files == nil && ob.FP.Count > 0 {
+		_, err = tx.Exec(`INSERT INTO snapshot_file(snapshot_id, rel_path, size, mtime, hash)
+			SELECT ?, rel_path, size, mtime, hash FROM snapshot_file WHERE snapshot_id=?`, id, prevSnap)
+		return id, err
+	}
 	return id, insertFiles(tx, id, ob.FP.Files)
 }
 
@@ -122,7 +128,11 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 		var snapID int64
 		switch {
 		case a.NeedSnapshot:
-			if snapID, err = insertSnapshot(tx, a.InstanceID, scanID, ob); err != nil {
+			var prevSnap int64
+			if a.Prev != nil {
+				prevSnap = a.Prev.ID
+			}
+			if snapID, err = insertSnapshot(tx, a.InstanceID, scanID, ob, prevSnap); err != nil {
 				return err
 			}
 			if _, err = tx.Exec(`UPDATE instance SET current_snapshot_id=? WHERE id=?`, snapID, a.InstanceID); err != nil {
@@ -130,7 +140,7 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 			}
 		default:
 			snapID = a.Prev.ID
-			if ob.FP.Hashed > 0 {
+			if ob.FP.Hashed > 0 && ob.FP.Files != nil {
 				// Same content, newer mtimes: refresh the cache so the next scan can skip hashing.
 				if _, err = tx.Exec(`DELETE FROM snapshot_file WHERE snapshot_id=?`, snapID); err != nil {
 					return err

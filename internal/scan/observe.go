@@ -72,9 +72,13 @@ type SourceStats struct {
 
 // Options tune a collection run.
 type Options struct {
-	// PrevFiles returns the previous manifest of a location (lower-cased Rel → File) for
-	// incremental hashing; nil or a nil result means hash everything.
+	// PrevFiles returns the previous semantic files of a location (lower-cased Rel → File)
+	// for incremental hashing; nil or a nil result means hash everything.
 	PrevFiles func(loc Location) map[string]File
+	// PrevHash returns the previous snapshot hash of a location. When the folder is
+	// unchanged and nothing had to be re-hashed, the manifest is released right away: the
+	// stored one is still valid, which keeps no-change rescans small.
+	PrevHash func(loc Location) (Hash, bool)
 	// Known reports whether a location already belongs to an Instance; alias groups keep
 	// a known location as primary so R1 keeps matching.
 	Known   func(loc Location) bool
@@ -245,6 +249,11 @@ func observe(ob *Observation, o Options) {
 	fp, err := Compute(dir, prev)
 	if err != nil {
 		ob.Err = err.Error()
+	}
+	if o.PrevHash != nil && fp.Hashed == 0 && err == nil {
+		if h, ok := o.PrevHash(ob.Loc); ok && h == fp.SnapshotHash {
+			fp.Files = nil
+		}
 	}
 	ob.FP = fp
 	if b, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(OriginFile))); err == nil {

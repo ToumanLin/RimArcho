@@ -158,6 +158,26 @@ func TestA2WorkshopUpdate(t *testing.T) {
 	wantKinds(t, eventsOf(t, e, sid), map[string]int{})
 }
 
+// Steam re-downloads an item without content change: a new snapshot records the new
+// manifest, its file list is copied from the previous snapshot, and nothing is reported.
+func TestManifestOnlyChange(t *testing.T) {
+	e := setup(t, false)
+	e.AddWorkshop("1012", testkit.Sample("tester.same", "Same"))
+	scanNow(t, e)
+	before := one(t, e, "Same")
+	e.SetManifest("1012", 777)
+	sid := scanNow(t, e)
+	wantKinds(t, eventsOf(t, e, sid), map[string]int{})
+	after := one(t, e, "Same")
+	if after.SnapID == before.SnapID || after.ACFManifest != "777" || after.FileCount != before.FileCount || after.FileCount == 0 {
+		t.Fatalf("snapshot %d→%d manifest %q files %d→%d", before.SnapID, after.SnapID, after.ACFManifest, before.FileCount, after.FileCount)
+	}
+	sem, err := e.App.Store.SemanticSet(after.SnapID)
+	if err != nil || len(sem) != after.SemanticCount || len(sem) == 0 {
+		t.Fatalf("copied manifest: %d semantic rows, want %d (%v)", len(sem), after.SemanticCount, err)
+	}
+}
+
 // A3: the author changes the packageId in an update — same Instance, `package-id-changed`,
 // lineage (where Loadout entries and user rules hang) unchanged.
 func TestA3PackageIDChange(t *testing.T) {
