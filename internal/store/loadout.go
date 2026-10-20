@@ -69,6 +69,19 @@ func (s *Store) PopStep(envID, stack string) (entries, op string, ok bool, err e
 	return entries, op, true, err
 }
 
+// LastStepID is the id of the newest state of a stack (0 when empty).
+func (s *Store) LastStepID(envID, stack string) int64 {
+	var id int64
+	s.DB.QueryRow(`SELECT coalesce(max(id), 0) FROM workspace_undo WHERE environment_id=? AND stack=?`, envID, stack).Scan(&id)
+	return id
+}
+
+// DeleteStepsAfter removes the states of a stack newer than id.
+func (s *Store) DeleteStepsAfter(envID, stack string, id int64) error {
+	_, err := s.DB.Exec(`DELETE FROM workspace_undo WHERE environment_id=? AND stack=? AND id > ?`, envID, stack, id)
+	return err
+}
+
 // StepCount returns the size of a stack.
 func (s *Store) StepCount(envID, stack string) int {
 	var n int
