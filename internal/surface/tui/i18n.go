@@ -126,7 +126,7 @@ var zhText = map[string]string{
 	// picking (06 §12.2)
 	"done · %s · u undoes it all": "完成 · %s · 按 u 可全部撤销", "cancelled · the lists are as they were": "已取消 · 列表已恢复原样",
 	"picked: enter drops, esc cancels": "已拾取：enter 放下，esc 取消", "↑↓ move mods within Enabled only": "↑↓ 只能在“已启用”中调整位置",
-	"picked %d": "已拾取 %d 个", "pick": "拾取", "pick a range": "连续拾取", "position": "位置", "move to": "移到", "drop": "放下",
+	"picked %d": "已拾取 %d 个", "pick": "拾取", "the terminal is too narrow for column widths": "终端太窄，无法调整列宽", "column widths reset": "列宽已恢复默认", "%s: long names wrap": "%s：长名称换行显示", "%s: long names are cut": "%s：长名称截断显示", "pick a range": "连续拾取", "position": "位置", "move to": "移到", "drop": "放下",
 	// double press (06 §9)
 	"press %s again: %s": "再按一次 %s：%s",
 	"press L again to load it; your unsaved edits are replaced": "再按一次 L 载入；未保存的修改会被替换",

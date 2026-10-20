@@ -341,6 +341,12 @@ func (m *model) listKey(s string) tea.Cmd {
 			return m.requestDetail()
 		}}
 		return nil
+	case "<", ">", "=":
+		m.resizeKey(s)
+		return nil
+	case "z":
+		m.wrapKey()
+		return nil
 	case "S":
 		return m.sortPreview()
 	case "w":
@@ -605,6 +611,24 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 			return m.key(tea.KeyMsg{Type: tea.KeyUp})
 		}
 		return nil
+	}
+	// Dragging the gap after a list column sets its width (06 §12.1).
+	if r := m.resizing; r != nil {
+		switch e.Action {
+		case tea.MouseActionMotion:
+			m.setColW(r.kind, r.w0+e.X-r.x0)
+		case tea.MouseActionRelease:
+			m.setColW(r.kind, r.w0+e.X-r.x0)
+			m.resizing = nil
+			m.saveColPrefs()
+		}
+		return nil
+	}
+	if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonLeft && e.Y >= 2 {
+		if k, w, ok := m.gapAt(e.X); ok {
+			m.resizing = &resizeDrag{kind: k, x0: e.X, w0: w}
+			return nil
+		}
 	}
 	k, i, ok := m.hit(e.X, e.Y)
 	switch e.Button {

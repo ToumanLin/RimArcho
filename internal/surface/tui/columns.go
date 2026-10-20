@@ -144,19 +144,26 @@ func (m *model) layout() layout {
 		out[len(out)-1] += rest - used
 		return out
 	}
+	// Stored widths (06 §12.1) replace the defaults; the detail column takes the rest.
+	withDetail := func(kinds []colKind, defaults []int) {
+		gaps := len(kinds) * colGap
+		ws := m.fitWidths(kinds, defaults, w-gaps-minDetailW)
+		x := 0
+		for i, k := range kinds {
+			l.slots = append(l.slots, slot{k, x, ws[i]})
+			x += ws[i] + colGap
+		}
+		l.detailX, l.detailW = x, w-x
+	}
 	switch {
 	case w >= 140:
-		l.detailW = max(40, w-105)
-		ws := split(w-l.detailW-3*colGap, 30, 40, 26)
-		l.slots = []slot{{cInactive, 0, ws[0]}, {cActive, ws[0] + colGap, ws[1]}, {cStaging, ws[0] + ws[1] + 2*colGap, ws[2]}}
-		l.detailX = w - l.detailW
+		withDetail([]colKind{cInactive, cActive, cStaging}, split(w-max(40, w-105)-3*colGap, 30, 40, 26))
 	case w >= 110:
-		l.detailW = max(40, w-76)
-		ws := split(w-l.detailW-2*colGap, 30, 40)
-		l.slots = []slot{{left, 0, ws[0]}, {cActive, ws[0] + colGap, ws[1]}}
-		l.detailX = w - l.detailW
+		withDetail([]colKind{left, cActive}, split(w-max(40, w-76)-2*colGap, 30, 40))
 	case w >= 80:
-		ws := split(w-colGap, 30, 40)
+		// No detail column: the two lists share the width in proportion to their widths.
+		def := split(w-colGap, 30, 40)
+		ws := split(w-colGap, m.colWant(left, def[0]), m.colWant(cActive, def[1]))
 		l.slots = []slot{{left, 0, ws[0]}, {cActive, ws[0] + colGap, ws[1]}}
 	default:
 		l.tabs = true
@@ -198,6 +205,7 @@ func (m *model) reload() {
 		return
 	}
 	m.envName, m.gameVer = st.Ix.Env.Name, st.Ix.Env.GameVersion
+	m.loadColPrefs(st.Ix.Env.ID)
 	chs := st.Changes()
 	m.unsaved = len(chs)
 	unsaved := map[string]bool{}
@@ -344,9 +352,27 @@ func (m *model) drawColumn(s slot, n int, tabs bool) []string {
 			rm = append(rm, -1)
 		}
 	}
+	if m.prefs.Wrap[c.kind] && !tabs {
+		// Wrapped names: rows take several lines; keep the cursor's row in full view.
+		for c.off < c.cursor {
+			h := 0
+			for i := c.off; i <= c.cursor; i++ {
+				h += m.rowLines(c, i, s.w)
+			}
+			if h <= rows {
+				break
+			}
+			c.off++
+		}
+	}
 	for i := c.off; i < len(c.view) && len(out) < n; i++ {
-		out = append(out, m.drawRow(c, i, focused, s.w))
-		rm = append(rm, i)
+		for _, line := range m.drawRowLines(c, i, focused, s.w, m.prefs.Wrap[c.kind] && !tabs) {
+			if len(out) == n {
+				break
+			}
+			out = append(out, line)
+			rm = append(rm, i)
+		}
 	}
 	for len(out) < n {
 		out = append(out, strings.Repeat(" ", s.w))
@@ -407,6 +433,12 @@ func (m *model) tabStrip(w int) string {
 // drawRow: mark, position (enabled column), source icon, name, unsaved dot, status icon at
 // the right edge (06 §5.2). Exactly w cells.
 func (m *model) drawRow(c *column, vi int, focused bool, w int) string {
+	return m.drawRowLines(c, vi, focused, w, false)[0]
+}
+
+// drawRowLines draws a row; with wrap a long name continues on more lines, under the name
+// (the position, icons and status are on the first line only, 06 §12.1).
+func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bool) []string {
 	it := &c.items[c.view[vi]]
 	isCur := vi == c.cursor
 	mark := "  "
@@ -442,7 +474,16 @@ func (m *model) drawRow(c *column, vi int, focused bool, w int) string {
 	if it.unsaved {
 		dot = " " + ic.unsaved
 	}
+	var more []string // wrapped lines after the first
+	if wrapName && width.StringWidth(name) > nameW {
+		if ls := wrap(name, nameW); len(ls) > 1 {
+			name, more = ls[0], ls[1:]
+		}
+	}
 	nw := min(width.StringWidth(name), nameW-width.StringWidth(dot))
+	if more != nil {
+		nw, dot = min(width.StringWidth(name), nameW), "" // the dot goes on the last line
+	}
 	if nw < 1 {
 		nw, dot = nameW, ""
 	}
@@ -473,9 +514,25 @@ func (m *model) drawRow(c *column, vi int, focused bool, w int) string {
 		}
 	}
 	b.WriteString(strings.Repeat(" ", max(w-used-statusW, 0)))
-	used = max(used, w-statusW)
 	b.WriteString(" " + statusIcon(st))
-	return b.String()
+	lines := []string{b.String()}
+	pre := w - nameW - statusW // the cells before the name
+	for i, l := range more {
+		lead := strings.Repeat(" ", pre)
+		if picked {
+			lead = sAccent.Render("▌") + strings.Repeat(" ", pre-1)
+		}
+		d := ""
+		if i == len(more)-1 && it.unsaved && width.StringWidth(l)+2 <= nameW {
+			d = " " + ic.unsaved
+		}
+		t := ns.Render(fit(l, width.StringWidth(l)))
+		if d != "" {
+			t += sAccent.Render(d)
+		}
+		lines = append(lines, lead+t+strings.Repeat(" ", max(w-pre-width.StringWidth(l)-width.StringWidth(d), 0)))
+	}
+	return lines
 }
 
 func statusIcon(s int) string {

@@ -136,10 +136,13 @@ type model struct {
 	fsecs      *fullSecs  // the full-screen detail's sub-sections (06 §6.3)
 	pal        *palette   // the command palette (06 §8), nil when closed
 	pick       *pickState // a pick session (06 §12.2)
-	rowMap     [3][]int   // per list column: body line → view index (-1: title or empty), as last drawn
-	armed      *armed     // a destructive key pressed once (06 §9)
-	images     *imgWriter // the WezTerm host's output; nil: no inline images
-	full       bool       // the full-screen detail
+	prefs      colPrefs   // column widths and wrapping (06 §12.1)
+	prefsEnv   string
+	resizing   *resizeDrag // a column gap being dragged
+	rowMap     [3][]int    // per list column: body line → view index (-1: title or empty), as last drawn
+	armed      *armed      // a destructive key pressed once (06 §9)
+	images     *imgWriter  // the WezTerm host's output; nil: no inline images
+	full       bool        // the full-screen detail
 	fullOff    int
 	lastLines  []dline
 
@@ -226,6 +229,12 @@ func (m *model) run(argv ...string) (string, int) {
 	out, code := cmds.Execute(m.app, argv)
 	m.reload()
 	return out, code
+}
+
+// resizeDrag: a mouse drag on the gap right of a list column (06 §12.1).
+type resizeDrag struct {
+	kind   colKind
+	x0, w0 int
 }
 
 // armed is a destructive action waiting for its second press (06 §9).
