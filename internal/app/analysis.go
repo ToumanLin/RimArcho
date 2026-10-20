@@ -170,6 +170,7 @@ func ChildAnalyzeExe(exe, home, envName, mm string, progress func(string)) error
 	}
 	cmd := exec.Command(exe, args...)
 	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
+	hideWindow(cmd)
 	out, err := cmd.StdoutPipe()
 	if err != nil {
 		return err

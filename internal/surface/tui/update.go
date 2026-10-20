@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 const helpText = `the arrows only move: the cursor, the focus, the scroll; keys that change things act at once, u undoes
@@ -75,7 +76,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case detailTick:
 		if msg.seq == m.detailSeq {
 			var data tea.Cmd
-			if it := m.current(); it != nil && it.id != "" && (m.dd == nil || m.dd.id != it.id) {
+			if it := m.current(); it != nil && it.id != "" && (m.dd == nil || m.dd.ID != it.id) {
 				data = m.loadData(it.id, false, false)
 			}
 			return m, tea.Batch(m.loadDetail(), data)
@@ -141,7 +142,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // scanSummary: "scan complete · 12 changes" (06 §4.1); the CLI line keeps the scan id.
 func (m *model) scanSummary(out string) string {
 	if m.changes > 0 {
-		return T("scan complete") + " " + markDot + " " + changeSummary(m.lastEvents) + " " + markDot + " " + T("c shows them")
+		return T("scan complete") + " " + markDot + " " + view.ChangeSummary(m.lastEvents) + " " + markDot + " " + T("c shows them")
 	}
 	return T("scan complete · nothing changed")
 }

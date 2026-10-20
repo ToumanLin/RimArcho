@@ -1,8 +1,7 @@
 package tui
 
 import (
-	"sort"
-	"strings"
+	"strconv"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -17,9 +16,9 @@ import (
 type palKind int
 
 const (
-	palCommand palKind = iota
-	palMod
-	palEnv
+	palCommand palKind = view.PalCommand
+	palEnv     palKind = view.PalEnv
+	palMod     palKind = view.PalMod
 )
 
 type palItem struct {
@@ -37,42 +36,64 @@ type palette struct {
 	results []palItem
 }
 
-// palCommands: every command of the main screen, with the key that also does it.
-func (m *model) palCommands() []palItem {
+// palRun: what each shared command (view.Commands) does here, with the key that also does it.
+func (m *model) palRun(id string) func(m *model) tea.Cmd {
 	list := func(key string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { m.tab = tabList; return m.listKey(key) }
 	}
-	cmd := func(zh, en, desc string, run func(m *model) tea.Cmd) palItem {
-		name := en
-		if view.Lang() == "zh" {
-			name = zh
-		}
-		return palItem{kind: palCommand, name: name, alias: en, desc: desc, run: run}
-	}
-	return []palItem{
-		cmd("自动排序", "sort", "S", func(m *model) tea.Cmd { m.tab = tabList; return m.sortPreview() }),
-		cmd("保存到游戏", "save", "w ModsConfig.xml", func(m *model) tea.Cmd { m.tab = tabList; return m.savePreview() }),
-		cmd("启动游戏", "launch", "L RimWorld", list("L")),
-		cmd("撤销", "undo", "u", list("u")),
-		cmd("重做", "redo", "ctrl+r", list("ctrl+r")),
-		cmd("需要处理", "needs attention", "! problems", func(m *model) tea.Cmd { m.tab = tabProblems; return m.ensureProblems() }),
-		cmd("最近变化", "recent changes", "c history", func(m *model) tea.Cmd { m.tab = tabChanges; m.loadChanges(); return nil }),
-		cmd("重新扫描", "rescan", "R scan", func(m *model) tea.Cmd { return m.startScan() }),
-		cmd("重新检查文件", "check the files again", "A analyze", func(m *model) tea.Cmd { return m.startAnalyze() }),
-		cmd("选择日志", "choose a log", "Player.log", func(m *model) tea.Cmd { return m.chooseLog() }),
-		cmd("切换环境", "switch environment", "E env", func(m *model) tea.Cmd { return m.chooseEnv() }),
-		cmd("全部从暂存放回", "put all back", "T staging", list("T")),
-		cmd("筛选这一列", "filter", "/ search", list("/")),
-		cmd("详情", "details", "enter", list("enter")),
-		cmd("技术信息", "technical information", "i", list("i")),
-		cmd("编辑标签", "tags", "#", list("#")),
-		cmd("运行 archo 命令", "command line", ": archo", func(m *model) tea.Cmd {
+	switch id {
+	case "sort":
+		return func(m *model) tea.Cmd { m.tab = tabList; return m.sortPreview() }
+	case "save":
+		return func(m *model) tea.Cmd { m.tab = tabList; return m.savePreview() }
+	case "launch":
+		return list("L")
+	case "undo":
+		return list("u")
+	case "redo":
+		return list("ctrl+r")
+	case "needs":
+		return func(m *model) tea.Cmd { m.tab = tabProblems; return m.ensureProblems() }
+	case "changes":
+		return func(m *model) tea.Cmd { m.tab = tabChanges; m.loadChanges(); return nil }
+	case "rescan":
+		return func(m *model) tea.Cmd { return m.startScan() }
+	case "analyze":
+		return func(m *model) tea.Cmd { return m.startAnalyze() }
+	case "log":
+		return func(m *model) tea.Cmd { return m.chooseLog() }
+	case "env":
+		return func(m *model) tea.Cmd { return m.chooseEnv() }
+	case "restore-all":
+		return list("T")
+	case "filter":
+		return list("/")
+	case "details":
+		return list("enter")
+	case "tech":
+		return list("i")
+	case "tags":
+		return list("#")
+	case "cli":
+		return func(m *model) tea.Cmd {
 			m.tab = tabList
 			return m.key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
-		}),
-		cmd("帮助", "help", "?", func(m *model) tea.Cmd { m.openPanel(T("help"), T(helpText), nil); return nil }),
-		cmd("退出", "quit", "q", func(m *model) tea.Cmd { m.quitting = true; return tea.Quit }),
+		}
+	case "help":
+		return func(m *model) tea.Cmd { m.openPanel(T("help"), T(helpText), nil); return nil }
+	case "quit":
+		return func(m *model) tea.Cmd { m.quitting = true; return tea.Quit }
 	}
+	return func(m *model) tea.Cmd { return nil }
+}
+
+// palCommands: every command of the main screen.
+func (m *model) palCommands() []palItem {
+	var out []palItem
+	for _, c := range view.Commands {
+		out = append(out, palItem{kind: palCommand, name: c.Name(), alias: c.En, desc: c.Desc, run: m.palRun(c.ID)})
+	}
+	return out
 }
 
 // palAll: commands, then the other environments, then every mod.
@@ -112,59 +133,25 @@ func (m *model) palAll() []palItem {
 	return out
 }
 
-// palScore ranks one candidate for q (lower case): 4 prefix, 3 substring, 2 subsequence,
-// 1 description, 0 no match.
+// palScore ranks one candidate for q (view.PalScore).
 func palScore(q string, it palItem) int {
-	if q == "" {
-		return 1
-	}
-	best := 0
-	for _, f := range []string{it.name, it.alias} {
-		f = strings.ToLower(f)
-		if f == "" {
-			continue
-		}
-		switch {
-		case strings.HasPrefix(f, q):
-			best = max(best, 4)
-		case strings.Contains(f, q):
-			best = max(best, 3)
-		case view.Subsequence(q, f):
-			best = max(best, 2)
-		}
-	}
-	if best == 0 && strings.Contains(strings.ToLower(it.desc), q) {
-		best = 1
-	}
-	return best
+	return view.PalScore(q, view.PalEntry{Name: it.name, Alias: it.alias, Desc: it.desc})
 }
 
 func (m *model) palFilter() {
 	p := m.pal
-	q := strings.ToLower(strings.TrimSpace(p.query))
-	p.results = p.results[:0]
-	for _, it := range m.palAll() {
-		if q == "" && it.kind == palMod {
-			continue // an empty query lists the commands and environments
-		}
-		if s := palScore(q, it); s > 0 {
-			it.score = s
-			p.results = append(p.results, it)
-		}
+	all := m.palAll()
+	entries := make([]view.PalEntry, len(all))
+	for i, it := range all {
+		entries[i] = view.PalEntry{Kind: int(it.kind), ID: strconv.Itoa(i), Name: it.name, Alias: it.alias, Desc: it.desc}
 	}
-	sort.SliceStable(p.results, func(i, j int) bool {
-		a, b := p.results[i], p.results[j]
-		if a.score != b.score {
-			return a.score > b.score
-		}
-		if a.kind != b.kind {
-			return a.kind < b.kind
-		}
-		if q != "" && len(a.name) != len(b.name) {
-			return len(a.name) < len(b.name)
-		}
-		return false
-	})
+	p.results = p.results[:0]
+	for _, e := range view.PalRank(p.query, entries) {
+		n, _ := strconv.Atoi(e.ID)
+		it := all[n]
+		it.score = e.Score
+		p.results = append(p.results, it)
+	}
 	p.sel = max(0, min(p.sel, len(p.results)-1))
 }
 

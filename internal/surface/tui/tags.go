@@ -1,14 +1,12 @@
 package tui
 
 import (
-	"sort"
-	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // The tag bar (06 §12.3): # opens one line of candidates for the selected mods (or the one
@@ -26,10 +24,11 @@ type tagBar struct {
 	off   int // the first candidate shown
 }
 
+// tagCand is a candidate tag (view.TagCand: tag, uses, how many selected have it).
 type tagCand struct {
 	tag  string
-	n    int // mods of the environment that have it
-	have int // of the selected mods
+	n    int
+	have int
 }
 
 func (m *model) tagKey() tea.Cmd {
@@ -38,39 +37,14 @@ func (m *model) tagKey() tea.Cmd {
 		return nil
 	}
 	tb := &tagBar{mods: refsOf(sel), names: named(sel)}
-	have := map[string]int{}
+	var selTags [][]string
 	for _, it := range sel {
-		for _, t := range it.tags {
-			have[strings.ToLower(t)]++
-		}
+		selTags = append(selTags, it.tags)
 	}
-	seen := map[string]bool{}
-	add := func(tag string, n int) {
-		k := strings.ToLower(tag)
-		if tag == "" || seen[k] {
-			return
-		}
-		seen[k] = true
-		tb.cands = append(tb.cands, tagCand{tag: tag, n: n, have: min(have[k], len(sel))})
-	}
-	counts := map[string]int{}
-	var used []tagCand
 	if m.st != nil {
-		if ts, err := m.app.Store.TagCounts(m.st.Ix.Env.ID); err == nil {
-			for _, t := range ts {
-				n, _ := strconv.Atoi(t[1])
-				counts[strings.ToLower(t[0])] = n
-				used = append(used, tagCand{tag: t[0], n: n})
-			}
+		for _, c := range view.TagCandidates(m.app, m.st.Ix.Env.ID, selTags) {
+			tb.cands = append(tb.cands, tagCand{tag: c.Tag, n: c.N, have: c.Have})
 		}
-	}
-	for _, t := range strings.FieldsFunc(cmds.Setting(m.app, "tags.pinned"), func(r rune) bool { return r == ',' || r == '，' }) {
-		t = strings.TrimSpace(t)
-		add(t, counts[strings.ToLower(t)])
-	}
-	sort.SliceStable(used, func(i, j int) bool { return used[i].n > used[j].n })
-	for _, t := range used {
-		add(t.tag, t.n)
 	}
 	if len(tb.cands) == 0 {
 		tb.sel = -1
@@ -124,15 +98,15 @@ func (m *model) tagBarKey(k tea.KeyMsg) tea.Cmd {
 
 // applyTag adds a tag to every mod of the bar, or removes it from them.
 func (m *model) applyTag(tb *tagBar, tag string, remove bool) tea.Cmd {
-	verb, msg := "add", Tf("added %s", tag)
+	msg := Tf("added %s", tag)
 	if remove {
-		verb, msg = "remove", Tf("removed %s", tag)
+		msg = Tf("removed %s", tag)
 	}
-	argv := []string{"tag", verb, tb.mods[0], tag}
-	for _, r := range tb.mods[1:] {
-		argv = append(argv, "--mod", r)
-	}
-	if m.act("", argv...) {
+	_, err := m.app.SetTags(tb.mods, []string{tag}, remove)
+	m.reload()
+	if err != nil {
+		m.say(sayFail, m.humanize(err.Error()))
+	} else {
 		m.say(sayOK, Tf("tags of %s: %s", tb.names, msg))
 	}
 	m.refilterCol(m.focus, m.col().curID())

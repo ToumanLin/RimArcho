@@ -74,15 +74,15 @@ func (q Query) NeedsContent() bool {
 	return false
 }
 
-// Facts are what matching needs beyond the row: content kinds by instance (Contents) and
+// MatchFacts are what matching needs beyond the row: content kinds by instance (Contents) and
 // the row status (06 §5.5 has:problem).
-type Facts struct {
+type MatchFacts struct {
 	Content map[string]int
 	Status  map[string]int
 }
 
 // Match reports whether a row satisfies every term.
-func (q Query) Match(it *Item, f Facts) bool {
+func (q Query) Match(it *Item, f MatchFacts) bool {
 	for _, t := range q.terms {
 		if termMatch(t, it, f) == t.neg {
 			return false
@@ -102,7 +102,7 @@ func (q Query) Fallback() func(*Item) bool {
 }
 
 // Filter returns the indexes of the rows that match, with the fallback when nothing does.
-func (q Query) Filter(items []Item, f Facts) []int {
+func (q Query) Filter(items []Item, f MatchFacts) []int {
 	out := []int{}
 	for i := range items {
 		if q.Empty() || q.Match(&items[i], f) {
@@ -119,7 +119,7 @@ func (q Query) Filter(items []Item, f Facts) []int {
 	return out
 }
 
-func termMatch(t term, it *Item, f Facts) bool {
+func termMatch(t term, it *Item, f MatchFacts) bool {
 	v := t.value
 	switch t.field {
 	case "":

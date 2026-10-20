@@ -5,7 +5,6 @@ package tui
 
 import (
 	"os"
-	"os/exec"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -33,19 +33,9 @@ type Options struct {
 	OpenURL func(string) error
 }
 
-// ChildScan runs `<exe> scan --env <name>` as a separate process.
-func ChildScan(envName string) (string, error) {
-	exe, err := os.Executable()
-	if err != nil {
-		return "", err
-	}
-	args := []string{"scan"}
-	if envName != "" {
-		args = append(args, "--env", envName)
-	}
-	out, err := exec.Command(exe, args...).CombinedOutput()
-	return string(out), err
-}
+// ChildScan runs `<exe> scan --env <name>` as a separate process (app.ChildScan with the
+// data directory of the environment variable or the default).
+func ChildScan(envName string) (string, error) { return app.ChildScan(env.AppHome(), envName) }
 
 // Screens. The main screen is the four columns; the others are opened from it and esc
 // returns (06 §4.2).
@@ -164,7 +154,8 @@ type model struct {
 // New builds the TUI model.
 func New(o Options) tea.Model {
 	if o.Scan == nil {
-		o.Scan = ChildScan
+		home := o.App.Home
+		o.Scan = func(envName string) (string, error) { return app.ChildScan(home, envName) }
 	}
 	o.App.LazyLog = true // the newest log is parsed when the Problems view opens
 	// Until then the status-bar counts use a stored log report only, never a parse.
@@ -422,11 +413,5 @@ func named(its []*item) string {
 }
 
 func plural(n int, w string) string {
-	if view.Lang() == "zh" {
-		return Tf("%d 个%s", n, T(w))
-	}
-	if n == 1 {
-		return Tf("%d %s", n, w)
-	}
-	return Tf("%d %ss", n, w)
+	return view.Plural(n, w)
 }

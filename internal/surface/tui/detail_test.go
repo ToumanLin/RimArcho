@@ -67,12 +67,12 @@ func TestDetailContent(t *testing.T) {
 		t.Fatalf("cursor on %q", m.current().name)
 	}
 	runCmd(m, m.loadData(m.current().id, false, false)) // the cache is empty: fetched after the dwell
-	if m.dd == nil || m.dd.desc.WorkshopState != "not cached" {
+	if m.dd == nil || m.dd.Desc.WorkshopState != "not cached" {
 		t.Fatalf("data %+v", m.dd)
 	}
 	runCmd(m, m.onFetchTick(m.current().id))
-	if m.dd.desc.WorkshopState != "fetched" {
-		t.Fatalf("fetch: %s", m.dd.desc.WorkshopState)
+	if m.dd.Desc.WorkshopState != "fetched" {
+		t.Fatalf("fetch: %s", m.dd.Desc.WorkshopState)
 	}
 	got := plainLines(m.detailLayout(detailOpts{width: 50, descMax: 12}))
 	for _, want := range []string{"Alpha Plus", "package", "tester.a", "workshop", "1001", "tags", "weapons", "alias", "(Alpha)", "note", "keep after Harmony",
@@ -470,9 +470,9 @@ func TestT7Wrapping(t *testing.T) {
 	press(m, "g")
 	press(m, "down")
 	runCmd(m, m.loadData(m.current().id, false, false))
-	m.dd.ws = bbcode.Parse(desc)
-	m.dd.desc.Show = "both"
-	m.dd.about = bbcode.Parse("中文 English 混排的 About 简介，含一个很长的路径 C:\\Users\\Someone\\AppData\\Roaming\\RimArcho\\cache\\workshop\\1001.json 以及标点。")
+	m.dd.Workshop = bbcode.Parse(desc)
+	m.dd.Desc.Show = "both"
+	m.dd.About = bbcode.Parse("中文 English 混排的 About 简介，含一个很长的路径 C:\\Users\\Someone\\AppData\\Roaming\\RimArcho\\cache\\workshop\\1001.json 以及标点。")
 	m.detailTech = true
 	m.detail = []string{"#abcd Alpha", "  path: D:\\SteamLibrary\\steamapps\\workshop\\content\\294100\\1001\\Defs\\ThingDefs\\VeryLongFileNameForTesting.xml", "  files: 12 (34 KB)"}
 	var buf bytes.Buffer

@@ -11,7 +11,7 @@ func (m *model) matcher(q string) (func(*item) bool, func(*item) bool) {
 	if pq.Empty() {
 		return nil, nil
 	}
-	f := view.Facts{Status: m.prob.status}
+	f := view.MatchFacts{Status: m.prob.status}
 	if pq.NeedsContent() {
 		c, err := m.content.Get(m.app, m.st)
 		if err != nil {

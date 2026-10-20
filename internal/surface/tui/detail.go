@@ -14,9 +14,6 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/bbcode"
-	"github.com/ToumanLin/RimArcho/internal/identity"
-	"github.com/ToumanLin/RimArcho/internal/scan"
-	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -25,16 +22,8 @@ import (
 // version, Workshop page, tags, alias, note, dependencies), the description, and the
 // technical information folded behind i.
 
-// detailData is what the detail shows for one mod, loaded off the key path.
-type detailData struct {
-	id       string
-	decl     scan.Decl
-	desc     *app.Description
-	about    []bbcode.Block
-	ws       []bbcode.Block
-	events   []*store.Event // the mod's change events, oldest first
-	fetching bool
-}
+// detailData is what the detail shows for one mod beyond its row (view.DetailData).
+type detailData = view.DetailData
 
 type detailDataMsg struct{ d *detailData }
 type fetchTick struct{ id string }
@@ -52,33 +41,27 @@ func (m *model) loadData(id string, fetch, refresh bool) tea.Cmd {
 		return nil
 	}
 	ix, a := m.st.Ix, m.app
-	return func() tea.Msg {
-		d := &detailData{id: id, decl: mod.Decl()}
-		d.desc = a.Describe(ix, mod, fetch, refresh)
-		d.about, d.ws = bbcode.Parse(d.desc.About), bbcode.Parse(d.desc.Workshop)
-		d.events, _ = a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, InstanceIDs: []string{id}})
-		return detailDataMsg{d}
-	}
+	return func() tea.Msg { return detailDataMsg{view.LoadDetail(a, ix, mod, fetch, refresh)} }
 }
 
 // onData stores loaded data and schedules the Workshop fetch when it is missing.
 func (m *model) onData(d *detailData) tea.Cmd {
-	if it := m.current(); it == nil || it.id != d.id {
+	if it := m.current(); it == nil || it.id != d.ID {
 		return nil
 	}
 	m.dd = d
-	if d.desc.WorkshopState == "not cached" {
-		id := d.id
+	if d.Desc.WorkshopState == "not cached" {
+		id := d.ID
 		return tea.Tick(fetchDwell, func(time.Time) tea.Msg { return fetchTick{id} })
 	}
 	return nil
 }
 
 func (m *model) onFetchTick(id string) tea.Cmd {
-	if it := m.current(); it == nil || it.id != id || m.dd == nil || m.dd.id != id {
+	if it := m.current(); it == nil || it.id != id || m.dd == nil || m.dd.ID != id {
 		return nil
 	}
-	m.dd.fetching = true
+	m.dd.Fetching = true
 	return m.loadData(id, true, false)
 }
 
@@ -127,20 +110,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	if mod == nil {
 		return nil
 	}
-	facts := []string{view.SourceText(mod)}
-	if mod.Kind != source.Official {
-		if v := strings.Fields(mod.SupportedVersions); len(v) > 0 {
-			facts = append(facts, T("supports")+" "+strings.Join(v, " "))
-		}
-	}
-	switch {
-	case it.pos > 0:
-		facts = append(facts, Tf("number %d", it.pos))
-	case m.focus == cStaging:
-		facts = append(facts, T("staged"))
-	default:
-		facts = append(facts, T("not enabled"))
-	}
+	facts := view.HeaderFacts(mod, it.pos, m.focus == cStaging)
 	out = append(out, m.headerLines(it, mod, strings.Join(facts, " "+markDot+" "), w, o)...)
 	add("")
 	marked := func(mark, text string, st lipgloss.Style) {
@@ -156,12 +126,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	case statusNone:
 		marked(sOK.Render(markOK), T("no problems found"), sSecond)
 	case statusUnloadable:
-		why := T("the game cannot load it")
-		if mod.Unloadable != "" {
-			why = T("About.xml is renamed: the game cannot load it")
-		} else if mod.Residue {
-			why = T("no longer subscribed: the game ignores this folder")
-		}
+		why := view.UnloadableWhy(mod)
 		marked(statusIcon(s), why, sSecond)
 	default:
 		marked(statusIcon(s), T("needs attention · ! shows what"), sText)
@@ -169,28 +134,26 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	add("")
 	// facts
 	var d *detailData
-	if m.dd != nil && m.dd.id == it.id {
+	if m.dd != nil && m.dd.ID == it.id {
 		d = m.dd
 	}
 	type kv struct{ k, v string }
 	var kvs []kv
-	kvs = append(kvs, kv{T("package"), mod.PackageID})
-	if d != nil && d.decl.ModVersion != "" {
-		kvs = append(kvs, kv{T("version"), d.decl.ModVersion})
-	}
-	if ws := mod.WorkshopID(); ws != "" && isNumber(ws) {
-		kvs = append(kvs, kv{T("workshop"), ws + sDimS.Render(" "+markDot+" o "+T("opens the page"))})
-	}
-	if len(mod.Tags) > 0 {
-		kvs = append(kvs, kv{T("tags"), strings.Join(mod.Tags, " "+markDot+" ")})
-	} else {
-		kvs = append(kvs, kv{T("tags"), sDimS.Render(T("none · # adds"))})
-	}
-	if mod.Alias != "" {
-		kvs = append(kvs, kv{T("alias"), mod.Alias + sDimS.Render("  ("+mod.Name+")")})
-	}
-	if mod.Note != "" {
-		kvs = append(kvs, kv{T("note"), mod.Note})
+	for _, f := range view.Facts(mod, d) {
+		v := f.Value
+		switch f.Kind {
+		case view.FactWorkshop:
+			v += sDimS.Render(" " + markDot + " o " + T("opens the page"))
+		case view.FactTags:
+			if len(f.List) == 0 {
+				v = sDimS.Render(T("none · # adds"))
+			} else {
+				v = strings.Join(f.List, " "+markDot+" ")
+			}
+		case view.FactAlias:
+			v += sDimS.Render("  (" + f.Extra + ")")
+		}
+		kvs = append(kvs, kv{f.Label, v})
 	}
 	lw := 0
 	for _, x := range kvs {
@@ -238,9 +201,9 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	add("")
 	if o.full {
 		out = append(out, m.secLines(w)...)
-	} else if d != nil && len(d.events) > 0 {
+	} else if d != nil && len(d.Events) > 0 {
 		add(sDimS.Render(fit(T("history"), w)))
-		for _, l := range wrap(historyLine(d.events), w-2) {
+		for _, l := range wrap(view.HistoryLine(d.Events), w-2) {
 			add("  " + sSecond.Render(fit(l, w-2)))
 		}
 		add("")
@@ -329,15 +292,6 @@ func (m *model) headerLines(it *item, mod *store.Mod, facts string, w int, o det
 	return out
 }
 
-func isNumber(s string) bool {
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return s != ""
-}
-
 // stripANSIWidth: the text of a possibly styled value, for wrapping.
 func stripANSIWidth(s string) string { return ansi.Strip(s) }
 
@@ -355,46 +309,15 @@ func (m *model) depLines(d *detailData) []string {
 	if d == nil {
 		return nil
 	}
-	mm := ""
-	if m.st != nil {
-		mm = "v" + m.st.GameMM()
-	}
-	seen := map[string]bool{}
-	var pkgs []scan.Dependency
-	for _, x := range append(append([]scan.Dependency{}, d.decl.Dependencies...), d.decl.DependenciesByVersion[mm]...) {
-		p := strings.ToLower(x.PackageID)
-		if p == "" || seen[p] {
-			continue
-		}
-		seen[p] = true
-		pkgs = append(pkgs, x)
-	}
 	var out []string
-	for _, x := range pkgs {
-		p := strings.ToLower(x.PackageID)
-		var inst []*store.Mod
-		for _, mod := range m.st.Ix.Mods {
-			if mod.PackageID == p && mod.Status == identity.Live {
-				inst = append(inst, mod)
-			}
-		}
-		name := x.DisplayName
-		if name == "" {
-			name = p
-		}
-		enabled := false
-		for _, mod := range inst {
-			if m.st.List.Index(mod.ID) >= 0 {
-				enabled, name = true, mod.DisplayName()
-			}
-		}
-		switch {
-		case enabled:
-			out = append(out, sOK.Render(markOK)+" "+sText.Render(name))
-		case len(inst) > 0:
-			out = append(out, sWarnS.Render(ic.warn)+" "+sText.Render(inst[0].DisplayName())+sDimS.Render(T(" (not enabled)")))
+	for _, x := range view.Deps(m.st, d) {
+		switch x.State {
+		case view.DepEnabled:
+			out = append(out, sOK.Render(markOK)+" "+sText.Render(x.Name))
+		case view.DepDisabled:
+			out = append(out, sWarnS.Render(ic.warn)+" "+sText.Render(x.Name)+sDimS.Render(T(" (not enabled)")))
 		default:
-			out = append(out, sErrS.Render(ic.err)+" "+sText.Render(name)+sDimS.Render(T(" (not installed)")))
+			out = append(out, sErrS.Render(ic.err)+" "+sText.Render(x.Name)+sDimS.Render(T(" (not installed)")))
 		}
 	}
 	return out
@@ -415,27 +338,17 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 		head(T("description"), T("loading…"))
 		return out
 	}
-	note := ""
-	switch st := d.desc.WorkshopState; {
-	case d.fetching && st == "not cached":
-		note = T("fetching the Workshop page…")
-	case st == "not cached":
-		note = T("the Workshop page is fetched in a moment")
-	case st == "offline":
-		note = T("offline (workshop.fetch)")
-	case st != "" && st != "fetched" && st != "cached":
-		note = T("Workshop page: ") + st
-	}
-	show := d.desc.Show
+	note := view.DescNote(d)
+	show := d.Desc.Show
 	var parts [][]dline
 	if show == "about" || show == "both" {
 		title := T("description · About.xml")
-		if len(d.about) == 0 {
+		if len(d.About) == 0 {
 			head(title, note)
 			out = append(out, dline{text: "  " + sDimS.Render(fit(T("(empty)"), w-2))})
 		} else {
 			head(title, note)
-			parts = append(parts, m.renderBlocks(d.about, w, o))
+			parts = append(parts, m.renderBlocks(d.About, w, o))
 			out = append(out, parts[len(parts)-1]...)
 		}
 		note = ""
@@ -445,7 +358,7 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 			out = append(out, dline{})
 		}
 		head(T("description · Workshop page"), note)
-		out = append(out, m.renderBlocks(d.ws, w, o)...)
+		out = append(out, m.renderBlocks(d.Workshop, w, o)...)
 	}
 	if o.descMax > 0 && len(out) > o.descMax {
 		out = append(out[:o.descMax-1], dline{text: sDimS.Render(fit(T("… enter shows all"), w))})
@@ -969,7 +882,7 @@ func (m *model) openWorkshop() tea.Cmd {
 		return nil
 	}
 	mod := m.st.Ix.ByID[it.id]
-	if mod == nil || !isNumber(mod.WorkshopID()) {
+	if mod == nil || !view.IsNumber(mod.WorkshopID()) {
 		m.say(sayInfo, T("not a workshop mod"))
 		return nil
 	}

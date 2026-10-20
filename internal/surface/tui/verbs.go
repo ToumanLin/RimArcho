@@ -1,14 +1,10 @@
 package tui
 
 import (
-	"fmt"
-	"sort"
-	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -26,27 +22,23 @@ func objIDs(its []*item) []string {
 	return out
 }
 
-// placedText: "placed at number 352 · m changes it" for the mods now at positions ps.
-func placedText(ps []int) string {
-	if len(ps) == 0 {
-		return ""
-	}
-	sort.Ints(ps)
-	where := fmt.Sprint(ps[0])
-	if len(ps) > 1 {
-		where = fmt.Sprintf("%d–%d", ps[0], ps[len(ps)-1])
-	}
-	return Tf("placed at position %s · m changes it", where)
+func placedText(ps []int) string { return view.PlacedText(ps) }
+
+func (m *model) positions(ids []string) []int { return view.Positions(m.st, ids) }
+
+// object: the shared verb object of the selection (06 §13.6).
+func object(sel []*item) view.Object {
+	return view.Object{IDs: objIDs(sel), Refs: refsOf(sel), What: named(sel)}
 }
 
-func (m *model) positions(ids []string) []int {
-	var ps []int
-	for _, id := range ids {
-		if p := m.st.Position(id); p > 0 {
-			ps = append(ps, p)
-		}
+// verb runs a shared verb and shows its result.
+func (m *model) verb(r *view.Result, err error) bool {
+	if !m.applied(err) {
+		return false
 	}
-	return ps
+	m.say(sayOK, r.Text)
+	m.placed = r.Placed
+	return true
 }
 
 // space enables the object where the load order wants it (Disabled), disables it
@@ -56,37 +48,13 @@ func (m *model) space() tea.Cmd {
 	if len(sel) == 0 {
 		return nil
 	}
-	ids, refs, what := objIDs(sel), refsOf(sel), named(sel)
 	keep := m.col().curID()
-	switch m.focus {
-	case cInactive:
-		at, err := m.app.SuggestAt(ids)
-		if err == nil {
-			_, err = m.app.Enable(refs, app.Placement{At: at})
-		}
-		if !m.applied(err) {
-			return nil
-		}
-		m.say(sayOK, placedText(m.positions(ids)))
-		m.placed = ids
-	case cActive:
-		m.act(Tf("disabled %s", what), append([]string{"disable"}, refs...)...)
-	case cStaging:
-		if !m.applied(m.restore(refs)) {
-			return nil
-		}
-		m.say(sayOK, placedText(m.positions(ids)))
-		m.placed = ids
+	if !m.verb(view.Toggle(m.app, view.Column(m.focus), object(sel))) {
+		return nil
 	}
 	m.clearSel()
 	m.refilterCol(m.focus, keep)
 	return m.requestDetail()
-}
-
-// restore puts staged mods back where they were (one undo step).
-func (m *model) restore(refs []string) error {
-	_, err := m.app.Restore(refs, app.Placement{})
-	return err
 }
 
 // applied reloads after an edit and reports a failure on the status line.
@@ -106,20 +74,9 @@ func (m *model) stageKey() tea.Cmd {
 	if len(ids) == 0 {
 		return nil
 	}
-	refs, what := refsOf(sel), named(sel)
 	keep := m.col().curID()
-	if m.focus == cStaging {
-		if !m.applied(m.restore(refs)) {
-			return nil
-		}
-		m.say(sayOK, placedText(m.positions(ids)))
-		m.placed = ids
-	} else {
-		_, err := m.app.Stage(refs)
-		if !m.applied(err) {
-			return nil
-		}
-		m.say(sayOK, Tf("staged %s", what))
+	if !m.verb(view.Stage(m.app, view.Column(m.focus), object(sel))) {
+		return nil
 	}
 	m.clearSel()
 	m.refilterCol(m.focus, keep)
@@ -135,36 +92,22 @@ func (m *model) moveBy(d int) tea.Cmd {
 		m.say(sayInfo, T("only enabled mods can be moved"))
 		return nil
 	}
-	ps := m.positions(ids)
-	sort.Ints(ps)
-	rest := len(m.st.List) - len(ids)
-	at := max(1, min(ps[0]+d, rest+1))
-	return m.moveTo(ids, named(sel), at)
+	keep := m.cols[cActive].curID()
+	if !m.verb(view.MoveBy(m.app, object(sel), d)) {
+		return nil
+	}
+	m.refilterCol(cActive, keep)
+	return m.requestDetail()
 }
 
 // moveTo moves enabled mods to a 1-based place in the list without them, as one block.
 func (m *model) moveTo(ids []string, what string, at int) tea.Cmd {
 	keep := m.cols[cActive].curID()
-	_, err := m.app.MoveBlock(ids, at)
-	if !m.applied(err) {
+	if !m.verb(view.Place(m.app, view.Active, view.Object{IDs: ids, What: what}, at)) {
 		return nil
 	}
-	m.say(sayOK, m.nowAt(what, ids))
 	m.refilterCol(cActive, keep)
 	return m.requestDetail()
-}
-
-// nowAt: "Alpha is now number 3" / "3 mods are now at 3–5".
-func (m *model) nowAt(what string, ids []string) string {
-	ps := m.positions(ids)
-	sort.Ints(ps)
-	if len(ps) == 0 {
-		return ""
-	}
-	if len(ps) == 1 {
-		return Tf("%s is now number %d", what, ps[0])
-	}
-	return Tf("%s are now at %d–%d", what, ps[0], ps[len(ps)-1])
 }
 
 // ---- the position input (06 §13.7) ----
@@ -212,73 +155,13 @@ func (m *model) openPos(placed []string) tea.Cmd {
 	return nil
 }
 
-// posOptions: a number is "number N"; a name lists the enabled mods it matches ("after X",
-// tab makes them "before X"); then the suggested place, then first and last.
+// posOptions: view.PosOptions for the input's text.
 func (m *model) posOptions() {
 	p := m.pos
-	moving := map[string]bool{}
-	for _, id := range p.ids {
-		moving[id] = true
-	}
-	type ent struct {
-		name string
-		pos  int // shown: its number now
-		at   int // its place in the list without the moving mods, 1-based
-	}
-	var rest []ent
-	for i, e := range m.st.List {
-		if moving[e.Instance] && e.Instance != "" {
-			continue
-		}
-		name := e.Missing
-		if mod := m.st.Ix.ByID[e.Instance]; mod != nil {
-			name = mod.DisplayName()
-		}
-		rest = append(rest, ent{name, i + 1, len(rest) + 1})
-	}
-	n := len(rest)
 	p.opts = nil
-	q := strings.ToLower(strings.TrimSpace(p.text))
-	if v, err := strconv.Atoi(q); err == nil && v > 0 {
-		v = min(v, n+1)
-		p.opts = append(p.opts, posOpt{label: Tf("position %d", v), at: v})
-	} else if q != "" {
-		type hit struct {
-			e     ent
-			score int
-		}
-		var hits []hit
-		for _, e := range rest {
-			l := strings.ToLower(e.name)
-			s := 0
-			switch {
-			case strings.HasPrefix(l, q):
-				s = 3
-			case strings.Contains(l, q):
-				s = 2
-			case view.Subsequence(q, l):
-				s = 1
-			}
-			if s > 0 {
-				hits = append(hits, hit{e, s})
-			}
-		}
-		sort.SliceStable(hits, func(i, j int) bool { return hits[i].score > hits[j].score })
-		for i, h := range hits {
-			if i == 5 {
-				break
-			}
-			o := posOpt{label: T("after") + "  " + h.e.name, note: Tf("(position %d)", h.e.pos), at: h.e.at + 1}
-			if p.before {
-				o.label, o.at = T("before")+"  "+h.e.name, h.e.at
-			}
-			p.opts = append(p.opts, o)
-		}
+	for _, o := range view.PosOptions(m.app, m.st, p.ids, p.text, p.before) {
+		p.opts = append(p.opts, posOpt{label: o.Label, note: o.Note, at: o.At, edge: o.Edge})
 	}
-	if at, err := m.app.SuggestAt(p.ids); err == nil {
-		p.opts = append(p.opts, posOpt{label: Tf("position %d", at), note: T("(suggested)"), at: at})
-	}
-	p.opts = append(p.opts, posOpt{label: T("first"), at: 1, edge: true}, posOpt{label: T("last"), at: n + 1, edge: true})
 	p.sel = 0
 }
 
@@ -328,14 +211,9 @@ func (m *model) placeAt(p *posInput, at int) tea.Cmd {
 		return m.moveTo(p.ids, p.what, at)
 	}
 	keep := m.col().curID()
-	_, err := m.app.Enable(p.refs, app.Placement{At: at})
-	if err == nil && p.from == cStaging {
-		_, err = m.app.Unstage(p.refs)
-	}
-	if !m.applied(err) {
+	if !m.verb(view.Place(m.app, view.Column(p.from), view.Object{IDs: p.ids, Refs: p.refs, What: p.what}, at)) {
 		return nil
 	}
-	m.say(sayOK, m.nowAt(p.what, p.ids))
 	m.clearSel()
 	m.refilterCol(m.focus, keep)
 	return m.requestDetail()

@@ -303,7 +303,7 @@ func (m *model) detailLines(w, n, x int) ([]string, []placement) {
 	// The scroll is kept as asked until the mod's details have loaded: PgDn pressed while
 	// the description is still on its way would otherwise be lost.
 	off := max(0, min(m.detailOff, len(lines)-(n-1)))
-	if it := m.current(); it == nil || (m.dd != nil && m.dd.id == it.id) {
+	if it := m.current(); it == nil || (m.dd != nil && m.dd.ID == it.id) {
 		m.detailOff = off
 	}
 	title := T("details")
