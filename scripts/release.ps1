@@ -1,5 +1,5 @@
 # Builds a release: one self-contained archo.exe (pure Go, no cgo, no runtime to install)
-# with the version stamped in through -ldflags, plus README and CHANGELOG, and the font of
+# with the version stamped in through -ldflags, plus README, CHANGELOG and LICENSE, and the font of
 # the WezTerm host (06 §1.2): Maple Mono NF CN Regular and Bold with its SIL OFL license under
 # fonts/. The font is fetched at build time from the official Maple Mono GitHub release
 # (pinned by -MapleTag, checked against the release's .sha256) and cached in dist/cache/;
@@ -50,7 +50,7 @@ go build -trimpath -ldflags $ldflags -o (Join-Path $out $exe) ./cmd/archo
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED
 
-Copy-Item README.md, CHANGELOG.md $out
+Copy-Item README.md, CHANGELOG.md, LICENSE $out
 
 # The bundled font (06 §1.2): Maple Mono NF CN, Regular and Bold, and the OFL.
 $maple = "https://github.com/subframe7536/maple-font/releases/download/$MapleTag"
