@@ -206,6 +206,7 @@ func (m *model) reload() {
 	for k := range m.cols {
 		m.refilterCol(colKind(k), keep[k])
 	}
+	m.loadHistory()
 }
 
 // fromView copies a shared row into the TUI's row and adds the source icon.
@@ -286,6 +287,12 @@ func (m *model) drawColumn(s slot, n int, tabs bool) []string {
 		for _, l := range wrap(msg, s.w-2) {
 			out = append(out, "  "+sDimS.Render(fit(l, s.w-2)))
 			rm = append(rm, -1)
+		}
+		if c.kind == cStaging && m.historyShown() && len(out) < n-1 {
+			out, rm = append(out, ""), append(rm, -1)
+			for _, l := range m.histLines(s.w, n-len(out)) {
+				out, rm = append(out, l), append(rm, -1)
+			}
 		}
 	}
 	if m.prefs.Wrap[c.kind] && !tabs {

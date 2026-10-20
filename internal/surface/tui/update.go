@@ -43,6 +43,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if _, ok := msg.(liveTick); ok {
+		// Not input: the idle countdown goes on.
+		m.pollLive()
+		return m, liveNext()
+	}
 	m.idleSeq++
 	seq := m.idleSeq
 	next := tea.Tick(idleAfter, func(time.Time) tea.Msg { return idleTick{seq} })
@@ -233,6 +238,11 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	}
 	if m.detailFocus {
 		if cmd, ok := m.detailKey(s); ok {
+			return cmd
+		}
+	}
+	if m.histActive() {
+		if cmd, ok := m.histKey(s); ok {
 			return cmd
 		}
 	}

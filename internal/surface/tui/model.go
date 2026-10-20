@@ -107,6 +107,13 @@ type model struct {
 	analyzeWait func() tea.Msg
 
 	chg chState
+
+	liveTr view.LiveTracker
+	live   *view.Live // the running game (10 §3.4); nil until the first poll
+
+	hist    []view.HistItem // the history area, shown in empty staging (08 §14)
+	histCur int
+	histOff int
 	// afterPanel runs once after a confirmed panel command (the Changes view reloads).
 	afterPanel func(m *model)
 
@@ -219,9 +226,9 @@ func (m *model) Init() tea.Cmd {
 	m.reload()
 	m.problemCounts()
 	if m.opts.ScanOnStart && m.loadErr == nil && m.neverScanned() {
-		return m.startScan()
+		return tea.Batch(m.startScan(), liveNext())
 	}
-	return nil
+	return liveNext()
 }
 
 func (m *model) neverScanned() bool {

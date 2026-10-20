@@ -24,6 +24,7 @@ type probState struct {
 	status map[string]int
 	need   int
 	open   map[string]bool // folded items shown open (enter), by text
+	base   []view.Need     // the analysis' items; the running game's lead them (10 §3.4)
 }
 
 // analysis progress plumbing
@@ -55,7 +56,7 @@ func (m *model) loadProblems() {
 	p.loaded = true
 	p.countsKey = m.app.Store.ChangeKey()
 	if err != nil {
-		p.items, p.need, p.status = nil, 0, map[string]int{}
+		p.base, p.items, p.need, p.status = nil, nil, 0, map[string]int{}
 		m.say(sayFail, err.Error())
 		return
 	}
@@ -68,7 +69,18 @@ func (m *model) loadProblems() {
 	}
 	vn := view.BuildNeeds(m.app, m.st, ps)
 	p.never, p.stale = vn.Never, vn.Stale
-	p.items, p.status, p.need = m.toNeeds(vn.Items), vn.Status, vn.Count
+	p.base, p.status, p.need = vn.Items, vn.Status, vn.Count
+	m.composeNeeds()
+}
+
+// composeNeeds puts the running game's errors (group "this run") before the analysis' items.
+func (m *model) composeNeeds() {
+	p := &m.prob
+	items := p.base
+	if m.live != nil && len(m.live.Items) > 0 {
+		items = append(append([]view.Need{}, m.live.Items...), p.base...)
+	}
+	p.items = m.toNeeds(items)
 	p.cursor = min(p.cursor, max(len(p.items)-1, 0))
 }
 

@@ -90,6 +90,13 @@ func (m *model) topBar() string {
 		t := Tf("needs attention %d", n)
 		add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
 	}
+	if t := m.liveText(); t != "" {
+		st := sOK
+		if m.live.Errors > 0 {
+			st = sErrS
+		}
+		add("  "+st.Render(t), 2+width.StringWidth(t))
+	}
 	if m.unsaved > 0 {
 		t := Tf("unsaved %d", m.unsaved)
 		add("  "+sAccent.Render(ic.unsaved+" "+t), 2+2+width.StringWidth(t))
@@ -195,6 +202,12 @@ func (m *model) hintLine() string {
 		// 06 §13.5: what the selection can do, and that another list drops it.
 		prefix = Tf("selected %d", m.selCount())
 		pairs = append(m.verbPairs(), [2]string{"esc", T("clear the selection")}, [2]string{"←→", T("another list clears it")})
+	case m.histActive():
+		pairs = [][2]string{{"↑↓", T("choose")}}
+		if l := m.histLabel(); l != "" {
+			pairs = append(pairs, [2]string{"enter", l})
+		}
+		pairs = append(pairs, [2]string{"?", T("all keys")})
 	case m.detailFocus:
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"←", T("back to the list")}, {"enter", T("full screen")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"?", T("all keys")}}
 	default:
