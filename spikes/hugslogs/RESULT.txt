@@ -14,6 +14,10 @@ raw logs + parsed.jsonl). Only aggregate numbers are recorded here.
    - Listing faster than ~1 page / 2 s gets HTTP 429 (Retry-After 120 s). 998 of 1,000 raw logs
      downloaded; 2 were 404 (deleted).
    => P1 needs a scheduled fetch at least once a day; the index is append-only, so runs resume.
+   UPDATE 2026-10-19 (local run, own token): the GitHub API is not limited to 100 pages.
+   `hugslogs probe` found 7,041 pages x 100 = ~704,100 gists, oldest 2016-11-17. Page 100 =
+   2026-09-28, page 1,000 = 2026-02-01, page 3,000 = 2024-02. History can be backfilled by date
+   range (`api -from`); the constraint is storage (~600 KB/log), not the rolling window.
 
 2. Format. Header sections are exactly as in HugsLib's LogPublisher: "Loaded mods:" (load order,
    name(packageId)[mv:…]: assemblies), "Active Harmony patches:" (target: PRE/post/TRANS/FIN …),

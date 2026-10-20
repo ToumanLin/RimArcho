@@ -33,7 +33,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rimarcho/rimarcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
 const (
