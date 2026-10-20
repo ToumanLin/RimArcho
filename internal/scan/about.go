@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf16"
+
+	"github.com/ToumanLin/RimArcho/internal/textenc"
 )
 
 // Dependency is one <modDependencies> entry.
@@ -91,7 +93,7 @@ func (n *node) list(name string) []string {
 }
 
 func parseXML(b []byte) (*node, error) {
-	b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
+	b = textenc.UTF8(b)
 	d := xml.NewDecoder(bytes.NewReader(b))
 	d.Strict = false
 	d.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }

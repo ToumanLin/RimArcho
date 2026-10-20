@@ -5,6 +5,8 @@ import (
 	"encoding/xml"
 	"io"
 	"strings"
+
+	"github.com/ToumanLin/RimArcho/internal/textenc"
 )
 
 // Event is one parsed token. Parsing (the slow part) produces events and can run on many
@@ -26,7 +28,7 @@ const (
 
 // Parse tokenises an XML file like LoadableXmlAsset (IgnoreComments, IgnoreWhitespace).
 func Parse(b []byte) ([]Event, error) {
-	b = bytes.TrimPrefix(b, []byte{0xEF, 0xBB, 0xBF})
+	b = textenc.UTF8(b)
 	dec := xml.NewDecoder(bytes.NewReader(b))
 	dec.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }
 	evs := make([]Event, 0, len(b)/64)

@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/ToumanLin/RimArcho/internal/textenc"
 )
 
 // Active reports whether a packageId (lower case, no _steam suffix) is in the Loadout.
@@ -157,7 +159,7 @@ func parseLoadFolders(s string) map[string][]lfEntry {
 	if strings.TrimSpace(s) == "" {
 		return nil
 	}
-	dec := xml.NewDecoder(bytes.NewReader(bytes.TrimPrefix([]byte(s), []byte{0xEF, 0xBB, 0xBF})))
+	dec := xml.NewDecoder(bytes.NewReader(textenc.UTF8([]byte(s))))
 	dec.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }
 	dec.Strict = false
 	out := map[string][]lfEntry{}
