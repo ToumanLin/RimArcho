@@ -145,6 +145,7 @@ type model struct {
 	thumbSeq   int
 	fsecs      *fullSecs  // the full-screen detail's sub-sections (06 §6.3)
 	pal        *palette   // the command palette (06 §8), nil when closed
+	armed      *armed     // a destructive key pressed once (06 §9)
 	images     *imgWriter // the WezTerm host's output; nil: no inline images
 	full       bool       // the full-screen detail
 	fullOff    int
@@ -233,6 +234,20 @@ func (m *model) run(argv ...string) (string, int) {
 	out, code := cmds.Execute(m.app, argv)
 	m.reload()
 	return out, code
+}
+
+// armed is a destructive action waiting for its second press (06 §9).
+type armed struct {
+	key string
+	run func(m *model) tea.Cmd
+}
+
+// arm: the first press of a destructive key only says what the second press will do; the
+// same key again does it, any other key cancels.
+func (m *model) arm(key, warning string, run func(m *model) tea.Cmd) tea.Cmd {
+	m.armed = &armed{key: key, run: run}
+	m.say(sayFail, warning)
+	return nil
 }
 
 // say sets the status line (06 §9); it is cleared by the next key.

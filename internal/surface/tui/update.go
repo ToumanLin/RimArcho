@@ -148,6 +148,14 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	if m.prompt == nil && !m.editing {
 		m.status, m.sayKind = "", sayNone // the status line lasts until the next key
 	}
+	if a := m.armed; a != nil {
+		m.armed = nil
+		if s == a.key || (a.key == "space" && s == " ") {
+			return a.run(m)
+		}
+		m.say(sayInfo, T("cancelled"))
+		return nil
+	}
 	switch {
 	case m.pal != nil:
 		return m.paletteKey(k)

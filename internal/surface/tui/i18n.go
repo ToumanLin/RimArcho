@@ -123,6 +123,10 @@ var zhText = map[string]string{
 	"technical information · i":                          "技术信息 · i 展开",
 	"technical information":                              "技术信息",
 	"no preview":                                         "无预览",
+	// double press (06 §9)
+	"press %s again: %s": "再按一次 %s：%s",
+	"press L again to load it; your unsaved edits are replaced": "再按一次 L 载入；未保存的修改会被替换",
+	"the outside change is loaded into the list":                "已把外部修改载入列表",
 	// command palette (06 §8)
 	"command palette": "命令面板", "command": "命令", "environment": "环境", "switch to %s": "切换到环境 %s",
 	"nothing matches": "没有匹配的结果", "run": "执行", "close": "关闭",

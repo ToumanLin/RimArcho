@@ -235,8 +235,12 @@ func (m *model) buildNeeds(ps *app.ProblemSet) []need {
 	if v := m.st.WS.Conflict; v != 0 {
 		add(need{group: gConfirm, text: T("ModsConfig.xml was changed outside RimArcho"), counted: true, status: statusWarn, keys: []needKey{
 			{key: "L", label: T("load it into the list"), run: func(m *model) tea.Cmd {
-				m.openPanel(T("load the outside change into the list?"), T("your unsaved edits are replaced by the list in ModsConfig.xml"), []string{"loadout", "checkout", fmt.Sprintf("v%d", v)})
-				return nil
+				// It replaces the unsaved edits: press twice (06 §9).
+				return m.arm("L", T("press L again to load it; your unsaved edits are replaced"), func(m *model) tea.Cmd {
+					m.act(T("the outside change is loaded into the list"), "loadout", "checkout", fmt.Sprintf("v%d", v))
+					m.loadProblems()
+					return nil
+				})
 			}},
 			{key: "I", label: T("ignore it"), run: func(m *model) tea.Cmd {
 				if err := m.app.DismissConflict(); err != nil {
@@ -260,10 +264,13 @@ func (m *model) buildNeeds(ps *app.ProblemSet) []need {
 func (m *model) questionNeed(q *store.Question) need {
 	nm := func(id string) string { return m.tokName(finding.Inst(id)) }
 	answer := func(key, label, ans, done string) needKey {
+		// Merging or splitting lineages is not undone with u: press twice (06 §9).
 		return needKey{key: key, label: label, run: func(m *model) tea.Cmd {
-			m.act(done, "identity", "resolve", fmt.Sprintf("q:%d", q.ID), ans)
-			m.loadProblems()
-			return nil
+			return m.arm(key, Tf("press %s again: %s", key, done), func(m *model) tea.Cmd {
+				m.act(done, "identity", "resolve", fmt.Sprintf("q:%d", q.ID), ans)
+				m.loadProblems()
+				return nil
+			})
 		}}
 	}
 	a, b := nm(q.InstanceID), nm(q.CandidateID)

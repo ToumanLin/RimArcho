@@ -602,6 +602,21 @@ func TestChangesView(t *testing.T) {
 		t.Fatalf("items: %q", needItems(m))
 	}
 	m.prob.cursor = i
+	// L replaces the unsaved edits: the first press only warns, another key cancels,
+	// and two presses load it (06 §9).
+	L := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")}
+	m.update(L)
+	if m.armed == nil || !strings.Contains(m.status, "press L again") {
+		t.Fatalf("first L: %q", m.status)
+	}
+	press(m, "j")
+	if m.armed != nil || m.status != "cancelled" {
+		t.Fatalf("other key: %q", m.status)
+	}
+	if st, _ := e.App.Loadout(); st.WS.Conflict == 0 {
+		t.Fatal("loaded after a cancelled L")
+	}
+	m.prob.cursor = findNeed(m, "changed outside RimArcho")
 	m.needsKey("I")
 	st, _ := e.App.Loadout()
 	if st.WS.Conflict != 0 || !strings.Contains(m.status, "ignored") {
@@ -784,5 +799,23 @@ func TestColumnSearch(t *testing.T) {
 	press(m, "esc")
 	if names(cInactive) == "Beta" {
 		t.Fatal("esc did not clear the query")
+	}
+}
+
+// 06 §9: L pressed twice loads an outside change of ModsConfig.xml into the list.
+func TestDoublePressLoad(t *testing.T) {
+	e, _ := fixture(t)
+	e.MustRun("enable", "pkg:tester.b")
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
+	m := direct(t, e, 120, 30)
+	m.tab = tabProblems
+	m.loadProblems()
+	m.prob.cursor = findNeed(m, "changed outside RimArcho")
+	L := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")}
+	m.update(L)
+	m.update(L)
+	st, _ := e.App.Loadout()
+	if st.WS.Conflict != 0 || activeNames(t, e) != "Core, Harmony" {
+		t.Fatalf("after L L: conflict %d, list %q, status %q", st.WS.Conflict, activeNames(t, e), m.status)
 	}
 }

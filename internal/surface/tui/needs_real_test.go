@@ -139,6 +139,13 @@ func TestT8NeedsReal(t *testing.T) {
 			}
 			wasOpen := m.prob.open[text]
 			m.needsKey(key)
+			if a := m.armed; a != nil { // a destructive key: the second press (06 §9)
+				if !strings.Contains(m.status, "again") {
+					t.Errorf("%q: armed without saying so: %q", text, m.status)
+				}
+				m.armed, m.status, m.sayKind = nil, "", sayNone
+				a.run(m)
+			}
 			ran++
 			did := m.panel != nil || m.insp != nil || m.sayKind == sayOK || opened != "" || m.prob.open[text] != wasOpen
 			if !did || m.sayKind == sayFail {
