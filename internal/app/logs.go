@@ -525,7 +525,9 @@ var (
 	winPathRe     = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
 	xrefRe        = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
 	forDefRe      = regexp.MustCompile(` for def '([^']+)'`)
-	ctxDefNameRe  = regexp.MustCompile(`Context: [\s\S]*?<defName>([^<\s]+)</defName>`)
+	ctxDefNameRe  = regexp.MustCompile(`(?:Context|Full node): [\s\S]*?<defName>([^<\s]+)</defName>`)
+	parentRe      = regexp.MustCompile(`Could not find parent node named "([^"]+)"`)
+	thinkKeyRe    = regexp.MustCompile(`^Config error in (\S+): Two ThinkNodes have the same unique save key`)
 	ctxNameRe     = regexp.MustCompile(`Context: <\w+[^>]*\bName="([^"]+)"`)
 	missingTypeRe = regexp.MustCompile(`Could not find (?:a )?type (?:named )?([A-Za-z_][\w.+]*\.[\w+]+)|expected class '([^']+)'`)
 	blockRe       = regexp.MustCompile(`^\[(.+?)\] Verse\.PatchOperation`)
@@ -623,6 +625,25 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	case logs.ClassXMLLoad:
 		// "XML error: … Context: <ThingDef …><defName>X</defName>…": the def's XML is at fault.
 		texts := strings.Join(append([]string{e.Message}, e.Extra...), "\n")
+		// A missing parent provided by an installed, disabled mod is a missing dependency.
+		if m := parentRe.FindStringSubmatch(e.Message); m != nil {
+			ds, _ := cx.a.Store.DefsNamed(m[1], true)
+			for _, d := range ds {
+				if cx.st.Position(d.Instance) == 0 && ix.ByID[d.Instance] != nil {
+					lc.add(d.Instance, RoleDependency, fmt.Sprintf("provides the abstract def %s (%s:%d) but is not enabled", m[1], d.File, d.Line))
+					lc.next("archo enable " + ix.Ref(d.Instance))
+				}
+			}
+		}
+		// Duplicate ThinkNode keys come from patches to the think tree, not from the tree itself.
+		if m := thinkKeyRe.FindStringSubmatch(e.Message); m != nil && cx.run != nil {
+			pf, _ := cx.a.Store.PatchFacts(cx.run.ID, store.PatchFilter{Target: "ThinkTreeDef/" + m[1]})
+			for _, p := range pf {
+				if cx.st.Position(p.Instance) > 0 && !cx.official(p.Instance) {
+					lc.add(p.Instance, RolePatcher, fmt.Sprintf("patches ThinkTreeDef %s at %s:%d", m[1], p.File, p.Line))
+				}
+			}
+		}
 		if m := ctxDefNameRe.FindStringSubmatch(texts); m != nil {
 			cx.definedBy(lc, m[1], false, "is the def the XML error is in")
 		} else if m := ctxNameRe.FindStringSubmatch(texts); m != nil {
