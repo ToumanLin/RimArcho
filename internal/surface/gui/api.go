@@ -35,6 +35,7 @@ type API struct {
 	content view.ContentCache
 	events  map[int64]*store.Event // the changes list's events, by id
 	busy    map[string]bool        // scan, analyze
+	live    view.LiveTracker       // the running game's log (10 §3)
 	// Exe runs the scan and analysis children; "" is this executable (the development
 	// harness points it at archo.exe).
 	Exe string
@@ -131,6 +132,17 @@ func (s *API) boardLocked() *Board {
 }
 
 // Stamp is the database state; the page asks on focus and reloads when it changed (G8).
+// Live reports the running game and the errors its log gained (10 §3.4); the page asks
+// every two seconds.
+func (s *API) Live() (*view.Live, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.board == nil || s.board.St == nil {
+		return &view.Live{}, nil
+	}
+	return s.live.Update(s.a, s.board.St)
+}
+
 func (s *API) Stamp() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

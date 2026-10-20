@@ -112,49 +112,96 @@ func isContinuation(l string) bool {
 
 // Parse reads a Player.log. Very long lines (XML dumps) are cut at 4 KiB.
 func Parse(r io.Reader) (*File, error) {
-	f := &File{}
+	p := NewParser()
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64<<10), 64<<20)
-	var cur *Entry
-	afterSubnode := false
-	n := 0
 	for sc.Scan() {
-		n++
-		l := strings.TrimRight(sc.Text(), "\r")
-		if len(l) > 4096 {
-			l = l[:4096]
-		}
-		if !f.Waylith && n < 50 && strings.HasPrefix(l, "=== Waylith log ===") {
-			f.Waylith, cur = true, nil
-			continue
-		}
-		if f.Waylith {
-			cur = waylithLine(f, cur, n, l)
-			continue
-		}
-		if f.Version == "" && n < 50 {
-			if m := versionRe.FindStringSubmatch(l); m != nil {
-				f.Version = m[1]
-			}
-		}
-		if strings.HasPrefix(l, "(Filename: ") || strings.TrimSpace(l) == "" {
-			cur, afterSubnode = nil, false
-			continue
-		}
-		if cur != nil && (isContinuation(l) || afterSubnode) {
-			afterSubnode = false
-			addLine(cur, l)
-			if strings.HasPrefix(l, "Subnode:") {
-				afterSubnode = true
-			}
-			continue
-		}
-		cur = &Entry{Line: n, Message: l}
-		f.Entries = append(f.Entries, cur)
+		p.Line(sc.Text())
 	}
-	f.Lines = n
+	f := p.F
 	resolveRefs(f)
 	return f, sc.Err()
+}
+
+// Parser reads a log line by line (Parse, and the live follower of a running game: 10 §3.2).
+// Entries are appended to F.Entries; the last one may still grow until Open reports false.
+type Parser struct {
+	F            *File
+	cur          *Entry
+	afterSubnode bool
+	orig         map[string]*Entry // [Ref X] originals, for duplicates that follow them
+}
+
+// NewParser starts an empty log.
+func NewParser() *Parser { return &Parser{F: &File{}, orig: map[string]*Entry{}} }
+
+// Open reports whether the last entry can still receive continuation lines.
+func (p *Parser) Open() bool { return p.cur != nil }
+
+// Close ends the current entry (the log ended or the game exited).
+func (p *Parser) Close() { p.finish(); p.cur = nil }
+
+// finish resolves the current entry's duplicate stack against an earlier original.
+func (p *Parser) finish() {
+	e := p.cur
+	if e == nil {
+		return
+	}
+	if e.Ref != "" && !e.Dup && len(e.Frames) > 0 {
+		if len(p.orig) > 4096 {
+			clear(p.orig)
+		}
+		p.orig[e.Ref] = e
+	} else if e.Dup && len(e.Frames) == 0 {
+		if o := p.orig[e.Ref]; o != nil {
+			e.Frames = o.Frames
+		}
+	}
+}
+
+// Line feeds one line (without its newline).
+func (p *Parser) Line(l string) {
+	f := p.F
+	f.Lines++
+	n := f.Lines
+	l = strings.TrimRight(l, "\r")
+	if len(l) > 4096 {
+		l = l[:4096]
+	}
+	if !f.Waylith && n < 50 && strings.HasPrefix(l, "=== Waylith log ===") {
+		p.finish()
+		f.Waylith, p.cur = true, nil
+		return
+	}
+	if f.Waylith {
+		next := waylithLine(f, p.cur, n, l)
+		if next != p.cur {
+			p.finish()
+		}
+		p.cur = next
+		return
+	}
+	if f.Version == "" && n < 50 {
+		if m := versionRe.FindStringSubmatch(l); m != nil {
+			f.Version = m[1]
+		}
+	}
+	if strings.HasPrefix(l, "(Filename: ") || strings.TrimSpace(l) == "" {
+		p.finish()
+		p.cur, p.afterSubnode = nil, false
+		return
+	}
+	if p.cur != nil && (isContinuation(l) || p.afterSubnode) {
+		p.afterSubnode = false
+		addLine(p.cur, l)
+		if strings.HasPrefix(l, "Subnode:") {
+			p.afterSubnode = true
+		}
+		return
+	}
+	p.finish()
+	p.cur = &Entry{Line: n, Message: l}
+	f.Entries = append(f.Entries, p.cur)
 }
 
 // waylithLine handles one line of a 1.7 log: a new message, or a continuation of cur (any line
@@ -459,6 +506,19 @@ type Cluster struct {
 	Lines    []int // first few occurrences
 }
 
+// ClusterKey is how Clusters groups an entry: the key, the template and the class.
+func ClusterKey(e *Entry) (key, template, class string) {
+	class = Classify(e)
+	key = class + "|" + Normalize(e.Message)
+	if class == ClassPatchFailed {
+		key += "|" + strings.Join(e.Extra, "|") // the file distinguishes failures
+	}
+	if top := e.Top(); top != nil {
+		key += "|" + top.Type + "." + top.Method
+	}
+	return key, class + "|" + Template(e.Message), class
+}
+
 // Clusters returns the error clusters of a log.
 func Clusters(f *File) []*Cluster {
 	by := map[string]*Cluster{}
@@ -467,17 +527,10 @@ func Clusters(f *File) []*Cluster {
 		if !Interesting(e) {
 			continue
 		}
-		cls := Classify(e)
-		key := cls + "|" + Normalize(e.Message)
-		if cls == ClassPatchFailed {
-			key += "|" + strings.Join(e.Extra, "|") // the file distinguishes failures
-		}
-		if top := e.Top(); top != nil {
-			key += "|" + top.Type + "." + top.Method
-		}
+		key, tmpl, cls := ClusterKey(e)
 		c := by[key]
 		if c == nil {
-			c = &Cluster{Key: key, Template: cls + "|" + Template(e.Message), Class: cls, First: e}
+			c = &Cluster{Key: key, Template: tmpl, Class: cls, First: e}
 			by[key] = c
 			out = append(out, c)
 			c.ID = "E" + itoa(len(out))

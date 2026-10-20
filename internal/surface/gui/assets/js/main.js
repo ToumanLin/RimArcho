@@ -543,8 +543,25 @@ async function start() {
   });
   await reload();
   requestAnimationFrame(() => api.Ready().catch(() => {}));
+  pollLive();
   await loadWidths();
   if (S.board && S.board.neverScanned) cmd("rescan");
+}
+
+// pollLive follows the running game every two seconds (10 §3.4): the top bar says it is
+// running, and its errors lead 需要处理.
+async function pollLive() {
+  try {
+    const l = await api.Live();
+    const before = JSON.stringify(S.live && S.live.items);
+    S.live = l;
+    const b = $("#live");
+    b.hidden = !l.running;
+    b.textContent = l.running ? (l.errors ? Tf("game running since %s · %d errors", l.since, l.errors) : Tf("game running since %s", l.since)) : "";
+    b.onclick = () => cmd("needs");
+    if (JSON.stringify(l.items) !== before) scr.liveChanged();
+  } catch { /* the next poll tries again */ }
+  setTimeout(pollLive, 2000);
 }
 
 start().catch((e) => say("fail", errText(e)));

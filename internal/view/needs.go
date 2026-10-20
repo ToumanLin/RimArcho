@@ -32,7 +32,7 @@ const (
 )
 
 // GroupTitles are the groups' headings (English; T translates them).
-var GroupTitles = []string{"this list", "missing dependencies", "conflicts", "last run", "needs your answer", "hidden mods"}
+var GroupTitles = []string{"this list", "missing dependencies", "conflicts", "last run", "needs your answer", "hidden mods", "this run"}
 
 // Action kinds. An action is data; each interface binds it to a key or a button.
 const (

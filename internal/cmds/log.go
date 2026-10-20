@@ -14,7 +14,9 @@ func init() {
 	register(&Command{Name: "log", Summary: "attribute Player.log errors to mods (clusters, roles, evidence, next steps)", MaxArgs: 0, Run: logCmd,
 		Flags: []Flag{{Name: "cluster", Value: "<E#>"}, {Name: "file", Value: "<path>"}, {Name: "prev", Help: "Player-prev.log"},
 			{Name: "text", Value: "<log or stack text>"}, {Name: "all", Help: "include informational clusters"},
-			{Name: "select", Help: "include this log's clusters in archo problems"}, gameVersionFlag}})
+			{Name: "select", Help: "include this log's clusters in archo problems"},
+			{Name: "follow", Help: "follow Player.log while the game runs: new clusters as they appear"},
+			{Name: "once", Help: "with --follow: read what is there now and stop"}, {Name: "json", Help: "with --follow: one JSON object per cluster"}, gameVersionFlag}})
 }
 
 // loadLog picks the log to analyse: --text, --file, --prev, else the current Player.log.
@@ -60,6 +62,9 @@ func roleLine(ix *app.Index, at *app.Attribution) string {
 }
 
 func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Bool("follow") {
+		return logFollow(c, a)
+	}
 	r, st, err := loadLog(c, a)
 	if err != nil {
 		return nil, err

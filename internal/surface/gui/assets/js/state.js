@@ -15,6 +15,7 @@ export const S = {
   popup: null,  // the open popup (06 §13.2 rule 5)
   screen: null, // "needs" | "changes" | "full"
   busy: {},     // scan, analyze
+  live: null,   // Live(): the running game and its errors (10 §3.4)
 };
 
 export const $ = (sel, root = document) => root.querySelector(sel);

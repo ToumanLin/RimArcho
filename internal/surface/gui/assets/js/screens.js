@@ -8,7 +8,7 @@ import * as pop from "./popups.js";
 let ui = null;
 export function initScreens(u) { ui = u; }
 
-const GROUPS = ["this list", "missing dependencies", "conflicts", "last run", "needs your answer", "hidden mods"];
+const GROUPS = ["this list", "missing dependencies", "conflicts", "last run", "needs your answer", "hidden mods", "this run"];
 
 function openScreen(name) {
   S.screen = name;
@@ -33,11 +33,19 @@ export function closeScreen() {
 // ---- 需要处理 ----
 const N = { items: [], cur: 0, open: new Set(), data: null };
 
+// liveChanged redraws 需要处理 when the running game's errors changed (10 §3.4).
+export function liveChanged() {
+  if (S.screen === "needs" && N.data) {
+    N.items = ((S.live && S.live.items) || []).concat(N.data.items || []);
+    drawNeeds();
+  }
+}
+
 export async function needs(keepCursor) {
   let data;
   try { data = await api.Needs(); } catch (e) { say("fail", errText(e)); return; }
   N.data = data;
-  N.items = data.items || [];
+  N.items = ((S.live && S.live.items) || []).concat(data.items || []);
   if (!keepCursor) N.cur = 0;
   N.cur = Math.min(N.cur, Math.max(N.items.length - 1, 0));
   drawNeeds();

@@ -53,6 +53,7 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .badge.none { color: var(--second); background: none; }
 .badge.quiet { color: var(--accent); background: none; }
 .badge:empty { display: none; }
+.badge.live { color: var(--accent); cursor: pointer; }
 .where { color: var(--second); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tb { padding: 4px 10px; border-radius: 6px; color: var(--second); white-space: nowrap; }
 .tb:hover { background: var(--hover); color: var(--text); }

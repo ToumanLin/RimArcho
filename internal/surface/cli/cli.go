@@ -66,6 +66,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		return cmds.ExitOK
 	}
 	cmds.Progress = func(line string) { fmt.Fprintln(stderr, line) }
+	cmds.Stream = func(line string) { fmt.Fprintln(stdout, line) }
 	if rest[0] == "mcp" && len(rest) == 1 {
 		// MCP over stdio (05 §4): stdout carries only protocol messages.
 		if err := mcp.Run(context.Background(), ap); err != nil {

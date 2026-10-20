@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -378,7 +379,7 @@ func modCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		if err != nil {
 			return nil, err
 		}
-		d, root := render.New(fmt.Sprintf("%s → %s: %d semantic files differ", modLabel(ix, m.ID), modLabel(ix, o.ID), len(lines)))
+		d, root := render.New(fmt.Sprintf("%s → %s: %d semantic files differ", ix.Ref(m.ID), ix.Ref(o.ID), len(lines)))
 		for _, l := range lines {
 			root.Add(l)
 		}
@@ -749,6 +750,9 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 		line += fmt.Sprintf(", same as v%d (%s)", st.Latest.N, st.Latest.Source)
 	}
 	root.KV("loadout", line)
+	if run, _ := c.App.GameRunning(); run != nil {
+		root.KV("game", fmt.Sprintf("running for %s (pid %d; archo log --follow)", c.App.Now().Sub(run.Started).Round(time.Minute), run.PID))
+	}
 	for _, n := range st.Notices {
 		root.KV("notice", n)
 	}
