@@ -488,11 +488,11 @@ func (s *API) Redo() (string, error) {
 	return s.text(view.UndoRedo(s.a, true))
 }
 
-// KeepOfficial is T: only Core and the DLCs stay enabled (one undo step).
-func (s *API) KeepOfficial() (*view.Result, error) {
+// StageAll is T: every enabled mod but Core and the DLCs goes to staging (one undo step).
+func (s *API) StageAll() (*view.Result, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.after(view.KeepOfficial(s.a))
+	return s.after(view.StageAll(s.a))
 }
 
 // RestoreAll puts everything in staging back (the palette).

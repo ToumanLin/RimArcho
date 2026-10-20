@@ -177,3 +177,37 @@ func TestSplitArgs(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+// T: the whole enabled list goes to staging (Core stays), one step; put all back restores
+// the order.
+func TestStageAll(t *testing.T) {
+	_, api, _ := fixture(t)
+	b := api.Board()
+	var harmony string
+	for _, it := range b.Cols[view.Inactive] {
+		if it.Name == "Harmony" {
+			harmony = it.ID
+		}
+	}
+	if _, err := api.Toggle(int(view.Inactive), []string{harmony}, nil); err != nil {
+		t.Fatal(err)
+	}
+	cols := func() string {
+		b := api.Board()
+		return names(b.Cols[view.Active]) + " | " + names(b.Cols[view.Staging])
+	}
+	before := cols()
+	r, err := api.StageAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cols(); got != "Core | Harmony,Alpha" && got != "Core | Alpha,Harmony" {
+		t.Fatalf("stage all: %s (%s)", got, r.Text)
+	}
+	if _, err := api.RestoreAll(); err != nil {
+		t.Fatal(err)
+	}
+	if got := cols(); got != before {
+		t.Fatalf("put all back: %s, want %s", got, before)
+	}
+}

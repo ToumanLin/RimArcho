@@ -82,8 +82,10 @@ Spec: `docs/specs/10-1.0实现.md`.
   a sub-view switch does not animate, the tabs and sub-tabs have a sliding thumb, the game
   log shows what it read before at once and a loading line only after 150 ms, popups have no
   backdrop blur.
-- `T` in the window keeps only Core and the DLCs enabled, in one undo step (also in the
-  palette of both interfaces; put-all-back from staging stays in the palette).
+- `T` in the window moves the whole enabled list to staging in one step, each mod keeping
+  its place; Core and the DLCs stay enabled, entries that are not installed stay in the list.
+  In staging `T` puts everything back, as in the TUI. Both are in the palette of both
+  interfaces.
 - The Enabled list's position column is as wide as its longest number.
 - About.xml, LoadFolders.xml and Defs saved as UTF-16 are read (10 §1).
 

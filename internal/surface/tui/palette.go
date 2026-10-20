@@ -69,9 +69,9 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { return m.chooseEnv() }
 	case "restore-all":
 		return list("T")
-	case "keep-official":
+	case "stage-all":
 		return func(m *model) tea.Cmd {
-			if m.verb(view.KeepOfficial(m.app)) {
+			if m.verb(view.StageAll(m.app)) {
 				m.clearSel()
 			}
 			return m.requestDetail()

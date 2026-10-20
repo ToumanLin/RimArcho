@@ -278,7 +278,7 @@ async function verb(name) {
     case "restore-all":
       if (!S.cols[2].items.length) return say("", T("staging is empty"));
       return edited(api.RestoreAll());
-    case "keep-official": return edited(api.KeepOfficial());
+    case "stage-all": return edited(api.StageAll());
     case "needs": return scr.needs();
   }
 }
@@ -321,7 +321,7 @@ async function cmd(id) {
   if (["sort", "save", "launch", "filter", "details", "tech", "tags"].includes(id)) scr.closeScreen();
   switch (id) {
     case "sort": case "save": case "launch": return preview(id);
-    case "undo": case "redo": case "restore-all": case "keep-official": return verb(id);
+    case "undo": case "redo": case "restore-all": case "stage-all": return verb(id);
     case "rescan":
       if (await api.Scan()) { S.busy.scan = true; say("busy", T("scanning…")); scr.busyChanged(); }
       return;
@@ -489,7 +489,7 @@ function onKey(e) {
   const map = {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
     g: () => verb("tags"), "#": () => verb("tags"), Enter: () => verb("full"), o: () => verb("workshop"), x: () => verb("swap"),
-    S: () => preview("sort"), w: () => preview("save"), L: () => preview("launch"), u: () => verb("undo"), T: () => verb("keep-official"),
+    S: () => preview("sort"), w: () => preview("save"), L: () => preview("launch"), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "!": () => scr.needs(), c: () => cmd("changes"), l: () => cmd("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     E: () => chooseEnv(), "?": () => pop.help(), ":": () => commandLine(),
   };

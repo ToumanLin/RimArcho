@@ -266,27 +266,25 @@ func PosOptions(a *app.App, st *app.LoadoutState, ids []string, text string, bef
 	return append(opts, PosOpt{Label: T("first"), At: 1, Edge: true}, PosOpt{Label: T("last"), At: n + 1, Edge: true})
 }
 
-// KeepOfficial is T: the enabled list keeps only Core and the DLCs, in one undo step.
-func KeepOfficial(a *app.App) (*Result, error) {
+// StageAll is T: every enabled mod goes to staging, each remembering its place, in one
+// undo step; Core and the DLCs stay enabled (the game needs Core, and t puts the rest back
+// where it was). Entries that are not installed stay in the list.
+func StageAll(a *app.App) (*Result, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
 	}
 	var refs []string
 	for _, e := range st.List {
-		if e.Instance == "" {
-			refs = append(refs, "pkg:"+e.Missing)
-			continue
-		}
-		if m := st.Ix.ByID[e.Instance]; m != nil && m.Kind != source.Official {
+		if m := st.Ix.ByID[e.Instance]; e.Instance != "" && m != nil && m.Kind != source.Official {
 			refs = append(refs, st.Ix.Ref(m.ID))
 		}
 	}
 	if len(refs) == 0 {
 		return &Result{Text: T("only Core and the DLCs are enabled already")}, nil
 	}
-	if _, err := a.Disable(refs); err != nil {
+	if _, err := a.Stage(refs); err != nil {
 		return nil, err
 	}
-	return &Result{Text: Tf("only Core and the DLCs stay enabled (%d mods disabled)", len(refs))}, nil
+	return &Result{Text: Tf("staged %s; Core and the DLCs stay enabled", Plural(len(refs), "mod"))}, nil
 }

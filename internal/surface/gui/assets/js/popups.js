@@ -233,7 +233,7 @@ export function help() {
       ["g · #", T("tags")], ["enter", T("full details")], ["o", T("Workshop page")],
       ["S · w · L", T("sort · save · launch (preview first)")], ["u · ctrl+z", T("undo")], ["ctrl+r · ctrl+y", T("redo")],
       ["/ · ctrl+f", T("search the list")], ["shift+1–5", T("go to a page (the tabs at the top)")], ["l · c", T("game log · mod changes")],
-      ["T", T("keep only Core and the DLCs")],
+      ["T", T("stage the whole enabled list; in staging, put all back")],
       ["R · A", T("rescan · check the files again")], ["E", T("switch environment")], ["ctrl+k", T("command palette")],
       [T("drag"), T("between lists: enable, disable, stage; within Enabled: reorder")], [T("right click"), T("what you can do with it")],
     ];
