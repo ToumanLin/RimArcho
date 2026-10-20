@@ -3,6 +3,7 @@ package app
 import (
 	"crypto/sha1"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -218,6 +219,10 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				Subjects:    []string{"pkg:" + e.Missing},
 				Claim:       fmt.Sprintf("pkg:%s in the Loadout matches no installed mod (kept in ModsConfig.xml)", e.Missing),
 				Suggestions: []string{"archo find " + e.Missing, "archo disable pkg:" + e.Missing}})
+			if w, ok := a.WorkshopFor(e.Missing); ok {
+				f := out[len(out)-1]
+				f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+w.WorkshopID)
+			}
 			continue
 		}
 		m := st.Ix.ByID[e.Instance]
@@ -244,6 +249,19 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 
 	for _, m := range active {
 		d := m.Decl()
+		// Use This Instead (10 §5): the community knows a maintained replacement for this game version.
+		if r := a.ReplacementFor(m.WorkshopID(), m.PackageID); r != nil && r.NewPackageID != m.PackageID && (len(r.NewVersions) == 0 || slices.Contains(r.NewVersions, mm)) {
+			f := &finding.Finding{Code: "mod.replaced", Severity: finding.Warning, Key: r.NewWorkshopID, Subjects: []string{inst(m.ID)},
+				Claim:    fmt.Sprintf("%s has a replacement for %s: %s by %s", inst(m.ID), mm, r.NewName, r.NewAuthor),
+				Evidence: []finding.Evidence{{Source: finding.Inferred, Ref: "replacements.json", Text: fmt.Sprintf("Use This Instead: ws:%s → ws:%s", r.OldWorkshopID, r.NewWorkshopID)}}}
+			if ins := installed[r.NewPackageID]; len(ins) > 0 {
+				f.Subjects = append(f.Subjects, inst(ins[0].ID))
+				f.Suggestions = []string{"archo disable " + inst(m.ID), "archo enable " + inst(ins[0].ID)}
+			} else if r.NewWorkshopID != "" {
+				f.Suggestions = []string{"subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=" + r.NewWorkshopID}
+			}
+			add(f)
+		}
 		if why := whyNotLoadable(st, m); why != "" {
 			add(&finding.Finding{Code: "mod.unloadable", Severity: finding.Error, Key: "active", Subjects: []string{inst(m.ID)},
 				Claim:       fmt.Sprintf("%s is enabled but the game will not load it: %s", inst(m.ID), why),
@@ -284,6 +302,10 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				f.Claim = fmt.Sprintf("%s requires the %s DLC (pkg:%s), which is not installed", inst(m.ID), name, p)
 			case dep.url != "":
 				f.Suggestions = append(f.Suggestions, "subscribe: "+dep.url)
+			default:
+				if w, ok := a.WorkshopFor(p); ok { // steamDB (10 §5): a direct link
+					f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+w.WorkshopID)
+				}
 			}
 			if ws := workshopID(dep.url); ws != "" {
 				f.Suggestions = append(f.Suggestions, "steam://url/CommunityFilePage/"+ws)

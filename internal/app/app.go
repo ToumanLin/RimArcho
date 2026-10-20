@@ -77,6 +77,8 @@ type App struct {
 	SteamCollectionAPI string
 	analyzing          *pendingAnalysis
 
+	dataIdx *dataIndex // community data indexes (10 §5), loaded on first use
+
 	ixCache *Index
 	ixKey   string
 	stCache *LoadoutState

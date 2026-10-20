@@ -187,9 +187,26 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			add(Need{rank: 3, Group: GroupList, Text: Tf("%s is enabled twice", nm(x)), Actions: []Action{keepOne(st, ids)}, Counted: true, Mods: ids, Status: s})
 		case "entry.missing":
 			pkg := strings.TrimPrefix(x, "pkg:")
+			look := Action{Kind: ActOpenURL, Key: "o", Label: T("look for it in the Workshop"), URL: WorkshopSearch(pkg), Done: T("opened the Workshop page")}
+			for _, sg := range p.Suggestions {
+				if u, ok := strings.CutPrefix(sg, "subscribe: "); ok { // steamDB knows the item (10 §5)
+					look.Label, look.URL = T("open it in the Workshop"), u
+				}
+			}
 			add(Need{rank: 4, Group: GroupList, Text: Tf("the list has %s, but it is not installed", pkg),
-				Actions: []Action{{Kind: ActOpenURL, Key: "o", Label: T("look for it in the Workshop"), URL: WorkshopSearch(pkg), Done: T("opened the Workshop page")},
-					disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s})
+				Actions: []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s})
+		case "mod.replaced":
+			name := y
+			if mt := replacedRe.FindStringSubmatch(p.Claim); mt != nil {
+				name = mt[1]
+			} else if y != "" {
+				name = nm(y)
+			}
+			acts := []Action{workshop(p, name)}
+			if y != "" {
+				acts = []Action{enable(st, y), disable(st, x, Tf("disable %s", nm(x)))}
+			}
+			add(Need{rank: 5, Group: GroupList, Text: Tf("%s has a maintained replacement: %s", nm(x), name), Actions: acts, Counted: true, Mods: ids, Status: s})
 		case "mod.unloadable":
 			add(Need{rank: 4, Group: GroupList, Text: Tf("%s is enabled, but the game cannot load it", nm(x)), Actions: []Action{disable(st, x, T("disable it"))}, Counted: true, Mods: ids, Status: s})
 		case "dep.missing":
@@ -549,6 +566,8 @@ func TokRef(st *app.LoadoutState, tok string) string {
 	}
 	return tok
 }
+
+var replacedRe = regexp.MustCompile(`has a replacement for [^:]+: (.+) by `)
 
 var depNameRe = regexp.MustCompile(`requires (?:the )?(.+?)(?: DLC)? \(pkg:`)
 
