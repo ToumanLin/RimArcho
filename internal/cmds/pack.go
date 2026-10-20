@@ -93,7 +93,11 @@ func packListCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		if !p.LastPlayed.IsZero() {
 			played = "played " + c.App.FormatDate(p.LastPlayed)
 		}
-		root.Addf("%s  %d mods  %s  %s  built %s  %s", p.Name, len(p.Entries), kind, p.Game, c.App.FormatDate(p.Created), played)
+		where := ""
+		if p.Env != "" {
+			where = "  env " + p.Env
+		}
+		root.Addf("%s  %d mods  %s  %s%s  built %s  %s", p.Name, len(p.Entries), kind, p.Game, where, c.App.FormatDate(p.Created), played)
 	}
 	if len(ps) == 0 {
 		d.AddNext("archo pack build <name>")

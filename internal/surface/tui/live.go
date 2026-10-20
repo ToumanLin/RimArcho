@@ -46,13 +46,4 @@ func liveKey(l *view.Live) string {
 }
 
 // liveText is the top bar's "game running since 14:05 · 3 errors" ("" when not running).
-func (m *model) liveText() string {
-	l := m.live
-	if l == nil || !l.Running {
-		return ""
-	}
-	if l.Errors > 0 {
-		return Tf("game running since %s · %d errors", l.Since, l.Errors)
-	}
-	return Tf("game running since %s", l.Since)
-}
+func (m *model) liveText() string { return view.LiveText(m.live) }

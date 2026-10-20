@@ -44,10 +44,37 @@ func gameProcess(gameRoot string) *GameRun {
 		if windows.GetProcessTimes(h, &c, &x, &k, &u) == nil {
 			started = time.Unix(0, c.Nanoseconds())
 		}
+		cmdline, known := processCommandLine(h)
 		windows.CloseHandle(h)
 		if exe != "" && strings.HasPrefix(env.PathKey(filepath.Dir(exe)), root) {
-			return &GameRun{PID: int(pe.ProcessID), Exe: exe, Started: started}
+			r := &GameRun{PID: int(pe.ProcessID), Exe: exe, Started: started, ArgsKnown: known}
+			if known {
+				r.SaveData = SaveDataArg(cmdline)
+			}
+			return r
 		}
 	}
 	return nil
+}
+
+// processCommandLine reads a process's command line (Windows 8.1 and later allow it with
+// PROCESS_QUERY_LIMITED_INFORMATION); ok is false when it cannot be read.
+func processCommandLine(h windows.Handle) (string, bool) {
+	buf := make([]byte, 4096)
+	for i := 0; i < 3; i++ {
+		var n uint32
+		err := windows.NtQueryInformationProcess(h, windows.ProcessCommandLineInformation, unsafe.Pointer(&buf[0]), uint32(len(buf)), &n)
+		if err == nil {
+			us := (*windows.NTUnicodeString)(unsafe.Pointer(&buf[0]))
+			if us.Buffer == nil || us.Length == 0 {
+				return "", true
+			}
+			return windows.UTF16ToString(unsafe.Slice(us.Buffer, us.Length/2)), true
+		}
+		if n <= uint32(len(buf)) {
+			return "", false
+		}
+		buf = make([]byte, n)
+	}
+	return "", false
 }

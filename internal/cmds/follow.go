@@ -22,7 +22,9 @@ func logFollow(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	path := a.Str("file")
 	if path == "" {
-		if path, _ = c.App.LogPaths(st); path == "" {
+		// a running pack writes its own log on 1.7: follow the one the running game writes
+		run, _ := c.App.GameRunning()
+		if path = c.App.RunLog(st, c.App.WhatRuns(st.Ix.Env, run)); path == "" {
 			return nil, fmt.Errorf("no Player.log found under %s (archo log --follow --file <path>)", st.Ix.Env.UserDataRoot)
 		}
 	}

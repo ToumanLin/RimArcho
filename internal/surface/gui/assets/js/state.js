@@ -79,4 +79,18 @@ export function named(its) {
   return S.start && S.start.lang === "zh" ? `${its.length} 个 Mod` : `${its.length} mods`;
 }
 
+// slideThumb moves a switch's raised thumb under its open choice (magpie's view switch):
+// it slides from where it was instead of jumping. None open: it fades out.
+export function slideThumb(box, on) {
+  const th = box && box.querySelector(":scope > .thumb");
+  if (!th) return;
+  if (!on) { th.style.opacity = "0"; return; }
+  const first = !th.style.width;
+  if (first) th.style.transition = "none";
+  th.style.opacity = "1";
+  th.style.transform = `translateX(${on.offsetLeft}px)`;
+  th.style.width = on.offsetWidth + "px";
+  if (first) requestAnimationFrame(() => { th.style.transition = ""; });
+}
+
 export { api, T, Tf };

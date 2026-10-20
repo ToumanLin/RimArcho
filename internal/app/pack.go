@@ -301,6 +301,34 @@ func dirSize(dir string) int64 {
 
 // ---- list ----
 
+// PacksOf lists the packs of an environment (10 §8): built in it, or — for a pack from
+// another machine whose environment does not exist here — built for its game version.
+// others counts the packs that belong to other environments.
+func (a *App) PacksOf(e *env.Environment) (mine []*PackInfo, others int, err error) {
+	all, err := a.Packs()
+	if err != nil {
+		return nil, 0, err
+	}
+	known := map[string]bool{}
+	if envs, err := a.Store.Envs(); err == nil {
+		for _, x := range envs {
+			known[x.Name] = true
+		}
+	}
+	for _, p := range all {
+		ok := p.Env == e.Name
+		if !ok && !known[p.Env] {
+			ok = env.MajorMinor(p.Game) == env.MajorMinor(e.GameVersion)
+		}
+		if ok {
+			mine = append(mine, p)
+		} else {
+			others++
+		}
+	}
+	return mine, others, nil
+}
+
 // PackInfo is a pack in the list.
 type PackInfo struct {
 	*Pack

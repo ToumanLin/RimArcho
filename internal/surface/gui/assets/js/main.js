@@ -6,7 +6,7 @@
 //   4. the hint line lists what you can do with the object now;
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
-import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
+import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS, slideThumb } from "./state.js";
 import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory } from "./lists.js";
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
@@ -56,10 +56,8 @@ function renderTop() {
   $("#needs").textContent = b.needs ? String(b.needs) : "";
   $("#needs").title = b.needs ? Tf("%d to handle", b.needs) : T("nothing to handle");
   $("#unsaved").textContent = b.unsaved ? Tf("%d not saved", b.unsaved) : "";
-  const r = $("#btn-rescan");
-  if (!r.firstChild) r.innerHTML = icon.rescan;
-  r.title = T("rescan the mod folders") + " · R";
-  r.classList.toggle("spin", !!S.busy.scan);
+  $("#env").classList.toggle("on", S.screen === "env");
+  $("#env").title = T("environment") + " · E";
   $("#btn-sort").textContent = T("sort");
   $("#btn-save").textContent = T("save");
   $("#btn-launch").textContent = T("launch") + " ▶";
@@ -77,12 +75,18 @@ const TABS = [
 
 function renderTabs() {
   const on = !S.screen || S.screen === "full" ? "board" : S.screen;
+  let cur = null;
   for (const b of $$("#tabs .tab")) {
     b.classList.toggle("on", b.dataset.tab === on);
+    if (b.dataset.tab === on) cur = b;
     const t = TABS.find((x) => x.id === b.dataset.tab);
     $(".lbl", b).textContent = T(t.label);
   }
+  $("#env").classList.toggle("on", S.screen === "env");
+  slideThumb($("#tabs"), cur);
 }
+
+
 
 function goTab(i) {
   const t = TABS[i];
@@ -97,6 +101,7 @@ function renderWhere() {
   let s = "";
   const page = TABS.find((t) => t.id === S.screen);
   if (S.screen === "logs") s = scr.logsWhere();
+  else if (S.screen === "env") s = T("environment");
   else if (page) s = T(page.label);
   else if (S.screen === "full") {
     const it = cur(lastList);
@@ -310,14 +315,15 @@ async function preview(what) {
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { needs: () => scr.needs(), logs: () => scr.logs(), changes: () => scr.logs(1), log: () => scr.logs(0), settings: () => scr.settings(), packs: () => scr.packs() };
+  const pages = { needs: () => scr.needs(), logs: () => scr.logs(), changes: () => scr.logs(1), log: () => scr.logs(0), settings: () => scr.settings(), packs: () => scr.packs(), "env-page": () => scr.environment() };
   if (pages[id]) return pages[id]();
-  scr.closeScreen();
+  // the list's own actions show the list; the rest work on any page
+  if (["sort", "save", "launch", "filter", "details", "tech", "tags"].includes(id)) scr.closeScreen();
   switch (id) {
     case "sort": case "save": case "launch": return preview(id);
     case "undo": case "redo": case "restore-all": case "keep-official": return verb(id);
     case "rescan":
-      if (await api.Scan()) { S.busy.scan = true; say("busy", T("scanning…")); renderTop(); }
+      if (await api.Scan()) { S.busy.scan = true; say("busy", T("scanning…")); scr.busyChanged(); }
       return;
     case "analyze":
       if (await api.Analyze()) { S.busy.analyze = true; say("busy", T("checking the mods' files…")); }
@@ -555,15 +561,17 @@ async function start() {
   wireSplits();
   document.addEventListener("keydown", onKey);
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? scr.needs() : verb(v); });
-  $("#env").onclick = () => chooseEnv();
+  $("#env").onclick = () => (S.screen === "env" ? goTab(0) : cmd("env-page"));
   $$("#tabs .tab").forEach((b, i) => { b.onclick = () => goTab(i); });
-  for (const b of $$("#top [data-cmd]")) b.onclick = () => (b.dataset.cmd === "rescan" ? cmd("rescan") : preview(b.dataset.cmd));
+  for (const b of $$("#listbar [data-cmd]")) b.onclick = () => preview(b.dataset.cmd);
+  addEventListener("resize", () => renderTabs());
   $(".detail .scroll").addEventListener("scroll", () => { if (S.focus === 3) renderWhere(); }, { passive: true });
   $(".detail").addEventListener("mousedown", () => focusArea(3));
   on("scan", async (ev) => {
     S.busy.scan = false;
     say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
     await reload();
+    scr.busyChanged();
   });
   on("analyze", async (ev) => {
     if (ev.line) { S.busy.analyze = true; say("busy", T("checking the mods' files…") + " " + ev.line); return; }
@@ -606,7 +614,8 @@ async function pollLive() {
     S.live = l;
     const b = $("#live");
     b.hidden = !l.running;
-    b.textContent = l.running ? (l.errors ? Tf("game running since %s · %d errors", l.since, l.errors) : Tf("game running since %s", l.since)) : "";
+    b.textContent = l.running ? (l.pack ? Tf("pack %s running since %s", l.pack, l.since) : Tf("game running since %s", l.since)) + (l.errors ? " · " + Tf("%d errors", l.errors) : "") : "";
+    b.title = l.guess ? T("which list runs is taken from the launch records") : "";
     b.onclick = () => cmd("needs");
     if (JSON.stringify(l.items) !== before) scr.liveChanged();
   } catch { /* the next poll tries again */ }

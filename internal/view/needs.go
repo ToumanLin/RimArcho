@@ -108,6 +108,9 @@ type Needs struct {
 	Count  int            `json:"count"`  // the top bar's number
 	Never  bool           `json:"never"`  // the mods' files were never checked
 	Stale  bool           `json:"stale"`  // the files changed since the last check
+	// LastRun says which run wrote the last-run log: "the list · 9 月 29 日 19:41" or
+	// "pack X · …" (10 §8.3: a pack's errors are not the list's).
+	LastRun string `json:"lastRun,omitempty"`
 }
 
 // BuildNeeds turns the problem set and the environment's open questions into items, and
@@ -120,6 +123,18 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		return n
 	}
 	n.Items = buildItems(a, st, ps)
+	for _, r := range ps.Logs {
+		if r.Stale() || r.ModTime.IsZero() {
+			continue
+		}
+		when := ShortDate(r.ModTime) + " " + r.ModTime.In(a.Loc).Format("15:04")
+		if pack := a.RunOfLog(st.Ix.Env.ID, r.ModTime); pack != "" {
+			n.LastRun = Tf("pack %s", pack) + " · " + when
+		} else {
+			n.LastRun = T("the list") + " · " + when
+		}
+		break
+	}
 	// The number in the top bar is the number of items the player can act on, and a row
 	// carries an icon exactly when its mod is in one of them (06 §3, §4.2).
 	for _, it := range n.Items {

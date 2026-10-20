@@ -39,12 +39,41 @@ type SettingGroup struct {
 
 func mbText(n int64) string { return fmt.Sprintf("%.1f MB", float64(n)/(1<<20)) }
 
-// SettingsPage builds the settings page for the current environment.
-func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
+// EnvRow is an environment on the environment page.
+type EnvRow struct {
+	Name    string `json:"name"`
+	Game    string `json:"game"` // "1.6.4633 · D:\…\RimWorld"
+	Current bool   `json:"current"`
+}
+
+// EnvPage is the environment page: the environments, and the current one's folders and
+// launch (what belongs to an environment rather than to RimArcho, 10 §7).
+type EnvPage struct {
+	Envs   []EnvRow       `json:"envs"`
+	Groups []SettingGroup `json:"groups"`
+}
+
+// BuildEnvPage builds the environment page.
+func BuildEnvPage(a *app.App, st *app.LoadoutState) *EnvPage {
+	p := &EnvPage{Groups: EnvGroups(a, st)}
+	cur := ""
+	if st != nil {
+		cur = st.Ix.Env.ID
+	}
+	if envs, err := a.Store.Envs(); err == nil {
+		for _, e := range envs {
+			p.Envs = append(p.Envs, EnvRow{Name: e.Name, Game: e.GameVersion + " · " + e.GameRoot, Current: e.ID == cur})
+		}
+	}
+	return p
+}
+
+// EnvGroups are the current environment's folders and launch settings.
+func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	var out []SettingGroup
 	if st != nil {
 		e := st.Ix.Env
-		g := SettingGroup{Title: T("environment") + " · " + e.Name}
+		g := SettingGroup{Title: T("folders")}
 		g.Items = append(g.Items,
 			SettingItem{Label: T("game folder"), Value: e.GameRoot, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"},
 				Note: T("RimArcho checks that the mods are still the same before it moves them over")},
@@ -70,6 +99,13 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 				Note: T("for example -popupwindow")},
 		}})
 	}
+	return out
+}
+
+// SettingsPage builds the settings page: what is RimArcho's, for every environment (the
+// environment's own folders and launch are on the environment page).
+func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
+	var out []SettingGroup
 	lang := cmds.Setting(a, "ui.lang")
 	out = append(out, SettingGroup{Title: T("interface"), Items: []SettingItem{
 		{Label: T("language"), Value: lang, Edit: "choice", Choices: []string{"auto", "zh", "en"}, Argv: []string{"config", "set", "ui.lang", "{}"}},

@@ -65,7 +65,7 @@ kbd { font: 11px var(--font); color: var(--faint); margin-left: 6px; }
 .ok { color: var(--green); } .warn { color: var(--amber); } .err { color: var(--red); } .log { color: var(--log); }
 svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 
-#app { display: grid; grid-template-rows: 46px 1fr 30px; height: 100%; }
+#app { display: grid; grid-template-rows: 46px auto 1fr 30px; height: 100%; }
 
 /* ---- header: the environment, the pages (shift+1–5), the list's actions ---- */
 #top { position: relative; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 14px; min-width: 0; }
@@ -74,11 +74,15 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 #top .side.right { flex: 1 1 0; justify-content: flex-end; gap: 2px; }
 .pill { height: 24px; display: inline-flex; align-items: center; background: var(--pill); color: var(--fg-2); border-radius: 999px; padding: 0 11px; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background .12s; }
 .pill:hover { background: var(--pill-hover); color: var(--fg); }
-#tabs { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; flex: none; }
-.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; }
+.pill.on { background: var(--accent-soft); color: var(--accent); }
+#tabs { position: relative; display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; flex: none; }
+.seg { position: relative; display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; }
+/* the open view's raised thumb slides between the choices (slideThumb) */
+#tabs > .thumb, .seg > .thumb { position: absolute; top: 2px; bottom: 2px; left: 0; width: 0; border-radius: 6px; background: var(--seg-thumb); box-shadow: var(--seg-edge); opacity: 0; pointer-events: none;
+  transition: transform .28s var(--ease), width .28s var(--ease), opacity .15s; will-change: transform; }
 .tab, .seg button { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 12px; border-radius: 6px; font-size: 12.5px; color: var(--ctl-fg); white-space: nowrap; transition: color .18s var(--ease), background .18s var(--ease); }
 .tab:hover:not(.on), .seg button:hover:not(.on) { color: var(--fg-2); }
-.tab.on, .seg button.on { color: var(--fg); background: var(--seg-thumb); box-shadow: var(--seg-edge); }
+.tab.on, .seg button.on { color: var(--fg); }
 .seg.sub { background: color-mix(in srgb, var(--fg) 4%, transparent); }
 .seg.sub button { height: 24px; }
 .tab .count { font-size: 10.5px; font-weight: 600; line-height: 16px; min-width: 16px; padding: 0 5px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); font-variant-numeric: tabular-nums; }
@@ -102,6 +106,15 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .btn.small { height: 22px; padding: 0 8px; font-size: 11.5px; }
 .btn kbd { margin-left: 6px; }
 .btn.primary kbd { color: inherit; opacity: .6; }
+.btn:disabled { opacity: .6; pointer-events: none; }
+.btn .ic { display: inline-flex; margin-right: 5px; }
+.btn .ic.spin svg { animation: spin .9s linear infinite; }
+
+/* the Mod list's own actions: sort, save, launch (they act on the enabled list) */
+#listbar { display: flex; align-items: center; gap: 4px; padding: 0 14px 8px; min-height: 34px; }
+#listbar .btn { border: 1px solid var(--line); background: var(--card); color: var(--fg-2); }
+#listbar .btn:hover { border-color: var(--muted); color: var(--fg); }
+#listbar .btn.primary { color: var(--accent-fg); background: var(--accent); border-color: transparent; font-weight: 500; }
 
 /* ---- the board: four cards (06 §5, §13.3) ---- */
 #board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 8px var(--c2, .8fr) 8px var(--c3, 1.4fr); }
@@ -182,10 +195,21 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 
 /* ---- pages (the tabs): a head, then cards; centred within 1200px like magpie's ---- */
 #screen { position: absolute; inset: 46px 0 30px 0; background: var(--bg); overflow-y: auto; z-index: 10; }
-.page { padding: 4px max(16px, calc(50% - 600px)) 24px; display: flex; flex-direction: column; gap: 10px; animation: view-in .24s var(--ease); }
+.page { padding: 4px max(16px, calc(50% - 600px)) 24px; display: flex; flex-direction: column; gap: 10px; }
+/* a new page fades in; a redraw of the page shown does not (no slide: it shook the scrollbars) */
+.page.enter { animation: view-in .16s ease-out; }
 .page.fill { height: 100%; min-height: 0; padding-bottom: 8px; }
-@keyframes view-in { from { opacity: 0; transform: translateY(5px); } }
-@media (prefers-reduced-motion: reduce) { .page { animation: none; } }
+@keyframes view-in { from { opacity: 0; } }
+.head-right { display: flex; align-items: center; gap: 8px; }
+.note { padding: 0 4px; font-size: 12px; }
+.envrow { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 14px; }
+.envrow + .envrow { border-top: 1px solid var(--line-2); }
+.envrow .l { flex: 1; min-width: 0; }
+.envrow .name { font-weight: 500; }
+.envrow .sub { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.envrow.on .name { color: var(--accent); }
+.chip.cur { color: var(--accent); background: var(--accent-soft); margin: 0; }
+@media (prefers-reduced-motion: reduce) { .page.enter, #tabs > .thumb, .seg > .thumb { animation: none; transition: none; } }
 .page-head { display: flex; gap: 10px; align-items: center; min-height: 34px; flex-wrap: wrap; }
 .page-head h2 { font-size: 15px; margin: 0 6px 0 0; font-weight: 600; letter-spacing: -.01em; }
 .subbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
@@ -272,10 +296,11 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 #hints .sep { color: var(--faint); margin: 0 6px; }
 
 /* ---- popups (06 §13.2 rule 5) and the context menu: magpie's popovers ---- */
-#popup { position: absolute; inset: 0; z-index: 20; background: rgba(0, 0, 0, .28); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; animation: fade .15s ease-out; }
+#popup { position: absolute; inset: 0; z-index: 20; background: rgba(0, 0, 0, .28); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; animation: fade .12s ease-out; }
 @keyframes fade { from { opacity: 0; } }
-.pop { width: min(620px, 92vw); background: var(--pop-bg); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; animation: pop-in .38s cubic-bezier(.16, 1, .3, 1); }
-@keyframes pop-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
+/* no backdrop blur: WebView2 repaints it on every frame of a scroll behind it */
+.pop { width: min(620px, 92vw); background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; animation: pop-in .18s ease-out; }
+@keyframes pop-in { from { opacity: 0; transform: scale(.98); } }
 .pop .ttl { padding: 12px 16px 0; color: var(--muted); font-size: 12px; }
 .pop .in { display: flex; gap: 8px; padding: 0 14px; height: 42px; border-bottom: 1px solid var(--line-2); align-items: center; }
 .pop .in .pr { color: var(--accent); }
@@ -291,7 +316,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .chips .c:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .chips .c.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .chips .c .h { color: var(--accent); margin-right: 3px; }
-#menu { position: fixed; z-index: 25; background: var(--pop-bg); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 4px; min-width: 200px; display: grid; gap: 1px; animation: pop-in .3s cubic-bezier(.16, 1, .3, 1); }
+#menu { position: fixed; z-index: 25; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 4px; min-width: 200px; display: grid; gap: 1px; animation: pop-in .14s ease-out; }
 #menu button { display: flex; align-items: center; width: 100%; height: 28px; padding: 0 8px; border-radius: 7px; gap: 18px; font-size: 12.5px; }
 #menu button:hover { background: var(--pill); }
 #menu button .key { margin-left: auto; font-size: 11px; color: var(--faint); }

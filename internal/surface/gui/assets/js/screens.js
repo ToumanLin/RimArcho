@@ -1,7 +1,8 @@
 // The pages over the board (the top bar's tabs): 需要处理 (06 §7), 日志 (the game log, mod
 // changes 06 §4.1, the manager's actions 08 §14), the full detail (§6.3), packs and
 // settings. esc returns to the mod list; the tab shows where you are.
-import { S, $, el, api, T, Tf, errText, say, cur } from "./state.js";
+import { S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
+import { icon } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { onHistory } from "./lists.js";
 import * as pop from "./popups.js";
@@ -11,7 +12,12 @@ export function initScreens(u) { ui = u; }
 
 const GROUPS = ["this list", "missing dependencies", "conflicts", "last run", "needs your answer", "hidden mods", "this run"];
 
+// fresh: the next page built is a new page (not a redraw of the one shown); only a new page
+// fades in, so a redraw after an action or a sub-view switch does not flicker.
+let fresh = false;
+
 function openScreen(name) {
+  fresh = S.screen !== name;
   S.screen = name;
   const sc = $("#screen");
   sc.hidden = false;
@@ -33,7 +39,8 @@ export function closeScreen() {
 
 // page builds a page: a head (title, then what sits right of it) and a body.
 function page(cls, title, ...right) {
-  const w = el("div", "page " + cls);
+  const w = el("div", "page " + cls + (fresh ? " enter" : ""));
+  fresh = false;
   const head = el("div", "page-head");
   head.append(el("h2", "", title));
   for (const r of right) if (r) head.append(r);
@@ -51,13 +58,23 @@ function button(label, keyName, run, cls = "") {
 // seg is a small view switch (magpie's): one button per choice, the chosen one raised.
 function seg(names, on, pick, keys) {
   const s = el("div", "seg sub");
+  s.append(el("span", "thumb"));
   names.forEach((n, i) => {
     const b = el("button", i === on ? "on" : "", n);
     if (keys) b.title = keys[i];
     b.onclick = () => pick(i);
     s.append(b);
   });
+  requestAnimationFrame(() => setSeg(s, on));
   return s;
+}
+
+// setSeg opens choice i of a switch already on the page: its thumb slides there.
+function setSeg(s, i) {
+  if (!s) return;
+  const bs = [...s.querySelectorAll(":scope > button")];
+  bs.forEach((b, j) => b.classList.toggle("on", j === i));
+  slideThumb(s, bs[i]);
 }
 
 // moveIn moves a cursor kept as an index in [0, n).
@@ -76,7 +93,7 @@ function moveIn(curIdx, n, k) {
 // last run's log) and what needs your call (identity questions, hidden mods).
 const NCOLS = [
   { title: "list", groups: [0, 1, 2] },
-  { title: "the game", groups: [6, 3] },
+  { title: "game log", groups: [6, 3] },
   { title: "your call", groups: [4, 5] },
 ];
 const N = { data: null, cols: [[], [], []], col: 0, cur: [0, 0, 0], open: new Set(), els: [[], [], []] };
@@ -126,7 +143,11 @@ function drawNeeds() {
     N.cols[ci].forEach((it, i) => {
       if (it.group !== g && c.groups.length > 1) {
         g = it.group;
-        scroll.append(el("div", "group", T(GROUPS[g])));
+        // which run the log is from: the list, or a pack (10 §8.3)
+        let t = T(GROUPS[g]);
+        if (g === 3 && d.lastRun) t += " · " + d.lastRun;
+        if (g === 6 && S.live && S.live.pack) t += " · " + Tf("pack %s", S.live.pack);
+        scroll.append(el("div", "group", t));
       }
       const row = needRow(it, ci, i);
       N.els[ci][i] = row;
@@ -246,24 +267,35 @@ export async function logs(sub = L.sub) {
 // changes is the palette's and c's "recent changes".
 export function changesPage() { return logs(1); }
 
+// logsPage keeps the page's head (its switch slides between the three views) and gives a
+// fresh body below it.
 function logsPage(...right) {
-  const sc = S.screen === "logs" ? $("#screen") : openScreen("logs");
-  sc.innerHTML = "";
-  const w = page("logs fill", T("logs"), seg(SUBS.map((s) => T(s)), L.sub, (i) => logs(i), ["1", "2", "3"]), el("span", "grow"), ...right);
-  sc.append(w);
+  let w = S.screen === "logs" ? $("#screen .page.logs") : null;
+  if (!w) {
+    const sc = openScreen("logs");
+    w = page("logs fill", T("logs"), seg(SUBS.map((s) => T(s)), L.sub, (i) => logs(i), ["1", "2", "3"]), el("span", "grow"), el("span", "head-right"));
+    sc.append(w);
+  } else {
+    while (w.children.length > 1) w.lastChild.remove();
+    setSeg($(".page-head .seg", w), L.sub);
+  }
+  const hr = $(".page-head .head-right", w);
+  hr.innerHTML = "";
+  for (const r of right) if (r) hr.append(r);
   ui.renderWhere();
   return w;
 }
 
 async function gameLog(path = L.path) {
   const n = ++L.seq;
-  // The page shows at once; the log is read behind it (a new log takes a moment).
-  if (!L.page || L.page.path !== path || !path) {
-    L.loading = true;
-    drawGameLog();
-  }
+  // What was read before shows at once and is replaced when the new read is in; a log not
+  // read yet says so only if it takes a moment (no flash of a loading line).
+  let slow = 0;
+  if (L.page && L.page.path && (L.page.path === path || !path)) drawGameLog();
+  else slow = setTimeout(() => { if (n === L.seq) { L.loading = true; drawGameLog(); } }, 150);
   let p;
   try { p = await api.LogPage(path || ""); } catch (e) { L.loading = false; if (n === L.seq) { say("fail", errText(e)); drawGameLog(); } return; }
+  clearTimeout(slow);
   if (n !== L.seq) return;
   if (p.pending) {
     // the mods are being analysed for the log's game version: look again shortly
@@ -276,8 +308,10 @@ async function gameLog(path = L.path) {
     return;
   }
   L.pending = "";
+  const same = L.page && !L.loading && JSON.stringify(L.page) === JSON.stringify(p);
   if (!L.page || L.page.path !== p.path) L.cur = 0;
   L.page = p;
+  if (same) return;
   L.path = p.path;
   L.loading = false;
   if (S.screen === "logs" && L.sub === 0) drawGameLog();
@@ -369,8 +403,24 @@ async function changes() {
   drawChanges();
 }
 
+function rescanButton() {
+  const b = button(S.busy.scan ? T("scanning…") : T("rescan the mod folders"), "R", () => ui.cmd("rescan"));
+  b.classList.add("rescan");
+  b.prepend(el("span", "ic" + (S.busy.scan ? " spin" : "")));
+  b.firstChild.innerHTML = icon.rescan;
+  b.disabled = !!S.busy.scan;
+  return b;
+}
+
+// busyChanged redraws what shows the scan's state (the rescan buttons) and, after a scan,
+// the pages that show what it found.
+export function busyChanged() {
+  if (S.screen === "env") return environment();
+  if (S.screen === "logs" && L.sub === 1) return changes();
+}
+
 function drawChanges() {
-  const w = logsPage();
+  const w = logsPage(rescanButton());
   const scroll = el("div", "scroll page-scroll");
   w.append(scroll);
   if (!C.scans.length) { scroll.append(el("div", "card empty-state", T("no scan yet (R scans)"))); return; }
@@ -539,18 +589,29 @@ export async function settings() {
   sc.innerHTML = "";
   const w = page("settings", T("settings"));
   sc.append(w);
-  const run = async (argv, value, after) => {
+  renderGroups(w, groups, settings);
+  sc.scrollTop = top;
+}
+
+// settingRunner runs a setting's command, then redraws the page with again.
+function settingRunner(again) {
+  return async (argv, value, after) => {
     try {
       const out = await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
     } catch (e) { say("fail", errText(e)); }
     if (after) return after();
     await ui.reload();
-    settings();
+    again();
   };
+}
+
+// renderGroups draws setting groups (view.SettingGroup) as labelled cards.
+function renderGroups(w, groups, again) {
+  const run = settingRunner(again);
   for (const g of groups) {
     w.append(el("div", "label section", g.title));
-    const card = el("section", "card");
+    const card = el("section", "card settings");
     for (const it of g.items || []) {
       const row = el("div", "set");
       const left = el("div", "l");
@@ -586,6 +647,39 @@ export async function settings() {
     }
     w.append(card);
   }
+}
+
+// ---- the environment (the pill on the left of the top bar) ----
+// Everything here belongs to one game installation: which one is in use, its folders, how
+// it is started, and rescanning its mod folders.
+
+export async function environment() {
+  let p;
+  try { p = await api.Environment(); } catch (e) { say("fail", errText(e)); return; }
+  const sc = S.screen === "env" ? $("#screen") : openScreen("env");
+  const top = sc.scrollTop;
+  sc.innerHTML = "";
+  const w = page("env", T("environment"), el("span", "grow"), rescanButton());
+  sc.append(w);
+  const card = el("section", "card");
+  for (const e of p.envs || []) {
+    const row = el("div", "envrow" + (e.current ? " on" : ""));
+    const l = el("div", "l");
+    l.append(el("div", "name", e.name), el("div", "sub", e.game));
+    row.append(l);
+    if (e.current) row.append(el("span", "chip cur", T("in use")));
+    else {
+      row.append(button(T("use this one"), "", async () => {
+        try { say("ok", await api.UseEnv(e.name)); } catch (err) { say("fail", errText(err)); }
+        for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
+        await ui.reload();
+        environment();
+      }));
+    }
+    card.append(row);
+  }
+  w.append(card);
+  renderGroups(w, p.groups || [], environment);
   sc.scrollTop = top;
 }
 
@@ -593,8 +687,8 @@ export async function settings() {
 // The packs like versions in a game launcher: play one, or build one from the current list.
 
 export async function packs() {
-  let rows;
-  try { rows = (await api.Packs()) || []; } catch (e) { say("fail", errText(e)); return; }
+  let rows, others = 0;
+  try { const l = await api.Packs(); rows = (l && l.rows) || []; others = (l && l.others) || 0; } catch (e) { say("fail", errText(e)); return; }
   const sc = S.screen === "packs" ? $("#screen") : openScreen("packs");
   sc.innerHTML = "";
   const name = el("input", "field");
@@ -637,4 +731,5 @@ export async function packs() {
     card.append(row);
   }
   w.append(card);
+  if (others) w.append(el("div", "muted note", Tf("%d packs belong to other environments; switch the environment to see them", others)));
 }

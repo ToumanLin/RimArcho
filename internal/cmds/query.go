@@ -751,7 +751,14 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	}
 	root.KV("loadout", line)
 	if run, _ := c.App.GameRunning(); run != nil {
-		root.KV("game", fmt.Sprintf("running for %s (pid %d; archo log --follow)", c.App.Now().Sub(run.Started).Round(time.Minute), run.PID))
+		what := "the list"
+		if w := c.App.WhatRuns(st.Ix.Env, run); w.Pack != "" {
+			what = "pack " + w.Pack
+			if w.Guess {
+				what += " (from the launch records)"
+			}
+		}
+		root.KV("game", fmt.Sprintf("running %s for %s (pid %d; archo log --follow)", what, c.App.Now().Sub(run.Started).Round(time.Minute), run.PID))
 	}
 	for _, n := range st.Notices {
 		root.KV("notice", n)

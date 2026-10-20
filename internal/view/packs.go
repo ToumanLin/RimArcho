@@ -18,13 +18,16 @@ type PackRow struct {
 	Light  bool   `json:"light,omitempty"`
 }
 
-// PackRows lists the packs.
-func PackRows(a *app.App) ([]PackRow, error) {
-	ps, err := a.Packs()
+// PackRows lists the current environment's packs; others counts the other environments'.
+func PackRows(a *app.App) (out []PackRow, others int, err error) {
+	e, err := a.Env()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	var out []PackRow
+	ps, others, err := a.PacksOf(e)
+	if err != nil {
+		return nil, 0, err
+	}
 	for _, p := range ps {
 		size := mbText(p.Bytes)
 		if p.Light {
@@ -36,7 +39,7 @@ func PackRows(a *app.App) ([]PackRow, error) {
 		}
 		out = append(out, r)
 	}
-	return out, nil
+	return out, others, nil
 }
 
 // PackPreview is what building a pack from the current list would do.

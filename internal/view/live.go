@@ -17,13 +17,18 @@ type Live struct {
 	Since   string `json:"since,omitempty"` // HH:MM
 	Errors  int    `json:"errors"`
 	Items   []Need `json:"items"`
+	// Pack is the pack the game plays ("" for the environment's list); Guess: taken from
+	// the launch records because the game's command line could not be read.
+	Pack  string `json:"pack,omitempty"`
+	Guess bool   `json:"guess,omitempty"`
 }
 
 // LiveTracker follows the game's log while it runs: start when it starts, stop when it exits
 // (the last-run group then takes over from the full analysis).
 type LiveTracker struct {
-	lv  *app.LiveLog
-	pid int
+	lv   *app.LiveLog
+	pid  int
+	what app.RunWhat
 }
 
 // Update checks the game and reads what its log gained.
@@ -40,16 +45,18 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 		return &Live{}, nil
 	}
 	if t.lv == nil || t.pid != run.PID {
-		path, _ := a.LogPaths(st)
+		// a pack run writes its own log on 1.7 (10 §8.3): follow the one this run writes
+		t.what = a.WhatRuns(st.Ix.Env, run)
+		path := a.RunLog(st, t.what)
 		if path == "" {
-			return &Live{Running: true, Since: run.Started.In(a.Loc).Format("15:04")}, nil
+			return &Live{Running: true, Since: run.Started.In(a.Loc).Format("15:04"), Pack: t.what.Pack, Guess: t.what.Guess}, nil
 		}
 		t.lv, t.pid = a.FollowLog(path, a.CompanionLog(st)), run.PID
 	}
 	if _, err := t.lv.Poll(a); err != nil {
 		return nil, err
 	}
-	l := &Live{Running: true, Since: run.Started.In(a.Loc).Format("15:04")}
+	l := &Live{Running: true, Since: run.Started.In(a.Loc).Format("15:04"), Pack: t.what.Pack, Guess: t.what.Guess}
 	l.Items = LiveNeeds(st, t.lv.Clusters())
 	l.Errors = len(l.Items)
 	return l, nil
@@ -81,4 +88,20 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 			Actions: []Action{{Kind: ActList, Key: "enter", Label: T("see the log and evidence"), Title: T("this run"), Lines: lines}}})
 	}
 	return out
+}
+
+// LiveText is the top bar's "game running since 14:05 · 3 errors", naming the pack when a
+// pack is played ("" when the game is not running).
+func LiveText(l *Live) string {
+	if l == nil || !l.Running {
+		return ""
+	}
+	s := Tf("game running since %s", l.Since)
+	if l.Pack != "" {
+		s = Tf("pack %s running since %s", l.Pack, l.Since)
+	}
+	if l.Errors > 0 {
+		s += " · " + Tf("%d errors", l.Errors)
+	}
+	return s
 }

@@ -93,9 +93,12 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		// The packs as text (10 §8); build and play them with the commands shown.
 		return func(m *model) tea.Cmd {
 			var b strings.Builder
-			rows, err := view.PackRows(m.app)
+			rows, others, err := view.PackRows(m.app)
 			if err != nil {
 				b.WriteString(err.Error() + "\n")
+			}
+			if others > 0 {
+				b.WriteString(Tf("%d packs belong to other environments (archo pack list)", others) + "\n\n")
 			}
 			for _, r := range rows {
 				fmt.Fprintf(&b, "%s\n  %s · %s\n  : archo pack launch %q\n\n", r.Name, r.Facts, r.Played, r.Name)
@@ -111,7 +114,7 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		// The settings page as text (10 §7); each value says the command that changes it.
 		return func(m *model) tea.Cmd {
 			var b strings.Builder
-			for _, g := range view.SettingsPage(m.app, m.st) {
+			for _, g := range append(view.EnvGroups(m.app, m.st), view.SettingsPage(m.app, m.st)...) {
 				b.WriteString(g.Title + "\n")
 				for _, it := range g.Items {
 					fmt.Fprintf(&b, "  %s: %s\n", it.Label, it.Value)

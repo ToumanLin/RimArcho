@@ -132,11 +132,18 @@ func (s *API) boardLocked() *Board {
 }
 
 // Stamp is the database state; the page asks on focus and reloads when it changed (G8).
-// Packs lists the packs (10 §8).
-func (s *API) Packs() ([]view.PackRow, error) {
+// PackList is the environment's packs and how many belong to other environments.
+type PackList struct {
+	Rows   []view.PackRow `json:"rows"`
+	Others int            `json:"others"`
+}
+
+// Packs lists the current environment's packs (10 §8).
+func (s *API) Packs() (*PackList, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return view.PackRows(s.a)
+	rows, others, err := view.PackRows(s.a)
+	return &PackList{Rows: rows, Others: others}, err
 }
 
 // PackPreview is a dry-run build of the current list as a pack.
@@ -181,6 +188,14 @@ func (s *API) Settings() []view.SettingGroup {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return view.SettingsPage(s.a, s.boardState())
+}
+
+// Environment is the environment page: the environments, the current one's folders and
+// launch.
+func (s *API) Environment() *view.EnvPage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.BuildEnvPage(s.a, s.boardState())
 }
 
 // ApplySetting runs one of the settings page's commands, with value in place of {}.

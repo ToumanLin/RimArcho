@@ -12,9 +12,9 @@
   <header id="top">
     <div class="side left">
       <button id="env" class="pill" title="E"></button>
-      <span id="live" class="badge live" hidden></span>
     </div>
     <nav id="tabs">
+      <span class="thumb"></span>
       <button class="tab" data-tab="board" title="Shift+1"><span class="lbl"></span></button>
       <button class="tab" data-tab="needs" title="Shift+2"><span class="lbl"></span><span id="needs" class="count"></span></button>
       <button class="tab" data-tab="logs" title="Shift+3"><span class="lbl"></span></button>
@@ -22,14 +22,16 @@
       <button class="tab" data-tab="settings" title="Shift+5"><span class="lbl"></span></button>
     </nav>
     <div class="side right">
-      <span id="unsaved" class="badge quiet"></span>
-      <button id="btn-rescan" class="icon" data-cmd="rescan" title="R"></button>
-      <span class="vsep"></span>
-      <button id="btn-sort" class="btn" data-cmd="sort" title="S"></button>
-      <button id="btn-save" class="btn" data-cmd="save" title="w"></button>
-      <button id="btn-launch" class="btn primary" data-cmd="launch" title="L"></button>
+      <span id="live" class="badge live" hidden></span>
     </div>
   </header>
+  <div id="listbar">
+    <span id="unsaved" class="badge quiet"></span>
+    <span class="grow"></span>
+    <button id="btn-sort" class="btn" data-cmd="sort" title="S"></button>
+    <button id="btn-save" class="btn" data-cmd="save" title="w"></button>
+    <button id="btn-launch" class="btn primary" data-cmd="launch" title="L"></button>
+  </div>
   <main id="board">
     <section class="area list" data-area="0"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
     <div class="split" data-split="0"></div>

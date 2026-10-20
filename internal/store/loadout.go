@@ -328,3 +328,15 @@ func (s *Store) AllAliases(envID string) (map[string][]Alias, error) {
 	}
 	return out, rows.Err()
 }
+
+// LaunchBefore returns the newest launch at or before t: its method ("steam", "direct",
+// "pack:<name>") and time; "" when there is none.
+func (s *Store) LaunchBefore(envID string, t time.Time) (string, time.Time) {
+	var m sql.NullString
+	var at sql.NullInt64
+	s.DB.QueryRow(`SELECT method, started_at FROM launch WHERE environment_id=? AND started_at<=? ORDER BY started_at DESC, rowid DESC LIMIT 1`, envID, t.Unix()).Scan(&m, &at)
+	if !m.Valid || !at.Valid {
+		return "", time.Time{}
+	}
+	return m.String, time.Unix(at.Int64, 0).UTC()
+}

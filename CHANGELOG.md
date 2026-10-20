@@ -64,6 +64,24 @@ Spec: `docs/specs/10-1.0实现.md`.
   background instead of holding the window for seconds.
 - 需要处理 is three columns (the list · the game · your call); ←→ between them. Moving the
   cursor no longer rebuilds the page.
+- The top bar holds only what applies everywhere: the environment and the tabs (and the
+  running game). Sort, save and launch sit in a bar above the lists, since they act on the
+  enabled list; packs have their own Play.
+- The environment pill opens an environment page: the environments (switch there), this
+  one's folders and launch method, and rescanning its mod folders. Settings keeps only what
+  is RimArcho's (language, community data, database, caches, packs folder).
+- Packs belong to the environment they were built in (a pack from another machine: to an
+  environment of its game version); the packs page and the TUI say how many belong to
+  others, `pack list` shows each pack's environment.
+- A running game is told apart: its `-savedatafolder` (read from the process's command
+  line) says whether a pack or the environment's list is playing; when the command line
+  cannot be read, the launch records decide. The live log follows the log that run writes,
+  the top bar says "整合包 X 运行中", `archo status` names it, and 需要处理's last-run group
+  says whether the log came from the list or a pack. Its column is now called 游戏日志.
+- Smoother pages: a new page fades in once (no slide that shook the scrollbars), a redraw or
+  a sub-view switch does not animate, the tabs and sub-tabs have a sliding thumb, the game
+  log shows what it read before at once and a loading line only after 150 ms, popups have no
+  backdrop blur.
 - `T` in the window keeps only Core and the DLCs enabled, in one undo step (also in the
   palette of both interfaces; put-all-back from staging stays in the palette).
 - The Enabled list's position column is as wide as its longest number.
