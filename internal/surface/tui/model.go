@@ -96,18 +96,19 @@ type model struct {
 	w, h int
 	tab  int
 
-	envName  string
-	gameVer  string
-	st       *app.LoadoutState
-	loadErr  error
-	cols     [3]column
-	focus    colKind
-	marked   map[string]bool
-	editing  bool // typing a filter
-	unsaved  int
-	changes  int
-	question int
-	missing  int
+	envName    string
+	gameVer    string
+	st         *app.LoadoutState
+	loadErr    error
+	cols       [3]column
+	focus      colKind
+	marked     map[string]bool
+	editing    bool // typing a filter
+	unsaved    int
+	changes    int
+	lastEvents map[string]int // the last scan's events by kind
+	question   int
+	missing    int
 
 	idleSeq    int
 	detailRef  string

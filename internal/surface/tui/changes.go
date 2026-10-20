@@ -7,23 +7,21 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Changes view (06 §5): open identity questions pinned on top (s same · c copy · u
-// unrelated), an external ModsConfig.xml change (L load into the workspace · I ignore),
-// then the change events of the last scans, newest first, grouped by event type; enter
-// shows the semantic files an event changed.
+// Changes (06 §4.1): after a scan the status line says what changed in one sentence, and c
+// lists the changes of the last scans in words, newest first; enter shows the files an
+// update changed. Questions that need the player's answer and an outside change of the
+// list are items of 需要处理 (06 §7), not rows here.
 
 const changeScans = 10 // scans shown
 
 type chRow struct {
 	text  string
 	style int // 1 header, 2 dim
-	q     *store.Question
 	ev    *store.Event
-	conf  int // ModsConfig.xml conflict version
 	child bool
 }
 
@@ -43,22 +41,6 @@ func (m *model) loadChanges() {
 		return
 	}
 	ix := m.st.Ix
-	label := func(id string) string {
-		if x := ix.ByID[id]; x != nil {
-			return ix.Ref(id) + " " + x.DisplayName()
-		}
-		return ix.Ref(id)
-	}
-	if qs, err := m.app.Store.Questions(ix.Env.ID, false); err == nil && len(qs) > 0 {
-		c.rows = append(c.rows, chRow{text: Tf("identity questions %d — s same · c copy · u unrelated", len(qs)), style: 1})
-		for _, q := range qs {
-			c.rows = append(c.rows, chRow{q: q, text: fmt.Sprintf("q:%d  %s  ↔  %s  (%s %.2f)", q.ID, label(q.InstanceID), label(q.CandidateID), T("score"), q.Score)})
-		}
-	}
-	if n := m.st.WS.Conflict; n != 0 {
-		c.rows = append(c.rows, chRow{text: T("ModsConfig.xml"), style: 1},
-			chRow{conf: n, text: Tf("changed outside RimArcho, kept as v%d — L load into the workspace · I ignore", n)})
-	}
 	scans, err := m.app.Store.Scans(ix.Env.ID, changeScans)
 	if err != nil || len(scans) == 0 {
 		c.rows = append(c.rows, chRow{text: T("no scan yet (R scans)"), style: 2})
@@ -72,34 +54,31 @@ func (m *model) loadChanges() {
 	for _, e := range evs {
 		by[e.ScanID] = append(by[e.ScanID], e)
 	}
+	name := func(id string) string {
+		if x := ix.ByID[id]; x != nil {
+			return x.DisplayName()
+		}
+		return T("a removed mod")
+	}
 	for _, s := range scans {
 		es := by[s.ID]
 		counts := map[string]int{}
 		for _, e := range es {
 			counts[e.Kind]++
 		}
-		var parts []string
-		for k, n := range counts {
-			parts = append(parts, fmt.Sprintf("%d %s", n, k))
-		}
-		sort.Strings(parts)
-		sum := strings.Join(parts, ", ")
+		sum := changeSummary(counts)
 		if sum == "" {
-			sum = T("no changes")
+			sum = T("nothing changed")
 		}
-		c.rows = append(c.rows, chRow{text: fmt.Sprintf("scan:%d  %s  %s", s.ID, m.app.FormatTime(s.Started), sum), style: 1})
+		c.rows = append(c.rows, chRow{text: Tf("scan %s", m.app.FormatTime(s.Started)) + "  " + markDot + "  " + sum, style: 1})
 		sort.SliceStable(es, func(i, j int) bool {
 			if es[i].Kind != es[j].Kind {
-				return es[i].Kind < es[j].Kind
+				return kindOrder(es[i].Kind) < kindOrder(es[j].Kind)
 			}
-			return strings.ToLower(label(es[i].InstanceID)) < strings.ToLower(label(es[j].InstanceID))
+			return strings.ToLower(name(es[i].InstanceID)) < strings.ToLower(name(es[j].InstanceID))
 		})
 		for _, e := range es {
-			text := fmt.Sprintf("  %-14s %s", e.Kind, label(e.InstanceID))
-			if e.Detail != "" {
-				text += "  " + e.Detail
-			}
-			c.rows = append(c.rows, chRow{ev: e, text: text})
+			c.rows = append(c.rows, chRow{ev: e, text: "  " + name(e.InstanceID) + "  " + markDot + "  " + eventText(e.Kind)})
 			for _, f := range c.expanded[e.ID] {
 				c.rows = append(c.rows, chRow{text: "      " + f, style: 2, child: true})
 			}
@@ -113,8 +92,46 @@ func (m *model) loadChanges() {
 	}
 }
 
-// selectable rows are questions, the conflict and events.
-func (r chRow) selectable() bool { return r.q != nil || r.ev != nil || r.conf != 0 }
+// kindOrder puts what a player most wants to know first.
+func kindOrder(k string) int {
+	for i, x := range []string{identity.EvUpdated, identity.EvPackageIDChanged, identity.EvRenamed, identity.EvDiscovered,
+		identity.EvDisappeared, identity.EvReappeared, identity.EvDependencies, identity.EvLoadRules, identity.EvVersionSupport,
+		identity.EvAuthorChanged, identity.EvMoved, identity.EvCopied} {
+		if k == x {
+			return i
+		}
+	}
+	return 99
+}
+
+// changeSummary: "12 mods updated · 1 changed its package id" (06 §4.1).
+func changeSummary(counts map[string]int) string {
+	var kinds []string
+	for k := range counts {
+		kinds = append(kinds, k)
+	}
+	sort.Slice(kinds, func(i, j int) bool { return kindOrder(kinds[i]) < kindOrder(kinds[j]) })
+	var parts []string
+	for _, k := range kinds {
+		n := counts[k]
+		switch k {
+		case identity.EvUpdated:
+			parts = append(parts, Tf("%d mods updated", n))
+		case identity.EvDiscovered:
+			parts = append(parts, Tf("%d new mods", n))
+		case identity.EvDisappeared:
+			parts = append(parts, Tf("%d mods gone", n))
+		case identity.EvPackageIDChanged:
+			parts = append(parts, Tf("%d changed their package id", n))
+		default:
+			parts = append(parts, fmt.Sprintf("%d %s", n, eventText(k)))
+		}
+	}
+	return strings.Join(parts, " "+markDot+" ")
+}
+
+// selectable rows are the events.
+func (r chRow) selectable() bool { return r.ev != nil }
 
 func (c *chState) moveCursor(d int) {
 	for i := c.cursor + d; i >= 0 && i < len(c.rows); i += d {
@@ -128,7 +145,7 @@ func (c *chState) moveCursor(d int) {
 	}
 }
 
-// fileDiff lists the semantic files an event changed (06 §5: enter).
+// fileDiff lists the semantic files an event changed (enter).
 func (m *model) fileDiff(e *store.Event) []string {
 	if e.Before == 0 || e.After == 0 || e.Before == e.After {
 		return []string{T("(no file-level difference recorded for this event)")}
@@ -164,10 +181,6 @@ func (m *model) fileDiff(e *store.Event) []string {
 func (m *model) changesKey(s string) tea.Cmd {
 	c := &m.chg
 	page := max(m.h-4, 1)
-	var cur chRow
-	if c.cursor < len(c.rows) {
-		cur = c.rows[c.cursor]
-	}
 	switch s {
 	case "down", "j":
 		c.moveCursor(1)
@@ -182,41 +195,17 @@ func (m *model) changesKey(s string) tea.Cmd {
 			c.moveCursor(-1)
 		}
 	case "enter":
-		if cur.ev != nil {
-			if _, ok := c.expanded[cur.ev.ID]; ok {
-				delete(c.expanded, cur.ev.ID)
+		if c.cursor < len(c.rows) && c.rows[c.cursor].ev != nil {
+			ev := c.rows[c.cursor].ev
+			if _, ok := c.expanded[ev.ID]; ok {
+				delete(c.expanded, ev.ID)
 			} else {
-				c.expanded[cur.ev.ID] = m.fileDiff(cur.ev)
+				c.expanded[ev.ID] = m.fileDiff(ev)
 			}
 			m.loadChanges()
 		}
-	case "s", "c", "u":
-		if cur.q != nil {
-			ans := map[string]string{"s": "same", "c": "copy", "u": "unrelated"}[s]
-			m.confirmChange([]string{"identity", "resolve", fmt.Sprintf("q:%d", cur.q.ID), ans})
-		}
-	case "L":
-		if cur.conf != 0 {
-			m.confirmChange([]string{"loadout", "checkout", fmt.Sprintf("v%d", cur.conf)})
-		}
-	case "I":
-		if cur.conf != 0 {
-			if err := m.app.DismissConflict(); err != nil {
-				m.status = T("error: ") + err.Error()
-			} else {
-				m.status = T("external ModsConfig.xml version ignored (it stays in loadout log)")
-				m.reload()
-				m.loadChanges()
-			}
-		}
 	}
 	return nil
-}
-
-// confirmChange previews a command and runs it on y; the view reloads afterwards.
-func (m *model) confirmChange(argv []string) {
-	m.openPanel("archo "+strings.Join(argv, " "), T("run this command?"), argv)
-	m.afterPanel = func(m *model) { m.loadChanges() }
 }
 
 func (m *model) changeLines(n int) []string {
@@ -234,15 +223,13 @@ func (m *model) changeLines(n int) []string {
 		l := fit(r.text, m.w)
 		switch {
 		case i == c.cursor && r.selectable():
-			l = stSel.Render(l)
+			l = sSel.Render(l)
 		case r.style == 1:
-			l = stHeader.Render(l)
+			l = sDimS.Render(l)
 		case r.style == 2:
-			l = stDim.Render(l)
+			l = sDimS.Render(l)
 		}
 		out = append(out, l)
 	}
 	return out
 }
-
-var _ = cmds.ExitOK

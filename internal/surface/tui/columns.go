@@ -242,7 +242,7 @@ func (m *model) reload() {
 		m.question = len(qs)
 	}
 	if sc, ss, _ := m.app.LastScan(st.Ix.Env.ID); sc != nil && ss != nil {
-		m.changes = 0
+		m.changes, m.lastEvents = 0, ss.Events
 		for _, n := range ss.Events {
 			m.changes += n
 		}

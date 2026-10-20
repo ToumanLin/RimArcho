@@ -30,8 +30,8 @@ func (m *model) View() string {
 	case m.insp != nil:
 		content = m.inspectLines(body)
 	case m.tab == tabProblems:
-		m.problemCounts() // reloads the list when the database changed (a rule, an ignore)
-		content = m.problemLines(body)
+		m.problemCounts() // reloads the items when the database changed (an edit, a rule, an answer)
+		content = m.needLines(body)
 	case m.tab == tabChanges:
 		content = m.changeLines(body)
 	case m.full:
@@ -161,7 +161,7 @@ func (m *model) hintLine() string {
 	case m.full:
 		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}, {"1–5", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"r", T("refresh")}, {"i", T("technical information")}, {"tab", T("technical pages")}}
 	case m.tab == tabProblems:
-		pairs = [][2]string{{"esc", T("back")}, {"enter", T("expand")}, {"a", T("run the suggestion")}, {"i", T("ignore")}, {"l", T("choose a log")}, {"A", T("re-analyze")}}
+		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
 	case m.tab == tabChanges:
 		pairs = [][2]string{{"esc", T("back")}, {"enter", T("file changes")}}
 	default:

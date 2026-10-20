@@ -133,9 +133,9 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // scanSummary: "scan complete · 12 changes" (06 §4.1); the CLI line keeps the scan id.
 func (m *model) scanSummary(out string) string {
 	if m.changes > 0 {
-		return Tf("scan complete · %d changes · c shows them", m.changes)
+		return T("scan complete") + " " + markDot + " " + changeSummary(m.lastEvents) + " " + markDot + " " + T("c shows them")
 	}
-	return T("scan complete · nothing changed") + " (" + firstLine(out) + ")"
+	return T("scan complete · nothing changed")
 }
 
 func (m *model) key(k tea.KeyMsg) tea.Cmd {
@@ -194,10 +194,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		case "esc":
 			m.tab = tabList
 			return m.requestDetail()
-		case "l":
-			return m.chooseLog()
 		}
-		return m.problemsKey(s)
+		return m.needsKey(s)
 	case tabChanges:
 		if s == "esc" {
 			m.tab = tabList
@@ -322,21 +320,9 @@ func (m *model) listKey(s string) tea.Cmd {
 		}}
 		return nil
 	case "S":
-		out, code := m.run("sort", "--dry-run")
-		var confirm []string
-		if code == cmds.ExitOK && !strings.HasPrefix(out, "sort: 0 moved") {
-			confirm = []string{"sort"}
-		}
-		m.openPanel(T("sort — preview"), out, confirm)
-		return nil
+		return m.sortPreview()
 	case "w":
-		out, code := m.run("save", "--dry-run")
-		var confirm []string
-		if code == cmds.ExitOK {
-			confirm = []string{"save"}
-		}
-		m.openPanel(T("save to game — preview"), out, confirm)
-		return nil
+		return m.savePreview()
 	case "u":
 		m.act(T("undid the last change"), "undo")
 		return m.requestDetail()

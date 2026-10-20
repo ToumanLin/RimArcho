@@ -203,11 +203,12 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	keys(tm, "R")
 	waitFor(t, tm, "scan complete")
 	keys(tm, ":", "scan", "enter") // the command line also routes scans to the child
-	waitFor(t, tm, "scan:3")
+	time.Sleep(300 * time.Millisecond)
+	waitFor(t, tm, "nothing changed")
 	keys(tm, ":", "list --active", "enter")
 	waitFor(t, tm, "archo list --active")
 	keys(tm, "esc", "c")
-	waitAll(t, tm, "recent changes", "scan:3  2026-10-01 10:00  no changes")
+	waitAll(t, tm, "recent changes", "scan 2026-10-01 10:00", "nothing changed")
 	keys(tm, "esc")
 	m := finish(t, tm)
 	if *scans != 2 || m.tab != tabList {
@@ -469,10 +470,29 @@ func TestChineseUI(t *testing.T) {
 	}
 }
 
-func TestProblemsView(t *testing.T) {
+// needItems: the texts of the items of 需要处理.
+func needItems(m *model) []string {
+	var out []string
+	for _, it := range m.prob.items {
+		out = append(out, it.text)
+	}
+	return out
+}
+
+func findNeed(m *model, sub string) int {
+	for i, it := range m.prob.items {
+		if strings.Contains(it.text, sub) {
+			return i
+		}
+	}
+	return -1
+}
+
+// 06 §7: a cycle of order requirements is one item in "this list"; enter shows the
+// requirements in words and x ignores the suggested one; a dependency that is installed but
+// not enabled is one item in "missing dependencies" that space enables.
+func TestNeedsView(t *testing.T) {
 	e, scans := fixture(t)
-	// X and Y declare loadAfter each other: an order.cycle whose first suggestion is the
-	// ignore rule; Alpha's sample patch has no <value> and fails.
 	for _, p := range [][2]string{{"X", "tester.y"}, {"Y", "tester.x"}} {
 		m := testkit.Sample("tester."+strings.ToLower(p[0]), p[0])
 		dir := filepath.Join(e.Game, "Mods", p[0])
@@ -482,124 +502,155 @@ func TestProblemsView(t *testing.T) {
 	}
 	e.MustRun("scan")
 	e.MustRun("enable", "pkg:tester.x", "pkg:tester.y")
+	e.MustRun("disable", "pkg:brrainz.harmony")
 	tm := start(t, e, scans, 140, 40)
-	waitFor(t, tm, "Enabled 5")
+	waitFor(t, tm, "Enabled")
 	keys(tm, "!")
-	waitFor(t, tm, "patch.no-match")
-	time.Sleep(200 * time.Millisecond)
+	waitFor(t, tm, "contradict each other")
+	time.Sleep(300 * time.Millisecond)
 	fm := finish(t, tm)
-	ci := -1
-	for i, p := range fm.prob.list {
-		if p.Code == "order.cycle" {
-			ci = i
-		}
-	}
-	if ci < 0 {
-		t.Fatalf("no order.cycle in %d problems", len(fm.prob.list))
-	}
 	if fm.prob.never || fm.prob.stale {
 		t.Fatal("analysis did not complete")
 	}
-	// The rows of X and Y carry the error icon, and the top bar counts them.
-	if fm.needCount() == 0 {
-		t.Fatal("needs attention is 0")
+	ci, di := findNeed(fm, "the order requirements of 2 mods"), findNeed(fm, "Alpha needs Harmony, but Harmony is not enabled")
+	if ci < 0 || di < 0 {
+		t.Fatalf("items: %q", needItems(fm))
 	}
-	// Second session: the analysis is current; select the cycle, expand, a, y.
+	if fm.needCount() != countedNeeds(fm) || fm.needCount() == 0 {
+		t.Fatalf("top bar %d, counted items %d", fm.needCount(), countedNeeds(fm))
+	}
+	// Second session: x on the cycle, space on the dependency.
 	tm = start(t, e, scans, 140, 40)
-	waitFor(t, tm, "Enabled 5")
+	waitFor(t, tm, "Enabled")
 	keys(tm, "!")
-	waitFor(t, tm, "order.cycle")
+	waitFor(t, tm, "contradict each other")
 	for i := 0; i < ci; i++ {
 		keys(tm, "down")
 	}
 	keys(tm, "enter")
-	waitFor(t, tm, "[a] archo rule add ignore decl:")
-	keys(tm, "a")
-	waitFor(t, tm, "run this command?")
-	keys(tm, "y")
-	waitFor(t, tm, "r:1 added")
-	keys(tm, "i") // ignore whatever is under the cursor now
-	time.Sleep(200 * time.Millisecond)
-	keys(tm, "esc")
-	fm = finish(t, tm)
+	waitFor(t, tm, "wants to load after")
+	keys(tm, "esc", "x")
+	waitFor(t, tm, "ignored from now on")
+	keys(tm, "g")
+	time.Sleep(100 * time.Millisecond)
+	fm2 := finish(t, tm)
+	if findNeed(fm2, "contradict") >= 0 {
+		t.Fatalf("cycle still listed: %q", needItems(fm2))
+	}
 	if out := e.MustRun("rule", "list"); !strings.Contains(out, "ignore") {
 		t.Fatalf("rule not added: %s", out)
 	}
-	if fm.prob.ignored != 1 {
-		t.Fatalf("ignored = %d", fm.prob.ignored)
+	tm = start(t, e, scans, 140, 40)
+	waitFor(t, tm, "Enabled")
+	keys(tm, "!")
+	waitFor(t, tm, "is not enabled")
+	fm3 := finish(t, tm)
+	m := direct(t, e, 140, 40)
+	m.tab = tabProblems
+	m.loadProblems()
+	m.prob.cursor = findNeed(m, "Alpha needs Harmony")
+	if m.prob.cursor < 0 {
+		t.Fatalf("items: %q", needItems(fm3))
 	}
-	for _, p := range fm.prob.list {
-		if p.Code == "order.cycle" {
-			t.Fatal("cycle still reported after the ignore rule")
-		}
+	m.needsKey(" ")
+	if !strings.Contains(activeNames(t, e), "Harmony") {
+		t.Fatal("space did not enable Harmony")
+	}
+	if findNeed(m, "Alpha needs Harmony") >= 0 {
+		t.Fatal("item still listed after enabling")
 	}
 }
 
-// 06 §5: the Changes view groups the scan's events, enter shows the file diff, an external
-// ModsConfig.xml change offers load / ignore.
+func countedNeeds(m *model) int {
+	n := 0
+	for _, it := range m.prob.items {
+		if it.counted {
+			n++
+		}
+	}
+	return n
+}
+
+// 06 §4.1: changes are a sentence on the status line after a scan and the c view, in
+// words; an outside change of ModsConfig.xml is an item of 需要处理 with load / ignore.
 func TestChangesView(t *testing.T) {
 	e, scans := fixture(t)
 	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Defs", "ThingDefs", "beta.xml"), "<Defs><ThingDef><defName>beta_Changed</defName></ThingDef></Defs>\n")
 	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Patches", "new.xml"), "<Patch/>\n")
 	e.Advance(time.Hour)
-	e.MustRun("scan")
-	e.MustRun("enable", "pkg:tester.b")                                         // an unsaved edit …
-	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony") // … and an external change
 	tm := start(t, e, scans, 120, 30)
 	waitFor(t, tm, "Enabled")
+	keys(tm, "R")
+	waitFor(t, tm, "1 mods updated")
 	keys(tm, "c")
-	waitAll(t, tm, "L load into the workspace", "scan:2", "updated")
-	keys(tm, "down", "enter") // the conflict row is selected first; the updated event is next
+	waitAll(t, tm, "Beta", "updated")
+	keys(tm, "enter")
 	waitAll(t, tm, "~ defs/thingdefs/beta.xml", "+ patches/new.xml")
-	keys(tm, "up", "I") // back to the conflict row
-	waitFor(t, tm, "external ModsConfig.xml version ignored")
 	keys(tm, "esc")
-	m := finish(t, tm)
+	finish(t, tm)
+
+	e.MustRun("enable", "pkg:tester.b")                                         // an unsaved edit …
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony") // … and an outside change
+	m := direct(t, e, 120, 30)
+	m.tab = tabProblems
+	m.loadProblems()
+	i := findNeed(m, "changed outside RimArcho")
+	if i < 0 {
+		t.Fatalf("items: %q", needItems(m))
+	}
+	m.prob.cursor = i
+	m.needsKey("I")
 	st, _ := e.App.Loadout()
-	if st.WS.Conflict != 0 || m.tab != tabList {
-		t.Fatal("I did not dismiss the conflict")
+	if st.WS.Conflict != 0 || !strings.Contains(m.status, "ignored") {
+		t.Fatalf("I did not dismiss the conflict: %q", m.status)
+	}
+	m.loadProblems()
+	if findNeed(m, "changed outside") >= 0 {
+		t.Fatal("still listed")
 	}
 }
 
-// 06 §4 / 03 §6.3: log problems sit under one heading per log; a stale log is one folded,
-// dimmed row and its problems are not in the counts.
-func TestProblemsViewLogs(t *testing.T) {
+// 06 §7.1, §7.3: the current log's errors are one item per mod under "last run"; a stale
+// log is one dim row that is not counted.
+func TestNeedsLogs(t *testing.T) {
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	scans := new(int)
 	tm := start(t, e, scans, 160, 50)
 	keys(tm, "!")
-	waitAll(t, tm, "Player.log 1.6.4633", "current (4)", "log.harmony-stack")
+	waitFor(t, tm, "last run")
 	time.Sleep(200 * time.Millisecond)
 	fm := finish(t, tm)
-	logs := 0
-	for _, p := range fm.prob.list {
-		if p.Log != nil {
-			logs++
+	last := 0
+	for _, it := range fm.prob.items {
+		if it.group == gLastRun {
+			last++
+			if !it.counted || !strings.HasPrefix(it.text, "last run, ") {
+				t.Fatalf("log item %+v", it)
+			}
 		}
 	}
-	if logs != 4 || fm.prob.counts[0] != 3 {
-		t.Fatalf("current log: %d log rows, %d errors", logs, fm.prob.counts[0])
+	if last == 0 {
+		t.Fatalf("no log items: %q", needItems(fm))
 	}
 
 	e.Advance(time.Hour)
 	e.MustRun("disable", "pkg:tester.manual")
-	tm = start(t, e, scans, 160, 50)
-	keys(tm, "!")
-	waitAll(t, tm, "stale: older than the Loadout's last change (4)", "log.stale")
-	time.Sleep(200 * time.Millisecond)
-	fm = finish(t, tm)
-	logs = 0
-	for _, p := range fm.prob.list {
-		if p.Log != nil {
-			logs++
-			if p.Ref != staleLogRef {
-				t.Fatalf("stale log row not folded: %s", p.Ref)
+	m := direct(t, e, 160, 50)
+	m.tab = tabProblems
+	m.app.LazyLog, m.app.LogCacheOnly = false, false
+	m.loadProblems()
+	stale := 0
+	for _, it := range m.prob.items {
+		if it.group == gLastRun {
+			if it.counted || !strings.HasPrefix(it.text, "earlier log") {
+				t.Fatalf("stale log item %+v", it)
 			}
+			stale++
 		}
 	}
-	if logs != 1 || fm.prob.counts[0] != 1 {
-		t.Fatalf("stale log: %d log rows, %d errors", logs, fm.prob.counts[0])
+	if stale != 1 {
+		t.Fatalf("stale rows %d: %q", stale, needItems(m))
 	}
 }
 
