@@ -1,0 +1,131 @@
+Spike P0 — HugsLib log corpus feasibility (docs/research/00-日志语料顶层设计.md §10)
+Run: 2026-10-20, cloud session. Corpus: /home/user/rimarcho-corpus/hugslogs (outside the repo, 588 MB,
+raw logs + parsed.jsonl). Only aggregate numbers are recorded here.
+
+== Answers
+
+1. Bulk collection works, but only as a rolling window.
+   - Account: HugsLibRecordKeeper (default HugsLib uploads are public gists).
+   - The GitHub API is not usable from this environment (the session proxy only allows
+     repository-scoped API paths). The gist web listing + gist.githubusercontent.com raw content work.
+   - The listing serves at most 100 pages = the newest ~1,000 gists. That was 2.6 days
+     (2026-10-17 09:08 .. 2026-10-20 00:32), i.e. ~380 uploads per day. Ascending order only reaches
+     the 2016 end. Older logs can only come from links found elsewhere (Steam threads).
+   - Listing faster than ~1 page / 2 s gets HTTP 429 (Retry-After 120 s). 998 of 1,000 raw logs
+     downloaded; 2 were 404 (deleted).
+   => P1 needs a scheduled fetch at least once a day; the index is append-only, so runs resume.
+
+2. Format. Header sections are exactly as in HugsLib's LogPublisher: "Loaded mods:" (load order,
+   name(packageId)[mv:…]: assemblies), "Active Harmony patches:" (target: PRE/post/TRANS/FIN …),
+   "Harmony versions present:", "Platform information:" (dropped), "Log file contents:".
+   Two surprises:
+   - RimWorld 1.7 (runtime "Waylith", .NET 10) writes a different Player.log: every line is
+     "<date> <time> <LEVEL> [<category>] <message>", continuation lines can start at column 0, every
+     entry (warnings too) carries a stack whose leading frames are the logger (Brutal.Logging.*,
+     Verse.Log.*), and the "RimWorld x.y.z revN" line comes after line 50. internal/logs does not
+     handle this (no version; INFO lines become entries; warnings classify as exception). The spike
+     converts 1.7 logs to the Unity form (fromWaylith) and keeps the level per cluster. Product fix
+     recorded in docs/backlog.md.
+   - An unofficial publisher (m00nl1ght.UnofficialUpdates.HugsLogPublisher, 71 of 998 logs) omits
+     the "Log file contents:" line before a 1.7 log.
+
+3. Cleaning: 975 of 998 kept. Dropped: 16 version-out-of-scope (1.5), 7 empty-log (mod list only).
+   Version mix: 1.6 936, 1.7 39, 1.5 16. 34 of the 39 1.7 logs load the official HugsLib, so 1.7 is
+   rare because players are still on 1.6, not because the publisher fails => scope 1.6 main,
+   1.7 tracked separately.
+   12% of kept logs are truncated (10,000-line limit).
+
+4. Sessions (repeat uploads; same version, package-set Jaccard >= 0.9, <= 48 h apart): 135 sessions
+   cover 389 logs (40%). 254 consecutive pairs; 71 differ by 1-3 packages; in 51 of those at least
+   one error cluster disappeared. => repeat uploads are a real source of fix evidence (G5), even in
+   2.6 days. Caveat: a cluster can vanish for reasons other than the change (different save, menu
+   only, truncation); P1 must control for that.
+
+5. Packages: 14,290 distinct packageIds in 201,928 entries (median 150 mods per log, p95 521).
+   Top 100 cover 19% of entries, top 1,000 57%, top 3,000 80%. The tail is heavier than assumed in
+   §5 L2: a local mod library of a few hundred mods will not cover typical logs; G3/G4 need ~3,000
+   mods or must be limited to the mods they concern.
+
+6. Errors: every kept log has clusters (median 38, p95 739). Harmony section present in all kept
+   logs (median 2,047 patched methods).
+
+7. Thread route (B): Steam workshop discussion pages can be fetched; they contain HugsLib gist links
+   (inside steamcommunity.com/linkfilter redirects) and replies.
+
+== Cleaning problems found (to fix in P1)
+
+- "other" is the largest class (76k clusters in 925 logs). internal/logs' Interesting() keeps any
+  line with "failed", "missing", "not found" …, so status lines ("[XML Extensions] N total patch
+  operations run in Nms, N failed"), translation summaries, mod self-reports ([MeleeAnim] …,
+  GAGARIN …) count as errors. G1's coverage metric must be computed on a cleaned set.
+- Per-type messages do not merge ("Type X probably needs a StaticConstructorOnStartup attribute"
+  once per type; "[SafePatcher]The xPath … not found" once per def). G5 needs template-level
+  normalisation on top of internal/logs' cluster key.
+- 1.7 warnings with caller frames classify as exception (1,692 "WARN exception" clusters); use the
+  level.
+
+== Small-model enrichment pilot (R1)
+
+One Steam bug-report thread (7 reports) converted to text and given to one Haiku sub-agent with a
+fixed JSON schema (symptom, verbatim error text, replies, resolution_status, fix, implicated mods,
+evidence quote). Result: valid JSON; gist ids correctly decoded from linkfilter URLs; no invented
+error text; uncertain cases marked unclear. Problems, all in the pre-processing, not the model:
+- the HTML-to-text step cut replies at the first nested quote block, so the mod author's answers
+  were lost ("replied with only a quote");
+- the author of the mod was not given, so is_mod_author was always null — supply it from the page;
+- one naming overlap was labelled other_mod_conflict_identified: the label set needs definitions.
+=> For P1: robust thread extraction (quotes, pagination, developer badge), labels with written
+   definitions, schema validation, and a sampled manual check per batch (design §10 R2).
+
+== Raw statistics (go run ./spikes/hugslogs stats)
+
+== corpus
+indexed 1000, raw on disk 998, missing 2; parse 1m8.615s
+upload window: 2026-10-17T09:08:59Z .. 2026-10-20T00:32:26Z
+game versions (all parsed): 1.6 936, 1.7 39, 1.5 16
+log formats: unity 952, waylith 39
+== cleaning
+kept 975, dropped 23: version-out-of-scope 16, empty-log 7
+== content of kept logs (975)
+mods per log: min 2, p25 75, median 150, p75 272, p95 521, max 1192
+harmony-patched methods per log: min 2, p25 1174, median 2047, p75 3073, p95 5847, max 11217; logs with a Harmony section 975
+error clusters per log: min 0, p25 14, median 38, p75 119, p95 739, max 3405; logs with at least one cluster 972 (100%)
+truncated logs: 121 (12%)
+clusters by class: other 76154, xref-missing 32010, xml-load 21173, exception 15182, patch-failed 8299, harmony-stack 2720, material 203
+logs containing class: other 925, exception 732, xref-missing 687, xml-load 617, harmony-stack 513, patch-failed 418, material 173
+1.7 clusters by level and class: WARN exception 1692, ERROR exception 1034, ERROR xml-load 736, ERROR xref-missing 248, ERROR patch-failed 182, WARN xref-missing 22
+distinct cluster keys 63747; top 25 by number of logs:
+   391 logs  other         [XML Extensions] 17555 total patch operations run in 199805ms, 4 failed
+   339 logs  other         Shader 'Camera+/Bordered': fallback shader 'Diffuse' not found
+   325 logs  other         Translation data for language Simplified Chinese has 2332 errors. Generate translation report for more info.
+   292 logs  other         <color=#66ffb5>[MeleeAnim]</color> Skipping reporting of missing mod/weapons because user opted out or the feature is di
+   242 logs  other         Translation data for language English has 25 errors. Generate translation report for more info.
+   234 logs  xref-missing  Could not resolve cross-reference: No Verse.SoundDef named Pawn_Melee_Punch_HitBuilding found to give to Verse.RacePrope
+   141 logs  other         Verse.PatchOperationSequence: Error in the operation at position=5
+   128 logs  other         GAGARIN: <color=green>Cache not found or got purged!</color>
+   127 logs  exception     FileNotFoundException: Cannot resolve dependency to assembly 'UnityEngine.InputLegacyModule, Version=0.0.0.0, Culture=ne
+   114 logs  other         <color=#66ffb5>[MeleeAnim]</color> solaris.ratkinracemod 'NewRatkinPlus' has 5 missing weapon tweak data.
+   108 logs  material      Material 'Custom/MyShader/Beam_Lightning_Optimized_null' with Shader 'Custom/MyShader/Beam_Lightning_Optimized' doesn't 
+   102 logs  other         Failed to find Verse.TerrainDef named AncientHeavyBridge. There are 636 defs of this type loaded.
+   102 logs  other         Translation data for language Russian / Русский has 4680 errors. Generate translation report for more info.
+    95 logs  other         <color=#66ffb5>[MeleeAnim]</color> ancot.milirarace 'Milira Race' has 5 missing weapon tweak data.
+    89 logs  other         Could not resolve reference to object with loadID Lord_64 of type Verse.AI.Group.Lord. Was it compressed away, destroyed
+    87 logs  other         <color=#66ffb5>[MeleeAnim]</color> melondove.wolfeinrace 'Wolfein Race' has 15 missing weapon tweak data.
+    87 logs  other         Could not resolve reference to object with loadID Thing_Human3262543 of type Verse.Pawn. Was it compressed away, destroy
+    84 logs  other         TradingControl :: 23.3.24.18192  - 02 - LandingZoneCanBeUsed not found, skipping.
+    83 logs  other         <color=#66ffb5>[MeleeAnim]</color> ancot.kiirorace 'Kiiro Race' has 1 missing weapon tweak data.
+    82 logs  exception     System.Reflection.ReflectionTypeLoadException: Exception of type 'System.Reflection.ReflectionTypeLoadException' was thr
+    81 logs  other         Mod  is missing supported versions list in About.xml! (example: <supportedVersions><li>1.0</li></supportedVersions>)
+    78 logs  other         Loader exceptions:
+    78 logs  other         [SafePatcher]The xPath: "Defs/ThingDef[defName="VFES_Artillery_Weapon"]" not found
+    78 logs  other         [SafePatcher]The xPath: "Defs/ThingDef[defName="VFES_Gun_ChargeComplex"]" not found
+    78 logs  other         [SafePatcher]The xPath: "Defs/ThingDef[defName="VFES_Gun_HMGComplex"]" not found
+== packages
+distinct packageIds 14290, mod entries 201928
+  top 100 packages cover 19% of entries
+  top 300 packages cover 34% of entries
+  top 1000 packages cover 57% of entries
+  top 3000 packages cover 80% of entries
+== sessions (repeat uploads)
+sessions with 2+ uploads: 135, covering 389 logs (40%)
+consecutive pairs 254; with 1-3 package changes 71; of those, some cluster vanished 51
