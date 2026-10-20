@@ -131,7 +131,7 @@ var zhText = map[string]string{
 	"placed at position %s · m changes it": "已放在第 %s 位 · m 改位置", "%s are now at %d–%d": "%s 现在在第 %d–%d 位",
 	"position %d": "第 %d 位", "(position %d)": "（第 %d 位）", "(suggested)": "（建议位置）",
 	"after": "之后", "before": "之前", "first": "最前", "last": "最后", "move %s to": "移动 %s 到",
-	"before / after": "之前 / 之后", "a number or a name": "序号或名称", "type": "输入",
+	"before / after": "之前 / 之后", "previous page": "上一页",
 	"next list with matches": "下一个有匹配的区", "no other list has a match": "其他区没有匹配",
 	"other lists: ": "其他区：", "tab jumps to the next list with matches": "tab 跳到下一个匹配的区",
 	"clear the selection": "取消选择", "another list clears it": "换列表会取消选择",

@@ -170,7 +170,7 @@ func (m *model) hintLine() string {
 	case m.pal != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
 	case m.pos != nil:
-		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("move")}, {"tab", T("before / after")}, {T("a number or a name"), T("type")}, {"esc", T("close")}}
+		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("move")}, {"tab", T("before / after")}, {"esc", T("close")}}
 	case m.prompt != nil:
 		return sAccent.Render(markPrompt+" ") + sSecond.Render(m.prompt.label) + sText.Render(m.prompt.text+"_")
 	case m.editing:
@@ -184,7 +184,7 @@ func (m *model) hintLine() string {
 	case m.panel != nil:
 		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}}
 	case m.insp != nil:
-		pairs = [][2]string{{"esc", T("back")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
+		pairs = [][2]string{{"esc", T("back")}, {"backspace", T("previous page")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
 	case m.full:
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
 	case m.tab == tabProblems:
