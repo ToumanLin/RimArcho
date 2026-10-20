@@ -123,10 +123,18 @@ var zhText = map[string]string{
 	"technical information · i":                          "技术信息 · i 展开",
 	"technical information":                              "技术信息",
 	"no preview":                                         "无预览",
-	// picking (06 §12.2)
-	"done · %s · u undoes it all": "完成 · %s · 按 u 可全部撤销", "cancelled · the lists are as they were": "已取消 · 列表已恢复原样",
-	"picked: enter drops, esc cancels": "已拾取：enter 放下，esc 取消", "↑↓ move mods within Enabled only": "↑↓ 只能在“已启用”中调整位置",
-	"picked %d": "已拾取 %d 个", "pick": "拾取", "the terminal is too narrow for column widths": "终端太窄，无法调整列宽", "column widths reset": "列宽已恢复默认", "%s: long names wrap": "%s：长名称换行显示", "%s: long names are cut": "%s：长名称截断显示", "pick a range": "连续拾取", "position": "位置", "move to": "移到", "drop": "放下",
+	// v3 interaction (06 §13)
+	"the terminal is too narrow for column widths": "终端太窄，无法调整列宽", "column widths reset": "列宽已恢复默认", "%s: long names wrap": "%s：长名称换行显示", "%s: long names are cut": "%s：长名称截断显示",
+	"move to": "移到", "move to…": "移动到…", "enable at…": "启用到…", "position": "位置",
+	"the terminal is too narrow for the detail column · enter shows the details": "终端太窄，没有详情列 · 按 enter 查看详情",
+	" (%s)": "（%s）", "filtered": "已筛选", "selected %d": "已选 %d", "search": "搜索", "all keys": "全部按键",
+	"placed at position %s · m changes it": "已放在第 %s 位 · m 改位置", "%s are now at %d–%d": "%s 现在在第 %d–%d 位",
+	"position %d": "第 %d 位", "(position %d)": "（第 %d 位）", "(suggested)": "（建议位置）",
+	"after": "之后", "before": "之前", "first": "最前", "last": "最后", "move %s to": "移动 %s 到",
+	"before / after": "之前 / 之后", "previous page": "上一页",
+	"next list with matches": "下一个有匹配的区", "no other list has a match": "其他区没有匹配",
+	"other lists: ": "其他区：", "tab jumps to the next list with matches": "tab 跳到下一个匹配的区",
+	"clear the selection": "取消选择", "another list clears it": "换列表会取消选择",
 	// double press (06 §9)
 	"press %s again: %s": "再按一次 %s：%s",
 	"press L again to load it; your unsaved edits are replaced": "再按一次 L 载入；未保存的修改会被替换",
@@ -305,21 +313,22 @@ var zhText = map[string]string{
 	helpText: helpTextZh,
 }
 
-const helpTextZh = `四列（06 §5）
-  ↑↓ j k     移动光标         ←→ h l tab   切换列          [ ]   切换列表（窄终端）
-拾取（06 §12）：先拾取 Mod，再移动它们；整个过程只算一步撤销
-  space v    拾取 / 放下这一个        shift+↑↓  连续拾取        ctrl+↑↓  只移动光标
-  ctrl+space 加入或去掉一个           拾取后：↑↓ 移动（按住 shift 一次 10 格），←→ 移到相邻列表
-  #          标签                     enter 确认，esc 全部恢复
-  t          暂存 / 移出暂存          T     全部从暂存放回原位置
-  J K        上移 / 下移              m     移到第几个
-  S          自动排序（先看差异）     w     保存到游戏（先看差异）
-  u ctrl+r   撤销 / 重做              L     启动游戏
-  /          筛选这一列               < > =  列宽（= 恢复默认）   z  名称换行
-  enter      详情（全屏：←→ 上一个 / 下一个 Mod，tab 切换子区，I 技术页面）
-  在已启用或暂存列按 →：进入详情列（↑↓ 滚动，← 返回）    i  技术信息
-  !          需要处理                 c     最近变化
-  R          重新扫描                 E     切换环境
-  :          运行 archo 命令          ctrl+k 命令面板
-  ? 帮助   q 退出
-鼠标：点击移动光标；ctrl+点击再拾取一个；shift+点击连续拾取；拖动列间空隙调整列宽；滚轮滚动`
+const helpTextZh = `方向键只移动光标、焦点和滚动位置；改动东西的键立即生效，u 撤销
+焦点区     1 未启用  2 已启用  3 暂存  4 详情      ←→ 相邻的区    tab 依次经过所有区
+  ↑↓ j k   移动光标（详情区中滚动）    PgUp PgDn  在任何区滚动详情    g G  到顶 / 到底
+选择       shift+↑↓ 连续选择    ctrl+space（v）选中或取消一个    esc 取消选择（换到另一个列表也会取消）
+动作，作用于选中的 Mod，没有选中时作用于光标所在的 Mod：
+  space    启用（放到排序建议的位置）/ 停用 / 从暂存放回
+  t        放入暂存；在暂存区中放回原来的位置     T  全部从暂存放回原位置
+  m        移动到…：输入序号或 Mod 名（tab 切换之前 / 之后），直接 enter 移到建议位置
+  J K      下移 / 上移 1 位       alt+J alt+K  10 位
+  #        标签                   enter  全屏详情（←→ 上一个 / 下一个 Mod，tab 子区，I 技术页面）
+  o        工坊页面               i  技术信息     x  换成另一份副本    r  添加规则
+  S        自动排序（先看差异）   w  保存到游戏（先看差异）    L  启动游戏
+  u ctrl+r 撤销 / 重做
+/          搜索聚焦的列表；tab 跳到下一个有匹配的列表；esc 清除
+!          需要处理               c  最近变化     R  重新扫描     E  切换环境
+< > =      列宽（= 恢复默认）     z  名称换行    [ ]  切换列表（窄终端）
+ctrl+k     命令面板               :  运行 archo 命令      ?  本帮助    q  退出
+鼠标：点击移动光标；ctrl+点击选中或取消一个；shift+点击连续选择；
+滚轮滚动详情；拖动列间空隙调整列宽`

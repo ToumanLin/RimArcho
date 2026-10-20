@@ -317,14 +317,13 @@ func (m *model) columnLines(n int) ([]string, []placement) {
 		}
 		out[y] = b.String()
 	}
-	m.overlayHint(out, l)
 	return out, ps
 }
 
 // drawColumn returns n lines of exactly s.w cells: the title, then the rows.
 func (m *model) drawColumn(s slot, n int, tabs bool) []string {
 	c := &m.cols[s.kind]
-	focused := m.focus == s.kind
+	focused := m.focus == s.kind && !m.detailFocus // area 4 has the focus: no list is bright (06 §13.3)
 	out := make([]string, 0, n)
 	if tabs {
 		out = append(out, m.tabStrip(s.w))
@@ -391,8 +390,9 @@ func (m *model) columnTitle(c *column, focused bool, w int) string {
 	if focused {
 		st = sAccent
 	}
-	title := st.Render(fit(t, min(width.StringWidth(t), w)))
-	used := min(width.StringWidth(t), w)
+	num := fmt.Sprintf("%d ", int(c.kind)+1) // the area's number key (06 §13.3)
+	title := sDimS.Render(num) + st.Render(fit(t, min(width.StringWidth(t), w-2)))
+	used := 2 + min(width.StringWidth(t), w-2)
 	if c.filter != "" || (focused && m.editing) {
 		f := "  " + ic.search + " " + c.filter
 		if focused && m.editing {
@@ -410,7 +410,7 @@ func (m *model) tabStrip(w int) string {
 	var b strings.Builder
 	used := 0
 	for k := cInactive; k <= cStaging; k++ {
-		t := fmt.Sprintf(" %s %d ", k.title(), len(m.cols[k].items))
+		t := fmt.Sprintf(" %d %s %d ", int(k)+1, k.title(), len(m.cols[k].items))
 		tw := width.StringWidth(t)
 		if used+tw > w {
 			break
@@ -422,7 +422,7 @@ func (m *model) tabStrip(w int) string {
 		}
 		used += tw
 	}
-	hint := " [ ]"
+	hint := " [ ] 1 2 3"
 	if used+width.StringWidth(hint) <= w {
 		b.WriteString(sDimS.Render(hint))
 		used += width.StringWidth(hint)
@@ -441,27 +441,37 @@ func (m *model) drawRow(c *column, vi int, focused bool, w int) string {
 func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bool) []string {
 	it := &c.items[c.view[vi]]
 	isCur := vi == c.cursor
-	mark := "  "
-	picked := m.marked[it.id] && it.id != ""
+	// The focused area's cursor row has a faint background, so one place on the screen is
+	// the brightest (06 §13.3). Every piece of the row carries it.
+	bg := func(st lipgloss.Style) lipgloss.Style { return st }
 	if isCur && focused {
-		mark = sAccent.Render(markSel + " ")
+		bg = func(st lipgloss.Style) lipgloss.Style { return st.Background(cRowBg) }
 	}
-	if picked {
-		mark = sAccent.Render("▌ ") // 06 §12.2
+	pad := func(n int) string { return bg(plainStyle).Render(strings.Repeat(" ", max(n, 0))) }
+	mark := pad(2)
+	selected := m.marked[it.id] && it.id != ""
+	if isCur && focused {
+		mark = bg(sAccent).Render(markSel + " ")
+	}
+	if selected {
+		mark = bg(sAccent).Render("▌ ") // 06 §13.5
+		if isCur && focused {
+			mark = bg(sAccent).Render("▌" + markSel)
+		}
 	}
 	used := 2
 	var b strings.Builder
 	b.WriteString(mark)
 	if c.kind == cActive {
 		p := fmt.Sprintf("%4d  ", it.pos)
-		b.WriteString(sDimS.Render(p))
+		b.WriteString(bg(sDimS).Render(p))
 		used += len(p)
 	}
 	icon := it.icon
 	if icon == "" {
 		icon = " "
 	}
-	b.WriteString(sDimS.Render(icon) + "  ")
+	b.WriteString(bg(sDimS).Render(icon) + pad(2))
 	used += 3
 	st := m.rowStatus(it)
 	statusW := 2 // a space and the icon
@@ -492,16 +502,16 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 	switch {
 	case isCur && focused:
 		ns = sSel
-	case picked:
+	case selected:
 		ns = sText
 	case it.dim || it.missing:
 		ns = sDimS
 	case !focused && !isCur:
 		ns = sDimS
 	}
-	b.WriteString(ns.Render(nameText))
+	b.WriteString(bg(ns).Render(nameText))
 	if dot != "" {
-		b.WriteString(sAccent.Render(dot))
+		b.WriteString(bg(sAccent).Render(dot))
 	}
 	used += nw + width.StringWidth(dot)
 	// Tags: a faint suffix when the name leaves room (06 §5.6).
@@ -509,17 +519,17 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 		if avail := w - used - statusW; avail >= 6 {
 			t := "  " + strings.Join(it.tags, " ")
 			tw := min(width.StringWidth(t), avail)
-			b.WriteString(sDimS.Render(fit(t, tw)))
+			b.WriteString(bg(sDimS).Render(fit(t, tw)))
 			used += tw
 		}
 	}
-	b.WriteString(strings.Repeat(" ", max(w-used-statusW, 0)))
-	b.WriteString(" " + statusIcon(st))
+	b.WriteString(pad(w - used - statusW))
+	b.WriteString(pad(1) + bg(statusStyle(st)).Render(statusGlyph(st)))
 	lines := []string{b.String()}
 	pre := w - nameW - statusW // the cells before the name
 	for i, l := range more {
 		lead := strings.Repeat(" ", pre)
-		if picked {
+		if selected {
 			lead = sAccent.Render("▌") + strings.Repeat(" ", pre-1)
 		}
 		d := ""
@@ -536,17 +546,36 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 }
 
 func statusIcon(s int) string {
+	if s == statusNone {
+		return " "
+	}
+	return statusStyle(s).Render(statusGlyph(s))
+}
+
+func statusGlyph(s int) string {
 	switch s {
 	case statusErr:
-		return sErrS.Render(ic.err)
+		return ic.err
 	case statusLog:
-		return sErrS.Render(ic.logErr)
+		return ic.logErr
 	case statusWarn:
-		return sWarnS.Render(ic.warn)
+		return ic.warn
 	case statusUnloadable:
-		return sDimS.Render(ic.unloadable)
+		return ic.unloadable
 	}
 	return " "
+}
+
+func statusStyle(s int) lipgloss.Style {
+	switch s {
+	case statusErr, statusLog:
+		return sErrS
+	case statusWarn:
+		return sWarnS
+	case statusUnloadable:
+		return sDimS
+	}
+	return plainStyle
 }
 
 // fit truncates (with …) and pads s to exactly w cells.

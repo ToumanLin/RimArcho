@@ -184,10 +184,10 @@ func (m *model) paletteKey(k tea.KeyMsg) tea.Cmd {
 			return p.results[p.sel].run(m)
 		}
 		return nil
-	case tea.KeyUp, tea.KeyCtrlP:
+	case tea.KeyUp, tea.KeyLeft, tea.KeyCtrlP: // 06 §13.4: in a popup both pairs of arrows choose
 		p.sel = max(p.sel-1, 0)
 		return nil
-	case tea.KeyDown, tea.KeyCtrlN, tea.KeyTab:
+	case tea.KeyDown, tea.KeyRight, tea.KeyCtrlN, tea.KeyTab:
 		p.sel = min(p.sel+1, max(len(p.results)-1, 0))
 		return nil
 	case tea.KeyBackspace:

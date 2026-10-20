@@ -939,33 +939,26 @@ func (m *model) syncFullSec() {
 	}
 }
 
-// detailKey: the keys while the compact detail has the focus (06 §12.5); handled is false
-// for the keys it leaves to the list, which then has the focus again.
+// detailKey: the keys of area 4, the compact detail (06 §13.4): ↑↓ scroll it, ← and esc
+// go back to the list whose mod it shows. Verbs and the other keys work as in that list
+// (they act on the mod shown, or on the list's selection) and keep the focus here.
 func (m *model) detailKey(s string) (tea.Cmd, bool) {
-	page := max(m.rowsShown()-2, 1)
+	m.syncDetailOff()
 	switch s {
 	case "down", "j":
 		m.detailOff++
 	case "up", "k":
-		m.detailOff--
-	case "pgdown", " ":
-		m.detailOff += page
-	case "pgup":
-		m.detailOff -= page
+		m.detailOff = max(m.detailOff-1, 0)
 	case "home", "g":
 		m.detailOff = 0
 	case "end", "G":
 		m.detailOff = 1 << 30
 	case "left", "h", "esc":
 		m.detailFocus = false
-		return nil, true
-	case "i", "o", "r", "#", "enter":
-		return m.listKey(s), true // about the mod shown; the focus stays
+	case "right", "l", "shift+up", "shift+down":
 	default:
-		m.detailFocus = false
 		return nil, false
 	}
-	m.detailOff = max(m.detailOff, 0)
 	return nil, true
 }
 

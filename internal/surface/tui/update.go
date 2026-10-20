@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"time"
 
@@ -12,25 +11,25 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-const helpText = `four columns (06 §5)
-  ↑↓ j k     move            ←→ h l tab   switch column      [ ]   switch list (narrow)
-picking (06 §12): pick mods first, then move them; one undo step for it all
-  space v    pick / unpick          shift+↑↓  pick a range     ctrl+↑↓  cursor only
-  ctrl+space add or remove one      picked: ↑↓ move (shift: by 10), ←→ to the next list
-  #          tags                   enter keeps it, esc puts everything back
-  t          stage / unstage        T     put everything back from staging
-  J K        move up / down         m     move to a position
-  S          sort (preview first)   w     save to the game (preview first)
-  u ctrl+r   undo / redo            L     launch the game
-  /          filter this column     < > =  column width (= resets)   z  wrap names
-  enter      details (full screen: ←→ previous / next mod, tab sub-sections, I technical pages)
-  → on Enabled or Staging: the detail column (↑↓ scroll it, ← back)    i  technical information
-  !          needs attention        c     recent changes
-  R          rescan                 E     switch environment
-  :          run an archo command   ctrl+k command palette
-  ? help     q quit
-mouse: click moves the cursor; ctrl+click picks one more; shift+click picks a range;
-drag a column gap to resize it; the wheel scrolls`
+const helpText = `the arrows only move: the cursor, the focus, the scroll; keys that change things act at once, u undoes
+areas      1 Disabled  2 Enabled  3 Staging  4 detail      ←→ the next area    tab round all areas
+  ↑↓ j k   cursor (in the detail: scroll)    PgUp PgDn  scroll the detail from anywhere   g G  top / bottom
+selection  shift+↑↓ a range    ctrl+space (v) add or remove one    esc clear    (another list clears it)
+verbs, on the selection or else the cursor's mod:
+  space    enable where the order wants it / disable / put back from staging
+  t        stage; in Staging: put back where it was     T  put everything back from staging
+  m        move to…: a number, a mod's name (tab: before / after), enter alone = the suggested place
+  J K      move down / up one     alt+J alt+K  ten
+  #        tags                   enter  details full screen (←→ previous / next mod, tab sub-sections, I technical pages)
+  o        Workshop page          i  technical information     x  swap for another copy    r  add a rule
+  S        sort (preview first)   w  save to the game (preview first)    L  launch the game
+  u ctrl+r undo / redo
+/          search the focused list; tab takes it to the next list with matches; esc clears
+!          needs attention        c  recent changes     R  rescan     E  switch environment
+< > =      column width (= resets)    z  wrap names    [ ]  switch list (narrow)
+ctrl+k     command palette        :  run an archo command      ?  this help    q  quit
+mouse: click moves the cursor; ctrl+click adds or removes one; shift+click selects a range;
+the wheel scrolls the detail; drag a column gap to resize it`
 
 // idleAfter is how long the TUI waits without input before returning freed memory to the
 // OS, so the resident size stays near the live heap while idle (06 §8 T5).
@@ -153,9 +152,11 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		m.quitting = true
 		return tea.Quit
 	}
-	if m.prompt == nil && !m.editing {
+	if m.prompt == nil && !m.editing && m.pos == nil {
 		m.status, m.sayKind = "", sayNone // the status line lasts until the next key
 	}
+	placed := m.placed // "m changes it" holds for the next key only (06 §13.6)
+	m.placed = nil
 	if a := m.armed; a != nil {
 		m.armed = nil
 		if s == a.key || (a.key == "space" && s == " ") {
@@ -167,11 +168,13 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	switch {
 	case m.pal != nil:
 		return m.paletteKey(k)
-	case s == "ctrl+k" && m.prompt == nil && !m.editing:
-		m.panel, m.insp = nil, nil
+	case s == "ctrl+k" && m.prompt == nil && !m.editing && m.pos == nil:
+		m.panel, m.insp, m.tags = nil, nil, nil
 		return m.openPalette()
 	case m.tags != nil:
 		return m.tagBarKey(k)
+	case m.pos != nil:
+		return m.posKey(k)
 	case m.prompt != nil:
 		return m.promptKey(k)
 	case m.panel != nil:
@@ -188,7 +191,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		m.quitting = true
 		return tea.Quit
 	case "?":
-		m.openPanel(T("help"), T(helpText), nil)
+		m.openPanel(T("all keys"), T(helpText), nil)
 		return nil
 	case ":":
 		m.prompt = &prompt{label: T("archo command: "), submit: func(m *model, text string) tea.Cmd {
@@ -212,16 +215,6 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case "R":
 		return m.startScan()
 	}
-	if m.tab == tabList && m.detailFocus {
-		if cmd, ok := m.detailKey(s); ok {
-			return cmd
-		}
-	}
-	if m.tab == tabList {
-		if cmd, ok := m.pickKey(s); ok {
-			return cmd
-		}
-	}
 	switch m.tab {
 	case tabProblems:
 		switch s {
@@ -237,57 +230,65 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		}
 		return m.changesKey(s)
 	}
+	if m.detailFocus {
+		if cmd, ok := m.detailKey(s); ok {
+			return cmd
+		}
+	}
+	if s == "m" {
+		return m.openPos(placed)
+	}
 	return m.listKey(s)
 }
 
-// focusCycle: ←→ tab move between the list columns; staging is always reachable, also
-// when it is hidden (then it takes the first column's place, 06 §5.1).
-func (m *model) focusMove(d int) tea.Cmd {
-	m.focus = colKind((int(m.focus) + d + 3) % 3)
-	m.detailRef = ""
-	return m.requestDetail()
-}
-
+// listKey: the keys of the list areas (06 §13.4, §13.6). The arrows only navigate.
 func (m *model) listKey(s string) tea.Cmd {
 	c := m.col()
-	page := m.rowsShown() - 1
 	switch s {
-	case "up", "k":
+	case "up", "k", "ctrl+up":
+		m.sel.anchor = ""
 		return m.moveCursor(-1)
-	case "down", "j":
+	case "down", "j", "ctrl+down":
+		m.sel.anchor = ""
 		return m.moveCursor(1)
-	case "pgup":
-		return m.moveCursor(-page)
-	case "pgdown":
-		return m.moveCursor(page)
+	case "shift+up":
+		return m.selExtend(-1)
+	case "shift+down":
+		return m.selExtend(1)
 	case "home", "g":
 		return m.moveCursor(-len(c.view))
 	case "end", "G":
 		return m.moveCursor(len(c.view))
-	case "left", "h", "shift+tab":
-		return m.focusMove(-1)
+	case "pgup":
+		return m.scrollDetail(-m.detailPage())
+	case "pgdown":
+		return m.scrollDetail(m.detailPage())
+	case "left", "h":
+		return m.areaStep(-1)
 	case "right", "l":
-		if (m.focus == cActive || m.focus == cStaging) && m.layout().detailW > 0 {
-			m.detailFocus = true // 06 §12.5
-			return nil
-		}
-		return m.focusMove(1)
+		return m.areaStep(1)
 	case "tab":
-		return m.focusMove(1)
+		return m.areaCycle(1)
+	case "shift+tab":
+		return m.areaCycle(-1)
+	case "1", "2", "3", "4":
+		return m.goArea(int(s[0] - '0'))
 	case "[":
-		return m.focusMove(-1)
+		return m.goArea((int(m.focus)+2)%3 + 1)
 	case "]":
-		return m.focusMove(1)
+		return m.goArea((int(m.focus)+1)%3 + 1)
 	case "/":
-		m.editing = true
+		m.editing, m.detailFocus = true, false
 		return nil
 	case "esc":
 		if c.filter != "" {
 			c.filter = ""
 			m.refilterCol(m.focus, c.curID())
 		}
-		m.marked = map[string]bool{}
+		m.clearSel()
 		return nil
+	case "ctrl+@", "ctrl+ ", "v":
+		return m.selToggle()
 	case "!":
 		m.tab = tabProblems
 		return m.ensureProblems()
@@ -299,16 +300,6 @@ func (m *model) listKey(s string) tea.Cmd {
 		m.detailTech = !m.detailTech
 		m.detailRef = ""
 		return m.requestDetail()
-	case "v":
-		if it := c.cur(); it != nil && it.id != "" {
-			if m.marked[it.id] {
-				delete(m.marked, it.id)
-			} else {
-				m.marked[it.id] = true
-			}
-			return m.moveCursor(1)
-		}
-		return nil
 	case " ":
 		return m.space()
 	case "t":
@@ -322,43 +313,16 @@ func (m *model) listKey(s string) tea.Cmd {
 			return nil
 		}
 		m.act(Tf("put %s back in place", plural(n, "mod")), "stage", "restore")
+		m.clearSel()
 		return m.requestDetail()
-	case "J", "K":
-		it := c.cur()
-		if m.focus != cActive || it == nil {
-			m.say(sayInfo, T("only enabled mods can be moved"))
-			return nil
-		}
-		dir := "--down"
-		if s == "K" {
-			dir = "--up"
-		}
-		id, name := it.id, it.name // it points into the rows that the command rebuilds
-		if m.act("", "move", it.ref, dir) {
-			m.say(sayOK, Tf("%s is now number %d", name, m.st.Position(id)))
-		}
-		m.refilterCol(cActive, id)
-		return m.requestDetail()
-	case "m":
-		it := c.cur()
-		if m.focus != cActive || it == nil || it.id == "" {
-			m.say(sayInfo, T("only enabled mods can be moved"))
-			return nil
-		}
-		ref, name, id := it.ref, it.name, it.id
-		m.prompt = &prompt{label: Tf("move %s to number: ", name), submit: func(m *model, text string) tea.Cmd {
-			n, err := strconv.Atoi(strings.TrimSpace(text))
-			if err != nil || n < 1 {
-				m.say(sayFail, T("expected a number"))
-				return nil
-			}
-			if m.act("", "move", ref, "--to", fmt.Sprint(n)) {
-				m.say(sayOK, Tf("%s is now number %d", name, m.st.Position(id)))
-			}
-			m.refilterCol(cActive, id)
-			return m.requestDetail()
-		}}
-		return nil
+	case "K":
+		return m.moveBy(-1)
+	case "J":
+		return m.moveBy(1)
+	case "alt+K", "alt+k":
+		return m.moveBy(-10)
+	case "alt+J", "alt+j":
+		return m.moveBy(10)
 	case "<", ">", "=":
 		m.resizeKey(s)
 		return nil
@@ -390,7 +354,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.requestDetail()
 	case "enter":
 		if it := c.cur(); it != nil && it.id != "" {
-			m.full, m.fullOff = true, 0
+			m.full, m.fullOff, m.fullSec = true, 0, 0
 			return tea.Batch(m.requestDetail(), m.loadFullSecs())
 		}
 		return nil
@@ -416,49 +380,8 @@ func (m *model) listKey(s string) tea.Cmd {
 	return nil
 }
 
-// space enables (not enabled), disables (enabled) or puts back (staging) the selection.
-func (m *model) space() tea.Cmd {
-	sel := m.selection()
-	if len(sel) == 0 {
-		return nil
-	}
-	// sel points into the rows that the command rebuilds: take what the message needs first.
-	keep, what, first := sel[0].id, named(sel), sel[0].name
-	refs := refsOf(sel)
-	switch m.focus {
-	case cInactive:
-		m.act(Tf("enabled %s", what), append([]string{"enable"}, refs...)...)
-	case cActive:
-		m.act(Tf("disabled %s", what), append([]string{"disable"}, refs...)...)
-	case cStaging:
-		if m.act("", append([]string{"stage", "restore"}, refs...)...) {
-			if len(refs) == 1 {
-				m.say(sayOK, Tf("%s is back at number %d", first, m.st.Position(keep)))
-			} else {
-				m.say(sayOK, Tf("put %s back in place", what))
-			}
-		}
-	}
-	m.marked = map[string]bool{}
-	m.refilterCol(m.focus, "")
-	return m.requestDetail()
-}
-
-// stageKey: t stages the selection, or takes it out of staging.
-func (m *model) stageKey() tea.Cmd {
-	sel := m.selection()
-	if len(sel) == 0 || sel[0].id == "" {
-		return nil
-	}
-	if m.focus == cStaging {
-		m.act(Tf("took %s out of staging", named(sel)), append([]string{"stage", "drop"}, refsOf(sel)...)...)
-	} else {
-		m.act(Tf("staged %s", named(sel)), append([]string{"stage", "add"}, refsOf(sel)...)...)
-	}
-	m.marked = map[string]bool{}
-	return m.requestDetail()
-}
-
+// filterKey: typing the search of the focused list (06 §13.8). The status line counts the
+// matches in the other lists; tab takes the search to the next list that has any.
 func (m *model) filterKey(k tea.KeyMsg) tea.Cmd {
 	c := m.col()
 	keep := c.curID()
@@ -468,6 +391,8 @@ func (m *model) filterKey(k tea.KeyMsg) tea.Cmd {
 		return nil
 	case tea.KeyEsc:
 		m.editing, c.filter = false, ""
+	case tea.KeyTab:
+		return m.searchJump()
 	case tea.KeyBackspace:
 		if r := []rune(c.filter); len(r) > 0 {
 			c.filter = string(r[:len(r)-1])
@@ -478,11 +403,82 @@ func (m *model) filterKey(k tea.KeyMsg) tea.Cmd {
 		return m.moveCursor(-1)
 	case tea.KeyDown:
 		return m.moveCursor(1)
+	case tea.KeyPgUp:
+		return m.scrollDetail(-m.detailPage())
+	case tea.KeyPgDown:
+		return m.scrollDetail(m.detailPage())
 	default:
 		return nil
 	}
 	m.refilterCol(m.focus, keep)
 	return m.requestDetail()
+}
+
+// otherMatches counts what the focused list's search finds in each other list.
+func (m *model) otherMatches() [3]int {
+	var n [3]int
+	q := m.col().filter
+	match, fallback := m.matcher(q)
+	if match == nil {
+		return n
+	}
+	for k := range m.cols {
+		if colKind(k) == m.focus {
+			continue
+		}
+		for i := range m.cols[k].items {
+			if match(&m.cols[k].items[i]) {
+				n[k]++
+			}
+		}
+		if n[k] == 0 && fallback != nil {
+			for i := range m.cols[k].items {
+				if fallback(&m.cols[k].items[i]) {
+					n[k]++
+				}
+			}
+		}
+	}
+	return n
+}
+
+// searchJump: tab while searching takes the search to the next list (to the right, round)
+// with matches, on its first match, and ends the typing there.
+func (m *model) searchJump() tea.Cmd {
+	n := m.otherMatches()
+	q := m.col().filter
+	for d := 1; d < 3; d++ {
+		k := colKind((int(m.focus) + d) % 3)
+		if n[k] == 0 {
+			continue
+		}
+		from := m.focus
+		m.cols[from].filter = ""
+		m.refilterCol(from, m.cols[from].curID())
+		m.setFocus(k)
+		c := m.col()
+		c.filter, c.cursor = q, 0
+		m.refilterCol(k, "")
+		m.editing = false
+		return m.requestDetail()
+	}
+	m.say(sayInfo, T("no other list has a match"))
+	return nil
+}
+
+// searchLine: "other lists: Disabled 2 · Staging 0 · tab jumps to the next one with matches".
+func (m *model) searchLine() string {
+	if m.col().filter == "" {
+		return ""
+	}
+	n := m.otherMatches()
+	var parts []string
+	for k := cInactive; k <= cStaging; k++ {
+		if k != m.focus {
+			parts = append(parts, fmt.Sprintf("%s %d", k.title(), n[k]))
+		}
+	}
+	return T("other lists: ") + strings.Join(parts, " "+markDot+" ") + " " + markDot + " " + T("tab jumps to the next list with matches")
 }
 
 func (m *model) promptKey(k tea.KeyMsg) tea.Cmd {
@@ -597,7 +593,7 @@ func (m *model) chooseEnv() tea.Cmd {
 	return nil
 }
 
-// ---- mouse (06 §5.3) ----
+// ---- mouse (06 §13.4, §13.5) ----
 
 // hit returns the column slot and view index under a point (index -1: the title row or
 // below the last row; ok false: not over a list column).
@@ -617,29 +613,31 @@ func (m *model) hit(x, y int) (colKind, int, bool) {
 }
 
 func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
-	if m.prompt != nil || m.editing || m.panel != nil || m.insp != nil || m.tab != tabList || m.full {
+	wheel := 0
+	switch e.Button {
+	case tea.MouseButtonWheelDown:
+		wheel = 3
+	case tea.MouseButtonWheelUp:
+		wheel = -3
+	}
+	if m.prompt != nil || m.editing || m.panel != nil || m.insp != nil || m.tab != tabList || m.full || m.pal != nil || m.tags != nil || m.pos != nil {
 		var cmds []tea.Cmd
-		for i := 0; i < 3; i++ { // the wheel scrolls three lines
-			switch e.Button {
-			case tea.MouseButtonWheelDown:
+		for i := 0; i < 3 && wheel != 0; i++ { // the wheel scrolls three lines
+			if wheel > 0 {
 				cmds = append(cmds, m.key(tea.KeyMsg{Type: tea.KeyDown}))
-			case tea.MouseButtonWheelUp:
+			} else {
 				cmds = append(cmds, m.key(tea.KeyMsg{Type: tea.KeyUp}))
 			}
 		}
 		return tea.Batch(cmds...)
 	}
-	// The detail column: a click gives it the focus, the wheel scrolls it (06 §12.5).
+	// The wheel scrolls the detail wherever the pointer is; the focus stays (06 §13.4).
+	if wheel != 0 {
+		return m.scrollDetail(wheel)
+	}
+	// A click on the detail column focuses it (area 4).
 	if l := m.layout(); l.detailW > 0 && e.X >= l.detailX && e.Y >= 2 {
-		switch {
-		case e.Button == tea.MouseButtonWheelDown:
-			m.detailFocus, m.detailOff = true, m.detailOff+3
-		case e.Button == tea.MouseButtonWheelUp:
-			m.detailFocus, m.detailOff = true, max(m.detailOff-3, 0)
-		case e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonLeft:
-			if m.pick != nil {
-				m.endPick(true)
-			}
+		if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonLeft {
 			m.detailFocus = true
 		}
 		return nil
@@ -663,26 +661,12 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 	}
 	k, i, ok := m.hit(e.X, e.Y)
-	switch e.Button {
-	case tea.MouseButtonWheelDown, tea.MouseButtonWheelUp:
-		if ok {
-			m.focus, m.detailFocus = k, false
-		}
-		d := 3
-		if e.Button == tea.MouseButtonWheelUp {
-			d = -3
-		}
-		return m.moveCursor(d)
-	}
 	if e.Action != tea.MouseActionPress || e.Button != tea.MouseButtonLeft || !ok {
 		return nil
 	}
 	// Click: the cursor; shift+click: a range from the cursor; ctrl+click: add or remove
-	// one row. Picks stay in one column (06 §12.2). Moving is done with the keys.
-	if m.pick != nil && (m.pick.col != k || (!e.Shift && !e.Ctrl)) {
-		m.endPick(true)
-	}
-	m.focus, m.detailFocus = k, false
+	// one row. Another list drops the selection (06 §13.5). Moving is done with verbs.
+	m.setFocus(k)
 	c := &m.cols[k]
 	if i < 0 {
 		return m.requestDetail()
@@ -690,20 +674,19 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 	switch {
 	case e.Ctrl:
 		c.cursor = i
-		m.pickToggle()
+		m.selToggle()
 	case e.Shift:
-		if m.pick == nil {
-			m.beginPick()
-		}
-		if m.pick != nil {
-			if m.pick.anchor == "" {
-				m.pick.anchor = c.curID()
+		if m.sel.anchor == "" {
+			m.sel.anchor, m.sel.base = c.curID(), map[string]bool{}
+			for id := range m.marked {
+				m.sel.base[id] = true
 			}
-			c.cursor = i
-			m.pickRange()
 		}
+		c.cursor = i
+		m.selRangeTo()
 	default:
 		c.cursor = i
+		m.sel.anchor = ""
 	}
 	return m.requestDetail()
 }

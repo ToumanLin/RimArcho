@@ -206,8 +206,8 @@ func TestT13TagBar(t *testing.T) {
 	if got := tagged("美化"); got != "Alpha Harmony" {
 		t.Fatalf("after # → enter: %q (status %q)", got, m.status)
 	}
-	if !m.picking() {
-		t.Fatal("tagging ended the pick")
+	if len(m.marked) != 2 {
+		t.Fatal("tagging dropped the selection")
 	}
 	press(m, "#")
 	press(m, "right")
@@ -247,7 +247,7 @@ func TestT13TagBar(t *testing.T) {
 	if got := tagged("lib"); got != "Alpha Harmony" {
 		t.Fatalf("lib: %q", got)
 	}
-	press(m, "esc") // cancel the pick: tags are not part of the list, they stay
+	press(m, "esc") // clears the selection; the tags stay
 	if got := tagged("lib"); got != "Alpha Harmony" {
 		t.Fatalf("esc removed the tag: %q", got)
 	}

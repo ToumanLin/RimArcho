@@ -96,12 +96,16 @@ func (m *model) inspectKey(s string) tea.Cmd {
 		}
 	}
 	switch s {
-	case "esc", "backspace", "q":
+	case "backspace":
 		if n := len(m.inspHist); n > 0 {
 			m.insp, m.inspHist = m.inspHist[n-1], m.inspHist[:n-1]
 		} else {
 			m.insp = nil
 		}
+	case "esc", "q":
+		// The whole stack at once, so esc gets back to the list in a few presses
+		// (06 §13.10 T20); backspace goes back one page.
+		m.insp, m.inspHist = nil, nil
 	case "down", "j":
 		move(1)
 	case "up", "k":

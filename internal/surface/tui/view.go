@@ -38,6 +38,11 @@ func (m *model) View() string {
 		content = m.changeLines(body)
 	case m.full:
 		content, ps = m.fullLines(body)
+	case m.pos != nil:
+		// The position input sits under the columns, which give it their last lines.
+		sheet := m.posLines(m.w)
+		content, ps = m.columnLines(max(body-len(sheet)-1, 3))
+		content = append(append(content, ""), sheet...)
 	default:
 		content, ps = m.columnLines(body)
 	}
@@ -57,14 +62,16 @@ func (m *model) View() string {
 	return strings.Join(lines, "\n")
 }
 
-// topBar: brand · environment pill · needs attention · unsaved … launch (06 §4.2); a
-// breadcrumb on secondary screens.
+// topBar: brand · environment pill · needs attention · unsaved, and on the right the
+// position line (06 §13.3) and launch. Secondary screens show a breadcrumb that is the
+// position line.
 func (m *model) topBar() string {
 	left := sBold.Render("RimArcho")
 	lw := len("RimArcho")
 	add := func(s string, w int) { left += s; lw += w }
-	if crumb := m.crumb(); crumb != "" {
-		c := "  › " + crumb
+	pos := m.position()
+	if m.full || m.insp != nil || m.tab != tabList {
+		c := "  › " + pos
 		cw := width.StringWidth(c)
 		add(sSecond.Render(fit(c, min(cw, m.w-lw))), min(cw, m.w-lw))
 		return left + strings.Repeat(" ", max(m.w-lw, 0))
@@ -87,40 +94,48 @@ func (m *model) topBar() string {
 		t := Tf("unsaved %d", m.unsaved)
 		add("  "+sAccent.Render(ic.unsaved+" "+t), 2+2+width.StringWidth(t))
 	}
-	right := T("launch") + " " + ic.play
-	rw := width.StringWidth(right) + 2
-	if lw+rw+2 > m.w {
-		return left + strings.Repeat(" ", max(m.w-lw, 0))
+	launch := T("launch") + " " + ic.play
+	launchW := width.StringWidth(launch) + 2 // "L "
+	pw := width.StringWidth(pos)
+	room := m.w - lw - 3 // at least three cells between the left side and the position
+	right, rw := "", 0
+	if pw+3+launchW <= room {
+		right = m.renderPos(pos) + "   " + sText.Render("L") + " " + sSecond.Render(launch)
+		rw = pw + 3 + launchW
+	} else if room >= 8 {
+		pw = min(pw, room)
+		right, rw = m.renderPos(fit(pos, pw)), pw
 	}
-	return left + strings.Repeat(" ", m.w-lw-rw) + sText.Render("L") + " " + sSecond.Render(right)
+	return left + strings.Repeat(" ", max(m.w-lw-rw, 0)) + right
 }
 
-// crumb is the breadcrumb of a secondary screen ("" on the main screen).
-func (m *model) crumb() string {
-	switch {
-	case m.pal != nil:
-		return T("command palette")
-	case m.panel != nil:
-		return m.panel.title
-	case m.insp != nil || m.full:
-		if it := m.current(); it != nil {
-			return m.focus.title() + " › " + it.name
-		}
-		return T("details")
-	case m.tab == tabProblems:
-		return T("needs attention")
-	case m.tab == tabChanges:
-		return T("recent changes")
+// renderPos styles the position line: the area in the accent colour, the rest secondary,
+// an open popup in the text colour.
+func (m *model) renderPos(p string) string {
+	head, rest := p, ""
+	if i := strings.Index(p, " "+markDot+" "); i >= 0 {
+		head, rest = p[:i], p[i:]
 	}
-	return ""
+	pop := ""
+	if i := strings.Index(rest, " › "); i >= 0 {
+		rest, pop = rest[:i], rest[i:]
+	} else if i := strings.Index(head, " › "); i >= 0 {
+		head, pop = head[:i], head[i:]
+	}
+	return sAccent.Render(head) + sSecond.Render(rest) + sText.Render(pop)
 }
 
 // statusLine: one sentence, ✓ done (green), ✗ failed (red), … in progress (06 §9).
 func (m *model) statusLine() string {
-	if m.tags != nil && !m.picking() { // while picking it sits under the hint
+	if m.tags != nil {
 		return m.tagBarLine(m.w)
 	}
 	text, kind := m.status, m.sayKind
+	if m.editing && text == "" {
+		if l := m.searchLine(); l != "" {
+			return sSecond.Render(fit(l, m.w))
+		}
+	}
 	if text == "" && m.scanning {
 		text, kind = T("scanning…"), sayBusy
 	}
@@ -146,16 +161,20 @@ func (m *model) statusLine() string {
 	return ms.Render(mark) + " " + sText.Render(fit(text, m.w-2))
 }
 
-// hintLine: "key label · key label" for the current place (06 §9).
+// hintLine: "key label · key label", only what the object can do now, at most 7 (06 §9,
+// §13.2 rule 4); ? lists everything.
 func (m *model) hintLine() string {
 	var pairs [][2]string
+	prefix := ""
 	switch {
 	case m.pal != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
+	case m.pos != nil:
+		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("move")}, {"tab", T("before / after")}, {"esc", T("close")}}
 	case m.prompt != nil:
 		return sAccent.Render(markPrompt+" ") + sSecond.Render(m.prompt.label) + sText.Render(m.prompt.text+"_")
 	case m.editing:
-		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"↑↓", T("move")}}
+		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"tab", T("next list with matches")}, {"↑↓", T("move")}}
 	case m.panel != nil && m.panel.choices != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("confirm")}, {"esc", T("back")}}
 	case m.tags != nil:
@@ -165,38 +184,40 @@ func (m *model) hintLine() string {
 	case m.panel != nil:
 		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}}
 	case m.insp != nil:
-		pairs = [][2]string{{"esc", T("back")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
+		pairs = [][2]string{{"esc", T("back")}, {"backspace", T("previous page")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
 	case m.full:
-		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"r", T("refresh")}, {"i", T("technical information")}, {"I", T("technical pages")}}
-	case m.detailFocus && m.tab == tabList:
-		pairs = [][2]string{{"↑↓", T("scroll")}, {"←", T("back to the list")}, {"enter", T("full screen")}, {"#", T("tags")}, {"o", T("Workshop page")}}
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
 	case m.tab == tabChanges:
 		pairs = [][2]string{{"esc", T("back")}, {"enter", T("file changes")}}
+	case m.selCount() > 0:
+		// 06 §13.5: what the selection can do, and that another list drops it.
+		prefix = Tf("selected %d", m.selCount())
+		pairs = append(m.verbPairs(), [2]string{"esc", T("clear the selection")}, [2]string{"←→", T("another list clears it")})
+	case m.detailFocus:
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"←", T("back to the list")}, {"enter", T("full screen")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"?", T("all keys")}}
 	default:
-		switch {
-		case m.picking():
-			pairs = [][2]string{{"↑↓", T("move")}, {"←→", T("move to")}, {"#", T("tags")}, {"t", T("stage")}, {"enter", T("drop")}, {"esc", T("cancel")}}
-		case m.focus == cInactive:
-			pairs = [][2]string{{"space", T("pick")}, {"shift+↑↓", T("pick a range")}, {"t", T("stage")}, {"/", T("filter")}, {"←→", T("columns")}}
-		case m.focus == cActive:
-			pairs = [][2]string{{"space", T("pick")}, {"J K", T("move")}, {"t", T("stage")}, {"S", T("sort")}, {"w", T("save")}, {"u", T("undo")}}
-		case m.focus == cStaging:
-			pairs = [][2]string{{"space", T("pick")}, {"T", T("put all back")}, {"t", T("unstage")}, {"←→", T("columns")}}
-		}
+		pairs = append(m.verbPairs(), [2]string{"/", T("search")})
 		if m.layout().tabs {
 			pairs = append([][2]string{{"[ ]", T("lists")}}, pairs...) // the only way to the other lists
 		} else if m.layout().detailW == 0 {
 			pairs = append(pairs, [2]string{"enter", T("details")})
 		}
-		pairs = append(pairs, [2]string{"!", T("needs attention")}, [2]string{"?", T("help")})
+		pairs = append(pairs, [2]string{"?", T("all keys")})
+	}
+	if len(pairs) > 7 {
+		pairs = append(pairs[:6], pairs[len(pairs)-1])
 	}
 	var b strings.Builder
 	used := 0
+	if prefix != "" {
+		b.WriteString(sAccent.Render(prefix))
+		used += width.StringWidth(prefix)
+	}
 	for i, p := range pairs {
 		sep := ""
-		if i > 0 {
+		if i > 0 || prefix != "" {
 			sep = "  " + markDot + "  "
 		}
 		w := width.StringWidth(sep + p[0] + " " + p[1])
@@ -210,6 +231,24 @@ func (m *model) hintLine() string {
 		used += w
 	}
 	return b.String()
+}
+
+// verbPairs: the verbs the focused list's object can use now (06 §13.6).
+func (m *model) verbPairs() [][2]string {
+	if m.col().cur() == nil {
+		return nil
+	}
+	switch m.focus {
+	case cInactive:
+		return [][2]string{{"space", T("enable")}, {"m", T("enable at…")}, {"t", T("stage")}, {"#", T("tags")}}
+	case cActive:
+		return [][2]string{{"space", T("disable")}, {"J K", T("move")}, {"m", T("move to…")}, {"t", T("stage")}, {"#", T("tags")}}
+	}
+	ps := [][2]string{{"space", T("put back")}, {"m", T("enable at…")}, {"#", T("tags")}}
+	if m.selCount() == 0 {
+		ps = append(ps, [2]string{"T", T("put all back")})
+	}
+	return ps
 }
 
 // panelLines draws a secondary screen without a frame: the text, indented, or a chooser.
@@ -245,40 +284,44 @@ func window(lines []string, off, n int) []string {
 	return lines[off:end]
 }
 
-// descMax is how many description lines the detail column shows (06 §6.1).
+// descMax is how many description lines the detail column shows (06 §6.1): all of them
+// once it is focused or scrolled.
 func (m *model) descMax() int {
-	if m.detailFocus {
-		return 0 // scrolled: all of it
+	if m.detailFocus || m.detailOff > 0 {
+		return 0
 	}
 	return 12
 }
 
 // detailLines draws the detail column (w wide, n lines, starting at 0-based column x) and
-// returns its image placements.
+// returns its image placements. The first line is the area title, "4 details", or the
+// mod's name once scrolled; in the accent colour when area 4 has the focus (06 §13.3).
 func (m *model) detailLines(w, n, x int) ([]string, []placement) {
+	m.syncDetailOff()
 	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), images: m.inlineImages(), techText: m.detail})
 	m.lastLines = lines
-	if id := m.col().curID(); id != m.detailOffID {
-		if m.detailOffID != "" {
-			m.detailOff = 0 // another mod: from the top
+	// The scroll is kept as asked until the mod's details have loaded: PgDn pressed while
+	// the description is still on its way would otherwise be lost.
+	off := max(0, min(m.detailOff, len(lines)-(n-1)))
+	if it := m.current(); it == nil || (m.dd != nil && m.dd.id == it.id) {
+		m.detailOff = off
+	}
+	title := T("details")
+	if off > 0 {
+		if it := m.current(); it != nil {
+			title = "▲ " + it.name
 		}
-		m.detailOffID = id
 	}
-	m.detailOff = max(0, min(m.detailOff, len(lines)-n))
-	if !m.detailFocus {
-		m.detailOff = 0
+	st := sDimS
+	if m.detailFocus {
+		st = sAccent
 	}
-	var out []string
+	out := []string{sDimS.Render("4 ") + st.Render(fit(title, w-2))}
 	var ps []placement
-	for i := m.detailOff; i < len(lines) && len(out) < n; i++ {
+	for i := off; i < len(lines) && len(out) < n; i++ {
 		out = append(out, lines[i].text)
 		if p, ok := m.place(lines[i], len(out)-1, n, x+1); ok { // x is 0-based
 			ps = append(ps, p)
-		}
-	}
-	if m.detailFocus && len(out) > 0 && m.detailOff > 0 {
-		if it := m.current(); it != nil { // scrolled: the name stays on top
-			out[0] = sAccent.Render(fit("▲ "+it.name, w))
 		}
 	}
 	return out, ps

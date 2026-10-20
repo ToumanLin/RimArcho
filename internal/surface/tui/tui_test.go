@@ -167,14 +167,14 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	e, scans := fixture(t)
 	tm := start(t, e, scans, 160, 40)
 	waitFor(t, tm, "Enabled 3")
-	// Enabled is focused; h goes to "Disabled", where a filter finds Beta.
-	// space picks it, → moves it into Enabled (the end: nothing constrains it), enter drops (06 §12.2).
-	keys(tm, "h", "/", "Beta", "enter", "space", "right", "enter")
-	waitFor(t, tm, "undoes it all")
+	// Enabled is focused; h goes to "Disabled", where a filter finds Beta. space enables it
+	// where the order wants it: the end, nothing constrains it (06 §13.6).
+	keys(tm, "h", "/", "Beta", "enter", "space")
+	waitFor(t, tm, "placed at position 4 · m changes it")
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
-		t.Fatalf("after space → enter: %s", got)
+		t.Fatalf("after space: %s", got)
 	}
-	keys(tm, "esc", "g", "down", "J") // the cursor followed Beta into Enabled; move Alpha down one
+	keys(tm, "esc", "l", "g", "down", "J") // to Enabled; move Alpha down one
 	waitFor(t, tm, "Alpha is now number 3")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
 		t.Fatalf("after J: %s", got)
@@ -279,7 +279,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			check("start")
 			// Staging is reachable at every width: focus it (it takes the first slot when
 			// hidden), stage a mod from "enabled", put it back.
-			press(m, "tab") // Enabled → Staging (→ goes to the detail, 06 §12.5)
+			press(m, "tab") // Enabled → Staging
 			if m.focus != cStaging || !m.layout().has(cStaging) {
 				t.Fatalf("staging not shown when focused: %+v", m.layout())
 			}
@@ -302,16 +302,19 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			if it := m.current(); it == nil || !strings.HasPrefix(it.name, "中文") {
 				t.Fatalf("cursor on %+v", m.current())
 			}
-			for _, k := range []string{"space", "right", "enter", "space", "left", "enter"} { // pick, enable, drop; pick, disable, drop
+			press(m, "space") // enabled at the end, the cursor stays in Disabled
+			if got := activeNames(t, e); !strings.HasSuffix(got, "中文汉化补丁（简体）加长的名字用来测试截断") || m.focus != cInactive {
+				t.Fatalf("enable: %s, focus %d", got, m.focus)
+			}
+			for _, k := range []string{"l", "G", "space", "h"} { // Enabled, the last row, disable, back
 				press(m, k)
 			}
 			if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
 				t.Fatalf("enable + disable: %s", got)
 			}
 			// The CJK name is cut at a character boundary: the row is exactly its column wide.
-			// (The cursor followed the mod back into Disabled.)
 			if m.focus != cInactive {
-				t.Fatalf("focus %d after the drop", m.focus)
+				t.Fatalf("focus %d", m.focus)
 			}
 			press(m, "G")
 			for _, s := range m.layout().slots {
@@ -405,35 +408,40 @@ func TestMouseClicks(t *testing.T) {
 	}
 	// Disabled rows start at y=3: Beta, N1 … N5, 中文
 	click(xOf(cInactive), 3, false, false)
-	if m.focus != cInactive || m.current().name != "Beta" || m.picking() {
-		t.Fatalf("click: focus %d on %+v, picking %v", m.focus, m.current(), m.picking())
+	if m.focus != cInactive || m.current().name != "Beta" || len(m.marked) != 0 {
+		t.Fatalf("click: focus %d on %+v, selected %d", m.focus, m.current(), len(m.marked))
 	}
 	click(xOf(cInactive), 5, false, true) // ctrl: N2
 	click(xOf(cInactive), 7, false, true) // ctrl: N4
 	if len(m.marked) != 2 {
-		t.Fatalf("ctrl+click: %d picked", len(m.marked))
+		t.Fatalf("ctrl+click: %d selected", len(m.marked))
 	}
 	click(xOf(cInactive), 8, true, false) // shift: N4 … N5 added to the range from N4
 	if names := pickedNames(m); names != "N2 N4 N5" {
 		t.Fatalf("shift+click: %q", names)
 	}
-	// A plain click drops the pick (nothing was moved) and moves the cursor.
+	click(xOf(cInactive), 3, false, false) // a plain click in the same list keeps the selection
+	if names := pickedNames(m); names != "N2 N4 N5" || m.current().name != "Beta" {
+		t.Fatalf("plain click: %q on %s", names, m.current().name)
+	}
+	// A click in another list moves the focus there and drops the selection (06 §13.5).
 	click(xOf(cActive), 4, false, false)
-	if m.picking() || m.focus != cActive || m.current().name != "Alpha" {
-		t.Fatalf("plain click: picking %v, %+v", m.picking(), m.current())
+	if len(m.marked) != 0 || m.focus != cActive || m.current().name != "Alpha" {
+		t.Fatalf("click in Enabled: selected %d, %+v", len(m.marked), m.current())
 	}
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
 		t.Fatalf("a click changed the list: %s", got)
 	}
+	// The wheel scrolls the detail wherever it is; the cursor and the focus stay (06 §13.4).
 	m.update(tea.MouseMsg{X: xOf(cActive), Y: 5, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
-	if m.cols[cActive].cursor != 2 { // three down from Alpha, clamped at Harmony
-		t.Fatalf("wheel: cursor %d", m.cols[cActive].cursor)
+	if m.cols[cActive].cursor != 1 || m.focus != cActive || m.detailFocus || m.detailOff != 3 {
+		t.Fatalf("wheel: cursor %d, focus %d/%v, detail scrolled %d", m.cols[cActive].cursor, m.focus, m.detailFocus, m.detailOff)
 	}
 }
 
 func pickedNames(m *model) string {
 	var out []string
-	for _, id := range m.pickedIDs() {
+	for _, id := range m.selectedIDs() {
 		out = append(out, m.st.Ix.ByID[id].Name)
 	}
 	return strings.Join(out, " ")
@@ -471,9 +479,9 @@ func TestChineseUI(t *testing.T) {
 	tm := start(t, e, scans, 100, 24)
 	waitAll(t, tm, "已启用 3", "未启用 2")
 	keys(tm, "?")
-	waitFor(t, tm, "四列")
-	keys(tm, "esc", "h", "space", "right", "enter")
-	waitFor(t, tm, "可全部撤销")
+	waitFor(t, tm, "方向键只移动")
+	keys(tm, "esc", "h", "space")
+	waitFor(t, tm, "已放在第 4 位 · m 改位置")
 	m := finish(t, tm)
 	for _, l := range strings.Split(m.View(), "\n") {
 		if w := lipgloss.Width(l); w > 100 {

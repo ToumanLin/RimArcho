@@ -63,17 +63,23 @@ func TestT15FullScreenNext(t *testing.T) {
 	}
 }
 
-// 06 §12.5: → on Enabled gives the detail the focus; ↑↓ scroll it, the name stays on top
-// in the accent colour; ← goes back; a click on the detail gives it the focus too.
+// 06 §13.3, §13.4: 4 (or → from Staging) focuses the detail; ↑↓ scroll it, the name stays
+// on top in the accent colour; ← and esc go back to the list it shows; a click focuses it
+// too. PgDn scrolls it from a list without moving the focus or the cursor.
 func TestDetailFocus(t *testing.T) {
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 10)
 	press(m, "g")
 	press(m, "down") // Alpha
 	runCmd(m, m.loadData(m.current().id, false, false))
-	press(m, "right")
+	press(m, "right") // Enabled → Staging: the neighbouring area
+	if m.focus != cStaging || m.detailFocus {
+		t.Fatalf("→: focus %d, detail %v", m.focus, m.detailFocus)
+	}
+	press(m, "2")
+	press(m, "4")
 	if !m.detailFocus || m.focus != cActive {
-		t.Fatalf("→: detail %v, focus %d", m.detailFocus, m.focus)
+		t.Fatalf("4: detail %v, focus %d", m.detailFocus, m.focus)
 	}
 	press(m, "down")
 	press(m, "down")
@@ -84,12 +90,9 @@ func TestDetailFocus(t *testing.T) {
 	if m.current().name != "Alpha" {
 		t.Fatalf("↓ moved the list cursor to %s", m.current().name)
 	}
-	press(m, "left")
+	press(m, "left") // back to Enabled, whose mod it shows
 	if m.detailFocus || m.focus != cActive {
 		t.Fatalf("←: detail %v focus %d", m.detailFocus, m.focus)
-	}
-	if strings.Contains(ansi.Strip(m.View()), "▲ Alpha") {
-		t.Fatal("still scrolled after ←")
 	}
 	l := m.layout()
 	m.update(tea.MouseMsg{X: l.detailX + 5, Y: 6, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
@@ -97,12 +100,21 @@ func TestDetailFocus(t *testing.T) {
 		t.Fatal("a click did not focus the detail")
 	}
 	press(m, "esc")
-	press(m, "h") // Enabled → Disabled: an ordinary column move again
+	if m.detailFocus || m.focus != cActive {
+		t.Fatalf("esc: detail %v focus %d", m.detailFocus, m.focus)
+	}
+	// PgDn from the list: the detail scrolls, the focus and the cursor stay.
+	press(m, "g")
+	m.update(tea.KeyMsg{Type: tea.KeyPgDown})
+	if m.detailOff == 0 || m.detailFocus || m.focus != cActive || m.current().name != "Core" {
+		t.Fatalf("PgDn: scrolled %d, detail %v, focus %d, cursor %s", m.detailOff, m.detailFocus, m.focus, m.current().name)
+	}
+	m.update(tea.KeyMsg{Type: tea.KeyPgUp})
+	if m.detailOff != 0 {
+		t.Fatalf("PgUp: %d", m.detailOff)
+	}
+	press(m, "h") // Enabled → Disabled
 	if m.focus != cInactive || m.detailFocus {
 		t.Fatalf("h: focus %d detail %v", m.focus, m.detailFocus)
-	}
-	press(m, "l") // Disabled → Enabled (→ enters the detail from Enabled and Staging only)
-	if m.focus != cActive || m.detailFocus {
-		t.Fatalf("l from Disabled: focus %d detail %v", m.focus, m.detailFocus)
 	}
 }

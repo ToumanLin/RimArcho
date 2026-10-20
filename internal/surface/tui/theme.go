@@ -24,6 +24,7 @@ var (
 	cDim    = lipgloss.Color("#4A4F5A")
 	cAccent = lipgloss.Color("#A5B4FC")
 	cPill   = lipgloss.Color("#2C2E4A")
+	cRowBg  = lipgloss.Color("#1A1C24") // the focused area's cursor row (06 §13.3)
 	cOK     = lipgloss.Color("#7EE2A8")
 	cWarn   = lipgloss.Color("#F2C46D")
 	cErr    = lipgloss.Color("#FF8A80")

@@ -139,10 +139,12 @@ type model struct {
 	prefetching string        // the thumbnail being made ahead of the cursor
 	imgUse      map[string]int
 	imgClock    int
-	fsecs       *fullSecs  // the full-screen detail's sub-sections (06 §6.3)
-	pal         *palette   // the command palette (06 §8), nil when closed
-	pick        *pickState // a pick session (06 §12.2)
-	prefs       colPrefs   // column widths and wrapping (06 §12.1)
+	fsecs       *fullSecs // the full-screen detail's sub-sections (06 §6.3)
+	pal         *palette  // the command palette (06 §8), nil when closed
+	sel         selRange  // the shift range of the selection (06 §13.5)
+	pos         *posInput // the position input, m (06 §13.7)
+	placed      []string  // the mods space just enabled: an m right after it moves them (06 §13.6)
+	prefs       colPrefs  // column widths and wrapping (06 §12.1)
 	prefsEnv    string
 	resizing    *resizeDrag // a column gap being dragged
 	rowMap      [3][]int    // per list column: body line → view index (-1: title or empty), as last drawn
@@ -151,8 +153,8 @@ type model struct {
 	full        bool        // the full-screen detail
 	fullOff     int
 	fullSec     int    // the full-screen sub-section tab / shift+tab went to (0: the summary)
-	detailFocus bool   // the compact detail has the focus: ↑↓ scroll it (06 §12.5)
-	detailOff   int    // its scroll
+	detailFocus bool   // focus area 4, the compact detail: ↑↓ scroll it (06 §13.3)
+	detailOff   int    // its scroll (PgUp PgDn and the wheel scroll it from any area)
 	detailOffID string // the mod it was scrolled for
 	lastLines   []dline
 
