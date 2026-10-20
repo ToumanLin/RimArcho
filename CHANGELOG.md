@@ -64,9 +64,13 @@ Spec: `docs/specs/10-1.0实现.md`.
   background instead of holding the window for seconds.
 - 需要处理 is three columns (the list · the game · your call); ←→ between them. Moving the
   cursor no longer rebuilds the page.
-- The top bar holds only what applies everywhere: the environment and the tabs (and the
-  running game). Sort, save and launch sit in a bar above the lists, since they act on the
-  enabled list; packs have their own Play.
+- The top bar holds the environment, the tabs, and the game: launch (the saved list) while it
+  is not running, its state while it is. Sort and save sit in the Enabled list's head with
+  the unsaved count, since they act on that list; packs have their own Play.
+- The mod list no longer leaves the right side empty at narrower widths (a hidden staging
+  column pushed the details into a zero-width track); staging hides below 900 px, the
+  details below 680 px, and dragging a column edge skips hidden columns.
+- With mods in staging the history stays, folded into a bar under them.
 - The environment pill opens an environment page: the environments (switch there), this
   one's folders and launch method, and rescanning its mod folders. Settings keeps only what
   is RimArcho's (language, community data, database, caches, packs folder).

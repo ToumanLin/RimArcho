@@ -452,6 +452,7 @@ var zhText = map[string]string{
 	"%d packs belong to other environments (archo pack list)":                   "另有 %d 个整合包属于其他环境（archo pack list）",
 	"%d packs belong to other environments; switch the environment to see them": "另有 %d 个整合包属于其他环境；切换环境后可见",
 	"in use": "正在使用", "use this one": "使用这个",
+	"%d steps": "%d 步", "start the game with the saved list": "用已保存的列表启动游戏",
 	"which list runs is taken from the launch records":       "运行的是哪个列表，是按启动记录推断的",
 	"only Core and the DLCs are enabled already":             "已经只启用了原版和 DLC",
 	"staged %s; Core and the DLCs stay enabled":              "已把 %s 放进暂存；原版和 DLC 仍启用",

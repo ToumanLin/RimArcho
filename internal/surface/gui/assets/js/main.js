@@ -55,12 +55,10 @@ function renderTop() {
   $("#env").textContent = b.env ? `${b.env} · ${mm(b.gameVersion)}` : T("no environment");
   $("#needs").textContent = b.needs ? String(b.needs) : "";
   $("#needs").title = b.needs ? Tf("%d to handle", b.needs) : T("nothing to handle");
-  $("#unsaved").textContent = b.unsaved ? Tf("%d not saved", b.unsaved) : "";
   $("#env").classList.toggle("on", S.screen === "env");
   $("#env").title = T("environment") + " · E";
-  $("#btn-sort").textContent = T("sort");
-  $("#btn-save").textContent = T("save");
   $("#btn-launch").textContent = T("launch") + " ▶";
+  $("#btn-launch").title = T("start the game with the saved list") + " · L";
 }
 
 function mm(v) { const p = String(v || "").split("."); return p.length >= 2 ? p[0] + "." + p[1] : v || ""; }
@@ -508,15 +506,20 @@ function wireSplits() {
       e.preventDefault();
       const areas = $$("#board .area");
       const widths = areas.map((a) => a.getBoundingClientRect().width);
+      // the areas on either side of this split that are shown (staging may be hidden)
       const i = +sp.dataset.split;
+      let lo = i, hi = i + 1;
+      while (lo > 0 && !widths[lo]) lo--;
+      while (hi < 3 && !widths[hi]) hi++;
       const x0 = e.clientX;
       sp.classList.add("drag");
       const move = (ev) => {
         const dx = ev.clientX - x0;
         const w = widths.slice();
-        w[i] = Math.max(160, widths[i] + dx);
-        w[i + 1] = Math.max(160, widths[i + 1] - dx);
-        w.forEach((v, j) => board.style.setProperty(`--c${j}`, v + "fr"));
+        w[lo] = Math.max(160, widths[lo] + dx);
+        w[hi] = Math.max(160, widths[hi] - dx);
+        // a hidden area keeps a usable width for when it shows again
+        w.forEach((v, j) => board.style.setProperty(`--c${j}`, (v || 220) + "fr"));
       };
       const up = () => {
         sp.classList.remove("drag");
@@ -563,7 +566,12 @@ async function start() {
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? scr.needs() : verb(v); });
   $("#env").onclick = () => (S.screen === "env" ? goTab(0) : cmd("env-page"));
   $$("#tabs .tab").forEach((b, i) => { b.onclick = () => goTab(i); });
-  for (const b of $$("#listbar [data-cmd]")) b.onclick = () => preview(b.dataset.cmd);
+  $("#btn-launch").onclick = () => preview("launch");
+  // the enabled list's head: sort, save
+  $("#board").addEventListener("click", (e) => {
+    const b = e.target.closest(".head [data-cmd]");
+    if (b) { e.stopPropagation(); preview(b.dataset.cmd); }
+  });
   addEventListener("resize", () => renderTabs());
   $(".detail .scroll").addEventListener("scroll", () => { if (S.focus === 3) renderWhere(); }, { passive: true });
   $(".detail").addEventListener("mousedown", () => focusArea(3));
@@ -614,6 +622,8 @@ async function pollLive() {
     S.live = l;
     const b = $("#live");
     b.hidden = !l.running;
+    // the game's place in the top bar: launch while it is not running, its state while it is
+    $("#btn-launch").hidden = !!l.running;
     b.textContent = l.running ? (l.pack ? Tf("pack %s running since %s", l.pack, l.since) : Tf("game running since %s", l.since)) + (l.errors ? " · " + Tf("%d errors", l.errors) : "") : "";
     b.title = l.guess ? T("which list runs is taken from the launch records") : "";
     b.onclick = () => cmd("needs");

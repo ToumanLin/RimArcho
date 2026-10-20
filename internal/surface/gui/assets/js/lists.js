@@ -49,7 +49,7 @@ export function renderHeads() {
     const c = S.cols[k];
     const n = c.query.trim() ? `${c.view.length}/${c.items.length}` : `${c.items.length}`;
     h.innerHTML = `<span class="n">${k + 1}</span><span class="t">${esc(T(AREAS[k]))}</span><span class="num">${n}</span>` +
-      (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "");
+      (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "") + (k === 1 ? listActions() : "");
     const s = $(".search", a);
     s.classList.toggle("on", c.searching || !!c.query);
     let o = $(".others", a);
@@ -59,6 +59,15 @@ export function renderHeads() {
       o.textContent = Tf("other lists: %s · tab goes to the next list with matches", parts.join(" · "));
     } else if (o) o.remove();
   }
+}
+
+// listActions: the enabled list's own actions sit in its head (sort and save act on it);
+// main.js runs them by data-cmd.
+function listActions() {
+  const u = S.board && S.board.unsaved;
+  return `<span class="acts">` + (u ? `<span class="unsaved">${esc(Tf("%d not saved", u))}</span>` : "") +
+    `<button class="btn small" data-cmd="sort" title="S">${esc(T("sort"))}</button>` +
+    `<button class="btn small${u ? " hot" : ""}" data-cmd="save" title="w">${esc(T("save"))}</button></span>`;
 }
 
 const pools = [new Map(), new Map(), new Map()];
@@ -85,6 +94,7 @@ export function renderRows(k) {
     // Staging is empty: its place shows the history (08 §14).
     if (k === 2 && !c.query && S.history && S.history.length > 1) empty.append(historyPanel());
   } else if (empty) empty.remove();
+  if (k === 2) historyDock(box, !c.view.length && !c.query);
   const first = Math.max(0, Math.floor(box.scrollTop / ROW_H) - 4);
   const last = Math.min(c.view.length, first + Math.ceil(box.clientHeight / ROW_H) + 8);
   const pool = pools[k];
@@ -113,10 +123,30 @@ export function renderRows(k) {
 export let onHistory = () => {};
 export function setOnHistory(fn) { onHistory = fn; }
 
+// historyDock: while staging holds mods the history does not go away; it folds into a bar
+// under the staged mods (open it to see the steps).
+let histOpen = false;
+function historyDock(box, emptyShown) {
+  const area = box.parentElement;
+  let dock = $(".histdock", area);
+  const show = !emptyShown && S.history && S.history.length > 1;
+  if (!show) { if (dock) dock.remove(); return; }
+  if (!dock) { dock = el("div", "histdock"); area.append(dock); }
+  const sig = JSON.stringify(S.history) + histOpen;
+  if (dock.dataset.sig === sig) return;
+  dock.dataset.sig = sig;
+  dock.innerHTML = "";
+  const steps = S.history.filter((h) => h.kind === "undo" || h.kind === "redo").length;
+  const bar = el("button", "hbar", (histOpen ? "▾ " : "▸ ") + T("history") + (steps ? " · " + Tf("%d steps", steps) : ""));
+  bar.onclick = (e) => { e.stopPropagation(); histOpen = !histOpen; historyDock(box, false); };
+  dock.append(bar);
+  if (histOpen) dock.append(historyPanel(false));
+}
+
 // historyPanel: unsaved steps around "now", then the saved versions (08 §14).
-function historyPanel() {
+function historyPanel(title = true) {
   const p = el("div", "hist");
-  p.append(el("div", "hh", T("history")));
+  if (title) p.append(el("div", "hh", T("history")));
   let versions = false;
   for (const h of S.history) {
     if (h.kind === "version" && !versions) {

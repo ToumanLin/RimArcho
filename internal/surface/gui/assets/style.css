@@ -65,7 +65,7 @@ kbd { font: 11px var(--font); color: var(--faint); margin-left: 6px; }
 .ok { color: var(--green); } .warn { color: var(--amber); } .err { color: var(--red); } .log { color: var(--log); }
 svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 
-#app { display: grid; grid-template-rows: 46px auto 1fr 30px; height: 100%; }
+#app { display: grid; grid-template-rows: 46px 1fr 30px; height: 100%; }
 
 /* ---- header: the environment, the pages (shift+1–5), the list's actions ---- */
 #top { position: relative; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 14px; min-width: 0; }
@@ -110,16 +110,23 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .btn .ic { display: inline-flex; margin-right: 5px; }
 .btn .ic.spin svg { animation: spin .9s linear infinite; }
 
-/* the Mod list's own actions: sort, save, launch (they act on the enabled list) */
-#listbar { display: flex; align-items: center; gap: 4px; padding: 0 14px 8px; min-height: 34px; }
-#listbar .btn { border: 1px solid var(--line); background: var(--card); color: var(--fg-2); }
-#listbar .btn:hover { border-color: var(--muted); color: var(--fg); }
-#listbar .btn.primary { color: var(--accent-fg); background: var(--accent); border-color: transparent; font-weight: 500; }
+/* the enabled list's own actions in its head: sort, save (launch is the top bar's) */
+.area .head .acts { margin-left: auto; display: flex; align-items: center; gap: 4px; align-self: center; }
+.area .head .acts .unsaved { color: var(--accent); font-size: 11.5px; margin-right: 4px; }
+.area .head .acts .btn { height: 22px; border: 1px solid var(--line); background: var(--card); color: var(--fg-2); }
+.area .head .acts .btn:hover { border-color: var(--muted); color: var(--fg); }
+.area .head .acts .btn.hot { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 
 /* ---- the board: four cards (06 §5, §13.3) ---- */
 #board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 8px var(--c2, .8fr) 8px var(--c3, 1.4fr); }
 #board.no-staging { grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 0 0 8px var(--c3, 1.4fr); }
 #board.no-staging [data-area="2"], #board.no-staging [data-split="1"] { display: none; }
+/* every child keeps its own track: a hidden one leaves its track empty (0 wide) instead of
+   letting the ones after it slide into the wrong tracks (the detail landed in a 0 track) */
+#board > [data-area="0"] { grid-column: 1; } #board > [data-split="0"] { grid-column: 2; }
+#board > [data-area="1"] { grid-column: 3; } #board > [data-split="1"] { grid-column: 4; }
+#board > [data-area="2"] { grid-column: 5; } #board > [data-split="2"] { grid-column: 6; }
+#board > [data-area="3"] { grid-column: 7; } #board > * { grid-row: 1; }
 .area { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; transition: border-color .15s; }
 .area.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .area .head { display: flex; align-items: baseline; gap: 8px; padding: 9px 12px 6px; color: var(--faint); white-space: nowrap; overflow: hidden; border-bottom: 1px solid var(--line-2); }
@@ -163,6 +170,10 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .hist .h.now { cursor: default; color: var(--accent); font-weight: 600; }
 .hist .h.now::before { content: "● "; }
 .hist .h.redo { color: var(--faint); }
+.histdock { flex: none; border-top: 1px solid var(--line-2); max-height: 45%; overflow-y: auto; padding: 0 10px 6px; }
+.histdock .hbar { display: block; width: 100%; text-align: left; padding: 7px 2px 3px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.histdock .hbar:hover { color: var(--fg); }
+.histdock .hist { margin-top: 0; }
 .drop-tip { position: fixed; pointer-events: none; background: var(--pop-bg); box-shadow: var(--shadow); color: var(--fg); padding: 3px 9px; border-radius: 7px; font-size: 12px; z-index: 30; }
 
 /* detail (06 §6, 08 §7) */
@@ -324,6 +335,6 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .help b { color: var(--fg); font-weight: 500; white-space: nowrap; }
 .help span { color: var(--muted); }
 
-@media (max-width: 1100px) { #board { grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 0 0 8px var(--c3, 1.2fr); } #board [data-area="2"], #board [data-split="1"] { display: none; } }
-@media (max-width: 800px) { #board { grid-template-columns: 1fr 8px 1.2fr 0 0 0 0; } #board .detail, #board [data-split="2"] { display: none; } }
+@media (max-width: 900px) { #board { grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 0 0 8px var(--c3, 1.2fr); } #board [data-area="2"], #board [data-split="1"] { display: none; } }
+@media (max-width: 680px) { #board { grid-template-columns: 1fr 8px 1.2fr 0 0 0 0; } #board .detail, #board [data-split="2"] { display: none; } }
 @media (max-width: 760px) { #top .side.left .badge { display: none; } }
