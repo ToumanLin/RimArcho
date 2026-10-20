@@ -27,6 +27,14 @@ Spec: `docs/specs/10-1.0实现.md`.
 - `loadout export --format rimsort|rml|rimcrow`.
 - `archo collection <link|ID> [--import]` compares a Steam Workshop collection with what is
   installed and can load it into the workspace.
+- The window imports and exports lists (导入 / 导出 in the Enabled list's head, `i` / `e`, the
+  palette): a file (open dialog, typed path or drop), pasted text, a share code, a Rentry or
+  collection link is previewed first — installed, not installed with Workshop links and known
+  replacements, what replacing or only adding the missing mods would change — and applied as
+  one undo step; ModsConfig.xml still changes only on save. Export writes RimSort, `.rml`,
+  RimCrow ModList.xml, text or ModsConfig.xml (save dialog or a path; never the game's own
+  file, never over a file without asking) or copies a share code. The TUI has both in the
+  palette and `e` for export.
 
 ### Community data (10 §5)
 - `archo data update` / `archo data status`: RimSort's rules and Workshop database, Use This

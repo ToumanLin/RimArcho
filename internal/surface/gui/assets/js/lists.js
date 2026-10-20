@@ -66,6 +66,7 @@ export function renderHeads() {
 function listActions() {
   const u = S.board && S.board.unsaved;
   return `<span class="acts">` + (u ? `<span class="unsaved">${esc(Tf("%d not saved", u))}</span>` : "") +
+    `<button class="btn small" data-cmd="exchange" title="i · e">${esc(T("import / export"))}</button>` +
     `<button class="btn small" data-cmd="sort" title="S">${esc(T("sort"))}</button>` +
     `<button class="btn small${u ? " hot" : ""}" data-cmd="save" title="w">${esc(T("save"))}</button></span>`;
 }

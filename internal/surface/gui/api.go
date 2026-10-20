@@ -38,6 +38,7 @@ type API struct {
 	// building is the pack this window's build child is making ("" none).
 	building string
 	live     view.LiveTracker // the running game's log (10 §3)
+	x        exchange         // import and export (exchange.go)
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string

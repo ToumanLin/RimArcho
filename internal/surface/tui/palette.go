@@ -76,6 +76,10 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			}
 			return m.requestDetail()
 		}
+	case "import":
+		return func(m *model) tea.Cmd { return m.importPrompt() }
+	case "export":
+		return func(m *model) tea.Cmd { m.tab = tabList; return m.exportChoice() }
 	case "filter":
 		return list("/")
 	case "details":

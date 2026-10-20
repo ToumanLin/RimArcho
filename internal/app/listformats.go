@@ -25,6 +25,8 @@ const (
 	FormatRimSort = "rimsort" // = ModsConfig XML
 	FormatRML     = "rml"
 	FormatRimCrow = "rimcrow" // share code
+	// FormatRimCrowXML is RimCrow's ModList.xml.
+	FormatRimCrowXML = "rimcrow-xml"
 )
 
 // ParseList reads a list in any supported format. Tokens are lower-case packageIds (with
@@ -424,5 +426,43 @@ func RML(game string, tokens []string, ws, names map[string]string) []byte {
 	b.WriteString("    </ids>\n    <names>\n")
 	li("      ", nl)
 	b.WriteString("    </names>\n  </modList>\n</savedModList>\n")
+	return []byte(b.String())
+}
+
+// RimCrowXML renders a list as RimCrow's ModList.xml (ids, names and workshop IDs in
+// parallel lists, as parseXMLList reads them).
+func RimCrowXML(tokens []string, ws, names map[string]string) []byte {
+	var b strings.Builder
+	esc := func(s string) string {
+		var w strings.Builder
+		xml.EscapeText(&w, []byte(s))
+		return w.String()
+	}
+	b.WriteString("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ModList>\n")
+	for _, part := range []struct {
+		tag string
+		val func(t string) string
+	}{
+		{"modIds", func(t string) string { return t }},
+		{"modNames", func(t string) string {
+			if n := names[t]; n != "" {
+				return n
+			}
+			return t
+		}},
+		{"modSteamWorkshopIds", func(t string) string {
+			if w := ws[t]; w != "" {
+				return w
+			}
+			return "0"
+		}},
+	} {
+		b.WriteString("  <" + part.tag + ">\n")
+		for _, t := range tokens {
+			b.WriteString("    <li>" + esc(part.val(t)) + "</li>\n")
+		}
+		b.WriteString("  </" + part.tag + ">\n")
+	}
+	b.WriteString("</ModList>\n")
 	return []byte(b.String())
 }
