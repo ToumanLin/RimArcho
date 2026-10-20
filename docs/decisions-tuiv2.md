@@ -448,3 +448,100 @@ Implements 06 §12 (commit f7ba56a). Where §12 and the rest of 06 disagree, §1
 | T15 | `TestT15FullScreenNext`: ↓ to the bottom, `→` shows Harmony from the top; tab / shift+tab sections; wheel; `esc` with the cursor on Harmony. `TestDetailFocus` for the compact detail |
 | T16 | `TestT16WidthsPersist`: `>`×3 and `z` survive a new model on the same database; the detail keeps ≥ 40 cells; `=` resets. `TestResizeDrag`: dragging the gap sets and stores the width |
 | Old tests | Updated for the new keys: space picks, ctrl+↓ moves the cursor, `tab` reaches Staging, `I` opens the technical pages, no drag-to-move. `TestT6Thumbnail` checks the thumbnail appears at once, and the 150 ms dwell when `ui.preview_dwell_ms` is set |
+
+# V3 interaction model (06 §13)
+
+Implements 06 §13 (commit 3e9c416). §13 replaces the pick session and floating hint of
+§12.2 and the "→ into the detail" case of §12.5. §12.1, §12.3 and §12.4 are kept. These are
+the calls made where §13 was open.
+
+## Decisions
+
+### Areas and the arrows (§13.3, §13.4)
+
+1. **← from the detail goes back to the list whose mod it shows.** It does not go to area 3.
+   At 130 columns Staging is not on screen, and from Enabled at 160 columns area 3 would show
+   another mod. → from Staging (area 3) still reaches area 4. ←→ do not wrap. `tab` /
+   `shift+tab` go round all the areas, the detail included.
+2. **No detail column (below 110 cells):** area 4 does not exist. `4` says so and points to
+   `enter`. PgUp/PgDn and the wheel page the list, because there is no detail to scroll.
+3. **The wheel scrolls the detail wherever the pointer is**, as §13.4 says. It no longer
+   moves a list's cursor. Lists are scrolled with the keys, or by a click.
+4. **Scrolled detail:** the 12-line cap on the description only applies at the top. Once the
+   detail is scrolled (PgDn from anywhere) or focused, the whole description shows, so
+   `PgDn` `PgDn` reads it (§13.9). A PgDn pressed before the mod's details have loaded is
+   kept until they arrive.
+5. **The detail column has a title line**, `4 详情` (it becomes `▲ name` once scrolled), in
+   the accent colour while area 4 has the focus. Its content starts one line lower, level
+   with the first list row. While area 4 has the focus, the lists are drawn unfocused, so
+   there is one bright place.
+6. **In popups both pairs of arrows choose** (§13.4 table): the palette and the tag bar take
+   ↑↓ and ←→, and the position input steps through its options with either pair.
+
+### Selection (§13.5)
+
+7. **`v` still toggles**, as an alias of `ctrl+space`. `ctrl+↑↓` are plain cursor moves.
+8. **A plain click in the same list keeps the selection.** It moves the cursor, like ↑↓ do.
+   A click in another list drops the selection. The hint line says so in advance:
+   `←→ 换列表会取消选择`.
+9. **Tagging keeps the selection**, so `#` can be used again. `space` and `t` drop it,
+   because the rows leave the list. `J`/`K` and `m` within Enabled keep it.
+
+### Verbs (§13.6, §13.7)
+
+10. **`shift+J`/`shift+K` cannot be told apart from `J`/`K`** in a terminal: `J` is already
+    shift+j. Moving by 10 is on `alt+J`/`alt+K` (also `alt+j`/`alt+k`).
+11. **After `space` enables, the cursor stays in Disabled**, so several mods can be enabled
+    in a row. The status line says `✓ 已放在第 352 位 · m 改位置`. An `m` pressed as the
+    very next key moves the mods that `space` just placed. Any other key forgets them, just
+    as it clears the status line.
+12. **`space` in Staging** puts the mod back where it was, like `t` there and like
+    §5.4. Disabling from Staging makes no sense.
+13. **The position input** is one list of options, each one line except `最前 · 最后`, which
+    share a line. Positions count in the list without the moving mods, which is what
+    `MoveBlock` and `Enable` take. `（第 N 位）` beside a name is that mod's current number.
+    There are up to 5 name matches, ranked prefix, then substring, then letters in order.
+    `tab` makes them "before" and keeps the chosen row. The input sits under the columns,
+    which give it their last lines, so a thumbnail never covers it.
+14. **The suggested position for mods that are already enabled:** `App.SuggestAt` now
+    takes them out of the list first, so `m` can suggest a place for a move too.
+15. **`m` from Staging with several mods** enables them at the place and takes them out of
+    staging. `Restore` only takes a placement for one mod. This is one undo step; staging
+    itself is not on the undo stack, the same as before.
+16. **One undo step per verb** comes from one app edit per verb. The pick session's
+    `App.BeginBatch` is no longer used by the TUI. It is left in `internal/app` (with its
+    test) for the main session to keep or remove.
+
+### Search and position line (§13.3, §13.8)
+
+17. **The "其他区" line is the status line while typing**, not a line under the column title.
+    A line there would push every row down.
+18. **`tab` while searching** moves the query to the next list to the right (wrapping) that
+    has matches, puts the cursor on the first match, and ends the typing. Ending the typing
+    is what makes `/` name `tab` `space` work in 3 keys: otherwise `space` would type a space.
+    The list it left has its query cleared.
+19. **The position line** is on the right of the top bar, before `L 启动`, which is dropped
+    first when space runs out. On full-screen, technical, 需要处理 and 最近变化 screens it is
+    the breadcrumb. The place counts the visible (searched) rows, and `已筛选` marks a search.
+    In the detail, the section comes from the heading above the top line (概要, 简介, 历史,
+    技术信息) plus how far down it is.
+20. **Popups.** The five of §13.2 are the palette, tag bar, position input, confirm panels and
+    help. The `:` command line and the `r` rule prompt are kept as inputs for advanced use,
+    and only `?` lists them. Search shows as `› 搜索`, and a pending double press as `› 确认`.
+    Confirm panels and help still use the whole body, as before.
+21. **esc in the technical pages closes the whole stack** (backspace goes back one page), so
+    T20's three presses hold from any depth.
+22. **Hint line:** at most 7 pairs, the last being `? 全部按键`. `!` is no longer on the
+    hint line (the top bar shows the count), but `!` still works and `?` lists it.
+
+## Verification
+
+| Test | Result |
+| --- | --- |
+| T17 | `TestT17ArrowsOnlyNavigate`: 15 states (three lists, selection, detail, full screen, technical pages, search, palette, tag bar, position input, confirm, help, 需要处理, 最近变化). Each gets 1000 random ↑↓←→, PgUp/PgDn, shift and ctrl arrows, and the wheel. List, staging, tags and the undo stack are unchanged in each |
+| T18 | `TestT18TaskSteps` on 128 enabled mods. Enable Late by name, landing after P050 as its loadAfter wants: 3 keys. Move P003 after P124: 2. Disable three mods that are not next to each other: 4 plus moves. Read a 40-line description to the end without moving the focus: 2. Tag five in a row: 7. Stage half: N |
+| T19 | `TestT19PositionLine`: every state's top line matches area, `i / n`, selection and popup name. Chinese: `已启用 · 3 / 128 · 已选 2` |
+| T20 | `TestT20EscBack`: the 15 states plus 7 nested ones (detail + selection + tag bar / position input / confirm, full + selection + palette, technical pages two deep, search + selection, a double press) get back to a list with nothing selected or open in ≤ 3 esc |
+| §13.7, §13.8 | `TestPositionInput` (a number, a name with tab = before, enter alone = the suggestion, one undo step, `m` right after `space`, J/K/alt+J). `TestSearchOtherLists` |
+| Old tests | T11, T12 and the hint overlay test are removed with the pick session. TestEnableMoveSortSaveUndo, TestBreakpointsAndCJK, TestMouseClicks, TestDetailFocus, TestT13TagBar and TestChineseUI were updated for the new keys. Full suite, gofmt and vet are clean |
+| Screens | On a copy of the data directory, in WezTerm, Chinese: the selection hint and `已启用 · 6 / 483 · 已选 3`; the position input `移动 3 个Mod 到 ❯ har` with `之后 Harmony（第 1 位）` … `第 4 位（建议位置）`, `最前 · 最后`; the detail, `详情 · Vehicle Framework · 简介 26%` after one PgDn. The screenshots are in the session notes folder and are not committed (user data) |
