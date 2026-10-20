@@ -2,7 +2,7 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
-## 0.6.0 — the window (unreleased)
+## 0.7.0 — the window (unreleased)
 
 ### GUI (08)
 - `RimArcho.exe`: a desktop window (Wails v3 and plain HTML/CSS/JavaScript, no frontend build
