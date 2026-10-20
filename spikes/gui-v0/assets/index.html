@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>RimArcho</title>
+<style>
+:root { --bg:#0f1011; --panel:#151617; --line:#232426; --text:#e6e6e6; --dim:#8a8f98; --acc:#5e6ad2; }
+* { box-sizing:border-box; }
+html,body { margin:0; height:100%; background:var(--bg); color:var(--text);
+  font:13px/1.4 "Segoe UI Variable","Segoe UI","Microsoft YaHei UI",sans-serif; user-select:none; }
+#app { display:grid; grid-template-columns:1fr 1fr 1fr 1.3fr; grid-template-rows:40px 1fr; height:100%; }
+header { grid-column:1/-1; display:flex; align-items:center; gap:12px; padding:0 14px; border-bottom:1px solid var(--line); }
+header b { font-weight:600; } header span { color:var(--dim); }
+.col { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); }
+.col h2 { margin:0; padding:8px 12px; font-size:12px; font-weight:500; color:var(--dim); }
+.list { flex:1; overflow-y:auto; position:relative; }
+.row { position:absolute; left:0; right:0; height:26px; display:flex; align-items:center; gap:8px; padding:0 12px; cursor:default; white-space:nowrap; }
+.row:hover { background:#1b1c1e; } .row.sel { background:#22233a; }
+.row .n { color:var(--dim); width:34px; text-align:right; font-variant-numeric:tabular-nums; }
+.row .k { color:var(--dim); width:14px; } .row .t { overflow:hidden; text-overflow:ellipsis; }
+#detail { padding:16px; overflow-y:auto; }
+#detail img { max-width:100%; border-radius:6px; display:block; margin-bottom:12px; }
+#detail h1 { font-size:18px; margin:0 0 8px; } #detail .f { color:var(--dim); margin:2px 0; word-break:break-all; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header><b>RimArcho</b><span id="sum">加载中…</span></header>
+  <section class="col"><h2>未启用</h2><div class="list" id="c0"></div></section>
+  <section class="col"><h2>已启用</h2><div class="list" id="c1"></div></section>
+  <section class="col"><h2>暂存（V0 空）</h2><div class="list" id="c2"></div></section>
+  <section id="detail"></section>
+</div>
+<script type="module">
+import { Call } from "/wails/runtime.js";
+const H = 26, call = (m, ...a) => Call.ByName("main.Svc." + m, ...a);
+const kinds = { workshop:"◆", local:"●", official:"★" };
+let sel = null;
+
+function virtual(el, rows) {
+  const pad = document.createElement("div");
+  pad.style.height = rows.length * H + "px";
+  el.replaceChildren(pad);
+  const pool = new Map();
+  function draw() {
+    const a = Math.max(0, Math.floor(el.scrollTop / H) - 5), b = Math.min(rows.length, a + Math.ceil(el.clientHeight / H) + 10);
+    for (const [i, d] of pool) if (i < a || i >= b) { d.remove(); pool.delete(i); }
+    for (let i = a; i < b; i++) {
+      if (pool.has(i)) continue;
+      const r = rows[i], d = document.createElement("div");
+      d.className = "row" + (r.id === sel ? " sel" : ""); d.style.top = i * H + "px"; d.dataset.id = r.id;
+      d.innerHTML = `<span class="n">${r.pos || ""}</span><span class="k">${kinds[r.kind] || "·"}</span><span class="t"></span>`;
+      d.querySelector(".t").textContent = r.name;
+      d.onclick = () => show(r.id);
+      el.appendChild(d); pool.set(i, d);
+    }
+  }
+  el.onscroll = draw; new ResizeObserver(draw).observe(el); draw();
+}
+
+async function show(id) {
+  sel = id;
+  document.querySelectorAll(".row").forEach(d => d.classList.toggle("sel", d.dataset.id === id));
+  const t0 = performance.now(), d = await call("Detail", id), el = document.getElementById("detail");
+  el.replaceChildren();
+  if (d.Preview) { const img = new Image(); img.src = "/preview/" + id; el.appendChild(img); }
+  const h = document.createElement("h1"); h.textContent = d.Name; el.appendChild(h);
+  for (const f of [d.Package, d.Authors, d.Path, (d.Tags || []).join(" · "), `detail ${Math.round(performance.now() - t0)} ms`]) {
+    if (!f) continue; const p = document.createElement("p"); p.className = "f"; p.textContent = f; el.appendChild(p);
+  }
+}
+
+const t0 = performance.now(), rows = await call("Rows");
+const on = rows.filter(r => r.pos).sort((a, b) => a.pos - b.pos), off = rows.filter(r => !r.pos);
+virtual(document.getElementById("c0"), off); virtual(document.getElementById("c1"), on); virtual(document.getElementById("c2"), []);
+document.getElementById("sum").textContent = `${rows.length} 个 Mod · 启用 ${on.length} · Rows ${Math.round(performance.now() - t0)} ms`;
+</script>
+</body>
+</html>
