@@ -145,6 +145,12 @@ func planLinks(st *LoadoutState) (string, []LinkChange, error) {
 	}
 	for _, d := range ents {
 		name := d.Name()
+		if packLink(name) && source.IsLink(filepath.Join(mods, name)) {
+			// A pack's link (10 §8.3): saving the normal list ends the pack's run.
+			tgt, _ := source.RealPath(filepath.Join(mods, name))
+			out = append(out, LinkChange{Op: "remove", Name: name, Target: tgt})
+			continue
+		}
 		if !managedLink(name) {
 			continue
 		}

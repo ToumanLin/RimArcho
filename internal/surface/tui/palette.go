@@ -82,6 +82,24 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			m.tab = tabList
 			return m.key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
 		}
+	case "packs":
+		// The packs as text (10 §8); build and play them with the commands shown.
+		return func(m *model) tea.Cmd {
+			var b strings.Builder
+			rows, err := view.PackRows(m.app)
+			if err != nil {
+				b.WriteString(err.Error() + "\n")
+			}
+			for _, r := range rows {
+				fmt.Fprintf(&b, "%s\n  %s · %s\n  : archo pack launch %q\n\n", r.Name, r.Facts, r.Played, r.Name)
+			}
+			if len(rows) == 0 {
+				b.WriteString(T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves") + "\n\n")
+			}
+			b.WriteString(": archo pack build <name>\n")
+			m.openPanel(T("packs"), b.String(), nil)
+			return nil
+		}
 	case "settings":
 		// The settings page as text (10 §7); each value says the command that changes it.
 		return func(m *model) tea.Cmd {

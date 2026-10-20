@@ -365,3 +365,62 @@ export async function settings() {
   }
   sc.scrollTop = top;
 }
+
+// ---- packs (10 §8) ----
+// The packs like versions in a game launcher: play one, or build one from the current list.
+
+export async function packs() {
+  let rows;
+  try { rows = (await api.Packs()) || []; } catch (e) { say("fail", errText(e)); return; }
+  if (S.screen !== "packs") openScreen("packs");
+  const sc = $("#screen");
+  sc.innerHTML = "";
+  const w = el("div", "wrap packs");
+  sc.append(w);
+  const bar = el("div", "bar");
+  bar.append(el("h2", "", T("packs")), el("span", "grow"));
+  const name = el("input");
+  name.placeholder = T("name of a new pack");
+  name.spellcheck = false;
+  const build = el("button", "act", T("build from the current list"));
+  build.onclick = async () => {
+    const n = name.value.trim();
+    if (!n) { name.focus(); return; }
+    let pv;
+    try { pv = await api.PackPreview(n); } catch (e) { return say("fail", errText(e)); }
+    pop.confirm(Tf("build pack %s", n), pv.lines, T("build"), pv.ok ? async () => {
+      say("busy", T("copying the mods…"));
+      try { say("ok", await api.PackBuild(n)); } catch (e) { say("fail", errText(e)); }
+      packs();
+    } : null);
+  };
+  name.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); build.click(); } };
+  bar.append(name, build);
+  w.append(bar);
+  if (!rows.length) {
+    w.append(el("p", "dim", T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves")));
+    return;
+  }
+  for (const r of rows) {
+    const row = el("div", "pack");
+    const left = el("div", "l");
+    left.append(el("div", "n", r.name), el("div", "second", r.facts + " · " + r.played));
+    const right = el("div", "r");
+    if (!r.light) {
+      const play = el("button", "act primary", T("play") + " ▶");
+      play.onclick = async () => {
+        try { say("ok", await api.PackLaunch(r.name)); } catch (e) { say("fail", errText(e)); }
+        packs();
+      };
+      right.append(play);
+    }
+    const del = el("button", "act", T("move to the recycle bin"));
+    del.onclick = () => pop.confirm(T("move to the recycle bin"), [Tf("pack %s goes to the recycle bin; you can restore it from there", r.name)], T("move to the recycle bin"), async () => {
+      try { say("ok", await api.PackRemove(r.name)); } catch (e) { say("fail", errText(e)); }
+      packs();
+    });
+    right.append(del);
+    row.append(left, right);
+    w.append(row);
+  }
+}

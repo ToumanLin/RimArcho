@@ -232,6 +232,9 @@ var verRe = regexp.MustCompile(`^[vV]?\d+\.\d+$`)
 
 func isVersion(s string) bool { return verRe.MatchString(s) }
 
+// IsVersionFolder reports whether a folder name is a game version ("1.6", "v1.5").
+func IsVersionFolder(s string) bool { return isVersion(s) }
+
 func trimV(s string) string { return strings.TrimPrefix(strings.TrimPrefix(s, "v"), "V") }
 
 func versionParts(s string) (int, int) {

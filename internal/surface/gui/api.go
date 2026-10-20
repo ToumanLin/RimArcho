@@ -132,6 +132,50 @@ func (s *API) boardLocked() *Board {
 }
 
 // Stamp is the database state; the page asks on focus and reloads when it changed (G8).
+// Packs lists the packs (10 §8).
+func (s *API) Packs() ([]view.PackRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.PackRows(s.a)
+}
+
+// PackPreview is a dry-run build of the current list as a pack.
+func (s *API) PackPreview(name string) (*view.PackPreview, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.PreviewPack(s.a, name)
+}
+
+// PackBuild builds the pack.
+func (s *API) PackBuild(name string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := s.a.BuildPack(name, false, false); err != nil {
+		return "", err
+	}
+	return view.Tf("built pack %s", name), nil
+}
+
+// PackLaunch plays a pack.
+func (s *API) PackLaunch(name string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := s.a.LaunchPack(name, false); err != nil {
+		return "", err
+	}
+	return view.Tf("pack %s: the game is starting", name), nil
+}
+
+// PackRemove moves a pack to the recycle bin.
+func (s *API) PackRemove(name string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := s.a.RemovePack(name, false); err != nil {
+		return "", err
+	}
+	return view.Tf("pack %s is in the recycle bin", name), nil
+}
+
 // Settings is the settings page (10 §7).
 func (s *API) Settings() []view.SettingGroup {
 	s.mu.Lock()

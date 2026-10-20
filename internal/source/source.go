@@ -114,6 +114,12 @@ type Entry struct {
 	IsLink   bool
 }
 
+// PackLinkPrefix names the Mods/ links of a pack being played (10 §8.3). "!" sorts before
+// every folder name, so the game registers the pack's pinned copy before another Mods/ copy
+// with the same packageId. The links are not part of
+// the environment and List skips them.
+const PackLinkPrefix = "!ArchoPack_"
+
 // List enumerates the sub-directories of root, following junctions and symlinks the way the
 // game's DirectoryInfo.GetDirectories does. realRoot is root with links resolved.
 func List(root string) (entries []Entry, realRoot string, err error) {
@@ -129,6 +135,9 @@ func List(root string) (entries []Entry, realRoot string, err error) {
 		p := filepath.Join(root, de.Name())
 		e := Entry{Name: de.Name(), Path: p, RealPath: filepath.Join(realRoot, de.Name())}
 		if IsLink(p) {
+			if strings.HasPrefix(strings.ToLower(de.Name()), strings.ToLower(PackLinkPrefix)) {
+				continue // a pack's copy, linked only while the pack is played (10 §8.3)
+			}
 			rp, err := RealPath(p)
 			if err != nil {
 				continue // dangling link

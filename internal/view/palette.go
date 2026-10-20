@@ -43,6 +43,7 @@ var Commands = []Command{
 	{"details", "详情", "details", "enter"},
 	{"tech", "技术信息", "technical information", "i"},
 	{"tags", "编辑标签", "tags", "#"},
+	{"packs", "整合包", "packs", "build, play"},
 	{"settings", "设置", "settings", "paths, language, data, caches"},
 	{"cli", "运行 archo 命令", "command line", ": archo"},
 	{"help", "帮助", "help", "?"},

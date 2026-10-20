@@ -66,17 +66,45 @@ func (a *App) Launch(dryRun, force bool) (*LaunchPlan, *LoadoutState, error) {
 		return nil, st, fmt.Errorf("%w: the workspace has %d unsaved changes; run archo save first, or launch --force to play the saved list",
 			ErrLaunchBlocked, n)
 	}
+	p, err := a.gamePlan(e, e.UserDataRoot)
+	if err != nil {
+		return nil, st, err
+	}
+	if dryRun {
+		return p, st, nil
+	}
+	// A pack's links would let the game see its copies next to this list (10 §8.3).
+	if _, err := a.removePackLinks(st.Ix, ""); err != nil {
+		return nil, st, err
+	}
+	if err := a.startGame(p); err != nil {
+		return nil, st, err
+	}
+	return p, st, a.Store.AddLaunch(e.ID, a.Now().UTC(), p.Method, p.Command())
+}
+
+func (a *App) startGame(p *LaunchPlan) error {
+	launcher := a.Launcher
+	if launcher == nil {
+		launcher = ExecLauncher
+	}
+	return launcher(p.Exe, p.Args, p.Dir)
+}
+
+// gamePlan is how the environment's game is started with userData as its data folder:
+// Steam or the executable, -savedatafolder when it is not the default, the launch arguments.
+func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error) {
 	p := &LaunchPlan{Method: e.Launch, Dir: e.GameRoot}
 	var extra []string
-	if e.UserDataRoot != "" && env.PathKey(e.UserDataRoot) != env.PathKey(env.DefaultUserDataRoot()) {
-		extra = append(extra, "-savedatafolder="+e.UserDataRoot)
+	if userData != "" && env.PathKey(userData) != env.PathKey(env.DefaultUserDataRoot()) {
+		extra = append(extra, "-savedatafolder="+userData)
 	}
 	extra = append(extra, strings.Fields(a.LaunchArgs(e.ID))...) // 10 §7
 	switch e.Launch {
 	case "steam":
 		p.Exe = env.SteamExe(a.Detect)
 		if p.Exe == "" {
-			return nil, st, fmt.Errorf("%w: Steam not found; use archo env set --launch direct", ErrLaunchBlocked)
+			return nil, fmt.Errorf("%w: Steam not found; use archo env set --launch direct", ErrLaunchBlocked)
 		}
 		p.Args = append([]string{"-applaunch", env.WorkshopAppID}, extra...)
 	default:
@@ -88,19 +116,9 @@ func (a *App) Launch(dryRun, force bool) (*LaunchPlan, *LoadoutState, error) {
 			}
 		}
 		if p.Exe == "" {
-			return nil, st, fmt.Errorf("%w: no game executable in %s", ErrLaunchBlocked, e.GameRoot)
+			return nil, fmt.Errorf("%w: no game executable in %s", ErrLaunchBlocked, e.GameRoot)
 		}
 		p.Args = extra
 	}
-	if dryRun {
-		return p, st, nil
-	}
-	launcher := a.Launcher
-	if launcher == nil {
-		launcher = ExecLauncher
-	}
-	if err := launcher(p.Exe, p.Args, p.Dir); err != nil {
-		return nil, st, err
-	}
-	return p, st, a.Store.AddLaunch(e.ID, a.Now().UTC(), p.Method, p.Command())
+	return p, nil
 }
