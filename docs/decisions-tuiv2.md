@@ -448,3 +448,61 @@ Implements 06 §12 (commit f7ba56a). Where §12 and the rest of 06 disagree, §1
 | T15 | `TestT15FullScreenNext`: ↓ to the bottom, `→` shows Harmony from the top; tab / shift+tab sections; wheel; `esc` with the cursor on Harmony. `TestDetailFocus` for the compact detail |
 | T16 | `TestT16WidthsPersist`: `>`×3 and `z` survive a new model on the same database; the detail keeps ≥ 40 cells; `=` resets. `TestResizeDrag`: dragging the gap sets and stores the width |
 | Old tests | Updated for the new keys: space picks, ctrl+↓ moves the cursor, `tab` reaches Staging, `I` opens the technical pages, no drag-to-move. `TestT6Thumbnail` checks the thumbnail appears at once, and the 150 ms dwell when `ui.preview_dwell_ms` is set |
+
+# V2.1 follow-up: thumbnail height, WezTerm memory
+
+## Thumbnail block
+
+The block under the thumbnail is as tall as the image. Before the size is known it is 16:9
+(prefetch usually knows it first). It is one line for "no preview". The erase on moving
+away covers only the image's own rows, and the old 9-row erase is gone: it could blank
+unchanged text below a short image.
+
+## WezTerm memory
+
+V3 recorded wezterm-gui at 161 MB (V0: 91 MB) and guessed image textures. Measured with
+`mem21.ps1` (scratchpad). Each run used its own `wezterm-gui start --always-new-process` on a
+data copy and the same 20240203 build the host installs. The session: rest on N mods, open 5
+full-screen details, idle. Working set in MB:
+
+| Configuration | Start | After 40 mods | After 40 + 5 full screens |
+| --- | --- | --- | --- |
+| Default, images off | 99–157 | 145–207 | 163–223 |
+| Default, images on | 98 | 160 | 172 |
+| OpenGL | 107 | 143 | 161 |
+| WebGpu | 155 | 383 | 379 |
+| Software | 101 | 163 | 177 |
+| Line caches 256 (+ image cache 16), images off | 102 | 127 | 132 |
+| Line caches 256, images on | 100 | 133 | 141 |
+
+| 150 mods, images on | After 150 mods | After + 5 full screens | CPU (s) |
+| --- | --- | --- | --- |
+| Default caches | 188 | 209 | 14.3 |
+| shape_cache_size 256 only | 186 | – | – |
+| Line caches 256 only | 144 | – | – |
+| Line caches 128 (chosen) | 136 | 152 | 15.2 |
+| Line caches 64 | 132 | – | – |
+
+Findings:
+
+1. **Images are a small part.** With images off the growth is nearly the same. The cost is
+   WezTerm's per-line render caches (`line_state_cache_size`, `line_quad_cache_size`,
+   `line_to_ele_shape_cache_size`, 1024 each by default). Every distinct line shown is
+   cached, and browsing mods shows many distinct lines, most of them CJK. `shape_cache_size`
+   makes no difference.
+2. **128 lines** keeps most of the saving (64 saves only 4 MB more) and still holds a
+   maximised window's lines, so frames are not reshaped. CPU over the same session matched
+   the default.
+3. **OpenGL is pinned.** In this build the default behaves like OpenGL. WebGpu used 2.3× as
+   much memory, and a later WezTerm could make it the default.
+4. **Also set:** `glyph_cache_image_cache_size = 16` (archo's own LRU holds the images) and
+   `scrollback_lines = 0` (the TUI runs on the alternate screen).
+
+The idle baseline is still about 100 MB, close to V0's 91 MB. It is the GPU context and the
+font; the config does not change it. archo's own working set was 46–58 MB in these runs,
+under the 80 MB gate.
+
+Caution for later scripts: if `WEZTERM_UNIX_SOCKET` is empty, `wezterm cli` falls back to
+the default socket, which may be the user's own window. `mem21.ps1` now stops if it cannot
+find its own `gui-sock-<pid>`. In the one run where that happened, the CLI refused anyway
+because no pane was focused, so nothing reached another window.

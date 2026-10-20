@@ -56,5 +56,16 @@ config.check_for_updates = false
 config.show_update_window = false
 config.automatically_reload_config = false
 config.enable_kitty_graphics = false -- iTerm2 inline images are always on
+
+-- Memory (docs/decisions-tuiv2.md, "WezTerm memory"): the per-line render caches hold 1024
+-- lines by default and grow with every distinct line shown; 128 still covers a maximised
+-- window. The same session went from 209 MB to 152 MB with the same CPU time. OpenGL is
+-- pinned: WebGpu measured 383 MB.
+config.front_end = 'OpenGL'
+config.line_state_cache_size = 128
+config.line_quad_cache_size = 128
+config.line_to_ele_shape_cache_size = 128
+config.glyph_cache_image_cache_size = 16
+config.scrollback_lines = 0 -- the TUI runs on the alternate screen
 return config
 `

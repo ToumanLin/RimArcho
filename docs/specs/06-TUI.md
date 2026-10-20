@@ -61,7 +61,7 @@
 
 ### 1.4 资源
 
-WezTerm 是独立进程，有自己的 GPU 和内存开销。V0 实测（07 §6.2）：承载 archo 空闲时 wezterm-gui 工作集约 91 MB，OpenConsole 约 12 MB；启动到窗口可见约 0.5 秒（首次约 1.2 秒）。01 §5.2 的“TUI ≤ 80 MB”仍然只约束 archo 进程本身。V3 实测（数据目录副本，依次停留 40 个 Mod 显示缩略图并打开一次全屏详情后空闲 60 秒）：archo 工作集 45.7 MB，峰值 53.5 MB；wezterm-gui 约 161 MB，比 V0 的 91 MB 高，原因未查（可能是图片纹理）。
+WezTerm 是独立进程，有自己的 GPU 和内存开销。V0 实测（07 §6.2）：承载 archo 空闲时 wezterm-gui 工作集约 91 MB，OpenConsole 约 12 MB；启动到窗口可见约 0.5 秒（首次约 1.2 秒）。01 §5.2 的“TUI ≤ 80 MB”仍然只约束 archo 进程本身。V3 实测（数据目录副本，依次停留 40 个 Mod 显示缩略图并打开一次全屏详情后空闲 60 秒）：archo 工作集 45.7 MB，峰值 53.5 MB；wezterm-gui 约 161 MB，比 V0 的 91 MB 高。V2.1 查明：主要不是图片，而是 WezTerm 按行缓存的渲染结果（默认每种 1024 行，浏览越多越大；关掉图片也涨 60 MB）。生成的 wezterm.lua 把三个行缓存降到 128 行并固定 OpenGL 前端（WebGpu 实测 383 MB），同一套操作从 209 MB 降到 152 MB，CPU 时间不变；空闲基线约 100 MB。
 
 WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI 套接字和日志，这个位置不能通过配置改变；RimArcho 的说明和卸载说明要提到它。
 
