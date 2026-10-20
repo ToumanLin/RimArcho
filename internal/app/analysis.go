@@ -151,6 +151,11 @@ func ChildAnalyze(home, envName, mm string, progress func(string)) error {
 	if err != nil {
 		return err
 	}
+	if b := strings.ToLower(filepath.Base(exe)); strings.HasSuffix(b, ".test") || strings.HasSuffix(b, ".test.exe") {
+		// A test binary would run its tests again instead of `analyze`, and those could
+		// start it again: tests set App.AnalyzeRunner (testkit uses InProcessAnalyze).
+		return errors.New("child analysis from a test binary: set App.AnalyzeRunner")
+	}
 	return ChildAnalyzeExe(exe, home, envName, mm, progress)
 }
 
