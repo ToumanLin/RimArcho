@@ -6,11 +6,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/host"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 	"github.com/ToumanLin/RimArcho/internal/surface/tui"
 )
@@ -20,7 +24,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	if len(argv) == 1 && (argv[0] == "--version" || argv[0] == "-v") {
 		argv = []string{"version"}
 	}
-	envName, rest, err := globalFlags(argv)
+	envName, here, rest, err := globalFlags(argv)
 	if err != nil {
 		fmt.Fprintln(stderr, "error:", err)
 		return cmds.ExitUsage
@@ -32,6 +36,15 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	defer ap.Close()
 	ap.EnvName = envName
+	if wantsHost(rest, here) {
+		// A bare `archo` (a double click): run the TUI in RimArcho's WezTerm host when it is
+		// there or the player agrees to download it (06 §1.1).
+		if launched, err := runHost(ap, envName, stdout); err != nil {
+			fmt.Fprintln(stderr, "error:", err)
+		} else if launched {
+			return cmds.ExitOK
+		}
+	}
 	if len(rest) == 0 || (len(rest) == 1 && rest[0] == "tui") {
 		// No command, or `archo tui` (what the WezTerm host runs, 06 §1.1): the TUI.
 		// Scans run as a child process of this executable.
@@ -59,16 +72,53 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	return code
 }
 
-// globalFlags removes --env <name> / --env=<name> from argv.
-func globalFlags(argv []string) (envName string, rest []string, err error) {
+// wantsHost: only a bare `archo` may start the WezTerm host; `archo tui` (what the host
+// runs), `archo --here`, every CLI command and `archo mcp` never do (06 §1.1).
+func wantsHost(rest []string, here bool) bool { return len(rest) == 0 && !here }
+
+// runHost is replaced in tests.
+var runHost = func(ap *app.App, envName string, out io.Writer) (bool, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return false, err
+	}
+	var args []string
+	if envName != "" {
+		args = []string{"--env", envName}
+	}
+	h := &host.Host{
+		Home: ap.Home, ProgramDir: filepath.Dir(exe), Exe: exe, Args: args, API: host.GitHubAPI,
+		Out: out, Getenv: os.Getenv, LookPath: exec.LookPath,
+		Start:   func(name string, args ...string) error { return exec.Command(name, args...).Start() },
+		Pref:    func() string { return ap.Store.Meta("cfg:terminal.host") },
+		SetPref: func(v string) error { return ap.Store.SetMeta("cfg:terminal.host", v) },
+	}
+	for _, k := range []string{"ProgramW6432", "ProgramFiles", "LOCALAPPDATA"} {
+		if d := os.Getenv(k); d != "" {
+			if k == "LOCALAPPDATA" {
+				d = filepath.Join(d, "Programs")
+			}
+			h.ProgramFiles = append(h.ProgramFiles, d)
+		}
+	}
+	if st, err := os.Stdin.Stat(); err == nil && st.Mode()&os.ModeCharDevice != 0 {
+		h.In = os.Stdin // a console to ask on
+	}
+	return h.Run()
+}
+
+// globalFlags removes --env <name> / --env=<name> and --here from argv.
+func globalFlags(argv []string) (envName string, here bool, rest []string, err error) {
 	for i := 0; i < len(argv); i++ {
 		a := argv[i]
 		switch {
 		case a == "--":
-			return envName, append(rest, argv[i:]...), nil
+			return envName, here, append(rest, argv[i:]...), nil
+		case a == "--here" && len(rest) == 0:
+			here = true // only before a command: `archo --here` (06 §1.1)
 		case a == "--env":
 			if i+1 >= len(argv) {
-				return "", nil, fmt.Errorf("--env needs a name")
+				return "", false, nil, fmt.Errorf("--env needs a name")
 			}
 			envName = argv[i+1]
 			i++
@@ -78,5 +128,5 @@ func globalFlags(argv []string) (envName string, rest []string, err error) {
 			rest = append(rest, a)
 		}
 	}
-	return envName, rest, nil
+	return envName, here, rest, nil
 }

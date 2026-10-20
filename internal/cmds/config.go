@@ -17,11 +17,14 @@ var configKeys = map[string][]string{
 	// 06 §6.4: whether descriptions and their images may be fetched from the Steam Workshop
 	"workshop.fetch":  {"on", "off"},
 	"workshop.images": {"on", "off"},
+	// 06 §1.1: auto asks once whether to download WezTerm; none (a "no") runs in the
+	// current terminal; wezterm always uses the host.
+	"terminal.host": {"auto", "wezterm", "none"},
 }
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.
