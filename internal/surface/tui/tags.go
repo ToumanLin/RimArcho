@@ -11,8 +11,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// The tag bar (06 §12.3): # opens one line of candidates for the picked mods (or the one
-// under the cursor). ←→ choose, enter applies, esc closes. Left of the first candidate is
+// The tag bar (06 §12.3): # opens one line of candidates for the selected mods (or the one
+// under the cursor; 06 §13.6). ←→ choose, enter applies, esc closes. Left of the first candidate is
 // "✎ type…", where typing makes a new tag. A tag every mod has shows as [✓tag] (enter
 // removes it), one only some have as [~tag] (enter gives it to all). The pinned tags
 // (config tags.pinned) come first, then the tags in use, most used first.
@@ -29,7 +29,7 @@ type tagBar struct {
 type tagCand struct {
 	tag  string
 	n    int // mods of the environment that have it
-	have int // of the picked mods
+	have int // of the selected mods
 }
 
 func (m *model) tagKey() tea.Cmd {
@@ -134,9 +134,6 @@ func (m *model) applyTag(tb *tagBar, tag string, remove bool) tea.Cmd {
 	}
 	if m.act("", argv...) {
 		m.say(sayOK, Tf("tags of %s: %s", tb.names, msg))
-	}
-	if !m.picking() {
-		m.marked = map[string]bool{}
 	}
 	m.refilterCol(m.focus, m.col().curID())
 	return m.requestDetail()
