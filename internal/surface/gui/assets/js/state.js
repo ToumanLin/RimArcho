@@ -16,6 +16,7 @@ export const S = {
   screen: null, // "needs" | "changes" | "full"
   busy: {},     // scan, analyze
   live: null,   // Live(): the running game and its errors (10 §3.4)
+  history: null, // History(): unsaved steps and versions (08 §14)
 };
 
 export const $ = (sel, root = document) => root.querySelector(sel);

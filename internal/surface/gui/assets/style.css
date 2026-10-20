@@ -98,6 +98,13 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .row.drop-before::before { top: -1px; } .row.drop-after::after { bottom: -1px; }
 .area.drop-target { background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .empty { color: var(--dim); padding: 10px 14px; }
+.hist { margin-top: 14px; color: var(--text); }
+.hist .hh { color: var(--second); font-size: 12px; margin: 10px 0 4px; }
+.hist .h { padding: 3px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist .h:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.hist .h.now { cursor: default; color: var(--accent); font-weight: 600; }
+.hist .h.now::before { content: "● "; }
+.hist .h.redo { color: var(--dim); }
 .drop-tip { position: fixed; pointer-events: none; background: var(--pill); color: var(--text); padding: 2px 8px; border-radius: 6px; font-size: 12px; z-index: 30; }
 
 /* detail (06 §6, 08 §7) */

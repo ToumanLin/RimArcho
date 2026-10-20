@@ -33,8 +33,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     move <ref>                                move an enabled mod
     swap <ref> [<ref>]                        replace an enabled mod by another instance of its lineage
     sort                                      sort the workspace by load-order constraints
-    undo                                      undo the last workspace edit
-    redo                                      redo an undone workspace edit
+    undo [<n>]                                undo the last workspace edit (or the last n: archo history)
+    redo [<n>]                                redo an undone workspace edit (or n of them)
     save                                      write the workspace to ModsConfig.xml (backup + atomic replace)
     loadout log                               saved and imported Loadout versions
     loadout diff [<v>] [<v>]                  differences between versions (default: newest version → workspace)
@@ -69,6 +69,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     unhide <ref>                              rename About.xml.disabled back to About.xml so the game sees the mod again
     unpin <ref>                               restore a pinned mod's workshop copy and use it instead of the pinning copy
     trash <ref>                               move a hidden or unsubscribed workshop folder to the recycle bin
+    history                                   the workspace's unsaved edits (undo/redo) and the saved versions
   references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>
   global flags: --env <name> (use another environment for this command)
 

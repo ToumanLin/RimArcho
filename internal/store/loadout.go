@@ -69,6 +69,31 @@ func (s *Store) PopStep(envID, stack string) (entries, op string, ok bool, err e
 	return entries, op, true, err
 }
 
+// Step is one stored workspace state of an undo or redo stack.
+type Step struct {
+	ID      int64
+	Entries string
+	Op      string
+}
+
+// Steps lists a stack, newest first.
+func (s *Store) Steps(envID, stack string) ([]Step, error) {
+	rows, err := s.DB.Query(`SELECT id, entries, op FROM workspace_undo WHERE environment_id=? AND stack=? ORDER BY id DESC`, envID, stack)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Step
+	for rows.Next() {
+		var x Step
+		if err := rows.Scan(&x.ID, &x.Entries, &x.Op); err != nil {
+			return nil, err
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
+}
+
 // LastStepID is the id of the newest state of a stack (0 when empty).
 func (s *Store) LastStepID(envID, stack string) int64 {
 	var id int64

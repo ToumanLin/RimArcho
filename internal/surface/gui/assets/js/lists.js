@@ -80,6 +80,8 @@ export function renderRows(k) {
   if (!c.view.length) {
     if (!empty) box.appendChild(empty = el("div", "empty"));
     empty.textContent = c.query ? T("nothing matches") : [T("every installed mod is enabled"), T("nothing enabled yet"), T("staging is empty · t puts the selected mods here")][k];
+    // Staging is empty: its place shows the history (08 §14).
+    if (k === 2 && !c.query && S.history && S.history.length > 1) empty.append(historyPanel());
   } else if (empty) empty.remove();
   const first = Math.max(0, Math.floor(box.scrollTop / ROW_H) - 4);
   const last = Math.min(c.view.length, first + Math.ceil(box.clientHeight / ROW_H) + 8);
@@ -103,6 +105,30 @@ export function renderRows(k) {
       (it.unsaved ? `<span class="u" title="${esc(T("not saved yet"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
     d.title = it.name;
   }
+}
+
+// onHistory runs when a history row is clicked (main.js sets it).
+export let onHistory = () => {};
+export function setOnHistory(fn) { onHistory = fn; }
+
+// historyPanel: unsaved steps around "now", then the saved versions (08 §14).
+function historyPanel() {
+  const p = el("div", "hist");
+  p.append(el("div", "hh", T("history")));
+  let versions = false;
+  for (const h of S.history) {
+    if (h.kind === "version" && !versions) {
+      versions = true;
+      p.append(el("div", "hh", T("saved versions")));
+    }
+    const r = el("div", "h " + h.kind, h.text);
+    if (h.kind !== "now") {
+      r.title = h.kind === "version" ? T("load this version into the list") : T("go back to here");
+      r.onclick = (e) => { e.stopPropagation(); onHistory(h); };
+    }
+    p.append(r);
+  }
+  return p;
 }
 
 function rowSig(k, i, it) {

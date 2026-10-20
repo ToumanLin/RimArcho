@@ -28,8 +28,8 @@ func init() {
 	register(&Command{Name: "swap", Args: "<ref> [<ref>]", Summary: "replace an enabled mod by another instance of its lineage", MinArgs: 1, MaxArgs: 2, Run: swapCmd})
 	register(&Command{Name: "sort", Summary: "sort the workspace by load-order constraints", MaxArgs: 0,
 		Flags: []Flag{{Name: "dry-run", Help: "show the result without changing the workspace"}}, Run: sortCmd})
-	register(&Command{Name: "undo", Summary: "undo the last workspace edit", MaxArgs: 0, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, false) }})
-	register(&Command{Name: "redo", Summary: "redo an undone workspace edit", MaxArgs: 0, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, true) }})
+	register(&Command{Name: "undo", Args: "[<n>]", Summary: "undo the last workspace edit (or the last n: archo history)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, false) }})
+	register(&Command{Name: "redo", Args: "[<n>]", Summary: "redo an undone workspace edit (or n of them)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, true) }})
 	register(&Command{Name: "save", Summary: "write the workspace to ModsConfig.xml (backup + atomic replace)", MaxArgs: 0,
 		Flags: []Flag{{Name: "dry-run", Help: "show what would be written"}}, Run: saveCmd})
 	register(&Command{Name: "loadout log", Summary: "saved and imported Loadout versions", MaxArgs: 0, Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: loadoutLog})
@@ -180,7 +180,27 @@ func swapCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	return editDoc(c, r), nil
 }
 
-func undoRedo(c *Ctx, redo bool) (*render.Doc, error) {
+func undoRedo(c *Ctx, a *Args, redo bool) (*render.Doc, error) {
+	if len(a.Pos) == 1 {
+		n, err := strconv.Atoi(a.Pos[0])
+		if err != nil || n < 1 {
+			return nil, fmt.Errorf("%q: give the number of steps (archo history numbers them)", a.Pos[0])
+		}
+		if redo {
+			n = -n
+		}
+		r, err := c.App.StepTo(n)
+		if err != nil {
+			return nil, err
+		}
+		d := editDoc(c, r)
+		verb := "undid"
+		if redo {
+			verb = "redid"
+		}
+		d.Nodes[0].Children = append([]*render.Node{{Line: fmt.Sprintf("%s %s", verb, a.Pos[0]+" steps")}}, d.Nodes[0].Children...)
+		return d, nil
+	}
 	r, op, err := c.App.UndoRedo(redo)
 	if err != nil {
 		return nil, err

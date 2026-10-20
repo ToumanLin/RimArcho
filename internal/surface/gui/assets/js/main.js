@@ -7,7 +7,7 @@
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
 import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
-import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists } from "./lists.js";
+import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory } from "./lists.js";
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
@@ -22,6 +22,7 @@ async function reload() {
   S.busy.analyze = b.analyzing;
   if (b.error) say("fail", b.error);
   const cols = b.cols || [[], [], []];
+  try { S.history = await api.History(); } catch { S.history = null; }
   const keep = [0, 1, 2].map((k) => setItems(k, cols[k] || []));
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
   render();
@@ -547,6 +548,19 @@ async function start() {
   await loadWidths();
   if (S.board && S.board.neverScanned) cmd("rescan");
 }
+
+// A history row (08 §14): an unsaved step goes there at once (u / ctrl+r move back); a
+// version is loaded after a confirmation.
+setOnHistory(async (h) => {
+  const go = async () => {
+    try { say("ok", await api.HistoryGo(h.steps || 0, h.version || 0)); } catch (e) { say("fail", errText(e)); }
+    await reload();
+  };
+  if (h.kind === "version") {
+    return pop.confirm(T("load this version into the list"), [h.text, T("your current list stays in the history; u brings it back")], T("load this version into the list"), go);
+  }
+  return go();
+});
 
 // pollLive follows the running game every two seconds (10 §3.4): the top bar says it is
 // running, and its errors lead 需要处理.

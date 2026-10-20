@@ -132,6 +132,34 @@ func (s *API) boardLocked() *Board {
 }
 
 // Stamp is the database state; the page asks on focus and reloads when it changed (G8).
+// History is the history area (08 §14): unsaved steps around now, then the versions.
+func (s *API) History() ([]view.HistItem, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.board == nil || s.board.St == nil {
+		return nil, nil
+	}
+	return view.HistoryItems(s.a, s.board.St)
+}
+
+// HistoryGo moves through the unsaved steps (n > 0 undoes n, n < 0 redoes -n) or, with
+// version > 0, loads that version into the list (loadout checkout).
+func (s *API) HistoryGo(steps, version int) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if version > 0 {
+		if _, _, err := s.a.Checkout(fmt.Sprintf("v%d", version)); err != nil {
+			return "", err
+		}
+		return view.Tf("loaded v%d into the list (not saved yet)", version), nil
+	}
+	r, err := s.a.StepTo(steps)
+	if err != nil {
+		return "", err
+	}
+	return view.Tf("%d changes", len(r.Changes)), nil
+}
+
 // Live reports the running game and the errors its log gained (10 §3.4); the page asks
 // every two seconds.
 func (s *API) Live() (*view.Live, error) {
