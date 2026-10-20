@@ -70,6 +70,7 @@ function renderWhere() {
   let s = "";
   if (S.screen === "needs") s = "RimArcho › " + T("needs attention");
   else if (S.screen === "changes") s = "RimArcho › " + T("recent changes");
+  else if (S.screen === "settings") s = "RimArcho › " + T("settings");
   else if (S.screen === "full") {
     const it = cur(lastList);
     s = `${T(AREAS[lastList])} › ${S.detail ? S.detail.name : ""}`;
@@ -286,6 +287,7 @@ async function cmd(id) {
     case "undo": case "redo": case "restore-all": return verb(id);
     case "needs": return scr.needs();
     case "changes": return scr.changes();
+    case "settings": return scr.settings();
     case "rescan":
       if (await api.Scan()) { S.busy.scan = true; say("busy", T("scanning…")); }
       return;
@@ -522,7 +524,7 @@ async function start() {
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? scr.needs() : verb(v); });
   $("#needs").onclick = () => scr.needs();
   $("#env").onclick = () => chooseEnv();
-  for (const b of $$("#top .tb")) b.onclick = () => preview(b.dataset.cmd);
+  for (const b of $$("#top .tb")) b.onclick = () => (b.dataset.cmd === "settings" ? cmd("settings") : preview(b.dataset.cmd));
   $(".detail .scroll").addEventListener("scroll", () => { if (S.focus === 3) renderWhere(); }, { passive: true });
   $(".detail").addEventListener("mousedown", () => focusArea(3));
   on("scan", async (ev) => {

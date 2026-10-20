@@ -72,6 +72,11 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     unpin <ref>                               restore a pinned mod's workshop copy and use it instead of the pinning copy
     trash <ref>                               move a hidden or unsubscribed workshop folder to the recycle bin
     history                                   the workspace's unsaved edits (undo/redo) and the saved versions
+    db status                                 the database: path, size, backups
+    db backup                                 write a consistent copy of the database to <data>/backups
+    db vacuum                                 compact the database
+    cache status                              the caches and their sizes
+    cache clear <kind>                        empty one cache (previews, workshop, images, source, logs); rebuilt on demand
   references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>
   global flags: --env <name> (use another environment for this command)
 

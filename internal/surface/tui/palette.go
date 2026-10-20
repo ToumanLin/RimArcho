@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
+
 	"strconv"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -78,6 +81,26 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd {
 			m.tab = tabList
 			return m.key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
+		}
+	case "settings":
+		// The settings page as text (10 §7); each value says the command that changes it.
+		return func(m *model) tea.Cmd {
+			var b strings.Builder
+			for _, g := range view.SettingsPage(m.app, m.st) {
+				b.WriteString(g.Title + "\n")
+				for _, it := range g.Items {
+					fmt.Fprintf(&b, "  %s: %s\n", it.Label, it.Value)
+					if len(it.Argv) > 0 {
+						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.Argv, " "))
+					}
+					for _, a := range it.Actions {
+						fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, strings.Join(a.Argv, " "))
+					}
+				}
+				b.WriteString("\n")
+			}
+			m.openPanel(T("settings"), b.String(), nil)
+			return nil
 		}
 	case "help":
 		return func(m *model) tea.Cmd { m.openPanel(T("help"), T(helpText), nil); return nil }

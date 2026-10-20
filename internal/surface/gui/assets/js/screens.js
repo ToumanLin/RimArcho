@@ -298,3 +298,70 @@ export function fullSection() {
   if (S.screen !== "full" || !F.secs || F.tab === 0) return "";
   return F.secs[F.tab - 1].title;
 }
+
+// ---- settings (10 §7) ----
+// Every row is a value and the command that changes it (view.SettingsPage); the page runs
+// only those commands (API.ApplySetting).
+
+export async function settings() {
+  let groups;
+  try { groups = (await api.Settings()) || []; } catch (e) { say("fail", errText(e)); return; }
+  if (S.screen !== "settings") openScreen("settings");
+  const sc = $("#screen");
+  const top = sc.scrollTop;
+  sc.innerHTML = "";
+  const w = el("div", "wrap settings");
+  sc.append(w);
+  const bar = el("div", "bar");
+  bar.append(el("h2", "", T("settings")));
+  w.append(bar);
+  const run = async (argv, value, after) => {
+    try {
+      const out = await api.ApplySetting(argv, value || "");
+      say("ok", (out && out[0]) || T("done"));
+    } catch (e) { say("fail", errText(e)); }
+    if (after) return after();
+    await ui.reload();
+    settings();
+  };
+  for (const g of groups) {
+    w.append(el("div", "grp", g.title));
+    for (const it of g.items || []) {
+      const row = el("div", "set");
+      const left = el("div", "l");
+      left.append(el("div", "", it.label));
+      if (it.note) left.append(el("div", "dim small", it.note));
+      const right = el("div", "r");
+      if (it.edit === "choice") {
+        const s = el("select");
+        for (const c of it.choices) {
+          const o = el("option", "", c);
+          o.value = c;
+          if (c === it.value) o.selected = true;
+          s.append(o);
+        }
+        // A new language needs the page's text again: reload after it is set.
+        s.onchange = () => run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => location.reload() : null);
+        right.append(s);
+      } else if (it.edit) {
+        const inp = el("input");
+        inp.value = it.value || "";
+        inp.spellcheck = false;
+        const ok = el("button", "act", T("apply"));
+        ok.onclick = () => run(it.argv, inp.value.trim());
+        inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
+        right.append(inp, ok);
+      } else if (it.value) {
+        right.append(el("span", "second", it.value));
+      }
+      for (const a of it.actions || []) {
+        const b = el("button", "act", a.label);
+        b.onclick = () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, () => run(a.argv)) : run(a.argv);
+        right.append(b);
+      }
+      row.append(left, right);
+      w.append(row);
+    }
+  }
+  sc.scrollTop = top;
+}

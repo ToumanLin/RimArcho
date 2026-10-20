@@ -71,6 +71,7 @@ func (a *App) Launch(dryRun, force bool) (*LaunchPlan, *LoadoutState, error) {
 	if e.UserDataRoot != "" && env.PathKey(e.UserDataRoot) != env.PathKey(env.DefaultUserDataRoot()) {
 		extra = append(extra, "-savedatafolder="+e.UserDataRoot)
 	}
+	extra = append(extra, strings.Fields(a.LaunchArgs(e.ID))...) // 10 §7
 	switch e.Launch {
 	case "steam":
 		p.Exe = env.SteamExe(a.Detect)

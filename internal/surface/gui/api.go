@@ -132,6 +132,39 @@ func (s *API) boardLocked() *Board {
 }
 
 // Stamp is the database state; the page asks on focus and reloads when it changed (G8).
+// Settings is the settings page (10 §7).
+func (s *API) Settings() []view.SettingGroup {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.SettingsPage(s.a, s.boardState())
+}
+
+// ApplySetting runs one of the settings page's commands, with value in place of {}.
+func (s *API) ApplySetting(argv []string, value string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := view.SettingCommand(argv); err != nil {
+		return nil, err
+	}
+	run := make([]string, len(argv))
+	for i, x := range argv {
+		if x == "{}" {
+			x = value
+		}
+		run[i] = x
+	}
+	text, code := cmds.Execute(s.a, run)
+	s.board, s.needs = nil, nil
+	if len(run) == 4 && run[0] == "config" && run[2] == "ui.lang" && code == cmds.ExitOK {
+		view.SetLang(run[3])
+	}
+	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	if code != cmds.ExitOK {
+		return nil, fmt.Errorf("%s", strings.Join(lines, " "))
+	}
+	return lines, nil
+}
+
 // History is the history area (08 §14): unsaved steps around now, then the versions.
 func (s *API) History() ([]view.HistItem, error) {
 	s.mu.Lock()

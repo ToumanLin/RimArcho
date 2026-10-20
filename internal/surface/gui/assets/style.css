@@ -199,3 +199,11 @@ pre.lines { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 "Casc
 
 @media (max-width: 1100px) { #board { grid-template-columns: var(--c0, 1fr) 6px var(--c1, 1.2fr) 0 0 6px var(--c3, 1.2fr); } #board [data-area="2"], #board [data-split="1"] { display: none; } }
 @media (max-width: 800px) { #board { grid-template-columns: 1fr 6px 1.2fr 0 0 0 0; } #board .detail, #board [data-split="2"] { display: none; } }
+
+/* settings (10 §7) */
+.settings .set { display: flex; gap: 16px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.settings .set .l { flex: 0 0 38%; min-width: 0; }
+.settings .set .l .small { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings .set .r { flex: 1; display: flex; gap: 8px; align-items: center; min-width: 0; }
+.settings .set input { flex: 1; min-width: 0; background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.settings .set select { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }

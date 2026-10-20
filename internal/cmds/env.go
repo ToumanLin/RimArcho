@@ -27,7 +27,7 @@ func init() {
 	register(&Command{Name: "env add", Args: "<name>", Summary: "add an environment", MinArgs: 1, MaxArgs: 1,
 		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}}, envFlags...), Run: envAdd})
 	register(&Command{Name: "env set", Args: "<name>", Summary: "change an environment's paths (re-binds moved sources)", MinArgs: 1, MaxArgs: 1,
-		Flags: append(append([]Flag(nil), envFlags...), removeSourceFlag), Run: envSet})
+		Flags: append(append([]Flag(nil), envFlags...), removeSourceFlag, Flag{Name: "launch-args", Value: "<args>", Help: "extra game arguments, e.g. -popupwindow (\"\" removes them)"}), Run: envSet})
 	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget an environment (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "yes", Help: "confirm"}}, Run: envRemove})
 	register(&Command{Name: "env use", Args: "<name>", Summary: "select the current environment", MinArgs: 1, MaxArgs: 1, Run: envUse})
@@ -175,6 +175,11 @@ func envSet(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
+	if a.Bool("launch-args") {
+		if err := c.App.SetLaunchArgs(e.ID, a.Str("launch-args")); err != nil {
+			return nil, err
+		}
+	}
 	return envDoc(c, e, "updated", changes), nil
 }
 
@@ -191,7 +196,11 @@ func envDoc(c *Ctx, e *env.Environment, verb string, changes []app.SourceChange)
 	} else {
 		root.KV("user-data", "not set (ModsConfig.xml and Player.log unavailable)")
 	}
-	root.KV("launch", e.Launch)
+	launch := e.Launch
+	if args := c.App.LaunchArgs(e.ID); args != "" {
+		launch += "  " + args
+	}
+	root.KV("launch", launch)
 	srcs := root.Section("sources")
 	var pending []string
 	for _, ch := range changes {
