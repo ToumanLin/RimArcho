@@ -300,9 +300,14 @@ func (m *model) detailLines(w, n, x int) ([]string, []placement) {
 	m.syncDetailOff()
 	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), images: m.inlineImages(), techText: m.detail})
 	m.lastLines = lines
-	m.detailOff = max(0, min(m.detailOff, len(lines)-(n-1)))
+	// The scroll is kept as asked until the mod's details have loaded: PgDn pressed while
+	// the description is still on its way would otherwise be lost.
+	off := max(0, min(m.detailOff, len(lines)-(n-1)))
+	if it := m.current(); it == nil || (m.dd != nil && m.dd.id == it.id) {
+		m.detailOff = off
+	}
 	title := T("details")
-	if m.detailOff > 0 {
+	if off > 0 {
 		if it := m.current(); it != nil {
 			title = "▲ " + it.name
 		}
@@ -313,7 +318,7 @@ func (m *model) detailLines(w, n, x int) ([]string, []placement) {
 	}
 	out := []string{sDimS.Render("4 ") + st.Render(fit(title, w-2))}
 	var ps []placement
-	for i := m.detailOff; i < len(lines) && len(out) < n; i++ {
+	for i := off; i < len(lines) && len(out) < n; i++ {
 		out = append(out, lines[i].text)
 		if p, ok := m.place(lines[i], len(out)-1, n, x+1); ok { // x is 0-based
 			ps = append(ps, p)
