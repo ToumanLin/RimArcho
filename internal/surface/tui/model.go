@@ -121,7 +121,7 @@ type model struct {
 
 	panel   *panel
 	prompt  *prompt
-	tagging *tagEdit // the prompt edits tags
+	tags    *tagBar // the tag bar is open (06 §12.3)
 	status  string
 	sayKind int
 

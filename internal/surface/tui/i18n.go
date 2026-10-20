@@ -250,7 +250,7 @@ var zhText = map[string]string{
 	// tags (06 §5.6)
 	"tags for %s (word adds, -word removes): ": "%s 的标签（词 = 添加，-词 = 移除）：",
 	"added %s": "添加了 %s", "removed %s": "移除了 %s", "tags of %s: %s": "%s 的标签：%s",
-	"has": "已有", "tab completes": "tab 补全", "no tags yet: type one": "还没有标签：直接输入一个",
+	"type…": "输入…", "apply": "应用", "type a new tag": "输入新标签",
 	// Problems, Changes and Inspect screens (plain versions until V3/V4)
 	"(%d–%d of %d, ↑/↓)":                              "（%d–%d / 共 %d，↑/↓）",
 	"no problems":                                     "没有问题",

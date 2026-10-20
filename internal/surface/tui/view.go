@@ -117,8 +117,8 @@ func (m *model) crumb() string {
 
 // statusLine: one sentence, ✓ done (green), ✗ failed (red), … in progress (06 §9).
 func (m *model) statusLine() string {
-	if m.tagging != nil && m.prompt != nil {
-		return sSecond.Render(fit(m.tagStatus(), m.w))
+	if m.tags != nil && !m.picking() { // while picking it sits under the hint
+		return m.tagBarLine(m.w)
 	}
 	text, kind := m.status, m.sayKind
 	if text == "" && m.scanning {
@@ -158,6 +158,8 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"↑↓", T("move")}}
 	case m.panel != nil && m.panel.choices != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("confirm")}, {"esc", T("back")}}
+	case m.tags != nil:
+		pairs = [][2]string{{"←→", T("choose")}, {"enter", T("apply")}, {"esc", T("close")}, {"←", T("type a new tag")}}
 	case m.panel != nil && m.panel.confirm != nil:
 		pairs = [][2]string{{"y", T("confirm")}, {"n", T("cancel")}, {"↑↓", T("scroll")}}
 	case m.panel != nil:

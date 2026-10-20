@@ -167,10 +167,13 @@ func TestImgRows(t *testing.T) {
 	}
 }
 
-// 06 §5.6: # on two marked mods, completion of tags in use, add and remove at once.
-func TestTagEditing(t *testing.T) {
+// T13 (06 §12.6): # → enter gives the picked mods the second candidate; the same again
+// removes it ([✓]); a tag only some have shows as [~] and enter gives it to all; # ←
+// then typing makes a new tag. The list rows show tags faintly.
+func TestT13TagBar(t *testing.T) {
 	e, _ := fixture(t)
 	e.MustRun("tag", "add", "pkg:ludeon.rimworld", "official-stuff", "core")
+	e.MustRun("tag", "add", "pkg:tester.a", "half")
 	m := direct(t, e, 160, 40)
 	press(m, "g")
 	press(m, "down")
@@ -178,38 +181,74 @@ func TestTagEditing(t *testing.T) {
 	press(m, "ctrl+down") // the cursor alone
 	press(m, "v")         // Harmony
 	press(m, "#")
-	if m.prompt == nil || m.tagging == nil {
-		t.Fatal("# did not open the tag line")
+	if m.tags == nil || m.tags.sel != 0 {
+		t.Fatalf("# did not open the tag bar on the first candidate: %+v", m.tags)
 	}
-	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("offi")})
-	if s := ansi.Strip(m.statusLine()); !strings.Contains(s, "official-stuff 1") {
-		t.Fatalf("completions: %q", s)
+	press(m, "right")
+	if bar := ansi.Strip(m.View()); !strings.Contains(bar, "✎ 输入…") && !strings.Contains(bar, "✎ type…") {
+		t.Fatalf("no input in the bar:\n%s", bar)
 	}
-	m.update(tea.KeyMsg{Type: tea.KeyTab})
-	if m.prompt.text != "official-stuff " {
-		t.Fatalf("tab: %q", m.prompt.text)
+	press(m, "enter")
+	tagged := func(tag string) string {
+		out := e.MustRun("list", "--filter", "tag:"+tag)
+		var got []string
+		for _, n := range []string{"Alpha", "Harmony", "Core"} {
+			if strings.Contains(out, n) {
+				got = append(got, n)
+			}
+		}
+		return strings.Join(got, " ")
 	}
+	if got := tagged("美化"); got != "Alpha Harmony" {
+		t.Fatalf("after # → enter: %q (status %q)", got, m.status)
+	}
+	if !m.picking() {
+		t.Fatal("tagging ended the pick")
+	}
+	press(m, "#")
+	press(m, "right")
+	if s := ansi.Strip(m.View()); !strings.Contains(s, "[✓美化]") {
+		t.Fatalf("no [✓美化]:\n%s", s)
+	}
+	press(m, "enter")
+	if got := tagged("美化"); got != "" {
+		t.Fatalf("not removed: %q", got)
+	}
+	// [~half]: Alpha only; enter gives it to Harmony too.
+	press(m, "#")
+	i := -1
+	for j, c := range m.tags.cands {
+		if c.tag == "half" {
+			i = j
+		}
+	}
+	if i < 0 || m.tags.cands[i].have != 1 {
+		t.Fatalf("half: %+v", m.tags.cands)
+	}
+	for m.tags.sel < i {
+		press(m, "right")
+	}
+	if s := ansi.Strip(m.View()); !strings.Contains(s, "[~half]") {
+		t.Fatalf("no [~half] (scrolled to it):\n%s", s)
+	}
+	press(m, "enter")
+	if got := tagged("half"); got != "Alpha Harmony" {
+		t.Fatalf("half: %q", got)
+	}
+	// # ← then type: a new tag.
+	press(m, "#")
+	press(m, "left")
 	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("lib")})
 	press(m, "enter")
-	if !strings.Contains(m.status, "tags of 2 mods: added official-stuff, lib") {
-		t.Fatalf("status %q", m.status)
+	if got := tagged("lib"); got != "Alpha Harmony" {
+		t.Fatalf("lib: %q", got)
 	}
-	out := e.MustRun("list", "--filter", "tag:lib")
-	if !strings.Contains(out, "Alpha") || !strings.Contains(out, "Harmony") {
-		t.Fatalf("tagged:\n%s", out)
-	}
-	// remove from one mod, with the - form; the list row shows the remaining tags faintly
-	press(m, "g")
-	press(m, "down")
-	press(m, "#")
-	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("-lib")})
-	press(m, "enter")
-	if out := e.MustRun("list", "--filter", "tag:lib"); strings.Contains(out, "Alpha") {
-		t.Fatalf("not removed:\n%s", out)
+	press(m, "esc") // cancel the pick: tags are not part of the list, they stay
+	if got := tagged("lib"); got != "Alpha Harmony" {
+		t.Fatalf("esc removed the tag: %q", got)
 	}
 	c := &m.cols[cActive]
-	row := ansi.Strip(m.drawRow(c, 1, true, 60))
-	if !strings.Contains(row, "official-stuff") {
+	if row := ansi.Strip(m.drawRow(c, 0, true, 60)); !strings.Contains(row, "official-stuff") {
 		t.Fatalf("row without its tag: %q", row)
 	}
 }

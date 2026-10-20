@@ -425,6 +425,9 @@ func (m *model) overlayHint(out []string, l layout) {
 		}
 	}
 	hint := m.pickHint()
+	if m.tags != nil {
+		hint = append(hint, m.tagBarLine(max(m.w-sl.x-3, 20)))
+	}
 	y := last + 1
 	switch {
 	case first < 0: // scrolled away: at the bottom of the column

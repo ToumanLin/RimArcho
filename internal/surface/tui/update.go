@@ -165,6 +165,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case s == "ctrl+k" && m.prompt == nil && !m.editing:
 		m.panel, m.insp = nil, nil
 		return m.openPalette()
+	case m.tags != nil:
+		return m.tagBarKey(k)
 	case m.prompt != nil:
 		return m.promptKey(k)
 	case m.panel != nil:
@@ -474,11 +476,7 @@ func (m *model) promptKey(k tea.KeyMsg) tea.Cmd {
 		m.prompt = nil
 		return p.submit(m, strings.TrimSpace(p.text))
 	case tea.KeyEsc:
-		m.prompt, m.tagging = nil, nil
-	case tea.KeyTab:
-		if m.tagging != nil {
-			p.text = m.tagging.complete(p.text)
-		}
+		m.prompt = nil
 	case tea.KeyBackspace:
 		if r := []rune(p.text); len(r) > 0 {
 			p.text = string(r[:len(r)-1])
