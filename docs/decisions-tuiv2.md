@@ -340,3 +340,111 @@ passed): `dist/archo-0.6.0-dev-windows-amd64.zip`, 25.4 MB.
 The font zip's sha256 (af913b63…dcd3e94) matched the release's `.sha256`. Both TTFs name the
 family "Maple Mono NF CN", as wezterm.lua expects. v7.9 is newer than the files V0 measured
 (March 2025), so its glyph widths still need a look in WezTerm.
+
+# V2.1: instance picking, tag bar, widths, images, detail scrolling (06 §12)
+
+Implements 06 §12 (commit f7ba56a). Where §12 and the rest of 06 disagree, §12 wins. Where
+§12 was open or disagreed with itself, these are the calls made.
+
+## Decisions
+
+### Picking (§12.2)
+
+1. **space picks.** The table says `space` picks the row when nothing is picked. The bullet
+   below it says the old single keys (`space` enables or disables) still work. Both cannot
+   hold, so the table wins: `space` (and `v`) pick or unpick one row. A single mod is enabled
+   with `space` `→` `enter`. `J` `K`, `m`, `t`, `T`, `x`, `S`, `w`, `u` and `L` are unchanged
+   when nothing is picked.
+2. **shift+↑↓ has two meanings.** It extends the range until the first action. After that it
+   moves the picked mods by 10, as the action table says. Before any move nobody wants "move
+   by 10", and after a move a wider range is rarely wanted.
+3. **ctrl+↑↓ always moves the cursor**, picked or not, so that `ctrl+space` can pick rows that
+   are not next to each other.
+4. **`t` ends the session.** It stages the picked mods (or takes them out of staging) and
+   keeps everything as one undo step. The cursor stays in its column, as §12.2 says.
+5. **Into Enabled goes to the suggested position**, also from staging. It does not go back to
+   the place the mod had before it was staged; that is still `T` or `space` with nothing
+   picked. The suggestion (`App.SuggestAt`) uses the sorter's edges. It is just after the last
+   enabled mod a picked one must follow. With only "load before" constraints it is just
+   before the first of those mods. With no constraints it is the end. The official-first
+   edge is ignored.
+6. **↑↓ outside Enabled** does nothing and says so ("↑↓ move mods within Enabled only").
+7. **One undo step.** `App.BeginBatch` records the newest undo step. On `enter`, the steps the
+   session made are replaced by one step that holds the list as it was at the start. On
+   `esc`, the list and the staging list are restored exactly and the session's steps are
+   deleted, so there is nothing to redo.
+8. **Changing column ends the pick.** `tab`, `[` `]`, a click elsewhere, or a plain click all
+   keep what was done. Only `esc` undoes it.
+9. **Tags are not undone.** Tags added with `#` during a session stay after `esc`. They are
+   player data, not the load order, and are not part of the list's undo.
+10. **The mouse:** click moves the cursor, ctrl+click picks one more, shift+click picks a
+    range. Drag-to-move from V2 is removed, as §12.2 says (no drag or box select in the TUI).
+
+### Widths and wrapping (§12.1)
+
+11. **Storage.** Widths and wrap flags are stored per environment as JSON in meta
+    `ui.columns:<env id>`, not in `config`. They are layout state, not settings. `=` resets
+    the widths of all columns but leaves wrapping on or off.
+12. **Narrow screens.** From 80 to 109 columns there is no detail column, so the two lists
+    share the width in proportion to their widths. Below 80 there is one list at a time and
+    widths do not apply; `<` `>` say so. When the stored widths leave the detail under 40
+    cells, the widest column that is not focused shrinks first, down to 12 cells.
+13. **Wrapping** wraps by display width. Continuation lines start under the name and carry
+    the pick bar `▌`. The unsaved dot goes on the last line, and tags are not shown on
+    wrapped rows. The cursor's row always shows in full.
+
+### Tag bar (§12.3)
+
+14. **Preset pinned tags** are the default value of `tags.pinned`. They are not written to the
+    database on first run, so `config get` shows them and `config set` replaces them. Both `,`
+    and `，` separate tags.
+15. **Typing on a candidate** jumps to the input and types there. `#` `←` then typing works as
+    §12.3 says; typing straight away also works.
+16. **The bar closes after `enter`**, as T13 needs (`#` `→` `enter` twice adds, then removes).
+    The pick stays, so `#` can be used again. With nothing picked, the bar replaces the status
+    line. While picking, it sits under the hint.
+17. **Free-valued settings.** `config` now accepts settings with free values: `tags.pinned`,
+    and `ui.preview_dwell_ms` (0–5000). `ui.previews` (on|off) is new too.
+
+### Images (§12.4)
+
+18. **Two loaders.** The visible images and the ±10 prefetch use separate slots, one image
+    each. A miss on the current row therefore never waits behind a prefetch. A finished load
+    is kept even if the cursor has moved on, since it is a prefetch for later.
+19. **"One image per frame"** is done in the writer. Each frame redraws the images already
+    shown, because the frame may have written over them, and adds at most one new image. The
+    rest follow 16 ms apart without a new frame. In the compact detail there is only ever the
+    thumbnail, so this matters for the full screen.
+20. **The compact detail** replaces all description images with one line, placed where the
+    first image was: `[图片 ×3 · enter 在全屏中查看]`. Outside WezTerm it is `[图片 ×3]`. The
+    full screen still lists each image, as text outside WezTerm.
+21. **The LRU** holds 64 encoded images. Thumbnails are already stored at 360 px wide
+    (`PreviewWidth`), so 64 of them stay within a few MB. Images on screen or still loading
+    are never evicted.
+
+### Detail focus and full screen (§12.5)
+
+22. **`→` enters the detail from Enabled and Staging** when the detail column is shown and
+    nothing is picked. `tab` still cycles the three lists, so Staging is reached with `tab`
+    (or `]`). `→` from Disabled still goes to Enabled.
+23. **While the detail is focused** it shows the whole description (no 12-line cap). When it
+    is scrolled, the first line is `▲ <name>` in the accent colour. The name line is in the
+    accent colour while the detail has focus. `i`, `o`, `r`, `#` and `enter` act on the mod
+    shown and keep the focus. Any other key goes back to the list and is handled there. A
+    click on the detail column focuses it, and the wheel over it scrolls it.
+24. **The full-screen `tab`** goes through 概要 and the five sub-sections. `1`–`5` still jump.
+    The technical pages, which used to be on `tab`, are now on `I`. Each `tab` says the
+    sub-section's name on the status line. `←` `→` move the list's cursor, so `esc` returns to
+    the last mod viewed. The wheel scrolls three lines.
+
+## Verification
+
+| Test | Result |
+| --- | --- |
+| T11 | `TestT11PickMoveUndo`: shift×4 and ctrl×2 pick 7, `→` puts them at the suggested position, `↑`×3, `enter`. The 7 keep their order; one `u` restores the list; the hint said "picked 7 · Enabled #4–10" |
+| T12 | `TestT12PickCancel`: `esc` restores the list, the staging list and the cursor, and leaves no undo step |
+| T13 | `TestT13TagBar`: `#` `→` `enter` adds 美化 to both picked mods; again, `[✓美化]` shows and is removed; `[~half]` is given to all; `#` `←` `lib` `enter` makes a new tag; `esc` on the pick keeps tags |
+| T14 | `TestT14ThumbLatencyReal` on the data copy (872 rows in Disabled), 5 × 100 rows at 30 rows/s. Thumbnail after stopping: worst 0.7 ms; one row on after the prefetch settled: worst 1.0 ms; 10 of 10 stops had a thumbnail. Also `TestPrefetchAndLRU` (±10 made ahead, LRU of 64) and `TestImgWriterOneNewPerFrame` |
+| T15 | `TestT15FullScreenNext`: ↓ to the bottom, `→` shows Harmony from the top; tab / shift+tab sections; wheel; `esc` with the cursor on Harmony. `TestDetailFocus` for the compact detail |
+| T16 | `TestT16WidthsPersist`: `>`×3 and `z` survive a new model on the same database; the detail keeps ≥ 40 cells; `=` resets. `TestResizeDrag`: dragging the gap sets and stores the width |
+| Old tests | Updated for the new keys: space picks, ctrl+↓ moves the cursor, `tab` reaches Staging, `I` opens the technical pages, no drag-to-move. `TestT6Thumbnail` checks the thumbnail appears at once, and the 150 ms dwell when `ui.preview_dwell_ms` is set |
