@@ -109,7 +109,7 @@ func TestEnableRefusals(t *testing.T) {
 	e.WriteMod(filepath.Join(e.Game, "Mods", "A local"), testkit.Sample("tester.a", "A"))
 	scanNow(t, e)
 	for name, want := range map[string]string{
-		"Residue": "residue", "CmdOnly": "does not load mods from src:steamcmd", "Off": "unloadable: about-disabled",
+		"Residue": "residue", "Off": "unloadable: about-disabled",
 	} {
 		out, code := e.Run("enable", refOf(t, e, name, ""))
 		if code == 0 || !strings.Contains(out, want) {

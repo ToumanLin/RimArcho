@@ -4,6 +4,14 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.7.0 — the window (unreleased)
 
+### Link deployment (09 §8)
+- Mods in SteamCMD and extra folders can be enabled. `save` links each one into `Mods/` as
+  `_Archo_<source>_<folder>` before it writes ModsConfig.xml, and removes the link once the mod is
+  disabled. `save --dry-run` and the save preview list the links. Windows uses junctions.
+- The deployed copy registers like any `Mods/` folder: a `Mods/` mod with the same packageId wins,
+  and next to a workshop copy it can only be swapped in.
+- Only links with the `_Archo_` prefix are touched; a real folder with that name stops the save.
+
 ### GUI (08)
 - `RimArcho.exe`: a desktop window (Wails v3 and plain HTML/CSS/JavaScript, no frontend build
   step) next to the terminal UI. A double click opens it; `archo gui` opens it from a terminal.

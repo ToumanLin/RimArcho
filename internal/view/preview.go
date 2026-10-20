@@ -65,6 +65,9 @@ func Apply(a *app.App, what string) (string, error) {
 		if r.Unchanged {
 			return T("nothing to save"), nil
 		}
+		if len(r.Links) > 0 {
+			return Tf("saved to the game as v%d; %d Mods/ links updated", r.Version, len(r.Links)), nil
+		}
 		return Tf("saved to the game as v%d", r.Version), nil
 	case ListLaunch:
 		if _, _, err := a.Launch(false, false); err != nil {

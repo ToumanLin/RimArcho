@@ -24,7 +24,10 @@ What it knows about your installation:
 - **Code.** It decompiles assemblies on demand with ilspycmd and caches the result per DLL hash.
 
 RimArcho never writes to the game, Workshop or `Mods/` folders, with two exceptions that you ask for
-yourself: `save` (ModsConfig.xml) and `copy-local` (a new folder in `Mods/`). Its own data lives in
+yourself: `save` (ModsConfig.xml) and `copy-local` (a new folder in `Mods/`). When you enable a mod
+from a SteamCMD or extra folder, `save` also links it into `Mods/` as `_Archo_<source>_<folder>` (a
+junction, no admin rights needed) and removes that link once you disable it. It only creates and
+deletes links with that prefix and never writes into their targets. Its own data lives in
 `%APPDATA%\RimArcho\`.
 
 ## Install

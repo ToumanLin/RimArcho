@@ -236,7 +236,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	}
 	installed := map[string][]*store.Mod{} // live, loadable instances by packageId
 	for _, m := range st.Ix.Mods {
-		if m.TombstoneAt.IsZero() && !m.Residue && m.Unloadable == "" && st.Reg.Known(m.ID) {
+		if m.TombstoneAt.IsZero() && !m.Residue && m.Unloadable == "" && (st.Reg.Known(m.ID) || st.Deployable(m)) {
 			p := strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")
 			installed[p] = append(installed[p], m)
 		}

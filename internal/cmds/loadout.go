@@ -327,6 +327,16 @@ func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if r.Source == "undo" {
 		root.KV("source", fmt.Sprintf("undo (restores v%d)", r.Restores))
 	}
+	if len(r.Links) > 0 {
+		ln := root.KV("links", fmt.Sprintf("%d in Mods/ (09 §8: SteamCMD and extra mods are linked, never copied)", len(r.Links)))
+		for _, l := range r.Links {
+			what := "+ " + l.Name + " → " + l.Target
+			if l.Op == "remove" {
+				what = "- " + l.Name
+			}
+			ln.Add(what)
+		}
+	}
 	base := "workspace"
 	if r.State.Latest != nil {
 		base = fmt.Sprintf("v%d", r.State.Latest.N)

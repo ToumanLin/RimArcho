@@ -46,7 +46,7 @@
 - 之后能解析到时（扫描到了新 Mod），自动变为 Instance 条目，不需要手动修复。
 - 已在列表中的 Instance 如果后来变得不可登记（被删除、被停用），写入时退回为它的 packageId，避免从游戏列表里悄悄消失。
 
-**K3 可加载性。** 只有活着、不是残留、不是 `unloadable`，并且位于 `Data/`、`Mods/` 或已订阅工坊中的 Instance，才能进 Loadout；通过别名可见也算，例如 SteamCMD 目录经 junction 出现在 `Mods/` 下。`enable` 拒绝时会说明原因。工坊版和本地版同包名时，不能同时启用，只能 `swap`（04 §2.2 第 4 条）。
+**K3 可加载性。** 只有活着、不是残留、不是 `unloadable`，并且位于 `Data/`、`Mods/` 或已订阅工坊中的 Instance，才能进 Loadout；通过别名可见也算，例如 SteamCMD 目录经 junction 出现在 `Mods/` 下。`enable` 拒绝时会说明原因。工坊版和本地版同包名时，不能同时启用，只能 `swap`（04 §2.2 第 4 条）。（正式版修订：SteamCMD 和额外目录里的 Mod 可以直接启用，保存时链接部署进 `Mods/`，09 §8。）
 
 **K4 保存。**
 - CLI 的 `save` 不做交互确认：CLI 一次执行完，MCP 那边是否放行由 harness 决定（D6）。`save --dry-run` 和 TUI 的 `w` 会先显示 diff、版本改写（“从 1.6 改写为 1.7”）以及缺失条目数，再确认。

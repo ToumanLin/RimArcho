@@ -32,6 +32,9 @@ type LoadoutState struct {
 	Aliases  map[string][]store.Alias
 	// MM overrides the game's major.minor for analysis (--game-version, decisions-m3 §12.7).
 	MM string
+
+	cands  []loadout.Candidate // what Reg was built from, deployed instances included
+	deploy map[string]bool     // instances linked into Mods/ by RimArcho (09 §8)
 }
 
 // GameMM is the environment's game major.minor version.
@@ -81,8 +84,9 @@ func (st *LoadoutState) FileVersionMismatch() string {
 
 // Candidates derives the game-loadable instances (02 §4.1, 04 §2.4): live, subscribed,
 // not unloadable, and located in Data/, Mods/ or the workshop — directly or via an alias.
+// RimArcho's own Mods/ links do not count here; deployed instances are added separately.
 func Candidates(ix *Index, aliases map[string][]store.Alias) []loadout.Candidate {
-	visible := func(k source.Kind) bool { return k == source.Official || k == source.Local || k == source.Workshop }
+	visible := gameVisible
 	kindOf := map[string]source.Kind{}
 	for _, s := range ix.Sources {
 		kindOf[s.ID] = s.Kind
@@ -98,7 +102,7 @@ func Candidates(ix *Index, aliases map[string][]store.Alias) []loadout.Candidate
 			c.Kind, c.Folder = m.Kind, m.Rel
 		default:
 			for _, al := range aliases[m.ID] {
-				if k := kindOf[al.SourceID]; visible(k) {
+				if k := kindOf[al.SourceID]; visible(k) && !managedLink(al.Rel) {
 					c.Kind, c.Folder = k, al.Rel
 					break
 				}
@@ -156,7 +160,18 @@ func (a *App) loadLoadout(ix *Index) (*LoadoutState, error) {
 	if err != nil {
 		return nil, err
 	}
-	st := &LoadoutState{Ix: ix, Reg: loadout.NewRegistry(Candidates(ix, aliases)), Aliases: aliases}
+	deploy, err := a.deploySet(ix, aliases)
+	if err != nil {
+		return nil, err
+	}
+	cands := Candidates(ix, aliases)
+	all := cands
+	for _, m := range ix.Mods { // index order keeps the registry deterministic
+		if deploy[m.ID] {
+			all = append(all[:len(all):len(all)], deployCandidate(m))
+		}
+	}
+	st := &LoadoutState{Ix: ix, Reg: loadout.NewRegistry(all), Aliases: aliases, cands: all, deploy: deploy}
 	if err := a.sync(st); err != nil {
 		return nil, err
 	}
@@ -360,9 +375,9 @@ func whyNotLoadable(st *LoadoutState, m *store.Mod) string {
 		return "unloadable: " + m.Unloadable + " (About.xml was renamed; the game cannot load it)"
 	case m.Residue:
 		return "residue: the workshop folder is no longer subscribed, the game ignores it"
-	case !st.Reg.Known(m.ID):
+	case !st.Reg.Known(m.ID) && !st.Deployable(m):
 		return fmt.Sprintf("the game does not load mods from src:%s; link or copy it into Mods/", m.SourceLabel)
-	case !st.Reg.Loadable(m.ID):
+	case !st.regWith(m.ID).Loadable(m.ID):
 		return "pkg.duplicate-installed: another copy with packageId " + m.PackageID + " in the same place wins (the game ignores this one)"
 	}
 	return ""
@@ -385,7 +400,7 @@ func (a *App) Enable(refs []string, p Placement) (*EditResult, error) {
 				notes = append(notes, st.Ix.Ref(m.ID)+" is already enabled")
 				continue
 			}
-			for _, o := range st.Reg.SamePackage(m.ID) {
+			for _, o := range st.regWith(m.ID).SamePackage(m.ID) {
 				if l.Index(o.ID) >= 0 {
 					return nil, nil, fmt.Errorf("cannot enable %s: %s with the same packageId %s is enabled; the game keeps only one (archo swap %s %s)",
 						st.Ix.Ref(m.ID), st.Ix.Ref(o.ID), m.PackageID, st.Ix.Ref(o.ID), st.Ix.Ref(m.ID))
@@ -654,6 +669,7 @@ type SaveResult struct {
 	Restores   int // source "undo": the version the workspace was checked out from
 	Missing    int
 	Unchanged  bool
+	Links      []LinkChange // Mods/ links created or removed first (09 §8)
 }
 
 // Save writes the workspace to ModsConfig.xml: backup, atomic replace, version (04 §2.2).
@@ -670,6 +686,11 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) {
 		return nil, fmt.Errorf("cannot read %s: %v (fix or remove the file first)", st.FilePath, st.FileErr)
 	}
 	r := &SaveResult{State: st, Path: st.FilePath, DryRun: dryRun, Changes: st.Changes()}
+	mods, links, err := planLinks(st)
+	if err != nil {
+		return nil, err
+	}
+	r.Links = links
 	r.Tokens = st.Reg.Tokens(st.List, func(id string) string {
 		if m := st.Ix.ByID[id]; m != nil {
 			return m.PackageID
@@ -708,6 +729,14 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) {
 	}
 	if err := a.checkRoots(filepath.Dir(st.FilePath)); err != nil {
 		return nil, err
+	}
+	if len(links) > 0 {
+		if err := a.checkRoots(mods); err != nil {
+			return nil, err
+		}
+		if err := applyLinks(mods, links); err != nil {
+			return nil, err
+		}
 	}
 	if r.Backup, err = loadout.WriteFile(st.FilePath, data); err != nil {
 		return nil, err

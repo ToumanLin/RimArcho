@@ -130,7 +130,7 @@ func ModItem(st *app.LoadoutState, mod *store.Mod) Item {
 	it.Package, it.Workshop = mod.PackageID, mod.WorkshopID()
 	it.Tags, it.Note, it.Alias = mod.Tags, mod.Note, mod.Alias != ""
 	it.Kind, it.SteamCMD = SourceKind(mod), mod.Kind == source.SteamCMD
-	it.Dim = mod.Unloadable != "" || mod.Residue || !st.Reg.Known(mod.ID) || !st.Reg.Loadable(mod.ID)
+	it.Dim = mod.Unloadable != "" || mod.Residue || (!st.Reg.Known(mod.ID) && !st.Deployable(mod)) || (st.Reg.Known(mod.ID) && !st.Reg.Loadable(mod.ID))
 	return it
 }
 
