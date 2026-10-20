@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 9
+const SchemaVersion = 10
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -192,6 +192,17 @@ CREATE TABLE log_cache(
   input_key TEXT NOT NULL, report BLOB NOT NULL);
 `
 
+// schemaV10: saveHarmony deletes an instance's facts by (instance_id, game_mm) for every
+// instance of an analysis. Without an index on both, SQLite took type_fact_mm (all rows share
+// the game version) and scanned harmony_id: on the log corpus's 3,500 instances an analysis
+// spent 60% of its time in these deletes (docs/research/00, spikes/corpusrun).
+const schemaV10 = `
+CREATE INDEX assembly_fact_inst_mm ON assembly_fact(instance_id, game_mm);
+CREATE INDEX type_fact_inst_mm ON type_fact(instance_id, game_mm);
+CREATE INDEX harmony_fact_inst_mm ON harmony_fact(instance_id, game_mm);
+CREATE INDEX harmony_id_inst_mm ON harmony_id(instance_id, game_mm);
+`
+
 // Store wraps the database handle.
 type Store struct {
 	DB   *sql.DB
@@ -234,7 +245,7 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {

@@ -18,6 +18,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"sort"
 	"strings"
 	"time"
@@ -48,6 +49,7 @@ func main() {
 	corpus := fs.String("corpus", "", "run: the hugslogs folder of RimArcho-corpus (parsed.jsonl, raw/)")
 	out := fs.String("out", "", "run: results JSONL (appended; logs already in it are skipped)")
 	mm := fs.String("mm", "1.6", "run: game major.minor of the logs to process")
+	cpuprof := fs.String("cpuprofile", "", "write a CPU profile to this file")
 	maxN := fs.Int("max", 0, "run: process at most this many logs (0 = all)")
 	minCov := fs.Float64("mincov", 0.8, "report: coverage threshold for the 'covered' subset")
 	fs.Parse(os.Args[2:])
@@ -59,6 +61,14 @@ func main() {
 	}
 	if *home == "" {
 		fail(fmt.Errorf("-home is required"))
+	}
+	if *cpuprof != "" {
+		pf, err := os.Create(*cpuprof)
+		if err != nil {
+			fail(err)
+		}
+		pprof.StartCPUProfile(pf)
+		defer pprof.StopCPUProfile()
 	}
 	if os.Getenv("RIMARCHO_HOME") == "" {
 		os.Setenv("RIMARCHO_HOME", *home) // the analysis child process, if any, uses the same home
