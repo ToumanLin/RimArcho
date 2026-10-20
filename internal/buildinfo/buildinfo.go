@@ -8,6 +8,9 @@ var (
 	Version = "dev"
 	Commit  = ""
 	Date    = ""
+	// GUI is "1" in RimArcho.exe, the Windows-GUI-subsystem link of the same program
+	// (08 §2): with no command it opens the GUI instead of the WezTerm-hosted TUI.
+	GUI = ""
 )
 
 // String is "0.5.0 (abc1234, 2026-10-19)" or, for a plain go build, "dev (<vcs revision>)".

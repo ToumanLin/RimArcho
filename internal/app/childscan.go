@@ -13,6 +13,11 @@ func ChildScan(home, envName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return ChildScanExe(exe, home, envName)
+}
+
+// ChildScanExe is ChildScan with an explicit archo executable.
+func ChildScanExe(exe, home, envName string) (string, error) {
 	args := []string{"scan"}
 	if envName != "" {
 		args = append(args, "--env", envName)

@@ -9,12 +9,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/host"
+	"github.com/ToumanLin/RimArcho/internal/surface/gui"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 	"github.com/ToumanLin/RimArcho/internal/surface/tui"
 )
@@ -36,6 +39,14 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	defer ap.Close()
 	ap.EnvName = envName
+	if (len(rest) == 0 && buildinfo.GUI == "1") || (len(rest) == 1 && rest[0] == "gui") {
+		// RimArcho.exe (a double click) or `archo gui` (08 §2).
+		if err := runGUI(ap, len(rest) == 1); err != nil {
+			fmt.Fprintln(stderr, "error:", err)
+			return cmds.ExitError
+		}
+		return cmds.ExitOK
+	}
 	if wantsHost(rest, here) {
 		// A bare `archo` (a double click): run the TUI in RimArcho's WezTerm host when it is
 		// there or the player agrees to download it (06 §1.1).
@@ -70,6 +81,28 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		io.WriteString(stdout, out)
 	}
 	return code
+}
+
+// runGUI opens the GUI. `archo gui` hands over to RimArcho.exe next to it when there is
+// one (no console stays open), else it runs the GUI in this process.
+func runGUI(ap *app.App, fromConsole bool) error {
+	if fromConsole && runtime.GOOS == "windows" {
+		if exe, err := os.Executable(); err == nil {
+			sib := filepath.Join(filepath.Dir(exe), "RimArcho.exe")
+			if !strings.EqualFold(sib, exe) {
+				if _, err := os.Stat(sib); err == nil {
+					var args []string
+					if ap.EnvName != "" {
+						args = []string{"--env", ap.EnvName}
+					}
+					c := exec.Command(sib, args...)
+					c.Env = append(os.Environ(), "RIMARCHO_HOME="+ap.Home)
+					return c.Start()
+				}
+			}
+		}
+	}
+	return gui.Run(gui.Options{App: ap})
 }
 
 // wantsHost: only a bare `archo` may start the WezTerm host; `archo tui` (what the host

@@ -142,6 +142,14 @@ func Stage(a *app.App, from Column, o Object) (*Result, error) {
 	return &Result{Text: Tf("staged %s", o.What)}, nil
 }
 
+// Unstage takes mods out of staging without enabling them (a drop on Disabled).
+func Unstage(a *app.App, o Object) (*Result, error) {
+	if _, err := a.Unstage(o.Refs); err != nil {
+		return nil, err
+	}
+	return &Result{Text: Tf("took %s out of staging", o.What)}, nil
+}
+
 // MoveBy is J / K: move enabled mods d places as one block (a selection that is not
 // contiguous first gathers at its first mod's place).
 func MoveBy(a *app.App, o Object, d int) (*Result, error) {

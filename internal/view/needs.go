@@ -65,7 +65,8 @@ type Action struct {
 	// Done is what the status line says afterwards; Confirm, when set, is asked first
 	// (06 §9: actions u cannot undo).
 	Done    string   `json:"done,omitempty"`
-	Confirm string   `json:"confirm,omitempty"`
+	Confirm string   `json:"confirm,omitempty"` // the TUI's "press again" line
+	Warn    string   `json:"warn,omitempty"`    // what a confirmation dialog says
 	Refs    []string `json:"refs,omitempty"`
 	Options []Option `json:"options,omitempty"`
 	Title   string   `json:"title,omitempty"`
@@ -299,7 +300,8 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	if v := st.WS.Conflict; v != 0 {
 		add(Need{Group: GroupConfirm, Text: T("ModsConfig.xml was changed outside RimArcho"), Counted: true, Status: StatusWarn, Actions: []Action{
 			{Kind: ActLoadExternal, Key: "L", Label: T("load it into the list"), Version: v,
-				Confirm: T("press L again to load it; your unsaved edits are replaced"), Done: T("the outside change is loaded into the list")},
+				Confirm: T("press L again to load it; your unsaved edits are replaced"), Warn: T("your unsaved edits are replaced"),
+				Done: T("the outside change is loaded into the list")},
 			{Kind: ActDismissConflict, Key: "I", Label: T("ignore it"), Done: T("the outside change is ignored (it stays in the history)")},
 		}})
 	}
@@ -317,7 +319,7 @@ func questionNeed(st *app.LoadoutState, q *store.Question) Need {
 	x, y := nm(q.InstanceID), nm(q.CandidateID)
 	answer := func(key, label, ans, done string) Action {
 		// Merging or splitting lineages is not undone with u: confirm first (06 §9).
-		return Action{Kind: ActAnswer, Key: key, Label: label, QID: q.ID, Answer: ans, Done: done, Confirm: Tf("press %s again: %s", key, done)}
+		return Action{Kind: ActAnswer, Key: key, Label: label, QID: q.ID, Answer: ans, Done: done, Confirm: Tf("press %s again: %s", key, done), Warn: done}
 	}
 	return Need{Group: GroupConfirm, Text: Tf("is %s the same mod as %s?", x, y), Counted: true, Status: StatusWarn,
 		Mods: []string{q.InstanceID, q.CandidateID},
