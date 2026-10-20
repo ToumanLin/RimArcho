@@ -327,7 +327,7 @@ WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI �
 4. **离线开关。** `archo config set workshop.fetch on|off`（默认 on）；`workshop.images on|off`（默认 on）单独关闭图片下载。关闭后只用缓存和 About.xml。联网只访问 Steam 的这个公开接口，以及工坊描述里出现的图片地址。
 5. **BBCode 渲染**（按显示宽度换行，遵守 §2.1）：`h1`–`h3` 粗体文字色并前后空一行；`b` 粗体；`i` `u` 照常显示（不用斜体和下划线）；`strike` 淡色；`list`/`olist` 用 `•` 和序号、按层级缩进两格；`url` 显示链接文字，WezTerm 中用 OSC 8 做成可点击，兼容模式在文字后面淡色显示域名；`quote` `code` 缩进两格、次要色；`table` 按列对齐、放不下的列截断；`hr` 变成空行；`nl` 换行；`noparse` 原样；未知标签去掉、保留内容。
 6. **图片。** 完整模式（WezTerm）：`[img]` 在原位置占一块区域，宽度为列宽和 60 格中较小者，行数按图片比例算、最多 20 行；下载、解码、缩放到 720 像素宽后缓存为 PNG（`<数据目录>/cache/workshop-img/`），用 §6.2 的 OSC 1337 方法绘制（补成整格比例、`preserveAspectRatio=0`、离开时 ECH 清除）。图片只有完全进入可见区域时才画，部分可见时显示占位行；图片在需要时才下载。GIF 只显示第一帧；WebP 和解码失败的显示占位。兼容模式：一行淡色占位 `[图片 · i.imgur.com]`。
-7. **图片里的文字（OCR）** 不做：Windows 自带 OCR 需要 WinRT 调用，对工坊横幅这类艺术字识别不可靠；而且测量显示只靠图片写简介的 Mod 只有 1 个。
+7. **图片里的文字（OCR）**（2026-10-20 修订：要做，改用视觉模型，放进 AI 工作台，见 09 §5.2。下面是原结论）不做：Windows 自带 OCR 需要 WinRT 调用，对工坊横幅这类艺术字识别不可靠；而且测量显示只靠图片写简介的 Mod 只有 1 个。
 
 ## 7. 需要处理
 

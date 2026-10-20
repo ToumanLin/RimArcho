@@ -37,6 +37,10 @@ yourself: `save` (ModsConfig.xml) and `copy-local` (a new folder in `Mods/`). It
    ```
    RimArcho never installs it for you; it tells you when it is missing.
 
+The executables are not code-signed. The first time you run `RimArcho.exe` or `archo.exe`, Windows
+SmartScreen may say "Windows protected your PC": choose **More info**, then **Run anyway**. You can
+check a download against the source by building it yourself (below).
+
 To build from source (Go 1.27+), run `go build -o archo.exe ./cmd/archo`, or
 `pwsh scripts/release.ps1 -Version x.y.z` for a release zip with the version stamped in.
 
