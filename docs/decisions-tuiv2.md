@@ -264,3 +264,79 @@ follows 06 §7, with the additions recorded in §7.2 (V4 rulings).
 | T8 on the real data copy (`TestT8NeedsReal`, a temp copy of the copy) | 20 items, 19 counted, in en and zh: each one sentence with at least one key. The top bar equals the counted items. Every rendered line of the screen, with each item selected, has no problem code and no `#ref`, and neither does the cycle view. Every key of every item was run: each opened a view or a preview, or acted and said so, and none failed |
 | Groups and keys on fixtures | `TestNeedsView`: the cycle in words, `x` adds the ignore rule and the item goes; `space` enables the missing dependency. `TestNeedsLogs`: current log → "last run, … reported N errors" per mod; stale log → one dim, uncounted row. `TestChangesView`: the scan sentence, `c` in words, file diff, outside change ignored with `I` from 需要处理 |
 | Screenshots | not taken: the display was off (desktop idle for over an hour) |
+
+# V4 follow-up: one item for all order violations
+
+One `S` fixes every order violation, so `order.violated` is folded into one item:
+"10 个 Mod 的顺序不对" (counts the mods that must move), with `S` and `enter` to list the
+pairs. A single violation keeps its own sentence. No other kind qualifies yet: missing
+entries, disabled dependencies and logs each need their own key. The top bar counts the
+folded item as 1, so on the real data copy it shows 9 (was 19): the number is how many
+things to do. T8 asserts the fold.
+
+# V5: command palette, double press, WezTerm host, bundled font
+
+06 §10 V5 (T4, T10).
+
+## Decisions
+
+1. **Command palette** (06 §8): `ctrl+k`, a `❯` input line over the results.
+   - It finds 19 commands by Chinese name or English alias. Each command does what its key does,
+     and the key is matched as the description.
+   - It finds every mod (`enter` jumps to the mod, clearing a column search that hides it), and
+     the other environments (`enter` switches).
+   - Ranking: prefix 4 > substring 3 > subsequence 2 > description 1. Ties go to commands, then
+     environments, then mods, then the shorter name. An empty query lists commands and
+     environments only.
+2. **Double press** (06 §9): `arm(key, warning, run)`.
+   - The first press puts "✗ 再按一次 … " on the status line; the same key does it; any other key
+     cancels ("已取消").
+   - Used where `u` cannot undo: loading an outside ModsConfig.xml change (`L`, replaces unsaved
+     edits; it was a y/n panel) and identity answers (`s` / `c` / `u`).
+3. **WezTerm host** (06 §1.1), `internal/host`. Only a bare `archo` reaches it; `archo tui`,
+   `archo --here`, CLI commands and MCP never do (`wantsHost`, tested). Order of the check:
+   - Already inside WezTerm (`TERM_PROGRAM`): run here.
+   - `terminal.host none`: run here.
+   - Look for wezterm-gui on PATH, then `%ProgramW6432%` / `%ProgramFiles%` / `%LOCALAPPDATA%\Programs`
+     `\WezTerm\`, then `<data dir>/wezterm/`.
+   - None found and a console to ask on: "Download the WezTerm portable build (about 66 MB)…? [Y/n]".
+     - No: `terminal.host none`, run here, with a note on how to change it.
+     - Yes: GitHub `releases/latest`, take `WezTerm-windows-*.zip` and its `.sha256`, download to a
+       `.part` file while hashing, compare, check that every zip entry stays inside
+       `<data dir>/wezterm/` before writing any, extract, and set `terminal.host wezterm`.
+   - Then write `<data dir>/wezterm.lua` (CloseOnCleanExit, fonts from `<program dir>/fonts`) and
+     start `wezterm-gui start --config-file … -- archo tui [--env x]`. This process exits.
+   - Any failure (download, checksum, start) says so and runs the TUI here.
+   - No console (redirected or piped): never ask, run here.
+4. **Bundled font**: `scripts/release.ps1 -MapleTag v7.9` (pinned).
+   - It downloads `MapleMono-NF-CN.zip` and `.sha256` from github.com/subframe7536/maple-font
+     releases, verifies the hash, and takes `MapleMono-NF-CN-Regular.ttf` and `-Bold.ttf`.
+   - `OFL.txt` comes from the repo at the same tag; the script checks it is the SIL OFL.
+   - Everything goes under `fonts/` in the zip. The download is cached in `dist/cache/` (gitignored).
+     No font file is in git.
+
+## Verification
+
+| Test | Result |
+| --- | --- |
+| Palette | `TestPalScore` (each rank, Chinese name, English alias, description); `TestPalette`: ctrl+k, sort first for "sort", 自动排序 for "排序" and 保存到游戏 for "save" in zh, a mod hidden by another column's search found and jumped to, a command run, esc |
+| Double press | `TestChangesView`: first `L` only warns, another key cancels, nothing loaded. `TestDoublePressLoad`: `L L` loads. T8 completes armed keys and checks they say "again" |
+| T10 first run (fake GitHub, `httptest`) | `TestT10FirstRunYes`: asked, downloaded, sha256 verified, extracted into `<data dir>/wezterm/`, wezterm.lua with CloseOnCleanExit and the fonts dir, started with `archo tui --env main`, pref `wezterm`, no `.part` left; the second start finds it without a question or download. `TestT10FirstRunNo`: pref `none`, nothing started or downloaded, never asked again. `TestT10ChecksumMismatch`: nothing extracted or started. `TestT10ZipSlip`: refused before writing. `TestT10NoQuestion`: inside WezTerm, without a console, from Program Files, from PATH |
+| CLI never starts the host | `TestWantsHost`, `TestCommandsNeverStartHost` (the host hook fails the test if reached) |
+| T4 (usability test with a person) | not done here: needs a new player at the machine |
+
+Release build (`pwsh scripts/release.ps1 -Version 0.6.0-dev -SkipTests`, after the full suite
+passed): `dist/archo-0.6.0-dev-windows-amd64.zip`, 25.4 MB.
+
+| Entry | Bytes |
+| --- | --- |
+| archo.exe | 18,046,976 |
+| fonts/MapleMono-NF-CN-Regular.ttf | 20,649,812 |
+| fonts/MapleMono-NF-CN-Bold.ttf | 20,604,560 |
+| fonts/OFL.txt | 4,394 |
+| README.md | 6,166 |
+| CHANGELOG.md | 3,796 |
+
+The font zip's sha256 (af913b63…dcd3e94) matched the release's `.sha256`. Both TTFs name the
+family "Maple Mono NF CN", as wezterm.lua expects. v7.9 is newer than the files V0 measured
+(March 2025), so its glyph widths still need a look in WezTerm.
