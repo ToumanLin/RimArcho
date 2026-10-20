@@ -26,7 +26,7 @@
 双击 archo.exe（或在任意终端里运行 archo）
   ├─ 已经运行在 WezTerm 中（TERM_PROGRAM=WezTerm）→ 直接进入 TUI，完整模式
   ├─ 找到了 WezTerm（PATH、Program Files、<数据目录>/wezterm/）
-  │    → 用 RimArcho 的配置启动：wezterm-gui start --config-file <数据目录>/wezterm.lua -- archo tui
+  │    → 用 RimArcho 的配置启动：wezterm-gui --config-file <数据目录>/wezterm.lua start -- archo tui（`--config-file` 是全局参数，必须写在 `start` 之前）
   └─ 没找到 → 在当前控制台询问：
        “下载 WezTerm 便携版（约 66 MB）以显示图标和 Mod 预览图？[Y/n]”
        Y：从 WezTerm 的 GitHub Releases 下载 Windows 便携版 zip，校验发布页提供的 sha256，

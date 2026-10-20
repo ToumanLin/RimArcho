@@ -99,7 +99,7 @@ func TestT10FirstRunYes(t *testing.T) {
 	if len(*starts) != 1 || (*starts)[0].name != gui {
 		t.Fatalf("started %+v", *starts)
 	}
-	want := []string{"start", "--config-file", filepath.Join(h.Home, "wezterm.lua"), "--", h.Exe, "tui", "--env", "main"}
+	want := []string{"--config-file", filepath.Join(h.Home, "wezterm.lua"), "start", "--", h.Exe, "tui", "--env", "main"}
 	if got := (*starts)[0].args; strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("args %q", got)
 	}

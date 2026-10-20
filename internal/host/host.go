@@ -1,7 +1,7 @@
 // Package host runs the TUI inside RimArcho's WezTerm host (06 §1.1): it finds WezTerm,
 // offers to download the portable build when there is none (only after the player says
 // yes, verified against the release's sha256), writes wezterm.lua and starts
-// `wezterm-gui start -- archo tui`. A "no" is remembered in terminal.host. Only a bare
+// `wezterm-gui --config-file <lua> start -- archo tui`. A "no" is remembered in terminal.host. Only a bare
 // `archo` reaches this package: `archo tui`, `archo --here`, CLI commands and MCP never do.
 package host
 
@@ -82,7 +82,8 @@ func (h *Host) Run() (launched bool, err error) {
 	if err := os.WriteFile(lua, []byte(wezterm.Config(filepath.Join(h.ProgramDir, "fonts"))), 0o644); err != nil {
 		return false, err
 	}
-	args := append([]string{"start", "--config-file", lua, "--", h.Exe, "tui"}, h.Args...)
+	// --config-file is a global option: it must come before the "start" subcommand.
+	args := append([]string{"--config-file", lua, "start", "--", h.Exe, "tui"}, h.Args...)
 	if err := h.Start(gui, args...); err != nil {
 		fmt.Fprintln(h.Out, "could not start WezTerm:", err)
 		return false, nil
