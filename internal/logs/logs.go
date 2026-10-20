@@ -104,7 +104,9 @@ func isContinuation(l string) bool {
 	case strings.HasPrefix(l, "[Ref "), strings.HasPrefix(l, "(wrapper "), strings.HasPrefix(l, "Rethrow as "),
 		strings.HasPrefix(l, "--- End of"), strings.HasPrefix(l, "file: "), strings.HasPrefix(l, "Subnode:"),
 		// .NET exception messages that span lines (ArgumentException and ObjectDisposedException).
-		strings.HasPrefix(l, "Parameter name: "), strings.HasPrefix(l, "Actual value was "), strings.HasPrefix(l, "Object name: "):
+		strings.HasPrefix(l, "Parameter name: "), strings.HasPrefix(l, "Actual value was "), strings.HasPrefix(l, "Object name: "),
+		// A Mono native frame at column 0: "<0x2693319a2b0 + 0x000d2> <unknown method>".
+		strings.HasPrefix(l, "<0x") && strings.Contains(l, "> <unknown method>"):
 		return true
 	}
 	return bareFrameRe.MatchString(l)
@@ -118,6 +120,7 @@ func Parse(r io.Reader) (*File, error) {
 	for sc.Scan() {
 		p.Line(sc.Text())
 	}
+	p.Close()
 	f := p.F
 	resolveRefs(f)
 	return f, sc.Err()
@@ -130,6 +133,27 @@ type Parser struct {
 	cur          *Entry
 	afterSubnode bool
 	orig         map[string]*Entry // [Ref X] originals, for duplicates that follow them
+	// An XML Extensions error block: "[Mod - Start of stack trace]", the failure lines,
+	// "[End of stack trace]", then "Source file: <path>" (28% of the log corpus).
+	xname  string
+	xinner []string
+	xended bool
+}
+
+var xmlExtStartRe = regexp.MustCompile(`^(?:\S+\|0x[0-9A-Fa-f]+\|)?\[(.+) - Start of stack trace\]\s*$`)
+
+// closeBlock turns an XML Extensions block into "[Mod] <first failure line>" with the other
+// lines as continuation text.
+func (p *Parser) closeBlock() {
+	e := p.cur
+	if e != nil {
+		e.Message = "[" + p.xname + "]"
+		if len(p.xinner) > 0 {
+			e.Message += " " + p.xinner[0]
+			e.Extra = append(e.Extra, p.xinner[1:]...)
+		}
+	}
+	p.xname, p.xinner, p.xended = "", nil, false
 }
 
 // NewParser starts an empty log.
@@ -139,7 +163,13 @@ func NewParser() *Parser { return &Parser{F: &File{}, orig: map[string]*Entry{}}
 func (p *Parser) Open() bool { return p.cur != nil }
 
 // Close ends the current entry (the log ended or the game exited).
-func (p *Parser) Close() { p.finish(); p.cur = nil }
+func (p *Parser) Close() {
+	if p.xname != "" {
+		p.closeBlock()
+	}
+	p.finish()
+	p.cur = nil
+}
 
 // finish resolves the current entry's duplicate stack against an earlier original.
 func (p *Parser) finish() {
@@ -185,6 +215,32 @@ func (p *Parser) Line(l string) {
 		if m := versionRe.FindStringSubmatch(l); m != nil {
 			f.Version = m[1]
 		}
+	}
+	if p.xname != "" {
+		switch t := strings.TrimSpace(l); {
+		case !p.xended && t == "[End of stack trace]":
+			p.xended = true
+			return
+		case !p.xended:
+			if t != "" {
+				p.xinner = append(p.xinner, t)
+			}
+			return
+		case strings.HasPrefix(l, "Source file: "):
+			p.closeBlock()
+			p.cur.Extra = append(p.cur.Extra, "file: "+strings.TrimPrefix(l, "Source file: "))
+			p.finish()
+			p.cur = nil
+			return
+		}
+		p.closeBlock()
+	}
+	if m := xmlExtStartRe.FindStringSubmatch(l); m != nil {
+		p.finish()
+		p.cur = &Entry{Line: n, Message: "[" + m[1] + "]"}
+		f.Entries = append(f.Entries, p.cur)
+		p.xname = m[1]
+		return
 	}
 	if strings.HasPrefix(l, "(Filename: ") || strings.TrimSpace(l) == "" {
 		p.finish()
@@ -351,7 +407,9 @@ func Classify(e *Entry) string {
 	case strings.Contains(m, "] Patch operation ") || strings.HasPrefix(m, "Patch operation ") ||
 		strings.HasPrefix(m, "Verse.PatchOperation") && strings.Contains(m, "): Failed"):
 		return ClassPatchFailed
-	case strings.HasPrefix(m, "Verse.PatchOperationSequence: Error in the operation"):
+	case strings.HasPrefix(m, "Verse.PatchOperationSequence: Error in the operation"),
+		// An XML Extensions block: "[Mod] Verse.PatchOperationAdd(xpath=…): Failed …".
+		strings.Contains(m, "] Verse.PatchOperation") && (strings.Contains(m, "): Failed") || strings.Contains(m, ": Error in")):
 		return ClassPatchFailed
 	case strings.Contains(m, "Could not resolve cross-reference") || strings.HasPrefix(m, "Could not load reference to") ||
 		defNamedRe.MatchString(m):

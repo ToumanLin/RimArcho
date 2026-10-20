@@ -152,3 +152,52 @@ func TestTemplate(t *testing.T) {
 		}
 	}
 }
+
+// A Mono native frame at column 0 continues the stack (the log corpus's most frequent template
+// was this line as a message of its own, with the exception's stack cut in two).
+func TestParseNativeFrame(t *testing.T) {
+	text := "Exception in Verse.Mod constructor: System.Reflection.TargetInvocationException: boom\n" +
+		"  at HarmonyLib.Harmony.PatchAll () [0x0001d] in <8124cc12bdf242eab0a5f7e7edecf387>:0 \n" +
+		"<0x2693319a2b0 + 0x000d2> <unknown method>\n" +
+		"(wrapper managed-to-native) System.Reflection.RuntimeConstructorInfo.InternalInvoke(System.Reflection.RuntimeConstructorInfo,object,object[],System.Exception&)\n" +
+		"  at MyMod.Startup..ctor () [0x00005] in <51fded79cd284d4d911c5949aff4cb21>:0 \n"
+	f, err := Parse(strings.NewReader(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Entries) != 1 || len(f.Entries[0].Frames) != 3 || f.Entries[0].Top().Type != "HarmonyLib.Harmony" {
+		t.Fatalf("entries %d, frames %+v", len(f.Entries), f.Entries[0].Frames)
+	}
+}
+
+// An XML Extensions error block becomes one patch-failed entry named after the mod, with the
+// source file as a "file:" line (28% of the log corpus has such blocks).
+func TestParseXMLExtensionsBlock(t *testing.T) {
+	text := "2025-07-15T10:05:28.296Z|0x60d0|[ReBuild: Doors and Corners - Start of stack trace]\n" +
+		"Verse.PatchOperationAdd(xpath=\"Defs/ThingDef[defName=\"VFEArch_CellDoor\"]\"): Failed to find a node with the given xpath\n" +
+		"Verse.PatchOperationSequence: Error in the operation at position=2\n" +
+		"[End of stack trace]\n" +
+		`Source file: c:\program files (x86)\steam\steamapps\workshop\content\294100\3262718980\1.6\Patches\PerspectiveDoors-Mods.xml` + "\n" +
+		"[[FSF] Vanilla Bionics Expansion - Start of stack trace]\n" +
+		"Verse.PatchOperationReplace(xpath=\"/Defs/ThingDef[@Name = \"BodyPartArchotechBase\"]/graphicData/color\"): Failed to find a node with the given xpath\n" +
+		"[End of stack trace]\n" +
+		"GAGARIN: Cache created!\n"
+	f, err := Parse(strings.NewReader(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Entries) != 3 {
+		t.Fatalf("%d entries, want 3", len(f.Entries))
+	}
+	a, b := f.Entries[0], f.Entries[1]
+	if !strings.HasPrefix(a.Message, "[ReBuild: Doors and Corners] Verse.PatchOperationAdd(") || Classify(a) != ClassPatchFailed ||
+		len(a.Extra) != 2 || !strings.HasPrefix(a.Extra[1], `file: c:\program files`) {
+		t.Fatalf("first block %q %q class %s", a.Message, a.Extra, Classify(a))
+	}
+	if !strings.HasPrefix(b.Message, "[[FSF] Vanilla Bionics Expansion] Verse.PatchOperationReplace(") || len(b.Extra) != 0 {
+		t.Fatalf("second block (no source file) %q %q", b.Message, b.Extra)
+	}
+	if f.Entries[2].Message != "GAGARIN: Cache created!" {
+		t.Fatalf("line after a block: %q", f.Entries[2].Message)
+	}
+}

@@ -97,7 +97,7 @@ type logCacheEntry struct {
 var ErrLogNotCached = errors.New("log not analysed yet")
 
 // logCacheVersion invalidates stored reports when attribution changes.
-const logCacheVersion = 1
+const logCacheVersion = 2
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -493,6 +493,22 @@ func (cx *attrCtx) harmonyOwners(p logs.Patch) ([]string, string) {
 	return out, "Harmony ID " + p.Owner
 }
 
+// folderOwner maps a path from another machine (a shared log) to an active mod by its folder:
+// …\workshop\content\294100\<id>\… or …\Mods\<folder>\… ([Rimworld_dir]\Mods\… after HugsLib's
+// redaction).
+func (cx *attrCtx) folderOwner(path string) (string, string) {
+	m := modFolderRe.FindStringSubmatch(path)
+	if m == nil {
+		return "", ""
+	}
+	for _, e := range cx.st.List {
+		if mod := cx.st.Ix.ByID[e.Instance]; mod != nil && strings.EqualFold(filepath.Base(filepath.FromSlash(mod.Rel)), m[1]) {
+			return mod.ID, filepath.ToSlash(m[2])
+		}
+	}
+	return "", ""
+}
+
 func (cx *attrCtx) dirOwner(path string) (string, string) {
 	p := strings.ToLower(filepath.Clean(strings.ReplaceAll(path, "/", string(os.PathSeparator))))
 	for _, d := range cx.dirs {
@@ -504,11 +520,18 @@ func (cx *attrCtx) dirOwner(path string) (string, string) {
 }
 
 var (
-	bracketRe = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
-	xmlExtRe  = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
-	winPathRe = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
-	xrefRe    = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
-	typeTokRe = regexp.MustCompile(`\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\b`)
+	bracketRe     = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
+	xmlExtRe      = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
+	winPathRe     = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
+	xrefRe        = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
+	forDefRe      = regexp.MustCompile(` for def '([^']+)'`)
+	ctxDefNameRe  = regexp.MustCompile(`Context: [\s\S]*?<defName>([^<\s]+)</defName>`)
+	ctxNameRe     = regexp.MustCompile(`Context: <\w+[^>]*\bName="([^"]+)"`)
+	missingTypeRe = regexp.MustCompile(`Could not find (?:a )?type (?:named )?([A-Za-z_][\w.+]*\.[\w+]+)|expected class '([^']+)'`)
+	blockRe       = regexp.MustCompile(`^\[(.+?)\] Verse\.PatchOperation`)
+	modFolderRe   = regexp.MustCompile(`(?i)[\\/](?:294100|Mods)[\\/]([^\\/]+)[\\/](.+)$`)
+	wanterRe      = regexp.MustCompile(`found to give to ([\w.]+Def) ([^\s(]+)`)
+	typeTokRe     = regexp.MustCompile(`\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\b`)
 )
 
 var hotSpots = map[string]bool{"Verse.Pawn.Tick": true, "Verse.ThingWithComps.Tick": true, "Verse.Thing.DoTick": true,
@@ -526,8 +549,13 @@ var tickChecklist = []string{
 func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.LogFailure) {
 	e := lc.First
 	ix := cx.st.Ix
-	// 1. "[Mod Name] …" prefix: the mod logs its own problem.
-	if m := bracketRe.FindStringSubmatch(e.Message); m != nil {
+	// 1. "[Mod Name] …" prefix: the mod logs its own problem. An XML Extensions block names
+	// the mod in full ("[[FSF] Vanilla Bionics Expansion] Verse.PatchOperation…").
+	if m := blockRe.FindStringSubmatch(e.Message); m != nil {
+		for _, mod := range cx.byName[strings.ToLower(m[1])] {
+			lc.add(mod.ID, RoleSource, fmt.Sprintf("log message prefix [%s]", m[1]))
+		}
+	} else if m := bracketRe.FindStringSubmatch(e.Message); m != nil {
 		for _, mod := range cx.byName[strings.ToLower(m[1])] {
 			lc.add(mod.ID, RoleSource, fmt.Sprintf("log message prefix [%s]", m[1]))
 		}
@@ -538,6 +566,8 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		for _, p := range winPathRe.FindAllString(t, -1) {
 			if id, rel := cx.dirOwner(p); id != "" {
 				lc.add(id, RoleSource, "log file "+rel)
+			} else if id, rel := cx.folderOwner(p); id != "" {
+				lc.add(id, RoleSource, "log file "+rel+" (by mod folder)")
 			}
 		}
 	}
@@ -572,10 +602,48 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 				lc.Details = append(lc.Details, "providers: "+strings.Join(uniqStr(prov), ", "))
 			}
 			lc.next("archo def "+short+"/"+name, fmt.Sprintf("archo files search %q", name))
+			// "… found to give to Verse.ThingDef RKU_Hammer": the def that wanted the missing one.
+			// Whoever defines it holds the reference (log corpus: a direct rule beats searching
+			// every file for the missing name).
+			if w := wanterRe.FindStringSubmatch(e.Message); w != nil {
+				wshort := w[1][strings.LastIndexByte(w[1], '.')+1:]
+				ws, _ := cx.a.Store.DefsNamed(w[2], false)
+				for _, d := range ws {
+					if d.Type == wshort && cx.st.Position(d.Instance) > 0 && !cx.official(d.Instance) {
+						lc.add(d.Instance, RoleSource, fmt.Sprintf("defines %s %s, which wants %s %s (%s:%d)", wshort, w[2], short, name, d.File, d.Line))
+					}
+				}
+			}
+		}
+	case logs.ClassTexture:
+		// "Could not load Texture2D at '…' for def 'X'": the mod defining X points at it.
+		if m := forDefRe.FindStringSubmatch(e.Message); m != nil {
+			cx.definedBy(lc, m[1], false, "names the missing file")
+		}
+	case logs.ClassXMLLoad:
+		// "XML error: … Context: <ThingDef …><defName>X</defName>…": the def's XML is at fault.
+		texts := strings.Join(append([]string{e.Message}, e.Extra...), "\n")
+		if m := ctxDefNameRe.FindStringSubmatch(texts); m != nil {
+			cx.definedBy(lc, m[1], false, "is the def the XML error is in")
+		} else if m := ctxNameRe.FindStringSubmatch(texts); m != nil {
+			cx.definedBy(lc, m[1], true, "is the abstract def the XML error is in")
 		}
 	case logs.ClassMaterial:
 		lc.next(`archo files search "uiIconColor"`, `archo files search "uiIconPath"`)
 		lc.Checklist = append(lc.Checklist, "a _MainTex/ResolveIcon error is XML-side first: look for buildable defs with uiIconColor but no uiIconPath, uiIconPathsStuff or graphicData/texPath, including abstract bases")
+	}
+	// Missing types ("Could not find type named NS.T", "expected class 'NS.T' in assembly 'A'"):
+	// an installed mod that provides the type but is not enabled is a missing dependency.
+	for _, m := range missingTypeRe.FindAllStringSubmatch(e.Message+"\n"+strings.Join(e.Extra, "\n"), -1) {
+		t := m[1] + m[2]
+		for _, id := range cx.types(t) {
+			if cx.st.Position(id) == 0 {
+				lc.add(id, RoleDependency, "provides type "+t+" but is not enabled")
+				lc.next("archo enable " + ix.Ref(id))
+			} else {
+				lc.add(id, RoleMentioned, "provides type "+t+" and is enabled (a version mismatch?)")
+			}
+		}
 	}
 	// 3. Stack frames and Harmony lines.
 	firstMod := true
@@ -621,7 +689,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			continue
 		}
 		role := RoleMentioned
-		if strings.Contains(e.Message, "instantiating a mod of type "+t) {
+		if strings.Contains(e.Message, "instantiating a mod of type "+t) || strings.Contains(e.Message, "static constructor of "+t) {
 			role = RoleSource
 		}
 		ids := cx.types(t)
@@ -654,6 +722,32 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	}
 }
 
+// definedBy makes the enabled mods (not Core or a DLC) that define a def the source of a
+// cluster; byName looks the name up as an abstract Name="…".
+func (cx *attrCtx) definedBy(lc *LogCluster, name string, byName bool, why string) {
+	ds, _ := cx.a.Store.DefsNamed(name, byName)
+	for _, d := range ds {
+		if cx.st.Position(d.Instance) > 0 && !cx.official(d.Instance) {
+			lc.add(d.Instance, RoleSource, fmt.Sprintf("defines %s %s (%s:%d), which %s", d.Type, name, d.File, d.Line, why))
+		}
+	}
+}
+
+// official reports Core and the DLCs.
+func (cx *attrCtx) official(inst string) bool {
+	m := cx.st.Ix.ByID[inst]
+	return m != nil && strings.HasPrefix(strings.ToLower(m.PackageID), "ludeon.rimworld")
+}
+
+func hasSource(lc *LogCluster) bool {
+	for _, at := range lc.Attr {
+		if at.Role == RoleSource {
+			return true
+		}
+	}
+	return false
+}
+
 func outerType(t string) string {
 	if i := strings.IndexByte(t, '+'); i >= 0 {
 		return t[:i]
@@ -681,19 +775,35 @@ func (cx *attrCtx) patchFailure(lc *LogCluster, failAt map[string]analyze.LogFai
 			}
 		}
 	}
-	if !ok || lf.File == "" {
-		// XML Extensions logs each failure as Verse.PatchOperationX(xpath="…"): Failed …
-		if m := xmlExtRe.FindStringSubmatch(e.Message); m != nil {
+	byXPath := func() {
+		// XML Extensions logs each failure as Verse.PatchOperationX(xpath="…"): Failed …, in a
+		// block after "[Mod] " (logs.Parser).
+		body := e.Message
+		if i := strings.Index(body, "] Verse.PatchOperation"); i >= 0 {
+			body = body[i+2:]
+		}
+		if m := xmlExtRe.FindStringSubmatch(body); m != nil {
 			for _, p := range cx.byXPath[m[1]] {
 				lc.add(p.Instance, RoleSource, fmt.Sprintf("patch %s:%d %s (matched by XPath)", p.File, p.Line, p.Class))
 				lc.Details = append(lc.Details, fmt.Sprintf("simulation: %s:%d fails (patch.no-match: %s)", p.File, p.Line, strings.Join(p.Reasons, ", ")))
 				lc.next("archo patches --mod " + cx.st.Ix.Ref(p.Instance) + " --failed")
 			}
 		}
+	}
+	if !ok || lf.File == "" {
+		byXPath()
 		return
 	}
 	id, rel := cx.dirOwner(lf.File)
 	if id == "" {
+		// A shared log's path: match the mod folder instead (the simulation's failure keys are
+		// local paths, so only the file is evidence here).
+		if fid, frel := cx.folderOwner(lf.File); fid != "" {
+			lc.add(fid, RoleSource, "patch file "+frel+" (by mod folder)")
+			lc.next("archo patches --mod " + cx.st.Ix.Ref(fid) + " --failed")
+		} else {
+			byXPath()
+		}
 		return
 	}
 	if p := cx.fails[analyze.FailKey(lf.File, lf.Desc)]; p != nil {
@@ -817,9 +927,43 @@ func (cx *attrCtx) xrefReferrers(cs []*LogCluster) {
 		}
 		return cx.st.Position(hits[i].inst) < cx.st.Position(hits[j].inst)
 	})
+	// A text match is weak evidence (log corpus): vanilla XML is full of names like None,
+	// animal or Fishing that are enum values, tags or defs of another type, and a mod that
+	// defines the name provides it rather than wanting it. Core and DLCs and such mods are
+	// skipped; when many mods match, or the wanter rule already found the source, the matches
+	// are only mentioned.
+	defines := map[int]map[string]bool{}
+	for i, t := range toks {
+		defines[i] = map[string]bool{}
+		ds, _ := cx.a.Store.DefsNamed(t.name, false)
+		for _, d := range ds {
+			defines[i][d.Instance] = true
+		}
+	}
+	perTok := map[int]map[string]bool{}
 	for _, h := range hits {
+		if cx.official(h.inst) || defines[h.t][h.inst] {
+			continue
+		}
+		if perTok[h.t] == nil {
+			perTok[h.t] = map[string]bool{}
+		}
+		perTok[h.t][h.inst] = true
+	}
+	hadSource := map[int]bool{}
+	for i, t := range toks {
+		hadSource[i] = hasSource(t.lc)
+	}
+	for _, h := range hits {
+		if !perTok[h.t][h.inst] {
+			continue
+		}
 		t := toks[h.t]
-		t.lc.add(h.inst, RoleSource, fmt.Sprintf("references %s at %s:%d", t.name, h.file, h.line))
+		role := RoleSource
+		if len(perTok[h.t]) > 3 || hadSource[h.t] {
+			role = RoleMentioned
+		}
+		t.lc.add(h.inst, role, fmt.Sprintf("references %s at %s:%d", t.name, h.file, h.line))
 	}
 	for _, t := range toks {
 		sort.SliceStable(t.lc.Attr, func(i, j int) bool { return roleRank[t.lc.Attr[i].Role] < roleRank[t.lc.Attr[j].Role] })
