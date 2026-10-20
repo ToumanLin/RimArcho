@@ -102,3 +102,33 @@ func TestT12PickCancel(t *testing.T) {
 	}
 	press(m, "esc")
 }
+
+// The hint floats over the rows without disturbing the rest of each line: with Nerd Font
+// icons and Chinese, every line keeps 160 cells and a row's text shows once.
+func TestPickHintOverlay(t *testing.T) {
+	SetIcons("nerd")
+	SetLang("zh")
+	defer SetLang("en")
+	defer SetIcons("compat")
+	_, m := pickFixture(t)
+	press(m, "space")
+	press(m, "shift+down")
+	press(m, "right")
+	out, _ := m.columnLines(m.rowsShown())
+	seen := 0
+	for _, l := range out {
+		s := ansi.Strip(l)
+		if w := ansi.StringWidthWc(l); w > 160 {
+			t.Fatalf("%d cells: %q", w, s)
+		}
+		if strings.Contains(s, "已拾取 2 个") {
+			seen++
+			if strings.Count(s, "N") > 1 {
+				t.Fatalf("the row's start repeated after the hint: %q", s)
+			}
+		}
+	}
+	if seen != 1 {
+		t.Fatalf("hint shown %d times", seen)
+	}
+}

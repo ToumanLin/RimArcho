@@ -449,6 +449,15 @@ func (m *model) overlayHint(out []string, l layout) {
 		if lw := ansi.StringWidthWc(line); lw < m.w {
 			line += strings.Repeat(" ", m.w-lw)
 		}
-		out[y+i] = ansi.CutWc(line, 0, x) + h + ansi.CutWc(line, x+hw, m.w)
+		out[y+i] = cutCells(line, 0, x) + h + cutCells(line, x+hw, m.w)
 	}
+}
+
+// cutCells returns cells [left, right) of a styled line. ansi.CutWc (x/ansi v0.10.1) cuts
+// the left side with TruncateWc instead of TruncateLeftWc and returns the line's start.
+func cutCells(s string, left, right int) string {
+	if right <= left {
+		return ""
+	}
+	return ansi.TruncateLeftWc(ansi.TruncateWc(s, right, ""), left, "")
 }
