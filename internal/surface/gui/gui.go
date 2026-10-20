@@ -15,6 +15,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/icon"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -39,6 +40,7 @@ func Run(o Options) error {
 	}
 	w := application.New(application.Options{
 		Name:     "RimArcho",
+		Icon:     icon.PNG(256), // used when the exe has no icon resource (development builds, 08 §15.3)
 		Services: []application.Service{application.NewService(api)},
 		Assets:   application.AssetOptions{Handler: page},
 		Windows: application.WindowsOptions{
@@ -95,6 +97,13 @@ func handler(api *API, files fs.FS) http.Handler {
 		path, _, _, err := api.a.DescImage(r.URL.Query().Get("u")) // downloads into the cache once
 		serveFile(w, r, path, err)
 	})
+	for path, size := range map[string]int{"/icon.svg": 256, "/icon-small.svg": 16} {
+		svg := []byte(icon.SVG(size))
+		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "image/svg+xml")
+			w.Write(svg)
+		})
+	}
 	files2 := application.BundledAssetFileServer(files)
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'")

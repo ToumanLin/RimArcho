@@ -4,6 +4,15 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.7.0 — the window (unreleased)
 
+### Icon (08 §15)
+- A keystone arch: stone blocks with an amber keystone on a dark rounded base. Sizes up to 24 px
+  draw three heavier stones so the shape still reads in the taskbar.
+- Drawn from geometry (`internal/icon`), so the repository holds no image files apart from the
+  generated `docs/assets/rimarcho.svg`.
+- Both exes carry the icon and Windows version information (FileVersion, description). The
+  release script writes the resource object with `go run ./scripts/winres`; no resource compiler is
+  needed. The window, its title bar and the page header use the same icon.
+
 ### Link deployment (09 §8)
 - Mods in SteamCMD and extra folders can be enabled. `save` links each one into `Mods/` as
   `_Archo_<source>_<folder>` before it writes ModsConfig.xml, and removes the link once the mod is

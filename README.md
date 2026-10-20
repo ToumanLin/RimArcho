@@ -1,5 +1,7 @@
 # RimArcho
 
+<img src="docs/assets/rimarcho.svg" width="96" alt="RimArcho icon: a stone arch with an amber keystone">
+
 A RimWorld mod manager for players with hundreds of mods, and for the AI agents that help them.
 One program gives you a desktop window (`RimArcho.exe`), a terminal UI, a scriptable CLI and an MCP
 server (`archo.exe`). The window and the terminal UI are two faces of the same Go code: they show the

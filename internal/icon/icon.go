@@ -177,15 +177,16 @@ func PNG(size int) []byte {
 	return buf.Bytes()
 }
 
-// SVG is the large-size icon as a 256×256 SVG document.
-func SVG() string {
+// SVG is the icon as a 256×256 SVG document with the detail of a size×size image: the
+// three-stone arch for size ≤ 24, the five-stone arch above.
+func SVG(size int) string {
 	const k = 256.0
 	hex := func(c color.NRGBA) string { return fmt.Sprintf("#%02X%02X%02X", c.R, c.G, c.B) }
 	var b strings.Builder
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">`+"\n")
 	fmt.Fprintf(&b, `<title>RimArcho</title>`+"\n")
 	fmt.Fprintf(&b, `<rect width="256" height="256" rx="%.1f" fill="%s"/>`+"\n", cornerR*k, hex(Base))
-	for _, s := range shapes(256)[1:] {
+	for _, s := range shapes(size)[1:] {
 		var p []string
 		for _, q := range s.pts {
 			p = append(p, fmt.Sprintf("%.1f,%.1f", q.x*k, q.y*k))

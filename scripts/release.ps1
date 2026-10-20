@@ -45,16 +45,33 @@ New-Item -ItemType Directory -Force $out | Out-Null
 $pkg = "github.com/ToumanLin/RimArcho/internal/buildinfo"
 $ldflags = "-s -w -X $pkg.Version=$Version -X $pkg.Commit=$commit -X $pkg.Date=$date"
 $exe = if ($GOOS -eq "windows") { "archo.exe" } else { "archo" }
-$env:CGO_ENABLED = "0"; $env:GOOS = $GOOS; $env:GOARCH = $GOARCH
-Write-Host "go build $exe ($Version, $commit, $date)"
-go build -trimpath -ldflags $ldflags -o (Join-Path $out $exe) ./cmd/archo
-if ($LASTEXITCODE -ne 0) { throw "build failed" }
-if ($GOOS -eq "windows") {
-    Write-Host "go build RimArcho.exe (Windows GUI)"
-    go build -trimpath -ldflags "$ldflags -H windowsgui -X $pkg.GUI=1" -o (Join-Path $out "RimArcho.exe") ./cmd/archo
-    if ($LASTEXITCODE -ne 0) { throw "build failed" }
+# Windows resources (08 §15.3): the keystone icon and the version information, written as a
+# .syso next to main.go before each build (the two exes differ in their description) and
+# removed afterwards; the .syso is never committed.
+$syso = "cmd/archo/rsrc_windows_$GOARCH.syso"
+function Write-Res([string]$file, [string]$desc) {
+    if ($GOOS -ne "windows" -or $GOARCH -ne "amd64") { return }
+    Remove-Item Env:GOOS, Env:GOARCH -ErrorAction SilentlyContinue
+    go run ./scripts/winres -version $Version -exe $file -desc $desc -o $syso
+    if ($LASTEXITCODE -ne 0) { throw "winres failed" }
+    $env:GOOS = $GOOS; $env:GOARCH = $GOARCH
 }
-Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED
+$env:CGO_ENABLED = "0"; $env:GOOS = $GOOS; $env:GOARCH = $GOARCH
+try {
+    Write-Res $exe "RimArcho command line"
+    Write-Host "go build $exe ($Version, $commit, $date)"
+    go build -trimpath -ldflags $ldflags -o (Join-Path $out $exe) ./cmd/archo
+    if ($LASTEXITCODE -ne 0) { throw "build failed" }
+    if ($GOOS -eq "windows") {
+        Write-Res "RimArcho.exe" "RimArcho"
+        Write-Host "go build RimArcho.exe (Windows GUI)"
+        go build -trimpath -ldflags "$ldflags -H windowsgui -X $pkg.GUI=1" -o (Join-Path $out "RimArcho.exe") ./cmd/archo
+        if ($LASTEXITCODE -ne 0) { throw "build failed" }
+    }
+} finally {
+    if (Test-Path $syso) { Remove-Item $syso }
+    Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
+}
 
 Copy-Item README.md, CHANGELOG.md, LICENSE $out
 
