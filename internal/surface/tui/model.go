@@ -129,28 +129,28 @@ type model struct {
 	content    map[string]int // content kinds for type: (loaded on first use)
 	contentKey string
 
-	dd         *detailData          // the current mod's details beyond the row
-	imgs       map[string]*imgEntry // description images by url and width
-	imgLoading string               // the image being loaded ("" none)
-	thumbShown string               // the mod whose thumbnail may be drawn: the cursor rested on it (06 §6.2)
-	thumbSeq   int
+	dd          *detailData          // the current mod's details beyond the row
+	imgs        map[string]*imgEntry // description images by url and width
+	imgLoading  string               // the image being loaded ("" none)
+	thumbShown  string               // the mod whose thumbnail may be drawn: the cursor rested on it (06 §6.2)
+	thumbSeq    int
 	dwell       time.Duration // ui.preview_dwell_ms (06 §12.4: 0, the thumbnail at once)
 	previewsOff bool          // ui.previews off: no images at all
 	prefetching string        // the thumbnail being made ahead of the cursor
 	imgUse      map[string]int
 	imgClock    int
-	fsecs      *fullSecs  // the full-screen detail's sub-sections (06 §6.3)
-	pal        *palette   // the command palette (06 §8), nil when closed
-	pick       *pickState // a pick session (06 §12.2)
-	prefs      colPrefs   // column widths and wrapping (06 §12.1)
-	prefsEnv   string
-	resizing   *resizeDrag // a column gap being dragged
-	rowMap     [3][]int    // per list column: body line → view index (-1: title or empty), as last drawn
-	armed      *armed      // a destructive key pressed once (06 §9)
-	images     *imgWriter  // the WezTerm host's output; nil: no inline images
-	full       bool        // the full-screen detail
-	fullOff    int
-	lastLines  []dline
+	fsecs       *fullSecs  // the full-screen detail's sub-sections (06 §6.3)
+	pal         *palette   // the command palette (06 §8), nil when closed
+	pick        *pickState // a pick session (06 §12.2)
+	prefs       colPrefs   // column widths and wrapping (06 §12.1)
+	prefsEnv    string
+	resizing    *resizeDrag // a column gap being dragged
+	rowMap      [3][]int    // per list column: body line → view index (-1: title or empty), as last drawn
+	armed       *armed      // a destructive key pressed once (06 §9)
+	images      *imgWriter  // the WezTerm host's output; nil: no inline images
+	full        bool        // the full-screen detail
+	fullOff     int
+	lastLines   []dline
 
 	scanning bool
 	quitting bool
