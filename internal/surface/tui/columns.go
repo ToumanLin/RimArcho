@@ -323,7 +323,7 @@ func (m *model) columnLines(n int) ([]string, []placement) {
 // drawColumn returns n lines of exactly s.w cells: the title, then the rows.
 func (m *model) drawColumn(s slot, n int, tabs bool) []string {
 	c := &m.cols[s.kind]
-	focused := m.focus == s.kind
+	focused := m.focus == s.kind && !m.detailFocus // area 4 has the focus: no list is bright (06 §13.3)
 	out := make([]string, 0, n)
 	if tabs {
 		out = append(out, m.tabStrip(s.w))
@@ -444,7 +444,7 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 	// The focused area's cursor row has a faint background, so one place on the screen is
 	// the brightest (06 §13.3). Every piece of the row carries it.
 	bg := func(st lipgloss.Style) lipgloss.Style { return st }
-	if isCur && focused && !m.detailFocus {
+	if isCur && focused {
 		bg = func(st lipgloss.Style) lipgloss.Style { return st.Background(cRowBg) }
 	}
 	pad := func(n int) string { return bg(plainStyle).Render(strings.Repeat(" ", max(n, 0))) }

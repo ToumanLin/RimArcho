@@ -86,10 +86,10 @@ func (m *model) tagBarKey(k tea.KeyMsg) tea.Cmd {
 	case tea.KeyEsc:
 		m.tags = nil
 		return nil
-	case tea.KeyLeft:
+	case tea.KeyLeft, tea.KeyUp: // 06 §13.4: in a popup both pairs of arrows choose
 		tb.sel = max(tb.sel-1, -1)
 		return nil
-	case tea.KeyRight:
+	case tea.KeyRight, tea.KeyDown:
 		tb.sel = min(tb.sel+1, len(tb.cands)-1)
 		return nil
 	case tea.KeyHome:
