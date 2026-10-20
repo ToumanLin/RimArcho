@@ -123,6 +123,9 @@ var zhText = map[string]string{
 	"technical information · i":                          "技术信息 · i 展开",
 	"technical information":                              "技术信息",
 	"no preview":                                         "无预览",
+	// command palette (06 §8)
+	"command palette": "命令面板", "command": "命令", "environment": "环境", "switch to %s": "切换到环境 %s",
+	"nothing matches": "没有匹配的结果", "run": "执行", "close": "关闭",
 	// 需要处理 and changes (06 §4.1, §7)
 	"%d mods are out of order":     "%d 个 Mod 的顺序不对",
 	"show which":                   "展开查看",
@@ -305,5 +308,6 @@ const helpTextZh = `四列（06 §5）
   enter      详情                     i     技术信息
   !          需要处理                 c     最近变化
   R          重新扫描                 E     切换环境
-  :          运行 archo 命令          ? 帮助   q 退出
+  :          运行 archo 命令          ctrl+k 命令面板
+  ? 帮助   q 退出
 鼠标：点击选中；在列之间拖动 = 启用、停用或暂存；在“已启用”内拖动 = 调整顺序；滚轮滚动`

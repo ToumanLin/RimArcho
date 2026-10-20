@@ -144,6 +144,7 @@ type model struct {
 	thumbShown string               // the mod whose thumbnail may be drawn: the cursor rested on it (06 §6.2)
 	thumbSeq   int
 	fsecs      *fullSecs  // the full-screen detail's sub-sections (06 §6.3)
+	pal        *palette   // the command palette (06 §8), nil when closed
 	images     *imgWriter // the WezTerm host's output; nil: no inline images
 	full       bool       // the full-screen detail
 	fullOff    int

@@ -25,6 +25,8 @@ func (m *model) View() string {
 	case m.loadErr != nil:
 		content = []string{"", "  " + sErrS.Render(fit(T("error: ")+m.loadErr.Error(), m.w-2)),
 			"  " + sSecond.Render(fit(T("Set up an environment first: archo env detect, archo env add <name> --detected"), m.w-2))}
+	case m.pal != nil:
+		content = m.paletteLines(body)
 	case m.panel != nil:
 		content = m.panelLines(body)
 	case m.insp != nil:
@@ -96,6 +98,8 @@ func (m *model) topBar() string {
 // crumb is the breadcrumb of a secondary screen ("" on the main screen).
 func (m *model) crumb() string {
 	switch {
+	case m.pal != nil:
+		return T("command palette")
 	case m.panel != nil:
 		return m.panel.title
 	case m.insp != nil || m.full:
@@ -146,6 +150,8 @@ func (m *model) statusLine() string {
 func (m *model) hintLine() string {
 	var pairs [][2]string
 	switch {
+	case m.pal != nil:
+		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
 	case m.prompt != nil:
 		return sAccent.Render(markPrompt+" ") + sSecond.Render(m.prompt.label) + sText.Render(m.prompt.text+"_")
 	case m.editing:

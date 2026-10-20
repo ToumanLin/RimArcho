@@ -23,7 +23,8 @@ const helpText = `four columns (06 §5)
   enter      details                i     technical information
   !          needs attention        c     recent changes
   R          rescan                 E     switch environment
-  :          run an archo command   ? help   q quit
+  :          run an archo command   ctrl+k command palette
+  ? help     q quit
 mouse: click selects; drag between columns enables, disables or stages; drag within
 "enabled" changes the order; the wheel scrolls`
 
@@ -148,6 +149,11 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		m.status, m.sayKind = "", sayNone // the status line lasts until the next key
 	}
 	switch {
+	case m.pal != nil:
+		return m.paletteKey(k)
+	case s == "ctrl+k" && m.prompt == nil && !m.editing:
+		m.panel, m.insp = nil, nil
+		return m.openPalette()
 	case m.prompt != nil:
 		return m.promptKey(k)
 	case m.panel != nil:
