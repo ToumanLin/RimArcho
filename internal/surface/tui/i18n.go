@@ -124,6 +124,8 @@ var zhText = map[string]string{
 	"technical information":                              "技术信息",
 	"no preview":                                         "无预览",
 	// 需要处理 and changes (06 §4.1, §7)
+	"%d mods are out of order":     "%d 个 Mod 的顺序不对",
+	"show which":                   "展开查看",
 	"this list":                    "这个列表",
 	"missing dependencies":         "缺少的前置",
 	"conflicts":                    "冲突",

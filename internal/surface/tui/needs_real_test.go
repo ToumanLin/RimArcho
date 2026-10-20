@@ -88,6 +88,38 @@ func TestT8NeedsReal(t *testing.T) {
 	}
 	SetLang("en")
 	m.loadProblems()
+	// One key fixes every order violation: they are one item, counted once (06 §7.2).
+	folds := 0
+	for i, it := range m.prob.items {
+		if strings.Contains(it.text, "should load after") {
+			t.Errorf("order violation not folded: %q", it.text)
+		}
+		if !it.fold {
+			continue
+		}
+		folds++
+		if !strings.HasSuffix(it.text, "mods are out of order") || len(it.parts) < 2 || keyList(it) != "S sort · enter show which" {
+			t.Errorf("fold %q: %d parts, keys %s", it.text, len(it.parts), keyList(it))
+		}
+		m.prob.cursor = i
+		m.needsKey("enter")
+		shown := strings.Join(func() []string {
+			var ls []string
+			for _, l := range m.needLines(4000) {
+				ls = append(ls, ansi.Strip(l))
+			}
+			return ls
+		}(), "\n")
+		for _, part := range it.parts {
+			if !strings.Contains(shown, part) {
+				t.Errorf("enter does not show %q", part)
+			}
+		}
+		m.needsKey("enter")
+	}
+	if folds != 1 {
+		t.Errorf("%d folded items, want 1", folds)
+	}
 	// Every key does something. Edits only change this temp copy; nothing is saved.
 	texts := needItems(m)
 	ran := 0
@@ -105,9 +137,10 @@ func TestT8NeedsReal(t *testing.T) {
 			if key == "space" {
 				key = " "
 			}
+			wasOpen := m.prob.open[text]
 			m.needsKey(key)
 			ran++
-			did := m.panel != nil || m.insp != nil || m.sayKind == sayOK || opened != ""
+			did := m.panel != nil || m.insp != nil || m.sayKind == sayOK || opened != "" || m.prob.open[text] != wasOpen
 			if !did || m.sayKind == sayFail {
 				t.Errorf("%q: key %s (%s) did nothing: status %q", text, k.key, k.label, m.status)
 			}

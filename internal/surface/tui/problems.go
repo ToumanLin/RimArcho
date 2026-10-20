@@ -22,6 +22,7 @@ type probState struct {
 	// 需要处理 (06 §3, §4.2, §7).
 	status map[string]int
 	need   int
+	open   map[string]bool // folded items shown open (enter), by text
 }
 
 // analysis progress plumbing
@@ -75,8 +76,14 @@ func (m *model) loadProblems() {
 			continue
 		}
 		p.need++
-		if len(it.mods) > 0 && it.status > p.status[it.mods[0]] {
-			p.status[it.mods[0]] = it.status
+		icons := it.mods
+		if !it.fold && len(icons) > 1 {
+			icons = icons[:1] // the subject; the others are what it needs or conflicts with
+		}
+		for _, id := range icons {
+			if it.status > p.status[id] {
+				p.status[id] = it.status
+			}
 		}
 	}
 	p.cursor = min(p.cursor, max(len(p.items)-1, 0))

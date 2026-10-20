@@ -203,8 +203,11 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	keys(tm, "R")
 	waitFor(t, tm, "scan complete")
 	keys(tm, ":", "scan", "enter") // the command line also routes scans to the child
-	time.Sleep(300 * time.Millisecond)
-	waitFor(t, tm, "nothing changed")
+	// The second scan prints the same sentence, which the renderer does not send again: wait
+	// for the child-process hook instead.
+	for deadline := time.Now().Add(5 * time.Second); *scans < 2 && time.Now().Before(deadline); {
+		time.Sleep(20 * time.Millisecond)
+	}
 	keys(tm, ":", "list --active", "enter")
 	waitFor(t, tm, "archo list --active")
 	keys(tm, "esc", "c")

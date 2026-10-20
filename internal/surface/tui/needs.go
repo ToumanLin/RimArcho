@@ -48,6 +48,10 @@ type need struct {
 	status  int      // statusErr, statusWarn or statusLog for the row icon
 	dim     bool
 	rank    int // order within the group (06 §7.2's order)
+	// A folded item stands for several findings one key resolves (06 §7.2): enter shows
+	// them; every mod in mods gets the row icon.
+	parts []string
+	fold  bool
 }
 
 // buildNeeds turns the problem set and the environment's open questions into items.
@@ -60,6 +64,7 @@ func (m *model) buildNeeds(ps *app.ProblemSet) []need {
 	var out []need
 	add := func(n need) { out = append(out, n) }
 	var versions []*app.Problem
+	var order []need                    // order.violated: folded into one item when there are several
 	logs := map[string][]*app.Problem{} // current log problems by subject mod ("" unattributed)
 	for _, p := range ps.List {
 		if p.Log != nil {
@@ -92,7 +97,7 @@ func (m *model) buildNeeds(ps *app.ProblemSet) []need {
 		case "official.order":
 			add(need{rank: 0, group: gList, text: T("Core and the DLCs must come first in the list"), keys: []needKey{m.sortKey()}, counted: true, status: st})
 		case "order.violated":
-			add(need{rank: 1, group: gList, text: Tf("%s should load after %s", nm(a), nm(b)), keys: []needKey{m.sortKey()}, counted: true, mods: ids, status: st})
+			order = append(order, need{rank: 1, group: gList, text: Tf("%s should load after %s", nm(a), nm(b)), keys: []needKey{m.sortKey()}, counted: true, mods: ids, status: st})
 		case "order.cycle":
 			add(need{rank: 2, group: gList, text: Tf("the order requirements of %d mods contradict each other", len(subj)),
 				keys: []needKey{m.cycleViewKey(p), m.cycleIgnoreKey(p)}, counted: true, mods: ids, status: st})
@@ -124,6 +129,31 @@ func (m *model) buildNeeds(ps *app.ProblemSet) []need {
 			// Harmony warnings without log evidence, overlapping Defs and patches whose target
 			// is simply absent stay in the technical information (06 §7.3).
 		}
+	}
+	switch len(order) {
+	case 0:
+	case 1:
+		add(order[0])
+	default:
+		f := need{rank: 1, group: gList, counted: true, status: statusWarn, fold: true}
+		seen := map[string]bool{}
+		for _, o := range order {
+			f.parts = append(f.parts, o.text)
+			if len(o.mods) > 0 && !seen[o.mods[0]] {
+				seen[o.mods[0]] = true
+				f.mods = append(f.mods, o.mods[0])
+			}
+		}
+		f.text = Tf("%d mods are out of order", len(seen))
+		f.keys = []needKey{m.sortKey(), {key: "enter", label: T("show which"), run: func(m *model) tea.Cmd {
+			p := &m.prob
+			if p.open == nil {
+				p.open = map[string]bool{}
+			}
+			p.open[f.text] = !p.open[f.text]
+			return nil
+		}}}
+		add(f)
 	}
 	if n := len(versions); n > 0 {
 		warn := 0
@@ -573,6 +603,17 @@ func (m *model) needLines(n int) []string {
 				s = sSel
 			}
 			rows = append(rows, row{lead + s.Render(fit(l, tw)), i})
+		}
+		if it.fold && p.open[it.text] {
+			for _, part := range it.parts {
+				for j, l := range wrap(part, tw-2) {
+					lead := "    " + sDimS.Render(markDot) + " "
+					if j > 0 {
+						lead = "      "
+					}
+					rows = append(rows, row{lead + sSecond.Render(fit(l, tw-2)), i})
+				}
+			}
 		}
 		if sel && hint != "" {
 			for _, l := range wrap(hint, tw) {
