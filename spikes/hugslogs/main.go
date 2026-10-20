@@ -2,10 +2,16 @@
 // can HugsLib logs be collected in bulk, what do their sections look like, how many survive
 // cleaning, and are there enough repeat uploads (sessions) to mine fix evidence from.
 //
-//	go run ./spikes/hugslogs fetch -dir <corpus>   # list gist.github.com/HugsLibRecordKeeper, download raw logs
+//	go run ./spikes/hugslogs fetch -dir <corpus>   # web listing (newest ~1,000 only), download raw logs
+//	go run ./spikes/hugslogs probe                 # GitHub API: how far back the listing goes
+//	go run ./spikes/hugslogs api -dir <corpus> -from 2025-07-01 [-max N]   # GitHub API listing + download
 //	go run ./spikes/hugslogs stats -dir <corpus>   # parse, clean, print RESULT numbers
 //
-// The corpus directory holds raw logs and parsed records. It stays outside the repository.
+// probe and api need a GitHub token (GITHUB_TOKEN, GH_TOKEN or `gh auth login`). They do not work
+// in the cloud session, whose proxy only allows repository-scoped API paths.
+//
+// The corpus directory holds raw logs and parsed records. It lives in the private
+// ToumanLin/RimArcho-corpus repository, never in this one.
 package main
 
 import (
@@ -18,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -34,20 +41,44 @@ const (
 	ua      = "RimArcho-research-spike (contact via github.com/ToumanLin/RimArcho)"
 )
 
+// Endpoints; tests point them at a local server.
+var (
+	apiBase = "https://api.github.com"
+	rawBase = "https://gist.githubusercontent.com"
+	// rawDelay spaces raw downloads per worker.
+	rawDelay = 500 * time.Millisecond
+)
+
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: hugslogs fetch|stats -dir <corpus>")
+		fmt.Fprintln(os.Stderr, "usage: hugslogs fetch|probe|api|stats [flags]   (hugslogs <command> -h for flags)")
 		os.Exit(2)
 	}
 	fs := flag.NewFlagSet(os.Args[1], flag.ExitOnError)
-	dir := fs.String("dir", "/home/user/rimarcho-corpus/hugslogs", "corpus directory (outside the repo)")
-	pages := fs.Int("pages", 100, "listing pages to read (10 gists each; GitHub serves at most 100)")
+	dir := fs.String("dir", "/home/user/rimarcho-corpus/hugslogs", "corpus directory (the hugslogs folder of RimArcho-corpus)")
+	pages := fs.Int("pages", 0, "listing pages to read; fetch: 10 gists per page, default 100; api: 100 gists per page, default no limit")
 	workers := fs.Int("workers", 2, "parallel raw downloads")
+	from := fs.String("from", "", "api: only gists created at or after this time (RFC 3339 or YYYY-MM-DD); default: 3 days before the newest indexed gist")
+	maxDL := fs.Int("max", 0, "api: download at most this many raw logs this run, newest first (0 = no limit)")
 	fs.Parse(os.Args[2:])
 	var err error
 	switch os.Args[1] {
 	case "fetch":
-		err = fetch(*dir, *pages, *workers)
+		p := *pages
+		if p == 0 {
+			p = 100
+		}
+		err = fetch(*dir, p, *workers)
+	case "probe":
+		err = probe()
+	case "api":
+		f, ferr := resolveFrom(*dir, *from)
+		if ferr != nil {
+			err = ferr
+			break
+		}
+		fmt.Printf("listing gists created since %s\n", f)
+		err = apiFetch(*dir, f, *pages, *workers, *maxDL)
 	case "stats":
 		err = stats(*dir)
 	default:
@@ -57,6 +88,37 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
+}
+
+// resolveFrom turns -from into an RFC 3339 time. Without -from it is 3 days before the newest
+// indexed gist (an incremental run), or 3 days ago for an empty index.
+func resolveFrom(dir, from string) (string, error) {
+	if from != "" {
+		if t, err := time.Parse("2006-01-02", from); err == nil {
+			return t.UTC().Format(time.RFC3339), nil
+		}
+		if t, err := time.Parse(time.RFC3339, from); err == nil {
+			return t.UTC().Format(time.RFC3339), nil
+		}
+		return "", fmt.Errorf("-from %q: use YYYY-MM-DD or RFC 3339", from)
+	}
+	idx, err := readIndex(filepath.Join(dir, "index.jsonl"))
+	if err != nil {
+		return "", err
+	}
+	newest := time.Now().UTC()
+	if len(idx) > 0 {
+		var n string
+		for _, e := range idx {
+			if e.Created > n {
+				n = e.Created
+			}
+		}
+		if t, err := time.Parse(time.RFC3339, n); err == nil {
+			newest = t
+		}
+	}
+	return newest.Add(-72 * time.Hour).Format(time.RFC3339), nil
 }
 
 // ---- fetch ----
@@ -175,13 +237,25 @@ func fetch(dir string, pages, workers int) error {
 		time.Sleep(2 * time.Second)
 	}
 	fmt.Printf("listed %d gists (%s .. %s), %d new, index holds %d\n", listed, oldest, newest, added, len(idx))
+	return download(dir, idx, workers, "", 0)
+}
 
-	// Download raw logs not yet on disk.
+// download fetches the raw logs of index entries that are not on disk yet, newest first: only
+// entries created at or after from ("" = all), at most max of them (0 = no limit).
+func download(dir string, idx map[string]indexEntry, workers int, from string, limit int) error {
 	var todo []indexEntry
 	for _, e := range idx {
+		if from != "" && e.Created < from {
+			continue
+		}
 		if _, err := os.Stat(rawPath(dir, e.ID)); os.IsNotExist(err) {
 			todo = append(todo, e)
 		}
+	}
+	sort.Slice(todo, func(a, b int) bool { return todo[a].Created > todo[b].Created })
+	if limit > 0 && len(todo) > limit {
+		fmt.Printf("%d raw logs to download, capped at -max %d (newest first)\n", len(todo), limit)
+		todo = todo[:limit]
 	}
 	ch := make(chan indexEntry)
 	var mu sync.Mutex
@@ -192,7 +266,7 @@ func fetch(dir string, pages, workers int) error {
 		go func() {
 			defer wg.Done()
 			for e := range ch {
-				b, code, err := get(fmt.Sprintf("https://gist.githubusercontent.com/%s/%s/raw", account, e.ID))
+				b, code, err := get(fmt.Sprintf("%s/%s/%s/raw", rawBase, account, e.ID))
 				mu.Lock()
 				if err != nil || code != 200 {
 					failed++
@@ -202,8 +276,11 @@ func fetch(dir string, pages, workers int) error {
 				} else {
 					ok++
 				}
+				if n := ok + failed; n%200 == 0 {
+					fmt.Printf("  %d / %d downloaded (%d failed)\n", n, len(todo), failed)
+				}
 				mu.Unlock()
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(rawDelay)
 			}
 		}()
 	}
@@ -217,6 +294,197 @@ func fetch(dir string, pages, workers int) error {
 }
 
 func rawPath(dir, id string) string { return filepath.Join(dir, "raw", id+".txt") }
+
+// ---- GitHub API (for running outside the cloud session, where the API is not blocked) ----
+
+// token returns a GitHub token from GITHUB_TOKEN, GH_TOKEN or `gh auth token`.
+func token() (string, error) {
+	for _, k := range []string{"GITHUB_TOKEN", "GH_TOKEN"} {
+		if t := strings.TrimSpace(os.Getenv(k)); t != "" {
+			return t, nil
+		}
+	}
+	out, err := exec.Command("gh", "auth", "token").Output()
+	if t := strings.TrimSpace(string(out)); err == nil && t != "" {
+		return t, nil
+	}
+	return "", fmt.Errorf("no GitHub token: set GITHUB_TOKEN, or log in with `gh auth login`")
+}
+
+type apiGist struct {
+	ID        string `json:"id"`
+	CreatedAt string `json:"created_at"`
+	Files     map[string]struct {
+		Filename string `json:"filename"`
+		Size     int    `json:"size"`
+	} `json:"files"`
+}
+
+// apiPage lists one page (100 gists) of the account's gists. It waits out rate limits.
+func apiPage(tok string, page int) ([]apiGist, error) {
+	url := fmt.Sprintf("%s/users/%s/gists?per_page=100&page=%d", apiBase, account, page)
+	for try := 0; try < 6; try++ {
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Set("User-Agent", ua)
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := client.Do(req)
+		if err != nil {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		b, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			continue
+		}
+		switch {
+		case resp.StatusCode == 200:
+			var gs []apiGist
+			if err := json.Unmarshal(b, &gs); err != nil {
+				return nil, fmt.Errorf("page %d: %v", page, err)
+			}
+			return gs, nil
+		case resp.StatusCode == 429 || resp.StatusCode == 403 && (resp.Header.Get("Retry-After") != "" ||
+			resp.Header.Get("X-RateLimit-Remaining") == "0" || strings.Contains(strings.ToLower(string(b)), "rate limit")):
+			wait := 60 * time.Second
+			if s, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil && s > 0 {
+				wait = time.Duration(s+1) * time.Second
+			} else if resp.Header.Get("X-RateLimit-Remaining") == "0" {
+				if r, err := strconv.ParseInt(resp.Header.Get("X-RateLimit-Reset"), 10, 64); err == nil {
+					wait = time.Until(time.Unix(r, 0)) + 5*time.Second
+				}
+			}
+			fmt.Fprintf(os.Stderr, "page %d: HTTP %d (rate limit), waiting %v\n", page, resp.StatusCode, wait.Round(time.Second))
+			time.Sleep(wait)
+		case resp.StatusCode >= 500:
+			time.Sleep(10 * time.Second)
+		default:
+			return nil, fmt.Errorf("page %d: HTTP %d: %s", page, resp.StatusCode, trunc(string(b), 300))
+		}
+	}
+	return nil, fmt.Errorf("page %d: giving up after retries", page)
+}
+
+// probe answers "how deep does the API listing go": a few pages far apart, then a binary
+// search for the last non-empty page. It downloads nothing.
+func probe() error {
+	tok, err := token()
+	if err != nil {
+		return err
+	}
+	show := func(p int) (int, string) {
+		gs, err := apiPage(tok, p)
+		if err != nil {
+			fmt.Printf("page %5d: error %v\n", p, err)
+			return -1, ""
+		}
+		if len(gs) == 0 {
+			fmt.Printf("page %5d: empty\n", p)
+			return 0, ""
+		}
+		fmt.Printf("page %5d: %3d gists, %s .. %s\n", p, len(gs), gs[len(gs)-1].CreatedAt, gs[0].CreatedAt)
+		return len(gs), gs[len(gs)-1].CreatedAt
+	}
+	lastFull, firstEmpty := 0, 0
+	for _, p := range []int{1, 10, 30, 31, 100, 300, 1000, 3000, 10000} {
+		n, _ := show(p)
+		if n < 0 {
+			return fmt.Errorf("probe stopped")
+		}
+		if n == 0 {
+			firstEmpty = p
+			break
+		}
+		lastFull = p
+	}
+	if firstEmpty == 0 {
+		fmt.Println("page 10000 still has gists; the listing goes at least 1,000,000 deep")
+		return nil
+	}
+	for firstEmpty-lastFull > 1 {
+		m := (lastFull + firstEmpty) / 2
+		n, _ := show(m)
+		if n < 0 {
+			return fmt.Errorf("probe stopped")
+		}
+		if n == 0 {
+			firstEmpty = m
+		} else {
+			lastFull = m
+		}
+	}
+	_, oldest := show(lastFull)
+	fmt.Printf("\nlast page with gists: %d, so the API lists about %d gists, back to %s\n", lastFull, lastFull*100, oldest)
+	return nil
+}
+
+// apiFetch lists the account's gists through the API, newest first, until it reaches gists
+// created before from (or maxPages, or the end), adds them to the index, then downloads the raw
+// logs in range that are not on disk yet, newest first, at most max of them.
+func apiFetch(dir, from string, maxPages, workers, limit int) error {
+	tok, err := token()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "raw"), 0o755); err != nil {
+		return err
+	}
+	idxPath := filepath.Join(dir, "index.jsonl")
+	idx, err := readIndex(idxPath)
+	if err != nil {
+		return err
+	}
+	out, err := os.OpenFile(idxPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	now := time.Now().UTC().Format(time.RFC3339)
+	listed, added, known := 0, 0, 0
+	var oldest string
+	for p := 1; maxPages == 0 || p <= maxPages; p++ {
+		gs, err := apiPage(tok, p)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "listing stopped: %v\n", err)
+			break
+		}
+		if len(gs) == 0 {
+			fmt.Printf("listing ends at page %d\n", p)
+			break
+		}
+		past := false
+		for _, g := range gs {
+			if from != "" && g.CreatedAt < from {
+				past = true
+				continue
+			}
+			listed++
+			oldest = g.CreatedAt
+			if _, ok := idx[g.ID]; ok {
+				known++
+				continue
+			}
+			e := indexEntry{ID: g.ID, Created: g.CreatedAt, Listed: now}
+			for _, f := range g.Files {
+				e.File = f.Filename
+			}
+			idx[g.ID] = e
+			added++
+			j, _ := json.Marshal(e)
+			out.Write(append(j, '\n'))
+		}
+		if p%10 == 0 {
+			fmt.Printf("  page %d: back to %s, %d new so far\n", p, oldest, added)
+		}
+		if past {
+			fmt.Printf("reached gists older than %s at page %d\n", from, p)
+			break
+		}
+	}
+	fmt.Printf("listed %d gists in range (oldest %s), %d new, %d already indexed; index holds %d\n", listed, oldest, added, known, len(idx))
+	return download(dir, idx, workers, from, limit)
+}
 
 // ---- parse ----
 
