@@ -10,9 +10,9 @@ import (
 )
 
 func init() {
-	register(&Command{Name: "loadout export", Summary: "write the workspace as a text list or a ModsConfig.xml", MaxArgs: 0, Run: loadoutExport,
-		Flags: []Flag{{Name: "format", Value: "text|modsconfig"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"}}})
-	register(&Command{Name: "loadout import", Args: "<file>", Summary: "replace the workspace with a text list, a ModsConfig.xml or a save's mod list (.rws); undoable", MinArgs: 1, MaxArgs: 1, Run: loadoutImport})
+	register(&Command{Name: "loadout export", Summary: "write the workspace as a list file: text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code", MaxArgs: 0, Run: loadoutExport,
+		Flags: []Flag{{Name: "format", Value: "text|modsconfig|rimsort|rml|rimcrow"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"}}})
+	register(&Command{Name: "loadout import", Args: "<file|share code>", Summary: "replace the workspace with a list (text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs); undoable", MinArgs: 1, MaxArgs: 1, Run: loadoutImport})
 }
 
 func loadoutExport(c *Ctx, a *Args) (*render.Doc, error) {
@@ -31,7 +31,11 @@ func loadoutExport(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	d, root := render.New(fmt.Sprintf("exported %d bytes to %s", len(b), out))
-	root.KV("format", map[bool]string{true: "modsconfig", false: "text"}[a.Str("format") == app.FormatModsConfig])
+	f := a.Str("format")
+	if f == "" {
+		f = app.FormatText
+	}
+	root.KV("format", f)
 	d.AddNext("archo loadout import " + quoteArg(out))
 	return d, nil
 }
@@ -54,11 +58,28 @@ func loadoutImport(c *Ctx, a *Args) (*render.Doc, error) {
 			names = append(names, n)
 		}
 	}
-	line := fmt.Sprintf("imported %d entries from a %s", len(il.Tokens), map[string]string{app.FormatText: "text list", app.FormatModsConfig: "ModsConfig.xml", app.FormatSave: "save"}[il.Format])
+	kind := map[string]string{app.FormatText: "text list", app.FormatModsConfig: "ModsConfig.xml", app.FormatSave: "save", app.FormatRML: "RimWorld mod list (.rml)",
+		"rimcrow-modlist": "RimCrow ModList.xml", "rimcrow-json": "RimCrow JSON list", "rimcrow-share": "RimCrow share code", "rimsort-json": "RimSort JSON list",
+		"rimsort-text": "RimSort clipboard list", "rentry": "Rentry list"}[il.Format]
+	line := fmt.Sprintf("imported %d entries from a %s", len(r.State.List), kind)
 	if il.Game != "" {
 		line += ", game " + il.Game
 	}
 	head := []*render.Node{{Line: line}}
+	if il.Title != "" {
+		head = append(head, &render.Node{Line: "list: " + il.Title})
+	}
+	if len(il.Unresolved) > 0 {
+		n := &render.Node{Line: fmt.Sprintf("skipped: %d workshop IDs no installed mod has", len(il.Unresolved))}
+		for i, w := range il.Unresolved {
+			if i == 8 {
+				n.Children = append(n.Children, &render.Node{Line: fmt.Sprintf("… %d more", len(il.Unresolved)-8)})
+				break
+			}
+			n.Children = append(n.Children, &render.Node{Line: "https://steamcommunity.com/sharedfiles/filedetails/?id=" + w})
+		}
+		head = append(head, n)
+	}
 	if missing > 0 {
 		n := &render.Node{Line: fmt.Sprintf("not installed: %d", missing)}
 		for i, x := range names {

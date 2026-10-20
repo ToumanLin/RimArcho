@@ -73,7 +73,9 @@ type App struct {
 	TrashFunc func(path string) error
 	HTTP      *http.Client
 	SteamAPI  string
-	analyzing *pendingAnalysis
+	// SteamCollectionAPI reads Workshop collections (10 §4.3); "" is the public endpoint.
+	SteamCollectionAPI string
+	analyzing          *pendingAnalysis
 
 	ixCache *Index
 	ixKey   string

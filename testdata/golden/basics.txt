@@ -40,8 +40,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     loadout diff [<v>] [<v>]                  differences between versions (default: newest version → workspace)
     loadout checkout <v>                      load a version into the workspace (save to apply)
     loadout tag <v> <name>                    name a version
-    loadout export                            write the workspace as a text list or a ModsConfig.xml
-    loadout import <file>                     replace the workspace with a text list, a ModsConfig.xml or a save's mod list (.rws); undoable
+    loadout export                            write the workspace as a list file: text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code
+    loadout import <file|share code>          replace the workspace with a list (text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs); undoable
     stage list                                staged mods, with the place each one came from
     stage add <ref…>                          stage mods (enabled ones leave the Loadout and remember their place)
     stage drop <ref…>                         take mods out of staging without enabling them
@@ -65,6 +65,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     gui                                       open the desktop window (RimArcho.exe does this on a double click)
     version                                   print the RimArcho version
+    collection <link|ID>                      read a Steam Workshop collection and compare it with the installed mods (uses the network)
     unhide <ref>                              rename About.xml.disabled back to About.xml so the game sees the mod again
     unpin <ref>                               restore a pinned mod's workshop copy and use it instead of the pinning copy
     trash <ref>                               move a hidden or unsubscribed workshop folder to the recycle bin
