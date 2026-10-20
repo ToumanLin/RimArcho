@@ -100,7 +100,18 @@ func (a *App) SuggestAt(ids []string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	l := st.List.Clone()
+	// Enabled ones are taken out first (06 §13.7: m suggests a place for them too); the
+	// position counts in the list without them, as MoveBlock and Enable expect.
+	moving := map[string]bool{}
+	for _, id := range ids {
+		moving[id] = true
+	}
+	var l loadout.List
+	for _, e := range st.List {
+		if !moving[e.Instance] {
+			l = append(l, e)
+		}
+	}
 	n := len(l)
 	for _, id := range ids {
 		if l.Index(id) < 0 {
