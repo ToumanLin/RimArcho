@@ -309,6 +309,7 @@ func (m *model) columnLines(n int) ([]string, []placement) {
 		}
 		out[y] = b.String()
 	}
+	m.overlayHint(out, l)
 	return out, ps
 }
 
@@ -324,6 +325,8 @@ func (m *model) drawColumn(s slot, n int, tabs bool) []string {
 	}
 	rows := n - 1
 	c.scroll(rows)
+	rm := make([]int, 0, n)
+	rm = append(rm, -1) // the title
 	if len(c.view) == 0 {
 		var msg string
 		switch {
@@ -338,14 +341,18 @@ func (m *model) drawColumn(s slot, n int, tabs bool) []string {
 		}
 		for _, l := range wrap(msg, s.w-2) {
 			out = append(out, "  "+sDimS.Render(fit(l, s.w-2)))
+			rm = append(rm, -1)
 		}
 	}
 	for i := c.off; i < len(c.view) && len(out) < n; i++ {
 		out = append(out, m.drawRow(c, i, focused, s.w))
+		rm = append(rm, i)
 	}
 	for len(out) < n {
 		out = append(out, strings.Repeat(" ", s.w))
+		rm = append(rm, -1)
 	}
+	m.rowMap[s.kind] = rm
 	return out
 }
 
@@ -403,11 +410,12 @@ func (m *model) drawRow(c *column, vi int, focused bool, w int) string {
 	it := &c.items[c.view[vi]]
 	isCur := vi == c.cursor
 	mark := "  "
-	if m.marked[it.id] && it.id != "" {
-		mark = sAccent.Render("+ ")
-	}
+	picked := m.marked[it.id] && it.id != ""
 	if isCur && focused {
 		mark = sAccent.Render(markSel + " ")
+	}
+	if picked {
+		mark = sAccent.Render("▌ ") // 06 §12.2
 	}
 	used := 2
 	var b strings.Builder
@@ -443,6 +451,8 @@ func (m *model) drawRow(c *column, vi int, focused bool, w int) string {
 	switch {
 	case isCur && focused:
 		ns = sSel
+	case picked:
+		ns = sText
 	case it.dim || it.missing:
 		ns = sDimS
 	case !focused && !isCur:

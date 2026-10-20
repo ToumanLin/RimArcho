@@ -14,19 +14,22 @@ import (
 
 const helpText = `four columns (06 §5)
   ↑↓ j k     move            ←→ h l tab   switch column      [ ]   switch list (narrow)
-  space      enable / disable / put back from staging
+picking (06 §12): pick mods first, then move them; one undo step for it all
+  space v    pick / unpick          shift+↑↓  pick a range     ctrl+↑↓  cursor only
+  ctrl+space add or remove one      picked: ↑↓ move (shift: by 10), ←→ to the next list
+  #          tags                   enter keeps it, esc puts everything back
   t          stage / unstage        T     put everything back from staging
   J K        move up / down         m     move to a position
   S          sort (preview first)   w     save to the game (preview first)
   u ctrl+r   undo / redo            L     launch the game
-  /          filter this column     v     mark several
+  /          filter this column     < > =  column width (= resets)   z  wrap names
   enter      details                i     technical information
   !          needs attention        c     recent changes
   R          rescan                 E     switch environment
   :          run an archo command   ctrl+k command palette
   ? help     q quit
-mouse: click selects; drag between columns enables, disables or stages; drag within
-"enabled" changes the order; the wheel scrolls`
+mouse: click moves the cursor; ctrl+click picks one more; shift+click picks a range;
+drag a column gap to resize it; the wheel scrolls`
 
 // idleAfter is how long the TUI waits without input before returning freed memory to the
 // OS, so the resident size stays near the live heap while idle (06 §8 T5).
@@ -201,6 +204,11 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.chooseEnv()
 	case "R":
 		return m.startScan()
+	}
+	if m.tab == tabList {
+		if cmd, ok := m.pickKey(s); ok {
+			return cmd
+		}
 	}
 	switch m.tab {
 	case tabProblems:
@@ -579,15 +587,11 @@ func (m *model) hit(x, y int) (colKind, int, bool) {
 		if x < s.x || x >= s.x+s.w {
 			continue
 		}
-		c := &m.cols[s.kind]
-		if y < 3 || y >= 3+m.rowsShown()-1 {
+		rm := m.rowMap[s.kind]
+		if y-2 < 0 || y-2 >= len(rm) {
 			return s.kind, -1, true
 		}
-		i := c.off + y - 3
-		if i >= len(c.view) {
-			i = -1
-		}
-		return s.kind, i, true
+		return s.kind, rm[y-2], true
 	}
 	return 0, -1, false
 }
@@ -614,120 +618,36 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 		return m.moveCursor(d)
 	}
-	switch e.Action {
-	case tea.MouseActionPress:
-		if e.Button != tea.MouseButtonLeft || !ok {
-			return nil
-		}
-		m.focus = k
-		if i >= 0 {
-			c := &m.cols[k]
-			c.cursor = i
-			if it := c.cur(); it != nil && it.id != "" {
-				m.drag = &drag{from: k, id: it.id, ref: it.ref, name: it.name}
-			}
-		}
-		return m.requestDetail()
-	case tea.MouseActionMotion:
-		if m.drag != nil {
-			m.drag.active = true
-			if ok {
-				m.say(sayBusy, m.dropText(m.drag, k, i))
-			}
-		}
-		return nil
-	case tea.MouseActionRelease:
-		d := m.drag
-		m.drag = nil
-		if d == nil || !d.active || !ok {
-			if d != nil && d.active {
-				m.status = ""
-			}
-			return nil
-		}
-		return m.drop(d, k, i)
-	}
-	return nil
-}
-
-// dropPos is the 1-based enabled position a drop on view index i means (0: the end).
-func (m *model) dropPos(i int) int {
-	c := &m.cols[cActive]
-	if i < 0 || i >= len(c.view) {
-		return 0
-	}
-	return c.items[c.view[i]].pos
-}
-
-func (m *model) dropText(d *drag, k colKind, i int) string {
-	switch {
-	case k == cActive && d.from == cActive:
-		if p := m.dropPos(i); p > 0 {
-			return Tf("move %s to number %d", d.name, p)
-		}
-		return Tf("move %s to the end", d.name)
-	case k == cActive:
-		if p := m.dropPos(i); p > 0 {
-			return Tf("enable %s at number %d", d.name, p)
-		}
-		return Tf("enable %s", d.name)
-	case k == cStaging && d.from != cStaging:
-		return Tf("stage %s", d.name)
-	case k == cInactive && d.from == cActive:
-		return Tf("disable %s", d.name)
-	case k == cInactive && d.from == cStaging:
-		return Tf("take %s out of staging", d.name)
-	}
-	return d.name
-}
-
-// drop performs a drag: between columns it enables, disables or stages; within "enabled"
-// it moves.
-func (m *model) drop(d *drag, k colKind, i int) tea.Cmd {
-	pos := 0
-	if k == cActive {
-		pos = m.dropPos(i)
-	}
-	at := func(flag string) []string {
-		if pos > 0 {
-			return []string{flag, fmt.Sprint(pos)}
-		}
+	if e.Action != tea.MouseActionPress || e.Button != tea.MouseButtonLeft || !ok {
 		return nil
 	}
-	switch {
-	case k == cActive && d.from == cActive:
-		if pos == 0 {
-			pos = len(m.st.List)
-		}
-		if pos == m.st.Position(d.id) {
-			m.status = ""
-			return nil
-		}
-		if m.act("", "move", d.ref, "--to", fmt.Sprint(pos)) {
-			m.say(sayOK, Tf("%s is now number %d", d.name, m.st.Position(d.id)))
-		}
-	case k == cActive && d.from == cInactive:
-		if m.act("", append([]string{"enable", d.ref}, at("--at")...)...) {
-			m.say(sayOK, Tf("enabled %s at number %d", d.name, m.st.Position(d.id)))
-		}
-	case k == cActive && d.from == cStaging:
-		if pos == 0 { // below the last row: the end, not the remembered place
-			pos = len(m.st.List) + 1
-		}
-		if m.act("", append([]string{"stage", "restore", d.ref}, at("--at")...)...) {
-			m.say(sayOK, Tf("%s is back at number %d", d.name, m.st.Position(d.id)))
-		}
-	case k == cStaging && d.from != cStaging:
-		m.act(Tf("staged %s", d.name), "stage", "add", d.ref)
-	case k == cInactive && d.from == cActive:
-		m.act(Tf("disabled %s", d.name), "disable", d.ref)
-	case k == cInactive && d.from == cStaging:
-		m.act(Tf("took %s out of staging", d.name), "stage", "drop", d.ref)
-	default:
-		m.status = ""
-		return nil
+	// Click: the cursor; shift+click: a range from the cursor; ctrl+click: add or remove
+	// one row. Picks stay in one column (06 §12.2). Moving is done with the keys.
+	if m.pick != nil && (m.pick.col != k || (!e.Shift && !e.Ctrl)) {
+		m.endPick(true)
 	}
 	m.focus = k
-	m.refilterCol(k, d.id)
+	c := &m.cols[k]
+	if i < 0 {
+		return m.requestDetail()
+	}
+	switch {
+	case e.Ctrl:
+		c.cursor = i
+		m.pickToggle()
+	case e.Shift:
+		if m.pick == nil {
+			m.beginPick()
+		}
+		if m.pick != nil {
+			if m.pick.anchor == "" {
+				m.pick.anchor = c.curID()
+			}
+			c.cursor = i
+			m.pickRange()
+		}
+	default:
+		c.cursor = i
+	}
 	return m.requestDetail()
 }

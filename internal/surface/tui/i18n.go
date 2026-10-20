@@ -123,6 +123,10 @@ var zhText = map[string]string{
 	"technical information · i":                          "技术信息 · i 展开",
 	"technical information":                              "技术信息",
 	"no preview":                                         "无预览",
+	// picking (06 §12.2)
+	"done · %s · u undoes it all": "完成 · %s · 按 u 可全部撤销", "cancelled · the lists are as they were": "已取消 · 列表已恢复原样",
+	"picked: enter drops, esc cancels": "已拾取：enter 放下，esc 取消", "↑↓ move mods within Enabled only": "↑↓ 只能在“已启用”中调整位置",
+	"picked %d": "已拾取 %d 个", "pick": "拾取", "pick a range": "连续拾取", "position": "位置", "move to": "移到", "drop": "放下",
 	// double press (06 §9)
 	"press %s again: %s": "再按一次 %s：%s",
 	"press L again to load it; your unsaved edits are replaced": "再按一次 L 载入；未保存的修改会被替换",
@@ -303,15 +307,18 @@ var zhText = map[string]string{
 
 const helpTextZh = `四列（06 §5）
   ↑↓ j k     移动光标         ←→ h l tab   切换列          [ ]   切换列表（窄终端）
-  space      启用 / 停用 / 从暂存放回
+拾取（06 §12）：先拾取 Mod，再移动它们；整个过程只算一步撤销
+  space v    拾取 / 放下这一个        shift+↑↓  连续拾取        ctrl+↑↓  只移动光标
+  ctrl+space 加入或去掉一个           拾取后：↑↓ 移动（按住 shift 一次 10 格），←→ 移到相邻列表
+  #          标签                     enter 确认，esc 全部恢复
   t          暂存 / 移出暂存          T     全部从暂存放回原位置
   J K        上移 / 下移              m     移到第几个
   S          自动排序（先看差异）     w     保存到游戏（先看差异）
   u ctrl+r   撤销 / 重做              L     启动游戏
-  /          筛选这一列               v     多选
+  /          筛选这一列               < > =  列宽（= 恢复默认）   z  名称换行
   enter      详情                     i     技术信息
   !          需要处理                 c     最近变化
   R          重新扫描                 E     切换环境
   :          运行 archo 命令          ctrl+k 命令面板
   ? 帮助   q 退出
-鼠标：点击选中；在列之间拖动 = 启用、停用或暂存；在“已启用”内拖动 = 调整顺序；滚轮滚动`
+鼠标：点击移动光标；ctrl+点击再拾取一个；shift+点击连续拾取；拖动列间空隙调整列宽；滚轮滚动`

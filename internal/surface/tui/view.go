@@ -171,13 +171,15 @@ func (m *model) hintLine() string {
 	case m.tab == tabChanges:
 		pairs = [][2]string{{"esc", T("back")}, {"enter", T("file changes")}}
 	default:
-		switch m.focus {
-		case cInactive:
-			pairs = [][2]string{{"space", T("enable")}, {"t", T("stage")}, {"/", T("filter")}, {"←→", T("columns")}}
-		case cActive:
-			pairs = [][2]string{{"space", T("disable")}, {"J K", T("move")}, {"t", T("stage")}, {"S", T("sort")}, {"w", T("save")}, {"u", T("undo")}}
-		case cStaging:
-			pairs = [][2]string{{"space", T("put back")}, {"T", T("put all back")}, {"t", T("unstage")}, {"←→", T("columns")}}
+		switch {
+		case m.picking():
+			pairs = [][2]string{{"↑↓", T("move")}, {"←→", T("move to")}, {"#", T("tags")}, {"t", T("stage")}, {"enter", T("drop")}, {"esc", T("cancel")}}
+		case m.focus == cInactive:
+			pairs = [][2]string{{"space", T("pick")}, {"shift+↑↓", T("pick a range")}, {"t", T("stage")}, {"/", T("filter")}, {"←→", T("columns")}}
+		case m.focus == cActive:
+			pairs = [][2]string{{"space", T("pick")}, {"J K", T("move")}, {"t", T("stage")}, {"S", T("sort")}, {"w", T("save")}, {"u", T("undo")}}
+		case m.focus == cStaging:
+			pairs = [][2]string{{"space", T("pick")}, {"T", T("put all back")}, {"t", T("unstage")}, {"←→", T("columns")}}
 		}
 		if m.layout().tabs {
 			pairs = append([][2]string{{"[ ]", T("lists")}}, pairs...) // the only way to the other lists

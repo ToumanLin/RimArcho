@@ -144,6 +144,20 @@ func press(m *model, k string) {
 		m.update(tea.KeyMsg{Type: tea.KeyEnter})
 	case "esc":
 		m.update(tea.KeyMsg{Type: tea.KeyEsc})
+	case "left":
+		m.update(tea.KeyMsg{Type: tea.KeyLeft})
+	case "right":
+		m.update(tea.KeyMsg{Type: tea.KeyRight})
+	case "shift+up":
+		m.update(tea.KeyMsg{Type: tea.KeyShiftUp})
+	case "shift+down":
+		m.update(tea.KeyMsg{Type: tea.KeyShiftDown})
+	case "ctrl+up":
+		m.update(tea.KeyMsg{Type: tea.KeyCtrlUp})
+	case "ctrl+down":
+		m.update(tea.KeyMsg{Type: tea.KeyCtrlDown})
+	case "ctrl+space":
+		m.update(tea.KeyMsg{Type: tea.KeyCtrlAt})
 	default:
 		m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)})
 	}
@@ -154,12 +168,13 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	tm := start(t, e, scans, 160, 40)
 	waitFor(t, tm, "Enabled 3")
 	// Enabled is focused; h goes to "Disabled", where a filter finds Beta.
-	keys(tm, "h", "/", "Beta", "enter", "space")
-	waitFor(t, tm, "enabled Beta")
+	// space picks it, → moves it into Enabled (the end: nothing constrains it), enter drops (06 §12.2).
+	keys(tm, "h", "/", "Beta", "enter", "space", "right", "enter")
+	waitFor(t, tm, "undoes it all")
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
-		t.Fatalf("after space: %s", got)
+		t.Fatalf("after space → enter: %s", got)
 	}
-	keys(tm, "esc", "l", "g", "down", "J") // move Alpha down one
+	keys(tm, "esc", "g", "down", "J") // the cursor followed Beta into Enabled; move Alpha down one
 	waitFor(t, tm, "Alpha is now number 3")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
 		t.Fatalf("after J: %s", got)
@@ -287,15 +302,17 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			if it := m.current(); it == nil || !strings.HasPrefix(it.name, "中文") {
 				t.Fatalf("cursor on %+v", m.current())
 			}
-			press(m, "space")
-			press(m, "l")
-			press(m, "G")
-			press(m, "space")
+			for _, k := range []string{"space", "right", "enter", "space", "left", "enter"} { // pick, enable, drop; pick, disable, drop
+				press(m, k)
+			}
 			if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
 				t.Fatalf("enable + disable: %s", got)
 			}
 			// The CJK name is cut at a character boundary: the row is exactly its column wide.
-			press(m, "h")
+			// (The cursor followed the mod back into Disabled.)
+			if m.focus != cInactive {
+				t.Fatalf("focus %d after the drop", m.focus)
+			}
 			press(m, "G")
 			for _, s := range m.layout().slots {
 				if s.kind != cInactive {
@@ -323,7 +340,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 	}
 }
 
-// 06 §11 T9: 20 mods into staging (marked with v, one t), then T: all back in place.
+// 06 §11 T9: 20 mods into staging (picked with v, one t), then T: all back in place.
 func TestStagingT9(t *testing.T) {
 	e := testkit.New(t)
 	active := []string{"ludeon.rimworld"}
@@ -340,11 +357,10 @@ func TestStagingT9(t *testing.T) {
 	press(m, "g")
 	press(m, "down") // M01
 	for i := 0; i < 26; i++ {
-		if i%4 != 3 && i < 26 { // marks 20 of 26 (v moves down)
+		if i%4 != 3 { // picks 20 of 26; ctrl+↓ moves the cursor alone (06 §12.2)
 			press(m, "v")
-		} else {
-			press(m, "down")
 		}
+		press(m, "ctrl+down")
 	}
 	if len(m.marked) != 20 {
 		t.Fatalf("marked %d", len(m.marked))
@@ -363,11 +379,16 @@ func TestStagingT9(t *testing.T) {
 	}
 }
 
-// 06 §5.3: drag between columns enables at the drop row, drags within "enabled" move,
-// a click focuses and selects; the wheel scrolls.
-func TestMouseDrag(t *testing.T) {
+// 06 §12.2: a click moves the cursor (and focus), ctrl+click picks one more, shift+click
+// picks a range; there is no drag-to-move; the wheel scrolls.
+func TestMouseClicks(t *testing.T) {
 	e, _ := fixture(t)
+	for i := 1; i <= 5; i++ {
+		e.WriteMod(filepath.Join(e.Game, "Mods", fmt.Sprintf("N%d", i)), testkit.Sample(fmt.Sprintf("tester.n%d", i), fmt.Sprintf("N%d", i)))
+	}
+	e.MustRun("scan")
 	m := direct(t, e, 160, 30)
+	m.View()
 	l := m.layout()
 	xOf := func(k colKind) int {
 		for _, s := range l.slots {
@@ -378,52 +399,44 @@ func TestMouseDrag(t *testing.T) {
 		t.Fatalf("no slot %d", k)
 		return 0
 	}
-	mouse := func(x, y int, a tea.MouseAction) {
-		m.update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: a})
+	click := func(x, y int, shift, ctrl bool) {
+		m.update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Shift: shift, Ctrl: ctrl})
+		m.View()
 	}
-	// Disabled row 0 is Beta (rows start at y=3); drop it on enabled row 1 (Alpha, number 2).
-	mouse(xOf(cInactive), 3, tea.MouseActionPress)
-	if m.focus != cInactive || m.current().name != "Beta" {
-		t.Fatalf("click: focus %d on %+v", m.focus, m.current())
+	// Disabled rows start at y=3: Beta, N1 … N5, 中文
+	click(xOf(cInactive), 3, false, false)
+	if m.focus != cInactive || m.current().name != "Beta" || m.picking() {
+		t.Fatalf("click: focus %d on %+v, picking %v", m.focus, m.current(), m.picking())
 	}
-	mouse(xOf(cActive), 4, tea.MouseActionMotion)
-	if !strings.Contains(m.status, "enable Beta at number 2") {
-		t.Fatalf("drag feedback %q", m.status)
+	click(xOf(cInactive), 5, false, true) // ctrl: N2
+	click(xOf(cInactive), 7, false, true) // ctrl: N4
+	if len(m.marked) != 2 {
+		t.Fatalf("ctrl+click: %d picked", len(m.marked))
 	}
-	mouse(xOf(cActive), 4, tea.MouseActionRelease)
-	if got := activeNames(t, e); got != "Core, Beta, Alpha, Harmony" {
-		t.Fatalf("drop: %s", got)
+	click(xOf(cInactive), 8, true, false) // shift: N4 … N5 added to the range from N4
+	if names := pickedNames(m); names != "N2 N4 N5" {
+		t.Fatalf("shift+click: %q", names)
 	}
-	// Within enabled: Harmony (row 3) onto Beta's row (number 2).
-	mouse(xOf(cActive), 6, tea.MouseActionPress)
-	mouse(xOf(cActive), 4, tea.MouseActionMotion)
-	mouse(xOf(cActive), 4, tea.MouseActionRelease)
-	if got := activeNames(t, e); got != "Core, Harmony, Beta, Alpha" {
-		t.Fatalf("reorder: %s", got)
+	// A plain click drops the pick (nothing was moved) and moves the cursor.
+	click(xOf(cActive), 4, false, false)
+	if m.picking() || m.focus != cActive || m.current().name != "Alpha" {
+		t.Fatalf("plain click: picking %v, %+v", m.picking(), m.current())
 	}
-	// Enabled → staging, staging → enabled at the end.
-	mouse(xOf(cActive), 5, tea.MouseActionPress) // Beta
-	mouse(xOf(cStaging), 3, tea.MouseActionMotion)
-	mouse(xOf(cStaging), 3, tea.MouseActionRelease)
-	if got := activeNames(t, e); got != "Core, Harmony, Alpha" || len(m.cols[cStaging].items) != 1 {
-		t.Fatalf("to staging: %s", got)
-	}
-	mouse(xOf(cStaging), 3, tea.MouseActionPress)
-	mouse(xOf(cActive), 20, tea.MouseActionMotion)
-	mouse(xOf(cActive), 20, tea.MouseActionRelease)
-	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
-		t.Fatalf("from staging: %s", got)
-	}
-	// A press and release on the same row is a click, not a drop.
-	mouse(xOf(cActive), 3, tea.MouseActionPress)
-	mouse(xOf(cActive), 3, tea.MouseActionRelease)
-	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
-		t.Fatalf("click moved something: %s", got)
+	if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
+		t.Fatalf("a click changed the list: %s", got)
 	}
 	m.update(tea.MouseMsg{X: xOf(cActive), Y: 5, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
-	if m.cols[cActive].cursor != 3 {
+	if m.cols[cActive].cursor != 2 { // three down from Alpha, clamped at Harmony
 		t.Fatalf("wheel: cursor %d", m.cols[cActive].cursor)
 	}
+}
+
+func pickedNames(m *model) string {
+	var out []string
+	for _, id := range m.pickedIDs() {
+		out = append(out, m.st.Ix.ByID[id].Name)
+	}
+	return strings.Join(out, " ")
 }
 
 func TestEnvSwitchAndInspect(t *testing.T) {
@@ -459,8 +472,8 @@ func TestChineseUI(t *testing.T) {
 	waitAll(t, tm, "已启用 3", "未启用 2")
 	keys(tm, "?")
 	waitFor(t, tm, "四列")
-	keys(tm, "esc", "h", "space")
-	waitFor(t, tm, "启用了 Beta")
+	keys(tm, "esc", "h", "space", "right", "enter")
+	waitFor(t, tm, "可全部撤销")
 	m := finish(t, tm)
 	for _, l := range strings.Split(m.View(), "\n") {
 		if w := lipgloss.Width(l); w > 100 {

@@ -174,8 +174,9 @@ func TestTagEditing(t *testing.T) {
 	m := direct(t, e, 160, 40)
 	press(m, "g")
 	press(m, "down")
-	press(m, "v") // Alpha
-	press(m, "v") // Harmony
+	press(m, "v")         // Alpha
+	press(m, "ctrl+down") // the cursor alone
+	press(m, "v")         // Harmony
 	press(m, "#")
 	if m.prompt == nil || m.tagging == nil {
 		t.Fatal("# did not open the tag line")

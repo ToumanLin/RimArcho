@@ -81,15 +81,6 @@ const (
 	sayInfo
 )
 
-// drag is a mouse drag in progress (06 §5.3).
-type drag struct {
-	from   colKind
-	id     string
-	ref    string
-	name   string
-	active bool // moved off the starting row
-}
-
 type model struct {
 	opts Options
 	app  *app.App
@@ -133,7 +124,6 @@ type model struct {
 	tagging *tagEdit // the prompt edits tags
 	status  string
 	sayKind int
-	drag    *drag
 
 	content    map[string]int // content kinds for type: (loaded on first use)
 	contentKey string
@@ -145,6 +135,8 @@ type model struct {
 	thumbSeq   int
 	fsecs      *fullSecs  // the full-screen detail's sub-sections (06 §6.3)
 	pal        *palette   // the command palette (06 §8), nil when closed
+	pick       *pickState // a pick session (06 §12.2)
+	rowMap     [3][]int   // per list column: body line → view index (-1: title or empty), as last drawn
 	armed      *armed     // a destructive key pressed once (06 §9)
 	images     *imgWriter // the WezTerm host's output; nil: no inline images
 	full       bool       // the full-screen detail
