@@ -425,6 +425,13 @@ func (m *model) overlayHint(out []string, l layout) {
 		}
 	}
 	hint := m.pickHint()
+	hw := 0 // one width for the hint's lines, so no row shows through beside the shorter one
+	for _, h := range hint {
+		hw = max(hw, ansi.StringWidthWc(h))
+	}
+	for i, h := range hint {
+		hint[i] = h + sPill.Render(strings.Repeat(" ", hw-ansi.StringWidthWc(h)))
+	}
 	if m.tags != nil {
 		hint = append(hint, m.tagBarLine(max(m.w-sl.x-3, 20)))
 	}
