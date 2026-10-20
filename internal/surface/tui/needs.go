@@ -11,6 +11,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -46,6 +47,7 @@ type need struct {
 	mods    []string // instance ids: the first carries the row icon
 	status  int      // statusErr, statusWarn or statusLog for the row icon
 	dim     bool
+	rank    int // order within the group (06 §7.2's order)
 }
 
 // buildNeeds turns the problem set and the environment's open questions into items.
@@ -88,20 +90,20 @@ func (m *model) buildNeeds(ps *app.ProblemSet) []need {
 		}
 		switch p.Code {
 		case "official.order":
-			add(need{group: gList, text: T("Core and the DLCs must come first in the list"), keys: []needKey{m.sortKey()}, counted: true, status: st})
+			add(need{rank: 0, group: gList, text: T("Core and the DLCs must come first in the list"), keys: []needKey{m.sortKey()}, counted: true, status: st})
 		case "order.violated":
-			add(need{group: gList, text: Tf("%s should load after %s", nm(a), nm(b)), keys: []needKey{m.sortKey()}, counted: true, mods: ids, status: st})
+			add(need{rank: 1, group: gList, text: Tf("%s should load after %s", nm(a), nm(b)), keys: []needKey{m.sortKey()}, counted: true, mods: ids, status: st})
 		case "order.cycle":
-			add(need{group: gList, text: Tf("the order requirements of %d mods contradict each other", len(subj)),
+			add(need{rank: 2, group: gList, text: Tf("the order requirements of %d mods contradict each other", len(subj)),
 				keys: []needKey{m.cycleViewKey(p), m.cycleIgnoreKey(p)}, counted: true, mods: ids, status: st})
 		case "pkg.duplicate-active":
-			add(need{group: gList, text: Tf("%s is enabled twice", nm(a)), keys: []needKey{m.keepOneKey(ids)}, counted: true, mods: ids, status: st})
+			add(need{rank: 3, group: gList, text: Tf("%s is enabled twice", nm(a)), keys: []needKey{m.keepOneKey(ids)}, counted: true, mods: ids, status: st})
 		case "entry.missing":
 			pkg := strings.TrimPrefix(a, "pkg:")
-			add(need{group: gList, text: Tf("the list has %s, but it is not installed", pkg),
+			add(need{rank: 4, group: gList, text: Tf("the list has %s, but it is not installed", pkg),
 				keys: []needKey{m.searchKey(pkg), m.disableKey("pkg:"+pkg, T("remove it from the list"))}, counted: true, status: st})
 		case "mod.unloadable":
-			add(need{group: gList, text: Tf("%s is enabled, but the game cannot load it", nm(a)), keys: []needKey{m.disableKey(a, T("disable it"))}, counted: true, mods: ids, status: st})
+			add(need{rank: 4, group: gList, text: Tf("%s is enabled, but the game cannot load it", nm(a)), keys: []needKey{m.disableKey(a, T("disable it"))}, counted: true, mods: ids, status: st})
 		case "dep.missing":
 			dep := depName(p.Claim, strings.TrimPrefix(b, "pkg:"))
 			add(need{group: gDeps, text: Tf("%s needs %s, but %s is not installed", nm(a), dep, dep), keys: []needKey{m.workshopKey(p, dep)}, counted: true, mods: ids, status: st})
@@ -141,15 +143,15 @@ func (m *model) buildNeeds(ps *app.ProblemSet) []need {
 				names = append(names, nm(v.Subjects[0]))
 			}
 			sort.Strings(names)
-			add(need{group: gList, text: text, counted: true, status: statusWarn,
+			add(need{rank: 5, group: gList, text: text, counted: true, status: statusWarn,
 				keys: []needKey{{key: "enter", label: T("see the list"), run: func(m *model) tea.Cmd {
 					m.openPanel(text, strings.Join(names, "\n"), nil)
 					return nil
 				}}}})
 		}
 	}
-	if v := m.st.FileVersionMismatch(); v != "" {
-		add(need{group: gList, text: Tf("the list was saved for %s; the game resets it when it starts — saving once fixes it", v),
+	if v := env.MajorMinor(m.st.FileVersionMismatch()); v != "" {
+		add(need{rank: 6, group: gList, text: Tf("the list was saved for %s; the game resets it when it starts — saving once fixes it", v),
 			keys: []needKey{{key: "w", label: T("save"), run: func(m *model) tea.Cmd { return m.savePreview() }}}, counted: true, status: statusWarn})
 	}
 	// Last run: the current log's errors, one item per mod (06 §7.1).
@@ -216,7 +218,12 @@ func (m *model) buildNeeds(ps *app.ProblemSet) []need {
 				return nil
 			}}}})
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].group < out[j].group })
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].group != out[j].group {
+			return out[i].group < out[j].group
+		}
+		return out[i].rank < out[j].rank
+	})
 	return out
 }
 
