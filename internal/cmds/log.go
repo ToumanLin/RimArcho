@@ -97,7 +97,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	var classes []string
-	for _, k := range []string{logs.ClassException, logs.ClassHarmony, logs.ClassXMLLoad, logs.ClassPatchFailed, logs.ClassXrefMissing, logs.ClassMaterial, logs.ClassOther} {
+	for _, k := range logs.Classes {
 		if byClass[k] > 0 {
 			classes = append(classes, fmt.Sprintf("%s %d", k, byClass[k]))
 		}
@@ -106,7 +106,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	root.KV("classes", strings.Join(classes, ", "))
 	lst := root.Section("list")
 	for _, lc := range r.Clusters {
-		if lc.Class == logs.ClassOther && !a.Bool("all") {
+		if logs.Informational(lc.Class) && !a.Bool("all") {
 			hidden++
 			continue
 		}
@@ -121,7 +121,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("hidden", fmt.Sprintf("%d informational clusters (archo log --all)", hidden))
 	}
 	for _, lc := range r.Clusters {
-		if lc.Class != logs.ClassOther {
+		if !logs.Informational(lc.Class) {
 			d.AddNext("archo log --cluster " + lc.ID)
 			break
 		}

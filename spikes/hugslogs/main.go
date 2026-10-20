@@ -51,7 +51,7 @@ var (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: hugslogs fetch|probe|api|stats [flags]   (hugslogs <command> -h for flags)")
+		fmt.Fprintln(os.Stderr, "usage: hugslogs fetch|probe|api|sample|stats [flags]   (hugslogs <command> -h for flags)")
 		os.Exit(2)
 	}
 	fs := flag.NewFlagSet(os.Args[1], flag.ExitOnError)
@@ -59,7 +59,9 @@ func main() {
 	pages := fs.Int("pages", 0, "listing pages to read; fetch: 10 gists per page, default 100; api: 100 gists per page, default no limit")
 	workers := fs.Int("workers", 2, "parallel raw downloads")
 	from := fs.String("from", "", "api: only gists created at or after this time (RFC 3339 or YYYY-MM-DD); default: 3 days before the newest indexed gist")
-	maxDL := fs.Int("max", 0, "api: download at most this many raw logs this run, newest first (0 = no limit)")
+	maxDL := fs.Int("max", 0, "api, sample: download at most this many raw logs this run, newest first (0 = no limit)")
+	listOnly := fs.Bool("list-only", false, "api: index the listing, download nothing")
+	day := fs.Int("day", 15, "sample: day of the month (UTC) to download")
 	fs.Parse(os.Args[2:])
 	var err error
 	switch os.Args[1] {
@@ -78,7 +80,13 @@ func main() {
 			break
 		}
 		fmt.Printf("listing gists created since %s\n", f)
-		err = apiFetch(*dir, f, *pages, *workers, *maxDL)
+		limit := *maxDL
+		if *listOnly {
+			limit = -1
+		}
+		err = apiFetch(*dir, f, *pages, *workers, limit)
+	case "sample":
+		err = sample(*dir, *from, *day, *workers, *maxDL)
 	case "stats":
 		err = stats(*dir)
 	default:
@@ -237,15 +245,15 @@ func fetch(dir string, pages, workers int) error {
 		time.Sleep(2 * time.Second)
 	}
 	fmt.Printf("listed %d gists (%s .. %s), %d new, index holds %d\n", listed, oldest, newest, added, len(idx))
-	return download(dir, idx, workers, "", 0)
+	return download(dir, idx, workers, inRange(""), 0)
 }
 
 // download fetches the raw logs of index entries that are not on disk yet, newest first: only
-// entries created at or after from ("" = all), at most max of them (0 = no limit).
-func download(dir string, idx map[string]indexEntry, workers int, from string, limit int) error {
+// entries that keep accepts, at most limit of them (0 = no limit).
+func download(dir string, idx map[string]indexEntry, workers int, keep func(indexEntry) bool, limit int) error {
 	var todo []indexEntry
 	for _, e := range idx {
-		if from != "" && e.Created < from {
+		if !keep(e) {
 			continue
 		}
 		if _, err := os.Stat(rawPath(dir, e.ID)); os.IsNotExist(err) {
@@ -443,8 +451,30 @@ func apiFetch(dir, from string, maxPages, workers, limit int) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	listed, added, known := 0, 0, 0
 	var oldest string
+	// A listing page takes ~10 s on GitHub's side at any depth, so pages are requested workers at
+	// a time and processed in order. Uploads arriving meanwhile shift entries to later pages; an
+	// entry can be listed twice (the index dedupes) or, rarely, missed at a batch boundary.
+	var batch [][]apiGist
+	var batchErr []error
 	for p := 1; maxPages == 0 || p <= maxPages; p++ {
-		gs, err := apiPage(tok, p)
+		if len(batch) == 0 {
+			n := max(workers, 1)
+			if maxPages > 0 {
+				n = min(n, maxPages-p+1)
+			}
+			batch, batchErr = make([][]apiGist, n), make([]error, n)
+			var wg sync.WaitGroup
+			for i := range n {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					batch[i], batchErr[i] = apiPage(tok, p+i)
+				}()
+			}
+			wg.Wait()
+		}
+		gs, err := batch[0], batchErr[0]
+		batch, batchErr = batch[1:], batchErr[1:]
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "listing stopped: %v\n", err)
 			break
@@ -483,7 +513,59 @@ func apiFetch(dir, from string, maxPages, workers, limit int) error {
 		}
 	}
 	fmt.Printf("listed %d gists in range (oldest %s), %d new, %d already indexed; index holds %d\n", listed, oldest, added, known, len(idx))
-	return download(dir, idx, workers, from, limit)
+	if limit < 0 {
+		return nil
+	}
+	return download(dir, idx, workers, inRange(from), limit)
+}
+
+// sample downloads the indexed gists created on one day of each month (UTC), at or after from.
+// Whole days, not a random draw, keep a player's repeat uploads together (design §6.2). The
+// listing must already be indexed (api -list-only).
+func sample(dir, from string, day, workers, limit int) error {
+	if day < 1 || day > 28 {
+		return fmt.Errorf("-day %d: use 1..28", day)
+	}
+	if from != "" {
+		f, err := resolveFrom(dir, from)
+		if err != nil {
+			return err
+		}
+		from = f
+	}
+	idx, err := readIndex(filepath.Join(dir, "index.jsonl"))
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "raw"), 0o755); err != nil {
+		return err
+	}
+	days := map[string]int{}
+	keep := func(e indexEntry) bool {
+		t, err := time.Parse(time.RFC3339, e.Created)
+		if err != nil || (from != "" && e.Created < from) || t.UTC().Day() != day {
+			return false
+		}
+		days[t.UTC().Format("2006-01-02")]++
+		return true
+	}
+	for _, e := range idx {
+		keep(e)
+	}
+	ds := make([]string, 0, len(days))
+	for d := range days {
+		ds = append(ds, d)
+	}
+	sort.Strings(ds)
+	for _, d := range ds {
+		fmt.Printf("  %s: %d gists\n", d, days[d])
+	}
+	return download(dir, idx, workers, keep, limit)
+}
+
+// inRange keeps entries created at or after from ("" = all).
+func inRange(from string) func(indexEntry) bool {
+	return func(e indexEntry) bool { return from == "" || e.Created >= from }
 }
 
 // ---- parse ----
@@ -504,12 +586,13 @@ type HPatch struct {
 
 // Cluster is a cleaned error cluster.
 type Cluster struct {
-	Key     string `json:"key"`
-	Class   string `json:"class"`
-	Count   int    `json:"count"`
-	Message string `json:"msg"`
-	Top     string `json:"top,omitempty"`   // first stack frame type.method
-	Level   string `json:"level,omitempty"` // 1.7 only: WARN | ERROR
+	Key      string `json:"key"`
+	Template string `json:"tpl"` // logs.Cluster.Template: the kind of problem across defs, types, mods
+	Class    string `json:"class"`
+	Count    int    `json:"count"`
+	Message  string `json:"msg"`
+	Top      string `json:"top,omitempty"`   // first stack frame type.method
+	Level    string `json:"level,omitempty"` // 1.7 only: WARN | ERROR
 }
 
 // Record is one parsed log.
@@ -555,14 +638,6 @@ func parse(id, created string, raw []byte) Record {
 	if strings.TrimSpace(body) == "" {
 		r.Drop = "empty-log" // shared with the mod list only
 		return r
-	}
-	waylithVersion := ""
-	var lineLevel map[int]string
-	if strings.HasPrefix(body, "=== Waylith log ===\n") {
-		r.Format = "waylith"
-		body, waylithVersion, r.Levels, lineLevel = fromWaylith(body)
-	} else {
-		r.Format = "unity"
 	}
 	lines := strings.Split(head, "\n")
 	sec := ""
@@ -631,8 +706,13 @@ func parse(id, created string, raw []byte) Record {
 	}
 	r.LogLines = lf.Lines
 	r.Version = lf.Version
-	if r.Version == "" {
-		r.Version = waylithVersion
+	r.Format = "unity"
+	if lf.Waylith {
+		r.Format = "waylith"
+		r.Levels = map[string]int{}
+		for _, e := range lf.Entries {
+			r.Levels[e.Level]++
+		}
 	}
 	if m := mmRe.FindStringSubmatch(r.Version); m != nil {
 		r.MM = m[1]
@@ -642,83 +722,14 @@ func parse(id, created string, raw []byte) Record {
 		return r
 	}
 	for _, c := range logs.Clusters(lf) {
-		cl := Cluster{Key: c.Key, Class: c.Class, Count: c.Count, Message: trunc(c.First.Message, 300), Level: lineLevel[c.First.Line]}
-		if len(c.First.Frames) > 0 {
-			cl.Top = c.First.Frames[0].Type + "." + c.First.Frames[0].Method
+		cl := Cluster{Key: c.Key, Template: c.Template, Class: c.Class, Count: c.Count, Message: trunc(c.First.Message, 300), Level: c.First.Level}
+		if top := c.First.Top(); top != nil {
+			cl.Top = top.Type + "." + top.Method
 		}
 		r.Clusters = append(r.Clusters, cl)
 	}
 	r.Status = "ok"
 	return r
-}
-
-var (
-	waylithLineRe = regexp.MustCompile(`^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ +([A-Z]+) \[[^\]]*\] ?(.*)$`)
-	waylithVerRe  = regexp.MustCompile(`^Version:\s+(\d+\.\d+\.\d+)\.(\d+)`)
-)
-
-// fromWaylith turns a 1.7 (Waylith runtime) log into the Unity-style text internal/logs reads.
-//   - The timestamp, level and category prefix is removed. INFO/DEBUG/TRACE entries are dropped
-//     with their continuation lines, so only WARN and ERROR entries remain.
-//   - A message can span lines; unindented continuation lines are indented so internal/logs
-//     keeps them in the entry ("Objects: 1" would otherwise become an entry of its own).
-//   - Every 1.7 entry carries a stack; its leading frames inside the logging system
-//     (Brutal.Logging.*, Verse.Log.*) are removed so the first frame is the caller.
-//   - Blank lines inside an entry are dropped (internal/logs ends an entry at a blank line).
-//
-// It returns the text, the game version from the header ("1.7.4982 rev1280", since the
-// RimWorld line comes too late for internal/logs), the line count per level, and the level of
-// each entry keyed by its line number in the returned text.
-func fromWaylith(body string) (string, string, map[string]int, map[int]string) {
-	var b strings.Builder
-	ver := ""
-	levels := map[string]int{}
-	lineLevel := map[int]string{}
-	out := 0 // lines written
-	write := func(l string) {
-		b.WriteString(l)
-		b.WriteByte('\n')
-		out++
-	}
-	skip := true // the header block until the first entry
-	leading := false
-	for _, l := range strings.Split(body, "\n") {
-		if m := waylithLineRe.FindStringSubmatch(l); m != nil {
-			levels[m[1]]++
-			switch m[1] {
-			case "WARN", "WARNING", "ERROR", "FATAL", "CRITICAL":
-				skip, leading = false, true
-				write("") // a blank line ends the previous entry
-				write(m[2])
-				lineLevel[out] = m[1]
-			default:
-				skip = true
-			}
-			continue
-		}
-		if ver == "" {
-			if m := waylithVerRe.FindStringSubmatch(l); m != nil {
-				ver = m[1] + " rev" + m[2]
-			}
-		}
-		if skip || strings.TrimSpace(l) == "" {
-			continue
-		}
-		t := strings.TrimSpace(l)
-		if strings.HasPrefix(t, "at ") {
-			if leading && (strings.HasPrefix(t, "at Brutal.Logging.") || strings.HasPrefix(t, "at Verse.Log.") || strings.HasPrefix(t, "at .Verse.Log.")) {
-				continue
-			}
-			leading = false
-			write(l)
-			continue
-		}
-		if l[0] != ' ' && l[0] != '\t' {
-			l = "    " + l
-		}
-		write(l)
-	}
-	return b.String(), ver, levels, lineLevel
 }
 
 // splitTop splits "A(1.0), B(av:1,fv:2)" on commas outside parentheses.
@@ -833,6 +844,7 @@ func stats(dir string) error {
 	pkgFreq := map[string]int{}
 	clusterFreq := map[string]int{}
 	clusterSample := map[string]Cluster{}
+	tplLogs := map[string]int{} // logs per cluster template
 	for _, r := range ok {
 		nMods = append(nMods, len(r.Mods))
 		nHar = append(nHar, len(r.Harmony))
@@ -847,6 +859,7 @@ func stats(dir string) error {
 			withHar = append(withHar, 1)
 		}
 		seenC := map[string]bool{}
+		seenT := map[string]bool{}
 		for _, c := range r.Clusters {
 			classes[c.Class]++
 			if c.Level != "" {
@@ -859,6 +872,10 @@ func stats(dir string) error {
 			clusterFreq[c.Key]++
 			if _, ok := clusterSample[c.Key]; !ok {
 				clusterSample[c.Key] = c
+			}
+			if !seenT[c.Template] {
+				seenT[c.Template] = true
+				tplLogs[c.Template]++
 			}
 		}
 		for _, m := range r.Mods {
@@ -886,6 +903,18 @@ func stats(dir string) error {
 	for i := 0; i < len(cf) && i < 25; i++ {
 		c := clusterSample[cf[i].k]
 		p("  %4d logs  %-13s %s", cf[i].v, c.Class, trunc(strings.ReplaceAll(c.Message, "\n", " "), 120))
+	}
+	var tf []kv
+	tplClass := map[string]int{}
+	for k, v := range tplLogs {
+		tf = append(tf, kv{k, v})
+		tplClass[k[:strings.IndexByte(k, '|')]]++
+	}
+	sort.Slice(tf, func(a, b int) bool { return tf[a].v > tf[b].v || tf[a].v == tf[b].v && tf[a].k < tf[b].k })
+	p("distinct cluster templates %d (by class: %s); top 40 by number of logs:", len(tf), fmtCounts(tplClass, 0))
+	for i := 0; i < len(tf) && i < 40; i++ {
+		cls, msg, _ := strings.Cut(tf[i].k, "|")
+		p("  %4d logs  %-15s %s", tf[i].v, cls, trunc(strings.ReplaceAll(msg, "\n", " "), 118))
 	}
 
 	// Mod coverage: how many distinct packages cover most entries (design §5 L2).

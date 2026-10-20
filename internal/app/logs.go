@@ -396,7 +396,7 @@ func (a *App) ImplicatedMods(st *LoadoutState) []string {
 	if p := a.ProblemLog(st); p != "" {
 		if rep, err := a.AnalyzeLog(p); err == nil {
 			for _, lc := range rep.Clusters {
-				if lc.Class == logs.ClassOther {
+				if logs.Informational(lc.Class) {
 					continue
 				}
 				for _, at := range lc.Attr {
@@ -832,7 +832,8 @@ func (cx *attrCtx) xrefReferrers(cs []*LogCluster) {
 var logSeverity = map[string]string{
 	logs.ClassException: finding.Error, logs.ClassHarmony: finding.Error, logs.ClassXMLLoad: finding.Error,
 	logs.ClassPatchFailed: finding.Warning, logs.ClassXrefMissing: finding.Warning, logs.ClassMaterial: finding.Warning,
-	logs.ClassOther: finding.Info,
+	logs.ClassTexture: finding.Warning, logs.ClassSave: finding.Warning,
+	logs.ClassModReport: finding.Info, logs.ClassOther: finding.Info,
 }
 
 // findingKey keeps a log problem's ref (and an ignore of it) stable across logs and
@@ -1020,7 +1021,7 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 	var out []*finding.Finding
 	hot := map[string]hotMethod{}
 	for _, lc := range rep.Clusters {
-		if lc.Class == logs.ClassOther {
+		if logs.Informational(lc.Class) {
 			continue
 		}
 		if lc.Finding != nil {

@@ -53,13 +53,14 @@ func TestAPIFetch(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "test-token")
 	dir := t.TempDir()
 
-	// From 2026-10-16 00:00: gists 0..96 are in range (96 hours back); the listing stops on page 1.
+	// From 2026-10-16 00:00: gists 0..96 are in range (96 hours back); the listing stops on page 1,
+	// after one batch of 2 pages (-workers 2).
 	if err := apiFetch(dir, "2026-10-16T00:00:00Z", 0, 2, 10); err != nil {
 		t.Fatal(err)
 	}
 	idx, _ := readIndex(filepath.Join(dir, "index.jsonl"))
-	if len(idx) != 97 || *pages != 1 {
-		t.Fatalf("index %d entries after %d pages, want 97 after 1", len(idx), *pages)
+	if len(idx) != 97 || *pages != 2 {
+		t.Fatalf("index %d entries after %d pages, want 97 after 2 (one batch of -workers 2)", len(idx), *pages)
 	}
 	raws, _ := os.ReadDir(filepath.Join(dir, "raw"))
 	if len(raws) != 10 {
@@ -98,6 +99,41 @@ func TestAPIFetch(t *testing.T) {
 	idx, _ = readIndex(filepath.Join(dir, "index.jsonl"))
 	if len(idx) != 250 || *pages != 4 {
 		t.Fatalf("index %d after %d pages, want 250 after 4", len(idx), *pages)
+	}
+}
+
+func TestListOnlyAndSample(t *testing.T) {
+	srv, _ := fakeGitHub(t)
+	apiBase, rawBase, rawDelay = srv.URL, srv.URL, 0
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	dir := t.TempDir()
+
+	// -list-only indexes everything and downloads nothing.
+	if err := apiFetch(dir, "2000-01-01T00:00:00Z", 0, 2, -1); err != nil {
+		t.Fatal(err)
+	}
+	idx, _ := readIndex(filepath.Join(dir, "index.jsonl"))
+	raws, _ := os.ReadDir(filepath.Join(dir, "raw"))
+	if len(idx) != 250 || len(raws) != 0 {
+		t.Fatalf("index %d, raw %d, want 250 and 0", len(idx), len(raws))
+	}
+
+	// 250 hourly gists back from 2026-10-20 00:00 reach 2026-10-09 15:00. Day 10 is a full day
+	// (24 gists); day 9 has 2026-10-09 15:00 .. 23:00 (9 gists).
+	if err := sample(dir, "", 10, 2, 0); err != nil {
+		t.Fatal(err)
+	}
+	if raws, _ = os.ReadDir(filepath.Join(dir, "raw")); len(raws) != 24 {
+		t.Fatalf("day 10: %d raw logs, want 24", len(raws))
+	}
+	if err := sample(dir, "", 9, 2, 0); err != nil {
+		t.Fatal(err)
+	}
+	if raws, _ = os.ReadDir(filepath.Join(dir, "raw")); len(raws) != 33 {
+		t.Fatalf("days 9+10: %d raw logs, want 33", len(raws))
+	}
+	if err := sample(dir, "", 30, 2, 0); err == nil {
+		t.Fatal("-day 30: want an error")
 	}
 }
 

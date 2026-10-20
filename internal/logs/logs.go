@@ -2,6 +2,10 @@
 // (a message line plus its stack, Harmony patch lines and continuation lines), resolves
 // "[Ref X] Duplicate stacktrace" back to the original stack, normalises messages into
 // cluster keys and classifies each cluster. Attribution to mods happens in internal/app.
+//
+// Two formats: the Unity Player.log of RimWorld up to 1.6, and the Waylith log of 1.7
+// ("=== Waylith log ===", every message "<date> <time> <LEVEL> [<category>] <message>" followed by
+// the exception stack, if any, and the caller stack).
 package logs
 
 import (
@@ -19,8 +23,19 @@ const (
 	ClassException   = "exception"
 	ClassHarmony     = "harmony-stack"
 	ClassMaterial    = "material"
+	ClassTexture     = "texture-missing"
+	ClassSave        = "save-load"
+	ClassModReport   = "mod-report"
 	ClassOther       = "other"
 )
+
+// Classes lists the classes from most to least severe, for display.
+var Classes = []string{ClassException, ClassHarmony, ClassXMLLoad, ClassPatchFailed, ClassXrefMissing,
+	ClassMaterial, ClassTexture, ClassSave, ClassModReport, ClassOther}
+
+// Informational reports classes that are context rather than problems: a mod reporting on itself
+// ("[Mod] … not found, skipping") and unclassified lines.
+func Informational(class string) bool { return class == ClassModReport || class == ClassOther }
 
 // Frame is one stack frame.
 type Frame struct {
@@ -28,6 +43,7 @@ type Frame struct {
 	Type    string // declaring type, compiler-generated parts removed; '+' kept for nesting
 	Method  string
 	Patched bool // a Harmony replacement (wrapper dynamic-method …_PatchN)
+	Caller  bool // Waylith: a frame of the stack that logged the message, not of an exception
 	Harmony []Patch
 }
 
@@ -44,6 +60,7 @@ type Entry struct {
 	Frames  []Frame
 	Ref     string // "[Ref X]" this entry defines or points to
 	Dup     bool   // "Duplicate stacktrace, see ref for original"
+	Level   string // Waylith: INFO, WARN, ERROR …; "" for Unity logs, which carry no level
 }
 
 // File is a parsed log.
@@ -51,6 +68,7 @@ type File struct {
 	Entries []*Entry
 	Lines   int
 	Version string // "1.6.4871 rev…" from the header, if found
+	Waylith bool   // the 1.7 log format
 }
 
 var (
@@ -63,7 +81,18 @@ var (
 	patchNumRe    = regexp.MustCompile(`_Patch\d+$`)
 	genericArgsRe = regexp.MustCompile(`\[[^\[\]]*\]`)
 	versionRe     = regexp.MustCompile(`RimWorld (\d+\.\d+\.\d+ rev\d+)`)
+
+	waylithLineRe  = regexp.MustCompile(`^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ +([A-Z]+) (?:\[[^\]]*\] )?(.*)$`)
+	waylithVerRe   = regexp.MustCompile(`^Version:\s+(\d+\.\d+\.\d+)\.(\d+)`)
+	callerFrameRe  = regexp.MustCompile(` \[0x[0-9A-F]+\]$`)
+	waylithPatchRe = regexp.MustCompile(`^\s*- (PREFIX|POSTFIX|TRANSPILER|FINALIZER|ILMANIPULATOR) ([^:]+): \S+ <- (.*)$`)
 )
+
+// loggerFrame reports a Waylith caller frame of the logging system itself.
+func loggerFrame(t string) bool {
+	t = strings.TrimPrefix(t, ".")
+	return strings.HasPrefix(t, "Brutal.Logging.") || t == "Verse.Log"
+}
 
 func isContinuation(l string) bool {
 	if l == "" {
@@ -95,6 +124,14 @@ func Parse(r io.Reader) (*File, error) {
 		if len(l) > 4096 {
 			l = l[:4096]
 		}
+		if !f.Waylith && n < 50 && strings.HasPrefix(l, "=== Waylith log ===") {
+			f.Waylith, cur = true, nil
+			continue
+		}
+		if f.Waylith {
+			cur = waylithLine(f, cur, n, l)
+			continue
+		}
 		if f.Version == "" && n < 50 {
 			if m := versionRe.FindStringSubmatch(l); m != nil {
 				f.Version = m[1]
@@ -118,6 +155,47 @@ func Parse(r io.Reader) (*File, error) {
 	f.Lines = n
 	resolveRefs(f)
 	return f, sc.Err()
+}
+
+// waylithLine handles one line of a 1.7 log: a new message, or a continuation of cur (any line
+// that does not start with a timestamp, including unindented message lines).
+func waylithLine(f *File, cur *Entry, n int, l string) *Entry {
+	if m := waylithLineRe.FindStringSubmatch(l); m != nil {
+		e := &Entry{Line: n, Message: m[2], Level: m[1]}
+		f.Entries = append(f.Entries, e)
+		return e
+	}
+	if cur == nil {
+		if m := waylithVerRe.FindStringSubmatch(l); m != nil && f.Version == "" {
+			f.Version = m[1] + " rev" + m[2]
+		}
+		return nil
+	}
+	if strings.TrimSpace(l) == "" {
+		return cur
+	}
+	if m := waylithPatchRe.FindStringSubmatch(l); m != nil {
+		// "- PREFIX owner: Target.Method <- Ret Type:Method(…)": the Unity form without the target.
+		l = "- " + m[1] + " " + m[2] + ": " + m[3]
+	}
+	before := len(cur.Frames)
+	addLine(cur, l)
+	if len(cur.Frames) > before {
+		fr := &cur.Frames[len(cur.Frames)-1]
+		// .NET 10 prints a patched method as ".Ns.Type.Method_PatchN(…)".
+		fr.Type = strings.TrimPrefix(fr.Type, ".")
+		if p := patchNumRe.FindStringIndex(fr.Method); p != nil {
+			fr.Method, fr.Patched = fr.Method[:p[0]], true
+		}
+		if callerFrameRe.MatchString(fr.Text) {
+			if loggerFrame(fr.Type) {
+				cur.Frames = cur.Frames[:before]
+				return cur
+			}
+			fr.Caller = true
+		}
+	}
+	return cur
 }
 
 func addLine(e *Entry, l string) {
@@ -175,6 +253,9 @@ func dedupePatched(s string) string {
 // splitMember: "Verse.Pawn+<>c__DisplayClass1_0.<Tick>b__0" → ("Verse.Pawn", "Tick").
 func splitMember(s string) (typ, method string) {
 	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '('); i > 0 { // .NET 10: "Ns.Type.Method(Args a)", no space
+		s = s[:i]
+	}
 	if i := strings.IndexByte(s, ' '); i >= 0 {
 		s = s[:i]
 	}
@@ -223,22 +304,69 @@ func Classify(e *Entry) string {
 	case strings.Contains(m, "] Patch operation ") || strings.HasPrefix(m, "Patch operation ") ||
 		strings.HasPrefix(m, "Verse.PatchOperation") && strings.Contains(m, "): Failed"):
 		return ClassPatchFailed
-	case strings.Contains(m, "Could not resolve cross-reference") || strings.HasPrefix(m, "Could not load reference to"):
+	case strings.HasPrefix(m, "Verse.PatchOperationSequence: Error in the operation"):
+		return ClassPatchFailed
+	case strings.Contains(m, "Could not resolve cross-reference") || strings.HasPrefix(m, "Could not load reference to") ||
+		defNamedRe.MatchString(m):
 		return ClassXrefMissing
 	case strings.Contains(m, "_MainTex") || hasFrame(e, "ResolveIcon"):
 		return ClassMaterial
 	case xmlRe.MatchString(m):
 		return ClassXMLLoad
+	case textureRe.MatchString(m):
+		return ClassTexture
+	case saveRe.MatchString(m):
+		return ClassSave
 	}
 	for _, fr := range e.Frames {
 		if len(fr.Harmony) > 0 {
 			return ClassHarmony
 		}
 	}
-	if len(e.Frames) > 0 || strings.Contains(m, "Exception") {
+	if hasExceptionStack(e) || strings.Contains(m, "Exception") {
 		return ClassException
 	}
+	if modReportRe.MatchString(m) && !levelWordRe.MatchString(m) {
+		return ClassModReport
+	}
 	return ClassOther
+}
+
+var (
+	// DefDatabase.GetNamed: "Failed to find Verse.TerrainDef named X. There are N defs of this type loaded."
+	defNamedRe = regexp.MustCompile(`^Failed to find [\w.]+Def named `)
+	textureRe  = regexp.MustCompile(`^Could not load Texture2D at |^Failed to find any textures at |^Could not load (?:Texture|Material|Shader|AudioClip|SoundDef)\b`)
+	saveRe     = regexp.MustCompile(`^Could not resolve reference to object with loadID|is referenced \(xml node name: .*\) but is not deep-saved|^Error in PostExposeData|^Could not find think node with key|^Exception loading .* from save|^Could not load .* from save|^Could not get load ID\. `)
+	// A mod reporting on itself: "[Mod] …", "<color=…>[Mod]</color> …", "Mod :: …", "MOD: …".
+	modReportRe = regexp.MustCompile(`^(?:<color=[^>]*>\s*)?\[[^\]]{2,80}\]|^[\w .+-]{2,40} :: |^[A-Z][\w.+-]{1,30}: `)
+	// "ERROR: …" is a level written by the engine or a library, not a mod's name.
+	levelWordRe = regexp.MustCompile(`^(?i:error|warning|warn|err|info|exception): `)
+	// Engine and framework status lines that read like errors but are not.
+	noiseRe = regexp.MustCompile(`^Shader '[^']*': fallback shader '[^']*' not found|^Translation data for language .* has \d+ errors|^\[XML Extensions\] \d+ total patch operations run|^Curl error \d+: Callback aborted|^Mod .* is missing supported versions list in About\.xml`)
+)
+
+// hasExceptionStack reports frames other than a Waylith caller stack.
+func hasExceptionStack(e *Entry) bool {
+	for _, fr := range e.Frames {
+		if !fr.Caller {
+			return true
+		}
+	}
+	return false
+}
+
+// Top returns the frame that identifies where an entry happened: the first exception frame, or
+// for a Waylith message without an exception the first caller frame after the logging system.
+func (e *Entry) Top() *Frame {
+	for i := range e.Frames {
+		if !e.Frames[i].Caller {
+			return &e.Frames[i]
+		}
+	}
+	if len(e.Frames) > 0 {
+		return &e.Frames[0]
+	}
+	return nil
 }
 
 var xmlRe = regexp.MustCompile(`XML error|XmlException|Exception parsing|Could not find parent node|parent node named|Duplicate def|Could not find a type named|Exception loading def from file|Exception reading .*\.xml|XML parse|failed to load|Could not find class|Exception loading .* from|is not a valid .*Def|DefOf field .* not found|Config error in`)
@@ -255,7 +383,17 @@ func hasFrame(e *Entry, method string) bool {
 // Interesting reports whether an entry is an error worth clustering (Player.log mixes in
 // plenty of informational lines).
 func Interesting(e *Entry) bool {
-	if len(e.Frames) > 0 || Classify(e) != ClassOther {
+	if !hasExceptionStack(e) && noiseRe.MatchString(e.Message) {
+		return false
+	}
+	switch e.Level { // Waylith: the level decides
+	case "":
+	case "WARN", "WARNING", "ERROR", "FATAL", "CRITICAL":
+		return true
+	default: // INFO, DEBUG, TRACE
+		return false
+	}
+	if c := Classify(e); hasExceptionStack(e) || !Informational(c) {
 		return true
 	}
 	l := strings.ToLower(e.Message)
@@ -285,14 +423,40 @@ func Normalize(m string) string {
 	return m
 }
 
+var templateRules = []struct {
+	re  *regexp.Regexp
+	rep string
+}{
+	{regexp.MustCompile(`</?color[^>]*>`), ""},
+	{regexp.MustCompile(`defName="?[^\]"]*"?`), "defName=…"},
+	{regexp.MustCompile(`'[^']*'`), "'…'"},
+	{regexp.MustCompile(`"[^"]*"`), `"…"`},
+	{regexp.MustCompile(`\b(named|loadID|Type|type|field|at|for def|key) [^\s'"(),]+`), "$1 …"},
+	{regexp.MustCompile(`(found to give to [\w.]+) [^\s(]+`), "$1 …"}, // the def that wanted it
+	{regexp.MustCompile(`\(\w+\)`), "(…)"},                            // TypeByName(WorkGiver_DoBill)
+	{regexp.MustCompile(`\b[a-z0-9_]+(?:\.[a-z0-9_]+)+\b`), "<pkg>"},  // packageIds
+}
+
+// Template turns a message into a template that also merges messages reported once per def, type,
+// texture or mod ("Could not load Texture2D at '…'", "Type … probably needs …"). Cluster keys keep
+// these names because attribution needs them; templates are for counting kinds of problems.
+func Template(m string) string {
+	m = Normalize(m)
+	for _, r := range templateRules {
+		m = r.re.ReplaceAllString(m, r.rep)
+	}
+	return m
+}
+
 // Cluster groups entries with the same class, normalised message and top frame.
 type Cluster struct {
-	ID    string // E1, E2 … in order of first occurrence
-	Key   string
-	Class string
-	Count int
-	First *Entry
-	Lines []int // first few occurrences
+	ID       string // E1, E2 … in order of first occurrence
+	Key      string
+	Template string // class|Template(message): the kind of problem, across defs, types and mods
+	Class    string
+	Count    int
+	First    *Entry
+	Lines    []int // first few occurrences
 }
 
 // Clusters returns the error clusters of a log.
@@ -308,12 +472,12 @@ func Clusters(f *File) []*Cluster {
 		if cls == ClassPatchFailed {
 			key += "|" + strings.Join(e.Extra, "|") // the file distinguishes failures
 		}
-		if len(e.Frames) > 0 {
-			key += "|" + e.Frames[0].Type + "." + e.Frames[0].Method
+		if top := e.Top(); top != nil {
+			key += "|" + top.Type + "." + top.Method
 		}
 		c := by[key]
 		if c == nil {
-			c = &Cluster{Key: key, Class: cls, First: e}
+			c = &Cluster{Key: key, Template: cls + "|" + Template(e.Message), Class: cls, First: e}
 			by[key] = c
 			out = append(out, c)
 			c.ID = "E" + itoa(len(out))
@@ -340,7 +504,7 @@ func itoa(n int) string {
 
 // GameNamespace reports frames of the game, Unity, .NET or Harmony itself.
 func GameNamespace(t string) bool {
-	for _, p := range []string{"Verse.", "RimWorld.", "System.", "UnityEngine.", "HarmonyLib.", "Mono.", "Unity.", "MonoMod.", "Ionic.", "LudeonTK.", "Steamworks."} {
+	for _, p := range []string{"Verse.", "RimWorld.", "System.", "UnityEngine.", "HarmonyLib.", "Mono.", "Unity.", "MonoMod.", "Ionic.", "LudeonTK.", "Steamworks.", "Waylith.", "Brutal.", "RimWorldWaylith."} {
 		if strings.HasPrefix(t, p) {
 			return true
 		}
