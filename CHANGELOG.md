@@ -33,6 +33,19 @@ Spec: `docs/specs/10-1.0实现.md`.
   Instead's replacements. All-or-nothing; the only command that fetches them.
 - Missing mods get direct Workshop links; enabled mods with a maintained replacement are listed.
 
+### Packs (10 §8)
+- `archo pack build|list|launch|export|import|remove`: compile the current list into a pack
+  (checked, sorted for the pack only, each mod copied without other game versions' folders),
+  play it with its own list and saves through links in `Mods/`, share it as a zip or a list.
+- The window has a Packs screen: the packs with when they were last played, Play, and build
+  from the current list with a preview.
+
+### Settings (10 §7)
+- A settings screen (gear in the top bar): environment folders, launch method and arguments,
+  language, Workshop descriptions, community data sources, database backup and compaction,
+  and each cache with its size and a clear button.
+- `archo db status|backup|vacuum`, `archo cache status|clear <kind>`, `env set --launch-args`.
+
 ### History (10 §6)
 - `archo history`, `archo undo <n>`, `archo redo <n>`. The window shows the history in the empty
   staging list: redo steps, now, undo steps in plain words, then the saved versions.
