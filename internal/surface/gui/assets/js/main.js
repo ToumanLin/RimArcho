@@ -542,6 +542,7 @@ async function start() {
     try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
   });
   await reload();
+  requestAnimationFrame(() => api.Ready().catch(() => {}));
   await loadWidths();
   if (S.board && S.board.neverScanned) cmd("rescan");
 }

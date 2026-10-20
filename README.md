@@ -1,7 +1,9 @@
 # RimArcho
 
 A RimWorld mod manager for players with hundreds of mods, and for the AI agents that help them.
-One `archo.exe` gives you a terminal UI, a scriptable CLI and an MCP server. All three print the
+One program gives you a desktop window (`RimArcho.exe`), a terminal UI, a scriptable CLI and an MCP
+server (`archo.exe`). The window and the terminal UI are two faces of the same Go code: they show the
+same lists, details and "needs attention" items and run the same actions. The CLI and MCP print the
 same plain-text outlines, and every reference in them (`#id`, `pkg:`, `p:…`, `log:E3`) can be pasted
 into another command.
 
@@ -44,8 +46,11 @@ To build from source (Go 1.27+), run `go build -o archo.exe ./cmd/archo`, or
 archo env detect                 # finds the game, the user data folder and the Workshop folder
 archo env add main --detected    # registers them as environment "main"
 archo scan                       # reads every mod folder (incremental afterwards)
-archo                            # opens the TUI
 ```
+
+Then double-click `RimArcho.exe` for the window, or run `archo` for the terminal UI (in RimArcho's
+WezTerm host; `archo --here` uses the current terminal). `archo gui` opens the window from a
+terminal. The window needs Microsoft Edge WebView2, which Windows 10 and 11 already have.
 
 Useful next steps:
 
@@ -58,42 +63,32 @@ archo import rimcrow --db "D:\Game\RimModManager\data\mod_manager.db" --dry-run 
 
 `archo help` lists every command. `archo <command> --help` shows its flags.
 
-## TUI keys
+## Keys (window and terminal)
 
-| Keys | List view |
+Both interfaces follow one rule set: **the arrows only move** (the cursor, the focus, the scroll)
+and never change anything; **keys that change things act at once** on the selection (or the row
+under the cursor) and `u` undoes them. The top line always says where you are.
+
+| Keys | |
 |---|---|
-| `↑/↓` `j/k`, `PgUp/PgDn`, `g/G` | move, page, ends |
-| `space` | enable / disable |
-| `J` / `K`, `m` | move down / up, move to … |
-| `v` | mark (multi-select) |
-| `S` / `w` | sort / save to the game (each shows the diff first) |
-| `u` / `ctrl+r` | undo / redo |
-| `x` | swap to another instance of the same lineage |
-| `enter` | inspect |
-| `r` | add a rule for this mod |
-| `/`, `f` | search, filter (all / enabled / disabled / unloadable) |
-| `R` | rescan (child process) |
-| `l` | analyse Player.log (or the previous one) |
-| `L` | launch the game |
+| `↑/↓`, `←/→`, `1`–`4` | move the cursor; go to Disabled, Enabled, Staging, details |
+| `PgUp/PgDn` | scroll the details from anywhere |
+| `shift+↑/↓`, `ctrl+space` | select a range; select or unselect one |
+| `space` | enable (where the load order wants it) / disable / put back from staging |
+| `t`, `T` | stage (or put back); put everything back |
+| `m`, `J` / `K` | move to a position or after a mod; move down / up |
+| `#` | tags |
+| `enter`, `o` | full details; the Workshop page |
+| `S` / `w` / `L` | sort / save to the game / launch (each shows a preview first) |
+| `u` / `ctrl+r` | undo / redo (the window also takes `ctrl+z` / `ctrl+y`) |
+| `/` | search the list: words, `tag:`, `author:`, `type:`, `has:`, `-not` |
+| `!`, `c` | needs attention; recent changes |
+| `R`, `A`, `E` | rescan; check the files again; switch environment |
+| `ctrl+k`, `?` | command palette; all keys |
 
-| Keys | Problems view (`2`) |
-|---|---|
-| `enter` | expand / inspect |
-| `a` | run the suggested command (`tab` picks one) |
-| `i` / `I` | ignore / show ignored |
-| `s` | severity filter |
-| `o` | inspect the mod |
-| `A` | re-analyse (child process) |
-
-| Keys | Changes view (`3`) |
-|---|---|
-| `enter` | file-level diff of an event |
-| `s` / `c` / `u` | answer an identity question: same / copy / unrelated |
-| `L` / `I` | load / ignore a ModsConfig.xml that changed outside RimArcho |
-
-Everywhere: `1` `2` `3` switch views, `E` switches environment, `:` runs any archo command, `?` opens
-help and `q` quits. The mouse wheel scrolls and a click selects (`archo config set ui.mouse off`
-turns the mouse off). The language follows the system; change it with
+In the window, the mouse does the same: click, `shift`/`ctrl`+click, double-click to enable or
+disable, drag between lists (enable, disable, stage) or within Enabled (reorder), right-click for
+what you can do with the mod. The language follows the system; change it with
 `archo config set ui.lang zh|en|auto`.
 
 ## Connecting an agent (`archo mcp`)

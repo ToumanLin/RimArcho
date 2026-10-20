@@ -45,12 +45,12 @@
 | 源码 | 按需调用 ilspycmd 反编译单个 Mod 并缓存；在缓存中搜索 |
 | 本地副本 | copy-local：写入 `.rimarcho/origin.json`，可选初始化 git |
 | 启动 | 直接启动游戏，或通过 Steam 启动 |
-| 表面 | TUI、CLI、MCP（stdio） |
+| 表面 | TUI、GUI（08，D9）、CLI、MCP（stdio） |
 | 迁移 | 从 RimCrow 一次性导入别名、分组、用户规则 |
 
 ### 3.2 MVP 不包含
 
-- 图形界面（GUI）。
+- ~~图形界面（GUI）。~~ 2026-10-20 改为纳入（D9，08）。
 - 订阅、退订、下载。这些交给 Steam 客户端；RimArcho 只读 ACF 状态。
 - 工坊浏览和搜索、Git 来源订阅、SteamCMD 下载。
 - 贴图优化、推荐清单导出、主题、多语言 UI（MVP 只做中文和英文）。
@@ -70,6 +70,7 @@
 | M3 问题 | 声明层问题、Def 和 Patch 分析、交叉引用；TUI 的 Problems 和 Inspect 视图 | U5 |
 | M4 日志与 MCP | 日志归因、Harmony 元数据、按需反编译；MCP server | U6、U12–U14 |
 | M5 收尾 | copy-local、RimCrow 导入、Changes 视图、性能调优、打包 | U10、U11 |
+| M6 GUI | `internal/view` 共享视图模型；Wails v3 桌面窗口；`RimArcho.exe` | U2–U8 在窗口中同样成立（08 §12） |
 
 M4 完成后，删除 `rim_mod_inspector.py` 和两个 skill（D7）。
 

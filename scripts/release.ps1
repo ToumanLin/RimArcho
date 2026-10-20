@@ -1,4 +1,5 @@
-# Builds a release: one self-contained archo.exe (pure Go, no cgo, no runtime to install)
+# Builds a release: archo.exe and RimArcho.exe (pure Go, no cgo, no runtime to install; the same
+# program, RimArcho.exe linked as a Windows GUI so a double click opens the window, 08 §2)
 # with the version stamped in through -ldflags, plus README, CHANGELOG and LICENSE, and the font of
 # the WezTerm host (06 §1.2): Maple Mono NF CN Regular and Bold with its SIL OFL license under
 # fonts/. The font is fetched at build time from the official Maple Mono GitHub release
@@ -48,6 +49,11 @@ $env:CGO_ENABLED = "0"; $env:GOOS = $GOOS; $env:GOARCH = $GOARCH
 Write-Host "go build $exe ($Version, $commit, $date)"
 go build -trimpath -ldflags $ldflags -o (Join-Path $out $exe) ./cmd/archo
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
+if ($GOOS -eq "windows") {
+    Write-Host "go build RimArcho.exe (Windows GUI)"
+    go build -trimpath -ldflags "$ldflags -H windowsgui -X $pkg.GUI=1" -o (Join-Path $out "RimArcho.exe") ./cmd/archo
+    if ($LASTEXITCODE -ne 0) { throw "build failed" }
+}
 Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED
 
 Copy-Item README.md, CHANGELOG.md, LICENSE $out

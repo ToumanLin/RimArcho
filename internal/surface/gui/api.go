@@ -4,8 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/bbcode"
@@ -48,6 +51,25 @@ func (s *API) send(name string, data any) {
 }
 
 // ---- start ----
+
+// processStart is when this process began (close enough: package initialisation).
+var processStart = time.Now()
+
+// Ready is called once the page has drawn the list; it logs the start-up time to
+// <data>/logs/gui.log (08 §10: cold start to an interactive list).
+func (s *API) Ready() {
+	ms := time.Since(processStart).Milliseconds()
+	dir := filepath.Join(s.a.Home, "logs")
+	if os.MkdirAll(dir, 0o755) != nil {
+		return
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "gui.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "%s ready %d ms (%s)\n", time.Now().Format(time.RFC3339), ms, buildinfo.String())
+}
 
 // Start is what the page needs once: the language, its text table, the commands.
 type Start struct {

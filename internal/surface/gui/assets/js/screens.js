@@ -16,6 +16,7 @@ function openScreen(name) {
   sc.hidden = false;
   sc.innerHTML = "";
   ui.renderWhere();
+  ui.renderHints();
   return sc;
 }
 

@@ -58,7 +58,7 @@ TUI 目前的编辑操作是拼 CLI 参数再调用 `cmds.Execute`、读回文�
 - 身份问题回答、日志选择、扫描子进程（`ChildScan` 从 TUI 移入 app）。
 - 每个 Mod 的 Def / Patch / Harmony 小结的结构化数据（替代 TUI 解析 `def` / `patches` / `harmony` 命令的文字）。
 
-TUI 随之改为调用这些接口；`cmds.Execute` 只留给命令面板里“运行 CLI 命令”这类确实是文字的场景。
+TUI 随之改为调用这些接口；`cmds.Execute` 只留给本来就是文字的只读场景：排序 / 保存 / 启动的预览（CLI 的 `--dry-run` 文字）、“查看”类操作和全屏详情的 Def / Patch / Harmony 分页，以及玩家自己在命令面板里输入的 archo 命令。
 
 ### 1.3 规则
 
@@ -73,7 +73,7 @@ TUI 随之改为调用这些接口；`cmds.Execute` 只留给命令面板里“�
 | 文件 | 子系统 | 双击 | 用途 |
 | --- | --- | --- | --- |
 | `archo.exe` | 控制台 | WezTerm 中的 TUI（不变，06 §1.1） | CLI、`archo mcp`、`archo tui`；`archo gui` 启动 GUI |
-| `RimArcho.exe` | Windows GUI（`-H windowsgui`，没有控制台黑框） | GUI | 给玩家双击的入口；带参数时只认 `--env <名称>` |
+| `RimArcho.exe` | Windows GUI（`-H windowsgui`，没有控制台黑框） | GUI | 给玩家双击的入口（可带 `--env <名称>`）；带命令参数时按 CLI 执行，供 GUI 的扫描和分析子进程使用 |
 
 - 两个 exe 共用数据目录和数据库，可以同时打开（SQLite WAL 已支持多进程）；一方改动后，另一方在下次获得焦点时按 `ChangeKey` 重新加载。
 - `archo gui`：同目录下有 `RimArcho.exe` 就启动它并立即返回；没有就在当前进程中运行 GUI。
@@ -171,7 +171,7 @@ WebView2 不可用（极少数精简系统）时，弹出说明和微软下载�
 
 | # | 场景 | 期望 |
 | --- | --- | --- |
-| G1 | 同一状态（测试环境） | TUI 和 GUI 得到的 `Columns`、`Needs`、`Detail` 结构相同；GUI 的 Go 代码中没有 `cmds.Execute` |
+| G1 | 同一状态（测试环境） | TUI 和 GUI 得到的 `Columns`、`Needs`、`Detail` 结构相同；GUI 的 Go 代码中修改数据都走 view / app 的类型化调用，`cmds.Execute` 只用于 §1.2 列出的只读文字和玩家输入的命令 |
 | G2 | 1354 个 Mod 滚动、筛选 | 每次交互 ≤ 50 毫秒 |
 | G3 | 每种操作做一次（键盘、鼠标、拖放、右键菜单） | 结果与 TUI 中相同操作一致；每一步都能 `u` 撤销 |
 | G4 | 在 GUI 中随机单击、滚动、按方向键 1000 次 | 工作区差异为 0（规则 1） |
@@ -181,3 +181,46 @@ WebView2 不可用（极少数精简系统）时，弹出说明和微软下载�
 | G8 | 同时打开 TUI 和 GUI，在一方修改 | 另一方获得焦点后显示新的状态，不覆盖对方的修改 |
 | G9 | 空闲 10 分钟 | 满足 §10 |
 | G10 | 双击 `RimArcho.exe` | 没有控制台窗口，直接出现 GUI |
+
+## 13. 实施结果（2026-10-20）
+
+### 13.1 结构
+
+- `internal/view`：`text`（中英文表，TUI / GUI 各自用 `Register` 补充自己的按键说明）、`columns`、`query`、`needs`（`Action` 是数据，`Do` 执行修改数据的动作）、`detail`、`changes`、`tags`、`verbs`（`Toggle` / `Stage` / `Unstage` / `MoveBy` / `Place` / `PosOptions`）、`palette`、`preview`（预览与执行排序、保存、启动，撤销，全部放回，换副本）。
+- `internal/app` 新增 `SetTags` / `SetAlias` / `SetNote`、`ChildScan`（子进程不弹控制台窗口）。
+- TUI 只剩布局、绘制、按键和鼠标映射，全部原有测试不改断言即通过。
+- `internal/surface/gui`：`api.go`（Wails 服务，每个方法只调用 view）、`gui.go`（窗口、`/preview/`、`/img` 本地图片处理器、CSP）、`assets/`（`index.html`、`style.css`、`js/` 下 8 个 ES 模块，约 1500 行，无框架、无构建）。
+- `spikes/guidev`：开发用，在 127.0.0.1 上用同一个 API 驱动页面，便于在浏览器里调试；不进发布包。
+
+### 13.2 验收
+
+| # | 结果 | 依据 |
+| --- | --- | --- |
+| G1 | 通过 | `gui.TestSameViewModels`：GUI 的列和“需要处理”与 `view.BuildBoard` / `view.BuildNeeds` 完全相同 |
+| G2 | 通过 | 真实 1354 个 Mod：列表数据 106 毫秒到达；单击、方向键、筛选均在一帧内重绘（虚拟列表只渲染可见行） |
+| G3 | 通过 | `gui.TestVerbsAndUndo`（启用、J、暂存、放到某位置、放回，再逐步撤销）；真实窗口和浏览器中逐一操作了键盘、单击、shift/ctrl 单击、右键菜单、拖放（拖到 Royalty 与 Ideology 之间成为第 6 位） |
+| G4 | 通过 | 浏览器中随机按 1000 次方向键、PgUp/PgDn、Home/End、tab、1–4、esc（含 shift）：数据库状态和三列完全不变 |
+| G5 | 通过 | 同上，结束时 0 次 esc 即处于“列表区、无选择、无弹层” |
+| G6 | 通过 | 注入 `<script>`、`onerror`、`javascript:` 链接和远程图片：无脚本执行，`OpenURL` 拒绝非 http(s) 链接，图片只经 `/img` 从缓存读取；CSP `default-src 'self'` |
+| G7 | 通过 | 真实环境副本：“需要处理”与 TUI 同一份 9 项，每项都有按钮 |
+| G8 | 实现 | 窗口获得焦点时比较 `Stamp()`（数据库状态），变化即重新加载；未做双进程并发写的自动化测试 |
+| G9 | 见 §13.3 | |
+| G10 | 通过 | `RimArcho.exe` 用 `-H windowsgui` 链接，双击直接出现窗口，无控制台；扫描、分析子进程带 `CREATE_NO_WINDOW` |
+
+### 13.3 资源（真实环境副本，1354 个 Mod）
+
+| 指标 | 目标 | 实测 |
+| --- | --- | --- |
+| 体积 | — | `RimArcho.exe` / `archo.exe` 各 22.7 MB（`-s -w`；加入 Wails 前 archo 为 17.3 MB） |
+| 整体内存（使用后，任务管理器口径） | ≤ 200 MB | 169 MB：Go 进程 52.5 MB + WebView2 6 个进程 116.5 MB |
+
+### 13.4 实施中的裁定
+
+1. **Wails 绑定名**：服务方法的全名是 `github.com/ToumanLin/RimArcho/internal/surface/gui.API.<方法>`；`api.js` 用 `Proxy` 拼出，前端没有生成文件。
+2. **CSP 与运行时**：`script-src 'self'` 下 Wails 运行时正常工作，不需要 `unsafe-eval`。
+3. **`[hidden]` 必须强制**：弹层容器的 `display:flex` 会盖过 `hidden` 属性，形成一层看不见的遮罩吃掉所有点击。样式表首行加 `[hidden]{display:none !important}`。
+4. **拖到“未启用”**：从暂存拖回“未启用”是“移出暂存、不启用”，为此加了 `view.Unstage`。
+5. **标签不进撤销**：标签属于家族数据，不是列表编辑，`u` 不撤销它；GUI 的状态行因此不给标签修改显示“撤销”。
+6. **确认文案**：TUI 的“再按一次 L”不适合按钮对话框；`view.Action` 增加 `Warn`，对话框显示它。
+7. **最小化时的 WebView2 内存目标**：Wails beta.28 没有公开 `MemoryUsageTargetLevel`（只在内部包中），本版不做。
+8. **WebView2 用户数据**放在 `<数据目录>/webview2`，不放 `%APPDATA%\RimArcho.exe`。

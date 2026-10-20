@@ -2,6 +2,21 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## 0.6.0 — the window (unreleased)
+
+### GUI (08)
+- `RimArcho.exe`: a desktop window (Wails v3 and plain HTML/CSS/JavaScript, no frontend build
+  step) next to the terminal UI. A double click opens it; `archo gui` opens it from a terminal.
+- The window and the TUI share one layer, `internal/view`: the columns, the search syntax, the
+  details, 需要处理 with its actions, the changes, tags, the verbs and the position input, the
+  palette and the interface text. Neither interface builds these itself.
+- The window follows the TUI's v3 rules (06 §13) and adds the mouse: click and modifier clicks,
+  double-click, drag and drop between and within the lists, a context menu, resizable columns.
+- Workshop descriptions are built from parsed BBCode blocks and never inserted as HTML; images
+  come only from RimArcho's cache. The page loads nothing remote and the window opens no port.
+- Children of the window (scan, analysis) open no console window.
+- Typed app calls for tags, alias and note (`SetTags`, `SetAlias`, `SetNote`).
+
 ## 0.5.0 — MVP (unreleased)
 
 ### M5: local copies, RimCrow import, exchange, polish
