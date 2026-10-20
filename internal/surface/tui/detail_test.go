@@ -309,7 +309,7 @@ func previewPNG(t *testing.T, path string, w, h int) {
 }
 
 // T6 (06 §11, §12.4): a mod with Preview.png shows its thumbnail at once; moving on erases
-// the whole 18×9 block in the same write; scrolling never draws another mod's thumbnail;
+// the image's 18×5 cells (the block is as tall as the image) in the same write; scrolling never draws another mod's thumbnail;
 // with ui.preview_dwell_ms set, the thumbnail waits until the cursor rests that long.
 func TestT6Thumbnail(t *testing.T) {
 	e, _ := fixture(t)
@@ -336,7 +336,7 @@ func TestT6Thumbnail(t *testing.T) {
 	}
 	m.View()
 	ps := m.images.cur
-	if len(ps) != 1 || ps[0].cols != 18 || ps[0].rows != 5 || ps[0].clr != 9 {
+	if len(ps) != 1 || ps[0].cols != 18 || ps[0].rows != 5 {
 		t.Fatalf("placement %+v", ps)
 	}
 	p := ps[0]
@@ -344,16 +344,23 @@ func TestT6Thumbnail(t *testing.T) {
 	if l := ansi.Strip(m.lastLines[0].text); !strings.HasPrefix(l, strings.Repeat(" ", 20)+"Alpha") {
 		t.Fatalf("header %q", l)
 	}
-	// moving on: no image, and the whole 18×9 block erased in the same write
+	// the block is as tall as the image: line 5 is no longer an empty part of it
+	if l := m.lastLines; len(l) < 6 || strings.HasPrefix(ansi.Strip(l[5].text), strings.Repeat(" ", 20)) {
+		t.Fatalf("block taller than the image:\n%s", plainLines(m.lastLines))
+	}
+	// moving on: no image, and its 18×5 cells erased in the same write, nothing below
 	press(m, "down")
 	out = frame()
 	if strings.Contains(out, "1337;File") {
 		t.Fatal("thumbnail kept after moving on")
 	}
-	for r := 0; r < 9; r++ {
+	for r := 0; r < 5; r++ {
 		if want := fmt.Sprintf("\x1b[%d;%dH\x1b[18X", p.row+r, p.col); !strings.Contains(out, want) {
-			t.Fatalf("row %d of the block not erased: %q", r, out)
+			t.Fatalf("row %d of the image not erased: %q", r, out)
 		}
+	}
+	if strings.Contains(out, fmt.Sprintf("\x1b[%d;%dH\x1b[18X", p.row+5, p.col)) {
+		t.Fatal("erased below the image")
 	}
 	// scrolling: a thumbnail only ever on its own mod, at once from the cache
 	for i := 0; i < 20; i++ {

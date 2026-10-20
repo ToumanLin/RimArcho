@@ -30,7 +30,6 @@ const cellAspect = 13.0 / 30.0
 // placement is one image on screen (1-based cell position).
 type placement struct {
 	row, col, cols, rows int
-	clr                  int // rows to erase when it goes, if more than rows (a thumbnail's block)
 	seq                  []byte
 }
 
@@ -70,7 +69,7 @@ func (w *imgWriter) Write(frame []byte) (int, error) {
 			continue
 		}
 		b.WriteString("\x1b7")
-		for r := 0; r < max(p.rows, p.clr); r++ {
+		for r := 0; r < p.rows; r++ {
 			fmt.Fprintf(&b, "\x1b[%d;%dH\x1b[%dX", p.row+r, p.col, p.cols)
 		}
 		b.WriteString("\x1b8")

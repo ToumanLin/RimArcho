@@ -302,11 +302,20 @@ func (m *model) headerLines(it *item, mod *store.Mod, facts string, w int, o det
 	url := previewURL(mod.ID)
 	e := m.imgs[imgKey(url, tc, tr)]
 	empty := strings.Repeat(" ", tc)
-	n := max(tr, len(text))
+	// The block is as tall as the image: 16:9 until its size is known, one line for "no
+	// preview" (06 §6.2, revised: no fixed 9-line block).
+	rows := imgRows(0, 0, tc, tr)
+	switch {
+	case e != nil && e.state == imgOK:
+		rows = e.rows
+	case e != nil && e.state == imgFailed:
+		rows = 1
+	}
+	n := max(rows, len(text))
 	out := make([]dline, n)
 	for i := range out {
 		left := empty
-		if i == tr/2 && e != nil && e.state == imgFailed {
+		if i == 0 && e != nil && e.state == imgFailed {
 			left = sDimS.Render(fit(strings.Repeat(" ", (tc-width.StringWidth(T("no preview")))/2)+T("no preview"), tc))
 		}
 		right := strings.Repeat(" ", tw)
@@ -1020,8 +1029,5 @@ func (m *model) place(l dline, y, n, x int) (placement, bool) {
 	m.touchImage(key)
 	// body line y is screen row 3+y (1-based): top bar, blank line, then the body
 	p := placement{row: 3 + y, col: x + l.imgInd, cols: l.imgCols, rows: e.rows, seq: e.seq}
-	if l.thumb != "" {
-		p.clr = l.imgMax // the whole reserved block is erased (06 §6.2)
-	}
 	return p, true
 }
