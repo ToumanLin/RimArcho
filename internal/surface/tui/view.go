@@ -167,7 +167,9 @@ func (m *model) hintLine() string {
 	case m.insp != nil:
 		pairs = [][2]string{{"esc", T("back")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
 	case m.full:
-		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}, {"1–5", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"r", T("refresh")}, {"i", T("technical information")}, {"tab", T("technical pages")}}
+		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"r", T("refresh")}, {"i", T("technical information")}, {"I", T("technical pages")}}
+	case m.detailFocus && m.tab == tabList:
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"←", T("back to the list")}, {"enter", T("full screen")}, {"#", T("tags")}, {"o", T("Workshop page")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
 	case m.tab == tabChanges:
@@ -244,19 +246,39 @@ func window(lines []string, off, n int) []string {
 }
 
 // descMax is how many description lines the detail column shows (06 §6.1).
-func (m *model) descMax() int { return 12 }
+func (m *model) descMax() int {
+	if m.detailFocus {
+		return 0 // scrolled: all of it
+	}
+	return 12
+}
 
 // detailLines draws the detail column (w wide, n lines, starting at 0-based column x) and
 // returns its image placements.
 func (m *model) detailLines(w, n, x int) ([]string, []placement) {
 	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), images: m.inlineImages(), techText: m.detail})
 	m.lastLines = lines
+	if id := m.col().curID(); id != m.detailOffID {
+		if m.detailOffID != "" {
+			m.detailOff = 0 // another mod: from the top
+		}
+		m.detailOffID = id
+	}
+	m.detailOff = max(0, min(m.detailOff, len(lines)-n))
+	if !m.detailFocus {
+		m.detailOff = 0
+	}
 	var out []string
 	var ps []placement
-	for i := 0; i < len(lines) && i < n; i++ {
+	for i := m.detailOff; i < len(lines) && len(out) < n; i++ {
 		out = append(out, lines[i].text)
-		if p, ok := m.place(lines[i], i, n, x+1); ok { // x is 0-based
+		if p, ok := m.place(lines[i], len(out)-1, n, x+1); ok { // x is 0-based
 			ps = append(ps, p)
+		}
+	}
+	if m.detailFocus && len(out) > 0 && m.detailOff > 0 {
+		if it := m.current(); it != nil { // scrolled: the name stays on top
+			out[0] = sAccent.Render(fit("▲ "+it.name, w))
 		}
 	}
 	return out, ps

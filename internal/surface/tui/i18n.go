@@ -250,7 +250,7 @@ var zhText = map[string]string{
 	// tags (06 §5.6)
 	"tags for %s (word adds, -word removes): ": "%s 的标签（词 = 添加，-词 = 移除）：",
 	"added %s": "添加了 %s", "removed %s": "移除了 %s", "tags of %s: %s": "%s 的标签：%s",
-	"type…": "输入…", "[images ×%d · enter shows them full screen]": "[图片 ×%d · enter 在全屏中查看]", "[images ×%d]": "[图片 ×%d]", "apply": "应用", "type a new tag": "输入新标签",
+	"type…": "输入…", "previous / next mod": "上一个 / 下一个", "back to the list": "回到列表", "full screen": "全屏", "[images ×%d · enter shows them full screen]": "[图片 ×%d · enter 在全屏中查看]", "[images ×%d]": "[图片 ×%d]", "apply": "应用", "type a new tag": "输入新标签",
 	// Problems, Changes and Inspect screens (plain versions until V3/V4)
 	"(%d–%d of %d, ↑/↓)":                              "（%d–%d / 共 %d，↑/↓）",
 	"no problems":                                     "没有问题",
@@ -316,7 +316,8 @@ const helpTextZh = `四列（06 §5）
   S          自动排序（先看差异）     w     保存到游戏（先看差异）
   u ctrl+r   撤销 / 重做              L     启动游戏
   /          筛选这一列               < > =  列宽（= 恢复默认）   z  名称换行
-  enter      详情                     i     技术信息
+  enter      详情（全屏：←→ 上一个 / 下一个 Mod，tab 切换子区，I 技术页面）
+  在已启用或暂存列按 →：进入详情列（↑↓ 滚动，← 返回）    i  技术信息
   !          需要处理                 c     最近变化
   R          重新扫描                 E     切换环境
   :          运行 archo 命令          ctrl+k 命令面板

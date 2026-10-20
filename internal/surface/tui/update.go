@@ -23,7 +23,8 @@ picking (06 §12): pick mods first, then move them; one undo step for it all
   S          sort (preview first)   w     save to the game (preview first)
   u ctrl+r   undo / redo            L     launch the game
   /          filter this column     < > =  column width (= resets)   z  wrap names
-  enter      details                i     technical information
+  enter      details (full screen: ←→ previous / next mod, tab sub-sections, I technical pages)
+  → on Enabled or Staging: the detail column (↑↓ scroll it, ← back)    i  technical information
   !          needs attention        c     recent changes
   R          rescan                 E     switch environment
   :          run an archo command   ctrl+k command palette
@@ -211,6 +212,11 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case "R":
 		return m.startScan()
 	}
+	if m.tab == tabList && m.detailFocus {
+		if cmd, ok := m.detailKey(s); ok {
+			return cmd
+		}
+	}
 	if m.tab == tabList {
 		if cmd, ok := m.pickKey(s); ok {
 			return cmd
@@ -260,7 +266,13 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.moveCursor(len(c.view))
 	case "left", "h", "shift+tab":
 		return m.focusMove(-1)
-	case "right", "l", "tab":
+	case "right", "l":
+		if (m.focus == cActive || m.focus == cStaging) && m.layout().detailW > 0 {
+			m.detailFocus = true // 06 §12.5
+			return nil
+		}
+		return m.focusMove(1)
+	case "tab":
 		return m.focusMove(1)
 	case "[":
 		return m.focusMove(-1)
@@ -605,12 +617,30 @@ func (m *model) hit(x, y int) (colKind, int, bool) {
 }
 
 func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
-	if m.prompt != nil || m.editing || m.panel != nil || m.insp != nil || m.tab != tabList {
-		switch e.Button {
-		case tea.MouseButtonWheelDown:
-			return m.key(tea.KeyMsg{Type: tea.KeyDown})
-		case tea.MouseButtonWheelUp:
-			return m.key(tea.KeyMsg{Type: tea.KeyUp})
+	if m.prompt != nil || m.editing || m.panel != nil || m.insp != nil || m.tab != tabList || m.full {
+		var cmds []tea.Cmd
+		for i := 0; i < 3; i++ { // the wheel scrolls three lines
+			switch e.Button {
+			case tea.MouseButtonWheelDown:
+				cmds = append(cmds, m.key(tea.KeyMsg{Type: tea.KeyDown}))
+			case tea.MouseButtonWheelUp:
+				cmds = append(cmds, m.key(tea.KeyMsg{Type: tea.KeyUp}))
+			}
+		}
+		return tea.Batch(cmds...)
+	}
+	// The detail column: a click gives it the focus, the wheel scrolls it (06 §12.5).
+	if l := m.layout(); l.detailW > 0 && e.X >= l.detailX && e.Y >= 2 {
+		switch {
+		case e.Button == tea.MouseButtonWheelDown:
+			m.detailFocus, m.detailOff = true, m.detailOff+3
+		case e.Button == tea.MouseButtonWheelUp:
+			m.detailFocus, m.detailOff = true, max(m.detailOff-3, 0)
+		case e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonLeft:
+			if m.pick != nil {
+				m.endPick(true)
+			}
+			m.detailFocus = true
 		}
 		return nil
 	}
@@ -636,7 +666,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 	switch e.Button {
 	case tea.MouseButtonWheelDown, tea.MouseButtonWheelUp:
 		if ok {
-			m.focus = k
+			m.focus, m.detailFocus = k, false
 		}
 		d := 3
 		if e.Button == tea.MouseButtonWheelUp {
@@ -652,7 +682,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 	if m.pick != nil && (m.pick.col != k || (!e.Shift && !e.Ctrl)) {
 		m.endPick(true)
 	}
-	m.focus = k
+	m.focus, m.detailFocus = k, false
 	c := &m.cols[k]
 	if i < 0 {
 		return m.requestDetail()

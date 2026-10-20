@@ -150,6 +150,10 @@ type model struct {
 	images      *imgWriter  // the WezTerm host's output; nil: no inline images
 	full        bool        // the full-screen detail
 	fullOff     int
+	fullSec     int    // the full-screen sub-section tab / shift+tab went to (0: the summary)
+	detailFocus bool   // the compact detail has the focus: ↑↓ scroll it (06 §12.5)
+	detailOff   int    // its scroll
+	detailOffID string // the mod it was scrolled for
 	lastLines   []dline
 
 	scanning bool

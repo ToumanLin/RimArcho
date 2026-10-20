@@ -279,7 +279,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			check("start")
 			// Staging is reachable at every width: focus it (it takes the first slot when
 			// hidden), stage a mod from "enabled", put it back.
-			press(m, "l") // Enabled → Staging
+			press(m, "tab") // Enabled → Staging (→ goes to the detail, 06 §12.5)
 			if m.focus != cStaging || !m.layout().has(cStaging) {
 				t.Fatalf("staging not shown when focused: %+v", m.layout())
 			}
@@ -447,9 +447,9 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 	e.MustRun("env", "add", "second", "--game", other)
 	tm := start(t, e, scans, 120, 30)
 	waitFor(t, tm, " main ")
-	keys(tm, "g", "enter") // the full-screen detail, then tab: the technical pages
+	keys(tm, "g", "enter") // the full-screen detail, then I: the technical pages
 	waitFor(t, tm, "ludeon.rimworld")
-	keys(tm, "tab")
+	keys(tm, "I")
 	waitFor(t, tm, "package: ludeon.rimworld")
 	keys(tm, "esc", "esc", "E", "down", "enter")
 	waitFor(t, tm, "switched to second")

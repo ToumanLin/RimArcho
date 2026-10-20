@@ -283,7 +283,11 @@ func (m *model) headerLines(it *item, mod *store.Mod, facts string, w int, o det
 			text = append(text, st.Render(fit(l, tw)))
 		}
 	}
-	put(it.name, sBold)
+	if m.detailFocus && !o.full {
+		put(it.name, sAccent.Bold(true))
+	} else {
+		put(it.name, sBold)
+	}
 	if a := strings.TrimSpace(mod.Authors); a != "" {
 		put(a, sSecond)
 	}
@@ -821,24 +825,55 @@ func (m *model) fullKey(s string) tea.Cmd {
 	page := max(m.h-6, 1)
 	switch s {
 	case "esc", "q", "backspace":
-		m.full = false
-		return nil
+		m.full = false // the cursor is on the last mod shown
+		return m.requestDetail()
 	case "down", "j":
 		m.fullOff++
+		m.syncFullSec()
 	case "up", "k":
 		m.fullOff--
+		m.syncFullSec()
 	case "pgdown", " ":
 		m.fullOff += page
+		m.syncFullSec()
 	case "pgup":
 		m.fullOff -= page
+		m.syncFullSec()
 	case "home", "g":
-		m.fullOff = 0
+		m.fullOff, m.fullSec = 0, 0
 	case "end", "G":
 		m.fullOff = 1 << 30
+		m.syncFullSec()
+	case "left", "h", "right", "l":
+		// the previous / next mod of the list, from the top
+		d := 1
+		if s == "left" || s == "h" {
+			d = -1
+		}
+		c := m.col()
+		i := c.cursor + d
+		if i < 0 || i >= len(c.view) || c.items[c.view[i]].id == "" {
+			return nil
+		}
+		c.cursor = i
+		c.scroll(m.rowsShown() - 1)
+		m.fullOff, m.fullSec = 0, 0
+		m.detailRef = ""
+		return tea.Batch(m.requestDetail(), m.loadFullSecs())
+	case "tab", "shift+tab":
+		starts := m.fullStarts()
+		if s == "tab" {
+			m.fullSec = min(m.fullSec+1, len(starts)-1)
+		} else {
+			m.fullSec = max(m.fullSec-1, 0)
+		}
+		m.fullOff = starts[m.fullSec]
+		m.say(sayInfo, m.fullSecName(m.fullSec))
 	case "1", "2", "3", "4", "5":
 		for i, l := range m.lastLines {
 			if l.sec == int(s[0]-'0') {
 				m.fullOff = i
+				m.fullSec = l.sec
 			}
 		}
 	case "i":
@@ -854,13 +889,75 @@ func (m *model) fullKey(s string) tea.Cmd {
 		return m.openWorkshop()
 	case "#":
 		return m.tagKey()
-	case "tab":
+	case "I":
 		if it := m.current(); it != nil && it.id != "" {
 			m.insp, m.inspHist = nil, nil
 			return m.openInspect([]string{"mod", it.ref})
 		}
 	}
 	return nil
+}
+
+// fullStarts: where the summary and each sub-section start in the full-screen detail.
+func (m *model) fullStarts() []int {
+	starts := []int{0}
+	for i, l := range m.lastLines {
+		if l.sec > 0 {
+			starts = append(starts, i)
+		}
+	}
+	return starts
+}
+
+func (m *model) fullSecName(k int) string {
+	if k == 0 {
+		return T("summary")
+	}
+	starts := m.fullStarts()
+	if k < len(starts) {
+		return strings.TrimSpace(ansi.Strip(m.lastLines[starts[k]].text))
+	}
+	return ""
+}
+
+// syncFullSec: after scrolling, the sub-section at the top of the screen.
+func (m *model) syncFullSec() {
+	m.fullSec = 0
+	for k, i := range m.fullStarts() {
+		if i <= m.fullOff {
+			m.fullSec = k
+		}
+	}
+}
+
+// detailKey: the keys while the compact detail has the focus (06 §12.5); handled is false
+// for the keys it leaves to the list, which then has the focus again.
+func (m *model) detailKey(s string) (tea.Cmd, bool) {
+	page := max(m.rowsShown()-2, 1)
+	switch s {
+	case "down", "j":
+		m.detailOff++
+	case "up", "k":
+		m.detailOff--
+	case "pgdown", " ":
+		m.detailOff += page
+	case "pgup":
+		m.detailOff -= page
+	case "home", "g":
+		m.detailOff = 0
+	case "end", "G":
+		m.detailOff = 1 << 30
+	case "left", "h", "esc":
+		m.detailFocus = false
+		return nil, true
+	case "i", "o", "r", "#", "enter":
+		return m.listKey(s), true // about the mod shown; the focus stays
+	default:
+		m.detailFocus = false
+		return nil, false
+	}
+	m.detailOff = max(m.detailOff, 0)
+	return nil, true
 }
 
 func (m *model) openWorkshop() tea.Cmd {
