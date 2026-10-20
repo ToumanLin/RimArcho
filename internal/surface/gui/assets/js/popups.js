@@ -230,9 +230,9 @@ export function help() {
       ["ctrl+space · ctrl+click", T("select or unselect one")], ["esc", T("clear the selection, close a popup")],
       ["space · double-click", T("enable / disable / put back")], ["t", T("stage; in staging, put back")],
       ["m", T("move to a position or after a mod")], ["J K · alt+J K", T("move down / up 1 (10)")],
-      ["#", T("tags")], ["enter", T("full details")], ["o", T("Workshop page")],
+      ["g · #", T("tags")], ["enter", T("full details")], ["o", T("Workshop page")],
       ["S · w · L", T("sort · save · launch (preview first)")], ["u · ctrl+z", T("undo")], ["ctrl+r · ctrl+y", T("redo")],
-      ["/ · ctrl+f", T("search the list")], ["!", T("needs attention")], ["c", T("recent changes")],
+      ["/ · ctrl+f", T("search the list")], ["shift+1–5", T("go to a page (the tabs at the top)")], ["c", T("recent changes")],
       ["R · A", T("rescan · check the files again")], ["E", T("switch environment")], ["ctrl+k", T("command palette")],
       [T("drag"), T("between lists: enable, disable, stage; within Enabled: reorder")], [T("right click"), T("what you can do with it")],
     ];

@@ -11,6 +11,7 @@ import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
+import { icon } from "./icons.js";
 
 // ---- loading ----
 
@@ -52,11 +53,13 @@ function renderTop() {
   const b = S.board;
   if (!b) return;
   $("#env").textContent = b.env ? `${b.env} · ${mm(b.gameVersion)}` : T("no environment");
-  const n = $("#needs");
-  n.textContent = b.needs ? Tf("%d to handle", b.needs) : T("nothing to handle");
-  n.classList.toggle("none", !b.needs);
+  $("#needs").textContent = b.needs ? String(b.needs) : "";
+  $("#needs").title = b.needs ? Tf("%d to handle", b.needs) : T("nothing to handle");
   $("#unsaved").textContent = b.unsaved ? Tf("%d not saved", b.unsaved) : "";
-  $("#btn-packs").textContent = T("packs");
+  const r = $("#btn-rescan");
+  if (!r.firstChild) r.innerHTML = icon.rescan;
+  r.title = T("rescan the mod folders") + " · R";
+  r.classList.toggle("spin", !!S.busy.scan);
   $("#btn-sort").textContent = T("sort");
   $("#btn-save").textContent = T("save");
   $("#btn-launch").textContent = T("launch") + " ▶";
@@ -66,13 +69,34 @@ function mm(v) { const p = String(v || "").split("."); return p.length >= 2 ? p[
 
 let lastList = 1;
 
+// The pages in the top bar (shift+1–5). The full detail belongs to the mod list.
+const TABS = [
+  { id: "board", label: "mod list" }, { id: "needs", label: "needs attention" }, { id: "changes", label: "recent changes" },
+  { id: "packs", label: "packs" }, { id: "settings", label: "settings" },
+];
+
+function renderTabs() {
+  const on = !S.screen || S.screen === "full" ? "board" : S.screen;
+  for (const b of $$("#tabs .tab")) {
+    b.classList.toggle("on", b.dataset.tab === on);
+    const t = TABS.find((x) => x.id === b.dataset.tab);
+    $(".lbl", b).textContent = T(t.label);
+  }
+}
+
+function goTab(i) {
+  const t = TABS[i];
+  if (!t) return;
+  if (t.id === "board") { if (scr.closeScreen()) detailFollow(true); return; }
+  return cmd(t.id);
+}
+
 // renderWhere: the position line (06 §13.3).
 function renderWhere() {
+  renderTabs();
   let s = "";
-  if (S.screen === "needs") s = "RimArcho › " + T("needs attention");
-  else if (S.screen === "changes") s = "RimArcho › " + T("recent changes");
-  else if (S.screen === "settings") s = "RimArcho › " + T("settings");
-  else if (S.screen === "packs") s = "RimArcho › " + T("packs");
+  const page = TABS.find((t) => t.id === S.screen);
+  if (page) s = T(page.label);
   else if (S.screen === "full") {
     const it = cur(lastList);
     s = `${T(AREAS[lastList])} › ${S.detail ? S.detail.name : ""}`;
@@ -96,7 +120,7 @@ function renderWhere() {
 function actions() {
   if (S.focus > 2) return [
     { key: "PgDn", label: T("scroll") }, { key: "enter", label: T("full details"), run: () => verb("full") },
-    { key: "o", label: T("Workshop page"), run: () => verb("workshop") }, { key: "#", label: T("tags"), run: () => verb("tags") },
+    { key: "o", label: T("Workshop page"), run: () => verb("workshop") }, { key: "g", label: T("tags"), run: () => verb("tags") },
   ];
   const sel = selection();
   const k = S.focus;
@@ -108,7 +132,7 @@ function actions() {
   out.push({ key: "t", label: k === 2 ? T("put back") : T("stage"), run: () => verb("stage") });
   out.push({ key: "m", label: k === 1 ? T("move to…") : T("enable at…"), run: () => verb("move") });
   if (k === 1) out.push({ key: "J K", label: T("down / up"), run: null });
-  out.push({ key: "#", label: T("tags"), run: () => verb("tags") });
+  out.push({ key: "g", label: T("tags"), run: () => verb("tags") });
   if (sel.length === 1) {
     out.push({ key: "enter", label: T("full details"), run: () => verb("full") });
     if (sel[0].id && S.detail && S.detail.url) out.push({ key: "o", label: T("Workshop page"), run: () => verb("workshop") });
@@ -292,7 +316,7 @@ async function cmd(id) {
     case "settings": return scr.settings();
     case "packs": return scr.packs();
     case "rescan":
-      if (await api.Scan()) { S.busy.scan = true; say("busy", T("scanning…")); }
+      if (await api.Scan()) { S.busy.scan = true; say("busy", T("scanning…")); renderTop(); }
       return;
     case "analyze":
       if (await api.Analyze()) { S.busy.analyze = true; say("busy", T("checking the mods' files…")); }
@@ -411,6 +435,10 @@ function onKey(e) {
   if (pop.popupKey(e)) return;
   if (document.activeElement && document.activeElement.tagName === "INPUT") return;
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
+  // shift+1–5: the pages. By the physical key, so it works on any layout (shift+1 is "!"
+  // on a US keyboard, shift+3 is "#").
+  const dig = /^Digit([1-9])$/.exec(e.code || "");
+  if (dig && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); return goTab(+dig[1] - 1); }
   if (S.screen) {
     if (k === "Escape" || k === "Backspace") { e.preventDefault(); scr.closeScreen(); detailFollow(true); return; }
     if (e.ctrlKey && k === "k") { e.preventDefault(); return pop.palette(); }
@@ -454,7 +482,7 @@ function onKey(e) {
   if (e.altKey && (k === "J" || k === "j" || k === "K" || k === "k")) { handled(); return verb(k.toLowerCase() === "j" ? "down10" : "up10"); }
   const map = {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
-    "#": () => verb("tags"), Enter: () => verb("full"), o: () => verb("workshop"), x: () => verb("swap"),
+    g: () => verb("tags"), "#": () => verb("tags"), Enter: () => verb("full"), o: () => verb("workshop"), x: () => verb("swap"),
     S: () => preview("sort"), w: () => preview("save"), L: () => preview("launch"), u: () => verb("undo"), T: () => verb("restore-all"),
     "/": () => startSearch(), "!": () => scr.needs(), c: () => scr.changes(), R: () => cmd("rescan"), A: () => cmd("analyze"),
     E: () => chooseEnv(), "?": () => pop.help(), ":": () => commandLine(),
@@ -525,9 +553,9 @@ async function start() {
   wireSplits();
   document.addEventListener("keydown", onKey);
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? scr.needs() : verb(v); });
-  $("#needs").onclick = () => scr.needs();
   $("#env").onclick = () => chooseEnv();
-  for (const b of $$("#top .tb")) b.onclick = () => (b.dataset.cmd === "settings" || b.dataset.cmd === "packs" ? cmd(b.dataset.cmd) : preview(b.dataset.cmd));
+  $$("#tabs .tab").forEach((b, i) => { b.onclick = () => goTab(i); });
+  for (const b of $$("#top [data-cmd]")) b.onclick = () => (b.dataset.cmd === "rescan" ? cmd("rescan") : preview(b.dataset.cmd));
   $(".detail .scroll").addEventListener("scroll", () => { if (S.focus === 3) renderWhere(); }, { passive: true });
   $(".detail").addEventListener("mousedown", () => focusArea(3));
   on("scan", async (ev) => {

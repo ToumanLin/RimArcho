@@ -10,18 +10,26 @@
 <body>
 <div id="app">
   <header id="top">
-    <span class="brand"><img class="logo" src="/icon-small.svg" alt="">RimArcho</span>
-    <button id="env" class="pill" title="E"></button>
-    <button id="needs" class="badge" title="!"></button>
-    <span id="unsaved" class="badge quiet"></span>
-    <span id="live" class="badge live" hidden></span>
-    <span id="where" class="where"></span>
-    <span class="grow"></span>
-    <button id="btn-packs" class="tb" data-cmd="packs"></button>
-    <button id="btn-settings" class="tb" data-cmd="settings" title="settings">⚙</button>
-    <button id="btn-sort" class="tb" data-cmd="sort"></button>
-    <button id="btn-save" class="tb" data-cmd="save"></button>
-    <button id="btn-launch" class="tb primary" data-cmd="launch"></button>
+    <div class="side left">
+      <span class="brand"><img class="logo" src="/icon-small.svg" alt="">RimArcho</span>
+      <button id="env" class="pill" title="E"></button>
+      <span id="live" class="badge live" hidden></span>
+    </div>
+    <nav id="tabs">
+      <button class="tab" data-tab="board" title="Shift+1"><span class="lbl"></span></button>
+      <button class="tab" data-tab="needs" title="Shift+2"><span class="lbl"></span><span id="needs" class="count"></span></button>
+      <button class="tab" data-tab="changes" title="Shift+3"><span class="lbl"></span></button>
+      <button class="tab" data-tab="packs" title="Shift+4"><span class="lbl"></span></button>
+      <button class="tab" data-tab="settings" title="Shift+5"><span class="lbl"></span></button>
+    </nav>
+    <div class="side right">
+      <span id="unsaved" class="badge quiet"></span>
+      <button id="btn-rescan" class="ib" data-cmd="rescan" title="R"></button>
+      <span class="vsep"></span>
+      <button id="btn-sort" class="tb" data-cmd="sort" title="S"></button>
+      <button id="btn-save" class="tb" data-cmd="save" title="w"></button>
+      <button id="btn-launch" class="tb primary" data-cmd="launch" title="L"></button>
+    </div>
   </header>
   <main id="board">
     <section class="area list" data-area="0"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
@@ -33,7 +41,7 @@
     <section class="area detail" data-area="3"><div class="head"></div><div class="scroll" tabindex="-1"><div id="detail"></div></div></section>
   </main>
   <div id="screen" hidden></div>
-  <footer id="bottom"><span id="status"></span><span class="grow"></span><span id="hints"></span></footer>
+  <footer id="bottom"><span id="where" class="where"></span><span id="status"></span><span class="grow"></span><span id="hints"></span></footer>
   <div id="popup" hidden></div>
   <div id="menu" hidden></div>
 </div>

@@ -445,7 +445,10 @@ var zhText = map[string]string{
 	"no changes":            "没有变化",
 	"no scan yet (R scans)": "尚未扫描（R 扫描）",
 	"changed outside RimArcho, kept as v%d — L load into the workspace · I ignore": "在 RimArcho 之外被修改，已存为 v%d — L 载入工作区 · I 忽略",
-	"score": "相似度",
+	"score":                              "相似度",
+	"mod list":                           "Mod 列表",
+	"rescan the mod folders":             "重新扫描 Mod 文件夹",
+	"go to a page (the tabs at the top)": "切换页面（顶栏的标签）",
 	"identity questions %d — s same · c copy · u unrelated":                "身份待确认 %d 项 — s 是同一个 · c 是副本 · u 无关",
 	"%d bool prefixes from %d mods can skip methods other mods also patch": "%d 个返回 bool 的前缀（来自 %d 个 Mod）可能跳过其他 Mod 也在补丁的方法",
 }

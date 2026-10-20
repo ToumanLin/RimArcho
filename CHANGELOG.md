@@ -51,6 +51,10 @@ Spec: `docs/specs/10-1.0实现.md`.
   staging list: redo steps, now, undo steps in plain words, then the saved versions.
 
 ### Other
+- The window's top bar is three zones: the environment on the left, the pages as tabs in the
+  middle (Mod 列表 · 需要处理 · 最近变化 · 整合包 · 设置, `shift+1`–`5` by physical key), and
+  rescan, sort, save and launch on the right. The position line moved to the bottom bar. Tags
+  are `g` in the window (`#` still works where it is not shift+3).
 - About.xml, LoadFolders.xml and Defs saved as UTF-16 are read (10 §1).
 
 ## 0.7.0 — the window (unreleased)
