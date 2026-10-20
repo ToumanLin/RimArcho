@@ -71,7 +71,7 @@ let lastList = 1;
 
 // The pages in the top bar (shift+1–5). The full detail belongs to the mod list.
 const TABS = [
-  { id: "board", label: "mod list" }, { id: "needs", label: "needs attention" }, { id: "changes", label: "recent changes" },
+  { id: "board", label: "mod list" }, { id: "needs", label: "needs attention" }, { id: "logs", label: "logs" },
   { id: "packs", label: "packs" }, { id: "settings", label: "settings" },
 ];
 
@@ -96,7 +96,8 @@ function renderWhere() {
   renderTabs();
   let s = "";
   const page = TABS.find((t) => t.id === S.screen);
-  if (page) s = T(page.label);
+  if (S.screen === "logs") s = scr.logsWhere();
+  else if (page) s = T(page.label);
   else if (S.screen === "full") {
     const it = cur(lastList);
     s = `${T(AREAS[lastList])} › ${S.detail ? S.detail.name : ""}`;
@@ -272,6 +273,7 @@ async function verb(name) {
     case "restore-all":
       if (!S.cols[2].items.length) return say("", T("staging is empty"));
       return edited(api.RestoreAll());
+    case "keep-official": return edited(api.KeepOfficial());
     case "needs": return scr.needs();
   }
 }
@@ -307,21 +309,19 @@ async function preview(what) {
 
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
+  // A page replaces the page shown once its data is in: the mod list never shows between.
+  const pages = { needs: () => scr.needs(), logs: () => scr.logs(), changes: () => scr.logs(1), log: () => scr.logs(0), settings: () => scr.settings(), packs: () => scr.packs() };
+  if (pages[id]) return pages[id]();
   scr.closeScreen();
   switch (id) {
     case "sort": case "save": case "launch": return preview(id);
-    case "undo": case "redo": case "restore-all": return verb(id);
-    case "needs": return scr.needs();
-    case "changes": return scr.changes();
-    case "settings": return scr.settings();
-    case "packs": return scr.packs();
+    case "undo": case "redo": case "restore-all": case "keep-official": return verb(id);
     case "rescan":
       if (await api.Scan()) { S.busy.scan = true; say("busy", T("scanning…")); renderTop(); }
       return;
     case "analyze":
       if (await api.Analyze()) { S.busy.analyze = true; say("busy", T("checking the mods' files…")); }
       return;
-    case "log": return scr.chooseLog();
     case "env": return chooseEnv();
     case "filter": return startSearch();
     case "details": return verb("full");
@@ -443,7 +443,7 @@ function onKey(e) {
     if (k === "Escape" || k === "Backspace") { e.preventDefault(); scr.closeScreen(); detailFollow(true); return; }
     if (e.ctrlKey && k === "k") { e.preventDefault(); return pop.palette(); }
     if (S.screen === "needs") return scr.needsKey(e);
-    if (S.screen === "changes") return scr.changesKey(e);
+    if (S.screen === "logs") return scr.logsKey(e);
     if (S.screen === "full") return scr.fullKey(e);
     return;
   }
@@ -483,11 +483,13 @@ function onKey(e) {
   const map = {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
     g: () => verb("tags"), "#": () => verb("tags"), Enter: () => verb("full"), o: () => verb("workshop"), x: () => verb("swap"),
-    S: () => preview("sort"), w: () => preview("save"), L: () => preview("launch"), u: () => verb("undo"), T: () => verb("restore-all"),
-    "/": () => startSearch(), "!": () => scr.needs(), c: () => scr.changes(), R: () => cmd("rescan"), A: () => cmd("analyze"),
+    S: () => preview("sort"), w: () => preview("save"), L: () => preview("launch"), u: () => verb("undo"), T: () => verb("keep-official"),
+    "/": () => startSearch(), "!": () => scr.needs(), c: () => cmd("changes"), l: () => cmd("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     E: () => chooseEnv(), "?": () => pop.help(), ":": () => commandLine(),
   };
-  if (map[k]) { handled(); map[k](); }
+  // shift+letter is the capital letter even where the key reports it in lower case
+  const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
+  if (map[kk]) { handled(); map[kk](); }
 }
 
 // ---- the column widths (08 §4) ----

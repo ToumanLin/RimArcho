@@ -76,6 +76,8 @@ export function renderRows(k) {
     pools[k].clear();
   }
   pad.style.height = c.view.length * ROW_H + "px";
+  // the position column is as wide as the longest number, not a fixed gutter
+  if (k === 1) box.style.setProperty("--pw", Math.max(2, String(c.items.length).length) + "ch");
   let empty = $(".empty", box);
   if (!c.view.length) {
     if (!empty) box.appendChild(empty = el("div", "empty"));

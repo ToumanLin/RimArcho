@@ -39,6 +39,7 @@ var Commands = []Command{
 	{"log", "选择日志", "choose a log", "Player.log"},
 	{"env", "切换环境", "switch environment", "E env"},
 	{"restore-all", "全部从暂存放回", "put all back", "T staging"},
+	{"keep-official", "只保留原版和 DLC", "keep only Core and the DLCs", "T in the window"},
 	{"filter", "筛选这一列", "filter", "/ search"},
 	{"details", "详情", "details", "enter"},
 	{"tech", "技术信息", "technical information", "i"},

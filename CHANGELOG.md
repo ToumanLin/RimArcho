@@ -51,10 +51,22 @@ Spec: `docs/specs/10-1.0实现.md`.
   staging list: redo steps, now, undo steps in plain words, then the saved versions.
 
 ### Other
-- The window's top bar is three zones: the environment on the left, the pages as tabs in the
-  middle (Mod 列表 · 需要处理 · 最近变化 · 整合包 · 设置, `shift+1`–`5` by physical key), and
-  rescan, sort, save and launch on the right. The position line moved to the bottom bar. Tags
-  are `g` in the window (`#` still works where it is not shift+3).
+- The window's look follows magpie (MIT): cards with hairline borders and 12px corners, a
+  centred view switch with a raised thumb, icon and text buttons, frosted popovers.
+- The top bar: the environment on the left, the pages as tabs in the middle (Mod 列表 · 需要处理
+  · 日志 · 整合包 · 设置, `shift+1`–`5` by physical key), rescan, sort, save and launch on the
+  right; no name or icon (the window's title bar has them). Switching pages no longer shows the
+  mod list in between. The position line moved to the bottom bar. Tags are `g` in the window
+  (`#` still works where it is not shift+3).
+- 日志 (`l`, `c`): the game log (its error clusters with the mods they are tied to, a cluster's
+  evidence beside it, Player.log or Player-prev.log), mod changes, and the manager's actions
+  (unsaved steps and saved versions). A log of another game version is analysed in the
+  background instead of holding the window for seconds.
+- 需要处理 is three columns (the list · the game · your call); ←→ between them. Moving the
+  cursor no longer rebuilds the page.
+- `T` in the window keeps only Core and the DLCs enabled, in one undo step (also in the
+  palette of both interfaces; put-all-back from staging stays in the palette).
+- The Enabled list's position column is as wide as its longest number.
 - About.xml, LoadFolders.xml and Defs saved as UTF-16 are read (10 §1).
 
 ## 0.7.0 — the window (unreleased)

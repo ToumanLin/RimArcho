@@ -11,24 +11,23 @@
 <div id="app">
   <header id="top">
     <div class="side left">
-      <span class="brand"><img class="logo" src="/icon-small.svg" alt="">RimArcho</span>
       <button id="env" class="pill" title="E"></button>
       <span id="live" class="badge live" hidden></span>
     </div>
     <nav id="tabs">
       <button class="tab" data-tab="board" title="Shift+1"><span class="lbl"></span></button>
       <button class="tab" data-tab="needs" title="Shift+2"><span class="lbl"></span><span id="needs" class="count"></span></button>
-      <button class="tab" data-tab="changes" title="Shift+3"><span class="lbl"></span></button>
+      <button class="tab" data-tab="logs" title="Shift+3"><span class="lbl"></span></button>
       <button class="tab" data-tab="packs" title="Shift+4"><span class="lbl"></span></button>
       <button class="tab" data-tab="settings" title="Shift+5"><span class="lbl"></span></button>
     </nav>
     <div class="side right">
       <span id="unsaved" class="badge quiet"></span>
-      <button id="btn-rescan" class="ib" data-cmd="rescan" title="R"></button>
+      <button id="btn-rescan" class="icon" data-cmd="rescan" title="R"></button>
       <span class="vsep"></span>
-      <button id="btn-sort" class="tb" data-cmd="sort" title="S"></button>
-      <button id="btn-save" class="tb" data-cmd="save" title="w"></button>
-      <button id="btn-launch" class="tb primary" data-cmd="launch" title="L"></button>
+      <button id="btn-sort" class="btn" data-cmd="sort" title="S"></button>
+      <button id="btn-save" class="btn" data-cmd="save" title="w"></button>
+      <button id="btn-launch" class="btn primary" data-cmd="launch" title="L"></button>
     </div>
   </header>
   <main id="board">

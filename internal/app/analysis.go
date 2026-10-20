@@ -223,7 +223,15 @@ func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
 	}
 	run := a.AnalyzeRunner
 	if run == nil {
-		run = func(envName string, p func(string)) error { return ChildAnalyze(a.Home, envName, a.GameVersion, p) }
+		// the version and the executable are read now: with AnalyzeWait the child starts
+		// in a goroutine, after EnsureLogAnalysis may have put GameVersion back
+		mm, exe := a.GameVersion, a.AnalyzeExe
+		run = func(envName string, p func(string)) error {
+			if exe != "" {
+				return ChildAnalyzeExe(exe, a.Home, envName, mm, p)
+			}
+			return ChildAnalyze(a.Home, envName, mm, p)
+		}
 	}
 	if a.AnalyzeWait <= 0 {
 		if err := run(st.Ix.Env.Name, progress); err != nil {

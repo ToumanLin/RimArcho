@@ -473,7 +473,14 @@ func (s *API) Redo() (string, error) {
 	return s.text(view.UndoRedo(s.a, true))
 }
 
-// RestoreAll is T.
+// KeepOfficial is T: only Core and the DLCs stay enabled (one undo step).
+func (s *API) KeepOfficial() (*view.Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.after(view.KeepOfficial(s.a))
+}
+
+// RestoreAll puts everything in staging back (the palette).
 func (s *API) RestoreAll() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -668,6 +675,38 @@ func (s *API) Logs() []string {
 		}
 	}
 	return out
+}
+
+// LogPage analyses a log for the 日志 tab (the newest when path is empty).
+func (s *API) LogPage(path string) (*view.LogPage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.boardState()
+	if st == nil {
+		return nil, errors.New("no list")
+	}
+	// A log of another game version needs an analysis for that version first (seconds):
+	// it runs in the background and the page says so instead of holding every other call.
+	s.a.AnalyzeExe = s.Exe
+	s.a.AnalyzeWait = 200 * time.Millisecond
+	defer func() { s.a.AnalyzeWait = 0 }()
+	return view.BuildLogPage(s.a, st, path)
+}
+
+// LogCluster is one cluster's evidence (archo log --cluster), names for #refs.
+func (s *API) LogCluster(path, id string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if path == "" || id == "" || strings.HasPrefix(path, "-") || strings.HasPrefix(id, "-") {
+		return nil, errors.New("no cluster")
+	}
+	text, _ := cmds.Execute(s.a, []string{"log", "--file", path, "--cluster", id})
+	st := s.boardState()
+	var out []string
+	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+		out = append(out, view.Humanize(st, l))
+	}
+	return out, nil
 }
 
 // SelectLog picks the log whose errors join 需要处理.

@@ -69,6 +69,13 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { return m.chooseEnv() }
 	case "restore-all":
 		return list("T")
+	case "keep-official":
+		return func(m *model) tea.Cmd {
+			if m.verb(view.KeepOfficial(m.app)) {
+				m.clearSel()
+			}
+			return m.requestDetail()
+		}
 	case "filter":
 		return list("/")
 	case "details":

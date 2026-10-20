@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 // Verbs (06 §13.6): each acts at once on the object (the selection, else the cursor's
@@ -263,4 +264,29 @@ func PosOptions(a *app.App, st *app.LoadoutState, ids []string, text string, bef
 		opts = append(opts, PosOpt{Label: Tf("position %d", at), Note: T("(suggested)"), At: at})
 	}
 	return append(opts, PosOpt{Label: T("first"), At: 1, Edge: true}, PosOpt{Label: T("last"), At: n + 1, Edge: true})
+}
+
+// KeepOfficial is T: the enabled list keeps only Core and the DLCs, in one undo step.
+func KeepOfficial(a *app.App) (*Result, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	var refs []string
+	for _, e := range st.List {
+		if e.Instance == "" {
+			refs = append(refs, "pkg:"+e.Missing)
+			continue
+		}
+		if m := st.Ix.ByID[e.Instance]; m != nil && m.Kind != source.Official {
+			refs = append(refs, st.Ix.Ref(m.ID))
+		}
+	}
+	if len(refs) == 0 {
+		return &Result{Text: T("only Core and the DLCs are enabled already")}, nil
+	}
+	if _, err := a.Disable(refs); err != nil {
+		return nil, err
+	}
+	return &Result{Text: Tf("only Core and the DLCs stay enabled (%d mods disabled)", len(refs))}, nil
 }
