@@ -19,13 +19,19 @@ func TestRender(t *testing.T) {
 		if err != nil || img.Bounds().Dx() != s {
 			t.Fatalf("size %d: %v", s, err)
 		}
-		// Corners are transparent, the keystone is drawn.
+		// Corners are transparent; the centre is opaque.
 		if _, _, _, a := img.At(0, 0).RGBA(); a != 0 {
 			t.Fatalf("size %d: corner not transparent", s)
 		}
+		if _, _, _, a := img.At(s/2, s/2).RGBA(); a != 0xffff {
+			t.Fatalf("size %d: centre not opaque", s)
+		}
 	}
-	if !strings.Contains(SVG(256), "#E8A93A") {
-		t.Fatal("svg has no keystone")
+	if !strings.Contains(SVG(256), "<path") || !strings.Contains(SVG(16), `viewBox="20 24 44 44"`) {
+		t.Fatal("svg does not carry the portrait")
+	}
+	if len(portrait().ops) < 300 {
+		t.Fatalf("portrait parsed into %d shapes", len(portrait().ops))
 	}
 	if dir := os.Getenv("ICON_PREVIEW"); dir != "" {
 		for _, s := range Sizes {
@@ -34,7 +40,7 @@ func TestRender(t *testing.T) {
 	}
 }
 
-// docs/assets/rimarcho.svg is generated from the geometry (08 §15.2):
+// docs/assets/rimarcho.svg is generated from the artwork (08 §15.2):
 // go test ./internal/icon -update
 func TestSVGFile(t *testing.T) {
 	path := filepath.Join("..", "..", "docs", "assets", "rimarcho.svg")

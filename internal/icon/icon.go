@@ -1,115 +1,56 @@
-// Package icon draws RimArcho's icon, a keystone arch (08 §15), from geometry: a PNG at any
-// size for the window and the Windows resources, and the same shapes as SVG. Nothing binary
-// is kept in the repository.
+// Package icon draws RimArcho's icon (08 §15): the portrait artwork (portrait.svg) on a dark
+// rounded base. It renders PNGs at any size for the window and the Windows resources, and
+// the same composition as SVG for the page. Nothing binary is kept in the repository.
 package icon
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
 	"math"
+	"regexp"
 	"strings"
+	"sync"
 )
 
-// Colors (08 §15.1).
-var (
-	Base     = color.NRGBA{0x1B, 0x1D, 0x23, 0xFF}
-	Stone    = color.NRGBA{0xE8, 0xE4, 0xDA, 0xFF}
-	Keystone = color.NRGBA{0xE8, 0xA9, 0x3A, 0xFF}
-)
+// Portrait is the artwork, an 80×80 SVG (provided by the author, 2026-10-20).
+//
+//go:embed portrait.svg
+var Portrait []byte
+
+// Base is the rounded square behind the portrait (08 §15.1).
+var Base = color.NRGBA{0x1B, 0x1D, 0x23, 0xFF}
 
 // Sizes are the icon sizes of the Windows icon group (08 §15.3).
 var Sizes = []int{16, 20, 24, 32, 40, 48, 64, 256}
 
-// Geometry in the unit square.
-const (
-	cornerR = 0.22 // rounded base
-	cx      = 0.5
-)
+const cornerR = 0.22 // rounded base, as a fraction of the size
 
-// layout is the arch for one level of detail (08 §15.1).
-type layout struct {
-	cy, outerR, innerR float64 // arch centre height and radii
-	keyOut             float64 // the keystone stands out this much
-	footY              float64 // bottom of the pillars
-	bounds             []float64
-	key                int  // index of the keystone in bounds
-	pillarJoint        bool // a joint between the springing stones and the pillars
+// crop is the part of the artwork's viewBox shown at a size: the whole portrait from 48 px,
+// the face below that so it stays readable.
+func crop(size int) (x, y, w float64) {
+	if size < 48 {
+		return 20, 24, 44
+	}
+	return 0, 0, 80
 }
 
 var (
-	large = layout{cy: 0.60, outerR: 0.36, innerR: 0.20, keyOut: 0.035, footY: 0.80,
-		bounds: []float64{180, 144, 108, 72, 36, 0}, key: 2, pillarJoint: true}
-	// Small sizes: three stones, a heavier arch, and only the keystone's joints.
-	small = layout{cy: 0.58, outerR: 0.40, innerR: 0.17, keyOut: 0.03, footY: 0.86,
-		bounds: []float64{180, 114, 66, 0}, key: 1}
+	artOnce sync.Once
+	art     *artwork
 )
 
-type shape struct {
-	pts []pt // polygon; nil for the base
-	col color.NRGBA
-}
-
-type pt struct{ x, y float64 }
-
-// shapes lays out the icon for a pixel size: small sizes (≤ 24 px) get three arch stones
-// instead of five, and the joints are at least one pixel wide.
-func shapes(size int) []shape {
-	gap := math.Max(0.018, 1.1/float64(size)) // joint width
-	l := large
-	if size <= 24 {
-		l = small
-	}
-	cy, outerR, innerR, bounds, key := l.cy, l.outerR, l.innerR, l.bounds, l.key
-	out := []shape{{col: Base}}
-	at := func(r, deg float64) pt {
-		a := deg * math.Pi / 180
-		return pt{cx + r*math.Cos(a), cy - r*math.Sin(a)}
-	}
-	for i := 0; i+1 < len(bounds); i++ {
-		a1, a2 := bounds[i], bounds[i+1] // a1 > a2: left to right
-		ro, col := outerR, Stone
-		if i == key {
-			ro, col = outerR+l.keyOut, Keystone
+func portrait() *artwork {
+	artOnce.Do(func() {
+		var err error
+		if art, err = parseArtwork(Portrait); err != nil {
+			panic(err) // the embedded file is checked by the tests
 		}
-		// Each inner radial edge moves in by half a joint, measured along the arc at radius r;
-		// the springing edges (180° and 0°) stay on the pillars.
-		d := func(r float64) float64 { return gap / 2 / r * 180 / math.Pi }
-		var poly []pt
-		ins := func(r float64, first bool) float64 {
-			switch {
-			case first && i == 0:
-				return a1
-			case first:
-				return a1 - d(r)
-			case i == len(bounds)-2:
-				return a2
-			}
-			return a2 + d(r)
-		}
-		// Outer edge from a1 to a2 (a few points so the keystone reads as an arc), then inner back.
-		const steps = 4
-		s, e := ins(ro, true), ins(ro, false)
-		for k := 0; k <= steps; k++ {
-			poly = append(poly, at(ro, s+(e-s)*float64(k)/steps))
-		}
-		s, e = ins(innerR, false), ins(innerR, true)
-		for k := 0; k <= steps; k++ {
-			poly = append(poly, at(innerR, s+(e-s)*float64(k)/steps))
-		}
-		out = append(out, shape{poly, col})
-	}
-	// Pillars under the springing stones, a joint below them.
-	top := cy
-	if l.pillarJoint {
-		top += gap
-	}
-	for _, x := range [][2]float64{{cx - outerR, cx - innerR}, {cx + innerR, cx + outerR}} {
-		out = append(out, shape{[]pt{{x[0], top}, {x[1], top}, {x[1], l.footY}, {x[0], l.footY}}, Stone})
-	}
-	return out
+	})
+	return art
 }
 
 func inRoundRect(x, y float64) bool {
@@ -121,48 +62,38 @@ func inRoundRect(x, y float64) bool {
 	return qx*qx+qy*qy <= cornerR*cornerR
 }
 
-func inPoly(p []pt, x, y float64) bool {
-	in := false
-	for i, j := 0, len(p)-1; i < len(p); j, i = i, i+1 {
-		if (p[i].y > y) != (p[j].y > y) && x < (p[j].x-p[i].x)*(y-p[i].y)/(p[j].y-p[i].y)+p[i].x {
-			in = !in
+// roundRectCoverage is the share of a pixel inside the rounded base (4×4 samples).
+func roundRectCoverage(px, py, size int) float64 {
+	const ss = 4
+	in := 0
+	for sy := 0; sy < ss; sy++ {
+		for sx := 0; sx < ss; sx++ {
+			x := (float64(px) + (float64(sx)+0.5)/ss) / float64(size)
+			y := (float64(py) + (float64(sy)+0.5)/ss) / float64(size)
+			if inRoundRect(x, y) {
+				in++
+			}
 		}
 	}
-	return in
+	return float64(in) / ss / ss
 }
 
-// Image renders the icon at size×size with supersampled anti-aliasing.
+// Image renders the icon at size×size: the base, the portrait over it, both clipped to the
+// rounded square.
 func Image(size int) *image.NRGBA {
-	ss := 8
-	if size <= 64 {
-		ss = 12
-	}
+	cx, cy, cw := crop(size)
+	fg := portrait().render(size, cx, cy, cw, cw)
 	img := image.NewNRGBA(image.Rect(0, 0, size, size))
-	sh := shapes(size)
-	n := float64(ss * ss)
-	for py := 0; py < size; py++ {
-		for px := 0; px < size; px++ {
-			var r, g, b, a float64
-			for sy := 0; sy < ss; sy++ {
-				for sx := 0; sx < ss; sx++ {
-					x := (float64(px) + (float64(sx)+0.5)/float64(ss)) / float64(size)
-					y := (float64(py) + (float64(sy)+0.5)/float64(ss)) / float64(size)
-					if !inRoundRect(x, y) {
-						continue
-					}
-					c := sh[0].col
-					for _, s := range sh[1:] {
-						if inPoly(s.pts, x, y) {
-							c = s.col
-						}
-					}
-					r, g, b, a = r+float64(c.R), g+float64(c.G), b+float64(c.B), a+1
-				}
-			}
-			if a == 0 {
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			cov := roundRectCoverage(x, y, size)
+			if cov == 0 {
 				continue
 			}
-			img.SetNRGBA(px, py, color.NRGBA{uint8(r/a + 0.5), uint8(g/a + 0.5), uint8(b/a + 0.5), uint8(a/n*255 + 0.5)})
+			f := fg.NRGBAAt(x, y)
+			a := float64(f.A) / 255
+			mix := func(top, base uint8) uint8 { return uint8(math.Round(float64(top)*a + float64(base)*(1-a))) }
+			img.SetNRGBA(x, y, color.NRGBA{mix(f.R, Base.R), mix(f.G, Base.G), mix(f.B, Base.B), uint8(math.Round(cov * 255))})
 		}
 	}
 	return img
@@ -177,22 +108,22 @@ func PNG(size int) []byte {
 	return buf.Bytes()
 }
 
-// SVG is the icon as a 256×256 SVG document with the detail of a size×size image: the
-// three-stone arch for size ≤ 24, the five-stone arch above.
+var svgOpen = regexp.MustCompile(`(?s)^.*?<svg[^>]*>`)
+
+// SVG is the icon as a 256×256 SVG document showing what a size×size image shows (the face
+// only below 48 px).
 func SVG(size int) string {
 	const k = 256.0
-	hex := func(c color.NRGBA) string { return fmt.Sprintf("#%02X%02X%02X", c.R, c.G, c.B) }
+	cx, cy, cw := crop(size)
+	inner := svgOpen.ReplaceAllString(string(Portrait), "")
+	inner = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(inner), "</svg>"))
 	var b strings.Builder
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">`+"\n")
 	fmt.Fprintf(&b, `<title>RimArcho</title>`+"\n")
-	fmt.Fprintf(&b, `<rect width="256" height="256" rx="%.1f" fill="%s"/>`+"\n", cornerR*k, hex(Base))
-	for _, s := range shapes(size)[1:] {
-		var p []string
-		for _, q := range s.pts {
-			p = append(p, fmt.Sprintf("%.1f,%.1f", q.x*k, q.y*k))
-		}
-		fmt.Fprintf(&b, `<polygon points="%s" fill="%s"/>`+"\n", strings.Join(p, " "), hex(s.col))
-	}
-	b.WriteString("</svg>\n")
+	fmt.Fprintf(&b, `<clipPath id="rimarcho-base"><rect width="256" height="256" rx="%.1f"/></clipPath>`+"\n", cornerR*k)
+	fmt.Fprintf(&b, `<g clip-path="url(#rimarcho-base)">`+"\n")
+	fmt.Fprintf(&b, `<rect width="256" height="256" fill="#%02X%02X%02X"/>`+"\n", Base.R, Base.G, Base.B)
+	fmt.Fprintf(&b, `<svg width="256" height="256" viewBox="%g %g %g %g" fill="none">`+"\n%s\n</svg>\n", cx, cy, cw, cw, inner)
+	b.WriteString("</g>\n</svg>\n")
 	return b.String()
 }

@@ -43,10 +43,11 @@ Spec: `docs/specs/10-1.0实现.md`.
 ## 0.7.0 — the window (unreleased)
 
 ### Icon (08 §15)
-- A keystone arch: stone blocks with an amber keystone on a dark rounded base. Sizes up to 24 px
-  draw three heavier stones so the shape still reads in the taskbar.
-- Drawn from geometry (`internal/icon`), so the repository holds no image files apart from the
-  generated `docs/assets/rimarcho.svg`.
+- The author's portrait artwork (`internal/icon/portrait.svg`) on a dark rounded base; below
+  48 px only the face is shown so it still reads in the taskbar. (It replaces the keystone arch
+  drawn earlier the same day.)
+- Rendered by a small built-in SVG renderer, so the repository holds no image files apart from
+  the SVG source and the generated `docs/assets/rimarcho.svg`.
 - Both exes carry the icon and Windows version information (FileVersion, description). The
   release script writes the resource object with `go run ./scripts/winres`; no resource compiler is
   needed. The window, its title bar and the page header use the same icon.
