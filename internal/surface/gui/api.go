@@ -34,11 +34,15 @@ type API struct {
 	needsAt string // the database state the needs were built at
 	content view.ContentCache
 	events  map[int64]*store.Event // the changes list's events, by id
-	busy    map[string]bool        // scan, analyze
-	live    view.LiveTracker       // the running game's log (10 §3)
-	// Exe runs the scan and analysis children; "" is this executable (the development
-	// harness points it at archo.exe).
+	busy    map[string]bool        // scan, analyze, pack
+	// building is the pack this window's build child is making ("" none).
+	building string
+	live     view.LiveTracker // the running game's log (10 §3)
+	// Exe runs the scan, analysis and pack build children; "" is this executable (the
+	// development harness points it at archo.exe).
 	Exe string
+	// PackRunner builds a pack in place of the child process (tests).
+	PackRunner func(name string) error
 }
 
 func newAPI(a *app.App) *API {
@@ -132,10 +136,13 @@ func (s *API) boardLocked() *Board {
 }
 
 // Stamp is the database state; the page asks on focus and reloads when it changed (G8).
-// PackList is the environment's packs and how many belong to other environments.
+// PackList is the environment's packs, how many belong to other environments, and the
+// builds running or cut short.
 type PackList struct {
-	Rows   []view.PackRow `json:"rows"`
-	Others int            `json:"others"`
+	Rows       []view.PackRow       `json:"rows"`
+	Others     int                  `json:"others"`
+	Unfinished []view.UnfinishedRow `json:"unfinished"`
+	Building   string               `json:"building,omitempty"` // the build this window started
 }
 
 // Packs lists the current environment's packs (10 §8).
@@ -143,24 +150,125 @@ func (s *API) Packs() (*PackList, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rows, others, err := view.PackRows(s.a)
-	return &PackList{Rows: rows, Others: others}, err
+	if err != nil {
+		return nil, err
+	}
+	un, err := view.UnfinishedRows(s.a)
+	return &PackList{Rows: rows, Others: others, Unfinished: un, Building: s.building}, err
 }
 
-// PackPreview is a dry-run build of the current list as a pack.
+// PackPreview is a dry-run build of the current list as a pack: checked and sorted under
+// the lock, measured (every mod's folder walked) outside it.
 func (s *API) PackPreview(name string) (*view.PackPreview, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.PreviewPack(s.a, name)
+	pl, err := s.a.PlanPack(name, false)
+	dir := s.a.PacksDir()
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	pl.Measure(dir)
+	return view.PreviewOf(pl, dir), nil
 }
 
-// PackBuild builds the pack.
+// PackBuild starts building the pack in an `archo pack build` child process and returns at
+// once: the copy takes minutes and holds nothing here, so every page keeps working, and it
+// goes on when the window closes. "pack" events carry the progress (view.PackProgress) and
+// the end. One build at a time.
 func (s *API) PackBuild(name string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, err := s.a.BuildPack(name, false, false); err != nil {
+	if err := app.CheckPackName(name); err != nil {
 		return "", err
 	}
-	return view.Tf("built pack %s", name), nil
+	if s.busy["pack"] {
+		return "", errors.New(view.T("another pack is being built; wait for it to finish"))
+	}
+	if un, err := s.a.UnfinishedPacks(); err == nil {
+		for _, u := range un {
+			if u.Running {
+				return "", errors.New(view.T("another pack is being built; wait for it to finish"))
+			}
+		}
+	}
+	if _, err := s.a.ReadPack(name); err == nil {
+		return "", fmt.Errorf("pack %q exists; remove it first or pick another name", name)
+	}
+	s.busy["pack"], s.building = true, name
+	tmp := filepath.Join(s.a.PacksDir(), name+app.TmpSuffix)
+	run := s.PackRunner
+	if run == nil {
+		home, env, exe := s.a.Home, s.a.EnvName, s.Exe
+		log := filepath.Join(home, "logs", "pack-build.log")
+		run = func(name string) error {
+			if exe != "" {
+				return app.ChildPackBuildExe(exe, home, env, name, log)
+			}
+			return app.ChildPackBuild(home, env, name, log)
+		}
+	}
+	go s.watchBuild(name, tmp, run)
+	return view.Tf("build pack %s: it goes on in the background; you can use the other pages, or close the window", name), nil
+}
+
+// watchBuild runs the build and passes its progress file on as events until it ends.
+func (s *API) watchBuild(name, tmp string, run func(string) error) {
+	done := make(chan error, 1)
+	go func() { done <- run(name) }()
+	t := time.NewTicker(300 * time.Millisecond)
+	defer t.Stop()
+	var last view.PackProgress
+	for {
+		select {
+		case err := <-done:
+			s.mu.Lock()
+			s.busy["pack"], s.building = false, ""
+			s.mu.Unlock()
+			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 4, Frac: 1, Text: view.Tf("built pack %s", name)}
+			if err != nil {
+				ev.Step, ev.Frac, ev.Text = last.Step, last.Frac, ""
+				lines := strings.Split(view.Humanize(nil, err.Error()), "\n")
+				for i, l := range lines {
+					lines[i] = view.T(strings.TrimPrefix(strings.TrimSpace(l), "error: "))
+				}
+				ev.Error = strings.Join(lines, "\n")
+			}
+			s.send("pack", ev)
+			return
+		case <-t.C:
+			if p := app.ReadBuildProgress(tmp); p != nil {
+				if pp := view.ProgressOf(p); pp != last {
+					last = pp
+					s.send("pack", pp)
+				}
+			}
+		}
+	}
+}
+
+// PackStop asks a running build to stop (it removes what it copied).
+func (s *API) PackStop(name string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.a.StopBuild(name); err != nil {
+		return "", err
+	}
+	return view.Tf("asked the build of %s to stop", name), nil
+}
+
+// PackRemoveUnfinished deletes what a build cut short copied (its folder in the packs
+// folder, nothing else).
+func (s *API) PackRemoveUnfinished(name string) (string, error) {
+	s.mu.Lock()
+	dir, err := s.a.UnfinishedDir(name)
+	s.mu.Unlock()
+	if err != nil {
+		return "", err
+	}
+	if err := os.RemoveAll(dir); err != nil { // off the lock: gigabytes take a while
+		return "", err
+	}
+	return view.Tf("deleted the unfinished build of %s", name), nil
 }
 
 // PackLaunch plays a pack.

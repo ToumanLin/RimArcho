@@ -51,6 +51,9 @@ type App struct {
 	AnalyzeRunner func(envName string, progress func(string)) error
 	// AnalyzeExe is the archo executable the default runner starts; "" is this one.
 	AnalyzeExe string
+	// FreeSpace tells the free space of a folder's drive for a pack build (tests); nil
+	// means DiskFree.
+	FreeSpace func(dir string) int64
 	// Decompile replaces ilspycmd (tests); nil means ILSpyDecompiler.
 	Decompile Decompiler
 	// GameVersion ("X.Y") overrides the environment's game version for analysis commands.

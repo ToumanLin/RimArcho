@@ -2,12 +2,14 @@ package gui
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -209,5 +211,89 @@ func TestStageAll(t *testing.T) {
 	}
 	if got := cols(); got != before {
 		t.Fatalf("put all back: %s, want %s", got, before)
+	}
+}
+
+// A pack build runs in the background: the build call returns at once, the other pages
+// answer while it copies, a second build is refused, and "pack" events carry the
+// progress and the end.
+func TestPackBuildBackground(t *testing.T) {
+	e, api, events := fixture(t)
+	release := make(chan struct{})
+	api.PackRunner = func(name string) error {
+		tmp := filepath.Join(e.App.PacksDir(), name+app.TmpSuffix)
+		os.MkdirAll(tmp, 0o755)
+		b, _ := json.Marshal(app.BuildProgress{Name: name, Step: app.StepCopy, Mods: 1, ModsTotal: 2, Bytes: 50, BytesTotal: 100, Beat: time.Now()})
+		os.WriteFile(filepath.Join(tmp, app.BuildFile), b, 0o644)
+		<-release
+		os.RemoveAll(tmp)
+		return nil
+	}
+	start := time.Now()
+	if _, err := api.PackBuild("first"); err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Fatal("PackBuild waited for the build")
+	}
+	answered := make(chan *PackList, 1)
+	go func() {
+		api.Settings()
+		api.Needs()
+		l, _ := api.Packs()
+		answered <- l
+	}()
+	select {
+	case l := <-answered:
+		if l.Building != "first" {
+			t.Fatalf("packs during the build: %+v", l)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the pages wait for the build")
+	}
+	if _, err := api.PackBuild("second"); err == nil {
+		t.Fatal("a second build started")
+	}
+	waitPack := func(want string) string {
+		deadline := time.After(10 * time.Second)
+		for {
+			select {
+			case ev := <-events:
+				if strings.HasPrefix(ev, "pack ") && strings.Contains(ev, want) {
+					return ev
+				}
+			case <-deadline:
+				t.Fatalf("no pack event with %s", want)
+			}
+		}
+	}
+	if ev := waitPack(`"frac":0.5`); !strings.Contains(ev, `"step":2`) || !strings.Contains(ev, `"running":true`) {
+		t.Fatalf("progress event %s", ev)
+	}
+	close(release)
+	if ev := waitPack(`"done":true`); !strings.Contains(ev, `"ok":true`) {
+		t.Fatalf("end event %s", ev)
+	}
+	if l, _ := api.Packs(); l.Building != "" {
+		t.Fatalf("still building: %+v", l)
+	}
+}
+
+// A build cut short shows on the packs page and can be removed from there.
+func TestPackUnfinishedRows(t *testing.T) {
+	e, api, _ := fixture(t)
+	tmp := filepath.Join(e.App.PacksDir(), "cut"+app.TmpSuffix)
+	os.MkdirAll(tmp, 0o755)
+	b, _ := json.Marshal(app.BuildProgress{Name: "cut", Step: app.StepCopy, Mods: 4, ModsTotal: 10, Bytes: 3 << 30, Beat: time.Now().Add(-time.Hour)})
+	os.WriteFile(filepath.Join(tmp, app.BuildFile), b, 0o644)
+	l, err := api.Packs()
+	if err != nil || len(l.Unfinished) != 1 || l.Unfinished[0].Running || !strings.Contains(l.Unfinished[0].Facts, "3.0 GB") {
+		t.Fatalf("unfinished: %+v %v", l, err)
+	}
+	if _, err := api.PackRemoveUnfinished("cut"); err != nil {
+		t.Fatal(err)
+	}
+	if l, _ := api.Packs(); len(l.Unfinished) != 0 {
+		t.Fatalf("still listed: %+v", l.Unfinished)
 	}
 }

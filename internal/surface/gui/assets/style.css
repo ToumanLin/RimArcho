@@ -290,6 +290,48 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .field { height: 26px; flex: 1; min-width: 0; background: var(--card-2); color: var(--fg); border: 1px solid var(--line); border-radius: 7px; padding: 0 9px; }
 .field:focus { border-color: var(--accent); }
 .packs .page-head .field { flex: 0 0 220px; }
+
+/* a pack build: its steps as boxes joined by arrows, the progress, what needs attention */
+.pop.wide { width: min(940px, 94vw); }
+.flow { display: flex; align-items: stretch; gap: 0; }
+.flow .step { flex: 1 1 0; min-width: 0; padding: 9px 10px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card-2); transition: border-color .2s var(--ease), background-color .2s var(--ease), opacity .2s var(--ease); }
+.flow .step .h { display: flex; gap: 7px; align-items: center; font-weight: 500; color: var(--fg); margin-bottom: 4px; }
+.flow .step .n { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; background: var(--pill); color: var(--ctl-fg); }
+.flow .step .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flow .step .f { font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; line-height: 1.45; }
+.flow .step .f:nth-child(2) { color: var(--fg-2); }
+.flow .step.warn { border-color: var(--amber); background: var(--amber-soft); }
+.flow .step.warn .n { background: var(--amber); color: var(--card); }
+.flow .step.bad { border-color: var(--red); background: var(--red-soft); }
+.flow .step.bad .n { background: var(--red); color: var(--card); }
+.flow .step.off, .flow .step.wait { opacity: .55; }
+.flow .step.cur { border-color: var(--accent); background: var(--accent-soft); }
+.flow .step.cur .n { background: var(--accent); color: var(--accent-fg); animation: pulse 1.4s ease-in-out infinite; }
+.flow .step.done .n { background: var(--green); color: var(--card); }
+.flow .arrow { flex: 0 0 20px; position: relative; align-self: center; height: 2px; margin: 0 2px; background: var(--faint); }
+.flow .arrow::after { content: ""; position: absolute; right: -2px; top: -4px; border: 5px solid transparent; border-left: 6px solid var(--faint); border-right: 0; }
+.flow .arrow.on { background: var(--green); }
+.flow .arrow.on::after { border-left-color: var(--green); }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--accent-soft); } }
+.packpv .dir { font-size: 11.5px; overflow-wrap: anywhere; user-select: text; }
+.packpv { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 2px; }
+.attn { display: flex; flex-direction: column; gap: 8px; }
+.attn .a { border-left: 3px solid var(--amber); background: var(--amber-soft); border-radius: 6px; padding: 7px 10px; }
+.attn .a.bad { border-left-color: var(--red); background: var(--red-soft); }
+.attn .a .h { font-weight: 500; color: var(--amber); }
+.attn .a.bad .h { color: var(--red); }
+.attn ul { margin: 4px 0 0; padding-left: 18px; font-size: 12px; color: var(--fg-2); user-select: text; }
+.attn li { overflow-wrap: anywhere; }
+.card.build { margin-bottom: 12px; }
+.card.build.unfinished { border-color: var(--amber); }
+.card.build.unfinished .pack .name::before { content: "⚠ "; color: var(--amber); }
+.flowwrap { padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.prog .bar { height: 6px; border-radius: 6px; background: var(--pill); overflow: hidden; }
+.prog .bar i { display: block; height: 100%; background: var(--accent); border-radius: 6px; transition: width .3s var(--ease); }
+.prog .bar.bad i { background: var(--red); }
+.prog .ptext { margin-top: 5px; font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog .ptext.bad { color: var(--red); white-space: pre-wrap; }
+@media (max-width: 760px) { .flow { flex-direction: column; } .flow .arrow { flex: 0 0 12px; width: 2px; height: 12px; align-self: center; } .flow .arrow::after { display: none; } }
 .settings select { height: 26px; background: var(--card-2); color: var(--fg); border: 1px solid var(--line); border-radius: 7px; padding: 0 6px; font: inherit; }
 .settings .set .r > .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 

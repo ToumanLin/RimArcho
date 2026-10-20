@@ -100,6 +100,16 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			if others > 0 {
 				b.WriteString(Tf("%d packs belong to other environments (archo pack list)", others) + "\n\n")
 			}
+			// Builds running (the window's, the CLI's) or cut short.
+			if un, err := view.UnfinishedRows(m.app); err == nil {
+				for _, u := range un {
+					if u.Running {
+						fmt.Fprintf(&b, "%s\n  %s\n  : archo pack stop %q\n\n", Tf("building pack %s", u.Name), u.Facts, u.Name)
+					} else {
+						fmt.Fprintf(&b, "⚠ %s\n  %s\n  : archo pack build %q\n  : archo pack remove %q --unfinished\n\n", u.Name, u.Facts, u.Name, u.Name)
+					}
+				}
+			}
 			for _, r := range rows {
 				fmt.Fprintf(&b, "%s\n  %s · %s\n  : archo pack launch %q\n\n", r.Name, r.Facts, r.Played, r.Name)
 			}

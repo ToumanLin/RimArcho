@@ -37,8 +37,6 @@ type SettingGroup struct {
 	Items []SettingItem `json:"items"`
 }
 
-func mbText(n int64) string { return fmt.Sprintf("%.1f MB", float64(n)/(1<<20)) }
-
 // EnvRow is an environment on the environment page.
 type EnvRow struct {
 	Name    string `json:"name"`
@@ -127,7 +125,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	out = append(out, data)
 	db, _ := a.DBInfo()
 	out = append(out, SettingGroup{Title: T("database"), Items: []SettingItem{
-		{Label: T("size"), Value: mbText(db.Bytes), Note: db.Path, Actions: []SettingAction{
+		{Label: T("size"), Value: SizeText(db.Bytes), Note: db.Path, Actions: []SettingAction{
 			{Label: T("back up"), Argv: []string{"db", "backup"}},
 			{Label: T("compact"), Argv: []string{"db", "vacuum"}},
 			{Label: T("remove old tombstones"), Argv: []string{"gc"}, Confirm: T("mods gone for longer than the tombstone time are forgotten")},
@@ -135,7 +133,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}})
 	caches := SettingGroup{Title: T("caches")}
 	for _, c := range a.Caches() {
-		caches.Items = append(caches.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s · %d items", mbText(c.Bytes), c.Files),
+		caches.Items = append(caches.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s · %d items", SizeText(c.Bytes), c.Files),
 			Actions: []SettingAction{{Label: T("clear"), Argv: []string{"cache", "clear", c.Kind}}}})
 	}
 	out = append(out, caches)

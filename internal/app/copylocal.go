@@ -23,6 +23,9 @@ type CopyResult struct {
 	Skipped  []string // links that point outside the mod folder, relative to it
 	GitError string   // --git failed after the copy succeeded
 	Git      bool
+	// onFile is called after each copied file (a pack build's progress); an error stops
+	// the copy.
+	onFile func(bytes int64) error
 }
 
 // LocalSource is the environment's local source (the game's Mods folder).
@@ -133,6 +136,11 @@ func copyTree(root, dir, dst, rel string, res *CopyResult) error {
 		}
 		res.Files++
 		res.Bytes += fi.Size()
+		if res.onFile != nil {
+			if err := res.onFile(fi.Size()); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

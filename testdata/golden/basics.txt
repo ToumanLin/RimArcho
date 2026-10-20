@@ -77,7 +77,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     pack launch <name>                        play a pack: link its mods into Mods/, its own list and saves, start the game
     pack export <name> <file>                 write a pack to a file (.archopack zip, or --light .archopack.json)
     pack import <file>                        unpack a .archopack, or compare a light pack with the installed mods
-    pack remove <name>                        move a pack to the recycle bin
+    pack remove <name>                        move a pack to the recycle bin; --unfinished deletes what a build cut short copied
+    pack stop <name>                          stop a running pack build (what it copied is removed)
     db status                                 the database: path, size, backups
     db backup                                 write a consistent copy of the database to <data>/backups
     db vacuum                                 compact the database
