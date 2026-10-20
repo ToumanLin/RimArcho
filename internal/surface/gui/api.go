@@ -225,7 +225,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 	case view.StatusNone:
 		d.StatusText = view.T("no problems found")
 	case view.StatusUnloadable:
-		d.StatusText = view.UnloadableWhy(mod)
+		d.StatusText = view.UnloadableWhy(st, mod)
 	default:
 		d.StatusText = view.T("needs attention")
 	}

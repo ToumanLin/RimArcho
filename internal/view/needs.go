@@ -28,10 +28,11 @@ const (
 	GroupConflict
 	GroupLastRun
 	GroupConfirm
+	GroupHidden
 )
 
 // GroupTitles are the groups' headings (English; T translates them).
-var GroupTitles = []string{"this list", "missing dependencies", "conflicts", "last run", "needs your answer"}
+var GroupTitles = []string{"this list", "missing dependencies", "conflicts", "last run", "needs your answer", "hidden mods"}
 
 // Action kinds. An action is data; each interface binds it to a key or a button.
 const (
@@ -48,6 +49,10 @@ const (
 	ActLoadExternal    = "load-external"    // check out Version (confirm first)
 	ActDismissConflict = "dismiss-conflict" // keep the workspace, ignore the outside change
 	ActAnswer          = "answer"           // Question, Answer (confirm first)
+	ActUnhide          = "unhide"           // Refs[0]: rename About.xml back (confirm first)
+	ActUnpin           = "unpin"            // Refs[0]: restore the workshop copy (confirm first)
+	ActTrash           = "trash"            // Refs[0]: folder to the recycle bin (confirm first)
+	ActIgnore          = "ignore"           // Problem: keep as it is (ignore the problem)
 )
 
 // Option is one choice of a choose-disable action.
@@ -77,6 +82,7 @@ type Action struct {
 	Version int      `json:"version,omitempty"`
 	QID     int64    `json:"question,omitempty"`
 	Answer  string   `json:"answer,omitempty"`
+	Problem string   `json:"problem,omitempty"` // p:<ref> for ignore
 }
 
 // Need is one item of 需要处理.
@@ -199,6 +205,15 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				Actions: []Action{enable(st, y), viewAction(T("see what"), "patches", "--mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s})
 		case "incompat.active":
 			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s})
+		case "mod.pinned":
+			add(Need{Group: GroupHidden, Text: Tf("%s is pinned to a copy, and the workshop version has been updated since", nm(x)),
+				Actions: []Action{viewAction(T("see what changed"), "mod", TokRef(st, y), "--diff", TokRef(st, x)), unpin(st, x)}, Counted: true, Mods: ids, Status: s})
+		case "mod.hidden-residue":
+			add(Need{Group: GroupHidden, Text: Tf("%s is hidden and no longer subscribed; its folder is left over", nm(x)),
+				Actions: []Action{trash(st, x)}, Counted: true, Mods: ids, Status: s})
+		case "mod.hidden":
+			add(Need{Group: GroupHidden, Text: Tf("%s is hidden from the game (probably by another mod manager)", nm(x)),
+				Actions: []Action{keepHidden(p), unhide(st, x), trash(st, x)}, Counted: true, Mods: ids, Status: s})
 		case "def.parent-missing":
 			add(Need{Group: GroupDeps, Text: Tf("part of %s builds on a definition no enabled mod provides; a dependency may be missing", nm(x)),
 				Actions: []Action{viewAction(T("see what"), "mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s})
@@ -334,6 +349,31 @@ func questionNeed(st *app.LoadoutState, q *store.Question) Need {
 
 func sortAction() Action { return Action{Kind: ActSort, Key: "S", Label: T("sort")} }
 
+func unhide(st *app.LoadoutState, tok string) Action {
+	name := TokName(st, tok)
+	return Action{Kind: ActUnhide, Key: "R", Label: T("show it to the game again"), Refs: []string{TokRef(st, tok)},
+		Confirm: T("press R again to rename About.xml.disabled back to About.xml"), Warn: Tf("RimArcho renames About.xml.disabled back to About.xml in %s", name),
+		Done: Tf("%s is visible to the game again", name)}
+}
+
+func unpin(st *app.LoadoutState, tok string) Action {
+	name := TokName(st, tok)
+	return Action{Kind: ActUnpin, Key: "P", Label: T("use the workshop version"), Refs: []string{TokRef(st, tok)},
+		Confirm: T("press P again to restore the workshop copy and use it"), Warn: Tf("RimArcho restores the workshop copy of %s and uses it instead of the pinned copy; the copy stays on disk", name),
+		Done: Tf("the list now uses the workshop version of %s (not saved yet)", name)}
+}
+
+func trash(st *app.LoadoutState, tok string) Action {
+	name := TokName(st, tok)
+	return Action{Kind: ActTrash, Key: "D", Label: T("move to the recycle bin"), Refs: []string{TokRef(st, tok)},
+		Confirm: T("press D again to move the folder to the recycle bin"), Warn: Tf("the folder of %s goes to the recycle bin; you can restore it from there", name),
+		Done: Tf("%s is in the recycle bin", name)}
+}
+
+func keepHidden(p *app.Problem) Action {
+	return Action{Kind: ActIgnore, Key: "I", Label: T("keep it hidden"), Problem: p.Ref, Done: T("kept hidden; asked again if the mod changes")}
+}
+
 func viewAction(label string, argv ...string) Action {
 	return Action{Kind: ActView, Key: "enter", Label: label, Argv: argv}
 }
@@ -447,6 +487,14 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		err = a.DismissConflict()
 	case ActAnswer:
 		_, err = a.ResolveQuestion(act.QID, act.Answer)
+	case ActUnhide:
+		_, err = a.Unhide(act.Refs[0], false)
+	case ActUnpin:
+		_, err = a.Unpin(act.Refs[0], false)
+	case ActTrash:
+		_, err = a.Trash(act.Refs[0], false)
+	case ActIgnore:
+		_, err = a.IgnoreProblem(act.Problem, false)
 	default:
 		return "", fmt.Errorf("%s is not a data action", act.Kind)
 	}

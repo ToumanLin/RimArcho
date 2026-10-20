@@ -60,9 +60,15 @@ func HeaderFacts(mod *store.Mod, pos int, staged bool) []string {
 	return facts
 }
 
-// UnloadableWhy says why the game cannot load a mod.
-func UnloadableWhy(mod *store.Mod) string {
+// UnloadableWhy says why the game cannot load a mod; a pinned workshop copy names the copy
+// the game uses instead (10 §2.1).
+func UnloadableWhy(st *app.LoadoutState, mod *store.Mod) string {
 	switch {
+	case mod.Unloadable != "" && st != nil:
+		if h := st.HiddenOf(mod.ID); h != nil && h.Kind == app.HiddenPinned {
+			return Tf("pinned: the game uses %s", h.Copy.DisplayName())
+		}
+		return T("About.xml is renamed: the game cannot load it")
 	case mod.Unloadable != "":
 		return T("About.xml is renamed: the game cannot load it")
 	case mod.Residue:

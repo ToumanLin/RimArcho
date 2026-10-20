@@ -22,7 +22,8 @@ func init() {
 			{Name: "active", Help: "the workspace Loadout in load order"}, {Name: "all", Help: "no truncation"}}, Run: listCmd})
 	register(&Command{Name: "find", Args: "<words…>", Summary: "search by name, package id, author, workshop id, folder", MinArgs: 1, MaxArgs: -1,
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: findCmd})
-	register(&Command{Name: "mod", Args: "<ref>", Summary: "mod details", MinArgs: 1, MaxArgs: 1, Run: modCmd})
+	register(&Command{Name: "mod", Args: "<ref>", Summary: "mod details", MinArgs: 1, MaxArgs: 1, Run: modCmd,
+		Flags: []Flag{{Name: "diff", Value: "<ref>", Help: "list the semantic files that differ from another instance"}}})
 	register(&Command{Name: "changes", Args: "[<ref>]", Summary: "change events (default: the last scan)", MaxArgs: 1,
 		Flags: []Flag{{Name: "since", Value: "scan:<n>|<days>d|YYYY-MM-DD"}, {Name: "all", Help: "no truncation"}}, Run: changesCmd})
 }
@@ -367,6 +368,22 @@ func modCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	m, err := ix.ResolveOne(a.Pos[0])
 	if err != nil {
 		return nil, err
+	}
+	if ref := a.Str("diff"); ref != "" {
+		o, err := ix.ResolveOne(ref)
+		if err != nil {
+			return nil, err
+		}
+		lines, err := c.App.DiffInstances(m, o)
+		if err != nil {
+			return nil, err
+		}
+		d, root := render.New(fmt.Sprintf("%s → %s: %d semantic files differ", modLabel(ix, m.ID), modLabel(ix, o.ID), len(lines)))
+		for _, l := range lines {
+			root.Add(l)
+		}
+		root.Truncate(render.DefaultLimit, "")
+		return d, nil
 	}
 	return modDoc(c, ix, m)
 }

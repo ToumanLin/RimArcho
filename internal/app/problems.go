@@ -385,9 +385,36 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			add(f)
 		}
 	}
-	// About.xml renamed away (about-disabled) on installed mods that are not enabled.
+	// About.xml renamed away (about-disabled) on installed mods that are not enabled: pinned
+	// by a copy, unsubscribed, or hidden on their own (10 §2.1).
+	for _, h := range st.Hidden() {
+		m := h.Mod
+		if activePos[m.ID] != 0 {
+			continue
+		}
+		switch h.Kind {
+		case HiddenPinned:
+			f := &finding.Finding{Code: "mod.pinned", Severity: finding.Info, Key: "pinned", Subjects: []string{inst(m.ID), inst(h.Copy.ID)},
+				Claim:       fmt.Sprintf("%s is pinned: the game uses %s, this workshop copy is hidden (About.xml renamed)", inst(m.ID), inst(h.Copy.ID)),
+				Suggestions: []string{"archo unpin " + inst(m.ID)}}
+			if h.Upstream {
+				f.Severity, f.Key = finding.Warning, "upstream"
+				f.Claim = fmt.Sprintf("%s is pinned to %s, and the workshop copy has been updated since", inst(m.ID), inst(h.Copy.ID))
+				f.Suggestions = []string{"archo mod " + inst(h.Copy.ID) + " --diff " + inst(m.ID), "archo unpin " + inst(m.ID)}
+			}
+			add(f)
+		case HiddenResidue:
+			add(&finding.Finding{Code: "mod.hidden-residue", Severity: finding.Warning, Key: "residue", Subjects: []string{inst(m.ID)},
+				Claim:       fmt.Sprintf("%s is hidden (About.xml renamed) and no longer subscribed; its folder is left over", inst(m.ID)),
+				Suggestions: []string{"archo trash " + inst(m.ID)}})
+		default:
+			add(&finding.Finding{Code: "mod.hidden", Severity: finding.Warning, Key: "hidden", Subjects: []string{inst(m.ID)},
+				Claim:       fmt.Sprintf("%s is hidden from the game (About.xml renamed, probably by another mod manager)", inst(m.ID)),
+				Suggestions: []string{"archo unhide " + inst(m.ID), "archo trash " + inst(m.ID)}})
+		}
+	}
 	for _, m := range st.Ix.Mods {
-		if m.TombstoneAt.IsZero() && m.Unloadable != "" && activePos[m.ID] == 0 {
+		if m.TombstoneAt.IsZero() && m.Unloadable != "" && m.Unloadable != scan.UnloadableAboutDisabled && activePos[m.ID] == 0 {
 			add(&finding.Finding{Code: "mod.unloadable", Severity: finding.Info, Key: m.Unloadable, Subjects: []string{inst(m.ID)},
 				Claim: fmt.Sprintf("%s is installed but cannot be loaded: %s", inst(m.ID), m.Unloadable)})
 		}

@@ -126,7 +126,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	case statusNone:
 		marked(sOK.Render(markOK), T("no problems found"), sSecond)
 	case statusUnloadable:
-		why := view.UnloadableWhy(mod)
+		why := view.UnloadableWhy(m.st, mod)
 		marked(statusIcon(s), why, sSecond)
 	default:
 		marked(statusIcon(s), T("needs attention · ! shows what"), sText)

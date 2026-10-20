@@ -66,6 +66,8 @@ type App struct {
 	LogCacheOnly bool
 	// HTTP and SteamAPI reach the Steam Workshop for descriptions (06 §6.4); nil and ""
 	// mean a 15-second client and the public endpoint. Tests replace both.
+	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
+	TrashFunc func(path string) error
 	HTTP      *http.Client
 	SteamAPI  string
 	analyzing *pendingAnalysis

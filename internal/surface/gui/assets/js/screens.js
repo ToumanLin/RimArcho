@@ -8,7 +8,7 @@ import * as pop from "./popups.js";
 let ui = null;
 export function initScreens(u) { ui = u; }
 
-const GROUPS = ["this list", "missing dependencies", "conflicts", "last run", "needs your answer"];
+const GROUPS = ["this list", "missing dependencies", "conflicts", "last run", "needs your answer", "hidden mods"];
 
 function openScreen(name) {
   S.screen = name;

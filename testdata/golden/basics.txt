@@ -65,6 +65,9 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     gui                                       open the desktop window (RimArcho.exe does this on a double click)
     version                                   print the RimArcho version
+    unhide <ref>                              rename About.xml.disabled back to About.xml so the game sees the mod again
+    unpin <ref>                               restore a pinned mod's workshop copy and use it instead of the pinning copy
+    trash <ref>                               move a hidden or unsubscribed workshop folder to the recycle bin
   references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>
   global flags: --env <name> (use another environment for this command)
 
