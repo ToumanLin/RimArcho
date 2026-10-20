@@ -49,7 +49,14 @@ func main() {
 	out := fs.String("out", "", "run: results JSONL (appended; logs already in it are skipped)")
 	mm := fs.String("mm", "1.6", "run: game major.minor of the logs to process")
 	maxN := fs.Int("max", 0, "run: process at most this many logs (0 = all)")
+	minCov := fs.Float64("mincov", 0.8, "report: coverage threshold for the 'covered' subset")
 	fs.Parse(os.Args[2:])
+	if os.Args[1] == "report" {
+		if err := report(*out, *minCov); err != nil {
+			fail(err)
+		}
+		return
+	}
 	if *home == "" {
 		fail(fmt.Errorf("-home is required"))
 	}
