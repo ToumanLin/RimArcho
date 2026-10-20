@@ -2,6 +2,44 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## 0.8.0 — toward 1.0 (unreleased)
+
+Spec: `docs/specs/10-1.0实现.md`.
+
+### Hidden and pinned mods (10 §2)
+- Folders another manager hid by renaming About.xml are classified: **pinned** (a loadable copy
+  of the lineage is what the game uses; a warning once the workshop copy changed since, with
+  `archo mod <copy> --diff <workshop>`), **left over** (unsubscribed) or **hidden** on their own.
+- 需要处理 gets a "hidden mods" group: keep hidden, show again (`archo unhide`), use the workshop
+  version (`archo unpin`), move to the recycle bin (`archo trash`). Trash never deletes
+  permanently and only takes hidden or unsubscribed workshop/SteamCMD folders.
+
+### Live game log (10 §3)
+- `archo log --follow [--once] [--json]` follows Player.log while the game runs: only new bytes
+  are read, clusters instead of text are kept, attribution is the full-log engine's.
+- RimCrow's companion log (`RimCrow_Realtime.log`) adds timestamps, levels and related mods.
+- The window says "game running since … · n errors" and puts this run's errors first in
+  需要处理; `archo status` shows a running game.
+
+### Lists from other tools (10 §4)
+- `loadout import` reads RimSort (XML, JSON, clipboard, Rentry), RimWorld's `.rml`, RimCrow's
+  ModList.xml, JSON and share codes (also pasted as the argument), and workshop-ID lists.
+- `loadout export --format rimsort|rml|rimcrow`.
+- `archo collection <link|ID> [--import]` compares a Steam Workshop collection with what is
+  installed and can load it into the workspace.
+
+### Community data (10 §5)
+- `archo data update` / `archo data status`: RimSort's rules and Workshop database, Use This
+  Instead's replacements. All-or-nothing; the only command that fetches them.
+- Missing mods get direct Workshop links; enabled mods with a maintained replacement are listed.
+
+### History (10 §6)
+- `archo history`, `archo undo <n>`, `archo redo <n>`. The window shows the history in the empty
+  staging list: redo steps, now, undo steps in plain words, then the saved versions.
+
+### Other
+- About.xml, LoadFolders.xml and Defs saved as UTF-16 are read (10 §1).
+
 ## 0.7.0 — the window (unreleased)
 
 ### Icon (08 §15)
