@@ -101,8 +101,12 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case imgLoadedMsg:
 		e := msg.e
 		m.imgs[msg.key] = &e
+		m.touchImage(msg.key)
 		if m.imgLoading == msg.key {
 			m.imgLoading = ""
+		}
+		if m.prefetching == msg.key {
+			m.prefetching = ""
 		}
 		m.evictImages()
 		return m, nil

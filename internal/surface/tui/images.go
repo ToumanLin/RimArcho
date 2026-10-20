@@ -9,8 +9,10 @@ import (
 	"image/png"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
@@ -37,10 +39,14 @@ func (p placement) key() string { return fmt.Sprintf("%d,%d,%d,%d", p.row, p.col
 // imgWriter is the program's output in the WezTerm host.
 type imgWriter struct {
 	io.Writer
-	mu   sync.Mutex
-	cur  []placement
-	prev []placement
+	mu      sync.Mutex
+	cur     []placement
+	prev    []placement // drawn
+	pending bool        // a later write draws the next new image
 }
+
+// imgGap is the time between two new images (06 §12.4: one image per frame at most).
+const imgGap = 16 * time.Millisecond
 
 // set replaces the images to show from the next frame on.
 func (w *imgWriter) set(ps []placement) {
@@ -69,18 +75,53 @@ func (w *imgWriter) Write(frame []byte) (int, error) {
 		}
 		b.WriteString("\x1b8")
 	}
-	for _, p := range w.cur {
-		b.WriteString("\x1b7\x1b[?25h")
-		fmt.Fprintf(&b, "\x1b[%d;%dH", p.row, p.col)
-		b.Write(p.seq)
-		b.WriteString("\x1b[?25l\x1b8")
-	}
+	w.drawImages(&b)
 	b.WriteString("\x1b[?2026l")
-	w.prev = append(w.prev[:0], w.cur...)
 	if _, err := w.Writer.Write(b.Bytes()); err != nil {
 		return 0, err
 	}
 	return len(frame), nil
+}
+
+// drawImages redraws the images already shown (the frame may have written over them) and
+// adds at most one new one; the next new one follows imgGap later.
+func (w *imgWriter) drawImages(b *bytes.Buffer) {
+	was := map[string]bool{}
+	for _, p := range w.prev {
+		was[p.key()] = true
+	}
+	var drawn []placement
+	added := false
+	for _, p := range w.cur {
+		if !was[p.key()] {
+			if added {
+				if !w.pending {
+					w.pending = true
+					time.AfterFunc(imgGap, w.flush)
+				}
+				continue
+			}
+			added = true
+		}
+		b.WriteString("\x1b7\x1b[?25h")
+		fmt.Fprintf(b, "\x1b[%d;%dH", p.row, p.col)
+		b.Write(p.seq)
+		b.WriteString("\x1b[?25l\x1b8")
+		drawn = append(drawn, p)
+	}
+	w.prev = drawn
+}
+
+// flush draws the next waiting image without a new frame.
+func (w *imgWriter) flush() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.pending = false
+	var b bytes.Buffer
+	b.WriteString("\x1b[?2026h")
+	w.drawImages(&b)
+	b.WriteString("\x1b[?2026l")
+	w.Writer.Write(b.Bytes())
 }
 
 // imgRows is how many rows an image w×h takes at cols columns (at most maxRows).
@@ -174,28 +215,45 @@ func loadImage(a *app.App, ix *app.Index, url string, cols, maxRows int) func() 
 	}
 }
 
+// touchImage marks an image as just used, for the LRU.
+func (m *model) touchImage(key string) {
+	m.imgClock++
+	m.imgUse[key] = m.imgClock
+}
+
 // evictImages keeps the image cache small (the encoded images are the TUI's largest
-// allocations, 06 §11 T5): beyond imgKeep entries, those not on screen go.
+// allocations, 06 §11 T5): an LRU of imgKeep entries (06 §12.4); those on screen or still
+// loading stay.
 func (m *model) evictImages() {
 	if len(m.imgs) <= imgKeep {
 		return
 	}
-	shown := map[string]bool{m.imgLoading: true}
+	shown := map[string]bool{}
 	for _, l := range m.lastLines {
 		if l.imgURL != "" {
 			shown[imgKey(l.imgURL, l.imgCols, l.imgMax)] = true
 		}
 	}
-	for k := range m.imgs {
-		if len(m.imgs) <= imgKeep*3/4 {
+	type kv struct {
+		k string
+		t int
+	}
+	var old []kv
+	for k, e := range m.imgs {
+		if !shown[k] && e.state != imgLoading {
+			old = append(old, kv{k, m.imgUse[k]})
+		}
+	}
+	sort.Slice(old, func(i, j int) bool { return old[i].t < old[j].t })
+	for _, o := range old {
+		if len(m.imgs) <= imgKeep {
 			break
 		}
-		if !shown[k] {
-			delete(m.imgs, k)
-		}
+		delete(m.imgs, o.k)
+		delete(m.imgUse, o.k)
 	}
 }
 
-const imgKeep = 24
+const imgKeep = 64
 
 func imgKey(url string, cols, maxRows int) string { return fmt.Sprintf("%d|%d|%s", cols, maxRows, url) }

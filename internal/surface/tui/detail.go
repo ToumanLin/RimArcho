@@ -450,6 +450,19 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 	var out []dline
 	add := func(s string) { out = append(out, dline{text: s}) }
+	// The compact detail draws no description images: one faint line counts them, and the
+	// full-screen detail shows them (06 §12.4).
+	nimg, imgAt := 0, -1
+	fill := func() {
+		if nimg == 0 {
+			return
+		}
+		t := Tf("[images ×%d · enter shows them full screen]", nimg)
+		if !o.images {
+			t = Tf("[images ×%d]", nimg)
+		}
+		out[imgAt].text = "  " + sDimS.Render(fit(t, max(w-2, 4)))
+	}
 	for i, b := range bs {
 		ind := 2
 		if b.Quote {
@@ -491,6 +504,14 @@ func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 				add(strings.Repeat(" ", ind) + l)
 			}
 		case bbcode.Image:
+			if !o.full {
+				if nimg == 0 {
+					imgAt = len(out)
+					add("")
+				}
+				nimg++
+				continue
+			}
 			host := ""
 			if u, err := url.Parse(b.URL); err == nil {
 				host = u.Host
@@ -520,6 +541,7 @@ func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 			}
 		}
 	}
+	fill()
 	return out
 }
 
@@ -705,31 +727,82 @@ func tableLines(rows [][]string, w int) []string {
 // imageCmds starts loading the images of the detail that are not known yet (one at a
 // time, so the newest selection is not stuck behind a queue).
 func (m *model) imageCmds(lines []dline) tea.Cmd {
-	if m.imgLoading != "" || !m.inlineImages() {
+	if !m.inlineImages() {
 		return nil
 	}
+	var cmds []tea.Cmd
+	if m.imgLoading == "" {
+		for _, l := range lines {
+			if l.imgURL == "" || (l.thumb != "" && m.thumbShown != l.thumb) {
+				continue // with a dwell set, a thumbnail waits until the cursor rests
+			}
+			key := imgKey(l.imgURL, l.imgCols, l.imgMax)
+			if _, ok := m.imgs[key]; ok {
+				continue
+			}
+			m.imgLoading = key
+			cmds = append(cmds, m.startImage(key, l.imgURL, l.imgCols, l.imgMax))
+			break
+		}
+	}
+	if m.prefetching == "" {
+		if c := m.prefetchCmd(lines); c != nil {
+			cmds = append(cmds, c)
+		}
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *model) startImage(key, url string, cols, maxRows int) tea.Cmd {
+	m.imgs[key] = &imgEntry{state: imgLoading}
+	var ix *app.Index
+	if m.st != nil {
+		ix = m.st.Ix
+	}
+	f := loadImage(m.app, ix, url, cols, maxRows)
+	return func() tea.Msg { return f() }
+}
+
+// prefetchRange: thumbnails are made ahead for this many rows above and below the cursor.
+const prefetchRange = 10
+
+// prefetchCmd loads the nearest thumbnail around the cursor that is not cached yet, one
+// at a time beside the visible images, so stopping on a row usually finds it ready.
+func (m *model) prefetchCmd(lines []dline) tea.Cmd {
+	tc, tr := 0, 0
 	for _, l := range lines {
-		if l.imgURL == "" || (l.thumb != "" && m.thumbShown != l.thumb) {
-			continue // a thumbnail is loaded only once the cursor rests (06 §6.2)
+		if l.thumb != "" {
+			tc, tr = l.imgCols, l.imgMax
+			break
 		}
-		key := imgKey(l.imgURL, l.imgCols, l.imgMax)
-		if _, ok := m.imgs[key]; ok {
-			continue
+	}
+	if tc == 0 || m.full {
+		return nil
+	}
+	c := m.col()
+	for d := 1; d <= prefetchRange; d++ {
+		for _, i := range []int{c.cursor + d, c.cursor - d} {
+			if i < 0 || i >= len(c.view) {
+				continue
+			}
+			id := c.items[c.view[i]].id
+			if id == "" {
+				continue
+			}
+			key := imgKey(previewURL(id), tc, tr)
+			if _, ok := m.imgs[key]; ok {
+				continue
+			}
+			m.prefetching = key
+			return m.startImage(key, previewURL(id), tc, tr)
 		}
-		m.imgs[key] = &imgEntry{state: imgLoading}
-		m.imgLoading = key
-		var ix *app.Index
-		if m.st != nil {
-			ix = m.st.Ix
-		}
-		f := loadImage(m.app, ix, l.imgURL, l.imgCols, l.imgMax)
-		return func() tea.Msg { return f() }
 	}
 	return nil
 }
 
-// inlineImages: images are drawn in the WezTerm host (06 §6.4 item 6).
-func (m *model) inlineImages() bool { return m.images != nil }
+// inlineImages: images are drawn in the WezTerm host (06 §6.4 item 6), unless ui.previews
+// is off (06 §12.4).
+func (m *model) inlineImages() bool { return m.images != nil && !m.previewsOff }
 
 // openURL opens a page in the default browser.
 func openURL(u string) error {
@@ -842,10 +915,12 @@ func (m *model) place(l dline, y, n, x int) (placement, bool) {
 	if l.imgURL == "" || (l.thumb != "" && m.thumbShown != l.thumb) {
 		return placement{}, false
 	}
-	e := m.imgs[imgKey(l.imgURL, l.imgCols, l.imgMax)]
+	key := imgKey(l.imgURL, l.imgCols, l.imgMax)
+	e := m.imgs[key]
 	if e == nil || e.state != imgOK || y+e.rows > n {
 		return placement{}, false
 	}
+	m.touchImage(key)
 	// body line y is screen row 3+y (1-based): top bar, blank line, then the body
 	p := placement{row: 3 + y, col: x + l.imgInd, cols: l.imgCols, rows: e.rows, seq: e.seq}
 	if l.thumb != "" {

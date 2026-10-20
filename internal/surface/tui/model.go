@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -133,6 +134,11 @@ type model struct {
 	imgLoading string               // the image being loaded ("" none)
 	thumbShown string               // the mod whose thumbnail may be drawn: the cursor rested on it (06 §6.2)
 	thumbSeq   int
+	dwell       time.Duration // ui.preview_dwell_ms (06 §12.4: 0, the thumbnail at once)
+	previewsOff bool          // ui.previews off: no images at all
+	prefetching string        // the thumbnail being made ahead of the cursor
+	imgUse      map[string]int
+	imgClock    int
 	fsecs      *fullSecs  // the full-screen detail's sub-sections (06 §6.3)
 	pal        *palette   // the command palette (06 §8), nil when closed
 	pick       *pickState // a pick session (06 §12.2)
@@ -158,7 +164,14 @@ func New(o Options) tea.Model {
 	o.App.LazyLog = true // the newest log is parsed when the Problems view opens
 	// Until then the status-bar counts use a stored log report only, never a parse.
 	o.App.LogCacheOnly = true
-	return &model{opts: o, app: o.App, w: 120, h: 30, focus: cActive, marked: map[string]bool{}, imgs: map[string]*imgEntry{}}
+	return &model{opts: o, app: o.App, w: 120, h: 30, focus: cActive, marked: map[string]bool{}, imgs: map[string]*imgEntry{}, imgUse: map[string]int{},
+		previewsOff: cmds.Setting(o.App, "ui.previews") == "off", dwell: dwellSetting(o.App)}
+}
+
+// dwellSetting reads ui.preview_dwell_ms.
+func dwellSetting(a *app.App) time.Duration {
+	n, _ := strconv.Atoi(cmds.Setting(a, "ui.preview_dwell_ms"))
+	return time.Duration(n) * time.Millisecond
 }
 
 // MemoryLimit is the Go heap soft cap of the TUI process (06 §8 T5: idle ≤ 80 MB with
@@ -328,8 +341,9 @@ func (m *model) requestDetail() tea.Cmd {
 	return tea.Batch(tick, m.thumbDwell())
 }
 
-// thumbDwell: when the selection changed, the thumbnail goes at once (the next frame erases
-// its block) and comes back once the cursor has rested 150 ms (06 §6.2).
+// thumbDwell: the thumbnail follows the selection at once (06 §12.4); with
+// ui.preview_dwell_ms set, it goes when the selection changes and comes back once the
+// cursor has rested that long (the old 06 §6.2 behaviour).
 func (m *model) thumbDwell() tea.Cmd {
 	it := m.current()
 	if it == nil || it.id == "" {
@@ -339,13 +353,15 @@ func (m *model) thumbDwell() tea.Cmd {
 	if it.id == m.thumbShown {
 		return nil
 	}
+	if m.dwell <= 0 {
+		m.thumbShown = it.id
+		return nil
+	}
 	m.thumbShown = ""
 	m.thumbSeq++
 	seq, id := m.thumbSeq, it.id
-	return tea.Tick(thumbDwellTime, func(time.Time) tea.Msg { return thumbTick{seq, id} })
+	return tea.Tick(m.dwell, func(time.Time) tea.Msg { return thumbTick{seq, id} })
 }
-
-const thumbDwellTime = 150 * time.Millisecond
 
 type thumbTick struct {
 	seq int

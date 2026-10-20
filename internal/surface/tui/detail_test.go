@@ -76,10 +76,14 @@ func TestDetailContent(t *testing.T) {
 	}
 	got := plainLines(m.detailLayout(detailOpts{width: 50, descMax: 12}))
 	for _, want := range []string{"Alpha Plus", "package", "tester.a", "workshop", "1001", "tags", "weapons", "alias", "(Alpha)", "note", "keep after Harmony",
-		"requires", "Harmony (not enabled)", "description · Workshop page", "Alpha adds things.", "• one", "[image · i.imgur.com]", "… enter shows all", "technical information · i"} {
+		"requires", "Harmony (not enabled)", "description · Workshop page", "Alpha adds things.", "• one", "[images ×1]", "… enter shows all", "technical information · i"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("detail lacks %q:\n%s", want, got)
 		}
+	}
+	// the full-screen detail lists each image (no WezTerm: as text)
+	if full := plainLines(m.detailLayout(detailOpts{width: 50, full: true})); !strings.Contains(full, "[image · i.imgur.com]") || strings.Contains(full, "images ×") {
+		t.Fatalf("full-screen images:\n%s", full)
 	}
 	// the key appears once: "1001 · o opens the page" (not "o 按 o 打开页面")
 	SetLang("zh")
@@ -304,8 +308,9 @@ func previewPNG(t *testing.T, path string, w, h int) {
 	}
 }
 
-// T6 (06 §11): a mod with Preview.png shows its thumbnail after a 150 ms rest; moving on
-// erases the whole 18×9 block at once; fast scrolling never draws a stale thumbnail.
+// T6 (06 §11, §12.4): a mod with Preview.png shows its thumbnail at once; moving on erases
+// the whole 18×9 block in the same write; scrolling never draws another mod's thumbnail;
+// with ui.preview_dwell_ms set, the thumbnail waits until the cursor rests that long.
 func TestT6Thumbnail(t *testing.T) {
 	e, _ := fixture(t)
 	previewPNG(t, filepath.Join(e.Workshop, "1001", "About", "Preview.png"), 1600, 900)
@@ -321,18 +326,8 @@ func TestT6Thumbnail(t *testing.T) {
 	press(m, "g")
 	press(m, "down") // Alpha, with a 16:9 Preview.png
 	id := m.current().id
-	if out := frame(); strings.Contains(out, "1337;File") {
-		t.Fatal("thumbnail drawn before the dwell")
-	}
-	// the dwell is a 150 ms tick carrying the selection
-	t0 := time.Now()
-	msg := m.thumbDwell()() // the tick press scheduled, made again
-	if d := time.Since(t0); d < 150*time.Millisecond || d > 600*time.Millisecond {
-		t.Fatalf("dwell %v", d)
-	}
-	m.update(msg)
 	if m.thumbShown != id {
-		t.Fatalf("shown %q", m.thumbShown)
+		t.Fatalf("no dwell, yet not shown: %q", m.thumbShown)
 	}
 	runCmd(m, m.imageCmds(m.visibleDetail()))
 	out := frame()
@@ -360,15 +355,42 @@ func TestT6Thumbnail(t *testing.T) {
 			t.Fatalf("row %d of the block not erased: %q", r, out)
 		}
 	}
-	// fast scrolling: stale ticks change nothing, and no frame draws a thumbnail
-	old := m.thumbSeq
+	// scrolling: a thumbnail only ever on its own mod, at once from the cache
 	for i := 0; i < 20; i++ {
 		press(m, map[bool]string{true: "up", false: "down"}[i%2 == 0])
-		m.update(thumbTick{old, id})
-		if out := frame(); strings.Contains(out, "1337;File") {
-			t.Fatalf("stale thumbnail at step %d", i)
+		out := frame()
+		if on := m.current().id == id; on != strings.Contains(out, "1337;File") {
+			t.Fatalf("step %d: on Alpha %v, drawn %v", i, on, !on)
 		}
 	}
+	// with a dwell: gone when the selection changes, back after a rest of that length
+	m.dwell = 150 * time.Millisecond
+	press(m, "g")
+	press(m, "down") // Alpha
+	if out := frame(); strings.Contains(out, "1337;File") {
+		t.Fatal("thumbnail drawn before the dwell")
+	}
+	t0 := time.Now()
+	msg := m.thumbDwell()() // the tick press scheduled, made again
+	if d := time.Since(t0); d < 150*time.Millisecond || d > 600*time.Millisecond {
+		t.Fatalf("dwell %v", d)
+	}
+	old := m.thumbSeq
+	press(m, "down")
+	m.update(thumbTick{old, id}) // stale: changes nothing
+	if out := frame(); strings.Contains(out, "1337;File") {
+		t.Fatal("stale thumbnail")
+	}
+	press(m, "up")
+	m.update(msg) // stale too
+	if m.thumbShown == id {
+		t.Fatal("a stale tick showed the thumbnail")
+	}
+	m.update(thumbTick{m.thumbSeq, id})
+	if out := frame(); !strings.Contains(out, "1337;File") {
+		t.Fatal("no thumbnail after the dwell")
+	}
+	m.dwell = 0
 	// a mod without Preview.png: after the dwell the block says so
 	press(m, "g")
 	press(m, "down")
