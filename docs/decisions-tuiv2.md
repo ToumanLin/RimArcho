@@ -209,3 +209,58 @@ with the previous round; V3 adds the rest.
 | Sub-sections | `TestFullSections`: five headers with counts, the player's rule in words, the history, `1`–`5` jumps, no `#ref`, every line within the width |
 | T5 memory (gate ≤ 80 MB) | `spikes/tuiv2-v0/v3mem.ps1` on the data copy: rest 400 ms on each of 40 mods (41 thumbnails cached), open one full-screen detail, idle 60 s. archo working set **45.7 MB** idle, peak 53.5 MB. wezterm-gui 161 MB (V0: 91 MB; not investigated, possibly image textures) |
 | T1 after V3 | real-size copy: max 7.6 ms per key (was 1.75 ms; the token wrapper costs more), first frame 105 ms |
+
+# V4: 需要处理
+
+06 §10 V4: grouping, plain wording, one-key actions, notification-style changes (T8). It
+follows 06 §7, with the additions recorded in §7.2 (V4 rulings).
+
+## Decisions
+
+1. **What an item is.** Each item of 需要处理 is built from the problem set and the
+   environment's open questions:
+   - its group (06 §7.1);
+   - one sentence made from mod names;
+   - the keys that act on it;
+   - whether it is counted.
+   Problem codes, `#refs`, `pkg:`, `p:` and the other CLI reference forms never reach the screen.
+   They remain in the technical information, the CLI and MCP.
+2. **The count.** The top bar shows the number of counted items. A list row has an icon exactly
+   when its mod is the subject of one of them.
+   - On the real data copy this is 19 instead of the old 32.
+   - The 13 that dropped out are 5 `def.abstract-collision` and 8 `patch.no-match` whose target is
+     absent rather than disabled.
+   - The player cannot act on those, so they moved to the technical information.
+   - Harmony warnings without log evidence were already excluded. The 16 errors and 46 warnings of
+     the old screen counted info-only folds and stale-log rows as well.
+3. **Keys.** Each item names its own keys, shown under the selected item:
+   - `S` sort (preview first).
+   - `space` enable the dependency, or disable.
+   - `o` open the Workshop page: the declared URL, else a Workshop search.
+   - `space` on an incompatible pair or a duplicated mod opens a chooser: disable which one, or
+     keep which copy.
+   - `enter` / `x` on an order cycle: the requirements in words, then ignore the suggested one.
+   - `s` / `c` / `u` answer an identity question.
+   - `L` / `I` load or ignore an outside ModsConfig.xml change.
+   - `w` save a list that was saved for an older version.
+   - `enter` on log items opens the log and its evidence (a technical page).
+   Screen-level keys are `A` (check the files again) and `l` (choose a log).
+4. **Changes** (06 §4.1). After a scan the status line reads "扫描完成 · 3 个 Mod 有更新 · 1 个改了包名 ·
+   按 c 查看". `c` lists the last scans' changes in words: mod name and what happened; `enter`
+   still shows the changed files. Identity questions and the outside change of ModsConfig.xml
+   moved to 需要处理, and the old changes screen with codes and refs is gone.
+5. **Safety found while testing.** `app.ChildAnalyze` refuses to start when the executable is a Go
+   test binary.
+   - A real-data test that opened the app without an in-process analyzer started `tui.test.exe
+     analyze`. That binary ran the tests again, which started it again, and so on.
+   - Every copy worked only on temp copies of the data, and nothing outside them changed: the real
+     ModsConfig.xml md5 and archo.db time were checked afterwards.
+   - The processes were stopped, and the real-data tests now set `AnalyzeRunner`.
+
+## Verification
+
+| Test | Result |
+| --- | --- |
+| T8 on the real data copy (`TestT8NeedsReal`, a temp copy of the copy) | 20 items, 19 counted, in en and zh: each one sentence with at least one key. The top bar equals the counted items. Every rendered line of the screen, with each item selected, has no problem code and no `#ref`, and neither does the cycle view. Every key of every item was run: each opened a view or a preview, or acted and said so, and none failed |
+| Groups and keys on fixtures | `TestNeedsView`: the cycle in words, `x` adds the ignore rule and the item goes; `space` enables the missing dependency. `TestNeedsLogs`: current log → "last run, … reported N errors" per mod; stale log → one dim, uncounted row. `TestChangesView`: the scan sentence, `c` in words, file diff, outside change ignored with `I` from 需要处理 |
+| Screenshots | not taken: the display was off (desktop idle for over an hour) |

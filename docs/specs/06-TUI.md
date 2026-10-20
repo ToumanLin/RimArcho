@@ -356,6 +356,13 @@ WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI �
 | `version.unsupported`（汇总） | 293 个 Mod 没有标明支持 1.7（其中 288 个支持 1.6） | `enter` 查看列表 |
 | `log.*` | 上次运行时 A 报了 12 次错 | `enter` 查看日志与证据 |
 
+补充（V4 裁定）：
+- `patch.no-match` 只有在它针对的 Mod 已安装但未启用时（target-inactive）才出现，归入“缺少的前置”；目标根本不存在、版本路由错误等情况玩家无法处理，留在“技术信息”。
+- `def.parent-missing`（错误）写成“A 的部分内容继承的定义不存在，可能缺少前置 Mod”，归入“缺少的前置”，`enter` 查看。
+- `mod.unloadable`（已启用但游戏无法加载）写成“A 已启用，但游戏无法加载它”，`space` 停用；`entry.missing` 写成“列表里有 X，但没有安装它”，`o` 在工坊搜索、`space` 从列表中移除；列表为旧版本保存写成一项，`w` 保存。这三项都归入“这个列表”。
+- `version.unsupported` 只有在其中有 Mod 连上一个版本都不支持（warning）时才出现；全部只是支持上一版本时，按 info 处理，不出现。
+- 顶栏的数字 = 这个页面上可以操作的项数（折叠的旧日志那一行不算）。列表行上的状态图标也只标在这些项涉及的 Mod 上，所以图标和数字一致。
+
 ### 7.3 什么不出现在这里
 
 - info 级别（Def 覆盖、补丁争用、共享 Harmony 目标等）：只在详情的“技术信息”里，以及 CLI 和 MCP 中。
