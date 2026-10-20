@@ -17,7 +17,7 @@ func TestSettingsCommands(t *testing.T) {
 	scanNow(t, e)
 	e.WriteFile(filepath.Join(e.Home, "cache", "previews", "a.png"), strings.Repeat("x", 4096))
 	out := e.MustRun("cache", "status")
-	if !strings.Contains(out, "previews: 0.0 MB, 1 items") {
+	if !strings.Contains(out, "previews: 4.0 KB, 1 items") {
 		t.Fatalf("cache status:\n%s", out)
 	}
 	e.MustRun("cache", "clear", "previews")

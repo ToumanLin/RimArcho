@@ -166,12 +166,18 @@ export function position(obj, from) {
 
 // ---- a preview with a confirmation (sort, save, launch; 06 §9) ----
 export function confirm(title, lines, goLabel, go) {
+  const pre = el("pre", "lines");
+  pre.textContent = (lines || []).join("\n");
+  panel(title, pre, goLabel, go);
+}
+
+// panel is a confirmation whose body is an element (the pack build's steps); cls widens it.
+export function panel(title, content, goLabel, go, cls = "") {
   open("confirm", title, (pop, p) => {
+    if (cls) pop.classList.add(cls);
     pop.append(el("div", "ttl", title));
     const body = el("div", "body");
-    const pre = el("pre", "lines");
-    pre.textContent = (lines || []).join("\n");
-    body.append(pre);
+    body.append(content);
     pop.append(body);
     const btns = el("div", "btns");
     const no = el("button", "", T("cancel") + "  esc");

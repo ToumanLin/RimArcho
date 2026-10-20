@@ -19,6 +19,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -69,6 +70,9 @@ func (a *App) PacksDir() string {
 
 var packNameRe = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} ._\-]{0,63}$`)
 
+// CheckPackName says whether name can name a pack (a folder in the packs folder).
+func CheckPackName(name string) error { return checkPackName(name) }
+
 func checkPackName(name string) error {
 	if !packNameRe.MatchString(name) || strings.HasSuffix(name, ".") || strings.HasSuffix(name, " ") {
 		return fmt.Errorf("pack name %q: letters, digits, space, . _ - (up to 64)", name)
@@ -104,14 +108,49 @@ type PackBuild struct {
 	Pack     *Pack
 	Dir      string
 	DryRun   bool
-	Blockers []string // why it cannot be built
+	Blockers []string // why it cannot be built (需要处理)
 	Moved    int      // entries the sort moved
+	// Measured (not for a light pack): what the copy needs, and what the packs drive has
+	// (-1: unknown). A build is refused when Free < Need + SpaceMargin.
+	Need, Free int64
+	CannotCopy []string // mods whose folder cannot be read: the build is refused
+	Mismatch   []string // mods that do not list the game's version (warnings)
+	Skipped    int      // links leaving a mod's folder, not copied
 }
+
+// BuildOptions for BuildPackWith.
+type BuildOptions struct {
+	Light, DryRun bool
+	Progress      func(BuildProgress) // each step, and while copying
+}
+
+// ErrBuildRunning: a build of this pack is going on (in this or another process).
+var ErrBuildRunning = errors.New("a build of this pack is running")
+
+// ErrNoSpace: the packs drive has less free space than the copy needs.
+var ErrNoSpace = errors.New("not enough free space for the pack")
+
+// SpaceMargin is kept free on the packs drive beyond the copy itself.
+const SpaceMargin = 256 << 20
 
 // BuildPack compiles the workspace into a pack (10 §8.2): nothing must be left to fix,
 // the list is sorted (for the pack only), and each mod is copied without the version
 // folders this game does not load. light writes the list only.
 func (a *App) BuildPack(name string, light, dryRun bool) (*PackBuild, error) {
+	return a.BuildPackWith(name, BuildOptions{Light: light, DryRun: dryRun})
+}
+
+// PackPlan is a build before anything is measured or copied: the checked, sorted list
+// with the version folders each mod leaves out.
+type PackPlan struct {
+	St    *LoadoutState
+	R     *PackBuild
+	roots []string // per entry: the folder copied ("" for Core, the DLCs, a light pack)
+	free  func(string) int64
+}
+
+// PlanPack checks the list and sorts it for the pack (the first two steps of a build).
+func (a *App) PlanPack(name string, light bool) (*PackPlan, error) {
 	if err := checkPackName(name); err != nil {
 		return nil, err
 	}
@@ -123,7 +162,8 @@ func (a *App) BuildPack(name string, light, dryRun bool) (*PackBuild, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &PackBuild{Dir: dir, DryRun: dryRun}
+	r := &PackBuild{Dir: dir, Free: -1}
+	pl := &PackPlan{St: st, R: r, free: a.FreeSpace}
 	for _, e := range st.List {
 		if e.Instance == "" {
 			r.Blockers = append(r.Blockers, "not installed: pkg:"+e.Missing)
@@ -134,22 +174,30 @@ func (a *App) BuildPack(name string, light, dryRun bool) (*PackBuild, error) {
 		return nil, err
 	}
 	for _, p := range ps.List {
+		if p.Log != nil {
+			continue
+		}
 		// Order problems do not block: the pack is sorted on its own below.
-		if p.Log == nil && p.Severity == finding.Error && !strings.HasPrefix(p.Code, "order.") && p.Code != "official.order" {
+		if p.Severity == finding.Error && !strings.HasPrefix(p.Code, "order.") && p.Code != "official.order" {
 			r.Blockers = append(r.Blockers, p.Claim)
+		} else if p.Code == "version.unsupported" && len(p.Subjects) > 0 {
+			line := p.Claim
+			if m := st.Ix.ByID[finding.InstID(p.Subjects[0])]; m != nil {
+				line = fmt.Sprintf("%s (%s)", m.DisplayName(), strings.TrimSpace(m.SupportedVersions))
+			}
+			r.Mismatch = append(r.Mismatch, line)
 		}
 	}
 	if len(r.Blockers) > 0 {
-		return r, nil
+		return pl, nil
 	}
 	sr, err := a.Sort(true)
 	if err != nil {
 		return nil, err
 	}
 	r.Moved = len(sr.Changes)
-	list := sr.Sorted
 	var mods []*store.Mod
-	for _, e := range list {
+	for _, e := range sr.Sorted {
 		if m := st.Ix.ByID[e.Instance]; m != nil {
 			mods = append(mods, m)
 		}
@@ -164,15 +212,16 @@ func (a *App) BuildPack(name string, light, dryRun bool) (*PackBuild, error) {
 	p := &Pack{Format: PackFormat, Name: name, Created: a.Now().UTC(), Game: st.Ix.Env.GameVersion, Env: st.Ix.Env.Name, Light: light}
 	used := map[string]bool{}
 	for _, m := range mods {
-		pe := PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Lineage: m.LineageID, Instance: m.ID, WorkshopID: m.WorkshopID(), Hash: hex.EncodeToString(m.SnapHash)}
 		if m.Kind == source.Official {
-			pe = PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Official: true}
-			p.Entries = append(p.Entries, pe)
+			p.Entries = append(p.Entries, PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Official: true})
+			pl.roots = append(pl.roots, "")
 			continue
 		}
+		pe := PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Lineage: m.LineageID, Instance: m.ID, WorkshopID: m.WorkshopID(), Hash: hex.EncodeToString(m.SnapHash)}
+		root := ""
 		if !light {
 			pe.Folder = packFolder(m, used)
-			root := st.Ix.ModDir(m)
+			root = st.Ix.ModDir(m)
 			if real, err := source.RealPath(root); err == nil {
 				root = real
 			}
@@ -187,35 +236,138 @@ func (a *App) BuildPack(name string, light, dryRun bool) (*PackBuild, error) {
 			for _, de := range ents {
 				if de.IsDir() && content.IsVersionFolder(de.Name()) && !keep[strings.ToLower(de.Name())] {
 					pe.TrimmedDir = append(pe.TrimmedDir, de.Name())
-					pe.Trimmed += dirSize(filepath.Join(root, de.Name()))
 				}
 			}
-			pe.Bytes = dirSize(root) - pe.Trimmed
-			p.Trimmed += pe.Trimmed
 		}
 		p.Entries = append(p.Entries, pe)
+		pl.roots = append(pl.roots, root)
 	}
 	r.Pack = p
-	if dryRun {
+	return pl, nil
+}
+
+// Measure sizes each mod's copy, finds the folders that cannot be read and the free
+// space of the packs drive. It only reads the file system, so the window runs it without
+// holding the app.
+func (pl *PackPlan) Measure(packsDir string) {
+	r := pl.R
+	if r.Pack == nil || r.Pack.Light {
+		return
+	}
+	r.Need, r.Pack.Trimmed, r.CannotCopy = 0, 0, nil
+	for i := range r.Pack.Entries {
+		pe := &r.Pack.Entries[i]
+		root := pl.roots[i]
+		if root == "" {
+			continue
+		}
+		if _, err := os.ReadDir(root); err != nil {
+			r.CannotCopy = append(r.CannotCopy, fmt.Sprintf("%s: %s", pe.Name, root))
+			continue
+		}
+		pe.Trimmed = 0
+		for _, t := range pe.TrimmedDir {
+			pe.Trimmed += dirSize(filepath.Join(root, t))
+		}
+		pe.Bytes = dirSize(root) - pe.Trimmed
+		r.Pack.Trimmed += pe.Trimmed
+		r.Need += pe.Bytes
+	}
+	if pl.free != nil {
+		r.Free = pl.free(packsDir)
+	} else {
+		r.Free = DiskFree(packsDir)
+	}
+}
+
+// BuildPackWith is BuildPack with progress. While it copies, the pack is assembled in
+// <name>.archo-tmp next to the packs, whose build.json says how far it got; a build cut
+// short (its process ended) leaves that folder, which UnfinishedPacks reports.
+func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
+	if err := checkPackName(name); err != nil {
+		return nil, err
+	}
+	tmp := a.packPath(name) + TmpSuffix
+	if b := ReadBuildProgress(tmp); b != nil && b.Running() {
+		return nil, fmt.Errorf("%w (%s)", ErrBuildRunning, name)
+	}
+	bs := &buildState{report: o.Progress}
+	if !o.DryRun {
+		if _, err := os.Stat(a.packPath(name)); err == nil {
+			return nil, fmt.Errorf("pack %q exists (%s); remove it first or pick another name", name, a.packPath(name))
+		}
+		// What is left of an earlier, unfinished build of this name is replaced.
+		if err := os.RemoveAll(tmp); err != nil {
+			return nil, err
+		}
+		if err := os.MkdirAll(tmp, 0o755); err != nil {
+			return nil, err
+		}
+		bs.start(tmp, BuildProgress{Name: name, Step: StepCheck})
+	}
+	cleanup := func() {
+		bs.stop()
+		if !o.DryRun {
+			os.RemoveAll(tmp)
+		}
+	}
+	bs.update(func(p *BuildProgress) { p.Step = StepCheck })
+	pl, err := a.PlanPack(name, o.Light)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+	r := pl.R
+	r.DryRun = o.DryRun
+	if len(r.Blockers) > 0 {
+		cleanup()
 		return r, nil
 	}
-	tmp := dir + ".archo-tmp"
-	os.RemoveAll(tmp)
-	if err := a.writePack(st, p, tmp); err != nil {
+	bs.update(func(p *BuildProgress) { p.Step, p.Env, p.ModsTotal = StepMeasure, r.Pack.Env, carriedCount(r.Pack) })
+	pl.Measure(a.PacksDir())
+	if o.DryRun {
+		return r, nil
+	}
+	if len(r.CannotCopy) > 0 {
+		cleanup()
+		return nil, fmt.Errorf("%d mods cannot be read, so they cannot be copied:\n  %s", len(r.CannotCopy), strings.Join(r.CannotCopy, "\n  "))
+	}
+	if r.Free >= 0 && r.Free < r.Need+SpaceMargin {
+		cleanup()
+		return nil, fmt.Errorf("%w: it needs %s, the drive of %s has %s free", ErrNoSpace, render.Size(r.Need+SpaceMargin), a.PacksDir(), render.Size(r.Free))
+	}
+	bs.update(func(p *BuildProgress) { p.Step, p.BytesTotal = StepCopy, r.Need })
+	if err := a.writePack(pl.St, r.Pack, tmp, bs, &r.Skipped); err != nil {
+		cleanup()
+		return nil, err
+	}
+	bs.update(func(p *BuildProgress) { p.Step, p.Mod = StepWrite, "" })
+	b, _ := json.MarshalIndent(r.Pack, "", "  ")
+	if err := os.WriteFile(filepath.Join(tmp, "pack.json"), append(b, '\n'), 0o644); err != nil {
+		cleanup()
+		return nil, err
+	}
+	bs.stop()
+	os.Remove(filepath.Join(tmp, BuildFile))
+	if err := os.Rename(tmp, r.Dir); err != nil {
 		os.RemoveAll(tmp)
 		return nil, err
 	}
-	if err := os.Rename(tmp, dir); err != nil {
-		os.RemoveAll(tmp)
-		return nil, err
-	}
+	bs.update(func(p *BuildProgress) { p.Step = StepDone })
 	return r, nil
 }
 
-func (a *App) writePack(st *LoadoutState, p *Pack, dir string) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
+func carriedCount(p *Pack) int {
+	n := 0
+	for _, pe := range p.Entries {
+		if !pe.Official && pe.Folder != "" {
+			n++
+		}
 	}
+	return n
+}
+
+func (a *App) writePack(st *LoadoutState, p *Pack, dir string, bs *buildState, skipped *int) error {
 	for _, pe := range p.Entries {
 		if pe.Official || pe.Folder == "" {
 			continue
@@ -225,6 +377,7 @@ func (a *App) writePack(st *LoadoutState, p *Pack, dir string) error {
 		if real, err := source.RealPath(root); err == nil {
 			root = real
 		}
+		bs.update(func(p *BuildProgress) { p.Mod = pe.Name })
 		dst := filepath.Join(dir, "mods", pe.Folder)
 		if err := os.MkdirAll(dst, 0o755); err != nil {
 			return err
@@ -233,7 +386,10 @@ func (a *App) writePack(st *LoadoutState, p *Pack, dir string) error {
 		for _, t := range pe.TrimmedDir {
 			skip[t] = true
 		}
-		res := &CopyResult{}
+		res := &CopyResult{onFile: func(n int64) error {
+			bs.update(func(p *BuildProgress) { p.Bytes += n })
+			return bs.stopRequested()
+		}}
 		ents, err := os.ReadDir(root)
 		if err != nil {
 			return err
@@ -254,8 +410,11 @@ func (a *App) writePack(st *LoadoutState, p *Pack, dir string) error {
 				}
 			} else if err := copyFile(src, filepath.Join(dst, name), fi); err != nil {
 				return err
+			} else if err := res.onFile(fi.Size()); err != nil {
+				return err
 			}
 		}
+		*skipped += len(res.Skipped)
 		o := scan.Origin{InstanceID: m.ID, LineageID: m.LineageID, WorkshopID: m.WorkshopID(), SnapshotHash: pe.Hash,
 			CopiedAt: a.Now().UTC().Format("2006-01-02T15:04:05Z")}
 		b, _ := json.MarshalIndent(o, "", "  ")
@@ -265,9 +424,9 @@ func (a *App) writePack(st *LoadoutState, p *Pack, dir string) error {
 		if err := os.WriteFile(filepath.Join(dst, filepath.FromSlash(scan.OriginFile)), append(b, '\n'), 0o644); err != nil {
 			return err
 		}
+		bs.update(func(p *BuildProgress) { p.Mods++ })
 	}
-	b, _ := json.MarshalIndent(p, "", "  ")
-	return os.WriteFile(filepath.Join(dir, "pack.json"), append(b, '\n'), 0o644)
+	return nil
 }
 
 var unsafeFolder = regexp.MustCompile(`[^A-Za-z0-9._\-]+`)
@@ -352,14 +511,20 @@ func (a *App) Packs() ([]*PackInfo, error) {
 	}
 	var out []*PackInfo
 	for _, de := range ents {
-		if !de.IsDir() || strings.HasSuffix(de.Name(), ".archo-tmp") {
+		if !de.IsDir() || strings.HasSuffix(de.Name(), TmpSuffix) {
 			continue
 		}
 		p, err := a.ReadPack(de.Name())
 		if err != nil {
 			continue
 		}
-		pi := &PackInfo{Pack: p, Dir: a.packPath(de.Name()), Bytes: dirSize(filepath.Join(a.packPath(de.Name()), "mods"))}
+		pi := &PackInfo{Pack: p, Dir: a.packPath(de.Name())}
+		for _, pe := range p.Entries {
+			pi.Bytes += pe.Bytes // measured when it was built: listing does not walk the copies
+		}
+		if pi.Bytes == 0 && !p.Light {
+			pi.Bytes = dirSize(filepath.Join(pi.Dir, "mods"))
+		}
 		if b, err := os.ReadFile(filepath.Join(pi.Dir, "state.json")); err == nil {
 			var s packState
 			if json.Unmarshal(b, &s) == nil {
@@ -728,7 +893,10 @@ func (a *App) unpackPack(zr *zip.Reader) (*PackMatch, error) {
 	if _, err := os.Stat(dir); err == nil {
 		return nil, fmt.Errorf("pack %q exists; remove it first", p.Name)
 	}
-	tmp := dir + ".archo-tmp"
+	tmp := dir + TmpSuffix
+	if ReadBuildProgress(tmp).Running() {
+		return nil, fmt.Errorf("%w (%s)", ErrBuildRunning, p.Name)
+	}
 	os.RemoveAll(tmp)
 	for _, f := range zr.File {
 		name := filepath.FromSlash(f.Name)

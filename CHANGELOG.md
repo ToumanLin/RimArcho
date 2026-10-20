@@ -39,6 +39,14 @@ Spec: `docs/specs/10-1.0实现.md`.
   play it with its own list and saves through links in `Mods/`, share it as a zip or a list.
 - The window has a Packs screen: the packs with when they were last played, Play, and build
   from the current list with a preview.
+- Building a pack no longer freezes the window: it runs as an `archo pack build` child that
+  goes on when the window closes, with its steps (check → sort → copy → write → ready) drawn
+  as a diagram, a progress bar and a Stop button. The preview marks what needs attention:
+  blockers, too little free space (checked before copying; the build is refused), mods that
+  cannot be read, mods that do not list the game's version. A build cut short is shown as
+  unfinished (build again, or delete what it copied) instead of disappearing; `archo pack
+  list` shows it too, `archo pack stop` and `pack remove --unfinished` handle it, and `archo
+  pack build` prints progress lines. Sizes show in GB from 1 GB up.
 
 ### Settings (10 §7)
 - A settings screen (gear in the top bar): environment folders, launch method and arguments,

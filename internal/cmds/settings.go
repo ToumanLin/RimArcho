@@ -26,7 +26,7 @@ func init() {
 	register(&Command{Name: "cache clear", Args: "<kind>", Summary: "empty one cache (previews, workshop, images, source, logs); rebuilt on demand", MinArgs: 1, MaxArgs: 1, Run: cacheClearCmd})
 }
 
-func mb(n int64) string { return fmt.Sprintf("%.1f MB", float64(n)/(1<<20)) }
+func mb(n int64) string { return render.Size(n) }
 
 func dbStatusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	s, err := c.App.DBInfo()

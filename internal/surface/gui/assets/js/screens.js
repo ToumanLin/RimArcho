@@ -685,29 +685,156 @@ export async function environment() {
 
 // ---- packs (10 §8) ----
 // The packs like versions in a game launcher: play one, or build one from the current list.
+// A build runs in the background (an `archo pack build` child): the page shows its steps
+// and progress from the "pack" events, and a build another window started, or one cut
+// short, from the list (Packs().unfinished).
+
+const PACK_STEPS = ["check the list", "sort for the pack", "copy the mods", "write pack.json", "ready to play"];
+const builds = {};      // name → the preview's steps, for the build card
+let packPoll = 0;
+
+// flow draws the build's steps as boxes joined by arrows. steps: the preview's (with
+// facts); at: the step a build is at (-1: a preview); done: the build ended.
+function flow(steps, at = -1, done = false) {
+  const f = el("div", "flow");
+  steps.forEach((s, i) => {
+    if (i) f.append(el("div", "arrow" + (at > i - 1 || done ? " on" : "")));
+    let cls = "step";
+    if (s.level) cls += " " + s.level;
+    if (at >= 0) cls += done || i < at ? " done" : i === at ? " cur" : " wait";
+    const b = el("div", cls);
+    const h = el("div", "h");
+    h.append(el("span", "n", done || (at >= 0 && i < at) ? "✓" : String(i + 1)), el("span", "t", s.title));
+    b.append(h);
+    for (const x of s.facts || []) b.append(el("div", "f", x));
+    f.append(b);
+  });
+  return f;
+}
+
+function plainSteps() { return PACK_STEPS.map((t) => ({ title: T(t), facts: [] })); }
+
+// attention lists what the player must look at: the steps marked amber or red, with their
+// details (the blockers, the mods that cannot be copied, the version mismatches).
+function attention(steps) {
+  const box = el("div", "attn");
+  for (const s of steps) {
+    if (s.level !== "warn" && s.level !== "bad") continue;
+    const g = el("div", "a " + s.level);
+    g.append(el("div", "h", [s.title, ...(s.facts || [])].join(" · ")));
+    if (s.more && s.more.length) {
+      const ul = el("ul");
+      for (const m of s.more) ul.append(el("li", "", m));
+      g.append(ul);
+    }
+    box.append(g);
+  }
+  return box.childNodes.length ? box : null;
+}
+
+function progressBox(p) {
+  const w = el("div", "prog");
+  const bar = el("div", "bar" + (p.error ? " bad" : ""));
+  const fill = el("i");
+  fill.style.width = Math.round((p.frac || 0) * 100) + "%";
+  bar.append(fill);
+  w.append(bar, el("div", "ptext" + (p.error ? " bad" : ""), p.error || p.text || ""));
+  return w;
+}
+
+// buildCard is a build on the page: running (here or in another window) or cut short.
+function buildCard(u) {
+  const card = el("section", "card build" + (u.running ? "" : " unfinished"));
+  card.dataset.build = u.name;
+  const head = el("div", "pack");
+  const left = el("div", "l");
+  left.append(el("div", "name", u.running ? Tf("building pack %s", u.name) : u.name), el("div", "sub", u.facts || ""));
+  const right = el("div", "r");
+  if (u.running) {
+    right.append(button(T("stop"), "", async () => {
+      try { say("ok", await api.PackStop(u.name)); } catch (e) { say("fail", errText(e)); }
+    }));
+  } else {
+    right.append(button(T("build again"), "", () => previewBuild(u.name), "primary"));
+    right.append(button(T("delete what it copied"), "", () => pop.confirm(T("delete what it copied"), [Tf("the unfinished build of %s and what it copied (%s) are deleted; your mods are not touched", u.name, u.copied || "?")], T("delete what it copied"), async () => {
+      say("busy", T("deleting what it copied…"));
+      try { say("ok", await api.PackRemoveUnfinished(u.name)); } catch (e) { say("fail", errText(e)); }
+      packs();
+    }), "danger"));
+  }
+  head.append(left, right);
+  card.append(head);
+  if (u.running) {
+    const p = u.progress || { step: 0, frac: 0, text: "" };
+    const body = el("div", "flowwrap");
+    body.append(flow(builds[u.name] || plainSteps(), p.step, p.done), progressBox(p));
+    card.append(body);
+  }
+  return card;
+}
+
+// packEvent is a "pack" event: the progress of the build this window started, and its end.
+export function packEvent(ev) {
+  S.packBuild = ev.done ? null : ev;
+  if (ev.done) {
+    say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
+    if (S.screen === "packs") packs();
+    return;
+  }
+  if (S.screen !== "packs") { say("busy", Tf("building pack %s", ev.name) + " · " + ev.text); return; }
+  const card = document.querySelector(`.card.build[data-build="${CSS.escape(ev.name)}"]`);
+  if (!card) { packs(); return; }
+  const body = card.querySelector(".flowwrap");
+  body.innerHTML = "";
+  body.append(flow(builds[ev.name] || plainSteps(), ev.step, false), progressBox(ev));
+  card.querySelector(".sub").textContent = T("building") + " · " + ev.text;
+}
+
+async function previewBuild(n) {
+  let pv;
+  say("busy", T("checking the list…"));
+  try { pv = await api.PackPreview(n); } catch (e) { return say("fail", errText(e)); }
+  say("", "");
+  const body = el("div", "packpv");
+  body.append(flow(pv.steps));
+  const a = attention(pv.steps);
+  if (a) body.append(a);
+  if (pv.dir) body.append(el("div", "muted dir", T("folder") + ": " + pv.dir));
+  pop.panel(Tf("build pack %s", n), body, T("build"), pv.ok ? async () => {
+    builds[n] = pv.steps;
+    try { say("ok", await api.PackBuild(n)); } catch (e) { say("fail", errText(e)); }
+    packs();
+  } : null, "wide");
+}
 
 export async function packs() {
-  let rows, others = 0;
-  try { const l = await api.Packs(); rows = (l && l.rows) || []; others = (l && l.others) || 0; } catch (e) { say("fail", errText(e)); return; }
+  let rows, others = 0, un = [];
+  try {
+    const l = await api.Packs();
+    rows = (l && l.rows) || []; others = (l && l.others) || 0; un = (l && l.unfinished) || [];
+    // This window's build before its child wrote its first state.
+    if (l && l.building && !un.some((u) => u.name === l.building)) un.unshift({ name: l.building, running: true, facts: T("checking the list…") });
+  } catch (e) { say("fail", errText(e)); return; }
   const sc = S.screen === "packs" ? $("#screen") : openScreen("packs");
+  const typed = sc.querySelector(".page.packs input.field");
+  const keep = typed ? typed.value : "";
   sc.innerHTML = "";
   const name = el("input", "field");
   name.placeholder = T("name of a new pack");
   name.spellcheck = false;
-  const build = button(T("build from the current list"), "", async () => {
+  name.value = keep;
+  const build = button(T("build from the current list"), "", () => {
     const n = name.value.trim();
     if (!n) { name.focus(); return; }
-    let pv;
-    try { pv = await api.PackPreview(n); } catch (e) { return say("fail", errText(e)); }
-    pop.confirm(Tf("build pack %s", n), pv.lines, T("build"), pv.ok ? async () => {
-      say("busy", T("copying the mods…"));
-      try { say("ok", await api.PackBuild(n)); } catch (e) { say("fail", errText(e)); }
-      packs();
-    } : null);
+    previewBuild(n);
   });
   name.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); build.click(); } };
   const w = page("packs", T("packs"), el("span", "grow"), name, build);
   sc.append(w);
+  for (const u of un) {
+    if (u.running && S.packBuild && S.packBuild.name === u.name) u.progress = S.packBuild;
+    w.append(buildCard(u));
+  }
   const card = el("section", "card");
   if (!rows.length) {
     card.append(el("div", "empty-state", T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves")));
@@ -732,4 +859,10 @@ export async function packs() {
   }
   w.append(card);
   if (others) w.append(el("div", "muted note", Tf("%d packs belong to other environments; switch the environment to see them", others)));
+  // A build this window does not watch (started before a restart, or elsewhere): look
+  // again while it runs.
+  clearTimeout(packPoll);
+  if (un.some((u) => u.running && !(S.packBuild && S.packBuild.name === u.name))) {
+    packPoll = setTimeout(() => { if (S.screen === "packs" && !S.popup) packs(); else if (S.screen === "packs") packPoll = setTimeout(packs, 1500); }, 1500);
+  }
 }

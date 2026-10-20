@@ -588,6 +588,7 @@ async function start() {
     await reload();
     scr.analyzeEvent(ev);
   });
+  on("pack", (ev) => scr.packEvent(ev));
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again
   // when the window gets the focus (G8).
   addEventListener("focus", async () => {

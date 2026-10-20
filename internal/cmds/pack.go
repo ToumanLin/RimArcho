@@ -19,11 +19,38 @@ func init() {
 		Flags: []Flag{{Name: "light", Help: "the list only"}}})
 	register(&Command{Name: "pack import", Args: "<file>", Summary: "unpack a .archopack, or compare a light pack with the installed mods", MinArgs: 1, MaxArgs: 1, Run: packImportCmd,
 		Flags: []Flag{{Name: "as-plan", Help: "light pack: also load its list into the workspace (undoable)"}}})
-	register(&Command{Name: "pack remove", Args: "<name>", Summary: "move a pack to the recycle bin", MinArgs: 1, MaxArgs: 1, Run: packRemoveCmd, Flags: []Flag{dry}})
+	register(&Command{Name: "pack remove", Args: "<name>", Summary: "move a pack to the recycle bin; --unfinished deletes what a build cut short copied", MinArgs: 1, MaxArgs: 1, Run: packRemoveCmd,
+		Flags: []Flag{dry, {Name: "unfinished", Help: "the unfinished build of <name> (its folder in the packs folder)"}}})
+	register(&Command{Name: "pack stop", Args: "<name>", Summary: "stop a running pack build (what it copied is removed)", MinArgs: 1, MaxArgs: 1, Run: packStopCmd})
+}
+
+// BuildProgressLine is a build's progress as one line ("copy 12/300 mods · 1.2 GB of 5.4 GB · Name").
+func BuildProgressLine(p app.BuildProgress) string {
+	switch p.Step {
+	case app.StepCheck:
+		return "check: the list, then sort it for the pack"
+	case app.StepMeasure:
+		return fmt.Sprintf("measure: %d mods to copy", p.ModsTotal)
+	case app.StepCopy:
+		l := fmt.Sprintf("copy %d/%d mods · %s of %s", p.Mods, p.ModsTotal, render.Size(p.Bytes), render.Size(p.BytesTotal))
+		if p.Mod != "" {
+			l += " · " + p.Mod
+		}
+		return l
+	case app.StepWrite:
+		return "write: pack.json"
+	case app.StepDone:
+		return "done"
+	}
+	return p.Step
 }
 
 func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.BuildPack(a.Pos[0], a.Bool("light"), a.Bool("dry-run"))
+	o := app.BuildOptions{Light: a.Bool("light"), DryRun: a.Bool("dry-run")}
+	if Progress != nil {
+		o.Progress = func(p app.BuildProgress) { Progress("progress: " + BuildProgressLine(p)) }
+	}
+	r, err := c.App.BuildPackWith(a.Pos[0], o)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +82,23 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	root.KV("mods", fmt.Sprintf("%d carried, %d from the game (Core and DLCs)", carried, official))
 	if !r.Pack.Light {
 		root.KV("size", fmt.Sprintf("%s; %s of other game versions left out", mb(bytes), mb(r.Pack.Trimmed)))
+		if r.DryRun && r.Free >= 0 {
+			free := fmt.Sprintf("%s free on the packs drive", mb(r.Free))
+			if r.Free < r.Need+app.SpaceMargin {
+				free += " — NOT ENOUGH: the build is refused"
+			}
+			root.KV("space", free)
+		}
+		if len(r.CannotCopy) > 0 {
+			n := root.KV("cannot copy", fmt.Sprintf("%d mods (their folders cannot be read; the build is refused)", len(r.CannotCopy)))
+			for _, x := range r.CannotCopy {
+				n.Add(x)
+			}
+			n.Truncate(10, "")
+		}
+		if r.Skipped > 0 {
+			root.KV("skipped", fmt.Sprintf("%d links that leave their mod's folder", r.Skipped))
+		}
 		n := root.Add("trimmed:")
 		for _, e := range r.Pack.Entries {
 			if len(e.TrimmedDir) > 0 {
@@ -70,6 +114,13 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("order", fmt.Sprintf("sorted for the pack: %d moved (the workspace is unchanged)", r.Moved))
 	}
 	root.KV("game", r.Pack.Game)
+	if len(r.Mismatch) > 0 {
+		n := root.KV("versions", fmt.Sprintf("%d mods do not list the game's version", len(r.Mismatch)))
+		for _, x := range r.Mismatch {
+			n.Add(x)
+		}
+		n.Truncate(10, "")
+	}
 	if r.DryRun {
 		d.AddNext("archo pack build " + quoteArg(r.Pack.Name))
 	} else {
@@ -99,9 +150,29 @@ func packListCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		root.Addf("%s  %d mods  %s  %s%s  built %s  %s", p.Name, len(p.Entries), kind, p.Game, where, c.App.FormatDate(p.Created), played)
 	}
+	if us, err := c.App.UnfinishedPacks(); err == nil {
+		for _, u := range us {
+			if u.Running {
+				root.Addf("%s  building: %s", u.Name, BuildProgressLine(*u.Progress))
+				d.AddNext("archo pack stop " + quoteArg(u.Name))
+			} else {
+				root.Addf("%s  unfinished build (%s)", u.Name, u.Dir)
+				d.AddNext("archo pack build " + quoteArg(u.Name))
+				d.AddNext("archo pack remove " + quoteArg(u.Name) + " --unfinished")
+			}
+		}
+	}
 	if len(ps) == 0 {
 		d.AddNext("archo pack build <name>")
 	}
+	return d, nil
+}
+
+func packStopCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if err := c.App.StopBuild(a.Pos[0]); err != nil {
+		return nil, err
+	}
+	d, _ := render.New("asked the build of " + a.Pos[0] + " to stop; what it copied is removed")
 	return d, nil
 }
 
@@ -177,6 +248,17 @@ func packImportCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func packRemoveCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Bool("unfinished") {
+		if a.Bool("dry-run") {
+			d, _ := render.New("dry run: would delete the unfinished build of " + a.Pos[0])
+			return d, nil
+		}
+		if err := c.App.RemoveUnfinished(a.Pos[0]); err != nil {
+			return nil, err
+		}
+		d, _ := render.New("deleted the unfinished build of " + a.Pos[0])
+		return d, nil
+	}
 	dir, err := c.App.RemovePack(a.Pos[0], a.Bool("dry-run"))
 	if err != nil {
 		return nil, err

@@ -15,6 +15,7 @@ export const S = {
   popup: null,  // the open popup (06 §13.2 rule 5)
   screen: null, // "needs" | "changes" | "full"
   busy: {},     // scan, analyze
+  packBuild: null, // the last "pack" event of the build this window runs
   live: null,   // Live(): the running game and its errors (10 §3.4)
   history: null, // History(): unsaved steps and versions (08 §14)
 };
