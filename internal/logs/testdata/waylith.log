@@ -1,0 +1,41 @@
+=== Waylith log ===
+Started:   2026-10-19 15:17:40.706 -07:00
+Version:   1.7.4982.1280
+Platform:  Windows x64
+
+2026-10-19 15:17:41.100  INFO [Waylith] Starting up
+2026-10-19 15:17:41.163  WARN [Vulkan] [General] [Loader Message] Removing layer VK_LAYER_X from instance layers
+Objects: 1
+    [0] VkInstance 0x1a1a81d4880
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, Object context) [0x0]
+    at Waylith.Graphics.GraphicsDevice+<>c.<.cctor>b__126_1(String s) [0x0]
+    at Waylith.Graphics.GraphicsDevice.Init() [0x0]
+2026-10-19 15:17:41.976  INFO [Verse] RimWorld 1.7.4982 rev1280
+    at Brutal.Logging.LogCategory.Info(LogString`1 message) [0x0]
+    at Verse.Log.Message(String text) [0x0]
+    at Verse.Root.Start() [0x0]
+2026-10-19 15:17:42.010 DEBUG [Verse] Loading mods
+2026-10-19 15:17:50.500  WARN [Verse] Could not load reference to Verse.ThingDef named Gun_Missing
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message) [0x0]
+    at Verse.Log.Warning(String text) [0x0]
+    at Verse.DirectXmlCrossRefLoader.ResolveAllWantedCrossReferences(FailMode failReportMode) [0x0]
+2026-10-19 15:17:51.000 ERROR [Verse] [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed
+file: C:\Mods\Compat\Patches\Compat.xml
+    at Brutal.Logging.LogCategory.Error(LogString`1 message) [0x0]
+    at Verse.Log.Error(String text) [0x0]
+    at .Verse.Log.Error_Patch3(String text) [0x0]
+    at Verse.PatchOperation.Complete(String modIdentifier) [0x0]
+2026-10-19 15:17:52.000  WARN [Verse] Some mod did something odd
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message) [0x0]
+    at Verse.Log.Warning(String text) [0x0]
+    at OddMod.Startup..ctor() [0x0]
+2026-10-19 15:17:59.207 ERROR [Verse] Error while instantiating a mod of type BadMod.BadMod: System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> HarmonyLib.HarmonyException: Patching exception in method null
+[Ref 2704D0D1]
+    at Brutal.Logging.LogCategory.Error(LogString`1 message) [0x0]
+    at Verse.Log.Error(String text) [0x0]
+    at .Verse.Log.Error_Patch3(String text) [0x0]
+   at HarmonyLib.MethodCreatorTools.ValidateBinding(Type a) [0x0]
+   at BadMod.BadMod..ctor(ModContentPack content) [0x0]
+2026-10-19 15:18:00.000 ERROR [Verse] Error while instantiating a mod of type BadMod.BadMod: System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+[Ref 2704D0D1] Duplicate stacktrace, see ref for original

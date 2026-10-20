@@ -2,6 +2,10 @@
 // (a message line plus its stack, Harmony patch lines and continuation lines), resolves
 // "[Ref X] Duplicate stacktrace" back to the original stack, normalises messages into
 // cluster keys and classifies each cluster. Attribution to mods happens in internal/app.
+//
+// Two formats are read: Unity's Player.log (game ≤1.6) and the Waylith log of 1.7
+// ("=== Waylith log ===" header, then "<date> <time> <LEVEL> [<category>] message" lines
+// with continuation lines and a stack under each).
 package logs
 
 import (
@@ -38,12 +42,14 @@ type Patch struct {
 
 // Entry is one log message with its stack.
 type Entry struct {
-	Line    int // 1-based line of the message
-	Message string
-	Extra   []string // continuation lines that are not frames (file:, Subnode:, inner messages)
-	Frames  []Frame
-	Ref     string // "[Ref X]" this entry defines or points to
-	Dup     bool   // "Duplicate stacktrace, see ref for original"
+	Line     int    // 1-based line of the message
+	Level    string // Waylith only: TRACE, DEBUG, INFO, WARN, ERROR, FATAL; "" in Unity logs
+	Category string // Waylith only: the first [category] of the line ("Verse", "Vulkan")
+	Message  string
+	Extra    []string // continuation lines that are not frames (file:, Subnode:, inner messages)
+	Frames   []Frame
+	Ref      string // "[Ref X]" this entry defines or points to
+	Dup      bool   // "Duplicate stacktrace, see ref for original"
 }
 
 // File is a parsed log.
@@ -51,6 +57,21 @@ type File struct {
 	Entries []*Entry
 	Lines   int
 	Version string // "1.6.4871 rev…" from the header, if found
+	Waylith bool   // the 1.7 format
+}
+
+// Format names.
+const (
+	FormatUnity   = "unity"
+	FormatWaylith = "waylith"
+)
+
+// Format returns the log format name.
+func (f *File) Format() string {
+	if f.Waylith {
+		return FormatWaylith
+	}
+	return FormatUnity
 }
 
 var (
@@ -63,6 +84,12 @@ var (
 	patchNumRe    = regexp.MustCompile(`_Patch\d+$`)
 	genericArgsRe = regexp.MustCompile(`\[[^\[\]]*\]`)
 	versionRe     = regexp.MustCompile(`RimWorld (\d+\.\d+\.\d+ rev\d+)`)
+
+	// Waylith (1.7).
+	waylithHeader    = "=== Waylith log ==="
+	waylithLineRe    = regexp.MustCompile(`^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d(?:\.\d+)?\s+([A-Z]+)\s+(.*)$`)
+	waylithCatRe     = regexp.MustCompile(`^\[([^\]]*)\]\s?`)
+	waylithVersionRe = regexp.MustCompile(`^Version:\s+(\d+\.\d+\.\d+)\.(\d+)\s*$`)
 )
 
 func isContinuation(l string) bool {
@@ -95,6 +122,13 @@ func Parse(r io.Reader) (*File, error) {
 		if len(l) > 4096 {
 			l = l[:4096]
 		}
+		if n == 1 && strings.TrimSpace(strings.TrimPrefix(l, "\ufeff")) == waylithHeader {
+			f.Waylith = true
+		}
+		if f.Waylith {
+			cur = parseWaylith(f, cur, n, l)
+			continue
+		}
 		if f.Version == "" && n < 50 {
 			if m := versionRe.FindStringSubmatch(l); m != nil {
 				f.Version = m[1]
@@ -116,8 +150,70 @@ func Parse(r io.Reader) (*File, error) {
 		f.Entries = append(f.Entries, cur)
 	}
 	f.Lines = n
+	if f.Waylith {
+		for _, e := range f.Entries {
+			e.Frames = skipLoggerFrames(e.Frames)
+		}
+	}
 	resolveRefs(f)
 	return f, sc.Err()
+}
+
+// parseWaylith handles one line of a 1.7 log. Every message starts with a timestamped
+// line; anything else (stack frames, but also column-0 continuation lines such as
+// "Objects: 1" or "[Ref X]") belongs to the current message. Lines before the first
+// message are the header.
+func parseWaylith(f *File, cur *Entry, n int, l string) *Entry {
+	m := waylithLineRe.FindStringSubmatch(l)
+	if m == nil {
+		if cur == nil {
+			if v := waylithVersionRe.FindStringSubmatch(l); v != nil && f.Version == "" {
+				f.Version = v[1] + " rev" + v[2]
+			}
+			return nil
+		}
+		if strings.TrimSpace(l) != "" {
+			addLine(cur, l)
+		}
+		return cur
+	}
+	e := &Entry{Line: n, Level: m[1], Message: m[2]}
+	if c := waylithCatRe.FindStringSubmatch(e.Message); c != nil {
+		e.Category, e.Message = c[1], e.Message[len(c[0]):]
+	}
+	if f.Version == "" && e.Category == "Verse" {
+		if v := versionRe.FindStringSubmatch(e.Message); v != nil {
+			f.Version = v[1]
+		}
+	}
+	f.Entries = append(f.Entries, e)
+	return e
+}
+
+// loggerFrame reports frames of the logging system itself (Brutal.Logging, Verse.Log and
+// Harmony replacements of Verse.Log methods): in 1.7 every message's stack starts with them.
+func loggerFrame(fr Frame) bool {
+	t := fr.Type
+	return strings.HasPrefix(t, "Brutal.Logging.") || t == "Brutal.Logging" ||
+		t == "Verse.Log" || strings.HasPrefix(t, "Verse.Log+") ||
+		strings.HasPrefix(t, "Waylith.Logging.") || t == "Waylith.Logging"
+}
+
+func skipLoggerFrames(frs []Frame) []Frame {
+	i := 0
+	for i < len(frs) && loggerFrame(frs[i]) && len(frs[i].Harmony) == 0 {
+		i++
+	}
+	return frs[i:]
+}
+
+// errorLevel reports a Waylith level that is a warning or an error.
+func errorLevel(level string) bool {
+	switch level {
+	case "WARN", "WARNING", "ERROR", "ERR", "FATAL", "CRITICAL":
+		return true
+	}
+	return false
 }
 
 func addLine(e *Entry, l string) {
@@ -153,7 +249,15 @@ func addLine(e *Entry, l string) {
 	}
 	if m := frameRe.FindStringSubmatch(l); m != nil {
 		fr := Frame{Text: strings.TrimSpace(l)}
-		fr.Type, fr.Method = splitMember(m[1])
+		name := m[1]
+		if i := strings.IndexByte(name, '('); i > 0 { // .NET Core: "at Ns.Type.Method(args) [0x0]"
+			name = name[:i]
+		}
+		if strings.HasPrefix(name, ".") || patchNumRe.MatchString(name) { // Harmony replacement: ".Verse.Log.Error_Patch3"
+			name = dedupePatched(strings.TrimPrefix(name, "."))
+			fr.Patched = true
+		}
+		fr.Type, fr.Method = splitMember(name)
 		e.Frames = append(e.Frames, fr)
 		return
 	}
@@ -179,11 +283,16 @@ func splitMember(s string) (typ, method string) {
 		s = s[:i]
 	}
 	s = genericArgsRe.ReplaceAllString(s, "") // generic arguments: List`1[T].get_Item, Foo.Bar[T]
+	// Lambdas in constructors: "Type+<>c.<.cctor>b__1_0" (the dot would split the name).
+	s = strings.ReplaceAll(strings.ReplaceAll(s, "<.cctor>", "<cctor>"), "<.ctor>", "<ctor>")
 	i := strings.LastIndexByte(s, '.')
 	if i < 0 {
 		return "", s
 	}
 	typ, method = s[:i], s[i+1:]
+	if strings.HasSuffix(typ, ".") { // constructor: "Ns.Type..ctor" → ("Ns.Type", ".ctor")
+		typ, method = typ[:len(typ)-1], "."+method
+	}
 	if j := strings.Index(typ, "+<"); j >= 0 { // compiler-generated closure or iterator
 		if a, b := strings.IndexByte(method, '<'), strings.IndexByte(method, '>'); a == 0 && b > 1 {
 			method = method[1:b]
@@ -235,13 +344,18 @@ func Classify(e *Entry) string {
 			return ClassHarmony
 		}
 	}
-	if len(e.Frames) > 0 || strings.Contains(m, "Exception") {
+	// In 1.7 every message has a stack, warnings included: a warning's frames are just
+	// its caller, not an exception.
+	frames := len(e.Frames) > 0 && !isWarning(e.Level)
+	if frames || strings.Contains(m, "Exception") {
 		return ClassException
 	}
 	return ClassOther
 }
 
 var xmlRe = regexp.MustCompile(`XML error|XmlException|Exception parsing|Could not find parent node|parent node named|Duplicate def|Could not find a type named|Exception loading def from file|Exception reading .*\.xml|XML parse|failed to load|Could not find class|Exception loading .* from|is not a valid .*Def|DefOf field .* not found|Config error in`)
+
+func isWarning(level string) bool { return level == "WARN" || level == "WARNING" }
 
 func hasFrame(e *Entry, method string) bool {
 	for _, fr := range e.Frames {
@@ -253,8 +367,12 @@ func hasFrame(e *Entry, method string) bool {
 }
 
 // Interesting reports whether an entry is an error worth clustering (Player.log mixes in
-// plenty of informational lines).
+// plenty of informational lines). A leveled (1.7) entry is interesting when it is a warning
+// or an error.
 func Interesting(e *Entry) bool {
+	if e.Level != "" {
+		return errorLevel(e.Level)
+	}
 	if len(e.Frames) > 0 || Classify(e) != ClassOther {
 		return true
 	}
@@ -290,6 +408,7 @@ type Cluster struct {
 	ID    string // E1, E2 … in order of first occurrence
 	Key   string
 	Class string
+	Level string // the first entry's level (1.7 logs); "" in Unity logs
 	Count int
 	First *Entry
 	Lines []int // first few occurrences
@@ -313,7 +432,7 @@ func Clusters(f *File) []*Cluster {
 		}
 		c := by[key]
 		if c == nil {
-			c = &Cluster{Key: key, Class: cls, First: e}
+			c = &Cluster{Key: key, Class: cls, Level: e.Level, First: e}
 			by[key] = c
 			out = append(out, c)
 			c.ID = "E" + itoa(len(out))
