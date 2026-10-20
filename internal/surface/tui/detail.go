@@ -18,6 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // Details (06 §6): who the mod is, its problems, the facts a player uses (package id,
@@ -126,7 +127,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	if mod == nil {
 		return nil
 	}
-	facts := []string{sourceText(mod)}
+	facts := []string{view.SourceText(mod)}
 	if mod.Kind != source.Official {
 		if v := strings.Fields(mod.SupportedVersions); len(v) > 0 {
 			facts = append(facts, T("supports")+" "+strings.Join(v, " "))

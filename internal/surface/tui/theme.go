@@ -130,33 +130,3 @@ func sourceIcon(m *store.Mod) string {
 	}
 	return ic.local
 }
-
-// sourceText names the source in the detail column.
-func sourceText(m *store.Mod) string {
-	switch {
-	case m.Kind == source.Official:
-		return T("official")
-	case m.Kind.WorkshopLike():
-		return T("workshop")
-	case m.GitHead != "":
-		return "Git"
-	case m.Origin != "":
-		return T("local copy")
-	}
-	return T("local")
-}
-
-// sourceKind is the type: value of a mod's source (06 §5.5).
-func sourceKind(m *store.Mod) string {
-	switch {
-	case m.Kind == source.Official:
-		return "official"
-	case m.Kind.WorkshopLike():
-		return "workshop"
-	case m.GitHead != "":
-		return "git"
-	case m.Origin != "":
-		return "copy"
-	}
-	return "local"
-}

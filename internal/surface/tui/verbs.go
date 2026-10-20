@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // Verbs (06 §13.6): each acts at once on the object, the selection or else the cursor's
@@ -255,7 +256,7 @@ func (m *model) posOptions() {
 				s = 3
 			case strings.Contains(l, q):
 				s = 2
-			case subsequence(q, l):
+			case view.Subsequence(q, l):
 				s = 1
 			}
 			if s > 0 {

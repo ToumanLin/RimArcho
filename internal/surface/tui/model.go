@@ -6,7 +6,6 @@ package tui
 import (
 	"os"
 	"os/exec"
-	"regexp"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // Options configure the TUI.
@@ -126,8 +126,7 @@ type model struct {
 	status  string
 	sayKind int
 
-	content    map[string]int // content kinds for type: (loaded on first use)
-	contentKey string
+	content view.ContentCache // content kinds for type: (loaded on first use)
 
 	dd          *detailData          // the current mod's details beyond the row
 	imgs        map[string]*imgEntry // description images by url and width
@@ -295,22 +294,8 @@ func (m *model) runToStatus(argv ...string) {
 	m.openPanel("archo "+strings.Join(argv, " "), out, nil)
 }
 
-var idRe = regexp.MustCompile(`#[0-9a-z]{3,8}\b`)
-
-// humanize replaces instance references by mod names and drops the "error: " prefix
-// (06 §2.1 rule 6: no #id on screen).
-func (m *model) humanize(s string) string {
-	s = strings.TrimPrefix(strings.TrimSpace(s), "error: ")
-	if m.st == nil {
-		return s
-	}
-	return idRe.ReplaceAllStringFunc(s, func(r string) string {
-		if mod, err := m.st.Ix.ResolveOne(r); err == nil {
-			return mod.DisplayName()
-		}
-		return r
-	})
-}
+// humanize replaces instance references by mod names and drops the "error: " prefix.
+func (m *model) humanize(s string) string { return view.Humanize(m.st, s) }
 
 func firstLine(s string) string {
 	s = strings.TrimSpace(s)
@@ -437,7 +422,7 @@ func named(its []*item) string {
 }
 
 func plural(n int, w string) string {
-	if lang == "zh" {
+	if view.Lang() == "zh" {
 		return Tf("%d 个%s", n, T(w))
 	}
 	if n == 1 {

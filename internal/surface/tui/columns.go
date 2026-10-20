@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -10,9 +9,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/bbcode"
-	"github.com/ToumanLin/RimArcho/internal/identity"
-	"github.com/ToumanLin/RimArcho/internal/source"
-	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // The four columns (06 §5): not enabled | enabled | staging | detail.
@@ -29,31 +26,31 @@ func (k colKind) title() string {
 	return [...]string{T("Disabled"), T("Enabled"), T("Staging")}[k]
 }
 
-// Row status, worst first wins (06 §3: one status icon at most).
+// Row status, worst first wins (06 §3: one status icon at most; view.Status*).
 const (
-	statusNone = iota
-	statusUnloadable
-	statusWarn
-	statusLog
-	statusErr
+	statusNone       = view.StatusNone
+	statusUnloadable = view.StatusUnloadable
+	statusWarn       = view.StatusWarn
+	statusLog        = view.StatusLog
+	statusErr        = view.StatusErr
 )
 
-// item is one row.
+// item is one row: the shared view.Item (08 §1.1) and the TUI's copies of its fields.
 type item struct {
-	id, ref string
-	name    string
-	lower   string // sort key
-	// search fields (06 §5.5), lower case
-	text, names, author, pkg, ws string
-	tags                         []string
-	kind                         string // official, workshop, local, copy, git
-	steamcmd, alias              bool
-	note                         string
-	icon                         string
-	pos                          int  // 1-based load position (enabled column)
-	unsaved                      bool // changed since the last save
-	dim                          bool // cannot be loaded
-	missing                      bool // a ModsConfig entry with no installed mod
+	v               view.Item
+	id, ref         string
+	name            string
+	lower           string // sort key
+	pkg, ws         string
+	tags            []string
+	kind            string // official, workshop, local, copy, git
+	steamcmd, alias bool
+	note            string
+	icon            string
+	pos             int  // 1-based load position (enabled column)
+	unsaved         bool // changed since the last save
+	dim             bool // cannot be loaded
+	missing         bool // a ModsConfig entry with no installed mod
 }
 
 type column struct {
@@ -76,22 +73,6 @@ func (c *column) curID() string {
 		return it.id
 	}
 	return ""
-}
-
-// subsequence: the letters of q appear in s in order.
-func subsequence(q, s string) bool {
-	rs := []rune(s)
-	i := 0
-	for _, r := range q {
-		for i < len(rs) && rs[i] != r {
-			i++
-		}
-		if i == len(rs) {
-			return false
-		}
-		i++
-	}
-	return true
 }
 
 func (c *column) scroll(rows int) {
@@ -192,7 +173,8 @@ func (m *model) reload() {
 	for k := range m.cols {
 		keep[k] = m.cols[k].curID()
 	}
-	staged, st, err := m.app.Staged()
+	b, err := view.BuildBoard(m.app)
+	st := b.St
 	m.st, m.loadErr = st, err
 	for k := range m.cols {
 		m.cols[k].kind = colKind(k)
@@ -204,86 +186,41 @@ func (m *model) reload() {
 		}
 		return
 	}
-	m.envName, m.gameVer = st.Ix.Env.Name, st.Ix.Env.GameVersion
+	m.envName, m.gameVer = b.EnvName, b.GameVersion
 	m.loadColPrefs(st.Ix.Env.ID)
-	chs := st.Changes()
-	m.unsaved = len(chs)
-	unsaved := map[string]bool{}
-	for _, c := range chs {
-		unsaved[c.Entry.Key()] = true
-	}
-	inList := map[string]bool{}
-	m.missing = 0
-	act := &m.cols[cActive]
-	for i, e := range st.List {
-		if e.Instance == "" {
-			m.missing++
-			act.items = append(act.items, item{pos: i + 1, ref: "pkg:" + e.Missing, name: e.Missing, lower: e.Missing, missing: true, unsaved: unsaved[e.Key()]})
-			continue
-		}
-		inList[e.Instance] = true
-		if mod := st.Ix.ByID[e.Instance]; mod != nil {
-			it := modItem(st, mod)
-			it.pos, it.unsaved = i+1, unsaved[e.Key()]
-			act.items = append(act.items, it)
+	m.unsaved, m.missing = b.Unsaved, b.Missing
+	for k := range b.Cols {
+		for _, v := range b.Cols[k] {
+			m.cols[k].items = append(m.cols[k].items, fromView(st, v))
 		}
 	}
-	isStaged := map[string]bool{}
-	for _, s := range staged {
-		isStaged[s.Instance] = true
-		m.cols[cStaging].items = append(m.cols[cStaging].items, modItem(st, st.Ix.ByID[s.Instance]))
-	}
-	ina := &m.cols[cInactive]
-	for _, mod := range st.Ix.Mods {
-		if inList[mod.ID] || isStaged[mod.ID] || mod.Status != identity.Live {
-			continue
-		}
-		ina.items = append(ina.items, modItem(st, mod))
-	}
-	sort.SliceStable(ina.items, func(i, j int) bool { return ina.items[i].lower < ina.items[j].lower })
 	for id := range m.marked {
 		if st.Ix.ByID[id] == nil {
 			delete(m.marked, id)
 		}
 	}
-	if qs, err := m.app.Store.Questions(st.Ix.Env.ID, false); err == nil {
-		m.question = len(qs)
-	}
-	if sc, ss, _ := m.app.LastScan(st.Ix.Env.ID); sc != nil && ss != nil {
-		m.changes, m.lastEvents = 0, ss.Events
-		for _, n := range ss.Events {
-			m.changes += n
-		}
+	m.question = b.Questions
+	if b.LastEvents != nil {
+		m.changes, m.lastEvents = b.Changes, b.LastEvents
 	}
 	for k := range m.cols {
 		m.refilterCol(colKind(k), keep[k])
 	}
 }
 
-func modItem(st *app.LoadoutState, mod *store.Mod) item {
-	it := item{id: mod.ID, ref: st.Ix.Ref(mod.ID), name: mod.DisplayName(), icon: sourceIcon(mod)}
-	it.lower = strings.ToLower(it.name)
-	it.names = strings.ToLower(it.name + " " + mod.Name)
-	it.author = strings.ToLower(mod.Authors)
-	it.text = it.names + " " + it.author
-	it.pkg, it.ws = mod.PackageID, mod.WorkshopID()
-	it.tags, it.note, it.alias = mod.Tags, mod.Note, mod.Alias != ""
-	it.kind, it.steamcmd = sourceKind(mod), mod.Kind == source.SteamCMD
-	it.dim = mod.Unloadable != "" || mod.Residue || !st.Reg.Known(mod.ID) || !st.Reg.Loadable(mod.ID)
+// fromView copies a shared row into the TUI's row and adds the source icon.
+func fromView(st *app.LoadoutState, v view.Item) item {
+	it := item{v: v, id: v.ID, ref: v.Ref, name: v.Name, lower: v.Lower, pos: v.Pos, unsaved: v.Unsaved, dim: v.Dim, missing: v.Missing}
+	it.pkg, it.ws, it.tags, it.note, it.alias = v.Package, v.Workshop, v.Tags, v.Note, v.Alias
+	it.kind, it.steamcmd = v.Kind, v.SteamCMD
+	if mod := st.Ix.ByID[v.ID]; mod != nil {
+		it.icon = sourceIcon(mod)
+	}
 	return it
 }
 
-// status is the row's status icon: problems from the last analysis, unloadable mods.
-func (m *model) rowStatus(it *item) int {
-	s := m.prob.status[it.id]
-	if it.missing {
-		s = statusErr
-	}
-	if s == statusNone && it.dim {
-		s = statusUnloadable
-	}
-	return s
-}
+// rowStatus is the row's status icon: problems from the last analysis, unloadable mods.
+func (m *model) rowStatus(it *item) int { return view.RowStatus(&it.v, m.prob.status) }
 
 // ---- drawing ----
 

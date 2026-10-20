@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // Loading 需要处理 (06 §7; the items and the screen are in needs.go), the analysis in a child
@@ -65,27 +66,9 @@ func (m *model) loadProblems() {
 			m.newLog = false
 		}
 	}
-	p.never = ps.Analysis == nil || ps.Analysis.Run == nil
-	p.stale = !p.never && !ps.Analysis.Fresh
-	p.items = m.buildNeeds(ps)
-	// The number in the top bar is the number of items the player can act on, and a row
-	// carries an icon exactly when its mod is in one of them (06 §3, §4.2).
-	p.status, p.need = map[string]int{}, 0
-	for _, it := range p.items {
-		if !it.counted {
-			continue
-		}
-		p.need++
-		icons := it.mods
-		if !it.fold && len(icons) > 1 {
-			icons = icons[:1] // the subject; the others are what it needs or conflicts with
-		}
-		for _, id := range icons {
-			if it.status > p.status[id] {
-				p.status[id] = it.status
-			}
-		}
-	}
+	vn := view.BuildNeeds(m.app, m.st, ps)
+	p.never, p.stale = vn.Never, vn.Stale
+	p.items, p.status, p.need = m.toNeeds(vn.Items), vn.Status, vn.Count
 	p.cursor = min(p.cursor, max(len(p.items)-1, 0))
 }
 

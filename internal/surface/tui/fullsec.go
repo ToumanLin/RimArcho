@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/order"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // The full-screen detail's sub-sections (06 §6.3): Def, patches, Harmony, rules and the
@@ -197,20 +197,11 @@ func eventText(kind string) string {
 	return kind
 }
 
-// shortDate: "Oct 17" / "10 月 17 日".
-func shortDate(t time.Time) string {
-	t = t.Local()
-	if lang == "zh" {
-		return fmt.Sprintf("%d 月 %d 日", int(t.Month()), t.Day())
-	}
-	return t.Format("Jan 2")
-}
-
 // historyLine: the column's one-line history, the three newest events (06 §6.1).
 func historyLine(evs []*store.Event) string {
 	var parts []string
 	for i := len(evs) - 1; i >= 0 && len(parts) < 3; i-- {
-		parts = append(parts, shortDate(evs[i].ScanTime)+" "+eventText(evs[i].Kind))
+		parts = append(parts, view.ShortDate(evs[i].ScanTime)+" "+eventText(evs[i].Kind))
 	}
 	return strings.Join(parts, " "+markDot+" ")
 }

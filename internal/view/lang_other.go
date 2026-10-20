@@ -1,6 +1,6 @@
 //go:build !windows
 
-package tui
+package view
 
 import "os"
 

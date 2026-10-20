@@ -17,6 +17,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 func init() { lipgloss.SetColorProfile(termenv.Ascii) }
@@ -475,7 +476,7 @@ func TestChineseUI(t *testing.T) {
 	e.MustRun("config", "set", "ui.lang", "zh")
 	t.Setenv("ARCHO_LANG", "")
 	SetLang(e.App.Store.Meta("cfg:ui.lang"))
-	t.Cleanup(func() { lang = "en" })
+	t.Cleanup(func() { SetLang("en") })
 	tm := start(t, e, scans, 100, 24)
 	waitAll(t, tm, "已启用 3", "未启用 2")
 	keys(tm, "?")
@@ -733,14 +734,6 @@ func TestWrap(t *testing.T) {
 	}
 }
 
-func TestParseQuery(t *testing.T) {
-	got := parseQuery(`har -tag:ui author:"Brrainz X" id:#abc type:workshop bogus:x -`)
-	want := []term{{"", "har", false}, {"tag", "ui", true}, {"author", "brrainz x", false}, {"id", "#abc", false}, {"type", "workshop", false}, {"", "bogus:x", false}, {"", "-", false}}
-	if fmt.Sprint(got) != fmt.Sprint(want) {
-		t.Fatalf("got  %v\nwant %v", got, want)
-	}
-}
-
 // 06 §5.5 on the fixture: every field, negation, AND, the per-column query, the fallback.
 func TestColumnSearch(t *testing.T) {
 	e, _ := fixture(t)
@@ -788,7 +781,7 @@ func TestColumnSearch(t *testing.T) {
 		"hmy":                      "Harmony | ", // the fallback: letters in order
 		`"alpha"`:                  "Alpha | ",
 	} {
-		m.content = nil // each query loads what it needs itself
+		m.content = view.ContentCache{} // each query loads what it needs itself
 		if got := all(q); got != want {
 			t.Errorf("%q: got %q, want %q", q, got, want)
 		}

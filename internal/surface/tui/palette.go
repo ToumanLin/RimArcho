@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // The command palette (06 §8): ctrl+k, a "❯" input line over a result list in the style of
@@ -42,7 +44,7 @@ func (m *model) palCommands() []palItem {
 	}
 	cmd := func(zh, en, desc string, run func(m *model) tea.Cmd) palItem {
 		name := en
-		if lang == "zh" {
+		if view.Lang() == "zh" {
 			name = zh
 		}
 		return palItem{kind: palCommand, name: name, alias: en, desc: desc, run: run}
@@ -104,7 +106,7 @@ func (m *model) palAll() []palItem {
 			}
 			seen[it.id] = true
 			id := it.id
-			out = append(out, palItem{kind: palMod, name: it.name, desc: it.pkg + " " + it.author, run: func(m *model) tea.Cmd { return m.jumpTo(id) }})
+			out = append(out, palItem{kind: palMod, name: it.name, desc: it.pkg + " " + it.v.Author, run: func(m *model) tea.Cmd { return m.jumpTo(id) }})
 		}
 	}
 	return out
@@ -127,7 +129,7 @@ func palScore(q string, it palItem) int {
 			best = max(best, 4)
 		case strings.Contains(f, q):
 			best = max(best, 3)
-		case subsequence(q, f):
+		case view.Subsequence(q, f):
 			best = max(best, 2)
 		}
 	}
