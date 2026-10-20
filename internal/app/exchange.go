@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/identity"
@@ -59,6 +61,8 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 	case FormatRimCrow:
 		code, err := ShareCode("RimArcho "+st.Ix.Env.Name, game, tokens, ws, names)
 		return []byte(code + "\n"), err
+	case FormatRimCrowXML:
+		return RimCrowXML(tokens, ws, names), nil
 	case FormatRimSort:
 		format = FormatModsConfig
 	}
@@ -92,7 +96,7 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 		}
 		return loadout.Render(nil, version, tokens, known)
 	}
-	return nil, fmt.Errorf("unknown format %q (text, modsconfig, rimsort, rml, rimcrow)", format)
+	return nil, fmt.Errorf("unknown format %q (text, modsconfig, rimsort, rml, rimcrow, rimcrow-xml)", format)
 }
 
 // ImportedList is a mod list read from a file.
@@ -233,27 +237,128 @@ func (a *App) ImportLoadout(path string) (*EditResult, *ImportedList, error) {
 // importList replaces the workspace with a list; workshop-only entries become the
 // installed mod with that workshop ID, or are noted in il.Unresolved.
 func (a *App) importList(il *ImportedList, label string) (*EditResult, error) {
-	return a.edit("import "+label, func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
-		tokens := il.Tokens
-		if len(il.WorkshopOnly) > 0 {
-			byWS := map[string]string{}
-			for _, m := range st.Ix.Mods {
-				if m.Status == identity.Live && m.WorkshopID() != "" {
-					if _, ok := byWS[m.WorkshopID()]; !ok || st.Reg.Loadable(m.ID) {
-						byWS[m.WorkshopID()] = m.PackageID
-					}
-				}
-			}
-			il.Unresolved = nil
-			for _, ws := range il.WorkshopOnly {
-				if p := byWS[ws]; p != "" {
-					tokens = append(tokens, p)
-				} else {
-					il.Unresolved = append(il.Unresolved, ws)
+	return a.ApplyImport(il, label, false)
+}
+
+// ApplyImport puts an imported list into the workspace as one undoable step (nothing is
+// written to ModsConfig.xml until save): it replaces the list, or with merge keeps the
+// list and adds the imported list's installed mods it lacks (MergedEntries).
+func (a *App) ApplyImport(il *ImportedList, label string, merge bool) (*EditResult, error) {
+	op := "import " + label
+	if merge {
+		op = "add from " + label
+	}
+	return a.edit(op, func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+		if merge {
+			return MergedEntries(st, il), nil, nil
+		}
+		list, unresolved := ImportedEntries(st, il)
+		il.Unresolved = unresolved
+		return list, nil, nil
+	})
+}
+
+// ImportedEntries is the list an import would make, without changing anything: the
+// tokens resolved against the installed mods (entries that match nothing are kept, as in
+// ModsConfig.xml), then the workshop-only entries by their installed mod. Unresolved are
+// the workshop IDs no installed mod has.
+func ImportedEntries(st *LoadoutState, il *ImportedList) (list loadout.List, unresolved []string) {
+	tokens := append([]string(nil), il.Tokens...)
+	if len(il.WorkshopOnly) > 0 {
+		byWS := map[string]string{}
+		for _, m := range st.Ix.Mods {
+			if m.Status == identity.Live && m.WorkshopID() != "" {
+				if _, ok := byWS[m.WorkshopID()]; !ok || st.Reg.Loadable(m.ID) {
+					byWS[m.WorkshopID()] = m.PackageID
 				}
 			}
 		}
-		list, _ := st.Reg.FromTokens(tokens)
-		return list, nil, nil
-	})
+		for _, ws := range il.WorkshopOnly {
+			if p := byWS[ws]; p != "" {
+				tokens = append(tokens, p)
+			} else {
+				unresolved = append(unresolved, ws)
+			}
+		}
+	}
+	list, _ = st.Reg.FromTokens(tokens)
+	return list, unresolved
+}
+
+// MergedEntries keeps the workspace list and adds the imported list's installed mods it
+// lacks. Each goes after the nearest mod before it in the imported list that is already
+// in the list (else before the nearest one after it, else at the end), so the imported
+// order is kept around what is there.
+func MergedEntries(st *LoadoutState, il *ImportedList) loadout.List {
+	imported, _ := ImportedEntries(st, il)
+	out := st.List.Clone()
+	for i, e := range imported {
+		if e.Instance == "" || out.Index(e.Instance) >= 0 {
+			continue
+		}
+		at := len(out)
+		found := false
+		for j := i - 1; j >= 0 && !found; j-- {
+			if p := imported[j]; p.Instance != "" {
+				if k := out.Index(p.Instance); k >= 0 {
+					at, found = k+1, true
+				}
+			}
+		}
+		for j := i + 1; j < len(imported) && !found; j++ {
+			if p := imported[j]; p.Instance != "" {
+				if k := out.Index(p.Instance); k >= 0 {
+					at, found = k, true
+				}
+			}
+		}
+		out = append(out[:at], append(loadout.List{e}, out[at:]...)...)
+	}
+	return out
+}
+
+// RentryRaw is where a Rentry page's text is read (%s is the page's id).
+var RentryRaw = "https://rentry.co/%s/raw"
+
+var rentryLinkRe = regexp.MustCompile(`^https?://(?:www\.)?rentry\.(?:co|org)/([A-Za-z0-9_\-]+)/?(?:raw/?)?$`)
+
+// RentryID returns the page id of a Rentry link ("" when it is not one).
+func RentryID(s string) string {
+	if m := rentryLinkRe.FindStringSubmatch(strings.TrimSpace(s)); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// ReadRentry reads a mod list RimSort published on Rentry (uses the network).
+func (a *App) ReadRentry(link string) (*ImportedList, error) {
+	id := RentryID(link)
+	if id == "" {
+		return nil, fmt.Errorf("%q is not a Rentry link", link)
+	}
+	req, err := http.NewRequest("GET", fmt.Sprintf(RentryRaw, id), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", UserAgent)
+	resp, err := a.httpClient().Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("Rentry unreachable: %v", shortErr(err))
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("Rentry answered %s: open the page, copy the list and paste it here", resp.Status)
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return nil, err
+	}
+	l, err := ParseList(b)
+	if err != nil {
+		return nil, err
+	}
+	if len(l.Tokens) == 0 && len(l.WorkshopOnly) == 0 {
+		return nil, errors.New("the Rentry page has no mod list")
+	}
+	return l, nil
 }

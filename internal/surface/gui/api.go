@@ -36,6 +36,7 @@ type API struct {
 	events  map[int64]*store.Event // the changes list's events, by id
 	busy    map[string]bool        // scan, analyze
 	live    view.LiveTracker       // the running game's log (10 §3)
+	x       exchange               // import and export (exchange.go)
 	// Exe runs the scan and analysis children; "" is this executable (the development
 	// harness points it at archo.exe).
 	Exe string

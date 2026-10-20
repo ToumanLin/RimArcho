@@ -11,6 +11,7 @@ import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
+import { initExchange, exchange } from "./exchange.js";
 import { icon } from "./icons.js";
 
 // ---- loading ----
@@ -332,6 +333,8 @@ async function cmd(id) {
     case "tech": return verb("full");
     case "tags": return verb("tags");
     case "cli": return commandLine();
+    case "import": return exchange(0);
+    case "export": return exchange(1);
     case "help": return pop.help();
     case "quit": return window.close();
   }
@@ -489,7 +492,7 @@ function onKey(e) {
     g: () => verb("tags"), "#": () => verb("tags"), Enter: () => verb("full"), o: () => verb("workshop"), x: () => verb("swap"),
     S: () => preview("sort"), w: () => preview("save"), L: () => preview("launch"), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "!": () => scr.needs(), c: () => cmd("changes"), l: () => cmd("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
-    E: () => chooseEnv(), "?": () => pop.help(), ":": () => commandLine(),
+    E: () => chooseEnv(), "?": () => pop.help(), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
@@ -560,6 +563,7 @@ async function start() {
   document.documentElement.lang = s.lang;
   pop.initPopups(ui);
   scr.initScreens(ui);
+  initExchange(ui);
   wireLists(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
@@ -567,10 +571,10 @@ async function start() {
   $("#env").onclick = () => (S.screen === "env" ? goTab(0) : cmd("env-page"));
   $$("#tabs .tab").forEach((b, i) => { b.onclick = () => goTab(i); });
   $("#btn-launch").onclick = () => preview("launch");
-  // the enabled list's head: sort, save
+  // the enabled list's head: import / export, sort, save
   $("#board").addEventListener("click", (e) => {
     const b = e.target.closest(".head [data-cmd]");
-    if (b) { e.stopPropagation(); preview(b.dataset.cmd); }
+    if (b) { e.stopPropagation(); b.dataset.cmd === "exchange" ? exchange(0) : preview(b.dataset.cmd); }
   });
   addEventListener("resize", () => renderTabs());
   $(".detail .scroll").addEventListener("scroll", () => { if (S.focus === 3) renderWhere(); }, { passive: true });

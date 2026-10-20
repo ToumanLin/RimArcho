@@ -24,7 +24,7 @@ verbs, on the selection or else the cursor's mod:
   #        tags                   enter  details full screen (←→ previous / next mod, tab sub-sections, I technical pages)
   o        Workshop page          i  technical information     x  swap for another copy    r  add a rule
   S        sort (preview first)   w  save to the game (preview first)    L  launch the game
-  u ctrl+r undo / redo
+  u ctrl+r undo / redo           e  export the list (import: ctrl+k import a list)
 /          search the focused list; tab takes it to the next list with matches; esc clears
 !          needs attention        c  recent changes     R  rescan     E  switch environment
 < > =      column width (= resets)    z  wrap names    [ ]  switch list (narrow)
@@ -307,6 +307,8 @@ func (m *model) listKey(s string) tea.Cmd {
 		m.tab = tabChanges
 		m.loadChanges()
 		return nil
+	case "e":
+		return m.exportChoice()
 	case "i":
 		m.detailTech = !m.detailTech
 		m.detailRef = ""
