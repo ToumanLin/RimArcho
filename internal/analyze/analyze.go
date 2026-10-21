@@ -20,7 +20,7 @@ import (
 )
 
 // Version of the analyzers; facts written by another version are rebuilt (03 §2).
-const Version = 4
+const Version = 5 // 5: Lunar/Components DLLs
 
 // Mod is one installed instance.
 type Mod struct {

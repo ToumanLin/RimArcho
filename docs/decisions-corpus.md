@@ -22,6 +22,45 @@ Research design: `docs/research/00-日志语料顶层设计.md`. Measurements: `
 | 621ce34 | Mono native frames continue the stack; XML Extensions error blocks are one entry; wanter rule for xref-missing and no Core/DLC text-match sources; paths matched by mod folder; texture "for def", xml Context defName, missing types, static constructors | Same 671 logs: with a source 22.5% → 26.1%; Core/DLC wrongly blamed 5,875 → 0 |
 | da9d181 | Missing parent nodes (disabled provider = dependency), duplicate ThinkNode keys (think-tree patchers) | xml-load with a source 3.3% → 12.8% |
 | (branch claude/g2-sorter-5f1419) | Sorter reports by constraint strength (04 §4.4). Per kind, violated vs kept pairs (same pair, same list-size band), observed/expected error sources: dependency 1.41, loadBefore 1.34 → warning; loadAfter 1.14, community 1.13 → info; a mod declaring it loads before Core/DLC 1.05 → info (harmless); a mod needing a DLC that loads after it 3–4.5 → part of `official.order`. 74 rules observed harmless and 7 harmful ship in `internal/order/observed.json` (aggregate counts; embedded: `data update` only fetches third-party datasets). A rule putting a mod before official content that other constraints keep after it, or a rule between DLCs against the official order, is not used, with the reason, instead of a cycle. `official.order` suggests the cheapest `archo move` (DLC back after its predecessor, or the few mods ahead of it down) | Sort-only rerun of 6,734 logs (`spikes/g2sev`): `order.violated` warnings 19,945 → 2,274 (16,677 info, 8,147 of them observed harmless); logs with such a warning 65.4% → 18.8%; 35 constraints not used (35 logs), logs with a cycle 746 → 716; `official.order` in 1,533 logs: a move suggested in 1,381 (DLC back 571, mods down 810; one move in 1,152), sort only 152 |
+| d268a93, 0ad44ae, a7117bd | Rules for the RESULT gaps (below): missing textures and `GetNamed` names looked up in the enabled mods' XML and DLL string literals; a mod that defines and uses the missing def; reflection-only resolvers for `Cannot resolve dependency to assembly`; save holders (`curParent`); `absFilePath:` files; `<F>V</F>` field errors; Lunar/Components DLLs analysed; a library several mods ship is not the topmost frame | Same 671 logs: with a source 28.4% → 35.6%, attributed 59.0% → 63.6% |
+
+### 2.1 G1 gap rules (d268a93 … a7117bd), measured
+
+Compared on the same warmed research home (`home-g1`, every log's mods analysed once before;
+a fresh home attributes less, because "an installed, disabled mod provides X" needs that mod's
+facts). The baseline build (a328b49) on that home reproduces `results-v3` exactly. Mod lists:
+the old `parsed.jsonl` on both sides (without `[v:]`/`[ov:]` entries such as HugsLib and CE).
+
+First 671 logs, problem clusters, attributed / with a source:
+
+| | before | after |
+|---|---|---|
+| all problem | 59.0% / 28.4% | 63.6% / 35.6% |
+| texture-missing | 18.3% / 18.3% | 69.7% / 65.9% |
+| — without a def (1,187) | 0% / 0% | 60.6% / 57.6% |
+| xref-missing | 64.9% / 15.1% | 69.1% / 24.6% |
+| — `Failed to find X named …` (738) | 21.8% / 0% | 67.8% / 24.3% |
+| — cross-references (11,026) | 76.5% / 25.8% | 81.5% / 43.2% |
+| — save `Could not load reference to … named` (8,321) | 53.4% / 2.4% | 52.8% / 0% |
+| save-load | 14.7% / 0% | 14.7% / 14.5% |
+| — `loadID … curParent=` (2,215) | 16.7% / 0% | 16.7% / 16.6% |
+| xml-load | 45.5% / 12.8% | 48.0% / 16.6% |
+| — `<F>V</F> doesn't correspond to any field` (1,755) | 46.6% / 21.9% | 53.8% / 39.8% |
+| exception / harmony-stack | 59.7% / 53.6%, 97.5% / 73.6% | 61.9% / 54.6%, 99.5% / 74.6% |
+
+The first 671 logs hardly have the assembly line or `_MainTex`, so 160 later logs that do were
+measured too (same home, before → after, with a source): assembly line (79) 0% → 89.9%
+(Prepatcher hooks `ReflectionOnlyAssemblyResolve`; Dubs Performance Analyzer, which only calls
+`ReflectionOnlyLoadFrom`, is mentioned), Skyfaller SoundDefs (65) 7.7% → 78.5%, `GetNamed`
+(368) 0% → 28.8%, `absFilePath` files (280) 0% → 23.2%, textures without a def (1,082) 0% → 6.2%.
+
+Deliberately left without a source, with a Details line instead: save references to defs (the
+save names the def, not its mod; the earlier text matches were guesses, 2.4% → 0%), think-node
+keys, references held by game objects, and `_MainTex` shaders (they live in compressed asset
+bundles; 548 logs are mostly one Ariandel Library shader and Odyssey's gravship shader).
+Remaining misses: texture paths built at run time from a prefix, and mods shipping the Lunar
+framework under another file name (5 clusters). Spot-check of 10 newly sourced clusters: 8
+right, 2 plausible (a mod that defines and uses a def the player's game lacked).
 
 ## 3. Conclusions
 

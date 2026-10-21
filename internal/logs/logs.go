@@ -103,6 +103,8 @@ func isContinuation(l string) bool {
 		return true
 	case strings.HasPrefix(l, "[Ref "), strings.HasPrefix(l, "(wrapper "), strings.HasPrefix(l, "Rethrow as "),
 		strings.HasPrefix(l, "--- End of"), strings.HasPrefix(l, "file: "), strings.HasPrefix(l, "Subnode:"),
+		// "Exception loading UnityEngine.AudioClip from file." is followed by the file.
+		strings.HasPrefix(l, "absFilePath: "),
 		// .NET exception messages that span lines (ArgumentException and ObjectDisposedException).
 		strings.HasPrefix(l, "Parameter name: "), strings.HasPrefix(l, "Actual value was "), strings.HasPrefix(l, "Object name: "),
 		// A Mono native frame at column 0: "<0x2693319a2b0 + 0x000d2> <unknown method>".
@@ -570,6 +572,12 @@ func ClusterKey(e *Entry) (key, template, class string) {
 	key = class + "|" + Normalize(e.Message)
 	if class == ClassPatchFailed {
 		key += "|" + strings.Join(e.Extra, "|") // the file distinguishes failures
+	}
+	for _, x := range e.Extra {
+		// "Exception loading UnityEngine.Texture2D from file." names the file on the next line.
+		if strings.HasPrefix(x, "absFilePath: ") {
+			key += "|" + x
+		}
 	}
 	if top := e.Top(); top != nil {
 		key += "|" + top.Type + "." + top.Method

@@ -54,7 +54,7 @@ type Assembly struct {
 
 // DefaultSkip are library assemblies whose Harmony facts are not the mod's own (03 §5.3).
 // Their TypeDefs are still indexed (frames inside them are attributed as "library").
-var DefaultSkip = []string{"0harmony.dll", "harmony.dll", "hugslib.dll", "0multiplayerapi.dll", "0prepatcherapi.dll",
+var DefaultSkip = []string{"0harmony.dll", "harmony.dll", "harmonylib.dll", "hugslib.dll", "0multiplayerapi.dll", "0prepatcherapi.dll",
 	"mono.cecil*.dll", "system.*.dll", "microsoft.*.dll", "newtonsoft.json.dll", "unityengine*.dll", "assembly-csharp*.dll"}
 
 // Skipped reports whether a DLL file name matches the skip list (simple * globs, case-insensitive).
