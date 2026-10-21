@@ -79,43 +79,57 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 #body { position: relative; display: grid; min-height: 0; min-width: 0; }
 
 #side { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-right: 1px solid var(--line-2); background: var(--bg); }
-/* No name or icon here: the window's title bar has them. The empty head keeps the nav
-   below the top bar's line. */
-#side .side-head { height: 50px; flex: none; }
-#nav { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 8px; display: flex; flex-direction: column; gap: 1px; }
-/* the groups breathe: a group's title sits apart from the entries above it (06 §2.1) */
-#nav .grp { padding: 8px 10px 3px; color: var(--muted); font-size: 11.5px; }
-#nav .grp ~ .grp { padding-top: 14px; }
-.nav-item { width: 100%; min-height: 29px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 8px; color: var(--fg-2); font-size: 13px; white-space: nowrap; text-align: left; transition: background var(--t-press), color var(--t-press); }
-.nav-item .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.nav-item .ic { display: inline-flex; color: inherit; }
-.nav-item .ic svg.i { width: 15px; height: 15px; }
-.nav-item:hover { background: var(--pill); color: var(--fg); }
-.nav-item.on { color: var(--fg); font-weight: 600; }
-#nav { position: relative; }
+/* The sidebar follows magpie's: 212px (184px in a smaller window), 10px sides, entries
+   30px high with the icon, the name and the count on the same edges in every row. */
+/* No name or icon at the top (the window's title bar has them) and no empty head: the
+   sidebar starts with its first group title, level with the top bar's breadcrumb. */
+#nav { position: relative; flex: 1; min-height: 0; overflow-y: auto; padding: 16px 10px 10px; display: flex; flex-direction: column; gap: 1px; }
+/* a group's title: small, muted, apart from the entries above it (06 §2.1) */
+#nav .grp { padding: 14px 8px 4px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; }
+#nav > .grp:first-of-type { padding-top: 2px; }
 #nav > :not(.nav-thumb) { position: relative; z-index: 1; }
-#nav > .kids > .nav-kid { position: relative; z-index: 1; }
-.nav-thumb { position: absolute; left: 0; top: 0; z-index: 0; background: var(--pill); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
-.nav-item.open { color: var(--fg); }
-.nav-item .cnt { color: var(--muted); font-size: 11.5px; font-weight: 400; }
-.nav-item .badge-n { font-size: 11.5px; font-weight: 400; line-height: 17px; min-width: 17px; padding: 0 6px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); }
-/* the open entry's sub-entries hang off a hairline, like the design's plan list */
-#nav .kids { display: flex; flex-direction: column; gap: 1px; margin: 1px 0 3px 17px; padding-left: 8px; border-left: 1px solid var(--line); }
-.nav-kid { height: 24px; padding: 0 10px; border-radius: 7px; text-align: left; color: var(--fg-2); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background var(--t-press), color var(--t-press); }
-.nav-kid:hover { color: var(--fg); background: var(--pill); }
+.nav-item { width: 100%; height: 30px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 8px; border-radius: 7px; color: var(--fg-2); font-size: 13px; white-space: nowrap; text-align: left; transition: background var(--t-press), color var(--t-press); }
+.nav-item .lbl { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nav-item .ic { display: inline-flex; flex: none; color: var(--muted); transition: color var(--t-press); }
+.nav-item .ic svg.i { width: 14px; height: 14px; }
+.nav-item:hover:not(.on) { background: var(--pill); color: var(--fg); }
+.nav-item.on { color: var(--fg); font-weight: 500; }
+.nav-item.on .ic, .nav-item:hover .ic { color: var(--fg); }
+/* the open entry is raised like the view switch's thumb; the highlight slides between entries */
+.nav-thumb { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 7px; background: var(--card); box-shadow: var(--seg-edge); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
+/* an entry with sub-entries: a small chevron after its name turns down while it is open */
+.nav-item .chev { display: inline-flex; flex: none; margin-left: -3px; color: var(--faint); transition: transform var(--t-layout) var(--ease); }
+.nav-item .chev svg.i { width: 10px; height: 10px; stroke-width: 1.8; }
+.nav-item.on .chev { transform: rotate(90deg); }
+.nav-item .cnt, .nav-kid .cnt { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.nav-item .badge-n, #live .badge-n { margin: 0 -4px 0 auto; font-size: 11px; font-weight: 500; line-height: 17px; min-width: 17px; padding: 0 5px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); }
+/* The open entry's sub-entries hang off a thin guide line, 16px in. Opening and closing
+   grows the row from 0fr to 1fr and fades it (06 §7.1); a closed list is out of the tab order. */
+.kids-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; margin-top: -1px; transition: grid-template-rows var(--t-layout) var(--ease), opacity var(--t-enter) var(--ease); }
+.kids-wrap.open { grid-template-rows: 1fr; opacity: 1; }
+.kids { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s linear var(--t-layout); }
+.kids-wrap.open .kids { visibility: visible; transition-delay: 0s; }
+.kids-in { position: relative; display: flex; flex-direction: column; gap: 1px; margin-left: 16px; padding: 3px 0 6px 8px; }
+.kids-in::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 9px; width: 1px; background: var(--line); }
+.nav-kid { position: relative; z-index: 1; height: 26px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 6px; text-align: left; color: var(--ctl-fg); font-size: 12.5px; white-space: nowrap; transition: color var(--t-press); }
+.nav-kid:hover:not(.on) { color: var(--fg); }
 .nav-kid.on { color: var(--fg); font-weight: 600; }
-.side-foot { flex: none; padding: 6px 8px 10px; border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
-.runbox { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); text-align: left; transition: border-color var(--t-press); }
-.runbox:hover { border-color: var(--muted); }
-.runbox .env { color: var(--fg-2); font-size: 12px; font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.runbox .run { color: var(--muted); font-size: 11.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.runbox.running { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-.runbox.running .run { color: var(--accent); }
-.runbox.running .run::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 6px; vertical-align: 1px; }
+.kid-hl { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 6px; background: color-mix(in srgb, var(--fg) 6.5%, transparent); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
+.side-foot .nav-item.on { background: var(--card); box-shadow: var(--seg-edge); }
+.side-foot { flex: none; padding: 8px 10px 10px; border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 859px) { #app:not(.collapsed):not(.narrow) { grid-template-columns: 184px minmax(0, 1fr); } }
+/* the foot's one line, only while the game runs or a new log waits (06 §2.1): a dot in the
+   icon column, then the text, on the entries' edges */
+#live { width: 100%; height: 30px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 8px; border-radius: 7px; color: var(--fg-2); font-size: 12px; text-align: left; white-space: nowrap; overflow: hidden; transition: background var(--t-press), color var(--t-press); animation: view-in var(--t-enter) var(--ease); }
+#live::before { content: ""; flex: none; width: 6px; height: 6px; margin: 0 4px; border-radius: 50%; background: var(--green); }
+#live.newlog { color: var(--accent); }
+#live.newlog::before { background: var(--accent); }
+#live:hover { background: var(--pill); color: var(--fg); }
+#live .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* a narrow window: the sidebar opens over the page */
 #scrim { position: fixed; inset: 0; z-index: 14; background: rgba(0, 0, 0, .28); animation: fade var(--t-press) ease-out; }
 #app.narrow { grid-template-columns: 0 minmax(0, 1fr); }
-#app.narrow #side { position: fixed; top: 0; bottom: 0; left: 0; width: 232px; z-index: 15; box-shadow: var(--shadow); transition: transform var(--t-enter) var(--ease); }
+#app.narrow #side { position: fixed; top: 0; bottom: 0; left: 0; width: 212px; z-index: 15; box-shadow: var(--shadow); transition: transform var(--t-enter) var(--ease); }
 #app.narrow.collapsed #side { transform: translateX(-100%); visibility: hidden; }
 
 /* ---- the top bar: collapse, the breadcrumb, the environment chip, the page's actions ---- */
@@ -186,16 +200,27 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .area .head .acts .btn:hover { border-color: var(--muted); color: var(--fg); }
 .area .head .acts .btn.hot { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 
-/* ---- the board: four cards (06 §2.5, §13.3) ---- */
-#board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 8px var(--c2, .8fr) 8px var(--c3, 1.4fr); }
-#board.no-staging { grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 0 0 8px var(--c3, 1.4fr); }
-#board.no-staging [data-area="2"], #board.no-staging [data-split="1"] { display: none; }
-/* every child keeps its own track: a hidden one leaves its track empty (0 wide) instead of
-   letting the ones after it slide into the wrong tracks (the detail landed in a 0 track) */
+/* ---- the board: three columns (06 §2.5): 未启用 | 已启用 | 详情, with 暂存 and 历史 folded
+   under 详情 in the third column ---- */
+#board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 8px var(--c2, 1.5fr); }
 #board > [data-area="0"] { grid-column: 1; } #board > [data-split="0"] { grid-column: 2; }
 #board > [data-area="1"] { grid-column: 3; } #board > [data-split="1"] { grid-column: 4; }
-#board > [data-area="2"] { grid-column: 5; } #board > [data-split="2"] { grid-column: 6; }
-#board > [data-area="3"] { grid-column: 7; } #board > * { grid-row: 1; }
+#board > .stack { grid-column: 5; } #board > * { grid-row: 1; }
+.stack { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+.stack > .detail { flex: 1 1 0; min-height: 140px; }
+/* a fold is its bar until opened; open, it takes a share of the column under 详情 */
+.stack > .fold { flex: none; }
+.stack > .fold.open { flex: 0 1 auto; max-height: 38%; min-height: 72px; }
+.fold > .head { cursor: pointer; }
+.fold:not(.open) > :not(.head) { display: none; }
+.fold:not(.open) > .head { border-bottom-color: transparent; }
+.fold .head .fold-chev { margin-left: auto; align-self: center; display: inline-flex; color: var(--faint); transition: transform var(--t-layout) var(--ease); }
+.fold .head .acts + .fold-chev { margin-left: 6px; }
+.fold .head .fold-chev svg.i { width: 10px; height: 10px; stroke-width: 1.8; }
+.fold.open .head .fold-chev { transform: rotate(90deg); }
+.histarea .hbar { width: 100%; text-align: left; }
+.histbody { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 6px; }
+.histbody .hist { margin-top: 4px; }
 .area { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; transition: border-color var(--t-press); }
 .area.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .area .head { display: flex; align-items: baseline; gap: 8px; padding: 9px 12px 6px; color: var(--faint); white-space: nowrap; overflow: hidden; border-bottom: 1px solid var(--line-2); }
@@ -239,10 +264,6 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .hist .h.now { cursor: default; color: var(--accent); font-weight: 600; }
 .hist .h.now::before { content: "● "; }
 .hist .h.redo { color: var(--faint); }
-.histdock { flex: none; border-top: 1px solid var(--line-2); max-height: 45%; overflow-y: auto; padding: 0 10px 6px; }
-.histdock .hbar { display: block; width: 100%; text-align: left; padding: 7px 2px 3px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
-.histdock .hbar:hover { color: var(--fg); }
-.histdock .hist { margin-top: 0; }
 .drop-tip { position: fixed; pointer-events: none; background: var(--pop-bg); box-shadow: var(--shadow); color: var(--fg); padding: 3px 9px; border-radius: 7px; font-size: 12px; z-index: 30; }
 
 /* detail (06 §4) */
@@ -495,50 +516,49 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .help b { color: var(--fg); font-weight: 500; white-space: nowrap; }
 .help span { color: var(--muted); }
 
-@media (max-width: 900px) { #board { grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 0 0 8px var(--c3, 1.2fr); } #board [data-area="2"], #board [data-split="1"] { display: none; } }
-@media (max-width: 680px) { #board { grid-template-columns: 1fr 8px 1.2fr 0 0 0 0; } #board .detail, #board [data-split="2"] { display: none; } }
+/* a narrow window: the third column goes first (enter opens the full detail; 暂存 and 历史
+   are reached by their keys and the command palette) */
+@media (max-width: 680px) { #board { grid-template-columns: 1fr 8px 1.2fr 0 0; } #board > .stack, #board [data-split="1"] { display: none; } }
 
-/* ---- 首页 (06 §2.3) ---- */
-.home-row { display: flex; gap: 14px; align-items: center; min-height: 62px; padding: 10px 16px; }
-.home-row + .home-row { border-top: 1px solid var(--line-2); }
-.home-row .envtag { flex: none; width: 92px; height: 22px; line-height: 22px; text-align: center; border-radius: 6px; background: var(--pill); color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
-.home-row .l { flex: 1; min-width: 0; }
-.home-row .name { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.home-row .name .n { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.home-row .chip { margin: 0; flex: none; }
-.home-row .kind { flex: none; font-size: 11px; line-height: 18px; padding: 0 6px; border-radius: 5px; color: var(--muted); background: var(--pill); }
-.home-row .kind.pack { color: var(--green); background: var(--green-soft); }
-.home-row .sub { margin-top: 3px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.home-row .r { flex: none; display: flex; gap: 14px; align-items: center; }
-.home-row .state { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
-.home-row .state .ic { display: inline-flex; }
-.home-row .state .ic svg.i { width: 13px; height: 13px; }
-.home-row .state.bad { color: var(--amber); background: var(--amber-soft); }
-.home-row .state.ok { color: var(--green); background: var(--green-soft); }
-.home-row .state.unknown { color: var(--muted); padding: 0 2px; }
-button.state.bad:hover { filter: brightness(1.12); }
-.home-row .btn { height: 30px; padding: 0 12px; border-radius: 8px; font-size: 13px; }
-.home-row .btn:not(.primary) { background: transparent; color: var(--fg); box-shadow: none; }
-.home-row .btn.launch { padding: 0 14px; font-weight: 600; }
-.home-row .btn.launch .ic { margin-right: 7px; }
-.home-row .launch-wrap { display: inline-flex; }
+/* ---- 首页 (06 §2.3): what is applied now as one large card, the others as one line each on
+   one grid (versions | name [kind] | mods | 应用), the activity as two lines ---- */
+.page.home { gap: 24px; padding-top: 8px; }
+.page.home .sec { margin-top: 0; }
+.hb-hero { display: flex; align-items: center; gap: 24px; padding: 24px; cursor: pointer; transition: border-color var(--t-press); }
+.hb-hero:hover { border-color: var(--muted); }
+.hb-hero .l { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.hb-hero .k { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hb-hero .nm { display: flex; align-items: center; gap: 10px; max-width: 100%; min-width: 0; }
+.hb-hero .n { font-size: 22px; font-weight: 600; letter-spacing: -.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb-hero .s { font-size: 13px; color: var(--muted); }
+.hb-hero .problem { margin-top: 8px; }
+.kind { flex: none; font-size: 11px; line-height: 16px; padding: 0 5px; border-radius: 4px; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); white-space: nowrap; }
+.problem { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--amber); white-space: nowrap; }
+.problem svg.i { width: 13px; height: 13px; }
+button.problem:hover { text-decoration: underline; }
+.hb-hero .btn.launch.big { flex: none; height: 40px; padding: 0 20px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+.btn.launch .ic { margin-right: 7px; }
+/* the others: one grid, every row on it (subgrid), so versions, names, kinds and counts line up */
+.hb-list { display: grid; grid-template-columns: minmax(64px, max-content) minmax(0, max-content) max-content max-content 1fr; column-gap: 16px; padding: 4px; }
+.hb-line { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; height: 44px; padding: 0 8px 0 12px; border-radius: 8px; }
+.hb-line:hover { background: var(--card-2); }
+.hb-line .v { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.hb-line .n { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb-line .m { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.hb-line .btn.apply { justify-self: end; height: 28px; padding: 0 12px; border-radius: 7px; border: 0; box-shadow: none; background: var(--pill); color: var(--fg-2); font-size: 12.5px; }
+.hb-line .btn.apply:hover { background: var(--accent); color: var(--accent-fg); }
+.hb-act { display: flex; flex-direction: column; gap: 2px; }
+.hb-actline { display: flex; align-items: baseline; gap: 12px; height: 32px; padding: 0 12px; border-radius: 8px; text-align: left; min-width: 0; }
+.hb-actline:hover { background: var(--pill); }
+.hb-actline .t { flex: none; width: 96px; font-size: 12px; color: var(--muted); }
+.hb-actline .x { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }
+.hb-actline .go { color: var(--accent); }
+.card.empty-state { padding: 32px 16px; }
 svg.i.fill { fill: currentColor; }
-.act-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
-.act-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; transition: border-color var(--t-press); }
-button.act-card:hover { border-color: var(--muted); }
-.act-card > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.act-card .t { font-weight: 600; }
-.act-card .a { color: var(--muted); }
-.act-card .go { color: var(--accent); }
-.act-card.hl { background: var(--accent-soft); border-color: transparent; }
-.act-card.hl .t { color: var(--accent); }
 .packs .pack.hl { background: var(--accent-soft); }
-@media (max-width: 760px) {
-  .home-row { flex-wrap: wrap; row-gap: 8px; }
-  .home-row .envtag { width: auto; }
-  .home-row .l { flex-basis: calc(100% - 120px); }
-  .home-row .r { width: 100%; justify-content: flex-end; }
-  .act-cards { grid-template-columns: 1fr; }
+@media (max-width: 560px) {
+  .hb-hero { flex-direction: column; align-items: stretch; }
+  .hb-list .m { display: none; }
 }
 
 /* ---- the first-run guide (06 §2.15) ---- */
@@ -634,23 +654,20 @@ details.xc-sec > summary { cursor: pointer; }
 .xc .btns { display: none; }
 
 /* ---- plans (plans.js): the sidebar's plan entries, their marks, the plan dialogs ---- */
-.nav-kid { display: flex; align-items: center; gap: 6px; flex: none; }
 .nav-kid .lbl { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.nav-kid .mark { margin-left: auto; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
-.nav-kid.on::before { flex: none; margin: 0 1px 0 -12px; }
+.nav-kid .mark { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.nav-kid .mark + .cnt { margin-left: auto; }
 .nav-kid.add { color: var(--faint); }
 .nav-kid.add:hover { color: var(--accent); }
 .chip.mark { color: var(--amber); background: var(--amber-soft); }
-.chip.ingame { color: var(--green); background: var(--green-soft); }
 #acts .chip.mark { margin: 0; white-space: nowrap; flex: none; cursor: pointer; border: 0; display: inline-flex; align-items: center; gap: 6px; }
 #acts .chip.mark .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
 #crumbs { min-width: 0; }
 #top #env { margin-left: 2px; }
 @media (max-width: 1280px) { #acts .chip.mark .t { display: none; } #acts .chip.mark { padding: 0 7px; line-height: 22px; } }
 #acts .icon-btn { padding: 0 8px; letter-spacing: 1px; }
-#ingame { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
-#ingame:not(:empty) + #hints:not(:empty) { border-left: 1px solid var(--line); padding-left: 12px; }
-#ingame.other { color: var(--amber); }
+/* the plan the game has, when there are several plans: a small green dot by its name */
+.ingame-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 .plan-pop .label { padding: 10px 16px 2px; }
 .plan-pop .plan-why { min-height: 16px; padding: 3px 16px 0; color: var(--red); font-size: 12px; }
 .plan-pop .plan-from { max-height: 40vh; }

@@ -176,3 +176,26 @@ func TestFindAndAddGames(t *testing.T) {
 		t.Fatal("not a game folder was accepted")
 	}
 }
+
+// The home page's large card is what is applied: a pack applied on the home page while the
+// same plan is current, else the current plan; another environment's rows never are.
+func TestPickFeatured(t *testing.T) {
+	h := &view.Home{Rows: []view.HomeRow{
+		{Kind: view.RowPlan, Name: "Main", Current: true, EnvName: "main"},
+		{Kind: view.RowPack, Name: "Old", EnvName: "main"},
+		{Kind: view.RowPack, Name: "Old", EnvName: "test", OtherEnv: true},
+	}}
+	view.PickFeatured(h, "", "main", 7)
+	if h.Featured != 0 {
+		t.Fatalf("no setting: %d", h.Featured)
+	}
+	view.PickFeatured(h, view.FeaturedValue("main", "Old", 7), "main", 7)
+	if h.Featured != 1 {
+		t.Fatalf("applied pack: %d", h.Featured)
+	}
+	// the current plan changed since: the pack is no longer what is applied
+	view.PickFeatured(h, view.FeaturedValue("main", "Old", 7), "main", 8)
+	if h.Featured != 0 {
+		t.Fatalf("lapsed: %d", h.Featured)
+	}
+}

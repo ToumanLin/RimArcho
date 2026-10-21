@@ -90,24 +90,36 @@ export function bump(name, e, value) {
 
 // ---- the sidebar: one highlight that slides to the open entry ----
 
-// slideNav moves the sidebar's highlight under the entry that is on (like the view
-// switch's thumb). Its size follows at once; only its place animates.
-export function slideNav(nav) {
+// slideNav moves the sidebar's highlights (like the view switch's thumb): one under the
+// entry that is on, and in an open entry one under the sub-entry that is on. Their size
+// follows at once; only their place animates.
+export function slideNav(nav, jump) {
   let th = nav.querySelector(":scope > .nav-thumb");
   if (!th) { th = document.createElement("span"); th.className = "nav-thumb"; nav.prepend(th); }
-  const on = nav.querySelector(".nav-item.on, .nav-kid.on");
-  if (!on) { th.style.opacity = "0"; return; }
-  const first = !th.dataset.placed;
-  const r = on.getBoundingClientRect(), n = nav.getBoundingClientRect();
-  const x = r.left - n.left + nav.scrollLeft, y = r.top - n.top + nav.scrollTop;
-  if (first || still()) th.style.transition = "none";
-  else th.style.transition = "";
-  th.style.width = r.width + "px";
-  th.style.height = r.height + "px";
-  th.style.borderRadius = getComputedStyle(on).borderRadius;
-  th.style.transform = `translate(${x}px, ${y}px)`;
-  th.style.opacity = "1";
-  th.dataset.placed = "1";
+  place(th, nav.querySelector(":scope > .nav-item.on"), nav, true, jump);
+  for (const box of nav.querySelectorAll(".kids-in")) place(box.querySelector(".kid-hl"), box.querySelector(".nav-kid.on"), box, false, jump);
+}
+
+// place puts the highlight h under on, inside box. In the sidebar itself the sub-entries
+// above on may be opening or closing: its place is where it will be when they are done.
+function place(h, on, box, outer, jump) {
+  if (!h) return;
+  if (!on) { h.style.opacity = "0"; delete h.dataset.placed; return; }
+  const first = jump || !h.dataset.placed;
+  let y = on.offsetTop;
+  if (outer) {
+    for (const w of box.querySelectorAll(":scope > .kids-wrap")) {
+      if (!(w.compareDocumentPosition(on) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+      const end = w.classList.contains("open") ? w.firstElementChild.scrollHeight : 0;
+      y += end - w.offsetHeight;
+    }
+  }
+  h.style.transition = first || still() ? "none" : "";
+  h.style.width = on.offsetWidth + "px";
+  h.style.height = on.offsetHeight + "px";
+  h.style.transform = `translate(${on.offsetLeft}px, ${y}px)`;
+  h.style.opacity = "1";
+  h.dataset.placed = "1";
 }
 
 // ---- the status line slides in from below ----

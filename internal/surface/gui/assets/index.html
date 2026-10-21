@@ -10,11 +10,10 @@
 <body>
 <div id="app">
   <aside id="side">
-    <div class="side-head"></div>
     <nav id="nav"></nav>
     <div class="side-foot">
+      <button id="live" class="live" hidden></button>
       <button id="nav-settings" class="nav-item" data-page="settings"><span class="lbl"></span></button>
-      <button id="live" class="runbox"><span class="env"></span><span class="run"></span></button>
     </div>
   </aside>
   <div id="scrim" hidden></div>
@@ -33,13 +32,15 @@
         <div class="split" data-split="0"></div>
         <section class="area list" data-area="1"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
         <div class="split" data-split="1"></div>
-        <section class="area list" data-area="2"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
-        <div class="split" data-split="2"></div>
-        <section class="area detail" data-area="3"><div class="head"></div><div class="scroll" tabindex="-1"><div id="detail"></div></div></section>
+        <div class="stack">
+          <section class="area detail" data-area="3"><div class="head"></div><div class="scroll" tabindex="-1"><div id="detail"></div></div></section>
+          <section class="area list fold" data-area="2"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
+          <section class="area fold histarea"><button class="head hbar"></button><div class="histbody"></div></section>
+        </div>
       </main>
       <div id="screen" hidden></div>
     </div>
-    <footer id="bottom"><span id="where" class="where"></span><span id="status"></span><span class="grow"></span><span id="ingame"></span><span id="hints"></span></footer>
+    <footer id="bottom"><span id="where" class="where"></span><span id="status"></span><span class="grow"></span><span id="hints"></span></footer>
   </div>
   <div id="popup" hidden></div>
   <div id="menu" hidden></div>

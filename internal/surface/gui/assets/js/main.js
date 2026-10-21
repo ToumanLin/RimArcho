@@ -7,7 +7,7 @@
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
 import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
-import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory } from "./lists.js";
+import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen } from "./lists.js";
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
@@ -154,8 +154,10 @@ function renderWhere() {
   shell.sync();
   syncLaunch();
   if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + T("undo") + "|" + JSON.stringify(S.shell && S.shell.plan), ...planActions());
+  // A page's place is its breadcrumb; the position line says more only on the plan (where
+  // the cursor is in which list) and in the full detail.
   let s = "";
-  if (S.screen && S.screen !== "full") s = shell.crumbs().map((c) => c.label).join(" › ");
+  if (S.screen && S.screen !== "full") s = ""; // a page: the breadcrumb is enough
   else if (S.screen === "full") {
     const it = cur(lastList);
     s = `${T(AREAS[lastList])} › ${S.detail ? S.detail.name : ""}`;
@@ -225,6 +227,8 @@ function focusArea(k) {
   S.focus = k;
   if (k < 3) lastList = k;
   S.anchor = -1;
+  // 暂存 is folded under 详情: going to it opens it
+  if (k === 2 && !stagingOpen()) setStagingOpen(true);
   renderLists();
   renderWhere();
   renderHints();
@@ -572,19 +576,18 @@ function onKey(e) {
 
 // ---- the column widths (06 §7) ----
 
+// Three columns: 未启用, 已启用, and 详情 with 暂存 and 历史 under it. split 0 is between the
+// first two, split 1 before the third. Widths are fr values per environment.
+const COLS = () => [$('.area[data-area="0"]'), $('.area[data-area="1"]'), $("#board .stack")];
+
 function wireSplits() {
   const board = $("#board");
   const key = () => "ui.gui.columns:" + ((S.board && S.board.env) || "");
   $$(".split").forEach((sp) => {
     sp.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      const areas = $$("#board .area");
-      const widths = areas.map((a) => a.getBoundingClientRect().width);
-      // the areas on either side of this split that are shown (staging may be hidden)
-      const i = +sp.dataset.split;
-      let lo = i, hi = i + 1;
-      while (lo > 0 && !widths[lo]) lo--;
-      while (hi < 3 && !widths[hi]) hi++;
+      const widths = COLS().map((a) => a.getBoundingClientRect().width);
+      const lo = +sp.dataset.split, hi = lo + 1;
       const x0 = e.clientX;
       sp.classList.add("drag");
       const move = (ev) => {
@@ -592,14 +595,14 @@ function wireSplits() {
         const w = widths.slice();
         w[lo] = Math.max(160, widths[lo] + dx);
         w[hi] = Math.max(160, widths[hi] - dx);
-        // a hidden area keeps a usable width for when it shows again
+        // a hidden column (a narrow window) keeps a usable width for when it shows again
         w.forEach((v, j) => board.style.setProperty(`--c${j}`, (v || 220) + "fr"));
       };
       const up = () => {
         sp.classList.remove("drag");
         removeEventListener("mousemove", move);
         removeEventListener("mouseup", up);
-        const vals = [0, 1, 2, 3].map((j) => board.style.getPropertyValue(`--c${j}`)).join(",");
+        const vals = [0, 1, 2].map((j) => board.style.getPropertyValue(`--c${j}`)).join(",");
         api.SetSetting(key(), vals).catch(() => {});
         for (const k of [0, 1, 2]) renderRows(k);
       };
@@ -607,7 +610,7 @@ function wireSplits() {
       addEventListener("mouseup", up);
     });
     sp.addEventListener("dblclick", () => {
-      [0, 1, 2, 3].forEach((j) => board.style.removeProperty(`--c${j}`));
+      [0, 1, 2].forEach((j) => board.style.removeProperty(`--c${j}`));
       api.SetSetting(key(), "").catch(() => {});
     });
   });
@@ -616,7 +619,10 @@ function wireSplits() {
 async function loadWidths() {
   const v = await api.Setting("ui.gui.columns:" + ((S.board && S.board.env) || ""));
   const board = $("#board");
-  (v || "").split(",").forEach((w, j) => { if (w) board.style.setProperty(`--c${j}`, w); });
+  let ws = (v || "").split(",");
+  // saved by the four-column board: 未启用, 已启用, 暂存, 详情 — 详情's is the third column's now
+  if (ws.length === 4) ws = [ws[0], ws[1], ws[3]];
+  ws.slice(0, 3).forEach((w, j) => { if (w) board.style.setProperty(`--c${j}`, w); });
 }
 
 // ---- start ----
@@ -679,8 +685,9 @@ async function start() {
   pollLive();
   await loadWidths();
   // No environment yet: the first-run guide (06 §2.15); else the home page (06 §2.3).
-  if (!S.shell || !S.shell.envs) return guide.start("first");
+  if (!S.shell || !S.shell.envs) { await guide.start("first"); shell.settle(); return; }
   await go("home");
+  shell.settle();
   if (S.board && S.board.neverScanned) cmd("rescan");
 }
 

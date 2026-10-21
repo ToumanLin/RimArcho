@@ -1,9 +1,9 @@
-// The three lists (06 §2.5): virtual rows, the cursor, selection, search, dragging.
+// The three lists (06 §2.5): virtual rows, the cursor, selection, search, dragging. The
+// board has three columns: 未启用 | 已启用 | 详情, with 暂存 and 历史 folded under 详情.
 import { S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
-import { sourceIcon, statusIcon } from "./icons.js";
+import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { bump } from "./motion.js";
 
-const areas = () => $$("#board .area");
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
 
 // ---- building the views ----
@@ -38,7 +38,33 @@ export async function refilter(k, keepKey) {
 
 // ---- drawing ----
 
+// ---- the folds under 详情: 暂存 and 历史 ----
+
+// Staging is open while it holds mods, unless the player folded it; the history is folded
+// until opened. A choice is kept for the session (and in the browser's storage).
+const fold = { stage: null, hist: false };
+try { const v = JSON.parse(localStorage.getItem("archo.folds") || "null"); if (v) Object.assign(fold, v); } catch { /* defaults */ }
+const keepFolds = () => { try { localStorage.setItem("archo.folds", JSON.stringify(fold)); } catch { /* not kept */ } };
+
+export const stagingOpen = () => fold.stage ?? (S.cols[2].items.length > 0 || !!S.cols[2].query);
+export function setStagingOpen(v) {
+  if (stagingOpen() === v && fold.stage === v) return;
+  fold.stage = v;
+  keepFolds();
+  applyFolds();
+}
+function toggleHistory() { fold.hist = !fold.hist; keepFolds(); applyFolds(); renderHistory(); }
+
+function applyFolds() {
+  $('.area[data-area="2"]').classList.toggle("open", stagingOpen());
+  $(".histarea").classList.toggle("open", fold.hist);
+  $(".histarea").hidden = !(S.history && S.history.length > 1);
+}
+
+const chev = () => `<span class="fold-chev">${icon.chev}</span>`;
+
 export function renderHeads() {
+  applyFolds();
   for (const k of [0, 1, 2, 3]) {
     const a = $(`.area[data-area="${k}"]`);
     a.classList.toggle("focus", S.focus === k && !S.popup);
@@ -50,7 +76,7 @@ export function renderHeads() {
     const c = S.cols[k];
     const n = c.query.trim() ? `${c.view.length}/${c.items.length}` : `${c.items.length}`;
     h.innerHTML = `<span class="n">${k + 1}</span><span class="t">${esc(T(AREAS[k]))}</span><span class="num">${n}</span>` +
-      (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "") + (k === 1 ? listActions() : "");
+      (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "") + (k === 1 ? listActions() : "") + (k === 2 ? chev() : "");
     bump("head:" + k, $(".num", h), n);
     const s = $(".search", a);
     s.classList.toggle("on", c.searching || !!c.query);
@@ -90,10 +116,7 @@ export function renderRows(k) {
   if (!c.view.length) {
     if (!empty) box.appendChild(empty = el("div", "empty"));
     empty.textContent = c.query ? T("nothing matches") : [T("every installed mod is enabled"), T("nothing enabled yet"), T("staging is empty · t puts the selected mods here")][k];
-    // Staging is empty: its place shows the history (06 §2.5).
-    if (k === 2 && !c.query && S.history && S.history.length > 1) empty.append(historyPanel());
   } else if (empty) empty.remove();
-  if (k === 2) historyDock(box, !c.view.length && !c.query);
   const first = Math.max(0, Math.floor(box.scrollTop / ROW_H) - 4);
   const last = Math.min(c.view.length, first + Math.ceil(box.clientHeight / ROW_H) + 8);
   const pool = pools[k];
@@ -123,30 +146,25 @@ export function renderRows(k) {
 export let onHistory = () => {};
 export function setOnHistory(fn) { onHistory = fn; }
 
-// historyDock: while staging holds mods the history does not go away; it folds into a bar
-// under the staged mods (open it to see the steps).
-let histOpen = false;
-function historyDock(box, emptyShown) {
-  const area = box.parentElement;
-  let dock = $(".histdock", area);
-  const show = !emptyShown && S.history && S.history.length > 1;
-  if (!show) { if (dock) dock.remove(); return; }
-  if (!dock) { dock = el("div", "histdock"); area.append(dock); }
-  const sig = JSON.stringify(S.history) + histOpen;
-  if (dock.dataset.sig === sig) return;
-  dock.dataset.sig = sig;
-  dock.innerHTML = "";
+// renderHistory: the history's fold under 详情 and staging (06 §2.5): its bar says how
+// many steps; open, it lists them, then the saved versions.
+export function renderHistory() {
+  const area = $(".histarea");
+  applyFolds();
+  if (area.hidden) return;
+  const sig = JSON.stringify(S.history) + fold.hist;
+  if (area.dataset.sig === sig) return;
+  area.dataset.sig = sig;
   const steps = S.history.filter((h) => h.kind === "undo" || h.kind === "redo").length;
-  const bar = el("button", "hbar", (histOpen ? "▾ " : "▸ ") + T("history") + (steps ? " · " + Tf("%d steps", steps) : ""));
-  bar.onclick = (e) => { e.stopPropagation(); histOpen = !histOpen; historyDock(box, false); };
-  dock.append(bar);
-  if (histOpen) dock.append(historyPanel(false));
+  $(".hbar", area).innerHTML = `<span class="t">${esc(T("history"))}</span>` + (steps ? `<span class="num">${esc(Tf("%d steps", steps))}</span>` : "") + chev();
+  const body = $(".histbody", area);
+  body.innerHTML = "";
+  if (fold.hist) body.append(historyPanel());
 }
 
 // historyPanel: unsaved steps around "now", then the saved versions (06 §2.5).
-function historyPanel(title = true) {
+function historyPanel() {
   const p = el("div", "hist");
-  if (title) p.append(el("div", "hh", T("history")));
   let versions = false;
   for (const h of S.history) {
     if (h.kind === "version" && !versions) {
@@ -179,6 +197,7 @@ export function rowStatus(it) {
 export function renderLists() {
   renderHeads();
   for (const k of [0, 1, 2]) renderRows(k);
+  renderHistory();
 }
 
 // ensureVisible scrolls a list so its cursor row shows.
@@ -194,6 +213,13 @@ export function ensureVisible(k = S.focus) {
 // ---- wiring: scrolling, clicks, drags ----
 
 export function wireLists(ui) {
+  // the folds open and close from their bars; dropping on a folded 暂存's bar still stages
+  $('.area[data-area="2"] .head').addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    setStagingOpen(!stagingOpen());
+    renderRows(2);
+  });
+  $(".histarea .hbar").addEventListener("click", () => toggleHistory());
   for (const k of [0, 1, 2]) {
     const box = rowsEl(k);
     box.addEventListener("scroll", () => renderRows(k), { passive: true });
