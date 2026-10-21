@@ -1,0 +1,102 @@
+Spike corpusrun — RimArcho's own attribution and sorter over the HugsLib log corpus
+(docs/research/00-日志语料顶层设计.md, P1: G1 attribution, G2 ordering)
+Run: 2026-10-20, local machine. Only aggregate numbers are recorded here; per-log results stay with
+the corpus (results-v3.jsonl next to RimArcho-corpus, not in any repository).
+
+== Setup
+
+- Sample: one whole day per month (the 15th, UTC) from 2025-07 to 2026-10 via the GitHub API
+  listing (180,479 gists indexed, 6,093 downloaded) plus the P0 window (998). 6,734 logs of 1.6
+  kept for this run (1.5 and older dropped; the 50 logs of 1.7 are tracked separately).
+- Research environment: a separate RIMARCHO_HOME, the public 1.6 branch installed with SteamCMD
+  (D:\RimWorld16, Core + 5 DLCs), the author's 1,275 Workshop mods, and 1,960 downloaded mods (the
+  top 3,000 packages of the sample that were neither local nor unmappable; packageId -> Workshop id
+  via RimSort's steamDB.json, by packageId or a unique name; the download is checked against
+  About.xml's own packageId). 3,475 instances.
+- Per log: its mod list becomes ModsConfig.xml; the product's analysis (patch simulation), then
+  AnalyzeLogText on the log body (G1), then SortInput + order.Sort on the log's own order (G2).
+- Library coverage per log (mod entries the environment resolves): p10 0.65, median 0.82, p90 0.94;
+  3,884 logs >= 0.80.
+- Mods are the current Workshop versions, not the versions the players had.
+
+== Performance found on the way (fixed, d4e074e, schema v10)
+
+Analysis took 74-133 s per log: saveHarmony deletes each instance's facts by (instance_id,
+game_mm), and SQLite used type_fact_mm (all rows share game_mm) and scanned harmony_id. 63% of the
+CPU. With composite indexes: 3.5-13 s. 6,734 logs in about 11 h.
+
+== G1 attribution
+
+Same 671 logs, before and after the corpus-driven changes (621ce34, da9d181), share of problem
+clusters (informational classes excluded) with at least one source mod:
+
+                    v1 (before)   v3 (after)
+  all problem          22.5%        28.4%
+  exception            13.4%        53.6%
+  harmony-stack        61.5%        73.6%
+  patch-failed         43.6%        76.7%
+  xml-load              0.0%        12.8%
+  texture-missing       0.0%        18.3%
+  xref-missing         32.2%        15.1%   (v1 counted Core/DLCs as the source: 5,875 clusters -> 0)
+  confidence certain     309         1,766
+
+Full sample (v3), 610,910 problem clusters in 6,734 logs:
+
+                     attributed   with a source   (logs >= 80% covered)
+  all problem           47.8%         21.2%          53.0% / 21.6%
+  exception             40.0%         33.5%
+  harmony-stack         95.7%         31.3%          (mostly patchers: the Harmony lines name them)
+  xml-load              43.1%          9.1%
+  patch-failed          58.9%         54.6%          70.0% / 66.4%
+  xref-missing          59.7%         23.8%
+  texture-missing        6.1%          6.1%
+  save-load             14.0%          0.0%
+  confidence: certain 25,345, likely 104,385, possible 481,180
+
+The first 671 logs over-state the full sample (28.4% vs 21.2% with a source; harmony-stack 73.6%
+vs 31.3%): the P0 window and the July sample differ from the later months. Coverage of the
+research library barely changes the rates (21.2% all, 21.6% covered): the gaps are rules, not
+missing mods.
+
+These are coverage numbers. Accuracy needs labelled causes (design §6.4), not done yet.
+
+Largest remaining gaps (logs; clusters with a source):
+  texture-missing "Could not load Texture2D at '…'" without a def   1,187 logs   0%
+  "FileNotFoundException: Cannot resolve dependency to assembly"    773 logs     0%
+  "Could not load reference to ThingDef named …" (save load)        716 logs     3%  (78,857 clusters)
+  save-load "Could not resolve reference to object with loadID"     673 logs     0%
+  save-load "Could not find think node with key"                    562 logs     0%
+  material "_MainTex"                                                537 logs     0%
+  xref-missing "Failed to find ThingDef named … There are N defs"   487 logs     0%
+  xref-missing "No SoundDef named … found to give to Verse.S…"      626 logs     2%
+
+== G2 ordering
+
+6,734 logs (3,884 covered logs in brackets where different):
+  logs violating a declared constraint (dependency / load rules)   49.2%  (44.8%)
+    dependency 29.7%, loadAfter 31.6%, loadBefore 13.9%, forceLoad* < 1%
+  logs violating a community rule                                   45.1%
+  logs violating the official order                                 22.8%  — almost all Odyssey
+    loaded after mods (adaptive.storage.framework 417 logs, vanillaexpanded.backgrounds 237 …):
+    a DLC enabled later is appended to the end of the list
+  logs with a cycle                                                 746 (11%)
+  mods the sorter moves: p25 0, median 2, p75 5, p90 12, max 209
+
+Errors vs violations, by list size (logs with patch-failed / xref-missing / xml-load clusters):
+  < 100 mods     violating 75.1%   not violating 59.0%
+  100-199        violating 89.1%   not violating 89.0%
+  200-399        violating 97.2%   not violating 95.8%
+  >= 400         violating 99.7%   not violating 100%
+Only small lists show a difference; above 100 mods nearly every shared log has these errors. The
+665-log interim (74% vs 51%, 85% vs 76%) did not hold on the full sample. Correlation only, and the
+sample is logs players shared because something went wrong.
+
+Most violated constraints rarely involve the mods that the errors are attributed to:
+  community nals.facialanimation < erdelf.humanoidalienraces       851 logs, 87 with either as source
+  loadBefore superniquito.modoptionssort < ludeon.rimworld         651 logs, 1 (cannot be satisfied:
+                                                                    Core loads first)
+  dependency vanillaexpanded.vfepropsanddecor < reel.expanded.storage   464 logs, 15
+  community ludeon.rimworld.odyssey < adaptive.storage.framework   417 logs, 6
+  community lwm.deepstorage < mehni.pickupandhaul                  220 logs, 54
+=> Many declared and community constraints are harmless in practice; the sorter should not present
+   every violation as an error.
