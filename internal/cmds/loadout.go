@@ -1,7 +1,6 @@
 package cmds
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -36,7 +35,6 @@ func init() {
 	register(&Command{Name: "loadout diff", Args: "[<v>] [<v>]", Summary: "differences between versions (default: newest version → workspace)", MaxArgs: 2,
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: loadoutDiff})
 	register(&Command{Name: "loadout checkout", Args: "<v>", Summary: "load a version into the workspace (save to apply)", MinArgs: 1, MaxArgs: 1, Run: loadoutCheckout})
-	register(&Command{Name: "loadout tag", Args: "<v> <name>", Summary: "name a version", MinArgs: 2, MaxArgs: 2, Run: loadoutTag})
 	register(&Command{Name: "rule add", Args: "after|before|incompatible|attach <A> <B> | ignore <constraint>", Summary: "add a user rule",
 		MinArgs: 2, MaxArgs: 3, Flags: []Flag{{Name: "note", Value: "<text>"}}, Run: ruleAdd})
 	register(&Command{Name: "rule list", Summary: "list user rules", MaxArgs: 0, Run: ruleList})
@@ -99,7 +97,7 @@ func workspaceLine(st *app.LoadoutState) string {
 	} else {
 		s += ", saved"
 	}
-	return s + " (" + envRef(st.Ix.Env) + ")"
+	return s + " (" + app.PlanRef(st.Plan) + ", " + envRef(st.Ix.Env) + ")"
 }
 
 func editDoc(c *Ctx, r *app.EditResult) *render.Doc {
@@ -378,25 +376,18 @@ func loadoutLog(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	vs, err := c.App.Store.Versions(st.Ix.Env.ID)
+	vs, err := c.App.Store.Versions(st.Plan.ID)
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("versions: %d (%s)", len(vs), envRef(st.Ix.Env)))
+	d, root := render.New(fmt.Sprintf("versions: %d (%s, %s)", len(vs), app.PlanRef(st.Plan), envRef(st.Ix.Env)))
 	root.Add(workspaceLine(st))
 	if st.WS.Conflict != 0 {
 		root.KV("pending", fmt.Sprintf("v%d came from outside RimArcho and was not loaded (archo loadout checkout v%d)", st.WS.Conflict, st.WS.Conflict))
 	}
 	var rows [][]string
 	for _, v := range vs {
-		tag := ""
-		if len(v.Tags) > 0 {
-			tag = "[" + strings.Join(v.Tags, ", ") + "]"
-		}
 		note := v.Note
-		if tag != "" {
-			note = strings.TrimSpace(tag + " " + note)
-		}
 		gv := v.GameVersion
 		if gv == "" {
 			gv = "-"
@@ -473,30 +464,6 @@ func loadoutCheckout(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d := editDoc(c, r)
 	d.Nodes[0].Children = append([]*render.Node{{Line: fmt.Sprintf("checked out v%d into the workspace (archo save writes it to the game)", n)}}, d.Nodes[0].Children...)
-	return d, nil
-}
-
-func loadoutTag(c *Ctx, a *Args) (*render.Doc, error) {
-	e, err := c.App.Env()
-	if err != nil {
-		return nil, err
-	}
-	n, err := c.App.ParseVersionRef(e.ID, a.Pos[0])
-	if err != nil {
-		return nil, err
-	}
-	if n == 0 {
-		return nil, errors.New("only saved versions can be tagged")
-	}
-	name := a.Pos[1]
-	if _, err := strconv.Atoi(strings.TrimPrefix(name, "v")); err == nil || strings.ContainsAny(name, " :#") || name == "workspace" {
-		return nil, fmt.Errorf("tag %q would be confused with a version reference", name)
-	}
-	if err := c.App.Store.TagVersion(e.ID, name, n); err != nil {
-		return nil, err
-	}
-	d, _ := render.New(fmt.Sprintf("v%d tagged %s", n, name))
-	d.AddNext("archo loadout checkout " + name)
 	return d, nil
 }
 

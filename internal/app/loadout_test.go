@@ -171,7 +171,7 @@ func TestSaveSteamSuffixVersionAndBackup(t *testing.T) {
 	}
 	// Our own write is not an external change; the launch goes through now.
 	scanNow(t, e)
-	vs, _ := e.App.Store.Versions(mustEnv(t, e))
+	vs, _ := e.App.Store.Versions(mustPlan(t, e))
 	if len(vs) != 2 || vs[0].Source != "user" {
 		t.Fatalf("versions after rescan: %d, newest %s", len(vs), vs[0].Source)
 	}
@@ -188,7 +188,7 @@ func TestExternalChangeAndConflict(t *testing.T) {
 	// Same list, different formatting (the game re-saving it): no new version.
 	e.WriteFile(e.ModsConfig, strings.ReplaceAll(e.ReadModsConfig(), "    <li>", "\t\t<li>"))
 	scanNow(t, e)
-	if vs, _ := e.App.Store.Versions(mustEnv(t, e)); len(vs) != 1 {
+	if vs, _ := e.App.Store.Versions(mustPlan(t, e)); len(vs) != 1 {
 		t.Fatalf("a reformatted but identical file created %d versions", len(vs))
 	}
 	// Clean workspace: the external change is loaded.
@@ -216,21 +216,20 @@ func TestExternalChangeAndConflict(t *testing.T) {
 	}
 }
 
-func TestHistoryCheckoutTagUndoSource(t *testing.T) {
+func TestHistoryCheckoutUndoSource(t *testing.T) {
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("save") // v2
-	e.MustRun("loadout", "tag", "v2", "base")
 	e.MustRun("enable", refOf(t, e, "B", ""))
 	e.Advance(time.Hour)
 	e.MustRun("save") // v3
-	e.MustRun("loadout", "checkout", "base")
+	e.MustRun("loadout", "checkout", "v2")
 	out := e.MustRun("save") // v4, restores v2
 	if !strings.Contains(out, "source: undo (restores v2)") {
 		t.Fatal(out)
 	}
-	vs, _ := e.App.Store.Versions(mustEnv(t, e))
+	vs, _ := e.App.Store.Versions(mustPlan(t, e))
 	if vs[0].Source != "undo" || vs[0].Note != "restored v2" {
 		t.Fatalf("newest version %+v", vs[0])
 	}
@@ -238,8 +237,8 @@ func TestHistoryCheckoutTagUndoSource(t *testing.T) {
 	if !strings.Contains(out, "diff v3 → v4: 1 change") || !strings.Contains(out, "removed") {
 		t.Fatal(out)
 	}
-	if _, code := e.Run("loadout", "tag", "v2", "v9"); code == 0 {
-		t.Fatal("a tag that looks like a version must be refused")
+	if _, code := e.Run("loadout", "tag", "v2", "base"); code == 0 {
+		t.Fatal("loadout tag is gone: named lists are plans (04 §1.1)")
 	}
 }
 

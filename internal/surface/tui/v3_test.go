@@ -52,7 +52,7 @@ func workspace(t *testing.T, m *model) string {
 		s = append(s, x.Instance)
 	}
 	tags, _ := m.app.Store.TagCounts(st.Ix.Env.ID)
-	return fmt.Sprintf("%s | %v | %v | %d", st.List.Encode(), s, tags, m.app.Store.StepCount(st.Ix.Env.ID, "undo"))
+	return fmt.Sprintf("%s | %v | %v | %d", st.List.Encode(), s, tags, m.app.Store.StepCount(st.Plan.ID, "undo"))
 }
 
 func pressAll(m *model, ks ...string) {
@@ -348,7 +348,7 @@ func TestPositionInput(t *testing.T) {
 		t.Fatalf("Alpha %d, P100 %d", pos("Alpha"), pos("P100"))
 	}
 	// From Disabled: m, enter alone = the suggested place (after P050).
-	steps := e.App.Store.StepCount(m.st.Ix.Env.ID, "undo")
+	steps := e.App.Store.StepCount(m.st.Plan.ID, "undo")
 	press(m, "1")
 	for m.current().name != "Late" {
 		press(m, "down")
@@ -361,7 +361,7 @@ func TestPositionInput(t *testing.T) {
 	if pos("Late") != pos("P050")+1 || m.focus != cInactive {
 		t.Fatalf("Late at %d, P050 %d, focus %d", pos("Late"), pos("P050"), m.focus)
 	}
-	if n := e.App.Store.StepCount(m.st.Ix.Env.ID, "undo"); n != steps+1 {
+	if n := e.App.Store.StepCount(m.st.Plan.ID, "undo"); n != steps+1 {
 		t.Fatalf("undo steps %d → %d", steps, n)
 	}
 	// space then m: m moves the mod space just placed, from where the cursor is.

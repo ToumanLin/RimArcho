@@ -59,7 +59,8 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 	case FormatRML:
 		return RML(game, tokens, ws, names), nil
 	case FormatRimCrow:
-		code, err := ShareCode("RimArcho "+st.Ix.Env.Name, game, tokens, ws, names)
+		// The share code's list name is the plan's (04 §9.4).
+		code, err := ShareCode(st.Plan.Name, game, tokens, ws, names)
 		return []byte(code + "\n"), err
 	case FormatRimCrowXML:
 		return RimCrowXML(tokens, ws, names), nil

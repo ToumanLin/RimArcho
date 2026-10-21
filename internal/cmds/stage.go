@@ -22,7 +22,7 @@ func stageList(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("staging: %s (%s)", render.Plural(len(items), "mod"), envRef(st.Ix.Env)))
+	d, root := render.New(fmt.Sprintf("staging: %s (%s, %s)", render.Plural(len(items), "mod"), app.PlanRef(st.Plan), envRef(st.Ix.Env)))
 	var rows [][]string
 	for _, it := range items {
 		m := st.Ix.ByID[it.Instance]

@@ -287,11 +287,11 @@ func TestGoldenLoadout(t *testing.T) {
 		cmd("launch", "--dry-run"),
 		cmd("save", "--dry-run"),
 		cmd("save"),
-		cmd("loadout", "tag", "v2", "raid-night"),
+		cmd("plan", "new", "raid-night", "--from", "v2"),
 		func(e *testkit.Env) []string { return []string{"swap", ref(e, "Alpha"), ref(e, "Alpha Fork")} },
 		cmd("loadout", "log"),
 		cmd("loadout", "checkout", "v1"),
-		cmd("loadout", "diff", "raid-night", "workspace"),
+		cmd("loadout", "diff", "v2", "workspace"),
 		cmd("launch", "--dry-run"),
 		cmd("undo"),
 		cmd("launch", "--dry-run"),
@@ -303,6 +303,60 @@ func TestGoldenLoadout(t *testing.T) {
 		cmd("loadout", "log"),
 		cmd("rule", "remove", "r:1"),
 		cmd("rule", "remove", "r:9"),
+	})
+}
+
+// Several plans per environment (04 §1, 05 §4.3): each has its own list, undo stack,
+// versions and staging; switching writes no game file.
+func TestGoldenPlans(t *testing.T) {
+	e := testkit.New(t)
+	populate(e)
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony", "tester.alpha", "gone.mod")
+	list := filepath.Join(e.Root, "Raid Night.txt")
+	e.WriteFile(list, "# a list\nludeon.rimworld\nbrrainz.harmony\ntester.beta\nnot.installed\n")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	mc := e.ReadModsConfig()
+	runGolden(t, "plans", e, []step{
+		cmd("plan", "list"),
+		cmd("plan", "new", "copy", "--from", "current"),
+		cmd("plan", "new", "blank"),
+		cmd("plan", "new", "listed", "--from", list),
+		cmd("loadout", "import", list, "--new"),
+		cmd("loadout", "import", list, "--new", "night 2"),
+		cmd("plan", "new", "Copy"),
+		cmd("plan", "new", "old", "--from", "v9"),
+		cmd("loadout", "import", list, "extra"),
+		cmd("plan", "list"),
+		cmd("status"),
+		cmd("plan", "use", "copy"),
+		func(e *testkit.Env) []string { return []string{"enable", ref(e, "Gamma")} },
+		func(e *testkit.Env) []string { return []string{"stage", "add", ref(e, "Alpha")} },
+		cmd("history"),
+		cmd("plan", "use", "plan:default"),
+		cmd("history"),
+		cmd("stage", "list"),
+		cmd("undo"),
+		cmd("plan", "use", "copy"),
+		cmd("stage", "list"),
+		cmd("loadout", "log"),
+		cmd("plan", "rename", "copy", "raid"),
+		cmd("plan", "rename", "raid", "blank"),
+		cmd("plan", "remove", "raid"),
+		cmd("plan", "remove", "raid", "--yes"),
+		cmd("plan", "list"),
+		cmd("plan", "use", "nope"),
+		act(func(e *testkit.Env) {
+			if got := e.ReadModsConfig(); got != mc {
+				e.T.Fatalf("plan commands wrote ModsConfig.xml:\n%s", got)
+			}
+		}),
+		cmd("plan", "remove", "blank", "--yes"),
+		cmd("plan", "remove", "listed", "--yes"),
+		cmd("plan", "remove", "Raid Night", "--yes"),
+		cmd("plan", "remove", "night 2", "--yes"),
+		cmd("plan", "remove", "default", "--yes"),
+		cmd("plan", "list"),
 	})
 }
 

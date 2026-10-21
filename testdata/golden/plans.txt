@@ -1,0 +1,195 @@
+$ archo plan list
+plans: 1 (env:main)
+  plan:default  4 active  1 version  never played  [current]
+next:
+  archo plan new <name> --from current
+
+$ archo plan new copy --from current
+plan:copy created: 4 active
+  v1: import, copied from default v1
+  current: plan:default (unchanged)
+next:
+  archo plan use copy
+
+$ archo plan new blank
+plan:blank created: 0 active
+  v1: import, empty
+  current: plan:default (unchanged)
+next:
+  archo plan use blank
+
+$ archo plan new listed --from $ROOT/Raid Night.txt
+plan:listed created: 4 active
+  v1: import, Raid Night.txt
+  not installed: 1
+  current: plan:default (unchanged)
+next:
+  archo plan use listed
+
+$ archo loadout import $ROOT/Raid Night.txt --new
+plan:Raid Night created: 4 active
+  v1: import, Raid Night.txt
+  not installed: 1
+  current: plan:default (unchanged)
+next:
+  archo plan use "Raid Night"
+
+$ archo loadout import $ROOT/Raid Night.txt --new night 2
+plan:night 2 created: 4 active
+  v1: import, Raid Night.txt
+  not installed: 1
+  current: plan:default (unchanged)
+next:
+  archo plan use "night 2"
+
+$ archo plan new Copy
+error: plan:copy already exists (archo plan list)
+[exit 1]
+
+$ archo plan new old --from v9
+error: no version v9 in plan:default (archo loadout log)
+[exit 1]
+
+$ archo loadout import $ROOT/Raid Night.txt extra
+error: a plan name goes with --new (archo loadout import <file> --new [<name>])
+usage: archo loadout import <file|share code> [<name>] [--new]
+[exit 2]
+
+$ archo plan list
+plans: 6 (env:main)
+  plan:default     4 active  1 version  never played  [current]
+  plan:copy        4 active  1 version  never played
+  plan:blank       0 active  1 version  never played
+  plan:listed      4 active  1 version  never played
+  plan:Raid Night  4 active  1 version  never played
+  plan:night 2     4 active  1 version  never played
+next:
+  archo plan use <name>
+
+$ archo status
+env:main  RimWorld 1.6.4633 rev1261
+  mods: 9 live (official 1, local 3, workshop 5), 0 tombstones
+  residue: 1 (unsubscribed workshop folders still on disk; the game does not load them: archo list --filter residue)
+  lineages: 9 (0 with several instances)
+  last-scan: scan:1 2026-10-01 10:00, 0s
+  changes: 9 discovered (archo changes)
+  plan: plan:default (6 plans: archo plan list)
+  loadout: 4 active (1 missing entries), same as v1 (import)
+  problems: 0 error, 2 warning, 1 info in declarations; Defs and Patches not analysed yet (archo problems)
+
+$ archo plan use copy
+current plan: plan:copy (env:main)
+  workspace: 4 active, saved (plan:copy, env:main)
+  game: ModsConfig.xml unchanged (archo save or archo launch writes this plan)
+
+$ archo enable #gpto
+workspace: 5 active, 1 change unsaved (plan:copy, env:main)
+  added  #gpto  Gamma  at 5
+next:
+  archo save
+
+$ archo stage add #nyh3
+workspace: 5 active, 1 change unsaved (plan:copy, env:main)
+  staged: 1 mod
+  no change
+next:
+  archo save
+
+$ archo history
+history: 1 unsaved edits, 0 redoable, 1 versions
+  now: workspace: 5 active, 1 change unsaved (plan:copy, env:main)
+  undo: archo undo <n> returns to before step n
+    1    enable     added #gpto Gamma at 5
+  versions: archo loadout checkout v<n>
+    v1   2026-10-01  import   4 mods  copied from default v1
+
+$ archo plan use plan:default
+current plan: plan:default (env:main)
+  workspace: 4 active, saved (plan:default, env:main)
+  game: ModsConfig.xml unchanged (archo save or archo launch writes this plan)
+
+$ archo history
+history: 0 unsaved edits, 0 redoable, 1 versions
+  now: workspace: 4 active, saved (plan:default, env:main)
+  versions: archo loadout checkout v<n>
+    v1   2026-10-01  import   4 mods  ModsConfig.xml
+
+$ archo stage list
+staging: 0 mods (plan:default, env:main)
+
+$ archo undo
+error: nothing to undo
+[exit 1]
+
+$ archo plan use copy
+current plan: plan:copy (env:main)
+  workspace: 5 active, 1 change unsaved (plan:copy, env:main)
+  game: ModsConfig.xml unchanged (archo save or archo launch writes this plan)
+
+$ archo stage list
+staging: 1 mod (plan:copy, env:main)
+  #nyh3  Alpha  was not enabled
+next:
+  archo stage restore
+
+$ archo loadout log
+versions: 1 (plan:copy, env:main)
+  workspace: 5 active, 1 change unsaved (plan:copy, env:main)
+  v1  2026-10-01 10:00  import  4 entries  1.6.4633 rev1261  copied from default v1
+
+$ archo plan rename copy raid
+plan:copy renamed to plan:raid
+
+$ archo plan rename raid blank
+error: plan:blank already exists (archo plan list)
+[exit 1]
+
+$ archo plan remove raid
+error: this deletes plan:raid with its versions, undo steps and staging list; add --yes to confirm
+usage: archo plan remove <name> [--yes]
+[exit 2]
+
+$ archo plan remove raid --yes
+plan:raid  removed
+  current: plan:default
+
+$ archo plan list
+plans: 5 (env:main)
+  plan:default     4 active  1 version  never played  [current]
+  plan:blank       0 active  1 version  never played
+  plan:listed      4 active  1 version  never played
+  plan:Raid Night  4 active  1 version  never played
+  plan:night 2     4 active  1 version  never played
+next:
+  archo plan use <name>
+
+$ archo plan use nope
+error: no plan "nope" (archo plan list)
+[exit 1]
+
+$ archo plan remove blank --yes
+plan:blank  removed
+  current: plan:default
+
+$ archo plan remove listed --yes
+plan:listed  removed
+  current: plan:default
+
+$ archo plan remove Raid Night --yes
+plan:Raid Night  removed
+  current: plan:default
+
+$ archo plan remove night 2 --yes
+plan:night 2  removed
+  current: plan:default
+
+$ archo plan remove default --yes
+error: plan:default is the environment's only plan; it cannot be removed
+[exit 1]
+
+$ archo plan list
+plans: 1 (env:main)
+  plan:default  4 active  1 version  never played  [current]
+next:
+  archo plan new <name> --from current
+

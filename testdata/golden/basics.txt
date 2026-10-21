@@ -39,9 +39,13 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     loadout log                               saved and imported Loadout versions
     loadout diff [<v>] [<v>]                  differences between versions (default: newest version → workspace)
     loadout checkout <v>                      load a version into the workspace (save to apply)
-    loadout tag <v> <name>                    name a version
     loadout export                            write the workspace as a list file: text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code
-    loadout import <file|share code>          replace the workspace with a list (text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs); undoable
+    loadout import <file|share code> [<name>]  replace the workspace with a list (text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs; undoable), or with --new make it a new plan
+    plan list                                 list the environment's plans
+    plan new <name>                           create a plan: empty, or from the current plan, one of its versions, or a list file
+    plan use <name>                           make a plan current (writes no game file)
+    plan rename <old> <new>                   rename a plan (its history stays)
+    plan remove <name>                        delete a plan and its history (not the last one)
     stage list                                staged mods, with the place each one came from
     stage add <ref…>                          stage mods (enabled ones leave the Loadout and remember their place)
     stage drop <ref…>                         take mods out of staging without enabling them
@@ -146,6 +150,7 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (0 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered (archo changes)
+  plan: plan:default
   loadout: 1 active, same as v1 (import)
   problems: 0 error, 0 warning, 1 info in declarations; Defs and Patches not analysed yet (archo problems)
 

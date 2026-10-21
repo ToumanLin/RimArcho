@@ -77,9 +77,15 @@ func deployCandidate(m *store.Mod) loadout.Candidate {
 // those in the workspace (they will be linked on save) and those whose RimArcho link is on
 // disk now (the game sees them until the next save removes the link).
 func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string]bool, error) {
-	ws, err := a.Store.Workspace(ix.Env.ID)
+	var ws *store.Workspace
+	plan, err := a.Store.CurrentPlan(ix.Env.ID)
 	if err != nil {
 		return nil, err
+	}
+	if plan != nil {
+		if ws, err = a.Store.Workspace(plan.ID); err != nil {
+			return nil, err
+		}
 	}
 	set := map[string]bool{}
 	if ws != nil {

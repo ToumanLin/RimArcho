@@ -5,6 +5,7 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (1 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered, 1 copied (archo changes)
+  plan: plan:default
   loadout: 1 active, same as v1 (import)
   problems: 0 error, 0 warning, 2 info in declarations; Defs and Patches not analysed yet (archo problems)
 
@@ -152,6 +153,7 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (2 with several instances)
   last-scan: scan:3 2026-10-03 12:00, 0s
   changes: 1 discovered (archo changes)
+  plan: plan:default
   loadout: 1 active, same as v1 (import)
   problems: 0 error, 0 warning, 2 info in declarations; Defs and Patches not analysed yet (archo problems)
 
