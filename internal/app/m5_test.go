@@ -30,7 +30,9 @@ func TestCopyLocal(t *testing.T) {
 	orig := ref(t, e, "Example Mod")
 	out := e.MustRun("copy-local", orig, "--git")
 	dst := filepath.Join(e.Game, "Mods", "123456_local")
-	for _, want := range []string{"copied to", "git: repository with a baseline commit", "skipped: 1 links", "Textures/External", "loadout: unchanged", "archo swap " + orig + " #"} {
+	// copy-local is now an alias of pin: the enabled original is swapped for the copy in
+	// the current plan (04 §7.2 step 6); the game's files are not touched.
+	for _, want := range []string{"locked: copied to", "git: repository with a baseline commit", "skipped: 1 links", "Textures/External", "replaces " + orig + " in the current plan"} {
 		if !strings.Contains(e.Scrub(out), want) {
 			t.Fatalf("missing %q:\n%s", want, out)
 		}
@@ -63,9 +65,6 @@ func TestCopyLocal(t *testing.T) {
 	}
 	if e.ReadModsConfig() != before {
 		t.Fatal("ModsConfig.xml changed")
-	}
-	if st := e.MustRun("status"); !strings.Contains(st, "same as") && !strings.Contains(st, "0 changes") && strings.Contains(st, "unsaved") {
-		t.Fatalf("workspace changed:\n%s", st)
 	}
 	ix, _ := e.App.Index()
 	var lin []string

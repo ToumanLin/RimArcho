@@ -275,6 +275,21 @@ type RuleIn struct {
 	Note   string `json:"note,omitempty"`
 }
 
+type PinIn struct {
+	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Ref    string `json:"ref" jsonschema:"the mod to lock (#id, pkg:…); with update: the locked copy or its upstream"`
+	Name   string `json:"name,omitempty" jsonschema:"folder name under Mods/ (default <folder>_local; update picks a free one)"`
+	Git    bool   `json:"git,omitempty" jsonschema:"make the copy a git repository with a baseline commit, so edits can be diffed"`
+	Update bool   `json:"update,omitempty" jsonschema:"remake the locked version from the upstream's current content in a new folder; the old copy stays"`
+	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would be copied and swapped without changing anything"`
+}
+
+type UnpinIn struct {
+	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Ref    string `json:"ref" jsonschema:"the locked copy or its upstream (#id, pkg:…)"`
+	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would change"`
+}
+
 func gv(b *builder, mm string) []string { return b.str("game-version", mm).a }
 
 func toolList() []tool {
@@ -328,6 +343,10 @@ func toolList() []tool {
 			}
 			return b.str("note", in.Note).a
 		}),
+		reg("pin_mod", false, false, descPin, func(in PinIn) []string {
+			return argv("pin", in.Ref).str("name", in.Name).flag("git", in.Git).flag("update", in.Update).flag("dry-run", in.DryRun).a
+		}),
+		reg("unpin_mod", false, false, descUnpin, func(in UnpinIn) []string { return argv("unpin", in.Ref).flag("dry-run", in.DryRun).a }),
 	}
 }
 

@@ -26,6 +26,8 @@ type CopyResult struct {
 	// onFile is called after each copied file (a pack build's progress); an error stops
 	// the copy.
 	onFile func(bytes int64) error
+	// dry: count what would be copied, write nothing.
+	dry bool
 }
 
 // LocalSource is the environment's local source (the game's Mods folder).
@@ -43,6 +45,11 @@ func (ix *Index) LocalSource() *source.Source {
 // never follows links that leave the mod folder. The copy is assembled next to its final
 // place and renamed, so a failure leaves nothing behind.
 func (a *App) CopyLocal(st *LoadoutState, m *store.Mod, name string, git bool) (*CopyResult, error) {
+	return a.copyLocal(st, m, name, git, false)
+}
+
+// copyLocal is CopyLocal; dry checks the name and counts the files without writing.
+func (a *App) copyLocal(st *LoadoutState, m *store.Mod, name string, git, dry bool) (*CopyResult, error) {
 	ix := st.Ix
 	ls := ix.LocalSource()
 	if ls == nil {
@@ -62,9 +69,12 @@ func (a *App) CopyLocal(st *LoadoutState, m *store.Mod, name string, git bool) (
 	if _, err := os.Lstat(dst); err == nil {
 		return nil, fmt.Errorf("%s already exists; choose another --name (nothing is overwritten)", dst)
 	}
+	res := &CopyResult{Dir: dst, dry: dry}
+	if dry {
+		return res, copyTree(src, src, "", "", res)
+	}
 	tmp := dst + ".archo-tmp"
 	os.RemoveAll(tmp)
-	res := &CopyResult{Dir: dst}
 	if err := copyTree(src, src, tmp, "", res); err != nil {
 		os.RemoveAll(tmp)
 		return nil, err
@@ -96,8 +106,10 @@ func (a *App) CopyLocal(st *LoadoutState, m *store.Mod, name string, git bool) (
 
 // copyTree copies dir (whose path relative to the mod root is rel) into dst.
 func copyTree(root, dir, dst, rel string, res *CopyResult) error {
-	if err := os.MkdirAll(dst, 0o755); err != nil {
-		return err
+	if !res.dry {
+		if err := os.MkdirAll(dst, 0o755); err != nil {
+			return err
+		}
 	}
 	ents, err := os.ReadDir(dir)
 	if err != nil {
@@ -131,8 +143,10 @@ func copyTree(root, dir, dst, rel string, res *CopyResult) error {
 			}
 			continue
 		}
-		if err := copyFile(target, filepath.Join(dst, de.Name()), fi); err != nil {
-			return err
+		if !res.dry {
+			if err := copyFile(target, filepath.Join(dst, de.Name()), fi); err != nil {
+				return err
+			}
 		}
 		res.Files++
 		res.Bytes += fi.Size()

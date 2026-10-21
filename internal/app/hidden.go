@@ -80,12 +80,16 @@ func (st *LoadoutState) pinCopy(m *store.Mod) *store.Mod {
 
 // FileOp is a change RimArcho makes to a mod folder at the player's request (08 §6).
 type FileOp struct {
-	Op     string // "rename", "trash"
+	Op     string // "rename", "trash", "unpin"
 	Path   string
 	To     string // rename target
 	DryRun bool
 	Swap   *EditResult // unpin: the workspace now uses the workshop copy
 	Scan   *ScanReport // the rescan afterwards
+	// Op "unpin" (a locked version RimArcho made, no file changes): Path is the copy, To
+	// the upstream; InPlan says whether the current plan uses the copy.
+	Locked *Locked
+	InPlan bool
 }
 
 func aboutDisabledPath(m *store.Mod) (string, error) {
@@ -162,7 +166,22 @@ func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 		}
 	}
 	if h == nil {
-		return nil, fmt.Errorf("%s is not pinned (no hidden workshop copy with a loadable copy beside it)", st.Ix.Ref(m.ID))
+		// A locked version RimArcho made: the upstream was never hidden, so unpinning only
+		// swaps it back into the current plan (04 §7.5). The copy stays on disk.
+		l, err := st.lockFor(m)
+		if err != nil {
+			return nil, err
+		}
+		if l == nil {
+			return nil, fmt.Errorf("%s is not pinned (no hidden workshop copy with a loadable copy beside it, and no copy made by archo pin)", st.Ix.Ref(m.ID))
+		}
+		op := &FileOp{Op: "unpin", Path: l.Copy.RealPath, To: l.Upstream.RealPath, DryRun: dryRun, Locked: l,
+			InPlan: st.List.Index(l.Copy.ID) >= 0}
+		if dryRun || !op.InPlan {
+			return op, nil
+		}
+		op.Swap, err = a.Swap(st.Ix.Ref(l.Copy.ID), st.Ix.Ref(l.Upstream.ID))
+		return op, err
 	}
 	op, err := a.unhide(st, h.Mod, dryRun)
 	if err != nil || dryRun || st.List.Index(h.Copy.ID) < 0 {

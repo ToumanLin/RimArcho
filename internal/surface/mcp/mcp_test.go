@@ -58,7 +58,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
 		"read_source": "ro", "edit_loadout": "write", "copy_local": "write", "save_loadout": "destructive", "add_rule": "write",
-		"get_description": "ro", "set_player_data": "write",
+		"get_description": "ro", "set_player_data": "write", "pin_mod": "write", "unpin_mod": "write",
 	}
 	seen := map[string]bool{}
 	for _, tl := range res.Tools {
@@ -125,6 +125,10 @@ func TestCLIParity(t *testing.T) {
 		{"save_loadout", map[string]any{"dry_run": true}, []string{"save", "--dry-run"}},
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},
 		{"get_description", map[string]any{"ref": modA, "offline": true}, []string{"describe", modA, "--offline"}},
+		{"pin_mod", map[string]any{"ref": modA, "dry_run": true}, []string{"pin", modA, "--dry-run"}},
+		{"pin_mod", map[string]any{"ref": modA, "update": true}, []string{"pin", modA, "--update"}},
+		{"copy_local", map[string]any{"ref": modA, "name": "x/y"}, []string{"copy-local", modA, "--name", "x/y"}},
+		{"unpin_mod", map[string]any{"ref": modA, "dry_run": true}, []string{"unpin", modA, "--dry-run"}},
 	}
 	for _, c := range cases {
 		got, isErr := call(t, cs, c.tool, c.args)
@@ -316,5 +320,24 @@ func TestStillComputing(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	if out, _ := call(t, cs, "list_problems", map[string]any{"code": "harmony"}); !strings.Contains(out, "analysis: a:1") || !strings.Contains(out, "harmony.multi-transpiler") {
 		t.Fatalf("second call:\n%s", out)
+	}
+}
+
+// pin_mod swaps the copy into the current plan; unpin_mod swaps the upstream back (04 §7).
+func TestPinUnpinTools(t *testing.T) {
+	e := testkit.New(t)
+	e.AddWorkshop("5100", testkit.Sample("tester.lock", "Lockable"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.lock")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	cs := connect(t, e)
+	up := ref(t, e, "Lockable")
+	out, isErr := call(t, cs, "pin_mod", map[string]any{"ref": up})
+	if isErr || !strings.Contains(out, "replaces "+up+" in the current plan") {
+		t.Fatalf("pin_mod:\n%s", out)
+	}
+	out, isErr = call(t, cs, "unpin_mod", map[string]any{"ref": up})
+	if isErr || !strings.Contains(out, "the current plan uses "+up) {
+		t.Fatalf("unpin_mod:\n%s", out)
 	}
 }
