@@ -6,7 +6,7 @@ import "github.com/ToumanLin/RimArcho/internal/view"
 func init() {
 	view.Register(map[string]string{
 		"%d mods":                          "%d 个 Mod",
-		"%d not saved":                     "%d 项未保存",
+		"%d not written":                   "%d 项未写入",
 		"%d selected":                      "已选 %d",
 		"[image · %s]":                     "[图片 · %s]",
 		"a command, a mod, an environment": "命令、Mod 或环境",
@@ -27,7 +27,7 @@ func init() {
 		"move down / up 1 (10)":                                          "下移 / 上移 1 位（10 位）",
 		"move the cursor (scroll in the details)":                        "移动光标（在详情区中滚动）",
 		"move to a position or after a mod":                              "移动到某个序号或某个 Mod 之后",
-		"not saved yet":                                                  "尚未保存",
+		"not written to the game yet":                                    "还没写入游戏",
 		"nothing enabled yet":                                            "还没有启用任何 Mod",
 		"open the page":                                                  "打开页面",
 		"other lists: %s · tab goes to the next list with matches": "其他区：%s · tab 跳到下一个有匹配的区",

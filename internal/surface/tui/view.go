@@ -62,7 +62,7 @@ func (m *model) View() string {
 	return strings.Join(lines, "\n")
 }
 
-// topBar: brand · environment pill · needs attention · unsaved, and on the right the
+// topBar: brand · environment pill · needs attention · not written (to the game), and on the right the
 // position line (06 §3.2) and launch. Secondary screens show a breadcrumb that is the
 // position line.
 func (m *model) topBar() string {
@@ -98,7 +98,7 @@ func (m *model) topBar() string {
 		add("  "+st.Render(t), 2+width.StringWidth(t))
 	}
 	if m.unsaved > 0 {
-		t := Tf("unsaved %d", m.unsaved)
+		t := Tf("not written %d", m.unsaved)
 		add("  "+sAccent.Render(ic.unsaved+" "+t), 2+2+width.StringWidth(t))
 	}
 	launch := T("launch") + " " + ic.play

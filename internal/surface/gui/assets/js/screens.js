@@ -1,10 +1,11 @@
-// The pages over the board (the top bar's tabs): 需要处理 (06 §5), 日志 (the game log, mod
-// changes 06 §2.9, the manager's actions 06 §2.5), the full detail (§6.3), packs and
-// settings. esc returns to the mod list; the tab shows where you are.
+// The pages over the board (the sidebar's entries, 06 §2.1): 能不能跑 (06 §2.4, §5), the
+// game log (§2.10), Mod 库 › 变化 (§2.9), the full detail (§4.2), packs, the environment
+// and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
+// esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
 import { S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
 import { icon } from "./icons.js";
 import { statusIcon } from "./icons.js";
-import { onHistory } from "./lists.js";
+import { setActs } from "./shell.js";
 import * as pop from "./popups.js";
 
 let ui = null;
@@ -16,7 +17,7 @@ const GROUPS = ["this list", "missing dependencies", "conflicts", "last run", "n
 // fades in, so a redraw after an action or a sub-view switch does not flicker.
 let fresh = false;
 
-function openScreen(name) {
+export function openScreen(name) {
   fresh = S.screen !== name;
   S.screen = name;
   const sc = $("#screen");
@@ -37,18 +38,25 @@ export function closeScreen() {
   return true;
 }
 
-// page builds a page: a head (title, then what sits right of it) and a body.
-function page(cls, title, ...right) {
+// page builds a page: a head (the title and what describes the page) and a body. The
+// buttons and fields among right are the page's actions: they go to the top bar (06 §2.2).
+export function page(cls, title, ...right) {
   const w = el("div", "page " + cls + (fresh ? " enter" : ""));
   fresh = false;
   const head = el("div", "page-head");
   head.append(el("h2", "", title));
-  for (const r of right) if (r) head.append(r);
+  const acts = [];
+  for (const r of right) {
+    if (!r) continue;
+    if (r.matches("button, input, select")) acts.push(r);
+    else head.append(r);
+  }
+  setActs("", ...acts);
   w.append(head);
   return w;
 }
 
-function button(label, keyName, run, cls = "") {
+export function button(label, keyName, run, cls = "") {
   const b = el("button", "btn " + cls, label);
   if (keyName) b.append(el("kbd", "", keyName));
   b.onclick = (e) => { e.stopPropagation(); run(); };
@@ -127,10 +135,11 @@ function drawNeeds() {
   if (S.busy.analyze) state = T("checking the mods' files…");
   else if (d.never) state = T("the mods' files are not checked yet");
   else if (d.stale) state = T("the files changed since the last check");
-  const w = page("needs fill", d.count ? Tf("%d to handle", d.count) : T("nothing to handle"),
-    state ? el("span", "muted", state) : null, el("span", "grow"),
+  const w = page("needs fill", T("can it run"),
+    el("span", "muted", d.count ? Tf("%d to handle", d.count) : T("nothing to handle")),
+    state ? el("span", "muted", state) : null,
     button(T("check the files again"), "A", () => ui.cmd("analyze")),
-    button(T("game log"), "l", () => logs(0)));
+    button(T("game log"), "l", () => ui.go("log")));
   const grid = el("div", "cols three");
   N.els = [[], [], []];
   NCOLS.forEach((c, ci) => {
@@ -236,7 +245,7 @@ export function needsKey(e) {
   const m = n ? moveIn(N.cur[N.col], n, k) : null;
   if (m != null) { e.preventDefault(); N.cur[N.col] = m; return markNeeds(); }
   if (k === "A") return ui.cmd("analyze");
-  if (k === "l") return logs(0);
+  if (k === "l") return ui.go("log");
   const it = N.cols[N.col][N.cur[N.col]];
   const name = k === " " ? "space" : k === "Enter" ? "enter" : k;
   const act = it && (it.actions || []).find((a) => a.key === name);
@@ -247,46 +256,27 @@ export function analyzeEvent(ev) {
   if (S.screen === "needs" && ev.done) needs(true);
 }
 
-// chooseLog is the palette's "choose a log": the game log page.
-export function chooseLog() { return logs(0); }
-
-// ---- 日志: the game log, mod changes, the manager's actions ----
-const SUBS = ["game log", "mod changes", "manager actions"];
-const L = { sub: 0, path: "", page: null, loading: false, pending: "", cur: 0, detail: new Map(), seq: 0, els: [] };
+// ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
+const L = { path: "", page: null, loading: false, pending: "", cur: 0, detail: new Map(), seq: 0, els: [] };
 const C = { scans: [], cur: 0, rows: [], open: new Map(), els: [] };
-const H = { items: [], cur: -1, els: [] };
 
-export function logsWhere() { return S.screen === "logs" ? T("logs") + " › " + T(SUBS[L.sub]) : ""; }
-
-export async function logs(sub = L.sub) {
-  L.sub = sub;
-  if (sub === 0) return gameLog();
-  if (sub === 1) return changes();
-  return actions();
-}
-// changes is the palette's and c's "recent changes".
-export function changesPage() { return logs(1); }
-
-// logsPage keeps the page's head (its switch slides between the three views) and gives a
-// fresh body below it.
-function logsPage(...right) {
-  let w = S.screen === "logs" ? $("#screen .page.logs") : null;
+// logPage keeps the page's head and gives a fresh body below it; the actions go to the top
+// bar.
+function logPage(name, title, ...right) {
+  let w = S.screen === name ? $("#screen .page.logs") : null;
   if (!w) {
-    const sc = openScreen("logs");
-    w = page("logs fill", T("logs"), seg(SUBS.map((s) => T(s)), L.sub, (i) => logs(i), ["1", "2", "3"]), el("span", "grow"), el("span", "head-right"));
+    const sc = openScreen(name);
+    w = page("logs fill", title, ...right);
     sc.append(w);
   } else {
     while (w.children.length > 1) w.lastChild.remove();
-    setSeg($(".page-head .seg", w), L.sub);
+    setActs("", ...right.filter((r) => r && r.matches("button, input, select")));
   }
-  const hr = $(".page-head .head-right", w);
-  hr.innerHTML = "";
-  for (const r of right) if (r) hr.append(r);
   ui.renderWhere();
   return w;
 }
 
-async function gameLog(path = L.path) {
+export async function gameLog(path = L.path) {
   const n = ++L.seq;
   // What was read before shows at once and is replaced when the new read is in; a log not
   // read yet says so only if it takes a moment (no flash of a loading line).
@@ -303,8 +293,8 @@ async function gameLog(path = L.path) {
     L.loading = false;
     L.page = { files: p.files, path: "" };
     L.path = p.path;
-    if (S.screen === "logs" && L.sub === 0) drawGameLog();
-    setTimeout(() => { if (S.screen === "logs" && L.sub === 0 && n === L.seq) gameLog(p.path); }, 1500);
+    if (S.screen === "log") drawGameLog();
+    setTimeout(() => { if (S.screen === "log" && n === L.seq) gameLog(p.path); }, 1500);
     return;
   }
   L.pending = "";
@@ -314,7 +304,7 @@ async function gameLog(path = L.path) {
   if (same) return;
   L.path = p.path;
   L.loading = false;
-  if (S.screen === "logs" && L.sub === 0) drawGameLog();
+  if (S.screen === "log") drawGameLog();
 }
 
 function drawGameLog() {
@@ -328,7 +318,7 @@ function drawGameLog() {
       gameLog(p.path);
     }));
   }
-  const w = logsPage(...right);
+  const w = logPage("log", T("game log"), ...right);
   const files = (p && p.files) || [];
   const bar = el("div", "subbar");
   if (files.length) {
@@ -397,7 +387,7 @@ function showLines(box, lines) {
   box.append(pre);
 }
 
-async function changes() {
+export async function changes() {
   try { C.scans = (await api.Changes()) || []; } catch (e) { say("fail", errText(e)); return; }
   C.cur = Math.min(C.cur, 1e9);
   drawChanges();
@@ -416,11 +406,11 @@ function rescanButton() {
 // the pages that show what it found.
 export function busyChanged() {
   if (S.screen === "env") return environment();
-  if (S.screen === "logs" && L.sub === 1) return changes();
+  if (S.screen === "changes") return changes();
 }
 
 function drawChanges() {
-  const w = logsPage(rescanButton());
+  const w = logPage("changes", T("changes"), rescanButton());
   const scroll = el("div", "scroll page-scroll");
   w.append(scroll);
   if (!C.scans.length) { scroll.append(el("div", "card empty-state", T("no scan yet (R scans)"))); return; }
@@ -463,57 +453,19 @@ function markRows(X) {
   if (on) on.scrollIntoView({ block: "nearest" });
 }
 
-async function actions() {
-  try { H.items = (await api.History()) || []; } catch (e) { say("fail", errText(e)); return; }
-  const w = logsPage();
-  const scroll = el("div", "scroll page-scroll");
-  w.append(scroll);
-  const card = el("section", "card");
-  const head = el("div", "card-head");
-  head.append(el("span", "label", T("manager actions")), el("span", "muted", T("unsaved steps and saved versions; click one to go there")));
-  card.append(head);
-  H.els = [];
-  if (H.items.length <= 1) card.append(el("div", "empty-state", T("no actions yet")));
-  let versions = false;
-  H.items.forEach((h, i) => {
-    if (h.kind === "version" && !versions) { versions = true; card.append(el("div", "group", T("saved versions"))); }
-    const r = el("div", "ev h " + h.kind, h.text);
-    if (h.kind === "now") r.prepend(el("span", "dot"));
-    r.onclick = () => { H.cur = i; markRows(H); if (h.kind !== "now") goHistory(h); };
-    H.els.push(r);
-    card.append(r);
-  });
-  scroll.append(card);
-  if (H.cur < 0) H.cur = Math.max(0, H.items.findIndex((h) => h.kind === "now"));
-  H.cur = Math.max(0, Math.min(H.cur, H.items.length - 1));
-  markRows(H);
-}
-
-async function goHistory(h) {
-  await onHistory(h);
-  if (S.screen === "logs" && L.sub === 2) actions();
-}
-
+// logsKey: the arrows move in the game log's errors or in the changes; enter opens a
+// change's files.
 export function logsKey(e) {
   const k = e.key;
-  if (k === "Tab") { e.preventDefault(); return logs((L.sub + (e.shiftKey ? 2 : 1)) % 3); }
-  if (!e.shiftKey && "123".includes(k) && k.length === 1) { e.preventDefault(); return logs(+k - 1); }
-  if (L.sub === 0) {
+  if (S.screen === "log") {
     const n = (L.page && L.page.rows && L.page.rows.length) || 0;
     const m = n ? moveIn(L.cur, n, k) : null;
     if (m != null) { e.preventDefault(); L.cur = m; return markLog(); }
     return;
   }
-  const X = L.sub === 1 ? C : H;
-  const n = L.sub === 1 ? C.rows.length : H.items.length;
-  const m = n ? moveIn(X.cur, n, k) : null;
-  if (m != null) { e.preventDefault(); X.cur = m; return markRows(X); }
-  if (k === "Enter") {
-    e.preventDefault();
-    if (L.sub === 1 && C.rows[C.cur]) return toggleFiles(C.rows[C.cur]);
-    const h = H.items[H.cur];
-    if (L.sub === 2 && h && h.kind !== "now") return goHistory(h);
-  }
+  const m = C.rows.length ? moveIn(C.cur, C.rows.length, k) : null;
+  if (m != null) { e.preventDefault(); C.cur = m; return markRows(C); }
+  if (k === "Enter" && C.rows[C.cur]) { e.preventDefault(); return toggleFiles(C.rows[C.cur]); }
 }
 
 // ---- the full detail (06 §4.2): ←→ the previous / next mod, tab the sub-sections ----
@@ -659,7 +611,7 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", T("environment"), el("span", "grow"), rescanButton());
+  const w = page("env", T("environment"), button(T("add an environment"), "", () => ui.go("guide")), rescanButton());
   sc.append(w);
   const card = el("section", "card");
   for (const e of p.envs || []) {
@@ -829,7 +781,7 @@ export async function packs() {
     previewBuild(n);
   });
   name.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); build.click(); } };
-  const w = page("packs", T("packs"), el("span", "grow"), name, build);
+  const w = page("packs", T("packs"), name, build);
   sc.append(w);
   for (const u of un) {
     if (u.running && S.packBuild && S.packBuild.name === u.name) u.progress = S.packBuild;
@@ -839,8 +791,10 @@ export async function packs() {
   if (!rows.length) {
     card.append(el("div", "empty-state", T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves")));
   }
+  let focus = null;
   for (const r of rows) {
-    const row = el("div", "pack");
+    const row = el("div", "pack" + (S.packFocus === r.name ? " hl" : ""));
+    if (S.packFocus === r.name) focus = row;
     const left = el("div", "l");
     left.append(el("div", "name", r.name), el("div", "sub", r.facts + " · " + r.played));
     const right = el("div", "r");
@@ -858,6 +812,7 @@ export async function packs() {
     card.append(row);
   }
   w.append(card);
+  if (focus) requestAnimationFrame(() => focus.scrollIntoView({ block: "nearest" }));
   if (others) w.append(el("div", "muted note", Tf("%d packs belong to other environments; switch the environment to see them", others)));
   // A build this window does not watch (started before a restart, or elsewhere): look
   // again while it runs.

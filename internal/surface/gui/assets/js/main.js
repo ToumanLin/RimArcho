@@ -6,11 +6,14 @@
 //   4. the hint line lists what you can do with the object now;
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
-import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS, slideThumb } from "./state.js";
+import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
 import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory } from "./lists.js";
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
+import * as shell from "./shell.js";
+import * as homePage from "./home.js";
+import * as guide from "./guide.js";
 import { initExchange, exchange } from "./exchange.js";
 import { icon } from "./icons.js";
 
@@ -22,9 +25,12 @@ async function reload() {
   S.board = b;
   S.busy.scan = b.scanning;
   S.busy.analyze = b.analyzing;
-  if (b.error) say("fail", b.error);
+  // no environment yet: the first-run guide says so, not an error
+  if (b.error && b.envs && b.envs.length) say("fail", b.error);
   const cols = b.cols || [[], [], []];
+  const sh = shell.loadShell();
   try { S.history = await api.History(); } catch { S.history = null; }
+  await sh;
   const keep = [0, 1, 2].map((k) => setItems(k, cols[k] || []));
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
   render();
@@ -51,57 +57,77 @@ function render() {
 }
 
 function renderTop() {
-  const b = S.board;
-  if (!b) return;
-  $("#env").textContent = b.env ? `${b.env} · ${mm(b.gameVersion)}` : T("no environment");
-  $("#needs").textContent = b.needs ? String(b.needs) : "";
-  $("#needs").title = b.needs ? Tf("%d to handle", b.needs) : T("nothing to handle");
-  $("#env").classList.toggle("on", S.screen === "env");
-  $("#env").title = T("environment") + " · E";
+  if (!S.board) return;
   $("#btn-launch").textContent = T("launch") + " ▶";
-  $("#btn-launch").title = T("start the game with the saved list") + " · L";
+  $("#btn-launch").title = T("start the game with the list") + " · L";
+  syncLaunch();
 }
 
-function mm(v) { const p = String(v || "").split("."); return p.length >= 2 ? p[0] + "." + p[1] : v || ""; }
+// syncLaunch: launch sits in the top bar on the plan only, and not while a game runs.
+function syncLaunch() {
+  $("#btn-launch").hidden = !!S.screen || !!(S.live && S.live.running);
+}
+
+// planActions: the plan's actions in the top bar (06 §2.5): undo, sort, build a pack, write
+// to the game, and how many entries are not written to the game yet (06 §2.2).
+function planActions() {
+  const u = (S.board && S.board.unsaved) || 0;
+  const btn = (label, k, run, cls = "") => {
+    const b = el("button", "btn " + cls, label);
+    if (k) { b.append(el("kbd", "", k)); b.title = k; }
+    b.onclick = (e) => { e.stopPropagation(); run(); };
+    return b;
+  };
+  const out = [];
+  if (u) {
+    const n = el("span", "unwritten", Tf("%d not written", u));
+    n.title = T("different from the list last written to the game; launching or writing to the game writes them");
+    out.push(n);
+  }
+  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("sort"), "S", () => preview("sort")),
+    btn(T("build a pack"), "", () => go("packs"), "wide-only"), btn(T("write to the game"), "w", () => preview("save"), u ? "hot" : ""));
+  return out;
+}
 
 let lastList = 1;
 
-// The pages in the top bar (shift+1–5). The full detail belongs to the mod list.
-const TABS = [
-  { id: "board", label: "mod list" }, { id: "needs", label: "needs attention" }, { id: "logs", label: "logs" },
-  { id: "packs", label: "packs" }, { id: "settings", label: "settings" },
-];
+// The sidebar's 在玩 entries in shift+1–7 order (06 §3.5; view.Nav).
+const NAV = ["home", "needs", "plan", "packs", "env", "changes", "log"];
 
-function renderTabs() {
-  const on = !S.screen || S.screen === "full" ? "board" : S.screen;
-  let cur = null;
-  for (const b of $$("#tabs .tab")) {
-    b.classList.toggle("on", b.dataset.tab === on);
-    if (b.dataset.tab === on) cur = b;
-    const t = TABS.find((x) => x.id === b.dataset.tab);
-    $(".lbl", b).textContent = T(t.label);
+// go opens a sidebar page; "plan" is the editor, "pack:<name>" a pack on the packs page.
+async function go(id) {
+  shell.navigated();
+  if (id === "library") id = "changes";
+  S.packFocus = id.startsWith("pack:") ? id.slice(5) : null;
+  await openPage(id);
+  // a page already shown is redrawn in place: its sub-entry and breadcrumb follow too
+  renderWhere();
+}
+
+async function openPage(id) {
+  if (S.packFocus) return scr.packs();
+  switch (id) {
+    case "plan":
+      if (scr.closeScreen()) detailFollow(true);
+      return renderWhere();
+    case "home": return homePage.home();
+    case "needs": return scr.needs();
+    case "packs": return scr.packs();
+    case "env": return scr.environment();
+    case "changes": return scr.changes();
+    case "log": return scr.gameLog();
+    case "settings": return scr.settings();
+    case "guide": return guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
   }
-  $("#env").classList.toggle("on", S.screen === "env");
-  slideThumb($("#tabs"), cur);
 }
 
-
-
-function goTab(i) {
-  const t = TABS[i];
-  if (!t) return;
-  if (t.id === "board") { if (scr.closeScreen()) detailFollow(true); return; }
-  return cmd(t.id);
-}
-
-// renderWhere: the position line (06 §3.2).
+// renderWhere: the position line (06 §3.2), the sidebar and the breadcrumb.
 function renderWhere() {
-  renderTabs();
+  shell.sync();
+  syncLaunch();
+  if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + T("undo"), ...planActions());
   let s = "";
-  const page = TABS.find((t) => t.id === S.screen);
-  if (S.screen === "logs") s = scr.logsWhere();
-  else if (S.screen === "env") s = T("environment");
-  else if (page) s = T(page.label);
+  if (S.screen && S.screen !== "full") s = shell.crumbs().map((c) => c.label).join(" › ");
   else if (S.screen === "full") {
     const it = cur(lastList);
     s = `${T(AREAS[lastList])} › ${S.detail ? S.detail.name : ""}`;
@@ -150,7 +176,8 @@ function renderHints() {
   const h = $("#hints");
   h.innerHTML = "";
   let list = actions();
-  if (S.screen) list = [{ key: "esc", label: T("back") }];
+  if (S.screen === "full") list = [{ key: "esc", label: T("back") }];
+  else if (S.screen) list = [{ key: "shift+1–7", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
   const c = S.focus < 3 ? col() : null;
   if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)), el("span", "sep", "·"));
   list.slice(0, 7).forEach((a, i) => {
@@ -314,10 +341,10 @@ async function preview(what) {
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { needs: () => scr.needs(), logs: () => scr.logs(), changes: () => scr.logs(1), log: () => scr.logs(0), settings: () => scr.settings(), packs: () => scr.packs(), "env-page": () => scr.environment() };
-  if (pages[id]) return pages[id]();
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", log: "log", settings: "settings", packs: "packs", "env-page": "env" };
+  if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
-  if (["sort", "save", "launch", "filter", "details", "tech", "tags"].includes(id)) scr.closeScreen();
+  if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
   switch (id) {
     case "sort": case "save": case "launch": return preview(id);
     case "undo": case "redo": case "restore-all": case "stage-all": return verb(id);
@@ -442,15 +469,22 @@ function onKey(e) {
   if (pop.popupKey(e)) return;
   if (document.activeElement && document.activeElement.tagName === "INPUT") return;
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
-  // shift+1–5: the pages. By the physical key, so it works on any layout (shift+1 is "!"
-  // on a US keyboard, shift+3 is "#").
+  // shift+1–7: the sidebar's 在玩 entries. By the physical key, so it works on any layout
+  // (shift+1 is "!" on a US keyboard, shift+3 is "#").
   const dig = /^Digit([1-9])$/.exec(e.code || "");
-  if (dig && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); return goTab(+dig[1] - 1); }
+  if (dig && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault();
+    if (NAV[+dig[1] - 1]) go(NAV[+dig[1] - 1]);
+    return;
+  }
   if (S.screen) {
-    if (k === "Escape" || k === "Backspace") { e.preventDefault(); scr.closeScreen(); detailFollow(true); return; }
+    // esc leaves the full detail for the plan; the sidebar's pages are side by side, so
+    // esc does not go from one to another (06 §3.1)
+    if (S.screen === "full" && (k === "Escape" || k === "Backspace")) { e.preventDefault(); scr.closeScreen(); detailFollow(true); return; }
     if (e.ctrlKey && k === "k") { e.preventDefault(); return pop.palette(); }
+    if (k === "?" && S.screen !== "full") { e.preventDefault(); return pop.help(); }
     if (S.screen === "needs") return scr.needsKey(e);
-    if (S.screen === "logs") return scr.logsKey(e);
+    if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     if (S.screen === "full") return scr.fullKey(e);
     return;
   }
@@ -491,8 +525,8 @@ function onKey(e) {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
     g: () => verb("tags"), "#": () => verb("tags"), Enter: () => verb("full"), o: () => verb("workshop"), x: () => verb("swap"),
     S: () => preview("sort"), w: () => preview("save"), L: () => preview("launch"), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
-    "/": () => startSearch(), "!": () => scr.needs(), c: () => cmd("changes"), l: () => cmd("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
-    E: () => chooseEnv(), "?": () => pop.help(), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
+    "/": () => startSearch(), "!": () => go("needs"), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
+    E: () => go("env"), "?": () => pop.help(), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
@@ -551,9 +585,10 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, renderWhere, renderHints, renderHeads, click, verb, drop, place, preview, cmd, step, search, searchKey,
+  reload, renderWhere, renderHints, renderHeads, click, verb, drop, place, preview, cmd, step, search, searchKey, go,
   palette: paletteChoice, selectionItems: selection,
   menu: (x, y) => pop.menu(x, y, actions().filter((a) => a.run)),
+  afterImport: null, // the first-run guide's next step once an import is applied
 };
 
 async function start() {
@@ -563,20 +598,20 @@ async function start() {
   document.documentElement.lang = s.lang;
   pop.initPopups(ui);
   scr.initScreens(ui);
+  shell.initShell(ui);
+  homePage.initHome(ui);
+  guide.initGuide(ui);
   initExchange(ui);
   wireLists(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
-  document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? scr.needs() : verb(v); });
-  $("#env").onclick = () => (S.screen === "env" ? goTab(0) : cmd("env-page"));
-  $$("#tabs .tab").forEach((b, i) => { b.onclick = () => goTab(i); });
+  document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
   $("#btn-launch").onclick = () => preview("launch");
-  // the enabled list's head: import / export, sort, save
+  // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {
     const b = e.target.closest(".head [data-cmd]");
     if (b) { e.stopPropagation(); b.dataset.cmd === "exchange" ? exchange(0) : preview(b.dataset.cmd); }
   });
-  addEventListener("resize", () => renderTabs());
   $(".detail .scroll").addEventListener("scroll", () => { if (S.focus === 3) renderWhere(); }, { passive: true });
   $(".detail").addEventListener("mousedown", () => focusArea(3));
   on("scan", async (ev) => {
@@ -584,6 +619,7 @@ async function start() {
     say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
     await reload();
     scr.busyChanged();
+    if (S.screen === "home") homePage.home();
   });
   on("analyze", async (ev) => {
     if (ev.line) { S.busy.analyze = true; say("busy", T("checking the mods' files…") + " " + ev.line); return; }
@@ -591,8 +627,10 @@ async function start() {
     say(ev.ok ? "ok" : "fail", ev.ok ? T("analysis done") : ev.error);
     await reload();
     scr.analyzeEvent(ev);
+    if (ev.done && S.screen === "home") homePage.home();
   });
   on("pack", (ev) => scr.packEvent(ev));
+  on("guide", (ev) => guide.guideEvent(ev));
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again
   // when the window gets the focus (G8).
   addEventListener("focus", async () => {
@@ -602,6 +640,9 @@ async function start() {
   requestAnimationFrame(() => api.Ready().catch(() => {}));
   pollLive();
   await loadWidths();
+  // No environment yet: the first-run guide (06 §2.15); else the home page (06 §2.3).
+  if (!S.shell || !S.shell.envs) return guide.start("first");
+  await go("home");
   if (S.board && S.board.neverScanned) cmd("rescan");
 }
 
@@ -618,21 +659,18 @@ setOnHistory(async (h) => {
   return go();
 });
 
-// pollLive follows the running game every two seconds (06 §2.1): the top bar says it is
-// running, and its errors lead 需要处理.
+// pollLive follows the running game every two seconds (06 §2.1): the sidebar's foot says
+// it is running, its errors lead 能不能跑, and launching waits until it exits (08 §4).
 async function pollLive() {
   try {
     const l = await api.Live();
     const before = JSON.stringify(S.live && S.live.items);
+    const was = !!(S.live && S.live.running);
     S.live = l;
-    const b = $("#live");
-    b.hidden = !l.running;
-    // the game's place in the top bar: launch while it is not running, its state while it is
-    $("#btn-launch").hidden = !!l.running;
-    b.textContent = l.running ? (l.pack ? Tf("pack %s running since %s", l.pack, l.since) : Tf("game running since %s", l.since)) + (l.errors ? " · " + Tf("%d errors", l.errors) : "") : "";
-    b.title = l.guess ? T("which list runs is taken from the launch records") : "";
-    b.onclick = () => cmd("needs");
+    shell.renderLive();
+    syncLaunch();
     if (JSON.stringify(l.items) !== before) scr.liveChanged();
+    if (was !== !!l.running) homePage.liveChanged();
   } catch { /* the next poll tries again */ }
   setTimeout(pollLive, 2000);
 }

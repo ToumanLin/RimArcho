@@ -64,7 +64,7 @@ func TestHistoryArea(t *testing.T) {
 	press(m, "3")
 	s := ansi.Strip(m.View())
 	step := Tf("disabled %s", "Alpha")
-	for _, want := range []string{T("history"), Tf("now · %d not saved", 1), step} {
+	for _, want := range []string{T("history"), Tf("now · %d not written", 1), step} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("no %q in the history area:\n%s", want, s)
 		}
