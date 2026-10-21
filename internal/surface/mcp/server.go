@@ -229,7 +229,7 @@ type SourceIn struct {
 
 type EditIn struct {
 	Env     string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action  string   `json:"action" jsonschema:"enable, disable, move, swap, sort, undo, redo, stage, unstage or restore"`
+	Action  string   `json:"action" jsonschema:"enable, disable, move, swap, sort, undo, redo, checkout, stage, unstage or restore"`
 	Refs    []string `json:"refs,omitempty" jsonschema:"mods to enable/disable; for move and swap the first is the mod (swap: optional second = the instance to use)"`
 	At      int      `json:"at,omitempty" jsonschema:"enable at / move to this 1-based position"`
 	Before  string   `json:"before,omitempty"`
