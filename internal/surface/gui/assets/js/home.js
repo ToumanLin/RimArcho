@@ -5,6 +5,7 @@ import { S, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button, act, rescanButton } from "./screens.js";
 import { icon } from "./icons.js";
 import { openPlan, newPlan } from "./plans.js";
+import { inGameMark } from "./shell.js";
 
 let ui = null;
 export function initHome(u) { ui = u; }
@@ -59,7 +60,8 @@ function row(r, running) {
   const name = el("div", "name");
   name.append(el("span", "n", r.name), el("span", "kind " + r.kind, r.kind === "plan" ? T("plan") : T("pack")));
   // the game's ModsConfig.xml holds this plan now; a plan's unloaded external version
-  if (r.inGame) { const g = el("span", "chip ingame", T("in the game")); g.title = S.shell && S.shell.inGame ? S.shell.inGame.text : ""; name.append(g); }
+  const g = inGameMark(r.inGame);
+  if (g) name.append(g);
   if (r.mark) name.append(el("span", "chip mark", r.mark));
   const meta = [r.facts, r.mode, r.played].filter(Boolean).join(" · ");
   l.append(name, el("div", "sub", meta));

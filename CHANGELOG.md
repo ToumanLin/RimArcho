@@ -112,7 +112,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - Polish after a side-by-side with magpie: the sidebar takes magpie's sizes and edges (212 px,
   30 px entries, 14 px icons, small group titles), the open entry is raised, sub-entries hang
   16 px in on a guide line with their mod counts and their own sliding highlight, and they
-  open and close smoothly (rows 0fr → 1fr, a turning chevron).
+  open and close smoothly (rows 0fr → 1fr, a turning chevron). Less always-on chrome: the
+  sidebar's environment / "游戏没在运行" box is gone (one line shows only while a game runs or
+  a new log waits), the status line no longer says "游戏里现在是…" (a green dot marks that plan
+  when there are several) nor repeats the breadcrumb on pages.
 - "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
   the history stays in the editor's third column.
 

@@ -93,19 +93,19 @@ export function bump(name, e, value) {
 // slideNav moves the sidebar's highlights (like the view switch's thumb): one under the
 // entry that is on, and in an open entry one under the sub-entry that is on. Their size
 // follows at once; only their place animates.
-export function slideNav(nav) {
+export function slideNav(nav, jump) {
   let th = nav.querySelector(":scope > .nav-thumb");
   if (!th) { th = document.createElement("span"); th.className = "nav-thumb"; nav.prepend(th); }
-  place(th, nav.querySelector(":scope > .nav-item.on"), nav, true);
-  for (const box of nav.querySelectorAll(".kids-in")) place(box.querySelector(".kid-hl"), box.querySelector(".nav-kid.on"), box, false);
+  place(th, nav.querySelector(":scope > .nav-item.on"), nav, true, jump);
+  for (const box of nav.querySelectorAll(".kids-in")) place(box.querySelector(".kid-hl"), box.querySelector(".nav-kid.on"), box, false, jump);
 }
 
 // place puts the highlight h under on, inside box. In the sidebar itself the sub-entries
 // above on may be opening or closing: its place is where it will be when they are done.
-function place(h, on, box, outer) {
+function place(h, on, box, outer, jump) {
   if (!h) return;
   if (!on) { h.style.opacity = "0"; delete h.dataset.placed; return; }
-  const first = !h.dataset.placed;
+  const first = jump || !h.dataset.placed;
   let y = on.offsetTop;
   if (outer) {
     for (const w of box.querySelectorAll(":scope > .kids-wrap")) {

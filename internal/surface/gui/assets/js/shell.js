@@ -65,18 +65,17 @@ export function current() {
 export function sync() {
   renderSide();
   renderCrumbs();
-  renderInGame();
 }
 
-// renderInGame: the status line's "游戏里现在是：<方案> v<n>" (04 §1.3) — what the game's
-// ModsConfig.xml holds by the write record, whichever plan is being edited.
-function renderInGame() {
-  const g = S.shell && S.shell.inGame;
-  const box = $("#ingame");
-  box.textContent = g ? g.text : "";
-  box.title = g ? T("switching plans writes no game file; writing to the game or launching does") : "";
-  const cur = S.shell && S.shell.plan;
-  box.classList.toggle("other", !!(g && cur && g.planId !== cur.id));
+// inGameMark: which plan the game's ModsConfig.xml holds (04 §1.3) is a small mark on that
+// plan's sub-entry and home row, and only when there are several plans to tell apart; its
+// tooltip says "游戏里现在是：<方案> v<n>". null when there is nothing to mark.
+export function inGameMark(isInGame) {
+  const sh = S.shell;
+  if (!isInGame || !sh || !sh.inGame || !sh.plans || sh.plans.length < 2) return null;
+  const m = el("span", "ingame-dot");
+  m.title = sh.inGame.text + " · " + T("switching plans writes no game file; writing to the game or launching does");
+  return m;
 }
 
 const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", env: "env", library: "library", log: "log" };
@@ -84,6 +83,10 @@ const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", env:
 // The entry whose sub-entries were open when the sidebar was last drawn: a redraw starts
 // from it, so the sub-entries open and close with a transition (06 §7.1).
 let openWas = "";
+// Until the first page is shown the sidebar takes its state without moving (startup draws
+// it before the home page is open).
+let settled = false;
+export function settle() { settled = true; }
 
 function renderSide() {
   const nav = $("#nav");
@@ -129,13 +132,13 @@ function renderSide() {
     // Draw the old state first, then switch to the new one: the sub-entries that close
     // and the ones that open move together, and nothing below them jumps. The first
     // drawing starts as it is.
-    if (!thumb) openWas = openNow;
+    if (!thumb || !settled) openWas = openNow;
     for (const w of nav.querySelectorAll(".kids-wrap")) w.classList.toggle("open", w.dataset.for === openWas);
     void nav.offsetHeight;
     for (const w of nav.querySelectorAll(".kids-wrap")) w.classList.toggle("open", w.dataset.for === openNow);
     openWas = openNow;
   }
-  slideNav(nav);
+  slideNav(nav, !settled);
   const set = $("#nav-settings");
   set.classList.toggle("on", cur === "settings");
   if (!set.firstChild || !set.querySelector(".ic")) {
@@ -161,6 +164,8 @@ function kidList(it, kids, cur, hl) {
     const kb = el("button", "nav-kid" + (k.id === cur ? " on" : "") + (k.add ? " add" : ""));
     kb.dataset.id = k.id;
     kb.append(el("span", "lbl", k.label));
+    const g = inGameMark(k.inGame);
+    if (g) kb.append(g);
     // a plan's "有未载入的外部版本" (04 §4.3)
     if (k.mark) { const m = el("span", "mark"); m.title = k.mark; kb.append(m); kb.title = k.mark; }
     if (k.count) kb.append(el("span", "cnt num", String(k.count)));
@@ -175,19 +180,30 @@ function kidList(it, kids, cur, hl) {
   return wrap;
 }
 
-// renderLive: the environment and the running game at the sidebar's foot (06 §2.1).
+// renderLive: one line at the sidebar's foot, only while there is something to say (06
+// §2.1): the game running ("游戏运行中 · 14:05 起 · 3 个错误") or, after it, a new Player.log
+// to analyse (08 §2). The click opens 能不能跑. Otherwise nothing: the environment is the
+// top bar's chip, and "the game is not running" is not news.
 export function renderLive() {
   const box = $("#live");
   const l = S.live;
-  const env = (S.shell && S.shell.env) || "";
-  $(".env", box).textContent = env;
-  const run = $(".run", box);
-  box.classList.toggle("running", !!(l && l.running));
-  if (l && l.running) {
-    run.textContent = (l.pack ? Tf("pack %s running since %s", l.pack, l.since) : Tf("game running since %s", l.since)) + (l.errors ? " · " + Tf("%d errors", l.errors) : "");
-  } else run.textContent = (l && l.newLog) || T("the game is not running"); // 08 §2: a new Player.log; the click opens 能不能跑
-  box.classList.toggle("newlog", !!(l && !l.running && l.newLog));
-  box.title = l && l.guess ? T("which list runs is taken from the launch records") : T("can it run");
+  const running = !!(l && l.running), hint = !!(l && !running && l.newLog);
+  box.hidden = !running && !hint;
+  box.classList.toggle("running", running);
+  box.classList.toggle("newlog", hint);
+  let text = "", errs = "";
+  if (running) {
+    text = l.pack ? Tf("pack %s running since %s", l.pack, l.since) : Tf("game running since %s", l.since);
+    if (l.errors) errs = String(l.errors); // this run's errors: the amber count on the right edge
+  } else if (hint) text = l.newLog;
+  if (box.dataset.sig !== text + "|" + errs) {
+    box.dataset.sig = text + "|" + errs;
+    box.innerHTML = "";
+    box.append(el("span", "t", text));
+    if (errs) box.append(el("span", "badge-n num", errs));
+  }
+  const full = text + (errs ? " · " + Tf("%d errors", +errs) : "");
+  box.title = full + " · " + (l && l.guess ? T("which list runs is taken from the launch records") : T("can it run"));
 }
 
 // crumbs: the breadcrumb of what is shown; every level opens its page (06 §2.2).

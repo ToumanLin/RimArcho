@@ -154,8 +154,10 @@ function renderWhere() {
   shell.sync();
   syncLaunch();
   if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + T("undo") + "|" + JSON.stringify(S.shell && S.shell.plan), ...planActions());
+  // A page's place is its breadcrumb; the position line says more only on the plan (where
+  // the cursor is in which list) and in the full detail.
   let s = "";
-  if (S.screen && S.screen !== "full") s = shell.crumbs().map((c) => c.label).join(" › ");
+  if (S.screen && S.screen !== "full") s = ""; // a page: the breadcrumb is enough
   else if (S.screen === "full") {
     const it = cur(lastList);
     s = `${T(AREAS[lastList])} › ${S.detail ? S.detail.name : ""}`;
@@ -679,8 +681,9 @@ async function start() {
   pollLive();
   await loadWidths();
   // No environment yet: the first-run guide (06 §2.15); else the home page (06 §2.3).
-  if (!S.shell || !S.shell.envs) return guide.start("first");
+  if (!S.shell || !S.shell.envs) { await guide.start("first"); shell.settle(); return; }
   await go("home");
+  shell.settle();
   if (S.board && S.board.neverScanned) cmd("rescan");
 }
 

@@ -77,9 +77,11 @@ type NavItem struct {
 	Count int       `json:"count,omitempty"`
 	Key   string    `json:"key,omitempty"` // shift+1–7
 	Kids  []NavItem `json:"kids,omitempty"`
-	// Mark is a plan's "有未载入的外部版本" (04 §4.3); Current the plan being edited.
+	// Mark is a plan's "有未载入的外部版本" (04 §4.3); Current the plan being edited;
+	// InGame the plan the game's ModsConfig.xml holds (a small mark when there are several).
 	Mark    string `json:"mark,omitempty"`
 	Current bool   `json:"current,omitempty"`
+	InGame  bool   `json:"inGame,omitempty"`
 	// Add: the entry opens a dialog ("+ 新方案"), not a page.
 	Add bool `json:"add,omitempty"`
 }
@@ -97,7 +99,7 @@ type NavGroup struct {
 func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	var planKids []NavItem
 	for _, p := range plans {
-		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, Count: p.Entries})
+		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, InGame: p.InGame, Count: p.Entries})
 	}
 	planKids = append(planKids, NavItem{ID: PagePlanNew, Label: "+ " + T("new plan"), Add: true})
 	var packKids []NavItem

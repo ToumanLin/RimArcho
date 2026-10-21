@@ -186,6 +186,12 @@ func TestInGameAndMarks(t *testing.T) {
 	if kids[0].Count != rows[0].Entries || kids[2].Count != 0 {
 		t.Fatalf("plan kid counts %+v", kids)
 	}
+	// the plan the game has is marked on its entry, not on the status line
+	for i, r := range rows {
+		if kids[i].InGame != r.InGame {
+			t.Fatalf("in-game mark %d: %+v vs %+v", i, kids[i], r)
+		}
+	}
 }
 
 // G12 in part: one home row per plan, by the last launch; never played ones by name. The
