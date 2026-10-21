@@ -521,60 +521,42 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
    are reached by their keys and the command palette) */
 @media (max-width: 680px) { #board { grid-template-columns: 1fr 8px 1.2fr 0 0; } #board > .stack, #board [data-split="1"] { display: none; } }
 
-/* ---- 首页 (06 §2.3) ----
-   One card whose rows share one grid (subgrid): the name column, the state column and the
-   actions line up from row to row. Spacing is on the 4/8px grid: rows 64px with 16px sides,
-   24px between the columns and between the sections. */
-.page.home { gap: 24px; padding-top: 4px; }
+/* ---- 首页 (06 §2.3), variant B "continue": one large card for what you played last, a
+   compact list of the others, the activity as two lines ---- */
+.page.home { gap: 24px; padding-top: 8px; }
 .page.home .sec { margin-top: 0; }
-.home-list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 24px; }
-.home-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: 64px; padding: 12px 16px; }
-.home-row + .home-row { border-top: 1px solid var(--line-2); }
-.home-row .l { min-width: 0; }
-.home-row .name { display: flex; align-items: center; gap: 8px; min-width: 0; height: 20px; }
-.home-row .name .n { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-/* the kind is a quiet outline tag; what a plan or a pack is lives in its tooltip */
-.home-row .kind { flex: none; font-size: 11px; line-height: 16px; padding: 0 5px; border-radius: 4px; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
-.home-row .mark-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
-.home-row .sub { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.home-row .st { justify-self: start; display: flex; }
-/* one state per row: a tinted chip only when something is wrong */
-.home-row .state { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
-.home-row .state .ic { display: inline-flex; }
-.home-row .state .ic svg.i { width: 13px; height: 13px; }
-.home-row .state.bad { color: var(--amber); background: var(--amber-soft); }
-.home-row .state.ok { color: var(--green); padding: 0; }
-.home-row .state.unknown { color: var(--faint); padding: 0; }
-button.state.bad:hover { filter: brightness(1.12); }
-.home-row .r { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
-.home-row .btn { height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; }
-/* 编辑 / 详情 are quiet: no border, muted until hovered */
-.home-row .btn.ghost { border-color: transparent; background: none; box-shadow: none; color: var(--muted); }
-.home-row .btn.ghost:hover { background: var(--pill); color: var(--fg); }
-.home-row .btn.launch { padding: 0 14px; font-weight: 600; border-color: transparent; box-shadow: none; transition: background var(--t-press), color var(--t-press); }
-.home-row .btn.launch .ic { margin-right: 7px; }
-.home-row .btn.launch.soft { background: var(--accent-soft); color: var(--accent); }
-.home-row:hover .btn.launch.soft, .home-row .btn.launch.soft:focus-visible { background: var(--accent); color: var(--accent-fg); }
-.home-row .launch-wrap { display: inline-flex; }
-svg.i.fill { fill: currentColor; }
-/* the activity: cards on the same edges as the list above, as tall as each other */
-.act-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
-.act-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; transition: border-color var(--t-press); }
-button.act-card:hover { border-color: var(--muted); }
-.act-card > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.act-card .t { font-size: 12px; color: var(--muted); }
-.act-card .a { font-size: 14px; font-weight: 600; color: var(--fg); }
-.act-card .b { font-size: 12px; color: var(--muted); }
-.act-card .go { margin-top: 4px; font-size: 12px; color: var(--accent); }
-.act-card.hl { background: var(--accent-soft); border-color: transparent; }
-.act-card.hl .t { color: var(--accent); }
-.packs .pack.hl { background: var(--accent-soft); }
+.hb-hero { display: flex; align-items: center; gap: 24px; padding: 24px; cursor: pointer; transition: border-color var(--t-press); }
+.hb-hero:hover { border-color: var(--muted); }
+.hb-hero .l { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.hb-hero .k { font-size: 12px; color: var(--muted); }
+.hb-hero .n { font-size: 22px; font-weight: 600; letter-spacing: -.01em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb-hero .s { font-size: 13px; color: var(--muted); }
+.hb-hero .problem { margin-top: 8px; }
+.problem { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--amber); white-space: nowrap; }
+.problem svg.i { width: 13px; height: 13px; }
+button.problem:hover { text-decoration: underline; }
+.hb-hero .btn.launch.big { height: 40px; padding: 0 20px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+.btn.launch .ic { margin-right: 7px; }
+.hb-list { display: flex; flex-direction: column; padding: 4px; }
+.hb-line { display: flex; align-items: center; gap: 16px; height: 44px; padding: 0 8px 0 12px; border-radius: 8px; cursor: pointer; }
+.hb-line:hover { background: var(--card-2); }
+.hb-line .n { flex: none; max-width: 30%; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb-line .s { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb-line .btn.launch.quiet { height: 28px; color: var(--accent); background: none; border: 0; box-shadow: none; padding: 0 10px; }
+.hb-line .btn.launch.quiet:hover { background: var(--accent-soft); }
+.hb-act { display: flex; flex-direction: column; gap: 2px; }
+.hb-actline { display: flex; align-items: baseline; gap: 12px; height: 32px; padding: 0 12px; border-radius: 8px; text-align: left; min-width: 0; }
+.hb-actline:hover { background: var(--pill); }
+.hb-actline .t { flex: none; width: 96px; font-size: 12px; color: var(--muted); }
+.hb-actline .x { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }
+.hb-actline .go { color: var(--accent); }
 .card.empty-state { padding: 32px 16px; }
+svg.i.fill { fill: currentColor; }
+.packs .pack.hl { background: var(--accent-soft); }
 @media (max-width: 760px) {
-  .home-list { display: block; }
-  .home-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "l l" "st r"; row-gap: 8px; column-gap: 16px; }
-  .home-row .l { grid-area: l; } .home-row .st { grid-area: st; } .home-row .r { grid-area: r; }
-  .act-cards { grid-template-columns: 1fr; }
+  .hb-hero { flex-direction: column; align-items: stretch; }
+  .hb-line .s { display: none; }
+  .hb-line .n { flex: 1; max-width: none; }
 }
 
 /* ---- the first-run guide (06 §2.15) ---- */
