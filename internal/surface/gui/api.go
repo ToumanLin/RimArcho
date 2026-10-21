@@ -42,6 +42,8 @@ type API struct {
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string
+
+	monitorOnce sync.Once
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
 	// ScanRunner scans an environment in place of the child process (tests).
@@ -66,6 +68,7 @@ var processStart = time.Now()
 // Ready is called once the page has drawn the list; it logs the start-up time to
 // <data>/logs/gui.log (06 §10: cold start to an interactive list).
 func (s *API) Ready() {
+	s.monitorOnce.Do(s.checkMonitor)
 	ms := time.Since(processStart).Milliseconds()
 	dir := filepath.Join(s.a.Home, "logs")
 	if os.MkdirAll(dir, 0o755) != nil {
@@ -77,6 +80,28 @@ func (s *API) Ready() {
 	}
 	defer f.Close()
 	fmt.Fprintf(f, "%s ready %d ms (%s)\n", time.Now().Format(time.RFC3339), ms, buildinfo.String())
+}
+
+// checkMonitor installs or updates Archo Monitor in a child process once per window (08 §9)
+// and, when that changed something, refreshes the page the way a scan does.
+func (s *API) checkMonitor() {
+	home, env, exe := s.a.Home, s.a.EnvName, s.Exe
+	go func() {
+		var out string
+		var err error
+		if exe != "" {
+			out, err = app.ChildMonitorExe(exe, home, env)
+		} else {
+			out, err = app.ChildMonitor(home, env)
+		}
+		if err != nil || !strings.Contains(out, "installed ") && !strings.Contains(out, "plan:") && !strings.Contains(out, "replaced ") {
+			return
+		}
+		s.mu.Lock()
+		s.board, s.needs = nil, nil
+		s.mu.Unlock()
+		s.send("scan", map[string]any{"ok": true, "text": view.T("Archo Monitor is ready")})
+	}()
 }
 
 // Start is what the page needs once: the language, its text table, the commands.

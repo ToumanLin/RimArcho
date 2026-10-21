@@ -90,6 +90,8 @@ func (e *Env) Open() {
 	a.Detect = env.DetectOptions{SteamRoots: []string{e.Steam}, ManualRoots: []string{}, Home: e.Root, GOOS: "windows", SkipRegistry: true}
 	// The lock library (04 §7) stays inside the fixture.
 	a.LockBase = filepath.Join(e.Root, "LocalAppData")
+	// No bundled Archo Monitor unless a test brings one (08 §9).
+	a.MonitorBundle = app.MonitorNone
 	// Never start a process from a test: launches are only recorded.
 	a.Launcher = func(exe string, args []string, dir string) error {
 		e.Launched = append(e.Launched, strings.Join(append([]string{exe}, args...), " "))

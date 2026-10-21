@@ -25,6 +25,8 @@ var configKeys = map[string][]string{
 	"terminal.host": {"auto", "wezterm", "none"},
 	// 06 §9.4: off draws no images at all in the TUI
 	"ui.previews": {"on", "off"},
+	// 04 §1.5: add Archo Monitor to new plans (and to each plan once on upgrade)
+	"monitor.default": {"on", "off"},
 }
 
 // freeKeys are settings with free values: their default and a check (06 §3.8, §12.4).
@@ -38,6 +40,13 @@ var freeKeys = map[string]struct {
 	"lock.dir": {"", func(v string) error {
 		if !filepath.IsAbs(v) {
 			return fmt.Errorf("lock.dir must be an absolute folder path")
+		}
+		return nil
+	}},
+	// the Archo Monitor folder (08 §9): "" is %LOCALAPPDATA%\RimArcho\monitor
+	"monitor.dir": {"", func(v string) error {
+		if !filepath.IsAbs(v) {
+			return fmt.Errorf("monitor.dir must be an absolute folder path")
 		}
 		return nil
 	}},
@@ -69,7 +78,7 @@ func Setting(a *app.App, key string) string {
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.

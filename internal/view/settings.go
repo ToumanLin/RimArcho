@@ -137,6 +137,17 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			Actions: []SettingAction{{Label: T("clear"), Argv: []string{"cache", "clear", c.Kind}}}})
 	}
 	out = append(out, caches)
+	mon := SettingItem{Label: T("add Archo Monitor to plans"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
+		Argv: []string{"config", "set", "monitor.default", "{}"}, Note: T("new plans, and each plan once; after that it is a normal mod you can disable or move")}
+	if s, err := a.MonitorState(); err == nil {
+		v := T("not installed")
+		if len(s.Installed) > 0 {
+			v = s.Installed[0]
+		}
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Label: T("Archo Monitor installed"), Value: v, Note: s.Dir}}})
+	} else {
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
+	}
 	out = append(out, SettingGroup{Title: T("packs"), Items: []SettingItem{
 		{Label: T("where packs are kept"), Value: cmds.Setting(a, "pack.dir"), Edit: "path", Argv: []string{"config", "set", "pack.dir", "{}"},
 			Note: T("a full pack takes as much space as its mods")},

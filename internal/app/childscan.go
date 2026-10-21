@@ -16,6 +16,29 @@ func ChildScan(home, envName string) (string, error) {
 	return ChildScanExe(exe, home, envName)
 }
 
+// ChildMonitor runs `<this executable> monitor install` in a separate process (08 §9): the
+// install may scan, and scans never run in an interface process.
+func ChildMonitor(home, envName string) (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return ChildMonitorExe(exe, home, envName)
+}
+
+// ChildMonitorExe is ChildMonitor with an explicit archo executable.
+func ChildMonitorExe(exe, home, envName string) (string, error) {
+	args := []string{"monitor", "install"}
+	if envName != "" {
+		args = append(args, "--env", envName)
+	}
+	cmd := exec.Command(exe, args...)
+	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
+	hideWindow(cmd)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
 // ChildScanExe is ChildScan with an explicit archo executable.
 func ChildScanExe(exe, home, envName string) (string, error) {
 	args := []string{"scan"}

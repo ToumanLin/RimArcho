@@ -73,6 +73,14 @@ func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	for _, n := range r.Notices {
 		root.KV("loadout", n)
 	}
+	// Archo Monitor (08 §9): install or update the bundled monitor, apply the default.
+	if m, err := c.App.EnsureMonitor(false); err != nil {
+		root.KV("monitor", "error: "+err.Error())
+	} else {
+		for _, l := range MonitorLines(m, false) {
+			root.KV("monitor", l)
+		}
+	}
 	if len(st.Events) > 0 {
 		d.AddNext("archo changes")
 	}
@@ -755,6 +763,10 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	}
 	root.KV("plan", plan)
 	root.KV("loadout", line)
+	// Archo Monitor (08 §9): shown once it is bundled or installed.
+	if s, err := c.App.MonitorState(); err == nil && (s.Bundled != nil || s.Source != nil || s.InPlan != nil) {
+		root.KV("monitor", MonitorPlanLine(c, s))
+	}
 	if run, _ := c.App.GameRunning(); run != nil {
 		w := c.App.WhatRuns(st.Ix.Env, run)
 		what := w.PlanText() // the plan, from the launch records (08 §4)

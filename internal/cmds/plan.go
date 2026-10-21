@@ -80,6 +80,9 @@ func newPlanDoc(c *Ctx, r *app.NewPlanResult) *render.Doc {
 			root.KV("skipped", fmt.Sprintf("%d workshop IDs no installed mod has", len(r.Unresolved)))
 		}
 	}
+	if r.Monitor != "" {
+		root.KV("monitor", "Archo Monitor "+r.Monitor+" (one undoable edit; archo config set monitor.default off)")
+	}
 	root.KV("current", app.PlanRef(r.State.Plan)+" (unchanged)")
 	d.AddNext("archo plan use " + quoteArg(r.Plan.Name))
 	return d

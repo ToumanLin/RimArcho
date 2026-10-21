@@ -76,8 +76,15 @@ type App struct {
 	GameProbe func(gameRoot string) *GameRun
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
-	// LockBase replaces %LOCALAPPDATA% when finding the default lock library (tests).
+	// LockBase replaces %LOCALAPPDATA% when finding the default lock library and monitor
+	// folder (tests).
 	LockBase string
+	// MonitorBundle is the bundled Archo Monitor folder (08 §9): "" searches the usual
+	// places, MonitorNone turns it off (tests).
+	MonitorBundle string
+	// VolumeFS names the file system of a folder's volume; nil means source.VolumeFS
+	// (tests act out exFAT with it).
+	VolumeFS func(dir string) string
 	HTTP     *http.Client
 	SteamAPI string
 	// SteamCollectionAPI reads Workshop collections (04 §9.5); "" is the public endpoint.
