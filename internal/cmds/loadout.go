@@ -35,6 +35,7 @@ func init() {
 	register(&Command{Name: "loadout diff", Args: "[<v>] [<v>]", Summary: "differences between versions (default: newest version → workspace)", MaxArgs: 2,
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: loadoutDiff})
 	register(&Command{Name: "loadout checkout", Args: "<v>", Summary: "load a version into the workspace (save to apply)", MinArgs: 1, MaxArgs: 1, Run: loadoutCheckout})
+	register(&Command{Name: "loadout ignore-external", Summary: "ignore the external ModsConfig.xml version that was not loaded (it stays in the history)", MaxArgs: 0, Run: loadoutIgnoreExternal})
 	register(&Command{Name: "rule add", Args: "after|before|incompatible|attach <A> <B> | ignore <constraint>", Summary: "add a user rule",
 		MinArgs: 2, MaxArgs: 3, Flags: []Flag{{Name: "note", Value: "<text>"}}, Run: ruleAdd})
 	register(&Command{Name: "rule list", Summary: "list user rules", MaxArgs: 0, Run: ruleList})
@@ -391,9 +392,7 @@ func loadoutLog(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d, root := render.New(fmt.Sprintf("versions: %d (%s, %s)", len(vs), app.PlanRef(st.Plan), envRef(st.Ix.Env)))
 	root.Add(workspaceLine(st))
-	if st.WS.Conflict != 0 {
-		root.KV("pending", fmt.Sprintf("v%d came from outside RimArcho and was not loaded (archo loadout checkout v%d)", st.WS.Conflict, st.WS.Conflict))
-	}
+	addConflicts(c, root, st)
 	var rows [][]string
 	for _, v := range vs {
 		note := v.Note
@@ -474,6 +473,34 @@ func loadoutCheckout(c *Ctx, a *Args) (*render.Doc, error) {
 	d := editDoc(c, r)
 	d.Nodes[0].Children = append([]*render.Node{{Line: fmt.Sprintf("checked out v%d into the workspace (archo save writes it to the game)", n)}}, d.Nodes[0].Children...)
 	return d, nil
+}
+
+func loadoutIgnoreExternal(c *Ctx, a *Args) (*render.Doc, error) {
+	n, st, err := c.App.IgnoreExternal()
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		d, root := render.New(fmt.Sprintf("nothing to ignore: %s has no external version that was not loaded", app.PlanRef(st.Plan)))
+		addConflicts(c, root, st) // other plans' marks
+		return d, nil
+	}
+	d, root := render.New(fmt.Sprintf("ignored v%d of %s: the workspace stays as it is; v%d stays in the history (archo loadout log)", n, app.PlanRef(st.Plan), n))
+	root.Add(workspaceLine(st))
+	return d, nil
+}
+
+// addConflicts lists the environment's plans with an unloaded external ModsConfig.xml
+// version and the three ways out (04 §4.3).
+func addConflicts(c *Ctx, root *render.Node, st *app.LoadoutState) {
+	cs, err := c.App.Conflicts(st)
+	if err != nil {
+		return
+	}
+	for _, x := range cs {
+		root.KV("pending", fmt.Sprintf("ModsConfig.xml changed outside RimArcho; %s was not loaded because the plan changed since it was written: %s",
+			x.Name(st.Ix.Env), strings.Join(x.Commands(st.Ix.Env), ", ")))
+	}
 }
 
 func ruleLine(c *Ctx, ix *app.Index, r *store.UserRule) []string {

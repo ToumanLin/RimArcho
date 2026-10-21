@@ -352,6 +352,8 @@ var zhText = map[string]string{
 	"last run, %s reported %d errors":                                                                          "上次运行时 %s 报了 %d 次错",
 	"last run, %s reported %d warnings":                                                                        "上次运行时 %s 报了 %d 次警告",
 	"earlier log · %s · %s":                                                                                    "更早的日志 · %s · %s",
+	"see the difference":                                                                                       "看差异",
+	"ModsConfig.xml was changed outside RimArcho; plan %s has it as v%d, not loaded":                           "ModsConfig.xml 在 RimArcho 之外被修改了；方案 %s 已存为 v%d，未载入",
 	"ModsConfig.xml was changed outside RimArcho":                                                              "ModsConfig.xml 在 RimArcho 之外被修改了",
 	"is %s the same mod as %s?":                                                                                "%s 和 %s 是同一个 Mod 吗？",
 	"same":                                                                                                     "是同一个",

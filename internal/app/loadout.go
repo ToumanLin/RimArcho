@@ -157,26 +157,35 @@ func (a *App) Loadout() (*LoadoutState, error) {
 }
 
 func (a *App) loadLoadout(ix *Index) (*LoadoutState, error) {
-	aliases, err := a.Store.AllAliases(ix.Env.ID)
+	reg, aliases, all, deploy, err := a.registry(ix)
 	if err != nil {
 		return nil, err
+	}
+	st := &LoadoutState{Ix: ix, Reg: reg, Aliases: aliases, cands: all, deploy: deploy}
+	if err := a.sync(st); err != nil {
+		return nil, err
+	}
+	return st, nil
+}
+
+// registry builds the environment's instance registry (04 §4.2): the game-loadable
+// instances plus the ones RimArcho deploys into Mods/.
+func (a *App) registry(ix *Index) (*loadout.Registry, map[string][]store.Alias, []loadout.Candidate, map[string]bool, error) {
+	aliases, err := a.Store.AllAliases(ix.Env.ID)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 	deploy, err := a.deploySet(ix, aliases)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, nil, err
 	}
-	cands := Candidates(ix, aliases)
-	all := cands
+	all := Candidates(ix, aliases)
 	for _, m := range ix.Mods { // index order keeps the registry deterministic
 		if deploy[m.ID] {
 			all = append(all[:len(all):len(all)], deployCandidate(m))
 		}
 	}
-	st := &LoadoutState{Ix: ix, Reg: loadout.NewRegistry(all), Aliases: aliases, cands: all, deploy: deploy}
-	if err := a.sync(st); err != nil {
-		return nil, err
-	}
-	return st, nil
+	return loadout.NewRegistry(all), aliases, all, deploy, nil
 }
 
 func (a *App) sync(st *LoadoutState) error {
@@ -203,7 +212,6 @@ func (a *App) sync(st *LoadoutState) error {
 	if err != nil {
 		return err
 	}
-	var ws *store.Workspace
 	if plan == nil {
 		// First use (04 §1.4): ModsConfig.xml becomes the environment's first plan.
 		p, err := a.Store.CreatePlan(e.ID, store.DefaultPlanName, now)
@@ -229,66 +237,31 @@ func (a *App) sync(st *LoadoutState) error {
 			if err != nil {
 				return err
 			}
-			ws = &store.Workspace{PlanID: plan.ID, Entries: fileList.Encode(), OriginVersion: n, OriginKind: "import", Updated: now}
+			ws := &store.Workspace{PlanID: plan.ID, Entries: fileList.Encode(), OriginVersion: n, OriginKind: "import", Updated: now}
 			if err := a.Store.SetWorkspace(ws); err != nil {
 				return err
 			}
-			if st.File != nil {
-				mcs.Seen = h
-				if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, mcs); err != nil {
-					return err
-				}
-			}
+			// The file is not marked as seen here: the check below finds it equal to this
+			// import, or — when another plan sharing the folder wrote it and it changed
+			// since — an external change of that plan (04 §4.3).
 			st.Notices = append(st.Notices, fmt.Sprintf("imported ModsConfig.xml as v%d: %d entries", n, len(fileList)))
 		}
 	}
 	st.Plan = plan
-	if ws == nil {
-		if ws, err = a.planWorkspace(plan); err != nil {
-			return err
-		}
-	}
 	if st.File != nil && !bytes.Equal(h, mcs.Seen) {
 		if bytes.Equal(h, mcs.Written) {
 			mcs.Seen = h
-		} else {
-			latest, err := a.Store.LatestVersion(plan.ID)
-			if err != nil {
-				return err
-			}
-			if latest != nil && latest.GameVersion == st.File.Version &&
-				st.Reg.Heal(loadout.Decode(latest.Entries)).Equal(fileList) {
-				// Rewritten by the game or another tool without a real change (formatting).
-				mcs.Seen = h
-				if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, mcs); err != nil {
-					return err
-				}
-				goto done
-			}
-			clean := latest == nil || st.Reg.Heal(loadout.Decode(ws.Entries)).Equal(st.Reg.Heal(loadout.Decode(latest.Entries)))
-			n, err := a.Store.AddVersion(plan.ID, &store.Version{Created: now, Source: "external", Entries: fileList.Encode(),
-				GameVersion: st.File.Version, Note: "ModsConfig.xml changed outside RimArcho"})
-			if err != nil {
-				return err
-			}
-			if clean {
-				ws.Entries, ws.OriginVersion, ws.OriginKind, ws.Conflict = fileList.Encode(), n, "external", 0
-				st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: loaded as v%d", n))
-			} else {
-				ws.Conflict = n
-				st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: kept as v%d, not loaded because the workspace has unsaved edits (archo loadout diff v%d; archo loadout checkout v%d)", n, n, n))
-			}
-			ws.Updated = now
-			if err := a.Store.SetWorkspace(ws); err != nil {
-				return err
-			}
-			mcs.Seen = h
+		} else if err := a.attributeExternal(st, mcs, h, now); err != nil {
+			return err
 		}
 		if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, mcs); err != nil {
 			return err
 		}
 	}
-done:
+	ws, err := a.planWorkspace(plan)
+	if err != nil {
+		return err
+	}
 	st.WS = ws
 	st.List = st.Reg.Heal(loadout.Decode(ws.Entries))
 	st.Latest, err = a.Store.LatestVersion(plan.ID)
@@ -746,6 +719,12 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch bool) (*SaveResult, err
 	if st.FileErr != nil {
 		return nil, fmt.Errorf("cannot read %s: %v (fix or remove the file first)", st.FilePath, st.FileErr)
 	}
+	// Never over an external change the player has not seen (05 I8, 04 §4.3).
+	if c, err := a.writeBlocker(st); err != nil {
+		return nil, err
+	} else if c != nil {
+		return nil, conflictError(st, c)
+	}
 	r := &SaveResult{State: st, Path: st.FilePath, DryRun: dryRun, Changes: st.Changes()}
 	mods, links, err := planLinks(st)
 	if err != nil {
@@ -992,18 +971,4 @@ func loadCommunity(path string) (order.Community, error) {
 		return nil, err
 	}
 	return c, nil
-}
-
-// DismissConflict drops the pointer to an external ModsConfig.xml version that was not
-// loaded (06 §2.5 "ignore"); the version stays in the history.
-func (a *App) DismissConflict() error {
-	st, err := a.Loadout()
-	if err != nil {
-		return err
-	}
-	if st.WS.Conflict == 0 {
-		return nil
-	}
-	st.WS.Conflict = 0
-	return a.Store.SetWorkspace(st.WS)
 }

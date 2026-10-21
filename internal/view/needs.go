@@ -346,11 +346,22 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	}
 	if v := st.WS.Conflict; v != 0 {
 		add(Need{Group: GroupConfirm, Text: T("ModsConfig.xml was changed outside RimArcho"), Counted: true, Status: StatusWarn, Actions: []Action{
+			viewAction(T("see the difference"), "loadout", "diff", fmt.Sprintf("v%d", v), "workspace"),
 			{Kind: ActLoadExternal, Key: "L", Label: T("load it into the list"), Version: v,
 				Confirm: T("press L again to load it; your unsaved edits are replaced"), Warn: T("your unsaved edits are replaced"),
 				Done: T("the outside change is loaded into the list")},
 			{Kind: ActDismissConflict, Key: "I", Label: T("ignore it"), Done: T("the outside change is ignored (it stays in the history)")},
 		}})
+	}
+	// Other plans of the environment with an unloaded outside change (04 §4.3): resolved
+	// after switching to them.
+	if cs, err := a.Conflicts(st); err == nil {
+		for _, c := range cs {
+			if !c.Current {
+				add(Need{Group: GroupConfirm, Text: Tf("ModsConfig.xml was changed outside RimArcho; plan %s has it as v%d, not loaded", c.Plan.Name, c.Version),
+					Counted: true, Status: StatusWarn})
+			}
+		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Group != out[j].Group {

@@ -131,6 +131,7 @@ func TestCLIParity(t *testing.T) {
 		{"search_files", map[string]any{"pattern": "Lib_Gun"}, []string{"files", "search", "Lib_Gun"}},
 		{"save_loadout", map[string]any{"dry_run": true}, []string{"save", "--dry-run"}},
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},
+		{"edit_loadout", map[string]any{"action": "ignore_external"}, []string{"loadout", "ignore-external"}},
 		{"get_description", map[string]any{"ref": modA, "offline": true}, []string{"describe", modA, "--offline"}},
 		// The read-only pages folded into status, and the read-only actions of the 05 §1.2
 		// tools (their write actions: TestGoldenManageTools).

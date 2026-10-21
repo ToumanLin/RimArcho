@@ -39,6 +39,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     loadout log                               saved and imported Loadout versions
     loadout diff [<v>] [<v>]                  differences between versions (default: newest version → workspace)
     loadout checkout <v>                      load a version into the workspace (save to apply)
+    loadout ignore-external                   ignore the external ModsConfig.xml version that was not loaded (it stays in the history)
     loadout export                            write the workspace as a list file: text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code
     loadout import <file|share code> [<name>]  replace the workspace with a list (text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs; undoable), or with --new make it a new plan
     plan list                                 list the environment's plans
