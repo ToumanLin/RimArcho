@@ -2,18 +2,20 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
-## 0.9.0 — plans and launching (in progress)
+## 0.9.0 — plans and launching (unreleased)
 
-The new design's 1.0 work (01 §5.1). 1.0.0 follows once this is done and 01 §5.2 is
-verified, with a `1.0.0-rc1` first.
+The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
+`1.0.0-rc1` first.
 
 ### Breaking
-- Database schema v10 → v11: plans. Each environment's workspace, undo stack, versions and
+- Database schema v10 → v12: plans (v11) and analysis kept per plan (v12). Each environment's workspace, undo stack, versions and
   staging become its first plan, `default`; each `loadout tag` name becomes a plan of its own
   with one `import` version (04 §1.4).
 - `launch --force` is removed: launching always writes the plan first (08 §2).
 - `loadout tag` is removed: a named list is a plan (05 §4.3).
 - `archo save` means "write to the game without launching" (04 §4.1).
+- `save` and `launch` refuse while ModsConfig.xml holds an outside change that was not loaded
+  (04 §4.1, §4.3).
 - Locked copies made by `pin` live in the lock library, not in `Mods/` (04 §7).
 
 ### Plans (04 §1)
@@ -22,7 +24,18 @@ verified, with a `1.0.0-rc1` first.
 - Workspace, undo, versions (numbered per plan) and staging belong to a plan; `status`,
   `loadout log` and `stage list` name it. Share codes carry the plan name.
 - The ModsConfig.xml write record is kept per user-data folder and names the writer (plan,
-  version); launch records have plan, list fingerprint and version columns (filled in later).
+  version).
+- The window: one sidebar entry per plan and + 新方案; new (empty, copy, a version, an
+  import), rename, delete (confirmed; never the last) from the plan page's ⋯ menu, a
+  right-click, `P` or the palette. The status bar says "游戏里现在是：<方案> v<n>". The TUI
+  has the same switcher on `P` and names the plan in its top bar.
+
+### Outside changes (04 §4.3)
+- A change made to ModsConfig.xml outside RimArcho goes to the plan that last wrote the file,
+  in whichever environment shares the folder: loaded as an `external` version when that plan
+  is untouched since, else recorded and marked. With no record it goes to the current plan.
+- `archo loadout ignore-external` clears the mark; the version stays. The mark shows in
+  `status`, `loadout log`, 能不能跑 (with "see the difference"), the sidebar and the plan page.
 
 ### Launching (08 §1, §2, §4)
 - `archo launch` writes the plan to the game (links, ModsConfig.xml, a `launch` version unless
@@ -32,7 +45,8 @@ verified, with a `1.0.0-rc1` first.
   entries and missing, plus the command line for launch.
 - `archo save` works while the game runs and says the game reads it on its next start.
 - One game at a time: a game running from any registered environment blocks `launch` and
-  `pack launch`, naming the environment (and the pack). The window disables launch.
+  `pack launch`, naming the environment and the plan or pack. The window disables launch.
+- Launch records carry the plan, the enabled list's fingerprint and the version played.
   A game in `RimWorld2` no longer counts as running in `RimWorld`.
 
 ### Locked versions (04 §7)
@@ -48,31 +62,42 @@ verified, with a `1.0.0-rc1` first.
   `Mods/` into the library — a rename on the same volume, else copy, verify, recycle.
 - `unpin` on a RimArcho copy swaps the upstream back into the current plan.
 
+### Logs (03 §3, §6.4)
+- A log belongs to the newest launch before it was written (else the plan that last wrote
+  ModsConfig.xml; else "source unknown"). It is stale for another game version, another
+  plan, environment or pack, or a list changed since that launch; the header says why.
+  ModsConfig.xml's modification time is no longer used.
+- Analysis is kept per plan's enabled set: switching plans and back does not re-run it.
+- "分析本次日志" shows in the sidebar foot and the TUI top bar when Player.log is newer than
+  the last launch and the log last seen.
+
 ### MCP (05 §1.2, §5.2)
 - New tools: `manage_packs`, `ignore_problem`, `resolve_identity`, `scan`, `exchange_list`,
   `manage_rules` (`add_rule` stays as an alias), `manage_hidden`, `maintenance`, `pin_mod`
   (`copy_local` stays as an alias), `unpin_mod`; `status` gains `show` pages (envs,
-  settings, data, db, cache). 28 tools in all.
-- `exchange_list` and `maintenance` are open-world; the destructive ones are listed in the
-  server instructions with "show the dry run and ask first".
+  settings, data, db, cache); `launch_game`, `manage_plans`, `plan_history`;
+  `edit_loadout` gains `checkout` and `ignore_external`. 31 tools in all.
+- `exchange_list` and `maintenance` are open-world; the destructive ones (`save_loadout`,
+  `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`, `manage_hidden`,
+  `maintenance`) are listed in the server instructions with "show the dry run and ask first".
+- Instructions and descriptions speak of the current plan, writing to the game and locked
+  versions.
 
 ### The window (06 §2)
 - A sidebar replaces the top tabs: 首页, 能不能跑 with its badge, 方案, 整合包, 环境,
   Mod 库 › 变化, 游戏日志, then 设置 and the game status at the bottom (`shift+1`–`7`).
   It collapses, and starts collapsed below 760 px.
 - The top bar has a clickable breadcrumb, the environment chip and the page's actions.
-- A home page: the current list and each pack with its state and a launch button, and the
-  last run and last scan's changes.
+- A home page: each plan and pack, newest played first, with its state (another plan's from
+  its stored analysis) and a launch button, and the last run and last scan's changes.
 - A first-run guide: find games (several at once), scan them, start from the game's list, an
   import, a pack or a Steam collection. 环境 › 添加环境 opens it.
 - "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
   the history stays in the editor's third column.
 
-### Still to do for 0.9.0
-- External changes attributed to the plan that wrote the file, `loadout ignore-external`
-  (04 §4.3); logs matched to launch records, analysis cached per plan (03 §6.4, §3); the
-  launch record's plan and fingerprint; `launch_game`, `manage_plans`, `plan_history`; plan
-  pages in the window and the TUI page mapping.
+### Known gaps
+- Command output still says "unsaved" in a few places (`1 change unsaved`).
+- `collection <id> --import` replaces the list with only the collection's mods, dropping Core.
 
 ## 0.8.0 — toward 1.0 (unreleased)
 

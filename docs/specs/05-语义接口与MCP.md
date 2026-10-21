@@ -1,6 +1,6 @@
 # 05 · 语义接口与 MCP
 
-> 状态：CLI 与 MCP 已实现（28 个 MCP 工具，含别名 `add_rule`、`copy_local`）；启动、方案管理、方案历史的工具待实现，逐条标在文中。
+> 状态：CLI 与 MCP 已实现（31 个 MCP 工具，含别名 `add_rule`、`copy_local`）。还缺 1.1 的存档工具和少数引用形式，逐条标在文中。
 > 依据：00、00a；02、03、04、08 的命令语义；09（Archo 用同一套工具）。
 
 ## 1. 一套命令与工具层
@@ -34,11 +34,11 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 
 | 玩家动作 | 现状 | 目标 |
 | --- | --- | --- |
-| 启动方案（08 §2） | 只有 CLI `launch`，没有 MCP 工具 | 工具 `launch_game`，`destructiveHint: true`（**待实现**） |
-| 方案管理：列出、新建、切换、改名、删除（04 §1） | CLI `plan …` 已有（§4.3） | 工具 `manage_plans`（**待实现**） |
+| 启动方案（08 §2） | 已完成 | 工具 `launch_game`，`destructiveHint: true` |
+| 方案管理：列出、新建、切换、改名、删除（04 §1） | 已完成 | 工具 `manage_plans`，`destructiveHint: true`（删除方案连同历史，不能撤回） |
 | 写入游戏但不启动 | `save_loadout` 的描述已改为“写入游戏但不启动” | 已完成 |
-| 看历史、对比、回到某个版本（04 §3） | CLI `history`、`loadout log/diff/checkout`，无工具 | 工具 `plan_history`（只读：log / diff，**待实现**）；回到版本走 `edit_loadout` 的 `checkout` 动作 |
-| 处理外部修改的冲突：看差异 / 载入 / 忽略（04 §4.3） | 无命令 | 看差异 `loadout diff v<n> workspace`、载入 `loadout checkout v<n>`、忽略 `loadout ignore-external`（**待实现**，随 04 §4.3）；工具并入 `plan_history` / `edit_loadout` |
+| 看历史、对比、回到某个版本（04 §3） | 已完成 | 工具 `plan_history`（只读：log / diff / steps）；回到版本走 `edit_loadout` 的 `checkout` 动作 |
+| 处理外部修改的冲突：看差异 / 载入 / 忽略（04 §4.3） | 已完成 | 看差异 `loadout diff v<n> workspace`、载入 `loadout checkout v<n>`、忽略 `loadout ignore-external`；工具：`plan_history action=diff`、`edit_loadout action=checkout` / `ignore_external` |
 | 锁定版本、解除、更新锁定版本（04 §7） | 已完成 | 工具 `pin_mod`（对应 `pin`，创建锁定版本并在当前方案里换上；`copy_local` 保留为别名）；新增工具 `unpin_mod`；更新锁定版本是 `pin --update <实例>`，并入 `pin_mod` |
 | 整合包：编译、列表、启动、导出、导入、删除、停止编译（08 §5） | 已完成 | 工具 `manage_packs`，`destructiveHint: true` |
 | 忽略 / 取消忽略问题（03 §4.2） | 已完成 | 工具 `ignore_problem` |
@@ -77,7 +77,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 - 不带 `#` 的 ID 前缀也被接受，因为 `#` 在 bash 和 PowerShell 里是注释符，命令行里带 `#` 的引用要加引号（`'#a3f9'`）。TUI、GUI 和 MCP 没有这个问题。
 - `harmony:<Type.Method>`（如 `harmony:Verse.Pawn.Tick`）只出现在 `harmony --target` 输出的标题里；作为参数时直接写方法名（`harmony --target Verse.Pawn.Tick`），带 `harmony:` 前缀的输入（待实现）。
 - `patch:#<id>/<文件>#<序号>` 这种单个 Patch 操作的引用没有实现（待实现）；现在用 `patches --mod <引用>` 加文件:行号定位。
-- 方案（待实现）：`plan` 命令按名称指定方案，名称在本环境内唯一。
+- 方案：`plan` 命令按名称指定方案，名称在本环境内唯一，不区分大小写。
 
 ## 3. 文本格式
 
@@ -298,6 +298,9 @@ next:
 | `read_source` | 有 `search` 时 `source search`：给了 `in` 用 `--in`，`scope: "active"` 用 `--active --yes`，否则 `--implicated`；`budget` 默认 10。否则 `source`（`ref`、`type`） | true | — |
 | `edit_loadout` | `action`：`enable` / `disable` / `move` / `swap` / `sort`（`dry_run`）/ `undo` / `redo` / `stage`（`stage add`）/ `unstage`（`stage drop`）/ `restore`（`stage restore`）；位置参数 `at`、`before`、`after`、`up`、`down` | false | false |
 | `save_loadout` | `save`（`dry_run`） | false | true |
+| `launch_game` | `launch`（`dry_run`） | false | true |
+| `manage_plans` | `plan list/new/use/rename/remove --yes`、`loadout import --new` | false | true |
+| `plan_history` | `loadout log`、`loadout diff`、`history`（`action=steps`） | true | — |
 | `pin_mod` | `pin`（`ref`、`name`、`git`、`update`、`move_to_library`、`dry_run`） | false | false |
 | `copy_local` | `pin` 的旧名（`ref`、`name`、`git`） | false | false |
 | `unpin_mod` | `unpin`（`ref`、`dry_run`） | false | false |
@@ -312,14 +315,14 @@ next:
 | `manage_hidden` | `unhide`、`trash` | false | true |
 | `maintenance` | `data update`、`import rimcrow`、`gc` | false | true |
 
-共 28 个（含两个别名）：13 个只读，15 个写；`destructiveHint: true` 的是 `save_loadout`、`manage_packs`、`resolve_identity`、`manage_hidden`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
+共 31 个（含两个别名）：14 个只读，17 个写；`destructiveHint: true` 的是 `save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
 
-**描述与代码不符之处（现状）和目标描述：**
+**描述的改写**（已完成；2026-10-21 之前的描述与代码不符，留作记录）：
 
-| 工具 | 现在的描述 | 实际行为 | 目标描述（待实现） |
+| 工具 | 原来的描述 | 原来的实际行为 | 现在的描述 |
 | --- | --- | --- | --- |
-| `save_loadout` | “Refuses when ModsConfig.xml changed outside RimArcho.” | **不拒绝**：直接备份并覆盖；外部修改的检测只发生在读取时（载入为 external 版本并标冲突） | “写入游戏但不启动：把当前方案写进 ModsConfig.xml（备份、原子替换、写当前游戏版本），同步 `_Archo_` 链接、移除整合包链接。会改变游戏下次读到的列表：先问玩家，并先用 `dry_run=true` 给玩家看差异。ModsConfig.xml 有尚未处理的外部修改冲突（04 §4.3）时拒绝，文本给出看差异 / 载入 / 忽略三个选项的命令。游戏正在运行时照常写入，并提示游戏下次启动才会读到。” 冲突时拒绝这一条连同实现一起做 |
-| `edit_loadout` | “Change RimArcho's workspace Loadout … nothing reaches the game until save_loadout” | 改的是环境唯一的工作区 | “改当前方案（即时保存，每步可撤销）；不写游戏文件，直到 save_loadout 或启动方案。” 加 `plan` 参数和 `checkout` 动作 |
+| `save_loadout` | “Refuses when ModsConfig.xml changed outside RimArcho.” | **不拒绝**：直接备份并覆盖；外部修改的检测只发生在读取时（载入为 external 版本并标冲突） | “写入游戏但不启动：把当前方案写进 ModsConfig.xml（备份、原子替换、写当前游戏版本），同步 `_Archo_` 链接、移除整合包链接。会改变游戏下次读到的列表：先问玩家，并先用 `dry_run=true` 给玩家看差异。ModsConfig.xml 有尚未处理的外部修改冲突（04 §4.3）时拒绝，文本给出看差异 / 载入 / 忽略三个选项的命令。游戏正在运行时照常写入，并提示游戏下次启动才会读到。” |
+| `edit_loadout` | “Change RimArcho's workspace Loadout … nothing reaches the game until save_loadout” | 改的是环境唯一的工作区 | “改当前方案（即时保存，每步可撤销）；不写游戏文件，直到 save_loadout 或启动方案。” 加了 `checkout` 动作；`plan` 参数暂不加（§4.3） |
 | `status` | 示例里有 “unsaved edits” | 显示工作区与最新版本的差异 | 改说“与游戏里的列表的差异”，并列出方案 |
 | `copy_local` | “The Loadout is not changed: call edit_loadout action=swap …” | 不改方案 | “创建锁定版本：复制成独立副本并在当前方案里换上，其他方案不动；工坊更新不影响它。” |
 
@@ -342,7 +345,7 @@ next:
      - 混合：先确认 XML 一侧加载成功（`get_patches failed=true`），再怪代码。
   4. `list_problems` 给静态全貌（依赖、不兼容、加载顺序、Def 覆盖、Patch 落空、Harmony 冲突）；`explain_relation` 解释两个具体的 Mod。
   5. **报告**：失败阶段、XML / 程序集 / 混合、确切的 Mod 实例和路径、文件+行或类+方法、为什么失败、点名的 Mod 是原因、依赖还是旁观者，以及最小的修复。
-- 编辑：先 `pin_mod`（从不原地改工坊文件），再改副本；`edit_loadout` 只改 RimArcho 里的方案；`save_loadout` 写游戏的 ModsConfig.xml（先问用户）。（待实现：随 §5.2 的目标描述改为“锁定版本”“当前方案”“写入游戏”的说法，并加入启动工具的规则。）
+- 编辑：先 `pin_mod`（从不原地改工坊文件），再改副本；`edit_loadout` 只改 RimArcho 里的方案；`save_loadout` 写游戏的 ModsConfig.xml（先问用户）。破坏性工具（`save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`maintenance`）先用 dry run 给用户看，再经用户同意调用。诊断流程加一步：以前能跑时，用 `list_changes` 和 `plan_history action=diff` 找出变化。
 
 各工具描述的要点（示例调用与输出见 `internal/surface/mcp/desc.go`）：
 
@@ -384,7 +387,7 @@ next:
 | I4 | 用 Claude Code 或 Codex 接入 MCP，不加载任何 skill | 能完成一次补丁失败的诊断和一次 `Pawn.Tick` 异常的排查 | 通过（脚本化客户端自检，`spikes/mcpcheck`）；真实 agent 会话待验证 |
 | I5 | 默认输出 | 单次不超过 40 行，截断时给出展开命令（`TestCLIParity`、`TestTruncation`） | 通过 |
 | I6 | 注解 | 13 个只读工具 `readOnlyHint: true`；`destructiveHint: true` 只有 `save_loadout`；每个描述都有示例调用（`TestToolsAndAnnotations`）。写工具只在合成环境测试（`TestWriteTools`）；`env` 参数（`TestEnvParameter`）；分析超过等待时间时返回“仍在计算”（`TestStillComputing`） | 通过 |
-| I7 | 对照 §1.2 的表，逐个玩家动作找对应工具 | 每个动作都有 CLI 命令和 MCP 工具，注解与是否写文件一致 | 待实现 |
-| I8 | ModsConfig.xml 有未处理的外部修改冲突时调用 `save_loadout` | 拒绝，文本给出看差异 / 载入 / 忽略三条命令；ModsConfig.xml 不变 | 待实现 |
-| I9 | 游戏正在运行时调用启动工具；调用 `save_loadout` | 启动工具拒绝并说明哪个环境的游戏在运行；`save_loadout` 照常写入，提示游戏下次启动才会读到 | 部分通过（`save_loadout`；启动工具待实现） |
-| I10 | `plan new` / `use` / `rename` / `remove` 与 `loadout import --new` 经 CLI 和 MCP 各执行一次 | 输出逐字相同；`plan use` 不写游戏文件；不能删除最后一个方案 | 待实现 |
+| I7 | 对照 §1.2 的表，逐个玩家动作找对应工具 | 每个动作都有 CLI 命令和 MCP 工具，注解与是否写文件一致 | 部分通过（1.0 的玩家动作都有工具；1.1 的存档工具未做） |
+| I8 | ModsConfig.xml 有未处理的外部修改冲突时调用 `save_loadout` | 拒绝，文本给出看差异 / 载入 / 忽略三条命令；ModsConfig.xml 不变 | 通过 |
+| I9 | 游戏正在运行时调用启动工具；调用 `save_loadout` | 启动工具拒绝并说明哪个环境的游戏在运行；`save_loadout` 照常写入，提示游戏下次启动才会读到 | 通过 |
+| I10 | `plan new` / `use` / `rename` / `remove` 与 `loadout import --new` 经 CLI 和 MCP 各执行一次 | 输出逐字相同；`plan use` 不写游戏文件；不能删除最后一个方案 | 通过 |
