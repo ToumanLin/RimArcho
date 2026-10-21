@@ -2,11 +2,39 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## 0.9.0 — plans and launching (in progress)
+
+The new design's 1.0 work (01 §5.1). Below is the plan; entries are rewritten as they land.
+1.0.0 follows once this is done and 01 §5.2 is verified, with a `1.0.0-rc1` first.
+
+### Breaking (planned)
+- Database schema v10 → v11: plans. Each environment's workspace, undo stack, versions and
+  staging become its first plan; each `loadout tag` name becomes a plan of its own (04 §1.4).
+- `launch --force` is removed: launching always writes the plan first (08 §2).
+- `loadout tag` is removed: a named list is a plan (05 §4.3).
+- `archo save` means "write to the game without launching" (04 §4.1).
+
+### Planned
+- Several plans per environment: `plan list|new|use|rename|remove`,
+  `loadout import --new` (04 §1, 05 §4.3).
+- Launching writes ModsConfig.xml and records a `launch` version; one game at a time across
+  all environments; one `--dry-run` preview for `launch` and `save` (08 §1, §2, §4).
+- External changes to ModsConfig.xml go to the plan that last wrote it (tracked per user-data
+  folder); `loadout ignore-external` clears the mark (04 §4.3).
+- Locked versions: `pin` swaps the copy into the current plan; upstream updates detected from
+  `origin_snapshot`; `pin --update <instance>` makes a fresh copy (04 §7).
+- Logs are matched to launch records; analysis is cached per plan's enabled set (03 §6.4, §3).
+- Missing tools: `launch_game`, `manage_plans`, `plan_history`, `pin_mod`, `unpin_mod`,
+  `manage_packs`, `ignore_problem` and the rest of 05 §1.2.
+- The window: sidebar, breadcrumb top bar, home page, plan pages, first-run guide;
+  "未保存" becomes "未写入"; TUI page mapping (06 §2, §9).
+
 ## 0.8.0 — toward 1.0 (unreleased)
 
-Spec: `docs/specs/10-1.0实现.md`.
+Specs: `docs/specs/` (rewritten 2026-10-21; the old `10-1.0实现.md` was folded into them). Section
+numbers below are the current ones.
 
-### Hidden and pinned mods (10 §2)
+### Hidden and pinned mods (08 §6, 04 §7)
 - Folders another manager hid by renaming About.xml are classified: **pinned** (a loadable copy
   of the lineage is what the game uses; a warning once the workshop copy changed since, with
   `archo mod <copy> --diff <workshop>`), **left over** (unsubscribed) or **hidden** on their own.
@@ -14,14 +42,14 @@ Spec: `docs/specs/10-1.0实现.md`.
   version (`archo unpin`), move to the recycle bin (`archo trash`). Trash never deletes
   permanently and only takes hidden or unsubscribed workshop/SteamCMD folders.
 
-### Live game log (10 §3)
+### Live game log (03 §6.6)
 - `archo log --follow [--once] [--json]` follows Player.log while the game runs: only new bytes
   are read, clusters instead of text are kept, attribution is the full-log engine's.
 - RimCrow's companion log (`RimCrow_Realtime.log`) adds timestamps, levels and related mods.
 - The window says "game running since … · n errors" and puts this run's errors first in
   需要处理; `archo status` shows a running game.
 
-### Lists from other tools (10 §4)
+### Lists from other tools (04 §9)
 - `loadout import` reads RimSort (XML, JSON, clipboard, Rentry), RimWorld's `.rml`, RimCrow's
   ModList.xml, JSON and share codes (also pasted as the argument), and workshop-ID lists.
 - `loadout export --format rimsort|rml|rimcrow`.
@@ -36,12 +64,12 @@ Spec: `docs/specs/10-1.0实现.md`.
   file, never over a file without asking) or copies a share code. The TUI has both in the
   palette and `e` for export.
 
-### Community data (10 §5)
+### Community data (04 §6.3)
 - `archo data update` / `archo data status`: RimSort's rules and Workshop database, Use This
   Instead's replacements. All-or-nothing; the only command that fetches them.
 - Missing mods get direct Workshop links; enabled mods with a maintained replacement are listed.
 
-### Packs (10 §8)
+### Packs (08 §5)
 - `archo pack build|list|launch|export|import|remove`: compile the current list into a pack
   (checked, sorted for the pack only, each mod copied without other game versions' folders),
   play it with its own list and saves through links in `Mods/`, share it as a zip or a list.
@@ -56,13 +84,13 @@ Spec: `docs/specs/10-1.0实现.md`.
   list` shows it too, `archo pack stop` and `pack remove --unfinished` handle it, and `archo
   pack build` prints progress lines. Sizes show in GB from 1 GB up.
 
-### Settings (10 §7)
+### Settings (06 §2.14)
 - A settings screen (gear in the top bar): environment folders, launch method and arguments,
   language, Workshop descriptions, community data sources, database backup and compaction,
   and each cache with its size and a clear button.
 - `archo db status|backup|vacuum`, `archo cache status|clear <kind>`, `env set --launch-args`.
 
-### History (10 §6)
+### History (04 §3)
 - `archo history`, `archo undo <n>`, `archo redo <n>`. The window shows the history in the empty
   staging list: redo steps, now, undo steps in plain words, then the saved versions.
 
@@ -107,7 +135,7 @@ Spec: `docs/specs/10-1.0实现.md`.
   In staging `T` puts everything back, as in the TUI. Both are in the palette of both
   interfaces.
 - The Enabled list's position column is as wide as its longest number.
-- About.xml, LoadFolders.xml and Defs saved as UTF-16 are read (10 §1).
+- About.xml, LoadFolders.xml and Defs saved as UTF-16 are read (02 §4.3).
 
 ## 0.7.0 — the window (unreleased)
 

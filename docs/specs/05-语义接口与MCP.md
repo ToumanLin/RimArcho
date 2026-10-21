@@ -38,8 +38,8 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 方案管理：列出、新建、切换、改名、删除（04 §1） | 都没有（一个环境只有一个工作区） | CLI `plan …`（§4.3）；工具 `manage_plans` |
 | 写入游戏但不启动 | 有 `save_loadout`，描述与新规则不符（§5.2） | 改描述，见 §5.2 |
 | 看历史、对比、回到某个版本（04 §3） | CLI `history`、`loadout log/diff/checkout`，无工具 | 工具 `plan_history`（只读：log / diff）；回到版本走 `edit_loadout` 的 `checkout` 动作 |
-| 处理外部修改的冲突：看差异 / 载入 / 忽略（04 §4.3） | 无命令 | CLI 命令名待定（随 04 §4.3 实现确定）；工具并入 `plan_history` / `edit_loadout` |
-| 锁定版本、解除、更新锁定版本（04 §7） | 有 `copy_local`（不换进方案）；CLI 有 `unpin`，无工具 | 工具 `pin_mod`（对应 `pin`，创建锁定版本并在当前方案里换上；`copy_local` 保留为别名）；新增工具 `unpin_mod`；“更新锁定版本”命令待定 |
+| 处理外部修改的冲突：看差异 / 载入 / 忽略（04 §4.3） | 无命令 | 看差异 `loadout diff v<n> workspace`、载入 `loadout checkout v<n>`、忽略 `loadout ignore-external`（新增）；工具并入 `plan_history` / `edit_loadout` |
+| 锁定版本、解除、更新锁定版本（04 §7） | 有 `copy_local`（不换进方案）；CLI 有 `unpin`，无工具 | 工具 `pin_mod`（对应 `pin`，创建锁定版本并在当前方案里换上；`copy_local` 保留为别名）；新增工具 `unpin_mod`；更新锁定版本是 `pin --update <实例>`，并入 `pin_mod` |
 | 整合包：编译、列表、启动、导出、导入、删除、停止编译（08 §5） | 只有 CLI `pack …` | 工具 `manage_packs` |
 | 忽略 / 取消忽略问题（03 §4.2） | 只有 CLI `problems ignore/unignore` | 工具 `ignore_problem` |
 | 回答身份待确认项、拆分 / 合并 Lineage（02 §5.4、§6） | 只有 CLI | 工具 `resolve_identity`，`destructiveHint: true` |
@@ -260,7 +260,7 @@ next:
 
 - 版本命令保持 `loadout log/diff/checkout/export/import`，作用于当前方案。`loadout import <文件> --new [<名字>]` 把列表导入为新方案；不带 `--new` 是替换当前方案（一步可撤销）。
 - 其他命令都作用于当前方案，暂不加 `--plan` 参数。
-- 外部修改冲突的三个选项（看差异 / 载入 / 忽略，04 §4.3）的命令名随实现确定。
+- 外部修改冲突的三个选项（04 §4.3）：看差异 `loadout diff v<n> workspace`，载入 `loadout checkout v<n>`，忽略 `loadout ignore-external`（清除“有未载入的外部版本”标记，版本留在历史里）。
 - 删除：`loadout tag`（给版本起名当命名列表）。命名列表就是方案。
 - 删除：`launch --force`（启动时总会先写入，不再有“未写入就启动”的情况）。
 
