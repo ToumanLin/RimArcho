@@ -521,42 +521,37 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
    are reached by their keys and the command palette) */
 @media (max-width: 680px) { #board { grid-template-columns: 1fr 8px 1.2fr 0 0; } #board > .stack, #board [data-split="1"] { display: none; } }
 
-/* ---- 首页 (06 §2.3), variant B "continue": one large card for what you played last, a
-   compact list of the others, the activity as two lines ---- */
+/* ---- 首页 (06 §2.3): magpie's list pages — one card per item, 8px apart: a 36px icon tile,
+   the name in bold over one muted line, the problem only when there is one, and the
+   item's one action on the right. The whole card opens the item. ---- */
 .page.home { gap: 24px; padding-top: 8px; }
 .page.home .sec { margin-top: 0; }
-.hb-hero { display: flex; align-items: center; gap: 24px; padding: 24px; cursor: pointer; transition: border-color var(--t-press); }
-.hb-hero:hover { border-color: var(--muted); }
-.hb-hero .l { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
-.hb-hero .k { font-size: 12px; color: var(--muted); }
-.hb-hero .n { font-size: 22px; font-weight: 600; letter-spacing: -.01em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hb-hero .s { font-size: 13px; color: var(--muted); }
-.hb-hero .problem { margin-top: 8px; }
-.problem { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--amber); white-space: nowrap; }
+.ha-list { display: flex; flex-direction: column; gap: 8px; }
+.ha-item { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 12px 12px 14px; cursor: pointer; transition: border-color var(--t-press); }
+.ha-item:hover { border-color: color-mix(in srgb, var(--muted) 60%, var(--line)); }
+.ha-item .tile { flex: none; width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; background: var(--pill); color: var(--fg-2); }
+.ha-item .tile svg.i { width: 16px; height: 16px; }
+.ha-item .l { flex: 1; min-width: 0; }
+.ha-item .n { font-size: 14px; font-weight: 600; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ha-item .s { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.problem { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--amber); white-space: nowrap; }
 .problem svg.i { width: 13px; height: 13px; }
-button.problem:hover { text-decoration: underline; }
-.hb-hero .btn.launch.big { height: 40px; padding: 0 20px; border-radius: 10px; font-size: 14px; font-weight: 600; }
-.btn.launch .ic { margin-right: 7px; }
-.hb-list { display: flex; flex-direction: column; padding: 4px; }
-.hb-line { display: flex; align-items: center; gap: 16px; height: 44px; padding: 0 8px 0 12px; border-radius: 8px; cursor: pointer; }
-.hb-line:hover { background: var(--card-2); }
-.hb-line .n { flex: none; max-width: 30%; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hb-line .s { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hb-line .btn.launch.quiet { height: 28px; color: var(--accent); background: none; border: 0; box-shadow: none; padding: 0 10px; }
-.hb-line .btn.launch.quiet:hover { background: var(--accent-soft); }
-.hb-act { display: flex; flex-direction: column; gap: 2px; }
-.hb-actline { display: flex; align-items: baseline; gap: 12px; height: 32px; padding: 0 12px; border-radius: 8px; text-align: left; min-width: 0; }
-.hb-actline:hover { background: var(--pill); }
-.hb-actline .t { flex: none; width: 96px; font-size: 12px; color: var(--muted); }
-.hb-actline .x { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }
-.hb-actline .go { color: var(--accent); }
+button.problem { height: 28px; padding: 0 8px; border-radius: 7px; }
+button.problem:hover { background: var(--amber-soft); }
+/* the action is quiet until wanted: a pill that turns to the accent under the pointer */
+.ha-item .btn.launch { height: 30px; padding: 0 12px; border-radius: 8px; border: 0; box-shadow: none; background: var(--pill); color: var(--fg); font-size: 12.5px; font-weight: 500; transition: background var(--t-press), color var(--t-press); }
+.ha-item .btn.launch .ic { margin-right: 6px; color: var(--accent); }
+.ha-item .btn.launch:hover { background: var(--accent); color: var(--accent-fg); }
+.ha-item .btn.launch:hover .ic { color: inherit; }
+.ha-item .go { flex: none; font-size: 12px; color: var(--accent); }
 .card.empty-state { padding: 32px 16px; }
 svg.i.fill { fill: currentColor; }
 .packs .pack.hl { background: var(--accent-soft); }
-@media (max-width: 760px) {
-  .hb-hero { flex-direction: column; align-items: stretch; }
-  .hb-line .s { display: none; }
-  .hb-line .n { flex: 1; max-width: none; }
+@media (max-width: 560px) {
+  .ha-item { flex-wrap: wrap; row-gap: 8px; }
+  .ha-item .l { flex-basis: calc(100% - 48px); }
+  .ha-item .problem { margin-left: 48px; }
+  .ha-item .btn.launch, .ha-item .go { margin-left: auto; }
 }
 
 /* ---- the first-run guide (06 §2.15) ---- */

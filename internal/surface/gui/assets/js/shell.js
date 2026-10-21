@@ -68,9 +68,9 @@ export function sync() {
 }
 
 // inGameMark: which plan the game's ModsConfig.xml holds (04 §1.3) is a small mark on that
-// plan's sub-entry and home row, and only when there are several plans to tell apart; its
-// tooltip says "游戏里现在是：<方案> v<n>". null when there is nothing to mark.
-export function inGameMark(isInGame) {
+// plan's sub-entry (the home card says it in words), only when there are several plans to
+// tell apart; its tooltip says "游戏里现在是：<方案> v<n>". null when there is nothing to mark.
+function inGameMark(isInGame) {
   const sh = S.shell;
   if (!isInGame || !sh || !sh.inGame || !sh.plans || sh.plans.length < 2) return null;
   const m = el("span", "ingame-dot");

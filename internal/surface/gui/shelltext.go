@@ -33,7 +33,6 @@ func init() {
 		"a plan is a list of mods that follows Workshop updates":   "方案是一份 Mod 列表，跟着工坊更新",
 		"a pack locks every mod's version and keeps its own saves": "整合包把每个 Mod 的版本锁住，并且有自己的存档",
 		"since the last scan": "上次扫描以来",
-		"the others":          "其他",
 		"new plan / import":   "新方案 / 导入",
 		"launch the game":     "启动游戏",
 		"no errors yet":       "还没有报错",
