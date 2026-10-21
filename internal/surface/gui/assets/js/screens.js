@@ -6,6 +6,7 @@ import { S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js"
 import { icon } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { setActs } from "./shell.js";
+import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
 
 let ui = null;
@@ -179,9 +180,12 @@ function drawNeeds() {
     if (!its.length) return;
     const sec = el("section", "sec need-sec " + SECTION_CLS[si]);
     const n = its.filter((x) => x.counted).length;
-    let t = T(title);
-    if (n) t += " · " + n;
-    const h = el("h2", "label", t);
+    const h = el("h2", "label", T(title));
+    if (n) {
+      const c = el("span", "n num", String(n));
+      h.append(el("span", "", " · "), c);
+      bump("needs:" + si, c, n);
+    }
     // which run the log is from: the list, or a pack (08 §5.3)
     if (si === 1 && S.live && S.live.running) h.append(el("span", "muted", " · " + (S.live.pack ? Tf("pack %s", S.live.pack) : T("this run"))));
     else if (si === 1 && d.lastRun) h.append(el("span", "muted", " · " + d.lastRun));
@@ -380,7 +384,7 @@ function drawGameLog() {
   if (p && p.facts && !L.loading) bar.append(el("span", "muted", p.facts));
   w.append(bar);
   if (L.pending) { w.append(el("div", "card empty-state", Tf("the mods are analysed for %s first (once per game version)…", L.pending))); return; }
-  if (L.loading) { w.append(el("div", "card empty-state", T("reading the log…"))); return; }
+  if (L.loading) { const c = el("div", "card pad"); c.append(shimmer(T("reading the log…"), 6)); w.append(c); return; }
   if (!p || !p.path) { w.append(el("div", "card empty-state", T("no Player.log found"))); return; }
   const grid = el("div", "cols two");
   const list = el("section", "card col focus");
@@ -421,7 +425,7 @@ function markLog() {
   const k = L.page.path + "|" + r.cluster;
   if (L.detail.has(k)) return showLines(box, L.detail.get(k));
   box.innerHTML = "";
-  box.append(el("div", "empty-state", T("loading…")));
+  box.append(shimmer(T("loading…"), 8));
   clearTimeout(detailTimer);
   detailTimer = setTimeout(async () => {
     let lines;
@@ -554,7 +558,7 @@ function drawFull() {
     const pre = el("pre", "lines");
     pre.textContent = (s.lines || []).join("\n");
     card.append(pre);
-  } else card.append(el("p", "muted", T("loading…")));
+  } else card.append(shimmer(T("loading…"), 8));
   w.append(card);
   sc.append(w);
   ui.renderWhere();

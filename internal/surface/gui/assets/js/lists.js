@@ -1,6 +1,7 @@
 // The three lists (06 §2.5): virtual rows, the cursor, selection, search, dragging.
 import { S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { sourceIcon, statusIcon } from "./icons.js";
+import { bump } from "./motion.js";
 
 const areas = () => $$("#board .area");
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
@@ -50,6 +51,7 @@ export function renderHeads() {
     const n = c.query.trim() ? `${c.view.length}/${c.items.length}` : `${c.items.length}`;
     h.innerHTML = `<span class="n">${k + 1}</span><span class="t">${esc(T(AREAS[k]))}</span><span class="num">${n}</span>` +
       (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "") + (k === 1 ? listActions() : "");
+    bump("head:" + k, $(".num", h), n);
     const s = $(".search", a);
     s.classList.toggle("on", c.searching || !!c.query);
     let o = $(".others", a);
@@ -104,6 +106,7 @@ export function renderRows(k) {
     if (!d) { d = el("div", "row"); box.appendChild(d); pool.set(i, d); }
     d.dataset.sig = sig;
     d.dataset.i = i;
+    d.style.transform = ""; // a slide (motion.js) belongs to the mod the row showed before
     d.style.top = i * ROW_H + "px";
     d.draggable = !!it.id || k === 1;
     const st = S.board && S.board.status ? rowStatus(it) : 0;

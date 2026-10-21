@@ -5,6 +5,7 @@
 import { S, $, el, api, T, Tf } from "./state.js";
 import { icon } from "./icons.js";
 import { liveCount } from "./screens.js";
+import { bump, slideNav } from "./motion.js";
 
 let ui = null;
 
@@ -88,7 +89,9 @@ function renderSide() {
   const sig = JSON.stringify([sh.nav, cur, S.board && S.board.needs, liveCount()]);
   if (nav.dataset.sig !== sig) {
     nav.dataset.sig = sig;
+    const thumb = nav.querySelector(":scope > .nav-thumb"); // kept, so it slides
     nav.innerHTML = "";
+    if (thumb) nav.append(thumb);
     for (const g of sh.nav || []) {
       nav.append(el("div", "grp", g.title));
       for (const it of g.items || []) {
@@ -106,8 +109,10 @@ function renderSide() {
         // 能不能跑's badge is the page's count: the board's between two Shell calls, plus
         // this run's errors (06 §2.1); the other entries carry a quiet count
         const badge = it.id === "needs" && S.board ? S.board.needs + liveCount() : it.badge;
-        if (badge) b.append(el("span", "badge-n num", String(badge)));
-        else if (it.count) b.append(el("span", "cnt num", String(it.count)));
+        let n = null;
+        if (badge) b.append(n = el("span", "badge-n num", String(badge)));
+        else if (it.count) b.append(n = el("span", "cnt num", String(it.count)));
+        bump("nav:" + it.id, n, badge || it.count || 0);
         b.onclick = () => ui.go(it.id === "library" ? "changes" : it.id);
         nav.append(b);
         if (open && kids.length) {
@@ -129,6 +134,7 @@ function renderSide() {
       }
     }
   }
+  slideNav(nav);
   const set = $("#nav-settings");
   set.classList.toggle("on", cur === "settings");
   if (!set.firstChild || !set.querySelector(".ic")) {

@@ -17,6 +17,7 @@ import * as guide from "./guide.js";
 import * as plans from "./plans.js";
 import { initExchange, exchange } from "./exchange.js";
 import { icon } from "./icons.js";
+import * as motion from "./motion.js";
 
 // ---- loading ----
 
@@ -96,8 +97,9 @@ function planActions() {
   if (u) {
     const n = el("span", "unwritten", Tf("%d not written", u));
     n.title = T("different from the list last written to the game; launching or writing to the game writes them");
+    motion.bump("unwritten", n, u);
     out.push(n);
-  }
+  } else motion.bump("unwritten", null, 0);
   out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("sort"), "S", () => preview("sort")),
     btn(T("build a pack"), "", () => go("packs"), "wide-only"), btn(T("write to the game"), "w", () => preview("save"), u ? "hot" : ""));
   if (plan) {
@@ -281,7 +283,10 @@ function click(k, i, e) {
 
 // ---- verbs (rule 2): each acts at once and is one undo step ----
 
-async function edited(p, undoable = true) {
+// edited waits for a verb, says what it did and redraws; the visible rows slide to their
+// new places and the ones it changed (ids; else what moved) flash (06 §7.1).
+async function edited(p, undoable = true, ids = null) {
+  const before = motion.snapshot();
   let r;
   try { r = await p; } catch (e) { say("fail", errText(e)); await reload(); return null; }
   const text = typeof r === "string" ? r : r && r.text;
@@ -289,6 +294,7 @@ async function edited(p, undoable = true) {
   S.placed = r && r.placed && r.placed.length ? r.placed : null;
   for (const c of S.cols) c.sel.clear();
   await reload();
+  motion.play(before, S.placed || ids);
   return r;
 }
 
@@ -299,10 +305,10 @@ async function verb(name) {
   switch (name) {
     case "toggle":
       if (!sel.length) return;
-      return edited(api.Toggle(k, ids, refsOf(sel)));
+      return edited(api.Toggle(k, ids, refsOf(sel)), true, ids);
     case "stage":
       if (!ids.length) return;
-      return edited(api.Stage(k, ids));
+      return edited(api.Stage(k, ids), true, ids);
     case "move": {
       const placed = S.placed;
       if (placed) return pop.position({ ids: placed, what: placed.length === 1 ? nameOf(placed[0]) : named(placed.map((id) => ({ name: nameOf(id) }))) }, 1);
@@ -312,7 +318,7 @@ async function verb(name) {
     case "down": case "up": case "down10": case "up10": {
       if (k !== 1 || !ids.length) return say("", T("only enabled mods can be moved"));
       const d = { down: 1, up: -1, down10: 10, up10: -10 }[name];
-      return edited(api.MoveBy(ids, d));
+      return edited(api.MoveBy(ids, d), true, ids);
     }
     case "tags":
       return pop.tags(sel);
@@ -323,7 +329,7 @@ async function verb(name) {
       if (S.detail && S.detail.url) return api.OpenURL(S.detail.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
       return say("", T("not a workshop mod"));
     case "swap":
-      if (sel.length === 1 && sel[0].id) return edited(api.Swap(sel[0].id));
+      if (sel.length === 1 && sel[0].id) return edited(api.Swap(sel[0].id), true, ids);
       return;
     case "undo": return edited(api.Undo(), false);
     case "redo": return edited(api.Redo(), false);
@@ -341,17 +347,17 @@ function nameOf(id) {
 }
 
 async function place(from, obj, at) {
-  await edited(api.Place(from, obj.ids, at));
+  await edited(api.Place(from, obj.ids, at), true, obj.ids);
 }
 
 // drop: dragging is another way to run a verb (06 §8.5).
 async function drop(from, to, items, at) {
   const ids = idsOf(items);
-  if (to === 1) return edited(api.Place(from, ids, at));
+  if (to === 1) return edited(api.Place(from, ids, at), true, ids);
   if (from === to) return;
-  if (to === 2) return edited(api.Stage(from, ids));
-  if (to === 0 && from === 1) return edited(api.Toggle(1, ids, refsOf(items)));
-  if (to === 0 && from === 2) return edited(api.Unstage(ids));
+  if (to === 2) return edited(api.Stage(from, ids), true, ids);
+  if (to === 0 && from === 1) return edited(api.Toggle(1, ids, refsOf(items)), true, ids);
+  if (to === 0 && from === 2) return edited(api.Unstage(ids), true, ids);
 }
 
 // preview: sort, save and launch show what they will do first (06 §6).
@@ -359,8 +365,10 @@ async function preview(what) {
   let p;
   try { p = await api.Preview(what); } catch (e) { return say("fail", errText(e)); }
   pop.confirm(p.title, p.lines, { sort: T("sort"), save: T("save to the game"), launch: T("launch") }[what], p.apply ? async () => {
+    const before = motion.snapshot();
     try { say("ok", await api.Apply(what), what === "sort"); } catch (e) { say("fail", errText(e)); }
     await reload();
+    motion.play(before, null);
   } : null);
 }
 
