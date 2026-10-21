@@ -1,27 +1,22 @@
 package app
 
 import (
-	"path/filepath"
 	"strings"
 	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
-
-	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
-// gameProcess finds a running RimWorld whose executable is in gameRoot (08 §4).
-func gameProcess(gameRoot string) *GameRun {
-	if gameRoot == "" {
-		return nil
-	}
-	root := env.PathKey(gameRoot)
+// gameProcesses lists the running RimWorld processes (08 §4): executable name starting with
+// "rimworld", with full path, start time and, when readable, -savedatafolder.
+func gameProcesses() []*GameRun {
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
 		return nil
 	}
 	defer windows.CloseHandle(snap)
+	var out []*GameRun
 	var pe windows.ProcessEntry32
 	pe.Size = uint32(unsafe.Sizeof(pe))
 	for err = windows.Process32First(snap, &pe); err == nil; err = windows.Process32Next(snap, &pe) {
@@ -46,15 +41,16 @@ func gameProcess(gameRoot string) *GameRun {
 		}
 		cmdline, known := processCommandLine(h)
 		windows.CloseHandle(h)
-		if exe != "" && strings.HasPrefix(env.PathKey(filepath.Dir(exe)), root) {
-			r := &GameRun{PID: int(pe.ProcessID), Exe: exe, Started: started, ArgsKnown: known}
-			if known {
-				r.SaveData = SaveDataArg(cmdline)
-			}
-			return r
+		if exe == "" {
+			continue
 		}
+		r := &GameRun{PID: int(pe.ProcessID), Exe: exe, Started: started, ArgsKnown: known}
+		if known {
+			r.SaveData = SaveDataArg(cmdline)
+		}
+		out = append(out, r)
 	}
-	return nil
+	return out
 }
 
 // processCommandLine reads a process's command line (Windows 8.1 and later allow it with

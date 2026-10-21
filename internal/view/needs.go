@@ -295,7 +295,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		}
 	}
 	if v := env.MajorMinor(st.FileVersionMismatch()); v != "" {
-		add(Need{rank: 6, Group: GroupList, Text: Tf("the list was saved for %s; the game resets it when it starts — saving once fixes it", v),
+		add(Need{rank: 6, Group: GroupList, Text: Tf("the list was saved for %s; the game resets it when it starts — launching from RimArcho or saving once writes it for the current version", v),
 			Actions: []Action{{Kind: ActSave, Key: "w", Label: T("save")}}, Counted: true, Status: StatusWarn})
 	}
 	// Last run: the current log's errors, one item per mod (06 §2.4).

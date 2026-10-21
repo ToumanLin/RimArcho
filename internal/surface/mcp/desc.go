@@ -98,7 +98,7 @@ Example: edit_loadout {"action": "enable", "refs": ["#b21c"], "before": "#a3f9"}
     added  #b21c  Harmony  at 1
   next:`
 
-const descSave = `Write the workspace Loadout to the game's ModsConfig.xml (backup first, atomic replace). This changes what the game loads on next start: ask the user before calling it, and call with dry_run=true first to show the diff. Refuses when ModsConfig.xml changed outside RimArcho.
+const descSave = `Write the Loadout to the game without starting it ("写入游戏", 08 §2): sync RimArcho's Mods/ links, then write ModsConfig.xml (backup first, atomic replace) for the current game version. The game reads it on its next start; allowed while the game runs. Ask the user before calling it, and call with dry_run=true first to show the preview (links, path, version rewrite, entries, changes).
 Example: save_loadout {"dry_run": true}
   save (dry run): 2 changes
     added  #b21c  Harmony  at 1

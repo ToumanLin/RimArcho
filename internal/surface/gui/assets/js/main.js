@@ -59,7 +59,7 @@ function renderTop() {
   $("#env").classList.toggle("on", S.screen === "env");
   $("#env").title = T("environment") + " · E";
   $("#btn-launch").textContent = T("launch") + " ▶";
-  $("#btn-launch").title = T("start the game with the saved list") + " · L";
+  $("#btn-launch").title = T("write the list to the game and start it") + " · L";
 }
 
 function mm(v) { const p = String(v || "").split("."); return p.length >= 2 ? p[0] + "." + p[1] : v || ""; }
@@ -629,6 +629,9 @@ async function pollLive() {
     b.hidden = !l.running;
     // the game's place in the top bar: launch while it is not running, its state while it is
     $("#btn-launch").hidden = !!l.running;
+    // another environment's game runs: one game at a time (08 §1)
+    $("#btn-launch").disabled = !!l.blocked;
+    $("#btn-launch").title = (l.blocked || T("write the list to the game and start it")) + " · L";
     b.textContent = l.running ? (l.pack ? Tf("pack %s running since %s", l.pack, l.since) : Tf("game running since %s", l.since)) + (l.errors ? " · " + Tf("%d errors", l.errors) : "") : "";
     b.title = l.guess ? T("which list runs is taken from the launch records") : "";
     b.onclick = () => cmd("needs");

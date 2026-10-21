@@ -654,12 +654,13 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 	return &EditResult{State: st, Before: before, Changes: loadout.Diff(before, st.List, st.LineageOf)}, op, nil
 }
 
-// SaveResult describes a save (04 §4.1).
+// SaveResult describes a write to the game: archo save, or the writing part of a launch
+// (04 §4.1, 08 §2).
 type SaveResult struct {
 	State      *LoadoutState
 	Path       string
 	Backup     string
-	Version    int // new version number (0 on dry run)
+	Version    int // new version number (0 on dry run, or when Unchanged)
 	Source     string
 	OldVersion string // ModsConfig.xml <version> before
 	NewVersion string
@@ -668,16 +669,41 @@ type SaveResult struct {
 	DryRun     bool
 	Restores   int // source "undo": the version the workspace was checked out from
 	Missing    int
-	Unchanged  bool
-	Links      []LinkChange // Mods/ links created or removed first (08 §3)
+	// Unchanged: a launch whose list equals the newest version records no new version
+	// (08 §2 step 7).
+	Unchanged bool
+	Links     []LinkChange // Mods/ links created or removed first (08 §3)
+	// Launch is the game command (launch only).
+	Launch *LaunchPlan
+	// Running is a game that reads this ModsConfig.xml and is running now (save only): it
+	// reads the new list on its next start.
+	Running *RunningGame
 }
 
-// Save writes the workspace to ModsConfig.xml: backup, atomic replace, version (04 §4.1).
+// Save writes the workspace to ModsConfig.xml without starting the game (08 §2 "写入游戏":
+// steps 1–5 and 7). It is allowed while the game runs; the game reads the file on its next
+// start.
 func (a *App) Save(dryRun bool) (*SaveResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
 	}
+	r, err := a.writeGame(st, dryRun, false)
+	if err != nil {
+		return nil, err
+	}
+	if g, _ := a.RunningGame(); g != nil && g.What.UserData != "" &&
+		env.PathKey(g.What.UserData) == env.PathKey(st.Ix.Env.UserDataRoot) {
+		r.Running = g
+	}
+	return r, nil
+}
+
+// writeGame carries out 08 §2 steps 1 (the file checks), 3–5 and 7 for the synced state st
+// (step 2 happened in Loadout): Mods/ links, ModsConfig.xml by the 04 §4.1 rules, and a
+// version — source "launch" when launch is set (none when the list equals the newest
+// version), else "user" or "undo". dryRun computes the same result and writes nothing.
+func (a *App) writeGame(st *LoadoutState, dryRun, launch bool) (*SaveResult, error) {
 	e := st.Ix.Env
 	if st.FilePath == "" {
 		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
@@ -720,9 +746,14 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.Source = "user"
-	if st.WS.OriginKind == "checkout" {
+	switch {
+	case launch:
+		r.Source = "launch"
+		r.Unchanged = st.Latest != nil && st.Latest.GameVersion == r.NewVersion && st.Baseline().Equal(st.List)
+	case st.WS.OriginKind == "checkout":
 		r.Source, r.Restores = "undo", st.WS.OriginVersion
+	default:
+		r.Source = "user"
 	}
 	if dryRun {
 		return r, nil
@@ -742,23 +773,29 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) {
 		return nil, err
 	}
 	now := a.Now().UTC()
-	note := ""
-	if r.Source == "undo" {
-		note = fmt.Sprintf("restored v%d", st.WS.OriginVersion)
-	}
-	n, err := a.Store.AddVersion(e.ID, &store.Version{Created: now, Source: r.Source, Entries: st.List.Encode(), GameVersion: r.NewVersion, Note: note})
-	if err != nil {
-		return nil, err
-	}
 	h := loadout.Hash(data)
+	// TODO(0.9 wave 2): record the writer (plan and version) with the hash, per user data
+	// folder (04 §4.3), once modsconfig_state has the writer columns.
 	if err := a.Store.SetModsConfigState(e.ID, &store.ModsConfigState{Written: h, Seen: h, WrittenAt: now}); err != nil {
 		return nil, err
+	}
+	n := 0
+	if r.Unchanged {
+		n = st.Latest.N
+	} else {
+		note := ""
+		if r.Source == "undo" {
+			note = fmt.Sprintf("restored v%d", st.WS.OriginVersion)
+		}
+		if n, err = a.Store.AddVersion(e.ID, &store.Version{Created: now, Source: r.Source, Entries: st.List.Encode(), GameVersion: r.NewVersion, Note: note}); err != nil {
+			return nil, err
+		}
+		r.Version = n
 	}
 	st.WS.OriginVersion, st.WS.OriginKind, st.WS.Conflict, st.WS.Updated = n, "save", 0, now
 	if err := a.Store.SetWorkspace(st.WS); err != nil {
 		return nil, err
 	}
-	r.Version = n
 	return r, nil
 }
 

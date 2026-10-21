@@ -145,8 +145,9 @@ func TestSaveSteamSuffixVersionAndBackup(t *testing.T) {
 	if !strings.Contains(out, "ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start") {
 		t.Fatal(out)
 	}
-	if _, code := e.Run("launch"); code == 0 {
-		t.Fatal("launch must be blocked by the version mismatch")
+	// The mismatch no longer blocks a launch: launching writes the file for 1.6 (08 §2).
+	if out, _ := e.Run("launch", "--dry-run"); strings.Contains(out, "saved for") {
+		t.Fatalf("launch blocked by the version mismatch:\n%s", out)
 	}
 	out = e.MustRun("save", "--dry-run")
 	if e.ReadModsConfig() != orig || !strings.Contains(out, "1.5.4409 rev1118 → 1.6.4633 rev1261 (rewritten from 1.5 to 1.6") {
@@ -312,10 +313,11 @@ func TestLaunchPlans(t *testing.T) {
 	}
 	e.MustRun("env", "set", "main", "--launch", "direct")
 	e.MustRun("enable", refOf(t, e, "B", ""))
-	if out, code := e.Run("launch"); code == 0 || !strings.Contains(out, "unsaved changes") {
-		t.Fatalf("unsaved: exit %d\n%s", code, out)
+	// Edits since the last write do not block: the launch writes them (08 §2 "删除了什么").
+	if out, code := e.Run("launch", "--force"); code == 0 {
+		t.Fatalf("launch --force must be gone:\n%s", out)
 	}
-	e.MustRun("launch", "--force")
+	e.MustRun("launch")
 	if len(e.Launched) != 1 || !strings.Contains(e.Launched[0], "RimWorldWin64.exe") {
 		t.Fatalf("launched %v", e.Launched)
 	}

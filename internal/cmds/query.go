@@ -767,7 +767,7 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 		root.KV("pending", fmt.Sprintf("ModsConfig.xml changed outside RimArcho (v%d) while the workspace had unsaved edits: archo loadout diff v%d, archo loadout checkout v%d", st.WS.Conflict, st.WS.Conflict, st.WS.Conflict))
 	}
 	if v := st.FileVersionMismatch(); v != "" {
-		root.KV("warning", fmt.Sprintf("ModsConfig.xml was saved for %s; the game (%s) resets it on start. Saving once rewrites it for %s (archo save)",
+		root.KV("warning", fmt.Sprintf("ModsConfig.xml was saved for %s; the game (%s) resets it on start. Launching from RimArcho or writing to the game once (archo save) writes it for %s",
 			env.MajorMinor(v), st.GameMM(), st.GameMM()))
 	}
 	if st.FileErr != nil {
