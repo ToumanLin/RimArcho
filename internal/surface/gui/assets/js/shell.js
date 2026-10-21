@@ -22,12 +22,54 @@ export function initShell(u) {
   $("#env").onclick = () => ui.go("env");
   $("#nav-settings").onclick = () => ui.go("settings");
   $("#live").onclick = () => ui.go("needs");
+  wireSideSplit();
   addEventListener("resize", () => {
     const n = innerWidth < NARROW;
     if (n !== narrow) { narrow = n; collapsed = n; }
     applyCollapse();
   });
   applyCollapse();
+}
+
+// The sidebar's width: dragged on its right edge, kept in the settings (ui.gui.side),
+// double-click resets it (06 §2.1).
+const SIDE_MIN = 168, SIDE_MAX = 360, SIDE_KEY = "ui.gui.side";
+
+function setSideWidth(px) {
+  const app = $("#app");
+  if (px) app.style.setProperty("--side-w", Math.round(px) + "px");
+  else app.style.removeProperty("--side-w");
+  slideNav($("#nav"), true); // the highlights take the new width at once
+}
+
+function wireSideSplit() {
+  const sp = $("#side-split");
+  sp.title = T("drag to change the width; double-click to reset");
+  api.Setting(SIDE_KEY).then((v) => { if (+v) setSideWidth(Math.min(SIDE_MAX, Math.max(SIDE_MIN, +v))); }).catch(() => {});
+  sp.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const x0 = e.clientX, w0 = $("#side").getBoundingClientRect().width;
+    let w = w0;
+    sp.classList.add("drag");
+    document.body.classList.add("resizing");
+    const move = (ev) => {
+      w = Math.min(SIDE_MAX, Math.max(SIDE_MIN, w0 + ev.clientX - x0));
+      setSideWidth(w);
+    };
+    const up = () => {
+      sp.classList.remove("drag");
+      document.body.classList.remove("resizing");
+      removeEventListener("mousemove", move);
+      removeEventListener("mouseup", up);
+      if (w !== w0) api.SetSetting(SIDE_KEY, String(Math.round(w))).catch(() => {});
+    };
+    addEventListener("mousemove", move);
+    addEventListener("mouseup", up);
+  });
+  sp.addEventListener("dblclick", () => {
+    setSideWidth(0);
+    api.SetSetting(SIDE_KEY, "").catch(() => {});
+  });
 }
 
 function setCollapsed(v) {
@@ -117,13 +159,12 @@ function renderSide() {
         ic.innerHTML = icon[ICONS[it.id]] || "";
         b.append(ic, el("span", "lbl", it.label));
         if (kids.length) { const c = el("span", "chev"); c.innerHTML = icon.chev; b.append(c); }
-        // 能不能跑's badge is the page's count: the board's between two Shell calls, plus
-        // this run's errors (06 §2.1); the other entries carry a quiet count
+        // Only 能不能跑 carries a number (06 §2.1): the board's count between two Shell
+        // calls, plus this run's errors
         const badge = it.id === "needs" && S.board ? S.board.needs + liveCount() : it.badge;
         let n = null;
         if (badge) b.append(n = el("span", "badge-n num", String(badge)));
-        else if (it.count) b.append(n = el("span", "cnt num", String(it.count)));
-        bump("nav:" + it.id, n, badge || it.count || 0);
+        bump("nav:" + it.id, n, badge || 0);
         b.onclick = () => ui.go(it.id === "library" ? "changes" : it.id);
         nav.append(b);
         if (kids.length) nav.append(kidList(it, kids, cur, hls.get(it.id)));
@@ -168,7 +209,6 @@ function kidList(it, kids, cur, hl) {
     if (g) kb.append(g);
     // a plan's "有未载入的外部版本" (04 §4.3)
     if (k.mark) { const m = el("span", "mark"); m.title = k.mark; kb.append(m); kb.title = k.mark; }
-    if (k.count) kb.append(el("span", "cnt num", String(k.count)));
     kb.onclick = () => ui.go(k.id);
     if (it.id === "plan" && !k.add) {
       kb.oncontextmenu = (e) => { e.preventDefault(); ui.planMenu(+k.id.slice(5), e.clientX, e.clientY); };

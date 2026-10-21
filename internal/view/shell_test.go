@@ -59,17 +59,13 @@ func TestNavAndPath(t *testing.T) {
 	if g[0].Items[1].Badge != n.Count || n.Count == 0 {
 		t.Fatalf("badge %d, needs %d", g[0].Items[1].Badge, n.Count)
 	}
-	// quiet counts: the plans and packs from the rows, the environments and the library
-	// from NavCounts (06 §2.1)
-	view.NavCounts(g, 2, 1354)
-	counts := map[string]int{}
+	// only 能不能跑 carries a number (06 §2.1)
 	for _, gr := range g {
 		for _, it := range gr.Items {
-			counts[it.ID] = it.Count
+			if it.ID != view.PageNeeds && it.Badge != 0 {
+				t.Fatalf("%s has a number: %+v", it.ID, it)
+			}
 		}
-	}
-	if counts["plan"] != 1 || counts["packs"] != 1 || counts["env"] != 2 || counts["library"] != 1354 || counts["needs"] != 0 {
-		t.Fatalf("counts %v", counts)
 	}
 	path := func(id string) string {
 		var out []string

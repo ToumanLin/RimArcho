@@ -6,8 +6,9 @@ import "github.com/ToumanLin/RimArcho/internal/view"
 func init() {
 	view.Register(map[string]string{
 		// the sidebar and the top bar
-		"show the sidebar":             "显示侧栏",
-		"hide the sidebar":             "收起侧栏",
+		"show the sidebar": "显示侧栏",
+		"hide the sidebar": "收起侧栏",
+		"drag to change the width; double-click to reset": "拖动改变宽度，双击恢复默认",
 		"pages":                        "页面",
 		"go to a page in the sidebar":  "去侧栏的页面",
 		"the environment page":         "环境页",

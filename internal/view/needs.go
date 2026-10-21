@@ -150,7 +150,11 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		if !it.Counted {
 			continue
 		}
-		n.Count++
+		// Hidden mods are housekeeping, not something that stops the game: they are listed
+		// on the page but not counted in the sidebar's number (06 §2.1).
+		if it.Group != GroupHidden {
+			n.Count++
+		}
 		icons := it.Mods
 		if !it.Fold && len(icons) > 1 {
 			icons = icons[:1] // the subject; the others are what it needs or conflicts with

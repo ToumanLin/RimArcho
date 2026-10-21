@@ -10,7 +10,6 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
-	"github.com/ToumanLin/RimArcho/internal/identity"
 )
 
 // The window's shell (06 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
@@ -70,13 +69,10 @@ const (
 
 // NavItem is one sidebar entry. Kids show only under the open entry.
 type NavItem struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
-	Badge int    `json:"badge,omitempty"` // 能不能跑: the actionable items (06 §5)
-	// Count is a quiet number on the right: the plans, the packs, the environments, the
-	// mods in the library (06 §2.1). Badge is the one that asks for attention.
-	Count int       `json:"count,omitempty"`
-	Key   string    `json:"key,omitempty"` // shift+1–7
+	ID    string    `json:"id"`
+	Label string    `json:"label"`
+	Badge int       `json:"badge,omitempty"` // 能不能跑: the actionable items (06 §5)
+	Key   string    `json:"key,omitempty"`   // shift+1–7
 	Kids  []NavItem `json:"kids,omitempty"`
 	// Mark is a plan's "有未载入的外部版本" (04 §4.3); Current the plan being edited;
 	// InGame the plan the game's ModsConfig.xml holds (a small mark when there are several).
@@ -100,12 +96,12 @@ type NavGroup struct {
 func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	var planKids []NavItem
 	for _, p := range plans {
-		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, InGame: p.InGame, Count: p.Entries})
+		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, InGame: p.InGame})
 	}
 	planKids = append(planKids, NavItem{ID: PagePlanNew, Label: "+ " + T("new plan"), Add: true})
 	var packKids []NavItem
 	for _, p := range packs {
-		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name, Count: p.Mods})
+		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name})
 	}
 	// Two groups (06 §2.1): what you play now, and what you have.
 	playing := []NavItem{
@@ -115,8 +111,8 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	}
 	library := []NavItem{
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageChanges, Label: T("changes")}}},
-		{ID: PagePlan, Label: T("plans"), Kids: planKids, Count: len(plans)},
-		{ID: PagePacks, Label: T("packs"), Kids: packKids, Count: len(packs)},
+		{ID: PagePlan, Label: T("plans"), Kids: planKids},
+		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		{ID: PageEnv, Label: T("environment")},
 	}
 	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: T("library"), Items: library}}
@@ -128,34 +124,6 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		}
 	}
 	return groups
-}
-
-// NavCounts puts the environments' and the library's numbers on their entries.
-func NavCounts(groups []NavGroup, envs, mods int) {
-	for g := range groups {
-		for i := range groups[g].Items {
-			switch it := &groups[g].Items[i]; it.ID {
-			case PageEnv:
-				it.Count = envs
-			case PageLibrary:
-				it.Count = mods
-			}
-		}
-	}
-}
-
-// LibraryCount is the number of installed mods of the environment (the library's entry).
-func LibraryCount(st *app.LoadoutState) int {
-	if st == nil || st.Ix == nil {
-		return 0
-	}
-	n := 0
-	for _, m := range st.Ix.Mods {
-		if m.Status == identity.Live {
-			n++
-		}
-	}
-	return n
 }
 
 // NavPath is where a page sits in the sidebar: the group, the entry and the sub-entry's
