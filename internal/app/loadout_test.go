@@ -198,14 +198,14 @@ func TestExternalChangeAndConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.Notices) != 1 || !strings.Contains(r.Notices[0], "loaded as v2") || joined(active(t, e)) != "Core, A" {
+	if len(r.Notices) != 1 || !strings.Contains(r.Notices[0], "loaded as plan:default v2") || joined(active(t, e)) != "Core, A" {
 		t.Fatalf("notices %v, active %v", r.Notices, active(t, e))
 	}
 	// Dirty workspace: the external change is kept as a version but not loaded.
 	e.MustRun("enable", refOf(t, e, "B", ""))
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
 	out := e.MustRun("status")
-	if !strings.Contains(out, "not loaded because the workspace has unsaved edits") || joined(active(t, e)) != "Core, A, B" {
+	if !strings.Contains(out, "not loaded because the plan changed since it was written") || joined(active(t, e)) != "Core, A, B" {
 		t.Fatalf("conflict:\n%s", out)
 	}
 	e.MustRun("loadout", "checkout", "v3")

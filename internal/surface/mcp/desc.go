@@ -93,13 +93,13 @@ Example: read_source {"ref": "#ipv5", "type": "yayoCombat.HarmonyPatches.Pawn_Ti
     file: …\cache\source\8612…\yayoCombat.HarmonyPatches\Pawn_Tick.cs
     source:`
 
-const descEdit = `Change RimArcho's workspace Loadout (not the game's file): action=enable|disable (refs), move (refs[0] with at / before / after / up / down), swap (refs[0] → another instance of its lineage, optional refs[1]), sort (dry_run=true previews), undo, redo; staging (RimArcho's own side list, 06 §2.5): stage (refs leave the Loadout and remember their place), unstage (out of staging, stays disabled), restore (refs, or all when empty, go back to their old place; at / before / after for one mod). Every change can be undone; nothing reaches the game until save_loadout. Refs as in get_mod.
+const descEdit = `Change RimArcho's workspace Loadout (not the game's file): action=enable|disable (refs), move (refs[0] with at / before / after / up / down), swap (refs[0] → another instance of its lineage, optional refs[1]), sort (dry_run=true previews), undo, redo; staging (RimArcho's own side list, 06 §2.5): stage (refs leave the Loadout and remember their place), unstage (out of staging, stays disabled), restore (refs, or all when empty, go back to their old place; at / before / after for one mod); ignore_external drops the "external version not loaded" mark that status shows after ModsConfig.xml changed outside RimArcho (the version stays in the history). Every change can be undone; nothing reaches the game until save_loadout. Refs as in get_mod.
 Example: edit_loadout {"action": "enable", "refs": ["#b21c"], "before": "#a3f9"}
   workspace: 213 active, 1 change unsaved (env:main)
     added  #b21c  Harmony  at 1
   next:`
 
-const descSave = `Write the Loadout to the game without starting it ("写入游戏", 08 §2): sync RimArcho's Mods/ links, then write ModsConfig.xml (backup first, atomic replace) for the current game version. The game reads it on its next start; allowed while the game runs. Ask the user before calling it, and call with dry_run=true first to show the preview (links, path, version rewrite, entries, changes).
+const descSave = `Write the Loadout to the game without starting it ("写入游戏", 08 §2): sync RimArcho's Mods/ links, then write ModsConfig.xml (backup first, atomic replace) for the current game version. The game reads it on its next start; allowed while the game runs. Refused while ModsConfig.xml holds an external change that was not loaded: the text gives the commands to see the difference, load it, or ignore it (edit_loadout action=ignore_external). Ask the user before calling it, and call with dry_run=true first to show the preview (links, path, version rewrite, entries, changes).
 Example: save_loadout {"dry_run": true}
   save (dry run): 2 changes
     added  #b21c  Harmony  at 1

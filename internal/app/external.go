@@ -1,0 +1,246 @@
+package app
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/store"
+)
+
+// attributeExternal handles a ModsConfig.xml whose hash is neither the one RimArcho last
+// saw nor the one it last wrote (04 §4.3). The change belongs to the plan that last wrote
+// the file — possibly another plan of this environment, or a plan of another environment
+// sharing the user data folder — with entries resolved by that plan's environment (§4.2).
+// Without a usable record it belongs to the current plan. A file that only differs in
+// format from the version the file is known to hold is no change.
+//
+// The record then names that plan and the new version as what the file holds, so the next
+// check compares against it. mcs is updated in place; the caller stores it.
+func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h []byte, now time.Time) error {
+	target, tenv, reg, err := a.writerPlan(st, mcs)
+	if err != nil {
+		return err
+	}
+	list, _ := reg.FromTokens(st.File.Active)
+	// The version the file was known to hold: the writer's, else (no record) the newest.
+	var ref *store.Version
+	if target.ID == mcs.WriterPlan && mcs.WriterVersion > 0 {
+		if ref, err = a.Store.Version(target.ID, mcs.WriterVersion); err != nil {
+			return err
+		}
+	}
+	if ref == nil {
+		if ref, err = a.Store.LatestVersion(target.ID); err != nil {
+			return err
+		}
+	}
+	mcs.Seen = h
+	if ref != nil && ref.GameVersion == st.File.Version && reg.Heal(loadout.Decode(ref.Entries)).Equal(list) {
+		// Rewritten by the game or another tool without a real change (formatting).
+		return nil
+	}
+	ws, err := a.planWorkspace(target)
+	if err != nil {
+		return err
+	}
+	cur := reg.Heal(loadout.Decode(ws.Entries))
+	clean := ref == nil || cur.Equal(reg.Heal(loadout.Decode(ref.Entries)))
+	n, err := a.Store.AddVersion(target.ID, &store.Version{Created: now, Source: "external", Entries: list.Encode(),
+		GameVersion: st.File.Version, Note: "ModsConfig.xml changed outside RimArcho"})
+	if err != nil {
+		return err
+	}
+	c := &ExternalConflict{Plan: target, Env: tenv, Version: n, Current: target.ID == st.Plan.ID}
+	if clean {
+		// Loaded as a workspace edit that u takes back.
+		if !cur.Equal(list) {
+			if err := a.Store.PushStep(target.ID, "undo", ws.Entries, "external"); err != nil {
+				return err
+			}
+			if err := a.Store.ClearSteps(target.ID, "redo"); err != nil {
+				return err
+			}
+		}
+		ws.Entries, ws.OriginVersion, ws.OriginKind, ws.Conflict = list.Encode(), n, "external", 0
+		st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: loaded as %s", c.Name(st.Ix.Env)))
+	} else {
+		ws.Conflict = n
+		st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: kept as %s, not loaded because the plan changed since it was written (%s)",
+			c.Name(st.Ix.Env), strings.Join(c.Commands(st.Ix.Env), "; ")))
+	}
+	ws.Updated = now
+	if err := a.Store.SetWorkspace(ws); err != nil {
+		return err
+	}
+	mcs.WriterPlan, mcs.WriterVersion = target.ID, n
+	return nil
+}
+
+// writerPlan is the plan an external change of the folder's ModsConfig.xml belongs to, its
+// environment and that environment's registry: the record's writer when it still exists,
+// else the current plan.
+func (a *App) writerPlan(st *LoadoutState, mcs *store.ModsConfigState) (*store.Plan, *env.Environment, *loadout.Registry, error) {
+	if mcs.WriterPlan == 0 || mcs.WriterPlan == st.Plan.ID {
+		return st.Plan, st.Ix.Env, st.Reg, nil
+	}
+	p, err := a.Store.PlanByID(mcs.WriterPlan)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if p == nil { // the writer was deleted
+		return st.Plan, st.Ix.Env, st.Reg, nil
+	}
+	if p.EnvID == st.Ix.Env.ID {
+		return p, st.Ix.Env, st.Reg, nil
+	}
+	e, err := a.Store.EnvByID(p.EnvID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if e == nil {
+		return st.Plan, st.Ix.Env, st.Reg, nil
+	}
+	ix, err := a.loadIndex(e)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	reg, _, _, _, err := a.registry(ix)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return p, e, reg, nil
+}
+
+// ExternalConflict is a plan's external ModsConfig.xml version that was not loaded because
+// the plan had changed since it was written (04 §4.3: "有未载入的外部版本").
+type ExternalConflict struct {
+	Plan    *store.Plan
+	Env     *env.Environment // the plan's environment
+	Version int
+	// Current: the plan is the current plan of the invocation's environment.
+	Current bool
+}
+
+// Name is "plan:<name> v<n>", with the environment first when it is not from.
+func (c *ExternalConflict) Name(from *env.Environment) string {
+	s := fmt.Sprintf("%s v%d", PlanRef(c.Plan), c.Version)
+	if from == nil || c.Env.ID != from.ID {
+		s = "env:" + c.Env.Name + " " + s
+	}
+	return s
+}
+
+// Commands are the three ways out — see the difference, load it, ignore it — runnable from
+// the environment from: a plan that is not the current one is selected first.
+func (c *ExternalConflict) Commands(from *env.Environment) []string {
+	pre := "archo "
+	var out []string
+	if from == nil || c.Env.ID != from.ID {
+		pre = "archo --env " + quoteArg(c.Env.Name) + " "
+	}
+	if !c.Current || from == nil || c.Env.ID != from.ID {
+		out = append(out, pre+"plan use "+quoteArg(c.Plan.Name))
+	}
+	return append(out,
+		fmt.Sprintf("%sloadout diff v%d workspace", pre, c.Version),
+		fmt.Sprintf("%sloadout checkout v%d", pre, c.Version),
+		pre+"loadout ignore-external")
+}
+
+// Conflicts lists the plans of the environment with an unloaded external version, the
+// current plan first.
+func (a *App) Conflicts(st *LoadoutState) ([]*ExternalConflict, error) {
+	var out []*ExternalConflict
+	if st.WS.Conflict != 0 {
+		out = append(out, &ExternalConflict{Plan: st.Plan, Env: st.Ix.Env, Version: st.WS.Conflict, Current: true})
+	}
+	ps, err := a.Store.Plans(st.Ix.Env.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range ps {
+		if p.ID == st.Plan.ID {
+			continue
+		}
+		ws, err := a.Store.Workspace(p.ID)
+		if err != nil {
+			return nil, err
+		}
+		if ws != nil && ws.Conflict != 0 {
+			out = append(out, &ExternalConflict{Plan: p, Env: st.Ix.Env, Version: ws.Conflict})
+		}
+	}
+	return out, nil
+}
+
+// ErrExternalConflict is wrapped by writes refused over an unloaded external version.
+var ErrExternalConflict = errors.New("unloaded external change")
+
+// writeBlocker is the unloaded external version a write of st would overwrite unseen
+// (05 I8): the plan's own, or the one ModsConfig.xml still holds for another plan.
+func (a *App) writeBlocker(st *LoadoutState) (*ExternalConflict, error) {
+	if st.WS.Conflict != 0 {
+		return &ExternalConflict{Plan: st.Plan, Env: st.Ix.Env, Version: st.WS.Conflict, Current: true}, nil
+	}
+	if st.File == nil {
+		return nil, nil
+	}
+	mcs, err := a.Store.ModsConfigStateAt(st.Ix.Env.UserDataRoot)
+	if err != nil || mcs.WriterPlan == 0 || mcs.WriterPlan == st.Plan.ID || !bytes.Equal(mcs.Seen, loadout.Hash(st.File.Raw)) {
+		return nil, err
+	}
+	ws, err := a.Store.Workspace(mcs.WriterPlan)
+	if err != nil || ws == nil || ws.Conflict == 0 || ws.Conflict != mcs.WriterVersion {
+		return nil, err
+	}
+	p, err := a.Store.PlanByID(mcs.WriterPlan)
+	if err != nil || p == nil {
+		return nil, err
+	}
+	e := st.Ix.Env
+	if p.EnvID != e.ID {
+		if e, err = a.Store.EnvByID(p.EnvID); err != nil || e == nil {
+			return nil, err
+		}
+	}
+	return &ExternalConflict{Plan: p, Env: e, Version: ws.Conflict}, nil
+}
+
+// conflictError is the refusal of a write over an unloaded external version.
+func conflictError(st *LoadoutState, c *ExternalConflict) error {
+	cmds := c.Commands(st.Ix.Env)
+	n := len(cmds)
+	how := fmt.Sprintf("see the difference: %s; load it: %s; ignore it: %s", cmds[n-3], cmds[n-2], cmds[n-1])
+	if n == 4 {
+		how = "first " + cmds[0] + ", then " + how
+	}
+	return fmt.Errorf("%w: ModsConfig.xml changed outside RimArcho and %s was not loaded; nothing was written (%s)",
+		ErrExternalConflict, c.Name(st.Ix.Env), how)
+}
+
+// IgnoreExternal clears the current plan's "unloaded external version" mark (04 §4.3,
+// `loadout ignore-external`); the version stays in the history. It returns the version
+// that was ignored, 0 when there was none.
+func (a *App) IgnoreExternal() (int, *LoadoutState, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return 0, nil, err
+	}
+	n := st.WS.Conflict
+	if n == 0 {
+		return 0, st, nil
+	}
+	st.WS.Conflict = 0
+	return n, st, a.Store.SetWorkspace(st.WS)
+}
+
+// DismissConflict is IgnoreExternal for the UI's "ignore it" (06 §2.5).
+func (a *App) DismissConflict() error {
+	_, _, err := a.IgnoreExternal()
+	return err
+}
