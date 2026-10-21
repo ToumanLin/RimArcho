@@ -162,6 +162,7 @@ type record struct {
 	Mods    []struct {
 		Pkg string `json:"pkg"`
 	} `json:"mods"`
+	Harmony []HPatch `json:"harmony"`
 }
 
 // Result is one log's line in results.jsonl.
@@ -174,6 +175,8 @@ type Result struct {
 	AnalysisOK bool       `json:"analysis_ok"`
 	Clusters   []RCluster `json:"clusters"`
 	Sort       *RSort     `json:"sort,omitempty"`
+	Harmony    *RHarmony  `json:"harmony,omitempty"`  // G3; absent in results written before it
+	Findings   []RFinding `json:"findings,omitempty"` // G4; absent in results written before it
 	Err        string     `json:"err,omitempty"`
 }
 
@@ -285,7 +288,7 @@ func one(a *app.App, userData, corpus string, r record) *Result {
 		}
 	}
 	t := time.Now()
-	_, err = a.EnsureAnalysis(nil)
+	as, err := a.EnsureAnalysis(nil)
 	res.AnalysisMS = time.Since(t).Milliseconds()
 	res.AnalysisOK = err == nil
 	if err != nil {
@@ -313,6 +316,10 @@ func one(a *app.App, userData, corpus string, r record) *Result {
 			c.Attr = append(c.Attr, RAttr{Pkg: pkgOf(at.Instance), Role: at.Role, Evidence: at.Evidence})
 		}
 		res.Clusters = append(res.Clusters, c)
+	}
+	if res.AnalysisOK {
+		res.Harmony = g3(a, st, r.Harmony)
+		g4(a, st, as, rep, res)
 	}
 	in, err := a.SortInput(st, st.List)
 	if err != nil {

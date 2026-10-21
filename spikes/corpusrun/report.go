@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// report prints the G1 (attribution) and G2 (ordering) metrics of results.jsonl
+// report prints the G1 (attribution), G2 (ordering), G3 (Harmony recall) and G4 (calibration) metrics of results.jsonl
 // (docs/research/00 §3). Every number is reported for all logs and for the logs whose mod list
 // the research library covers at least minCov (attribution needs the mods' files).
 func report(path string, minCov float64) error {
@@ -61,6 +61,8 @@ func report(path string, minCov float64) error {
 	g2(all)
 	fmt.Printf("\n== G2 ordering, covered logs (%d)\n", len(covered))
 	g2(covered)
+	g3report(all)
+	g4report(all)
 	return nil
 }
 
