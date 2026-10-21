@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Locked is a locked version RimArcho created (04 §7.1): a copy in the local source with
+// Locked is a locked version RimArcho created (04 §7.1): a copy in the local (or an extra) source with
 // .rimarcho/origin.json whose origin instance (the upstream) is still installed and not
 // hidden. RimCrow-style locks (a hidden workshop copy) are Hidden with HiddenPinned.
 type Locked struct {
@@ -39,7 +39,7 @@ func (st *LoadoutState) Locked() []*Locked {
 
 // lockedCopy returns the lock m is the copy of (nil if m is not one).
 func (st *LoadoutState) lockedCopy(m *store.Mod) *Locked {
-	if m.Origin == "" || m.Status != identity.Live || m.Unloadable != "" || m.Kind != source.Local {
+	if m.Origin == "" || m.Status != identity.Live || m.Unloadable != "" || m.Kind != source.Local && m.Kind != source.Extra {
 		return nil
 	}
 	var og scan.Origin
