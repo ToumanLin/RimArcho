@@ -66,8 +66,8 @@ func New(a *app.App) *Server {
 	}
 	s.srv = sdk.NewServer(&sdk.Implementation{Name: "rimarcho", Version: buildinfo.Version}, &sdk.ServerOptions{Instructions: Instructions})
 	for _, t := range Tools() {
-		// get_description reaches the Steam Workshop (06 §4.3); everything else stays local.
-		ann := &sdk.ToolAnnotations{ReadOnlyHint: t.readOnly, OpenWorldHint: ptr(t.name == "get_description")}
+		// Only the tools in openWorld may reach the network; everything else stays local.
+		ann := &sdk.ToolAnnotations{ReadOnlyHint: t.readOnly, OpenWorldHint: ptr(openWorld[t.name])}
 		if !t.readOnly {
 			ann.DestructiveHint = ptr(t.destructive)
 		}
@@ -126,7 +126,8 @@ func argv(words ...string) *builder { return &builder{a: append([]string{}, word
 // ---- tool arguments ----
 
 type StatusIn struct {
-	Env string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env  string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Show string `json:"show,omitempty" jsonschema:"overview (default), envs, settings, data (community data), db or cache"`
 }
 
 type FindIn struct {
@@ -268,7 +269,9 @@ type SaveIn struct {
 
 type RuleIn struct {
 	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Kind   string `json:"kind" jsonschema:"after, before, incompatible, attach (A B) or ignore (target)"`
+	Action string `json:"action,omitempty" jsonschema:"add (default), list or remove"`
+	Rule   string `json:"rule,omitempty" jsonschema:"remove: the rule ref r:<n> from action=list"`
+	Kind   string `json:"kind,omitempty" jsonschema:"add: after, before, incompatible, attach (A B) or ignore (target)"`
 	A      string `json:"a,omitempty" jsonschema:"the mod the rule is about"`
 	B      string `json:"b,omitempty" jsonschema:"the other mod"`
 	Target string `json:"target,omitempty" jsonschema:"for ignore: the constraint ref printed by sort/problems, e.g. decl:#ab12:loadafter:pkg.id"`
@@ -279,7 +282,7 @@ func gv(b *builder, mm string) []string { return b.str("game-version", mm).a }
 
 func toolList() []tool {
 	return []tool{
-		reg("status", true, false, descStatus, func(in StatusIn) []string { return []string{"status"} }),
+		reg("status", true, false, descStatus, func(in StatusIn) []string { return StatusArgv(in) }),
 		reg("find_mods", true, false, descFind, func(in FindIn) []string {
 			if in.Query != "" {
 				return argv("find").pos(in.Query).flag("all", in.All).a
@@ -319,20 +322,13 @@ func toolList() []tool {
 			return argv("copy-local", in.Ref).str("name", in.Name).flag("git", in.Git).a
 		}),
 		reg("set_player_data", false, false, descPlayer, func(in PlayerIn) []string { return PlayerArgv(in) }),
-		reg("add_rule", false, false, descRule, func(in RuleIn) []string {
-			b := argv("rule", "add", in.Kind)
-			if in.Kind == "ignore" {
-				b.pos(in.Target)
-			} else {
-				b.pos(in.A).pos(in.B)
-			}
-			return b.str("note", in.Note).a
-		}),
+		// add_rule is the old name of manage_rules, kept as an alias (05 §6).
+		reg("add_rule", false, false, descRuleAlias, func(in RuleIn) []string { return RulesArgv(in) }),
 	}
 }
 
 // Tools returns the tool table.
-func Tools() []tool { return toolList() }
+func Tools() []tool { return append(toolList(), manageTools()...) }
 
 // ProblemsArgv maps list_problems: warning and above by default (03 §4.5).
 func ProblemsArgv(in ProblemsIn) []string {

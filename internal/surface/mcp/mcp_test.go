@@ -59,7 +59,11 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
 		"read_source": "ro", "edit_loadout": "write", "copy_local": "write", "save_loadout": "destructive", "add_rule": "write",
 		"get_description": "ro", "set_player_data": "write",
+		// 05 §1.2: the player actions that only had CLI commands.
+		"manage_rules": "write", "ignore_problem": "write", "scan": "write", "exchange_list": "write",
+		"manage_packs": "destructive", "resolve_identity": "destructive", "manage_hidden": "destructive", "maintenance": "destructive",
 	}
+	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true}
 	seen := map[string]bool{}
 	for _, tl := range res.Tools {
 		seen[tl.Name] = true
@@ -76,6 +80,8 @@ func TestToolsAndAnnotations(t *testing.T) {
 			t.Errorf("%s: want readOnlyHint", tl.Name)
 		case kind != "ro" && (a.ReadOnlyHint || a.DestructiveHint == nil || *a.DestructiveHint != (kind == "destructive")):
 			t.Errorf("%s: annotations %+v, want %s", tl.Name, a, kind)
+		case a.OpenWorldHint == nil || *a.OpenWorldHint != openWorld[tl.Name]:
+			t.Errorf("%s: openWorldHint %v, want %v", tl.Name, a.OpenWorldHint, openWorld[tl.Name])
 		}
 		// 05 §5.3: every description gives an example call with output.
 		if !strings.Contains(tl.Description, "Example: "+tl.Name+" {") {
@@ -125,6 +131,20 @@ func TestCLIParity(t *testing.T) {
 		{"save_loadout", map[string]any{"dry_run": true}, []string{"save", "--dry-run"}},
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},
 		{"get_description", map[string]any{"ref": modA, "offline": true}, []string{"describe", modA, "--offline"}},
+		// The read-only pages folded into status, and the read-only actions of the 05 §1.2
+		// tools (their write actions: TestGoldenManageTools).
+		{"status", map[string]any{"show": "envs"}, []string{"env", "list"}},
+		{"status", map[string]any{"show": "settings"}, []string{"config", "get"}},
+		{"status", map[string]any{"show": "data"}, []string{"data", "status"}},
+		{"status", map[string]any{"show": "db"}, []string{"db", "status"}},
+		{"status", map[string]any{"show": "cache"}, []string{"cache", "status"}},
+		{"manage_rules", map[string]any{"action": "list"}, []string{"rule", "list"}},
+		{"resolve_identity", map[string]any{"action": "list", "all": true}, []string{"identity", "list", "--all"}},
+		{"manage_packs", map[string]any{"action": "list"}, []string{"pack", "list"}},
+		{"exchange_list", map[string]any{"action": "export", "format": "rimsort"}, []string{"loadout", "export", "--format", "rimsort"}},
+		{"manage_hidden", map[string]any{"action": "trash", "ref": modA, "dry_run": true}, []string{"trash", modA, "--dry-run"}},
+		{"maintenance", map[string]any{"action": "gc", "dry_run": true}, []string{"gc", "--dry-run"}},
+		{"ignore_problem", map[string]any{"ref": "p:000000"}, []string{"problems", "ignore", "p:000000"}},
 	}
 	for _, c := range cases {
 		got, isErr := call(t, cs, c.tool, c.args)
@@ -272,8 +292,17 @@ func TestWriteTools(t *testing.T) {
 	if out, isErr := call(t, cs, "add_rule", map[string]any{"kind": "after", "a": "pkg:tester.modc", "b": "pkg:tester.modb"}); isErr || !strings.Contains(out, "r:1") {
 		t.Fatalf("add_rule:\n%s", out)
 	}
-	if out, isErr := call(t, cs, "edit_loadout", map[string]any{"action": "bogus"}); !isErr {
-		t.Fatalf("unknown action is an error:\n%s", out)
+	for _, tool := range []string{"edit_loadout", "manage_rules", "exchange_list", "manage_packs", "resolve_identity", "manage_hidden", "maintenance"} {
+		args := map[string]any{"action": "bogus"}
+		if tool == "manage_hidden" {
+			args["ref"] = "#x"
+		}
+		if out, isErr := call(t, cs, tool, args); !isErr || !strings.Contains(out, "unknown action") {
+			t.Errorf("%s: unknown action is an error:\n%s", tool, out)
+		}
+	}
+	if out, isErr := call(t, cs, "status", map[string]any{"show": "bogus"}); !isErr {
+		t.Errorf("status: unknown show is an error:\n%s", out)
 	}
 }
 

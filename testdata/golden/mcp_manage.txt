@@ -1,0 +1,270 @@
+> status {"show":"envs"}
+environments: 1
+  env:main  1.6.4633 rev1261  [current]
+    game: $ROOT/Steam/steamapps/common/RimWorld
+    user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+    launch: direct
+    sources:
+      src:official  $ROOT/Steam/steamapps/common/RimWorld/Data
+      src:local     $ROOT/Steam/steamapps/common/RimWorld/Mods
+      src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
+
+> status {"show":"settings"}
+settings
+  data.replacements.url: https://raw.githubusercontent.com/emipa606/UseThisInstead/main/replacements.json.gz
+  data.rules.url: https://raw.githubusercontent.com/RimSort/Community-Rules-Database/main/communityRules.json
+  data.steamdb.url: https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json
+  tags.pinned: 框架,美化,服装,种族,武器,建筑,家具,QoL,平衡,剧情,性能,语言包,测试中,待删除
+  terminal.host: auto
+  ui.icons: auto
+  ui.lang: auto
+  ui.mouse: on
+  ui.preview_dwell_ms: 0
+  ui.previews: on
+  workshop.fetch: on
+  workshop.images: on
+
+> status {"show":"data"}
+community data
+  rules: not downloaded (RimSort community sorting rules)
+  steamdb: not downloaded (RimSort Steam Workshop database (packageIds, dependencies, versions))
+  replacements: not downloaded (Use This Instead replacements)
+next:
+  archo data update
+
+> scan {}
+scan:3  env:main  0s
+  sources:
+    src:official  1 mod
+    src:local     3 mods
+    src:workshop  4 mods (1 residue, 2 about-disabled)
+  instances: 8 live, 1 tombstones
+  files: 40 (3.9 KB), semantic hashed 4, reused 24
+  changes: 1 discovered
+  questions: 1 new (archo identity list)
+next:
+  archo changes
+  archo identity list
+
+> resolve_identity {"action":"list"}
+questions: 1 open
+  q:1  score 1.00  scan:3
+    new:     #np4v  Leftover  [local Leftover Again]
+    was it:  #xzwf  Leftover  [local Leftover, tombstone since 2026-10-01]
+next:
+  archo identity resolve q:1 same|copy|unrelated
+
+> resolve_identity {"action":"resolve","answer":"same","question":"q:1"}
+q:1  resolved: same
+  #np4v merged into #xzwf; it keeps its ID, lineage and history
+  #xzwf  Leftover  [local Leftover Again]
+next:
+  archo mod #xzwf
+
+> resolve_identity {"action":"split","refs":["#iqmu"]}
+#iqmu A  split
+  lineage: L#bakj (was L#l4xt)
+next:
+  archo mod #iqmu
+
+> resolve_identity {"action":"merge","refs":["L#l4xt","#iqmu"]}
+L#l4xt  merged L#bakj into it
+  members:
+    #iqmu  A  [active 3/3, local A Local]
+    #6olp  A  [workshop ws:1001]
+
+> manage_rules {"a":"#76gh","action":"add","b":"#hnyg","kind":"after","note":"test"}
+r:1 added
+  r:1  after  L#gpto B  L#u2mx Harmony  test
+next:
+  archo sort --dry-run
+
+> manage_rules {"action":"list"}
+rules: 1 (env:main)
+  r:1  after  L#gpto B  L#u2mx Harmony  test
+
+> add_rule {"action":"remove","rule":"r:1"}
+r:1 removed
+
+> ignore_problem {"ref":"p:c86d19"}
+ignored p:c86d19 mod.hidden
+  #z3bw Alone is hidden from the game (About.xml renamed, probably by another mod manager)
+  until: the mod changes (ignores are kept per lineage and expire when its files change)
+next:
+  archo problems unignore p:c86d19
+
+> ignore_problem {"ref":"p:c86d19","undo":true}
+no longer ignored: p:c86d19 mod.hidden
+
+> exchange_list {"action":"export"}
+# RimArcho loadout, env:main, 3 mods, 2026-10-01 12:00
+# one packageId per line in load order; text after # is ignored (archo loadout import <file>)
+ludeon.rimworld  # Core
+brrainz.harmony  # Harmony
+tester.a  # A
+
+> exchange_list {"action":"export","format":"rml","out":"$ROOT/list.txt"}
+exported 655 bytes to $ROOT/list.txt
+  format: rml
+next:
+  archo loadout import $ROOT/list.txt
+
+> exchange_list {"action":"collection","from":"3000000001"}
+collection Title 3000000001: 3 items
+  installed: 2
+    #hnyg Harmony
+    #6olp A
+  not installed: 1
+    Title 5550001  https://steamcommunity.com/sharedfiles/filedetails/?id=5550001
+next:
+  archo collection 3000000001 --import
+
+> exchange_list {"action":"collection","from":"3000000001","import":true}
+workspace: 2 active, 1 change unsaved (env:main)
+  imported collection Title 3000000001: 2 of 3 mods are installed
+  not installed (subscribe in the Workshop): 1
+    Title 5550001  https://steamcommunity.com/sharedfiles/filedetails/?id=5550001
+  removed  #i4uc  Core  was 1
+next:
+  archo save
+
+> exchange_list {"action":"import","from":"$ROOT/list.txt"}
+workspace: 3 active, saved (env:main)
+  imported 3 entries from a RimWorld mod list (.rml), game 1.6.4633 rev1261
+  added  #i4uc  Core  at 1
+next:
+  archo undo
+
+> manage_hidden {"action":"unhide","dry_run":true,"ref":"ws:4300"}
+dry run, nothing changed: would be renamed
+  from: $ROOT/Steam/steamapps/workshop/content/294100/4300/About/About.xml.disabled
+  to: $ROOT/Steam/steamapps/workshop/content/294100/4300/About/About.xml
+next:
+  archo unhide ws:4300
+
+> manage_hidden {"action":"unhide","ref":"ws:4300"}
+renamed
+  from: $ROOT/Steam/steamapps/workshop/content/294100/4300/About/About.xml.disabled
+  to: $ROOT/Steam/steamapps/workshop/content/294100/4300/About/About.xml
+  rescanned: scan:4
+
+> manage_hidden {"action":"trash","dry_run":true,"ref":"ws:4200"}
+dry run, nothing changed: would be moved to the recycle bin
+  folder: $ROOT/Steam/steamapps/workshop/content/294100/4200
+next:
+  archo trash ws:4200
+
+> manage_hidden {"action":"trash","ref":"ws:4200"}
+moved to the recycle bin
+  folder: $ROOT/Steam/steamapps/workshop/content/294100/4200
+  rescanned: scan:5
+
+> manage_packs {"action":"list"}
+packs: 0 ($ROOT/ArchoHome/packs)
+next:
+  archo pack build <name>
+
+> manage_packs {"action":"build","dry_run":true,"name":"first"}
+pack build: dry run, nothing written
+  folder: $ROOT/ArchoHome/packs/first
+  mods: 2 carried, 1 from the game (Core and DLCs)
+  size: 868 B; 0 B of other game versions left out
+  space: <free> free on the packs drive
+  trimmed: nothing (no folders for other game versions)
+  game: 1.6.4633 rev1261
+next:
+  archo pack build first
+
+> manage_packs {"action":"build","name":"first"}
+built pack first
+  folder: $ROOT/ArchoHome/packs/first
+  mods: 2 carried, 1 from the game (Core and DLCs)
+  size: 868 B; 0 B of other game versions left out
+  trimmed: nothing (no folders for other game versions)
+  game: 1.6.4633 rev1261
+next:
+  archo pack launch first
+
+> manage_packs {"action":"launch","dry_run":true,"name":"first"}
+pack launch: dry run, nothing written
+  links: 2 changes in Mods/
+    + !ArchoPack_first_2009463077
+    + !ArchoPack_first_A_Local
+  list: $ROOT/ArchoHome/packs/first/userdata/Config/ModsConfig.xml (3 entries; the environment's ModsConfig.xml is not touched)
+  saves: $ROOT/ArchoHome/packs/first/userdata
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/ArchoHome/packs/first/userdata
+
+> manage_packs {"action":"launch","name":"first"}
+pack first: the game is starting
+  links: 2 changes in Mods/
+    + !ArchoPack_first_2009463077
+    + !ArchoPack_first_A_Local
+  list: $ROOT/ArchoHome/packs/first/userdata/Config/ModsConfig.xml (3 entries; the environment's ModsConfig.xml is not touched)
+  saves: $ROOT/ArchoHome/packs/first/userdata
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/ArchoHome/packs/first/userdata
+
+> manage_packs {"action":"export","file":"$ROOT/first.archopack.json","light":true,"name":"first"}
+exported pack first to $ROOT/first.archopack.json (717 B)
+
+> manage_packs {"action":"import","file":"$ROOT/first.archopack.json"}
+light pack first: 3 mods
+  same version installed: 2
+    Harmony  pkg:brrainz.harmony  https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077
+    A  pkg:tester.a
+  another version installed: 0
+  not installed: 0
+next:
+  archo pack import $ROOT/first.archopack.json --as-plan
+
+> manage_packs {"action":"stop","name":"first"}
+error: no build of "first" is running
+[isError]
+
+> manage_packs {"action":"remove","dry_run":true,"name":"first"}
+dry run: would move $ROOT/ArchoHome/packs/first to the recycle bin
+
+> manage_packs {"action":"remove","name":"first"}
+moved $ROOT/ArchoHome/packs/first to the recycle bin
+
+> manage_packs {"action":"list"}
+packs: 0 ($ROOT/ArchoHome/packs)
+next:
+  archo pack build <name>
+
+> maintenance {"action":"data_update","datasets":["rules"],"dry_run":true}
+data update: dry run, nothing downloaded
+  rules: https://raw.githubusercontent.com/RimSort/Community-Rules-Database/main/communityRules.json
+
+> maintenance {"action":"import_rimcrow","db":"$ROOT/RimCrow/data/mod_manager.db","dry_run":true}
+import rimcrow (dry run: nothing written)
+  database: $ROOT/RimCrow/data/mod_manager.db (read from a copy)
+  mods: 1 with data: 1 mapped (0 by path, 1 by packageId), 0 not mapped
+  aliases: 1 new, 0 already set
+  notes: 1 new, 0 already set
+  tags: 0 new, 0 already present (0 groups, 0 memberships)
+  rules: 0: 0 new, 0 already present, 0 skipped (no user_rules.json found)
+  conflicts: 0 (RimArcho's value kept)
+next:
+  archo import rimcrow --db $ROOT/RimCrow/data/mod_manager.db
+
+> maintenance {"action":"import_rimcrow","db":"$ROOT/RimCrow/data/mod_manager.db"}
+import rimcrow
+  database: $ROOT/RimCrow/data/mod_manager.db (read from a copy)
+  mods: 1 with data: 1 mapped (0 by path, 1 by packageId), 0 not mapped
+  aliases: 1 new, 0 already set
+  notes: 1 new, 0 already set
+  tags: 0 new, 0 already present (0 groups, 0 memberships)
+  rules: 0: 0 new, 0 already present, 0 skipped (no user_rules.json found)
+  conflicts: 0 (RimArcho's value kept)
+next:
+  archo tag list
+  archo rule list
+
+> maintenance {"action":"gc","dry_run":true}
+gc: would remove 0 tombstones (tombstones older than 90 days, before 2026-07-03)
+  snapshots: 0 superseded (0 file rows)
+
+> maintenance {"action":"gc"}
+gc: removed 0 tombstones (tombstones older than 90 days, before 2026-07-03)
+  snapshots: 0 superseded (0 file rows)
+

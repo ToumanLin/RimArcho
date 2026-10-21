@@ -18,9 +18,10 @@ Diagnosis workflow (use the exact evidence, not paraphrases):
    - Mixed: confirm the XML side loaded (get_patches failed=true) before blaming code.
 4. list_problems gives the static picture (dependencies, incompatibilities, load order, def overrides, patch failures, Harmony conflicts); explain_relation explains two specific mods.
 5. Report: failure stage, XML/Assembly/Mixed, the exact mod instance and path, the file+line or class+method, why it fails, whether a named mod is cause, dependency or observer, and the smallest fix.
-Editing: copy_local first (never edit Workshop files in place), then edit the copy; edit_loadout only changes RimArcho's workspace; save_loadout writes the game's ModsConfig.xml (ask the user first).`
+Editing: copy_local first (never edit Workshop files in place), then edit the copy; edit_loadout only changes RimArcho's workspace; save_loadout writes the game's ModsConfig.xml (ask the user first).
+Tools marked destructive (save_loadout, manage_packs, resolve_identity, manage_hidden, maintenance) write game or mod files, start the game or are hard to undo: show the dry run where there is one and ask the user before the real call.`
 
-const descStatus = `Overview of the current environment: game version, installed mods per source, last scan, the Loadout (enabled count, unsaved edits) and problem counts. Use first in a session; use get_mod for one mod and list_problems for the problems themselves.
+const descStatus = `Overview of the current environment: game version, installed mods per source, last scan, the Loadout (enabled count, unsaved edits) and problem counts. Use first in a session; use get_mod for one mod and list_problems for the problems themselves. show= gives one read-only page of RimArcho's own setup instead: envs (environments, their paths, sources and launch mode), settings (config values), data (community data), db (database path, size, backups), cache (cache sizes). Changing environments and settings is left to the player in RimArcho.
 Example: status {}
   env:main  RimWorld 1.6.4633 rev1261
     mods: 485 live (official 6, local 3, workshop 476), 0 tombstones
@@ -103,12 +104,6 @@ Example: save_loadout {"dry_run": true}
   save (dry run): 2 changes
     added  #b21c  Harmony  at 1
     moved  #a3f9  Combat Extended  34 → 35`
-
-const descRule = `Add a user rule: kind after|before (A must load after/before B), incompatible (A B), attach (A always right after B), or ignore (target = a constraint ref printed by sort or list_problems, e.g. decl:#ab12:loadafter:other.pkg, to drop a wrong About.xml/community constraint — this is how an order.cycle is broken). Rules apply to sort and to the order problems; they do not reorder by themselves.
-Example: add_rule {"kind": "ignore", "target": "decl:#iqmu:loadafter:tester.y"}
-  r:1 added
-    r:1  ignore  decl:#iqmu:loadafter:tester.y
-  next:`
 
 const descCopy = `Copy a mod (usually a Workshop item) into the game's Mods folder as an independent local copy before editing it: the copy gets .rimarcho/origin.json (origin instance, lineage, workshop id, snapshot) and stays in the same lineage; git=true adds a repository with a baseline commit so every edit can be diffed. Links that point outside the mod folder and the upstream .git are not copied; an existing folder is never overwritten. The Loadout is not changed: call edit_loadout action=swap refs=[original, copy] when the user wants the game to load the copy. Never edit Workshop files in place — Steam overwrites them.
 Example: copy_local {"ref": "#ipv5", "git": true}
