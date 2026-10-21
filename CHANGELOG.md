@@ -115,7 +115,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   open and close smoothly (rows 0fr → 1fr, a turning chevron). Less always-on chrome: the
   sidebar's environment / "游戏没在运行" box is gone (one line shows only while a game runs or
   a new log waits), the status line no longer says "游戏里现在是…" (a green dot marks that plan
-  when there are several) nor repeats the breadcrumb on pages.
+  when there are several) nor repeats the breadcrumb on pages. A calmer home page: one card
+  whose rows share columns (name and one quiet line, one state, a borderless 编辑, ▶ 启动游戏
+  solid only on the last-played row), no repeated environment or "跟着工坊更新", activity
+  cards on the list's edges with the news first.
 - "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
   the history stays in the editor's third column.
 

@@ -1,6 +1,11 @@
 // 首页 (06 §2.3): what you play — each plan and pack with its state, edit or details, and
 // launch — then the activity cards: the last run, what the last scan changed, and the slot
 // 没玩到 will fill (10 §3). Data: API.Home (view.BuildHome).
+//
+// One card of rows on one grid (the columns line up from row to row): the name and one
+// quiet line, one state chip, then a quiet 编辑 / 详情 and ▶ 启动游戏. Only the first row
+// you can launch (the one played last) has the solid launch button; the others are tinted
+// until the row is hovered.
 import { S, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button, act, rescanButton } from "./screens.js";
 import { icon } from "./icons.js";
@@ -24,18 +29,22 @@ function draw() {
   const sc = S.screen === "home" ? document.querySelector("#screen") : openScreen("home");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("home", T("pick one and play. A plan is a list of mods that follows Workshop updates; a pack locks every mod's version and keeps its own saves."),
-    rescanButton(), act(T("new plan / import"), "plus", () => newPlan()));
+  const w = page("home", T("pick one and play."), rescanButton(), act(T("new plan / import"), "plus", () => newPlan()));
   sc.append(w);
   const running = !!(S.live && (S.live.running || S.live.blocked));
+  const rows = data.rows || [];
+  // the environment is said only when the rows span more than one
+  const manyEnvs = new Set(rows.map((r) => r.env)).size > 1;
+  const lead = rows.findIndex((r) => !r.light);
 
   const playing = el("section", "sec");
   playing.append(el("h2", "label", T("playing now")));
-  const list = el("div", "card home-list");
-  for (const r of data.rows || []) list.append(row(r, running));
-  if (!(data.rows || []).length) list.append(el("div", "empty-state", T("no environment yet: add one on the environment page")));
-  playing.append(list);
-  if ((data.rows || []).length > 1) playing.append(el("div", "note muted", T("most recently played first")));
+  if (!rows.length) playing.append(el("div", "card empty-state", T("no environment yet: add one on the environment page")));
+  else {
+    const list = el("div", "card home-list");
+    rows.forEach((r, i) => list.append(row(r, running, manyEnvs, i === lead)));
+    playing.append(list);
+  }
   w.append(playing);
 
   const actv = el("section", "sec");
@@ -52,27 +61,33 @@ function draw() {
   sc.scrollTop = top;
 }
 
-// row: [environment] name [方案 | 整合包] / its facts — state, edit or details, launch.
-function row(r, running) {
+// row: name [方案 | 整合包] (marks) / one quiet line — the state chip — 编辑 / 详情, launch.
+function row(r, running, manyEnvs, lead) {
   const d = el("div", "home-row");
-  d.append(el("span", "envtag", r.env));
   const l = el("div", "l");
   const name = el("div", "name");
-  name.append(el("span", "n", r.name), el("span", "kind " + r.kind, r.kind === "plan" ? T("plan") : T("pack")));
-  // the game's ModsConfig.xml holds this plan now; a plan's unloaded external version
+  name.append(el("span", "n", r.name));
+  const kind = el("span", "kind", r.kind === "plan" ? T("plan") : T("pack"));
+  kind.title = r.kind === "plan" ? T("a plan is a list of mods that follows Workshop updates") : T("a pack locks every mod's version and keeps its own saves");
+  name.append(kind);
+  // the plan the game has (when there are several), a plan's unloaded external version
   const g = inGameMark(r.inGame);
   if (g) name.append(g);
-  if (r.mark) name.append(el("span", "chip mark", r.mark));
-  const meta = [r.facts, r.mode, r.played].filter(Boolean).join(" · ");
+  if (r.mark) { const m = el("span", "mark-dot"); m.title = r.mark; name.append(m); }
+  // a plan always follows the Workshop (its tag says so); a pack says how it is locked
+  const meta = [manyEnvs ? r.env : "", r.facts, r.kind === "pack" ? r.mode : "", r.played].filter(Boolean).join(" · ");
   l.append(name, el("div", "sub", meta));
   d.append(l);
 
+  const st = el("div", "st");
+  st.append(stateChip(r));
+  d.append(st);
+
   const right = el("div", "r");
-  right.append(stateChip(r));
-  if (r.kind === "plan") right.append(button(T("edit"), "", () => ui.go(r.page)));
-  else right.append(button(T("details"), "", () => ui.go("pack:" + r.name)));
+  if (r.kind === "plan") right.append(button(T("edit"), "", () => ui.go(r.page), "ghost"));
+  else right.append(button(T("details"), "", () => ui.go("pack:" + r.name), "ghost"));
   if (!r.light) {
-    const b = button(T("launch the game"), "", () => launch(r), "primary launch");
+    const b = button(T("launch the game"), "", () => launch(r), "launch " + (lead ? "primary" : "soft"));
     const i = el("span", "ic");
     i.innerHTML = icon.play;
     b.prepend(i);
@@ -113,27 +128,29 @@ async function launch(r) {
   try { say("ok", await api.PackLaunch(r.name)); } catch (e) { say("fail", errText(e)); }
 }
 
+// lastRun: what the last run left — its errors first, which list and when under it.
 function lastRun() {
   if (S.live && S.live.running) {
-    return actCard(T("last run"), S.live.pack ? Tf("pack %s", S.live.pack) + " · " + T("the game is running") : T("the game is running"),
-      S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"), T("see this run →"), () => ui.go("needs"));
+    return actCard(T("last run"), S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"),
+      S.live.pack ? Tf("pack %s", S.live.pack) + " · " + T("the game is running") : T("the game is running"), T("see this run →"), () => ui.go("needs"));
   }
-  if (!data.lastRun) return actCard(T("last run"), T("no run read yet"), T("launch once and its errors show here"), T("open the game log →"), () => ui.go("log"));
-  return actCard(T("last run"), data.lastRun, data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : T("no errors"),
+  if (!data.lastRun) return actCard(T("last run"), T("no run read yet"), "", T("open the game log →"), () => ui.go("log"));
+  return actCard(T("last run"), data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : T("no errors"), data.lastRun,
     data.lastRunErrors ? T("see which →") : T("open the game log →"), () => ui.go(data.lastRunErrors ? "needs" : "log"));
 }
 
+// changes: what the last scan found, then when it ran.
 function changes() {
-  if (!data.scanWhen) return actCard(T("mod library · since the last scan"), T("no scan yet (R scans)"), "", T("scan now →"), () => ui.cmd("rescan"));
-  return actCard(T("mod library · since the last scan"), Tf("scanned %s", data.scanWhen), data.changes || T("nothing changed"), T("see what changed →"), () => ui.go("changes"));
+  if (!data.scanWhen) return actCard(T("since the last scan"), T("no scan yet (R scans)"), "", T("scan now →"), () => ui.cmd("rescan"));
+  return actCard(T("since the last scan"), data.changes || T("nothing changed"), Tf("scanned %s", data.scanWhen), T("see what changed →"), () => ui.go("changes"));
 }
 
-// actCard: a heading, a muted line, a line, and a "… →" link (the whole card opens it).
-function actCard(title, first, second, link, go) {
+// actCard: a small title, the news, a muted line, and a "… →" link (the whole card opens it).
+function actCard(title, main, sub, link, go) {
   const d = el(go ? "button" : "div", "act-card");
   d.append(el("span", "t", title));
-  if (first) d.append(el("span", "a", first));
-  if (second) d.append(el("span", "b", second));
+  if (main) d.append(el("span", "a", main));
+  if (sub) d.append(el("span", "b", sub));
   if (link) d.append(el("span", "go", link));
   if (go) d.onclick = go;
   return d;

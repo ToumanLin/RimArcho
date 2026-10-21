@@ -513,46 +513,59 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 @media (max-width: 900px) { #board { grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 0 0 8px var(--c3, 1.2fr); } #board [data-area="2"], #board [data-split="1"] { display: none; } }
 @media (max-width: 680px) { #board { grid-template-columns: 1fr 8px 1.2fr 0 0 0 0; } #board .detail, #board [data-split="2"] { display: none; } }
 
-/* ---- 首页 (06 §2.3) ---- */
-.home-row { display: flex; gap: 14px; align-items: center; min-height: 62px; padding: 10px 16px; }
+/* ---- 首页 (06 §2.3) ----
+   One card whose rows share one grid (subgrid): the name column, the state column and the
+   actions line up from row to row. Spacing is on the 4/8px grid: rows 64px with 16px sides,
+   24px between the columns and between the sections. */
+.page.home { gap: 24px; padding-top: 4px; }
+.page.home .sec { margin-top: 0; }
+.home-list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 24px; }
+.home-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: 64px; padding: 12px 16px; }
 .home-row + .home-row { border-top: 1px solid var(--line-2); }
-.home-row .envtag { flex: none; width: 92px; height: 22px; line-height: 22px; text-align: center; border-radius: 6px; background: var(--pill); color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
-.home-row .l { flex: 1; min-width: 0; }
-.home-row .name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.home-row .l { min-width: 0; }
+.home-row .name { display: flex; align-items: center; gap: 8px; min-width: 0; height: 20px; }
 .home-row .name .n { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.home-row .chip { margin: 0; flex: none; }
-.home-row .kind { flex: none; font-size: 11px; line-height: 18px; padding: 0 6px; border-radius: 5px; color: var(--muted); background: var(--pill); }
-.home-row .kind.pack { color: var(--green); background: var(--green-soft); }
-.home-row .sub { margin-top: 3px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.home-row .r { flex: none; display: flex; gap: 14px; align-items: center; }
-.home-row .state { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
+/* the kind is a quiet outline tag; what a plan or a pack is lives in its tooltip */
+.home-row .kind { flex: none; font-size: 11px; line-height: 16px; padding: 0 5px; border-radius: 4px; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.home-row .mark-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.home-row .sub { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-row .st { justify-self: start; display: flex; }
+/* one state per row: a tinted chip only when something is wrong */
+.home-row .state { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
 .home-row .state .ic { display: inline-flex; }
 .home-row .state .ic svg.i { width: 13px; height: 13px; }
 .home-row .state.bad { color: var(--amber); background: var(--amber-soft); }
-.home-row .state.ok { color: var(--green); background: var(--green-soft); }
-.home-row .state.unknown { color: var(--muted); padding: 0 2px; }
+.home-row .state.ok { color: var(--green); padding: 0; }
+.home-row .state.unknown { color: var(--faint); padding: 0; }
 button.state.bad:hover { filter: brightness(1.12); }
-.home-row .btn { height: 30px; padding: 0 12px; border-radius: 8px; font-size: 13px; }
-.home-row .btn:not(.primary) { background: transparent; color: var(--fg); box-shadow: none; }
-.home-row .btn.launch { padding: 0 14px; font-weight: 600; }
+.home-row .r { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.home-row .btn { height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; }
+/* 编辑 / 详情 are quiet: no border, muted until hovered */
+.home-row .btn.ghost { border-color: transparent; background: none; box-shadow: none; color: var(--muted); }
+.home-row .btn.ghost:hover { background: var(--pill); color: var(--fg); }
+.home-row .btn.launch { padding: 0 14px; font-weight: 600; border-color: transparent; box-shadow: none; transition: background var(--t-press), color var(--t-press); }
 .home-row .btn.launch .ic { margin-right: 7px; }
+.home-row .btn.launch.soft { background: var(--accent-soft); color: var(--accent); }
+.home-row:hover .btn.launch.soft, .home-row .btn.launch.soft:focus-visible { background: var(--accent); color: var(--accent-fg); }
 .home-row .launch-wrap { display: inline-flex; }
 svg.i.fill { fill: currentColor; }
-.act-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
-.act-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; transition: border-color var(--t-press); }
+/* the activity: cards on the same edges as the list above, as tall as each other */
+.act-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.act-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; transition: border-color var(--t-press); }
 button.act-card:hover { border-color: var(--muted); }
 .act-card > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.act-card .t { font-weight: 600; }
-.act-card .a { color: var(--muted); }
-.act-card .go { color: var(--accent); }
+.act-card .t { font-size: 12px; color: var(--muted); }
+.act-card .a { font-size: 14px; font-weight: 600; color: var(--fg); }
+.act-card .b { font-size: 12px; color: var(--muted); }
+.act-card .go { margin-top: 4px; font-size: 12px; color: var(--accent); }
 .act-card.hl { background: var(--accent-soft); border-color: transparent; }
 .act-card.hl .t { color: var(--accent); }
 .packs .pack.hl { background: var(--accent-soft); }
+.card.empty-state { padding: 32px 16px; }
 @media (max-width: 760px) {
-  .home-row { flex-wrap: wrap; row-gap: 8px; }
-  .home-row .envtag { width: auto; }
-  .home-row .l { flex-basis: calc(100% - 120px); }
-  .home-row .r { width: 100%; justify-content: flex-end; }
+  .home-list { display: block; }
+  .home-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "l l" "st r"; row-gap: 8px; column-gap: 16px; }
+  .home-row .l { grid-area: l; } .home-row .st { grid-area: st; } .home-row .r { grid-area: r; }
   .act-cards { grid-template-columns: 1fr; }
 }
 
