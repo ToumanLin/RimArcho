@@ -1,0 +1,105 @@
+Spike corpuslabel — labelling the real cause of log error clusters (design §6.4, §6.5, R1, R2)
+Run: 2026-10-21, local machine. Only aggregates here. Sample, packets, labels and per-item scores
+stay next to the corpus (corpus-kb\labels\pilot1\, not in any repository).
+
+== What it is
+
+  sample    stratified clusters from corpusrun results (logs >= 80% library coverage; classes
+            other and mod-report excluded; per class the 2 templates found in most logs; 2
+            clusters per template; at most 1 cluster per log)
+  cooc      per sampled cluster key: mods over-represented in the corpus logs with the same key
+            (>= 20 logs, >= 50% of them, >= 2x the other logs)
+  packets   loads each log's list into a research environment, re-runs RimArcho's attribution,
+            writes <item>.txt (what the labeller reads, 1.5-7.5 KB, mean 3.7 KB) and <item>.json
+            (adds RimArcho's verdict, the log's packageIds)
+  validate  label schema check (fixed enums; gist, key and packageIds must exist; quotes
+            verbatim from the packet)
+  score     labeller vs reviewer, then RimArcho vs the reviewed labels, by class
+  exec      reviewer lookups: load one log's list and run any archo command
+
+Packet facts come from the same cmds commands as the MCP tools (def, harmony --target,
+patches --failed, files search) plus stack type owners, Harmony owners, folder owners, a byte
+search of the list's DLLs for a missing assembly name, About.xml (dependencies missing from the
+list, declared rules broken) and corpus co-occurrence. The labeller does not see RimArcho's
+attribution (anchoring would inflate agreement).
+
+Why not let the labeller call the MCP tools itself: the research environment holds one log's
+mod list at a time, so parallel labellers cannot share it; packets are reproducible, bounded,
+cheap and reviewable. An agent diagnosing through MCP is the §6.5 evaluation, scored against
+these labels.
+
+== Found on the way
+
+parsed.jsonl drops mod entries written with [v:…] or [ov:…] (spikes/hugslogs accepts only
+[mv:…]): ~78k of ~244k entries in the raw corpus, 7,082 of 7,091 logs. All corpusrun Loadouts
+(results-v3, G1/G2 numbers) miss these mods, e.g. Combat Extended. This spike reads the list from
+the raw upload. In this sample the bug cost RimArcho 2 of its 13 correct sources (both CE patch
+failures): results-v3 finds 11.
+
+== Pilot: 32 clusters, 8 classes x 4
+
+Labeller claude-haiku, 8 parallel subagents x 4 items, three rounds; reviewer claude-opus-5-5
+labelled all 32 independently with the raw log, exec lookups and co-occurrence. Every label of
+every round passed validate (96/96).
+
+Labeller vs reviewer (same source mods, or both none):
+
+  round  packet / prompt                                      disagree   labeller says cause
+  p1     facts, file search, DLL refs                          43.8%      11 of 32
+  p2     + corpus co-occurrence, prompt on how to weigh it     31.2%      15
+  p3     + lines after the message, exact ">name<" search,     21.9%      20
+         Workshop id -> Steam title; prompt: a mod frame
+         calling the throwing game method is the lead
+  reviewer                                                                25
+
+  p3, other fields: cause/no cause 78%, stage 75%, cause type 34%, fix kind 19%.
+
+What the labeller gets wrong (p3, 7 items):
+  - Says "unknown" where one clear hint exists (P02 Prepatcher fork not in the co-occurrence
+    list; P10 the same shader warning it attributed in p2: run-to-run variance).
+  - Over-applies a new rule: after p3's "calling mod frame" rule it blamed Replace Stuff for an
+    NRE inside vanilla GenSpawn.Spawn (P05).
+  - Cannot see a cause that sits in other clusters of the same log (P07: Gloomy Furniture Fix
+    ships defs whose classes live in the inactive GloomyFurniture; the NRE comes later).
+  - Has no file evidence when the player's mod is not in the research library (P28, an older
+    Ratkin package).
+  - P19/P20 (stale save references held by VEF's RaidGroup) are debatable; the reviewer named VEF
+    with low confidence. Without them: 5 of 30.
+  - Fix kind and cause type are inconsistent between labeller and reviewer: the enums are too
+    loose ("update" the mod vs the game, "other").
+  Never: a validation failure, a mod outside the list, a fabricated quote, a Ludeon package as
+  source.
+
+RimArcho vs the reviewed labels (= first accuracy estimate; attribution re-run on raw lists):
+
+  class            n  reviewer   hit  wrong  silent  overclaim  both    agree  precision  recall
+                      names src                                 none
+  exception        4      4       2     0      2        0        0     50%     100%      2/4
+  harmony-stack    4      3       1     0      2        0        1     50%     100%      1/3
+  material         4      2       0     0      2        0        2     50%      -        0/2
+  patch-failed     4      4       4     0      0        0        0    100%     100%      4/4
+  save-load        4      2       0     0      2        0        2     50%      -        0/2
+  texture-missing  4      2       2     0      0        0        2    100%     100%      2/2
+  xml-load         4      4       0     0      4        0        0      0%      -        0/4
+  xref-missing     4      4       4     0      0        0        0    100%     100%      4/4
+  all             32     25      13     0     12        0        7    62.5%    100%     13/25
+
+  agree = hit or both name none. RimArcho never named a wrong source and never named one where
+  the reviewer found none; its gap is silence (recall 52%). The coverage figure of 21.2% is
+  therefore mostly correct attributions, not guesses.
+
+Where RimArcho is silent but the cause is findable (rules for G1):
+  - xml-load "Exception loading UnityEngine.Texture2D from file." (2): the next line
+    "absFilePath: …\294100\<id>\…" is not attached to the entry, so folder attribution never
+    sees it.
+  - xml-load "XML error: <field> doesn't correspond to any field" (2): search the literal
+    "<field>value</field>" in the list's files.
+  - material shader warnings, Prepatcher's ReflectionOnly assembly error (4): no mod in the text;
+    corpus co-occurrence names them (100% vs 3%; 98% vs 11%).
+  - harmony-stack: Map Preview's own frames (MapPreview.*) were not resolved to the mod by type
+    owner (P06); a cause in an earlier cluster (P07).
+  - save-load "curParent=VEF.…" gives role "mentioned" only (P19/P20).
+
+Limits: 4 clusters per class; strata are frequent templates, not a random sample, so the
+per-class rates do not weight to the corpus. One reviewer; the reviewer saw RimArcho's verdict
+for a few items while checking packets (P19, P29). Mods are current Workshop versions.
