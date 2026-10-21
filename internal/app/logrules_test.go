@@ -31,6 +31,7 @@ Exception: System.ArgumentNullException: Value cannot be null.
 XML error: <oldField>7</oldField> doesn't correspond to any field in type ThingDef.
 Exception in a Lunar component: System.InvalidOperationException: boom
   at LogLoader.Loader.Load (System.String path) [0x00000] in <abc>:0
+  at LogRefs.Lookups.Icon () [0x00000] in <abc>:0
 `
 
 // logRulesFixture: mods whose files hold the names the log reports missing.
@@ -41,6 +42,7 @@ Exception in a Lunar component: System.InvalidOperationException: boom
 //	                       LogRefs.Holder, a ReflectionOnlyAssemblyResolve handler
 //	Luna    tester.luna    Lunar/Components/LogLoader.dll (a Lunar framework mod):
 //	                       Assembly.ReflectionOnlyLoadFrom, type LogLoader.Loader
+//	Luna2   tester.luna2   the same Lunar component DLL (a library two mods ship)
 //	Sounder tester.sounder a mod folder named by absFilePath
 //	Fielder tester.fielder XML with <oldField>7</oldField>
 //	Lister  tester.lister  XML that lists LogRefs_Missing and Gone_Thing
@@ -66,12 +68,13 @@ func logRulesFixture(t *testing.T) (*testkit.Env, *app.LogReport) {
 	mod("TexLib", "tester.texlib", map[string]string{"Textures/UI/Lib/Badge.png": "png"})
 	mod("Coder", "tester.coder", nil, "LogRefs.dll")
 	mod("Luna", "tester.luna", nil, "Lunar/Components/LogLoader.dll")
+	mod("Luna2", "tester.luna2", nil, "Lunar/Components/LogLoader.dll")
 	mod("Sounder", "tester.sounder", map[string]string{"Sounds/Bad.mp3": "mp3"})
 	mod("Fielder", "tester.fielder", map[string]string{"Defs/Old.xml": "<Defs>\n  <ThingDef>\n    <defName>Old_Thing</defName>\n    <oldField>7</oldField>\n  </ThingDef>\n</Defs>\n"})
 	mod("Lister", "tester.lister", map[string]string{"Defs/Lists.xml": "<Defs>\n  <ThingDef>\n    <defName>Lister_Thing</defName>\n    <comps>\n      <li>LogRefs_Missing</li>\n      <li>Gone_Thing</li>\n    </comps>\n  </ThingDef>\n</Defs>\n"})
 	mod("Selfer", "tester.selfer", map[string]string{"Defs/Self.xml": "<Defs>\n  <SoundDef>\n    <defName>Self_Sound</defName>\n  </SoundDef>\n  <ThingDef>\n    <defName>Self_Gun</defName>\n    <verbs>\n      <li>\n        <soundCast>Self_Sound</soundCast>\n      </li>\n    </verbs>\n  </ThingDef>\n</Defs>\n"})
 	mod("AsmLib", "tester.asmlib", map[string]string{"Assemblies/Extra.dll": "MZ"})
-	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.texer", "tester.coder", "tester.luna", "tester.lister", "tester.selfer", "tester.sounder", "tester.fielder")
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.texer", "tester.coder", "tester.luna", "tester.luna2", "tester.lister", "tester.selfer", "tester.sounder", "tester.fielder")
 	e.AddEnv(false)
 	e.MustRun("scan")
 	if _, err := e.App.EnsureAnalysis(nil); err != nil {
@@ -126,7 +129,7 @@ func TestLogRulesFromCorpus(t *testing.T) {
 		{"a mod that defines and uses the missing def", "Self_Sound",
 			map[string]string{"tester.selfer": "source"}, []string{"defines it itself (Defs/Self.xml:2)", "update the mod"}},
 		{"game assembly: the reflection-only resolver", "UnityEngine.InputLegacyModule",
-			map[string]string{"tester.coder": "source", "tester.luna": "mentioned"}, []string{"ships with the game", "AppDomain.ReflectionOnlyAssemblyResolve", "LogLoader.dll"}},
+			map[string]string{"tester.coder": "source", "tester.luna": "mentioned", "tester.luna2": "mentioned"}, []string{"ships with the game", "AppDomain.ReflectionOnlyAssemblyResolve", "LogLoader.dll"}},
 		{"mod assembly shipped by a disabled mod", "assembly 'Extra",
 			map[string]string{"tester.asmlib": "dependency"}, []string{"ships Assemblies/Extra.dll but is not enabled"}},
 		{"save reference held by a mod's type", "curParent=LogRefs.Holder",
@@ -143,8 +146,9 @@ func TestLogRulesFromCorpus(t *testing.T) {
 			map[string]string{"tester.sounder": "source"}, []string{"log file Sounds/Bad.mp3 (by mod folder; the file the game failed to load)"}},
 		{"an XML field error matched by element and value", "<oldField>",
 			map[string]string{"tester.fielder": "source"}, []string{"has <oldField>7</oldField> at Defs/Old.xml:4"}},
-		{"a frame in a Lunar component DLL", "Exception in a Lunar component",
-			map[string]string{"tester.luna": "source"}, []string{"log frame 1 LogLoader.Loader.Load"}},
+		{"a frame in a library several mods ship (Lunar components) is not the topmost mod frame", "Exception in a Lunar component",
+			map[string]string{"tester.coder": "source", "tester.luna": "mentioned", "tester.luna2": "mentioned"},
+			[]string{"log frame 1 LogLoader.Loader.Load (library logloader.dll, shipped by 2 enabled mods)", "log frame 2 LogRefs.Lookups.Icon (topmost mod code in the stack)"}},
 	} {
 		roles, text := ruleCluster(t, e, rep, c.sub)
 		if len(roles) != len(c.want) {

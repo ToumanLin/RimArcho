@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -291,7 +292,8 @@ type attrCtx struct {
 	run      *store.Analysis
 	fails    map[string]*analyze.PatchFact // FailKey(game path, desc) → fact
 	byXPath  map[string][]*analyze.PatchFact
-	roMemo   map[string]roUse // reflectionOnly, once per log
+	roMemo   map[string]roUse  // reflectionOnly, once per log
+	libMemo  map[string]string // type → the one DLL file name its owners ship it in
 }
 
 type dirOwner struct {
@@ -300,7 +302,7 @@ type dirOwner struct {
 }
 
 func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure) error {
-	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}}
+	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, libMemo: map[string]string{}}
 	for _, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
 		if m == nil {
@@ -461,16 +463,39 @@ func (cx *attrCtx) types(t string) []string {
 		return r
 	}
 	var out []string
+	files := map[string]bool{}
 	if owners, err := cx.a.Store.TypeOwners(t); err == nil {
 		for _, o := range owners {
 			if cx.st.Position(o[0]) > 0 || cx.st.Ix.ByID[o[0]] != nil {
 				out = append(out, o[0])
+				files[strings.ToLower(path.Base(filepath.ToSlash(o[1])))] = true
 			}
 		}
 	}
 	out = uniqStr(out)
 	cx.typeMemo[t] = out
+	if len(files) == 1 {
+		for f := range files {
+			cx.libMemo[t] = f
+		}
+	}
 	return out
+}
+
+// library is the DLL file name when a type comes from a library that several enabled mods
+// ship under the same name (LunarFramework.dll in every Lunar mod): a frame in it does not
+// say which of them is at fault (log corpus).
+func (cx *attrCtx) library(t string) string {
+	n := 0
+	for _, id := range cx.types(t) {
+		if cx.st.Position(id) > 0 {
+			n++
+		}
+	}
+	if n < 2 {
+		return ""
+	}
+	return cx.libMemo[t]
 }
 
 func (cx *attrCtx) harmonyOwners(p logs.Patch) ([]string, string) {
@@ -759,6 +784,12 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			continue
 		}
 		ids := cx.types(fr.Type)
+		if lib := cx.library(fr.Type); lib != "" {
+			for _, id := range ids {
+				lc.add(id, RoleMentioned, fmt.Sprintf("log frame %d %s (library %s, shipped by %d enabled mods)", i+1, target, lib, len(ids)))
+			}
+			continue
+		}
 		for _, id := range ids {
 			if firstMod {
 				lc.add(id, RoleSource, fmt.Sprintf("log frame %d %s (topmost mod code in the stack)", i+1, target))
