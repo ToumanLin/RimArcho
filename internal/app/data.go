@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// Community data (04 §5.2, 10 §5): RimSort's sorting rules and Steam Workshop database and
+// Community data (04 §6.3): RimSort's sorting rules and Steam Workshop database and
 // the "Use This Instead" replacements. Downloaded only by archo data update; stored in
 // <home>/cache with a sidecar recording where and when each came from.
 
@@ -83,7 +83,7 @@ type DataUpdate struct {
 }
 
 // UpdateData downloads the datasets (only those named in keys, or all), validates every
-// one, and replaces the stored files only when all succeeded (10 §5 D2).
+// one, and replaces the stored files only when all succeeded (04 §6.3 D2).
 func (a *App) UpdateData(keys []string, dryRun bool) ([]*DataUpdate, error) {
 	want := func(k string) bool {
 		if len(keys) == 0 {

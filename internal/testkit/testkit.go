@@ -1,5 +1,5 @@
 // Package testkit builds synthetic RimWorld environments in a temporary directory for the
-// identity acceptance tests (02 §9) and the CLI golden tests. Everything it writes lives
+// identity acceptance tests (02 §8) and the CLI golden tests. Everything it writes lives
 // under t.TempDir(); it never touches a real game or workshop folder.
 package testkit
 

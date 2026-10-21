@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// Inspect (06 §6): a full-screen panel showing any reference with the same text as the CLI
+// Inspect (06 §4): a full-screen panel showing any reference with the same text as the CLI
 // command. enter follows the reference on the selected line, backspace goes back, and a
 // mod has sub-tabs (tab / shift+tab): summary, Defs, Patches, problems, rules, history.
 
@@ -104,7 +104,7 @@ func (m *model) inspectKey(s string) tea.Cmd {
 		}
 	case "esc", "q":
 		// The whole stack at once, so esc gets back to the list in a few presses
-		// (06 §13.10 T20); backspace goes back one page.
+		// (06 §11 T20); backspace goes back one page.
 		m.insp, m.inspHist = nil, nil
 	case "down", "j":
 		move(1)

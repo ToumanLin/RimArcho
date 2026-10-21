@@ -1,5 +1,5 @@
-// The pages over the board (the top bar's tabs): 需要处理 (06 §7), 日志 (the game log, mod
-// changes 06 §4.1, the manager's actions 08 §14), the full detail (§6.3), packs and
+// The pages over the board (the top bar's tabs): 需要处理 (06 §5), 日志 (the game log, mod
+// changes 06 §2.9, the manager's actions 06 §2.5), the full detail (§6.3), packs and
 // settings. esc returns to the mod list; the tab shows where you are.
 import { S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
 import { icon } from "./icons.js";
@@ -143,7 +143,7 @@ function drawNeeds() {
     N.cols[ci].forEach((it, i) => {
       if (it.group !== g && c.groups.length > 1) {
         g = it.group;
-        // which run the log is from: the list, or a pack (10 §8.3)
+        // which run the log is from: the list, or a pack (08 §5.3)
         let t = T(GROUPS[g]);
         if (g === 3 && d.lastRun) t += " · " + d.lastRun;
         if (g === 6 && S.live && S.live.pack) t += " · " + Tf("pack %s", S.live.pack);
@@ -212,7 +212,7 @@ async function runAction(it, act) {
       return pop.choose(act.title, act.options.map((o) => o.label), (i) => doAction(act, i));
   }
   if (act.confirm) {
-    // Not undone with u: ask first (06 §9, 08 §8).
+    // Not undone with u: ask first (06 §6).
     return pop.confirm(act.label, [act.warn || act.label], act.label, () => doAction(act, 0));
   }
   return doAction(act, 0);
@@ -516,7 +516,7 @@ export function logsKey(e) {
   }
 }
 
-// ---- the full detail (06 §6.3): ←→ the previous / next mod, tab the sub-sections ----
+// ---- the full detail (06 §4.2): ←→ the previous / next mod, tab the sub-sections ----
 const F = { tab: 0, secs: null, id: "" };
 
 export async function full() {
@@ -577,7 +577,7 @@ export function fullSection() {
   return F.secs[F.tab - 1].title;
 }
 
-// ---- settings (10 §7) ----
+// ---- settings (06 §2.14) ----
 // Every row is a value and the command that changes it (view.SettingsPage); the page runs
 // only those commands (API.ApplySetting).
 
@@ -683,7 +683,7 @@ export async function environment() {
   sc.scrollTop = top;
 }
 
-// ---- packs (10 §8) ----
+// ---- packs (08 §5) ----
 // The packs like versions in a game launcher: play one, or build one from the current list.
 // A build runs in the background (an `archo pack build` child): the page shows its steps
 // and progress from the "pack" events, and a build another window started, or one cut

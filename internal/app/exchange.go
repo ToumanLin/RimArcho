@@ -18,7 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// Loadout exchange (05 §3): a text list of packageIds, a ModsConfig.xml, or the mod list
+// Loadout exchange (05 §4.2): a text list of packageIds, a ModsConfig.xml, or the mod list
 // stored in a save file's <meta>.
 
 // Export formats.
@@ -110,11 +110,11 @@ type ImportedList struct {
 	// entries known only by workshop ID (resolved against installed mods on import).
 	Workshop     map[string]string
 	WorkshopOnly []string
-	// Unresolved are WorkshopOnly IDs no installed mod has (import notes them, 10 §4).
+	// Unresolved are WorkshopOnly IDs no installed mod has (import notes them, 04 §9).
 	Unresolved []string
 }
 
-// ReadLoadoutFile reads a list file in any supported format (10 §4), or a RimCrow share
+// ReadLoadoutFile reads a list file in any supported format (04 §9), or a RimCrow share
 // code given instead of a path.
 func ReadLoadoutFile(path string) (*ImportedList, error) {
 	if _, err := os.Stat(path); err != nil && shareCodeRe.MatchString(strings.TrimSpace(path)) {

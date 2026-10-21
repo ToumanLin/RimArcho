@@ -1,4 +1,4 @@
-// Package textenc normalises the encodings mod XML files come in (10 §1).
+// Package textenc normalises the encodings mod XML files come in (02 §4.3).
 package textenc
 
 import (

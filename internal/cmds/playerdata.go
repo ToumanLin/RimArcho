@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Player data on lineages (04 §7.1, 05 §3): every instance of a lineage shares it.
+// Player data on lineages (04 §8.1, 05 §4.2): every instance of a lineage shares it.
 
 func init() {
 	register(&Command{Name: "alias", Args: "<ref> [<name>]", Summary: "set the name RimArcho shows for a mod (all its copies)", MinArgs: 1, MaxArgs: 2, Run: aliasCmd,

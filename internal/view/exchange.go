@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 )
 
-// Exchange with other mod managers (10 §4): a list read from a file, pasted text (any
+// Exchange with other mod managers (04 §9): a list read from a file, pasted text (any
 // list, a share code, a Rentry link) or a Steam Workshop collection is previewed first —
 // what is installed, what is missing and where to get it, what the enabled list would
 // become — and then put into the workspace as one undoable step. Nothing writes

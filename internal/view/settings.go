@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// The settings page (10 §7): every item is a value and the command that changes it, so the
+// The settings page (06 §2.14): every item is a value and the command that changes it, so the
 // interfaces only show and run commands; nothing here has logic of its own.
 
 // SettingItem is one row of the settings page.
@@ -45,7 +45,7 @@ type EnvRow struct {
 }
 
 // EnvPage is the environment page: the environments, and the current one's folders and
-// launch (what belongs to an environment rather than to RimArcho, 10 §7).
+// launch (what belongs to an environment rather than to RimArcho, 06 §2.14).
 type EnvPage struct {
 	Envs   []EnvRow       `json:"envs"`
 	Groups []SettingGroup `json:"groups"`

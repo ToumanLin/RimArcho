@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Kinds of hidden mods (10 §2.1): folders another manager hid by renaming About.xml.
+// Kinds of hidden mods (08 §6): folders another manager hid by renaming About.xml.
 const (
 	HiddenPinned  = "pinned"  // a loadable copy of the same lineage is what the game uses
 	HiddenResidue = "residue" // an unsubscribed workshop folder
@@ -78,7 +78,7 @@ func (st *LoadoutState) pinCopy(m *store.Mod) *store.Mod {
 	return best
 }
 
-// FileOp is a change RimArcho makes to a mod folder at the player's request (10 §2.2).
+// FileOp is a change RimArcho makes to a mod folder at the player's request (08 §6).
 type FileOp struct {
 	Op     string // "rename", "trash"
 	Path   string
@@ -108,7 +108,7 @@ func aboutDisabledPath(m *store.Mod) (string, error) {
 }
 
 // Unhide renames About.xml.disabled back to About.xml so the game sees the folder again
-// (10 §2.2), then rescans.
+// (08 §6), then rescans.
 func (a *App) Unhide(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -144,7 +144,7 @@ func (a *App) unhide(st *LoadoutState, m *store.Mod, dryRun bool) (*FileOp, erro
 }
 
 // Unpin restores the hidden workshop copy of a pinned mod and switches the workspace to
-// it; the pinning copy stays where it is (10 §2.2). ref may name either copy.
+// it; the pinning copy stays where it is (08 §6). ref may name either copy.
 func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -176,7 +176,7 @@ func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 var ErrNotTrashable = errors.New("not trashable")
 
 // Trash moves a hidden or unsubscribed workshop (or SteamCMD) folder to the recycle bin
-// (10 §2.2, §2.4), then rescans.
+// (08 §6, §2.4), then rescans.
 func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
 	if err != nil {

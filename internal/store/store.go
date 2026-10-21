@@ -1,5 +1,5 @@
-// Package store is RimArcho's SQLite fact store (02 §8), using modernc.org/sqlite in WAL mode
-// with synchronous=NORMAL (07 §6.1 item 4).
+// Package store is RimArcho's SQLite fact store (02 §7), using modernc.org/sqlite in WAL mode
+// with synchronous=NORMAL (07 §7 item 4).
 package store
 
 import (
@@ -152,7 +152,7 @@ CREATE TABLE source_cache(
   error TEXT NOT NULL DEFAULT '', decompiled_at INTEGER NOT NULL, PRIMARY KEY(dll_hash, instance_id));
 `
 
-// schemaV7 (M5): player data on lineages (04 §7.1): alias, note, tags.
+// schemaV7 (M5): player data on lineages (04 §8.1): alias, note, tags.
 const schemaV7 = `
 CREATE TABLE lineage_data(
   environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, alias TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
@@ -163,7 +163,7 @@ CREATE TABLE lineage_tag(
 `
 
 // schemaV8 (M5): analysis runs and the per-instance facts are kept per game major.minor,
-// so an analysis for the log's version does not evict the environment's (decisions-m5).
+// so an analysis for the log's version does not evict the environment's (03 §3).
 // The facts are a cache: they are dropped and rebuilt on the next analysis.
 const schemaV8 = `
 DROP TABLE content_state;

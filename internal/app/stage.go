@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 )
 
-// Staging (06 §5.4): one list per environment, kept by RimArcho and never written to the
+// Staging (06 §2.5): one list per environment, kept by RimArcho and never written to the
 // game. A mod staged from the Loadout remembers where it was, so it can be put back:
 // its 1-based position then and the instance just before it (the anchor).
 //

@@ -58,18 +58,18 @@ type App struct {
 	Decompile Decompiler
 	// GameVersion ("X.Y") overrides the environment's game version for analysis commands.
 	GameVersion string
-	// AnalyzeWait bounds how long a command waits for an out-of-date analysis (05 §4.1:
+	// AnalyzeWait bounds how long a command waits for an out-of-date analysis (05 §5.1:
 	// MCP returns the finished part after 10 s and the analysis continues in the
 	// background). 0 waits until it is done (CLI).
 	AnalyzeWait time.Duration
 	// LazyLog keeps the newest Player.log out of Problems until the player opens the
-	// Problems view (the TUI; decisions-m4 §7.2: parse lazily to keep idle memory down).
+	// Problems view (the TUI; 03 §6.4: parse lazily to keep idle memory down).
 	// An explicitly selected log is always included.
 	LazyLog bool
 	// LogCacheOnly makes Problems use a stored log report only, never parse the log
 	// (status and mod: commands that are not about the log).
 	LogCacheOnly bool
-	// HTTP and SteamAPI reach the Steam Workshop for descriptions (06 §6.4); nil and ""
+	// HTTP and SteamAPI reach the Steam Workshop for descriptions (06 §4.3); nil and ""
 	// mean a 15-second client and the public endpoint. Tests replace both.
 	// GameProbe finds the running game of a game folder; nil means the process table
 	// (tests replace it).
@@ -78,11 +78,11 @@ type App struct {
 	TrashFunc func(path string) error
 	HTTP      *http.Client
 	SteamAPI  string
-	// SteamCollectionAPI reads Workshop collections (10 §4.3); "" is the public endpoint.
+	// SteamCollectionAPI reads Workshop collections (04 §9.5); "" is the public endpoint.
 	SteamCollectionAPI string
 	analyzing          *pendingAnalysis
 
-	dataIdx *dataIndex // community data indexes (10 §5), loaded on first use
+	dataIdx *dataIndex // community data indexes (04 §6.3), loaded on first use
 
 	ixCache *Index
 	ixKey   string

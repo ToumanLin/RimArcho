@@ -19,7 +19,7 @@ func slotW(t *testing.T, m *model, k colKind) int {
 	return 0
 }
 
-// T16 (06 §12.6): column widths and name wrapping survive a restart; the detail column
+// T16 (06 §11): column widths and name wrapping survive a restart; the detail column
 // keeps at least 40 cells; = resets the widths.
 func TestT16WidthsPersist(t *testing.T) {
 	e, _ := fixture(t)
@@ -74,7 +74,7 @@ func TestT16WidthsPersist(t *testing.T) {
 	}
 }
 
-// Dragging the gap right of a column sets its width (06 §12.1).
+// Dragging the gap right of a column sets its width (06 §2.5).
 func TestResizeDrag(t *testing.T) {
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 30)

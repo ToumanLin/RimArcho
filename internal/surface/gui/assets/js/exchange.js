@@ -1,4 +1,4 @@
-// Import and export of the mod list (10 §4): to and from RimSort, RimCrow, RimWorld's
+// Import and export of the mod list (04 §9): to and from RimSort, RimCrow, RimWorld's
 // own .rml, share codes, Rentry and Workshop collections. An import is previewed first —
 // what is installed, what is missing and where to get it, what the enabled list becomes —
 // and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).

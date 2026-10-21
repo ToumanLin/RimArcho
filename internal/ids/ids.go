@@ -1,6 +1,6 @@
 // Package ids mints RimArcho's internal identifiers and renders their short references.
 //
-// IDs are 128-bit random values written as lower-case base32 without padding (02 §7).
+// IDs are 128-bit random values written as lower-case base32 without padding (05 §2).
 package ids
 
 import (

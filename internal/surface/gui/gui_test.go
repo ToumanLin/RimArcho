@@ -12,7 +12,7 @@ import (
 
 var textRe = regexp.MustCompile(`\bTf?\("((?:[^"\\]|\\.)*)"`)
 
-// Every string the page translates has a Chinese entry (06 §2.3; the page has no table of
+// Every string the page translates has a Chinese entry (06 §7; the page has no table of
 // its own: it gets view.Table).
 func TestPageTextTranslated(t *testing.T) {
 	view.SetLang("zh")

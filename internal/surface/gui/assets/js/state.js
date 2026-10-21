@@ -8,16 +8,16 @@ export const S = {
   start: null,  // Init(): language, text, commands
   board: null,  // Board(): the columns and the counts
   cols: [0, 1, 2].map(() => ({ items: [], view: [], cursor: 0, sel: new Set(), query: "", searching: false, others: null })),
-  focus: 1,     // 0–2 the lists, 3 the detail (06 §13.3)
+  focus: 1,     // 0–2 the lists, 3 the detail (06 §3.2)
   anchor: -1,   // where shift+arrows started
   detail: null, // the shown Detail
-  placed: null, // the mods space just placed: "m changes it" (06 §13.6)
-  popup: null,  // the open popup (06 §13.2 rule 5)
+  placed: null, // the mods space just placed: "m changes it" (06 §3.5)
+  popup: null,  // the open popup (06 §3.1 rule 5)
   screen: null, // "needs" | "changes" | "full"
   busy: {},     // scan, analyze
   packBuild: null, // the last "pack" event of the build this window runs
-  live: null,   // Live(): the running game and its errors (10 §3.4)
-  history: null, // History(): unsaved steps and versions (08 §14)
+  live: null,   // Live(): the running game and its errors (06 §2.1)
+  history: null, // History(): unsaved steps and versions (06 §2.5)
 };
 
 export const $ = (sel, root = document) => root.querySelector(sel);
@@ -39,7 +39,7 @@ export function errText(e) {
   return m.replace(/^error: /, "");
 }
 
-// ---- the status line (06 §9): one sentence, cleared by the next key ----
+// ---- the status line (06 §6): one sentence, cleared by the next key ----
 let undoLink = false;
 export function say(kind, text, undo = false) {
   const s = $("#status");
@@ -64,7 +64,7 @@ export function cur(k = S.focus) {
   return c.items[c.view[c.cursor]];
 }
 
-// selection: the selected rows of the focused list, else the cursor's row (06 §13.6).
+// selection: the selected rows of the focused list, else the cursor's row (06 §3.5).
 export function selection() {
   if (S.focus > 2) return [];
   const c = col();

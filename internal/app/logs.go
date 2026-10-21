@@ -61,7 +61,7 @@ type LogReport struct {
 	Lines   int
 	Version string
 	// AnalysedAs is the major.minor the log was attributed against when it differs from
-	// the environment's (EnvMM): the log's own version (decisions-m4 §7.3).
+	// the environment's (EnvMM): the log's own version (03 §6.4).
 	AnalysedAs, EnvMM string
 	Clusters          []*LogCluster
 }
@@ -226,7 +226,7 @@ func (a *App) AnalyzeLogText(text string) (*LogReport, error) {
 func LogMM(version string) string { return env.MajorMinor(version) }
 
 // logState switches attribution to the log's own game version when it differs from the
-// environment's and no --game-version was given (decisions-m4 §7.3). restore undoes it.
+// environment's and no --game-version was given (03 §6.4). restore undoes it.
 func (a *App) logState(st *LoadoutState, rep *LogReport) (*LoadoutState, func(), error) {
 	mm := LogMM(rep.Version)
 	if a.GameVersion != "" || mm == "" || mm == st.GameMM() {
@@ -360,7 +360,7 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		cx.xrefReferrers(xrefs)
 	}
 	for _, lc := range rep.Clusters {
-		// Source searches cover the cluster's candidates, not every enabled mod (decisions-m4 §7.4).
+		// Source searches cover the cluster's candidates, not every enabled mod (03 §5.4).
 		in := ""
 		for i, at := range lc.Attr {
 			if i == 4 {
@@ -383,7 +383,7 @@ const inPlaceholder = "<in>"
 
 // ImplicatedMods are the mods the newest log and the current problems point at: the
 // candidates of the problem log's error clusters, else the subjects of Harmony warnings.
-// MCP source searches default to them (decisions-m4 §7.4).
+// MCP source searches default to them (03 §5.4).
 func (a *App) ImplicatedMods(st *LoadoutState) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -1048,7 +1048,7 @@ func uniqStr(l []string) []string {
 	return out
 }
 
-// SelectedLog is the log whose clusters `problems` includes ("" if none) (06 §4).
+// SelectedLog is the log whose clusters `problems` includes ("" if none) (06 §2).
 func (a *App) SelectedLog(st *LoadoutState) string {
 	return a.Store.Meta("log.selected:" + st.Ix.Env.ID)
 }
@@ -1065,7 +1065,7 @@ func (a *App) SelectLog(st *LoadoutState, path string) error {
 }
 
 // NewLog reports whether the current Player.log is newer than the last launch and the
-// last log the player looked at (06 §7.3).
+// last log the player looked at (06 §5).
 func (a *App) NewLog(st *LoadoutState) (string, bool) {
 	cur, _ := a.LogPaths(st)
 	if cur == "" {
@@ -1086,7 +1086,7 @@ func (a *App) NewLog(st *LoadoutState) (string, bool) {
 	return cur, true
 }
 
-// ProblemLog is the log whose clusters join the problems (decisions-m4 §7.2): the
+// ProblemLog is the log whose clusters join the problems (03 §6.4): the
 // selected one, or the current Player.log when that is newer.
 func (a *App) ProblemLog(st *LoadoutState) string {
 	sel := a.SelectedLog(st)
@@ -1206,7 +1206,7 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 }
 
 // escalateSkips raises harmony.skip-prefix to warning when its method is in a log cluster
-// (decisions-m4 §7.1): a bool prefix is ordinary until a stack trace passes through it.
+// (03 §4.5): a bool prefix is ordinary until a stack trace passes through it.
 func escalateSkips(fs []*finding.Finding, hot map[string]hotMethod) []*finding.Finding {
 	if len(hot) == 0 {
 		return fs

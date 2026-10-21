@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// 06 §1.1: only a bare `archo` may start the WezTerm host.
+// 06 §9.2: only a bare `archo` may start the WezTerm host.
 func TestWantsHost(t *testing.T) {
 	for _, c := range []struct {
 		argv []string

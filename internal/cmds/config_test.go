@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// Settings with free values (06 §12.3, §12.4): a default, a check, and set/get.
+// Settings with free values (06 §3.8, §12.4): a default, a check, and set/get.
 func TestFreeSettings(t *testing.T) {
 	e := testkit.New(t)
 	if v := cmds.Setting(e.App, "tags.pinned"); !strings.HasPrefix(v, "框架,美化,") {

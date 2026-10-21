@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Staging (06 §5.4): a per-environment list RimArcho keeps and never writes to the game.
+// Staging (06 §2.5): a per-environment list RimArcho keeps and never writes to the game.
 
 func init() {
 	register(&Command{Name: "stage list", Summary: "staged mods, with the place each one came from", MaxArgs: 0, Run: stageList})

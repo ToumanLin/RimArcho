@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// 06 §12.4: one new image per frame; the others follow without a new frame.
+// 06 §9.4: one new image per frame; the others follow without a new frame.
 func TestImgWriterOneNewPerFrame(t *testing.T) {
 	var buf bytes.Buffer
 	w := &imgWriter{Writer: &buf}
@@ -52,7 +52,7 @@ func TestImgWriterOneNewPerFrame(t *testing.T) {
 	}
 }
 
-// 06 §12.4: the thumbnails of ±10 rows around the cursor are made ahead; the cache keeps
+// 06 §9.4: the thumbnails of ±10 rows around the cursor are made ahead; the cache keeps
 // the 64 most recently used images.
 func TestPrefetchAndLRU(t *testing.T) {
 	e, _ := fixture(t)

@@ -25,7 +25,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Packs (10 §8, 09 §2): a plan compiled into a fixed product. Every mod is pinned to the
+// Packs (08 §5): a plan compiled into a fixed product. Every mod is pinned to the
 // instance and content it had, copied without the version folders this game does not load,
 // and played from its own data folder through links in Mods/, so the environment's list and
 // saves stay as they were.
@@ -133,7 +133,7 @@ var ErrNoSpace = errors.New("not enough free space for the pack")
 // SpaceMargin is kept free on the packs drive beyond the copy itself.
 const SpaceMargin = 256 << 20
 
-// BuildPack compiles the workspace into a pack (10 §8.2): nothing must be left to fix,
+// BuildPack compiles the workspace into a pack (08 §5.2): nothing must be left to fix,
 // the list is sorted (for the pack only), and each mod is copied without the version
 // folders this game does not load. light writes the list only.
 func (a *App) BuildPack(name string, light, dryRun bool) (*PackBuild, error) {
@@ -460,7 +460,7 @@ func dirSize(dir string) int64 {
 
 // ---- list ----
 
-// PacksOf lists the packs of an environment (10 §8): built in it, or — for a pack from
+// PacksOf lists the packs of an environment (08 §5): built in it, or — for a pack from
 // another machine whose environment does not exist here — built for its game version.
 // others counts the packs that belong to other environments.
 func (a *App) PacksOf(e *env.Environment) (mine []*PackInfo, others int, err error) {
@@ -558,7 +558,7 @@ func packLinkName(pack, folder string) string {
 	return source.PackLinkPrefix + unsafeFolder.ReplaceAllString(pack, "_") + "_" + folder
 }
 
-// LaunchPack plays a pack (10 §8.3): its mods are linked into Mods/, its list is written to
+// LaunchPack plays a pack (08 §5.3): its mods are linked into Mods/, its list is written to
 // its own data folder, and the game starts with -savedatafolder pointing there.
 func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 	p, err := a.ReadPack(name)
@@ -583,7 +583,7 @@ func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 	dir := a.packPath(name)
 	r := &PackLaunch{Pack: p, UserData: filepath.Join(dir, "userdata"), DryRun: dryRun}
 	r.ModsConfig = env.ModsConfigPath(r.UserData)
-	// How the game will register the pack's copies next to what is in Mods/ (04 §2.4).
+	// How the game will register the pack's copies next to what is in Mods/ (04 §4.2).
 	cands := Candidates(st.Ix, st.Aliases)
 	want := map[string]string{} // link name (lower) → target
 	for _, pe := range p.Entries {
@@ -798,7 +798,7 @@ func (a *App) ExportPack(name, file string, light bool) (int64, error) {
 	return fi.Size(), nil
 }
 
-// PackMatch compares a light pack with the installed mods (10 §8.4).
+// PackMatch compares a light pack with the installed mods (08 §5.4).
 type PackMatch struct {
 	Pack            *Pack
 	Same, Different []PackEntry // installed with the same content / another version

@@ -1,4 +1,4 @@
-// Package rules holds community ordering data (04 §5.2). M2 reads a local RimSort-format
+// Package rules holds community ordering data (04 §6.3). M2 reads a local RimSort-format
 // communityRules.json if one is present; downloading (`archo data update`) comes later.
 package rules
 

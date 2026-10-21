@@ -1,4 +1,4 @@
-// Icons (06 §3): sources and row states, drawn as small SVGs in currentColor.
+// Icons (06 §7): sources and row states, drawn as small SVGs in currentColor.
 const svg = (body, cls = "") => `<svg class="i ${cls}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 export const icon = {

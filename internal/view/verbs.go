@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// Verbs (06 §13.6): each acts at once on the object (the selection, else the cursor's
+// Verbs (06 §3.5): each acts at once on the object (the selection, else the cursor's
 // row) and is one undo step. The interfaces decide which key, click or drop runs them.
 
 // Result is what a verb did, for the status line; Placed are the mods it put into the list
@@ -188,7 +188,7 @@ func Place(a *app.App, from Column, o Object, at int) (*Result, error) {
 	return &Result{Text: NowAt(st, o.What, o.IDs)}, nil
 }
 
-// ---- the position input (06 §13.7) ----
+// ---- the position input (06 §3.6) ----
 
 // PosOpt is one place the position input offers.
 type PosOpt struct {

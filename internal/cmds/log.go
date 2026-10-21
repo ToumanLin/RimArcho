@@ -50,7 +50,7 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 	return r, st, err
 }
 
-// analysedAs says when a log was attributed against its own game version (decisions-m4 §7.3).
+// analysedAs says when a log was attributed against its own game version (03 §6.4).
 func analysedAs(root *render.Node, r *app.LogReport) {
 	if r.AnalysedAs != "" {
 		root.KV("analysed", fmt.Sprintf("as %s (log version); environment is %s", r.AnalysedAs, r.EnvMM))

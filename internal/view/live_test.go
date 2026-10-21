@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 10 §3.4: while the game runs, its log's errors become "this run" items; when it exits the
+// 06 §2.1: while the game runs, its log's errors become "this run" items; when it exits the
 // tracker stops.
 func TestLiveTracker(t *testing.T) {
 	e := testkit.New(t)

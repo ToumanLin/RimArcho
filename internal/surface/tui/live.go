@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The running game (10 §3.4): every two seconds view.LiveTracker checks the game and reads
+// The running game (06 §2.1): every two seconds view.LiveTracker checks the game and reads
 // what its log gained. While it runs the top bar says so, and its errors lead 需要处理.
 
 const livePoll = 2 * time.Second

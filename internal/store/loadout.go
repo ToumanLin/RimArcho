@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Workspace is the Loadout being edited (04 §1).
+// Workspace is the Loadout being edited (04 §1.1).
 type Workspace struct {
 	EnvID   string
 	Entries string // loadout.List encoded
@@ -15,7 +15,7 @@ type Workspace struct {
 	OriginVersion int
 	OriginKind    string
 	// Conflict is an external version that was not loaded because the workspace had
-	// unsaved edits (04 §2.3); 0 when none.
+	// unsaved edits (04 §4.3); 0 when none.
 	Conflict int
 	Updated  time.Time
 }
@@ -239,7 +239,7 @@ func (s *Store) SetModsConfigState(envID string, st *ModsConfigState) error {
 	return err
 }
 
-// UserRule is a stored user rule (04 §5.1); A and B are lineage IDs.
+// UserRule is a stored user rule (04 §6.1); A and B are lineage IDs.
 type UserRule struct {
 	ID      int64
 	Kind    string
@@ -293,7 +293,7 @@ func (s *Store) RemoveRule(envID string, id int64) (bool, error) {
 	return n > 0, nil
 }
 
-// AddLaunch records a game launch (04 §8).
+// AddLaunch records a game launch (08 §2).
 func (s *Store) AddLaunch(envID string, at time.Time, method, command string) error {
 	_, err := s.DB.Exec(`INSERT INTO launch(environment_id, started_at, method, command) VALUES(?,?,?,?)`, envID, at.Unix(), method, command)
 	return err

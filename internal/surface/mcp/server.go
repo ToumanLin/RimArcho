@@ -1,6 +1,6 @@
-// Package mcp is the MCP surface (05 §4): `archo mcp` over stdio. Every tool translates
+// Package mcp is the MCP surface (05 §5): `archo mcp` over stdio. Every tool translates
 // its arguments into the argv of one CLI command and returns that command's text, so the
-// output is byte-identical to the CLI (05 §1, I1).
+// output is byte-identical to the CLI (05 §1.1, I1).
 package mcp
 
 import (
@@ -19,7 +19,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// AnalyzeWait is how long a tool call waits for an out-of-date analysis (05 §4.1).
+// AnalyzeWait is how long a tool call waits for an out-of-date analysis (05 §5.1).
 var AnalyzeWait = 10 * time.Second
 
 func ptr[T any](v T) *T { return &v }
@@ -57,16 +57,16 @@ func (s *Server) run(env string, argv []string) (*sdk.CallToolResult, any, error
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: out}}, IsError: code == cmds.ExitError || code == cmds.ExitUsage}, nil, nil
 }
 
-// New builds the server with every tool of 05 §4.2.
+// New builds the server with every tool of 05 §5.2.
 func New(a *app.App) *Server {
 	s := &Server{app: a}
-	// 05 §4.1: a first call that needs the analysis returns what is ready after 10 s.
+	// 05 §5.1: a first call that needs the analysis returns what is ready after 10 s.
 	if a.AnalyzeWait == 0 {
 		a.AnalyzeWait = AnalyzeWait
 	}
 	s.srv = sdk.NewServer(&sdk.Implementation{Name: "rimarcho", Version: buildinfo.Version}, &sdk.ServerOptions{Instructions: Instructions})
 	for _, t := range Tools() {
-		// get_description reaches the Steam Workshop (06 §6.4); everything else stays local.
+		// get_description reaches the Steam Workshop (06 §4.3); everything else stays local.
 		ann := &sdk.ToolAnnotations{ReadOnlyHint: t.readOnly, OpenWorldHint: ptr(t.name == "get_description")}
 		if !t.readOnly {
 			ann.DestructiveHint = ptr(t.destructive)
@@ -334,7 +334,7 @@ func toolList() []tool {
 // Tools returns the tool table.
 func Tools() []tool { return toolList() }
 
-// ProblemsArgv maps list_problems: warning and above by default (decisions-m3 §12.2).
+// ProblemsArgv maps list_problems: warning and above by default (03 §4.5).
 func ProblemsArgv(in ProblemsIn) []string {
 	if in.Ref != "" {
 		return []string{"problems", "show", in.Ref}
@@ -347,7 +347,7 @@ func ProblemsArgv(in ProblemsIn) []string {
 		flag("all", in.All).flag("detail", in.Detail).flag("ignored", in.Ignored), in.GameVersion)
 }
 
-// SourceArgv maps read_source: a search gets a 10 s decompile budget by default (05 §4.1).
+// SourceArgv maps read_source: a search gets a 10 s decompile budget by default (05 §5.1).
 func SourceArgv(in SourceIn) []string {
 	if in.Search != "" {
 		b := argv("source", "search", in.Search)
@@ -359,7 +359,7 @@ func SourceArgv(in SourceIn) []string {
 		case in.Scope == "active":
 			b.flag("active", true).flag("yes", true)
 		default:
-			b.flag("implicated", true) // decisions-m4 §7.4
+			b.flag("implicated", true) // 03 §5.4
 		}
 		budget := in.Budget
 		if budget == 0 {

@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// Live log tracking (10 §3): follow Player.log while the game runs, reading only what was
+// Live log tracking (03 §6.6): follow Player.log while the game runs, reading only what was
 // appended, keeping clusters instead of text.
 
 const (
@@ -61,7 +61,7 @@ type liveKey struct {
 }
 
 // FollowLog starts following path from its beginning (a running game's log is short).
-// The RimCrow companion log next to the user data is read when present (10 §3.3).
+// The RimCrow companion log next to the user data is read when present (03 §6.6).
 func (a *App) FollowLog(path, companion string) *LiveLog {
 	lv := &LiveLog{Path: path, Companion: companion, now: a.Now}
 	lv.reset()
@@ -212,7 +212,7 @@ func (lv *LiveLog) take(all bool) []*LiveCluster {
 	return fresh
 }
 
-// trim drops the oldest informational clusters beyond the cap (10 §3.2).
+// trim drops the oldest informational clusters beyond the cap (03 §6.6).
 func (lv *LiveLog) trim() {
 	for len(lv.order) > liveMaxClusters {
 		drop := -1
@@ -307,7 +307,7 @@ func mentionPackage(st *LoadoutState, lc *LogCluster, pkg string) {
 	}
 }
 
-// companionLog reads RimCrow_Realtime.log: one JSON object per line (10 §3.3).
+// companionLog reads RimCrow_Realtime.log: one JSON object per line (03 §6.6).
 type companionLog struct {
 	path    string
 	off     int64

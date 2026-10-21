@@ -190,7 +190,7 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 		return nil, err
 	}
 	rep := &ScanReport{Env: e, ScanID: scanID, Full: full, Stats: st}
-	// 04 §2.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
+	// 04 §4.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
 	if ls, err := a.Loadout(); err == nil {
 		rep.Notices = ls.Notices
 	} else {

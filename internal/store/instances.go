@@ -14,7 +14,7 @@ import (
 
 // Mod is an Instance joined with its source and current snapshot, for queries and output.
 type Mod struct {
-	// Player data of the lineage (04 §7.1), filled by the app's index.
+	// Player data of the lineage (04 §8.1), filled by the app's index.
 	Alias, Note string
 	Tags        []string
 
@@ -65,7 +65,7 @@ func (m *Mod) WorkshopID() string {
 // DisplayName falls back to the folder name when About.xml has no <name>.
 func (m *Mod) DisplayName() string {
 	if m.Alias != "" {
-		return m.Alias // the player's name for it comes first (04 §7.1)
+		return m.Alias // the player's name for it comes first (04 §8.1)
 	}
 	if m.Name != "" {
 		return m.Name

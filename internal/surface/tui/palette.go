@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The command palette (06 §8): ctrl+k, a "❯" input line over a result list in the style of
+// The command palette (06 §3.5): ctrl+k, a "❯" input line over a result list in the style of
 // magpie's picker. It finds commands (by their Chinese name or English alias), mods (enter
 // jumps to the mod) and the other environments. Ranking: prefix > substring > subsequence
 // > description; ties go to commands, then the shorter name.
@@ -94,7 +94,7 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			return m.key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
 		}
 	case "packs":
-		// The packs as text (10 §8); build and play them with the commands shown.
+		// The packs as text (08 §5); build and play them with the commands shown.
 		return func(m *model) tea.Cmd {
 			var b strings.Builder
 			rows, others, err := view.PackRows(m.app)
@@ -125,7 +125,7 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			return nil
 		}
 	case "settings":
-		// The settings page as text (10 §7); each value says the command that changes it.
+		// The settings page as text (06 §2.14); each value says the command that changes it.
 		return func(m *model) tea.Cmd {
 			var b strings.Builder
 			for _, g := range append(view.EnvGroups(m.app, m.st), view.SettingsPage(m.app, m.st)...) {
@@ -238,7 +238,7 @@ func (m *model) paletteKey(k tea.KeyMsg) tea.Cmd {
 			return p.results[p.sel].run(m)
 		}
 		return nil
-	case tea.KeyUp, tea.KeyLeft, tea.KeyCtrlP: // 06 §13.4: in a popup both pairs of arrows choose
+	case tea.KeyUp, tea.KeyLeft, tea.KeyCtrlP: // 06 §3.3: in a popup both pairs of arrows choose
 		p.sel = max(p.sel-1, 0)
 		return nil
 	case tea.KeyDown, tea.KeyRight, tea.KeyCtrlN, tea.KeyTab:

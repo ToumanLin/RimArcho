@@ -126,7 +126,7 @@ func Parse(r io.Reader) (*File, error) {
 	return f, sc.Err()
 }
 
-// Parser reads a log line by line (Parse, and the live follower of a running game: 10 §3.2).
+// Parser reads a log line by line (Parse, and the live follower of a running game: 03 §6.6).
 // Entries are appended to F.Entries; the last one may still grow until Open reports false.
 type Parser struct {
 	F            *File

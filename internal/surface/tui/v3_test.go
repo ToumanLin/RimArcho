@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// The v3 interaction model (06 §13): T17–T20.
+// The v3 interaction model (06 §3): T17–T20.
 
 // v3Fixture: the fixture plus P001 … P125 enabled after it, and Late (loads after P050),
 // not enabled. P001 has a long description.
@@ -114,7 +114,7 @@ func TestT17ArrowsOnlyNavigate(t *testing.T) {
 	}
 }
 
-// T18: the tasks of 06 §13.9, each in no more keys than the v3 column, with the right result.
+// T18: the tasks of 06 §11, each in no more keys than the v3 column, with the right result.
 func TestT18TaskSteps(t *testing.T) {
 	e, m := v3Fixture(t)
 	n := 0
@@ -234,7 +234,7 @@ func idOf(t *testing.T, m *model, name string) string {
 	return ""
 }
 
-// tagsDefault is the i-th pinned tag (06 §12.3).
+// tagsDefault is the i-th pinned tag (06 §3.8).
 func (m *model) tagsDefault(i int) string {
 	m.tagKey()
 	defer func() { m.tags = nil }()
@@ -320,7 +320,7 @@ func TestT20EscBack(t *testing.T) {
 	}
 }
 
-// The position input (06 §13.7): a number, a name with tab for before, enter alone is the
+// The position input (06 §3.6): a number, a name with tab for before, enter alone is the
 // suggested place; from Disabled it enables there, one undo step.
 func TestPositionInput(t *testing.T) {
 	e, m := v3Fixture(t)
@@ -393,7 +393,7 @@ func TestPositionInput(t *testing.T) {
 	}
 }
 
-// 06 §13.8: while searching, the status line counts the other lists' matches; tab takes
+// 06 §3.7: while searching, the status line counts the other lists' matches; tab takes
 // the search to the next list with matches.
 func TestSearchOtherLists(t *testing.T) {
 	_, m := v3Fixture(t)

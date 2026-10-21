@@ -40,7 +40,7 @@ func Run(o Options) error {
 	}
 	w := application.New(application.Options{
 		Name:     "RimArcho",
-		Icon:     icon.PNG(256), // used when the exe has no icon resource (development builds, 08 §15.3)
+		Icon:     icon.PNG(256), // used when the exe has no icon resource (development builds, 06 §8.6)
 		Services: []application.Service{application.NewService(api)},
 		Assets:   application.AssetOptions{Handler: page},
 		Windows: application.WindowsOptions{
@@ -53,7 +53,7 @@ func Run(o Options) error {
 	w.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: "/",
 		BackgroundColour:           application.NewRGB(0x0f, 0x10, 0x11),
-		DefaultContextMenuDisabled: true, // the page draws its own (08 §6)
+		DefaultContextMenuDisabled: true, // the page draws its own (06 §8.5)
 	})
 	return w.Run()
 }
@@ -67,7 +67,7 @@ func NewAPI(a *app.App, emit func(name string, data any)) *API {
 }
 
 // PageHandler serves the page, the thumbnails (/preview/<id>) and the description images
-// (/img?u=<url>) from the local caches; nothing remote is loaded by the page (08 §3).
+// (/img?u=<url>) from the local caches; nothing remote is loaded by the page (06 §8.2).
 func PageHandler(api *API) (http.Handler, error) {
 	files, err := fs.Sub(assets, "assets")
 	if err != nil {

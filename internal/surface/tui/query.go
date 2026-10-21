@@ -2,7 +2,7 @@ package tui
 
 import "github.com/ToumanLin/RimArcho/internal/view"
 
-// Column search (06 §5.5): the syntax and the matching are view.Query (08 §1.1).
+// Column search (06 §3.7): the syntax and the matching are view.Query (06 §1).
 
 // matcher builds the column predicate. The second result is the fallback for a single
 // free word that matched nothing: its letters in order in the name.

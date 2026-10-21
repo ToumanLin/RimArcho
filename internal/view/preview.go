@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// Whole-list actions (06 §9): sort, save and launch show a preview first; the preview is
+// Whole-list actions (06 §6): sort, save and launch show a preview first; the preview is
 // the CLI's dry run (read-only), the action itself a typed call.
 
 // Whole-list actions.

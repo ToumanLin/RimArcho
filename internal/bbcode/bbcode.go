@@ -1,5 +1,5 @@
 // Package bbcode parses Steam Workshop descriptions (BBCode) into blocks that a terminal
-// can lay out (06 §6.4 item 5). It is tolerant: unknown tags are dropped and their content
+// can lay out (06 §4.3 item 5). It is tolerant: unknown tags are dropped and their content
 // kept, unclosed tags end with the text.
 package bbcode
 
@@ -219,7 +219,7 @@ func (p *parser) tag(name, arg string, closing bool) {
 	case "strike", "s":
 		p.strike += step(closing)
 	case "i", "u", "em", "spoiler", "color", "size", "font", "center":
-		// shown as plain text (06 §2.1: no italics or underlines)
+		// shown as plain text (06 §7: no italics or underlines)
 	case "url":
 		if closing {
 			if len(p.link) > 0 {
@@ -266,7 +266,7 @@ func (p *parser) tag(name, arg string, closing bool) {
 		p.quote += step(closing)
 	case "hr":
 		p.flush()
-		p.out = append(p.out, Block{Kind: Para}) // a paragraph break (06 §2.1: no lines)
+		p.out = append(p.out, Block{Kind: Para}) // a paragraph break (06 §7: no lines)
 	case "nl", "br":
 		p.flush()
 	case "table":
@@ -391,7 +391,7 @@ func Plain(bs []Block) string {
 	return s.String()
 }
 
-// TextLen is the length in runes of the text without markup and images (06 §6.4: what
+// TextLen is the length in runes of the text without markup and images (06 §4.3: what
 // "short" means when choosing a source).
 func TextLen(bs []Block) int {
 	n := 0

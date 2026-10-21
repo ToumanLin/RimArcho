@@ -7,10 +7,10 @@ import (
 )
 
 // Package view holds what the TUI and the GUI show, independent of how they draw it
-// (08 §1): view models built from internal/app, and the interface text.
+// (06 §1): view models built from internal/app, and the interface text.
 //
-// The interfaces speak Chinese or English (06 §1, "跟随配置"); command output shown in panels
-// is the fixed-English CLI text (05 §1). Strings are looked up by their English text.
+// The interfaces speak Chinese or English (06 §9.2, "跟随配置"); command output shown in panels
+// is the fixed-English CLI text (05 §1.1). Strings are looked up by their English text.
 
 var lang = "en"
 
@@ -63,7 +63,7 @@ func T(s string) string {
 func Tf(f string, a ...any) string { return fmt.Sprintf(T(f), a...) }
 
 var zhText = map[string]string{
-	// top bar, columns, status and hint lines (06 §2.3: short, verb first)
+	// top bar, columns, status and hint lines (06 §7: short, verb first)
 	"no environment": "无环境",
 	// whole-list actions shared by both interfaces (view/preview.go)
 	"sorted: %d moved":                                 "已排序：移动了 %d 个",
@@ -151,7 +151,7 @@ var zhText = map[string]string{
 	"technical information · i":                          "技术信息 · i 展开",
 	"technical information":                              "技术信息",
 	"no preview":                                         "无预览",
-	// v3 interaction (06 §13)
+	// v3 interaction (06 §3)
 	"the terminal is too narrow for column widths": "终端太窄，无法调整列宽", "column widths reset": "列宽已恢复默认", "%s: long names wrap": "%s：长名称换行显示", "%s: long names are cut": "%s：长名称截断显示",
 	"move to": "移到", "move to…": "移动到…", "enable at…": "启用到…", "position": "位置",
 	"the terminal is too narrow for the detail column · enter shows the details": "终端太窄，没有详情列 · 按 enter 查看详情",
@@ -163,14 +163,14 @@ var zhText = map[string]string{
 	"next list with matches": "下一个有匹配的区", "no other list has a match": "其他区没有匹配",
 	"other lists: ": "其他区：", "tab jumps to the next list with matches": "tab 跳到下一个匹配的区",
 	"clear the selection": "取消选择", "another list clears it": "换列表会取消选择",
-	// double press (06 §9)
+	// double press (06 §6)
 	"press %s again: %s": "再按一次 %s：%s",
 	"press L again to load it; your unsaved edits are replaced": "再按一次 L 载入；未保存的修改会被替换",
 	"the outside change is loaded into the list":                "已把外部修改载入列表",
-	// command palette (06 §8)
+	// command palette (06 §3.5)
 	"command palette": "命令面板", "command": "命令", "environment": "环境", "switch to %s": "切换到环境 %s",
 	"nothing matches": "没有匹配的结果", "run": "执行", "close": "关闭",
-	// 需要处理 and changes (06 §4.1, §7)
+	// 需要处理 and changes (06 §2.9, §7)
 	"%d mods are out of order": "%d 个 Mod 的顺序不对",
 	"show which":               "展开查看",
 	"this list":                "这个列表",
@@ -398,7 +398,7 @@ var zhText = map[string]string{
 	"%d new mods":                                                                                              "%d 个新 Mod",
 	"%d mods gone":                                                                                             "%d 个 Mod 不见了",
 	"%d changed their package id":                                                                              "%d 个改了包名",
-	// full-screen sub-sections and history (06 §6.1, §6.3)
+	// full-screen sub-sections and history (06 §4.1, §6.3)
 	"Defs": "Def", "full history": "完整历史",
 	"sections": "跳到子区", "none": "无",
 	"loads after %s (About.xml)":             "排在 %s 之后（About.xml）",
@@ -413,7 +413,7 @@ var zhText = map[string]string{
 	"gone": "消失", "reappeared": "重新出现", "package id changed": "改了包名", "renamed": "改了名称",
 	"author changed": "换了作者", "supported versions changed": "支持的版本变了",
 	"dependencies changed": "依赖变了", "load order rules changed": "排序规则变了",
-	// details: facts, requirements, description (06 §6.1, §6.4)
+	// details: facts, requirements, description (06 §4.1, §6.4)
 	"package": "包名", "version": "版本", "opens the page": "打开页面", "tags": "标签",
 	"none · # adds": "无 · 按 # 添加", "alias": "别名", "note": "备注", "requires": "依赖",
 	" (not enabled)": "（未启用）", " (not installed)": "（未安装）",
@@ -432,7 +432,7 @@ var zhText = map[string]string{
 	"Workshop page":              "创意工坊页面",
 	"refresh":                    "刷新",
 	"technical pages":            "技术页面",
-	// tags (06 §5.6)
+	// tags (06 §3.8)
 	"tags for %s (word adds, -word removes): ": "%s 的标签（词 = 添加，-词 = 移除）：",
 	"added %s": "添加了 %s", "removed %s": "移除了 %s", "tags of %s: %s": "%s 的标签：%s",
 	"type…": "输入…", "previous / next mod": "上一个 / 下一个", "back to the list": "回到列表", "full screen": "全屏", "[images ×%d · enter shows them full screen]": "[图片 ×%d · enter 在全屏中查看]", "[images ×%d]": "[图片 ×%d]", "apply": "应用", "type a new tag": "输入新标签",

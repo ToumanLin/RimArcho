@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
-// GameRun is a running game of an environment (10 §3.1).
+// GameRun is a running game of an environment (08 §4).
 type GameRun struct {
 	PID     int
 	Exe     string
@@ -56,7 +56,7 @@ func (a *App) GameRunning() (*GameRun, error) {
 	return gameProcess(e.GameRoot), nil
 }
 
-// RunWhat is what a game run plays: the environment's own list or a pack (10 §8.3).
+// RunWhat is what a game run plays: the environment's own list or a pack (08 §5.3).
 type RunWhat struct {
 	Pack     string // "" for the environment's list
 	UserData string // the run's data folder: its ModsConfig.xml, and on 1.7 its Logs/

@@ -1,6 +1,6 @@
 package app_test
 
-// M2 Loadout tests (04 §1–§4, §8). Every ModsConfig.xml written here lives in a temp dir.
+// M2 Loadout tests (04 §1.1–§4, §8). Every ModsConfig.xml written here lives in a temp dir.
 
 import (
 	"os"

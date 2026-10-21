@@ -1,5 +1,5 @@
 // RimArcho GUI (08). The page only lays out and maps input: what it shows comes from
-// internal/view through the Go service, and the 06 §13 rules hold here too:
+// internal/view through the Go service, and the 06 §3 rules hold here too:
 //   1. the arrows only move (the cursor, the focus, the scroll), never change data;
 //   2. verbs act at once on the object (the selection, else the cursor's row), u undoes;
 //   3. the position line always says where you are;
@@ -94,7 +94,7 @@ function goTab(i) {
   return cmd(t.id);
 }
 
-// renderWhere: the position line (06 §13.3).
+// renderWhere: the position line (06 §3.2).
 function renderWhere() {
   renderTabs();
   let s = "";
@@ -165,7 +165,7 @@ function renderHints() {
 function focusArea(k) {
   if (k === S.focus) return;
   if (S.focus < 3 && k < 3 && col().sel.size) {
-    col().sel.clear(); // switching to another list clears the selection (06 §13.5)
+    col().sel.clear(); // switching to another list clears the selection (06 §3.4)
   }
   S.focus = k;
   if (k < 3) lastList = k;
@@ -291,7 +291,7 @@ async function place(from, obj, at) {
   await edited(api.Place(from, obj.ids, at));
 }
 
-// drop: dragging is another way to run a verb (08 §6).
+// drop: dragging is another way to run a verb (06 §8.5).
 async function drop(from, to, items, at) {
   const ids = idsOf(items);
   if (to === 1) return edited(api.Place(from, ids, at));
@@ -301,7 +301,7 @@ async function drop(from, to, items, at) {
   if (to === 0 && from === 2) return edited(api.Unstage(ids));
 }
 
-// preview: sort, save and launch show what they will do first (06 §9).
+// preview: sort, save and launch show what they will do first (06 §6).
 async function preview(what) {
   let p;
   try { p = await api.Preview(what); } catch (e) { return say("fail", errText(e)); }
@@ -364,7 +364,7 @@ async function paletteChoice(o) {
     try { say("ok", await api.UseEnv(o.id)); } catch (e) { say("fail", errText(e)); }
     return reload();
   }
-  // a mod: go to its list and row; a filter that hides it is cleared (06 §8)
+  // a mod: go to its list and row; a filter that hides it is cleared (06 §3.5)
   for (const k of [1, 0, 2]) {
     const c = S.cols[k];
     let i = c.items.findIndex((x) => x.id === o.id);
@@ -381,7 +381,7 @@ async function paletteChoice(o) {
   }
 }
 
-// ---- search (06 §13.8) ----
+// ---- search (06 §3.7) ----
 
 function startSearch(k = S.focus < 3 ? S.focus : lastList) {
   focusArea(k);
@@ -499,7 +499,7 @@ function onKey(e) {
   if (map[kk]) { handled(); map[kk](); }
 }
 
-// ---- the column widths (08 §4) ----
+// ---- the column widths (06 §7) ----
 
 function wireSplits() {
   const board = $("#board");
@@ -605,7 +605,7 @@ async function start() {
   if (S.board && S.board.neverScanned) cmd("rescan");
 }
 
-// A history row (08 §14): an unsaved step goes there at once (u / ctrl+r move back); a
+// A history row (06 §2.5): an unsaved step goes there at once (u / ctrl+r move back); a
 // version is loaded after a confirmation.
 setOnHistory(async (h) => {
   const go = async () => {
@@ -618,7 +618,7 @@ setOnHistory(async (h) => {
   return go();
 });
 
-// pollLive follows the running game every two seconds (10 §3.4): the top bar says it is
+// pollLive follows the running game every two seconds (06 §2.1): the top bar says it is
 // running, and its errors lead 需要处理.
 async function pollLive() {
   try {

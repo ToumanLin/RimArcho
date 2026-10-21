@@ -1,4 +1,4 @@
-// Popups (06 §13.2 rule 5): the command palette, the tag bar, the position input, a
+// Popups (06 §3.1 rule 5): the command palette, the tag bar, the position input, a
 // confirmation, a text or choice panel, help. Each has a title, shows in the position
 // line, closes with esc, and never nests: opening one closes the other.
 import { S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
@@ -37,7 +37,7 @@ export function popupKey(e) {
   return true;
 }
 
-// optionList: a list of options moved with the arrows (both pairs, 06 §13.4).
+// optionList: a list of options moved with the arrows (both pairs, 06 §3.3).
 function optionList(pop, p, opts, render, pick, input) {
   const list = el("div", "opts");
   pop.append(list);
@@ -83,7 +83,7 @@ function inputLine(pop, prompt, placeholder) {
   return inp;
 }
 
-// ---- the command palette (06 §8) ----
+// ---- the command palette (06 §3.5) ----
 export function palette() {
   open("palette", T("command palette"), (pop, p) => {
     const inp = inputLine(pop, "❯", T("a command, a mod, an environment"));
@@ -100,7 +100,7 @@ export function palette() {
   });
 }
 
-// ---- the tag bar (06 §12.3): pinned tags first, then by use; ✓ all have it, ~ some ----
+// ---- the tag bar (06 §3.8): pinned tags first, then by use; ✓ all have it, ~ some ----
 export async function tags(items) {
   const ids = items.filter((x) => x.id).map((x) => x.id);
   if (!ids.length) return;
@@ -144,7 +144,7 @@ export async function tags(items) {
   });
 }
 
-// ---- the position input (06 §13.7) ----
+// ---- the position input (06 §3.6) ----
 export function position(obj, from) {
   open("position", T("move to"), (pop, p) => {
     pop.append(el("div", "ttl", Tf("move %s to", obj.what)));
@@ -164,7 +164,7 @@ export function position(obj, from) {
   });
 }
 
-// ---- a preview with a confirmation (sort, save, launch; 06 §9) ----
+// ---- a preview with a confirmation (sort, save, launch; 06 §6) ----
 export function confirm(title, lines, goLabel, go) {
   const pre = el("pre", "lines");
   pre.textContent = (lines || []).join("\n");
@@ -225,7 +225,7 @@ export function ask(title, placeholder, done) {
   });
 }
 
-// help: every key (06 §13.2 rule 4).
+// help: every key (06 §3.1 rule 4).
 export function help() {
   open("help", T("all keys"), (pop) => {
     pop.append(el("div", "ttl", T("the arrows only move; keys that change things act at once, u undoes")));
@@ -248,7 +248,7 @@ export function help() {
   });
 }
 
-// ---- the context menu (08 §6): the same actions as the hint line ----
+// ---- the context menu (06 §8.5): the same actions as the hint line ----
 export function menu(x, y, actions) {
   const m = $("#menu");
   m.innerHTML = "";

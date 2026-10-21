@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// A small SVG renderer for the icon artwork (08 §15): paths (absolute and relative m, l, h,
+// A small SVG renderer for the icon artwork (06 §8.6): paths (absolute and relative m, l, h,
 // v, c, s, q, z), circles and ellipses, fills (nonzero), strokes (round joins), solid
 // colours and linear gradients in user space, opacity. Enough for the portrait, no
 // dependency, nothing binary in the repository.

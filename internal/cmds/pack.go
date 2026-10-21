@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Packs (10 §8).
+// Packs (08 §5).
 func init() {
 	dry := Flag{Name: "dry-run", Help: "show what would happen"}
 	register(&Command{Name: "pack build", Args: "<name>", Summary: "compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load", MinArgs: 1, MaxArgs: 1, Run: packBuildCmd,

@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Index is an environment's instances with reference helpers (02 §7).
+// Index is an environment's instances with reference helpers (05 §2).
 type Index struct {
 	Env       *env.Environment
 	Mods      []*store.Mod // sorted by display name, then ID

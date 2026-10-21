@@ -1,6 +1,6 @@
 package app_test
 
-// Acceptance tests A1–A11 of 02 §9, plus residue, identity questions, lineage editing and gc.
+// Acceptance tests A1–A11 of 02 §8, plus residue, identity questions, lineage editing and gc.
 
 import (
 	"encoding/json"
@@ -578,7 +578,7 @@ func TestTombstoneGC(t *testing.T) {
 	}
 }
 
-// 02 §4.3 (revised): files moved into a version folder with unchanged content still count
+// 02 §4.4 (revised): files moved into a version folder with unchanged content still count
 // as the same mod (J(hash)); a content-only edit keeps J(path) = 1.
 func TestSimilarityRestructureAndContentOnly(t *testing.T) {
 	e := setup(t, false)
@@ -608,7 +608,7 @@ func TestSimilarityRestructureAndContentOnly(t *testing.T) {
 	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvMoved: 1, identity.EvUpdated: 1})
 }
 
-// 02 §4.1: RimCrow disables a workshop mod by renaming About.xml and deploys a copy through
+// 02 §4.2: RimCrow disables a workshop mod by renaming About.xml and deploys a copy through
 // a junction outside every source. The disabled folder is an unloadable Instance, and the
 // deployed copy joins its lineage.
 func TestAboutDisabled(t *testing.T) {

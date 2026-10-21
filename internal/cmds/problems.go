@@ -115,7 +115,7 @@ func analysisText(c *Ctx, s *app.AnalysisState, err error) string {
 
 func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if !a.Bool("no-analyze") {
-		// The newest log is attributed against its own version (decisions-m4 §7.2, §7.3).
+		// The newest log is attributed against its own version (03 §6.4, §7.3).
 		if st, err := c.App.Loadout(); err == nil {
 			if p := c.App.ProblemLog(st); p != "" {
 				c.App.EnsureLogAnalysis(st, app.LogVersionOf(p), progress())
@@ -167,7 +167,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			continue
 		}
 		if !full && p.Code == "harmony.skip-prefix" && p.Severity == finding.Info {
-			skips = append(skips, p) // folded too (decisions-m4 §3)
+			skips = append(skips, p) // folded too (03 §4.5)
 			continue
 		}
 		if p.Log != nil {
@@ -371,7 +371,7 @@ func contains(l []string, s string) bool {
 	return false
 }
 
-// addModProblems adds the "content:" and "problems:" lines of `archo mod` (05 §2.2). It
+// addModProblems adds the "content:" and "problems:" lines of `archo mod` (05 §3.4). It
 // uses the stored analysis as is (no rebuild).
 func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) error {
 	st, err := c.App.Loadout()
@@ -451,7 +451,7 @@ func skipSummary(ps []*app.Problem) string {
 	return fmt.Sprintf("%s harmony.skip-prefix  %d bool prefixes from %d mods can skip methods other mods also patch; none is in a log stack  (archo problems --code harmony.skip-prefix)", ps[0].Severity, len(ps), len(mods))
 }
 
-// versionSummary folds version.unsupported into one row per game version (decisions-m3 §12.1).
+// versionSummary folds version.unsupported into one row per game version (03 §4.5).
 func versionSummary(ps []*app.Problem, mm string) string {
 	sev := finding.Info
 	warn := 0

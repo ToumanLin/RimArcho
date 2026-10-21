@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// DeployPrefix marks the Mods/ links RimArcho manages (09 §8). It only ever creates or
+// DeployPrefix marks the Mods/ links RimArcho manages (08 §3). It only ever creates or
 // removes entries with this prefix.
 const DeployPrefix = "_Archo_"
 
@@ -33,7 +33,7 @@ func gameVisible(k source.Kind) bool {
 }
 
 // deployable reports whether m lives where the game does not look (SteamCMD or an extra
-// folder) and could be linked into Mods/ (09 §8.1). An instance the game already sees
+// folder) and could be linked into Mods/ (08 §3). An instance the game already sees
 // through someone else's link is not deployable: it is an ordinary candidate.
 func deployable(ix *Index, aliases map[string][]store.Alias, m *store.Mod) bool {
 	if m.Status != identity.Live || m.Residue || m.Unloadable != "" || (m.Kind != source.SteamCMD && m.Kind != source.Extra) {
@@ -114,7 +114,7 @@ func modsDir(ix *Index) string {
 	return ""
 }
 
-// LinkChange is one Mods/ link a save creates or removes (09 §8.1).
+// LinkChange is one Mods/ link a save creates or removes (08 §3).
 type LinkChange struct {
 	Op     string // "add" or "remove"
 	Name   string // link name in Mods/
@@ -146,7 +146,7 @@ func planLinks(st *LoadoutState) (string, []LinkChange, error) {
 	for _, d := range ents {
 		name := d.Name()
 		if packLink(name) && source.IsLink(filepath.Join(mods, name)) {
-			// A pack's link (10 §8.3): saving the normal list ends the pack's run.
+			// A pack's link (08 §5.3): saving the normal list ends the pack's run.
 			tgt, _ := source.RealPath(filepath.Join(mods, name))
 			out = append(out, LinkChange{Op: "remove", Name: name, Target: tgt})
 			continue

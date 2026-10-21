@@ -16,12 +16,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// 需要处理 (06 §7): what the player can act on, grouped by where the problem is, each item one
+// 需要处理 (06 §5): what the player can act on, grouped by where the problem is, each item one
 // sentence in plain words with the actions that fix it. No problem codes and no #refs appear
 // here: they stay in the technical information, the CLI and MCP. The top bar's number is
-// the number of counted items (06 §4.2).
+// the number of counted items (06 §2.2).
 
-// Groups, in screen order (06 §7.1).
+// Groups, in screen order (06 §2.4).
 const (
 	GroupList = iota
 	GroupDeps
@@ -65,10 +65,10 @@ type Option struct {
 // Action is one way to handle an item.
 type Action struct {
 	Kind  string `json:"kind"`
-	Key   string `json:"key"` // the TUI's key for it (06 §7.2)
+	Key   string `json:"key"` // the TUI's key for it (06 §5)
 	Label string `json:"label"`
 	// Done is what the status line says afterwards; Confirm, when set, is asked first
-	// (06 §9: actions u cannot undo).
+	// (06 §6: actions u cannot undo).
 	Done    string   `json:"done,omitempty"`
 	Confirm string   `json:"confirm,omitempty"` // the TUI's "press again" line
 	Warn    string   `json:"warn,omitempty"`    // what a confirmation dialog says
@@ -94,11 +94,11 @@ type Need struct {
 	Mods    []string `json:"mods,omitempty"`
 	Status  int      `json:"status"` // StatusErr, StatusWarn or StatusLog for the row icon
 	Dim     bool     `json:"dim,omitempty"`
-	// A folded item stands for several findings one action resolves (06 §7.2): its parts
+	// A folded item stands for several findings one action resolves (06 §5): its parts
 	// are shown on demand; every mod in Mods gets the row icon.
 	Parts []string `json:"parts,omitempty"`
 	Fold  bool     `json:"fold,omitempty"`
-	rank  int      // order within the group (06 §7.2's order)
+	rank  int      // order within the group (06 §5's order)
 }
 
 // Needs is the screen's content and what it means for the rest of the interface.
@@ -109,12 +109,12 @@ type Needs struct {
 	Never  bool           `json:"never"`  // the mods' files were never checked
 	Stale  bool           `json:"stale"`  // the files changed since the last check
 	// LastRun says which run wrote the last-run log: "the list · 9 月 29 日 19:41" or
-	// "pack X · …" (10 §8.3: a pack's errors are not the list's).
+	// "pack X · …" (08 §5.3: a pack's errors are not the list's).
 	LastRun string `json:"lastRun,omitempty"`
 }
 
 // BuildNeeds turns the problem set and the environment's open questions into items, and
-// counts them (06 §3, §4.2, §7).
+// counts them (06 §7, §4.2, §7).
 func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	n := &Needs{Status: map[string]int{}}
 	n.Never = ps.Analysis == nil || ps.Analysis.Run == nil
@@ -136,7 +136,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		break
 	}
 	// The number in the top bar is the number of items the player can act on, and a row
-	// carries an icon exactly when its mod is in one of them (06 §3, §4.2).
+	// carries an icon exactly when its mod is in one of them (06 §7, §4.2).
 	for _, it := range n.Items {
 		if !it.Counted {
 			continue
@@ -175,7 +175,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			continue
 		}
 		if p.Severity != finding.Error && p.Severity != finding.Warning {
-			continue // info: technical information only (06 §7.3)
+			continue // info: technical information only (06 §5)
 		}
 		subj := subjects(p)
 		x, y := "", ""
@@ -204,7 +204,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			pkg := strings.TrimPrefix(x, "pkg:")
 			look := Action{Kind: ActOpenURL, Key: "o", Label: T("look for it in the Workshop"), URL: WorkshopSearch(pkg), Done: T("opened the Workshop page")}
 			for _, sg := range p.Suggestions {
-				if u, ok := strings.CutPrefix(sg, "subscribe: "); ok { // steamDB knows the item (10 §5)
+				if u, ok := strings.CutPrefix(sg, "subscribe: "); ok { // steamDB knows the item (04 §6.3)
 					look.Label, look.URL = T("open it in the Workshop"), u
 				}
 			}
@@ -251,7 +251,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				Actions: []Action{viewAction(T("see what"), "mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s})
 		default:
 			// Harmony warnings without log evidence, overlapping Defs and patches whose target
-			// is simply absent stay in the technical information (06 §7.3).
+			// is simply absent stay in the technical information (06 §5).
 		}
 	}
 	switch len(order) {
@@ -298,7 +298,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		add(Need{rank: 6, Group: GroupList, Text: Tf("the list was saved for %s; the game resets it when it starts — saving once fixes it", v),
 			Actions: []Action{{Kind: ActSave, Key: "w", Label: T("save")}}, Counted: true, Status: StatusWarn})
 	}
-	// Last run: the current log's errors, one item per mod (06 §7.1).
+	// Last run: the current log's errors, one item per mod (06 §2.4).
 	var subjectsOrder []string
 	for id := range logs {
 		subjectsOrder = append(subjectsOrder, id)
@@ -365,7 +365,7 @@ func questionNeed(st *app.LoadoutState, q *store.Question) Need {
 	nm := func(id string) string { return TokName(st, finding.Inst(id)) }
 	x, y := nm(q.InstanceID), nm(q.CandidateID)
 	answer := func(key, label, ans, done string) Action {
-		// Merging or splitting lineages is not undone with u: confirm first (06 §9).
+		// Merging or splitting lineages is not undone with u: confirm first (06 §6).
 		return Action{Kind: ActAnswer, Key: key, Label: label, QID: q.ID, Answer: ans, Done: done, Confirm: Tf("press %s again: %s", key, done), Warn: done}
 	}
 	return Need{Group: GroupConfirm, Text: Tf("is %s the same mod as %s?", x, y), Counted: true, Status: StatusWarn,

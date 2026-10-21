@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The history area (08 §14, 10 §6): the unsaved steps of the workspace (the undo and redo
+// The history area (06 §2.5): the unsaved steps of the workspace (the undo and redo
 // stacks) and the saved versions, so the player sees what u takes back and can jump.
 
 // HistoryStep is one workspace edit.

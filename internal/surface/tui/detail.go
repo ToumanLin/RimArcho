@@ -18,7 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Details (06 §6): who the mod is, its problems, the facts a player uses (package id,
+// Details (06 §4): who the mod is, its problems, the facts a player uses (package id,
 // version, Workshop page, tags, alias, note, dependencies), the description, and the
 // technical information folded behind i.
 
@@ -28,7 +28,7 @@ type detailData = view.DetailData
 type detailDataMsg struct{ d *detailData }
 type fetchTick struct{ id string }
 
-// fetchDwell: the Workshop page is fetched once the cursor rests this long (06 §6.4 item 3).
+// fetchDwell: the Workshop page is fetched once the cursor rests this long (06 §4.3 item 3).
 const fetchDwell = 400 * time.Millisecond
 
 // loadData reads the declaration, About.xml and the cached Workshop text (no network).
@@ -221,7 +221,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	return out
 }
 
-// Thumbnail block sizes in cells (06 §6.2, §6.3): the column and the full-screen detail.
+// Thumbnail block sizes in cells (06 §9.4, §6.3): the column and the full-screen detail.
 const (
 	thumbCols, thumbRows         = 18, 9
 	thumbFullCols, thumbFullRows = 36, 18
@@ -230,7 +230,7 @@ const (
 
 // headerLines: name, authors and facts, beside the thumbnail block in the WezTerm host.
 // The block is always reserved at full size; the image takes the fewest rows that hold
-// it, and a mod without Preview.png shows a faint "no preview" in it (06 §6.1, §6.2).
+// it, and a mod without Preview.png shows a faint "no preview" in it (06 §4.1, §6.2).
 func (m *model) headerLines(it *item, mod *store.Mod, facts string, w int, o detailOpts) []dline {
 	tc, tr := thumbCols, thumbRows
 	if o.full {
@@ -267,7 +267,7 @@ func (m *model) headerLines(it *item, mod *store.Mod, facts string, w int, o det
 	e := m.imgs[imgKey(url, tc, tr)]
 	empty := strings.Repeat(" ", tc)
 	// The block is as tall as the image: 16:9 until its size is known, one line for "no
-	// preview" (06 §6.2, revised: no fixed 9-line block).
+	// preview" (06 §9.4, revised: no fixed 9-line block).
 	rows := imgRows(0, 0, tc, tr)
 	switch {
 	case e != nil && e.state == imgOK:
@@ -304,7 +304,7 @@ func clip(s string, w int) string {
 	return sText.Render("") + s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
 }
 
-// depLines: the declared dependencies with their state (06 §6.1).
+// depLines: the declared dependencies with their state (06 §4.1).
 func (m *model) depLines(d *detailData) []string {
 	if d == nil {
 		return nil
@@ -323,7 +323,7 @@ func (m *model) depLines(d *detailData) []string {
 	return out
 }
 
-// descLines: the description heading and text (06 §6.4 item 2).
+// descLines: the description heading and text (06 §4.3 item 2).
 func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	var out []dline
 	head := func(title, note string) {
@@ -373,12 +373,12 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	return out
 }
 
-// renderBlocks lays out BBCode blocks at width w (06 §6.4 item 5).
+// renderBlocks lays out BBCode blocks at width w (06 §4.3 item 5).
 func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 	var out []dline
 	add := func(s string) { out = append(out, dline{text: s}) }
 	// The compact detail draws no description images: one faint line counts them, and the
-	// full-screen detail shows them (06 §12.4).
+	// full-screen detail shows them (06 §9.4).
 	nimg, imgAt := 0, -1
 	fill := func() {
 		if nimg == 0 {
@@ -727,8 +727,8 @@ func (m *model) prefetchCmd(lines []dline) tea.Cmd {
 	return nil
 }
 
-// inlineImages: images are drawn in the WezTerm host (06 §6.4 item 6), unless ui.previews
-// is off (06 §12.4).
+// inlineImages: images are drawn in the WezTerm host (06 §4.3 item 6), unless ui.previews
+// is off (06 §9.4).
 func (m *model) inlineImages() bool { return m.images != nil && !m.previewsOff }
 
 // openURL opens a page in the default browser.
@@ -742,7 +742,7 @@ func openURL(u string) error {
 	return exec.Command("xdg-open", u).Start()
 }
 
-// ---- full-screen detail (06 §6.3) ----
+// ---- full-screen detail (06 §4.2) ----
 
 func (m *model) fullKey(s string) tea.Cmd {
 	page := max(m.h-6, 1)
@@ -853,7 +853,7 @@ func (m *model) syncFullSec() {
 	}
 }
 
-// detailKey: the keys of area 4, the compact detail (06 §13.4): ↑↓ scroll it, ← and esc
+// detailKey: the keys of area 4, the compact detail (06 §3.3): ↑↓ scroll it, ← and esc
 // go back to the list whose mod it shows. Verbs and the other keys work as in that list
 // (they act on the mod shown, or on the list's selection) and keep the focus here.
 func (m *model) detailKey(s string) (tea.Cmd, bool) {

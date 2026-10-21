@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// AnalyzeMemoryLimit is the soft heap cap of the `archo analyze` child (01 §5.2 target:
+// AnalyzeMemoryLimit is the soft heap cap of the `archo analyze` child (07 §6.2 target:
 // peak ≤ 400 MB). M3 measurement: 310 MB peak working set on 482 active mods.
 const AnalyzeMemoryLimit = 300 << 20
 

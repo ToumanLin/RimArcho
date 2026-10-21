@@ -1,4 +1,4 @@
-// Package order sorts a Loadout under hard constraints (04 §4): official order, dependencies,
+// Package order sorts a Loadout under hard constraints (04 §5): official order, dependencies,
 // About.xml load rules, community rules and user rules, keeping the current relative order
 // wherever the constraints allow. Constraint cycles are reported, never broken silently.
 package order
@@ -34,7 +34,7 @@ type Node struct {
 	Decl      *scan.Decl
 }
 
-// Rule kinds (04 §5.1).
+// Rule kinds (04 §6.1).
 const (
 	RuleAfter        = "after"
 	RuleBefore       = "before"
@@ -51,7 +51,7 @@ type Rule struct {
 	Target string
 }
 
-// Community supplies community ordering rules by packageId (04 §5.2).
+// Community supplies community ordering rules by packageId (04 §6.3).
 type Community interface {
 	Rules(pkg string) (loadAfter, loadBefore []string)
 }
@@ -100,7 +100,7 @@ type Cycle struct {
 }
 
 // suggestRank orders constraint kinds by how readily an ignore rule should drop them
-// (04 §4.2): community rules, then About.xml load rules, then dependencies. User rules
+// (04 §5.2): community rules, then About.xml load rules, then dependencies. User rules
 // are never suggested — the user removes them instead.
 func suggestRank(k string) int {
 	switch k {
@@ -166,7 +166,7 @@ func withVersion(base []string, byV map[string][]string, mm string) []string {
 	return out
 }
 
-// Sort computes the new order (04 §4.2).
+// Sort computes the new order (04 §5.2).
 func Sort(in Input) Result {
 	n := len(in.Nodes)
 	byPkg := map[string][]int{}

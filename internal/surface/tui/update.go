@@ -33,7 +33,7 @@ mouse: click moves the cursor; ctrl+click adds or removes one; shift+click selec
 the wheel scrolls the detail; drag a column gap to resize it`
 
 // idleAfter is how long the TUI waits without input before returning freed memory to the
-// OS, so the resident size stays near the live heap while idle (06 §8 T5).
+// OS, so the resident size stays near the live heap while idle (06 §3.5 T5).
 const idleAfter = 2 * time.Second
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -144,7 +144,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// scanSummary: "scan complete · 12 changes" (06 §4.1); the CLI line keeps the scan id.
+// scanSummary: "scan complete · 12 changes" (06 §2.9); the CLI line keeps the scan id.
 func (m *model) scanSummary(out string) string {
 	if m.changes > 0 {
 		return T("scan complete") + " " + markDot + " " + view.ChangeSummary(m.lastEvents) + " " + markDot + " " + T("c shows them")
@@ -161,7 +161,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	if m.prompt == nil && !m.editing && m.pos == nil {
 		m.status, m.sayKind = "", sayNone // the status line lasts until the next key
 	}
-	placed := m.placed // "m changes it" holds for the next key only (06 §13.6)
+	placed := m.placed // "m changes it" holds for the next key only (06 §3.5)
 	m.placed = nil
 	if a := m.armed; a != nil {
 		m.armed = nil
@@ -252,7 +252,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	return m.listKey(s)
 }
 
-// listKey: the keys of the list areas (06 §13.4, §13.6). The arrows only navigate.
+// listKey: the keys of the list areas (06 §3.3, §13.6). The arrows only navigate.
 func (m *model) listKey(s string) tea.Cmd {
 	c := m.col()
 	switch s {
@@ -393,7 +393,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	return nil
 }
 
-// filterKey: typing the search of the focused list (06 §13.8). The status line counts the
+// filterKey: typing the search of the focused list (06 §3.7). The status line counts the
 // matches in the other lists; tab takes the search to the next list that has any.
 func (m *model) filterKey(k tea.KeyMsg) tea.Cmd {
 	c := m.col()
@@ -606,7 +606,7 @@ func (m *model) chooseEnv() tea.Cmd {
 	return nil
 }
 
-// ---- mouse (06 §13.4, §13.5) ----
+// ---- mouse (06 §3.3, §13.5) ----
 
 // hit returns the column slot and view index under a point (index -1: the title row or
 // below the last row; ok false: not over a list column).
@@ -644,7 +644,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 		return tea.Batch(cmds...)
 	}
-	// The wheel scrolls the detail wherever the pointer is; the focus stays (06 §13.4).
+	// The wheel scrolls the detail wherever the pointer is; the focus stays (06 §3.3).
 	if wheel != 0 {
 		return m.scrollDetail(wheel)
 	}
@@ -655,7 +655,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 		return nil
 	}
-	// Dragging the gap after a list column sets its width (06 §12.1).
+	// Dragging the gap after a list column sets its width (06 §2.5).
 	if r := m.resizing; r != nil {
 		switch e.Action {
 		case tea.MouseActionMotion:
@@ -678,7 +678,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		return nil
 	}
 	// Click: the cursor; shift+click: a range from the cursor; ctrl+click: add or remove
-	// one row. Another list drops the selection (06 §13.5). Moving is done with verbs.
+	// one row. Another list drops the selection (06 §3.4). Moving is done with verbs.
 	m.setFocus(k)
 	c := &m.cols[k]
 	if i < 0 {

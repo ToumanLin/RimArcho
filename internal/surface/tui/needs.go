@@ -10,10 +10,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 需要处理 (06 §7). The items, their wording and their actions are view.BuildNeeds (08 §1.1);
+// 需要处理 (06 §5). The items, their wording and their actions are view.BuildNeeds (06 §1);
 // here each action gets its key and the screen is drawn.
 
-// Groups, in screen order (06 §7.1).
+// Groups, in screen order (06 §2.4).
 const (
 	gList     = view.GroupList
 	gDeps     = view.GroupDeps
@@ -52,7 +52,7 @@ func (m *model) toNeeds(items []view.Need) []need {
 	return out
 }
 
-// actionKey binds a shared action to its key (06 §7.2).
+// actionKey binds a shared action to its key (06 §5).
 func (m *model) actionKey(a view.Action, text string) needKey {
 	k := needKey{key: a.Key, label: a.Label}
 	switch a.Kind {
@@ -95,7 +95,7 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 	default:
 		k.run = func(m *model) tea.Cmd {
 			if a.Confirm != "" {
-				// Not undone with u: press twice (06 §9).
+				// Not undone with u: press twice (06 §6).
 				return m.arm(a.Key, a.Confirm, func(m *model) tea.Cmd { m.doAction(a, 0); return nil })
 			}
 			m.doAction(a, 0)

@@ -45,7 +45,7 @@ func plainLines(ls []dline) string {
 	return strings.Join(out, "\n")
 }
 
-// 06 §6.1: the default detail shows package id, version, Workshop id, tags, alias, note,
+// 06 §4.1: the default detail shows package id, version, Workshop id, tags, alias, note,
 // dependencies with their state, and the description; technical information is folded.
 func TestDetailContent(t *testing.T) {
 	e, _ := fixture(t)
@@ -171,7 +171,7 @@ func TestImgRows(t *testing.T) {
 	}
 }
 
-// T13 (06 §12.6): # → enter gives the picked mods the second candidate; the same again
+// T13 (06 §11): # → enter gives the picked mods the second candidate; the same again
 // removes it ([✓]); a tag only some have shows as [~] and enter gives it to all; # ←
 // then typing makes a new tag. The list rows show tags faintly.
 func TestT13TagBar(t *testing.T) {
@@ -414,7 +414,7 @@ func TestT6Thumbnail(t *testing.T) {
 	}
 }
 
-// 06 §6.3: the full-screen detail has Def, patches, Harmony, rules and the full history
+// 06 §4.2: the full-screen detail has Def, patches, Harmony, rules and the full history
 // as sub-sections, 1–5 jump to them; the column shows a one-line history.
 func TestFullSections(t *testing.T) {
 	e, _ := fixture(t)

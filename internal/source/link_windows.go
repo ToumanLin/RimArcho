@@ -64,7 +64,7 @@ func RealPath(p string) (string, error) {
 	}
 }
 
-// CreateLink makes link a directory junction pointing at target (09 §8). A junction needs no
+// CreateLink makes link a directory junction pointing at target (08 §3). A junction needs no
 // privileges; volumes without reparse points (FAT, exFAT) fail with an error.
 func CreateLink(link, target string) error {
 	abs, err := filepath.Abs(target)

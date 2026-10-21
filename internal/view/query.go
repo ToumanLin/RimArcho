@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Column search (06 §5.5): words, field:value terms, - negation, "quoted words"; all
+// Column search (06 §3.7): words, field:value terms, - negation, "quoted words"; all
 // terms must hold.
 
 type term struct {
@@ -75,7 +75,7 @@ func (q Query) NeedsContent() bool {
 }
 
 // MatchFacts are what matching needs beyond the row: content kinds by instance (Contents) and
-// the row status (06 §5.5 has:problem).
+// the row status (06 §3.7 has:problem).
 type MatchFacts struct {
 	Content map[string]int
 	Status  map[string]int

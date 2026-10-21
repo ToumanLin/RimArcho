@@ -38,7 +38,7 @@ type Options struct {
 func ChildScan(envName string) (string, error) { return app.ChildScan(env.AppHome(), envName) }
 
 // Screens. The main screen is the four columns; the others are opened from it and esc
-// returns (06 §4.2).
+// returns (06 §2.2).
 const (
 	tabList = iota
 	tabProblems
@@ -63,7 +63,7 @@ type prompt struct {
 	submit func(m *model, text string) tea.Cmd
 }
 
-// Status line kinds (06 §9).
+// Status line kinds (06 §6).
 const (
 	sayNone = iota
 	sayOK
@@ -109,9 +109,9 @@ type model struct {
 	chg chState
 
 	liveTr view.LiveTracker
-	live   *view.Live // the running game (10 §3.4); nil until the first poll
+	live   *view.Live // the running game (06 §2.1); nil until the first poll
 
-	hist    []view.HistItem // the history area, shown in empty staging (08 §14)
+	hist    []view.HistItem // the history area, shown in empty staging (06 §2.5)
 	histCur int
 	histOff int
 	// afterPanel runs once after a confirmed panel command (the Changes view reloads).
@@ -119,7 +119,7 @@ type model struct {
 
 	panel   *panel
 	prompt  *prompt
-	tags    *tagBar // the tag bar is open (06 §12.3)
+	tags    *tagBar // the tag bar is open (06 §3.8)
 	status  string
 	sayKind int
 
@@ -128,28 +128,28 @@ type model struct {
 	dd          *detailData          // the current mod's details beyond the row
 	imgs        map[string]*imgEntry // description images by url and width
 	imgLoading  string               // the image being loaded ("" none)
-	thumbShown  string               // the mod whose thumbnail may be drawn: the cursor rested on it (06 §6.2)
+	thumbShown  string               // the mod whose thumbnail may be drawn: the cursor rested on it (06 §9.4)
 	thumbSeq    int
-	dwell       time.Duration // ui.preview_dwell_ms (06 §12.4: 0, the thumbnail at once)
+	dwell       time.Duration // ui.preview_dwell_ms (06 §9.4: 0, the thumbnail at once)
 	previewsOff bool          // ui.previews off: no images at all
 	prefetching string        // the thumbnail being made ahead of the cursor
 	imgUse      map[string]int
 	imgClock    int
-	fsecs       *fullSecs // the full-screen detail's sub-sections (06 §6.3)
-	pal         *palette  // the command palette (06 §8), nil when closed
-	sel         selRange  // the shift range of the selection (06 §13.5)
-	pos         *posInput // the position input, m (06 §13.7)
-	placed      []string  // the mods space just enabled: an m right after it moves them (06 §13.6)
-	prefs       colPrefs  // column widths and wrapping (06 §12.1)
+	fsecs       *fullSecs // the full-screen detail's sub-sections (06 §4.2)
+	pal         *palette  // the command palette (06 §3.5), nil when closed
+	sel         selRange  // the shift range of the selection (06 §3.4)
+	pos         *posInput // the position input, m (06 §3.6)
+	placed      []string  // the mods space just enabled: an m right after it moves them (06 §3.5)
+	prefs       colPrefs  // column widths and wrapping (06 §2.5)
 	prefsEnv    string
 	resizing    *resizeDrag // a column gap being dragged
 	rowMap      [3][]int    // per list column: body line → view index (-1: title or empty), as last drawn
-	armed       *armed      // a destructive key pressed once (06 §9)
+	armed       *armed      // a destructive key pressed once (06 §6)
 	images      *imgWriter  // the WezTerm host's output; nil: no inline images
 	full        bool        // the full-screen detail
 	fullOff     int
 	fullSec     int    // the full-screen sub-section tab / shift+tab went to (0: the summary)
-	detailFocus bool   // focus area 4, the compact detail: ↑↓ scroll it (06 §13.3)
+	detailFocus bool   // focus area 4, the compact detail: ↑↓ scroll it (06 §3.2)
 	detailOff   int    // its scroll (PgUp PgDn and the wheel scroll it from any area)
 	detailOffID string // the mod it was scrolled for
 	lastLines   []dline
@@ -177,12 +177,12 @@ func dwellSetting(a *app.App) time.Duration {
 	return time.Duration(n) * time.Millisecond
 }
 
-// MemoryLimit is the Go heap soft cap of the TUI process (06 §8 T5: idle ≤ 80 MB with
+// MemoryLimit is the Go heap soft cap of the TUI process (06 §3.5 T5: idle ≤ 80 MB with
 // ≥ 15 MB headroom). The GC works harder near the cap instead of growing the heap.
 const MemoryLimit = 40 << 20
 
 // TuneProcess applies the TUI process's memory settings (M3 measurements in
-// docs/decisions-m3.md): a soft heap cap, GOGC 50, and a 256 KiB SQLite page cache on the
+// 07 §8.3): a soft heap cap, GOGC 50, and a 256 KiB SQLite page cache on the
 // single connection (the default 2 MB stays resident in modernc's allocator).
 func TuneProcess(a *app.App) {
 	debug.SetMemoryLimit(MemoryLimit)
@@ -201,7 +201,7 @@ func Run(o Options) error {
 		opts = append(opts, tea.WithMouseCellMotion())
 	}
 	mdl := New(o).(*model)
-	if os.Getenv("TERM_PROGRAM") == "WezTerm" { // inline images in the host only (06 §1.3)
+	if os.Getenv("TERM_PROGRAM") == "WezTerm" { // inline images in the host only (06 §9.3)
 		mdl.images = &imgWriter{Writer: os.Stdout}
 		opts = append(opts, tea.WithOutput(mdl.images))
 	}
@@ -247,13 +247,13 @@ func (m *model) run(argv ...string) (string, int) {
 	return out, code
 }
 
-// resizeDrag: a mouse drag on the gap right of a list column (06 §12.1).
+// resizeDrag: a mouse drag on the gap right of a list column (06 §2.5).
 type resizeDrag struct {
 	kind   colKind
 	x0, w0 int
 }
 
-// armed is a destructive action waiting for its second press (06 §9).
+// armed is a destructive action waiting for its second press (06 §6).
 type armed struct {
 	key string
 	run func(m *model) tea.Cmd
@@ -267,7 +267,7 @@ func (m *model) arm(key, warning string, run func(m *model) tea.Cmd) tea.Cmd {
 	return nil
 }
 
-// say sets the status line (06 §9); it is cleared by the next key.
+// say sets the status line (06 §6); it is cleared by the next key.
 func (m *model) say(kind int, text string) { m.sayKind, m.status = kind, text }
 
 // act runs a command; success shows okText, failure the command's error in plain words.
@@ -330,9 +330,9 @@ func (m *model) requestDetail() tea.Cmd {
 	return tea.Batch(tick, m.thumbDwell())
 }
 
-// thumbDwell: the thumbnail follows the selection at once (06 §12.4); with
+// thumbDwell: the thumbnail follows the selection at once (06 §9.4); with
 // ui.preview_dwell_ms set, it goes when the selection changes and comes back once the
-// cursor has rested that long (the old 06 §6.2 behaviour).
+// cursor has rested that long (the old 06 §9.4 behaviour).
 func (m *model) thumbDwell() tea.Cmd {
 	it := m.current()
 	if it == nil || it.id == "" {

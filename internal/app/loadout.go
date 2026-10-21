@@ -30,11 +30,11 @@ type LoadoutState struct {
 	FileErr  error
 	Notices  []string // what Sync did (import, external change, conflict)
 	Aliases  map[string][]store.Alias
-	// MM overrides the game's major.minor for analysis (--game-version, decisions-m3 §12.7).
+	// MM overrides the game's major.minor for analysis (--game-version, 03 §3).
 	MM string
 
 	cands  []loadout.Candidate // what Reg was built from, deployed instances included
-	deploy map[string]bool     // instances linked into Mods/ by RimArcho (09 §8)
+	deploy map[string]bool     // instances linked into Mods/ by RimArcho (08 §3)
 }
 
 // GameMM is the environment's game major.minor version.
@@ -70,7 +70,7 @@ func (st *LoadoutState) LineageOf(id string) string {
 func (st *LoadoutState) Position(id string) int { return st.List.Index(id) + 1 }
 
 // FileVersionMismatch reports the ModsConfig.xml version when its major.minor differs from
-// the game's: the game resets such a list on load (04 §2.2 rule 5).
+// the game's: the game resets such a list on load (04 §4.1 rule 6).
 func (st *LoadoutState) FileVersionMismatch() string {
 	if st.File == nil {
 		return ""
@@ -82,7 +82,7 @@ func (st *LoadoutState) FileVersionMismatch() string {
 	return ""
 }
 
-// Candidates derives the game-loadable instances (02 §4.1, 04 §2.4): live, subscribed,
+// Candidates derives the game-loadable instances (02 §4.2, 04 §4.2): live, subscribed,
 // not unloadable, and located in Data/, Mods/ or the workshop — directly or via an alias.
 // RimArcho's own Mods/ links do not count here; deployed instances are added separately.
 func Candidates(ix *Index, aliases map[string][]store.Alias) []loadout.Candidate {
@@ -115,7 +115,7 @@ func Candidates(ix *Index, aliases map[string][]store.Alias) []loadout.Candidate
 	return out
 }
 
-// Loadout loads the workspace, first syncing it with ModsConfig.xml (04 §2.3). Like Index,
+// Loadout loads the workspace, first syncing it with ModsConfig.xml (04 §4.3). Like Index,
 // the result is cached until the database or ModsConfig.xml (size, mtime) changes; a cached
 // state carries no notices (they were reported when the sync happened).
 func (a *App) Loadout() (*LoadoutState, error) {
@@ -542,7 +542,7 @@ type SortResult struct {
 	Applied bool
 }
 
-// Community loads community rules from <home>/cache/communityRules.json (04 §5.2).
+// Community loads community rules from <home>/cache/communityRules.json (04 §6.3).
 func (a *App) Community() order.Community {
 	c, err := loadCommunity(filepath.Join(a.Home, "cache", "communityRules.json"))
 	if err != nil {
@@ -586,7 +586,7 @@ func (a *App) SortInput(st *LoadoutState, l loadout.List) (order.Input, error) {
 	return in, nil
 }
 
-// Sort orders the workspace (04 §4); dryRun only computes.
+// Sort orders the workspace (04 §5); dryRun only computes.
 func (a *App) Sort(dryRun bool) (*SortResult, error) {
 	var out *SortResult
 	compute := func(st *LoadoutState, l loadout.List) (loadout.List, error) {
@@ -654,7 +654,7 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 	return &EditResult{State: st, Before: before, Changes: loadout.Diff(before, st.List, st.LineageOf)}, op, nil
 }
 
-// SaveResult describes a save (04 §2.2).
+// SaveResult describes a save (04 §4.1).
 type SaveResult struct {
 	State      *LoadoutState
 	Path       string
@@ -669,10 +669,10 @@ type SaveResult struct {
 	Restores   int // source "undo": the version the workspace was checked out from
 	Missing    int
 	Unchanged  bool
-	Links      []LinkChange // Mods/ links created or removed first (09 §8)
+	Links      []LinkChange // Mods/ links created or removed first (08 §3)
 }
 
-// Save writes the workspace to ModsConfig.xml: backup, atomic replace, version (04 §2.2).
+// Save writes the workspace to ModsConfig.xml: backup, atomic replace, version (04 §4.1).
 func (a *App) Save(dryRun bool) (*SaveResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -820,7 +820,7 @@ func (a *App) Checkout(ref string) (*EditResult, int, error) {
 	return r, n, nil
 }
 
-// RuleSpec is a user rule as typed (04 §5.1).
+// RuleSpec is a user rule as typed (04 §6.1).
 type RuleSpec struct {
 	Kind   string
 	A, B   string // references
@@ -915,7 +915,7 @@ func loadCommunity(path string) (order.Community, error) {
 }
 
 // DismissConflict drops the pointer to an external ModsConfig.xml version that was not
-// loaded (06 §5 "ignore"); the version stays in the history.
+// loaded (06 §2.5 "ignore"); the version stays in the history.
 func (a *App) DismissConflict() error {
 	st, err := a.Loadout()
 	if err != nil {

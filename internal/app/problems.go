@@ -249,7 +249,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 
 	for _, m := range active {
 		d := m.Decl()
-		// Use This Instead (10 §5): the community knows a maintained replacement for this game version.
+		// Use This Instead (04 §6.3): the community knows a maintained replacement for this game version.
 		if r := a.ReplacementFor(m.WorkshopID(), m.PackageID); r != nil && r.NewPackageID != m.PackageID && (len(r.NewVersions) == 0 || slices.Contains(r.NewVersions, mm)) {
 			f := &finding.Finding{Code: "mod.replaced", Severity: finding.Warning, Key: r.NewWorkshopID, Subjects: []string{inst(m.ID)},
 				Claim:    fmt.Sprintf("%s has a replacement for %s: %s by %s", inst(m.ID), mm, r.NewName, r.NewAuthor),
@@ -303,7 +303,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			case dep.url != "":
 				f.Suggestions = append(f.Suggestions, "subscribe: "+dep.url)
 			default:
-				if w, ok := a.WorkshopFor(p); ok { // steamDB (10 §5): a direct link
+				if w, ok := a.WorkshopFor(p); ok { // steamDB (04 §6.3): a direct link
 					f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+w.WorkshopID)
 				}
 			}
@@ -351,7 +351,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			}
 			if !ok {
 				// Listing the previous minor version only is the normal state right after a game
-				// update: info. Anything older: warning (decisions-m3 §12.1).
+				// update: info. Anything older: warning (03 §4.5).
 				sev := finding.Warning
 				if prev := PrevMinor(mm); prev != "" {
 					for _, v := range d.SupportedVersions {
@@ -408,7 +408,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		}
 	}
 	// About.xml renamed away (about-disabled) on installed mods that are not enabled: pinned
-	// by a copy, unsubscribed, or hidden on their own (10 §2.1).
+	// by a copy, unsubscribed, or hidden on their own (08 §6).
 	for _, h := range st.Hidden() {
 		m := h.Mod
 		if activePos[m.ID] != 0 {
@@ -579,6 +579,6 @@ func PrevMinor(mm string) string {
 	return fmt.Sprintf("%d.%d", a, b-1)
 }
 
-// NoisyCodes are hidden from default problem lists (decisions-m3 §12.2); they show with
+// NoisyCodes are hidden from default problem lists (03 §4.5); they show with
 // --all, an explicit --code or --subject, severity info, and in def / patches output.
 var NoisyCodes = map[string]bool{"def.override": true, "patch.contested": true}

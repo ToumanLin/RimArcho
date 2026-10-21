@@ -11,7 +11,7 @@ Research design: `docs/research/00-日志语料顶层设计.md`. Measurements: `
 | Sample whole days | One day per month (the 15th, `hugslogs sample`). Whole days keep a player's repeat uploads together (sessions, design §6.2). 6,093 logs, 0.49 GB packed in git (8× compression), within the corpus repository's 2 GB guard |
 | Research mod library | The top 3,000 packages of the sample that are not installed locally: packageId → Workshop id via RimSort's `steamDB.json` (packageId, else a unique name), SteamCMD download, check against About.xml's own packageId (a dependency's `<packageId>` comes first in many files), textures and sounds stripped. 1,960 mods, 3.2 GB |
 | 1.6 game data | The public 1.6 branch installed separately with SteamCMD (`D:\RimWorld16`), so 1.6 logs are simulated against 1.6 Core and DLCs, not the author's 1.7 |
-| Research environment | A separate `RIMARCHO_HOME`. The downloaded mods sit in the 1.6 game's `Mods` folder, because a Loadout only takes mods the game can load (official, local, Workshop). Link deployment (09 §8) would now also allow a SteamCMD source |
+| Research environment | A separate `RIMARCHO_HOME`. The downloaded mods sit in the 1.6 game's `Mods` folder, because a Loadout only takes mods the game can load (official, local, Workshop). Link deployment (08 §3) would now also allow a SteamCMD source |
 
 ## 2. Product changes made from the corpus
 

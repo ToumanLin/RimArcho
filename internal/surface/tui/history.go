@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The history area (08 §14, 10 §6): where the staging list is when staging is empty, the
+// The history area (06 §2.5): where the staging list is when staging is empty, the
 // unsaved steps around "now" (redo dimmed above, undo below), then the saved versions. The
 // rows are view.HistoryItems; enter on a step goes there at once (u / ctrl+r move back), on
 // a version asks first (press twice).

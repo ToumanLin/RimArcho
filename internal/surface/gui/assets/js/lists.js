@@ -1,4 +1,4 @@
-// The three lists (06 §5): virtual rows, the cursor, selection, search, dragging.
+// The three lists (06 §2.5): virtual rows, the cursor, selection, search, dragging.
 import { S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { sourceIcon, statusIcon } from "./icons.js";
 
@@ -92,7 +92,7 @@ export function renderRows(k) {
   if (!c.view.length) {
     if (!empty) box.appendChild(empty = el("div", "empty"));
     empty.textContent = c.query ? T("nothing matches") : [T("every installed mod is enabled"), T("nothing enabled yet"), T("staging is empty · t puts the selected mods here")][k];
-    // Staging is empty: its place shows the history (08 §14).
+    // Staging is empty: its place shows the history (06 §2.5).
     if (k === 2 && !c.query && S.history && S.history.length > 1) empty.append(historyPanel());
   } else if (empty) empty.remove();
   if (k === 2) historyDock(box, !c.view.length && !c.query);
@@ -144,7 +144,7 @@ function historyDock(box, emptyShown) {
   if (histOpen) dock.append(historyPanel(false));
 }
 
-// historyPanel: unsaved steps around "now", then the saved versions (08 §14).
+// historyPanel: unsaved steps around "now", then the saved versions (06 §2.5).
 function historyPanel(title = true) {
   const p = el("div", "hist");
   if (title) p.append(el("div", "hh", T("history")));
@@ -226,7 +226,7 @@ export function wireLists(ui) {
   }
 }
 
-// Dragging is another way to run a verb (08 §6): it acts on drop and u undoes it.
+// Dragging is another way to run a verb (06 §8.5): it acts on drop and u undoes it.
 let drag = null;
 const tip = el("div", "drop-tip");
 

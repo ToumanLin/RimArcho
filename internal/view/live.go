@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// GroupThisRun holds the errors of the running game (10 §3.4); interfaces show it first.
+// GroupThisRun holds the errors of the running game (06 §2.1); interfaces show it first.
 const GroupThisRun = 6
 
 // Live is the running game as the interfaces show it.
@@ -45,7 +45,7 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 		return &Live{}, nil
 	}
 	if t.lv == nil || t.pid != run.PID {
-		// a pack run writes its own log on 1.7 (10 §8.3): follow the one this run writes
+		// a pack run writes its own log on 1.7 (08 §5.3): follow the one this run writes
 		t.what = a.WhatRuns(st.Ix.Env, run)
 		path := a.RunLog(st, t.what)
 		if path == "" {

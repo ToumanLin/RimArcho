@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Changes (06 §4.1): the changes of the last scans in words, newest first; each update can
+// Changes (06 §2.9): the changes of the last scans in words, newest first; each update can
 // show the semantic files it changed.
 
 // ChangeScans is the number of scans shown.
@@ -92,7 +92,7 @@ func KindOrder(k string) int {
 	return 99
 }
 
-// ChangeSummary: "12 mods updated · 1 changed its package id" (06 §4.1).
+// ChangeSummary: "12 mods updated · 1 changed its package id" (06 §2.9).
 func ChangeSummary(counts map[string]int) string {
 	var kinds []string
 	for k := range counts {

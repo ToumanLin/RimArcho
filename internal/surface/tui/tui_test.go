@@ -169,7 +169,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	tm := start(t, e, scans, 160, 40)
 	waitFor(t, tm, "Enabled 3")
 	// Enabled is focused; h goes to "Disabled", where a filter finds Beta. space enables it
-	// where the order wants it: the end, nothing constrains it (06 §13.6).
+	// where the order wants it: the end, nothing constrains it (06 §3.5).
 	keys(tm, "h", "/", "Beta", "enter", "space")
 	waitFor(t, tm, "placed at position 4 · m changes it")
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
@@ -361,7 +361,7 @@ func TestStagingT9(t *testing.T) {
 	press(m, "g")
 	press(m, "down") // M01
 	for i := 0; i < 26; i++ {
-		if i%4 != 3 { // picks 20 of 26; ctrl+↓ moves the cursor alone (06 §12.2)
+		if i%4 != 3 { // picks 20 of 26; ctrl+↓ moves the cursor alone (06 §3.4)
 			press(m, "v")
 		}
 		press(m, "ctrl+down")
@@ -383,7 +383,7 @@ func TestStagingT9(t *testing.T) {
 	}
 }
 
-// 06 §12.2: a click moves the cursor (and focus), ctrl+click picks one more, shift+click
+// 06 §3.4: a click moves the cursor (and focus), ctrl+click picks one more, shift+click
 // picks a range; there is no drag-to-move; the wheel scrolls.
 func TestMouseClicks(t *testing.T) {
 	e, _ := fixture(t)
@@ -425,7 +425,7 @@ func TestMouseClicks(t *testing.T) {
 	if names := pickedNames(m); names != "N2 N4 N5" || m.current().name != "Beta" {
 		t.Fatalf("plain click: %q on %s", names, m.current().name)
 	}
-	// A click in another list moves the focus there and drops the selection (06 §13.5).
+	// A click in another list moves the focus there and drops the selection (06 §3.4).
 	click(xOf(cActive), 4, false, false)
 	if len(m.marked) != 0 || m.focus != cActive || m.current().name != "Alpha" {
 		t.Fatalf("click in Enabled: selected %d, %+v", len(m.marked), m.current())
@@ -433,7 +433,7 @@ func TestMouseClicks(t *testing.T) {
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
 		t.Fatalf("a click changed the list: %s", got)
 	}
-	// The wheel scrolls the detail wherever it is; the cursor and the focus stay (06 §13.4).
+	// The wheel scrolls the detail wherever it is; the cursor and the focus stay (06 §3.3).
 	m.update(tea.MouseMsg{X: xOf(cActive), Y: 5, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
 	if m.cols[cActive].cursor != 1 || m.focus != cActive || m.detailFocus || m.detailOff != 3 {
 		t.Fatalf("wheel: cursor %d, focus %d/%v, detail scrolled %d", m.cols[cActive].cursor, m.focus, m.detailFocus, m.detailOff)
@@ -489,7 +489,7 @@ func TestChineseUI(t *testing.T) {
 			t.Fatalf("line wider than the terminal (%d): %q", w, l)
 		}
 	}
-	// Command output stays English (05 §1).
+	// Command output stays English (05 §1.1).
 	if out, _ := cmds.Execute(e.App, []string{"status"}); !strings.Contains(out, "lineages:") {
 		t.Fatalf("status output changed: %s", out)
 	}
@@ -513,7 +513,7 @@ func findNeed(m *model, sub string) int {
 	return -1
 }
 
-// 06 §7: a cycle of order requirements is one item in "this list"; enter shows the
+// 06 §5: a cycle of order requirements is one item in "this list"; enter shows the
 // requirements in words and x ignores the suggested one; a dependency that is installed but
 // not enabled is one item in "missing dependencies" that space enables.
 func TestNeedsView(t *testing.T) {
@@ -596,7 +596,7 @@ func countedNeeds(m *model) int {
 	return n
 }
 
-// 06 §4.1: changes are a sentence on the status line after a scan and the c view, in
+// 06 §2.9: changes are a sentence on the status line after a scan and the c view, in
 // words; an outside change of ModsConfig.xml is an item of 需要处理 with load / ignore.
 func TestChangesView(t *testing.T) {
 	e, scans := fixture(t)
@@ -625,7 +625,7 @@ func TestChangesView(t *testing.T) {
 	}
 	m.prob.cursor = i
 	// L replaces the unsaved edits: the first press only warns, another key cancels,
-	// and two presses load it (06 §9).
+	// and two presses load it (06 §6).
 	L := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")}
 	m.update(L)
 	if m.armed == nil || !strings.Contains(m.status, "press L again") {
@@ -650,7 +650,7 @@ func TestChangesView(t *testing.T) {
 	}
 }
 
-// 06 §7.1, §7.3: the current log's errors are one item per mod under "last run"; a stale
+// 06 §2.4, §7.3: the current log's errors are one item per mod under "last run"; a stale
 // log is one dim row that is not counted.
 func TestNeedsLogs(t *testing.T) {
 	e := testkit.New(t)
@@ -694,7 +694,7 @@ func TestNeedsLogs(t *testing.T) {
 	}
 }
 
-// 06 §3: every icon of both sets is one cell wide for RimArcho's width function.
+// 06 §7: every icon of both sets is one cell wide for RimArcho's width function.
 func TestIconWidths(t *testing.T) {
 	for name, set := range map[string]icons{"nerd": nerdIcons, "compat": compatIcons} {
 		for i, s := range []string{set.official, set.workshop, set.local, set.localCopy, set.git, set.err, set.warn, set.logErr,
@@ -734,7 +734,7 @@ func TestWrap(t *testing.T) {
 	}
 }
 
-// 06 §5.5 on the fixture: every field, negation, AND, the per-column query, the fallback.
+// 06 §3.7 on the fixture: every field, negation, AND, the per-column query, the fallback.
 func TestColumnSearch(t *testing.T) {
 	e, _ := fixture(t)
 	e.MustRun("tag", "add", "pkg:brrainz.harmony", "core-lib", "--mod", "pkg:tester.b")
@@ -816,7 +816,7 @@ func TestColumnSearch(t *testing.T) {
 	}
 }
 
-// 06 §9: L pressed twice loads an outside change of ModsConfig.xml into the list.
+// 06 §6: L pressed twice loads an outside change of ModsConfig.xml into the list.
 func TestDoublePressLoad(t *testing.T) {
 	e, _ := fixture(t)
 	e.MustRun("enable", "pkg:tester.b")

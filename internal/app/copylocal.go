@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// CopyResult describes a finished copy-local (04 §6).
+// CopyResult describes a finished copy-local (04 §7.2).
 type CopyResult struct {
 	Dir      string // the new folder under the local source
 	Files    int
@@ -38,7 +38,7 @@ func (ix *Index) LocalSource() *source.Source {
 	return nil
 }
 
-// CopyLocal copies an instance into the local source with an origin marker (04 §6). It
+// CopyLocal copies an instance into the local source with an origin marker (04 §7.2). It
 // never changes the Loadout, never overwrites an existing folder, never copies .git and
 // never follows links that leave the mod folder. The copy is assembled next to its final
 // place and renamed, so a failure leaves nothing behind.

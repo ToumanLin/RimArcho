@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// T15 (06 §12.6): in the full-screen detail, ↓ to the bottom then → shows the next mod
+// T15 (06 §11): in the full-screen detail, ↓ to the bottom then → shows the next mod
 // from the top; tab / shift+tab go through the sub-sections; the wheel scrolls; esc goes
 // back with the cursor on the last mod shown.
 func TestT15FullScreenNext(t *testing.T) {
@@ -63,7 +63,7 @@ func TestT15FullScreenNext(t *testing.T) {
 	}
 }
 
-// 06 §13.3, §13.4: 4 (or → from Staging) focuses the detail; ↑↓ scroll it, the name stays
+// 06 §3.2, §13.4: 4 (or → from Staging) focuses the detail; ↑↓ scroll it, the name stays
 // on top in the accent colour; ← and esc go back to the list it shows; a click focuses it
 // too. PgDn scrolls it from a list without moving the focus or the cursor.
 func TestDetailFocus(t *testing.T) {

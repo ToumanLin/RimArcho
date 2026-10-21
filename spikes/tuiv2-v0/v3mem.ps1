@@ -32,7 +32,7 @@ while (((Get-Date) - $t0).TotalSeconds -lt $IdleSeconds) {
   Sample ("idle {0,3}s" -f [int]((Get-Date) - $t0).TotalSeconds)
 }
 $w = Get-Process wezterm-gui -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($w) { "wezterm-gui working set {0:N1} MB (recorded separately, 06 §1.4)" -f ($w.WorkingSet64 / 1MB) }
+if ($w) { "wezterm-gui working set {0:N1} MB (recorded separately, 06 §10)" -f ($w.WorkingSet64 / 1MB) }
 Send "q"; Start-Sleep -Milliseconds 800
 Get-Process archo, wezterm-gui -ErrorAction SilentlyContinue | Stop-Process -Force
 $n = @(Get-ChildItem (Join-Path $DataHome "cache\previews") -Filter *.png -ErrorAction SilentlyContinue).Count

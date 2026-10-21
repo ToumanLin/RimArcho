@@ -7,10 +7,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Changes (06 §4.1): after a scan the status line says what changed in one sentence, and c
+// Changes (06 §2.9): after a scan the status line says what changed in one sentence, and c
 // lists the changes of the last scans in words, newest first; enter shows the files an
 // update changed. Questions that need the player's answer and an outside change of the
-// list are items of 需要处理 (06 §7), not rows here.
+// list are items of 需要处理 (06 §5), not rows here.
 
 type chRow struct {
 	text  string

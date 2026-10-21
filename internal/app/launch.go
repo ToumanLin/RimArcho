@@ -49,9 +49,9 @@ func quoteArg(s string) string {
 // ErrLaunchBlocked is wrapped by Launch refusals.
 var ErrLaunchBlocked = errors.New("launch blocked")
 
-// Launch starts the game (04 §8). It refuses when the workspace has unsaved changes (unless
+// Launch starts the game (08 §2). It refuses when the workspace has unsaved changes (unless
 // force: the saved list is used as is) and always when ModsConfig.xml was written for
-// another game version, because the game would discard the list (04 §2.2 rule 5).
+// another game version, because the game would discard the list (04 §4.1 rule 6).
 func (a *App) Launch(dryRun, force bool) (*LaunchPlan, *LoadoutState, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -73,7 +73,7 @@ func (a *App) Launch(dryRun, force bool) (*LaunchPlan, *LoadoutState, error) {
 	if dryRun {
 		return p, st, nil
 	}
-	// A pack's links would let the game see its copies next to this list (10 §8.3).
+	// A pack's links would let the game see its copies next to this list (08 §5.3).
 	if _, err := a.removePackLinks(st.Ix, ""); err != nil {
 		return nil, st, err
 	}
@@ -99,7 +99,7 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 	if userData != "" && env.PathKey(userData) != env.PathKey(env.DefaultUserDataRoot()) {
 		extra = append(extra, "-savedatafolder="+userData)
 	}
-	extra = append(extra, strings.Fields(a.LaunchArgs(e.ID))...) // 10 §7
+	extra = append(extra, strings.Fields(a.LaunchArgs(e.ID))...) // 06 §2.14
 	switch e.Launch {
 	case "steam":
 		p.Exe = env.SteamExe(a.Detect)

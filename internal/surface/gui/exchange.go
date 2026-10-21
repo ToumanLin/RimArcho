@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Import and export of the mod list (10 §4): the page previews a list before anything
+// Import and export of the mod list (04 §9): the page previews a list before anything
 // changes, and applies it as one undoable step; export writes a file or copies text.
 // The file dialogs and the clipboard are the window's (Wails); the development harness
 // has none, so every path can also be typed.

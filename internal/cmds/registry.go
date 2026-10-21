@@ -1,4 +1,4 @@
-// Package cmds is the single command set behind every surface (05 §1): argument parsing,
+// Package cmds is the single command set behind every surface (05 §1.1): argument parsing,
 // execution against internal/app, and outline text output. CLI (and later MCP and the TUI
 // command line) only translate their input into Execute calls.
 package cmds
@@ -22,7 +22,7 @@ type Flag struct {
 	Help  string
 }
 
-// Command is one entry of the command table (05 §3).
+// Command is one entry of the command table (05 §4.2).
 type Command struct {
 	Name    string // words, e.g. "env list"
 	Args    string // positional usage, e.g. "<ref>"
@@ -92,7 +92,7 @@ var registry []*Command
 
 func register(c *Command) { registry = append(registry, c) }
 
-// order is the documented command order (05 §3); registration order depends on file names.
+// order is the documented command order (05 §4.2); registration order depends on file names.
 var commandOrder = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "env remove", "scan", "status", "list", "find",
 	"mod", "describe", "def", "patches", "harmony", "why", "log", "problems", "problems show", "problems ignore", "problems unignore", "files search", "source", "source search", "analyze", "changes", "enable", "disable", "move", "swap", "sort", "undo", "redo", "save", "loadout log", "loadout diff",
 	"loadout checkout", "loadout tag", "loadout export", "loadout import", "stage list", "stage add", "stage drop", "stage restore", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule list", "rule remove", "launch", "identity list", "identity resolve", "lineage split", "lineage merge", "gc", "config get", "config set", "mcp", "gui", "version"}
@@ -271,7 +271,7 @@ func Help() *render.Doc {
 
 var gameVersionRe = regexp.MustCompile(`^\d+\.\d+$`)
 
-// gameVersionFlag is accepted by the analysis commands (decisions-m3 §12.7).
+// gameVersionFlag is accepted by the analysis commands (03 §3).
 var gameVersionFlag = Flag{Name: "game-version", Value: "<X.Y>", Help: "analyse for another game version than the environment's"}
 
 // CommandHelp is `archo <command> --help`: the usage line, the summary and each flag.

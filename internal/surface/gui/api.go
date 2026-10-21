@@ -18,7 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// API is the service the page calls (08 §1, §3): every method returns view models from
+// API is the service the page calls (06 §1, §3): every method returns view models from
 // internal/view, or runs a view verb. No business rule lives here.
 //
 // The app is not safe for concurrent use and Wails calls methods concurrently, so each
@@ -37,7 +37,7 @@ type API struct {
 	busy    map[string]bool        // scan, analyze, pack
 	// building is the pack this window's build child is making ("" none).
 	building string
-	live     view.LiveTracker // the running game's log (10 §3)
+	live     view.LiveTracker // the running game's log (03 §6.6)
 	x        exchange         // import and export (exchange.go)
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
@@ -62,7 +62,7 @@ func (s *API) send(name string, data any) {
 var processStart = time.Now()
 
 // Ready is called once the page has drawn the list; it logs the start-up time to
-// <data>/logs/gui.log (08 §10: cold start to an interactive list).
+// <data>/logs/gui.log (06 §10: cold start to an interactive list).
 func (s *API) Ready() {
 	ms := time.Since(processStart).Milliseconds()
 	dir := filepath.Join(s.a.Home, "logs")
@@ -97,7 +97,7 @@ func (s *API) Init() *Start {
 // Board is the three columns with what surrounds them.
 type Board struct {
 	*view.Board
-	Status    map[string]int `json:"status"` // row icons (06 §3)
+	Status    map[string]int `json:"status"` // row icons (06 §7)
 	Needs     int            `json:"needs"`  // the top bar's number
 	Stamp     string         `json:"stamp"`  // the database state: the page reloads when it changes
 	Envs      []string       `json:"envs"`
@@ -107,7 +107,7 @@ type Board struct {
 	Never     bool           `json:"neverScanned"`
 }
 
-// Board builds the columns (06 §5) and the counts from the workspace.
+// Board builds the columns (06 §2.5) and the counts from the workspace.
 func (s *API) Board() *Board {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -146,7 +146,7 @@ type PackList struct {
 	Building   string               `json:"building,omitempty"` // the build this window started
 }
 
-// Packs lists the current environment's packs (10 §8).
+// Packs lists the current environment's packs (08 §5).
 func (s *API) Packs() (*PackList, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -292,7 +292,7 @@ func (s *API) PackRemove(name string) (string, error) {
 	return view.Tf("pack %s is in the recycle bin", name), nil
 }
 
-// Settings is the settings page (10 §7).
+// Settings is the settings page (06 §2.14).
 func (s *API) Settings() []view.SettingGroup {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -333,7 +333,7 @@ func (s *API) ApplySetting(argv []string, value string) ([]string, error) {
 	return lines, nil
 }
 
-// History is the history area (08 §14): unsaved steps around now, then the versions.
+// History is the history area (06 §2.5): unsaved steps around now, then the versions.
 func (s *API) History() ([]view.HistItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -361,7 +361,7 @@ func (s *API) HistoryGo(steps, version int) (string, error) {
 	return view.Tf("%d changes", len(r.Changes)), nil
 }
 
-// Live reports the running game and the errors its log gained (10 §3.4); the page asks
+// Live reports the running game and the errors its log gained (06 §2.1); the page asks
 // every two seconds.
 func (s *API) Live() (*view.Live, error) {
 	s.mu.Lock()
@@ -378,8 +378,8 @@ func (s *API) Stamp() string {
 	return s.a.Store.ChangeKey()
 }
 
-// Filter returns the indexes of a column's rows that match the query (06 §5.5), and how
-// many rows match in each column (for "other lists: …", 06 §13.8).
+// Filter returns the indexes of a column's rows that match the query (06 §3.7), and how
+// many rows match in each column (for "other lists: …", 06 §3.7).
 func (s *API) Filter(col int, query string) (*Filtered, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -414,7 +414,7 @@ type Filtered struct {
 
 // ---- the detail ----
 
-// Detail is one mod's detail (06 §6.1), in the order the page shows it.
+// Detail is one mod's detail (06 §4.1), in the order the page shows it.
 type Detail struct {
 	ID         string         `json:"id"`
 	Name       string         `json:"name"`
@@ -437,7 +437,7 @@ type Detail struct {
 }
 
 // Detail returns the detail of an instance; fetch allows the network for the Workshop
-// page (the page asks again after the cursor rested, 06 §6.4 item 3), refresh ignores the
+// page (the page asks again after the cursor rested, 06 §4.3 item 3), refresh ignores the
 // cache.
 func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 	s.mu.Lock()
@@ -476,7 +476,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 	return d, nil
 }
 
-// Sections are the full detail's sub-sections (06 §6.3), #refs replaced by names.
+// Sections are the full detail's sub-sections (06 §4.2), #refs replaced by names.
 func (s *API) Sections(id string) ([]view.Section, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -503,7 +503,7 @@ func (s *API) boardState() *app.LoadoutState {
 	return s.board.St
 }
 
-// ---- verbs (06 §13.6) ----
+// ---- verbs (06 §3.5) ----
 
 func (s *API) object(ids, refs []string) view.Object {
 	st := s.boardState()
@@ -564,7 +564,7 @@ func (s *API) Place(col int, ids []string, at int) (*view.Result, error) {
 	return s.after(view.Place(s.a, view.Column(col), s.object(ids, nil), at))
 }
 
-// PosOptions are the position input's choices (06 §13.7).
+// PosOptions are the position input's choices (06 §3.6).
 func (s *API) PosOptions(ids []string, text string, before bool) ([]view.PosOpt, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -622,7 +622,7 @@ func (s *API) Swap(id string) (string, error) {
 	return s.text(view.Swap(s.a, st, id))
 }
 
-// Preview shows sort, save or launch before it happens (06 §9).
+// Preview shows sort, save or launch before it happens (06 §6).
 func (s *API) Preview(what string) (*view.Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -637,7 +637,7 @@ func (s *API) Apply(what string) (string, error) {
 	return s.text(view.Apply(s.a, what))
 }
 
-// ---- tags (06 §12.3) ----
+// ---- tags (06 §3.8) ----
 
 // TagCandidates for the mods.
 func (s *API) TagCandidates(ids []string) ([]view.TagCand, error) {
@@ -673,7 +673,7 @@ func (s *API) SetTag(ids []string, tag string, remove bool) (string, error) {
 	return s.text(view.Tf("tags of %s: %s", o.What, msg), err)
 }
 
-// ---- 需要处理 (06 §7) ----
+// ---- 需要处理 (06 §5) ----
 
 // Needs builds the screen. Opening it includes the newest log (parsing it if needed) and
 // starts the files' check when it is stale, as the TUI does.
@@ -701,7 +701,7 @@ func (s *API) needsLocked(withLog bool) *view.Needs {
 		return &view.Needs{Status: map[string]int{}}
 	}
 	if withLog {
-		// The newest log was parsed into this list (decisions-m4 §7.2): it has been seen.
+		// The newest log was parsed into this list (03 §6.4): it has been seen.
 		if cur, _ := s.a.LogPaths(st); cur != "" && s.a.ProblemLog(st) == cur {
 			s.a.SelectLog(st, cur)
 		}
@@ -725,7 +725,7 @@ func (s *API) DoAction(act view.Action, option int) (string, error) {
 // inspectable are the read-only commands an item's "see what" may run.
 var inspectable = map[string]bool{"problems": true, "patches": true, "mod": true, "def": true, "harmony": true}
 
-// Inspect runs a read-only command an action names (view, 06 §7.2) and returns its text
+// Inspect runs a read-only command an action names (view, 06 §5) and returns its text
 // with names for #refs.
 func (s *API) Inspect(argv []string) ([]string, error) {
 	s.mu.Lock()
@@ -742,7 +742,7 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 	return out, nil
 }
 
-// ---- changes (06 §4.1) ----
+// ---- changes (06 §2.9) ----
 
 // Changes lists the last scans' changes.
 func (s *API) Changes() ([]view.ChangeScan, error) {
@@ -918,7 +918,7 @@ func (s *API) startAnalyze() bool {
 
 // ---- palette and the rest ----
 
-// Palette ranks commands, mods and the other environments for a query (06 §8).
+// Palette ranks commands, mods and the other environments for a query (06 §3.5).
 func (s *API) Palette(query string) []view.PalEntry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -987,7 +987,7 @@ func (s *API) OpenURL(raw string) error {
 	return s.open(u.String())
 }
 
-// Setting reads a GUI setting (column widths, 08 §4).
+// Setting reads a GUI setting (column widths, 06 §7).
 func (s *API) Setting(key string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

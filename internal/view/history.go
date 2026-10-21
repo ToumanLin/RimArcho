@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 )
 
-// The history area (08 §14, 10 §6): where the workspace is, where u takes it, and the saved
+// The history area (06 §2.5): where the workspace is, where u takes it, and the saved
 // versions to go back to. The interfaces show it where the staging list is when staging is
 // empty.
 

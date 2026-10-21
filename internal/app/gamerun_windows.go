@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
-// gameProcess finds a running RimWorld whose executable is in gameRoot (10 §3.1).
+// gameProcess finds a running RimWorld whose executable is in gameRoot (08 §4).
 func gameProcess(gameRoot string) *GameRun {
 	if gameRoot == "" {
 		return nil

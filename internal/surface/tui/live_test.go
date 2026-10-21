@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 10 §3.4: while the game runs the top bar says so and its errors lead 需要处理; when it
+// 06 §2.1: while the game runs the top bar says so and its errors lead 需要处理; when it
 // exits both go.
 func TestLiveGame(t *testing.T) {
 	e := testkit.New(t)
@@ -54,7 +54,7 @@ func TestLiveGame(t *testing.T) {
 	}
 }
 
-// 08 §14, 10 §6: empty staging shows the history; enter on a step goes there, on a version
+// 06 §2.5: empty staging shows the history; enter on a step goes there, on a version
 // asks first.
 func TestHistoryArea(t *testing.T) {
 	e, _ := fixture(t)

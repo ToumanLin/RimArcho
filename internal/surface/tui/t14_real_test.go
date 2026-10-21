@@ -77,7 +77,7 @@ func (l *eventLoop) thumbReady() bool {
 	return e.state == imgFailed || len(m.images.cur) > 0
 }
 
-// T14 (06 §12.6) on a copy of a real data directory: scrolling 500 rows at 30 rows a
+// T14 (06 §11) on a copy of a real data directory: scrolling 500 rows at 30 rows a
 // second, the thumbnail is on screen within 100 ms after stopping, and within 30 ms when
 // it was made ahead.
 //

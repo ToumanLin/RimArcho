@@ -118,7 +118,7 @@ func TestVerbsAndUndo(t *testing.T) {
 		}
 		b = api.Board()
 		got := names(b.Cols[view.Active]) + " | " + names(b.Cols[view.Staging])
-		// Undo restores the list; staging is the player's separate list (04 §5.4).
+		// Undo restores the list; staging is the player's separate list (04 §6).
 		if strings.Split(got, " | ")[0] != strings.Split(want, " | ")[0] {
 			t.Fatalf("undo: %s, want %s", got, want)
 		}
@@ -151,7 +151,7 @@ func TestPreviewAndInspect(t *testing.T) {
 	}
 }
 
-// The scan runs in the background and says when it is done (an event, 08 §9).
+// The scan runs in the background and says when it is done (an event, 06 §8.4).
 func TestScanEvent(t *testing.T) {
 	e, api, events := fixture(t)
 	exe := filepath.Join(t.TempDir(), "none.exe")

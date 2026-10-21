@@ -17,14 +17,14 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// Inline images (06 §6.2 method, §6.4 item 6). bubbletea draws text only; this writer
+// Inline images (06 §9.4 method, §6.4 item 6). bubbletea draws text only; this writer
 // wraps the program's output and, after every frame and in the same write, erases image
 // rects that are gone (ECH) and draws the current ones with OSC 1337. Images are padded
 // to exactly cols×rows cells and sent with preserveAspectRatio=0, so they cover exactly
 // their rect; the cursor is shown while an image is written (ConPTY drops the positioning
-// otherwise, 07 §6.2).
+// otherwise, 07 §8.2).
 
-// cellAspect is cell width / height of the bundled font in WezTerm (07 §6.2).
+// cellAspect is cell width / height of the bundled font in WezTerm (07 §8.2).
 const cellAspect = 13.0 / 30.0
 
 // placement is one image on screen (1-based cell position).
@@ -44,7 +44,7 @@ type imgWriter struct {
 	pending bool        // a later write draws the next new image
 }
 
-// imgGap is the time between two new images (06 §12.4: one image per frame at most).
+// imgGap is the time between two new images (06 §9.4: one image per frame at most).
 const imgGap = 16 * time.Millisecond
 
 // set replaces the images to show from the next frame on.
@@ -182,7 +182,7 @@ type imgLoadedMsg struct {
 	e   imgEntry
 }
 
-// previewURL names a mod's thumbnail among the images (06 §6.2).
+// previewURL names a mod's thumbnail among the images (06 §9.4).
 func previewURL(id string) string { return "preview:" + id }
 
 // loadImage downloads (or reads from the cache) and encodes one image for cols columns;
@@ -221,7 +221,7 @@ func (m *model) touchImage(key string) {
 }
 
 // evictImages keeps the image cache small (the encoded images are the TUI's largest
-// allocations, 06 §11 T5): an LRU of imgKeep entries (06 §12.4); those on screen or still
+// allocations, 06 §11 T5): an LRU of imgKeep entries (06 §9.4); those on screen or still
 // loading stay.
 func (m *model) evictImages() {
 	if len(m.imgs) <= imgKeep {

@@ -14,19 +14,19 @@ import (
 // allowed values; the first is the default.
 var configKeys = map[string][]string{
 	"ui.lang":  {"auto", "en", "zh"},
-	"ui.icons": {"auto", "nerd", "compat"}, // auto: Nerd Font icons in the WezTerm host (06 §1.3)
+	"ui.icons": {"auto", "nerd", "compat"}, // auto: Nerd Font icons in the WezTerm host (06 §9.3)
 	"ui.mouse": {"on", "off"},
-	// 06 §6.4: whether descriptions and their images may be fetched from the Steam Workshop
+	// 06 §4.3: whether descriptions and their images may be fetched from the Steam Workshop
 	"workshop.fetch":  {"on", "off"},
 	"workshop.images": {"on", "off"},
-	// 06 §1.1: auto asks once whether to download WezTerm; none (a "no") runs in the
+	// 06 §9.2: auto asks once whether to download WezTerm; none (a "no") runs in the
 	// current terminal; wezterm always uses the host.
 	"terminal.host": {"auto", "wezterm", "none"},
-	// 06 §12.4: off draws no images at all in the TUI
+	// 06 §9.4: off draws no images at all in the TUI
 	"ui.previews": {"on", "off"},
 }
 
-// freeKeys are settings with free values: their default and a check (06 §12.3, §12.4).
+// freeKeys are settings with free values: their default and a check (06 §3.8, §12.4).
 var freeKeys = map[string]struct {
 	def   string
 	check func(string) error
@@ -42,7 +42,7 @@ var freeKeys = map[string]struct {
 	}},
 }
 
-// DefaultPinnedTags is the preset of common tags (06 §12.3).
+// DefaultPinnedTags is the preset of common tags (06 §3.8).
 const DefaultPinnedTags = "框架,美化,服装,种族,武器,建筑,家具,QoL,平衡,剧情,性能,语言包,测试中,待删除"
 
 // Setting returns a setting of the app, or its default.

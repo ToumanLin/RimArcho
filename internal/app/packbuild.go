@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// A pack build in progress (10 §8.2). The copy takes minutes, so the window runs it as an
+// A pack build in progress (08 §5.2). The copy takes minutes, so the window runs it as an
 // `archo pack build` child process: it goes on when the window closes, and its state is a
 // file in the folder it assembles the pack in, which any process can read.
 

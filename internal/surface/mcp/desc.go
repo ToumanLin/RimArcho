@@ -1,6 +1,6 @@
 package mcp
 
-// Tool descriptions (05 §4.3): when to use each tool and what to use instead, how to write
+// Tool descriptions (05 §5.3): when to use each tool and what to use instead, how to write
 // references, and an example call with the first lines of output. Together with
 // Instructions they cover the error-debugging and assembly-inspector workflows without any
 // skill (D7, I4).
@@ -92,7 +92,7 @@ Example: read_source {"ref": "#ipv5", "type": "yayoCombat.HarmonyPatches.Pawn_Ti
     file: …\cache\source\8612…\yayoCombat.HarmonyPatches\Pawn_Tick.cs
     source:`
 
-const descEdit = `Change RimArcho's workspace Loadout (not the game's file): action=enable|disable (refs), move (refs[0] with at / before / after / up / down), swap (refs[0] → another instance of its lineage, optional refs[1]), sort (dry_run=true previews), undo, redo; staging (RimArcho's own side list, 06 §5.4): stage (refs leave the Loadout and remember their place), unstage (out of staging, stays disabled), restore (refs, or all when empty, go back to their old place; at / before / after for one mod). Every change can be undone; nothing reaches the game until save_loadout. Refs as in get_mod.
+const descEdit = `Change RimArcho's workspace Loadout (not the game's file): action=enable|disable (refs), move (refs[0] with at / before / after / up / down), swap (refs[0] → another instance of its lineage, optional refs[1]), sort (dry_run=true previews), undo, redo; staging (RimArcho's own side list, 06 §2.5): stage (refs leave the Loadout and remember their place), unstage (out of staging, stays disabled), restore (refs, or all when empty, go back to their old place; at / before / after for one mod). Every change can be undone; nothing reaches the game until save_loadout. Refs as in get_mod.
 Example: edit_loadout {"action": "enable", "refs": ["#b21c"], "before": "#a3f9"}
   workspace: 213 active, 1 change unsaved (env:main)
     added  #b21c  Harmony  at 1

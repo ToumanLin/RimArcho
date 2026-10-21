@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// G8 (08 §12): two RimArcho processes on one data directory (the TUI and the window). Each
+// G8 (06 §11): two RimArcho processes on one data directory (the TUI and the window). Each
 // sees the other's edit at its next look, and an edit made on a stale view does not
 // overwrite the other's: both edits are in the workspace and in the undo history.
 func TestTwoProcessesShareTheWorkspace(t *testing.T) {

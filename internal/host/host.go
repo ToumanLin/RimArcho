@@ -1,4 +1,4 @@
-// Package host runs the TUI inside RimArcho's WezTerm host (06 §1.1): it finds WezTerm,
+// Package host runs the TUI inside RimArcho's WezTerm host (06 §9.2): it finds WezTerm,
 // offers to download the portable build when there is none (only after the player says
 // yes, verified against the release's sha256), writes wezterm.lua and starts
 // `wezterm-gui --config-file <lua> start -- archo tui`. A "no" is remembered in terminal.host. Only a bare

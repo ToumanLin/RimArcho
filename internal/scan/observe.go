@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// Origin is the content of .rimarcho/origin.json, written by copy-local (00 §6.6).
+// Origin is the content of .rimarcho/origin.json, written by copy-local (00a §4.2).
 type Origin struct {
 	InstanceID   string `json:"origin_instance"`
 	LineageID    string `json:"origin_lineage,omitempty"`
@@ -24,7 +24,7 @@ type Origin struct {
 	CopiedAt     string `json:"copied_at,omitempty"`
 }
 
-// UnloadableAboutDisabled marks a folder with only About/About.xml.disabled (02 §4.1).
+// UnloadableAboutDisabled marks a folder with only About/About.xml.disabled (02 §4.2).
 const UnloadableAboutDisabled = "about-disabled"
 
 // OriginFile is the marker's path relative to a mod folder.
@@ -46,7 +46,7 @@ func (l Location) Key() string { return LocKey(l.SourceID, l.Rel) }
 // LocKey builds a location key.
 func LocKey(sourceID, rel string) string { return sourceID + "\x00" + strings.ToLower(rel) }
 
-// Observation is everything one scan learned about one mod folder (02 §4.2).
+// Observation is everything one scan learned about one mod folder (02 §4.3).
 type Observation struct {
 	Loc        Location
 	Aliases    []Location // other locations resolving to the same real directory

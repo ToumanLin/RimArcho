@@ -724,7 +724,7 @@ func activeList(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// loadoutStatus adds the workspace lines to status (04 §2.2, §2.3).
+// loadoutStatus adds the workspace lines to status (04 §4.1, §2.3).
 func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	st := c.Loadout()
 	if st == nil {

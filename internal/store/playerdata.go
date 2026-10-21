@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// PlayerData is what the player attached to a lineage (04 §7.1).
+// PlayerData is what the player attached to a lineage (04 §8.1).
 type PlayerData struct {
 	Alias, Note string
 	Tags        []string

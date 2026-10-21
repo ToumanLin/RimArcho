@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// Tag candidates (06 §12.3): the pinned tags (config tags.pinned) first, then the tags in
+// Tag candidates (06 §3.8): the pinned tags (config tags.pinned) first, then the tags in
 // use, most used first; each says how many of the selected mods have it.
 
 // TagCand is one candidate tag.

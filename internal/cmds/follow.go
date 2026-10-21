@@ -13,7 +13,7 @@ import (
 // stdout. When nil the lines are collected into the command's output.
 var Stream func(string)
 
-// logFollow follows Player.log (10 §3.4): new clusters as they appear, until the game
+// logFollow follows Player.log (03 §6.6): new clusters as they appear, until the game
 // exits (or Ctrl+C when it was not running); --once reads what is there and stops.
 func logFollow(c *Ctx, a *Args) (*render.Doc, error) {
 	st, err := c.App.Loadout()

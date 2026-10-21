@@ -18,7 +18,7 @@ const (
 	Tombstone = "tombstone"
 )
 
-// Lineage membership basis (02 §5.2, §6).
+// Lineage membership basis (02 §5.1, §6).
 const (
 	BasisRoot      = ""          // founded the lineage
 	BasisInferred  = "inferred"  // R4: similar content + same declaration
@@ -26,14 +26,14 @@ const (
 	BasisManual    = "manual"    // lineage split/merge
 )
 
-// Thresholds (02 §5.2).
+// Thresholds (02 §5.1).
 const (
 	MoveSimilarity     = 0.85 // R3
 	CopySimilarity     = 0.6  // R4
 	QuestionSimilarity = 0.6  // R6
 )
 
-// Event kinds (00 §6.8, 02 §5.3).
+// Event kinds (02 §5.3).
 const (
 	EvDiscovered       = "discovered"
 	EvUpdated          = "updated"
@@ -133,7 +133,7 @@ type reconciler struct {
 	present []*Assignment
 }
 
-// Reconcile applies 02 §5.2. R1, R2, R5 and R3 match against the known state rule by rule;
+// Reconcile applies 02 §5.1. R1, R2, R5 and R3 match against the known state rule by rule;
 // the remaining observations then go through R4, R6 and R7 one at a time, so an Instance
 // created earlier in the same scan can be the original of a later copy (first scan of a
 // workshop item and its Mods/ copy, or Steam + SteamCMD).

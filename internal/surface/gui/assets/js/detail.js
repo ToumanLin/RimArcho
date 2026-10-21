@@ -1,6 +1,6 @@
-// The detail (06 §6, 08 §7): who the mod is, its state, facts, dependencies, the
+// The detail (06 §4): who the mod is, its state, facts, dependencies, the
 // description, the history. The description is built from Go's BBCode blocks with
-// elements and textContent only: outside text is never inserted as HTML (08 §3).
+// elements and textContent only: outside text is never inserted as HTML (06 §8.2).
 import { S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 
@@ -8,7 +8,7 @@ let seq = 0;
 let fetchTimer = 0;
 
 // show loads and draws the detail of a row; the Workshop page is fetched only after the
-// cursor rested on the mod (06 §6.4 item 3).
+// cursor rested on the mod (06 §4.3 item 3).
 export async function showDetail(it, staged) {
   const n = ++seq;
   clearTimeout(fetchTimer);
@@ -112,7 +112,7 @@ function draw(d, keepScroll) {
     row(T("requires"), v);
   }
   box.append(kv);
-  // description (06 §6.4 item 2)
+  // description (06 §4.3 item 2)
   const desc = el("div", "desc");
   const head = (title, note) => {
     const h = el("div", "sub", title);
@@ -202,7 +202,7 @@ function host(u) {
   try { return new URL(u).host; } catch { return u; }
 }
 
-// scrollDetail moves the detail by a page or a line (PgUp / PgDn anywhere, 06 §13.4).
+// scrollDetail moves the detail by a page or a line (PgUp / PgDn anywhere, 06 §3.3).
 export function scrollDetail(dy, page) {
   const sc = $(".detail .scroll");
   sc.scrollTop += page ? dy * sc.clientHeight * 0.9 : dy * 40;

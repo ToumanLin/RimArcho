@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
-// Screen structure (06 §4.2): top bar, blank, body, blank, status line, hint line.
+// Screen structure (06 §2.2): top bar, blank, body, blank, status line, hint line.
 
 func (m *model) View() string {
 	if m.quitting {
@@ -63,7 +63,7 @@ func (m *model) View() string {
 }
 
 // topBar: brand · environment pill · needs attention · unsaved, and on the right the
-// position line (06 §13.3) and launch. Secondary screens show a breadcrumb that is the
+// position line (06 §3.2) and launch. Secondary screens show a breadcrumb that is the
 // position line.
 func (m *model) topBar() string {
 	left := sBold.Render("RimArcho")
@@ -132,7 +132,7 @@ func (m *model) renderPos(p string) string {
 	return sAccent.Render(head) + sSecond.Render(rest) + sText.Render(pop)
 }
 
-// statusLine: one sentence, ✓ done (green), ✗ failed (red), … in progress (06 §9).
+// statusLine: one sentence, ✓ done (green), ✗ failed (red), … in progress (06 §6).
 func (m *model) statusLine() string {
 	if m.tags != nil {
 		return m.tagBarLine(m.w)
@@ -168,7 +168,7 @@ func (m *model) statusLine() string {
 	return ms.Render(mark) + " " + sText.Render(fit(text, m.w-2))
 }
 
-// hintLine: "key label · key label", only what the object can do now, at most 7 (06 §9,
+// hintLine: "key label · key label", only what the object can do now, at most 7 (06 §6,
 // §13.2 rule 4); ? lists everything.
 func (m *model) hintLine() string {
 	var pairs [][2]string
@@ -199,7 +199,7 @@ func (m *model) hintLine() string {
 	case m.tab == tabChanges:
 		pairs = [][2]string{{"esc", T("back")}, {"enter", T("file changes")}}
 	case m.selCount() > 0:
-		// 06 §13.5: what the selection can do, and that another list drops it.
+		// 06 §3.4: what the selection can do, and that another list drops it.
 		prefix = Tf("selected %d", m.selCount())
 		pairs = append(m.verbPairs(), [2]string{"esc", T("clear the selection")}, [2]string{"←→", T("another list clears it")})
 	case m.histActive():
@@ -246,7 +246,7 @@ func (m *model) hintLine() string {
 	return b.String()
 }
 
-// verbPairs: the verbs the focused list's object can use now (06 §13.6).
+// verbPairs: the verbs the focused list's object can use now (06 §3.5).
 func (m *model) verbPairs() [][2]string {
 	if m.col().cur() == nil {
 		return nil
@@ -297,7 +297,7 @@ func window(lines []string, off, n int) []string {
 	return lines[off:end]
 }
 
-// descMax is how many description lines the detail column shows (06 §6.1): all of them
+// descMax is how many description lines the detail column shows (06 §4.1): all of them
 // once it is focused or scrolled.
 func (m *model) descMax() int {
 	if m.detailFocus || m.detailOff > 0 {
@@ -308,7 +308,7 @@ func (m *model) descMax() int {
 
 // detailLines draws the detail column (w wide, n lines, starting at 0-based column x) and
 // returns its image placements. The first line is the area title, "4 details", or the
-// mod's name once scrolled; in the accent colour when area 4 has the focus (06 §13.3).
+// mod's name once scrolled; in the accent colour when area 4 has the focus (06 §3.2).
 func (m *model) detailLines(w, n, x int) ([]string, []placement) {
 	m.syncDetailOff()
 	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), images: m.inlineImages(), techText: m.detail})

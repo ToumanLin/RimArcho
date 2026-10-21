@@ -1,7 +1,7 @@
 // Spike: a development harness for the GUI page (08). It serves the embedded page on
 // 127.0.0.1 with a stand-in for /wails/runtime.js that calls the same gui.API over HTTP,
 // so the page can be driven in a browser during development. Never part of a release: the
-// product opens no port (01 §5.3).
+// product opens no port (01 §4).
 //
 //	go run ./spikes/guidev -home <copy of the data dir> -addr 127.0.0.1:8765
 package main

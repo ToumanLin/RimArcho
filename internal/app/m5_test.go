@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// U10 / 04 §6, and the inspector's test_copy_local_creates_clean_independent_git_baseline.
+// U10 / 04 §7.2, and the inspector's test_copy_local_creates_clean_independent_git_baseline.
 func TestCopyLocal(t *testing.T) {
 	e := testkit.New(t)
 	ws := e.AddWorkshop("123456", testkit.Sample("example.mod", "Example Mod"))
@@ -107,7 +107,7 @@ func rimcrowDB(t *testing.T, path string, stmts ...string) {
 	}
 }
 
-// U11 / 04 §7.2: path first, packageId second, ambiguous and missing reported, conflicts
+// U11 / 04 §8.2: path first, packageId second, ambiguous and missing reported, conflicts
 // kept, rules mapped, idempotent, and the RimCrow files are never written.
 func TestImportRimCrow(t *testing.T) {
 	e := testkit.New(t)
@@ -187,7 +187,7 @@ func TestImportRimCrow(t *testing.T) {
 	}
 }
 
-// 05 §3: loadout export / import round-trips through a text list and a ModsConfig.xml,
+// 05 §4.2: loadout export / import round-trips through a text list and a ModsConfig.xml,
 // and reads a save's mod list; import is one undoable step and never writes the game file.
 func TestLoadoutExchange(t *testing.T) {
 	e := testkit.New(t)
@@ -242,7 +242,7 @@ func TestLoadoutExchange(t *testing.T) {
 	}
 }
 
-// decisions-m5: the environment's analysis and one for the log's game version coexist;
+// 03 §3: the environment's analysis and one for the log's game version coexist;
 // alternating problems and log does not re-run either.
 func TestAnalysisPerGameVersion(t *testing.T) {
 	e := testkit.New(t)

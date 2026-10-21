@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Hidden mods (10 §2): folders another manager hid by renaming About.xml.
+// Hidden mods (08 §6): folders another manager hid by renaming About.xml.
 func init() {
 	dry := []Flag{{Name: "dry-run", Help: "show what would change"}}
 	register(&Command{Name: "unhide", Args: "<ref>", Summary: "rename About.xml.disabled back to About.xml so the game sees the mod again", MinArgs: 1, MaxArgs: 1, Flags: dry,

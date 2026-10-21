@@ -11,20 +11,20 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Visual system (06 §2, §3).
+// Visual system (06 §7, §3).
 
 // width uses the same East Asian setting as the CLI renderer and the WezTerm host
-// (07 §6.1 item 3, 06 §3): ambiguous-width characters and Nerd Font icons are 1 cell.
+// (07 §7 item 3, 06 §7): ambiguous-width characters and Nerd Font icons are 1 cell.
 var width = &runewidth.Condition{EastAsianWidth: false}
 
-// Palette (06 §2.2, dark).
+// Palette (06 §7, dark).
 var (
 	cText   = lipgloss.Color("#E6E6E6")
 	cSecond = lipgloss.Color("#7C8290")
 	cDim    = lipgloss.Color("#4A4F5A")
 	cAccent = lipgloss.Color("#A5B4FC")
 	cPill   = lipgloss.Color("#2C2E4A")
-	cRowBg  = lipgloss.Color("#1A1C24") // the focused area's cursor row (06 §13.3)
+	cRowBg  = lipgloss.Color("#1A1C24") // the focused area's cursor row (06 §3.2)
 	cOK     = lipgloss.Color("#7EE2A8")
 	cWarn   = lipgloss.Color("#F2C46D")
 	cErr    = lipgloss.Color("#FF8A80")
@@ -44,7 +44,7 @@ var (
 )
 
 // Styles used by the Problems, Changes and Inspect screens (kept from v1 until V3/V4,
-// restyled: selection is a colour change, not a reversed bar; 06 §2.1).
+// restyled: selection is a colour change, not a reversed bar; 06 §7).
 var (
 	stSel    = sSel
 	stHeader = sBold
@@ -54,7 +54,7 @@ var (
 	stTabOn  = sSel
 )
 
-// icons is one icon set (06 §3).
+// icons is one icon set (06 §7).
 type icons struct {
 	official, workshop, local, localCopy, git string
 	err, warn, logErr, unloadable             string
@@ -90,7 +90,7 @@ const (
 var ic = compatIcons
 
 // SetIcons picks the icon set: "nerd" or "compat" from ui.icons, else Nerd Font icons when
-// the WezTerm host runs the TUI (06 §1.3).
+// the WezTerm host runs the TUI (06 §9.3).
 func SetIcons(setting string) {
 	switch setting {
 	case "nerd":
@@ -116,7 +116,7 @@ func SetColors() {
 	}
 }
 
-// sourceIcon is the row's source icon (06 §3).
+// sourceIcon is the row's source icon (06 §7).
 func sourceIcon(m *store.Mod) string {
 	switch {
 	case m.Kind == source.Official:

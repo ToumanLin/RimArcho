@@ -77,7 +77,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		case kind != "ro" && (a.ReadOnlyHint || a.DestructiveHint == nil || *a.DestructiveHint != (kind == "destructive")):
 			t.Errorf("%s: annotations %+v, want %s", tl.Name, a, kind)
 		}
-		// 05 §4.3: every description gives an example call with output.
+		// 05 §5.3: every description gives an example call with output.
 		if !strings.Contains(tl.Description, "Example: "+tl.Name+" {") {
 			t.Errorf("%s: description has no example call", tl.Name)
 		}
@@ -277,7 +277,7 @@ func TestWriteTools(t *testing.T) {
 	}
 }
 
-// 05 §4.1: a tool can name another environment.
+// 05 §5.1: a tool can name another environment.
 func TestEnvParameter(t *testing.T) {
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
@@ -298,7 +298,7 @@ func TestEnvParameter(t *testing.T) {
 	}
 }
 
-// 05 §4.1: when the analysis takes longer than the wait, the call returns the declaration
+// 05 §5.1: when the analysis takes longer than the wait, the call returns the declaration
 // problems with a note, and a later call gets the finished analysis.
 func TestStillComputing(t *testing.T) {
 	e := testkit.New(t)

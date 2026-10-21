@@ -114,7 +114,7 @@ type Entry struct {
 	IsLink   bool
 }
 
-// PackLinkPrefix names the Mods/ links of a pack being played (10 §8.3). "!" sorts before
+// PackLinkPrefix names the Mods/ links of a pack being played (08 §5.3). "!" sorts before
 // every folder name, so the game registers the pack's pinned copy before another Mods/ copy
 // with the same packageId. The links are not part of
 // the environment and List skips them.
@@ -136,7 +136,7 @@ func List(root string) (entries []Entry, realRoot string, err error) {
 		e := Entry{Name: de.Name(), Path: p, RealPath: filepath.Join(realRoot, de.Name())}
 		if IsLink(p) {
 			if strings.HasPrefix(strings.ToLower(de.Name()), strings.ToLower(PackLinkPrefix)) {
-				continue // a pack's copy, linked only while the pack is played (10 §8.3)
+				continue // a pack's copy, linked only while the pack is played (08 §5.3)
 			}
 			rp, err := RealPath(p)
 			if err != nil {
@@ -158,7 +158,7 @@ func List(root string) (entries []Entry, realRoot string, err error) {
 const (
 	AboutNone     = 0 // not a mod folder
 	AboutPresent  = 1 // About/About.xml
-	AboutDisabled = 2 // only About/About.xml.disabled (how RimCrow disables a mod, 02 §4.1)
+	AboutDisabled = 2 // only About/About.xml.disabled (how RimCrow disables a mod, 02 §4.2)
 )
 
 // AboutState reports whether dir is a mod folder; names compare case-insensitively.
