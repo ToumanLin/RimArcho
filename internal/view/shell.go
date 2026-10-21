@@ -97,12 +97,12 @@ type NavGroup struct {
 func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	var planKids []NavItem
 	for _, p := range plans {
-		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current})
+		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, Count: p.Entries})
 	}
 	planKids = append(planKids, NavItem{ID: PagePlanNew, Label: "+ " + T("new plan"), Add: true})
 	var packKids []NavItem
 	for _, p := range packs {
-		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name})
+		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name, Count: p.Mods})
 	}
 	items := []NavItem{
 		{ID: PageHome, Label: T("home")},

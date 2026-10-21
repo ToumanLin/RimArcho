@@ -82,29 +82,43 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 /* No name or icon here: the window's title bar has them. The empty head keeps the nav
    below the top bar's line. */
 #side .side-head { height: 50px; flex: none; }
-#nav { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 8px; display: flex; flex-direction: column; gap: 1px; }
-/* the groups breathe: a group's title sits apart from the entries above it (06 §2.1) */
-#nav .grp { padding: 8px 10px 3px; color: var(--muted); font-size: 11.5px; }
-#nav .grp ~ .grp { padding-top: 14px; }
-.nav-item { width: 100%; min-height: 29px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 8px; color: var(--fg-2); font-size: 13px; white-space: nowrap; text-align: left; transition: background var(--t-press), color var(--t-press); }
-.nav-item .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.nav-item .ic { display: inline-flex; color: inherit; }
-.nav-item .ic svg.i { width: 15px; height: 15px; }
-.nav-item:hover { background: var(--pill); color: var(--fg); }
-.nav-item.on { color: var(--fg); font-weight: 600; }
-#nav { position: relative; }
+/* The sidebar follows magpie's: 212px (184px in a smaller window), 10px sides, entries
+   30px high with the icon, the name and the count on the same edges in every row. */
+#nav { position: relative; flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 10px; display: flex; flex-direction: column; gap: 1px; }
+/* a group's title: small, muted, apart from the entries above it (06 §2.1) */
+#nav .grp { padding: 14px 8px 4px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; }
+#nav > .grp:first-of-type { padding-top: 4px; }
 #nav > :not(.nav-thumb) { position: relative; z-index: 1; }
-#nav > .kids > .nav-kid { position: relative; z-index: 1; }
-.nav-thumb { position: absolute; left: 0; top: 0; z-index: 0; background: var(--pill); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
-.nav-item.open { color: var(--fg); }
-.nav-item .cnt { color: var(--muted); font-size: 11.5px; font-weight: 400; }
-.nav-item .badge-n { font-size: 11.5px; font-weight: 400; line-height: 17px; min-width: 17px; padding: 0 6px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); }
-/* the open entry's sub-entries hang off a hairline, like the design's plan list */
-#nav .kids { display: flex; flex-direction: column; gap: 1px; margin: 1px 0 3px 17px; padding-left: 8px; border-left: 1px solid var(--line); }
-.nav-kid { height: 24px; padding: 0 10px; border-radius: 7px; text-align: left; color: var(--fg-2); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background var(--t-press), color var(--t-press); }
-.nav-kid:hover { color: var(--fg); background: var(--pill); }
+.nav-item { width: 100%; height: 30px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 8px; border-radius: 7px; color: var(--fg-2); font-size: 13px; white-space: nowrap; text-align: left; transition: background var(--t-press), color var(--t-press); }
+.nav-item .lbl { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nav-item .ic { display: inline-flex; flex: none; color: var(--muted); transition: color var(--t-press); }
+.nav-item .ic svg.i { width: 14px; height: 14px; }
+.nav-item:hover:not(.on) { background: var(--pill); color: var(--fg); }
+.nav-item.on { color: var(--fg); font-weight: 500; }
+.nav-item.on .ic, .nav-item:hover .ic { color: var(--fg); }
+/* the open entry is raised like the view switch's thumb; the highlight slides between entries */
+.nav-thumb { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 7px; background: var(--card); box-shadow: var(--seg-edge); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
+/* an entry with sub-entries: a small chevron after its name turns down while it is open */
+.nav-item .chev { display: inline-flex; flex: none; margin-left: -3px; color: var(--faint); transition: transform var(--t-layout) var(--ease); }
+.nav-item .chev svg.i { width: 10px; height: 10px; stroke-width: 1.8; }
+.nav-item.on .chev { transform: rotate(90deg); }
+.nav-item .cnt, .nav-kid .cnt { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.nav-item .badge-n { margin: 0 -4px 0 auto; font-size: 11px; font-weight: 500; line-height: 17px; min-width: 17px; padding: 0 5px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); }
+/* The open entry's sub-entries hang off a thin guide line, 16px in. Opening and closing
+   grows the row from 0fr to 1fr and fades it (06 §7.1); a closed list is out of the tab order. */
+.kids-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; margin-top: -1px; transition: grid-template-rows var(--t-layout) var(--ease), opacity var(--t-enter) var(--ease); }
+.kids-wrap.open { grid-template-rows: 1fr; opacity: 1; }
+.kids { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s linear var(--t-layout); }
+.kids-wrap.open .kids { visibility: visible; transition-delay: 0s; }
+.kids-in { position: relative; display: flex; flex-direction: column; gap: 1px; margin-left: 16px; padding: 3px 0 6px 8px; }
+.kids-in::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 9px; width: 1px; background: var(--line); }
+.nav-kid { position: relative; z-index: 1; height: 26px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 6px; text-align: left; color: var(--ctl-fg); font-size: 12.5px; white-space: nowrap; transition: color var(--t-press); }
+.nav-kid:hover:not(.on) { color: var(--fg); }
 .nav-kid.on { color: var(--fg); font-weight: 600; }
-.side-foot { flex: none; padding: 6px 8px 10px; border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
+.kid-hl { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 6px; background: color-mix(in srgb, var(--fg) 6.5%, transparent); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
+.side-foot .nav-item.on { background: var(--card); box-shadow: var(--seg-edge); }
+.side-foot { flex: none; padding: 8px 10px 10px; border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 859px) { #app:not(.collapsed):not(.narrow) { grid-template-columns: 184px minmax(0, 1fr); } }
 .runbox { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); text-align: left; transition: border-color var(--t-press); }
 .runbox:hover { border-color: var(--muted); }
 .runbox .env { color: var(--fg-2); font-size: 12px; font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -115,7 +129,7 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 /* a narrow window: the sidebar opens over the page */
 #scrim { position: fixed; inset: 0; z-index: 14; background: rgba(0, 0, 0, .28); animation: fade var(--t-press) ease-out; }
 #app.narrow { grid-template-columns: 0 minmax(0, 1fr); }
-#app.narrow #side { position: fixed; top: 0; bottom: 0; left: 0; width: 232px; z-index: 15; box-shadow: var(--shadow); transition: transform var(--t-enter) var(--ease); }
+#app.narrow #side { position: fixed; top: 0; bottom: 0; left: 0; width: 212px; z-index: 15; box-shadow: var(--shadow); transition: transform var(--t-enter) var(--ease); }
 #app.narrow.collapsed #side { transform: translateX(-100%); visibility: hidden; }
 
 /* ---- the top bar: collapse, the breadcrumb, the environment chip, the page's actions ---- */
@@ -634,10 +648,9 @@ details.xc-sec > summary { cursor: pointer; }
 .xc .btns { display: none; }
 
 /* ---- plans (plans.js): the sidebar's plan entries, their marks, the plan dialogs ---- */
-.nav-kid { display: flex; align-items: center; gap: 6px; flex: none; }
 .nav-kid .lbl { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.nav-kid .mark { margin-left: auto; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
-.nav-kid.on::before { flex: none; margin: 0 1px 0 -12px; }
+.nav-kid .mark { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.nav-kid .mark + .cnt { margin-left: auto; }
 .nav-kid.add { color: var(--faint); }
 .nav-kid.add:hover { color: var(--accent); }
 .chip.mark { color: var(--amber); background: var(--amber-soft); }

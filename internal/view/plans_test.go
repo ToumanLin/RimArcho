@@ -182,6 +182,10 @@ func TestInGameAndMarks(t *testing.T) {
 	if len(kids) != 3 || kids[1].Mark == "" || !kids[1].Current || kids[2].ID != view.PagePlanNew || !kids[2].Add {
 		t.Fatalf("plan kids %+v", kids)
 	}
+	// each plan's sub-entry carries its number of mods, as magpie's sub-pages do
+	if kids[0].Count != rows[0].Entries || kids[2].Count != 0 {
+		t.Fatalf("plan kid counts %+v", kids)
+	}
 }
 
 // G12 in part: one home row per plan, by the last launch; never played ones by name. The
