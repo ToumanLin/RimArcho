@@ -1,6 +1,6 @@
 # 05 · 语义接口与 MCP
 
-> 状态：CLI 与 MCP 已实现（18 个 MCP 工具）；方案管理、新启动模型、锁定版本、整合包、忽略问题等工具（待实现），逐条标在文中。
+> 状态：CLI 与 MCP 已实现（28 个 MCP 工具，含别名 `add_rule`、`copy_local`）；启动、方案管理、方案历史的工具待实现，逐条标在文中。
 > 依据：00、00a；02、03、04、08 的命令语义；09（Archo 用同一套工具）。
 
 ## 1. 一套命令与工具层
@@ -30,25 +30,25 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 
 新增给玩家的动作时，同时加 CLI 命令和 MCP 工具；工具的写操作走同一个操作函数，进同一份撤销历史（04 §3）。
 
-现在缺的工具（全部 **待实现**）：
+玩家动作与工具（标 **待实现** 的还没有）：
 
 | 玩家动作 | 现状 | 目标 |
 | --- | --- | --- |
-| 启动方案（08 §2） | 只有 CLI `launch`，没有 MCP 工具 | 工具 `launch_game`，`destructiveHint: true` |
-| 方案管理：列出、新建、切换、改名、删除（04 §1） | 都没有（一个环境只有一个工作区） | CLI `plan …`（§4.3）；工具 `manage_plans` |
-| 写入游戏但不启动 | 有 `save_loadout`，描述与新规则不符（§5.2） | 改描述，见 §5.2 |
-| 看历史、对比、回到某个版本（04 §3） | CLI `history`、`loadout log/diff/checkout`，无工具 | 工具 `plan_history`（只读：log / diff）；回到版本走 `edit_loadout` 的 `checkout` 动作 |
-| 处理外部修改的冲突：看差异 / 载入 / 忽略（04 §4.3） | 无命令 | 看差异 `loadout diff v<n> workspace`、载入 `loadout checkout v<n>`、忽略 `loadout ignore-external`（新增）；工具并入 `plan_history` / `edit_loadout` |
-| 锁定版本、解除、更新锁定版本（04 §7） | 有 `copy_local`（不换进方案）；CLI 有 `unpin`，无工具 | 工具 `pin_mod`（对应 `pin`，创建锁定版本并在当前方案里换上；`copy_local` 保留为别名）；新增工具 `unpin_mod`；更新锁定版本是 `pin --update <实例>`，并入 `pin_mod` |
-| 整合包：编译、列表、启动、导出、导入、删除、停止编译（08 §5） | 只有 CLI `pack …` | 工具 `manage_packs` |
-| 忽略 / 取消忽略问题（03 §4.2） | 只有 CLI `problems ignore/unignore` | 工具 `ignore_problem` |
-| 回答身份待确认项、拆分 / 合并 Lineage（02 §5.4、§6） | 只有 CLI | 工具 `resolve_identity`，`destructiveHint: true` |
-| 扫描 | 只有 CLI `scan` | 工具 `scan` |
-| 列表导入、导出、工坊合集对照（04 §9） | 只有 CLI | 工具 `exchange_list`（导入是一步可撤销的方案编辑） |
-| 用户规则列出 / 删除 | 只有 CLI `rule list/remove` | 并入 `add_rule`（改名 `manage_rules`，保留旧名作别名） |
-| 隐藏的 Mod：恢复显示、移到回收站（08 §6、§7） | 只有 CLI `unhide` / `trash` | 工具 `manage_hidden`，`destructiveHint: true` |
-| 环境管理、设置 | 只有 CLI `env …` / `config …` | 只读部分并入 `status`；修改留给玩家（这些改的是 RimArcho 自己的配置，影响面大） |
-| 社区数据更新、RimCrow 导入、`gc` | 只有 CLI | 工具 `maintenance`，`destructiveHint: true` |
+| 启动方案（08 §2） | 只有 CLI `launch`，没有 MCP 工具 | 工具 `launch_game`，`destructiveHint: true`（**待实现**） |
+| 方案管理：列出、新建、切换、改名、删除（04 §1） | CLI `plan …` 已有（§4.3） | 工具 `manage_plans`（**待实现**） |
+| 写入游戏但不启动 | `save_loadout` 的描述已改为“写入游戏但不启动” | 已完成 |
+| 看历史、对比、回到某个版本（04 §3） | CLI `history`、`loadout log/diff/checkout`，无工具 | 工具 `plan_history`（只读：log / diff，**待实现**）；回到版本走 `edit_loadout` 的 `checkout` 动作 |
+| 处理外部修改的冲突：看差异 / 载入 / 忽略（04 §4.3） | 无命令 | 看差异 `loadout diff v<n> workspace`、载入 `loadout checkout v<n>`、忽略 `loadout ignore-external`（**待实现**，随 04 §4.3）；工具并入 `plan_history` / `edit_loadout` |
+| 锁定版本、解除、更新锁定版本（04 §7） | 已完成 | 工具 `pin_mod`（对应 `pin`，创建锁定版本并在当前方案里换上；`copy_local` 保留为别名）；新增工具 `unpin_mod`；更新锁定版本是 `pin --update <实例>`，并入 `pin_mod` |
+| 整合包：编译、列表、启动、导出、导入、删除、停止编译（08 §5） | 已完成 | 工具 `manage_packs`，`destructiveHint: true` |
+| 忽略 / 取消忽略问题（03 §4.2） | 已完成 | 工具 `ignore_problem` |
+| 回答身份待确认项、拆分 / 合并 Lineage（02 §5.4、§6） | 已完成 | 工具 `resolve_identity`，`destructiveHint: true` |
+| 扫描 | 已完成 | 工具 `scan` |
+| 列表导入、导出、工坊合集对照（04 §9） | 已完成 | 工具 `exchange_list`（导入是一步可撤销的方案编辑） |
+| 用户规则列出 / 删除 | 已完成 | `manage_rules`（`add_rule` 保留为别名） |
+| 隐藏的 Mod：恢复显示、移到回收站（08 §6、§7） | 已完成 | 工具 `manage_hidden`，`destructiveHint: true` |
+| 环境管理、设置 | 已完成（`status` 的 `show`：envs / settings / data / db / cache） | 只读部分并入 `status`；修改留给玩家（这些改的是 RimArcho 自己的配置，影响面大） |
+| 社区数据更新、RimCrow 导入、`gc` | 已完成 | 工具 `maintenance`，`destructiveHint: true` |
 | 存档：列出、看一份、没碰过的内容；备份、移到回收站（10 §1.6、§4） | 都没有（1.1） | CLI `saves list/show/backup/trash`、`unplayed`；只读工具 `list_saves`、`get_save`、`list_unplayed`；写工具 `manage_saves`，`destructiveHint: true` |
 
 旧规则“`launch`、`import rimcrow`、`gc`、`identity resolve` 不通过 MCP 开放”取消：这些动作也要有工具，用注解标出会写文件或难以撤回，是否放行交给外部 agent 的 harness；Archo 一律放进“要玩家确认”档（09 §2.2）。
@@ -181,7 +181,7 @@ next:
 
 ### 4.2 命令表
 
-“方案”在命令和输出里的英文是 Loadout / plan；下表的编辑类命令都作用于**当前方案**（待实现：多方案之前，作用于环境唯一的工作区）。
+“方案”在命令和输出里的英文是 Loadout / plan；下表的编辑类命令都作用于**当前方案**。
 
 | 分组 | 命令 | 说明 |
 | --- | --- | --- |
@@ -217,12 +217,12 @@ next:
 | 历史 | `history [--all]` | 当前方案的编辑步骤（撤销栈）和版本，默认最近 10 个版本 |
 | | `loadout log [--all]` / `loadout diff [<v>] [<v>]` / `loadout checkout <v>` | 版本列表；版本之间的差异（默认最新版本 → 当前状态）；把一个版本载入当前方案（一步可撤销的编辑） |
 | 写入与启动 | `save [--dry-run]` | **写入游戏但不启动**（界面上叫“写入游戏”），给从 Steam 等其他途径开游戏的玩家：渲染当前方案的 ModsConfig.xml（备份、原子替换、写当前游戏版本）、同步 `_Archo_` 链接、移除整合包链接（04 §4.1、08 §3）。`--dry-run` 显示会写什么 |
-| | `launch [--dry-run]` | 启动当前方案（08 §2）。`--dry-run` 只显示启动命令。（待实现：新启动模型——先写入再启动、已有游戏运行就拒绝、记启动记录和 `launch` 版本；现在的实现仍会在版本不符或有未写入修改时拒绝） |
-| 方案管理（待实现） | 见 §4.3 | |
+| | `launch [--dry-run]` | 启动当前方案（08 §2）。`--dry-run` 只显示启动命令。先写入再启动、已有游戏运行就拒绝、记启动记录和 `launch` 版本；`--dry-run` 显示与 `save --dry-run` 同一份预览加启动命令行 |
+| 方案管理 | 见 §4.3 | |
 | 列表交换 | `loadout export [--format text\|modsconfig\|rimsort\|rml\|rimcrow] [--out <文件>]` | 导出当前方案；`--out` 从不覆盖已有文件 |
 | | `loadout import <文件\|分享码> [--new [<名字>]]` | 用一份列表替换当前方案（文本、ModsConfig.xml、存档、`.rml`、RimSort、RimCrow 分享码、工坊 ID），一步可撤销，不写游戏文件（04 §9）；`--new` 导入为新方案（待实现） |
 | | `collection <链接\|ID> [--import]` | 读工坊合集并与已安装的 Mod 对照（联网）；`--import` 按合集顺序把已安装的部分放进当前方案（可撤销） |
-| 锁定版本 | `pin <实例> [--name <文件夹>] [--git] [--dry-run]` | 创建锁定版本（04 §7）：复制到 `Mods/`（默认 `<文件夹>_local`），写 `.rimarcho/origin.json`，`--git` 建基线提交，并只在当前方案里换成这份副本。（待实现：`pin` 这个名字、换进方案和 `--dry-run`；现在只有 `copy-local <引用> [--name] [--git]`，它不改方案，以后保留为 `pin` 的别名） |
+| 锁定版本 | `pin <实例> [--name <文件夹>] [--git] [--dry-run]` | 创建锁定版本（04 §7）：复制到锁定库（默认 `<文件夹>_local`），写 `.rimarcho/origin.json`，`--git` 建基线提交，并只在当前方案里换成这份副本；`--update` 更新锁定版本，`--move-to-library` 把 `Mods/` 里的旧副本移进锁定库。`copy-local` 是别名 |
 | | `unpin <引用> [--dry-run]` | 解除锁定：恢复工坊那份并改用它（含 RimCrow 风格的锁定） |
 | 隐藏的 Mod | `unhide <引用> [--dry-run]` / `trash <引用> [--dry-run]` | 把 `About.xml.disabled` 改回 `About.xml`；把隐藏或已退订的工坊文件夹移到回收站（08 §6、§7） |
 | 整合包 | `pack build <名> [--light] [--dry-run]` / `pack stop <名>` | 把当前方案编译成整合包；`--light` 只有列表不带文件；停止进行中的编译并删除已复制的部分（08 §5.2） |
@@ -246,7 +246,7 @@ next:
 
 **设置键**（`config set`）：`ui.lang auto|en|zh`；`ui.icons auto|nerd|compat`；`ui.mouse on|off`（关掉终端的鼠标上报，方便选中文字）；`workshop.fetch on|off`（是否联网获取工坊简介）；`workshop.images on|off`（是否下载简介里的图片）；`terminal.host auto|wezterm|none`；`ui.previews on|off`；`ui.preview_dwell_ms 0–5000`；`tags.pinned <逗号分隔的标签>`。设置存在数据库的 meta 表（键 `cfg:<键>`）；`config.toml` 只有 `tombstone_days`（07 §3）。
 
-### 4.3 方案管理（待实现）
+### 4.3 方案管理
 
 一个环境可以有多个方案（04 §1）。命令：
 
@@ -279,7 +279,7 @@ next:
 
 ### 5.2 工具表
 
-注解遵循 MCP 规范，是否放行由外部 harness 决定；Archo 按 09 §2.2 分档。`openWorldHint` 只有 `get_description` 为 true（可能访问 Steam 公开 API），其余都是 false。
+注解遵循 MCP 规范，是否放行由外部 harness 决定；Archo 按 09 §2.2 分档。`openWorldHint` 为 true 的：`get_description`（可能访问 Steam 公开 API）、`exchange_list`（读取 Steam 合集）、`maintenance`（下载社区数据）；其余都是 false。
 
 | 工具 | 对应命令 | readOnlyHint | destructiveHint |
 | --- | --- | --- | --- |
@@ -298,11 +298,21 @@ next:
 | `read_source` | 有 `search` 时 `source search`：给了 `in` 用 `--in`，`scope: "active"` 用 `--active --yes`，否则 `--implicated`；`budget` 默认 10。否则 `source`（`ref`、`type`） | true | — |
 | `edit_loadout` | `action`：`enable` / `disable` / `move` / `swap` / `sort`（`dry_run`）/ `undo` / `redo` / `stage`（`stage add`）/ `unstage`（`stage drop`）/ `restore`（`stage restore`）；位置参数 `at`、`before`、`after`、`up`、`down` | false | false |
 | `save_loadout` | `save`（`dry_run`） | false | true |
-| `copy_local` | `copy-local`（`ref`、`name`、`git`） | false | false |
+| `pin_mod` | `pin`（`ref`、`name`、`git`、`update`、`move_to_library`、`dry_run`） | false | false |
+| `copy_local` | `pin` 的旧名（`ref`、`name`、`git`） | false | false |
+| `unpin_mod` | `unpin`（`ref`、`dry_run`） | false | false |
 | `set_player_data` | `action`：`tag_add` / `tag_remove`（`refs`、`tags`）/ `alias` / `note`（`text`，空串清除） | false | false |
-| `add_rule` | `rule add`（`kind`、`a`、`b`、`target`、`note`） | false | false |
+| `manage_rules` | `rule add/list/remove`（`action`、`kind`、`a`、`b`、`target`、`note`、`rule`） | false | false |
+| `add_rule` | `manage_rules` 的旧名（`action` 默认 add） | false | false |
+| `ignore_problem` | `problems ignore` / `unignore`（`undo`） | false | false |
+| `scan` | `scan`（`full`） | false | false |
+| `exchange_list` | `loadout export/import`、`collection [--import]` | false | false |
+| `manage_packs` | `pack list/build/launch/export/import/remove/stop` | false | true |
+| `resolve_identity` | `identity list/resolve`、`lineage split/merge` | false | true |
+| `manage_hidden` | `unhide`、`trash` | false | true |
+| `maintenance` | `data update`、`import rimcrow`、`gc` | false | true |
 
-共 18 个：13 个只读，5 个写；`destructiveHint: true` 只有 `save_loadout`。§1.2 的新工具（待实现）按同样方式加入。
+共 28 个（含两个别名）：13 个只读，15 个写；`destructiveHint: true` 的是 `save_loadout`、`manage_packs`、`resolve_identity`、`manage_hidden`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
 
 **描述与代码不符之处（现状）和目标描述：**
 
@@ -332,7 +342,7 @@ next:
      - 混合：先确认 XML 一侧加载成功（`get_patches failed=true`），再怪代码。
   4. `list_problems` 给静态全貌（依赖、不兼容、加载顺序、Def 覆盖、Patch 落空、Harmony 冲突）；`explain_relation` 解释两个具体的 Mod。
   5. **报告**：失败阶段、XML / 程序集 / 混合、确切的 Mod 实例和路径、文件+行或类+方法、为什么失败、点名的 Mod 是原因、依赖还是旁观者，以及最小的修复。
-- 编辑：先 `copy_local`（从不原地改工坊文件），再改副本；`edit_loadout` 只改 RimArcho 里的方案；`save_loadout` 写游戏的 ModsConfig.xml（先问用户）。（待实现：随 §5.2 的目标描述改为“锁定版本”“当前方案”“写入游戏”的说法，并加入启动工具的规则。）
+- 编辑：先 `pin_mod`（从不原地改工坊文件），再改副本；`edit_loadout` 只改 RimArcho 里的方案；`save_loadout` 写游戏的 ModsConfig.xml（先问用户）。（待实现：随 §5.2 的目标描述改为“锁定版本”“当前方案”“写入游戏”的说法，并加入启动工具的规则。）
 
 各工具描述的要点（示例调用与输出见 `internal/surface/mcp/desc.go`）：
 
@@ -376,5 +386,5 @@ next:
 | I6 | 注解 | 13 个只读工具 `readOnlyHint: true`；`destructiveHint: true` 只有 `save_loadout`；每个描述都有示例调用（`TestToolsAndAnnotations`）。写工具只在合成环境测试（`TestWriteTools`）；`env` 参数（`TestEnvParameter`）；分析超过等待时间时返回“仍在计算”（`TestStillComputing`） | 通过 |
 | I7 | 对照 §1.2 的表，逐个玩家动作找对应工具 | 每个动作都有 CLI 命令和 MCP 工具，注解与是否写文件一致 | 待实现 |
 | I8 | ModsConfig.xml 有未处理的外部修改冲突时调用 `save_loadout` | 拒绝，文本给出看差异 / 载入 / 忽略三条命令；ModsConfig.xml 不变 | 待实现 |
-| I9 | 游戏正在运行时调用启动工具；调用 `save_loadout` | 启动工具拒绝并说明哪个环境的游戏在运行；`save_loadout` 照常写入，提示游戏下次启动才会读到 | 待实现 |
+| I9 | 游戏正在运行时调用启动工具；调用 `save_loadout` | 启动工具拒绝并说明哪个环境的游戏在运行；`save_loadout` 照常写入，提示游戏下次启动才会读到 | 部分通过（`save_loadout`；启动工具待实现） |
 | I10 | `plan new` / `use` / `rename` / `remove` 与 `loadout import --new` 经 CLI 和 MCP 各执行一次 | 输出逐字相同；`plan use` 不写游戏文件；不能删除最后一个方案 | 待实现 |
