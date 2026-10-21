@@ -1,6 +1,6 @@
 Spike patterns — error pattern library v0 (docs/research/00-日志语料顶层设计.md §3 G5)
-Run: 2026-10-21, local machine. Input: spikes/hugslogs parsed.jsonl (upload time, mod lists) and
-corpusrun results-v3.jsonl (clusters with RimArcho's v3 attribution), 6,734 logs of 1.6. Output:
+Run: 2026-10-21, local machine. Input: spikes/hugslogs parsed.jsonl, regenerated with the fixed
+mod-list parser (ef86650; upload time, mod lists), and corpusrun results-v3.jsonl (clusters with RimArcho's v3 attribution), 6,734 logs of 1.6. Output:
 patterns-v0.json (aggregates only: no gist ids, no mod lists, mod-specific patterns need >= 10 logs
 from >= 5 sessions, templates that look like paths or user data are dropped). Draft of how it
 would enter the product: docs/research/01-范式库接入草案.md.
@@ -34,67 +34,67 @@ StackShape of design §5 L1 (innermost game method, innermost mod assembly).
 
 == Sessions
 
-949 sessions with 2+ uploads (2,669 logs, 40%); 1,720 consecutive pairs: no change 948, order only
-83, 1-3 changes 410, more 279 (excluded).
+951 sessions with 2+ uploads (2,678 logs, 40%); 1,727 consecutive pairs: no change 936, order only
+80, 1-3 changes 400, more 311 (excluded).
 
 Disappearance without any list change (the control) depends on the stage:
   load-stage patterns   0-6%   (xref.sound 0%, xml.no-field 0%, xref.def 1%, patch.xpath 2%)
-  save / runtime        5-23%  (rt.nre 7%, save.loadid 7%, rt.tick 13%, rt.collection-modified 23%)
+  save / runtime        5-26%  (rt.nre 6%, save.loadid 7%, rt.tick 12%, rt.collection-modified 26%)
 So for load-stage patterns a disappearance after a small change is real evidence; for save and
-runtime patterns it has to beat the control (rt.tick: 54% after small changes vs 13%; save.loadid
-33% vs 7%; rt.ui 48% vs 10%).
+runtime patterns it has to beat the control (rt.tick: 56% after small changes vs 12%; save.loadid
+34% vs 7%; rt.ui 51% vs 9%).
 
 Load-stage errors rarely go away after a small change either (xref.def 3%, xref.sound 1%,
-patch.xpath 9%, xml.no-field 10%): players remove or add a mod, but not the one that matters.
-The strongest form, the source mod removed and the error gone, is rare: 96 mod-specific patterns
+patch.xpath 10%, xml.no-field 9%): players remove or add a mod, but not the one that matters.
+The strongest form, the source mod removed and the error gone, is rare: 87 mod-specific patterns
 (RocketMan's start-up errors 2-3 times each, the rest once).
 
 == Generic patterns
 
 logs, sessions, clusters, share of clusters with a source mod | pairs where A has it: gone in B
 (rate/pairs) for no change / order only / small change | what changed in the pairs where it went
-  xref.def                    3706 logs  2734 sess   94223 cl  37.1% src | gone none   1%/495  order   4%/49   small   3%/261  | reorder 6, disable-other 5, enable 4, disable-source 1, update-other 1
-  xref.sound                  3532 logs  2637 sess   21909 cl  64.7% src | gone none   0%/416  order   0%/44   small   1%/249  | disable-other 2, enable 2, reorder 1
-  rt.nre                      2502 logs  1931 sess   27838 cl  21.9% src | gone none   7%/358  order  32%/28   small  24%/149  | reorder 24, disable-other 23, enable 14, disable-source 1, update-other 1  (fallback)
-  patch.op-failed             2501 logs  1901 sess   27947 cl  54.1% src | gone none   3%/285  order   4%/27   small  10%/175  | disable-other 9, disable-source 7, enable 4, reorder 4
-  xml.type-missing            2248 logs  1735 sess   45124 cl   0.0% src | gone none   6%/272  order  21%/24   small  16%/156  | disable-other 14, enable 13, reorder 12, update-other 1
-  rt.other                    2148 logs  1655 sess   14245 cl  44.7% src | gone none   7%/280  order  25%/20   small  18%/146  | disable-other 17, reorder 12, enable 10, update-other 3, disable-source 1  (fallback)
-  xml.no-field                2044 logs  1542 sess   19603 cl  21.8% src | gone none   0%/270  order   0%/22   small  10%/136  | disable-other 11, reorder 7, enable 3, disable-source 1
-  xml.config-error            2004 logs  1421 sess   46760 cl   0.1% src | gone none   2%/337  order  10%/30   small   9%/147  | reorder 10, disable-other 7, enable 6, update-other 1
-  asm.version-mismatch        1950 logs  1506 sess   17513 cl  34.1% src | gone none   2%/237  order  12%/25   small  20%/138  | disable-other 16, reorder 15, enable 10, disable-source 4
-  rt.post-load                1905 logs  1490 sess    7517 cl  18.1% src | gone none   5%/245  order  20%/20   small  25%/116  | disable-other 17, reorder 15, enable 14, disable-source 3, update-other 2
-  asm.harmony-target          1867 logs  1426 sess    3690 cl  57.9% src | gone none   2%/233  order   0%/17   small  11%/131  | disable-other 6, disable-source 6, enable 4, reorder 4, update-other 1
-  asset.texture-missing       1821 logs  1412 sess   68115 cl   6.1% src | gone none   3%/212  order   9%/23   small   7%/106  | reorder 4, disable-other 3, enable 3, update-other 1
-  patch.xpath                 1790 logs  1324 sess   20705 cl  55.4% src | gone none   2%/226  order   9%/23   small   9%/117  | disable-other 4, enable 4, reorder 4, disable-source 3
-  save.loadid                 1704 logs  1324 sess   20718 cl   0.0% src | gone none   7%/284  order  53%/17   small  33%/93   | disable-other 23, reorder 21, enable 12, update-other 2
-  xref.getnamed               1561 logs  1199 sess   12098 cl   0.0% src | gone none   2%/179  order  18%/11   small   8%/104  | disable-other 5, reorder 4, enable 3
-  patch.findmod               1548 logs  1165 sess    3429 cl  57.5% src | gone none   1%/188  order   5%/20   small  11%/103  | disable-other 11, reorder 6, enable 1
-  xml.other                   1543 logs  1245 sess   27885 cl  30.4% src | gone none   4%/141  order  12%/17   small  12%/91   | reorder 8, disable-other 5, enable 4, disable-source 2  (fallback)
-  rt.ui                       1258 logs  1014 sess    1892 cl  27.3% src | gone none  10%/164  order  45%/11   small  48%/83   | disable-other 26, reorder 18, enable 14, disable-source 4, update-other 2
-  asm.static-ctor             1098 logs   861 sess    3398 cl  78.2% src | gone none   1%/135  order  25%/16   small  22%/63   | reorder 11, enable 7, disable-other 6, disable-source 4, update-other 1
-  save.defref                 1010 logs   767 sess   90952 cl   3.4% src | gone none   8%/128  order  44%/9    small  30%/77   | enable 16, disable-other 10, reorder 9, update-other 1
-  rt.tick                      827 logs   674 sess    4618 cl  31.9% src | gone none  13%/119  order  57%/7    small  54%/39   | disable-other 16, reorder 15, enable 10, update-other 1
-  asm.dependency-missing       774 logs   555 sess     774 cl   0.0% src | gone none   4%/142  order  44%/9    small  32%/57   | disable-other 15, reorder 10, enable 7, update-other 1
-  save.other                   676 logs   510 sess    8012 cl   0.0% src | gone none   8%/93   order   0%/3    small  18%/55   | disable-other 8, enable 5, reorder 4  (fallback)
-  save.thinknode               562 logs   454 sess     883 cl   0.0% src | gone none   9%/78   order  75%/4    small  45%/31   | disable-other 12, reorder 9, enable 5
-  rt.ai-job                    547 logs   463 sess    2969 cl  50.6% src | gone none  10%/73   order 100%/9    small  52%/23   | reorder 12, disable-other 7, enable 3, disable-source 2, update-other 1
-  asset.maintex                537 logs   414 sess     562 cl   0.0% src | gone none   0%/61   order   0%/4    small   6%/32   | disable-other 2, enable 1
-  patch.other                  513 logs   410 sess    1468 cl  49.5% src | gone none   0%/43   order  30%/10   small  11%/35   | reorder 4, disable-other 2, disable-source 1, enable 1  (fallback)
-  save.not-deep-saved          511 logs   411 sess    2142 cl   0.0% src | gone none  13%/99   order 100%/4    small  61%/18   | disable-other 9, reorder 8, enable 3, update-other 1
-  xml.asset-load               450 logs   338 sess     461 cl   0.0% src | gone none   2%/62   order   0%/5    small  11%/28   | disable-other 3, reorder 1
-  save.abstract-component      438 logs   350 sess     819 cl   0.0% src | gone none  14%/58   order 100%/1    small  41%/34   | disable-other 8, enable 8, reorder 3
-  xml.def-exception            413 logs   314 sess    1806 cl   0.6% src | gone none   4%/51   order   0%/3    small  13%/31   | disable-other 3, reorder 3, enable 2
-  rt.resolve-references        398 logs   326 sess    5815 cl  10.8% src | gone none   4%/45   order  60%/5    small  44%/25   | disable-other 6, enable 6, reorder 6, disable-source 1
-  asset.texture-create         389 logs   305 sess    1957 cl  81.1% src | gone none   2%/54   order   0%/4    small   6%/18   | disable-other 1, reorder 1
+  xref.def                    3706 logs  2730 sess   94223 cl  37.1% src | gone none   1%/488  order   4%/45   small   3%/249  | reorder 6, disable-other 5, enable 4, disable-source 1, update-other 1
+  xref.sound                  3532 logs  2632 sess   21909 cl  64.7% src | gone none   0%/408  order   0%/41   small   1%/243  | disable-other 2, enable 2, reorder 1
+  rt.nre                      2502 logs  1929 sess   27838 cl  21.9% src | gone none   6%/354  order  30%/27   small  26%/145  | disable-other 24, reorder 24, enable 15, disable-source 1, update-other 1  (fallback)
+  patch.op-failed             2501 logs  1899 sess   27947 cl  54.1% src | gone none   2%/280  order   8%/26   small  10%/164  | disable-other 9, disable-source 6, reorder 4, enable 2, update-other 1
+  xml.type-missing            2248 logs  1733 sess   45124 cl   0.0% src | gone none   6%/269  order  14%/22   small  19%/143  | disable-other 15, enable 14, reorder 12, update-other 3
+  rt.other                    2148 logs  1653 sess   14245 cl  44.7% src | gone none   7%/276  order  21%/19   small  17%/140  | disable-other 15, reorder 10, enable 9, update-other 2, disable-source 1  (fallback)
+  xml.no-field                2044 logs  1540 sess   19603 cl  21.8% src | gone none   0%/265  order   0%/22   small  10%/126  | disable-other 10, reorder 6, enable 2, disable-source 1
+  xml.config-error            2004 logs  1421 sess   46760 cl   0.1% src | gone none   2%/331  order   7%/28   small   8%/145  | disable-other 7, reorder 7, enable 4, update-other 2
+  asm.version-mismatch        1950 logs  1505 sess   17513 cl  34.1% src | gone none   2%/232  order  13%/23   small  19%/132  | disable-other 15, reorder 14, enable 8, disable-source 4, update-other 1
+  rt.post-load                1905 logs  1489 sess    7517 cl  18.1% src | gone none   5%/237  order  20%/20   small  24%/110  | disable-other 15, reorder 12, enable 11, disable-source 3, update-other 2
+  asm.harmony-target          1867 logs  1425 sess    3690 cl  57.9% src | gone none   2%/228  order   0%/15   small  13%/123  | disable-source 7, disable-other 6, enable 4, reorder 4, update-other 1
+  asset.texture-missing       1821 logs  1411 sess   68115 cl   6.1% src | gone none   2%/208  order   5%/22   small   9%/104  | disable-other 5, reorder 3, update-other 3, enable 2
+  patch.xpath                 1790 logs  1322 sess   20705 cl  55.4% src | gone none   2%/222  order  10%/21   small   9%/105  | disable-other 4, reorder 3, disable-source 2, enable 2, update-other 1
+  save.loadid                 1704 logs  1324 sess   20718 cl   0.0% src | gone none   7%/283  order  56%/16   small  34%/90   | disable-other 23, reorder 22, enable 11, update-other 3
+  xref.getnamed               1561 logs  1197 sess   12098 cl   0.0% src | gone none   2%/177  order  18%/11   small   7%/97   | disable-other 5, reorder 3, enable 2
+  patch.findmod               1548 logs  1165 sess    3429 cl  57.5% src | gone none   1%/185  order   5%/19   small  11%/94   | disable-other 10, reorder 5
+  xml.other                   1543 logs  1243 sess   27885 cl  30.4% src | gone none   4%/139  order  12%/16   small   9%/86   | reorder 6, disable-other 3, enable 3, disable-source 2, update-other 1  (fallback)
+  rt.ui                       1258 logs  1014 sess    1892 cl  27.3% src | gone none   9%/161  order  45%/11   small  51%/78   | disable-other 27, reorder 17, enable 13, disable-source 4, update-other 3
+  asm.static-ctor             1098 logs   858 sess    3398 cl  78.2% src | gone none   1%/135  order  21%/14   small  25%/60   | reorder 11, enable 8, disable-other 6, disable-source 4, update-other 1
+  save.defref                 1010 logs   767 sess   90952 cl   3.4% src | gone none   6%/125  order  44%/9    small  32%/76   | enable 16, disable-other 12, reorder 8, update-other 1
+  rt.tick                      827 logs   674 sess    4618 cl  31.9% src | gone none  12%/118  order  50%/6    small  56%/39   | disable-other 16, reorder 15, enable 10, update-other 1
+  asm.dependency-missing       774 logs   555 sess     774 cl   0.0% src | gone none   4%/140  order  50%/8    small  31%/55   | disable-other 14, reorder 10, enable 6, update-other 1
+  save.other                   676 logs   510 sess    8012 cl   0.0% src | gone none   8%/93   order   0%/3    small  17%/52   | disable-other 7, enable 4, reorder 3  (fallback)
+  save.thinknode               562 logs   454 sess     883 cl   0.0% src | gone none   8%/76   order  75%/4    small  48%/31   | disable-other 13, reorder 9, enable 5
+  rt.ai-job                    547 logs   463 sess    2969 cl  50.6% src | gone none   8%/72   order 100%/7    small  58%/26   | reorder 13, disable-other 8, enable 5, disable-source 2, update-other 1
+  asset.maintex                537 logs   414 sess     562 cl   0.0% src | gone none   0%/59   order   0%/4    small   0%/31   | 
+  patch.other                  513 logs   409 sess    1468 cl  49.5% src | gone none   0%/43   order  22%/9    small   9%/33   | disable-other 2, reorder 2, disable-source 1  (fallback)
+  save.not-deep-saved          511 logs   411 sess    2142 cl   0.0% src | gone none  11%/97   order 100%/3    small  68%/19   | disable-other 10, reorder 8, enable 5, update-other 1
+  xml.asset-load               450 logs   338 sess     461 cl   0.0% src | gone none   2%/61   order   0%/2    small  11%/28   | disable-other 3, reorder 1
+  save.abstract-component      438 logs   350 sess     819 cl   0.0% src | gone none  12%/57   order 100%/1    small  45%/33   | disable-other 9, enable 8, reorder 3
+  xml.def-exception            413 logs   314 sess    1806 cl   0.6% src | gone none   4%/49   order   0%/4    small  10%/29   | disable-other 3, reorder 2, enable 1, update-other 1
+  rt.resolve-references        398 logs   326 sess    5815 cl  10.8% src | gone none   4%/45   order  60%/5    small  43%/23   | disable-other 5, enable 5, reorder 5, disable-source 1
+  asset.texture-create         389 logs   305 sess    1957 cl  81.1% src | gone none   2%/53   order   0%/2    small   5%/21   | disable-other 1, reorder 1
   rt.mapgen                    338 logs   275 sess     437 cl  27.5% src | gone none   2%/52   order    -      small  56%/18   | enable 6, disable-other 5, reorder 4, disable-source 1, update-other 1
-  noise.analyzer               324 logs   228 sess     324 cl   0.0% src | gone none   0%/58   order   0%/6    small   8%/26   | disable-other 2, enable 1
-  rt.translation               311 logs   250 sess     359 cl   0.8% src | gone none  21%/39   order   0%/4    small  42%/19   | disable-other 6, reorder 4, enable 2
+  noise.analyzer               324 logs   228 sess     324 cl   0.0% src | gone none   0%/57   order   0%/5    small   8%/26   | disable-other 2, enable 1
+  rt.translation               311 logs   250 sess     359 cl   0.8% src | gone none  16%/37   order   0%/4    small  45%/20   | disable-other 7, reorder 4, update-other 2, enable 1
   rt.pawn-generation           293 logs   231 sess     390 cl  30.3% src | gone none   3%/39   order    -      small  52%/27   | disable-other 9, enable 8, reorder 7, update-other 1
-  rt.collection-modified       229 logs   189 sess     244 cl  48.0% src | gone none  23%/35   order    -      small  56%/18   | disable-other 5, enable 5, reorder 3, disable-source 1
-  rt.comp-init                 226 logs   168 sess     235 cl  48.1% src | gone none   0%/28   order  33%/3    small  12%/16   | disable-other 2, reorder 2
+  rt.collection-modified       229 logs   189 sess     244 cl  48.0% src | gone none  26%/35   order    -      small  53%/17   | enable 5, disable-other 4, reorder 3, disable-source 1
+  rt.comp-init                 226 logs   168 sess     235 cl  48.1% src | gone none   0%/28   order   0%/1    small  21%/14   | disable-other 3, reorder 2, update-other 1
   noise.hugslib-publish        205 logs   173 sess     385 cl 100.0% src | gone none  31%/26   order  80%/5    small  60%/20   | reorder 10, disable-other 9, enable 4, update-other 1
   asm.invalid-il               105 logs    69 sess     113 cl  23.9% src | gone none   0%/12   order   0%/1    small   0%/16   | 
-  noise.mod-status              97 logs    81 sess      97 cl   0.0% src | gone none   0%/11   order  50%/2    small  67%/3    | disable-other 2, reorder 1
+  noise.mod-status              97 logs    81 sess      97 cl   0.0% src | gone none   0%/11   order 100%/1    small  50%/4    | disable-other 2, reorder 1
   noise.harmony-il-dump         81 logs    54 sess     158 cl   3.8% src | gone none   0%/13   order    -      small   0%/11   | 
   rt.map-draw                   52 logs    48 sess     141 cl   4.3% src | gone none  67%/6    order 100%/1    small  75%/4    | disable-other 3, reorder 3, update-other 1
   rt.duplicate-key              39 logs    25 sess     111 cl  76.6% src | gone none  14%/7    order   0%/2    small    -      | 
@@ -104,43 +104,44 @@ logs, sessions, clusters, share of clusters with a source mod | pairs where A ha
 
 kept 1036 patterns over 317 mods, 53492 clusters
 top 40 (logs, sessions, versions seen, pairs with it: gone after no change / small change; fixes):
-   698 logs  498 sess  0 vers | gone none   0%/87   small   2%/58   | enable 1, reorder 1                      aoba.fortress.industrial.citadel  xref-missing|Could not resolve cross-reference: No Vers
-   429 logs  327 sess  0 vers | gone none   0%/47   small   0%/26   |                                          kindseal.lol  xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … f
-   423 logs  306 sess  0 vers | gone none   0%/55   small   0%/31   |                                          tot.celetech.mkiii  xref-missing|Could not resolve cross-reference: No Verse.SoundDef nam
-   401 logs  277 sess  0 vers | gone none   0%/54   small   3%/32   | disable-source 1                         rku.ratkinunderground  xref-missing|Could not resolve cross-reference: No Verse.SoundDef 
-   398 logs  320 sess  0 vers | gone none   0%/35   small   0%/19   |                                          rkk.ratknights.core  xref-missing|Could not resolve cross-reference: No Verse.SoundDef na
-   374 logs  301 sess  0 vers | gone none   0%/33   small   0%/17   |                                          rkk.ratknights.core  xref-missing|Could not resolve cross-reference: No Verse.SoundDef na
-   353 logs  296 sess  0 vers | gone none   0%/22   small   0%/23   |                                          fxz.solaris.ratkinracemod.odyssey  xref-missing|Could not resolve cross-reference: No Ver
-   244 logs  165 sess  0 vers | gone none   0%/33   small   0%/20   |                                          lts.i  xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to
+   698 logs  498 sess  0 vers | gone none   0%/85   small   2%/61   | enable 1, reorder 1                      aoba.fortress.industrial.citadel  xref-missing|Could not resolve cross-reference: No Vers
+   429 logs  326 sess  0 vers | gone none   0%/46   small   0%/28   |                                          kindseal.lol  xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … f
+   423 logs  305 sess  0 vers | gone none   0%/54   small   0%/32   |                                          tot.celetech.mkiii  xref-missing|Could not resolve cross-reference: No Verse.SoundDef nam
+   401 logs  276 sess  0 vers | gone none   0%/53   small   0%/30   |                                          rku.ratkinunderground  xref-missing|Could not resolve cross-reference: No Verse.SoundDef 
+   398 logs  319 sess  0 vers | gone none   0%/34   small   0%/19   |                                          rkk.ratknights.core  xref-missing|Could not resolve cross-reference: No Verse.SoundDef na
+   374 logs  300 sess  0 vers | gone none   0%/32   small   0%/17   |                                          rkk.ratknights.core  xref-missing|Could not resolve cross-reference: No Verse.SoundDef na
+   353 logs  295 sess  0 vers | gone none   0%/22   small   0%/23   |                                          fxz.solaris.ratkinracemod.odyssey  xref-missing|Could not resolve cross-reference: No Ver
+   244 logs  164 sess  0 vers | gone none   0%/32   small   0%/20   |                                          lts.i  xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to
    206 logs  166 sess  0 vers | gone none   0%/20   small   0%/11   | reorder 2                                oskarpotocki.vanillafactionsexpanded.core  patch-failed|[Vanilla Expanded Framework] Patc
-   177 logs  147 sess  0 vers | gone none  29%/24   small  58%/19   | reorder 9, disable-other 8, enable 3, update-other 1 unlimitedhugs.hugslib  exception|[HugsLib][ERR] HTTP/#.# # Bad Request
-   177 logs  147 sess  0 vers | gone none  29%/24   small  58%/19   | reorder 9, disable-other 8, enable 3, update-other 1 unlimitedhugs.hugslib  exception|[HugsLib][warn] Exception during log publish
-   168 logs   94 sess  0 vers | gone none   0%/30   small   4%/26   | disable-source 1                         asel.monolynrace  xref-missing|Could not resolve cross-reference: No Verse.SoundDef named
-   167 logs  119 sess  0 vers | gone none   0%/20   small   0%/11   |                                          jl.wolfeingfiexpanded  xref-missing|Could not resolve cross-reference: No Verse.SoundDef 
+   177 logs  147 sess  2 vers | gone none  29%/24   small  58%/19   | reorder 9, disable-other 8, enable 3, update-other 1 unlimitedhugs.hugslib  exception|[HugsLib][ERR] HTTP/#.# # Bad Request
+   177 logs  147 sess  2 vers | gone none  29%/24   small  58%/19   | reorder 9, disable-other 8, enable 3, update-other 1 unlimitedhugs.hugslib  exception|[HugsLib][warn] Exception during log publish
+   168 logs   94 sess  0 vers | gone none   0%/29   small   4%/23   | disable-source 1                         asel.monolynrace  xref-missing|Could not resolve cross-reference: No Verse.SoundDef named
+   167 logs  119 sess  0 vers | gone none   0%/19   small   0%/11   |                                          jl.wolfeingfiexpanded  xref-missing|Could not resolve cross-reference: No Verse.SoundDef 
    149 logs  116 sess  0 vers | gone none   0%/19   small   0%/9    |                                          aoba.rimthunder.mobileinfantry  xref-missing|Could not resolve cross-reference: No Verse.
-   144 logs  114 sess  0 vers | gone none   0%/11   small   0%/9    |                                          aoba.deadmanswitch.synthetic  patch-failed|[The Dead Man's Switch - Synthetic] Patch oper
+   144 logs  113 sess  0 vers | gone none   0%/11   small   0%/8    |                                          aoba.deadmanswitch.synthetic  patch-failed|[The Dead Man's Switch - Synthetic] Patch oper
    135 logs   97 sess  0 vers | gone none   0%/27   small   0%/6    |                                          ceteam.combatextended  patch-failed|[Combat Extended] Verse.PatchOperationReplace(xpath="
-   135 logs  100 sess  0 vers | gone none   0%/15   small   0%/8    |                                          kindseal.ufpc  xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … 
+   135 logs  100 sess  0 vers | gone none   0%/14   small   0%/9    |                                          kindseal.ufpc  xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … 
    130 logs   90 sess  0 vers | gone none   0%/21   small   0%/14   |                                          dms.proton.jointoperations  xref-missing|Could not resolve cross-reference: No Verse.Soun
-   122 logs  104 sess  0 vers | gone none   0%/9    small  50%/8    | disable-source 3, disable-other 1, reorder 1 krkr.rocketman  exception|Error while instantiating a mod of type … System.Reflection
-   120 logs  103 sess  0 vers | gone none   0%/9    small  43%/7    | disable-source 3, reorder 1              krkr.rocketman  exception|Error in static constructor of RocketMan.RocketPatcher: System.
-   105 logs   78 sess  0 vers | gone none   0%/8    small   0%/9    |                                          aoba.deadmanswitch.synthetic  patch-failed|[The Dead Man's Switch - Synthetic] Verse.Patc
+   122 logs  103 sess  0 vers | gone none   0%/9    small  50%/8    | disable-source 3, disable-other 1, reorder 1 krkr.rocketman  exception|Error while instantiating a mod of type … System.Reflection
+   120 logs  102 sess  0 vers | gone none   0%/9    small  43%/7    | disable-source 3, reorder 1              krkr.rocketman  exception|Error in static constructor of RocketMan.RocketPatcher: System.
+   105 logs   77 sess  0 vers | gone none   0%/8    small   0%/8    |                                          aoba.deadmanswitch.synthetic  patch-failed|[The Dead Man's Switch - Synthetic] Verse.Patc
     99 logs   78 sess  1 vers | gone none   0%/8    small  10%/10   | disable-other 1, enable 1, reorder 1, update-other 1 lwm.deepstorage  exception|Error in static constructor of LWM.DeepStorage.Mod
     97 logs   82 sess  0 vers | gone none   0%/5    small  14%/7    | disable-other 1, reorder 1               bbb.ratkinweapon.morefailure  xref-missing|Could not resolve cross-reference to Verse.Thi
-    93 logs   38 sess  0 vers | gone none   0%/17   small   0%/10   |                                          xxk.coffinbedcanbedeathrest  xref-missing|Could not resolve cross-reference: No Verse.Des
-    90 logs   53 sess  0 vers | gone none   0%/15   small   0%/14   |                                          oskarpotocki.vanillafactionsexpanded.core  exception|HarmonyLib.HarmonyException: Patchin
+    93 logs   38 sess  0 vers | gone none   0%/17   small   0%/4    |                                          xxk.coffinbedcanbedeathrest  xref-missing|Could not resolve cross-reference: No Verse.Des
+    90 logs   53 sess  0 vers | gone none   0%/14   small   0%/11   |                                          oskarpotocki.vanillafactionsexpanded.core  exception|HarmonyLib.HarmonyException: Patchin
 
 Most kept mod patterns are load-stage (patch.op-failed 243, patch.xpath 154, xref.def 147,
-xref.sound 70). 63 of 1,036 have a mod version: parsed.jsonl keeps only [mv:…] versions (see
-Known issues). 260 mod patterns have >= 3 small-change pairs; in 116 of them the error went at
-least once.
+xref.sound 70). 105 of 1,036 have a mod version (many mods report none). 209 mod patterns have
+>= 3 small-change pairs; in 92 of them the error went at least once.
 
 == Known issues
 
-- parsed.jsonl drops the mod entries written with [v:…] or [ov:…] instead of [mv:…]: 4.9% of the
-  entries of the first 671 logs, but in every log (HugsLib itself is written with [ov:]). Sessions
-  still match (the same mods are dropped from both uploads); version changes and "removed the
-  source mod" are undercounted, and only [mv:] versions are known. Regenerate after the hugslogs fix.
+- Before ef86650 parsed.jsonl dropped the mod entries written with [v:…] or [ov:…] (1.6: 1,425,158
+  -> 1,498,974 entries, +4.9%; median mods per log 159.5 -> 165; every log lost HugsLib). The numbers
+  here are on the corrected file; the old one gave the same coverage and nearly the same session
+  rates (949 sessions, 96 disable-source patterns).
+- The clusters and their attribution are from results-v3 (run on the old mod lists): HugsLib and
+  the other dropped mods are never a source there.
 - Attribution is RimArcho v3 (coverage, not accuracy): a mod-specific pattern is "a template
   attributed to this mod", not "this mod's bug".
 - Fix evidence co-occurs with a change; it is not causal. A player who removes three mods and
