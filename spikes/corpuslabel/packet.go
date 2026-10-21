@@ -834,7 +834,6 @@ func packetFor(a *app.App, userData, corpus string, r *parsedRec, it Item, co ma
 	return p, nil
 }
 
-
 var (
 	folderRe     = regexp.MustCompile(`(?i)(?:294100[\\/](\d+)|[\\/]Mods[\\/]([^\\/\]]+))[\\/]`)
 	searchHitRe  = regexp.MustCompile(`(?m)^\s{4}([a-z0-9][a-z0-9_.\-]*)\s{2}`)
