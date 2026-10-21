@@ -1,0 +1,71 @@
+package gui
+
+import "github.com/ToumanLin/RimArcho/internal/view"
+
+// The shell's text (shell.js, home.js, guide.js; 06 §2.1–§2.3, §2.15).
+func init() {
+	view.Register(map[string]string{
+		// the sidebar and the top bar
+		"show the sidebar":             "显示侧栏",
+		"hide the sidebar":             "收起侧栏",
+		"the game is not running":      "游戏没在运行",
+		"pages":                        "页面",
+		"go to a page in the sidebar":  "去侧栏的页面",
+		"the environment page":         "环境页",
+		"write to the game":            "写入游戏",
+		"build a pack":                 "编译成整合包",
+		"start the game with the list": "用这个列表启动游戏",
+		"different from the list last written to the game; launching or writing to the game writes them": "与上次写入游戏的列表不同；启动或写入游戏时写进去",
+		"sort · write to the game · launch (preview first)":                                              "排序 · 写入游戏 · 启动（先看预览）",
+		// the home page
+		"playing now":               "正在玩",
+		"activity":                  "动态",
+		"plan":                      "方案",
+		"pack":                      "整合包",
+		"a game is already running": "已有游戏在运行",
+		"mod library changes":       "Mod 库的变化",
+		"not played yet":            "没玩到",
+		"now":                       "现在",
+		"the game is running":       "游戏运行中",
+		"no run read yet":           "还没有读过游戏日志",
+		"no errors":                 "没有报错",
+		"no environment yet: add one on the environment page": "还没有环境：在环境页添加",
+		// the first-run guide
+		"getting started":                    "开始使用",
+		"add an environment":                 "添加环境",
+		"find the game":                      "找到游戏",
+		"read the mods":                      "读取 Mod",
+		"where to start":                     "从哪里开始",
+		"next":                               "下一步",
+		"skip":                               "跳过",
+		"open":                               "打开",
+		"name":                               "名称",
+		"waiting":                            "等待中",
+		"scan again":                         "重新扫描",
+		"add this folder":                    "添加这个目录",
+		"add and continue":                   "添加并继续",
+		"add %d environments":                "添加 %d 个环境",
+		"already environment %s":             "已是环境 %s",
+		"started directly":                   "直接启动",
+		"the environment's name":             "环境的名称",
+		"use this list":                      "用这个列表",
+		"import a list…":                     "导入列表…",
+		"the game's current list":            "游戏当前的列表",
+		"the game's list is your first plan": "游戏的列表成为你的第一个方案",
+		"move over from RimSort or RimCrow":  "从 RimSort、RimCrow 搬过来",
+		"open a pack or a Steam collection":  "打开整合包或 Steam 合集",
+		"which RimWorld installs should RimArcho manage?":                                           "要让 RimArcho 管理哪些 RimWorld？",
+		"where does your first plan come from?":                                                     "第一个方案从哪里来？",
+		"the game folder (the one with RimWorldWin64.exe)":                                          "游戏目录（有 RimWorldWin64.exe 的那个）",
+		"a scan is already running; wait for it to finish":                                          "已经在扫描，等它完成",
+		"a pack file, or a Steam Workshop collection link":                                          "整合包文件，或 Steam 创意工坊合集链接",
+		"ModsConfig.xml enables %d mods; it becomes your first plan":                                "ModsConfig.xml 里启用了 %d 个 Mod，它成为你的第一个方案",
+		"RimArcho reads every mod folder once; later scans only read what changed":                  "RimArcho 把每个 Mod 目录读一遍，以后的扫描只读变了的部分",
+		"a list file, a share code or pasted text; you see what changes before it is applied":       "列表文件、分享码或粘贴的文字；生效前先看会改动什么",
+		"a pack someone shared (.archopack or pack.json), or a Workshop collection":                 "别人分享的整合包（.archopack 或 pack.json），或创意工坊合集",
+		"no RimWorld found in the Steam libraries or the usual folders; type the game folder below": "在 Steam 库和常见目录里没找到 RimWorld，请在下面输入游戏目录",
+		// the guide's scan (shell.go)
+		"reading the mods of %s…": "正在读取 %s 的 Mod…",
+		"%d mods found":           "找到 %d 个 Mod",
+	})
+}

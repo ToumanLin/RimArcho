@@ -12,6 +12,13 @@ let info = null;  // ExchangeInfo(): dialogs, the typed paths' folder, the forma
 let fmt = 0;      // the chosen export format
 let pasted = "";  // what the paste box held (kept while the popup is reopened)
 
+// importFrom opens the import popup straight on the preview of a source (the first-run
+// guide's collection link).
+export async function importFrom(kind, src) {
+  await exchange(0);
+  if (S.popup && S.popup.kind === "exchange") preview(kind, src);
+}
+
 // exchange opens the popup on import (0) or export (1).
 export async function exchange(tab = 0) {
   try { info = await api.ExchangeInfo(); } catch (e) { return say("fail", errText(e)); }
@@ -194,6 +201,8 @@ async function apply(merge) {
   for (const c of S.cols) c.sel.clear();
   await ui.reload();
   say("ok", t, true);
+  // the first-run guide goes on once its list is in
+  if (ui.afterImport) ui.afterImport();
 }
 
 // ---- export ----

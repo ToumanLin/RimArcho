@@ -44,6 +44,8 @@ type API struct {
 	Exe string
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
+	// ScanRunner scans an environment in place of the child process (tests).
+	ScanRunner func(env string) (string, error)
 }
 
 func newAPI(a *app.App) *API {

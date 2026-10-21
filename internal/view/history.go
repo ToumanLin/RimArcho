@@ -30,9 +30,9 @@ func HistoryItems(a *app.App, st *app.LoadoutState) ([]HistItem, error) {
 	for i := len(h.Redo) - 1; i >= 0; i-- {
 		out = append(out, HistItem{Kind: "redo", Text: StepText(st, h.Redo[i]), Steps: h.Redo[i].Steps})
 	}
-	now := T("now · saved")
+	now := T("now · same as the game")
 	if n := len(st.Changes()); n > 0 {
-		now = Tf("now · %d not saved", n)
+		now = Tf("now · %d not written", n)
 	}
 	out = append(out, HistItem{Kind: "now", Text: now})
 	for _, s := range h.Undo {

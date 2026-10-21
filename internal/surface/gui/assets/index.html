@@ -9,34 +9,38 @@
 </head>
 <body>
 <div id="app">
-  <header id="top">
-    <div class="side left">
+  <aside id="side">
+    <div class="brand"><img src="/icon.svg" alt=""><span>RimArcho</span></div>
+    <nav id="nav"></nav>
+    <div class="side-foot">
+      <button id="nav-settings" class="nav-item" data-page="settings"><span class="lbl"></span></button>
+      <button id="live" class="runbox"><span class="env"></span><span class="run"></span></button>
+    </div>
+  </aside>
+  <div id="scrim" hidden></div>
+  <div id="main">
+    <header id="top">
+      <button id="collapse" class="icon" title="Sidebar"></button>
+      <nav id="crumbs"></nav>
       <button id="env" class="pill" title="E"></button>
-    </div>
-    <nav id="tabs">
-      <span class="thumb"></span>
-      <button class="tab" data-tab="board" title="Shift+1"><span class="lbl"></span></button>
-      <button class="tab" data-tab="needs" title="Shift+2"><span class="lbl"></span><span id="needs" class="count"></span></button>
-      <button class="tab" data-tab="logs" title="Shift+3"><span class="lbl"></span></button>
-      <button class="tab" data-tab="packs" title="Shift+4"><span class="lbl"></span></button>
-      <button class="tab" data-tab="settings" title="Shift+5"><span class="lbl"></span></button>
-    </nav>
-    <div class="side right">
-      <span id="live" class="badge live" hidden></span>
+      <span class="grow"></span>
+      <div id="acts"></div>
       <button id="btn-launch" class="btn primary" data-cmd="launch" title="L"></button>
+    </header>
+    <div id="body">
+      <main id="board">
+        <section class="area list" data-area="0"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
+        <div class="split" data-split="0"></div>
+        <section class="area list" data-area="1"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
+        <div class="split" data-split="1"></div>
+        <section class="area list" data-area="2"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
+        <div class="split" data-split="2"></div>
+        <section class="area detail" data-area="3"><div class="head"></div><div class="scroll" tabindex="-1"><div id="detail"></div></div></section>
+      </main>
+      <div id="screen" hidden></div>
     </div>
-  </header>
-  <main id="board">
-    <section class="area list" data-area="0"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
-    <div class="split" data-split="0"></div>
-    <section class="area list" data-area="1"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
-    <div class="split" data-split="1"></div>
-    <section class="area list" data-area="2"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
-    <div class="split" data-split="2"></div>
-    <section class="area detail" data-area="3"><div class="head"></div><div class="scroll" tabindex="-1"><div id="detail"></div></div></section>
-  </main>
-  <div id="screen" hidden></div>
-  <footer id="bottom"><span id="where" class="where"></span><span id="status"></span><span class="grow"></span><span id="hints"></span></footer>
+    <footer id="bottom"><span id="where" class="where"></span><span id="status"></span><span class="grow"></span><span id="hints"></span></footer>
+  </div>
   <div id="popup" hidden></div>
   <div id="menu" hidden></div>
 </div>
