@@ -6,12 +6,11 @@ import { S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js"
 import { icon } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { setActs } from "./shell.js";
+import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
 
 let ui = null;
 export function initScreens(u) { ui = u; }
-
-const GROUPS = ["this list", "missing dependencies", "conflicts", "last run", "needs your answer", "hidden mods", "this run"];
 
 // fresh: the next page built is a new page (not a redraw of the one shown); only a new page
 // fades in, so a redraw after an action or a sub-view switch does not flicker.
@@ -38,21 +37,24 @@ export function closeScreen() {
   return true;
 }
 
-// page builds a page: a head (the title and what describes the page) and a body. The
-// buttons and fields among right are the page's actions: they go to the top bar (06 §2.2).
-export function page(cls, title, ...right) {
+// page builds a page: one muted sentence that says what the page is for (the breadcrumb
+// names it, 06 §2.2), then the body. The buttons and fields among right are the page's
+// actions: they go to the top bar, quiet unless primary; anything else joins the lead.
+export function page(cls, lead, ...right) {
   const w = el("div", "page " + cls + (fresh ? " enter" : ""));
   fresh = false;
   const head = el("div", "page-head");
-  head.append(el("h2", "", title));
+  if (lead) head.append(el("p", "lead", lead));
   const acts = [];
   for (const r of right) {
     if (!r) continue;
-    if (r.matches("button, input, select")) acts.push(r);
-    else head.append(r);
+    if (r.matches("button, input, select")) {
+      if (r.matches("button.btn") && !r.classList.contains("primary")) r.classList.add("quiet");
+      acts.push(r);
+    } else head.append(r);
   }
   setActs("", ...acts);
-  w.append(head);
+  if (head.childNodes.length) w.append(head);
   return w;
 }
 
@@ -60,6 +62,16 @@ export function button(label, keyName, run, cls = "") {
   const b = el("button", "btn " + cls, label);
   if (keyName) b.append(el("kbd", "", keyName));
   b.onclick = (e) => { e.stopPropagation(); run(); };
+  return b;
+}
+
+// act is a page action with an icon (the top bar's quiet buttons, 06 §2.2).
+export function act(label, ic, run, keyName) {
+  const b = button(label, keyName, run);
+  const i = el("span", "ic");
+  i.innerHTML = icon[ic] || "";
+  b.prepend(i);
+  if (keyName) b.title = keyName;
   return b;
 }
 
@@ -96,111 +108,153 @@ function moveIn(curIdx, n, k) {
   return null;
 }
 
-// ---- 需要处理: three columns ----
-// The list itself (its order, missing dependencies, conflicts), the game (this run, the
-// last run's log) and what needs your call (identity questions, hidden mods).
-const NCOLS = [
-  { title: "list", groups: [0, 1, 2] },
-  { title: "game log", groups: [6, 3] },
-  { title: "your call", groups: [4, 5] },
-];
-const N = { data: null, cols: [[], [], []], col: 0, cur: [0, 0, 0], open: new Set(), els: [[], [], []] };
+// ---- 能不能跑 (06 §2.4, §5): one column of sections, by consequence ----
+// 会让游戏出错, 上次运行的报错 (this run first while the game runs), 要你确认, 隐藏的 Mod.
+// Each item is a card: a bold line, a plain sentence, where the claim comes from (the
+// evidence chip), one primary action and the rest under ⋯. The arrows move a cursor
+// through the items; an action's key runs it (06 §3).
+const SECTIONS = ["breaks the game", "errors from the last run", "for you to confirm", "hidden mods"];
+const SECTION_CLS = ["break", "run", "confirm", "hidden"];
+const N = { data: null, items: [], cur: 0, open: new Set(), els: [] };
+
+// archo is the hook for the Archo panel (06 §2.13, 1.1): when set, an item can be handed
+// to it ("Archo 在看"). Nothing sets it yet.
+export const archo = { ask: null };
 
 export function liveChanged() {
-  if (S.screen === "needs" && N.data) { splitNeeds(); drawNeeds(); }
+  if (S.screen === "needs" && N.data) { orderNeeds(); drawNeeds(); }
 }
 
-function splitNeeds() {
-  const items = ((S.live && S.live.items) || []).concat(N.data.items || []);
-  N.cols = NCOLS.map((c) => items.filter((it) => c.groups.includes(it.group)).sort((a, b) => c.groups.indexOf(a.group) - c.groups.indexOf(b.group)));
-  N.cur = N.cur.map((x, i) => Math.min(x, Math.max(N.cols[i].length - 1, 0)));
-  if (!N.cols[N.col].length) { const f = N.cols.findIndex((c) => c.length); if (f >= 0) N.col = f; }
+// liveCount: this run's counted errors (the sidebar's badge adds them, 06 §2.1).
+export function liveCount() {
+  return ((S.live && S.live.items) || []).filter((it) => it.counted).length;
+}
+
+function orderNeeds() {
+  const all = ((S.live && S.live.items) || []).concat(N.data.items || []);
+  // stable: within a section the view's order (this run before the last run)
+  N.items = all.map((it, i) => [it, i]).sort((a, b) => (a[0].section - b[0].section) || (a[1] - b[1])).map((x) => x[0]);
+  N.cur = Math.min(N.cur, Math.max(N.items.length - 1, 0));
 }
 
 export async function needs(keepCursor) {
   let data;
   try { data = await api.Needs(); } catch (e) { say("fail", errText(e)); return; }
   N.data = data;
-  if (!keepCursor) { N.cur = [0, 0, 0]; N.col = 0; }
-  splitNeeds();
+  if (!keepCursor) N.cur = 0;
+  orderNeeds();
   drawNeeds();
+}
+
+// lead: what the page says about the plan in one sentence.
+function needsLead(d) {
+  const plan = (S.shell && S.shell.plan && S.shell.plan.name) || T("the list");
+  const breaks = N.items.filter((x) => x.counted && x.section === 0).length;
+  const count = N.items.filter((x) => x.counted).length;
+  if (breaks) return Tf("%s is not safe to play yet: fix the %d problems below; every step can be undone.", plan, breaks);
+  if (count) return Tf("%s can run; %d things below are worth a look.", plan, count);
+  if (d.never) return Tf("%s: the mods' files are not checked yet.", plan);
+  return Tf("%s can run: nothing to handle.", plan);
 }
 
 function drawNeeds() {
   const sc = S.screen === "needs" ? $("#screen") : openScreen("needs");
-  const tops = [...sc.querySelectorAll(".col .scroll")].map((x) => x.scrollTop);
+  const top = sc.scrollTop;
   sc.innerHTML = "";
   const d = N.data;
   let state = "";
   if (S.busy.analyze) state = T("checking the mods' files…");
   else if (d.never) state = T("the mods' files are not checked yet");
   else if (d.stale) state = T("the files changed since the last check");
-  const w = page("needs fill", T("can it run"),
-    el("span", "muted", d.count ? Tf("%d to handle", d.count) : T("nothing to handle")),
-    state ? el("span", "muted", state) : null,
-    button(T("check the files again"), "A", () => ui.cmd("analyze")),
-    button(T("game log"), "l", () => ui.go("log")));
-  const grid = el("div", "cols three");
-  N.els = [[], [], []];
-  NCOLS.forEach((c, ci) => {
-    const card = el("section", "card col" + (ci === N.col ? " focus" : ""));
-    const head = el("div", "card-head");
-    head.append(el("span", "label", T(c.title)), el("span", "n", String(N.cols[ci].filter((x) => x.counted).length || "")));
-    const scroll = el("div", "scroll");
-    if (!N.cols[ci].length) scroll.append(el("div", "empty-state", "✓ " + T("nothing here")));
-    let g = -1;
-    N.cols[ci].forEach((it, i) => {
-      if (it.group !== g && c.groups.length > 1) {
-        g = it.group;
-        // which run the log is from: the list, or a pack (08 §5.3)
-        let t = T(GROUPS[g]);
-        if (g === 3 && d.lastRun) t += " · " + d.lastRun;
-        if (g === 6 && S.live && S.live.pack) t += " · " + Tf("pack %s", S.live.pack);
-        scroll.append(el("div", "group", t));
-      }
-      const row = needRow(it, ci, i);
-      N.els[ci][i] = row;
-      scroll.append(row);
-    });
-    card.append(head, scroll);
-    card.onmousedown = () => { if (N.col !== ci) { N.col = ci; markNeeds(); } };
-    grid.append(card);
+  const w = page("needs", needsLead(d),
+    state ? el("span", "state-note", state) : null,
+    act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A"),
+    act(T("game log"), "log", () => ui.go("log"), "l"));
+  N.els = [];
+  if (!N.items.length) {
+    w.append(el("section", "card empty-state", "✓ " + T("nothing here")));
+  }
+  let i = 0;
+  SECTIONS.forEach((title, si) => {
+    const its = N.items.filter((x) => x.section === si);
+    if (!its.length) return;
+    const sec = el("section", "sec need-sec " + SECTION_CLS[si]);
+    const n = its.filter((x) => x.counted).length;
+    const h = el("h2", "label", T(title));
+    if (n) {
+      const c = el("span", "n num", String(n));
+      h.append(el("span", "", " · "), c);
+      bump("needs:" + si, c, n);
+    }
+    // which run the log is from: the list, or a pack (08 §5.3)
+    if (si === 1 && S.live && S.live.running) h.append(el("span", "muted", " · " + (S.live.pack ? Tf("pack %s", S.live.pack) : T("this run"))));
+    else if (si === 1 && d.lastRun) h.append(el("span", "muted", " · " + d.lastRun));
+    sec.append(h);
+    const card = el("div", "card need-list");
+    for (const it of its) {
+      const row = needCard(it, i);
+      N.els[i] = row;
+      card.append(row);
+      i++;
+    }
+    sec.append(card);
+    w.append(sec);
   });
-  w.append(grid);
   sc.append(w);
-  [...sc.querySelectorAll(".col .scroll")].forEach((x, i) => { x.scrollTop = tops[i] || 0; });
-  markNeeds(true);
+  sc.scrollTop = top;
+  markNeeds();
 }
 
-function needRow(it, ci, i) {
+function needCard(it, i) {
   const row = el("div", "need" + (it.dim ? " dimmed" : ""));
-  const ic = el("span", "ic");
-  ic.innerHTML = it.dim || !it.status ? "" : statusIcon(it.status);
+  const top = el("div", "top");
   const body = el("div", "body");
-  body.append(el("div", "text", it.text));
+  if (it.dim) {
+    body.append(el("div", "why", it.text));
+  } else {
+    body.append(el("div", "title", it.title || it.text));
+    if (it.why) body.append(el("div", "why", it.why));
+  }
+  top.append(body);
+  const acts = it.actions || [];
+  const right = el("div", "acts");
+  if (archo.ask && it.section === 1) right.append(button(T("ask Archo"), "", () => archo.ask(it), "small"));
+  if (acts.length) {
+    const a = acts[0];
+    right.append(button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, it.dim ? "" : "primary"));
+    if (acts.length > 1) {
+      const more = button("⋯", "", () => {
+        N.cur = i; markNeeds();
+        const r = more.getBoundingClientRect();
+        pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, key: x.key, run: () => runAction(it, x) })));
+      }, "more");
+      more.title = acts.slice(1).map((x) => x.label).join(" · ");
+      right.append(more);
+    }
+  }
+  top.append(right);
+  row.append(top);
   if (it.fold && N.open.has(it.text)) {
     const parts = el("div", "parts");
     for (const p of it.parts || []) parts.append(el("div", "", "· " + p));
-    body.append(parts);
+    row.append(parts);
   }
-  const acts = el("div", "acts");
-  for (const act of it.actions || []) {
-    acts.append(button(act.label, act.key, () => { N.col = ci; N.cur[ci] = i; markNeeds(); runAction(it, act); }, "small"));
+  if (it.evidence) {
+    const ev = el("div", "ev-line");
+    ev.append(el("span", "ev-chip " + it.evidence.kind, it.evidence.label));
+    if (it.evidence.source) ev.append(el("span", "src", it.evidence.source));
+    row.append(ev);
   }
-  body.append(acts);
-  row.append(ic, body);
-  row.onclick = () => { N.col = ci; N.cur[ci] = i; markNeeds(); };
+  row.onclick = () => { N.cur = i; markNeeds(); };
   return row;
 }
 
 // markNeeds moves the cursor's mark without building the page again (the keys stay quick).
-function markNeeds(initial) {
-  $$cols().forEach((c, ci) => c.classList.toggle("focus", ci === N.col));
-  N.els.forEach((rows, ci) => rows.forEach((r, i) => r.classList.toggle("cur", i === N.cur[ci] && ci === N.col)));
-  const on = N.els[N.col][N.cur[N.col]];
-  if (on) on.scrollIntoView({ block: initial ? "nearest" : "nearest" });
+function markNeeds() {
+  N.els.forEach((r, i) => r && r.classList.toggle("cur", i === N.cur));
+  const on = N.els[N.cur];
+  if (on) on.scrollIntoView({ block: "nearest" });
 }
-const $$cols = () => [...document.querySelectorAll("#screen .cols .col")];
 
 async function runAction(it, act) {
   switch (act.kind) {
@@ -233,20 +287,23 @@ async function doAction(act, option) {
   if (S.screen === "needs") needs(true);
 }
 
+// needsKey: ↑↓ (j k, PageUp/PageDown, Home/End) move through the items, ← → jump to the
+// previous / next section; an item's action keys run its actions.
 export function needsKey(e) {
   const k = e.key;
-  if (k === "ArrowLeft" || k === "ArrowRight") {
+  const n = N.items.length;
+  if ((k === "ArrowLeft" || k === "ArrowRight") && n) {
     e.preventDefault();
-    const d = k === "ArrowRight" ? 1 : -1;
-    for (let c = N.col + d; c >= 0 && c < 3; c += d) if (N.cols[c].length) { N.col = c; break; }
-    return markNeeds();
+    const sec = N.items[N.cur].section;
+    const idx = k === "ArrowRight" ? N.items.findIndex((x) => x.section > sec) : N.items.findIndex((x) => x.section === Math.max(...N.items.filter((y) => y.section < sec).map((y) => y.section)));
+    if (idx >= 0) { N.cur = idx; markNeeds(); }
+    return;
   }
-  const n = N.cols[N.col].length;
-  const m = n ? moveIn(N.cur[N.col], n, k) : null;
-  if (m != null) { e.preventDefault(); N.cur[N.col] = m; return markNeeds(); }
+  const m = n ? moveIn(N.cur, n, k) : null;
+  if (m != null) { e.preventDefault(); N.cur = m; return markNeeds(); }
   if (k === "A") return ui.cmd("analyze");
   if (k === "l") return ui.go("log");
-  const it = N.cols[N.col][N.cur[N.col]];
+  const it = N.items[N.cur];
   const name = k === " " ? "space" : k === "Enter" ? "enter" : k;
   const act = it && (it.actions || []).find((a) => a.key === name);
   if (act) { e.preventDefault(); runAction(it, act); }
@@ -318,7 +375,7 @@ function drawGameLog() {
       gameLog(p.path);
     }));
   }
-  const w = logPage("log", T("game log"), ...right);
+  const w = logPage("log", T("each run's errors, grouped by mod; pick one to read the log"), ...right);
   const files = (p && p.files) || [];
   const bar = el("div", "subbar");
   if (files.length) {
@@ -327,7 +384,7 @@ function drawGameLog() {
   if (p && p.facts && !L.loading) bar.append(el("span", "muted", p.facts));
   w.append(bar);
   if (L.pending) { w.append(el("div", "card empty-state", Tf("the mods are analysed for %s first (once per game version)…", L.pending))); return; }
-  if (L.loading) { w.append(el("div", "card empty-state", T("reading the log…"))); return; }
+  if (L.loading) { const c = el("div", "card pad"); c.append(shimmer(T("reading the log…"), 6)); w.append(c); return; }
   if (!p || !p.path) { w.append(el("div", "card empty-state", T("no Player.log found"))); return; }
   const grid = el("div", "cols two");
   const list = el("section", "card col focus");
@@ -368,7 +425,7 @@ function markLog() {
   const k = L.page.path + "|" + r.cluster;
   if (L.detail.has(k)) return showLines(box, L.detail.get(k));
   box.innerHTML = "";
-  box.append(el("div", "empty-state", T("loading…")));
+  box.append(shimmer(T("loading…"), 8));
   clearTimeout(detailTimer);
   detailTimer = setTimeout(async () => {
     let lines;
@@ -393,7 +450,7 @@ export async function changes() {
   drawChanges();
 }
 
-function rescanButton() {
+export function rescanButton() {
   const b = button(S.busy.scan ? T("scanning…") : T("rescan the mod folders"), "R", () => ui.cmd("rescan"));
   b.classList.add("rescan");
   b.prepend(el("span", "ic" + (S.busy.scan ? " spin" : "")));
@@ -410,7 +467,7 @@ export function busyChanged() {
 }
 
 function drawChanges() {
-  const w = logPage("changes", T("changes"), rescanButton());
+  const w = logPage("changes", T("what each scan found: mods added, updated and gone"), rescanButton());
   const scroll = el("div", "scroll page-scroll");
   w.append(scroll);
   if (!C.scans.length) { scroll.append(el("div", "card empty-state", T("no scan yet (R scans)"))); return; }
@@ -486,7 +543,7 @@ function drawFull() {
   sc.innerHTML = "";
   const d = S.detail;
   const names = [T("summary"), ...(F.secs || []).map((s) => s.title + (s.count >= 0 ? " · " + s.count : ""))];
-  const w = page("full", d ? d.name : "", el("span", "muted", T("← → the previous / next mod · tab the sections")));
+  const w = page("full", T("← → the previous / next mod · tab the sections"));
   const bar = el("div", "subbar");
   bar.append(seg(names, F.tab, (i) => { F.tab = i; drawFull(); }));
   w.append(bar);
@@ -501,7 +558,7 @@ function drawFull() {
     const pre = el("pre", "lines");
     pre.textContent = (s.lines || []).join("\n");
     card.append(pre);
-  } else card.append(el("p", "muted", T("loading…")));
+  } else card.append(shimmer(T("loading…"), 8));
   w.append(card);
   sc.append(w);
   ui.renderWhere();
@@ -539,7 +596,7 @@ export async function settings() {
   const sc = S.screen === "settings" ? $("#screen") : openScreen("settings");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("settings", T("settings"));
+  const w = page("settings", T("how RimArcho looks and works; each row shows the command that changes it"));
   sc.append(w);
   renderGroups(w, groups, settings);
   sc.scrollTop = top;
@@ -611,7 +668,7 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", T("environment"), button(T("add an environment"), "", () => ui.go("guide")), rescanButton());
+  const w = page("env", T("an environment is one RimWorld install: its folders, how it starts, its mods"), act(T("add an environment"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
   const card = el("section", "card");
   for (const e of p.envs || []) {
@@ -781,7 +838,7 @@ export async function packs() {
     previewBuild(n);
   });
   name.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); build.click(); } };
-  const w = page("packs", T("packs"), name, build);
+  const w = page("packs", T("a pack copies every mod of the list as it is now and plays with its own saves"), name, build);
   sc.append(w);
   for (const u of un) {
     if (u.running && S.packBuild && S.packBuild.name === u.name) u.progress = S.packBuild;

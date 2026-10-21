@@ -1,5 +1,6 @@
 // The page's state and the helpers every part uses.
 import { api, T, Tf } from "./api.js";
+import { statusIn } from "./motion.js";
 
 export const AREAS = ["Disabled", "Enabled", "Staging", "details"];
 export const ROW_H = 28;
@@ -51,6 +52,7 @@ export function say(kind, text, undo = false) {
     a.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "undo" }));
     s.appendChild(a);
   }
+  statusIn(s);
 }
 export function clearSay() {
   if (!S.busy.scan && !S.busy.analyze) say("", "");

@@ -23,7 +23,9 @@ export const icon = {
   library: svg('<rect x="2.4" y="2.6" width="3" height="10.8" rx=".8"/><rect x="6.5" y="2.6" width="3" height="10.8" rx=".8"/><path d="M11 3.4l2.6-.6 1.4 10-2.6.6z"/>'),
   log: svg('<path d="M4 1.8h5.2L12.4 5v9.2H4z"/><path d="M9 1.8V5h3.4M6 8h4.4M6 10.6h4.4"/>'),
   settings: svg('<circle cx="8" cy="8" r="2.2"/><path d="M8 1.6v2M8 12.4v2M1.6 8h2M12.4 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4"/>'),
-  play: svg('<path d="M5 3.2v9.6L12.6 8z"/>'),
+  play: svg('<path d="M5 3.2v9.6L12.6 8z"/>', "fill"),
+  plus: svg('<path d="M8 3v10M3 8h10"/>'),
+  chev: svg('<path d="M6 4l4 4-4 4"/>'),
 };
 
 export function sourceIcon(kind) { return icon[kind] || icon.local; }

@@ -57,6 +57,16 @@ func TestNavAndPath(t *testing.T) {
 	if g[0].Items[1].Badge != n.Count || n.Count == 0 {
 		t.Fatalf("badge %d, needs %d", g[0].Items[1].Badge, n.Count)
 	}
+	// quiet counts: the plans and packs from the rows, the environments and the library
+	// from NavCounts (06 §2.1)
+	view.NavCounts(g, 2, 1354)
+	counts := map[string]int{}
+	for _, it := range g[0].Items {
+		counts[it.ID] = it.Count
+	}
+	if counts["plan"] != 1 || counts["packs"] != 1 || counts["env"] != 2 || counts["library"] != 1354 || counts["needs"] != 0 {
+		t.Fatalf("counts %v", counts)
+	}
 	path := func(id string) string {
 		var out []string
 		for _, c := range view.NavPath(g, id) {
@@ -107,6 +117,10 @@ func TestBuildHome(t *testing.T) {
 	if plan.Kind != view.RowPlan || plan.Env != "main · 1.6" || !strings.HasPrefix(plan.Played, "played ") {
 		t.Fatalf("plan row %+v", plan)
 	}
+	// the meta line: how many mods, and how they change (06 §2.3)
+	if !strings.HasSuffix(plan.Facts, " mods") && !strings.Contains(plan.Facts, " mods ·") || plan.Mode != "follows Workshop updates" {
+		t.Fatalf("plan meta %q / %q", plan.Facts, plan.Mode)
+	}
 	// Never analysed: the state says so instead of a count that may be short.
 	if n.Never && (plan.State != "not checked yet" || plan.Level != "") {
 		t.Fatalf("plan state %+v", plan)
@@ -118,6 +132,14 @@ func TestBuildHome(t *testing.T) {
 	}
 	if r := h.Rows[2]; !r.Light || r.State != "list only" {
 		t.Fatalf("light pack %+v", r)
+	}
+	if r := h.Rows[1]; r.Mode != "versions locked · own saves" || r.Facts != "f" {
+		t.Fatalf("pack meta %+v", r)
+	}
+	packs[0].Mods = 42
+	h = view.BuildHome(e.App, b, n, plans, packs)
+	if r := h.Rows[1]; r.Facts != "42 mods" || h.Rows[2].Mode != "" {
+		t.Fatalf("pack facts %+v, light %+v", r, h.Rows[2])
 	}
 	if h.ScanWhen == "" {
 		t.Fatalf("no scan time: %+v", h)

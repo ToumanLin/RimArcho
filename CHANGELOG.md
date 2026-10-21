@@ -92,6 +92,23 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   its stored analysis) and a launch button, and the last run and last scan's changes.
 - A first-run guide: find games (several at once), scan them, start from the game's list, an
   import, a pack or a Steam collection. 环境 › 添加环境 opens it.
+- The window follows the new design: no page title under the breadcrumb (it names the page)
+  but one muted line saying what the page is for; the environment chip sits by the page name
+  (plan and environment on 能不能跑); page actions are quiet icon + text buttons. Home rows
+  have a fixed environment column, a 方案 / 整合包 tag, a meta line (mods, follows Workshop
+  updates / versions locked, last played) and a state chip; the activity is a row of cards.
+  The sidebar shows quiet counts (plans, packs, environments, the library).
+- 能不能跑 is one column of four sections by consequence (会让游戏出错, 上次运行的报错,
+  要你确认, 隐藏的 Mod). Each item is a card: a bold line, a plain sentence, an evidence
+  chip (Mod 自己声明 / 推断 / 日志 / 社区数据 and the source) and one primary action, the
+  rest under ⋯; ← → jump between sections. The view model carries `Section`, `Title`,
+  `Why` and `Evidence` for both interfaces. A mod's missing inherited definitions, and its
+  patches that miss the same disabled target, are now one item each (the count drops).
+- Motion (06 §7.1): three duration tokens (120 / 180 / 260 ms); pages fade in with a 4px
+  rise; the sidebar's highlight slides; list edits slide the visible rows to their new
+  place and flash the changed ones; badges and counts bump; the status line slides in;
+  lazily loaded parts shimmer. Only opacity and transform move, and nothing does under
+  prefers-reduced-motion.
 - "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
   the history stays in the editor's third column.
 
