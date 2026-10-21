@@ -40,6 +40,19 @@ import (
 type pmod struct {
 	Pkg string `json:"pkg"`
 	MV  string `json:"mv"`
+	V   string `json:"v"`
+	OV  string `json:"ov"`
+}
+
+// version: override, then About.xml, then Manifest (as hugslogs Mod.Version).
+func (m pmod) version() string {
+	switch {
+	case m.OV != "":
+		return m.OV
+	case m.V != "":
+		return m.V
+	}
+	return m.MV
 }
 
 type pcluster struct {
@@ -427,7 +440,7 @@ func run(parsedPath, resultsPath, outPath, mm string, minLogs, minSess, maxChang
 		l := &log1{created: t, mods: r.Mods, set: map[string]bool{}, mv: map[string]string{}, pos: map[string]int{}}
 		for i, m := range r.Mods {
 			l.set[m.Pkg] = true
-			l.mv[m.Pkg] = m.MV
+			l.mv[m.Pkg] = m.version()
 			if _, ok := l.pos[m.Pkg]; !ok {
 				l.pos[m.Pkg] = i
 			}
