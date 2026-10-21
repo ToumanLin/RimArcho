@@ -98,6 +98,12 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   have a fixed environment column, a 方案 / 整合包 tag, a meta line (mods, follows Workshop
   updates / versions locked, last played) and a state chip; the activity is a row of cards.
   The sidebar shows quiet counts (plans, packs, environments, the library).
+- 能不能跑 is one column of four sections by consequence (会让游戏出错, 上次运行的报错,
+  要你确认, 隐藏的 Mod). Each item is a card: a bold line, a plain sentence, an evidence
+  chip (Mod 自己声明 / 推断 / 日志 / 社区数据 and the source) and one primary action, the
+  rest under ⋯; ← → jump between sections. The view model carries `Section`, `Title`,
+  `Why` and `Evidence` for both interfaces. A mod's missing inherited definitions, and its
+  patches that miss the same disabled target, are now one item each (the count drops).
 - "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
   the history stays in the editor's third column.
 

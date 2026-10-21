@@ -106,8 +106,9 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 		if len(c.Report.Attr) > 0 {
 			text = Tf("this run, %s: %d× %s", TokName(st, finding.Inst(c.Report.Attr[0].Instance)), c.Count, msg)
 		}
-		out = append(out, Need{Group: GroupThisRun, Text: text, Counted: true, Mods: ids, Status: StatusLog,
-			Actions: []Action{{Kind: ActList, Key: "enter", Label: T("see the log and evidence"), Title: T("this run"), Lines: lines}}})
+		out = append(out, Need{Group: GroupThisRun, Section: SectionRun, Text: text, Counted: true, Mods: ids, Status: StatusLog,
+			Evidence: evidence(EvLog, Tf("Player.log · this run, %d times", c.Count)),
+			Actions:  []Action{{Kind: ActList, Key: "enter", Label: T("see the log and evidence"), Title: T("this run"), Lines: lines}}})
 	}
 	return out
 }

@@ -43,6 +43,12 @@ func init() {
 		"scan now →":                           "现在扫描 →",
 		"scanned %s":                           "%s 扫描",
 		"see what changed →":                   "看变了什么 →",
+		// 能不能跑 (06 §2.4)
+		"%s is not safe to play yet: fix the %d problems below; every step can be undone.": "%s 还不能放心玩：修好下面 %d 个问题就行，每一步都能撤回。",
+		"%s can run; %d things below are worth a look.":                                    "%s 能跑；下面 %d 项可以看看。",
+		"%s: the mods' files are not checked yet.":                                         "%s：Mod 的文件还没有检查。",
+		"%s can run: nothing to handle.":                                                   "%s 能跑，没有要处理的。",
+		"ask Archo":                                                                        "问 Archo",
 		// each page's one line under the breadcrumb (06 §2.2)
 		"each run's errors, grouped by mod; pick one to read the log":                   "每次运行的报错，按 Mod 归并；选一条看日志原文",
 		"what each scan found: mods added, updated and gone":                            "每次扫描发现的变化：新装、更新和消失的 Mod",
