@@ -141,7 +141,25 @@ type Result struct {
 	Order   []int // node indices in the new order
 	Cycles  []Cycle
 	Edges   []Edge
-	Ignored int // edges removed by ignore rules
+	Ignored int       // edges removed by ignore rules
+	Dropped []Dropped // constraints not used because they cannot be satisfied (04 §4.2)
+}
+
+// Reasons a constraint is dropped.
+const (
+	// ReasonOfficialOrder: a declaration or community rule between two official packages
+	// that contradicts the official order.
+	ReasonOfficialOrder = "contradicts the official order of Core and the DLCs"
+	// ReasonOfficialFirst: a rule that puts a mod before Core or a DLC while other
+	// constraints keep the mod after official content (it would form a cycle with the
+	// built-in order).
+	ReasonOfficialFirst = "would put the mod before official content that other constraints keep ahead of it"
+)
+
+// Dropped is a constraint the sorter does not use, with the reason.
+type Dropped struct {
+	Edge
+	Reason string
 }
 
 // DeclRef is the ignore reference of an About.xml constraint, keyed by lineage so it
@@ -186,7 +204,6 @@ func Sort(in Input) Result {
 		}
 	}
 	var res Result
-	seen := map[[2]int]bool{}
 	add := func(from, to int, c Constraint) {
 		if from == to {
 			return
@@ -195,8 +212,15 @@ func Sort(in Input) Result {
 			res.Ignored++
 			return
 		}
-		res.Edges = append(res.Edges, Edge{From: from, To: to, C: c})
-		seen[[2]int{from, to}] = true
+		e := Edge{From: from, To: to, C: c}
+		if c.Kind != KindOfficial && c.Kind != KindUser {
+			rf, rt := officialRank(in.Nodes[from].PackageID), officialRank(in.Nodes[to].PackageID)
+			if rf >= 0 && rt >= 0 && rf > rt {
+				res.Dropped = append(res.Dropped, Dropped{e, ReasonOfficialOrder})
+				return
+			}
+		}
+		res.Edges = append(res.Edges, e)
 	}
 	pkgsOf := func(l []string) []string {
 		out := make([]string, 0, len(l))
@@ -325,22 +349,41 @@ func Sort(in Input) Result {
 		}
 	}
 
-	adj := make([][]int, n)
-	for k := range seen {
-		adj[k[0]] = append(adj[k[0]], k[1])
+	// A rule that puts a mod before official content, in a cycle with the built-in order:
+	// drop it and look again (the mod then simply follows what it needs).
+	var comp []int
+	var members [][]int
+	var seen map[[2]int]bool
+	for round := 0; ; round++ {
+		comp, members, seen = components(n, res.Edges)
+		drop := map[int]bool{}
+		if round < 4 {
+			cyclic := map[int]bool{} // components with a built-in edge inside
+			for _, e := range res.Edges {
+				if e.C.Kind == KindOfficial && comp[e.From] == comp[e.To] {
+					cyclic[comp[e.From]] = true
+				}
+			}
+			for k, e := range res.Edges {
+				if cyclic[comp[e.From]] && comp[e.From] == comp[e.To] && beforeOfficial(in, e) {
+					drop[k] = true
+				}
+			}
+		}
+		if len(drop) == 0 {
+			break
+		}
+		kept := res.Edges[:0:0]
+		for k, e := range res.Edges {
+			if drop[k] {
+				res.Dropped = append(res.Dropped, Dropped{e, ReasonOfficialFirst})
+			} else {
+				kept = append(kept, e)
+			}
+		}
+		res.Edges = kept
 	}
-	for i := range adj {
-		sort.Ints(adj[i])
-	}
-	comp := tarjan(n, adj)
-	nComp := 0
-	for _, c := range comp {
-		nComp = max(nComp, c+1)
-	}
-	members := make([][]int, nComp)
-	for i, c := range comp {
-		members[c] = append(members[c], i) // ascending node order
-	}
+	nComp := len(members)
 	for c, ms := range members {
 		if len(ms) < 2 {
 			continue
@@ -408,6 +451,42 @@ func Sort(in Input) Result {
 		}
 	}
 	return res
+}
+
+// beforeOfficial reports a non-built-in edge that puts a mod before Core or a DLC.
+func beforeOfficial(in Input, e Edge) bool {
+	switch e.C.Kind {
+	case KindLoadBefore, KindForceBef, KindCommunity:
+		return officialRank(in.Nodes[e.From].PackageID) < 0 && officialRank(in.Nodes[e.To].PackageID) >= 0
+	}
+	return false
+}
+
+// components returns the strongly connected component of every node, the members of each
+// component in ascending node order, and the set of distinct edges.
+func components(n int, edges []Edge) (comp []int, members [][]int, seen map[[2]int]bool) {
+	seen = map[[2]int]bool{}
+	adj := make([][]int, n)
+	for _, e := range edges {
+		k := [2]int{e.From, e.To}
+		if !seen[k] {
+			seen[k] = true
+			adj[e.From] = append(adj[e.From], e.To)
+		}
+	}
+	for i := range adj {
+		sort.Ints(adj[i])
+	}
+	comp = tarjan(n, adj)
+	nComp := 0
+	for _, c := range comp {
+		nComp = max(nComp, c+1)
+	}
+	members = make([][]int, nComp)
+	for i, c := range comp {
+		members[c] = append(members[c], i)
+	}
+	return comp, members, seen
 }
 
 // tarjan returns the strongly connected component of every node.

@@ -303,7 +303,24 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			d.AddNext("archo rule add ignore " + ig)
 		}
 	}
-	root.KV("constraints", fmt.Sprintf("%d edges, %d ignored by rules", len(r.Result.Edges), r.Result.Ignored))
+	if len(r.Result.Dropped) > 0 {
+		// Constraints that cannot be satisfied are left out with the reason (04 §4.2).
+		nu := root.Section("not used")
+		seen := map[string]bool{}
+		for _, dr := range r.Result.Dropped {
+			ev, _ := constraintText(st, r.Input, dr.Edge)
+			if !seen[ev] {
+				seen[ev] = true
+				nu.Addf("%s  (%s)", ev, dr.Reason)
+			}
+		}
+		nu.Truncate(12, "")
+	}
+	cs := fmt.Sprintf("%d edges, %d ignored by rules", len(r.Result.Edges), r.Result.Ignored)
+	if n := len(r.Result.Dropped); n > 0 {
+		cs += fmt.Sprintf(", %d not used", n)
+	}
+	root.KV("constraints", cs)
 	if dry && moved > 0 {
 		d.AddNext("archo sort")
 	} else if !dry && len(st.Changes()) > 0 {
