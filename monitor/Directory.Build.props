@@ -1,0 +1,10 @@
+<Project>
+  <!-- One project, built once per game version (build.ps1): 1.5 and 1.6 run on Mono
+       (net472, Harmony 2.x), 1.7 on .NET 10 (Waylith, Harmony 3.x). Each build keeps its
+       own obj/ and bin/ folder so the three never share restore state. -->
+  <PropertyGroup>
+    <GameVersion Condition="'$(GameVersion)' == ''">1.6</GameVersion>
+    <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)\obj\$(GameVersion)\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>
