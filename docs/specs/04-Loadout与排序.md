@@ -72,10 +72,21 @@ M0 时玩家的实际环境（485 个启用的 Mod）中没有本地与工坊同
 
 只对已启用的 Mod 建图。约束指向未启用的 Mod 时直接忽略。
 
+“硬”指排序时必须满足；当前顺序违反它时报告多严重，另见 §4.4。
+
+无法满足的约束不进图，在 `archo sort` 的“not used”里列出原因（日志语料 G2）：
+
+| 情况 | 原因 |
+| --- | --- |
+| 两个官方包之间的声明或社区规则，与官方顺序相反 | contradicts the official order |
+| 把某个 Mod 排到 Core 或 DLC 之前的规则（About.xml 的 loadBefore / forceLoadBefore、社区规则），而它的其他约束又要求它在官方内容之后，与内置顺序成环 | would put the mod before official content … |
+
+没有成环的“排在 Core 之前”（Harmony 的惯例）照常满足。
+
 ### 4.2 算法
 
 1. 建有向图，每条边记录它的来源（哪个 Mod 的哪条声明、哪条社区规则、哪条用户规则）。
-2. 求强连通分量。存在环时：不自动打破；产出 `order.cycle` 问题，列出环上每条边及其来源。环内成员保持当前相对顺序，其余部分照常排序。问题中给出一条“建议屏蔽”的边，挑选顺序：社区规则 → 声明的 loadAfter/loadBefore → 依赖；同类中选与当前顺序冲突的那条。TUI 中一键即可把它加为 `ignore` 规则（M2 裁定）。
+2. 求强连通分量。环里同时有内置官方边和“排在官方内容之前”的规则时，去掉后者（§4.1）再求一次。仍存在环时：不自动打破；产出 `order.cycle` 问题，列出环上每条边及其来源。环内成员保持当前相对顺序，其余部分照常排序。问题中给出一条“建议屏蔽”的边，挑选顺序：社区规则 → 声明的 loadAfter/loadBefore → 依赖；同类中选与当前顺序冲突的那条。TUI 中一键即可把它加为 `ignore` 规则（M2 裁定）。
 3. 拓扑排序。多个节点同时可选时，选当前位置最靠前的。这样结果和原列表的差异最小。
 4. `attach` 规则（§5.1）：被附着的 Mod 尽量紧跟在目标之后，前提是不违反硬约束。
 5. 输出新顺序与 diff。TUI 先显示 diff，玩家确认后写入工作区（还没有保存到游戏）。
@@ -89,6 +100,29 @@ M0 时玩家的实际环境（485 个启用的 Mod）中没有本地与工坊同
 | S3 | 用户规则屏蔽其中一条 | 排序成功，结果满足剩下的约束 |
 | S4 | 语言包设置了 `attach` 到原 Mod | 语言包紧跟在原 Mod 之后 |
 | S5 | 500 个 Mod 排序 | ≤ 1 秒 |
+| S6 | 社区规则要求 Royalty 在 Biotech 之后 | 不成环，规则在“not used”中列出，官方顺序不变 |
+| S7 | Mod 声明 loadBefore Core，又依赖一个在 Core 之后的 Mod | 不报 `order.cycle`；loadBefore 在“not used”中列出 |
+| S8 | Odyssey 后启用，排在所有 Mod 之后 | `official.order` 的第一条建议是 `archo move <Odyssey> --after <前一个官方包>`；执行后问题消失 |
+| S9 | 依赖顺序、loadAfter、`superniquito.modoptionssort` 的 loadBefore Core 各违反一条 | 依赖为 warning；loadAfter 为 info；modoptionssort 为 info，并说明语料中违反它没有更多错误 |
+
+### 4.4 违反的严重度
+
+`order.violated` 的严重度按约束强度给出，依据是日志语料 P1（6,734 份 1.6 的 HugsLib 日志，`docs/decisions-corpus.md`）：对每条被某些日志违反的约束，比较违反它的日志与保持它的日志（两个 Mod 都启用、列表规模同档）中，任一方被问题归因为来源（source）的比例。
+
+| 约束 | 违反次数 | 来源比例 观察/期望 | 强度 | 严重度 |
+| --- | --- | --- | --- | --- |
+| Mod 需要 Core/DLC 先加载（依赖、loadAfter、forceLoadAfter 指向官方包） | 192 | 3–4.5 | 强 | 并入 `official.order` |
+| 依赖（Mod 之间） | 2,903 | 1.41 | 强 | warning |
+| loadBefore（Mod 之间） | 395 | 1.34 | 强 | warning |
+| forceLoad*、用户规则 | 少 | — | 强 | warning |
+| loadAfter（Mod 之间） | 5,430 | 1.14 | 弱 | info |
+| 社区规则（Mod 之间） | 6,541 | 1.13 | 弱 | info |
+| 声明排在 Core/DLC 之前 | 451 | 1.05 | 无害 | info |
+
+- 1.3 以上为强。弱和无害的违反只出现在技术信息里，不进入“需要处理”。
+- 单条规则：语料中违反次数足够、能单独判断的规则随程序发布（`internal/order/observed.json`，只有汇总计数，不含日志编号）。“无害”：违反 ≥ 30 次，违反时来源比例不高于保持时（保持的日志不足 30 份时，违反 ≥ 100 次且比例 ≤ 2%）；“有害”：违反 ≥ 20 次，比例 ≥ 20%，是保持时的两倍以上，z ≥ 3。表中有的按表，表中没有的按类型。无害的违反在说明里写出语料计数，第一条建议是 `ignore` 规则。
+- `archo data update` 只拉取第三方数据集（10 §5），RimArcho 没有自己的数据仓库，所以这份表嵌在程序里，随版本更新。
+- 官方内容不在最前（多数是后启用的 DLC 被追加到列表末尾，语料中 23% 的日志）：`official.order` 给出最省的移动——把排在 Mod 之后的官方包移回前一个官方包之后，或把排在官方内容之前的少数 Mod 移到最后一个官方包之后，取步数少的（不超过 3 步，否则建议排序）。从官方包指向 Mod 的约束不单独报告；其中强约束（Mod 需要这个 DLC）作为 `official.order` 的证据列出。
 
 ## 5. 规则
 

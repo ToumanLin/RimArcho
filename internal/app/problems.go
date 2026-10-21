@@ -459,6 +459,15 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		}
 		return "pkg:" + in.Nodes[i].PackageID
 	}
+	// Official content out of place (mostly a DLC enabled later, appended to the end of the
+	// list): one official.order finding with the cheapest moves. Constraints from an official
+	// package to a mod are part of it rather than findings of their own.
+	officialBroken := false
+	for _, e := range r.Edges {
+		if e.C.Kind == order.KindOfficial && e.From > e.To {
+			officialBroken = true
+		}
+	}
 	var official []finding.Evidence
 	officialSubject := ""
 	for _, e := range r.Edges {
@@ -473,6 +482,13 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			official = append(official, finding.Evidence{Source: finding.Inferred, Text: ev})
 			continue
 		}
+		as := order.Assess(in, e)
+		if officialBroken && order.IsOfficial(in.Nodes[e.From].PackageID) && !order.IsOfficial(in.Nodes[e.To].PackageID) {
+			if as.Strength == order.Strong {
+				official = append(official, finding.Evidence{Source: finding.Declared, Text: ev + " (needs it loaded first)"})
+			}
+			continue
+		}
 		src := finding.Declared
 		switch e.C.Kind {
 		case order.KindCommunity:
@@ -480,20 +496,56 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		case order.KindUser:
 			src = finding.User
 		}
+		// Severity by constraint strength (04 §4.4): dependencies, loadBefore, forced orders
+		// and user rules are warnings; loadAfter and community preferences, and rules the
+		// log corpus saw broken without effect, are information.
+		sev := finding.Warning
+		claim := fmt.Sprintf("%s should load after %s but is at %d, before %d", nodeTok(e.To), nodeTok(e.From), e.To+1, e.From+1)
+		switch as.Strength {
+		case order.Weak:
+			sev = finding.Info
+		case order.Harmless:
+			sev = finding.Info
+			claim += " (declared, but breaking it is not known to cause errors)"
+		}
 		key := in.Nodes[e.From].PackageID + ">" + in.Nodes[e.To].PackageID
-		f := &finding.Finding{Code: "order.violated", Severity: finding.Warning, Key: key, Subjects: []string{nodeTok(e.To), nodeTok(e.From)},
-			Claim:       fmt.Sprintf("%s should load after %s but is at %d, before %d", nodeTok(e.To), nodeTok(e.From), e.To+1, e.From+1),
+		f := &finding.Finding{Code: "order.violated", Severity: sev, Key: key, Subjects: []string{nodeTok(e.To), nodeTok(e.From)},
+			Claim:       claim,
 			Evidence:    []finding.Evidence{{Source: src, Text: ev}},
 			Suggestions: []string{"archo sort --dry-run", "archo move " + nodeTok(e.To) + " --after " + nodeTok(e.From)}}
+		if as.Why != "" {
+			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: as.Why})
+		}
 		if !strings.HasPrefix(ig, "archo ") {
 			f.Suggestions = append(f.Suggestions, "archo rule add ignore "+ig)
+			if as.Strength == order.Harmless {
+				f.Suggestions = []string{"archo rule add ignore " + ig}
+			}
 		}
 		add(f)
 	}
 	if len(official) > 0 {
-		add(&finding.Finding{Code: "official.order", Severity: finding.Error, Key: "official", Subjects: []string{officialSubject},
+		f := &finding.Finding{Code: "official.order", Severity: finding.Error, Key: "official", Subjects: []string{officialSubject},
 			Claim:    "Core and the DLCs are not first in the list, in release order",
-			Evidence: official, Suggestions: []string{"archo sort --dry-run"}})
+			Evidence: official, Suggestions: []string{"archo sort --dry-run"}}
+		if moves := order.OfficialMoves(in, r.Edges, 3); len(moves) > 0 {
+			var cmds []string
+			dlc := true
+			for _, m := range moves {
+				cmds = append(cmds, "archo move "+nodeTok(m.Node)+" --after "+nodeTok(m.After))
+				dlc = dlc && order.IsOfficial(in.Nodes[m.Node].PackageID)
+			}
+			f.Subjects = []string{nodeTok(moves[0].Node)}
+			if dlc {
+				f.Claim = fmt.Sprintf("%s loads after mods (a DLC enabled later goes to the end of the list); move it back after %s",
+					nodeTok(moves[0].Node), nodeTok(moves[0].After))
+				if len(moves) > 1 {
+					f.Claim = fmt.Sprintf("%d DLCs load after mods (a DLC enabled later goes to the end of the list); move them back to the official position", len(moves))
+				}
+			}
+			f.Suggestions = append(cmds, f.Suggestions...)
+		}
+		add(f)
 	}
 	for _, cy := range r.Cycles {
 		var refs []string
