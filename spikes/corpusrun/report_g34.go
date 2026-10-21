@@ -261,7 +261,7 @@ func g4report(all []*Result) {
 		fmt.Printf("  %-24s %7d %5d logs %4.1f subj %-28s attr %5.1f%% / %5.1f%%  src %5.1f%% / %5.1f%%  class %5.1f%% / %5.1f%% [%s]  text %5.1f%% / %5.1f%%\n",
 			k, w.n, w.logs, float64(w.subj)/d, fmtTop(w.sev, 0),
 			100*float64(w.attr)/d, 100*w.expA/d, 100*float64(w.src)/d, 100*w.expS/d,
-			100*float64(w.cls)/d, 100*w.expC/d, strings.Join(expectClasses[k], ","),
+			100*float64(w.cls)/d, 100*w.expC/d, strings.Join(expectClasses[strings.TrimSuffix(k, " (lib)")], ","),
 			100*float64(w.text)/d, 100*float64(w.clsT)/d)
 	}
 }

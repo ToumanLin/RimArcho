@@ -137,10 +137,10 @@ least once.
 
 == Known issues
 
-- parsed.jsonl drops the mod entries written with [v:…] or [ov:…] (about 32% of entries; found by
-  the labelling session). Sessions still match (the same mods are dropped from both uploads), but
-  version changes and "removed the source mod" are undercounted, and mod versions are mostly
-  missing. Regenerate after the hugslogs fix.
+- parsed.jsonl drops the mod entries written with [v:…] or [ov:…] instead of [mv:…]: 4.9% of the
+  entries of the first 671 logs, but in every log (HugsLib itself is written with [ov:]). Sessions
+  still match (the same mods are dropped from both uploads); version changes and "removed the
+  source mod" are undercounted, and only [mv:] versions are known. Regenerate after the hugslogs fix.
 - Attribution is RimArcho v3 (coverage, not accuracy): a mod-specific pattern is "a template
   attributed to this mod", not "this mod's bug".
 - Fix evidence co-occurs with a change; it is not causal. A player who removes three mods and

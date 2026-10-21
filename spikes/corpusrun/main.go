@@ -18,6 +18,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime/pprof"
 	"sort"
 	"strings"
@@ -51,6 +52,7 @@ func main() {
 	mm := fs.String("mm", "1.6", "run: game major.minor of the logs to process")
 	cpuprof := fs.String("cpuprofile", "", "write a CPU profile to this file")
 	maxN := fs.Int("max", 0, "run: process at most this many logs (0 = all)")
+	fs.BoolVar(&rawMods, "rawmods", false, "run: take the mod list from the raw log header (parsed.jsonl misses [v:]/[ov:] entries)")
 	minCov := fs.Float64("mincov", 0.8, "report: coverage threshold for the 'covered' subset")
 	fs.Parse(os.Args[2:])
 	if os.Args[1] == "report" {
@@ -169,7 +171,8 @@ type record struct {
 type Result struct {
 	ID         string     `json:"id"`
 	Mods       int        `json:"mods"`
-	Resolved   int        `json:"resolved"` // entries the research library has (design §5 L2 coverage)
+	ModsFrom   string     `json:"mods_from,omitempty"` // "raw": the list was read from the raw log (-rawmods)
+	Resolved   int        `json:"resolved"`            // entries the research library has (design §5 L2 coverage)
 	Missing    []string   `json:"missing,omitempty"`
 	AnalysisMS int64      `json:"analysis_ms"`
 	AnalysisOK bool       `json:"analysis_ok"`
@@ -265,11 +268,52 @@ func run(home, corpus, out, mm string, maxN int) error {
 	return sc.Err()
 }
 
+// rawMods: read the mod list from the raw log header instead of parsed.jsonl, whose parser
+// skips entries written with [v:…] or [ov:…] instead of [mv:…] (about a third of all entries).
+var rawMods bool
+
+var rawModRe = regexp.MustCompile(`\(([^()\s]+)\)((?:\[[a-z]+:[^\]]*\])*): `)
+
+// rawModList is the "Loaded mods:" section of a raw HugsLib upload, in load order.
+func rawModList(path string) ([]string, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	text := strings.ReplaceAll(string(b), "\r\n", "\n")
+	if i := strings.Index(text, "\nLog file contents:\n"); i >= 0 {
+		text = text[:i]
+	}
+	var out []string
+	in := false
+	for _, l := range strings.Split(text, "\n") {
+		switch {
+		case l == "Loaded mods:":
+			in = true
+			continue
+		case in && (l == "Active Harmony patches:" || strings.HasPrefix(l, "Harmony versions present:") || strings.HasPrefix(l, "Platform information:")):
+			return out, nil
+		}
+		if in {
+			if m := rawModRe.FindStringSubmatch(l); m != nil {
+				out = append(out, strings.ToLower(m[1]))
+			}
+		}
+	}
+	return out, nil
+}
+
 func one(a *app.App, userData, corpus string, r record) *Result {
 	res := &Result{ID: r.ID, Mods: len(r.Mods)}
 	var pkgs []string
 	for _, m := range r.Mods {
 		pkgs = append(pkgs, strings.ToLower(m.Pkg))
+	}
+	if rawMods {
+		if p, err := rawModList(filepath.Join(corpus, "raw", r.ID+".txt")); err == nil && len(p) > 0 {
+			pkgs = p
+			res.Mods, res.ModsFrom = len(p), "raw"
+		}
 	}
 	if err := writeModsConfig(userData, r.Version, pkgs); err != nil {
 		res.Err = err.Error()
