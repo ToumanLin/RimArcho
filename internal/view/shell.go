@@ -9,6 +9,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/identity"
 )
 
 // The window's shell (06 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
@@ -68,10 +69,13 @@ const (
 
 // NavItem is one sidebar entry. Kids show only under the open entry.
 type NavItem struct {
-	ID    string    `json:"id"`
-	Label string    `json:"label"`
-	Badge int       `json:"badge,omitempty"` // 能不能跑: the actionable items (06 §5)
-	Key   string    `json:"key,omitempty"`   // shift+1–7
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Badge int    `json:"badge,omitempty"` // 能不能跑: the actionable items (06 §5)
+	// Count is a quiet number on the right: the plans, the packs, the environments, the
+	// mods in the library (06 §2.1). Badge is the one that asks for attention.
+	Count int       `json:"count,omitempty"`
+	Key   string    `json:"key,omitempty"` // shift+1–7
 	Kids  []NavItem `json:"kids,omitempty"`
 	// Mark is a plan's "有未载入的外部版本" (04 §4.3); Current the plan being edited.
 	Mark    string `json:"mark,omitempty"`
@@ -103,8 +107,8 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	items := []NavItem{
 		{ID: PageHome, Label: T("home")},
 		{ID: PageNeeds, Label: T("can it run"), Badge: needs},
-		{ID: PagePlan, Label: T("plans"), Kids: planKids},
-		{ID: PagePacks, Label: T("packs"), Kids: packKids},
+		{ID: PagePlan, Label: T("plans"), Kids: planKids, Count: len(plans)},
+		{ID: PagePacks, Label: T("packs"), Kids: packKids, Count: len(packs)},
 		{ID: PageEnv, Label: T("environment")},
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageChanges, Label: T("changes")}}},
 		{ID: PageLog, Label: T("game log")},
@@ -113,6 +117,34 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		items[i].Key = fmt.Sprintf("shift+%d", i+1)
 	}
 	return []NavGroup{{Title: T("playing"), Items: items}}
+}
+
+// NavCounts puts the environments' and the library's numbers on their entries.
+func NavCounts(groups []NavGroup, envs, mods int) {
+	for g := range groups {
+		for i := range groups[g].Items {
+			switch it := &groups[g].Items[i]; it.ID {
+			case PageEnv:
+				it.Count = envs
+			case PageLibrary:
+				it.Count = mods
+			}
+		}
+	}
+}
+
+// LibraryCount is the number of installed mods of the environment (the library's entry).
+func LibraryCount(st *app.LoadoutState) int {
+	if st == nil || st.Ix == nil {
+		return 0
+	}
+	n := 0
+	for _, m := range st.Ix.Mods {
+		if m.Status == identity.Live {
+			n++
+		}
+	}
+	return n
 }
 
 // NavPath is where a page sits in the sidebar: the group, the entry and the sub-entry's
@@ -161,7 +193,10 @@ type HomeRow struct {
 	Env   string `json:"env"`   // the environment chip
 	State string `json:"state"` // "2 problems break the game", "ready to play", "not checked yet"
 	Level string `json:"level"` // LevelBad, HomeOK, or "" for not checked
+	// Facts: "312 mods" (and what is not written to the game yet); Mode how its mods
+	// change: a plan follows Workshop updates, a pack keeps its versions (08 §5).
 	Facts string `json:"facts"`
+	Mode  string `json:"mode,omitempty"`
 	// Played is "played 10 月 20 日" or "never played"; Light packs are a list only and do
 	// not launch.
 	Played string `json:"played"`
@@ -199,10 +234,10 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 	chip := EnvChip(b.EnvName, b.GameVersion)
 	for _, p := range plans {
 		r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: p.Played, at: p.PlayedAt, Plan: p.ID, Page: p.Page,
-			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods enabled", p.Entries)}
+			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates")}
 		k, checked := 0, false
 		if p.Current {
-			r.Facts = Tf("%d mods enabled", len(b.Cols[Active]))
+			r.Facts = Tf("%d mods", len(b.Cols[Active]))
 			if b.Unsaved > 0 {
 				r.Facts += " · " + Tf("%d not written", b.Unsaved)
 			}
@@ -222,9 +257,13 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 	}
 	for _, p := range packs {
 		r := HomeRow{Kind: RowPack, Name: p.Name, Env: chip, Facts: p.Facts, Played: p.Played, Light: p.Light, at: p.PlayedAt}
+		if p.Mods > 0 {
+			r.Facts = Tf("%d mods", p.Mods)
+		}
 		if p.Light {
 			r.State = T("list only")
 		} else {
+			r.Mode = T("versions locked · own saves")
 			// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
 			r.State, r.Level = T("checked when built"), HomeOK
 		}

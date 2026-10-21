@@ -71,27 +71,31 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 #app.collapsed #side { visibility: hidden; }
 /* each keeps its column: the sidebar floats over the page in a narrow window */
 #side { grid-column: 1; grid-row: 1; }
-#main { grid-column: 2; grid-row: 1; display: grid; grid-template-rows: 46px minmax(0, 1fr) 30px; min-width: 0; min-height: 0; }
+#main { grid-column: 2; grid-row: 1; display: grid; grid-template-rows: 50px minmax(0, 1fr) 30px; min-width: 0; min-height: 0; }
 #body { position: relative; display: grid; min-height: 0; min-width: 0; }
 
 #side { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-right: 1px solid var(--line-2); background: var(--bg); }
 /* No name or icon here: the window's title bar has them. The empty head keeps the nav
    below the top bar's line. */
-#side .side-head { height: 46px; flex: none; }
-#nav { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 8px 8px; }
-#nav .grp { padding: 10px 8px 4px; color: var(--faint); font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-.nav-item { width: 100%; height: 30px; display: flex; align-items: center; gap: 9px; padding: 0 8px; border-radius: 7px; color: var(--ctl-fg); font-size: 13px; white-space: nowrap; text-align: left; transition: background .12s, color .12s; }
+#side .side-head { height: 50px; flex: none; }
+#nav { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 8px; display: flex; flex-direction: column; gap: 1px; }
+/* the groups breathe: a group's title sits apart from the entries above it (06 §2.1) */
+#nav .grp { padding: 8px 10px 3px; color: var(--muted); font-size: 11.5px; }
+#nav .grp ~ .grp { padding-top: 14px; }
+.nav-item { width: 100%; min-height: 29px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 8px; color: var(--fg-2); font-size: 13px; white-space: nowrap; text-align: left; transition: background .12s, color .12s; }
 .nav-item .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.nav-item .ic { display: inline-flex; color: var(--muted); }
+.nav-item .ic { display: inline-flex; color: inherit; }
+.nav-item .ic svg.i { width: 15px; height: 15px; }
 .nav-item:hover { background: var(--pill); color: var(--fg); }
-.nav-item.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
-.nav-item.on .ic { color: var(--accent); }
-.nav-item .count, .count.badge-n { font-size: 10.5px; font-weight: 600; line-height: 16px; min-width: 16px; padding: 0 5px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); font-variant-numeric: tabular-nums; }
-#nav .kids { display: flex; flex-direction: column; gap: 1px; padding: 2px 0 4px 31px; }
-.nav-kid { height: 26px; padding: 0 8px; border-radius: 6px; text-align: left; color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-item.on { background: var(--pill); color: var(--fg); font-weight: 600; }
+.nav-item.open { color: var(--fg); }
+.nav-item .cnt { color: var(--muted); font-size: 11.5px; font-weight: 400; }
+.nav-item .badge-n { font-size: 11.5px; font-weight: 400; line-height: 17px; min-width: 17px; padding: 0 6px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); }
+/* the open entry's sub-entries hang off a hairline, like the design's plan list */
+#nav .kids { display: flex; flex-direction: column; gap: 1px; margin: 1px 0 3px 17px; padding-left: 8px; border-left: 1px solid var(--line); }
+.nav-kid { height: 24px; padding: 0 10px; border-radius: 7px; text-align: left; color: var(--fg-2); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .12s, color .12s; }
 .nav-kid:hover { color: var(--fg); background: var(--pill); }
-.nav-kid.on { color: var(--fg); font-weight: 500; }
-.nav-kid.on::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin: 0 7px 2px -12px; }
+.nav-kid.on { color: var(--fg); background: var(--pill); font-weight: 600; }
 .side-foot { flex: none; padding: 6px 8px 10px; border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
 .runbox { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); text-align: left; transition: border-color .12s; }
 .runbox:hover { border-color: var(--muted); }
@@ -107,13 +111,13 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 #app.narrow.collapsed #side { transform: translateX(-100%); visibility: hidden; }
 
 /* ---- the top bar: collapse, the breadcrumb, the environment chip, the page's actions ---- */
-#top { position: relative; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 8px; min-width: 0; }
+#top { position: relative; display: flex; align-items: center; gap: 8px; padding: 0 16px 0 12px; min-width: 0; }
 #crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; overflow: hidden; flex: 0 1 auto; }
-#crumbs .crumb { height: 26px; padding: 0 6px; border-radius: 6px; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+#crumbs .crumb { height: 28px; padding: 0 5px; border-radius: 6px; color: var(--muted); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
 #crumbs .crumb:hover { color: var(--fg); background: var(--pill); }
 #crumbs .crumb.last { color: var(--fg); font-weight: 600; }
-#crumbs .sep { color: var(--faint); flex: none; }
-#acts { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#crumbs .sep { color: var(--muted); flex: none; margin: 0 2px; font-size: 15px; }
+#acts { display: flex; align-items: center; gap: 8px; min-width: 0; }
 #acts .btn { border: 1px solid var(--line); background: var(--card); color: var(--fg-2); box-shadow: 0 1px 1px rgba(0, 0, 0, .04); }
 #acts .btn:hover { border-color: var(--muted); background: var(--card-2); color: var(--fg); }
 #acts .btn.primary { color: var(--accent-fg); background: var(--accent); border-color: transparent; }
@@ -122,6 +126,14 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 #acts .unwritten { color: var(--accent); font-size: 11.5px; white-space: nowrap; margin-right: 2px; }
 #acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
 #top #env { flex: 0 1 auto; }
+/* the chip beside the page's name: the environment (and the plan on 能不能跑) */
+.envchip { height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 6px; background: var(--pill); color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background .12s, color .12s; }
+.envchip:hover, .envchip.on { background: var(--pill-hover); color: var(--fg); }
+/* a page's actions: quiet icon + text, no border (06 §2.2) */
+#acts .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); font-size: 13px; padding: 0 6px; }
+#acts .btn.quiet:hover { background: var(--pill); color: var(--fg); }
+#acts .btn.quiet kbd { display: none; }
+#acts .btn.quiet .ic { margin-right: 6px; }
 @media (max-width: 1100px) { #acts .wide-only, #acts kbd { display: none; } }
 @media (max-width: 640px) { #top #env { display: none; } }
 .pill { height: 24px; display: inline-flex; align-items: center; background: var(--pill); color: var(--fg-2); border-radius: 999px; padding: 0 11px; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background .12s; }
@@ -255,7 +267,7 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 
 /* ---- pages (the sidebar's entries): a head, then cards; centred within 1200px like magpie's ---- */
 #screen { position: absolute; inset: 0; background: var(--bg); overflow-y: auto; z-index: 10; }
-.page { padding: 4px max(16px, calc(50% - 600px)) 24px; display: flex; flex-direction: column; gap: 10px; }
+.page { padding: 0 max(20px, calc(50% - 600px)) 24px; display: flex; flex-direction: column; gap: 12px; }
 /* a new page fades in; a redraw of the page shown does not (no slide: it shook the scrollbars) */
 .page.enter { animation: view-in .16s ease-out; }
 .page.fill { height: 100%; min-height: 0; padding-bottom: 8px; }
@@ -270,11 +282,15 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .envrow.on .name { color: var(--accent); }
 .chip.cur { color: var(--accent); background: var(--accent-soft); margin: 0; }
 @media (prefers-reduced-motion: reduce) { .page.enter, .seg > .thumb { animation: none; transition: none; } }
-.page-head { display: flex; gap: 10px; align-items: center; min-height: 34px; flex-wrap: wrap; }
-.page-head h2 { font-size: 15px; margin: 0 6px 0 0; font-weight: 600; letter-spacing: -.01em; }
+.page-head { display: flex; gap: 6px 12px; align-items: baseline; flex-wrap: wrap; color: var(--muted); }
+/* one line under the breadcrumb that says what the page is for (06 §2.2) */
+.page-head .lead { margin: 0; color: var(--muted); font-size: 13px; }
 .subbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .label { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 .label.section { margin: 8px 2px -4px; }
+.sec { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.sec > h2.label { margin: 0 2px; font-size: 12px; letter-spacing: 0; text-transform: none; }
+.sec > .note { padding: 0 2px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; flex: none; }
 .card.pad { padding: 4px 4px 12px; }
 .card-head { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px 8px; border-bottom: 1px solid var(--line-2); }
@@ -430,28 +446,47 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 @media (max-width: 680px) { #board { grid-template-columns: 1fr 8px 1.2fr 0 0 0 0; } #board .detail, #board [data-split="2"] { display: none; } }
 
 /* ---- 首页 (06 §2.3) ---- */
-.home-row { display: flex; gap: 16px; align-items: center; min-height: 58px; padding: 9px 14px; }
+.home-row { display: flex; gap: 14px; align-items: center; min-height: 62px; padding: 10px 16px; }
 .home-row + .home-row { border-top: 1px solid var(--line-2); }
+.home-row .envtag { flex: none; width: 92px; height: 22px; line-height: 22px; text-align: center; border-radius: 6px; background: var(--pill); color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
 .home-row .l { flex: 1; min-width: 0; }
 .home-row .name { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .home-row .name .n { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .home-row .chip { margin: 0; flex: none; }
-.home-row .kind { flex: none; font-size: 11px; color: var(--faint); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; line-height: 17px; }
-.home-row .sub { margin-top: 3px; font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
-.home-row .sub .sep { color: var(--faint); }
-.home-row .state { font-weight: 500; }
-.home-row .state.bad { color: var(--red); } .home-row .state.ok { color: var(--green); } .home-row .state.unknown { color: var(--amber); }
-.home-row .r { flex: none; display: flex; gap: 6px; align-items: center; }
-.home-row .launch { display: inline-flex; }
-.activity .act-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 14px; text-align: left; }
-.activity .act-row + .act-row { border-top: 1px solid var(--line-2); }
-.activity .act-row:hover:not(:disabled) { background: var(--card-2); }
-.activity .act-row .ic { display: inline-flex; color: var(--muted); }
-.activity .act-row .t { flex: 0 0 150px; color: var(--fg-2); }
-.activity .act-row .v { flex: 1; min-width: 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.activity .act-row .go { color: var(--faint); font-size: 16px; }
+.home-row .kind { flex: none; font-size: 11px; line-height: 18px; padding: 0 6px; border-radius: 5px; color: var(--muted); background: var(--pill); }
+.home-row .kind.pack { color: var(--green); background: var(--green-soft); }
+.home-row .sub { margin-top: 3px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-row .r { flex: none; display: flex; gap: 14px; align-items: center; }
+.home-row .state { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
+.home-row .state .ic { display: inline-flex; }
+.home-row .state .ic svg.i { width: 13px; height: 13px; }
+.home-row .state.bad { color: var(--amber); background: var(--amber-soft); }
+.home-row .state.ok { color: var(--green); background: var(--green-soft); }
+.home-row .state.unknown { color: var(--muted); padding: 0 2px; }
+button.state.bad:hover { filter: brightness(1.12); }
+.home-row .btn { height: 30px; padding: 0 12px; border-radius: 8px; font-size: 13px; }
+.home-row .btn:not(.primary) { background: transparent; color: var(--fg); box-shadow: none; }
+.home-row .btn.launch { padding: 0 14px; font-weight: 600; }
+.home-row .btn.launch .ic { margin-right: 7px; }
+.home-row .launch-wrap { display: inline-flex; }
+svg.i.fill { fill: currentColor; }
+.act-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.act-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; transition: border-color .12s; }
+button.act-card:hover { border-color: var(--muted); }
+.act-card > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-card .t { font-weight: 600; }
+.act-card .a { color: var(--muted); }
+.act-card .go { color: var(--accent); }
+.act-card.hl { background: var(--accent-soft); border-color: transparent; }
+.act-card.hl .t { color: var(--accent); }
 .packs .pack.hl { background: var(--accent-soft); }
-@media (max-width: 640px) { .home-row { flex-wrap: wrap; } .activity .act-row .t { flex-basis: 96px; } }
+@media (max-width: 760px) {
+  .home-row { flex-wrap: wrap; row-gap: 8px; }
+  .home-row .envtag { width: auto; }
+  .home-row .l { flex-basis: calc(100% - 120px); }
+  .home-row .r { width: 100%; justify-content: flex-end; }
+  .act-cards { grid-template-columns: 1fr; }
+}
 
 /* ---- the first-run guide (06 §2.15) ---- */
 .steps { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -548,7 +583,7 @@ details.xc-sec > summary { cursor: pointer; }
 /* ---- plans (plans.js): the sidebar's plan entries, their marks, the plan dialogs ---- */
 .nav-kid { display: flex; align-items: center; gap: 6px; flex: none; }
 .nav-kid .lbl { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.nav-kid .mark { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.nav-kid .mark { margin-left: auto; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
 .nav-kid.on::before { flex: none; margin: 0 1px 0 -12px; }
 .nav-kid.add { color: var(--faint); }
 .nav-kid.add:hover { color: var(--accent); }
@@ -556,7 +591,8 @@ details.xc-sec > summary { cursor: pointer; }
 .chip.ingame { color: var(--green); background: var(--green-soft); }
 #acts .chip.mark { margin: 0; white-space: nowrap; flex: none; cursor: pointer; border: 0; display: inline-flex; align-items: center; gap: 6px; }
 #acts .chip.mark .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
-#crumbs { min-width: min(24%, 180px); }
+#crumbs { min-width: 0; }
+#top #env { margin-left: 2px; }
 @media (max-width: 1280px) { #acts .chip.mark .t { display: none; } #acts .chip.mark { padding: 0 7px; line-height: 22px; } }
 #acts .icon-btn { padding: 0 8px; letter-spacing: 1px; }
 #ingame { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }

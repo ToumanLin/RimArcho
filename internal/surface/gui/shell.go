@@ -35,9 +35,10 @@ func (s *API) Shell() *Shell {
 	if envs, err := s.a.Store.Envs(); err == nil {
 		out.Envs = len(envs)
 	}
-	count := 0
+	count, mods := 0, 0
 	if st := s.boardState(); st != nil {
 		count = s.needsLocked(false).Count
+		mods = view.LibraryCount(st)
 		out.Env = view.EnvChip(s.board.EnvName, s.board.GameVersion)
 	} else {
 		out.Env = view.EnvChip("", "")
@@ -53,6 +54,7 @@ func (s *API) Shell() *Shell {
 		}
 	}
 	out.Nav = view.Nav(count, out.Plans, packs)
+	view.NavCounts(out.Nav, out.Envs, mods)
 	ids := []string{view.PageSettings}
 	for _, g := range out.Nav {
 		for _, it := range g.Items {

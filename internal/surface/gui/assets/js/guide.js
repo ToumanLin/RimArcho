@@ -36,8 +36,8 @@ function draw() {
   if (S.screen !== "guide") return;
   const sc = $("#screen");
   sc.innerHTML = "";
-  const title = S.guideFrom === "env" ? T("add an environment") : T("getting started");
-  const w = page("guide", title);
+  const lead = S.guideFrom === "env" ? T("find the install, read its mods once, and it is ready") : T("find the game, read the mods once, then pick where your first plan comes from");
+  const w = page("guide", lead);
   sc.append(w);
   // the steps: where you are, where you can go back to
   const bar = el("div", "steps");

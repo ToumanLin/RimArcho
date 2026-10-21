@@ -16,6 +16,7 @@ type PackRow struct {
 	Name   string `json:"name"`
 	Facts  string `json:"facts"` // "42 mods · 1.2 GB · 1.6 · built 10 月 20 日"
 	Played string `json:"played"`
+	Mods   int    `json:"mods"`
 	Light  bool   `json:"light,omitempty"`
 	// PlayedAt is when it was last played (zero: never); the home page sorts by it.
 	PlayedAt time.Time `json:"-"`
@@ -36,7 +37,7 @@ func PackRows(a *app.App) (out []PackRow, others int, err error) {
 		if p.Light {
 			size = T("list only")
 		}
-		r := PackRow{Name: p.Name, Light: p.Light, Facts: Tf("%d mods · %s · %s · built %s", len(p.Entries), size, p.Game, ShortDate(p.Created)), Played: T("never played")}
+		r := PackRow{Name: p.Name, Light: p.Light, Mods: len(p.Entries), Facts: Tf("%d mods · %s · %s · built %s", len(p.Entries), size, p.Game, ShortDate(p.Created)), Played: T("never played")}
 		if !p.LastPlayed.IsZero() {
 			r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 			r.PlayedAt = p.LastPlayed

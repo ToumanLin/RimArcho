@@ -38,21 +38,24 @@ export function closeScreen() {
   return true;
 }
 
-// page builds a page: a head (the title and what describes the page) and a body. The
-// buttons and fields among right are the page's actions: they go to the top bar (06 §2.2).
-export function page(cls, title, ...right) {
+// page builds a page: one muted sentence that says what the page is for (the breadcrumb
+// names it, 06 §2.2), then the body. The buttons and fields among right are the page's
+// actions: they go to the top bar, quiet unless primary; anything else joins the lead.
+export function page(cls, lead, ...right) {
   const w = el("div", "page " + cls + (fresh ? " enter" : ""));
   fresh = false;
   const head = el("div", "page-head");
-  head.append(el("h2", "", title));
+  if (lead) head.append(el("p", "lead", lead));
   const acts = [];
   for (const r of right) {
     if (!r) continue;
-    if (r.matches("button, input, select")) acts.push(r);
-    else head.append(r);
+    if (r.matches("button, input, select")) {
+      if (r.matches("button.btn") && !r.classList.contains("primary")) r.classList.add("quiet");
+      acts.push(r);
+    } else head.append(r);
   }
   setActs("", ...acts);
-  w.append(head);
+  if (head.childNodes.length) w.append(head);
   return w;
 }
 
@@ -60,6 +63,16 @@ export function button(label, keyName, run, cls = "") {
   const b = el("button", "btn " + cls, label);
   if (keyName) b.append(el("kbd", "", keyName));
   b.onclick = (e) => { e.stopPropagation(); run(); };
+  return b;
+}
+
+// act is a page action with an icon (the top bar's quiet buttons, 06 §2.2).
+export function act(label, ic, run, keyName) {
+  const b = button(label, keyName, run);
+  const i = el("span", "ic");
+  i.innerHTML = icon[ic] || "";
+  b.prepend(i);
+  if (keyName) b.title = keyName;
   return b;
 }
 
@@ -135,7 +148,7 @@ function drawNeeds() {
   if (S.busy.analyze) state = T("checking the mods' files…");
   else if (d.never) state = T("the mods' files are not checked yet");
   else if (d.stale) state = T("the files changed since the last check");
-  const w = page("needs fill", T("can it run"),
+  const w = page("needs fill", "",
     el("span", "muted", d.count ? Tf("%d to handle", d.count) : T("nothing to handle")),
     state ? el("span", "muted", state) : null,
     button(T("check the files again"), "A", () => ui.cmd("analyze")),
@@ -318,7 +331,7 @@ function drawGameLog() {
       gameLog(p.path);
     }));
   }
-  const w = logPage("log", T("game log"), ...right);
+  const w = logPage("log", T("each run's errors, grouped by mod; pick one to read the log"), ...right);
   const files = (p && p.files) || [];
   const bar = el("div", "subbar");
   if (files.length) {
@@ -393,7 +406,7 @@ export async function changes() {
   drawChanges();
 }
 
-function rescanButton() {
+export function rescanButton() {
   const b = button(S.busy.scan ? T("scanning…") : T("rescan the mod folders"), "R", () => ui.cmd("rescan"));
   b.classList.add("rescan");
   b.prepend(el("span", "ic" + (S.busy.scan ? " spin" : "")));
@@ -410,7 +423,7 @@ export function busyChanged() {
 }
 
 function drawChanges() {
-  const w = logPage("changes", T("changes"), rescanButton());
+  const w = logPage("changes", T("what each scan found: mods added, updated and gone"), rescanButton());
   const scroll = el("div", "scroll page-scroll");
   w.append(scroll);
   if (!C.scans.length) { scroll.append(el("div", "card empty-state", T("no scan yet (R scans)"))); return; }
@@ -486,7 +499,7 @@ function drawFull() {
   sc.innerHTML = "";
   const d = S.detail;
   const names = [T("summary"), ...(F.secs || []).map((s) => s.title + (s.count >= 0 ? " · " + s.count : ""))];
-  const w = page("full", d ? d.name : "", el("span", "muted", T("← → the previous / next mod · tab the sections")));
+  const w = page("full", T("← → the previous / next mod · tab the sections"));
   const bar = el("div", "subbar");
   bar.append(seg(names, F.tab, (i) => { F.tab = i; drawFull(); }));
   w.append(bar);
@@ -539,7 +552,7 @@ export async function settings() {
   const sc = S.screen === "settings" ? $("#screen") : openScreen("settings");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("settings", T("settings"));
+  const w = page("settings", T("how RimArcho looks and works; each row shows the command that changes it"));
   sc.append(w);
   renderGroups(w, groups, settings);
   sc.scrollTop = top;
@@ -611,7 +624,7 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", T("environment"), button(T("add an environment"), "", () => ui.go("guide")), rescanButton());
+  const w = page("env", T("an environment is one RimWorld install: its folders, how it starts, its mods"), act(T("add an environment"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
   const card = el("section", "card");
   for (const e of p.envs || []) {
@@ -781,7 +794,7 @@ export async function packs() {
     previewBuild(n);
   });
   name.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); build.click(); } };
-  const w = page("packs", T("packs"), name, build);
+  const w = page("packs", T("a pack copies every mod of the list as it is now and plays with its own saves"), name, build);
   sc.append(w);
   for (const u of un) {
     if (u.running && S.packBuild && S.packBuild.name === u.name) u.progress = S.packBuild;

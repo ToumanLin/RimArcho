@@ -61,6 +61,7 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1:8765", "listen address (loopback only)")
 	lang := flag.String("lang", "", "zh or en (default: the setting)")
 	exe := flag.String("exe", "bin/archo.exe", "the archo executable for scan and analyze children")
+	assets := flag.String("assets", "", "serve the page's files from this folder (edits show on reload)")
 	flag.Parse()
 	if !strings.HasPrefix(*addr, "127.0.0.1:") {
 		log.Fatal("loopback only")
@@ -120,6 +121,18 @@ func main() {
 			}
 		}
 	})
+	if *assets != "" {
+		disk := http.FileServer(http.Dir(*assets))
+		embedded := page
+		page = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if p := r.URL.Path; p == "/" || p == "/index.html" || p == "/style.css" || strings.HasPrefix(p, "/js/") {
+				w.Header().Set("Cache-Control", "no-store")
+				disk.ServeHTTP(w, r)
+				return
+			}
+			embedded.ServeHTTP(w, r)
+		})
+	}
 	mux.Handle("/", page)
 	log.Printf("http://%s", *addr)
 	log.Fatal(http.ListenAndServe(*addr, mux))

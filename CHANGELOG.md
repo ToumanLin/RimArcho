@@ -92,6 +92,12 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   its stored analysis) and a launch button, and the last run and last scan's changes.
 - A first-run guide: find games (several at once), scan them, start from the game's list, an
   import, a pack or a Steam collection. 环境 › 添加环境 opens it.
+- The window follows the new design: no page title under the breadcrumb (it names the page)
+  but one muted line saying what the page is for; the environment chip sits by the page name
+  (plan and environment on 能不能跑); page actions are quiet icon + text buttons. Home rows
+  have a fixed environment column, a 方案 / 整合包 tag, a meta line (mods, follows Workshop
+  updates / versions locked, last played) and a state chip; the activity is a row of cards.
+  The sidebar shows quiet counts (plans, packs, environments, the library).
 - "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
   the history stays in the editor's third column.
 

@@ -92,22 +92,28 @@ function renderSide() {
       nav.append(el("div", "grp", g.title));
       for (const it of g.items || []) {
         const kids = it.kids || [];
-        const open = it.id === cur || kids.some((k) => k.id === cur) || (it.id === "library" && cur === "changes");
-        const b = el("button", "nav-item" + (open ? " on" : ""));
+        const kidOn = kids.some((k) => k.id === cur) || (it.id === "library" && cur === "changes");
+        const on = it.id === cur && !kidOn;
+        // only the open entry shows its sub-entries (06 §2.1)
+        const open = on || kidOn;
+        const b = el("button", "nav-item" + (on ? " on" : "") + (kidOn ? " open" : ""));
+        b.dataset.id = it.id;
         b.title = it.key ? it.key.replace("shift", "Shift") : "";
         const ic = el("span", "ic");
         ic.innerHTML = icon[ICONS[it.id]] || "";
         b.append(ic, el("span", "lbl", it.label));
-        // 能不能跑's badge follows the board's count between two Shell calls
+        // 能不能跑's badge follows the board's count between two Shell calls; the other
+        // entries carry a quiet count
         const badge = it.id === "needs" && S.board ? S.board.needs : it.badge;
-        if (badge) b.append(el("span", "count", String(badge)));
+        if (badge) b.append(el("span", "badge-n num", String(badge)));
+        else if (it.count) b.append(el("span", "cnt num", String(it.count)));
         b.onclick = () => ui.go(it.id === "library" ? "changes" : it.id);
         nav.append(b);
-        // only the open entry shows its sub-entries (06 §2.1)
         if (open && kids.length) {
           const box = el("div", "kids");
           for (const k of kids) {
             const kb = el("button", "nav-kid" + (k.id === cur ? " on" : "") + (k.add ? " add" : ""));
+            kb.dataset.id = k.id;
             kb.append(el("span", "lbl", k.label));
             // a plan's "有未载入的外部版本" (04 §4.3)
             if (k.mark) { const m = el("span", "mark"); m.title = k.mark; kb.append(m); kb.title = k.mark; }
@@ -158,9 +164,16 @@ export function crumbs() {
   return out;
 }
 
+// renderCrumbs: the breadcrumb names the page (there is no other title), and the chip
+// beside it says what the page is about: the environment, and on 能不能跑 the plan too.
+// The home page spans every environment: no chip there.
 function renderCrumbs() {
   const env = $("#env");
-  env.textContent = (S.shell && S.shell.env) || "";
+  const sh = S.shell;
+  let chip = (sh && sh.env) || "";
+  if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + " · " + chip;
+  env.textContent = chip;
+  env.hidden = !chip || S.screen === "home" || S.screen === "guide";
   env.title = T("environment") + " · E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");
