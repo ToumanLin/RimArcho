@@ -14,6 +14,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
+// CreateLink makes a Mods/ link (08 §3); tests replace it to act out a volume without
+// junctions (FAT, exFAT).
+var CreateLink = source.CreateLink
+
 // DeployPrefix marks the Mods/ links RimArcho manages (08 §3). It only ever creates or
 // removes entries with this prefix.
 const DeployPrefix = "_Archo_"
@@ -215,7 +219,7 @@ func applyLinks(mods string, plan []LinkChange) error {
 			if _, err := os.Stat(c.Target); err != nil {
 				return fmt.Errorf("cannot link %s: %v", c.Name, err)
 			}
-			if err := source.CreateLink(p, c.Target); err != nil {
+			if err := CreateLink(p, c.Target); err != nil {
 				return fmt.Errorf("cannot link %s into %s: %v (the Mods/ volume must support junctions, e.g. NTFS)", c.Target, mods, err)
 			}
 		}

@@ -29,8 +29,10 @@ func TestCopyLocal(t *testing.T) {
 	before := e.ReadModsConfig()
 	orig := ref(t, e, "Example Mod")
 	out := e.MustRun("copy-local", orig, "--git")
-	dst := filepath.Join(e.Game, "Mods", "123456_local")
-	for _, want := range []string{"copied to", "git: repository with a baseline commit", "skipped: 1 links", "Textures/External", "loadout: unchanged", "archo swap " + orig + " #"} {
+	dst := filepath.Join(e.Root, "LocalAppData", "RimArcho", "locked", "main", "123456_local")
+	// copy-local is now an alias of pin: the enabled original is swapped for the copy in
+	// the current plan (04 §7.2 step 6); the game's files are not touched.
+	for _, want := range []string{"locked: copied to", "git: repository with a baseline commit", "skipped: 1 links", "Textures/External", "replaces " + orig + " in the current plan"} {
 		if !strings.Contains(e.Scrub(out), want) {
 			t.Fatalf("missing %q:\n%s", want, out)
 		}
@@ -64,9 +66,6 @@ func TestCopyLocal(t *testing.T) {
 	if e.ReadModsConfig() != before {
 		t.Fatal("ModsConfig.xml changed")
 	}
-	if st := e.MustRun("status"); !strings.Contains(st, "same as") && !strings.Contains(st, "0 changes") && strings.Contains(st, "unsaved") {
-		t.Fatalf("workspace changed:\n%s", st)
-	}
 	ix, _ := e.App.Index()
 	var lin []string
 	for _, m := range ix.Mods {
@@ -77,8 +76,9 @@ func TestCopyLocal(t *testing.T) {
 	if len(lin) != 2 || lin[0] != lin[1] {
 		t.Fatalf("copy joins the origin's lineage: %v", lin)
 	}
-	if _, code := e.Run("copy-local", orig, "--git"); code != 1 {
-		t.Fatal("an existing folder must not be overwritten")
+	// An existing folder is never overwritten: the second copy gets a suffix.
+	if out := e.MustRun("copy-local", orig); !strings.Contains(out, "123456_local2") {
+		t.Fatalf("an existing folder must not be overwritten:\n%s", out)
 	}
 	if _, code := e.Run("copy-local", orig, "--name", `..\up`); code != 1 {
 		t.Fatal("--name must be a plain folder name")

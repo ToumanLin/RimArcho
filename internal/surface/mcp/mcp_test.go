@@ -62,6 +62,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		// 05 §1.2: the player actions that only had CLI commands.
 		"manage_rules": "write", "ignore_problem": "write", "scan": "write", "exchange_list": "write",
 		"manage_packs": "destructive", "resolve_identity": "destructive", "manage_hidden": "destructive", "maintenance": "destructive",
+		"pin_mod": "write", "unpin_mod": "write",
 	}
 	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true}
 	seen := map[string]bool{}
@@ -145,6 +146,10 @@ func TestCLIParity(t *testing.T) {
 		{"manage_hidden", map[string]any{"action": "trash", "ref": modA, "dry_run": true}, []string{"trash", modA, "--dry-run"}},
 		{"maintenance", map[string]any{"action": "gc", "dry_run": true}, []string{"gc", "--dry-run"}},
 		{"ignore_problem", map[string]any{"ref": "p:000000"}, []string{"problems", "ignore", "p:000000"}},
+		{"pin_mod", map[string]any{"ref": modA, "dry_run": true}, []string{"pin", modA, "--dry-run"}},
+		{"pin_mod", map[string]any{"ref": modA, "update": true}, []string{"pin", modA, "--update"}},
+		{"copy_local", map[string]any{"ref": modA, "name": "x/y"}, []string{"copy-local", modA, "--name", "x/y"}},
+		{"unpin_mod", map[string]any{"ref": modA, "dry_run": true}, []string{"unpin", modA, "--dry-run"}},
 	}
 	for _, c := range cases {
 		got, isErr := call(t, cs, c.tool, c.args)
@@ -345,5 +350,24 @@ func TestStillComputing(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	if out, _ := call(t, cs, "list_problems", map[string]any{"code": "harmony"}); !strings.Contains(out, "analysis: a:1") || !strings.Contains(out, "harmony.multi-transpiler") {
 		t.Fatalf("second call:\n%s", out)
+	}
+}
+
+// pin_mod swaps the copy into the current plan; unpin_mod swaps the upstream back (04 §7).
+func TestPinUnpinTools(t *testing.T) {
+	e := testkit.New(t)
+	e.AddWorkshop("5100", testkit.Sample("tester.lock", "Lockable"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.lock")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	cs := connect(t, e)
+	up := ref(t, e, "Lockable")
+	out, isErr := call(t, cs, "pin_mod", map[string]any{"ref": up})
+	if isErr || !strings.Contains(out, "replaces "+up+" in the current plan") {
+		t.Fatalf("pin_mod:\n%s", out)
+	}
+	out, isErr = call(t, cs, "unpin_mod", map[string]any{"ref": up})
+	if isErr || !strings.Contains(out, "the current plan uses "+up) {
+		t.Fatalf("unpin_mod:\n%s", out)
 	}
 }

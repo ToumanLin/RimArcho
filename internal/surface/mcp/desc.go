@@ -18,7 +18,7 @@ Diagnosis workflow (use the exact evidence, not paraphrases):
    - Mixed: confirm the XML side loaded (get_patches failed=true) before blaming code.
 4. list_problems gives the static picture (dependencies, incompatibilities, load order, def overrides, patch failures, Harmony conflicts); explain_relation explains two specific mods.
 5. Report: failure stage, XML/Assembly/Mixed, the exact mod instance and path, the file+line or class+method, why it fails, whether a named mod is cause, dependency or observer, and the smallest fix.
-Editing: copy_local first (never edit Workshop files in place), then edit the copy; edit_loadout only changes RimArcho's workspace; save_loadout writes the game's ModsConfig.xml (ask the user first).
+Editing: pin_mod first (never edit Workshop files in place), then edit the copy; edit_loadout only changes RimArcho's workspace; save_loadout writes the game's ModsConfig.xml (ask the user first).
 Tools marked destructive (save_loadout, manage_packs, resolve_identity, manage_hidden, maintenance) write game or mod files, start the game or are hard to undo: show the dry run where there is one and ask the user before the real call.`
 
 const descStatus = `Overview of the current environment: game version, installed mods per source, last scan, the Loadout (enabled count, unsaved edits) and problem counts. Use first in a session; use get_mod for one mod and list_problems for the problems themselves. show= gives one read-only page of RimArcho's own setup instead: envs (environments, their paths, sources and launch mode), settings (config values), data (community data), db (database path, size, backups), cache (cache sizes). Changing environments and settings is left to the player in RimArcho.
@@ -105,11 +105,23 @@ Example: save_loadout {"dry_run": true}
     added  #b21c  Harmony  at 1
     moved  #a3f9  Combat Extended  34 → 35`
 
-const descCopy = `Copy a mod (usually a Workshop item) into the game's Mods folder as an independent local copy before editing it: the copy gets .rimarcho/origin.json (origin instance, lineage, workshop id, snapshot) and stays in the same lineage; git=true adds a repository with a baseline commit so every edit can be diffed. Links that point outside the mod folder and the upstream .git are not copied; an existing folder is never overwritten. The Loadout is not changed: call edit_loadout action=swap refs=[original, copy] when the user wants the game to load the copy. Never edit Workshop files in place — Steam overwrites them.
+const descCopy = `Old name of pin_mod (same arguments except update, move_to_library and dry_run; same behaviour): lock a mod by copying it into RimArcho's lock library and using the copy in the current plan. Prefer pin_mod.
 Example: copy_local {"ref": "#ipv5", "git": true}
-  #ipv5 Yayo's Combat 3 copied to D:\Games\RimWorld\Mods\2854006492_local
+  #ipv5 Yayo's Combat 3 locked: copied to C:\Users\me\AppData\Local\RimArcho\locked\main\2854006492_local
     copy: #k2v8  (same lineage, origin marker .rimarcho/origin.json)
     files: 130 (1.5 MB)`
+
+const descPin = `Create a locked version of a mod (usually a Workshop item) before editing it, or so Workshop updates stop reaching it: the mod is copied into RimArcho's lock library (outside the game folder; src:locked) with .rimarcho/origin.json (origin instance, lineage, workshop id, snapshot), stays in the same lineage, and replaces the original in the current plan only (one undoable edit; nothing is swapped when the original is not enabled). The game sees the copy only through an _Archo_ link in Mods/ that save_loadout or a launch creates, so several copies can coexist and each plan uses its own. git=true adds a repository with a baseline commit so every edit can be diffed. Links that point outside the mod folder and the upstream .git are not copied; an existing folder is never overwritten (a taken name gets a suffix). update=true remakes it when list_problems reports mod.pinned "has been updated": shows the changed files, copies the upstream's current content to a new folder and swaps it in; the old copy stays. move_to_library=true moves a copy RimArcho made in Mods/ before the library existed into the library (update does this on its own). Undo with unpin_mod. Never edit Workshop files in place — Steam overwrites them.
+Example: pin_mod {"ref": "#ipv5", "git": true}
+  #ipv5 Yayo's Combat 3 locked: copied to C:\Users\me\AppData\Local\RimArcho\locked\main\2854006492_local
+    copy: #k2v8  (same lineage, origin marker .rimarcho/origin.json)
+    files: 130 (1.5 MB)`
+
+const descUnpin = `Unlock a locked version: the current plan uses the upstream (usually the Workshop copy) again instead of the locked copy; the copy stays in the lock library. ref may name the copy or the upstream. For a lock made by another manager (RimCrow: the Workshop folder's About.xml renamed to About.xml.disabled), About.xml is renamed back first. Only the current plan changes; call with dry_run=true to preview.
+Example: unpin_mod {"ref": "#k2v8"}
+  unpinned: the current plan uses #ipv5 instead of #k2v8 Yayo's Combat 3
+    copy: stays at C:\Users\me\AppData\Local\RimArcho\locked\main\2854006492_local (no files change)
+    upstream: #ipv5 at D:\Steam\steamapps\workshop\content\294100\2854006492`
 
 const descDescribe = `A mod's description: About.xml and the Steam Workshop page (BBCode rendered as plain text; images as [image: url]). The Workshop text is fetched for this one mod on demand and cached until the item is updated; offline=true uses the cache only, and the user can turn fetching off (config workshop.fetch). source=auto shows the Workshop text when About.xml is short or the same, both otherwise. Use it to learn what a mod does before suggesting it.
 Example: get_description {"ref": "#uuhe"}

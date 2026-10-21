@@ -2,6 +2,7 @@ package app
 
 import (
 	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"sort"
@@ -239,6 +240,11 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	if err := a.Store.LoadDecls(active); err != nil {
 		return nil, err
 	}
+	locked := st.Locked()
+	lockedCopy := map[string]string{} // copy ID → upstream ID
+	for _, l := range locked {
+		lockedCopy[l.Copy.ID] = l.Upstream.ID
+	}
 	installed := map[string][]*store.Mod{} // live, loadable instances by packageId
 	for _, m := range st.Ix.Mods {
 		if m.TombstoneAt.IsZero() && !m.Residue && m.Unloadable == "" && (st.Reg.Known(m.ID) || st.Deployable(m)) {
@@ -384,7 +390,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				f.Suggestions = append(f.Suggestions, "archo disable "+inst(m.ID))
 			}
 			add(f)
-		} else if ins := installed[p]; len(ins) > 1 {
+		} else if ins := installed[p]; len(ins) > 1 && !onlyLocks(ins, lockedCopy) {
 			subj := ins[0]
 			if len(as) == 1 {
 				subj = as[0]
@@ -434,6 +440,25 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				Claim:       fmt.Sprintf("%s is hidden from the game (About.xml renamed, probably by another mod manager)", inst(m.ID)),
 				Suggestions: []string{"archo unhide " + inst(m.ID), "archo trash " + inst(m.ID)}})
 		}
+	}
+	// Locked versions RimArcho made (04 §7): the upstream stays visible; the copy is what
+	// the plan uses. Reported while the upstream itself is not enabled.
+	for _, l := range locked {
+		up, cp := l.Upstream, l.Copy
+		if activePos[up.ID] != 0 {
+			continue
+		}
+		f := &finding.Finding{Code: "mod.pinned", Severity: finding.Info, Key: "copy:" + cp.ID, Subjects: []string{inst(up.ID), inst(cp.ID)},
+			Claim:       fmt.Sprintf("%s is locked: %s is a copy of it made by archo pin (.rimarcho/origin.json)", inst(up.ID), inst(cp.ID)),
+			Evidence:    []finding.Evidence{{Source: finding.Inferred, Ref: inst(cp.ID), Text: "origin_snapshot " + shortHash(l.Origin.SnapshotHash)}},
+			Suggestions: []string{"archo unpin " + inst(cp.ID)}}
+		if l.Updated {
+			f.Severity, f.Key = finding.Warning, "upstream:"+cp.ID
+			f.Claim = fmt.Sprintf("%s is locked to %s, and %s has been updated since the copy was made", inst(up.ID), inst(cp.ID), inst(up.ID))
+			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Ref: inst(up.ID), Text: "current snapshot " + shortHash(hex.EncodeToString(up.SnapHash))})
+			f.Suggestions = []string{"archo mod " + inst(cp.ID) + " --diff " + inst(up.ID), "archo pin --update " + inst(cp.ID), "archo unpin " + inst(cp.ID)}
+		}
+		add(f)
 	}
 	for _, m := range st.Ix.Mods {
 		if m.TombstoneAt.IsZero() && m.Unloadable != "" && m.Unloadable != scan.UnloadableAboutDisabled && activePos[m.ID] == 0 {
@@ -582,3 +607,31 @@ func PrevMinor(mm string) string {
 // NoisyCodes are hidden from default problem lists (03 §4.5); they show with
 // --all, an explicit --code or --subject, severity info, and in def / patches output.
 var NoisyCodes = map[string]bool{"def.override": true, "patch.contested": true}
+
+// onlyLocks reports whether ins is one instance plus locked copies of it (04 §7): those are
+// reported as mod.pinned, not as duplicates.
+func onlyLocks(ins []*store.Mod, lockedCopy map[string]string) bool {
+	var rest []*store.Mod
+	for _, m := range ins {
+		if _, ok := lockedCopy[m.ID]; !ok {
+			rest = append(rest, m)
+		}
+	}
+	if len(rest) != 1 {
+		return false
+	}
+	for _, m := range ins {
+		if up, ok := lockedCopy[m.ID]; ok && up != rest[0].ID {
+			return false
+		}
+	}
+	return true
+}
+
+// shortHash is the first 12 characters of a hex hash.
+func shortHash(h string) string {
+	if len(h) > 12 {
+		return h[:12]
+	}
+	return h
+}

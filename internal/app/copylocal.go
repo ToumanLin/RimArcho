@@ -26,6 +26,10 @@ type CopyResult struct {
 	// onFile is called after each copied file (a pack build's progress); an error stops
 	// the copy.
 	onFile func(bytes int64) error
+	// dry: count what would be copied, write nothing.
+	dry bool
+	// keepAll: copy .git and .rimarcho too (moving a locked copy, 04 §7).
+	keepAll bool
 }
 
 // LocalSource is the environment's local source (the game's Mods folder).
@@ -38,33 +42,29 @@ func (ix *Index) LocalSource() *source.Source {
 	return nil
 }
 
-// CopyLocal copies an instance into the local source with an origin marker (04 §7.2). It
-// never changes the Loadout, never overwrites an existing folder, never copies .git and
-// never follows links that leave the mod folder. The copy is assembled next to its final
-// place and renamed, so a failure leaves nothing behind.
-func (a *App) CopyLocal(st *LoadoutState, m *store.Mod, name string, git bool) (*CopyResult, error) {
-	ix := st.Ix
-	ls := ix.LocalSource()
-	if ls == nil {
-		return nil, fmt.Errorf("the environment has no local source (the game's Mods folder)")
-	}
-	src := ix.ModDir(m)
+// copyLocal copies an instance into the folder root (the lock library) with an origin
+// marker (04 §7.2). It never overwrites an existing folder (a taken name gets a numeric
+// suffix), never copies .git and never follows links that leave the mod folder. The copy
+// is assembled next to its final place and renamed, so a failure leaves nothing behind.
+// dry checks the name and counts the files without writing.
+func (a *App) copyLocal(st *LoadoutState, m *store.Mod, root, name string, git, dry bool) (*CopyResult, error) {
+	src := st.Ix.ModDir(m)
 	if real, err := source.RealPath(src); err == nil {
 		src = real
 	}
 	if name == "" {
 		name = filepath.Base(m.Rel) + "_local"
 	}
-	if name != filepath.Base(name) || name == "." || name == ".." || strings.ContainsAny(name, `<>:"|?*`) {
-		return nil, fmt.Errorf("--name must be a plain folder name: %q", name)
+	if err := plainName(name); err != nil {
+		return nil, err
 	}
-	dst := filepath.Join(ls.Root, name)
-	if _, err := os.Lstat(dst); err == nil {
-		return nil, fmt.Errorf("%s already exists; choose another --name (nothing is overwritten)", dst)
+	dst := filepath.Join(root, freeName(root, name))
+	res := &CopyResult{Dir: dst, dry: dry}
+	if dry {
+		return res, copyTree(src, src, "", "", res)
 	}
 	tmp := dst + ".archo-tmp"
 	os.RemoveAll(tmp)
-	res := &CopyResult{Dir: dst}
 	if err := copyTree(src, src, tmp, "", res); err != nil {
 		os.RemoveAll(tmp)
 		return nil, err
@@ -96,8 +96,10 @@ func (a *App) CopyLocal(st *LoadoutState, m *store.Mod, name string, git bool) (
 
 // copyTree copies dir (whose path relative to the mod root is rel) into dst.
 func copyTree(root, dir, dst, rel string, res *CopyResult) error {
-	if err := os.MkdirAll(dst, 0o755); err != nil {
-		return err
+	if !res.dry {
+		if err := os.MkdirAll(dst, 0o755); err != nil {
+			return err
+		}
 	}
 	ents, err := os.ReadDir(dir)
 	if err != nil {
@@ -106,10 +108,10 @@ func copyTree(root, dir, dst, rel string, res *CopyResult) error {
 	for _, de := range ents {
 		p := filepath.Join(dir, de.Name())
 		r := filepath.ToSlash(filepath.Join(rel, de.Name()))
-		if strings.EqualFold(de.Name(), ".git") {
+		if !res.keepAll && strings.EqualFold(de.Name(), ".git") {
 			continue // the copy gets its own history (--git), never the upstream one
 		}
-		if rel == "" && strings.EqualFold(de.Name(), ".rimarcho") {
+		if !res.keepAll && rel == "" && strings.EqualFold(de.Name(), ".rimarcho") {
 			continue // a fresh origin marker is written
 		}
 		target := p
@@ -131,8 +133,10 @@ func copyTree(root, dir, dst, rel string, res *CopyResult) error {
 			}
 			continue
 		}
-		if err := copyFile(target, filepath.Join(dst, de.Name()), fi); err != nil {
-			return err
+		if !res.dry {
+			if err := copyFile(target, filepath.Join(dst, de.Name()), fi); err != nil {
+				return err
+			}
 		}
 		res.Files++
 		res.Bytes += fi.Size()
@@ -193,4 +197,12 @@ func gitBaseline(dir, name, origin string) error {
 		return err
 	}
 	return run("commit", "-q", "--no-verify", "-m", fmt.Sprintf("Baseline: copy of %s (#%s)", name, origin))
+}
+
+// plainName checks a folder name given with --name: no path, no reserved characters.
+func plainName(name string) error {
+	if name != filepath.Base(name) || name == "." || name == ".." || strings.ContainsAny(name, `<>:"|?*/`) || strings.ContainsRune(name, filepath.Separator) {
+		return fmt.Errorf("--name must be a plain folder name: %q", name)
+	}
+	return nil
 }

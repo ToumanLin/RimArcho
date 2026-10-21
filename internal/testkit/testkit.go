@@ -88,6 +88,8 @@ func (e *Env) Open() {
 	a.Rand = rand.NewChaCha8([32]byte{'r', 'i', 'm', 'a', 'r', 'c', 'h', 'o'})
 	a.Loc = time.UTC
 	a.Detect = env.DetectOptions{SteamRoots: []string{e.Steam}, ManualRoots: []string{}, Home: e.Root, GOOS: "windows", SkipRegistry: true}
+	// The lock library (04 §7) stays inside the fixture.
+	a.LockBase = filepath.Join(e.Root, "LocalAppData")
 	// Never start a process from a test: launches are only recorded.
 	a.Launcher = func(exe string, args []string, dir string) error {
 		e.Launched = append(e.Launched, strings.Join(append([]string{exe}, args...), " "))

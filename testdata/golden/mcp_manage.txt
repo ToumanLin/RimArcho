@@ -120,7 +120,7 @@ next:
   archo collection 3000000001 --import
 
 > exchange_list {"action":"collection","from":"3000000001","import":true}
-workspace: 2 active, 1 change unsaved (env:main)
+workspace: 2 active, 1 change unsaved (plan:default, env:main)
   imported collection Title 3000000001: 2 of 3 mods are installed
   not installed (subscribe in the Workshop): 1
     Title 5550001  https://steamcommunity.com/sharedfiles/filedetails/?id=5550001
@@ -129,7 +129,7 @@ next:
   archo save
 
 > exchange_list {"action":"import","from":"$ROOT/list.txt"}
-workspace: 3 active, saved (env:main)
+workspace: 3 active, saved (plan:default, env:main)
   imported 3 entries from a RimWorld mod list (.rml), game 1.6.4633 rev1261
   added  #i4uc  Core  at 1
 next:

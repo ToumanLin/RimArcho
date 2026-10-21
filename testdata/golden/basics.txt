@@ -50,7 +50,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     stage add <ref…>                          stage mods (enabled ones leave the Loadout and remember their place)
     stage drop <ref…>                         take mods out of staging without enabling them
     stage restore [<ref…>]                    enable staged mods again at their old place (all when no ref)
-    copy-local <ref>                          copy a mod into the local Mods folder with an origin marker (the Loadout is not changed)
+    pin <ref>                                 lock a mod: copy it into the lock library (origin marker) and use the copy in the current plan
+    copy-local <ref>                          alias of pin
     import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)
     note <ref> [<text>]                       attach a plain-text note to a mod (all its copies)
@@ -73,7 +74,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     data update [<dataset>…]                  download the community data (rules, steamdb, replacements); the only command that fetches it
     data status                               the community data: source, version, when it was fetched, entries
     unhide <ref>                              rename About.xml.disabled back to About.xml so the game sees the mod again
-    unpin <ref>                               restore a pinned mod's workshop copy and use it instead of the pinning copy
+    unpin <ref>                               use a locked mod's upstream again in the current plan (a RimCrow-style lock also gets its About.xml back); the copy stays
     trash <ref>                               move a hidden or unsubscribed workshop folder to the recycle bin
     history                                   the workspace's unsaved edits (undo/redo) and the saved versions
     pack build <name>                         compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load
