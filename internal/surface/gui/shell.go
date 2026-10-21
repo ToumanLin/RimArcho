@@ -79,7 +79,40 @@ func (s *API) Home() *view.Home {
 	}
 	packs, _, _ := view.PackRows(s.a)
 	plans, _ := view.PlanRows(s.a)
-	return view.BuildHome(s.a, s.board, s.needsLocked(false), plans, packs)
+	h := view.BuildHome(s.a, s.board, s.needsLocked(false), plans, packs)
+	st := s.board.St
+	view.AddOtherEnvs(s.a, h, st.Ix.Env.ID)
+	view.PickFeatured(h, s.a.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
+	return h
+}
+
+// HomeApply is a home row's 应用 (06 §2.3): its environment becomes current if it is not,
+// then a plan becomes the current plan, a pack the featured item. No game file is written;
+// ▶ 启动游戏 on the featured card does that. The page reloads the board afterwards.
+func (s *API) HomeApply(kind, envName string, plan int64, pack string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.boardState()
+	if st == nil || st.Ix.Env.Name != envName {
+		s.a.EnvName = ""
+		if _, err := s.a.EnvUse(envName); err != nil {
+			return "", err
+		}
+		s.needs, s.board = nil, nil
+	}
+	if kind == view.RowPlan {
+		_, t, err := view.UsePlan(s.a, plan)
+		if err != nil {
+			return "", err
+		}
+		s.board = nil
+		return t, s.a.Store.SetMeta(view.FeaturedKey, "")
+	}
+	st = s.boardState()
+	if st == nil {
+		return "", fmt.Errorf("no environment")
+	}
+	return view.Tf("%s is ready to launch", pack), s.a.Store.SetMeta(view.FeaturedKey, view.FeaturedValue(envName, pack, st.Plan.ID))
 }
 
 // ---- plans (04 §1.3, 06 §2.5) ----

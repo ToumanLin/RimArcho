@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -210,7 +211,14 @@ type HomeRow struct {
 	Current bool   `json:"current,omitempty"`
 	Mark    string `json:"mark,omitempty"`
 	InGame  bool   `json:"inGame,omitempty"`
-	at      time.Time
+	// EnvName is its environment, Versions the game versions it runs on ("1.7"; a pack's
+	// from its mods, "1.5–1.6"), Mods its number of mods; OtherEnv: not the current
+	// environment (applying it switches environments first).
+	EnvName  string `json:"envName"`
+	Versions string `json:"versions"`
+	Mods     int    `json:"mods"`
+	OtherEnv bool   `json:"otherEnv,omitempty"`
+	at       time.Time
 }
 
 // Home is the home page: the rows, then the activity card.
@@ -222,6 +230,9 @@ type Home struct {
 	// Changes: the last scan's changes in words (ChangeSummary), ScanWhen when it ran.
 	Changes  string `json:"changes,omitempty"`
 	ScanWhen string `json:"scanWhen,omitempty"`
+	// Featured is the row of what is applied now (PickFeatured): the large card with
+	// ▶ 启动游戏; -1 when there is none.
+	Featured int `json:"featured"`
 }
 
 // BuildHome builds the home page: one row per plan of the environment and one per pack.
@@ -229,16 +240,18 @@ type Home struct {
 // Rows go by the last time they were played (launch records, 08 §2); never played ones
 // follow by name.
 func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow) *Home {
-	h := &Home{}
+	h := &Home{Featured: -1}
 	if b == nil || b.St == nil {
 		return h
 	}
-	chip := EnvChip(b.EnvName, b.GameVersion)
+	chip, ver := EnvChip(b.EnvName, b.GameVersion), env.MajorMinor(b.GameVersion)
 	for _, p := range plans {
 		r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: p.Played, at: p.PlayedAt, Plan: p.ID, Page: p.Page,
-			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates")}
+			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"),
+			EnvName: b.EnvName, Versions: ver, Mods: p.Entries}
 		k, checked := 0, false
 		if p.Current {
+			r.Mods = len(b.Cols[Active])
 			r.Facts = Tf("%d mods", len(b.Cols[Active]))
 			if b.Unsaved > 0 {
 				r.Facts += " · " + Tf("%d not written", b.Unsaved)
@@ -258,18 +271,7 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 		h.Rows = append(h.Rows, r)
 	}
 	for _, p := range packs {
-		r := HomeRow{Kind: RowPack, Name: p.Name, Env: chip, Facts: p.Facts, Played: p.Played, Light: p.Light, at: p.PlayedAt}
-		if p.Mods > 0 {
-			r.Facts = Tf("%d mods", p.Mods)
-		}
-		if p.Light {
-			r.State = T("list only")
-		} else {
-			r.Mode = T("versions locked · own saves")
-			// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
-			r.State, r.Level = T("checked when built"), HomeOK
-		}
-		h.Rows = append(h.Rows, r)
+		h.Rows = append(h.Rows, packHomeRow(p, chip, b.EnvName))
 	}
 	SortHome(h.Rows)
 	h.LastRun, h.LastRunErrors = n.LastRun, LastRunErrors(n)
@@ -280,6 +282,91 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 		h.ScanWhen = ShortDate(sc.Started) + " " + sc.Started.In(a.Loc).Format("15:04")
 	}
 	return h
+}
+
+func packHomeRow(p PackRow, chip, envName string) HomeRow {
+	r := HomeRow{Kind: RowPack, Name: p.Name, Env: chip, Facts: p.Facts, Played: p.Played, Light: p.Light, at: p.PlayedAt,
+		EnvName: envName, Versions: p.Versions, Mods: p.Mods}
+	if p.Mods > 0 {
+		r.Facts = Tf("%d mods", p.Mods)
+	}
+	if p.Light {
+		r.State = T("list only")
+	} else {
+		r.Mode = T("versions locked · own saves")
+		// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
+		r.State, r.Level = T("checked when built"), HomeOK
+	}
+	return r
+}
+
+// AddOtherEnvs puts the other environments' plans and packs on the home page (06 §2.3):
+// it lists what you play everywhere, not only in the current environment. Their state
+// comes from PlanProblems like any plan that is not current; nothing is loaded or scanned.
+func AddOtherEnvs(a *app.App, h *Home, current string) {
+	envs, err := a.Store.Envs()
+	if err != nil {
+		return
+	}
+	for _, e := range envs {
+		if e.ID == current {
+			continue
+		}
+		chip, ver := EnvChip(e.Name, e.GameVersion), env.MajorMinor(e.GameVersion)
+		ps, _ := a.PlansIn(e.ID)
+		for _, p := range ps {
+			r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: T("never played"), at: p.LastPlayed, Plan: p.ID,
+				Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"), EnvName: e.Name, Versions: ver, Mods: p.Entries, OtherEnv: true}
+			if !p.LastPlayed.IsZero() {
+				r.Played = Tf("played %s", ShortDate(p.LastPlayed))
+			}
+			r.State = T("not checked yet")
+			if k, checked := PlanProblems(a, p.ID); checked && k > 0 {
+				r.State, r.Level = Tf("%d problems break the game", k), LevelBad
+			} else if checked {
+				r.State, r.Level = T("ready to play"), HomeOK
+			}
+			h.Rows = append(h.Rows, r)
+		}
+		if packs, _, err := a.PacksOf(e); err == nil {
+			for _, p := range packRows(a, packs) {
+				r := packHomeRow(p, chip, e.Name)
+				r.OtherEnv = true
+				h.Rows = append(h.Rows, r)
+			}
+		}
+	}
+	SortHome(h.Rows)
+}
+
+// FeaturedKey is the GUI setting that remembers a pack applied on the home page:
+// "<environment><pack><the plan current then>". Applying a plan clears it, and it
+// lapses when the current plan changes some other way.
+const FeaturedKey = "ui.gui.home.pack"
+
+// FeaturedValue is what FeaturedKey holds after applying pack in envName.
+func FeaturedValue(envName, pack string, plan int64) string {
+	return envName + "" + pack + "" + strconv.FormatInt(plan, 10)
+}
+
+// PickFeatured sets h.Featured: the applied pack when it is still valid, else the
+// current environment's current plan.
+func PickFeatured(h *Home, setting, envName string, plan int64) {
+	h.Featured = -1
+	if f := strings.Split(setting, ""); len(f) == 3 && f[0] == envName && f[2] == strconv.FormatInt(plan, 10) {
+		for i, r := range h.Rows {
+			if r.Kind == RowPack && !r.OtherEnv && r.Name == f[1] {
+				h.Featured = i
+				return
+			}
+		}
+	}
+	for i, r := range h.Rows {
+		if r.Kind == RowPlan && r.Current && !r.OtherEnv {
+			h.Featured = i
+			return
+		}
+	}
 }
 
 // SortHome puts the rows played most recently first; the never played ones follow by name.

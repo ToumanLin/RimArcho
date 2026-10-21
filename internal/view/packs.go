@@ -1,6 +1,7 @@
 package view
 
 import (
+	"sort"
 	"strings"
 	"time"
 
@@ -18,6 +19,8 @@ type PackRow struct {
 	Played string `json:"played"`
 	Mods   int    `json:"mods"`
 	Light  bool   `json:"light,omitempty"`
+	// Versions are the game versions it runs on: "1.6", or "1.5–1.6" (PackVersions).
+	Versions string `json:"versions,omitempty"`
 	// PlayedAt is when it was last played (zero: never); the home page sorts by it.
 	PlayedAt time.Time `json:"-"`
 }
@@ -32,19 +35,66 @@ func PackRows(a *app.App) (out []PackRow, others int, err error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	return packRows(a, ps), others, nil
+}
+
+func packRows(a *app.App, ps []*app.PackInfo) (out []PackRow) {
 	for _, p := range ps {
 		size := SizeText(p.Bytes)
 		if p.Light {
 			size = T("list only")
 		}
-		r := PackRow{Name: p.Name, Light: p.Light, Mods: len(p.Entries), Facts: Tf("%d mods · %s · %s · built %s", len(p.Entries), size, p.Game, ShortDate(p.Created)), Played: T("never played")}
+		r := PackRow{Name: p.Name, Light: p.Light, Mods: len(p.Entries), Versions: PackVersions(a, p.Pack), Facts: Tf("%d mods · %s · %s · built %s", len(p.Entries), size, p.Game, ShortDate(p.Created)), Played: T("never played")}
 		if !p.LastPlayed.IsZero() {
 			r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 			r.PlayedAt = p.LastPlayed
 		}
 		out = append(out, r)
 	}
-	return out, others, nil
+	return out
+}
+
+// PackVersions are the game versions every carried mod of a pack supports (the
+// intersection of their supportedVersions), as "1.6" or "1.5–1.6"; the version it was
+// built for when that is unknown or empty.
+func PackVersions(a *app.App, p *app.Pack) string {
+	var common map[string]bool
+	for _, e := range p.Entries {
+		if e.Official || e.Instance == "" {
+			continue
+		}
+		m, err := a.Store.Mod(e.Instance)
+		if err != nil || m == nil || m.SupportedVersions == "" {
+			continue
+		}
+		vs := map[string]bool{}
+		for _, v := range strings.Fields(m.SupportedVersions) {
+			if v = env.MajorMinor(v); v != "" {
+				vs[v] = true
+			}
+		}
+		if common == nil {
+			common = vs
+			continue
+		}
+		for v := range common {
+			if !vs[v] {
+				delete(common, v)
+			}
+		}
+	}
+	var list []string
+	for v := range common {
+		list = append(list, v)
+	}
+	if len(list) == 0 {
+		return env.MajorMinor(p.Game)
+	}
+	sort.Slice(list, func(i, j int) bool { return env.VersionLess(list[i], list[j]) })
+	if len(list) == 1 {
+		return list[0]
+	}
+	return list[0] + "–" + list[len(list)-1]
 }
 
 // ---- building: the steps (preview and progress) ----

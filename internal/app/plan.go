@@ -62,6 +62,27 @@ func (a *App) Plans() ([]*PlanInfo, error) {
 	return out, nil
 }
 
+// PlansIn lists another environment's plans without loading it: each list's length comes
+// from its workspace (the home page lists every environment, 06 §2.3).
+func (a *App) PlansIn(envID string) ([]*PlanInfo, error) {
+	ps, err := a.Store.Plans(envID)
+	if err != nil {
+		return nil, err
+	}
+	cur := a.Store.CurrentPlanID(envID)
+	var out []*PlanInfo
+	for _, p := range ps {
+		pi := &PlanInfo{Plan: p, Current: p.ID == cur, Versions: a.Store.VersionCount(p.ID), LastPlayed: a.Store.LastPlanLaunch(p.ID)}
+		if ws, err := a.Store.Workspace(p.ID); err != nil {
+			return nil, err
+		} else if ws != nil {
+			pi.Entries = len(loadout.Decode(ws.Entries))
+		}
+		out = append(out, pi)
+	}
+	return out, nil
+}
+
 // PlanRef is how output names a plan.
 func PlanRef(p *store.Plan) string { return "plan:" + p.Name }
 

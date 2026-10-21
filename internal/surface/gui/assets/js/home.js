@@ -1,12 +1,12 @@
-// 首页 (06 §2.3), variant A: magpie's list pages — one card per plan or pack: a small icon
-// tile (a list for a plan, a box for a pack), the name in bold, one muted line (mods · last
-// played), the problem only when there is one, and ▶ 启动游戏 on the right. The card opens
-// the plan's editor or the pack's page. The activity is the same kind of card. Data:
-// API.Home (view.BuildHome).
+// 首页 (06 §2.3): what is applied now as one large card with ▶ 启动游戏, then every other
+// plan and pack of every environment as one line — the game versions it runs on, the
+// name, its kind, its mods, and 应用 — then the last run and the last scan as two lines.
+// 应用 makes a row the applied one (its environment and plan become current; a pack becomes
+// the featured item); it writes no game file. Data: API.Home (view.BuildHome,
+// view.AddOtherEnvs, view.PickFeatured).
 import { S, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, act, rescanButton } from "./screens.js";
+import { openScreen, page } from "./screens.js";
 import { icon } from "./icons.js";
-import { openPlan, newPlan } from "./plans.js";
 
 let ui = null;
 export function initHome(u) { ui = u; }
@@ -18,58 +18,34 @@ export async function home() {
   draw();
 }
 
-// liveChanged redraws the launch buttons when the game starts or stops.
+// liveChanged redraws the launch button when the game starts or stops.
 export function liveChanged() { if (S.screen === "home" && data) draw(); }
 
 function draw() {
   const sc = S.screen === "home" ? document.querySelector("#screen") : openScreen("home");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("home", "", rescanButton(), act(T("new plan / import"), "plus", () => newPlan()));
+  // no page actions: rescanning is Mod 库's, a new plan is 方案's
+  const w = page("home", "");
   sc.append(w);
   const rows = data.rows || [];
-  const ctx = { running: !!(S.live && (S.live.running || S.live.blocked)), manyEnvs: new Set(rows.map((r) => r.env)).size > 1, several: rows.filter((r) => r.kind === "plan").length > 1 };
-  const playing = el("section", "sec");
-  playing.append(el("h2", "label", T("playing now")));
-  const list = el("div", "ha-list");
-  if (!rows.length) list.append(el("div", "card empty-state", T("no environment yet: add one on the environment page")));
-  for (const r of rows) list.append(item(r, ctx));
-  playing.append(list);
-  w.append(playing);
-  const actv = el("section", "sec");
-  actv.append(el("h2", "label", T("activity")));
-  const cards = el("div", "ha-list");
-  cards.append(...activity());
-  actv.append(cards);
-  w.append(actv);
+  if (!rows.length) { w.append(el("div", "card empty-state", T("no environment yet: add one on the environment page"))); return; }
+  const running = !!(S.live && (S.live.running || S.live.blocked));
+  if (data.featured >= 0) w.append(hero(rows[data.featured], running));
+  const rest = rows.filter((_, i) => i !== data.featured);
+  if (rest.length) {
+    const sec = el("section", "sec");
+    sec.append(el("h2", "label", T("the others")));
+    const list = el("div", "card hb-list");
+    for (const r of rest) list.append(line(r));
+    sec.append(list);
+    w.append(sec);
+  }
+  w.append(activity());
   sc.scrollTop = top;
 }
 
-// card: [tile] title / subline … right. go opens what the card is about.
-function card(ic, title, sub, right, go, tip) {
-  const d = el("div", "card ha-item");
-  const t = el("span", "tile");
-  t.innerHTML = icon[ic] || "";
-  const l = el("div", "l");
-  l.append(el("div", "n", title));
-  if (sub) l.append(el("div", "s", sub));
-  d.append(t, l);
-  for (const x of right) if (x) d.append(x);
-  if (go) { d.onclick = go; d.tabIndex = 0; d.onkeydown = (e) => { if (e.key === "Enter" && e.target === d) go(); }; }
-  if (tip) d.title = tip;
-  return d;
-}
-
-function item(r, ctx) {
-  const tip = (r.kind === "plan" ? T("a plan is a list of mods that follows Workshop updates") : T("a pack locks every mod's version and keeps its own saves")) + " · " + (r.kind === "plan" ? T("edit") : T("details"));
-  return card(r.kind === "plan" ? "plan" : "packs", r.name, subline(r, ctx), [problem(r), r.light ? null : launchButton(r, ctx)], () => open(r), tip);
-}
-
-// subline: "485 个 Mod · 10 月 20 日玩过" — with the environment when there are several, and
-// "游戏里是它" on the plan the game has when there are several plans.
-function subline(r, ctx) {
-  return [ctx.manyEnvs ? r.env : "", r.facts, r.played, r.inGame && ctx.several ? T("in the game") : ""].filter(Boolean).join(" · ");
-}
+const kindTag = (r) => el("span", "kind", r.kind === "plan" ? T("plan") : T("pack"));
 
 // problem: the state only when something is wrong; else nothing.
 function problem(r) {
@@ -84,39 +60,73 @@ function problem(r) {
   return null;
 }
 
-function open(r) { ui.go(r.kind === "plan" ? r.page : "pack:" + r.name); }
+// hero: the applied plan or pack — its environment, the name and kind, mods · last played,
+// the problem, and the big ▶ 启动游戏. The card opens the plan's editor or the pack's page.
+function hero(r, running) {
+  const d = el("div", "card hb-hero");
+  d.onclick = () => ui.go(r.kind === "plan" ? r.page : "pack:" + r.name);
+  d.title = r.kind === "plan" ? T("edit") : T("details");
+  const l = el("div", "l");
+  const name = el("div", "nm");
+  name.append(el("span", "n", r.name), kindTag(r));
+  l.append(el("div", "k", r.env), name, el("div", "s", [Tf("%d mods", r.mods), r.played].join(" · ")));
+  const p = problem(r);
+  if (p) l.append(p);
+  d.append(l);
+  if (!r.light) {
+    const b = el("button", "btn launch primary big");
+    const i = el("span", "ic");
+    i.innerHTML = icon.play;
+    b.append(i, el("span", "", T("launch the game")));
+    b.onclick = (e) => { e.stopPropagation(); launch(r); };
+    // one game at a time (08 §4)
+    if (running) { b.disabled = true; b.title = T("a game is already running"); } else if (r.kind === "plan") b.title = "L";
+    d.append(b);
+  }
+  return d;
+}
 
-function launchButton(r, ctx) {
-  const b = el("button", "btn launch");
-  const i = el("span", "ic");
-  i.innerHTML = icon.play;
-  b.append(i, el("span", "", T("launch the game")));
-  b.onclick = (e) => { e.stopPropagation(); launch(r); };
-  // one game at a time (08 §4)
-  if (ctx.running) { b.disabled = true; b.title = T("a game is already running"); } else if (r.kind === "plan") b.title = "L";
+// line: versions | name [kind] | N 个 Mod | 应用 — on one grid, so the columns line up.
+function line(r) {
+  const d = el("div", "hb-line");
+  const v = el("span", "v num", r.versions || "—");
+  v.title = r.env;
+  const b = el("button", "btn apply", T("apply"));
+  b.title = r.otherEnv ? Tf("switch to %s and use this; no game file is written", r.envName) : T("use this; no game file is written");
+  b.onclick = () => apply(r);
+  d.append(v, el("span", "n", r.name), kindTag(r), el("span", "m num", Tf("%d mods", r.mods)), b);
+  return d;
+}
+
+// apply: 应用 (06 §2.3) — the row becomes the featured card.
+async function apply(r) {
+  try { say("ok", await api.HomeApply(r.kind, r.envName, r.plan || 0, r.kind === "pack" ? r.name : "")); } catch (e) { return say("fail", errText(e)); }
+  await ui.reload();
+  await home();
+}
+
+// activity: the last run and the last scan, two lines of text, each a link.
+function activity() {
+  const box = el("div", "hb-act");
+  const runText = S.live && S.live.running ? T("the game is running") + " · " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
+    : !data.lastRun ? T("no run read yet") : data.lastRun + " · " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : T("no errors"));
+  const runGo = (S.live && S.live.running) || data.lastRunErrors ? "needs" : "log";
+  box.append(actLine(T("last run"), runText, () => ui.go(runGo)));
+  const scanText = !data.scanWhen ? T("no scan yet (R scans)") : (data.changes || T("nothing changed")) + " · " + Tf("scanned %s", data.scanWhen);
+  box.append(actLine(T("since the last scan"), scanText, () => (data.scanWhen ? ui.go("changes") : ui.cmd("rescan"))));
+  return box;
+}
+
+function actLine(title, text, go) {
+  const b = el("button", "hb-actline");
+  b.append(el("span", "t", title), el("span", "x", text), el("span", "go", "→"));
+  b.onclick = go;
   return b;
 }
 
-// activity: the last run and the last scan, as cards like the ones above.
-function activity() {
-  const link = (text) => el("span", "go", text);
-  let run;
-  if (S.live && S.live.running) run = card("log", T("last run"), T("the game is running") + " · " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")), [link(T("see this run →"))], () => ui.go("needs"));
-  else if (!data.lastRun) run = card("log", T("last run"), T("no run read yet"), [link(T("open the game log →"))], () => ui.go("log"));
-  else run = card("log", T("last run"), (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : T("no errors")) + " · " + data.lastRun,
-    [link(data.lastRunErrors ? T("see which →") : T("open the game log →"))], () => ui.go(data.lastRunErrors ? "needs" : "log"));
-  const scan = !data.scanWhen ? card("rescan", T("since the last scan"), T("no scan yet (R scans)"), [link(T("scan now →"))], () => ui.cmd("rescan"))
-    : card("library", T("since the last scan"), (data.changes || T("nothing changed")) + " · " + Tf("scanned %s", data.scanWhen), [link(T("see what changed →"))], () => ui.go("changes"));
-  return [run, scan];
-}
-
-// launch is the row's L (08 §2, §5.3): that plan becomes current, then its preview; a pack
+// launch is the featured card's L (08 §2, §5.3): the plan's launch preview, or the pack
 // plays at once, as on the packs page.
 async function launch(r) {
-  if (r.kind === "plan") {
-    if (!(await openPlan(r.plan))) return;
-    await home();
-    return ui.preview("launch");
-  }
+  if (r.kind === "plan") return ui.preview("launch");
   try { say("ok", await api.PackLaunch(r.name)); } catch (e) { say("fail", errText(e)); }
 }

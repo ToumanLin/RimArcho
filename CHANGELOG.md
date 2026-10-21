@@ -115,10 +115,12 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   open and close smoothly (rows 0fr → 1fr, a turning chevron). Less always-on chrome: the
   sidebar's environment / "游戏没在运行" box is gone (one line shows only while a game runs or
   a new log waits), and the status line no longer says "游戏里现在是…" (with several plans, a
-  green dot on that plan's entry and "游戏里是它" on its home card) nor repeats the breadcrumb.
-  The home page follows magpie's list pages: one card per plan or pack with an icon tile, the
-  name over one muted line (mods · last played), the problem only when there is one, and a
-  quiet ▶ 启动游戏; the activity uses the same cards. The plan editor has three columns,
+  green dot on that plan's entry) nor repeats the breadcrumb; the sidebar has no empty head.
+  The home page lists the plans and packs of every environment: what is applied now is one
+  large card (environment · version, name [方案 / 整合包], mods · last played, the problem
+  if any, ▶ 启动游戏); every other one is a line on shared columns (game versions — a pack's
+  from its mods' supportedVersions —, name, kind, mods, 应用, which switches to it without
+  writing game files); the last run and scan are two lines. No page actions on home. The plan editor has three columns,
   未启用 | 已启用 | 详情, with 暂存 and 历史 as folds under 详情 (drag to a folded 暂存 still
   stages; `3` opens it); two splitters, old four-column widths carried over.
 - "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
