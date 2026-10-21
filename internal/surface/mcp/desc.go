@@ -110,22 +110,22 @@ Example: add_rule {"kind": "ignore", "target": "decl:#iqmu:loadafter:tester.y"}
     r:1  ignore  decl:#iqmu:loadafter:tester.y
   next:`
 
-const descCopy = `Old name of pin_mod (same arguments except update and dry_run; same behaviour): lock a mod by copying it into the game's Mods folder and using the copy in the current plan. Prefer pin_mod.
+const descCopy = `Old name of pin_mod (same arguments except update, move_to_library and dry_run; same behaviour): lock a mod by copying it into RimArcho's lock library and using the copy in the current plan. Prefer pin_mod.
 Example: copy_local {"ref": "#ipv5", "git": true}
-  #ipv5 Yayo's Combat 3 locked: copied to D:\Games\RimWorld\Mods\2854006492_local
+  #ipv5 Yayo's Combat 3 locked: copied to C:\Users\me\AppData\Local\RimArcho\locked\main\2854006492_local
     copy: #k2v8  (same lineage, origin marker .rimarcho/origin.json)
     files: 130 (1.5 MB)`
 
-const descPin = `Create a locked version of a mod (usually a Workshop item) before editing it, or so Workshop updates stop reaching it: the mod is copied into the game's Mods folder with .rimarcho/origin.json (origin instance, lineage, workshop id, snapshot), stays in the same lineage, and replaces the original in the current plan only (one undoable edit; other plans and the game's files are not changed; nothing is swapped when the original is not enabled). git=true adds a repository with a baseline commit so every edit can be diffed. Links that point outside the mod folder and the upstream .git are not copied; an existing folder is never overwritten. update=true remakes it when list_problems reports mod.pinned "has an update": shows the changed files, copies the upstream's current content to a new folder and swaps it in; the old copy stays. Undo with unpin_mod. Never edit Workshop files in place — Steam overwrites them.
+const descPin = `Create a locked version of a mod (usually a Workshop item) before editing it, or so Workshop updates stop reaching it: the mod is copied into RimArcho's lock library (outside the game folder; src:locked) with .rimarcho/origin.json (origin instance, lineage, workshop id, snapshot), stays in the same lineage, and replaces the original in the current plan only (one undoable edit; nothing is swapped when the original is not enabled). The game sees the copy only through an _Archo_ link in Mods/ that save_loadout or a launch creates, so several copies can coexist and each plan uses its own. git=true adds a repository with a baseline commit so every edit can be diffed. Links that point outside the mod folder and the upstream .git are not copied; an existing folder is never overwritten (a taken name gets a suffix). update=true remakes it when list_problems reports mod.pinned "has been updated": shows the changed files, copies the upstream's current content to a new folder and swaps it in; the old copy stays. move_to_library=true moves a copy RimArcho made in Mods/ before the library existed into the library (update does this on its own). Undo with unpin_mod. Never edit Workshop files in place — Steam overwrites them.
 Example: pin_mod {"ref": "#ipv5", "git": true}
-  #ipv5 Yayo's Combat 3 locked: copied to D:\Games\RimWorld\Mods\2854006492_local
+  #ipv5 Yayo's Combat 3 locked: copied to C:\Users\me\AppData\Local\RimArcho\locked\main\2854006492_local
     copy: #k2v8  (same lineage, origin marker .rimarcho/origin.json)
     files: 130 (1.5 MB)`
 
-const descUnpin = `Unlock a locked version: the current plan uses the upstream (usually the Workshop copy) again instead of the locked copy; the copy stays on disk. ref may name the copy or the upstream. For a lock made by another manager (RimCrow: the Workshop folder's About.xml renamed to About.xml.disabled), About.xml is renamed back first. Only the current plan changes; call with dry_run=true to preview.
+const descUnpin = `Unlock a locked version: the current plan uses the upstream (usually the Workshop copy) again instead of the locked copy; the copy stays in the lock library. ref may name the copy or the upstream. For a lock made by another manager (RimCrow: the Workshop folder's About.xml renamed to About.xml.disabled), About.xml is renamed back first. Only the current plan changes; call with dry_run=true to preview.
 Example: unpin_mod {"ref": "#k2v8"}
   unpinned: the current plan uses #ipv5 instead of #k2v8 Yayo's Combat 3
-    copy: stays at D:\Games\RimWorld\Mods\2854006492_local (no files change)
+    copy: stays at C:\Users\me\AppData\Local\RimArcho\locked\main\2854006492_local (no files change)
     upstream: #ipv5 at D:\Steam\steamapps\workshop\content\294100\2854006492`
 
 const descDescribe = `A mod's description: About.xml and the Steam Workshop page (BBCode rendered as plain text; images as [image: url]). The Workshop text is fetched for this one mod on demand and cached until the item is updated; offline=true uses the cache only, and the user can turn fetching off (config workshop.fetch). source=auto shows the Workshop text when About.xml is short or the same, both otherwise. Use it to learn what a mod does before suggesting it.

@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
@@ -33,6 +34,13 @@ var freeKeys = map[string]struct {
 }{
 	// the tags offered first by the tag bar, comma separated; the preset is the default
 	"tags.pinned": {DefaultPinnedTags, func(string) error { return nil }},
+	// the lock library (04 §7): "" is %LOCALAPPDATA%\RimArcho\locked
+	"lock.dir": {"", func(v string) error {
+		if !filepath.IsAbs(v) {
+			return fmt.Errorf("lock.dir must be an absolute folder path")
+		}
+		return nil
+	}},
 	// how long the cursor must rest on a mod before its thumbnail is drawn
 	"ui.preview_dwell_ms": {"0", func(v string) error {
 		if n, err := strconv.Atoi(v); err != nil || n < 0 || n > 5000 {

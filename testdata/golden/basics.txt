@@ -46,7 +46,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     stage add <ref…>                          stage mods (enabled ones leave the Loadout and remember their place)
     stage drop <ref…>                         take mods out of staging without enabling them
     stage restore [<ref…>]                    enable staged mods again at their old place (all when no ref)
-    pin <ref>                                 lock a mod: copy it into the local Mods folder (origin marker) and use the copy in the current plan
+    pin <ref>                                 lock a mod: copy it into the lock library (origin marker) and use the copy in the current plan
     copy-local <ref>                          alias of pin
     import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)

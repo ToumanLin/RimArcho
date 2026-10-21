@@ -524,7 +524,7 @@ func (a *App) Swap(ref, with string) (*EditResult, error) {
 		if other.LineageID != m.LineageID {
 			return nil, nil, fmt.Errorf("%s and %s are not in the same lineage (archo lineage merge, or disable + enable)", st.Ix.Ref(m.ID), st.Ix.Ref(other.ID))
 		}
-		if why := whyNotLoadable(st, other); why != "" {
+		if why := swapBlocker(st, other, m); why != "" {
 			return nil, nil, fmt.Errorf("cannot swap in %s: %s", st.Ix.Ref(other.ID), why)
 		}
 		l[i] = loadout.Entry{Instance: other.ID}

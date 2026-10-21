@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -101,10 +102,13 @@ type PinResult struct {
 	// Blocked: why the copy was not swapped in although Replaced is enabled (the game
 	// would not load it).
 	Blocked string
+	// Moved: update only, the old copy was in Mods/ and moves to the lock library first.
+	Moved *MoveResult
 }
 
-// Pin creates a locked version (04 §7.2): copy into Mods/ with an origin marker, rescan,
-// and swap the copy in for the original in the current plan when the original is enabled.
+// Pin creates a locked version (04 §7.2): copy into the lock library with an origin
+// marker, rescan, and swap the copy in for the original in the current plan when the
+// original is enabled. The game sees the copy only through an _Archo_ link (08 §3).
 func (a *App) Pin(ref, name string, git, dryRun bool) (*PinResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -123,7 +127,8 @@ func (a *App) Pin(ref, name string, git, dryRun bool) (*PinResult, error) {
 
 // PinUpdate remakes a locked version from the upstream's current content (04 §7.4): a
 // fresh copy under a new folder name replaces the old copy (or the upstream) in the
-// current plan; the old copy stays where it is. ref may name the copy or the upstream.
+// current plan; the old copy stays in the library. An old copy still in Mods/ (made before
+// the library) is moved into the library first. ref may name the copy or the upstream.
 func (a *App) PinUpdate(ref, name string, git, dryRun bool) (*PinResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -150,16 +155,28 @@ func (a *App) PinUpdate(ref, name string, git, dryRun bool) (*PinResult, error) 
 	if res.Diff, err = a.DiffInstances(l.Copy, l.Upstream); err != nil {
 		return nil, err
 	}
+	if l.Copy.Kind == source.Local {
+		if res.Moved, err = a.moveToLibrary(st, l.Copy, dryRun); err != nil {
+			return nil, err
+		}
+		if !dryRun {
+			if st, err = a.Loadout(); err != nil {
+				return nil, err
+			}
+			if res.Moved.After == nil {
+				return res, fmt.Errorf("moved %s to %s, but the scan did not find it there", st.Ix.Ref(l.Copy.ID), res.Moved.To)
+			}
+			if l = st.lockedCopy(res.Moved.After); l == nil {
+				return res, fmt.Errorf("moved to %s, but it is no longer recognised as a locked version", res.Moved.To)
+			}
+			res.Old, res.From = l.Copy, l.Upstream
+		}
+	}
 	switch {
 	case st.List.Index(l.Copy.ID) >= 0:
 		res.Replaced = l.Copy
 	case st.List.Index(l.Upstream.ID) >= 0:
 		res.Replaced = l.Upstream
-	}
-	if name == "" {
-		if ls := st.Ix.LocalSource(); ls != nil {
-			name = freeName(ls.Root, filepath.Base(l.Upstream.Rel)+"_local")
-		}
 	}
 	return res, a.makeLock(st, res, name, git)
 }
@@ -187,8 +204,14 @@ func freeName(root, base string) string {
 
 // makeLock copies res.From, rescans and swaps the copy in for res.Replaced.
 func (a *App) makeLock(st *LoadoutState, res *PinResult, name string, git bool) error {
+	root := a.lockRoot(st.Ix.Env)
+	if !res.DryRun {
+		if _, err := a.lockSource(st.Ix, true); err != nil {
+			return err
+		}
+	}
 	var err error
-	if res.Copy, err = a.copyLocal(st, res.From, name, git, res.DryRun); err != nil || res.DryRun {
+	if res.Copy, err = a.copyLocal(st, res.From, root, name, git, res.DryRun); err != nil || res.DryRun {
 		return err
 	}
 	// Scan so the copy has a ref (and its lineage via the origin marker) right away.
@@ -203,13 +226,13 @@ func (a *App) makeLock(st *LoadoutState, res *PinResult, name string, git bool) 
 	if res.Replaced == nil || res.CopyMod == nil {
 		return nil
 	}
-	// The game registers one Mods/ folder per packageId (the first by name), so an older
-	// copy left in Mods/ can hide the new one: then the plan is left as it is.
+	// The copy is deployable (an _Archo_ link on save or launch); should the game still not
+	// be able to load it, the plan is left as it is.
 	st2, err := a.Loadout()
 	if err != nil {
 		return err
 	}
-	if why := whyNotLoadable(st2, res.CopyMod); why != "" {
+	if why := swapBlocker(st2, res.CopyMod, res.Replaced); why != "" {
 		res.Blocked = why
 		return nil
 	}
@@ -234,4 +257,33 @@ func (ix *Index) ModAt(dir string) *store.Mod {
 		}
 	}
 	return nil
+}
+
+// swapBlocker is why in cannot replace out in the list (whyNotLoadable), judged as the game
+// would see it after the swap: out's own registration (e.g. its _Archo_ link, which the
+// next save removes) does not count against in.
+func swapBlocker(st *LoadoutState, in, out *store.Mod) string {
+	why := whyNotLoadable(st, in)
+	if why == "" || !strings.HasPrefix(why, "pkg.duplicate-installed") || !st.Deployed(out) {
+		return why
+	}
+	var cs []loadout.Candidate
+	for _, c := range st.cands {
+		if c.ID != out.ID && c.ID != in.ID {
+			cs = append(cs, c)
+		}
+	}
+	if st.Reg.Known(in.ID) {
+		for _, c := range st.cands {
+			if c.ID == in.ID {
+				cs = append(cs, c)
+			}
+		}
+	} else if st.Deployable(in) {
+		cs = append(cs, deployCandidate(in))
+	}
+	if loadout.NewRegistry(cs).Loadable(in.ID) {
+		return ""
+	}
+	return why
 }

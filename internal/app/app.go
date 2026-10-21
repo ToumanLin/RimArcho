@@ -76,8 +76,10 @@ type App struct {
 	GameProbe func(gameRoot string) *GameRun
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
-	HTTP      *http.Client
-	SteamAPI  string
+	// LockBase replaces %LOCALAPPDATA% when finding the default lock library (tests).
+	LockBase string
+	HTTP     *http.Client
+	SteamAPI string
 	// SteamCollectionAPI reads Workshop collections (04 §9.5); "" is the public endpoint.
 	SteamCollectionAPI string
 	analyzing          *pendingAnalysis

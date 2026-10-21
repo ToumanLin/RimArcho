@@ -11,12 +11,33 @@ import (
 // current plan; copy-local is the old name, kept as an alias.
 func init() {
 	flags := []Flag{{Name: "name", Value: "<folder>", Help: "default <folder>_local"}, {Name: "git", Help: "make the copy a git repository with a baseline commit"},
-		{Name: "update", Help: "remake the locked version from the upstream's current content, in a new folder"}, {Name: "dry-run", Help: "show what would be copied"}}
-	register(&Command{Name: "pin", Args: "<ref>", Summary: "lock a mod: copy it into the local Mods folder (origin marker) and use the copy in the current plan", MinArgs: 1, MaxArgs: 1, Run: pinCmd, Flags: flags})
+		{Name: "update", Help: "remake the locked version from the upstream's current content, in a new folder"}, {Name: "move-to-library", Help: "move a locked copy made in Mods/ before the lock library existed into the library"},
+		{Name: "dry-run", Help: "show what would be copied"}}
+	register(&Command{Name: "pin", Args: "<ref>", Summary: "lock a mod: copy it into the lock library (origin marker) and use the copy in the current plan", MinArgs: 1, MaxArgs: 1, Run: pinCmd, Flags: flags})
 	register(&Command{Name: "copy-local", Args: "<ref>", Summary: "alias of pin", MinArgs: 1, MaxArgs: 1, Run: pinCmd, Flags: flags})
 }
 
 func pinCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Bool("move-to-library") {
+		r, err := c.App.MoveToLibrary(a.Pos[0], a.Bool("dry-run"))
+		if err != nil {
+			return nil, err
+		}
+		ix, err := c.App.Index()
+		if err != nil {
+			return nil, err
+		}
+		head := "moved to the lock library"
+		if r.DryRun {
+			head = "dry run, nothing changed: would move to the lock library"
+		}
+		d, root := render.New(fmt.Sprintf("%s %s", modLabel(ix, r.Mod.ID), head))
+		moveKVs(ix, root, r)
+		if r.DryRun {
+			d.AddNext("archo pin " + a.Pos[0] + " --move-to-library")
+		}
+		return d, nil
+	}
 	f := c.App.Pin
 	if a.Bool("update") {
 		f = c.App.PinUpdate
@@ -38,6 +59,9 @@ func pinCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		head = fmt.Sprintf("dry run, nothing changed: would copy %s to %s", from, res.Copy.Dir)
 	}
 	d, root := render.New(head)
+	if res.Moved != nil {
+		moveKVs(ix, root.KV("old copy", "in Mods/, made before the lock library"), res.Moved)
+	}
 	if res.Old != nil {
 		n := root.KV("upstream changes", "compared with "+ix.Ref(res.Old.ID)+": "+render.Plural(len(res.Diff), "semantic file"))
 		for _, s := range res.Diff {
@@ -65,7 +89,7 @@ func pinCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		n.Truncate(5, "")
 	}
 	if res.Old != nil {
-		root.KV("old copy", ix.Ref(res.Old.ID)+" stays where it is")
+		root.KV("old copy", ix.Ref(res.Old.ID)+" stays in the lock library")
 	}
 	root.KV("plan", pinPlanText(ix, res))
 	switch {
@@ -91,11 +115,25 @@ func pinPlanText(ix *app.Index, res *app.PinResult) string {
 		return fmt.Sprintf("the copy would replace %s in the current plan", ix.Ref(res.Replaced.ID))
 	case res.CopyMod == nil:
 		return "unchanged: the copy was not found after the rescan"
-	case res.Blocked != "" && res.Old != nil:
-		return fmt.Sprintf("unchanged: the game ignores %s while %s (same packageId, earlier in Mods/) is there; move %s's folder out of Mods/, then archo swap %s %s",
-			ix.Ref(res.CopyMod.ID), ix.Ref(res.Old.ID), ix.Ref(res.Old.ID), ix.Ref(res.Replaced.ID), ix.Ref(res.CopyMod.ID))
 	case res.Blocked != "":
 		return fmt.Sprintf("unchanged: the game would not load %s (%s)", ix.Ref(res.CopyMod.ID), res.Blocked)
 	}
-	return fmt.Sprintf("%s replaces %s in the current plan (archo undo reverts it)", ix.Ref(res.CopyMod.ID), ix.Ref(res.Replaced.ID))
+	return fmt.Sprintf("%s replaces %s in the current plan (archo undo reverts it); the game gets it through an _Archo_ link on save or launch", ix.Ref(res.CopyMod.ID), ix.Ref(res.Replaced.ID))
+}
+
+// moveKVs describes moving a copy out of Mods/ into the lock library.
+func moveKVs(ix *app.Index, n *render.Node, r *app.MoveResult) {
+	n.KV("from", r.From)
+	n.KV("to", r.To)
+	how := "renamed (same volume)"
+	if r.Copied {
+		how = "copied to the other volume and checked, then the original goes to the recycle bin"
+	}
+	n.KV("how", how)
+	if r.After != nil {
+		n.KV("now", ix.Ref(r.After.ID))
+	}
+	if r.Swap != nil && len(r.Swap.Changes) > 0 {
+		n.KV("plan", "the current plan follows the moved copy")
+	}
 }

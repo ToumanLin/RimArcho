@@ -8,7 +8,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// Locked versions (04 §7): pin, the upstream update warning, pin --update, unpin.
+// Locked versions (04 §7): pin into the lock library, the upstream update warning,
+// pin --update, the _Archo_ link on save, unpin.
 func TestGoldenPin(t *testing.T) {
 	e := testkit.New(t)
 	m := testkit.Sample("tester.lock", "Lockable")
@@ -36,9 +37,10 @@ func TestGoldenPin(t *testing.T) {
 		cmd("problems", "--code", "mod", "--min-severity", "info"),
 		func(e *testkit.Env) []string { return []string{"pin", refTo(e, "5100"), "--update", "--dry-run"} },
 		func(e *testkit.Env) []string { return []string{"pin", refTo(e, "5100_local"), "--update"} },
-		func(e *testkit.Env) []string { return []string{"unpin", refTo(e, "5100_local"), "--dry-run"} },
-		func(e *testkit.Env) []string { return []string{"unpin", refTo(e, "5100_local")} },
-		func(e *testkit.Env) []string { return []string{"unpin", refTo(e, "5100_local")} },
+		cmd("save", "--dry-run"),
+		func(e *testkit.Env) []string { return []string{"unpin", refTo(e, "5100_local2"), "--dry-run"} },
+		func(e *testkit.Env) []string { return []string{"unpin", refTo(e, "5100_local2")} },
+		func(e *testkit.Env) []string { return []string{"unpin", refTo(e, "5100_local2")} },
 		cmd("undo"),
 		cmd("list", "--active"),
 	})
