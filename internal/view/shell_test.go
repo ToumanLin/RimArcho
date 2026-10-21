@@ -41,14 +41,16 @@ func TestNavAndPath(t *testing.T) {
 		t.Fatalf("plans %+v %v", plans, err)
 	}
 	g := view.Nav(n.Count, plans, []view.PackRow{{Name: "Main"}})
-	if len(g) != 1 || g[0].Title != "playing" {
-		t.Fatalf("groups with nothing in them are left out: %+v", g)
+	if len(g) != 2 || g[0].Title != "playing" || g[1].Title != "library" {
+		t.Fatalf("two groups, 在玩 and 库 (06 §2.1): %+v", g)
 	}
 	var ids, keys []string
-	for _, it := range g[0].Items {
-		ids, keys = append(ids, it.ID), append(keys, it.Key)
+	for _, gr := range g {
+		for _, it := range gr.Items {
+			ids, keys = append(ids, it.ID), append(keys, it.Key)
+		}
 	}
-	if strings.Join(ids, ",") != "home,needs,plan,packs,env,library,log" {
+	if strings.Join(ids, ",") != "home,needs,log,library,plan,packs,env" {
 		t.Fatalf("order %v", ids)
 	}
 	if keys[0] != "shift+1" || keys[6] != "shift+7" {
@@ -61,8 +63,10 @@ func TestNavAndPath(t *testing.T) {
 	// from NavCounts (06 §2.1)
 	view.NavCounts(g, 2, 1354)
 	counts := map[string]int{}
-	for _, it := range g[0].Items {
-		counts[it.ID] = it.Count
+	for _, gr := range g {
+		for _, it := range gr.Items {
+			counts[it.ID] = it.Count
+		}
 	}
 	if counts["plan"] != 1 || counts["packs"] != 1 || counts["env"] != 2 || counts["library"] != 1354 || counts["needs"] != 0 {
 		t.Fatalf("counts %v", counts)
@@ -75,12 +79,13 @@ func TestNavAndPath(t *testing.T) {
 		return strings.Join(out, " / ")
 	}
 	for id, want := range map[string]string{
-		"plan":        "playing=home / plans=plan",
-		plans[0].Page: "playing=home / plans=plan / default=" + plans[0].Page,
-		"plan:new":    "playing=home / plans=plan / + new plan=plan:new",
+		"plan":        "library=library / plans=plan",
+		plans[0].Page: "library=library / plans=plan / default=" + plans[0].Page,
+		"plan:new":    "library=library / plans=plan / + new plan=plan:new",
 		"needs":       "playing=home / can it run=needs",
-		"changes":     "playing=home / mod library=library / changes=changes",
-		"pack:Main":   "playing=home / packs=packs / Main=pack:Main",
+		"log":         "playing=home / game log=log",
+		"changes":     "library=library / mod library=library / changes=changes",
+		"pack:Main":   "library=library / packs=packs / Main=pack:Main",
 		"settings":    "settings=settings",
 		"nowhere":     "",
 	} {

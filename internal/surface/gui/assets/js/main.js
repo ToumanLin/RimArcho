@@ -112,8 +112,8 @@ function planActions() {
 
 let lastList = 1;
 
-// The sidebar's 在玩 entries in shift+1–7 order (06 §3.5; view.Nav).
-const NAV = ["home", "needs", "plan", "packs", "env", "changes", "log"];
+// The sidebar's entries in shift+1–7 order, 在玩 then 库 (06 §3.5; view.Nav).
+const NAV = ["home", "needs", "log", "changes", "plan", "packs", "env"];
 
 // go opens a sidebar page; "plan" is the current plan's editor, "plan:<id>" a plan (it
 // becomes current: no game file is written), "plan:new" the new-plan dialog, "pack:<name>"
@@ -510,7 +510,7 @@ function onKey(e) {
   if (pop.popupKey(e)) return;
   if (document.activeElement && document.activeElement.tagName === "INPUT") return;
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
-  // shift+1–7: the sidebar's 在玩 entries. By the physical key, so it works on any layout
+  // shift+1–7: the sidebar's entries. By the physical key, so it works on any layout
   // (shift+1 is "!" on a US keyboard, shift+3 is "#").
   const dig = /^Digit([1-9])$/.exec(e.code || "");
   if (dig && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {

@@ -94,7 +94,7 @@ type NavGroup struct {
 	Items []NavItem `json:"items"`
 }
 
-// Nav builds the sidebar: the 在玩 entries in the shift+1–7 order, every plan and "+ 新方案"
+// Nav builds the sidebar: the 在玩 and 库 entries in the shift+1–7 order, every plan and "+ 新方案"
 // under 方案, every pack under 整合包. 没玩到 and 值得玩 have no pages yet (10) and are
 // left out.
 func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
@@ -107,19 +107,27 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	for _, p := range packs {
 		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name, Count: p.Mods})
 	}
-	items := []NavItem{
-		{ID: PageHome, Label: T("home")},
+	// Two groups (06 §2.1): what you play now, and what you have.
+	playing := []NavItem{
+		{ID: PageHome, Label: T("start")},
 		{ID: PageNeeds, Label: T("can it run"), Badge: needs},
+		{ID: PageLog, Label: T("game log")},
+	}
+	library := []NavItem{
+		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageChanges, Label: T("changes")}}},
 		{ID: PagePlan, Label: T("plans"), Kids: planKids, Count: len(plans)},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids, Count: len(packs)},
 		{ID: PageEnv, Label: T("environment")},
-		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageChanges, Label: T("changes")}}},
-		{ID: PageLog, Label: T("game log")},
 	}
-	for i := range items {
-		items[i].Key = fmt.Sprintf("shift+%d", i+1)
+	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: T("library"), Items: library}}
+	n := 0
+	for g := range groups {
+		for i := range groups[g].Items {
+			n++
+			groups[g].Items[i].Key = fmt.Sprintf("shift+%d", n)
+		}
 	}
-	return []NavGroup{{Title: T("playing"), Items: items}}
+	return groups
 }
 
 // NavCounts puts the environments' and the library's numbers on their entries.

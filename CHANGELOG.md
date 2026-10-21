@@ -84,8 +84,8 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   versions.
 
 ### The window (06 §2)
-- A sidebar replaces the top tabs: 首页, 能不能跑 with its badge, 方案, 整合包, 环境,
-  Mod 库 › 变化, 游戏日志, then 设置 and the game status at the bottom (`shift+1`–`7`).
+- A sidebar replaces the top tabs, in two groups: 在玩 (启动, 能不能跑 with its badge,
+  游戏日志) and 库 (Mod 库存 › 变化, 方案, 整合包, 环境), then 设置 (`shift+1`–`7`).
   It collapses, and starts collapsed below 760 px.
 - The top bar has a clickable breadcrumb, the environment chip and the page's actions.
 - A home page: each plan and pack, newest played first, with its state (another plan's from

@@ -178,7 +178,7 @@ func TestInGameAndMarks(t *testing.T) {
 		t.Fatalf("marks %+v", rows)
 	}
 	nav := view.Nav(0, rows, nil)
-	kids := nav[0].Items[2].Kids
+	kids := nav[1].Items[1].Kids
 	if len(kids) != 3 || kids[1].Mark == "" || !kids[1].Current || kids[2].ID != view.PagePlanNew || !kids[2].Add {
 		t.Fatalf("plan kids %+v", kids)
 	}

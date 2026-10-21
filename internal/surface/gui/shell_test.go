@@ -147,7 +147,7 @@ func TestPlansInWindow(t *testing.T) {
 	if _, err := api.RemovePlan(def.ID); err != nil {
 		t.Fatal(err)
 	}
-	if sh := api.Shell(); len(sh.Plans) != 2 || sh.Nav[0].Items[2].Kids[0].Label != "Empty" {
+	if sh := api.Shell(); len(sh.Plans) != 2 || sh.Nav[1].Items[1].Kids[0].Label != "Empty" {
 		t.Fatalf("after delete %+v", sh.Plans)
 	}
 	// The palette goes to the other plans.
