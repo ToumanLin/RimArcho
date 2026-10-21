@@ -24,6 +24,17 @@ type Live struct {
 	// Blocked is set while another environment's game runs: launching is refused until it
 	// exits (08 §1), so the interfaces disable launch and say why.
 	Blocked string `json:"blocked,omitempty"`
+	// NewLog is the "analyse this run's log" hint (08 §2 "游戏退出后"): set while no game runs
+	// and Player.log is newer than the last launch and the last log the player looked at.
+	NewLog string `json:"newLog,omitempty"`
+}
+
+// newLog fills l's hint from app.NewLog.
+func newLog(a *app.App, st *app.LoadoutState, l *Live) *Live {
+	if _, ok := a.NewLog(st); ok {
+		l.NewLog = T("analyse this run's log")
+	}
+	return l
 }
 
 // LiveTracker follows the game's log while it runs: start when it starts, stop when it exits
@@ -51,9 +62,9 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 			t.lv, t.pid = nil, 0
 		}
 		if g != nil {
-			return &Live{Blocked: Tf("a game is already running (%s)", g.Env.Name)}, nil
+			return newLog(a, st, &Live{Blocked: Tf("a game is already running (%s)", g.Env.Name)}), nil
 		}
-		return &Live{}, nil
+		return newLog(a, st, &Live{}), nil
 	}
 	if t.lv == nil || t.pid != run.PID {
 		// a pack run writes its own log on 1.7 (08 §5.3): follow the one this run writes

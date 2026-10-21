@@ -304,6 +304,7 @@ var zhText = map[string]string{
 	"this run, %s: %d× %s":              "本次运行，%s：%d× %s",
 	"game running since %s · %d errors": "游戏运行中（%s 起）· %d 个错误",
 	"game running since %s":             "游戏运行中（%s 起）",
+	"analyse this run's log":            "分析本次日志",
 	"source":                            "源头",
 	"patcher":                           "补丁方",
 	"dependency":                        "依赖",

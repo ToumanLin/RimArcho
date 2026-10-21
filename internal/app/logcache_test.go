@@ -22,8 +22,8 @@ func logProblems(l []*app.Problem) int {
 	return n
 }
 
-// 03 §6.3: a log written before the Loadout's last change, or by another game version, is
-// stale: its problems are kept apart (ProblemSet.Stale), not counted, and do not escalate.
+// 03 §6.4: a log whose plan changed since its launch, or written by another game version,
+// is stale: its problems are kept apart (ProblemSet.Stale), not counted, and do not escalate.
 func TestStaleLog(t *testing.T) {
 	e := testkit.New(t)
 	log := e.HarmonyLogFixture()
@@ -41,7 +41,7 @@ func TestStaleLog(t *testing.T) {
 	e.MustRun("disable", "pkg:tester.manual")
 	ps = problems(t, e)
 	r := ps.Logs[0]
-	if !r.Before || r.OtherGame || !r.Stale() || len(ps.Stale) != 4 || logProblems(ps.List) != 0 {
+	if !r.Changed || r.OtherGame || r.OtherRun || !r.Stale() || len(ps.Stale) != 4 || logProblems(ps.List) != 0 {
 		t.Fatalf("log before the change: %+v, stale %d, listed %d", r, len(ps.Stale), logProblems(ps.List))
 	}
 	for _, p := range ps.List {
@@ -59,7 +59,7 @@ func TestStaleLog(t *testing.T) {
 	os.Chtimes(p, e.Now().Add(time.Hour), e.Now().Add(time.Hour))
 	ps = problems(t, e)
 	r = ps.Logs[0]
-	if r.Before || !r.OtherGame || r.MM != "1.5" || r.EnvMM != "1.6" || len(ps.Stale) == 0 || logProblems(ps.List) != 0 {
+	if !r.OtherGame || r.MM != "1.5" || r.EnvMM != "1.6" || len(ps.Stale) == 0 || logProblems(ps.List) != 0 {
 		t.Fatalf("1.5 log: %+v, stale %d, listed %d", r, len(ps.Stale), logProblems(ps.List))
 	}
 }

@@ -125,7 +125,8 @@ export function renderLive() {
   box.classList.toggle("running", !!(l && l.running));
   if (l && l.running) {
     run.textContent = (l.pack ? Tf("pack %s running since %s", l.pack, l.since) : Tf("game running since %s", l.since)) + (l.errors ? " · " + Tf("%d errors", l.errors) : "");
-  } else run.textContent = T("the game is not running");
+  } else run.textContent = (l && l.newLog) || T("the game is not running"); // 08 §2: a new Player.log; the click opens 能不能跑
+  box.classList.toggle("newlog", !!(l && !l.running && l.newLog));
   box.title = l && l.guess ? T("which list runs is taken from the launch records") : T("can it run");
 }
 

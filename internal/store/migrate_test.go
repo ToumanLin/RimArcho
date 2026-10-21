@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"database/sql"
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -59,7 +60,7 @@ func TestMigrateV10Plans(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	if v := s.Meta("schema_version"); v != "11" {
+	if v := s.Meta("schema_version"); v != fmt.Sprint(SchemaVersion) {
 		t.Fatalf("schema_version %s", v)
 	}
 

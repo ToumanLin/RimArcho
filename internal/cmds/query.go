@@ -756,8 +756,12 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	root.KV("plan", plan)
 	root.KV("loadout", line)
 	if run, _ := c.App.GameRunning(); run != nil {
-		what := "the list"
-		if w := c.App.WhatRuns(st.Ix.Env, run); w.Pack != "" {
+		w := c.App.WhatRuns(st.Ix.Env, run)
+		what := w.PlanText() // the plan, from the launch records (08 §4)
+		if what == "its list" {
+			what = "the list"
+		}
+		if w.Pack != "" {
 			what = "pack " + w.Pack
 			if w.Guess {
 				what += " (from the launch records)"

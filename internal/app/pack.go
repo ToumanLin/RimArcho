@@ -702,7 +702,9 @@ func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 	}
 	b, _ := json.Marshal(packState{LastPlayed: a.Now().UTC()})
 	os.WriteFile(filepath.Join(dir, "state.json"), b, 0o644)
-	return r, a.Store.AddLaunch(e.ID, a.Now().UTC(), "pack:"+name, r.Plan.Command())
+	// A pack's launch has no plan; its fingerprint is the pack's list (08 §1).
+	return r, a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: e.ID, Started: a.Now().UTC(), Method: "pack:" + name,
+		Command: r.Plan.Command(), Fingerprint: TokenFingerprint(r.Tokens)})
 }
 
 // ---- export, import, remove ----

@@ -106,8 +106,7 @@ type RunningGame struct {
 // Describe names what runs for a refusal or a status line: the environment and the list or
 // pack it plays.
 func (g *RunningGame) Describe(loc *time.Location) string {
-	what := "its list"
-	// TODO(0.9 wave 2): name the plan from the launch record once launch carries plan_id.
+	what := g.What.PlanText()
 	if g.What.Pack != "" {
 		what = "pack " + g.What.Pack
 		if g.What.Guess {
@@ -174,11 +173,37 @@ func (a *App) checkNoGame() error {
 	return nil
 }
 
-// RunWhat is what a game run plays: the environment's own list or a pack (08 §5.3).
+// RunWhat is what a game run plays: one of the environment's plans or a pack (08 §5.3).
 type RunWhat struct {
 	Pack     string // "" for the environment's list
 	UserData string // the run's data folder: its ModsConfig.xml, and on 1.7 its Logs/
 	Guess    bool   // read from the launch records: the command line was not available
+	// Plan names the plan played, from the launch records (08 §4) or, for a game started
+	// elsewhere, the plan last written to the game; "" when neither says.
+	Plan string
+	// PlanWritten: Plan comes from the write record, not from a launch.
+	PlanWritten bool
+}
+
+// PlanText names the plan a run plays: "plan:<name>", "plan:<name> (last written to the
+// game)", or "its list" when the records do not say.
+func (w RunWhat) PlanText() string {
+	switch {
+	case w.Plan == "":
+		return "its list"
+	case w.PlanWritten:
+		return "plan:" + w.Plan + " (last written to the game)"
+	}
+	return "plan:" + w.Plan
+}
+
+// withPlan fills the plan of an own-list run started at at from the records.
+func (a *App) withPlan(e *env.Environment, w RunWhat, at time.Time) RunWhat {
+	src := a.sourceAt(e, nil, at.Add(time.Minute), true)
+	if !src.Unknown && src.Plan != "" && (src.EnvID == "" || src.EnvID == e.ID) {
+		w.Plan, w.PlanWritten = src.Plan, src.ByWrite
+	}
+	return w
 }
 
 // launchSlack is how long before the process start a launch record may be: Steam takes a
@@ -191,24 +216,24 @@ func (a *App) WhatRuns(e *env.Environment, r *GameRun) RunWhat {
 	if r == nil {
 		return own
 	}
+	at := r.Started
+	if at.IsZero() {
+		at = a.Now()
+	}
 	if r.ArgsKnown {
 		if r.SaveData == "" || env.PathKey(r.SaveData) == env.PathKey(e.UserDataRoot) {
-			return own
+			return a.withPlan(e, own, at)
 		}
 		if name := a.packOfDir(r.SaveData); name != "" {
 			return RunWhat{Pack: name, UserData: r.SaveData}
 		}
 		return RunWhat{UserData: r.SaveData}
 	}
-	at := r.Started
-	if at.IsZero() {
-		at = a.Now()
-	}
 	if m, t := a.Store.LaunchBefore(e.ID, at.Add(time.Minute)); strings.HasPrefix(m, "pack:") && at.Sub(t) < launchSlack {
 		name := strings.TrimPrefix(m, "pack:")
 		return RunWhat{Pack: name, UserData: filepath.Join(a.packPath(name), "userdata"), Guess: true}
 	}
-	return own
+	return a.withPlan(e, own, at)
 }
 
 // RunOfLog says which launch wrote a log last modified at t: a pack's name, or "" for the

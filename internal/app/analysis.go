@@ -118,7 +118,7 @@ func (a *App) Analyze(progress func(string)) (*AnalyzeReport, error) {
 		return nil, err
 	}
 	in = analyze.Input{} // release the declarations before writing
-	id, err := a.Store.SaveAnalysis(st.Ix.Env.ID, key, st.GameMM(), out, started, a.Now())
+	id, err := a.Store.SaveAnalysis(st.Ix.Env.ID, SetFingerprint(st.List), key, st.GameMM(), a.planSetKeys(st), out, started, a.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -131,10 +131,20 @@ type AnalysisState struct {
 	Fresh bool
 }
 
-// Analysis returns the stored run and whether it is current.
-func (a *App) Analysis(st *LoadoutState) (*AnalysisState, error) {
+// Analysis returns the stored run of st's slot — its enabled set (03 §3) — and whether it
+// is current. Each plan's newest run is kept, so switching plans back and forth reuses it.
+// A slot not analysed yet (the list just gained or lost a mod) shows the environment's
+// newest run as stale, as before slots existed, until the analysis catches up.
+func (a *App) Analysis(st *LoadoutState) (*AnalysisState, error) { return a.analysisOf(st, true) }
+
+// analysisOf is Analysis; without newest an empty slot is "never analysed" (the per-plan
+// rows: another plan's run says nothing about this one).
+func (a *App) analysisOf(st *LoadoutState, newest bool) (*AnalysisState, error) {
 	a.Store.MM = st.GameMM()
-	r, err := a.Store.LatestAnalysis(st.Ix.Env.ID)
+	r, err := a.Store.LatestAnalysis(st.Ix.Env.ID, SetFingerprint(st.List))
+	if err == nil && r == nil && newest {
+		r, err = a.Store.NewestAnalysis(st.Ix.Env.ID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +248,7 @@ func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
 			return s, err
 		}
 	} else {
-		key := st.Ix.Env.ID + "|" + st.GameMM()
+		key := st.Ix.Env.ID + "|" + st.GameMM() + "|" + SetFingerprint(st.List)
 		if a.analyzing == nil || a.analyzing.key != key {
 			p := &pendingAnalysis{key: key, done: make(chan error, 1)}
 			a.analyzing = p

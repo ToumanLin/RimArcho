@@ -92,6 +92,7 @@ type App struct {
 	stKey   string
 	prCache *ProblemSet
 	prKey   string
+	planPS  map[int64]*planProblems // PlanProblems, by plan
 
 	logCache   *logCacheEntry
 	harmonyDir string

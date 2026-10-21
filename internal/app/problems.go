@@ -78,14 +78,73 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 			return nil, err
 		}
 	}
-	all, err := a.DeclFindings(st)
+	if err := a.collectProblems(ps); err != nil {
+		return nil, err
+	}
+	return ps, nil
+}
+
+type planProblems struct {
+	key string
+	ps  *ProblemSet
+}
+
+// PlanProblems is plan p's problem set from stored results only, never computing an
+// analysis or parsing a log: the declaration layer (computed, cheap), the stored run of
+// p's analysis slot (03 §3) and the log's stored report judged against p (03 §6.4). The
+// home page counts every plan's problems with it (06 §2.3). The result is kept until the
+// database, ModsConfig.xml or the log changes.
+func (a *App) PlanProblems(p *store.Plan) (*ProblemSet, error) {
+	cur, err := a.Loadout()
 	if err != nil {
 		return nil, err
+	}
+	st, err := a.PlanState(cur, p)
+	if err != nil {
+		return nil, err
+	}
+	key := ""
+	if a.stCache != nil && a.stCache.Ix == cur.Ix {
+		key = a.stKey + "|" + a.GameVersion + "|" + ListFingerprint(st.List)
+		if lp := a.ProblemLog(st); lp != "" {
+			key += "|" + lp + "|" + logStamp(lp)
+		}
+	}
+	if c := a.planPS[st.Plan.ID]; key != "" && c != nil && c.key == key {
+		return c.ps, nil
+	}
+	ps := &ProblemSet{State: st}
+	if ps.Analysis, err = a.analysisOf(st, st == cur); err != nil {
+		return nil, err
+	}
+	only := a.LogCacheOnly
+	a.LogCacheOnly = true
+	err = a.collectProblems(ps)
+	a.LogCacheOnly = only
+	if err != nil {
+		return nil, err
+	}
+	if key != "" {
+		if a.planPS == nil {
+			a.planPS = map[int64]*planProblems{}
+		}
+		a.planPS[st.Plan.ID] = &planProblems{key: key, ps: ps}
+	}
+	return ps, nil
+}
+
+// collectProblems fills ps for ps.State with ps.Analysis set: the declaration layer, the
+// stored Def/Patch findings, the problem log's clusters, and the ignores.
+func (a *App) collectProblems(ps *ProblemSet) error {
+	st := ps.State
+	all, err := a.DeclFindings(st)
+	if err != nil {
+		return err
 	}
 	if r := ps.Analysis.Run; r != nil {
 		fs, err := a.Store.Findings(r.ID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, f := range fs {
 			// A stale run may name instances that are gone.
@@ -110,7 +169,7 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	all = append(all, lfs...)
 	ignores, err := a.Store.Ignores(st.Ix.Env.ID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	type igKey struct{ lin, code, key string }
 	ig := map[igKey]*store.Ignore{}
@@ -152,7 +211,7 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	sortProblems(ps.List, order)
 	sortProblems(ps.Ignored, order)
 	sortProblems(ps.Stale, order)
-	return ps, nil
+	return nil
 }
 
 func sortProblems(ps []*Problem, order func(*finding.Finding) string) {
