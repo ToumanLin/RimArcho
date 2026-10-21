@@ -200,6 +200,30 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("maintenance", map[string]any{"action": "import_rimcrow", "db": crowDB}, "import", "rimcrow", "--db", crowDB),
 		s("maintenance", map[string]any{"action": "gc", "dry_run": true}, "gc", "--dry-run"),
 		s("maintenance", map[string]any{"action": "gc"}, "gc"),
+		// 0.9: history, going back to a version, plans (I10) and launching.
+		func() manageStep {
+			h := r("Harmony")
+			return manageStep{"edit_loadout", map[string]any{"action": "disable", "refs": []string{h}}, []string{"disable", h}}
+		},
+		s("plan_history", nil, "loadout", "log"),
+		s("plan_history", map[string]any{"action": "steps"}, "history"),
+		s("plan_history", map[string]any{"action": "diff"}, "loadout", "diff"),
+		s("plan_history", map[string]any{"action": "diff", "from": "v1", "to": "workspace"}, "loadout", "diff", "v1", "workspace"),
+		s("edit_loadout", map[string]any{"action": "checkout", "version": "v1"}, "loadout", "checkout", "v1"),
+		s("plan_history", map[string]any{"action": "steps"}, "history"),
+		s("manage_plans", nil, "plan", "list"),
+		s("manage_plans", map[string]any{"action": "new", "name": "copy", "from": "current"}, "plan", "new", "copy", "--from", "current"),
+		s("manage_plans", map[string]any{"action": "new", "name": "first", "from": "v1"}, "plan", "new", "first", "--from", "v1"),
+		s("manage_plans", map[string]any{"action": "new", "name": "empty"}, "plan", "new", "empty"),
+		s("manage_plans", map[string]any{"action": "use", "name": "copy"}, "plan", "use", "copy"),
+		s("manage_plans", map[string]any{"action": "rename", "name": "copy", "new_name": "raid night"}, "plan", "rename", "copy", "raid night"),
+		s("manage_plans", map[string]any{"action": "remove", "name": "empty"}, "plan", "remove", "empty", "--yes"),
+		s("manage_plans", map[string]any{"action": "import", "from": list, "name": "from file"}, "loadout", "import", list, "from file", "--new"),
+		s("manage_plans", map[string]any{"action": "list"}, "plan", "list"),
+		s("manage_plans", map[string]any{"action": "use", "name": "raid night"}, "plan", "use", "raid night"),
+		s("launch_game", map[string]any{"dry_run": true}, "launch", "--dry-run"),
+		s("launch_game", nil, "launch"),
+		s("plan_history", nil, "loadout", "log"),
 	}
 }
 

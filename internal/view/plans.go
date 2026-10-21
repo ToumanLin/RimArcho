@@ -115,9 +115,20 @@ func InGame(a *app.App) *InGameState {
 }
 
 // PlanProblems is the number of "会让游戏出错" items of a plan that is not the current
-// one, and whether its analysis is known. Until the per-plan analysis cache exists
-// (log-launch, 03 §3) no other plan has been checked; that work replaces this hook.
-var PlanProblems = func(a *app.App, planID int64) (count int, checked bool) { return 0, false }
+// one, and whether its analysis is known. It reads stored results only (PlanCheckOf,
+// 03 §3): a plan whose enabled set has no stored run is "not checked yet". A variable so
+// tests can replace it.
+var PlanProblems = func(a *app.App, planID int64) (count int, checked bool) {
+	p, err := a.Store.PlanByID(planID)
+	if err != nil || p == nil {
+		return 0, false
+	}
+	c, err := PlanCheckOf(a, p)
+	if err != nil || c.Pending {
+		return 0, false
+	}
+	return c.Count, true
+}
 
 // ---- managing (04 §1.3) ----
 

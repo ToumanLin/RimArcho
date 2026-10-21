@@ -63,6 +63,8 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"manage_rules": "write", "ignore_problem": "write", "scan": "write", "exchange_list": "write",
 		"manage_packs": "destructive", "resolve_identity": "destructive", "manage_hidden": "destructive", "maintenance": "destructive",
 		"pin_mod": "write", "unpin_mod": "write",
+		// 0.9: launching, plans and their history.
+		"launch_game": "destructive", "manage_plans": "destructive", "plan_history": "ro",
 	}
 	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true}
 	seen := map[string]bool{}
@@ -94,8 +96,20 @@ func TestToolsAndAnnotations(t *testing.T) {
 			t.Errorf("tool %s missing", n)
 		}
 	}
-	if r := cs.InitializeResult(); r == nil || !strings.Contains(r.Instructions, "analyze_log") {
-		t.Error("server instructions missing the diagnosis workflow")
+	r := cs.InitializeResult()
+	if r == nil || !strings.Contains(r.Instructions, "analyze_log") {
+		t.Fatal("server instructions missing the diagnosis workflow")
+	}
+	// Every destructive tool is named in the instructions' list; "unsaved" is gone (04 §3).
+	for n, kind := range want {
+		if kind == "destructive" && !strings.Contains(r.Instructions, n+",") && !strings.Contains(r.Instructions, n+")") {
+			t.Errorf("instructions do not list destructive tool %s", n)
+		}
+	}
+	for _, tl := range res.Tools {
+		if strings.Contains(tl.Description, "unsaved") || strings.Contains(r.Instructions, "unsaved") {
+			t.Errorf("%s: description or instructions still say unsaved", tl.Name)
+		}
 	}
 }
 
@@ -151,6 +165,13 @@ func TestCLIParity(t *testing.T) {
 		{"pin_mod", map[string]any{"ref": modA, "update": true}, []string{"pin", modA, "--update"}},
 		{"copy_local", map[string]any{"ref": modA, "name": "x/y"}, []string{"copy-local", modA, "--name", "x/y"}},
 		{"unpin_mod", map[string]any{"ref": modA, "dry_run": true}, []string{"unpin", modA, "--dry-run"}},
+		// 0.9: the read-only side of plans and history (write actions: TestGoldenManageTools).
+		{"plan_history", nil, []string{"loadout", "log"}},
+		{"plan_history", map[string]any{"action": "log", "all": true}, []string{"loadout", "log", "--all"}},
+		{"plan_history", map[string]any{"action": "diff", "from": "v1", "to": "workspace"}, []string{"loadout", "diff", "v1", "workspace"}},
+		{"plan_history", map[string]any{"action": "steps", "all": true}, []string{"history", "--all"}},
+		{"manage_plans", nil, []string{"plan", "list"}},
+		{"launch_game", map[string]any{"dry_run": true}, []string{"launch", "--dry-run"}},
 	}
 	for _, c := range cases {
 		got, isErr := call(t, cs, c.tool, c.args)
@@ -298,7 +319,7 @@ func TestWriteTools(t *testing.T) {
 	if out, isErr := call(t, cs, "add_rule", map[string]any{"kind": "after", "a": "pkg:tester.modc", "b": "pkg:tester.modb"}); isErr || !strings.Contains(out, "r:1") {
 		t.Fatalf("add_rule:\n%s", out)
 	}
-	for _, tool := range []string{"edit_loadout", "manage_rules", "exchange_list", "manage_packs", "resolve_identity", "manage_hidden", "maintenance"} {
+	for _, tool := range []string{"edit_loadout", "manage_rules", "exchange_list", "manage_packs", "resolve_identity", "manage_hidden", "maintenance", "manage_plans", "plan_history"} {
 		args := map[string]any{"action": "bogus"}
 		if tool == "manage_hidden" {
 			args["ref"] = "#x"

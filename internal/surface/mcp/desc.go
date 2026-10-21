@@ -6,7 +6,7 @@ package mcp
 // skill (D7, I4).
 
 // Instructions is sent to the client at initialisation.
-const Instructions = `RimArcho knows one RimWorld installation: every mod instance, the enabled list (Loadout), Defs, Patch simulation results, Harmony patches, Player.log clusters and decompiled C#. Every tool returns outline text; references in it (#id, L#id, pkg:, ws:, def:Type/name, p:<hex>, log:E<n>, r:<n>) can be passed straight to other tools.
+const Instructions = `RimArcho knows one RimWorld installation: every mod instance, the plans (named enabled lists; one is the current plan), Defs, Patch simulation results, Harmony patches, Player.log clusters and decompiled C#. Every tool returns outline text; references in it (#id, L#id, pkg:, ws:, def:Type/name, p:<hex>, log:E<n>, r:<n>) can be passed straight to other tools.
 
 Diagnosis workflow (use the exact evidence, not paraphrases):
 1. Start from the error. If the user pasted log text, call analyze_log with text=…; otherwise analyze_log (current Player.log), then analyze_log cluster=E<n> for the cluster in question. Each cluster lists candidate mods with a role: source (its code/data produced the error), patcher (only has a Harmony patch on a frame), dependency (provides something that is missing or disabled), mentioned (appears in the message or a lower frame). Never call a patcher or a mentioned mod the cause without further evidence.
@@ -18,10 +18,12 @@ Diagnosis workflow (use the exact evidence, not paraphrases):
    - Mixed: confirm the XML side loaded (get_patches failed=true) before blaming code.
 4. list_problems gives the static picture (dependencies, incompatibilities, load order, def overrides, patch failures, Harmony conflicts); explain_relation explains two specific mods.
 5. Report: failure stage, XML/Assembly/Mixed, the exact mod instance and path, the file+line or class+method, why it fails, whether a named mod is cause, dependency or observer, and the smallest fix.
-Editing: pin_mod first (never edit Workshop files in place), then edit the copy; edit_loadout only changes RimArcho's workspace; save_loadout writes the game's ModsConfig.xml (ask the user first).
-Tools marked destructive (save_loadout, manage_packs, resolve_identity, manage_hidden, maintenance) write game or mod files, start the game or are hard to undo: show the dry run where there is one and ask the user before the real call.`
+6. If it worked before: list_changes (mods that changed) and plan_history action=diff (what changed in the plan since a version).
+Plans: every editing tool acts on the current plan. edit_loadout changes it (stored at once, every step undoable) and never touches the game; edit_loadout action=checkout goes back to a version from plan_history. Nothing reaches the game until it is written to the game: save_loadout writes the current plan without starting the game, launch_game writes it and starts the game (refused while any game runs). manage_plans lists, creates, switches (writes no game file), renames and removes plans.
+Editing mod files: pin_mod first creates a locked version (a copy the current plan uses instead; never edit Workshop files in place — Steam overwrites them), then edit the copy.
+Tools marked destructive (save_loadout, launch_game, manage_plans, manage_packs, resolve_identity, manage_hidden, maintenance) write game or mod files, start the game or are hard to undo: show the dry run where there is one and ask the user before the real call (manage_plans: before action=remove).`
 
-const descStatus = `Overview of the current environment: game version, installed mods per source, last scan, the Loadout (enabled count, unsaved edits) and problem counts. Use first in a session; use get_mod for one mod and list_problems for the problems themselves. show= gives one read-only page of RimArcho's own setup instead: envs (environments, their paths, sources and launch mode), settings (config values), data (community data), db (database path, size, backups), cache (cache sizes). Changing environments and settings is left to the player in RimArcho.
+const descStatus = `Overview of the current environment: game version, installed mods per source, last scan, the current plan (and how many plans there are: manage_plans), its enabled count and how it differs from the list in the game (its newest version: plan_history), whether a game is running, and problem counts. Use first in a session; use get_mod for one mod and list_problems for the problems themselves. show= gives one read-only page of RimArcho's own setup instead: envs (environments, their paths, sources and launch mode), settings (config values), data (community data), db (database path, size, backups), cache (cache sizes). Changing environments and settings is left to the player in RimArcho.
 Example: status {}
   env:main  RimWorld 1.6.4633 rev1261
     mods: 485 live (official 6, local 3, workshop 476), 0 tombstones
@@ -93,13 +95,13 @@ Example: read_source {"ref": "#ipv5", "type": "yayoCombat.HarmonyPatches.Pawn_Ti
     file: …\cache\source\8612…\yayoCombat.HarmonyPatches\Pawn_Tick.cs
     source:`
 
-const descEdit = `Change RimArcho's workspace Loadout (not the game's file): action=enable|disable (refs), move (refs[0] with at / before / after / up / down), swap (refs[0] → another instance of its lineage, optional refs[1]), sort (dry_run=true previews), undo, redo; staging (RimArcho's own side list, 06 §2.5): stage (refs leave the Loadout and remember their place), unstage (out of staging, stays disabled), restore (refs, or all when empty, go back to their old place; at / before / after for one mod); ignore_external drops the "external version not loaded" mark that status shows after ModsConfig.xml changed outside RimArcho (the version stays in the history). Every change can be undone; nothing reaches the game until save_loadout. Refs as in get_mod.
-Example: edit_loadout {"action": "enable", "refs": ["#b21c"], "before": "#a3f9"}
-  workspace: 213 active, 1 change unsaved (env:main)
-    added  #b21c  Harmony  at 1
-  next:`
+const descEdit = `Change the current plan (stored at once, every step undoable; no game file is written): action=enable|disable (refs), move (refs[0] with at / before / after / up / down), swap (refs[0] → another instance of its lineage, optional refs[1]), sort (dry_run=true previews), undo, redo, checkout (version=v<n> from plan_history: load that version into the plan as one edit); staging (the plan's own side list, 06 §2.5): stage (refs leave the plan and remember their place), unstage (out of staging, stays disabled), restore (refs, or all when empty, go back to their old place; at / before / after for one mod); ignore_external drops the "external version not loaded" mark that status shows after ModsConfig.xml changed outside RimArcho (the version stays in the history). Nothing reaches the game until save_loadout or launch_game writes the plan to the game. Another plan: manage_plans action=use first. Refs as in get_mod.
+Example: edit_loadout {"action": "checkout", "version": "v1"}
+  workspace: 3 active, saved (plan:default, env:main)
+    checked out v1 into the workspace (archo save writes it to the game)
+    added  #hnyg  Harmony  at 2`
 
-const descSave = `Write the Loadout to the game without starting it ("写入游戏", 08 §2): sync RimArcho's Mods/ links, then write ModsConfig.xml (backup first, atomic replace) for the current game version. The game reads it on its next start; allowed while the game runs. Refused while ModsConfig.xml holds an external change that was not loaded: the text gives the commands to see the difference, load it, or ignore it (edit_loadout action=ignore_external). Ask the user before calling it, and call with dry_run=true first to show the preview (links, path, version rewrite, entries, changes).
+const descSave = `Write the current plan to the game without starting it ("写入游戏", 08 §2), for players who start RimWorld some other way (Steam): sync RimArcho's _Archo_ links in Mods/ and remove pack links, then write ModsConfig.xml (backup first, atomic replace) for the current game version, and record the list as a version of the plan. It changes the list the game reads next: ask the user before calling it, and call with dry_run=true first to show the preview (links, path, version rewrite, entries, changes). Refused while ModsConfig.xml holds an external change that was not loaded: the text gives the commands to see the difference, load it, or ignore it (edit_loadout action=ignore_external). While the game runs it still writes and says the game reads the new list on its next start. launch_game writes the same way and starts the game.
 Example: save_loadout {"dry_run": true}
   save (dry run): 2 changes
     added  #b21c  Harmony  at 1
