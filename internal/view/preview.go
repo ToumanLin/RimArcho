@@ -65,12 +65,16 @@ func Apply(a *app.App, what string) (string, error) {
 		if r.Unchanged {
 			return T("nothing to save"), nil
 		}
+		msg := Tf("saved to the game as v%d", r.Version)
 		if len(r.Links) > 0 {
-			return Tf("saved to the game as v%d; %d Mods/ links updated", r.Version, len(r.Links)), nil
+			msg = Tf("saved to the game as v%d; %d Mods/ links updated", r.Version, len(r.Links))
 		}
-		return Tf("saved to the game as v%d", r.Version), nil
+		if r.Running != nil {
+			msg += " · " + T("the game reads it on its next start")
+		}
+		return msg, nil
 	case ListLaunch:
-		if _, _, err := a.Launch(false, false); err != nil {
+		if _, err := a.Launch(false); err != nil {
 			return "", err
 		}
 		return T("the game is starting"), nil

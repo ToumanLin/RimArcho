@@ -59,13 +59,17 @@ function render() {
 function renderTop() {
   if (!S.board) return;
   $("#btn-launch").textContent = T("launch") + " ▶";
-  $("#btn-launch").title = T("start the game with the list") + " · L";
+  $("#btn-launch").title = T("write the list to the game and start it") + " · L";
   syncLaunch();
 }
 
 // syncLaunch: launch sits in the top bar on the plan only, and not while a game runs.
 function syncLaunch() {
-  $("#btn-launch").hidden = !!S.screen || !!(S.live && S.live.running);
+  const l = S.live || {};
+  $("#btn-launch").hidden = !!S.screen || !!l.running;
+  // another environment's game runs: one game at a time (08 §1)
+  $("#btn-launch").disabled = !!l.blocked;
+  $("#btn-launch").title = (l.blocked || T("write the list to the game and start it")) + " · L";
 }
 
 // planActions: the plan's actions in the top bar (06 §2.5): undo, sort, build a pack, write

@@ -103,11 +103,17 @@ func (m *model) topBar() string {
 	}
 	launch := T("launch") + " " + ic.play
 	launchW := width.StringWidth(launch) + 2 // "L "
+	key := sText.Render("L") + " "
+	if m.live != nil && m.live.Blocked != "" {
+		// another environment's game runs: launching is refused until it exits (08 §1)
+		launch, key = m.live.Blocked, ""
+		launchW = width.StringWidth(launch)
+	}
 	pw := width.StringWidth(pos)
 	room := m.w - lw - 3 // at least three cells between the left side and the position
 	right, rw := "", 0
 	if pw+3+launchW <= room {
-		right = m.renderPos(pos) + "   " + sText.Render("L") + " " + sSecond.Render(launch)
+		right = m.renderPos(pos) + "   " + key + sSecond.Render(launch)
 		rw = pw + 3 + launchW
 	} else if room >= 8 {
 		pw = min(pw, room)

@@ -107,3 +107,18 @@ func TestHistoryArea(t *testing.T) {
 		t.Fatal("history shown with mods in staging")
 	}
 }
+
+// 08 §1: while another environment's game runs, the top bar shows why launching is off
+// instead of the L key.
+func TestTopBarLaunchBlocked(t *testing.T) {
+	e := testkit.New(t)
+	m := direct(t, e, 160, 40)
+	if bar := ansi.Strip(m.topBar()); !strings.Contains(bar, "L "+T("launch")) {
+		t.Fatalf("no launch key: %q", bar)
+	}
+	m.live = &view.Live{Blocked: Tf("a game is already running (%s)", "second")}
+	bar := ansi.Strip(m.topBar())
+	if !strings.Contains(bar, Tf("a game is already running (%s)", "second")) || strings.Contains(bar, "L "+T("launch")) {
+		t.Fatalf("blocked top bar: %q", bar)
+	}
+}

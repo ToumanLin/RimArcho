@@ -21,6 +21,9 @@ type Live struct {
 	// the launch records because the game's command line could not be read.
 	Pack  string `json:"pack,omitempty"`
 	Guess bool   `json:"guess,omitempty"`
+	// Blocked is set while another environment's game runs: launching is refused until it
+	// exits (08 §1), so the interfaces disable launch and say why.
+	Blocked string `json:"blocked,omitempty"`
 }
 
 // LiveTracker follows the game's log while it runs: start when it starts, stop when it exits
@@ -33,14 +36,22 @@ type LiveTracker struct {
 
 // Update checks the game and reads what its log gained.
 func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
-	run, err := a.GameRunning()
+	// One look at the process table for every environment, the current one first (08 §4).
+	g, err := a.RunningGame()
 	if err != nil {
 		return nil, err
+	}
+	var run *app.GameRun
+	if g != nil && g.Env.ID == st.Ix.Env.ID {
+		run = g.Run
 	}
 	if run == nil {
 		if t.lv != nil {
 			t.lv.Close(a)
 			t.lv, t.pid = nil, 0
+		}
+		if g != nil {
+			return &Live{Blocked: Tf("a game is already running (%s)", g.Env.Name)}, nil
 		}
 		return &Live{}, nil
 	}

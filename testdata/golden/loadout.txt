@@ -7,7 +7,7 @@ env:main  RimWorld 1.6.4633 rev1261
   changes: 11 discovered (archo changes)
   plan: plan:default
   loadout: 7 active (1 missing entries), same as v1 (import)
-  warning: ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start. Saving once rewrites it for 1.6 (archo save)
+  warning: ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start. Launching from RimArcho or writing to the game once (archo save) writes it for 1.6
   problems: 1 error, 5 warning, 1 info in declarations; Defs and Patches not analysed yet (archo problems)
 
 $ archo list --active
@@ -122,8 +122,21 @@ diff v1 → workspace: 6 changes
   added    #z3bw         Beta                at 8
 
 $ archo launch --dry-run
-error: launch blocked: ModsConfig.xml was saved for 1.5 but the game is 1.6, so the game would reset the mod list; run archo save first
-[exit 1]
+launch: dry run (steam), nothing written
+  path: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml
+  version: 1.5.4409 rev1118 → 1.6.4633 rev1261 (rewritten from 1.5 to 1.6; the game would otherwise reset the list)
+  entries: 8
+  changes: 6 since v1
+    moved    #6olp         Harmony             4 → 1
+    added    #gpto         Gamma               at 2
+    moved    #hnyg         Versioned Mod 版本  1 → 4
+    removed  pkg:gone.mod  (missing)           was 7
+    moved    #qfph         X                   5 → 7
+    added    #z3bw         Beta                at 8
+  history: a new version (source launch)
+  command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+next:
+  archo launch
 
 $ archo save --dry-run
 save: dry run, nothing written
@@ -193,8 +206,20 @@ diff v2 → workspace: 5 changes
   removed  #z3bw         Beta       was 8
 
 $ archo launch --dry-run
-error: launch blocked: the workspace has 5 unsaved changes; run archo save first, or launch --force to play the saved list
-[exit 1]
+launch: dry run (steam), nothing written
+  path: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml
+  version: 1.6.4633 rev1261
+  entries: 7 (1 missing entries kept)
+  changes: 5 since v2
+    removed  #gpto         Gamma      was 2
+    moved    #iqmu         Core       3 → 2
+    moved    #6olp         Harmony    1 → 4
+    added    pkg:gone.mod  (missing)  at 7
+    removed  #z3bw         Beta       was 8
+  history: a new version (source launch)
+  command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+next:
+  archo launch
 
 $ archo undo
 workspace: 8 active, saved (plan:default, env:main)
@@ -207,8 +232,15 @@ workspace: 8 active, saved (plan:default, env:main)
   added    #z3bw         Beta                at 8
 
 $ archo launch --dry-run
-launch: dry run (steam)
+launch: dry run (steam), nothing written
+  path: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml
+  version: 1.6.4633 rev1261
+  entries: 8
+  changes: 0 since v2
+  history: same as v2, no new version
   command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+next:
+  archo launch
 
 $ archo scan
 scan:2  env:main  0s

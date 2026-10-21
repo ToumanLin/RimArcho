@@ -561,6 +561,9 @@ func packLinkName(pack, folder string) string {
 // LaunchPack plays a pack (08 §5.3): its mods are linked into Mods/, its list is written to
 // its own data folder, and the game starts with -savedatafolder pointing there.
 func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
+	if err := a.checkNoGame(); err != nil { // one game at a time (08 §1)
+		return nil, err
+	}
 	p, err := a.ReadPack(name)
 	if err != nil {
 		return nil, err
@@ -700,35 +703,6 @@ func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 	b, _ := json.Marshal(packState{LastPlayed: a.Now().UTC()})
 	os.WriteFile(filepath.Join(dir, "state.json"), b, 0o644)
 	return r, a.Store.AddLaunch(e.ID, a.Now().UTC(), "pack:"+name, r.Plan.Command())
-}
-
-// removePackLinks removes the packs' links from Mods/ (all of them when keep is ""): playing
-// the environment's own list must not show the game a pack's copies.
-func (a *App) removePackLinks(ix *Index, keep string) ([]string, error) {
-	mods := modsDir(ix)
-	if mods == "" {
-		return nil, nil
-	}
-	ents, err := os.ReadDir(mods)
-	if err != nil {
-		return nil, nil
-	}
-	var removed []string
-	for _, de := range ents {
-		n := de.Name()
-		lp := filepath.Join(mods, n)
-		if !packLink(n) || !source.IsLink(lp) {
-			continue
-		}
-		if keep != "" && strings.HasPrefix(strings.ToLower(n), strings.ToLower(packLinkName(keep, ""))) {
-			continue
-		}
-		if err := source.RemoveLink(lp); err != nil {
-			return removed, err
-		}
-		removed = append(removed, n)
-	}
-	return removed, nil
 }
 
 // ---- export, import, remove ----

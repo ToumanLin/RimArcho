@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,10 +51,127 @@ func (a *App) GameRunning() (*GameRun, error) {
 	if err != nil {
 		return nil, err
 	}
+	return a.probe()(e.GameRoot), nil
+}
+
+// probe returns how to find the running game of a game folder: GameProbe in tests, else a
+// match against the process table, listed once on first use and shared by the calls.
+func (a *App) probe() func(gameRoot string) *GameRun {
 	if a.GameProbe != nil {
-		return a.GameProbe(e.GameRoot), nil
+		return a.GameProbe
 	}
-	return gameProcess(e.GameRoot), nil
+	var procs []*GameRun
+	listed := false
+	return func(gameRoot string) *GameRun {
+		if !listed {
+			procs, listed = gameProcesses(), true
+		}
+		return processIn(procs, gameRoot)
+	}
+}
+
+// processIn picks the process whose executable lies in gameRoot.
+func processIn(procs []*GameRun, gameRoot string) *GameRun {
+	if gameRoot == "" {
+		return nil
+	}
+	root := env.PathKey(gameRoot)
+	for _, r := range procs {
+		if underDir(env.PathKey(filepath.Dir(r.Exe)), root) {
+			return r
+		}
+	}
+	return nil
+}
+
+// underDir reports whether the cleaned path p is dir or inside it ("D:/RimWorld2" is not in
+// "D:/RimWorld").
+func underDir(p, dir string) bool {
+	if p == dir {
+		return true
+	}
+	if !strings.HasSuffix(dir, string(filepath.Separator)) {
+		dir += string(filepath.Separator)
+	}
+	return strings.HasPrefix(p, dir)
+}
+
+// RunningGame is a game running in any registered environment (08 §1, §4).
+type RunningGame struct {
+	Env  *env.Environment
+	Run  *GameRun
+	What RunWhat
+}
+
+// Describe names what runs for a refusal or a status line: the environment and the list or
+// pack it plays.
+func (g *RunningGame) Describe(loc *time.Location) string {
+	what := "its list"
+	// TODO(0.9 wave 2): name the plan from the launch record once launch carries plan_id.
+	if g.What.Pack != "" {
+		what = "pack " + g.What.Pack
+		if g.What.Guess {
+			what += " (from the launch records)"
+		}
+	} else if g.What.UserData != "" && env.PathKey(g.What.UserData) != env.PathKey(g.Env.UserDataRoot) {
+		what = "data folder " + g.What.UserData
+	}
+	s := fmt.Sprintf("environment %s is running %s (pid %d", g.Env.Name, what, g.Run.PID)
+	if !g.Run.Started.IsZero() {
+		if loc == nil {
+			loc = time.Local
+		}
+		s += ", since " + g.Run.Started.In(loc).Format("15:04")
+	}
+	return s + ")"
+}
+
+// GameRunningError refuses a launch while a game runs: only one game runs at a time (08 §1).
+type GameRunningError struct {
+	Game *RunningGame
+	Loc  *time.Location
+}
+
+func (e *GameRunningError) Error() string {
+	return fmt.Sprintf("%v: a game is already running: %s; only one game runs at a time, close it first", ErrLaunchBlocked, e.Game.Describe(e.Loc))
+}
+
+func (e *GameRunningError) Unwrap() error { return ErrLaunchBlocked }
+
+// RunningGame finds a running game in any registered environment, the current one first: a
+// process whose executable is under an environment's game folder (08 §4). nil when none.
+func (a *App) RunningGame() (*RunningGame, error) {
+	envs, err := a.Store.Envs()
+	if err != nil {
+		return nil, err
+	}
+	if cur, err := a.Env(); err == nil {
+		for i, e := range envs {
+			if e.ID == cur.ID {
+				envs[0], envs[i] = envs[i], envs[0]
+				break
+			}
+		}
+	}
+	probe := a.probe()
+	for _, e := range envs {
+		if r := probe(e.GameRoot); r != nil {
+			return &RunningGame{Env: e, Run: r, What: a.WhatRuns(e, r)}, nil
+		}
+	}
+	return nil, nil
+}
+
+// checkNoGame refuses while any environment's game runs (08 §1).
+func (a *App) checkNoGame() error {
+	g, err := a.RunningGame()
+	if err != nil {
+		return err
+	}
+	if g != nil {
+		return &GameRunningError{Game: g, Loc: a.Loc}
+	}
+	return nil
 }
 
 // RunWhat is what a game run plays: the environment's own list or a pack (08 §5.3).

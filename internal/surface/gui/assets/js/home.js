@@ -24,7 +24,7 @@ function draw() {
   sc.innerHTML = "";
   const w = page("home", T("home"));
   sc.append(w);
-  const running = !!(S.live && S.live.running);
+  const running = !!(S.live && (S.live.running || S.live.blocked));
 
   w.append(el("div", "label section", T("playing now")));
   const list = el("section", "card");
