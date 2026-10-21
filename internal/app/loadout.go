@@ -18,9 +18,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// LoadoutState is the workspace with everything needed to interpret it.
+// LoadoutState is the current plan's workspace with everything needed to interpret it.
 type LoadoutState struct {
 	Ix       *Index
+	Plan     *store.Plan // the environment's current plan (04 §1.1)
 	Reg      *loadout.Registry
 	WS       *store.Workspace
 	List     loadout.List
@@ -193,41 +194,65 @@ func (a *App) sync(st *LoadoutState) error {
 		h = loadout.Hash(st.File.Raw)
 		fileList, _ = st.Reg.FromTokens(st.File.Active)
 	}
-	ws, err := a.Store.Workspace(e.ID)
-	if err != nil {
-		return err
-	}
-	mcs, err := a.Store.ModsConfigState(e.ID)
-	if err != nil {
-		return err
-	}
 	now := a.Now().UTC()
-	if ws == nil {
-		v := &store.Version{Created: now, Source: "import", Entries: fileList.Encode()}
-		if st.File != nil {
-			v.GameVersion = st.File.Version
-			v.Note = "ModsConfig.xml"
-		} else {
-			v.Note = "no ModsConfig.xml"
-		}
-		n, err := a.Store.AddVersion(e.ID, v)
+	mcs, err := a.Store.ModsConfigStateAt(e.UserDataRoot)
+	if err != nil {
+		return err
+	}
+	plan, err := a.Store.CurrentPlan(e.ID)
+	if err != nil {
+		return err
+	}
+	var ws *store.Workspace
+	if plan == nil {
+		// First use (04 §1.4): ModsConfig.xml becomes the environment's first plan.
+		p, err := a.Store.CreatePlan(e.ID, store.DefaultPlanName, now)
 		if err != nil {
+			// Another process may have just made it.
+			if p, _ = a.Store.PlanByName(e.ID, store.DefaultPlanName); p == nil {
+				return err
+			}
+			plan = p
+		} else {
+			plan = p
+			if err := a.Store.SetCurrentPlan(e.ID, plan.ID); err != nil {
+				return err
+			}
+			v := &store.Version{Created: now, Source: "import", Entries: fileList.Encode()}
+			if st.File != nil {
+				v.GameVersion = st.File.Version
+				v.Note = "ModsConfig.xml"
+			} else {
+				v.Note = "no ModsConfig.xml"
+			}
+			n, err := a.Store.AddVersion(plan.ID, v)
+			if err != nil {
+				return err
+			}
+			ws = &store.Workspace{PlanID: plan.ID, Entries: fileList.Encode(), OriginVersion: n, OriginKind: "import", Updated: now}
+			if err := a.Store.SetWorkspace(ws); err != nil {
+				return err
+			}
+			if st.File != nil {
+				mcs.Seen = h
+				if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, mcs); err != nil {
+					return err
+				}
+			}
+			st.Notices = append(st.Notices, fmt.Sprintf("imported ModsConfig.xml as v%d: %d entries", n, len(fileList)))
+		}
+	}
+	st.Plan = plan
+	if ws == nil {
+		if ws, err = a.planWorkspace(plan); err != nil {
 			return err
 		}
-		ws = &store.Workspace{EnvID: e.ID, Entries: fileList.Encode(), OriginVersion: n, OriginKind: "import", Updated: now}
-		if err := a.Store.SetWorkspace(ws); err != nil {
-			return err
-		}
-		mcs.Seen = h
-		if err := a.Store.SetModsConfigState(e.ID, mcs); err != nil {
-			return err
-		}
-		st.Notices = append(st.Notices, fmt.Sprintf("imported ModsConfig.xml as v%d: %d entries", n, len(fileList)))
-	} else if st.File != nil && !bytes.Equal(h, mcs.Seen) {
+	}
+	if st.File != nil && !bytes.Equal(h, mcs.Seen) {
 		if bytes.Equal(h, mcs.Written) {
 			mcs.Seen = h
 		} else {
-			latest, err := a.latest(e.ID)
+			latest, err := a.Store.LatestVersion(plan.ID)
 			if err != nil {
 				return err
 			}
@@ -235,13 +260,13 @@ func (a *App) sync(st *LoadoutState) error {
 				st.Reg.Heal(loadout.Decode(latest.Entries)).Equal(fileList) {
 				// Rewritten by the game or another tool without a real change (formatting).
 				mcs.Seen = h
-				if err := a.Store.SetModsConfigState(e.ID, mcs); err != nil {
+				if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, mcs); err != nil {
 					return err
 				}
 				goto done
 			}
 			clean := latest == nil || st.Reg.Heal(loadout.Decode(ws.Entries)).Equal(st.Reg.Heal(loadout.Decode(latest.Entries)))
-			n, err := a.Store.AddVersion(e.ID, &store.Version{Created: now, Source: "external", Entries: fileList.Encode(),
+			n, err := a.Store.AddVersion(plan.ID, &store.Version{Created: now, Source: "external", Entries: fileList.Encode(),
 				GameVersion: st.File.Version, Note: "ModsConfig.xml changed outside RimArcho"})
 			if err != nil {
 				return err
@@ -259,23 +284,35 @@ func (a *App) sync(st *LoadoutState) error {
 			}
 			mcs.Seen = h
 		}
-		if err := a.Store.SetModsConfigState(e.ID, mcs); err != nil {
+		if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, mcs); err != nil {
 			return err
 		}
 	}
 done:
 	st.WS = ws
 	st.List = st.Reg.Heal(loadout.Decode(ws.Entries))
-	st.Latest, err = a.latest(e.ID)
+	st.Latest, err = a.Store.LatestVersion(plan.ID)
 	return err
 }
 
-func (a *App) latest(envID string) (*store.Version, error) {
-	vs, err := a.Store.Versions(envID)
-	if err != nil || len(vs) == 0 {
+// planWorkspace returns a plan's workspace; a plan without one (only versions) starts
+// from its newest version.
+func (a *App) planWorkspace(p *store.Plan) (*store.Workspace, error) {
+	ws, err := a.Store.Workspace(p.ID)
+	if err != nil || ws != nil {
+		return ws, err
+	}
+	ws = &store.Workspace{PlanID: p.ID, Updated: a.Now().UTC()}
+	latest, err := a.Store.LatestVersion(p.ID)
+	if err != nil {
 		return nil, err
 	}
-	return vs[0], nil
+	if latest != nil {
+		ws.Entries, ws.OriginVersion, ws.OriginKind = latest.Entries, latest.N, latest.Source
+	} else {
+		ws.Entries = loadout.List(nil).Encode()
+	}
+	return ws, a.Store.SetWorkspace(ws)
 }
 
 // EditResult describes a workspace edit.
@@ -299,11 +336,10 @@ func (a *App) edit(op string, f func(st *LoadoutState, l loadout.List) (loadout.
 	}
 	r := &EditResult{Before: before, Notes: notes}
 	if !after.Equal(before) {
-		e := st.Ix.Env
-		if err := a.Store.PushStep(e.ID, "undo", before.Encode(), op); err != nil {
+		if err := a.Store.PushStep(st.Plan.ID, "undo", before.Encode(), op); err != nil {
 			return nil, err
 		}
-		if err := a.Store.ClearSteps(e.ID, "redo"); err != nil {
+		if err := a.Store.ClearSteps(st.Plan.ID, "redo"); err != nil {
 			return nil, err
 		}
 		st.WS.Entries, st.WS.Updated = after.Encode(), a.Now().UTC()
@@ -630,19 +666,18 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	e := st.Ix.Env
 	from, to := "undo", "redo"
 	if redo {
 		from, to = "redo", "undo"
 	}
-	entries, op, ok, err := a.Store.PopStep(e.ID, from)
+	entries, op, ok, err := a.Store.PopStep(st.Plan.ID, from)
 	if err != nil {
 		return nil, "", err
 	}
 	if !ok {
 		return nil, "", fmt.Errorf("nothing to %s", from)
 	}
-	if err := a.Store.PushStep(e.ID, to, st.List.Encode(), op); err != nil {
+	if err := a.Store.PushStep(st.Plan.ID, to, st.List.Encode(), op); err != nil {
 		return nil, "", err
 	}
 	before := st.List
@@ -746,12 +781,13 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) {
 	if r.Source == "undo" {
 		note = fmt.Sprintf("restored v%d", st.WS.OriginVersion)
 	}
-	n, err := a.Store.AddVersion(e.ID, &store.Version{Created: now, Source: r.Source, Entries: st.List.Encode(), GameVersion: r.NewVersion, Note: note})
+	n, err := a.Store.AddVersion(st.Plan.ID, &store.Version{Created: now, Source: r.Source, Entries: st.List.Encode(), GameVersion: r.NewVersion, Note: note})
 	if err != nil {
 		return nil, err
 	}
 	h := loadout.Hash(data)
-	if err := a.Store.SetModsConfigState(e.ID, &store.ModsConfigState{Written: h, Seen: h, WrittenAt: now}); err != nil {
+	if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, &store.ModsConfigState{Written: h, Seen: h, WrittenAt: now,
+		WriterPlan: st.Plan.ID, WriterVersion: n}); err != nil {
 		return nil, err
 	}
 	st.WS.OriginVersion, st.WS.OriginKind, st.WS.Conflict, st.WS.Updated = n, "save", 0, now
@@ -762,22 +798,30 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) {
 	return r, nil
 }
 
-// ParseVersionRef resolves "v3", "3", a tag name, or "workspace" (0).
+// ParseVersionRef resolves "v3", "3" or "workspace" (0) in the environment's current plan.
 func (a *App) ParseVersionRef(envID, ref string) (int, error) {
+	p, err := a.Store.CurrentPlan(envID)
+	if err != nil {
+		return 0, err
+	}
+	if p == nil {
+		return 0, errors.New("the environment has no plan yet")
+	}
+	return a.parsePlanVersion(p, ref)
+}
+
+func (a *App) parsePlanVersion(p *store.Plan, ref string) (int, error) {
 	r := strings.ToLower(strings.TrimSpace(ref))
 	if r == "workspace" || r == "ws" || r == "current" {
 		return 0, nil
 	}
 	if n, err := strconv.Atoi(strings.TrimPrefix(r, "v")); err == nil && n > 0 {
-		if v, _ := a.Store.Version(envID, n); v != nil {
+		if v, _ := a.Store.Version(p.ID, n); v != nil {
 			return n, nil
 		}
-		return 0, fmt.Errorf("no version v%d (archo loadout log)", n)
+		return 0, fmt.Errorf("no version v%d in plan:%s (archo loadout log)", n, p.Name)
 	}
-	if n := a.Store.TagVersionN(envID, ref); n > 0 {
-		return n, nil
-	}
-	return 0, fmt.Errorf("%q is not a version (v<n>, a tag, or workspace; archo loadout log)", ref)
+	return 0, fmt.Errorf("%q is not a version (v<n> or workspace; archo loadout log)", ref)
 }
 
 // ListAt returns the list of a version (0 = workspace).
@@ -785,7 +829,7 @@ func (a *App) ListAt(st *LoadoutState, n int) (loadout.List, error) {
 	if n == 0 {
 		return st.List, nil
 	}
-	v, err := a.Store.Version(st.Ix.Env.ID, n)
+	v, err := a.Store.Version(st.Plan.ID, n)
 	if err != nil || v == nil {
 		return nil, fmt.Errorf("no version v%d", n)
 	}
@@ -797,7 +841,7 @@ func (a *App) Checkout(ref string) (*EditResult, int, error) {
 	var n int
 	r, err := a.edit("checkout", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		var err error
-		if n, err = a.ParseVersionRef(st.Ix.Env.ID, ref); err != nil {
+		if n, err = a.parsePlanVersion(st.Plan, ref); err != nil {
 			return nil, nil, err
 		}
 		if n == 0 {

@@ -5,12 +5,13 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 11 (0 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 11 discovered (archo changes)
+  plan: plan:default
   loadout: 7 active (1 missing entries), same as v1 (import)
   warning: ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start. Saving once rewrites it for 1.6 (archo save)
   problems: 1 error, 5 warning, 1 info in declarations; Defs and Patches not analysed yet (archo problems)
 
 $ archo list --active
-workspace: 7 active, saved (env:main)
+workspace: 7 active, saved (plan:default, env:main)
   1  #hnyg         Versioned Mod 版本  [active 1/7, workshop ws:3000000001]
   2  #iqmu         Core                [active 2/7, official Core]
   3  #lqj2         Alpha Fork          [active 3/7, local Twin]
@@ -52,7 +53,7 @@ next:
   archo save
 
 $ archo list --active
-workspace: 7 active, 3 changes unsaved (env:main)
+workspace: 7 active, 3 changes unsaved (plan:default, env:main)
   1  #6olp         Harmony             [active 1/7, workshop ws:2009463077]
   2  #iqmu         Core                [active 2/7, official Core]
   3  #hnyg         Versioned Mod 版本  [active 3/7, workshop ws:3000000001]
@@ -65,7 +66,7 @@ next:
   archo save
 
 $ archo enable #gpto --after #6olp
-workspace: 8 active, 4 changes unsaved (env:main)
+workspace: 8 active, 4 changes unsaved (plan:default, env:main)
   added  #gpto  Gamma  at 2
 next:
   archo save
@@ -75,7 +76,7 @@ error: #z3bw is not enabled (archo enable #z3bw)
 [exit 1]
 
 $ archo enable #z3bw
-workspace: 9 active, 5 changes unsaved (env:main)
+workspace: 9 active, 5 changes unsaved (plan:default, env:main)
   added  #z3bw  Beta  at 9
 next:
   archo save
@@ -85,27 +86,27 @@ error: cannot enable #i4uc: residue: the workshop folder is no longer subscribed
 [exit 1]
 
 $ archo enable #lqj2
-workspace: 9 active, 5 changes unsaved (env:main)
+workspace: 9 active, 5 changes unsaved (plan:default, env:main)
   no change
   note: #lqj2 is already enabled
 next:
   archo save
 
 $ archo disable pkg:gone.mod
-workspace: 8 active, 6 changes unsaved (env:main)
+workspace: 8 active, 6 changes unsaved (plan:default, env:main)
   removed  pkg:gone.mod  (missing)  was 8
 next:
   archo save
 
 $ archo undo
-workspace: 9 active, 5 changes unsaved (env:main)
+workspace: 9 active, 5 changes unsaved (plan:default, env:main)
   undid: disable
   added  pkg:gone.mod  (missing)  at 8
 next:
   archo save
 
 $ archo redo
-workspace: 8 active, 6 changes unsaved (env:main)
+workspace: 8 active, 6 changes unsaved (plan:default, env:main)
   redid: disable
   removed  pkg:gone.mod  (missing)  was 8
 next:
@@ -155,23 +156,25 @@ saved v2 to ModsConfig.xml
 next:
   archo launch
 
-$ archo loadout tag v2 raid-night
-v2 tagged raid-night
+$ archo plan new raid-night --from v2
+plan:raid-night created: 8 active
+  v1: import, copied from default v2
+  current: plan:default (unchanged)
 next:
-  archo loadout checkout raid-night
+  archo plan use raid-night
 
 $ archo swap #nyh3 #lqj2
 error: #lqj2 and #nyh3 are not in the same lineage (archo lineage merge, or disable + enable)
 [exit 1]
 
 $ archo loadout log
-versions: 2 (env:main)
-  workspace: 8 active, saved (env:main)
-  v2  2026-10-01 10:00  user    8 entries  1.6.4633 rev1261  [raid-night]
+versions: 2 (plan:default, env:main)
+  workspace: 8 active, saved (plan:default, env:main)
+  v2  2026-10-01 10:00  user    8 entries  1.6.4633 rev1261
   v1  2026-10-01 10:00  import  7 entries  1.5.4409 rev1118  ModsConfig.xml
 
 $ archo loadout checkout v1
-workspace: 7 active, 5 changes unsaved (env:main)
+workspace: 7 active, 5 changes unsaved (plan:default, env:main)
   checked out v1 into the workspace (archo save writes it to the game)
   removed  #gpto         Gamma      was 2
   moved    #iqmu         Core       3 → 2
@@ -181,7 +184,7 @@ workspace: 7 active, 5 changes unsaved (env:main)
 next:
   archo save
 
-$ archo loadout diff raid-night workspace
+$ archo loadout diff v2 workspace
 diff v2 → workspace: 5 changes
   removed  #gpto         Gamma      was 2
   moved    #iqmu         Core       3 → 2
@@ -194,7 +197,7 @@ error: launch blocked: the workspace has 5 unsaved changes; run archo save first
 [exit 1]
 
 $ archo undo
-workspace: 8 active, saved (env:main)
+workspace: 8 active, saved (plan:default, env:main)
   undid: checkout
   moved    #6olp         Harmony             4 → 1
   added    #gpto         Gamma               at 2
@@ -219,10 +222,10 @@ scan:2  env:main  0s
   loadout: ModsConfig.xml changed outside RimArcho: loaded as v3
 
 $ archo loadout log
-versions: 3 (env:main)
-  workspace: 2 active, saved (env:main)
+versions: 3 (plan:default, env:main)
+  workspace: 2 active, saved (plan:default, env:main)
   v3  2026-10-01 11:00  external  2 entries  1.6.4633 rev1261  ModsConfig.xml changed outside RimArcho
-  v2  2026-10-01 10:00  user      8 entries  1.6.4633 rev1261  [raid-night]
+  v2  2026-10-01 10:00  user      8 entries  1.6.4633 rev1261
   v1  2026-10-01 10:00  import    7 entries  1.5.4409 rev1118  ModsConfig.xml
 
 $ archo rule remove r:1

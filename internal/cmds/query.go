@@ -749,6 +749,11 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	} else if st.Latest != nil {
 		line += fmt.Sprintf(", same as v%d (%s)", st.Latest.N, st.Latest.Source)
 	}
+	plan := app.PlanRef(st.Plan)
+	if ps, err := c.App.Store.Plans(st.Ix.Env.ID); err == nil && len(ps) > 1 {
+		plan += fmt.Sprintf(" (%d plans: archo plan list)", len(ps))
+	}
+	root.KV("plan", plan)
 	root.KV("loadout", line)
 	if run, _ := c.App.GameRunning(); run != nil {
 		what := "the list"

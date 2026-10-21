@@ -186,11 +186,13 @@ func (s *Store) DeleteEnv(envID string) error {
 			`DELETE FROM identity_question WHERE environment_id=?`,
 			`DELETE FROM scan WHERE environment_id=?`,
 			`DELETE FROM source WHERE environment_id=?`,
-			`DELETE FROM workspace WHERE environment_id=?`,
-			`DELETE FROM workspace_undo WHERE environment_id=?`,
-			`DELETE FROM loadout_version WHERE environment_id=?`,
-			`DELETE FROM loadout_tag WHERE environment_id=?`,
-			`DELETE FROM modsconfig_state WHERE environment_id=?`,
+			// The ModsConfig.xml write record belongs to the user data folder, which other
+			// environments may share; it stays.
+			`DELETE FROM meta WHERE key IN (SELECT 'stage:' || id FROM plan WHERE environment_id=?)`,
+			`DELETE FROM workspace WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
+			`DELETE FROM workspace_undo WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
+			`DELETE FROM loadout_version WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
+			`DELETE FROM plan WHERE environment_id=?`,
 			`DELETE FROM user_rule WHERE environment_id=?`,
 			`DELETE FROM lineage_data WHERE environment_id=?`,
 			`DELETE FROM lineage_tag WHERE environment_id=?`,

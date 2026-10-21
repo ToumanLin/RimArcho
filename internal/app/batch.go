@@ -5,6 +5,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/order"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Batches and block moves for the TUI's pick sessions (06 §3.4): the edits of one session
@@ -14,29 +15,29 @@ import (
 // Batch is an open pick session.
 type Batch struct {
 	a       *App
-	envID   string
+	planID  int64
 	entries string // the workspace list when it began
 	staged  string // the staging list when it began
 	lastID  int64  // the newest undo step then
 }
 
-// BeginBatch starts a session on the current environment.
+// BeginBatch starts a session on the current plan.
 func (a *App) BeginBatch() (*Batch, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
 	}
-	e := st.Ix.Env
-	return &Batch{a: a, envID: e.ID, entries: st.List.Encode(), staged: a.Store.Meta(stageKey(e.ID)), lastID: a.Store.LastStepID(e.ID, "undo")}, nil
+	p := st.Plan.ID
+	return &Batch{a: a, planID: p, entries: st.List.Encode(), staged: a.Store.Meta(store.StageKey(p)), lastID: a.Store.LastStepID(p, "undo")}, nil
 }
 
 // Commit ends the session: its undo steps become one, which restores the list as it was
 // when the session began.
 func (b *Batch) Commit(op string) error {
-	if b.a.Store.LastStepID(b.envID, "undo") == b.lastID {
+	if b.a.Store.LastStepID(b.planID, "undo") == b.lastID {
 		return nil // nothing was edited
 	}
-	if err := b.a.Store.DeleteStepsAfter(b.envID, "undo", b.lastID); err != nil {
+	if err := b.a.Store.DeleteStepsAfter(b.planID, "undo", b.lastID); err != nil {
 		return err
 	}
 	st, err := b.a.Loadout()
@@ -46,7 +47,7 @@ func (b *Batch) Commit(op string) error {
 	if st.List.Encode() == b.entries {
 		return nil // the edits cancelled out
 	}
-	return b.a.Store.PushStep(b.envID, "undo", b.entries, op)
+	return b.a.Store.PushStep(b.planID, "undo", b.entries, op)
 }
 
 // Revert ends the session and undoes everything it did, staging included.
@@ -55,7 +56,7 @@ func (b *Batch) Revert() error {
 	if err != nil {
 		return err
 	}
-	if err := b.a.Store.DeleteStepsAfter(b.envID, "undo", b.lastID); err != nil {
+	if err := b.a.Store.DeleteStepsAfter(b.planID, "undo", b.lastID); err != nil {
 		return err
 	}
 	if st.List.Encode() != b.entries {
@@ -64,7 +65,7 @@ func (b *Batch) Revert() error {
 			return err
 		}
 	}
-	return b.a.Store.SetMeta(stageKey(b.envID), b.staged)
+	return b.a.Store.SetMeta(store.StageKey(b.planID), b.staged)
 }
 
 // MoveBlock moves enabled instances to a 1-based position as one block, keeping their

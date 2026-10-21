@@ -26,15 +26,14 @@ type History struct {
 	Versions []*store.Version // newest first
 }
 
-// History reads the undo and redo stacks and the versions.
+// History reads the current plan's undo and redo stacks and versions.
 func (a *App) History() (*History, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
 	}
-	e := st.Ix.Env
 	h := &History{}
-	undo, err := a.Store.Steps(e.ID, "undo")
+	undo, err := a.Store.Steps(st.Plan.ID, "undo")
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +43,7 @@ func (a *App) History() (*History, error) {
 		h.Undo = append(h.Undo, HistoryStep{Op: s.Op, Changes: loadout.Diff(before, after, st.LineageOf), Steps: i + 1})
 		after = before
 	}
-	redo, err := a.Store.Steps(e.ID, "redo")
+	redo, err := a.Store.Steps(st.Plan.ID, "redo")
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +53,7 @@ func (a *App) History() (*History, error) {
 		h.Redo = append(h.Redo, HistoryStep{Op: s.Op, Changes: loadout.Diff(before, next, st.LineageOf), Steps: -(i + 1)})
 		before = next
 	}
-	vs, err := a.Store.Versions(e.ID)
+	vs, err := a.Store.Versions(st.Plan.ID)
 	if err != nil {
 		return nil, err
 	}

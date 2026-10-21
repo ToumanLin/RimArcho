@@ -510,6 +510,15 @@ func mustEnv(t *testing.T, e *testkit.Env) string {
 	return env.ID
 }
 
+// mustPlan is the ID of the current environment's current plan.
+func mustPlan(t *testing.T, e *testkit.Env) int64 {
+	p, err := e.App.CurrentPlan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p.ID
+}
+
 // Lineage split and merge.
 func TestLineageSplitMerge(t *testing.T) {
 	e := setup(t, false)

@@ -6,9 +6,10 @@ import (
 	"sort"
 
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Staging (06 §2.5): one list per environment, kept by RimArcho and never written to the
+// Staging (06 §2.5, 04 §2.2): one list per plan, kept by RimArcho and never written to the
 // game. A mod staged from the Loadout remembers where it was, so it can be put back:
 // its 1-based position then and the instance just before it (the anchor).
 //
@@ -22,16 +23,14 @@ type StageItem struct {
 	After    string `json:"a,omitempty"` // the instance before it then; "" at the top
 }
 
-func stageKey(envID string) string { return "stage:" + envID }
-
-// Staged returns the staging list of the current environment, in staging order.
+// Staged returns the staging list of the current plan, in staging order.
 func (a *App) Staged() ([]StageItem, *LoadoutState, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, nil, err
 	}
 	var items []StageItem
-	if v := a.Store.Meta(stageKey(st.Ix.Env.ID)); v != "" {
+	if v := a.Store.Meta(store.StageKey(st.Plan.ID)); v != "" {
 		if err := json.Unmarshal([]byte(v), &items); err != nil {
 			return nil, nil, fmt.Errorf("staging list unreadable: %w", err)
 		}
@@ -45,12 +44,12 @@ func (a *App) Staged() ([]StageItem, *LoadoutState, error) {
 	return out, st, nil
 }
 
-func (a *App) setStaged(envID string, items []StageItem) error {
+func (a *App) setStaged(planID int64, items []StageItem) error {
 	b, err := json.Marshal(items)
 	if err != nil {
 		return err
 	}
-	return a.Store.SetMeta(stageKey(envID), string(b))
+	return a.Store.SetMeta(store.StageKey(planID), string(b))
 }
 
 // Stage puts mods into staging; enabled ones leave the Loadout (one undo step) and
@@ -114,7 +113,7 @@ func (a *App) Stage(refs []string) (*EditResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r, a.setStaged(st.Ix.Env.ID, append(items, add...))
+	return r, a.setStaged(st.Plan.ID, append(items, add...))
 }
 
 // Unstage takes mods out of staging without enabling them.
@@ -140,7 +139,7 @@ func (a *App) Unstage(refs []string) ([]string, error) {
 		}
 		keep = append(keep, it)
 	}
-	return gone, a.setStaged(st.Ix.Env.ID, keep)
+	return gone, a.setStaged(st.Plan.ID, keep)
 }
 
 // Restore enables staged mods again (all of them when refs is empty): each goes back after
@@ -239,5 +238,5 @@ func (a *App) Restore(refs []string, p Placement) (*EditResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r, a.setStaged(st.Ix.Env.ID, keep)
+	return r, a.setStaged(st.Plan.ID, keep)
 }

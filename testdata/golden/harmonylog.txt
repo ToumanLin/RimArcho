@@ -200,12 +200,13 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (0 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered (archo changes)
+  plan: plan:default
   loadout: 8 active, same as v1 (import)
   problems: 3 error, 5 warning, 2 info (archo problems)
   log: Player.log 1.6.4633 2026-10-01 10:00, current (written after the Loadout's last change)
 
 $ archo disable #i4uc
-workspace: 7 active, 1 change unsaved (env:main)
+workspace: 7 active, 1 change unsaved (plan:default, env:main)
   removed  #i4uc  Manual Patcher  was 6
 next:
   archo save
@@ -230,6 +231,7 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (0 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered (archo changes)
+  plan: plan:default
   loadout: 7 active, 1 change unsaved (archo loadout diff)
   problems: 1 error, 2 warning, 2 info (archo problems)
   log: Player.log 1.6.4633 2026-10-01 10:00, stale log (older than the Loadout's last change at 2026-10-01 11:00): 2 error, 2 warning, not counted (archo problems --code log --all)
