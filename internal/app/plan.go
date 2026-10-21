@@ -218,6 +218,30 @@ func (a *App) ImportLoadoutAsPlan(path, name string) (*NewPlanResult, error) {
 	return a.NewPlan(name, path)
 }
 
+// NewPlanFromImport creates a plan from a list an interface already read and previewed
+// (a file, pasted text, a share code, a Workshop collection; 04 §9.1 "import as a new
+// plan"). source is its v1's note. The current plan stays.
+func (a *App) NewPlanFromImport(name string, il *ImportedList, source string) (*NewPlanResult, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	e := st.Ix.Env
+	if name, err = a.checkPlanName(e.ID, name, 0); err != nil {
+		return nil, err
+	}
+	list, unresolved := ImportedEntries(st, il)
+	v := &store.Version{Source: "import", GameVersion: il.Game, Note: source}
+	if v.Note == "" {
+		v.Note = "import"
+	}
+	p, err := a.createPlan(e.ID, name, list, v)
+	if err != nil {
+		return nil, err
+	}
+	return &NewPlanResult{Plan: p, List: list, Version: v, State: st, Imported: il, Unresolved: unresolved}, nil
+}
+
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func readListFile(path string) (*ImportedList, error) {

@@ -86,6 +86,15 @@ func (m *model) topBar() string {
 	pill := " " + envText + " "
 	add("  ", 2)
 	add(sPill.Render(pill), width.StringWidth(pill))
+	// the plan being edited (06 §9.1) and its "有未载入的外部版本" (04 §4.3)
+	if m.st != nil && m.st.Plan != nil {
+		t := T("plan") + " " + m.st.Plan.Name
+		add("  "+sText.Render(t), 2+width.StringWidth(t))
+		if m.st.WS != nil && m.st.WS.Conflict != 0 && m.w >= 110 {
+			t := Tf("an external version was not loaded (v%d)", m.st.WS.Conflict)
+			add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
+		}
+	}
 	if n := m.needCount(); n > 0 {
 		t := Tf("needs attention %d", n)
 		add("  "+sWarnS.Render(t), 2+width.StringWidth(t))

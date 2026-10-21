@@ -22,6 +22,7 @@ const (
 	palCommand palKind = view.PalCommand
 	palEnv     palKind = view.PalEnv
 	palMod     palKind = view.PalMod
+	palPlan    palKind = view.PalPlan
 )
 
 type palItem struct {
@@ -67,6 +68,10 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { return m.chooseLog() }
 	case "env":
 		return func(m *model) tea.Cmd { return m.chooseEnv() }
+	case "plans":
+		return func(m *model) tea.Cmd { return m.choosePlan() }
+	case "new-plan":
+		return func(m *model) tea.Cmd { return m.newPlan() }
 	case "restore-all":
 		return list("T")
 	case "stage-all":
@@ -183,6 +188,13 @@ func (m *model) palAll() []palItem {
 			}})
 		}
 	}
+	// the other plans: enter switches to one (06 §9.1)
+	if rows, err := view.PlanRows(m.app); err == nil {
+		for _, e := range view.PlanEntries(rows) {
+			id := view.PlanOfPage(e.ID)
+			out = append(out, palItem{kind: palPlan, name: e.Name, alias: e.Alias, desc: e.Desc, run: func(m *model) tea.Cmd { return m.usePlan(id) }})
+		}
+	}
 	seen := map[string]bool{}
 	for k := range m.cols {
 		for i := range m.cols[k].items {
@@ -267,7 +279,7 @@ func (m *model) paletteLines(n int) []string {
 	p := m.pal
 	w := m.w
 	out := []string{"  " + sAccent.Render(markPrompt+" ") + sText.Render(fit(p.query+"_", w-4)), ""}
-	kinds := map[palKind]string{palCommand: T("command"), palMod: "Mod", palEnv: T("environment")}
+	kinds := map[palKind]string{palCommand: T("command"), palMod: "Mod", palEnv: T("environment"), palPlan: T("plan")}
 	rows := max(n-len(out), 1)
 	off := max(0, p.sel-rows+1)
 	for i := off; i < len(p.results) && len(out) < n; i++ {

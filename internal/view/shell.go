@@ -12,8 +12,7 @@ import (
 )
 
 // The window's shell (06 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
-// guide's data. Until a player can keep several plans (04 §1) the environment's workspace
-// is its one plan.
+// guide's data. The plans are the environment's (plans.go).
 
 // ---- counts ----
 
@@ -53,7 +52,8 @@ func EnvChip(name, gameVersion string) string {
 
 // ---- the sidebar (06 §2.1) ----
 
-// Sidebar page IDs. The plan editor is "plan"; a pack's row is "pack:<name>".
+// Sidebar page IDs. "plan" is the current plan's editor; a plan's own page is
+// PlanPage(id) and a pack's is "pack:<name>".
 const (
 	PageHome     = "home"
 	PageNeeds    = "needs"
@@ -73,6 +73,11 @@ type NavItem struct {
 	Badge int       `json:"badge,omitempty"` // 能不能跑: the actionable items (06 §5)
 	Key   string    `json:"key,omitempty"`   // shift+1–7
 	Kids  []NavItem `json:"kids,omitempty"`
+	// Mark is a plan's "有未载入的外部版本" (04 §4.3); Current the plan being edited.
+	Mark    string `json:"mark,omitempty"`
+	Current bool   `json:"current,omitempty"`
+	// Add: the entry opens a dialog ("+ 新方案"), not a page.
+	Add bool `json:"add,omitempty"`
 }
 
 // NavGroup is one of the sidebar's three questions. A group with nothing in it yet is
@@ -82,10 +87,15 @@ type NavGroup struct {
 	Items []NavItem `json:"items"`
 }
 
-// Nav builds the sidebar: the 在玩 entries in the shift+1–7 order, with the current list as
-// the one plan and every pack under 整合包. 没玩到 and 值得玩 have no pages yet (10) and
-// are left out.
-func Nav(needs int, packs []PackRow) []NavGroup {
+// Nav builds the sidebar: the 在玩 entries in the shift+1–7 order, every plan and "+ 新方案"
+// under 方案, every pack under 整合包. 没玩到 and 值得玩 have no pages yet (10) and are
+// left out.
+func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
+	var planKids []NavItem
+	for _, p := range plans {
+		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current})
+	}
+	planKids = append(planKids, NavItem{ID: PagePlanNew, Label: "+ " + T("new plan"), Add: true})
 	var packKids []NavItem
 	for _, p := range packs {
 		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name})
@@ -93,7 +103,7 @@ func Nav(needs int, packs []PackRow) []NavGroup {
 	items := []NavItem{
 		{ID: PageHome, Label: T("home")},
 		{ID: PageNeeds, Label: T("can it run"), Badge: needs},
-		{ID: PagePlan, Label: T("plans"), Kids: []NavItem{{ID: PagePlan, Label: T("current list")}}},
+		{ID: PagePlan, Label: T("plans"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		{ID: PageEnv, Label: T("environment")},
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageChanges, Label: T("changes")}}},
@@ -156,7 +166,14 @@ type HomeRow struct {
 	// not launch.
 	Played string `json:"played"`
 	Light  bool   `json:"light,omitempty"`
-	at     time.Time
+	// A plan's row: its ID and page, whether it is the one being edited, its
+	// "有未载入的外部版本" mark, and whether the game holds it now.
+	Plan    int64  `json:"plan,omitempty"`
+	Page    string `json:"page,omitempty"`
+	Current bool   `json:"current,omitempty"`
+	Mark    string `json:"mark,omitempty"`
+	InGame  bool   `json:"inGame,omitempty"`
+	at      time.Time
 }
 
 // Home is the home page: the rows, then the activity card.
@@ -170,31 +187,39 @@ type Home struct {
 	ScanWhen string `json:"scanWhen,omitempty"`
 }
 
-// BuildHome builds the home page from the board, the needs and the packs. Rows go by the
-// last time they were played (launch records, 08 §2); never played ones follow by name.
-func BuildHome(a *app.App, b *Board, n *Needs, packs []PackRow) *Home {
+// BuildHome builds the home page: one row per plan of the environment and one per pack.
+// The current plan's state counts its needs; another plan's comes from PlanProblems.
+// Rows go by the last time they were played (launch records, 08 §2); never played ones
+// follow by name.
+func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow) *Home {
 	h := &Home{}
 	if b == nil || b.St == nil {
 		return h
 	}
 	chip := EnvChip(b.EnvName, b.GameVersion)
-	plan := HomeRow{Kind: RowPlan, Name: T("current list"), Env: chip, Played: T("never played"),
-		Facts: Tf("%d mods enabled", len(b.Cols[Active]))}
-	if b.Unsaved > 0 {
-		plan.Facts += " · " + Tf("%d not written", b.Unsaved)
+	for _, p := range plans {
+		r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: p.Played, at: p.PlayedAt, Plan: p.ID, Page: p.Page,
+			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods enabled", p.Entries)}
+		k, checked := 0, false
+		if p.Current {
+			r.Facts = Tf("%d mods enabled", len(b.Cols[Active]))
+			if b.Unsaved > 0 {
+				r.Facts += " · " + Tf("%d not written", b.Unsaved)
+			}
+			k, checked = BreakCount(n), !n.Never
+		} else {
+			k, checked = PlanProblems(a, p.ID)
+		}
+		switch {
+		case !checked:
+			r.State = T("not checked yet")
+		case k > 0:
+			r.State, r.Level = Tf("%d problems break the game", k), LevelBad
+		default:
+			r.State, r.Level = T("ready to play"), HomeOK
+		}
+		h.Rows = append(h.Rows, r)
 	}
-	switch k := BreakCount(n); {
-	case n.Never:
-		plan.State = T("not checked yet")
-	case k > 0:
-		plan.State, plan.Level = Tf("%d problems break the game", k), LevelBad
-	default:
-		plan.State, plan.Level = T("ready to play"), HomeOK
-	}
-	if t := a.Store.LastListLaunch(b.St.Ix.Env.ID); !t.IsZero() {
-		plan.at, plan.Played = t, Tf("played %s", ShortDate(t))
-	}
-	h.Rows = append(h.Rows, plan)
 	for _, p := range packs {
 		r := HomeRow{Kind: RowPack, Name: p.Name, Env: chip, Facts: p.Facts, Played: p.Played, Light: p.Light, at: p.PlayedAt}
 		if p.Light {

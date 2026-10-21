@@ -20,6 +20,11 @@ type Shell struct {
 	Crumbs map[string][]view.Crumb `json:"crumbs"`
 	Env    string                  `json:"env"` // the environment chip
 	Envs   int                     `json:"envs"`
+	// Plans are the environment's plans; Plan is the current one (the editor's), InGame
+	// what the game's ModsConfig.xml holds (the status line, 04 §1.3).
+	Plans  []view.PlanRow    `json:"plans"`
+	Plan   *view.PlanRow     `json:"plan,omitempty"`
+	InGame *view.InGameState `json:"inGame,omitempty"`
 }
 
 // Shell builds the sidebar from the needs count and the packs.
@@ -38,7 +43,16 @@ func (s *API) Shell() *Shell {
 		out.Env = view.EnvChip("", "")
 	}
 	packs, _, _ := view.PackRows(s.a)
-	out.Nav = view.Nav(count, packs)
+	if out.Envs > 0 {
+		out.Plans, _ = view.PlanRows(s.a)
+		out.InGame = view.InGame(s.a)
+	}
+	for i := range out.Plans {
+		if out.Plans[i].Current {
+			out.Plan = &out.Plans[i]
+		}
+	}
+	out.Nav = view.Nav(count, out.Plans, packs)
 	ids := []string{view.PageSettings}
 	for _, g := range out.Nav {
 		for _, it := range g.Items {
@@ -62,7 +76,108 @@ func (s *API) Home() *view.Home {
 		return &view.Home{}
 	}
 	packs, _, _ := view.PackRows(s.a)
-	return view.BuildHome(s.a, s.board, s.needsLocked(false), packs)
+	plans, _ := view.PlanRows(s.a)
+	return view.BuildHome(s.a, s.board, s.needsLocked(false), plans, packs)
+}
+
+// ---- plans (04 §1.3, 06 §2.5) ----
+
+// PlanFroms are the new-plan dialog's starting lists.
+func (s *API) PlanFroms() ([]view.PlanFrom, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.PlanFroms(s.a)
+}
+
+// PlanName suggests a free name ("" base: "new plan") and checks one being typed: Problem
+// says what is wrong with name ("" fine; self is the plan being renamed).
+type PlanName struct {
+	Free    string `json:"free"`
+	Problem string `json:"problem"`
+}
+
+// CheckPlanName checks a name the player types.
+func (s *API) CheckPlanName(base, name string, self int64) *PlanName {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return &PlanName{Free: view.FreePlanName(s.a, base), Problem: view.CheckPlanName(s.a, name, self)}
+}
+
+// planDone is a managing verb's result: the text and the page to show next.
+type PlanDone struct {
+	Text string `json:"text"`
+	Page string `json:"page"`
+}
+
+func (s *API) planDone(p int64, text string, err error) (*PlanDone, error) {
+	s.board, s.needs = nil, nil
+	if err != nil {
+		return nil, err
+	}
+	d := &PlanDone{Text: text, Page: view.PagePlan}
+	if p != 0 {
+		d.Page = view.PlanPage(p)
+	}
+	return d, nil
+}
+
+// NewPlan creates a plan (from "" empty, "current", "v<n>") and switches to it.
+func (s *API) NewPlan(name, from string) (*PlanDone, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, t, err := view.NewPlan(s.a, name, from)
+	if p == nil {
+		return s.planDone(0, t, err)
+	}
+	return s.planDone(p.ID, t, err)
+}
+
+// ImportAsPlan makes the import being previewed a new plan and switches to it.
+func (s *API) ImportAsPlan(name string) (*PlanDone, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.x.imp == nil {
+		return nil, errors.New(view.T("nothing to import"))
+	}
+	p, t, err := view.ImportAsPlan(s.a, s.x.imp, name)
+	if err == nil {
+		s.x.imp = nil
+	}
+	if p == nil {
+		return s.planDone(0, t, err)
+	}
+	return s.planDone(p.ID, t, err)
+}
+
+// UsePlan switches the current plan; no game file is written.
+func (s *API) UsePlan(id int64) (*PlanDone, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, t, err := view.UsePlan(s.a, id)
+	return s.planDone(id, t, err)
+}
+
+// RenamePlan renames a plan.
+func (s *API) RenamePlan(id int64, name string) (*PlanDone, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, err := view.RenamePlan(s.a, id, name)
+	return s.planDone(id, t, err)
+}
+
+// RemovePlanWarn is the delete confirmation (an error: it cannot be deleted).
+func (s *API) RemovePlanWarn(id int64) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.RemovePlanWarn(s.a, id)
+}
+
+// RemovePlan deletes a plan once the player confirmed.
+func (s *API) RemovePlan(id int64) (*PlanDone, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, err := view.RemovePlan(s.a, id)
+	return s.planDone(0, t, err)
 }
 
 // ---- the first-run guide (06 §2.15) ----

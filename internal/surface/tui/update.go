@@ -26,7 +26,7 @@ verbs, on the selection or else the cursor's mod:
   S        sort (preview first)   w  save to the game (preview first)    L  launch the game
   u ctrl+r undo / redo           e  export the list (import: ctrl+k import a list)
 /          search the focused list; tab takes it to the next list with matches; esc clears
-!          needs attention        c  recent changes     R  rescan     E  switch environment
+!          needs attention        c  recent changes     R  rescan     E  switch environment     P  plans (switch, new, rename, delete)
 < > =      column width (= resets)    z  wrap names    [ ]  switch list (narrow)
 ctrl+k     command palette        :  run an archo command      ?  this help    q  quit
 mouse: click moves the cursor; ctrl+click adds or removes one; shift+click selects a range;
@@ -218,6 +218,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return nil
 	case "E":
 		return m.chooseEnv()
+	case "P":
+		return m.choosePlan()
 	case "R":
 		return m.startScan()
 	}

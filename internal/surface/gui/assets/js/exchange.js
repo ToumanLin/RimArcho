@@ -133,6 +133,7 @@ async function preview(kind, src, name) {
   ways.append(
     way(T("replace the enabled list"), p.replace, true, () => apply(false)),
     way(T("add the ones you lack"), p.merge, false, () => apply(true)),
+    await asPlan(p),
   );
   body.append(ways);
   body.append(el("div", "xc-hint", T("one step: u undoes it; the game's ModsConfig.xml changes only when you save")));
@@ -192,6 +193,32 @@ function link(text, url, button) {
   a.title = url;
   a.onclick = (e) => { e.preventDefault(); api.OpenURL(url).catch((x) => say("fail", errText(x))); };
   return a;
+}
+
+// asPlan is the third way (04 §9.1): the list becomes a new plan of its own, and the
+// current one stays as it is.
+async function asPlan(p) {
+  const base = p.name || (p.source || "").replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
+  let free = base;
+  try { free = (await api.CheckPlanName(base, "", 0)).free; } catch { /* keep the base */ }
+  const d = el("div", "xc-way");
+  d.append(el("div", "t", T("as a new plan")), el("div", "xc-note", Tf("%d mods; the current plan stays as it is", p.total)));
+  const name = el("input", "xc-input");
+  name.value = free;
+  name.spellcheck = false;
+  const b = el("button", "btn", T("create the plan"));
+  b.onclick = async () => {
+    let r;
+    try { r = await api.ImportAsPlan(name.value); } catch (e) { return say("fail", errText(e)); }
+    pop.close();
+    for (const c of S.cols) { c.sel.clear(); c.query = ""; c.cursor = 0; }
+    await ui.reload();
+    await ui.go(r.page);
+    say("ok", r.text);
+  };
+  name.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); b.click(); } });
+  d.append(name, b);
+  return d;
 }
 
 async function apply(merge) {

@@ -49,10 +49,10 @@ export async function loadShell() {
   sync();
 }
 
-// current is the sidebar ID of what is shown: a page, the plan (the editor and its full
-// detail), or one pack.
+// current is the sidebar ID of what is shown: a page, the current plan (the editor and
+// its full detail), or one pack.
 export function current() {
-  if (!S.screen || S.screen === "full") return "plan";
+  if (!S.screen || S.screen === "full") return (S.shell && S.shell.plan && S.shell.plan.page) || "plan";
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
   // adding an environment belongs to the environment page
   if (S.screen === "guide" && S.guideFrom === "env") return "env";
@@ -63,6 +63,18 @@ export function current() {
 export function sync() {
   renderSide();
   renderCrumbs();
+  renderInGame();
+}
+
+// renderInGame: the status line's "游戏里现在是：<方案> v<n>" (04 §1.3) — what the game's
+// ModsConfig.xml holds by the write record, whichever plan is being edited.
+function renderInGame() {
+  const g = S.shell && S.shell.inGame;
+  const box = $("#ingame");
+  box.textContent = g ? g.text : "";
+  box.title = g ? T("switching plans writes no game file; writing to the game or launching does") : "";
+  const cur = S.shell && S.shell.plan;
+  box.classList.toggle("other", !!(g && cur && g.planId !== cur.id));
 }
 
 const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", env: "env", library: "library", log: "log" };
@@ -95,8 +107,14 @@ function renderSide() {
         if (open && kids.length) {
           const box = el("div", "kids");
           for (const k of kids) {
-            const kb = el("button", "nav-kid" + (k.id === cur ? " on" : ""), k.label);
+            const kb = el("button", "nav-kid" + (k.id === cur ? " on" : "") + (k.add ? " add" : ""));
+            kb.append(el("span", "lbl", k.label));
+            // a plan's "有未载入的外部版本" (04 §4.3)
+            if (k.mark) { const m = el("span", "mark"); m.title = k.mark; kb.append(m); kb.title = k.mark; }
             kb.onclick = () => ui.go(k.id);
+            if (it.id === "plan" && !k.add) {
+              kb.oncontextmenu = (e) => { e.preventDefault(); ui.planMenu(+k.id.slice(5), e.clientX, e.clientY); };
+            }
             box.append(kb);
           }
           nav.append(box);

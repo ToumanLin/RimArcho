@@ -4,6 +4,7 @@
 import { S, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button } from "./screens.js";
 import { icon } from "./icons.js";
+import { openPlan } from "./plans.js";
 
 let ui = null;
 export function initHome(u) { ui = u; }
@@ -49,12 +50,15 @@ function row(r, running) {
   const l = el("div", "l");
   const name = el("div", "name");
   name.append(el("span", "chip env", r.env), el("span", "n", r.name), el("span", "kind", r.kind === "plan" ? T("plan") : T("pack")));
+  // the game's ModsConfig.xml holds this plan now; a plan's unloaded external version
+  if (r.inGame) { const g = el("span", "chip ingame", T("in the game")); g.title = S.shell && S.shell.inGame ? S.shell.inGame.text : ""; name.append(g); }
+  if (r.mark) { const m = el("span", "chip mark", r.mark); name.append(m); }
   const state = el("span", "state " + (r.level || "unknown"), r.state);
   const sub = el("div", "sub");
   sub.append(state, el("span", "sep", "·"), el("span", "", r.facts), el("span", "sep", "·"), el("span", "", r.played));
   l.append(name, sub);
   const right = el("div", "r");
-  if (r.kind === "plan") right.append(button(T("edit"), "", () => ui.go("plan")));
+  if (r.kind === "plan") right.append(button(T("edit"), "", () => ui.go(r.page)));
   else right.append(button(T("details"), "", () => ui.go("pack:" + r.name)));
   if (!r.light) {
     const b = button(T("launch") + " ▶", "", () => launch(r), "primary");
@@ -69,10 +73,14 @@ function row(r, running) {
   return d;
 }
 
-// launch is the row's L (08 §2, §5.3): the plan's preview first; a pack plays at once, as
-// on the packs page.
+// launch is the row's L (08 §2, §5.3): that plan becomes current, then its preview; a pack
+// plays at once, as on the packs page.
 async function launch(r) {
-  if (r.kind === "plan") return ui.preview("launch");
+  if (r.kind === "plan") {
+    if (!(await openPlan(r.plan))) return;
+    await home(); // the row it launches from is now the current plan's
+    return ui.preview("launch");
+  }
   try { say("ok", await api.PackLaunch(r.name)); } catch (e) { say("fail", errText(e)); }
 }
 

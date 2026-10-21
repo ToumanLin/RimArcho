@@ -38,8 +38,12 @@ func (m *model) importChoice(imp *view.Import, p *view.ImportPreview) {
 	replace := T("replace the enabled list") + " — " + p.Replace.Text
 	merge := T("add the ones you lack") + " — " + p.Merge.Text
 	show := T("show the whole preview")
-	pn := &panel{title: p.Summary, choices: []string{replace, merge, show}}
+	asPlan := T("as a new plan") + " — " + Tf("%d mods; the current plan stays as it is", p.Total)
+	pn := &panel{title: p.Summary, choices: []string{replace, merge, asPlan, show}}
 	pn.onPick = func(m *model, v string) tea.Cmd {
+		if v == asPlan {
+			return m.importAsPlan(imp, p)
+		}
 		if v == show {
 			m.openPanel(p.Summary, strings.Join(p.Lines(), "\n"), nil)
 			m.afterPanel = nil
