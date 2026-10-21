@@ -100,3 +100,106 @@ Most violated constraints rarely involve the mods that the errors are attributed
   community lwm.deepstorage < mehni.pickupandhaul                  220 logs, 54
 => Many declared and community constraints are harmless in practice; the sorter should not present
    every violation as an error.
+
+
+== G3 / G4 setup (2026-10-21, branch claude/corpus-g345-f84a49)
+
+- Same 671 logs as the G1 comparison, own research environment (home-g345, the same game and
+  mod library), current master rules (v3). The mod list is read from the raw header (-rawmods):
+  parsed.jsonl then still dropped entries written with [v:]/[ov:] (4.9% of entries, HugsLib in
+  every log; fixed in hugslogs ef86650). A first pass on the old lists (212 logs) had 2,899
+  dep.inactive findings in 206 logs, mostly mods depending on the missing HugsLib; with the full
+  lists 527 in 669 logs.
+- Library coverage per log on the full lists: p10 0.71, median 0.86, p90 0.96 (465 of 671 >= 0.80).
+- Per log, after the analysis: the header's "Active Harmony patches" against the Loadout's
+  harmony_fact rows (G3), and the static findings of decl/def/patch/harmony layers with the
+  clusters of the same log that could be their effect (G4). Results file: results-g345.jsonl.
+  4-8 s per log, 81 min.
+
+== G3 Harmony static recall
+
+A runtime patch = one patch method on one target (1,103,842 in 671 logs). It counts when its
+patch class belongs to a mod of the Loadout the library resolves: 988,230 (89.5%).
+  matched (same patch method, kind and target)        62.2%
+  + patch method found, other target or kind          +9.1%  = 71.3%
+    (dynamic TargetMethod(s), overloads, a class patching several methods)
+  missed                                              28.7%
+    the owning assembly calls Harmony.Patch           75.6% of missed
+    the class is a static [HarmonyPatch] class         2.0%
+    neither                                           22.4%  (HugsLib: its DLL is skipped by the
+                                                              scan, 10,727 patches in 631 logs;
+                                                              Vehicle Framework 49,416)
+  missed patches owned by mods with harmony.manual    94.4% of missed
+Recall per log (>= 20 owned patches): p10 0.43, p25 0.56, median 0.64, p75 0.71, p90 0.78.
+By mod (918 mods with runtime patches): recall >= 90% for 680 (74%); nothing found for 144
+(16%), 138 of which call Harmony.Patch. 296 mods call Harmony.Patch.
+Static facts of those mods with no runtime counterpart: 17.9% (conditional patches, other
+versions of the mod, overloads the short header name cannot tell apart).
+
+Largest misses (patches summed over logs): Humanoid Alien Races 61,062 (0% found, all manual),
+Vehicle Framework 53,223 (0%), VEF core 42,962 missed of 214,850 (80% found), HugsLib 10,727
+(0%, skipped DLL), Vanilla Skills Expanded 10,684 (0%), Character Editor 5,057, Dubs Performance
+Analyzer 4,506, Pick Up And Haul 3,731, Facial Animation 3,080.
+
+=> The attribute scan is nearly complete for attribute patches (2% of misses). The gap is manual
+   Harmony.Patch: an IL scan for its targets (backlog) would close about 27 of the 29 missing
+   points. HugsLib.dll being skipped hides HugsLib's own patches from every analysis.
+
+== G4 severity calibration
+
+For each finding: does the same log have a problem cluster attributed to a subject mod (any role),
+of the classes the finding predicts, and how often would that happen by chance (a log where a
+share b of the resolved mods has such a cluster gives 1-(1-b)^k for k subject mods)? "text": a
+cluster that names the finding's def, patch file or Harmony target (message, details or stack).
+
+                            findings  logs  severity  expected class: observed / chance   text
+  patch.no-match               2,091   227  warning   patch-failed            42.9% / 1.3%  14.5%
+  patch.contested              1,713   287  info      patch/xml/xref          39.3% / 8.6%   0
+  harmony.multi-transpiler     3,124   482  warning   exception/harmony       33.2% / 9.2%   0.3%
+  harmony.skip-prefix         41,156   592  info      exception/harmony       32.8% /11.7%   0.5%
+  harmony.shared-target       82,657   631  info      exception/harmony       31.5% /10.3%   0.4%
+  def.abstract-collision       2,603   372  warning   xml-load/xref           22.2% / 8.8%   1.2%
+  dep.inactive                   527   239  error     xml/xref/exc/patch      20.5% /13.8%   0
+  def.parent-missing           1,455    83  error     xml-load/xref           17.0% / 4.4%  14.7%
+  def.override                42,178   656  info      xml/xref/exception      14.1% /10.5%   0.7%
+  harmony.manual              17,148   658  info      exception/harmony        8.8% / 4.9%   0
+  patch.unknown-op             4,206   554  info      patch-failed/xml         7.6% / 1.8%   0
+  order.violated (any class)   2,713   491  warning   any                     28.7% /14.8%
+  official.order (any class)     192   192  error     any                     15.1% / 6.4%
+  incompat.active (any class)     20    18  error     any                     30.0% /17.4%
+  order.cycle (any class)         45    45  warning   any                      6.7% /15.8%
+  dep.missing                      4     4  error     (548 more: the player had the dependency,
+                                                       the library does not; not counted)
+
+Reading:
+- patch.no-match is the best-calibrated finding: 33x chance, and in 14.5% the log's patch-failed
+  cluster names the same patch file. Warning fits. Not checked why 57% have no matching error;
+  candidates: operations inside a Sequence/FindMod whose failure the game does not log, and mod
+  versions in the library that differ from the player's.
+- def.parent-missing (error) is 4x chance and the only def finding whose text shows up (14.7%);
+  but 83% of the findings have no visible error. "likely" confidence is right, error severity is
+  too high for an unseen effect.
+- dep.inactive (error) is only 1.5x chance; official.order (error) 2.4x on any class. These are
+  declared, not observed, problems; with load-order errors rare (G2), error is too strong.
+- def.override (info) is at chance (1.3x): keeping it hidden by default is right.
+- The Harmony findings are 3x chance, but their subjects are patchers and the attribution of
+  harmony-stack clusters names patchers by the Harmony lines in the stack, so part of this is
+  circular. The target method appears in the error's stack for < 1% of findings: shared targets,
+  skip prefixes and multiple transpilers almost never show up as an error on that method.
+  multi-transpiler as warning is not supported by the logs; skip-prefix and shared-target as info
+  are.
+- order.cycle is below chance (45 findings).
+Correlation only, on logs players shared because something went wrong; the library has current
+mod versions, not the players'.
+
+== G5 pattern library v0 (summary; details in spikes/patterns/RESULT.txt)
+
+- 46 generic rules over cluster templates recognise 87.0% of the 610,910 problem clusters of the
+  6,734 logs (75.5% of occurrences). Stages: load 70%, save 21%, runtime 9%.
+- The current MCP diagnosis workflow covers 30% of the clusters, partly 29%, not 41% (save-load,
+  missing assets, assembly dependencies, config errors); 74.5% of logs have an uncovered cluster.
+- 1,036 mod-specific patterns (>= 10 logs from >= 5 sessions) over 317 mods.
+- Sessions: 1,727 consecutive pairs; 400 with 1-3 changes. Without any change, load-stage errors
+  stay (0-6% disappear), save/runtime errors disappear 5-26% anyway, so fix evidence for them
+  must beat that control. Removing the source mod and the error going is rare (87 mod patterns).
+- Draft for MCP Instructions / analyze_log: docs/research/01-范式库接入草案.md.
