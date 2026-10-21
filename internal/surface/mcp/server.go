@@ -228,15 +228,16 @@ type SourceIn struct {
 }
 
 type EditIn struct {
-	Env    string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action string   `json:"action" jsonschema:"enable, disable, move, swap, sort, undo, redo, stage, unstage or restore"`
-	Refs   []string `json:"refs,omitempty" jsonschema:"mods to enable/disable; for move and swap the first is the mod (swap: optional second = the instance to use)"`
-	At     int      `json:"at,omitempty" jsonschema:"enable at / move to this 1-based position"`
-	Before string   `json:"before,omitempty"`
-	After  string   `json:"after,omitempty"`
-	Up     bool     `json:"up,omitempty"`
-	Down   bool     `json:"down,omitempty"`
-	DryRun bool     `json:"dry_run,omitempty" jsonschema:"sort only: show the result without changing the workspace"`
+	Env     string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Action  string   `json:"action" jsonschema:"enable, disable, move, swap, sort, undo, redo, stage, unstage or restore"`
+	Refs    []string `json:"refs,omitempty" jsonschema:"mods to enable/disable; for move and swap the first is the mod (swap: optional second = the instance to use)"`
+	At      int      `json:"at,omitempty" jsonschema:"enable at / move to this 1-based position"`
+	Before  string   `json:"before,omitempty"`
+	After   string   `json:"after,omitempty"`
+	Up      bool     `json:"up,omitempty"`
+	Down    bool     `json:"down,omitempty"`
+	DryRun  bool     `json:"dry_run,omitempty" jsonschema:"sort only: show the result without changing the workspace"`
+	Version string   `json:"version,omitempty" jsonschema:"checkout: the version to load into the current plan, v<n> or <n> (plan_history action=log lists them)"`
 }
 
 type DescribeIn struct {
@@ -348,7 +349,7 @@ func toolList() []tool {
 }
 
 // Tools returns the tool table.
-func Tools() []tool { return append(toolList(), manageTools()...) }
+func Tools() []tool { return append(append(toolList(), manageTools()...), planTools()...) }
 
 // ProblemsArgv maps list_problems: warning and above by default (03 §4.5).
 func ProblemsArgv(in ProblemsIn) []string {
@@ -423,6 +424,8 @@ func EditArgv(in EditIn) []string {
 			b.str("at", strconv.Itoa(in.At))
 		}
 		return b.str("before", in.Before).str("after", in.After).a
+	case "checkout":
+		return argv("loadout", "checkout").pos(in.Version).a
 	}
 	return []string{"edit_loadout: unknown action " + fmt.Sprintf("%q", in.Action)}
 }
