@@ -121,7 +121,7 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 #acts .unwritten { color: var(--accent); font-size: 11.5px; white-space: nowrap; margin-right: 2px; }
 #acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
 #top #env { flex: 0 1 auto; }
-@media (max-width: 900px) { #acts .wide-only, #acts kbd { display: none; } }
+@media (max-width: 1100px) { #acts .wide-only, #acts kbd { display: none; } }
 @media (max-width: 640px) { #top #env { display: none; } }
 .pill { height: 24px; display: inline-flex; align-items: center; background: var(--pill); color: var(--fg-2); border-radius: 999px; padding: 0 11px; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background .12s; }
 .pill:hover { background: var(--pill-hover); color: var(--fg); }
@@ -543,3 +543,28 @@ details.xc-sec > summary { cursor: pointer; }
 .xc-out.ok { color: var(--green); }
 .xc-out.err { color: var(--red); }
 .xc .btns { display: none; }
+
+/* ---- plans (plans.js): the sidebar's plan entries, their marks, the plan dialogs ---- */
+.nav-kid { display: flex; align-items: center; gap: 6px; flex: none; }
+.nav-kid .lbl { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nav-kid .mark { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.nav-kid.on::before { flex: none; margin: 0 1px 0 -12px; }
+.nav-kid.add { color: var(--faint); }
+.nav-kid.add:hover { color: var(--accent); }
+.chip.mark { color: var(--amber); background: var(--amber-soft); }
+.chip.ingame { color: var(--green); background: var(--green-soft); }
+#acts .chip.mark { margin: 0; white-space: nowrap; flex: none; cursor: pointer; border: 0; display: inline-flex; align-items: center; gap: 6px; }
+#acts .chip.mark .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+#crumbs { min-width: min(24%, 180px); }
+@media (max-width: 1280px) { #acts .chip.mark .t { display: none; } #acts .chip.mark { padding: 0 7px; line-height: 22px; } }
+#acts .icon-btn { padding: 0 8px; letter-spacing: 1px; }
+#ingame { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+#ingame:not(:empty) + #hints:not(:empty) { border-left: 1px solid var(--line); padding-left: 12px; }
+#ingame.other { color: var(--amber); }
+.plan-pop .label { padding: 10px 16px 2px; }
+.plan-pop .plan-why { min-height: 16px; padding: 3px 16px 0; color: var(--red); font-size: 12px; }
+.plan-pop .plan-from { max-height: 40vh; }
+.plan-pop .plan-note { padding: 0 16px 10px; color: var(--muted); font-size: 12px; }
+.xc-ways { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.xc-way .xc-input { width: 100%; }
+.plan-pop .in .pr { flex: none; }

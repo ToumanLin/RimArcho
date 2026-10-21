@@ -93,3 +93,72 @@ func TestGuide(t *testing.T) {
 		t.Fatal("a folder was imported as a pack")
 	}
 }
+
+// Plans in the window (06 §2.1, §2.5): each plan is a sidebar entry with its breadcrumb;
+// opening one switches the board; new, import-as-plan, rename and delete go through view.
+func TestPlansInWindow(t *testing.T) {
+	e, api, _ := fixture(t)
+	b := api.Board()
+	enabled := len(b.Cols[view.Active])
+	d, err := api.NewPlan("Empty", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sh := api.Shell()
+	if len(sh.Plans) != 2 || sh.Plan == nil || sh.Plan.Name != "Empty" || d.Page != sh.Plan.Page {
+		t.Fatalf("shell plans %+v, done %+v", sh.Plans, d)
+	}
+	if got := sh.Crumbs[d.Page]; len(got) != 3 || got[2].Label != "Empty" || got[1].ID != "plan" {
+		t.Fatalf("crumbs %+v", got)
+	}
+	if len(api.Board().Cols[view.Active]) != 0 {
+		t.Fatal("the board still shows the old plan")
+	}
+	if h := api.Home(); len(h.Rows) != 2 {
+		t.Fatalf("home rows %+v", h.Rows)
+	}
+	def := sh.Plans[0]
+	if _, err := api.UsePlan(def.ID); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(api.Board().Cols[view.Active]); n != enabled {
+		t.Fatalf("back on default: %d enabled, want %d", n, enabled)
+	}
+	// The import being previewed becomes a plan of its own.
+	if _, err := api.ImportPreview("text", "tester.b\nludeon.rimworld"); err != nil {
+		t.Fatal(err)
+	}
+	d, err = api.ImportAsPlan("Pasted")
+	if err != nil || !strings.HasPrefix(d.Text, "new plan Pasted: 2 mods") {
+		t.Fatalf("import as plan %+v %v", d, err)
+	}
+	if names(api.Board().Cols[view.Active]) != "Beta,Core" {
+		t.Fatalf("imported list %s", names(api.Board().Cols[view.Active]))
+	}
+	if _, err := api.RenamePlan(def.ID, "pasted"); err == nil {
+		t.Fatal("renamed onto a taken name")
+	}
+	if _, err := api.RenamePlan(def.ID, "Main"); err != nil {
+		t.Fatal(err)
+	}
+	if w, err := api.RemovePlanWarn(def.ID); err != nil || w == "" {
+		t.Fatalf("warn %q %v", w, err)
+	}
+	if _, err := api.RemovePlan(def.ID); err != nil {
+		t.Fatal(err)
+	}
+	if sh := api.Shell(); len(sh.Plans) != 2 || sh.Nav[0].Items[2].Kids[0].Label != "Empty" {
+		t.Fatalf("after delete %+v", sh.Plans)
+	}
+	// The palette goes to the other plans.
+	var plans []string
+	for _, p := range api.Palette("") {
+		if p.Kind == view.PalPlan {
+			plans = append(plans, p.Name)
+		}
+	}
+	if strings.Join(plans, ",") != "plan Empty" {
+		t.Fatalf("palette plans %v", plans)
+	}
+	_ = e
+}

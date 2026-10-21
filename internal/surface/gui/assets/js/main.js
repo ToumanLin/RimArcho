@@ -14,6 +14,7 @@ import * as scr from "./screens.js";
 import * as shell from "./shell.js";
 import * as homePage from "./home.js";
 import * as guide from "./guide.js";
+import * as plans from "./plans.js";
 import { initExchange, exchange } from "./exchange.js";
 import { icon } from "./icons.js";
 
@@ -73,7 +74,8 @@ function syncLaunch() {
 }
 
 // planActions: the plan's actions in the top bar (06 §2.5): undo, sort, build a pack, write
-// to the game, and how many entries are not written to the game yet (06 §2.2).
+// to the game, and how many entries are not written to the game yet (06 §2.2); the plan's
+// own menu (rename, copy, delete) and its "有未载入的外部版本" mark (04 §4.3).
 function planActions() {
   const u = (S.board && S.board.unsaved) || 0;
   const btn = (label, k, run, cls = "") => {
@@ -83,6 +85,14 @@ function planActions() {
     return b;
   };
   const out = [];
+  const plan = S.shell && S.shell.plan;
+  if (plan && plan.conflict) {
+    const m = el("button", "chip mark");
+    m.append(el("span", "dot"), el("span", "t", plan.conflictText));
+    m.title = plan.conflictText + " · " + T("can it run › needs your answer");
+    m.onclick = (e) => { e.stopPropagation(); go("needs"); };
+    out.push(m);
+  }
   if (u) {
     const n = el("span", "unwritten", Tf("%d not written", u));
     n.title = T("different from the list last written to the game; launching or writing to the game writes them");
@@ -90,6 +100,11 @@ function planActions() {
   }
   out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("sort"), "S", () => preview("sort")),
     btn(T("build a pack"), "", () => go("packs"), "wide-only"), btn(T("write to the game"), "w", () => preview("save"), u ? "hot" : ""));
+  if (plan) {
+    const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");
+    more.title = T("the plan: rename, copy, delete") + " · P";
+    out.push(more);
+  }
   return out;
 }
 
@@ -98,10 +113,17 @@ let lastList = 1;
 // The sidebar's 在玩 entries in shift+1–7 order (06 §3.5; view.Nav).
 const NAV = ["home", "needs", "plan", "packs", "env", "changes", "log"];
 
-// go opens a sidebar page; "plan" is the editor, "pack:<name>" a pack on the packs page.
+// go opens a sidebar page; "plan" is the current plan's editor, "plan:<id>" a plan (it
+// becomes current: no game file is written), "plan:new" the new-plan dialog, "pack:<name>"
+// a pack on the packs page.
 async function go(id) {
   shell.navigated();
   if (id === "library") id = "changes";
+  if (id === "plan:new") return plans.newPlan();
+  if (id.startsWith("plan:")) {
+    if (!(await plans.openPlan(+id.slice(5)))) return;
+    id = "plan";
+  }
   S.packFocus = id.startsWith("pack:") ? id.slice(5) : null;
   await openPage(id);
   // a page already shown is redrawn in place: its sub-entry and breadcrumb follow too
@@ -129,7 +151,7 @@ async function openPage(id) {
 function renderWhere() {
   shell.sync();
   syncLaunch();
-  if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + T("undo"), ...planActions());
+  if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + T("undo") + "|" + JSON.stringify(S.shell && S.shell.plan), ...planActions());
   let s = "";
   if (S.screen && S.screen !== "full") s = shell.crumbs().map((c) => c.label).join(" › ");
   else if (S.screen === "full") {
@@ -359,6 +381,8 @@ async function cmd(id) {
       if (await api.Analyze()) { S.busy.analyze = true; say("busy", T("checking the mods' files…")); }
       return;
     case "env": return chooseEnv();
+    case "plans": return plans.chooser();
+    case "new-plan": return plans.newPlan();
     case "filter": return startSearch();
     case "details": return verb("full");
     case "tech": return verb("full");
@@ -391,6 +415,7 @@ function commandLine() {
 
 async function paletteChoice(o) {
   if (o.kind === 0) return cmd(o.id);
+  if (o.kind === 3) return go(o.id);
   if (o.kind === 2) {
     try { say("ok", await api.UseEnv(o.id)); } catch (e) { say("fail", errText(e)); }
     return reload();
@@ -530,7 +555,7 @@ function onKey(e) {
     g: () => verb("tags"), "#": () => verb("tags"), Enter: () => verb("full"), o: () => verb("workshop"), x: () => verb("swap"),
     S: () => preview("sort"), w: () => preview("save"), L: () => preview("launch"), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "!": () => go("needs"), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
-    E: () => go("env"), "?": () => pop.help(), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
+    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help(), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
@@ -590,7 +615,7 @@ async function loadWidths() {
 
 const ui = {
   reload, renderWhere, renderHints, renderHeads, click, verb, drop, place, preview, cmd, step, search, searchKey, go,
-  palette: paletteChoice, selectionItems: selection,
+  palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => pop.menu(x, y, actions().filter((a) => a.run)),
   afterImport: null, // the first-run guide's next step once an import is applied
 };
@@ -606,6 +631,7 @@ async function start() {
   homePage.initHome(ui);
   guide.initGuide(ui);
   initExchange(ui);
+  plans.initPlans(ui);
   wireLists(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);

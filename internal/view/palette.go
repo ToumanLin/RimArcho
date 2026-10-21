@@ -38,6 +38,8 @@ var Commands = []Command{
 	{"analyze", "重新检查文件", "check the files again", "A analyze"},
 	{"log", "选择日志", "choose a log", "Player.log"},
 	{"env", "切换环境", "switch environment", "E env"},
+	{"plans", "方案", "plans", "P switch, new, rename, delete a plan"},
+	{"new-plan", "新方案", "new plan", "+ plan copy import"},
 	{"restore-all", "全部从暂存放回", "put all back", "T staging"},
 	{"stage-all", "启用列表全部放进暂存", "stage the whole enabled list", "T in the window"},
 	{"import", "导入列表", "import a list", "i RimSort RimCrow .rml share code collection"},
@@ -53,11 +55,13 @@ var Commands = []Command{
 	{"quit", "退出", "quit", "q"},
 }
 
-// Palette entry kinds, in tie order.
+// Palette entry kinds, in tie order. A plan entry switches to that plan (its ID is
+// the plan's).
 const (
 	PalCommand = iota
 	PalMod
 	PalEnv
+	PalPlan
 )
 
 // PalEntry is one palette candidate.
@@ -97,8 +101,19 @@ func PalScore(q string, e PalEntry) int {
 	return best
 }
 
+// PlanEntries are the palette's "go to plan X" entries: every plan but the current one.
+func PlanEntries(rows []PlanRow) []PalEntry {
+	var out []PalEntry
+	for _, r := range rows {
+		if !r.Current {
+			out = append(out, PalEntry{Kind: PalPlan, ID: r.Page, Name: Tf("plan %s", r.Name), Alias: r.Name, Desc: "plan"})
+		}
+	}
+	return out
+}
+
 // PalRank filters and orders the candidates for a query; an empty query lists the
-// commands and environments only.
+// commands, environments and plans only.
 func PalRank(query string, all []PalEntry) []PalEntry {
 	q := strings.ToLower(strings.TrimSpace(query))
 	var out []PalEntry

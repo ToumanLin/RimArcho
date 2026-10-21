@@ -91,7 +91,7 @@ export function palette() {
     optionList(pop, p, [], (d, o) => {
       d.append(el("span", "", o.name));
       if (o.kind === 0 && o.alias !== o.name) d.append(el("span", "dim", o.alias));
-      d.append(el("span", "d", o.kind === 0 ? o.desc.split(" ")[0] : o.kind === 2 ? T("environment") : o.desc));
+      d.append(el("span", "d", o.kind === 0 ? o.desc.split(" ")[0] : o.kind === 2 ? T("environment") : o.kind === 3 ? T("plan") : o.desc));
     }, run, inp);
     const refresh = async () => p.redraw(await api.Palette(inp.value));
     inp.addEventListener("input", refresh);
@@ -240,7 +240,7 @@ export function help() {
       ["S · w · L", T("sort · write to the game · launch (preview first)")], ["u · ctrl+z", T("undo")], ["ctrl+r · ctrl+y", T("redo")],
       ["/ · ctrl+f", T("search the list")], ["shift+1–7", T("go to a page in the sidebar")], ["l · c", T("game log · mod changes")],
       ["T", T("stage the whole enabled list; in staging, put all back")],
-      ["R · A", T("rescan · check the files again")], ["E", T("the environment page")], ["i · e", T("import · export the mod list")], ["ctrl+k", T("command palette")],
+      ["R · A", T("rescan · check the files again")], ["E", T("the environment page")], ["P", T("plans: switch, new, rename, delete")], ["i · e", T("import · export the mod list")], ["ctrl+k", T("command palette")],
       [T("drag"), T("between lists: enable, disable, stage; within Enabled: reorder")], [T("right click"), T("what you can do with it")],
     ];
     for (const [k, v] of rows) body.append(el("b", "", k), el("span", "", v));

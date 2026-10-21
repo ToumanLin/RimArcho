@@ -939,6 +939,9 @@ func (s *API) Palette(query string) []view.PalEntry {
 			}
 		}
 	}
+	if rows, err := view.PlanRows(s.a); err == nil {
+		all = append(all, view.PlanEntries(rows)...)
+	}
 	if s.board != nil {
 		seen := map[string]bool{}
 		for _, col := range s.board.Cols {
