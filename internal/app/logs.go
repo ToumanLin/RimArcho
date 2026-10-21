@@ -1115,47 +1115,44 @@ type hotMethod struct {
 	count   int
 }
 
-// LogRun is a log whose clusters join the problems, and whether it still describes the
-// current Loadout (03 §6.3). A stale log was written by another game version or before
-// the Loadout's last save or change: its problems are listed apart and not counted.
+// LogRun is a log whose clusters join the problems, the run it belongs to, and whether it
+// still describes the analysed plan (03 §6.4). A stale log's problems are listed apart and
+// not counted.
 type LogRun struct {
 	Path, Label string
 	Version     string
 	ModTime     time.Time
-	MM, EnvMM   string    // the log's and the environment's major.minor
-	LoadoutAt   time.Time // the Loadout's last save or change
-	OtherGame   bool      // written by another game version
-	Before      bool      // written before LoadoutAt
+	MM, EnvMM   string // the log's and the environment's major.minor
+	// Source is the launch (or, without one, the ModsConfig.xml write) the log maps to.
+	Source *RunSource
+	// The stale reasons (03 §6.4 new rule):
+	OtherGame bool   // written by another game version
+	OtherRun  bool   // its run is not the analysed plan: another plan, environment or a pack
+	OtherEnv  string // the other environment's name, when that is the reason
+	Changed   bool   // the plan's enabled list changed since that run
+	Unknown   bool   // no launch or write record matches: the source is unknown
 	// Pending: a cache-only problem list (status, mod) found no stored report; the log's
 	// problems are not in the list until a log or problems command analyses it.
 	Pending bool
 }
 
-// Stale reports whether the log's problems describe an earlier state.
-func (r *LogRun) Stale() bool { return r.OtherGame || r.Before }
-
-// LoadoutChangedAt is when the Loadout last changed: the last unsaved edit, else when
-// ModsConfig.xml was written (by RimArcho, the game or another tool).
-func (a *App) LoadoutChangedAt(st *LoadoutState) time.Time {
-	if st.WS != nil && len(st.Changes()) > 0 {
-		return st.WS.Updated
-	}
-	if st.FilePath != "" {
-		if fi, err := os.Stat(st.FilePath); err == nil {
-			return fi.ModTime()
-		}
-	}
-	if st.Latest != nil {
-		return st.Latest.Created
-	}
-	return time.Time{}
-}
+// Stale reports whether the log's problems describe another run or an earlier state.
+func (r *LogRun) Stale() bool { return r.OtherGame || r.OtherRun || r.Changed || r.Unknown }
 
 func (a *App) logRun(st *LoadoutState, path, version string, mod time.Time) *LogRun {
-	r := &LogRun{Path: path, Label: filepath.Base(path), Version: version, ModTime: mod, MM: LogMM(version), EnvMM: st.GameMM(), LoadoutAt: a.LoadoutChangedAt(st)}
-	r.OtherGame = r.MM != "" && r.EnvMM != "" && r.MM != r.EnvMM
-	r.Before = !r.LoadoutAt.IsZero() && mod.Before(r.LoadoutAt)
+	r := &LogRun{Path: path, Label: filepath.Base(path), Version: version, ModTime: mod, MM: LogMM(version), EnvMM: st.GameMM()}
+	a.judge(st, r)
 	return r
+}
+
+// LogRunOf judges a log file against st's plan without analysing it (the log page's
+// headers and the per-plan rows).
+func (a *App) LogRunOf(st *LoadoutState, path string) *LogRun {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+	return a.logRun(st, path, LogVersionOf(path), fi.ModTime())
 }
 
 // logFindings returns the problem log's clusters as findings (informational ones left out),

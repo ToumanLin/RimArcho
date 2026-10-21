@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Launcher starts a process without waiting for it. Tests replace it; nothing in the test
@@ -83,8 +84,13 @@ func (a *App) Launch(dryRun bool) (*SaveResult, error) {
 		return r, err
 	}
 	// Recorded once the game started, so a failed start leaves no launch for logs to match.
-	// TODO(0.9 wave 2): the launch record carries the plan and the list fingerprint (08 §1).
-	return r, a.Store.AddLaunch(e.ID, a.Now().UTC(), p.Method, p.Command())
+	// The record names the plan, the list's fingerprint and the version played (08 §1).
+	vn := r.Version
+	if r.Unchanged && st.Latest != nil {
+		vn = st.Latest.N
+	}
+	return r, a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: e.ID, PlanID: st.Plan.ID, Started: a.Now().UTC(),
+		Method: p.Method, Command: p.Command(), Fingerprint: ListFingerprint(st.List), VersionN: vn})
 }
 
 func (a *App) startGame(p *LaunchPlan) error {

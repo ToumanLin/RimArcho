@@ -468,24 +468,54 @@ func versionSummary(ps []*app.Problem, mm string) string {
 	return line + "  (archo problems --code version.unsupported)"
 }
 
-// logRunText describes a log: file, game version, time, and whether it is stale.
+// logRunText describes a log: file, game version, time, the run it belongs to and whether
+// it is stale, with the reasons (03 §6.4).
 func logRunText(c *Ctx, r *app.LogRun) string {
 	s := r.Label
 	if v := strings.Fields(r.Version); len(v) > 0 {
 		s += " " + v[0]
 	}
 	s += " " + c.App.FormatTime(r.ModTime)
+	src := r.Source
+	plan := func() string {
+		if src.Plan == "" {
+			return "a plan that no longer exists"
+		}
+		return "plan:" + src.Plan
+	}
+	run := func() string { // the run the log maps to
+		if src.ByWrite {
+			return fmt.Sprintf("%s as written to the game at %s", plan(), c.App.FormatTime(src.At))
+		}
+		if src.Pack != "" {
+			return fmt.Sprintf("the launch of pack %s at %s", src.Pack, c.App.FormatTime(src.At))
+		}
+		return fmt.Sprintf("the launch of %s at %s", plan(), c.App.FormatTime(src.At))
+	}
 	var why []string
 	if r.OtherGame {
 		why = append(why, fmt.Sprintf("written by %s, the game is %s", r.MM, r.EnvMM))
 	}
-	if r.Before {
-		why = append(why, "older than the Loadout's last change at "+c.App.FormatTime(r.LoadoutAt))
+	switch {
+	case src == nil:
+	case r.Unknown:
+		why = append(why, "source unknown: no launch and no ModsConfig.xml write by RimArcho before it")
+	case r.OtherRun && r.OtherEnv != "":
+		why = append(why, fmt.Sprintf("from %s in environment %s", run(), r.OtherEnv))
+	case r.OtherRun && src.Pack != "":
+		why = append(why, "from "+run())
+	case r.OtherRun:
+		why = append(why, "from another plan: "+run())
+	case r.Changed:
+		why = append(why, "the plan changed since "+run())
 	}
 	if len(why) > 0 {
 		return s + ", stale log (" + strings.Join(why, "; ") + ")"
 	}
-	return s + ", current (written after the Loadout's last change)"
+	if src == nil {
+		return s + ", current"
+	}
+	return s + ", current (from " + run() + ")"
 }
 
 // shortCounts is severityCounts without the zero severities.

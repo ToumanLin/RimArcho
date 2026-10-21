@@ -7,6 +7,9 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // DotnetBin is testdata/dotnet/bin: the fixture assemblies built by testdata/dotnet/build.ps1.
@@ -64,11 +67,31 @@ func (e *Env) HarmonyLogFixture() string {
 	os.Chtimes(e.ModsConfig, e.Now().Add(-time.Hour), e.Now().Add(-time.Hour))
 	e.AddEnv(false)
 	e.MustRun("scan")
+	// RimArcho launched the plan before the session that wrote the log (03 §6.4).
+	e.RecordLaunch(e.Now().Add(-30 * time.Minute))
 	log := FixtureLog(filepath.Join(mods, "Compat", "Patches", "Compat.xml"))
 	p := filepath.Join(e.UserData, "Player.log")
 	e.WriteFile(p, log)
 	os.Chtimes(p, e.Now(), e.Now())
 	return log
+}
+
+// RecordLaunch records a launch of the current plan at at, as Launch does once the game
+// started: the plan, its list fingerprint and its newest version (08 §1). Nothing starts.
+func (e *Env) RecordLaunch(at time.Time) {
+	e.T.Helper()
+	st, err := e.App.Loadout()
+	if err != nil {
+		e.T.Fatal(err)
+	}
+	r := &store.LaunchRecord{EnvID: st.Ix.Env.ID, PlanID: st.Plan.ID, Started: at.UTC(), Method: "direct",
+		Command: "RimWorldWin64.exe", Fingerprint: app.ListFingerprint(st.List)}
+	if st.Latest != nil {
+		r.VersionN = st.Latest.N
+	}
+	if err := e.App.Store.AddLaunchRecord(r); err != nil {
+		e.T.Fatal(err)
+	}
 }
 
 // FixtureLog is the Player.log of HarmonyLogFixture; compatFile is the failing patch file.

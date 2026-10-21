@@ -167,7 +167,7 @@ problems: 2 error, 2 warning, 0 info
   list:
     (none)
   logs:
-    log Player.log 1.6.4633 2026-10-01 10:00, current (written after the Loadout's last change): 2 error, 2 warning
+    log Player.log 1.6.4633 2026-10-01 10:00, current (from the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning
       error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  (p:4c087a)
       error log.harmony-stack  log:E3 x500: Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object  (p:cfe9b5)
       warning log.patch-failed  log:E1 x1: [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  (p:906d0c)
@@ -186,7 +186,7 @@ problems: 3 error, 5 warning, 2 info
     info harmony.shared-target  3 mods patch Verse.Pawn.Tick  (p:280e07)
     info harmony.manual  #i4uc Manual Patcher calls Harmony.Patch from code; those targets cannot be determined statically  (p:3b74ac)
   logs:
-    log Player.log 1.6.4633 2026-10-01 10:00, current (written after the Loadout's last change): 2 error, 2 warning
+    log Player.log 1.6.4633 2026-10-01 10:00, current (from the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning
       error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  (p:4c087a)
       error log.harmony-stack  log:E3 x500: Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object  (p:cfe9b5)
       warning log.patch-failed  log:E1 x1: [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  (p:906d0c)
@@ -203,7 +203,7 @@ env:main  RimWorld 1.6.4633 rev1261
   plan: plan:default
   loadout: 8 active, same as v1 (import)
   problems: 3 error, 5 warning, 2 info (archo problems)
-  log: Player.log 1.6.4633 2026-10-01 10:00, current (written after the Loadout's last change)
+  log: Player.log 1.6.4633 2026-10-01 10:00, current (from the launch of plan:default at 2026-10-01 09:30)
 
 $ archo disable #i4uc
 workspace: 7 active, 1 change unsaved (plan:default, env:main)
@@ -221,7 +221,7 @@ problems: 1 error, 2 warning, 2 info
     info harmony.skip-prefix  1 bool prefixes from 1 mods can skip methods other mods also patch; none is in a log stack  (archo problems --code harmony.skip-prefix)
     info harmony.shared-target  3 mods patch Verse.Pawn.Tick  (p:280e07)
   logs:
-    log Player.log 1.6.4633 2026-10-01 10:00, stale log (older than the Loadout's last change at 2026-10-01 11:00): 2 error, 2 warning, not counted  (archo problems --code log --all)
+    log Player.log 1.6.4633 2026-10-01 10:00, stale log (the plan changed since the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning, not counted  (archo problems --code log --all)
 next:
   archo problems show p:a4972d
 
@@ -234,7 +234,7 @@ env:main  RimWorld 1.6.4633 rev1261
   plan: plan:default
   loadout: 7 active, 1 change unsaved (archo loadout diff)
   problems: 1 error, 2 warning, 2 info (archo problems)
-  log: Player.log 1.6.4633 2026-10-01 10:00, stale log (older than the Loadout's last change at 2026-10-01 11:00): 2 error, 2 warning, not counted (archo problems --code log --all)
+  log: Player.log 1.6.4633 2026-10-01 10:00, stale log (the plan changed since the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning, not counted (archo problems --code log --all)
 next:
   archo save
 
@@ -244,7 +244,7 @@ problems: 0 error, 0 warning, 0 info
   list:
     (none)
   logs:
-    log Player.log 1.6.4633 2026-10-01 10:00, stale log (older than the Loadout's last change at 2026-10-01 11:00): 2 error, 2 warning, not counted
+    log Player.log 1.6.4633 2026-10-01 10:00, stale log (the plan changed since the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning, not counted
       error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  (p:4c087a)
       error log.harmony-stack  log:E3 x500: Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object  (p:cfe9b5)
       warning log.patch-failed  log:E1 x1: [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  (p:906d0c)
@@ -255,7 +255,7 @@ error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutO
   confidence: likely
   layer: log
   subjects: #iqmu
-  log: Player.log 1.6.4633 2026-10-01 10:00, stale log (older than the Loadout's last change at 2026-10-01 11:00)
+  log: Player.log 1.6.4633 2026-10-01 10:00, stale log (the plan changed since the launch of plan:default at 2026-10-01 09:30)
   evidence: log #iqmu source: log frame 1 ModA.CompBroken.CompTick (topmost mod code in the stack)
   evidence: log #iqmu source: log harmony:Verse.Pawn.Tick#prefix "- PREFIX tester.moda.harmony" (type ModA.Pawn_Tick)
   fix: archo log --cluster E4

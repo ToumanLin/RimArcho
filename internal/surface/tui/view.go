@@ -96,6 +96,9 @@ func (m *model) topBar() string {
 			st = sErrS
 		}
 		add("  "+st.Render(t), 2+width.StringWidth(t))
+	} else if m.live != nil && m.live.NewLog != "" {
+		// 08 §2 "游戏退出后": a new Player.log; the Problems view analyses it
+		add("  "+sAccent.Render(m.live.NewLog), 2+width.StringWidth(m.live.NewLog))
 	}
 	if m.unsaved > 0 {
 		t := Tf("not written %d", m.unsaved)
