@@ -30,7 +30,7 @@ func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, wor
 	}
 	var jobs []job
 	for _, m := range active {
-		for _, a := range content.Files(m.Dir, folders[m.Instance], "Assemblies", ".dll") {
+		for _, a := range content.CodeFiles(m.Dir, folders[m.Instance]) {
 			jobs = append(jobs, job{m, a})
 		}
 	}

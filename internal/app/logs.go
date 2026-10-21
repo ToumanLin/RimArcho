@@ -542,6 +542,7 @@ var (
 	curParentRe = regexp.MustCompile(`curParent=([A-Za-z_][\w+]*(?:\.[A-Za-z_][\w+]*)+)`)
 	loadIDRe    = regexp.MustCompile(`loadID (\S+) of type (\S+?)\.? Was`)
 	shaderRe    = regexp.MustCompile(`with Shader '([^']+)' doesn't have a texture property '_MainTex'`)
+	fieldErrRe  = regexp.MustCompile(`^XML error: <([\w.]+)>([^<]{0,200})</[\w.]+> doesn't correspond to any field in type`)
 )
 
 // xrefName reads the missing def's type and name from a cross-reference, save-load reference
@@ -604,6 +605,15 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	// 2. File paths in the message or its continuation lines.
 	texts := append([]string{e.Message}, e.Extra...)
 	for _, t := range texts {
+		// "absFilePath: [Rimworld_dir]\Mods\<folder>\Sounds\x.mp3" after a failed content load.
+		if p, ok := strings.CutPrefix(t, "absFilePath: "); ok {
+			if id, rel := cx.dirOwner(p); id != "" {
+				lc.add(id, RoleSource, "log file "+rel+" (the file the game failed to load)")
+			} else if id, rel := cx.folderOwner(p); id != "" {
+				lc.add(id, RoleSource, "log file "+rel+" (by mod folder; the file the game failed to load)")
+			}
+			continue
+		}
 		for _, p := range winPathRe.FindAllString(t, -1) {
 			if id, rel := cx.dirOwner(p); id != "" {
 				lc.add(id, RoleSource, "log file "+rel)

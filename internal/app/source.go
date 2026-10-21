@@ -130,7 +130,7 @@ func (a *App) SourceDLLs(st *LoadoutState, m *store.Mod) ([]*SourceDLL, error) {
 	dir := st.Ix.ModDir(m)
 	r := content.Resolve(dir, m.Decl().LoadFolders, st.GameMM(), func(p string) bool { return active[strings.TrimSuffix(strings.ToLower(p), "_steam")] })
 	var out []*SourceDLL
-	for _, as := range content.Files(dir, r.Folders, "Assemblies", ".dll") {
+	for _, as := range content.CodeFiles(dir, r.Folders) {
 		if harmony.Skipped(filepath.Base(as.Path), harmony.DefaultSkip) {
 			continue
 		}

@@ -24,6 +24,13 @@ Could not resolve reference to object with loadID Battle_225 of type Verse.Battl
 Could not find think node with key 12345
 Could not load reference to Verse.ThingDef named Gone_Thing
 Material 'Custom/X_null' with Shader 'Custom/X' doesn't have a texture property '_MainTex'
+Exception loading UnityEngine.AudioClip from file.
+absFilePath: [Rimworld_dir]/Mods/Sounder/Sounds/Bad.mp3
+Exception: System.ArgumentNullException: Value cannot be null.
+
+XML error: <oldField>7</oldField> doesn't correspond to any field in type ThingDef.
+Exception in a Lunar component: System.InvalidOperationException: boom
+  at LogLoader.Loader.Load (System.String path) [0x00000] in <abc>:0
 `
 
 // logRulesFixture: mods whose files hold the names the log reports missing.
@@ -32,7 +39,10 @@ Material 'Custom/X_null' with Shader 'Custom/X' doesn't have a texture property 
 //	TexLib  tester.texlib  ships Textures/UI/Lib/Badge.png, installed but disabled
 //	Coder   tester.coder   LogRefs.dll: literals "UI/LogRefs/Icon" and "LogRefs_Missing", type
 //	                       LogRefs.Holder, a ReflectionOnlyAssemblyResolve handler
-//	Loader  tester.loader  LogLoader.dll: Assembly.ReflectionOnlyLoadFrom
+//	Luna    tester.luna    Lunar/Components/LogLoader.dll (a Lunar framework mod):
+//	                       Assembly.ReflectionOnlyLoadFrom, type LogLoader.Loader
+//	Sounder tester.sounder a mod folder named by absFilePath
+//	Fielder tester.fielder XML with <oldField>7</oldField>
 //	Lister  tester.lister  XML that lists LogRefs_Missing and Gone_Thing
 //	Selfer  tester.selfer  defines SoundDef Self_Sound and uses it
 //	AsmLib  tester.asmlib  ships Assemblies/Extra.dll, installed but disabled
@@ -42,21 +52,26 @@ func logRulesFixture(t *testing.T) (*testkit.Env, *app.LogReport) {
 	mod := func(dir, pkg string, files map[string]string, dlls ...string) {
 		e.WriteMod(filepath.Join(mods, dir), testkit.Mod{PackageID: pkg, Name: dir, Author: "Tester", Files: files})
 		for _, d := range dlls {
-			b, err := os.ReadFile(filepath.Join(testkit.DotnetBin(), d))
+			b, err := os.ReadFile(filepath.Join(testkit.DotnetBin(), filepath.Base(d)))
 			if err != nil {
 				t.Fatal(err)
 			}
-			e.WriteFile(filepath.Join(mods, dir, "Assemblies", d), string(b))
+			if !strings.Contains(d, "/") {
+				d = "Assemblies/" + d
+			}
+			e.WriteFile(filepath.Join(mods, dir, filepath.FromSlash(d)), string(b))
 		}
 	}
 	mod("Texer", "tester.texer", map[string]string{"Defs/Things.xml": "<Defs>\n  <ThingDef>\n    <defName>Tex_Lamp</defName>\n    <graphicData>\n      <texPath>Things/Tex/Lamp</texPath>\n    </graphicData>\n  </ThingDef>\n</Defs>\n"})
 	mod("TexLib", "tester.texlib", map[string]string{"Textures/UI/Lib/Badge.png": "png"})
 	mod("Coder", "tester.coder", nil, "LogRefs.dll")
-	mod("Loader", "tester.loader", nil, "LogLoader.dll")
+	mod("Luna", "tester.luna", nil, "Lunar/Components/LogLoader.dll")
+	mod("Sounder", "tester.sounder", map[string]string{"Sounds/Bad.mp3": "mp3"})
+	mod("Fielder", "tester.fielder", map[string]string{"Defs/Old.xml": "<Defs>\n  <ThingDef>\n    <defName>Old_Thing</defName>\n    <oldField>7</oldField>\n  </ThingDef>\n</Defs>\n"})
 	mod("Lister", "tester.lister", map[string]string{"Defs/Lists.xml": "<Defs>\n  <ThingDef>\n    <defName>Lister_Thing</defName>\n    <comps>\n      <li>LogRefs_Missing</li>\n      <li>Gone_Thing</li>\n    </comps>\n  </ThingDef>\n</Defs>\n"})
 	mod("Selfer", "tester.selfer", map[string]string{"Defs/Self.xml": "<Defs>\n  <SoundDef>\n    <defName>Self_Sound</defName>\n  </SoundDef>\n  <ThingDef>\n    <defName>Self_Gun</defName>\n    <verbs>\n      <li>\n        <soundCast>Self_Sound</soundCast>\n      </li>\n    </verbs>\n  </ThingDef>\n</Defs>\n"})
 	mod("AsmLib", "tester.asmlib", map[string]string{"Assemblies/Extra.dll": "MZ"})
-	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.texer", "tester.coder", "tester.loader", "tester.lister", "tester.selfer")
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.texer", "tester.coder", "tester.luna", "tester.lister", "tester.selfer", "tester.sounder", "tester.fielder")
 	e.AddEnv(false)
 	e.MustRun("scan")
 	if _, err := e.App.EnsureAnalysis(nil); err != nil {
@@ -111,7 +126,7 @@ func TestLogRulesFromCorpus(t *testing.T) {
 		{"a mod that defines and uses the missing def", "Self_Sound",
 			map[string]string{"tester.selfer": "source"}, []string{"defines it itself (Defs/Self.xml:2)", "update the mod"}},
 		{"game assembly: the reflection-only resolver", "UnityEngine.InputLegacyModule",
-			map[string]string{"tester.coder": "source", "tester.loader": "mentioned"}, []string{"ships with the game", "AppDomain.ReflectionOnlyAssemblyResolve", "LogLoader.dll"}},
+			map[string]string{"tester.coder": "source", "tester.luna": "mentioned"}, []string{"ships with the game", "AppDomain.ReflectionOnlyAssemblyResolve", "LogLoader.dll"}},
 		{"mod assembly shipped by a disabled mod", "assembly 'Extra",
 			map[string]string{"tester.asmlib": "dependency"}, []string{"ships Assemblies/Extra.dll but is not enabled"}},
 		{"save reference held by a mod's type", "curParent=LogRefs.Holder",
@@ -124,6 +139,12 @@ func TestLogRulesFromCorpus(t *testing.T) {
 			nil, []string{"providers: none among installed mods", "the mod that defined it was removed"}},
 		{"_MainTex shader", "_MainTex",
 			nil, []string{"shader Custom/X has no _MainTex"}},
+		{"a content file the game failed to load", "absFilePath",
+			map[string]string{"tester.sounder": "source"}, []string{"log file Sounds/Bad.mp3 (by mod folder; the file the game failed to load)"}},
+		{"an XML field error matched by element and value", "<oldField>",
+			map[string]string{"tester.fielder": "source"}, []string{"has <oldField>7</oldField> at Defs/Old.xml:4"}},
+		{"a frame in a Lunar component DLL", "Exception in a Lunar component",
+			map[string]string{"tester.luna": "source"}, []string{"log frame 1 LogLoader.Loader.Load"}},
 	} {
 		roles, text := ruleCluster(t, e, rep, c.sub)
 		if len(roles) != len(c.want) {

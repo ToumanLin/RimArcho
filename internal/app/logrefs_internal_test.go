@@ -18,10 +18,12 @@ func TestXMLRefs(t *testing.T) {
   </ThingDef>
 </Defs>`
 	var got []string
-	xmlRefs([]byte(src), func(s []byte, elem bool, off int) {
+	xmlRefs([]byte(src), func(tag, s []byte, elem bool, off int) {
 		k := "text:"
 		if elem {
 			k = "elem:"
+		} else if string(s) == "Things/A" && string(tag) != "texPath" {
+			t.Errorf("tag of Things/A: %q", tag)
 		}
 		got = append(got, k+string(s))
 	})

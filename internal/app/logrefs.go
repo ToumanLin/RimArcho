@@ -29,6 +29,9 @@ type refQuery struct {
 	// literal in an assembly can be the source; XML that lists the name is only mentioned
 	// (log corpus: vanilla biome names in animal and plant XML).
 	code bool
+	// field: an XML error names an element and value ("XML error: <F>V</F> doesn't correspond
+	// to any field"); the files holding exactly <F>V</F> are looked for.
+	field string
 }
 
 // referrerQuery is the lookup a cluster needs, if any.
@@ -54,6 +57,10 @@ func referrerQuery(lc *LogCluster) *refQuery {
 			names = append(names, m[1]) // Graphic_Multi: the XML names the base path
 		}
 		return &refQuery{lc: lc, names: names, dll: true}
+	case logs.ClassXMLLoad:
+		if m := fieldErrRe.FindStringSubmatch(msg); m != nil && m[2] != "" {
+			return &refQuery{lc: lc, field: m[1], names: []string{m[2]}}
+		}
 	}
 	return nil
 }
@@ -85,7 +92,7 @@ var defNameTag = []byte("defName")
 // xmlRefs calls hit for each element's text (<a>TEXT</a>, trimmed) and each attribute-less
 // start tag (<TEXT>1</TEXT>, elem true), with the byte offset. <defName> text is the def's own
 // name, not a reference, and comments are skipped.
-func xmlRefs(b []byte, hit func(s []byte, elem bool, off int)) {
+func xmlRefs(b []byte, hit func(tag, s []byte, elem bool, off int)) {
 	for i := 0; i < len(b); i++ {
 		if b[i] != '<' {
 			continue
@@ -116,14 +123,14 @@ func xmlRefs(b []byte, hit func(s []byte, elem bool, off int)) {
 			continue
 		}
 		if j == k {
-			hit(name, true, i)
+			hit(nil, name, true, i)
 		}
 		end := bytes.IndexByte(b[k+1:], '<')
 		if end < 0 {
 			return
 		}
 		if text := bytes.TrimSpace(b[k+1 : k+1+end]); len(text) > 0 && len(text) < 256 && !bytes.Equal(name, defNameTag) {
-			hit(text, false, k+1)
+			hit(name, text, false, k+1)
 		}
 		i = k
 	}
@@ -143,11 +150,16 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 			active[strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")] = true
 		}
 	}
-	text := map[string][]int{} // element text → queries
-	elem := map[string][]int{} // element name → queries (defs only)
-	lit := map[string][]int{}  // assembly string literal → queries
+	text := map[string][]int{}  // element text → queries
+	elem := map[string][]int{}  // element name → queries (defs only)
+	lit := map[string][]int{}   // assembly string literal → queries
+	field := map[string][]int{} // element name + "\x00" + text → queries
 	for i, q := range qs {
 		for _, n := range q.names {
+			if q.field != "" {
+				field[q.field+"\x00"+n] = append(field[q.field+"\x00"+n], i)
+				continue
+			}
 			text[n] = append(text[n], i)
 			if q.def != "" {
 				elem[n] = append(elem[n], i)
@@ -211,10 +223,12 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 					if err != nil {
 						continue
 					}
-					xmlRefs(b, func(s []byte, isElem bool, off int) {
+					xmlRefs(b, func(tag, s []byte, isElem bool, off int) {
 						idx := text[string(s)]
 						if isElem {
 							idx = elem[string(s)]
+						} else if len(field) > 0 {
+							idx = append(idx[:len(idx):len(idx)], field[string(tag)+"\x00"+string(s)]...)
 						}
 						for _, q := range idx {
 							if _, ok := first[q]; !ok {
@@ -314,6 +328,10 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 		if len(refs[h.q]) > 3 || hadSource[h.q] {
 			role = RoleMentioned
 		}
+		if q.field != "" {
+			q.lc.add(h.inst, role, fmt.Sprintf("has <%s>%s</%s> %s", q.field, name, q.field, where))
+			continue
+		}
 		q.lc.add(h.inst, role, fmt.Sprintf("references %s %s", name, where))
 	}
 	for i, q := range qs {
@@ -337,7 +355,7 @@ func (cx *attrCtx) rank(lc *LogCluster) {
 func (cx *attrCtx) textureProviders(qs []*refQuery) {
 	var need []*refQuery
 	for _, q := range qs {
-		if q.def == "" && !hasSource(q.lc) {
+		if q.def == "" && q.field == "" && !hasSource(q.lc) {
 			need = append(need, q)
 		}
 	}
