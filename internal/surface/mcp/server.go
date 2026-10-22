@@ -250,10 +250,10 @@ type DescribeIn struct {
 
 type PlayerIn struct {
 	Env    string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note"`
+	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 06 §2.9)"`
 	Refs   []string `json:"refs" jsonschema:"the mods (tag actions: one or more; alias and note: exactly one)"`
 	Tags   []string `json:"tags,omitempty" jsonschema:"tag_add / tag_remove: the tags"`
-	Text   string   `json:"text,omitempty" jsonschema:"alias / note: the text; empty clears it"`
+	Text   string   `json:"text,omitempty" jsonschema:"alias / note / copy_note: the text; empty clears it"`
 }
 
 type CopyIn struct {
@@ -286,6 +286,7 @@ type PinIn struct {
 	Git           bool   `json:"git,omitempty" jsonschema:"make the copy a git repository with a baseline commit, so edits can be diffed"`
 	Update        bool   `json:"update,omitempty" jsonschema:"remake the locked version from the upstream's current content in a new folder; the old copy stays"`
 	MoveToLibrary bool   `json:"move_to_library,omitempty" jsonschema:"move a copy RimArcho made in Mods/ (before the lock library) into the library"`
+	Reason        string `json:"reason,omitempty" jsonschema:"why it is locked (e.g. the problem it avoids): kept in the copy's note"`
 	DryRun        bool   `json:"dry_run,omitempty" jsonschema:"show what would be copied and swapped without changing anything"`
 }
 
@@ -342,7 +343,7 @@ func toolList() []tool {
 		// add_rule is the old name of manage_rules, kept as an alias (05 §6).
 		reg("add_rule", false, false, descRuleAlias, func(in RuleIn) []string { return RulesArgv(in) }),
 		reg("pin_mod", false, false, descPin, func(in PinIn) []string {
-			return argv("pin", in.Ref).str("name", in.Name).flag("git", in.Git).flag("update", in.Update).flag("move-to-library", in.MoveToLibrary).flag("dry-run", in.DryRun).a
+			return argv("pin", in.Ref).str("name", in.Name).flag("git", in.Git).flag("update", in.Update).flag("move-to-library", in.MoveToLibrary).str("reason", in.Reason).flag("dry-run", in.DryRun).a
 		}),
 		reg("unpin_mod", false, false, descUnpin, func(in UnpinIn) []string { return argv("unpin", in.Ref).flag("dry-run", in.DryRun).a }),
 	}
@@ -452,6 +453,11 @@ func PlayerArgv(in PlayerIn) []string {
 			return []string{in.Action, first, "--clear"}
 		}
 		return []string{in.Action, first, in.Text}
+	case "copy_note":
+		if in.Text == "" {
+			return []string{"note", first, "--copy", "--clear"}
+		}
+		return []string{"note", first, in.Text, "--copy"}
 	}
 	return []string{"set_player_data: unknown action " + fmt.Sprintf("%q", in.Action)}
 }

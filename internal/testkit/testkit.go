@@ -204,6 +204,13 @@ func (e *Env) CopyTree(src, dst string) {
 	if err != nil {
 		e.T.Fatal(err)
 	}
+	e.stamp(dst)
+}
+
+// stamp gives a mod folder the fake clock's time, so what reads folder times (Mod 库存's
+// 更新日期, 06 §2.9) is reproducible.
+func (e *Env) stamp(dir string) {
+	os.Chtimes(dir, e.now, e.now)
 }
 
 // Move renames a file or directory.
@@ -282,6 +289,7 @@ func (e *Env) WriteMod(dir string, m Mod) {
 	for _, k := range keys {
 		e.WriteFile(filepath.Join(dir, filepath.FromSlash(k)), m.Files[k])
 	}
+	e.stamp(dir)
 }
 
 // Sample returns a mod with a few defs and patches unique to name.

@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 12
+const SchemaVersion = 13
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -297,6 +297,15 @@ ALTER TABLE analysis ADD COLUMN set_key TEXT NOT NULL DEFAULT '';
 CREATE INDEX analysis_slot ON analysis(environment_id, game_mm, set_key, id);
 `
 
+// schemaV13: a note per Instance (06 §2.9): the player's (or an agent's) words about this
+// copy, and what RimArcho recorded when it made the copy (made: JSON, see store.Made). The
+// lineage's note (lineage_data, has:note) is about the mod and all its copies.
+const schemaV13 = `
+CREATE TABLE instance_note(
+  instance_id TEXT PRIMARY KEY, text TEXT NOT NULL DEFAULT '', made TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL DEFAULT 0);
+`
+
 // migrateV11 finishes schemaV11: modsconfig_state is keyed by the normalised user data
 // folder (UserDataKey); rows that normalise to the same folder keep the newest write.
 func migrateV11(tx *sql.Tx) error {
@@ -385,7 +394,7 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13}
 	// post runs after a step's SQL, in the same transaction.
 	post := map[int]func(*sql.Tx) error{11: migrateV11}
 	if n == 0 {

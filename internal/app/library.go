@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"slices"
 	"sort"
 	"strconv"
@@ -51,7 +52,26 @@ const (
 var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibExtra, LibMonitor}
 
 // Library filter keys (LibQuery Include / Exclude are "key:value").
-var LibKeys = []string{"tag", "source", "version", "state", "used"}
+var LibKeys = []string{"tag", "source", "version", "state", "used", "updated"}
+
+// LibAges are the updated: values (06 §2.9): within a week, a month, half a year, and
+// older. They nest: a copy updated three days ago is in week, month and half-year.
+var LibAges = []string{"week", "month", "half-year", "older"}
+
+func libAges(t, now time.Time) []string {
+	if t.IsZero() {
+		return nil
+	}
+	switch d := now.Sub(t); {
+	case d <= 7*24*time.Hour:
+		return []string{"week", "month", "half-year"}
+	case d <= 31*24*time.Hour:
+		return []string{"month", "half-year"}
+	case d <= 183*24*time.Hour:
+		return []string{"half-year"}
+	}
+	return []string{"older"}
+}
 
 // LibUse is a plan or a pack that uses an instance.
 type LibUse struct {
@@ -86,6 +106,13 @@ type LibInstance struct {
 	Changed time.Time // the newest scan that recorded a change
 	Locked  *Locked   // a locked version RimArcho made, with its upstream
 	Spare   bool      // a copy in Mods/ beside another copy of the lineage: it can move to the lock library
+	// Updated: the Workshop's update time when known, else the folder's modification time.
+	Updated time.Time
+	Authors string
+	// Note is this copy's own note and what RimArcho recorded when it made the copy (nil:
+	// none); UpstreamUpdates counts the upstream's updates since the copy was made.
+	Note            *store.CopyNote
+	UpstreamUpdates int
 }
 
 // Missing reports a subscribed item with no folder.
@@ -184,6 +211,7 @@ type Library struct {
 	GameMM   string
 	Lineages []*LibLineage // by name
 	St       *LoadoutState
+	Now      time.Time // what updated: is counted from
 }
 
 // Library builds the current environment's inventory.
@@ -206,6 +234,11 @@ func (a *App) Library() (*Library, error) {
 	if err != nil {
 		return nil, err
 	}
+	notes, err := a.Store.CopyNotes(ix.Env.ID)
+	if err != nil {
+		return nil, err
+	}
+	lib.Now = a.Now()
 	locks := map[string]*Locked{}
 	for _, l := range st.Locked() {
 		locks[l.Copy.ID] = l
@@ -258,6 +291,9 @@ func (a *App) Library() (*Library, error) {
 		l.Instances = append(l.Instances, i)
 		l.Alias, l.Note, l.Tags = m.Alias, m.Note, m.Tags
 		l.search += " " + strings.ToLower(strings.Join([]string{m.Name, m.Alias, m.PackageID, m.Authors, m.WorkshopID(), m.Rel, m.Note, strings.Join(m.Tags, " ")}, " "))
+		if i.Note != nil {
+			l.search += " " + strings.ToLower(i.Note.Text)
+		}
 	}
 	for _, m := range ix.Mods {
 		if m.Status != identity.Live || m.Kind == source.Official || srcKind[m.SourceID] == "" {
@@ -265,7 +301,13 @@ func (a *App) Library() (*Library, error) {
 		}
 		i := &LibInstance{Mod: m, Ref: ix.Ref(m.ID), Source: srcKind[m.SourceID], WorkshopID: m.WorkshopID(), Path: ix.ModDir(m),
 			Bytes: m.TotalSize, Sized: m.SnapID != 0 && (m.FileCount > 0 || m.TotalSize > 0),
-			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID]}
+			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID],
+			Authors: strings.TrimSpace(m.Authors), Note: notes[m.ID]}
+		if m.ACFTimeUpdated > 0 {
+			i.Updated = time.Unix(m.ACFTimeUpdated, 0).UTC()
+		} else if fi, err := os.Stat(i.Path); err == nil {
+			i.Updated = fi.ModTime().UTC()
+		}
 		for _, v := range strings.Fields(strings.ReplaceAll(m.SupportedVersions, ",", " ")) {
 			if !slices.Contains(i.Versions, v) {
 				i.Versions = append(i.Versions, v)
@@ -281,6 +323,15 @@ func (a *App) Library() (*Library, error) {
 			}
 		}
 		i.Spare = m.Kind == source.Local && live[m.LineageID] > 1 && !source.IsLink(i.Path)
+		if i.Locked != nil {
+			since := i.Created
+			if i.Note != nil && i.Note.Made != nil {
+				since = i.Note.Made.At
+			}
+			if !since.IsZero() {
+				i.UpstreamUpdates = a.Store.UpdatesSince(i.Locked.Upstream.ID, since)
+			}
+		}
 		i.States = libStates(st, lib.GameMM, m, i, i.Locked != nil && i.Locked.Updated || pinUpdated[m.ID])
 		add(m, i)
 	}
@@ -313,7 +364,7 @@ func (a *App) Library() (*Library, error) {
 				byLin["ws:"+id] = &LibLineage{ID: "ws:" + id, Ref: "ws:" + id, Name: "Workshop item " + id, Instances: []*LibInstance{i}, search: " " + id}
 				continue
 			}
-			i.Mod, i.Ref, i.UsedIn, i.InPlan = ghost, ix.Ref(ghost.ID), used[ghost.ID], st.List.Index(ghost.ID) >= 0
+			i.Mod, i.Ref, i.UsedIn, i.InPlan, i.Note = ghost, ix.Ref(ghost.ID), used[ghost.ID], st.List.Index(ghost.ID) >= 0, notes[ghost.ID]
 			add(ghost, i)
 		}
 	}
@@ -618,8 +669,10 @@ type LibQuery struct {
 	Sort             string
 }
 
-// LibSorts are the sort orders.
-var LibSorts = []string{"name", "size", "changed", "played"}
+// LibSorts are the sort orders, by column (06 §2.9); a leading "-" reverses one. Each has
+// its natural direction: names, sources, authors and tags A to Z; sizes biggest first;
+// dates and versions newest first; states most important first; used-in most used first.
+var LibSorts = []string{"name", "size", "changed", "played", "state", "source", "used", "updated", "version", "author", "tags"}
 
 // LibMatch is a lineage that matches, with the instances that match.
 type LibMatch struct {
@@ -661,8 +714,10 @@ func ParseLibFilter(f string) (key, value string, err error) {
 }
 
 // values are an instance's values for a filter key (tag: its lineage's tags).
-func libValues(l *LibLineage, i *LibInstance, key string) []string {
+func libValues(l *LibLineage, i *LibInstance, key string, now time.Time) []string {
 	switch key {
+	case "updated":
+		return libAges(i.Updated, now)
 	case "tag":
 		return l.Tags
 	case "source":
@@ -702,6 +757,7 @@ type libCond struct {
 	// tags are the library's tag names (lower case): tag:<v> naming one of them is that tag
 	// (a click on the filter column); any other v matches tags by word (TagMatch).
 	tags map[string]bool
+	now  time.Time
 }
 
 func (q LibQuery) cond() (*libCond, error) {
@@ -740,7 +796,7 @@ func (c *libCond) passes(l *LibLineage, i *LibInstance, skip string) bool {
 }
 
 func (c *libCond) has(l *LibLineage, i *LibInstance, k string, want map[string]bool) bool {
-	if anyIn(libValues(l, i, k), want, true) {
+	if anyIn(libValues(l, i, k, c.now), want, true) {
 		return true
 	}
 	if k != "tag" {
@@ -774,10 +830,10 @@ func (lib *Library) Filter(q LibQuery) (*LibResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	if q.Sort != "" && !slices.Contains(LibSorts, q.Sort) {
-		return nil, fmt.Errorf("bad sort %q: want %s", q.Sort, strings.Join(LibSorts, ", "))
+	if q.Sort != "" && !slices.Contains(LibSorts, strings.TrimPrefix(q.Sort, "-")) {
+		return nil, fmt.Errorf("bad sort %q: want %s (a leading - reverses)", q.Sort, strings.Join(LibSorts, ", "))
 	}
-	c.tags = map[string]bool{}
+	c.tags, c.now = map[string]bool{}, lib.Now
 	for _, l := range lib.Lineages {
 		for _, t := range l.Tags {
 			c.tags[strings.ToLower(t)] = true
@@ -795,7 +851,7 @@ func (lib *Library) Filter(q LibQuery) (*LibResult, error) {
 				if all[k] == nil {
 					all[k] = map[string]string{}
 				}
-				for _, v := range libValues(l, i, k) {
+				for _, v := range libValues(l, i, k, c.now) {
 					if _, ok := all[k][strings.ToLower(v)]; !ok {
 						all[k][strings.ToLower(v)] = v
 					}
@@ -822,7 +878,7 @@ func (lib *Library) Filter(q LibQuery) (*LibResult, error) {
 				if !c.passes(l, i, k) {
 					continue
 				}
-				for _, v := range libValues(l, i, k) {
+				for _, v := range libValues(l, i, k, c.now) {
 					seen[strings.ToLower(v)] = true
 				}
 			}
@@ -865,6 +921,8 @@ func sortFacet(k string, vs []LibFacetValue, lib *Library) {
 			return slices.Index(LibSources, v)
 		case "state":
 			return slices.Index(LibStates, v)
+		case "updated":
+			return slices.Index(LibAges, v)
 		case "used":
 			if v == "none" {
 				return -1
@@ -920,29 +978,147 @@ func versionLess(a, b string) bool {
 
 func sortLineages(ls []*LibLineage, by string) {
 	name := func(l *LibLineage) string { return strings.ToLower(l.Name) }
-	sort.SliceStable(ls, func(i, j int) bool {
-		a, b := ls[i], ls[j]
+	rev := strings.HasPrefix(by, "-")
+	by = strings.TrimPrefix(by, "-")
+	// cmp: <0 a first, >0 b first, 0 tie (then by name, A to Z, either way)
+	cmp := func(a, b *LibLineage) int {
+		str := func(x, y string) int {
+			switch {
+			case x == y:
+				return 0
+			case x == "":
+				return 1 // empty last
+			case y == "":
+				return -1
+			}
+			return strings.Compare(x, y)
+		}
 		switch by {
 		case "size":
 			x, _ := a.Bytes()
 			y, _ := b.Bytes()
-			if x != y {
-				return x > y
-			}
+			return compareDesc(x, y)
 		case "changed":
-			if x, y := a.Changed(), b.Changed(); !x.Equal(y) {
-				return x.After(y)
-			}
+			return timeDesc(a.Changed(), b.Changed())
 		case "played":
-			if x, y := a.Played(), b.Played(); !x.Equal(y) {
-				return x.After(y)
+			return timeDesc(a.Played(), b.Played())
+		case "updated":
+			return timeDesc(a.updated(), b.updated())
+		case "state":
+			return compareDesc(-stateRank(a.State()), -stateRank(b.State()))
+		case "source":
+			return str(a.sources(), b.sources())
+		case "used":
+			return compareDesc(int64(len(a.UsedIn())), int64(len(b.UsedIn())))
+		case "version":
+			x, y := a.newestVersion(), b.newestVersion()
+			switch {
+			case x == y:
+				return 0
+			case x == "":
+				return 1
+			case y == "":
+				return -1
+			case versionLess(y, x):
+				return -1
 			}
+			return 1
+		case "author":
+			return str(strings.ToLower(a.authors()), strings.ToLower(b.authors()))
+		case "tags":
+			return str(strings.ToLower(strings.Join(a.Tags, " ")), strings.ToLower(strings.Join(b.Tags, " ")))
+		}
+		return 0
+	}
+	sort.SliceStable(ls, func(i, j int) bool {
+		a, b := ls[i], ls[j]
+		if c := cmp(a, b); c != 0 {
+			if rev {
+				return c > 0
+			}
+			return c < 0
+		}
+		if by == "name" && rev {
+			if name(a) != name(b) {
+				return name(a) > name(b)
+			}
+			return a.ID > b.ID
 		}
 		if name(a) != name(b) {
 			return name(a) < name(b)
 		}
 		return a.ID < b.ID
 	})
+}
+
+func compareDesc(x, y int64) int {
+	switch {
+	case x > y:
+		return -1
+	case x < y:
+		return 1
+	}
+	return 0
+}
+
+func timeDesc(x, y time.Time) int {
+	switch {
+	case x.Equal(y):
+		return 0
+	case x.After(y):
+		return -1
+	}
+	return 1
+}
+
+// stateRank: the most important state is the highest; no state is the lowest.
+func stateRank(s string) int64 {
+	if s == "" {
+		return -1
+	}
+	return int64(len(LibStates) - slices.Index(LibStates, s))
+}
+
+func (l *LibLineage) updated() time.Time {
+	var t time.Time
+	for _, i := range l.Instances {
+		if i.Updated.After(t) {
+			t = i.Updated
+		}
+	}
+	return t
+}
+
+// sources are the lineage's copies' sources in order, each once ("workshop local").
+func (l *LibLineage) sources() string {
+	var out []string
+	for _, i := range l.Instances {
+		if !slices.Contains(out, i.Source) {
+			out = append(out, i.Source)
+		}
+	}
+	return strings.Join(out, " ")
+}
+
+func (l *LibLineage) newestVersion() string {
+	best := ""
+	for _, i := range l.Instances {
+		for _, v := range i.Versions {
+			if best == "" || versionLess(best, v) {
+				best = v
+			}
+		}
+	}
+	return best
+}
+
+func (l *LibLineage) authors() string {
+	for _, i := range l.Instances {
+		if i.Authors != "" {
+			return i.Authors
+		}
+	}
+	return ""
 }
 
 // Lineage finds a lineage by reference: L#…, ws:… for a missing item, or any instance
