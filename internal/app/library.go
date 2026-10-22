@@ -108,6 +108,11 @@ type LibLineage struct {
 	search        string // lower-cased names, package ids, authors, ids, folders, player data
 }
 
+// InPlan reports whether the current plan uses one of its copies.
+func (l *LibLineage) InPlan() bool {
+	return slices.ContainsFunc(l.Instances, func(i *LibInstance) bool { return i.InPlan })
+}
+
 // Bytes is the size of every instance with a known size.
 func (l *LibLineage) Bytes() (n int64, sized bool) {
 	for _, i := range l.Instances {
@@ -118,12 +123,17 @@ func (l *LibLineage) Bytes() (n int64, sized bool) {
 	return n, sized
 }
 
-// State is the most important state of any instance.
+// State is the most important state of any instance; "in no plan" only when no copy is
+// used.
 func (l *LibLineage) State() string {
 	best := len(LibStates)
+	used := len(l.UsedIn()) > 0
 	for _, i := range l.Instances {
-		if s := i.State(); s != "" {
-			best = min(best, slices.Index(LibStates, s))
+		for _, s := range i.States {
+			if s != LibUnused || !used {
+				best = min(best, slices.Index(LibStates, s))
+				break
+			}
 		}
 	}
 	if best == len(LibStates) {
@@ -300,7 +310,7 @@ func (a *App) Library() (*Library, error) {
 			}
 			i := &LibInstance{Source: LibWorkshop, WorkshopID: id, Ref: "ws:" + id, States: []string{LibMissing}}
 			if ghost == nil {
-				byLin["ws:"+id] = &LibLineage{ID: "ws:" + id, Ref: "ws:" + id, Name: "ws:" + id, Instances: []*LibInstance{i}, search: " " + id}
+				byLin["ws:"+id] = &LibLineage{ID: "ws:" + id, Ref: "ws:" + id, Name: "Workshop item " + id, Instances: []*LibInstance{i}, search: " " + id}
 				continue
 			}
 			i.Mod, i.Ref, i.UsedIn, i.InPlan = ghost, ix.Ref(ghost.ID), used[ghost.ID], st.List.Index(ghost.ID) >= 0

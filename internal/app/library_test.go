@@ -23,7 +23,7 @@ func libFixture(t *testing.T) *testkit.Env {
 	old.Supported = []string{"1.4"}
 	e.AddWorkshop("5400", old)
 	e.WriteMod(filepath.Join(e.Workshop, "5500"), testkit.Sample("tester.gone", "Gone")) // not subscribed
-	e.Subscribe("5300")                                                                    // no folder
+	e.Subscribe("5300")                                                                  // no folder
 	e.CopyTree(ws, filepath.Join(e.Game, "Mods", "Lockable Copy"))
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.lock")
 	e.AddEnv(false)
@@ -77,7 +77,7 @@ func TestLibraryStates(t *testing.T) {
 	if n, ok := lock.Bytes(); !ok || n <= 0 {
 		t.Errorf("sizes come from the scan: %d %v", n, ok)
 	}
-	want := map[string]string{"Idle": app.LibUnused, "Oldie": app.LibUnsupported, "Gone": app.LibResidue, "ws:5300": app.LibMissing}
+	want := map[string]string{"Idle": app.LibUnused, "Oldie": app.LibUnsupported, "Gone": app.LibResidue, "Workshop item 5300": app.LibMissing}
 	for name, s := range want {
 		if got := libLineage(t, lib, name).State(); got != s {
 			t.Errorf("%s: state %q, want %q", name, got, s)
@@ -118,7 +118,7 @@ func TestLibraryFilter(t *testing.T) {
 		q    app.LibQuery
 		want []string
 	}{
-		{app.LibQuery{}, []string{"Gone", "Idle", "Lockable", "Oldie", "ws:5300"}},
+		{app.LibQuery{}, []string{"Gone", "Idle", "Lockable", "Oldie", "Workshop item 5300"}},
 		{app.LibQuery{Search: "tester.idle"}, []string{"Idle"}},
 		{app.LibQuery{Search: "qol"}, []string{"Idle"}},
 		{app.LibQuery{Include: []string{"state:unused"}}, []string{"Gone", "Idle", "Lockable", "Oldie"}},
@@ -156,7 +156,7 @@ func TestLibraryFilter(t *testing.T) {
 	if _, err := lib.Filter(app.LibQuery{Include: []string{"colour:red"}}); err == nil {
 		t.Error("an unknown key is an error")
 	}
-	if got := filtered(t, lib, app.LibQuery{Sort: "size"}); got[len(got)-1] != "ws:5300" {
+	if got := filtered(t, lib, app.LibQuery{Sort: "size"}); got[len(got)-1] != "Workshop item 5300" {
 		t.Errorf("a missing item has no size: last by size, got %v", got)
 	}
 }
