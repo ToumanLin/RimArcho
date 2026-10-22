@@ -79,7 +79,8 @@ func (m *model) openChangesOf(id, name string) tea.Cmd {
 	return nil
 }
 
-func openDir(dir string) error {
+// A variable so tests can never start the real program (noopen_test.go).
+var openDir = func(dir string) error {
 	switch runtime.GOOS {
 	case "windows":
 		return exec.Command("explorer.exe", dir).Start()
