@@ -207,8 +207,9 @@ func (m *model) needLines(n int) []string {
 	p := &m.prob
 	w := m.w
 	items := p.items
-	head := Tf("%d to handle", p.need)
-	if p.need == 0 {
+	need := m.needCount() // the top bar's number: the analysis' and this run's (06 §2.4)
+	head := Tf("%d to handle", need)
+	if need == 0 {
 		head = T("nothing to handle")
 	}
 	switch {

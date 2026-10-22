@@ -364,6 +364,18 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   工坊 [打开页面], 标签 [编辑], 语言, 依赖, 冲突 — shared with Mod 库存; clicking Archo ID,
   包名, 位置 or the Workshop ID copies it and says 已复制 (06 §4.1); the list has no
   background and long values wrap. The TUI detail draws the same list.
+- The TUI's 能不能跑 has the GUI's four sections, each heading with its count (and which run
+  the run errors are from), and every item's evidence chip on the line under it: an icon
+  (Nerd Font or the compatible set), the kind and the source, e.g. `≣ Mod 自己声明 · About.xml
+  modDependencies`. ← → jump between sections. The top bar's 能不能跑 N now counts this
+  run's errors too, the same number as the GUI's sidebar badge (G13).
+- The running game is at the GUI sidebar's foot and, in the TUI, at the right end of the
+  status line (no longer in the top bar): `● 游戏运行中 · 14:05 起` with this run's errors as
+  an amber number, `● 分析本次日志` after the game when a new log waits, else nothing (G17).
+- `esc` brings every page back to its base (no popup or menu, nothing selected, the filter
+  bar closed) in at most 3 presses, checked on every page of both interfaces (G5, T20). In the
+  window, a row menu or ⋯ menu opened with the mouse now closes with `esc`, and `esc` on the
+  rows of the editor or Mod 库存 clears and closes an open filter bar in one press.
 
 ### Memory (07 §8.3)
 - 设置 › 界面 has GPU 加速 (`config set ui.gpu on|off`, default on). Off draws the window in

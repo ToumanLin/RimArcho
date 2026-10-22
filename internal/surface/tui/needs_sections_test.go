@@ -69,6 +69,9 @@ func TestNeedsSectionsLive(t *testing.T) {
 	if got, want := m.needCount(), countedNeeds(m); got != want || got <= m.prob.need {
 		t.Fatalf("top bar %d, counted items %d (analysis alone %d)", got, want, m.prob.need)
 	}
+	if !strings.Contains(s, Tf("%d to handle", m.needCount())) {
+		t.Fatalf("the head's count is not the top bar's %d:\n%s", m.needCount(), s)
+	}
 	press(m, "home")
 	press(m, "right")
 	if it := m.prob.items[m.prob.cursor]; it.section != view.SectionRun || it.group != view.GroupThisRun {
