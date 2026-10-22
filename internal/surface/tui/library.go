@@ -151,18 +151,16 @@ func (m *model) libraryLines(n int) []string {
 	right := min(44, m.w/2)
 	for i := l.off; i < len(p.Rows) && len(out) < n; i++ {
 		r := p.Rows[i]
+		// The table's default columns (06 §2.9): name, size, state, source, used in.
 		name := r.Name
-		if r.Single {
-			name += "  " + r.Insts[0].Label
-		} else {
+		if !r.Single {
 			name += "  " + Tf("%d copies", r.Copies)
 		}
 		info := r.Size
-		if r.State != "" {
-			info += "  " + r.State
-		}
-		if r.Used != "" {
-			info += "  " + r.Used
+		for _, c := range []string{r.State, r.Source, r.Used} {
+			if c != "" {
+				info += "  " + c
+			}
 		}
 		line := fit(name, m.w-right-2) + "  " + fit(info, right)
 		if i == l.cursor {

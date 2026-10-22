@@ -85,3 +85,34 @@ func openDir(dir string) error {
 	}
 	return exec.Command("xdg-open", dir).Start()
 }
+
+// LibraryFields is a copy's field list (06 §2.9): one list, the editor's fields with the
+// library's (state, used in, size, versions, update date, last played) among them.
+func (s *API) LibraryFields(ref string) ([]view.Field, error) {
+	s.mu.Lock()
+	lib, err := s.library()
+	if err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
+	i := lib.Instance(ref)
+	s.mu.Unlock()
+	if i == nil {
+		return nil, fmt.Errorf("no copy %s", ref)
+	}
+	var data *view.DetailData
+	if i.Mod != nil {
+		data = view.LoadDetail(s.a, lib.St.Ix, i.Mod, false, false) // the cache only: no network here
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.LibFields(s.a, lib, i, data), nil
+}
+
+// LibrarySetNote sets a copy's own note ("" clears it).
+func (s *API) LibrarySetNote(ref, text string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lib = nil
+	return s.text(view.LibSetNote(s.a, ref, text))
+}

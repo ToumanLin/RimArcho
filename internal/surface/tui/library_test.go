@@ -21,7 +21,7 @@ func TestLibraryList(t *testing.T) {
 		t.Fatal("the palette did not open the library")
 	}
 	screen := strings.Join(m.libraryLines(30), "\n")
-	for _, want := range []string{"Alpha", "Beta", "Harmony", "4 mods", "in no plan"} {
+	for _, want := range []string{"Alpha", "Beta", "Harmony", "4 mods", "workshop"} {
 		if !strings.Contains(screen, want) {
 			t.Fatalf("missing %q:\n%s", want, screen)
 		}

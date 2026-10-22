@@ -252,8 +252,9 @@ func TestT13TagBar(t *testing.T) {
 		t.Fatalf("esc removed the tag: %q", got)
 	}
 	c := &m.cols[cActive]
-	if row := ansi.Strip(m.drawRow(c, 0, true, 60)); !strings.Contains(row, "official-stuff") {
-		t.Fatalf("row without its tag: %q", row)
+	// 06 §3.8: rows carry no tags; they are in the detail and in search.
+	if row := ansi.Strip(m.drawRow(c, 0, true, 60)); strings.Contains(row, "official-stuff") {
+		t.Fatalf("a row shows its tag: %q", row)
 	}
 }
 
