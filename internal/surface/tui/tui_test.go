@@ -187,7 +187,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	}
 	// S, w and L act at once and say what they did (06 §6); sort offers u.
 	keys(tm, "S")
-	waitFor(t, tm, "sorted: 1 moved · u undoes")
+	waitFor(t, tm, "sorted: 1 moved · strong requirements put right: 1 · u undoes")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
 		t.Fatalf("after sort: %s", got)
 	}

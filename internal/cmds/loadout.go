@@ -266,6 +266,21 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d, root := render.New(head)
 	addChanges(c, root, st, r.Changes, render.DefaultLimit, "archo loadout diff --all")
+	if moved > 0 {
+		// Why: what the order broke, strong constraints first (04 §5.3): breaking a strong one
+		// came with more errors in shared logs, a weak or harmless one did not.
+		why := root.Section("why (order constraints the list broke; strong ones go with more errors)")
+		seen := map[string]bool{}
+		for _, b := range order.Broken(r.Input, r.Result) {
+			ev, _ := constraintText(st, r.Input, b.Edge)
+			if seen[ev] {
+				continue
+			}
+			seen[ev] = true
+			why.Addf("%-8s %s", b.Strength, ev)
+		}
+		why.Truncate(12, "")
+	}
 	if len(r.Result.Cycles) > 0 {
 		pr := root.Section("problems")
 		for _, cy := range r.Result.Cycles {

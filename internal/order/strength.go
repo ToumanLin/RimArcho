@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -141,4 +142,34 @@ func Assess(in Input, e Edge) Assessment {
 		return Assessment{Strong, ""}
 	}
 	return Assessment{Weak, ""} // loadAfter, community
+}
+
+// BrokenEdge is a constraint the current order breaks, with its strength.
+type BrokenEdge struct {
+	Edge
+	Assessment
+}
+
+// Broken lists what the current order breaks and a sort puts right, strongest first (04 §5.3):
+// the edges whose source comes after their target, left out when both ends are in one cycle
+// (a cycle keeps its order). Official content first is strong.
+func Broken(in Input, r Result) []BrokenEdge {
+	inCycle := map[int]int{}
+	for i, cy := range r.Cycles {
+		for _, m := range cy.Members {
+			inCycle[m] = i + 1
+		}
+	}
+	var out []BrokenEdge
+	for _, e := range r.Edges {
+		if e.From < e.To {
+			continue
+		}
+		if c := inCycle[e.From]; c != 0 && c == inCycle[e.To] {
+			continue
+		}
+		out = append(out, BrokenEdge{e, Assess(in, e)})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Strength > out[j].Strength })
+	return out
 }

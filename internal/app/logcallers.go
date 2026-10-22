@@ -318,7 +318,9 @@ func (cx *attrCtx) assemblyRules(lc *LogCluster) (skipProviders bool) {
 
 // nearMessages are up to 4 log messages before and 3 after e (other entries, clipped).
 func nearMessages(lf *logs.File, e *logs.Entry) []string {
-	if lf == nil || e == nil {
+	// An entry only the companion log has (03 §6.7.4) has no place in Player.log: nothing is
+	// near it, and such entries are near nothing.
+	if lf == nil || e == nil || e.Line <= 0 {
 		return nil
 	}
 	idx := -1
@@ -333,7 +335,7 @@ func nearMessages(lf *logs.File, e *logs.Entry) []string {
 	}
 	var out []string
 	add := func(x *logs.Entry, mark string) {
-		if x.Line < e.Line-30 || x.Line > e.Line+30 || x.Message == e.Message {
+		if x.Line <= 0 || x.Line < e.Line-30 || x.Line > e.Line+30 || x.Message == e.Message {
 			return
 		}
 		m := x.Message

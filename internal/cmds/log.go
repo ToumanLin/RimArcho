@@ -169,7 +169,7 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 
 func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc {
 	at := ""
-	if len(lc.Lines) > 0 {
+	if len(lc.Lines) > 0 && lc.Lines[0] > 0 { // 0: only the companion log has it
 		at = fmt.Sprintf("  first at %s:%d", r.Label, lc.Lines[0])
 	}
 	d, root := render.New(fmt.Sprintf("log:%s %s x%d%s", lc.ID, lc.Class, lc.Count, at))

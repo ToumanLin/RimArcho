@@ -504,6 +504,21 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   with a checklist for save loading, missing assets, config errors, assembly loading and noise,
   and say tool results are capped at 24 KB.
 - Privacy: pattern templates with HugsLib's `[Rimworld_dir]` paths are dropped (2 of 1,036).
+- **In the pages** (06 §2.3, §2.4, §2.5, §2.10, §4.2; TUI the same):
+  - 启动: the tab under 启动游戏 names the most likely trouble (the first `LaunchChecks` code
+    with an item in 能不能跑) and its one-line reason with the corpus numbers; it opens
+    能不能跑 and never blocks. The TUI's `L` says it on the status line (“留意：…”).
+  - 能不能跑: a 社区日志 evidence chip with the measured share (“缺了它时 40/50（80%）出错”);
+    `dep.observed-missing` with the dependencies, `combo.known-bad` with the conflicts,
+    `mod.known-error` a dimmed “这是 Mod 自己的问题” note. Weak and harmless order
+    preferences are one dimmed, uncounted item; counts and the sidebar badge leave them out.
+  - 游戏日志 (and the Archo Monitor view): a cluster's detail shows the whole message, extra
+    lines and nearby messages (none for an entry only ArchoMonitor.log has), then a pattern card (“这类报错通常是…”, common causes, next
+    step, kinds of fix) marked as community background, only when a pattern matches.
+  - 方案编辑 › 排序: the status line counts the strong requirements the sort put right; the
+    sort preview (`archo sort`) has a `why` section, strong / weak / harmless, strong first.
+  - Mod detail › 技术信息 › Harmony (`archo harmony --mod`): patches from `Harmony.Patch`
+    calls are marked, and every unresolved call is listed with its reason.
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).

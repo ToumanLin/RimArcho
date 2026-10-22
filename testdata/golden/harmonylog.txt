@@ -33,8 +33,8 @@ $ archo harmony --mod #i4uc
   assemblies:
     Assemblies/ModManual.dll  types 1, patches 1  (calls Harmony.Patch from code)
   patches:
-    postfix    Verse.ThingWithComps.Tick  ← ModManual.Boot.After
-  manual: Harmony.Patch calls: targets computed at runtime are not listed (archo source search ".Patch(" --in #i4uc)
+    postfix    Verse.ThingWithComps.Tick  ← ModManual.Boot.After  (Harmony.Patch call in code)
+  manual: 1 patch targets found in Harmony.Patch calls, 0 not resolved (archo source search ".Patch(" --in #i4uc)
 
 $ archo problems --code harmony
 problems: 0 error, 2 warning, 2 info

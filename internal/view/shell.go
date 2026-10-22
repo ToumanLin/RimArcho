@@ -229,6 +229,9 @@ type Home struct {
 	// Featured is the row of what is applied now (PickFeatured): the large card with
 	// ▶ 启动游戏; -1 when there is none.
 	Featured int `json:"featured"`
+	// Launch is the current plan's most likely trouble (Needs.Launch): the tab under the
+	// launch button says it with its reason and opens 能不能跑. It never blocks.
+	Launch *LaunchHint `json:"launch,omitempty"`
 }
 
 // BuildHome builds the home page: one row per plan of the environment and one per pack.
@@ -272,6 +275,7 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 	}
 	SortHome(h.Rows)
 	h.LastRun, h.LastRunDay, h.LastRunErrors = n.LastRun, n.LastRunDay, LastRunErrors(n)
+	h.Launch = n.Launch
 	h.Changes = ChangeHome(a, b.St)
 	return h
 }

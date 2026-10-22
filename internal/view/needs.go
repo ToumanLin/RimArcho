@@ -110,6 +110,7 @@ type Need struct {
 	Parts []string `json:"parts,omitempty"`
 	Fold  bool     `json:"fold,omitempty"`
 	rank  int      // order within the group (06 §5's order)
+	code  string   // the problem code it stands for (LaunchHint)
 }
 
 // Needs is the screen's content and what it means for the rest of the interface.
@@ -119,6 +120,9 @@ type Needs struct {
 	Count  int            `json:"count"`  // the top bar's number
 	Never  bool           `json:"never"`  // the mods' files were never checked
 	Stale  bool           `json:"stale"`  // the files changed since the last check
+	// Launch is the most likely trouble of a launch (app.LaunchChecks among the counted
+	// items), for the launch page's tab and the TUI's launch line (06 §2.3); nil when none.
+	Launch *LaunchHint `json:"launch,omitempty"`
 	// LastRun says which run wrote the last-run log: "the list · 9 月 29 日 19:41" or
 	// "pack X · …" (08 §5.3: a pack's errors are not the list's).
 	LastRun    string `json:"lastRun,omitempty"`
@@ -138,6 +142,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	for i := range n.Items {
 		n.Items[i].Section = SectionOf(n.Items[i].Group)
 	}
+	n.Launch = launchHint(n.Items)
 	for _, r := range ps.Logs {
 		if r.Stale() || r.ModTime.IsZero() {
 			continue
@@ -179,9 +184,16 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	ix := st.Ix
 	nm := func(tok string) string { return TokName(st, tok) }
 	var out []Need
-	add := func(n Need) { out = append(out, n) }
+	cur := "" // the code of the problem being turned into an item
+	add := func(n Need) {
+		if n.code == "" {
+			n.code = cur
+		}
+		out = append(out, n)
+	}
 	var versions []*app.Problem
 	var order []Need                    // order.violated: folded into one item when there are several
+	var weak []Need                     // order.violated of weak or harmless constraints: one dimmed item (04 §5.3)
 	logs := map[string][]*app.Problem{} // current log problems by subject mod ("" unattributed)
 	// A mod's patches that miss the same inactive target, and its definitions whose parent
 	// is missing, are one item each: one action covers them all (06 §5's merge rule).
@@ -195,6 +207,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	merge := func(key, x, y string, n Need) {
 		m := merges[key]
 		if m == nil {
+			n.code = cur
 			m = &merged{n: n, x: x, y: y}
 			merges[key] = m
 			mergeKeys = append(mergeKeys, key)
@@ -215,10 +228,14 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			continue
 		}
 		// A cycle is info (the corpus saw no effect, 03 §4.3), but only the player can resolve
-		// it: listed with its actions, dimmed and not counted.
-		if p.Severity != finding.Error && p.Severity != finding.Warning && p.Code != "order.cycle" {
+		// it: listed with its actions, dimmed and not counted. So are weak order preferences
+		// (folded) and a mod's own known error (a note): the player sees them, they are not
+		// what stops the game.
+		if p.Severity != finding.Error && p.Severity != finding.Warning &&
+			p.Code != "order.cycle" && p.Code != "order.violated" && p.Code != "mod.known-error" {
 			continue // info: technical information only (06 §5)
 		}
+		cur = p.Code
 		subj := subjects(p)
 		x, y := "", ""
 		if len(subj) > 0 {
@@ -238,8 +255,17 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			add(Need{rank: 0, Group: GroupList, Text: T("Core and the DLCs must come first in the list"), Actions: []Action{sortAction()}, Counted: true, Status: s,
 				Title: T("Core and the DLCs are out of place"), Why: T("Core and the DLCs must come first in the list"), Evidence: ev})
 		case "order.violated":
+			if p.Severity == finding.Info {
+				weak = append(weak, Need{Text: Tf("%s should load after %s", nm(x), nm(y)), Mods: ids})
+				continue
+			}
 			order = append(order, Need{rank: 1, Group: GroupList, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{sortAction()}, Counted: true, Mods: ids, Status: s,
-				Why: T("out of order, part of it may not take effect; sorting puts it right"), Evidence: ev})
+				Why: T("a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right"), Evidence: ev})
+		case "mod.known-error":
+			// The mod's own problem (03 §4.3): whatever else is enabled, shared logs show it.
+			add(Need{rank: 9, Group: GroupConflict, Text: Tf("%s has a known error: this is the mod's own problem", nm(x)),
+				Actions: []Action{viewAction(T("see the error"), "problems", "show", p.Ref)}, Mods: ids, Status: StatusWarn, Dim: true,
+				Title: Tf("%s has a known error: this is the mod's own problem", nm(x)), Why: T("not your list's: shared logs show it whatever else is enabled; an update may fix it"), Evidence: ev})
 		case "order.cycle":
 			add(Need{rank: 2, Group: GroupList, Text: Tf("the order requirements of %d mods contradict each other", len(subj)),
 				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: p.Severity != finding.Info, Dim: p.Severity == finding.Info, Mods: ids, Status: s,
@@ -364,12 +390,25 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		}
 		add(n)
 	}
+	if len(weak) > 0 {
+		// Weak and harmless constraints (04 §5.3): breaking them went with no more errors in
+		// shared logs. One dimmed, uncounted item; sorting still puts them right.
+		f := Need{rank: 8, Group: GroupList, Status: StatusWarn, Dim: true, Fold: true, code: "order.violated",
+			Text:     Tf("%d weaker order preferences are not met", len(weak)),
+			Why:      T("loadAfter and community rules: breaking them showed no more errors in shared logs; sorting puts them right"),
+			Evidence: evidence(EvCorpus, T("load-order constraint strength"))}
+		for _, w := range weak {
+			f.Parts = append(f.Parts, w.Text)
+		}
+		f.Actions = []Action{sortAction(), {Kind: ActFold, Key: "f", Label: T("show which")}}
+		add(f)
+	}
 	switch len(order) {
 	case 0:
 	case 1:
 		add(order[0])
 	default:
-		f := Need{rank: 1, Group: GroupList, Counted: true, Status: StatusWarn, Fold: true}
+		f := Need{rank: 1, Group: GroupList, Counted: true, Status: StatusWarn, Fold: true, code: "order.violated"}
 		seen := map[string]bool{}
 		for _, o := range order {
 			f.Parts = append(f.Parts, o.Text)

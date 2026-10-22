@@ -662,6 +662,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		if as.Why != "" {
 			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: as.Why})
 		}
+		f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: StrengthPrefix + as.Strength.String()})
 		if !strings.HasPrefix(ig, "archo ") {
 			f.Suggestions = append(f.Suggestions, "archo rule add ignore "+ig)
 			if as.Strength == order.Harmless {

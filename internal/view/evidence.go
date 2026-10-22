@@ -35,13 +35,15 @@ func SectionOf(group int) int {
 }
 
 // Evidence kinds: the mod's own declaration, RimArcho's analysis, the game's log, the
-// community's data (04 §6), or a rule the player added.
+// community's data (04 §6), a rule the player added, or what shared logs showed (the log
+// corpus, 03 §4.3: the source carries the measured share).
 const (
 	EvDeclared  = "declared"
 	EvInferred  = "inferred"
 	EvLog       = "log"
 	EvCommunity = "community"
 	EvRule      = "rule"
+	EvCorpus    = "corpus"
 )
 
 var evidenceLabels = map[string]string{
@@ -50,6 +52,7 @@ var evidenceLabels = map[string]string{
 	EvLog:       "log",
 	EvCommunity: "community data",
 	EvRule:      "your rule",
+	EvCorpus:    "shared logs",
 }
 
 // Evidence is the chip on an item: its kind in words and the concrete source
@@ -143,8 +146,55 @@ func evidenceFor(p *app.Problem) *Evidence {
 		return evidence(EvInferred, T("About.xml is renamed to About.xml.disabled"))
 	case "texture.stale":
 		return evidence(EvInferred, T("the mod's files changed after RimArcho wrote its DDS"))
+	case "dep.observed-missing", "combo.known-bad", "mod.known-error":
+		return corpusEvidence(p)
 	}
 	return nil
+}
+
+// The log corpus's counts (internal/app/known.go), for the chip's source.
+var (
+	corpusPrereqRe  = regexp.MustCompile(`^log corpus: (\d+) of (\d+) shared logs with `)
+	corpusPairRe    = regexp.MustCompile(`^log corpus: with \S+ and \S+ (\d+) of (\d+) shared logs .*; with \S+ alone (\d+) of (\d+)`)
+	corpusVersionRe = regexp.MustCompile(`^log corpus: \S+ (\S+) in (\d+) of (\d+) shared logs .*; other versions (\d+) of (\d+)`)
+	corpusOwnRe     = regexp.MustCompile(`^log corpus: (\d+) of (\d+) shared logs that enable `)
+)
+
+// corpusEvidence is the 社区日志 chip: what share of the shared logs showed the error.
+func corpusEvidence(p *app.Problem) *Evidence {
+	share := func(a, b string) string {
+		x, y := atoi(a), atoi(b)
+		if y == 0 {
+			return a + "/" + b
+		}
+		return Tf("%d of %d (%d%%)", x, y, (100*x+y/2)/y)
+	}
+	for _, e := range p.Evidence {
+		if m := corpusPairRe.FindStringSubmatch(e.Text); m != nil {
+			return evidence(EvCorpus, Tf("errors with both in %s of shared logs, alone in %s", share(m[1], m[2]), share(m[3], m[4])))
+		}
+		if m := corpusVersionRe.FindStringSubmatch(e.Text); m != nil {
+			return evidence(EvCorpus, Tf("version %s errors in %s of shared logs, other versions in %s", m[1], share(m[2], m[3]), share(m[4], m[5])))
+		}
+		if m := corpusPrereqRe.FindStringSubmatch(e.Text); m != nil {
+			return evidence(EvCorpus, Tf("errors without it in %s of shared logs", share(m[1], m[2])))
+		}
+		if m := corpusOwnRe.FindStringSubmatch(e.Text); m != nil {
+			return evidence(EvCorpus, Tf("errors in %s of the shared logs that enable it", share(m[1], m[2])))
+		}
+	}
+	return evidence(EvCorpus, T("seen in shared logs"))
+}
+
+func atoi(s string) int {
+	n := 0
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return n
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n
 }
 
 var (

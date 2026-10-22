@@ -121,8 +121,9 @@ func (a *App) DropPlanProblems() { a.planPS = nil }
 var ErrLogNotCached = errors.New("log not analysed yet")
 
 // logCacheVersion invalidates stored reports when attribution changes.
-// 7: both the companion log (dev, 4) and the G1/G7 attribution rules (master, 6).
-const logCacheVersion = 7
+// 7: both the companion log (dev, 4) and the G1/G7 attribution rules (master, 6); 8: no
+// nearby messages for entries only the companion log has.
+const logCacheVersion = 8
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a

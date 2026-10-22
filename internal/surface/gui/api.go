@@ -1027,10 +1027,18 @@ func (s *API) LogCluster(path, id string) ([]string, error) {
 	text, _ := cmds.Execute(s.a, []string{"log", "--file", path, "--cluster", id})
 	st := s.boardState()
 	var out []string
-	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+	for _, l := range view.WithoutPatternBlock(strings.Split(strings.TrimRight(text, "\n"), "\n")) {
 		out = append(out, view.Humanize(st, l))
 	}
 	return out, nil
+}
+
+// LogPattern is the pattern card of a cluster (06 §2.10): community background shown apart
+// from the evidence; nil when the cluster matches no pattern.
+func (s *API) LogPattern(path, id string) *view.PatternCard {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.PatternCardOf(s.a, s.boardState(), path, id)
 }
 
 // SelectLog picks the log whose errors join 需要处理.
