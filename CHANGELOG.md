@@ -321,6 +321,16 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   writing game files); the last run and scan are two lines. No page actions on home. The plan editor has three columns,
   未启用 | 已启用 | 详情, with 暂存 and 历史 as folds under 详情 (drag to a folded 暂存 still
   stages; `3` opens it); two splitters, old four-column widths carried over.
+- 启动 is laid out like the game's main menu over a background image (06 §2.3): the plans and
+  packs down the left (kind first, then the name; the applied one raised with 编辑 ↵, the
+  others with 应用 ↵ on the cursor), the last run and scan under them, ▶ 启动游戏 in the
+  bottom right with the problem as a tab under it. `↑` `↓`, `enter` (apply / edit), `L`.
+- 设置 › 启动页背景 (06 §2.14): the game's art (RimWorld's planet by default, the DLC
+  covers), the images of every mod with "background" in its name (their
+  `VBE.BackgroundImageDef`s: Vanilla Backgrounds Expanded, Shella Backgrounds, …), your own
+  PNG / JPG, or plain; dimming, blur, focus, and rotation among starred images, with a small
+  live preview. Each image is decoded once, one at a time, into 1920 / 480 px JPEGs in
+  `cache/backgrounds/`; the page never loads an original, and drops the image when you leave.
 - "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
   the history stays in the editor's third column.
 - Switching the language in 设置 happens in place: the page keeps its place, the lists their

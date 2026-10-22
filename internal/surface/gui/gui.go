@@ -118,6 +118,7 @@ func handler(api *API, files fs.FS) http.Handler {
 		path, _, _, err := api.a.DescImage(r.URL.Query().Get("u")) // downloads into the cache once
 		serveFile(w, r, path, err)
 	})
+	mux.HandleFunc("/bg", api.serveBg)
 	for path, size := range map[string]int{"/icon.svg": 256, "/icon-small.svg": 16} {
 		svg := []byte(icon.SVG(size))
 		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
