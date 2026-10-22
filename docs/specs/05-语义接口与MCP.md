@@ -44,6 +44,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 忽略 / 取消忽略问题（03 §4.2） | 已完成 | 工具 `ignore_problem` |
 | 回答身份待确认项、拆分 / 合并 Lineage（02 §5.4、§6） | 已完成 | 工具 `resolve_identity`，`destructiveHint: true` |
 | 扫描 | 已完成 | 工具 `scan` |
+| Mod 库存：列出、筛选、排序（06 §2.9） | 无 | CLI `library`；只读工具 `list_library`（**待实现**） |
 | 列表导入、导出、工坊合集对照（04 §9） | 已完成 | 工具 `exchange_list`（导入是一步可撤销的方案编辑） |
 | 用户规则列出 / 删除 | 已完成 | `manage_rules`（`add_rule` 保留为别名） |
 | 隐藏的 Mod：恢复显示、移到回收站（08 §6、§7） | 已完成 | 工具 `manage_hidden`，`destructiveHint: true` |
