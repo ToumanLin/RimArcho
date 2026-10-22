@@ -28,7 +28,7 @@ func unknown(tool, action string) []string {
 }
 
 // StatusArgv maps status: the overview, or one read-only page of RimArcho's own setup
-// (environments, settings, community data, database, caches). Changing them is left to the
+// (environments, shared mod folders, settings, community data, database, caches). Changing them is left to the
 // player (05 §1.2).
 func StatusArgv(in StatusIn) []string {
 	switch in.Show {
@@ -36,6 +36,8 @@ func StatusArgv(in StatusIn) []string {
 		return []string{"status"}
 	case "envs":
 		return []string{"env", "list"}
+	case "folders":
+		return []string{"folder", "list"}
 	case "settings":
 		return []string{"config", "get"}
 	case "data":

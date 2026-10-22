@@ -152,6 +152,7 @@ func TestCLIParity(t *testing.T) {
 		// The read-only pages folded into status, and the read-only actions of the 05 §1.2
 		// tools (their write actions: TestGoldenManageTools).
 		{"status", map[string]any{"show": "envs"}, []string{"env", "list"}},
+		{"status", map[string]any{"show": "folders"}, []string{"folder", "list"}},
 		{"status", map[string]any{"show": "settings"}, []string{"config", "get"}},
 		{"status", map[string]any{"show": "data"}, []string{"data", "status"}},
 		{"status", map[string]any{"show": "db"}, []string{"db", "status"}},
@@ -346,7 +347,7 @@ func TestWriteTools(t *testing.T) {
 func TestEnvParameter(t *testing.T) {
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
-	e.MustRun("env", "add", "other", "--game", e.Game, "--user-data", e.UserData, "--workshop", e.Workshop)
+	e.MustRun("env", "add", "other", "--game", e.OtherGame("Other", "1.6.4633 rev1261"), "--user-data", e.UserData)
 	e.MustRun("env", "use", "main")
 	cs := connect(t, e)
 	if out, _ := call(t, cs, "status", nil); !strings.HasPrefix(out, "env:main") {

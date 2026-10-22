@@ -76,7 +76,7 @@ export function act(label, ic, run, keyName) {
 }
 
 // seg is a small view switch (magpie's): one button per choice, the chosen one raised.
-function seg(names, on, pick, keys) {
+export function seg(names, on, pick, keys) {
   const s = el("div", "seg sub");
   s.append(el("span", "thumb"));
   names.forEach((n, i) => {
@@ -90,7 +90,7 @@ function seg(names, on, pick, keys) {
 }
 
 // setSeg opens choice i of a switch already on the page: its thumb slides there.
-function setSeg(s, i) {
+export function setSeg(s, i) {
   if (!s) return;
   const bs = [...s.querySelectorAll(":scope > button")];
   bs.forEach((b, j) => b.classList.toggle("on", j === i));
@@ -805,8 +805,8 @@ function renderGroups(w, groups, again) {
       const right = el("div", "r");
       if (it.edit === "choice") {
         const s = el("select");
-        for (const c of it.choices) {
-          const o = el("option", "", c);
+        for (const [i, c] of it.choices.entries()) {
+          const o = el("option", "", (it.choiceLabels && it.choiceLabels[i]) || c);
           o.value = c;
           if (c === it.value) o.selected = true;
           s.append(o);
@@ -820,7 +820,10 @@ function renderGroups(w, groups, again) {
         inp.spellcheck = false;
         const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim()));
         inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
-        right.append(inp, ok);
+        right.append(inp);
+        // A folder: the window's folder dialog; the chosen folder is applied at once.
+        if (it.edit === "path") right.append(button(T("choose…"), "", () => pickFolder(inp.value, (p) => run(it.argv, p))));
+        right.append(ok);
       } else if (it.value) {
         right.append(el("span", "muted", it.value));
       }
@@ -834,9 +837,19 @@ function renderGroups(w, groups, again) {
   }
 }
 
+// pickFolder opens the window's folder dialog at start and calls then with the folder
+// chosen (nothing when cancelled). Without a window (the development harness) it says so:
+// every path can be typed.
+export async function pickFolder(start, then) {
+  let p;
+  try { p = await api.PickFolder(start || ""); } catch (e) { say("fail", errText(e)); return; }
+  if (p) then(p);
+}
+
 // ---- the environment (the pill on the left of the top bar) ----
-// Everything here belongs to one game installation: which one is in use, its folders, how
-// it is started, and rescanning its mod folders.
+// Everything here belongs to one game folder (02 §0): which one is in use, the folder, its
+// version, how it is started and its saves. The mod folders every game shares are on the
+// settings page.
 
 export async function environment() {
   let p;
@@ -844,7 +857,7 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", T("an environment is one RimWorld install: its folders, how it starts, its mods"), act(T("add an environment"), "plus", () => ui.go("guide")), rescanButton());
+  const w = page("env", T("an environment is one game folder: its version, how it starts, its saves"), act(T("add an environment"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
   const card = el("section", "card");
   for (const e of p.envs || []) {

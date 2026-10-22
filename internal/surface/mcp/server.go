@@ -127,7 +127,7 @@ func argv(words ...string) *builder { return &builder{a: append([]string{}, word
 
 type StatusIn struct {
 	Env  string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Show string `json:"show,omitempty" jsonschema:"overview (default), envs, settings, data (community data), db or cache"`
+	Show string `json:"show,omitempty" jsonschema:"overview (default), envs, folders (the shared mod folders), settings, data (community data), db or cache"`
 }
 
 type FindIn struct {

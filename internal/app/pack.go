@@ -98,7 +98,26 @@ func (a *App) ReadPack(name string) (*Pack, error) {
 	if p.Format > PackFormat {
 		return nil, fmt.Errorf("pack %q has format %d; this RimArcho reads up to %d", name, p.Format, PackFormat)
 	}
+	a.aliasPack(&p)
 	return &p, nil
+}
+
+// aliasPack maps the IDs of a pack made before migration v14 to the IDs kept (02 §0.1): the
+// file on disk is not rewritten.
+func (a *App) aliasPack(p *Pack) {
+	al, err := a.Store.IDAliases()
+	if err != nil || len(al) == 0 {
+		return
+	}
+	for i := range p.Entries {
+		pe := &p.Entries[i]
+		if n := al[pe.Instance]; n != "" {
+			pe.Instance = n
+		}
+		if n := al[pe.Lineage]; n != "" {
+			pe.Lineage = n
+		}
+	}
 }
 
 // ---- build ----

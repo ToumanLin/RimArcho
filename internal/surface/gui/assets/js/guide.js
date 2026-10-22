@@ -1,18 +1,23 @@
 // The first-run guide (06 §2.15): three steps, each with a way back.
-//   1. find the game: what detection finds (tick several), or a folder typed in;
-//   2. read the mods: a scan per environment in a child process, with its progress;
+//   1. find the game: 已有的游戏 — what detection finds (tick several), a folder typed in or
+//      chosen in the folder dialog; or 下载一个版本 — a branch, a folder and the Steam account
+//      name, downloaded by SteamCMD in its own window (08 §11);
+//   2. read the mods: a scan per environment in a child process, with its progress (a game
+//      added once the shared mod folders were read: only its own Data/ and Mods/);
 //   3. where to start: the game's own list, a list from RimSort / RimCrow (previewed, then
 //      applied: view.ReadImport → PreviewImport → ApplyImport), or a pack / a collection.
 // The environment page's "add an environment" starts at step 1.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, button } from "./screens.js";
+import { openScreen, page, button, seg, pickFolder } from "./screens.js";
 import { exchange, importFrom } from "./exchange.js";
 
 let ui = null;
 export function initGuide(u) { ui = u; }
 
 const STEPS = ["find the game", "read the mods", "where to start"];
-const G = { step: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "" };
+const G = { step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "" };
+// The download way: SteamCMD's info (DownloadInfo), the choices, and a run's progress.
+const D = { info: null, loading: false, branch: "", dir: "", dirTyped: false, account: "", run: null };
 
 // start opens the guide at step 1; from is "first" (no environment yet) or "env".
 export async function start(from = "first") {
@@ -22,6 +27,8 @@ export async function start(from = "first") {
   G.scan = null;
   G.error = "";
   G.picked.clear();
+  if (D.run && D.run.end) D.run = null;
+  G.way = D.run ? 1 : 0;
   openScreen("guide");
   await find();
 }
@@ -74,6 +81,15 @@ function footer(card, ...btns) {
 
 function step1(card) {
   card.append(el("div", "guide-q", T("which RimWorld installs should RimArcho manage?")));
+  const sw = seg([T("a game you have"), T("download a version")], G.way, (i) => {
+    G.way = i;
+    G.error = "";
+    draw();
+    if (i === 1 && !D.info && !D.loading) loadDownload();
+  });
+  sw.classList.add("guide-way");
+  card.append(sw);
+  if (G.way === 1) return download(card);
   const list = el("div", "games");
   if (!G.games.length) list.append(el("div", "empty-state", T("no RimWorld found in the Steam libraries or the usual folders; type the game folder below")));
   G.games.forEach((g, i) => {
@@ -103,16 +119,16 @@ function step1(card) {
     list.append(r);
   });
   card.append(list);
-  // a folder typed in when detection finds nothing (or not this one)
+  // a folder typed in or chosen in the folder dialog (detection found nothing, or not this one)
   const typed = el("div", "typed");
   const inp = el("input", "field");
   inp.placeholder = T("the game folder (the one with RimWorldWin64.exe)");
   inp.spellcheck = false;
   inp.value = G.typed;
   inp.oninput = () => { G.typed = inp.value; };
-  const add = button(T("add this folder"), "", async () => {
+  const addPath = async (path) => {
     let g;
-    try { g = await api.GuideGame(inp.value); } catch (e) { G.error = errText(e); return draw(); }
+    try { g = await api.GuideGame(path); } catch (e) { G.typed = path; G.error = errText(e); return draw(); }
     G.typed = "";
     G.error = "";
     if (!G.games.some((x) => x.game.toLowerCase() === g.game.toLowerCase())) {
@@ -120,23 +136,170 @@ function step1(card) {
       if (!g.env) G.picked.add(G.games.length - 1);
     }
     draw();
-  });
+  };
+  const add = button(T("add this folder"), "", () => addPath(inp.value));
+  const choose = button(T("choose…"), "", () => pickFolder(inp.value, addPath));
   inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); add.click(); } };
-  typed.append(inp, add);
+  typed.append(inp, choose, add);
   card.append(typed);
   const picked = [...G.picked].filter((i) => G.games[i] && !G.games[i].env);
   const next = button(picked.length > 1 ? Tf("add %d environments", picked.length) : T("add and continue"), "", async () => {
     next.disabled = true;
     let names;
     try { names = await api.GuideAdd(picked.map((i) => G.games[i])); } catch (e) { G.error = errText(e); return draw(); }
-    G.added = names || [];
-    G.games = (await api.GuideFind()) || G.games;
-    G.picked.clear();
-    await ui.reload();
-    scanAll();
+    added(names || []);
   }, "primary");
   next.disabled = !picked.length;
   footer(card, G.added.length ? button(T("next"), "", () => go(1)) : null, next);
+}
+
+// added: environments were added (found, typed or downloaded); read their mods.
+async function added(names) {
+  G.added = names;
+  G.games = (await api.GuideFind()) || G.games;
+  G.picked.clear();
+  await ui.reload();
+  scanAll();
+}
+
+// ---- 1b. download a version (SteamCMD, 08 §11) ----
+
+async function loadDownload() {
+  D.loading = true;
+  draw();
+  try { D.info = await api.GuideDownloadInfo(); } catch (e) { D.info = { error: errText(e) }; }
+  D.loading = false;
+  const bs = (D.info && D.info.branches) || [];
+  if (bs.length && !bs.some((b) => b.name === D.branch)) D.branch = bs[0].name;
+  if (!D.dirTyped) D.dir = suggestDir();
+  draw();
+}
+
+function branchLabel(b) {
+  if (b.name === "public") return T("current version");
+  if (b.name === "unstable") return T("test version (unstable)");
+  if (b.version) return "RimWorld " + b.name.replace(/^version-/, "");
+  return b.name;
+}
+
+// suggestDir is <drive>\Games\RimWorld <version> for the chosen branch.
+function suggestDir() {
+  const b = ((D.info && D.info.branches) || []).find((x) => x.name === D.branch);
+  const games = (D.info && D.info.games) || "";
+  const v = b ? (b.version || (b.name === "public" ? "" : b.name)) : "";
+  return games ? games + "\\RimWorld" + (v ? " " + v : "") : "";
+}
+
+function download(card) {
+  if (D.run) return downloading(card, D.run);
+  if (D.loading || !D.info) {
+    card.append(el("div", "dl-note", T("asking Steam which versions RimWorld has… (SteamCMD may update itself first)")));
+    const prog = el("div", "prog");
+    const b = el("div", "bar busy");
+    b.append(el("i"));
+    prog.append(b);
+    card.append(prog);
+    return footer(card);
+  }
+  const info = D.info;
+  if (!info.steamcmd) {
+    const o = info.offer || {};
+    const size = o.bytes > 0 ? sizeText(o.bytes) : T("size unknown");
+    card.append(el("div", "dl-note", Tf("RimArcho downloads game versions with Valve's SteamCMD, which is not on this computer. Download it from Valve (%s) into %s?", size, o.dir || "")));
+    const get = button(T("download SteamCMD"), "", async () => {
+      get.disabled = true;
+      try { await api.GuideInstallSteamCMD(); } catch (e) { G.error = errText(e); return draw(); }
+      G.error = "";
+      D.info = null;
+      loadDownload();
+    }, "primary");
+    return footer(card, get);
+  }
+  if (info.error && !(info.branches || []).length) {
+    card.append(el("div", "dl-note err", info.error));
+    return footer(card, button(T("ask again"), "", () => { D.info = null; loadDownload(); }));
+  }
+  const list = el("div", "branches");
+  for (const b of info.branches || []) {
+    const row = el("button", "branch" + (b.name === D.branch ? " on" : ""));
+    row.append(el("span", "v", branchLabel(b)), el("span", "muted", b.description || b.name));
+    if (b.updated && !b.updated.startsWith("0001")) row.append(el("span", "when", b.updated.slice(0, 10)));
+    row.onclick = () => { D.branch = b.name; if (!D.dirTyped) D.dir = suggestDir(); draw(); };
+    list.append(row);
+  }
+  card.append(list);
+  const where = el("div", "typed");
+  const dir = el("input", "field");
+  dir.placeholder = T("the folder for the game");
+  dir.spellcheck = false;
+  dir.value = D.dir;
+  dir.oninput = () => { D.dir = dir.value; D.dirTyped = true; };
+  where.append(el("span", "muted lbl", T("game folder")), dir, button(T("choose…"), "", () => pickFolder(dir.value, (p) => { D.dir = p; D.dirTyped = true; draw(); })));
+  card.append(where);
+  const who = el("div", "typed");
+  const acc = el("input", "field");
+  acc.placeholder = T("your Steam account name");
+  acc.spellcheck = false;
+  acc.autocomplete = "username";
+  acc.value = D.account;
+  acc.oninput = () => { D.account = acc.value.trim(); };
+  who.append(el("span", "muted lbl", T("Steam account")), acc);
+  card.append(who);
+  card.append(el("div", "dl-note", T("SteamCMD opens a window of its own: type the password and the Steam Guard code there. RimArcho never sees them; it only gives SteamCMD the account name.")));
+  const start1 = button(T("download and add"), "", async () => {
+    if (!D.account) { G.error = T("type your Steam account name"); return draw(); }
+    let ok;
+    try { ok = await api.GuideDownload(D.branch, D.dir, D.account, ""); } catch (e) { G.error = errText(e); return draw(); }
+    if (!ok) { G.error = T("a download is already running"); return draw(); }
+    G.error = "";
+    D.run = { state: "starting", percent: 0, line: "", end: false };
+    draw();
+  }, "primary");
+  start1.disabled = !D.branch || !D.dir;
+  acc.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); start1.click(); } };
+  footer(card, start1);
+}
+
+const DL_STATES = { starting: "starting SteamCMD…", login: "logging in (in the SteamCMD window)…", downloading: "downloading", verifying: "checking the files", done: "done" };
+
+function downloading(card, r) {
+  const t = r.end ? (r.ok ? Tf("downloaded; environment %s added", r.env) : T("the download did not finish")) : T(DL_STATES[r.state] || r.state);
+  const head = el("div", "dl-state");
+  head.append(el("span", "t", t));
+  if (!r.end && r.total > 0) head.append(el("span", "muted", Tf("%s of %s", sizeText(r.done), sizeText(r.total))));
+  card.append(head);
+  const prog = el("div", "prog");
+  const bar = el("div", "bar" + (r.end || r.total > 0 ? "" : " busy"));
+  const fill = el("i");
+  fill.style.width = (r.end && r.ok ? 100 : Math.round(r.percent || 0)) + "%";
+  bar.append(fill);
+  prog.append(bar);
+  card.append(prog);
+  if (r.error) card.append(el("div", "dl-note err", r.error));
+  else if (r.line) card.append(el("div", "dl-line", r.line));
+  if (r.end && !r.ok) return footer(card, button(T("try again"), "", () => { D.run = null; draw(); }));
+  footer(card);
+}
+
+// downloadEvent is a "download" event: SteamCMD's progress, then the end.
+export function downloadEvent(ev) {
+  if (!D.run) return;
+  if (ev.end) {
+    Object.assign(D.run, { end: true, ok: ev.ok, error: ev.error || "", env: ev.env || "" });
+    draw();
+    if (ev.ok) added([ev.env]);
+    return;
+  }
+  Object.assign(D.run, ev);
+  draw();
+}
+
+function sizeText(n) {
+  if (!(n > 0)) return "0";
+  const u = ["B", "KB", "MB", "GB"];
+  let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return (i ? n.toFixed(1) : String(n)) + " " + u[i];
 }
 
 // ---- 2. read the mods ----

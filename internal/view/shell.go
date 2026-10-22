@@ -388,7 +388,7 @@ func FindGames(a *app.App) []GameFound {
 	for _, d := range env.DetectAll(a.Detect) {
 		g := GameFound{Game: d.GameRoot, Version: d.GameVersion, Launch: d.Launch, Workshop: d.WorkshopRoot, UserData: d.UserDataRoot, Env: used[env.PathKey(d.GameRoot)]}
 		if g.Env == "" {
-			g.Name = freeName(d.Launch, taken)
+			g.Name = freeName(env.MajorMinor(d.GameVersion), taken)
 			taken[g.Name] = true
 		}
 		out = append(out, g)
@@ -407,7 +407,7 @@ func GameAt(a *app.App, path string) (*GameFound, error) {
 	}
 	envs, _ := a.Store.Envs()
 	taken := map[string]bool{}
-	g := &GameFound{Game: path, Version: env.ReadGameVersion(path), Launch: "direct", UserData: env.DefaultUserDataRoot()}
+	g := &GameFound{Game: path, Version: env.ReadGameVersion(path), Launch: "direct", UserData: a.DefaultUserData()}
 	for _, e := range envs {
 		taken[e.Name] = true
 		if env.PathKey(e.GameRoot) == env.PathKey(path) {
@@ -418,14 +418,14 @@ func GameAt(a *app.App, path string) (*GameFound, error) {
 		g.Workshop, g.Launch = ws, "steam"
 	}
 	if g.Env == "" {
-		g.Name = freeName(g.Launch, taken)
+		g.Name = freeName(env.MajorMinor(g.Version), taken)
 	}
 	return g, nil
 }
 
-// freeName is base, or base-2, base-3… when it is taken.
+// freeName is base (the game's version, "1.6"), or base-2, base-3… when it is taken.
 func freeName(base string, taken map[string]bool) string {
-	if base == "direct" || base == "" {
+	if base == "" {
 		base = "rimworld"
 	}
 	if !taken[base] {
@@ -448,7 +448,9 @@ func AddGames(a *app.App, games []GameFound) ([]string, error) {
 			continue
 		}
 		name := strings.TrimSpace(g.Name)
-		if _, _, err := a.EnvAdd(name, app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, WorkshopRoot: g.Workshop, Launch: g.Launch}); err != nil {
+		// The Workshop folder of the game's Steam library is added by env add when RimArcho
+		// has none yet (02 §0 item 3); naming it here would move an existing one.
+		if _, _, err := a.EnvAdd(name, app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch}); err != nil {
 			return out, err
 		}
 		out = append(out, name)

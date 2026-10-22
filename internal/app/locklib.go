@@ -32,16 +32,27 @@ func (a *App) LockDir() string {
 	return filepath.Join(base, "RimArcho", "locked")
 }
 
-// lockRoot is the environment's folder in the lock library: one per environment, so the
-// copies of one installation never show up in another.
-func (a *App) lockRoot(e *env.Environment) string { return filepath.Join(a.LockDir(), e.Name) }
+// lockRoot is the lock library's folder. The library is shared by every environment
+// (02 §0 item 9): a copy is the same mod record whichever game plays it, and each plan links
+// the copy it uses. e is kept for the callers.
+func (a *App) lockRoot(e *env.Environment) string { return a.LockDir() }
 
-// lockSource returns the environment's lock library source, creating the folder and
-// registering it as an extra source (src:locked) when create is set. The game never
-// looks there: copies reach it only through _Archo_ links (08 §3).
+// IsLockSource reports whether s is the lock library, or one of the per-environment
+// library folders (<lock.dir>/<env>) RimArcho used before the library was shared.
+func (a *App) IsLockSource(s *source.Source) bool {
+	return s != nil && s.Kind == source.Extra && (env.PathKey(s.Root) == env.PathKey(a.LockDir()) || strings.HasPrefix(s.Label, LockLabel+"-"))
+}
+
+// lockSource returns the lock library source, creating the folder and registering it as a
+// shared extra source (src:locked) when create is set. The game never looks there: copies
+// reach it only through _Archo_ links (08 §3).
 func (a *App) lockSource(ix *Index, create bool) (*source.Source, error) {
-	root := a.lockRoot(ix.Env)
-	for _, s := range ix.Sources {
+	root := a.LockDir()
+	shared, err := a.Store.SharedSources()
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range shared {
 		if s.Kind == source.Extra && s.Status != source.StatusRetired && env.PathKey(s.Root) == env.PathKey(root) {
 			return s, nil
 		}
@@ -52,23 +63,13 @@ func (a *App) lockSource(ix *Index, create bool) (*source.Source, error) {
 	if err := a.checkRoots(root); err != nil {
 		return nil, err
 	}
-	for _, s := range ix.Sources {
-		if s.Status != source.StatusRetired && (source.Within(root, s.Root) || source.Within(s.Root, root)) {
-			return nil, fmt.Errorf("the lock library %s overlaps src:%s (%s); choose another folder with archo config set lock.dir <dir>", root, s.Label, s.Root)
-		}
-	}
-	if err := os.MkdirAll(root, 0o755); err != nil {
+	// The older per-environment folders sit inside the library on purpose.
+	if o, err := a.overlapping(root, func(s *source.Source) bool { return a.IsLockSource(s) }); err != nil {
 		return nil, err
+	} else if o != nil {
+		return nil, fmt.Errorf("the lock library %s overlaps src:%s (%s); choose another folder with archo config set lock.dir <dir>", root, o.Label, o.Root)
 	}
-	srcs, err := a.Store.Sources(ix.Env.ID)
-	if err != nil {
-		return nil, err
-	}
-	s := &source.Source{ID: a.NewID(), EnvID: ix.Env.ID, Kind: source.Extra, Label: nextLabel(srcs, source.Kind(LockLabel)), Root: root, Status: source.StatusOK}
-	if err := a.Store.InsertSource(s); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return a.sharedSource(LockLabel, root)
 }
 
 // MoveResult is a locked copy moved from Mods/ into the lock library (04 §7).

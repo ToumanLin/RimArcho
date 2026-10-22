@@ -1,10 +1,10 @@
 $ archo help
 archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
   commands:
-    env list                                  list environments and their sources
+    env list                                  list environments (one per game folder) and the shared mod folders
     env detect                                detect game, user data and workshop paths (suggestion only)
-    env add <name>                            add an environment
-    env set <name>                            change an environment's paths (re-binds moved sources)
+    env add <name>                            add an environment: one game folder
+    env set <name>                            change an environment's game folder, saves or launch (re-binds a moved game)
     env use <name>                            select the current environment
     env rebind <src:label> yes|no             answer a pending source re-binding
     env remove <name>                         forget an environment (RimArcho data only; no game files)
@@ -77,6 +77,11 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     collection <link|ID>                      read a Steam Workshop collection and compare it with the installed mods (uses the network)
     data update [<dataset>…]                  download the community data (rules, steamdb, replacements); the only command that fetches it
     data status                               the community data: source, version, when it was fetched, entries
+    env branches                              list RimWorld's Steam branches (versions) SteamCMD can download
+    env download <branch>                     download a RimWorld version with SteamCMD and add it as an environment (you log in in SteamCMD)
+    folder list                               list the mod folders every environment shares (Workshop, SteamCMD, others)
+    folder add workshop|steamcmd|extra <dir>  add a shared mod folder (a second Workshop folder replaces the first)
+    folder remove <src:label>                 forget a shared mod folder (its files stay)
     unhide <ref>                              rename About.xml.disabled back to About.xml so the game sees the mod again
     unpin <ref>                               use a locked mod's upstream again in the current plan (a RimCrow-style lock also gets its About.xml back); the copy stays
     trash <ref>                               move a hidden or unsubscribed workshop folder to the recycle bin
@@ -120,12 +125,13 @@ $ archo env add main --detected
 env:main  added  [current]
   game: $ROOT/Steam/steamapps/common/RimWorld
   version: 1.6.4633 rev1261
+  saves: shared
   user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
   launch: steam
   sources:
     src:official  added  $ROOT/Steam/steamapps/common/RimWorld/Data
     src:local  added  $ROOT/Steam/steamapps/common/RimWorld/Mods
-    src:workshop  added  $ROOT/Steam/steamapps/workshop/content/294100
+    src:workshop (shared)  added  $ROOT/Steam/steamapps/workshop/content/294100
 next:
   archo scan
 
@@ -133,12 +139,14 @@ $ archo env list
 environments: 1
   env:main  1.6.4633 rev1261  [current]
     game: $ROOT/Steam/steamapps/common/RimWorld
+    saves: shared
     user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
     launch: steam
     sources:
       src:official  $ROOT/Steam/steamapps/common/RimWorld/Data
       src:local     $ROOT/Steam/steamapps/common/RimWorld/Mods
-      src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
+  mod folders (every environment):
+    src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 
 $ archo scan
 scan:1  env:main  0s

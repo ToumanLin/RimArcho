@@ -25,6 +25,7 @@ $ archo env set main --game $ROOT/NewDrive/RimWorld
 env:main  updated  [current]
   game: $ROOT/NewDrive/RimWorld
   version: 1.6.4633 rev1261
+  saves: shared
   user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
   launch: steam
   sources:
@@ -51,6 +52,7 @@ $ archo env set main --game $ROOT/Unrelated/RimWorld
 env:main  updated  [current]
   game: $ROOT/Unrelated/RimWorld
   version: unknown version
+  saves: shared
   user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
   launch: steam
   sources:
@@ -70,12 +72,14 @@ $ archo env list
 environments: 1
   env:main  unknown version  [current]
     game: $ROOT/Unrelated/RimWorld
+    saves: shared
     user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
     launch: steam
     sources:
       src:official  $ROOT/Unrelated/RimWorld/Data
       src:local     $ROOT/NewDrive/RimWorld/Mods  [rebind-pending → $ROOT/Unrelated/RimWorld/Mods]
-      src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
+  mod folders (every environment):
+    src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 
 $ archo env rebind src:local no
 src:local  new source
@@ -101,11 +105,13 @@ $ archo env list
 environments: 1
   env:main  unknown version  [current]
     game: $ROOT/Unrelated/RimWorld
+    saves: shared
     user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
     launch: steam
     sources:
       src:official   $ROOT/Unrelated/RimWorld/Data
       src:local      $ROOT/Unrelated/RimWorld/Mods
       src:local-old  $ROOT/NewDrive/RimWorld/Mods  [retired]
-      src:workshop   $ROOT/Steam/steamapps/workshop/content/294100
+  mod folders (every environment):
+    src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 

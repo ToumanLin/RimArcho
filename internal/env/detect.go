@@ -268,3 +268,42 @@ func SteamExe(o DetectOptions) string {
 	}
 	return ""
 }
+
+// DefaultUserDataFor is the game's default user data folder under the detection options
+// (tests point Home at a fixture).
+func DefaultUserDataFor(o DetectOptions) string {
+	if o.GOOS == "" {
+		o.GOOS = runtime.GOOS
+	}
+	if o.Home == "" {
+		o.Home, _ = os.UserHomeDir()
+	}
+	return userDataCandidates(o.GOOS, o.Home)[0]
+}
+
+// WorkshopFolders lists the RimWorld Workshop content folders found in the Steam libraries
+// (02 §0 item 3): the one in the library that holds the game first.
+func WorkshopFolders(o DetectOptions) []string {
+	if o.GOOS == "" {
+		o.GOOS = runtime.GOOS
+	}
+	if o.Home == "" {
+		o.Home, _ = os.UserHomeDir()
+	}
+	if o.SteamRoots == nil {
+		o.SteamRoots = defaultSteamRoots(o)
+	}
+	var first, rest []string
+	for _, lib := range SteamLibraries(o.SteamRoots) {
+		ws := filepath.Join(lib, "steamapps", "workshop", "content", WorkshopAppID)
+		if !isDir(ws) {
+			continue
+		}
+		if LooksLikeGameRoot(filepath.Join(lib, "steamapps", "common", "RimWorld")) {
+			first = append(first, ws)
+		} else {
+			rest = append(rest, ws)
+		}
+	}
+	return append(first, rest...)
+}

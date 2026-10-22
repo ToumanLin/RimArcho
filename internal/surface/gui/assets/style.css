@@ -656,6 +656,19 @@ svg.i.fill { fill: currentColor; }
 .way .muted { font-size: 12px; flex: 1; }
 .way .typed { width: 100%; margin-top: 0; }
 @media (max-width: 900px) { .ways { grid-template-columns: 1fr; } }
+.guide-way { margin-bottom: 12px; }
+.branches { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.branch { display: flex; gap: 10px; align-items: baseline; text-align: left; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--card-2); }
+.branch.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: var(--accent-soft); }
+.branch .v { font-weight: 600; flex: none; min-width: 9em; }
+.branch .muted { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.branch .when { color: var(--faint); font-variant-numeric: tabular-nums; flex: none; }
+.typed .lbl { flex: none; min-width: 6em; }
+.dl-note { color: var(--fg-2); font-size: 12.5px; margin-top: 12px; }
+.dl-note.err { color: var(--red); }
+.dl-state { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; }
+.dl-state .t { font-weight: 500; }
+.dl-line { margin-top: 8px; font: 11.5px var(--code); color: var(--muted); overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .prog .bar.busy i { animation: none; } #app.narrow #side { transition: none; } }
 
 /* ---- import / export (js/exchange.js) ---- */

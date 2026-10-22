@@ -60,11 +60,11 @@ func TestGuide(t *testing.T) {
 		t.Fatalf("envs %d", sh.Envs)
 	}
 	found := api.GuideFind()
-	if len(found) != 1 || found[0].Name != "steam" {
+	if len(found) != 1 || found[0].Name != "1.6" {
 		t.Fatalf("found %+v", found)
 	}
 	names, err := api.GuideAdd(found)
-	if err != nil || strings.Join(names, ",") != "steam" {
+	if err != nil || strings.Join(names, ",") != "1.6" {
 		t.Fatalf("added %v %v", names, err)
 	}
 	if !api.GuideScan(names) {
@@ -86,7 +86,7 @@ func TestGuide(t *testing.T) {
 	if last["ok"] != true || len(texts) != 2 || !strings.Contains(texts[1], "mods found") {
 		t.Fatalf("end %v, texts %q", last, texts)
 	}
-	if b := api.Board(); b.Never || b.EnvName != "steam" {
+	if b := api.Board(); b.Never || b.EnvName != "1.6" {
 		t.Fatalf("board after the guide: never %v env %s", b.Never, b.EnvName)
 	}
 	if _, err := api.PackImport(e.Root); err == nil {
@@ -161,4 +161,17 @@ func TestPlansInWindow(t *testing.T) {
 		t.Fatalf("palette plans %v", plans)
 	}
 	_ = e
+}
+
+// A game added after the shared folders were read is scanned alone: the guide counts its
+// Data/ and Mods/ (02 §0 item 8).
+func TestScanLineGameOnly(t *testing.T) {
+	view.SetLang("en")
+	out := "scan:3  env:1.5  1s  [game only]\n  sources:\n    src:official  1 mod\n    src:local     2 mods (1 about-disabled)\n  instances: 900 live, 0 tombstones\n"
+	if got := scanLine(out); got != "3 mods in its Data and Mods" {
+		t.Fatalf("game only: %q", got)
+	}
+	if got := scanLine(strings.Replace(out, "  [game only]", "", 1)); got != "900 mods found" {
+		t.Fatalf("whole scan: %q", got)
+	}
 }

@@ -29,7 +29,7 @@ func TestCopyLocal(t *testing.T) {
 	before := e.ReadModsConfig()
 	orig := ref(t, e, "Example Mod")
 	out := e.MustRun("copy-local", orig, "--git")
-	dst := filepath.Join(e.Root, "LocalAppData", "RimArcho", "locked", "main", "123456_local")
+	dst := filepath.Join(e.Root, "LocalAppData", "RimArcho", "locked", "123456_local")
 	// copy-local is now an alias of pin: the enabled original is swapped for the copy in
 	// the current plan (04 §7.2 step 6); the game's files are not touched.
 	for _, want := range []string{"locked: copied to", "git: repository with a baseline commit", "skipped: 1 links", "Textures/External", "replaces " + orig + " in the current plan"} {

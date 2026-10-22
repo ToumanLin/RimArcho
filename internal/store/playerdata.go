@@ -11,7 +11,8 @@ type PlayerData struct {
 	Tags        []string
 }
 
-// PlayerDataAll returns every lineage's player data in the environment.
+// PlayerDataAll returns every lineage's player data. It is global, like the lineages
+// (02 §0); envID is kept for the callers.
 func (s *Store) PlayerDataAll(envID string) (map[string]*PlayerData, error) {
 	out := map[string]*PlayerData{}
 	get := func(lin string) *PlayerData {
@@ -20,7 +21,7 @@ func (s *Store) PlayerDataAll(envID string) (map[string]*PlayerData, error) {
 		}
 		return out[lin]
 	}
-	rows, err := s.DB.Query(`SELECT lineage_id, alias, note FROM lineage_data WHERE environment_id=?`, envID)
+	rows, err := s.DB.Query(`SELECT lineage_id, alias, note FROM lineage_data`)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +37,7 @@ func (s *Store) PlayerDataAll(envID string) (map[string]*PlayerData, error) {
 		}
 	}
 	rows.Close()
-	rows, err = s.DB.Query(`SELECT lineage_id, tag FROM lineage_tag WHERE environment_id=? ORDER BY tag`, envID)
+	rows, err = s.DB.Query(`SELECT lineage_id, tag FROM lineage_tag ORDER BY tag`)
 	if err != nil {
 		return nil, err
 	}
@@ -64,13 +65,13 @@ func (s *Store) SetNote(envID, lineage, note string) error {
 
 func (s *Store) setData(envID, lineage, col, v string) error {
 	_, err := s.DB.Exec(`INSERT INTO lineage_data(environment_id, lineage_id, `+col+`) VALUES(?,?,?)
-		ON CONFLICT(environment_id, lineage_id) DO UPDATE SET `+col+`=excluded.`+col, envID, lineage, v)
+		ON CONFLICT(environment_id, lineage_id) DO UPDATE SET `+col+`=excluded.`+col, Shared, lineage, v)
 	return err
 }
 
 // AddTag tags a lineage; it reports whether the tag is new.
 func (s *Store) AddTag(envID, lineage, tag string) (bool, error) {
-	r, err := s.DB.Exec(`INSERT OR IGNORE INTO lineage_tag(environment_id, lineage_id, tag) VALUES(?,?,?)`, envID, lineage, strings.TrimSpace(tag))
+	r, err := s.DB.Exec(`INSERT OR IGNORE INTO lineage_tag(environment_id, lineage_id, tag) VALUES(?,?,?)`, Shared, lineage, strings.TrimSpace(tag))
 	if err != nil {
 		return false, err
 	}
@@ -80,7 +81,7 @@ func (s *Store) AddTag(envID, lineage, tag string) (bool, error) {
 
 // RemoveTag removes a tag; it reports whether it was there.
 func (s *Store) RemoveTag(envID, lineage, tag string) (bool, error) {
-	r, err := s.DB.Exec(`DELETE FROM lineage_tag WHERE environment_id=? AND lineage_id=? AND tag=?`, envID, lineage, strings.TrimSpace(tag))
+	r, err := s.DB.Exec(`DELETE FROM lineage_tag WHERE lineage_id=? AND tag=?`, lineage, strings.TrimSpace(tag))
 	if err != nil {
 		return false, err
 	}
@@ -90,7 +91,7 @@ func (s *Store) RemoveTag(envID, lineage, tag string) (bool, error) {
 
 // TagCounts lists the environment's tags with how many lineages carry each.
 func (s *Store) TagCounts(envID string) ([][2]string, error) {
-	rows, err := s.DB.Query(`SELECT tag, count(*) FROM lineage_tag WHERE environment_id=? GROUP BY tag ORDER BY tag COLLATE NOCASE`, envID)
+	rows, err := s.DB.Query(`SELECT tag, count(*) FROM lineage_tag GROUP BY tag ORDER BY tag COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}

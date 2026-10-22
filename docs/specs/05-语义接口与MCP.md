@@ -186,12 +186,14 @@ next:
 
 | 分组 | 命令 | 说明 |
 | --- | --- | --- |
-| 环境 | `env list` / `env detect` / `env use <名>` | 列出环境和来源；探测游戏、用户数据、工坊路径（只给建议，02 §2.2）；切换当前环境 |
-| | `env add <名> [--detected] [--game <目录>] [--user-data <目录>] [--workshop <目录>] [--steamcmd <目录>]… [--extra <目录>]… [--launch direct\|steam]` | 新建环境。第一个环境自动成为当前环境 |
-| | `env set <名> [同上路径参数] [--remove-source src:<标签>]… [--launch-args <参数>]` | 改路径（触发来源重新绑定，02 §3.2）；退役 steamcmd / extra 来源；额外的游戏启动参数（如 `-popupwindow`，`""` 清除） |
+| 环境 | `env list` / `env detect` / `env use <名>` | 列出环境（一个游戏目录一个）和共用的 Mod 文件夹；探测游戏、用户数据、工坊路径（只给建议，02 §2.2）；切换当前环境 |
+| | `env add <名> [--detected] [--game <目录>] [--saves shared\|own \| --user-data <目录>] [--launch direct\|steam]` | 新建环境（02 §2.1）。一个游戏目录只能有一个环境；游戏在 Steam 库里且还没有工坊目录时顺便加上。第一个环境自动成为当前环境。`--workshop`、`--steamcmd`、`--extra` 仍可用，等于 `folder add` |
+| | `env set <名> [--game <目录>] [--saves shared\|own] [--user-data <目录>] [--launch …] [--launch-args <参数>]` | 改游戏目录（触发 `Data`、`Mods` 的重新绑定，02 §3.2）、存档方式、启动方式、额外的游戏启动参数（如 `-popupwindow`，`""` 清除）。`--remove-source` 等于 `folder remove` |
+| | `env branches [--install-steamcmd]` / `env download <分支> --to <目录> --account <账户名> [--name <环境>] [--saves …] [--install-steamcmd]` | 用 SteamCMD 列出 RimWorld 的分支、下载一个版本并加为环境；登录在 SteamCMD 里（08 §11） |
+| Mod 文件夹 | `folder list` / `folder add workshop\|steamcmd\|extra <目录>` / `folder remove src:<标签>` | 所有环境共用的 Mod 文件夹（02 §3.1）。MCP：`status show=folders`（只读） |
 | | `env rebind src:<标签> yes\|no` | 回答“这是原来的来源吗？” |
 | | `env remove <名> --yes` | 忘掉一个环境，只删 RimArcho 的数据，不动游戏文件 |
-| 扫描 | `scan [--full]` | 扫描并对账（02 §4）；`--full` 重新哈希全部语义文件 |
+| 扫描 | `scan [--full] [--game-only]` | 扫描并对账（02 §4）；`--full` 重新哈希全部语义文件；`--game-only` 只扫当前游戏的 `Data`、`Mods` |
 | 查询 | `status` | 当前环境概况：游戏版本、各来源 Mod 数、残留、Lineage、上次扫描、变化、方案（启用数、缺失项、与游戏里的列表的差异）、ModsConfig 版本不符的提示、问题数、游戏运行状态 |
 | | `list [--active] [--filter <表达式>] [--all]` | 列出 Mod。`--active` 按加载顺序列出当前方案；`--filter` 支持 `source:<标签\|类型>`、`status:live\|tombstone\|all`、`residue`、`unloadable`、`copies`、`pkg:`、`ws:`、`tag:<标签>`、`lineage:` 和普通词。默认只列活着的 Instance |
 | | `find <词…> [--all]` | 按名称（含别名）、包名、作者、工坊 ID、文件夹搜索 |

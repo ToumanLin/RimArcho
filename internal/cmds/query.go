@@ -16,7 +16,8 @@ import (
 
 func init() {
 	register(&Command{Name: "scan", Summary: "scan sources and reconcile identities", MaxArgs: 0,
-		Flags: []Flag{{Name: "full", Help: "re-hash every semantic file"}}, Run: scanCmd})
+		Flags: []Flag{{Name: "full", Help: "re-hash every semantic file"},
+			{Name: "game-only", Help: "only the game's own Data/ and Mods/, not the shared mod folders"}}, Run: scanCmd})
 	register(&Command{Name: "status", Summary: "overview of the current environment", MaxArgs: 0, Run: statusCmd})
 	register(&Command{Name: "list", Summary: "list mods", MaxArgs: 0,
 		Flags: []Flag{{Name: "filter", Value: "<expr>", Help: "terms: source:<label|kind> status:live|tombstone|all residue unloadable copies pkg:<id> ws:<id> tag:<tag> or words"},
@@ -48,7 +49,7 @@ func eventSummary(counts map[string]int) string {
 }
 
 func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.Scan(a.Bool("full"))
+	r, err := c.App.ScanWith(app.ScanOptions{Full: a.Bool("full"), GameOnly: a.Bool("game-only")})
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +57,9 @@ func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	line := fmt.Sprintf("scan:%d  %s  %s", r.ScanID, envRef(r.Env), app.Elapsed(st.DurationMS))
 	if r.Full {
 		line += "  [full]"
+	}
+	if r.GameOnly {
+		line += "  [game only]"
 	}
 	d, root := render.New(line)
 	srcs := root.Section("sources")

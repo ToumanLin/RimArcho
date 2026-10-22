@@ -8,7 +8,8 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 `1.0.0-rc1` first.
 
 ### Breaking
-- Database schema v10 → v13: plans (v11), analysis kept per plan (v12), copy notes (v13). Each environment's workspace, undo stack, versions and
+- Database schema v10 → v14: plans (v11), analysis kept per plan (v12), copy notes (v13),
+  shared mod folders (v14, below). Each environment's workspace, undo stack, versions and
   staging become its first plan, `default`; each `loadout tag` name becomes a plan of its own
   with one `import` version (04 §1.4).
 - `launch --force` is removed: launching always writes the plan first (08 §2).
@@ -17,6 +18,46 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - `save` and `launch` refuse while ModsConfig.xml holds an outside change that was not loaded
   (04 §4.1, §4.3).
 - Locked copies made by `pin` live in the lock library, not in `Mods/` (04 §7).
+- One environment is one game folder: `env add` refuses a game folder another environment
+  uses, and the Workshop, SteamCMD and other folders are no longer an environment's (below).
+
+### Environments and shared mod folders (02 §0)
+- An environment is one game folder: its `Data` and `Mods`, version, launch, arguments,
+  saves and plans. Saves are `--saves shared` (the game's default folder) or `--saves own`
+  (`<data>/userdata/<env>`, started with `-savedatafolder`).
+- The Workshop folder (found from Steam), SteamCMD folders, other folders, the Archo Monitor
+  folder and the lock library are shared by every environment: `archo folder list|add|remove`,
+  the settings page's Mod 文件夹, MCP `status show=folders`. One Workshop folder; naming another
+  moves it. `env add/set --workshop/--steamcmd/--extra/--remove-source` still work and mean the
+  folder commands.
+- One record per mod: a shared folder's mods, every lineage, tags, notes, aliases, copy notes,
+  history and user rules are the same in every environment; Mod 库存's 用在 lists every
+  environment's plans. Problem ignores stay per environment. Analysis stays per game version.
+- `scan` reads the shared folders once plus the game's own; `scan --game-only` reads only the
+  game's (adding a game), and its `Mods/` copies still join the Workshop original's lineage.
+- The lock library is `lock.dir` itself; older `<lock.dir>/<env>` folders keep working as
+  `src:locked-<env>`.
+- Migration v14 merges each environment's copies of a shared folder, their instances by
+  folder name and the lineages through them, and rewrites every reference (plans, undo,
+  versions, staging, aliases, snapshots and origin markers, events, questions, notes, rules,
+  player data, ignores, launch fingerprints). IDs on disk (pack.json, origin.json) resolve
+  through the new `id_alias` table.
+- The environment page shows only the game folder, version, launch, saves and arguments. The
+  add-environment guide offers 已有的游戏 (detected installs, a typed folder or the folder
+  dialog; named after the version, e.g. 1.6) or 下载一个版本, and after adding reads only the
+  new game's `Data` and `Mods`.
+
+### Downloading a game version (08 §11)
+- `archo env branches` lists RimWorld's Steam branches from SteamCMD (anonymous
+  `app_info_print`); `archo env download <branch> --to <dir> --account <name>` downloads one
+  with SteamCMD and adds it as an environment. The guide's 下载一个版本 does the same with a
+  progress bar.
+- The player logs in inside SteamCMD's own window; RimArcho never asks for, receives, stores
+  or passes a password or Steam Guard code, only the account name. Progress and the result
+  come from SteamCMD's `logs/console_log.txt`; failures are said plainly (no ownership,
+  password, Steam Guard, disk full, branch, network).
+- SteamCMD is downloaded from Valve into `%LOCALAPPDATA%\RimArcho\steamcmd` only after the
+  player saw its size (`--install-steamcmd` in the CLI).
 
 ### Archo Monitor (03 §6.7, 04 §1.5, 08 §9)
 - RimArcho ships its own in-game companion mod, Archo Monitor (`toumanlin.archomonitor`,

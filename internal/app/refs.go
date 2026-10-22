@@ -227,7 +227,7 @@ func (a *App) ResolveQuestion(qid int64, answer string) (*store.Question, error)
 	if err != nil {
 		return nil, err
 	}
-	if q == nil || q.EnvID != e.ID {
+	if q == nil || (q.EnvID != e.ID && q.EnvID != store.Shared) {
 		return nil, fmt.Errorf("no question q:%d in env:%s (archo identity list)", qid, e.Name)
 	}
 	if q.Status != "open" {

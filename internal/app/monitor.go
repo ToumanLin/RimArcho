@@ -414,24 +414,18 @@ func (a *App) installMonitor(r *MonitorResult, b *MonitorBundled, dryRun bool) (
 	return true, os.Rename(tmp, r.Target)
 }
 
-// registerMonitorSource adds the environment's src:monitor (an extra source).
+// registerMonitorSource adds src:monitor, a shared extra source (02 §0 item 10).
 func (a *App) registerMonitorSource(ix *Index, dir string) error {
 	if err := a.checkRoots(dir); err != nil {
 		return err
 	}
-	for _, s := range ix.Sources {
-		if s.Status != source.StatusRetired && (source.Within(dir, s.Root) || source.Within(s.Root, dir)) {
-			return fmt.Errorf("the monitor folder %s overlaps src:%s (%s); choose another folder with archo config set monitor.dir <dir>", dir, s.Label, s.Root)
-		}
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if o, err := a.overlapping(dir, nil); err != nil {
 		return err
+	} else if o != nil {
+		return fmt.Errorf("the monitor folder %s overlaps src:%s (%s); choose another folder with archo config set monitor.dir <dir>", dir, o.Label, o.Root)
 	}
-	srcs, err := a.Store.Sources(ix.Env.ID)
-	if err != nil {
-		return err
-	}
-	return a.Store.InsertSource(&source.Source{ID: a.NewID(), EnvID: ix.Env.ID, Kind: source.Extra, Label: nextLabel(srcs, source.Kind(MonitorLabel)), Root: dir, Status: source.StatusOK})
+	_, err := a.sharedSource(MonitorLabel, dir)
+	return err
 }
 
 func monitorAddedKey(planID int64) string { return fmt.Sprintf("monitor.added:%d", planID) }

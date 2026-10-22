@@ -90,7 +90,7 @@ next:
 $ archo library move-to-locked #iqmu --dry-run
 #iqmu Lockable dry run, nothing changed: would move to the lock library
   from: $ROOT/Steam/steamapps/common/RimWorld/Mods/Lockable Copy
-  to: $ROOT/LocalAppData/RimArcho/locked/main/Lockable Copy
+  to: $ROOT/LocalAppData/RimArcho/locked/Lockable Copy
   how: renamed (same volume)
   marker: .rimarcho/origin.json would be written (the folder has none)
   plans: plan:default, plan:other keep it: the same instance, linked into Mods/ (_Archo_) on save or launch
@@ -100,7 +100,7 @@ next:
 $ archo library move-to-locked #iqmu
 #iqmu Lockable moved to the lock library
   from: $ROOT/Steam/steamapps/common/RimWorld/Mods/Lockable Copy
-  to: $ROOT/LocalAppData/RimArcho/locked/main/Lockable Copy
+  to: $ROOT/LocalAppData/RimArcho/locked/Lockable Copy
   how: renamed (same volume)
   now: #iqmu
   marker: .rimarcho/origin.json written (the folder had none)
@@ -116,7 +116,7 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     supports: 1.6
     updated: 2026-09-21 14:13
   #iqmu locked 2026-10-01 11:00  549 B  (current plan)
-    path: $ROOT/LocalAppData/RimArcho/locked/main/Lockable Copy
+    path: $ROOT/LocalAppData/RimArcho/locked/Lockable Copy
     supports: 1.6
     updated: 2026-10-01 10:00
     note: (by RimArcho) moved into the lock library 2026-10-01 for plan:default, plan:other
@@ -136,7 +136,7 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     supports: 1.6
     updated: 2026-09-21 14:13
   #iqmu locked 2026-10-01 11:00  549 B  (current plan)
-    path: $ROOT/LocalAppData/RimArcho/locked/main/Lockable Copy
+    path: $ROOT/LocalAppData/RimArcho/locked/Lockable Copy
     supports: 1.6
     updated: 2026-10-01 10:00
     note: kept for the old save
