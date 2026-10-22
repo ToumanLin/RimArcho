@@ -25,6 +25,8 @@ type probState struct {
 	need   int
 	open   map[string]bool // folded items shown open (enter), by text
 	base   []view.Need     // the analysis' items; the running game's lead them (06 §2.1)
+	// lastRun says which run the last-run section is from ("the list · 9 月 29 日 19:41")
+	lastRun string
 }
 
 // analysis progress plumbing
@@ -56,7 +58,7 @@ func (m *model) loadProblems() {
 	p.loaded = true
 	p.countsKey = m.app.Store.ChangeKey()
 	if err != nil {
-		p.base, p.items, p.need, p.status = nil, nil, 0, map[string]int{}
+		p.base, p.items, p.need, p.status, p.lastRun = nil, nil, 0, map[string]int{}, ""
 		m.say(sayFail, err.Error())
 		return
 	}
@@ -69,7 +71,7 @@ func (m *model) loadProblems() {
 	}
 	vn := view.BuildNeeds(m.app, m.st, ps)
 	p.never, p.stale = vn.Never, vn.Stale
-	p.base, p.status, p.need = vn.Items, vn.Status, vn.Count
+	p.base, p.status, p.need, p.lastRun = vn.Items, vn.Status, vn.Count, vn.LastRun
 	m.composeNeeds()
 }
 
@@ -85,10 +87,19 @@ func (m *model) composeNeeds() {
 }
 
 // needCount is the top bar's "needs attention" number (06 §2.2): problems, identity
-// questions, an external change of the list, a list saved for another game version.
+// questions, an external change of the list, a list saved for another game version, and
+// the running game's errors, so it equals the counted items of the screen (06 §2.4).
 func (m *model) needCount() int {
 	m.problemCounts()
-	return m.prob.need
+	n := m.prob.need
+	if m.live != nil {
+		for _, it := range m.live.Items {
+			if it.Counted {
+				n++
+			}
+		}
+	}
+	return n
 }
 
 // problemCounts reloads the items when the database changed (an edit, a rule, an answer).

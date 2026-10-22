@@ -644,7 +644,7 @@ func TestNeedsLogs(t *testing.T) {
 	fm := finish(t, tm)
 	last := 0
 	for _, it := range fm.prob.items {
-		if it.group == gLastRun {
+		if it.group == view.GroupLastRun {
 			last++
 			if !it.counted || !strings.HasPrefix(it.text, "last run, ") {
 				t.Fatalf("log item %+v", it)
@@ -663,7 +663,7 @@ func TestNeedsLogs(t *testing.T) {
 	m.loadProblems()
 	stale := 0
 	for _, it := range m.prob.items {
-		if it.group == gLastRun {
+		if it.group == view.GroupLastRun {
 			if it.counted || !strings.HasPrefix(it.text, "earlier log") {
 				t.Fatalf("stale log item %+v", it)
 			}
@@ -680,6 +680,7 @@ func TestIconWidths(t *testing.T) {
 	for name, set := range map[string]icons{"nerd": nerdIcons, "compat": compatIcons} {
 		for i, s := range []string{set.official, set.workshop, set.local, set.localCopy, set.git, set.err, set.warn, set.logErr,
 			set.unloadable, set.unsaved, set.lock, set.update, set.dep, set.staging, set.play, set.save, set.sort, set.search, set.fail,
+			set.evDeclared, set.evInferred, set.evLog, set.evCommunity, set.evRule,
 			markSel, markOK, markPrompt, markBusy, markDot} {
 			if s == "" {
 				continue // "not shown" in compatibility mode

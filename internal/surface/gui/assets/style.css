@@ -4,6 +4,10 @@
    The colour tokens and several component rules are taken from magpie's app.css:
    Copyright (c) 2026 yetone, MIT License (https://github.com/yetone/magpie/blob/main/LICENSE). */
 :root {
+  /* the gap between side-by-side and stacked cards, the same everywhere (06 §7) */
+  --card-gap: 4px;
+  /* how far a drag handle's invisible hit area reaches over the cards on each side */
+  --grab: 3px;
   --bg: #f4f4f6;
   --card: #ffffff;
   --card-2: #f9f9fb;
@@ -75,25 +79,37 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 
 /* ---- the shell (06 §2.1, §2.2): the sidebar, then the top bar, the page and the bottom line ---- */
 /* --side-w: the width the player dragged the sidebar to (06 §2.1); unset = the default */
-#app { display: grid; grid-template-columns: var(--side-w, 212px) minmax(0, 1fr); height: 100%; }
-#app.collapsed { grid-template-columns: 0 minmax(0, 1fr); }
-#app.collapsed #side { visibility: hidden; }
+#app { display: grid; grid-template-columns: var(--side-w, 212px) minmax(0, 1fr); height: 100%; transition: grid-template-columns var(--t-enter) var(--ease); }
+/* the sidebar's modes (06 §2.1, magpie's NavigationView): expanded, compact (the icon rail),
+   hidden, and over (expanded, lying over the page in a medium or narrow window) */
+#app.nav-compact, #app.over-rail { grid-template-columns: 48px minmax(0, 1fr); }
+#app.nav-hidden, #app.nav-over:not(.over-rail) { grid-template-columns: 0 minmax(0, 1fr); }
+#app.still, #app.still #side, body.resizing #app { transition: none; }
 /* each keeps its column: the sidebar floats over the page in a narrow window */
 #side { grid-column: 1; grid-row: 1; }
 #main { grid-column: 2; grid-row: 1; display: grid; grid-template-rows: 50px minmax(0, 1fr) 30px; min-width: 0; min-height: 0; }
-#body { position: relative; display: grid; min-height: 0; min-width: 0; }
+#body { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; min-width: 0; }
+/* the plan editor's description line, like every page's (06 §2.5): the lead, its actions */
+#planhead { grid-row: 1; padding: 0 12px 10px; min-height: 28px; }
+#planhead[hidden] { display: none; }
+#body > #board { grid-row: 2; }
 
 #side { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-right: 1px solid var(--line-2); background: var(--bg); }
 /* the sidebar's right edge drags its width; double-click goes back to the default */
 #side-split { position: absolute; top: 0; bottom: 0; right: 0; width: 6px; z-index: 2; cursor: col-resize; }
 #side-split:hover, #side-split.drag { background: linear-gradient(to left, var(--line) 0 2px, transparent 2px); }
-#app.narrow #side-split, #app.collapsed #side-split { display: none; }
+#app:not(.nav-expanded) #side-split { display: none; }
 body.resizing, body.resizing * { cursor: col-resize !important; }
 /* The sidebar follows magpie's: 212px (184px in a smaller window), 10px sides, entries
    30px high with the icon, the name and the count on the same edges in every row. */
 /* No name or icon at the top (the window's title bar has them) and no empty head: the
    sidebar starts with its first group title, level with the top bar's breadcrumb. */
-#nav { position: relative; flex: 1; min-height: 0; overflow-y: auto; padding: 16px 10px 10px; display: flex; flex-direction: column; gap: 1px; }
+#nav { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 10px 10px; display: flex; flex-direction: column; gap: 1px; }
+/* the toggle heads the sidebar, level with the top bar; in the rail it stays at the top */
+.side-head { flex: none; height: 50px; display: flex; align-items: center; padding: 0 10px; }
+.navtoggle { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 7px; color: var(--muted); transition: background var(--t-press), color var(--t-press); }
+.navtoggle:hover { background: var(--pill); color: var(--fg); }
+.navtoggle svg.i { width: 15px; height: 15px; }
 /* a group's title: small, muted, apart from the entries above it (06 §2.1) */
 #nav .grp { padding: 14px 8px 4px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; }
 #nav > .grp:first-of-type { padding-top: 2px; }
@@ -127,7 +143,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .kid-hl { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 6px; background: color-mix(in srgb, var(--fg) 6.5%, transparent); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
 .side-foot .nav-item.on { background: var(--card); box-shadow: var(--seg-edge); }
 .side-foot { flex: none; padding: 8px 10px 10px; border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
-@media (max-width: 859px) { #app:not(.collapsed):not(.narrow) { grid-template-columns: var(--side-w, 184px) minmax(0, 1fr); } }
 /* the foot's one line, only while the game runs or a new log waits (06 §2.1): a dot in the
    icon column, then the text, on the entries' edges */
 #live { width: 100%; height: 30px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 8px; border-radius: 7px; color: var(--fg-2); font-size: 12px; text-align: left; white-space: nowrap; overflow: hidden; transition: background var(--t-press), color var(--t-press); animation: view-in var(--t-enter) var(--ease); }
@@ -136,11 +151,29 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 #live.newlog::before { background: var(--accent); }
 #live:hover { background: var(--pill); color: var(--fg); }
 #live .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* a narrow window: the sidebar opens over the page */
-#scrim { position: fixed; inset: 0; z-index: 14; background: rgba(0, 0, 0, .28); animation: fade var(--t-press) ease-out; }
-#app.narrow { grid-template-columns: 0 minmax(0, 1fr); }
-#app.narrow #side { position: fixed; top: 0; bottom: 0; left: 0; width: 212px; z-index: 15; box-shadow: var(--shadow); transition: transform var(--t-enter) var(--ease); }
-#app.narrow.collapsed #side { transform: translateX(-100%); visibility: hidden; }
+/* over: the expanded pane opens over the page, a light scrim behind it */
+#scrim { position: fixed; inset: 0; z-index: 14; background: rgba(0, 0, 0, .18); animation: fade var(--t-press) ease-out; }
+#side { transition: width var(--t-enter) var(--ease), box-shadow var(--t-enter) var(--ease); }
+#app.nav-over #side { position: fixed; top: 0; bottom: 30px; left: 0; width: 212px; z-index: 15; box-shadow: var(--shadow); animation: pane-in var(--t-enter) var(--ease); }
+@keyframes pane-in { from { transform: translateX(-24px); opacity: 0; } }
+/* compact: the rail. Icons keep their order; the group titles, labels, chevrons and
+   sub-entries go; the label is the tooltip; the highlight and the badge stay on the icon */
+#app.nav-compact #side { width: 48px; }
+#app.nav-compact #nav, #app.nav-compact .side-foot { padding-left: 6px; padding-right: 6px; }
+#app.nav-compact .side-head { padding: 0 10px; }
+#app.nav-compact #nav .grp { height: 10px; padding: 0; font-size: 0; }
+#app.nav-compact #nav > .grp:first-of-type { height: 0; }
+#app.nav-compact .nav-item { justify-content: center; padding: 0; gap: 0; }
+#app.nav-compact .nav-item .lbl, #app.nav-compact .nav-item .chev, #app.nav-compact .kids-wrap, #app.nav-compact #live .t { display: none; }
+#app.nav-compact .nav-item { position: relative; }
+#app.nav-compact .nav-item .badge-n, #app.nav-compact #live .badge-n { position: absolute; top: 1px; right: 0; margin: 0; min-width: 14px; padding: 0 3px; font-size: 9.5px; line-height: 14px; }
+#app.nav-compact #live { position: relative; justify-content: center; padding: 0; gap: 0; }
+#app.nav-compact #live::before { margin: 0; }
+/* hidden: only the toggle stays, at the window's top left; the breadcrumb moves over for it */
+#app.nav-hidden #side { visibility: hidden; }
+#app.nav-hidden #nav, #app.nav-hidden .side-foot { display: none; }
+#app.nav-hidden #navtoggle { visibility: visible; position: fixed; top: 11px; left: 10px; z-index: 16; }
+#app.nav-hidden #top { padding-left: 46px; }
 
 /* ---- the top bar: collapse, the breadcrumb, the environment chip, the page's actions ---- */
 #top { position: relative; display: flex; align-items: center; gap: 8px; padding: 0 16px 0 12px; min-width: 0; }
@@ -149,24 +182,24 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 #crumbs .crumb:hover { color: var(--fg); background: var(--pill); }
 #crumbs .crumb.last { color: var(--fg); font-weight: 600; }
 #crumbs .sep { color: var(--muted); flex: none; margin: 0 2px; font-size: 15px; }
-#acts { display: flex; align-items: center; gap: 8px; min-width: 0; }
-#acts .btn { border: 1px solid var(--line); background: var(--card); color: var(--fg-2); box-shadow: 0 1px 1px rgba(0, 0, 0, .04); }
-#acts .btn:hover { border-color: var(--muted); background: var(--card-2); color: var(--fg); }
-#acts .btn.primary { color: var(--accent-fg); background: var(--accent); border-color: transparent; }
-#acts .btn.hot { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-#acts .field { flex: 0 1 200px; }
-#acts .unwritten { color: var(--accent); font-size: 11.5px; white-space: nowrap; margin-right: 2px; }
-#acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+.page-acts { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.page-acts .btn { border: 1px solid var(--line); background: var(--card); color: var(--fg-2); box-shadow: 0 1px 1px rgba(0, 0, 0, .04); }
+.page-acts .btn:hover { border-color: var(--muted); background: var(--card-2); color: var(--fg); }
+.page-acts .btn.primary { color: var(--accent-fg); background: var(--accent); border-color: transparent; }
+.page-acts .btn.hot { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.page-acts .field { flex: 0 1 200px; }
+.page-acts .unwritten { color: var(--accent); font-size: 11.5px; white-space: nowrap; margin-right: 2px; }
+.page-acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
 #top #env { flex: 0 1 auto; }
 /* the chip beside the page's name: the environment (and the plan on 能不能跑) */
 .envchip { height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 6px; background: var(--pill); color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background var(--t-press), color var(--t-press); }
 .envchip:hover, .envchip.on { background: var(--pill-hover); color: var(--fg); }
 /* a page's actions: quiet icon + text, no border (06 §2.2) */
-#acts .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); font-size: 13px; padding: 0 6px; }
-#acts .btn.quiet:hover { background: var(--pill); color: var(--fg); }
-#acts .btn.quiet kbd { display: none; }
-#acts .btn.quiet .ic { margin-right: 6px; }
-@media (max-width: 1100px) { #acts .wide-only, #acts kbd { display: none; } }
+.page-acts .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); font-size: 13px; padding: 0 6px; }
+.page-acts .btn.quiet:hover { background: var(--pill); color: var(--fg); }
+.page-acts .btn.quiet kbd { display: none; }
+.page-acts .btn.quiet .ic { margin-right: 6px; }
+@media (max-width: 1100px) { .page-acts .wide-only, .page-acts kbd { display: none; } }
 @media (max-width: 640px) { #top #env { display: none; } }
 .pill { height: 24px; display: inline-flex; align-items: center; background: var(--pill); color: var(--fg-2); border-radius: 999px; padding: 0 11px; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background var(--t-press); }
 .pill:hover { background: var(--pill-hover); color: var(--fg); }
@@ -212,11 +245,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 
 /* ---- the board: three columns (06 §2.5): 未启用 | 已启用 | 详情, with 暂存 and 历史 folded
    under 详情 in the third column ---- */
-#board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 8px var(--c2, 1.5fr); }
+#board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 1fr) var(--card-gap) var(--c1, 1.2fr) var(--card-gap) var(--c2, 1.5fr); }
 #board > .fcol { grid-column: 1; } #board > [data-split="0"] { grid-column: 2; }
 #board > [data-area="1"] { grid-column: 3; } #board > [data-split="1"] { grid-column: 4; }
 #board > .stack { grid-column: 5; } #board > * { grid-row: 1; }
-.stack { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+.stack { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
 .stack > .detail { flex: 1 1 0; min-height: 140px; }
 /* a fold is its bar until opened; open, it takes a share of the column under 详情 */
 .stack > .fold { flex: none; }
@@ -249,8 +282,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .search .ghost .typed { color: transparent; }
 .search .ghost .sfx { color: var(--muted); opacity: .75; }
 .others { color: var(--faint); font-size: 11.5px; padding: 0 12px 4px; }
-.split { cursor: col-resize; border-radius: 4px; margin: 10px 2px; }
-.split:hover, .split.drag { background: var(--line); }
+.split { position: relative; z-index: 3; cursor: col-resize; margin: 10px 0; }
+/* the visible gap is --card-gap; the hit area reaches --grab over each card's edge */
+.split::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--grab)); right: calc(-1 * var(--grab)); }
+.split::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; border-radius: 1px; background: transparent; transition: background var(--t-press); }
+.split:hover::after, .split.drag::after { background: var(--line); }
 
 /* rows (06 §2.5): position, source, name, status */
 .rows { flex: 1; overflow-y: auto; position: relative; outline: 0; }
@@ -335,7 +371,9 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .envrow.on .name { color: var(--accent); }
 .chip.cur { color: var(--accent); background: var(--accent-soft); margin: 0; }
 @media (prefers-reduced-motion: reduce) { .page.enter, .seg > .thumb { animation: none; transition: none; } }
-.page-head { display: flex; gap: 6px 12px; align-items: baseline; flex-wrap: wrap; color: var(--muted); }
+.page-head { display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; color: var(--muted); min-height: 28px; }
+/* the page's actions at the right end of its description line (06 §2.2) */
+.page-head .page-acts { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 /* one line under the breadcrumb that says what the page is for (06 §2.2) */
 .page-head .lead { margin: 0; color: var(--muted); font-size: 13px; }
 .subbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
@@ -351,7 +389,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .empty-state { padding: 36px 20px; text-align: center; color: var(--muted); }
 .group { padding: 12px 14px 4px; color: var(--faint); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
 .page-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
-.cols { flex: 1; min-height: 0; display: grid; gap: 10px; }
+.cols { flex: 1; min-height: 0; display: grid; gap: var(--card-gap); }
 .cols.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .cols.two { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
 .cols .col { display: flex; flex-direction: column; min-height: 0; transition: border-color var(--t-press); }
@@ -563,7 +601,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 /* a number that changed bumps */
 .bump { animation: bump var(--t-layout) var(--ease); }
 @keyframes bump { 40% { transform: scale(1.18); } }
-.badge-n, .cnt, .area .head .num, .need-sec .n, #acts .unwritten { display: inline-block; }
+.badge-n, .cnt, .area .head .num, .need-sec .n, .page-acts .unwritten { display: inline-block; }
 /* the status line slides in from below */
 #status.in { animation: status-in var(--t-enter) var(--ease); }
 @keyframes status-in { from { opacity: 0; transform: translateY(6px); } }
@@ -622,7 +660,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 
 /* a narrow window: the third column goes first (enter opens the full detail; 暂存 and 历史
    are reached by their keys and the command palette) */
-@media (max-width: 680px) { #board { grid-template-columns: 1fr 8px 1.2fr 0 0; } #board > .stack, #board [data-split="1"] { display: none; } }
+@media (max-width: 680px) { #board { grid-template-columns: 1fr var(--card-gap) 1.2fr 0 0; } #board > .stack, #board [data-split="1"] { display: none; } }
 
 /* ---- 启动 (06 §2.3): like the game's main menu — the plans and packs down the left over a
    background image, the last run and scan under them, ▶ 启动游戏 in the bottom right with the
@@ -673,6 +711,8 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .hm-launch .where b { color: var(--fg); font-weight: 600; }
 .hm-launch .stack { display: flex; flex-direction: column; width: 200px; }
 .hm-launch .btn.launch { position: relative; z-index: 2; height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; font-size: 15px; font-weight: 600; box-shadow: 0 8px 28px color-mix(in srgb, var(--accent) 30%, transparent); }
+/* the editor's 启动游戏 lands here with the focus on it (06 §2.5): L or enter starts the game */
+.hm-launch .btn.launch:focus { outline: 2px solid var(--fg); outline-offset: 3px; }
 .hm-launch .btn.launch .ic { display: inline-flex; margin: 0; }
 .hm-launch .btn.launch kbd { font: 600 11px/1 var(--code); padding: 3px 5px; border-radius: 4px; background: rgba(20, 21, 43, .14); color: inherit; }
 .hm-launch .btn.launch:disabled { filter: saturate(.3) brightness(.8); box-shadow: none; }
@@ -805,7 +845,7 @@ svg.i.fill { fill: currentColor; }
 .dl-state { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; }
 .dl-state .t { font-weight: 500; }
 .dl-line { margin-top: 8px; font: 11.5px var(--code); color: var(--muted); overflow-wrap: anywhere; }
-@media (prefers-reduced-motion: reduce) { .prog .bar.busy i { animation: none; } #app.narrow #side { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .prog .bar.busy i { animation: none; } #app, #side { transition: none; } #app.nav-over #side { animation: none; } }
 
 /* ---- import / export (js/exchange.js) ---- */
 .pop.xc { width: min(760px, 94vw); display: flex; flex-direction: column; max-height: 80vh; }
@@ -862,12 +902,12 @@ details.xc-sec > summary { cursor: pointer; }
 .nav-kid.add { color: var(--faint); }
 .nav-kid.add:hover { color: var(--accent); }
 .chip.mark { color: var(--amber); background: var(--amber-soft); }
-#acts .chip.mark { margin: 0; white-space: nowrap; flex: none; cursor: pointer; border: 0; display: inline-flex; align-items: center; gap: 6px; }
-#acts .chip.mark .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.page-acts .chip.mark { margin: 0; white-space: nowrap; flex: none; cursor: pointer; border: 0; display: inline-flex; align-items: center; gap: 6px; }
+.page-acts .chip.mark .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
 #crumbs { min-width: 0; }
 #top #env { margin-left: 2px; }
-@media (max-width: 1280px) { #acts .chip.mark .t { display: none; } #acts .chip.mark { padding: 0 7px; line-height: 22px; } }
-#acts .icon-btn { padding: 0 8px; letter-spacing: 1px; }
+@media (max-width: 1280px) { .page-acts .chip.mark .t { display: none; } .page-acts .chip.mark { padding: 0 7px; line-height: 22px; } }
+.page-acts .icon-btn { padding: 0 8px; letter-spacing: 1px; }
 /* the plan the game has, when there are several plans: a small green dot by its name */
 .ingame-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 .plan-pop .label { padding: 10px 16px 2px; }
@@ -885,7 +925,7 @@ details.xc-sec > summary { cursor: pointer; }
 /* the left column (the filter bar, then the details) as wide as the editor's 未启用; the
    table takes the rest of the page, which is as wide as the window (no centred cap) */
 .page.library { padding-left: 12px; padding-right: 12px; }
-.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--lib-side, clamp(280px, 26%, 440px)) 8px minmax(0, 1fr); position: relative; }
+.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--lib-side, clamp(280px, 26%, 440px)) var(--card-gap) minmax(0, 1fr); position: relative; }
 .lib-split { cursor: col-resize; }
 /* the grey completion over the input (the plan's .search .ghost, in this box) */
 
@@ -946,7 +986,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-main.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 /* a narrow page: the filter bar heads the table and the details lie over it (enter) */
 @media (max-width: 900px) {
-  .lib:not(.full) { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 8px; }
+  .lib:not(.full) { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: var(--card-gap); }
   .lib:not(.full) .lib-split, .lib:not(.full) .lib-detail { display: none; }
 }
 .lib-detail .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 32px; user-select: text; }
@@ -1004,8 +1044,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
    values wrapping; what was under it (未启用's rows, Mod 库存's details) shrinks to its
    title bar at the bottom, a click on which (or \, esc) closes the bar again */
 /* the bar is a card of its own over the column's other card (未启用, the details); the
-   8 px between them is the gap that shares the column */
-.fcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+   --card-gap between them is the gap that shares the column */
+.fcol { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
 .fcol > .area { flex: 1; min-height: 0; }
 .fcol > .fbar { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
 .fcol > .fbar:not(.open) .fbar-row { border-bottom: 0; }
@@ -1015,9 +1055,11 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fbar.open .fbar-gt { margin-top: 8px; }
 .fbar.open .fbar-gt:first-child { margin-top: 0; }
 .fbar.open .fbar-line { flex-wrap: wrap; white-space: normal; overflow: visible; row-gap: 3px; }
-.fbar-gap { display: none; position: absolute; left: 0; right: 0; bottom: -9px; height: 8px; cursor: row-resize; border-radius: 4px; }
+.fbar-gap { display: none; position: absolute; z-index: 3; left: 0; right: 0; bottom: calc(-1 * (var(--card-gap) + var(--grab))); height: calc(var(--card-gap) + 2 * var(--grab)); cursor: row-resize; }
 .fbar.open .fbar-gap { display: block; }
-.fbar-gap:hover, .fbar-gap.drag { background: var(--line); }
+/* a 2px line in the middle of the visible gap shows it can be dragged */
+.fbar-gap::after { content: ""; position: absolute; left: 12px; right: 12px; top: 50%; height: 2px; margin-top: -1px; border-radius: 1px; background: transparent; transition: background var(--t-press); }
+.fbar-gap:hover::after, .fbar-gap.drag::after { background: var(--line); }
 /* filling the column, the bar leaves the card below only its title, a slim card at the
    bottom like 暂存 and 历史: a click on it gives the column back */
 .fcol:has(> .fbar.open.fill) > .area { flex: none; }

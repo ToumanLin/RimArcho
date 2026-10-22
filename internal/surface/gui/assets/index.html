@@ -11,6 +11,7 @@
 <div id="app">
   <aside id="side">
     <div id="side-split"></div>
+    <div class="side-head"><button id="navtoggle" class="navtoggle" aria-label="Sidebar"></button></div>
     <nav id="nav"></nav>
     <div class="side-foot">
       <button id="live" class="live" hidden></button>
@@ -20,14 +21,11 @@
   <div id="scrim" hidden></div>
   <div id="main">
     <header id="top">
-      <button id="collapse" class="icon" title="Sidebar"></button>
       <nav id="crumbs"></nav>
       <button id="env" class="envchip" title="E"></button>
-      <span class="grow"></span>
-      <div id="acts"></div>
-      <button id="btn-launch" class="btn primary" data-cmd="launch" title="L"></button>
     </header>
     <div id="body">
+      <div id="planhead" class="page-head"><p class="lead"></p><div class="page-acts"></div></div>
       <main id="board">
         <div class="fcol" data-col="0"><div class="barhost"></div><section class="area list" data-area="0"><div class="head"></div><div class="rows" tabindex="-1"></div></section></div>
         <div class="split" data-split="0"></div>

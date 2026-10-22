@@ -6,8 +6,10 @@ import "github.com/ToumanLin/RimArcho/internal/view"
 func init() {
 	view.Register(map[string]string{
 		// the sidebar and the top bar
-		"show the sidebar": "显示侧栏",
-		"hide the sidebar": "收起侧栏",
+		"expand the sidebar":                              "展开侧栏",
+		"collapse the sidebar":                            "收起侧栏",
+		"%d enabled, in the order the game loads them":    "启用了 %d 个，按游戏加载的顺序",
+		"opens the launch page, where the game starts":    "打开启动页，在那里启动游戏",
 		"drag to change the width; double-click to reset": "拖动改变宽度，双击恢复默认",
 		"pages":                        "页面",
 		"go to a page in the sidebar":  "去侧栏的页面",

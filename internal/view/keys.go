@@ -64,7 +64,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r(pick("← → · 1–4", "← → · 1–4 · h l"), "go to an area"),
 				r("J K · alt+J K", "move down / up 1 (10); with a filter, past the rows shown"),
 				r("T", "put everything back from staging; elsewhere, stage the enabled list"),
-				r("S · w · L", "sort · write to the game · launch (the palette previews them)"),
+				r("S · w · L", pick("sort · write to the game · to the launch page (the palette previews them)", "sort · write to the game · launch (the palette previews them)")),
 				r(pick("i · e", "e"), pick("import · export the mod list", "export the mod list")),
 				r("R · A", "rescan · check the files again"),
 				r("P · E", "plans · environments"),
@@ -125,6 +125,11 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	out = append(out,
 		r("tab · shift+tab", "next / previous page under the same sidebar entry"),
 		r("shift+1–7", "go to a page in the sidebar"),
+	)
+	if !tui {
+		out = append(out, r("ctrl+b", "show / hide the sidebar"))
+	}
+	out = append(out,
 		r(pick("c · l", "c"), pick("mod changes · game log", "mod changes")),
 		r("ctrl+k", "command palette"),
 		r("?", "this help"),

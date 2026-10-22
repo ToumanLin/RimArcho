@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 06 §2.1: while the game runs the top bar says so and its errors lead 需要处理; when it
+// 06 §9.1: while the game runs the status line says so and its errors lead their section; when it
 // exits both go.
 func TestLiveGame(t *testing.T) {
 	e := testkit.New(t)
@@ -30,12 +30,29 @@ func TestLiveGame(t *testing.T) {
 	if m.live == nil || !m.live.Running || m.live.Errors == 0 {
 		t.Fatalf("live: %+v", m.live)
 	}
-	bar := ansi.Strip(m.topBar())
-	if want := Tf("game running since %s · %d errors", since, m.live.Errors); !strings.Contains(bar, want) {
-		t.Fatalf("top bar %q, want %q", bar, want)
+	// the status line says so, the errors an amber number beside it; the top bar does not
+	line := ansi.Strip(m.statusLine())
+	if want := "● " + Tf("game running since %s", since) + " " + itoa(m.live.Errors); !strings.HasSuffix(strings.TrimRight(line, " "), want) {
+		t.Fatalf("status line %q, want %q at its end", line, want)
 	}
-	if len(m.prob.items) == 0 || m.prob.items[0].group != view.GroupThisRun {
-		t.Fatalf("needs do not start with this run: %+v", m.prob.items)
+	if bar := ansi.Strip(m.topBar()); strings.Contains(bar, Tf("game running since %s", since)) || strings.Contains(bar, "RimArcho  RimArcho") {
+		t.Fatalf("top bar %q", bar)
+	}
+	// a message takes the left of the line; the game stays on the right
+	m.say(sayOK, "done")
+	if line := ansi.Strip(m.statusLine()); !strings.HasPrefix(line, "✓ done") || !strings.Contains(line, Tf("game running since %s", since)) {
+		t.Fatalf("status line with a message %q", line)
+	}
+	// this run leads its section, 上次运行的报错 (06 §2.4)
+	first := -1
+	for i, it := range m.prob.items {
+		if it.section == view.SectionRun {
+			first = i
+			break
+		}
+	}
+	if first < 0 || m.prob.items[first].group != view.GroupThisRun {
+		t.Fatalf("the run section does not start with this run: %+v", m.prob.items)
 	}
 	m.tab = tabProblems
 	if s := ansi.Strip(m.View()); !strings.Contains(s, T("this run")) {
@@ -44,8 +61,8 @@ func TestLiveGame(t *testing.T) {
 	m.tab = tabList
 	running = false
 	m.Update(liveTick{})
-	if bar := ansi.Strip(m.topBar()); strings.Contains(bar, Tf("game running since %s", since)) {
-		t.Fatalf("still running: %q", bar)
+	if line := ansi.Strip(m.statusLine()); strings.Contains(line, Tf("game running since %s", since)) {
+		t.Fatalf("still running: %q", line)
 	}
 	for _, it := range m.prob.items {
 		if it.group == view.GroupThisRun {
@@ -116,5 +133,24 @@ func TestTopBarLaunchBlocked(t *testing.T) {
 	bar := ansi.Strip(m.topBar())
 	if !strings.Contains(bar, Tf("a game is already running (%s)", "second")) || strings.Contains(bar, "L "+T("launch")) {
 		t.Fatalf("blocked top bar: %q", bar)
+	}
+}
+
+// G17 in the TUI: with no game running the status line says nothing about it, unless a new
+// Player.log waits to be analysed; then it says so and which key opens 能不能跑.
+func TestStatusLineAfterGame(t *testing.T) {
+	e := testkit.New(t)
+	m := direct(t, e, 160, 40)
+	m.live = &view.Live{}
+	if line := strings.TrimSpace(ansi.Strip(m.statusLine())); line != "" {
+		t.Fatalf("idle status line %q", line)
+	}
+	m.live = &view.Live{NewLog: T("analyse this run's log")}
+	if line := strings.TrimSpace(ansi.Strip(m.statusLine())); line != "● "+T("analyse this run's log")+"  shift+2" {
+		t.Fatalf("new-log status line %q", line)
+	}
+	press(m, "@")
+	if m.tab != tabProblems {
+		t.Fatalf("shift+2 went to %d", m.tab)
 	}
 }
