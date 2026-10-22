@@ -154,6 +154,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return nil
 	}
 	switch {
+	case m.menu != nil:
+		return m.menuKey(s)
 	case m.pal != nil:
 		return m.paletteKey(k)
 	case s == "ctrl+k" && m.prompt == nil && !m.editing && m.pos == nil:
@@ -213,6 +215,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.subPage(1)
 	case "shift+tab":
 		return m.subPage(-1)
+	case "f10", "shift+f10", "f16": // the menu key and shift+F10 (menu.go says what terminals send)
+		return m.openRowMenu()
 	}
 	if n, ok := navKeys[s]; ok && !(m.tab == tabList && m.detailFocus) {
 		return m.goPage(n)
@@ -655,6 +659,18 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 	case tea.MouseButtonWheelUp:
 		wheel = -3
 	}
+	if m.menu != nil {
+		if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonLeft {
+			return m.menuClick(e.X, e.Y)
+		}
+		if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonRight {
+			m.menu = nil
+		}
+		return nil
+	}
+	if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonRight && m.tab == tabLibrary && m.panel == nil && m.prompt == nil {
+		return m.libRightClick(e.X, e.Y)
+	}
 	if m.prompt != nil || m.editing || m.panel != nil || m.insp != nil || m.tab != tabList || m.full || m.pal != nil || m.tags != nil || m.pos != nil {
 		var cmds []tea.Cmd
 		for i := 0; i < 3 && wheel != 0; i++ { // the wheel scrolls three lines
@@ -696,6 +712,16 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 	}
 	k, i, ok := m.hit(e.X, e.Y)
+	if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonRight && ok && i >= 0 {
+		// a right click: the row's menu at the pointer (06 §8.5); a selected row keeps the selection
+		c := &m.cols[k]
+		if k != m.focus || !m.marked[c.items[c.view[i]].id] {
+			m.setFocus(k)
+			m.clearSel()
+		}
+		c.cursor = i
+		return m.openMenu(m.editorOps(), e.X+1, e.Y+1, func(m *model, code string) tea.Cmd { return m.runEditorOp(code) })
+	}
 	if e.Action != tea.MouseActionPress || e.Button != tea.MouseButtonLeft || !ok {
 		return nil
 	}

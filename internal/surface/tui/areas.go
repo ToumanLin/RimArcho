@@ -156,6 +156,8 @@ func (m *model) position() string {
 // popupName is the open popup (06 §3.1 rule 5) or input, "" when there is none.
 func (m *model) popupName() string {
 	switch {
+	case m.menu != nil:
+		return T("menu")
 	case m.pal != nil:
 		return T("command palette")
 	case m.tags != nil:

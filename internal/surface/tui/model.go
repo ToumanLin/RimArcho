@@ -119,6 +119,7 @@ type model struct {
 	barCache *view.BarFilter
 	barKey   string
 	libCache *app.Library // the library as of board build libAt (the rows' ops)
+	menu     *rowMenu     // the row menu is open (06 §8.5)
 	libAt    int
 
 	liveTr view.LiveTracker

@@ -61,6 +61,9 @@ func (m *model) View() string {
 	}
 	lines[h-2] = m.statusLine()
 	lines[h-1] = m.hintLine()
+	if m.menu != nil {
+		m.overlayMenu(lines)
+	}
 	for i, l := range lines {
 		if lipgloss.Width(l) > m.w {
 			lines[i] = width.Truncate(l, m.w, "")
@@ -199,6 +202,8 @@ func (m *model) hintLine() string {
 	var pairs [][2]string
 	prefix := ""
 	switch {
+	case m.menu != nil:
+		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
 	case m.pal != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
 	case m.pos != nil:

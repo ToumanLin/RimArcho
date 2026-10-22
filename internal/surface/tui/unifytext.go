@@ -13,6 +13,7 @@ func init() {
 		"the start page is in the window only · ctrl+k goes anywhere": "启动页只在窗口里 · ctrl+k 可以去任何地方",
 		"one plan only · P makes another":                             "只有一个方案 · P 新建",
 		"%s filter":                                                   "%s 筛选",
+		"menu":                                                        "菜单",
 		"complete":                                                    "补全",
 		"drops the last filter":                                       "去掉最后一个条件",
 		"group":                                                       "分组",

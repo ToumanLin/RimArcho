@@ -237,3 +237,8 @@ func (m *model) libraryLines(n int) []string {
 	}
 	return out
 }
+
+// libMenu and libRightClick: Mod 库存's row menu (filled in with the page's rewrite).
+func (m *model) libMenu() tea.Cmd { return nil }
+
+func (m *model) libRightClick(x, y int) tea.Cmd { return nil }
