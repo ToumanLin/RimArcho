@@ -56,11 +56,12 @@ func Run(o Options) error {
 	})
 	api.emit = func(name string, data any) { w.Event.Emit(name, data) }
 	api.x.native = wailsNative{w}
-	w.Window.NewWithOptions(application.WebviewWindowOptions{
+	win := w.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: "/",
 		BackgroundColour:           application.NewRGB(0x0f, 0x10, 0x11),
 		DefaultContextMenuDisabled: true, // the page draws its own (06 §8.5)
 	})
+	lowMemoryWhenMinimised(win)
 	return w.Run()
 }
 
