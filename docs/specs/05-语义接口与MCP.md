@@ -105,6 +105,7 @@ next:
 | | `problems [--subject <引用>] [--code <代码>] [--all]` | 问题列表 |
 | | `changes [<引用>] [--since <时间或扫描>]` | 变化事件 |
 | | `log [--cluster <ID>] [--file <路径>] [--prev] [--text <文本>] [--select] [--all]` | 日志归因；`--prev` 读 Player-prev.log，`--text` 分析粘贴的堆栈，`--select` 让 `problems` 纳入该日志的 `log.*` 问题 |
+| | `pattern [<pattern:id>] [--mod <packageId>] [--all]` | 错误范式库（03 §6.5）：一个范式的识别规则、常见原因、诊断路线、修法和语料中的出现次数；不带参数列出所有通用范式，`--mod` 列出某 Mod 的已知错误 |
 | | `source <引用> [--type <类型>] [--all]` / `source search <模式> [--in <引用>…] [--regex] [--budget <秒>]` | 按需反编译与搜索（03 §5.3）；`--budget` 限定本次反编译时长，未完成的程序集在文本中注明“仍在计算” |
 | | `files search <模式> [--mod <引用>] [--regex] [--languages]` | 在生效内容中搜索文本；默认不搜 `Languages/`（M4） |
 | Loadout | `enable` / `disable` / `move` / `swap` / `sort` | 编辑工作区（04 §2） |
@@ -143,7 +144,7 @@ next:
 | `explain_relation` | `why` | true | — |
 | `list_problems` | `problems` | true | — |
 | `list_changes` | `changes` | true | — |
-| `analyze_log` | `log`；也可以直接传入一段堆栈文本 | true | — |
+| `analyze_log` | `log`；也可以直接传入一段堆栈文本；`pattern=<引用>` 对应 `pattern`（`list` 列出全部） | true | — |
 | `search_files` | `files search` | true | — |
 | `read_source` | `source` / `source search` | true | — |
 | `edit_loadout` | `enable` / `disable` / `move` / `swap` / `sort` / `stage add` / `stage drop` / `stage restore`（只改工作区；动作名 stage、unstage、restore） | false | false |
@@ -166,7 +167,7 @@ MVP 不通过 MCP 开放 `launch`、`import rimcrow`、`gc`、`identity resolve`
 ## 5. 稳定性
 
 - 输出中的英文关键词（`depends:`、`evidence:`、问题代码等）属于接口，改动要记入变更日志。
-- 引用格式稳定。Instance ID 不随路径、包名变化而变化（02）。
+- 引用格式稳定。Instance ID 不随路径、包名变化而变化（02）。范式引用 `pattern:g:<id>`、`pattern:m:<packageId>:<hash>` 在同一数据集版本内稳定；通用范式的 id 跨版本保留，Mod 特定范式的 hash 取自模板，模板不变则不变。
 - 新增字段只追加，不改变已有行的含义。
 
 ## 6. 验收

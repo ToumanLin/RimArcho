@@ -148,7 +148,7 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 		}
 		who += ")"
 	}
-	return fmt.Sprintf("log:%s %s x%d  %s%s", lc.ID, lc.Class, lc.Count, msg, who)
+	return fmt.Sprintf("log:%s %s x%d  %s%s%s", lc.ID, lc.Class, lc.Count, msg, who, patternTag(ix, lc))
 }
 
 func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc {
@@ -217,6 +217,7 @@ func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc
 		conf += " (" + lc.Why + ")"
 	}
 	root.KV("confidence", conf)
+	addClusterPatterns(root, ix, lc)
 	if len(lc.Checklist) > 0 {
 		cl := root.Section("checklist")
 		for _, x := range lc.Checklist {

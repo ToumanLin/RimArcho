@@ -384,7 +384,24 @@ func main() {
 	minSess := flag.Int("minsessions", 5, "mod-specific pattern: from at least this many sessions")
 	maxChange := flag.Int("maxchange", 3, "resolution: at most this many package/version changes between two uploads")
 	flag.StringVar(&dump, "dump", "", "print the most common templates of this rule id (local exploration; not for RESULT)")
+	exportOut := flag.String("export", "", "write the product's embedded data (internal/patterns/patterns.json) from -dataset")
+	dataset := flag.String("dataset", "spikes/patterns/patterns-v0.json", "with -export: the research dataset")
+	verifyIn := flag.String("verify", "", "check the product matcher against these rules on a corpusrun results file")
 	flag.Parse()
+	if *exportOut != "" || *verifyIn != "" {
+		var err error
+		if *exportOut != "" {
+			err = export(*dataset, *exportOut)
+		}
+		if err == nil && *verifyIn != "" {
+			err = verify(*verifyIn)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(*parsed, *results, *out, *mm, *minLogs, *minSess, *maxChange); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)

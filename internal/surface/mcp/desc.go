@@ -6,7 +6,7 @@ package mcp
 // skill (D7, I4).
 
 // Instructions is sent to the client at initialisation.
-const Instructions = `RimArcho knows one RimWorld installation: every mod instance, the enabled list (Loadout), Defs, Patch simulation results, Harmony patches, Player.log clusters and decompiled C#. Every tool returns outline text; references in it (#id, L#id, pkg:, ws:, def:Type/name, p:<hex>, log:E<n>, r:<n>) can be passed straight to other tools.
+const Instructions = `RimArcho knows one RimWorld installation: every mod instance, the enabled list (Loadout), Defs, Patch simulation results, Harmony patches, Player.log clusters and decompiled C#. Every tool returns outline text; references in it (#id, L#id, pkg:, ws:, def:Type/name, p:<hex>, log:E<n>, r:<n>, pattern:<id>) can be passed straight to other tools.
 
 Diagnosis workflow (use the exact evidence, not paraphrases):
 1. Start from the error. If the user pasted log text, call analyze_log with text=…; otherwise analyze_log (current Player.log), then analyze_log cluster=E<n> for the cluster in question. Each cluster lists candidate mods with a role: source (its code/data produced the error), patcher (only has a Harmony patch on a frame), dependency (provides something that is missing or disabled), mentioned (appears in the message or a lower frame). Never call a patcher or a mentioned mod the cause without further evidence.
@@ -22,7 +22,8 @@ Diagnosis workflow (use the exact evidence, not paraphrases):
 4. list_problems gives the static picture (dependencies, incompatibilities, load order, def overrides, patch failures, Harmony conflicts); explain_relation explains two specific mods.
 5. Report: failure stage, XML/Assembly/Mixed, the exact mod instance and path, the file+line or class+method, why it fails, whether a named mod is cause, dependency or observer, and the smallest fix.
 Tool results are capped at 24 KB: narrow with mod=, target=, a pattern or a cluster instead of all=true.
-Editing: copy_local first (never edit Workshop files in place), then edit the copy; edit_loadout only changes RimArcho's workspace; save_loadout writes the game's ModsConfig.xml (ask the user first).`
+Editing: copy_local first (never edit Workshop files in place), then edit the copy; edit_loadout only changes RimArcho's workspace; save_loadout writes the game's ModsConfig.xml (ask the user first).
+` + patternChecklist
 
 const descStatus = `Overview of the current environment: game version, installed mods per source, last scan, the Loadout (enabled count, unsaved edits) and problem counts. Use first in a session; use get_mod for one mod and list_problems for the problems themselves.
 Example: status {}
@@ -78,7 +79,7 @@ Example: list_changes {"since": "7d"}
     updated  #a3f9 Combat Extended  2026-10-17
     updated  #51aa Yayo's Combat 3  2026-10-16`
 
-const descLog = `Attribute Player.log errors to mods. Without cluster: the current Player.log (1.7+: Logs/Player.log; older: the user data folder; prev=true for Player-prev.log) as clusters log:E<n> with class (exception, harmony-stack, xml-load, patch-failed, xref-missing, material, other), count and the main candidate. cluster=E<n>: message, top frames with their Harmony patch lines, every candidate with role (source / patcher / dependency / mentioned) and evidence, confidence, a checklist for hot spots (Pawn.Tick, ThingWithComps.Tick) and next tool calls. text=<pasted stack trace or log excerpt> analyses that instead — use it whenever the user pastes an error. Patch failures are matched to the simulation (file, line, reason); cross-reference errors list referencing files and whether any provider exists.
+const descLog = `Attribute Player.log errors to mods. Without cluster: the current Player.log (1.7+: Logs/Player.log; older: the user data folder; prev=true for Player-prev.log) as clusters log:E<n> with class (exception, harmony-stack, xml-load, patch-failed, xref-missing, material, other), count and the main candidate. cluster=E<n>: message, top frames with their Harmony patch lines, every candidate with role (source / patcher / dependency / mentioned) and evidence, confidence, a checklist for hot spots (Pawn.Tick, ThingWithComps.Tick) and next tool calls. text=<pasted stack trace or log excerpt> analyses that instead — use it whenever the user pastes an error. Patch failures are matched to the simulation (file, line, reason); cross-reference errors list referencing files and whether any provider exists. A cluster of a known kind names its pattern:<id> (community data from public logs: usual causes, route, fixes; background, not evidence about this list); pattern=<id> explains one.
 Example: analyze_log {"cluster": "E3"}
   log:E3 exception x512  first at Player.log:4021
     message: ArgumentOutOfRangeException in List` + "`" + `1.get_Item

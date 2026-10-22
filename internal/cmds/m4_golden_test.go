@@ -38,5 +38,12 @@ func TestGoldenHarmonyLog(t *testing.T) {
 		cmd("status"),
 		cmd("problems", "--code", "log"),
 		cmd("problems", "show", "p:4c087a"),
+		// The error pattern library (docs/research/01): the kinds, one kind, a mod's known errors.
+		cmd("pattern"),
+		cmd("pattern", "pattern:g:xml.type-missing"),
+		cmd("pattern", "rt.nre"),
+		cmd("pattern", "--mod", "krkr.rocketman"),
+		cmd("pattern", "pattern:m:krkr.rocketman:e84d5a3b"),
+		cmd("pattern", "pattern:g:nope"),
 	})
 }

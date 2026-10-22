@@ -147,3 +147,67 @@ xref.sound 70). 105 of 1,036 have a mod version (many mods report none). 209 mod
 - Fix evidence co-occurs with a change; it is not causal. A player who removes three mods and
   loads another save also loses save-stage errors.
 - Workflow coverage is a manual judgement of the current Instructions text.
+
+== Product export (G11, 2026-10-22)
+
+go run ./spikes/patterns -export internal/patterns/patterns.json   (46 generic rules in match
+order, 1,036 mod patterns, 477 KB; no top_source_mods, no occurrences)
+go run ./spikes/patterns -verify corpus-kb/results-v3.jsonl: 610,910 problem clusters, the
+product matcher (internal/patterns) and these rules classify 0 differently.
+All 899 distinct mod-pattern templates also occur in results-v4 (current master attribution);
+9.4% of v4's 629,761 problem clusters get a mod-specific known error (in-sample).
+
+== Agent evaluation of the library in the product (G11, 2026-10-22)
+
+Harness: spikes/agenteval (G7), G6 benchmark v2 (140 tasks: 96 dev, 44 held-out), one Claude
+Sonnet subagent per task, read-only MCP tools only; 0 traces touched gold/packets/config.
+Builds: v1 = G7 final (044fee9; same product code as G7's run "v1", 8c32023); p1 = v1 + this
+library (merge 0751908): pattern section on every cluster, `analyze_log pattern=`, the
+Instructions checklist. Dev was run for p1 and once more for v1 ("v1r", same build, same day,
+interleaved task by task with p1) to measure run-to-run noise; held-out once for p1 only and
+compared with G7's held-out v1 run.
+
+Dev (96)          agree  precision  recall  undecidable-ok  stage  cause-type  fix-kind
+  v1  (G7 run)    85.4%    75.5%    88.9%      82.4%       88.5%    70.8%      75.0%
+  v1r (rerun)     81.2%    70.9%    86.7%      76.5%       91.7%    65.6%      72.9%
+  p1  (patterns)  83.3%    73.6%    86.7%      80.4%       87.5%    69.8%      76.0%
+Same build, two runs: 8 of 96 task outcomes differ (v1 vs v1r). p1 vs v1r: 10 differ; p1 vs
+v1: 6. The pattern effect on the verdict is inside the run-to-run noise (about +/-4 points).
+
+Dev agree by class (v1 / v1r / p1): patch-failed 100/100/100, xref-missing 86/86/86,
+texture-missing 79/57/71, xml-load 50/43/64, exception 100/90/90, harmony-stack 90/90/90,
+assembly 100/100/80 (two over-claims: AS09, AS10, both g:asm.version-mismatch "outdated mod"),
+static-ctor 90/100/90.
+By difficulty (agree): L1 92/85/100, L2 88/85/83, L3 80/74/77.
+
+Held-out (44)     agree  precision  recall  undecidable-ok  stage  cause-type  fix-kind
+  v1  (G7 run)    72.7%    69.0%    71.4%      75.0%       75.0%    56.8%      65.9%
+  p1  (strict)    75.0%    72.4%    75.0%      75.0%       75.0%    61.4%      56.8%
+  p1  (EX09 tab)  77.3%    73.3%    78.6%      75.0%       77.3%    61.4%      56.8%
+"strict": one answer file (EX09) has a raw tab inside a string and counts as no answer; with
+the tab escaped (the scorer already repairs lone backslashes the same way) it is a hit.
+Held-out agree by class (v1 / p1 strict): patch-failed 100/100, xref-missing 83/100,
+texture-missing 83/83, xml-load 83/83, exception 80/60 (80 with EX09), harmony-stack 60/60,
+assembly 60/80, static-ctor 20/20. By difficulty: L1 100/100, L2 73/73, L3 64/68 (72 with
+EX09); tier 1 88/92, tier 2 55/55 (60).
+
+Reading
+- Exposure is high, active use is low: 88 of 96 dev tasks (all assembly, static-ctor,
+  texture-missing, patch-failed and xref-missing tasks) show a non-fallback pattern on the
+  cluster, but agents called `analyze_log pattern=` only twice in 140 tasks. The checklist's
+  save-loading part is never exercised: the benchmark has no save-load class.
+- Source finding: no measurable change (dev recall 86.7 in both same-day runs; held-out 20 -> 21
+  of 28 gold sources, one task). Cause type is up on both splits (dev +4.2 vs the same-day run,
+  held-out +4.5), fix kind is mixed (dev +3.1, held-out -9.1: the pattern's fix list,
+  e.g. xref.def "enable-dependency, update, disable", competes with the brief's class defaults
+  such as "patch failures -> ignore"). Each is within one or two tasks per class.
+- Risk seen: on assembly tasks the version-mismatch summary ("the mod or a dependency is
+  outdated") led two agents to name the assembly's mod where the gold says unknown.
+- Cost unchanged: median 32 s vs 24 s (same-day rerun), 6 tool calls, 7 archo calls, ~81k
+  final context; the pattern section adds ~600 bytes to a cluster view.
+- Conclusion: keep the library as background (it does not hurt source finding and helps cause
+  type), but it is not the lever for the weak classes (static-ctor 20%, tier 2). Next: StackShape
+  for the fallback patterns, fix kinds in the benchmark's vocabulary, and a save-load slice in
+  the benchmark before tuning the checklist further.
+Data (outside the repo): agenteval/runs/{p1,v1r,p1x}, score-{p1,v1r}-dev.txt,
+score-p1-heldout.txt, score-p1x-heldout.txt, items-*-dev.txt.
