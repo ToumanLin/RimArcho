@@ -53,8 +53,10 @@ const (
 	OpMove      = "move"       // 备份锁定版本 (收进锁定库)
 	OpUnhide    = "unhide"     // 恢复
 	OpResub     = "resubscribe"
-	OpUnsub     = "unsubscribe" // 退订, through the Steam client
-	OpDelete    = "delete"      // 删除 (to the recycle bin)
+	OpUnsub     = "unsubscribe"    // 退订, through the Steam client
+	OpDelete    = "delete"         // 删除 (to the recycle bin)
+	OpTextures  = "textures"       // 优化贴图: the DDS of its PNGs next to them (08 §5.2)
+	OpTexClean  = "textures-clean" // 清除贴图优化: the DDS RimArcho wrote go
 )
 
 // opTable is every op in menu order (06 §8.5): within a group in this order, and 退订 /
@@ -80,6 +82,8 @@ var opTable = []Op{
 	{Code: OpUnpin, Group: 4, Confirm: true},
 	{Code: OpMove, Group: 4, Confirm: true, Detail: true},
 	{Code: OpUnhide, Group: 5, Confirm: true, Detail: true},
+	{Code: OpTextures, Group: 5, Confirm: true, Detail: true},
+	{Code: OpTexClean, Group: 5, Confirm: true, Detail: true},
 	{Code: OpResub, Group: 5, Detail: true},
 	{Code: OpUnsub, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
 	{Code: OpDelete, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
@@ -95,6 +99,7 @@ func opLabel(code string) string {
 		OpPin: T("lock this version"), OpPinUpdate: T("update the locked version"), OpUnpin: T("unlock"),
 		OpMove: T("back up as a locked version"), OpUnhide: T("restore"), OpResub: T("subscribe again"),
 		OpUnsub: T("unsubscribe"), OpDelete: T("delete"),
+		OpTextures: T("convert textures to DDS"), OpTexClean: T("remove the converted textures"),
 	}[code]
 }
 
@@ -234,6 +239,13 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	}
 	if live && has(app.LibHidden) {
 		ks = append(ks, OpUnhide)
+	}
+	// 贴图优化: a copy with PNG textures (not RimArcho's own mod)
+	if live && i.PNG && i.Path != "" && i.Source != app.LibMonitor && !has(app.LibHidden) && !has(app.LibResidue) {
+		ks = append(ks, OpTextures)
+	}
+	if i.Textures != nil && i.Textures.Files > 0 {
+		ks = append(ks, OpTexClean)
 	}
 	if live && has(app.LibResidue) && url {
 		ks = append(ks, OpResub)

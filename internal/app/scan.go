@@ -138,11 +138,28 @@ func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
 			return nil, err
 		}
 	}
+	// The DDS RimArcho wrote next to mods' PNGs are not part of the mods (贴图优化).
+	generated, err := a.Store.GeneratedFiles()
+	if err != nil {
+		return nil, err
+	}
 	scanID, err := a.Store.BeginScan(e.ID, started, full)
 	if err != nil {
 		return nil, err
 	}
 	obs, sstats := scan.Collect(active, scan.Options{
+		Generated: func(dir string) map[string]bool {
+			if len(generated) == 0 {
+				return nil
+			}
+			if g := generated[store.PathKey(dir)]; g != nil {
+				return g
+			}
+			if real, err := source.RealPath(dir); err == nil {
+				return generated[store.PathKey(real)]
+			}
+			return nil
+		},
 		PrevFiles: func(l scan.Location) map[string]scan.File { return prev[l.Key()] },
 		PrevHash: func(l scan.Location) (scan.Hash, bool) {
 			h, ok := prevHash[l.Key()]

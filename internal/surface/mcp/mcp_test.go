@@ -69,6 +69,8 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"list_library": "ro", "manage_library": "destructive",
 		// Uninstall: only its dry run (05 §5.2).
 		"preview_uninstall": "ro",
+		// 贴图优化 (08 §5.2).
+		"manage_textures": "destructive",
 	}
 	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true}
 	seen := map[string]bool{}
@@ -149,6 +151,8 @@ func TestCLIParity(t *testing.T) {
 		{"search_files", map[string]any{"pattern": "Lib_Gun"}, []string{"files", "search", "Lib_Gun"}},
 		{"save_loadout", map[string]any{"dry_run": true}, []string{"save", "--dry-run"}},
 		{"preview_uninstall", map[string]any{"keep_locked": true}, []string{"uninstall", "--dry-run", "--keep-locked"}},
+		{"manage_textures", map[string]any{"action": "optimize", "plan": true, "scale": 50, "dry_run": true}, []string{"textures", "optimize", "--plan", "--scale", "50", "--dry-run"}},
+		{"manage_textures", map[string]any{"action": "status", "refs": []string{modA}}, []string{"textures", "status", modA}},
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},
 		{"edit_loadout", map[string]any{"action": "ignore_external"}, []string{"loadout", "ignore-external"}},
 		{"get_description", map[string]any{"ref": modA, "offline": true}, []string{"describe", modA, "--offline"}},

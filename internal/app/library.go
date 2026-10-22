@@ -116,6 +116,10 @@ type LibInstance struct {
 	Note             *store.CopyNote
 	UpstreamUpdates  int
 	UpstreamWorkshop bool
+	// Textures: the DDS RimArcho wrote next to this copy's PNGs (贴图优化; nil: none).
+	Textures *TextureSummary
+	// PNG: the copy has PNGs under a Textures/ folder (its last scan), so 优化贴图 applies.
+	PNG bool
 }
 
 // Missing reports a subscribed item with no folder.
@@ -233,6 +237,7 @@ func (a *App) Library() (*Library, error) {
 		return nil, err
 	}
 	notes, err := a.Store.CopyNotes(ix.Env.ID)
+	texs := a.TextureSummaries() // 贴图优化: the DDS RimArcho wrote into each copy
 	if err != nil {
 		return nil, err
 	}
@@ -306,6 +311,10 @@ func (a *App) Library() (*Library, error) {
 			Bytes: m.TotalSize, Sized: m.SnapID != 0 && (m.FileCount > 0 || m.TotalSize > 0),
 			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Staged: staged[m.ID], Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID],
 			Authors: strings.TrimSpace(m.Authors), Note: notes[m.ID]}
+		i.PNG = a.HasPNGTextures(m)
+		if t, ok := texs[m.ID]; ok {
+			i.Textures = &t
+		}
 		if m.ACFTimeUpdated > 0 {
 			i.Updated = time.Unix(m.ACFTimeUpdated, 0).UTC()
 		} else if fi, err := os.Stat(i.Path); err == nil {

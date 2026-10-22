@@ -19,6 +19,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/ids"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 // Config is config.toml (07 §3). Only keys used by M1 are read.
@@ -101,6 +102,11 @@ type App struct {
 	SteamCMDNoPath bool
 	HTTP           *http.Client
 	SteamAPI       string
+	// 贴图优化 (textures.go): TextureEncoder replaces todds, ToddsZip its download URL,
+	// ToddsNoPath leaves PATH out when looking for it (tests).
+	TextureEncoder textures.Encoder
+	ToddsZip       string
+	ToddsNoPath    bool
 	// SteamCollectionAPI reads Workshop collections (04 §9.5); "" is the public endpoint.
 	SteamCollectionAPI string
 	// Uninstall (uninstall.go): UninstallExe is the program to remove ("" this one; a
@@ -120,14 +126,17 @@ type App struct {
 
 	dataIdx *dataIndex // community data indexes (04 §6.3), loaded on first use
 
-	ixCache    *Index
-	ixKey      string
-	stCache    *LoadoutState
-	stKey      string
-	modsCopies *modsCopiesCache
-	prCache    *ProblemSet
-	prKey      string
-	planPS     map[int64]*planProblems // PlanProblems, by plan
+	ixCache *Index
+	ixKey   string
+	// pngSnaps: the snapshots with PNG textures (贴图优化), until the snapshots change
+	pngSnaps    map[int64]bool
+	pngSnapsKey string
+	stCache     *LoadoutState
+	stKey       string
+	modsCopies  *modsCopiesCache
+	prCache     *ProblemSet
+	prKey       string
+	planPS      map[int64]*planProblems // PlanProblems, by plan
 
 	logCache   *logCacheEntry
 	harmonyDir string

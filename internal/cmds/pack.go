@@ -12,7 +12,9 @@ import (
 func init() {
 	dry := Flag{Name: "dry-run", Help: "show what would happen"}
 	register(&Command{Name: "pack build", Args: "<name>", Summary: "compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load", MinArgs: 1, MaxArgs: 1, Run: packBuildCmd,
-		Flags: []Flag{{Name: "light", Help: "the list only, no files (for sharing)"}, dry}})
+		Flags: []Flag{{Name: "light", Help: "the list only, no files (for sharing)"},
+			{Name: "textures", Help: "convert the copies' PNG textures to DDS and delete the PNGs (pre-convert; with --texture-scale: slim)"},
+			{Name: "texture-scale", Value: "<percent>", Help: "with --textures: scale textures down (20 25 40 50 60 75 80; never below 128 px or off a multiple of 4)"}, dry}})
 	register(&Command{Name: "pack list", Summary: "the packs: mods, size, game version, last played", MaxArgs: 0, Run: packListCmd})
 	register(&Command{Name: "pack launch", Args: "<name>", Summary: "play a pack: link its mods into Mods/, its own list and saves, start the game", MinArgs: 1, MaxArgs: 1, Run: packLaunchCmd, Flags: []Flag{dry}})
 	register(&Command{Name: "pack export", Args: "<name> <file>", Summary: "write a pack to a file (.archopack zip, or --light .archopack.json)", MinArgs: 2, MaxArgs: 2, Run: packExportCmd,
@@ -38,6 +40,12 @@ func BuildProgressLine(p app.BuildProgress) string {
 			l += " · " + p.Mod
 		}
 		return l
+	case app.StepTextures:
+		l := fmt.Sprintf("textures %d/%d", p.Files, p.FilesTotal)
+		if p.Mod != "" {
+			l += " · " + p.Mod
+		}
+		return l
 	case app.StepWrite:
 		return "write: pack.json"
 	case app.StepDone:
@@ -48,6 +56,13 @@ func BuildProgressLine(p app.BuildProgress) string {
 
 func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	o := app.BuildOptions{Light: a.Bool("light"), DryRun: a.Bool("dry-run")}
+	if a.Bool("textures") || a.Str("texture-scale") != "" {
+		to, err := textureOptions(a)
+		if err != nil {
+			return nil, err
+		}
+		o.Textures = &to
+	}
 	if Progress != nil {
 		o.Progress = func(p app.BuildProgress) { Progress("progress: " + BuildProgressLine(p)) }
 	}
@@ -85,7 +100,7 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("size", fmt.Sprintf("%s; %s of other game versions left out", mb(bytes), mb(r.Pack.Trimmed)))
 		if r.DryRun && r.Free >= 0 {
 			free := fmt.Sprintf("%s free on the packs drive", mb(r.Free))
-			if r.Free < r.Need+app.SpaceMargin {
+			if r.Free < max(r.Need, r.Peak)+app.SpaceMargin {
 				free += " — NOT ENOUGH: the build is refused"
 			}
 			root.KV("space", free)
@@ -99,6 +114,25 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		if r.Skipped > 0 {
 			root.KV("skipped", fmt.Sprintf("%d links that leave their mod's folder", r.Skipped))
+		}
+		if r.TexOptions != nil {
+			n := root.KV("textures", app.TextureLabel(*r.TexOptions))
+			if pt := r.Pack.Textures; pt != nil && !r.DryRun {
+				n.Addf("%d PNGs converted to DDS and deleted: %s of PNG → %s of DDS", pt.Converted, mb(pt.PNGBytes), mb(pt.DDSBytes))
+				if pt.Kept > 0 {
+					n.Addf("%d keep their PNG (%d failed to convert; the rest share a name with a DDS or another format)", pt.Kept, pt.Failed)
+				}
+			} else {
+				est := r.TexEst
+				n.Addf("%d PNGs: %s of PNG → about %s of DDS; video memory about %s → %s", est.Files, mb(est.PNGBytes), mb(est.DDSBytes), mb(est.VRAMBefore), mb(est.VRAMAfter))
+				n.Addf("pack size about %s after; up to %s while converting", mb(r.Final), mb(r.Peak))
+				if r.TexSkipped > 0 {
+					n.Addf("%d keep their PNG (a DDS or another format of the same name)", r.TexSkipped)
+				}
+				if r.Tool != nil && r.Tool.Err != "" {
+					n.Add("encoder: " + r.Tool.Err + " — the build is refused")
+				}
+			}
 		}
 		n := root.Add("trimmed:")
 		for _, e := range r.Pack.Entries {

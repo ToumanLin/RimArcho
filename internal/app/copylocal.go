@@ -30,6 +30,22 @@ type CopyResult struct {
 	dry bool
 	// keepAll: copy .git and .rimarcho too (moving a locked copy, 04 §7).
 	keepAll bool
+	// generated: files RimArcho wrote into the mod (lower-cased paths relative to it; the
+	// DDS of 贴图优化), not part of the mod, so a copy leaves them out.
+	generated map[string]bool
+}
+
+// generatedIn are the files RimArcho wrote into a mod folder (for CopyResult.generated).
+func (a *App) generatedIn(dir string) map[string]bool {
+	rows, err := a.Store.TextureFilesIn(dir)
+	if err != nil || len(rows) == 0 {
+		return nil
+	}
+	out := map[string]bool{}
+	for _, r := range rows {
+		out[strings.ToLower(r.Rel)] = true
+	}
+	return out
 }
 
 // LocalSource is the environment's local source (the game's Mods folder).
@@ -59,7 +75,7 @@ func (a *App) copyLocal(st *LoadoutState, m *store.Mod, root, name string, git, 
 		return nil, err
 	}
 	dst := filepath.Join(root, freeName(root, name))
-	res := &CopyResult{Dir: dst, dry: dry}
+	res := &CopyResult{Dir: dst, dry: dry, generated: a.generatedIn(src)}
 	if dry {
 		return res, copyTree(src, src, "", "", res)
 	}
@@ -113,6 +129,9 @@ func copyTree(root, dir, dst, rel string, res *CopyResult) error {
 		}
 		if !res.keepAll && rel == "" && strings.EqualFold(de.Name(), ".rimarcho") {
 			continue // a fresh origin marker is written
+		}
+		if res.generated[strings.ToLower(r)] {
+			continue // RimArcho's DDS: not the mod's
 		}
 		target := p
 		if source.IsLink(p) {

@@ -368,6 +368,8 @@ func downgradeWithTwin(t *testing.T, e *testkit.Env) map[string]string {
 	exec(`UPDATE user_rule SET environment_id=?`, envID)
 	exec(`INSERT INTO plan(environment_id, name, created_at, updated_at) VALUES(?, 'default', 1, 1)`, two)
 	exec(`DROP TABLE id_alias`)
+	exec(`DROP TABLE texture_file`) // v16
+	exec(`DROP TABLE texture_mod`)
 	exec(`UPDATE meta SET value='13' WHERE key='schema_version'`)
 	return twin
 }

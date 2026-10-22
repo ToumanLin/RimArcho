@@ -57,6 +57,9 @@ type API struct {
 	quit        func() // closes the window (nil in the harness and in tests)
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
+	// TexRunner runs `archo textures optimize` in place of the child process (tests).
+	TexRunner func(args []string, progress func(string)) ([]string, error)
+	texLast   TextureEvent // the running conversion's last progress
 	// ScanRunner scans an environment in place of the child process (tests).
 	ScanRunner func(env string) (string, error)
 }
@@ -201,7 +204,8 @@ func (s *API) Packs() (*PackList, error) {
 
 // BuildPage is 编译成整合包 for the current plan (06 §2.6): checked and sorted under the
 // lock, measured (every mod's folder walked) outside it; a light pack is not measured.
-func (s *API) BuildPage(light bool) (*view.BuildPage, error) {
+// tex is the textures choice (view.PackTextureOptions): 0 off, 100 预转换, less 精简.
+func (s *API) BuildPage(light bool, tex int) (*view.BuildPage, error) {
 	s.mu.Lock()
 	plan, chip := "", ""
 	if st := s.boardState(); st != nil {
@@ -212,6 +216,9 @@ func (s *API) BuildPage(light bool) (*view.BuildPage, error) {
 	}
 	name := view.DefaultPackName(s.a, plan)
 	pl, err := s.a.PlanPack(name, light)
+	if err == nil && !light {
+		view.PlanTextures(s.a, pl, tex)
+	}
 	dir := s.a.PacksDir()
 	s.mu.Unlock()
 	if err != nil {
@@ -300,7 +307,7 @@ func (s *API) PackExport(name, file string, light bool) (string, error) {
 // once: the copy takes minutes and holds nothing here, so every page keeps working, and it
 // goes on when the window closes. "pack" events carry the progress (view.PackProgress) and
 // the end. One build at a time.
-func (s *API) PackBuild(name string, light bool) (string, error) {
+func (s *API) PackBuild(name string, light bool, tex int) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := app.CheckPackName(name); err != nil {
@@ -332,11 +339,12 @@ func (s *API) PackBuild(name string, light bool) (string, error) {
 	if run == nil {
 		home, env, exe := s.a.Home, s.a.EnvName, s.Exe
 		log := filepath.Join(home, "logs", "pack-build.log")
+		extra := app.PackBuildArgs(view.PackTextureOptions(tex))
 		run = func(name string) error {
 			if exe != "" {
-				return app.ChildPackBuildExe(exe, home, env, name, log)
+				return app.ChildPackBuildExe(exe, home, env, name, log, extra...)
 			}
-			return app.ChildPackBuild(home, env, name, log)
+			return app.ChildPackBuild(home, env, name, log, extra...)
 		}
 	}
 	go s.watchBuild(name, tmp, run)
@@ -356,7 +364,7 @@ func (s *API) watchBuild(name, tmp string, run func(string) error) {
 			s.mu.Lock()
 			s.busy["pack"], s.building = false, ""
 			s.mu.Unlock()
-			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 4, Frac: 1, Text: view.Tf("built pack %s", name)}
+			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 5, Frac: 1, Text: view.Tf("built pack %s", name)}
 			if err != nil {
 				ev.Step, ev.Frac, ev.Text = last.Step, last.Frac, ""
 				lines := strings.Split(view.Humanize(nil, err.Error()), "\n")

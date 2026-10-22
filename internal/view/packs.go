@@ -7,6 +7,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 // The packs screen (08 §5, 08 §5.3): like choosing a version in a game launcher — the packs,
@@ -107,6 +108,25 @@ const (
 	LevelOff  = "off"  // a step that waits for an earlier one
 )
 
+// PackTextureOptions reads the window's texture choice: 0 off, 100 预转换 (full size), a
+// smaller percent 精简.
+func PackTextureOptions(tex int) *textures.Options {
+	if tex <= 0 {
+		return nil
+	}
+	o := textures.Options{Scale: tex}.Normal()
+	return &o
+}
+
+// PlanTextures makes a plan convert textures as tex says (and finds the encoder for the
+// preview). Call it with the app held, before Measure.
+func PlanTextures(a *app.App, pl *app.PackPlan, tex int) {
+	if o := PackTextureOptions(tex); o != nil && pl.R.Pack != nil {
+		a.WithTextures(pl, o)
+		pl.R.Tool = a.TextureTool()
+	}
+}
+
 // driveOf names the drive of a folder ("D:"), or the folder.
 func driveOf(dir string) string {
 	if len(dir) >= 2 && dir[1] == ':' {
@@ -144,10 +164,19 @@ func ProgressOf(p *app.BuildProgress) PackProgress {
 		if p.BytesTotal > 0 {
 			out.Frac = float64(p.Bytes) / float64(p.BytesTotal)
 		}
+	case app.StepTextures:
+		out.Step = 3
+		out.Text = Tf("converting %d of %d textures", p.Files, p.FilesTotal)
+		if p.Mod != "" {
+			out.Text += " · " + p.Mod
+		}
+		if p.FilesTotal > 0 {
+			out.Frac = float64(p.Files) / float64(p.FilesTotal)
+		}
 	case app.StepWrite:
-		out.Step, out.Text, out.Frac = 3, T("writing pack.json…"), 1
+		out.Step, out.Text, out.Frac = 4, T("writing pack.json…"), 1
 	case app.StepDone:
-		out.Step, out.Text, out.Frac, out.Done, out.Ok = 4, T("ready to play"), 1, true, true
+		out.Step, out.Text, out.Frac, out.Done, out.Ok = 5, T("ready to play"), 1, true, true
 	}
 	return out
 }

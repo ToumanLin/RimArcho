@@ -277,7 +277,7 @@ func TestPackBuildBackground(t *testing.T) {
 		return nil
 	}
 	start := time.Now()
-	if _, err := api.PackBuild("first", false); err != nil {
+	if _, err := api.PackBuild("first", false, 0); err != nil {
 		t.Fatal(err)
 	}
 	if time.Since(start) > 2*time.Second {
@@ -298,7 +298,7 @@ func TestPackBuildBackground(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the pages wait for the build")
 	}
-	if _, err := api.PackBuild("second", false); err == nil {
+	if _, err := api.PackBuild("second", false, 0); err == nil {
 		t.Fatal("a second build started")
 	}
 	waitPack := func(want string) string {
@@ -349,7 +349,7 @@ func TestPackUnfinishedRows(t *testing.T) {
 // pointing to 能不能跑; 先看清单 writes nothing; once fixed, 编译 is enabled with the sizes.
 func TestBuildPageG14(t *testing.T) {
 	e, api, _ := fixture(t)
-	p, err := api.BuildPage(false)
+	p, err := api.BuildPage(false, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,14 +368,14 @@ func TestBuildPageG14(t *testing.T) {
 	}
 	e.MustRun("enable", "pkg:brrainz.harmony")
 	api.board, api.needs = nil, nil
-	p, err = api.BuildPage(false)
+	p, err = api.BuildPage(false, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !p.Ok || p.Why != "" || p.Before == "" || p.After == "" || p.Mods != 2 || p.Steps[0].Level == view.LevelBad {
 		t.Fatalf("fixed: %+v", p)
 	}
-	if l, _ := api.BuildPage(true); l == nil || !l.Light || l.Before != "" || l.Steps[1].Level != view.LevelOff {
+	if l, _ := api.BuildPage(true, 0); l == nil || !l.Light || l.Before != "" || l.Steps[1].Level != view.LevelOff {
 		t.Fatalf("light: %+v", l)
 	}
 	for name, bad := range map[string]bool{"": true, ".x": true, "ok name": false} {
@@ -383,7 +383,7 @@ func TestBuildPageG14(t *testing.T) {
 			t.Errorf("name %q: %q", name, api.PackNameCheck(name))
 		}
 	}
-	if _, err := api.PackBuild("light one", true); err != nil {
+	if _, err := api.PackBuild("light one", true, 0); err != nil {
 		t.Fatal(err)
 	}
 	if api.PackNameCheck("light one") == "" {

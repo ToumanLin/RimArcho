@@ -751,7 +751,9 @@ async function run(code, copies) {
   if (!o.confirm) return done(api.LibraryDo(code, refs), false);
   let p;
   try { p = await api.LibraryPreview(code, refs); } catch (e) { return say("fail", errText(e)); }
-  pop.confirm(p.title, p.lines, o.label, p.apply ? () => done(api.LibraryDo(code, refs), false) : null);
+  // 优化贴图 takes minutes: it runs in the background ("textures" events), like the page's
+  const run = code === "textures" ? () => done(api.TexturesRun("", 100, refs), false) : () => done(api.LibraryDo(code, refs), false);
+  pop.confirm(p.title, p.lines, o.label, p.apply ? run : null);
 }
 
 // ---- keys (06 §3.5): the plan editor's table; the arrows only move ----

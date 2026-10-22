@@ -22,6 +22,8 @@ type Origin struct {
 	WorkshopID   string `json:"workshop_id,omitempty"`
 	SnapshotHash string `json:"origin_snapshot,omitempty"`
 	CopiedAt     string `json:"copied_at,omitempty"`
+	// Textures: a pack's copy whose PNGs were converted to DDS ("dds", "dds 50%"; 08 §5.2).
+	Textures string `json:"textures,omitempty"`
 }
 
 // UnloadableAboutDisabled marks a folder with only About/About.xml.disabled (02 §4.2).
@@ -86,8 +88,11 @@ type Options struct {
 	PrevHash func(loc Location) (Hash, bool)
 	// Known reports whether a location already belongs to an Instance; alias groups keep
 	// a known location as primary so R1 keeps matching.
-	Known   func(loc Location) bool
-	Workers int // per-source concurrency; default runtime.NumCPU()
+	Known func(loc Location) bool
+	// Generated lists the files RimArcho wrote into a mod folder (by its real path; lower-
+	// cased paths relative to it), left out of the fingerprint.
+	Generated func(realDir string) map[string]bool
+	Workers   int // per-source concurrency; default runtime.NumCPU()
 }
 
 // Collect scans every source and returns the observations in reconciliation order
@@ -260,7 +265,7 @@ func observe(ob *Observation, o Options) {
 	if o.PrevFiles != nil {
 		prev = o.PrevFiles(ob.Loc)
 	}
-	fp, err := Compute(dir, prev)
+	fp, err := ComputeSkip(dir, prev, o.Generated)
 	if err != nil {
 		ob.Err = err.Error()
 	}

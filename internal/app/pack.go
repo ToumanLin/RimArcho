@@ -24,6 +24,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 // Packs (08 §5): a plan compiled into a fixed product. Every mod is pinned to the
@@ -44,6 +45,31 @@ type Pack struct {
 	Light   bool        `json:"light,omitempty"` // the list only, no files
 	Entries []PackEntry `json:"entries"`
 	Trimmed int64       `json:"trimmed_bytes,omitempty"`
+	// Textures: the copies' PNGs were converted to DDS and deleted (08 §5.2).
+	Textures *PackTextures `json:"textures,omitempty"`
+}
+
+// PackTextures is what a build did to the copies' textures: 预转换 at full size, 精简 when
+// scaled. The PNGs of the textures converted are gone from the pack; those that could not
+// be converted (or share a name with a DDS or another format) keep their PNG.
+type PackTextures struct {
+	Tool      string `json:"tool"` // "todds 0.4.1"
+	Scale     int    `json:"scale"`
+	Mipmaps   bool   `json:"mipmaps"`
+	Converted int    `json:"converted"`
+	Kept      int    `json:"kept,omitempty"`   // PNGs left (skipped or failed)
+	Failed    int    `json:"failed,omitempty"` // of Kept: the encoder could not convert them
+	PNGBytes  int64  `json:"png_bytes"`        // the PNGs deleted
+	DDSBytes  int64  `json:"dds_bytes"`        // the DDS written
+}
+
+// TextureLabel names a texture option the way the interface does: 预转换 at full size,
+// 精简 when scaled (2026-10-22).
+func TextureLabel(o textures.Options) string {
+	if o = o.Normal(); o.Scale == 100 {
+		return "pre-convert"
+	}
+	return fmt.Sprintf("slim to %d%%", o.Scale)
 }
 
 // PackEntry is one mod of a pack, in load order.
@@ -151,12 +177,24 @@ type PackBuild struct {
 	CannotCopy []string // mods whose folder cannot be read: the build is refused
 	Mismatch   []string // mods that do not list the game's version (warnings)
 	Skipped    int      // links leaving a mod's folder, not copied
+	// Textures (when the build converts them): the estimate before, then what was done;
+	// Peak is the most the packs drive needs while converting (the copy, the DDS of the mods
+	// converted, the PNGs not yet deleted), Final the pack's size after.
+	TexOptions *textures.Options
+	TexEst     textures.Estimate
+	TexSkipped int // PNGs that keep their PNG: a DDS or another format of the same name
+	Peak       int64
+	Final      int64
+	Tool       *TextureTool
 }
 
 // BuildOptions for BuildPackWith.
 type BuildOptions struct {
 	Light, DryRun bool
 	Progress      func(BuildProgress) // each step, and while copying
+	// Textures converts the copies' PNGs to DDS and deletes them (nil: they are copied as
+	// they are). Full size is 预转换, a scale 精简.
+	Textures *textures.Options
 }
 
 // ErrBuildRunning: a build of this pack is going on (in this or another process).
@@ -182,6 +220,18 @@ type PackPlan struct {
 	R     *PackBuild
 	roots []string // per entry: the folder copied ("" for Core, the DLCs, a light pack)
 	free  func(string) int64
+	tex   *textures.Options
+	gen   []map[string]bool // per entry: RimArcho's DDS in the mod (not copied, not the mod's)
+}
+
+// WithTextures makes the plan convert textures (Measure then estimates them).
+func (a *App) WithTextures(pl *PackPlan, o *textures.Options) {
+	if o != nil {
+		n := o.Normal()
+		o = &n
+	}
+	pl.tex = o
+	pl.R.TexOptions = o
 }
 
 // PlanPack checks the list and sorts it for the pack (the first two steps of a build).
@@ -252,6 +302,7 @@ func (a *App) PlanPack(name string, light bool) (*PackPlan, error) {
 		if m.Kind == source.Official {
 			p.Entries = append(p.Entries, PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Official: true})
 			pl.roots = append(pl.roots, "")
+			pl.gen = append(pl.gen, nil)
 			continue
 		}
 		pe := PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Lineage: m.LineageID, Instance: m.ID, WorkshopID: m.WorkshopID(), Hash: hex.EncodeToString(m.SnapHash)}
@@ -278,6 +329,7 @@ func (a *App) PlanPack(name string, light bool) (*PackPlan, error) {
 		}
 		p.Entries = append(p.Entries, pe)
 		pl.roots = append(pl.roots, root)
+		pl.gen = append(pl.gen, a.generatedIn(root))
 	}
 	r.Pack = p
 	return pl, nil
@@ -306,9 +358,26 @@ func (pl *PackPlan) Measure(packsDir string) {
 		for _, t := range pe.TrimmedDir {
 			pe.Trimmed += dirSize(filepath.Join(root, t))
 		}
-		pe.Bytes = dirSize(root) - pe.Trimmed
+		pe.Bytes = dirSize(root) - pe.Trimmed - genSize(root, pl.gen[i])
 		r.Pack.Trimmed += pe.Trimmed
 		r.Need += pe.Bytes
+	}
+	r.TexEst, r.TexSkipped, r.Peak, r.Final = textures.Estimate{}, 0, r.Need, r.Need
+	if pl.tex != nil {
+		var maxPNG int64
+		for i := range r.Pack.Entries {
+			root := pl.roots[i]
+			if root == "" {
+				continue
+			}
+			est, skipped := packTextureEstimate(root, r.Pack.Entries[i].TrimmedDir, *pl.tex, pl.gen[i])
+			r.TexEst.Plus(est)
+			r.TexSkipped += skipped
+			maxPNG = max(maxPNG, est.PNGBytes)
+		}
+		// The mods are copied first, then converted one by one, each losing its PNGs.
+		r.Final = r.Need - r.TexEst.PNGBytes + r.TexEst.DDSBytes
+		r.Peak = max(r.Need, r.Final+maxPNG)
 	}
 	if pl.free != nil {
 		r.Free = pl.free(packsDir)
@@ -360,23 +429,45 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 		cleanup()
 		return r, nil
 	}
+	if o.Textures != nil && !o.Light {
+		a.WithTextures(pl, o.Textures)
+		r.Tool = a.TextureTool()
+	}
 	bs.update(func(p *BuildProgress) { p.Step, p.Env, p.ModsTotal = StepMeasure, r.Pack.Env, carriedCount(r.Pack) })
 	pl.Measure(a.PacksDir())
 	if o.DryRun {
 		return r, nil
 	}
+	var enc textures.Encoder
+	if r.TexOptions != nil {
+		// before copying gigabytes: the encoder must be there
+		if enc, err = a.encoder(nil); err != nil {
+			cleanup()
+			return nil, err
+		}
+	}
 	if len(r.CannotCopy) > 0 {
 		cleanup()
 		return nil, fmt.Errorf("%d mods cannot be read, so they cannot be copied:\n  %s", len(r.CannotCopy), strings.Join(r.CannotCopy, "\n  "))
 	}
-	if r.Free >= 0 && r.Free < r.Need+SpaceMargin {
+	if need := max(r.Need, r.Peak); r.Free >= 0 && r.Free < need+SpaceMargin {
 		cleanup()
-		return nil, fmt.Errorf("%w: it needs %s, the drive of %s has %s free", ErrNoSpace, render.Size(r.Need+SpaceMargin), a.PacksDir(), render.Size(r.Free))
+		return nil, fmt.Errorf("%w: it needs %s, the drive of %s has %s free", ErrNoSpace, render.Size(need+SpaceMargin), a.PacksDir(), render.Size(r.Free))
+	}
+	if r.TexOptions != nil {
+		r.Pack.Textures = &PackTextures{Tool: "todds " + textures.ToddsVersion, Scale: r.TexOptions.Scale, Mipmaps: !r.TexOptions.NoMips}
 	}
 	bs.update(func(p *BuildProgress) { p.Step, p.BytesTotal = StepCopy, r.Need })
 	if err := a.writePack(pl.St, r.Pack, tmp, bs, &r.Skipped); err != nil {
 		cleanup()
 		return nil, err
+	}
+	if r.TexOptions != nil {
+		bs.update(func(p *BuildProgress) { p.Step, p.Mod, p.Mods, p.FilesTotal = StepTextures, "", 0, r.TexEst.Files })
+		if err := a.packTextures(r, tmp, enc, bs); err != nil {
+			cleanup()
+			return nil, err
+		}
 	}
 	bs.update(func(p *BuildProgress) { p.Step, p.Mod = StepWrite, "" })
 	b, _ := json.MarshalIndent(r.Pack, "", "  ")
@@ -426,7 +517,7 @@ func (a *App) writePack(st *LoadoutState, p *Pack, dir string, bs *buildState, s
 		res := &CopyResult{onFile: func(n int64) error {
 			bs.update(func(p *BuildProgress) { p.Bytes += n })
 			return bs.stopRequested()
-		}}
+		}, generated: a.generatedIn(root)} // RimArcho's DDS next to the PNGs are not the mod's
 		ents, err := os.ReadDir(root)
 		if err != nil {
 			return err
@@ -454,6 +545,12 @@ func (a *App) writePack(st *LoadoutState, p *Pack, dir string, bs *buildState, s
 		*skipped += len(res.Skipped)
 		o := scan.Origin{InstanceID: m.ID, LineageID: m.LineageID, WorkshopID: m.WorkshopID(), SnapshotHash: pe.Hash,
 			CopiedAt: a.Now().UTC().Format("2006-01-02T15:04:05Z")}
+		if p.Textures != nil {
+			o.Textures = "dds" // its PNGs become DDS in the pack: not a change of the mod
+			if p.Textures.Scale < 100 {
+				o.Textures = fmt.Sprintf("dds %d%%", p.Textures.Scale)
+			}
+		}
 		b, _ := json.MarshalIndent(o, "", "  ")
 		if err := os.MkdirAll(filepath.Join(dst, ".rimarcho"), 0o755); err != nil {
 			return err
@@ -799,7 +896,7 @@ func (a *App) ExportPack(name, file string, light bool) (int64, error) {
 		for i := range q.Entries {
 			q.Entries[i].Folder, q.Entries[i].Bytes, q.Entries[i].Trimmed, q.Entries[i].TrimmedDir = "", 0, 0, nil
 		}
-		q.Trimmed = 0
+		q.Trimmed, q.Textures = 0, nil // a light pack carries no files
 		b, _ := json.MarshalIndent(&q, "", "  ")
 		return int64(len(b)), os.WriteFile(file, append(b, '\n'), 0o644)
 	}

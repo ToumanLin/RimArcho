@@ -207,7 +207,7 @@ export async function build(again = false) {
   try { await loadList(); } catch { L.un = []; }
   if (!B.page || !again) {
     say("busy", T("checking the list…"));
-    try { B.page = await api.BuildPage(B.light); } catch (e) { return say("fail", errText(e)); }
+    try { B.page = await api.BuildPage(B.light, B.tex || 0); } catch (e) { return say("fail", errText(e)); }
     if (seq !== B.seq) return;
     say("", "");
     if (!B.light) B.full = B.page;
@@ -224,7 +224,7 @@ async function setLight(light) {
   B.light = light;
   if (!light && B.full) B.page = B.full;
   else {
-    try { B.page = await api.BuildPage(light); } catch (e) { return say("fail", errText(e)); }
+    try { B.page = await api.BuildPage(light, B.tex || 0); } catch (e) { return say("fail", errText(e)); }
     if (!light) B.full = B.page;
   }
   drawBuild();
@@ -385,7 +385,7 @@ function go() {
 }
 
 async function startBuild(name, light) {
-  try { say("ok", await api.PackBuild(name, light)); } catch (e) { return say("fail", errText(e)); }
+  try { say("ok", await api.PackBuild(name, light, B.tex || 0)); } catch (e) { return say("fail", errText(e)); }
   if (light) { await ui.reload(); return ui.go("pack:" + name); }
   redraw();
 }

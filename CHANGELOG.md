@@ -8,8 +8,8 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 `1.0.0-rc1` first.
 
 ### Breaking
-- Database schema v10 → v15: plans (v11), analysis kept per plan (v12), copy notes (v13),
-  shared mod folders (v14, below), an index for looking defs up by `Name` (v15). Each environment's workspace, undo stack, versions and
+- Database schema v10 → v16: plans (v11), analysis kept per plan (v12), copy notes (v13),
+  shared mod folders (v14, below), an index for looking defs up by `Name` (v15), the DDS RimArcho wrote (v16). Each environment's workspace, undo stack, versions and
   staging become its first plan, `default`; each `loadout tag` name becomes a plan of its own
   with one `import` version (04 §1.4).
 - `launch --force` is removed: launching always writes the plan first (08 §2).
@@ -449,6 +449,23 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   `pack.links-left`: in 能不能跑 › 要你确认 with 移除链接, in the tab under 启动游戏, in
   `archo problems` and MCP `list_problems`. `archo pack unlink [--dry-run]` / MCP
   `manage_packs action=unlink` remove only the links; refused while a game runs.
+
+### 贴图优化 (08 §5.2)
+- Database schema v15 → v16: the DDS RimArcho wrote, per file and per mod.
+- `archo textures status|optimize|clean|tool`: converts a mod's PNG textures to DDS next to
+  them with todds 0.4.1 (BC1 when opaque, BC7 otherwise, with mipmaps); the PNGs stay. Every
+  folder with `Textures/` is covered, and a path is converted everywhere or nowhere. Only the
+  files RimArcho recorded are ever deleted; an author's own DDS is left alone. Refused while
+  the game runs; can be stopped.
+- todds is downloaded only after the player agrees (`tool --install`, settings), or
+  `textures.todds` points at an existing copy (e.g. RimSort's).
+- A mod updated after its textures were converted shows `texture.stale` in 需要处理.
+- Uninstall gains a `textures` step that deletes the recorded DDS.
+- `pack build --textures [--texture-scale N]`: 预转换 (full size) or 精简 (scaled) in the
+  pack's copies, which then drop their PNGs. Space is checked against the peak; `pack.json`
+  records what was done.
+- GUI: a 贴图优化 page (estimate, scale, progress, stop, clean), Mod 库存's 优化贴图 /
+  清除贴图优化, the pack build's textures option (in the API; the new build page still needs its control); TUI palette panel; MCP `manage_textures`.
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
