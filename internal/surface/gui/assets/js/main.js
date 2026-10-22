@@ -139,8 +139,8 @@ function planActions() {
 
 let lastList = 1;
 
-// The sidebar's entries in shift+1–7 order, 在玩 then 库 (06 §3.5; view.Nav).
-const NAV = ["home", "needs", "log", "library", "plan", "packs", "env"];
+// The sidebar's entries in shift+1–8 order, 在玩 then 库 (06 §3.5; view.Nav).
+const NAV = ["home", "needs", "log", "library", "plan", "packs", "textures", "env"];
 
 // go opens a sidebar page; "plan" is the current plan's editor, "plan:<id>" a plan (it
 // becomes current: no game file is written), "plan:new" the new-plan dialog, "pack:<name>"
@@ -245,7 +245,7 @@ function renderHints() {
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "home") list = homePage.hintList();
   else if (S.screen === "packs" || S.screen === "build") list = packsPage.hintList();
-  else if (S.screen) list = [{ key: "shift+1–7", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
+  else if (S.screen) list = [{ key: "shift+1–8", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);
   const c = S.focus < 3 ? col() : null;
@@ -695,7 +695,7 @@ function onKey(e) {
   if (pop.popupKey(e)) return;
   if (document.activeElement && document.activeElement.tagName === "INPUT") return;
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
-  // shift+1–7: the sidebar's entries. By the physical key, so it works on any layout
+  // shift+1–8: the sidebar's entries. By the physical key, so it works on any layout
   // (shift+1 is "!" on a US keyboard, shift+3 is "#").
   const dig = /^Digit([1-9])$/.exec(e.code || "");
   if (dig && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {

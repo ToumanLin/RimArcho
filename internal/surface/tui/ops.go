@@ -178,11 +178,11 @@ func (m *model) selectAll() tea.Cmd {
 
 // ---- pages ----
 
-// navKeys: shift+1…7 are the sidebar's entries (06 §3.5); a terminal sends them as the
+// navKeys: shift+1…8 are the sidebar's entries (06 §3.5); a terminal sends them as the
 // characters of the US layout.
-var navKeys = map[string]int{"!": 1, "@": 2, "#": 3, "$": 4, "%": 5, "^": 6, "&": 7}
+var navKeys = map[string]int{"!": 1, "@": 2, "#": 3, "$": 4, "%": 5, "^": 6, "&": 7, "*": 8}
 
-// goPage opens the n-th sidebar entry: 启动 能不能跑 游戏日志 Mod 库存 方案 整合包 环境.
+// goPage opens the n-th sidebar entry: 启动 能不能跑 游戏日志 Mod 库存 方案 整合包 贴图优化 环境.
 func (m *model) goPage(n int) tea.Cmd {
 	m.full, m.insp, m.panel = false, nil, nil
 	switch n {
@@ -202,6 +202,8 @@ func (m *model) goPage(n int) tea.Cmd {
 	case 6:
 		return m.palRun("packs")(m)
 	case 7:
+		return m.texturesPanel()
+	case 8:
 		return m.chooseEnv()
 	}
 	return nil

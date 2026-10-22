@@ -124,7 +124,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	out = append(out,
 		r("tab · shift+tab", "next / previous page under the same sidebar entry"),
-		r("shift+1–7", "go to a page in the sidebar"),
+		r("shift+1–8", "go to a page in the sidebar"),
 	)
 	if !tui {
 		out = append(out, r("ctrl+b", "show / hide the sidebar"))

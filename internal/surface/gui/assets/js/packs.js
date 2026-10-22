@@ -429,7 +429,7 @@ export function packsKey(e) {
 }
 
 export function hintList() {
-  const tail = [{ key: "shift+1–7", label: T("pages") }, { key: "?", label: T("all keys") }];
+  const tail = [{ key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
   if (S.screen === "build") {
     return [{ key: "B", label: T("build") }, { key: "V", label: T("see the list first") }, { key: "T", label: T("full / light pack") },
       { key: "n", label: T("name") }, { key: "esc", label: T("back to the plan") }, ...tail];

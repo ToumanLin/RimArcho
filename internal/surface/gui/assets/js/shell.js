@@ -138,7 +138,7 @@ export function current() {
   if (!S.screen || S.screen === "full" || S.screen === "build") return (S.shell && S.shell.plan && S.shell.plan.page) || "plan";
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
   // 卸载 RimArcho is under 设置
-  if (S.screen === "uninstall" || S.screen === "textures") return "settings";
+  if (S.screen === "uninstall") return "settings";
   // adding an environment belongs to the environment page
   if (S.screen === "guide" && S.guideFrom === "env") return "env";
   return S.screen;
@@ -161,7 +161,7 @@ function inGameMark(isInGame) {
   return m;
 }
 
-const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", env: "env", library: "library", log: "log" };
+const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", textures: "textures", env: "env", library: "library", log: "log" };
 
 // The entry whose sub-entries were open when the sidebar was last drawn: a redraw starts
 // from it, so the sub-entries open and close with a transition (06 §7.1).
@@ -298,7 +298,6 @@ export function crumbs() {
   if (S.screen === "full" && S.detail) out = out.concat([{ label: S.detail.name, id: "full" }]);
   if (S.screen === "uninstall") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
   if (S.screen === "build") out = out.concat([{ label: T("build a pack"), id: "build" }]);
-  if (S.screen === "textures") out = out.concat([{ label: T("texture optimisation"), id: "textures" }]);
   return out;
 }
 

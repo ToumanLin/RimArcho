@@ -312,6 +312,8 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   was never a run.
 
 ### The window (06 §2)
+- 贴图优化 is a page of its own under 库, after 整合包 (`shift+7`; 环境 is now `shift+8`, `*` in
+  the TUI, where `shift+7` shows the textures panel). 设置 keeps only where todds is.
 - A sidebar replaces the top tabs, in two groups: 在玩 (启动, 能不能跑 with its badge,
   游戏日志) and 库 (Mod 库存 › 变化, 方案, 整合包, 环境), then 设置 (`shift+1`–`7`).
   Only 能不能跑 shows a number, and it leaves out hidden mods. Drag the sidebar's right
