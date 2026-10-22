@@ -85,7 +85,7 @@ func score(samplePath, packetDir, labelDir, reviewDir string) error {
 		if r == nil {
 			continue
 		}
-		if l == nil || len(validate(l, items, ps)) > 0 {
+		if l == nil || len(validate(l, items, ps, nil)) > 0 {
 			invalid++
 		}
 		if l == nil {

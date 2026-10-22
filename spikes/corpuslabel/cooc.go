@@ -21,16 +21,18 @@ type Cooc struct {
 }
 
 type CoocKey struct {
-	Logs int    `json:"logs"` // logs with the key
-	Of   int    `json:"of"`   // logs in the run
-	Mods []Cooc `json:"mods"`
+	Logs  int    `json:"logs"`            // logs with the key
+	Lists int    `json:"lists,omitempty"` // distinct mod lists among them (repeat uploads once)
+	Of    int    `json:"of"`              // logs in the run
+	Mods  []Cooc `json:"mods"`
 }
 
 const (
-	coocMinLogs = 20 // fewer logs are often one player's repeat uploads (design §6.2)
-	coocMinWith = 0.5
-	coocMinLift = 2.0
-	coocTop     = 8
+	coocMinLogs  = 20 // fewer logs are often one player's repeat uploads (design §6.2)
+	coocMinLists = 15 // distinct mod lists (benchmark v2: repeat uploads collapsed)
+	coocMinWith  = 0.5
+	coocMinLift  = 2.0
+	coocTop      = 8
 )
 
 // cooc computes Cooc for the sample's cluster keys over the logs of a corpusrun results file,
@@ -91,23 +93,47 @@ func cooc(results, corpus, samplePath, out string) error {
 	res := map[string]*CoocKey{}
 	for key, logs := range withKey {
 		ck := &CoocKey{Of: n}
-		has := map[string]int{}
+		has, hasAll := map[string]int{}, map[string]int{}
+		// Repeat uploads of one player (near-identical lists) count once: a log joins the
+		// first earlier representative whose list it shares >= 80% with (Jaccard).
+		var ids []string
 		for id := range logs {
-			if _, ok := mods[id]; !ok {
+			if _, ok := mods[id]; ok {
+				ids = append(ids, id)
+			}
+		}
+		sort.Strings(ids)
+		var reps []map[string]bool
+		for _, id := range ids {
+			ck.Logs++
+			s := map[string]bool{}
+			for _, pk := range mods[id] {
+				s[pk] = true
+				hasAll[pk]++
+			}
+			dup := false
+			for _, r := range reps {
+				if jaccard(s, r) >= 0.8 {
+					dup = true
+					break
+				}
+			}
+			if dup {
 				continue
 			}
-			ck.Logs++
-			for _, pk := range mods[id] {
+			reps = append(reps, s)
+			for pk := range s {
 				has[pk]++
 			}
 		}
+		ck.Lists = len(reps)
 		res[key] = ck
-		if ck.Logs < coocMinLogs {
+		if ck.Lists < coocMinLists {
 			continue
 		}
 		for pk, h := range has {
-			with := float64(h) / float64(ck.Logs)
-			without := float64(base[pk]-h) / float64(max(1, n-ck.Logs))
+			with := float64(h) / float64(ck.Lists)
+			without := float64(base[pk]-hasAll[pk]) / float64(max(1, n-ck.Logs))
 			if with >= coocMinWith && with >= coocMinLift*without {
 				ck.Mods = append(ck.Mods, Cooc{pk, with, without})
 			}
@@ -153,4 +179,18 @@ func readCooc(path string) (map[string]*CoocKey, error) {
 	}
 	var m map[string]*CoocKey
 	return m, json.Unmarshal(b, &m)
+}
+
+func jaccard(a, b map[string]bool) float64 {
+	in := 0
+	for k := range a {
+		if b[k] {
+			in++
+		}
+	}
+	u := len(a) + len(b) - in
+	if u == 0 {
+		return 1
+	}
+	return float64(in) / float64(u)
 }

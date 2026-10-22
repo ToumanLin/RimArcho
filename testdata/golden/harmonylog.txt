@@ -77,6 +77,12 @@ log:E1 patch-failed x1  first at Player.log:4
   file: $ROOT/Steam/steamapps/common/RimWorld/Mods/Compat/Patches/Compat.xml
   detail: simulation: Patches/Compat.xml:2 fails (patch.no-match: target-inactive, unguarded-optional)
   detail: ThingDef/Lib_Gun is defined by #z3bw, which is not active; the patch is not wrapped in PatchOperationFindMod, a Conditional or a MayRequire list item
+  nearby (other log messages around the first occurrence):
+    before:1 Mono path[0] = 'x'
+    before:2 RimWorld 1.6.4633 rev1261
+    after:7 Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDefCountClass Verse.ThingDefCountClass
+    after:9 Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object
+    after:18 Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.
   attribution:
     #hnyg Compat  source  evidence: log message prefix [Compat]; log file Patches/Compat.xml; patch Patches/Compat.xml:2 PatchOperationAdd
     #z3bw Lib  dependency  evidence: the patch targets a def it provides
@@ -97,6 +103,13 @@ log:E2 xref-missing x1  first at Player.log:7
   message: Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDefCountClass Verse.ThingDefCountClass
   detail: missing: def:ThingDef/Lib_Gun
   detail: providers: #z3bw (not enabled)
+  nearby (other log messages around the first occurrence):
+    before:1 Mono path[0] = 'x'
+    before:2 RimWorld 1.6.4633 rev1261
+    before:4 [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed
+    after:9 Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object
+    after:18 Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.
+    after:26 Exception ticking Pawn100: System.NullReferenceException: Object reference not set to an instance of an object
   attribution:
     #lqj2 Refer  source  evidence: references Lib_Gun at Defs/Recipes.xml:5
     #z3bw Lib  dependency  evidence: defines ThingDef Lib_Gun at Defs/Lib.xml:2 but is not enabled
@@ -122,6 +135,14 @@ log:E3 harmony-stack x500  first at Player.log:9
       - TRANSPILER tester.modb: IEnumerable`1 ModB.Pawn_Tick_B:Transpiler(IEnumerable`1 instructions)
       - TRANSPILER tester.modc: IEnumerable`1 ModC.Pawn_Tick_C:Rewrite(IEnumerable`1 instructions)
     Verse.TickList.Tick
+  nearby (other log messages around the first occurrence):
+    before:1 Mono path[0] = 'x'
+    before:2 RimWorld 1.6.4633 rev1261
+    before:4 [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed
+    before:7 Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDefCountClass Verse.ThingDefCountClass
+    after:18 Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.
+    after:26 Exception ticking Pawn100: System.NullReferenceException: Object reference not set to an instance of an object
+    after:29 Exception ticking Pawn101: System.NullReferenceException: Object reference not set to an instance of an object
   attribution:
     #iqmu Mod A  patcher  evidence: log harmony:Verse.Pawn.Tick#prefix "- PREFIX tester.moda.harmony" (type ModA.Pawn_Tick)
     #gpto Mod B  patcher  evidence: log harmony:Verse.Pawn.Tick#postfix "- POSTFIX tester.modb" (type ModB.Pawn_Tick_B); log harmony:Verse.Pawn.Tick#transpiler "- TRANSPILER tester.modb" (type ModB.Pawn_Tick_B)
@@ -152,6 +173,14 @@ log:E4 harmony-stack x1  first at Player.log:18
     Verse.Pawn.Tick  (patched by Harmony)
       - PREFIX tester.moda.harmony: Boolean ModA.Pawn_Tick:Prefix(Verse.Pawn __instance)
     Verse.TickList.Tick
+  nearby (other log messages around the first occurrence):
+    before:2 RimWorld 1.6.4633 rev1261
+    before:4 [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed
+    before:7 Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDefCountClass Verse.ThingDefCountClass
+    before:9 Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object
+    after:26 Exception ticking Pawn100: System.NullReferenceException: Object reference not set to an instance of an object
+    after:29 Exception ticking Pawn101: System.NullReferenceException: Object reference not set to an instance of an object
+    after:32 Exception ticking Pawn102: System.NullReferenceException: Object reference not set to an instance of an object
   attribution:
     #iqmu Mod A  source  evidence: log frame 1 ModA.CompBroken.CompTick (topmost mod code in the stack); log harmony:Verse.Pawn.Tick#prefix "- PREFIX tester.moda.harmony" (type ModA.Pawn_Tick)
   confidence: likely

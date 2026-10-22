@@ -4,7 +4,9 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -31,6 +33,8 @@ type tool struct {
 	destructive bool
 	desc        string
 	add         func(s *sdk.Server, run func(env string, argv []string) (*sdk.CallToolResult, any, error), t *sdk.Tool)
+	in          reflect.Type                       // the argument struct
+	argvOf      func(raw []byte) ([]string, error) // JSON arguments → argv, as a tool call does
 }
 
 // Server serialises tool calls on one App (it is not safe for concurrent use).
@@ -52,8 +56,26 @@ func (s *Server) Execute(env string, argv []string) (string, int) {
 	return cmds.Execute(s.app, argv)
 }
 
+// MaxOutput caps one tool result. An agent that asked for --all on a large mod got 225-325 KB
+// (G7 traces): more than fits in a useful context, and nothing it could not get by narrowing.
+const MaxOutput = 24 << 10
+
+// ClipOutput cuts a tool result at MaxOutput bytes on a line boundary and says how to narrow.
+func ClipOutput(out string) string {
+	if len(out) <= MaxOutput {
+		return out
+	}
+	cut := strings.LastIndexByte(out[:MaxOutput], '\n')
+	if cut < MaxOutput/2 {
+		cut = MaxOutput
+	}
+	rest := strings.Count(out[cut:], "\n")
+	return out[:cut] + fmt.Sprintf("\n… output clipped at %d KB of %d KB (%d more lines): narrow the call (mod=, target=, pattern, cluster) instead of all=true\n", cut>>10, len(out)>>10, rest)
+}
+
 func (s *Server) run(env string, argv []string) (*sdk.CallToolResult, any, error) {
 	out, code := s.Execute(env, argv)
+	out = ClipOutput(out)
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: out}}, IsError: code == cmds.ExitError || code == cmds.ExitUsage}, nil, nil
 }
 
@@ -87,6 +109,18 @@ func Run(ctx context.Context, a *app.App) error {
 // reg builds a tool whose arguments of type In map to argv.
 func reg[In any](name string, readOnly, destructive bool, desc string, argv func(In) []string) tool {
 	return tool{name: name, readOnly: readOnly, destructive: destructive, desc: desc,
+		in: reflect.TypeOf((*In)(nil)).Elem(),
+		argvOf: func(raw []byte) ([]string, error) {
+			var in In
+			if len(bytes.TrimSpace(raw)) > 0 {
+				d := json.NewDecoder(bytes.NewReader(raw))
+				d.DisallowUnknownFields()
+				if err := d.Decode(&in); err != nil {
+					return nil, fmt.Errorf("%s: %w", name, err)
+				}
+			}
+			return argv(in), nil
+		},
 		add: func(s *sdk.Server, run func(string, []string) (*sdk.CallToolResult, any, error), t *sdk.Tool) {
 			sdk.AddTool(s, t, func(_ context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, any, error) {
 				return run(reflect.ValueOf(in).FieldByName("Env").String(), argv(in))
@@ -337,6 +371,58 @@ func toolList() []tool {
 
 // Tools returns the tool table.
 func Tools() []tool { return toolList() }
+
+// ToolDoc describes one tool as a client sees it (name, description, parameters): for
+// harnesses that drive the tools without an MCP client (spikes/agenteval).
+type ToolDoc struct {
+	Name, Description string
+	ReadOnly          bool
+	Params            []ParamDoc
+}
+
+// ParamDoc is one argument: JSON name, JSON type, the schema help text.
+type ParamDoc struct {
+	Name, Type, Help string
+	Required         bool
+}
+
+// Catalog lists every tool with its parameters (the env parameter is left out).
+func Catalog() []ToolDoc {
+	var out []ToolDoc
+	for _, t := range toolList() {
+		d := ToolDoc{Name: t.name, Description: t.desc, ReadOnly: t.readOnly}
+		for i := 0; i < t.in.NumField(); i++ {
+			f := t.in.Field(i)
+			name, opts, _ := strings.Cut(f.Tag.Get("json"), ",")
+			if name == "" || name == "env" {
+				continue
+			}
+			typ := "string"
+			switch f.Type.Kind() {
+			case reflect.Bool:
+				typ = "boolean"
+			case reflect.Int:
+				typ = "integer"
+			case reflect.Slice:
+				typ = "array of strings"
+			}
+			d.Params = append(d.Params, ParamDoc{Name: name, Type: typ, Help: f.Tag.Get("jsonschema"), Required: !strings.Contains(opts, "omitempty")})
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// ArgvFor maps a tool call (name and JSON arguments) to the CLI argv the server would run.
+// Unknown argument names are an error.
+func ArgvFor(name string, args []byte) ([]string, error) {
+	for _, t := range toolList() {
+		if t.name == name {
+			return t.argvOf(args)
+		}
+	}
+	return nil, fmt.Errorf("unknown tool %q", name)
+}
 
 // ProblemsArgv maps list_problems: warning and above by default (decisions-m3 §12.2).
 func ProblemsArgv(in ProblemsIn) []string {
