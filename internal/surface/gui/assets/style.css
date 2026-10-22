@@ -39,6 +39,9 @@
   --row-h: 28px;
   --font: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
   --code: "Cascadia Mono", Consolas, "Microsoft YaHei UI", "Microsoft YaHei", monospace;
+  /* log lines in the game's debug-log colours (view.GameLogColors), darkened for white
+     with the hue kept (view.LightLogColors); info is the text colour */
+  --log-error: #eb0000; --log-warning: #7e7400; --log-info: var(--fg);
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -47,6 +50,7 @@
     --line: #333339; --line-2: #2c2c32; --fg: #ededf1; --fg-2: #b9b9c1; --muted: #8b8b94; --faint: #56565f; --ctl-fg: #a1a1aa;
     --accent: #a5b4fc; --accent-soft: #2b2c47; --accent-fg: #14142a; --sel: #33345a;
     --green: #6fd99b; --green-soft: #1e3a2b; --red: #f28b82; --red-soft: #45272a; --amber: #f2b544; --amber-soft: #3f3220; --log: #f5a97f;
+    --log-error: #ff6666; --log-warning: #ffeb04; --log-info: #ffffff;
     --pop-bg: rgba(38, 38, 43, .96);
     --shadow: 0 16px 44px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .3), 0 0 0 .5px rgba(255, 255, 255, .1);
   }
@@ -402,6 +406,14 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .lrow .top .chip { white-space: nowrap; flex: none; }
 .lrow .files { margin-top: 3px; color: var(--muted); font-size: 11.5px; overflow-wrap: anywhere; }
 .mrow { cursor: pointer; }
+/* a log line's level colour and a mod's own <color> (--c dark, --l light; 06 §7) */
+.lrow .text.lv-error { color: var(--log-error); }
+.lrow .text.lv-warning { color: var(--log-warning); }
+.lrow .text.lv-info { color: var(--log-info); }
+.lrow .text .rc { color: var(--l); }
+@media (prefers-color-scheme: dark) { .lrow .text .rc { color: var(--c); } }
+.lrow .text .rb { font-weight: 600; }
+.lrow .text .ri { font-style: italic; }
 .mrow.open .text { -webkit-line-clamp: unset; display: block; }
 .mrow pre.details { margin: 8px 0 0; padding: 8px 10px; max-height: 260px; overflow: auto; border-radius: 8px; background: var(--card-2); color: var(--fg-2); font: 11px/1.5 var(--code); white-space: pre; cursor: text; user-select: text; }
 .mrow .go { margin-top: 6px; padding: 0; color: var(--accent); font-size: 12px; }

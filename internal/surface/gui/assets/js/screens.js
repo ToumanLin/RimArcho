@@ -335,8 +335,12 @@ function logPage(name, title, ...right) {
   return w;
 }
 
-export async function gameLog(path = L.path) {
+// gameLog reads the log page; open: it was navigated to, so it is drawn even when the read
+// comes back before the loading line would show (unless another page opened meanwhile).
+export async function gameLog(path = L.path, open = false) {
   const n = ++L.seq;
+  const from = S.screen;
+  const show = () => S.screen === "log" || (open && S.screen === from);
   // What was read before shows at once and is replaced when the new read is in; a log not
   // read yet says so only if it takes a moment (no flash of a loading line).
   let slow = 0;
@@ -352,7 +356,7 @@ export async function gameLog(path = L.path) {
     L.loading = false;
     L.page = { files: p.files, path: "" };
     L.path = p.path;
-    if (S.screen === "log") drawGameLog();
+    if (show()) drawGameLog();
     setTimeout(() => { if (S.screen === "log" && n === L.seq) gameLog(p.path); }, 1500);
     return;
   }
@@ -363,7 +367,7 @@ export async function gameLog(path = L.path) {
   if (same) return;
   L.path = p.path;
   L.loading = false;
-  if (S.screen === "log") drawGameLog();
+  if (show()) drawGameLog();
 }
 
 function drawGameLog() {
@@ -411,7 +415,7 @@ function drawGameLog() {
       const top = el("div", "top");
       top.append(el("span", "chip", r.class), el("span", "count", "×" + r.count));
       if (r.mods) top.append(el("span", "mods", r.mods));
-      body.append(top, el("div", "text", r.text));
+      body.append(top, logText(r));
       row.append(ic, body);
       row.onclick = () => { L.cur = i; markLog(); };
       L.els.push(row);
@@ -425,6 +429,23 @@ function drawGameLog() {
   w.append(grid);
   scroll.scrollTop = was;
   markLog(true);
+}
+
+// logText draws a log line in the game's colours: the level colours the line, a mod's
+// <color>, <b>, <i> (view.LogSpans) style its spans. Text only ever goes in as text; a
+// colour is used only when it is a plain #rrggbb.
+const HEX = /^#[0-9a-f]{6}$/;
+function logText(r) {
+  const d = el("div", "text lv-" + (r.level || "info"));
+  for (const sp of r.spans || [{ t: r.text }]) {
+    const styled = (sp.c && HEX.test(sp.c)) || sp.b || sp.i;
+    if (!styled) { d.append(document.createTextNode(sp.t)); continue; }
+    const s = el("span", (sp.c && HEX.test(sp.c) ? "rc" : "") + (sp.b ? " rb" : "") + (sp.i ? " ri" : ""));
+    s.textContent = sp.t;
+    if (sp.c && HEX.test(sp.c)) { s.style.setProperty("--c", sp.c); s.style.setProperty("--l", HEX.test(sp.l || "") ? sp.l : sp.c); }
+    d.append(s);
+  }
+  return d;
 }
 
 // filePicker: the log shown, and a menu of the logs — each Player.log with the companion
@@ -480,7 +501,7 @@ function monitorRows(scroll, mon) {
     if (m.kind) top.append(el("span", "chip", m.kind));
     if (m.count > 1) top.append(el("span", "count", "×" + m.count));
     if (m.mods && m.mods.length) { const s = el("span", "mods", m.mods.join(" · ")); s.title = m.mods.join("\n"); top.append(s); }
-    body.append(top, el("div", "text", m.text));
+    body.append(top, logText(m));
     if (m.files && m.files.length) body.append(el("div", "files", m.files.join(" · ")));
     if (open) {
       if (m.details) { const pre = el("pre", "details"); pre.textContent = m.details; pre.onclick = (e) => e.stopPropagation(); body.append(pre); }

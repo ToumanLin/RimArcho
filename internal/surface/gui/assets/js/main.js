@@ -143,7 +143,7 @@ async function openPage(id) {
     case "packs": return scr.packs();
     case "env": return scr.environment();
     case "changes": return scr.changes();
-    case "log": return scr.gameLog();
+    case "log": return scr.gameLog(undefined, true);
     case "settings": return scr.settings();
     case "guide": return guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
   }

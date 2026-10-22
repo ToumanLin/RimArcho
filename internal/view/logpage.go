@@ -28,14 +28,17 @@ type LogFile struct {
 
 // LogRow is one cluster.
 type LogRow struct {
-	ID      string `json:"id"` // E3
-	Class   string `json:"class"`
-	Count   int    `json:"count"`
-	Text    string `json:"text"`
-	Mods    string `json:"mods"` // "Harmony (patcher), +2"
-	Status  int    `json:"status"`
-	Info    bool   `json:"info,omitempty"`
-	Cluster string `json:"cluster"` // the argument of log --cluster
+	ID    string `json:"id"` // E3
+	Class string `json:"class"`
+	Count int    `json:"count"`
+	Text  string `json:"text"` // the first line, rich-text tags removed
+	// Spans is Text with the mods' rich text; Level the line's colour (logtext.go).
+	Spans   []TextSpan `json:"spans"`
+	Level   string     `json:"level"`
+	Mods    string     `json:"mods"` // "Harmony (patcher), +2"
+	Status  int        `json:"status"`
+	Info    bool       `json:"info,omitempty"`
+	Cluster string     `json:"cluster"` // the argument of log --cluster
 }
 
 // LogPage is one analysed log.
@@ -159,13 +162,8 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		p.Monitor = MonitorOf(a, st, readCompanion(c), p.Links, false)
 	}
 	for _, lc := range r.Clusters {
-		row := LogRow{ID: lc.ID, Class: T(lc.Class), Count: lc.Count, Text: lc.First.Message, Cluster: lc.ID, Info: logs.Informational(lc.Class)}
-		if i := strings.IndexByte(row.Text, '\n'); i >= 0 {
-			row.Text = row.Text[:i]
-		}
-		if len(row.Text) > 240 {
-			row.Text = row.Text[:237] + "…"
-		}
+		row := LogRow{ID: lc.ID, Class: T(lc.Class), Count: lc.Count, Spans: LogSpans(lc.First.Message, 240), Cluster: lc.ID, Info: logs.Informational(lc.Class)}
+		row.Text = SpanText(row.Spans)
 		switch {
 		case row.Info:
 			row.Status = StatusNone
@@ -174,6 +172,11 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		default:
 			row.Status = StatusErr
 		}
+		lvl := lc.Level
+		if lvl == "" {
+			lvl = lc.First.Level
+		}
+		row.Level = LevelOf(lvl, row.Status)
 		if len(lc.Attr) > 0 {
 			at := lc.Attr[0]
 			name := at.Instance

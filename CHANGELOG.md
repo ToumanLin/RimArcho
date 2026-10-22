@@ -38,6 +38,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   the session's version, game and start–end as its header. It follows the live tracker while
   the game runs. The file picker lists ArchoMonitor.log under its Player.log. A plan without
   the monitor gets one line with 加入 Archo Monitor (one undoable step) (06 §2.10).
+- Log lines on that page take RimWorld's own debug-log colours (error #ff6666, warning
+  #ffeb04, message white; darkened for the light theme with the hue kept), and mods' Unity
+  rich text (`<color>`, `<b>`, `<i>`) is shown as styled text, parsed in Go; other tags stay
+  plain text. The first visit to the page no longer stays blank when the log reads quickly.
 - The release zip has `monitor/ArchoMonitor/`; building it needs the .NET SDK 10.
 
 ### Plans (04 §1)
