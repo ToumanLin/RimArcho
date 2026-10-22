@@ -1,6 +1,7 @@
 package view
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -231,21 +232,10 @@ func (c *ContentCache) Get(a *app.App, st *app.LoadoutState) (map[string]int, er
 // TagMatch: v names tag when, ignoring case, it starts at the beginning of one of the tag's
 // words (06 §3.7): "facial" finds "Facial Hair" and "Facial Animation", "animation" and
 // "anim" find "Facial Animation", "facial hair" finds "Facial Hair"; "air" does not.
-func TagMatch(tag, v string) bool {
-	if v == "" {
-		return false
-	}
-	t := strings.ToLower(tag)
-	v = strings.ToLower(v)
-	for i := 0; i < len(t); i++ {
-		if (i == 0 || isTagSep(t[i-1])) && strings.HasPrefix(t[i:], v) {
-			return true
-		}
-	}
-	return false
-}
+// The rule is app.TagMatch, so Mod 库存's tag: filter (app.Library) matches the same way.
+func TagMatch(tag, v string) bool { return app.TagMatch(tag, v) }
 
-func isTagSep(c byte) bool { return c == ' ' || c == '-' || c == '_' || c == '/' || c == '.' }
+func isTagSep(c byte) bool { return app.IsTagSep(c) }
 
 // queryFieldOrder is the order completion offers fields in when several share a prefix.
 var queryFieldOrder = []string{"name", "author", "tag", "id", "type", "has"}
@@ -261,6 +251,17 @@ var queryValues = map[string][]string{
 // "ial" (from the tags in use, up to the end of the word). "" when nothing fits or the
 // last word is inside quotes.
 func CompleteQuery(q string, tags []string) string {
+	return completeWith(q, queryFieldOrder, func(f string) []string {
+		if f == "tag" {
+			return tagWords(tags)
+		}
+		return queryValues[f]
+	})
+}
+
+// completeWith is CompleteQuery for a set of fields (in the order offered) and their
+// values; Mod 库存's search box uses it with its own keys (CompleteLibrary).
+func completeWith(q string, fields []string, values func(field string) []string) string {
 	if q == "" || strings.HasSuffix(q, " ") || strings.Count(q, "\"")%2 == 1 {
 		return ""
 	}
@@ -268,16 +269,10 @@ func CompleteQuery(q string, tags []string) string {
 	tok = strings.TrimPrefix(tok, "-")
 	low := strings.ToLower(tok)
 	if f, v, ok := strings.Cut(low, ":"); ok {
-		if !queryFields[f] || v == "" {
+		if !slices.Contains(fields, f) || v == "" {
 			return ""
 		}
-		var cands []string
-		if f == "tag" {
-			cands = tagWords(tags)
-		} else {
-			cands = queryValues[f]
-		}
-		for _, c := range cands {
+		for _, c := range values(f) {
 			if len(c) > len(v) && strings.HasPrefix(strings.ToLower(c), v) {
 				return c[len(v):]
 			}
@@ -289,7 +284,7 @@ func CompleteQuery(q string, tags []string) string {
 	if len(low) < 2 {
 		return ""
 	}
-	for _, f := range queryFieldOrder {
+	for _, f := range fields {
 		if strings.HasPrefix(f, low) {
 			return f[len(low):] + ":"
 		}

@@ -137,17 +137,36 @@ function drawFilters() {
   box.innerHTML = "";
   const s = el("div", "lib-search-box");
   const inp = el("input", "lib-search");
-  inp.placeholder = T("search the library") + "  /";
+  inp.placeholder = T("search: words, tag:, state:, source:, used:, -not") + "  /";
   inp.spellcheck = false;
   inp.value = L.search;
+  // the grey completion after the last word (06 §3.7, view.CompleteLibrary): the typed text
+  // invisibly, then the rest, as in the plan's search boxes
+  const ghost = el("span", "lib-ghost");
+  ghost.append(el("span", "typed"), el("span", "sfx"));
+  const showGhost = () => {
+    const sfx = p.complete && inp.value === L.search ? p.complete : "";
+    const atEnd = document.activeElement === inp && inp.selectionStart === inp.value.length && inp.selectionEnd === inp.value.length;
+    ghost.hidden = !(sfx && atEnd && inp.scrollLeft === 0);
+    if (!ghost.hidden) { ghost.firstChild.textContent = inp.value; ghost.lastChild.textContent = sfx; }
+  };
   let timer = 0;
-  inp.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { L.search = inp.value; L.cur = 0; load(); }, 120); };
+  inp.oninput = () => { ghost.hidden = true; clearTimeout(timer); timer = setTimeout(() => { L.search = inp.value; L.cur = 0; load(); }, 120); };
+  inp.onblur = inp.onscroll = showGhost;
   inp.onkeydown = (e) => {
+    if ((e.key === "Tab" || e.key === "ArrowRight") && !ghost.hidden && p.complete) {
+      e.preventDefault(); e.stopPropagation();
+      inp.value += p.complete;
+      L.search = inp.value;
+      L.cur = 0;
+      load();
+      return;
+    }
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (inp.value) { inp.value = ""; L.search = ""; load(); } inp.blur(); els.rows.focus(); }
     else if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); e.stopPropagation(); inp.blur(); els.rows.focus(); }
     else e.stopPropagation();
   };
-  s.append(inp);
+  s.append(inp, ghost);
   box.append(s);
   // what is in force, each removable, and clear-all
   if ((p.conds || []).length || L.search) {
@@ -198,7 +217,8 @@ function drawFilters() {
   }
   so.append(seg);
   box.append(so);
-  if (focused) { const n = box.querySelector(".lib-search"); n.focus(); if (caret != null) n.setSelectionRange(caret, caret); }
+  if (focused) { inp.focus(); if (caret != null) inp.setSelectionRange(caret, caret); }
+  showGhost();
 }
 
 // setFilter: on 1 keeps only copies with the value, -1 leaves them out, 0 drops the condition.

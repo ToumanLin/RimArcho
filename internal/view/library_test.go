@@ -149,3 +149,47 @@ func TestLibraryDo(t *testing.T) {
 		t.Fatalf("trash of a subscribed mod: %+v %v", pv, err)
 	}
 }
+
+// 06 §3.7 in the library: typed key:value words filter, tag: matches tag words, and the
+// box completes the library's keys and values.
+func TestLibrarySearchBox(t *testing.T) {
+	e := libEnv(t)
+	e.MustRun("tag", "add", "pkg:tester.idle", "Facial Hair")
+	e.MustRun("tag", "add", "pkg:tester.hid", "Facial Animation")
+	lib := mustLibrary(t, e)
+	names := func(p *view.LibPage) []string {
+		var out []string
+		for _, r := range p.Rows {
+			out = append(out, r.Name)
+		}
+		return out
+	}
+	page := func(text string) *view.LibPage {
+		p, err := view.BuildLibrary(lib, text, nil, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	if got := names(page("tag:facial")); !slices.Equal(got, []string{"Hid", "Idle"}) {
+		t.Errorf("tag:facial: %v", got)
+	}
+	if got := names(page("tag:anim")); !slices.Equal(got, []string{"Hid"}) {
+		t.Errorf("tag:anim: %v", got)
+	}
+	if got := names(page("tag:air")); len(got) != 0 {
+		t.Errorf("tag:air must not match inside a word: %v", got)
+	}
+	// a click on a tag in the filter column is that tag only
+	if p, _ := view.BuildLibrary(lib, "", []string{"tag:Facial Hair"}, ""); !slices.Equal(names(p), []string{"Idle"}) {
+		t.Errorf("tag:Facial Hair: %v", names(p))
+	}
+	if got := names(page("-state:hidden lock")); !slices.Equal(got, []string{"Lockable"}) {
+		t.Errorf("words and an exclusion: %v", got)
+	}
+	for text, want := range map[string]string{"so": "urce:", "st": "ate:", "state:un": "loadable", "state:unu": "sed", "-source:wo": "rkshop", "tag:fa": "cial", "used:pl": "an:default", "lock": "", "x": ""} {
+		if got := page(text).Complete; got != want {
+			t.Errorf("complete %q: %q, want %q", text, got, want)
+		}
+	}
+}

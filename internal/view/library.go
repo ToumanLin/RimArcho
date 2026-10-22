@@ -3,6 +3,7 @@ package view
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,6 +28,9 @@ type LibPage struct {
 	Sort   string      `json:"sort"`
 	Sorts  []LibChoice `json:"sorts"`
 	Search string      `json:"search"`
+	// Complete is the grey text after the search box's last word that tab (or →) takes
+	// (06 §3.7): a key ("so" → "urce:") or a value ("state:un" → "used").
+	Complete string `json:"complete,omitempty"`
 }
 
 // LibGroup is one filter key with its values.
@@ -242,9 +246,72 @@ func LibQueryOf(search string, filters []string, sort string) app.LibQuery {
 	return q
 }
 
-// BuildLibrary builds the page for a query. filters are "key:value", "-key:value" to exclude.
+// LibSplitQuery splits what was typed into the search box into words and filters: a word
+// "key:value" (one of app.LibKeys) keeps, "-key:value" leaves out, like a click and a
+// right click in the filter column.
+func LibSplitQuery(text string) (words string, filters []string) {
+	var ws []string
+	for _, w := range strings.Fields(text) {
+		if _, _, err := app.ParseLibFilter(strings.TrimPrefix(w, "-")); err == nil {
+			filters = append(filters, w)
+		} else {
+			ws = append(ws, w)
+		}
+	}
+	return strings.Join(ws, " "), filters
+}
+
+// CompleteLibrary is the search box's completion (the plan's CompleteQuery with the
+// library's keys): keys from the second letter, then tag words, sources, versions, states
+// and the plans and packs in use.
+func CompleteLibrary(text string, lib *app.Library) string {
+	return completeWith(text, app.LibKeys, func(k string) []string {
+		switch k {
+		case "source":
+			return app.LibSources
+		case "state":
+			return app.LibStates
+		}
+		var tags, out []string
+		seen := map[string]bool{}
+		for _, l := range lib.Lineages {
+			tags = append(tags, l.Tags...)
+			for _, i := range l.Instances {
+				var vs []string
+				switch k {
+				case "version":
+					vs = i.Versions
+				case "used":
+					for _, u := range i.UsedIn {
+						vs = append(vs, u.Value())
+					}
+				}
+				for _, v := range vs {
+					if !seen[v] {
+						seen[v] = true
+						out = append(out, v)
+					}
+				}
+			}
+		}
+		switch k {
+		case "tag":
+			return tagWords(tags)
+		case "version":
+			slices.SortFunc(out, func(a, b string) int { return -strings.Compare(a, b) })
+		case "used":
+			slices.Sort(out)
+			out = append([]string{"none"}, out...)
+		}
+		return out
+	})
+}
+
+// BuildLibrary builds the page for a query. filters are "key:value", "-key:value" to exclude;
+// search may hold such words too (LibSplitQuery).
 func BuildLibrary(lib *app.Library, search string, filters []string, sort string) (*LibPage, error) {
-	q := LibQueryOf(search, filters, sort)
+	words, typed := LibSplitQuery(search)
+	q := LibQueryOf(words, append(append([]string(nil), filters...), typed...), sort)
 	res, err := lib.Filter(q)
 	if err != nil {
 		return nil, err
@@ -252,7 +319,7 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 	if sort == "" {
 		sort = "name"
 	}
-	p := &LibPage{Total: res.Total, Shown: len(res.Matches), Sort: sort, Search: search}
+	p := &LibPage{Total: res.Total, Shown: len(res.Matches), Sort: sort, Search: search, Complete: CompleteLibrary(search, lib)}
 	var bytes int64
 	for _, m := range res.Matches {
 		r := LibRow{ID: m.ID, Ref: m.Ref, Name: m.Name, Tags: m.Tags, Copies: len(m.Instances), Single: len(m.Instances) == 1}

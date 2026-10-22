@@ -585,6 +585,27 @@ func (a *App) libPlayed(st *LoadoutState) (map[string]time.Time, error) {
 	return out, nil
 }
 
+// TagMatch: v names tag when, ignoring case, it starts at the beginning of one of the tag's
+// words (06 §3.7): "facial" finds "Facial Hair" and "Facial Animation", "anim" finds
+// "Facial Animation"; "air" does not. The plan's search (view.TagMatch) and the library's
+// tag: filter share it.
+func TagMatch(tag, v string) bool {
+	if v == "" {
+		return false
+	}
+	t := strings.ToLower(tag)
+	v = strings.ToLower(v)
+	for i := 0; i < len(t); i++ {
+		if (i == 0 || IsTagSep(t[i-1])) && strings.HasPrefix(t[i:], v) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsTagSep separates the words of a tag.
+func IsTagSep(c byte) bool { return c == ' ' || c == '-' || c == '_' || c == '/' || c == '.' }
+
 // ---- filtering (06 §2.9) ----
 
 // LibQuery selects and orders the library: search words (all must match: names, package
@@ -678,6 +699,9 @@ func anyIn(vals []string, want map[string]bool, fold bool) bool {
 type libCond struct {
 	inc, exc map[string]map[string]bool // key → values (tag and used compared case-insensitively)
 	words    []string
+	// tags are the library's tag names (lower case): tag:<v> naming one of them is that tag
+	// (a click on the filter column); any other v matches tags by word (TagMatch).
+	tags map[string]bool
 }
 
 func (q LibQuery) cond() (*libCond, error) {
@@ -703,16 +727,36 @@ func (q LibQuery) cond() (*libCond, error) {
 // passes: the instance holds every key's included values but skip's, and none excluded.
 func (c *libCond) passes(l *LibLineage, i *LibInstance, skip string) bool {
 	for k, want := range c.inc {
-		if k != skip && !anyIn(libValues(l, i, k), want, true) {
+		if k != skip && !c.has(l, i, k, want) {
 			return false
 		}
 	}
 	for k, drop := range c.exc {
-		if anyIn(libValues(l, i, k), drop, true) {
+		if c.has(l, i, k, drop) {
 			return false
 		}
 	}
 	return true
+}
+
+func (c *libCond) has(l *LibLineage, i *LibInstance, k string, want map[string]bool) bool {
+	if anyIn(libValues(l, i, k), want, true) {
+		return true
+	}
+	if k != "tag" {
+		return false
+	}
+	for v := range want {
+		if c.tags[v] {
+			continue
+		}
+		for _, t := range l.Tags {
+			if TagMatch(t, v) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (c *libCond) found(l *LibLineage) bool {
@@ -732,6 +776,12 @@ func (lib *Library) Filter(q LibQuery) (*LibResult, error) {
 	}
 	if q.Sort != "" && !slices.Contains(LibSorts, q.Sort) {
 		return nil, fmt.Errorf("bad sort %q: want %s", q.Sort, strings.Join(LibSorts, ", "))
+	}
+	c.tags = map[string]bool{}
+	for _, l := range lib.Lineages {
+		for _, t := range l.Tags {
+			c.tags[strings.ToLower(t)] = true
+		}
 	}
 	res := &LibResult{Total: len(lib.Lineages)}
 	counts := map[string]map[string]int{}

@@ -1,11 +1,8 @@
 package tui
 
 import (
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -23,19 +20,6 @@ type libState struct {
 	typing      bool
 }
 
-// libQuery splits the filter line into search words and filters.
-func libQuery(q string) (search string, filters []string) {
-	var words []string
-	for _, w := range strings.Fields(q) {
-		if _, _, err := app.ParseLibFilter(strings.TrimPrefix(w, "-")); err == nil {
-			filters = append(filters, w)
-		} else {
-			words = append(words, w)
-		}
-	}
-	return strings.Join(words, " "), filters
-}
-
 func (m *model) loadLibrary() {
 	l := &m.libr
 	l.err = ""
@@ -44,8 +28,7 @@ func (m *model) loadLibrary() {
 		l.page, l.err = nil, err.Error()
 		return
 	}
-	search, filters := libQuery(l.query)
-	if l.page, err = view.BuildLibrary(lib, search, filters, ""); err != nil {
+	if l.page, err = view.BuildLibrary(lib, l.query, nil, ""); err != nil {
 		l.err = err.Error()
 	}
 	if l.page != nil && l.cursor >= len(l.page.Rows) {
@@ -72,6 +55,12 @@ func (m *model) libTypeKey(k tea.KeyMsg) tea.Cmd {
 		if r := []rune(l.query); len(r) > 0 {
 			l.query = string(r[:len(r)-1])
 		}
+	case tea.KeyTab:
+		// tab takes the grey completion (06 §3.7)
+		if l.page == nil || l.page.Complete == "" {
+			return nil
+		}
+		l.query += l.page.Complete
 	case tea.KeySpace:
 		l.query += " "
 	case tea.KeyRunes:
@@ -119,14 +108,24 @@ func (m *model) libraryKey(s string) tea.Cmd {
 func (m *model) libraryLines(n int) []string {
 	l := &m.libr
 	q := l.query
+	ghost := ""
 	if l.typing {
-		q += "▌"
+		if l.page != nil {
+			ghost = l.page.Complete
+		}
+		if ghost == "" {
+			ghost = "▌"
+		}
 	}
-	head := "/ " + q
-	if q == "" {
-		head = sDimS.Render("/ " + T("search the library") + "  state:unused  -source:local")
+	// the typed text, then the grey completion tab takes (or the cursor mark)
+	head := fit("/ "+q, m.w) + sDimS.Render(ghost)
+	if ghost != "" {
+		head = "/ " + q + sDimS.Render(ghost)
 	}
-	out := []string{fit(head, m.w)}
+	if q == "" && !l.typing {
+		head = sDimS.Render(fit("/ "+T("search: words, tag:, state:, source:, used:, -not"), m.w))
+	}
+	out := []string{head}
 	switch {
 	case l.err != "":
 		return append(out, sErrS.Render(fit(l.err, m.w)))
