@@ -145,7 +145,8 @@ func serveFile(w http.ResponseWriter, r *http.Request, path string, err error) {
 }
 
 // openURL opens a link in the system browser.
-func openURL(u string) error {
+// A variable so tests can never start the real program (noopen_test.go).
+var openURL = func(u string) error {
 	switch runtime.GOOS {
 	case "windows":
 		return exec.Command("rundll32", "url.dll,FileProtocolHandler", u).Start()

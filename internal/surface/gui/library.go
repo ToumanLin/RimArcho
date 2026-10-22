@@ -107,7 +107,8 @@ func (s *API) OpenWorkshop(id string) (string, error) {
 	return view.T("opened the Workshop page"), nil
 }
 
-func openDir(dir string) error {
+// A variable so tests can never start the real program (noopen_test.go).
+var openDir = func(dir string) error {
 	switch runtime.GOOS {
 	case "windows":
 		return exec.Command("explorer.exe", dir).Start()

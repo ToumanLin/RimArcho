@@ -663,7 +663,8 @@ func (m *model) prefetchCmd(lines []dline) tea.Cmd {
 func (m *model) inlineImages() bool { return m.images != nil && !m.previewsOff }
 
 // openURL opens a page in the default browser.
-func openURL(u string) error {
+// A variable so tests can never start the real program (noopen_test.go).
+var openURL = func(u string) error {
 	switch runtime.GOOS {
 	case "windows":
 		return exec.Command("rundll32", "url.dll,FileProtocolHandler", u).Start()
