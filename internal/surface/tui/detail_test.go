@@ -252,8 +252,9 @@ func TestT13TagBar(t *testing.T) {
 		t.Fatalf("esc removed the tag: %q", got)
 	}
 	c := &m.cols[cActive]
-	if row := ansi.Strip(m.drawRow(c, 0, true, 60)); !strings.Contains(row, "official-stuff") {
-		t.Fatalf("row without its tag: %q", row)
+	// 06 §3.8: rows carry no tags; they are in the detail and in search.
+	if row := ansi.Strip(m.drawRow(c, 0, true, 60)); strings.Contains(row, "official-stuff") {
+		t.Fatalf("a row shows its tag: %q", row)
 	}
 }
 
@@ -439,6 +440,8 @@ func TestFullSections(t *testing.T) {
 			t.Fatalf("full detail lacks %q:\n%s", want, all)
 		}
 	}
+	// text names mods; only the Archo ID field shows the #ref (06 §4.1)
+	all = regexp.MustCompile(`(?m)^\s*Archo ID .*$`).ReplaceAllString(all, "")
 	if strings.Contains(all, "#") && regexp.MustCompile(`#[a-z0-9]{4}\b`).MatchString(all) {
 		t.Fatalf("a #ref is shown:\n%s", all)
 	}

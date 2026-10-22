@@ -21,7 +21,7 @@ func TestLibraryList(t *testing.T) {
 		t.Fatal("the palette did not open the library")
 	}
 	screen := strings.Join(m.libraryLines(30), "\n")
-	for _, want := range []string{"Alpha", "Beta", "Harmony", "4 mods", "in no plan"} {
+	for _, want := range []string{"Alpha", "Beta", "Harmony", "4 mods", "workshop"} {
 		if !strings.Contains(screen, want) {
 			t.Fatalf("missing %q:\n%s", want, screen)
 		}
@@ -52,5 +52,38 @@ func TestLibraryList(t *testing.T) {
 	press(m, "esc")
 	if m.tab != tabList {
 		t.Fatal("esc goes back")
+	}
+}
+
+// 06 §2.9: n writes a copy's own note; an empty line clears it.
+func TestLibraryCopyNote(t *testing.T) {
+	e, _ := fixture(t)
+	m := direct(t, e, 140, 40)
+	m.openLibrary()
+	at := -1
+	for i, r := range m.libr.page.Rows {
+		if r.Name == "Beta" {
+			at = i
+		}
+	}
+	if at < 0 {
+		t.Fatal("no Beta row")
+	}
+	m.libr.cursor = at
+	press(m, "n")
+	if m.prompt == nil {
+		t.Fatal("n opens no input line")
+	}
+	m.prompt.text = ""
+	typeIn(m, "kept for the test plan")
+	m.update(tea.KeyMsg{Type: tea.KeyEnter})
+	if got := m.libr.page.Rows[at].Insts[0].Note; got != "kept for the test plan" {
+		t.Fatalf("note %q (status %q)", got, m.status)
+	}
+	press(m, "n")
+	m.prompt.text = ""
+	m.update(tea.KeyMsg{Type: tea.KeyEnter})
+	if got := m.libr.page.Rows[at].Insts[0].Note; got != "" {
+		t.Fatalf("not cleared: %q", got)
 	}
 }

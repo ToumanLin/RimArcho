@@ -595,9 +595,10 @@ export async function changes() {
   drawChanges();
 }
 
-export function rescanButton() {
-  const b = button(S.busy.scan ? T("scanning…") : T("rescan the mod folders"), "R", () => ui.cmd("rescan"));
+export function rescanButton(label) {
+  const b = button(S.busy.scan ? T("scanning…") : label || T("rescan the mod folders"), "R", () => ui.cmd("rescan"));
   b.classList.add("rescan");
+  if (label) b.dataset.label = label;
   b.prepend(el("span", "ic" + (S.busy.scan ? " spin" : "")));
   b.firstChild.innerHTML = icon.rescan;
   b.disabled = !!S.busy.scan;
@@ -609,6 +610,8 @@ export function rescanButton() {
 export function busyChanged() {
   if (S.screen === "env") return environment();
   if (S.screen === "changes") return changes();
+  const b = document.querySelector("#acts .rescan, .page .rescan");
+  if (b) b.replaceWith(rescanButton(b.dataset.label));
 }
 
 function drawChanges() {

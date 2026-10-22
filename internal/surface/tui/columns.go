@@ -466,15 +466,7 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 		b.WriteString(bg(sAccent).Render(dot))
 	}
 	used += nw + width.StringWidth(dot)
-	// Tags: a faint suffix when the name leaves room (06 §3.8).
-	if len(it.tags) > 0 {
-		if avail := w - used - statusW; avail >= 6 {
-			t := "  " + strings.Join(it.tags, " ")
-			tw := min(width.StringWidth(t), avail)
-			b.WriteString(bg(sDimS).Render(fit(t, tw)))
-			used += tw
-		}
-	}
+	// No tags after the name (06 §3.8): they are in the detail and in search.
 	b.WriteString(pad(w - used - statusW))
 	b.WriteString(pad(1) + bg(statusStyle(st)).Render(statusGlyph(st)))
 	lines := []string{b.String()}

@@ -258,14 +258,14 @@ export function crumbs() {
 
 // renderCrumbs: the breadcrumb names the page (there is no other title), and the chip
 // beside it says what the page is about: the environment, and on 能不能跑 the plan too.
-// The home page spans every environment: no chip there.
+// The home page spans every environment, and Mod 库存 every copy on the machine: no chip there.
 function renderCrumbs() {
   const env = $("#env");
   const sh = S.shell;
   let chip = (sh && sh.env) || "";
   if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + " · " + chip;
   env.textContent = chip;
-  env.hidden = !chip || S.screen === "home" || S.screen === "guide";
+  env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library";
   env.title = T("environment") + " · E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");

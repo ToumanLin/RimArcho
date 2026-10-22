@@ -101,7 +101,7 @@ function planActions() {
     motion.bump("unwritten", n, u);
     out.push(n);
   } else motion.bump("unwritten", null, 0);
-  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("sort"), "S", () => run("sort")),
+  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("import / export"), "i", () => exchange(0)),
     btn(T("build a pack"), "", () => go("packs"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
   if (plan) {
     const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");

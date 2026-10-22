@@ -1,6 +1,7 @@
 package view_test
 
 import (
+	"errors"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -72,17 +73,17 @@ func TestLibraryPage(t *testing.T) {
 	if lock.State != "" || lock.Used != "default" {
 		t.Errorf("a lineage with a used copy is not \"in no plan\": %q %q", lock.State, lock.Used)
 	}
-	if got := kinds(lock.Insts[1].Actions); !slices.Equal(got, []string{"remove", "move", "folder"}) {
+	if got := kinds(lock.Insts[1].Actions); !slices.Equal(got, []string{"move", "folder", "remove"}) {
 		t.Errorf("the Mods/ copy: %v", got)
 	}
-	if got := kinds(lock.Insts[0].Actions); !slices.Equal(got, []string{"pin", "folder", "workshop"}) {
+	if got := kinds(lock.Insts[0].Actions); !slices.Equal(got, []string{"unsubscribe", "folder", "workshop", "pin"}) {
 		t.Errorf("the unused workshop copy beside it (enabling it would clash): %v", got)
 	}
 	hid := libRow(t, p, "Hid")
-	if !hid.Single || hid.State != "被其它管理器隐藏" || hid.Insts[0].Note != hid.State {
+	if !hid.Single || hid.State != "被其它管理器隐藏" || hid.Source != "工坊" || hid.Insts[0].Name != "5600" {
 		t.Errorf("hidden: %+v", hid)
 	}
-	if got := kinds(hid.Insts[0].Actions); !slices.Equal(got, []string{"unhide", "trash", "folder", "workshop"}) {
+	if got := kinds(hid.Insts[0].Actions); !slices.Equal(got, []string{"unhide", "unsubscribe", "folder", "workshop"}) {
 		t.Errorf("hidden actions: %v", got)
 	}
 	ghost := libRow(t, p, "工坊条目 5300")
@@ -191,5 +192,79 @@ func TestLibrarySearchBox(t *testing.T) {
 		if got := page(text).Complete; got != want {
 			t.Errorf("complete %q: %q, want %q", text, got, want)
 		}
+	}
+}
+
+// 06 §4.1, §2.9: one field list, the editor's fields with the library's in between.
+func TestLibFields(t *testing.T) {
+	e := libEnv(t)
+	lib, err := e.App.Library()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := libRow(t, libPage(t, e, ""), "Lockable")
+	if len(r.Insts) != 2 {
+		t.Fatalf("copies %d", len(r.Insts))
+	}
+	i := lib.Instance(r.Insts[0].Ref)
+	var got []string
+	for _, f := range view.LibFields(e.App, lib, i, nil) {
+		got = append(got, f.Kind)
+	}
+	want := []string{"id", "package", "path", "tags", "state", "size", "versions", "updated"}
+	for _, k := range want {
+		if !slices.Contains(got, k) {
+			t.Fatalf("no %s field: %v", k, got)
+		}
+	}
+	if got[0] != "id" || got[1] != "package" {
+		t.Fatalf("order %v", got)
+	}
+	// the editor's: no library rows
+	for _, f := range view.ModFields(e.App, lib.St, i.Mod, nil) {
+		if f.Kind == "state" || f.Kind == "used" {
+			t.Fatalf("editor field %s", f.Kind)
+		}
+	}
+	// the page's columns: name first, the hidden ones last
+	p := libPage(t, e, "")
+	if len(p.Columns) == 0 || p.Columns[0].Key != "name" || !p.Columns[0].Shown || p.Columns[len(p.Columns)-1].Shown {
+		t.Fatalf("columns %+v", p.Columns)
+	}
+}
+
+// 06 §2.9: 退订 is a confirmed action through the Steam client; when Steam is out of reach
+// LibDo answers OpenPages (the window opens the page and says so).
+func TestLibSteam(t *testing.T) {
+	e := libEnv(t)
+	idle := libRow(t, libPage(t, e, ""), "Idle").Insts[0]
+	var unsub *view.LibAction
+	for k, a := range idle.Actions {
+		if a.Kind == view.LibUnsub {
+			unsub = &idle.Actions[k]
+		}
+	}
+	if unsub == nil || !unsub.Confirm || !unsub.Danger || unsub.URL != "" {
+		t.Fatalf("unsubscribe action %+v", unsub)
+	}
+	p, err := view.LibPreview(e.App, view.LibUnsub, []string{idle.Ref})
+	if err != nil || !p.Apply || !strings.Contains(strings.Join(p.Lines, "\n"), "would unsubscribe") {
+		t.Fatalf("preview %+v %v", p, err)
+	}
+	// no steam_api64.dll in the test game: out of reach
+	_, err = view.LibDo(e.App, view.LibUnsub, []string{idle.Ref})
+	var pages *view.OpenPages
+	if !errors.As(err, &pages) || len(pages.URLs) != 1 || !strings.HasSuffix(pages.URLs[0], "?id=5200") {
+		t.Fatalf("fallback %v", err)
+	}
+	e.WriteFile(filepath.Join(e.Game, "steam_api64.dll"), "fake")
+	var got []string
+	e.App.SteamWorker = func(_ string, args []string) (string, error) {
+		got = args
+		return "ITEM 5200 ok 0\nDONE unsubscribe 1\n", nil
+	}
+	msg, err := view.LibDo(e.App, view.LibUnsub, []string{idle.Ref})
+	if err != nil || !strings.Contains(msg, "Idle") || strings.Join(got, " ") != "unsubscribe 5200" {
+		t.Fatalf("unsubscribe %q %v %v", msg, err, got)
 	}
 }

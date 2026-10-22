@@ -58,7 +58,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     copy-local <ref>                          alias of pin
     import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)
-    note <ref> [<text>]                       attach a plain-text note to a mod (all its copies)
+    note <ref> [<text>]                       attach a plain-text note to a mod (all its copies), or with --copy to this copy only
     tag add|remove <ref> <tag…> | list        tags for filtering (list --filter tag:<tag>)
     rule add after|before|incompatible|attach <A> <B> | ignore <constraint>  add a user rule
     rule list                                 list user rules
@@ -95,6 +95,9 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     db vacuum                                 compact the database
     cache status                              the caches and their sizes
     cache clear <kind>                        empty one cache (previews, workshop, images, source, logs); rebuilt on demand
+    workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while enabled, in a plan, or the game runs)
+    workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
+    workshop state <ref…>                     ask Steam whether items are subscribed, installed, waiting for an update
   references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>
   global flags: --env <name> (use another environment for this command)
 

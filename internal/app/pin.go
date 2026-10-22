@@ -104,12 +104,19 @@ type PinResult struct {
 	Blocked string
 	// Moved: update only, the old copy was in Mods/ and moves to the lock library first.
 	Moved *MoveResult
+	// Reason: why the player (or an agent) made it, kept in the copy's note (06 §2.9).
+	Reason string
 }
 
 // Pin creates a locked version (04 §7.2): copy into the lock library with an origin
 // marker, rescan, and swap the copy in for the original in the current plan when the
 // original is enabled. The game sees the copy only through an _Archo_ link (08 §3).
 func (a *App) Pin(ref, name string, git, dryRun bool) (*PinResult, error) {
+	return a.PinFor(ref, name, git, dryRun, "")
+}
+
+// PinFor is Pin with the reason it is made for, kept in the copy's note.
+func (a *App) PinFor(ref, name string, git, dryRun bool, reason string) (*PinResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
@@ -118,7 +125,7 @@ func (a *App) Pin(ref, name string, git, dryRun bool) (*PinResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := &PinResult{From: m, DryRun: dryRun}
+	res := &PinResult{From: m, DryRun: dryRun, Reason: reason}
 	if st.List.Index(m.ID) >= 0 {
 		res.Replaced = m
 	}
@@ -130,6 +137,11 @@ func (a *App) Pin(ref, name string, git, dryRun bool) (*PinResult, error) {
 // current plan; the old copy stays in the library. An old copy still in Mods/ (made before
 // the library) is moved into the library first. ref may name the copy or the upstream.
 func (a *App) PinUpdate(ref, name string, git, dryRun bool) (*PinResult, error) {
+	return a.PinUpdateFor(ref, name, git, dryRun, "")
+}
+
+// PinUpdateFor is PinUpdate with the reason, kept in the new copy's note.
+func (a *App) PinUpdateFor(ref, name string, git, dryRun bool, reason string) (*PinResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
@@ -151,7 +163,7 @@ func (a *App) PinUpdate(ref, name string, git, dryRun bool) (*PinResult, error) 
 	if !l.Updated {
 		return nil, fmt.Errorf("%s has not changed since %s was copied from it; nothing to update", st.Ix.Ref(l.Upstream.ID), st.Ix.Ref(l.Copy.ID))
 	}
-	res := &PinResult{From: l.Upstream, Old: l.Copy, DryRun: dryRun}
+	res := &PinResult{From: l.Upstream, Old: l.Copy, DryRun: dryRun, Reason: reason}
 	if res.Diff, err = a.DiffInstances(l.Copy, l.Upstream); err != nil {
 		return nil, err
 	}
@@ -223,6 +235,19 @@ func (a *App) makeLock(st *LoadoutState, res *PinResult, name string, git bool) 
 		return err
 	}
 	res.CopyMod = ix.ModAt(res.Copy.Dir)
+	if res.CopyMod != nil {
+		// The copy's note starts from this (06 §2.9): made when, for which plan, why.
+		made := &store.Made{Kind: "pin", At: a.Now().UTC(), Reason: res.Reason}
+		if res.Old != nil {
+			made.Kind = "pin-update"
+		}
+		if res.Replaced != nil && st.Plan != nil {
+			made.Plans = []string{st.Plan.Name}
+		}
+		if err := a.Store.SetMade(res.CopyMod.ID, made); err != nil {
+			return err
+		}
+	}
 	if res.Replaced == nil || res.CopyMod == nil {
 		return nil
 	}

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -205,13 +206,19 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A copy of the player's own (in Mods/ or the lock library) may go; a Workshop or
+	// SteamCMD folder only when it is hidden or no longer subscribed: Steam would download a
+	// subscribed one again (06 §2.9, 01 §4).
+	own := m.Kind == source.Local || m.Kind == source.Extra && st.Ix.isLockSource(a, m.SourceID)
 	switch {
 	case m.Status != identity.Live:
 		return nil, fmt.Errorf("%s is no longer on disk", st.Ix.Ref(m.ID))
-	case m.Kind != source.Workshop && m.Kind != source.SteamCMD:
-		return nil, fmt.Errorf("%w: %s is in src:%s; RimArcho only moves hidden or unsubscribed workshop folders to the recycle bin", ErrNotTrashable, st.Ix.Ref(m.ID), m.SourceLabel)
-	case m.Unloadable != scan.UnloadableAboutDisabled && !m.Residue:
+	case !own && m.Kind != source.Workshop && m.Kind != source.SteamCMD:
+		return nil, fmt.Errorf("%w: %s is in src:%s; RimArcho only moves copies in Mods/ or the lock library, and hidden or unsubscribed workshop folders, to the recycle bin", ErrNotTrashable, st.Ix.Ref(m.ID), m.SourceLabel)
+	case !own && m.Unloadable != scan.UnloadableAboutDisabled && !m.Residue:
 		return nil, fmt.Errorf("%w: %s is a subscribed, loadable mod; unsubscribe it in Steam instead", ErrNotTrashable, st.Ix.Ref(m.ID))
+	case own && source.IsLink(st.Ix.ModDir(m)):
+		return nil, fmt.Errorf("%w: %s is a link, not a folder; RimArcho does not move it", ErrNotTrashable, st.Ix.ModDir(m))
 	case st.List.Index(m.ID) >= 0:
 		return nil, fmt.Errorf("%s is enabled; disable it first", st.Ix.Ref(m.ID))
 	}
@@ -250,6 +257,12 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	}
 	op.Scan, err = a.Scan(false)
 	return op, err
+}
+
+// isLockSource: the source is the environment's lock library (04 §7).
+func (ix *Index) isLockSource(a *App, id string) bool {
+	s := ix.Source(id)
+	return s != nil && s.Kind == source.Extra && env.PathKey(s.Root) == env.PathKey(a.lockRoot(ix.Env))
 }
 
 // env0 reports whether p is the source root itself (never trashed).

@@ -118,10 +118,10 @@ export function renderHeads() {
   }
 }
 
-// listActions: import / export sits in the enabled list's head; the plan's other actions
-// (sort, write to the game, launch) are in the top bar. main.js runs it by data-cmd.
+// listActions: sort sits in the enabled list's head, since it orders that list; import /
+// export and the plan's other actions are in the top bar. main.js runs it by data-cmd.
 function listActions() {
-  return `<span class="acts"><button class="btn small" data-cmd="exchange" title="i · e">${esc(T("import / export"))}</button></span>`;
+  return `<span class="acts"><button class="btn small" data-cmd="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
 }
 
 const pools = [new Map(), new Map(), new Map()];
@@ -163,9 +163,8 @@ export function renderRows(k) {
     d.draggable = !!it.id || k === 1;
     const st = S.board && S.board.status ? rowStatus(it) : 0;
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
-    const tags = it.tags && it.tags.length ? `<span class="g">${esc(it.tags.join(" · "))}</span>` : "";
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
-      `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>${tags}` +
+      `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>` +
       (it.unsaved ? `<span class="u" title="${esc(T("not written to the game yet"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
     d.title = it.name;
   }

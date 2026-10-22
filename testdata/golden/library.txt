@@ -14,6 +14,7 @@ library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
     version: 1.6 3, 1.4 1
     state: missing 1, residue 1, unsupported 1, unused 4
     used: none 5, plan:default 1
+    updated: week 2, month 4, half-year 4
 
 $ archo library --include state:unused --exclude source:workshop
 library: 0 of 5 mods match (state:unused, -source:workshop)
@@ -39,6 +40,7 @@ library: 1 of 5 mods match (tag:QoL)
     version: 1.6 1, 1.4 0
     state: missing 0, residue 0, unsupported 0, unused 1
     used: none 1, plan:default 0
+    updated: week 0, month 1, half-year 1
 
 $ archo library --sort size --include source:workshop
 library: 5 of 5 mods match (source:workshop)
@@ -54,10 +56,12 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     path: $ROOT/Steam/steamapps/workshop/content/294100/5100
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5100
     supports: 1.6
+    updated: 2026-09-21 14:13
     states: in no plan
   #iqmu local  549 B  (current plan)
     path: $ROOT/Steam/steamapps/common/RimWorld/Mods/Lockable Copy
     supports: 1.6
+    updated: 2026-10-01 10:00
     used in: plan:default
 next:
   archo library move-to-locked #iqmu --dry-run
@@ -69,7 +73,7 @@ ws:5300 Workshop item 5300  [1 copy, —]
     states: subscribed, not on disk
 
 $ archo library --include colour:red
-error: bad filter "colour:red": want key:value with key tag, source, version, state, used
+error: bad filter "colour:red": want key:value with key tag, source, version, state, used, updated
 [exit 1]
 
 $ archo library --include state:hidden
@@ -111,12 +115,52 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     path: $ROOT/Steam/steamapps/workshop/content/294100/5100
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5100
     supports: 1.6
+    updated: 2026-09-21 14:13
     states: in no plan
   #iqmu locked 2026-10-01 11:00  549 B  (current plan)
     path: $ROOT/LocalAppData/RimArcho/locked/main/Lockable Copy
     supports: 1.6
+    updated: 2026-10-01 10:00
+    note: (by RimArcho) moved into the lock library 2026-10-01 for plan:default, plan:other
     upstream: #6olp Lockable
     used in: plan:default, plan:other
+
+$ archo note #iqmu kept for the old save --copy
+copy note set for #iqmu Lockable
+  note: kept for the old save
+  copy: this instance only (src:locked Lockable Copy); the mod's note is archo note #iqmu
+
+$ archo library --lineage #iqmu
+L#l4xt Lockable  [2 copies, 1.1 KB]
+  #6olp workshop  549 B
+    path: $ROOT/Steam/steamapps/workshop/content/294100/5100
+    workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5100
+    supports: 1.6
+    updated: 2026-09-21 14:13
+    states: in no plan
+  #iqmu locked 2026-10-01 11:00  549 B  (current plan)
+    path: $ROOT/LocalAppData/RimArcho/locked/main/Lockable Copy
+    supports: 1.6
+    updated: 2026-10-01 10:00
+    note: kept for the old save
+    upstream: #6olp Lockable
+    used in: plan:default, plan:other
+
+$ archo note #iqmu --copy --clear
+copy note cleared for #iqmu Lockable
+
+$ archo library --sort -name
+library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
+  ws:5300  Workshop item 5300  [workshop, —, subscribed, not on disk]
+  L#mdx4   Oldie               [workshop, 536 B, does not support 1.6]
+  L#l4xt   Lockable            [2 copies, 1.1 KB, plan:default +1]
+  L#u2mx   Idle                [workshop, 533 B, in no plan]
+  L#a6o7   Gone                [workshop, 533 B, unsubscribed leftover]
+
+$ archo library --include updated:week --sort updated
+library: 2 of 5 mods match (updated:week)
+  L#a6o7  Gone      [workshop, 533 B, unsubscribed leftover]
+  L#l4xt  Lockable  [1 of 2 copies, 1.1 KB, plan:default +1]
 
 $ archo library --include source:locked
 library: 1 of 5 mods match (source:locked)

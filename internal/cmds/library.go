@@ -6,6 +6,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Mod 库存 (06 §2.9): every mod on this machine, one line per Lineage; --lineage shows each
@@ -13,9 +14,9 @@ import (
 func init() {
 	flags := []Flag{
 		{Name: "search", Value: "<words>", Help: "all words in a name, package id, author, alias, tag, note, Workshop ID or folder"},
-		{Name: "include", Value: "<key:value>", Multi: true, Help: "keep copies with this value; keys tag, source, version, state, used (one key's values: either; different keys: all)"},
+		{Name: "include", Value: "<key:value>", Multi: true, Help: "keep copies with this value; keys tag, source, version, state, used, updated (week, month, half-year, older); one key's values: either, different keys: all"},
 		{Name: "exclude", Value: "<key:value>", Multi: true, Help: "drop copies with this value"},
-		{Name: "sort", Value: "name|size|changed|played", Help: "default name"},
+		{Name: "sort", Value: "name|size|state|source|used|updated|version|author|tags|changed|played", Help: "default name; a leading - reverses"},
 		{Name: "lineage", Value: "<ref>", Help: "one mod: every copy with its path, states, plans and last launch"},
 		{Name: "facets", Help: "list each filter's values with how many mods they show"},
 		{Name: "all", Help: "do not truncate"},
@@ -25,7 +26,7 @@ func init() {
 	register(&Command{Name: "library remove-from-plans", Args: "<ref…>", Summary: "take mods out of every plan that has them (one undo step per plan)",
 		MinArgs: 1, MaxArgs: -1, Run: libraryRemoveCmd})
 	register(&Command{Name: "library move-to-locked", Args: "<ref>", Summary: "move a spare copy out of Mods/ into the lock library; plans keep using it",
-		MinArgs: 1, MaxArgs: 1, Flags: []Flag{{Name: "dry-run", Help: "show what would move"}}, Run: libraryMoveCmd})
+		MinArgs: 1, MaxArgs: 1, Flags: []Flag{{Name: "reason", Value: "<text>", Help: "why: kept in the copy's note"}, {Name: "dry-run", Help: "show what would move"}}, Run: libraryMoveCmd})
 }
 
 // libStateText is a state in the fixed English of the text output (05 §3).
@@ -220,6 +221,12 @@ func libraryLineageDoc(c *Ctx, lib *app.Library, l *app.LibLineage) *render.Doc 
 		if len(i.Versions) > 0 {
 			x.KV("supports", strings.Join(i.Versions, " "))
 		}
+		if !i.Updated.IsZero() {
+			x.KV("updated", c.App.FormatTime(i.Updated))
+		}
+		if n := copyNoteText(c, i); n != "" {
+			x.KV("note", n)
+		}
 		if i.Locked != nil {
 			x.KV("upstream", modLabel(lib.St.Ix, i.Locked.Upstream.ID))
 		}
@@ -247,6 +254,40 @@ func libraryLineageDoc(c *Ctx, lib *app.Library, l *app.LibLineage) *render.Doc 
 	return d
 }
 
+// copyNoteText is a copy's note: the player's words, else what RimArcho knows about how it
+// made the copy (the window shows the same in the interface language, view.CopyNote).
+func copyNoteText(c *Ctx, i *app.LibInstance) string {
+	if i.Note != nil && i.Note.Text != "" {
+		return i.Note.Text
+	}
+	var parts []string
+	var made *store.Made
+	if i.Note != nil {
+		made = i.Note.Made
+	}
+	switch {
+	case made != nil:
+		what := map[string]string{"pin": "locked version made", "pin-update": "new locked version made", "move": "moved into the lock library"}[made.Kind]
+		s := what + " " + c.App.FormatDate(made.At)
+		if len(made.Plans) > 0 {
+			s += " for plan:" + strings.Join(made.Plans, ", plan:")
+		}
+		parts = append(parts, s)
+	case i.Locked != nil && !i.Created.IsZero():
+		parts = append(parts, "locked version made "+c.App.FormatDate(i.Created))
+	}
+	if i.Locked != nil && i.UpstreamUpdates > 0 {
+		parts = append(parts, fmt.Sprintf("the upstream updated %s since", render.Plural(i.UpstreamUpdates, "time")))
+	}
+	if made != nil && made.Reason != "" {
+		parts = append(parts, "reason: "+made.Reason)
+	}
+	if len(parts) > 0 {
+		return "(by RimArcho) " + strings.Join(parts, "; ")
+	}
+	return ""
+}
+
 // libNext is what each state's action is as a command (06 §2.9's table).
 // inPlan: another copy is in the current plan already (enabling this one would clash).
 func libNext(i *app.LibInstance, inPlan bool) []string {
@@ -263,7 +304,7 @@ func libNext(i *app.LibInstance, inPlan bool) []string {
 		case app.LibHidden:
 			out = append(out, "archo unhide "+i.Ref+" --dry-run")
 		case app.LibResidue:
-			out = append(out, "archo trash "+i.Ref+" --dry-run")
+			out = append(out, "archo workshop subscribe "+i.Ref, "archo trash "+i.Ref+" --dry-run")
 		case app.LibUpdated:
 			out = append(out, "archo pin --update "+i.Ref+" --dry-run")
 		}
@@ -321,7 +362,7 @@ func libraryRemoveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func libraryMoveCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.MoveToLocked(a.Pos[0], a.Bool("dry-run"))
+	r, err := c.App.MoveToLockedFor(a.Pos[0], a.Bool("dry-run"), a.Str("reason"))
 	if err != nil {
 		return nil, err
 	}

@@ -76,6 +76,9 @@ type App struct {
 	GameProbe func(gameRoot string) *GameRun
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
+	// SteamWorker runs `archo steam-worker <args>` in the Steam runtime folder and returns
+	// its output; nil starts this executable (tests fake Steam with it, 06 §2.9).
+	SteamWorker func(dir string, args []string) (string, error)
 	// LockBase replaces %LOCALAPPDATA% when finding the default lock library and monitor
 	// folder (tests).
 	LockBase string

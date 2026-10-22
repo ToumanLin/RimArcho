@@ -132,68 +132,13 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		marked(statusIcon(s), T("needs attention · ! shows what"), sText)
 	}
 	add("")
-	// facts
 	var d *detailData
 	if m.dd != nil && m.dd.ID == it.id {
 		d = m.dd
 	}
-	type kv struct{ k, v string }
-	var kvs []kv
-	for _, f := range view.Facts(mod, d) {
-		v := f.Value
-		switch f.Kind {
-		case view.FactWorkshop:
-			v += sDimS.Render(" " + markDot + " o " + T("opens the page"))
-		case view.FactTags:
-			if len(f.List) == 0 {
-				v = sDimS.Render(T("none · # adds"))
-			} else {
-				v = strings.Join(f.List, " "+markDot+" ")
-			}
-		case view.FactAlias:
-			v += sDimS.Render("  (" + f.Extra + ")")
-		}
-		kvs = append(kvs, kv{f.Label, v})
-	}
-	lw := 0
-	for _, x := range kvs {
-		lw = max(lw, width.StringWidth(x.k))
-	}
-	deps := m.depLines(d)
-	if len(deps) > 0 {
-		lw = max(lw, width.StringWidth(T("requires")))
-	}
-	lw += 2
-	for _, x := range kvs {
-		label := sDimS.Render(fit(x.k, lw))
-		lines := wrap(stripANSIWidth(x.v), w-lw)
-		if len(lines) <= 1 {
-			add(label + clip(x.v, w-lw))
-			continue
-		}
-		for i, l := range lines {
-			if i == 0 {
-				add(label + sText.Render(fit(l, w-lw)))
-			} else {
-				add(strings.Repeat(" ", lw) + sText.Render(fit(l, w-lw)))
-			}
-		}
-	}
-	for i, l := range deps {
-		label := strings.Repeat(" ", lw)
-		if i == 0 {
-			label = sDimS.Render(fit(T("requires"), lw))
-		}
-		if lipgloss.Width(l) <= w-lw {
-			add(label + clip(l, w-lw))
-			continue
-		}
-		for j, x := range wrap(stripANSIWidth(l), w-lw) {
-			if j > 0 {
-				label = strings.Repeat(" ", lw)
-			}
-			add(label + sText.Render(fit(x, w-lw)))
-		}
+	// the field list (06 §4.1), the GUI's one
+	for _, l := range fieldLines(view.ModFields(m.app, m.st, mod, d), w) {
+		add(l)
 	}
 	add("")
 	// description
@@ -305,24 +250,6 @@ func clip(s string, w int) string {
 }
 
 // depLines: the declared dependencies with their state (06 §4.1).
-func (m *model) depLines(d *detailData) []string {
-	if d == nil {
-		return nil
-	}
-	var out []string
-	for _, x := range view.Deps(m.st, d) {
-		switch x.State {
-		case view.DepEnabled:
-			out = append(out, sOK.Render(markOK)+" "+sText.Render(x.Name))
-		case view.DepDisabled:
-			out = append(out, sWarnS.Render(ic.warn)+" "+sText.Render(x.Name)+sDimS.Render(T(" (not enabled)")))
-		default:
-			out = append(out, sErrS.Render(ic.err)+" "+sText.Render(x.Name)+sDimS.Render(T(" (not installed)")))
-		}
-	}
-	return out
-}
-
 // descLines: the description heading and text (06 §4.3 item 2).
 func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	var out []dline

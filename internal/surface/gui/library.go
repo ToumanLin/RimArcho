@@ -50,7 +50,18 @@ func (s *API) LibraryDo(kind string, refs []string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.board, s.needs, s.lib = nil, nil, nil
-	return s.text(view.LibDo(s.a, kind, refs))
+	t, err := view.LibDo(s.a, kind, refs)
+	// Steam out of reach (not running, no DLL): the Workshop pages instead, said so (06 §2.9)
+	var pages *view.OpenPages
+	if errors.As(err, &pages) {
+		for _, u := range pages.URLs {
+			if err := s.open(u); err != nil {
+				return "", err
+			}
+		}
+		return pages.Msg, nil
+	}
+	return s.text(t, err)
 }
 
 // OpenFolder shows an instance's folder in the file manager. Only folders of known
@@ -84,4 +95,35 @@ func openDir(dir string) error {
 		return exec.Command("open", dir).Start()
 	}
 	return exec.Command("xdg-open", dir).Start()
+}
+
+// LibraryFields is a copy's field list (06 §2.9): one list, the editor's fields with the
+// library's (state, used in, size, versions, update date, last played) among them.
+func (s *API) LibraryFields(ref string) ([]view.Field, error) {
+	s.mu.Lock()
+	lib, err := s.library()
+	if err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
+	i := lib.Instance(ref)
+	s.mu.Unlock()
+	if i == nil {
+		return nil, fmt.Errorf("no copy %s", ref)
+	}
+	var data *view.DetailData
+	if i.Mod != nil {
+		data = view.LoadDetail(s.a, lib.St.Ix, i.Mod, false, false) // the cache only: no network here
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.LibFields(s.a, lib, i, data), nil
+}
+
+// LibrarySetNote sets a copy's own note ("" clears it).
+func (s *API) LibrarySetNote(ref, text string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lib = nil
+	return s.text(view.LibSetNote(s.a, ref, text))
 }

@@ -12,6 +12,7 @@ import (
 func init() {
 	flags := []Flag{{Name: "name", Value: "<folder>", Help: "default <folder>_local"}, {Name: "git", Help: "make the copy a git repository with a baseline commit"},
 		{Name: "update", Help: "remake the locked version from the upstream's current content, in a new folder"}, {Name: "move-to-library", Help: "move a locked copy made in Mods/ before the lock library existed into the library"},
+		{Name: "reason", Value: "<text>", Help: "why it is locked: kept in the copy's note"},
 		{Name: "dry-run", Help: "show what would be copied"}}
 	register(&Command{Name: "pin", Args: "<ref>", Summary: "lock a mod: copy it into the lock library (origin marker) and use the copy in the current plan", MinArgs: 1, MaxArgs: 1, Run: pinCmd, Flags: flags})
 	register(&Command{Name: "copy-local", Args: "<ref>", Summary: "alias of pin", MinArgs: 1, MaxArgs: 1, Run: pinCmd, Flags: flags})
@@ -38,11 +39,11 @@ func pinCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		return d, nil
 	}
-	f := c.App.Pin
+	f := c.App.PinFor
 	if a.Bool("update") {
-		f = c.App.PinUpdate
+		f = c.App.PinUpdateFor
 	}
-	res, err := f(a.Pos[0], a.Str("name"), a.Bool("git"), a.Bool("dry-run"))
+	res, err := f(a.Pos[0], a.Str("name"), a.Bool("git"), a.Bool("dry-run"), a.Str("reason"))
 	if err != nil {
 		return nil, err
 	}

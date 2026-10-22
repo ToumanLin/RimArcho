@@ -4,12 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/steamworks"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Mod 库存 › 全部 (06 §2.9) for both interfaces: the filter groups, one row per Lineage with
@@ -27,7 +31,10 @@ type LibPage struct {
 	Conds  []LibCond   `json:"conds"` // what is in force, in the order given
 	Sort   string      `json:"sort"`
 	Sorts  []LibChoice `json:"sorts"`
-	Search string      `json:"search"`
+	// Columns are the table's columns in their default order (06 §2.9); the window keeps
+	// the player's order, widths and hidden ones (ui.gui.library.columns).
+	Columns []LibColumn `json:"columns"`
+	Search  string      `json:"search"`
 	// Complete is the grey text after the search box's last word that tab (or →) takes
 	// (06 §3.7): a key ("so" → "urce:") or a value ("state:un" → "used").
 	Complete string `json:"complete,omitempty"`
@@ -46,6 +53,7 @@ type LibChoice struct {
 	Label  string `json:"label"`
 	Count  int    `json:"count"`
 	On     int    `json:"on,omitempty"`
+	Cur    bool   `json:"cur,omitempty"` // the environment's game version (listed first, marked)
 }
 
 // LibCond is a filter in force.
@@ -55,17 +63,44 @@ type LibCond struct {
 	Exclude bool   `json:"exclude,omitempty"`
 }
 
+// LibCells are a row's table cells (06 §2.9): 名称 大小 状态 来源 用在, and from the
+// header's menu 更新日期 版本 作者 标签 上次游玩. State is only one worth acting on.
+type LibCells struct {
+	Name    string `json:"name"`
+	Size    string `json:"size"`
+	State   string `json:"state,omitempty"`
+	Code    string `json:"code,omitempty"` // the state (app.LibStates), for its colour
+	Source  string `json:"source"`
+	Used    string `json:"used,omitempty"`
+	UsedAt  string `json:"usedTitle,omitempty"` // every plan and pack, for the tooltip
+	Updated string `json:"updated,omitempty"`
+	Version string `json:"version,omitempty"`
+	Author  string `json:"author,omitempty"`
+	Tags    string `json:"tags,omitempty"`
+	Played  string `json:"played,omitempty"`
+}
+
+// LibColumns are the table's columns: key (= the sort), shown by default.
+var LibColumns = []struct {
+	Key   string
+	Shown bool
+}{{"name", true}, {"size", true}, {"state", true}, {"source", true}, {"used", true},
+	{"updated", false}, {"version", false}, {"author", false}, {"tags", false}, {"played", false}}
+
+// LibColumn is a table column: its key (= its sort), header, shown by default.
+type LibColumn struct {
+	Key   string `json:"key"`
+	Title string `json:"title"`
+	Shown bool   `json:"shown"`
+}
+
 // LibRow is a Lineage. A Lineage with one copy is that copy's row (Single, Insts[0]).
 type LibRow struct {
-	ID     string       `json:"id"`
-	Ref    string       `json:"ref"`
-	Name   string       `json:"name"`
-	Tags   []string     `json:"tags,omitempty"`
-	Size   string       `json:"size"`
-	State  string       `json:"state,omitempty"`
-	Code   string       `json:"code,omitempty"` // the state (app.LibStates), for its colour
-	Used   string       `json:"used,omitempty"`
-	UsedAt string       `json:"usedTitle,omitempty"` // every plan and pack, for the tooltip
+	ID   string   `json:"id"`
+	Ref  string   `json:"ref"`
+	Name string   `json:"name"`
+	Tags []string `json:"tags,omitempty"`
+	LibCells
 	Single bool         `json:"single,omitempty"`
 	Insts  []LibInstRow `json:"insts"`
 	Copies int          `json:"copies"` // all copies (Insts are the matching ones)
@@ -73,15 +108,15 @@ type LibRow struct {
 
 // LibInstRow is one copy.
 type LibInstRow struct {
-	ID       string      `json:"id"` // the instance ("" for a subscribed item RimArcho never saw)
-	Ref      string      `json:"ref"`
-	Label    string      `json:"label"`          // 工坊 · 本地 · 锁定版本 · 26/10/21 14:27 …
-	Note     string      `json:"note,omitempty"` // its abnormal state, the row's second part
-	Size     string      `json:"size"`
-	State    string      `json:"state,omitempty"`
-	Code     string      `json:"code,omitempty"`
-	Used     string      `json:"used,omitempty"`
-	UsedAt   string      `json:"usedTitle,omitempty"`
+	ID    string `json:"id"` // the instance ("" for a subscribed item RimArcho never saw)
+	Ref   string `json:"ref"`
+	Label string `json:"label"` // 工坊 · 本地 · 锁定版本 · 26/10/21 14:27 …
+	// Cells: Name is the copy's folder; Source its Label.
+	LibCells
+	// Note is the copy's own note (the player's or an agent's); Auto what RimArcho knows
+	// about how it made the copy, shown (and offered as a first version) while there is none.
+	Note     string      `json:"note,omitempty"`
+	Auto     string      `json:"auto,omitempty"`
 	InPlan   bool        `json:"inPlan,omitempty"`
 	Path     string      `json:"path,omitempty"`
 	URL      string      `json:"url,omitempty"`
@@ -99,30 +134,65 @@ type LibAction struct {
 	Label   string `json:"label"`
 	Confirm bool   `json:"confirm,omitempty"`
 	Danger  bool   `json:"danger,omitempty"`
+	// Detail: one of the six in a copy's detail (恢复 退订/删除 重新订阅 备份锁定版本 打开文件夹
+	// 打开网页); the others are in the right-click menu and the selection bar.
+	Detail bool `json:"detail,omitempty"`
+	// URL: the Workshop page (打开网页).
+	URL string `json:"url,omitempty"`
 }
+
+// OpenPages is LibDo's answer when Steam is out of reach (not running, the DLL would not
+// load): the interface opens the Workshop pages and says Msg, so the player can do it there.
+type OpenPages struct {
+	Msg  string
+	URLs []string
+}
+
+func (e *OpenPages) Error() string { return e.Msg }
 
 // Library action kinds.
 const (
-	LibEnable    = "enable"     // 加入当前方案
-	LibRemove    = "remove"     // 从所有方案里拿掉
-	LibPin       = "pin"        // 锁定版本
-	LibPinUpdate = "pin-update" // 更新锁定版本
-	LibUnpin     = "unpin"      // 解除锁定
-	LibUnhide    = "unhide"     // 恢复给游戏
-	LibMove      = "move"       // 收进锁定库
-	LibTrash     = "trash"      // 移到回收站
-	LibFolder    = "folder"     // 打开文件夹
-	LibWorkshop  = "workshop"   // 打开工坊页面
+	LibEnable    = "enable"      // 加入当前方案
+	LibRemove    = "remove"      // 从所有方案里拿掉
+	LibPin       = "pin"         // 锁定版本
+	LibPinUpdate = "pin-update"  // 更新锁定版本
+	LibUnpin     = "unpin"       // 解除锁定
+	LibUnhide    = "unhide"      // 恢复
+	LibUnsub     = "unsubscribe" // 退订, through the Steam client
+	LibDelete    = "delete"      // 删除 (to the recycle bin)
+	LibResub     = "resubscribe" // 重新订阅, through the Steam client
+	LibMove      = "move"        // 备份锁定版本 (收进锁定库)
+	LibFolder    = "folder"      // 打开文件夹
+	LibWorkshop  = "workshop"    // 打开网页
+	// LibTrash is the old name of LibDelete.
+	LibTrash = LibDelete
 )
 
-var libActionOrder = []string{LibEnable, LibRemove, LibUnhide, LibMove, LibPin, LibPinUpdate, LibUnpin, LibTrash, LibFolder, LibWorkshop}
+// The detail's six, in order (06 §2.9), then the others.
+var libActionOrder = []string{LibUnhide, LibUnsub, LibDelete, LibResub, LibMove, LibFolder, LibWorkshop, LibEnable, LibRemove, LibPin, LibPinUpdate, LibUnpin}
+
+var libDetail = map[string]bool{LibUnhide: true, LibUnsub: true, LibDelete: true, LibResub: true, LibMove: true, LibFolder: true, LibWorkshop: true}
 
 func libActionLabel(k string) string {
 	return map[string]string{
 		LibEnable: T("add to the current plan"), LibRemove: T("take out of every plan"), LibPin: T("lock this version"),
-		LibPinUpdate: T("update the locked version"), LibUnpin: T("unlock"), LibUnhide: T("give it back to the game"),
-		LibMove: T("move into the lock library"), LibTrash: T("move to the recycle bin"), LibFolder: T("open the folder"), LibWorkshop: T("open the Workshop page"),
+		LibPinUpdate: T("update the locked version"), LibUnpin: T("unlock"), LibUnhide: T("restore"),
+		LibUnsub: T("unsubscribe"), LibDelete: T("delete"), LibResub: T("subscribe again"),
+		LibMove: T("back up as a locked version"), LibFolder: T("open the folder"), LibWorkshop: T("open the web page"),
 	}[k]
+}
+
+// libRowStates are the states worth a look in a row (06 §2.9); the others ("不支持 1.7",
+// "不在任何方案里") stay in the filters and the detail.
+var libRowStates = map[string]bool{app.LibUnloadable: true, app.LibMissing: true, app.LibIgnored: true, app.LibResidue: true, app.LibHidden: true, app.LibUpdated: true}
+
+func rowState(states []string) string {
+	for _, s := range states {
+		if libRowStates[s] {
+			return s
+		}
+	}
+	return ""
 }
 
 // LibStateText is a state as the page says it.
@@ -168,7 +238,7 @@ func LibSourceText(s string) string {
 }
 
 func libKeyTitle(k string) string {
-	return map[string]string{"tag": T("tags"), "source": T("library source"), "version": T("supported versions"), "state": T("state"), "used": T("used in")}[k]
+	return map[string]string{"tag": T("tags"), "source": T("library source"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
 }
 
 func libUseText(v string) string {
@@ -191,8 +261,28 @@ func libValueText(key, v, mm string) string {
 		return LibStateText(v, mm)
 	case "used":
 		return libUseText(v)
+	case "updated":
+		return map[string]string{"week": T("within a week"), "month": T("within a month"), "half-year": T("within half a year"), "older": T("earlier")}[v]
 	}
 	return v
+}
+
+// LibSetNote sets a copy's own note from the page (06 §2.9); "" clears it.
+func LibSetNote(a *app.App, ref, text string) (string, error) {
+	m, err := a.SetCopyNote(ref, text)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(text) == "" {
+		return Tf("cleared the note of %s", m.DisplayName()), nil
+	}
+	return Tf("saved the note of %s", m.DisplayName()), nil
+}
+
+// LibColumnTitle is a table column's header.
+func LibColumnTitle(k string) string {
+	return map[string]string{"name": T("name"), "size": T("size"), "state": T("state"), "source": T("library source"), "used": T("used in"),
+		"updated": T("update date"), "version": T("supported versions"), "author": T("author"), "tags": T("tags"), "played": T("last played")}[k]
 }
 
 // libStamp is a locked copy's time: 26/10/21 14:27 (06 §2.9).
@@ -326,21 +416,46 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 		if m.Instances[0].Mod == nil {
 			r.Name = Tf("Workshop item %s", m.Instances[0].WorkshopID)
 		}
+		r.LibCells.Name = r.Name
 		n, ok := m.Bytes()
 		r.Size = libSize(n, ok)
-		if s := m.State(); s != "" {
-			r.State, r.Code = LibStateText(s, lib.GameMM), s
-		}
 		us := m.UsedIn()
 		r.Used, r.UsedAt = libUsed(us)
 		if len(us) > 1 {
 			r.Used = Tf("in %d plans", len(us))
 		}
+		var srcs []string
+		best := len(app.LibStates)
+		var updated, played time.Time
+		for _, i := range m.Instances {
+			if l := LibSourceText(i.Source); !slices.Contains(srcs, l) {
+				srcs = append(srcs, l)
+			}
+			if s := rowState(i.States); s != "" {
+				best = min(best, slices.Index(app.LibStates, s))
+			}
+			if i.Updated.After(updated) {
+				updated = i.Updated
+			}
+			if i.Played.After(played) {
+				played = i.Played
+			}
+		}
+		r.Source = strings.Join(srcs, " · ")
+		if best < len(app.LibStates) {
+			r.Code = app.LibStates[best]
+			r.State = LibStateText(r.Code, lib.GameMM)
+		}
+		r.Updated, r.Played = libDate(updated), libDate(played)
+		r.Version, r.Author, r.LibCells.Tags = lineageVersion(m.LibLineage), lineageAuthor(m.LibLineage), strings.Join(m.Tags, " · ")
 		for _, i := range m.Shown {
 			if i.Sized {
 				bytes += i.Bytes
 			}
 			r.Insts = append(r.Insts, libInst(lib, m.LibLineage, i))
+		}
+		if r.Single {
+			r.Source = r.Insts[0].Label
 		}
 		p.Rows = append(p.Rows, r)
 	}
@@ -349,7 +464,14 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 	for _, f := range res.Facets {
 		g := LibGroup{Key: f.Key, Title: libKeyTitle(f.Key)}
 		for _, v := range f.Values {
-			g.Values = append(g.Values, LibChoice{Filter: f.Key + ":" + v.Value, Label: libValueText(f.Key, v.Value, lib.GameMM), Count: v.Count, On: v.On})
+			c := LibChoice{Filter: f.Key + ":" + v.Value, Label: libValueText(f.Key, v.Value, lib.GameMM), Count: v.Count, On: v.On}
+			if f.Key == "version" && v.Value == lib.GameMM {
+				// the game's own version first, marked (06 §2.9)
+				c.Cur = true
+				g.Values = append([]LibChoice{c}, g.Values...)
+				continue
+			}
+			g.Values = append(g.Values, c)
 		}
 		p.Groups = append(p.Groups, g)
 	}
@@ -361,6 +483,9 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 		}
 		p.Conds = append(p.Conds, LibCond{Filter: f, Label: libKeyTitle(k) + " " + libValueText(k, v, lib.GameMM), Exclude: ex})
 	}
+	for _, c := range LibColumns {
+		p.Columns = append(p.Columns, LibColumn{Key: c.Key, Title: LibColumnTitle(c.Key), Shown: c.Shown})
+	}
 	for _, s := range app.LibSorts {
 		p.Sorts = append(p.Sorts, LibChoice{Filter: s, Label: map[string]string{"name": T("name"), "size": T("size"), "changed": T("last changed"), "played": T("last played")}[s]})
 	}
@@ -368,16 +493,21 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 }
 
 func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow {
-	r := LibInstRow{Ref: i.Ref, Label: libLabel(i), Size: libSize(i.Bytes, i.Sized), InPlan: i.InPlan, Path: i.Path}
+	r := LibInstRow{Ref: i.Ref, Label: libLabel(i), InPlan: i.InPlan, Path: i.Path}
+	r.Size, r.Source = libSize(i.Bytes, i.Sized), r.Label
 	if i.Mod != nil {
 		r.ID = i.Mod.ID
+		r.LibCells.Name = i.Mod.Rel // the copy's folder: the Lineage row has the name
 	}
-	if s := i.State(); s != "" {
+	if s := rowState(i.States); s != "" {
 		r.State, r.Code = LibStateText(s, lib.GameMM), s
-		if s != app.LibUnused {
-			r.Note = r.State
-		}
 	}
+	r.Updated, r.Version, r.Author = libDate(i.Updated), newest(i.Versions), i.Authors
+	r.LibCells.Tags = strings.Join(l.Tags, " · ")
+	if i.Note != nil {
+		r.Note = i.Note.Text
+	}
+	r.Auto = CopyNoteAuto(i)
 	for _, s := range i.States {
 		r.States = append(r.States, LibStateText(s, lib.GameMM))
 	}
@@ -386,9 +516,7 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 		r.UsedIn = append(r.UsedIn, libUseText(u.Value()))
 	}
 	r.Versions = strings.Join(i.Versions, " ")
-	if !i.Played.IsZero() {
-		r.Played = ShortDate(i.Played)
-	}
+	r.Played = libDate(i.Played)
 	if IsNumber(i.WorkshopID) {
 		r.URL = WorkshopURL(i.WorkshopID)
 	}
@@ -396,39 +524,139 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 	return r
 }
 
-// libActions is what can be done with a copy now (06 §2.9's table).
+// libDate is a table date: 26/10/21 (as the locked version's stamp), "" when unknown.
+func libDate(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Local().Format("06/01/02")
+}
+
+func newest(vs []string) string {
+	best := ""
+	for _, v := range vs {
+		if best == "" || versionNewer(v, best) {
+			best = v
+		}
+	}
+	return best
+}
+
+// versionNewer: "1.10" is newer than "1.9".
+func versionNewer(a, b string) bool {
+	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(pa) && i < len(pb); i++ {
+		x, e1 := strconv.Atoi(pa[i])
+		y, e2 := strconv.Atoi(pb[i])
+		if e1 == nil && e2 == nil && x != y {
+			return x > y
+		}
+		if (e1 != nil || e2 != nil) && pa[i] != pb[i] {
+			return pa[i] > pb[i]
+		}
+	}
+	return len(pa) > len(pb)
+}
+
+func lineageVersion(l *app.LibLineage) string {
+	var all []string
+	for _, i := range l.Instances {
+		all = append(all, i.Versions...)
+	}
+	return newest(all)
+}
+
+func lineageAuthor(l *app.LibLineage) string {
+	for _, i := range l.Instances {
+		if i.Authors != "" {
+			return i.Authors
+		}
+	}
+	return ""
+}
+
+// CopyNoteAuto is RimArcho's first version of a copy's note (06 §2.9): "锁定版本创建于 10 月
+// 21 日，为方案「测试」创建；之后上游有 2 次更新；原因：…" ("" when it knows nothing). The
+// player's note replaces it; editing starts from it.
+func CopyNoteAuto(i *app.LibInstance) string {
+	var parts []string
+	var made *store.Made
+	if i.Note != nil {
+		made = i.Note.Made
+	}
+	plans := func() string {
+		if made == nil || len(made.Plans) == 0 {
+			return ""
+		}
+		q := make([]string, len(made.Plans))
+		for j, p := range made.Plans {
+			q[j] = Tf("“%s”", p)
+		}
+		return Tf(", for plan %s", strings.Join(q, T(", ")))
+	}
+	switch {
+	case made != nil && made.Kind == "move":
+		parts = append(parts, Tf("moved into the lock library on %s", ShortDate(made.At))+plans())
+	case made != nil && made.Kind == "pin-update":
+		parts = append(parts, Tf("new locked version made on %s", ShortDate(made.At))+plans())
+	case made != nil:
+		parts = append(parts, Tf("locked version made on %s", ShortDate(made.At))+plans())
+	case i.Locked != nil && !i.Created.IsZero():
+		parts = append(parts, Tf("locked version made on %s", ShortDate(i.Created)))
+	}
+	if i.Locked != nil && i.UpstreamUpdates > 0 {
+		parts = append(parts, Tf("the upstream has updated %d times since", i.UpstreamUpdates))
+	}
+	if made != nil && made.Reason != "" {
+		parts = append(parts, Tf("reason: %s", made.Reason))
+	}
+	return strings.Join(parts, T("; "))
+}
+
+// libActions is what can be done with a copy now (06 §2.9). The six of the detail come
+// first: 恢复, 退订 (Workshop) or 删除 (a copy of the player's own, an unsubscribed leftover),
+// 重新订阅 (a leftover), 备份锁定版本 (a spare copy in Mods/), 打开文件夹, 打开网页.
 func libActions(lib *app.Library, l *app.LibLineage, i *app.LibInstance) []LibAction {
-	has := func(s string) bool {
-		for _, x := range i.States {
-			if x == s {
-				return true
-			}
-		}
-		return false
-	}
-	plans := false
-	for _, u := range i.UsedIn {
-		if u.Kind == "plan" {
-			plans = true
-		}
-	}
+	has := func(s string) bool { return slices.Contains(i.States, s) }
+	plans := slices.ContainsFunc(i.UsedIn, func(u app.LibUse) bool { return u.Kind == "plan" })
 	m := i.Mod
 	live := m != nil && !i.Missing()
+	workshop := i.Source == app.LibWorkshop || i.Source == app.LibSteamCMD
+	own := i.Source == app.LibLocal || i.Source == app.LibLocked
 	loadable := live && !has(app.LibUnloadable) && !has(app.LibHidden) && !has(app.LibResidue)
+	url := ""
+	if IsNumber(i.WorkshopID) {
+		url = WorkshopURL(i.WorkshopID)
+	}
 	var ks []string
-	if loadable && !l.InPlan() && !has(app.LibIgnored) {
-		ks = append(ks, LibEnable)
-	}
-	if plans && i.Ref != "" && m != nil {
-		ks = append(ks, LibRemove)
-	}
 	if live && has(app.LibHidden) {
 		ks = append(ks, LibUnhide)
+	}
+	if live && i.Source == app.LibWorkshop && !has(app.LibResidue) && url != "" {
+		ks = append(ks, LibUnsub)
+	}
+	if live && !plans && (own || workshop && has(app.LibResidue)) && !source.IsLink(i.Path) {
+		ks = append(ks, LibDelete)
+	}
+	if live && has(app.LibResidue) && url != "" {
+		ks = append(ks, LibResub)
 	}
 	if live && i.Spare && i.Source == app.LibLocal {
 		ks = append(ks, LibMove)
 	}
-	if loadable && (i.Source == app.LibWorkshop || i.Source == app.LibSteamCMD) {
+	if live && i.Path != "" {
+		ks = append(ks, LibFolder)
+	}
+	if url != "" {
+		ks = append(ks, LibWorkshop)
+	}
+	if loadable && !l.InPlan() && !has(app.LibIgnored) {
+		ks = append(ks, LibEnable)
+	}
+	if plans && m != nil {
+		ks = append(ks, LibRemove)
+	}
+	if loadable && workshop {
 		ks = append(ks, LibPin)
 	}
 	if i.Locked != nil && i.Locked.Updated {
@@ -437,28 +665,23 @@ func libActions(lib *app.Library, l *app.LibLineage, i *app.LibInstance) []LibAc
 	if i.Locked != nil {
 		ks = append(ks, LibUnpin)
 	}
-	if live && (i.Source == app.LibWorkshop || i.Source == app.LibSteamCMD) && (has(app.LibHidden) || has(app.LibResidue)) && !plans {
-		ks = append(ks, LibTrash)
-	}
-	if live && i.Path != "" {
-		ks = append(ks, LibFolder)
-	}
-	if IsNumber(i.WorkshopID) {
-		ks = append(ks, LibWorkshop)
-	}
 	var out []LibAction
 	for _, k := range libActionOrder {
-		for _, x := range ks {
-			if x == k {
-				out = append(out, LibAction{Kind: k, Label: libActionLabel(k), Confirm: libConfirm[k], Danger: k == LibTrash})
-			}
+		if !slices.Contains(ks, k) {
+			continue
 		}
+		a := LibAction{Kind: k, Label: libActionLabel(k), Confirm: libConfirm[k], Danger: k == LibDelete || k == LibUnsub, Detail: libDetail[k]}
+		switch k {
+		case LibWorkshop:
+			a.URL = url
+		}
+		out = append(out, a)
 	}
 	return out
 }
 
 // libConfirm: the actions that change files (a dry run first); the plan edits are undone with u.
-var libConfirm = map[string]bool{LibPin: true, LibPinUpdate: true, LibUnpin: true, LibUnhide: true, LibMove: true, LibTrash: true}
+var libConfirm = map[string]bool{LibPin: true, LibPinUpdate: true, LibUnpin: true, LibUnhide: true, LibMove: true, LibDelete: true, LibUnsub: true}
 
 // libArgv is an action's archo command (its dry run with --dry-run).
 func libArgv(kind string, refs []string) []string {
@@ -475,6 +698,8 @@ func libArgv(kind string, refs []string) []string {
 		return []string{"library", "move-to-locked", refs[0]}
 	case LibTrash:
 		return []string{"trash", refs[0]}
+	case LibUnsub:
+		return []string{"workshop", "unsubscribe", refs[0]}
 	}
 	return nil
 }
@@ -496,7 +721,13 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			if strings.HasPrefix(l, "next:") {
 				break
 			}
-			p.Lines = append(p.Lines, Humanize(st, l))
+			l = Humanize(st, l)
+			// "#ref Name" became "Name Name"
+			if m, err := st.Ix.ResolveOne(ref); err == nil {
+				n := m.DisplayName()
+				l = strings.ReplaceAll(l, n+" "+n, n)
+			}
+			p.Lines = append(p.Lines, l)
 		}
 		if code != 0 {
 			p.Apply = false
@@ -516,6 +747,8 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 	}
 	what := Named(st, idsOfRefs(st, refs))
 	switch kind {
+	case LibUnsub, LibResub:
+		return libSteam(a, kind, refs, what)
 	case LibEnable:
 		if _, err := a.Enable(refs, app.Placement{}); err != nil {
 			return "", err
@@ -560,6 +793,30 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 		done++
 	}
 	return Tf("%s: %s", libActionLabel(kind), what), nil
+}
+
+// libSteam unsubscribes or subscribes again through the Steam client (06 §2.9); when Steam
+// is out of reach the answer is OpenPages.
+func libSteam(a *app.App, kind string, refs []string, what string) (string, error) {
+	action := steamworks.Unsubscribe
+	if kind == LibResub {
+		action = steamworks.Subscribe
+	}
+	_, err := a.Workshop(action, refs, false)
+	var u *app.SteamUnavailable
+	switch {
+	case errors.As(err, &u):
+		msg := Tf("Steam could not be reached (%s): the Workshop page is open, unsubscribe there", u.Why)
+		if kind == LibResub {
+			msg = Tf("Steam could not be reached (%s): the Workshop page is open, subscribe there", u.Why)
+		}
+		return "", &OpenPages{Msg: msg, URLs: u.URLs}
+	case err != nil:
+		return "", err
+	case kind == LibResub:
+		return Tf("subscribed to %s again · Steam downloads it", what), nil
+	}
+	return Tf("unsubscribed from %s · Steam deletes the folder", what), nil
 }
 
 func idsOfRefs(st *app.LoadoutState, refs []string) []string {

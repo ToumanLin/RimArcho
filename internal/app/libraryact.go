@@ -113,6 +113,11 @@ func (a *App) editOther(p *store.Plan, op string, f func(loadout.List) (loadout.
 // history), so every plan keeps it; the game gets it through an _Archo_ link on the next
 // save or launch. .rimarcho/origin.json is written only when it has none.
 func (a *App) MoveToLocked(ref string, dryRun bool) (*MoveResult, error) {
+	return a.MoveToLockedFor(ref, dryRun, "")
+}
+
+// MoveToLockedFor is MoveToLocked with the reason, kept in the copy's note (06 §2.9).
+func (a *App) MoveToLockedFor(ref string, dryRun bool, reason string) (*MoveResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
@@ -136,7 +141,37 @@ func (a *App) MoveToLocked(ref string, dryRun bool) (*MoveResult, error) {
 	if !other && m.Origin == "" {
 		return nil, fmt.Errorf("%s is the only copy of its mod; RimArcho moves only spare copies out of Mods/", st.Ix.Ref(m.ID))
 	}
-	return a.moveToLibrary(st, m, dryRun)
+	r, err := a.moveToLibrary(st, m, dryRun)
+	if err != nil || dryRun {
+		return r, err
+	}
+	// The copy's note starts from this, unless RimArcho recorded how it made it before.
+	notes, err := a.Store.CopyNotes(st.Ix.Env.ID)
+	if err != nil {
+		return r, err
+	}
+	if n := notes[m.ID]; n == nil || n.Made == nil {
+		var plans []string
+		for _, p := range r.Plans {
+			plans = append(plans, strings.TrimPrefix(p, "plan:"))
+		}
+		err = a.Store.SetMade(m.ID, &store.Made{Kind: "move", At: a.Now().UTC(), Plans: plans, Reason: reason})
+	}
+	return r, err
+}
+
+// SetCopyNote sets one copy's own note (06 §2.9); "" clears it. The lineage's note (note,
+// has:note) is about the mod and all its copies; this one is about this copy only.
+func (a *App) SetCopyNote(ref, text string) (*store.Mod, error) {
+	ix, err := a.Index()
+	if err != nil {
+		return nil, err
+	}
+	m, err := ix.ResolveOne(ref)
+	if err != nil {
+		return nil, err
+	}
+	return m, a.Store.SetCopyNote(m.ID, strings.TrimSpace(text), a.Now().UTC())
 }
 
 // upstreamOf is the lineage's Workshop (else SteamCMD) instance a spare copy came from.
@@ -163,10 +198,18 @@ func (a *App) writeOrigin(ix *Index, m *store.Mod, dir string) error {
 		o.InstanceID, o.WorkshopID = up.ID, up.WorkshopID()
 	}
 	b, _ := json.MarshalIndent(o, "", "  ")
+	// RimArcho's marker is not an update of the mod: the folder keeps its time (更新日期).
+	fi, _ := os.Stat(dir)
 	if err := os.MkdirAll(filepath.Join(dir, ".rimarcho"), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, filepath.FromSlash(scan.OriginFile)), append(b, '\n'), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(scan.OriginFile)), append(b, '\n'), 0o644); err != nil {
+		return err
+	}
+	if fi != nil {
+		os.Chtimes(dir, fi.ModTime(), fi.ModTime())
+	}
+	return nil
 }
 
 // linksOutside lists the links inside dir that point outside it (relative paths).

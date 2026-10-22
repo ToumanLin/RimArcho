@@ -435,10 +435,13 @@ L#l4xt A  [2 copies, 1.3 KB]
     path: $ROOT/Steam/steamapps/workshop/content/294100/1001
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=1001
     supports: 1.6
+    updated: 2026-09-21 14:13
     states: in no plan
   #iqmu locked 2026-10-01 12:00  672 B  (current plan)
     path: $ROOT/LocalAppData/RimArcho/locked/main/A Local
     supports: 1.6
+    updated: 2026-10-01 10:00
+    note: (by RimArcho) moved into the lock library 2026-10-01 for plan:raid night, plan:default, plan:first, plan:from file
     upstream: #6olp A
     used in: plan:raid night, plan:default, plan:first, plan:from file
     played: 2026-10-01 12:00
@@ -451,4 +454,32 @@ removed #hnyg Harmony from 4 plans
   plan:from file: 1 entry (undo it in that plan: archo plan use "from file", then archo undo)
 next:
   archo save
+
+> manage_library {"action":"subscribe","dry_run":true,"refs":["#nyh3"]}
+dry run, nothing changed: would subscribe 1 Workshop item
+  #nyh3 Gone  ws:4200
+next:
+  archo workshop subscribe #nyh3
+
+> set_player_data {"action":"copy_note","refs":["#iqmu"],"text":"kept for the 1.5 save"}
+copy note set for #iqmu A
+  note: kept for the 1.5 save
+  copy: this instance only (src:locked A Local); the mod's note is archo note #iqmu
+
+> list_library {"lineage":"L#l4xt","sort":"-size"}
+L#l4xt A  [2 copies, 1.3 KB]
+  #6olp workshop  672 B
+    path: $ROOT/Steam/steamapps/workshop/content/294100/1001
+    workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=1001
+    supports: 1.6
+    updated: 2026-09-21 14:13
+    states: in no plan
+  #iqmu locked 2026-10-01 12:00  672 B  (current plan)
+    path: $ROOT/LocalAppData/RimArcho/locked/main/A Local
+    supports: 1.6
+    updated: 2026-10-01 10:00
+    note: kept for the 1.5 save
+    upstream: #6olp A
+    used in: plan:raid night, plan:default, plan:first, plan:from file
+    played: 2026-10-01 12:00
 

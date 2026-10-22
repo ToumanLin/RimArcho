@@ -135,6 +135,6 @@ Example: get_description {"ref": "#uuhe"}
       [image: https://i.imgur.com/abc.png]
       Adds vehicles to RimWorld …`
 
-const descPlayer = `Change the player's own data on mods (shared by all copies of a mod): action=tag_add / tag_remove (tags on one or more refs; tags are what list --filter tag:<t> and the TUI's tag: search use), alias (the name RimArcho shows; text "" clears), note (free text; "" clears). Nothing reaches the game.
+const descPlayer = `Change the player's own data on mods (shared by all copies of a mod): action=tag_add / tag_remove (tags on one or more refs; tags are what list --filter tag:<t> and the TUI's tag: search use), alias (the name RimArcho shows; text "" clears), note (free text; "" clears), copy_note (a note on one copy only, e.g. why this locked version exists; list_library lineage=… shows it, and RimArcho's own first version until one is written). Nothing reaches the game.
 Example: set_player_data {"action": "tag_add", "refs": ["#uuhe", "#vpcd"], "tags": ["vehicles"]}
   tagged 2 mods: vehicles`

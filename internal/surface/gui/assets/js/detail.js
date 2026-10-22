@@ -1,8 +1,9 @@
-// The detail (06 §4): who the mod is, its state, facts, dependencies, the
+// The detail (06 §4): who the mod is, its state, one field list (fields.js), the
 // description, the history. The description is built from Go's BBCode blocks with
 // elements and textContent only: outside text is never inserted as HTML (06 §8.2).
 import { S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
+import { fieldList } from "./fields.js";
 
 let seq = 0;
 let fetchTimer = 0;
@@ -57,66 +58,26 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   img.src = "/preview/" + encodeURIComponent(d.id);
   box.append(img, el("h1", "", d.name));
   if (d.authors) box.append(el("div", "who", d.authors));
-  const facts = el("div", "facts");
-  facts.innerHTML = sourceIcon(d.kind) + `<span>${esc(d.header.join(" · "))}</span>`;
-  box.append(facts);
-  // state
-  const st = el("div", "state");
-  st.innerHTML = (d.status ? statusIcon(d.status) : icon.ok) + `<span class="${d.status > 1 ? "" : "second"}">${esc(d.statusText)}</span>`;
-  if (d.status > 1) {
-    const b = el("button", "", T("show what"));
-    b.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "needs" }));
-    st.append(b);
-  }
-  box.append(st);
-  // facts
-  const kv = el("table", "kv");
-  const row = (label, node) => {
-    const tr = el("tr");
-    tr.append(el("td", "", label));
-    const td = el("td");
-    td.append(node);
-    tr.append(td);
-    kv.append(tr);
-  };
-  for (const f of d.facts) {
-    const v = el("span");
-    switch (f.kind) {
-      case "workshop": {
-        v.append(f.value + "  ");
-        const a = el("span", "link", T("open the page"));
-        a.onclick = () => api.OpenURL(d.url).catch((e) => say("fail", errText(e)));
-        v.append(a);
-        break;
-      }
-      case "tags":
-        if (!f.list || !f.list.length) v.append(el("span", "dim", T("none")));
-        for (const t of f.list || []) v.append(el("span", "chip", t));
-        if (!opts.page) {
-          const a = el("span", "link", " " + T("edit"));
-          a.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "tags" }));
-          v.append(a);
-        }
-        break;
-      case "alias":
-        v.append(f.value, el("span", "dim", `  (${f.extra})`));
-        break;
-      default:
-        v.textContent = f.value || "—";
+  // a copy's details on Mod 库存 draw their own note, actions and field list (06 §2.9)
+  if (!opts.page) {
+    const facts = el("div", "facts");
+    facts.innerHTML = sourceIcon(d.kind) + `<span>${esc(d.header.join(" · "))}</span>`;
+    box.append(facts);
+    // state
+    const st = el("div", "state");
+    st.innerHTML = (d.status ? statusIcon(d.status) : icon.ok) + `<span class="${d.status > 1 ? "" : "second"}">${esc(d.statusText)}</span>`;
+    if (d.status > 1) {
+      const b = el("button", "", T("show what"));
+      b.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "needs" }));
+      st.append(b);
     }
-    row(f.label, v);
+    box.append(st);
+    // the field list (06 §4.1): a click on a value copies it
+    box.append(fieldList(d.fields, {
+      tags: () => document.dispatchEvent(new CustomEvent("verb", { detail: "tags" })),
+      folder: () => api.OpenFolder(d.id).catch((e) => say("fail", errText(e))),
+    }));
   }
-  if (d.deps && d.deps.length) {
-    const v = el("div");
-    for (const x of d.deps) {
-      const line = el("div");
-      const ic = { enabled: icon.ok, disabled: icon.warn, missing: icon.err }[x.state];
-      line.innerHTML = ic + " " + esc(x.name) + (x.state === "disabled" ? `<span class="dim">${esc(T(" (not enabled)"))}</span>` : x.state === "missing" ? `<span class="dim">${esc(T(" (not installed)"))}</span>` : "");
-      v.append(line);
-    }
-    row(T("requires"), v);
-  }
-  box.append(kv);
   // description (06 §4.3 item 2)
   const desc = el("div", "desc");
   const head = (title, note) => {
