@@ -7,6 +7,7 @@ func init() {
 	Register(map[string]string{
 		// the card
 		"community background":                               "社区背景",
+		"Archo log analysis":                                 "Archo 日志分析",
 		"from shared logs, not a conclusion about your list": "来自玩家分享的日志，不是对你的列表的结论",
 		"this kind of error is usually: %s":                  "这类报错通常是：%s",
 		"common causes":                                      "常见原因",

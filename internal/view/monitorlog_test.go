@@ -75,8 +75,8 @@ func TestLogPageMonitor(t *testing.T) {
 		at, _ := time.ParseInLocation("2006-01-02 15:04:05.000", s, time.Local)
 		return at.In(e.App.Loc).Format("15:04")
 	}
-	if m.Title != "Archo Monitor · this run" || m.Label != "ArchoMonitor.log" ||
-		m.Facts != "0.9.0-dev · game 1.7.4985 rev1269 · "+clock("2026-10-21 17:51:43.164")+"–"+clock("2026-10-21 17:55:55.418") {
+	if m.Title != "Archo Monitor" || m.Label != "ArchoMonitor.log" ||
+		m.Facts != clock("2026-10-21 17:51:43.164")+"–"+clock("2026-10-21 17:55:55.418") {
 		t.Fatalf("head %q / %q", m.Title, m.Facts)
 	}
 	if m.Errors+m.Warnings != len(m.Entries) || m.Warnings != 4 || m.Errors < 10 {
@@ -114,8 +114,8 @@ func TestLogPageMonitor(t *testing.T) {
 	if patch < 10 || linked == 0 || !repeat {
 		t.Fatalf("%d patch errors, %d linked, a repeated entry %v", patch, linked, repeat)
 	}
-	// No monitor in the plan and none installed: one line, no action.
-	if !strings.Contains(p.NoMonitor, "not installed") || p.AddMonitor {
+	// The run had the monitor: no line saying it is missing, whatever the plan has now.
+	if p.NoMonitor != "" || p.AddMonitor {
 		t.Fatalf("no monitor: %q %v", p.NoMonitor, p.AddMonitor)
 	}
 	view.SetLang("zh")
@@ -150,5 +150,24 @@ func TestLiveMonitor(t *testing.T) {
 	}
 	if view.LiveMonitor(e.App, st, &tr, filepath.Join(e.UserData, "Logs", "Player-prev.log"), nil) != nil {
 		t.Fatal("a section for a log the game does not write")
+	}
+}
+
+// A run without the monitor's log, and no monitor installed: one line says so, no action.
+func TestLogPageNoMonitor(t *testing.T) {
+	e, player, monitor := realRun(t)
+	if err := os.Remove(monitor); err != nil {
+		t.Fatal(err)
+	}
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := view.BuildLogPage(e.App, st, player, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Monitor != nil || !strings.Contains(p.NoMonitor, "not installed") || p.AddMonitor {
+		t.Fatalf("monitor %v, note %q %v", p.Monitor != nil, p.NoMonitor, p.AddMonitor)
 	}
 }

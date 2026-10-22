@@ -45,7 +45,7 @@ type LogRow struct {
 type LogPage struct {
 	Files    []LogFile `json:"files"`
 	Path     string    `json:"path"`
-	Facts    string    `json:"facts"` // "1.6.4633 · 12 840 lines · 10 月 19 日 21:04"
+	Facts    string    `json:"facts"` // "1.6.4633 · 12 840 lines"
 	Rows     []LogRow  `json:"rows"`
 	Selected bool      `json:"selected"` // its errors are in 需要处理
 	// Pending is the game version whose analysis is still running: no rows yet, ask again.
@@ -147,10 +147,8 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 	if r.Version != "" {
 		facts = append(facts, r.Version)
 	}
+	// the file picker beside it already says when the log was written
 	facts = append(facts, Tf("%d lines", r.Lines))
-	if !r.ModTime.IsZero() {
-		facts = append(facts, ShortDate(r.ModTime)+" "+r.ModTime.In(a.Loc).Format("15:04"))
-	}
 	if r.AnalysedAs != "" {
 		facts = append(facts, Tf("read as %s", r.AnalysedAs))
 	}
@@ -160,6 +158,10 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		p.Monitor = m
 	} else if c := companionOf(path); c != "" {
 		p.Monitor = MonitorOf(a, st, readCompanion(c), p.Links, false)
+	}
+	if p.Monitor != nil {
+		// this run had the monitor: its tab is the answer, not a line saying it is missing
+		p.NoMonitor, p.AddMonitor = "", false
 	}
 	for _, lc := range r.Clusters {
 		row := LogRow{ID: lc.ID, Class: T(lc.Class), Count: lc.Count, Spans: LogSpans(lc.First.Message, 240), Cluster: lc.ID, Info: logs.Informational(lc.Class)}

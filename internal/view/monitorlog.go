@@ -33,10 +33,10 @@ type MonitorEntry struct {
 
 // MonitorLog is the companion section of the log page.
 type MonitorLog struct {
-	Title    string         `json:"title"` // "Archo Monitor · 本次运行"
+	Title    string         `json:"title"` // "Archo Monitor"
 	Label    string         `json:"label"` // ArchoMonitor.log
 	Path     string         `json:"path"`
-	Facts    string         `json:"facts"` // 0.9.0 · 游戏 1.7.4985 rev1269 · 17:51–17:55
+	Facts    string         `json:"facts"` // 17:51–17:55
 	Running  bool           `json:"running,omitempty"`
 	Errors   int            `json:"errors"`
 	Warnings int            `json:"warnings"`
@@ -68,14 +68,10 @@ func MonitorOf(a *app.App, st *app.LoadoutState, c *logs.Companion, links map[st
 	if c.Monitor {
 		name = "Archo Monitor"
 	}
-	m.Title = name + " · " + T("this run")
+	// The run is the Player.log's: its game version is on the line above, and the
+	// monitor's own version tells the player nothing. Only the run's time is new here.
+	m.Title = name
 	var facts []string
-	if c.Version != "" {
-		facts = append(facts, c.Version)
-	}
-	if c.Game != "" {
-		facts = append(facts, Tf("game %s", c.Game))
-	}
 	switch start := c.Started.In(a.Loc).Format("15:04"); {
 	case c.Started.IsZero():
 	case !c.Ended.IsZero():

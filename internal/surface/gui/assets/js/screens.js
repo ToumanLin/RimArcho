@@ -495,12 +495,21 @@ function drawGameLog() {
   const dscroll = el("div", "scroll", "");
   dscroll.tabIndex = -1;
   det.append(dscroll);
-  grid.append(list, det);
+  // Archo 日志分析: what the shared logs say about the picked error, its own card under the
+  // log text (06 §2.10); hidden while nothing matches
+  const ana = el("section", "card col ana-card");
+  ana.hidden = true;
+  ana.append(el("div", "col-head", ""), el("div", "scroll"));
+  ana.firstChild.append(el("span", "anum", "3"), T("Archo log analysis"));
+  const side = el("div", "logside");
+  side.append(det, ana);
+  grid.append(list, side);
   w.append(grid);
   // 1 the runs (or the monitor's entries), 2 the log text of the one picked
   resetAreas();
   area(list, list.querySelector(".ltabs") || null, () => { det.classList.remove("focus"); list.classList.add("focus"); });
   area(det, null, () => { list.classList.remove("focus"); det.classList.add("focus"); det.querySelector(".scroll").focus(); });
+  area(ana, null, () => { if (!ana.hidden) ana.querySelector(".scroll").focus(); });
   if (!list.querySelector(".ltabs")) { list.prepend(el("div", "col-head", "")); list.firstChild.append(el("span", "anum", "1"), T("the errors")); }
   det.prepend(el("div", "col-head", "")); det.firstChild.append(el("span", "anum", "2"), T("the log text"));
   scroll.scrollTop = was;
@@ -627,6 +636,7 @@ function markLog(keepScroll) {
   if (on && !keepScroll) on.scrollIntoView({ block: "nearest" });
   const box = $("#screen .detail-card .scroll");
   if (!box) return;
+  setAna(null);
   let id = "";
   if (L.tab === 1) {
     const mon = L.page && L.page.monitor;
@@ -668,7 +678,17 @@ function showLines(box, lines, card) {
   const pre = el("pre", "lines");
   pre.textContent = (lines || []).join("\n");
   box.append(pre);
-  if (card) box.append(patternCard(card));
+  setAna(card);
+}
+
+// setAna fills the Archo 日志分析 card with a pattern card, or hides it (null).
+function setAna(card) {
+  const ana = $("#screen .ana-card");
+  if (!ana) return;
+  const sc = ana.querySelector(".scroll");
+  sc.innerHTML = "";
+  ana.hidden = !card;
+  if (card) sc.append(patternCard(card));
 }
 
 // patternCard (06 §2.10): what the shared logs say this kind of error usually is. It is
@@ -677,7 +697,7 @@ function showLines(box, lines, card) {
 function patternCard(c) {
   const d = el("div", "pcard");
   const h = el("div", "ph");
-  h.append(el("span", "ev-chip corpus", T("community background")), el("span", "note", T("from shared logs, not a conclusion about your list")));
+  h.append(el("span", "note", T("from shared logs, not a conclusion about your list")));
   d.append(h);
   if (c.summary) d.append(el("div", "ps", c.summary));
   const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v", v)); d.append(r); };
