@@ -8,6 +8,7 @@ import { statusIcon } from "./icons.js";
 import { setActs } from "./shell.js";
 import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
+import { bgSection } from "./bg.js";
 
 let ui = null;
 export function initScreens(u) { ui = u; }
@@ -19,6 +20,7 @@ let fresh = false;
 export function openScreen(name) {
   fresh = S.screen !== name;
   S.screen = name;
+  if (name !== "home") dropBackdrop();
   const sc = $("#screen");
   sc.hidden = false;
   sc.innerHTML = "";
@@ -30,11 +32,19 @@ export function openScreen(name) {
 export function closeScreen() {
   if (!S.screen) return false;
   S.screen = null;
+  dropBackdrop();
   $("#screen").hidden = true;
   $("#screen").innerHTML = "";
   ui.renderWhere();
   ui.renderHints();
   return true;
+}
+
+// dropBackdrop takes the launch page's image away with the page (home.js setBackdrop).
+function dropBackdrop() {
+  const d = $("#backdrop");
+  if (d) d.remove();
+  $("#app").classList.remove("photo");
 }
 
 // page builds a page: one muted sentence that says what the page is for (the breadcrumb
@@ -767,13 +777,15 @@ export function fullSection() {
 // only those commands (API.ApplySetting).
 
 export async function settings() {
-  let groups;
-  try { groups = (await api.Settings()) || []; } catch (e) { say("fail", errText(e)); return; }
+  let groups, bg;
+  try { [groups, bg] = await Promise.all([api.Settings(), bgSection()]); } catch (e) { say("fail", errText(e)); return; }
+  groups = groups || [];
   const sc = S.screen === "settings" ? $("#screen") : openScreen("settings");
   const top = sc.scrollTop;
   sc.innerHTML = "";
   const w = page("settings", T("how RimArcho looks and works; each row shows the command that changes it"));
   sc.append(w);
+  w.append(bg);
   renderGroups(w, groups, settings);
   sc.scrollTop = top;
 }

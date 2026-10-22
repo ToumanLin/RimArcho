@@ -230,6 +230,7 @@ function renderHints() {
   let list = actions();
   if (S.screen === "full") list = [{ key: "esc", label: T("back") }];
   else if (S.screen === "library") list = library.hintList();
+  else if (S.screen === "home") list = homePage.hintList();
   else if (S.screen) list = [{ key: "shift+1–7", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);

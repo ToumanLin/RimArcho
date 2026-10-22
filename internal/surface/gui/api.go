@@ -44,6 +44,11 @@ type API struct {
 	logPath  string           // the log page's Player.log and its clusters' first lines
 	logLinks map[string]string
 	x        exchange // import and export (exchange.go)
+	// bgs are the environment bgsEnv's backgrounds; bgPick the image rotation chose for
+	// this window (background.go)
+	bgs    []app.Background
+	bgsEnv string
+	bgPick string
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string
