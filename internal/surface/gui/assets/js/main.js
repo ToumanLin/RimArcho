@@ -838,10 +838,9 @@ async function start() {
   plans.initPlans(ui);
   library.initLibrary(ui);
   S.bar = createBar({ data: () => S.barData, change: () => barChanged(), leave: () => focusArea(S.focus < 2 ? S.focus : 0),
-    // open, it reaches over both lists it filters
-    width: () => $('.area[data-area="1"]').getBoundingClientRect().right - $('.area[data-area="0"]').getBoundingClientRect().left,
     placeholder: T("search: words, tag:, author:, type:, has:, version:, -not") + "  /" });
   $(".barhost").append(S.bar.el);
+  $('.area[data-area="0"] > .head').addEventListener("click", () => { if (S.bar.open) S.bar.toggle(false); });
   wireLists(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);

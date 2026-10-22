@@ -20,8 +20,9 @@ import * as ops from "./ops.js";
 const ROW = 30;      // every row has the same height: the list is drawn by position
 const HEAD = 28;     // the column headers, sticky at the top of the table
 const COLS_KEY = "ui.gui.library.columns";
-// a column's width when the player has not set one; the name column also takes what is left
-const WIDTH = { name: 260, size: 72, state: 116, source: 120, used: 150, updated: 84, version: 64, author: 130, tags: 160, played: 84 };
+// a column's width when the player has not set one; the name column takes whatever is left
+// (its width here is its least), so the table grows with the window
+const WIDTH = { name: 200, size: 72, state: 116, source: 120, used: 150, updated: 84, version: 64, author: 130, tags: 160, played: 84 };
 // columns whose natural order is A to Z (the arrow points up); the rest start biggest or newest
 const ASC = new Set(["name", "source", "author", "tags"]);
 const L = {
@@ -123,16 +124,20 @@ function build() {
   const th = el("div", "lib-th");
   const sizer = el("div", "lib-sizer");
   rows.append(th, sizer);
-  main.append(bar().el, head, rows);
-  // the details: the editor's detail card (06 §2.9)
+  main.append(head, rows);
+  // the left column, as the editor's 未启用: the filter bar on top, then the details (the
+  // editor's detail card) filling the rest (06 §2.9)
   const detail = el("section", "area detail lib-detail");
   const dhead = el("div", "head");
   const scroll = el("div", "scroll");
   scroll.tabIndex = -1;
-  detail.append(dhead, scroll);
+  detail.append(bar().el, dhead, scroll);
+  dhead.addEventListener("click", () => { if (L.bar.open) L.bar.toggle(false); });
+  const split = el("div", "split lib-split");
+  wireSplit(split, root);
   const selbar = el("div", "lib-bar");
   selbar.hidden = true;
-  root.append(main, detail);
+  root.append(detail, split, main);
   w.append(root, selbar);
   sc.append(w);
   els = { root, main, head, rows, th, sizer, detail, dhead, scroll, bar: selbar, lead: w.querySelector(".lead") };
@@ -142,6 +147,35 @@ function build() {
   rows.addEventListener("contextmenu", (e) => { if (!e.target.closest(".lib-row")) e.preventDefault(); });
   draw();
   rows.focus();
+}
+
+// The left column's width: drag the split (kept in ui.gui.library.side), double click for
+// the default.
+const SIDE_KEY = "ui.gui.library.side";
+let sideW = null;
+function wireSplit(sp, root) {
+  if (sideW == null) api.Setting(SIDE_KEY).then((v) => { sideW = +v || 0; applySide(root); }).catch(() => { sideW = 0; });
+  else applySide(root);
+  sp.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const x0 = e.clientX, w0 = els.detail.getBoundingClientRect().width;
+    sp.classList.add("drag");
+    const move = (m) => { sideW = Math.max(240, Math.min(root.clientWidth - 360, Math.round(w0 + m.clientX - x0))); applySide(root); };
+    const up = () => {
+      sp.classList.remove("drag");
+      removeEventListener("mousemove", move);
+      removeEventListener("mouseup", up);
+      api.SetSetting(SIDE_KEY, String(sideW)).catch(() => {});
+      drawRows();
+    };
+    addEventListener("mousemove", move);
+    addEventListener("mouseup", up);
+  });
+  sp.addEventListener("dblclick", () => { sideW = 0; applySide(root); api.SetSetting(SIDE_KEY, "").catch(() => {}); });
+}
+function applySide(root) {
+  if (sideW) root.style.setProperty("--lib-side", sideW + "px");
+  else root.style.removeProperty("--lib-side");
 }
 
 function markFocus() {
