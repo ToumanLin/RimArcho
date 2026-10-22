@@ -30,6 +30,20 @@ problems: 2 error, 1 warning, 0 info
 next:
   subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
 
+$ archo launch --dry-run
+launch: dry run (steam)
+  command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  before you play: 3 problems that often cause errors in the game (they do not block the launch)
+    warning patch.no-match  #hnyg Compat: Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)
+      why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
+      fix: archo enable #nyh3
+    error incompat.active  #z3bw Needy is incompatible with #i4uc, and both are enabled
+      why: their authors say these mods do not work together: they were error sources in 26% of logs (7.3% by chance)
+      fix: archo disable #i4uc
+    error dep.missing  #z3bw Needy requires Absent Library (pkg:tester.absent), which is not installed
+      why: a mod without its dependency fails in parts: such mods were error sources in 10% of logs (4.4% by chance)
+      fix: subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
+
 $ archo problems --code patch --detail
 problems: 0 error, 1 warning, 1 info
   analysis: a:1 2026-10-01 10:00
@@ -125,6 +139,17 @@ ignored problems: 1 error, 0 warning, 0 info
       fix: archo why #z3bw #i4uc
 next:
   archo disable #i4uc
+
+$ archo launch --dry-run
+launch: dry run (steam)
+  command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  before you play: 2 problems that often cause errors in the game (they do not block the launch)
+    warning patch.no-match  #hnyg Compat: Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)
+      why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
+      fix: archo enable #nyh3
+    error dep.missing  #z3bw Needy requires Absent Library (pkg:tester.absent), which is not installed
+      why: a mod without its dependency fails in parts: such mods were error sources in 10% of logs (4.4% by chance)
+      fix: subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
 
 $ archo mod #hnyg
 #hnyg Compat  [active 3/5, local Compat]

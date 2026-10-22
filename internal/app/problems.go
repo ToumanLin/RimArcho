@@ -350,13 +350,16 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				}
 			}
 			if !ok {
-				// Listing the previous minor version only is the normal state right after a game
-				// update: info. Anything older: warning (decisions-m3 §12.1).
-				sev := finding.Warning
+				// Measured on 6,734 logs of 1.6 (decisions-corpus §2, G8): a mod that stops at
+				// the previous minor version is an error source 2.6× as often as chance (its code
+				// was built for the previous game): warning. A mod for older versions that players
+				// still run is 0.3× chance (the ones that broke were dropped long ago): info.
+				// This reverses decisions-m3 §12.1; the fold into one row keeps the count quiet.
+				sev := finding.Info
 				if prev := PrevMinor(mm); prev != "" {
 					for _, v := range d.SupportedVersions {
 						if strings.TrimSpace(v) == prev {
-							sev = finding.Info
+							sev = finding.Warning
 						}
 					}
 				}
@@ -525,7 +528,10 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		add(f)
 	}
 	if len(official) > 0 {
-		f := &finding.Finding{Code: "official.order", Severity: finding.Error, Key: "official", Subjects: []string{officialSubject},
+		// Warning, not error (G8): a mod ahead of a DLC is an error source about twice as often
+		// as chance (G4 2.1×, G2 pairs 1.8×), like a broken dependency order, not like a
+		// missing dependency.
+		f := &finding.Finding{Code: "official.order", Severity: finding.Warning, Key: "official", Subjects: []string{officialSubject},
 			Claim:    "Core and the DLCs are not first in the list, in release order",
 			Evidence: official, Suggestions: []string{"archo sort --dry-run"}}
 		if moves := order.OfficialMoves(in, r.Edges, 3); len(moves) > 0 {
@@ -552,7 +558,9 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		for _, mi := range cy.Members {
 			refs = append(refs, nodeTok(mi))
 		}
-		f := &finding.Finding{Code: "order.cycle", Severity: finding.Warning, Key: strings.Join(refs, " "), Subjects: refs,
+		// Info (G8): the list keeps its current order, and mods on a cycle were error sources
+		// no more often than chance (6.8% vs 6.1% in 804 logs).
+		f := &finding.Finding{Code: "order.cycle", Severity: finding.Info, Key: strings.Join(refs, " "), Subjects: refs,
 			Claim: fmt.Sprintf("load-order constraints form a cycle among %s (kept in the current order)", strings.Join(refs, " "))}
 		for i, e := range cy.Edges {
 			ev, ig := edgeText(st, in, e)

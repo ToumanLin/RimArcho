@@ -205,10 +205,10 @@ next:
   archo problems show p:4c087a
 
 $ archo problems
-problems: 3 error, 5 warning, 2 info
+problems: 2 error, 6 warning, 2 info
   analysis: a:1 2026-10-01 10:00
   list:
-    error official.order  Core and the DLCs are not first in the list, in release order  (p:a4972d)
+    warning official.order  Core and the DLCs are not first in the list, in release order  (p:a4972d)
     warning harmony.skip-prefix  #iqmu Mod A has a bool prefix on Verse.Pawn.Tick that can skip the original; 2 other mods patch it  (p:9c9994)
     warning harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict  (p:cc6232)
     warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
@@ -230,7 +230,7 @@ env:main  RimWorld 1.6.4633 rev1261
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered (archo changes)
   loadout: 8 active, same as v1 (import)
-  problems: 3 error, 5 warning, 2 info (archo problems)
+  problems: 2 error, 6 warning, 2 info (archo problems)
   log: Player.log 1.6.4633 2026-10-01 10:00, current (written after the Loadout's last change)
 
 $ archo disable #i4uc
@@ -240,10 +240,10 @@ next:
   archo save
 
 $ archo problems
-problems: 1 error, 2 warning, 2 info
+problems: 0 error, 3 warning, 2 info
   analysis: a:1 2026-10-01 11:00
   list:
-    error official.order  Core and the DLCs are not first in the list, in release order  (p:a4972d)
+    warning official.order  Core and the DLCs are not first in the list, in release order  (p:a4972d)
     warning harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict  (p:cc6232)
     warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
     info harmony.skip-prefix  1 bool prefixes from 1 mods can skip methods other mods also patch; none is in a log stack  (archo problems --code harmony.skip-prefix)
@@ -260,7 +260,7 @@ env:main  RimWorld 1.6.4633 rev1261
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered (archo changes)
   loadout: 7 active, 1 change unsaved (archo loadout diff)
-  problems: 1 error, 2 warning, 2 info (archo problems)
+  problems: 0 error, 3 warning, 2 info (archo problems)
   log: Player.log 1.6.4633 2026-10-01 10:00, stale log (older than the Loadout's last change at 2026-10-01 11:00): 2 error, 2 warning, not counted (archo problems --code log --all)
 next:
   archo save

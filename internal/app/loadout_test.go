@@ -260,7 +260,7 @@ func TestSortCycleIgnoreAttach(t *testing.T) {
 	scanNow(t, e)
 	out := e.MustRun("sort", "--dry-run")
 	xr, yr := refOf(t, e, "X", ""), refOf(t, e, "Y", "")
-	for _, want := range []string{"warning order.cycle  " + xr + " " + yr, "evidence: decl " + xr + " About.xml loadAfter pkg:tester.y",
+	for _, want := range []string{"info order.cycle  " + xr + " " + yr, "evidence: decl " + xr + " About.xml loadAfter pkg:tester.y",
 		"evidence: decl " + yr + " About.xml loadAfter pkg:tester.x", "(dry run; the workspace is unchanged)"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("sort output lacks %q:\n%s", want, out)

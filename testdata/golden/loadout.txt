@@ -7,7 +7,7 @@ env:main  RimWorld 1.6.4633 rev1261
   changes: 11 discovered (archo changes)
   loadout: 7 active (1 missing entries), same as v1 (import)
   warning: ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start. Saving once rewrites it for 1.6 (archo save)
-  problems: 1 error, 3 warning, 3 info in declarations; Defs and Patches not analysed yet (archo problems)
+  problems: 0 error, 3 warning, 4 info in declarations; Defs and Patches not analysed yet (archo problems)
 
 $ archo list --active
 workspace: 7 active, saved (env:main)
@@ -24,7 +24,7 @@ sort: 2 moved (dry run; the workspace is unchanged)
   moved  #6olp  Harmony             4 → 1
   moved  #hnyg  Versioned Mod 版本  1 → 3
   problems:
-    warning order.cycle  #qfph #tmxx  (kept in current order)
+    info order.cycle  #qfph #tmxx  (kept in current order)
       evidence: decl #qfph About.xml loadAfter pkg:tester.y  (ignore: decl:#qfph:loadafter:tester.y)  [suggested]
       evidence: decl #tmxx About.xml loadAfter pkg:tester.x  (ignore: decl:#tmxx:loadafter:tester.x)
   constraints: 10 edges, 0 ignored by rules
@@ -206,6 +206,7 @@ workspace: 8 active, saved (env:main)
 $ archo launch --dry-run
 launch: dry run (steam)
   command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  checks: declarations only: the def and patch layers were never analysed (archo analyze)
 
 $ archo scan
 scan:2  env:main  0s

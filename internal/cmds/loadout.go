@@ -277,7 +277,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 					refs = append(refs, st.Ix.Ref(nd.Instance))
 				}
 			}
-			p := pr.Addf("warning order.cycle  %s  (kept in current order)", strings.Join(refs, " "))
+			p := pr.Addf("info order.cycle  %s  (kept in current order)", strings.Join(refs, " "))
 			seen := map[string]bool{}
 			for i, e := range cy.Edges {
 				ev, ig := constraintText(st, r.Input, e)
@@ -612,7 +612,7 @@ func ruleRemove(c *Ctx, a *Args) (*render.Doc, error) {
 
 func launchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	dry := a.Bool("dry-run")
-	p, _, err := c.App.Launch(dry, a.Bool("force"))
+	p, st, err := c.App.Launch(dry, a.Bool("force"))
 	if err != nil {
 		return nil, err
 	}
@@ -622,5 +622,6 @@ func launchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d, root := render.New(head)
 	root.KV("command", p.Command())
+	addLaunchChecks(c, root, st.Ix)
 	return d, nil
 }
