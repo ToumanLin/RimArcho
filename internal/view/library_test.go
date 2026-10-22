@@ -193,3 +193,41 @@ func TestLibrarySearchBox(t *testing.T) {
 		}
 	}
 }
+
+// 06 §4.1, §2.9: one field list, the editor's fields with the library's in between.
+func TestLibFields(t *testing.T) {
+	e := libEnv(t)
+	lib, err := e.App.Library()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := libRow(t, libPage(t, e, ""), "Lockable")
+	if len(r.Insts) != 2 {
+		t.Fatalf("copies %d", len(r.Insts))
+	}
+	i := lib.Instance(r.Insts[0].Ref)
+	var got []string
+	for _, f := range view.LibFields(e.App, lib, i, nil) {
+		got = append(got, f.Kind)
+	}
+	want := []string{"id", "package", "path", "tags", "state", "size", "versions", "updated"}
+	for _, k := range want {
+		if !slices.Contains(got, k) {
+			t.Fatalf("no %s field: %v", k, got)
+		}
+	}
+	if got[0] != "id" || got[1] != "package" {
+		t.Fatalf("order %v", got)
+	}
+	// the editor's: no library rows
+	for _, f := range view.ModFields(e.App, lib.St, i.Mod, nil) {
+		if f.Kind == "state" || f.Kind == "used" {
+			t.Fatalf("editor field %s", f.Kind)
+		}
+	}
+	// the page's columns: name first, the hidden ones last
+	p := libPage(t, e, "")
+	if len(p.Columns) == 0 || p.Columns[0].Key != "name" || !p.Columns[0].Shown || p.Columns[len(p.Columns)-1].Shown {
+		t.Fatalf("columns %+v", p.Columns)
+	}
+}

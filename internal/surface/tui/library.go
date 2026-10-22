@@ -101,7 +101,55 @@ func (m *model) libraryKey(s string) tea.Cmd {
 			out, _ := cmds.Execute(m.app, []string{"library", "--lineage", r.Ref})
 			m.openPanel(r.Name, out)
 		}
+	case "n":
+		// a copy's own note (06 §2.9): the Lineage's one copy, else pick which
+		if l.cursor >= n {
+			return nil
+		}
+		r := l.page.Rows[l.cursor]
+		if len(r.Insts) == 1 {
+			return m.editCopyNote(r.Name, r.Insts[0])
+		}
+		p := &panel{title: Tf("note on which copy of %s", r.Name)}
+		for _, i := range r.Insts {
+			p.choices = append(p.choices, i.Label)
+		}
+		insts := r.Insts
+		p.onPick = func(m *model, label string) tea.Cmd {
+			for _, i := range insts {
+				if i.Label == label {
+					return m.editCopyNote(r.Name, i)
+				}
+			}
+			return nil
+		}
+		m.panel = p
 	}
+	return nil
+}
+
+// editCopyNote: the input line starts from the note, or from what RimArcho wrote; enter
+// saves, an empty line clears it, esc leaves it.
+func (m *model) editCopyNote(name string, i view.LibInstRow) tea.Cmd {
+	if i.ID == "" {
+		m.say(sayInfo, T("RimArcho has not seen this copy: it has no note"))
+		return nil
+	}
+	text := i.Note
+	if text == "" {
+		text = i.Auto
+	}
+	ref := i.Ref
+	m.prompt = &prompt{label: Tf("note on %s (%s): ", name, i.Label), text: text, submit: func(m *model, text string) tea.Cmd {
+		msg, err := view.LibSetNote(m.app, ref, text)
+		if err != nil {
+			m.say(sayFail, err.Error())
+			return nil
+		}
+		m.say(sayOK, msg)
+		m.loadLibrary()
+		return nil
+	}}
 	return nil
 }
 

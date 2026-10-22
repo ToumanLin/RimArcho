@@ -101,7 +101,7 @@ export function palette() {
 }
 
 // ---- the tag bar (06 §3.8): pinned tags first, then by use; ✓ all have it, ~ some ----
-export async function tags(items) {
+export async function tags(items, after) {
   const ids = items.filter((x) => x.id).map((x) => x.id);
   if (!ids.length) return;
   let cands;
@@ -128,6 +128,7 @@ export async function tags(items) {
       close();
       try { say("ok", await api.SetTag(ids, tag, remove)); } catch (e) { say("fail", errText(e)); }
       ui.reload();
+      if (after) after();
     };
     p.keys = (e) => {
       if (["ArrowRight", "ArrowDown"].includes(e.key)) { p.sel = Math.min(p.sel + 1, cands.length - 1); draw(); e.preventDefault(); return true; }

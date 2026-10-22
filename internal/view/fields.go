@@ -178,7 +178,7 @@ func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) 
 	}
 	add(FieldVersions, T("supported versions"), strings.Join(i.Versions, " "), nil)
 	if !i.Updated.IsZero() {
-		add(FieldUpdated, T("updated"), LongDate(i.Updated), nil)
+		add(FieldUpdated, T("update date"), LongDate(i.Updated), nil)
 	}
 	if !i.Played.IsZero() {
 		add(FieldPlayed, T("last played"), LongDate(i.Played), nil)

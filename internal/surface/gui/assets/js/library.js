@@ -1,18 +1,27 @@
-// Mod 库存 › 全部 (06 §2.9): what is on this machine. Three columns: the filters, one row per
-// Lineage (opening to its copies), and the right column's size · state · used-in, row by
-// row; a copy's details replace the right column (esc goes back). What it shows comes from
-// view.BuildLibrary through API.Library; the actions are the copies' view.LibAction data.
-// The list draws only the rows in view, so 1350+ Lineages stay smooth.
+// Mod 库存 › 全部 (06 §2.9): what is on this machine. The filters, then a table like a file
+// manager's details view: one row per Lineage (opening to its copies), columns the player
+// sorts (click a header, again reverses), moves (drag a header), sizes (drag its edge) and
+// picks (right click the headers), kept in ui.gui.library.columns. A copy's details open
+// over the right of the table (esc goes back). What it shows comes from view.BuildLibrary
+// through API.Library; the actions are the copies' view.LibAction data. The table draws
+// only the rows in view, so 1350+ Lineages stay smooth.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { on } from "./api.js";
 import { icon } from "./icons.js";
 import { renderDetail } from "./detail.js";
+import { fieldList } from "./fields.js";
 import * as pop from "./popups.js";
 import { openScreen, page, act, rescanButton } from "./screens.js";
 
 const FILTER = '<svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5h11l-4.2 5v4l-2.6 1.2V8.5z"/></svg>';
 const ROW = 30;      // every row has the same height: the list is drawn by position
+const HEAD = 28;     // the column headers, sticky at the top of the table
 const SHOW = 6;      // filter values shown before "more"
+const COLS_KEY = "ui.gui.library.columns";
+// a column's width when the player has not set one; the name column also takes what is left
+const WIDTH = { name: 260, size: 72, state: 116, source: 120, used: 150, updated: 84, version: 64, author: 130, tags: 160, played: 84 };
+// columns whose natural order is A to Z (the arrow points up); the rest start biggest or newest
+const ASC = new Set(["name", "source", "author", "tags"]);
 const L = {
   page: null, search: "", filters: [], sort: "name",
   open: new Set(),   // lineages shown open
@@ -22,6 +31,7 @@ const L = {
   detail: null,      // the copy whose details replace the right column
   drawer: false,     // a narrow window: the filters over the list
   seq: 0,
+  cols: null,        // [{key, title, shown, w}], in the player's order
 };
 let ui = null;
 let els = null;
@@ -45,10 +55,13 @@ export async function open() {
 
 async function load(fresh) {
   const n = ++L.seq;
-  let p;
-  try { p = await api.Library(L.search, L.filters, L.sort); } catch (e) { say("fail", errText(e)); return; }
+  let p, saved;
+  try {
+    [p, saved] = await Promise.all([api.Library(L.search, L.filters, L.sort), L.cols ? null : api.Setting(COLS_KEY).catch(() => "")]);
+  } catch (e) { say("fail", errText(e)); return; }
   if (n !== L.seq) return;
   L.page = p;
+  if (!L.cols) L.cols = mergeCols(p.columns || [], saved);
   flatten();
   if (fresh || !els || S.screen !== "library" || !document.body.contains(els.root)) build();
   else draw();
@@ -82,7 +95,7 @@ function build() {
   const filterBtn = act(T("filters"), "", () => setDrawer(!L.drawer), "f");
   filterBtn.classList.add("lib-drawer-btn");
   filterBtn.querySelector(".ic").innerHTML = FILTER;
-  const w = page("fill library", lead(), filterBtn, rescanButton());
+  const w = page("fill library", lead(), filterBtn, rescanButton(T("rescan")));
   const root = el("div", "lib" + (L.drawer ? " drawer-open" : ""));
   const side = el("aside", "lib-filter card");
   const scrim = el("div", "lib-scrim");
@@ -91,8 +104,9 @@ function build() {
   const head = el("div", "lib-head");
   const rows = el("div", "lib-rows");
   rows.tabIndex = -1;
+  const th = el("div", "lib-th");
   const sizer = el("div", "lib-sizer");
-  rows.append(sizer);
+  rows.append(th, sizer);
   const detail = el("section", "lib-detail");
   detail.hidden = true;
   main.append(head, rows, detail);
@@ -101,7 +115,7 @@ function build() {
   root.append(side, scrim, main);
   w.append(root, bar);
   sc.append(w);
-  els = { root, side, main, head, rows, sizer, detail, bar, lead: w.querySelector(".lead") };
+  els = { root, side, main, head, rows, th, sizer, detail, bar, lead: w.querySelector(".lead") };
   rows.addEventListener("scroll", drawRows, { passive: true });
   rows.addEventListener("mousedown", () => rows.focus());
   draw();
@@ -119,7 +133,7 @@ function draw() {
   els.root.classList.toggle("drawer-open", L.drawer);
   drawFilters();
   drawHead();
-  els.sizer.style.height = L.flat.length * ROW + "px";
+  els.sizer.style.height = HEAD + L.flat.length * ROW + "px";
   els.rows.dataset.sig = "";
   drawRows();
   drawDetail();
@@ -192,8 +206,10 @@ function drawFilters() {
     const full = L.more.has(g.key);
     vals.forEach((v, i) => {
       if (!full && i >= SHOW && !v.on) return;
-      const b = el("button", "lib-val" + (v.on === 1 ? " on" : v.on === -1 ? " ex" : ""));
-      b.append(el("span", "lbl", v.label), el("span", "n num", String(v.count)));
+      const b = el("button", "lib-val" + (v.on === 1 ? " on" : v.on === -1 ? " ex" : "") + (v.cur ? " cur" : ""));
+      b.append(el("span", "lbl", v.label));
+      if (v.cur) b.append(el("span", "curv", T("this game")));
+      b.append(el("span", "n num", String(v.count)));
       b.title = T("left click: only these · right click: leave these out");
       b.onclick = () => setFilter(v.filter, v.on === 1 ? 0 : 1);
       b.oncontextmenu = (e) => { e.preventDefault(); setFilter(v.filter, v.on === -1 ? 0 : -1); };
@@ -207,16 +223,6 @@ function drawFilters() {
     groups.append(sec);
   }
   box.append(groups);
-  const so = el("div", "lib-sort");
-  so.append(el("div", "lib-gtitle", T("sort")));
-  const seg = el("div", "lib-sorts");
-  for (const x of p.sorts || []) {
-    const b = el("button", x.filter === p.sort ? "on" : "", x.label);
-    b.onclick = () => { L.sort = x.filter; load(); };
-    seg.append(b);
-  }
-  so.append(seg);
-  box.append(so);
   if (focused) { inp.focus(); if (caret != null) inp.setSelectionRange(caret, caret); }
   showGhost();
 }
@@ -235,7 +241,43 @@ function setDrawer(v) {
   if (els) els.root.classList.toggle("drawer-open", v);
 }
 
-// ---- the list ----
+// ---- the columns ----
+
+// mergeCols: the page's columns in the saved order with the saved widths; a column the
+// saved list does not know (a new one) keeps its default place at the end.
+function mergeCols(page, saved) {
+  let keep = [];
+  try { keep = JSON.parse(saved || "[]") || []; } catch { keep = []; }
+  const by = new Map(page.map((c) => [c.key, c]));
+  const out = [];
+  for (const k of keep) {
+    const c = by.get(k.k);
+    if (!c) continue;
+    by.delete(k.k);
+    out.push({ key: c.key, title: c.title, shown: c.key === "name" || !k.h, w: +k.w || WIDTH[c.key] || 100 });
+  }
+  for (const c of by.values()) out.push({ key: c.key, title: c.title, shown: c.shown, w: WIDTH[c.key] || 100 });
+  return out;
+}
+
+function saveCols() {
+  const v = JSON.stringify(L.cols.map((c) => (c.shown ? { k: c.key, w: c.w } : { k: c.key, w: c.w, h: 1 })));
+  api.SetSetting(COLS_KEY, v).catch(() => {});
+}
+
+function shownCols() { return L.cols.filter((c) => c.shown); }
+
+// layout sets the grid for the headers and every row; the table scrolls sideways when the
+// columns are wider than the card.
+function layout() {
+  const cs = shownCols();
+  const tpl = cs.map((c) => (c.key === "name" ? `minmax(${c.w}px, 1fr)` : c.w + "px")).join(" ");
+  const min = cs.reduce((n, c) => n + c.w, 0) + 10 * (cs.length - 1) + 24;
+  els.rows.style.setProperty("--lib-cols", tpl);
+  els.rows.style.setProperty("--lib-minw", min + "px");
+}
+
+function sortKey() { return L.sort.replace(/^-/, ""); }
 
 function drawHead() {
   const p = L.page;
@@ -243,15 +285,101 @@ function drawHead() {
   h.innerHTML = "";
   const n = p.shown === p.total ? Tf("%d mods", p.total) : Tf("%d of %d mods", p.shown, p.total);
   h.append(el("span", "lib-count", n), el("span", "faint", " · " + p.size));
-  const r = el("div", "lib-rh");
-  r.append(el("span", "", T("size")), el("span", "", T("state")), el("span", "", T("used in")));
-  h.append(r);
+  layout();
+  const th = els.th;
+  th.innerHTML = "";
+  th.title = T("drag to move · right click: columns");
+  for (const c of shownCols()) {
+    const cell = el("div", "th " + c.key + (sortKey() === c.key ? " on" : ""));
+    cell.append(el("span", "lbl", c.title));
+    if (sortKey() === c.key) {
+      const up = ASC.has(c.key) !== L.sort.startsWith("-");
+      cell.append(el("span", "arrow", up ? "▲" : "▼"));
+    }
+    const rz = el("span", "rz");
+    rz.onpointerdown = (e) => resize(e, c);
+    cell.append(rz);
+    cell.onpointerdown = (e) => { if (e.button === 0 && e.target !== rz) drag(e, c, cell); };
+    th.append(cell);
+  }
+  th.oncontextmenu = (e) => { e.preventDefault(); colMenu(e.clientX, e.clientY); };
 }
+
+// sortBy: a click on a header sorts by it; again reverses.
+function sortBy(key) {
+  L.sort = L.sort === key ? "-" + key : key;
+  L.cur = 0;
+  load();
+}
+
+function resize(e, c) {
+  e.preventDefault();
+  e.stopPropagation();
+  const x0 = e.clientX, w0 = c.w;
+  const t = e.target;
+  t.setPointerCapture(e.pointerId);
+  document.body.classList.add("col-resizing");
+  t.onpointermove = (m) => { c.w = Math.max(c.key === "name" ? 120 : 40, Math.round(w0 + m.clientX - x0)); layout(); };
+  t.onpointerup = () => {
+    t.onpointermove = t.onpointerup = null;
+    document.body.classList.remove("col-resizing");
+    saveCols();
+  };
+}
+
+// drag: a header moved sideways more than a few pixels moves the column; otherwise the
+// press was a click, and sorts.
+function drag(e, c, cell) {
+  const x0 = e.clientX;
+  let moving = false, to = -1;
+  cell.setPointerCapture(e.pointerId);
+  const cells = () => [...els.th.querySelectorAll(".th")];
+  cell.onpointermove = (m) => {
+    if (!moving && Math.abs(m.clientX - x0) < 5) return;
+    moving = true;
+    cell.classList.add("dragging");
+    const cs = cells();
+    to = cs.length;
+    for (let i = 0; i < cs.length; i++) {
+      const r = cs[i].getBoundingClientRect();
+      if (m.clientX < r.left + r.width / 2) { to = i; break; }
+    }
+    for (const x of cs) x.classList.remove("drop-before", "drop-after");
+    if (to < cs.length) cs[to].classList.add("drop-before"); else cs[cs.length - 1].classList.add("drop-after");
+  };
+  cell.onpointerup = () => {
+    cell.onpointermove = cell.onpointerup = null;
+    if (!moving) return sortBy(c.key);
+    const shown = shownCols();
+    const target = to < shown.length ? shown[to] : null;
+    if (target !== c) {
+      L.cols.splice(L.cols.indexOf(c), 1);
+      const at = target ? L.cols.indexOf(target) : L.cols.length;
+      L.cols.splice(at, 0, c);
+      saveCols();
+    }
+    drawHead();
+    els.rows.dataset.sig = "";
+    drawRows();
+  };
+}
+
+// colMenu: right click on the headers shows or hides a column (the name always shows).
+function colMenu(x, y) {
+  const redraw = () => { saveCols(); drawHead(); els.rows.dataset.sig = ""; drawRows(); };
+  const items = L.cols.filter((c) => c.key !== "name").map((c) => ({
+    label: c.title, key: c.shown ? "✓" : "", run: () => { c.shown = !c.shown; redraw(); },
+  }));
+  items.push({ label: T("reset the columns"), cls: "sep", run: () => { L.cols = mergeCols(L.page.columns || [], ""); redraw(); } });
+  pop.menu(x, y, items);
+}
+
+// ---- the rows ----
 
 function drawRows() {
   if (!els) return;
   const box = els.rows;
-  const top = box.scrollTop, h = box.clientHeight || 600;
+  const top = Math.max(0, box.scrollTop - HEAD), h = box.clientHeight || 600;
   const a = Math.max(0, Math.floor(top / ROW) - 8), b = Math.min(L.flat.length, Math.ceil((top + h) / ROW) + 8);
   const sig = [a, b, L.cur, L.sel.size, L.flat.length, L.detail && L.detail.ref, [...L.sel].join(",")].join("|");
   if (box.dataset.sig === sig) return;
@@ -259,9 +387,7 @@ function drawRows() {
   for (const n of [...box.querySelectorAll(".lib-row")]) n.remove();
   if (!L.flat.length) {
     const p = L.page;
-    const e = el("div", "lib-row empty", p.total ? T("no mod matches") : T("no mods yet (R scans the mod folders)"));
-    e.style.top = "0px";
-    box.append(e);
+    box.append(el("div", "lib-row empty", p.total ? T("no mod matches") : T("no mods yet (R scans the mod folders)")));
     return;
   }
   const frag = document.createDocumentFragment();
@@ -271,53 +397,49 @@ function drawRows() {
 
 function rowEl(x, k) {
   const r = el("div", "lib-row " + x.t + (x.lone ? " lone" : "") + (k === L.cur ? " cur" : ""));
-  r.style.top = k * ROW + "px";
+  r.style.top = HEAD + k * ROW + "px";
   const selected = x.t === "inst" ? L.sel.has(x.i.ref) : x.r.insts.every((i) => L.sel.has(i.ref)) && x.r.insts.length;
   if (selected) r.classList.add("sel");
   if (L.detail && x.t === "inst" && L.detail.ref === x.i.ref) r.classList.add("open");
-  const left = el("div", "l");
-  left.append(el("span", "m"));
-  let size, state, code, used, usedAll;
-  if (x.t === "lin") {
-    const c = el("span", "chev" + (L.open.has(x.r.id) || x.r.insts.length < x.r.copies ? " down" : ""));
-    c.innerHTML = icon.chev;
-    c.onclick = (e) => { e.stopPropagation(); toggle(x.r); };
-    left.append(c, el("span", "t", x.r.name));
-    left.append(el("span", "g", Tf("%d copies", x.r.copies)));
-    if (x.r.tags && x.r.tags.length) left.append(el("span", "g", x.r.tags.join(" ")));
-    ({ size, state, code, used } = x.r);
-    usedAll = x.r.usedTitle;
-  } else {
-    const i = x.i;
-    if (x.lone) {
-      left.append(el("span", "t", x.r.name), el("span", "g", i.label));
-      if (x.r.tags && x.r.tags.length) left.append(el("span", "g", x.r.tags.join(" ")));
-    } else {
-      left.append(el("span", "tree", "└"), el("span", "t kind", i.label));
-    }
-    if (i.note) left.append(el("span", "note", i.note));
-    if (i.inPlan) left.append(el("span", "here", "●"));
-    ({ size, state, code, used } = i);
-    usedAll = i.usedTitle;
+  // the cells: a Lineage's from its row, a copy's from the copy (a lone copy is its Lineage)
+  const cells = x.t === "lin" || x.lone ? x.r : x.i;
+  for (const c of shownCols()) {
+    if (c.key === "name") { r.append(nameCell(x)); continue; }
+    const v = cells[c.key] || "";
+    const cell = el("span", "c " + c.key + (c.key === "state" && cells.code ? " " + cells.code : ""), v);
+    if (c.key === "size") cell.classList.add("num");
+    if (c.key === "used" && cells.usedTitle) cell.title = cells.usedTitle;
+    else if (v) cell.title = v;
+    r.append(cell);
   }
-  const right = el("div", "rc");
-  right.append(el("span", "sz num", size || ""));
-  const st = el("span", "st " + (code || ""), state || "");
-  right.append(st);
-  const u = el("span", "us", used || "");
-  if (usedAll) u.title = usedAll;
-  right.append(u);
-  r.append(left, right);
   r.onclick = (e) => click(k, e);
   r.ondblclick = () => { if (x.t === "lin") toggle(x.r); };
   r.oncontextmenu = (e) => { e.preventDefault(); if (!(selected)) { L.cur = k; drawRows(); } menuAt(e.clientX, e.clientY); };
   return r;
 }
 
+// nameCell: only the name (06 §2.9): a Lineage's, or under an open Lineage the copy's folder.
+function nameCell(x) {
+  const left = el("span", "c name");
+  left.append(el("span", "m"));
+  if (x.t === "lin") {
+    const c = el("span", "chev" + (L.open.has(x.r.id) || x.r.insts.length < x.r.copies ? " down" : ""));
+    c.innerHTML = icon.chev;
+    c.onclick = (e) => { e.stopPropagation(); toggle(x.r); };
+    left.append(c, el("span", "t", x.r.name));
+  } else if (x.lone) {
+    left.append(el("span", "t", x.r.name));
+  } else {
+    left.append(el("span", "tree", "└"), el("span", "t kind", x.i.name || x.i.label));
+  }
+  if (x.t === "inst" && x.i.inPlan) left.append(el("span", "here", "●"));
+  return left;
+}
+
 function toggle(r) {
   if (L.open.has(r.id)) L.open.delete(r.id); else L.open.add(r.id);
   flatten();
-  els.sizer.style.height = L.flat.length * ROW + "px";
+  els.sizer.style.height = HEAD + L.flat.length * ROW + "px";
   els.rows.dataset.sig = "";
   drawRows();
 }
@@ -358,9 +480,9 @@ function toggleSel(x) {
 
 function ensureVisible() {
   const box = els.rows;
-  const y = L.cur * ROW;
+  const y = L.cur * ROW; // below the sticky headers
   if (y < box.scrollTop) box.scrollTop = y;
-  else if (y + ROW > box.scrollTop + box.clientHeight) box.scrollTop = y + ROW - box.clientHeight;
+  else if (HEAD + y + ROW > box.scrollTop + box.clientHeight) box.scrollTop = HEAD + y + ROW - box.clientHeight;
 }
 
 function move(d, extend) {
@@ -404,51 +526,103 @@ function closeDetail() {
 }
 
 let detailSeq = 0;
+// drawDetail: the copy's note at the top, then its actions (only those that apply), then
+// one field list, then the mod's picture, name and description (06 §2.9).
 async function drawDetail() {
   const box = els.detail;
   const i = L.detail && findCopy(L.detail.ref);
-  if (!i) { box.hidden = true; els.main.classList.remove("detail-open"); L.detail = null; return; }
+  if (!i) { box.hidden = true; box.dataset.ref = ""; els.main.classList.remove("detail-open"); L.detail = null; return; }
+  const same = box.dataset.ref === i.ref && !box.hidden;
   L.detail = i;
   box.hidden = false;
+  if (same && box.querySelector(".lib-note.editing")) return; // keep a note being written
   const n = ++detailSeq;
-  const scroll = box.querySelector(".scroll") || el("div", "scroll");
+  const old = box.querySelector(".scroll");
+  const keep = same && old ? old.scrollTop : 0;
   box.innerHTML = "";
+  box.dataset.ref = i.ref;
   const top = el("div", "lib-dhead");
   const back = el("button", "btn small", "← " + T("back"));
   back.append(el("kbd", "", "esc"));
   back.onclick = closeDetail;
-  top.append(back, el("span", "t", i.label));
+  const row = (L.page.rows || []).find((r) => r.insts.some((x) => x.ref === i.ref));
+  top.append(back, el("span", "t", row ? row.name : i.label), el("span", "faint", i.label));
+  const scroll = el("div", "scroll");
   box.append(top, scroll);
-  scroll.innerHTML = "";
-  const facts = el("div", "lib-facts");
-  const kv = (label, value) => {
-    if (!value) return;
-    const r = el("div", "kv");
-    r.append(el("span", "k", label), el("span", "v", value));
-    facts.append(r);
-  };
-  kv(T("path"), i.path);
-  kv(T("states"), (i.states || []).join(" · "));
-  kv(T("used in"), (i.usedIn || []).join(" · "));
-  kv(T("versions"), i.versions);
-  kv(T("played"), i.played);
-  kv(T("size"), i.size);
+  scroll.append(noteEl(i));
   const acts = el("div", "lib-acts");
-  for (const a of i.actions || []) {
+  for (const a of (i.actions || []).filter((a) => a.detail)) {
     const b = el("button", "btn" + (a.danger ? " danger" : ""), a.label);
     b.onclick = () => run(a, [i]);
     acts.append(b);
   }
-  scroll.append(acts, facts);
-  if (!i.id) return;
+  if (acts.childNodes.length) scroll.append(acts);
+  const fields = el("div", "lib-fields");
+  scroll.append(fields);
   const d = el("div", "lib-desc");
   d.id = "lib-detail";
   scroll.append(d);
+  try {
+    const fs = await api.LibraryFields(i.ref);
+    if (n !== detailSeq) return;
+    fields.append(fieldList(fs, {
+      folder: () => api.OpenFolder(i.id).catch((e) => say("fail", errText(e))),
+      tags: () => pop.tags([{ id: i.id, name: row ? row.name : i.label }], () => load()),
+    }));
+  } catch (e) { if (n === detailSeq) fields.append(el("p", "err", errText(e))); }
+  scroll.scrollTop = keep;
+  if (!i.id) return;
   try {
     const det = await api.Detail(i.id, false, false, false);
     if (n !== detailSeq) return;
     renderDetail(det, d, scroll, true, { page: true });
   } catch (e) { if (n === detailSeq) d.append(el("p", "err", errText(e))); }
+}
+
+// noteEl: the copy's own note (06 §2.9). The player's text, else what RimArcho wrote (grey),
+// else a place to write one; a click edits it, enter saves, shift+enter breaks the line,
+// esc leaves it as it was.
+function noteEl(i) {
+  const box = el("div", "lib-note" + (i.note ? "" : i.auto ? " auto" : " empty"));
+  const show = () => {
+    box.innerHTML = "";
+    box.classList.remove("editing");
+    box.append(el("div", "txt", i.note || i.auto || T("write a note")));
+    if (!i.note && i.auto) box.append(el("div", "by", T("by RimArcho · click to edit")));
+  };
+  show();
+  if (!i.id) return box;
+  box.title = T("click to edit");
+  box.onclick = () => {
+    if (box.classList.contains("editing")) return;
+    box.classList.add("editing");
+    box.innerHTML = "";
+    const start = i.note || i.auto || "";
+    const ta = el("textarea", "lib-note-in");
+    ta.value = start;
+    ta.placeholder = T("a note on this copy…");
+    ta.rows = Math.min(6, Math.max(2, start.split("\n").length + 1));
+    box.append(ta, el("div", "by", T("enter saves · esc cancels")));
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    let done = false;
+    const save = async () => {
+      if (done) return;
+      done = true;
+      const text = ta.value.trim();
+      if (text === start.trim()) return show();
+      try { say("ok", await api.LibrarySetNote(i.ref, text)); } catch (e) { say("fail", errText(e)); }
+      box.classList.remove("editing");
+      await load();
+    };
+    ta.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
+      else if (e.key === "Escape") { e.preventDefault(); done = true; show(); els.rows.focus(); }
+    };
+    ta.onblur = save;
+  };
+  return box;
 }
 
 function findCopy(ref) {
@@ -508,6 +682,8 @@ async function run(a, copies) {
   const i0 = copies[0];
   if (a.kind === "folder") return api.OpenFolder(i0.id).catch((e) => say("fail", errText(e)));
   if (a.kind === "workshop") return api.OpenURL(i0.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
+  // Steam lets no other program subscribe or unsubscribe: the page opens, and says so
+  if (a.url) return api.OpenURL(a.url).then(() => say("", a.say || T("opened the Workshop page")), (e) => say("fail", errText(e)));
   const go = async () => {
     try { say("ok", await api.LibraryDo(a.kind, refs), a.kind === "enable" || a.kind === "remove"); } catch (e) { say("fail", errText(e)); }
     L.sel.clear();

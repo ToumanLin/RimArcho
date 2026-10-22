@@ -30,7 +30,10 @@ type LibPage struct {
 	Conds  []LibCond   `json:"conds"` // what is in force, in the order given
 	Sort   string      `json:"sort"`
 	Sorts  []LibChoice `json:"sorts"`
-	Search string      `json:"search"`
+	// Columns are the table's columns in their default order (06 §2.9); the window keeps
+	// the player's order, widths and hidden ones (ui.gui.library.columns).
+	Columns []LibColumn `json:"columns"`
+	Search  string      `json:"search"`
 	// Complete is the grey text after the search box's last word that tab (or →) takes
 	// (06 §3.7): a key ("so" → "urce:") or a value ("state:un" → "used").
 	Complete string `json:"complete,omitempty"`
@@ -82,6 +85,13 @@ var LibColumns = []struct {
 	Shown bool
 }{{"name", true}, {"size", true}, {"state", true}, {"source", true}, {"used", true},
 	{"updated", false}, {"version", false}, {"author", false}, {"tags", false}, {"played", false}}
+
+// LibColumn is a table column: its key (= its sort), header, shown by default.
+type LibColumn struct {
+	Key   string `json:"key"`
+	Title string `json:"title"`
+	Shown bool   `json:"shown"`
+}
 
 // LibRow is a Lineage. A Lineage with one copy is that copy's row (Single, Insts[0]).
 type LibRow struct {
@@ -464,6 +474,9 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 			continue
 		}
 		p.Conds = append(p.Conds, LibCond{Filter: f, Label: libKeyTitle(k) + " " + libValueText(k, v, lib.GameMM), Exclude: ex})
+	}
+	for _, c := range LibColumns {
+		p.Columns = append(p.Columns, LibColumn{Key: c.Key, Title: LibColumnTitle(c.Key), Shown: c.Shown})
 	}
 	for _, s := range app.LibSorts {
 		p.Sorts = append(p.Sorts, LibChoice{Filter: s, Label: map[string]string{"name": T("name"), "size": T("size"), "changed": T("last changed"), "played": T("last played")}[s]})
