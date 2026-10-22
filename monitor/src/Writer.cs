@@ -135,7 +135,7 @@ namespace ArchoMonitor
                 }
                 if (byPrint.Count >= MaxEntries)
                 {
-                    FlushDirty();
+                    FlushDirty(true);
                     byPrint.Clear();
                     foreach (var d in exact)
                     {
@@ -172,13 +172,19 @@ namespace ArchoMonitor
                 {
                     return;
                 }
-                FlushDirty();
+                FlushDirty(false);
                 Flush();
             }
         }
 
-        static void FlushDirty()
+        // FlushDirty writes the counts gained since the last line of each entry; a full file
+        // keeps them for the exit (03 §6.7.3).
+        static void FlushDirty(bool closing)
         {
+            if (full && !closing)
+            {
+                return;
+            }
             foreach (var e in dirty)
             {
                 if (e.Pending > 0)
@@ -251,7 +257,7 @@ namespace ArchoMonitor
                     return;
                 }
                 Ready = false;
-                FlushDirty();
+                FlushDirty(true);
                 var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] exit").Str("details", "").Num("count", 1);
                 j.Raw("context").Open().Num("entries", distinct).Close();
                 j.Str("source", "archo-monitor").Num("schema", 1).Str("kind", "exit");
