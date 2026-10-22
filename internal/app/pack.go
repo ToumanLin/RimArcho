@@ -966,9 +966,5 @@ func (a *App) RemovePack(name string, dryRun bool) (string, error) {
 			}
 		}
 	}
-	trash := a.TrashFunc
-	if trash == nil {
-		trash = source.Trash
-	}
-	return dir, trash(dir)
+	return dir, a.ToTrash(dir)
 }

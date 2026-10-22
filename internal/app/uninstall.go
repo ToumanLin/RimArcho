@@ -784,11 +784,7 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 	case DoRestore:
 		return restoreModsConfig(it.Path)
 	case DoTrash:
-		trash := a.TrashFunc
-		if trash == nil {
-			trash = source.Trash
-		}
-		return trash(it.Path)
+		return a.ToTrash(it.Path)
 	case DoDelete:
 		return removeTree(it.Path)
 	case DoMove:

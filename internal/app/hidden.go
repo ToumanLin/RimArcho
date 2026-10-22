@@ -247,11 +247,7 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if dryRun {
 		return op, nil
 	}
-	trash := a.TrashFunc
-	if trash == nil {
-		trash = source.Trash
-	}
-	if err := trash(real); err != nil {
+	if err := a.ToTrash(real); err != nil {
 		return nil, err
 	}
 	op.Scan, err = a.Scan(false)

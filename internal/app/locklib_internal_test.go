@@ -18,7 +18,8 @@ func TestCopyMove(t *testing.T) {
 	to := filepath.Join(root, "lib", "5100_local")
 	os.MkdirAll(filepath.Dir(to), 0o755)
 	var trashed []string
-	a := &App{TrashFunc: func(p string) error { trashed = append(trashed, p); return os.RemoveAll(p) }}
+	a := &App{TrashFunc: func(p string) error { trashed = append(trashed, p); return os.RemoveAll(p) },
+		trashAllow: func(string) error { return nil }}
 	if err := a.copyMove(from, to); err != nil {
 		t.Fatal(err)
 	}

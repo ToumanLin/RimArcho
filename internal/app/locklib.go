@@ -201,11 +201,7 @@ func (a *App) copyMove(from, to string) error {
 		os.RemoveAll(tmp)
 		return err
 	}
-	trash := a.TrashFunc
-	if trash == nil {
-		trash = source.Trash
-	}
-	if err := trash(from); err != nil {
+	if err := a.ToTrash(from); err != nil {
 		return fmt.Errorf("copied to %s, but the original could not go to the recycle bin: %v (remove %s yourself)", to, err, from)
 	}
 	return nil

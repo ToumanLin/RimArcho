@@ -379,6 +379,13 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - Measured on the same data copy, GPU on: idle 202 → 138 MB, plan editor 204 → 138,
   Mod 库存 175 → 151, minimised 171 → 105. GPU off: 182 → 123, 185 → 123, 155 → 132, 150 → 88.
 
+### Packs (06 §2.6, §2.7, 08 §5.3, §7)
+- The recycle bin has one entry that checks the allow-list (08 §7) for every caller: a mod
+  folder inside a source folder (not the folder itself), a pack directly in the pack folder,
+  saves (a game's `Saves/`, own save folders, save backups) and a game downloaded with
+  SteamCMD. A link, or any other path, is refused whoever asks (`trash`, `pack remove`,
+  Mod 库存, moving copies to the lock library, uninstall).
+
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
 - `collection <id> --import` replaces the list with only the collection's mods, dropping Core.
