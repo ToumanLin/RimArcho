@@ -385,6 +385,19 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   saves (a game's `Saves/`, own save folders, save backups) and a game downloaded with
   SteamCMD. A link, or any other path, is refused whoever asks (`trash`, `pack remove`,
   Mod 库存, moving copies to the lock library, uninstall).
+- 编译成整合包 is the current plan's own page, laid out as drawn: the name and full / light
+  pack, the four things building does (check, leave out, lock, put in place) with their
+  numbers, and a summary (environment, mods, size before → after, own saves, location) with
+  编译 and 先看清单，不写磁盘 (the text of `pack build --dry-run`). With error-level problems
+  编译 is disabled and says 先修好 N 个问题 →, which opens 能不能跑 (G14); not enough space, an
+  unreadable mod, a bad or taken name and a build in progress disable it too. The build's
+  progress shows on the four steps with 停止; a finished build opens its pack. Builds cut
+  short are listed below. Keys: `B` build, `V` the dry run, `T` full / light, `n` the name,
+  `esc` back to the plan. The old build popup is gone.
+- Each pack is a sub-entry under 整合包 with a page of its own: what it is, 启动 (`L`), 导出
+  (`e`, a save dialog) and 移到回收站 (`Del`), and its mods in load order with their sizes and
+  the version folders left out. `tab` / `shift+tab` go from pack to pack (from the list: the
+  first one); the list opens a pack with `enter`.
 - A pack's `!ArchoPack_` links left in `Mods/` while the pack is not being played (a game
   started from Steam would load the pack's copies) are a problem of the plan,
   `pack.links-left`: in 能不能跑 › 要你确认 with 移除链接, in the tab under 启动游戏, in

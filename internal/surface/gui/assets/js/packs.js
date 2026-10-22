@@ -1,0 +1,442 @@
+// 整合包 (06 §2.6, §2.7, 08 §5): the packs (the sidebar's 整合包), each pack's own page
+// (its sub-entries), and 编译成整合包, the plan's sub-page: on the left the name, the kind
+// and the four things building does, on the right the summary and 编译, disabled with the
+// reason when something stops the build (G14); the builds cut short below.
+// Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
+// API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
+import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { openScreen, page, button, act } from "./screens.js";
+import * as pop from "./popups.js";
+
+let ui = null;
+export function initPacks(u) { ui = u; }
+
+let packPoll = 0;
+const L = { rows: [], un: [], others: 0, cur: 0, els: [] }; // the list page
+let P = null; // the pack page shown: view.PackPage
+const B = { page: null, full: null, light: false, name: "", nameErr: "", seq: 0 }; // the build page
+
+// ---- the list (整合包) ----
+
+async function loadList() {
+  const l = await api.Packs();
+  L.rows = (l && l.rows) || []; L.others = (l && l.others) || 0; L.un = (l && l.unfinished) || [];
+  // This window's build before its child wrote its first state.
+  if (l && l.building && !L.un.some((u) => u.name === l.building)) L.un.unshift({ name: l.building, running: true, facts: T("checking the list…") });
+  for (const u of L.un) if (u.running && S.packBuild && S.packBuild.name === u.name) u.progress = S.packBuild;
+}
+
+// list: every pack of the environment, one row each; enter (or a click) opens its page.
+export async function list() {
+  try { await loadList(); } catch (e) { return say("fail", errText(e)); }
+  const sc = S.screen === "packs" && !S.packFocus ? $("#screen") : openScreen("packs");
+  sc.innerHTML = "";
+  const w = page("packs", T("a pack copies every mod of the list as it is now and plays with its own saves"),
+    act(T("build a pack"), "packs", () => ui.go("build"), "B"));
+  sc.append(w);
+  for (const u of L.un) w.append(buildCard(u));
+  const card = el("section", "card");
+  L.els = [];
+  if (!L.rows.length) {
+    card.append(el("div", "empty-state", T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves")));
+  }
+  L.cur = Math.min(L.cur, Math.max(L.rows.length - 1, 0));
+  L.rows.forEach((r, i) => {
+    const row = el("div", "pack link" + (i === L.cur ? " cur" : ""));
+    const left = el("div", "l");
+    left.append(el("div", "name", r.name), el("div", "sub", r.facts + " · " + r.played));
+    row.append(left, el("span", "go", "→"));
+    row.onclick = () => ui.go("pack:" + r.name);
+    L.els.push(row);
+    card.append(row);
+  });
+  w.append(card);
+  if (L.others) w.append(el("div", "muted note", Tf("%d packs belong to other environments; switch the environment to see them", L.others)));
+  ui.renderHints();
+  pollWhileBuilding(list);
+}
+
+function markList() {
+  L.els.forEach((r, i) => r.classList.toggle("cur", i === L.cur));
+  if (L.els[L.cur]) L.els[L.cur].scrollIntoView({ block: "nearest" });
+}
+
+// ---- one pack (a sub-entry of 整合包) ----
+
+export async function pack(name) {
+  try { P = await api.Pack(name); } catch (e) { say("fail", errText(e)); return ui.go("packs"); }
+  const sc = S.screen === "packs" && S.packFocus === name ? $("#screen") : openScreen("packs");
+  sc.innerHTML = "";
+  const acts = [button(T("export"), "e", () => exportPack()), button(T("move to the recycle bin"), "Del", () => removePack())];
+  if (!P.light) {
+    const play = act(T("play"), "play", () => launch(), "L");
+    play.classList.add("primary");
+    acts.push(play);
+  }
+  const w = page("packs pack-page", P.facts.join(" · "), ...acts);
+  sc.append(w);
+  const sec = el("section", "sec");
+  sec.append(el("h2", "label", T("the mods, in load order")));
+  const card = el("div", "card pack-mods");
+  for (const m of P.mods) {
+    const r = el("div", "pm");
+    r.append(el("span", "n", m.name), el("span", "x muted", [m.note, m.size].filter(Boolean).join(" · ")));
+    card.append(r);
+  }
+  sec.append(card);
+  w.append(sec, el("div", "muted note dir", T("folder") + ": " + P.dir));
+  ui.renderHints(); // the list and a pack's page share the screen: their keys differ
+}
+
+async function launch() {
+  if (!P || P.light) return;
+  try { say("ok", await api.PackLaunch(P.name)); } catch (e) { say("fail", errText(e)); }
+  ui.reload();
+}
+
+// exportPack writes the pack to a file: the save dialog in the window, a typed path in the
+// development harness.
+async function exportPack() {
+  if (!P) return;
+  const name = P.name;
+  try {
+    const t = await api.PackExport(name, "", !!P.light);
+    if (t) say("ok", t);
+  } catch (e) {
+    pop.ask(T("export the pack"), T("the new file") + " · " + name + (P.light ? ".archopack.json" : ".archopack"), async (file) => {
+      if (!file) return;
+      try { say("ok", await api.PackExport(name, file, !!P.light)); } catch (e2) { say("fail", errText(e2)); }
+    });
+  }
+}
+
+function removePack() {
+  if (!P) return;
+  const name = P.name;
+  pop.confirm(T("move to the recycle bin"), [Tf("pack %s goes to the recycle bin; you can restore it from there", name)], T("move to the recycle bin"), async () => {
+    try { say("ok", await api.PackRemove(name)); } catch (e) { return say("fail", errText(e)); }
+    await ui.reload();
+    ui.go("packs");
+  });
+}
+
+// ---- builds running or cut short ----
+
+function progressBox(p) {
+  const w = el("div", "prog");
+  const bar = el("div", "bar" + (p.error ? " bad" : ""));
+  const fill = el("i");
+  fill.style.width = Math.round((p.frac || 0) * 100) + "%";
+  bar.append(fill);
+  w.append(bar, el("div", "ptext" + (p.error ? " bad" : ""), p.error || p.text || ""));
+  return w;
+}
+
+// buildCard is a build: running (here or in another window) or cut short (delete what it
+// copied — RimArcho's own unfinished copy, 08 §5.2 — or build it again).
+function buildCard(u) {
+  const card = el("section", "card build" + (u.running ? "" : " unfinished"));
+  card.dataset.build = u.name;
+  const head = el("div", "pack");
+  const left = el("div", "l");
+  left.append(el("div", "name", u.running ? Tf("building pack %s", u.name) : u.name), el("div", "sub", u.facts || ""));
+  const right = el("div", "r");
+  if (u.running) {
+    right.append(button(T("stop"), "", async () => {
+      try { say("ok", await api.PackStop(u.name)); } catch (e) { say("fail", errText(e)); }
+    }));
+  } else {
+    right.append(button(T("build again"), "", () => startBuild(u.name, false)));
+    right.append(button(T("delete what it copied"), "", () => pop.confirm(T("delete what it copied"), [Tf("the unfinished build of %s and what it copied (%s) are deleted; your mods are not touched", u.name, u.copied || "?")], T("delete what it copied"), async () => {
+      say("busy", T("deleting what it copied…"));
+      try { say("ok", await api.PackRemoveUnfinished(u.name)); } catch (e) { say("fail", errText(e)); }
+      redraw();
+    }), "danger"));
+  }
+  head.append(left, right);
+  card.append(head);
+  if (u.running) {
+    const body = el("div", "progwrap");
+    body.append(progressBox(u.progress || { frac: 0, text: "" }));
+    card.append(body);
+  }
+  return card;
+}
+
+// A build this window does not watch (started before a restart, or elsewhere): look again
+// while it runs.
+function pollWhileBuilding(again) {
+  clearTimeout(packPoll);
+  if (L.un.some((u) => u.running && !(S.packBuild && S.packBuild.name === u.name))) {
+    const screen = S.screen;
+    packPoll = setTimeout(() => { if (S.screen === screen && !S.popup) again(); }, 1500);
+  }
+}
+
+function redraw() {
+  if (S.screen === "build") return build(true);
+  if (S.screen === "packs") return S.packFocus ? pack(S.packFocus) : list();
+}
+
+// packEvent is a "pack" event: the progress of the build this window started, and its end
+// (a finished build opens its page).
+export function packEvent(ev) {
+  S.packBuild = ev.done ? null : ev;
+  if (ev.done) {
+    say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
+    ui.reload();
+    if (ev.ok && S.screen === "build") return ui.go("pack:" + ev.name);
+    return redraw();
+  }
+  if (S.screen === "build") return drawBuild();
+  if (S.screen !== "packs" || S.packFocus) { say("busy", Tf("building pack %s", ev.name) + " · " + ev.text); return; }
+  const card = document.querySelector(`.card.build[data-build="${CSS.escape(ev.name)}"]`);
+  if (!card) return list();
+  const body = card.querySelector(".progwrap");
+  if (body) { body.innerHTML = ""; body.append(progressBox(ev)); }
+  card.querySelector(".sub").textContent = T("building") + " · " + ev.text;
+}
+
+// ---- 编译成整合包 (the plan's sub-page) ----
+
+// build opens the page: the check is quick, the sizes need every mod's folder walked, so
+// the page shows at once and the sizes follow. again: a redraw keeps the name typed.
+export async function build(again = false) {
+  const seq = ++B.seq;
+  if (!again) { B.full = null; B.light = false; B.name = ""; B.nameErr = ""; }
+  try { await loadList(); } catch { L.un = []; }
+  if (!B.page || !again) {
+    say("busy", T("checking the list…"));
+    try { B.page = await api.BuildPage(B.light); } catch (e) { return say("fail", errText(e)); }
+    if (seq !== B.seq) return;
+    say("", "");
+    if (!B.light) B.full = B.page;
+    if (!B.name) B.name = B.page.name;
+  }
+  B.nameErr = await api.PackNameCheck(B.name);
+  if (seq !== B.seq) return;
+  drawBuild();
+  pollWhileBuilding(() => build(true));
+}
+
+async function setLight(light) {
+  if (B.light === light) return;
+  B.light = light;
+  if (!light && B.full) B.page = B.full;
+  else {
+    try { B.page = await api.BuildPage(light); } catch (e) { return say("fail", errText(e)); }
+    if (!light) B.full = B.page;
+  }
+  drawBuild();
+}
+
+const building = () => !!(S.packBuild || L.un.some((u) => u.running));
+
+function drawBuild() {
+  const p = B.page;
+  if (!p) return;
+  const sc = S.screen === "build" ? $("#screen") : openScreen("build");
+  const focusName = document.activeElement && document.activeElement.id === "pk-name";
+  sc.innerHTML = "";
+  const w = page("build", T("a pack locks every mod's version: later Workshop updates do not change it, and it has its own saves and settings; the plan stays as it is"),
+    button(T("cancel"), "esc", () => ui.go("plan")));
+  const cols = el("div", "bd-cols");
+  const left = el("div", "bd-left");
+
+  // the name and the kind
+  const basics = el("section", "sec");
+  basics.append(el("h2", "label", T("the pack")));
+  const bc = el("div", "card bd-basics");
+  const nameRow = el("label", "bd-row");
+  const name = el("input", "field");
+  name.id = "pk-name";
+  name.spellcheck = false;
+  name.value = B.name;
+  name.oninput = async () => {
+    B.name = name.value;
+    const n = B.name, err = await api.PackNameCheck(n);
+    if (n !== B.name) return;
+    B.nameErr = err;
+    syncButton();
+  };
+  name.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); go(); }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); name.blur(); }
+  };
+  nameRow.append(el("span", "k", T("name")), name);
+  const kinds = el("div", "bd-row");
+  kinds.setAttribute("role", "radiogroup");
+  const pick = el("div", "bd-kinds");
+  for (const [light, title, sub] of [[false, T("full pack"), T("carries the mods' files; plays on its own, offline too")], [true, T("light pack"), T("the list only, for sharing; the other side gets the mods from the Workshop")]]) {
+    const b = el("button", "bd-kind" + (B.light === light ? " on" : ""));
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(B.light === light));
+    b.append(el("div", "t", title), el("div", "s", sub));
+    b.onclick = () => setLight(light);
+    pick.append(b);
+  }
+  kinds.append(el("span", "k", T("kind")), pick);
+  bc.append(nameRow, el("div", "bd-err", ""), kinds);
+  basics.append(bc);
+
+  // the four things building does; while it builds, where it is
+  const steps = el("section", "sec");
+  steps.append(el("h2", "label", T("what building does")));
+  const sc2 = el("div", "card bd-steps");
+  const at = S.packBuild ? ({ 0: 0, 2: 1, 3: 3, 4: 4 })[S.packBuild.step] ?? 0 : -1;
+  p.steps.forEach((s, i) => {
+    let cls = "bd-step" + (s.level ? " " + s.level : "");
+    if (at >= 0) cls += i < at ? " done" : i === at || (at === 1 && i === 2) ? " cur" : " wait";
+    const r = el("div", cls);
+    const n = el("span", "n", at >= 0 && i < at ? "✓" : s.level === "bad" ? "!" : String(i + 1));
+    const body = el("div", "b");
+    body.append(el("div", "t", s.title), el("div", "x", s.text));
+    if (s.more && s.more.length) {
+      const ul = el("ul");
+      for (const m of s.more) ul.append(el("li", "", m));
+      body.append(ul);
+    }
+    r.append(n, body);
+    if (s.needs) r.append(button(T("fix them"), "", () => ui.go("needs"), "primary"));
+    sc2.append(r);
+  });
+  if (S.packBuild) {
+    // this window's build: where it is, and 停止 (what it copied is removed)
+    const pw = el("div", "progwrap bd-prog");
+    const name = S.packBuild.name;
+    pw.append(progressBox(S.packBuild), button(T("stop"), "", async () => {
+      try { say("ok", await api.PackStop(name)); } catch (e) { say("fail", errText(e)); }
+    }));
+    sc2.append(pw);
+  }
+  steps.append(sc2);
+  left.append(basics, steps);
+
+  // the summary and 编译
+  const side = el("aside", "card bd-side");
+  side.append(el("div", "h", B.name || p.plan));
+  const kv = el("div", "bd-kv");
+  const row = (k, v) => kv.append(el("span", "k", k), v instanceof Node ? v : el("span", "v", v));
+  row(T("environment"), p.env);
+  row(T("mods"), el("span", "v num", String(p.mods)));
+  if (p.light) row(T("size"), T("list only"));
+  else if (p.before) {
+    const v = el("span", "v");
+    v.append(p.before + " → ", el("b", "", p.after));
+    row(T("size"), v);
+  } else row(T("size"), el("span", "v muted", T("worked out once the problems are fixed")));
+  row(T("saves"), p.saves);
+  row(T("location"), el("span", "v path", p.dir));
+  side.append(kv);
+  const go1 = el("button", "btn primary bd-go");
+  go1.append(T("build"), el("kbd", "", "B"));
+  go1.onclick = () => go();
+  const why = el("div", "bd-why");
+  const dry = button(T("see the list first, write nothing"), "V", () => dryRun());
+  dry.classList.add("bd-dry");
+  side.append(go1, why, dry);
+  cols.append(left, side);
+  w.append(cols);
+
+  // builds cut short (or running in another window) below
+  const un = L.un.filter((u) => !(S.packBuild && S.packBuild.name === u.name));
+  if (un.length) {
+    const s = el("section", "sec");
+    s.append(el("h2", "label", T("unfinished builds")));
+    for (const u of un) s.append(buildCard(u));
+    w.append(s);
+  }
+  sc.append(w);
+  syncButton();
+  if (focusName) { const n = $("#pk-name"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+}
+
+// syncButton: 编译 is enabled only when nothing stops the build; the line under it says
+// what does, and the check's problems lead to 能不能跑 (G14).
+function syncButton() {
+  const p = B.page;
+  const go1 = $(".bd-go"), why = $(".bd-why"), err = $(".bd-err"), head = $(".bd-side .h");
+  if (!go1 || !p) return;
+  if (head) head.textContent = B.name.trim() || p.plan;
+  err.textContent = B.nameErr || "";
+  let reason = "", toNeeds = false;
+  if (!p.ok) { reason = p.why; toNeeds = p.toNeeds; }
+  else if (S.packBuild) reason = Tf("building pack %s", S.packBuild.name);
+  else if (building()) reason = T("another pack is being built; wait for it to finish");
+  else if (B.nameErr) reason = B.nameErr;
+  go1.disabled = !!reason;
+  why.classList.toggle("busy", !!S.packBuild && p.ok);
+  why.innerHTML = "";
+  why.hidden = !reason;
+  if (reason) {
+    if (toNeeds) {
+      const a = el("button", "bd-link", reason + " →");
+      a.title = T("can it run");
+      a.onclick = () => ui.go("needs");
+      why.append(a);
+    } else why.append(el("span", "", reason));
+  }
+}
+
+function go() {
+  const p = B.page;
+  if (!p || !p.ok || B.nameErr || building()) return;
+  startBuild(B.name.trim(), B.light);
+}
+
+async function startBuild(name, light) {
+  try { say("ok", await api.PackBuild(name, light)); } catch (e) { return say("fail", errText(e)); }
+  if (light) { await ui.reload(); return ui.go("pack:" + name); }
+  redraw();
+}
+
+// dryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run.
+async function dryRun() {
+  const name = (B.name || "").trim() || (B.page && B.page.name) || "";
+  try { pop.text(T("see the list first, write nothing"), await api.PackDryRun(name, B.light)); } catch (e) { say("fail", errText(e)); }
+}
+
+// ---- keys ----
+
+// packsKey: the list (↑↓, enter, B), a pack's page (L, e, Del) and the build page (B, V,
+// T, esc back to the plan).
+export function packsKey(e) {
+  const k = e.key;
+  const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
+  if (S.screen === "build") {
+    if (kk === "B" || (k === "Enter" && e.ctrlKey)) { e.preventDefault(); return go(); }
+    if (kk === "V") { e.preventDefault(); return dryRun(); }
+    if (kk === "T") { e.preventDefault(); return setLight(!B.light); }
+    if (k === "n" || k === "/") { e.preventDefault(); const n = $("#pk-name"); if (n) n.focus(); return; }
+    if (k === "Escape") { e.preventDefault(); return ui.go("plan"); }
+    return;
+  }
+  if (S.packFocus) {
+    if (kk === "L") { e.preventDefault(); return launch(); }
+    if (k === "e") { e.preventDefault(); return exportPack(); }
+    if (k === "Delete") { e.preventDefault(); return removePack(); }
+    return;
+  }
+  if (k === "ArrowDown" || k === "ArrowUp" || k === "j" || k === "k") {
+    e.preventDefault();
+    if (!L.rows.length) return;
+    L.cur = Math.max(0, Math.min(L.rows.length - 1, L.cur + (k === "ArrowDown" || k === "j" ? 1 : -1)));
+    return markList();
+  }
+  if (k === "Home" || k === "End") { e.preventDefault(); L.cur = k === "Home" ? 0 : Math.max(L.rows.length - 1, 0); return markList(); }
+  if (k === "Enter" && L.rows[L.cur]) { e.preventDefault(); return ui.go("pack:" + L.rows[L.cur].name); }
+  if (kk === "B") { e.preventDefault(); return ui.go("build"); }
+}
+
+export function hintList() {
+  const tail = [{ key: "shift+1–7", label: T("pages") }, { key: "?", label: T("all keys") }];
+  if (S.screen === "build") {
+    return [{ key: "B", label: T("build") }, { key: "V", label: T("see the list first") }, { key: "T", label: T("full / light pack") },
+      { key: "n", label: T("name") }, { key: "esc", label: T("back to the plan") }, ...tail];
+  }
+  if (S.packFocus) {
+    return [...(P && !P.light ? [{ key: "L", label: T("play") }] : []), { key: "e", label: T("export") }, { key: "Del", label: T("move to the recycle bin") },
+      { key: "tab", label: T("next pack") }, ...tail];
+  }
+  return [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }, { key: "B", label: T("build a pack") }, { key: "tab", label: T("first pack") }, ...tail];
+}

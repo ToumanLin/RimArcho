@@ -102,6 +102,26 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("esc", "back; with one mod shown, every mod again"),
 		)
 	}
+	if page == PackPages {
+		out = append(out,
+			r("↑↓ · enter", "the packs: move, open one"),
+			r("tab · shift+tab", "the next / previous pack"),
+			r("L", "play the pack"),
+			r("e", "export the pack to a file"),
+			r("Del", "move the pack to the recycle bin (asks first)"),
+			r("B", "build a pack from the current plan"),
+		)
+	}
+	if page == BuildPageID {
+		out = append(out,
+			r("n · /", "type the name"),
+			r("T", "full pack / light pack"),
+			r("B · enter in the name", "build"),
+			r("V", "see the list first, write nothing"),
+			r("tab", "the next field or button"),
+			r("esc", "back to the plan"),
+		)
+	}
 	out = append(out,
 		r("tab · shift+tab", "next / previous page under the same sidebar entry"),
 		r("shift+1–7", "go to a page in the sidebar"),

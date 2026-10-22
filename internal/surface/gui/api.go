@@ -199,29 +199,119 @@ func (s *API) Packs() (*PackList, error) {
 	return &PackList{Rows: rows, Others: others, Unfinished: un, Building: s.building}, err
 }
 
-// PackPreview is a dry-run build of the current list as a pack: checked and sorted under
-// the lock, measured (every mod's folder walked) outside it.
-func (s *API) PackPreview(name string) (*view.PackPreview, error) {
+// BuildPage is 编译成整合包 for the current plan (06 §2.6): checked and sorted under the
+// lock, measured (every mod's folder walked) outside it; a light pack is not measured.
+func (s *API) BuildPage(light bool) (*view.BuildPage, error) {
 	s.mu.Lock()
-	pl, err := s.a.PlanPack(name, false)
+	plan, chip := "", ""
+	if st := s.boardState(); st != nil {
+		chip = view.EnvChip(s.board.EnvName, s.board.GameVersion)
+		if st.Plan != nil {
+			plan = st.Plan.Name
+		}
+	}
+	name := view.DefaultPackName(s.a, plan)
+	pl, err := s.a.PlanPack(name, light)
 	dir := s.a.PacksDir()
 	s.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
 	pl.Measure(dir)
-	return view.PreviewOf(pl, dir), nil
+	p := view.BuildPageOf(pl, plan, chip, dir, light)
+	p.Name = name
+	return p, nil
+}
+
+// PackNameCheck says what is wrong with a new pack's name ("" when it can be used).
+func (s *API) PackNameCheck(name string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return view.T("give the pack a name")
+	}
+	if app.CheckPackName(name) != nil {
+		return view.T("letters, digits, spaces and . _ - only (up to 64)")
+	}
+	if _, err := s.a.ReadPack(name); err == nil {
+		return view.T("a pack of this name exists")
+	}
+	return ""
+}
+
+// PackDryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run (nothing is written).
+func (s *API) PackDryRun(name string, light bool) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	argv := []string{"pack", "build", strings.TrimSpace(name), "--dry-run"}
+	if light {
+		argv = append(argv, "--light")
+	}
+	text, _ := cmds.Execute(s.a, argv)
+	st := s.boardState()
+	var out []string
+	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+		if strings.HasPrefix(l, "usage:") {
+			break // a refused build ends with the command's usage: not for the page
+		}
+		out = append(out, view.Humanize(st, l))
+	}
+	for len(out) > 0 && strings.TrimSpace(out[len(out)-1]) == "" {
+		out = out[:len(out)-1]
+	}
+	return out
+}
+
+// Pack is one pack's page (06 §2.7).
+func (s *API) Pack(name string) (*view.PackPage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.BuildPackPage(s.a, name)
+}
+
+// PackExport writes a pack to a file the player picks (pack export): the save dialog in
+// the window; file is the typed path where there is none. "" when it was cancelled.
+func (s *API) PackExport(name, file string, light bool) (string, error) {
+	ext := ".archopack"
+	if light {
+		ext = ".archopack.json"
+	}
+	if file == "" {
+		if s.x.native == nil {
+			return "", errors.New(view.T("no file dialog here; type the path"))
+		}
+		f, err := s.x.native.saveFile(view.T("export the pack"), name+ext, [][2]string{{"*" + ext, "*" + ext}, {"All files (*.*)", "*.*"}})
+		if err != nil || f == "" {
+			return "", err
+		}
+		file = f
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n, err := s.a.ExportPack(name, file, light)
+	if err != nil {
+		return "", err
+	}
+	return view.Tf("exported pack %s to %s (%s)", name, file, view.SizeText(n)), nil
 }
 
 // PackBuild starts building the pack in an `archo pack build` child process and returns at
 // once: the copy takes minutes and holds nothing here, so every page keeps working, and it
 // goes on when the window closes. "pack" events carry the progress (view.PackProgress) and
 // the end. One build at a time.
-func (s *API) PackBuild(name string) (string, error) {
+func (s *API) PackBuild(name string, light bool) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := app.CheckPackName(name); err != nil {
 		return "", err
+	}
+	if light {
+		// The list only: nothing to copy, done at once.
+		if _, err := s.a.BuildPack(name, true, false); err != nil {
+			return "", err
+		}
+		return view.Tf("built pack %s", name), nil
 	}
 	if s.busy["pack"] {
 		return "", errors.New(view.T("another pack is being built; wait for it to finish"))

@@ -22,6 +22,7 @@ import { icon } from "./icons.js";
 import * as motion from "./motion.js";
 import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
+import * as packsPage from "./packs.js";
 
 // ---- loading ----
 
@@ -124,7 +125,7 @@ function planActions() {
     out.push(n);
   } else motion.bump("unwritten", null, 0);
   out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("import / export"), "i", () => exchange(0)),
-    btn(T("build a pack"), "", () => go("packs"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
+    btn(T("build a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
   if (plan) {
     const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");
     more.title = T("the plan: rename, copy, delete") + " · P";
@@ -156,14 +157,15 @@ async function go(id) {
 }
 
 async function openPage(id) {
-  if (S.packFocus) return scr.packs();
+  if (S.packFocus) return packsPage.pack(S.packFocus);
   switch (id) {
     case "plan":
       if (scr.closeScreen()) detailFollow(true);
       return renderWhere();
     case "home": return homePage.home();
     case "needs": return scr.needs();
-    case "packs": return scr.packs();
+    case "packs": return packsPage.list();
+    case "build": return packsPage.build();
     case "env": return scr.environment();
     case "changes": return scr.changes(S.screen === "changes" ? undefined : null);
     case "library": return library.open();
@@ -238,6 +240,7 @@ function renderHints() {
   else if (S.screen === "library") list = library.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "home") list = homePage.hintList();
+  else if (S.screen === "packs" || S.screen === "build") list = packsPage.hintList();
   else if (S.screen) list = [{ key: "shift+1–7", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);
@@ -447,7 +450,7 @@ async function preview(what) {
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", "env-page": "env", uninstall: "uninstall" };
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
@@ -617,6 +620,9 @@ function subPage(d) {
     const kids = (it.kids || []).filter((x) => !x.add);
     const i = kids.findIndex((x) => x.id === cur);
     if (i >= 0 && kids.length > 1) return go(kids[(i + d + kids.length) % kids.length].id);
+    // the entry's own page that is not one of its sub-entries (整合包's list): to the first
+    // or the last of them
+    if (i < 0 && it.id === cur && kids.length) return go(kids[d > 0 ? 0 : kids.length - 1].id);
   }
 }
 
@@ -688,7 +694,7 @@ function onKey(e) {
   // tab / shift+tab: the next / previous page under the same sidebar entry (Mod 库存's 全部 and
   // 变化, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
   // (on the pages with forms, settings and the like, tab keeps moving the focus)
-  if (k === "Tab" && !e.ctrlKey && !e.altKey && (!S.screen || S.screen === "library" || S.screen === "changes")) { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
+  if (k === "Tab" && !e.ctrlKey && !e.altKey && (!S.screen || S.screen === "library" || S.screen === "changes" || S.screen === "packs")) { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
   if (S.screen) {
     // esc (and enter) leave the full detail for the plan; the sidebar's pages are side by
     // side, so esc does not go from one to another (06 §3.1)
@@ -696,6 +702,7 @@ function onKey(e) {
     if (e.ctrlKey && k === "k") { e.preventDefault(); return pop.palette(); }
     if (k === "?" && S.screen !== "full") { e.preventDefault(); return pop.help(S.screen); }
     if (S.screen === "home") return homePage.homeKey(e);
+    if (S.screen === "packs" || S.screen === "build") return packsPage.packsKey(e);
     if (S.screen === "needs") return scr.needsKey(e);
     if (S.screen === "library") return library.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
@@ -836,6 +843,7 @@ async function start() {
   scr.initScreens(ui);
   shell.initShell(ui);
   homePage.initHome(ui);
+  packsPage.initPacks(ui);
   guide.initGuide(ui);
   initExchange(ui);
   plans.initPlans(ui);
@@ -874,7 +882,7 @@ async function start() {
     scr.analyzeEvent(ev);
     if (ev.done && S.screen === "home") homePage.home();
   });
-  on("pack", (ev) => scr.packEvent(ev));
+  on("pack", (ev) => packsPage.packEvent(ev));
   on("uninstall", (ev) => uninst.event(ev));
   on("guide", (ev) => guide.guideEvent(ev));
   on("download", (ev) => guide.downloadEvent(ev));
