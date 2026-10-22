@@ -81,7 +81,7 @@ namespace ArchoMonitor
                 Writer.WriteSession(session, root, settings != null && settings.recordMessages);
                 Writer.Ready = true;
                 // The marker that pairs Player.log with this file (03 §6.7.3).
-                Log.Message("[Archo Monitor] " + Version + " session " + session);
+                Log.Message("[Archo Monitor] " + Version + " session " + session + ": " + Writer.Path);
             }
             catch (Exception e)
             {

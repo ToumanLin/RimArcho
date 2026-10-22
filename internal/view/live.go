@@ -73,7 +73,7 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 		if path == "" {
 			return &Live{Running: true, Since: run.Started.In(a.Loc).Format("15:04"), Pack: t.what.Pack, Guess: t.what.Guess}, nil
 		}
-		t.lv, t.pid = a.FollowLog(path, a.CompanionLog(st)), run.PID
+		t.lv, t.pid = a.FollowRun(path, a.RunDataRoot(st, t.what)), run.PID
 	}
 	if _, err := t.lv.Poll(a); err != nil {
 		return nil, err
@@ -106,8 +106,18 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 		if len(c.Report.Attr) > 0 {
 			text = Tf("this run, %s: %d× %s", TokName(st, finding.Inst(c.Report.Attr[0].Instance)), c.Count, msg)
 		}
+		ev := evidence(EvLog, Tf("Player.log · this run, %d times", c.Count))
+		var texts []string
+		for _, at := range c.Report.Attr {
+			texts = append(texts, at.Evidence...)
+		}
+		if files := companionChips(texts); len(files) > 0 {
+			ev = evidence(EvLog, files[0])
+		} else if c.OnlyCompanion && c.Report.Companion != "" {
+			ev = evidence(EvLog, Tf("%s · this run, %d times", c.Report.Companion, c.Count))
+		}
 		out = append(out, Need{Group: GroupThisRun, Section: SectionRun, Text: text, Counted: true, Mods: ids, Status: StatusLog,
-			Evidence: evidence(EvLog, Tf("Player.log · this run, %d times", c.Count)),
+			Evidence: ev,
 			Actions:  []Action{{Kind: ActList, Key: "enter", Label: T("see the log and evidence"), Title: T("this run"), Lines: lines}}})
 	}
 	return out

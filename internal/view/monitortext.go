@@ -8,6 +8,7 @@ func init() {
 		"Archo Monitor installed":                             "已安装的 Archo Monitor",
 		"Archo Monitor added after Harmony (undo removes it)": "已在 Harmony 后面加入 Archo Monitor（撤销即可去掉）",
 		"not installed":                                       "未安装",
+		"%s · this run, %d times":                             "%s · 本次运行，%d 次",
 		"Archo Monitor is ready":                              "Archo Monitor 已就绪",
 	})
 }

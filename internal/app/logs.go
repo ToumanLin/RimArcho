@@ -51,6 +51,12 @@ type LogCluster struct {
 	Checklist  []string
 	Details    []string // class-specific facts (patch reasons, cross-reference providers …)
 	Finding    *finding.Finding
+	// From the companion log (03 §6.7.4): its file name, the first occurrence's time and
+	// level; OnlyCompanion when Player.log does not have the entry at all.
+	Companion     string    `json:",omitempty"`
+	At            time.Time `json:",omitzero"`
+	Level         string    `json:",omitempty"`
+	OnlyCompanion bool      `json:",omitempty"`
 }
 
 // LogReport is an analysed log.
@@ -64,6 +70,9 @@ type LogReport struct {
 	// the environment's (EnvMM): the log's own version (03 §6.4).
 	AnalysedAs, EnvMM string
 	Clusters          []*LogCluster
+	// Companion is the companion log read with it (03 §6.7.4); CompanionBad its bad lines.
+	Companion    string `json:",omitempty"`
+	CompanionBad int    `json:",omitempty"`
 }
 
 // LogPaths returns the current and previous Player.log for the environment's (or the
@@ -97,7 +106,7 @@ type logCacheEntry struct {
 var ErrLogNotCached = errors.New("log not analysed yet")
 
 // logCacheVersion invalidates stored reports when attribution changes.
-const logCacheVersion = 2
+const logCacheVersion = 3
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -117,7 +126,8 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	key := fmt.Sprintf("%s|%d|%d|%s|%s", path, fi.Size(), fi.ModTime().UnixNano(), a.Store.ChangeKey(), a.GameVersion)
+	compPath := CompanionFor(path)
+	key := fmt.Sprintf("%s|%d|%d|%s|%s|%s", path, fi.Size(), fi.ModTime().UnixNano(), a.Store.ChangeKey(), a.GameVersion, companionKey(compPath))
 	if a.logCache != nil && a.logCache.key == key {
 		return a.logCache.rep, nil
 	}
@@ -141,7 +151,7 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 		return nil, err
 	}
 	defer restore()
-	ik := a.logInputKey(st)
+	ik := a.logInputKey(st) + "|" + companionKey(compPath)
 	if fresh && row.InputKey == ik {
 		var stored LogReport
 		if err := json.Unmarshal(row.Report, &stored); err == nil {
@@ -160,8 +170,22 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 	}
 	rep.Lines = lf.Lines
 	fails, _ := analyze.ParseLogFailures(path)
-	if err := a.attribute(st, rep, lf, fails); err != nil {
+	var comp *logs.Companion
+	if compPath != "" {
+		comp, _ = logs.ReadCompanion(compPath)
+		if comp != nil {
+			rep.Companion, rep.CompanionBad = filepath.Base(compPath), comp.BadLines
+		}
+	}
+	only := companionOnly(lf, comp)
+	if err := a.attribute(st, rep, lf, fails, comp); err != nil {
 		return nil, err
+	}
+	for _, lc := range rep.Clusters {
+		if only[lc.First] {
+			lc.OnlyCompanion = true
+			lc.Details = append(lc.Details, "only in "+filepath.Base(compPath)+": Player.log does not have it (the game may have stopped logging)")
+		}
 	}
 	a.logCache = &logCacheEntry{key: key, rep: rep}
 	if b, err := json.Marshal(rep); err == nil {
@@ -219,7 +243,7 @@ func (a *App) AnalyzeLogText(text string) (*LogReport, error) {
 		return nil, err
 	}
 	defer restore()
-	return rep, a.attribute(st, rep, lf, nil)
+	return rep, a.attribute(st, rep, lf, nil, nil)
 }
 
 // LogMM is the game major.minor a log was written by ("" if it does not say).
@@ -294,6 +318,7 @@ type attrCtx struct {
 	run      *store.Analysis
 	fails    map[string]*analyze.PatchFact // FailKey(game path, desc) → fact
 	byXPath  map[string][]*analyze.PatchFact
+	comp     *logs.Companion // nil without a companion log
 }
 
 type dirOwner struct {
@@ -301,8 +326,8 @@ type dirOwner struct {
 	id  string
 }
 
-func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure) error {
-	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}}
+func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure, comp *logs.Companion) error {
+	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, comp: comp}
 	for _, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
 		if m == nil {
@@ -348,7 +373,7 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		failAt[f.Mod+"|"+strings.SplitN(f.Desc, "\n", 2)[0]] = f
 	}
 	var xrefs []*LogCluster
-	for _, c := range logs.Clusters(lf) {
+	for _, c := range logs.ClustersHint(lf, logs.HintFrom(comp)) {
 		lc := &LogCluster{Cluster: c}
 		cx.attributeCluster(lc, failAt)
 		if c.Class == logs.ClassXrefMissing {
@@ -726,6 +751,9 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 				lc.next(fmt.Sprintf("archo source %s --type %s", ix.Ref(id), outerType(t)))
 			}
 		}
+	}
+	if cx.comp != nil {
+		cx.companion(lc)
 	}
 	sort.SliceStable(lc.Attr, func(i, j int) bool { return roleRank[lc.Attr[i].Role] < roleRank[lc.Attr[j].Role] })
 	switch {

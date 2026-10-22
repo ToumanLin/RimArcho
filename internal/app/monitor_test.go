@@ -35,7 +35,9 @@ func monitorBundle(t *testing.T, e *testkit.Env, version string) string {
 
 const monName = "Archo Monitor"
 
-func monitorDir(e *testkit.Env) string { return filepath.Join(e.Root, "LocalAppData", "RimArcho", "monitor") }
+func monitorDir(e *testkit.Env) string {
+	return filepath.Join(e.Root, "LocalAppData", "RimArcho", "monitor")
+}
 
 // 08 §9, 04 §1.5 (M1, M2, M4): the bundled monitor is copied, registered as src:monitor,
 // and added right after Harmony to every plan once, as one undoable edit; then it is a
@@ -246,5 +248,37 @@ func TestMonitorNotBundled(t *testing.T) {
 	}
 	if _, err := os.Stat(monitorDir(e)); err == nil {
 		t.Fatal("the monitor folder was created")
+	}
+}
+
+// 08 §9: RIMARCHO_MONITOR points RimArcho at a locally built monitor.
+func TestMonitorDevPath(t *testing.T) {
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	b := monitorBundle(t, e, "0.0.0-dev")
+	t.Setenv("RIMARCHO_MONITOR", b)
+	e.App.MonitorBundle = ""
+	got, tried := e.App.FindMonitor()
+	if got == nil || got.Dir != b || got.Version != "0.0.0-dev" || tried[0] != b {
+		t.Fatalf("found %+v (tried %v)", got, tried)
+	}
+}
+
+// M6: a pack carries the monitor like any other mod (a copy, not a link).
+func TestMonitorInPack(t *testing.T) {
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.MustRun("disable", "pkg:gone.mod")
+	e.App.MonitorBundle = monitorBundle(t, e, "0.9.0")
+	e.MustRun("monitor", "install")
+	out := e.MustRun("pack", "build", "p")
+	matches, _ := filepath.Glob(filepath.Join(e.App.Home, "packs", "p", "mods", "*", "About", "About.xml"))
+	found := false
+	for _, m := range matches {
+		b, _ := os.ReadFile(m)
+		found = found || strings.Contains(string(b), app.MonitorPackage)
+	}
+	if !found {
+		t.Fatalf("no monitor copy in the pack (%v):\n%s", matches, out)
 	}
 }
