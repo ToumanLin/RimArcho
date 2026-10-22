@@ -1,0 +1,8 @@
+Caught exception while loading '[Rimworld_dir]\Mods\3498575851\Textures\Patterns\Army_Dark.dds': System.ArgumentOutOfRangeException: The capacity may not be smaller than the file size.
+Parameter name: capacity
+[Ref 57B726A4]
+  at System.IO.MemoryMappedFiles.MemoryMapImpl.OpenFile (System.String path, System.IO.FileMode mode, System.String mapName, System.Int64& capacity, System.IO.MemoryMappedFiles.MemoryMappedFileAccess access, System.IO.MemoryMappedFiles.MemoryMappedFileOptions options) [0x00060] in <1f993cbf88314b1baa1e10ca917bdc64>:0
+  at System.IO.MemoryMappedFiles.MemoryMappedFile.CreateFromFile (System.String path, System.IO.FileMode mode, System.String mapName, System.Int64 capacity, System.IO.MemoryMappedFiles.MemoryMappedFileAccess access) [0x00056] in <1f993cbf88314b1baa1e10ca917bdc64>:0
+  at GraphicSetter.DDSLoader.OpenExistingMmf (System.String path) [0x0000d] in C:\NeutralSource\Source.cs:260
+  at GraphicSetter.DDSLoader.LoadDDS (System.String path, System.Boolean& hasMipMaps, System.Boolean skipFileCheck) [0x0001a] in C:\NeutralSource\Source.cs:40
+  at GraphicSetter.DDSHelper.TryLoadDDS (RimWorld.IO.VirtualFile file, System.Boolean& hasMipMapsSet, UnityEngine.Texture2D& texture2D) [0x0001f] in C:\NeutralSource\Source.cs:24

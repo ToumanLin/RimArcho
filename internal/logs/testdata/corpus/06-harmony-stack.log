@@ -1,0 +1,6 @@
+Could not resolve cross refs: System.NullReferenceException: Object reference not set to an instance of an object
+[Ref 850B7816]
+  at Worldbuilder.Faction_ExposeData_Patch.Postfix (RimWorld.Faction __instance) [0x00000] in <2218645cb6764cf999493611ff123787>:0
+  at RimWorld.Faction.ExposeData () [0x00258] in <fcfab19af5d14a608a65ebd77f29482f>:0
+    - POSTFIX WorldbuilderMod: Void Worldbuilder.Faction_ExposeData_Patch:Postfix(Faction __instance)
+  at Verse.CrossRefHandler.ResolveAllCrossReferences () [0x000e8] in <fcfab19af5d14a608a65ebd77f29482f>:0

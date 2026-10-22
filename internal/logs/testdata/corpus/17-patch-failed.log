@@ -1,0 +1,4 @@
+[Combat Extended - Start of stack trace]
+Verse.PatchOperationAdd(xpath="Defs/ThingDef[defName="AEXP_Walrus"]/comps"): Failed to find a node with the given xpath
+[End of stack trace]
+Source file: C:\Steam\steamapps\workshop\content\294100\3495749827\ModPatches\Vanilla Animals Expanded\Patches\Vanilla Animals Expanded\IceSheet_Animals.xml

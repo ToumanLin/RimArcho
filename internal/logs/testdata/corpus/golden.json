@@ -1,0 +1,793 @@
+{
+  "01-exception.log": {
+    "version": "1.6",
+    "coverage": "exception|Caught exception while loading '…': System.ArgumentOutOfRangeException: The capacity may not be smaller than the file size.",
+    "frequency": 1729,
+    "count": 1,
+    "entries": [
+      {
+        "class": "exception",
+        "frames": 5,
+        "extra": 1,
+        "ref": "57B726A4"
+      }
+    ],
+    "clusters": [
+      {
+        "class": "exception",
+        "template": "exception|Caught exception while loading '…': System.ArgumentOutOfRangeException: The capacity may not be smaller than the file size.",
+        "key": "exception|Caught exception while loading '[Rimworld_dir]\\Mods\\#\\Textures\\Patterns\\Army_Dark.dds': System.ArgumentOutOfRangeException: The capacity may not be smaller than the file size.|System.IO.MemoryMappedFiles.MemoryMapImpl.OpenFile",
+        "count": 1
+      }
+    ]
+  },
+  "02-exception.log": {
+    "version": "1.6",
+    "coverage": "exception|System.TypeLoadException: Invalid type … for instance field …",
+    "frequency": 1112,
+    "count": 1,
+    "entries": [
+      {
+        "class": "exception",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "exception",
+        "template": "exception|System.TypeLoadException: Invalid type … for instance field …",
+        "key": "exception|System.TypeLoadException: Invalid type CombatExtended.LightingTracker[] for instance field CombatExtended.CE_Utility:_lightingTrackers",
+        "count": 1
+      }
+    ]
+  },
+  "03-exception.log": {
+    "version": "1.6",
+    "coverage": "exception|System.NullReferenceException: Object reference not set to an instance of an object",
+    "frequency": 922,
+    "count": 1,
+    "entries": [
+      {
+        "class": "exception",
+        "frames": 2,
+        "extra": 0,
+        "ref": "118BEB25"
+      }
+    ],
+    "clusters": [
+      {
+        "class": "exception",
+        "template": "exception|System.NullReferenceException: Object reference not set to an instance of an object",
+        "key": "exception|System.NullReferenceException: Object reference not set to an instance of an object|Verse.AI.Group.Lord.LordTick",
+        "count": 1
+      }
+    ]
+  },
+  "04-harmony-stack.log": {
+    "version": "1.6",
+    "coverage": "harmony-stack|Error while resolving references for def … System.NullReferenceException: Object reference not set to an instance of an object",
+    "frequency": 4404,
+    "count": 1,
+    "entries": [
+      {
+        "class": "harmony-stack",
+        "frames": 5,
+        "patches": 1,
+        "extra": 0,
+        "ref": "F8CA26D2"
+      }
+    ],
+    "clusters": [
+      {
+        "class": "harmony-stack",
+        "template": "harmony-stack|Error while resolving references for def … System.NullReferenceException: Object reference not set to an instance of an object",
+        "key": "harmony-stack|Error while resolving references for def konf: System.NullReferenceException: Object reference not set to an instance of an object|Verse.RaceProperties.get_AnyPawnKind",
+        "count": 1
+      }
+    ]
+  },
+  "05-harmony-stack.log": {
+    "version": "1.6",
+    "coverage": "harmony-stack|System.NullReferenceException: Object reference not set to an instance of an object",
+    "frequency": 1326,
+    "count": 1,
+    "entries": [
+      {
+        "class": "harmony-stack",
+        "frames": 12,
+        "patches": 2,
+        "extra": 0,
+        "ref": "DD4337A7"
+      }
+    ],
+    "clusters": [
+      {
+        "class": "harmony-stack",
+        "template": "harmony-stack|System.NullReferenceException: Object reference not set to an instance of an object",
+        "key": "harmony-stack|System.NullReferenceException: Object reference not set to an instance of an object|Verse.Game.DeinitAndRemoveMap",
+        "count": 1
+      }
+    ]
+  },
+  "06-harmony-stack.log": {
+    "version": "1.6",
+    "coverage": "harmony-stack|Could not resolve cross refs: System.NullReferenceException: Object reference not set to an instance of an object",
+    "frequency": 316,
+    "count": 1,
+    "entries": [
+      {
+        "class": "harmony-stack",
+        "frames": 3,
+        "patches": 1,
+        "extra": 0,
+        "ref": "850B7816"
+      }
+    ],
+    "clusters": [
+      {
+        "class": "harmony-stack",
+        "template": "harmony-stack|Could not resolve cross refs: System.NullReferenceException: Object reference not set to an instance of an object",
+        "key": "harmony-stack|Could not resolve cross refs: System.NullReferenceException: Object reference not set to an instance of an object|Worldbuilder.Faction_ExposeData_Patch.Postfix",
+        "count": 1
+      }
+    ]
+  },
+  "07-material.log": {
+    "version": "1.6",
+    "coverage": "material|Material '…' with Shader '…' doesn'…'_MainTex'",
+    "frequency": 562,
+    "count": 1,
+    "entries": [
+      {
+        "class": "material",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "material",
+        "template": "material|Material '…' with Shader '…' doesn'…'_MainTex'",
+        "key": "material|Material 'SunShadowFade' with Shader 'Custom/Sun shadow fade' doesn't have a texture property '_MainTex'",
+        "count": 1
+      }
+    ]
+  },
+  "08-material.log": {
+    "version": "1.6",
+    "coverage": "material|Could not execute post-long-event action. Exception: System.NullReferenceException: Object reference not set to an instance of an object",
+    "frequency": 412,
+    "count": 1,
+    "entries": [
+      {
+        "class": "material",
+        "frames": 4,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "material",
+        "template": "material|Could not execute post-long-event action. Exception: System.NullReferenceException: Object reference not set to an instance of an object",
+        "key": "material|Could not execute post-long-event action. Exception: System.NullReferenceException: Object reference not set to an instance of an object|Verse.RaceProperties.get_AnyPawnKind",
+        "count": 1
+      }
+    ]
+  },
+  "09-material.log": {
+    "version": "1.6",
+    "coverage": "material|Could not execute post-long-event action. Exception: System.InvalidOperationException: Sequence contains no elements",
+    "frequency": 11,
+    "count": 1,
+    "entries": [
+      {
+        "class": "material",
+        "frames": 4,
+        "extra": 0,
+        "ref": "9C2DEAC1"
+      }
+    ],
+    "clusters": [
+      {
+        "class": "material",
+        "template": "material|Could not execute post-long-event action. Exception: System.InvalidOperationException: Sequence contains no elements",
+        "key": "material|Could not execute post-long-event action. Exception: System.InvalidOperationException: Sequence contains no elements|System.Linq.Enumerable.First",
+        "count": 1
+      }
+    ]
+  },
+  "10-mod-report.log": {
+    "version": "1.6",
+    "coverage": "mod-report|[MeleeAnim] \u003cpkg\u003e '…' has # missing weapon tweak data.",
+    "frequency": 25687,
+    "count": 1,
+    "entries": [
+      {
+        "class": "mod-report",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "mod-report",
+        "template": "mod-report|[MeleeAnim] \u003cpkg\u003e '…' has # missing weapon tweak data.",
+        "key": "mod-report|\u003ccolor=##ffb#\u003e[MeleeAnim]\u003c/color\u003e romyashi.treasures 'Treasures' has # missing weapon tweak data.",
+        "count": 1
+      }
+    ]
+  },
+  "11-mod-report.log": {
+    "version": "1.6",
+    "coverage": "mod-report|[Filter Manager v#.#] Skipping missing def '…'",
+    "frequency": 8161,
+    "count": 1,
+    "entries": [
+      {
+        "class": "mod-report",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "mod-report",
+        "template": "mod-report|[Filter Manager v#.#] Skipping missing def '…'",
+        "key": "mod-report|[Filter Manager v#.#] Skipping missing def 'Vin_CB'",
+        "count": 1
+      }
+    ]
+  },
+  "12-mod-report.log": {
+    "version": "1.6",
+    "coverage": "mod-report|[SafePatcher]The xPath: \"…\" not found",
+    "frequency": 6574,
+    "count": 1,
+    "entries": [
+      {
+        "class": "mod-report",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "mod-report",
+        "template": "mod-report|[SafePatcher]The xPath: \"…\" not found",
+        "key": "mod-report|[SafePatcher]The xPath: \"Defs/ThingDef[defName=\"GD_MSSS\"]\" not found",
+        "count": 1
+      }
+    ]
+  },
+  "13-other.log": {
+    "version": "1.6",
+    "coverage": "other|DDS ERROR at '…': Invalid DDS file",
+    "frequency": 14505,
+    "count": 1,
+    "entries": [
+      {
+        "class": "other",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "other",
+        "template": "other|DDS ERROR at '…': Invalid DDS file",
+        "key": "other|DDS ERROR at '[Rimworld_dir]\\Mods\\#\\Textures\\Things\\Building\\AM_RedMechBooster.png': Invalid DDS file",
+        "count": 1
+      }
+    ]
+  },
+  "14-other.log": {
+    "version": "1.6",
+    "coverage": "other|DDS loading failed for '…': Cannot load compressed texture with non multiple of # dimensions of #x# and format BC#",
+    "frequency": 9218,
+    "count": 1,
+    "entries": [
+      {
+        "class": "other",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "other",
+        "template": "other|DDS loading failed for '…': Cannot load compressed texture with non multiple of # dimensions of #x# and format BC#",
+        "key": "other|DDS loading failed for '[Rimworld_dir]\\Mods\\#\\Textures\\Things\\CMC_Void.dds': Cannot load compressed texture with non multiple of # dimensions of #x# and format BC#",
+        "count": 1
+      }
+    ]
+  },
+  "15-other.log": {
+    "version": "1.6",
+    "coverage": "other|Grain couldn't resolve: Clip not found at …",
+    "frequency": 6266,
+    "count": 1,
+    "entries": [
+      {
+        "class": "other",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "other",
+        "template": "other|Grain couldn't resolve: Clip not found at …",
+        "key": "other|Grain couldn't resolve: Clip not found at Psycasts/AA_SlicePsycast",
+        "count": 1
+      }
+    ]
+  },
+  "16-patch-failed.log": {
+    "version": "1.6",
+    "coverage": "patch-failed|[Combat Extended] Verse.PatchOperationReplace(xpath=\"…\"): Failed to find a node with the given xpath",
+    "frequency": 1945,
+    "count": 1,
+    "entries": [
+      {
+        "class": "patch-failed",
+        "frames": 0,
+        "extra": 1
+      }
+    ],
+    "clusters": [
+      {
+        "class": "patch-failed",
+        "template": "patch-failed|[Combat Extended] Verse.PatchOperationReplace(xpath=\"…\"): Failed to find a node with the given xpath",
+        "key": "patch-failed|[Combat Extended] Verse.PatchOperationReplace(xpath=\"Defs/ThingDef[defName=\"GR_Catalope\"]/verbs\"): Failed to find a node with the given xpath|file: C:\\Steam\\steamapps\\workshop\\content\\294100\\3495749827\\ModPatches\\Vanilla Genetics Expanded\\Patches\\Vanilla Genetics Expanded\\Patch_VerbShoot.xml",
+        "count": 1
+      }
+    ]
+  },
+  "17-patch-failed.log": {
+    "version": "1.6",
+    "coverage": "patch-failed|[Combat Extended] Verse.PatchOperationAdd(xpath=\"…\"): Failed to find a node with the given xpath",
+    "frequency": 1167,
+    "count": 1,
+    "entries": [
+      {
+        "class": "patch-failed",
+        "frames": 0,
+        "extra": 1
+      }
+    ],
+    "clusters": [
+      {
+        "class": "patch-failed",
+        "template": "patch-failed|[Combat Extended] Verse.PatchOperationAdd(xpath=\"…\"): Failed to find a node with the given xpath",
+        "key": "patch-failed|[Combat Extended] Verse.PatchOperationAdd(xpath=\"Defs/ThingDef[defName=\"AEXP_Walrus\"]/comps\"): Failed to find a node with the given xpath|file: C:\\Steam\\steamapps\\workshop\\content\\294100\\3495749827\\ModPatches\\Vanilla Animals Expanded\\Patches\\Vanilla Animals Expanded\\IceSheet_Animals.xml",
+        "count": 1
+      }
+    ]
+  },
+  "18-patch-failed.log": {
+    "version": "1.6",
+    "coverage": "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationReplace(Defs/ThingDef[defName=…]/verbs) failed",
+    "frequency": 694,
+    "count": 1,
+    "entries": [
+      {
+        "class": "patch-failed",
+        "frames": 0,
+        "extra": 1
+      }
+    ],
+    "clusters": [
+      {
+        "class": "patch-failed",
+        "template": "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationReplace(Defs/ThingDef[defName=…]/verbs) failed",
+        "key": "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationReplace(Defs/ThingDef[defName=\"GR_Catalope\"]/verbs) failed|file: C:\\Steam\\steamapps\\workshop\\content\\294100\\3495749827\\ModPatches\\Vanilla Genetics Expanded\\Patches\\Vanilla Genetics Expanded\\Patch_VerbShoot.xml",
+        "count": 1
+      }
+    ]
+  },
+  "19-save-load.log": {
+    "version": "1.6",
+    "coverage": "save-load|Could not find think node with key …",
+    "frequency": 883,
+    "count": 1,
+    "entries": [
+      {
+        "class": "save-load",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "save-load",
+        "template": "save-load|Could not find think node with key …",
+        "key": "save-load|Could not find think node with key #",
+        "count": 1
+      }
+    ]
+  },
+  "20-save-load.log": {
+    "version": "1.6",
+    "coverage": "save-load|Could not resolve reference to object with loadID … of type … Was it compressed away, destroyed, had no ID number, or not saved/loaded right? curParent=RimWorld.DirectPawnRelation curPathRelToParent=",
+    "frequency": 729,
+    "count": 1,
+    "entries": [
+      {
+        "class": "save-load",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "save-load",
+        "template": "save-load|Could not resolve reference to object with loadID … of type … Was it compressed away, destroyed, had no ID number, or not saved/loaded right? curParent=RimWorld.DirectPawnRelation curPathRelToParent=",
+        "key": "save-load|Could not resolve reference to object with loadID Thing_Human# of type Verse.Pawn. Was it compressed away, destroyed, had no ID number, or not saved/loaded right? curParent=RimWorld.DirectPawnRelation curPathRelToParent=",
+        "count": 1
+      }
+    ]
+  },
+  "21-save-load.log": {
+    "version": "1.6",
+    "coverage": "save-load|Could not resolve reference to object with loadID … of type … Was it compressed away, destroyed, had no ID number, or not saved/loaded right? curParent=VEF.Storyteller.RaidGroup curPathRelToParent=/lords",
+    "frequency": 624,
+    "count": 1,
+    "entries": [
+      {
+        "class": "save-load",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "save-load",
+        "template": "save-load|Could not resolve reference to object with loadID … of type … Was it compressed away, destroyed, had no ID number, or not saved/loaded right? curParent=VEF.Storyteller.RaidGroup curPathRelToParent=/lords",
+        "key": "save-load|Could not resolve reference to object with loadID Lord_# of type Verse.AI.Group.Lord. Was it compressed away, destroyed, had no ID number, or not saved/loaded right? curParent=VEF.Storyteller.RaidGroup curPathRelToParent=/lords",
+        "count": 1
+      }
+    ]
+  },
+  "22-texture-missing.log": {
+    "version": "1.6",
+    "coverage": "texture-missing|Could not load AudioClip at '…' in any active mod or in base resources.",
+    "frequency": 38080,
+    "count": 1,
+    "entries": [
+      {
+        "class": "texture-missing",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "texture-missing",
+        "template": "texture-missing|Could not load AudioClip at '…' in any active mod or in base resources.",
+        "key": "texture-missing|Could not load AudioClip at 'Kill' in any active mod or in base resources.",
+        "count": 1
+      }
+    ]
+  },
+  "23-texture-missing.log": {
+    "version": "1.6",
+    "coverage": "texture-missing|Could not load Texture#D at '…' in any active mod or in base resources.",
+    "frequency": 12423,
+    "count": 1,
+    "entries": [
+      {
+        "class": "texture-missing",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "texture-missing",
+        "template": "texture-missing|Could not load Texture#D at '…' in any active mod or in base resources.",
+        "key": "texture-missing|Could not load Texture#D at 'Furniture/RusticTorch' in any active mod or in base resources.",
+        "count": 1
+      }
+    ]
+  },
+  "24-texture-missing.log": {
+    "version": "1.6",
+    "coverage": "texture-missing|Could not load Texture#D at '…' for def '…' in any active mod or in base resources.",
+    "frequency": 12116,
+    "count": 1,
+    "entries": [
+      {
+        "class": "texture-missing",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "texture-missing",
+        "template": "texture-missing|Could not load Texture#D at '…' for def '…' in any active mod or in base resources.",
+        "key": "texture-missing|Could not load Texture#D at 'Production/Well' for def 'EGG_AdvancedWell' in any active mod or in base resources.",
+        "count": 1
+      }
+    ]
+  },
+  "25-xml-load.log": {
+    "version": "1.6",
+    "coverage": "xml-load|XML error: Could not register node named \"…\" in mod CETeam.CombatExtended because this name is already used in this mod.",
+    "frequency": 427,
+    "count": 1,
+    "entries": [
+      {
+        "class": "xml-load",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "xml-load",
+        "template": "xml-load|XML error: Could not register node named \"…\" in mod CETeam.CombatExtended because this name is already used in this mod.",
+        "key": "xml-load|XML error: Could not register node named \"AmmoBase\" in mod CETeam.CombatExtended because this name is already used in this mod.",
+        "count": 1
+      }
+    ]
+  },
+  "26-xml-load.log": {
+    "version": "1.6",
+    "coverage": "xml-load|Exception loading UnityEngine.Texture#D from file.",
+    "frequency": 381,
+    "count": 1,
+    "entries": [
+      {
+        "class": "xml-load",
+        "frames": 0,
+        "extra": 1
+      }
+    ],
+    "clusters": [
+      {
+        "class": "xml-load",
+        "template": "xml-load|Exception loading UnityEngine.Texture#D from file.",
+        "key": "xml-load|Exception loading UnityEngine.Texture#D from file.|absFilePath: C:\\Steam\\steamapps\\workshop\\content\\294100\\3446237098\\Textures\\Things\\CMC_Void.dds",
+        "count": 1
+      }
+    ]
+  },
+  "27-xref-missing.log": {
+    "version": "1.6",
+    "coverage": "xref-missing|Could not load reference to Verse.ThingDef named …",
+    "frequency": 78857,
+    "count": 1,
+    "entries": [
+      {
+        "class": "xref-missing",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "xref-missing",
+        "template": "xref-missing|Could not load reference to Verse.ThingDef named …",
+        "key": "xref-missing|Could not load reference to Verse.ThingDef named PowerArm",
+        "count": 1
+      }
+    ]
+  },
+  "28-xref-missing.log": {
+    "version": "1.6",
+    "coverage": "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named … found to give to Verse.PawnKindDef …",
+    "frequency": 10852,
+    "count": 1,
+    "entries": [
+      {
+        "class": "xref-missing",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "xref-missing",
+        "template": "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named … found to give to Verse.PawnKindDef …",
+        "key": "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named BMT_Maxolotl found to give to Verse.PawnKindDef BMT_Maxolotl",
+        "count": 1
+      }
+    ]
+  },
+  "29-xref-missing.log": {
+    "version": "1.6",
+    "coverage": "xref-missing|Could not resolve cross-reference: No CombatExtended.AmmoCategoryDef named … found to give to CombatExtended.AmmoDef …",
+    "frequency": 5160,
+    "count": 1,
+    "entries": [
+      {
+        "class": "xref-missing",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "xref-missing",
+        "template": "xref-missing|Could not resolve cross-reference: No CombatExtended.AmmoCategoryDef named … found to give to CombatExtended.AmmoDef …",
+        "key": "xref-missing|Could not resolve cross-reference: No CombatExtended.AmmoCategoryDef named HollowPoint found to give to CombatExtended.AmmoDef Ammo_#x#mmUNSC_HP",
+        "count": 1
+      }
+    ]
+  },
+  "30-mono-native.log": {
+    "version": "1.6",
+    "coverage": "mono-native",
+    "skip": "KI-2: generated static-constructor frame name; see KNOWN_ISSUES.md",
+    "count": 1,
+    "entries": null,
+    "clusters": null
+  },
+  "31-duplicate-stack.log": {
+    "version": "1.6",
+    "coverage": "duplicate-stack",
+    "count": 2,
+    "entries": [
+      {
+        "class": "exception",
+        "frames": 2,
+        "extra": 1,
+        "ref": "4DA5E042"
+      },
+      {
+        "class": "exception",
+        "frames": 2,
+        "extra": 0,
+        "ref": "4DA5E042",
+        "duplicate": true
+      }
+    ],
+    "clusters": [
+      {
+        "class": "exception",
+        "template": "exception|Caught exception while loading '…': System.ArgumentOutOfRangeException: Specified argument was out of the range of valid values.",
+        "key": "exception|Caught exception while loading '[Rimworld_dir]\\Mods\\#\\Textures\\BuildingSmart.dds': System.ArgumentOutOfRangeException: Specified argument was out of the range of valid values.|GraphicSetter.DDSLoader.LoadDDS",
+        "count": 1
+      },
+      {
+        "class": "exception",
+        "template": "exception|Caught exception while loading '…': System.ArgumentOutOfRangeException: Specified argument was out of the range of valid values.",
+        "key": "exception|Caught exception while loading '[Rimworld_dir]\\Mods\\#\\Textures\\MAU_A\\EY\\Mask#.dds': System.ArgumentOutOfRangeException: Specified argument was out of the range of valid values.|GraphicSetter.DDSLoader.LoadDDS",
+        "count": 1
+      }
+    ]
+  },
+  "32-xml-extensions.log": {
+    "version": "1.6",
+    "coverage": "xml-extensions",
+    "skip": "KI-1: generic PatchOperation error misclassified; see KNOWN_ISSUES.md",
+    "count": 1,
+    "entries": null,
+    "clusters": null
+  },
+  "33-parameter-name.log": {
+    "version": "1.6",
+    "coverage": "parameter-name",
+    "count": 1,
+    "entries": [
+      {
+        "class": "harmony-stack",
+        "frames": 3,
+        "patches": 1,
+        "extra": 1,
+        "ref": "594BA85A"
+      }
+    ],
+    "clusters": [
+      {
+        "class": "harmony-stack",
+        "template": "harmony-stack|System.ArgumentNullException: Value cannot be null.",
+        "key": "harmony-stack|System.ArgumentNullException: Value cannot be null.|System.Linq.Enumerable.Where",
+        "count": 1
+      }
+    ]
+  },
+  "34-subnode.log": {
+    "version": "1.6",
+    "coverage": "subnode",
+    "count": 1,
+    "entries": [
+      {
+        "class": "exception",
+        "frames": 1,
+        "extra": 2,
+        "ref": "8A9E09A7"
+      }
+    ],
+    "clusters": [
+      {
+        "class": "exception",
+        "template": "exception|SaveableFromNode exception: System.ArgumentException: Can't load abstract class Verse.GameComponent",
+        "key": "exception|SaveableFromNode exception: System.ArgumentException: Can't load abstract class Verse.GameComponent|Verse.ScribeExtractor.SaveableFromNode",
+        "count": 1
+      }
+    ]
+  },
+  "35-abs-file-path.log": {
+    "version": "1.6",
+    "coverage": "abs-file-path",
+    "count": 1,
+    "entries": [
+      {
+        "class": "xml-load",
+        "frames": 0,
+        "extra": 1
+      }
+    ],
+    "clusters": [
+      {
+        "class": "xml-load",
+        "template": "xml-load|Exception loading UnityEngine.AudioClip from file.",
+        "key": "xml-load|Exception loading UnityEngine.AudioClip from file.|absFilePath: C:\\Steam\\steamapps\\workshop\\content\\294100\\1127530465\\Sounds\\Misc\\tesla.ogg",
+        "count": 1
+      }
+    ]
+  },
+  "36-waylith-info.log": {
+    "version": "1.7",
+    "coverage": "other caller stack, level INFO",
+    "count": 1,
+    "entries": [
+      {
+        "class": "other",
+        "level": "INFO",
+        "frames": 13,
+        "callers": 13,
+        "extra": 0
+      }
+    ],
+    "clusters": []
+  },
+  "37-waylith-warn.log": {
+    "version": "1.7",
+    "coverage": "mod-report caller stack, level WARN",
+    "skip": "KI-2: generated static-constructor frame name; see KNOWN_ISSUES.md",
+    "count": 1,
+    "entries": null,
+    "clusters": null
+  },
+  "38-waylith-info.log": {
+    "version": "1.7",
+    "coverage": "exception caller stack, level INFO",
+    "skip": "KI-3: source-location caller frames treated as exception frames; see KNOWN_ISSUES.md",
+    "count": 1,
+    "entries": null,
+    "clusters": null
+  },
+  "39-waylith-error.log": {
+    "version": "1.7",
+    "coverage": "harmony-stack caller stack, level ERROR",
+    "skip": "KI-4: generated logger caller frame retained; see KNOWN_ISSUES.md",
+    "count": 1,
+    "entries": null,
+    "clusters": null
+  },
+  "40-xml-field.log": {
+    "version": "1.6",
+    "coverage": "xml-load|XML error: \u003cplacingDraggableDimensions\u003e#\u003c/placingDraggableDimensions\u003e does not correspond to a ThingDef field",
+    "frequency": 262,
+    "count": 1,
+    "entries": [
+      {
+        "class": "xml-load",
+        "frames": 0,
+        "extra": 0
+      }
+    ],
+    "clusters": [
+      {
+        "class": "xml-load",
+        "template": "xml-load|XML error: \u003cplacingDraggableDimensions\u003e#\u003c/placingDraggableDimensions\u003e doesn't correspond to any field … type … Context: \u003cThingDef ParentName=\"…\"\u003e\u003ccategory\u003eBuilding\u003c/category\u003e\u003cthingClass\u003eBuilding\u003c/thingClass\u003e\u003csoundImpactDefault\u003eBulletImpact_Metal\u003c/soundImpactDefault\u003e\u003cselectable\u003etr",
+        "key": "xml-load|XML error: \u003cplacingDraggableDimensions\u003e#\u003c/placingDraggableDimensions\u003e doesn't correspond to any field in type ThingDef. Context: \u003cThingDef ParentName=\"BuildingBase\"\u003e\u003ccategory\u003eBuilding\u003c/category\u003e\u003cthingClass\u003eBuilding\u003c/thingClass\u003e\u003csoundImpactDefault\u003eBulletImpact_Metal\u003c/soundImpactDefault\u003e\u003cselectable\u003etr",
+        "count": 1
+      }
+    ]
+  }
+}

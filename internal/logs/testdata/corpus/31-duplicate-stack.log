@@ -1,0 +1,8 @@
+Caught exception while loading '[Rimworld_dir]\Mods\730936602\Textures\BuildingSmart.dds': System.ArgumentOutOfRangeException: Specified argument was out of the range of valid values.
+[Ref 4DA5E042]
+ [0x00005] in <51fded79cd284d4d911c5949aff4cb21>:0
+  at GraphicSetter.DDSLoader.LoadDDS (System.String path, System.Boolean& hasMipMaps, System.Boolean skipFileCheck) [0x00032] in C:\NeutralSource\Source.cs:45
+  at GraphicSetter.DDSHelper.TryLoadDDS (RimWorld.IO.VirtualFile file, System.Boolean& hasMipMapsSet, UnityEngine.Texture2D& texture2D) [0x0001f] in C:\NeutralSource\Source.cs:24
+
+Caught exception while loading '[Rimworld_dir]\Mods\3605570313\Textures\MAU_A\EY\Mask2.dds': System.ArgumentOutOfRangeException: Specified argument was out of the range of valid values.
+[Ref 4DA5E042] Duplicate stacktrace, see ref for original

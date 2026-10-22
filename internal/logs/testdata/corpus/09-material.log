@@ -1,0 +1,6 @@
+Could not execute post-long-event action. Exception: System.InvalidOperationException: Sequence contains no elements
+[Ref 9C2DEAC1]
+  at System.Linq.Enumerable.First[TSource] (System.Collections.Generic.IEnumerable`1[T] source) [0x00010] in <08e4a20a710b4c49aa8710b78057029a>:0
+  at Verse.ThingDef.ResolveIcon () [0x00075] in <967ddb80559449f0a776dafa26a855d1>:0
+  at Verse.BuildableDef.<PostLoad>b__78_0 () [0x00021] in <967ddb80559449f0a776dafa26a855d1>:0
+  at Verse.LongEventHandler.ExecuteToExecuteWhenFinished () [0x0007c] in <967ddb80559449f0a776dafa26a855d1>:0
