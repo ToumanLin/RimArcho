@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/ToumanLin/RimArcho/internal/content"
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -68,13 +69,28 @@ func (a *App) PacksDir() string {
 	return filepath.Join(a.Home, "packs")
 }
 
-var packNameRe = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} ._\-]{0,63}$`)
+// packNameOK: a letter or digit, then up to 63 letters, digits, spaces and . _ -. Checked
+// rune by rune: the same rule as a regexp, whose {0,63} copies of two Unicode classes cost
+// about 1.4 MB of heap for the life of the process.
+func packNameOK(name string) bool {
+	n := 0
+	for _, r := range name {
+		n++
+		if n > 64 {
+			return false
+		}
+		if !unicode.IsLetter(r) && !unicode.IsNumber(r) && (n == 1 || !strings.ContainsRune(" ._-", r)) {
+			return false
+		}
+	}
+	return n > 0
+}
 
 // CheckPackName says whether name can name a pack (a folder in the packs folder).
 func CheckPackName(name string) error { return checkPackName(name) }
 
 func checkPackName(name string) error {
-	if !packNameRe.MatchString(name) || strings.HasSuffix(name, ".") || strings.HasSuffix(name, " ") {
+	if !packNameOK(name) || strings.HasSuffix(name, ".") || strings.HasSuffix(name, " ") {
 		return fmt.Errorf("pack name %q: letters, digits, space, . _ - (up to 64)", name)
 	}
 	return nil
