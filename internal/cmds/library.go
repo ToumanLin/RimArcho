@@ -44,10 +44,6 @@ func libStateText(s, mm string) string {
 		return "hidden by another manager"
 	case app.LibUpdated:
 		return "upstream updated"
-	case app.LibUnsupported:
-		return "does not support " + mm
-	case app.LibUnused:
-		return "in no plan"
 	}
 	return s
 }
@@ -295,12 +291,12 @@ func libNext(i *app.LibInstance, inPlan bool) []string {
 		return nil
 	}
 	var out []string
+	// a healthy copy no plan uses: add it to the current plan
+	if len(i.States) == 0 && len(i.UsedIn) == 0 && !inPlan {
+		out = append(out, "archo enable "+i.Ref)
+	}
 	for _, s := range i.States {
 		switch s {
-		case app.LibUnused:
-			if len(i.States) == 1 && !inPlan {
-				out = append(out, "archo enable "+i.Ref)
-			}
 		case app.LibHidden:
 			out = append(out, "archo unhide "+i.Ref+" --dry-run")
 		case app.LibResidue:

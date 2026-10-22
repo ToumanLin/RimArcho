@@ -27,12 +27,12 @@ func TestLibraryList(t *testing.T) {
 		}
 	}
 	press(m, "/")
-	typeIn(m, "state:unu")
-	if !strings.Contains(m.libraryLines(30)[0], "/ state:unused") {
+	typeIn(m, "used:no")
+	if !strings.Contains(m.libraryLines(30)[0], "/ used:none") {
 		t.Fatalf("no grey completion: %q", m.libraryLines(30)[0])
 	}
 	m.update(tea.KeyMsg{Type: tea.KeyTab})
-	if m.libr.query != "state:unused" {
+	if m.libr.query != "used:none" {
 		t.Fatalf("tab takes the completion: %q", m.libr.query)
 	}
 	press(m, "enter")

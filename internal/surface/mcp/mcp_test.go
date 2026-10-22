@@ -176,8 +176,8 @@ func TestCLIParity(t *testing.T) {
 		{"launch_game", map[string]any{"dry_run": true}, []string{"launch", "--dry-run"}},
 		// 06 §2.9: the library (its write actions: TestGoldenManageTools).
 		{"list_library", nil, []string{"library"}},
-		{"list_library", map[string]any{"search": "mod", "include": []string{"source:local", "state:unused"}, "exclude": []string{"tag:x"}, "sort": "size"},
-			[]string{"library", "--search", "mod", "--include", "source:local", "--include", "state:unused", "--exclude", "tag:x", "--sort", "size"}},
+		{"list_library", map[string]any{"search": "mod", "include": []string{"source:local", "used:none"}, "exclude": []string{"tag:x"}, "sort": "size"},
+			[]string{"library", "--search", "mod", "--include", "source:local", "--include", "used:none", "--exclude", "tag:x", "--sort", "size"}},
 		{"list_library", map[string]any{"facets": true}, []string{"library", "--facets"}},
 		{"list_library", map[string]any{"lineage": modA}, []string{"library", "--lineage", modA}},
 		{"manage_library", map[string]any{"action": "move_to_locked", "refs": []string{modA}, "dry_run": true}, []string{"library", "move-to-locked", modA, "--dry-run"}},

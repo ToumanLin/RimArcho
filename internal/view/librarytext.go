@@ -18,7 +18,6 @@ func init() {
 		"left over after unsubscribing": "退订残留",
 		"hidden by another manager":     "被其它管理器隐藏",
 		"upstream has an update":        "上游有更新",
-		"does not support %s":           "不支持 %s",
 		"in no plan":                    "不在任何方案里",
 		"lock library":                  "锁定库",
 		"other folder":                  "其他目录",

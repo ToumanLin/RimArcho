@@ -317,7 +317,8 @@ export function analyzeEvent(ev) {
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
 const L = { path: "", page: null, loading: false, pending: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "" };
-const C = { scans: [], cur: 0, rows: [], open: new Map(), els: [] };
+// of: only this mod's Lineage ({id, name}), from a detail's history; null every mod.
+const C = { scans: [], cur: 0, rows: [], open: new Map(), els: [], of: null };
 
 // logPage keeps the page's head and gives a fresh body below it; the actions go to the top
 // bar.
@@ -589,8 +590,14 @@ function showLines(box, lines) {
   box.append(pre);
 }
 
-export async function changes() {
-  try { C.scans = (await api.Changes()) || []; } catch (e) { say("fail", errText(e)); return; }
+// changesFiltered: 变化 shows one mod's Lineage (the hint line offers esc).
+export function changesFiltered() { return S.screen === "changes" && !!C.of; }
+
+// changes shows the page; of: {id, name} narrows it to that mod's Lineage, null shows every
+// mod, undefined keeps what it shows.
+export async function changes(of) {
+  if (of !== undefined && (of && of.id) !== (C.of && C.of.id)) { C.of = of; C.cur = 0; }
+  try { C.scans = (await api.Changes(C.of ? C.of.id : "")) || []; } catch (e) { say("fail", errText(e)); return; }
   C.cur = Math.min(C.cur, 1e9);
   drawChanges();
 }
@@ -618,7 +625,17 @@ function drawChanges() {
   const w = logPage("changes", T("what each scan found: mods added, updated and gone"), rescanButton());
   const scroll = el("div", "scroll page-scroll");
   w.append(scroll);
-  if (!C.scans.length) { scroll.append(el("div", "card empty-state", T("no scan yet (R scans)"))); return; }
+  if (C.of) {
+    // the one condition, removable as on Mod 库存
+    const bar = el("div", "chg-of");
+    const b = el("button", "lib-cond");
+    b.append(el("span", "", Tf("only %s", C.of.name)), el("span", "x", "×"));
+    b.title = T("esc shows every mod");
+    b.onclick = () => changes(null).then(() => ui.renderHints());
+    bar.append(b);
+    scroll.append(bar);
+  }
+  if (!C.scans.length) { scroll.append(el("div", "card empty-state", C.of ? T("no change recorded for this mod") : T("no scan yet (R scans)"))); return; }
   C.rows = [];
   C.els = [];
   for (const s of C.scans) {
@@ -678,6 +695,7 @@ export function logsKey(e) {
     if (m != null) { e.preventDefault(); L.cur = m; return markLog(); }
     return;
   }
+  if (k === "Escape" && C.of) { e.preventDefault(); return changes(null).then(() => ui.renderHints()); }
   const m = C.rows.length ? moveIn(C.cur, C.rows.length, k) : null;
   if (m != null) { e.preventDefault(); C.cur = m; return markRows(C); }
   if (k === "Enter" && C.rows[C.cur]) { e.preventDefault(); return toggleFiles(C.rows[C.cur]); }
@@ -793,8 +811,8 @@ function renderGroups(w, groups, again) {
           if (c === it.value) o.selected = true;
           s.append(o);
         }
-        // A new language needs the page's text again: reload after it is set.
-        s.onchange = () => run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => location.reload() : null);
+        // A new language: the page's text again, in place (main.js relang).
+        s.onchange = () => run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : null);
         right.append(s);
       } else if (it.edit) {
         const inp = el("input", "field");

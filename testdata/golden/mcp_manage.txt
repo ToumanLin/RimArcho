@@ -401,12 +401,12 @@ versions: 1 (plan:raid night, env:main)
   workspace: 3 active, saved (plan:raid night, env:main)
   v1  2026-10-01 12:00  import  3 entries  1.6.4633 rev1261  copied from default v1
 
-> list_library {"include":["state:unused"]}
-library: 4 of 5 mods match (state:unused)
+> list_library {"include":["used:none"]}
+library: 4 of 5 mods match (used:none)
   L#l4xt  A         [1 of 2 copies, 1.3 KB, plan:raid night +3]
-  L#a6o7  Alone     [workshop, 538 B, in no plan]
-  L#gpto  Bee       [local, 518 B, in no plan]
-  L#xamx  Leftover  [local, 554 B, in no plan]
+  L#a6o7  Alone     [workshop, 538 B]
+  L#gpto  Bee       [local, 518 B]
+  L#xamx  Leftover  [local, 554 B]
 
 > manage_library {"action":"move_to_locked","dry_run":true,"refs":["#iqmu"]}
 #iqmu A dry run, nothing changed: would move to the lock library
@@ -436,7 +436,6 @@ L#l4xt A  [2 copies, 1.3 KB]
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=1001
     supports: 1.6
     updated: 2026-09-21 14:13
-    states: in no plan
   #iqmu locked 2026-10-01 12:00  672 B  (current plan)
     path: $ROOT/LocalAppData/RimArcho/locked/main/A Local
     supports: 1.6
@@ -473,7 +472,6 @@ L#l4xt A  [2 copies, 1.3 KB]
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=1001
     supports: 1.6
     updated: 2026-09-21 14:13
-    states: in no plan
   #iqmu locked 2026-10-01 12:00  672 B  (current plan)
     path: $ROOT/LocalAppData/RimArcho/locked/main/A Local
     supports: 1.6

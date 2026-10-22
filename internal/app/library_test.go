@@ -77,7 +77,8 @@ func TestLibraryStates(t *testing.T) {
 	if n, ok := lock.Bytes(); !ok || n <= 0 {
 		t.Errorf("sizes come from the scan: %d %v", n, ok)
 	}
-	want := map[string]string{"Idle": app.LibUnused, "Oldie": app.LibUnsupported, "Gone": app.LibResidue, "Workshop item 5300": app.LibMissing}
+	// "does not support the game" and "in no plan" are not states (06 §2.9)
+	want := map[string]string{"Idle": "", "Oldie": "", "Gone": app.LibResidue, "Workshop item 5300": app.LibMissing}
 	for name, s := range want {
 		if got := libLineage(t, lib, name).State(); got != s {
 			t.Errorf("%s: state %q, want %q", name, got, s)
@@ -89,7 +90,7 @@ func TestLibraryStates(t *testing.T) {
 	if !cp.InPlan || len(cp.UsedIn) != 1 || !cp.UsedIn[0].Current || cp.UsedIn[0].Value() != "plan:default" {
 		t.Errorf("Mods/ copy used in: %+v", cp.UsedIn)
 	}
-	if !slices.Equal(ws.States, []string{app.LibUnused}) {
+	if len(ws.States) != 0 || len(ws.UsedIn) != 0 {
 		t.Errorf("workshop copy states: %v", ws.States)
 	}
 	// A second copy in Mods/: the game registers one of the two, the other is ignored.
@@ -121,11 +122,11 @@ func TestLibraryFilter(t *testing.T) {
 		{app.LibQuery{}, []string{"Gone", "Idle", "Lockable", "Oldie", "Workshop item 5300"}},
 		{app.LibQuery{Search: "tester.idle"}, []string{"Idle"}},
 		{app.LibQuery{Search: "qol"}, []string{"Idle"}},
-		{app.LibQuery{Include: []string{"state:unused"}}, []string{"Gone", "Idle", "Lockable", "Oldie"}},
+		{app.LibQuery{Include: []string{"used:none"}}, []string{"Gone", "Idle", "Lockable", "Oldie", "Workshop item 5300"}},
 		// one key: either value; two keys: both
-		{app.LibQuery{Include: []string{"state:residue", "state:unsupported"}}, []string{"Gone", "Oldie"}},
-		{app.LibQuery{Include: []string{"state:unused", "source:workshop"}}, []string{"Gone", "Idle", "Lockable", "Oldie"}},
-		{app.LibQuery{Include: []string{"state:unused", "source:local"}}, nil},
+		{app.LibQuery{Include: []string{"state:residue", "state:missing"}}, []string{"Gone", "Workshop item 5300"}},
+		{app.LibQuery{Include: []string{"used:none", "source:workshop"}}, []string{"Gone", "Idle", "Lockable", "Oldie", "Workshop item 5300"}},
+		{app.LibQuery{Include: []string{"used:none", "source:local"}}, nil},
 		{app.LibQuery{Exclude: []string{"source:workshop"}}, []string{"Lockable"}},
 		{app.LibQuery{Include: []string{"tag:qol"}}, []string{"Idle"}},
 		{app.LibQuery{Include: []string{"used:plan:default"}}, []string{"Lockable"}},

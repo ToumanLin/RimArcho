@@ -95,8 +95,8 @@ func TestLibraryPage(t *testing.T) {
 		t.Errorf("idle: %v", got)
 	}
 	// filters and conditions
-	p = libPage(t, e, "", "state:unused", "-source:local")
-	if p.Shown != 3 || len(p.Conds) != 2 || !p.Conds[1].Exclude || p.Conds[0].Label != "状态 不在任何方案里" {
+	p = libPage(t, e, "", "used:none", "-source:local")
+	if p.Shown != 4 || len(p.Conds) != 2 || !p.Conds[1].Exclude || p.Conds[0].Label != "用在 不在任何方案里" {
 		t.Errorf("filtered: shown %d conds %+v", p.Shown, p.Conds)
 	}
 	for _, g := range p.Groups {
@@ -188,7 +188,7 @@ func TestLibrarySearchBox(t *testing.T) {
 	if got := names(page("-state:hidden lock")); !slices.Equal(got, []string{"Lockable"}) {
 		t.Errorf("words and an exclusion: %v", got)
 	}
-	for text, want := range map[string]string{"so": "urce:", "st": "ate:", "state:un": "loadable", "state:unu": "sed", "-source:wo": "rkshop", "tag:fa": "cial", "used:pl": "an:default", "lock": "", "x": ""} {
+	for text, want := range map[string]string{"so": "urce:", "st": "ate:", "state:un": "loadable", "state:unu": "", "state:res": "idue", "-source:wo": "rkshop", "tag:fa": "cial", "used:pl": "an:default", "lock": "", "x": ""} {
 		if got := page(text).Complete; got != want {
 			t.Errorf("complete %q: %q, want %q", text, got, want)
 		}
@@ -211,7 +211,8 @@ func TestLibFields(t *testing.T) {
 	for _, f := range view.LibFields(e.App, lib, i, nil) {
 		got = append(got, f.Kind)
 	}
-	want := []string{"id", "package", "path", "tags", "state", "size", "versions", "updated"}
+	// the workshop copy has no state: no state row
+	want := []string{"id", "package", "path", "tags", "size", "versions", "updated"}
 	for _, k := range want {
 		if !slices.Contains(got, k) {
 			t.Fatalf("no %s field: %v", k, got)

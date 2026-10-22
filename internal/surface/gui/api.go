@@ -795,15 +795,15 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 
 // ---- changes (06 §2.9) ----
 
-// Changes lists the last scans' changes.
-func (s *API) Changes() ([]view.ChangeScan, error) {
+// Changes lists the last scans' changes; of (an instance ID) narrows them to its Lineage's.
+func (s *API) Changes(of string) ([]view.ChangeScan, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	st := s.boardState()
 	if st == nil {
 		return nil, errors.New("no list")
 	}
-	cs, err := view.Changes(s.a, st)
+	cs, err := view.Changes(s.a, st, of)
 	for _, c := range cs {
 		for _, e := range c.Events {
 			s.events[e.ID] = e.Event

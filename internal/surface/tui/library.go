@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ToumanLin/RimArcho/internal/cmds"
@@ -95,6 +97,22 @@ func (m *model) libraryKey(s string) tea.Cmd {
 		l.cursor = max(n-1, 0)
 	case "/":
 		l.typing = true
+	case "ctrl+o":
+		if i, _, ok := m.libCopy(); ok {
+			return m.openFolderOf(i.ID)
+		}
+	case "ctrl+w":
+		if i, _, ok := m.libCopy(); ok {
+			ws := strings.TrimPrefix(i.Ref, "ws:") // a subscribed item RimArcho never saw
+			if i.ID != "" {
+				ws = m.workshopOf(i.ID)
+			}
+			return m.openWorkshopID(ws)
+		}
+	case "C":
+		if i, name, ok := m.libCopy(); ok && i.ID != "" {
+			return m.openChangesOf(i.ID, name)
+		}
 	case "enter":
 		if l.cursor < n {
 			r := l.page.Rows[l.cursor]

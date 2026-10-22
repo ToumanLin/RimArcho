@@ -87,6 +87,25 @@ func (s *API) OpenFolder(id string) error {
 	return openDir(dir)
 }
 
+// OpenWorkshop opens an instance's Workshop page (ctrl+w, 06 §3.5); without a Workshop ID
+// it says so.
+func (s *API) OpenWorkshop(id string) (string, error) {
+	s.mu.Lock()
+	ix, err := s.a.Index()
+	s.mu.Unlock()
+	if err != nil {
+		return "", err
+	}
+	m := ix.ByID[id]
+	if m == nil || !view.IsNumber(m.WorkshopID()) {
+		return "", errors.New(view.T("no Workshop ID: not a Workshop mod"))
+	}
+	if err := s.open(view.WorkshopURL(m.WorkshopID())); err != nil {
+		return "", err
+	}
+	return view.T("opened the Workshop page"), nil
+}
+
 func openDir(dir string) error {
 	switch runtime.GOOS {
 	case "windows":

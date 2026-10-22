@@ -53,6 +53,15 @@ export async function open() {
   await load(true);
 }
 
+// relang: the language changed; the page is drawn again in it, where it was (the column
+// titles come again with the page data).
+export async function relang() {
+  const top = els ? els.rows.scrollTop : 0;
+  L.cols = null;
+  await load(true);
+  if (els) { els.rows.scrollTop = top; els.rows.dataset.sig = ""; drawRows(); }
+}
+
 async function load(fresh) {
   const n = ++L.seq;
   let p, saved;
@@ -680,7 +689,7 @@ function menuAt(x, y) {
 async function run(a, copies) {
   const refs = copies.map((i) => i.ref);
   const i0 = copies[0];
-  if (a.kind === "folder") return api.OpenFolder(i0.id).catch((e) => say("fail", errText(e)));
+  if (a.kind === "folder") return api.OpenFolder(i0.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
   if (a.kind === "workshop") return api.OpenURL(i0.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
   const go = async () => {
     try { say("ok", await api.LibraryDo(a.kind, refs), a.kind === "enable" || a.kind === "remove"); } catch (e) { say("fail", errText(e)); }
@@ -741,6 +750,12 @@ export function key(e) {
     if (x) { toggleSel(x); els.rows.dataset.sig = ""; drawRows(); drawBar(); hints(); }
     return;
   }
+  // ctrl+o / ctrl+w: the cursor's copy's folder and Workshop page (06 §3.5); the Wails
+  // window does not take them, preventDefault keeps them from the browser
+  if (ctrl && !e.shiftKey && !e.altKey && (k.toLowerCase() === "o" || k.toLowerCase() === "w")) {
+    done();
+    return shortcut(k.toLowerCase() === "o" ? "folder" : "workshop");
+  }
   if (k === "/" || (ctrl && k === "f")) { done(); const s = els.side.querySelector(".lib-search"); if (innerWidth < 760) setDrawer(true); s.focus(); s.select(); return; }
   if (k === "f" && !ctrl) { done(); return setDrawer(!L.drawer); }
   if (k === "u" && !ctrl) { done(); return ui.verb("undo").then(() => load()); }
@@ -754,6 +769,24 @@ export function key(e) {
   if (k === "R") { done(); return ui.cmd("rescan"); }
 }
 
+// cursorCopy: the copy the cursor stands for: its row's, the open details', or on a
+// Lineage's row the copy in the current plan, else the first.
+function cursorCopy() {
+  const x = L.flat[L.cur];
+  if (!x) return null;
+  if (x.t === "inst") return x.i;
+  return x.r.insts.find((i) => i.inPlan) || x.r.insts.find((i) => i.id) || x.r.insts[0] || null;
+}
+
+// shortcut runs ctrl+o (folder) or ctrl+w (workshop) on the cursor's copy.
+function shortcut(kind) {
+  const i = L.detail || cursorCopy();
+  if (!i) return;
+  const a = (i.actions || []).find((a) => a.kind === kind);
+  if (a) return run(a, [i]);
+  say("", kind === "workshop" ? T("no Workshop ID: not a Workshop mod") : i.id ? T("the folder is not there") : T("RimArcho has not seen this copy: no folder"));
+}
+
 // hints: the hint line for the page (06 §2.2).
 export function hintList() {
   const list = [{ key: "↑↓", label: T("move") }];
@@ -762,7 +795,7 @@ export function hintList() {
   if (x && x.t === "inst") list.push({ key: "enter", label: L.detail ? T("back") : T("details") });
   const acts = actionsOf(selected()).map(({ a }) => a.kind);
   if (acts.includes("enable")) list.push({ key: "space", label: T("add to the current plan") });
-  if (acts.includes("workshop")) list.push({ key: "o", label: T("open the Workshop page") });
+  if (x) list.push({ key: "ctrl+o ctrl+w", label: T("folder / Workshop page") });
   list.push({ key: "/", label: T("search") }, { key: "ctrl+space", label: T("select") });
   list.push({ key: "?", label: T("all keys") });
   return list;
