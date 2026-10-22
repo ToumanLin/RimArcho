@@ -13,7 +13,7 @@ import (
 )
 
 // A fake GitHub: 250 gists, one per hour going back from 2026-10-20 00:00, newest first,
-// 100 per page; raw content is "log <id>".
+// 100 per page; raw content is a 1.6 log with one problem that the filter keeps.
 func fakeGitHub(t *testing.T) (*httptest.Server, *int) {
 	t.Helper()
 	newest := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
@@ -40,7 +40,7 @@ func fakeGitHub(t *testing.T) (*httptest.Server, *int) {
 		json.NewEncoder(w).Encode(out)
 	})
 	mux.HandleFunc("/"+account+"/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "log %s", filepath.Base(filepath.Dir(r.URL.Path)))
+		fmt.Fprint(w, fakeLog(filepath.Base(filepath.Dir(r.URL.Path)), "1.6", true, 30))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -67,7 +67,7 @@ func TestAPIFetch(t *testing.T) {
 		t.Fatalf("%d raw logs, want 10 (-max)", len(raws))
 	}
 	// -max takes the newest first.
-	if b, _ := os.ReadFile(rawPath(dir, fmt.Sprintf("%032x", 0))); string(b) != "log "+fmt.Sprintf("%032x", 0) {
+	if b, _ := os.ReadFile(rawPath(dir, fmt.Sprintf("%032x", 0))); string(b) != fakeLog(fmt.Sprintf("%032x", 0), "1.6", true, 30) {
 		t.Fatalf("newest raw log missing or wrong: %q", b)
 	}
 
@@ -145,3 +145,4 @@ func TestAPIBadToken(t *testing.T) {
 		t.Fatal("bad token: want an error, not a retry loop")
 	}
 }
+

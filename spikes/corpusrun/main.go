@@ -5,7 +5,10 @@
 // AnalyzeLogText on the log body (G1), SortInput + order.Sort on the log's order (G2).
 //
 //	go run ./spikes/corpusrun setup -home H -game D:\RimWorld16 -userdata U -extra <kb>\mods -extra …
-//	go run ./spikes/corpusrun run -home H -corpus <RimArcho-corpus>\hugslogs -out results.jsonl [-max N]
+//	go run ./spikes/corpusrun run -home H -corpus <RimArcho-corpus>\hugslogs -out results.jsonl [-max N] [-shard i/n] [-ids F]
+//
+// -shard splits a run over several processes, each with its own home (setup per home) and out
+// file; concatenate the out files afterwards.
 //
 // Only aggregate numbers leave the machine (design §8); results.jsonl stays with the corpus.
 package main
@@ -15,6 +18,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
 	"path/filepath"
@@ -52,6 +56,8 @@ func main() {
 	mm := fs.String("mm", "1.6", "run: game major.minor of the logs to process")
 	cpuprof := fs.String("cpuprofile", "", "write a CPU profile to this file")
 	maxN := fs.Int("max", 0, "run: process at most this many logs (0 = all)")
+	shard := fs.String("shard", "", "run: i/n, process only the logs whose id hashes to shard i of n (one home per shard)")
+	idsFile := fs.String("ids", "", "run: process only the gist ids listed in this file (one per line)")
 	fs.BoolVar(&rawMods, "rawmods", false, "run: take the mod list from the raw log header (parsed.jsonl misses [v:]/[ov:] entries)")
 	minCov := fs.Float64("mincov", 0.8, "report: coverage threshold for the 'covered' subset")
 	fs.Parse(os.Args[2:])
@@ -80,7 +86,10 @@ func main() {
 	case "setup":
 		err = setup(*home, *game, *userData, *workshop, *rules, extra)
 	case "run":
-		err = run(*home, *corpus, *out, *mm, *maxN)
+		var sel func(string) bool
+		if sel, err = selector(*shard, *idsFile); err == nil {
+			err = run(*home, *corpus, *out, *mm, *maxN, sel)
+		}
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
@@ -212,7 +221,45 @@ type RViolation struct {
 	Kind, From, To string
 }
 
-func run(home, corpus, out, mm string, maxN int) error {
+// selector turns -shard i/n and -ids into a filter on gist ids (nil = all).
+func selector(shard, idsFile string) (func(string) bool, error) {
+	var fs []func(string) bool
+	if shard != "" {
+		var i, n int
+		if _, err := fmt.Sscanf(shard, "%d/%d", &i, &n); err != nil || n < 1 || i < 0 || i >= n {
+			return nil, fmt.Errorf("-shard %q: use i/n with 0 <= i < n", shard)
+		}
+		fs = append(fs, func(id string) bool {
+			h := fnv.New32a()
+			h.Write([]byte(id))
+			return int(h.Sum32()%uint32(n)) == i
+		})
+	}
+	if idsFile != "" {
+		b, err := os.ReadFile(idsFile)
+		if err != nil {
+			return nil, err
+		}
+		want := map[string]bool{}
+		for _, l := range strings.Fields(string(b)) {
+			want[l] = true
+		}
+		fs = append(fs, func(id string) bool { return want[id] })
+	}
+	if len(fs) == 0 {
+		return nil, nil
+	}
+	return func(id string) bool {
+		for _, f := range fs {
+			if !f(id) {
+				return false
+			}
+		}
+		return true
+	}, nil
+}
+
+func run(home, corpus, out, mm string, maxN int, sel func(string) bool) error {
 	done := map[string]bool{}
 	if f, err := os.Open(out); err == nil {
 		sc := bufio.NewScanner(f)
@@ -252,7 +299,7 @@ func run(home, corpus, out, mm string, maxN int) error {
 	t0 := time.Now()
 	for sc.Scan() {
 		var r record
-		if json.Unmarshal(sc.Bytes(), &r) != nil || r.Status != "ok" || r.MM != mm || done[r.ID] {
+		if json.Unmarshal(sc.Bytes(), &r) != nil || r.Status != "ok" || r.MM != mm || done[r.ID] || sel != nil && !sel(r.ID) {
 			continue
 		}
 		if maxN > 0 && n >= maxN {
