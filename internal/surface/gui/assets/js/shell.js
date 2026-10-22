@@ -4,7 +4,7 @@
 // view.Nav and view.NavPath through API.Shell.
 import { S, $, el, api, T, Tf } from "./state.js";
 import { icon } from "./icons.js";
-import { liveCount } from "./screens.js";
+import { liveCount, seg, setSeg } from "./screens.js";
 import { bump, slideNav } from "./motion.js";
 import * as pop from "./popups.js";
 
@@ -51,6 +51,7 @@ function applyNav() {
   const t = $("#navtoggle");
   t.title = (layout === "side" ? T("navigation at the top") : T("navigation at the side")) + " · ctrl+b";
   slideNav($("#nav"), true);
+  renderCrumbs();
 }
 
 // navigated: nothing to close any more (the navigation never lies over the page).
@@ -86,6 +87,16 @@ function kidMenu(b, keys) {
   if (!it || !it.kids) return;
   const r = b.getBoundingClientRect();
   pop.menu(r.left, r.bottom + 4, it.kids.map((k) => ({ label: k.label, cls: k.id === current() ? "on" : "", run: () => ui.go(k.id) })), keys);
+}
+
+// kidOwner: the entry whose sub-pages include the page shown (or that is the page shown).
+function kidOwner(id) {
+  for (const g of (S.shell && S.shell.nav) || []) {
+    for (const it of g.items || []) {
+      if (it.kids && it.kids.length && (it.id === id || it.kids.some((k) => k.id === id))) return it;
+    }
+  }
+  return null;
 }
 
 function navItem(id) {
@@ -331,11 +342,39 @@ function renderCrumbs() {
   env.title = T("environment") + " · E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");
-  const cs = crumbs();
-  const sig = JSON.stringify(cs);
-  if (nav.dataset.sig === sig) return;
+  let cs = crumbs();
+  // At the top the strip already names the entry: an entry with sub-pages shows them here
+  // as a switch (magpie's), then only what lies below the sub-page (the detail, the build).
+  const cur = current();
+  const owner = layout === "top" ? kidOwner(cur) : null;
+  let tabs = null;
+  if (owner) {
+    tabs = owner.kids;
+    cs = cs.slice(((sh && sh.crumbs && sh.crumbs[cur]) || []).length);
+  } else if (layout === "top" && ((sh && sh.crumbs && sh.crumbs[cur]) || []).length > 1) {
+    cs = cs.slice(1); // the group (在玩, 库) is not shown at the top
+  }
+  const sig = JSON.stringify([tabs && tabs.map((k) => k.id + k.label), cs]);
+  const on = tabs ? tabs.findIndex((k) => k.id === cur) : -1;
+  if (nav.dataset.sig === sig) {
+    if (tabs) setSeg(nav.querySelector(".seg"), on);
+    return;
+  }
   nav.dataset.sig = sig;
   nav.innerHTML = "";
+  if (tabs) {
+    const s = seg(tabs.map((k) => k.label), on, (i) => ui.go(tabs[i].id));
+    s.classList.add("navtabs");
+    // a plan's tab has the plan's menu, as its sidebar entry does
+    if (owner.id === "plan") {
+      [...s.querySelectorAll(":scope > button")].forEach((b, i) => {
+        const k = tabs[i];
+        if (!k.add) b.oncontextmenu = (e) => { e.preventDefault(); ui.planMenu(+k.id.slice(5), e.clientX, e.clientY); };
+      });
+    }
+    nav.append(s);
+    if (cs.length) nav.append(el("span", "sep", "/"));
+  }
   cs.forEach((c, i) => {
     if (i) nav.append(el("span", "sep", "/"));
     const b = el("button", "crumb" + (i === cs.length - 1 ? " last" : ""), c.label);
