@@ -164,6 +164,9 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 		if !managedLink(name) {
 			continue
 		}
+		if envLink(name) && source.IsLink(filepath.Join(mods, name)) {
+			continue // another game's local mod stays installed across plan changes
+		}
 		p := filepath.Join(mods, name)
 		if !source.IsLink(p) {
 			return "", nil, nil, fmt.Errorf("%s starts with %s but is not a link; RimArcho does not touch it (rename or remove it yourself)", p, DeployPrefix)

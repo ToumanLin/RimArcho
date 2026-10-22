@@ -563,7 +563,7 @@ func (a *App) EnvRebind(e *env.Environment, label string, yes bool) (*source.Sou
 	return s, n, a.Store.InsertSource(n)
 }
 
-// EnvUse selects the current environment.
+// EnvUse prepares missing Mods/ links before selecting the current environment.
 func (a *App) EnvUse(name string) (*env.Environment, error) {
 	e, err := a.Store.EnvByName(name)
 	if err != nil {
@@ -571,6 +571,9 @@ func (a *App) EnvUse(name string) (*env.Environment, error) {
 	}
 	if e == nil {
 		return nil, fmt.Errorf("no environment named %q (archo env list)", name)
+	}
+	if err := a.prepareEnvLinks(e); err != nil {
+		return nil, err
 	}
 	return e, a.Store.SetCurrentEnv(e.ID)
 }
