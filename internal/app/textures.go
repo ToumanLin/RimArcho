@@ -26,7 +26,7 @@ import (
 // deletes those. Packs convert their own copies instead (pack.go) and drop the PNGs.
 
 // ErrNoTodds: the encoder is not on this computer.
-var ErrNoTodds = errors.New("todds (the DDS encoder) is not installed")
+var ErrNoTodds = errors.New("todds (the DDS encoder) is not installed; archo textures tool --install downloads it")
 
 // ToddsDir is where RimArcho keeps the todds it downloads: %LOCALAPPDATA%\RimArcho\todds.
 func (a *App) ToddsDir() string { return filepath.Join(a.LocalDir(), "todds") }

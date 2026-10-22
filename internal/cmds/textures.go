@@ -151,7 +151,7 @@ func texToolLine(root *render.Node, t *app.TextureTool) {
 		return
 	}
 	if t.Err != "" {
-		root.KV("encoder", t.Err+"; archo textures tool --install")
+		root.KV("encoder", t.Err)
 		return
 	}
 	root.KV("encoder", fmt.Sprintf("todds %s (%s)", t.Version, t.Path))
@@ -175,7 +175,7 @@ func texOptimizeCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	r, err := c.App.OptimizeTextures(run)
 	if err != nil {
 		if errors.Is(err, app.ErrNoTodds) {
-			return nil, fmt.Errorf("%w; archo textures tool --install downloads it (%s)", err, textures.ToddsHome)
+			return nil, fmt.Errorf("%w (%s)", err, textures.ToddsHome)
 		}
 		return nil, err
 	}

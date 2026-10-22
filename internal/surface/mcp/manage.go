@@ -96,7 +96,11 @@ func PackArgv(in PackIn) []string {
 	case "list":
 		return []string{"pack", "list"}
 	case "build":
-		return argv("pack", "build").pos(in.Name).flag("light", in.Light).flag("dry-run", in.DryRun).a
+		b := argv("pack", "build").pos(in.Name).flag("light", in.Light).flag("textures", in.Textures && in.TextureScale == 0)
+		if in.TextureScale > 0 && in.TextureScale < 100 {
+			b.flag("textures", true).str("texture-scale", fmt.Sprint(in.TextureScale))
+		}
+		return b.flag("dry-run", in.DryRun).a
 	case "launch":
 		return argv("pack", "launch").pos(in.Name).flag("dry-run", in.DryRun).a
 	case "export":
@@ -179,14 +183,16 @@ type ExchangeIn struct {
 }
 
 type PackIn struct {
-	Env        string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action     string `json:"action" jsonschema:"list, build, launch, export, import, remove or stop"`
-	Name       string `json:"name,omitempty" jsonschema:"the pack (build, launch, export, remove, stop)"`
-	File       string `json:"file,omitempty" jsonschema:"export: the new .archopack / .archopack.json file; import: the file to read"`
-	Light      bool   `json:"light,omitempty" jsonschema:"build / export: the list only, no mod files"`
-	AsPlan     bool   `json:"as_plan,omitempty" jsonschema:"import of a light pack: also load its list into the Loadout (undoable)"`
-	Unfinished bool   `json:"unfinished,omitempty" jsonschema:"remove: delete what an interrupted build of name copied"`
-	DryRun     bool   `json:"dry_run,omitempty" jsonschema:"build / launch / remove: show what would happen, change nothing"`
+	Env          string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Action       string `json:"action" jsonschema:"list, build, launch, export, import, remove or stop"`
+	Name         string `json:"name,omitempty" jsonschema:"the pack (build, launch, export, remove, stop)"`
+	File         string `json:"file,omitempty" jsonschema:"export: the new .archopack / .archopack.json file; import: the file to read"`
+	Light        bool   `json:"light,omitempty" jsonschema:"build / export: the list only, no mod files"`
+	Textures     bool   `json:"textures,omitempty" jsonschema:"build: convert the copies' PNG textures to DDS and delete the PNGs (pre-convert; lighter loading and video memory, a bigger pack at full size)"`
+	TextureScale int    `json:"texture_scale,omitempty" jsonschema:"build: also scale textures down to this percent (20 25 40 50 60 75 80): slim"`
+	AsPlan       bool   `json:"as_plan,omitempty" jsonschema:"import of a light pack: also load its list into the Loadout (undoable)"`
+	Unfinished   bool   `json:"unfinished,omitempty" jsonschema:"remove: delete what an interrupted build of name copied"`
+	DryRun       bool   `json:"dry_run,omitempty" jsonschema:"build / launch / remove: show what would happen, change nothing"`
 }
 
 type IdentityIn struct {

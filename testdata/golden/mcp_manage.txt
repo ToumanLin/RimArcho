@@ -179,6 +179,25 @@ pack build: dry run, nothing written
 next:
   archo pack build first
 
+> manage_packs {"action":"build","dry_run":true,"name":"first","texture_scale":50}
+pack build: dry run, nothing written
+  folder: $ROOT/ArchoHome/packs/first
+  mods: 2 carried, 1 from the game (Core and DLCs)
+  size: 868 B; 0 B of other game versions left out
+  space: <free> free on the packs drive
+  textures: slim to 50%
+    0 PNGs: 0 B of PNG → about 0 B of DDS; video memory about 0 B → 0 B
+    pack size about 868 B after; up to 868 B while converting
+    encoder: todds (the DDS encoder) is not installed; archo textures tool --install downloads it — the build is refused
+  trimmed: nothing (no folders for other game versions)
+  game: 1.6.4633 rev1261
+next:
+  archo pack build first
+
+> manage_packs {"action":"build","name":"first","textures":true}
+error: todds (the DDS encoder) is not installed; archo textures tool --install downloads it
+[isError]
+
 > manage_packs {"action":"build","name":"first"}
 built pack first
   folder: $ROOT/ArchoHome/packs/first

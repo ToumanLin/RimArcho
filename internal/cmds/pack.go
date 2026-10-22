@@ -129,7 +129,7 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 					n.Addf("%d keep their PNG (a DDS or another format of the same name)", r.TexSkipped)
 				}
 				if r.Tool != nil && r.Tool.Err != "" {
-					n.Add("encoder: " + r.Tool.Err + " — the build is refused; archo textures tool --install")
+					n.Add("encoder: " + r.Tool.Err + " — the build is refused")
 				}
 			}
 		}
