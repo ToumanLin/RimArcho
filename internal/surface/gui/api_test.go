@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -353,13 +354,13 @@ func TestBuildPageG14(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Ok || p.Why == "" || !p.ToNeed || len(p.Steps) != 4 || p.Steps[0].Level != view.LevelBad || !p.Steps[0].Needs || len(p.Steps[0].More) == 0 {
+	if p.Ok || p.Why == "" || !p.ToNeed || len(p.Steps) != 5 || p.Steps[0].Level != view.LevelBad || !p.Steps[0].Needs || len(p.Steps[0].More) == 0 {
 		t.Fatalf("with a problem: %+v", p)
 	}
 	if p.Name == "" || api.PackNameCheck(p.Name) != "" {
 		t.Fatalf("default name %q: %s", p.Name, api.PackNameCheck(p.Name))
 	}
-	lines := api.PackDryRun(p.Name, false)
+	lines := api.PackDryRun(p.Name, false, 0)
 	if len(lines) == 0 || !strings.Contains(strings.Join(lines, "\n"), "cannot build") {
 		t.Fatalf("dry run: %v", lines)
 	}
@@ -378,6 +379,25 @@ func TestBuildPageG14(t *testing.T) {
 	if l, _ := api.BuildPage(true, 0); l == nil || !l.Light || l.Before != "" || l.Steps[1].Level != view.LevelOff {
 		t.Fatalf("light: %+v", l)
 	}
+	// Textures (08 §5.2): a step of a full pack with the choices; without todds, 编译 says
+	// to install it there; with an encoder the step says what it converts.
+	if p.Steps[2].Kind != "textures" || p.Tex != 0 || len(p.TexChoices) != 8 {
+		t.Fatalf("textures step: %+v", p.Steps[2])
+	}
+	if p, _ := api.BuildPage(false, 100); p.Steps[2].Go == "textures" && (p.Ok || p.ToGo != "textures") {
+		t.Fatalf("no todds: %+v", p)
+	}
+	e.App.TextureEncoder = fakeEncoder{}
+	if p, _ := api.BuildPage(false, 75); !p.Ok || p.Tex != 75 || p.Steps[2].Go != "" || p.Steps[2].Level == view.LevelBad {
+		t.Fatalf("with an encoder: %+v", p)
+	}
+	if l, _ := api.BuildPage(true, 75); len(l.Steps) != 4 || l.TexChoices != nil {
+		t.Fatalf("a light pack has no textures step: %+v", l)
+	}
+	if lines := strings.Join(api.PackDryRun("tex one", false, 75), " | "); !strings.Contains(lines, "dry run") {
+		t.Fatalf("dry run with textures: %s", lines)
+	}
+	e.App.TextureEncoder = nil
 	for name, bad := range map[string]bool{"": true, ".x": true, "ok name": false} {
 		if (api.PackNameCheck(name) != "") != bad {
 			t.Errorf("name %q: %q", name, api.PackNameCheck(name))
@@ -394,3 +414,8 @@ func TestBuildPageG14(t *testing.T) {
 		t.Fatalf("pack page: %+v %v", pg, err)
 	}
 }
+
+// fakeEncoder stands in for todds (it converts nothing).
+type fakeEncoder struct{}
+
+func (fakeEncoder) Encode(context.Context, []string, int, bool) error { return nil }

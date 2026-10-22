@@ -225,7 +225,7 @@ func (s *API) BuildPage(light bool, tex int) (*view.BuildPage, error) {
 		return nil, err
 	}
 	pl.Measure(dir)
-	p := view.BuildPageOf(pl, plan, chip, dir, light)
+	p := view.BuildPageOf(pl, plan, chip, dir, light, tex)
 	p.Name = name
 	return p, nil
 }
@@ -248,12 +248,14 @@ func (s *API) PackNameCheck(name string) string {
 }
 
 // PackDryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run (nothing is written).
-func (s *API) PackDryRun(name string, light bool) []string {
+func (s *API) PackDryRun(name string, light bool, tex int) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	argv := []string{"pack", "build", strings.TrimSpace(name), "--dry-run"}
 	if light {
 		argv = append(argv, "--light")
+	} else {
+		argv = append(argv, app.PackBuildArgs(view.PackTextureOptions(tex))...)
 	}
 	text, _ := cmds.Execute(s.a, argv)
 	st := s.boardState()

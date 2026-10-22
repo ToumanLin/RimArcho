@@ -465,7 +465,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   pack's copies, which then drop their PNGs. Space is checked against the peak; `pack.json`
   records what was done.
 - GUI: a 贴图优化 page (estimate, scale, progress, stop, clean), Mod 库存's 优化贴图 /
-  清除贴图优化, the pack build's textures option (in the API; the new build page still needs its control); TUI palette panel; MCP `manage_textures`.
+  清除贴图优化, the pack build's textures choice on 编译成整合包 (its own step 贴图 for full packs: off / 预转换 /
+  精简 80–25%, with the PNGs converted, the size after and the peak while converting; `D` steps
+  through it; without todds the step says so and 编译 points to 设置 › 贴图优化); TUI palette panel; MCP `manage_textures`.
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
