@@ -252,12 +252,18 @@ func (s *API) GuideScan(names []string) bool {
 	s.busy["scan"] = true
 	run := s.ScanRunner
 	if run == nil {
+		// A game added once the shared mod folders were read: only its own Data/ and Mods/
+		// (02 §0 item 8). The first game reads the shared folders as well.
+		var flags []string
+		if !s.a.SharedUnread() {
+			flags = append(flags, "--game-only")
+		}
 		home, exe := s.a.Home, s.Exe
 		run = func(env string) (string, error) {
 			if exe != "" {
-				return app.ChildScanExe(exe, home, env)
+				return app.ChildScanExe(exe, home, env, flags...)
 			}
-			return app.ChildScan(home, env)
+			return app.ChildScan(home, env, flags...)
 		}
 	}
 	go func() {

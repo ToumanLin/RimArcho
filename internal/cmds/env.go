@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -293,4 +294,82 @@ func envRebind(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d.AddNext("archo scan")
 	return d, nil
+}
+
+// ---- a game version downloaded with SteamCMD (08 §10) ----
+
+var steamcmdFlag = Flag{Name: "install-steamcmd", Help: "download SteamCMD from Valve first when it is not installed"}
+
+func init() {
+	register(&Command{Name: "env branches", Summary: "list RimWorld's Steam branches (versions) SteamCMD can download", MaxArgs: 0,
+		Flags: []Flag{steamcmdFlag}, Run: envBranches})
+	register(&Command{Name: "env download", Args: "<branch>", Summary: "download a RimWorld version with SteamCMD and add it as an environment (you log in in SteamCMD)",
+		MinArgs: 1, MaxArgs: 1, Flags: []Flag{
+			{Name: "to", Value: "<dir>", Help: "the new game folder"},
+			{Name: "account", Value: "<name>", Help: "your Steam account name (the password is typed in SteamCMD, never in RimArcho)"},
+			{Name: "name", Value: "<env>", Help: "the environment's name (default: the version, e.g. 1.6)"},
+			{Name: "saves", Value: "shared|own"},
+			steamcmdFlag,
+		}, Run: envDownload})
+}
+
+// needSteamCMD installs SteamCMD when asked to, else explains how.
+func needSteamCMD(c *Ctx, a *Args) error {
+	if c.App.SteamCMDPath() != "" {
+		return nil
+	}
+	if !a.Bool("install-steamcmd") {
+		o, _ := c.App.OfferSteamCMD()
+		size := "its size unknown"
+		if o != nil && o.Bytes > 0 {
+			size = render.Size(o.Bytes)
+		}
+		return &UsageError{Msg: fmt.Sprintf("SteamCMD is not installed. Add --install-steamcmd to download it from Valve (%s, %s) into %s", app.SteamCMDURL, size, c.App.SteamCMDDir())}
+	}
+	_, err := c.App.InstallSteamCMD()
+	return err
+}
+
+func envBranches(c *Ctx, a *Args) (*render.Doc, error) {
+	if err := needSteamCMD(c, a); err != nil {
+		return nil, err
+	}
+	bs, err := c.App.GameBranches()
+	if err != nil {
+		return nil, err
+	}
+	d, root := render.New(fmt.Sprintf("RimWorld branches: %d", len(bs)))
+	var rows [][]string
+	for _, b := range bs {
+		v := b.Version
+		switch b.Name {
+		case "public":
+			v = "current"
+		case "unstable":
+			v = "test"
+		}
+		when := ""
+		if !b.Updated.IsZero() {
+			when = b.Updated.Format("2006-01-02")
+		}
+		rows = append(rows, []string{b.Name, v, b.Description, when})
+	}
+	root.AddColumns(rows)
+	d.AddNext("archo env download <branch> --to <dir> --account <name>")
+	return d, nil
+}
+
+func envDownload(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Str("to") == "" || a.Str("account") == "" {
+		return nil, &UsageError{Msg: "give the folder (--to) and your Steam account name (--account)"}
+	}
+	if err := needSteamCMD(c, a); err != nil {
+		return nil, err
+	}
+	fmt.Fprintln(os.Stderr, "SteamCMD asks for the password and the Steam Guard code below; RimArcho does not see them.")
+	r, err := c.App.DownloadGame(app.DownloadSpec{Branch: a.Pos[0], Dir: a.Str("to"), Account: a.Str("account"), Name: a.Str("name"), Saves: a.Str("saves")}, nil)
+	if err != nil {
+		return nil, err
+	}
+	return envDoc(c, r.Env, "downloaded and added", r.Changes), nil
 }

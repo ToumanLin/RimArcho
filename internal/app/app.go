@@ -88,8 +88,16 @@ type App struct {
 	// VolumeFS names the file system of a folder's volume; nil means source.VolumeFS
 	// (tests act out exFAT with it).
 	VolumeFS func(dir string) string
-	HTTP     *http.Client
-	SteamAPI string
+	// SteamCMDStart and SteamCMDRun replace starting SteamCMD (tests fake it, 08 §10);
+	// SteamCMDZip replaces Valve's download URL, SteamCMDPoll how often its log is read,
+	// SteamCMDNoPath leaves PATH out when looking for it.
+	SteamCMDStart  func(exe string, args []string, console bool) (SteamCMDProc, error)
+	SteamCMDRun    func(exe string, args []string) (string, error)
+	SteamCMDZip    string
+	SteamCMDPoll   time.Duration
+	SteamCMDNoPath bool
+	HTTP           *http.Client
+	SteamAPI       string
 	// SteamCollectionAPI reads Workshop collections (04 §9.5); "" is the public endpoint.
 	SteamCollectionAPI string
 	analyzing          *pendingAnalysis

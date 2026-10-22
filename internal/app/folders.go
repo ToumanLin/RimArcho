@@ -210,3 +210,23 @@ func (a *App) sharedSource(label, root string) (*source.Source, error) {
 	s := &source.Source{ID: a.NewID(), EnvID: store.Shared, Kind: source.Extra, Label: nextLabel(all, source.Kind(label)), Root: root, Status: source.StatusOK}
 	return s, a.Store.InsertSource(s)
 }
+
+// SharedUnread reports whether a shared mod folder has never been read (no instance was
+// ever recorded from it): adding a game then scans the shared folders too, otherwise only
+// the game's own Data/ and Mods/ (02 §0 item 8).
+func (a *App) SharedUnread() bool {
+	fs, err := a.Folders()
+	if err != nil {
+		return true
+	}
+	var n int
+	for _, s := range fs {
+		if s.Status != source.StatusOK {
+			continue
+		}
+		if err := a.Store.DB.QueryRow(`SELECT count(*) FROM instance WHERE source_id=?`, s.ID).Scan(&n); err != nil || n == 0 {
+			return true
+		}
+	}
+	return false
+}

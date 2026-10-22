@@ -8,12 +8,12 @@ import (
 // ChildScan runs `<this executable> scan --env <name>` as a separate process with the same
 // data directory, so the scan's memory never stays in an interface process (07 §3). It
 // returns the command's output.
-func ChildScan(home, envName string) (string, error) {
+func ChildScan(home, envName string, flags ...string) (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
-	return ChildScanExe(exe, home, envName)
+	return ChildScanExe(exe, home, envName, flags...)
 }
 
 // ChildMonitor runs `<this executable> monitor install` in a separate process (08 §9): the
@@ -39,9 +39,10 @@ func ChildMonitorExe(exe, home, envName string) (string, error) {
 	return string(out), err
 }
 
-// ChildScanExe is ChildScan with an explicit archo executable.
-func ChildScanExe(exe, home, envName string) (string, error) {
-	args := []string{"scan"}
+// ChildScanExe is ChildScan with an explicit archo executable; flags go to scan
+// (--game-only).
+func ChildScanExe(exe, home, envName string, flags ...string) (string, error) {
+	args := append([]string{"scan"}, flags...)
 	if envName != "" {
 		args = append(args, "--env", envName)
 	}

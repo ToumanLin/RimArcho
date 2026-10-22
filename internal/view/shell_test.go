@@ -152,26 +152,26 @@ func TestFindAndAddGames(t *testing.T) {
 	view.SetLang("en")
 	e := testkit.New(t)
 	gs := view.FindGames(e.App)
-	if len(gs) != 1 || gs[0].Name != "steam" || gs[0].Launch != "steam" || gs[0].Workshop == "" || gs[0].Env != "" || gs[0].Version == "" {
+	if len(gs) != 1 || gs[0].Name != "1.6" || gs[0].Launch != "steam" || gs[0].Workshop == "" || gs[0].Env != "" || gs[0].Version == "" {
 		t.Fatalf("found %+v", gs)
 	}
 	names, err := view.AddGames(e.App, gs)
-	if err != nil || strings.Join(names, ",") != "steam" {
+	if err != nil || strings.Join(names, ",") != "1.6" {
 		t.Fatalf("added %v, %v", names, err)
 	}
-	if cur, err := e.App.Env(); err != nil || cur.Name != "steam" {
+	if cur, err := e.App.Env(); err != nil || cur.Name != "1.6" {
 		t.Fatalf("current %v %v", cur, err)
 	}
 	// Found again: it is in use, and adding it again does nothing.
 	gs = view.FindGames(e.App)
-	if len(gs) != 1 || gs[0].Env != "steam" || gs[0].Name != "" {
+	if len(gs) != 1 || gs[0].Env != "1.6" || gs[0].Name != "" {
 		t.Fatalf("again %+v", gs)
 	}
 	if names, err := view.AddGames(e.App, gs); err != nil || len(names) != 0 {
 		t.Fatalf("again: %v %v", names, err)
 	}
 	g, err := view.GameAt(e.App, `"`+e.Game+`"`)
-	if err != nil || g.Env != "steam" || g.Launch != "steam" {
+	if err != nil || g.Env != "1.6" || g.Launch != "steam" {
 		t.Fatalf("typed %+v %v", g, err)
 	}
 	if _, err := view.GameAt(e.App, e.Root); err == nil {

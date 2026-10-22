@@ -60,11 +60,11 @@ func TestGuide(t *testing.T) {
 		t.Fatalf("envs %d", sh.Envs)
 	}
 	found := api.GuideFind()
-	if len(found) != 1 || found[0].Name != "steam" {
+	if len(found) != 1 || found[0].Name != "1.6" {
 		t.Fatalf("found %+v", found)
 	}
 	names, err := api.GuideAdd(found)
-	if err != nil || strings.Join(names, ",") != "steam" {
+	if err != nil || strings.Join(names, ",") != "1.6" {
 		t.Fatalf("added %v %v", names, err)
 	}
 	if !api.GuideScan(names) {
@@ -86,7 +86,7 @@ func TestGuide(t *testing.T) {
 	if last["ok"] != true || len(texts) != 2 || !strings.Contains(texts[1], "mods found") {
 		t.Fatalf("end %v, texts %q", last, texts)
 	}
-	if b := api.Board(); b.Never || b.EnvName != "steam" {
+	if b := api.Board(); b.Never || b.EnvName != "1.6" {
 		t.Fatalf("board after the guide: never %v env %s", b.Never, b.EnvName)
 	}
 	if _, err := api.PackImport(e.Root); err == nil {
