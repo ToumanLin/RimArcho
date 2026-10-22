@@ -312,6 +312,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   was never a run.
 
 ### The window (06 §2)
+- `1`–`9` focus a page's areas on every page, as `1`–`4` do in the editor, and each area's
+  heading shows its number: Mod 库存 (filter, table, details), 能不能跑's sections, 游戏日志 (the
+  errors, the log text), 环境, 设置's groups, the build page's parts. The TUI's 能不能跑 and
+  Mod 库存 do the same.
 - 贴图优化 is a page of its own under 库, after 整合包 (`shift+7`; 环境 is now `shift+8`, `*` in
   the TUI, where `shift+7` shows the textures panel). 设置 keeps only where todds is.
 - A sidebar replaces the top tabs, in two groups: 在玩 (启动, 能不能跑 with its badge,

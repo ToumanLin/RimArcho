@@ -23,6 +23,7 @@ function left(next) {
 
 export function openScreen(name) {
   fresh = S.screen !== name;
+  if (fresh) onArea = 0;
   left(name);
   S.screen = name;
   if (name !== "home") dropBackdrop();
@@ -60,6 +61,7 @@ function dropBackdrop() {
 export function page(cls, lead, ...right) {
   const w = el("div", "page " + cls + (fresh ? " enter" : ""));
   fresh = false;
+  resetAreas();
   const head = el("div", "page-head");
   if (lead) head.append(el("p", "lead", lead));
   const acts = [];
@@ -77,6 +79,36 @@ export function page(cls, lead, ...right) {
   }
   if (head.childNodes.length) w.append(head);
   return w;
+}
+
+// ---- numbered areas (06 §3.5): on every page 1–9 focus its areas, as 1–4 do in the editor;
+// each area's heading shows its number ("1 会让游戏出错") ----
+let areas = [];
+let onArea = 0; // the area last picked on this page: a redraw keeps its mark
+export function resetAreas() { areas = []; }
+
+// area numbers box (its heading head gets the number) and says what focusing it does; the
+// default scrolls it into view and focuses its first control, so tab goes on from there.
+export function area(box, head, focus) {
+  const n = areas.length + 1;
+  if (n > 9 || !box) return;
+  areas.push({ box, focus: focus || (() => { const f = box.querySelector("button, input, select, [tabindex]"); if (f) f.focus({ preventScroll: true }); }) });
+  box.dataset.area = String(n);
+  box.classList.toggle("area-on", n === onArea);
+  if (head) head.prepend(el("span", "anum", String(n)));
+}
+
+// areaKey takes 1–9 on a page: the area is marked, shown and focused. true when taken.
+export function areaKey(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey || !/^[1-9]$/.test(e.key)) return false;
+  const a = areas[+e.key - 1];
+  if (!a || !a.box.isConnected) return false;
+  e.preventDefault();
+  onArea = +e.key;
+  for (const x of areas) x.box.classList.toggle("area-on", x === a);
+  a.box.scrollIntoView({ block: "nearest" });
+  a.focus();
+  return true;
 }
 
 export function button(label, keyName, run, cls = "") {
@@ -202,6 +234,8 @@ function drawNeeds() {
     const sec = el("section", "sec need-sec " + SECTION_CLS[si]);
     const n = its.filter((x) => x.counted).length;
     const h = el("h2", "label", T(title));
+    const first = i;
+    area(sec, h, () => { N.cur = first; markNeeds(); });
     if (n) {
       const c = el("span", "n num", String(n));
       h.append(el("span", "", " · "), c);
@@ -453,9 +487,17 @@ function drawGameLog() {
   }
   list.append(scroll);
   const det = el("section", "card col detail-card");
-  det.append(el("div", "scroll", ""));
+  const dscroll = el("div", "scroll", "");
+  dscroll.tabIndex = -1;
+  det.append(dscroll);
   grid.append(list, det);
   w.append(grid);
+  // 1 the runs (or the monitor's entries), 2 the log text of the one picked
+  resetAreas();
+  area(list, list.querySelector(".ltabs") || null, () => { det.classList.remove("focus"); list.classList.add("focus"); });
+  area(det, null, () => { list.classList.remove("focus"); det.classList.add("focus"); det.querySelector(".scroll").focus(); });
+  if (!list.querySelector(".ltabs")) { list.prepend(el("div", "col-head", "")); list.firstChild.append(el("span", "anum", "1"), T("the errors")); }
+  det.prepend(el("div", "col-head", "")); det.firstChild.append(el("span", "anum", "2"), T("the log text"));
   scroll.scrollTop = was;
   markLog(true);
 }
@@ -853,6 +895,8 @@ function markRows(X) {
 // change's files.
 export function logsKey(e) {
   const k = e.key;
+  // focus in the log text (2): the arrows and page keys scroll it
+  if (S.screen === "log" && document.activeElement && document.activeElement.closest(".detail-card") && /^(Arrow(Up|Down)|Page(Up|Down)|Home|End)$/.test(k)) return;
   if (S.screen === "log") {
     const mon = L.page && L.page.monitor;
     if (mon && (k === "ArrowLeft" || k === "ArrowRight")) { e.preventDefault(); L.tab = k === "ArrowRight" ? 1 : 0; return drawGameLog(); }
@@ -995,8 +1039,10 @@ function settingRunner(again) {
 function renderGroups(w, groups, again) {
   const run = settingRunner(again);
   for (const g of groups) {
-    w.append(el("div", "label section", g.title));
+    const lab = el("div", "label section", g.title);
+    w.append(lab);
     const card = el("section", "card settings");
+    area(card, lab);
     for (const it of g.items || []) {
       const row = el("div", "set");
       const left = el("div", "l");
@@ -1061,7 +1107,10 @@ export async function environment() {
   sc.innerHTML = "";
   const w = page("env", T("an environment is one game folder: its version, how it starts, its saves"), act(T("add an environment"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
+  const envLab = el("div", "label section", T("every environment"));
+  w.append(envLab);
   const card = el("section", "card");
+  area(card, envLab);
   for (const e of p.envs || []) {
     const row = el("div", "envrow" + (e.current ? " on" : ""));
     const l = el("div", "l");

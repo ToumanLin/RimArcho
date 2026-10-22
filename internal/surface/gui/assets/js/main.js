@@ -711,6 +711,8 @@ function onKey(e) {
     if (S.screen === "full" && (k === "Escape" || k === "Backspace" || k === "Enter")) { e.preventDefault(); scr.closeScreen(); detailFollow(true); return; }
     if (e.ctrlKey && k === "k") { e.preventDefault(); return pop.palette(); }
     if (k === "?" && S.screen !== "full") { e.preventDefault(); return pop.help(S.screen); }
+    // 1–9 focus the page's numbered areas (06 §3.5)
+    if (S.screen !== "full" && S.screen !== "home" && scr.areaKey(e)) return;
     if (S.screen === "home") return homePage.homeKey(e);
     if (S.screen === "packs" || S.screen === "build") return packsPage.packsKey(e);
     if (S.screen === "needs") return scr.needsKey(e);

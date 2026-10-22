@@ -13,7 +13,7 @@ import { icon } from "./icons.js";
 import { renderDetail } from "./detail.js";
 import { fieldList } from "./fields.js";
 import * as pop from "./popups.js";
-import { openScreen, page, rescanButton } from "./screens.js";
+import { openScreen, page, rescanButton, area } from "./screens.js";
 import { createBar } from "./filterbar.js";
 import * as ops from "./ops.js";
 
@@ -146,6 +146,12 @@ function build() {
   w.append(root, selbar);
   sc.append(w);
   els = { root, main, head, rows, th, sizer, side, detail, dhead, scroll, bar: selbar, lead: w.querySelector(".lead") };
+  // 1 the filter, 2 the table, 3 the details (06 §3.5); the numbers sit in their headings
+  const fb = L.bar.el;
+  fb.querySelector(".fbar-row").prepend(el("span", "anum", "1"));
+  area(fb, null, () => L.bar.focus());
+  area(main, null, () => { L.focus = "rows"; rows.focus(); markFocus(); hints(); });
+  area(detail, null, () => { L.focus = "detail"; scroll.focus(); markFocus(); hints(); });
   rows.addEventListener("scroll", drawRows, { passive: true });
   rows.addEventListener("mousedown", () => { L.focus = "rows"; rows.focus(); markFocus(); });
   scroll.addEventListener("mousedown", () => { L.focus = "detail"; markFocus(); });
@@ -252,6 +258,7 @@ function drawHead() {
   const p = L.page;
   const h = els.head;
   h.innerHTML = "";
+  h.append(el("span", "anum", "2"));
   const n = p.shown === p.total ? Tf("%d mods", p.total) : Tf("%d of %d mods", p.shown, p.total);
   h.append(el("span", "lib-count", n), el("span", "faint", " · " + p.size));
   layout();
@@ -548,7 +555,7 @@ async function drawDetail() {
   const box = els.scroll;
   const row = i && (L.page.rows || []).find((r) => r.insts.some((x) => x.ref === i.ref));
   els.dhead.innerHTML = "";
-  els.dhead.append(el("span", "t", T("details")));
+  els.dhead.append(el("span", "n", "3"), el("span", "t", T("details")));
   if (i) els.dhead.append(el("span", "q", (row ? row.name : "") + " · " + i.label));
   if (!i) { box.innerHTML = ""; box.dataset.ref = ""; return; }
   const same = box.dataset.ref === i.ref && box.dataset.stamp === stampOf(i);

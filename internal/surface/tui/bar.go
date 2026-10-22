@@ -340,6 +340,9 @@ func (m *model) barView(w int) []string {
 		line.WriteString(s)
 		used += cells
 	}
+	if m.tab == tabLibrary {
+		add(sDimS.Render("1 "), 2) // Mod 库存's first area (06 §3.5)
+	}
 	add(sDimS.Render(ic.search+" "), 2)
 	switch {
 	case b.typing:

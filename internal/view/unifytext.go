@@ -79,6 +79,7 @@ func init() {
 		"put everything back from staging; elsewhere, stage the enabled list":       "暂存里全部放回；其他地方是把已启用全部暂存",
 		"sort · write to the game · launch (the palette previews them)":             "排序 · 写入游戏 · 启动（命令面板里可预览）",
 		"sort · write to the game · to the launch page (the palette previews them)": "排序 · 写入游戏 · 去启动页（命令面板里可预览）",
+		"focus the page's areas (the numbers in their headings)":                    "聚焦页面的各个区（标题前的数字）",
 		"navigation at the side / at the top":                                       "导航在侧边 / 在顶部",
 		"rescan · check the files again":                                            "重新扫描 · 重新检查文件",
 		"plans · environments":                                                      "方案 · 环境",

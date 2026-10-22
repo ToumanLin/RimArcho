@@ -5,7 +5,7 @@
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, button, act } from "./screens.js";
+import { openScreen, page, button, act, area } from "./screens.js";
 import * as pop from "./popups.js";
 
 let ui = null;
@@ -245,7 +245,9 @@ function drawBuild() {
 
   // the name and the kind
   const basics = el("section", "sec");
-  basics.append(el("h2", "label", T("the pack")));
+  const basicsH = el("h2", "label", T("the pack"));
+  basics.append(basicsH);
+  area(basics, basicsH);
   const bc = el("div", "card bd-basics");
   const nameRow = el("label", "bd-row");
   const name = el("input", "field");
@@ -281,7 +283,9 @@ function drawBuild() {
 
   // the four things building does; while it builds, where it is
   const steps = el("section", "sec");
-  steps.append(el("h2", "label", T("what building does")));
+  const stepsH = el("h2", "label", T("what building does"));
+  steps.append(stepsH);
+  area(steps, stepsH);
   const sc2 = el("div", "card bd-steps");
   const at = S.packBuild ? ({ 0: 0, 2: 1, 3: 3, 4: 4 })[S.packBuild.step] ?? 0 : -1;
   p.steps.forEach((s, i) => {
