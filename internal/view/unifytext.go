@@ -42,6 +42,7 @@ func init() {
 		"no history yet":                       "还没有历史",
 		"sort and columns (the headers' menu)": "排序和列（表头的菜单）",
 		"the history: steps and versions":      "历史：每一步和各版本",
+		"mod changes":                          "Mod 变化",
 		// the filter bar
 		"content":       "内容",
 		"has":           "有",

@@ -91,7 +91,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	out = append(out,
 		r("tab · shift+tab", "next / previous page under the same sidebar entry"),
 		r("shift+1–7", "go to a page in the sidebar"),
-		r("c · l", "mod changes · game log"),
+		r(pick("c · l", "c"), pick("mod changes · game log", "mod changes")),
 		r("ctrl+k", "command palette"),
 		r("?", "this help"),
 	)
