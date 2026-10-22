@@ -61,6 +61,7 @@ func main() {
 	logF := fs.String("log", "", "exec: append the command and its output to this transcript")
 	execLogs := fs.String("execlogs", "", "validate/bench-score/tasks: directory of exec transcripts <item>.log")
 	raF := fs.String("rimarcho", "", "bench-score: rimarcho-v4.jsonl written by bench-sample")
+	keepF := fs.String("keep", "", "tasks: an earlier tasks.jsonl whose items keep their split (new items are split by a new hash)")
 	costsF := fs.String("costs", "", "bench-score: costs.jsonl of the tier-2 runs")
 	fs.Parse(os.Args[2:])
 	o := &vopts{Corpus: *corpus, ExecLogs: *execLogs}
@@ -83,7 +84,7 @@ func main() {
 	case "bench-score":
 		err = benchScore(*sampleF, *packets, *labels, *review, *raF, *execLogs, *costsF, o)
 	case "tasks":
-		err = exportTasks(*sampleF, *packets, *labels, *review, *out, o)
+		err = exportTasks(*sampleF, *packets, *labels, *review, *out, *keepF, o)
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
