@@ -2,6 +2,7 @@ package mcp_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
@@ -52,5 +53,17 @@ func TestCatalogAndArgvFor(t *testing.T) {
 	}
 	if _, err := mcp.ArgvFor("nope", nil); err == nil {
 		t.Error("unknown tool accepted")
+	}
+}
+
+func TestClipOutput(t *testing.T) {
+	short := "a\nb\n"
+	if mcp.ClipOutput(short) != short {
+		t.Error("short output changed")
+	}
+	long := strings.Repeat("0123456789abcdef0123456789abcdef\n", 4000) // 132 KB
+	got := mcp.ClipOutput(long)
+	if len(got) > mcp.MaxOutput+200 || !strings.Contains(got, "output clipped at") || !strings.Contains(got, "narrow the call") {
+		t.Errorf("clipped to %d bytes, tail %q", len(got), got[len(got)-150:])
 	}
 }

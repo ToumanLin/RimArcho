@@ -17,12 +17,18 @@ import (
 
 var (
 	// The type whose initialisation or construction failed, as the game names it.
-	failingTypeRe = regexp.MustCompile("static constructor of ([A-Za-z_][\\w.+`]*)|type initializer for '([^']+)'|instantiating a mod of type ([A-Za-z_][\\w.+]*)")
+	failingTypeRe = regexp.MustCompile("static constructor of ([A-Za-z_][\\w.+`]*)|type initializer for '([^']+)'|instantiating a mod of type ([A-Za-z_][\\w.+]*)|Could not load type of field '([A-Za-z_][\\w.]*)")
 	// The assembly the game could not list types of.
 	asmTypesRe = regexp.MustCompile(`getting types in assembly ([A-Za-z_][\w.\-]*)|Unable To Get Types For: ([A-Za-z_][\w.\-]*)`)
 	// A type reference into Harmony 1.x (0Harmony 1.x, namespace Harmony).
 	harmony1Re = regexp.MustCompile(`in assembly '0Harmony, Version=1\.|expected class 'Harmony\.`)
+	// Harmony's FileLog failing on harmony.log.txt.
+	harmonyLogRe = regexp.MustCompile(`(?i)(?:UnauthorizedAccessException|IOException|denied|sharing violation)[^\n]{0,200}harmony\.log\.txt|harmony\.log\.txt[^\n]{0,80}(?:denied|in use)`)
 )
+
+// infraCallers are type prefixes of mods that start vanilla flows for the player: HugsLib's
+// quickstarter and 1trickPwnyta's Defaults (G6: both named as wrong sources).
+var infraCallers = []string{"HugsLib.Quickstart.", "Defaults."}
 
 // dispatchFrames run code they did not write: a mod frame outside them (a profiler, an error
 // checker, a loading-screen mod's static-constructor runner) calls into what failed.
@@ -67,7 +73,7 @@ var dispatchFrames = map[string]bool{
 func failingTypes(msg string) []string {
 	var out []string
 	for _, m := range failingTypeRe.FindAllStringSubmatch(msg, -1) {
-		if t := strings.TrimSpace(m[1] + m[2] + m[3]); t != "" {
+		if t := strings.TrimSpace(m[1] + m[2] + m[3] + m[4]); t != "" {
 			out = append(out, strings.TrimSuffix(t, "."))
 		}
 	}
@@ -187,6 +193,30 @@ func (cx *attrCtx) callerRules(lc *LogCluster) {
 		}
 		cx.demote(lc, id, why, false)
 	}
+	// Infrastructure that runs vanilla flows for the player (HugsLib's quickstarter, Defaults
+	// applying default policies): the vanilla code it starts fails on someone else's data (G6).
+	for _, fr := range e.Frames {
+		if logs.GameNamespace(fr.Type) {
+			continue
+		}
+		for _, p := range infraCallers {
+			if strings.HasPrefix(fr.Type, p) {
+				for _, id := range cx.types(fr.Type) {
+					cx.demote(lc, id, fmt.Sprintf("log frame %s.%s runs a vanilla flow (quickstart / default settings); the vanilla code it starts failed on data from elsewhere", fr.Type, fr.Method), false)
+				}
+			}
+		}
+		break // only the topmost mod frame
+	}
+	// Harmony's debug log file cannot be written: the machine, not a mod.
+	if harmonyLogRe.MatchString(text) {
+		for _, at := range lc.Attr {
+			if at.Role == RoleSource {
+				cx.demote(lc, at.Instance, "Harmony could not write its debug log (harmony.log.txt): a file-permission problem on this machine with Harmony debug logging on, not this mod's defect", true)
+			}
+		}
+		lc.Details = append(lc.Details, "harmony.log.txt cannot be written (access denied / in use): Harmony debug logging is on and the Desktop (or the log folder) is protected; every mod that patches then fails the same way. Fix the folder permission (e.g. Windows Controlled Folder Access) or turn Harmony debug logging off")
+	}
 	// HugsLib's log upload.
 	upload := false
 	for _, fr := range e.Frames {
@@ -237,7 +267,7 @@ func (cx *attrCtx) assemblyRules(lc *LogCluster) (skipProviders bool) {
 		lc.Details = append(lc.Details, "the type belongs to Harmony 1.x (0Harmony 1.x, namespace Harmony): an assembly built against Harmony 1 cannot be loaded under RimWorld 1.6's Harmony 2, and the game skips it. Mods that bundle an old 0Harmony.dll are not a missing dependency. The failing assembly is the one named in the ReflectionTypeLoadException line next to this one")
 	}
 	ms := asmTypesRe.FindAllStringSubmatch(text, -1)
-	if len(ms) == 0 && skipProviders && cx.lf != nil {
+	if len(ms) == 0 && (skipProviders || strings.Contains(text, "from typeref")) && cx.lf != nil {
 		// The type-load error names the type; the next lines name the assembly
 		// ("ReflectionTypeLoadException getting types in assembly AchtungMod").
 		for _, x := range cx.lf.Entries {
@@ -284,4 +314,39 @@ func (cx *attrCtx) assemblyRules(lc *LogCluster) (skipProviders bool) {
 		}
 	}
 	return skipProviders
+}
+
+// nearMessages are up to 4 log messages before and 3 after e (other entries, clipped).
+func nearMessages(lf *logs.File, e *logs.Entry) []string {
+	if lf == nil || e == nil {
+		return nil
+	}
+	idx := -1
+	for i, x := range lf.Entries {
+		if x == e {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return nil
+	}
+	var out []string
+	add := func(x *logs.Entry, mark string) {
+		if x.Line < e.Line-30 || x.Line > e.Line+30 || x.Message == e.Message {
+			return
+		}
+		m := x.Message
+		if len(m) > 200 {
+			m = m[:197] + "..."
+		}
+		out = append(out, fmt.Sprintf("%s:%d %s", mark, x.Line, m))
+	}
+	for i := max(0, idx-4); i < idx; i++ {
+		add(lf.Entries[i], "before")
+	}
+	for i := idx + 1; i < len(lf.Entries) && i <= idx+3; i++ {
+		add(lf.Entries[i], "after")
+	}
+	return out
 }

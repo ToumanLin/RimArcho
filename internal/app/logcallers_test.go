@@ -23,6 +23,10 @@ Could not resolve type with token 0100006c from typeref (expected class 'Harmony
   at System.Reflection.Assembly.GetTypes () [0x00000] in <abc>:0
   at Verse.ModAssemblyHandler.AssemblyIsUsable (System.Reflection.Assembly asm) [0x00000] in <abc>:0
 ReflectionTypeLoadException getting types in assembly AchtungMod: System.Reflection.ReflectionTypeLoadException: Exception of type 'System.Reflection.ReflectionTypeLoadException' was thrown.
+Error patching RimWorld.Foo - Void Bar() - System.TypeInitializationException: The type initializer for 'ModA.Boot' threw an exception. ---> System.UnauthorizedAccessException: Access to the path "[Home_dir]/Desktop/harmony.log.txt" is denied.
+System.TypeLoadException: Could not resolve type with token 01000030 from typeref (expected class 'Other.Thing' in assembly 'Other, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null')
+ReflectionTypeLoadException getting types in assembly ModB: System.Reflection.ReflectionTypeLoadException: Exception of type 'System.Reflection.ReflectionTypeLoadException' was thrown.
+System.TypeLoadException: Could not load type of field 'LogRefs.Holder+<>c:<>9__1' (4) due to: Could not resolve type with token 0100017b from typeref (expected class 'System.Linq.IGrouping' in assembly 'System.Linq, Version=10.0.0.0')
 XML error: <selectionWeight>2</selectionWeight> doesn't correspond to any field in type LayoutRoomDef. Context: <LayoutRoomDef><defName>Ancient_Missing</defName><selectionWeight>2</selectionWeight></LayoutRoomDef>
 `
 
@@ -69,6 +73,12 @@ func TestLogCallerRules(t *testing.T) {
 			map[string]string{"unlimitedhugs.hugslib": "mentioned"}, nil, []string{"log upload failed"}},
 		{"Harmony 1.x type reference", "Harmony.CodeInstruction",
 			nil, nil, []string{"Harmony 1.x", "no enabled mod loads AchtungMod.dll"}},
+		{"unwritable harmony.log.txt is the machine", "Error patching RimWorld.Foo",
+			map[string]string{"tester.failer": "mentioned"}, nil, []string{"harmony.log.txt cannot be written"}},
+		{"type reference: the assembly named on the next line", "expected class 'Other.Thing'",
+			map[string]string{"tester.caller": "source"}, nil, []string{"loads ModB.dll"}},
+		{"type of a field: its declaring type's mod", "Could not load type of field",
+			map[string]string{"tester.coder": "source"}, nil, nil},
 		{"field error only in files of the context's def type", "<selectionWeight>",
 			map[string]string{"tester.roomer": "source"}, []string{"tester.gener"}, nil},
 	} {

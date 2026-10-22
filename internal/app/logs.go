@@ -48,7 +48,10 @@ type LogCluster struct {
 	Next       []string
 	Checklist  []string
 	Details    []string // class-specific facts (patch reasons, cross-reference providers …)
-	Finding    *finding.Finding
+	// Near: the log messages just before and after the first occurrence ("Player.log:<line>
+	// <message>"), the context agents otherwise grep the raw log for (G7 traces).
+	Near    []string
+	Finding *finding.Finding
 }
 
 // LogReport is an analysed log.
@@ -95,7 +98,7 @@ type logCacheEntry struct {
 var ErrLogNotCached = errors.New("log not analysed yet")
 
 // logCacheVersion invalidates stored reports when attribution changes.
-const logCacheVersion = 4
+const logCacheVersion = 6
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -352,6 +355,7 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 	var qs []*refQuery
 	for _, c := range logs.Clusters(lf) {
 		lc := &LogCluster{Cluster: c}
+		lc.Near = nearMessages(lf, c.First)
 		cx.attributeCluster(lc, failAt)
 		if q := referrerQuery(lc); q != nil {
 			qs = append(qs, q)
