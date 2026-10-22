@@ -733,37 +733,8 @@ details.xc-sec > summary { cursor: pointer; }
    the right of every row; a copy's details take the right column's place ---- */
 /* the list scrolls inside its card at every width, so only the rows in view are drawn */
 .page.fill.library { height: 100%; }
-.lib-groups { display: flex; flex-direction: column; gap: 14px; }
-.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: 224px minmax(0, 1fr); gap: 10px; position: relative; }
-.lib-filter { overflow-y: auto; padding: 10px 8px 12px; display: flex; flex-direction: column; gap: 14px; }
-.lib-search-box input { height: 28px; padding: 0 10px; border-radius: 7px; background: var(--pill); font-size: 12.5px; }
-.lib-search-box input::placeholder { color: var(--faint); }
+.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--lib-detail-w, min(420px, 40%)); gap: 8px; position: relative; }
 /* the grey completion over the input (the plan's .search .ghost, in this box) */
-.lib-search-box { position: relative; }
-.lib-ghost { position: absolute; inset: 0; padding: 0 10px; display: flex; align-items: center; overflow: hidden; white-space: pre; pointer-events: none; font-size: 12.5px; }
-.lib-ghost .typed { color: transparent; }
-.lib-ghost .sfx { color: var(--muted); opacity: .75; }
-.lib-conds { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: -6px; }
-.lib-cond { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11.5px; max-width: 100%; }
-.lib-cond > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lib-cond.ex { background: var(--pill); color: var(--muted); }
-.lib-cond.ex > span:first-child { text-decoration: line-through; }
-.lib-cond .x { opacity: .6; }
-.lib-cond:hover .x { opacity: 1; }
-.lib-clear { font-size: 11.5px; color: var(--muted); padding: 0 4px; }
-.lib-clear:hover { color: var(--fg); }
-.lib-gtitle { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .04em; margin: 0 0 3px 6px; }
-.lib-val { display: flex; align-items: center; gap: 8px; width: 100%; height: 24px; padding: 0 6px; border-radius: 6px; font-size: 12.5px; color: var(--fg-2); text-align: left; transition: background var(--t-press), color var(--t-press); }
-.lib-val:hover { background: var(--pill); color: var(--fg); }
-.lib-val .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lib-val .n { color: var(--faint); font-size: 11.5px; }
-.lib-val.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
-.lib-val.on .n { color: var(--accent); }
-.lib-val.ex .lbl { text-decoration: line-through; color: var(--faint); }
-.lib-val.cur .lbl { color: var(--fg); font-weight: 500; }
-.lib-val .curv { flex: none; font-size: 10.5px; line-height: 16px; padding: 0 5px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
-.lib-more { font-size: 11.5px; color: var(--muted); padding: 2px 6px; }
-.lib-more:hover { color: var(--fg); }
 
 .lib-main { display: flex; flex-direction: column; min-height: 0; position: relative; }
 .lib-head { flex: none; display: flex; align-items: center; height: 32px; padding: 0 12px 0 14px; font-size: 12px; color: var(--muted); white-space: nowrap; }
@@ -813,10 +784,14 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-row.empty { position: absolute; top: 28px; left: 0; right: 0; display: flex; justify-content: center; height: 80px; color: var(--muted); }
 .lib-row.empty:hover { background: none; }
 /* a copy's details over the right of the table */
-.lib-detail { position: absolute; top: 0; right: 0; bottom: 0; width: min(54%, 520px); z-index: 3; display: flex; flex-direction: column; background: var(--card); border-left: 1px solid var(--line-2); border-radius: 0 12px 12px 0; animation: view-in var(--t-enter) var(--ease); }
-.lib-dhead { flex: none; display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; border-bottom: 1px solid var(--line-2); }
-.lib-dhead .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lib-dhead .faint { flex: none; font-size: 12px; }
+/* the details: the editor's detail card, in the right column; enter lays it over the page */
+.lib-detail { min-height: 0; }
+.lib-detail .head .q { color: var(--faint); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+.lib.full { grid-template-columns: 0 minmax(0, 1fr); gap: 0; }
+.lib.full .lib-main { visibility: hidden; }
+.lib-main.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.lib-main .fbar-row { border-bottom: 0; padding: 4px 8px 0; }
+@media (max-width: 760px) { .lib:not(.full) { grid-template-columns: minmax(0, 1fr) 0; gap: 0; } .lib:not(.full) .lib-detail { display: none; } }
 .lib-detail .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 32px; user-select: text; }
 .lib-note { margin-bottom: 12px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--amber) 9%, transparent); font-size: 12.5px; color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; }
 .lib-note:hover:not(.editing) { background: color-mix(in srgb, var(--amber) 14%, transparent); }
@@ -830,16 +805,49 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-bar { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 10px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0, 0, 0, .05); animation: view-in var(--t-enter) var(--ease); }
 .lib-bar > .accent { font-weight: 600; margin-right: 4px; font-size: 12px; }
 .lib-bar .btn.quiet { margin-left: auto; border-color: transparent; background: none; box-shadow: none; }
-#acts .lib-drawer-btn { display: none; }
-@media (max-width: 1100px) { .lib { grid-template-columns: 196px minmax(0, 1fr); } }
-/* a narrow window: the filters become a drawer over the list; the right column keeps size and state */
-@media (max-width: 759px) {
-  .lib { grid-template-columns: minmax(0, 1fr); }
-  .lib-filter { position: absolute; top: 0; bottom: 0; left: 0; width: min(280px, 86%); z-index: 6; transform: translateX(-108%); visibility: hidden; transition: transform var(--t-enter) var(--ease), visibility 0s var(--t-enter); }
-  .lib.drawer-open .lib-filter { transform: none; visibility: visible; box-shadow: var(--shadow); transition: transform var(--t-enter) var(--ease); }
-  .lib.drawer-open .lib-scrim { display: block; position: absolute; inset: 0; z-index: 5; border-radius: 12px; background: color-mix(in srgb, var(--fg) 12%, transparent); }
-  .lib-detail { width: 100%; border-left: 0; border-radius: 12px; }
-  #acts .lib-drawer-btn { display: inline-flex; }
-}
-.lib-scrim { display: none; }
-@media (prefers-reduced-motion: reduce) { .lib-detail, .lib-bar { animation: none; } .lib-filter, .lib-row .chev svg { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .lib-bar, .fbar-panel { animation: none; } .lib-row .chev svg { transition: none; } }
+
+/* ---- the filter bar (06 §2.5, §2.9): the plan editor and Mod 库存 share it ---- */
+.fbar { position: relative; flex: none; z-index: 6; }
+.fbar-row { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 6px; border-bottom: 1px solid var(--line-2); }
+.fbar-search { flex: 1; min-width: 90px; position: relative; }
+.fbar-search input { height: 26px; padding: 0 9px; border-radius: 7px; background: var(--pill); font-size: 12.5px; }
+.fbar-search input::placeholder { color: var(--faint); }
+.fbar-search input:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+.fbar-ghost { position: absolute; inset: 0; padding: 0 9px; display: flex; align-items: center; overflow: hidden; white-space: pre; pointer-events: none; font-size: 12.5px; }
+.fbar-ghost .typed { color: transparent; }
+.fbar-ghost .sfx { color: var(--muted); opacity: .75; }
+.fbar-chips { display: flex; gap: 4px; min-width: 0; max-width: 55%; overflow: hidden; flex: 0 1 auto; }
+.fbar-chip { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11.5px; white-space: nowrap; max-width: 180px; }
+.fbar-chip > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.fbar-chip.ex { background: var(--pill); color: var(--muted); }
+.fbar-chip.ex > span:first-child { text-decoration: line-through; }
+.fbar-chip .x { opacity: .6; } .fbar-chip:hover .x { opacity: 1; }
+.fbar-tog { flex: none; height: 26px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; border-radius: 7px; color: var(--fg-2); font-size: 12px; transition: background var(--t-press); }
+.fbar-tog:hover, .fbar-tog.on { background: var(--pill); }
+.fbar-tog .c { color: var(--accent); font-weight: 600; }
+.fbar-tog kbd { margin-left: 2px; }
+.fbar-panel { position: absolute; left: 0; top: 36px; width: var(--fbar-w, 100%); max-width: calc(100vw - 40px); background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 6px 8px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; align-items: center; animation: view-in var(--t-enter) var(--ease); }
+.fbar-gt { font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.fbar-line { display: flex; gap: 3px; min-width: 0; overflow: hidden; white-space: nowrap; align-items: center; }
+.fbar-v { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px; border-radius: 6px; font-size: 12px; color: var(--fg-2); max-width: 220px; transition: background var(--t-press); }
+.fbar-v .l { overflow: hidden; text-overflow: ellipsis; }
+.fbar-v:hover { background: var(--pill); color: var(--fg); }
+.fbar-v:focus-visible, .fbar-v:focus { outline: 0; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.fbar-v .n { color: var(--faint); font-size: 11px; }
+.fbar-v.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.fbar-v.on .n { color: var(--accent); }
+.fbar-v.ex .l { text-decoration: line-through; color: var(--faint); }
+.fbar-v.cur .l { color: var(--fg); font-weight: 600; }
+.fbar-v .curv { font-size: 10px; line-height: 15px; padding: 0 4px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+.fbar-find { flex: 0 0 92px; height: 22px; border-radius: 6px; background: var(--pill); font-size: 11.5px; padding: 0 7px; }
+.fbar-find::placeholder { color: var(--faint); }
+.fbar-find:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+/* the editor: the bar heads 未启用, its panel opens over both lists */
+.area .barhost .fbar-row { border-bottom: 1px solid var(--line-2); }
+.area[data-area="0"] { overflow: visible; }
+.area[data-area="0"] > .rows { border-radius: 0 0 12px 12px; }
+/* the row menu (06 §8.5): groups split by a hairline, keys on the right, 退订 / 删除 in red */
+#menu hr { border: 0; border-top: 1px solid var(--line-2); margin: 3px 4px; }
+#menu button.danger { color: var(--red); }
+#menu button:focus { outline: 0; background: var(--pill); }

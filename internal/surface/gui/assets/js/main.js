@@ -7,7 +7,8 @@
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
 import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
-import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost } from "./lists.js";
+import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
+import { createBar } from "./filterbar.js";
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
@@ -177,7 +178,8 @@ function renderWhere() {
   // A page's place is its breadcrumb; the position line says more only on the plan (where
   // the cursor is in which list) and in the full detail.
   let s = "";
-  if (S.screen && S.screen !== "full") s = ""; // a page: the breadcrumb is enough
+  if (S.screen === "library") s = library.where(); // a table like the plan's lists
+  else if (S.screen && S.screen !== "full") s = ""; // a page: the breadcrumb is enough
   else if (S.screen === "full") {
     const it = cur(lastList);
     s = `${T(AREAS[lastList])} › ${S.detail ? S.detail.name : ""}`;
@@ -356,6 +358,8 @@ async function verb(name) {
     case "down": case "up": case "down10": case "up10": {
       if (k !== 1 || !ids.length) return say("", T("only enabled mods can be moved"));
       const d = { down: 1, up: -1, down10: 10, up10: -10 }[name];
+      // the bar shows only some rows: past the next row shown (view.StepAt, 06 §3.5)
+      if (barOn()) { const c = col(1); return edited(api.MoveShown(ids, d, c.view.map((i) => c.items[i].pos)), true, ids); }
       return edited(api.MoveBy(ids, d), true, ids);
     }
     case "tags":
@@ -487,6 +491,7 @@ async function paletteChoice(o) {
     let i = c.items.findIndex((x) => x.id === o.id);
     if (i < 0) continue;
     let v = c.view.indexOf(i);
+    if (v < 0 && k < 2) { S.bar.clear(); await barChanged(); v = c.view.indexOf(i); }
     if (v < 0) { c.query = ""; $(`.area[data-area="${k}"] .search input`).value = ""; await refilter(k, o.id); v = c.view.indexOf(i); }
     focusArea(k);
     c.cursor = v;
@@ -502,6 +507,7 @@ async function paletteChoice(o) {
 
 function startSearch(k = S.focus < 3 ? S.focus : lastList) {
   focusArea(k);
+  if (k < 2) return S.bar.focus();
   const c = col(k);
   c.searching = true;
   renderHeads();
@@ -557,6 +563,22 @@ function searchKey(k, e, inp) {
   e.stopPropagation();
 }
 
+// barChanged: the bar's search or filters changed (or it opened): both lists again, the
+// cursors kept on their mods.
+let barSeq = 0;
+async function barChanged() {
+  const n = ++barSeq;
+  const keep = [0, 1].map((k) => (cur(k) ? key(cur(k)) : ""));
+  await Promise.all([0, 1].map((k) => refilter(k, keep[k])));
+  if (n !== barSeq) return;
+  S.bar.draw();
+  for (const k of [0, 1]) ensureVisible(k);
+  renderLists();
+  renderWhere();
+  renderHints();
+  detailFollow();
+}
+
 // ---- the keyboard ----
 
 function onKey(e) {
@@ -602,7 +624,8 @@ function onKey(e) {
   if (k === "Escape") {
     handled();
     if (S.focus < 3 && col().sel.size) { col().sel.clear(); renderLists(); renderWhere(); renderHints(); }
-    else if (S.focus < 3 && col().query) { col().query = ""; $(`.area[data-area="${S.focus}"] .search input`).value = ""; search(S.focus, ""); }
+    else if (S.focus < 2 && barOn()) { S.bar.clear(); }
+    else if (S.focus === 2 && col().query) { col().query = ""; $(`.area[data-area="${S.focus}"] .search input`).value = ""; search(S.focus, ""); }
     return;
   }
   if (ctrl && (k === " " || k === "Spacebar")) {
@@ -626,7 +649,7 @@ function onKey(e) {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
     g: () => verb("tags"), "#": () => verb("tags"), Enter: () => verb("full"), o: () => verb("workshop"), x: () => verb("swap"),
     S: () => run("sort"), w: () => run("save"), L: () => run("launch"), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
-    "/": () => startSearch(), "!": () => go("needs"), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
+    "/": () => startSearch(), "\\": () => S.bar.toggle(), "!": () => go("needs"), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help(), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
@@ -707,6 +730,11 @@ async function start() {
   initExchange(ui);
   plans.initPlans(ui);
   library.initLibrary(ui);
+  S.bar = createBar({ data: () => S.barData, change: () => barChanged(), leave: () => focusArea(S.focus < 2 ? S.focus : 0),
+    // open, it reaches over both lists it filters
+    width: () => $('.area[data-area="1"]').getBoundingClientRect().right - $('.area[data-area="0"]').getBoundingClientRect().left,
+    placeholder: T("search: words, tag:, author:, type:, has:, version:, -not") + "  /" });
+  $(".barhost").append(S.bar.el);
   wireLists(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);

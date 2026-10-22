@@ -29,6 +29,9 @@ func init() {
 		"go to a page in the sidebar":           "去侧栏的页面",
 		"language pack":                         "语言包",
 		"between lists: enable, disable, stage; within Enabled: reorder": "在列表之间：启用、停用、暂存；在“已启用”内：调整顺序",
+		"%d more…":    "还有 %d 个…",
+		"Mod library": "Mod 库存",
+		"search: words, tag:, author:, type:, has:, version:, -not": "搜索：词、tag:、author:、type:、has:、version:、-排除",
 		// the filter bar
 		"content":       "内容",
 		"has":           "有",

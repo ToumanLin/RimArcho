@@ -1,35 +1,37 @@
-// Mod 库存 › 全部 (06 §2.9): what is on this machine. The filters, then a table like a file
-// manager's details view: one row per Lineage (opening to its copies), columns the player
-// sorts (click a header, again reverses), moves (drag a header), sizes (drag its edge) and
-// picks (right click the headers), kept in ui.gui.library.columns. A copy's details open
-// over the right of the table (esc goes back). What it shows comes from view.BuildLibrary
-// through API.Library; the actions are the copies' view.LibAction data. The table draws
-// only the rows in view, so 1350+ Lineages stay smooth.
+// Mod 库存 › 全部 (06 §2.9): what is on this machine. The same layout as the plan editor:
+// the filter bar on top of a table, the details in a column on the right. The table is like
+// a file manager's details view: one row per Lineage (opening to its copies), columns the
+// player sorts (click a header, again reverses), moves (drag a header), sizes (drag its
+// edge) and picks (right click the headers), kept in ui.gui.library.columns. The details
+// follow the cursor; enter opens them over the page and closes them again. What it shows
+// comes from view.BuildLibrary through API.Library; each copy carries only the codes of
+// its ops (view.CopyOps), the labels and keys are the page's op table, sent once. The table
+// draws only the rows in view, so 1350+ Lineages stay smooth.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { on } from "./api.js";
 import { icon } from "./icons.js";
 import { renderDetail } from "./detail.js";
 import { fieldList } from "./fields.js";
 import * as pop from "./popups.js";
-import { openScreen, page, act, rescanButton } from "./screens.js";
+import { openScreen, page, rescanButton } from "./screens.js";
+import { createBar } from "./filterbar.js";
+import * as ops from "./ops.js";
 
-const FILTER = '<svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5h11l-4.2 5v4l-2.6 1.2V8.5z"/></svg>';
 const ROW = 30;      // every row has the same height: the list is drawn by position
 const HEAD = 28;     // the column headers, sticky at the top of the table
-const SHOW = 6;      // filter values shown before "more"
 const COLS_KEY = "ui.gui.library.columns";
 // a column's width when the player has not set one; the name column also takes what is left
 const WIDTH = { name: 260, size: 72, state: 116, source: 120, used: 150, updated: 84, version: 64, author: 130, tags: 160, played: 84 };
 // columns whose natural order is A to Z (the arrow points up); the rest start biggest or newest
 const ASC = new Set(["name", "source", "author", "tags"]);
 const L = {
-  page: null, search: "", filters: [], sort: "name",
+  page: null, sort: "name",
+  bar: null,         // the filter bar (filterbar.js): its search and filters are the query
   open: new Set(),   // lineages shown open
-  more: new Set(),   // filter groups shown in full
   flat: [], cur: 0, anchor: -1,
   sel: new Set(),    // selected copies, by ref
-  detail: null,      // the copy whose details replace the right column
-  drawer: false,     // a narrow window: the filters over the list
+  full: false,       // the details over the whole page (enter)
+  focus: "rows",     // "rows" or "detail" (→ on a copy, ← back)
   seq: 0,
   cols: null,        // [{key, title, shown, w}], in the player's order
 };
@@ -46,10 +48,7 @@ export function initLibrary(u) {
 
 // open shows the page (the sidebar's Mod 库存 › 全部).
 export async function open() {
-  if (S.screen !== "library") {
-    L.detail = null;
-    L.drawer = false;
-  }
+  if (S.screen !== "library") { L.full = false; L.focus = "rows"; }
   await load(true);
 }
 
@@ -62,14 +61,29 @@ export async function relang() {
   if (els) { els.rows.scrollTop = top; els.rows.dataset.sig = ""; drawRows(); }
 }
 
+function bar() {
+  if (!L.bar) {
+    L.bar = createBar({
+      cls: "lib-fbar",
+      data: () => L.page,
+      change: () => { L.cur = 0; load(); },
+      leave: () => els && els.rows.focus(),
+      placeholder: T("search: words, tag:, state:, source:, used:, -not") + "  /",
+    });
+  }
+  return L.bar;
+}
+
 async function load(fresh) {
   const n = ++L.seq;
+  const b = bar();
   let p, saved;
   try {
-    [p, saved] = await Promise.all([api.Library(L.search, L.filters, L.sort), L.cols ? null : api.Setting(COLS_KEY).catch(() => "")]);
+    [p, saved] = await Promise.all([api.Library(b.search, b.filters, L.sort), L.cols ? null : api.Setting(COLS_KEY).catch(() => "")]);
   } catch (e) { say("fail", errText(e)); return; }
   if (n !== L.seq) return;
   L.page = p;
+  ops.setTable(p.opTable);
   if (!L.cols) L.cols = mergeCols(p.columns || [], saved);
   flatten();
   if (fresh || !els || S.screen !== "library" || !document.body.contains(els.root)) build();
@@ -100,15 +114,8 @@ function lineageHas(ref) { return (L.page.rows || []).some((r) => r.insts.some((
 
 function build() {
   const sc = openScreen("library");
-  // a narrow window: the filters open over the list (06 §2.9)
-  const filterBtn = act(T("filters"), "", () => setDrawer(!L.drawer), "f");
-  filterBtn.classList.add("lib-drawer-btn");
-  filterBtn.querySelector(".ic").innerHTML = FILTER;
-  const w = page("fill library", lead(), filterBtn, rescanButton(T("rescan")));
-  const root = el("div", "lib" + (L.drawer ? " drawer-open" : ""));
-  const side = el("aside", "lib-filter card");
-  const scrim = el("div", "lib-scrim");
-  scrim.onclick = () => setDrawer(false);
+  const w = page("fill library", lead(), rescanButton(T("rescan")));
+  const root = el("div", "lib" + (L.full ? " full" : ""));
   const main = el("section", "lib-main card");
   const head = el("div", "lib-head");
   const rows = el("div", "lib-rows");
@@ -116,18 +123,31 @@ function build() {
   const th = el("div", "lib-th");
   const sizer = el("div", "lib-sizer");
   rows.append(th, sizer);
-  const detail = el("section", "lib-detail");
-  detail.hidden = true;
-  main.append(head, rows, detail);
-  const bar = el("div", "lib-bar");
-  bar.hidden = true;
-  root.append(side, scrim, main);
-  w.append(root, bar);
+  main.append(bar().el, head, rows);
+  // the details: the editor's detail card (06 §2.9)
+  const detail = el("section", "area detail lib-detail");
+  const dhead = el("div", "head");
+  const scroll = el("div", "scroll");
+  scroll.tabIndex = -1;
+  detail.append(dhead, scroll);
+  const selbar = el("div", "lib-bar");
+  selbar.hidden = true;
+  root.append(main, detail);
+  w.append(root, selbar);
   sc.append(w);
-  els = { root, side, main, head, rows, th, sizer, detail, bar, lead: w.querySelector(".lead") };
+  els = { root, main, head, rows, th, sizer, detail, dhead, scroll, bar: selbar, lead: w.querySelector(".lead") };
   rows.addEventListener("scroll", drawRows, { passive: true });
-  rows.addEventListener("mousedown", () => rows.focus());
+  rows.addEventListener("mousedown", () => { L.focus = "rows"; rows.focus(); markFocus(); });
+  scroll.addEventListener("mousedown", () => { L.focus = "detail"; markFocus(); });
+  rows.addEventListener("contextmenu", (e) => { if (!e.target.closest(".lib-row")) e.preventDefault(); });
   draw();
+  rows.focus();
+}
+
+function markFocus() {
+  if (!els) return;
+  els.detail.classList.toggle("focus", L.focus === "detail");
+  els.main.classList.toggle("focus", L.focus === "rows");
 }
 
 function lead() {
@@ -139,115 +159,16 @@ function lead() {
 function draw() {
   if (!els) return;
   if (els.lead) els.lead.textContent = lead();
-  els.root.classList.toggle("drawer-open", L.drawer);
-  drawFilters();
+  els.root.classList.toggle("full", L.full);
+  bar().draw();
   drawHead();
   els.sizer.style.height = HEAD + L.flat.length * ROW + "px";
   els.rows.dataset.sig = "";
   drawRows();
-  drawDetail();
+  follow(true);
   drawBar();
+  markFocus();
   hints();
-}
-
-// ---- the filter column ----
-
-function drawFilters() {
-  const p = L.page;
-  const box = els.side;
-  const focused = document.activeElement && document.activeElement.classList.contains("lib-search");
-  const caret = focused ? document.activeElement.selectionStart : null;
-  box.innerHTML = "";
-  const s = el("div", "lib-search-box");
-  const inp = el("input", "lib-search");
-  inp.placeholder = T("search: words, tag:, state:, source:, used:, -not") + "  /";
-  inp.spellcheck = false;
-  inp.value = L.search;
-  // the grey completion after the last word (06 §3.7, view.CompleteLibrary): the typed text
-  // invisibly, then the rest, as in the plan's search boxes
-  const ghost = el("span", "lib-ghost");
-  ghost.append(el("span", "typed"), el("span", "sfx"));
-  const showGhost = () => {
-    const sfx = p.complete && inp.value === L.search ? p.complete : "";
-    const atEnd = document.activeElement === inp && inp.selectionStart === inp.value.length && inp.selectionEnd === inp.value.length;
-    ghost.hidden = !(sfx && atEnd && inp.scrollLeft === 0);
-    if (!ghost.hidden) { ghost.firstChild.textContent = inp.value; ghost.lastChild.textContent = sfx; }
-  };
-  let timer = 0;
-  inp.oninput = () => { ghost.hidden = true; clearTimeout(timer); timer = setTimeout(() => { L.search = inp.value; L.cur = 0; load(); }, 120); };
-  inp.onblur = inp.onscroll = showGhost;
-  inp.onkeydown = (e) => {
-    if ((e.key === "Tab" || e.key === "ArrowRight") && !ghost.hidden && p.complete) {
-      e.preventDefault(); e.stopPropagation();
-      inp.value += p.complete;
-      L.search = inp.value;
-      L.cur = 0;
-      load();
-      return;
-    }
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (inp.value) { inp.value = ""; L.search = ""; load(); } inp.blur(); els.rows.focus(); }
-    else if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); e.stopPropagation(); inp.blur(); els.rows.focus(); }
-    else e.stopPropagation();
-  };
-  s.append(inp, ghost);
-  box.append(s);
-  // what is in force, each removable, and clear-all
-  if ((p.conds || []).length || L.search) {
-    const c = el("div", "lib-conds");
-    for (const x of p.conds || []) {
-      const b = el("button", "lib-cond" + (x.exclude ? " ex" : ""));
-      b.append(el("span", "", x.label), el("span", "x", "×"));
-      b.title = x.exclude ? T("left out") : "";
-      b.onclick = () => setFilter(x.filter.replace(/^-/, ""), 0);
-      c.append(b);
-    }
-    const all = el("button", "lib-clear", T("clear all"));
-    all.onclick = () => { L.filters = []; L.search = ""; L.cur = 0; load(); };
-    c.append(all);
-    box.append(c);
-  }
-  const groups = el("div", "lib-groups");
-  for (const g of p.groups || []) {
-    const vals = (g.values || []).filter((v) => v.count > 0 || v.on);
-    if (!vals.length) continue;
-    const sec = el("div", "lib-group");
-    sec.append(el("div", "lib-gtitle", g.title));
-    const full = L.more.has(g.key);
-    vals.forEach((v, i) => {
-      if (!full && i >= SHOW && !v.on) return;
-      const b = el("button", "lib-val" + (v.on === 1 ? " on" : v.on === -1 ? " ex" : "") + (v.cur ? " cur" : ""));
-      b.append(el("span", "lbl", v.label));
-      if (v.cur) b.append(el("span", "curv", T("this game")));
-      b.append(el("span", "n num", String(v.count)));
-      b.title = T("left click: only these · right click: leave these out");
-      b.onclick = () => setFilter(v.filter, v.on === 1 ? 0 : 1);
-      b.oncontextmenu = (e) => { e.preventDefault(); setFilter(v.filter, v.on === -1 ? 0 : -1); };
-      sec.append(b);
-    });
-    if (vals.length > SHOW) {
-      const m = el("button", "lib-more", full ? T("fewer") : Tf("%d more", vals.length - SHOW));
-      m.onclick = () => { full ? L.more.delete(g.key) : L.more.add(g.key); drawFilters(); };
-      sec.append(m);
-    }
-    groups.append(sec);
-  }
-  box.append(groups);
-  if (focused) { inp.focus(); if (caret != null) inp.setSelectionRange(caret, caret); }
-  showGhost();
-}
-
-// setFilter: on 1 keeps only copies with the value, -1 leaves them out, 0 drops the condition.
-function setFilter(f, on) {
-  L.filters = L.filters.filter((x) => x !== f && x !== "-" + f);
-  if (on === 1) L.filters.push(f);
-  if (on === -1) L.filters.push("-" + f);
-  L.cur = 0;
-  load();
-}
-
-function setDrawer(v) {
-  L.drawer = v;
-  if (els) els.root.classList.toggle("drawer-open", v);
 }
 
 // ---- the columns ----
@@ -390,7 +311,8 @@ function drawRows() {
   const box = els.rows;
   const top = Math.max(0, box.scrollTop - HEAD), h = box.clientHeight || 600;
   const a = Math.max(0, Math.floor(top / ROW) - 8), b = Math.min(L.flat.length, Math.ceil((top + h) / ROW) + 8);
-  const sig = [a, b, L.cur, L.sel.size, L.flat.length, L.detail && L.detail.ref, [...L.sel].join(",")].join("|");
+  const shownRef = shownCopy() && shownCopy().ref;
+  const sig = [a, b, L.cur, L.sel.size, L.flat.length, shownRef, [...L.sel].join(",")].join("|");
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig;
   for (const n of [...box.querySelectorAll(".lib-row")]) n.remove();
@@ -409,7 +331,6 @@ function rowEl(x, k) {
   r.style.top = HEAD + k * ROW + "px";
   const selected = x.t === "inst" ? L.sel.has(x.i.ref) : x.r.insts.every((i) => L.sel.has(i.ref)) && x.r.insts.length;
   if (selected) r.classList.add("sel");
-  if (L.detail && x.t === "inst" && L.detail.ref === x.i.ref) r.classList.add("open");
   // the cells: a Lineage's from its row, a copy's from the copy (a lone copy is its Lineage)
   const cells = x.t === "lin" || x.lone ? x.r : x.i;
   for (const c of shownCols()) {
@@ -423,7 +344,11 @@ function rowEl(x, k) {
   }
   r.onclick = (e) => click(k, e);
   r.ondblclick = () => { if (x.t === "lin") toggle(x.r); };
-  r.oncontextmenu = (e) => { e.preventDefault(); if (!(selected)) { L.cur = k; drawRows(); } menuAt(e.clientX, e.clientY); };
+  r.oncontextmenu = (e) => {
+    e.preventDefault();
+    if (!selected) { L.cur = k; L.sel.clear(); els.rows.dataset.sig = ""; drawRows(); follow(); drawBar(); }
+    menuAt(e.clientX, e.clientY);
+  };
   return r;
 }
 
@@ -455,6 +380,7 @@ function toggle(r) {
 
 function click(k, e) {
   const x = L.flat[k];
+  L.focus = "rows";
   if (e.shiftKey) {
     if (L.anchor < 0) L.anchor = L.cur;
     L.sel.clear();
@@ -465,18 +391,15 @@ function click(k, e) {
     L.anchor = k;
   } else {
     L.anchor = k;
-    // a copy opens its details in the right column; again (or esc) goes back (06 §2.9)
-    if (x.t === "inst") {
-      L.cur = k;
-      if (L.detail && L.detail.ref === x.i.ref) closeDetail(); else openDetail(x.i);
-      return;
-    }
+    // a click on a Lineage's row again opens or closes it; the details follow the cursor
     if (x.t === "lin" && L.cur === k) toggle(x.r);
   }
   L.cur = k;
   els.rows.dataset.sig = "";
   drawRows();
   drawBar();
+  follow();
+  markFocus();
   hints();
 }
 
@@ -508,89 +431,104 @@ function move(d, extend) {
   els.rows.dataset.sig = "";
   drawRows();
   drawBar();
-  // the details follow the cursor while they are open
+  follow();
+  hints();
+}
+
+function selectAll() {
+  L.sel.clear();
+  for (const x of L.flat) for (const i of copiesOf(x)) L.sel.add(i.ref);
+  els.rows.dataset.sig = "";
+  drawRows();
+  drawBar();
+  hints();
+}
+
+// ---- the details: the cursor's copy, in the right column (enter: over the page) ----
+
+// cursorCopy: the copy the cursor stands for: its row's, or on a Lineage's row the copy in
+// the current plan, else the first.
+function cursorCopy() {
   const x = L.flat[L.cur];
-  if (L.detail && x.t === "inst" && x.i.ref !== L.detail.ref) openDetail(x.i);
-  hints();
+  if (!x) return null;
+  if (x.t === "inst") return x.i;
+  return x.r.insts.find((i) => i.inPlan) || x.r.insts.find((i) => i.id) || x.r.insts[0] || null;
+}
+const shownCopy = () => cursorCopy();
+
+let followTimer = 0;
+// follow draws the cursor's copy in the details, at once when asked, else once the cursor
+// rests a moment (the arrows held down do not load every copy on the way).
+function follow(now) {
+  clearTimeout(followTimer);
+  if (now) return drawDetail();
+  followTimer = setTimeout(drawDetail, 90);
 }
 
-// ---- a copy's details: they replace the right column ----
-
-async function openDetail(i) {
-  L.detail = i;
-  els.main.classList.add("detail-open");
-  els.rows.dataset.sig = "";
-  drawRows();
-  drawDetail();
-  hints();
-}
-
-function closeDetail() {
-  L.detail = null;
-  els.main.classList.remove("detail-open");
-  els.rows.dataset.sig = "";
-  drawRows();
-  drawDetail();
+function setFull(v) {
+  L.full = v;
+  els.root.classList.toggle("full", v);
+  if (v) { L.focus = "detail"; els.scroll.focus(); } else { L.focus = "rows"; els.rows.focus(); }
+  markFocus();
+  ui.renderWhere();
   hints();
 }
 
 let detailSeq = 0;
-// drawDetail: the copy's note at the top, then its actions (only those that apply), then
-// one field list, then the mod's picture, name and description (06 §2.9).
+// drawDetail: the copy's note at the top, then its buttons (the detail's ops, only those
+// that apply), then one field list, then the mod's picture, name and description (06 §2.9).
 async function drawDetail() {
-  const box = els.detail;
-  const i = L.detail && findCopy(L.detail.ref);
-  if (!i) { box.hidden = true; box.dataset.ref = ""; els.main.classList.remove("detail-open"); L.detail = null; return; }
-  const same = box.dataset.ref === i.ref && !box.hidden;
-  L.detail = i;
-  box.hidden = false;
-  if (same && box.querySelector(".lib-note.editing")) return; // keep a note being written
+  if (!els) return;
+  const i = cursorCopy() && findCopy(cursorCopy().ref);
+  const box = els.scroll;
+  const row = i && (L.page.rows || []).find((r) => r.insts.some((x) => x.ref === i.ref));
+  els.dhead.innerHTML = "";
+  els.dhead.append(el("span", "t", T("details")));
+  if (i) els.dhead.append(el("span", "q", (row ? row.name : "") + " · " + i.label));
+  if (!i) { box.innerHTML = ""; box.dataset.ref = ""; return; }
+  const same = box.dataset.ref === i.ref && box.dataset.stamp === stampOf(i);
+  if (same) return;
+  if (box.dataset.ref === i.ref && box.querySelector(".lib-note.editing")) return; // keep a note being written
   const n = ++detailSeq;
-  const old = box.querySelector(".scroll");
-  const keep = same && old ? old.scrollTop : 0;
+  const keep = box.dataset.ref === i.ref ? box.scrollTop : 0;
   box.innerHTML = "";
   box.dataset.ref = i.ref;
-  const top = el("div", "lib-dhead");
-  const back = el("button", "btn small", "← " + T("back"));
-  back.append(el("kbd", "", "esc"));
-  back.onclick = closeDetail;
-  const row = (L.page.rows || []).find((r) => r.insts.some((x) => x.ref === i.ref));
-  top.append(back, el("span", "t", row ? row.name : i.label), el("span", "faint", i.label));
-  const scroll = el("div", "scroll");
-  box.append(top, scroll);
-  scroll.append(noteEl(i));
+  box.dataset.stamp = stampOf(i);
+  box.append(noteEl(i));
   const acts = el("div", "lib-acts");
-  for (const a of (i.actions || []).filter((a) => a.detail)) {
-    const b = el("button", "btn" + (a.danger ? " danger" : ""), a.label);
-    b.onclick = () => run(a, [i]);
+  for (const c of ops.sorted((i.ops || []).filter((c) => ops.op(c).detail))) {
+    const o = ops.op(c);
+    const b = el("button", "btn" + (o.danger ? " danger" : ""), o.label);
+    if (o.key) b.append(el("kbd", "", o.key));
+    b.onclick = () => run(c, [i]);
     acts.append(b);
   }
-  if (acts.childNodes.length) scroll.append(acts);
+  if (acts.childNodes.length) box.append(acts);
   const fields = el("div", "lib-fields");
-  scroll.append(fields);
+  box.append(fields);
   const d = el("div", "lib-desc");
-  d.id = "lib-detail";
-  scroll.append(d);
+  box.append(d);
   try {
     const fs = await api.LibraryFields(i.ref);
     if (n !== detailSeq) return;
     fields.append(fieldList(fs, {
-      folder: () => api.OpenFolder(i.id).catch((e) => say("fail", errText(e))),
-      tags: () => pop.tags([{ id: i.id, name: row ? row.name : i.label }], () => load()),
+      folder: () => run("folder", [i]),
+      tags: () => run("tags", [i]),
     }));
   } catch (e) { if (n === detailSeq) fields.append(el("p", "err", errText(e))); }
-  scroll.scrollTop = keep;
+  box.scrollTop = keep;
   if (!i.id) return;
   try {
     const det = await api.Detail(i.id, false, false, false);
     if (n !== detailSeq) return;
-    renderDetail(det, d, scroll, true, { page: true });
+    renderDetail(det, d, box, true, { page: true });
   } catch (e) { if (n === detailSeq) d.append(el("p", "err", errText(e))); }
 }
+const stampOf = (i) => [i.note, i.auto, (i.ops || []).join(","), i.state, i.inPlan].join("|");
 
 // noteEl: the copy's own note (06 §2.9). The player's text, else what RimArcho wrote (grey),
-// else a place to write one; a click edits it, enter saves, shift+enter breaks the line,
-// esc leaves it as it was.
+// else a place to write one; a click (or n) edits it, enter saves, shift+enter breaks the
+// line, esc leaves it as it was.
 function noteEl(i) {
   const box = el("div", "lib-note" + (i.note ? "" : i.auto ? " auto" : " empty"));
   const show = () => {
@@ -601,7 +539,7 @@ function noteEl(i) {
   };
   show();
   if (!i.id) return box;
-  box.title = T("click to edit");
+  box.title = T("click to edit") + " · n";
   box.onclick = () => {
     if (box.classList.contains("editing")) return;
     box.classList.add("editing");
@@ -619,9 +557,10 @@ function noteEl(i) {
       if (done) return;
       done = true;
       const text = ta.value.trim();
-      if (text === start.trim()) return show();
+      if (text === start.trim()) { show(); els.rows.focus(); return; }
       try { say("ok", await api.LibrarySetNote(i.ref, text)); } catch (e) { say("fail", errText(e)); }
       box.classList.remove("editing");
+      els.rows.focus();
       await load();
     };
     ta.onkeydown = (e) => {
@@ -639,7 +578,7 @@ function findCopy(ref) {
   return null;
 }
 
-// ---- actions: the selection's (the bar), else the cursor's ----
+// ---- ops: the selection's (the bar), else the cursor's ----
 
 function selected() {
   if (L.sel.size) {
@@ -647,19 +586,20 @@ function selected() {
     for (const r of L.page.rows || []) for (const i of r.insts) if (L.sel.has(i.ref)) out.push(i);
     return out;
   }
-  const x = L.flat[L.cur];
-  if (!x) return [];
-  return x.t === "inst" ? [x.i] : x.r.single ? [x.r.insts[0]] : [];
+  const i = cursorCopy();
+  return i ? [i] : [];
 }
 
-// actionsOf: every action any of the copies has, each run on the copies that have it.
-function actionsOf(copies) {
-  const order = [], by = new Map();
-  for (const i of copies) for (const a of i.actions || []) {
-    if (!by.has(a.kind)) { by.set(a.kind, { a, copies: [] }); order.push(a.kind); }
-    by.get(a.kind).copies.push(i);
+// opsOf: every op any of the copies has, each run on the copies that have it; the ops of
+// one row at a time only for one copy.
+function opsOf(copies) {
+  const by = new Map();
+  for (const i of copies) for (const c of i.ops || []) {
+    if (!by.has(c)) by.set(c, []);
+    by.get(c).push(i);
   }
-  return order.map((k) => by.get(k));
+  for (const [c] of by) if (copies.length > 1 && ops.op(c).one) by.delete(c);
+  return by;
 }
 
 function drawBar() {
@@ -668,11 +608,13 @@ function drawBar() {
   bar.hidden = false;
   bar.innerHTML = "";
   bar.append(el("span", "accent", Tf("selected %d", L.sel.size)));
-  for (const { a, copies } of actionsOf(selected())) {
-    if (a.kind === "folder" || a.kind === "workshop") continue; // one copy at a time
-    const b = el("button", "btn" + (a.danger ? " danger" : ""), a.label);
+  const by = opsOf(selected());
+  for (const c of ops.sorted([...by.keys()])) {
+    const o = ops.op(c), copies = by.get(c);
+    const b = el("button", "btn" + (o.danger ? " danger" : ""), o.label);
     if (copies.length < L.sel.size) b.append(el("span", "faint", " " + copies.length));
-    b.onclick = () => run(a, copies);
+    if (o.key) b.append(el("kbd", "", o.key));
+    b.onclick = () => run(c, copies);
     bar.append(b);
   }
   const x = el("button", "btn quiet", T("clear the selection"));
@@ -681,39 +623,94 @@ function drawBar() {
   bar.append(x);
 }
 
-function menuAt(x, y) {
-  const items = actionsOf(selected()).map(({ a, copies }) => ({ label: a.label, run: () => run(a, copies) }));
-  if (items.length) pop.menu(x, y, items);
+// menuAt: the row menu (06 §8.5), the same groups as the editor's.
+function menuAt(x, y, keys = false) {
+  const by = opsOf(selected());
+  ops.openMenu(x, y, [...by.keys()], (c) => run(c, by.get(c)), keys);
 }
 
-async function run(a, copies) {
+// menuAtCursor: the menu key or shift+F10 open the menu at the cursor's row.
+function menuAtCursor() {
+  const r = els.rows.querySelector(".lib-row.cur");
+  const b = r ? r.getBoundingClientRect() : els.rows.getBoundingClientRect();
+  menuAt(b.left + 40, b.bottom, true);
+}
+
+// byKey runs the op key k stands for on the object, if it has one.
+function byKey(k) {
+  const by = opsOf(selected());
+  const c = ops.keyed([...by.keys()], k);
+  if (c) return run(c, by.get(c));
+  const i = cursorCopy();
+  if (k === "ctrl+w") return say("", T("no Workshop ID: not a Workshop mod"));
+  if (k === "ctrl+o") return say("", i && i.id ? T("the folder is not there") : T("RimArcho has not seen this copy: no folder"));
+  say("", T("nothing to do with this row"));
+}
+
+const PLAN = new Set(["add", "take-out", "put-back", "stage", "use", "swap", "remove"]);
+
+async function run(code, copies) {
   const refs = copies.map((i) => i.ref);
   const i0 = copies[0];
-  if (a.kind === "folder") return api.OpenFolder(i0.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
-  if (a.kind === "workshop") return api.OpenURL(i0.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
-  const go = async () => {
-    try { say("ok", await api.LibraryDo(a.kind, refs), a.kind === "enable" || a.kind === "remove"); } catch (e) { say("fail", errText(e)); }
+  const o = ops.op(code);
+  const done = async (p, undo) => {
+    try { const t = await p; say("ok", typeof t === "string" ? t : t && t.text, undo); } catch (e) { say("fail", errText(e)); }
     L.sel.clear();
     await load();
     ui.reload();
   };
-  if (!a.confirm) return go();
+  switch (code) {
+    case "folder": return api.OpenFolder(i0.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+    case "workshop":
+      if (i0.id) return api.OpenWorkshop(i0.id).then((t) => say("ok", t), (e) => say("", errText(e)));
+      return api.OpenURL(i0.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
+    case "tags": {
+      const row = (L.page.rows || []).find((r) => r.insts.some((x) => x.ref === i0.ref));
+      return pop.tags(copies.filter((i) => i.id).map((i) => ({ id: i.id, name: row ? row.name : i.label })), () => load());
+    }
+    case "note": {
+      if (!L.full && innerWidth <= 760) setFull(true);
+      const n = els.scroll.querySelector(".lib-note");
+      if (n) n.click();
+      return;
+    }
+    case "enable-at": case "move-to": {
+      const ids = copies.filter((i) => i.id).map((i) => i.id);
+      const row = (L.page.rows || []).find((r) => r.insts.some((x) => x.ref === i0.ref));
+      const what = ids.length === 1 ? (row ? row.name : i0.label) : Tf("%d mods", ids.length);
+      const from = code === "move-to" ? 1 : i0.ops.includes("put-back") ? 2 : 0;
+      return pop.position({ ids, what }, from, (at) => done(api.Place(from, ids, at), true));
+    }
+  }
+  if (PLAN.has(code)) return done(api.LibraryDo(code, refs), true);
+  if (!o.confirm) return done(api.LibraryDo(code, refs), false);
   let p;
-  try { p = await api.LibraryPreview(a.kind, refs); } catch (e) { return say("fail", errText(e)); }
-  pop.confirm(p.title, p.lines, a.label, p.apply ? go : null);
+  try { p = await api.LibraryPreview(code, refs); } catch (e) { return say("fail", errText(e)); }
+  pop.confirm(p.title, p.lines, o.label, p.apply ? () => done(api.LibraryDo(code, refs), false) : null);
 }
 
-// ---- keys (06 §3): the arrows only move; enter opens; verbs act on the object ----
+// ---- keys (06 §3.5): the plan editor's table; the arrows only move ----
 
 export function key(e) {
   const k = e.key;
   const ctrl = e.ctrlKey || e.metaKey;
   const x = L.flat[L.cur];
   const done = () => e.preventDefault();
+  if (!els) return;
+  if (ops.menuKey(e)) { done(); return menuAtCursor(); }
+  // the details hold the focus: the arrows scroll them, ← (or esc) goes back to the rows
+  if (L.focus === "detail" && (k === "ArrowDown" || k === "ArrowUp" || k === "PageDown" || k === "PageUp" || k === "j" || k === "k")) {
+    done();
+    const d = k === "PageDown" || k === "PageUp" ? els.scroll.clientHeight * 0.9 : 40;
+    els.scroll.scrollTop += (k === "ArrowDown" || k === "PageDown" || k === "j") ? d : -d;
+    return;
+  }
+  if (L.focus === "detail" && (k === "ArrowLeft" || k === "h") && !L.full) { done(); L.focus = "rows"; els.rows.focus(); markFocus(); return hints(); }
   if (k === "ArrowDown" || k === "j") { done(); return move(1, e.shiftKey); }
   if (k === "ArrowUp" || k === "k") { done(); return move(-1, e.shiftKey); }
-  if (k === "PageDown") { done(); return move(Math.floor(els.rows.clientHeight / ROW) - 1, e.shiftKey); }
-  if (k === "PageUp") { done(); return move(-Math.floor(els.rows.clientHeight / ROW) + 1, e.shiftKey); }
+  const page = Math.max(1, Math.floor(els.rows.clientHeight / ROW) - 1);
+  if (k === "PageDown") { done(); return move(page, e.shiftKey); }
+  if (k === "PageUp") { done(); return move(-page, e.shiftKey); }
   if (k === "Home") { done(); return move(-1e9, e.shiftKey); }
   if (k === "End") { done(); return move(1e9, e.shiftKey); }
   if (k === "ArrowRight" || k === "l") {
@@ -721,28 +718,22 @@ export function key(e) {
     if (!x) return;
     if (x.t === "lin" && !(L.open.has(x.r.id) || x.r.insts.length < x.r.copies)) return toggle(x.r);
     if (x.t === "lin") return move(1);
-    return openDetail(x.i);
+    L.focus = "detail"; els.scroll.focus(); markFocus(); return hints();
   }
   if (k === "ArrowLeft" || k === "h") {
     done();
-    if (L.detail) return closeDetail();
     if (!x) return;
-    if (x.t === "inst" && !x.lone) { L.cur = L.flat.findIndex((y) => y.t === "lin" && y.r.id === x.r.id); ensureVisible(); els.rows.dataset.sig = ""; return drawRows(); }
+    if (x.t === "inst" && !x.lone) { L.cur = L.flat.findIndex((y) => y.t === "lin" && y.r.id === x.r.id); ensureVisible(); els.rows.dataset.sig = ""; drawRows(); return follow(); }
     if (x.t === "lin" && L.open.has(x.r.id)) return toggle(x.r);
     return;
   }
-  if (k === "Enter") {
-    done();
-    if (!x) return;
-    if (x.t === "lin") return toggle(x.r);
-    return L.detail && L.detail.ref === x.i.ref ? closeDetail() : openDetail(x.i);
-  }
+  if (k === "Enter") { done(); return setFull(!L.full); }
   if (k === "Escape") {
     done();
-    if (L.drawer) return setDrawer(false);
-    if (L.detail) return closeDetail();
+    if (L.full) return setFull(false);
+    if (L.focus === "detail") { L.focus = "rows"; els.rows.focus(); markFocus(); return hints(); }
     if (L.sel.size) { L.sel.clear(); els.rows.dataset.sig = ""; drawRows(); drawBar(); return hints(); }
-    if (L.search || L.filters.length) { L.search = ""; L.filters = []; L.cur = 0; return load(); }
+    if (L.bar.active()) return L.bar.clear();
     return;
   }
   if (ctrl && (k === " " || k === "Spacebar")) {
@@ -750,54 +741,43 @@ export function key(e) {
     if (x) { toggleSel(x); els.rows.dataset.sig = ""; drawRows(); drawBar(); hints(); }
     return;
   }
+  if (ctrl && k.toLowerCase() === "a") { done(); return selectAll(); }
   // ctrl+o / ctrl+w: the cursor's copy's folder and Workshop page (06 §3.5); the Wails
   // window does not take them, preventDefault keeps them from the browser
-  if (ctrl && !e.shiftKey && !e.altKey && (k.toLowerCase() === "o" || k.toLowerCase() === "w")) {
-    done();
-    return shortcut(k.toLowerCase() === "o" ? "folder" : "workshop");
-  }
-  if (k === "/" || (ctrl && k === "f")) { done(); const s = els.side.querySelector(".lib-search"); if (innerWidth < 760) setDrawer(true); s.focus(); s.select(); return; }
-  if (k === "f" && !ctrl) { done(); return setDrawer(!L.drawer); }
-  if (k === "u" && !ctrl) { done(); return ui.verb("undo").then(() => load()); }
-  const verbs = { " ": "enable", o: "workshop", d: "folder" };
-  if (verbs[k] && !ctrl) {
-    done();
-    const found = actionsOf(selected()).find(({ a }) => a.kind === verbs[k]);
-    if (found) return run(found.a, found.copies);
-    return;
-  }
+  if (ctrl && !e.shiftKey && !e.altKey && (k.toLowerCase() === "o" || k.toLowerCase() === "w")) { done(); return byKey("ctrl+" + k.toLowerCase()); }
+  if (k === "/" || (ctrl && k.toLowerCase() === "f")) { done(); return L.bar.focus(); }
+  if (k === "\\") { done(); return L.bar.toggle(); }
+  // undo / redo: the plan edits (space, m, t, x) are the current plan's steps
+  if ((k === "u" && !ctrl) || (ctrl && k.toLowerCase() === "z")) { done(); return ui.verb("undo").then(() => load()); }
+  if (ctrl && (k.toLowerCase() === "y" || k.toLowerCase() === "r")) { done(); return ui.verb("redo").then(() => load()); }
+  if (ctrl || e.altKey) return;
+  const keys = { " ": "space", m: "m", t: "t", x: "x", g: "g", n: "n", Delete: "Del" };
+  if (keys[k]) { done(); return byKey(keys[k]); }
   if (k === "R") { done(); return ui.cmd("rescan"); }
 }
 
-// cursorCopy: the copy the cursor stands for: its row's, the open details', or on a
-// Lineage's row the copy in the current plan, else the first.
-function cursorCopy() {
-  const x = L.flat[L.cur];
-  if (!x) return null;
-  if (x.t === "inst") return x.i;
-  return x.r.insts.find((i) => i.inPlan) || x.r.insts.find((i) => i.id) || x.r.insts[0] || null;
+// where: the position line on this page (06 §3.2): the cursor's row of the rows shown.
+export function where() {
+  if (!L.page) return "";
+  let s = `${T("Mod library")} · ${L.flat.length ? L.cur + 1 : 0} / ${L.flat.length}`;
+  if (L.sel.size) s += " · " + Tf("%d selected", L.sel.size);
+  if (L.full) s += " › " + T("details");
+  return s;
 }
 
-// shortcut runs ctrl+o (folder) or ctrl+w (workshop) on the cursor's copy.
-function shortcut(kind) {
-  const i = L.detail || cursorCopy();
-  if (!i) return;
-  const a = (i.actions || []).find((a) => a.kind === kind);
-  if (a) return run(a, [i]);
-  say("", kind === "workshop" ? T("no Workshop ID: not a Workshop mod") : i.id ? T("the folder is not there") : T("RimArcho has not seen this copy: no folder"));
-}
-
-// hints: the hint line for the page (06 §2.2).
+// hintList: the hint line for the page (06 §2.2): what the object can do now, as the editor.
 export function hintList() {
-  const list = [{ key: "↑↓", label: T("move") }];
+  const list = [];
   const x = L.flat[L.cur];
+  const codes = [...opsOf(selected()).keys()];
+  const sp = ops.keyed(codes, "space");
+  if (sp) list.push({ key: "space", label: ops.op(sp).label });
+  for (const k of ["m", "t"]) { const c = ops.keyed(codes, k); if (c) list.push({ key: k, label: ops.op(c).label }); }
   if (x && x.t === "lin") list.push({ key: "→ ←", label: T("open / close") });
-  if (x && x.t === "inst") list.push({ key: "enter", label: L.detail ? T("back") : T("details") });
-  const acts = actionsOf(selected()).map(({ a }) => a.kind);
-  if (acts.includes("enable")) list.push({ key: "space", label: T("add to the current plan") });
-  if (x) list.push({ key: "ctrl+o ctrl+w", label: T("folder / Workshop page") });
-  list.push({ key: "/", label: T("search") }, { key: "ctrl+space", label: T("select") });
+  list.push({ key: "enter", label: L.full ? T("back") : T("details") });
+  if (codes.includes("folder") || codes.includes("workshop")) list.push({ key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") });
+  list.push({ key: "/", label: T("search") }, { key: "\\", label: T("filter") });
   list.push({ key: "?", label: T("all keys") });
   return list;
 }
-function hints() { ui.renderHints(); }
+function hints() { ui.renderHints(); ui.renderWhere(); }
