@@ -852,7 +852,11 @@ details.xc-sec > summary { cursor: pointer; }
    the right of every row; a copy's details take the right column's place ---- */
 /* the list scrolls inside its card at every width, so only the rows in view are drawn */
 .page.fill.library { height: 100%; }
-.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--lib-detail-w, min(420px, 40%)); gap: 8px; position: relative; }
+/* the left column (the filter bar, then the details) as wide as the editor's 未启用; the
+   table takes the rest of the page, which is as wide as the window (no centred cap) */
+.page.library { padding-left: 12px; padding-right: 12px; }
+.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--lib-side, clamp(280px, 26%, 440px)) 8px minmax(0, 1fr); position: relative; }
+.lib-split { cursor: col-resize; }
 /* the grey completion over the input (the plan's .search .ghost, in this box) */
 
 .lib-main { display: flex; flex-direction: column; min-height: 0; position: relative; }
@@ -906,11 +910,16 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 /* the details: the editor's detail card, in the right column; enter lays it over the page */
 .lib-detail { min-height: 0; }
 .lib-detail .head .q { color: var(--faint); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
-.lib.full { grid-template-columns: 0 minmax(0, 1fr); gap: 0; }
-.lib.full .lib-main { visibility: hidden; }
+.lib.full { grid-template-columns: minmax(0, 1fr) 0 0; }
+.lib.full .lib-main, .lib.full .lib-split { visibility: hidden; }
+.lib-detail { display: flex; flex-direction: column; overflow: visible; }
+.lib-detail .fbar-row { border-bottom: 1px solid var(--line-2); }
 .lib-main.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-.lib-main .fbar-row { border-bottom: 0; padding: 4px 8px 0; }
-@media (max-width: 760px) { .lib:not(.full) { grid-template-columns: minmax(0, 1fr) 0; gap: 0; } .lib:not(.full) .lib-detail { display: none; } }
+/* a narrow page: the filter bar heads the table and the details lie over it (enter) */
+@media (max-width: 900px) {
+  .lib:not(.full) { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 8px; }
+  .lib:not(.full) .lib-split, .lib:not(.full) .lib-detail > .head, .lib:not(.full) .lib-detail > .scroll { display: none; }
+}
 .lib-detail .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 32px; user-select: text; }
 .lib-note { margin-bottom: 12px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--amber) 9%, transparent); font-size: 12.5px; color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; }
 .lib-note:hover:not(.editing) { background: color-mix(in srgb, var(--amber) 14%, transparent); }
@@ -962,7 +971,26 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fbar-find { flex: 0 0 92px; height: 22px; border-radius: 6px; background: var(--pill); font-size: 11.5px; padding: 0 7px; }
 .fbar-find::placeholder { color: var(--faint); }
 .fbar-find:focus { box-shadow: inset 0 0 0 1px var(--accent); }
-/* the editor: the bar heads 未启用, its panel opens over both lists */
+/* open, the bar grows down its column (06 §2.5, §2.9): the groups stacked, each group's
+   values wrapping; what was under it (未启用's rows, Mod 库存's details) shrinks to its
+   title bar at the bottom, a click on which (or \, esc) closes the bar again */
+.fbar.open { display: flex; flex-direction: column; flex: none; height: var(--fbar-h); min-height: 0; }
+.fbar.open.fill { flex: 1; height: auto; }
+.fbar.open .fbar-panel { position: static; width: auto; max-width: none; flex: 1; min-height: 0; overflow-y: auto; border: 0; border-radius: 0; box-shadow: none; animation: none; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 2px; padding: 8px 8px 12px; }
+.fbar.open .fbar-gt { margin-top: 8px; }
+.fbar.open .fbar-gt:first-child { margin-top: 0; }
+.fbar.open .fbar-line { flex-wrap: wrap; white-space: normal; overflow: visible; row-gap: 3px; }
+.fbar-gap { display: none; flex: none; height: 7px; cursor: row-resize; border-top: 1px solid var(--line-2); }
+.fbar.open .fbar-gap { display: block; }
+.fbar-gap:hover, .fbar-gap.drag { background: var(--line); }
+.area:has(> .barhost .fbar.open) > .barhost { flex: none; display: flex; flex-direction: column; min-height: 0; }
+.area:has(> .barhost .fbar.open.fill) > .barhost { flex: 1; }
+.area:has(> .barhost .fbar.open.fill) > .rows, .lib-detail:has(> .fbar.open.fill) > .scroll { display: none; }
+/* filling the column, the bar leaves what is below it a slim title bar at the bottom, like
+   暂存 and 历史: a click on it gives the column back */
+.area:has(> .barhost .fbar.open.fill) > .head, .lib-detail:has(> .fbar.open.fill) > .head { order: 2; border-top: 1px solid var(--line-2); border-bottom: 0; cursor: pointer; }
+.area:has(> .barhost .fbar.open.fill) .fbar-gap, .lib-detail:has(> .fbar.open.fill) .fbar-gap { border-top: 0; }
+/* the editor: the bar heads 未启用 */
 .area .barhost .fbar-row { border-bottom: 1px solid var(--line-2); }
 .area[data-area="0"] { overflow: visible; }
 .area[data-area="0"] > .rows { border-radius: 0 0 12px 12px; }

@@ -837,11 +837,11 @@ async function start() {
   initExchange(ui);
   plans.initPlans(ui);
   library.initLibrary(ui);
-  S.bar = createBar({ data: () => S.barData, change: () => barChanged(), leave: () => focusArea(S.focus < 2 ? S.focus : 0),
-    // open, it reaches over both lists it filters
-    width: () => $('.area[data-area="1"]').getBoundingClientRect().right - $('.area[data-area="0"]').getBoundingClientRect().left,
+  S.bar = createBar({ data: () => S.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:plan",
+    column: () => $('.area[data-area="0"]'), resized: () => renderRows(0), leave: () => focusArea(S.focus < 2 ? S.focus : 0),
     placeholder: T("search: words, tag:, author:, type:, has:, version:, -not") + "  /" });
   $(".barhost").append(S.bar.el);
+  $('.area[data-area="0"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
   wireLists(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);

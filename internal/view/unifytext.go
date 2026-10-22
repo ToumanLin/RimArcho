@@ -43,6 +43,8 @@ func init() {
 		"sort and columns (the headers' menu)": "排序和列（表头的菜单）",
 		"the history: steps and versions":      "历史：每一步和各版本",
 		"mod changes":                          "Mod 变化",
+		"open / close the filter bar (in it, ctrl+↑↓ moves its lower edge)": "展开 / 收起筛选栏（在栏里 ctrl+↑↓ 移动它的下边）",
+		"drag: share the column · double click: the filter takes it all":    "拖动：分配这一栏 · 双击：筛选占满",
 		// the filter bar
 		"content":       "内容",
 		"has":           "有",
