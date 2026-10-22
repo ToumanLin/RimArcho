@@ -228,6 +228,20 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   包名, 位置 or the Workshop ID copies it and says 已复制 (06 §4.1); the list has no
   background and long values wrap. The TUI detail draws the same list.
 
+### Memory (07 §8.3)
+- 设置 › 界面 has GPU 加速 (`config set ui.gpu on|off`, default on). Off draws the window in
+  software and saves about 20–35 MB; it takes effect the next time RimArcho opens.
+- The window's Go process returns freed memory to the system 2 seconds after heavy work, and
+  forgets a page's caches when the player leaves it (Mod 库存, 需要处理 / 日志, 首页); a 32 MiB
+  soft cap and a 256 KiB SQLite page cache as in the TUI. Idle 85 → 22 MB.
+- The window icon is no longer drawn at 256 px: not at all when the exe carries its icon
+  (release builds), at the system icon size otherwise. Start-up peak 122 → 67 MB.
+- WebView2 runs its network service inside the browser process (one process fewer), and its
+  memory target is low while the window is minimised.
+- Pack names are checked without a regular expression (about 1.4 MB less).
+- Measured on the same data copy, GPU on: idle 202 → 138 MB, plan editor 204 → 138,
+  Mod 库存 175 → 151, minimised 171 → 105. GPU off: 182 → 123, 185 → 123, 155 → 132, 150 → 88.
+
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
 - `collection <id> --import` replaces the list with only the collection's mods, dropping Core.
