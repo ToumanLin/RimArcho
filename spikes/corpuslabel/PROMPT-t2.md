@@ -17,14 +17,16 @@ code. You never see any automatic verdict on this cluster.
 
        <EXE> exec -home <HOME> -corpus <CORPUS> -packet <PACKETS>/<ITEM>.txt -log <EXECLOGS>/<ITEM>.log -- <archo command>
 
+   Refer to a mod as `pkg:<packageId>` (e.g. `source pkg:oskarpotocki.vanillafactionsexpanded.core`);
+   outputs show mods as short refs like `#ux5i`, which also work as arguments.
    Useful commands:
-   - `source <packageId>` decompiles a mod's assemblies (ilspycmd) and prints the folders of
+   - `source pkg:<packageId>` decompiles a mod's assemblies (ilspycmd) and prints the folders of
      the .cs files; then use Grep/Read on those folders directly (faster than more exec calls).
-   - `source <packageId> --type Ns.Type --all` prints one type with line numbers.
-   - `source search "<text>" --in <packageId>` (add `--regex` for a regex) searches decompiled code.
-   - `harmony --target Ns.Type.Method` who patches a game method; `harmony --mod <packageId>`.
-   - `def <Type/defName>`, `patches --mod <packageId> --failed`, `files search "<text>"`,
-     `mod <packageId>` (About.xml, dependencies), `why <A> <B>` (how two mods relate).
+   - `source pkg:<packageId> --type Ns.Type --all` prints one type with line numbers.
+   - `source search "<text>" --in pkg:<packageId>` (add `--regex` for a regex) searches decompiled code.
+   - `harmony --target Ns.Type.Method` who patches a game method; `harmony --mod pkg:<packageId>`.
+   - `def <Type/defName>`, `patches --mod pkg:<packageId> --failed`, `files search "<text>"`,
+     `mod pkg:<packageId>` (About.xml, dependencies), `why <A> <B>` (how two mods relate).
    Only fact commands are allowed (`log` and `problems` are blocked).
 4. Game code: the decompiled RimWorld assemblies are not in the environment; reason about
    vanilla methods from their names and the stack, or decompile `D:/RimWorld16/RimWorldWin64_Data/Managed/Assembly-CSharp.dll`
@@ -58,7 +60,7 @@ labels: they contain automatic verdicts.
 
 ## cause_type: take the FIRST rule that applies
 
-1. `unknown` — verdict `unknown`.
+1. `unknown` — verdict `unknown`, or a source is named but none of the rules below can be decided.
 2. `missing-dependency` — the source needs a mod that is not in the list (declared dependency,
    or its code references that mod's assembly/types without a guard). Add it with role `missing`.
 3. `optional-absent` — the source's code targets an optional mod/DLC that is not active and
@@ -78,7 +80,7 @@ labels: they contain automatic verdicts.
 missing-dependency → `enable-dependency` (mods = the missing mod) · optional-absent → `ignore`
 or `enable-dependency` · load-order → `reorder` (mods = the mod to move; note says where) ·
 incompatible-mods → `disable` / `report` / `ignore` · version-mismatch → `update` ·
-outdated-mod and mod-bug → `disable` / `report` / `ignore` · unknown → `unknown` / `ignore`.
+outdated-mod and mod-bug → `disable` / `report` / `ignore` · unknown → `unknown` / `ignore` (also `report` / `disable` when a source is named).
 By impact: `ignore` = log noise or a cosmetic glitch the game recovers from; `report` = one
 feature of the mod breaks; `disable` = loading, saving or a core loop breaks (exceptions every
 tick, a failed static constructor or Mod constructor aborting the mod's setup).

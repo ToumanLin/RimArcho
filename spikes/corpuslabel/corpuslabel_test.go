@@ -114,3 +114,14 @@ func TestBenchClass(t *testing.T) {
 		}
 	}
 }
+
+func TestDefNamedDropsSentencePeriod(t *testing.T) {
+	m := defNamedRe.FindStringSubmatch("Failed to find Verse.ThingDef named konf. There are 10129 defs of this type loaded.")
+	if m == nil || m[2] != "konf" {
+		t.Fatalf("got %v", m)
+	}
+	m = defNamedRe.FindStringSubmatch("No Verse.SoundDef named Foo.Bar_1 found")
+	if m == nil || m[2] != "Foo.Bar_1" {
+		t.Fatalf("got %v", m)
+	}
+}

@@ -252,7 +252,7 @@ const (
 )
 
 var (
-	defNamedRe = regexp.MustCompile(`\b([A-Z]\w*Def)\b[^\n]{0,40}?\bnamed\s+"?([\w\-\.]+)`)
+	defNamedRe = regexp.MustCompile(`\b([A-Z]\w*Def)\b[^\n]{0,40}?\bnamed\s+"?([\w\-\.]*[\w\-])`) // not the sentence's period ("named konf. There are …")
 	defNameRe  = regexp.MustCompile(`(?i)\b(?:defName[=:\s]+|<defName>|for def\s+|def\s+)"?([A-Za-z][\w\-]{2,})`)
 	refRe      = regexp.MustCompile(`#[0-9a-z]{2,8}\b`)
 )

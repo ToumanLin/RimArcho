@@ -1,6 +1,6 @@
-# Labelling prompt — version corpuslabel-v2-t1 (tier 1: evidence packet only)
+# Labelling prompt — version corpuslabel-v2.2-t1 (tier 1: evidence packet only)
 
-(Builds on corpuslabel-p3. v2: schema corpuslabel/2 with ordered cause-type rules, fix kind
+(v2.2: the fix-kind class default applies without a named source; optional-absent only when the target mod is not in the list. v2.1: who and why are separate: a named source may have cause_type unknown. Builds on corpuslabel-p3. v2: schema corpuslabel/2 with ordered cause-type rules, fix kind
 tied to cause type, difficulty; packets show the library's version of each mod.)
 
 You label the real cause of one error cluster from a RimWorld 1.6 Player.log (shared through
@@ -13,7 +13,10 @@ knowledge; do not use outside knowledge of specific mods.
 
 ## Who to name
 
-Name a mod only when the packet shows *why* it is responsible, not merely that it is present.
+Name a mod only when the packet shows that it is responsible (its patch, file or def is the one failing), not merely that it is present.
+**Who and why are separate questions.** When the packet shows whose patch/file/def fails (e.g. the
+`[Mod name]` prefix of a failed patch) but not why, still give verdict `cause` with that `source`
+and set `cause_type` to `unknown`.
 
 | Class | What usually causes it | Who to name |
 |---|---|---|
@@ -32,13 +35,14 @@ mods (`erdelf.humanoidalienraces`, translations) co-occur with everything.
 
 ## cause_type: take the FIRST rule that applies
 
-1. `unknown` — your verdict is `unknown`.
+1. `unknown` — your verdict is `unknown`, or you named a source but cannot tell which rule below applies.
 2. `missing-dependency` — the source needs a mod that is not in the list, unconditionally (the
    packet says "depends on … NOT in the log's list", or its content uses that mod's
    defs/classes without a guard). Add that mod with role `missing`.
-3. `optional-absent` — the source's content targets a mod/DLC that is **not active** and is
+3. `optional-absent` — the source's content targets a mod/DLC that is **not in the player's list** and is
    meant as optional (a compatibility patch, a patch for another mod's def, a reference to an
    inactive mod's def), but the guard is missing or broken.
+   If the target mod IS in the list but no longer has that def/node, it is `outdated-mod` (rule 7).
 4. `load-order` — everything involved is active and moving one mod before/after another fixes
    it (packet: "declared rules broken here", or the target def comes from a mod later in the
    list). Add that other mod as `partner`.
@@ -64,12 +68,17 @@ mods (`erdelf.humanoidalienraces`, translations) co-occur with everything.
 | version-mismatch | `update` | the source |
 | outdated-mod | `disable`, `report`, `ignore` | the source |
 | mod-bug | `report`, `disable`, `ignore` | the source |
-| unknown | `unknown` or `ignore` | (none) |
+| unknown | `unknown` or `ignore` (also `report`/`disable` when a source is named) | (the source) |
 
 Choose by impact: `ignore` = only a missing texture/sound/compat tweak, the game recovers
 (default for patch-failed, texture-missing, and "doesn't correspond to any field");
 `report` = one feature of the mod breaks (default for "Could not find class/type");
 `disable` = loading or a core loop breaks. `fix.mods` is required except for `ignore`/`unknown`.
+The class default applies whether or not you name a source: a failed patch, a missing texture or
+sound, an unknown XML field and a save reference to a removed mod are `ignore` even with verdict
+`unknown`. Use `unknown` only for errors whose impact you cannot tell (exceptions without a known
+source).
+
 
 ## stage (default by class)
 
@@ -103,7 +112,7 @@ Write exactly one JSON object, no comments, no markdown fence, all fields requir
   "difficulty": "L1 | L2 | L3",
   "evidence": ["<verbatim quote from the packet>"],
   "model": "<your model name>",
-  "prompt": "corpuslabel-v2-t1",
+  "prompt": "corpuslabel-v2.2-t1",
   "note": "<one or two sentences: your reasoning>"
 }
 ```

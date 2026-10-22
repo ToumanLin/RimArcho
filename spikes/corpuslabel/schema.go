@@ -97,7 +97,7 @@ var (
 		"outdated-mod":       set("disable", "report", "ignore"),
 		"version-mismatch":   set("update"),
 		"mod-bug":            set("report", "disable", "ignore"),
-		"unknown":            set("unknown", "ignore"),
+		"unknown":            set("unknown", "ignore", "report", "disable"),
 	}
 )
 
@@ -163,7 +163,9 @@ func validate(l *Label, items map[string]Item, packets map[string]*Packet, o *vo
 		bad("no packet")
 		return errs
 	}
-	if l.Key != p.Key && l.Key != it.Key {
+	// the packet's "key:" line is clipped at 400 bytes (clip adds "…")
+	clipped := strings.TrimSuffix(l.Key, "…")
+	if l.Key != p.Key && l.Key != it.Key && !(len(clipped) >= 300 && strings.HasPrefix(p.Key, clipped)) {
 		bad("cluster key does not match the item")
 	}
 	vs, cts, fks := verdicts, causeTypes, fixKinds
@@ -256,8 +258,10 @@ func validate(l *Label, items map[string]Item, packets map[string]*Packet, o *vo
 		return errs
 	}
 	// --- corpuslabel/2
-	if (l.Verdict == "unknown") != (l.CauseType == "unknown") {
-		bad("verdict %q with cause_type %q (unknown goes with unknown)", l.Verdict, l.CauseType)
+	// A named source with an undecided reason is allowed (round 1 showed that requiring a cause
+	// type made labellers drop clear sources); no source means no cause type.
+	if l.Verdict == "unknown" && l.CauseType != "unknown" {
+		bad("verdict unknown with cause_type %q", l.CauseType)
 	}
 	if ok := fixFor[l.CauseType]; ok != nil && !ok[l.Fix.Kind] {
 		bad("fix.kind %q does not fit cause_type %q (allowed %s)", l.Fix.Kind, l.CauseType, keys(ok))

@@ -25,7 +25,7 @@ The pilot (`corpuslabel/1`, RESULT.txt) agreed on source mods, but only 34% on c
 
 ## Verdict and causes
 
-- `cause`: the evidence shows *why* a mod is responsible (not only that it is present).
+- `cause`: the evidence shows that a mod is responsible (its patch, file, def or code fails), not only that it is present. Who and why are separate: name the source even when the reason (cause type) stays `unknown`.
   `unknown`: it does not. An honest `unknown` beats a guess. **[v]** `causes` is empty unless
   `cause`, and has at least one entry with `cause`.
 - Roles: `source` = the mod whose own content or code is wrong or out of date (the one to fix,
@@ -38,9 +38,9 @@ The pilot (`corpuslabel/1`, RESULT.txt) agreed on source mods, but only 34% on c
 
 | # | cause_type | Applies when | Needs |
 |---|---|---|---|
-| 1 | `unknown` | verdict is `unknown` | **[v]** unknown ⇔ unknown |
+| 1 | `unknown` | verdict is `unknown`, or a source is named but none of the rules below can be decided from the evidence | **[v]** verdict unknown ⇒ unknown |
 | 2 | `missing-dependency` | the source needs a mod/DLC that is not in the list, unconditionally: a declared dependency ("depends on … NOT in the log's list"), or its defs/code use that mod's types/defs without a guard (`MayRequire`, `FindMod`, a LoadFolders condition) | **[v]** a `missing` cause |
-| 3 | `optional-absent` | the source's content targets a mod/DLC that is **not active** and is meant as optional (compatibility patch, `MayRequire`d def, patch for another mod's def, reference to an inactive mod's def), but the guard is missing or broken. The player loses nothing they had | |
+| 3 | `optional-absent` | the source's content targets a mod/DLC that is **not in the list** (if it is in the list but lacks the def/node: `outdated-mod`) and is meant as optional (compatibility patch, `MayRequire`d def, patch for another mod's def, reference to an inactive mod's def), but the guard is missing or broken. The player loses nothing they had | |
 | 4 | `load-order` | everything involved is active, and moving one mod before/after another removes the error (a declared loadAfter/loadBefore broken here; a patch whose target def comes from a mod later in the list) | **[v]** a `partner` |
 | 5 | `incompatible-mods` | everything involved is active, order is not the issue, and two mods change the same thing in conflicting ways (one removes, renames or replaces what the other patches or calls; a declared incompatibleWith) | **[v]** a `partner` |
 | 6 | `version-mismatch` | the player's copy of the source differs from the research library's (log version ≠ installed, or the Workshop copy was updated after the upload) **and** the current copy no longer has the defect (tier 2: the code or def at fault differs) | **[v]** a `versions` entry with `same: no` for a cause mod |
@@ -60,7 +60,7 @@ The pilot (`corpuslabel/1`, RESULT.txt) agreed on source mods, but only 34% on c
 | version-mismatch | `update` | the source |
 | outdated-mod | `disable`, `report`, `ignore` | the source |
 | mod-bug | `report`, `disable`, `ignore` | the source |
-| unknown | `unknown`, `ignore` | — |
+| unknown | `unknown`, `ignore` (no source); also `report`, `disable` with a named source | the source |
 
 Among the allowed kinds, choose by impact:
 - `ignore`: nothing visible beyond a missing texture, sound or compatibility tweak; the game
@@ -73,6 +73,10 @@ Among the allowed kinds, choose by impact:
 Defaults by class (use unless the packet shows otherwise): patch-failed, texture-missing and
 "doesn't correspond to any field" → `ignore`; "Could not find class/type …" and other
 exceptions → `report`; failed static constructors / Mod constructors → `disable`.
+
+The class default applies whether or not a source is named (a failed patch or a save reference to
+a removed mod is `ignore` even with verdict `unknown`); `unknown` is only for errors whose impact
+cannot be told.
 
 **[v]** `fix.mods` is required except for `ignore` and `unknown`.
 
