@@ -16,8 +16,14 @@ export function initScreens(u) { ui = u; }
 // fades in, so a redraw after an action or a sub-view switch does not flicker.
 let fresh = false;
 
+// left tells Go the player left a page, which forgets what only that page used (07 §8.3).
+function left(next) {
+  if (S.screen && S.screen !== next) api.Leave(S.screen).catch(() => {});
+}
+
 export function openScreen(name) {
   fresh = S.screen !== name;
+  left(name);
   S.screen = name;
   const sc = $("#screen");
   sc.hidden = false;
@@ -29,6 +35,7 @@ export function openScreen(name) {
 
 export function closeScreen() {
   if (!S.screen) return false;
+  left(null);
   S.screen = null;
   $("#screen").hidden = true;
   $("#screen").innerHTML = "";

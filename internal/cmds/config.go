@@ -27,6 +27,9 @@ var configKeys = map[string][]string{
 	"ui.previews": {"on", "off"},
 	// 04 §1.5: add Archo Monitor to new plans (and to each plan once on upgrade)
 	"monitor.default": {"on", "off"},
+	// 06 §2.14: off starts the window's WebView2 without GPU acceleration (less memory,
+	// software drawing); read when the window opens
+	"ui.gpu": {"on", "off"},
 }
 
 // freeKeys are settings with free values: their default and a check (06 §3.8, §12.4).
@@ -78,7 +81,7 @@ func Setting(a *app.App, key string) string {
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.gpu: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.

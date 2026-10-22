@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -33,29 +34,48 @@ func Run(o Options) error {
 	view.SetLang(cmds.Setting(a, "ui.lang"))
 	a.LazyLog = true // the newest log is parsed when 需要处理 opens (as in the TUI)
 	a.LogCacheOnly = true
+	tuneProcess(a)
 	api := newAPI(a)
+	api.free.on = true
 	page, err := PageHandler(api)
 	if err != nil {
 		return err
 	}
+	ico := windowIcon()
+	debug.FreeOSMemory() // the drawing's buffers
 	w := application.New(application.Options{
 		Name:     "RimArcho",
-		Icon:     icon.PNG(256), // used when the exe has no icon resource (development builds, 06 §8.6)
+		Icon:     ico, // used when the exe has no icon resource (development builds, 06 §8.6)
 		Services: []application.Service{application.NewService(api)},
 		Assets:   application.AssetOptions{Handler: page},
 		Windows: application.WindowsOptions{
 			// WebView2's profile lives in RimArcho's data directory, not %APPDATA%\RimArcho.exe.
-			WebviewUserDataPath: filepath.Join(a.Home, "webview2"),
+			WebviewUserDataPath:   filepath.Join(a.Home, "webview2"),
+			AdditionalBrowserArgs: BrowserArgs(cmds.Setting(a, "ui.gpu") != "off"),
 		},
 	})
 	api.emit = func(name string, data any) { w.Event.Emit(name, data) }
 	api.x.native = wailsNative{w}
-	w.Window.NewWithOptions(application.WebviewWindowOptions{
+	win := w.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: "/",
 		BackgroundColour:           application.NewRGB(0x0f, 0x10, 0x11),
 		DefaultContextMenuDisabled: true, // the page draws its own (06 §8.5)
 	})
+	lowMemoryWhenMinimised(win)
 	return w.Run()
+}
+
+// BrowserArgs are WebView2's command-line switches (07 §8.3). Always: the network service
+// runs inside the browser process (the page loads nothing from the network, 06 §8.2) and
+// there is one renderer, which saves a process of about 7 MB. Without GPU acceleration
+// (ui.gpu off, 06 §2.14) the GPU process goes too and the page is drawn in software.
+// WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS has no effect under Wails, so they go here.
+func BrowserArgs(gpu bool) []string {
+	args := []string{"--enable-features=NetworkServiceInProcess2", "--renderer-process-limit=1"}
+	if !gpu {
+		args = append(args, "--disable-gpu", "--disable-gpu-compositing", "--in-process-gpu")
+	}
+	return args
 }
 
 // NewAPI makes the service for an app; emit receives its events (scan, analyze). The

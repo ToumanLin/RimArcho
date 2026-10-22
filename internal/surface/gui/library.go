@@ -31,6 +31,7 @@ func (s *API) library() (*app.Library, error) {
 func (s *API) Library(search string, filters []string, sort string) (*view.LibPage, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.free.soon()
 	lib, err := s.library()
 	if err != nil {
 		return nil, err

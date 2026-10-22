@@ -102,6 +102,17 @@ type logCacheEntry struct {
 	rep *LogReport
 }
 
+// DropLogCaches forgets the parsed log report and the problem set built with it; the next
+// read takes the stored report from the database again (the GUI calls it when the player
+// leaves 需要处理 or 日志, 07 §8.3).
+func (a *App) DropLogCaches() {
+	a.logCache = nil
+	a.prCache, a.prKey = nil, ""
+}
+
+// DropPlanProblems forgets every plan's problem set (PlanProblems, the home page's counts).
+func (a *App) DropPlanProblems() { a.planPS = nil }
+
 // ErrLogNotCached: a cache-only read found no stored report for the log as it is now.
 var ErrLogNotCached = errors.New("log not analysed yet")
 
