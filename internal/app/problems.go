@@ -519,6 +519,13 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		}
 		add(f)
 	}
+	// 贴图优化: a mod updated since RimArcho wrote its DDS may show its old textures (a DDS
+	// shadows the PNG of the same name).
+	for _, m := range a.StaleTextures(st.Ix) {
+		add(&finding.Finding{Code: "texture.stale", Severity: finding.Warning, Key: "textures", Subjects: []string{inst(m.ID)},
+			Claim:       fmt.Sprintf("%s changed since its textures were converted to DDS; the game may show its old textures", inst(m.ID)),
+			Suggestions: []string{"archo textures optimize " + inst(m.ID), "archo textures clean " + inst(m.ID)}})
+	}
 	for _, m := range st.Ix.Mods {
 		if m.TombstoneAt.IsZero() && m.Unloadable != "" && m.Unloadable != scan.UnloadableAboutDisabled && activePos[m.ID] == 0 {
 			add(&finding.Finding{Code: "mod.unloadable", Severity: finding.Info, Key: m.Unloadable, Subjects: []string{inst(m.ID)},

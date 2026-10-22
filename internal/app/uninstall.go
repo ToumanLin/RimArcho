@@ -28,7 +28,8 @@ import (
 const (
 	UnLinks      = "links"      // _Archo_ and !ArchoPack_ links in each game's Mods/
 	UnModsConfig = "modsconfig" // ModsConfig.xml in each user data folder RimArcho wrote
-	UnLocked     = "locked"     // the lock library's copies
+	UnTextures   = "textures"   // the DDS RimArcho wrote next to mods' PNGs (贴图优化)
+	UnLocked    = "locked"     // the lock library's copies
 	UnMonitor    = "monitor"    // Archo Monitor's folder
 	UnPacks      = "packs"      // packs and the saves inside them
 	UnSaves      = "saves"      // the "own" save folders and save backups in the data folder
@@ -39,7 +40,7 @@ const (
 )
 
 // UninstallSteps lists every step in order.
-var UninstallSteps = []string{UnLinks, UnModsConfig, UnLocked, UnMonitor, UnPacks, UnSaves, UnGames, UnSteamCMD, UnData, UnProgram}
+var UninstallSteps = []string{UnLinks, UnModsConfig, UnTextures, UnLocked, UnMonitor, UnPacks, UnSaves, UnGames, UnSteamCMD, UnData, UnProgram}
 
 // What happens to an item.
 const (
@@ -52,6 +53,7 @@ const (
 	DoDelete  = "delete"     // RimArcho's own: deleted
 	DoLater   = "after-exit" // deleted once RimArcho has closed
 	DoLeave   = "leave"      // left alone; Note says why
+	DoDDS     = "delete-dds" // the DDS RimArcho recorded in a mod folder are deleted, nothing else
 )
 
 // UninstallOptions are the player's answers; the zero value is the defaults.
@@ -361,6 +363,11 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 		mcs = append(mcs, it)
 	}
 	add(UnModsConfig, mcs)
+	tex, err := a.uninstallTextures()
+	if err != nil {
+		return nil, err
+	}
+	add(UnTextures, tex)
 	add(UnLocked, locked)
 
 	// 4. Archo Monitor's folder (RimArcho's own)
@@ -791,6 +798,8 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 		return trash(it.Path)
 	case DoDelete:
 		return removeTree(it.Path)
+	case DoDDS:
+		return a.deleteTexturesIn(it.Path)
 	case DoMove:
 		if err := a.moveDir(it.Path, it.To); err != nil {
 			return err

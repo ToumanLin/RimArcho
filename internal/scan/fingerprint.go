@@ -75,6 +75,12 @@ func skipDir(name string) bool {
 // snapshot's entries; a semantic file whose size and mtime are unchanged reuses its hash.
 // Links inside the mod folder are not followed.
 func Compute(dir string, prev map[string]File) (Fingerprint, error) {
+	return ComputeSkip(dir, prev, nil)
+}
+
+// ComputeSkip is Compute leaving out the files RimArcho wrote into the folder (lower-cased
+// Rel; the DDS of 贴图优化), so writing them is not an update of the mod.
+func ComputeSkip(dir string, prev map[string]File, generated func(realDir string) map[string]bool) (Fingerprint, error) {
 	var fp Fingerprint
 	fp.Semantic = SemanticSet{}
 	if source.IsLink(dir) {
@@ -82,6 +88,10 @@ func Compute(dir string, prev map[string]File) (Fingerprint, error) {
 		if real, err := source.RealPath(dir); err == nil {
 			dir = real
 		}
+	}
+	var skip map[string]bool
+	if generated != nil {
+		skip = generated(dir)
 	}
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -105,6 +115,9 @@ func Compute(dir string, prev map[string]File) (Fingerprint, error) {
 		}
 		rel, _ := filepath.Rel(dir, p)
 		rel = filepath.ToSlash(rel)
+		if skip[strings.ToLower(rel)] {
+			return nil
+		}
 		f := File{Rel: rel, Size: info.Size(), MTime: info.ModTime().UnixNano()}
 		if IsSemantic(rel) {
 			key := strings.ToLower(rel)
