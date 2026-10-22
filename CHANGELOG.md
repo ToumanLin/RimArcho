@@ -388,6 +388,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - In the window, the editor's 启动游戏 (button, `L`, the palette's 启动) opens the 启动 page with
   the current plan applied and the focus on ▶ 启动游戏; `L` or enter there starts the game. The
   TUI's `L` and the CLI / MCP `launch` still launch at once.
+- The gaps between cards are 4 px everywhere (`--card-gap`): the editor's columns and its
+  stacked details / 暂存 / 历史, the filter card and what is under it, Mod 库存's two sides, the
+  log pages' columns. The draggable gaps keep a 10 px grab area that reaches over the cards'
+  edges.
 
 ### Memory (07 §8.3)
 - 设置 › 界面 has GPU 加速 (`config set ui.gpu on|off`, default on). Off draws the window in

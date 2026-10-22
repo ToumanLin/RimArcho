@@ -4,6 +4,10 @@
    The colour tokens and several component rules are taken from magpie's app.css:
    Copyright (c) 2026 yetone, MIT License (https://github.com/yetone/magpie/blob/main/LICENSE). */
 :root {
+  /* the gap between side-by-side and stacked cards, the same everywhere (06 §7) */
+  --card-gap: 4px;
+  /* how far a drag handle's invisible hit area reaches over the cards on each side */
+  --grab: 3px;
   --bg: #f4f4f6;
   --card: #ffffff;
   --card-2: #f9f9fb;
@@ -241,11 +245,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 
 /* ---- the board: three columns (06 §2.5): 未启用 | 已启用 | 详情, with 暂存 and 历史 folded
    under 详情 in the third column ---- */
-#board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 1fr) 8px var(--c1, 1.2fr) 8px var(--c2, 1.5fr); }
+#board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 1fr) var(--card-gap) var(--c1, 1.2fr) var(--card-gap) var(--c2, 1.5fr); }
 #board > .fcol { grid-column: 1; } #board > [data-split="0"] { grid-column: 2; }
 #board > [data-area="1"] { grid-column: 3; } #board > [data-split="1"] { grid-column: 4; }
 #board > .stack { grid-column: 5; } #board > * { grid-row: 1; }
-.stack { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+.stack { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
 .stack > .detail { flex: 1 1 0; min-height: 140px; }
 /* a fold is its bar until opened; open, it takes a share of the column under 详情 */
 .stack > .fold { flex: none; }
@@ -278,8 +282,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .search .ghost .typed { color: transparent; }
 .search .ghost .sfx { color: var(--muted); opacity: .75; }
 .others { color: var(--faint); font-size: 11.5px; padding: 0 12px 4px; }
-.split { cursor: col-resize; border-radius: 4px; margin: 10px 2px; }
-.split:hover, .split.drag { background: var(--line); }
+.split { position: relative; z-index: 3; cursor: col-resize; margin: 10px 0; }
+/* the visible gap is --card-gap; the hit area reaches --grab over each card's edge */
+.split::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--grab)); right: calc(-1 * var(--grab)); }
+.split::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; border-radius: 1px; background: transparent; transition: background var(--t-press); }
+.split:hover::after, .split.drag::after { background: var(--line); }
 
 /* rows (06 §2.5): position, source, name, status */
 .rows { flex: 1; overflow-y: auto; position: relative; outline: 0; }
@@ -382,7 +389,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .empty-state { padding: 36px 20px; text-align: center; color: var(--muted); }
 .group { padding: 12px 14px 4px; color: var(--faint); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
 .page-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
-.cols { flex: 1; min-height: 0; display: grid; gap: 10px; }
+.cols { flex: 1; min-height: 0; display: grid; gap: var(--card-gap); }
 .cols.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .cols.two { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
 .cols .col { display: flex; flex-direction: column; min-height: 0; transition: border-color var(--t-press); }
@@ -623,7 +630,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 
 /* a narrow window: the third column goes first (enter opens the full detail; 暂存 and 历史
    are reached by their keys and the command palette) */
-@media (max-width: 680px) { #board { grid-template-columns: 1fr 8px 1.2fr 0 0; } #board > .stack, #board [data-split="1"] { display: none; } }
+@media (max-width: 680px) { #board { grid-template-columns: 1fr var(--card-gap) 1.2fr 0 0; } #board > .stack, #board [data-split="1"] { display: none; } }
 
 /* ---- 启动 (06 §2.3): like the game's main menu — the plans and packs down the left over a
    background image, the last run and scan under them, ▶ 启动游戏 in the bottom right with the
@@ -674,6 +681,8 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .hm-launch .where b { color: var(--fg); font-weight: 600; }
 .hm-launch .stack { display: flex; flex-direction: column; width: 200px; }
 .hm-launch .btn.launch { position: relative; z-index: 2; height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; font-size: 15px; font-weight: 600; box-shadow: 0 8px 28px color-mix(in srgb, var(--accent) 30%, transparent); }
+/* the editor's 启动游戏 lands here with the focus on it (06 §2.5): L or enter starts the game */
+.hm-launch .btn.launch:focus { outline: 2px solid var(--fg); outline-offset: 3px; }
 .hm-launch .btn.launch .ic { display: inline-flex; margin: 0; }
 .hm-launch .btn.launch kbd { font: 600 11px/1 var(--code); padding: 3px 5px; border-radius: 4px; background: rgba(20, 21, 43, .14); color: inherit; }
 .hm-launch .btn.launch:disabled { filter: saturate(.3) brightness(.8); box-shadow: none; }
@@ -681,8 +690,6 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .hm-launch .issue { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; margin-top: -14px; padding: 20px 14px 8px; border-radius: 0 0 12px 12px; border: 1px solid var(--line); border-top: 0; background: color-mix(in srgb, var(--fg) 7%, transparent); backdrop-filter: blur(14px); color: var(--fg-2); font-size: 12.5px; text-align: left; }
 .hm-launch .issue.bad { color: var(--amber); background: color-mix(in srgb, var(--amber) 16%, transparent); border-color: color-mix(in srgb, var(--amber) 28%, transparent); }
 .hm-launch .issue .ic { display: inline-flex; }
-/* the editor's 启动游戏 lands here with the focus on it (06 §2.5): L or enter starts the game */
-.hm-launch .btn.launch:focus { outline: 2px solid var(--fg); outline-offset: 3px; }
 .hm-launch .issue svg.i { width: 13px; height: 13px; }
 .hm-launch .issue .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-launch .issue .go { margin-left: auto; opacity: .7; }
@@ -888,7 +895,7 @@ details.xc-sec > summary { cursor: pointer; }
 /* the left column (the filter bar, then the details) as wide as the editor's 未启用; the
    table takes the rest of the page, which is as wide as the window (no centred cap) */
 .page.library { padding-left: 12px; padding-right: 12px; }
-.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--lib-side, clamp(280px, 26%, 440px)) 8px minmax(0, 1fr); position: relative; }
+.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--lib-side, clamp(280px, 26%, 440px)) var(--card-gap) minmax(0, 1fr); position: relative; }
 .lib-split { cursor: col-resize; }
 /* the grey completion over the input (the plan's .search .ghost, in this box) */
 
@@ -949,7 +956,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-main.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 /* a narrow page: the filter bar heads the table and the details lie over it (enter) */
 @media (max-width: 900px) {
-  .lib:not(.full) { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 8px; }
+  .lib:not(.full) { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: var(--card-gap); }
   .lib:not(.full) .lib-split, .lib:not(.full) .lib-detail { display: none; }
 }
 .lib-detail .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 32px; user-select: text; }
@@ -1007,8 +1014,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
    values wrapping; what was under it (未启用's rows, Mod 库存's details) shrinks to its
    title bar at the bottom, a click on which (or \, esc) closes the bar again */
 /* the bar is a card of its own over the column's other card (未启用, the details); the
-   8 px between them is the gap that shares the column */
-.fcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+   --card-gap between them is the gap that shares the column */
+.fcol { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
 .fcol > .area { flex: 1; min-height: 0; }
 .fcol > .fbar { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
 .fcol > .fbar:not(.open) .fbar-row { border-bottom: 0; }
@@ -1018,9 +1025,11 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fbar.open .fbar-gt { margin-top: 8px; }
 .fbar.open .fbar-gt:first-child { margin-top: 0; }
 .fbar.open .fbar-line { flex-wrap: wrap; white-space: normal; overflow: visible; row-gap: 3px; }
-.fbar-gap { display: none; position: absolute; left: 0; right: 0; bottom: -9px; height: 8px; cursor: row-resize; border-radius: 4px; }
+.fbar-gap { display: none; position: absolute; z-index: 3; left: 0; right: 0; bottom: calc(-1 * (var(--card-gap) + var(--grab))); height: calc(var(--card-gap) + 2 * var(--grab)); cursor: row-resize; }
 .fbar.open .fbar-gap { display: block; }
-.fbar-gap:hover, .fbar-gap.drag { background: var(--line); }
+/* a 2px line in the middle of the visible gap shows it can be dragged */
+.fbar-gap::after { content: ""; position: absolute; left: 12px; right: 12px; top: 50%; height: 2px; margin-top: -1px; border-radius: 1px; background: transparent; transition: background var(--t-press); }
+.fbar-gap:hover::after, .fbar-gap.drag::after { background: var(--line); }
 /* filling the column, the bar leaves the card below only its title, a slim card at the
    bottom like 暂存 and 历史: a click on it gives the column back */
 .fcol:has(> .fbar.open.fill) > .area { flex: none; }
