@@ -1020,3 +1020,16 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .page .btn.primary.danger-go { background: var(--red); border-color: var(--red); color: #fff; }
 .page .btn.primary.danger-go:disabled { opacity: .45; cursor: default; }
 .uninstall .set .sub { white-space: normal; }
+
+/* 设置 › 贴图优化 (08 §5.2): settings rows, the run's foot, the mods table */
+.textures .set .sub { white-space: normal; }
+.textures .set .sub.warn, .tex-rows .warn { color: var(--amber); }
+.tex-foot { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin: 14px 0 18px; }
+.tex-foot .prog { flex: 1; }
+.tex-rows { padding: 6px 0; font-size: 12px; }
+.tex-rows .tr { display: grid; grid-template-columns: minmax(0, 3fr) repeat(5, minmax(0, 1fr)); gap: 8px; padding: 3px 14px; }
+.tex-rows .tr.th { color: var(--muted); border-bottom: 1px solid var(--line-2); padding-bottom: 5px; margin-bottom: 3px; }
+.tex-rows .tr span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tex-rows .tr.stale .n { color: var(--amber); }
+.packpv .packtex { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
+.packpv .packtex select { height: 26px; background: var(--card-2); color: var(--fg); border: 1px solid var(--line); border-radius: 7px; padding: 0 6px; font: inherit; }

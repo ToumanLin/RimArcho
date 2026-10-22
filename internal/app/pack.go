@@ -221,10 +221,11 @@ type PackPlan struct {
 	roots []string // per entry: the folder copied ("" for Core, the DLCs, a light pack)
 	free  func(string) int64
 	tex   *textures.Options
+	gen   []map[string]bool // per entry: RimArcho's DDS in the mod (not copied, not the mod's)
 }
 
 // WithTextures makes the plan convert textures (Measure then estimates them).
-func (pl *PackPlan) WithTextures(o *textures.Options) {
+func (a *App) WithTextures(pl *PackPlan, o *textures.Options) {
 	if o != nil {
 		n := o.Normal()
 		o = &n
@@ -299,6 +300,7 @@ func (a *App) PlanPack(name string, light bool) (*PackPlan, error) {
 		if m.Kind == source.Official {
 			p.Entries = append(p.Entries, PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Official: true})
 			pl.roots = append(pl.roots, "")
+			pl.gen = append(pl.gen, nil)
 			continue
 		}
 		pe := PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Lineage: m.LineageID, Instance: m.ID, WorkshopID: m.WorkshopID(), Hash: hex.EncodeToString(m.SnapHash)}
@@ -325,6 +327,7 @@ func (a *App) PlanPack(name string, light bool) (*PackPlan, error) {
 		}
 		p.Entries = append(p.Entries, pe)
 		pl.roots = append(pl.roots, root)
+		pl.gen = append(pl.gen, a.generatedIn(root))
 	}
 	r.Pack = p
 	return pl, nil
@@ -353,7 +356,7 @@ func (pl *PackPlan) Measure(packsDir string) {
 		for _, t := range pe.TrimmedDir {
 			pe.Trimmed += dirSize(filepath.Join(root, t))
 		}
-		pe.Bytes = dirSize(root) - pe.Trimmed
+		pe.Bytes = dirSize(root) - pe.Trimmed - genSize(root, pl.gen[i])
 		r.Pack.Trimmed += pe.Trimmed
 		r.Need += pe.Bytes
 	}
@@ -365,7 +368,7 @@ func (pl *PackPlan) Measure(packsDir string) {
 			if root == "" {
 				continue
 			}
-			est, skipped := packTextureEstimate(root, r.Pack.Entries[i].TrimmedDir, *pl.tex)
+			est, skipped := packTextureEstimate(root, r.Pack.Entries[i].TrimmedDir, *pl.tex, pl.gen[i])
 			r.TexEst.Plus(est)
 			r.TexSkipped += skipped
 			maxPNG = max(maxPNG, est.PNGBytes)
@@ -425,7 +428,7 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 		return r, nil
 	}
 	if o.Textures != nil && !o.Light {
-		pl.WithTextures(o.Textures)
+		a.WithTextures(pl, o.Textures)
 		r.Tool = a.TextureTool()
 	}
 	bs.update(func(p *BuildProgress) { p.Step, p.Env, p.ModsTotal = StepMeasure, r.Pack.Env, carriedCount(r.Pack) })
@@ -512,7 +515,7 @@ func (a *App) writePack(st *LoadoutState, p *Pack, dir string, bs *buildState, s
 		res := &CopyResult{onFile: func(n int64) error {
 			bs.update(func(p *BuildProgress) { p.Bytes += n })
 			return bs.stopRequested()
-		}}
+		}, generated: a.generatedIn(root)} // RimArcho's DDS next to the PNGs are not the mod's
 		ents, err := os.ReadDir(root)
 		if err != nil {
 			return err

@@ -178,4 +178,3 @@ func (s *API) TexturesClean(scope string) (string, error) {
 	}
 	return view.Tf("deleted %d DDS RimArcho wrote (%s); the game uses the PNGs again", c.Files, view.SizeText(c.Bytes)), nil
 }
-

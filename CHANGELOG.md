@@ -379,6 +379,23 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - Measured on the same data copy, GPU on: idle 202 → 138 MB, plan editor 204 → 138,
   Mod 库存 175 → 151, minimised 171 → 105. GPU off: 182 → 123, 185 → 123, 155 → 132, 150 → 88.
 
+### 贴图优化 (08 §5.2)
+- Database schema v14 → v15: the DDS RimArcho wrote, per file and per mod.
+- `archo textures status|optimize|clean|tool`: converts a mod's PNG textures to DDS next to
+  them with todds 0.4.1 (BC1 when opaque, BC7 otherwise, with mipmaps); the PNGs stay. Every
+  folder with `Textures/` is covered, and a path is converted everywhere or nowhere. Only the
+  files RimArcho recorded are ever deleted; an author's own DDS is left alone. Refused while
+  the game runs; can be stopped.
+- todds is downloaded only after the player agrees (`tool --install`, settings), or
+  `textures.todds` points at an existing copy (e.g. RimSort's).
+- A mod updated after its textures were converted shows `texture.stale` in 需要处理.
+- Uninstall gains a `textures` step that deletes the recorded DDS.
+- `pack build --textures [--texture-scale N]`: 预转换 (full size) or 精简 (scaled) in the
+  pack's copies, which then drop their PNGs. Space is checked against the peak; `pack.json`
+  records what was done.
+- GUI: a 贴图优化 page (estimate, scale, progress, stop, clean), Mod 库存's 优化贴图 /
+  清除贴图优化, the pack build's textures choice; TUI palette panel; MCP `manage_textures`.
+
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
 - `collection <id> --import` replaces the list with only the collection's mods, dropping Core.

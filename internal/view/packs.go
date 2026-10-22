@@ -153,7 +153,7 @@ func PackTextureOptions(tex int) *textures.Options {
 // preview). Call it with the app held, before Measure.
 func PlanTextures(a *app.App, pl *app.PackPlan, tex int) {
 	if o := PackTextureOptions(tex); o != nil && pl.R.Pack != nil {
-		pl.WithTextures(o)
+		a.WithTextures(pl, o)
 		pl.R.Tool = a.TextureTool()
 	}
 }
@@ -265,7 +265,7 @@ func textureStep(r *app.PackBuild) PackStep {
 	}
 	if r.Final > r.Need {
 		s.Level = LevelWarn
-		s.More = append(s.More, T("at full size the pack grows: DDS take more disk than PNG"))
+		s.More = append(s.More, T("the pack grows: DDS take more disk than PNG"))
 	}
 	if t := r.Tool; t != nil && t.Err != "" {
 		s.Level = LevelBad

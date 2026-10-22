@@ -255,11 +255,14 @@ func check(j Job, start time.Time, mips, exact bool) Result {
 		r.Err = "the DDS was not rewritten"
 		return r
 	}
-	if err := CheckDDS(r.DDS); err != nil {
+	in, err := ReadDDS(r.DDS)
+	if err != nil {
 		r.Err = err.Error()
 		return r
 	}
-	if want := DDSSize(j.W, j.H, j.Alpha, j.Scale, mips); exact && fi.Size() != want {
+	// todds looks at the pixels: an RGBA PNG whose alpha is all opaque becomes BC1, so the
+	// size is checked against the format it wrote
+	if want := DDSSize(j.W, j.H, in.Format == "BC7", j.Scale, mips); exact && fi.Size() != want {
 		r.Err = fmt.Sprintf("the DDS is %d bytes, not %d (incomplete)", fi.Size(), want)
 		return r
 	}

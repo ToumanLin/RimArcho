@@ -17,7 +17,7 @@ import (
 
 // packTextureEstimate is what converting one mod's textures would take, as Measure sees it
 // before anything is copied: the mod's folders without the version folders left out.
-func packTextureEstimate(root string, trimmed []string, o textures.Options) (textures.Estimate, int) {
+func packTextureEstimate(root string, trimmed []string, o textures.Options, gen map[string]bool) (textures.Estimate, int) {
 	var folders []string
 	for _, f := range textures.AllFolders(root) {
 		rel, err := filepath.Rel(root, f)
@@ -39,8 +39,24 @@ func packTextureEstimate(root string, trimmed []string, o textures.Options) (tex
 	if err != nil {
 		return textures.Estimate{}, 0
 	}
-	p := textures.MakePlan(set, o, textures.Owned{}, false)
+	// RimArcho's DDS are not copied: their keys are converted like any other
+	ours := func(p string) bool {
+		rel, err := filepath.Rel(root, p)
+		return err == nil && gen[strings.ToLower(filepath.ToSlash(rel))]
+	}
+	p := textures.MakePlan(set, o, textures.Owned{Ours: ours}, false)
 	return p.Est, p.Skipped[textures.SkipOwnDDS] + p.Skipped[textures.SkipOtherFmt]
+}
+
+// genSize is the size of the files RimArcho wrote into a mod folder (not copied to packs).
+func genSize(root string, gen map[string]bool) int64 {
+	var n int64
+	for rel := range gen {
+		if fi, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err == nil {
+			n += fi.Size()
+		}
+	}
+	return n
 }
 
 // packTextures converts the textures of every copy in the pack being assembled in tmp.

@@ -22,6 +22,7 @@ import { icon } from "./icons.js";
 import * as motion from "./motion.js";
 import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
+import * as tex from "./textures.js";
 
 // ---- loading ----
 
@@ -170,6 +171,7 @@ async function openPage(id) {
     case "log": return scr.gameLog(undefined, true);
     case "settings": return scr.settings();
     case "uninstall": return uninst.open();
+    case "textures": return tex.open();
     case "guide": return guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
   }
 }
@@ -447,7 +449,7 @@ async function preview(what) {
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", "env-page": "env", uninstall: "uninstall" };
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", "env-page": "env", uninstall: "uninstall", textures: "textures" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
@@ -876,6 +878,7 @@ async function start() {
   });
   on("pack", (ev) => scr.packEvent(ev));
   on("uninstall", (ev) => uninst.event(ev));
+  on("textures", (ev) => tex.event(ev));
   on("guide", (ev) => guide.guideEvent(ev));
   on("download", (ev) => guide.downloadEvent(ev));
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again

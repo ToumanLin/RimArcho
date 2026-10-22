@@ -32,6 +32,12 @@ func TestPackTextures(t *testing.T) {
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("enable", "pkg:tester.textured")
+	// the mod already has RimArcho's own DDS next to its PNGs: they are not the mod's, so
+	// the pack neither copies them nor treats them as the author's
+	if r, err := e.App.OptimizeTextures(app.TextureRun{Refs: []string{"pkg:tester.textured"}}); err != nil || r.Converted != 3 { // 1.5 too: in place covers every version folder
+		t.Fatalf("in place: %+v %v", r, err)
+	}
+	enc.files = 0
 
 	dry, err := e.App.BuildPackWith("tex", app.BuildOptions{DryRun: true, Textures: &textures.Options{}})
 	if err != nil {
@@ -65,7 +71,7 @@ func TestPackTextures(t *testing.T) {
 			t.Errorf("%s present=%v", rel, !want)
 		}
 	}
-	if !exists(filepath.Join(src, "Textures", "Things", "A.png")) || exists(filepath.Join(src, "Textures", "Things", "A.dds")) {
+	if !exists(filepath.Join(src, "Textures", "Things", "A.png")) || !exists(filepath.Join(src, "Textures", "Things", "A.dds")) {
 		t.Fatal("the mod itself was changed")
 	}
 	var og scan.Origin

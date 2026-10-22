@@ -515,7 +515,7 @@ func (a *App) OptimizeTextures(run TextureRun) (*TextureReport, error) {
 	}
 	if ctx.Err() != nil {
 		r.Stopped = true
-		r.Incomplete = p.FilesTotal - p.Files
+		r.Incomplete = max(0, p.FilesTotal-r.Converted-len(r.Failed)) // the batch a stop cut short is not done
 	}
 	if run.Progress != nil {
 		p.Mod = ""
@@ -563,7 +563,8 @@ func (a *App) optimizeMod(ctx context.Context, enc textures.Encoder, ix *Index, 
 			os.Remove(x.DDS) // ours: recorded before the run (a half-written file goes too)
 			drop = append(drop, x.DDS)
 			delete(t.rows, store.PathKey(x.DDS))
-			if len(r.Failed) < 200 {
+			// a stop interrupts the batch being written: those are not done, not failed
+			if ctx.Err() == nil && len(r.Failed) < 200 {
 				r.Failed = append(r.Failed, TextureFailure{Mod: t.Mod.DisplayName(), Rel: x.Rel, Err: x.Err})
 			}
 		}
@@ -906,19 +907,23 @@ type TextureSummary struct {
 
 // TextureSummaries maps instance IDs to their optimised textures (only those with any).
 func (a *App) TextureSummaries() map[string]TextureSummary {
-	last, err := a.Store.TextureMods()
-	if err != nil || len(last) == 0 {
+	// from the files recorded: a run that was stopped wrote some and no mod record
+	counts, err := a.Store.TextureCounts()
+	if err != nil || len(counts) == 0 {
 		return nil
 	}
-	counts, _ := a.Store.TextureCounts()
+	last, _ := a.Store.TextureMods()
 	out := map[string]TextureSummary{}
-	for id, l := range last {
-		n := counts[id]
-		out[id] = TextureSummary{Files: int(n[0]), Bytes: n[1], Scale: l.Scale}
+	for id, n := range counts {
+		s := TextureSummary{Files: int(n[0]), Bytes: n[1], Scale: last[id].Scale}
+		if s.Scale == 0 {
+			s.Scale = 100
+		}
+		out[id] = s
 	}
 	if ix, err := a.Index(); err == nil {
 		for id, s := range out {
-			if m := ix.ByID[id]; m != nil && !bytes.Equal(m.SnapHash, last[id].SnapHash) {
+			if l, ok := last[id]; ok && ix.ByID[id] != nil && !bytes.Equal(ix.ByID[id].SnapHash, l.SnapHash) {
 				s.Stale = true
 				out[id] = s
 			}

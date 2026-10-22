@@ -42,6 +42,7 @@ func init() {
 		"stop":                                        "停止",
 		"remove every converted texture…":             "清除全部贴图优化…",
 		"%d mods":                                     "%d 个 Mod",
+		"mods":                                        "Mod",
 		"%d up to date":                               "%d 张已是最新",
 		"%d left alone (a DDS of the mod's own, or another format of the same name)":                                                             "%d 张不处理（Mod 自带同名 DDS，或同名的其他格式）",
 		"%d DDS whose PNG changed or is gone, in %d mods: the game may show the old texture":                                                     "%[2]d 个 Mod 里有 %[1]d 个 DDS 的 PNG 已经变了或没了：游戏可能显示旧贴图",

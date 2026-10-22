@@ -99,7 +99,7 @@ export function current() {
   if (!S.screen || S.screen === "full") return (S.shell && S.shell.plan && S.shell.plan.page) || "plan";
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
   // 卸载 RimArcho is under 设置
-  if (S.screen === "uninstall") return "settings";
+  if (S.screen === "uninstall" || S.screen === "textures") return "settings";
   // adding an environment belongs to the environment page
   if (S.screen === "guide" && S.guideFrom === "env") return "env";
   return S.screen;
@@ -256,6 +256,7 @@ export function crumbs() {
   if (S.screen === "guide") out = (S.guideFrom === "env" ? out : []).concat([{ label: S.guideFrom === "env" ? T("add an environment") : T("getting started"), id: "guide" }]);
   if (S.screen === "full" && S.detail) out = out.concat([{ label: S.detail.name, id: "full" }]);
   if (S.screen === "uninstall") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
+  if (S.screen === "textures") out = out.concat([{ label: T("texture optimisation"), id: "textures" }]);
   return out;
 }
 
@@ -269,7 +270,7 @@ function renderCrumbs() {
   let chip = (sh && sh.env) || "";
   if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + " · " + chip;
   env.textContent = chip;
-  env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "uninstall";
+  env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "uninstall" || S.screen === "textures";
   env.title = T("environment") + " · E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");

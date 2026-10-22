@@ -274,7 +274,11 @@ func texCleanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	d, root := render.New(head)
 	for _, m := range r.Mods {
 		if m.Files > 0 {
-			root.Addf("%s %s: %d (%s)", m.Ref, m.Name, m.Files, mb(m.Bytes))
+			who := m.Name
+			if m.Ref != "" && m.Ref != m.Name { // a ref can be the name itself
+				who = m.Ref + " " + m.Name
+			}
+			root.Addf("%s: %d (%s)", who, m.Files, mb(m.Bytes))
 		}
 	}
 	root.Truncate(render.DefaultLimit, "")

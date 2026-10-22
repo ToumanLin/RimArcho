@@ -1018,7 +1018,7 @@ function renderGroups(w, groups, again) {
       }
       for (const a of it.actions || []) {
         // 卸载 RimArcho is its own page with the plan; every other action is a command
-        if (a.argv[0] === "uninstall") { right.append(button(a.label, "", () => ui.go("uninstall"))); continue; }
+        if (a.argv[0] === "uninstall" || a.argv[0] === "textures") { right.append(button(a.label, "", () => ui.go(a.argv[0]))); continue; }
         right.append(button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, () => run(a.argv)) : run(a.argv)));
       }
       row.append(left, right);
@@ -1078,7 +1078,14 @@ export async function environment() {
 // and progress from the "pack" events, and a build another window started, or one cut
 // short, from the list (Packs().unfinished).
 
-const PACK_STEPS = ["check the list", "sort for the pack", "copy the mods", "write pack.json", "ready to play"];
+const PACK_STEPS = ["check the list", "sort for the pack", "copy the mods", "textures", "write pack.json", "ready to play"];
+// The pack's textures (08 §5.2): 0 copied as they are, 100 预转换 (full size), less 精简.
+const PACK_TEX = [0, 100, 80, 75, 60, 50, 40, 25];
+let packTex = 0;
+function packTexLabel(v) {
+  if (!v) return T("PNGs stay as they are");
+  return v === 100 ? T("pre-convert textures") : T("slim textures") + " · " + v + "%";
+}
 const builds = {};      // name → the preview's steps, for the build card
 let packPoll = 0;
 
@@ -1182,16 +1189,29 @@ export function packEvent(ev) {
 async function previewBuild(n) {
   let pv;
   say("busy", T("checking the list…"));
-  try { pv = await api.PackPreview(n); } catch (e) { return say("fail", errText(e)); }
+  try { pv = await api.PackPreview(n, packTex); } catch (e) { return say("fail", errText(e)); }
   say("", "");
   const body = el("div", "packpv");
+  // the textures: a choice on the preview; another choice measures again
+  const texRow = el("div", "packtex");
+  const sel = el("select");
+  for (const v of PACK_TEX) {
+    const o = el("option", "", packTexLabel(v));
+    o.value = String(v);
+    if (v === packTex) o.selected = true;
+    sel.append(o);
+  }
+  sel.onchange = () => { packTex = Number(sel.value); pop.close(); previewBuild(n); };
+  texRow.append(el("span", "muted", T("textures")), sel);
+  body.append(texRow);
   body.append(flow(pv.steps));
   const a = attention(pv.steps);
   if (a) body.append(a);
   if (pv.dir) body.append(el("div", "muted dir", T("folder") + ": " + pv.dir));
+  const tex = packTex;
   pop.panel(Tf("build pack %s", n), body, T("build"), pv.ok ? async () => {
     builds[n] = pv.steps;
-    try { say("ok", await api.PackBuild(n)); } catch (e) { say("fail", errText(e)); }
+    try { say("ok", await api.PackBuild(n, tex)); } catch (e) { say("fail", errText(e)); }
     packs();
   } : null, "wide");
 }

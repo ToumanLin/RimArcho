@@ -83,7 +83,7 @@ var opTable = []Op{
 	{Code: OpMove, Group: 4, Confirm: true, Detail: true},
 	{Code: OpUnhide, Group: 5, Confirm: true, Detail: true},
 	{Code: OpTextures, Group: 5, Confirm: true, Detail: true},
-	{Code: OpTexClean, Group: 5, Confirm: true},
+	{Code: OpTexClean, Group: 5, Confirm: true, Detail: true},
 	{Code: OpResub, Group: 5, Detail: true},
 	{Code: OpUnsub, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
 	{Code: OpDelete, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
