@@ -17,6 +17,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/host"
+	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/surface/gui"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 	"github.com/ToumanLin/RimArcho/internal/surface/tui"
@@ -24,6 +25,10 @@ import (
 
 // Run executes argv (without the program name) and returns the exit code.
 func Run(argv []string, stdout, stderr io.Writer) int {
+	if len(argv) >= 1 && argv[0] == "steam-worker" {
+		// The short-lived Steam client call (06 §2.9, 08 §10); no data directory.
+		return steamWorker(argv[1:], stdout)
+	}
 	if len(argv) == 1 && (argv[0] == "--version" || argv[0] == "-v") {
 		argv = []string{"version"}
 	}
@@ -163,4 +168,24 @@ func globalFlags(argv []string) (envName string, here bool, rest []string, err e
 		}
 	}
 	return envName, here, rest, nil
+}
+
+// steamWorker runs `archo steam-worker <action> <id>…`, started by app.Workshop in the
+// Steam runtime folder. It is not a listed command: players and agents use
+// `archo workshop subscribe|unsubscribe|state`.
+func steamWorker(argv []string, stdout io.Writer) int {
+	if len(argv) < 2 {
+		fmt.Fprintln(stdout, steamworks.ErrorLine("usage: archo steam-worker subscribe|unsubscribe|state <workshop id>…"))
+		return cmds.ExitUsage
+	}
+	var ids []uint64
+	for _, a := range argv[1:] {
+		var id uint64
+		if _, err := fmt.Sscan(a, &id); err != nil || id == 0 {
+			fmt.Fprintln(stdout, steamworks.ErrorLine("not a Workshop id: "+a))
+			return cmds.ExitUsage
+		}
+		ids = append(ids, id)
+	}
+	return steamworks.Worker(argv[0], ids, stdout)
 }

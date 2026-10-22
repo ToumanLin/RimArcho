@@ -95,6 +95,9 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     db vacuum                                 compact the database
     cache status                              the caches and their sizes
     cache clear <kind>                        empty one cache (previews, workshop, images, source, logs); rebuilt on demand
+    workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while enabled, in a plan, or the game runs)
+    workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
+    workshop state <ref…>                     ask Steam whether items are subscribed, installed, waiting for an update
   references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>
   global flags: --env <name> (use another environment for this command)
 

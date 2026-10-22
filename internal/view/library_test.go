@@ -1,6 +1,7 @@
 package view_test
 
 import (
+	"errors"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -229,5 +230,41 @@ func TestLibFields(t *testing.T) {
 	p := libPage(t, e, "")
 	if len(p.Columns) == 0 || p.Columns[0].Key != "name" || !p.Columns[0].Shown || p.Columns[len(p.Columns)-1].Shown {
 		t.Fatalf("columns %+v", p.Columns)
+	}
+}
+
+// 06 §2.9: 退订 is a confirmed action through the Steam client; when Steam is out of reach
+// LibDo answers OpenPages (the window opens the page and says so).
+func TestLibSteam(t *testing.T) {
+	e := libEnv(t)
+	idle := libRow(t, libPage(t, e, ""), "Idle").Insts[0]
+	var unsub *view.LibAction
+	for k, a := range idle.Actions {
+		if a.Kind == view.LibUnsub {
+			unsub = &idle.Actions[k]
+		}
+	}
+	if unsub == nil || !unsub.Confirm || !unsub.Danger || unsub.URL != "" {
+		t.Fatalf("unsubscribe action %+v", unsub)
+	}
+	p, err := view.LibPreview(e.App, view.LibUnsub, []string{idle.Ref})
+	if err != nil || !p.Apply || !strings.Contains(strings.Join(p.Lines, "\n"), "would unsubscribe") {
+		t.Fatalf("preview %+v %v", p, err)
+	}
+	// no steam_api64.dll in the test game: out of reach
+	_, err = view.LibDo(e.App, view.LibUnsub, []string{idle.Ref})
+	var pages *view.OpenPages
+	if !errors.As(err, &pages) || len(pages.URLs) != 1 || !strings.HasSuffix(pages.URLs[0], "?id=5200") {
+		t.Fatalf("fallback %v", err)
+	}
+	e.WriteFile(filepath.Join(e.Game, "steam_api64.dll"), "fake")
+	var got []string
+	e.App.SteamWorker = func(_ string, args []string) (string, error) {
+		got = args
+		return "ITEM 5200 ok 0\nDONE unsubscribe 1\n", nil
+	}
+	msg, err := view.LibDo(e.App, view.LibUnsub, []string{idle.Ref})
+	if err != nil || !strings.Contains(msg, "Idle") || strings.Join(got, " ") != "unsubscribe 5200" {
+		t.Fatalf("unsubscribe %q %v %v", msg, err, got)
 	}
 }

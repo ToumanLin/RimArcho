@@ -682,8 +682,6 @@ async function run(a, copies) {
   const i0 = copies[0];
   if (a.kind === "folder") return api.OpenFolder(i0.id).catch((e) => say("fail", errText(e)));
   if (a.kind === "workshop") return api.OpenURL(i0.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
-  // Steam lets no other program subscribe or unsubscribe: the page opens, and says so
-  if (a.url) return api.OpenURL(a.url).then(() => say("", a.say || T("opened the Workshop page")), (e) => say("fail", errText(e)));
   const go = async () => {
     try { say("ok", await api.LibraryDo(a.kind, refs), a.kind === "enable" || a.kind === "remove"); } catch (e) { say("fail", errText(e)); }
     L.sel.clear();

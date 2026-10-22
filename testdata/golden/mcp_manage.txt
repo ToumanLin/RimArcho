@@ -455,6 +455,12 @@ removed #hnyg Harmony from 4 plans
 next:
   archo save
 
+> manage_library {"action":"subscribe","dry_run":true,"refs":["#nyh3"]}
+dry run, nothing changed: would subscribe 1 Workshop item
+  #nyh3 Gone  ws:4200
+next:
+  archo workshop subscribe #nyh3
+
 > set_player_data {"action":"copy_note","refs":["#iqmu"],"text":"kept for the 1.5 save"}
 copy note set for #iqmu A
   note: kept for the 1.5 save

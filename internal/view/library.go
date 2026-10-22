@@ -12,6 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -136,11 +137,18 @@ type LibAction struct {
 	// Detail: one of the six in a copy's detail (恢复 退订/删除 重新订阅 备份锁定版本 打开文件夹
 	// 打开网页); the others are in the right-click menu and the selection bar.
 	Detail bool `json:"detail,omitempty"`
-	// URL / Say: the interface opens the page and says this (Steam has no way for another
-	// program to subscribe or unsubscribe; RimArcho does not pretend it does).
+	// URL: the Workshop page (打开网页).
 	URL string `json:"url,omitempty"`
-	Say string `json:"say,omitempty"`
 }
+
+// OpenPages is LibDo's answer when Steam is out of reach (not running, the DLL would not
+// load): the interface opens the Workshop pages and says Msg, so the player can do it there.
+type OpenPages struct {
+	Msg  string
+	URLs []string
+}
+
+func (e *OpenPages) Error() string { return e.Msg }
 
 // Library action kinds.
 const (
@@ -150,9 +158,9 @@ const (
 	LibPinUpdate = "pin-update"  // 更新锁定版本
 	LibUnpin     = "unpin"       // 解除锁定
 	LibUnhide    = "unhide"      // 恢复
-	LibUnsub     = "unsubscribe" // 退订 (opens the Workshop page)
+	LibUnsub     = "unsubscribe" // 退订, through the Steam client
 	LibDelete    = "delete"      // 删除 (to the recycle bin)
-	LibResub     = "resubscribe" // 重新订阅 (opens the Workshop page)
+	LibResub     = "resubscribe" // 重新订阅, through the Steam client
 	LibMove      = "move"        // 备份锁定版本 (收进锁定库)
 	LibFolder    = "folder"      // 打开文件夹
 	LibWorkshop  = "workshop"    // 打开网页
@@ -662,12 +670,8 @@ func libActions(lib *app.Library, l *app.LibLineage, i *app.LibInstance) []LibAc
 		if !slices.Contains(ks, k) {
 			continue
 		}
-		a := LibAction{Kind: k, Label: libActionLabel(k), Confirm: libConfirm[k], Danger: k == LibDelete, Detail: libDetail[k]}
+		a := LibAction{Kind: k, Label: libActionLabel(k), Confirm: libConfirm[k], Danger: k == LibDelete || k == LibUnsub, Detail: libDetail[k]}
 		switch k {
-		case LibUnsub:
-			a.URL, a.Say = url, T("Steam has no way for another program to unsubscribe: the Workshop page is open, unsubscribe there")
-		case LibResub:
-			a.URL, a.Say = url, T("Steam has no way for another program to subscribe: the Workshop page is open, subscribe there")
 		case LibWorkshop:
 			a.URL = url
 		}
@@ -677,7 +681,7 @@ func libActions(lib *app.Library, l *app.LibLineage, i *app.LibInstance) []LibAc
 }
 
 // libConfirm: the actions that change files (a dry run first); the plan edits are undone with u.
-var libConfirm = map[string]bool{LibPin: true, LibPinUpdate: true, LibUnpin: true, LibUnhide: true, LibMove: true, LibDelete: true}
+var libConfirm = map[string]bool{LibPin: true, LibPinUpdate: true, LibUnpin: true, LibUnhide: true, LibMove: true, LibDelete: true, LibUnsub: true}
 
 // libArgv is an action's archo command (its dry run with --dry-run).
 func libArgv(kind string, refs []string) []string {
@@ -694,6 +698,8 @@ func libArgv(kind string, refs []string) []string {
 		return []string{"library", "move-to-locked", refs[0]}
 	case LibTrash:
 		return []string{"trash", refs[0]}
+	case LibUnsub:
+		return []string{"workshop", "unsubscribe", refs[0]}
 	}
 	return nil
 }
@@ -715,7 +721,13 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			if strings.HasPrefix(l, "next:") {
 				break
 			}
-			p.Lines = append(p.Lines, Humanize(st, l))
+			l = Humanize(st, l)
+			// "#ref Name" became "Name Name"
+			if m, err := st.Ix.ResolveOne(ref); err == nil {
+				n := m.DisplayName()
+				l = strings.ReplaceAll(l, n+" "+n, n)
+			}
+			p.Lines = append(p.Lines, l)
 		}
 		if code != 0 {
 			p.Apply = false
@@ -735,10 +747,8 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 	}
 	what := Named(st, idsOfRefs(st, refs))
 	switch kind {
-	case LibUnsub:
-		return T("Steam has no way for another program to unsubscribe: the Workshop page is open, unsubscribe there"), nil
-	case LibResub:
-		return T("Steam has no way for another program to subscribe: the Workshop page is open, subscribe there"), nil
+	case LibUnsub, LibResub:
+		return libSteam(a, kind, refs, what)
 	case LibEnable:
 		if _, err := a.Enable(refs, app.Placement{}); err != nil {
 			return "", err
@@ -783,6 +793,30 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 		done++
 	}
 	return Tf("%s: %s", libActionLabel(kind), what), nil
+}
+
+// libSteam unsubscribes or subscribes again through the Steam client (06 §2.9); when Steam
+// is out of reach the answer is OpenPages.
+func libSteam(a *app.App, kind string, refs []string, what string) (string, error) {
+	action := steamworks.Unsubscribe
+	if kind == LibResub {
+		action = steamworks.Subscribe
+	}
+	_, err := a.Workshop(action, refs, false)
+	var u *app.SteamUnavailable
+	switch {
+	case errors.As(err, &u):
+		msg := Tf("Steam could not be reached (%s): the Workshop page is open, unsubscribe there", u.Why)
+		if kind == LibResub {
+			msg = Tf("Steam could not be reached (%s): the Workshop page is open, subscribe there", u.Why)
+		}
+		return "", &OpenPages{Msg: msg, URLs: u.URLs}
+	case err != nil:
+		return "", err
+	case kind == LibResub:
+		return Tf("subscribed to %s again · Steam downloads it", what), nil
+	}
+	return Tf("unsubscribed from %s · Steam deletes the folder", what), nil
 }
 
 func idsOfRefs(st *app.LoadoutState, refs []string) []string {

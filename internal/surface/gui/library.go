@@ -50,7 +50,18 @@ func (s *API) LibraryDo(kind string, refs []string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.board, s.needs, s.lib = nil, nil, nil
-	return s.text(view.LibDo(s.a, kind, refs))
+	t, err := view.LibDo(s.a, kind, refs)
+	// Steam out of reach (not running, no DLL): the Workshop pages instead, said so (06 §2.9)
+	var pages *view.OpenPages
+	if errors.As(err, &pages) {
+		for _, u := range pages.URLs {
+			if err := s.open(u); err != nil {
+				return "", err
+			}
+		}
+		return pages.Msg, nil
+	}
+	return s.text(t, err)
 }
 
 // OpenFolder shows an instance's folder in the file manager. Only folders of known

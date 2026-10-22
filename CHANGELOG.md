@@ -145,9 +145,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   the Workshop update time, else the folder's). No environment chip on this page; the
   button says 重新扫描. A selection action bar; the TUI has the list in the palette.
 - A copy's details: its note at the top, then only the actions that apply — 恢复, 退订 /
-  删除, 重新订阅, 备份锁定版本, 打开文件夹, 打开网页 — then one field list. Steam lets no
-  other program subscribe or unsubscribe, so 退订 and 重新订阅 open the Workshop page and
-  say so. 删除 now also takes the player's own copies in `Mods/` and the lock library
+  删除, 重新订阅, 备份锁定版本, 打开文件夹, 打开网页 — then one field list. 删除 now also takes the player's own copies in `Mods/` and the lock library
   (not links, not while a plan uses them).
 - Copy notes (schema v13 `instance_note`): each copy has its own note, apart from the mod's.
   RimArcho writes the first version from how the copy was made ("锁定版本创建于 10 月 21 日，
@@ -155,6 +153,14 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   count stays current. Edit it in the window (click), the TUI (`n` in Mod 库存), the CLI
   (`archo note <ref> <text> --copy`, `--clear`) or MCP (`set_player_data` `copy_note`);
   `pin --reason`, `library move-to-locked --reason` and the MCP `reason` record why.
+- 退订 and 重新订阅 go through the running Steam client, as RimCrow does (08 §10): a
+  short-lived `archo steam-worker` process, started in `%LOCALAPPDATA%\RimArcho\steam` with
+  the game's `steam_api64.dll` copied in and `steam_appid.txt`, calls the Steamworks flat API
+  (no cgo) and exits. Unsubscribing makes Steam delete the folder, so it shows the dry run
+  first and is refused while the mod is enabled, used by a plan, or the game runs. Only when
+  Steam is not running or the DLL cannot be loaded does the window open the Workshop page
+  instead, and say why. CLI `archo workshop unsubscribe|subscribe|state <ref…>`; MCP
+  `manage_library` actions `unsubscribe`, `subscribe`, `steam_state`.
 - `archo library --sort` takes every column (name, size, changed, played, state, source,
   used, updated, version, author, tags; a leading `-` reverses) and `--include updated:week`
   (month, half-year, older); `--lineage` lists each copy's `updated:` and `note:`.

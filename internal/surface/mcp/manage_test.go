@@ -243,6 +243,10 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 			return manageStep{"manage_library", map[string]any{"action": "remove_from_plans", "refs": []string{h}}, []string{"library", "remove-from-plans", h}}
 		},
 		func() manageStep {
+			g := r("Gone")
+			return manageStep{"manage_library", map[string]any{"action": "subscribe", "refs": []string{g}, "dry_run": true}, []string{"workshop", "subscribe", g, "--dry-run"}}
+		},
+		func() manageStep {
 			a := pick("A", "locked")
 			return manageStep{"set_player_data", map[string]any{"action": "copy_note", "refs": []string{a}, "text": "kept for the 1.5 save"}, []string{"note", a, "kept for the 1.5 save", "--copy"}}
 		},

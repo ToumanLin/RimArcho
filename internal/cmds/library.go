@@ -304,7 +304,7 @@ func libNext(i *app.LibInstance, inPlan bool) []string {
 		case app.LibHidden:
 			out = append(out, "archo unhide "+i.Ref+" --dry-run")
 		case app.LibResidue:
-			out = append(out, "archo trash "+i.Ref+" --dry-run")
+			out = append(out, "archo workshop subscribe "+i.Ref, "archo trash "+i.Ref+" --dry-run")
 		case app.LibUpdated:
 			out = append(out, "archo pin --update "+i.Ref+" --dry-run")
 		}
