@@ -203,6 +203,7 @@ type LogIn struct {
 	Prev        bool   `json:"prev,omitempty" jsonschema:"Player-prev.log (the run before the last)"`
 	All         bool   `json:"all,omitempty" jsonschema:"include informational clusters"`
 	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
+	Pattern     string `json:"pattern,omitempty" jsonschema:"explain an error pattern instead (pattern:g:xref.def from a cluster; list = all kinds): causes, route, fixes, how often public logs show it"`
 }
 
 type FilesIn struct {
@@ -307,6 +308,9 @@ func toolList() []tool {
 			return argv("changes").pos(in.Ref).str("since", in.Since).flag("all", in.All).a
 		}),
 		reg("analyze_log", true, false, descLog, func(in LogIn) []string {
+			if in.Pattern != "" {
+				return argv("pattern").pos(in.Pattern).a
+			}
 			return gv(argv("log").str("cluster", in.Cluster).str("text", in.Text).str("file", in.File).flag("prev", in.Prev).flag("all", in.All), in.GameVersion)
 		}),
 		reg("search_files", true, false, descFiles, func(in FilesIn) []string {

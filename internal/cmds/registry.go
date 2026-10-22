@@ -264,7 +264,7 @@ func Help() *render.Doc {
 		rows = append(rows, []string{u, c.Summary})
 	}
 	root.Section("commands").AddColumns(rows)
-	root.KV("references", "#<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>")
+	root.KV("references", "#<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern")
 	root.KV("global flags", "--env <name> (use another environment for this command)")
 	return d
 }

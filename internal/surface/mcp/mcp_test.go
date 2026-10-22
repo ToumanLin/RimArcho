@@ -89,6 +89,8 @@ func TestToolsAndAnnotations(t *testing.T) {
 	}
 	if r := cs.InitializeResult(); r == nil || !strings.Contains(r.Instructions, "analyze_log") {
 		t.Error("server instructions missing the diagnosis workflow")
+	} else if !strings.Contains(r.Instructions, "Save loading") || !strings.Contains(r.Instructions, "pattern=<id>") {
+		t.Error("server instructions missing the pattern checklist")
 	}
 }
 
@@ -121,6 +123,8 @@ func TestCLIParity(t *testing.T) {
 		{"analyze_log", map[string]any{"cluster": "E3"}, []string{"log", "--cluster", "E3"}},
 		{"analyze_log", map[string]any{"text": testkit.FixtureLog(`C:\x\Compat.xml`)}, []string{"log", "--text", testkit.FixtureLog(`C:\x\Compat.xml`)}},
 		{"analyze_log", map[string]any{"cluster": "E1", "game_version": "1.6"}, []string{"log", "--cluster", "E1", "--game-version", "1.6"}},
+		{"analyze_log", map[string]any{"pattern": "pattern:g:xref.def"}, []string{"pattern", "pattern:g:xref.def"}},
+		{"analyze_log", map[string]any{"pattern": "list"}, []string{"pattern", "list"}},
 		{"search_files", map[string]any{"pattern": "Lib_Gun"}, []string{"files", "search", "Lib_Gun"}},
 		{"save_loadout", map[string]any{"dry_run": true}, []string{"save", "--dry-run"}},
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},
@@ -146,7 +150,7 @@ func TestRefsRoundTrip(t *testing.T) {
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	cs := connect(t, e)
-	refRe := regexp.MustCompile(`(?:^|\s)(#[0-9a-z]{4}|p:[0-9a-f]{6}|log:E\d+|def:\w+/\w+|pkg:[\w.]+)\b`)
+	refRe := regexp.MustCompile(`(?:^|[\s\[])(#[0-9a-z]{4}|p:[0-9a-f]{6}|log:E\d+|def:\w+/\w+|pkg:[\w.]+|pattern:g:[\w.-]*\w)\b`)
 	seen := map[string]bool{}
 	for _, c := range []struct {
 		tool string
@@ -178,6 +182,8 @@ func TestRefsRoundTrip(t *testing.T) {
 			tool, args = "analyze_log", map[string]any{"cluster": r}
 		case strings.HasPrefix(r, "def:"):
 			tool, args = "get_def", map[string]any{"def": r}
+		case strings.HasPrefix(r, "pattern:"):
+			tool, args = "analyze_log", map[string]any{"pattern": r}
 		}
 		if out, isErr := call(t, cs, tool, args); isErr {
 			t.Errorf("%s %s: %s", tool, r, out)

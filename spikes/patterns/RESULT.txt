@@ -147,3 +147,12 @@ xref.sound 70). 105 of 1,036 have a mod version (many mods report none). 209 mod
 - Fix evidence co-occurs with a change; it is not causal. A player who removes three mods and
   loads another save also loses save-stage errors.
 - Workflow coverage is a manual judgement of the current Instructions text.
+
+== Product export (G11, 2026-10-22)
+
+go run ./spikes/patterns -export internal/patterns/patterns.json   (46 generic rules in match
+order, 1,036 mod patterns, 477 KB; no top_source_mods, no occurrences)
+go run ./spikes/patterns -verify corpus-kb/results-v3.jsonl: 610,910 problem clusters, the
+product matcher (internal/patterns) and these rules classify 0 differently.
+All 899 distinct mod-pattern templates also occur in results-v4 (current master attribution);
+9.4% of v4's 629,761 problem clusters get a mod-specific known error (in-sample).

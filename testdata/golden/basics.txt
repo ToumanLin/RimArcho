@@ -79,12 +79,13 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     pack import <file>                        unpack a .archopack, or compare a light pack with the installed mods
     pack remove <name>                        move a pack to the recycle bin; --unfinished deletes what a build cut short copied
     pack stop <name>                          stop a running pack build (what it copied is removed)
+    pattern [<pattern:id>]                    error patterns from public logs: what a kind of log error usually is, its causes, route and fixes
     db status                                 the database: path, size, backups
     db backup                                 write a consistent copy of the database to <data>/backups
     db vacuum                                 compact the database
     cache status                              the caches and their sizes
     cache clear <kind>                        empty one cache (previews, workshop, images, source, logs); rebuilt on demand
-  references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>
+  references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern
   global flags: --env <name> (use another environment for this command)
 
 $ archo status

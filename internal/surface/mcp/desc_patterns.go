@@ -1,0 +1,11 @@
+package mcp
+
+// patternChecklist extends the diagnosis workflow with the kinds of errors it did not cover:
+// 41% of the error clusters in 6,734 public 1.6 logs (spikes/patterns/RESULT.txt), most
+// frequent first. Shares are of all error clusters.
+const patternChecklist = `Error kinds step 3 does not cover, most frequent first (shares of the error clusters in 6,734 public 1.6 logs). analyze_log names a cluster's kind as pattern:<id>; analyze_log pattern=<id> gives its usual causes, route and fixes. A pattern is community background about that kind of error, never on its own the reason to name a mod:
+- Save loading (21%; pattern:g:save.*, g:rt.post-load): "Could not load reference to X named", "Could not resolve reference to object with loadID", "is referenced but is not deep-saved", "Could not find think node", "Can't load abstract class". Data of mods added or removed during a save; the type or mod named is whose data remains in the save, not a broken mod. Fix: ignore, re-enable that mod, or a new game; do not disable mods for it.
+- Missing assets (12%; g:asset.*): "Could not load Texture2D at", "Failed to create texture", _MainTex. The texture comes from a mod or DLC that is not active, or the path's case differs, or the mod does not ship it: search_files the path; a texture no installed mod ships cannot be pinned on a mod. Fix: ignore unless something visible is missing.
+- Config errors (8%; g:xml.config-error): "Config error in <def>: …" is the game's consistency check of one def: get_def <def> names the defining mod (the source) and the patches that touched it. Usually harmless: ignore or report.
+- Assembly loading (4%; g:asm.*): "Cannot resolve dependency to assembly X" (a DLL the loading mod needs: get_mod on that mod, is the mod that ships X enabled and earlier, are there two versions of one library), MissingMethodException / TypeLoadException (built against another version of the game or of a mod it uses), "Error in static constructor of X" (X's mod fails to start; the inner exception says why). Fix: enable or update the dependency, update or disable the mod; never an XML edit.
+- Noise (g:noise.*): HugsLib log-publishing errors, "[Analyzer] Detected Visual Exceptions", Harmony IL dump lines are not problems of the list.`
