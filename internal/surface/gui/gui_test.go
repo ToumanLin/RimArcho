@@ -12,7 +12,7 @@ import (
 
 var textRe = regexp.MustCompile(`\bTf?\("((?:[^"\\]|\\.)*)"`)
 
-// Every string the page translates has a Chinese entry (06 §2.3; the page has no table of
+// Every string the page translates has a Chinese entry (06 §7; the page has no table of
 // its own: it gets view.Table).
 func TestPageTextTranslated(t *testing.T) {
 	view.SetLang("zh")
@@ -47,4 +47,18 @@ func compactStrings(s []string) []string {
 		}
 	}
 	return out
+}
+
+// ui.gpu off adds the software-drawing switches; both keep the network service in the
+// browser process and one renderer (07 §8.3).
+func TestBrowserArgs(t *testing.T) {
+	on, off := strings.Join(BrowserArgs(true), " "), strings.Join(BrowserArgs(false), " ")
+	for _, s := range []string{on, off} {
+		if !strings.Contains(s, "NetworkServiceInProcess2") || !strings.Contains(s, "--renderer-process-limit=1") {
+			t.Fatalf("missing the shared switches: %s", s)
+		}
+	}
+	if strings.Contains(on, "--disable-gpu") || !strings.Contains(off, "--disable-gpu --disable-gpu-compositing --in-process-gpu") {
+		t.Fatalf("gpu switches: on %q, off %q", on, off)
+	}
 }

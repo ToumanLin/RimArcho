@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
-// GameRun is a running game of an environment (10 §3.1).
+// GameRun is a running game of an environment (08 §4).
 type GameRun struct {
 	PID     int
 	Exe     string
@@ -50,17 +51,159 @@ func (a *App) GameRunning() (*GameRun, error) {
 	if err != nil {
 		return nil, err
 	}
-	if a.GameProbe != nil {
-		return a.GameProbe(e.GameRoot), nil
-	}
-	return gameProcess(e.GameRoot), nil
+	return a.probe()(e.GameRoot), nil
 }
 
-// RunWhat is what a game run plays: the environment's own list or a pack (10 §8.3).
+// probe returns how to find the running game of a game folder: GameProbe in tests, else a
+// match against the process table, listed once on first use and shared by the calls.
+func (a *App) probe() func(gameRoot string) *GameRun {
+	if a.GameProbe != nil {
+		return a.GameProbe
+	}
+	var procs []*GameRun
+	listed := false
+	return func(gameRoot string) *GameRun {
+		if !listed {
+			procs, listed = gameProcesses(), true
+		}
+		return processIn(procs, gameRoot)
+	}
+}
+
+// processIn picks the process whose executable lies in gameRoot.
+func processIn(procs []*GameRun, gameRoot string) *GameRun {
+	if gameRoot == "" {
+		return nil
+	}
+	root := env.PathKey(gameRoot)
+	for _, r := range procs {
+		if underDir(env.PathKey(filepath.Dir(r.Exe)), root) {
+			return r
+		}
+	}
+	return nil
+}
+
+// underDir reports whether the cleaned path p is dir or inside it ("D:/RimWorld2" is not in
+// "D:/RimWorld").
+func underDir(p, dir string) bool {
+	if p == dir {
+		return true
+	}
+	if !strings.HasSuffix(dir, string(filepath.Separator)) {
+		dir += string(filepath.Separator)
+	}
+	return strings.HasPrefix(p, dir)
+}
+
+// RunningGame is a game running in any registered environment (08 §1, §4).
+type RunningGame struct {
+	Env  *env.Environment
+	Run  *GameRun
+	What RunWhat
+}
+
+// Describe names what runs for a refusal or a status line: the environment and the list or
+// pack it plays.
+func (g *RunningGame) Describe(loc *time.Location) string {
+	what := g.What.PlanText()
+	if g.What.Pack != "" {
+		what = "pack " + g.What.Pack
+		if g.What.Guess {
+			what += " (from the launch records)"
+		}
+	} else if g.What.UserData != "" && env.PathKey(g.What.UserData) != env.PathKey(g.Env.UserDataRoot) {
+		what = "data folder " + g.What.UserData
+	}
+	s := fmt.Sprintf("environment %s is running %s (pid %d", g.Env.Name, what, g.Run.PID)
+	if !g.Run.Started.IsZero() {
+		if loc == nil {
+			loc = time.Local
+		}
+		s += ", since " + g.Run.Started.In(loc).Format("15:04")
+	}
+	return s + ")"
+}
+
+// GameRunningError refuses a launch while a game runs: only one game runs at a time (08 §1).
+type GameRunningError struct {
+	Game *RunningGame
+	Loc  *time.Location
+}
+
+func (e *GameRunningError) Error() string {
+	return fmt.Sprintf("%v: a game is already running: %s; only one game runs at a time, close it first", ErrLaunchBlocked, e.Game.Describe(e.Loc))
+}
+
+func (e *GameRunningError) Unwrap() error { return ErrLaunchBlocked }
+
+// RunningGame finds a running game in any registered environment, the current one first: a
+// process whose executable is under an environment's game folder (08 §4). nil when none.
+func (a *App) RunningGame() (*RunningGame, error) {
+	envs, err := a.Store.Envs()
+	if err != nil {
+		return nil, err
+	}
+	if cur, err := a.Env(); err == nil {
+		for i, e := range envs {
+			if e.ID == cur.ID {
+				envs[0], envs[i] = envs[i], envs[0]
+				break
+			}
+		}
+	}
+	probe := a.probe()
+	for _, e := range envs {
+		if r := probe(e.GameRoot); r != nil {
+			return &RunningGame{Env: e, Run: r, What: a.WhatRuns(e, r)}, nil
+		}
+	}
+	return nil, nil
+}
+
+// checkNoGame refuses while any environment's game runs (08 §1).
+func (a *App) checkNoGame() error {
+	g, err := a.RunningGame()
+	if err != nil {
+		return err
+	}
+	if g != nil {
+		return &GameRunningError{Game: g, Loc: a.Loc}
+	}
+	return nil
+}
+
+// RunWhat is what a game run plays: one of the environment's plans or a pack (08 §5.3).
 type RunWhat struct {
 	Pack     string // "" for the environment's list
 	UserData string // the run's data folder: its ModsConfig.xml, and on 1.7 its Logs/
 	Guess    bool   // read from the launch records: the command line was not available
+	// Plan names the plan played, from the launch records (08 §4) or, for a game started
+	// elsewhere, the plan last written to the game; "" when neither says.
+	Plan string
+	// PlanWritten: Plan comes from the write record, not from a launch.
+	PlanWritten bool
+}
+
+// PlanText names the plan a run plays: "plan:<name>", "plan:<name> (last written to the
+// game)", or "its list" when the records do not say.
+func (w RunWhat) PlanText() string {
+	switch {
+	case w.Plan == "":
+		return "its list"
+	case w.PlanWritten:
+		return "plan:" + w.Plan + " (last written to the game)"
+	}
+	return "plan:" + w.Plan
+}
+
+// withPlan fills the plan of an own-list run started at at from the records.
+func (a *App) withPlan(e *env.Environment, w RunWhat, at time.Time) RunWhat {
+	src := a.sourceAt(e, nil, at.Add(time.Minute), true)
+	if !src.Unknown && src.Plan != "" && (src.EnvID == "" || src.EnvID == e.ID) {
+		w.Plan, w.PlanWritten = src.Plan, src.ByWrite
+	}
+	return w
 }
 
 // launchSlack is how long before the process start a launch record may be: Steam takes a
@@ -73,24 +216,24 @@ func (a *App) WhatRuns(e *env.Environment, r *GameRun) RunWhat {
 	if r == nil {
 		return own
 	}
+	at := r.Started
+	if at.IsZero() {
+		at = a.Now()
+	}
 	if r.ArgsKnown {
 		if r.SaveData == "" || env.PathKey(r.SaveData) == env.PathKey(e.UserDataRoot) {
-			return own
+			return a.withPlan(e, own, at)
 		}
 		if name := a.packOfDir(r.SaveData); name != "" {
 			return RunWhat{Pack: name, UserData: r.SaveData}
 		}
 		return RunWhat{UserData: r.SaveData}
 	}
-	at := r.Started
-	if at.IsZero() {
-		at = a.Now()
-	}
 	if m, t := a.Store.LaunchBefore(e.ID, at.Add(time.Minute)); strings.HasPrefix(m, "pack:") && at.Sub(t) < launchSlack {
 		name := strings.TrimPrefix(m, "pack:")
 		return RunWhat{Pack: name, UserData: filepath.Join(a.packPath(name), "userdata"), Guess: true}
 	}
-	return own
+	return a.withPlan(e, own, at)
 }
 
 // RunOfLog says which launch wrote a log last modified at t: a pack's name, or "" for the

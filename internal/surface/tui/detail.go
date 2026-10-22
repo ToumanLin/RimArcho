@@ -18,7 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Details (06 §6): who the mod is, its problems, the facts a player uses (package id,
+// Details (06 §4): who the mod is, its problems, the facts a player uses (package id,
 // version, Workshop page, tags, alias, note, dependencies), the description, and the
 // technical information folded behind i.
 
@@ -28,7 +28,7 @@ type detailData = view.DetailData
 type detailDataMsg struct{ d *detailData }
 type fetchTick struct{ id string }
 
-// fetchDwell: the Workshop page is fetched once the cursor rests this long (06 §6.4 item 3).
+// fetchDwell: the Workshop page is fetched once the cursor rests this long (06 §4.3 item 3).
 const fetchDwell = 400 * time.Millisecond
 
 // loadData reads the declaration, About.xml and the cached Workshop text (no network).
@@ -132,68 +132,13 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		marked(statusIcon(s), T("needs attention · ! shows what"), sText)
 	}
 	add("")
-	// facts
 	var d *detailData
 	if m.dd != nil && m.dd.ID == it.id {
 		d = m.dd
 	}
-	type kv struct{ k, v string }
-	var kvs []kv
-	for _, f := range view.Facts(mod, d) {
-		v := f.Value
-		switch f.Kind {
-		case view.FactWorkshop:
-			v += sDimS.Render(" " + markDot + " o " + T("opens the page"))
-		case view.FactTags:
-			if len(f.List) == 0 {
-				v = sDimS.Render(T("none · # adds"))
-			} else {
-				v = strings.Join(f.List, " "+markDot+" ")
-			}
-		case view.FactAlias:
-			v += sDimS.Render("  (" + f.Extra + ")")
-		}
-		kvs = append(kvs, kv{f.Label, v})
-	}
-	lw := 0
-	for _, x := range kvs {
-		lw = max(lw, width.StringWidth(x.k))
-	}
-	deps := m.depLines(d)
-	if len(deps) > 0 {
-		lw = max(lw, width.StringWidth(T("requires")))
-	}
-	lw += 2
-	for _, x := range kvs {
-		label := sDimS.Render(fit(x.k, lw))
-		lines := wrap(stripANSIWidth(x.v), w-lw)
-		if len(lines) <= 1 {
-			add(label + clip(x.v, w-lw))
-			continue
-		}
-		for i, l := range lines {
-			if i == 0 {
-				add(label + sText.Render(fit(l, w-lw)))
-			} else {
-				add(strings.Repeat(" ", lw) + sText.Render(fit(l, w-lw)))
-			}
-		}
-	}
-	for i, l := range deps {
-		label := strings.Repeat(" ", lw)
-		if i == 0 {
-			label = sDimS.Render(fit(T("requires"), lw))
-		}
-		if lipgloss.Width(l) <= w-lw {
-			add(label + clip(l, w-lw))
-			continue
-		}
-		for j, x := range wrap(stripANSIWidth(l), w-lw) {
-			if j > 0 {
-				label = strings.Repeat(" ", lw)
-			}
-			add(label + sText.Render(fit(x, w-lw)))
-		}
+	// the field list (06 §4.1), the GUI's one
+	for _, l := range fieldLines(view.ModFields(m.app, m.st, mod, d), w) {
+		add(l)
 	}
 	add("")
 	// description
@@ -205,6 +150,10 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		add(sDimS.Render(fit(T("history"), w)))
 		for _, l := range wrap(view.HistoryLine(d.Events), w-2) {
 			add("  " + sSecond.Render(fit(l, w-2)))
+		}
+		// the whole history of its Lineage is on the 变化 page (06 §2.9)
+		for _, l := range wrap(T("see all on the changes page")+" · C", w-2) {
+			add("  " + sDimS.Render(l))
 		}
 		add("")
 	}
@@ -221,7 +170,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	return out
 }
 
-// Thumbnail block sizes in cells (06 §6.2, §6.3): the column and the full-screen detail.
+// Thumbnail block sizes in cells (06 §9.4, §6.3): the column and the full-screen detail.
 const (
 	thumbCols, thumbRows         = 18, 9
 	thumbFullCols, thumbFullRows = 36, 18
@@ -230,7 +179,7 @@ const (
 
 // headerLines: name, authors and facts, beside the thumbnail block in the WezTerm host.
 // The block is always reserved at full size; the image takes the fewest rows that hold
-// it, and a mod without Preview.png shows a faint "no preview" in it (06 §6.1, §6.2).
+// it, and a mod without Preview.png shows a faint "no preview" in it (06 §4.1, §6.2).
 func (m *model) headerLines(it *item, mod *store.Mod, facts string, w int, o detailOpts) []dline {
 	tc, tr := thumbCols, thumbRows
 	if o.full {
@@ -267,7 +216,7 @@ func (m *model) headerLines(it *item, mod *store.Mod, facts string, w int, o det
 	e := m.imgs[imgKey(url, tc, tr)]
 	empty := strings.Repeat(" ", tc)
 	// The block is as tall as the image: 16:9 until its size is known, one line for "no
-	// preview" (06 §6.2, revised: no fixed 9-line block).
+	// preview" (06 §9.4, revised: no fixed 9-line block).
 	rows := imgRows(0, 0, tc, tr)
 	switch {
 	case e != nil && e.state == imgOK:
@@ -304,26 +253,8 @@ func clip(s string, w int) string {
 	return sText.Render("") + s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
 }
 
-// depLines: the declared dependencies with their state (06 §6.1).
-func (m *model) depLines(d *detailData) []string {
-	if d == nil {
-		return nil
-	}
-	var out []string
-	for _, x := range view.Deps(m.st, d) {
-		switch x.State {
-		case view.DepEnabled:
-			out = append(out, sOK.Render(markOK)+" "+sText.Render(x.Name))
-		case view.DepDisabled:
-			out = append(out, sWarnS.Render(ic.warn)+" "+sText.Render(x.Name)+sDimS.Render(T(" (not enabled)")))
-		default:
-			out = append(out, sErrS.Render(ic.err)+" "+sText.Render(x.Name)+sDimS.Render(T(" (not installed)")))
-		}
-	}
-	return out
-}
-
-// descLines: the description heading and text (06 §6.4 item 2).
+// depLines: the declared dependencies with their state (06 §4.1).
+// descLines: the description heading and text (06 §4.3 item 2).
 func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	var out []dline
 	head := func(title, note string) {
@@ -373,12 +304,12 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	return out
 }
 
-// renderBlocks lays out BBCode blocks at width w (06 §6.4 item 5).
+// renderBlocks lays out BBCode blocks at width w (06 §4.3 item 5).
 func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 	var out []dline
 	add := func(s string) { out = append(out, dline{text: s}) }
 	// The compact detail draws no description images: one faint line counts them, and the
-	// full-screen detail shows them (06 §12.4).
+	// full-screen detail shows them (06 §9.4).
 	nimg, imgAt := 0, -1
 	fill := func() {
 		if nimg == 0 {
@@ -727,12 +658,13 @@ func (m *model) prefetchCmd(lines []dline) tea.Cmd {
 	return nil
 }
 
-// inlineImages: images are drawn in the WezTerm host (06 §6.4 item 6), unless ui.previews
-// is off (06 §12.4).
+// inlineImages: images are drawn in the WezTerm host (06 §4.3 item 6), unless ui.previews
+// is off (06 §9.4).
 func (m *model) inlineImages() bool { return m.images != nil && !m.previewsOff }
 
 // openURL opens a page in the default browser.
-func openURL(u string) error {
+// A variable so tests can never start the real program (noopen_test.go).
+var openURL = func(u string) error {
 	switch runtime.GOOS {
 	case "windows":
 		return exec.Command("rundll32", "url.dll,FileProtocolHandler", u).Start()
@@ -742,13 +674,13 @@ func openURL(u string) error {
 	return exec.Command("xdg-open", u).Start()
 }
 
-// ---- full-screen detail (06 §6.3) ----
+// ---- full-screen detail (06 §4.2) ----
 
 func (m *model) fullKey(s string) tea.Cmd {
 	page := max(m.h-6, 1)
 	switch s {
-	case "esc", "q", "backspace":
-		m.full = false // the cursor is on the last mod shown
+	case "esc", "q", "backspace", "enter":
+		m.full = false // the cursor is on the last mod shown (enter opens and closes, 06 §3.5)
 		return m.requestDetail()
 	case "down", "j":
 		m.fullOff++
@@ -762,9 +694,9 @@ func (m *model) fullKey(s string) tea.Cmd {
 	case "pgup":
 		m.fullOff -= page
 		m.syncFullSec()
-	case "home", "g":
+	case "home":
 		m.fullOff, m.fullSec = 0, 0
-	case "end", "G":
+	case "end":
 		m.fullOff = 1 << 30
 		m.syncFullSec()
 	case "left", "h", "right", "l":
@@ -808,10 +740,18 @@ func (m *model) fullKey(s string) tea.Cmd {
 			m.say(sayBusy, T("fetching the Workshop page…"))
 			return m.loadData(it.id, true, true)
 		}
-	case "o":
-		return m.openWorkshop()
-	case "#":
+	case "ctrl+o":
+		if it := m.current(); it != nil {
+			return m.openFolderOf(it.id)
+		}
+	case "ctrl+w":
+		if it := m.current(); it != nil {
+			return m.openWorkshopID(m.workshopOf(it.id))
+		}
+	case "g":
 		return m.tagKey()
+	case "n":
+		return m.noteKey()
 	case "I":
 		if it := m.current(); it != nil && it.id != "" {
 			m.insp, m.inspHist = nil, nil
@@ -853,7 +793,7 @@ func (m *model) syncFullSec() {
 	}
 }
 
-// detailKey: the keys of area 4, the compact detail (06 §13.4): ↑↓ scroll it, ← and esc
+// detailKey: the keys of area 4, the compact detail (06 §3.3): ↑↓ scroll it, ← and esc
 // go back to the list whose mod it shows. Verbs and the other keys work as in that list
 // (they act on the mod shown, or on the list's selection) and keep the focus here.
 func (m *model) detailKey(s string) (tea.Cmd, bool) {
@@ -863,10 +803,14 @@ func (m *model) detailKey(s string) (tea.Cmd, bool) {
 		m.detailOff++
 	case "up", "k":
 		m.detailOff = max(m.detailOff-1, 0)
-	case "home", "g":
+	case "home":
 		m.detailOff = 0
-	case "end", "G":
+	case "end":
 		m.detailOff = 1 << 30
+	case "pgdown":
+		m.detailOff += m.detailPage() // PgUp PgDn scroll the detail only while it has the focus
+	case "pgup":
+		m.detailOff = max(m.detailOff-m.detailPage(), 0)
 	case "left", "h", "esc":
 		m.detailFocus = false
 	case "right", "l", "shift+up", "shift+down":

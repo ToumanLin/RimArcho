@@ -1,8 +1,9 @@
-// The three lists (06 §5): virtual rows, the cursor, selection, search, dragging.
+// The three lists (06 §2.5): virtual rows, the cursor, selection, search, dragging. The
+// board has three columns: 未启用 | 已启用 | 详情, with 暂存 and 历史 folded under 详情.
 import { S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
-import { sourceIcon, statusIcon } from "./icons.js";
+import { icon, sourceIcon, statusIcon } from "./icons.js";
+import { bump } from "./motion.js";
 
-const areas = () => $$("#board .area");
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
 
 // ---- building the views ----
@@ -17,16 +18,40 @@ export function setItems(k, items) {
   return keep ? key(keep) : "";
 }
 
-// refilter applies the column's query (view.Query in Go) and keeps the cursor on keepKey.
+// The filter bar over 未启用 and 已启用 (06 §2.5): one search and one set of filters for both
+// lists; S.bar is the bar (filterbar.js), S.barData its last answer (view.BarFilter).
+// Both lists ask at once: one call per bar state; only the latest call's answer counts.
+let barCall = null, barSig = "";
+function fetchBar() {
+  const on = S.bar && (S.bar.active() || S.bar.open);
+  const sig = on ? JSON.stringify([S.bar.search, S.bar.filters, S.bar.open, S.board && S.board.stamp]) : "";
+  if (!barCall || sig !== barSig) {
+    barSig = sig;
+    barCall = (on ? api.BarFilter(S.bar.search, S.bar.filters, S.bar.open) : Promise.resolve(null)).catch(() => null);
+  }
+  const p = barCall;
+  return p.then((r) => { if (p === barCall) S.barData = r; return r; });
+}
+export const barOn = () => !!(S.bar && S.bar.active());
+
+// refilter applies the column's query (view.Query in Go; the bar for 未启用 and 已启用) and
+// keeps the cursor on keepKey.
 export async function refilter(k, keepKey) {
   const c = S.cols[k];
-  if (!c.query.trim()) {
+  if (k < 2) {
+    const r = await fetchBar();
+    c.view = barOn() && r ? r.rows[k] || [] : c.items.map((_, i) => i);
+    c.others = null;
+    c.complete = "";
+  } else if (!c.query.trim()) {
     c.view = c.items.map((_, i) => i);
     c.others = null;
+    c.complete = "";
   } else {
     const r = await api.Filter(k, c.query);
     c.view = r.rows || [];
-    c.others = r.counts;
+    c.others = null; // no "other lists" line: tab no longer jumps lists (06 §3.7)
+    c.complete = r.complete || "";
   }
   c.cursor = Math.max(0, Math.min(c.cursor, c.view.length - 1));
   if (keepKey) {
@@ -35,9 +60,62 @@ export async function refilter(k, keepKey) {
   }
 }
 
+// showGhost draws column k's completion after its query, only while the caret is at the end
+// of a query that fits in the box; the query's own text goes in invisibly, so the grey part
+// starts exactly where the typed text ends.
+export function showGhost(k) {
+  const box = $(`.area[data-area="${k}"] .search`);
+  if (!box) return;
+  const input = $("input", box), g = $(".ghost", box);
+  if (!g) return;
+  const c = S.cols[k];
+  const sfx = c.complete && input.value === c.query ? c.complete : "";
+  const atEnd = document.activeElement === input && input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
+  const show = !!sfx && atEnd && input.scrollLeft === 0;
+  g.hidden = !show;
+  if (show) { $(".typed", g).textContent = input.value; $(".sfx", g).textContent = sfx; }
+}
+
+// acceptGhost puts column k's completion into its query; false when there is none to take.
+export function acceptGhost(k, input) {
+  const c = S.cols[k];
+  if (!c.complete || input.value !== c.query || input.selectionStart !== input.value.length) return false;
+  input.value += c.complete;
+  c.complete = "";
+  input.setSelectionRange(input.value.length, input.value.length);
+  input.dispatchEvent(new Event("input"));
+  return true;
+}
+
 // ---- drawing ----
 
+// ---- the folds under 详情: 暂存 and 历史 ----
+
+// Staging is open while it holds mods, unless the player folded it; the history is folded
+// until opened. A choice is kept for the session (and in the browser's storage).
+const fold = { stage: null, hist: false };
+try { const v = JSON.parse(localStorage.getItem("archo.folds") || "null"); if (v) Object.assign(fold, v); } catch { /* defaults */ }
+const keepFolds = () => { try { localStorage.setItem("archo.folds", JSON.stringify(fold)); } catch { /* not kept */ } };
+
+export const stagingOpen = () => fold.stage ?? (S.cols[2].items.length > 0 || !!S.cols[2].query);
+export function setStagingOpen(v) {
+  if (stagingOpen() === v && fold.stage === v) return;
+  fold.stage = v;
+  keepFolds();
+  applyFolds();
+}
+function toggleHistory() { fold.hist = !fold.hist; keepFolds(); applyFolds(); renderHistory(); }
+
+function applyFolds() {
+  $('.area[data-area="2"]').classList.toggle("open", stagingOpen());
+  $(".histarea").classList.toggle("open", fold.hist);
+  $(".histarea").hidden = !(S.history && S.history.length > 1);
+}
+
+const chev = () => `<span class="fold-chev">${icon.chev}</span>`;
+
 export function renderHeads() {
+  applyFolds();
   for (const k of [0, 1, 2, 3]) {
     const a = $(`.area[data-area="${k}"]`);
     a.classList.toggle("focus", S.focus === k && !S.popup);
@@ -47,10 +125,13 @@ export function renderHeads() {
       continue;
     }
     const c = S.cols[k];
-    const n = c.query.trim() ? `${c.view.length}/${c.items.length}` : `${c.items.length}`;
+    const filtered = k < 2 ? barOn() : !!c.query.trim();
+    const n = filtered ? Tf("%d / %d", c.view.length, c.items.length) : `${c.items.length}`;
     h.innerHTML = `<span class="n">${k + 1}</span><span class="t">${esc(T(AREAS[k]))}</span><span class="num">${n}</span>` +
-      (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "") + (k === 1 ? listActions() : "");
+      (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "") + (k === 1 ? listActions() : "") + (k === 2 ? chev() : "");
+    bump("head:" + k, $(".num", h), n);
     const s = $(".search", a);
+    if (!s) continue;
     s.classList.toggle("on", c.searching || !!c.query);
     let o = $(".others", a);
     if (c.searching && c.others) {
@@ -61,14 +142,10 @@ export function renderHeads() {
   }
 }
 
-// listActions: the enabled list's own actions sit in its head (sort and save act on it);
-// main.js runs them by data-cmd.
+// listActions: sort sits in the enabled list's head, since it orders that list; import /
+// export and the plan's other actions are in the top bar. main.js runs it by data-cmd.
 function listActions() {
-  const u = S.board && S.board.unsaved;
-  return `<span class="acts">` + (u ? `<span class="unsaved">${esc(Tf("%d not saved", u))}</span>` : "") +
-    `<button class="btn small" data-cmd="exchange" title="i · e">${esc(T("import / export"))}</button>` +
-    `<button class="btn small" data-cmd="sort" title="S">${esc(T("sort"))}</button>` +
-    `<button class="btn small${u ? " hot" : ""}" data-cmd="save" title="w">${esc(T("save"))}</button></span>`;
+  return `<span class="acts"><button class="btn small" data-cmd="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
 }
 
 const pools = [new Map(), new Map(), new Map()];
@@ -92,10 +169,7 @@ export function renderRows(k) {
   if (!c.view.length) {
     if (!empty) box.appendChild(empty = el("div", "empty"));
     empty.textContent = c.query ? T("nothing matches") : [T("every installed mod is enabled"), T("nothing enabled yet"), T("staging is empty · t puts the selected mods here")][k];
-    // Staging is empty: its place shows the history (08 §14).
-    if (k === 2 && !c.query && S.history && S.history.length > 1) empty.append(historyPanel());
   } else if (empty) empty.remove();
-  if (k === 2) historyDock(box, !c.view.length && !c.query);
   const first = Math.max(0, Math.floor(box.scrollTop / ROW_H) - 4);
   const last = Math.min(c.view.length, first + Math.ceil(box.clientHeight / ROW_H) + 8);
   const pool = pools[k];
@@ -108,14 +182,14 @@ export function renderRows(k) {
     if (!d) { d = el("div", "row"); box.appendChild(d); pool.set(i, d); }
     d.dataset.sig = sig;
     d.dataset.i = i;
+    d.style.transform = ""; // a slide (motion.js) belongs to the mod the row showed before
     d.style.top = i * ROW_H + "px";
     d.draggable = !!it.id || k === 1;
     const st = S.board && S.board.status ? rowStatus(it) : 0;
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
-    const tags = it.tags && it.tags.length ? `<span class="g">${esc(it.tags.join(" · "))}</span>` : "";
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
-      `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>${tags}` +
-      (it.unsaved ? `<span class="u" title="${esc(T("not saved yet"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
+      `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>` +
+      (it.unsaved ? `<span class="u" title="${esc(T("not written to the game yet"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
     d.title = it.name;
   }
 }
@@ -124,30 +198,25 @@ export function renderRows(k) {
 export let onHistory = () => {};
 export function setOnHistory(fn) { onHistory = fn; }
 
-// historyDock: while staging holds mods the history does not go away; it folds into a bar
-// under the staged mods (open it to see the steps).
-let histOpen = false;
-function historyDock(box, emptyShown) {
-  const area = box.parentElement;
-  let dock = $(".histdock", area);
-  const show = !emptyShown && S.history && S.history.length > 1;
-  if (!show) { if (dock) dock.remove(); return; }
-  if (!dock) { dock = el("div", "histdock"); area.append(dock); }
-  const sig = JSON.stringify(S.history) + histOpen;
-  if (dock.dataset.sig === sig) return;
-  dock.dataset.sig = sig;
-  dock.innerHTML = "";
+// renderHistory: the history's fold under 详情 and staging (06 §2.5): its bar says how
+// many steps; open, it lists them, then the saved versions.
+export function renderHistory() {
+  const area = $(".histarea");
+  applyFolds();
+  if (area.hidden) return;
+  const sig = JSON.stringify(S.history) + fold.hist;
+  if (area.dataset.sig === sig) return;
+  area.dataset.sig = sig;
   const steps = S.history.filter((h) => h.kind === "undo" || h.kind === "redo").length;
-  const bar = el("button", "hbar", (histOpen ? "▾ " : "▸ ") + T("history") + (steps ? " · " + Tf("%d steps", steps) : ""));
-  bar.onclick = (e) => { e.stopPropagation(); histOpen = !histOpen; historyDock(box, false); };
-  dock.append(bar);
-  if (histOpen) dock.append(historyPanel(false));
+  $(".hbar", area).innerHTML = `<span class="t">${esc(T("history"))}</span>` + (steps ? `<span class="num">${esc(Tf("%d steps", steps))}</span>` : "") + chev();
+  const body = $(".histbody", area);
+  body.innerHTML = "";
+  if (fold.hist) body.append(historyPanel());
 }
 
-// historyPanel: unsaved steps around "now", then the saved versions (08 §14).
-function historyPanel(title = true) {
+// historyPanel: unsaved steps around "now", then the saved versions (06 §2.5).
+function historyPanel() {
   const p = el("div", "hist");
-  if (title) p.append(el("div", "hh", T("history")));
   let versions = false;
   for (const h of S.history) {
     if (h.kind === "version" && !versions) {
@@ -180,6 +249,7 @@ export function rowStatus(it) {
 export function renderLists() {
   renderHeads();
   for (const k of [0, 1, 2]) renderRows(k);
+  renderHistory();
 }
 
 // ensureVisible scrolls a list so its cursor row shows.
@@ -195,6 +265,13 @@ export function ensureVisible(k = S.focus) {
 // ---- wiring: scrolling, clicks, drags ----
 
 export function wireLists(ui) {
+  // the folds open and close from their bars; dropping on a folded 暂存's bar still stages
+  $('.area[data-area="2"] .head').addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    setStagingOpen(!stagingOpen());
+    renderRows(2);
+  });
+  $(".histarea .hbar").addEventListener("click", () => toggleHistory());
   for (const k of [0, 1, 2]) {
     const box = rowsEl(k);
     box.addEventListener("scroll", () => renderRows(k), { passive: true });
@@ -219,14 +296,20 @@ export function wireLists(ui) {
     });
     wireDrag(ui, k, box);
     const input = $(`.area[data-area="${k}"] .search input`);
+    if (!input) continue; // 未启用 and 已启用 share the filter bar
     input.placeholder = T("search: words, tag:, author:, type:, has:, -not");
-    input.addEventListener("input", () => ui.search(k, input.value));
+    // the grey completion after the query (06 §3.7): the typed text, invisible, then the rest
+    const ghost = el("span", "ghost");
+    ghost.append(el("span", "typed"), el("span", "sfx"));
+    input.after(ghost);
+    input.addEventListener("input", () => { showGhost(k); ui.search(k, input.value); });
     input.addEventListener("keydown", (e) => ui.searchKey(k, e, input));
-    input.addEventListener("blur", () => { S.cols[k].searching = false; renderHeads(); });
+    input.addEventListener("scroll", () => showGhost(k));
+    input.addEventListener("blur", () => { S.cols[k].searching = false; showGhost(k); renderHeads(); });
   }
 }
 
-// Dragging is another way to run a verb (08 §6): it acts on drop and u undoes it.
+// Dragging is another way to run a verb (06 §8.5): it acts on drop and u undoes it.
 let drag = null;
 const tip = el("div", "drop-tip");
 

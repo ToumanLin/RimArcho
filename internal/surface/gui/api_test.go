@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -118,10 +119,57 @@ func TestVerbsAndUndo(t *testing.T) {
 		}
 		b = api.Board()
 		got := names(b.Cols[view.Active]) + " | " + names(b.Cols[view.Staging])
-		// Undo restores the list; staging is the player's separate list (04 §5.4).
+		// Undo restores the list; staging is the player's separate list (04 §6).
 		if strings.Split(got, " | ")[0] != strings.Split(want, " | ")[0] {
 			t.Fatalf("undo: %s, want %s", got, want)
 		}
+	}
+}
+
+// 06 §6: sort, write and launch act on one click (no confirmation); sort offers 撤销, and
+// a refusal comes back with the commands that resolve it, writing nothing.
+func TestRunAtOnce(t *testing.T) {
+	e, api, _ := fixture(t)
+	if _, err := api.Toggle(int(view.Inactive), []string{api.Board().Cols[view.Inactive][0].ID}, nil); err != nil {
+		t.Fatal(err)
+	}
+	before := names(api.Board().Cols[view.Active])
+	o, err := api.Run(view.ListSort)
+	if err != nil || o.Refused != nil {
+		t.Fatalf("sort: %+v %v", o, err)
+	}
+	if after := names(api.Board().Cols[view.Active]); after != before {
+		if !o.Undo {
+			t.Fatalf("sort moved mods but offers no undo: %+v", o)
+		}
+		if _, err := api.Undo(); err != nil || names(api.Board().Cols[view.Active]) != before {
+			t.Fatalf("undo after sort: %v %s", err, names(api.Board().Cols[view.Active]))
+		}
+	}
+	if o, _ := api.Run(view.ListSort); o.Undo == (o.Text == view.T("the order is already right")) {
+		t.Fatalf("sort undo flag: %+v", o)
+	}
+	o, err = api.Run(view.ListSave)
+	if err != nil || o.Refused != nil || !strings.Contains(o.Text, "v") {
+		t.Fatalf("save: %+v %v", o, err)
+	}
+	// An outside change not loaded: launch is refused, nothing is written or started.
+	e.MustRun("enable", "pkg:tester.b")
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
+	file := e.ReadModsConfig()
+	o, err = api.Run(view.ListLaunch)
+	if err != nil || len(o.Refused) < 2 || o.Text != o.Refused[0] || len(e.Launched) != 0 || e.ReadModsConfig() != file {
+		t.Fatalf("launch over an outside change: %+v %v, launched %v", o, err, e.Launched)
+	}
+	if strings.HasPrefix(o.Text, "unloaded external change") || !strings.Contains(strings.Join(o.Refused[1:], " "), "archo ") {
+		t.Fatalf("refusal lines: %q", o.Refused)
+	}
+	if _, err := api.Run("rm"); err == nil {
+		t.Fatal("Run took an unknown action")
+	}
+	// The preview stays reachable (the palette's 预览启动) and starts nothing.
+	if p, err := api.Preview(view.ListLaunch); err != nil || len(p.Lines) == 0 || len(e.Launched) != 0 {
+		t.Fatalf("launch preview: %+v %v", p, err)
 	}
 }
 
@@ -151,7 +199,7 @@ func TestPreviewAndInspect(t *testing.T) {
 	}
 }
 
-// The scan runs in the background and says when it is done (an event, 08 §9).
+// The scan runs in the background and says when it is done (an event, 06 §8.4).
 func TestScanEvent(t *testing.T) {
 	e, api, events := fixture(t)
 	exe := filepath.Join(t.TempDir(), "none.exe")
@@ -230,7 +278,7 @@ func TestPackBuildBackground(t *testing.T) {
 		return nil
 	}
 	start := time.Now()
-	if _, err := api.PackBuild("first"); err != nil {
+	if _, err := api.PackBuild("first", false, 0); err != nil {
 		t.Fatal(err)
 	}
 	if time.Since(start) > 2*time.Second {
@@ -251,7 +299,7 @@ func TestPackBuildBackground(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the pages wait for the build")
 	}
-	if _, err := api.PackBuild("second"); err == nil {
+	if _, err := api.PackBuild("second", false, 0); err == nil {
 		t.Fatal("a second build started")
 	}
 	waitPack := func(want string) string {
@@ -295,5 +343,105 @@ func TestPackUnfinishedRows(t *testing.T) {
 	}
 	if l, _ := api.Packs(); len(l.Unfinished) != 0 {
 		t.Fatalf("still listed: %+v", l.Unfinished)
+	}
+}
+
+// G14 (06 §2.6): with an error-level problem the build page disables 编译 and says why,
+// pointing to 能不能跑; 先看清单 writes nothing; once fixed, 编译 is enabled with the sizes.
+func TestBuildPageG14(t *testing.T) {
+	e, api, _ := fixture(t)
+	p, err := api.BuildPage(false, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Ok || p.Why == "" || !p.ToNeed || len(p.Steps) != 5 || p.Steps[0].Level != view.LevelBad || !p.Steps[0].Needs || len(p.Steps[0].More) == 0 {
+		t.Fatalf("with a problem: %+v", p)
+	}
+	if p.Name == "" || api.PackNameCheck(p.Name) != "" {
+		t.Fatalf("default name %q: %s", p.Name, api.PackNameCheck(p.Name))
+	}
+	lines := api.PackDryRun(p.Name, false, 0)
+	if len(lines) == 0 || !strings.Contains(strings.Join(lines, "\n"), "cannot build") {
+		t.Fatalf("dry run: %v", lines)
+	}
+	if ents, _ := os.ReadDir(e.App.PacksDir()); len(ents) != 0 {
+		t.Fatalf("the dry run wrote %d entries", len(ents))
+	}
+	e.MustRun("enable", "pkg:brrainz.harmony")
+	api.board, api.needs = nil, nil
+	p, err = api.BuildPage(false, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Ok || p.Why != "" || p.Before == "" || p.After == "" || p.Mods != 2 || p.Steps[0].Level == view.LevelBad {
+		t.Fatalf("fixed: %+v", p)
+	}
+	if l, _ := api.BuildPage(true, 0); l == nil || !l.Light || l.Before != "" || l.Steps[1].Level != view.LevelOff {
+		t.Fatalf("light: %+v", l)
+	}
+	// Textures (08 §5.2): a step of a full pack with the choices; without todds, 编译 says
+	// to install it there; with an encoder the step says what it converts.
+	if p.Steps[2].Kind != "textures" || p.Tex != 0 || len(p.TexChoices) != 8 {
+		t.Fatalf("textures step: %+v", p.Steps[2])
+	}
+	if p, _ := api.BuildPage(false, 100); p.Steps[2].Go == "textures" && (p.Ok || p.ToGo != "textures") {
+		t.Fatalf("no todds: %+v", p)
+	}
+	e.App.TextureEncoder = fakeEncoder{}
+	if p, _ := api.BuildPage(false, 75); !p.Ok || p.Tex != 75 || p.Steps[2].Go != "" || p.Steps[2].Level == view.LevelBad {
+		t.Fatalf("with an encoder: %+v", p)
+	}
+	if l, _ := api.BuildPage(true, 75); len(l.Steps) != 4 || l.TexChoices != nil {
+		t.Fatalf("a light pack has no textures step: %+v", l)
+	}
+	if lines := strings.Join(api.PackDryRun("tex one", false, 75), " | "); !strings.Contains(lines, "dry run") {
+		t.Fatalf("dry run with textures: %s", lines)
+	}
+	e.App.TextureEncoder = nil
+	for name, bad := range map[string]bool{"": true, ".x": true, "ok name": false} {
+		if (api.PackNameCheck(name) != "") != bad {
+			t.Errorf("name %q: %q", name, api.PackNameCheck(name))
+		}
+	}
+	if _, err := api.PackBuild("light one", true, 0); err != nil {
+		t.Fatal(err)
+	}
+	if api.PackNameCheck("light one") == "" {
+		t.Fatal("the name of an existing pack is accepted")
+	}
+	pg, err := api.Pack("light one")
+	if err != nil || !pg.Light || len(pg.Mods) == 0 {
+		t.Fatalf("pack page: %+v %v", pg, err)
+	}
+}
+
+// fakeEncoder stands in for todds (it converts nothing).
+type fakeEncoder struct{}
+
+func (fakeEncoder) Encode(context.Context, []string, int, bool) error { return nil }
+
+// Another version in the way of a pack copy (08 §5.3): the launch comes back with the moves
+// for one confirmation; with move it goes on.
+func TestPackLaunchMovesConfirm(t *testing.T) {
+	e, api, _ := fixture(t)
+	e.MustRun("enable", "pkg:brrainz.harmony")
+	e.MustRun("enable", "pkg:tester.b")
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	e.MustRun("pack", "build", "p")
+	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Defs", "New.xml"), "<Defs/>")
+	e.MustRun("scan")
+	o, err := api.PackLaunch("p", false)
+	if err != nil || len(o.Moves) < 2 || !strings.Contains(strings.Join(o.Moves, "\n"), "Mods/B →") {
+		t.Fatalf("first: %+v %v", o, err)
+	}
+	if _, err := os.Stat(filepath.Join(e.Game, "Mods", "B")); err != nil {
+		t.Fatal("moved before the confirmation")
+	}
+	o, err = api.PackLaunch("p", true)
+	if err != nil || o.Refused != nil {
+		t.Fatalf("with move: %+v %v", o, err)
+	}
+	if _, err := os.Stat(filepath.Join(e.Game, "Mods", "B")); err == nil {
+		t.Fatal("Mods/B is still there")
 	}
 }

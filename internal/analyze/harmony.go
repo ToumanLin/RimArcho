@@ -168,7 +168,11 @@ func harmonyFindings(active []*Mod, asms []*AssemblyFacts) []*Finding {
 					tev = append(tev, ev(h))
 				}
 			}
-			out = append(out, &Finding{Code: "harmony.multi-transpiler", Severity: finding.Warning, Layer: "harmony", Confidence: finding.Likely,
+			// Info (03 §4.3.1): after the manual targets of G9, the subjects of this finding are
+			// error sources 2.3x as often as chance, less than harmony.shared-target (2.6x, info),
+			// and the rewritten method is in an error's stack no more often than a shared target
+			// (0.5% / 0.6%). It is raised to warning when a current log's stack passes through it.
+			out = append(out, &Finding{Code: "harmony.multi-transpiler", Severity: finding.Info, Layer: "harmony", Confidence: finding.Likely,
 				Key: t, Subjects: ts, Evidence: tev,
 				Claim:       fmt.Sprintf("%d mods rewrite %s with transpilers; their IL edits can conflict", len(trans), t),
 				Suggestions: []string{"archo harmony --target " + t, "archo source search \"" + shortMethod(t) + "\" --in " + strings.Join(ts, " --in ")}})

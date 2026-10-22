@@ -5,6 +5,7 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (1 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered, 1 copied (archo changes)
+  plan: plan:default
   loadout: 1 active, same as v1 (import)
   problems: 0 error, 0 warning, 2 info in declarations; Defs and Patches not analysed yet (archo problems)
 
@@ -22,29 +23,35 @@ next:
   archo changes
 
 $ archo changes
-changes: 9 (scan:2)
-  scan:2  2026-10-02 12:00  1 updated, 1 moved, 1 copied, 1 disappeared, 1 package-id-changed, 1 renamed, 1 author-changed, 1 version-support-changed, 1 dependencies-changed
-    updated                  #a6o7  Beta Reborn
-    package-id-changed       #a6o7  Beta Reborn  pkg:tester.beta → pkg:newauthor.beta
-    renamed                  #a6o7  Beta Reborn  "Beta" → "Beta Reborn"
-    author-changed           #a6o7  Beta Reborn  Tester → New Author
-    version-support-changed  #a6o7  Beta Reborn  1.6 → 1.5 1.6
-    dependencies-changed     #a6o7  Beta Reborn  +pkg:brrainz.harmony
-    moved                    #xamx  Gamma        src:local Gamma → src:local Gamma (renamed)
-    copied                   #tmxx  Alpha        inferred copy of #mdx4
-    disappeared              #ekgo  Leftover     src:workshop 3000000009
+changes: 0 mods (plan:default, the last scan · Oct 2 12:00)
+  nothing changed
+next:
+  archo changes --library
+
+$ archo changes --library
+changes: 4 mods (library, the last scan · Oct 2 12:00)
+  worth a look:
+    #a6o7  Beta Reborn  package id changed: tester.beta → newauthor.beta; now supports 1.5; needs Harmony now
+      About/LoadFolders 1 changed
+      renamed from Beta
+      author: Tester → New Author
+  content only:
+    #xamx  Gamma  its folder moved
+  new and gone: 1 new · 1 gone:
+    #tmxx  Alpha     a new copy
+    #ekgo  Leftover  no longer here
 
 $ archo changes #a6o7
-changes: 7 (#a6o7)
-  scan:1  2026-10-01 10:00  1 discovered
-    discovered  #a6o7  Beta Reborn  src:workshop 3000000003
-  scan:2  2026-10-02 12:00  1 updated, 1 package-id-changed, 1 renamed, 1 author-changed, 1 version-support-changed, 1 dependencies-changed
-    updated                  #a6o7  Beta Reborn
-    package-id-changed       #a6o7  Beta Reborn  pkg:tester.beta → pkg:newauthor.beta
-    renamed                  #a6o7  Beta Reborn  "Beta" → "Beta Reborn"
-    author-changed           #a6o7  Beta Reborn  Tester → New Author
-    version-support-changed  #a6o7  Beta Reborn  1.6 → 1.5 1.6
-    dependencies-changed     #a6o7  Beta Reborn  +pkg:brrainz.harmony
+changes: 2 mods (#a6o7)
+  Oct 2 12:00:
+    worth a look:
+      #a6o7  Beta Reborn  package id changed: tester.beta → newauthor.beta; now supports 1.5; needs Harmony now
+        About/LoadFolders 1 changed
+        renamed from Beta
+        author: Tester → New Author
+  Oct 1 10:00:
+    new and gone: 1 new subscription:
+      #a6o7  Beta Reborn  new subscription
 
 $ archo mod pkg:tester.alpha
 pkg:tester.alpha matches 3 instances; pick one
@@ -94,13 +101,17 @@ questions: 0 open, 1 resolved
     was it:  #ekgo      Leftover  [local Leftover Again]
 
 $ archo changes #ekgo
-changes: 3 (#ekgo)
-  scan:1  2026-10-01 10:00  1 discovered
-    discovered  #ekgo  Leftover  src:workshop 3000000009
-  scan:2  2026-10-02 12:00  1 disappeared
-    disappeared  #ekgo  Leftover  src:workshop 3000000009
-  scan:3  2026-10-03 12:00  1 reappeared
-    reappeared  #ekgo  Leftover  confirmed by player (q:1)
+changes: 3 mods (#ekgo)
+  Oct 3 12:00:
+    worth a look:
+      #ekgo  Leftover  came back; package id changed: tester.leftover → tester.leftover2
+        About/LoadFolders 1 changed
+  Oct 2 12:00:
+    new and gone: 1 gone:
+      #ekgo  Leftover  no longer here
+  Oct 1 10:00:
+    new and gone: 1 new:
+      #ekgo  Leftover  newly added
 
 $ archo lineage split #tmxx
 #tmxx Alpha  split
@@ -124,19 +135,24 @@ next:
 [exit 3]
 
 $ archo changes --since scan:2 --all
-changes: 10 (since scan:2)
-  scan:2  2026-10-02 12:00  1 updated, 1 moved, 1 copied, 1 disappeared, 1 package-id-changed, 1 renamed, 1 author-changed, 1 version-support-changed, 1 dependencies-changed
-    updated                  #a6o7  Beta Reborn
-    package-id-changed       #a6o7  Beta Reborn  pkg:tester.beta → pkg:newauthor.beta
-    renamed                  #a6o7  Beta Reborn  "Beta" → "Beta Reborn"
-    author-changed           #a6o7  Beta Reborn  Tester → New Author
-    version-support-changed  #a6o7  Beta Reborn  1.6 → 1.5 1.6
-    dependencies-changed     #a6o7  Beta Reborn  +pkg:brrainz.harmony
-    moved                    #xamx  Gamma        src:local Gamma → src:local Gamma (renamed)
-    copied                   #tmxx  Alpha        inferred copy of #mdx4
-    disappeared              #ekgo  Leftover     src:workshop 3000000009
-  scan:3  2026-10-03 12:00  1 reappeared
-    reappeared  #ekgo  Leftover  confirmed by player (q:1)
+changes: 0 mods (plan:default, since scan 2)
+  nothing changed
+next:
+  archo changes --library
+
+$ archo changes --library --since scan:2 --all
+changes: 4 mods (library, since scan 2)
+  worth a look:
+    #a6o7  Beta Reborn  package id changed: tester.beta → newauthor.beta; now supports 1.5; needs Harmony now
+      About/LoadFolders 1 changed
+      renamed from Beta
+      author: Tester → New Author
+    #ekgo  Leftover     came back; package id changed: tester.leftover → tester.leftover2
+      About/LoadFolders 1 changed
+  content only:
+    #xamx  Gamma  its folder moved
+  new and gone: 1 new:
+    #tmxx  Alpha  a new copy
 
 $ archo gc --dry-run
 gc: would remove 0 tombstones (tombstones older than 90 days, before 2026-07-05)
@@ -152,6 +168,7 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (2 with several instances)
   last-scan: scan:3 2026-10-03 12:00, 0s
   changes: 1 discovered (archo changes)
+  plan: plan:default
   loadout: 1 active, same as v1 (import)
-  problems: 0 error, 0 warning, 2 info in declarations; Defs and Patches not analysed yet (archo problems)
+  problems: 1 error, 0 warning, 2 info in declarations; Defs and Patches not analysed yet (archo problems)
 

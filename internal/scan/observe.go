@@ -15,16 +15,18 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// Origin is the content of .rimarcho/origin.json, written by copy-local (00 §6.6).
+// Origin is the content of .rimarcho/origin.json, written by copy-local (00a §4.2).
 type Origin struct {
 	InstanceID   string `json:"origin_instance"`
 	LineageID    string `json:"origin_lineage,omitempty"`
 	WorkshopID   string `json:"workshop_id,omitempty"`
 	SnapshotHash string `json:"origin_snapshot,omitempty"`
 	CopiedAt     string `json:"copied_at,omitempty"`
+	// Textures: a pack's copy whose PNGs were converted to DDS ("dds", "dds 50%"; 08 §5.2).
+	Textures string `json:"textures,omitempty"`
 }
 
-// UnloadableAboutDisabled marks a folder with only About/About.xml.disabled (02 §4.1).
+// UnloadableAboutDisabled marks a folder with only About/About.xml.disabled (02 §4.2).
 const UnloadableAboutDisabled = "about-disabled"
 
 // OriginFile is the marker's path relative to a mod folder.
@@ -46,7 +48,7 @@ func (l Location) Key() string { return LocKey(l.SourceID, l.Rel) }
 // LocKey builds a location key.
 func LocKey(sourceID, rel string) string { return sourceID + "\x00" + strings.ToLower(rel) }
 
-// Observation is everything one scan learned about one mod folder (02 §4.2).
+// Observation is everything one scan learned about one mod folder (02 §4.3).
 type Observation struct {
 	Loc        Location
 	Aliases    []Location // other locations resolving to the same real directory
@@ -86,8 +88,11 @@ type Options struct {
 	PrevHash func(loc Location) (Hash, bool)
 	// Known reports whether a location already belongs to an Instance; alias groups keep
 	// a known location as primary so R1 keeps matching.
-	Known   func(loc Location) bool
-	Workers int // per-source concurrency; default runtime.NumCPU()
+	Known func(loc Location) bool
+	// Generated lists the files RimArcho wrote into a mod folder (by its real path; lower-
+	// cased paths relative to it), left out of the fingerprint.
+	Generated func(realDir string) map[string]bool
+	Workers   int // per-source concurrency; default runtime.NumCPU()
 }
 
 // Collect scans every source and returns the observations in reconciliation order
@@ -260,7 +265,7 @@ func observe(ob *Observation, o Options) {
 	if o.PrevFiles != nil {
 		prev = o.PrevFiles(ob.Loc)
 	}
-	fp, err := Compute(dir, prev)
+	fp, err := ComputeSkip(dir, prev, o.Generated)
 	if err != nil {
 		ob.Err = err.Error()
 	}

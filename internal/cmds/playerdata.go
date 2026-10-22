@@ -8,13 +8,13 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Player data on lineages (04 §7.1, 05 §3): every instance of a lineage shares it.
+// Player data on lineages (04 §8.1, 05 §4.2): every instance of a lineage shares it.
 
 func init() {
 	register(&Command{Name: "alias", Args: "<ref> [<name>]", Summary: "set the name RimArcho shows for a mod (all its copies)", MinArgs: 1, MaxArgs: 2, Run: aliasCmd,
 		Flags: []Flag{{Name: "clear"}}})
-	register(&Command{Name: "note", Args: "<ref> [<text>]", Summary: "attach a plain-text note to a mod (all its copies)", MinArgs: 1, MaxArgs: 2, Run: noteCmd,
-		Flags: []Flag{{Name: "clear"}}})
+	register(&Command{Name: "note", Args: "<ref> [<text>]", Summary: "attach a plain-text note to a mod (all its copies), or with --copy to this copy only", MinArgs: 1, MaxArgs: 2, Run: noteCmd,
+		Flags: []Flag{{Name: "clear"}, {Name: "copy", Help: "this copy's own note (Mod 库存), not the mod's"}}})
 	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list", Summary: "tags for filtering (list --filter tag:<tag>)", MinArgs: 1, MaxArgs: -1, Run: tagCmd,
 		Flags: []Flag{{Name: "mod", Value: "<ref>", Multi: true, Help: "more mods to tag (add/remove)"}}})
 }
@@ -36,7 +36,38 @@ func aliasCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func noteCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Bool("copy") {
+		return copyNoteCmd(c, a)
+	}
 	return setText(c, a, "note", c.App.Store.SetNote)
+}
+
+// copyNoteCmd sets one copy's own note (06 §2.9); the mod's note stays as it is.
+func copyNoteCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	v := ""
+	switch {
+	case a.Bool("clear"):
+	case len(a.Pos) == 2:
+		v = a.Pos[1]
+	default:
+		return nil, &UsageError{Msg: "give the note text, or --clear"}
+	}
+	m, err := c.App.SetCopyNote(a.Pos[0], v)
+	if err != nil {
+		return nil, err
+	}
+	ix, err := c.App.Index()
+	if err != nil {
+		return nil, err
+	}
+	if v == "" {
+		d, _ := render.New("copy note cleared for " + modLabel(ix, m.ID))
+		return d, nil
+	}
+	d, root := render.New("copy note set for " + modLabel(ix, m.ID))
+	root.KV("note", v)
+	root.KV("copy", "this instance only (src:"+m.SourceLabel+" "+m.Rel+"); the mod's note is archo note "+ix.Ref(m.ID))
+	return d, nil
 }
 
 func setText(c *Ctx, a *Args, what string, set func(env, lin, v string) error) (*render.Doc, error) {

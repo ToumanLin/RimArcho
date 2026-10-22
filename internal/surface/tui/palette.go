@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The command palette (06 §8): ctrl+k, a "❯" input line over a result list in the style of
+// The command palette (06 §3.5): ctrl+k, a "❯" input line over a result list in the style of
 // magpie's picker. It finds commands (by their Chinese name or English alias), mods (enter
 // jumps to the mod) and the other environments. Ranking: prefix > substring > subsequence
 // > description; ties go to commands, then the shorter name.
@@ -22,6 +22,7 @@ const (
 	palCommand palKind = view.PalCommand
 	palEnv     palKind = view.PalEnv
 	palMod     palKind = view.PalMod
+	palPlan    palKind = view.PalPlan
 )
 
 type palItem struct {
@@ -46,11 +47,14 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 	}
 	switch id {
 	case "sort":
-		return func(m *model) tea.Cmd { m.tab = tabList; return m.sortPreview() }
+		return list("S")
 	case "save":
-		return func(m *model) tea.Cmd { m.tab = tabList; return m.savePreview() }
+		return list("w")
 	case "launch":
 		return list("L")
+	case "preview-sort", "preview-save", "preview-launch":
+		what := strings.TrimPrefix(id, "preview-")
+		return func(m *model) tea.Cmd { m.tab = tabList; return m.listPreview(what) }
 	case "undo":
 		return list("u")
 	case "redo":
@@ -59,6 +63,8 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { m.tab = tabProblems; return m.ensureProblems() }
 	case "changes":
 		return func(m *model) tea.Cmd { m.tab = tabChanges; m.loadChanges(); return nil }
+	case "library":
+		return func(m *model) tea.Cmd { return m.openLibrary() }
 	case "rescan":
 		return func(m *model) tea.Cmd { return m.startScan() }
 	case "analyze":
@@ -67,6 +73,10 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { return m.chooseLog() }
 	case "env":
 		return func(m *model) tea.Cmd { return m.chooseEnv() }
+	case "plans":
+		return func(m *model) tea.Cmd { return m.choosePlan() }
+	case "new-plan":
+		return func(m *model) tea.Cmd { return m.newPlan() }
 	case "restore-all":
 		return list("T")
 	case "stage-all":
@@ -94,7 +104,7 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			return m.key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
 		}
 	case "packs":
-		// The packs as text (10 §8); build and play them with the commands shown.
+		// The packs as text (08 §5); build and play them with the commands shown.
 		return func(m *model) tea.Cmd {
 			var b strings.Builder
 			rows, others, err := view.PackRows(m.app)
@@ -121,11 +131,11 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 				b.WriteString(T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves") + "\n\n")
 			}
 			b.WriteString(": archo pack build <name>\n")
-			m.openPanel(T("packs"), b.String(), nil)
+			m.openPanel(T("packs"), b.String())
 			return nil
 		}
 	case "settings":
-		// The settings page as text (10 §7); each value says the command that changes it.
+		// The settings page as text (06 §2.14); each value says the command that changes it.
 		return func(m *model) tea.Cmd {
 			var b strings.Builder
 			for _, g := range append(view.EnvGroups(m.app, m.st), view.SettingsPage(m.app, m.st)...) {
@@ -141,11 +151,15 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 				}
 				b.WriteString("\n")
 			}
-			m.openPanel(T("settings"), b.String(), nil)
+			m.openPanel(T("settings"), b.String())
 			return nil
 		}
+	case "uninstall":
+		return func(m *model) tea.Cmd { return m.uninstallPanel() }
+	case "textures":
+		return func(m *model) tea.Cmd { return m.texturesPanel() }
 	case "help":
-		return func(m *model) tea.Cmd { m.openPanel(T("help"), T(helpText), nil); return nil }
+		return func(m *model) tea.Cmd { return m.helpPage() }
 	case "quit":
 		return func(m *model) tea.Cmd { m.quitting = true; return tea.Quit }
 	}
@@ -181,6 +195,13 @@ func (m *model) palAll() []palItem {
 				}
 				return m.requestDetail()
 			}})
+		}
+	}
+	// the other plans: enter switches to one (06 §9.1)
+	if rows, err := view.PlanRows(m.app); err == nil {
+		for _, e := range view.PlanEntries(rows) {
+			id := view.PlanOfPage(e.ID)
+			out = append(out, palItem{kind: palPlan, name: e.Name, alias: e.Alias, desc: e.Desc, run: func(m *model) tea.Cmd { return m.usePlan(id) }})
 		}
 	}
 	seen := map[string]bool{}
@@ -238,7 +259,7 @@ func (m *model) paletteKey(k tea.KeyMsg) tea.Cmd {
 			return p.results[p.sel].run(m)
 		}
 		return nil
-	case tea.KeyUp, tea.KeyLeft, tea.KeyCtrlP: // 06 §13.4: in a popup both pairs of arrows choose
+	case tea.KeyUp, tea.KeyLeft, tea.KeyCtrlP: // 06 §3.3: in a popup both pairs of arrows choose
 		p.sel = max(p.sel-1, 0)
 		return nil
 	case tea.KeyDown, tea.KeyRight, tea.KeyCtrlN, tea.KeyTab:
@@ -267,7 +288,7 @@ func (m *model) paletteLines(n int) []string {
 	p := m.pal
 	w := m.w
 	out := []string{"  " + sAccent.Render(markPrompt+" ") + sText.Render(fit(p.query+"_", w-4)), ""}
-	kinds := map[palKind]string{palCommand: T("command"), palMod: "Mod", palEnv: T("environment")}
+	kinds := map[palKind]string{palCommand: T("command"), palMod: "Mod", palEnv: T("environment"), palPlan: T("plan")}
 	rows := max(n-len(out), 1)
 	off := max(0, p.sel-rows+1)
 	for i := off; i < len(p.results) && len(out) < n; i++ {
@@ -314,7 +335,13 @@ func (m *model) jumpTo(id string) tea.Cmd {
 			}
 		}
 		if !in {
-			c.filter = ""
+			if colKind(k) == cStaging {
+				c.filter = ""
+			} else {
+				m.bar.search, m.bar.filters = "", nil // the bar hides it: show every row
+				m.barCache = nil
+				m.refilterBar()
+			}
 			m.refilterCol(colKind(k), id)
 		} else {
 			m.refilterCol(colKind(k), id)

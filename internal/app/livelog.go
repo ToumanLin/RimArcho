@@ -3,18 +3,16 @@ package app
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// Live log tracking (10 §3): follow Player.log while the game runs, reading only what was
+// Live log tracking (03 §6.6): follow Player.log while the game runs, reading only what was
 // appended, keeping clusters instead of text.
 
 const (
@@ -30,6 +28,10 @@ type LiveCluster struct {
 	FirstLine            int
 	At                   time.Time // the companion log's timestamp, else when RimArcho saw it
 	Level                string    // the companion log's level, if any
+	// OnlyCompanion: the entry is in the companion log only (the game had stopped writing
+	// Player.log, 03 §6.7.4).
+	OnlyCompanion bool
+	withComp      bool // attributed with its companion entry
 	// Report is the attribution of the first sample (roles, evidence, next steps); nil
 	// until attributed.
 	Report  *LogCluster
@@ -39,56 +41,84 @@ type LiveCluster struct {
 // LiveLog follows one Player.log.
 type LiveLog struct {
 	Path      string
-	Companion string // RimCrow_Realtime.log ("" when absent)
+	Companion string // the companion log followed: ArchoMonitor.log or RimCrow's ("" for none)
 	Version   string
 	Lines     int
 	Resets    int // times the file started over (the game restarted)
 	BadLines  int // companion lines that were not JSON
 
-	off     int64
-	pending []byte
-	p       *logs.Parser
-	by      map[string]*LiveCluster
-	order   []*LiveCluster
-	comp    *companionLog
-	now     func() time.Time
-	memo    map[string]liveKey // message + top frame → classification (repeats are common)
+	off      int64
+	pending  []byte
+	p        *logs.Parser
+	by       map[string]*LiveCluster
+	byMatch  map[string]bool // normalised first lines of the clusters' entries
+	order    []*LiveCluster
+	comp     *logs.Companion
+	compRead map[*logs.CompanionEntry]time.Time // when each companion entry was first read
+	compDone map[*logs.CompanionEntry]bool      // matched, or made a cluster of its own
+	now      func() time.Time
+	memo     map[string]liveKey // message + top frame → classification (repeats are common)
 }
+
+// liveCompanionWait is how long a companion entry waits for Player.log to show it before it
+// becomes a cluster of its own (03 §6.7.4).
+const liveCompanionWait = 5 * time.Second
 
 type liveKey struct {
 	interesting          bool
 	key, template, class string
 }
 
-// FollowLog starts following path from its beginning (a running game's log is short).
-// The RimCrow companion log next to the user data is read when present (10 §3.3).
+// FollowLog starts following path from its beginning (a running game's log is short),
+// with an explicit companion log ("" for none).
 func (a *App) FollowLog(path, companion string) *LiveLog {
-	lv := &LiveLog{Path: path, Companion: companion, now: a.Now}
+	lv := &LiveLog{Path: path, now: a.Now}
 	lv.reset()
-	if companion != "" {
-		lv.comp = &companionLog{path: companion, seen: map[string]companionLine{}}
-	}
+	lv.follow(companion)
 	return lv
 }
 
-// CompanionLog is RimCrow's realtime log in the environment's user data ("" if absent).
-func (a *App) CompanionLog(st *LoadoutState) string {
-	if st.Ix.Env.UserDataRoot == "" {
-		return ""
+// FollowRun follows a running game's Player.log (03 §6.6). Its companion is RimCrow's log in
+// the run's save data root until Player.log shows Archo Monitor's marker, which names the
+// ArchoMonitor.log of this run (03 §6.7.4).
+func (a *App) FollowRun(path, dataRoot string) *LiveLog {
+	return a.FollowLog(path, rimCrowLog(dataRoot, 0, time.Time{}))
+}
+
+// RunDataRoot is the save data root a run writes into: the pack's when a pack runs.
+func (a *App) RunDataRoot(st *LoadoutState, w RunWhat) string {
+	if w.UserData != "" {
+		return w.UserData
 	}
-	p := filepath.Join(st.Ix.Env.UserDataRoot, "RimCrow_Realtime.log")
-	if _, err := os.Stat(p); err != nil {
-		return ""
+	return st.Ix.Env.UserDataRoot
+}
+
+func (lv *LiveLog) follow(companion string) {
+	lv.Companion, lv.comp = companion, nil
+	lv.compRead, lv.compDone = map[*logs.CompanionEntry]time.Time{}, map[*logs.CompanionEntry]bool{}
+	if companion != "" {
+		lv.comp = logs.NewCompanion(companion)
 	}
-	return p
 }
 
 func (lv *LiveLog) reset() {
 	lv.off, lv.pending, lv.Lines = 0, nil, 0
 	lv.p = logs.NewParser()
 	lv.by = map[string]*LiveCluster{}
+	lv.byMatch = map[string]bool{}
 	lv.order = nil
 	lv.memo = map[string]liveKey{}
+}
+
+// marker switches to the ArchoMonitor.log a Player.log line names (03 §6.7.4).
+func (lv *LiveLog) marker(line string) {
+	m := logs.SessionRe.FindStringSubmatch(line)
+	if m == nil || m[3] == "" {
+		return
+	}
+	if p := strings.TrimSpace(m[3]); lv.comp == nil || !strings.EqualFold(lv.Companion, p) {
+		lv.follow(p)
+	}
 }
 
 // classify is logs.Interesting + logs.ClusterKey, memoised on the exact message and top
@@ -106,7 +136,7 @@ func (lv *LiveLog) classify(e *logs.Entry) liveKey {
 	}
 	k := liveKey{interesting: logs.Interesting(e)}
 	if k.interesting {
-		k.key, k.template, k.class = logs.ClusterKey(e)
+		k.key, k.template, k.class = logs.ClusterKeyHint(e, logs.HintFrom(lv.comp))
 	}
 	if len(lv.memo) >= 10000 {
 		clear(lv.memo)
@@ -117,6 +147,9 @@ func (lv *LiveLog) classify(e *logs.Entry) liveKey {
 
 // Clusters are the clusters so far, in order of first occurrence.
 func (lv *LiveLog) Clusters() []*LiveCluster { return lv.order }
+
+// CompanionLog is the companion log read so far (nil when none is followed).
+func (lv *LiveLog) CompanionLog() *logs.Companion { return lv.comp }
 
 // Poll reads what was appended since the last poll and returns the clusters that appeared.
 func (lv *LiveLog) Poll(a *App) ([]*LiveCluster, error) {
@@ -130,6 +163,18 @@ func (lv *LiveLog) Poll(a *App) ([]*LiveCluster, error) {
 	if fi.Size() < lv.off {
 		lv.reset()
 		lv.Resets++
+	}
+	// The companion first: its class hints apply to the entries read below.
+	if lv.comp != nil {
+		before := lv.comp.BadLines
+		got, err := lv.comp.Poll(liveMaxRead)
+		lv.BadLines += lv.comp.BadLines - before
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range got {
+			lv.compRead[e] = lv.now()
+		}
 	}
 	var fresh []*LiveCluster
 	if fi.Size() > lv.off {
@@ -150,20 +195,18 @@ func (lv *LiveLog) Poll(a *App) ([]*LiveCluster, error) {
 			sc := bufio.NewScanner(bytes.NewReader(lv.pending[:i+1]))
 			sc.Buffer(make([]byte, 64<<10), 64<<20)
 			for sc.Scan() {
-				lv.p.Line(sc.Text())
+				l := sc.Text()
+				if strings.Contains(l, "[Archo Monitor]") {
+					lv.marker(l)
+				}
+				lv.p.Line(l)
 			}
 			lv.pending = append([]byte(nil), lv.pending[i+1:]...)
 		}
 		fresh = lv.take(false)
 	}
 	lv.Lines, lv.Version = lv.p.F.Lines, lv.p.F.Version
-	if lv.comp != nil {
-		bad, err := lv.comp.poll()
-		lv.BadLines += bad
-		if err != nil {
-			return fresh, err
-		}
-	}
+	fresh = append(fresh, lv.companionOnly(false)...)
 	return fresh, lv.finish(a, fresh)
 }
 
@@ -175,6 +218,7 @@ func (lv *LiveLog) Close(a *App) ([]*LiveCluster, error) {
 	}
 	lv.p.Close()
 	fresh := lv.take(true)
+	fresh = append(fresh, lv.companionOnly(true)...)
 	return fresh, lv.finish(a, fresh)
 }
 
@@ -201,6 +245,7 @@ func (lv *LiveLog) take(all bool) []*LiveCluster {
 			lv.by[key] = c
 			lv.order = append(lv.order, c)
 			fresh = append(fresh, c)
+			lv.byMatch[firstLineKey(e.Message)] = true
 		}
 		c.Count++
 		if len(c.samples) < liveSamples {
@@ -212,7 +257,7 @@ func (lv *LiveLog) take(all bool) []*LiveCluster {
 	return fresh
 }
 
-// trim drops the oldest informational clusters beyond the cap (10 §3.2).
+// trim drops the oldest informational clusters beyond the cap (03 §6.6).
 func (lv *LiveLog) trim() {
 	for len(lv.order) > liveMaxClusters {
 		drop := -1
@@ -230,8 +275,70 @@ func (lv *LiveLog) trim() {
 	}
 }
 
+// companionOnly turns companion entries Player.log has not shown within
+// liveCompanionWait (or at all, once the game exited) into clusters of their own: the game
+// stops writing Player.log after its message limit, the monitor does not (03 §6.7.4).
+func (lv *LiveLog) companionOnly(all bool) []*LiveCluster {
+	if lv.comp == nil {
+		return nil
+	}
+	var fresh []*LiveCluster
+	for _, e := range lv.comp.Entries {
+		if lv.compDone[e] || !e.Monitor || (e.Level != "ERROR" && e.Level != "WARNING") {
+			continue
+		}
+		if lv.byMatch[e.Match] {
+			lv.compDone[e] = true
+			continue
+		}
+		if !all && lv.now().Sub(lv.compRead[e]) < liveCompanionWait {
+			continue
+		}
+		lv.compDone[e] = true
+		en := logs.EntryOf(e)
+		ck := lv.classify(en)
+		if !ck.interesting {
+			continue
+		}
+		c := lv.by[ck.key]
+		if c == nil {
+			c = &LiveCluster{Key: ck.key, Template: ck.template, Class: ck.class, At: e.At, Level: e.Level, OnlyCompanion: true}
+			lv.by[ck.key] = c
+			lv.order = append(lv.order, c)
+			fresh = append(fresh, c)
+			lv.byMatch[e.Match] = true
+		}
+		c.Count += max(e.Count, 1)
+		if len(c.samples) < liveSamples {
+			c.samples = append(c.samples, en)
+		}
+	}
+	lv.trim()
+	return fresh
+}
+
+// firstLineKey is how a cluster's message meets a companion entry: its first line, normalised.
+func firstLineKey(m string) string {
+	if i := strings.IndexByte(m, '\n'); i >= 0 {
+		m = m[:i]
+	}
+	return logs.Normalize(strings.TrimSpace(m))
+}
+
 // finish attributes new clusters with the full-log engine and applies the companion log.
 func (lv *LiveLog) finish(a *App, fresh []*LiveCluster) error {
+	// A cluster attributed before its companion line was read is attributed again once the
+	// line is there (the files and mods it names are evidence, 03 §6.7.4).
+	todo := fresh
+	for _, c := range lv.order {
+		if c.Report != nil && !c.withComp && len(c.samples) > 0 && lv.comp.Lookup(c.samples[0].Message) != nil {
+			todo = append(todo[:len(todo):len(todo)], c)
+		}
+	}
+	for _, c := range todo {
+		c.withComp = len(c.samples) > 0 && lv.comp.Lookup(c.samples[0].Message) != nil
+	}
+	fresh = todo
 	if len(fresh) > 0 {
 		lf := &logs.File{Version: lv.Version, Waylith: lv.p.F.Waylith}
 		for _, c := range fresh {
@@ -246,134 +353,39 @@ func (lv *LiveLog) finish(a *App, fresh []*LiveCluster) error {
 		if err != nil {
 			return err
 		}
-		err = a.attribute(st2, rep, lf, nil)
+		err = a.attribute(st2, rep, lf, nil, lv.comp)
 		restore()
 		if err != nil {
 			return err
 		}
-		byKey := map[string]*LogCluster{}
-		for _, lc := range rep.Clusters {
-			byKey[lc.Key] = lc
-		}
-		for _, c := range fresh {
-			c.Report = byKey[c.Key]
-		}
-	}
-	if lv.comp != nil {
-		st, err := a.Loadout()
-		if err != nil {
-			return err
-		}
-		for _, c := range lv.order {
-			if c.Level != "" || len(c.samples) == 0 {
+		for i, c := range fresh {
+			if i < len(rep.Clusters) && rep.Clusters[i].First == c.samples[0] {
+				c.Report = rep.Clusters[i]
 				continue
 			}
-			cl, ok := lv.comp.seen[logs.Normalize(c.samples[0].Message)]
-			if !ok {
-				continue
-			}
-			c.At, c.Level = cl.at, cl.level
-			if c.Report != nil {
-				for _, pkg := range cl.related {
-					mentionPackage(st, c.Report, pkg)
+			for _, lc := range rep.Clusters {
+				if lc.First == c.samples[0] {
+					c.Report = lc
 				}
 			}
 		}
 	}
+	// Times, levels and counts from the companion log (03 §6.7.4).
 	for _, c := range lv.order {
+		if len(c.samples) == 0 {
+			continue
+		}
+		if e := lv.comp.Lookup(c.samples[0].Message); e != nil {
+			if c.Level == "" {
+				c.At, c.Level = e.At, e.Level
+			}
+			if e.Count > c.Count {
+				c.Count = e.Count
+			}
+		}
 		if c.Report != nil && c.Report.Cluster != nil {
 			c.Report.Count = c.Count
 		}
 	}
 	return nil
-}
-
-// mentionPackage adds an enabled instance with packageId pkg as "mentioned" by the
-// companion mod, unless the cluster already names it.
-func mentionPackage(st *LoadoutState, lc *LogCluster, pkg string) {
-	pkg = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(pkg), "_steam"))
-	for _, e := range st.List {
-		m := st.Ix.ByID[e.Instance]
-		if m == nil || m.Status != identity.Live || m.PackageID != pkg {
-			continue
-		}
-		for _, at := range lc.Attr {
-			if at.Instance == m.ID {
-				return
-			}
-		}
-		lc.Attr = append(lc.Attr, &Attribution{Instance: m.ID, Role: RoleMentioned, Evidence: []string{"RimCrow companion: relatedModIds " + pkg}})
-		return
-	}
-}
-
-// companionLog reads RimCrow_Realtime.log: one JSON object per line (10 §3.3).
-type companionLog struct {
-	path    string
-	off     int64
-	pending []byte
-	seen    map[string]companionLine // normalised message → first occurrence
-}
-
-type companionLine struct {
-	at      time.Time
-	level   string
-	related []string
-}
-
-func (c *companionLog) poll() (bad int, err error) {
-	fi, err := os.Stat(c.path)
-	if err != nil {
-		return 0, nil
-	}
-	if fi.Size() < c.off {
-		c.off, c.pending = 0, nil
-		clear(c.seen)
-	}
-	if fi.Size() == c.off {
-		return 0, nil
-	}
-	f, err := os.Open(c.path)
-	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
-	n := min(fi.Size()-c.off, liveMaxRead)
-	buf := make([]byte, n)
-	if _, err := f.ReadAt(buf, c.off); err != nil && err != io.EOF {
-		return 0, err
-	}
-	c.off += n
-	c.pending = append(c.pending, buf...)
-	i := bytes.LastIndexByte(c.pending, '\n')
-	if i < 0 {
-		return 0, nil
-	}
-	for _, line := range bytes.Split(c.pending[:i], []byte{'\n'}) {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		}
-		var j struct {
-			Timestamp, Level, Message string
-			Context                   struct {
-				RelatedModIDs []string `json:"relatedModIds"`
-			}
-		}
-		if json.Unmarshal(line, &j) != nil || j.Message == "" {
-			bad++
-			continue
-		}
-		key := logs.Normalize(j.Message)
-		if _, ok := c.seen[key]; ok {
-			continue
-		}
-		if len(c.seen) >= 20000 {
-			continue
-		}
-		at, _ := time.ParseInLocation("2006-01-02 15:04:05.000", j.Timestamp, time.Local)
-		c.seen[key] = companionLine{at: at, level: strings.ToUpper(j.Level), related: j.Context.RelatedModIDs}
-	}
-	c.pending = append([]byte(nil), c.pending[i+1:]...)
-	return bad, nil
 }

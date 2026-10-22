@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Index is an environment's instances with reference helpers (02 §7).
+// Index is an environment's instances with reference helpers (05 §2).
 type Index struct {
 	Env       *env.Environment
 	Mods      []*store.Mod // sorted by display name, then ID
@@ -227,7 +227,7 @@ func (a *App) ResolveQuestion(qid int64, answer string) (*store.Question, error)
 	if err != nil {
 		return nil, err
 	}
-	if q == nil || q.EnvID != e.ID {
+	if q == nil || (q.EnvID != e.ID && q.EnvID != store.Shared) {
 		return nil, fmt.Errorf("no question q:%d in env:%s (archo identity list)", qid, e.Name)
 	}
 	if q.Status != "open" {

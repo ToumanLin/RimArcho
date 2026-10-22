@@ -10,7 +10,7 @@ import (
 )
 
 // addLaunchChecks lists the enabled list's problems that most often cause errors in the game
-// (app.LaunchChecks, 04 §8), one row per code with why and what to do. It never blocks the
+// (app.LaunchChecks, 08 §2), one row per code with why and what to do. It never blocks the
 // launch: a failure to compute them is a line of its own.
 func addLaunchChecks(c *Ctx, root *render.Node, ix *app.Index) {
 	ws, as, err := c.App.LaunchWarnings()

@@ -14,7 +14,7 @@ import (
 
 // Mod is an Instance joined with its source and current snapshot, for queries and output.
 type Mod struct {
-	// Player data of the lineage (04 §7.1), filled by the app's index.
+	// Player data of the lineage (04 §8.1), filled by the app's index.
 	Alias, Note string
 	Tags        []string
 
@@ -65,7 +65,7 @@ func (m *Mod) WorkshopID() string {
 // DisplayName falls back to the folder name when About.xml has no <name>.
 func (m *Mod) DisplayName() string {
 	if m.Alias != "" {
-		return m.Alias // the player's name for it comes first (04 §7.1)
+		return m.Alias // the player's name for it comes first (04 §8.1)
 	}
 	if m.Name != "" {
 		return m.Name
@@ -120,7 +120,8 @@ var (
 	modColsLite = fmt.Sprintf(modCols, "''")
 )
 
-// Mods returns every Instance of an environment (live and tombstones). Declarations are
+// Mods returns every Instance an environment sees (live and tombstones): those of the shared
+// mod folders and those of its own Data/ and Mods/ (02 §0). Declarations are
 // loaded on demand by Mod.Decl (see LoadDecls for a batch).
 func (s *Store) Mods(envID string) ([]*Mod, error) { return s.mods(envID, modColsLite) }
 
@@ -128,7 +129,7 @@ func (s *Store) Mods(envID string) ([]*Mod, error) { return s.mods(envID, modCol
 func (s *Store) ModsFull(envID string) ([]*Mod, error) { return s.mods(envID, modColsFull) }
 
 func (s *Store) mods(envID, cols string) ([]*Mod, error) {
-	rows, err := s.DB.Query(`SELECT `+cols+modFrom+` WHERE i.environment_id=? ORDER BY i.id`, envID)
+	rows, err := s.DB.Query(`SELECT `+cols+modFrom+` WHERE i.environment_id IN ('', ?) ORDER BY i.id`, envID)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +214,7 @@ func (s *Store) Aliases(instanceID string) ([]Alias, error) {
 // AliasCount counts alias rows per instance in an environment.
 func (s *Store) AliasCount(envID string) (int, error) {
 	var n int
-	err := s.DB.QueryRow(`SELECT count(*) FROM instance_alias a JOIN instance i ON i.id=a.instance_id WHERE i.environment_id=?`, envID).Scan(&n)
+	err := s.DB.QueryRow(`SELECT count(*) FROM instance_alias a JOIN instance i ON i.id=a.instance_id WHERE i.environment_id IN ('', ?)`, envID).Scan(&n)
 	return n, err
 }
 
@@ -242,9 +243,9 @@ func (s *Store) Known(envID string) ([]*identity.Known, error) {
 	return out, nil
 }
 
-// LineageIDs returns the set of lineage IDs of an environment.
+// LineageIDs returns the set of lineage IDs (lineages are shared by every environment).
 func (s *Store) LineageIDs(envID string) (map[string]bool, error) {
-	rows, err := s.DB.Query(`SELECT id FROM lineage WHERE environment_id=?`, envID)
+	rows, err := s.DB.Query(`SELECT id FROM lineage`)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +283,7 @@ func (s *Store) SemanticSet(snapshotID int64) (scan.SemanticSet, error) {
 // CurrentHashes returns the current snapshot hash of every Instance, keyed by location.
 func (s *Store) CurrentHashes(envID string) (map[string]scan.Hash, error) {
 	rows, err := s.DB.Query(`SELECT i.source_id, i.rel_path, n.snapshot_hash FROM instance i
-		JOIN snapshot n ON n.id = i.current_snapshot_id WHERE i.environment_id=?`, envID)
+		JOIN snapshot n ON n.id = i.current_snapshot_id WHERE i.environment_id IN ('', ?)`, envID)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +306,7 @@ func (s *Store) CurrentHashes(envID string) (map[string]scan.Hash, error) {
 // Instances of an environment, keyed by location (scan.LocKey) and lower-cased file path.
 func (s *Store) CurrentFiles(envID string) (map[string]map[string]scan.File, error) {
 	rows, err := s.DB.Query(`SELECT i.source_id, i.rel_path, f.rel_path, f.size, f.mtime, f.hash FROM instance i
-		JOIN snapshot_file f ON f.snapshot_id = i.current_snapshot_id WHERE i.environment_id=? AND f.hash IS NOT NULL`, envID)
+		JOIN snapshot_file f ON f.snapshot_id = i.current_snapshot_id WHERE i.environment_id IN ('', ?) AND f.hash IS NOT NULL`, envID)
 	if err != nil {
 		return nil, err
 	}

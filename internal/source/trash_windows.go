@@ -32,7 +32,7 @@ const (
 	fofWantNukeWarn   = 0x4000 // fail instead of deleting permanently when there is no recycle bin
 )
 
-// Trash moves a file or folder to the recycle bin (10 §2.4). It never deletes permanently:
+// Trash moves a file or folder to the recycle bin (08 §7). It never deletes permanently:
 // where the volume has no recycle bin the shell reports an error instead.
 func Trash(path string) error {
 	abs, err := filepath.Abs(path)

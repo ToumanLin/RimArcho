@@ -1,5 +1,5 @@
-// Package store is RimArcho's SQLite fact store (02 §8), using modernc.org/sqlite in WAL mode
-// with synchronous=NORMAL (07 §6.1 item 4).
+// Package store is RimArcho's SQLite fact store (02 §7), using modernc.org/sqlite in WAL mode
+// with synchronous=NORMAL (07 §7 item 4).
 package store
 
 import (
@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 10
+const SchemaVersion = 16
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -152,7 +152,7 @@ CREATE TABLE source_cache(
   error TEXT NOT NULL DEFAULT '', decompiled_at INTEGER NOT NULL, PRIMARY KEY(dll_hash, instance_id));
 `
 
-// schemaV7 (M5): player data on lineages (04 §7.1): alias, note, tags.
+// schemaV7 (M5): player data on lineages (04 §8.1): alias, note, tags.
 const schemaV7 = `
 CREATE TABLE lineage_data(
   environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, alias TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
@@ -163,7 +163,7 @@ CREATE TABLE lineage_tag(
 `
 
 // schemaV8 (M5): analysis runs and the per-instance facts are kept per game major.minor,
-// so an analysis for the log's version does not evict the environment's (decisions-m5).
+// so an analysis for the log's version does not evict the environment's (03 §3).
 // The facts are a cache: they are dropped and rebuilt on the next analysis.
 const schemaV8 = `
 DROP TABLE content_state;
@@ -202,6 +202,167 @@ CREATE INDEX type_fact_inst_mm ON type_fact(instance_id, game_mm);
 CREATE INDEX harmony_fact_inst_mm ON harmony_fact(instance_id, game_mm);
 CREATE INDEX harmony_id_inst_mm ON harmony_id(instance_id, game_mm);
 `
+
+// schemaV11: several plans per environment (04 §1). The workspace, its undo stack and the
+// versions belong to a plan; versions are numbered per plan. Each environment's existing
+// data becomes its first plan ("default"); each loadout_tag name becomes a plan whose
+// list is that version, with one import version (04 §1.4). ModsConfig.xml write records
+// are kept per user data folder with the writer (plan, version); launches record the plan,
+// the list fingerprint and the version (08 §1). Key normalisation of modsconfig_state is
+// finished in Go (migrateV11).
+const schemaV11 = `
+CREATE TABLE plan(
+  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, name TEXT NOT NULL,
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(environment_id, name));
+ALTER TABLE environment ADD COLUMN current_plan INTEGER NOT NULL DEFAULT 0;
+
+INSERT INTO plan(environment_id, name, created_at, updated_at)
+  SELECT e.id, 'default',
+    coalesce((SELECT min(v.created_at) FROM loadout_version v WHERE v.environment_id=e.id), e.created_at),
+    coalesce((SELECT w.updated_at FROM workspace w WHERE w.environment_id=e.id), e.created_at)
+  FROM environment e
+  WHERE EXISTS(SELECT 1 FROM workspace w WHERE w.environment_id=e.id)
+     OR EXISTS(SELECT 1 FROM loadout_version v WHERE v.environment_id=e.id)
+  ORDER BY e.created_at, e.id;
+UPDATE environment SET current_plan=coalesce((SELECT p.id FROM plan p WHERE p.environment_id=environment.id), 0);
+
+CREATE TABLE workspace_v11(
+  plan_id INTEGER PRIMARY KEY, entries TEXT NOT NULL, origin_version INTEGER NOT NULL DEFAULT 0,
+  origin_kind TEXT NOT NULL DEFAULT '', conflict_version INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL);
+INSERT INTO workspace_v11(plan_id, entries, origin_version, origin_kind, conflict_version, updated_at)
+  SELECT p.id, w.entries, w.origin_version, w.origin_kind, w.conflict_version, w.updated_at
+  FROM workspace w JOIN plan p ON p.environment_id=w.environment_id;
+
+CREATE TABLE workspace_undo_v11(
+  id INTEGER PRIMARY KEY, plan_id INTEGER NOT NULL, stack TEXT NOT NULL, entries TEXT NOT NULL, op TEXT NOT NULL);
+INSERT INTO workspace_undo_v11(id, plan_id, stack, entries, op)
+  SELECT u.id, p.id, u.stack, u.entries, u.op FROM workspace_undo u JOIN plan p ON p.environment_id=u.environment_id;
+
+CREATE TABLE loadout_version_v11(
+  id INTEGER PRIMARY KEY, plan_id INTEGER NOT NULL, n INTEGER NOT NULL, created_at INTEGER NOT NULL,
+  source TEXT NOT NULL, entries TEXT NOT NULL, game_version TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+  UNIQUE(plan_id, n));
+INSERT INTO loadout_version_v11(plan_id, n, created_at, source, entries, game_version, note)
+  SELECT p.id, v.n, v.created_at, v.source, v.entries, v.game_version, v.note
+  FROM loadout_version v JOIN plan p ON p.environment_id=v.environment_id ORDER BY v.id;
+
+UPDATE meta SET key='stage:' || (SELECT p.id FROM plan p WHERE 'stage:' || p.environment_id = meta.key)
+  WHERE key IN (SELECT 'stage:' || environment_id FROM plan);
+
+INSERT INTO plan(environment_id, name, created_at, updated_at)
+  SELECT t.environment_id, CASE WHEN t.name='default' THEN 'default (tag)' ELSE t.name END, v.created_at, v.created_at
+  FROM loadout_tag t JOIN loadout_version v ON v.environment_id=t.environment_id AND v.n=t.version_n
+  ORDER BY t.environment_id, t.name;
+INSERT INTO loadout_version_v11(plan_id, n, created_at, source, entries, game_version, note)
+  SELECT p.id, 1, v.created_at, 'import', v.entries, v.game_version, 'copied from default v' || v.n
+  FROM loadout_tag t JOIN loadout_version v ON v.environment_id=t.environment_id AND v.n=t.version_n
+  JOIN plan p ON p.environment_id=t.environment_id AND p.name=CASE WHEN t.name='default' THEN 'default (tag)' ELSE t.name END;
+INSERT INTO workspace_v11(plan_id, entries, origin_version, origin_kind, conflict_version, updated_at)
+  SELECT v.plan_id, v.entries, 1, 'import', 0, v.created_at FROM loadout_version_v11 v
+  WHERE v.plan_id NOT IN (SELECT plan_id FROM workspace_v11)
+    AND v.plan_id NOT IN (SELECT min(id) FROM plan GROUP BY environment_id);
+
+DROP TABLE workspace; ALTER TABLE workspace_v11 RENAME TO workspace;
+DROP TABLE workspace_undo; ALTER TABLE workspace_undo_v11 RENAME TO workspace_undo;
+CREATE INDEX workspace_undo_plan ON workspace_undo(plan_id, stack, id);
+DROP TABLE loadout_version; ALTER TABLE loadout_version_v11 RENAME TO loadout_version;
+DROP TABLE loadout_tag;
+
+CREATE TABLE modsconfig_state_v11(
+  user_data_root TEXT PRIMARY KEY, written_hash BLOB, seen_hash BLOB, written_at INTEGER,
+  writer_plan INTEGER, writer_version INTEGER NOT NULL DEFAULT 0);
+INSERT OR REPLACE INTO modsconfig_state_v11(user_data_root, written_hash, seen_hash, written_at, writer_plan, writer_version)
+  SELECT e.user_data_root, m.written_hash, m.seen_hash, m.written_at,
+    CASE WHEN m.written_hash IS NULL THEN NULL ELSE (SELECT min(p.id) FROM plan p WHERE p.environment_id=e.id) END,
+    CASE WHEN m.written_hash IS NULL THEN 0 ELSE coalesce((SELECT max(v.n) FROM loadout_version v WHERE v.plan_id=
+      (SELECT min(p.id) FROM plan p WHERE p.environment_id=e.id) AND v.source IN ('user', 'undo', 'launch')), 0) END
+  FROM modsconfig_state m JOIN environment e ON e.id=m.environment_id
+  WHERE e.user_data_root<>''
+  ORDER BY coalesce(m.written_at, 0), e.created_at;
+DROP TABLE modsconfig_state; ALTER TABLE modsconfig_state_v11 RENAME TO modsconfig_state;
+
+ALTER TABLE launch ADD COLUMN plan_id INTEGER;
+ALTER TABLE launch ADD COLUMN fingerprint TEXT NOT NULL DEFAULT '';
+ALTER TABLE launch ADD COLUMN version_n INTEGER NOT NULL DEFAULT 0;
+UPDATE launch SET plan_id=(SELECT min(p.id) FROM plan p WHERE p.environment_id=launch.environment_id)
+  WHERE method NOT LIKE 'pack:%';
+CREATE INDEX launch_env ON launch(environment_id, started_at);
+`
+
+// schemaV12: analysis runs are kept per enabled set (03 §3 "按方案缓存多份"): the slot is
+// (environment, game_mm, set_key), so switching between plans does not evict each other's
+// runs. Existing runs get an empty key and are replaced on the next analysis.
+const schemaV12 = `
+ALTER TABLE analysis ADD COLUMN set_key TEXT NOT NULL DEFAULT '';
+CREATE INDEX analysis_slot ON analysis(environment_id, game_mm, set_key, id);
+`
+
+// schemaV13: a note per Instance (06 §2.9): the player's (or an agent's) words about this
+// copy, and what RimArcho recorded when it made the copy (made: JSON, see store.Made). The
+// lineage's note (lineage_data, has:note) is about the mod and all its copies.
+const schemaV13 = `
+CREATE TABLE instance_note(
+  instance_id TEXT PRIMARY KEY, text TEXT NOT NULL DEFAULT '', made TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL DEFAULT 0);
+`
+
+// schemaV15: log attribution looks defs up by their Name="…" attribute (a missing parent,
+// 03 §6.2). Without an index each lookup scanned every Def fact of the game version (~70 ms
+// on 83k rows); a log with 190 such clusters took 14 s on its first query (07 §6). Partial:
+// only abstract and named defs have a Name (about 5%).
+const schemaV15 = `
+CREATE INDEX IF NOT EXISTS def_fact_mm_named ON def_fact(game_mm, name) WHERE name<>'';
+`
+
+// migrateV11 finishes schemaV11: modsconfig_state is keyed by the normalised user data
+// folder (UserDataKey); rows that normalise to the same folder keep the newest write.
+func migrateV11(tx *sql.Tx) error {
+	rows, err := tx.Query(`SELECT user_data_root, coalesce(written_at, 0) FROM modsconfig_state`)
+	if err != nil {
+		return err
+	}
+	type row struct {
+		root string
+		at   int64
+	}
+	var all []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.root, &r.at); err != nil {
+			rows.Close()
+			return err
+		}
+		all = append(all, r)
+	}
+	rows.Close()
+	newest := map[string]row{}
+	for _, r := range all {
+		k := UserDataKey(r.root)
+		if o, ok := newest[k]; !ok || r.at > o.at {
+			newest[k] = r
+		}
+	}
+	for _, r := range all {
+		k := UserDataKey(r.root)
+		if newest[k].root != r.root {
+			if _, err := tx.Exec(`DELETE FROM modsconfig_state WHERE user_data_root=?`, r.root); err != nil {
+				return err
+			}
+		}
+	}
+	for k, r := range newest {
+		if k != r.root {
+			if _, err := tx.Exec(`UPDATE modsconfig_state SET user_data_root=? WHERE user_data_root=?`, k, r.root); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Shared is the environment ID of what every environment shares (02 §0): the mod folders
+// and their instances, the lineages, the player's data on lineages and the user rules.
+const Shared = ""
 
 // Store wraps the database handle.
 type Store struct {
@@ -245,7 +406,9 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13, schemaV14, schemaV15, schemaV16}
+	// post runs after a step's SQL, in the same transaction.
+	post := map[int]func(*sql.Tx) error{11: migrateV11, 14: migrateV14}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {
@@ -273,6 +436,12 @@ func (s *Store) migrate() error {
 		if _, err := tx.Exec(steps[v]); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("store: migrate to v%d: %w", v+1, err)
+		}
+		if f := post[v+1]; f != nil {
+			if err := f(tx); err != nil {
+				tx.Rollback()
+				return fmt.Errorf("store: migrate to v%d: %w", v+1, err)
+			}
 		}
 		if _, err := tx.Exec(`UPDATE meta SET value=? WHERE key='schema_version'`, fmt.Sprint(v+1)); err != nil {
 			tx.Rollback()

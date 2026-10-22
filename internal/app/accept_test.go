@@ -1,6 +1,6 @@
 package app_test
 
-// Acceptance tests A1–A11 of 02 §9, plus residue, identity questions, lineage editing and gc.
+// Acceptance tests A1–A11 of 02 §8, plus residue, identity questions, lineage editing and gc.
 
 import (
 	"encoding/json"
@@ -510,6 +510,15 @@ func mustEnv(t *testing.T, e *testkit.Env) string {
 	return env.ID
 }
 
+// mustPlan is the ID of the current environment's current plan.
+func mustPlan(t *testing.T, e *testkit.Env) int64 {
+	p, err := e.App.CurrentPlan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p.ID
+}
+
 // Lineage split and merge.
 func TestLineageSplitMerge(t *testing.T) {
 	e := setup(t, false)
@@ -578,7 +587,7 @@ func TestTombstoneGC(t *testing.T) {
 	}
 }
 
-// 02 §4.3 (revised): files moved into a version folder with unchanged content still count
+// 02 §4.4 (revised): files moved into a version folder with unchanged content still count
 // as the same mod (J(hash)); a content-only edit keeps J(path) = 1.
 func TestSimilarityRestructureAndContentOnly(t *testing.T) {
 	e := setup(t, false)
@@ -608,7 +617,7 @@ func TestSimilarityRestructureAndContentOnly(t *testing.T) {
 	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvMoved: 1, identity.EvUpdated: 1})
 }
 
-// 02 §4.1: RimCrow disables a workshop mod by renaming About.xml and deploys a copy through
+// 02 §4.2: RimCrow disables a workshop mod by renaming About.xml and deploys a copy through
 // a junction outside every source. The disabled folder is an unloadable Instance, and the
 // deployed copy joins its lineage.
 func TestAboutDisabled(t *testing.T) {
@@ -649,16 +658,25 @@ func TestEnvRemoveAndSourceRemove(t *testing.T) {
 	e.MustRun("env", "set", "main", "--remove-source", "src:steamcmd")
 	sid := scanNow(t, e)
 	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvDisappeared: 1})
-	if _, code := e.Run("env", "remove", "main"); code != 2 {
-		t.Fatal("env remove without --yes must be refused")
+	if out, code := e.Run("env", "remove", "main"); code != 0 || !strings.Contains(out, "dry run") {
+		t.Fatalf("env remove without --yes is the dry run: exit %d\n%s", code, out)
+	}
+	if out := e.MustRun("env", "list"); !strings.Contains(out, "environments: 1") {
+		t.Fatal("the dry run removes nothing: " + out)
 	}
 	e.MustRun("env", "remove", "main", "--yes")
 	if out := e.MustRun("env", "list"); !strings.Contains(out, "environments: 0") {
 		t.Fatal(out)
 	}
-	var n int
-	e.App.Store.DB.QueryRow(`SELECT (SELECT count(*) FROM instance) + (SELECT count(*) FROM snapshot_file) + (SELECT count(*) FROM source)`).Scan(&n)
+	// The game's own rows go; the shared mod folders and their mods stay (02 §0).
+	var n, shared int
+	e.App.Store.DB.QueryRow(`SELECT (SELECT count(*) FROM instance WHERE environment_id<>'') + (SELECT count(*) FROM source WHERE environment_id<>'')
+		+ (SELECT count(*) FROM snapshot_file WHERE snapshot_id IN (SELECT n.id FROM snapshot n LEFT JOIN instance i ON i.id=n.instance_id WHERE i.id IS NULL))`).Scan(&n)
 	if n != 0 {
-		t.Fatalf("%d rows left after env remove", n)
+		t.Fatalf("%d rows of the environment left after env remove", n)
+	}
+	e.App.Store.DB.QueryRow(`SELECT count(*) FROM source WHERE environment_id='' AND kind='workshop' AND status='ok'`).Scan(&shared)
+	if shared != 1 {
+		t.Fatal("the shared Workshop folder must stay")
 	}
 }

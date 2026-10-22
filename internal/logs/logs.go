@@ -128,7 +128,7 @@ func Parse(r io.Reader) (*File, error) {
 	return f, sc.Err()
 }
 
-// Parser reads a log line by line (Parse, and the live follower of a running game: 10 §3.2).
+// Parser reads a log line by line (Parse, and the live follower of a running game: 03 §6.6).
 // Entries are appended to F.Entries; the last one may still grow until Open reports false.
 type Parser struct {
 	F            *File
@@ -442,14 +442,16 @@ func Classify(e *Entry) string {
 var (
 	// DefDatabase.GetNamed: "Failed to find Verse.TerrainDef named X. There are N defs of this type loaded."
 	defNamedRe = regexp.MustCompile(`^Failed to find [\w.]+Def named `)
-	textureRe  = regexp.MustCompile(`^Could not load Texture2D at |^Failed to find any textures at |^Could not load (?:Texture|Material|Shader|AudioClip|SoundDef)\b`)
+	textureRe  = regexp.MustCompile(`^(?:Could not load Texture2D at |Failed to find any textures at |Could not load (?:Texture|Material|Shader|AudioClip|SoundDef)\b)`)
 	saveRe     = regexp.MustCompile(`^Could not resolve reference to object with loadID|is referenced \(xml node name: .*\) but is not deep-saved|^Error in PostExposeData|^Could not find think node with key|^Exception loading .* from save|^Could not load .* from save|^Could not get load ID\. `)
 	// A mod reporting on itself: "[Mod] …", "<color=…>[Mod]</color> …", "Mod :: …", "MOD: …".
-	modReportRe = regexp.MustCompile(`^(?:<color=[^>]*>\s*)?\[[^\]]{2,80}\]|^[\w .+-]{2,40} :: |^[A-Z][\w.+-]{1,30}: `)
+	modReportRe = regexp.MustCompile(`^(?:(?:<color=[^>]*>\s*)?\[[^\]]{2,80}\]|[\w .+-]{2,40} :: |[A-Z][\w.+-]{1,30}: )`)
 	// "ERROR: …" is a level written by the engine or a library, not a mod's name.
 	levelWordRe = regexp.MustCompile(`^(?i:error|warning|warn|err|info|exception): `)
-	// Engine and framework status lines that read like errors but are not.
-	noiseRe = regexp.MustCompile(`^Shader '[^']*': fallback shader '[^']*' not found|^Translation data for language .* has \d+ errors|^\[XML Extensions\] \d+ total patch operations run|^Curl error \d+: Callback aborted|^Mod .* is missing supported versions list in About\.xml`)
+	// Engine and framework status lines that read like errors but are not. One ^ before all
+	// the branches (here and above): with a ^ in each branch Go retries the pattern at every
+	// offset of a long message.
+	noiseRe = regexp.MustCompile(`^(?:Shader '[^']*': fallback shader '[^']*' not found|Translation data for language .* has \d+ errors|\[XML Extensions\] \d+ total patch operations run|Curl error \d+: Callback aborted|Mod .* is missing supported versions list in About\.xml)`)
 )
 
 // hasExceptionStack reports frames other than a Waylith caller stack.
@@ -489,27 +491,31 @@ func hasFrame(e *Entry, method string) bool {
 
 // Interesting reports whether an entry is an error worth clustering (Player.log mixes in
 // plenty of informational lines).
-func Interesting(e *Entry) bool {
+func Interesting(e *Entry) bool { ok, _ := interesting(e); return ok }
+
+// interesting is Interesting plus the entry's class when it was computed ("" otherwise).
+func interesting(e *Entry) (bool, string) {
 	if !hasExceptionStack(e) && noiseRe.MatchString(e.Message) {
-		return false
+		return false, ""
 	}
 	switch e.Level { // Waylith: the level decides
 	case "":
 	case "WARN", "WARNING", "ERROR", "FATAL", "CRITICAL":
-		return true
+		return true, ""
 	default: // INFO, DEBUG, TRACE
-		return false
+		return false, ""
 	}
-	if c := Classify(e); hasExceptionStack(e) || !Informational(c) {
-		return true
+	c := Classify(e)
+	if hasExceptionStack(e) || !Informational(c) {
+		return true, c
 	}
 	l := strings.ToLower(e.Message)
 	for _, w := range []string{"error", "exception", "failed", "could not", "couldn't", "invalid", "missing", "not found"} {
 		if strings.Contains(l, w) {
-			return true
+			return true, c
 		}
 	}
-	return false
+	return false, c
 }
 
 var (
@@ -567,8 +573,9 @@ type Cluster struct {
 }
 
 // ClusterKey is how Clusters groups an entry: the key, the template and the class.
-func ClusterKey(e *Entry) (key, template, class string) {
-	class = Classify(e)
+func ClusterKey(e *Entry) (key, template, class string) { return clusterKey(e, Classify(e)) }
+
+func clusterKey(e *Entry, class string) (key, template, cls string) {
 	key = class + "|" + Normalize(e.Message)
 	if class == ClassPatchFailed {
 		key += "|" + strings.Join(e.Extra, "|") // the file distinguishes failures
@@ -586,28 +593,7 @@ func ClusterKey(e *Entry) (key, template, class string) {
 }
 
 // Clusters returns the error clusters of a log.
-func Clusters(f *File) []*Cluster {
-	by := map[string]*Cluster{}
-	var out []*Cluster
-	for _, e := range f.Entries {
-		if !Interesting(e) {
-			continue
-		}
-		key, tmpl, cls := ClusterKey(e)
-		c := by[key]
-		if c == nil {
-			c = &Cluster{Key: key, Template: tmpl, Class: cls, First: e}
-			by[key] = c
-			out = append(out, c)
-			c.ID = "E" + itoa(len(out))
-		}
-		c.Count++
-		if len(c.Lines) < 5 {
-			c.Lines = append(c.Lines, e.Line)
-		}
-	}
-	return out
-}
+func Clusters(f *File) []*Cluster { return ClustersHint(f, nil) }
 
 func itoa(n int) string {
 	if n == 0 {

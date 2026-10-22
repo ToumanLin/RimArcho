@@ -2,6 +2,7 @@ package gui
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Import and export of the mod list (10 §4): the page previews a list before anything
+// Import and export of the mod list (04 §9): the page previews a list before anything
 // changes, and applies it as one undoable step; export writes a file or copies text.
 // The file dialogs and the clipboard are the window's (Wails); the development harness
 // has none, so every path can also be typed.
@@ -18,6 +19,7 @@ import (
 // native is what the window offers beyond the page; nil in the harness and in tests.
 type native interface {
 	openFile(title string, filters [][2]string) (string, error)
+	openDir(title, start string) (string, error)
 	saveFile(title, name string, filters [][2]string) (string, error)
 	setClipboard(text string) bool
 	clipboard() (string, bool)
@@ -47,6 +49,28 @@ func (s *API) ExchangeInfo() *Exchange {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return &Exchange{Dialogs: s.x.native != nil, Dir: view.DefaultExportDir(), Formats: view.ExportFormats(s.a)}
+}
+
+// PickFolder shows the folder dialog (the guide's game folder, the settings page's folders),
+// starting at start when it exists; "" when it was cancelled. Without a window (the
+// development harness) it is an error: the path is typed instead.
+func (s *API) PickFolder(start string) (string, error) {
+	if s.x.native == nil {
+		return "", errors.New(view.T("no folder dialog here; type the path"))
+	}
+	start = strings.Trim(strings.TrimSpace(start), `"'`)
+	for start != "" {
+		if st, err := os.Stat(start); err == nil && st.IsDir() {
+			break
+		}
+		parent := filepath.Dir(start)
+		if parent == start {
+			start = ""
+			break
+		}
+		start = parent
+	}
+	return s.x.native.openDir(view.T("choose a folder"), start)
 }
 
 // PickImportFile shows the open dialog; "" when it was cancelled or there is none.
@@ -159,6 +183,17 @@ func (w wailsNative) openFile(title string, filters [][2]string) (string, error)
 	d := w.app.Dialog.OpenFile().SetTitle(title).CanChooseFiles(true)
 	for _, f := range filters {
 		d.AddFilter(f[0], f[1])
+	}
+	if win := w.app.Window.Current(); win != nil {
+		d.AttachToWindow(win)
+	}
+	return d.PromptForSingleSelection()
+}
+
+func (w wailsNative) openDir(title, start string) (string, error) {
+	d := w.app.Dialog.OpenFile().SetTitle(title).CanChooseFiles(false).CanChooseDirectories(true).CanCreateDirectories(true)
+	if start != "" {
+		d.SetDirectory(start)
 	}
 	if win := w.app.Window.Current(); win != nil {
 		d.AttachToWindow(win)

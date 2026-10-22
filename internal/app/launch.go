@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Launcher starts a process without waiting for it. Tests replace it; nothing in the test
@@ -49,38 +50,51 @@ func quoteArg(s string) string {
 // ErrLaunchBlocked is wrapped by Launch refusals.
 var ErrLaunchBlocked = errors.New("launch blocked")
 
-// Launch starts the game (04 §8). It refuses when the workspace has unsaved changes (unless
-// force: the saved list is used as is) and always when ModsConfig.xml was written for
-// another game version, because the game would discard the list (04 §2.2 rule 5).
-func (a *App) Launch(dryRun, force bool) (*LaunchPlan, *LoadoutState, error) {
-	st, err := a.Loadout()
+// Launch plays the current list (08 §2): no game may be running in any environment; then
+// the list is written to the game exactly as archo save does (Mods/ links, ModsConfig.xml,
+// a version with source "launch" unless the list equals the newest version), the launch is
+// recorded and the game started. Nothing blocks on edits since the last write: launching is
+// the write. dryRun computes the same preview and writes nothing.
+func (a *App) Launch(dryRun bool) (*SaveResult, error) { return a.LaunchWith(dryRun, false) }
+
+// LaunchWith is Launch that, with move, first moves plain Mods/ folders in the way of a
+// deployed copy into the lock library (08 §3; --move-duplicates).
+func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
+	if err := a.checkNoGame(); err != nil {
+		return nil, err
+	}
+	st, err := a.Loadout() // step 2: an external change is attributed first (04 §4.3)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	e := st.Ix.Env
-	if v := st.FileVersionMismatch(); v != "" {
-		return nil, st, fmt.Errorf("%w: ModsConfig.xml was saved for %s but the game is %s, so the game would reset the mod list; run archo save first",
-			ErrLaunchBlocked, env.MajorMinor(v), st.GameMM())
+	if e.UserDataRoot == "" {
+		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
 	}
-	if n := len(st.Changes()); n > 0 && !force {
-		return nil, st, fmt.Errorf("%w: the workspace has %d unsaved changes; run archo save first, or launch --force to play the saved list",
-			ErrLaunchBlocked, n)
-	}
+	// The command first: a missing Steam or executable refuses before anything is written.
 	p, err := a.gamePlan(e, e.UserDataRoot)
 	if err != nil {
-		return nil, st, err
+		return nil, err
 	}
+	r, err := a.writeGame(st, dryRun, true, move)
+	if err != nil {
+		return nil, err
+	}
+	r.Launch = p
 	if dryRun {
-		return p, st, nil
-	}
-	// A pack's links would let the game see its copies next to this list (10 §8.3).
-	if _, err := a.removePackLinks(st.Ix, ""); err != nil {
-		return nil, st, err
+		return r, nil
 	}
 	if err := a.startGame(p); err != nil {
-		return nil, st, err
+		return r, err
 	}
-	return p, st, a.Store.AddLaunch(e.ID, a.Now().UTC(), p.Method, p.Command())
+	// Recorded once the game started, so a failed start leaves no launch for logs to match.
+	// The record names the plan, the list's fingerprint and the version played (08 §1).
+	vn := r.Version
+	if r.Unchanged && st.Latest != nil {
+		vn = st.Latest.N
+	}
+	return r, a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: e.ID, PlanID: st.Plan.ID, Started: a.Now().UTC(),
+		Method: p.Method, Command: p.Command(), Fingerprint: ListFingerprint(st.List), VersionN: vn})
 }
 
 func (a *App) startGame(p *LaunchPlan) error {
@@ -99,7 +113,7 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 	if userData != "" && env.PathKey(userData) != env.PathKey(env.DefaultUserDataRoot()) {
 		extra = append(extra, "-savedatafolder="+userData)
 	}
-	extra = append(extra, strings.Fields(a.LaunchArgs(e.ID))...) // 10 §7
+	extra = append(extra, strings.Fields(a.LaunchArgs(e.ID))...) // 06 §2.14
 	switch e.Launch {
 	case "steam":
 		p.Exe = env.SteamExe(a.Detect)

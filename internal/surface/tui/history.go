@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The history area (08 §14, 10 §6): where the staging list is when staging is empty, the
+// The history area (06 §2.5): where the staging list is when staging is empty, the
 // unsaved steps around "now" (redo dimmed above, undo below), then the saved versions. The
 // rows are view.HistoryItems; enter on a step goes there at once (u / ctrl+r move back), on
 // a version asks first (press twice).
@@ -120,7 +120,7 @@ func (m *model) histLabel() string {
 	return T("go back to here")
 }
 
-// histGo goes to the cursor's row: a step at once, a version after a second enter.
+// histGo goes to the cursor's row at once: a step, or a version loaded into the list.
 func (m *model) histGo() tea.Cmd {
 	if m.histCur >= len(m.hist) {
 		return nil
@@ -130,17 +130,15 @@ func (m *model) histGo() tea.Cmd {
 	case "now":
 		return nil
 	case "version":
-		warn := T("load this version into the list") + ": " + h.Text + " " + markDot + " " + T("your current list stays in the history; u brings it back")
-		return m.arm("enter", warn, func(m *model) tea.Cmd {
-			_, _, err := m.app.Checkout(fmt.Sprintf("v%d", h.Version))
-			m.reload()
-			if err != nil {
-				m.say(sayFail, m.humanize(err.Error()))
-			} else {
-				m.say(sayOK, Tf("loaded v%d into the list (not saved yet)", h.Version))
-			}
-			return m.requestDetail()
-		})
+		// One step: the list it replaces stays in the history, u brings it back (06 §6).
+		_, _, err := m.app.Checkout(fmt.Sprintf("v%d", h.Version))
+		m.reload()
+		if err != nil {
+			m.say(sayFail, m.humanize(err.Error()))
+		} else {
+			m.say(sayOK, Tf("loaded v%d into the list (not saved yet)", h.Version)+" · "+T("u undoes"))
+		}
+		return m.requestDetail()
 	}
 	r, err := m.app.StepTo(h.Steps)
 	m.reload()

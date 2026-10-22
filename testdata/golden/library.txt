@@ -1,0 +1,186 @@
+$ archo library
+library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
+  L#a6o7   Gone                [workshop, 533 B, unsubscribed leftover]
+  L#u2mx   Idle                [workshop, 533 B]
+  L#l4xt   Lockable            [2 copies, 1.1 KB, plan:default]
+  L#mdx4   Oldie               [workshop, 536 B]
+  ws:5300  Workshop item 5300  [workshop, —, subscribed, not on disk]
+
+$ archo library --facets
+library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
+  filters:
+    tag: QoL 1
+    source: workshop 5, local 1
+    version: 1.6 3, 1.4 1
+    state: missing 1, residue 1
+    used: none 5, plan:default 1
+    updated: week 2, month 4, half-year 4
+
+$ archo library --include used:none --exclude source:workshop
+library: 0 of 5 mods match (used:none, -source:workshop)
+next:
+  archo library --facets --include used:none --exclude source:workshop
+
+$ archo library --include state:residue --include state:missing
+library: 2 of 5 mods match (state:residue, state:missing)
+  L#a6o7   Gone                [workshop, 533 B, unsubscribed leftover]
+  ws:5300  Workshop item 5300  [workshop, —, subscribed, not on disk]
+
+$ archo library --search qol
+library: 1 of 5 mods match (search qol)
+  L#u2mx  Idle  [workshop, 533 B]
+next:
+  archo library --lineage L#u2mx
+
+$ archo library --include tag:QoL --facets
+library: 1 of 5 mods match (tag:QoL)
+  filters:
+    tag: +QoL 1
+    source: workshop 1, local 0
+    version: 1.6 1, 1.4 0
+    state: missing 0, residue 0
+    used: none 1, plan:default 0
+    updated: week 0, month 1, half-year 1
+
+$ archo library --sort size --include source:workshop
+library: 5 of 5 mods match (source:workshop)
+  L#l4xt   Lockable            [1 of 2 copies, 1.1 KB, plan:default]
+  L#mdx4   Oldie               [workshop, 536 B]
+  L#a6o7   Gone                [workshop, 533 B, unsubscribed leftover]
+  L#u2mx   Idle                [workshop, 533 B]
+  ws:5300  Workshop item 5300  [workshop, —, subscribed, not on disk]
+
+$ archo library --lineage #iqmu
+L#l4xt Lockable  [2 copies, 1.1 KB]
+  #6olp workshop  549 B
+    path: $ROOT/Steam/steamapps/workshop/content/294100/5100
+    workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5100
+    supports: 1.6
+    updated: 2026-09-21 14:13
+  #iqmu local  549 B  (current plan)
+    path: $ROOT/Steam/steamapps/common/RimWorld/Mods/Lockable Copy
+    supports: 1.6
+    updated: 2026-10-01 10:00
+    used in: plan:default
+next:
+  archo library move-to-locked #iqmu --dry-run
+
+$ archo library --lineage ws:5300
+ws:5300 Workshop item 5300  [1 copy, —]
+  ws:5300 workshop  —
+    workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5300
+    states: subscribed, not on disk
+
+$ archo library --include colour:red
+error: bad filter "colour:red": want key:value with key tag, source, version, state, used, updated
+[exit 1]
+
+$ archo library --include state:hidden
+library: 0 of 5 mods match (state:hidden)
+next:
+  archo library --facets --include state:hidden
+
+$ archo plan new other --from current
+plan:other created: 2 active
+  v1: import, copied from default v1
+  current: plan:default (unchanged)
+next:
+  archo plan use other
+
+$ archo library move-to-locked #iqmu --dry-run
+#iqmu Lockable dry run, nothing changed: would move to the lock library
+  from: $ROOT/Steam/steamapps/common/RimWorld/Mods/Lockable Copy
+  to: $ROOT/LocalAppData/RimArcho/locked/Lockable Copy
+  how: renamed (same volume)
+  marker: .rimarcho/origin.json would be written (the folder has none)
+  plans: plan:default, plan:other keep it: the same instance, linked into Mods/ (_Archo_) on save or launch
+next:
+  archo library move-to-locked #iqmu
+
+$ archo library move-to-locked #iqmu
+#iqmu Lockable moved to the lock library
+  from: $ROOT/Steam/steamapps/common/RimWorld/Mods/Lockable Copy
+  to: $ROOT/LocalAppData/RimArcho/locked/Lockable Copy
+  how: renamed (same volume)
+  now: #iqmu
+  marker: .rimarcho/origin.json written (the folder had none)
+  plans: plan:default, plan:other keep it: the same instance, linked into Mods/ (_Archo_) on save or launch
+next:
+  archo save
+
+$ archo library --lineage #iqmu
+L#l4xt Lockable  [2 copies, 1.1 KB]
+  #6olp workshop  549 B
+    path: $ROOT/Steam/steamapps/workshop/content/294100/5100
+    workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5100
+    supports: 1.6
+    updated: 2026-09-21 14:13
+  #iqmu locked 2026-10-01 11:00  549 B  (current plan)
+    path: $ROOT/LocalAppData/RimArcho/locked/Lockable Copy
+    supports: 1.6
+    updated: 2026-10-01 10:00
+    note: (by RimArcho) moved into the lock library 2026-10-01 for plan:default, plan:other
+    upstream: #6olp Lockable
+    used in: plan:default, plan:other
+
+$ archo note #iqmu kept for the old save --copy
+copy note set for #iqmu Lockable
+  note: kept for the old save
+  copy: this instance only (src:locked Lockable Copy); the mod's note is archo note #iqmu
+
+$ archo library --lineage #iqmu
+L#l4xt Lockable  [2 copies, 1.1 KB]
+  #6olp workshop  549 B
+    path: $ROOT/Steam/steamapps/workshop/content/294100/5100
+    workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5100
+    supports: 1.6
+    updated: 2026-09-21 14:13
+  #iqmu locked 2026-10-01 11:00  549 B  (current plan)
+    path: $ROOT/LocalAppData/RimArcho/locked/Lockable Copy
+    supports: 1.6
+    updated: 2026-10-01 10:00
+    note: kept for the old save
+    upstream: #6olp Lockable
+    used in: plan:default, plan:other
+
+$ archo note #iqmu --copy --clear
+copy note cleared for #iqmu Lockable
+
+$ archo library --sort -name
+library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
+  ws:5300  Workshop item 5300  [workshop, —, subscribed, not on disk]
+  L#mdx4   Oldie               [workshop, 536 B]
+  L#l4xt   Lockable            [2 copies, 1.1 KB, plan:default +1]
+  L#u2mx   Idle                [workshop, 533 B]
+  L#a6o7   Gone                [workshop, 533 B, unsubscribed leftover]
+
+$ archo library --include updated:week --sort updated
+library: 2 of 5 mods match (updated:week)
+  L#a6o7  Gone      [workshop, 533 B, unsubscribed leftover]
+  L#l4xt  Lockable  [1 of 2 copies, 1.1 KB, plan:default +1]
+
+$ archo library --include source:locked
+library: 1 of 5 mods match (source:locked)
+  L#l4xt  Lockable  [1 of 2 copies, 1.1 KB, plan:default +1]
+next:
+  archo library --lineage L#l4xt
+
+$ archo library remove-from-plans #iqmu
+removed #iqmu Lockable from 2 plans
+  plan:default: 1 entry (archo undo reverts it)
+  plan:other: 1 entry (undo it in that plan: archo plan use other, then archo undo)
+next:
+  archo save
+
+$ archo library remove-from-plans #iqmu
+nothing changed: no plan uses #iqmu Lockable
+
+$ archo undo
+workspace: 2 active, saved (plan:default, env:main)
+  undid: disable
+  added  #iqmu  Lockable  at 2
+
+$ archo library move-to-locked #hnyg
+error: #hnyg is in src:workshop; only copies in the game's Mods/ move to the lock library
+[exit 1]
+

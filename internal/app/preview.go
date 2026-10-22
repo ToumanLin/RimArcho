@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Thumbnails (06 §6.2): the mod's About/Preview.png, scaled to 360 px wide and cached by
+// Thumbnails (06 §9.4): the mod's About/Preview.png, scaled to 360 px wide and cached by
 // snapshot hash in <home>/cache/previews/. The mod folder is only read.
 
 // PreviewWidth is the cached thumbnail width in pixels.

@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// The command palette (06 §8): commands (by their Chinese name or English alias), mods and
+// The command palette (06 §3.5): commands (by their Chinese name or English alias), mods and
 // the other environments. Ranking: prefix > substring > subsequence > description; ties go
 // to commands, then mods, then environments, then the shorter name.
 
@@ -30,14 +30,20 @@ var Commands = []Command{
 	{"sort", "自动排序", "sort", "S"},
 	{"save", "保存到游戏", "save", "w ModsConfig.xml"},
 	{"launch", "启动游戏", "launch", "L RimWorld"},
+	{"preview-sort", "预览排序", "preview the sort", "S dry run"},
+	{"preview-save", "预览写入", "preview writing to the game", "w dry run ModsConfig.xml"},
+	{"preview-launch", "预览启动", "preview the launch", "L dry run"},
 	{"undo", "撤销", "undo", "u"},
 	{"redo", "重做", "redo", "ctrl+r"},
 	{"needs", "需要处理", "needs attention", "! problems"},
 	{"changes", "最近变化", "recent changes", "c history"},
+	{"library", "Mod 库存", "mod library", "all mods, copies, sizes, filter, clean up"},
 	{"rescan", "重新扫描", "rescan", "R scan"},
 	{"analyze", "重新检查文件", "check the files again", "A analyze"},
 	{"log", "选择日志", "choose a log", "Player.log"},
 	{"env", "切换环境", "switch environment", "E env"},
+	{"plans", "方案", "plans", "P switch, new, rename, delete a plan"},
+	{"new-plan", "新方案", "new plan", "+ plan copy import"},
 	{"restore-all", "全部从暂存放回", "put all back", "T staging"},
 	{"stage-all", "启用列表全部放进暂存", "stage the whole enabled list", "T in the window"},
 	{"import", "导入列表", "import a list", "i RimSort RimCrow .rml share code collection"},
@@ -49,15 +55,19 @@ var Commands = []Command{
 	{"packs", "整合包", "packs", "build, play"},
 	{"settings", "设置", "settings", "paths, language, data, caches"},
 	{"cli", "运行 archo 命令", "command line", ": archo"},
+	{"uninstall", "卸载 RimArcho", "uninstall RimArcho", "remove what RimArcho put on this machine"},
+	{"textures", "贴图优化", "texture optimisation", "convert mods' PNG textures to DDS"},
 	{"help", "帮助", "help", "?"},
 	{"quit", "退出", "quit", "q"},
 }
 
-// Palette entry kinds, in tie order.
+// Palette entry kinds, in tie order. A plan entry switches to that plan (its ID is
+// the plan's).
 const (
 	PalCommand = iota
 	PalMod
 	PalEnv
+	PalPlan
 )
 
 // PalEntry is one palette candidate.
@@ -97,8 +107,19 @@ func PalScore(q string, e PalEntry) int {
 	return best
 }
 
+// PlanEntries are the palette's "go to plan X" entries: every plan but the current one.
+func PlanEntries(rows []PlanRow) []PalEntry {
+	var out []PalEntry
+	for _, r := range rows {
+		if !r.Current {
+			out = append(out, PalEntry{Kind: PalPlan, ID: r.Page, Name: Tf("plan %s", r.Name), Alias: r.Name, Desc: "plan"})
+		}
+	}
+	return out
+}
+
 // PalRank filters and orders the candidates for a query; an empty query lists the
-// commands and environments only.
+// commands, environments and plans only.
 func PalRank(query string, all []PalEntry) []PalEntry {
 	q := strings.ToLower(strings.TrimSpace(query))
 	var out []PalEntry

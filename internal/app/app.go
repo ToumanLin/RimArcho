@@ -19,6 +19,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/ids"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 // Config is config.toml (07 §3). Only keys used by M1 are read.
@@ -58,38 +59,84 @@ type App struct {
 	Decompile Decompiler
 	// GameVersion ("X.Y") overrides the environment's game version for analysis commands.
 	GameVersion string
-	// AnalyzeWait bounds how long a command waits for an out-of-date analysis (05 §4.1:
+	// AnalyzeWait bounds how long a command waits for an out-of-date analysis (05 §5.1:
 	// MCP returns the finished part after 10 s and the analysis continues in the
 	// background). 0 waits until it is done (CLI).
 	AnalyzeWait time.Duration
 	// LazyLog keeps the newest Player.log out of Problems until the player opens the
-	// Problems view (the TUI; decisions-m4 §7.2: parse lazily to keep idle memory down).
+	// Problems view (the TUI; 03 §6.4: parse lazily to keep idle memory down).
 	// An explicitly selected log is always included.
 	LazyLog bool
 	// LogCacheOnly makes Problems use a stored log report only, never parse the log
 	// (status and mod: commands that are not about the log).
 	LogCacheOnly bool
-	// HTTP and SteamAPI reach the Steam Workshop for descriptions (06 §6.4); nil and ""
+	// HTTP and SteamAPI reach the Steam Workshop for descriptions (06 §4.3); nil and ""
 	// mean a 15-second client and the public endpoint. Tests replace both.
 	// GameProbe finds the running game of a game folder; nil means the process table
 	// (tests replace it).
 	GameProbe func(gameRoot string) *GameRun
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
-	HTTP      *http.Client
-	SteamAPI  string
-	// SteamCollectionAPI reads Workshop collections (10 §4.3); "" is the public endpoint.
+	// trashAllow replaces the recycle bin's allow-list check (08 §7) in tests of a bare App
+	// with no store; nil means trashAllowed.
+	trashAllow func(path string) error
+	// SteamWorker runs `archo steam-worker <args>` in the Steam runtime folder and returns
+	// its output; nil starts this executable (tests fake Steam with it, 06 §2.9).
+	SteamWorker func(dir string, args []string) (string, error)
+	// LockBase replaces %LOCALAPPDATA% when finding the default lock library and monitor
+	// folder (tests).
+	LockBase string
+	// MonitorBundle is the bundled Archo Monitor folder (08 §9): "" searches the usual
+	// places, MonitorNone turns it off (tests).
+	MonitorBundle string
+	// VolumeFS names the file system of a folder's volume; nil means source.VolumeFS
+	// (tests act out exFAT with it).
+	VolumeFS func(dir string) string
+	// SteamCMDStart and SteamCMDRun replace starting SteamCMD (tests fake it, 08 §11);
+	// SteamCMDZip replaces Valve's download URL, SteamCMDPoll how often its log is read,
+	// SteamCMDNoPath leaves PATH out when looking for it.
+	SteamCMDStart  func(exe string, args []string, console bool) (SteamCMDProc, error)
+	SteamCMDRun    func(exe string, args []string) (string, error)
+	SteamCMDZip    string
+	SteamCMDPoll   time.Duration
+	SteamCMDNoPath bool
+	HTTP           *http.Client
+	SteamAPI       string
+	// 贴图优化 (textures.go): TextureEncoder replaces todds, ToddsZip its download URL,
+	// ToddsNoPath leaves PATH out when looking for it (tests).
+	TextureEncoder textures.Encoder
+	ToddsZip       string
+	ToddsNoPath    bool
+	// SteamCollectionAPI reads Workshop collections (04 §9.5); "" is the public endpoint.
 	SteamCollectionAPI string
-	analyzing          *pendingAnalysis
+	// Uninstall (uninstall.go): UninstallExe is the program to remove ("" this one; a
+	// development build is never removed), UninstallKeepBase replaces Documents as the
+	// default home of kept saves and packs, ArchoProbe lists the other RimArcho processes and
+	// AfterExitFunc replaces starting the clean-up script (tests).
+	UninstallExe      string
+	UninstallKeepBase string
+	UninstallLog      string // where the script lists what it could not delete ("" %TEMP%)
+	ArchoProbe        func() []int
+	AfterExitFunc     func(AfterExit) error
+	// Uninstalled is set once an uninstall has run: every command is refused after it.
+	Uninstalled bool
+	sizes       map[string]int64
 
-	dataIdx *dataIndex // community data indexes (10 §5), loaded on first use
+	analyzing *pendingAnalysis
+
+	dataIdx *dataIndex // community data indexes (04 §6.3), loaded on first use
 
 	ixCache *Index
 	ixKey   string
-	stCache *LoadoutState
-	stKey   string
-	prCache *ProblemSet
-	prKey   string
+	// pngSnaps: the snapshots with PNG textures (贴图优化), until the snapshots change
+	pngSnaps    map[int64]bool
+	pngSnapsKey string
+	stCache     *LoadoutState
+	stKey       string
+	modsCopies  *modsCopiesCache
+	prCache     *ProblemSet
+	prKey       string
+	planPS      map[int64]*planProblems // PlanProblems, by plan
 
 	logCache   *logCacheEntry
 	harmonyDir string

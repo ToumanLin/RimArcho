@@ -17,6 +17,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/host"
+	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/surface/gui"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 	"github.com/ToumanLin/RimArcho/internal/surface/tui"
@@ -24,6 +25,10 @@ import (
 
 // Run executes argv (without the program name) and returns the exit code.
 func Run(argv []string, stdout, stderr io.Writer) int {
+	if len(argv) >= 1 && argv[0] == "steam-worker" {
+		// The short-lived Steam client call (06 §2.9, 08 §10); no data directory.
+		return steamWorker(argv[1:], stdout)
+	}
 	if len(argv) == 1 && (argv[0] == "--version" || argv[0] == "-v") {
 		argv = []string{"version"}
 	}
@@ -40,7 +45,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	defer ap.Close()
 	ap.EnvName = envName
 	if (len(rest) == 0 && buildinfo.GUI == "1") || (len(rest) == 1 && rest[0] == "gui") {
-		// RimArcho.exe (a double click) or `archo gui` (08 §2).
+		// RimArcho.exe (a double click) or `archo gui` (06 §8.1).
 		if err := runGUI(ap, len(rest) == 1); err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return cmds.ExitError
@@ -49,7 +54,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	if wantsHost(rest, here) {
 		// A bare `archo` (a double click): run the TUI in RimArcho's WezTerm host when it is
-		// there or the player agrees to download it (06 §1.1).
+		// there or the player agrees to download it (06 §9.2).
 		if launched, err := runHost(ap, envName, stdout); err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 		} else if launched {
@@ -57,7 +62,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if len(rest) == 0 || (len(rest) == 1 && rest[0] == "tui") {
-		// No command, or `archo tui` (what the WezTerm host runs, 06 §1.1): the TUI.
+		// No command, or `archo tui` (what the WezTerm host runs, 06 §9.2): the TUI.
 		// Scans run as a child process of this executable.
 		if err := tui.Run(tui.Options{App: ap, ScanOnStart: true}); err != nil {
 			fmt.Fprintln(stderr, "error:", err)
@@ -68,7 +73,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	cmds.Progress = func(line string) { fmt.Fprintln(stderr, line) }
 	cmds.Stream = func(line string) { fmt.Fprintln(stdout, line) }
 	if rest[0] == "mcp" && len(rest) == 1 {
-		// MCP over stdio (05 §4): stdout carries only protocol messages.
+		// MCP over stdio (05 §5): stdout carries only protocol messages.
 		if err := mcp.Run(context.Background(), ap); err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return cmds.ExitError
@@ -107,7 +112,7 @@ func runGUI(ap *app.App, fromConsole bool) error {
 }
 
 // wantsHost: only a bare `archo` may start the WezTerm host; `archo tui` (what the host
-// runs), `archo --here`, every CLI command and `archo mcp` never do (06 §1.1).
+// runs), `archo --here`, every CLI command and `archo mcp` never do (06 §9.2).
 func wantsHost(rest []string, here bool) bool { return len(rest) == 0 && !here }
 
 // runHost is replaced in tests.
@@ -149,7 +154,7 @@ func globalFlags(argv []string) (envName string, here bool, rest []string, err e
 		case a == "--":
 			return envName, here, append(rest, argv[i:]...), nil
 		case a == "--here" && len(rest) == 0:
-			here = true // only before a command: `archo --here` (06 §1.1)
+			here = true // only before a command: `archo --here` (06 §9.2)
 		case a == "--env":
 			if i+1 >= len(argv) {
 				return "", false, nil, fmt.Errorf("--env needs a name")
@@ -163,4 +168,24 @@ func globalFlags(argv []string) (envName string, here bool, rest []string, err e
 		}
 	}
 	return envName, here, rest, nil
+}
+
+// steamWorker runs `archo steam-worker <action> <id>…`, started by app.Workshop in the
+// Steam runtime folder. It is not a listed command: players and agents use
+// `archo workshop subscribe|unsubscribe|state`.
+func steamWorker(argv []string, stdout io.Writer) int {
+	if len(argv) < 2 {
+		fmt.Fprintln(stdout, steamworks.ErrorLine("usage: archo steam-worker subscribe|unsubscribe|state <workshop id>…"))
+		return cmds.ExitUsage
+	}
+	var ids []uint64
+	for _, a := range argv[1:] {
+		var id uint64
+		if _, err := fmt.Sscan(a, &id); err != nil || id == 0 {
+			fmt.Fprintln(stdout, steamworks.ErrorLine("not a Workshop id: "+a))
+			return cmds.ExitUsage
+		}
+		ids = append(ids, id)
+	}
+	return steamworks.Worker(argv[0], ids, stdout)
 }

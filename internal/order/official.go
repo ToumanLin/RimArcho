@@ -8,7 +8,7 @@ func IsOfficial(pkg string) bool { return officialRank(pkg) >= 0 }
 // Move puts node Node right after node After.
 type Move struct{ Node, After int }
 
-// OfficialMoves is the cheapest way to put official content back in place (04 §4.4), from
+// OfficialMoves is the cheapest way to put official content back in place (04 §5.3), from
 // the built-in edges of a Sort result: either move the official packages that sit after
 // mods back behind the official package before them (a DLC enabled later is appended to the
 // end of the list: 23% of shared 1.6 logs), or move the few mods that sit ahead of official

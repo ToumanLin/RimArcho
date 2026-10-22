@@ -102,7 +102,7 @@ logs, sessions, clusters, share of clusters with a source mod | pairs where A ha
 
 == Mod-specific patterns
 
-kept 1036 patterns over 317 mods, 53492 clusters
+kept 1034 patterns over 317 mods, 53465 clusters
 top 40 (logs, sessions, versions seen, pairs with it: gone after no change / small change; fixes):
    698 logs  498 sess  0 vers | gone none   0%/85   small   2%/61   | enable 1, reorder 1                      aoba.fortress.industrial.citadel  xref-missing|Could not resolve cross-reference: No Vers
    429 logs  326 sess  0 vers | gone none   0%/46   small   0%/28   |                                          kindseal.lol  xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … f
@@ -131,7 +131,7 @@ top 40 (logs, sessions, versions seen, pairs with it: gone after no change / sma
     90 logs   53 sess  0 vers | gone none   0%/14   small   0%/11   |                                          oskarpotocki.vanillafactionsexpanded.core  exception|HarmonyLib.HarmonyException: Patchin
 
 Most kept mod patterns are load-stage (patch.op-failed 243, patch.xpath 154, xref.def 147,
-xref.sound 70). 105 of 1,036 have a mod version (many mods report none). 209 mod patterns have
+xref.sound 70). 103 of 1,034 have a mod version (many mods report none). 209 mod patterns have
 >= 3 small-change pairs; in 92 of them the error went at least once.
 
 == Known issues
@@ -151,7 +151,7 @@ xref.sound 70). 105 of 1,036 have a mod version (many mods report none). 209 mod
 == Product export (G11, 2026-10-22)
 
 go run ./spikes/patterns -export internal/patterns/patterns.json   (46 generic rules in match
-order, 1,036 mod patterns, 477 KB; no top_source_mods, no occurrences)
+order, 1,034 mod patterns, 476 KB; no top_source_mods, no occurrences)
 go run ./spikes/patterns -verify corpus-kb/results-v3.jsonl: 610,910 problem clusters, the
 product matcher (internal/patterns) and these rules classify 0 differently.
 All 899 distinct mod-pattern templates also occur in results-v4 (current master attribution);
@@ -211,3 +211,12 @@ Reading
   the benchmark before tuning the checklist further.
 Data (outside the repo): agenteval/runs/{p1,v1r,p1x}, score-{p1,v1r}-dev.txt,
 score-p1-heldout.txt, score-p1x-heldout.txt, items-*-dev.txt.
+
+== Privacy fix (merge into 0.9, 2026-10-22)
+
+The private-template filter missed HugsLib's own path placeholder: two RimHugs templates of
+unlimitedhugs.hugslib kept "path:[Rimworld_dir]\Mods\<a local folder name>\About\Manifest.xml".
+privateRe (here and in spikes/knowndeps) now also drops "[Rimworld_dir]" / "[Rimworld_data]".
+Regenerated from the same inputs: exactly those 2 mod patterns dropped (1,036 -> 1,034), no other
+pattern changed. A scan of patterns.json and internal/known/known.json found no user names,
+Windows user paths, Steam IDs, e-mail addresses, save or colony names.

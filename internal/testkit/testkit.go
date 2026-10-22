@@ -1,5 +1,5 @@
 // Package testkit builds synthetic RimWorld environments in a temporary directory for the
-// identity acceptance tests (02 §9) and the CLI golden tests. Everything it writes lives
+// identity acceptance tests (02 §8) and the CLI golden tests. Everything it writes lives
 // under t.TempDir(); it never touches a real game or workshop folder.
 package testkit
 
@@ -88,6 +88,18 @@ func (e *Env) Open() {
 	a.Rand = rand.NewChaCha8([32]byte{'r', 'i', 'm', 'a', 'r', 'c', 'h', 'o'})
 	a.Loc = time.UTC
 	a.Detect = env.DetectOptions{SteamRoots: []string{e.Steam}, ManualRoots: []string{}, Home: e.Root, GOOS: "windows", SkipRegistry: true}
+	// The lock library (04 §7) stays inside the fixture.
+	a.LockBase = filepath.Join(e.Root, "LocalAppData")
+	// Uninstall stays inside the fixture: kept saves and packs go to <root>/Documents, no
+	// other RimArcho is found, and the clean-up script is never started.
+	a.UninstallKeepBase = filepath.Join(e.Root, "Documents")
+	a.UninstallLog = filepath.Join(e.Root, "uninstall.log")
+	a.ArchoProbe = func() []int { return nil }
+	a.AfterExitFunc = func(app.AfterExit) error { return nil }
+	// No bundled Archo Monitor unless a test brings one (08 §9).
+	a.MonitorBundle = app.MonitorNone
+	// The DDS encoder is only what a test brings (贴图优化), never one on PATH.
+	a.ToddsNoPath = true
 	// Never start a process from a test: launches are only recorded.
 	a.Launcher = func(exe string, args []string, dir string) error {
 		e.Launched = append(e.Launched, strings.Join(append([]string{exe}, args...), " "))
@@ -200,6 +212,13 @@ func (e *Env) CopyTree(src, dst string) {
 	if err != nil {
 		e.T.Fatal(err)
 	}
+	e.stamp(dst)
+}
+
+// stamp gives a mod folder the fake clock's time, so what reads folder times (Mod 库存's
+// 更新日期, 06 §2.9) is reproducible.
+func (e *Env) stamp(dir string) {
+	os.Chtimes(dir, e.now, e.now)
 }
 
 // Move renames a file or directory.
@@ -278,6 +297,7 @@ func (e *Env) WriteMod(dir string, m Mod) {
 	for _, k := range keys {
 		e.WriteFile(filepath.Join(dir, filepath.FromSlash(k)), m.Files[k])
 	}
+	e.stamp(dir)
 }
 
 // Sample returns a mod with a few defs and patches unique to name.
@@ -368,3 +388,15 @@ func (e *Env) ReadModsConfig() string {
 }
 
 const nl = string(rune(10))
+
+// OtherGame makes a second RimWorld install named name under the fixture root, outside any
+// Steam library (one environment is one game folder, 02 §0), and returns its folder.
+func (e *Env) OtherGame(name, version string) string {
+	e.T.Helper()
+	g := filepath.Join(e.Root, name)
+	e.WriteFile(filepath.Join(g, "RimWorldWin64.exe"), "")
+	e.WriteFile(filepath.Join(g, "Version.txt"), version+"\n")
+	e.MkdirAll(filepath.Join(g, "Mods"))
+	e.CopyTemplate("core", filepath.Join(g, "Data", "Core"))
+	return g
+}

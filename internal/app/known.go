@@ -13,7 +13,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Findings from what the log corpus observed (internal/known, docs/decisions-corpus.md §2):
+// Findings from what the log corpus observed (internal/known, docs/research/decisions-corpus.md §2):
 //
 //   - dep.observed-missing: A is enabled, B is not, A's About.xml does not declare B, and in the
 //     shared logs with A enabled and B not, an error regularly named B as the provider of

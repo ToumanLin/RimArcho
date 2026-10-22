@@ -56,7 +56,7 @@ func (s *Store) DefsOf(instanceID string) ([]analyze.DefFact, error) {
 func (s *Store) DefsNamed(name string, byName bool) ([]analyze.DefFact, error) {
 	q := `SELECT ` + defCols + ` FROM def_fact WHERE def_name=? AND game_mm=? ORDER BY rowid`
 	if byName {
-		q = `SELECT ` + defCols + ` FROM def_fact WHERE name=? AND game_mm=? ORDER BY rowid`
+		q = `SELECT ` + defCols + ` FROM def_fact WHERE name=? AND name<>'' AND game_mm=? ORDER BY rowid`
 	}
 	rows, err := s.DB.Query(q, name, s.MM)
 	if err != nil {
@@ -97,6 +97,7 @@ func (s *Store) ContentFolders(instanceID string) []string {
 // Analysis is one stored analysis run.
 type Analysis struct {
 	ID       int64
+	SetKey   string // the enabled set's fingerprint: the run's slot (03 §3)
 	RunKey   string
 	MM       string
 	Version  int
@@ -106,8 +107,11 @@ type Analysis struct {
 }
 
 // SaveAnalysis persists a run: content states and rebuilt Def facts, the Patch facts and
-// findings. Older runs of the environment are deleted.
-func (s *Store) SaveAnalysis(envID, runKey, mm string, out *analyze.Output, started, finished time.Time) (int64, error) {
+// findings. The run fills the slot (environment, mm, setKey) (03 §3): the slot's older run
+// is deleted, and so is every run of the environment and mm whose set key is not in keep
+// (the enabled sets the environment's plans have now), so slots do not pile up as plans
+// are edited.
+func (s *Store) SaveAnalysis(envID, setKey, runKey, mm string, keep []string, out *analyze.Output, started, finished time.Time) (int64, error) {
 	var id int64
 	err := s.inTx(func(tx *sql.Tx) error {
 		for inst, cs := range out.Content {
@@ -142,15 +146,22 @@ func (s *Store) SaveAnalysis(envID, runKey, mm string, out *analyze.Output, star
 				}
 			}
 		}
+		kept := map[string]bool{}
+		for _, k := range keep {
+			kept[k] = true
+		}
 		var old []int64
-		rows, err := tx.Query(`SELECT id FROM analysis WHERE environment_id=? AND game_mm=?`, envID, mm)
+		rows, err := tx.Query(`SELECT id, set_key FROM analysis WHERE environment_id=? AND game_mm=?`, envID, mm)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var x int64
-			rows.Scan(&x)
-			old = append(old, x)
+			var k string
+			rows.Scan(&x, &k)
+			if k == setKey || !kept[k] {
+				old = append(old, x)
+			}
 		}
 		rows.Close()
 		for _, x := range old {
@@ -161,8 +172,8 @@ func (s *Store) SaveAnalysis(envID, runKey, mm string, out *analyze.Output, star
 			}
 		}
 		st, _ := json.Marshal(out.Stats)
-		res, err := tx.Exec(`INSERT INTO analysis(environment_id, run_key, game_mm, version, started_at, finished_at, stats) VALUES(?,?,?,?,?,?,?)`,
-			envID, runKey, mm, analyze.Version, started.Unix(), finished.Unix(), string(st))
+		res, err := tx.Exec(`INSERT INTO analysis(environment_id, set_key, run_key, game_mm, version, started_at, finished_at, stats) VALUES(?,?,?,?,?,?,?,?)`,
+			envID, setKey, runKey, mm, analyze.Version, started.Unix(), finished.Unix(), string(st))
 		if err != nil {
 			return err
 		}
@@ -198,13 +209,26 @@ func (s *Store) SaveAnalysis(envID, runKey, mm string, out *analyze.Output, star
 	return id, err
 }
 
-// LatestAnalysis returns the environment's stored run (nil if none).
-func (s *Store) LatestAnalysis(envID string) (*Analysis, error) {
+// LatestAnalysis returns the stored run of the slot (environment, Store.MM, setKey) (nil if
+// none).
+func (s *Store) LatestAnalysis(envID, setKey string) (*Analysis, error) {
+	return s.latestAnalysis(`SELECT id, set_key, run_key, game_mm, version, started_at, finished_at, stats FROM analysis
+		WHERE environment_id=? AND game_mm=? AND set_key=? ORDER BY id DESC LIMIT 1`, envID, s.MM, setKey)
+}
+
+// NewestAnalysis returns the environment's newest run for Store.MM in any slot (nil if
+// none).
+func (s *Store) NewestAnalysis(envID string) (*Analysis, error) {
+	return s.latestAnalysis(`SELECT id, set_key, run_key, game_mm, version, started_at, finished_at, stats FROM analysis
+		WHERE environment_id=? AND game_mm=? ORDER BY id DESC LIMIT 1`, envID, s.MM)
+}
+
+func (s *Store) latestAnalysis(q string, args ...any) (*Analysis, error) {
 	var a Analysis
 	var st string
 	var started, finished int64
-	err := s.DB.QueryRow(`SELECT id, run_key, game_mm, version, started_at, finished_at, stats FROM analysis WHERE environment_id=? AND game_mm=? ORDER BY id DESC LIMIT 1`, envID, s.MM).
-		Scan(&a.ID, &a.RunKey, &a.MM, &a.Version, &started, &finished, &st)
+	err := s.DB.QueryRow(q, args...).
+		Scan(&a.ID, &a.SetKey, &a.RunKey, &a.MM, &a.Version, &started, &finished, &st)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -413,7 +437,9 @@ func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, mm string) error {
 			}
 		}
 		for _, p := range a.Patches {
-			if _, err := insH.Exec(a.Instance, a.File, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic), mm); err != nil {
+			// dynamic holds two bits: 1 the target is chosen at run time, 2 the patch was
+			// found at a Harmony.Patch call in code (G9, 03 §5.3).
+			if _, err := insH.Exec(a.Instance, a.File, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual), mm); err != nil {
 				return err
 			}
 		}
@@ -430,6 +456,9 @@ func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, mm string) error {
 type HarmonyRow struct {
 	Instance, File, PatchType, PatchMethod, Kind, Target string
 	Skips, Dynamic                                       bool
+	// Manual: found at a Harmony.Patch call in code, not from attributes (G9). With
+	// Dynamic its original was not resolved and Target says why ("<manual: …>").
+	Manual bool
 }
 
 // HarmonyFilter selects Harmony patches.
@@ -468,7 +497,7 @@ func (s *Store) HarmonyPatches(f HarmonyFilter) ([]*HarmonyRow, error) {
 		if err := rows.Scan(&h.Instance, &h.File, &h.PatchType, &h.PatchMethod, &h.Kind, &h.Target, &sk, &dy); err != nil {
 			return nil, err
 		}
-		h.Skips, h.Dynamic = sk != 0, dy != 0
+		h.Skips, h.Dynamic, h.Manual = sk != 0, dy&1 != 0, dy&2 != 0
 		out = append(out, &h)
 	}
 	return out, rows.Err()

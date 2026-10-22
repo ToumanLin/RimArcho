@@ -2,7 +2,7 @@ package tui
 
 import "github.com/ToumanLin/RimArcho/internal/view"
 
-// Column search (06 §5.5): the syntax and the matching are view.Query (08 §1.1).
+// Column search (06 §3.7): the syntax and the matching are view.Query (06 §1).
 
 // matcher builds the column predicate. The second result is the fallback for a single
 // free word that matched nothing: its letters in order in the name.
@@ -30,6 +30,19 @@ func (m *model) matcher(q string) (func(*item) bool, func(*item) bool) {
 // refilterCol applies the column's query and keeps the cursor on keepID.
 func (m *model) refilterCol(k colKind, keepID string) {
 	c := &m.cols[k]
+	if k != cStaging {
+		// 未启用 and 已启用 follow the filter bar (06 §2.5); 暂存 keeps its own search
+		c.view = c.view[:0]
+		if r := m.barResult(); r != nil && m.bar.active() {
+			c.view = append(c.view, r.Rows[k]...)
+		} else {
+			for i := range c.items {
+				c.view = append(c.view, i)
+			}
+		}
+		m.keepCursor(c, keepID)
+		return
+	}
 	match, fallback := m.matcher(c.filter)
 	c.view = c.view[:0]
 	for i := range c.items {
@@ -44,6 +57,11 @@ func (m *model) refilterCol(k colKind, keepID string) {
 			}
 		}
 	}
+	m.keepCursor(c, keepID)
+}
+
+// keepCursor keeps a column's cursor in its rows, on keepID when it is there.
+func (m *model) keepCursor(c *column, keepID string) {
 	c.cursor = min(c.cursor, max(len(c.view)-1, 0))
 	if keepID != "" {
 		for i, vi := range c.view {

@@ -12,7 +12,8 @@ import (
 func init() {
 	register(&Command{Name: "loadout export", Summary: "write the workspace as a list file: text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code", MaxArgs: 0, Run: loadoutExport,
 		Flags: []Flag{{Name: "format", Value: "text|modsconfig|rimsort|rml|rimcrow"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"}}})
-	register(&Command{Name: "loadout import", Args: "<file|share code>", Summary: "replace the workspace with a list (text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs); undoable", MinArgs: 1, MaxArgs: 1, Run: loadoutImport})
+	register(&Command{Name: "loadout import", Args: "<file|share code> [<name>]", Summary: "replace the workspace with a list (text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs; undoable), or with --new make it a new plan",
+		MinArgs: 1, MaxArgs: 2, Flags: []Flag{{Name: "new", Help: "import as a new plan named <name> (default: the list's own name or the file name)"}}, Run: loadoutImport})
 }
 
 func loadoutExport(c *Ctx, a *Args) (*render.Doc, error) {
@@ -41,6 +42,20 @@ func loadoutExport(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func loadoutImport(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Bool("new") {
+		name := ""
+		if len(a.Pos) == 2 {
+			name = a.Pos[1]
+		}
+		r, err := c.App.ImportLoadoutAsPlan(a.Pos[0], name)
+		if err != nil {
+			return nil, err
+		}
+		return newPlanDoc(c, r), nil
+	}
+	if len(a.Pos) == 2 {
+		return nil, &UsageError{Msg: "a plan name goes with --new (archo loadout import <file> --new [<name>])"}
+	}
 	r, il, err := c.App.ImportLoadout(a.Pos[0])
 	if err != nil {
 		return nil, err

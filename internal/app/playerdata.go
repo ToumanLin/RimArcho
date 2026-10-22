@@ -6,8 +6,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Player data on lineages (04 §7.1): tags, alias and note are shared by every instance of
-// a lineage. These are the typed calls the interfaces use (08 §1.2); the CLI's tag, alias
+// Player data on lineages (04 §8.1): tags, alias and note are shared by every instance of
+// a lineage. These are the typed calls the interfaces use (06 §1); the CLI's tag, alias
 // and note commands write the same store rows.
 
 // SetTags adds tags to the mods (or removes them); copies of one lineage are written once.

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// startAlive is how a bare `archo` starts the WezTerm host (06 §1.1). The host must not be
+// startAlive is how a bare `archo` starts the WezTerm host (06 §9.2). The host must not be
 // tied to archo's console: on a double click that console closes as soon as archo exits,
 // and everything attached to it is closed with it. A host that dies within the grace period
 // (a bad argument, a broken install) is an error, so the caller falls back to running here

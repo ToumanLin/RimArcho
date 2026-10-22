@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Trash moves a file or folder to the user's trash (10 §2.4): ~/.Trash on macOS, the
+// Trash moves a file or folder to the user's trash (08 §7): ~/.Trash on macOS, the
 // freedesktop trash elsewhere. A move across volumes is refused, never turned into a delete.
 func Trash(path string) error {
 	abs, err := filepath.Abs(path)

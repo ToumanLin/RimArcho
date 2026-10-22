@@ -1,24 +1,32 @@
-// The pages over the board (the top bar's tabs): 需要处理 (06 §7), 日志 (the game log, mod
-// changes 06 §4.1, the manager's actions 08 §14), the full detail (§6.3), packs and
-// settings. esc returns to the mod list; the tab shows where you are.
+// The pages over the board (the sidebar's entries, 06 §2.1): 能不能跑 (06 §2.4, §5), the
+// game log (§2.10), Mod 库 › 变化 (§2.9), the full detail (§4.2), packs, the environment
+// and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
+// esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
 import { S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
 import { icon } from "./icons.js";
 import { statusIcon } from "./icons.js";
-import { onHistory } from "./lists.js";
+import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
+import { bgSection } from "./bg.js";
 
 let ui = null;
 export function initScreens(u) { ui = u; }
-
-const GROUPS = ["this list", "missing dependencies", "conflicts", "last run", "needs your answer", "hidden mods", "this run"];
 
 // fresh: the next page built is a new page (not a redraw of the one shown); only a new page
 // fades in, so a redraw after an action or a sub-view switch does not flicker.
 let fresh = false;
 
-function openScreen(name) {
+// left tells Go the player left a page, which forgets what only that page used (07 §8.3).
+function left(next) {
+  if (S.screen && S.screen !== next) api.Leave(S.screen).catch(() => {});
+}
+
+export function openScreen(name) {
   fresh = S.screen !== name;
+  if (fresh) onArea = 0;
+  left(name);
   S.screen = name;
+  if (name !== "home") dropBackdrop();
   const sc = $("#screen");
   sc.hidden = false;
   sc.innerHTML = "";
@@ -29,7 +37,9 @@ function openScreen(name) {
 
 export function closeScreen() {
   if (!S.screen) return false;
+  left(null);
   S.screen = null;
+  dropBackdrop();
   $("#screen").hidden = true;
   $("#screen").innerHTML = "";
   ui.renderWhere();
@@ -37,26 +47,93 @@ export function closeScreen() {
   return true;
 }
 
-// page builds a page: a head (title, then what sits right of it) and a body.
-function page(cls, title, ...right) {
+// dropBackdrop takes the launch page's image away with the page (home.js setBackdrop).
+function dropBackdrop() {
+  const d = $("#backdrop");
+  if (d) d.remove();
+  $("#app").classList.remove("photo");
+}
+
+// page builds a page: one muted sentence that says what the page is for (the breadcrumb
+// names it, 06 §2.2), then the body. The buttons and fields among right are the page's
+// actions: they sit at the right end of that line, quiet unless primary; anything else
+// joins the lead. The top bar has no buttons.
+export function page(cls, lead, ...right) {
   const w = el("div", "page " + cls + (fresh ? " enter" : ""));
   fresh = false;
+  resetAreas();
   const head = el("div", "page-head");
-  head.append(el("h2", "", title));
-  for (const r of right) if (r) head.append(r);
-  w.append(head);
+  if (lead) head.append(el("p", "lead", lead));
+  const acts = [];
+  for (const r of right) {
+    if (!r) continue;
+    if (r.matches("button, input, select")) {
+      if (r.matches("button.btn") && !r.classList.contains("primary")) r.classList.add("quiet");
+      acts.push(r);
+    } else head.append(r);
+  }
+  if (acts.length) {
+    const box = el("div", "page-acts");
+    for (const a of acts) box.append(a);
+    head.append(box);
+  }
+  if (head.childNodes.length) w.append(head);
   return w;
 }
 
-function button(label, keyName, run, cls = "") {
+// ---- numbered areas (06 §3.5): on every page 1–9 focus its areas, as 1–4 do in the editor;
+// each area's heading shows its number ("1 会让游戏出错") ----
+let areas = [];
+let onArea = 0; // the area last picked on this page: a redraw keeps its mark
+export function resetAreas() { areas = []; }
+
+// area numbers box (its heading head gets the number) and says what focusing it does; the
+// default scrolls it into view and focuses its first control, so tab goes on from there.
+export function area(box, head, focus) {
+  const n = areas.length + 1;
+  if (n > 9 || !box) return;
+  areas.push({ box, focus: focus || (() => { const f = box.querySelector("button, input, select, [tabindex]"); if (f) f.focus({ preventScroll: true }); }) });
+  box.dataset.area = String(n);
+  box.classList.toggle("area-on", n === onArea);
+  if (!head) return;
+  // a heading kept across visits keeps one number
+  const had = head.querySelector(":scope > .anum");
+  if (had) had.textContent = String(n);
+  else head.prepend(el("span", "anum", String(n)));
+}
+
+// areaKey takes 1–9 on a page: the area is marked, shown and focused. true when taken.
+export function areaKey(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey || !/^[1-9]$/.test(e.key)) return false;
+  const a = areas[+e.key - 1];
+  if (!a || !a.box.isConnected) return false;
+  e.preventDefault();
+  onArea = +e.key;
+  for (const x of areas) x.box.classList.toggle("area-on", x === a);
+  a.box.scrollIntoView({ block: "nearest" });
+  a.focus();
+  return true;
+}
+
+export function button(label, keyName, run, cls = "") {
   const b = el("button", "btn " + cls, label);
   if (keyName) b.append(el("kbd", "", keyName));
   b.onclick = (e) => { e.stopPropagation(); run(); };
   return b;
 }
 
+// act is a page action with an icon (the top bar's quiet buttons, 06 §2.2).
+export function act(label, ic, run, keyName) {
+  const b = button(label, keyName, run);
+  const i = el("span", "ic");
+  i.innerHTML = icon[ic] || "";
+  b.prepend(i);
+  if (keyName) b.title = keyName;
+  return b;
+}
+
 // seg is a small view switch (magpie's): one button per choice, the chosen one raised.
-function seg(names, on, pick, keys) {
+export function seg(names, on, pick, keys) {
   const s = el("div", "seg sub");
   s.append(el("span", "thumb"));
   names.forEach((n, i) => {
@@ -70,7 +147,7 @@ function seg(names, on, pick, keys) {
 }
 
 // setSeg opens choice i of a switch already on the page: its thumb slides there.
-function setSeg(s, i) {
+export function setSeg(s, i) {
   if (!s) return;
   const bs = [...s.querySelectorAll(":scope > button")];
   bs.forEach((b, j) => b.classList.toggle("on", j === i));
@@ -88,115 +165,161 @@ function moveIn(curIdx, n, k) {
   return null;
 }
 
-// ---- 需要处理: three columns ----
-// The list itself (its order, missing dependencies, conflicts), the game (this run, the
-// last run's log) and what needs your call (identity questions, hidden mods).
-const NCOLS = [
-  { title: "list", groups: [0, 1, 2] },
-  { title: "game log", groups: [6, 3] },
-  { title: "your call", groups: [4, 5] },
-];
-const N = { data: null, cols: [[], [], []], col: 0, cur: [0, 0, 0], open: new Set(), els: [[], [], []] };
+// ---- 能不能跑 (06 §2.4, §5): one column of sections, by consequence ----
+// 会让游戏出错, 上次运行的报错 (this run first while the game runs), 要你确认, 隐藏的 Mod.
+// Each item is a card: a bold line, a plain sentence, where the claim comes from (the
+// evidence chip), one primary action and the rest under ⋯. The arrows move a cursor
+// through the items; an action's key runs it (06 §3).
+const SECTIONS = ["breaks the game", "errors from the last run", "for you to confirm", "hidden mods"];
+const SECTION_CLS = ["break", "run", "confirm", "hidden"];
+const N = { data: null, items: [], cur: 0, open: new Set(), els: [] };
+
+// archo is the hook for the Archo panel (06 §2.13, 1.1): when set, an item can be handed
+// to it ("Archo 在看"). Nothing sets it yet.
+export const archo = { ask: null };
 
 export function liveChanged() {
-  if (S.screen === "needs" && N.data) { splitNeeds(); drawNeeds(); }
+  if (S.screen === "needs" && N.data) { orderNeeds(); drawNeeds(); }
 }
 
-function splitNeeds() {
-  const items = ((S.live && S.live.items) || []).concat(N.data.items || []);
-  N.cols = NCOLS.map((c) => items.filter((it) => c.groups.includes(it.group)).sort((a, b) => c.groups.indexOf(a.group) - c.groups.indexOf(b.group)));
-  N.cur = N.cur.map((x, i) => Math.min(x, Math.max(N.cols[i].length - 1, 0)));
-  if (!N.cols[N.col].length) { const f = N.cols.findIndex((c) => c.length); if (f >= 0) N.col = f; }
+// liveCount: this run's counted errors (the sidebar's badge adds them, 06 §2.1).
+export function liveCount() {
+  return ((S.live && S.live.items) || []).filter((it) => it.counted).length;
+}
+
+function orderNeeds() {
+  const all = ((S.live && S.live.items) || []).concat(N.data.items || []);
+  // stable: within a section the view's order (this run before the last run)
+  N.items = all.map((it, i) => [it, i]).sort((a, b) => (a[0].section - b[0].section) || (a[1] - b[1])).map((x) => x[0]);
+  N.cur = Math.min(N.cur, Math.max(N.items.length - 1, 0));
 }
 
 export async function needs(keepCursor) {
   let data;
   try { data = await api.Needs(); } catch (e) { say("fail", errText(e)); return; }
   N.data = data;
-  if (!keepCursor) { N.cur = [0, 0, 0]; N.col = 0; }
-  splitNeeds();
+  if (!keepCursor) N.cur = 0;
+  orderNeeds();
   drawNeeds();
+}
+
+// lead: what the page says about the plan in one sentence.
+function needsLead(d) {
+  const plan = (S.shell && S.shell.plan && S.shell.plan.name) || T("the list");
+  const breaks = N.items.filter((x) => x.counted && x.section === 0).length;
+  const count = N.items.filter((x) => x.counted).length;
+  if (breaks) return Tf("%s is not safe to play yet: fix the %d problems below; every step can be undone.", plan, breaks);
+  if (count) return Tf("%s can run; %d things below are worth a look.", plan, count);
+  if (d.never) return Tf("%s: the mods' files are not checked yet.", plan);
+  return Tf("%s can run: nothing to handle.", plan);
 }
 
 function drawNeeds() {
   const sc = S.screen === "needs" ? $("#screen") : openScreen("needs");
-  const tops = [...sc.querySelectorAll(".col .scroll")].map((x) => x.scrollTop);
+  const top = sc.scrollTop;
   sc.innerHTML = "";
   const d = N.data;
   let state = "";
   if (S.busy.analyze) state = T("checking the mods' files…");
   else if (d.never) state = T("the mods' files are not checked yet");
   else if (d.stale) state = T("the files changed since the last check");
-  const w = page("needs fill", d.count ? Tf("%d to handle", d.count) : T("nothing to handle"),
-    state ? el("span", "muted", state) : null, el("span", "grow"),
-    button(T("check the files again"), "A", () => ui.cmd("analyze")),
-    button(T("game log"), "l", () => logs(0)));
-  const grid = el("div", "cols three");
-  N.els = [[], [], []];
-  NCOLS.forEach((c, ci) => {
-    const card = el("section", "card col" + (ci === N.col ? " focus" : ""));
-    const head = el("div", "card-head");
-    head.append(el("span", "label", T(c.title)), el("span", "n", String(N.cols[ci].filter((x) => x.counted).length || "")));
-    const scroll = el("div", "scroll");
-    if (!N.cols[ci].length) scroll.append(el("div", "empty-state", "✓ " + T("nothing here")));
-    let g = -1;
-    N.cols[ci].forEach((it, i) => {
-      if (it.group !== g && c.groups.length > 1) {
-        g = it.group;
-        // which run the log is from: the list, or a pack (10 §8.3)
-        let t = T(GROUPS[g]);
-        if (g === 3 && d.lastRun) t += " · " + d.lastRun;
-        if (g === 6 && S.live && S.live.pack) t += " · " + Tf("pack %s", S.live.pack);
-        scroll.append(el("div", "group", t));
-      }
-      const row = needRow(it, ci, i);
-      N.els[ci][i] = row;
-      scroll.append(row);
-    });
-    card.append(head, scroll);
-    card.onmousedown = () => { if (N.col !== ci) { N.col = ci; markNeeds(); } };
-    grid.append(card);
+  const w = page("needs", needsLead(d),
+    state ? el("span", "state-note", state) : null,
+    act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A"),
+    act(T("game log"), "log", () => ui.go("log"), "l"));
+  N.els = [];
+  if (!N.items.length) {
+    w.append(el("section", "card empty-state", "✓ " + T("nothing here")));
+  }
+  let i = 0;
+  SECTIONS.forEach((title, si) => {
+    const its = N.items.filter((x) => x.section === si);
+    if (!its.length) return;
+    const sec = el("section", "sec need-sec " + SECTION_CLS[si]);
+    const n = its.filter((x) => x.counted).length;
+    const h = el("h2", "label", T(title));
+    const first = i;
+    area(sec, h, () => { N.cur = first; markNeeds(); });
+    if (n) {
+      const c = el("span", "n num", String(n));
+      h.append(el("span", "", " · "), c);
+      bump("needs:" + si, c, n);
+    }
+    // which run the log is from: the list, or a pack (08 §5.3)
+    if (si === 1 && S.live && S.live.running) h.append(el("span", "muted", " · " + (S.live.pack ? Tf("pack %s", S.live.pack) : T("this run"))));
+    else if (si === 1 && d.lastRun) h.append(el("span", "muted", " · " + d.lastRun));
+    sec.append(h);
+    const card = el("div", "card need-list");
+    for (const it of its) {
+      const row = needCard(it, i);
+      N.els[i] = row;
+      card.append(row);
+      i++;
+    }
+    sec.append(card);
+    w.append(sec);
   });
-  w.append(grid);
   sc.append(w);
-  [...sc.querySelectorAll(".col .scroll")].forEach((x, i) => { x.scrollTop = tops[i] || 0; });
-  markNeeds(true);
+  sc.scrollTop = top;
+  markNeeds();
 }
 
-function needRow(it, ci, i) {
+function needCard(it, i) {
   const row = el("div", "need" + (it.dim ? " dimmed" : ""));
-  const ic = el("span", "ic");
-  ic.innerHTML = it.dim || !it.status ? "" : statusIcon(it.status);
+  const top = el("div", "top");
   const body = el("div", "body");
-  body.append(el("div", "text", it.text));
+  if (it.dim) {
+    body.append(el("div", "why", it.text));
+    if (it.why) body.append(el("div", "why sub", it.why));
+  } else {
+    body.append(el("div", "title", it.title || it.text));
+    if (it.why) body.append(el("div", "why", it.why));
+  }
+  top.append(body);
+  const acts = it.actions || [];
+  const right = el("div", "acts");
+  if (archo.ask && it.section === 1) right.append(button(T("ask Archo"), "", () => archo.ask(it), "small"));
+  if (acts.length) {
+    const a = acts[0];
+    right.append(button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, it.dim ? "" : "primary"));
+    if (acts.length > 1) {
+      const more = button("⋯", "", () => {
+        N.cur = i; markNeeds();
+        const r = more.getBoundingClientRect();
+        pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, key: x.key, run: () => runAction(it, x) })));
+      }, "more");
+      more.title = acts.slice(1).map((x) => x.label).join(" · ");
+      right.append(more);
+    }
+  }
+  top.append(right);
+  row.append(top);
   if (it.fold && N.open.has(it.text)) {
     const parts = el("div", "parts");
     for (const p of it.parts || []) parts.append(el("div", "", "· " + p));
-    body.append(parts);
+    row.append(parts);
   }
-  const acts = el("div", "acts");
-  for (const act of it.actions || []) {
-    acts.append(button(act.label, act.key, () => { N.col = ci; N.cur[ci] = i; markNeeds(); runAction(it, act); }, "small"));
+  if (it.evidence) {
+    const ev = el("div", "ev-line");
+    ev.append(el("span", "ev-chip " + it.evidence.kind, it.evidence.label));
+    if (it.evidence.source) ev.append(el("span", "src", it.evidence.source));
+    row.append(ev);
   }
-  body.append(acts);
-  row.append(ic, body);
-  row.onclick = () => { N.col = ci; N.cur[ci] = i; markNeeds(); };
+  row.onclick = () => { N.cur = i; markNeeds(); };
   return row;
 }
 
 // markNeeds moves the cursor's mark without building the page again (the keys stay quick).
-function markNeeds(initial) {
-  $$cols().forEach((c, ci) => c.classList.toggle("focus", ci === N.col));
-  N.els.forEach((rows, ci) => rows.forEach((r, i) => r.classList.toggle("cur", i === N.cur[ci] && ci === N.col)));
-  const on = N.els[N.col][N.cur[N.col]];
-  if (on) on.scrollIntoView({ block: initial ? "nearest" : "nearest" });
+function markNeeds() {
+  N.els.forEach((r, i) => r && r.classList.toggle("cur", i === N.cur));
+  const on = N.els[N.cur];
+  if (on) on.scrollIntoView({ block: "nearest" });
 }
-const $$cols = () => [...document.querySelectorAll("#screen .cols .col")];
 
 async function runAction(it, act) {
   switch (act.kind) {
     case "sort": case "save":
-      return ui.preview(act.kind);
+      return ui.run(act.kind);
     case "open-url":
       try { await api.OpenURL(act.url); say("ok", act.done); } catch (e) { say("fail", errText(e)); }
       return;
@@ -212,32 +335,35 @@ async function runAction(it, act) {
       return pop.choose(act.title, act.options.map((o) => o.label), (i) => doAction(act, i));
   }
   if (act.confirm) {
-    // Not undone with u: ask first (06 §9, 08 §8).
+    // Not undone with u: ask first (06 §6).
     return pop.confirm(act.label, [act.warn || act.label], act.label, () => doAction(act, 0));
   }
   return doAction(act, 0);
 }
 
 async function doAction(act, option) {
-  try { say("ok", await api.DoAction(act, option), act.kind === "enable" || act.kind === "disable" || act.kind === "choose-disable"); } catch (e) { say("fail", errText(e)); }
+  try { say("ok", await api.DoAction(act, option), act.undo || act.kind === "enable" || act.kind === "disable" || act.kind === "choose-disable"); } catch (e) { say("fail", errText(e)); }
   await ui.reload();
   if (S.screen === "needs") needs(true);
 }
 
+// needsKey: ↑↓ (j k, PageUp/PageDown, Home/End) move through the items, ← → jump to the
+// previous / next section; an item's action keys run its actions.
 export function needsKey(e) {
   const k = e.key;
-  if (k === "ArrowLeft" || k === "ArrowRight") {
+  const n = N.items.length;
+  if ((k === "ArrowLeft" || k === "ArrowRight") && n) {
     e.preventDefault();
-    const d = k === "ArrowRight" ? 1 : -1;
-    for (let c = N.col + d; c >= 0 && c < 3; c += d) if (N.cols[c].length) { N.col = c; break; }
-    return markNeeds();
+    const sec = N.items[N.cur].section;
+    const idx = k === "ArrowRight" ? N.items.findIndex((x) => x.section > sec) : N.items.findIndex((x) => x.section === Math.max(...N.items.filter((y) => y.section < sec).map((y) => y.section)));
+    if (idx >= 0) { N.cur = idx; markNeeds(); }
+    return;
   }
-  const n = N.cols[N.col].length;
-  const m = n ? moveIn(N.cur[N.col], n, k) : null;
-  if (m != null) { e.preventDefault(); N.cur[N.col] = m; return markNeeds(); }
+  const m = n ? moveIn(N.cur, n, k) : null;
+  if (m != null) { e.preventDefault(); N.cur = m; return markNeeds(); }
   if (k === "A") return ui.cmd("analyze");
-  if (k === "l") return logs(0);
-  const it = N.cols[N.col][N.cur[N.col]];
+  if (k === "l") return ui.go("log");
+  const it = N.items[N.cur];
   const name = k === " " ? "space" : k === "Enter" ? "enter" : k;
   const act = it && (it.actions || []).find((a) => a.key === name);
   if (act) { e.preventDefault(); runAction(it, act); }
@@ -247,47 +373,42 @@ export function analyzeEvent(ev) {
   if (S.screen === "needs" && ev.done) needs(true);
 }
 
-// chooseLog is the palette's "choose a log": the game log page.
-export function chooseLog() { return logs(0); }
+// ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
+// tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
+// and the entries whose details are open).
+const L = { path: "", page: null, loading: false, pending: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "" };
+// of: only this mod's Lineage ({id, name}), from a detail's history; null every mod.
+const C = { page: null, cur: 0, items: [], els: [], open: new Set(), raw: new Map(), of: null, library: false };
 
-// ---- 日志: the game log, mod changes, the manager's actions ----
-const SUBS = ["game log", "mod changes", "manager actions"];
-const L = { sub: 0, path: "", page: null, loading: false, pending: "", cur: 0, detail: new Map(), seq: 0, els: [] };
-const C = { scans: [], cur: 0, rows: [], open: new Map(), els: [] };
-const H = { items: [], cur: -1, els: [] };
-
-export function logsWhere() { return S.screen === "logs" ? T("logs") + " › " + T(SUBS[L.sub]) : ""; }
-
-export async function logs(sub = L.sub) {
-  L.sub = sub;
-  if (sub === 0) return gameLog();
-  if (sub === 1) return changes();
-  return actions();
-}
-// changes is the palette's and c's "recent changes".
-export function changesPage() { return logs(1); }
-
-// logsPage keeps the page's head (its switch slides between the three views) and gives a
-// fresh body below it.
-function logsPage(...right) {
-  let w = S.screen === "logs" ? $("#screen .page.logs") : null;
+// logPage keeps the page's head and gives a fresh body below it, and its actions.
+function logPage(name, title, ...right) {
+  let w = S.screen === name ? $("#screen .page.logs") : null;
   if (!w) {
-    const sc = openScreen("logs");
-    w = page("logs fill", T("logs"), seg(SUBS.map((s) => T(s)), L.sub, (i) => logs(i), ["1", "2", "3"]), el("span", "grow"), el("span", "head-right"));
+    const sc = openScreen(name);
+    w = page("logs fill", title, ...right);
     sc.append(w);
   } else {
     while (w.children.length > 1) w.lastChild.remove();
-    setSeg($(".page-head .seg", w), L.sub);
+    let box = $(".page-head .page-acts", w);
+    if (!box) {
+      let head = $(".page-head", w);
+      if (!head) { head = el("div", "page-head"); w.prepend(head); }
+      box = el("div", "page-acts");
+      head.append(box);
+    }
+    box.innerHTML = "";
+    for (const r of right) if (r && r.matches("button, input, select")) { if (r.matches("button.btn") && !r.classList.contains("primary")) r.classList.add("quiet"); box.append(r); }
   }
-  const hr = $(".page-head .head-right", w);
-  hr.innerHTML = "";
-  for (const r of right) if (r) hr.append(r);
   ui.renderWhere();
   return w;
 }
 
-async function gameLog(path = L.path) {
+// gameLog reads the log page; open: it was navigated to, so it is drawn even when the read
+// comes back before the loading line would show (unless another page opened meanwhile).
+export async function gameLog(path = L.path, open = false) {
   const n = ++L.seq;
+  const from = S.screen;
+  const show = () => S.screen === "log" || (open && S.screen === from);
   // What was read before shows at once and is replaced when the new read is in; a log not
   // read yet says so only if it takes a moment (no flash of a loading line).
   let slow = 0;
@@ -303,8 +424,8 @@ async function gameLog(path = L.path) {
     L.loading = false;
     L.page = { files: p.files, path: "" };
     L.path = p.path;
-    if (S.screen === "logs" && L.sub === 0) drawGameLog();
-    setTimeout(() => { if (S.screen === "logs" && L.sub === 0 && n === L.seq) gameLog(p.path); }, 1500);
+    if (show()) drawGameLog();
+    setTimeout(() => { if (S.screen === "log" && n === L.seq) gameLog(p.path); }, 1500);
     return;
   }
   L.pending = "";
@@ -314,7 +435,7 @@ async function gameLog(path = L.path) {
   if (same) return;
   L.path = p.path;
   L.loading = false;
-  if (S.screen === "logs" && L.sub === 0) drawGameLog();
+  if (show()) drawGameLog();
 }
 
 function drawGameLog() {
@@ -328,84 +449,352 @@ function drawGameLog() {
       gameLog(p.path);
     }));
   }
-  const w = logsPage(...right);
+  const keep = $("#screen .page.logs .col.focus .scroll");
+  const was = keep ? keep.scrollTop : 0;
+  const w = logPage("log", T("each run's errors, grouped by mod; pick one to read the log"), ...right);
   const files = (p && p.files) || [];
   const bar = el("div", "subbar");
-  if (files.length) {
-    bar.append(seg(files.map((f) => f.label + (f.when ? " · " + f.when : "")), Math.max(0, files.findIndex((f) => f.path === L.path)), (i) => { L.path = files[i].path; L.page = null; gameLog(files[i].path); }));
-  }
+  if (files.length) bar.append(filePicker(files));
   if (p && p.facts && !L.loading) bar.append(el("span", "muted", p.facts));
   w.append(bar);
+  if (p && p.noMonitor && !L.loading) w.append(noMonitor(p));
   if (L.pending) { w.append(el("div", "card empty-state", Tf("the mods are analysed for %s first (once per game version)…", L.pending))); return; }
-  if (L.loading) { w.append(el("div", "card empty-state", T("reading the log…"))); return; }
+  if (L.loading) { const c = el("div", "card pad"); c.append(shimmer(T("reading the log…"), 6)); w.append(c); return; }
   if (!p || !p.path) { w.append(el("div", "card empty-state", T("no Player.log found"))); return; }
-  const grid = el("div", "cols two");
+  const mon = p.monitor;
+  if (!mon) L.tab = 0;
+  const grid = el("div", "cols two logcols");
   const list = el("section", "card col focus");
+  if (mon) {
+    const tabs = el("div", "ltabs");
+    tabs.append(seg([Tf("Player.log · %d", (p.rows || []).length), mon.title + " · " + mon.entries.length], L.tab, (i) => { L.tab = i; drawGameLog(); }, ["←", "→"]));
+    list.append(tabs);
+  }
   const scroll = el("div", "scroll");
   L.els = [];
-  if (!(p.rows || []).length) scroll.append(el("div", "empty-state", "✓ " + T("no errors in this log")));
-  (p.rows || []).forEach((r, i) => {
-    const row = el("div", "lrow" + (r.info ? " dimmed" : ""));
+  if (L.tab === 1) monitorRows(scroll, mon);
+  else {
+    if (!(p.rows || []).length) scroll.append(el("div", "empty-state", "✓ " + T("no errors in this log")));
+    (p.rows || []).forEach((r, i) => {
+      const row = el("div", "lrow" + (r.info ? " dimmed" : ""));
+      const ic = el("span", "ic");
+      ic.innerHTML = statusIcon(r.status);
+      const body = el("div", "body");
+      const top = el("div", "top");
+      top.append(el("span", "chip", r.class), el("span", "count", "×" + r.count));
+      if (r.mods) top.append(el("span", "mods", r.mods));
+      body.append(top, logText(r));
+      row.append(ic, body);
+      row.onclick = () => { L.cur = i; markLog(); };
+      L.els.push(row);
+      scroll.append(row);
+    });
+  }
+  list.append(scroll);
+  const det = el("section", "card col detail-card");
+  const dscroll = el("div", "scroll", "");
+  dscroll.tabIndex = -1;
+  det.append(dscroll);
+  // Archo 日志分析: what the shared logs say about the picked error, its own card under the
+  // log text (06 §2.10); hidden while nothing matches
+  const ana = el("section", "card col ana-card");
+  ana.hidden = true;
+  ana.append(el("div", "col-head", ""), el("div", "scroll"));
+  ana.firstChild.append(el("span", "anum", "3"), T("Archo log analysis"));
+  // the analysis above the log text it explains; the gaps between the three cards drag
+  const side = el("div", "logside");
+  const hs = el("div", "hsplit");
+  hs.hidden = true;
+  side.append(ana, hs, det);
+  const vs = el("div", "split logsplit");
+  grid.append(list, vs, side);
+  logSplits(grid, list, vs, ana, hs);
+  w.append(grid);
+  // 1 the runs (or the monitor's entries), 2 the log text of the one picked
+  resetAreas();
+  area(list, list.querySelector(".ltabs") || null, () => { det.classList.remove("focus"); list.classList.add("focus"); });
+  area(det, null, () => { list.classList.remove("focus"); det.classList.add("focus"); det.querySelector(".scroll").focus(); });
+  area(ana, null, () => { if (!ana.hidden) ana.querySelector(".scroll").focus(); });
+  if (!list.querySelector(".ltabs")) { list.prepend(el("div", "col-head", "")); list.firstChild.append(el("span", "anum", "1"), T("the errors")); }
+  det.prepend(el("div", "col-head", "")); det.firstChild.append(el("span", "anum", "2"), T("the log text"));
+  scroll.scrollTop = was;
+  markLog(true);
+}
+
+// logText draws a log line in the game's colours: the level colours the line, a mod's
+// <color>, <b>, <i> (view.LogSpans) style its spans. Text only ever goes in as text; a
+// colour is used only when it is a plain #rrggbb.
+const HEX = /^#[0-9a-f]{6}$/;
+function logText(r) {
+  const d = el("div", "text lv-" + (r.level || "info"));
+  for (const sp of r.spans || [{ t: r.text }]) {
+    const styled = (sp.c && HEX.test(sp.c)) || sp.b || sp.i;
+    if (!styled) { d.append(document.createTextNode(sp.t)); continue; }
+    const s = el("span", (sp.c && HEX.test(sp.c) ? "rc" : "") + (sp.b ? " rb" : "") + (sp.i ? " ri" : ""));
+    s.textContent = sp.t;
+    if (sp.c && HEX.test(sp.c)) { s.style.setProperty("--c", sp.c); s.style.setProperty("--l", HEX.test(sp.l || "") ? sp.l : sp.c); }
+    d.append(s);
+  }
+  return d;
+}
+
+// filePicker: the log shown, and a menu of the logs — each Player.log with the companion
+// log of its run under it (03 §6.7.4); picking a companion shows its section.
+function filePicker(files) {
+  const shown = files.find((f) => f.path === L.path) || files[0];
+  const b = el("button", "btn quiet picker");
+  b.append(el("span", "", shown.label), el("span", "muted num", shown.when || ""), el("span", "chev", "⌄"));
+  b.onclick = (e) => {
+    e.stopPropagation();
+    const r = b.getBoundingClientRect();
+    pop.menu(r.left, r.bottom + 4, files.map((f) => ({
+      label: f.label, key: f.when, cls: (f.of ? "sub" : "") + ((f.of ? f.of === L.path && L.tab === 1 : f.path === L.path && L.tab === 0) ? " on" : ""),
+      run: () => {
+        L.tab = f.of ? 1 : 0;
+        if ((f.of || f.path) === L.path) return drawGameLog();
+        L.path = f.of || f.path; L.page = null; L.cur = 0; L.mcur = 0;
+        gameLog(L.path);
+      },
+    })));
+  };
+  return b;
+}
+
+// noMonitor: one line when the current plan has no Archo Monitor, with the default edit.
+function noMonitor(p) {
+  const n = el("div", "lognote");
+  n.append(el("span", "", p.noMonitor));
+  if (p.addMonitor) n.append(button(T("add Archo Monitor"), "", async () => {
+    try { say("ok", await api.AddMonitor(), true); } catch (e) { say("fail", errText(e)); }
+    await ui.reload();
+    gameLog(L.path);
+  }, "small"));
+  return n;
+}
+
+// monitorRows: the companion log of the run — time, level, kind, ×count, related mods and
+// files; a click opens its details and the Player.log cluster it matches.
+function monitorRows(scroll, mon) {
+  const head = el("div", "mhead");
+  if (mon.running) head.append(el("span", "live-dot"));
+  head.append(el("span", "", mon.facts));
+  scroll.append(head);
+  if (!mon.entries.length) { scroll.append(el("div", "empty-state", "✓ " + T("nothing reported in this run"))); return; }
+  mon.entries.forEach((m, i) => {
+    const open = L.open.has(m.key);
+    const row = el("div", "lrow mrow" + (open ? " open" : ""));
     const ic = el("span", "ic");
-    ic.innerHTML = statusIcon(r.status);
+    ic.innerHTML = statusIcon(m.status);
     const body = el("div", "body");
     const top = el("div", "top");
-    top.append(el("span", "chip", r.class), el("span", "count", "×" + r.count));
-    if (r.mods) top.append(el("span", "mods", r.mods));
-    body.append(top, el("div", "text", r.text));
+    top.append(el("span", "time num", m.time || ""));
+    if (m.kind) top.append(el("span", "chip", m.kind));
+    if (m.count > 1) top.append(el("span", "count", "×" + m.count));
+    if (m.mods && m.mods.length) { const s = el("span", "mods", m.mods.join(" · ")); s.title = m.mods.join("\n"); top.append(s); }
+    body.append(top, logText(m));
+    if (m.files && m.files.length) body.append(el("div", "files", m.files.join(" · ")));
+    if (open) {
+      if (m.details) { const pre = el("pre", "details"); pre.textContent = m.details; pre.onclick = (e) => e.stopPropagation(); body.append(pre); }
+      if (m.cluster) {
+        const go = el("button", "go", Tf("%s in Player.log", m.cluster) + " →");
+        go.onclick = (e) => { e.stopPropagation(); toCluster(m.cluster); };
+        body.append(go);
+      } else if (m.only) body.append(el("div", "files", Tf("only in %s: the game had stopped writing Player.log", mon.label)));
+    }
     row.append(ic, body);
-    row.onclick = () => { L.cur = i; markLog(); };
+    row.onclick = () => {
+      L.mcur = i;
+      L.open.has(m.key) ? L.open.delete(m.key) : L.open.add(m.key);
+      drawGameLog();
+    };
     L.els.push(row);
     scroll.append(row);
   });
-  list.append(scroll);
-  const det = el("section", "card col detail-card");
-  det.append(el("div", "scroll", ""));
-  grid.append(list, det);
-  w.append(grid);
+}
+
+// toCluster shows a Player.log cluster in the errors tab.
+function toCluster(id) {
+  const i = ((L.page && L.page.rows) || []).findIndex((r) => r.cluster === id);
+  L.tab = 0;
+  if (i >= 0) L.cur = i;
+  drawGameLog();
   markLog();
 }
 
+// logLive refreshes the companion section from the live tracker (pollLive's 2 s tick,
+// while the game runs).
+export async function logLive() {
+  if (S.screen !== "log" || !L.page || !L.page.path) return;
+  let m;
+  try { m = await api.LogMonitor(L.page.path); } catch { return; }
+  if (!m || S.screen !== "log" || !L.page) return;
+  if (JSON.stringify(m) === JSON.stringify(L.page.monitor)) return;
+  L.page.monitor = m;
+  drawGameLog();
+}
+
 let detailTimer = 0;
-function markLog() {
-  L.els.forEach((r, i) => r.classList.toggle("cur", i === L.cur));
-  const on = L.els[L.cur];
-  if (on) on.scrollIntoView({ block: "nearest" });
-  const r = L.page && L.page.rows && L.page.rows[L.cur];
+function markLog(keepScroll) {
+  const at = L.tab === 1 ? L.mcur : L.cur;
+  L.els.forEach((r, i) => r.classList.toggle("cur", i === at));
+  const on = L.els[at];
+  if (on && !keepScroll) on.scrollIntoView({ block: "nearest" });
   const box = $("#screen .detail-card .scroll");
   if (!box) return;
-  if (!r) { box.innerHTML = ""; box.append(el("div", "empty-state", T("pick an error on the left"))); return; }
-  const k = L.page.path + "|" + r.cluster;
-  if (L.detail.has(k)) return showLines(box, L.detail.get(k));
+  setAna(null);
+  let id = "";
+  if (L.tab === 1) {
+    const mon = L.page && L.page.monitor;
+    const m = mon && mon.entries[at];
+    if (!m) { box.innerHTML = ""; box.append(el("div", "empty-state", T("pick an entry on the left"))); return; }
+    if (!m.cluster) {
+      const why = m.only ? Tf("only in %s: the game had stopped writing Player.log", mon.label) : T("no matching error in Player.log");
+      showLines(box, [why, "", m.text, ...(m.details ? ["", m.details] : [])]);
+      return;
+    }
+    id = m.cluster;
+  } else {
+    const r = L.page && L.page.rows && L.page.rows[at];
+    if (!r) { box.innerHTML = ""; box.append(el("div", "empty-state", T("pick an error on the left"))); return; }
+    id = r.cluster;
+  }
+  const k = L.page.path + "|" + id;
+  if (L.detail.has(k)) { const d = L.detail.get(k); return showLines(box, d.lines, d.card); }
   box.innerHTML = "";
-  box.append(el("div", "empty-state", T("loading…")));
+  box.append(shimmer(T("loading…"), 8));
   clearTimeout(detailTimer);
+  L.want = k;
   detailTimer = setTimeout(async () => {
-    let lines;
-    try { lines = await api.LogCluster(L.page.path, r.cluster); } catch (e) { lines = [errText(e)]; }
-    L.detail.set(k, lines);
-    const now = L.page && L.page.rows && L.page.rows[L.cur];
-    if (now && L.page.path + "|" + now.cluster === k) showLines($("#screen .detail-card .scroll"), lines);
+    const path = L.page.path;
+    let lines, card = null;
+    try {
+      [lines, card] = await Promise.all([api.LogCluster(path, id), api.LogPattern(path, id).catch(() => null)]);
+    } catch (e) { lines = [errText(e)]; }
+    L.detail.set(k, { lines, card });
+    if (L.want === k) showLines($("#screen .detail-card .scroll"), lines, card);
   }, 90);
 }
 
-function showLines(box, lines) {
+// showLines: a cluster's evidence (the CLI text: the whole message, its extra lines, the
+// messages around it), then the pattern card when the cluster matches a pattern.
+function showLines(box, lines, card) {
   if (!box) return;
   box.innerHTML = "";
   const pre = el("pre", "lines");
   pre.textContent = (lines || []).join("\n");
   box.append(pre);
+  setAna(card);
 }
 
-async function changes() {
-  try { C.scans = (await api.Changes()) || []; } catch (e) { say("fail", errText(e)); return; }
-  C.cur = Math.min(C.cur, 1e9);
+// logSplits: the gap between the list and the right side drags the list's width; the gap
+// under Archo 日志分析 drags its height. Kept in ui.gui.log.left / ui.gui.log.ana;
+// double-click goes back to the default.
+const LOG_LEFT = "ui.gui.log.left", LOG_ANA = "ui.gui.log.ana";
+const logSize = { left: null, ana: null };
+function applyLogSize(grid) {
+  if (logSize.left) grid.style.setProperty("--log-left", logSize.left + "px");
+  else grid.style.removeProperty("--log-left");
+  if (logSize.ana) grid.style.setProperty("--log-ana", logSize.ana + "px");
+  else grid.style.removeProperty("--log-ana");
+  grid.classList.toggle("ana-sized", !!logSize.ana);
+}
+function logSplits(grid, list, vs, ana, hs) {
+  if (logSize.left == null) {
+    Promise.all([api.Setting(LOG_LEFT), api.Setting(LOG_ANA)]).then(([l, a]) => {
+      logSize.left = +l || 0; logSize.ana = +a || 0; applyLogSize(grid);
+    }).catch(() => { logSize.left = 0; logSize.ana = 0; });
+  } else applyLogSize(grid);
+  const drag = (sp, key, axis, start, clamp) => {
+    sp.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      const p0 = axis === "x" ? e.clientX : e.clientY, v0 = start();
+      sp.classList.add("drag");
+      document.body.classList.add(axis === "x" ? "resizing" : "resizing-y");
+      const move = (m) => { logSize[key] = clamp(Math.round(v0 + (axis === "x" ? m.clientX : m.clientY) - p0)); applyLogSize(grid); };
+      const up = () => {
+        sp.classList.remove("drag");
+        document.body.classList.remove("resizing", "resizing-y");
+        removeEventListener("mousemove", move);
+        removeEventListener("mouseup", up);
+        api.SetSetting(key === "left" ? LOG_LEFT : LOG_ANA, String(logSize[key])).catch(() => {});
+      };
+      addEventListener("mousemove", move);
+      addEventListener("mouseup", up);
+    });
+    sp.addEventListener("dblclick", () => { logSize[key] = 0; applyLogSize(grid); api.SetSetting(key === "left" ? LOG_LEFT : LOG_ANA, "").catch(() => {}); });
+  };
+  drag(vs, "left", "x", () => list.getBoundingClientRect().width, (v) => Math.max(260, Math.min(grid.clientWidth - 320, v)));
+  drag(hs, "ana", "y", () => ana.getBoundingClientRect().height, (v) => Math.max(80, Math.min(grid.clientHeight - 140, v)));
+}
+
+// setAna fills the Archo 日志分析 card with a pattern card, or hides it (null).
+function setAna(card) {
+  const ana = $("#screen .ana-card");
+  if (!ana) return;
+  const sc = ana.querySelector(".scroll");
+  sc.innerHTML = "";
+  ana.hidden = !card;
+  const hs = ana.nextElementSibling;
+  if (hs && hs.classList.contains("hsplit")) hs.hidden = !card;
+  if (card) sc.append(patternCard(card));
+}
+
+// patternCard (06 §2.10): what the shared logs say this kind of error usually is. It is
+// marked as community background, apart from the evidence above: never a conclusion about
+// this list.
+function patternCard(c) {
+  const d = el("div", "pcard");
+  // first what it does to the game and how much that matters, then what it usually is and
+  // what to try; the causes, the other fixes and the numbers are quieter, and the source
+  // (shared logs, not a verdict on this list) closes the card
+  if (c.levelText) {
+    const h = el("div", "psev");
+    h.append(el("span", "sev " + c.level, c.levelText), el("span", "impact", c.impact));
+    d.append(h);
+  }
+  if (c.summary) d.append(el("div", "ps", c.summary));
+  if (c.next) d.append(el("div", "pnext", c.next));
+  if (c.known) d.append(el("div", "ps known", c.known));
+  const more = el("div", "pmore");
+  const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v", v)); more.append(r); };
+  if (c.causes && c.causes.length) row(T("common causes"), c.causes.join(T("; ")));
+  if (c.fixes && c.fixes.length) row(T("kinds of fix"), c.fixes.join(" · "));
+  if (more.childNodes.length) d.append(more);
+  const facts = [c.seen, c.gone].filter(Boolean).join(" · ");
+  if (facts) d.append(el("div", "pm", facts));
+  d.append(el("div", "pm note", T("from shared logs, not a conclusion about your list")));
+  return d;
+}
+
+// ---- Mod 库存 › 变化 (06 §2.9): one row per mod, what its changes mean, by tier ----
+// The current plan's mods since that plan was last played (a: the whole library); new and
+// gone mods are one summary row; older changes follow by day. enter opens a row (the
+// grouped summary, then every fact, then its actions), i its raw file list. ctrl+w opens
+// the Workshop change notes, ctrl+o the folder, S sorts, ! goes to 能不能跑, p locks this
+// version. tab / shift+tab go to the other sub-page (全部). Data: API.Changes
+// (view.BuildChanges → modchanges.Build).
+
+// changesFiltered: 变化 shows one mod's Lineage (the hint line offers esc).
+export function changesFiltered() { return S.screen === "changes" && !!C.of; }
+
+// changesPlan: the next 变化 shows the current plan since it was last played (the home
+// page's line opens it so).
+export function changesPlan() { C.library = false; C.of = null; C.cur = 0; }
+
+// changes shows the page; of: {id, name} narrows it to that mod's Lineage, null shows every
+// mod, undefined keeps what it shows.
+export async function changes(of) {
+  if (of !== undefined && (of && of.id) !== (C.of && C.of.id)) { C.of = of; C.cur = 0; C.open.clear(); }
+  let p;
+  try { p = await api.Changes(C.library, C.of ? C.of.id : ""); } catch (e) { say("fail", errText(e)); return; }
+  C.page = p;
   drawChanges();
 }
 
-function rescanButton() {
-  const b = button(S.busy.scan ? T("scanning…") : T("rescan the mod folders"), "R", () => ui.cmd("rescan"));
+export function rescanButton(label) {
+  const b = button(S.busy.scan ? T("scanning…") : label || T("rescan the mod folders"), "R", () => ui.cmd("rescan"));
   b.classList.add("rescan");
+  if (label) b.dataset.label = label;
   b.prepend(el("span", "ic" + (S.busy.scan ? " spin" : "")));
   b.firstChild.innerHTML = icon.rescan;
   b.disabled = !!S.busy.scan;
@@ -416,45 +805,190 @@ function rescanButton() {
 // the pages that show what it found.
 export function busyChanged() {
   if (S.screen === "env") return environment();
-  if (S.screen === "logs" && L.sub === 1) return changes();
+  if (S.screen === "changes") return changes();
+  const b = document.querySelector(".page .rescan");
+  if (b) b.replaceWith(rescanButton(b.dataset.label));
 }
 
+const rowKey = (r) => r.id + "|" + (r.before || 0) + "|" + (r.after || 0);
+const TIER = { 1: "launch", 2: "watch", 3: "content" };
+
 function drawChanges() {
-  const w = logsPage(rescanButton());
-  const scroll = el("div", "scroll page-scroll");
+  const top = ($("#screen .page-scroll") || {}).scrollTop || 0;
+  const w = logPage("changes", T("what changed in your mods"), rescanButton());
+  const scroll = el("div", "scroll page-scroll chg");
   w.append(scroll);
-  if (!C.scans.length) { scroll.append(el("div", "card empty-state", T("no scan yet (R scans)"))); return; }
-  C.rows = [];
+  const p = C.page || {};
+  // the scope and time, or the one condition (removable as on Mod 库存)
+  const bar = el("div", "chg-bar");
+  if (C.of) {
+    const b = el("button", "lib-cond");
+    b.append(el("span", "", Tf("only %s", C.of.name)), el("span", "x", "×"));
+    b.title = T("esc shows every mod");
+    b.onclick = () => changes(null).then(() => ui.renderHints());
+    bar.append(b);
+  } else {
+    const seg = el("div", "chg-scope");
+    for (const [lib, label] of [[false, T("the current plan")], [true, T("the whole library")]]) {
+      const b = el("button", "pill" + (C.library === lib ? " on" : ""), label);
+      b.title = "a";
+      b.onclick = () => { if (C.library !== lib) toggleScope(); };
+      seg.append(b);
+    }
+    bar.append(seg);
+    if (p.since) bar.append(el("span", "muted", p.since));
+  }
+  scroll.append(bar);
+  C.items = [];
   C.els = [];
-  for (const s of C.scans) {
-    const card = el("section", "card");
-    const head = el("div", "card-head");
-    head.append(el("span", "label", Tf("scan %s", s.time)), el("span", "muted", s.summary));
+  if (p.noScan) { scroll.append(el("div", "card empty-state", T("no scan yet (R scans)"))); return finish(); }
+  if (!C.of) {
+    const card = el("section", "card chg-card");
+    for (const r of p.rows || []) modRow(card, r);
+    if (p.arrivals) group(card, p.arrivals, "now");
+    if (!card.children.length) card.append(el("div", "empty-state", T("nothing changed")));
+    scroll.append(card);
+  }
+  const older = p.older || [];
+  if (older.length && !C.of) scroll.append(el("h2", "label chg-older", T("earlier")));
+  for (const d of older) {
+    const k = "day:" + d.day;
+    const open = !!C.of || C.open.has(k);
+    const card = el("section", "card chg-card");
+    const n = (d.rows || []).length + ((d.arrivals && d.arrivals.rows) || []).length;
+    const head = el("div", "chg-row chg-day");
+    head.append(el("span", "mod", d.day), el("span", "muted", Tf("%d mods", n)), el("span", "chev", open ? "▾" : "▸"));
+    item(head, { t: "day", key: k });
     card.append(head);
-    for (const e of s.events || []) {
-      const i = C.rows.length;
-      C.rows.push(e);
-      const r = el("div", "ev");
-      r.append(el("span", "mod", e.mod), el("span", "muted", e.text));
-      if (e.files) r.append(el("span", "faint", C.open.has(e.id) ? "▾" : "▸"));
-      r.onclick = () => { C.cur = i; toggleFiles(e); };
-      C.els.push(r);
-      card.append(r);
-      if (C.open.has(e.id)) card.append(el("pre", "lines files", C.open.get(e.id).join("\n")));
+    if (open) {
+      for (const r of d.rows || []) modRow(card, r);
+      if (d.arrivals) group(card, d.arrivals, d.day);
     }
     scroll.append(card);
   }
-  C.cur = Math.min(C.cur, Math.max(C.rows.length - 1, 0));
-  markRows(C);
+  finish();
+  function finish() {
+    C.cur = Math.min(C.cur, Math.max(C.items.length - 1, 0));
+    markRows(C);
+    const sc = $("#screen .page-scroll");
+    if (sc) sc.scrollTop = top;
+    ui.renderHints();
+  }
 }
 
-async function toggleFiles(e) {
-  const top = ($("#screen .page-scroll") || {}).scrollTop || 0;
-  if (C.open.has(e.id)) C.open.delete(e.id);
-  else if (e.files) C.open.set(e.id, (await api.FileDiff(e.id)) || []);
+// item registers a selectable row: a click selects it and opens or closes it.
+function item(node, it) {
+  const i = C.items.length;
+  C.items.push(it);
+  C.els.push(node);
+  node.onclick = (e) => { if (e.target.closest("button")) return; C.cur = i; toggle(it); };
+}
+
+// modRow: [tier] name · sentence ▸, opened: the summary, every fact, the files, the actions.
+function modRow(card, r) {
+  const k = rowKey(r);
+  const open = C.open.has(k);
+  const row = el("div", "chg-row");
+  row.append(el("span", "tier " + (TIER[r.tier] || ""), r.tierText), el("span", "mod", r.mod), el("span", "txt", r.text));
+  if ((r.details && r.details.length) || r.actions || hasFiles(r)) row.append(el("span", "chev", open ? "▾" : "▸"));
+  item(row, { t: "mod", key: k, r });
+  card.append(row);
+  if (!open) return;
+  const box = el("div", "chg-open");
+  for (const d of r.details || []) box.append(el("div", "line", d));
+  if (hasFiles(r)) {
+    const f = el("button", "chg-files", (C.raw.has(k) ? "▾ " : "▸ ") + T("files"));
+    f.title = "i";
+    f.onclick = () => rawFiles(r);
+    box.append(f);
+    if (C.raw.has(k)) {
+      const pre = el("pre", "lines files");
+      pre.textContent = C.raw.get(k).join("\n");
+      box.append(pre);
+    }
+  }
+  if (r.actions && r.actions.length) {
+    const acts = el("div", "chg-acts");
+    for (const a of r.actions) {
+      const b = el("button", "btn", a.label);
+      b.append(el("kbd", "", a.key));
+      b.onclick = () => changeAct(r, a.kind);
+      acts.append(b);
+    }
+    box.append(acts);
+  }
+  card.append(box);
+}
+
+const hasFiles = (r) => r.before && r.after && r.before !== r.after;
+
+// group: the one row of new and gone mods; opened, each of them.
+function group(card, g, where) {
+  const k = "group:" + where;
+  const open = C.open.has(k);
+  const row = el("div", "chg-row chg-group");
+  row.append(el("span", "tier content", T("new and gone")), el("span", "txt", g.text), el("span", "chev", open ? "▾" : "▸"));
+  item(row, { t: "group", key: k });
+  card.append(row);
+  if (open) for (const r of g.rows || []) modRow(card, r);
+}
+
+function toggle(it) {
+  C.open.has(it.key) ? C.open.delete(it.key) : C.open.add(it.key);
   drawChanges();
-  const sc = $("#screen .page-scroll");
-  if (sc) sc.scrollTop = top;
+}
+
+async function rawFiles(r) {
+  const k = rowKey(r);
+  if (C.raw.has(k)) C.raw.delete(k);
+  else {
+    try { C.raw.set(k, (await api.ChangeFiles(r.before, r.after)) || []); } catch (e) { return say("fail", errText(e)); }
+    C.open.add(k);
+  }
+  drawChanges();
+}
+
+function toggleScope() {
+  if (C.of) return;
+  C.library = !C.library;
+  C.cur = 0;
+  changes();
+}
+
+// changeAct runs a row's action (each also has its key on the page).
+async function changeAct(r, kind) {
+  switch (kind) {
+    case "workshop":
+      try { say("ok", await api.OpenChangeNotes(r.workshopId)); } catch (e) { say("fail", errText(e)); }
+      return;
+    case "deps": return ui.go("needs");
+    case "sort": return ui.run("sort");
+    case "lock": {
+      // a copy in the lock library: the dry run first, as on Mod 库存 (06 §6)
+      let p;
+      try { p = await api.LibraryPreview("pin", [r.ref]); } catch (e) { return say("fail", errText(e)); }
+      pop.confirm(p.title, p.lines, T("lock this one"), p.apply ? async () => {
+        try { say("ok", await api.LibraryDo("pin", [r.ref])); } catch (e) { say("fail", errText(e)); }
+        await ui.reload();
+        changes();
+      } : null);
+    }
+  }
+}
+
+// changesHints: the hint line on 变化 — the moves, then what the row under the cursor offers.
+export function changesHints() {
+  const it = C.items[C.cur];
+  const out = [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }];
+  if (it && it.r) {
+    if (hasFiles(it.r)) out.push({ key: "i", label: T("files") });
+    // ctrl+o first: the hint line folds it with ctrl+w into one place
+    out.push({ key: "ctrl+o", label: T("open the folder") });
+    for (const a of it.r.actions || []) out.push({ key: a.key, label: a.label });
+  }
+  if (!C.of) out.push({ key: "a", label: C.library ? T("the current plan") : T("the whole library") });
+  out.push({ key: "tab", label: T("all mods") });
+  return out;
 }
 
 function markRows(X) {
@@ -463,132 +997,75 @@ function markRows(X) {
   if (on) on.scrollIntoView({ block: "nearest" });
 }
 
-async function actions() {
-  try { H.items = (await api.History()) || []; } catch (e) { say("fail", errText(e)); return; }
-  const w = logsPage();
-  const scroll = el("div", "scroll page-scroll");
-  w.append(scroll);
-  const card = el("section", "card");
-  const head = el("div", "card-head");
-  head.append(el("span", "label", T("manager actions")), el("span", "muted", T("unsaved steps and saved versions; click one to go there")));
-  card.append(head);
-  H.els = [];
-  if (H.items.length <= 1) card.append(el("div", "empty-state", T("no actions yet")));
-  let versions = false;
-  H.items.forEach((h, i) => {
-    if (h.kind === "version" && !versions) { versions = true; card.append(el("div", "group", T("saved versions"))); }
-    const r = el("div", "ev h " + h.kind, h.text);
-    if (h.kind === "now") r.prepend(el("span", "dot"));
-    r.onclick = () => { H.cur = i; markRows(H); if (h.kind !== "now") goHistory(h); };
-    H.els.push(r);
-    card.append(r);
-  });
-  scroll.append(card);
-  if (H.cur < 0) H.cur = Math.max(0, H.items.findIndex((h) => h.kind === "now"));
-  H.cur = Math.max(0, Math.min(H.cur, H.items.length - 1));
-  markRows(H);
-}
-
-async function goHistory(h) {
-  await onHistory(h);
-  if (S.screen === "logs" && L.sub === 2) actions();
-}
-
+// logsKey: the arrows move in the game log's errors or in the changes; enter opens a
+// change's files.
 export function logsKey(e) {
   const k = e.key;
-  if (k === "Tab") { e.preventDefault(); return logs((L.sub + (e.shiftKey ? 2 : 1)) % 3); }
-  if (!e.shiftKey && "123".includes(k) && k.length === 1) { e.preventDefault(); return logs(+k - 1); }
-  if (L.sub === 0) {
+  // focus in the log text (2): the arrows and page keys scroll it
+  if (S.screen === "log" && document.activeElement && document.activeElement.closest(".detail-card") && /^(Arrow(Up|Down)|Page(Up|Down)|Home|End)$/.test(k)) return;
+  if (S.screen === "log") {
+    const mon = L.page && L.page.monitor;
+    if (mon && (k === "ArrowLeft" || k === "ArrowRight")) { e.preventDefault(); L.tab = k === "ArrowRight" ? 1 : 0; return drawGameLog(); }
+    if (L.tab === 1 && mon) {
+      const n = mon.entries.length;
+      const m = n ? moveIn(L.mcur, n, k) : null;
+      if (m != null) { e.preventDefault(); L.mcur = m; return markLog(); }
+      const it = mon.entries[L.mcur];
+      if (k === "Enter" && it) { e.preventDefault(); L.open.has(it.key) ? L.open.delete(it.key) : L.open.add(it.key); return drawGameLog(); }
+      return;
+    }
     const n = (L.page && L.page.rows && L.page.rows.length) || 0;
     const m = n ? moveIn(L.cur, n, k) : null;
     if (m != null) { e.preventDefault(); L.cur = m; return markLog(); }
     return;
   }
-  const X = L.sub === 1 ? C : H;
-  const n = L.sub === 1 ? C.rows.length : H.items.length;
-  const m = n ? moveIn(X.cur, n, k) : null;
-  if (m != null) { e.preventDefault(); X.cur = m; return markRows(X); }
-  if (k === "Enter") {
-    e.preventDefault();
-    if (L.sub === 1 && C.rows[C.cur]) return toggleFiles(C.rows[C.cur]);
-    const h = H.items[H.cur];
-    if (L.sub === 2 && h && h.kind !== "now") return goHistory(h);
-  }
+  return changesKey(e);
 }
 
-// ---- the full detail (06 §6.3): ←→ the previous / next mod, tab the sub-sections ----
-const F = { tab: 0, secs: null, id: "" };
-
-export async function full() {
-  const it = cur();
-  if (!it || !it.id) return;
-  if (F.id !== it.id) { F.tab = 0; F.secs = null; F.id = it.id; }
-  openScreen("full");
-  drawFull();
-  try { F.secs = await api.Sections(it.id); } catch (e) { F.secs = []; say("fail", errText(e)); }
-  if (S.screen === "full" && F.id === it.id) drawFull();
-}
-
-function drawFull() {
-  const sc = $("#screen");
-  sc.innerHTML = "";
-  const d = S.detail;
-  const names = [T("summary"), ...(F.secs || []).map((s) => s.title + (s.count >= 0 ? " · " + s.count : ""))];
-  const w = page("full", d ? d.name : "", el("span", "muted", T("← → the previous / next mod · tab the sections")));
-  const bar = el("div", "subbar");
-  bar.append(seg(names, F.tab, (i) => { F.tab = i; drawFull(); }));
-  w.append(bar);
-  const card = el("section", "card pad");
-  if (F.tab === 0) {
-    const src = $("#detail");
-    card.append(src.cloneNode(true));
-    // re-bind the links of the copy through the original's handlers
-    card.querySelectorAll(".link").forEach((a, i) => { const o = src.querySelectorAll(".link")[i]; if (o) a.onclick = o.onclick; });
-  } else if (F.secs) {
-    const s = F.secs[F.tab - 1];
-    const pre = el("pre", "lines");
-    pre.textContent = (s.lines || []).join("\n");
-    card.append(pre);
-  } else card.append(el("p", "muted", T("loading…")));
-  w.append(card);
-  sc.append(w);
-  ui.renderWhere();
-}
-
-export function fullKey(e) {
-  const n = 1 + (F.secs ? F.secs.length : 0);
-  if (e.key === "Tab") { F.tab = (F.tab + (e.shiftKey ? n - 1 : 1)) % n; drawFull(); e.preventDefault(); return; }
-  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-    e.preventDefault();
-    ui.step(e.key === "ArrowRight" ? 1 : -1).then(() => full());
+// changesKey: the keys of 变化 (every action on the page has one).
+function changesKey(e) {
+  const k = e.key;
+  const ctrl = e.ctrlKey || e.metaKey;
+  const done = () => e.preventDefault();
+  if (k === "Escape" && C.of) { done(); return changes(null).then(() => ui.renderHints()); }
+  if (k === "Tab") { done(); return ui.go("library"); }
+  const m = C.items.length ? moveIn(C.cur, C.items.length, k) : null;
+  if (m != null) { done(); C.cur = m; markRows(C); return ui.renderHints(); }
+  const it = C.items[C.cur];
+  const r = it && it.r;
+  const has = (kind) => r && (r.actions || []).some((a) => a.kind === kind);
+  if (ctrl) {
+    const lk = k.toLowerCase();
+    if (lk === "o" && r) { done(); return api.OpenFolder(r.id).then(() => say("ok", T("opened the folder")), (x) => say("fail", errText(x))); }
+    if (lk === "w" && r) { done(); return changeAct(r, "workshop"); }
     return;
   }
-  const sc = $("#screen");
-  if (e.key === "ArrowDown") sc.scrollTop += 40;
-  else if (e.key === "ArrowUp") sc.scrollTop -= 40;
-  else if (e.key === "PageDown" || e.key === " ") sc.scrollTop += sc.clientHeight * 0.9;
-  else if (e.key === "PageUp") sc.scrollTop -= sc.clientHeight * 0.9;
-  else return;
-  e.preventDefault();
+  if (k === "Enter" && it) { done(); return toggle(it); }
+  if (k === "i" && r && hasFiles(r)) { done(); return rawFiles(r); }
+  if (k === "a" && !C.of) { done(); return toggleScope(); }
+  if (k === "R") { done(); return ui.cmd("rescan"); }
+  if (k === "S" && has("sort")) { done(); return changeAct(r, "sort"); }
+  if (k === "D" && has("deps")) { done(); return changeAct(r, "deps"); }
+  if (k === "p" && has("lock")) { done(); return changeAct(r, "lock"); }
 }
 
-export function fullSection() {
-  if (S.screen !== "full" || !F.secs || F.tab === 0) return "";
-  return F.secs[F.tab - 1].title;
-}
+// ---- the full detail (06 §4.2): one page for the editor and Mod 库存 (fulldetail.js) ----
+export { full, fullKey, fullSection } from "./fulldetail.js";
 
-// ---- settings (10 §7) ----
+// ---- settings (06 §2.14) ----
 // Every row is a value and the command that changes it (view.SettingsPage); the page runs
 // only those commands (API.ApplySetting).
 
 export async function settings() {
-  let groups;
-  try { groups = (await api.Settings()) || []; } catch (e) { say("fail", errText(e)); return; }
+  let groups, bg;
+  try { [groups, bg] = await Promise.all([api.Settings(), bgSection()]); } catch (e) { say("fail", errText(e)); return; }
+  groups = groups || [];
   const sc = S.screen === "settings" ? $("#screen") : openScreen("settings");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("settings", T("settings"));
+  const w = page("settings", T("how RimArcho looks and works; each row shows the command that changes it"));
   sc.append(w);
+  w.append(bg);
   renderGroups(w, groups, settings);
   sc.scrollTop = top;
 }
@@ -610,8 +1087,10 @@ function settingRunner(again) {
 function renderGroups(w, groups, again) {
   const run = settingRunner(again);
   for (const g of groups) {
-    w.append(el("div", "label section", g.title));
+    const lab = el("div", "label section", g.title);
+    w.append(lab);
     const card = el("section", "card settings");
+    area(card, lab);
     for (const it of g.items || []) {
       const row = el("div", "set");
       const left = el("div", "l");
@@ -620,14 +1099,14 @@ function renderGroups(w, groups, again) {
       const right = el("div", "r");
       if (it.edit === "choice") {
         const s = el("select");
-        for (const c of it.choices) {
-          const o = el("option", "", c);
+        for (const [i, c] of it.choices.entries()) {
+          const o = el("option", "", (it.choiceLabels && it.choiceLabels[i]) || c);
           o.value = c;
           if (c === it.value) o.selected = true;
           s.append(o);
         }
-        // A new language needs the page's text again: reload after it is set.
-        s.onchange = () => run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => location.reload() : null);
+        // A new language: the page's text again, in place (main.js relang).
+        s.onchange = () => run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : null);
         right.append(s);
       } else if (it.edit) {
         const inp = el("input", "field");
@@ -635,11 +1114,16 @@ function renderGroups(w, groups, again) {
         inp.spellcheck = false;
         const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim()));
         inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
-        right.append(inp, ok);
+        right.append(inp);
+        // A folder: the window's folder dialog; the chosen folder is applied at once.
+        if (it.edit === "path") right.append(button(T("choose…"), "", () => pickFolder(inp.value, (p) => run(it.argv, p))));
+        right.append(ok);
       } else if (it.value) {
         right.append(el("span", "muted", it.value));
       }
       for (const a of it.actions || []) {
+        // 卸载 RimArcho is its own page with the plan; every other action is a command
+        if (a.argv[0] === "uninstall") { right.append(button(a.label, "", () => ui.go(a.argv[0]))); continue; }
         right.append(button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, () => run(a.argv)) : run(a.argv)));
       }
       row.append(left, right);
@@ -649,9 +1133,19 @@ function renderGroups(w, groups, again) {
   }
 }
 
+// pickFolder opens the window's folder dialog at start and calls then with the folder
+// chosen (nothing when cancelled). Without a window (the development harness) it says so:
+// every path can be typed.
+export async function pickFolder(start, then) {
+  let p;
+  try { p = await api.PickFolder(start || ""); } catch (e) { say("fail", errText(e)); return; }
+  if (p) then(p);
+}
+
 // ---- the environment (the pill on the left of the top bar) ----
-// Everything here belongs to one game installation: which one is in use, its folders, how
-// it is started, and rescanning its mod folders.
+// Everything here belongs to one game folder (02 §0): which one is in use, the folder, its
+// version, how it is started and its saves. The mod folders every game shares are on the
+// settings page.
 
 export async function environment() {
   let p;
@@ -659,9 +1153,12 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", T("environment"), el("span", "grow"), rescanButton());
+  const w = page("env", T("an environment is one game folder: its version, how it starts, its saves"), act(T("add an environment"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
+  const envLab = el("div", "label section", T("every environment"));
+  w.append(envLab);
   const card = el("section", "card");
+  area(card, envLab);
   for (const e of p.envs || []) {
     const row = el("div", "envrow" + (e.current ? " on" : ""));
     const l = el("div", "l");
@@ -676,6 +1173,7 @@ export async function environment() {
         environment();
       }));
     }
+    row.append(button(T("remove environment"), "", () => removeEnv(e.name), "quiet"));
     card.append(row);
   }
   w.append(card);
@@ -683,186 +1181,17 @@ export async function environment() {
   sc.scrollTop = top;
 }
 
-// ---- packs (10 §8) ----
-// The packs like versions in a game launcher: play one, or build one from the current list.
-// A build runs in the background (an `archo pack build` child): the page shows its steps
-// and progress from the "pack" events, and a build another window started, or one cut
-// short, from the list (Packs().unfinished).
-
-const PACK_STEPS = ["check the list", "sort for the pack", "copy the mods", "write pack.json", "ready to play"];
-const builds = {};      // name → the preview's steps, for the build card
-let packPoll = 0;
-
-// flow draws the build's steps as boxes joined by arrows. steps: the preview's (with
-// facts); at: the step a build is at (-1: a preview); done: the build ended.
-function flow(steps, at = -1, done = false) {
-  const f = el("div", "flow");
-  steps.forEach((s, i) => {
-    if (i) f.append(el("div", "arrow" + (at > i - 1 || done ? " on" : "")));
-    let cls = "step";
-    if (s.level) cls += " " + s.level;
-    if (at >= 0) cls += done || i < at ? " done" : i === at ? " cur" : " wait";
-    const b = el("div", cls);
-    const h = el("div", "h");
-    h.append(el("span", "n", done || (at >= 0 && i < at) ? "✓" : String(i + 1)), el("span", "t", s.title));
-    b.append(h);
-    for (const x of s.facts || []) b.append(el("div", "f", x));
-    f.append(b);
+// removeEnv: the dry run says what RimArcho forgets and what stays, one confirmation removes
+// it (06 §2.14). Another environment takes over when it was in use; with none left, the
+// guide opens.
+export async function removeEnv(name) {
+  let p;
+  try { p = await api.EnvRemovePreview(name); } catch (e) { say("fail", errText(e)); return; }
+  pop.confirm(p.title, p.lines, T("remove environment"), async () => {
+    try { say("ok", await api.RemoveEnv(name)); } catch (e) { say("fail", errText(e)); return; }
+    for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
+    await ui.reload();
+    if (!(S.board && S.board.envs && S.board.envs.length)) return ui.go("guide");
+    if (S.screen === "env") environment();
   });
-  return f;
-}
-
-function plainSteps() { return PACK_STEPS.map((t) => ({ title: T(t), facts: [] })); }
-
-// attention lists what the player must look at: the steps marked amber or red, with their
-// details (the blockers, the mods that cannot be copied, the version mismatches).
-function attention(steps) {
-  const box = el("div", "attn");
-  for (const s of steps) {
-    if (s.level !== "warn" && s.level !== "bad") continue;
-    const g = el("div", "a " + s.level);
-    g.append(el("div", "h", [s.title, ...(s.facts || [])].join(" · ")));
-    if (s.more && s.more.length) {
-      const ul = el("ul");
-      for (const m of s.more) ul.append(el("li", "", m));
-      g.append(ul);
-    }
-    box.append(g);
-  }
-  return box.childNodes.length ? box : null;
-}
-
-function progressBox(p) {
-  const w = el("div", "prog");
-  const bar = el("div", "bar" + (p.error ? " bad" : ""));
-  const fill = el("i");
-  fill.style.width = Math.round((p.frac || 0) * 100) + "%";
-  bar.append(fill);
-  w.append(bar, el("div", "ptext" + (p.error ? " bad" : ""), p.error || p.text || ""));
-  return w;
-}
-
-// buildCard is a build on the page: running (here or in another window) or cut short.
-function buildCard(u) {
-  const card = el("section", "card build" + (u.running ? "" : " unfinished"));
-  card.dataset.build = u.name;
-  const head = el("div", "pack");
-  const left = el("div", "l");
-  left.append(el("div", "name", u.running ? Tf("building pack %s", u.name) : u.name), el("div", "sub", u.facts || ""));
-  const right = el("div", "r");
-  if (u.running) {
-    right.append(button(T("stop"), "", async () => {
-      try { say("ok", await api.PackStop(u.name)); } catch (e) { say("fail", errText(e)); }
-    }));
-  } else {
-    right.append(button(T("build again"), "", () => previewBuild(u.name), "primary"));
-    right.append(button(T("delete what it copied"), "", () => pop.confirm(T("delete what it copied"), [Tf("the unfinished build of %s and what it copied (%s) are deleted; your mods are not touched", u.name, u.copied || "?")], T("delete what it copied"), async () => {
-      say("busy", T("deleting what it copied…"));
-      try { say("ok", await api.PackRemoveUnfinished(u.name)); } catch (e) { say("fail", errText(e)); }
-      packs();
-    }), "danger"));
-  }
-  head.append(left, right);
-  card.append(head);
-  if (u.running) {
-    const p = u.progress || { step: 0, frac: 0, text: "" };
-    const body = el("div", "flowwrap");
-    body.append(flow(builds[u.name] || plainSteps(), p.step, p.done), progressBox(p));
-    card.append(body);
-  }
-  return card;
-}
-
-// packEvent is a "pack" event: the progress of the build this window started, and its end.
-export function packEvent(ev) {
-  S.packBuild = ev.done ? null : ev;
-  if (ev.done) {
-    say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
-    if (S.screen === "packs") packs();
-    return;
-  }
-  if (S.screen !== "packs") { say("busy", Tf("building pack %s", ev.name) + " · " + ev.text); return; }
-  const card = document.querySelector(`.card.build[data-build="${CSS.escape(ev.name)}"]`);
-  if (!card) { packs(); return; }
-  const body = card.querySelector(".flowwrap");
-  body.innerHTML = "";
-  body.append(flow(builds[ev.name] || plainSteps(), ev.step, false), progressBox(ev));
-  card.querySelector(".sub").textContent = T("building") + " · " + ev.text;
-}
-
-async function previewBuild(n) {
-  let pv;
-  say("busy", T("checking the list…"));
-  try { pv = await api.PackPreview(n); } catch (e) { return say("fail", errText(e)); }
-  say("", "");
-  const body = el("div", "packpv");
-  body.append(flow(pv.steps));
-  const a = attention(pv.steps);
-  if (a) body.append(a);
-  if (pv.dir) body.append(el("div", "muted dir", T("folder") + ": " + pv.dir));
-  pop.panel(Tf("build pack %s", n), body, T("build"), pv.ok ? async () => {
-    builds[n] = pv.steps;
-    try { say("ok", await api.PackBuild(n)); } catch (e) { say("fail", errText(e)); }
-    packs();
-  } : null, "wide");
-}
-
-export async function packs() {
-  let rows, others = 0, un = [];
-  try {
-    const l = await api.Packs();
-    rows = (l && l.rows) || []; others = (l && l.others) || 0; un = (l && l.unfinished) || [];
-    // This window's build before its child wrote its first state.
-    if (l && l.building && !un.some((u) => u.name === l.building)) un.unshift({ name: l.building, running: true, facts: T("checking the list…") });
-  } catch (e) { say("fail", errText(e)); return; }
-  const sc = S.screen === "packs" ? $("#screen") : openScreen("packs");
-  const typed = sc.querySelector(".page.packs input.field");
-  const keep = typed ? typed.value : "";
-  sc.innerHTML = "";
-  const name = el("input", "field");
-  name.placeholder = T("name of a new pack");
-  name.spellcheck = false;
-  name.value = keep;
-  const build = button(T("build from the current list"), "", () => {
-    const n = name.value.trim();
-    if (!n) { name.focus(); return; }
-    previewBuild(n);
-  });
-  name.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); build.click(); } };
-  const w = page("packs", T("packs"), el("span", "grow"), name, build);
-  sc.append(w);
-  for (const u of un) {
-    if (u.running && S.packBuild && S.packBuild.name === u.name) u.progress = S.packBuild;
-    w.append(buildCard(u));
-  }
-  const card = el("section", "card");
-  if (!rows.length) {
-    card.append(el("div", "empty-state", T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves")));
-  }
-  for (const r of rows) {
-    const row = el("div", "pack");
-    const left = el("div", "l");
-    left.append(el("div", "name", r.name), el("div", "sub", r.facts + " · " + r.played));
-    const right = el("div", "r");
-    if (!r.light) {
-      right.append(button(T("play") + " ▶", "", async () => {
-        try { say("ok", await api.PackLaunch(r.name)); } catch (e) { say("fail", errText(e)); }
-        packs();
-      }, "primary"));
-    }
-    right.append(button(T("move to the recycle bin"), "", () => pop.confirm(T("move to the recycle bin"), [Tf("pack %s goes to the recycle bin; you can restore it from there", r.name)], T("move to the recycle bin"), async () => {
-      try { say("ok", await api.PackRemove(r.name)); } catch (e) { say("fail", errText(e)); }
-      packs();
-    }), "danger"));
-    row.append(left, right);
-    card.append(row);
-  }
-  w.append(card);
-  if (others) w.append(el("div", "muted note", Tf("%d packs belong to other environments; switch the environment to see them", others)));
-  // A build this window does not watch (started before a restart, or elsewhere): look
-  // again while it runs.
-  clearTimeout(packPoll);
-  if (un.some((u) => u.running && !(S.packBuild && S.packBuild.name === u.name))) {
-    packPoll = setTimeout(() => { if (S.screen === "packs" && !S.popup) packs(); else if (S.screen === "packs") packPoll = setTimeout(packs, 1500); }, 1500);
-  }
 }

@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// The v3 interaction model (06 §13): T17–T20.
+// The v3 interaction model (06 §3): T17–T20.
 
 // v3Fixture: the fixture plus P001 … P125 enabled after it, and Late (loads after P050),
 // not enabled. P001 has a long description.
@@ -52,7 +52,7 @@ func workspace(t *testing.T, m *model) string {
 		s = append(s, x.Instance)
 	}
 	tags, _ := m.app.Store.TagCounts(st.Ix.Env.ID)
-	return fmt.Sprintf("%s | %v | %v | %d", st.List.Encode(), s, tags, m.app.Store.StepCount(st.Ix.Env.ID, "undo"))
+	return fmt.Sprintf("%s | %v | %v | %d", st.List.Encode(), s, tags, m.app.Store.StepCount(st.Plan.ID, "undo"))
 }
 
 func pressAll(m *model, ks ...string) {
@@ -79,11 +79,11 @@ var v3States = []v3State{
 	{"technical pages", func(m *model) { press(m, "2"); press(m, "enter"); press(m, "I") }},
 	{"search", func(m *model) { press(m, "1"); press(m, "/"); typeIn(m, "p0") }},
 	{"command palette", func(m *model) { m.update(tea.KeyMsg{Type: tea.KeyCtrlK}) }},
-	{"tags", func(m *model) { press(m, "2"); pressAll(m, "shift+down", "#") }},
+	{"tags", func(m *model) { press(m, "2"); pressAll(m, "shift+down", "g") }},
 	{"move to", func(m *model) { press(m, "2"); pressAll(m, "down", "m") }},
-	{"confirm", func(m *model) { press(m, "S") }},
+	{"preview", func(m *model) { m.palRun("preview-sort")(m) }},
 	{"help", func(m *model) { press(m, "?") }},
-	{"needs attention", func(m *model) { press(m, "!") }},
+	{"needs attention", func(m *model) { press(m, "@") }},
 	{"recent changes", func(m *model) { press(m, "c") }},
 }
 
@@ -114,7 +114,7 @@ func TestT17ArrowsOnlyNavigate(t *testing.T) {
 	}
 }
 
-// T18: the tasks of 06 §13.9, each in no more keys than the v3 column, with the right result.
+// T18: the tasks of 06 §11, each in no more keys than the v3 column, with the right result.
 func TestT18TaskSteps(t *testing.T) {
 	e, m := v3Fixture(t)
 	n := 0
@@ -134,14 +134,15 @@ func TestT18TaskSteps(t *testing.T) {
 	}
 	pos := func(name string) int { return m.st.Position(m.st.Ix.ByID[idOf(t, m, name)].ID) }
 
-	// 1. Enable a mod by name at the right place, focus in Enabled: / name tab space.
+	// 1. Enable a mod by name at the right place, focus in Enabled: / name enter 1 space
+	// (the bar filters both lists, 06 §2.5).
 	press(m, "2")
 	n = 0
 	key("/")
 	typeIn(m, "late")
-	key2(tea.KeyTab)
-	key("space")
-	task("enable Late", 3)
+	key2(tea.KeyEnter)
+	key("1", "space")
+	task("enable Late", 4)
 	if p := pos("Late"); p != pos("P050")+1 {
 		t.Fatalf("Late at %d, P050 at %d (status %q)", p, pos("P050"), m.status)
 	}
@@ -151,7 +152,7 @@ func TestT18TaskSteps(t *testing.T) {
 	// 2. Move a mod after another, 120 apart: m name enter.
 	press(m, "esc")
 	press(m, "2")
-	press(m, "g")
+	press(m, "home")
 	for m.current().name != "P003" {
 		press(m, "down")
 	}
@@ -164,7 +165,7 @@ func TestT18TaskSteps(t *testing.T) {
 		t.Fatalf("P003 at %d, P124 at %d", pos("P003"), pos("P124"))
 	}
 	// 3. Disable three mods that are not next to each other: moves, ctrl+space ×3, space.
-	press(m, "g")
+	press(m, "home")
 	n = 0
 	for _, name := range []string{"P010", "P020", "P030"} {
 		for m.current().name != name {
@@ -177,19 +178,22 @@ func TestT18TaskSteps(t *testing.T) {
 	if got := activeNames(t, e); strings.Contains(got, "P010") || strings.Contains(got, "P020") || strings.Contains(got, "P030") || !strings.Contains(got, "P011") {
 		t.Fatalf("after space: %s", got)
 	}
-	// 4. Read the current mod's description to the end: PgDn PgDn.
-	press(m, "g")
+	// 4. Read the current mod's description to the end: 4 PgDn PgDn (PgDn pages the list
+	// cursor, and the detail once it has the focus, 06 §3.3).
+	press(m, "home")
 	for m.current().name != "P001" {
 		press(m, "down")
 	}
 	runCmd(m, m.loadData(m.current().id, false, false))
 	m.View()
 	n = 0
+	key("4")
 	key2(tea.KeyPgDown)
 	m.View()
 	key2(tea.KeyPgDown)
 	out := ansi.Strip(m.View())
-	task("read the description", 2)
+	task("read the description", 3)
+	press(m, "esc")
 	if !strings.Contains(out, "technical information · i") || m.detailFocus || m.current().name != "P001" {
 		t.Fatalf("not at the end, or the focus moved (detail %v, %s):\n%s", m.detailFocus, m.current().name, out)
 	}
@@ -199,7 +203,7 @@ func TestT18TaskSteps(t *testing.T) {
 		press(m, "down")
 	}
 	n = 0
-	key("shift+down", "shift+down", "shift+down", "shift+down", "#", "right", "enter")
+	key("shift+down", "shift+down", "shift+down", "shift+down", "g", "right", "enter")
 	task("tag five", 7)
 	tagged := e.MustRun("list", "--filter", "tag:"+m.tagsDefault(1))
 	for _, name := range []string{"P040", "P041", "P042", "P043", "P044"} {
@@ -209,7 +213,7 @@ func TestT18TaskSteps(t *testing.T) {
 	}
 	// 6. Half of the list into staging: shift+↓ N times, t.
 	press(m, "esc")
-	press(m, "g")
+	press(m, "home")
 	n = 0
 	half := len(m.cols[cActive].items) / 2
 	for i := 0; i < half-1; i++ {
@@ -234,7 +238,7 @@ func idOf(t *testing.T, m *model, name string) string {
 	return ""
 }
 
-// tagsDefault is the i-th pinned tag (06 §12.3).
+// tagsDefault is the i-th pinned tag (06 §3.8).
 func (m *model) tagsDefault(i int) string {
 	m.tagKey()
 	defer func() { m.tags = nil }()
@@ -258,7 +262,7 @@ func TestT19PositionLine(t *testing.T) {
 		"command palette": `Enabled · 1 / \d+ › command palette$`,
 		"tags":            `Enabled · 2 / \d+ · selected 2 › tags$`,
 		"move to":         `Enabled · 2 / \d+ › move to…$`,
-		"confirm":         `Enabled · 1 / \d+ › sort — preview$`,
+		"preview":         `Enabled · 1 / \d+ › preview the sort$`,
 		"help":            `Enabled · 1 / \d+ › all keys$`,
 		"needs attention": `› needs attention · 1 / \d+`,
 		"recent changes":  `› recent changes`,
@@ -289,7 +293,7 @@ func TestT20EscBack(t *testing.T) {
 	e, _ := v3Fixture(t)
 	deep := []v3State{
 		{"selection + search", func(m *model) { pressAll(m, "shift+down", "/"); typeIn(m, "p") }},
-		{"detail + selection + tags", func(m *model) { pressAll(m, "shift+down", "4", "#") }},
+		{"detail + selection + tags", func(m *model) { pressAll(m, "shift+down", "4", "g") }},
 		{"detail + selection + move to", func(m *model) { pressAll(m, "shift+down", "4", "m") }},
 		{"full + selection + palette", func(m *model) {
 			pressAll(m, "shift+down", "enter")
@@ -298,7 +302,7 @@ func TestT20EscBack(t *testing.T) {
 		{"full + technical pages two deep + selection", func(m *model) {
 			pressAll(m, "shift+down", "enter", "I", "down", "down", "enter", "down", "enter")
 		}},
-		{"detail + selection + confirm", func(m *model) { pressAll(m, "shift+down", "4", "S") }},
+		{"detail + selection + preview", func(m *model) { pressAll(m, "shift+down", "4"); m.palRun("preview-sort")(m) }},
 		{"armed", func(m *model) {
 			m.arm("d", "press d again", func(*model) tea.Cmd { return nil })
 		}},
@@ -320,13 +324,13 @@ func TestT20EscBack(t *testing.T) {
 	}
 }
 
-// The position input (06 §13.7): a number, a name with tab for before, enter alone is the
+// The position input (06 §3.6): a number, a name with tab for before, enter alone is the
 // suggested place; from Disabled it enables there, one undo step.
 func TestPositionInput(t *testing.T) {
 	e, m := v3Fixture(t)
 	pos := func(name string) int { return m.st.Position(idOf(t, m, name)) }
 	press(m, "2")
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // Alpha
 	press(m, "m")
 	typeIn(m, "5")
@@ -348,7 +352,7 @@ func TestPositionInput(t *testing.T) {
 		t.Fatalf("Alpha %d, P100 %d", pos("Alpha"), pos("P100"))
 	}
 	// From Disabled: m, enter alone = the suggested place (after P050).
-	steps := e.App.Store.StepCount(m.st.Ix.Env.ID, "undo")
+	steps := e.App.Store.StepCount(m.st.Plan.ID, "undo")
 	press(m, "1")
 	for m.current().name != "Late" {
 		press(m, "down")
@@ -361,7 +365,7 @@ func TestPositionInput(t *testing.T) {
 	if pos("Late") != pos("P050")+1 || m.focus != cInactive {
 		t.Fatalf("Late at %d, P050 %d, focus %d", pos("Late"), pos("P050"), m.focus)
 	}
-	if n := e.App.Store.StepCount(m.st.Ix.Env.ID, "undo"); n != steps+1 {
+	if n := e.App.Store.StepCount(m.st.Plan.ID, "undo"); n != steps+1 {
 		t.Fatalf("undo steps %d → %d", steps, n)
 	}
 	// space then m: m moves the mod space just placed, from where the cursor is.
@@ -377,7 +381,7 @@ func TestPositionInput(t *testing.T) {
 	press(m, "esc")
 	// J K move by one, alt+J by ten.
 	press(m, "2")
-	press(m, "g")
+	press(m, "home")
 	for m.current().name != "Harmony" {
 		press(m, "down")
 	}
@@ -393,18 +397,20 @@ func TestPositionInput(t *testing.T) {
 	}
 }
 
-// 06 §13.8: while searching, the status line counts the other lists' matches; tab takes
+// 06 §3.7: while searching, the status line counts the other lists' matches; tab takes
 // the search to the next list with matches.
 func TestSearchOtherLists(t *testing.T) {
 	_, m := v3Fixture(t)
 	press(m, "2")
 	press(m, "/")
 	typeIn(m, "beta")
-	if l := ansi.Strip(m.statusLine()); !strings.Contains(l, "other lists: Disabled 1 · Staging 0") {
-		t.Fatalf("status %q", l)
+	// the bar's search filters both lists at once (06 §2.5): Beta shows in Disabled
+	press(m, "enter")
+	press(m, "1")
+	if m.focus != cInactive || m.bar.typing || m.current() == nil || m.current().name != "Beta" || len(m.cols[cActive].view) != 0 {
+		t.Fatalf("bar: focus %d, typing %v, %v", m.focus, m.bar.typing, m.current())
 	}
-	pressKey(m, tea.KeyTab)
-	if m.focus != cInactive || m.editing || m.current().name != "Beta" || m.cols[cActive].filter != "" || m.cols[cInactive].filter != "beta" {
-		t.Fatalf("tab: focus %d, editing %v, %s", m.focus, m.editing, m.current().name)
+	if l := ansi.Strip(m.columnTitle(&m.cols[cActive], false, 40)); !strings.Contains(l, "Enabled 0 / ") {
+		t.Fatalf("title %q", l)
 	}
 }

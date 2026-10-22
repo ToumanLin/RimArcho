@@ -1,6 +1,6 @@
-// Package mcp is the MCP surface (05 §4): `archo mcp` over stdio. Every tool translates
+// Package mcp is the MCP surface (05 §5): `archo mcp` over stdio. Every tool translates
 // its arguments into the argv of one CLI command and returns that command's text, so the
-// output is byte-identical to the CLI (05 §1, I1).
+// output is byte-identical to the CLI (05 §1.1, I1).
 package mcp
 
 import (
@@ -21,7 +21,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// AnalyzeWait is how long a tool call waits for an out-of-date analysis (05 §4.1).
+// AnalyzeWait is how long a tool call waits for an out-of-date analysis (05 §5.1).
 var AnalyzeWait = 10 * time.Second
 
 func ptr[T any](v T) *T { return &v }
@@ -79,17 +79,17 @@ func (s *Server) run(env string, argv []string) (*sdk.CallToolResult, any, error
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: out}}, IsError: code == cmds.ExitError || code == cmds.ExitUsage}, nil, nil
 }
 
-// New builds the server with every tool of 05 §4.2.
+// New builds the server with every tool of 05 §5.2.
 func New(a *app.App) *Server {
 	s := &Server{app: a}
-	// 05 §4.1: a first call that needs the analysis returns what is ready after 10 s.
+	// 05 §5.1: a first call that needs the analysis returns what is ready after 10 s.
 	if a.AnalyzeWait == 0 {
 		a.AnalyzeWait = AnalyzeWait
 	}
 	s.srv = sdk.NewServer(&sdk.Implementation{Name: "rimarcho", Version: buildinfo.Version}, &sdk.ServerOptions{Instructions: Instructions})
 	for _, t := range Tools() {
-		// get_description reaches the Steam Workshop (06 §6.4); everything else stays local.
-		ann := &sdk.ToolAnnotations{ReadOnlyHint: t.readOnly, OpenWorldHint: ptr(t.name == "get_description")}
+		// Only the tools in openWorld may reach the network; everything else stays local.
+		ann := &sdk.ToolAnnotations{ReadOnlyHint: t.readOnly, OpenWorldHint: ptr(openWorld[t.name])}
 		if !t.readOnly {
 			ann.DestructiveHint = ptr(t.destructive)
 		}
@@ -160,7 +160,8 @@ func argv(words ...string) *builder { return &builder{a: append([]string{}, word
 // ---- tool arguments ----
 
 type StatusIn struct {
-	Env string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env  string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Show string `json:"show,omitempty" jsonschema:"overview (default), envs, folders (the shared mod folders), settings, data (community data), db or cache"`
 }
 
 type FindIn struct {
@@ -223,10 +224,11 @@ type ProblemsIn struct {
 }
 
 type ChangesIn struct {
-	Env   string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Ref   string `json:"ref,omitempty" jsonschema:"one mod's history"`
-	Since string `json:"since,omitempty" jsonschema:"scan:<n>, <days>d or YYYY-MM-DD"`
-	All   bool   `json:"all,omitempty"`
+	Env     string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Ref     string `json:"ref,omitempty" jsonschema:"one mod's history"`
+	Library bool   `json:"library,omitempty" jsonschema:"every mod, not only the current plan's"`
+	Since   string `json:"since,omitempty" jsonschema:"scan:<n>, <days>d or YYYY-MM-DD"`
+	All     bool   `json:"all,omitempty"`
 }
 
 type LogIn struct {
@@ -236,6 +238,7 @@ type LogIn struct {
 	File        string `json:"file,omitempty" jsonschema:"another log file path"`
 	Prev        bool   `json:"prev,omitempty" jsonschema:"Player-prev.log (the run before the last)"`
 	All         bool   `json:"all,omitempty" jsonschema:"include informational clusters"`
+	Since       string `json:"since,omitempty" jsonschema:"the cursor an earlier analyze_log call returned: only clusters new or grown after it (poll a running game)"`
 	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
 	Pattern     string `json:"pattern,omitempty" jsonschema:"explain an error pattern instead (pattern:g:xref.def from a cluster; list = all kinds): causes, route, fixes, how often public logs show it"`
 }
@@ -262,15 +265,16 @@ type SourceIn struct {
 }
 
 type EditIn struct {
-	Env    string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action string   `json:"action" jsonschema:"enable, disable, move, swap, sort, undo, redo, stage, unstage or restore"`
-	Refs   []string `json:"refs,omitempty" jsonschema:"mods to enable/disable; for move and swap the first is the mod (swap: optional second = the instance to use)"`
-	At     int      `json:"at,omitempty" jsonschema:"enable at / move to this 1-based position"`
-	Before string   `json:"before,omitempty"`
-	After  string   `json:"after,omitempty"`
-	Up     bool     `json:"up,omitempty"`
-	Down   bool     `json:"down,omitempty"`
-	DryRun bool     `json:"dry_run,omitempty" jsonschema:"sort only: show the result without changing the workspace"`
+	Env     string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Action  string   `json:"action" jsonschema:"enable, disable, move, swap, sort, undo, redo, checkout, stage, unstage, restore or ignore_external"`
+	Refs    []string `json:"refs,omitempty" jsonschema:"mods to enable/disable; for move and swap the first is the mod (swap: optional second = the instance to use)"`
+	At      int      `json:"at,omitempty" jsonschema:"enable at / move to this 1-based position"`
+	Before  string   `json:"before,omitempty"`
+	After   string   `json:"after,omitempty"`
+	Up      bool     `json:"up,omitempty"`
+	Down    bool     `json:"down,omitempty"`
+	DryRun  bool     `json:"dry_run,omitempty" jsonschema:"sort only: show the result without changing the workspace"`
+	Version string   `json:"version,omitempty" jsonschema:"checkout: the version to load into the current plan, v<n> or <n> (plan_history action=log lists them)"`
 }
 
 type DescribeIn struct {
@@ -283,10 +287,10 @@ type DescribeIn struct {
 
 type PlayerIn struct {
 	Env    string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note"`
+	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 06 §2.9)"`
 	Refs   []string `json:"refs" jsonschema:"the mods (tag actions: one or more; alias and note: exactly one)"`
 	Tags   []string `json:"tags,omitempty" jsonschema:"tag_add / tag_remove: the tags"`
-	Text   string   `json:"text,omitempty" jsonschema:"alias / note: the text; empty clears it"`
+	Text   string   `json:"text,omitempty" jsonschema:"alias / note / copy_note: the text; empty clears it"`
 }
 
 type CopyIn struct {
@@ -297,24 +301,64 @@ type CopyIn struct {
 }
 
 type SaveIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would be written without writing"`
+	Env            string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	DryRun         bool   `json:"dry_run,omitempty" jsonschema:"show what would be written without writing"`
+	MoveDuplicates bool   `json:"move_duplicates,omitempty" jsonschema:"first move plain Mods/ folders holding another version of a mod RimArcho links into the lock library (the refusal names them; show the dry run first)"`
 }
 
 type RuleIn struct {
 	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Kind   string `json:"kind" jsonschema:"after, before, incompatible, attach (A B) or ignore (target)"`
+	Action string `json:"action,omitempty" jsonschema:"add (default), list or remove"`
+	Rule   string `json:"rule,omitempty" jsonschema:"remove: the rule ref r:<n> from action=list"`
+	Kind   string `json:"kind,omitempty" jsonschema:"add: after, before, incompatible, attach (A B) or ignore (target)"`
 	A      string `json:"a,omitempty" jsonschema:"the mod the rule is about"`
 	B      string `json:"b,omitempty" jsonschema:"the other mod"`
 	Target string `json:"target,omitempty" jsonschema:"for ignore: the constraint ref printed by sort/problems, e.g. decl:#ab12:loadafter:pkg.id"`
 	Note   string `json:"note,omitempty"`
 }
 
+type PinIn struct {
+	Env           string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Ref           string `json:"ref" jsonschema:"the mod to lock (#id, pkg:…); with update: the locked copy or its upstream"`
+	Name          string `json:"name,omitempty" jsonschema:"folder name under Mods/ (default <folder>_local; update picks a free one)"`
+	Git           bool   `json:"git,omitempty" jsonschema:"make the copy a git repository with a baseline commit, so edits can be diffed"`
+	Update        bool   `json:"update,omitempty" jsonschema:"remake the locked version from the upstream's current content in a new folder; the old copy stays"`
+	MoveToLibrary bool   `json:"move_to_library,omitempty" jsonschema:"move a copy RimArcho made in Mods/ (before the lock library) into the library"`
+	Reason        string `json:"reason,omitempty" jsonschema:"why it is locked (e.g. the problem it avoids): kept in the copy's note"`
+	DryRun        bool   `json:"dry_run,omitempty" jsonschema:"show what would be copied and swapped without changing anything"`
+}
+
+type UnpinIn struct {
+	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Ref    string `json:"ref" jsonschema:"the locked copy or its upstream (#id, pkg:…)"`
+	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would change"`
+}
+
+// UninstallIn is preview_uninstall: the player's answers, as archo uninstall's flags.
+type UninstallIn struct {
+	KeepLocked    bool   `json:"keep_locked,omitempty" jsonschema:"move the lock library's copies into a game's Mods/ as ordinary mods (default: recycle bin)"`
+	LockedTo      string `json:"locked_to,omitempty" jsonschema:"the environment whose Mods/ gets them (default: the current one)"`
+	RemovePacks   bool   `json:"remove_packs,omitempty" jsonschema:"packs to the recycle bin (default: kept)"`
+	PacksTo       string `json:"packs_to,omitempty" jsonschema:"where kept packs inside the data folder go (default: Documents/RimArcho packs)"`
+	RemoveSaves   bool   `json:"remove_saves,omitempty" jsonschema:"the environments' own save folders to the recycle bin (default: moved out)"`
+	SavesTo       string `json:"saves_to,omitempty" jsonschema:"where they are moved (default: Documents/RimArcho saves)"`
+	RemoveGames   bool   `json:"remove_games,omitempty" jsonschema:"game folders downloaded with SteamCMD to the recycle bin (default: kept)"`
+	RestoreBackup bool   `json:"restore_modsconfig_backup,omitempty" jsonschema:"put ModsConfig.xml.rimarcho.bak back instead of cleaning the current list"`
+	All           bool   `json:"all,omitempty" jsonschema:"no truncation"`
+}
+
+// UninstallArgv maps preview_uninstall: always the dry run, never --yes (05 §5.2).
+func UninstallArgv(in UninstallIn) []string {
+	return argv("uninstall", "--dry-run").flag("keep-locked", in.KeepLocked).str("locked-to", in.LockedTo).flag("remove-packs", in.RemovePacks).
+		str("packs-to", in.PacksTo).flag("remove-saves", in.RemoveSaves).str("saves-to", in.SavesTo).flag("remove-games", in.RemoveGames).
+		flag("restore-modsconfig-backup", in.RestoreBackup).flag("all", in.All).a
+}
+
 func gv(b *builder, mm string) []string { return b.str("game-version", mm).a }
 
 func toolList() []tool {
 	return []tool{
-		reg("status", true, false, descStatus, func(in StatusIn) []string { return []string{"status"} }),
+		reg("status", true, false, descStatus, func(in StatusIn) []string { return StatusArgv(in) }),
 		reg("find_mods", true, false, descFind, func(in FindIn) []string {
 			if in.Query != "" {
 				return argv("find").pos(in.Query).flag("all", in.All).a
@@ -339,38 +383,40 @@ func toolList() []tool {
 		}),
 		reg("list_problems", true, false, descProblems, func(in ProblemsIn) []string { return ProblemsArgv(in) }),
 		reg("list_changes", true, false, descChanges, func(in ChangesIn) []string {
-			return argv("changes").pos(in.Ref).str("since", in.Since).flag("all", in.All).a
+			return argv("changes").pos(in.Ref).flag("library", in.Library).str("since", in.Since).flag("all", in.All).a
 		}),
 		reg("analyze_log", true, false, descLog, func(in LogIn) []string {
 			if in.Pattern != "" {
 				return argv("pattern").pos(in.Pattern).a
 			}
-			return gv(argv("log").str("cluster", in.Cluster).str("text", in.Text).str("file", in.File).flag("prev", in.Prev).flag("all", in.All), in.GameVersion)
+			return gv(argv("log").str("cluster", in.Cluster).str("text", in.Text).str("file", in.File).flag("prev", in.Prev).flag("all", in.All).str("since", in.Since), in.GameVersion)
 		}),
 		reg("search_files", true, false, descFiles, func(in FilesIn) []string {
 			return argv("files", "search", in.Pattern).str("mod", in.Mod).flag("regex", in.Regex).flag("languages", in.Languages).flag("all", in.All).a
 		}),
 		reg("read_source", true, false, descSource, func(in SourceIn) []string { return SourceArgv(in) }),
 		reg("edit_loadout", false, false, descEdit, func(in EditIn) []string { return EditArgv(in) }),
-		reg("save_loadout", false, true, descSave, func(in SaveIn) []string { return argv("save").flag("dry-run", in.DryRun).a }),
+		reg("save_loadout", false, true, descSave, func(in SaveIn) []string {
+			return argv("save").flag("dry-run", in.DryRun).flag("move-duplicates", in.MoveDuplicates).a
+		}),
 		reg("copy_local", false, false, descCopy, func(in CopyIn) []string {
 			return argv("copy-local", in.Ref).str("name", in.Name).flag("git", in.Git).a
 		}),
 		reg("set_player_data", false, false, descPlayer, func(in PlayerIn) []string { return PlayerArgv(in) }),
-		reg("add_rule", false, false, descRule, func(in RuleIn) []string {
-			b := argv("rule", "add", in.Kind)
-			if in.Kind == "ignore" {
-				b.pos(in.Target)
-			} else {
-				b.pos(in.A).pos(in.B)
-			}
-			return b.str("note", in.Note).a
+		// add_rule is the old name of manage_rules, kept as an alias (05 §6).
+		reg("add_rule", false, false, descRuleAlias, func(in RuleIn) []string { return RulesArgv(in) }),
+		reg("pin_mod", false, false, descPin, func(in PinIn) []string {
+			return argv("pin", in.Ref).str("name", in.Name).flag("git", in.Git).flag("update", in.Update).flag("move-to-library", in.MoveToLibrary).str("reason", in.Reason).flag("dry-run", in.DryRun).a
 		}),
+		reg("preview_uninstall", true, false, descUninstall, UninstallArgv),
+		reg("unpin_mod", false, false, descUnpin, func(in UnpinIn) []string { return argv("unpin", in.Ref).flag("dry-run", in.DryRun).a }),
 	}
 }
 
 // Tools returns the tool table.
-func Tools() []tool { return toolList() }
+func Tools() []tool {
+	return append(append(append(append(toolList(), manageTools()...), planTools()...), libraryTools()...), textureTools()...)
+}
 
 // ToolDoc describes one tool as a client sees it (name, description, parameters): for
 // harnesses that drive the tools without an MCP client (spikes/agenteval).
@@ -389,7 +435,7 @@ type ParamDoc struct {
 // Catalog lists every tool with its parameters (the env parameter is left out).
 func Catalog() []ToolDoc {
 	var out []ToolDoc
-	for _, t := range toolList() {
+	for _, t := range Tools() {
 		d := ToolDoc{Name: t.name, Description: t.desc, ReadOnly: t.readOnly}
 		for i := 0; i < t.in.NumField(); i++ {
 			f := t.in.Field(i)
@@ -416,7 +462,7 @@ func Catalog() []ToolDoc {
 // ArgvFor maps a tool call (name and JSON arguments) to the CLI argv the server would run.
 // Unknown argument names are an error.
 func ArgvFor(name string, args []byte) ([]string, error) {
-	for _, t := range toolList() {
+	for _, t := range Tools() {
 		if t.name == name {
 			return t.argvOf(args)
 		}
@@ -424,7 +470,7 @@ func ArgvFor(name string, args []byte) ([]string, error) {
 	return nil, fmt.Errorf("unknown tool %q", name)
 }
 
-// ProblemsArgv maps list_problems: warning and above by default (decisions-m3 §12.2).
+// ProblemsArgv maps list_problems: warning and above by default (03 §4.5).
 func ProblemsArgv(in ProblemsIn) []string {
 	if in.Ref != "" {
 		return []string{"problems", "show", in.Ref}
@@ -437,7 +483,7 @@ func ProblemsArgv(in ProblemsIn) []string {
 		flag("all", in.All).flag("detail", in.Detail).flag("ignored", in.Ignored), in.GameVersion)
 }
 
-// SourceArgv maps read_source: a search gets a 10 s decompile budget by default (05 §4.1).
+// SourceArgv maps read_source: a search gets a 10 s decompile budget by default (05 §5.1).
 func SourceArgv(in SourceIn) []string {
 	if in.Search != "" {
 		b := argv("source", "search", in.Search)
@@ -449,7 +495,7 @@ func SourceArgv(in SourceIn) []string {
 		case in.Scope == "active":
 			b.flag("active", true).flag("yes", true)
 		default:
-			b.flag("implicated", true) // decisions-m4 §7.4
+			b.flag("implicated", true) // 03 §5.4
 		}
 		budget := in.Budget
 		if budget == 0 {
@@ -487,6 +533,8 @@ func EditArgv(in EditIn) []string {
 		return argv("sort").flag("dry-run", in.DryRun).a
 	case "undo", "redo":
 		return []string{in.Action}
+	case "ignore_external":
+		return []string{"loadout", "ignore-external"}
 	case "stage":
 		return append([]string{"stage", "add"}, in.Refs...)
 	case "unstage":
@@ -497,6 +545,8 @@ func EditArgv(in EditIn) []string {
 			b.str("at", strconv.Itoa(in.At))
 		}
 		return b.str("before", in.Before).str("after", in.After).a
+	case "checkout":
+		return argv("loadout", "checkout").pos(in.Version).a
 	}
 	return []string{"edit_loadout: unknown action " + fmt.Sprintf("%q", in.Action)}
 }
@@ -519,6 +569,11 @@ func PlayerArgv(in PlayerIn) []string {
 			return []string{in.Action, first, "--clear"}
 		}
 		return []string{in.Action, first, in.Text}
+	case "copy_note":
+		if in.Text == "" {
+			return []string{"note", first, "--copy", "--clear"}
+		}
+		return []string{"note", first, in.Text, "--copy"}
 	}
 	return []string{"set_player_data: unknown action " + fmt.Sprintf("%q", in.Action)}
 }

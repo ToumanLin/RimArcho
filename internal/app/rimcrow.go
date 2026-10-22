@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// RimCrow import (04 §7.2, U11). RimCrow (D:\…\RimModManager) keeps player data in
+// RimCrow import (04 §8.2, U11). RimCrow (D:\…\RimModManager) keeps player data in
 // <home>/data/mod_manager.db (peewee, keyed by packageId) and user rules in
 // <home>/data/rules/user_rules.json. Both are read from copies; the originals are never
 // opened for writing.
@@ -43,7 +43,7 @@ type RimCrowReport struct {
 
 	NotMapped map[string]int // RimCrow fields with no RimArcho equivalent
 
-	// About-disabled (02 §4.1): RimCrow renames About.xml to About.xml.disabled.
+	// About-disabled (02 §4.2): RimCrow renames About.xml to About.xml.disabled.
 	CrowDisabled  int            // modasset rows with disabled=1
 	AboutDisabled []string       // RimArcho instances marked unloadable: about-disabled
 	DisabledKinds map[string]int // by source kind

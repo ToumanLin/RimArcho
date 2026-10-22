@@ -2,7 +2,23 @@
 
 <img src="docs/assets/rimarcho.svg" width="96" alt="RimArcho icon: a stone arch with an amber keystone">
 
-A RimWorld mod manager for players with hundreds of mods, and for the AI agents that help them.
+A one-stop RimWorld launcher that understands its players. Pick your mods, put them in order, check
+that the game will run, launch it, and find out why when something breaks, all in one place. It is
+built for players with hundreds of mods, and for the AI assistants that work alongside them.
+
+RimArcho sets out to answer three questions:
+
+1. **What am I playing, and will it run?** This is what version 1.0 answers.
+2. **What haven't I played yet?** Planned: reading your saves to find the mods and content you have
+   never touched.
+3. **What's worth playing?** Further out: packs that players share with each other, and suggestions
+   from an AI assistant based on what you haven't played yet.
+
+Everything works without AI. AI assistants are its second kind of user: the built-in AI workbench
+and outside agents (through MCP) get the same facts and the same actions as you, and follow the same
+rules. Their changes can be undone, and nothing is written to the game until you confirm. (The
+built-in workbench is planned for 1.1; outside agents can connect today, see below.)
+
 One program gives you a desktop window (`RimArcho.exe`), a terminal UI, a scriptable CLI and an MCP
 server (`archo.exe`). The window and the terminal UI are two faces of the same Go code: they show the
 same lists, details and "needs attention" items and run the same actions. The CLI and MCP print the

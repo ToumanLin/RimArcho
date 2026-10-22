@@ -23,6 +23,9 @@ var update = flag.Bool("update", false, "rewrite golden files")
 // msRe matches wall-clock durations (analysis timings), which vary between runs.
 var msRe = regexp.MustCompile(`(active mods, )[0-9.]+(?:ms|s|µs)`)
 
+// cursorRe matches log cursors (03 §6.6): a checksum of the fixture log, whose paths vary.
+var cursorRe = regexp.MustCompile(`log1\.[0-9a-z]+\.[0-9a-f]{8}(?:\.[0-9a-z]+\.[0-9a-f]{8})?`)
+
 type step func(e *testkit.Env) []string
 
 func cmd(args ...string) step { return func(*testkit.Env) []string { return args } }
@@ -61,7 +64,7 @@ func goldenDir() string {
 	return filepath.Join(filepath.Dir(file), "..", "..", "testdata", "golden")
 }
 
-func runGolden(t *testing.T, name string, e *testkit.Env, steps []step) {
+func runGolden(t *testing.T, name string, e *testkit.Env, steps []step, scrub ...func(string) string) {
 	t.Helper()
 	var sb strings.Builder
 	for _, s := range steps {
@@ -71,7 +74,12 @@ func runGolden(t *testing.T, name string, e *testkit.Env, steps []step) {
 		}
 		out, code := e.Run(args...)
 		fmt.Fprintf(&sb, "$ archo %s\n", e.Scrub(strings.Join(args, " ")))
-		sb.WriteString(msRe.ReplaceAllString(e.Scrub(out), "${1}<dur>"))
+		out = msRe.ReplaceAllString(e.Scrub(out), "${1}<dur>")
+		out = cursorRe.ReplaceAllString(out, "<cursor>")
+		for _, f := range scrub {
+			out = f(out)
+		}
+		sb.WriteString(out)
 		if code != 0 {
 			fmt.Fprintf(&sb, "[exit %d]\n", code)
 		}
@@ -186,6 +194,7 @@ func TestGoldenLifecycle(t *testing.T) {
 		}),
 		cmd("scan"),
 		cmd("changes"),
+		cmd("changes", "--library"),
 		func(e *testkit.Env) []string { return []string{"changes", ref(e, "Beta Reborn")} },
 		cmd("mod", "pkg:tester.alpha"),
 		act(func(e *testkit.Env) {
@@ -212,6 +221,7 @@ func TestGoldenLifecycle(t *testing.T) {
 		},
 		cmd("mod", "pkg:brrainz.harmony"),
 		cmd("changes", "--since", "scan:2", "--all"),
+		cmd("changes", "--library", "--since", "scan:2", "--all"),
 		cmd("gc", "--dry-run"),
 		act(func(e *testkit.Env) { e.Advance(120 * 24 * time.Hour) }),
 		cmd("gc"),
@@ -287,11 +297,11 @@ func TestGoldenLoadout(t *testing.T) {
 		cmd("launch", "--dry-run"),
 		cmd("save", "--dry-run"),
 		cmd("save"),
-		cmd("loadout", "tag", "v2", "raid-night"),
+		cmd("plan", "new", "raid-night", "--from", "v2"),
 		func(e *testkit.Env) []string { return []string{"swap", ref(e, "Alpha"), ref(e, "Alpha Fork")} },
 		cmd("loadout", "log"),
 		cmd("loadout", "checkout", "v1"),
-		cmd("loadout", "diff", "raid-night", "workspace"),
+		cmd("loadout", "diff", "v2", "workspace"),
 		cmd("launch", "--dry-run"),
 		cmd("undo"),
 		cmd("launch", "--dry-run"),
@@ -303,6 +313,60 @@ func TestGoldenLoadout(t *testing.T) {
 		cmd("loadout", "log"),
 		cmd("rule", "remove", "r:1"),
 		cmd("rule", "remove", "r:9"),
+	})
+}
+
+// Several plans per environment (04 §1, 05 §4.3): each has its own list, undo stack,
+// versions and staging; switching writes no game file.
+func TestGoldenPlans(t *testing.T) {
+	e := testkit.New(t)
+	populate(e)
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony", "tester.alpha", "gone.mod")
+	list := filepath.Join(e.Root, "Raid Night.txt")
+	e.WriteFile(list, "# a list\nludeon.rimworld\nbrrainz.harmony\ntester.beta\nnot.installed\n")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	mc := e.ReadModsConfig()
+	runGolden(t, "plans", e, []step{
+		cmd("plan", "list"),
+		cmd("plan", "new", "copy", "--from", "current"),
+		cmd("plan", "new", "blank"),
+		cmd("plan", "new", "listed", "--from", list),
+		cmd("loadout", "import", list, "--new"),
+		cmd("loadout", "import", list, "--new", "night 2"),
+		cmd("plan", "new", "Copy"),
+		cmd("plan", "new", "old", "--from", "v9"),
+		cmd("loadout", "import", list, "extra"),
+		cmd("plan", "list"),
+		cmd("status"),
+		cmd("plan", "use", "copy"),
+		func(e *testkit.Env) []string { return []string{"enable", ref(e, "Gamma")} },
+		func(e *testkit.Env) []string { return []string{"stage", "add", ref(e, "Alpha")} },
+		cmd("history"),
+		cmd("plan", "use", "plan:default"),
+		cmd("history"),
+		cmd("stage", "list"),
+		cmd("undo"),
+		cmd("plan", "use", "copy"),
+		cmd("stage", "list"),
+		cmd("loadout", "log"),
+		cmd("plan", "rename", "copy", "raid"),
+		cmd("plan", "rename", "raid", "blank"),
+		cmd("plan", "remove", "raid"),
+		cmd("plan", "remove", "raid", "--yes"),
+		cmd("plan", "list"),
+		cmd("plan", "use", "nope"),
+		act(func(e *testkit.Env) {
+			if got := e.ReadModsConfig(); got != mc {
+				e.T.Fatalf("plan commands wrote ModsConfig.xml:\n%s", got)
+			}
+		}),
+		cmd("plan", "remove", "blank", "--yes"),
+		cmd("plan", "remove", "listed", "--yes"),
+		cmd("plan", "remove", "Raid Night", "--yes"),
+		cmd("plan", "remove", "night 2", "--yes"),
+		cmd("plan", "remove", "default", "--yes"),
+		cmd("plan", "list"),
 	})
 }
 
@@ -354,7 +418,7 @@ func TestGoldenProblems(t *testing.T) {
 	runGolden(t, "problems", e, []step{
 		cmd("status"),
 		cmd("problems"),
-		cmd("launch", "--dry-run"), // 04 §8: the problems that most often cause errors, not blocking
+		cmd("launch", "--dry-run"), // 08 §2: the problems that most often cause errors, not blocking
 		cmd("problems", "--code", "patch", "--detail"),
 		firstRef("dep.missing"),
 		cmd("def", "ThingDef/Shared_Gun"),

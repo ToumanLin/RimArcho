@@ -18,7 +18,7 @@ const (
 	Tombstone = "tombstone"
 )
 
-// Lineage membership basis (02 §5.2, §6).
+// Lineage membership basis (02 §5.1, §6).
 const (
 	BasisRoot      = ""          // founded the lineage
 	BasisInferred  = "inferred"  // R4: similar content + same declaration
@@ -26,14 +26,14 @@ const (
 	BasisManual    = "manual"    // lineage split/merge
 )
 
-// Thresholds (02 §5.2).
+// Thresholds (02 §5.1).
 const (
 	MoveSimilarity     = 0.85 // R3
 	CopySimilarity     = 0.6  // R4
 	QuestionSimilarity = 0.6  // R6
 )
 
-// Event kinds (00 §6.8, 02 §5.3).
+// Event kinds (02 §5.3).
 const (
 	EvDiscovered       = "discovered"
 	EvUpdated          = "updated"
@@ -81,6 +81,10 @@ type Input struct {
 	// Skip lists sources that were not scanned (missing or awaiting re-binding): their
 	// instances are neither matched nor tombstoned.
 	Skip map[string]bool
+	// Present lists skipped sources that were left out of this scan, not lost: the shared mod
+	// folders during a scan of one game's own Data/ and Mods/ (02 §0 item 8). Their live
+	// instances are still there, so they count as originals for R4.
+	Present map[string]bool
 	// Lineages that exist (to validate origin markers).
 	Lineages map[string]bool
 	NewID    func() string
@@ -133,7 +137,7 @@ type reconciler struct {
 	present []*Assignment
 }
 
-// Reconcile applies 02 §5.2. R1, R2, R5 and R3 match against the known state rule by rule;
+// Reconcile applies 02 §5.1. R1, R2, R5 and R3 match against the known state rule by rule;
 // the remaining observations then go through R4, R6 and R7 one at a time, so an Instance
 // created earlier in the same scan can be the original of a later copy (first scan of a
 // workshop item and its Mods/ copy, or Steam + SteamCMD).
@@ -210,9 +214,9 @@ func Reconcile(in Input) *Result {
 		if assigned[i] != nil {
 			continue
 		}
-		if orig, _ := r.bestPresent(ob); orig != nil {
-			a := r.create(ob, "R4", orig.LineageID, BasisInferred)
-			r.event(a, EvCopied, "inferred copy of #"+orig.InstanceID, 0)
+		if origID, origLineage := r.bestPresent(ob); origID != "" {
+			a := r.create(ob, "R4", origLineage, BasisInferred)
+			r.event(a, EvCopied, "inferred copy of #"+origID, 0)
 			assigned[i] = a
 			continue
 		}
@@ -303,9 +307,10 @@ func (r *reconciler) best(ob *scan.Observation, cands []*Known, min float64, ok 
 	return best, bestS
 }
 
-// bestPresent finds an Instance present in this scan that ob is an inferred copy of (R4).
-func (r *reconciler) bestPresent(ob *scan.Observation) (*Assignment, float64) {
-	var best *Assignment
+// bestPresent finds an Instance present in this scan that ob is an inferred copy of (R4):
+// one seen in this scan, or a live one of a source left out of it (Input.Present). It
+// returns the instance and its lineage ("" when none).
+func (r *reconciler) bestPresent(ob *scan.Observation) (id, lineage string) {
 	bestS := -1.0
 	for _, a := range r.present {
 		if !SameDecl(ob.Decl.PackageID, ob.WorkshopID, a.Obs.Decl.PackageID, a.Obs.WorkshopID) {
@@ -313,10 +318,22 @@ func (r *reconciler) bestPresent(ob *scan.Observation) (*Assignment, float64) {
 		}
 		s := scan.Similarity(ob.FP.Semantic, a.Obs.FP.Semantic)
 		if s >= CopySimilarity && s > bestS {
-			best, bestS = a, s
+			id, lineage, bestS = a.InstanceID, a.LineageID, s
 		}
 	}
-	return best, bestS
+	for _, k := range r.in.Known {
+		if !r.in.Present[k.SourceID] || k.Status != Live || k.Snap == nil {
+			continue
+		}
+		if !SameDecl(ob.Decl.PackageID, ob.WorkshopID, k.Snap.Decl.PackageID, k.Snap.WorkshopID) {
+			continue
+		}
+		s := scan.Similarity(ob.FP.Semantic, r.sem(k))
+		if s >= CopySimilarity && s > bestS {
+			id, lineage, bestS = k.ID, k.LineageID, s
+		}
+	}
+	return id, lineage
 }
 
 func (r *reconciler) match(ob *scan.Observation, k *Known, rule string) *Assignment {

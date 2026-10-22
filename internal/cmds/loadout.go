@@ -1,7 +1,6 @@
 package cmds
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -30,19 +29,19 @@ func init() {
 		Flags: []Flag{{Name: "dry-run", Help: "show the result without changing the workspace"}}, Run: sortCmd})
 	register(&Command{Name: "undo", Args: "[<n>]", Summary: "undo the last workspace edit (or the last n: archo history)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, false) }})
 	register(&Command{Name: "redo", Args: "[<n>]", Summary: "redo an undone workspace edit (or n of them)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, true) }})
-	register(&Command{Name: "save", Summary: "write the workspace to ModsConfig.xml (backup + atomic replace)", MaxArgs: 0,
-		Flags: []Flag{{Name: "dry-run", Help: "show what would be written"}}, Run: saveCmd})
+	register(&Command{Name: "save", Summary: "write the list to the game without starting it: Mods/ links, ModsConfig.xml (backup + atomic replace)", MaxArgs: 0,
+		Flags: []Flag{{Name: "dry-run", Help: "show what would be written"}, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a mod to link into the lock library"}}, Run: saveCmd})
 	register(&Command{Name: "loadout log", Summary: "saved and imported Loadout versions", MaxArgs: 0, Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: loadoutLog})
 	register(&Command{Name: "loadout diff", Args: "[<v>] [<v>]", Summary: "differences between versions (default: newest version → workspace)", MaxArgs: 2,
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: loadoutDiff})
 	register(&Command{Name: "loadout checkout", Args: "<v>", Summary: "load a version into the workspace (save to apply)", MinArgs: 1, MaxArgs: 1, Run: loadoutCheckout})
-	register(&Command{Name: "loadout tag", Args: "<v> <name>", Summary: "name a version", MinArgs: 2, MaxArgs: 2, Run: loadoutTag})
+	register(&Command{Name: "loadout ignore-external", Summary: "ignore the external ModsConfig.xml version that was not loaded (it stays in the history)", MaxArgs: 0, Run: loadoutIgnoreExternal})
 	register(&Command{Name: "rule add", Args: "after|before|incompatible|attach <A> <B> | ignore <constraint>", Summary: "add a user rule",
 		MinArgs: 2, MaxArgs: 3, Flags: []Flag{{Name: "note", Value: "<text>"}}, Run: ruleAdd})
 	register(&Command{Name: "rule list", Summary: "list user rules", MaxArgs: 0, Run: ruleList})
 	register(&Command{Name: "rule remove", Args: "<r:n>", Summary: "delete a user rule", MinArgs: 1, MaxArgs: 1, Run: ruleRemove})
-	register(&Command{Name: "launch", Summary: "start the game", MaxArgs: 0,
-		Flags: []Flag{{Name: "dry-run", Help: "show the command only"}, {Name: "force", Help: "launch with the saved list despite unsaved edits"}}, Run: launchCmd})
+	register(&Command{Name: "launch", Summary: "write the list to the game and start it (one game at a time)", MaxArgs: 0,
+		Flags: []Flag{{Name: "dry-run", Help: "show what would be written and the command; write nothing"}, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a mod to link into the lock library"}}, Run: launchCmd})
 }
 
 // changeRows renders Loadout changes as aligned rows.
@@ -99,7 +98,7 @@ func workspaceLine(st *app.LoadoutState) string {
 	} else {
 		s += ", saved"
 	}
-	return s + " (" + envRef(st.Ix.Env) + ")"
+	return s + " (" + app.PlanRef(st.Plan) + ", " + envRef(st.Ix.Env) + ")"
 }
 
 func editDoc(c *Ctx, r *app.EditResult) *render.Doc {
@@ -267,6 +266,21 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d, root := render.New(head)
 	addChanges(c, root, st, r.Changes, render.DefaultLimit, "archo loadout diff --all")
+	if moved > 0 {
+		// Why: what the order broke, strong constraints first (04 §5.3): breaking a strong one
+		// came with more errors in shared logs, a weak or harmless one did not.
+		why := root.Section("why (order constraints the list broke; strong ones go with more errors)")
+		seen := map[string]bool{}
+		for _, b := range order.Broken(r.Input, r.Result) {
+			ev, _ := constraintText(st, r.Input, b.Edge)
+			if seen[ev] {
+				continue
+			}
+			seen[ev] = true
+			why.Addf("%-8s %s", b.Strength, ev)
+		}
+		why.Truncate(12, "")
+	}
 	if len(r.Result.Cycles) > 0 {
 		pr := root.Section("problems")
 		for _, cy := range r.Result.Cycles {
@@ -304,7 +318,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	if len(r.Result.Dropped) > 0 {
-		// Constraints that cannot be satisfied are left out with the reason (04 §4.2).
+		// Constraints that cannot be satisfied are left out with the reason (04 §5.1).
 		nu := root.Section("not used")
 		seen := map[string]bool{}
 		for _, dr := range r.Result.Dropped {
@@ -330,7 +344,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.Save(a.Bool("dry-run"))
+	r, err := c.App.SaveWith(a.Bool("dry-run"), a.Bool("move-duplicates"))
 	if err != nil {
 		return nil, err
 	}
@@ -341,6 +355,22 @@ func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	} else {
 		d, root = render.New(fmt.Sprintf("saved v%d to ModsConfig.xml", r.Version))
 	}
+	writeBody(c, root, r)
+	if r.Running != nil {
+		root.KV("game", fmt.Sprintf("running (%s); it reads the new list on its next start", r.Running.Describe(c.App.Loc)))
+	}
+	if r.DryRun {
+		d.AddNext("archo save")
+	} else if r.Running == nil {
+		d.AddNext("archo launch")
+	}
+	return d, nil
+}
+
+// writeBody is what save and launch write (08 §2, one preview for both dry runs): the file,
+// its version rewrite, the entries, the Mods/ links and the changes since the newest version.
+func writeBody(c *Ctx, root *render.Node, r *app.SaveResult) {
+	movedKV(root, r.Moved, r.DryRun)
 	root.KV("path", r.Path)
 	if r.Backup != "" {
 		root.KV("backup", r.Backup)
@@ -365,7 +395,7 @@ func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("source", fmt.Sprintf("undo (restores v%d)", r.Restores))
 	}
 	if len(r.Links) > 0 {
-		ln := root.KV("links", fmt.Sprintf("%d in Mods/ (09 §8: SteamCMD and extra mods are linked, never copied)", len(r.Links)))
+		ln := root.KV("links", fmt.Sprintf("%d in Mods/ (08 §3: SteamCMD and extra mods are linked, never copied)", len(r.Links)))
 		for _, l := range r.Links {
 			what := "+ " + l.Name + " → " + l.Target
 			if l.Op == "remove" {
@@ -382,12 +412,6 @@ func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if ch != nil {
 		addChanges(c, ch, r.State, r.Changes, render.DefaultLimit/2, "archo loadout diff --all")
 	}
-	if r.DryRun {
-		d.AddNext("archo save")
-	} else {
-		d.AddNext("archo launch")
-	}
-	return d, nil
 }
 
 func loadoutLog(c *Ctx, a *Args) (*render.Doc, error) {
@@ -395,25 +419,16 @@ func loadoutLog(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	vs, err := c.App.Store.Versions(st.Ix.Env.ID)
+	vs, err := c.App.Store.Versions(st.Plan.ID)
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("versions: %d (%s)", len(vs), envRef(st.Ix.Env)))
+	d, root := render.New(fmt.Sprintf("versions: %d (%s, %s)", len(vs), app.PlanRef(st.Plan), envRef(st.Ix.Env)))
 	root.Add(workspaceLine(st))
-	if st.WS.Conflict != 0 {
-		root.KV("pending", fmt.Sprintf("v%d came from outside RimArcho and was not loaded (archo loadout checkout v%d)", st.WS.Conflict, st.WS.Conflict))
-	}
+	addConflicts(c, root, st)
 	var rows [][]string
 	for _, v := range vs {
-		tag := ""
-		if len(v.Tags) > 0 {
-			tag = "[" + strings.Join(v.Tags, ", ") + "]"
-		}
 		note := v.Note
-		if tag != "" {
-			note = strings.TrimSpace(tag + " " + note)
-		}
 		gv := v.GameVersion
 		if gv == "" {
 			gv = "-"
@@ -493,28 +508,32 @@ func loadoutCheckout(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-func loadoutTag(c *Ctx, a *Args) (*render.Doc, error) {
-	e, err := c.App.Env()
-	if err != nil {
-		return nil, err
-	}
-	n, err := c.App.ParseVersionRef(e.ID, a.Pos[0])
+func loadoutIgnoreExternal(c *Ctx, a *Args) (*render.Doc, error) {
+	n, st, err := c.App.IgnoreExternal()
 	if err != nil {
 		return nil, err
 	}
 	if n == 0 {
-		return nil, errors.New("only saved versions can be tagged")
+		d, root := render.New(fmt.Sprintf("nothing to ignore: %s has no external version that was not loaded", app.PlanRef(st.Plan)))
+		addConflicts(c, root, st) // other plans' marks
+		return d, nil
 	}
-	name := a.Pos[1]
-	if _, err := strconv.Atoi(strings.TrimPrefix(name, "v")); err == nil || strings.ContainsAny(name, " :#") || name == "workspace" {
-		return nil, fmt.Errorf("tag %q would be confused with a version reference", name)
-	}
-	if err := c.App.Store.TagVersion(e.ID, name, n); err != nil {
-		return nil, err
-	}
-	d, _ := render.New(fmt.Sprintf("v%d tagged %s", n, name))
-	d.AddNext("archo loadout checkout " + name)
+	d, root := render.New(fmt.Sprintf("ignored v%d of %s: the workspace stays as it is; v%d stays in the history (archo loadout log)", n, app.PlanRef(st.Plan), n))
+	root.Add(workspaceLine(st))
 	return d, nil
+}
+
+// addConflicts lists the environment's plans with an unloaded external ModsConfig.xml
+// version and the three ways out (04 §4.3).
+func addConflicts(c *Ctx, root *render.Node, st *app.LoadoutState) {
+	cs, err := c.App.Conflicts(st)
+	if err != nil {
+		return
+	}
+	for _, x := range cs {
+		root.KV("pending", fmt.Sprintf("ModsConfig.xml changed outside RimArcho; %s was not loaded because the plan changed since it was written: %s",
+			x.Name(st.Ix.Env), strings.Join(x.Commands(st.Ix.Env), ", ")))
+	}
 }
 
 func ruleLine(c *Ctx, ix *app.Index, r *store.UserRule) []string {
@@ -612,16 +631,45 @@ func ruleRemove(c *Ctx, a *Args) (*render.Doc, error) {
 
 func launchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	dry := a.Bool("dry-run")
-	p, st, err := c.App.Launch(dry, a.Bool("force"))
+	r, err := c.App.LaunchWith(dry, a.Bool("move-duplicates"))
 	if err != nil {
 		return nil, err
 	}
+	p := r.Launch
 	head := "launched RimWorld via " + p.Method
 	if dry {
-		head = "launch: dry run (" + p.Method + ")"
+		head = "launch: dry run (" + p.Method + "), nothing written"
 	}
 	d, root := render.New(head)
+	writeBody(c, root, r)
+	switch {
+	case r.Unchanged && r.State.Latest != nil:
+		root.KV("history", fmt.Sprintf("same as v%d, no new version", r.State.Latest.N))
+	case dry:
+		root.KV("history", "a new version (source launch)")
+	default:
+		root.KV("history", fmt.Sprintf("v%d (launch)", r.Version))
+	}
 	root.KV("command", p.Command())
-	addLaunchChecks(c, root, st.Ix)
+	if dry {
+		d.AddNext("archo launch")
+	}
+	addLaunchChecks(c, root, r.State.Ix)
 	return d, nil
+}
+
+// movedKV lists the Mods/ folders moved into the lock library first (--move-duplicates).
+func movedKV(root *render.Node, moved []app.DuplicateMove, dry bool) {
+	if len(moved) == 0 {
+		return
+	}
+	head := fmt.Sprintf("%d folders moved into the lock library first (their plans keep them)", len(moved))
+	if dry {
+		head = fmt.Sprintf("%d folders would move into the lock library first (their plans keep them)", len(moved))
+	}
+	n := root.KV("moved", head)
+	for _, l := range (&app.DuplicatesError{Moves: moved}).Lines() {
+		n.Add(l)
+	}
+	n.Truncate(10, "")
 }

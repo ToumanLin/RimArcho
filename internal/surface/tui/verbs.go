@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Verbs (06 §13.6): each acts at once on the object, the selection or else the cursor's
+// Verbs (06 §3.5): each acts at once on the object, the selection or else the cursor's
 // row, and is one undo step. None opens a mode; m opens the position input, a popup.
 
 // objIDs: the instances of the rows (missing entries have none).
@@ -26,7 +26,7 @@ func placedText(ps []int) string { return view.PlacedText(ps) }
 
 func (m *model) positions(ids []string) []int { return view.Positions(m.st, ids) }
 
-// object: the shared verb object of the selection (06 §13.6).
+// object: the shared verb object of the selection (06 §3.5).
 func object(sel []*item) view.Object {
 	return view.Object{IDs: objIDs(sel), Refs: refsOf(sel), What: named(sel)}
 }
@@ -60,6 +60,9 @@ func (m *model) space() tea.Cmd {
 // applied reloads after an edit and reports a failure on the status line.
 func (m *model) applied(err error) bool {
 	m.reload()
+	if m.tab == tabLibrary {
+		m.loadLibrary() // a plan op from Mod 库存 (m, space)
+	}
 	if err != nil {
 		m.say(sayFail, m.humanize(err.Error()))
 		return false
@@ -67,7 +70,7 @@ func (m *model) applied(err error) bool {
 	return true
 }
 
-// stageKey: t stages the object; in Staging it puts it back where it was (06 §13.6).
+// stageKey: t stages the object; in Staging it puts it back where it was (06 §3.5).
 func (m *model) stageKey() tea.Cmd {
 	sel := m.selection()
 	ids := objIDs(sel)
@@ -93,6 +96,24 @@ func (m *model) moveBy(d int) tea.Cmd {
 		return nil
 	}
 	keep := m.cols[cActive].curID()
+	if m.bar.active() {
+		// the bar shows some rows: past the next shown row (06 §3.5, view.StepAt)
+		c := &m.cols[cActive]
+		var shown []int
+		for _, vi := range c.view {
+			shown = append(shown, c.items[vi].pos)
+		}
+		at := view.StepAt(shown, m.positions(ids), d)
+		if at == 0 {
+			m.say(sayInfo, T("already at the edge of the rows shown"))
+			return nil
+		}
+		if !m.verb(view.Place(m.app, view.Active, object(sel), at)) {
+			return nil
+		}
+		m.refilterCol(cActive, keep)
+		return m.requestDetail()
+	}
 	if !m.verb(view.MoveBy(m.app, object(sel), d)) {
 		return nil
 	}
@@ -110,7 +131,7 @@ func (m *model) moveTo(ids []string, what string, at int) tea.Cmd {
 	return m.requestDetail()
 }
 
-// ---- the position input (06 §13.7) ----
+// ---- the position input (06 §3.6) ----
 
 type posOpt struct {
 	label string // "after  Harmony"
@@ -165,7 +186,7 @@ func (m *model) posOptions() {
 	p.sel = 0
 }
 
-// posKey: typing filters; ↑↓ ←→ choose (06 §13.4: the arrows move among the options);
+// posKey: typing filters; ↑↓ ←→ choose (06 §3.3: the arrows move among the options);
 // tab switches after / before; enter moves; esc closes.
 func (m *model) posKey(k tea.KeyMsg) tea.Cmd {
 	p := m.pos

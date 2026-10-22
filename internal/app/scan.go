@@ -44,21 +44,37 @@ type ScanStats struct {
 
 // ScanReport is the result of Scan.
 type ScanReport struct {
-	Env     *env.Environment
-	ScanID  int64
-	Full    bool
-	Stats   ScanStats
-	Notices []string // Loadout sync messages
+	Env      *env.Environment
+	ScanID   int64
+	Full     bool
+	GameOnly bool // only the game's own Data/ and Mods/ were read
+	Stats    ScanStats
+	Notices  []string // Loadout sync messages
 }
 
-// Scan runs 02 §4.1 for the current environment: enumerate → observe → reconcile → persist.
-// full ignores cached hashes and reads every semantic file again.
-func (a *App) Scan(full bool) (*ScanReport, error) {
+// ScanOptions choose what a scan reads.
+type ScanOptions struct {
+	Full bool // ignore cached hashes and read every semantic file again
+	// GameOnly reads only the environment's own Data/ and Mods/, not the shared mod folders
+	// (a game just added, 02 §0 item 8).
+	GameOnly bool
+}
+
+// Scan runs 02 §4.1 for the current environment: the shared mod folders and the game's own
+// Data/ and Mods/, each read once. full ignores cached hashes.
+func (a *App) Scan(full bool) (*ScanReport, error) { return a.ScanWith(ScanOptions{Full: full}) }
+
+// ScanWith is Scan with options: enumerate → observe → reconcile → persist.
+func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
+	full := o.Full
 	e, err := a.Env()
 	if err != nil {
 		return nil, err
 	}
 	started := a.Now()
+	if err := a.adoptGameWorkshops(); err != nil {
+		return nil, err
+	}
 	srcs, err := a.Store.Sources(e.ID)
 	if err != nil {
 		return nil, err
@@ -71,8 +87,18 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 		return nil, err
 	}
 	skip := map[string]bool{}
+	present := map[string]bool{} // left out of this scan, not lost (identity.Input.Present)
 	var active []*source.Source
+	var listed []*source.Source // the sources this scan reports on
 	for _, s := range srcs {
+		if o.GameOnly && s.EnvID != e.ID {
+			if s.Status != source.StatusRetired {
+				skip[s.ID] = true
+				present[s.ID] = s.Status == source.StatusOK
+			}
+			continue
+		}
+		listed = append(listed, s)
 		switch s.Status {
 		case source.StatusRetired:
 			continue
@@ -115,11 +141,28 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 			return nil, err
 		}
 	}
+	// The DDS RimArcho wrote next to mods' PNGs are not part of the mods (贴图优化).
+	generated, err := a.Store.GeneratedFiles()
+	if err != nil {
+		return nil, err
+	}
 	scanID, err := a.Store.BeginScan(e.ID, started, full)
 	if err != nil {
 		return nil, err
 	}
 	obs, sstats := scan.Collect(active, scan.Options{
+		Generated: func(dir string) map[string]bool {
+			if len(generated) == 0 {
+				return nil
+			}
+			if g := generated[store.PathKey(dir)]; g != nil {
+				return g
+			}
+			if real, err := source.RealPath(dir); err == nil {
+				return generated[store.PathKey(real)]
+			}
+			return nil
+		},
 		PrevFiles: func(l scan.Location) map[string]scan.File { return prev[l.Key()] },
 		PrevHash: func(l scan.Location) (scan.Hash, bool) {
 			h, ok := prevHash[l.Key()]
@@ -132,8 +175,23 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Origin markers written before migration v14 name IDs merged away (02 §0.1).
+	if aliases, err := a.Store.IDAliases(); err != nil {
+		return nil, err
+	} else if len(aliases) > 0 {
+		for _, ob := range obs {
+			if og := ob.Origin; og != nil {
+				if n := aliases[og.InstanceID]; n != "" {
+					og.InstanceID = n
+				}
+				if n := aliases[og.LineageID]; n != "" {
+					og.LineageID = n
+				}
+			}
+		}
+	}
 	res := identity.Reconcile(identity.Input{
-		Obs: obs, Known: known, Skip: skip, Lineages: lineages, NewID: a.NewID,
+		Obs: obs, Known: known, Skip: skip, Present: present, Lineages: lineages, NewID: a.NewID,
 		Semantic: func(k *identity.Known) scan.SemanticSet {
 			if k.Snap == nil {
 				return nil
@@ -152,7 +210,7 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 	}
 
 	st := ScanStats{Events: map[string]int{}, Questions: len(res.Questions)}
-	for _, s := range srcs {
+	for _, s := range listed {
 		ss := SourceStat{Label: s.Label, Kind: string(s.Kind), Status: s.Status}
 		if x := sstats[s.ID]; x != nil {
 			ss.Folders, ss.Mods, ss.Residue, ss.Disabled, ss.NoAbout, ss.ResidueNoAbout, ss.Aliases, ss.HasACF, ss.Err =
@@ -189,8 +247,8 @@ func (a *App) Scan(full bool) (*ScanReport, error) {
 	if err := a.Store.FinishScan(scanID, a.Now(), st); err != nil {
 		return nil, err
 	}
-	rep := &ScanReport{Env: e, ScanID: scanID, Full: full, Stats: st}
-	// 04 §2.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
+	rep := &ScanReport{Env: e, ScanID: scanID, Full: full, GameOnly: o.GameOnly, Stats: st}
+	// 04 §4.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
 	if ls, err := a.Loadout(); err == nil {
 		rep.Notices = ls.Notices
 	} else {

@@ -1,4 +1,4 @@
-// Spike (TUI v2 V0, 06 §3): are the icon glyphs and the compat-mode fallbacks one cell?
+// Spike (TUI v2 V0, 06 §7): are the icon glyphs and the compat-mode fallbacks one cell?
 //
 // For each code point it reports the Unicode East Asian Width class, go-runewidth with
 // EastAsianWidth off (RimArcho's setting) and on, and, for each font, whether the font has
@@ -239,7 +239,7 @@ var candidates = []glyph{
 	{"cand ↕ U+2195", 0x2195}, {"cand ⇕ U+21D5", 0x21D5}, {"cand ↧ U+21A7", 0x21A7}, {"cand ⌄ U+2304", 0x2304},
 }
 
-// proposed is the corrected compat column (and the nerd-mode unsaved dot) for 06 §3.
+// proposed is the corrected compat column (and the nerd-mode unsaved dot) for 06 §7.
 var proposed = []glyph{
 	{"official ⬥", 0x2B25}, {"workshop ◉", 0x25C9}, {"local ▢", 0x25A2}, {"local copy ⬦", 0x2B26},
 	{"git ∆", 0x2206}, {"error ⨯", 0x2A2F}, {"warn !", '!'}, {"log error ◍", 0x25CD}, {"unloadable ◌", 0x25CC},

@@ -3,11 +3,12 @@ package app
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/finding"
 )
 
-// LaunchCheck is one row of the pre-launch list (04 §8): a problem code whose mods were error
+// LaunchCheck is one row of the pre-launch list (08 §2): a problem code whose mods were error
 // sources in the game's log much more often than chance in the log corpus (decisions-corpus
 // §3, G4/G8). The list never blocks a launch; it says what is likely to go wrong and what to do.
 //
@@ -79,6 +80,21 @@ func (a *App) LaunchWarnings() ([]*LaunchWarning, *AnalysisState, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	return LaunchWarningsOf(ps), ps.Analysis, nil
+}
+
+// LaunchCheckOf is the LaunchChecks row of a code (nil when the code is not in the list).
+func LaunchCheckOf(code string) *LaunchCheck {
+	for i := range LaunchChecks {
+		if LaunchChecks[i].Code == code {
+			return &LaunchChecks[i]
+		}
+	}
+	return nil
+}
+
+// LaunchWarningsOf is LaunchWarnings over a problem set already computed.
+func LaunchWarningsOf(ps *ProblemSet) []*LaunchWarning {
 	by := map[string]*LaunchWarning{}
 	var out []*LaunchWarning
 	for i := range LaunchChecks {
@@ -102,7 +118,7 @@ func (a *App) LaunchWarnings() ([]*LaunchWarning, *AnalysisState, error) {
 			kept = append(kept, w)
 		}
 	}
-	return kept, ps.Analysis, nil
+	return kept
 }
 
 // count is "1 patch", "2 patches".
@@ -111,4 +127,18 @@ func count(n int, one, many string) string {
 		return "1 " + one
 	}
 	return fmt.Sprintf("%d %s", n, many)
+}
+
+// StrengthPrefix starts the evidence line that gives an order.violated finding its
+// constraint strength (04 §5.3): "constraint strength: strong|weak|harmless".
+const StrengthPrefix = "constraint strength: "
+
+// Strength is the constraint strength an order.violated problem carries ("" for other codes).
+func (p *Problem) Strength() string {
+	for _, e := range p.Evidence {
+		if s, ok := strings.CutPrefix(e.Text, StrengthPrefix); ok {
+			return s
+		}
+	}
+	return ""
 }

@@ -1,4 +1,4 @@
-// Import and export of the mod list (10 §4): to and from RimSort, RimCrow, RimWorld's
+// Import and export of the mod list (04 §9): to and from RimSort, RimCrow, RimWorld's
 // own .rml, share codes, Rentry and Workshop collections. An import is previewed first —
 // what is installed, what is missing and where to get it, what the enabled list becomes —
 // and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).
@@ -11,6 +11,13 @@ export function initExchange(u) { ui = u; }
 let info = null;  // ExchangeInfo(): dialogs, the typed paths' folder, the formats
 let fmt = 0;      // the chosen export format
 let pasted = "";  // what the paste box held (kept while the popup is reopened)
+
+// importFrom opens the import popup straight on the preview of a source (the first-run
+// guide's collection link).
+export async function importFrom(kind, src) {
+  await exchange(0);
+  if (S.popup && S.popup.kind === "exchange") preview(kind, src);
+}
 
 // exchange opens the popup on import (0) or export (1).
 export async function exchange(tab = 0) {
@@ -126,6 +133,7 @@ async function preview(kind, src, name) {
   ways.append(
     way(T("replace the enabled list"), p.replace, true, () => apply(false)),
     way(T("add the ones you lack"), p.merge, false, () => apply(true)),
+    await asPlan(p),
   );
   body.append(ways);
   body.append(el("div", "xc-hint", T("one step: u undoes it; the game's ModsConfig.xml changes only when you save")));
@@ -187,6 +195,32 @@ function link(text, url, button) {
   return a;
 }
 
+// asPlan is the third way (04 §9.1): the list becomes a new plan of its own, and the
+// current one stays as it is.
+async function asPlan(p) {
+  const base = p.name || (p.source || "").replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
+  let free = base;
+  try { free = (await api.CheckPlanName(base, "", 0)).free; } catch { /* keep the base */ }
+  const d = el("div", "xc-way");
+  d.append(el("div", "t", T("as a new plan")), el("div", "xc-note", Tf("%d mods; the current plan stays as it is", p.total)));
+  const name = el("input", "xc-input");
+  name.value = free;
+  name.spellcheck = false;
+  const b = el("button", "btn", T("create the plan"));
+  b.onclick = async () => {
+    let r;
+    try { r = await api.ImportAsPlan(name.value); } catch (e) { return say("fail", errText(e)); }
+    pop.close();
+    for (const c of S.cols) { c.sel.clear(); c.query = ""; c.cursor = 0; }
+    await ui.reload();
+    await ui.go(r.page);
+    say("ok", r.text);
+  };
+  name.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); b.click(); } });
+  d.append(name, b);
+  return d;
+}
+
 async function apply(merge) {
   let t;
   try { t = await api.ImportApply(merge); } catch (e) { return say("fail", errText(e)); }
@@ -194,6 +228,8 @@ async function apply(merge) {
   for (const c of S.cols) c.sel.clear();
   await ui.reload();
   say("ok", t, true);
+  // the first-run guide goes on once its list is in
+  if (ui.afterImport) ui.afterImport();
 }
 
 // ---- export ----

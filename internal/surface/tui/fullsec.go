@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The full-screen detail's sub-sections (06 §6.3): Def, patches, Harmony, rules and the
+// The full-screen detail's sub-sections (06 §4.2): Def, patches, Harmony, rules and the
 // full history, loaded when the full screen opens for a mod. 1–5 jump to them.
 
 type fullSec = view.Section

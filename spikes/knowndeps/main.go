@@ -483,7 +483,7 @@ func pct(a, b int) float64 {
 	return 100 * float64(a) / float64(b)
 }
 
-var privateRe = regexp.MustCompile(`(?i)users[\\/]|/home/|appdata|steamapps|[a-z]:[\\/]|@[a-z0-9-]+\.[a-z]`)
+var privateRe = regexp.MustCompile(`(?i)users[\\/]|/home/|appdata|steamapps|[a-z]:[\\/]|@[a-z0-9-]+\.[a-z]|\[rimworld_(dir|data)\]`)
 
 func top(m map[string]int, n int) []string {
 	type kv struct {

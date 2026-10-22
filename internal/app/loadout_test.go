@@ -1,6 +1,6 @@
 package app_test
 
-// M2 Loadout tests (04 §1–§4, §8). Every ModsConfig.xml written here lives in a temp dir.
+// M2 Loadout tests (04 §1.1–§4, §8). Every ModsConfig.xml written here lives in a temp dir.
 
 import (
 	"os"
@@ -145,8 +145,9 @@ func TestSaveSteamSuffixVersionAndBackup(t *testing.T) {
 	if !strings.Contains(out, "ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start") {
 		t.Fatal(out)
 	}
-	if _, code := e.Run("launch"); code == 0 {
-		t.Fatal("launch must be blocked by the version mismatch")
+	// The mismatch no longer blocks a launch: launching writes the file for 1.6 (08 §2).
+	if out, _ := e.Run("launch", "--dry-run"); strings.Contains(out, "saved for") {
+		t.Fatalf("launch blocked by the version mismatch:\n%s", out)
 	}
 	out = e.MustRun("save", "--dry-run")
 	if e.ReadModsConfig() != orig || !strings.Contains(out, "1.5.4409 rev1118 → 1.6.4633 rev1261 (rewritten from 1.5 to 1.6") {
@@ -171,7 +172,7 @@ func TestSaveSteamSuffixVersionAndBackup(t *testing.T) {
 	}
 	// Our own write is not an external change; the launch goes through now.
 	scanNow(t, e)
-	vs, _ := e.App.Store.Versions(mustEnv(t, e))
+	vs, _ := e.App.Store.Versions(mustPlan(t, e))
 	if len(vs) != 2 || vs[0].Source != "user" {
 		t.Fatalf("versions after rescan: %d, newest %s", len(vs), vs[0].Source)
 	}
@@ -188,7 +189,7 @@ func TestExternalChangeAndConflict(t *testing.T) {
 	// Same list, different formatting (the game re-saving it): no new version.
 	e.WriteFile(e.ModsConfig, strings.ReplaceAll(e.ReadModsConfig(), "    <li>", "\t\t<li>"))
 	scanNow(t, e)
-	if vs, _ := e.App.Store.Versions(mustEnv(t, e)); len(vs) != 1 {
+	if vs, _ := e.App.Store.Versions(mustPlan(t, e)); len(vs) != 1 {
 		t.Fatalf("a reformatted but identical file created %d versions", len(vs))
 	}
 	// Clean workspace: the external change is loaded.
@@ -197,14 +198,14 @@ func TestExternalChangeAndConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.Notices) != 1 || !strings.Contains(r.Notices[0], "loaded as v2") || joined(active(t, e)) != "Core, A" {
+	if len(r.Notices) != 1 || !strings.Contains(r.Notices[0], "loaded as plan:default v2") || joined(active(t, e)) != "Core, A" {
 		t.Fatalf("notices %v, active %v", r.Notices, active(t, e))
 	}
 	// Dirty workspace: the external change is kept as a version but not loaded.
 	e.MustRun("enable", refOf(t, e, "B", ""))
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
 	out := e.MustRun("status")
-	if !strings.Contains(out, "not loaded because the workspace has unsaved edits") || joined(active(t, e)) != "Core, A, B" {
+	if !strings.Contains(out, "not loaded because the plan changed since it was written") || joined(active(t, e)) != "Core, A, B" {
 		t.Fatalf("conflict:\n%s", out)
 	}
 	e.MustRun("loadout", "checkout", "v3")
@@ -216,21 +217,20 @@ func TestExternalChangeAndConflict(t *testing.T) {
 	}
 }
 
-func TestHistoryCheckoutTagUndoSource(t *testing.T) {
+func TestHistoryCheckoutUndoSource(t *testing.T) {
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("save") // v2
-	e.MustRun("loadout", "tag", "v2", "base")
 	e.MustRun("enable", refOf(t, e, "B", ""))
 	e.Advance(time.Hour)
 	e.MustRun("save") // v3
-	e.MustRun("loadout", "checkout", "base")
+	e.MustRun("loadout", "checkout", "v2")
 	out := e.MustRun("save") // v4, restores v2
 	if !strings.Contains(out, "source: undo (restores v2)") {
 		t.Fatal(out)
 	}
-	vs, _ := e.App.Store.Versions(mustEnv(t, e))
+	vs, _ := e.App.Store.Versions(mustPlan(t, e))
 	if vs[0].Source != "undo" || vs[0].Note != "restored v2" {
 		t.Fatalf("newest version %+v", vs[0])
 	}
@@ -238,8 +238,8 @@ func TestHistoryCheckoutTagUndoSource(t *testing.T) {
 	if !strings.Contains(out, "diff v3 → v4: 1 change") || !strings.Contains(out, "removed") {
 		t.Fatal(out)
 	}
-	if _, code := e.Run("loadout", "tag", "v2", "v9"); code == 0 {
-		t.Fatal("a tag that looks like a version must be refused")
+	if _, code := e.Run("loadout", "tag", "v2", "base"); code == 0 {
+		t.Fatal("loadout tag is gone: named lists are plans (04 §1.1)")
 	}
 }
 
@@ -312,10 +312,11 @@ func TestLaunchPlans(t *testing.T) {
 	}
 	e.MustRun("env", "set", "main", "--launch", "direct")
 	e.MustRun("enable", refOf(t, e, "B", ""))
-	if out, code := e.Run("launch"); code == 0 || !strings.Contains(out, "unsaved changes") {
-		t.Fatalf("unsaved: exit %d\n%s", code, out)
+	// Edits since the last write do not block: the launch writes them (08 §2 "删除了什么").
+	if out, code := e.Run("launch", "--force"); code == 0 {
+		t.Fatalf("launch --force must be gone:\n%s", out)
 	}
-	e.MustRun("launch", "--force")
+	e.MustRun("launch")
 	if len(e.Launched) != 1 || !strings.Contains(e.Launched[0], "RimWorldWin64.exe") {
 		t.Fatalf("launched %v", e.Launched)
 	}

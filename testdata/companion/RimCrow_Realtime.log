@@ -1,0 +1,4 @@
+{"timestamp":"2026-09-29 19:35:20.001","level":"INFO","message":"[RimCrow Companion] 深度智能诊断 Hook 注入成功！","details":"","count":1,"context":{"relatedModIds":[],"relatedFiles":[],"inferredType":""}}
+{"timestamp":"2026-09-29 19:35:21.500","level":"ERROR","message":"[Mod A] Could not resolve cross-reference to Verse.ThingDef named Missing_Thing (wanter=costList)","details":"Verse.Log:Error (string)","count":1,"context":{"relatedModIds":["tester.a"],"relatedFiles":["Defs/ThingDefs/a.xml","xref:Missing_Thing:Defs/ThingDef[defName=a_Thing]/costList","patch:a_Thing:PatchOperationAdd"],"inferredType":"CrossRefError"}}
+{"timestamp":"2026-09-29 19:35:22.500","level":"ERROR","message":"[Mod A] Could not resolve cross-reference to Verse.ThingDef named Missing_Thing (wanter=costList)","details":"Verse.Log:Error (string)","count":4,"context":{"relatedModIds":["tester.a"],"relatedFiles":["Defs/ThingDefs/a.xml"],"inferredType":"CrossRefError"}}
+{broken

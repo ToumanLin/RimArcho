@@ -7,9 +7,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Screen structure (06 §4.2): top bar, blank, body, blank, status line, hint line.
+// Screen structure (06 §2.2): top bar, blank, body, blank, status line, hint line.
 
 func (m *model) View() string {
 	if m.quitting {
@@ -36,15 +37,22 @@ func (m *model) View() string {
 		content = m.needLines(body)
 	case m.tab == tabChanges:
 		content = m.changeLines(body)
+	case m.tab == tabLibrary:
+		content = m.libraryLines(body)
 	case m.full:
 		content, ps = m.fullLines(body)
 	case m.pos != nil:
 		// The position input sits under the columns, which give it their last lines.
 		sheet := m.posLines(m.w)
-		content, ps = m.columnLines(max(body-len(sheet)-1, 3))
-		content = append(append(content, ""), sheet...)
+		bar := m.barView(m.w)
+		content, ps = m.columnLines(max(body-len(bar)-len(sheet)-1, 3))
+		content = append(append(append(bar, content...), ""), sheet...)
+		ps = shiftPlacements(ps, len(bar))
 	default:
-		content, ps = m.columnLines(body)
+		bar := m.barView(m.w)
+		content, ps = m.columnLines(max(body-len(bar), 3))
+		content = append(bar, content...)
+		ps = shiftPlacements(ps, len(bar))
 	}
 	if m.images != nil {
 		m.images.set(ps) // an empty list clears the images of the previous screen
@@ -54,6 +62,9 @@ func (m *model) View() string {
 	}
 	lines[h-2] = m.statusLine()
 	lines[h-1] = m.hintLine()
+	if m.menu != nil {
+		m.overlayMenu(lines)
+	}
 	for i, l := range lines {
 		if lipgloss.Width(l) > m.w {
 			lines[i] = width.Truncate(l, m.w, "")
@@ -62,8 +73,8 @@ func (m *model) View() string {
 	return strings.Join(lines, "\n")
 }
 
-// topBar: brand · environment pill · needs attention · unsaved, and on the right the
-// position line (06 §13.3) and launch. Secondary screens show a breadcrumb that is the
+// topBar: brand · environment pill · needs attention · not written (to the game), and on the right the
+// position line (06 §3.2) and launch. Secondary screens show a breadcrumb that is the
 // position line.
 func (m *model) topBar() string {
 	left := sBold.Render("RimArcho")
@@ -86,28 +97,37 @@ func (m *model) topBar() string {
 	pill := " " + envText + " "
 	add("  ", 2)
 	add(sPill.Render(pill), width.StringWidth(pill))
+	// the plan being edited (06 §9.1) and its "有未载入的外部版本" (04 §4.3)
+	if m.st != nil && m.st.Plan != nil {
+		t := T("plan") + " " + m.st.Plan.Name
+		add("  "+sText.Render(t), 2+width.StringWidth(t))
+		if m.st.WS != nil && m.st.WS.Conflict != 0 && m.w >= 110 {
+			t := Tf("an external version was not loaded (v%d)", m.st.WS.Conflict)
+			add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
+		}
+	}
 	if n := m.needCount(); n > 0 {
 		t := Tf("needs attention %d", n)
 		add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
 	}
-	if t := m.liveText(); t != "" {
-		st := sOK
-		if m.live.Errors > 0 {
-			st = sErrS
-		}
-		add("  "+st.Render(t), 2+width.StringWidth(t))
-	}
+	// (the running game is on the status line, 06 §9.1)
 	if m.unsaved > 0 {
-		t := Tf("unsaved %d", m.unsaved)
+		t := Tf("not written %d", m.unsaved)
 		add("  "+sAccent.Render(ic.unsaved+" "+t), 2+2+width.StringWidth(t))
 	}
 	launch := T("launch") + " " + ic.play
 	launchW := width.StringWidth(launch) + 2 // "L "
+	key := sText.Render("L") + " "
+	if m.live != nil && m.live.Blocked != "" {
+		// another environment's game runs: launching is refused until it exits (08 §1)
+		launch, key = m.live.Blocked, ""
+		launchW = width.StringWidth(launch)
+	}
 	pw := width.StringWidth(pos)
 	room := m.w - lw - 3 // at least three cells between the left side and the position
 	right, rw := "", 0
 	if pw+3+launchW <= room {
-		right = m.renderPos(pos) + "   " + sText.Render("L") + " " + sSecond.Render(launch)
+		right = m.renderPos(pos) + "   " + key + sSecond.Render(launch)
 		rw = pw + 3 + launchW
 	} else if room >= 8 {
 		pw = min(pw, room)
@@ -132,15 +152,48 @@ func (m *model) renderPos(p string) string {
 	return sAccent.Render(head) + sSecond.Render(rest) + sText.Render(pop)
 }
 
-// statusLine: one sentence, ✓ done (green), ✗ failed (red), … in progress (06 §9).
+// statusLine: the sentence (statusText) and, on its right, the running game while there is
+// something to say (06 §9.1; the sidebar's foot in the GUI): "● game running since 14:05"
+// with this run's errors in amber, or after the game "● analyse this run's log".
 func (m *model) statusLine() string {
 	if m.tags != nil {
 		return m.tagBarLine(m.w)
 	}
+	live, lw := m.liveStatus()
+	if live == "" || lw+3 > m.w {
+		return m.statusText(m.w)
+	}
+	left := m.statusText(m.w - lw - 3)
+	return left + strings.Repeat(" ", max(m.w-lw-3-lipgloss.Width(left), 0)) + "   " + live
+}
+
+// liveStatus is the running game's part of the status line and its width; "" when there is
+// nothing to say ("the game is not running" is not news).
+func (m *model) liveStatus() (string, int) {
+	l := m.live
+	switch {
+	case l != nil && l.Running:
+		t := view.LiveText(l)
+		s, w := sOK.Render("●")+" "+sSecond.Render(t), 2+width.StringWidth(t)
+		if l.Errors > 0 {
+			n := itoa(l.Errors)
+			s, w = s+" "+sWarnS.Render(n), w+1+len(n)
+		}
+		return s, w
+	case l != nil && l.NewLog != "":
+		// 08 §2 "游戏退出后": a new Player.log; 能不能跑 (shift+2) analyses it
+		return sAccent.Render("● "+l.NewLog) + sDimS.Render("  shift+2"), 2 + width.StringWidth(l.NewLog) + 9
+	}
+	return "", 0
+}
+
+// statusText is the status line's sentence in w cells: ✓ done (green), ✗ failed (red), …
+// in progress (06 §6).
+func (m *model) statusText(w int) string {
 	text, kind := m.status, m.sayKind
 	if m.editing && text == "" {
 		if l := m.searchLine(); l != "" {
-			return sSecond.Render(fit(l, m.w))
+			return sSecond.Render(fit(l, w))
 		}
 	}
 	if text == "" && m.scanning {
@@ -163,17 +216,19 @@ func (m *model) statusLine() string {
 		mark = markBusy
 	}
 	if mark == "" {
-		return sSecond.Render(fit(text, m.w))
+		return sSecond.Render(fit(text, w))
 	}
-	return ms.Render(mark) + " " + sText.Render(fit(text, m.w-2))
+	return ms.Render(mark) + " " + sText.Render(fit(text, w-2))
 }
 
-// hintLine: "key label · key label", only what the object can do now, at most 7 (06 §9,
+// hintLine: "key label · key label", only what the object can do now, at most 7 (06 §6,
 // §13.2 rule 4); ? lists everything.
 func (m *model) hintLine() string {
 	var pairs [][2]string
 	prefix := ""
 	switch {
+	case m.menu != nil:
+		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
 	case m.pal != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
 	case m.pos != nil:
@@ -182,24 +237,46 @@ func (m *model) hintLine() string {
 		return sAccent.Render(markPrompt+" ") + sSecond.Render(m.prompt.label) + sText.Render(m.prompt.text+"_")
 	case m.editing:
 		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"tab", T("next list with matches")}, {"↑↓", T("move")}}
+	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
+		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"tab", T("complete")}, {"backspace", T("drops the last filter")}, {"↑↓", T("move")}}
+	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
+		pairs = [][2]string{{"↑↓", T("group")}, {"←→", T("value")}, {"enter", T("only these")}, {"x", T("leave out")}, {T("type"), T("find a value")}, {"esc", T("close")}}
 	case m.panel != nil && m.panel.choices != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("confirm")}, {"esc", T("back")}}
+		if m.panel.onDelete != nil {
+			pairs = append(pairs, [2]string{"d", T("remove environment")})
+		}
 	case m.tags != nil:
 		pairs = [][2]string{{"←→", T("choose")}, {"enter", T("apply")}, {"esc", T("close")}, {"←", T("type a new tag")}}
-	case m.panel != nil && m.panel.confirm != nil:
-		pairs = [][2]string{{"y", T("confirm")}, {"n", T("cancel")}, {"↑↓", T("scroll")}}
 	case m.panel != nil:
 		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}}
 	case m.insp != nil:
 		pairs = [][2]string{{"esc", T("back")}, {"backspace", T("previous page")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
 	case m.full:
-		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"g", T("tags")}, {"ctrl+w", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
 	case m.tab == tabChanges:
-		pairs = [][2]string{{"esc", T("back")}, {"enter", T("file changes")}}
+		pairs = [][2]string{{"esc", T("back")}, {"enter", T("open")}, {"i", T("files")}}
+		if m.chg.of != "" {
+			pairs[0][1] = T("every mod")
+		} else if m.chg.library {
+			pairs = append(pairs, [2]string{"a", T("the current plan")})
+		} else {
+			pairs = append(pairs, [2]string{"a", T("the whole library")})
+		}
+		if c := &m.chg; c.cursor < len(c.rows) && c.rows[c.cursor].mod != nil {
+			for _, a := range c.rows[c.cursor].mod.Actions {
+				pairs = append(pairs, [2]string{a.Key, a.Label})
+			}
+		}
+		pairs = append(pairs, [2]string{"tab", T("all mods")})
+	case m.tab == tabLibrary && (m.libr.full || m.libr.detail):
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"enter", T("full screen")}, {"esc", T("back")}, {"F10", T("menu")}, {"?", T("all keys")}}
+	case m.tab == tabLibrary:
+		pairs = m.libPairs()
 	case m.selCount() > 0:
-		// 06 §13.5: what the selection can do, and that another list drops it.
+		// 06 §3.4: what the selection can do, and that another list drops it.
 		prefix = Tf("selected %d", m.selCount())
 		pairs = append(m.verbPairs(), [2]string{"esc", T("clear the selection")}, [2]string{"←→", T("another list clears it")})
 	case m.histActive():
@@ -209,7 +286,7 @@ func (m *model) hintLine() string {
 		}
 		pairs = append(pairs, [2]string{"?", T("all keys")})
 	case m.detailFocus:
-		pairs = [][2]string{{"↑↓", T("scroll")}, {"←", T("back to the list")}, {"enter", T("full screen")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"?", T("all keys")}}
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"←", T("back to the list")}, {"enter", T("full screen")}, {"g", T("tags")}, {"ctrl+o ctrl+w", T("folder / Workshop page")}, {"C", T("this mod's changes")}, {"?", T("all keys")}}
 	default:
 		pairs = append(m.verbPairs(), [2]string{"/", T("search")})
 		if m.layout().tabs {
@@ -246,18 +323,20 @@ func (m *model) hintLine() string {
 	return b.String()
 }
 
-// verbPairs: the verbs the focused list's object can use now (06 §13.6).
+// verbPairs: the verbs the focused list's object can use now (06 §3.5).
 func (m *model) verbPairs() [][2]string {
 	if m.col().cur() == nil {
 		return nil
 	}
+	// ctrl+o / ctrl+w: the cursor's mod's folder and Workshop page (06 §3.5)
+	one := [2]string{"ctrl+o ctrl+w", T("folder / Workshop page")}
 	switch m.focus {
 	case cInactive:
-		return [][2]string{{"space", T("enable")}, {"m", T("enable at…")}, {"t", T("stage")}, {"#", T("tags")}}
+		return [][2]string{{"space", T("enable")}, {"m", T("enable at…")}, {"t", T("stage")}, one, {"g", T("tags")}}
 	case cActive:
-		return [][2]string{{"space", T("disable")}, {"J K", T("move")}, {"m", T("move to…")}, {"t", T("stage")}, {"#", T("tags")}}
+		return [][2]string{{"space", T("disable")}, {"J K", T("move")}, {"m", T("move to…")}, {"t", T("stage")}, one, {"g", T("tags")}}
 	}
-	ps := [][2]string{{"space", T("put back")}, {"m", T("enable at…")}, {"#", T("tags")}}
+	ps := [][2]string{{"space", T("put back")}, {"m", T("enable at…")}, one, {"g", T("tags")}}
 	if m.selCount() == 0 {
 		ps = append(ps, [2]string{"T", T("put all back")})
 	}
@@ -297,7 +376,7 @@ func window(lines []string, off, n int) []string {
 	return lines[off:end]
 }
 
-// descMax is how many description lines the detail column shows (06 §6.1): all of them
+// descMax is how many description lines the detail column shows (06 §4.1): all of them
 // once it is focused or scrolled.
 func (m *model) descMax() int {
 	if m.detailFocus || m.detailOff > 0 {
@@ -308,7 +387,7 @@ func (m *model) descMax() int {
 
 // detailLines draws the detail column (w wide, n lines, starting at 0-based column x) and
 // returns its image placements. The first line is the area title, "4 details", or the
-// mod's name once scrolled; in the accent colour when area 4 has the focus (06 §13.3).
+// mod's name once scrolled; in the accent colour when area 4 has the focus (06 §3.2).
 func (m *model) detailLines(w, n, x int) ([]string, []placement) {
 	m.syncDetailOff()
 	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), images: m.inlineImages(), techText: m.detail})

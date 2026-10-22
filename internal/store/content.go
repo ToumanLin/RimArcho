@@ -1,6 +1,6 @@
 package store
 
-// Content kinds of snapshots (06 §5.5 type:assembly|xml|language), from their file lists.
+// Content kinds of snapshots (06 §3.7 type:assembly|xml|language), from their file lists.
 const (
 	HasDLL       = 1 << iota // a .dll anywhere
 	HasDefsPatch             // XML under Defs/ or Patches/ (at any load-folder depth)

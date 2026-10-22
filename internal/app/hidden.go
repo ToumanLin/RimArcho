@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Kinds of hidden mods (10 §2.1): folders another manager hid by renaming About.xml.
+// Kinds of hidden mods (08 §6): folders another manager hid by renaming About.xml.
 const (
 	HiddenPinned  = "pinned"  // a loadable copy of the same lineage is what the game uses
 	HiddenResidue = "residue" // an unsubscribed workshop folder
@@ -78,14 +78,18 @@ func (st *LoadoutState) pinCopy(m *store.Mod) *store.Mod {
 	return best
 }
 
-// FileOp is a change RimArcho makes to a mod folder at the player's request (10 §2.2).
+// FileOp is a change RimArcho makes to a mod folder at the player's request (08 §6).
 type FileOp struct {
-	Op     string // "rename", "trash"
+	Op     string // "rename", "trash", "unpin"
 	Path   string
 	To     string // rename target
 	DryRun bool
 	Swap   *EditResult // unpin: the workspace now uses the workshop copy
 	Scan   *ScanReport // the rescan afterwards
+	// Op "unpin" (a locked version RimArcho made, no file changes): Path is the copy, To
+	// the upstream; InPlan says whether the current plan uses the copy.
+	Locked *Locked
+	InPlan bool
 }
 
 func aboutDisabledPath(m *store.Mod) (string, error) {
@@ -108,7 +112,7 @@ func aboutDisabledPath(m *store.Mod) (string, error) {
 }
 
 // Unhide renames About.xml.disabled back to About.xml so the game sees the folder again
-// (10 §2.2), then rescans.
+// (08 §6), then rescans.
 func (a *App) Unhide(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -144,7 +148,7 @@ func (a *App) unhide(st *LoadoutState, m *store.Mod, dryRun bool) (*FileOp, erro
 }
 
 // Unpin restores the hidden workshop copy of a pinned mod and switches the workspace to
-// it; the pinning copy stays where it is (10 §2.2). ref may name either copy.
+// it; the pinning copy stays where it is (08 §6). ref may name either copy.
 func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -162,7 +166,22 @@ func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 		}
 	}
 	if h == nil {
-		return nil, fmt.Errorf("%s is not pinned (no hidden workshop copy with a loadable copy beside it)", st.Ix.Ref(m.ID))
+		// A locked version RimArcho made: the upstream was never hidden, so unpinning only
+		// swaps it back into the current plan (04 §7.5). The copy stays on disk.
+		l, err := st.lockFor(m)
+		if err != nil {
+			return nil, err
+		}
+		if l == nil {
+			return nil, fmt.Errorf("%s is not pinned (no hidden workshop copy with a loadable copy beside it, and no copy made by archo pin)", st.Ix.Ref(m.ID))
+		}
+		op := &FileOp{Op: "unpin", Path: l.Copy.RealPath, To: l.Upstream.RealPath, DryRun: dryRun, Locked: l,
+			InPlan: st.List.Index(l.Copy.ID) >= 0}
+		if dryRun || !op.InPlan {
+			return op, nil
+		}
+		op.Swap, err = a.Swap(st.Ix.Ref(l.Copy.ID), st.Ix.Ref(l.Upstream.ID))
+		return op, err
 	}
 	op, err := a.unhide(st, h.Mod, dryRun)
 	if err != nil || dryRun || st.List.Index(h.Copy.ID) < 0 {
@@ -172,11 +191,12 @@ func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 	return op, err
 }
 
-// ErrNotTrashable: Trash only removes hidden or unsubscribed workshop and SteamCMD folders.
+// ErrNotTrashable: Trash only removes the player's own copies (Mods/, the lock library,
+// SteamCMD) and hidden or unsubscribed workshop folders.
 var ErrNotTrashable = errors.New("not trashable")
 
-// Trash moves a hidden or unsubscribed workshop (or SteamCMD) folder to the recycle bin
-// (10 §2.2, §2.4), then rescans.
+// Trash moves a copy of the player's own, or a hidden or unsubscribed workshop folder, to the recycle bin
+// (08 §6, §2.4), then rescans.
 func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -186,15 +206,27 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A copy of the player's own (in Mods/, the lock library, or a SteamCMD download: no
+	// subscription brings it back) may go; a Workshop folder only when it is hidden or no
+	// longer subscribed: Steam would download a subscribed one again (06 §2.9, 01 §4).
+	own := m.Kind == source.Local || m.Kind == source.SteamCMD || m.Kind == source.Extra && st.Ix.isLockSource(a, m.SourceID)
 	switch {
 	case m.Status != identity.Live:
 		return nil, fmt.Errorf("%s is no longer on disk", st.Ix.Ref(m.ID))
-	case m.Kind != source.Workshop && m.Kind != source.SteamCMD:
-		return nil, fmt.Errorf("%w: %s is in src:%s; RimArcho only moves hidden or unsubscribed workshop folders to the recycle bin", ErrNotTrashable, st.Ix.Ref(m.ID), m.SourceLabel)
-	case m.Unloadable != scan.UnloadableAboutDisabled && !m.Residue:
+	case !own && m.Kind != source.Workshop && m.Kind != source.SteamCMD:
+		return nil, fmt.Errorf("%w: %s is in src:%s; RimArcho only moves copies in Mods/, the lock library or SteamCMD, and hidden or unsubscribed workshop folders, to the recycle bin", ErrNotTrashable, st.Ix.Ref(m.ID), m.SourceLabel)
+	case !own && m.Unloadable != scan.UnloadableAboutDisabled && !m.Residue:
 		return nil, fmt.Errorf("%w: %s is a subscribed, loadable mod; unsubscribe it in Steam instead", ErrNotTrashable, st.Ix.Ref(m.ID))
+	case own && source.IsLink(st.Ix.ModDir(m)):
+		return nil, fmt.Errorf("%w: %s is a link, not a folder; RimArcho does not move it", ErrNotTrashable, st.Ix.ModDir(m))
 	case st.List.Index(m.ID) >= 0:
 		return nil, fmt.Errorf("%s is enabled; disable it first", st.Ix.Ref(m.ID))
+	}
+	// Another plan (of any environment of this game) would lose it too: say which (06 §2.9).
+	if ps, err := a.usedBy(st, m.ID); err != nil {
+		return nil, err
+	} else if len(ps) > 0 {
+		return nil, fmt.Errorf("%s is used by %s; take it out of them first (archo library remove-from-plans %s)", st.Ix.Ref(m.ID), joinPlans(ps), st.Ix.Ref(m.ID))
 	}
 	var root string
 	for _, s := range st.Ix.Sources {
@@ -216,15 +248,17 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if dryRun {
 		return op, nil
 	}
-	trash := a.TrashFunc
-	if trash == nil {
-		trash = source.Trash
-	}
-	if err := trash(real); err != nil {
+	if err := a.ToTrash(real); err != nil {
 		return nil, err
 	}
 	op.Scan, err = a.Scan(false)
 	return op, err
+}
+
+// isLockSource: the source is the environment's lock library (04 §7).
+func (ix *Index) isLockSource(a *App, id string) bool {
+	s := ix.Source(id)
+	return a.IsLockSource(s)
 }
 
 // env0 reports whether p is the source root itself (never trashed).

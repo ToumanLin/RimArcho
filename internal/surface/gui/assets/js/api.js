@@ -1,4 +1,4 @@
-// The Go service (internal/surface/gui.API) through the Wails runtime (08 §3): no
+// The Go service (internal/surface/gui.API) through the Wails runtime (06 §8.2): no
 // generated bindings, no build step.
 import { Call, Events } from "/wails/runtime.js";
 

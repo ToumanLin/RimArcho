@@ -25,7 +25,7 @@ type Active func(pkg string) bool
 type Resolved struct {
 	Folders []string // absolute, highest priority first
 	// Conds is the outcome of every conditional LoadFolders entry, e.g.
-	// "IfModActive=a.b:1;IfModNotActive=c.d:0". It is part of the cache key (03 §1.2).
+	// "IfModActive=a.b:1;IfModNotActive=c.d:0". It is part of the cache key (03 §1).
 	Conds string
 	// Tag is the LoadFolders version tag used ("" without LoadFolders.xml).
 	Tag string
@@ -106,7 +106,7 @@ func Resolve(root, loadFoldersXML, mm string, active Active) Resolved {
 }
 
 // pickTag: the exact version, else the highest tag not above it, else "default", else the
-// lowest (03 §1.1).
+// lowest (03 §1).
 func pickTag(lf map[string][]lfEntry, mm string) string {
 	if _, ok := lf[mm]; ok {
 		return mm

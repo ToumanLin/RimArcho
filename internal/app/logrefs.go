@@ -188,12 +188,41 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 		dll  bool
 	}
 	var jobs []job
+	// The reference index names the XML files that can mention each name; only those are
+	// read (03 §6.5). Without it every effective Defs/Patches file is read.
+	x, _ := cx.a.RefIndex(cx.st)
+	if x != nil {
+		read := map[int]bool{}
+		for _, q := range qs {
+			for _, n := range q.names {
+				for _, f := range x.filesWith(n) {
+					read[f] = true
+				}
+			}
+		}
+		byID := map[string]*store.Mod{}
+		for _, m := range mods {
+			byID[m.ID] = m
+		}
+		idx := make([]int, 0, len(read))
+		for f := range read {
+			idx = append(idx, f)
+		}
+		sort.Ints(idx)
+		for _, f := range idx {
+			if m := byID[x.files[f].Inst]; m != nil {
+				jobs = append(jobs, job{m, x.files[f].Path, x.files[f].Rel, false})
+			}
+		}
+	}
 	for _, m := range mods {
 		dir := cx.st.Ix.ModDir(m)
-		r := content.Resolve(dir, m.Decl().LoadFolders, cx.st.GameMM(), func(p string) bool { return active[strings.TrimSuffix(strings.ToLower(p), "_steam")] })
-		for _, sub := range []string{"Defs", "Patches"} {
-			for _, as := range content.Assets(dir, r.Folders, sub) {
-				jobs = append(jobs, job{m, as.Path, as.Rel, false})
+		if x == nil {
+			r := content.Resolve(dir, m.Decl().LoadFolders, cx.st.GameMM(), func(p string) bool { return active[strings.TrimSuffix(strings.ToLower(p), "_steam")] })
+			for _, sub := range []string{"Defs", "Patches"} {
+				for _, as := range content.Assets(dir, r.Folders, sub) {
+					jobs = append(jobs, job{m, as.Path, as.Rel, false})
+				}
 			}
 		}
 		if len(lit) > 0 {
@@ -290,7 +319,7 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 			continue
 		}
 		defines[i] = map[string]string{}
-		ds, _ := cx.a.Store.DefsNamed(q.names[0], false)
+		ds, _ := cx.defsNamed(q.names[0], false)
 		for _, d := range ds {
 			if d.Type == q.def || strings.HasSuffix(d.Type, "."+q.def) {
 				defines[i][d.Instance] = fmt.Sprintf("%s:%d", d.File, d.Line)

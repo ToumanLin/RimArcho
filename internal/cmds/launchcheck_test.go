@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// 04 §8: before a launch, the problems of app.LaunchChecks are listed, one row per code; several
+// 08 §2: before a launch, the problems of app.LaunchChecks are listed, one row per code; several
 // problems of a code are summed up, with their shared fix. Nothing of it blocks the launch.
 func TestLaunchChecksGrouped(t *testing.T) {
 	e := testkit.New(t)

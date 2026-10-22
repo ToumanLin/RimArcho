@@ -16,12 +16,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// 需要处理 (06 §7): what the player can act on, grouped by where the problem is, each item one
+// 需要处理 (06 §5): what the player can act on, grouped by where the problem is, each item one
 // sentence in plain words with the actions that fix it. No problem codes and no #refs appear
 // here: they stay in the technical information, the CLI and MCP. The top bar's number is
-// the number of counted items (06 §4.2).
+// the number of counted items (06 §2.2).
 
-// Groups, in screen order (06 §7.1).
+// Groups, in screen order (06 §2.4).
 const (
 	GroupList = iota
 	GroupDeps
@@ -53,6 +53,11 @@ const (
 	ActUnpin           = "unpin"            // Refs[0]: restore the workshop copy (confirm first)
 	ActTrash           = "trash"            // Refs[0]: folder to the recycle bin (confirm first)
 	ActIgnore          = "ignore"           // Problem: keep as it is (ignore the problem)
+	ActUnlinkPacks     = "unlink-packs"     // remove the packs' links from Mods/ (08 §5.3)
+	ActSwap            = "swap"             // Refs[0] → Refs[1] in the plan (one undoable step)
+	ActMoveLocked      = "move-to-locked"   // Refs[0]: a Mods/ folder into the lock library (confirm first)
+	ActTextures        = "textures"         // Refs: convert their textures to DDS again (confirm first)
+	ActTexClean        = "textures-clean"   // Refs: delete the DDS RimArcho wrote (confirm first)
 )
 
 // Option is one choice of a choose-disable action.
@@ -65,13 +70,14 @@ type Option struct {
 // Action is one way to handle an item.
 type Action struct {
 	Kind  string `json:"kind"`
-	Key   string `json:"key"` // the TUI's key for it (06 §7.2)
+	Key   string `json:"key"` // the TUI's key for it (06 §5)
 	Label string `json:"label"`
 	// Done is what the status line says afterwards; Confirm, when set, is asked first
-	// (06 §9: actions u cannot undo).
+	// (06 §6: actions u cannot undo).
 	Done    string   `json:"done,omitempty"`
 	Confirm string   `json:"confirm,omitempty"` // the TUI's "press again" line
 	Warn    string   `json:"warn,omitempty"`    // what a confirmation dialog says
+	Undo    bool     `json:"undo,omitempty"`    // one workspace step: the status line offers u
 	Refs    []string `json:"refs,omitempty"`
 	Options []Option `json:"options,omitempty"`
 	Title   string   `json:"title,omitempty"`
@@ -87,18 +93,25 @@ type Action struct {
 
 // Need is one item of 需要处理.
 type Need struct {
-	Group   int      `json:"group"`
-	Text    string   `json:"text"`
-	Actions []Action `json:"actions"`
-	Counted bool     `json:"counted"` // in the top bar's number; false for the folded stale log
-	Mods    []string `json:"mods,omitempty"`
-	Status  int      `json:"status"` // StatusErr, StatusWarn or StatusLog for the row icon
-	Dim     bool     `json:"dim,omitempty"`
-	// A folded item stands for several findings one action resolves (06 §7.2): its parts
+	Group   int    `json:"group"`
+	Section int    `json:"section"` // the section it is shown in (SectionOf, 06 §2.4)
+	Text    string `json:"text"`    // one sentence (the TUI's line)
+	// Title and Why are the GUI card's bold line and its plain explanation (Title empty:
+	// the card shows Text); Evidence is where the claim comes from.
+	Title    string    `json:"title,omitempty"`
+	Why      string    `json:"why,omitempty"`
+	Evidence *Evidence `json:"evidence,omitempty"`
+	Actions  []Action  `json:"actions"`
+	Counted  bool      `json:"counted"` // in the top bar's number; false for the folded stale log
+	Mods     []string  `json:"mods,omitempty"`
+	Status   int       `json:"status"` // StatusErr, StatusWarn or StatusLog for the row icon
+	Dim      bool      `json:"dim,omitempty"`
+	// A folded item stands for several findings one action resolves (06 §5): its parts
 	// are shown on demand; every mod in Mods gets the row icon.
 	Parts []string `json:"parts,omitempty"`
 	Fold  bool     `json:"fold,omitempty"`
-	rank  int      // order within the group (06 §7.2's order)
+	rank  int      // order within the group (06 §5's order)
+	code  string   // the problem code it stands for (LaunchHint)
 }
 
 // Needs is the screen's content and what it means for the rest of the interface.
@@ -108,13 +121,17 @@ type Needs struct {
 	Count  int            `json:"count"`  // the top bar's number
 	Never  bool           `json:"never"`  // the mods' files were never checked
 	Stale  bool           `json:"stale"`  // the files changed since the last check
+	// Launch is the most likely trouble of a launch (app.LaunchChecks among the counted
+	// items), for the launch page's tab and the TUI's launch line (06 §2.3); nil when none.
+	Launch *LaunchHint `json:"launch,omitempty"`
 	// LastRun says which run wrote the last-run log: "the list · 9 月 29 日 19:41" or
-	// "pack X · …" (10 §8.3: a pack's errors are not the list's).
-	LastRun string `json:"lastRun,omitempty"`
+	// "pack X · …" (08 §5.3: a pack's errors are not the list's).
+	LastRun    string `json:"lastRun,omitempty"`
+	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "10 月 21 日"
 }
 
 // BuildNeeds turns the problem set and the environment's open questions into items, and
-// counts them (06 §3, §4.2, §7).
+// counts them (06 §7, §4.2, §7).
 func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	n := &Needs{Status: map[string]int{}}
 	n.Never = ps.Analysis == nil || ps.Analysis.Run == nil
@@ -123,11 +140,16 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		return n
 	}
 	n.Items = buildItems(a, st, ps)
+	for i := range n.Items {
+		n.Items[i].Section = SectionOf(n.Items[i].Group)
+	}
+	n.Launch = launchHint(n.Items)
 	for _, r := range ps.Logs {
 		if r.Stale() || r.ModTime.IsZero() {
 			continue
 		}
 		when := ShortDate(r.ModTime) + " " + r.ModTime.In(a.Loc).Format("15:04")
+		n.LastRunDay = ShortDate(r.ModTime)
 		if pack := a.RunOfLog(st.Ix.Env.ID, r.ModTime); pack != "" {
 			n.LastRun = Tf("pack %s", pack) + " · " + when
 		} else {
@@ -136,12 +158,16 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		break
 	}
 	// The number in the top bar is the number of items the player can act on, and a row
-	// carries an icon exactly when its mod is in one of them (06 §3, §4.2).
+	// carries an icon exactly when its mod is in one of them (06 §7, §4.2).
 	for _, it := range n.Items {
 		if !it.Counted {
 			continue
 		}
-		n.Count++
+		// Hidden mods are housekeeping, not something that stops the game: they are listed
+		// on the page but not counted in the sidebar's number (06 §2.1).
+		if it.Group != GroupHidden {
+			n.Count++
+		}
 		icons := it.Mods
 		if !it.Fold && len(icons) > 1 {
 			icons = icons[:1] // the subject; the others are what it needs or conflicts with
@@ -159,10 +185,38 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	ix := st.Ix
 	nm := func(tok string) string { return TokName(st, tok) }
 	var out []Need
-	add := func(n Need) { out = append(out, n) }
+	cur := "" // the code of the problem being turned into an item
+	add := func(n Need) {
+		if n.code == "" {
+			n.code = cur
+		}
+		out = append(out, n)
+	}
 	var versions []*app.Problem
 	var order []Need                    // order.violated: folded into one item when there are several
+	var weak []Need                     // order.violated of weak or harmless constraints: one dimmed item (04 §5.3)
 	logs := map[string][]*app.Problem{} // current log problems by subject mod ("" unattributed)
+	// A mod's patches that miss the same inactive target, and its definitions whose parent
+	// is missing, are one item each: one action covers them all (06 §5's merge rule).
+	type merged struct {
+		n    Need
+		x, y string
+		srcs []string
+	}
+	var mergeKeys []string
+	merges := map[string]*merged{}
+	merge := func(key, x, y string, n Need) {
+		m := merges[key]
+		if m == nil {
+			n.code = cur
+			m = &merged{n: n, x: x, y: y}
+			merges[key] = m
+			mergeKeys = append(mergeKeys, key)
+		}
+		if n.Evidence != nil {
+			m.srcs = append(m.srcs, n.Evidence.Source)
+		}
+	}
 	for _, p := range ps.List {
 		if p.Log != nil {
 			if !p.Log.Stale() && (p.Severity == finding.Error || p.Severity == finding.Warning) {
@@ -175,10 +229,14 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			continue
 		}
 		// A cycle is info (the corpus saw no effect, 03 §4.3), but only the player can resolve
-		// it: listed with its actions, dimmed and not counted.
-		if p.Severity != finding.Error && p.Severity != finding.Warning && p.Code != "order.cycle" {
-			continue // info: technical information only (06 §7.3)
+		// it: listed with its actions, dimmed and not counted. So are weak order preferences
+		// (folded) and a mod's own known error (a note): the player sees them, they are not
+		// what stops the game.
+		if p.Severity != finding.Error && p.Severity != finding.Warning &&
+			p.Code != "order.cycle" && p.Code != "order.violated" && p.Code != "mod.known-error" {
+			continue // info: technical information only (06 §5)
 		}
+		cur = p.Code
 		subj := subjects(p)
 		x, y := "", ""
 		if len(subj) > 0 {
@@ -192,26 +250,41 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		if p.Severity == finding.Error {
 			s = StatusErr
 		}
+		ev := evidenceFor(p)
 		switch p.Code {
 		case "official.order":
-			add(Need{rank: 0, Group: GroupList, Text: T("Core and the DLCs must come first in the list"), Actions: []Action{sortAction()}, Counted: true, Status: s})
+			add(Need{rank: 0, Group: GroupList, Text: T("Core and the DLCs must come first in the list"), Actions: []Action{sortAction()}, Counted: true, Status: s,
+				Title: T("Core and the DLCs are out of place"), Why: T("Core and the DLCs must come first in the list"), Evidence: ev})
 		case "order.violated":
-			order = append(order, Need{rank: 1, Group: GroupList, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{sortAction()}, Counted: true, Mods: ids, Status: s})
+			if p.Severity == finding.Info {
+				weak = append(weak, Need{Text: Tf("%s should load after %s", nm(x), nm(y)), Mods: ids})
+				continue
+			}
+			order = append(order, Need{rank: 1, Group: GroupList, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{sortAction()}, Counted: true, Mods: ids, Status: s,
+				Why: T("a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right"), Evidence: ev})
+		case "mod.known-error":
+			// The mod's own problem (03 §4.3): whatever else is enabled, shared logs show it.
+			add(Need{rank: 9, Group: GroupConflict, Text: Tf("%s has a known error: this is the mod's own problem", nm(x)),
+				Actions: []Action{viewAction(T("see the error"), "problems", "show", p.Ref)}, Mods: ids, Status: StatusWarn, Dim: true,
+				Title: Tf("%s has a known error: this is the mod's own problem", nm(x)), Why: T("not your list's: shared logs show it whatever else is enabled; an update may fix it"), Evidence: ev})
 		case "order.cycle":
 			add(Need{rank: 2, Group: GroupList, Text: Tf("the order requirements of %d mods contradict each other", len(subj)),
-				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: p.Severity != finding.Info, Dim: p.Severity == finding.Info, Mods: ids, Status: s})
+				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: p.Severity != finding.Info, Dim: p.Severity == finding.Info, Mods: ids, Status: s,
+				Why: T("they stay in the current order; ignoring the suggested requirement lets sorting work"), Evidence: ev})
 		case "pkg.duplicate-active":
-			add(Need{rank: 3, Group: GroupList, Text: Tf("%s is enabled twice", nm(x)), Actions: []Action{keepOne(st, ids)}, Counted: true, Mods: ids, Status: s})
+			add(Need{rank: 3, Group: GroupList, Text: Tf("%s is enabled twice", nm(x)), Actions: []Action{keepOne(st, ids)}, Counted: true, Mods: ids, Status: s,
+				Why: T("the game loads only one of them; you pick which"), Evidence: ev})
 		case "entry.missing":
 			pkg := strings.TrimPrefix(x, "pkg:")
 			look := Action{Kind: ActOpenURL, Key: "o", Label: T("look for it in the Workshop"), URL: WorkshopSearch(pkg), Done: T("opened the Workshop page")}
 			for _, sg := range p.Suggestions {
-				if u, ok := strings.CutPrefix(sg, "subscribe: "); ok { // steamDB knows the item (10 §5)
+				if u, ok := strings.CutPrefix(sg, "subscribe: "); ok { // steamDB knows the item (04 §6.3)
 					look.Label, look.URL = T("open it in the Workshop"), u
 				}
 			}
 			add(Need{rank: 4, Group: GroupList, Text: Tf("the list has %s, but it is not installed", pkg),
-				Actions: []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s})
+				Actions: []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s,
+				Title: Tf("not installed: %s", pkg), Why: T("the list has it, but no mod folder does"), Evidence: ev})
 		case "mod.replaced":
 			name := y
 			if mt := replacedRe.FindStringSubmatch(p.Claim); mt != nil {
@@ -223,58 +296,120 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			if y != "" {
 				acts = []Action{enable(st, y), disable(st, x, Tf("disable %s", nm(x)))}
 			}
-			add(Need{rank: 5, Group: GroupList, Text: Tf("%s has a maintained replacement: %s", nm(x), name), Actions: acts, Counted: true, Mods: ids, Status: s})
+			add(Need{rank: 5, Group: GroupList, Text: Tf("%s has a maintained replacement: %s", nm(x), name), Actions: acts, Counted: true, Mods: ids, Status: s,
+				Title: Tf("%s has a maintained replacement", nm(x)), Why: Tf("%s is no longer kept up; %s does the same and is", nm(x), name), Evidence: ev})
 		case "mod.unloadable":
-			add(Need{rank: 4, Group: GroupList, Text: Tf("%s is enabled, but the game cannot load it", nm(x)), Actions: []Action{disable(st, x, T("disable it"))}, Counted: true, Mods: ids, Status: s})
+			add(Need{rank: 4, Group: GroupList, Text: Tf("%s is enabled, but the game cannot load it", nm(x)), Actions: []Action{disable(st, x, T("disable it"))}, Counted: true, Mods: ids, Status: s,
+				Title: Tf("the game cannot load %s", nm(x)), Why: T("it is enabled, but the game skips it; disabling it changes nothing in play"), Evidence: ev})
 		case "dep.missing":
 			dep := depName(p.Claim, strings.TrimPrefix(y, "pkg:"))
-			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not installed", nm(x), dep, dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s})
+			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not installed", nm(x), dep, dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
+				Title: Tf("missing dependency: %s", dep), Why: Tf("%s needs it, but it is not installed.", nm(x)), Evidence: ev})
 		case "dep.inactive":
-			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s})
+			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
+				Title: Tf("missing dependency: %s", nm(y)), Why: Tf("%s needs it, but it is not enabled.", nm(x)), Evidence: ev})
 		case "dep.observed-missing": // undeclared, seen in shared logs (internal/known)
 			if strings.HasPrefix(y, "pkg:") {
 				dep := strings.TrimPrefix(y, "pkg:")
-				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not installed", nm(x), dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s})
+				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not installed", nm(x), dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("probably missing: %s", dep), Why: Tf("%s does not declare it, but in shared logs it fails without it. It is not installed.", nm(x)), Evidence: ev})
 			} else {
-				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not enabled", nm(x), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s})
+				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not enabled", nm(x), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("probably missing: %s", nm(y)), Why: Tf("%s does not declare it, but in shared logs it fails without it. It is not enabled.", nm(x)), Evidence: ev})
 			}
 		case "combo.known-bad":
 			if y != "" {
-				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s})
+				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("%s and %s often fail together", nm(x), nm(y)), Why: T("in shared logs this pair produces errors far more often than either one alone. Disable one if you see errors."), Evidence: ev})
 			} else {
-				add(Need{Group: GroupConflict, Text: Tf("this version of %s often produces errors (seen in shared logs); other versions did not", nm(x)), Actions: []Action{disable(st, x, Tf("disable %s", nm(x)))}, Counted: true, Mods: ids, Status: s})
+				add(Need{Group: GroupConflict, Text: Tf("this version of %s often produces errors (seen in shared logs); other versions did not", nm(x)), Actions: []Action{disable(st, x, Tf("disable %s", nm(x)))}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("this version of %s often fails", nm(x)), Why: T("in shared logs this version produces errors; other versions did not. Updating it usually helps."), Evidence: ev})
 			}
 		case "patch.no-match":
 			if y == "" {
 				continue // no inactive target: nothing the player can do (technical information)
 			}
-			add(Need{Group: GroupDeps, Text: Tf("part of %s does not take effect: %s, which it targets, is not enabled", nm(x), nm(y)),
-				Actions: []Action{enable(st, y), viewAction(T("see what"), "patches", "--mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s})
+			merge("patch|"+x+"|"+y, nm(x), nm(y), Need{Group: GroupDeps, Text: Tf("part of %s does not take effect: %s, which it targets, is not enabled", nm(x), nm(y)),
+				Actions: []Action{enable(st, y), viewAction(T("see what"), "patches", "--mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s,
+				Title: Tf("part of %s does not take effect", nm(x)), Why: Tf("it changes things %s adds, and %s is not enabled.", nm(y), nm(y)), Evidence: ev})
 		case "incompat.active":
-			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s})
+			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s,
+				Why: T("one of them says so; with both enabled the game misbehaves. Disable one."), Evidence: ev})
 		case "mod.pinned":
 			add(Need{Group: GroupHidden, Text: Tf("%s is pinned to a copy, and the workshop version has been updated since", nm(x)),
-				Actions: []Action{viewAction(T("see what changed"), "mod", TokRef(st, y), "--diff", TokRef(st, x)), unpin(st, x)}, Counted: true, Mods: ids, Status: s})
+				Actions: []Action{viewAction(T("see what changed"), "mod", TokRef(st, y), "--diff", TokRef(st, x)), unpin(st, x)}, Counted: true, Mods: ids, Status: s,
+				Title: Tf("%s: the Workshop has a newer version", nm(x)), Why: T("the list uses a locked copy; see what changed, or use the Workshop version"), Evidence: ev})
+		case "texture.stale":
+			ref := TokRef(st, x)
+			add(Need{Group: GroupHidden, Text: Tf("%s changed since its textures were converted", nm(x)),
+				Actions: []Action{
+					{Kind: ActTextures, Key: "T", Label: T("convert again"), Refs: []string{ref}, Confirm: T("press T again to convert its textures again"),
+						Warn: T("RimArcho writes the DDS again next to the PNGs that changed"), Done: Tf("converted the textures of %s again", nm(x))},
+					{Kind: ActTexClean, Key: "C", Label: T("remove the converted textures"), Refs: []string{ref}, Confirm: T("press C again to delete the DDS RimArcho wrote"),
+						Warn: T("the DDS RimArcho wrote are deleted; the PNGs stay and the game uses them again"), Done: Tf("removed the converted textures of %s", nm(x))},
+				}, Counted: true, Mods: ids, Status: s,
+				Title: Tf("%s changed since its textures were converted", nm(x)), Why: T("the game may show its old textures: convert them again, or remove them"), Evidence: ev})
 		case "mod.hidden-residue":
 			add(Need{Group: GroupHidden, Text: Tf("%s is hidden and no longer subscribed; its folder is left over", nm(x)),
-				Actions: []Action{trash(st, x)}, Counted: true, Mods: ids, Status: s})
+				Actions: []Action{trash(st, x)}, Counted: true, Mods: ids, Status: s,
+				Title: Tf("%s is left over", nm(x)), Why: T("it is hidden and no longer subscribed; its folder still takes space"), Evidence: ev})
 		case "mod.hidden":
 			add(Need{Group: GroupHidden, Text: Tf("%s is hidden from the game (probably by another mod manager)", nm(x)),
-				Actions: []Action{keepHidden(p), unhide(st, x), trash(st, x)}, Counted: true, Mods: ids, Status: s})
+				Actions: []Action{keepHidden(p), unhide(st, x), trash(st, x)}, Counted: true, Mods: ids, Status: s,
+				Title: Tf("%s is hidden from the game", nm(x)), Why: T("probably by another mod manager; keep it hidden, show it again, or recycle it"), Evidence: ev})
+		case app.CodePackLinks:
+			add(packLinksNeed(p))
+		case app.CodeModsDuplicate:
+			add(modsDuplicateNeed(st, p, ids))
 		case "def.parent-missing":
-			add(Need{Group: GroupDeps, Text: Tf("part of %s builds on a definition no enabled mod provides; a dependency may be missing", nm(x)),
-				Actions: []Action{viewAction(T("see what"), "mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s})
+			merge("def|"+x, nm(x), "", Need{Group: GroupDeps, Text: Tf("part of %s builds on a definition no enabled mod provides; a dependency may be missing", nm(x)),
+				Actions: []Action{viewAction(T("see what"), "mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s,
+				Title: Tf("part of %s may be missing a dependency", nm(x)), Why: T("it builds on a definition no enabled mod provides."), Evidence: ev})
 		default:
 			// Harmony warnings without log evidence, overlapping Defs and patches whose target
-			// is simply absent stay in the technical information (06 §7.3).
+			// is simply absent stay in the technical information (06 §5).
 		}
+	}
+	for _, k := range mergeKeys {
+		m := merges[k]
+		n := m.n
+		if c := len(m.srcs); c > 1 {
+			if strings.HasPrefix(k, "def|") {
+				n.Title = Tf("%d parts of %s may be missing a dependency", c, m.x)
+				n.Text = Tf("%d parts of %s build on definitions no enabled mod provides; a dependency may be missing", c, m.x)
+				n.Why = T("they build on definitions no enabled mod provides.")
+			} else {
+				n.Title = Tf("%d patches of %s do not take effect", c, m.x)
+				n.Text = Tf("%d patches of %s do not take effect: %s, which they target, is not enabled", c, m.x, m.y)
+				n.Why = Tf("they change things %s adds, and %s is not enabled.", m.y, m.y)
+			}
+			n.Parts, n.Fold = m.srcs, true
+			ev := *n.Evidence
+			ev.Source = Tf("%s and %d more", m.srcs[0], c-1)
+			n.Evidence = &ev
+			n.Actions = append(append([]Action{}, n.Actions...), Action{Kind: ActFold, Key: "f", Label: T("show which")})
+		}
+		add(n)
+	}
+	if len(weak) > 0 {
+		// Weak and harmless constraints (04 §5.3): breaking them went with no more errors in
+		// shared logs. One dimmed, uncounted item; sorting still puts them right.
+		f := Need{rank: 8, Group: GroupList, Status: StatusWarn, Dim: true, Fold: true, code: "order.violated",
+			Text:     Tf("%d weaker order preferences are not met", len(weak)),
+			Why:      T("loadAfter and community rules: breaking them showed no more errors in shared logs; sorting puts them right"),
+			Evidence: evidence(EvCorpus, T("load-order constraint strength"))}
+		for _, w := range weak {
+			f.Parts = append(f.Parts, w.Text)
+		}
+		f.Actions = []Action{sortAction(), {Kind: ActFold, Key: "f", Label: T("show which")}}
+		add(f)
 	}
 	switch len(order) {
 	case 0:
 	case 1:
 		add(order[0])
 	default:
-		f := Need{rank: 1, Group: GroupList, Counted: true, Status: StatusWarn, Fold: true}
+		f := Need{rank: 1, Group: GroupList, Counted: true, Status: StatusWarn, Fold: true, code: "order.violated"}
 		seen := map[string]bool{}
 		for _, o := range order {
 			f.Parts = append(f.Parts, o.Text)
@@ -284,6 +419,8 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			}
 		}
 		f.Text = Tf("%d mods are out of order", len(seen))
+		f.Why = T("sorting puts them right in one step; show which to see each one")
+		f.Evidence = order[0].Evidence
 		f.Actions = []Action{sortAction(), {Kind: ActFold, Key: "enter", Label: T("show which")}}
 		add(f)
 	}
@@ -306,14 +443,23 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			}
 			sort.Strings(names)
 			add(Need{rank: 5, Group: GroupList, Text: text, Counted: true, Status: StatusWarn,
+				Why: T("they may still work, but their authors have not said they do on this version"), Evidence: evidence(EvDeclared, T("About.xml supportedVersions")),
 				Actions: []Action{{Kind: ActList, Key: "enter", Label: T("see the list"), Title: text, Lines: names}}})
 		}
 	}
 	if v := env.MajorMinor(st.FileVersionMismatch()); v != "" {
-		add(Need{rank: 6, Group: GroupList, Text: Tf("the list was saved for %s; the game resets it when it starts — saving once fixes it", v),
-			Actions: []Action{{Kind: ActSave, Key: "w", Label: T("save")}}, Counted: true, Status: StatusWarn})
+		add(Need{rank: 6, Group: GroupList, Text: Tf("the list was saved for %s; the game resets it when it starts — launching from RimArcho or saving once writes it for the current version", v),
+			Actions: []Action{{Kind: ActSave, Key: "w", Label: T("save")}}, Counted: true, Status: StatusWarn,
+			Title: Tf("the list was saved for %s", v), Why: T("the game resets it when it starts; writing it to the game once fixes that"), Evidence: evidence(EvInferred, Tf("ModsConfig.xml says %s", v))})
 	}
-	// Last run: the current log's errors, one item per mod (06 §7.1).
+	// Last run: the current log's errors, one item per mod (06 §2.4).
+	logWhen := ""
+	for _, r := range ps.Logs {
+		if !r.Stale() && !r.ModTime.IsZero() {
+			logWhen = ShortDate(r.ModTime) + " " + r.ModTime.In(a.Loc).Format("15:04")
+			break
+		}
+	}
 	var subjectsOrder []string
 	for id := range logs {
 		subjectsOrder = append(subjectsOrder, id)
@@ -328,7 +474,13 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				warns += logCount(p)
 			}
 		}
-		var text string
+		var text, why string
+		switch {
+		case id == "":
+			why = T("the log does not say which mod they come from")
+		default:
+			why = T("they most likely come from this mod; see the log and evidence before changing anything")
+		}
 		switch {
 		case id == "" && errs > 0:
 			text = Tf("last run, %d errors could not be tied to a mod", errs)
@@ -345,7 +497,8 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			argv = append(argv, "--subject", ix.Ref(id))
 			ids = []string{id}
 		}
-		add(Need{Group: GroupLastRun, Text: text, Actions: []Action{viewAction(T("see the log and evidence"), argv...)}, Counted: true, Mods: ids, Status: StatusLog})
+		add(Need{Group: GroupLastRun, Text: text, Actions: []Action{viewAction(T("see the log and evidence"), argv...)}, Counted: true, Mods: ids, Status: StatusLog,
+			Why: why, Evidence: logEvidence(logs[id], logWhen)})
 	}
 	for _, r := range ps.Logs {
 		if r.Stale() {
@@ -360,12 +513,24 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		}
 	}
 	if v := st.WS.Conflict; v != 0 {
-		add(Need{Group: GroupConfirm, Text: T("ModsConfig.xml was changed outside RimArcho"), Counted: true, Status: StatusWarn, Actions: []Action{
-			{Kind: ActLoadExternal, Key: "L", Label: T("load it into the list"), Version: v,
-				Confirm: T("press L again to load it; your unsaved edits are replaced"), Warn: T("your unsaved edits are replaced"),
-				Done: T("the outside change is loaded into the list")},
-			{Kind: ActDismissConflict, Key: "I", Label: T("ignore it"), Done: T("the outside change is ignored (it stays in the history)")},
-		}})
+		add(Need{Group: GroupConfirm, Text: T("ModsConfig.xml was changed outside RimArcho"), Counted: true, Status: StatusWarn,
+			Why: T("this plan was changed after it too: load the outside list, or keep yours"), Evidence: evidence(EvInferred, T("ModsConfig.xml differs from what RimArcho wrote")), Actions: []Action{
+				viewAction(T("see the difference"), "loadout", "diff", fmt.Sprintf("v%d", v), "workspace"),
+				// One step: u brings the list back (06 §6), so no confirmation.
+				{Kind: ActLoadExternal, Key: "L", Label: T("load it into the list"), Version: v, Undo: true,
+					Done: T("the outside change is loaded into the list")},
+				{Kind: ActDismissConflict, Key: "I", Label: T("ignore it"), Done: T("the outside change is ignored (it stays in the history)")},
+			}})
+	}
+	// Other plans of the environment with an unloaded outside change (04 §4.3): resolved
+	// after switching to them.
+	if cs, err := a.Conflicts(st); err == nil {
+		for _, c := range cs {
+			if !c.Current {
+				add(Need{Group: GroupConfirm, Text: Tf("ModsConfig.xml was changed outside RimArcho; plan %s has it as v%d, not loaded", c.Plan.Name, c.Version),
+					Counted: true, Status: StatusWarn})
+			}
+		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Group != out[j].Group {
@@ -376,14 +541,112 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	return out
 }
 
+// packLinksNeed: a pack's links left in Mods/ (08 §5.3). Launching from RimArcho removes
+// them anyway, so it is something to decide, not something that breaks the game: in
+// 要你确认, with one action that removes only the links (no confirmation: launching the
+// pack makes them again).
+func packLinksNeed(p *app.Problem) Need {
+	var packs []string
+	for _, s := range p.Subjects {
+		if n, ok := strings.CutPrefix(s, "pack:"); ok {
+			packs = append(packs, n)
+		}
+	}
+	name := strings.Join(packs, ", ")
+	if name == "" {
+		name = "?"
+	}
+	var src []string
+	for _, e := range p.Evidence {
+		src = append(src, e.Text)
+	}
+	act := Action{Kind: ActUnlinkPacks, Key: "X", Label: T("remove the links"), Done: Tf("the links of pack %s are out of Mods/", name)}
+	n := Need{Group: GroupConfirm, rank: -1, Counted: true, Status: StatusWarn, Actions: []Action{act},
+		Text:     Tf("pack %s left its links in Mods/: a game started from Steam loads the pack's copies", name),
+		Title:    Tf("pack %s left its links in Mods/", name),
+		Why:      T("a game started from Steam, not from RimArcho, loads the pack's copies instead of this plan's mods; launching from RimArcho removes them, and launching the pack makes them again"),
+		Evidence: evidence(EvInferred, strings.Join(src, ", "))}
+	if p.Key == "duplicate" {
+		// Next to other copies of the same mods: the game reports an error at every start
+		// from Steam, so it is one that breaks the game.
+		n.Group, n.rank, n.Status = GroupList, 3, StatusErr
+		n.Title = Tf("pack %s's links put mods twice in Mods/", name)
+		n.Text = Tf("pack %s left its links in Mods/ next to other copies of the same mods: the game reports an error for each", name)
+		n.Why = T("a game started from Steam finds two folders with one packageId, reports an error and ignores one; launching from RimArcho removes the links, and launching the pack makes them again without the duplicates")
+	}
+	if p.Key == "running" {
+		n.Status = StatusErr
+		n.Text = Tf("the game is running with pack %s's copies: it was not started from RimArcho", name)
+		n.Title = Tf("the game is running with pack %s's copies", name)
+		n.Why = T("it was started from Steam while the pack's links were in Mods/, so it loaded the pack's copies; close the game, then remove the links")
+	}
+	return n
+}
+
+// modsDuplicateNeed: two folders of one packageId in Mods/ (08 §3). The one action never
+// moves a folder RimArcho did not make: it uses the copy in Mods/ instead of RimArcho's link,
+// or takes the linked mod out of the plan; with only the player's folders it says what to do.
+func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need {
+	pkg := p.Key
+	var where []string
+	for _, e := range p.Evidence {
+		// "Mods/<name> (<who made it>)": the part in brackets in the UI language
+		t := e.Text
+		if i := strings.LastIndex(t, " ("); i > 0 && strings.HasSuffix(t, ")") {
+			t = t[:i] + " (" + T(t[i+2:len(t)-1]) + ")"
+		}
+		where = append(where, t)
+	}
+	n := Need{Group: GroupList, rank: 3, Counted: true, Status: StatusErr, Mods: ids,
+		Title:    Tf("Mods/ holds %s twice", pkg),
+		Text:     Tf("Mods/ has %d folders with packageId %s: the game reports an error and ignores all but one", len(where), pkg),
+		Evidence: evidence(EvInferred, strings.Join(where, ", "))}
+	var move *Action
+	sgs := p.Suggestions
+	if len(sgs) > 0 && strings.HasPrefix(sgs[0], "archo library move-to-locked ") {
+		tok := strings.TrimPrefix(sgs[0], "archo library move-to-locked ")
+		name := TokName(st, tok)
+		move = &Action{Kind: ActMoveLocked, Key: "M", Label: T("move into the lock library"), Refs: []string{TokRef(st, tok)},
+			Confirm: T("press M again to move the folder into the lock library"),
+			Warn:    Tf("the folder of %s leaves Mods/ for the lock library; plans that use it keep it and get it through a link", name),
+			Done:    Tf("%s is in the lock library", name)}
+		sgs = sgs[1:]
+	}
+	sg := ""
+	if len(sgs) > 0 {
+		sg = sgs[0]
+	}
+	f := strings.Fields(sg)
+	switch {
+	case len(f) == 4 && f[1] == "swap":
+		from, to := f[2], f[3]
+		n.Why = Tf("RimArcho links %s for this plan, and Mods/ already has the same mod; use the copy in Mods/ (the link goes the next time the plan is written to the game)", TokName(st, from))
+		n.Actions = []Action{{Kind: ActSwap, Key: "x", Label: T("use the copy in Mods/"), Refs: []string{TokRef(st, from), TokRef(st, to)}, Undo: true,
+			Done: Tf("the plan uses the copy of %s in Mods/ (not written yet)", TokName(st, to))}}
+	case len(f) == 3 && f[1] == "disable":
+		n.Why = Tf("RimArcho links %s for this plan, and Mods/ has another mod with the same packageId; take it out of the plan, or move the folder out of Mods/", TokName(st, f[2]))
+		n.Actions = []Action{disable(st, f[2], T("take it out of the plan"))}
+	default:
+		n.Why = T("RimArcho did not make these folders and does not move them: move all but one out of Mods/ yourself")
+		n.Actions = []Action{{Kind: ActList, Key: "enter", Label: T("see which"), Title: Tf("Mods/ holds %s twice", pkg), Lines: where}}
+	}
+	if move != nil {
+		// 收进锁定库 first: the plain folder leaves Mods/, plans keep it (08 §3)
+		n.Why = T("move the plain folder into the lock library: it leaves Mods/, and plans that use it keep it and get it through a link")
+		n.Actions = append([]Action{*move}, n.Actions...)
+	}
+	return n
+}
+
 func questionNeed(st *app.LoadoutState, q *store.Question) Need {
 	nm := func(id string) string { return TokName(st, finding.Inst(id)) }
 	x, y := nm(q.InstanceID), nm(q.CandidateID)
 	answer := func(key, label, ans, done string) Action {
-		// Merging or splitting lineages is not undone with u: confirm first (06 §9).
+		// Merging or splitting lineages is not undone with u: confirm first (06 §6).
 		return Action{Kind: ActAnswer, Key: key, Label: label, QID: q.ID, Answer: ans, Done: done, Confirm: Tf("press %s again: %s", key, done), Warn: done}
 	}
 	return Need{Group: GroupConfirm, Text: Tf("is %s the same mod as %s?", x, y), Counted: true, Status: StatusWarn,
+		Why: T("they look alike; your answer decides whether lists and history treat them as one"), Evidence: evidence(EvInferred, T("RimArcho compared their folders")),
 		Mods: []string{q.InstanceID, q.CandidateID},
 		Actions: []Action{
 			answer("s", T("same"), "same", Tf("%s and %s are one mod", x, y)),
@@ -542,6 +805,20 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		_, err = a.Trash(act.Refs[0], false)
 	case ActIgnore:
 		_, err = a.IgnoreProblem(act.Problem, false)
+	case ActUnlinkPacks:
+		_, err = a.UnlinkPacks(false)
+	case ActSwap:
+		_, err = a.Swap(act.Refs[0], act.Refs[1])
+	case ActMoveLocked:
+		_, err = a.MoveToLocked(act.Refs[0], false)
+	case ActTextures:
+		r, err := a.OptimizeTextures(app.TextureRun{Refs: act.Refs})
+		if err != nil {
+			return "", err
+		}
+		return TextureRunText(r), nil
+	case ActTexClean:
+		_, err = a.CleanTextures(act.Refs, app.TexRefs, false)
 	default:
 		return "", fmt.Errorf("%s is not a data action", act.Kind)
 	}

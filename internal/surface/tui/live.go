@@ -8,8 +8,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The running game (10 §3.4): every two seconds view.LiveTracker checks the game and reads
-// what its log gained. While it runs the top bar says so, and its errors lead 需要处理.
+// The running game (06 §2.1): every two seconds view.LiveTracker checks the game and reads
+// what its log gained. While it runs the status line says so (statusLine), and its errors
+// lead their section of 能不能跑.
 
 const livePoll = 2 * time.Second
 
@@ -44,6 +45,3 @@ func liveKey(l *view.Live) string {
 	}
 	return k
 }
-
-// liveText is the top bar's "game running since 14:05 · 3 errors" ("" when not running).
-func (m *model) liveText() string { return view.LiveText(m.live) }

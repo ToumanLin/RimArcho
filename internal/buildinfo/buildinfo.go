@@ -9,7 +9,7 @@ var (
 	Commit  = ""
 	Date    = ""
 	// GUI is "1" in RimArcho.exe, the Windows-GUI-subsystem link of the same program
-	// (08 §2): with no command it opens the GUI instead of the WezTerm-hosted TUI.
+	// (06 §8.1): with no command it opens the GUI instead of the WezTerm-hosted TUI.
 	GUI = ""
 )
 

@@ -14,7 +14,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// DeployPrefix marks the Mods/ links RimArcho manages (09 §8). It only ever creates or
+// CreateLink makes a Mods/ link (08 §3); tests replace it to act out a volume without
+// junctions (FAT, exFAT).
+var CreateLink = source.CreateLink
+
+// DeployPrefix marks the Mods/ links RimArcho manages (08 §3). It only ever creates or
 // removes entries with this prefix.
 const DeployPrefix = "_Archo_"
 
@@ -33,7 +37,7 @@ func gameVisible(k source.Kind) bool {
 }
 
 // deployable reports whether m lives where the game does not look (SteamCMD or an extra
-// folder) and could be linked into Mods/ (09 §8.1). An instance the game already sees
+// folder) and could be linked into Mods/ (08 §3). An instance the game already sees
 // through someone else's link is not deployable: it is an ordinary candidate.
 func deployable(ix *Index, aliases map[string][]store.Alias, m *store.Mod) bool {
 	if m.Status != identity.Live || m.Residue || m.Unloadable != "" || (m.Kind != source.SteamCMD && m.Kind != source.Extra) {
@@ -77,9 +81,15 @@ func deployCandidate(m *store.Mod) loadout.Candidate {
 // those in the workspace (they will be linked on save) and those whose RimArcho link is on
 // disk now (the game sees them until the next save removes the link).
 func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string]bool, error) {
-	ws, err := a.Store.Workspace(ix.Env.ID)
+	var ws *store.Workspace
+	plan, err := a.Store.CurrentPlan(ix.Env.ID)
 	if err != nil {
 		return nil, err
+	}
+	if plan != nil {
+		if ws, err = a.Store.Workspace(plan.ID); err != nil {
+			return nil, err
+		}
 	}
 	set := map[string]bool{}
 	if ws != nil {
@@ -114,7 +124,7 @@ func modsDir(ix *Index) string {
 	return ""
 }
 
-// LinkChange is one Mods/ link a save creates or removes (09 §8.1).
+// LinkChange is one Mods/ link a save creates or removes (08 §3).
 type LinkChange struct {
 	Op     string // "add" or "remove"
 	Name   string // link name in Mods/
@@ -123,7 +133,7 @@ type LinkChange struct {
 }
 
 // planLinks compares the RimArcho links in Mods/ with the deployed instances of the list.
-func planLinks(st *LoadoutState) (string, []LinkChange, error) {
+func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []DuplicateMove, error) {
 	mods := modsDir(st.Ix)
 	want := map[string]*store.Mod{}
 	for _, e := range st.List {
@@ -133,20 +143,20 @@ func planLinks(st *LoadoutState) (string, []LinkChange, error) {
 	}
 	if mods == "" {
 		if len(want) > 0 {
-			return "", nil, fmt.Errorf("the environment has no Mods/ folder to link %d mod(s) into; set the game folder with archo env set --game <dir>", len(want))
+			return "", nil, nil, fmt.Errorf("the environment has no Mods/ folder to link %d mod(s) into; set the game folder with archo env set --game <dir>", len(want))
 		}
-		return "", nil, nil
+		return "", nil, nil, nil
 	}
 	var out []LinkChange
 	have := map[string]bool{}
 	ents, err := os.ReadDir(mods)
 	if err != nil && !os.IsNotExist(err) {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	for _, d := range ents {
 		name := d.Name()
 		if packLink(name) && source.IsLink(filepath.Join(mods, name)) {
-			// A pack's link (10 §8.3): saving the normal list ends the pack's run.
+			// A pack's link (08 §5.3): saving the normal list ends the pack's run.
 			tgt, _ := source.RealPath(filepath.Join(mods, name))
 			out = append(out, LinkChange{Op: "remove", Name: name, Target: tgt})
 			continue
@@ -156,7 +166,7 @@ func planLinks(st *LoadoutState) (string, []LinkChange, error) {
 		}
 		p := filepath.Join(mods, name)
 		if !source.IsLink(p) {
-			return "", nil, fmt.Errorf("%s starts with %s but is not a link; RimArcho does not touch it (rename or remove it yourself)", p, DeployPrefix)
+			return "", nil, nil, fmt.Errorf("%s starts with %s but is not a link; RimArcho does not touch it (rename or remove it yourself)", p, DeployPrefix)
 		}
 		m := want[strings.ToLower(name)]
 		if m != nil && sameDir(p, m.RealPath) {
@@ -170,11 +180,16 @@ func planLinks(st *LoadoutState) (string, []LinkChange, error) {
 		}
 		out = append(out, c)
 	}
+	// A link next to another copy of the same packageId in Mods/ makes the game report an
+	// error and ignore one of them (08 §3): refuse instead of making the pair.
+	if dups := deployDuplicates(st, want, copies); len(dups) > 0 {
+		return "", nil, dups, nil
+	}
 	for key, m := range want {
 		if !have[key] {
 			if p := filepath.Join(mods, DeployName(m)); !source.IsLink(p) {
 				if _, err := os.Lstat(p); err == nil {
-					return "", nil, fmt.Errorf("%s already exists and is not a link; RimArcho does not touch it", p)
+					return "", nil, nil, fmt.Errorf("%s already exists and is not a link; RimArcho does not touch it", p)
 				}
 			}
 			out = append(out, LinkChange{Op: "add", Name: DeployName(m), Target: m.RealPath, Mod: m.ID})
@@ -186,7 +201,7 @@ func planLinks(st *LoadoutState) (string, []LinkChange, error) {
 		}
 		return out[i].Name < out[j].Name
 	})
-	return mods, out, nil
+	return mods, out, nil, nil
 }
 
 func sameDir(link, target string) bool {
@@ -209,10 +224,33 @@ func applyLinks(mods string, plan []LinkChange) error {
 			if _, err := os.Stat(c.Target); err != nil {
 				return fmt.Errorf("cannot link %s: %v", c.Name, err)
 			}
-			if err := source.CreateLink(p, c.Target); err != nil {
+			if err := CreateLink(p, c.Target); err != nil {
+				if strings.Contains(strings.ToLower(c.Name), strings.ToLower(monitorFolder)) {
+					// 08 §9: the monitor never falls back to a copy.
+					return fmt.Errorf("Archo Monitor reaches the game only through a link, and %s cannot hold one: %v (the Mods/ volume must support junctions, e.g. NTFS; FAT and exFAT cannot). Disable it in this plan: archo disable pkg:%s", mods, err, MonitorPackage)
+				}
 				return fmt.Errorf("cannot link %s into %s: %v (the Mods/ volume must support junctions, e.g. NTFS)", c.Target, mods, err)
 			}
 		}
 	}
 	return nil
+}
+
+// deployDuplicates lists the plain Mods/ entries in the way of instances to deploy: a
+// folder, or another tool's link, with the packageId of one (RimArcho's own links are
+// replaced anyway).
+func deployDuplicates(st *LoadoutState, want map[string]*store.Mod, copies []ModsCopy) []DuplicateMove {
+	byPkg := map[string][]ModsCopy{}
+	for _, c := range copies {
+		if c.By == CopyPlayer {
+			byPkg[c.PackageID] = append(byPkg[c.PackageID], c)
+		}
+	}
+	var out []DuplicateMove
+	for _, m := range want {
+		for _, c := range byPkg[m.PackageID] {
+			out = append(out, DuplicateMove{Copy: c, For: st.Ix.Ref(m.ID) + " " + m.DisplayName(), Link: DeployName(m)})
+		}
+	}
+	return out
 }

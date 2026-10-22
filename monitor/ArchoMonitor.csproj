@@ -1,0 +1,75 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Archo Monitor, RimArcho's in-game companion mod (docs/specs 03 §6.7, 08 §9).
+
+    dotnet build -p:GameVersion=1.6                 references Krafs.Rimworld.Ref from NuGet
+    dotnet build -p:GameVersion=1.7 -p:RimWorldDir=D:\…\RimWorld   references the local game
+
+    No game binary is committed. build.ps1 builds 1.5, 1.6 and 1.7 and assembles the mod folder.
+  -->
+  <PropertyGroup>
+    <TargetFramework Condition="'$(GameVersion)' == '1.7'">net10.0</TargetFramework>
+    <TargetFramework Condition="'$(GameVersion)' != '1.7'">net472</TargetFramework>
+    <AssemblyName>ArchoMonitor</AssemblyName>
+    <RootNamespace>ArchoMonitor</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <OutputPath>bin\$(GameVersion)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DebugType>none</DebugType>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <MonitorVersion Condition="'$(MonitorVersion)' == ''">0.0.0-dev</MonitorVersion>
+    <InformationalVersion>$(MonitorVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Version>$([System.Text.RegularExpressions.Regex]::Match($(MonitorVersion), '^\d+\.\d+\.\d+'))</Version>
+    <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);CS0618;NU1603;NU1701</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GameVersion)' == '1.7'">
+    <DefineConstants>$(DefineConstants);RW_WAYLITH;RW17</DefineConstants>
+    <KrafsVersion>1.7.4984-unstable</KrafsVersion>
+    <HarmonyVersion>3.0.0-rc.3</HarmonyVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(GameVersion)' == '1.6'">
+    <DefineConstants>$(DefineConstants);RW_UNITY;RW16</DefineConstants>
+    <KrafsVersion>1.6.4871</KrafsVersion>
+    <HarmonyVersion>2.3.6</HarmonyVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(GameVersion)' == '1.5'">
+    <DefineConstants>$(DefineConstants);RW_UNITY;RW15</DefineConstants>
+    <KrafsVersion>1.5.4409</KrafsVersion>
+    <HarmonyVersion>2.3.6</HarmonyVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Harmony: compile against it, ship nothing (the Harmony mod provides 0Harmony). -->
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="$(HarmonyVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- The game: reference assemblies from NuGet, or the local game with RimWorldDir. -->
+  <ItemGroup Condition="'$(RimWorldDir)' == ''">
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="$(KrafsVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RimWorldDir)' != '' and '$(GameVersion)' == '1.7'">
+    <Reference Include="Assembly-CSharp" HintPath="$(RimWorldDir)\Assembly-CSharp.dll" Private="false" />
+    <Reference Include="UnityStubs" HintPath="$(RimWorldDir)\UnityStubs.dll" Private="false" />
+    <Reference Include="Waylith" HintPath="$(RimWorldDir)\Waylith.dll" Private="false" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RimWorldDir)' != '' and '$(GameVersion)' != '1.7'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="Assembly-CSharp" HintPath="$(RimWorldDir)\RimWorldWin64_Data\Managed\Assembly-CSharp.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.IMGUIModule" HintPath="$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.TextRenderingModule" HintPath="$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.TextRenderingModule.dll" Private="false" />
+  </ItemGroup>
+</Project>

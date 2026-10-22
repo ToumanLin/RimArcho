@@ -1,4 +1,4 @@
-// Package icon draws RimArcho's icon (08 §15): the portrait artwork (portrait.svg) on a dark
+// Package icon draws RimArcho's icon (06 §8.6): the portrait artwork (portrait.svg) on a dark
 // rounded base. It renders PNGs at any size for the window and the Windows resources, and
 // the same composition as SVG for the page. Nothing binary is kept in the repository.
 package icon
@@ -21,10 +21,10 @@ import (
 //go:embed portrait.svg
 var Portrait []byte
 
-// Base is the rounded square behind the portrait (08 §15.1).
+// Base is the rounded square behind the portrait (06 §8.6).
 var Base = color.NRGBA{0x1B, 0x1D, 0x23, 0xFF}
 
-// Sizes are the icon sizes of the Windows icon group (08 §15.3).
+// Sizes are the icon sizes of the Windows icon group (06 §8.6).
 var Sizes = []int{16, 20, 24, 32, 40, 48, 64, 256}
 
 const cornerR = 0.22 // rounded base, as a fraction of the size

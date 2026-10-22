@@ -169,13 +169,13 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	tm := start(t, e, scans, 160, 40)
 	waitFor(t, tm, "Enabled 3")
 	// Enabled is focused; h goes to "Disabled", where a filter finds Beta. space enables it
-	// where the order wants it: the end, nothing constrains it (06 §13.6).
+	// where the order wants it: the end, nothing constrains it (06 §3.5).
 	keys(tm, "h", "/", "Beta", "enter", "space")
 	waitFor(t, tm, "placed at position 4 · m changes it")
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
 		t.Fatalf("after space: %s", got)
 	}
-	keys(tm, "esc", "l", "g", "down", "J") // to Enabled; move Alpha down one
+	keys(tm, "esc", "l", "home", "down", "J") // to Enabled; move Alpha down one
 	waitFor(t, tm, "Alpha is now number 3")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
 		t.Fatalf("after J: %s", got)
@@ -185,29 +185,21 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
 		t.Fatalf("after undo: %s", got)
 	}
+	// S, w and L act at once and say what they did (06 §6); sort offers u.
 	keys(tm, "S")
-	waitFor(t, tm, "sort — preview")
-	keys(tm, "y")
-	waitFor(t, tm, "sorted the list")
+	waitFor(t, tm, "sorted: 1 moved · strong requirements put right: 1 · u undoes")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
 		t.Fatalf("after sort: %s", got)
 	}
-	before := e.ReadModsConfig()
 	keys(tm, "w")
-	waitFor(t, tm, "save to game — preview")
-	if e.ReadModsConfig() != before {
-		t.Fatal("the preview wrote the file")
-	}
-	keys(tm, "y")
-	waitFor(t, tm, "saved to the game")
+	waitFor(t, tm, "saved to the game as v")
 	if !strings.Contains(e.ReadModsConfig(), "<li>tester.b</li>") {
 		t.Fatal("save did not write the list")
 	}
 	keys(tm, "L")
-	waitFor(t, tm, "launch: dry run (steam)")
-	keys(tm, "n")
+	waitFor(t, tm, "the game is starting")
 	m := finish(t, tm)
-	if len(e.Launched) != 0 || m.unsaved != 0 || *scans != 0 {
+	if len(e.Launched) != 1 || m.unsaved != 0 || *scans != 0 {
 		t.Fatalf("launched %v, unsaved %d, scans %d", e.Launched, m.unsaved, *scans)
 	}
 }
@@ -227,7 +219,7 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	keys(tm, ":", "list --active", "enter")
 	waitFor(t, tm, "archo list --active")
 	keys(tm, "esc", "c")
-	waitAll(t, tm, "recent changes", "scan 2026-10-01 10:00", "nothing changed")
+	waitAll(t, tm, "recent changes", "the last scan", "nothing changed")
 	keys(tm, "esc")
 	m := finish(t, tm)
 	if *scans != 2 || m.tab != tabList {
@@ -280,13 +272,13 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			check("start")
 			// Staging is reachable at every width: focus it (it takes the first slot when
 			// hidden), stage a mod from "enabled", put it back.
-			press(m, "tab") // Enabled → Staging
+			press(m, "right") // Enabled → Staging
 			if m.focus != cStaging || !m.layout().has(cStaging) {
 				t.Fatalf("staging not shown when focused: %+v", m.layout())
 			}
 			check("staging focused")
 			press(m, "h")
-			press(m, "g")
+			press(m, "home")
 			press(m, "down") // Alpha
 			press(m, "t")
 			if !strings.Contains(m.status, "staged Alpha") {
@@ -298,7 +290,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			}
 			// Not enabled: the CJK row, enable and disable again.
 			press(m, "h")
-			press(m, "G")
+			press(m, "end")
 			check("CJK row selected")
 			if it := m.current(); it == nil || !strings.HasPrefix(it.name, "中文") {
 				t.Fatalf("cursor on %+v", m.current())
@@ -307,7 +299,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			if got := activeNames(t, e); !strings.HasSuffix(got, "中文汉化补丁（简体）加长的名字用来测试截断") || m.focus != cInactive {
 				t.Fatalf("enable: %s, focus %d", got, m.focus)
 			}
-			for _, k := range []string{"l", "G", "space", "h"} { // Enabled, the last row, disable, back
+			for _, k := range []string{"l", "end", "space", "h"} { // Enabled, the last row, disable, back
 				press(m, k)
 			}
 			if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
@@ -317,7 +309,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			if m.focus != cInactive {
 				t.Fatalf("focus %d", m.focus)
 			}
-			press(m, "G")
+			press(m, "end")
 			for _, s := range m.layout().slots {
 				if s.kind != cInactive {
 					continue
@@ -358,10 +350,10 @@ func TestStagingT9(t *testing.T) {
 	e.MustRun("scan")
 	before := activeNames(t, e)
 	m := direct(t, e, 160, 40)
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // M01
 	for i := 0; i < 26; i++ {
-		if i%4 != 3 { // picks 20 of 26; ctrl+↓ moves the cursor alone (06 §12.2)
+		if i%4 != 3 { // picks 20 of 26; ctrl+↓ moves the cursor alone (06 §3.4)
 			press(m, "v")
 		}
 		press(m, "ctrl+down")
@@ -383,7 +375,7 @@ func TestStagingT9(t *testing.T) {
 	}
 }
 
-// 06 §12.2: a click moves the cursor (and focus), ctrl+click picks one more, shift+click
+// 06 §3.4: a click moves the cursor (and focus), ctrl+click picks one more, shift+click
 // picks a range; there is no drag-to-move; the wheel scrolls.
 func TestMouseClicks(t *testing.T) {
 	e, _ := fixture(t)
@@ -407,34 +399,34 @@ func TestMouseClicks(t *testing.T) {
 		m.update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Shift: shift, Ctrl: ctrl})
 		m.View()
 	}
-	// Disabled rows start at y=3: Beta, N1 … N5, 中文
-	click(xOf(cInactive), 3, false, false)
+	// Disabled rows start at y=4 (the filter bar is above the lists): Beta, N1 … N5, 中文
+	click(xOf(cInactive), 4, false, false)
 	if m.focus != cInactive || m.current().name != "Beta" || len(m.marked) != 0 {
 		t.Fatalf("click: focus %d on %+v, selected %d", m.focus, m.current(), len(m.marked))
 	}
-	click(xOf(cInactive), 5, false, true) // ctrl: N2
-	click(xOf(cInactive), 7, false, true) // ctrl: N4
+	click(xOf(cInactive), 6, false, true) // ctrl: N2
+	click(xOf(cInactive), 8, false, true) // ctrl: N4
 	if len(m.marked) != 2 {
 		t.Fatalf("ctrl+click: %d selected", len(m.marked))
 	}
-	click(xOf(cInactive), 8, true, false) // shift: N4 … N5 added to the range from N4
+	click(xOf(cInactive), 9, true, false) // shift: N4 … N5 added to the range from N4
 	if names := pickedNames(m); names != "N2 N4 N5" {
 		t.Fatalf("shift+click: %q", names)
 	}
-	click(xOf(cInactive), 3, false, false) // a plain click in the same list keeps the selection
+	click(xOf(cInactive), 4, false, false) // a plain click in the same list keeps the selection
 	if names := pickedNames(m); names != "N2 N4 N5" || m.current().name != "Beta" {
 		t.Fatalf("plain click: %q on %s", names, m.current().name)
 	}
-	// A click in another list moves the focus there and drops the selection (06 §13.5).
-	click(xOf(cActive), 4, false, false)
+	// A click in another list moves the focus there and drops the selection (06 §3.4).
+	click(xOf(cActive), 5, false, false)
 	if len(m.marked) != 0 || m.focus != cActive || m.current().name != "Alpha" {
 		t.Fatalf("click in Enabled: selected %d, %+v", len(m.marked), m.current())
 	}
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
 		t.Fatalf("a click changed the list: %s", got)
 	}
-	// The wheel scrolls the detail wherever it is; the cursor and the focus stay (06 §13.4).
-	m.update(tea.MouseMsg{X: xOf(cActive), Y: 5, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
+	// The wheel scrolls the detail wherever it is; the cursor and the focus stay (06 §3.3).
+	m.update(tea.MouseMsg{X: xOf(cActive), Y: 6, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
 	if m.cols[cActive].cursor != 1 || m.focus != cActive || m.detailFocus || m.detailOff != 3 {
 		t.Fatalf("wheel: cursor %d, focus %d/%v, detail scrolled %d", m.cols[cActive].cursor, m.focus, m.detailFocus, m.detailOff)
 	}
@@ -456,7 +448,7 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 	e.MustRun("env", "add", "second", "--game", other)
 	tm := start(t, e, scans, 120, 30)
 	waitFor(t, tm, " main ")
-	keys(tm, "g", "enter") // the full-screen detail, then I: the technical pages
+	keys(tm, "home", "enter") // the full-screen detail, then I: the technical pages
 	waitFor(t, tm, "ludeon.rimworld")
 	keys(tm, "I")
 	waitFor(t, tm, "package: ludeon.rimworld")
@@ -465,6 +457,29 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 	m := finish(t, tm)
 	if m.envName != "second" {
 		t.Fatalf("env %q", m.envName)
+	}
+}
+
+// 06 §2.14: E, then d on an environment: the dry run, enter removes it; the other one is
+// then in use.
+func TestEnvRemoveFromChooser(t *testing.T) {
+	e, scans := fixture(t)
+	other := filepath.Join(e.Root, "Second", "RimWorld")
+	e.CopyTemplate("core", filepath.Join(other, "Data", "Core"))
+	e.WriteFile(filepath.Join(other, "RimWorldWin64.exe"), "")
+	e.MustRun("env", "add", "second", "--game", other)
+	tm := start(t, e, scans, 120, 30)
+	waitFor(t, tm, " main ")
+	keys(tm, "E", "d")
+	waitFor(t, tm, "then second is in use")
+	keys(tm, "enter")
+	waitFor(t, tm, "removed environment main")
+	m := finish(t, tm)
+	if m.envName != "second" {
+		t.Fatalf("env %q", m.envName)
+	}
+	if envs, _ := e.App.Store.Envs(); len(envs) != 1 {
+		t.Fatalf("%d environments", len(envs))
 	}
 }
 
@@ -489,7 +504,7 @@ func TestChineseUI(t *testing.T) {
 			t.Fatalf("line wider than the terminal (%d): %q", w, l)
 		}
 	}
-	// Command output stays English (05 §1).
+	// Command output stays English (05 §1.1).
 	if out, _ := cmds.Execute(e.App, []string{"status"}); !strings.Contains(out, "lineages:") {
 		t.Fatalf("status output changed: %s", out)
 	}
@@ -513,7 +528,7 @@ func findNeed(m *model, sub string) int {
 	return -1
 }
 
-// 06 §7: a cycle of order requirements is one item in "this list"; enter shows the
+// 06 §5: a cycle of order requirements is one item in "this list"; enter shows the
 // requirements in words and x ignores the suggested one; a dependency that is installed but
 // not enabled is one item in "missing dependencies" that space enables.
 func TestNeedsView(t *testing.T) {
@@ -530,7 +545,7 @@ func TestNeedsView(t *testing.T) {
 	e.MustRun("disable", "pkg:brrainz.harmony")
 	tm := start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "contradict each other")
 	time.Sleep(300 * time.Millisecond)
 	fm := finish(t, tm)
@@ -547,7 +562,7 @@ func TestNeedsView(t *testing.T) {
 	// Second session: x on the cycle, space on the dependency.
 	tm = start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "contradict each other")
 	for i := 0; i < ci; i++ {
 		keys(tm, "down")
@@ -567,7 +582,7 @@ func TestNeedsView(t *testing.T) {
 	}
 	tm = start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "is not enabled")
 	fm3 := finish(t, tm)
 	m := direct(t, e, 140, 40)
@@ -596,7 +611,7 @@ func countedNeeds(m *model) int {
 	return n
 }
 
-// 06 §4.1: changes are a sentence on the status line after a scan and the c view, in
+// 06 §2.9: changes are a sentence on the status line after a scan and the c view, in
 // words; an outside change of ModsConfig.xml is an item of 需要处理 with load / ignore.
 func TestChangesView(t *testing.T) {
 	e, scans := fixture(t)
@@ -608,9 +623,13 @@ func TestChangesView(t *testing.T) {
 	keys(tm, "R")
 	waitFor(t, tm, "1 mods updated")
 	keys(tm, "c")
-	waitAll(t, tm, "Beta", "updated")
+	waitFor(t, tm, "a: the whole library") // Beta is not in the plan
+	keys(tm, "a")
+	waitAll(t, tm, "worth a look", "Beta", "Defs, Patches changed")
 	keys(tm, "enter")
-	waitAll(t, tm, "~ defs/thingdefs/beta.xml", "+ patches/new.xml")
+	waitFor(t, tm, "Defs 1 changed; Patches 1 new")
+	keys(tm, "i")
+	waitAll(t, tm, "~ Defs/ThingDefs/beta.xml", "+ Patches/new.xml")
 	keys(tm, "esc")
 	finish(t, tm)
 
@@ -624,21 +643,6 @@ func TestChangesView(t *testing.T) {
 		t.Fatalf("items: %q", needItems(m))
 	}
 	m.prob.cursor = i
-	// L replaces the unsaved edits: the first press only warns, another key cancels,
-	// and two presses load it (06 §9).
-	L := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")}
-	m.update(L)
-	if m.armed == nil || !strings.Contains(m.status, "press L again") {
-		t.Fatalf("first L: %q", m.status)
-	}
-	press(m, "j")
-	if m.armed != nil || m.status != "cancelled" {
-		t.Fatalf("other key: %q", m.status)
-	}
-	if st, _ := e.App.Loadout(); st.WS.Conflict == 0 {
-		t.Fatal("loaded after a cancelled L")
-	}
-	m.prob.cursor = findNeed(m, "changed outside RimArcho")
 	m.needsKey("I")
 	st, _ := e.App.Loadout()
 	if st.WS.Conflict != 0 || !strings.Contains(m.status, "ignored") {
@@ -650,20 +654,20 @@ func TestChangesView(t *testing.T) {
 	}
 }
 
-// 06 §7.1, §7.3: the current log's errors are one item per mod under "last run"; a stale
+// 06 §2.4, §7.3: the current log's errors are one item per mod under "last run"; a stale
 // log is one dim row that is not counted.
 func TestNeedsLogs(t *testing.T) {
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	scans := new(int)
 	tm := start(t, e, scans, 160, 50)
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "last run")
 	time.Sleep(200 * time.Millisecond)
 	fm := finish(t, tm)
 	last := 0
 	for _, it := range fm.prob.items {
-		if it.group == gLastRun {
+		if it.group == view.GroupLastRun {
 			last++
 			if !it.counted || !strings.HasPrefix(it.text, "last run, ") {
 				t.Fatalf("log item %+v", it)
@@ -682,7 +686,7 @@ func TestNeedsLogs(t *testing.T) {
 	m.loadProblems()
 	stale := 0
 	for _, it := range m.prob.items {
-		if it.group == gLastRun {
+		if it.group == view.GroupLastRun {
 			if it.counted || !strings.HasPrefix(it.text, "earlier log") {
 				t.Fatalf("stale log item %+v", it)
 			}
@@ -694,11 +698,12 @@ func TestNeedsLogs(t *testing.T) {
 	}
 }
 
-// 06 §3: every icon of both sets is one cell wide for RimArcho's width function.
+// 06 §7: every icon of both sets is one cell wide for RimArcho's width function.
 func TestIconWidths(t *testing.T) {
 	for name, set := range map[string]icons{"nerd": nerdIcons, "compat": compatIcons} {
 		for i, s := range []string{set.official, set.workshop, set.local, set.localCopy, set.git, set.err, set.warn, set.logErr,
 			set.unloadable, set.unsaved, set.lock, set.update, set.dep, set.staging, set.play, set.save, set.sort, set.search, set.fail,
+			set.evDeclared, set.evInferred, set.evLog, set.evCommunity, set.evRule,
 			markSel, markOK, markPrompt, markBusy, markDot} {
 			if s == "" {
 				continue // "not shown" in compatibility mode
@@ -734,7 +739,7 @@ func TestWrap(t *testing.T) {
 	}
 }
 
-// 06 §5.5 on the fixture: every field, negation, AND, the per-column query, the fallback.
+// 06 §3.7 on the fixture: every field, negation, AND, the per-column query, the fallback.
 func TestColumnSearch(t *testing.T) {
 	e, _ := fixture(t)
 	e.MustRun("tag", "add", "pkg:brrainz.harmony", "core-lib", "--mod", "pkg:tester.b")
@@ -753,10 +758,8 @@ func TestColumnSearch(t *testing.T) {
 		return strings.Join(out, ",")
 	}
 	all := func(q string) string {
-		for k := range m.cols {
-			m.cols[k].filter = q
-			m.refilterCol(colKind(k), "")
-		}
+		m.bar.search = q // the filter bar filters 未启用 and 已启用 together (06 §2.5)
+		m.barChanged()
 		return names(cActive) + " | " + names(cInactive)
 	}
 	for q, want := range map[string]string{
@@ -791,33 +794,29 @@ func TestColumnSearch(t *testing.T) {
 	if got := all("id:" + ref); got != "Alpha | " {
 		t.Errorf("id:%s: %q", ref, got)
 	}
-	// The query stays with its column until esc there; the header shows N/M and the query.
+	// The bar's query holds for both lists; the headers say N / M; esc clears it.
 	all("")
 	m.focus = cInactive
 	press(m, "/")
 	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("tag:core-lib")})
 	press(m, "enter")
-	press(m, "l") // to "enabled": its own query is empty
-	if names(cActive) != "Core,Alpha,Harmony" || names(cInactive) != "Beta" {
-		t.Fatalf("per column: %q / %q", names(cActive), names(cInactive))
+	press(m, "l")
+	if names(cActive) != "Harmony" || names(cInactive) != "Beta" {
+		t.Fatalf("both lists: %q / %q", names(cActive), names(cInactive))
 	}
 	title := m.columnTitle(&m.cols[cInactive], false, 40)
-	if !strings.Contains(title, "Disabled 1/2") || !strings.Contains(title, "tag:core-lib") {
+	if !strings.Contains(title, "Disabled 1 / 2") {
 		t.Fatalf("title %q", title)
 	}
-	press(m, "esc") // in "enabled": nothing to clear there
-	if names(cInactive) != "Beta" {
-		t.Fatal("esc cleared another column's query")
-	}
-	press(m, "h")
 	press(m, "esc")
-	if names(cInactive) == "Beta" {
-		t.Fatal("esc did not clear the query")
+	if names(cInactive) == "Beta" || names(cActive) == "Harmony" {
+		t.Fatal("esc did not clear the bar")
 	}
 }
 
-// 06 §9: L pressed twice loads an outside change of ModsConfig.xml into the list.
-func TestDoublePressLoad(t *testing.T) {
+// 06 §6: L loads an outside change of ModsConfig.xml into the list at once; it is one
+// step, so u brings the player's list back.
+func TestLoadExternalAtOnce(t *testing.T) {
 	e, _ := fixture(t)
 	e.MustRun("enable", "pkg:tester.b")
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
@@ -825,11 +824,13 @@ func TestDoublePressLoad(t *testing.T) {
 	m.tab = tabProblems
 	m.loadProblems()
 	m.prob.cursor = findNeed(m, "changed outside RimArcho")
-	L := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")}
-	m.update(L)
-	m.update(L)
+	before := activeNames(t, e)
+	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")})
 	st, _ := e.App.Loadout()
-	if st.WS.Conflict != 0 || activeNames(t, e) != "Core, Harmony" {
-		t.Fatalf("after L L: conflict %d, list %q, status %q", st.WS.Conflict, activeNames(t, e), m.status)
+	if st.WS.Conflict != 0 || activeNames(t, e) != "Core, Harmony" || m.armed != nil || !strings.Contains(m.status, T("u undoes")) {
+		t.Fatalf("after L: conflict %d, list %q, status %q", st.WS.Conflict, activeNames(t, e), m.status)
+	}
+	if _, _, err := e.App.UndoRedo(false); err != nil || activeNames(t, e) != before {
+		t.Fatalf("undo: %v, list %q, want %q", err, activeNames(t, e), before)
 	}
 }

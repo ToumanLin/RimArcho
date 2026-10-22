@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Staging (06 §5.4): a per-environment list RimArcho keeps and never writes to the game.
+// Staging (06 §2.5): a per-environment list RimArcho keeps and never writes to the game.
 
 func init() {
 	register(&Command{Name: "stage list", Summary: "staged mods, with the place each one came from", MaxArgs: 0, Run: stageList})
@@ -22,7 +22,7 @@ func stageList(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("staging: %s (%s)", render.Plural(len(items), "mod"), envRef(st.Ix.Env)))
+	d, root := render.New(fmt.Sprintf("staging: %s (%s, %s)", render.Plural(len(items), "mod"), app.PlanRef(st.Plan), envRef(st.Ix.Env)))
 	var rows [][]string
 	for _, it := range items {
 		m := st.Ix.ByID[it.Instance]

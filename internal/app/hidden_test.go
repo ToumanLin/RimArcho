@@ -121,8 +121,14 @@ func TestHiddenAlone(t *testing.T) {
 	e.Remove(filepath.Join(ws, "About", "About.xml"))
 	e.MustRun("unhide", ref)
 	e.MustRun("enable", refOf(t, e, "Alone", ""))
-	if out, code := e.Run("trash", refOf(t, e, "Mine", "")); code == 0 || !strings.Contains(out, "src:local") {
+	// H6 (06 §2.9 删除): a copy in Mods/ may go to the recycle bin, unless a plan uses it.
+	mine := refOf(t, e, "Mine", "")
+	if out, code := e.Run("trash", mine, "--dry-run"); code != 0 || !strings.Contains(out, "Mods") {
 		t.Fatalf("H6: exit %d\n%s", code, out)
+	}
+	e.MustRun("enable", mine)
+	if out, code := e.Run("trash", mine); code == 0 || !strings.Contains(out, "enabled") {
+		t.Fatalf("H6 enabled: exit %d\n%s", code, out)
 	}
 }
 

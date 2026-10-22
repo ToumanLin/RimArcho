@@ -1,6 +1,6 @@
 package order
 
-// Sort acceptance S1–S5 (04 §4.3) at the algorithm level; the CLI path is covered by the
+// Sort acceptance S1–S5 (04 §10) at the algorithm level; the CLI path is covered by the
 // golden and app tests.
 
 import (

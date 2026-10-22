@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// 09 §8: a SteamCMD mod can be enabled; save links it into Mods/ and removes the link once
+// 08 §3: a SteamCMD mod can be enabled; save links it into Mods/ and removes the link once
 // it is disabled, never touching the target.
 func TestLinkDeployment(t *testing.T) {
 	e := loadoutEnv(t)

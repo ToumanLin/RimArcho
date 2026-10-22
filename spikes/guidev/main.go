@@ -1,17 +1,19 @@
 // Spike: a development harness for the GUI page (08). It serves the embedded page on
 // 127.0.0.1 with a stand-in for /wails/runtime.js that calls the same gui.API over HTTP,
 // so the page can be driven in a browser during development. Never part of a release: the
-// product opens no port (01 §5.3).
+// product opens no port (01 §4).
 //
 //	go run ./spikes/guidev -home <copy of the data dir> -addr 127.0.0.1:8765
 package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -39,6 +41,11 @@ es.onmessage = (m) => { const e = JSON.parse(m.data); (subs[e.name] || []).forEa
 export const Events = { On: (n, f) => { (subs[n] = subs[n] || []).push(f); } };
 `
 
+// escCheck is G5's check of esc on every page, run in the page (esccheck.js says how).
+//
+//go:embed esccheck.js
+var escCheck string
+
 type hub struct {
 	mu   sync.Mutex
 	subs []chan []byte
@@ -61,6 +68,8 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1:8765", "listen address (loopback only)")
 	lang := flag.String("lang", "", "zh or en (default: the setting)")
 	exe := flag.String("exe", "bin/archo.exe", "the archo executable for scan and analyze children")
+	assets := flag.String("assets", "", "serve the page's files from this folder (edits show on reload)")
+	fake := flag.String("fakegame", "", "while this file exists the current environment's game counts as running (started at its time)")
 	flag.Parse()
 	if !strings.HasPrefix(*addr, "127.0.0.1:") {
 		log.Fatal("loopback only")
@@ -77,6 +86,16 @@ func main() {
 	view.SetLang(l)
 	a.LazyLog, a.LogCacheOnly = true, true
 	a.Launcher = func(string, []string, string) error { return fmt.Errorf("launching is off in the dev harness") }
+	if *fake != "" {
+		// the sidebar's running game (06 §2.1, G17) without starting RimWorld
+		a.GameProbe = func(string) *app.GameRun {
+			fi, err := os.Stat(*fake)
+			if err != nil {
+				return nil
+			}
+			return &app.GameRun{PID: 4242, Started: fi.ModTime()}
+		}
+	}
 	h := &hub{}
 	api := gui.NewAPI(a, h.emit)
 	api.Exe, _ = filepath.Abs(*exe)
@@ -88,6 +107,18 @@ func main() {
 	mux.HandleFunc("/wails/runtime.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		fmt.Fprint(w, shim)
+	})
+	mux.HandleFunc("/dev/esccheck.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript")
+		w.Header().Set("Cache-Control", "no-store")
+		if *assets != "" {
+			// with -assets the page's files come from disk; so does this one
+			if b, err := os.ReadFile(filepath.Join("spikes", "guidev", "esccheck.js")); err == nil {
+				w.Write(b)
+				return
+			}
+		}
+		fmt.Fprint(w, escCheck)
 	})
 	mux.HandleFunc("/call", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -120,6 +151,18 @@ func main() {
 			}
 		}
 	})
+	if *assets != "" {
+		disk := http.FileServer(http.Dir(*assets))
+		embedded := page
+		page = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if p := r.URL.Path; p == "/" || p == "/index.html" || p == "/style.css" || strings.HasPrefix(p, "/js/") {
+				w.Header().Set("Cache-Control", "no-store")
+				disk.ServeHTTP(w, r)
+				return
+			}
+			embedded.ServeHTTP(w, r)
+		})
+	}
 	mux.Handle("/", page)
 	log.Printf("http://%s", *addr)
 	log.Fatal(http.ListenAndServe(*addr, mux))

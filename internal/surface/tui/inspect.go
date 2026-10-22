@@ -7,9 +7,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Inspect (06 §6): a full-screen panel showing any reference with the same text as the CLI
+// Inspect (06 §4): a full-screen panel showing any reference with the same text as the CLI
 // command. enter follows the reference on the selected line, backspace goes back, and a
 // mod has sub-tabs (tab / shift+tab): summary, Defs, Patches, problems, rules, history.
 
@@ -60,10 +61,14 @@ func (m *model) fillInspect(v *inspectView) {
 	}
 	out, _ := cmds.Execute(m.app, argv)
 	v.lines = strings.Split(strings.TrimRight(out, "\n"), "\n")
+	// A log cluster: the pattern card replaces the CLI's English pattern section (06 §2.10).
+	if c := view.PatternCardArgv(m.app, m.st, argv); c != nil {
+		v.lines = append(append(view.WithoutPatternBlock(v.lines), ""), c.Lines()...)
+	}
 	v.cursor, v.off = 0, 0
 }
 
-var refRe = regexp.MustCompile(`(?:^|[\s(,\[])((?:L?#[a-z0-9]{4,})|(?:def:[A-Za-z0-9_.]+[/@][^\s,)]+)|(?:p:[0-9a-f]{6}))`)
+var refRe = regexp.MustCompile(`(?:^|[\s(,\[])((?:L?#[a-z0-9]{4,})|(?:def:[A-Za-z0-9_.]+[/@][^\s,)]+)|(?:p:[0-9a-f]{6})|(?:log:E[0-9]+))`)
 
 // lineRef returns the first followable reference in a line and the command that shows it.
 func lineRef(line string) []string {
@@ -74,6 +79,8 @@ func lineRef(line string) []string {
 			return []string{"def", r}
 		case strings.HasPrefix(r, "p:"):
 			return []string{"problems", "show", r}
+		case strings.HasPrefix(r, "log:"):
+			return []string{"log", "--cluster", strings.TrimPrefix(r, "log:")}
 		case strings.HasPrefix(r, "L#"):
 			return []string{"list", "--filter", "lineage:" + r[2:]}
 		default:
@@ -104,7 +111,7 @@ func (m *model) inspectKey(s string) tea.Cmd {
 		}
 	case "esc", "q":
 		// The whole stack at once, so esc gets back to the list in a few presses
-		// (06 §13.10 T20); backspace goes back one page.
+		// (06 §11 T20); backspace goes back one page.
 		m.insp, m.inspHist = nil, nil
 	case "down", "j":
 		move(1)

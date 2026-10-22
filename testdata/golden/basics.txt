@@ -1,10 +1,10 @@
 $ archo help
 archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
   commands:
-    env list                                  list environments and their sources
+    env list                                  list environments (one per game folder) and the shared mod folders
     env detect                                detect game, user data and workshop paths (suggestion only)
-    env add <name>                            add an environment
-    env set <name>                            change an environment's paths (re-binds moved sources)
+    env add <name>                            add an environment: one game folder
+    env set <name>                            change an environment's game folder, saves or launch (re-binds a moved game)
     env use <name>                            select the current environment
     env rebind <src:label> yes|no             answer a pending source re-binding
     env remove <name>                         forget an environment (RimArcho data only; no game files)
@@ -27,7 +27,10 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     source <ref>                              decompile a mod's assemblies on demand (ilspycmd; cached per DLL hash)
     source search <pattern>                   search decompiled C# (uncached assemblies are decompiled first)
     analyze                                   rebuild the Def and Patch facts (normally run on demand as a child process)
-    changes [<ref>]                           change events (default: the last scan)
+    changes [<ref>]                           what changed in the mods, one row per mod (default: the current plan since it was last played)
+    library                                   the mod library: every mod on this machine, its copies, sizes, states and the plans and packs using it
+    library remove-from-plans <ref…>          take mods out of every plan that has them (one undo step per plan)
+    library move-to-locked <ref>              move a spare copy out of Mods/ into the lock library; plans keep using it
     enable <ref…>                             add mods to the workspace Loadout
     disable <ref…>                            remove mods from the workspace Loadout
     move <ref>                                move an enabled mod
@@ -35,49 +38,64 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     sort                                      sort the workspace by load-order constraints
     undo [<n>]                                undo the last workspace edit (or the last n: archo history)
     redo [<n>]                                redo an undone workspace edit (or n of them)
-    save                                      write the workspace to ModsConfig.xml (backup + atomic replace)
+    save                                      write the list to the game without starting it: Mods/ links, ModsConfig.xml (backup + atomic replace)
     loadout log                               saved and imported Loadout versions
     loadout diff [<v>] [<v>]                  differences between versions (default: newest version → workspace)
     loadout checkout <v>                      load a version into the workspace (save to apply)
-    loadout tag <v> <name>                    name a version
+    loadout ignore-external                   ignore the external ModsConfig.xml version that was not loaded (it stays in the history)
     loadout export                            write the workspace as a list file: text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code
-    loadout import <file|share code>          replace the workspace with a list (text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs); undoable
+    loadout import <file|share code> [<name>]  replace the workspace with a list (text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs; undoable), or with --new make it a new plan
+    plan list                                 list the environment's plans
+    plan new <name>                           create a plan: empty, or from the current plan, one of its versions, or a list file
+    plan use <name>                           make a plan current (writes no game file)
+    plan rename <old> <new>                   rename a plan (its history stays)
+    plan remove <name>                        delete a plan and its history (not the last one)
     stage list                                staged mods, with the place each one came from
     stage add <ref…>                          stage mods (enabled ones leave the Loadout and remember their place)
     stage drop <ref…>                         take mods out of staging without enabling them
     stage restore [<ref…>]                    enable staged mods again at their old place (all when no ref)
-    copy-local <ref>                          copy a mod into the local Mods folder with an origin marker (the Loadout is not changed)
+    pin <ref>                                 lock a mod: copy it into the lock library (origin marker) and use the copy in the current plan
+    copy-local <ref>                          alias of pin
     import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)
-    note <ref> [<text>]                       attach a plain-text note to a mod (all its copies)
+    note <ref> [<text>]                       attach a plain-text note to a mod (all its copies), or with --copy to this copy only
     tag add|remove <ref> <tag…> | list        tags for filtering (list --filter tag:<tag>)
     rule add after|before|incompatible|attach <A> <B> | ignore <constraint>  add a user rule
     rule list                                 list user rules
     rule remove <r:n>                         delete a user rule
-    launch                                    start the game
+    launch                                    write the list to the game and start it (one game at a time)
     identity list                             open identity questions ("is this #xxxx back?")
     identity resolve <q:n> same|copy|unrelated  answer an identity question
     lineage split <ref>                       move an instance into a lineage of its own
     lineage merge <ref> <ref>                 merge the second lineage into the first
     gc                                        remove expired tombstones and superseded snapshots
     config get [<key>]                        show settings
-    config set <key> <value>                  change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags)
+    config set <key> <value>                  change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.gpu: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder)
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     gui                                       open the desktop window (RimArcho.exe does this on a double click)
     version                                   print the RimArcho version
+    uninstall                                 remove what RimArcho put on this machine and restore what it changed (a dry run; --yes runs it)
     collection <link|ID>                      read a Steam Workshop collection and compare it with the installed mods (uses the network)
     data update [<dataset>…]                  download the community data (rules, steamdb, replacements); the only command that fetches it
     data status                               the community data: source, version, when it was fetched, entries
+    env branches                              list RimWorld's Steam branches (versions) SteamCMD can download
+    env download <branch>                     download a RimWorld version with SteamCMD and add it as an environment (you log in in SteamCMD)
+    folder list                               list the mod folders every environment shares (Workshop, SteamCMD, others)
+    folder add workshop|steamcmd|extra <dir>  add a shared mod folder (a second Workshop folder replaces the first)
+    folder remove <src:label>                 forget a shared mod folder (its files stay)
     unhide <ref>                              rename About.xml.disabled back to About.xml so the game sees the mod again
-    unpin <ref>                               restore a pinned mod's workshop copy and use it instead of the pinning copy
+    unpin <ref>                               use a locked mod's upstream again in the current plan (a RimCrow-style lock also gets its About.xml back); the copy stays
     trash <ref>                               move a hidden or unsubscribed workshop folder to the recycle bin
     history                                   the workspace's unsaved edits (undo/redo) and the saved versions
+    monitor                                   Archo Monitor, the in-game companion: versions, source, place in the plan
+    monitor install                           install or update the bundled Archo Monitor and add it to plans by default (08 §9)
     pack build <name>                         compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load
     pack list                                 the packs: mods, size, game version, last played
     pack launch <name>                        play a pack: link its mods into Mods/, its own list and saves, start the game
     pack export <name> <file>                 write a pack to a file (.archopack zip, or --light .archopack.json)
     pack import <file>                        unpack a .archopack, or compare a light pack with the installed mods
     pack remove <name>                        move a pack to the recycle bin; --unfinished deletes what a build cut short copied
+    pack unlink                               remove the packs' links from Mods/ (only the links, never the packs)
     pack stop <name>                          stop a running pack build (what it copied is removed)
     pattern [<pattern:id>]                    error patterns from public logs: what a kind of log error usually is, its causes, route and fixes
     db status                                 the database: path, size, backups
@@ -85,6 +103,13 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     db vacuum                                 compact the database
     cache status                              the caches and their sizes
     cache clear <kind>                        empty one cache (previews, workshop, images, source, logs); rebuilt on demand
+    textures status [<mod>...]                PNG textures, the DDS RimArcho made (and stale ones), and what converting them would take and save
+    textures optimize [<mod>...]              write the DDS of mods' PNG textures next to them (the game loads them instead; the PNGs stay)
+    textures clean [<mod>...]                 delete the DDS RimArcho wrote (only those; the game goes back to the PNGs)
+    textures tool                             the DDS encoder (todds): where it is, or --install to download it
+    workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while enabled, in a plan, or the game runs)
+    workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
+    workshop state <ref…>                     ask Steam whether items are subscribed, installed, waiting for an update
   references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern
   global flags: --env <name> (use another environment for this command)
 
@@ -107,12 +132,13 @@ $ archo env add main --detected
 env:main  added  [current]
   game: $ROOT/Steam/steamapps/common/RimWorld
   version: 1.6.4633 rev1261
+  saves: shared
   user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
   launch: steam
   sources:
     src:official  added  $ROOT/Steam/steamapps/common/RimWorld/Data
     src:local  added  $ROOT/Steam/steamapps/common/RimWorld/Mods
-    src:workshop  added  $ROOT/Steam/steamapps/workshop/content/294100
+    src:workshop (shared)  added  $ROOT/Steam/steamapps/workshop/content/294100
 next:
   archo scan
 
@@ -120,12 +146,14 @@ $ archo env list
 environments: 1
   env:main  1.6.4633 rev1261  [current]
     game: $ROOT/Steam/steamapps/common/RimWorld
+    saves: shared
     user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
     launch: steam
     sources:
       src:official  $ROOT/Steam/steamapps/common/RimWorld/Data
       src:local     $ROOT/Steam/steamapps/common/RimWorld/Mods
-      src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
+  mod folders (every environment):
+    src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 
 $ archo scan
 scan:1  env:main  0s
@@ -147,6 +175,7 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (0 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered (archo changes)
+  plan: plan:default
   loadout: 1 active, same as v1 (import)
   problems: 0 error, 0 warning, 1 info in declarations; Defs and Patches not analysed yet (archo problems)
 
@@ -251,17 +280,10 @@ error: Alpha matches nothing (archo find <words>)
 [exit 1]
 
 $ archo changes
-changes: 9 (scan:1)
-  scan:1  2026-10-01 10:00  9 discovered
-    discovered  #6olp  Harmony             src:workshop 2009463077
-    discovered  #hnyg  Versioned Mod 版本  src:workshop 3000000001
-    discovered  #nyh3  Alpha               src:workshop 3000000002
-    discovered  #z3bw  Beta                src:workshop 3000000003
-    discovered  #i4uc  Leftover            src:workshop 3000000009
-    discovered  #iqmu  Core                src:official Core
-    discovered  #gpto  Gamma               src:local Gamma
-    discovered  #xamx  Old Mod             src:local OldMod
-    discovered  #lqj2  Alpha Fork          src:local Twin
+changes: 0 mods (plan:default, the last scan · Oct 1 10:00)
+  nothing changed
+next:
+  archo changes --library
 
 $ archo scan
 scan:2  env:main  0s
@@ -274,9 +296,10 @@ scan:2  env:main  0s
   changes: none
 
 $ archo changes
-changes: 0 (scan:2)
+changes: 0 mods (plan:default, the last scan · Oct 1 10:00)
+  nothing changed
 next:
-  archo changes --since 30d
+  archo changes --library
 
 $ archo identity list
 questions: 0 open

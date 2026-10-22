@@ -1,5 +1,5 @@
 // Package dotnet reads .NET metadata (TypeDef, MethodDef, MemberRef, CustomAttribute, heaps)
-// with saferwall/pe plus a custom-attribute blob decoder (M0 spike spikes/dotnetmeta, 07 §6.1 item 1).
+// with saferwall/pe plus a custom-attribute blob decoder (M0 spike spikes/dotnetmeta, 07 §7 item 1).
 package dotnet
 
 import (

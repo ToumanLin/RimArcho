@@ -2,6 +2,7 @@ package app
 
 import (
 	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"sort"
@@ -43,8 +44,58 @@ func ProblemRef(f *finding.Finding, lineage string) string {
 }
 
 // Problems collects the declaration layer (computed now) and the stored Def/Patch layers.
-// With ensure, a stale or missing analysis is rebuilt first.
+// With ensure, a stale or missing analysis is rebuilt first. A pack's links left in Mods/
+// (08 §5.3) are looked at every time: they change on disk, outside what the cache knows.
 func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) {
+	ps, err := a.problems(ensure, progress)
+	if err != nil || ps.State == nil {
+		return ps, err
+	}
+	// What Mods/ holds now (08 §3, §5.3): a pack's links left there, and two folders of one
+	// packageId, which the game reports as an error.
+	ix := ps.State.Ix
+	dups := ModsDuplicates(a.ModsCopies(ix))
+	var extra []*finding.Finding
+	if l := a.LeftPackLinks(ix); l != nil {
+		for _, d := range dups {
+			if d.onlyPacks() {
+				l.Duplicates = append(l.Duplicates, d)
+			}
+		}
+		extra = append(extra, l.Finding())
+	}
+	extra = append(extra, a.duplicateFindings(ps.State, dups)...)
+	if len(extra) > 0 {
+		c := *ps
+		c.List = append([]*Problem{}, ps.List...)
+		for _, f := range extra {
+			lin := ""
+			if m := ix.ByID[f.SubjectInstance()]; m != nil {
+				lin = m.LineageID
+			}
+			p := &Problem{Finding: f, Ref: ProblemRef(f, lin)}
+			i := 0
+			for i < len(c.List) && sevRank(c.List[i].Severity) <= sevRank(f.Severity) {
+				i++
+			}
+			c.List = append(c.List[:i], append([]*Problem{p}, c.List[i:]...)...)
+		}
+		ps = &c
+	}
+	return ps, nil
+}
+
+func sevRank(s string) int {
+	switch s {
+	case finding.Error:
+		return 0
+	case finding.Warning:
+		return 1
+	}
+	return 2
+}
+
+func (a *App) problems(ensure bool, progress func(string)) (*ProblemSet, error) {
 	ps := &ProblemSet{}
 	if ensure {
 		ps.Analysis, ps.AnalysisErr = a.EnsureAnalysis(progress)
@@ -77,14 +128,73 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 			return nil, err
 		}
 	}
-	all, err := a.DeclFindings(st)
+	if err := a.collectProblems(ps); err != nil {
+		return nil, err
+	}
+	return ps, nil
+}
+
+type planProblems struct {
+	key string
+	ps  *ProblemSet
+}
+
+// PlanProblems is plan p's problem set from stored results only, never computing an
+// analysis or parsing a log: the declaration layer (computed, cheap), the stored run of
+// p's analysis slot (03 §3) and the log's stored report judged against p (03 §6.4). The
+// home page counts every plan's problems with it (06 §2.3). The result is kept until the
+// database, ModsConfig.xml or the log changes.
+func (a *App) PlanProblems(p *store.Plan) (*ProblemSet, error) {
+	cur, err := a.Loadout()
 	if err != nil {
 		return nil, err
+	}
+	st, err := a.PlanState(cur, p)
+	if err != nil {
+		return nil, err
+	}
+	key := ""
+	if a.stCache != nil && a.stCache.Ix == cur.Ix {
+		key = a.stKey + "|" + a.GameVersion + "|" + ListFingerprint(st.List)
+		if lp := a.ProblemLog(st); lp != "" {
+			key += "|" + lp + "|" + logStamp(lp)
+		}
+	}
+	if c := a.planPS[st.Plan.ID]; key != "" && c != nil && c.key == key {
+		return c.ps, nil
+	}
+	ps := &ProblemSet{State: st}
+	if ps.Analysis, err = a.analysisOf(st, st == cur); err != nil {
+		return nil, err
+	}
+	only := a.LogCacheOnly
+	a.LogCacheOnly = true
+	err = a.collectProblems(ps)
+	a.LogCacheOnly = only
+	if err != nil {
+		return nil, err
+	}
+	if key != "" {
+		if a.planPS == nil {
+			a.planPS = map[int64]*planProblems{}
+		}
+		a.planPS[st.Plan.ID] = &planProblems{key: key, ps: ps}
+	}
+	return ps, nil
+}
+
+// collectProblems fills ps for ps.State with ps.Analysis set: the declaration layer, the
+// stored Def/Patch findings, the problem log's clusters, and the ignores.
+func (a *App) collectProblems(ps *ProblemSet) error {
+	st := ps.State
+	all, err := a.DeclFindings(st)
+	if err != nil {
+		return err
 	}
 	if r := ps.Analysis.Run; r != nil {
 		fs, err := a.Store.Findings(r.ID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, f := range fs {
 			// A stale run may name instances that are gone.
@@ -109,7 +219,7 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	all = append(all, lfs...)
 	ignores, err := a.Store.Ignores(st.Ix.Env.ID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	type igKey struct{ lin, code, key string }
 	ig := map[igKey]*store.Ignore{}
@@ -151,7 +261,7 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	sortProblems(ps.List, order)
 	sortProblems(ps.Ignored, order)
 	sortProblems(ps.Stale, order)
-	return ps, nil
+	return nil
 }
 
 func sortProblems(ps []*Problem, order func(*finding.Finding) string) {
@@ -239,6 +349,11 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	if err := a.Store.LoadDecls(active); err != nil {
 		return nil, err
 	}
+	locked := st.Locked()
+	lockedCopy := map[string]string{} // copy ID → upstream ID
+	for _, l := range locked {
+		lockedCopy[l.Copy.ID] = l.Upstream.ID
+	}
 	installed := map[string][]*store.Mod{} // live, loadable instances by packageId
 	for _, m := range st.Ix.Mods {
 		if m.TombstoneAt.IsZero() && !m.Residue && m.Unloadable == "" && (st.Reg.Known(m.ID) || st.Deployable(m)) {
@@ -249,7 +364,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 
 	for _, m := range active {
 		d := m.Decl()
-		// Use This Instead (10 §5): the community knows a maintained replacement for this game version.
+		// Use This Instead (04 §6.3): the community knows a maintained replacement for this game version.
 		if r := a.ReplacementFor(m.WorkshopID(), m.PackageID); r != nil && r.NewPackageID != m.PackageID && (len(r.NewVersions) == 0 || slices.Contains(r.NewVersions, mm)) {
 			f := &finding.Finding{Code: "mod.replaced", Severity: finding.Warning, Key: r.NewWorkshopID, Subjects: []string{inst(m.ID)},
 				Claim:    fmt.Sprintf("%s has a replacement for %s: %s by %s", inst(m.ID), mm, r.NewName, r.NewAuthor),
@@ -303,7 +418,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			case dep.url != "":
 				f.Suggestions = append(f.Suggestions, "subscribe: "+dep.url)
 			default:
-				if w, ok := a.WorkshopFor(p); ok { // steamDB (10 §5): a direct link
+				if w, ok := a.WorkshopFor(p); ok { // steamDB (04 §6.3): a direct link
 					f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+w.WorkshopID)
 				}
 			}
@@ -350,11 +465,11 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				}
 			}
 			if !ok {
-				// Measured on 6,734 logs of 1.6 (decisions-corpus §2, G8): a mod that stops at
-				// the previous minor version is an error source 2.6× as often as chance (its code
-				// was built for the previous game): warning. A mod for older versions that players
-				// still run is 0.3× chance (the ones that broke were dropped long ago): info.
-				// This reverses decisions-m3 §12.1; the fold into one row keeps the count quiet.
+				// Measured on 6,734 logs of 1.6 (decisions-corpus §2, G8; 03 §4.5): a mod that
+				// stops at the previous minor version is an error source 2.6× as often as chance
+				// (its code was built for the previous game): warning. A mod for older versions
+				// that players still run is 0.3× chance (the ones that broke were dropped long
+				// ago): info. The fold into one row keeps the count quiet.
 				sev := finding.Info
 				if prev := PrevMinor(mm); prev != "" {
 					for _, v := range d.SupportedVersions {
@@ -389,7 +504,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				f.Suggestions = append(f.Suggestions, "archo disable "+inst(m.ID))
 			}
 			add(f)
-		} else if ins := installed[p]; len(ins) > 1 {
+		} else if ins := installed[p]; len(ins) > 1 && !onlyLocks(ins, lockedCopy) {
 			subj := ins[0]
 			if len(as) == 1 {
 				subj = as[0]
@@ -413,7 +528,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		}
 	}
 	// About.xml renamed away (about-disabled) on installed mods that are not enabled: pinned
-	// by a copy, unsubscribed, or hidden on their own (10 §2.1).
+	// by a copy, unsubscribed, or hidden on their own (08 §6).
 	for _, h := range st.Hidden() {
 		m := h.Mod
 		if activePos[m.ID] != 0 {
@@ -439,6 +554,32 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				Claim:       fmt.Sprintf("%s is hidden from the game (About.xml renamed, probably by another mod manager)", inst(m.ID)),
 				Suggestions: []string{"archo unhide " + inst(m.ID), "archo trash " + inst(m.ID)}})
 		}
+	}
+	// Locked versions RimArcho made (04 §7): the upstream stays visible; the copy is what
+	// the plan uses. Reported while the upstream itself is not enabled.
+	for _, l := range locked {
+		up, cp := l.Upstream, l.Copy
+		if activePos[up.ID] != 0 {
+			continue
+		}
+		f := &finding.Finding{Code: "mod.pinned", Severity: finding.Info, Key: "copy:" + cp.ID, Subjects: []string{inst(up.ID), inst(cp.ID)},
+			Claim:       fmt.Sprintf("%s is locked: %s is a copy of it made by archo pin (.rimarcho/origin.json)", inst(up.ID), inst(cp.ID)),
+			Evidence:    []finding.Evidence{{Source: finding.Inferred, Ref: inst(cp.ID), Text: "origin_snapshot " + shortHash(l.Origin.SnapshotHash)}},
+			Suggestions: []string{"archo unpin " + inst(cp.ID)}}
+		if l.Updated {
+			f.Severity, f.Key = finding.Warning, "upstream:"+cp.ID
+			f.Claim = fmt.Sprintf("%s is locked to %s, and %s has been updated since the copy was made", inst(up.ID), inst(cp.ID), inst(up.ID))
+			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Ref: inst(up.ID), Text: "current snapshot " + shortHash(hex.EncodeToString(up.SnapHash))})
+			f.Suggestions = []string{"archo mod " + inst(cp.ID) + " --diff " + inst(up.ID), "archo pin --update " + inst(cp.ID), "archo unpin " + inst(cp.ID)}
+		}
+		add(f)
+	}
+	// 贴图优化: a mod updated since RimArcho wrote its DDS may show its old textures (a DDS
+	// shadows the PNG of the same name).
+	for _, m := range a.StaleTextures(st.Ix) {
+		add(&finding.Finding{Code: "texture.stale", Severity: finding.Warning, Key: "textures", Subjects: []string{inst(m.ID)},
+			Claim:       fmt.Sprintf("%s changed since its textures were converted to DDS; the game may show its old textures", inst(m.ID)),
+			Suggestions: []string{"archo textures optimize " + inst(m.ID), "archo textures clean " + inst(m.ID)}})
 	}
 	for _, m := range st.Ix.Mods {
 		if m.TombstoneAt.IsZero() && m.Unloadable != "" && m.Unloadable != scan.UnloadableAboutDisabled && activePos[m.ID] == 0 {
@@ -501,7 +642,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		case order.KindUser:
 			src = finding.User
 		}
-		// Severity by constraint strength (04 §4.4): dependencies, loadBefore, forced orders
+		// Severity by constraint strength (04 §5.3): dependencies, loadBefore, forced orders
 		// and user rules are warnings; loadAfter and community preferences, and rules the
 		// log corpus saw broken without effect, are information.
 		sev := finding.Warning
@@ -521,6 +662,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		if as.Why != "" {
 			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: as.Why})
 		}
+		f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: StrengthPrefix + as.Strength.String()})
 		if !strings.HasPrefix(ig, "archo ") {
 			f.Suggestions = append(f.Suggestions, "archo rule add ignore "+ig)
 			if as.Strength == order.Harmless {
@@ -641,6 +783,34 @@ func PrevMinor(mm string) string {
 	return fmt.Sprintf("%d.%d", a, b-1)
 }
 
-// NoisyCodes are hidden from default problem lists (decisions-m3 §12.2); they show with
+// NoisyCodes are hidden from default problem lists (03 §4.5); they show with
 // --all, an explicit --code or --subject, severity info, and in def / patches output.
 var NoisyCodes = map[string]bool{"def.override": true, "patch.contested": true}
+
+// onlyLocks reports whether ins is one instance plus locked copies of it (04 §7): those are
+// reported as mod.pinned, not as duplicates.
+func onlyLocks(ins []*store.Mod, lockedCopy map[string]string) bool {
+	var rest []*store.Mod
+	for _, m := range ins {
+		if _, ok := lockedCopy[m.ID]; !ok {
+			rest = append(rest, m)
+		}
+	}
+	if len(rest) != 1 {
+		return false
+	}
+	for _, m := range ins {
+		if up, ok := lockedCopy[m.ID]; ok && up != rest[0].ID {
+			return false
+		}
+	}
+	return true
+}
+
+// shortHash is the first 12 characters of a hex hash.
+func shortHash(h string) string {
+	if len(h) > 12 {
+		return h[:12]
+	}
+	return h
+}

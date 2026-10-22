@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The three list columns (06 §5, 08 §1.1): not enabled | enabled | staging.
+// The three list columns (06 §2.5, 06 §1): not enabled | enabled | staging.
 
 // Column is a list column.
 type Column int
@@ -21,7 +21,7 @@ const (
 	Staging
 )
 
-// Row status, worst first wins (06 §3: one status icon at most).
+// Row status, worst first wins (06 §7: one status icon at most).
 const (
 	StatusNone = iota
 	StatusUnloadable
@@ -35,7 +35,7 @@ type Item struct {
 	ID       string   `json:"id"`
 	Ref      string   `json:"ref"`
 	Name     string   `json:"name"` // the alias when there is one
-	Kind     string   `json:"kind"` // official, workshop, local, copy, git (06 §5.5 type:)
+	Kind     string   `json:"kind"` // official, workshop, local, copy, git (06 §3.7 type:)
 	SteamCMD bool     `json:"steamcmd,omitempty"`
 	Pos      int      `json:"pos,omitempty"`     // 1-based load position (enabled column)
 	Unsaved  bool     `json:"unsaved,omitempty"` // changed since the last save
@@ -47,9 +47,10 @@ type Item struct {
 	Package  string   `json:"-"`
 	Workshop string   `json:"-"`
 	Author   string   `json:"-"`
+	Versions []string `json:"-"` // the game versions it supports ("1.6")
 
 	Lower string `json:"-"` // sort key
-	// search fields (06 §5.5), lower case
+	// search fields (06 §3.7), lower case
 	names, author, text string
 }
 
@@ -129,6 +130,7 @@ func ModItem(st *app.LoadoutState, mod *store.Mod) Item {
 	it.text = it.names + " " + it.author
 	it.Package, it.Workshop = mod.PackageID, mod.WorkshopID()
 	it.Tags, it.Note, it.Alias = mod.Tags, mod.Note, mod.Alias != ""
+	it.Versions = strings.Fields(mod.SupportedVersions)
 	it.Kind, it.SteamCMD = SourceKind(mod), mod.Kind == source.SteamCMD
 	it.Dim = mod.Unloadable != "" || mod.Residue || (!st.Reg.Known(mod.ID) && !st.Deployable(mod)) || (st.Reg.Known(mod.ID) && !st.Reg.Loadable(mod.ID))
 	return it
@@ -147,7 +149,7 @@ func RowStatus(it *Item, status map[string]int) int {
 	return s
 }
 
-// SourceKind is the type: value of a mod's source (06 §5.5).
+// SourceKind is the type: value of a mod's source (06 §3.7).
 func SourceKind(m *store.Mod) string {
 	switch {
 	case m.Kind == source.Official:

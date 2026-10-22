@@ -23,7 +23,7 @@ func RealPath(p string) (string, error) {
 	return filepath.EvalSymlinks(abs)
 }
 
-// CreateLink makes link a symbolic link to target (09 §8).
+// CreateLink makes link a symbolic link to target (08 §3).
 func CreateLink(link, target string) error {
 	abs, err := filepath.Abs(target)
 	if err != nil {

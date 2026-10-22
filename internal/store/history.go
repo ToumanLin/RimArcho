@@ -88,7 +88,8 @@ type EventFilter struct {
 // Events returns matching change events, oldest scan first, in insertion order.
 func (s *Store) Events(f EventFilter) ([]*Event, error) {
 	q := `SELECT e.id, e.scan_id, sc.started_at, e.instance_id, e.kind, coalesce(e.before_snapshot, 0), coalesce(e.after_snapshot, 0), e.detail
-		FROM change_event e JOIN scan sc ON sc.id = e.scan_id WHERE sc.environment_id=? AND e.scan_id >= ?`
+		FROM change_event e JOIN scan sc ON sc.id = e.scan_id JOIN instance i ON i.id = e.instance_id
+		WHERE i.environment_id IN ('', ?) AND e.scan_id >= ?`
 	args := []any{f.EnvID, f.MinScan}
 	if f.MaxScan != 0 {
 		q += ` AND e.scan_id <= ?`
@@ -151,7 +152,7 @@ type Question struct {
 // Questions lists an environment's identity questions (open first unless all is false).
 func (s *Store) Questions(envID string, all bool) ([]*Question, error) {
 	q := `SELECT id, environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score, status, resolution,
-		coalesce(resolved_at, 0) FROM identity_question WHERE environment_id=?`
+		coalesce(resolved_at, 0) FROM identity_question WHERE environment_id IN ('', ?)`
 	if !all {
 		q += ` AND status='open'`
 	}
@@ -199,9 +200,10 @@ type Lineage struct {
 	CreatedAt time.Time
 }
 
-// Lineages returns an environment's lineages keyed by ID.
+// Lineages returns the lineages of the instances an environment sees, keyed by ID.
 func (s *Store) Lineages(envID string) (map[string]*Lineage, error) {
-	rows, err := s.DB.Query(`SELECT id, coalesce(primary_instance_id, ''), created_at FROM lineage WHERE environment_id=?`, envID)
+	rows, err := s.DB.Query(`SELECT id, coalesce(primary_instance_id, ''), created_at FROM lineage
+		WHERE id IN (SELECT lineage_id FROM instance WHERE environment_id IN ('', ?))`, envID)
 	if err != nil {
 		return nil, err
 	}

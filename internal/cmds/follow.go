@@ -13,7 +13,7 @@ import (
 // stdout. When nil the lines are collected into the command's output.
 var Stream func(string)
 
-// logFollow follows Player.log (10 §3.4): new clusters as they appear, until the game
+// logFollow follows Player.log (03 §6.6): new clusters as they appear, until the game
 // exits (or Ctrl+C when it was not running); --once reads what is there and stops.
 func logFollow(c *Ctx, a *Args) (*render.Doc, error) {
 	st, err := c.App.Loadout()
@@ -21,14 +21,18 @@ func logFollow(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	path := a.Str("file")
+	var lv *app.LiveLog
 	if path == "" {
 		// a running pack writes its own log on 1.7: follow the one the running game writes
 		run, _ := c.App.GameRunning()
-		if path = c.App.RunLog(st, c.App.WhatRuns(st.Ix.Env, run)); path == "" {
+		w := c.App.WhatRuns(st.Ix.Env, run)
+		if path = c.App.RunLog(st, w); path == "" {
 			return nil, fmt.Errorf("no Player.log found under %s (archo log --follow --file <path>)", st.Ix.Env.UserDataRoot)
 		}
+		lv = c.App.FollowRun(path, c.App.RunDataRoot(st, w))
+	} else {
+		lv = c.App.FollowLog(path, app.CompanionFor(path))
 	}
-	lv := c.App.FollowLog(path, c.App.CompanionLog(st))
 	d, root := render.New("following " + path)
 	emit := func(s string) {
 		if Stream != nil {

@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
-	_ "image/gif" // first frame (06 §6.4 item 6)
+	_ "image/gif" // first frame (06 §4.3 item 6)
 	_ "image/jpeg"
 	"image/png"
 	"io"
@@ -30,7 +30,7 @@ import (
 // UserAgent is sent with Workshop and image requests.
 const UserAgent = "RimArcho (+https://github.com/ToumanLin/RimArcho)"
 
-// Descriptions (06 §6.4): About.xml from disk, the Steam Workshop description fetched on
+// Descriptions (06 §4.3): About.xml from disk, the Steam Workshop description fetched on
 // demand for one mod and cached, and the images it embeds.
 
 // SteamAPI is the public, keyless endpoint; tests point App.SteamAPI elsewhere.
@@ -45,7 +45,7 @@ type Description struct {
 	// "not cached" (fetch false), or an error message.
 	WorkshopState string
 	Updated       time.Time // Workshop time_updated
-	// Show: which to display (06 §6.4 item 2): "workshop", "about", or "both".
+	// Show: which to display (06 §4.3 item 2): "workshop", "about", or "both".
 	Show string
 }
 
@@ -171,7 +171,7 @@ func (a *App) Describe(ix *Index, m *store.Mod, fetch, refresh bool) *Descriptio
 	return d
 }
 
-// choose implements 06 §6.4 item 2.
+// choose implements 06 §4.3 item 2.
 func choose(about, ws string) string {
 	if strings.TrimSpace(ws) == "" {
 		return "about"
@@ -269,7 +269,7 @@ func shortErr(err error) string {
 	return err.Error()
 }
 
-// DescImageMaxWidth is the width images are scaled to in the cache (06 §6.4 item 6).
+// DescImageMaxWidth is the width images are scaled to in the cache (06 §4.3 item 6).
 const DescImageMaxWidth = 720
 
 // DescImage returns a description image as a PNG file in the cache, downloading,

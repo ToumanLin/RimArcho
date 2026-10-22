@@ -8,19 +8,23 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Packs (10 §8).
+// Packs (08 §5).
 func init() {
 	dry := Flag{Name: "dry-run", Help: "show what would happen"}
 	register(&Command{Name: "pack build", Args: "<name>", Summary: "compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load", MinArgs: 1, MaxArgs: 1, Run: packBuildCmd,
-		Flags: []Flag{{Name: "light", Help: "the list only, no files (for sharing)"}, dry}})
+		Flags: []Flag{{Name: "light", Help: "the list only, no files (for sharing)"},
+			{Name: "textures", Help: "convert the copies' PNG textures to DDS and delete the PNGs (pre-convert; with --texture-scale: slim)"},
+			{Name: "texture-scale", Value: "<percent>", Help: "with --textures: scale textures down (20 25 40 50 60 75 80; never below 128 px or off a multiple of 4)"}, dry}})
 	register(&Command{Name: "pack list", Summary: "the packs: mods, size, game version, last played", MaxArgs: 0, Run: packListCmd})
-	register(&Command{Name: "pack launch", Args: "<name>", Summary: "play a pack: link its mods into Mods/, its own list and saves, start the game", MinArgs: 1, MaxArgs: 1, Run: packLaunchCmd, Flags: []Flag{dry}})
+	register(&Command{Name: "pack launch", Args: "<name>", Summary: "play a pack: link its mods into Mods/, its own list and saves, start the game", MinArgs: 1, MaxArgs: 1, Run: packLaunchCmd,
+		Flags: []Flag{dry, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a pack's mod into the lock library"}}})
 	register(&Command{Name: "pack export", Args: "<name> <file>", Summary: "write a pack to a file (.archopack zip, or --light .archopack.json)", MinArgs: 2, MaxArgs: 2, Run: packExportCmd,
 		Flags: []Flag{{Name: "light", Help: "the list only"}}})
 	register(&Command{Name: "pack import", Args: "<file>", Summary: "unpack a .archopack, or compare a light pack with the installed mods", MinArgs: 1, MaxArgs: 1, Run: packImportCmd,
 		Flags: []Flag{{Name: "as-plan", Help: "light pack: also load its list into the workspace (undoable)"}}})
 	register(&Command{Name: "pack remove", Args: "<name>", Summary: "move a pack to the recycle bin; --unfinished deletes what a build cut short copied", MinArgs: 1, MaxArgs: 1, Run: packRemoveCmd,
 		Flags: []Flag{dry, {Name: "unfinished", Help: "the unfinished build of <name> (its folder in the packs folder)"}}})
+	register(&Command{Name: "pack unlink", Summary: "remove the packs' links from Mods/ (only the links, never the packs)", MaxArgs: 0, Run: packUnlinkCmd, Flags: []Flag{dry}})
 	register(&Command{Name: "pack stop", Args: "<name>", Summary: "stop a running pack build (what it copied is removed)", MinArgs: 1, MaxArgs: 1, Run: packStopCmd})
 }
 
@@ -37,6 +41,12 @@ func BuildProgressLine(p app.BuildProgress) string {
 			l += " · " + p.Mod
 		}
 		return l
+	case app.StepTextures:
+		l := fmt.Sprintf("textures %d/%d", p.Files, p.FilesTotal)
+		if p.Mod != "" {
+			l += " · " + p.Mod
+		}
+		return l
 	case app.StepWrite:
 		return "write: pack.json"
 	case app.StepDone:
@@ -47,6 +57,13 @@ func BuildProgressLine(p app.BuildProgress) string {
 
 func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	o := app.BuildOptions{Light: a.Bool("light"), DryRun: a.Bool("dry-run")}
+	if a.Bool("textures") || a.Str("texture-scale") != "" {
+		to, err := textureOptions(a)
+		if err != nil {
+			return nil, err
+		}
+		o.Textures = &to
+	}
 	if Progress != nil {
 		o.Progress = func(p app.BuildProgress) { Progress("progress: " + BuildProgressLine(p)) }
 	}
@@ -84,7 +101,7 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("size", fmt.Sprintf("%s; %s of other game versions left out", mb(bytes), mb(r.Pack.Trimmed)))
 		if r.DryRun && r.Free >= 0 {
 			free := fmt.Sprintf("%s free on the packs drive", mb(r.Free))
-			if r.Free < r.Need+app.SpaceMargin {
+			if r.Free < max(r.Need, r.Peak)+app.SpaceMargin {
 				free += " — NOT ENOUGH: the build is refused"
 			}
 			root.KV("space", free)
@@ -98,6 +115,25 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		if r.Skipped > 0 {
 			root.KV("skipped", fmt.Sprintf("%d links that leave their mod's folder", r.Skipped))
+		}
+		if r.TexOptions != nil {
+			n := root.KV("textures", app.TextureLabel(*r.TexOptions))
+			if pt := r.Pack.Textures; pt != nil && !r.DryRun {
+				n.Addf("%d PNGs converted to DDS and deleted: %s of PNG → %s of DDS", pt.Converted, mb(pt.PNGBytes), mb(pt.DDSBytes))
+				if pt.Kept > 0 {
+					n.Addf("%d keep their PNG (%d failed to convert; the rest share a name with a DDS or another format)", pt.Kept, pt.Failed)
+				}
+			} else {
+				est := r.TexEst
+				n.Addf("%d PNGs: %s of PNG → about %s of DDS; video memory about %s → %s", est.Files, mb(est.PNGBytes), mb(est.DDSBytes), mb(est.VRAMBefore), mb(est.VRAMAfter))
+				n.Addf("pack size about %s after; up to %s while converting", mb(r.Final), mb(r.Peak))
+				if r.TexSkipped > 0 {
+					n.Addf("%d keep their PNG (a DDS or another format of the same name)", r.TexSkipped)
+				}
+				if r.Tool != nil && r.Tool.Err != "" {
+					n.Add("encoder: " + r.Tool.Err + " — the build is refused")
+				}
+			}
 		}
 		n := root.Add("trimmed:")
 		for _, e := range r.Pack.Entries {
@@ -177,7 +213,7 @@ func packStopCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.LaunchPack(a.Pos[0], a.Bool("dry-run"))
+	r, err := c.App.LaunchPackWith(a.Pos[0], a.Bool("dry-run"), a.Bool("move-duplicates"))
 	if err != nil {
 		return nil, err
 	}
@@ -186,6 +222,7 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		head = "pack launch: dry run, nothing written"
 	}
 	d, root := render.New(head)
+	movedKV(root, r.Moved, r.DryRun)
 	ln := root.KV("links", fmt.Sprintf("%d changes in Mods/", len(r.Links)))
 	for _, l := range r.Links {
 		if l.Op == "remove" {
@@ -195,6 +232,13 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	ln.Truncate(10, "")
+	if len(r.InMods) > 0 {
+		n := root.KV("from Mods/", fmt.Sprintf("%d mods: the same version is already in Mods/, so the pack's copy is not linked next to it", len(r.InMods)))
+		for _, m := range r.InMods {
+			n.Add(m)
+		}
+		n.Truncate(10, "")
+	}
 	root.KV("list", fmt.Sprintf("%s (%d entries; the environment's ModsConfig.xml is not touched)", r.ModsConfig, len(r.Tokens)))
 	root.KV("saves", r.UserData)
 	if len(r.Copied) > 0 {
@@ -268,5 +312,30 @@ func packRemoveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return d, nil
 	}
 	d, _ := render.New("moved " + dir + " to the recycle bin")
+	return d, nil
+}
+
+func packUnlinkCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	r, err := c.App.UnlinkPacks(a.Bool("dry-run"))
+	if err != nil {
+		return nil, err
+	}
+	if len(r.Links) == 0 {
+		d, _ := render.New("no pack links in Mods/")
+		return d, nil
+	}
+	head := fmt.Sprintf("removed %d links of pack %s from Mods/ (the pack is unchanged)", len(r.Links), r.PackNames())
+	if a.Bool("dry-run") {
+		head = fmt.Sprintf("pack unlink: dry run, would remove %d links of pack %s", len(r.Links), r.PackNames())
+	}
+	d, root := render.New(head)
+	ln := root.KV("links", r.Mods)
+	for _, l := range r.Links {
+		ln.Add("- " + l.Name)
+	}
+	ln.Truncate(10, "")
+	if a.Bool("dry-run") {
+		d.AddNext("archo pack unlink")
+	}
 	return d, nil
 }

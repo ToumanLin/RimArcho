@@ -25,7 +25,7 @@ func ids(t *testing.T, e *testkit.Env, refs ...string) []string {
 	return out
 }
 
-// 06 §12.2: a pick session's edits become one undo step; a reverted one leaves nothing.
+// 06 §3.4: a pick session's edits become one undo step; a reverted one leaves nothing.
 func TestBatchCommitAndRevert(t *testing.T) {
 	e := stageEnv(t)
 	before := names(t, e)

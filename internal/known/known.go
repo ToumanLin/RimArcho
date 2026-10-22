@@ -1,6 +1,6 @@
 // Package known holds what the log corpus observed about mods: prerequisites their authors
 // did not declare, and combinations that produce the same error in many shared logs
-// (docs/decisions-corpus.md §2, generator spikes/knowndeps). Aggregate counts only: no log
+// (docs/research/decisions-corpus.md §2, generator spikes/knowndeps). Aggregate counts only: no log
 // ids, no full mod lists; every entry was seen in the logs of at least five different players.
 //
 // The data is embedded: `archo data update` only fetches third-party datasets, and RimArcho

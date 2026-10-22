@@ -1,15 +1,31 @@
 package view
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/order"
 )
 
-// Whole-list actions (06 §9): sort, save and launch show a preview first; the preview is
-// the CLI's dry run (read-only), the action itself a typed call.
+// launchHintNow is the current plan's LaunchHint from the stored problems (no analysis).
+func launchHintNow(a *app.App) *LaunchHint {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil
+	}
+	ps, err := a.Problems(false, nil)
+	if err != nil {
+		return nil
+	}
+	return BuildNeeds(a, st, ps).Launch
+}
+
+// Whole-list actions (06 §6): sort, save and launch act on one key or click and say what
+// they did (sort: u undoes it). The preview is the CLI's dry run (read-only), reached from
+// the palette (预览排序 / 预览写入 / 预览启动) or `archo … --dry-run`; it never asks to go on.
 
 // Whole-list actions.
 const (
@@ -18,7 +34,7 @@ const (
 	ListLaunch = "launch"
 )
 
-// Preview is what an interface shows before a whole-list action.
+// Preview is the dry run of a whole-list action, for reading.
 type Preview struct {
 	What  string   `json:"what"`
 	Title string   `json:"title"`
@@ -26,16 +42,90 @@ type Preview struct {
 	Apply bool     `json:"apply"` // there is something to do and nothing blocks it
 }
 
+// Outcome is what a whole-list action did, for the status line.
+type Outcome struct {
+	What    string   `json:"what"`
+	Text    string   `json:"text"`
+	Undo    bool     `json:"undo,omitempty"`    // u takes it back (sort)
+	Refused []string `json:"refused,omitempty"` // refused: why, then the commands that resolve it
+	// Moves: refused because Mods/ holds another version that can move into the lock
+	// library (08 §3): what moving them does, for the one confirmation; RunMoving goes on.
+	Moves []string `json:"moves,omitempty"`
+}
+
+// Run carries out sort, save or launch at once (06 §6). A refusal (a game is running, an
+// outside change not loaded, no user data folder …) is an Outcome with Refused set, not an
+// error: the interface shows it and asks nothing.
+func Run(a *app.App, what string) *Outcome { return run(a, what, false) }
+
+// RunMoving is Run after the player agreed to move the folders in the way into the lock
+// library (Outcome.Moves).
+func RunMoving(a *app.App, what string) *Outcome { return run(a, what, true) }
+
+func run(a *app.App, what string, move bool) *Outcome {
+	o := &Outcome{What: what}
+	text, err := apply(a, what, move)
+	if err != nil {
+		return refused(a, o, err)
+	}
+	o.Text = text
+	o.Undo = what == ListSort && text != T("the order is already right")
+	return o
+}
+
+// refused fills an outcome from a refusal; a movable one carries the moves.
+func refused(a *app.App, o *Outcome, err error) *Outcome {
+	st, _ := a.Loadout()
+	var de *app.DuplicatesError
+	if errors.As(err, &de) && de.Movable() {
+		o.Text = T("Mods/ holds another version of mods RimArcho must link")
+		o.Refused = []string{o.Text}
+		o.Moves = MoveLines(de)
+		return o
+	}
+	o.Refused = RefusalLines(Humanize(st, err.Error()))
+	o.Text = o.Refused[0]
+	return o
+}
+
+// MoveLines say what moving the folders in the way does (the confirmation's lines).
+func MoveLines(de *app.DuplicatesError) []string {
+	out := []string{T("these folders move from Mods/ into the lock library; plans that use them keep them and get them through a link:")}
+	for _, m := range de.Moves {
+		what := m.For
+		if m.Pack != "" {
+			what = Tf("pack %s's copy of %s", m.Pack, m.Mod)
+		}
+		out = append(out, Tf("Mods/%s → %s, so that Mods/%s can be linked for %s", m.Copy.Name, m.To, m.Link, what))
+	}
+	return out
+}
+
+// RefusalLines splits a refusal into its reason and the commands it names: "reason (a: archo
+// x; b: archo y)" or "reason; do archo x". The app's error kinds ("launch blocked: ") go.
+func RefusalLines(msg string) []string {
+	for _, pre := range []string{app.ErrLaunchBlocked.Error() + ": ", app.ErrExternalConflict.Error() + ": "} {
+		msg = strings.TrimPrefix(msg, pre)
+	}
+	if i := strings.LastIndex(msg, " ("); i > 0 && strings.HasSuffix(msg, ")") && strings.Contains(msg[i:], "archo ") {
+		return append([]string{msg[:i]}, strings.Split(msg[i+2:len(msg)-1], "; ")...)
+	}
+	if i := strings.Index(msg, "; "); i > 0 && strings.Contains(msg[i:], "archo ") {
+		return []string{msg[:i], msg[i+2:]}
+	}
+	return []string{msg}
+}
+
 // DryRun previews sort, save or launch.
 func DryRun(a *app.App, what string) (*Preview, error) {
 	p := &Preview{What: what}
 	switch what {
 	case ListSort:
-		p.Title = T("sort — preview")
+		p.Title = T("preview the sort")
 	case ListSave:
-		p.Title = T("save to game — preview")
+		p.Title = T("preview writing to the game")
 	case ListLaunch:
-		p.Title = T("launch")
+		p.Title = T("preview the launch")
 	default:
 		return nil, fmt.Errorf("no preview for %s", what)
 	}
@@ -49,29 +139,53 @@ func DryRun(a *app.App, what string) (*Preview, error) {
 }
 
 // Apply runs sort, save or launch and says what it did.
-func Apply(a *app.App, what string) (string, error) {
+func Apply(a *app.App, what string) (string, error) { return apply(a, what, false) }
+
+func apply(a *app.App, what string, move bool) (string, error) {
 	switch what {
 	case ListSort:
 		r, err := a.Sort(false)
 		if err != nil {
 			return "", err
 		}
-		return Tf("sorted: %d moved", len(r.Changes)), nil
+		if len(r.Changes) == 0 {
+			return T("the order is already right"), nil
+		}
+		strong := 0
+		for _, b := range order.Broken(r.Input, r.Result) {
+			if b.Strength == order.Strong {
+				strong++
+			}
+		}
+		if strong > 0 {
+			// Strong ones first (04 §5.3): they are what the sort mattered for.
+			return Tf("sorted: %d moved · strong requirements put right: %d", len(r.Changes), strong), nil
+		}
+		return Tf("sorted: %d moved · only weaker preferences were out of order", len(r.Changes)), nil
 	case ListSave:
-		r, err := a.Save(false)
+		r, err := a.SaveWith(false, move)
 		if err != nil {
 			return "", err
 		}
 		if r.Unchanged {
 			return T("nothing to save"), nil
 		}
+		msg := Tf("saved to the game as v%d", r.Version)
 		if len(r.Links) > 0 {
-			return Tf("saved to the game as v%d; %d Mods/ links updated", r.Version, len(r.Links)), nil
+			msg = Tf("saved to the game as v%d; %d Mods/ links updated", r.Version, len(r.Links))
 		}
-		return Tf("saved to the game as v%d", r.Version), nil
+		if r.Running != nil {
+			msg += " · " + T("the game reads it on its next start")
+		}
+		return msg, nil
 	case ListLaunch:
-		if _, _, err := a.Launch(false, false); err != nil {
+		if _, err := a.LaunchWith(false, move); err != nil {
 			return "", err
+		}
+		// The most likely trouble goes with it (06 §2.3, never blocking): the TUI has no
+		// launch page, so its status line is where the player reads it.
+		if h := launchHintNow(a); h != nil {
+			return T("the game is starting") + " · " + Tf("watch for: %s", h.Text), nil
 		}
 		return T("the game is starting"), nil
 	}
@@ -114,4 +228,19 @@ func Swap(a *app.App, st *app.LoadoutState, id string) (string, error) {
 		return "", err
 	}
 	return Tf("swapped %s for another copy", Named(st, []string{id})), nil
+}
+
+// LaunchPack plays a pack as an Outcome: a refusal because of folders that can move into the
+// lock library carries the moves (08 §5.3).
+func LaunchPack(a *app.App, name string, move bool) *Outcome {
+	o := &Outcome{What: "pack"}
+	r, err := a.LaunchPackWith(name, false, move)
+	if err != nil {
+		return refused(a, o, err)
+	}
+	o.Text = Tf("pack %s: the game is starting", name)
+	if len(r.Moved) > 0 {
+		o.Text += " · " + Tf("%d folders moved into the lock library", len(r.Moved))
+	}
+	return o
 }

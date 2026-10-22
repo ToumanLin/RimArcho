@@ -2,25 +2,17 @@ package tui
 
 import (
 	"errors"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
-	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 需要处理 (06 §7). The items, their wording and their actions are view.BuildNeeds (08 §1.1);
+// 需要处理 (06 §5). The items, their wording and their actions are view.BuildNeeds (06 §1);
 // here each action gets its key and the screen is drawn.
-
-// Groups, in screen order (06 §7.1).
-const (
-	gList     = view.GroupList
-	gDeps     = view.GroupDeps
-	gConflict = view.GroupConflict
-	gLastRun  = view.GroupLastRun
-	gConfirm  = view.GroupConfirm
-)
 
 type needKey struct {
 	key, label string
@@ -29,43 +21,78 @@ type needKey struct {
 
 // need is one item of the screen: the shared item and its keys.
 type need struct {
-	group   int
-	text    string
-	keys    []needKey
-	counted bool     // in the top bar's number; false for the folded stale log
-	mods    []string // instance ids: the first carries the row icon
-	status  int      // statusErr, statusWarn or statusLog for the row icon
-	dim     bool
-	parts   []string
-	fold    bool
+	group    int
+	section  int            // the section it is shown in (view.SectionOf, 06 §2.4)
+	evidence *view.Evidence // where the claim comes from: the chip under the item
+	text     string
+	keys     []needKey
+	counted  bool     // in the top bar's number; false for the folded stale log
+	mods     []string // instance ids: the first carries the row icon
+	status   int      // statusErr, statusWarn or statusLog for the row icon
+	dim      bool
+	parts    []string
+	fold     bool
 }
 
 func (m *model) toNeeds(items []view.Need) []need {
 	out := make([]need, 0, len(items))
 	for _, it := range items {
-		n := need{group: it.Group, text: it.Text, counted: it.Counted, mods: it.Mods, status: it.Status, dim: it.Dim, parts: it.Parts, fold: it.Fold}
+		n := need{group: it.Group, section: it.Section, evidence: it.Evidence, text: it.Text, counted: it.Counted, mods: it.Mods, status: it.Status, dim: it.Dim, parts: it.Parts, fold: it.Fold}
 		for _, a := range it.Actions {
 			n.keys = append(n.keys, m.actionKey(a, it.Text))
 		}
 		out = append(out, n)
 	}
+	// by section, stable: within a section the view's order (this run before the last run)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].section < out[j].section })
 	return out
 }
 
-// actionKey binds a shared action to its key (06 §7.2).
+// evIcon is the evidence chip's icon (06 §7, §9.3).
+func evIcon(kind string) string {
+	switch kind {
+	case view.EvDeclared:
+		return ic.evDeclared
+	case view.EvInferred:
+		return ic.evInferred
+	case view.EvLog:
+		return ic.evLog
+	case view.EvCommunity:
+		return ic.evCommunity
+	case view.EvRule:
+		return ic.evRule
+	case view.EvCorpus:
+		return ic.evCorpus
+	}
+	return markDot
+}
+
+// chipText is the evidence chip as compact text: "≣ declared by the mod · About.xml modDependencies".
+func chipText(e *view.Evidence) string {
+	if e == nil {
+		return ""
+	}
+	s := evIcon(e.Kind) + " " + e.Label
+	if e.Source != "" {
+		s += " " + markDot + " " + e.Source
+	}
+	return s
+}
+
+// actionKey binds a shared action to its key (06 §5).
 func (m *model) actionKey(a view.Action, text string) needKey {
 	k := needKey{key: a.Key, label: a.Label}
 	switch a.Kind {
 	case view.ActSort:
-		k.run = func(m *model) tea.Cmd { return m.sortPreview() }
+		k.run = func(m *model) tea.Cmd { return m.listAction(view.ListSort) }
 	case view.ActSave:
-		k.run = func(m *model) tea.Cmd { return m.savePreview() }
+		k.run = func(m *model) tea.Cmd { return m.listAction(view.ListSave) }
 	case view.ActOpenURL:
 		k.run = func(m *model) tea.Cmd { return m.open(a.URL) }
 	case view.ActView:
 		k.run = func(m *model) tea.Cmd { return m.openInspect(a.Argv) }
 	case view.ActList:
-		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n"), nil); return nil }
+		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n")); return nil }
 	case view.ActFold:
 		k.run = func(m *model) tea.Cmd {
 			p := &m.prob
@@ -95,7 +122,7 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 	default:
 		k.run = func(m *model) tea.Cmd {
 			if a.Confirm != "" {
-				// Not undone with u: press twice (06 §9).
+				// Not undone with u: press twice (06 §6).
 				return m.arm(a.Key, a.Confirm, func(m *model) tea.Cmd { m.doAction(a, 0); return nil })
 			}
 			m.doAction(a, 0)
@@ -114,6 +141,8 @@ func (m *model) doAction(a view.Action, option int) {
 		m.say(sayInfo, done)
 	case err != nil:
 		m.say(sayFail, m.humanize(err.Error()))
+	case a.Undo:
+		m.say(sayOK, done+" · "+T("u undoes"))
 	default:
 		m.say(sayOK, done)
 	}
@@ -133,25 +162,43 @@ func (m *model) open(u string) tea.Cmd {
 	return nil
 }
 
-// sortPreview and savePreview are the S and w of the main screen.
-func (m *model) sortPreview() tea.Cmd {
-	out, code := m.run("sort", "--dry-run")
-	var confirm []string
-	if code == cmds.ExitOK && !strings.HasPrefix(out, "sort: 0 moved") {
-		confirm = []string{"sort"}
+// listAction is S, w and L (06 §6): it acts at once and says what it did; sort adds "u
+// undoes". A refusal says why and opens a panel with the commands that resolve it.
+func (m *model) listAction(what string) tea.Cmd {
+	o := view.Run(m.app, what)
+	m.reload()
+	m.detailRef = ""
+	switch {
+	case o.Refused != nil:
+		m.say(sayFail, o.Text)
+		if len(o.Refused) > 1 {
+			m.openPanel(listTitle(what), strings.Join(o.Refused, "\n"))
+		}
+	case o.Undo:
+		m.say(sayOK, o.Text+" · "+T("u undoes"))
+	default:
+		m.say(sayOK, o.Text)
 	}
-	m.openPanel(T("sort — preview"), out, confirm)
+	return m.requestDetail()
+}
+
+// listPreview is the palette's 预览排序 / 预览写入 / 预览启动: the dry run, to read.
+func (m *model) listPreview(what string) tea.Cmd {
+	out, _ := m.run(what, "--dry-run")
+	title := map[string]string{view.ListSort: "preview the sort", view.ListSave: "preview writing to the game", view.ListLaunch: "preview the launch"}[what]
+	m.openPanel(T(title), out)
 	return nil
 }
 
-func (m *model) savePreview() tea.Cmd {
-	out, code := m.run("save", "--dry-run")
-	var confirm []string
-	if code == cmds.ExitOK {
-		confirm = []string{"save"}
+// listTitle names a refused whole-list action.
+func listTitle(what string) string {
+	switch what {
+	case view.ListSort:
+		return T("sort")
+	case view.ListSave:
+		return T("write to the game")
 	}
-	m.openPanel(T("save to game — preview"), out, confirm)
-	return nil
+	return T("launch")
 }
 
 // ---- the screen ----
@@ -162,8 +209,9 @@ func (m *model) needLines(n int) []string {
 	p := &m.prob
 	w := m.w
 	items := p.items
-	head := Tf("%d to handle", p.need)
-	if p.need == 0 {
+	need := m.needCount() // the top bar's number: the analysis' and this run's (06 §2.4)
+	head := Tf("%d to handle", need)
+	if need == 0 {
 		head = T("nothing to handle")
 	}
 	switch {
@@ -184,14 +232,14 @@ func (m *model) needLines(n int) []string {
 		item int
 	}
 	var rows []row
-	grp := -1
+	sec := -1
 	for i, it := range items {
-		if it.group != grp {
-			if grp >= 0 {
+		if it.section != sec {
+			if sec >= 0 {
 				rows = append(rows, row{"", -1})
 			}
-			grp = it.group
-			rows = append(rows, row{"  " + sDimS.Render(fit(T(view.GroupTitles[grp]), w-2)), -1})
+			sec = it.section
+			rows = append(rows, row{"  " + m.sectionHead(sec, w-2), -1})
 		}
 		icon := statusIcon(it.status)
 		if it.dim || it.status == statusNone {
@@ -234,6 +282,9 @@ func (m *model) needLines(n int) []string {
 				}
 			}
 		}
+		if c := chipText(it.evidence); c != "" {
+			rows = append(rows, row{"    " + sDimS.Render(fit(c, tw)), i})
+		}
 		if sel && hint != "" {
 			for _, l := range wrap(hint, tw) {
 				rows = append(rows, row{"    " + sSecond.Render(fit(l, tw)), i})
@@ -264,9 +315,115 @@ func (m *model) needLines(n int) []string {
 	return out
 }
 
+// sectionHead is a section's heading: its title, its count and, for the run errors, which
+// run they are from (06 §2.4).
+func (m *model) sectionHead(sec, w int) string {
+	n := 0
+	for _, it := range m.prob.items {
+		if it.section == sec && it.counted {
+			n++
+		}
+	}
+	title := T(view.SectionTitles[sec])
+	// its number among the sections shown: 1–4 jump to it (06 §3.5)
+	num := itoa(m.sectionNumber(sec)) + " "
+	head := sDimS.Render(num) + sDimS.Render(title)
+	if sec == view.SectionBreak {
+		head = sDimS.Render(num) + sErrS.Render(title)
+	}
+	used := width.StringWidth(num + title)
+	add := func(s string, st lipgloss.Style) {
+		s = width.Truncate(s, max(w-used, 0), "…")
+		head += st.Render(s)
+		used += width.StringWidth(s)
+	}
+	if n > 0 {
+		add(" "+markDot+" ", sDimS)
+		add(itoa(n), sText)
+	}
+	if sec == view.SectionRun {
+		switch {
+		case m.live != nil && m.live.Running && m.live.Pack != "":
+			add(" "+markDot+" "+Tf("pack %s", m.live.Pack), sDimS)
+		case m.live != nil && m.live.Running:
+			add(" "+markDot+" "+T("this run"), sDimS)
+		case m.prob.lastRun != "":
+			add(" "+markDot+" "+m.prob.lastRun, sDimS)
+		}
+	}
+	return head
+}
+
+// sectionNumber is a section's number among the sections shown (1 first).
+func (m *model) sectionNumber(sec int) int {
+	n, last := 0, -1
+	for _, it := range m.prob.items {
+		if it.section != last {
+			n, last = n+1, it.section
+		}
+		if it.section == sec {
+			return n
+		}
+	}
+	return n
+}
+
+// sectionGo moves the cursor to the first item of the n-th section shown.
+func (m *model) sectionGo(n int) {
+	k, last := 0, -1
+	for i, it := range m.prob.items {
+		if it.section != last {
+			k, last = k+1, it.section
+			if k == n {
+				m.prob.cursor = i
+				return
+			}
+		}
+	}
+}
+
+// sectionStep moves the cursor to the first item of the previous / next section.
+func (m *model) sectionStep(d int) {
+	p := &m.prob
+	if p.cursor >= len(p.items) {
+		return
+	}
+	sec := p.items[p.cursor].section
+	if d > 0 {
+		for i, it := range p.items {
+			if it.section > sec {
+				p.cursor = i
+				return
+			}
+		}
+		return
+	}
+	prev := -1
+	for _, it := range p.items {
+		if it.section < sec {
+			prev = it.section
+		}
+	}
+	for i, it := range p.items {
+		if it.section == prev {
+			p.cursor = i
+			return
+		}
+	}
+}
+
 func (m *model) needsKey(s string) tea.Cmd {
 	p := &m.prob
 	switch s {
+	case "left":
+		m.sectionStep(-1)
+		return nil
+	case "right":
+		m.sectionStep(1)
+		return nil
+	case "1", "2", "3", "4":
+		m.sectionGo(int(s[0] - '0'))
+		return nil
 	case "up", "k":
 		p.cursor = max(p.cursor-1, 0)
 		return nil

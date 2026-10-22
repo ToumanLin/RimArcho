@@ -1,4 +1,4 @@
-// Package render builds the semantic outline text shared by CLI and MCP (05 §2): a subject
+// Package render builds the semantic outline text shared by CLI and MCP (05 §3): a subject
 // line, two-space indentation per level, `key: value` lines or list items, truncation hints,
 // and an optional trailing `next:` section. No ANSI colour, no JSON.
 package render
@@ -11,10 +11,10 @@ import (
 )
 
 // width measures display columns; East Asian ambiguous characters (…, →, ·) count as one
-// column, matching Windows Terminal regardless of locale (07 §6.1 item 3).
+// column, matching Windows Terminal regardless of locale (07 §7 item 3).
 var width = &runewidth.Condition{EastAsianWidth: false}
 
-// DefaultLimit is the default number of list items before truncation (keeps output ≤ 40 lines, 05 §6 I5).
+// DefaultLimit is the default number of list items before truncation (keeps output ≤ 40 lines, 05 §7 I5).
 const DefaultLimit = 30
 
 // Node is one outline line with its children.
@@ -59,7 +59,7 @@ func (n *Node) KV(key, value string) *Node {
 func (n *Node) Section(key string) *Node { return n.Add(key + ":") }
 
 // Truncate keeps the first limit children (limit ≤ 0 keeps all) and appends the
-// "… N more (cmd)" hint (05 §2.1 rule 4).
+// "… N more (cmd)" hint (05 §3.1 rule 4).
 func (n *Node) Truncate(limit int, expand string) {
 	if limit <= 0 || len(n.Children) <= limit {
 		return

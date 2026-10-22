@@ -2,3 +2,4 @@
 *.exe binary
 *.dll binary
 *.png binary
+testdata/companion/real17/** -text

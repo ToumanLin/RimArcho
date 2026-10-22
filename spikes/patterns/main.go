@@ -985,8 +985,9 @@ func run(parsedPath, resultsPath, outPath, mm string, minLogs, minSess, maxChang
 	return nil
 }
 
-// private: a template that could carry a player's own data (paths, user names) is never kept.
-var privateRe = regexp.MustCompile(`(?i)users[\\/]|/home/|appdata|steamapps|[a-z]:[\\/]|@[a-z0-9-]+\.[a-z]`)
+// private: a template that could carry a player's own data (paths, user names, HugsLib's
+// [Rimworld_dir] paths with a local folder name) is never kept.
+var privateRe = regexp.MustCompile(`(?i)users[\\/]|/home/|appdata|steamapps|[a-z]:[\\/]|@[a-z0-9-]+\.[a-z]|\[rimworld_(dir|data)\]`)
 
 func private(s string) bool { return privateRe.MatchString(s) }
 

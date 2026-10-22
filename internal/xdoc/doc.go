@@ -1,4 +1,4 @@
-// Package xdoc is a compact, mutable XML node store for the Patch simulation (07 §6.1
+// Package xdoc is a compact, mutable XML node store for the Patch simulation (07 §7
 // item 2): nodes live in chunked arenas linked by int32 indices, element and attribute
 // names are interned, and text is appended to fixed-size pages. It implements
 // xpath.NodeNavigator, so antchfx/xpath evaluates expressions over it directly.

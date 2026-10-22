@@ -9,34 +9,37 @@
 </head>
 <body>
 <div id="app">
-  <header id="top">
-    <div class="side left">
-      <button id="env" class="pill" title="E"></button>
+  <aside id="side">
+    <div id="side-split"></div>
+    <div class="side-head"><button id="navtoggle" class="navtoggle" aria-label="Sidebar"></button></div>
+    <nav id="nav"></nav>
+    <div class="side-foot">
+      <button id="live" class="live" hidden></button>
+      <button id="nav-settings" class="nav-item" data-page="settings"><span class="lbl"></span></button>
     </div>
-    <nav id="tabs">
-      <span class="thumb"></span>
-      <button class="tab" data-tab="board" title="Shift+1"><span class="lbl"></span></button>
-      <button class="tab" data-tab="needs" title="Shift+2"><span class="lbl"></span><span id="needs" class="count"></span></button>
-      <button class="tab" data-tab="logs" title="Shift+3"><span class="lbl"></span></button>
-      <button class="tab" data-tab="packs" title="Shift+4"><span class="lbl"></span></button>
-      <button class="tab" data-tab="settings" title="Shift+5"><span class="lbl"></span></button>
-    </nav>
-    <div class="side right">
-      <span id="live" class="badge live" hidden></span>
-      <button id="btn-launch" class="btn primary" data-cmd="launch" title="L"></button>
+  </aside>
+  <div id="main">
+    <header id="top">
+      <nav id="crumbs"></nav>
+      <button id="env" class="envchip" title="E"></button>
+    </header>
+    <div id="body">
+      <div id="planhead" class="page-head"><p class="lead"></p><div class="page-acts"></div></div>
+      <main id="board">
+        <div class="fcol" data-col="0"><div class="barhost"></div><section class="area list" data-area="0"><div class="head"></div><div class="rows" tabindex="-1"></div></section></div>
+        <div class="split" data-split="0"></div>
+        <section class="area list" data-area="1"><div class="head"></div><div class="rows" tabindex="-1"></div></section>
+        <div class="split" data-split="1"></div>
+        <div class="stack">
+          <section class="area detail" data-area="3"><div class="head"></div><div class="scroll" tabindex="-1"><div id="detail"></div></div></section>
+          <section class="area list fold" data-area="2"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
+          <section class="area fold histarea"><button class="head hbar"></button><div class="histbody"></div></section>
+        </div>
+      </main>
+      <div id="screen" hidden></div>
     </div>
-  </header>
-  <main id="board">
-    <section class="area list" data-area="0"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
-    <div class="split" data-split="0"></div>
-    <section class="area list" data-area="1"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
-    <div class="split" data-split="1"></div>
-    <section class="area list" data-area="2"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
-    <div class="split" data-split="2"></div>
-    <section class="area detail" data-area="3"><div class="head"></div><div class="scroll" tabindex="-1"><div id="detail"></div></div></section>
-  </main>
-  <div id="screen" hidden></div>
-  <footer id="bottom"><span id="where" class="where"></span><span id="status"></span><span class="grow"></span><span id="hints"></span></footer>
+    <footer id="bottom"><span id="where" class="where"></span><span id="status"></span><span class="grow"></span><span id="hints"></span></footer>
+  </div>
   <div id="popup" hidden></div>
   <div id="menu" hidden></div>
 </div>

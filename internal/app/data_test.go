@@ -22,7 +22,7 @@ func gz(s string) []byte {
 	return b.Bytes()
 }
 
-// D1–D3 (10 §5): download, all-or-nothing replacement, and what the data adds to 需要处理.
+// D1–D3 (04 §6.3): download, all-or-nothing replacement, and what the data adds to 需要处理.
 func TestCommunityData(t *testing.T) {
 	e := loadoutEnv(t)
 	scanNow(t, e)

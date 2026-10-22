@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Import and export of the mod list (10 §4), the TUI's short form of the window's popup:
+// Import and export of the mod list (04 §9), the TUI's short form of the window's popup:
 // import reads a path, share code or link, shows what it would do and offers replace or
 // add; export picks a format, then a file.
 
@@ -38,11 +38,14 @@ func (m *model) importChoice(imp *view.Import, p *view.ImportPreview) {
 	replace := T("replace the enabled list") + " — " + p.Replace.Text
 	merge := T("add the ones you lack") + " — " + p.Merge.Text
 	show := T("show the whole preview")
-	pn := &panel{title: p.Summary, choices: []string{replace, merge, show}}
+	asPlan := T("as a new plan") + " — " + Tf("%d mods; the current plan stays as it is", p.Total)
+	pn := &panel{title: p.Summary, choices: []string{replace, merge, asPlan, show}}
 	pn.onPick = func(m *model, v string) tea.Cmd {
+		if v == asPlan {
+			return m.importAsPlan(imp, p)
+		}
 		if v == show {
-			m.openPanel(p.Summary, strings.Join(p.Lines(), "\n"), nil)
-			m.afterPanel = nil
+			m.openPanel(p.Summary, strings.Join(p.Lines(), "\n"))
 			return nil
 		}
 		t, err := view.ApplyImport(m.app, imp, v == merge)

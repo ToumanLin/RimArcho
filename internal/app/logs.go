@@ -52,6 +52,12 @@ type LogCluster struct {
 	// <message>"), the context agents otherwise grep the raw log for (G7 traces).
 	Near    []string
 	Finding *finding.Finding
+	// From the companion log (03 §6.7.4): its file name, the first occurrence's time and
+	// level; OnlyCompanion when Player.log does not have the entry at all.
+	Companion     string    `json:",omitempty"`
+	At            time.Time `json:",omitzero"`
+	Level         string    `json:",omitempty"`
+	OnlyCompanion bool      `json:",omitempty"`
 }
 
 // LogReport is an analysed log.
@@ -62,9 +68,15 @@ type LogReport struct {
 	Lines   int
 	Version string
 	// AnalysedAs is the major.minor the log was attributed against when it differs from
-	// the environment's (EnvMM): the log's own version (decisions-m4 §7.3).
+	// the environment's (EnvMM): the log's own version (03 §6.4).
 	AnalysedAs, EnvMM string
 	Clusters          []*LogCluster
+	// Companion is the companion log read with it (03 §6.7.4); CompanionBad its bad lines.
+	Companion    string `json:",omitempty"`
+	CompanionBad int    `json:",omitempty"`
+	// Cursor marks how much of the log and its companion this report covers: get_log
+	// since=<cursor> lists what is new after it (03 §6.6). Empty for pasted text.
+	Cursor string `json:",omitempty"`
 }
 
 // LogPaths returns the current and previous Player.log for the environment's (or the
@@ -94,11 +106,24 @@ type logCacheEntry struct {
 	rep *LogReport
 }
 
+// DropLogCaches forgets the parsed log report and the problem set built with it; the next
+// read takes the stored report from the database again (the GUI calls it when the player
+// leaves 需要处理 or 日志, 07 §8.3).
+func (a *App) DropLogCaches() {
+	a.logCache = nil
+	a.prCache, a.prKey = nil, ""
+}
+
+// DropPlanProblems forgets every plan's problem set (PlanProblems, the home page's counts).
+func (a *App) DropPlanProblems() { a.planPS = nil }
+
 // ErrLogNotCached: a cache-only read found no stored report for the log as it is now.
 var ErrLogNotCached = errors.New("log not analysed yet")
 
 // logCacheVersion invalidates stored reports when attribution changes.
-const logCacheVersion = 6
+// 7: both the companion log (dev, 4) and the G1/G7 attribution rules (master, 6); 8: no
+// nearby messages for entries only the companion log has.
+const logCacheVersion = 8
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -118,12 +143,14 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	key := fmt.Sprintf("%s|%d|%d|%s|%s", path, fi.Size(), fi.ModTime().UnixNano(), a.Store.ChangeKey(), a.GameVersion)
+	compPath := CompanionFor(path)
+	key := fmt.Sprintf("%s|%d|%d|%s|%s|%s", path, fi.Size(), fi.ModTime().UnixNano(), a.Store.ChangeKey(), a.GameVersion, companionKey(compPath))
 	if a.logCache != nil && a.logCache.key == key {
 		return a.logCache.rep, nil
 	}
 	rep := &LogReport{Path: path, Label: filepath.Base(path), ModTime: fi.ModTime()}
 	var lf *logs.File
+	var mark logMark
 	row, _ := a.Store.LogCache(path)
 	fresh := row != nil && row.Size == fi.Size() && row.MTime == fi.ModTime().UnixNano()
 	switch {
@@ -132,7 +159,7 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 	case cacheOnly:
 		return nil, ErrLogNotCached
 	default:
-		if lf, err = parseLogFile(path); err != nil {
+		if lf, mark, err = readLog(path, fi.Size()); err != nil {
 			return nil, err
 		}
 		rep.Version = lf.Version
@@ -142,7 +169,7 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 		return nil, err
 	}
 	defer restore()
-	ik := a.logInputKey(st)
+	ik := a.logInputKey(st) + "|" + companionKey(compPath)
 	if fresh && row.InputKey == ik {
 		var stored LogReport
 		if err := json.Unmarshal(row.Report, &stored); err == nil {
@@ -155,29 +182,38 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 		return nil, ErrLogNotCached
 	}
 	if lf == nil {
-		if lf, err = parseLogFile(path); err != nil {
+		if lf, mark, err = readLog(path, fi.Size()); err != nil {
 			return nil, err
 		}
 	}
 	rep.Lines = lf.Lines
 	fails, _ := analyze.ParseLogFailures(path)
-	if err := a.attribute(st, rep, lf, fails); err != nil {
+	var comp *logs.Companion
+	cur := LogCursor{Size: mark.size, Sum: mark.sum}
+	if compPath != "" {
+		var cm logMark
+		comp, cm = readCompanion(compPath, -1)
+		if comp != nil {
+			rep.Companion, rep.CompanionBad = filepath.Base(compPath), comp.BadLines
+			cur.CompSize, cur.CompSum = cm.size, cm.sum
+		}
+	}
+	rep.Cursor = cur.String()
+	only := companionOnly(lf, comp)
+	if err := a.attribute(st, rep, lf, fails, comp); err != nil {
 		return nil, err
+	}
+	for _, lc := range rep.Clusters {
+		if only[lc.First] {
+			lc.OnlyCompanion = true
+			lc.Details = append(lc.Details, "only in "+filepath.Base(compPath)+": Player.log does not have it (the game may have stopped logging)")
+		}
 	}
 	a.logCache = &logCacheEntry{key: key, rep: rep}
 	if b, err := json.Marshal(rep); err == nil {
 		a.Store.PutLogCache(&store.LogCache{Path: path, Size: fi.Size(), MTime: fi.ModTime().UnixNano(), Version: rep.Version, InputKey: ik, Report: b})
 	}
 	return rep, nil
-}
-
-func parseLogFile(path string) (*logs.File, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return logs.Parse(f)
 }
 
 // logInputKey fingerprints what attribution reads besides the log: the game version, the
@@ -220,14 +256,14 @@ func (a *App) AnalyzeLogText(text string) (*LogReport, error) {
 		return nil, err
 	}
 	defer restore()
-	return rep, a.attribute(st, rep, lf, nil)
+	return rep, a.attribute(st, rep, lf, nil, nil)
 }
 
 // LogMM is the game major.minor a log was written by ("" if it does not say).
 func LogMM(version string) string { return env.MajorMinor(version) }
 
 // logState switches attribution to the log's own game version when it differs from the
-// environment's and no --game-version was given (decisions-m4 §7.3). restore undoes it.
+// environment's and no --game-version was given (03 §6.4). restore undoes it.
 func (a *App) logState(st *LoadoutState, rep *LogReport) (*LoadoutState, func(), error) {
 	mm := LogMM(rep.Version)
 	if a.GameVersion != "" || mm == "" || mm == st.GameMM() {
@@ -292,9 +328,11 @@ type attrCtx struct {
 	dirs     []dirOwner
 	typeMemo map[string][]string
 	idMemo   map[string][]string
+	defMemo  map[string][]analyze.DefFact // "n|" / "N|" + name → DefsNamed
 	run      *store.Analysis
 	fails    map[string]*analyze.PatchFact // FailKey(game path, desc) → fact
 	byXPath  map[string][]*analyze.PatchFact
+	comp     *logs.Companion     // nil without a companion log
 	roMemo   map[string]roUse    // reflectionOnly, once per log
 	libMemo  map[string]string   // type → the one DLL file name its owners ship it in
 	asmMemo  map[string][]string // assembly base name (lower) → enabled mods loading it
@@ -306,8 +344,8 @@ type dirOwner struct {
 	id  string
 }
 
-func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure) error {
-	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, libMemo: map[string]string{}, lf: lf}
+func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure, comp *logs.Companion) error {
+	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, defMemo: map[string][]analyze.DefFact{}, libMemo: map[string]string{}, lf: lf, comp: comp}
 	for _, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
 		if m == nil {
@@ -353,7 +391,7 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		failAt[f.Mod+"|"+strings.SplitN(f.Desc, "\n", 2)[0]] = f
 	}
 	var qs []*refQuery
-	for _, c := range logs.Clusters(lf) {
+	for _, c := range logs.ClustersHint(lf, logs.HintFrom(comp)) {
 		lc := &LogCluster{Cluster: c}
 		lc.Near = nearMessages(lf, c.First)
 		cx.attributeCluster(lc, failAt)
@@ -367,7 +405,7 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		cx.textureProviders(qs)
 	}
 	for _, lc := range rep.Clusters {
-		// Source searches cover the cluster's candidates, not every enabled mod (decisions-m4 §7.4).
+		// Source searches cover the cluster's candidates, not every enabled mod (03 §5.4).
 		in := ""
 		for i, at := range lc.Attr {
 			if i == 4 {
@@ -390,7 +428,7 @@ const inPlaceholder = "<in>"
 
 // ImplicatedMods are the mods the newest log and the current problems point at: the
 // candidates of the problem log's error clusters, else the subjects of Harmony warnings.
-// MCP source searches default to them (decisions-m4 §7.4).
+// MCP source searches default to them (03 §5.4).
 func (a *App) ImplicatedMods(st *LoadoutState) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -666,7 +704,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			} else if strings.HasPrefix(e.Message, "Failed to find ") {
 				lc.Details = append(lc.Details, "asked for by name at run time (DefDatabase.GetNamed), usually from a mod's code: the def is not loaded")
 			}
-			defs, _ := cx.a.Store.DefsNamed(name, false)
+			defs, _ := cx.defsNamed(name, false)
 			var prov []string
 			for _, d := range defs {
 				if d.Type != short && !strings.HasSuffix(typ, "."+d.Type) {
@@ -695,7 +733,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			// every file for the missing name).
 			if w := wanterRe.FindStringSubmatch(e.Message); w != nil {
 				wshort := w[1][strings.LastIndexByte(w[1], '.')+1:]
-				ws, _ := cx.a.Store.DefsNamed(w[2], false)
+				ws, _ := cx.defsNamed(w[2], false)
 				for _, d := range ws {
 					if d.Type == wshort && cx.st.Position(d.Instance) > 0 && !cx.official(d.Instance) {
 						lc.add(d.Instance, RoleSource, fmt.Sprintf("defines %s %s, which wants %s %s (%s:%d)", wshort, w[2], short, name, d.File, d.Line))
@@ -719,7 +757,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		texts := strings.Join(append([]string{e.Message}, e.Extra...), "\n")
 		// A missing parent provided by an installed, disabled mod is a missing dependency.
 		if m := parentRe.FindStringSubmatch(e.Message); m != nil {
-			ds, _ := cx.a.Store.DefsNamed(m[1], true)
+			ds, _ := cx.defsNamed(m[1], true)
 			for _, d := range ds {
 				if cx.st.Position(d.Instance) == 0 && ix.ByID[d.Instance] != nil {
 					lc.add(d.Instance, RoleDependency, fmt.Sprintf("provides the abstract def %s (%s:%d) but is not enabled", m[1], d.File, d.Line))
@@ -842,6 +880,9 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	}
 	// 5. Callers of failing code, HugsLib's log upload (logcallers.go).
 	cx.callerRules(lc)
+	if cx.comp != nil {
+		cx.companion(lc)
+	}
 	sort.SliceStable(lc.Attr, func(i, j int) bool { return roleRank[lc.Attr[i].Role] < roleRank[lc.Attr[j].Role] })
 	switch {
 	case len(lc.Attr) > 0 && lc.Attr[0].Role == RoleSource:
@@ -861,12 +902,29 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 // definedBy makes the enabled mods (not Core or a DLC) that define a def the source of a
 // cluster; byName looks the name up as an abstract Name="…".
 func (cx *attrCtx) definedBy(lc *LogCluster, name string, byName bool, why string) {
-	ds, _ := cx.a.Store.DefsNamed(name, byName)
+	ds, _ := cx.defsNamed(name, byName)
 	for _, d := range ds {
 		if cx.st.Position(d.Instance) > 0 && !cx.official(d.Instance) {
 			lc.add(d.Instance, RoleSource, fmt.Sprintf("defines %s %s (%s:%d), which %s", d.Type, name, d.File, d.Line, why))
 		}
 	}
+}
+
+// defsNamed is Store.DefsNamed, once per name and attribution: clusters of one log name
+// the same defs again and again.
+func (cx *attrCtx) defsNamed(name string, byName bool) ([]analyze.DefFact, error) {
+	k := "n|" + name
+	if byName {
+		k = "N|" + name
+	}
+	if ds, ok := cx.defMemo[k]; ok {
+		return ds, nil
+	}
+	ds, err := cx.a.Store.DefsNamed(name, byName)
+	if err == nil {
+		cx.defMemo[k] = ds
+	}
+	return ds, err
 }
 
 // official reports Core and the DLCs.
@@ -1025,7 +1083,7 @@ func uniqStr(l []string) []string {
 	return out
 }
 
-// SelectedLog is the log whose clusters `problems` includes ("" if none) (06 §4).
+// SelectedLog is the log whose clusters `problems` includes ("" if none) (06 §2).
 func (a *App) SelectedLog(st *LoadoutState) string {
 	return a.Store.Meta("log.selected:" + st.Ix.Env.ID)
 }
@@ -1042,7 +1100,7 @@ func (a *App) SelectLog(st *LoadoutState, path string) error {
 }
 
 // NewLog reports whether the current Player.log is newer than the last launch and the
-// last log the player looked at (06 §7.3).
+// last log the player looked at (06 §5).
 func (a *App) NewLog(st *LoadoutState) (string, bool) {
 	cur, _ := a.LogPaths(st)
 	if cur == "" {
@@ -1063,7 +1121,7 @@ func (a *App) NewLog(st *LoadoutState) (string, bool) {
 	return cur, true
 }
 
-// ProblemLog is the log whose clusters join the problems (decisions-m4 §7.2): the
+// ProblemLog is the log whose clusters join the problems (03 §6.4): the
 // selected one, or the current Player.log when that is newer.
 func (a *App) ProblemLog(st *LoadoutState) string {
 	sel := a.SelectedLog(st)
@@ -1092,47 +1150,44 @@ type hotMethod struct {
 	count   int
 }
 
-// LogRun is a log whose clusters join the problems, and whether it still describes the
-// current Loadout (03 §6.3). A stale log was written by another game version or before
-// the Loadout's last save or change: its problems are listed apart and not counted.
+// LogRun is a log whose clusters join the problems, the run it belongs to, and whether it
+// still describes the analysed plan (03 §6.4). A stale log's problems are listed apart and
+// not counted.
 type LogRun struct {
 	Path, Label string
 	Version     string
 	ModTime     time.Time
-	MM, EnvMM   string    // the log's and the environment's major.minor
-	LoadoutAt   time.Time // the Loadout's last save or change
-	OtherGame   bool      // written by another game version
-	Before      bool      // written before LoadoutAt
+	MM, EnvMM   string // the log's and the environment's major.minor
+	// Source is the launch (or, without one, the ModsConfig.xml write) the log maps to.
+	Source *RunSource
+	// The stale reasons (03 §6.4 new rule):
+	OtherGame bool   // written by another game version
+	OtherRun  bool   // its run is not the analysed plan: another plan, environment or a pack
+	OtherEnv  string // the other environment's name, when that is the reason
+	Changed   bool   // the plan's enabled list changed since that run
+	Unknown   bool   // no launch or write record matches: the source is unknown
 	// Pending: a cache-only problem list (status, mod) found no stored report; the log's
 	// problems are not in the list until a log or problems command analyses it.
 	Pending bool
 }
 
-// Stale reports whether the log's problems describe an earlier state.
-func (r *LogRun) Stale() bool { return r.OtherGame || r.Before }
-
-// LoadoutChangedAt is when the Loadout last changed: the last unsaved edit, else when
-// ModsConfig.xml was written (by RimArcho, the game or another tool).
-func (a *App) LoadoutChangedAt(st *LoadoutState) time.Time {
-	if st.WS != nil && len(st.Changes()) > 0 {
-		return st.WS.Updated
-	}
-	if st.FilePath != "" {
-		if fi, err := os.Stat(st.FilePath); err == nil {
-			return fi.ModTime()
-		}
-	}
-	if st.Latest != nil {
-		return st.Latest.Created
-	}
-	return time.Time{}
-}
+// Stale reports whether the log's problems describe another run or an earlier state.
+func (r *LogRun) Stale() bool { return r.OtherGame || r.OtherRun || r.Changed || r.Unknown }
 
 func (a *App) logRun(st *LoadoutState, path, version string, mod time.Time) *LogRun {
-	r := &LogRun{Path: path, Label: filepath.Base(path), Version: version, ModTime: mod, MM: LogMM(version), EnvMM: st.GameMM(), LoadoutAt: a.LoadoutChangedAt(st)}
-	r.OtherGame = r.MM != "" && r.EnvMM != "" && r.MM != r.EnvMM
-	r.Before = !r.LoadoutAt.IsZero() && mod.Before(r.LoadoutAt)
+	r := &LogRun{Path: path, Label: filepath.Base(path), Version: version, ModTime: mod, MM: LogMM(version), EnvMM: st.GameMM()}
+	a.judge(st, r)
 	return r
+}
+
+// LogRunOf judges a log file against st's plan without analysing it (the log page's
+// headers and the per-plan rows).
+func (a *App) LogRunOf(st *LoadoutState, path string) *LogRun {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+	return a.logRun(st, path, LogVersionOf(path), fi.ModTime())
 }
 
 // logFindings returns the problem log's clusters as findings (informational ones left out),
@@ -1182,14 +1237,15 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 	return out, hot, run
 }
 
-// escalateSkips raises harmony.skip-prefix to warning when its method is in a log cluster
-// (decisions-m4 §7.1): a bool prefix is ordinary until a stack trace passes through it.
+// escalateSkips raises harmony.skip-prefix and harmony.multi-transpiler to warning when their
+// method is in a log cluster (03 §4.5): a bool prefix or two transpilers on one method are
+// ordinary until a stack trace passes through it.
 func escalateSkips(fs []*finding.Finding, hot map[string]hotMethod) []*finding.Finding {
 	if len(hot) == 0 {
 		return fs
 	}
 	for i, f := range fs {
-		if f.Code != "harmony.skip-prefix" {
+		if f.Code != "harmony.skip-prefix" && f.Code != "harmony.multi-transpiler" {
 			continue
 		}
 		t, _, _ := strings.Cut(f.Key, "|")

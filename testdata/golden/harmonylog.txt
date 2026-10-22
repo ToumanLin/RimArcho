@@ -33,8 +33,8 @@ $ archo harmony --mod #i4uc
   assemblies:
     Assemblies/ModManual.dll  types 1, patches 1  (calls Harmony.Patch from code)
   patches:
-    postfix    Verse.ThingWithComps.Tick  ← ModManual.Boot.After
-  manual: Harmony.Patch calls: targets computed at runtime are not listed (archo source search ".Patch(" --in #i4uc)
+    postfix    Verse.ThingWithComps.Tick  ← ModManual.Boot.After  (Harmony.Patch call in code)
+  manual: 1 patch targets found in Harmony.Patch calls, 0 not resolved (archo source search ".Patch(" --in #i4uc)
 
 $ archo problems --code harmony
 problems: 0 error, 2 warning, 2 info
@@ -58,12 +58,13 @@ $ archo why #gpto #xamx
     Verse.Pawn.Tick  postfix+transpiler / transpiler
   shared-problems:
     info harmony.shared-target  3 mods patch Verse.Pawn.Tick
-    warning harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict
+    info harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict
     info harmony.skip-prefix  #iqmu has a bool prefix on Verse.Pawn.Tick that can skip the original; 2 other mods patch it
 
 $ archo log
 log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Player.log
+  cursor: <cursor>
   classes: harmony-stack 2, patch-failed 1, xref-missing 1
   list:
     log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)  [pattern:g:patch.op-failed]
@@ -206,6 +207,7 @@ next:
 $ archo log --select
 log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Player.log
+  cursor: <cursor>
   selected: archo problems now includes these clusters as log.* problems
   classes: harmony-stack 2, patch-failed 1, xref-missing 1
   list:
@@ -222,7 +224,7 @@ problems: 2 error, 2 warning, 0 info
   list:
     (none)
   logs:
-    log Player.log 1.6.4633 2026-10-01 10:00, current (written after the Loadout's last change): 2 error, 2 warning
+    log Player.log 1.6.4633 2026-10-01 10:00, current (from the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning
       error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  (p:4c087a)
       error log.harmony-stack  log:E3 x500: Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object  (p:cfe9b5)
       warning log.patch-failed  log:E1 x1: [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  (p:906d0c)
@@ -241,7 +243,7 @@ problems: 2 error, 6 warning, 2 info
     info harmony.shared-target  3 mods patch Verse.Pawn.Tick  (p:280e07)
     info harmony.manual  #i4uc Manual Patcher calls Harmony.Patch from code; 1 of 1 calls have a target found statically  (p:3b74ac)
   logs:
-    log Player.log 1.6.4633 2026-10-01 10:00, current (written after the Loadout's last change): 2 error, 2 warning
+    log Player.log 1.6.4633 2026-10-01 10:00, current (from the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning
       error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  (p:4c087a)
       error log.harmony-stack  log:E3 x500: Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object  (p:cfe9b5)
       warning log.patch-failed  log:E1 x1: [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  (p:906d0c)
@@ -255,27 +257,28 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (0 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered (archo changes)
+  plan: plan:default
   loadout: 8 active, same as v1 (import)
   problems: 2 error, 6 warning, 2 info (archo problems)
-  log: Player.log 1.6.4633 2026-10-01 10:00, current (written after the Loadout's last change)
+  log: Player.log 1.6.4633 2026-10-01 10:00, current (from the launch of plan:default at 2026-10-01 09:30)
 
 $ archo disable #i4uc
-workspace: 7 active, 1 change unsaved (env:main)
+workspace: 7 active, 1 change unsaved (plan:default, env:main)
   removed  #i4uc  Manual Patcher  was 6
 next:
   archo save
 
 $ archo problems
-problems: 0 error, 3 warning, 2 info
+problems: 0 error, 2 warning, 3 info
   analysis: a:1 2026-10-01 11:00
   list:
     warning official.order  Core and the DLCs are not first in the list, in release order  (p:a4972d)
-    warning harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict  (p:cc6232)
     warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
     info harmony.skip-prefix  1 bool prefixes from 1 mods can skip methods other mods also patch; none is in a log stack  (archo problems --code harmony.skip-prefix)
     info harmony.shared-target  3 mods patch Verse.Pawn.Tick  (p:280e07)
+    info harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict  (p:cc6232)
   logs:
-    log Player.log 1.6.4633 2026-10-01 10:00, stale log (older than the Loadout's last change at 2026-10-01 11:00): 2 error, 2 warning, not counted  (archo problems --code log --all)
+    log Player.log 1.6.4633 2026-10-01 10:00, stale log (the plan changed since the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning, not counted  (archo problems --code log --all)
 next:
   archo problems show p:a4972d
 
@@ -285,9 +288,10 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 9 (0 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 9 discovered (archo changes)
+  plan: plan:default
   loadout: 7 active, 1 change unsaved (archo loadout diff)
-  problems: 0 error, 3 warning, 2 info (archo problems)
-  log: Player.log 1.6.4633 2026-10-01 10:00, stale log (older than the Loadout's last change at 2026-10-01 11:00): 2 error, 2 warning, not counted (archo problems --code log --all)
+  problems: 0 error, 2 warning, 3 info (archo problems)
+  log: Player.log 1.6.4633 2026-10-01 10:00, stale log (the plan changed since the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning, not counted (archo problems --code log --all)
 next:
   archo save
 
@@ -297,7 +301,7 @@ problems: 0 error, 0 warning, 0 info
   list:
     (none)
   logs:
-    log Player.log 1.6.4633 2026-10-01 10:00, stale log (older than the Loadout's last change at 2026-10-01 11:00): 2 error, 2 warning, not counted
+    log Player.log 1.6.4633 2026-10-01 10:00, stale log (the plan changed since the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning, not counted
       error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  (p:4c087a)
       error log.harmony-stack  log:E3 x500: Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance of an object  (p:cfe9b5)
       warning log.patch-failed  log:E1 x1: [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  (p:906d0c)
@@ -308,7 +312,7 @@ error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutO
   confidence: likely
   layer: log
   subjects: #iqmu
-  log: Player.log 1.6.4633 2026-10-01 10:00, stale log (older than the Loadout's last change at 2026-10-01 11:00)
+  log: Player.log 1.6.4633 2026-10-01 10:00, stale log (the plan changed since the launch of plan:default at 2026-10-01 09:30)
   evidence: log #iqmu source: log frame 1 ModA.CompBroken.CompTick (topmost mod code in the stack)
   evidence: log #iqmu source: log harmony:Verse.Pawn.Tick#prefix "- PREFIX tester.moda.harmony" (type ModA.Pawn_Tick)
   fix: archo log --cluster E4
@@ -320,7 +324,7 @@ next:
   archo log --cluster E4
 
 $ archo pattern
-patterns v0: 46 kinds of log errors and 1036 mod-specific errors from 6,734 public 1.6 logs
+patterns v0: 46 kinds of log errors and 1034 mod-specific errors from 6,734 public 1.6 logs
   evidence: community: what a kind of error usually is, never which mod causes it in one list
   list:
     pattern:g:xref.def  load  15.4%  3,706 logs  a def references another def by name that no active mod defines
@@ -360,7 +364,7 @@ next:
 
 $ archo pattern pattern:g:xml.type-missing
 pattern:g:xml.type-missing  XML names a C# class that no loaded assembly has
-  evidence: community: patterns v0 from 6,734 public HugsLib logs of RimWorld 1.6 (2026-10-21); what this kind of error usually is, not evidence about one list
+  evidence: community: patterns v0 from 6,734 public HugsLib logs of RimWorld 1.6 (2026-10-22); what this kind of error usually is, not evidence about one list
   recognises: cluster class any, message matches /Could not find (a )?type|Could not find type named|Could not find class/
   stage: load
   seen: 2,248 of 6,734 public 1.6 logs, 1,733 players' sessions, 45,124 clusters (7.4% of error clusters)
@@ -377,7 +381,7 @@ pattern:g:xml.type-missing  XML names a C# class that no loaded assembly has
 
 $ archo pattern rt.nre
 pattern:g:rt.nre  a null reference in mod or game code
-  evidence: community: patterns v0 from 6,734 public HugsLib logs of RimWorld 1.6 (2026-10-21); what this kind of error usually is, not evidence about one list
+  evidence: community: patterns v0 from 6,734 public HugsLib logs of RimWorld 1.6 (2026-10-22); what this kind of error usually is, not evidence about one list
   recognises: cluster class any, message matches /NullReferenceException/ (fallback: names the class only, not shown on clusters)
   stage: runtime
   seen: 2,502 of 6,734 public 1.6 logs, 1,929 players' sessions, 27,838 clusters (4.6% of error clusters)

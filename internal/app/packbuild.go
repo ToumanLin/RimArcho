@@ -11,9 +11,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// A pack build in progress (10 §8.2). The copy takes minutes, so the window runs it as an
+// A pack build in progress (08 §5.2). The copy takes minutes, so the window runs it as an
 // `archo pack build` child process: it goes on when the window closes, and its state is a
 // file in the folder it assembles the pack in, which any process can read.
 
@@ -28,11 +30,12 @@ const (
 
 // The steps of a build, in order.
 const (
-	StepCheck   = "check"   // the list: nothing left to fix (需要处理)
-	StepMeasure = "measure" // sizes, free space
-	StepCopy    = "copy"    // the mods, without other game versions' folders
-	StepWrite   = "write"   // pack.json
-	StepDone    = "done"
+	StepCheck    = "check"    // the list: nothing left to fix (需要处理)
+	StepMeasure  = "measure"  // sizes, free space
+	StepCopy     = "copy"     // the mods, without other game versions' folders
+	StepTextures = "textures" // the copies' PNGs to DDS (when asked)
+	StepWrite    = "write"    // pack.json
+	StepDone     = "done"
 )
 
 // beatEvery is how often a running build rewrites its state; one not rewritten for
@@ -51,7 +54,9 @@ type BuildProgress struct {
 	ModsTotal  int       `json:"mods_total"` // to copy
 	Bytes      int64     `json:"bytes"`
 	BytesTotal int64     `json:"bytes_total"`
-	Mod        string    `json:"mod,omitempty"` // being copied
+	Mod        string    `json:"mod,omitempty"`         // being copied
+	Files      int       `json:"files,omitempty"`       // textures converted (StepTextures)
+	FilesTotal int       `json:"files_total,omitempty"` // to convert
 	PID        int       `json:"pid,omitempty"`
 	Started    time.Time `json:"started"`
 	Beat       time.Time `json:"beat"` // last written
@@ -273,7 +278,7 @@ func DiskFree(dir string) int64 {
 // ---- the child process ----
 
 // ChildPackBuild is ChildPackBuildExe with this executable.
-func ChildPackBuild(home, envName, name, logPath string) error {
+func ChildPackBuild(home, envName, name, logPath string, extra ...string) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -281,14 +286,28 @@ func ChildPackBuild(home, envName, name, logPath string) error {
 	if b := strings.ToLower(filepath.Base(exe)); strings.HasSuffix(b, ".test") || strings.HasSuffix(b, ".test.exe") {
 		return errors.New("child pack build from a test binary: set the runner")
 	}
-	return ChildPackBuildExe(exe, home, envName, name, logPath)
+	return ChildPackBuildExe(exe, home, envName, name, logPath, extra...)
 }
 
-// ChildPackBuildExe runs `<exe> pack build <name>` with the same data directory. Its
-// output goes to logPath (not a pipe: the build goes on when this process ends); the
-// progress is in the build folder (ReadBuildProgress). It returns when the child ends.
-func ChildPackBuildExe(exe, home, envName, name, logPath string) error {
-	args := []string{"pack", "build", name}
+// PackBuildArgs are the `pack build` flags for texture options (nil: none).
+func PackBuildArgs(t *textures.Options) []string {
+	if t == nil {
+		return nil
+	}
+	n := t.Normal()
+	out := []string{"--textures"}
+	if n.Scale < 100 {
+		out = append(out, "--texture-scale", fmt.Sprint(n.Scale))
+	}
+	return out
+}
+
+// ChildPackBuildExe runs `<exe> pack build <name> [extra flags]` with the same data
+// directory. Its output goes to logPath (not a pipe: the build goes on when this process
+// ends); the progress is in the build folder (ReadBuildProgress). It returns when the
+// child ends.
+func ChildPackBuildExe(exe, home, envName, name, logPath string, extra ...string) error {
+	args := append([]string{"pack", "build", name}, extra...)
 	if envName != "" {
 		args = append(args, "--env", envName)
 	}

@@ -1,6 +1,6 @@
 package tui
 
-// Measurement against a real installation (01 §5.2, 06 §8 T5), skipped unless
+// Measurement against a real installation (07 §6.2, 06 §3.5 T5), skipped unless
 // RIMARCHO_REAL_HOME (data dir) and RIMARCHO_EXE (archo binary for the child scan) are set.
 // Only navigation and search keys are sent; the launcher fails the test if called.
 
@@ -57,7 +57,7 @@ func TestRealIdleMemory(t *testing.T) {
 			keys(tm, "j")
 			time.Sleep(150 * time.Millisecond) // let the detail pane load for every row
 		}
-		keys(tm, "/", "har", "enter", "esc", "G", "g", "h", "G", "g", "l")
+		keys(tm, "/", "har", "enter", "esc", "end", "home", "h", "end", "home", "l")
 	}
 	time.Sleep(2 * time.Second)
 	ws, priv, peak := procmem.MB()

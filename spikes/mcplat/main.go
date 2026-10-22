@@ -1,4 +1,4 @@
-// Spike: MCP single-query latency (01 §5.2, target ≤ 500 ms with the index built). Starts
+// Spike: MCP single-query latency (07 §6.2, target ≤ 500 ms with the index built). Starts
 // `archo mcp` once and times each read-only tool call (5 runs, median and max).
 package main
 

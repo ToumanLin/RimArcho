@@ -4,6 +4,7 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 6 (0 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 6 discovered (archo changes)
+  plan: plan:default
   loadout: 5 active, same as v1 (import)
   problems: 2 error, 0 warning, 0 info in declarations; Defs and Patches not analysed yet (archo problems)
 
@@ -31,7 +32,12 @@ next:
   subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
 
 $ archo launch --dry-run
-launch: dry run (steam)
+launch: dry run (steam), nothing written
+  path: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml
+  version: 1.6.4633 rev1261
+  entries: 5
+  changes: 0 since v1
+  history: same as v1, no new version
   command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
   before you play: 3 problems that often cause errors in the game (they do not block the launch)
     warning patch.no-match  #hnyg Compat: Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)
@@ -43,6 +49,8 @@ launch: dry run (steam)
     error dep.missing  #z3bw Needy requires Absent Library (pkg:tester.absent), which is not installed
       why: a mod without its dependency fails in parts: such mods were error sources in 10% of logs (4.4% by chance)
       fix: subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
+next:
+  archo launch
 
 $ archo problems --code patch --detail
 problems: 0 error, 1 warning, 1 info
@@ -141,7 +149,12 @@ next:
   archo disable #i4uc
 
 $ archo launch --dry-run
-launch: dry run (steam)
+launch: dry run (steam), nothing written
+  path: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml
+  version: 1.6.4633 rev1261
+  entries: 5
+  changes: 0 since v1
+  history: same as v1, no new version
   command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
   before you play: 2 problems that often cause errors in the game (they do not block the launch)
     warning patch.no-match  #hnyg Compat: Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)
@@ -150,6 +163,8 @@ launch: dry run (steam)
     error dep.missing  #z3bw Needy requires Absent Library (pkg:tester.absent), which is not installed
       why: a mod without its dependency fails in parts: such mods were error sources in 10% of logs (4.4% by chance)
       fix: subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
+next:
+  archo launch
 
 $ archo mod #hnyg
 #hnyg Compat  [active 3/5, local Compat]
@@ -171,7 +186,7 @@ next:
   archo changes #hnyg
 
 $ archo enable #nyh3 --before #hnyg
-workspace: 6 active, 1 change unsaved (env:main)
+workspace: 6 active, 1 change unsaved (plan:default, env:main)
   added  #nyh3  Lib  at 3
 next:
   archo save
@@ -182,6 +197,7 @@ env:main  RimWorld 1.6.4633 rev1261
   lineages: 6 (0 with several instances)
   last-scan: scan:1 2026-10-01 10:00, 0s
   changes: 6 discovered (archo changes)
+  plan: plan:default
   loadout: 6 active, 1 change unsaved (archo loadout diff)
   problems: 1 error, 1 warning, 2 info; Def/Patch analysis stale (archo problems)
 next:

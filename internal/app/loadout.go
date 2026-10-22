@@ -18,9 +18,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// LoadoutState is the workspace with everything needed to interpret it.
+// LoadoutState is the current plan's workspace with everything needed to interpret it.
 type LoadoutState struct {
 	Ix       *Index
+	Plan     *store.Plan // the environment's current plan (04 §1.1)
 	Reg      *loadout.Registry
 	WS       *store.Workspace
 	List     loadout.List
@@ -30,11 +31,11 @@ type LoadoutState struct {
 	FileErr  error
 	Notices  []string // what Sync did (import, external change, conflict)
 	Aliases  map[string][]store.Alias
-	// MM overrides the game's major.minor for analysis (--game-version, decisions-m3 §12.7).
+	// MM overrides the game's major.minor for analysis (--game-version, 03 §3).
 	MM string
 
 	cands  []loadout.Candidate // what Reg was built from, deployed instances included
-	deploy map[string]bool     // instances linked into Mods/ by RimArcho (09 §8)
+	deploy map[string]bool     // instances linked into Mods/ by RimArcho (08 §3)
 }
 
 // GameMM is the environment's game major.minor version.
@@ -70,7 +71,7 @@ func (st *LoadoutState) LineageOf(id string) string {
 func (st *LoadoutState) Position(id string) int { return st.List.Index(id) + 1 }
 
 // FileVersionMismatch reports the ModsConfig.xml version when its major.minor differs from
-// the game's: the game resets such a list on load (04 §2.2 rule 5).
+// the game's: the game resets such a list on load (04 §4.1 rule 6).
 func (st *LoadoutState) FileVersionMismatch() string {
 	if st.File == nil {
 		return ""
@@ -82,7 +83,7 @@ func (st *LoadoutState) FileVersionMismatch() string {
 	return ""
 }
 
-// Candidates derives the game-loadable instances (02 §4.1, 04 §2.4): live, subscribed,
+// Candidates derives the game-loadable instances (02 §4.2, 04 §4.2): live, subscribed,
 // not unloadable, and located in Data/, Mods/ or the workshop — directly or via an alias.
 // RimArcho's own Mods/ links do not count here; deployed instances are added separately.
 func Candidates(ix *Index, aliases map[string][]store.Alias) []loadout.Candidate {
@@ -115,7 +116,7 @@ func Candidates(ix *Index, aliases map[string][]store.Alias) []loadout.Candidate
 	return out
 }
 
-// Loadout loads the workspace, first syncing it with ModsConfig.xml (04 §2.3). Like Index,
+// Loadout loads the workspace, first syncing it with ModsConfig.xml (04 §4.3). Like Index,
 // the result is cached until the database or ModsConfig.xml (size, mtime) changes; a cached
 // state carries no notices (they were reported when the sync happened).
 func (a *App) Loadout() (*LoadoutState, error) {
@@ -156,26 +157,35 @@ func (a *App) Loadout() (*LoadoutState, error) {
 }
 
 func (a *App) loadLoadout(ix *Index) (*LoadoutState, error) {
-	aliases, err := a.Store.AllAliases(ix.Env.ID)
+	reg, aliases, all, deploy, err := a.registry(ix)
 	if err != nil {
 		return nil, err
+	}
+	st := &LoadoutState{Ix: ix, Reg: reg, Aliases: aliases, cands: all, deploy: deploy}
+	if err := a.sync(st); err != nil {
+		return nil, err
+	}
+	return st, nil
+}
+
+// registry builds the environment's instance registry (04 §4.2): the game-loadable
+// instances plus the ones RimArcho deploys into Mods/.
+func (a *App) registry(ix *Index) (*loadout.Registry, map[string][]store.Alias, []loadout.Candidate, map[string]bool, error) {
+	aliases, err := a.Store.AllAliases(ix.Env.ID)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 	deploy, err := a.deploySet(ix, aliases)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, nil, err
 	}
-	cands := Candidates(ix, aliases)
-	all := cands
+	all := Candidates(ix, aliases)
 	for _, m := range ix.Mods { // index order keeps the registry deterministic
 		if deploy[m.ID] {
 			all = append(all[:len(all):len(all)], deployCandidate(m))
 		}
 	}
-	st := &LoadoutState{Ix: ix, Reg: loadout.NewRegistry(all), Aliases: aliases, cands: all, deploy: deploy}
-	if err := a.sync(st); err != nil {
-		return nil, err
-	}
-	return st, nil
+	return loadout.NewRegistry(all), aliases, all, deploy, nil
 }
 
 func (a *App) sync(st *LoadoutState) error {
@@ -193,89 +203,89 @@ func (a *App) sync(st *LoadoutState) error {
 		h = loadout.Hash(st.File.Raw)
 		fileList, _ = st.Reg.FromTokens(st.File.Active)
 	}
-	ws, err := a.Store.Workspace(e.ID)
-	if err != nil {
-		return err
-	}
-	mcs, err := a.Store.ModsConfigState(e.ID)
-	if err != nil {
-		return err
-	}
 	now := a.Now().UTC()
-	if ws == nil {
-		v := &store.Version{Created: now, Source: "import", Entries: fileList.Encode()}
-		if st.File != nil {
-			v.GameVersion = st.File.Version
-			v.Note = "ModsConfig.xml"
-		} else {
-			v.Note = "no ModsConfig.xml"
-		}
-		n, err := a.Store.AddVersion(e.ID, v)
+	mcs, err := a.Store.ModsConfigStateAt(e.UserDataRoot)
+	if err != nil {
+		return err
+	}
+	plan, err := a.Store.CurrentPlan(e.ID)
+	if err != nil {
+		return err
+	}
+	if plan == nil {
+		// First use (04 §1.4): ModsConfig.xml becomes the environment's first plan.
+		p, err := a.Store.CreatePlan(e.ID, store.DefaultPlanName, now)
 		if err != nil {
-			return err
-		}
-		ws = &store.Workspace{EnvID: e.ID, Entries: fileList.Encode(), OriginVersion: n, OriginKind: "import", Updated: now}
-		if err := a.Store.SetWorkspace(ws); err != nil {
-			return err
-		}
-		mcs.Seen = h
-		if err := a.Store.SetModsConfigState(e.ID, mcs); err != nil {
-			return err
-		}
-		st.Notices = append(st.Notices, fmt.Sprintf("imported ModsConfig.xml as v%d: %d entries", n, len(fileList)))
-	} else if st.File != nil && !bytes.Equal(h, mcs.Seen) {
-		if bytes.Equal(h, mcs.Written) {
-			mcs.Seen = h
+			// Another process may have just made it.
+			if p, _ = a.Store.PlanByName(e.ID, store.DefaultPlanName); p == nil {
+				return err
+			}
+			plan = p
 		} else {
-			latest, err := a.latest(e.ID)
-			if err != nil {
+			plan = p
+			if err := a.Store.SetCurrentPlan(e.ID, plan.ID); err != nil {
 				return err
 			}
-			if latest != nil && latest.GameVersion == st.File.Version &&
-				st.Reg.Heal(loadout.Decode(latest.Entries)).Equal(fileList) {
-				// Rewritten by the game or another tool without a real change (formatting).
-				mcs.Seen = h
-				if err := a.Store.SetModsConfigState(e.ID, mcs); err != nil {
-					return err
-				}
-				goto done
-			}
-			clean := latest == nil || st.Reg.Heal(loadout.Decode(ws.Entries)).Equal(st.Reg.Heal(loadout.Decode(latest.Entries)))
-			n, err := a.Store.AddVersion(e.ID, &store.Version{Created: now, Source: "external", Entries: fileList.Encode(),
-				GameVersion: st.File.Version, Note: "ModsConfig.xml changed outside RimArcho"})
-			if err != nil {
-				return err
-			}
-			if clean {
-				ws.Entries, ws.OriginVersion, ws.OriginKind, ws.Conflict = fileList.Encode(), n, "external", 0
-				st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: loaded as v%d", n))
+			v := &store.Version{Created: now, Source: "import", Entries: fileList.Encode()}
+			if st.File != nil {
+				v.GameVersion = st.File.Version
+				v.Note = "ModsConfig.xml"
 			} else {
-				ws.Conflict = n
-				st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: kept as v%d, not loaded because the workspace has unsaved edits (archo loadout diff v%d; archo loadout checkout v%d)", n, n, n))
+				v.Note = "no ModsConfig.xml"
 			}
-			ws.Updated = now
+			n, err := a.Store.AddVersion(plan.ID, v)
+			if err != nil {
+				return err
+			}
+			ws := &store.Workspace{PlanID: plan.ID, Entries: fileList.Encode(), OriginVersion: n, OriginKind: "import", Updated: now}
 			if err := a.Store.SetWorkspace(ws); err != nil {
 				return err
 			}
-			mcs.Seen = h
+			// The file is not marked as seen here: the check below finds it equal to this
+			// import, or — when another plan sharing the folder wrote it and it changed
+			// since — an external change of that plan (04 §4.3).
+			st.Notices = append(st.Notices, fmt.Sprintf("imported ModsConfig.xml as v%d: %d entries", n, len(fileList)))
 		}
-		if err := a.Store.SetModsConfigState(e.ID, mcs); err != nil {
+	}
+	st.Plan = plan
+	if st.File != nil && !bytes.Equal(h, mcs.Seen) {
+		if bytes.Equal(h, mcs.Written) {
+			mcs.Seen = h
+		} else if err := a.attributeExternal(st, mcs, h, now); err != nil {
+			return err
+		}
+		if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, mcs); err != nil {
 			return err
 		}
 	}
-done:
+	ws, err := a.planWorkspace(plan)
+	if err != nil {
+		return err
+	}
 	st.WS = ws
 	st.List = st.Reg.Heal(loadout.Decode(ws.Entries))
-	st.Latest, err = a.latest(e.ID)
+	st.Latest, err = a.Store.LatestVersion(plan.ID)
 	return err
 }
 
-func (a *App) latest(envID string) (*store.Version, error) {
-	vs, err := a.Store.Versions(envID)
-	if err != nil || len(vs) == 0 {
+// planWorkspace returns a plan's workspace; a plan without one (only versions) starts
+// from its newest version.
+func (a *App) planWorkspace(p *store.Plan) (*store.Workspace, error) {
+	ws, err := a.Store.Workspace(p.ID)
+	if err != nil || ws != nil {
+		return ws, err
+	}
+	ws = &store.Workspace{PlanID: p.ID, Updated: a.Now().UTC()}
+	latest, err := a.Store.LatestVersion(p.ID)
+	if err != nil {
 		return nil, err
 	}
-	return vs[0], nil
+	if latest != nil {
+		ws.Entries, ws.OriginVersion, ws.OriginKind = latest.Entries, latest.N, latest.Source
+	} else {
+		ws.Entries = loadout.List(nil).Encode()
+	}
+	return ws, a.Store.SetWorkspace(ws)
 }
 
 // EditResult describes a workspace edit.
@@ -299,11 +309,10 @@ func (a *App) edit(op string, f func(st *LoadoutState, l loadout.List) (loadout.
 	}
 	r := &EditResult{Before: before, Notes: notes}
 	if !after.Equal(before) {
-		e := st.Ix.Env
-		if err := a.Store.PushStep(e.ID, "undo", before.Encode(), op); err != nil {
+		if err := a.Store.PushStep(st.Plan.ID, "undo", before.Encode(), op); err != nil {
 			return nil, err
 		}
-		if err := a.Store.ClearSteps(e.ID, "redo"); err != nil {
+		if err := a.Store.ClearSteps(st.Plan.ID, "redo"); err != nil {
 			return nil, err
 		}
 		st.WS.Entries, st.WS.Updated = after.Encode(), a.Now().UTC()
@@ -524,7 +533,7 @@ func (a *App) Swap(ref, with string) (*EditResult, error) {
 		if other.LineageID != m.LineageID {
 			return nil, nil, fmt.Errorf("%s and %s are not in the same lineage (archo lineage merge, or disable + enable)", st.Ix.Ref(m.ID), st.Ix.Ref(other.ID))
 		}
-		if why := whyNotLoadable(st, other); why != "" {
+		if why := swapBlocker(st, other, m); why != "" {
 			return nil, nil, fmt.Errorf("cannot swap in %s: %s", st.Ix.Ref(other.ID), why)
 		}
 		l[i] = loadout.Entry{Instance: other.ID}
@@ -542,7 +551,7 @@ type SortResult struct {
 	Applied bool
 }
 
-// Community loads community rules from <home>/cache/communityRules.json (04 §5.2).
+// Community loads community rules from <home>/cache/communityRules.json (04 §6.3).
 func (a *App) Community() order.Community {
 	c, err := loadCommunity(filepath.Join(a.Home, "cache", "communityRules.json"))
 	if err != nil {
@@ -586,7 +595,7 @@ func (a *App) SortInput(st *LoadoutState, l loadout.List) (order.Input, error) {
 	return in, nil
 }
 
-// Sort orders the workspace (04 §4); dryRun only computes.
+// Sort orders the workspace (04 §5); dryRun only computes.
 func (a *App) Sort(dryRun bool) (*SortResult, error) {
 	var out *SortResult
 	compute := func(st *LoadoutState, l loadout.List) (loadout.List, error) {
@@ -630,19 +639,18 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	e := st.Ix.Env
 	from, to := "undo", "redo"
 	if redo {
 		from, to = "redo", "undo"
 	}
-	entries, op, ok, err := a.Store.PopStep(e.ID, from)
+	entries, op, ok, err := a.Store.PopStep(st.Plan.ID, from)
 	if err != nil {
 		return nil, "", err
 	}
 	if !ok {
 		return nil, "", fmt.Errorf("nothing to %s", from)
 	}
-	if err := a.Store.PushStep(e.ID, to, st.List.Encode(), op); err != nil {
+	if err := a.Store.PushStep(st.Plan.ID, to, st.List.Encode(), op); err != nil {
 		return nil, "", err
 	}
 	before := st.List
@@ -654,12 +662,16 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 	return &EditResult{State: st, Before: before, Changes: loadout.Diff(before, st.List, st.LineageOf)}, op, nil
 }
 
-// SaveResult describes a save (04 §2.2).
+// SaveResult describes a write to the game: archo save, or the writing part of a launch
+// (04 §4.1, 08 §2).
 type SaveResult struct {
+	// Moved: plain Mods/ folders moved into the lock library first (--move-duplicates); in a
+	// dry run, the ones that would move.
+	Moved      []DuplicateMove
 	State      *LoadoutState
 	Path       string
 	Backup     string
-	Version    int // new version number (0 on dry run)
+	Version    int // new version number (0 on dry run, or when Unchanged)
 	Source     string
 	OldVersion string // ModsConfig.xml <version> before
 	NewVersion string
@@ -668,16 +680,46 @@ type SaveResult struct {
 	DryRun     bool
 	Restores   int // source "undo": the version the workspace was checked out from
 	Missing    int
-	Unchanged  bool
-	Links      []LinkChange // Mods/ links created or removed first (09 §8)
+	// Unchanged: a launch whose list equals the newest version records no new version
+	// (08 §2 step 7).
+	Unchanged bool
+	Links     []LinkChange // Mods/ links created or removed first (08 §3)
+	// Launch is the game command (launch only).
+	Launch *LaunchPlan
+	// Running is a game that reads this ModsConfig.xml and is running now (save only): it
+	// reads the new list on its next start.
+	Running *RunningGame
 }
 
-// Save writes the workspace to ModsConfig.xml: backup, atomic replace, version (04 §2.2).
-func (a *App) Save(dryRun bool) (*SaveResult, error) {
+// Save writes the workspace to ModsConfig.xml without starting the game (08 §2 "写入游戏":
+// steps 1–5 and 7). It is allowed while the game runs; the game reads the file on its next
+// start.
+func (a *App) Save(dryRun bool) (*SaveResult, error) { return a.SaveWith(dryRun, false) }
+
+// SaveWith is Save that, with move, first moves plain Mods/ folders in the way of a deployed
+// copy into the lock library (08 §3; --move-duplicates). The dry run lists those moves.
+func (a *App) SaveWith(dryRun, move bool) (*SaveResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
 	}
+	r, err := a.writeGame(st, dryRun, false, move)
+	if err != nil {
+		return nil, err
+	}
+	if g, _ := a.RunningGame(); g != nil && g.What.UserData != "" &&
+		env.PathKey(g.What.UserData) == env.PathKey(st.Ix.Env.UserDataRoot) {
+		r.Running = g
+	}
+	return r, nil
+}
+
+// writeGame carries out 08 §2 steps 1 (the file checks), 3–5 and 7 for the synced state st
+// (step 2 happened in Loadout): Mods/ links, ModsConfig.xml by the 04 §4.1 rules, and a
+// version — source "launch" when launch is set (none when the list equals the newest
+// version), else "user" or "undo". dryRun computes the same result and writes nothing.
+// move: plain Mods/ folders in the way move into the lock library first (08 §3).
+func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool) (*SaveResult, error) {
 	e := st.Ix.Env
 	if st.FilePath == "" {
 		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
@@ -685,11 +727,61 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) {
 	if st.FileErr != nil {
 		return nil, fmt.Errorf("cannot read %s: %v (fix or remove the file first)", st.FilePath, st.FileErr)
 	}
-	r := &SaveResult{State: st, Path: st.FilePath, DryRun: dryRun, Changes: st.Changes()}
-	mods, links, err := planLinks(st)
+	// Never over an external change the player has not seen (05 I8, 04 §4.3).
+	if c, err := a.writeBlocker(st); err != nil {
+		return nil, err
+	} else if c != nil {
+		return nil, conflictError(st, c)
+	}
+	copies := a.ModsCopies(st.Ix)
+	mods, links, dups, err := planLinks(st, copies)
 	if err != nil {
 		return nil, err
 	}
+	var moved []DuplicateMove
+	if len(dups) > 0 {
+		de := &DuplicatesError{Moves: a.planMoves(st, copies, dups), Fix: "archo save --move-duplicates"}
+		if launch {
+			de.Fix = "archo launch --move-duplicates"
+		}
+		if !move || !de.Movable() {
+			if !de.Movable() {
+				de.Fix = ""
+			}
+			return nil, de
+		}
+		if !dryRun {
+			// Move them, then write from the state after the move (the instances moved).
+			if _, err := a.doMoves(de.Moves); err != nil {
+				return nil, err
+			}
+			st2, err := a.Loadout()
+			if err != nil {
+				return nil, err
+			}
+			r, err := a.writeGame(st2, false, launch, false)
+			if r != nil {
+				r.Moved = de.Moves
+			}
+			return r, err
+		}
+		// The dry run: what would be linked once they have moved.
+		moved = de.Moves
+		var rest []ModsCopy
+		for _, c := range copies {
+			gone := false
+			for _, m := range de.Moves {
+				gone = gone || m.Copy.Name == c.Name
+			}
+			if !gone {
+				rest = append(rest, c)
+			}
+		}
+		if mods, links, _, err = planLinks(st, rest); err != nil {
+			return nil, err
+		}
+	}
+	r := &SaveResult{State: st, Path: st.FilePath, DryRun: dryRun, Changes: st.Changes(), Moved: moved}
 	r.Links = links
 	r.Tokens = st.Reg.Tokens(st.List, func(id string) string {
 		if m := st.Ix.ByID[id]; m != nil {
@@ -720,14 +812,19 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.Source = "user"
-	if st.WS.OriginKind == "checkout" {
+	switch {
+	case launch:
+		r.Source = "launch"
+		r.Unchanged = st.Latest != nil && st.Latest.GameVersion == r.NewVersion && st.Baseline().Equal(st.List)
+	case st.WS.OriginKind == "checkout":
 		r.Source, r.Restores = "undo", st.WS.OriginVersion
+	default:
+		r.Source = "user"
 	}
 	if dryRun {
 		return r, nil
 	}
-	if err := a.checkRoots(filepath.Dir(st.FilePath)); err != nil {
+	if err := a.checkUserData(filepath.Dir(st.FilePath)); err != nil { // own saves live in the data directory (02 §0)
 		return nil, err
 	}
 	if len(links) > 0 {
@@ -742,42 +839,56 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) {
 		return nil, err
 	}
 	now := a.Now().UTC()
-	note := ""
-	if r.Source == "undo" {
-		note = fmt.Sprintf("restored v%d", st.WS.OriginVersion)
+	n := 0
+	if r.Unchanged {
+		n = st.Latest.N
+	} else {
+		note := ""
+		if r.Source == "undo" {
+			note = fmt.Sprintf("restored v%d", st.WS.OriginVersion)
+		}
+		if n, err = a.Store.AddVersion(st.Plan.ID, &store.Version{Created: now, Source: r.Source, Entries: st.List.Encode(), GameVersion: r.NewVersion, Note: note}); err != nil {
+			return nil, err
+		}
+		r.Version = n
 	}
-	n, err := a.Store.AddVersion(e.ID, &store.Version{Created: now, Source: r.Source, Entries: st.List.Encode(), GameVersion: r.NewVersion, Note: note})
-	if err != nil {
-		return nil, err
-	}
+	// The write record is per user data folder and names the writer (04 §4.3).
 	h := loadout.Hash(data)
-	if err := a.Store.SetModsConfigState(e.ID, &store.ModsConfigState{Written: h, Seen: h, WrittenAt: now}); err != nil {
+	if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, &store.ModsConfigState{Written: h, Seen: h, WrittenAt: now,
+		WriterPlan: st.Plan.ID, WriterVersion: n}); err != nil {
 		return nil, err
 	}
 	st.WS.OriginVersion, st.WS.OriginKind, st.WS.Conflict, st.WS.Updated = n, "save", 0, now
 	if err := a.Store.SetWorkspace(st.WS); err != nil {
 		return nil, err
 	}
-	r.Version = n
 	return r, nil
 }
 
-// ParseVersionRef resolves "v3", "3", a tag name, or "workspace" (0).
+// ParseVersionRef resolves "v3", "3" or "workspace" (0) in the environment's current plan.
 func (a *App) ParseVersionRef(envID, ref string) (int, error) {
+	p, err := a.Store.CurrentPlan(envID)
+	if err != nil {
+		return 0, err
+	}
+	if p == nil {
+		return 0, errors.New("the environment has no plan yet")
+	}
+	return a.parsePlanVersion(p, ref)
+}
+
+func (a *App) parsePlanVersion(p *store.Plan, ref string) (int, error) {
 	r := strings.ToLower(strings.TrimSpace(ref))
 	if r == "workspace" || r == "ws" || r == "current" {
 		return 0, nil
 	}
 	if n, err := strconv.Atoi(strings.TrimPrefix(r, "v")); err == nil && n > 0 {
-		if v, _ := a.Store.Version(envID, n); v != nil {
+		if v, _ := a.Store.Version(p.ID, n); v != nil {
 			return n, nil
 		}
-		return 0, fmt.Errorf("no version v%d (archo loadout log)", n)
+		return 0, fmt.Errorf("no version v%d in plan:%s (archo loadout log)", n, p.Name)
 	}
-	if n := a.Store.TagVersionN(envID, ref); n > 0 {
-		return n, nil
-	}
-	return 0, fmt.Errorf("%q is not a version (v<n>, a tag, or workspace; archo loadout log)", ref)
+	return 0, fmt.Errorf("%q is not a version (v<n> or workspace; archo loadout log)", ref)
 }
 
 // ListAt returns the list of a version (0 = workspace).
@@ -785,7 +896,7 @@ func (a *App) ListAt(st *LoadoutState, n int) (loadout.List, error) {
 	if n == 0 {
 		return st.List, nil
 	}
-	v, err := a.Store.Version(st.Ix.Env.ID, n)
+	v, err := a.Store.Version(st.Plan.ID, n)
 	if err != nil || v == nil {
 		return nil, fmt.Errorf("no version v%d", n)
 	}
@@ -797,7 +908,7 @@ func (a *App) Checkout(ref string) (*EditResult, int, error) {
 	var n int
 	r, err := a.edit("checkout", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		var err error
-		if n, err = a.ParseVersionRef(st.Ix.Env.ID, ref); err != nil {
+		if n, err = a.parsePlanVersion(st.Plan, ref); err != nil {
 			return nil, nil, err
 		}
 		if n == 0 {
@@ -820,7 +931,7 @@ func (a *App) Checkout(ref string) (*EditResult, int, error) {
 	return r, n, nil
 }
 
-// RuleSpec is a user rule as typed (04 §5.1).
+// RuleSpec is a user rule as typed (04 §6.1).
 type RuleSpec struct {
 	Kind   string
 	A, B   string // references
@@ -912,18 +1023,4 @@ func loadCommunity(path string) (order.Community, error) {
 		return nil, err
 	}
 	return c, nil
-}
-
-// DismissConflict drops the pointer to an external ModsConfig.xml version that was not
-// loaded (06 §5 "ignore"); the version stays in the history.
-func (a *App) DismissConflict() error {
-	st, err := a.Loadout()
-	if err != nil {
-		return err
-	}
-	if st.WS.Conflict == 0 {
-		return nil
-	}
-	st.WS.Conflict = 0
-	return a.Store.SetWorkspace(st.WS)
 }

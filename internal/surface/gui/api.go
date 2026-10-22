@@ -14,11 +14,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/bbcode"
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
-	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// API is the service the page calls (08 §1, §3): every method returns view models from
+// API is the service the page calls (06 §1, §3): every method returns view models from
 // internal/view, or runs a view verb. No business rule lives here.
 //
 // The app is not safe for concurrent use and Wails calls methods concurrently, so each
@@ -29,25 +29,43 @@ type API struct {
 	a       *app.App
 	emit    func(name string, data any) // Wails events; nil in tests
 	open    func(url string) error      // the system browser
+	openDir func(dir string) error      // the file manager (nil: the system's)
+	lib     *app.Library                // Mod 库存, as of libAt
+	libAt   string
 	board   *view.Board
 	needs   *view.Needs
 	needsAt string // the database state the needs were built at
 	content view.ContentCache
-	events  map[int64]*store.Event // the changes list's events, by id
-	busy    map[string]bool        // scan, analyze, pack
+	busy    map[string]bool // scan, analyze, pack
 	// building is the pack this window's build child is making ("" none).
 	building string
-	live     view.LiveTracker // the running game's log (10 §3)
-	x        exchange         // import and export (exchange.go)
+	live     view.LiveTracker // the running game's log (03 §6.6)
+	logPath  string           // the log page's Player.log and its clusters' first lines
+	logLinks map[string]string
+	x        exchange // import and export (exchange.go)
+	free     releaser // returns memory to the OS after heavy work (memory.go)
+	// bgs are the environment bgsEnv's backgrounds; bgPick the image rotation chose for
+	// this window (background.go)
+	bgs    []app.Background
+	bgsEnv string
+	bgPick string
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string
+
+	monitorOnce sync.Once
+	quit        func() // closes the window (nil in the harness and in tests)
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
+	// TexRunner runs `archo textures optimize` in place of the child process (tests).
+	TexRunner func(args []string, progress func(string)) ([]string, error)
+	texLast   TextureEvent // the running conversion's last progress
+	// ScanRunner scans an environment in place of the child process (tests).
+	ScanRunner func(env string) (string, error)
 }
 
 func newAPI(a *app.App) *API {
-	return &API{a: a, open: openURL, events: map[int64]*store.Event{}, busy: map[string]bool{}}
+	return &API{a: a, open: openURL, busy: map[string]bool{}}
 }
 
 func (s *API) send(name string, data any) {
@@ -62,8 +80,9 @@ func (s *API) send(name string, data any) {
 var processStart = time.Now()
 
 // Ready is called once the page has drawn the list; it logs the start-up time to
-// <data>/logs/gui.log (08 §10: cold start to an interactive list).
+// <data>/logs/gui.log (06 §10: cold start to an interactive list).
 func (s *API) Ready() {
+	s.monitorOnce.Do(s.checkMonitor)
 	ms := time.Since(processStart).Milliseconds()
 	dir := filepath.Join(s.a.Home, "logs")
 	if os.MkdirAll(dir, 0o755) != nil {
@@ -77,19 +96,43 @@ func (s *API) Ready() {
 	fmt.Fprintf(f, "%s ready %d ms (%s)\n", time.Now().Format(time.RFC3339), ms, buildinfo.String())
 }
 
+// checkMonitor installs or updates Archo Monitor in a child process once per window (08 §9)
+// and, when that changed something, refreshes the page the way a scan does.
+func (s *API) checkMonitor() {
+	home, env, exe := s.a.Home, s.a.EnvName, s.Exe
+	go func() {
+		var out string
+		var err error
+		if exe != "" {
+			out, err = app.ChildMonitorExe(exe, home, env)
+		} else {
+			out, err = app.ChildMonitor(home, env)
+		}
+		if err != nil || !strings.Contains(out, "installed ") && !strings.Contains(out, "plan:") && !strings.Contains(out, "replaced ") {
+			return
+		}
+		s.mu.Lock()
+		s.board, s.needs = nil, nil
+		s.mu.Unlock()
+		s.send("scan", map[string]any{"ok": true, "text": view.T("Archo Monitor is ready")})
+	}()
+}
+
 // Start is what the page needs once: the language, its text table, the commands.
 type Start struct {
 	Lang     string            `json:"lang"`
 	Text     map[string]string `json:"text"`
 	Commands []view.Command    `json:"commands"`
 	Version  string            `json:"version"`
+	// Ops is the op table both pages' menus, hint lines and keys come from (06 §8.5).
+	Ops []view.Op `json:"ops"`
 }
 
 // Init returns the page's start data.
 func (s *API) Init() *Start {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Start{Lang: view.Lang(), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String()}
+	return &Start{Lang: view.Lang(), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
 }
 
 // ---- the board ----
@@ -97,7 +140,7 @@ func (s *API) Init() *Start {
 // Board is the three columns with what surrounds them.
 type Board struct {
 	*view.Board
-	Status    map[string]int `json:"status"` // row icons (06 §3)
+	Status    map[string]int `json:"status"` // row icons (06 §7)
 	Needs     int            `json:"needs"`  // the top bar's number
 	Stamp     string         `json:"stamp"`  // the database state: the page reloads when it changes
 	Envs      []string       `json:"envs"`
@@ -107,10 +150,11 @@ type Board struct {
 	Never     bool           `json:"neverScanned"`
 }
 
-// Board builds the columns (06 §5) and the counts from the workspace.
+// Board builds the columns (06 §2.5) and the counts from the workspace.
 func (s *API) Board() *Board {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.free.soon()
 	return s.boardLocked()
 }
 
@@ -146,7 +190,7 @@ type PackList struct {
 	Building   string               `json:"building,omitempty"` // the build this window started
 }
 
-// Packs lists the current environment's packs (10 §8).
+// Packs lists the current environment's packs (08 §5).
 func (s *API) Packs() (*PackList, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -158,29 +202,125 @@ func (s *API) Packs() (*PackList, error) {
 	return &PackList{Rows: rows, Others: others, Unfinished: un, Building: s.building}, err
 }
 
-// PackPreview is a dry-run build of the current list as a pack: checked and sorted under
-// the lock, measured (every mod's folder walked) outside it.
-func (s *API) PackPreview(name string) (*view.PackPreview, error) {
+// BuildPage is 编译成整合包 for the current plan (06 §2.6): checked and sorted under the
+// lock, measured (every mod's folder walked) outside it; a light pack is not measured.
+// tex is the textures choice (view.PackTextureOptions): 0 off, 100 预转换, less 精简.
+func (s *API) BuildPage(light bool, tex int) (*view.BuildPage, error) {
 	s.mu.Lock()
-	pl, err := s.a.PlanPack(name, false)
+	plan, chip := "", ""
+	if st := s.boardState(); st != nil {
+		chip = view.EnvChip(s.board.EnvName, s.board.GameVersion)
+		if st.Plan != nil {
+			plan = st.Plan.Name
+		}
+	}
+	name := view.DefaultPackName(s.a, plan)
+	pl, err := s.a.PlanPack(name, light)
+	if err == nil && !light {
+		view.PlanTextures(s.a, pl, tex)
+	}
 	dir := s.a.PacksDir()
 	s.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
 	pl.Measure(dir)
-	return view.PreviewOf(pl, dir), nil
+	p := view.BuildPageOf(pl, plan, chip, dir, light, tex)
+	p.Name = name
+	return p, nil
+}
+
+// PackNameCheck says what is wrong with a new pack's name ("" when it can be used).
+func (s *API) PackNameCheck(name string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return view.T("give the pack a name")
+	}
+	if app.CheckPackName(name) != nil {
+		return view.T("letters, digits, spaces and . _ - only (up to 64)")
+	}
+	if _, err := s.a.ReadPack(name); err == nil {
+		return view.T("a pack of this name exists")
+	}
+	return ""
+}
+
+// PackDryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run (nothing is written).
+func (s *API) PackDryRun(name string, light bool, tex int) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	argv := []string{"pack", "build", strings.TrimSpace(name), "--dry-run"}
+	if light {
+		argv = append(argv, "--light")
+	} else {
+		argv = append(argv, app.PackBuildArgs(view.PackTextureOptions(tex))...)
+	}
+	text, _ := cmds.Execute(s.a, argv)
+	st := s.boardState()
+	var out []string
+	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+		if strings.HasPrefix(l, "usage:") {
+			break // a refused build ends with the command's usage: not for the page
+		}
+		out = append(out, view.Humanize(st, l))
+	}
+	for len(out) > 0 && strings.TrimSpace(out[len(out)-1]) == "" {
+		out = out[:len(out)-1]
+	}
+	return out
+}
+
+// Pack is one pack's page (06 §2.7).
+func (s *API) Pack(name string) (*view.PackPage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.BuildPackPage(s.a, name)
+}
+
+// PackExport writes a pack to a file the player picks (pack export): the save dialog in
+// the window; file is the typed path where there is none. "" when it was cancelled.
+func (s *API) PackExport(name, file string, light bool) (string, error) {
+	ext := ".archopack"
+	if light {
+		ext = ".archopack.json"
+	}
+	if file == "" {
+		if s.x.native == nil {
+			return "", errors.New(view.T("no file dialog here; type the path"))
+		}
+		f, err := s.x.native.saveFile(view.T("export the pack"), name+ext, [][2]string{{"*" + ext, "*" + ext}, {"All files (*.*)", "*.*"}})
+		if err != nil || f == "" {
+			return "", err
+		}
+		file = f
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n, err := s.a.ExportPack(name, file, light)
+	if err != nil {
+		return "", err
+	}
+	return view.Tf("exported pack %s to %s (%s)", name, file, view.SizeText(n)), nil
 }
 
 // PackBuild starts building the pack in an `archo pack build` child process and returns at
 // once: the copy takes minutes and holds nothing here, so every page keeps working, and it
 // goes on when the window closes. "pack" events carry the progress (view.PackProgress) and
 // the end. One build at a time.
-func (s *API) PackBuild(name string) (string, error) {
+func (s *API) PackBuild(name string, light bool, tex int) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := app.CheckPackName(name); err != nil {
 		return "", err
+	}
+	if light {
+		// The list only: nothing to copy, done at once.
+		if _, err := s.a.BuildPack(name, true, false); err != nil {
+			return "", err
+		}
+		return view.Tf("built pack %s", name), nil
 	}
 	if s.busy["pack"] {
 		return "", errors.New(view.T("another pack is being built; wait for it to finish"))
@@ -201,11 +341,12 @@ func (s *API) PackBuild(name string) (string, error) {
 	if run == nil {
 		home, env, exe := s.a.Home, s.a.EnvName, s.Exe
 		log := filepath.Join(home, "logs", "pack-build.log")
+		extra := app.PackBuildArgs(view.PackTextureOptions(tex))
 		run = func(name string) error {
 			if exe != "" {
-				return app.ChildPackBuildExe(exe, home, env, name, log)
+				return app.ChildPackBuildExe(exe, home, env, name, log, extra...)
 			}
-			return app.ChildPackBuild(home, env, name, log)
+			return app.ChildPackBuild(home, env, name, log, extra...)
 		}
 	}
 	go s.watchBuild(name, tmp, run)
@@ -225,7 +366,7 @@ func (s *API) watchBuild(name, tmp string, run func(string) error) {
 			s.mu.Lock()
 			s.busy["pack"], s.building = false, ""
 			s.mu.Unlock()
-			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 4, Frac: 1, Text: view.Tf("built pack %s", name)}
+			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 5, Frac: 1, Text: view.Tf("built pack %s", name)}
 			if err != nil {
 				ev.Step, ev.Frac, ev.Text = last.Step, last.Frac, ""
 				lines := strings.Split(view.Humanize(nil, err.Error()), "\n")
@@ -272,14 +413,12 @@ func (s *API) PackRemoveUnfinished(name string) (string, error) {
 	return view.Tf("deleted the unfinished build of %s", name), nil
 }
 
-// PackLaunch plays a pack.
-func (s *API) PackLaunch(name string) (string, error) {
+// PackLaunch plays a pack. move: the player agreed to move the folders in the way into the
+// lock library first (Outcome.Moves, 08 §5.3).
+func (s *API) PackLaunch(name string, move bool) (*view.Outcome, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, err := s.a.LaunchPack(name, false); err != nil {
-		return "", err
-	}
-	return view.Tf("pack %s: the game is starting", name), nil
+	return view.LaunchPack(s.a, name, move), nil
 }
 
 // PackRemove moves a pack to the recycle bin.
@@ -292,7 +431,7 @@ func (s *API) PackRemove(name string) (string, error) {
 	return view.Tf("pack %s is in the recycle bin", name), nil
 }
 
-// Settings is the settings page (10 §7).
+// Settings is the settings page (06 §2.14).
 func (s *API) Settings() []view.SettingGroup {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -333,7 +472,7 @@ func (s *API) ApplySetting(argv []string, value string) ([]string, error) {
 	return lines, nil
 }
 
-// History is the history area (08 §14): unsaved steps around now, then the versions.
+// History is the history area (06 §2.5): unsaved steps around now, then the versions.
 func (s *API) History() ([]view.HistItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -361,7 +500,7 @@ func (s *API) HistoryGo(steps, version int) (string, error) {
 	return view.Tf("%d changes", len(r.Changes)), nil
 }
 
-// Live reports the running game and the errors its log gained (10 §3.4); the page asks
+// Live reports the running game and the errors its log gained (06 §2.1); the page asks
 // every two seconds.
 func (s *API) Live() (*view.Live, error) {
 	s.mu.Lock()
@@ -378,8 +517,8 @@ func (s *API) Stamp() string {
 	return s.a.Store.ChangeKey()
 }
 
-// Filter returns the indexes of a column's rows that match the query (06 §5.5), and how
-// many rows match in each column (for "other lists: …", 06 §13.8).
+// Filter returns the indexes of a column's rows that match the query (06 §3.7), and how
+// many rows match in each column (for "other lists: …", 06 §3.7).
 func (s *API) Filter(col int, query string) (*Filtered, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -396,6 +535,13 @@ func (s *API) Filter(col int, query string) (*Filtered, error) {
 		f.Content = c
 	}
 	out := &Filtered{}
+	var tags []string
+	for k := range s.board.Cols {
+		for i := range s.board.Cols[k] {
+			tags = append(tags, s.board.Cols[k][i].Tags...)
+		}
+	}
+	out.Complete = view.CompleteQuery(query, tags)
 	for k := range s.board.Cols {
 		ix := q.Filter(s.board.Cols[k], f)
 		out.Counts[k] = len(ix)
@@ -410,34 +556,39 @@ func (s *API) Filter(col int, query string) (*Filtered, error) {
 type Filtered struct {
 	Rows   []int  `json:"rows"`
 	Counts [3]int `json:"counts"`
+	// Complete is the grey text after the query that tab accepts (06 §3.7).
+	Complete string `json:"complete,omitempty"`
 }
 
 // ---- the detail ----
 
-// Detail is one mod's detail (06 §6.1), in the order the page shows it.
+// Detail is one mod's detail (06 §4.1), in the order the page shows it.
 type Detail struct {
-	ID         string         `json:"id"`
-	Name       string         `json:"name"`
-	Authors    string         `json:"authors,omitempty"`
-	Kind       string         `json:"kind"`
-	Header     []string       `json:"header"`
-	Status     int            `json:"status"`
-	StatusText string         `json:"statusText"`
-	Facts      []view.Fact    `json:"facts"`
-	Deps       []view.Dep     `json:"deps"`
-	Show       string         `json:"show"`
-	Note       string         `json:"note,omitempty"`
-	State      string         `json:"state,omitempty"` // the Workshop page's state
-	About      []bbcode.Block `json:"about"`
-	Workshop   []bbcode.Block `json:"workshop"`
-	History    string         `json:"history,omitempty"`
-	Missing    bool           `json:"missing,omitempty"`
-	URL        string         `json:"url,omitempty"` // the Workshop page
-	Pos        int            `json:"pos,omitempty"`
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
+	Authors    string      `json:"authors,omitempty"`
+	Kind       string      `json:"kind"`
+	Header     []string    `json:"header"`
+	Status     int         `json:"status"`
+	StatusText string      `json:"statusText"`
+	Facts      []view.Fact `json:"facts"`
+	// Fields is the detail's one field list (06 §4.1): Archo ID, package, location, Workshop,
+	// tags, languages, dependencies, conflicts.
+	Fields   []view.Field   `json:"fields"`
+	Deps     []view.Dep     `json:"deps"`
+	Show     string         `json:"show"`
+	Note     string         `json:"note,omitempty"`
+	State    string         `json:"state,omitempty"` // the Workshop page's state
+	About    []bbcode.Block `json:"about"`
+	Workshop []bbcode.Block `json:"workshop"`
+	History  string         `json:"history,omitempty"`
+	Missing  bool           `json:"missing,omitempty"`
+	URL      string         `json:"url,omitempty"` // the Workshop page
+	Pos      int            `json:"pos,omitempty"`
 }
 
 // Detail returns the detail of an instance; fetch allows the network for the Workshop
-// page (the page asks again after the cursor rested, 06 §6.4 item 3), refresh ignores the
+// page (the page asks again after the cursor rested, 06 §4.3 item 3), refresh ignores the
 // cache.
 func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 	s.mu.Lock()
@@ -458,7 +609,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 
 	data := view.LoadDetail(s.a, st.Ix, mod, fetch, refresh) // off the lock: may use the network
 	d := &Detail{ID: id, Name: mod.DisplayName(), Authors: strings.TrimSpace(mod.Authors), Kind: view.SourceKind(mod), Pos: pos,
-		Header: view.HeaderFacts(mod, pos, staged), Facts: view.Facts(mod, data), Deps: view.Deps(st, data),
+		Header: view.HeaderFacts(mod, pos, staged), Facts: view.Facts(mod, data), Deps: view.Deps(st, data), Fields: view.ModFields(s.a, st, mod, data),
 		Show: data.Desc.Show, Note: view.DescNote(data), State: data.Desc.WorkshopState,
 		About: data.About, Workshop: data.Workshop, History: view.HistoryLine(data.Events)}
 	d.Status = view.RowStatus(&item, n.Status)
@@ -476,7 +627,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 	return d, nil
 }
 
-// Sections are the full detail's sub-sections (06 §6.3), #refs replaced by names.
+// Sections are the full detail's sub-sections (06 §4.2), #refs replaced by names.
 func (s *API) Sections(id string) ([]view.Section, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -503,7 +654,7 @@ func (s *API) boardState() *app.LoadoutState {
 	return s.board.St
 }
 
-// ---- verbs (06 §13.6) ----
+// ---- verbs (06 §3.5) ----
 
 func (s *API) object(ids, refs []string) view.Object {
 	st := s.boardState()
@@ -564,7 +715,7 @@ func (s *API) Place(col int, ids []string, at int) (*view.Result, error) {
 	return s.after(view.Place(s.a, view.Column(col), s.object(ids, nil), at))
 }
 
-// PosOptions are the position input's choices (06 §13.7).
+// PosOptions are the position input's choices (06 §3.6).
 func (s *API) PosOptions(ids []string, text string, before bool) ([]view.PosOpt, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -622,22 +773,43 @@ func (s *API) Swap(id string) (string, error) {
 	return s.text(view.Swap(s.a, st, id))
 }
 
-// Preview shows sort, save or launch before it happens (06 §9).
+// Preview is the dry run of sort, save or launch (the palette's 预览…; 06 §6).
 func (s *API) Preview(what string) (*view.Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return view.DryRun(s.a, what)
 }
 
-// Apply runs sort, save or launch after its preview.
-func (s *API) Apply(what string) (string, error) {
+// Run does sort, save or launch at once (S, w, L; 06 §6): no confirmation. A refusal comes
+// back in Outcome.Refused with the commands that resolve it.
+func (s *API) Run(what string) (*view.Outcome, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.needs = nil
-	return s.text(view.Apply(s.a, what))
+	s.board = nil
+	switch what {
+	case view.ListSort, view.ListSave, view.ListLaunch:
+	default:
+		return nil, fmt.Errorf("no action %s", what)
+	}
+	return view.Run(s.a, what), nil
 }
 
-// ---- tags (06 §12.3) ----
+// RunMoving is Run after the player agreed to move the folders in the way into the lock
+// library (Outcome.Moves, 08 §3).
+func (s *API) RunMoving(what string) (*view.Outcome, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	switch what {
+	case view.ListSave, view.ListLaunch:
+	default:
+		return nil, fmt.Errorf("no action %s", what)
+	}
+	return view.RunMoving(s.a, what), nil
+}
+
+// ---- tags (06 §3.8) ----
 
 // TagCandidates for the mods.
 func (s *API) TagCandidates(ids []string) ([]view.TagCand, error) {
@@ -673,13 +845,14 @@ func (s *API) SetTag(ids []string, tag string, remove bool) (string, error) {
 	return s.text(view.Tf("tags of %s: %s", o.What, msg), err)
 }
 
-// ---- 需要处理 (06 §7) ----
+// ---- 需要处理 (06 §5) ----
 
 // Needs builds the screen. Opening it includes the newest log (parsing it if needed) and
 // starts the files' check when it is stale, as the TUI does.
 func (s *API) Needs() *view.Needs {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.free.soon()
 	n := s.needsLocked(true)
 	if (n.Stale || n.Never) && !s.busy["analyze"] {
 		s.startAnalyze()
@@ -701,7 +874,7 @@ func (s *API) needsLocked(withLog bool) *view.Needs {
 		return &view.Needs{Status: map[string]int{}}
 	}
 	if withLog {
-		// The newest log was parsed into this list (decisions-m4 §7.2): it has been seen.
+		// The newest log was parsed into this list (03 §6.4): it has been seen.
 		if cur, _ := s.a.LogPaths(st); cur != "" && s.a.ProblemLog(st) == cur {
 			s.a.SelectLog(st, cur)
 		}
@@ -725,7 +898,7 @@ func (s *API) DoAction(act view.Action, option int) (string, error) {
 // inspectable are the read-only commands an item's "see what" may run.
 var inspectable = map[string]bool{"problems": true, "patches": true, "mod": true, "def": true, "harmony": true}
 
-// Inspect runs a read-only command an action names (view, 06 §7.2) and returns its text
+// Inspect runs a read-only command an action names (view, 06 §5) and returns its text
 // with names for #refs.
 func (s *API) Inspect(argv []string) ([]string, error) {
 	s.mu.Lock()
@@ -742,33 +915,45 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 	return out, nil
 }
 
-// ---- changes (06 §4.1) ----
+// ---- changes (06 §2.9) ----
 
-// Changes lists the last scans' changes.
-func (s *API) Changes() ([]view.ChangeScan, error) {
+// Changes is the 变化 page: the current plan's mods since it was last played, or the whole
+// library; of (an instance ID) narrows it to that mod's Lineage, every change by day.
+func (s *API) Changes(library bool, of string) (*modchanges.Page, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	st := s.boardState()
 	if st == nil {
 		return nil, errors.New("no list")
 	}
-	cs, err := view.Changes(s.a, st)
-	for _, c := range cs {
-		for _, e := range c.Events {
-			s.events[e.ID] = e.Event
+	o := modchanges.Opts{Library: library}
+	if of != "" {
+		o.Of = view.LineageIDs(st.Ix, of)
+		if len(o.Of) == 0 {
+			return nil, errors.New(view.T("that mod is not known"))
 		}
+		o.OfName = st.Ix.ByID[of].DisplayName()
 	}
-	return cs, err
+	return view.BuildChanges(s.a, st, o)
 }
 
-// FileDiff lists the files a change touched.
-func (s *API) FileDiff(eventID int64) []string {
+// ChangeFiles is the raw file list behind a row: the files that differ between two
+// snapshots.
+func (s *API) ChangeFiles(before, after int64) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if e := s.events[eventID]; e != nil {
-		return view.FileDiff(s.a, e)
+	return view.ChangeFiles(s.a, before, after)
+}
+
+// OpenChangeNotes opens a Workshop item's change notes (ctrl+w on 变化).
+func (s *API) OpenChangeNotes(ws string) (string, error) {
+	if !view.IsNumber(ws) {
+		return "", errors.New(view.T("no Workshop ID: not a Workshop mod"))
 	}
-	return nil
+	if err := s.open(view.ChangeNotesURL(ws)); err != nil {
+		return "", err
+	}
+	return view.T("opened the change notes"), nil
 }
 
 // ---- environments, logs, scans ----
@@ -781,6 +966,34 @@ func (s *API) UseEnv(name string) (string, error) {
 	_, err := s.a.EnvUse(name)
 	s.needs = nil
 	return s.text(view.Tf("switched to %s", name), err)
+}
+
+// EnvRemoval is the dry run of removing an environment (06 §2.14): the confirmation's
+// title and lines. Nothing changes.
+type EnvRemoval struct {
+	Title string   `json:"title"`
+	Lines []string `json:"lines"`
+}
+
+func (s *API) EnvRemovePreview(name string) (*EnvRemoval, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, err := s.a.EnvRemovePreview(name)
+	if err != nil {
+		return nil, err
+	}
+	return &EnvRemoval{Title: view.EnvRemovalTitle(r), Lines: view.EnvRemovalLines(r)}, nil
+}
+
+// RemoveEnv removes an environment from RimArcho's records; another one becomes current
+// when it was in use. Refused while its game runs.
+func (s *API) RemoveEnv(name string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.a.EnvName = ""
+	_, err := s.a.EnvRemove(name)
+	s.board, s.needs, s.lib = nil, nil, nil
+	return s.text(view.Tf("removed environment %s", name), err)
 }
 
 // Logs are the logs the player may choose (Player.log, Player-prev.log).
@@ -805,6 +1018,7 @@ func (s *API) Logs() []string {
 func (s *API) LogPage(path string) (*view.LogPage, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.free.soon()
 	st := s.boardState()
 	if st == nil {
 		return nil, errors.New("no list")
@@ -814,7 +1028,35 @@ func (s *API) LogPage(path string) (*view.LogPage, error) {
 	s.a.AnalyzeExe = s.Exe
 	s.a.AnalyzeWait = 200 * time.Millisecond
 	defer func() { s.a.AnalyzeWait = 0 }()
-	return view.BuildLogPage(s.a, st, path)
+	p, err := view.BuildLogPage(s.a, st, path, &s.live)
+	if err == nil && p.Path != "" {
+		s.logLinks, s.logPath = p.Links, p.Path
+	}
+	return p, err
+}
+
+// LogMonitor is the companion section of path as the running game writes it, for the log
+// page's refresh on the live tick (nil when the game does not write path).
+func (s *API) LogMonitor(path string) (*view.MonitorLog, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.boardState()
+	if st == nil {
+		return nil, errors.New("no list")
+	}
+	var links map[string]string
+	if strings.EqualFold(s.logPath, path) {
+		links = s.logLinks
+	}
+	return view.LiveMonitor(s.a, st, &s.live, path, links), nil
+}
+
+// AddMonitor puts Archo Monitor after Harmony in the current plan (the log page's action;
+// one undoable step).
+func (s *API) AddMonitor() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.text(view.MonitorAdd(s.a))
 }
 
 // LogCluster is one cluster's evidence (archo log --cluster), names for #refs.
@@ -827,10 +1069,18 @@ func (s *API) LogCluster(path, id string) ([]string, error) {
 	text, _ := cmds.Execute(s.a, []string{"log", "--file", path, "--cluster", id})
 	st := s.boardState()
 	var out []string
-	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+	for _, l := range view.WithoutPatternBlock(strings.Split(strings.TrimRight(text, "\n"), "\n")) {
 		out = append(out, view.Humanize(st, l))
 	}
 	return out, nil
+}
+
+// LogPattern is the pattern card of a cluster (06 §2.10): community background shown apart
+// from the evidence; nil when the cluster matches no pattern.
+func (s *API) LogPattern(path, id string) *view.PatternCard {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.PatternCardOf(s.a, s.boardState(), path, id)
 }
 
 // SelectLog picks the log whose errors join 需要处理.
@@ -873,6 +1123,7 @@ func (s *API) Scan() bool {
 			ev["text"] = view.T("scan complete · nothing changed")
 		}
 		s.mu.Unlock()
+		s.free.soon()
 		s.send("scan", ev)
 	}()
 	return true
@@ -918,7 +1169,7 @@ func (s *API) startAnalyze() bool {
 
 // ---- palette and the rest ----
 
-// Palette ranks commands, mods and the other environments for a query (06 §8).
+// Palette ranks commands, mods and the other environments for a query (06 §3.5).
 func (s *API) Palette(query string) []view.PalEntry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -936,6 +1187,9 @@ func (s *API) Palette(query string) []view.PalEntry {
 				all = append(all, view.PalEntry{Kind: view.PalEnv, ID: e.Name, Name: view.Tf("switch to %s", e.Name), Alias: e.Name, Desc: "env"})
 			}
 		}
+	}
+	if rows, err := view.PlanRows(s.a); err == nil {
+		all = append(all, view.PlanEntries(rows)...)
 	}
 	if s.board != nil {
 		seen := map[string]bool{}
@@ -987,7 +1241,7 @@ func (s *API) OpenURL(raw string) error {
 	return s.open(u.String())
 }
 
-// Setting reads a GUI setting (column widths, 08 §4).
+// Setting reads a GUI setting (column widths, 06 §7).
 func (s *API) Setting(key string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

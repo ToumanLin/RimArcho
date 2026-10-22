@@ -1,0 +1,289 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/steamworks"
+	"github.com/ToumanLin/RimArcho/internal/store"
+)
+
+// Subscribing and unsubscribing through the Steam client (06 §2.9, 08 §10). The call runs in
+// `archo steam-worker` started in %LOCALAPPDATA%\RimArcho\steam, which holds a copy of the
+// game's steam_api64.dll and steam_appid.txt; RimArcho never writes into the game folder.
+
+// ErrSteamUnavailable: Steam could not be reached (not running, no DLL in the game, the
+// API did not start). The window then opens the item's Workshop page instead.
+var ErrSteamUnavailable = errors.New("Steam is not available")
+
+// WorkshopOp is a subscribe, unsubscribe or state call.
+type WorkshopOp struct {
+	Action string
+	DryRun bool
+	Items  []WorkshopItem
+}
+
+// WorkshopItem is one item of the call.
+type WorkshopItem struct {
+	ID         string // the instance
+	Name       string
+	WorkshopID string
+	Folder     string // unsubscribe: what Steam deletes
+	Result     string // ok, failed:<EResult>, timeout
+	State      uint32
+}
+
+// SteamUnavailable is ErrSteamUnavailable with why, and the Workshop pages to open instead.
+type SteamUnavailable struct {
+	Why  string
+	URLs []string
+}
+
+func (e *SteamUnavailable) Error() string {
+	return fmt.Sprintf("Steam is not available (%s)", e.Why)
+}
+func (e *SteamUnavailable) Unwrap() error { return ErrSteamUnavailable }
+
+// Workshop subscribes to (action "subscribe") or unsubscribes from ("unsubscribe") the
+// Workshop items of refs. Unsubscribing makes Steam delete the item's folder, so it is
+// refused while the game runs, while the mod is enabled, or while any plan uses it.
+func (a *App) Workshop(action string, refs []string, dryRun bool) (*WorkshopOp, error) {
+	if action != steamworks.Subscribe && action != steamworks.Unsubscribe {
+		return nil, fmt.Errorf("unknown action %s: want subscribe or unsubscribe", action)
+	}
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	op := &WorkshopOp{Action: action, DryRun: dryRun}
+	for _, ref := range refs {
+		m, err := st.Ix.ResolveOne(ref)
+		if err != nil {
+			return nil, err
+		}
+		ws := m.WorkshopID()
+		if m.Kind != source.Workshop || ws == "" {
+			return nil, fmt.Errorf("%s is not a Workshop item (src:%s)", st.Ix.Ref(m.ID), m.SourceLabel)
+		}
+		it := WorkshopItem{ID: m.ID, Name: m.DisplayName(), WorkshopID: ws}
+		switch action {
+		case steamworks.Subscribe:
+			if !m.Residue {
+				return nil, fmt.Errorf("%s is subscribed already", st.Ix.Ref(m.ID))
+			}
+		case steamworks.Unsubscribe:
+			if m.Residue {
+				return nil, fmt.Errorf("%s is not subscribed (an unsubscribed leftover: archo trash %s moves the folder to the recycle bin)", st.Ix.Ref(m.ID), st.Ix.Ref(m.ID))
+			}
+			if err := a.unsubscribable(st, m); err != nil {
+				return nil, err
+			}
+			if m.Status == identity.Live {
+				it.Folder = st.Ix.ModDir(m)
+			}
+		}
+		op.Items = append(op.Items, it)
+	}
+	if action == steamworks.Unsubscribe {
+		if run, err := a.GameRunning(); err == nil && run != nil {
+			return nil, fmt.Errorf("the game is running (pid %d): Steam would delete folders it has loaded; close it first", run.PID)
+		}
+	}
+	if dryRun || len(op.Items) == 0 {
+		return op, nil
+	}
+	ids := make([]string, len(op.Items))
+	for k, it := range op.Items {
+		ids[k] = it.WorkshopID
+	}
+	rep, err := a.runSteam(action, ids)
+	if err != nil {
+		return nil, a.unavailable(err, op.Items)
+	}
+	by := map[string]steamworks.Item{}
+	for _, x := range rep.Items {
+		by[strconv.FormatUint(x.ID, 10)] = x
+	}
+	var failed []string
+	for k := range op.Items {
+		it := &op.Items[k]
+		x, ok := by[it.WorkshopID]
+		if !ok {
+			it.Result = "timeout"
+		} else {
+			it.Result, it.State = x.Result, x.State
+		}
+		if it.Result != "ok" {
+			failed = append(failed, fmt.Sprintf("%s (%s)", it.Name, it.Result))
+		}
+	}
+	if len(failed) > 0 {
+		return op, fmt.Errorf("Steam did not confirm: %s", strings.Join(failed, ", "))
+	}
+	return op, nil
+}
+
+// unsubscribable: not enabled, in no plan.
+func (a *App) unsubscribable(st *LoadoutState, m *store.Mod) error {
+	if st.List.Index(m.ID) >= 0 {
+		return fmt.Errorf("%s is enabled; disable it first (Steam deletes the folder)", st.Ix.Ref(m.ID))
+	}
+	ps, err := a.usedBy(st, m.ID)
+	if err != nil {
+		return err
+	}
+	if len(ps) > 0 {
+		return fmt.Errorf("%s is used by %s; take it out of them first (archo library remove-from-plans %s)", st.Ix.Ref(m.ID), joinPlans(ps), st.Ix.Ref(m.ID))
+	}
+	return nil
+}
+
+// WorkshopState asks Steam for the items' state (subscribed, installed, needs update…).
+func (a *App) WorkshopState(refs []string) (*WorkshopOp, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	op := &WorkshopOp{Action: steamworks.State}
+	var ids []string
+	for _, ref := range refs {
+		m, err := st.Ix.ResolveOne(ref)
+		if err != nil {
+			return nil, err
+		}
+		ws := m.WorkshopID()
+		if ws == "" {
+			return nil, fmt.Errorf("%s has no Workshop id", st.Ix.Ref(m.ID))
+		}
+		op.Items = append(op.Items, WorkshopItem{ID: m.ID, Name: m.DisplayName(), WorkshopID: ws})
+		ids = append(ids, ws)
+	}
+	rep, err := a.runSteam(steamworks.State, ids)
+	if err != nil {
+		return nil, a.unavailable(err, op.Items)
+	}
+	by := map[string]uint32{}
+	for _, x := range rep.Items {
+		by[strconv.FormatUint(x.ID, 10)] = x.State
+	}
+	for k := range op.Items {
+		op.Items[k].State = by[op.Items[k].WorkshopID]
+	}
+	return op, nil
+}
+
+func (a *App) unavailable(err error, items []WorkshopItem) error {
+	var u *SteamUnavailable
+	if !errors.As(err, &u) {
+		return err
+	}
+	for _, it := range items {
+		u.URLs = append(u.URLs, "https://steamcommunity.com/sharedfiles/filedetails/?id="+it.WorkshopID)
+	}
+	return u
+}
+
+// runSteam prepares the runtime folder and runs the worker (SteamWorker in tests), 50 items
+// a call.
+func (a *App) runSteam(action string, ids []string) (*steamworks.Report, error) {
+	dir, err := a.SteamRuntime()
+	if err != nil {
+		return nil, &SteamUnavailable{Why: err.Error()}
+	}
+	run := a.SteamWorker
+	if run == nil {
+		run = steamWorkerProcess
+	}
+	all := &steamworks.Report{}
+	for i := 0; i < len(ids); i += 50 {
+		out, err := run(dir, append([]string{action}, ids[i:min(i+50, len(ids))]...))
+		r := steamworks.Parse(out)
+		if r.Error != "" {
+			return nil, &SteamUnavailable{Why: r.Error}
+		}
+		if err != nil || !r.Done {
+			why := strings.TrimSpace(out)
+			if err != nil {
+				why = err.Error()
+			}
+			return nil, &SteamUnavailable{Why: "the Steam call did not finish: " + why}
+		}
+		all.Items = append(all.Items, r.Items...)
+	}
+	return all, nil
+}
+
+// SteamRuntime is the worker's folder, %LOCALAPPDATA%\RimArcho\steam: the game's
+// steam_api64.dll copied in (again when the game's changes) and steam_appid.txt.
+func (a *App) SteamRuntime() (string, error) {
+	e, err := a.Env()
+	if err != nil {
+		return "", err
+	}
+	var src string
+	// next to the game's executable (1.7 here), or with Unity's plugins
+	for _, p := range []string{
+		filepath.Join(e.GameRoot, "steam_api64.dll"),
+		filepath.Join(e.GameRoot, "RimWorldWin64_Data", "Plugins", "x86_64", "steam_api64.dll"),
+		filepath.Join(e.GameRoot, "RimWorldWin64_Data", "Plugins", "steam_api64.dll"),
+	} {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			src = p
+			break
+		}
+	}
+	if src == "" {
+		return "", fmt.Errorf("the game install has no steam_api64.dll")
+	}
+	dir := filepath.Join(a.LocalDir(), "steam")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "steam_appid.txt"), []byte(strconv.Itoa(steamworks.AppID)), 0o644); err != nil {
+		return "", err
+	}
+	dst := filepath.Join(dir, "steam_api64.dll")
+	if s, d := statOf(src), statOf(dst); d == nil || s.Size() != d.Size() || s.ModTime().After(d.ModTime()) {
+		os.Remove(dst)
+		if err := copyFile(src, dst, s); err != nil {
+			return "", fmt.Errorf("copying steam_api64.dll: %w", err)
+		}
+	}
+	return dir, nil
+}
+
+func statOf(p string) os.FileInfo {
+	fi, err := os.Stat(p)
+	if err != nil {
+		return nil
+	}
+	return fi
+}
+
+// steamWorkerProcess starts `<this executable> steam-worker …` in dir, with a time limit.
+func steamWorkerProcess(dir string, args []string) (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, exe, append([]string{"steam-worker"}, args...)...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "SteamAppId="+strconv.Itoa(steamworks.AppID), "SteamGameId="+strconv.Itoa(steamworks.AppID))
+	hideWindow(cmd)
+	out, err := cmd.Output()
+	if ctx.Err() != nil {
+		return string(out), fmt.Errorf("the Steam call took longer than 40 s")
+	}
+	return string(out), err
+}

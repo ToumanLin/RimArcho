@@ -48,8 +48,8 @@ func keyLatency(t *testing.T, m *model) map[string][]time.Duration {
 		for i := 0; i < 10; i++ {
 			step("page", key("pgdown"))
 		}
-		step("ends", key("G"))
-		step("ends", key("g"))
+		step("ends", key("end"))
+		step("ends", key("home"))
 		step("filter", key("/"))
 		for _, r := range "harmony" {
 			step("filter", key(string(r)))
@@ -140,7 +140,7 @@ func TestT1KeyLatencyReal(t *testing.T) {
 	if worst := report(t, keyLatency(t, m)); worst > 50*time.Millisecond {
 		t.Fatalf("slowest key %v > 50 ms", worst)
 	}
-	// search (06 §5.5): the first content term loads the content kinds once
+	// search (06 §3.7): the first content term loads the content kinds once
 	for _, q := range []string{"type:assembly", "type:xml-only has:problem", "harmony", "author:oskar -tag:ui", "id:2009463077", "hrmny"} {
 		c := &m.cols[cInactive]
 		c.filter = q
