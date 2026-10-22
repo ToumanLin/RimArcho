@@ -89,7 +89,9 @@ type Trace struct {
 	Pipes      int      // archo calls post-filtered with a pipe (grep/head …)
 }
 
-var leakWords = []string{`labels`, `tasks.jsonl`, `review`, `rimarcho-v4`, `packets`, `corpus-kb`, `agenteval.json`, `execlogs`, `hugslogs`}
+// leakWords are path parts of the gold, the packets and the harness config. Answer text is not
+// checked (evidence may quote cache paths under the research homes).
+var leakWords = []string{`labels/`, `tasks.jsonl`, `/review`, `rimarcho-v4`, `/packets`, `agenteval.json`, `execlogs`, `hugslogs`, `corpus-kb/labels`, `agenteval/tasks`}
 
 // readTraces maps "<run> <task>" (the Agent description "g7 <run> <task>") to its trace.
 func readTraces(dirs []string) (map[string]*Trace, error) {
@@ -188,36 +190,46 @@ func parseTrace(path, run, task string) (*Trace, error) {
 			}
 			tr.ToolCalls++
 			in := string(bl.Input)
-			low := strings.ToLower(strings.ReplaceAll(in, `\\`, `\`))
+			var x struct {
+				Command  string `json:"command"`
+				FilePath string `json:"file_path"`
+				Path     string `json:"path"`
+				Pattern  string `json:"pattern"`
+			}
+			json.Unmarshal(bl.Input, &x)
+			cmd := x.Command
+			if i := strings.Index(cmd, "<<"); i >= 0 && strings.Contains(cmd, "answers") { // heredoc writing the answer
+				cmd = cmd[:i]
+			}
+			probe := strings.ToLower(strings.ReplaceAll(strings.Join([]string{cmd, x.FilePath, x.Path, x.Pattern}, " "), `\`, "/"))
 			for _, w := range leakWords {
-				if strings.Contains(low, w) {
+				if strings.Contains(probe, w) {
 					tr.Leaks = append(tr.Leaks, bl.Name+": "+clip(in, 160))
 					break
 				}
 			}
-			var x struct {
-				Command  string `json:"command"`
-				FilePath string `json:"file_path"`
-			}
-			json.Unmarshal(bl.Input, &x)
 			switch bl.Name {
 			case "Bash", "PowerShell":
-				if strings.Contains(x.Command, "agenteval") && strings.Contains(x.Command, " call ") {
+				switch {
+				case strings.Contains(x.Command, "agenteval") && strings.Contains(x.Command, " call "):
 					tr.ArchoCalls += strings.Count(x.Command, " call -run")
 					if strings.Contains(x.Command, "|") {
 						tr.Pipes++
 					}
-				} else {
+				case strings.Contains(x.Command, "answers") && strings.Contains(x.Command, task+".json"): // writes the answer
+				default:
 					tr.OffTool = append(tr.OffTool, bl.Name+": "+clip(x.Command, 160))
 				}
 			case "Read":
-				if !strings.HasSuffix(filepath.ToSlash(x.FilePath), run+"/AGENT.md") {
+				// the brief, or the output file of a call the Bash tool moved to the background
+				if p := filepath.ToSlash(x.FilePath); !strings.HasSuffix(p, run+"/AGENT.md") && !strings.HasSuffix(p, ".output") {
 					tr.OffTool = append(tr.OffTool, "Read: "+x.FilePath)
 				}
 			case "Write", "Edit":
 				if !strings.HasSuffix(filepath.ToSlash(x.FilePath), "answers/"+task+".json") {
 					tr.OffTool = append(tr.OffTool, bl.Name+": "+x.FilePath)
 				}
+			case "Monitor", "ToolSearch", "TaskOutput", "BashOutput": // waiting for a slow call
 			default:
 				tr.OffTool = append(tr.OffTool, bl.Name)
 			}

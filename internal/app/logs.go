@@ -95,7 +95,7 @@ type logCacheEntry struct {
 var ErrLogNotCached = errors.New("log not analysed yet")
 
 // logCacheVersion invalidates stored reports when attribution changes.
-const logCacheVersion = 3
+const logCacheVersion = 4
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -292,8 +292,10 @@ type attrCtx struct {
 	run      *store.Analysis
 	fails    map[string]*analyze.PatchFact // FailKey(game path, desc) → fact
 	byXPath  map[string][]*analyze.PatchFact
-	roMemo   map[string]roUse  // reflectionOnly, once per log
-	libMemo  map[string]string // type → the one DLL file name its owners ship it in
+	roMemo   map[string]roUse    // reflectionOnly, once per log
+	libMemo  map[string]string   // type → the one DLL file name its owners ship it in
+	asmMemo  map[string][]string // assembly base name (lower) → enabled mods loading it
+	lf       *logs.File          // the whole log (neighbouring lines)
 }
 
 type dirOwner struct {
@@ -302,7 +304,7 @@ type dirOwner struct {
 }
 
 func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure) error {
-	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, libMemo: map[string]string{}}
+	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, libMemo: map[string]string{}, lf: lf}
 	for _, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
 		if m == nil {
@@ -749,9 +751,14 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	if m := asmDepRe.FindStringSubmatch(e.Message + "\n" + strings.Join(e.Extra, "\n")); m != nil {
 		cx.missingAssembly(lc, m[1])
 	}
+	// Assemblies whose types could not be listed; type references into Harmony 1.x.
+	skipProviders := cx.assemblyRules(lc)
 	// Missing types ("Could not find type named NS.T", "expected class 'NS.T' in assembly 'A'"):
 	// an installed mod that provides the type but is not enabled is a missing dependency.
 	for _, m := range missingTypeRe.FindAllStringSubmatch(e.Message+"\n"+strings.Join(e.Extra, "\n"), -1) {
+		if skipProviders {
+			break
+		}
 		t := m[1] + m[2]
 		for _, id := range cx.types(t) {
 			if cx.st.Position(id) == 0 {
@@ -829,6 +836,8 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			}
 		}
 	}
+	// 5. Callers of failing code, HugsLib's log upload (logcallers.go).
+	cx.callerRules(lc)
 	sort.SliceStable(lc.Attr, func(i, j int) bool { return roleRank[lc.Attr[i].Role] < roleRank[lc.Attr[j].Role] })
 	switch {
 	case len(lc.Attr) > 0 && lc.Attr[0].Role == RoleSource:
@@ -923,6 +932,7 @@ func (cx *attrCtx) patchFailure(lc *LogCluster, failAt map[string]analyze.LogFai
 		// local paths, so only the file is evidence here).
 		if fid, frel := cx.folderOwner(lf.File); fid != "" {
 			lc.add(fid, RoleSource, "patch file "+frel+" (by mod folder)")
+			lc.Details = append(lc.Details, "the failed operation is in this mod's file: the mod stays the source even when the simulation of the installed copy does not fail (the player's copy, list or order may differ); the reason is what remains to find")
 			lc.next("archo patches --mod " + cx.st.Ix.Ref(fid) + " --failed")
 		} else {
 			byXPath()
@@ -944,7 +954,7 @@ func (cx *attrCtx) patchFailure(lc *LogCluster, failAt map[string]analyze.LogFai
 	} else {
 		lc.add(id, RoleSource, "patch file "+rel)
 		if cx.run != nil {
-			lc.Details = append(lc.Details, "simulation: this operation does not fail now (the mod or the Loadout changed since the log)")
+			lc.Details = append(lc.Details, "simulation: this operation does not fail now (the mod or the Loadout changed since the log); the failed operation is still this mod's, so it stays the source")
 		}
 	}
 	lc.next("archo patches --mod "+cx.st.Ix.Ref(id)+" --failed", fmt.Sprintf("archo files search %q --mod %s", lastToken(lf.Desc), cx.st.Ix.Ref(id)))

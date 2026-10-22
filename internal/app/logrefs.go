@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -32,7 +33,14 @@ type refQuery struct {
 	// field: an XML error names an element and value ("XML error: <F>V</F> doesn't correspond
 	// to any field"); the files holding exactly <F>V</F> are looked for.
 	field string
+	// ctx: the root element of the message's Context ("Context: <LayoutRoomDef>…" →
+	// LayoutRoomDef). A file without it cannot hold the failing node: the same <F>V</F> in a
+	// GeneDef file is another def type (G6: selectionWeight in GeneDefs for a LayoutRoomDef).
+	ctx string
 }
+
+// ctxRootRe is the first element of a field error's Context.
+var ctxRootRe = regexp.MustCompile(`Context: <([A-Za-z_][\w.]*)`)
 
 // referrerQuery is the lookup a cluster needs, if any.
 func referrerQuery(lc *LogCluster) *refQuery {
@@ -59,7 +67,11 @@ func referrerQuery(lc *LogCluster) *refQuery {
 		return &refQuery{lc: lc, names: names, dll: true}
 	case logs.ClassXMLLoad:
 		if m := fieldErrRe.FindStringSubmatch(msg); m != nil && m[2] != "" {
-			return &refQuery{lc: lc, field: m[1], names: []string{m[2]}}
+			q := &refQuery{lc: lc, field: m[1], names: []string{m[2]}}
+			if c := ctxRootRe.FindStringSubmatch(msg); c != nil {
+				q.ctx = c[1]
+			}
+			return q
 		}
 	}
 	return nil
@@ -228,7 +240,11 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 						if isElem {
 							idx = elem[string(s)]
 						} else if len(field) > 0 {
-							idx = append(idx[:len(idx):len(idx)], field[string(tag)+"\x00"+string(s)]...)
+							for _, q := range field[string(tag)+"\x00"+string(s)] {
+								if c := qs[q].ctx; c == "" || bytes.Contains(b, []byte("<"+c)) || bytes.Contains(b, []byte(c+"[")) || bytes.Contains(b, []byte("/"+c)) {
+									idx = append(idx[:len(idx):len(idx)], q)
+								}
+							}
 						}
 						for _, q := range idx {
 							if _, ok := first[q]; !ok {

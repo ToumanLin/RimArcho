@@ -56,8 +56,26 @@ func (s *Server) Execute(env string, argv []string) (string, int) {
 	return cmds.Execute(s.app, argv)
 }
 
+// MaxOutput caps one tool result. An agent that asked for --all on a large mod got 225-325 KB
+// (G7 traces): more than fits in a useful context, and nothing it could not get by narrowing.
+const MaxOutput = 24 << 10
+
+// ClipOutput cuts a tool result at MaxOutput bytes on a line boundary and says how to narrow.
+func ClipOutput(out string) string {
+	if len(out) <= MaxOutput {
+		return out
+	}
+	cut := strings.LastIndexByte(out[:MaxOutput], '\n')
+	if cut < MaxOutput/2 {
+		cut = MaxOutput
+	}
+	rest := strings.Count(out[cut:], "\n")
+	return out[:cut] + fmt.Sprintf("\n… output clipped at %d KB of %d KB (%d more lines): narrow the call (mod=, target=, pattern, cluster) instead of all=true\n", cut>>10, len(out)>>10, rest)
+}
+
 func (s *Server) run(env string, argv []string) (*sdk.CallToolResult, any, error) {
 	out, code := s.Execute(env, argv)
+	out = ClipOutput(out)
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: out}}, IsError: code == cmds.ExitError || code == cmds.ExitUsage}, nil, nil
 }
 
