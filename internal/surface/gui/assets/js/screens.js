@@ -232,6 +232,7 @@ function needCard(it, i) {
   const body = el("div", "body");
   if (it.dim) {
     body.append(el("div", "why", it.text));
+    if (it.why) body.append(el("div", "why sub", it.why));
   } else {
     body.append(el("div", "title", it.title || it.text));
     if (it.why) body.append(el("div", "why", it.why));
@@ -597,25 +598,50 @@ function markLog(keepScroll) {
     id = r.cluster;
   }
   const k = L.page.path + "|" + id;
-  if (L.detail.has(k)) return showLines(box, L.detail.get(k));
+  if (L.detail.has(k)) { const d = L.detail.get(k); return showLines(box, d.lines, d.card); }
   box.innerHTML = "";
   box.append(shimmer(T("loading…"), 8));
   clearTimeout(detailTimer);
   L.want = k;
   detailTimer = setTimeout(async () => {
-    let lines;
-    try { lines = await api.LogCluster(L.page.path, id); } catch (e) { lines = [errText(e)]; }
-    L.detail.set(k, lines);
-    if (L.want === k) showLines($("#screen .detail-card .scroll"), lines);
+    const path = L.page.path;
+    let lines, card = null;
+    try {
+      [lines, card] = await Promise.all([api.LogCluster(path, id), api.LogPattern(path, id).catch(() => null)]);
+    } catch (e) { lines = [errText(e)]; }
+    L.detail.set(k, { lines, card });
+    if (L.want === k) showLines($("#screen .detail-card .scroll"), lines, card);
   }, 90);
 }
 
-function showLines(box, lines) {
+// showLines: a cluster's evidence (the CLI text: the whole message, its extra lines, the
+// messages around it), then the pattern card when the cluster matches a pattern.
+function showLines(box, lines, card) {
   if (!box) return;
   box.innerHTML = "";
   const pre = el("pre", "lines");
   pre.textContent = (lines || []).join("\n");
   box.append(pre);
+  if (card) box.append(patternCard(card));
+}
+
+// patternCard (06 §2.10): what the shared logs say this kind of error usually is. It is
+// marked as community background, apart from the evidence above: never a conclusion about
+// this list.
+function patternCard(c) {
+  const d = el("div", "pcard");
+  const h = el("div", "ph");
+  h.append(el("span", "ev-chip corpus", T("community background")), el("span", "note", T("from shared logs, not a conclusion about your list")));
+  d.append(h);
+  if (c.summary) d.append(el("div", "ps", c.summary));
+  const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v", v)); d.append(r); };
+  if (c.causes && c.causes.length) row(T("common causes"), c.causes.join(T("; ")));
+  row(T("next step"), c.next);
+  if (c.fixes && c.fixes.length) row(T("kinds of fix"), c.fixes.join(" · "));
+  if (c.known) d.append(el("div", "ps known", c.known));
+  const facts = [c.seen, c.gone].filter(Boolean).join(" · ");
+  if (facts) d.append(el("div", "pm", facts));
+  return d;
 }
 
 // ---- Mod 库存 › 变化 (06 §2.9): one row per mod, what its changes mean, by tier ----

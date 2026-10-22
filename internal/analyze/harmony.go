@@ -30,7 +30,7 @@ func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, wor
 	}
 	var jobs []job
 	for _, m := range active {
-		for _, a := range content.Files(m.Dir, folders[m.Instance], "Assemblies", ".dll") {
+		for _, a := range content.CodeFiles(m.Dir, folders[m.Instance]) {
 			jobs = append(jobs, job{m, a})
 		}
 	}
@@ -43,7 +43,7 @@ func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, wor
 			defer wg.Done()
 			for i := range next {
 				j := jobs[i]
-				f := &AssemblyFacts{Instance: j.m.Instance, File: j.a.Rel, Skipped: harmony.Skipped(filepath.Base(j.a.Path), skip)}
+				f := &AssemblyFacts{Instance: j.m.Instance, File: j.a.Rel, Skipped: harmony.SkippedFor(filepath.Base(j.a.Path), j.m.Pkg, skip)}
 				r, err := harmony.Read(j.a.Path, f.Skipped)
 				if err != nil {
 					f.Err = err.Error()
@@ -78,6 +78,11 @@ func harmonyFindings(active []*Mod, asms []*AssemblyFacts) []*Finding {
 	byTarget := map[string][]hpatch{}
 	var targets []string
 	manual := map[*Mod][]string{}
+	type mstat struct {
+		calls, resolved int
+		why             map[string]int
+	}
+	mstats := map[*Mod]*mstat{}
 	var manualMods []*Mod
 	for _, a := range asms {
 		m := byInst[a.Instance]
@@ -97,8 +102,15 @@ func harmonyFindings(active []*Mod, asms []*AssemblyFacts) []*Finding {
 		if a.Manual {
 			if manual[m] == nil {
 				manualMods = append(manualMods, m)
+				mstats[m] = &mstat{why: map[string]int{}}
 			}
 			manual[m] = append(manual[m], a.File)
+			ms := mstats[m]
+			ms.calls += a.ManualCalls
+			ms.resolved += a.ManualResolved
+			for r, n := range a.Unresolved {
+				ms.why[r] += n
+			}
 		}
 	}
 	sort.Strings(targets)
@@ -156,7 +168,11 @@ func harmonyFindings(active []*Mod, asms []*AssemblyFacts) []*Finding {
 					tev = append(tev, ev(h))
 				}
 			}
-			out = append(out, &Finding{Code: "harmony.multi-transpiler", Severity: finding.Warning, Layer: "harmony", Confidence: finding.Likely,
+			// Info (03 §4.3.1): after the manual targets of G9, the subjects of this finding are
+			// error sources 2.3x as often as chance, less than harmony.shared-target (2.6x, info),
+			// and the rewritten method is in an error's stack no more often than a shared target
+			// (0.5% / 0.6%). It is raised to warning when a current log's stack passes through it.
+			out = append(out, &Finding{Code: "harmony.multi-transpiler", Severity: finding.Info, Layer: "harmony", Confidence: finding.Likely,
 				Key: t, Subjects: ts, Evidence: tev,
 				Claim:       fmt.Sprintf("%d mods rewrite %s with transpilers; their IL edits can conflict", len(trans), t),
 				Suggestions: []string{"archo harmony --target " + t, "archo source search \"" + shortMethod(t) + "\" --in " + strings.Join(ts, " --in ")}})
@@ -187,10 +203,22 @@ func harmonyFindings(active []*Mod, asms []*AssemblyFacts) []*Finding {
 		}
 	}
 	for _, m := range manualMods {
+		ms := mstats[m]
+		claim := fmt.Sprintf("%s calls Harmony.Patch from code; those targets cannot be determined statically", finding.Inst(m.Instance))
+		if ms.calls > 0 {
+			claim = fmt.Sprintf("%s calls Harmony.Patch from code; %d of %d calls have a target found statically", finding.Inst(m.Instance), ms.resolved, ms.calls)
+		}
+		evs := []finding.Evidence{{Source: finding.Declared, Ref: finding.Inst(m.Instance), Text: "Harmony.Patch calls in " + strings.Join(manual[m], ", ")}}
+		if len(ms.why) > 0 {
+			var ws []string
+			for r, n := range ms.why {
+				ws = append(ws, fmt.Sprintf("%s %d", r, n))
+			}
+			sort.Strings(ws)
+			evs = append(evs, finding.Evidence{Source: finding.Declared, Ref: finding.Inst(m.Instance), Text: "not resolved: " + strings.Join(ws, ", ")})
+		}
 		out = append(out, &Finding{Code: "harmony.manual", Severity: finding.Info, Layer: "harmony", Confidence: finding.Certain,
-			Key: "manual", Subjects: []string{finding.Inst(m.Instance)},
-			Claim:       fmt.Sprintf("%s calls Harmony.Patch from code; those targets cannot be determined statically", finding.Inst(m.Instance)),
-			Evidence:    []finding.Evidence{{Source: finding.Declared, Ref: finding.Inst(m.Instance), Text: "MemberRef HarmonyLib.Harmony::Patch in " + strings.Join(manual[m], ", ")}},
+			Key: "manual", Subjects: []string{finding.Inst(m.Instance)}, Claim: claim, Evidence: evs,
 			Suggestions: []string{fmt.Sprintf("archo source search \".Patch(\" --in %s", finding.Inst(m.Instance))}})
 	}
 	return out

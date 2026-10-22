@@ -1,0 +1,16 @@
+System.NullReferenceException: Object reference not set to an instance of an object
+[Ref DD4337A7]
+  at Verse.Game.DeinitAndRemoveMap (Verse.Map map, System.Boolean notifyPlayer) [0x00159] in <fcfab19af5d14a608a65ebd77f29482f>:0
+    - POSTFIX UnlimitedHugs.HugsLib: Void HugsLib.Patches.Game_DeinitAndRemoveMap_Patch:MapRemovalHook(Map map)
+  at RimWorld.Planet.MapParent.PostRemove () [0x00019] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at RimWorld.Planet.Settlement.PostRemove () [0x00000] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at RimWorld.Planet.WorldObjectsHolder.Remove (RimWorld.Planet.WorldObject o) [0x00033] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at RimWorld.Planet.WorldObject.Destroy () [0x00032] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at RimWorld.Planet.MapParent.Destroy () [0x00045] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at RimWorld.Planet.MapParent.Abandon (System.Boolean wasGravshipLaunch) [0x00108] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at RimWorld.Planet.Settlement.Abandon (System.Boolean wasGravshipLaunch) [0x00006] in <fcfab19af5d14a608a65ebd77f29482f>:0
+    - PREFIX ResearchPapers: Void ResearchPapers.Harmony_Settlement_Abandon:Prefix(Settlement __instance)
+  at RimWorld.GravshipUtility.AbandonMap (Verse.Map map) [0x00080] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at Verse.WorldComponent_GravshipController.TakeoffEnded () [0x00034] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at Verse.WorldComponent_GravshipController.WorldComponentUpdate () [0x000b7] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at RimWorld.Planet.WorldComponentUtility.WorldComponentUpdate (RimWorld.Planet.World world) [0x00013] in <fcfab19af5d14a608a65ebd77f29482f>:0

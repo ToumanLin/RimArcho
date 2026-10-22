@@ -435,6 +435,10 @@ launch: dry run (direct), nothing written
   changes: 0 since v1
   history: same as v1, no new version
   command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  before you play: 1 problems that often cause errors in the game (they do not block the launch)
+    warning patch.no-match  #iqmu A: Patches/a.xml:1 Verse.PatchOperationAdd(Defs/ThingDef[defName="a"]) matched nothing (exception)
+      why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
+      fix: archo patches --mod #iqmu
 next:
   archo launch
 
@@ -447,6 +451,10 @@ launched RimWorld via direct
   changes: 0 since v1
   history: same as v1, no new version
   command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  before you play: 1 problems that often cause errors in the game (they do not block the launch)
+    warning patch.no-match  #iqmu A: Patches/a.xml:1 Verse.PatchOperationAdd(Defs/ThingDef[defName="a"]) matched nothing (exception)
+      why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
+      fix: archo patches --mod #iqmu
 
 > plan_history {}
 versions: 1 (plan:raid night, env:main)

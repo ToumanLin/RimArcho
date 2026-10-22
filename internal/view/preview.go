@@ -6,7 +6,21 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/order"
 )
+
+// launchHintNow is the current plan's LaunchHint from the stored problems (no analysis).
+func launchHintNow(a *app.App) *LaunchHint {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil
+	}
+	ps, err := a.Problems(false, nil)
+	if err != nil {
+		return nil
+	}
+	return BuildNeeds(a, st, ps).Launch
+}
 
 // Whole-list actions (06 §6): sort, save and launch act on one key or click and say what
 // they did (sort: u undoes it). The preview is the CLI's dry run (read-only), reached from
@@ -100,7 +114,17 @@ func Apply(a *app.App, what string) (string, error) {
 		if len(r.Changes) == 0 {
 			return T("the order is already right"), nil
 		}
-		return Tf("sorted: %d moved", len(r.Changes)), nil
+		strong := 0
+		for _, b := range order.Broken(r.Input, r.Result) {
+			if b.Strength == order.Strong {
+				strong++
+			}
+		}
+		if strong > 0 {
+			// Strong ones first (04 §5.3): they are what the sort mattered for.
+			return Tf("sorted: %d moved · strong requirements put right: %d", len(r.Changes), strong), nil
+		}
+		return Tf("sorted: %d moved · only weaker preferences were out of order", len(r.Changes)), nil
 	case ListSave:
 		r, err := a.Save(false)
 		if err != nil {
@@ -120,6 +144,11 @@ func Apply(a *app.App, what string) (string, error) {
 	case ListLaunch:
 		if _, err := a.Launch(false); err != nil {
 			return "", err
+		}
+		// The most likely trouble goes with it (06 §2.3, never blocking): the TUI has no
+		// launch page, so its status line is where the player reads it.
+		if h := launchHintNow(a); h != nil {
+			return T("the game is starting") + " · " + Tf("watch for: %s", h.Text), nil
 		}
 		return T("the game is starting"), nil
 	}

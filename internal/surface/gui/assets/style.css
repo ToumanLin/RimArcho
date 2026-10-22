@@ -414,6 +414,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .need .body { flex: 1; min-width: 0; }
 .need .title { font-weight: 600; overflow-wrap: anywhere; }
 .need .why { color: var(--fg-2); overflow-wrap: anywhere; }
+.need .why.sub { font-size: 12px; color: var(--muted); }
 .need.dimmed { padding-top: 9px; padding-bottom: 9px; }
 .need.dimmed .why { color: var(--faint); }
 .need .acts { flex: none; display: flex; gap: 6px; align-items: center; }
@@ -425,6 +426,17 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .ev-chip { flex: none; line-height: 16px; padding: 0 6px; border-radius: 5px; background: var(--pill); color: var(--fg-2); font-size: 12px; }
 .ev-chip.log { color: var(--log); }
 .ev-chip.community { color: var(--accent); }
+.ev-chip.corpus { color: var(--amber); background: var(--amber-soft); }
+/* the pattern card under a log cluster's evidence (06 §2.10): community background */
+.pcard { margin-top: 14px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--fg-2); }
+.pcard .ph { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.pcard .ph .note { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pcard .ps { color: var(--fg); }
+.pcard .ps.known { color: var(--fg-2); }
+.pcard .pr { display: flex; gap: 10px; }
+.pcard .pr .k { flex: none; width: 5.5em; color: var(--muted); }
+.pcard .pr .v { min-width: 0; }
+.pcard .pm { color: var(--muted); font-size: 12px; }
 .page-head .state-note { font-size: 12px; color: var(--amber); }
 .parts { color: var(--muted); margin: 4px 0 0 2px; font-size: 12px; }
 @media (max-width: 760px) { .need .top { flex-wrap: wrap; } .need .acts { margin-left: auto; } }
@@ -724,6 +736,12 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .hm-launch .issue .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-launch .issue .go { margin-left: auto; opacity: .7; }
 .hm-launch button.issue:hover { background: color-mix(in srgb, var(--amber) 24%, transparent); }
+/* the launch hint (06 §2.3): the most likely trouble on the first line, its reason below */
+.hm-launch .issue.hint { align-items: flex-start; }
+.hm-launch .issue.hint .ic { margin-top: 2px; }
+.hm-launch .issue.hint .t { display: flex; flex-direction: column; gap: 2px; white-space: normal; }
+.hm-launch .issue.hint .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-launch .issue.hint .why { font-size: 11.5px; opacity: .8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .kind { flex: none; font-size: 11px; line-height: 16px; padding: 0 5px; border-radius: 4px; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); white-space: nowrap; }
 .card.empty-state { padding: 32px 16px; }
 svg.i.fill { fill: currentColor; }

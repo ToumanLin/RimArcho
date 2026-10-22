@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/analyze"
@@ -48,7 +48,10 @@ type LogCluster struct {
 	Next       []string
 	Checklist  []string
 	Details    []string // class-specific facts (patch reasons, cross-reference providers …)
-	Finding    *finding.Finding
+	// Near: the log messages just before and after the first occurrence ("Player.log:<line>
+	// <message>"), the context agents otherwise grep the raw log for (G7 traces).
+	Near    []string
+	Finding *finding.Finding
 	// From the companion log (03 §6.7.4): its file name, the first occurrence's time and
 	// level; OnlyCompanion when Player.log does not have the entry at all.
 	Companion     string    `json:",omitempty"`
@@ -118,7 +121,9 @@ func (a *App) DropPlanProblems() { a.planPS = nil }
 var ErrLogNotCached = errors.New("log not analysed yet")
 
 // logCacheVersion invalidates stored reports when attribution changes.
-const logCacheVersion = 4
+// 7: both the companion log (dev, 4) and the G1/G7 attribution rules (master, 6); 8: no
+// nearby messages for entries only the companion log has.
+const logCacheVersion = 8
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -327,7 +332,11 @@ type attrCtx struct {
 	run      *store.Analysis
 	fails    map[string]*analyze.PatchFact // FailKey(game path, desc) → fact
 	byXPath  map[string][]*analyze.PatchFact
-	comp     *logs.Companion // nil without a companion log
+	comp     *logs.Companion     // nil without a companion log
+	roMemo   map[string]roUse    // reflectionOnly, once per log
+	libMemo  map[string]string   // type → the one DLL file name its owners ship it in
+	asmMemo  map[string][]string // assembly base name (lower) → enabled mods loading it
+	lf       *logs.File          // the whole log (neighbouring lines)
 }
 
 type dirOwner struct {
@@ -336,7 +345,7 @@ type dirOwner struct {
 }
 
 func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure, comp *logs.Companion) error {
-	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, defMemo: map[string][]analyze.DefFact{}, comp: comp}
+	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, defMemo: map[string][]analyze.DefFact{}, libMemo: map[string]string{}, lf: lf, comp: comp}
 	for _, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
 		if m == nil {
@@ -381,17 +390,19 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 	for _, f := range fails {
 		failAt[f.Mod+"|"+strings.SplitN(f.Desc, "\n", 2)[0]] = f
 	}
-	var xrefs []*LogCluster
+	var qs []*refQuery
 	for _, c := range logs.ClustersHint(lf, logs.HintFrom(comp)) {
 		lc := &LogCluster{Cluster: c}
+		lc.Near = nearMessages(lf, c.First)
 		cx.attributeCluster(lc, failAt)
-		if c.Class == logs.ClassXrefMissing {
-			xrefs = append(xrefs, lc)
+		if q := referrerQuery(lc); q != nil {
+			qs = append(qs, q)
 		}
 		rep.Clusters = append(rep.Clusters, lc)
 	}
-	if len(xrefs) > 0 {
-		cx.xrefReferrers(xrefs)
+	if len(qs) > 0 {
+		cx.referrers(qs)
+		cx.textureProviders(qs)
 	}
 	for _, lc := range rep.Clusters {
 		// Source searches cover the cluster's candidates, not every enabled mod (03 §5.4).
@@ -496,16 +507,39 @@ func (cx *attrCtx) types(t string) []string {
 		return r
 	}
 	var out []string
+	files := map[string]bool{}
 	if owners, err := cx.a.Store.TypeOwners(t); err == nil {
 		for _, o := range owners {
 			if cx.st.Position(o[0]) > 0 || cx.st.Ix.ByID[o[0]] != nil {
 				out = append(out, o[0])
+				files[strings.ToLower(path.Base(filepath.ToSlash(o[1])))] = true
 			}
 		}
 	}
 	out = uniqStr(out)
 	cx.typeMemo[t] = out
+	if len(files) == 1 {
+		for f := range files {
+			cx.libMemo[t] = f
+		}
+	}
 	return out
+}
+
+// library is the DLL file name when a type comes from a library that several enabled mods
+// ship under the same name (LunarFramework.dll in every Lunar mod): a frame in it does not
+// say which of them is at fault (log corpus).
+func (cx *attrCtx) library(t string) string {
+	n := 0
+	for _, id := range cx.types(t) {
+		if cx.st.Position(id) > 0 {
+			n++
+		}
+	}
+	if n < 2 {
+		return ""
+	}
+	return cx.libMemo[t]
 }
 
 func (cx *attrCtx) harmonyOwners(p logs.Patch) ([]string, string) {
@@ -568,7 +602,48 @@ var (
 	modFolderRe   = regexp.MustCompile(`(?i)[\\/](?:294100|Mods)[\\/]([^\\/]+)[\\/](.+)$`)
 	wanterRe      = regexp.MustCompile(`found to give to ([\w.]+Def) ([^\s(]+)`)
 	typeTokRe     = regexp.MustCompile(`\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\b`)
+	// DefDatabase.GetNamed: "Failed to find Verse.ThingDef named X. There are N defs of this type loaded."
+	getNamedRe = regexp.MustCompile(`^Failed to find ([\w.]+Def) named ([^\s.]+(?:\.[^\s.]+)*)\. There are`)
+	texPathRe  = regexp.MustCompile(`^Could not load Texture2D at '([^']+)'|^Failed to find any textures at (\S+) while constructing`)
+	multiRe    = regexp.MustCompile(`^(.+)_(?:north|south|east|west)m?$`)
+	asmDepRe   = regexp.MustCompile(`Cannot resolve dependency to assembly '([^',]+)`)
+	// "Could not resolve reference to object with loadID X of type T. … curParent=NS.Holder …"
+	curParentRe = regexp.MustCompile(`curParent=([A-Za-z_][\w+]*(?:\.[A-Za-z_][\w+]*)+)`)
+	loadIDRe    = regexp.MustCompile(`loadID (\S+) of type (\S+?)\.? Was`)
+	shaderRe    = regexp.MustCompile(`with Shader '([^']+)' doesn't have a texture property '_MainTex'`)
+	fieldErrRe  = regexp.MustCompile(`^XML error: <([\w.]+)>([^<]{0,200})</[\w.]+> doesn't correspond to any field in type`)
 )
+
+// xrefName reads the missing def's type and name from a cross-reference, save-load reference
+// or DefDatabase.GetNamed message.
+func xrefName(msg string) (typ, name string, ok bool) {
+	if m := xrefRe.FindStringSubmatch(msg); m != nil {
+		return m[1] + m[4] + m[6], m[2] + m[5] + m[7], true
+	}
+	if m := getNamedRe.FindStringSubmatch(msg); m != nil {
+		return m[1], m[2], true
+	}
+	return "", "", false
+}
+
+// texturePath is the path of a texture-missing message ("" if it names none).
+func texturePath(msg string) string {
+	if m := texPathRe.FindStringSubmatch(msg); m != nil {
+		return m[1] + m[2]
+	}
+	return ""
+}
+
+// gameAssembly reports assemblies that ship with the game (Unity, Mono/.NET, RimWorld itself).
+func gameAssembly(name string) bool {
+	n := strings.ToLower(name)
+	for _, p := range []string{"system", "unityengine", "unity.", "mono.", "microsoft.", "assembly-csharp"} {
+		if strings.HasPrefix(n, p) {
+			return true
+		}
+	}
+	return n == "mscorlib" || n == "netstandard"
+}
 
 var hotSpots = map[string]bool{"Verse.Pawn.Tick": true, "Verse.ThingWithComps.Tick": true, "Verse.Thing.DoTick": true,
 	"RimWorld.Planet.WorldPawns.WorldPawnsTick": true, "Verse.Pawn.TickRare": true, "Verse.ThingWithComps.TickRare": true,
@@ -599,6 +674,15 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	// 2. File paths in the message or its continuation lines.
 	texts := append([]string{e.Message}, e.Extra...)
 	for _, t := range texts {
+		// "absFilePath: [Rimworld_dir]\Mods\<folder>\Sounds\x.mp3" after a failed content load.
+		if p, ok := strings.CutPrefix(t, "absFilePath: "); ok {
+			if id, rel := cx.dirOwner(p); id != "" {
+				lc.add(id, RoleSource, "log file "+rel+" (the file the game failed to load)")
+			} else if id, rel := cx.folderOwner(p); id != "" {
+				lc.add(id, RoleSource, "log file "+rel+" (by mod folder; the file the game failed to load)")
+			}
+			continue
+		}
 		for _, p := range winPathRe.FindAllString(t, -1) {
 			if id, rel := cx.dirOwner(p); id != "" {
 				lc.add(id, RoleSource, "log file "+rel)
@@ -611,12 +695,14 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	case logs.ClassPatchFailed:
 		cx.patchFailure(lc, failAt)
 	case logs.ClassXrefMissing:
-		if m := xrefRe.FindStringSubmatch(e.Message); m != nil {
-			typ, name := m[1]+m[4]+m[6], m[2]+m[5]+m[7]
+		if typ, name, ok := xrefName(e.Message); ok {
 			short := typ[strings.LastIndexByte(typ, '.')+1:]
+			save := strings.HasPrefix(e.Message, "Could not load reference")
 			lc.Details = append(lc.Details, "missing: def:"+short+"/"+name)
-			if strings.HasPrefix(e.Message, "Could not load reference") {
+			if save {
 				lc.Details = append(lc.Details, "raised while loading a save: the save references a def no active mod provides")
+			} else if strings.HasPrefix(e.Message, "Failed to find ") {
+				lc.Details = append(lc.Details, "asked for by name at run time (DefDatabase.GetNamed), usually from a mod's code: the def is not loaded")
 			}
 			defs, _ := cx.defsNamed(name, false)
 			var prov []string
@@ -634,6 +720,10 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			}
 			if len(prov) == 0 {
 				lc.Details = append(lc.Details, "providers: none among installed mods")
+				if save {
+					// The save names the def, not the mod that defined it: nothing to attribute.
+					lc.Details = append(lc.Details, "the mod that defined it was removed, or it renamed or removed the def; the game drops the reference (usually harmless once the game is saved again)")
+				}
 			} else {
 				lc.Details = append(lc.Details, "providers: "+strings.Join(uniqStr(prov), ", "))
 			}
@@ -656,6 +746,12 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		if m := forDefRe.FindStringSubmatch(e.Message); m != nil {
 			cx.definedBy(lc, m[1], false, "names the missing file")
 		}
+		if p := texturePath(e.Message); p != "" {
+			lc.Details = append(lc.Details, "missing: texture "+p)
+			lc.next(fmt.Sprintf("archo files search %q", p))
+		}
+	case logs.ClassSave:
+		cx.saveLoad(lc)
 	case logs.ClassXMLLoad:
 		// "XML error: … Context: <ThingDef …><defName>X</defName>…": the def's XML is at fault.
 		texts := strings.Join(append([]string{e.Message}, e.Extra...), "\n")
@@ -684,12 +780,27 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			cx.definedBy(lc, m[1], true, "is the abstract def the XML error is in")
 		}
 	case logs.ClassMaterial:
+		if m := shaderRe.FindStringSubmatch(e.Message); m != nil {
+			// The shader lives in a mod's asset bundle (compressed) or in the game: its name is not
+			// in any file RimArcho reads, so the message names no mod (log corpus).
+			lc.Details = append(lc.Details, "shader "+m[1]+" has no _MainTex: a texture was assigned to a material made with it. The shader comes from the game or a mod's asset bundle, which file contents do not reveal; usually harmless unless something renders wrong")
+			break
+		}
 		lc.next(`archo files search "uiIconColor"`, `archo files search "uiIconPath"`)
 		lc.Checklist = append(lc.Checklist, "a _MainTex/ResolveIcon error is XML-side first: look for buildable defs with uiIconColor but no uiIconPath, uiIconPathsStuff or graphicData/texPath, including abstract bases")
 	}
+	// "Cannot resolve dependency to assembly 'X'" (FileNotFoundException, ReflectionOnly APIs).
+	if m := asmDepRe.FindStringSubmatch(e.Message + "\n" + strings.Join(e.Extra, "\n")); m != nil {
+		cx.missingAssembly(lc, m[1])
+	}
+	// Assemblies whose types could not be listed; type references into Harmony 1.x.
+	skipProviders := cx.assemblyRules(lc)
 	// Missing types ("Could not find type named NS.T", "expected class 'NS.T' in assembly 'A'"):
 	// an installed mod that provides the type but is not enabled is a missing dependency.
 	for _, m := range missingTypeRe.FindAllStringSubmatch(e.Message+"\n"+strings.Join(e.Extra, "\n"), -1) {
+		if skipProviders {
+			break
+		}
 		t := m[1] + m[2]
 		for _, id := range cx.types(t) {
 			if cx.st.Position(id) == 0 {
@@ -722,6 +833,12 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			continue
 		}
 		ids := cx.types(fr.Type)
+		if lib := cx.library(fr.Type); lib != "" {
+			for _, id := range ids {
+				lc.add(id, RoleMentioned, fmt.Sprintf("log frame %d %s (library %s, shipped by %d enabled mods)", i+1, target, lib, len(ids)))
+			}
+			continue
+		}
 		for _, id := range ids {
 			if firstMod {
 				lc.add(id, RoleSource, fmt.Sprintf("log frame %d %s (topmost mod code in the stack)", i+1, target))
@@ -761,6 +878,8 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			}
 		}
 	}
+	// 5. Callers of failing code, HugsLib's log upload (logcallers.go).
+	cx.callerRules(lc)
 	if cx.comp != nil {
 		cx.companion(lc)
 	}
@@ -875,6 +994,7 @@ func (cx *attrCtx) patchFailure(lc *LogCluster, failAt map[string]analyze.LogFai
 		// local paths, so only the file is evidence here).
 		if fid, frel := cx.folderOwner(lf.File); fid != "" {
 			lc.add(fid, RoleSource, "patch file "+frel+" (by mod folder)")
+			lc.Details = append(lc.Details, "the failed operation is in this mod's file: the mod stays the source even when the simulation of the installed copy does not fail (the player's copy, list or order may differ); the reason is what remains to find")
 			lc.next("archo patches --mod " + cx.st.Ix.Ref(fid) + " --failed")
 		} else {
 			byXPath()
@@ -896,7 +1016,7 @@ func (cx *attrCtx) patchFailure(lc *LogCluster, failAt map[string]analyze.LogFai
 	} else {
 		lc.add(id, RoleSource, "patch file "+rel)
 		if cx.run != nil {
-			lc.Details = append(lc.Details, "simulation: this operation does not fail now (the mod or the Loadout changed since the log)")
+			lc.Details = append(lc.Details, "simulation: this operation does not fail now (the mod or the Loadout changed since the log); the failed operation is still this mod's, so it stays the source")
 		}
 	}
 	lc.next("archo patches --mod "+cx.st.Ix.Ref(id)+" --failed", fmt.Sprintf("archo files search %q --mod %s", lastToken(lf.Desc), cx.st.Ix.Ref(id)))
@@ -907,141 +1027,6 @@ func lastToken(desc string) string {
 		return m[1]
 	}
 	return desc
-}
-
-// xrefReferrers finds which enabled mods' effective XML mentions each missing def (B2),
-// reading every file once.
-func (cx *attrCtx) xrefReferrers(cs []*LogCluster) {
-	type tok struct {
-		name string
-		lc   *LogCluster
-	}
-	var toks []tok
-	for _, lc := range cs {
-		if m := xrefRe.FindStringSubmatch(lc.First.Message); m != nil {
-			toks = append(toks, tok{m[2] + m[5] + m[7], lc})
-		}
-	}
-	if len(toks) == 0 {
-		return
-	}
-	// The reference index names the files that can mention each name; only those are read
-	// (03 §6.5).
-	x, err := cx.a.RefIndex(cx.st)
-	if err != nil {
-		return
-	}
-	want := make(map[string]int, len(toks))
-	read := map[int]bool{}
-	for i, t := range toks {
-		if _, ok := want[t.name]; ok {
-			continue
-		}
-		want[t.name] = i
-		for _, f := range x.filesWith(t.name) {
-			read[f] = true
-		}
-	}
-	files := make([]int, 0, len(read))
-	for f := range read {
-		files = append(files, f)
-	}
-	type hit struct {
-		t    int
-		inst string
-		file string
-		line int
-	}
-	var mu sync.Mutex
-	var hits []hit
-	var wg sync.WaitGroup
-	next := make(chan int)
-	for w := 0; w < 8; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := range next {
-				f := x.files[i]
-				b, err := os.ReadFile(f.Path)
-				if err != nil {
-					continue
-				}
-				refScan(b, want, func(t, line int) {
-					mu.Lock()
-					hits = append(hits, hit{t, f.Inst, f.Rel, line})
-					mu.Unlock()
-				})
-			}
-		}()
-	}
-	for _, f := range files {
-		next <- f
-	}
-	close(next)
-	wg.Wait()
-	// Two clusters can miss the same name (different referrers or classes): both get the hits.
-	for i, t := range toks {
-		if k := want[t.name]; k != i {
-			for _, h := range hits {
-				if h.t == k {
-					hits = append(hits, hit{i, h.inst, h.file, h.line})
-				}
-			}
-		}
-	}
-	sort.Slice(hits, func(i, j int) bool {
-		if hits[i].t != hits[j].t {
-			return hits[i].t < hits[j].t
-		}
-		if pi, pj := cx.st.Position(hits[i].inst), cx.st.Position(hits[j].inst); pi != pj {
-			return pi < pj
-		}
-		return hits[i].file < hits[j].file
-	})
-	// A text match is weak evidence (log corpus): vanilla XML is full of names like None,
-	// animal or Fishing that are enum values, tags or defs of another type, and a mod that
-	// defines the name provides it rather than wanting it. Core and DLCs and such mods are
-	// skipped; when many mods match, or the wanter rule already found the source, the matches
-	// are only mentioned.
-	defines := map[int]map[string]bool{}
-	for i, t := range toks {
-		defines[i] = map[string]bool{}
-		ds, _ := cx.defsNamed(t.name, false)
-		for _, d := range ds {
-			defines[i][d.Instance] = true
-		}
-	}
-	perTok := map[int]map[string]bool{}
-	for _, h := range hits {
-		if cx.official(h.inst) || defines[h.t][h.inst] {
-			continue
-		}
-		if perTok[h.t] == nil {
-			perTok[h.t] = map[string]bool{}
-		}
-		perTok[h.t][h.inst] = true
-	}
-	hadSource := map[int]bool{}
-	for i, t := range toks {
-		hadSource[i] = hasSource(t.lc)
-	}
-	for _, h := range hits {
-		if !perTok[h.t][h.inst] {
-			continue
-		}
-		t := toks[h.t]
-		role := RoleSource
-		if len(perTok[h.t]) > 3 || hadSource[h.t] {
-			role = RoleMentioned
-		}
-		t.lc.add(h.inst, role, fmt.Sprintf("references %s at %s:%d", t.name, h.file, h.line))
-	}
-	for _, t := range toks {
-		sort.SliceStable(t.lc.Attr, func(i, j int) bool { return roleRank[t.lc.Attr[i].Role] < roleRank[t.lc.Attr[j].Role] })
-		if len(t.lc.Attr) > 0 && t.lc.Attr[0].Role == RoleSource {
-			t.lc.Confidence, t.lc.Why = finding.Likely, ""
-		}
-	}
 }
 
 var logSeverity = map[string]string{
@@ -1252,14 +1237,15 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 	return out, hot, run
 }
 
-// escalateSkips raises harmony.skip-prefix to warning when its method is in a log cluster
-// (03 §4.5): a bool prefix is ordinary until a stack trace passes through it.
+// escalateSkips raises harmony.skip-prefix and harmony.multi-transpiler to warning when their
+// method is in a log cluster (03 §4.5): a bool prefix or two transpilers on one method are
+// ordinary until a stack trace passes through it.
 func escalateSkips(fs []*finding.Finding, hot map[string]hotMethod) []*finding.Finding {
 	if len(hot) == 0 {
 		return fs
 	}
 	for i, f := range fs {
-		if f.Code != "harmony.skip-prefix" {
+		if f.Code != "harmony.skip-prefix" && f.Code != "harmony.multi-transpiler" {
 			continue
 		}
 		t, _, _ := strings.Cut(f.Key, "|")

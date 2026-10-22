@@ -463,7 +463,8 @@ func versionSummary(ps []*app.Problem, mm string) string {
 	}
 	line := fmt.Sprintf("%s version.unsupported  %d enabled mods do not list %s", sev, len(ps), mm)
 	if prev := app.PrevMinor(mm); prev != "" {
-		line += fmt.Sprintf(" (%d list %s, %d older only)", len(ps)-warn, prev, warn)
+		// Stopping at the previous version is the warning; older ones are info (03 §4.3).
+		line += fmt.Sprintf(" (%d list %s, %d older only)", warn, prev, len(ps)-warn)
 	}
 	return line + "  (archo problems --code version.unsupported)"
 }

@@ -266,6 +266,21 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d, root := render.New(head)
 	addChanges(c, root, st, r.Changes, render.DefaultLimit, "archo loadout diff --all")
+	if moved > 0 {
+		// Why: what the order broke, strong constraints first (04 §5.3): breaking a strong one
+		// came with more errors in shared logs, a weak or harmless one did not.
+		why := root.Section("why (order constraints the list broke; strong ones go with more errors)")
+		seen := map[string]bool{}
+		for _, b := range order.Broken(r.Input, r.Result) {
+			ev, _ := constraintText(st, r.Input, b.Edge)
+			if seen[ev] {
+				continue
+			}
+			seen[ev] = true
+			why.Addf("%-8s %s", b.Strength, ev)
+		}
+		why.Truncate(12, "")
+	}
 	if len(r.Result.Cycles) > 0 {
 		pr := root.Section("problems")
 		for _, cy := range r.Result.Cycles {
@@ -276,7 +291,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 					refs = append(refs, st.Ix.Ref(nd.Instance))
 				}
 			}
-			p := pr.Addf("warning order.cycle  %s  (kept in current order)", strings.Join(refs, " "))
+			p := pr.Addf("info order.cycle  %s  (kept in current order)", strings.Join(refs, " "))
 			seen := map[string]bool{}
 			for i, e := range cy.Edges {
 				ev, ig := constraintText(st, r.Input, e)
@@ -302,7 +317,24 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			d.AddNext("archo rule add ignore " + ig)
 		}
 	}
-	root.KV("constraints", fmt.Sprintf("%d edges, %d ignored by rules", len(r.Result.Edges), r.Result.Ignored))
+	if len(r.Result.Dropped) > 0 {
+		// Constraints that cannot be satisfied are left out with the reason (04 §5.1).
+		nu := root.Section("not used")
+		seen := map[string]bool{}
+		for _, dr := range r.Result.Dropped {
+			ev, _ := constraintText(st, r.Input, dr.Edge)
+			if !seen[ev] {
+				seen[ev] = true
+				nu.Addf("%s  (%s)", ev, dr.Reason)
+			}
+		}
+		nu.Truncate(12, "")
+	}
+	cs := fmt.Sprintf("%d edges, %d ignored by rules", len(r.Result.Edges), r.Result.Ignored)
+	if n := len(r.Result.Dropped); n > 0 {
+		cs += fmt.Sprintf(", %d not used", n)
+	}
+	root.KV("constraints", cs)
 	if dry && moved > 0 {
 		d.AddNext("archo sort")
 	} else if !dry && len(st.Changes()) > 0 {
@@ -621,5 +653,6 @@ func launchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if dry {
 		d.AddNext("archo launch")
 	}
+	addLaunchChecks(c, root, r.State.Ix)
 	return d, nil
 }

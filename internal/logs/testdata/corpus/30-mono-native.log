@@ -1,0 +1,11 @@
+Error in static constructor of CombatExtended.Compatibility.PawnKindPatcher: System.TypeInitializationException: The type initializer for 'CombatExtended.Compatibility.PawnKindPatcher' threw an exception. ---> System.NullReferenceException: Object reference not set to an instance of an object
+[Ref 65A32969]
+  at CombatExtended.Compatibility.PawnKindPatcher+<>c.<.cctor>b__0_0 (Verse.PawnKindDef i) [0x00033] in <c092b9f9e1f84d09905bb8c476374648>:0
+  at System.Collections.Generic.List`1[T].FindAll (System.Predicate`1[T] match) [0x00013] in <51fded79cd284d4d911c5949aff4cb21>:0
+<0x23da974d280 + 0x0013a> <unknown method>
+   --- End of inner exception stack trace ---
+[Ref 414DB11F]
+(wrapper managed-to-native) System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(intptr)
+  at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor (System.RuntimeTypeHandle type) [0x0002a] in <51fded79cd284d4d911c5949aff4cb21>:0
+  at Verse.StaticConstructorOnStartupUtility.CallAll () [0x00028] in <fcfab19af5d14a608a65ebd77f29482f>:0
+    - POSTFIX LunarFramework.Bootstrap: Void LunarFramework.Internal.Patches.Patch_Verse_StaticConstructorOnStartupUtility:CallAll_Postfix()
