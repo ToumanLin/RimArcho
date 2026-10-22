@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -62,6 +63,7 @@ func main() {
 	lang := flag.String("lang", "", "zh or en (default: the setting)")
 	exe := flag.String("exe", "bin/archo.exe", "the archo executable for scan and analyze children")
 	assets := flag.String("assets", "", "serve the page's files from this folder (edits show on reload)")
+	fake := flag.String("fakegame", "", "while this file exists the current environment's game counts as running (started at its time)")
 	flag.Parse()
 	if !strings.HasPrefix(*addr, "127.0.0.1:") {
 		log.Fatal("loopback only")
@@ -78,6 +80,16 @@ func main() {
 	view.SetLang(l)
 	a.LazyLog, a.LogCacheOnly = true, true
 	a.Launcher = func(string, []string, string) error { return fmt.Errorf("launching is off in the dev harness") }
+	if *fake != "" {
+		// the sidebar's running game (06 §2.1, G17) without starting RimWorld
+		a.GameProbe = func(string) *app.GameRun {
+			fi, err := os.Stat(*fake)
+			if err != nil {
+				return nil
+			}
+			return &app.GameRun{PID: 4242, Started: fi.ModTime()}
+		}
+	}
 	h := &hub{}
 	api := gui.NewAPI(a, h.emit)
 	api.Exe, _ = filepath.Abs(*exe)

@@ -123,18 +123,15 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 	return out
 }
 
-// LiveText is the top bar's "game running since 14:05 · 3 errors", naming the pack when a
-// pack is played ("" when the game is not running).
+// LiveText is the running game's line, "game running since 14:05", naming the pack when a
+// pack is played ("" when the game is not running). The GUI's sidebar foot and the TUI's
+// status line show it with this run's errors as an amber number beside it (06 §2.1, §9.1).
 func LiveText(l *Live) string {
 	if l == nil || !l.Running {
 		return ""
 	}
-	s := Tf("game running since %s", l.Since)
 	if l.Pack != "" {
-		s = Tf("pack %s running since %s", l.Pack, l.Since)
+		return Tf("pack %s running since %s", l.Pack, l.Since)
 	}
-	if l.Errors > 0 {
-		s += " · " + Tf("%d errors", l.Errors)
-	}
-	return s
+	return Tf("game running since %s", l.Since)
 }

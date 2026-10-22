@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // Screen structure (06 §2.2): top bar, blank, body, blank, status line, hint line.
@@ -109,16 +110,7 @@ func (m *model) topBar() string {
 		t := Tf("needs attention %d", n)
 		add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
 	}
-	if t := m.liveText(); t != "" {
-		st := sOK
-		if m.live.Errors > 0 {
-			st = sErrS
-		}
-		add("  "+st.Render(t), 2+width.StringWidth(t))
-	} else if m.live != nil && m.live.NewLog != "" {
-		// 08 §2 "游戏退出后": a new Player.log; the Problems view analyses it
-		add("  "+sAccent.Render(m.live.NewLog), 2+width.StringWidth(m.live.NewLog))
-	}
+	// (the running game is on the status line, 06 §9.1)
 	if m.unsaved > 0 {
 		t := Tf("not written %d", m.unsaved)
 		add("  "+sAccent.Render(ic.unsaved+" "+t), 2+2+width.StringWidth(t))
@@ -160,15 +152,48 @@ func (m *model) renderPos(p string) string {
 	return sAccent.Render(head) + sSecond.Render(rest) + sText.Render(pop)
 }
 
-// statusLine: one sentence, ✓ done (green), ✗ failed (red), … in progress (06 §6).
+// statusLine: the sentence (statusText) and, on its right, the running game while there is
+// something to say (06 §9.1; the sidebar's foot in the GUI): "● game running since 14:05"
+// with this run's errors in amber, or after the game "● analyse this run's log".
 func (m *model) statusLine() string {
 	if m.tags != nil {
 		return m.tagBarLine(m.w)
 	}
+	live, lw := m.liveStatus()
+	if live == "" || lw+3 > m.w {
+		return m.statusText(m.w)
+	}
+	left := m.statusText(m.w - lw - 3)
+	return left + strings.Repeat(" ", max(m.w-lw-3-lipgloss.Width(left), 0)) + "   " + live
+}
+
+// liveStatus is the running game's part of the status line and its width; "" when there is
+// nothing to say ("the game is not running" is not news).
+func (m *model) liveStatus() (string, int) {
+	l := m.live
+	switch {
+	case l != nil && l.Running:
+		t := view.LiveText(l)
+		s, w := sOK.Render("●")+" "+sSecond.Render(t), 2+width.StringWidth(t)
+		if l.Errors > 0 {
+			n := itoa(l.Errors)
+			s, w = s+" "+sWarnS.Render(n), w+1+len(n)
+		}
+		return s, w
+	case l != nil && l.NewLog != "":
+		// 08 §2 "游戏退出后": a new Player.log; 能不能跑 (shift+2) analyses it
+		return sAccent.Render("● "+l.NewLog) + sDimS.Render("  shift+2"), 2 + width.StringWidth(l.NewLog) + 9
+	}
+	return "", 0
+}
+
+// statusText is the status line's sentence in w cells: ✓ done (green), ✗ failed (red), …
+// in progress (06 §6).
+func (m *model) statusText(w int) string {
 	text, kind := m.status, m.sayKind
 	if m.editing && text == "" {
 		if l := m.searchLine(); l != "" {
-			return sSecond.Render(fit(l, m.w))
+			return sSecond.Render(fit(l, w))
 		}
 	}
 	if text == "" && m.scanning {
@@ -191,9 +216,9 @@ func (m *model) statusLine() string {
 		mark = markBusy
 	}
 	if mark == "" {
-		return sSecond.Render(fit(text, m.w))
+		return sSecond.Render(fit(text, w))
 	}
-	return ms.Render(mark) + " " + sText.Render(fit(text, m.w-2))
+	return ms.Render(mark) + " " + sText.Render(fit(text, w-2))
 }
 
 // hintLine: "key label · key label", only what the object can do now, at most 7 (06 §6,
