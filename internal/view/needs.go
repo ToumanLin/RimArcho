@@ -214,7 +214,9 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			versions = append(versions, p)
 			continue
 		}
-		if p.Severity != finding.Error && p.Severity != finding.Warning {
+		// A cycle is info (the corpus saw no effect, 03 §4.3), but only the player can resolve
+		// it: listed with its actions, dimmed and not counted.
+		if p.Severity != finding.Error && p.Severity != finding.Warning && p.Code != "order.cycle" {
 			continue // info: technical information only (06 §5)
 		}
 		subj := subjects(p)
@@ -240,7 +242,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				Why: T("out of order, part of it may not take effect; sorting puts it right"), Evidence: ev})
 		case "order.cycle":
 			add(Need{rank: 2, Group: GroupList, Text: Tf("the order requirements of %d mods contradict each other", len(subj)),
-				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: true, Mods: ids, Status: s,
+				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: p.Severity != finding.Info, Dim: p.Severity == finding.Info, Mods: ids, Status: s,
 				Why: T("they stay in the current order; ignoring the suggested requirement lets sorting work"), Evidence: ev})
 		case "pkg.duplicate-active":
 			add(Need{rank: 3, Group: GroupList, Text: Tf("%s is enabled twice", nm(x)), Actions: []Action{keepOne(st, ids)}, Counted: true, Mods: ids, Status: s,
@@ -279,6 +281,23 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		case "dep.inactive":
 			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("missing dependency: %s", nm(y)), Why: Tf("%s needs it, but it is not enabled.", nm(x)), Evidence: ev})
+		case "dep.observed-missing": // undeclared, seen in shared logs (internal/known)
+			if strings.HasPrefix(y, "pkg:") {
+				dep := strings.TrimPrefix(y, "pkg:")
+				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not installed", nm(x), dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("probably missing: %s", dep), Why: Tf("%s does not declare it, but in shared logs it fails without it. It is not installed.", nm(x)), Evidence: ev})
+			} else {
+				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not enabled", nm(x), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("probably missing: %s", nm(y)), Why: Tf("%s does not declare it, but in shared logs it fails without it. It is not enabled.", nm(x)), Evidence: ev})
+			}
+		case "combo.known-bad":
+			if y != "" {
+				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("%s and %s often fail together", nm(x), nm(y)), Why: T("in shared logs this pair produces errors far more often than either one alone. Disable one if you see errors."), Evidence: ev})
+			} else {
+				add(Need{Group: GroupConflict, Text: Tf("this version of %s often produces errors (seen in shared logs); other versions did not", nm(x)), Actions: []Action{disable(st, x, Tf("disable %s", nm(x)))}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("this version of %s often fails", nm(x)), Why: T("in shared logs this version produces errors; other versions did not. Updating it usually helps."), Evidence: ev})
+			}
 		case "patch.no-match":
 			if y == "" {
 				continue // no inactive target: nothing the player can do (technical information)
@@ -376,7 +395,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			mm := st.GameMM()
 			text := Tf("%d mods do not list %s as supported", n, mm)
 			if prev := app.PrevMinor(mm); prev != "" {
-				text = Tf("%d mods do not list %s as supported (%d of them list %s)", n, mm, n-warn, prev)
+				text = Tf("%d mods do not list %s as supported (%d of them list %s)", n, mm, warn, prev)
 			}
 			names := make([]string, 0, n)
 			for _, v := range versions {

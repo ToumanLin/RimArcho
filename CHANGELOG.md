@@ -13,6 +13,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   staging become its first plan, `default`; each `loadout tag` name becomes a plan of its own
   with one `import` version (04 §1.4).
 - `launch --force` is removed: launching always writes the plan first (08 §2).
+- Severities follow the log corpus (03 §4.3.1): `official.order` error → warning,
+  `order.cycle` warning → info, `version.unsupported` reversed (stopping at the previous minor
+  version → warning, older only → info), `harmony.multi-transpiler` warning → info (warning when
+  a current log's stack passes through the method); `order.violated` is info for weak and
+  harmless constraints (04 §5.3). Analyzer version 7: stored analyses are rebuilt once.
 - `loadout tag` is removed: a named list is a plan (05 §4.3).
 - `archo save` means "write to the game without launching" (04 §4.1).
 - `save` and `launch` refuse while ModsConfig.xml holds an outside change that was not loaded
@@ -466,6 +471,39 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   records what was done.
 - GUI: a 贴图优化 page (estimate, scale, progress, stop, clean), Mod 库存's 优化贴图 /
   清除贴图优化, the pack build's textures option (in the API; the new build page still needs its control); TUI palette panel; MCP `manage_textures`.
+
+### Log corpus (03 §4.3, §4.3.1, §5.3, §6.3, §6.8; 04 §5; 08 §2)
+The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
+- **Severities from the corpus** (G8): each code graded by how often its mods are error
+  sources in the same log against chance; see Breaking. `official.order`'s first suggestion is
+  the cheapest `archo move` (a DLC enabled late goes back after the previous official package).
+- **Constraint strength** (G2, `internal/order/strength.go`, `observed.json`): dependencies,
+  loadBefore, forced orders and user rules are strong (warning); loadAfter and community rules
+  weak (info); rules the corpus saw broken without effect harmless (info, with the counts and an
+  `ignore` suggestion). Constraints that cannot be satisfied (two official packages against the
+  official order, a "load before Core" that closes a cycle) are left out and listed under
+  "not used" in `archo sort`.
+- **Before you play** (`app.LaunchChecks`): `archo launch` and its dry run list the problems
+  that most often end in red errors (`patch.no-match`, `def.parent-missing`, `incompat.active`,
+  `dep.inactive`, `dep.missing`, `dep.observed-missing`, `combo.known-bad`), one row per code
+  with why (the corpus numbers) and fix. It never blocks the launch.
+- **The log corpus layer** (G10, `internal/known`): `dep.observed-missing` (an undeclared
+  prerequisite seen in shared logs), `combo.known-bad` (a pair or a version that errors),
+  `mod.known-error` (a mod's own error), evidence `community`.
+- **Manual Harmony targets** (G9, `internal/harmony/manual.go`, `internal/dotnet/il.go`):
+  `Harmony.Patch` calls and `(MethodBase, HarmonyMethod, …)` wrappers are read from IL; resolved
+  targets are ordinary patches, unresolved ones say why. `HugsLib.dll` is read in its own mod.
+- **Log attribution** (G1/G7): callers of failing code, HugsLib's log upload, Harmony 1.x
+  references, field errors with their Context, XML Extensions blocks, absolute file paths,
+  texture providers, missing assemblies loaded reflection-only, save-load holders. The cluster
+  view shows the full message, its extra lines and the messages around it (`nearby`). The
+  referrer search keeps using the reference index (03 §6.5).
+- **Error patterns** (G5/G11, `internal/patterns`): `[pattern:g:<id>]` on cluster lines, a
+  `pattern:` section in the cluster view (community background: usual causes, route, fixes,
+  repeat-upload evidence), `archo pattern` and MCP `analyze_log pattern=`; MCP Instructions end
+  with a checklist for save loading, missing assets, config errors, assembly loading and noise,
+  and say tool results are capped at 24 KB.
+- Privacy: pattern templates with HugsLib's `[Rimworld_dir]` paths are dropped (2 of 1,036).
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).

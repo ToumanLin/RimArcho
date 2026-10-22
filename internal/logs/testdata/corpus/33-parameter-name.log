@@ -1,0 +1,7 @@
+System.ArgumentNullException: Value cannot be null.
+Parameter name: source
+[Ref 594BA85A]
+  at System.Linq.Enumerable.Where[TSource] (System.Collections.Generic.IEnumerable`1[T] source, System.Func`2[T,TResult] predicate) [0x0000d] in <1f993cbf88314b1baa1e10ca917bdc64>:0
+  at ProstheticsTable.RecipeTransfer_Component.FinalizeInit () [0x000a5] in <2a6aa4073abb454ca2d0393eff3c00af>:0
+  at Verse.GameComponentUtility.FinalizeInit () [0x0001a] in <fcfab19af5d14a608a65ebd77f29482f>:0
+    - POSTFIX smashphil.updatelog: Void UpdateLogTool.UpdateHandler:UpdateOnGameInit()

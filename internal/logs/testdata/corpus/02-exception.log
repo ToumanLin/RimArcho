@@ -1,0 +1,1 @@
+System.TypeLoadException: Invalid type CombatExtended.LightingTracker[] for instance field CombatExtended.CE_Utility:_lightingTrackers

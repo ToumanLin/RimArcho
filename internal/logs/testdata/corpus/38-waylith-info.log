@@ -1,0 +1,20 @@
+2026-10-15 21:54:28.393  INFO [Verse] <color=#34e2eb>AutoTranslation</color>: Starting migration check...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AutoTranslation.Utilities.MigrationHelper.PerformMigration() [0x9] in [Rimworld_dir]\Mods\Auto Translation\Source\AutoTranslation\Utilities\MigrationHelper.cs:24
+    at AutoTranslation.AutoTranslation..ctor(ModContentPack content) [0x13] in [Rimworld_dir]\Mods\Auto Translation\Source\AutoTranslation\AutoTranslation.cs:34
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]

@@ -1,0 +1,5 @@
+SaveableFromNode exception: System.ArgumentException: Can't load abstract class Verse.GameComponent
+[Ref 8A9E09A7]
+  at Verse.ScribeExtractor.SaveableFromNode[T] (System.Xml.XmlNode subNode, System.Object[] ctorArgs) [0x00143] in <fcfab19af5d14a608a65ebd77f29482f>:0
+Subnode:
+<li Class="ResearchPapers.ResearchPapersGameComponent" />

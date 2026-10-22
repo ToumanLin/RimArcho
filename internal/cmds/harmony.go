@@ -156,7 +156,7 @@ func harmonyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			ps.Truncate(limit, "archo harmony --mod "+ix.Ref(m.ID)+" --all")
 		}
 		if manual {
-			root.KV("manual", "targets patched from code are not statically known (archo source search \".Patch(\" --in "+ix.Ref(m.ID)+")")
+			root.KV("manual", "Harmony.Patch calls: targets computed at runtime are not listed (archo source search \".Patch(\" --in "+ix.Ref(m.ID)+")")
 		} else if len(rows) == 0 && len(asms) > 0 {
 			root.Add("no Harmony patches declared")
 		}
