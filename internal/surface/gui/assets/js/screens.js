@@ -95,7 +95,11 @@ export function area(box, head, focus) {
   areas.push({ box, focus: focus || (() => { const f = box.querySelector("button, input, select, [tabindex]"); if (f) f.focus({ preventScroll: true }); }) });
   box.dataset.area = String(n);
   box.classList.toggle("area-on", n === onArea);
-  if (head) head.prepend(el("span", "anum", String(n)));
+  if (!head) return;
+  // a heading kept across visits keeps one number
+  const had = head.querySelector(":scope > .anum");
+  if (had) had.textContent = String(n);
+  else head.prepend(el("span", "anum", String(n)));
 }
 
 // areaKey takes 1–9 on a page: the area is marked, shown and focused. true when taken.

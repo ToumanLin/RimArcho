@@ -148,7 +148,9 @@ function build() {
   els = { root, main, head, rows, th, sizer, side, detail, dhead, scroll, bar: selbar, lead: w.querySelector(".lead") };
   // 1 the filter, 2 the table, 3 the details (06 §3.5); the numbers sit in their headings
   const fb = L.bar.el;
-  fb.querySelector(".fbar-row").prepend(el("span", "anum", "1"));
+  // the bar is kept across visits: mark it once
+  const row = fb.querySelector(".fbar-row");
+  if (!row.querySelector(":scope > .anum")) row.prepend(el("span", "anum", "1"));
   area(fb, null, () => L.bar.focus());
   area(main, null, () => { L.focus = "rows"; rows.focus(); markFocus(); hints(); });
   area(detail, null, () => { L.focus = "detail"; scroll.focus(); markFocus(); hints(); });
