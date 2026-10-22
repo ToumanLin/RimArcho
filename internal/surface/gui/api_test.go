@@ -277,7 +277,7 @@ func TestPackBuildBackground(t *testing.T) {
 		return nil
 	}
 	start := time.Now()
-	if _, err := api.PackBuild("first"); err != nil {
+	if _, err := api.PackBuild("first", false); err != nil {
 		t.Fatal(err)
 	}
 	if time.Since(start) > 2*time.Second {
@@ -298,7 +298,7 @@ func TestPackBuildBackground(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the pages wait for the build")
 	}
-	if _, err := api.PackBuild("second"); err == nil {
+	if _, err := api.PackBuild("second", false); err == nil {
 		t.Fatal("a second build started")
 	}
 	waitPack := func(want string) string {
@@ -342,5 +342,55 @@ func TestPackUnfinishedRows(t *testing.T) {
 	}
 	if l, _ := api.Packs(); len(l.Unfinished) != 0 {
 		t.Fatalf("still listed: %+v", l.Unfinished)
+	}
+}
+
+// G14 (06 §2.6): with an error-level problem the build page disables 编译 and says why,
+// pointing to 能不能跑; 先看清单 writes nothing; once fixed, 编译 is enabled with the sizes.
+func TestBuildPageG14(t *testing.T) {
+	e, api, _ := fixture(t)
+	p, err := api.BuildPage(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Ok || p.Why == "" || !p.ToNeed || len(p.Steps) != 4 || p.Steps[0].Level != view.LevelBad || !p.Steps[0].Needs || len(p.Steps[0].More) == 0 {
+		t.Fatalf("with a problem: %+v", p)
+	}
+	if p.Name == "" || api.PackNameCheck(p.Name) != "" {
+		t.Fatalf("default name %q: %s", p.Name, api.PackNameCheck(p.Name))
+	}
+	lines := api.PackDryRun(p.Name, false)
+	if len(lines) == 0 || !strings.Contains(strings.Join(lines, "\n"), "cannot build") {
+		t.Fatalf("dry run: %v", lines)
+	}
+	if ents, _ := os.ReadDir(e.App.PacksDir()); len(ents) != 0 {
+		t.Fatalf("the dry run wrote %d entries", len(ents))
+	}
+	e.MustRun("enable", "pkg:brrainz.harmony")
+	api.board, api.needs = nil, nil
+	p, err = api.BuildPage(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Ok || p.Why != "" || p.Before == "" || p.After == "" || p.Mods != 2 || p.Steps[0].Level == view.LevelBad {
+		t.Fatalf("fixed: %+v", p)
+	}
+	if l, _ := api.BuildPage(true); l == nil || !l.Light || l.Before != "" || l.Steps[1].Level != view.LevelOff {
+		t.Fatalf("light: %+v", l)
+	}
+	for name, bad := range map[string]bool{"": true, ".x": true, "ok name": false} {
+		if (api.PackNameCheck(name) != "") != bad {
+			t.Errorf("name %q: %q", name, api.PackNameCheck(name))
+		}
+	}
+	if _, err := api.PackBuild("light one", true); err != nil {
+		t.Fatal(err)
+	}
+	if api.PackNameCheck("light one") == "" {
+		t.Fatal("the name of an existing pack is accepted")
+	}
+	pg, err := api.Pack("light one")
+	if err != nil || !pg.Light || len(pg.Mods) == 0 {
+		t.Fatalf("pack page: %+v %v", pg, err)
 	}
 }

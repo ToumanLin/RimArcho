@@ -40,7 +40,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 看历史、对比、回到某个版本（04 §3） | 已完成 | 工具 `plan_history`（只读：log / diff / steps）；回到版本走 `edit_loadout` 的 `checkout` 动作 |
 | 处理外部修改的冲突：看差异 / 载入 / 忽略（04 §4.3） | 已完成 | 看差异 `loadout diff v<n> workspace`、载入 `loadout checkout v<n>`、忽略 `loadout ignore-external`；工具：`plan_history action=diff`、`edit_loadout action=checkout` / `ignore_external` |
 | 锁定版本、解除、更新锁定版本（04 §7） | 已完成 | 工具 `pin_mod`（对应 `pin`，创建锁定版本并在当前方案里换上；`copy_local` 保留为别名）；新增工具 `unpin_mod`；更新锁定版本是 `pin --update <实例>`，并入 `pin_mod` |
-| 整合包：编译、列表、启动、导出、导入、删除、停止编译（08 §5） | 已完成 | 工具 `manage_packs`，`destructiveHint: true` |
+| 整合包：编译、列表、启动、导出、导入、删除、停止编译、移除留下的链接（08 §5） | 已完成 | 工具 `manage_packs`，`destructiveHint: true` |
 | 忽略 / 取消忽略问题（03 §4.2） | 已完成 | 工具 `ignore_problem` |
 | 回答身份待确认项、拆分 / 合并 Lineage（02 §5.4、§6） | 已完成 | 工具 `resolve_identity`，`destructiveHint: true` |
 | 扫描 | 已完成 | 工具 `scan` |
@@ -234,7 +234,7 @@ next:
 | 隐藏的 Mod | `unhide <引用> [--dry-run]` / `trash <引用> [--dry-run]` | 把 `About.xml.disabled` 改回 `About.xml`；把隐藏或已退订的工坊文件夹移到回收站（08 §6、§7） |
 | 工坊订阅 | `workshop unsubscribe <引用…> [--dry-run]` / `workshop subscribe <引用…> [--dry-run]` / `workshop state <引用…>` | 经 Steam 客户端退订（Steam 删掉文件夹）、重新订阅、读状态；连不上 Steam 时报错并给出工坊页面（08 §10） |
 | 整合包 | `pack build <名> [--light] [--dry-run]` / `pack stop <名>` | 把当前方案编译成整合包；`--light` 只有列表不带文件；停止进行中的编译并删除已复制的部分（08 §5.2） |
-| | `pack list` / `pack launch <名> [--dry-run]` | 列出整合包；启动整合包（08 §5.3） |
+| | `pack list` / `pack launch <名> [--dry-run]` / `pack unlink [--dry-run]` | 列出整合包；启动整合包；只删掉 `Mods/` 里整合包的 `!ArchoPack_` 链接（08 §5.3；`problems` 报 `pack.links-left` 时的修法） |
 | | `pack export <名> <文件> [--light]` / `pack import <文件> [--as-plan]` / `pack remove <名> [--dry-run] [--unfinished]` | 导出为 `.archopack`（zip）或 `.archopack.json`（轻包）；导入或对照轻包，`--as-plan` 同时把列表载入当前方案；移到回收站，`--unfinished` 删除被中断的编译（08 §5.4） |
 | 规则 | `rule add after\|before\|incompatible\|attach <A> <B> [--note <文本>]` / `rule add ignore <约束> [--note]` | 用户规则（04 §6）；`ignore` 的目标是 `sort` / `problems` 打印的约束引用 |
 | | `rule list` / `rule remove <r:n>` | |
@@ -320,7 +320,7 @@ next:
 | `ignore_problem` | `problems ignore` / `unignore`（`undo`） | false | false |
 | `scan` | `scan`（`full`） | false | false |
 | `exchange_list` | `loadout export/import`、`collection [--import]` | false | false |
-| `manage_packs` | `pack list/build/launch/export/import/remove/stop` | false | true |
+| `manage_packs` | `pack list/build/launch/export/import/remove/stop/unlink` | false | true |
 | `resolve_identity` | `identity list/resolve`、`lineage split/merge` | false | true |
 | `manage_hidden` | `unhide`、`trash` | false | true |
 | `maintenance` | `data update`、`import rimcrow`、`gc` | false | true |

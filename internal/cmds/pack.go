@@ -21,6 +21,7 @@ func init() {
 		Flags: []Flag{{Name: "as-plan", Help: "light pack: also load its list into the workspace (undoable)"}}})
 	register(&Command{Name: "pack remove", Args: "<name>", Summary: "move a pack to the recycle bin; --unfinished deletes what a build cut short copied", MinArgs: 1, MaxArgs: 1, Run: packRemoveCmd,
 		Flags: []Flag{dry, {Name: "unfinished", Help: "the unfinished build of <name> (its folder in the packs folder)"}}})
+	register(&Command{Name: "pack unlink", Summary: "remove the packs' links from Mods/ (only the links, never the packs)", MaxArgs: 0, Run: packUnlinkCmd, Flags: []Flag{dry}})
 	register(&Command{Name: "pack stop", Args: "<name>", Summary: "stop a running pack build (what it copied is removed)", MinArgs: 1, MaxArgs: 1, Run: packStopCmd})
 }
 
@@ -195,6 +196,13 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	ln.Truncate(10, "")
+	if len(r.InMods) > 0 {
+		n := root.KV("from Mods/", fmt.Sprintf("%d mods: the same version is already in Mods/, so the pack's copy is not linked next to it", len(r.InMods)))
+		for _, m := range r.InMods {
+			n.Add(m)
+		}
+		n.Truncate(10, "")
+	}
 	root.KV("list", fmt.Sprintf("%s (%d entries; the environment's ModsConfig.xml is not touched)", r.ModsConfig, len(r.Tokens)))
 	root.KV("saves", r.UserData)
 	if len(r.Copied) > 0 {
@@ -268,5 +276,30 @@ func packRemoveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return d, nil
 	}
 	d, _ := render.New("moved " + dir + " to the recycle bin")
+	return d, nil
+}
+
+func packUnlinkCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	r, err := c.App.UnlinkPacks(a.Bool("dry-run"))
+	if err != nil {
+		return nil, err
+	}
+	if len(r.Links) == 0 {
+		d, _ := render.New("no pack links in Mods/")
+		return d, nil
+	}
+	head := fmt.Sprintf("removed %d links of pack %s from Mods/ (the pack is unchanged)", len(r.Links), r.PackNames())
+	if a.Bool("dry-run") {
+		head = fmt.Sprintf("pack unlink: dry run, would remove %d links of pack %s", len(r.Links), r.PackNames())
+	}
+	d, root := render.New(head)
+	ln := root.KV("links", r.Mods)
+	for _, l := range r.Links {
+		ln.Add("- " + l.Name)
+	}
+	ln.Truncate(10, "")
+	if a.Bool("dry-run") {
+		d.AddNext("archo pack unlink")
+	}
 	return d, nil
 }

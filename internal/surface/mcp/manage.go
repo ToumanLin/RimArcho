@@ -107,6 +107,8 @@ func PackArgv(in PackIn) []string {
 		return argv("pack", "remove").pos(in.Name).flag("dry-run", in.DryRun).flag("unfinished", in.Unfinished).a
 	case "stop":
 		return argv("pack", "stop").pos(in.Name).a
+	case "unlink":
+		return argv("pack", "unlink").flag("dry-run", in.DryRun).a
 	}
 	return unknown("manage_packs", in.Action)
 }
@@ -180,13 +182,13 @@ type ExchangeIn struct {
 
 type PackIn struct {
 	Env        string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action     string `json:"action" jsonschema:"list, build, launch, export, import, remove or stop"`
+	Action     string `json:"action" jsonschema:"list, build, launch, export, import, remove, stop or unlink"`
 	Name       string `json:"name,omitempty" jsonschema:"the pack (build, launch, export, remove, stop)"`
 	File       string `json:"file,omitempty" jsonschema:"export: the new .archopack / .archopack.json file; import: the file to read"`
 	Light      bool   `json:"light,omitempty" jsonschema:"build / export: the list only, no mod files"`
 	AsPlan     bool   `json:"as_plan,omitempty" jsonschema:"import of a light pack: also load its list into the Loadout (undoable)"`
 	Unfinished bool   `json:"unfinished,omitempty" jsonschema:"remove: delete what an interrupted build of name copied"`
-	DryRun     bool   `json:"dry_run,omitempty" jsonschema:"build / launch / remove: show what would happen, change nothing"`
+	DryRun     bool   `json:"dry_run,omitempty" jsonschema:"build / launch / remove / unlink: show what would happen, change nothing"`
 }
 
 type IdentityIn struct {

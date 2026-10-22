@@ -77,5 +77,26 @@ func init() {
 		"they most likely come from this mod; see the log and evidence before changing anything": "最可能来自这个 Mod；先看看日志和证据再改。",
 		"this plan was changed after it too: load the outside list, or keep yours":               "这个方案之后也改过：可以载入外面的列表，或者保留你的。",
 		"they look alike; your answer decides whether lists and history treat them as one":       "它们很像；你的回答决定列表和历史是否把它们当成同一个。",
+		// a pack's links left in Mods/ (08 §5.3)
+		"pack %s's links put mods twice in Mods/": "整合包 %s 的链接让 Mod 在 Mods/ 里有两份",
+		"pack %s left its links in Mods/ next to other copies of the same mods: the game reports an error for each":                                                                                                   "整合包 %s 的链接留在 Mods/，旁边有同一个 Mod 的另一份：游戏会为每一个报错",
+		"a game started from Steam finds two folders with one packageId, reports an error and ignores one; launching from RimArcho removes the links, and launching the pack makes them again without the duplicates": "从 Steam 启动时，游戏看到两个同包名的文件夹，会报错并忽略其中一个。从 RimArcho 启动会自动移除这些链接；再启动这个包时会重建，但不会和已有的那份重复。",
+		// two folders of one packageId in Mods/ (08 §3)
+		"Mods/ holds %s twice": "Mods/ 里有两份 %s",
+		"Mods/ has %d folders with packageId %s: the game reports an error and ignores all but one":                                                                "Mods/ 里有 %d 个包名都是 %s 的文件夹：游戏会报错，只用其中一个",
+		"RimArcho links %s for this plan, and Mods/ already has the same mod; use the copy in Mods/ (the link goes the next time the plan is written to the game)": "RimArcho 为这个方案链接了 %s，而 Mods/ 里已经有同一个 Mod；改用 Mods/ 里的那份（下次写入游戏时链接会去掉）。",
+		"use the copy in Mods/":                                   "改用 Mods/ 里的",
+		"the plan uses the copy of %s in Mods/ (not written yet)": "方案改用 Mods/ 里的 %s（还没写入游戏）",
+		"RimArcho links %s for this plan, and Mods/ has another mod with the same packageId; take it out of the plan, or move the folder out of Mods/": "RimArcho 为这个方案链接了 %s，而 Mods/ 里有另一个同包名的 Mod；把它移出方案，或者把那个文件夹移出 Mods/。",
+		"take it out of the plan": "移出方案",
+		"RimArcho did not make these folders and does not move them: move all but one out of Mods/ yourself": "这些文件夹不是 RimArcho 建的，它不会去动：请自己把多余的移出 Mods/，只留一个。",
+		"remove the links":                      "移除链接",
+		"the links of pack %s are out of Mods/": "整合包 %s 的链接已从 Mods/ 移除",
+		"pack %s left its links in Mods/: a game started from Steam loads the pack's copies": "整合包 %s 的链接还在 Mods/：从 Steam 启动的游戏会读到包里的副本",
+		"pack %s left its links in Mods/": "整合包 %s 的链接还在 Mods/",
+		"a game started from Steam, not from RimArcho, loads the pack's copies instead of this plan's mods; launching from RimArcho removes them, and launching the pack makes them again": "不经过 RimArcho、直接从 Steam 启动时，游戏读到的是包里的副本，不是这个方案的 Mod。从 RimArcho 启动会自动移除它们，再启动这个包时会重新建立。",
+		"the game is running with pack %s's copies: it was not started from RimArcho":                                                                                                      "游戏正在用整合包 %s 的副本运行：它不是从 RimArcho 启动的",
+		"the game is running with pack %s's copies": "游戏正在用整合包 %s 的副本运行",
+		"it was started from Steam while the pack's links were in Mods/, so it loaded the pack's copies; close the game, then remove the links": "它是在包的链接还在 Mods/ 时从 Steam 启动的，所以读到了包里的副本。先关掉游戏，再移除链接。",
 	})
 }

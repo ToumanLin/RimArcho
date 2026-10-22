@@ -189,6 +189,11 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("manage_packs", map[string]any{"action": "build", "name": "first"}, "pack", "build", "first"),
 		s("manage_packs", map[string]any{"action": "launch", "name": "first", "dry_run": true}, "pack", "launch", "first", "--dry-run"),
 		s("manage_packs", map[string]any{"action": "launch", "name": "first"}, "pack", "launch", "first"),
+		// 08 §5.3: the pack's links stay in Mods/ after the game; a launch from Steam would load them.
+		s("list_problems", map[string]any{"code": "pack"}, "problems", "--code", "pack", "--min-severity", "warning"),
+		s("manage_packs", map[string]any{"action": "unlink", "dry_run": true}, "pack", "unlink", "--dry-run"),
+		s("manage_packs", map[string]any{"action": "unlink"}, "pack", "unlink"),
+		s("list_problems", map[string]any{"code": "pack"}, "problems", "--code", "pack", "--min-severity", "warning"),
 		s("manage_packs", map[string]any{"action": "export", "name": "first", "file": light, "light": true}, "pack", "export", "first", light, "--light"),
 		s("manage_packs", map[string]any{"action": "import", "file": light}, "pack", "import", light),
 		s("manage_packs", map[string]any{"action": "stop", "name": "first"}, "pack", "stop", "first"),

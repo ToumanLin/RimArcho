@@ -30,6 +30,19 @@ func BreakCount(n *Needs) int {
 	return c
 }
 
+// PackLinksText is the title of 能不能跑's item for a pack's links left in Mods/ ("" when
+// there is none).
+func PackLinksText(n *Needs) string {
+	for _, it := range n.Items {
+		for _, a := range it.Actions {
+			if a.Kind == ActUnlinkPacks {
+				return it.Title
+			}
+		}
+	}
+	return ""
+}
+
 // LastRunErrors is the number of the last run's errors in 能不能跑.
 func LastRunErrors(n *Needs) int {
 	c := 0
@@ -189,6 +202,9 @@ type HomeRow struct {
 	Current bool   `json:"current,omitempty"`
 	Mark    string `json:"mark,omitempty"`
 	InGame  bool   `json:"inGame,omitempty"`
+	// Links: the current plan's row when a pack's links are left in Mods/ (08 §5.3), the
+	// sentence of its 能不能跑 item; the launch button's tab shows it.
+	Links string `json:"links,omitempty"`
 	// EnvName is its environment, Versions the game versions it runs on ("1.7"; a pack's
 	// from its mods, "1.5–1.6"), Mods its number of mods; OtherEnv: not the current
 	// environment (applying it switches environments first).
@@ -237,6 +253,7 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 				r.Facts += " · " + Tf("%d not written", b.Unsaved)
 			}
 			k, checked = BreakCount(n), !n.Never
+			r.Links = PackLinksText(n)
 		} else {
 			k, checked = PlanProblems(a, p.ID)
 		}

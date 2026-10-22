@@ -44,8 +44,58 @@ func ProblemRef(f *finding.Finding, lineage string) string {
 }
 
 // Problems collects the declaration layer (computed now) and the stored Def/Patch layers.
-// With ensure, a stale or missing analysis is rebuilt first.
+// With ensure, a stale or missing analysis is rebuilt first. A pack's links left in Mods/
+// (08 §5.3) are looked at every time: they change on disk, outside what the cache knows.
 func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) {
+	ps, err := a.problems(ensure, progress)
+	if err != nil || ps.State == nil {
+		return ps, err
+	}
+	// What Mods/ holds now (08 §3, §5.3): a pack's links left there, and two folders of one
+	// packageId, which the game reports as an error.
+	ix := ps.State.Ix
+	dups := ModsDuplicates(a.ModsCopies(ix))
+	var extra []*finding.Finding
+	if l := a.LeftPackLinks(ix); l != nil {
+		for _, d := range dups {
+			if d.onlyPacks() {
+				l.Duplicates = append(l.Duplicates, d)
+			}
+		}
+		extra = append(extra, l.Finding())
+	}
+	extra = append(extra, duplicateFindings(ps.State, dups)...)
+	if len(extra) > 0 {
+		c := *ps
+		c.List = append([]*Problem{}, ps.List...)
+		for _, f := range extra {
+			lin := ""
+			if m := ix.ByID[f.SubjectInstance()]; m != nil {
+				lin = m.LineageID
+			}
+			p := &Problem{Finding: f, Ref: ProblemRef(f, lin)}
+			i := 0
+			for i < len(c.List) && sevRank(c.List[i].Severity) <= sevRank(f.Severity) {
+				i++
+			}
+			c.List = append(c.List[:i], append([]*Problem{p}, c.List[i:]...)...)
+		}
+		ps = &c
+	}
+	return ps, nil
+}
+
+func sevRank(s string) int {
+	switch s {
+	case finding.Error:
+		return 0
+	case finding.Warning:
+		return 1
+	}
+	return 2
+}
+
+func (a *App) problems(ensure bool, progress func(string)) (*ProblemSet, error) {
 	ps := &ProblemSet{}
 	if ensure {
 		ps.Analysis, ps.AnalysisErr = a.EnsureAnalysis(progress)

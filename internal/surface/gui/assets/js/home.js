@@ -158,16 +158,18 @@ function launcher(r) {
 }
 
 // problem: what is wrong with the applied list, as a tab under the button; nothing when
-// all is well. The current plan's goes to 能不能跑.
+// all is well. The current plan's goes to 能不能跑: problems that break the game, else a
+// pack's links left in Mods/ (08 §5.3), else an outside version not loaded.
 function problem(r) {
-  if (r.level !== "bad" && !r.mark) return null;
-  const p = el(r.current && r.level === "bad" ? "button" : "div", "issue" + (r.level === "bad" ? " bad" : ""));
+  if (r.level !== "bad" && !r.mark && !r.links) return null;
+  const links = r.level !== "bad" && r.links;
+  const p = el(r.current && (r.level === "bad" || links) ? "button" : "div", "issue" + (r.level === "bad" ? " bad" : ""));
   if (r.level === "bad") {
     const i = el("span", "ic");
     i.innerHTML = icon.warn;
     p.append(i);
   }
-  p.append(el("span", "t", r.level === "bad" ? r.state : r.mark));
+  p.append(el("span", "t", r.level === "bad" ? r.state : links || r.mark));
   if (p.tagName === "BUTTON") {
     p.append(el("span", "go", "→"));
     p.title = T("can it run");

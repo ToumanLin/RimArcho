@@ -388,6 +388,40 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - Measured on the same data copy, GPU on: idle 202 → 138 MB, plan editor 204 → 138,
   Mod 库存 175 → 151, minimised 171 → 105. GPU off: 182 → 123, 185 → 123, 155 → 132, 150 → 88.
 
+### Packs (06 §2.6, §2.7, 08 §5.3, §7)
+- The recycle bin has one entry that checks the allow-list (08 §7) for every caller: a mod
+  folder inside a source folder (not the folder itself), a pack directly in the pack folder,
+  saves (a game's `Saves/`, own save folders, save backups) and a game downloaded with
+  SteamCMD. A link, or any other path, is refused whoever asks (`trash`, `pack remove`,
+  Mod 库存, moving copies to the lock library, uninstall).
+- 编译成整合包 is the current plan's own page, laid out as drawn: the name and full / light
+  pack, the four things building does (check, leave out, lock, put in place) with their
+  numbers, and a summary (environment, mods, size before → after, own saves, location) with
+  编译 and 先看清单，不写磁盘 (the text of `pack build --dry-run`). With error-level problems
+  编译 is disabled and says 先修好 N 个问题 →, which opens 能不能跑 (G14); not enough space, an
+  unreadable mod, a bad or taken name and a build in progress disable it too. The build's
+  progress shows on the four steps with 停止; a finished build opens its pack. Builds cut
+  short are listed below. Keys: `B` build, `V` the dry run, `T` full / light, `n` the name,
+  `esc` back to the plan. The old build popup is gone.
+- Each pack is a sub-entry under 整合包 with a page of its own: what it is, 启动 (`L`), 导出
+  (`e`, a save dialog) and 移到回收站 (`Del`), and its mods in load order with their sizes and
+  the version folders left out. `tab` / `shift+tab` go from pack to pack (from the list: the
+  first one); the list opens a pack with `enter`.
+- `Mods/` never gets two copies of one packageId from RimArcho (the game logs "Tried loading
+  mod with the same packageId multiple times" and ignores one; the player's 2026-10-21 log
+  had six, from launching the pack 测试 next to RimCrow-style copies). Launching a pack uses
+  the copy already in `Mods/` when it is the same version (listed as "from Mods/"), refuses
+  and names the folders when it is another version, and drops a plan's `_Archo_` link of the
+  same package for the run. Writing a plan refuses a new `_Archo_` link next to another copy
+  in `Mods/`. Such pairs already there are `pkg.duplicate-mods` errors in 能不能跑 › 会让游戏出错,
+  whoever made them; the fix only ever changes RimArcho's own links or the plan, never the
+  player's folders. Pack links that duplicate a copy raise `pack.links-left` to an error.
+- A pack's `!ArchoPack_` links left in `Mods/` while the pack is not being played (a game
+  started from Steam would load the pack's copies) are a problem of the plan,
+  `pack.links-left`: in 能不能跑 › 要你确认 with 移除链接, in the tab under 启动游戏, in
+  `archo problems` and MCP `list_problems`. `archo pack unlink [--dry-run]` / MCP
+  `manage_packs action=unlink` remove only the links; refused while a game runs.
+
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
 - `collection <id> --import` replaces the list with only the collection's mods, dropping Core.

@@ -212,8 +212,10 @@ func (a *App) PlanPack(name string, light bool) (*PackPlan, error) {
 		if p.Log != nil {
 			continue
 		}
-		// Order problems do not block: the pack is sorted on its own below.
-		if p.Severity == finding.Error && !strings.HasPrefix(p.Code, "order.") && p.Code != "official.order" {
+		// Order problems do not block: the pack is sorted on its own below. Nor does what
+		// Mods/ holds now (leftover links, two folders of one mod): launching the pack deals
+		// with it, and the build only writes to the packs folder.
+		if p.Severity == finding.Error && !strings.HasPrefix(p.Code, "order.") && p.Code != "official.order" && p.Code != CodePackLinks && p.Code != CodeModsDuplicate {
 			r.Blockers = append(r.Blockers, p.Claim)
 		} else if p.Code == "version.unsupported" && len(p.Subjects) > 0 {
 			line := p.Claim
@@ -583,6 +585,7 @@ type PackLaunch struct {
 	Plan       *LaunchPlan
 	DryRun     bool
 	Copied     []string // settings files copied from the environment on the first run
+	InMods     []string // mods whose copy already in Mods/ (the same content) stands in for the pack's
 }
 
 func packLink(name string) bool {
@@ -621,44 +624,80 @@ func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 	dir := a.packPath(name)
 	r := &PackLaunch{Pack: p, UserData: filepath.Join(dir, "userdata"), DryRun: dryRun}
 	r.ModsConfig = env.ModsConfigPath(r.UserData)
-	// How the game will register the pack's copies next to what is in Mods/ (04 §4.2).
+	// What Mods/ holds besides this pack (08 §5.3 step 2): a second folder with a pack copy's
+	// packageId makes the game report an error and ignore one of them, so a pack copy is
+	// never linked next to one. A copy of the player's (a folder, or another tool's link)
+	// with the same content stands in for the pack's; with other content the launch is
+	// refused. A plan's _Archo_ link of the same packageId is removed for the run (writing
+	// the plan to the game makes it again).
+	byPkg := map[string][]ModsCopy{}
+	for _, c := range a.ModsCopies(st.Ix) {
+		byPkg[c.PackageID] = append(byPkg[c.PackageID], c)
+	}
 	cands := Candidates(st.Ix, st.Aliases)
-	want := map[string]string{} // link name (lower) → target
+	want := map[string]string{}         // link name (lower) → target
+	useLocal := map[string]*store.Mod{} // pack folder → the player's copy that stands in
+	dropDeploy := map[string]bool{}     // _Archo_ link names (lower) that would duplicate
+	var conflicts []string
 	for _, pe := range p.Entries {
 		if pe.Official {
 			continue
 		}
-		link := packLinkName(name, pe.Folder)
-		want[strings.ToLower(link)] = filepath.Join(dir, "mods", pe.Folder)
-		cands = append(cands, loadout.Candidate{ID: "pack:" + pe.Folder, PackageID: pe.PackageID, Kind: source.Local, Folder: link})
+		var player []ModsCopy
+		for _, c := range byPkg[strings.ToLower(pe.PackageID)] {
+			switch c.By {
+			case CopyDeploy:
+				dropDeploy[strings.ToLower(c.Name)] = true
+			case CopyPlayer:
+				player = append(player, c)
+			}
+		}
+		switch {
+		case len(player) == 0:
+			link := packLinkName(name, pe.Folder)
+			want[strings.ToLower(link)] = filepath.Join(dir, "mods", pe.Folder)
+			cands = append(cands, loadout.Candidate{ID: "pack:" + pe.Folder, PackageID: pe.PackageID, Kind: source.Local, Folder: link})
+		case len(player) == 1 && packSameContent(pe, player[0].Mod):
+			useLocal[pe.Folder] = player[0].Mod
+		default:
+			var ns []string
+			for _, c := range player {
+				ns = append(ns, "Mods/"+c.Name)
+			}
+			conflicts = append(conflicts, fmt.Sprintf("%s: %s has the same packageId with other content than the pack's copy", pe.Name, strings.Join(ns, ", ")))
+		}
+	}
+	if len(conflicts) > 0 {
+		return nil, fmt.Errorf("%w: Mods/ already holds %d of the pack's mods in another version; the game would load both and report an error. Move those folders out of Mods/, or build the pack again from the current list:\n  %s", ErrLaunchBlocked, len(conflicts), strings.Join(conflicts, "\n  "))
 	}
 	reg := loadout.NewRegistry(cands)
-	var conflicts []string
 	for _, pe := range p.Entries {
 		if pe.Official {
 			r.Tokens = append(r.Tokens, pe.PackageID)
 			continue
 		}
+		if m := useLocal[pe.Folder]; m != nil {
+			r.Tokens = append(r.Tokens, reg.Token(m.ID))
+			r.InMods = append(r.InMods, pe.Name)
+			continue
+		}
 		id := "pack:" + pe.Folder
 		if !reg.Loadable(id) {
-			for _, o := range reg.SamePackage(id) {
-				if o.Kind != source.Workshop && reg.Loadable(o.ID) {
-					conflicts = append(conflicts, fmt.Sprintf("%s: Mods/%s has the same packageId and the game takes it first", pe.Name, o.Folder))
-				}
-			}
-			continue
+			return nil, fmt.Errorf("%w: the game would not load the pack's copy of %s", ErrLaunchBlocked, pe.Name)
 		}
 		r.Tokens = append(r.Tokens, reg.Token(id))
 	}
-	if len(conflicts) > 0 {
-		return nil, fmt.Errorf("%w: the game would not load the pack's copy of %d mods:\n  %s", ErrLaunchBlocked, len(conflicts), strings.Join(conflicts, "\n  "))
-	}
-	// Links: other packs' go, this pack's are made (or fixed).
+	// Links: other packs' and the duplicating _Archo_ ones go, this pack's are made (or fixed).
 	ents, _ := os.ReadDir(mods)
 	have := map[string]bool{}
 	for _, de := range ents {
 		n := de.Name()
 		lp := filepath.Join(mods, n)
+		if dropDeploy[strings.ToLower(n)] && source.IsLink(lp) {
+			tgt, _ := source.RealPath(lp)
+			r.Links = append(r.Links, LinkChange{Op: "remove", Name: n, Target: tgt})
+			continue
+		}
 		if !packLink(n) || !source.IsLink(lp) {
 			continue
 		}
@@ -670,7 +709,7 @@ func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 		r.Links = append(r.Links, LinkChange{Op: "remove", Name: n, Target: tgt})
 	}
 	for _, pe := range p.Entries {
-		if pe.Official {
+		if pe.Official || useLocal[pe.Folder] != nil {
 			continue
 		}
 		link := packLinkName(name, pe.Folder)
@@ -966,9 +1005,5 @@ func (a *App) RemovePack(name string, dryRun bool) (string, error) {
 			}
 		}
 	}
-	trash := a.TrashFunc
-	if trash == nil {
-		trash = source.Trash
-	}
-	return dir, trash(dir)
+	return dir, a.ToTrash(dir)
 }

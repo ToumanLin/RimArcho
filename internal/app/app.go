@@ -76,6 +76,9 @@ type App struct {
 	GameProbe func(gameRoot string) *GameRun
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
+	// trashAllow replaces the recycle bin's allow-list check (08 §7) in tests of a bare App
+	// with no store; nil means trashAllowed.
+	trashAllow func(path string) error
 	// SteamWorker runs `archo steam-worker <args>` in the Steam runtime folder and returns
 	// its output; nil starts this executable (tests fake Steam with it, 06 §2.9).
 	SteamWorker func(dir string, args []string) (string, error)
@@ -117,13 +120,14 @@ type App struct {
 
 	dataIdx *dataIndex // community data indexes (04 §6.3), loaded on first use
 
-	ixCache *Index
-	ixKey   string
-	stCache *LoadoutState
-	stKey   string
-	prCache *ProblemSet
-	prKey   string
-	planPS  map[int64]*planProblems // PlanProblems, by plan
+	ixCache    *Index
+	ixKey      string
+	stCache    *LoadoutState
+	stKey      string
+	modsCopies *modsCopiesCache
+	prCache    *ProblemSet
+	prKey      string
+	planPS     map[int64]*planProblems // PlanProblems, by plan
 
 	logCache   *logCacheEntry
 	harmonyDir string
