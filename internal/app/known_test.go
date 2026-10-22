@@ -107,6 +107,32 @@ func TestKnownFindings(t *testing.T) {
 	if n := len(byCode(ps.List, "combo.known-bad")); n != 4 {
 		t.Fatalf("combo.known-bad after enabling lib: %d", n)
 	}
+
+	// The pre-launch list takes the G10 codes at warning level only.
+	ws, _, err := e.App.LaunchWarnings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 0
+	for _, p := range byCode(ps.List, "combo.known-bad") {
+		if p.Severity != "info" {
+			want++
+		}
+	}
+	got := 0
+	for _, w := range ws {
+		for _, p := range w.Problems {
+			if w.Check.Code == "combo.known-bad" {
+				got++
+			}
+			if w.Check.NoInfo && p.Severity == "info" {
+				t.Errorf("info problem in the pre-launch list: %+v", p.Finding)
+			}
+		}
+	}
+	if got != want {
+		t.Errorf("combo.known-bad in the pre-launch list: %d, want %d", got, want)
+	}
 }
 
 type appProblem = app.Problem

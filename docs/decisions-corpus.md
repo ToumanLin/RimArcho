@@ -111,8 +111,9 @@ logs of 1.6 with full mod lists. Numbers in `spikes/corpusrun/RESULT.txt` "Final
 
 - ~~Lower `dep.missing (lib)` and `official.order` from error; consider `patch.contested` as warning.~~
   Done in G8 (§2): `official.order` warning; `dep.missing` and `patch.contested` kept, with reasons.
-- Pre-launch list (04 §8): add the G10 missing-dependency / known-bad-combination codes to
-  `app.LaunchChecks` once measured; check the list's precision on new corpus runs.
+- ~~Pre-launch list (04 §8): add the G10 missing-dependency / known-bad-combination codes to
+  `app.LaunchChecks`~~: `dep.observed-missing` and `combo.known-bad` added at warning level
+  only (merge of G6–G11). Still to do: check the list's precision on new corpus runs.
 - ~~IL scan for manual `Harmony.Patch` targets; scan HugsLib.dll~~ (G9, §2).
 - `harmony.multi-transpiler` warnings rose from 4,559 to 11,078 clusters with G9's IL scan;
   review its severity the way G8 did.

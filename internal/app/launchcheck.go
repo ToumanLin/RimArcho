@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 	"slices"
+
+	"github.com/ToumanLin/RimArcho/internal/finding"
 )
 
 // LaunchCheck is one row of the pre-launch list (04 §8): a problem code whose mods were error
@@ -17,6 +19,8 @@ type LaunchCheck struct {
 	Why string
 	// Many describes several problems of the code: n problems over mods subject mods.
 	Many func(n, mods int) string
+	// NoInfo leaves out the code's info-level problems (the weaker corpus observations).
+	NoInfo bool
 }
 
 // LaunchChecks in the order they are shown: most predictive first (observed / chance).
@@ -46,6 +50,18 @@ var LaunchChecks = []LaunchCheck{
 		Many: func(n, mods int) string {
 			return fmt.Sprintf("%d dependencies of %s are not installed", n, count(mods, "mod", "mods"))
 		}},
+	// G10 (decisions-corpus §2): learned from shared logs, warning level only. When the next
+	// upload changed the mods involved, the error was gone in every case (8/8 and 48/48).
+	{Code: "dep.observed-missing", NoInfo: true,
+		Why: "the mod uses content from a mod that is not enabled, without declaring it: in shared logs it then errored in at least half of the cases",
+		Many: func(n, mods int) string {
+			return fmt.Sprintf("%s use content from %s that are not enabled", count(mods, "mod", "mods"), count(n, "mod", "mods"))
+		}},
+	{Code: "combo.known-bad", NoInfo: true,
+		Why: "in shared logs this mod errored in at least half of the lists with the other mod (or this version), far less without it",
+		Many: func(n, _ int) string {
+			return fmt.Sprintf("%s of mods or versions are known to error", count(n, "combination", "combinations"))
+		}},
 }
 
 // LaunchWarning is the problems of one LaunchCheck code in the enabled list.
@@ -72,7 +88,7 @@ func (a *App) LaunchWarnings() ([]*LaunchWarning, *AnalysisState, error) {
 	}
 	for _, p := range ps.List {
 		w := by[p.Code]
-		if w == nil || p.Log != nil {
+		if w == nil || p.Log != nil || (w.Check.NoInfo && p.Severity == finding.Info) {
 			continue
 		}
 		w.Problems = append(w.Problems, p)
