@@ -13,16 +13,16 @@ func TestSearchCompletes(t *testing.T) {
 	press(m, "1")
 	press(m, "/")
 	typeIn(m, "au")
-	if g := m.searchGhost(); g != "thor:" {
+	if g := m.bar.ghost; g != "thor:" {
 		t.Fatalf("ghost %q", g)
 	}
 	pressKey(m, tea.KeyTab)
-	if f := m.col().filter; f != "author:" {
+	if f := m.bar.search; f != "author:" {
 		t.Fatalf("filter %q after Tab", f)
 	}
 	typeIn(m, "x ty")
 	pressKey(m, tea.KeyTab)
-	if f := m.col().filter; f != "author:x type:" {
+	if f := m.bar.search; f != "author:x type:" {
 		t.Fatalf("filter %q after second Tab", f)
 	}
 }

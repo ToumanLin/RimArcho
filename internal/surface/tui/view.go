@@ -43,10 +43,15 @@ func (m *model) View() string {
 	case m.pos != nil:
 		// The position input sits under the columns, which give it their last lines.
 		sheet := m.posLines(m.w)
-		content, ps = m.columnLines(max(body-len(sheet)-1, 3))
-		content = append(append(content, ""), sheet...)
+		bar := m.barView(m.w)
+		content, ps = m.columnLines(max(body-len(bar)-len(sheet)-1, 3))
+		content = append(append(append(bar, content...), ""), sheet...)
+		ps = shiftPlacements(ps, len(bar))
 	default:
-		content, ps = m.columnLines(body)
+		bar := m.barView(m.w)
+		content, ps = m.columnLines(max(body-len(bar), 3))
+		content = append(bar, content...)
+		ps = shiftPlacements(ps, len(bar))
 	}
 	if m.images != nil {
 		m.images.set(ps) // an empty list clears the images of the previous screen
@@ -56,6 +61,9 @@ func (m *model) View() string {
 	}
 	lines[h-2] = m.statusLine()
 	lines[h-1] = m.hintLine()
+	if m.menu != nil {
+		m.overlayMenu(lines)
+	}
 	for i, l := range lines {
 		if lipgloss.Width(l) > m.w {
 			lines[i] = width.Truncate(l, m.w, "")
@@ -194,6 +202,8 @@ func (m *model) hintLine() string {
 	var pairs [][2]string
 	prefix := ""
 	switch {
+	case m.menu != nil:
+		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
 	case m.pal != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
 	case m.pos != nil:
@@ -202,6 +212,10 @@ func (m *model) hintLine() string {
 		return sAccent.Render(markPrompt+" ") + sSecond.Render(m.prompt.label) + sText.Render(m.prompt.text+"_")
 	case m.editing:
 		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"tab", T("next list with matches")}, {"↑↓", T("move")}}
+	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
+		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"tab", T("complete")}, {"backspace", T("drops the last filter")}, {"↑↓", T("move")}}
+	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
+		pairs = [][2]string{{"↑↓", T("group")}, {"←→", T("value")}, {"enter", T("only these")}, {"x", T("leave out")}, {T("type"), T("find a value")}, {"esc", T("close")}}
 	case m.panel != nil && m.panel.choices != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("confirm")}, {"esc", T("back")}}
 	case m.tags != nil:
@@ -211,17 +225,17 @@ func (m *model) hintLine() string {
 	case m.insp != nil:
 		pairs = [][2]string{{"esc", T("back")}, {"backspace", T("previous page")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
 	case m.full:
-		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"g", T("tags")}, {"ctrl+w", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
 	case m.tab == tabChanges && m.chg.of != "":
 		pairs = [][2]string{{"esc", T("every mod")}, {"enter", T("file changes")}}
 	case m.tab == tabChanges:
 		pairs = [][2]string{{"esc", T("back")}, {"enter", T("file changes")}}
-	case m.tab == tabLibrary && m.libr.typing:
-		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"key:value", T("keep")}, {"-key:value", T("leave out")}}
+	case m.tab == tabLibrary && (m.libr.full || m.libr.detail):
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"enter", T("full screen")}, {"esc", T("back")}, {"F10", T("menu")}, {"?", T("all keys")}}
 	case m.tab == tabLibrary:
-		pairs = [][2]string{{"↑↓", T("choose")}, {"/", T("filter")}, {"enter", T("copies")}, {"n", T("note")}, {"ctrl+o ctrl+w", T("folder / Workshop page")}, {"C", T("this mod's changes")}, {"esc", T("back")}}
+		pairs = m.libPairs()
 	case m.selCount() > 0:
 		// 06 §3.4: what the selection can do, and that another list drops it.
 		prefix = Tf("selected %d", m.selCount())
@@ -233,7 +247,7 @@ func (m *model) hintLine() string {
 		}
 		pairs = append(pairs, [2]string{"?", T("all keys")})
 	case m.detailFocus:
-		pairs = [][2]string{{"↑↓", T("scroll")}, {"←", T("back to the list")}, {"enter", T("full screen")}, {"#", T("tags")}, {"ctrl+o ctrl+w", T("folder / Workshop page")}, {"C", T("this mod's changes")}, {"?", T("all keys")}}
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"←", T("back to the list")}, {"enter", T("full screen")}, {"g", T("tags")}, {"ctrl+o ctrl+w", T("folder / Workshop page")}, {"C", T("this mod's changes")}, {"?", T("all keys")}}
 	default:
 		pairs = append(m.verbPairs(), [2]string{"/", T("search")})
 		if m.layout().tabs {
@@ -279,11 +293,11 @@ func (m *model) verbPairs() [][2]string {
 	one := [2]string{"ctrl+o ctrl+w", T("folder / Workshop page")}
 	switch m.focus {
 	case cInactive:
-		return [][2]string{{"space", T("enable")}, {"m", T("enable at…")}, {"t", T("stage")}, one, {"#", T("tags")}}
+		return [][2]string{{"space", T("enable")}, {"m", T("enable at…")}, {"t", T("stage")}, one, {"g", T("tags")}}
 	case cActive:
-		return [][2]string{{"space", T("disable")}, {"J K", T("move")}, {"m", T("move to…")}, {"t", T("stage")}, one, {"#", T("tags")}}
+		return [][2]string{{"space", T("disable")}, {"J K", T("move")}, {"m", T("move to…")}, {"t", T("stage")}, one, {"g", T("tags")}}
 	}
-	ps := [][2]string{{"space", T("put back")}, {"m", T("enable at…")}, one, {"#", T("tags")}}
+	ps := [][2]string{{"space", T("put back")}, {"m", T("enable at…")}, one, {"g", T("tags")}}
 	if m.selCount() == 0 {
 		ps = append(ps, [2]string{"T", T("put all back")})
 	}

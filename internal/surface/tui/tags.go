@@ -110,6 +110,9 @@ func (m *model) applyTag(tb *tagBar, tag string, remove bool) tea.Cmd {
 		m.say(sayOK, Tf("tags of %s: %s", tb.names, msg))
 	}
 	m.refilterCol(m.focus, m.col().curID())
+	if m.tab == tabLibrary {
+		m.loadLibrary()
+	}
 	return m.requestDetail()
 }
 

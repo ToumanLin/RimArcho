@@ -100,6 +100,7 @@ type LibInstance struct {
 	States   []string // LibStates order
 	UsedIn   []LibUse
 	InPlan   bool // the current plan uses it
+	Staged   bool // in the current plan's staging (06 §2.5)
 	// Played: the newest launch whose list held it (launch records, 08 §1).
 	Played  time.Time
 	Changed time.Time // the newest scan that recorded a change
@@ -291,13 +292,19 @@ func (a *App) Library() (*Library, error) {
 			l.search += " " + strings.ToLower(i.Note.Text)
 		}
 	}
+	staged := map[string]bool{}
+	if items, _, err := a.Staged(); err == nil {
+		for _, it := range items {
+			staged[it.Instance] = true
+		}
+	}
 	for _, m := range ix.Mods {
 		if m.Status != identity.Live || m.Kind == source.Official || srcKind[m.SourceID] == "" {
 			continue
 		}
 		i := &LibInstance{Mod: m, Ref: ix.Ref(m.ID), Source: srcKind[m.SourceID], WorkshopID: m.WorkshopID(), Path: ix.ModDir(m),
 			Bytes: m.TotalSize, Sized: m.SnapID != 0 && (m.FileCount > 0 || m.TotalSize > 0),
-			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID],
+			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Staged: staged[m.ID], Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID],
 			Authors: strings.TrimSpace(m.Authors), Note: notes[m.ID]}
 		if m.ACFTimeUpdated > 0 {
 			i.Updated = time.Unix(m.ACFTimeUpdated, 0).UTC()

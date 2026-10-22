@@ -87,7 +87,7 @@ func TestHistoryArea(t *testing.T) {
 		t.Fatalf("redo row not drawn:\n%s", s)
 	}
 	// A saved version: one enter loads it (one step, u brings the list back; 06 §6).
-	press(m, "G")
+	press(m, "end")
 	h := m.hist[m.histCur]
 	if h.Kind != "version" {
 		t.Fatalf("no version at the end: %+v", m.hist)

@@ -1,6 +1,7 @@
 package view_test
 
 import (
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"slices"
@@ -50,13 +51,7 @@ func libRow(t *testing.T, p *view.LibPage, name string) view.LibRow {
 	return view.LibRow{}
 }
 
-func kinds(as []view.LibAction) []string {
-	var out []string
-	for _, a := range as {
-		out = append(out, a.Kind)
-	}
-	return out
-}
+func kinds(as []string) []string { return as }
 
 func TestLibraryPage(t *testing.T) {
 	view.SetLang("zh")
@@ -73,25 +68,25 @@ func TestLibraryPage(t *testing.T) {
 	if lock.State != "" || lock.Used != "default" {
 		t.Errorf("a lineage with a used copy is not \"in no plan\": %q %q", lock.State, lock.Used)
 	}
-	if got := kinds(lock.Insts[1].Actions); !slices.Equal(got, []string{"move", "folder", "remove"}) {
+	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"take-out", "move-to", "stage", "swap", "remove", "tags", "note", "folder", "move"}) {
 		t.Errorf("the Mods/ copy: %v", got)
 	}
-	if got := kinds(lock.Insts[0].Actions); !slices.Equal(got, []string{"unsubscribe", "folder", "workshop", "pin"}) {
+	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"use", "tags", "note", "folder", "workshop", "pin", "unsubscribe"}) {
 		t.Errorf("the unused workshop copy beside it (enabling it would clash): %v", got)
 	}
 	hid := libRow(t, p, "Hid")
 	if !hid.Single || hid.State != "被其它管理器隐藏" || hid.Source != "工坊" || hid.Insts[0].Name != "5600" {
 		t.Errorf("hidden: %+v", hid)
 	}
-	if got := kinds(hid.Insts[0].Actions); !slices.Equal(got, []string{"unhide", "unsubscribe", "folder", "workshop"}) {
+	if got := kinds(hid.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "folder", "workshop", "unhide", "unsubscribe"}) {
 		t.Errorf("hidden actions: %v", got)
 	}
 	ghost := libRow(t, p, "工坊条目 5300")
-	if ghost.Insts[0].ID != "" || ghost.Size != "—" || ghost.State != "订阅了但不在磁盘上" || !slices.Equal(kinds(ghost.Insts[0].Actions), []string{"workshop"}) {
+	if ghost.Insts[0].ID != "" || ghost.Size != "—" || ghost.State != "订阅了但不在磁盘上" || !slices.Equal(kinds(ghost.Insts[0].Ops), []string{"workshop"}) {
 		t.Errorf("ghost: %+v", ghost)
 	}
 	idle := libRow(t, p, "Idle")
-	if got := kinds(idle.Insts[0].Actions); !slices.Contains(got, "enable") {
+	if got := kinds(idle.Insts[0].Ops); !slices.Contains(got, "add") {
 		t.Errorf("idle: %v", got)
 	}
 	// filters and conditions
@@ -239,14 +234,9 @@ func TestLibFields(t *testing.T) {
 func TestLibSteam(t *testing.T) {
 	e := libEnv(t)
 	idle := libRow(t, libPage(t, e, ""), "Idle").Insts[0]
-	var unsub *view.LibAction
-	for k, a := range idle.Actions {
-		if a.Kind == view.LibUnsub {
-			unsub = &idle.Actions[k]
-		}
-	}
-	if unsub == nil || !unsub.Confirm || !unsub.Danger || unsub.URL != "" {
-		t.Fatalf("unsubscribe action %+v", unsub)
+	unsub := view.OpOf(view.LibUnsub)
+	if !slices.Contains(idle.Ops, view.LibUnsub) || !unsub.Confirm || !unsub.Danger || unsub.Key != "Del" {
+		t.Fatalf("unsubscribe op %+v %v", unsub, idle.Ops)
 	}
 	p, err := view.LibPreview(e.App, view.LibUnsub, []string{idle.Ref})
 	if err != nil || !p.Apply || !strings.Contains(strings.Join(p.Lines, "\n"), "would unsubscribe") {
@@ -267,5 +257,25 @@ func TestLibSteam(t *testing.T) {
 	msg, err := view.LibDo(e.App, view.LibUnsub, []string{idle.Ref})
 	if err != nil || !strings.Contains(msg, "Idle") || strings.Join(got, " ") != "unsubscribe 5200" {
 		t.Fatalf("unsubscribe %q %v %v", msg, err, got)
+	}
+}
+
+// 06 §2.9: the rows carry op codes only; the labels go once, in the page's op table, and
+// the copies' paths and Workshop URLs stay on the Go side.
+func TestLibraryPayload(t *testing.T) {
+	view.SetLang("zh")
+	defer view.SetLang("en")
+	p := libPage(t, libEnv(t), "")
+	rows, err := json.Marshal(p.Rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{"打开文件夹", `"path"`, `"url"`, `"actions"`} {
+		if strings.Contains(string(rows), s) {
+			t.Errorf("rows carry %s", s)
+		}
+	}
+	if len(p.Ops) != len(view.OpTable()) || p.Ops[0].Label == "" {
+		t.Errorf("op table %+v", p.Ops)
 	}
 }

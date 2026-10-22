@@ -65,7 +65,7 @@ func TestPrefetchAndLRU(t *testing.T) {
 	m := direct(t, e, 160, 40)
 	m.images = &imgWriter{Writer: io.Discard}
 	press(m, "h")
-	press(m, "g")
+	press(m, "home")
 	for m.current().name != "P15" {
 		press(m, "down")
 	}

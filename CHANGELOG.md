@@ -216,6 +216,45 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - `ctrl+o` opens the cursor's mod's folder and `ctrl+w` its Workshop page, in the plan editor
   and Mod 库存, in both interfaces; without a Workshop ID the status line says so.
 
+### One interface for the plan editor and Mod 库存 (06 §2.5, §2.9, §3, §8.5)
+- One filter bar on both pages: a search box (the grey completion and `tag:` word matching
+  as before, now with `version:`), the filters in force as removable chips, and 筛选 (`\`).
+  Open, it shows one line per group (标签, 来源, 版本 with the current game marked, 内容 and 有
+  in the editor; Mod 库存 adds 状态, 用在, 更新日期): the values most used first with counts,
+  then a box to type in for the rest. Left click (enter, space) keeps a value, right click
+  (`x`) leaves it out; values of one group are "or", groups "and". The keyboard reaches all of
+  it (↑↓ groups, ←→ values, a letter types into the group's box, backspace in an empty search
+  takes the last chip off).
+- The editor's bar sits above 未启用 and filters 未启用 and 已启用 together; the heads say
+  "已启用 6 / 34". 暂存 keeps its own search. While the bar filters, `J` / `K` (and alt+) move
+  past the next row shown (`view.StepAt`); `m`, `space` and drops still place by the whole
+  load order.
+- Mod 库存 loses its filter column: the bar is over the table, and a copy's details are a
+  permanent right-hand column (the editor's detail card) that follows the cursor; `enter`
+  lays them over the page, `enter` or `esc` closes them, `→` on a copy focuses them.
+- One key table on both pages (06 §3.5), in both interfaces: `PgUp` / `PgDn` move the cursor
+  (they scroll only the focused details), `ctrl+a` selects everything shown, `enter` opens /
+  closes the details, `esc` backs out (details → selection → search and filters), `space`
+  takes effect / stops (启用 / 停用 in the editor; 加入当前方案 / 从当前方案拿掉 / 换成这一份 in
+  Mod 库存), `m`, `t`, `x`, `g`, `n` (the mod's note in the editor, the copy's in Mod 库存),
+  `ctrl+o` / `ctrl+w`, `u` / `ctrl+z`, `ctrl+y` / `ctrl+r` (Mod 库存's undo is the plan's),
+  `Del` (退订 / 删除, dry run first). `tab` / `shift+tab` switch the pages under one sidebar
+  entry (全部 ↔ 变化, the plans); the editor's areas are `←→` and `1`–`4` only. `#`, `o`, `d`,
+  `f` and `!` are no longer shortcuts (`shift+1`–`7` go to the sidebar's pages). `?` shows the
+  keys of the page it is pressed on (`view.KeyHelp`).
+- One row menu on both pages, from one op table (`view.OpTable`, `view.CopyOps`): 方案
+  (space, m, t, x, 从所有方案里拿掉), 整理 (标签 g, 备注 n), 打开 (ctrl+o, ctrl+w), 版本 (锁定这个
+  版本, 更新锁定版本, 解除锁定, 备份锁定版本), 磁盘 (恢复, 重新订阅, then 退订 / 删除 in red),
+  each with its key, only what applies. The editor's menu now has the version and disk
+  ops too.
+- New rule (06 §3.1 rule 6): everything the mouse can do, the keyboard can do. The menu key
+  and `shift+F10` open the row's menu at the cursor (↑↓, enter, esc); `H` lists the history,
+  `C` a mod's changes, `<` `>` `=` set the editor's column widths, `s` in Mod 库存 is the
+  headers' menu (sort, move, size, show columns). A test checks every op has a key or the
+  menu and a runner on both pages.
+- Mod 库存's page data is 0.77 MB instead of 1.47 MB on a 1,284-mod library: each copy
+  carries op codes, the labels come once, and folder paths and Workshop URLs stay in Go.
+
 ### The window (06 §2)
 - A sidebar replaces the top tabs, in two groups: 在玩 (启动, 能不能跑 with its badge,
   游戏日志) and 库 (Mod 库存 › 变化, 方案, 整合包, 环境), then 设置 (`shift+1`–`7`).

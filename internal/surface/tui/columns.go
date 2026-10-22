@@ -163,7 +163,7 @@ func (l layout) has(k colKind) bool {
 }
 
 // rowsShown is the number of list rows: top bar, blank, titles … blank, status, hints.
-func (m *model) rowsShown() int { return max(m.h-6, 1) }
+func (m *model) rowsShown() int { return max(m.h-6-m.barLines(), 1) }
 
 // ---- building the rows ----
 
@@ -186,6 +186,8 @@ func (m *model) reload() {
 		}
 		return
 	}
+	m.boardSeq++
+	m.board, m.barCache = &boardRef{b: b, seq: m.boardSeq}, nil
 	m.envName, m.gameVer = b.EnvName, b.GameVersion
 	m.loadColPrefs(st.Ix.Env.ID)
 	m.unsaved, m.missing = b.Unsaved, b.Missing
@@ -329,6 +331,9 @@ func (m *model) columnTitle(c *column, focused bool, w int) string {
 	t := fmt.Sprintf("%s %d", c.kind.title(), len(c.items))
 	if c.filter != "" || (focused && m.editing) {
 		t = fmt.Sprintf("%s %d/%d", c.kind.title(), len(c.view), len(c.items))
+	}
+	if c.kind != cStaging && m.bar.active() {
+		t = fmt.Sprintf("%s %d / %d", c.kind.title(), len(c.view), len(c.items)) // the bar filters both lists (06 §2.5)
 	}
 	st := sDimS
 	if focused {

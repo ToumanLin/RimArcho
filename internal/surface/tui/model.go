@@ -56,6 +56,8 @@ type panel struct {
 	choices []string // chooser values (env names)
 	choice  int
 	onPick  func(m *model, value string) tea.Cmd
+	// onEnter: enter runs it (a confirmation: the dry run is the text, 06 §6)
+	onEnter func(m *model) tea.Cmd
 }
 
 // prompt is an input line: ":" command line, "m" move target, "r" rule.
@@ -110,6 +112,15 @@ type model struct {
 
 	chg  chState
 	libr libState
+
+	bar      barState  // the editor's filter bar over 未启用 and 已启用 (06 §2.5)
+	board    *boardRef // the board the columns were built from (the bar filters it)
+	boardSeq int
+	barCache *view.BarFilter
+	barKey   string
+	libCache *app.Library // the library as of board build libAt (the rows' ops)
+	menu     *rowMenu     // the row menu is open (06 §8.5)
+	libAt    int
 
 	liveTr view.LiveTracker
 	live   *view.Live // the running game (06 §2.1); nil until the first poll
@@ -246,6 +257,12 @@ func (m *model) run(argv ...string) (string, int) {
 	out, code := cmds.Execute(m.app, argv)
 	m.reload()
 	return out, code
+}
+
+// boardRef is the shared board of the columns and its build number.
+type boardRef struct {
+	b   *view.Board
+	seq int
 }
 
 // resizeDrag: a mouse drag on the gap right of a list column (06 §2.5).

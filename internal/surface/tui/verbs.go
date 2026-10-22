@@ -60,6 +60,9 @@ func (m *model) space() tea.Cmd {
 // applied reloads after an edit and reports a failure on the status line.
 func (m *model) applied(err error) bool {
 	m.reload()
+	if m.tab == tabLibrary {
+		m.loadLibrary() // a plan op from Mod 库存 (m, space)
+	}
 	if err != nil {
 		m.say(sayFail, m.humanize(err.Error()))
 		return false
@@ -93,6 +96,24 @@ func (m *model) moveBy(d int) tea.Cmd {
 		return nil
 	}
 	keep := m.cols[cActive].curID()
+	if m.bar.active() {
+		// the bar shows some rows: past the next shown row (06 §3.5, view.StepAt)
+		c := &m.cols[cActive]
+		var shown []int
+		for _, vi := range c.view {
+			shown = append(shown, c.items[vi].pos)
+		}
+		at := view.StepAt(shown, m.positions(ids), d)
+		if at == 0 {
+			m.say(sayInfo, T("already at the edge of the rows shown"))
+			return nil
+		}
+		if !m.verb(view.Place(m.app, view.Active, object(sel), at)) {
+			return nil
+		}
+		m.refilterCol(cActive, keep)
+		return m.requestDetail()
+	}
 	if !m.verb(view.MoveBy(m.app, object(sel), d)) {
 		return nil
 	}

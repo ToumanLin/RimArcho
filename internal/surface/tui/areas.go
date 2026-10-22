@@ -126,6 +126,9 @@ func (m *model) position() string {
 		p = T("recent changes")
 	case m.tab == tabLibrary:
 		p = T("mod library")
+		if l := &m.libr; l.page != nil && len(l.flat) > 0 {
+			p += " " + markDot + " " + fmt.Sprintf("%d / %d", l.cursor+1, len(l.flat))
+		}
 	case m.full || m.insp != nil:
 		p = m.focus.title() + " › " + name() + Tf(" (%s)", idx())
 		if m.insp != nil {
@@ -140,7 +143,7 @@ func (m *model) position() string {
 		}
 	default:
 		p = m.focus.title() + " " + markDot + " " + idx()
-		if c.filter != "" {
+		if c.filter != "" || c.kind != cStaging && m.bar.active() {
 			p += " " + markDot + " " + T("filtered")
 		}
 	}
@@ -156,6 +159,8 @@ func (m *model) position() string {
 // popupName is the open popup (06 §3.1 rule 5) or input, "" when there is none.
 func (m *model) popupName() string {
 	switch {
+	case m.menu != nil:
+		return T("menu")
 	case m.pal != nil:
 		return T("command palette")
 	case m.tags != nil:
@@ -166,8 +171,10 @@ func (m *model) popupName() string {
 		return strings.TrimRight(strings.TrimSpace(m.prompt.label), ":：")
 	case m.panel != nil:
 		return m.panel.title
-	case m.editing:
+	case m.editing, (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
 		return T("search")
+	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
+		return T("filter")
 	case m.armed != nil:
 		return T("confirm")
 	}

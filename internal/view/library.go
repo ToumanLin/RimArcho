@@ -11,7 +11,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/render"
-	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -35,6 +34,8 @@ type LibPage struct {
 	// the player's order, widths and hidden ones (ui.gui.library.columns).
 	Columns []LibColumn `json:"columns"`
 	Search  string      `json:"search"`
+	// Ops is the op table (labels, keys, menu groups) the rows' codes refer to.
+	Ops []Op `json:"opTable"`
 	// Complete is the grey text after the search box's last word that tab (or →) takes
 	// (06 §3.7): a key ("so" → "urce:") or a value ("state:un" → "used").
 	Complete string `json:"complete,omitempty"`
@@ -115,30 +116,23 @@ type LibInstRow struct {
 	LibCells
 	// Note is the copy's own note (the player's or an agent's); Auto what RimArcho knows
 	// about how it made the copy, shown (and offered as a first version) while there is none.
-	Note     string      `json:"note,omitempty"`
-	Auto     string      `json:"auto,omitempty"`
-	InPlan   bool        `json:"inPlan,omitempty"`
-	Path     string      `json:"path,omitempty"`
-	URL      string      `json:"url,omitempty"`
-	States   []string    `json:"states,omitempty"` // every state (the detail lists them all)
-	UsedIn   []string    `json:"usedIn,omitempty"`
-	Versions string      `json:"versions,omitempty"`
-	Played   string      `json:"played,omitempty"`
-	Actions  []LibAction `json:"actions,omitempty"`
-}
-
-// LibAction is something the player can do with a copy (06 §2.9's 动作). Confirm: it
-// changes files, so the interface shows the dry run first (LibPreview).
-type LibAction struct {
-	Kind    string `json:"kind"`
-	Label   string `json:"label"`
-	Confirm bool   `json:"confirm,omitempty"`
-	Danger  bool   `json:"danger,omitempty"`
-	// Detail: one of the six in a copy's detail (恢复 退订/删除 重新订阅 备份锁定版本 打开文件夹
-	// 打开网页); the others are in the right-click menu and the selection bar.
-	Detail bool `json:"detail,omitempty"`
-	// URL: the Workshop page (打开网页).
-	URL string `json:"url,omitempty"`
+	Note   string `json:"note,omitempty"`
+	Auto   string `json:"auto,omitempty"`
+	InPlan bool   `json:"inPlan,omitempty"`
+	// Path and URL stay on the Go side (the TUI, the field list); the page asks for a
+	// copy's fields when it shows it and opens folders and pages by instance (06 §2.9).
+	Path string `json:"-"`
+	URL  string `json:"-"`
+	// Page is the Workshop page of a subscribed item RimArcho never saw (no instance to
+	// open it by).
+	Page     string   `json:"page,omitempty"`
+	States   []string `json:"states,omitempty"` // every state (the detail lists them all)
+	UsedIn   []string `json:"usedIn,omitempty"`
+	Versions string   `json:"versions,omitempty"`
+	Played   string   `json:"played,omitempty"`
+	// Ops are the op codes that apply (ops.go, CopyOps); the labels and keys are the page's
+	// Ops table, sent once.
+	Ops []string `json:"ops,omitempty"`
 }
 
 // OpenPages is LibDo's answer when Steam is out of reach (not running, the DLL would not
@@ -150,37 +144,25 @@ type OpenPages struct {
 
 func (e *OpenPages) Error() string { return e.Msg }
 
-// Library action kinds.
+// Library action kinds: the op codes (ops.go) that LibDo runs.
 const (
-	LibEnable    = "enable"      // 加入当前方案
-	LibRemove    = "remove"      // 从所有方案里拿掉
-	LibPin       = "pin"         // 锁定版本
-	LibPinUpdate = "pin-update"  // 更新锁定版本
-	LibUnpin     = "unpin"       // 解除锁定
-	LibUnhide    = "unhide"      // 恢复
-	LibUnsub     = "unsubscribe" // 退订, through the Steam client
-	LibDelete    = "delete"      // 删除 (to the recycle bin)
-	LibResub     = "resubscribe" // 重新订阅, through the Steam client
-	LibMove      = "move"        // 备份锁定版本 (收进锁定库)
-	LibFolder    = "folder"      // 打开文件夹
-	LibWorkshop  = "workshop"    // 打开网页
+	LibEnable    = OpAdd       // 加入当前方案
+	LibRemove    = OpRemove    // 从所有方案里拿掉
+	LibPin       = OpPin       // 锁定版本
+	LibPinUpdate = OpPinUpdate // 更新锁定版本
+	LibUnpin     = OpUnpin     // 解除锁定
+	LibUnhide    = OpUnhide    // 恢复
+	LibUnsub     = OpUnsub     // 退订, through the Steam client
+	LibDelete    = OpDelete    // 删除 (to the recycle bin)
+	LibResub     = OpResub     // 重新订阅, through the Steam client
+	LibMove      = OpMove      // 备份锁定版本 (收进锁定库)
+	LibFolder    = OpFolder    // 打开文件夹
+	LibWorkshop  = OpWorkshop  // 打开网页
 	// LibTrash is the old name of LibDelete.
 	LibTrash = LibDelete
 )
 
-// The detail's six, in order (06 §2.9), then the others.
-var libActionOrder = []string{LibUnhide, LibUnsub, LibDelete, LibResub, LibMove, LibFolder, LibWorkshop, LibEnable, LibRemove, LibPin, LibPinUpdate, LibUnpin}
-
-var libDetail = map[string]bool{LibUnhide: true, LibUnsub: true, LibDelete: true, LibResub: true, LibMove: true, LibFolder: true, LibWorkshop: true}
-
-func libActionLabel(k string) string {
-	return map[string]string{
-		LibEnable: T("add to the current plan"), LibRemove: T("take out of every plan"), LibPin: T("lock this version"),
-		LibPinUpdate: T("update the locked version"), LibUnpin: T("unlock"), LibUnhide: T("restore"),
-		LibUnsub: T("unsubscribe"), LibDelete: T("delete"), LibResub: T("subscribe again"),
-		LibMove: T("back up as a locked version"), LibFolder: T("open the folder"), LibWorkshop: T("open the web page"),
-	}[k]
-}
+func libActionLabel(k string) string { return opLabel(k) }
 
 // rowState is the state a row shows: the most important one (06 §2.9).
 func rowState(states []string) string {
@@ -400,7 +382,7 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 	if sort == "" {
 		sort = "name"
 	}
-	p := &LibPage{Total: res.Total, Shown: len(res.Matches), Sort: sort, Search: search, Complete: CompleteLibrary(search, lib)}
+	p := &LibPage{Total: res.Total, Shown: len(res.Matches), Sort: sort, Search: search, Complete: CompleteLibrary(search, lib), Ops: OpTable()}
 	var bytes int64
 	for _, m := range res.Matches {
 		r := LibRow{ID: m.ID, Ref: m.Ref, Name: m.Name, Tags: m.Tags, Copies: len(m.Instances), Single: len(m.Instances) == 1}
@@ -510,8 +492,11 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 	r.Played = libDate(i.Played)
 	if IsNumber(i.WorkshopID) {
 		r.URL = WorkshopURL(i.WorkshopID)
+		if r.ID == "" {
+			r.Page = r.URL
+		}
 	}
-	r.Actions = libActions(lib, l, i)
+	r.Ops = CopyOps(lib, l, i, LibraryPage)
 	return r
 }
 
@@ -629,73 +614,6 @@ func CopyNoteAuto(i *app.LibInstance) string {
 	return strings.Join(parts, T("; "))
 }
 
-// libActions is what can be done with a copy now (06 §2.9). The six of the detail come
-// first: 恢复, 退订 (Workshop) or 删除 (a copy of the player's own, an unsubscribed leftover),
-// 重新订阅 (a leftover), 备份锁定版本 (a spare copy in Mods/), 打开文件夹, 打开网页.
-func libActions(lib *app.Library, l *app.LibLineage, i *app.LibInstance) []LibAction {
-	has := func(s string) bool { return slices.Contains(i.States, s) }
-	plans := slices.ContainsFunc(i.UsedIn, func(u app.LibUse) bool { return u.Kind == "plan" })
-	m := i.Mod
-	live := m != nil && !i.Missing()
-	workshop := i.Source == app.LibWorkshop || i.Source == app.LibSteamCMD
-	own := i.Source == app.LibLocal || i.Source == app.LibLocked
-	loadable := live && !has(app.LibUnloadable) && !has(app.LibHidden) && !has(app.LibResidue)
-	url := ""
-	if IsNumber(i.WorkshopID) {
-		url = WorkshopURL(i.WorkshopID)
-	}
-	var ks []string
-	if live && has(app.LibHidden) {
-		ks = append(ks, LibUnhide)
-	}
-	if live && i.Source == app.LibWorkshop && !has(app.LibResidue) && url != "" {
-		ks = append(ks, LibUnsub)
-	}
-	if live && !plans && (own || workshop && has(app.LibResidue)) && !source.IsLink(i.Path) {
-		ks = append(ks, LibDelete)
-	}
-	if live && has(app.LibResidue) && url != "" {
-		ks = append(ks, LibResub)
-	}
-	if live && i.Spare && i.Source == app.LibLocal {
-		ks = append(ks, LibMove)
-	}
-	if live && i.Path != "" {
-		ks = append(ks, LibFolder)
-	}
-	if url != "" {
-		ks = append(ks, LibWorkshop)
-	}
-	if loadable && !l.InPlan() && !has(app.LibIgnored) {
-		ks = append(ks, LibEnable)
-	}
-	if plans && m != nil {
-		ks = append(ks, LibRemove)
-	}
-	if loadable && workshop {
-		ks = append(ks, LibPin)
-	}
-	if i.Locked != nil && i.Locked.Updated {
-		ks = append(ks, LibPinUpdate)
-	}
-	if i.Locked != nil {
-		ks = append(ks, LibUnpin)
-	}
-	var out []LibAction
-	for _, k := range libActionOrder {
-		if !slices.Contains(ks, k) {
-			continue
-		}
-		a := LibAction{Kind: k, Label: libActionLabel(k), Confirm: libConfirm[k], Danger: k == LibDelete || k == LibUnsub, Detail: libDetail[k]}
-		switch k {
-		case LibWorkshop:
-			a.URL = url
-		}
-		out = append(out, a)
-	}
-	return out
-}
-
 // libConfirm: the actions that change files (a dry run first); the plan edits are undone with u.
 var libConfirm = map[string]bool{LibPin: true, LibPinUpdate: true, LibUnpin: true, LibUnhide: true, LibMove: true, LibDelete: true, LibUnsub: true}
 
@@ -765,11 +683,12 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 	switch kind {
 	case LibUnsub, LibResub:
 		return libSteam(a, kind, refs, what)
-	case LibEnable:
-		if _, err := a.Enable(refs, app.Placement{}); err != nil {
+	case OpAdd, OpEnable, OpTakeOut, OpDisable, OpPutBack, OpStage, OpUse, OpSwap:
+		r, err := LibPlan(a, kind, refs)
+		if err != nil {
 			return "", err
 		}
-		return Tf("added %s to the current plan", what), nil
+		return r.Text, nil
 	case LibRemove:
 		rs, err := a.RemoveFromPlans(refs)
 		if err != nil {
@@ -811,6 +730,52 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 	return Tf("%s: %s", libActionLabel(kind), what), nil
 }
 
+// LibPlan runs a plan op of Mod 库存 on copies (06 §2.9): space adds and enables, or takes
+// out of the current plan, or puts back from staging; t stages; x uses this copy (the plan
+// had another) or swaps for another. Each is the editor's verb, one undo step.
+func LibPlan(a *app.App, kind string, refs []string) (*Result, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	ids := idsOfRefs(st, refs)
+	if len(ids) == 0 {
+		return nil, errors.New(T("RimArcho has not seen this copy"))
+	}
+	o := ObjectOf(st, ids)
+	switch kind {
+	case OpAdd, OpEnable:
+		return Toggle(a, Inactive, o)
+	case OpTakeOut, OpDisable:
+		return Toggle(a, Active, o)
+	case OpPutBack:
+		return Toggle(a, Staging, o)
+	case OpStage:
+		return Stage(a, Inactive, o) // enabled ones leave the list and remember their place
+	case OpSwap:
+		t, err := Swap(a, st, ids[0])
+		return &Result{Text: t}, err
+	case OpUse:
+		// the copy the plan uses now, of the same mod
+		mod := st.Ix.ByID[ids[0]]
+		for _, e := range st.List {
+			if other := st.Ix.ByID[e.Instance]; other != nil && other.ID != mod.ID && other.LineageID == mod.LineageID {
+				if _, err := a.Swap(st.Ix.Ref(other.ID), o.Refs[0]); err != nil {
+					return nil, err
+				}
+				return &Result{Text: Tf("the current plan now uses %s", libCopyName(st, mod)), Placed: ids[:1]}, nil
+			}
+		}
+		return Toggle(a, Inactive, o)
+	}
+	return nil, fmt.Errorf("unknown action %s", kind)
+}
+
+// libCopyName: the mod's name and which copy ("Harmony（锁定版本）").
+func libCopyName(st *app.LoadoutState, m *store.Mod) string {
+	return Tf("%s (%s)", m.DisplayName(), SourceText(m))
+}
+
 // libSteam unsubscribes or subscribes again through the Steam client (06 §2.9); when Steam
 // is out of reach the answer is OpenPages.
 func libSteam(a *app.App, kind string, refs []string, what string) (string, error) {
@@ -843,4 +808,34 @@ func idsOfRefs(st *app.LoadoutState, refs []string) []string {
 		}
 	}
 	return out
+}
+
+// SetModNote sets a mod's own note (`n` in the editor, 06 §3.5; the note on the Lineage,
+// `archo note <ref>`); "" clears it.
+func SetModNote(a *app.App, ref, text string) (string, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return "", err
+	}
+	if err := a.SetNote(ref, strings.TrimSpace(text)); err != nil {
+		return "", err
+	}
+	name := ref
+	if m, err := st.Ix.ResolveOne(ref); err == nil {
+		name = m.DisplayName()
+	}
+	if strings.TrimSpace(text) == "" {
+		return Tf("cleared the note of %s", name), nil
+	}
+	return Tf("saved the note of %s", name), nil
+}
+
+// LibDoes reports whether LibDo runs op kind (the plan ops, 从所有方案里拿掉, the version and
+// disk ops); the rest are the interface's own (a page, a folder, a note, a position).
+func LibDoes(kind string) bool {
+	switch kind {
+	case LibUnsub, LibResub, LibRemove, OpAdd, OpEnable, OpTakeOut, OpDisable, OpPutBack, OpStage, OpUse, OpSwap:
+		return true
+	}
+	return libConfirm[kind]
 }

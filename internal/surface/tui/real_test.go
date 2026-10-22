@@ -57,7 +57,7 @@ func TestRealIdleMemory(t *testing.T) {
 			keys(tm, "j")
 			time.Sleep(150 * time.Millisecond) // let the detail pane load for every row
 		}
-		keys(tm, "/", "har", "enter", "esc", "G", "g", "h", "G", "g", "l")
+		keys(tm, "/", "har", "enter", "esc", "end", "home", "h", "end", "home", "l")
 	}
 	time.Sleep(2 * time.Second)
 	ws, priv, peak := procmem.MB()

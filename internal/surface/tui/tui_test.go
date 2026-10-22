@@ -175,7 +175,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
 		t.Fatalf("after space: %s", got)
 	}
-	keys(tm, "esc", "l", "g", "down", "J") // to Enabled; move Alpha down one
+	keys(tm, "esc", "l", "home", "down", "J") // to Enabled; move Alpha down one
 	waitFor(t, tm, "Alpha is now number 3")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
 		t.Fatalf("after J: %s", got)
@@ -272,13 +272,13 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			check("start")
 			// Staging is reachable at every width: focus it (it takes the first slot when
 			// hidden), stage a mod from "enabled", put it back.
-			press(m, "tab") // Enabled → Staging
+			press(m, "right") // Enabled → Staging
 			if m.focus != cStaging || !m.layout().has(cStaging) {
 				t.Fatalf("staging not shown when focused: %+v", m.layout())
 			}
 			check("staging focused")
 			press(m, "h")
-			press(m, "g")
+			press(m, "home")
 			press(m, "down") // Alpha
 			press(m, "t")
 			if !strings.Contains(m.status, "staged Alpha") {
@@ -290,7 +290,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			}
 			// Not enabled: the CJK row, enable and disable again.
 			press(m, "h")
-			press(m, "G")
+			press(m, "end")
 			check("CJK row selected")
 			if it := m.current(); it == nil || !strings.HasPrefix(it.name, "中文") {
 				t.Fatalf("cursor on %+v", m.current())
@@ -299,7 +299,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			if got := activeNames(t, e); !strings.HasSuffix(got, "中文汉化补丁（简体）加长的名字用来测试截断") || m.focus != cInactive {
 				t.Fatalf("enable: %s, focus %d", got, m.focus)
 			}
-			for _, k := range []string{"l", "G", "space", "h"} { // Enabled, the last row, disable, back
+			for _, k := range []string{"l", "end", "space", "h"} { // Enabled, the last row, disable, back
 				press(m, k)
 			}
 			if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
@@ -309,7 +309,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			if m.focus != cInactive {
 				t.Fatalf("focus %d", m.focus)
 			}
-			press(m, "G")
+			press(m, "end")
 			for _, s := range m.layout().slots {
 				if s.kind != cInactive {
 					continue
@@ -350,7 +350,7 @@ func TestStagingT9(t *testing.T) {
 	e.MustRun("scan")
 	before := activeNames(t, e)
 	m := direct(t, e, 160, 40)
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // M01
 	for i := 0; i < 26; i++ {
 		if i%4 != 3 { // picks 20 of 26; ctrl+↓ moves the cursor alone (06 §3.4)
@@ -399,26 +399,26 @@ func TestMouseClicks(t *testing.T) {
 		m.update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Shift: shift, Ctrl: ctrl})
 		m.View()
 	}
-	// Disabled rows start at y=3: Beta, N1 … N5, 中文
-	click(xOf(cInactive), 3, false, false)
+	// Disabled rows start at y=4 (the filter bar is above the lists): Beta, N1 … N5, 中文
+	click(xOf(cInactive), 4, false, false)
 	if m.focus != cInactive || m.current().name != "Beta" || len(m.marked) != 0 {
 		t.Fatalf("click: focus %d on %+v, selected %d", m.focus, m.current(), len(m.marked))
 	}
-	click(xOf(cInactive), 5, false, true) // ctrl: N2
-	click(xOf(cInactive), 7, false, true) // ctrl: N4
+	click(xOf(cInactive), 6, false, true) // ctrl: N2
+	click(xOf(cInactive), 8, false, true) // ctrl: N4
 	if len(m.marked) != 2 {
 		t.Fatalf("ctrl+click: %d selected", len(m.marked))
 	}
-	click(xOf(cInactive), 8, true, false) // shift: N4 … N5 added to the range from N4
+	click(xOf(cInactive), 9, true, false) // shift: N4 … N5 added to the range from N4
 	if names := pickedNames(m); names != "N2 N4 N5" {
 		t.Fatalf("shift+click: %q", names)
 	}
-	click(xOf(cInactive), 3, false, false) // a plain click in the same list keeps the selection
+	click(xOf(cInactive), 4, false, false) // a plain click in the same list keeps the selection
 	if names := pickedNames(m); names != "N2 N4 N5" || m.current().name != "Beta" {
 		t.Fatalf("plain click: %q on %s", names, m.current().name)
 	}
 	// A click in another list moves the focus there and drops the selection (06 §3.4).
-	click(xOf(cActive), 4, false, false)
+	click(xOf(cActive), 5, false, false)
 	if len(m.marked) != 0 || m.focus != cActive || m.current().name != "Alpha" {
 		t.Fatalf("click in Enabled: selected %d, %+v", len(m.marked), m.current())
 	}
@@ -426,7 +426,7 @@ func TestMouseClicks(t *testing.T) {
 		t.Fatalf("a click changed the list: %s", got)
 	}
 	// The wheel scrolls the detail wherever it is; the cursor and the focus stay (06 §3.3).
-	m.update(tea.MouseMsg{X: xOf(cActive), Y: 5, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
+	m.update(tea.MouseMsg{X: xOf(cActive), Y: 6, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
 	if m.cols[cActive].cursor != 1 || m.focus != cActive || m.detailFocus || m.detailOff != 3 {
 		t.Fatalf("wheel: cursor %d, focus %d/%v, detail scrolled %d", m.cols[cActive].cursor, m.focus, m.detailFocus, m.detailOff)
 	}
@@ -448,7 +448,7 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 	e.MustRun("env", "add", "second", "--game", other)
 	tm := start(t, e, scans, 120, 30)
 	waitFor(t, tm, " main ")
-	keys(tm, "g", "enter") // the full-screen detail, then I: the technical pages
+	keys(tm, "home", "enter") // the full-screen detail, then I: the technical pages
 	waitFor(t, tm, "ludeon.rimworld")
 	keys(tm, "I")
 	waitFor(t, tm, "package: ludeon.rimworld")
@@ -522,7 +522,7 @@ func TestNeedsView(t *testing.T) {
 	e.MustRun("disable", "pkg:brrainz.harmony")
 	tm := start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "contradict each other")
 	time.Sleep(300 * time.Millisecond)
 	fm := finish(t, tm)
@@ -539,7 +539,7 @@ func TestNeedsView(t *testing.T) {
 	// Second session: x on the cycle, space on the dependency.
 	tm = start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "contradict each other")
 	for i := 0; i < ci; i++ {
 		keys(tm, "down")
@@ -559,7 +559,7 @@ func TestNeedsView(t *testing.T) {
 	}
 	tm = start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "is not enabled")
 	fm3 := finish(t, tm)
 	m := direct(t, e, 140, 40)
@@ -634,7 +634,7 @@ func TestNeedsLogs(t *testing.T) {
 	e.HarmonyLogFixture()
 	scans := new(int)
 	tm := start(t, e, scans, 160, 50)
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "last run")
 	time.Sleep(200 * time.Millisecond)
 	fm := finish(t, tm)
@@ -730,10 +730,8 @@ func TestColumnSearch(t *testing.T) {
 		return strings.Join(out, ",")
 	}
 	all := func(q string) string {
-		for k := range m.cols {
-			m.cols[k].filter = q
-			m.refilterCol(colKind(k), "")
-		}
+		m.bar.search = q // the filter bar filters 未启用 and 已启用 together (06 §2.5)
+		m.barChanged()
 		return names(cActive) + " | " + names(cInactive)
 	}
 	for q, want := range map[string]string{
@@ -768,28 +766,23 @@ func TestColumnSearch(t *testing.T) {
 	if got := all("id:" + ref); got != "Alpha | " {
 		t.Errorf("id:%s: %q", ref, got)
 	}
-	// The query stays with its column until esc there; the header shows N/M and the query.
+	// The bar's query holds for both lists; the headers say N / M; esc clears it.
 	all("")
 	m.focus = cInactive
 	press(m, "/")
 	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("tag:core-lib")})
 	press(m, "enter")
-	press(m, "l") // to "enabled": its own query is empty
-	if names(cActive) != "Core,Alpha,Harmony" || names(cInactive) != "Beta" {
-		t.Fatalf("per column: %q / %q", names(cActive), names(cInactive))
+	press(m, "l")
+	if names(cActive) != "Harmony" || names(cInactive) != "Beta" {
+		t.Fatalf("both lists: %q / %q", names(cActive), names(cInactive))
 	}
 	title := m.columnTitle(&m.cols[cInactive], false, 40)
-	if !strings.Contains(title, "Disabled 1/2") || !strings.Contains(title, "tag:core-lib") {
+	if !strings.Contains(title, "Disabled 1 / 2") {
 		t.Fatalf("title %q", title)
 	}
-	press(m, "esc") // in "enabled": nothing to clear there
-	if names(cInactive) != "Beta" {
-		t.Fatal("esc cleared another column's query")
-	}
-	press(m, "h")
 	press(m, "esc")
-	if names(cInactive) == "Beta" {
-		t.Fatal("esc did not clear the query")
+	if names(cInactive) == "Beta" || names(cActive) == "Harmony" {
+		t.Fatal("esc did not clear the bar")
 	}
 }
 

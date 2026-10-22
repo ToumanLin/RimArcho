@@ -155,7 +155,7 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			return nil
 		}
 	case "help":
-		return func(m *model) tea.Cmd { m.openPanel(T("help"), T(helpText)); return nil }
+		return func(m *model) tea.Cmd { return m.helpPage() }
 	case "quit":
 		return func(m *model) tea.Cmd { m.quitting = true; return tea.Quit }
 	}
@@ -331,7 +331,13 @@ func (m *model) jumpTo(id string) tea.Cmd {
 			}
 		}
 		if !in {
-			c.filter = ""
+			if colKind(k) == cStaging {
+				c.filter = ""
+			} else {
+				m.bar.search, m.bar.filters = "", nil // the bar hides it: show every row
+				m.barCache = nil
+				m.refilterBar()
+			}
 			m.refilterCol(colKind(k), id)
 		} else {
 			m.refilterCol(colKind(k), id)

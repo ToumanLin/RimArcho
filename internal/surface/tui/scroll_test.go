@@ -15,7 +15,7 @@ func TestT15FullScreenNext(t *testing.T) {
 	e, _ := fixture(t)
 	e.MustRun("rule", "add", "after", "pkg:tester.a", "pkg:brrainz.harmony")
 	m := direct(t, e, 120, 16)
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // Alpha
 	_, c := m.update(tea.KeyMsg{Type: tea.KeyEnter})
 	runCmd(m, c) // the sub-sections load
@@ -69,7 +69,7 @@ func TestT15FullScreenNext(t *testing.T) {
 func TestDetailFocus(t *testing.T) {
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 10)
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // Alpha
 	runCmd(m, m.loadData(m.current().id, false, false))
 	press(m, "right") // Enabled → Staging: the neighbouring area
@@ -103,16 +103,23 @@ func TestDetailFocus(t *testing.T) {
 	if m.detailFocus || m.focus != cActive {
 		t.Fatalf("esc: detail %v focus %d", m.detailFocus, m.focus)
 	}
-	// PgDn from the list: the detail scrolls, the focus and the cursor stay.
-	press(m, "g")
+	// PgDn in a list pages its cursor (06 §3.3); in the focused detail it scrolls.
+	press(m, "home")
 	m.update(tea.KeyMsg{Type: tea.KeyPgDown})
-	if m.detailOff == 0 || m.detailFocus || m.focus != cActive || m.current().name != "Core" {
+	if m.detailFocus || m.focus != cActive || m.current().name == "Core" {
 		t.Fatalf("PgDn: scrolled %d, detail %v, focus %d, cursor %s", m.detailOff, m.detailFocus, m.focus, m.current().name)
+	}
+	press(m, "home")
+	press(m, "4")
+	m.update(tea.KeyMsg{Type: tea.KeyPgDown})
+	if m.detailOff == 0 || !m.detailFocus {
+		t.Fatalf("PgDn in the detail: scrolled %d", m.detailOff)
 	}
 	m.update(tea.KeyMsg{Type: tea.KeyPgUp})
 	if m.detailOff != 0 {
 		t.Fatalf("PgUp: %d", m.detailOff)
 	}
+	press(m, "esc")
 	press(m, "h") // Enabled → Disabled
 	if m.focus != cInactive || m.detailFocus {
 		t.Fatalf("h: focus %d detail %v", m.focus, m.detailFocus)

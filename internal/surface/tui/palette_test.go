@@ -67,16 +67,16 @@ func TestPalette(t *testing.T) {
 	m.update(tea.KeyMsg{Type: tea.KeyEsc})
 	SetLang("en")
 	// a mod in another column: enter jumps there, even through that column's search
-	m.cols[cInactive].filter = "zzz"
-	m.refilterCol(cInactive, "")
+	m.bar.search = "zzz"
+	m.barChanged()
 	m.update(ctrlK)
 	typeIn(m, "beta")
 	if r := m.pal.results[0]; r.kind != palMod || r.name != "Beta" {
 		t.Fatalf("beta: first result %q", r.name)
 	}
 	m.update(tea.KeyMsg{Type: tea.KeyEnter})
-	if m.pal != nil || m.focus != cInactive || m.current() == nil || m.current().name != "Beta" || m.cols[cInactive].filter != "" {
-		t.Fatalf("jump: focus %d, current %v, filter %q", m.focus, m.current(), m.cols[cInactive].filter)
+	if m.pal != nil || m.focus != cInactive || m.current() == nil || m.current().name != "Beta" || m.bar.search != "" {
+		t.Fatalf("jump: focus %d, current %v, filter %q", m.focus, m.current(), m.bar.search)
 	}
 	// a command runs: needs attention
 	m.update(ctrlK)

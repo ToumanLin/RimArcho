@@ -5,7 +5,6 @@ func init() {
 	Register(map[string]string{
 		"add to the current plan":       "加入当前方案",
 		"take out of every plan":        "从所有方案里拿掉",
-		"lock this version":             "锁定版本",
 		"update the locked version":     "更新锁定版本",
 		"unlock":                        "解除锁定",
 		"give it back to the game":      "恢复给游戏",

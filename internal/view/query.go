@@ -13,12 +13,12 @@ import (
 // terms must hold.
 
 type term struct {
-	field string // "" (free text), name, author, tag, id, type, has
+	field string // "" (free text), name, author, tag, id, type, has, version; tagname (a bar filter: one whole tag)
 	value string // lower case
 	neg   bool
 }
 
-var queryFields = map[string]bool{"name": true, "author": true, "tag": true, "id": true, "type": true, "has": true}
+var queryFields = map[string]bool{"name": true, "author": true, "tag": true, "id": true, "type": true, "has": true, "version": true}
 
 // Query is a parsed column search.
 type Query struct{ terms []term }
@@ -137,6 +137,10 @@ func termMatch(t term, it *Item, f MatchFacts) bool {
 			}
 		}
 		return false
+	case "tagname":
+		return slices.ContainsFunc(it.Tags, func(tg string) bool { return strings.EqualFold(tg, v) })
+	case "version":
+		return slices.Contains(it.Versions, v)
 	case "id":
 		return v != "" && (strings.Contains(it.Package, v) || it.Workshop == v || strings.EqualFold(it.Ref, v) || strings.EqualFold(strings.TrimPrefix(it.Ref, "#"), v))
 	case "type":
@@ -238,7 +242,7 @@ func TagMatch(tag, v string) bool { return app.TagMatch(tag, v) }
 func isTagSep(c byte) bool { return app.IsTagSep(c) }
 
 // queryFieldOrder is the order completion offers fields in when several share a prefix.
-var queryFieldOrder = []string{"name", "author", "tag", "id", "type", "has"}
+var queryFieldOrder = []string{"name", "author", "tag", "id", "type", "has", "version"}
 
 // queryValues are the fixed values of type: and has: (06 §3.7), in the order offered.
 var queryValues = map[string][]string{
@@ -250,10 +254,16 @@ var queryValues = map[string][]string{
 // accepts (06 §3.7), from the second letter on: "au" → "thor:", "-ta" → "g:", "type:wo" → "rkshop", "tag:fac" →
 // "ial" (from the tags in use, up to the end of the word). "" when nothing fits or the
 // last word is inside quotes.
-func CompleteQuery(q string, tags []string) string {
+func CompleteQuery(q string, tags []string) string { return CompleteQueryWith(q, tags, nil) }
+
+// CompleteQueryWith is CompleteQuery with the game versions the rows support (version:).
+func CompleteQueryWith(q string, tags, versions []string) string {
 	return completeWith(q, queryFieldOrder, func(f string) []string {
-		if f == "tag" {
+		switch f {
+		case "tag":
 			return tagWords(tags)
+		case "version":
+			return versions
 		}
 		return queryValues[f]
 	})

@@ -18,17 +18,39 @@ export function setItems(k, items) {
   return keep ? key(keep) : "";
 }
 
-// refilter applies the column's query (view.Query in Go) and keeps the cursor on keepKey.
+// The filter bar over 未启用 and 已启用 (06 §2.5): one search and one set of filters for both
+// lists; S.bar is the bar (filterbar.js), S.barData its last answer (view.BarFilter).
+// Both lists ask at once: one call per bar state; only the latest call's answer counts.
+let barCall = null, barSig = "";
+function fetchBar() {
+  const on = S.bar && (S.bar.active() || S.bar.open);
+  const sig = on ? JSON.stringify([S.bar.search, S.bar.filters, S.bar.open, S.board && S.board.stamp]) : "";
+  if (!barCall || sig !== barSig) {
+    barSig = sig;
+    barCall = (on ? api.BarFilter(S.bar.search, S.bar.filters, S.bar.open) : Promise.resolve(null)).catch(() => null);
+  }
+  const p = barCall;
+  return p.then((r) => { if (p === barCall) S.barData = r; return r; });
+}
+export const barOn = () => !!(S.bar && S.bar.active());
+
+// refilter applies the column's query (view.Query in Go; the bar for 未启用 and 已启用) and
+// keeps the cursor on keepKey.
 export async function refilter(k, keepKey) {
   const c = S.cols[k];
-  if (!c.query.trim()) {
+  if (k < 2) {
+    const r = await fetchBar();
+    c.view = barOn() && r ? r.rows[k] || [] : c.items.map((_, i) => i);
+    c.others = null;
+    c.complete = "";
+  } else if (!c.query.trim()) {
     c.view = c.items.map((_, i) => i);
     c.others = null;
     c.complete = "";
   } else {
     const r = await api.Filter(k, c.query);
     c.view = r.rows || [];
-    c.others = r.counts;
+    c.others = null; // no "other lists" line: tab no longer jumps lists (06 §3.7)
     c.complete = r.complete || "";
   }
   c.cursor = Math.max(0, Math.min(c.cursor, c.view.length - 1));
@@ -103,11 +125,13 @@ export function renderHeads() {
       continue;
     }
     const c = S.cols[k];
-    const n = c.query.trim() ? `${c.view.length}/${c.items.length}` : `${c.items.length}`;
+    const filtered = k < 2 ? barOn() : !!c.query.trim();
+    const n = filtered ? Tf("%d / %d", c.view.length, c.items.length) : `${c.items.length}`;
     h.innerHTML = `<span class="n">${k + 1}</span><span class="t">${esc(T(AREAS[k]))}</span><span class="num">${n}</span>` +
       (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "") + (k === 1 ? listActions() : "") + (k === 2 ? chev() : "");
     bump("head:" + k, $(".num", h), n);
     const s = $(".search", a);
+    if (!s) continue;
     s.classList.toggle("on", c.searching || !!c.query);
     let o = $(".others", a);
     if (c.searching && c.others) {
@@ -272,6 +296,7 @@ export function wireLists(ui) {
     });
     wireDrag(ui, k, box);
     const input = $(`.area[data-area="${k}"] .search input`);
+    if (!input) continue; // 未启用 and 已启用 share the filter bar
     input.placeholder = T("search: words, tag:, author:, type:, has:, -not");
     // the grey completion after the query (06 §3.7): the typed text, invisible, then the rest
     const ghost = el("span", "ghost");

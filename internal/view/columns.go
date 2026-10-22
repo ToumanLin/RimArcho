@@ -47,6 +47,7 @@ type Item struct {
 	Package  string   `json:"-"`
 	Workshop string   `json:"-"`
 	Author   string   `json:"-"`
+	Versions []string `json:"-"` // the game versions it supports ("1.6")
 
 	Lower string `json:"-"` // sort key
 	// search fields (06 §3.7), lower case
@@ -129,6 +130,7 @@ func ModItem(st *app.LoadoutState, mod *store.Mod) Item {
 	it.text = it.names + " " + it.author
 	it.Package, it.Workshop = mod.PackageID, mod.WorkshopID()
 	it.Tags, it.Note, it.Alias = mod.Tags, mod.Note, mod.Alias != ""
+	it.Versions = strings.Fields(mod.SupportedVersions)
 	it.Kind, it.SteamCMD = SourceKind(mod), mod.Kind == source.SteamCMD
 	it.Dim = mod.Unloadable != "" || mod.Residue || (!st.Reg.Known(mod.ID) && !st.Deployable(mod)) || (st.Reg.Known(mod.ID) && !st.Reg.Loadable(mod.ID))
 	return it

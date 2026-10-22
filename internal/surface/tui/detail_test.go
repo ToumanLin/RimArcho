@@ -61,7 +61,7 @@ func TestDetailContent(t *testing.T) {
 	e.MustRun("note", "pkg:tester.a", "keep after Harmony")
 	e.MustRun("disable", "pkg:brrainz.harmony") // Alpha's dependency: installed, not enabled
 	m := direct(t, e, 160, 40)
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // Alpha Plus
 	if m.current().name != "Alpha Plus" {
 		t.Fatalf("cursor on %q", m.current().name)
@@ -85,11 +85,11 @@ func TestDetailContent(t *testing.T) {
 	if full := plainLines(m.detailLayout(detailOpts{width: 50, full: true})); !strings.Contains(full, "[image · i.imgur.com]") || strings.Contains(full, "images ×") {
 		t.Fatalf("full-screen images:\n%s", full)
 	}
-	// the key appears once: "1001 · o opens the page" (not "o 按 o 打开页面")
+	// the key appears once: "1001 · ctrl+w opens the page"
 	SetLang("zh")
 	zh := plainLines(m.detailLayout(detailOpts{width: 50, descMax: 12}))
 	SetLang("en")
-	if !strings.Contains(got, "1001 · o opens the page") || !strings.Contains(zh, "1001 · o 打开页面") {
+	if !strings.Contains(got, "1001 · ctrl+w opens the page") || !strings.Contains(zh, "1001 · ctrl+w 打开页面") {
 		t.Fatalf("workshop line:\n%s\n%s", got, zh)
 	}
 	for _, l := range m.detailLayout(detailOpts{width: 50, descMax: 12}) {
@@ -110,7 +110,7 @@ func TestDetailContent(t *testing.T) {
 	if !strings.Contains(ansi.Strip(lines[len(lines)-1]), "0% · ↑↓") {
 		t.Fatalf("scroll line %q", ansi.Strip(lines[len(lines)-1]))
 	}
-	press(m, "G")
+	press(m, "end")
 	lines, _ = m.fullLines(16)
 	if !strings.Contains(ansi.Strip(lines[len(lines)-1]), "100%") {
 		t.Fatalf("after G: %q", ansi.Strip(lines[len(lines)-1]))
@@ -118,7 +118,7 @@ func TestDetailContent(t *testing.T) {
 	// o opens the Workshop page.
 	var opened string
 	m.opts.OpenURL = func(u string) error { opened = u; return nil }
-	press(m, "o")
+	press(m, "ctrl+w")
 	if opened != "https://steamcommunity.com/sharedfiles/filedetails/?id=1001" {
 		t.Fatalf("opened %q", opened)
 	}
@@ -179,12 +179,12 @@ func TestT13TagBar(t *testing.T) {
 	e.MustRun("tag", "add", "pkg:ludeon.rimworld", "official-stuff", "core")
 	e.MustRun("tag", "add", "pkg:tester.a", "half")
 	m := direct(t, e, 160, 40)
-	press(m, "g")
+	press(m, "home")
 	press(m, "down")
 	press(m, "v")         // Alpha
 	press(m, "ctrl+down") // the cursor alone
 	press(m, "v")         // Harmony
-	press(m, "#")
+	press(m, "g")
 	if m.tags == nil || m.tags.sel != 0 {
 		t.Fatalf("# did not open the tag bar on the first candidate: %+v", m.tags)
 	}
@@ -209,7 +209,7 @@ func TestT13TagBar(t *testing.T) {
 	if len(m.marked) != 2 {
 		t.Fatal("tagging dropped the selection")
 	}
-	press(m, "#")
+	press(m, "g")
 	press(m, "right")
 	if s := ansi.Strip(m.View()); !strings.Contains(s, "[✓美化]") {
 		t.Fatalf("no [✓美化]:\n%s", s)
@@ -219,7 +219,7 @@ func TestT13TagBar(t *testing.T) {
 		t.Fatalf("not removed: %q", got)
 	}
 	// [~half]: Alpha only; enter gives it to Harmony too.
-	press(m, "#")
+	press(m, "g")
 	i := -1
 	for j, c := range m.tags.cands {
 		if c.tag == "half" {
@@ -240,7 +240,7 @@ func TestT13TagBar(t *testing.T) {
 		t.Fatalf("half: %q", got)
 	}
 	// # ← then type: a new tag.
-	press(m, "#")
+	press(m, "g")
 	press(m, "left")
 	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("lib")})
 	press(m, "enter")
@@ -324,7 +324,7 @@ func TestT6Thumbnail(t *testing.T) {
 		m.images.Write([]byte("F"))
 		return buf.String()
 	}
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // Alpha, with a 16:9 Preview.png
 	id := m.current().id
 	if m.thumbShown != id {
@@ -373,7 +373,7 @@ func TestT6Thumbnail(t *testing.T) {
 	}
 	// with a dwell: gone when the selection changes, back after a rest of that length
 	m.dwell = 150 * time.Millisecond
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // Alpha
 	if out := frame(); strings.Contains(out, "1337;File") {
 		t.Fatal("thumbnail drawn before the dwell")
@@ -400,7 +400,7 @@ func TestT6Thumbnail(t *testing.T) {
 	}
 	m.dwell = 0
 	// a mod without Preview.png: after the dwell the block says so
-	press(m, "g")
+	press(m, "home")
 	press(m, "down")
 	press(m, "down") // Harmony
 	m.update(thumbTick{m.thumbSeq, m.current().id})
@@ -421,7 +421,7 @@ func TestFullSections(t *testing.T) {
 	e, _ := fixture(t)
 	e.MustRun("rule", "add", "after", "pkg:tester.a", "pkg:brrainz.harmony")
 	m := direct(t, e, 120, 40)
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // Alpha
 	id := m.current().id
 	runCmd(m, m.loadData(id, false, false))
@@ -470,7 +470,7 @@ func TestT7Wrapping(t *testing.T) {
 	e.MustRun("note", "pkg:tester.a", "放在 Harmony 之后；D:\\SteamLibrary\\steamapps\\workshop\\content\\294100\\1001\\About\\About.xml 里写错了版本")
 	e.MustRun("tag", "add", "pkg:tester.a", "a-really-long-tag-name-for-testing", "中文标签")
 	m := direct(t, e, 160, 40)
-	press(m, "g")
+	press(m, "home")
 	press(m, "down")
 	runCmd(m, m.loadData(m.current().id, false, false))
 	m.dd.Workshop = bbcode.Parse(desc)
