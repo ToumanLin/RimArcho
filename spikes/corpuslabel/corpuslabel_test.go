@@ -125,3 +125,63 @@ func TestDefNamedDropsSentencePeriod(t *testing.T) {
 		t.Fatalf("got %v", m)
 	}
 }
+
+func TestValidateV3(t *testing.T) {
+	items := map[string]Item{
+		"P01": {Item: "P01", Gist: "g1", Key: "k1", Tier: 1, Bench: "patch-failed"},
+		"S01": {Item: "S01", Gist: "g2", Key: "k2", Tier: 2, Bench: "static-ctor"},
+	}
+	packets := map[string]*Packet{
+		"P01": {Item: "P01", Gist: "g1", Key: "k1", LogMods: []string{"a.mod"}, Created: "2026-07-15T19:09:17Z", Text: "## Message\n[A] patch failed"},
+		"S01": {Item: "S01", Gist: "g2", Key: "k2", LogMods: []string{"b.mod"}, Created: "2026-07-15T19:09:17Z", Text: "## Message\nstatic constructor of B.Foo"},
+	}
+	// patch-failed, header without a version, library copy updated after the upload, the
+	// operation no longer fails: version-mismatch with fix update.
+	vm := Label{Schema: "corpuslabel/3", Item: "P01", Gist: "g1", Key: "k1", Verdict: "cause",
+		Causes: []Cause{{"a.mod", "source"}}, Stage: "patch-apply", CauseType: "version-mismatch", Repro: "no",
+		Fix: Fix{Kind: "update", Mods: []string{"a.mod"}}, Confidence: "medium", Difficulty: "L2",
+		Evidence: []string{"[A] patch failed"}, Versions: []VersionCheck{{Pkg: "a.mod", Same: "unknown", Updated: "2026-08-01"}},
+		Model: "m", Prompt: "p"}
+	if es := validate(&vm, items, packets, nil); len(es) != 0 {
+		t.Fatalf("good v3 label rejected: %v", es)
+	}
+	old := vm
+	old.Versions = []VersionCheck{{Pkg: "a.mod", Same: "unknown", Updated: "2026-06-10"}}
+	old.Repro = "yes"
+	es := strings.Join(validate(&old, items, packets, nil), "\n")
+	for _, want := range []string{"updated after the upload", "needs repro no"} {
+		if !strings.Contains(es, want) {
+			t.Errorf("no error mentions %q:\n%s", want, es)
+		}
+	}
+	// a named source with an undecided reason needs unknown_why; patch-failed's fix is ignore
+	src := vm
+	src.CauseType, src.Repro, src.Fix, src.Versions = "unknown", "unknown", Fix{Kind: "report", Mods: []string{"a.mod"}}, nil
+	es = strings.Join(validate(&src, items, packets, nil), "\n")
+	for _, want := range []string{"unknown_why", `v3 rules give "ignore"`} {
+		if !strings.Contains(es, want) {
+			t.Errorf("no error mentions %q:\n%s", want, es)
+		}
+	}
+	src.UnknownWhy, src.Fix = "reason-unclear", Fix{Kind: "ignore"}
+	if es := validate(&src, items, packets, nil); len(es) != 0 {
+		t.Errorf("source with reason-unclear rejected: %v", es)
+	}
+	// static-ctor: a named source is disable; verdict unknown on a machine problem is ignore
+	sc := Label{Schema: "corpuslabel/3", Item: "S01", Gist: "g2", Key: "k2", Verdict: "cause",
+		Causes: []Cause{{"b.mod", "source"}}, Stage: "static-init", CauseType: "mod-bug", Repro: "yes",
+		Fix: Fix{Kind: "report", Mods: []string{"b.mod"}}, Confidence: "high", Difficulty: "L2",
+		Evidence: []string{"static constructor of B.Foo"}, Model: "m", Prompt: "p"}
+	if es := strings.Join(validate(&sc, items, packets, nil), "\n"); !strings.Contains(es, `v3 rules give "disable"`) {
+		t.Errorf("static-ctor report accepted: %s", es)
+	}
+	un := sc
+	un.Verdict, un.Causes, un.CauseType, un.Repro, un.UnknownWhy, un.Fix = "unknown", nil, "unknown", "", "machine", Fix{Kind: "ignore"}
+	if es := validate(&un, items, packets, nil); len(es) != 0 {
+		t.Errorf("machine unknown rejected: %v", es)
+	}
+	un.UnknownWhy = "reason-unclear"
+	if es := strings.Join(validate(&un, items, packets, nil), "\n"); !strings.Contains(es, "required with verdict unknown") {
+		t.Errorf("verdict unknown with a cause-only reason accepted: %s", es)
+	}
+}

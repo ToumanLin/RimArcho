@@ -47,22 +47,24 @@ most 60); `{"what": "lines", "from": 120, "to": 160}` a range of Player.log line
 
 ## Answer
 
-Write ONE JSON file, `{{ANSWERS}}\<TASK>.json` (Write tool), schema corpuslabel/2:
+Write ONE JSON file, `{{ANSWERS}}\<TASK>.json` (Write tool), schema corpuslabel/3:
 
 ```json
 {
-  "schema": "corpuslabel/2", "item": "<TASK>",
+  "schema": "corpuslabel/3", "item": "<TASK>",
   "verdict": "cause | unknown",
   "causes": [{"pkg": "<packageId>", "role": "source | partner | missing"}],
   "stage": "assembly-load | xml-load | patch-apply | def-resolve | static-init | game-start | save-load | map-gen | tick | ui | other",
   "cause_type": "missing-dependency | optional-absent | load-order | incompatible-mods | version-mismatch | outdated-mod | mod-bug | unknown",
+  "repro": "yes | no | unknown",
+  "unknown_why": "game-or-save | machine | several-candidates | no-evidence | not-in-library | reason-unclear",
   "fix": {"kind": "enable-dependency | reorder | update | disable | report | ignore | unknown", "mods": ["<packageId>"], "note": "<one sentence>"},
   "confidence": "high | medium | low",
   "difficulty": "L1 | L2 | L3",
   "evidence": ["env: <line copied from a tool output>", "log: <line of the player's log>"],
   "code": [{"file": "<.cs path printed by read_source>", "type": "Ns.Type", "method": "Method", "lines": "120-134", "text": "<verbatim>"}],
-  "versions": [{"pkg": "<packageId>", "log": "<player's version>", "installed": "<installed modVersion>", "same": "yes | no | unknown"}],
-  "model": "<your model>", "prompt": "agenteval/1",
+  "versions": [{"pkg": "<packageId>", "log": "<player's version>", "installed": "<installed modVersion>", "same": "yes | no | unknown", "updated": "<installed copy's Workshop date>"}],
+  "model": "<your model>", "prompt": "agenteval/3",
   "note": "<reasoning, 1-3 sentences>"
 }
 ```
@@ -80,51 +82,65 @@ Write ONE JSON file, `{{ANSWERS}}\<TASK>.json` (Write tool), schema corpuslabel/
   mod, a framework running every mod's static constructors) or only has a Harmony patch on a
   frame is not the source without further evidence.
 
-### cause_type: take the FIRST rule that applies
-1. `unknown`: verdict unknown, or a source is named but none of the rules below can be decided.
-2. `missing-dependency`: the source needs a mod/DLC that is not in the list, unconditionally (a
+Write `repro` only with verdict `cause`, and `unknown_why` only when the verdict or the
+cause_type is `unknown`; leave each field out otherwise.
+
+### repro (with a named source)
+Does the installed copy (current version, the player's list and order) still show the defect?
+`yes` = get_patches still fails it, the def/node/field/path the error names is still missing, or
+the installed code still has the failing line or missing guard; `no` = the patch no longer
+fails ("does not fail now"), the def/node now exists, or the installed code no longer has the
+defect; `unknown` = the mod is not installed here, or nothing decides it.
+
+### unknown_why
+With verdict `unknown`: `game-or-save` (vanilla code or data, or save data / references of mods
+that are not in the list; no active mod's own content or code fails) · `machine` (the player's
+machine or install: a file that cannot be read or written, a missing Unity module, out of
+memory) · `several-candidates` (two or more mods fit, nothing picks one) · `no-evidence` ·
+`not-in-library` (the deciding mod is not installed here). With a named source and cause_type
+`unknown`: `reason-unclear` (the note says which question below stayed open) or `not-in-library`.
+
+### cause_type: answer in order, take the first "yes"
+1. `missing-dependency`: the source needs a mod/DLC that is NOT in the list, unconditionally (a
    declared dependency that is missing, or its defs/code use that mod's types/defs without a
    guard). Needs a `missing` cause.
-3. `optional-absent`: the source's content targets a mod/DLC that is **not in the list** (if it
-   is in the list but lacks the def/node: `outdated-mod`) and is meant as optional
-   (compatibility patch, MayRequire'd def, patch for another mod's def), but the guard is
-   missing or broken. The player loses nothing they had.
-4. `load-order`: everything involved is active, and moving one mod before/after another removes
-   the error. Needs a `partner`.
-5. `incompatible-mods`: everything is active, order is not the issue, and two mods change the
+2. `optional-absent`: the source's content targets a mod/DLC that is NOT in the list and is meant
+   as optional (compatibility patch, a patch folder named after that mod, MayRequire'd def,
+   PatchOperationFindMod), with a missing or broken guard. If the target mod IS in the list, go on.
+3. `load-order`: everything involved is active, and moving one mod before/after another removes
+   the error (the target def comes from a mod loaded later). Needs a `partner`.
+4. `incompatible-mods`: everything is active, order is not the issue, and two mods change the
    same thing in conflicting ways. Needs a `partner`.
-6. `version-mismatch`: the player's copy of the source (or their game build) differs from the
-   installed one (log version ≠ installed, or the Workshop copy was updated after the upload)
-   **and** the current copy no longer has the defect. Needs a `versions` entry with same "no".
-7. `outdated-mod`: written for an older game or an older version of a mod it builds on, and the
-   current copy still is: an XML field, def, type or method that no longer exists ("doesn't
-   correspond to any field", TypeLoadException/MissingMethodException on another assembly's
-   member).
-8. `mod-bug`: the defect is in the source itself while everything it needs is present and
-   current: a wrong path or def name in its own files, a missing null check, malformed XML, a
-   texture it references but does not ship.
+5. `version-mismatch`: `repro` is `no` AND the player's copy differs from the installed one: the
+   version in the player's header differs (`versions` same "no"), or the header has no version
+   and the installed copy's Workshop update is after the upload date (same "unknown", `updated`
+   = that date). Put that mod in `versions`.
+6. `outdated-mod`: the missing or wrong thing belongs to the game or ANOTHER mod (a def, node,
+   XML field, type or method removed or renamed there: "doesn't correspond to any field",
+   MissingMethodException / TypeLoadException on another assembly's member), and `repro` is not
+   `no`.
+7. `mod-bug`: the defect is inside the source itself (its own def name or path, a texture it
+   names but does not ship, its own missing null check, malformed XML), and `repro` is not `no`.
+8. none decidable: `unknown` with `unknown_why`.
+`repro` `no` without a version difference is never outdated-mod or mod-bug (→ `unknown`,
+`reason-unclear`).
 
-### fix.kind (must fit the cause type)
-| cause_type | allowed fix kinds | fix.mods |
-|---|---|---|
-| missing-dependency | enable-dependency | the missing mod(s) |
-| optional-absent | ignore (default), enable-dependency | the optional mod for enable-dependency |
-| load-order | reorder | the mod to move; the note says before/after which |
-| incompatible-mods | disable, report, ignore | the mod to drop / report |
-| version-mismatch | update | the source |
-| outdated-mod | disable, report, ignore | the source |
-| mod-bug | report, disable, ignore | the source |
-| unknown | unknown, ignore (no source); also report, disable with a named source | the source |
-
-Choose by impact: `ignore` = nothing visible beyond a missing texture/sound/compatibility tweak,
-the game recovers (failed optional patches, unknown XML fields that are dropped, missing
-textures, log-upload noise); `report` = one feature breaks; `disable` = loading, saving or a
-core loop breaks (an exception every tick, a failed static constructor or Mod constructor).
-Class defaults: patch failures, missing textures and "doesn't correspond to any field" →
-`ignore`; "Could not find class/type" and other exceptions → `report`; failed static
-constructors / Mod constructors → `disable`. The class default applies with or without a
-named source; `unknown` only when the impact cannot be told. `fix.mods` is required except
-for ignore and unknown.
+### fix.kind: a fixed rule (take the first row that applies)
+1. missing-dependency → `enable-dependency` (mods = the missing mod)
+2. load-order → `reorder` (mods = the mod to move; the note says before/after which)
+3. version-mismatch → `update` (mods = the mod to update)
+4. optional-absent → `ignore`
+5. the error is a failed XML patch, a cross-reference to a missing def ("Could not resolve
+   cross-reference", "Could not load reference to", "Failed to find … named"), a missing texture
+   or sound, or an XML/asset loading error → `ignore` (the game drops the bad entry)
+6. verdict unknown with unknown_why game-or-save or machine → `ignore`
+7. any other verdict unknown → `unknown`
+8. a failed static constructor (TypeInitializationException, "Error in static constructor") or
+   an assembly/type loading error (TypeLoadException, ReflectionTypeLoadException,
+   MissingMethodException, MissingFieldException, "Could not load type/file or assembly",
+   "Cannot resolve dependency to assembly") with a named source → `disable`
+9. any other exception with a named source → `report`
+`fix.mods` = the source unless the row says otherwise; empty for ignore and unknown.
 
 ### stage (default by class, override when the log shows otherwise)
 assembly-load (loading DLLs, constructing Mod classes) · xml-load (reading def XML/assets) ·

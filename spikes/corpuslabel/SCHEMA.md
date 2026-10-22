@@ -1,124 +1,159 @@
-# Label schema corpuslabel/2 (benchmark v2, G6)
+# Label schema corpuslabel/3 (benchmark v3, G12)
 
 One JSON object per (log, error cluster). `validate` checks every rule marked **[v]**.
-The pilot (`corpuslabel/1`, RESULT.txt) agreed on source mods, but only 34% on cause type and
-19% on fix kind: the enums were loose ("other", "update" the mod vs the game, "none" vs
-"disable"). v2 decides both by ordered rules and ties fix kind to cause type.
+
+History. The pilot (`corpuslabel/1`) agreed on source mods but only 34% on cause type and 19%
+on fix kind. `corpuslabel/2` (G6, benchmark v2) decided both by ordered rules; labeller vs
+reviewer then agreed 69-97% on cause type and 88-93% on fix kind, but agents vs gold only 57-71%
+and 61-76%, and 21 of 73 named sources had cause type `unknown`. The disagreements were of
+three kinds: version-mismatch vs unknown/outdated-mod (nobody wrote down whether the current copy
+still fails), report vs disable and ignore vs unknown (fix kind was a judgement of impact), and
+unknown used both for "no mod is responsible" and "I could not tell". `corpuslabel/3` adds two
+fields and turns the fix kind into a rule:
+
+- `repro`: does the research environment (same list and order, current library copies) still
+  show the defect? It decides version-mismatch vs outdated-mod/mod-bug.
+- `unknown_why`: why the verdict or the cause type stays unknown (an enum).
+- `fix.kind` follows from cause type, class and verdict (table below); the validator computes it.
+
+Every corpuslabel/2 rule still holds unless this file says otherwise.
 
 ```json
 {
-  "schema": "corpuslabel/2",
+  "schema": "corpuslabel/3",
   "item": "XR07", "gist": "<log id>", "key": "<cluster key>",
   "verdict": "cause | unknown",
   "causes": [{"pkg": "<packageId>", "role": "source | partner | missing"}],
   "stage": "assembly-load | xml-load | patch-apply | def-resolve | static-init | game-start | save-load | map-gen | tick | ui | other",
   "cause_type": "missing-dependency | optional-absent | load-order | incompatible-mods | version-mismatch | outdated-mod | mod-bug | unknown",
+  "repro": "yes | no | unknown",
+  "unknown_why": "game-or-save | machine | several-candidates | no-evidence | not-in-library | reason-unclear",
   "fix": {"kind": "enable-dependency | reorder | update | disable | report | ignore | unknown", "mods": ["<packageId>"], "note": "<one sentence>"},
   "confidence": "high | medium | low",
   "difficulty": "L1 | L2 | L3",
   "evidence": ["<verbatim quote>", "log: <raw log line>", "env: <exec output>", "corpus: <co-occurrence>"],
   "code": [{"file": "<decompiled .cs>", "type": "Ns.Type", "method": "Method", "lines": "120-134", "text": "<verbatim>"}],
-  "versions": [{"pkg": "<packageId>", "log": "<header version>", "installed": "<library modVersion>", "same": "yes | no | unknown"}],
+  "versions": [{"pkg": "<packageId>", "log": "<header version>", "installed": "<library modVersion>", "same": "yes | no | unknown", "updated": "<library Workshop date>"}],
   "model": "<model>", "prompt": "<prompt version>", "note": "<reasoning, 1-3 sentences>"
 }
 ```
 
-## Verdict and causes
+## Verdict and causes (unchanged from v2)
 
-- `cause`: the evidence shows that a mod is responsible (its patch, file, def or code fails), not only that it is present. Who and why are separate: name the source even when the reason (cause type) stays `unknown`.
-  `unknown`: it does not. An honest `unknown` beats a guess. **[v]** `causes` is empty unless
-  `cause`, and has at least one entry with `cause`.
-- Roles: `source` = the mod whose own content or code is wrong or out of date (the one to fix,
-  update or drop); `partner` = the other active side of an ordering or incompatibility
-  problem; `missing` = a mod that should be active and is not.
+- `cause`: the evidence shows that a mod is responsible (its patch, file, def or code fails), not
+  only that it is present. Who and why are separate: name the source even when the reason (cause
+  type) stays `unknown`. `unknown`: it does not. **[v]** `causes` is empty unless `cause`, and
+  has at least one entry with `cause`.
+- Roles: `source` = the mod whose own content or code is wrong or out of date; `partner` = the
+  other active side of an ordering or incompatibility problem; `missing` = a mod that should be
+  active and is not.
 - **[v]** `source`/`partner` packageIds are in the log's list; a `missing` packageId appears in
   the packet (or the exec transcript). Ludeon packages are never a `source`.
 
-## cause_type: take the FIRST rule that applies
+## repro (new)
 
-| # | cause_type | Applies when | Needs |
-|---|---|---|---|
-| 1 | `unknown` | verdict is `unknown`, or a source is named but none of the rules below can be decided from the evidence | **[v]** verdict unknown ⇒ unknown |
-| 2 | `missing-dependency` | the source needs a mod/DLC that is not in the list, unconditionally: a declared dependency ("depends on … NOT in the log's list"), or its defs/code use that mod's types/defs without a guard (`MayRequire`, `FindMod`, a LoadFolders condition) | **[v]** a `missing` cause |
-| 3 | `optional-absent` | the source's content targets a mod/DLC that is **not in the list** (if it is in the list but lacks the def/node: `outdated-mod`) and is meant as optional (compatibility patch, `MayRequire`d def, patch for another mod's def, reference to an inactive mod's def), but the guard is missing or broken. The player loses nothing they had | |
-| 4 | `load-order` | everything involved is active, and moving one mod before/after another removes the error (a declared loadAfter/loadBefore broken here; a patch whose target def comes from a mod later in the list) | **[v]** a `partner` |
-| 5 | `incompatible-mods` | everything involved is active, order is not the issue, and two mods change the same thing in conflicting ways (one removes, renames or replaces what the other patches or calls; a declared incompatibleWith) | **[v]** a `partner` |
-| 6 | `version-mismatch` | the player's copy of the source (or the player's game build, `versions` entry `ludeon.rimworld`) differs from the research library's (log version ≠ installed, or the Workshop copy was updated after the upload) **and** the current copy no longer has the defect (tier 2: the code or def at fault differs) | **[v]** a `versions` entry with `same: no` for a cause mod |
-| 7 | `outdated-mod` | the source was written for an older game or an older version of a mod it builds on, and the current copy still is: an XML field, def, type or method that no longer exists ("doesn't correspond to any field", `TypeLoadException`/`MissingMethodException` on another assembly's member, 1.6 not in supported versions) | |
-| 8 | `mod-bug` | the defect is in the source itself while everything it needs is present and current: a wrong path or def name in its own files, a missing null check, malformed XML, a texture it references but does not ship | |
+**[v]** Required with verdict `cause`, absent otherwise. Does the research environment — the same
+list and order with the library's current copies — still show the defect?
 
-## fix.kind: what the player should do
-
-**[v]** The kind must fit the cause type:
-
-| cause_type | allowed fix kinds | fix.mods |
+| value | tier 1 (packet facts) | tier 2 (code) |
 |---|---|---|
-| missing-dependency | `enable-dependency` | the missing mod(s) |
-| optional-absent | `ignore` (default), `enable-dependency` (only if the packet shows the player wants that content) | the optional mod for enable-dependency |
-| load-order | `reorder` | the mod to move first; the note says before/after which |
-| incompatible-mods | `disable`, `report`, `ignore` | the mod to drop / report |
-| version-mismatch | `update` | the source |
-| outdated-mod | `disable`, `report`, `ignore` | the source |
-| mod-bug | `report`, `disable`, `ignore` | the source |
-| unknown | `unknown`, `ignore` (no source); also `report`, `disable` with a named source | the source |
+| `yes` | the simulation still fails, or the def/node/field/type/path the error names is still missing (`def`, `files search`) | the library code still has the failing line / missing member / missing guard |
+| `no` | "simulation: this operation does not fail now", or the def/node/path the error names now exists | the library code no longer has the defect (null check added, member exists, line changed) |
+| `unknown` | the source is not in the library, or the packet has no fact either way | the code is unavailable or does not decide |
 
-Among the allowed kinds, choose by impact:
-- `ignore`: nothing visible beyond a missing texture, sound or compatibility tweak; the game
-  recovers by itself (failed optional patches, unknown XML fields that are dropped, missing
-  sounds and textures, log-upload noise).
-- `report`: one feature of the mod breaks, the rest works; keep the mod and tell its author.
-- `disable`: loading, saving or a core loop breaks (an exception every tick, a failed static
-  constructor or Mod constructor that aborts the mod's setup, a save that will not load).
+## unknown_why (new)
 
-Defaults by class (use unless the packet shows otherwise): patch-failed, texture-missing and
-"doesn't correspond to any field" → `ignore`; "Could not find class/type …" and other
-exceptions → `report`; failed static constructors / Mod constructors → `disable`.
+**[v]** Required whenever verdict or cause type is `unknown`; absent otherwise.
 
-The class default applies whether or not a source is named (a failed patch or a save reference to
-a removed mod is `ignore` even with verdict `unknown`); `unknown` is only for errors whose impact
-cannot be told.
+| value | when | allowed with |
+|---|---|---|
+| `game-or-save` | the failure is in vanilla code or data, or in save data / references of mods that are not in the list; no active mod's own content or code fails | verdict unknown |
+| `machine` | the player's machine or install: a file that cannot be written or read, a missing Unity module, out of memory, a corrupt or partial download | verdict unknown |
+| `several-candidates` | two or more mods fit and the evidence does not pick one | verdict unknown |
+| `no-evidence` | nothing in the packet, log or code points at any mod | verdict unknown |
+| `not-in-library` | the mod whose content or code would decide is not in the research library | either |
+| `reason-unclear` | the source is clear, but none of the cause-type tests below can be decided; the note says which test failed | cause_type unknown with verdict cause |
+
+## cause_type: answer the questions in order, take the first "yes"
+
+| # | question | cause_type | needs |
+|---|---|---|---|
+| 0 | No source named? | `unknown` (+ `unknown_why`) | **[v]** |
+| 1 | Does the source need a mod/DLC that is **not in the list**, unconditionally (declared dependency; its defs/code use that mod's defs/types without `MayRequire`/`FindMod`/a LoadFolders condition)? | `missing-dependency` | **[v]** a `missing` cause |
+| 2 | Does the source's content target a mod/DLC that is **not in the list** and is meant as optional (a compatibility patch or patch folder named after it, a `MayRequire`d def, a reference to that mod's def) with a missing or broken guard? (If the target mod **is** in the list, go on: it is 5 or 6.) | `optional-absent` | |
+| 3 | Everything involved is active, and moving one mod before/after another removes the error (target def defined by a mod later in the list; a declared loadAfter/loadBefore broken here)? | `load-order` | **[v]** a `partner` |
+| 4 | Everything active, order not the issue, and two mods change the same thing in conflicting ways (one removes/renames/replaces what the other patches or calls; declared incompatibleWith)? | `incompatible-mods` | **[v]** a `partner` |
+| 5 | `repro` is `no` **and** the player's copy of the source (or of the mod it targets, or the game build) differs from the library's: header version ≠ library version, or the header has no version and the library copy's Workshop update is after the log's upload date? | `version-mismatch` | **[v]** `repro` no; a `versions` entry for a cause or fix mod with `same` no, or `same` unknown and `updated` after the upload |
+| 6 | The thing that is missing or wrong belongs to **the game or another mod** (a def, XPath node, XML field, class, type or method that was removed or renamed there)? | `outdated-mod` | **[v]** `repro` not no |
+| 7 | The defect is **inside the source itself** (its own def name or path, a texture it names but does not ship, its own null check, malformed XML)? | `mod-bug` | **[v]** `repro` not no |
+| 8 | none decidable | `unknown` + `unknown_why` `reason-unclear` or `not-in-library` | **[v]** |
+
+`repro` `no` without a version difference (question 5 fails) is not outdated-mod or mod-bug: the
+current copy no longer fails, so the answer is `unknown` with `reason-unclear`.
+
+### Patch-failed checklist (most tier-1 disagreements)
+
+1. Target: the XPath's `defName` (or the `PatchOperationFindMod` mod name) and the patch file's
+   folder name (`Patches/<OtherMod>/…`, `ModPatches/<OtherMod>/…`).
+2. Is the target mod in the list? No → question 2 (`optional-absent`; a `FindMod`-guarded
+   patch that still fails is a broken guard). Yes → step 3.
+3. `def <defName>`: defined by an active mod/DLC? Loaded after the patch's mod → question 3. The
+   def exists but the node does not → question 5 or 6 (the target changed). The def exists nowhere
+   → question 6 if the def name belongs to the game or another mod, else 7.
+4. `repro` from the packet's simulation line ("does not fail now" = `no`).
+
+## fix.kind: a rule, not a judgement (new)
+
+**[v]** `fix.kind` must equal the first matching row:
+
+| # | condition | fix.kind | fix.mods |
+|---|---|---|---|
+| 1 | cause_type missing-dependency | `enable-dependency` | the missing mod(s) |
+| 2 | cause_type load-order | `reorder` | the mod to move (the note says before/after which) |
+| 3 | cause_type version-mismatch | `update` | the mod to update |
+| 4 | cause_type optional-absent | `ignore` | |
+| 5 | tier-1 class (patch-failed, xref-missing, texture-missing, xml-load): the game drops the bad entry and goes on | `ignore` | |
+| 6 | verdict unknown with `unknown_why` game-or-save or machine | `ignore` | |
+| 7 | verdict unknown otherwise | `unknown` | |
+| 8 | static-ctor or assembly class with a named source (the mod's setup or types fail to load) | `disable` | the source |
+| 9 | exception or harmony-stack class with a named source | `report` | the source |
 
 **[v]** `fix.mods` is required except for `ignore` and `unknown`.
 
-## stage: what the game was doing (default by class, override when the packet shows otherwise)
+## stage (unchanged)
 
-`assembly-load` (loading DLLs, listing their types, constructing `Mod` classes) ·
-`xml-load` (reading def XML and asset files) · `patch-apply` (XML patches) · `def-resolve`
-(cross-references, ResolveReferences, ConfigErrors) · `static-init`
-(`[StaticConstructorOnStartup]`, after defs) · `game-start` (finishing load, main menu,
-graphics init) · `save-load` (loading a save, `Could not load reference to …`) · `map-gen` ·
-`tick` (in play) · `ui` (drawing, OnGUI, windows) · `other`.
+`assembly-load` · `xml-load` · `patch-apply` · `def-resolve` · `static-init` · `game-start` ·
+`save-load` · `map-gen` · `tick` · `ui` · `other`. Defaults: patch-failed → patch-apply;
+xml-load → xml-load; "Could not resolve cross-reference" → def-resolve; "Failed to find X named"
+→ the stage the stack shows (static-init when called from a static constructor); "Could not load
+reference to" → save-load; texture-missing → static-init (graphics are built after defs), tick/ui
+in play.
 
-Defaults: patch-failed → patch-apply; xml-load → xml-load; "Could not resolve cross-reference"
-→ def-resolve; "Failed to find X named" → the stage the stack shows (static-init when
-called from a static constructor); "Could not load reference to" → save-load;
-texture-missing → static-init (graphics are built after defs), tick/ui in play.
+## difficulty (unchanged)
 
-## difficulty
+- `L1` fact lookup: the message or one fact names the responsible mod directly.
+- `L2` cross-mod reasoning: needs two or more facts or mods.
+- `L3` needs code. **[v]** a tier-2 `cause` label of difficulty L3 has at least one `code` quote.
 
-- `L1` fact lookup: the message or one fact names the responsible mod directly (a "[Mod
-  name]" patch prefix, a file path inside the mod's folder, the mod's own type as the
-  innermost frame, a single file-search hit).
-- `L2` cross-mod reasoning: needs two or more facts or mods (which mod defines vs references,
-  a missing dependency, load order, Harmony patchers on a game method, co-occurrence).
-- `L3` needs code: only reading decompiled code decides it. **[v]** a tier-2 `cause` label of
-  difficulty L3 has at least one `code` quote.
+## evidence, code, versions (unchanged, plus `updated`)
 
-## evidence, code, versions
+- `evidence`: 1-4 quotes copied character for character from the packet; `log:` (raw log, **[v]**
+  against `raw/<gist>.txt`), `env:` (exec transcript, **[v]**), `corpus:` (not checked).
+- `code` (tier 2): **[v]** the file exists, the text is in it at those lines (±3), the type's and
+  method's simple names occur in it.
+- `versions`: one entry per mod the conclusion depends on. **[v]** `log` equals the header
+  version in the packet. `updated` (v3) is the library copy's Workshop date from the packet's
+  "research library: …, Workshop updated <date>" line.
 
-- `evidence`: 1-4 quotes copied character for character from the packet. Prefixes cite other
-  sources: `log:` (raw log; **[v]** against `raw/<gist>.txt` when `-corpus` is given),
-  `env:` (an `exec` transcript; **[v]** against `<execlogs>/<item>.log`), `corpus:` (not checked).
-- `code` (tier 2): the decisive decompiled code. `file` is the .cs file `archo source` wrote,
-  `lines` its 1-based range, `text` verbatim (whitespace may differ). **[v]** the file exists,
-  the text is in it at those lines (±3), and the type's and method's simple names occur in it.
-- `versions`: for every mod the conclusion depends on, the header version and the library's
-  modVersion. **[v]** `log` equals the header version recorded in the packet.
+## Benchmark v3 files (outside the repository: `corpus-kb\labels\v3\`)
 
-## Files (outside the repository: `corpus-kb\labels\v2\`)
+`sample-new.jsonl` (the 360 new items, PF21…, numbering continues after v2) · `sample.jsonl`
+(v2's 140 + the new 360) · `rimarcho-v4.jsonl` (RimArcho's final-run verdicts; never shown to
+labellers or agents) · `packets\` · `t1\`, `t2\` (labeller labels) · `review\` (reviewer
+labels, the gold where present) · `overlap\` (the agreement study) · `v2-migrated\` (v2 gold in
+corpuslabel/3) · `execlogs\` · `costs.jsonl` · `tasks.jsonl` + `code\` · `heldout.sha256` (the
+frozen held-out id list).
 
-`sample.jsonl` (items: gist, key, tier, bench class, stratum) · `rimarcho-v4.jsonl`
-(RimArcho's verdict in the final run; never shown to labellers or agents) · `packets\<item>.txt`
-(what a labeller reads) and `.json` (adds RimArcho's re-run verdict: not for agents) ·
-`haiku\`, `t2\` (labeller labels) · `review\` (reviewer's labels, the gold where present) ·
-`execlogs\<item>.log` (tool transcripts) · `costs.jsonl` · `tasks.jsonl` + `code\` (G7 tasks).
+v2 labels are scored as they were (`corpuslabel/2` stays valid); the v3 task set carries v2's
+gold migrated to corpuslabel/3 (same sources and verdicts unless the reviewer corrected them;
+`repro`, `unknown_why` added, fix kind recomputed).

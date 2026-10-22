@@ -10,7 +10,7 @@
 //
 // Benchmark v2 (G6, bench.go, SCHEMA.md):
 //
-//	corpuslabel bench-sample -results results-v4.jsonl -out <v2>\sample.jsonl [-n1 20 -n2 15 -mincov 0.8 -seed s -exclude pilot\sample.jsonl]
+//	corpuslabel bench-sample -results results-v4.jsonl -out <v2>\sample.jsonl [-n1 20 -n2 15 -mincov 0.8 -seed s -exclude pilot\sample.jsonl -balance]
 //	corpuslabel bench-score  -sample … -packets … -labels … -review … -rimarcho <v2>\rimarcho-v4.jsonl [-execlogs <dir> -costs costs.jsonl -corpus C]
 //	corpuslabel tasks        -sample … -packets … -labels … -review … -out <v2> [-execlogs <dir> -corpus C]
 //
@@ -45,7 +45,8 @@ func main() {
 	per := fs.Int("per", 2, "sample: clusters per template")
 	n1 := fs.Int("n1", 20, "bench-sample: clusters per tier-1 class")
 	n2 := fs.Int("n2", 15, "bench-sample: clusters per tier-2 class")
-	exclude := fs.String("exclude", "", "bench-sample: comma-separated earlier samples whose logs are skipped")
+	exclude := fs.String("exclude", "", "bench-sample: comma-separated earlier samples whose logs are skipped (numbering continues after them)")
+	balance := fs.Bool("balance", false, "bench-sample: split each class evenly between clusters RimArcho names a source for and silent ones")
 	minCov := fs.Float64("mincov", 0.8, "sample: minimum library coverage of a log")
 	seed := fs.String("seed", "p1", "sample: seed of the deterministic pick")
 	home := fs.String("home", "", "packets: RimArcho data directory of the research environment")
@@ -78,7 +79,7 @@ func main() {
 	case "exec":
 		err = execCmd(*home, *corpus, *gist, *packetF, *logF, fs.Args())
 	case "bench-sample":
-		err = benchSample(*results, *out, *n1, *n2, *minCov, *seed, strings.Split(*exclude, ","))
+		err = benchSample(*results, *out, *n1, *n2, *minCov, *seed, strings.Split(*exclude, ","), *balance)
 	case "bench-score":
 		err = benchScore(*sampleF, *packets, *labels, *review, *raF, *execLogs, *costsF, o)
 	case "tasks":

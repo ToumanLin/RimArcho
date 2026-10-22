@@ -13,7 +13,8 @@ import (
 
 // Label is the fixed output of a labeller (design R2: structured, with model and prompt).
 // Schema corpuslabel/1 is the pilot's; corpuslabel/2 (SCHEMA.md) tightens cause type and
-// fix kind, and adds difficulty, code quotes and version checks.
+// fix kind, and adds difficulty, code quotes and version checks; corpuslabel/3 (G12) adds
+// repro and unknown_why and makes the fix kind a rule.
 type Label struct {
 	Schema string `json:"schema"` // "corpuslabel/1" or "corpuslabel/2"
 	Item   string `json:"item"`
@@ -34,9 +35,14 @@ type Label struct {
 	Code       []CodeQuote    `json:"code,omitempty"`       // decisive decompiled code (tier 2)
 	Versions   []VersionCheck `json:"versions,omitempty"`   // log header version vs research library
 	Difficulty string         `json:"difficulty,omitempty"` // L1 fact lookup, L2 cross-mod reasoning, L3 needs code
-	Model      string         `json:"model"`
-	Prompt     string         `json:"prompt"`
-	Note       string         `json:"note,omitempty"`
+	// v3 (G12): Repro says whether the research environment (same list, current library
+	// copies) still shows the defect: yes | no | unknown; required with a named cause.
+	// UnknownWhy says why the verdict or the cause type stays unknown (unknownWhys).
+	Repro      string `json:"repro,omitempty"`
+	UnknownWhy string `json:"unknown_why,omitempty"`
+	Model      string `json:"model"`
+	Prompt     string `json:"prompt"`
+	Note       string `json:"note,omitempty"`
 }
 
 // Cause is one mod of the cause. Role:
@@ -71,6 +77,10 @@ type VersionCheck struct {
 	Log       string `json:"log"`       // [mv:]/[v:]/[ov:] of the log header, "" when none
 	Installed string `json:"installed"` // About.xml modVersion of the library copy, "" when none
 	Same      string `json:"same"`      // yes | no | unknown
+	// Updated (v3): the library copy's Workshop update date as the packet shows it; with
+	// same "unknown" (no version in the header) an update after the log's upload counts as
+	// a different copy for version-mismatch.
+	Updated string `json:"updated,omitempty"`
 }
 
 var (
@@ -99,7 +109,52 @@ var (
 		"mod-bug":            set("report", "disable", "ignore"),
 		"unknown":            set("unknown", "ignore", "report", "disable"),
 	}
+
+	// v3 (SCHEMA.md): why an outcome stays unknown, and the repro values.
+	unknownWhyVerdict = set("game-or-save", "machine", "several-candidates", "no-evidence", "not-in-library")
+	unknownWhyCause   = set("reason-unclear", "not-in-library")
+	repros            = set("yes", "no", "unknown")
 )
+
+// tier1Bench: load-time data errors the game recovers from by dropping the bad entry.
+var tier1Bench = set("patch-failed", "xref-missing", "texture-missing", "xml-load")
+
+// expectedFix is v3's fix kind: a function of the cause type, the benchmark class and whether a
+// source is named (G6 found labellers disagreeing mostly on report vs disable and ignore vs
+// unknown when the kind was a judgement of impact).
+func expectedFix(l *Label, bench string) string {
+	switch l.CauseType {
+	case "missing-dependency":
+		return "enable-dependency"
+	case "load-order":
+		return "reorder"
+	case "version-mismatch":
+		return "update"
+	case "optional-absent":
+		return "ignore"
+	}
+	if tier1Bench[bench] {
+		return "ignore"
+	}
+	if l.Verdict != "cause" {
+		if l.UnknownWhy == "game-or-save" || l.UnknownWhy == "machine" {
+			return "ignore"
+		}
+		return "unknown"
+	}
+	if bench == "static-ctor" || bench == "assembly" {
+		return "disable"
+	}
+	return "report"
+}
+
+// dateAfter: a (a Workshop date "2026-06-10" or RFC 3339) is later than b (RFC 3339).
+func dateAfter(a, b string) bool {
+	if len(a) < 10 || len(b) < 10 {
+		return false
+	}
+	return a[:10] > b[:10]
+}
 
 func set(xs ...string) map[string]bool {
 	m := map[string]bool{}
@@ -146,7 +201,8 @@ func rawText(path string) string {
 func validate(l *Label, items map[string]Item, packets map[string]*Packet, o *vopts) []string {
 	var errs []string
 	bad := func(f string, a ...any) { errs = append(errs, fmt.Sprintf(f, a...)) }
-	v2 := l.Schema == "corpuslabel/2"
+	v3 := l.Schema == "corpuslabel/3"
+	v2 := l.Schema == "corpuslabel/2" || v3 // v3 keeps every v2 rule and adds its own
 	if l.Schema != "corpuslabel/1" && !v2 {
 		bad("schema %q", l.Schema)
 	}
@@ -279,6 +335,10 @@ func validate(l *Label, items map[string]Item, packets map[string]*Packet, o *vo
 		bad("difficulty %q not in %s", l.Difficulty, keys(difficulties))
 	}
 	verMismatch := false
+	fixPk := map[string]bool{}
+	for _, m := range l.Fix.Mods {
+		fixPk[strings.ToLower(m)] = true
+	}
 	for _, vc := range l.Versions {
 		if !sames[vc.Same] {
 			bad("versions same %q not in %s", vc.Same, keys(sames))
@@ -287,12 +347,47 @@ func validate(l *Label, items map[string]Item, packets map[string]*Packet, o *vo
 			bad("versions: log version of %s is %q, not %q", vc.Pkg, lv, vc.Log)
 		}
 		// the game itself may be the differing party (a mod written for a newer 1.6 build)
-		if vc.Same == "no" && (causePk[strings.ToLower(vc.Pkg)] || strings.ToLower(vc.Pkg) == "ludeon.rimworld") {
+		pk := strings.ToLower(vc.Pkg)
+		involved := causePk[pk] || pk == "ludeon.rimworld" || (v3 && fixPk[pk])
+		if vc.Same == "no" && involved {
+			verMismatch = true
+		}
+		// v3: no version in the header, but the library copy was updated after the upload
+		if v3 && vc.Same == "unknown" && involved && dateAfter(vc.Updated, p.Created) {
 			verMismatch = true
 		}
 	}
 	if l.CauseType == "version-mismatch" && !verMismatch {
-		bad("cause_type version-mismatch without a versions entry same=no for a cause mod")
+		if v3 {
+			bad("cause_type version-mismatch without a versions entry for a cause or fix mod with same=no, or same=unknown and updated after the upload (%s)", p.Created)
+		} else {
+			bad("cause_type version-mismatch without a versions entry same=no for a cause mod")
+		}
+	}
+	if v3 {
+		if l.Verdict == "cause" && !repros[l.Repro] {
+			bad("repro %q not in %s (required with verdict cause)", l.Repro, keys(repros))
+		}
+		if l.Verdict != "cause" && l.Repro != "" {
+			bad("repro given with verdict %q", l.Verdict)
+		}
+		switch {
+		case l.Verdict != "cause" && !unknownWhyVerdict[l.UnknownWhy]:
+			bad("unknown_why %q not in %s (required with verdict unknown)", l.UnknownWhy, keys(unknownWhyVerdict))
+		case l.Verdict == "cause" && l.CauseType == "unknown" && !unknownWhyCause[l.UnknownWhy]:
+			bad("unknown_why %q not in %s (required with cause_type unknown)", l.UnknownWhy, keys(unknownWhyCause))
+		case l.Verdict == "cause" && l.CauseType != "unknown" && l.UnknownWhy != "":
+			bad("unknown_why given with cause_type %q", l.CauseType)
+		}
+		if l.CauseType == "version-mismatch" && l.Repro != "no" {
+			bad("cause_type version-mismatch needs repro no (the library copy no longer fails)")
+		}
+		if (l.CauseType == "outdated-mod" || l.CauseType == "mod-bug") && l.Repro == "no" {
+			bad("cause_type %s with repro no: the library copy no longer fails (version-mismatch, or unknown with reason-unclear)", l.CauseType)
+		}
+		if want := expectedFix(l, it.Bench); l.Fix.Kind != want {
+			bad("fix.kind %q, v3 rules give %q", l.Fix.Kind, want)
+		}
 	}
 	if it.Tier == 2 && l.Verdict == "cause" && l.Difficulty == "L3" && len(l.Code) == 0 {
 		bad("tier-2 L3 cause without a code quote")
