@@ -126,6 +126,7 @@ type App struct {
 	planPS  map[int64]*planProblems // PlanProblems, by plan
 
 	logCache   *logCacheEntry
+	refIdx     *refIndex // the enabled set's reference index (refindex.go), loaded on first use
 	harmonyDir string
 }
 

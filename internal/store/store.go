@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 14
+const SchemaVersion = 15
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -306,6 +306,14 @@ CREATE TABLE instance_note(
   updated_at INTEGER NOT NULL DEFAULT 0);
 `
 
+// schemaV15: log attribution looks defs up by their Name="…" attribute (a missing parent,
+// 03 §6.2). Without an index each lookup scanned every Def fact of the game version (~70 ms
+// on 83k rows); a log with 190 such clusters took 14 s on its first query (07 §6). Partial:
+// only abstract and named defs have a Name (about 5%).
+const schemaV15 = `
+CREATE INDEX IF NOT EXISTS def_fact_mm_named ON def_fact(game_mm, name) WHERE name<>'';
+`
+
 // migrateV11 finishes schemaV11: modsconfig_state is keyed by the normalised user data
 // folder (UserDataKey); rows that normalise to the same folder keep the newest write.
 func migrateV11(tx *sql.Tx) error {
@@ -398,7 +406,7 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13, schemaV14}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13, schemaV14, schemaV15}
 	// post runs after a step's SQL, in the same transaction.
 	post := map[int]func(*sql.Tx) error{11: migrateV11, 14: migrateV14}
 	if n == 0 {

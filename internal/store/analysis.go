@@ -56,7 +56,7 @@ func (s *Store) DefsOf(instanceID string) ([]analyze.DefFact, error) {
 func (s *Store) DefsNamed(name string, byName bool) ([]analyze.DefFact, error) {
 	q := `SELECT ` + defCols + ` FROM def_fact WHERE def_name=? AND game_mm=? ORDER BY rowid`
 	if byName {
-		q = `SELECT ` + defCols + ` FROM def_fact WHERE name=? AND game_mm=? ORDER BY rowid`
+		q = `SELECT ` + defCols + ` FROM def_fact WHERE name=? AND name<>'' AND game_mm=? ORDER BY rowid`
 	}
 	rows, err := s.DB.Query(q, name, s.MM)
 	if err != nil {

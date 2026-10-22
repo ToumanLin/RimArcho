@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/json"
 	"errors"
@@ -17,7 +16,6 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/analyze"
-	"github.com/ToumanLin/RimArcho/internal/content"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/logs"
@@ -106,7 +104,7 @@ type logCacheEntry struct {
 // read takes the stored report from the database again (the GUI calls it when the player
 // leaves 需要处理 or 日志, 07 §8.3).
 func (a *App) DropLogCaches() {
-	a.logCache = nil
+	a.logCache, a.refIdx = nil, nil
 	a.prCache, a.prKey = nil, ""
 }
 
@@ -326,6 +324,7 @@ type attrCtx struct {
 	dirs     []dirOwner
 	typeMemo map[string][]string
 	idMemo   map[string][]string
+	defMemo  map[string][]analyze.DefFact // "n|" / "N|" + name → DefsNamed
 	run      *store.Analysis
 	fails    map[string]*analyze.PatchFact // FailKey(game path, desc) → fact
 	byXPath  map[string][]*analyze.PatchFact
@@ -338,7 +337,7 @@ type dirOwner struct {
 }
 
 func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure, comp *logs.Companion) error {
-	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, comp: comp}
+	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, defMemo: map[string][]analyze.DefFact{}, comp: comp}
 	for _, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
 		if m == nil {
@@ -620,7 +619,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			if strings.HasPrefix(e.Message, "Could not load reference") {
 				lc.Details = append(lc.Details, "raised while loading a save: the save references a def no active mod provides")
 			}
-			defs, _ := cx.a.Store.DefsNamed(name, false)
+			defs, _ := cx.defsNamed(name, false)
 			var prov []string
 			for _, d := range defs {
 				if d.Type != short && !strings.HasSuffix(typ, "."+d.Type) {
@@ -645,7 +644,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			// every file for the missing name).
 			if w := wanterRe.FindStringSubmatch(e.Message); w != nil {
 				wshort := w[1][strings.LastIndexByte(w[1], '.')+1:]
-				ws, _ := cx.a.Store.DefsNamed(w[2], false)
+				ws, _ := cx.defsNamed(w[2], false)
 				for _, d := range ws {
 					if d.Type == wshort && cx.st.Position(d.Instance) > 0 && !cx.official(d.Instance) {
 						lc.add(d.Instance, RoleSource, fmt.Sprintf("defines %s %s, which wants %s %s (%s:%d)", wshort, w[2], short, name, d.File, d.Line))
@@ -663,7 +662,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		texts := strings.Join(append([]string{e.Message}, e.Extra...), "\n")
 		// A missing parent provided by an installed, disabled mod is a missing dependency.
 		if m := parentRe.FindStringSubmatch(e.Message); m != nil {
-			ds, _ := cx.a.Store.DefsNamed(m[1], true)
+			ds, _ := cx.defsNamed(m[1], true)
 			for _, d := range ds {
 				if cx.st.Position(d.Instance) == 0 && ix.ByID[d.Instance] != nil {
 					lc.add(d.Instance, RoleDependency, fmt.Sprintf("provides the abstract def %s (%s:%d) but is not enabled", m[1], d.File, d.Line))
@@ -785,12 +784,29 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 // definedBy makes the enabled mods (not Core or a DLC) that define a def the source of a
 // cluster; byName looks the name up as an abstract Name="…".
 func (cx *attrCtx) definedBy(lc *LogCluster, name string, byName bool, why string) {
-	ds, _ := cx.a.Store.DefsNamed(name, byName)
+	ds, _ := cx.defsNamed(name, byName)
 	for _, d := range ds {
 		if cx.st.Position(d.Instance) > 0 && !cx.official(d.Instance) {
 			lc.add(d.Instance, RoleSource, fmt.Sprintf("defines %s %s (%s:%d), which %s", d.Type, name, d.File, d.Line, why))
 		}
 	}
+}
+
+// defsNamed is Store.DefsNamed, once per name and attribution: clusters of one log name
+// the same defs again and again.
+func (cx *attrCtx) defsNamed(name string, byName bool) ([]analyze.DefFact, error) {
+	k := "n|" + name
+	if byName {
+		k = "N|" + name
+	}
+	if ds, ok := cx.defMemo[k]; ok {
+		return ds, nil
+	}
+	ds, err := cx.a.Store.DefsNamed(name, byName)
+	if err == nil {
+		cx.defMemo[k] = ds
+	}
+	return ds, err
 }
 
 // official reports Core and the DLCs.
@@ -910,38 +926,26 @@ func (cx *attrCtx) xrefReferrers(cs []*LogCluster) {
 	if len(toks) == 0 {
 		return
 	}
-	var mods []*store.Mod
-	for _, e := range cx.st.List {
-		if m := cx.st.Ix.ByID[e.Instance]; m != nil {
-			mods = append(mods, m)
-		}
-	}
-	if err := cx.a.Store.LoadDecls(mods); err != nil {
+	// The reference index names the files that can mention each name; only those are read
+	// (03 §6.5).
+	x, err := cx.a.RefIndex(cx.st)
+	if err != nil {
 		return
 	}
-	active := map[string]bool{}
-	for _, m := range mods {
-		active[strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")] = true
-	}
-	type job struct {
-		m  *store.Mod
-		as content.Asset
-	}
-	var jobs []job
-	for _, m := range mods {
-		dir := cx.st.Ix.ModDir(m)
-		r := content.Resolve(dir, m.Decl().LoadFolders, cx.st.GameMM(), func(p string) bool { return active[strings.TrimSuffix(strings.ToLower(p), "_steam")] })
-		for _, sub := range []string{"Defs", "Patches"} {
-			for _, as := range content.Assets(dir, r.Folders, sub) {
-				jobs = append(jobs, job{m, as})
-			}
+	want := make(map[string]int, len(toks))
+	read := map[int]bool{}
+	for i, t := range toks {
+		if _, ok := want[t.name]; ok {
+			continue
+		}
+		want[t.name] = i
+		for _, f := range x.filesWith(t.name) {
+			read[f] = true
 		}
 	}
-	// A def is referenced as element text (<thingDef>X</thingDef>, <li>X</li>) or, in
-	// ThingDefCountClass lists such as costList and products, as an element name (<X>1</X>).
-	needles := make([][2][]byte, len(toks))
-	for i, t := range toks {
-		needles[i] = [2][]byte{[]byte(">" + t.name + "<"), []byte("<" + t.name + ">")}
+	files := make([]int, 0, len(read))
+	for f := range read {
+		files = append(files, f)
 	}
 	type hit struct {
 		t    int
@@ -952,40 +956,48 @@ func (cx *attrCtx) xrefReferrers(cs []*LogCluster) {
 	var mu sync.Mutex
 	var hits []hit
 	var wg sync.WaitGroup
-	next := make(chan job)
+	next := make(chan int)
 	for w := 0; w < 8; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := range next {
-				b, err := os.ReadFile(j.as.Path)
+			for i := range next {
+				f := x.files[i]
+				b, err := os.ReadFile(f.Path)
 				if err != nil {
 					continue
 				}
-				for i, n := range needles {
-					k := bytes.Index(b, n[0])
-					if k2 := bytes.Index(b, n[1]); k2 >= 0 && (k < 0 || k2 < k) {
-						k = k2
-					}
-					if k >= 0 {
-						mu.Lock()
-						hits = append(hits, hit{i, j.m.ID, j.as.Rel, bytes.Count(b[:k], []byte{'\n'}) + 1})
-						mu.Unlock()
-					}
-				}
+				refScan(b, want, func(t, line int) {
+					mu.Lock()
+					hits = append(hits, hit{t, f.Inst, f.Rel, line})
+					mu.Unlock()
+				})
 			}
 		}()
 	}
-	for _, j := range jobs {
-		next <- j
+	for _, f := range files {
+		next <- f
 	}
 	close(next)
 	wg.Wait()
+	// Two clusters can miss the same name (different referrers or classes): both get the hits.
+	for i, t := range toks {
+		if k := want[t.name]; k != i {
+			for _, h := range hits {
+				if h.t == k {
+					hits = append(hits, hit{i, h.inst, h.file, h.line})
+				}
+			}
+		}
+	}
 	sort.Slice(hits, func(i, j int) bool {
 		if hits[i].t != hits[j].t {
 			return hits[i].t < hits[j].t
 		}
-		return cx.st.Position(hits[i].inst) < cx.st.Position(hits[j].inst)
+		if pi, pj := cx.st.Position(hits[i].inst), cx.st.Position(hits[j].inst); pi != pj {
+			return pi < pj
+		}
+		return hits[i].file < hits[j].file
 	})
 	// A text match is weak evidence (log corpus): vanilla XML is full of names like None,
 	// animal or Fishing that are enum values, tags or defs of another type, and a mod that
@@ -995,7 +1007,7 @@ func (cx *attrCtx) xrefReferrers(cs []*LogCluster) {
 	defines := map[int]map[string]bool{}
 	for i, t := range toks {
 		defines[i] = map[string]bool{}
-		ds, _ := cx.a.Store.DefsNamed(t.name, false)
+		ds, _ := cx.defsNamed(t.name, false)
 		for _, d := range ds {
 			defines[i][d.Instance] = true
 		}
