@@ -54,6 +54,7 @@ const (
 	ActTrash           = "trash"            // Refs[0]: folder to the recycle bin (confirm first)
 	ActIgnore          = "ignore"           // Problem: keep as it is (ignore the problem)
 	ActUnlinkPacks     = "unlink-packs"     // remove the packs' links from Mods/ (08 §5.3)
+	ActSwap            = "swap"             // Refs[0] → Refs[1] in the plan (one undoable step)
 )
 
 // Option is one choice of a choose-disable action.
@@ -300,6 +301,8 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				Title: Tf("%s is hidden from the game", nm(x)), Why: T("probably by another mod manager; keep it hidden, show it again, or recycle it"), Evidence: ev})
 		case app.CodePackLinks:
 			add(packLinksNeed(p))
+		case app.CodeModsDuplicate:
+			add(modsDuplicateNeed(st, p, ids))
 		case "def.parent-missing":
 			merge("def|"+x, nm(x), "", Need{Group: GroupDeps, Text: Tf("part of %s builds on a definition no enabled mod provides; a dependency may be missing", nm(x)),
 				Actions: []Action{viewAction(T("see what"), "mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s,
@@ -492,11 +495,53 @@ func packLinksNeed(p *app.Problem) Need {
 		Title:    Tf("pack %s left its links in Mods/", name),
 		Why:      T("a game started from Steam, not from RimArcho, loads the pack's copies instead of this plan's mods; launching from RimArcho removes them, and launching the pack makes them again"),
 		Evidence: evidence(EvInferred, strings.Join(src, ", "))}
+	if p.Key == "duplicate" {
+		// Next to other copies of the same mods: the game reports an error at every start
+		// from Steam, so it is one that breaks the game.
+		n.Group, n.rank, n.Status = GroupList, 3, StatusErr
+		n.Title = Tf("pack %s's links put mods twice in Mods/", name)
+		n.Text = Tf("pack %s left its links in Mods/ next to other copies of the same mods: the game reports an error for each", name)
+		n.Why = T("a game started from Steam finds two folders with one packageId, reports an error and ignores one; launching from RimArcho removes the links, and launching the pack makes them again without the duplicates")
+	}
 	if p.Key == "running" {
 		n.Status = StatusErr
 		n.Text = Tf("the game is running with pack %s's copies: it was not started from RimArcho", name)
 		n.Title = Tf("the game is running with pack %s's copies", name)
 		n.Why = T("it was started from Steam while the pack's links were in Mods/, so it loaded the pack's copies; close the game, then remove the links")
+	}
+	return n
+}
+
+// modsDuplicateNeed: two folders of one packageId in Mods/ (08 §3). The one action never
+// moves a folder RimArcho did not make: it uses the copy in Mods/ instead of RimArcho's link,
+// or takes the linked mod out of the plan; with only the player's folders it says what to do.
+func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need {
+	pkg := p.Key
+	var where []string
+	for _, e := range p.Evidence {
+		where = append(where, e.Text)
+	}
+	n := Need{Group: GroupList, rank: 3, Counted: true, Status: StatusErr, Mods: ids,
+		Title:    Tf("Mods/ holds %s twice", pkg),
+		Text:     Tf("Mods/ has %d folders with packageId %s: the game reports an error and ignores all but one", len(where), pkg),
+		Evidence: evidence(EvInferred, strings.Join(where, ", "))}
+	sg := ""
+	if len(p.Suggestions) > 0 {
+		sg = p.Suggestions[0]
+	}
+	f := strings.Fields(sg)
+	switch {
+	case len(f) == 4 && f[1] == "swap":
+		from, to := f[2], f[3]
+		n.Why = Tf("RimArcho links %s for this plan, and Mods/ already has the same mod; use the copy in Mods/ (the link goes the next time the plan is written to the game)", TokName(st, from))
+		n.Actions = []Action{{Kind: ActSwap, Key: "x", Label: T("use the copy in Mods/"), Refs: []string{TokRef(st, from), TokRef(st, to)}, Undo: true,
+			Done: Tf("the plan uses the copy of %s in Mods/ (not written yet)", TokName(st, to))}}
+	case len(f) == 3 && f[1] == "disable":
+		n.Why = Tf("RimArcho links %s for this plan, and Mods/ has another mod with the same packageId; take it out of the plan, or move the folder out of Mods/", TokName(st, f[2]))
+		n.Actions = []Action{disable(st, f[2], T("take it out of the plan"))}
+	default:
+		n.Why = T("RimArcho did not make these folders and does not move them: move all but one out of Mods/ yourself")
+		n.Actions = []Action{{Kind: ActList, Key: "enter", Label: T("see which"), Title: Tf("Mods/ holds %s twice", pkg), Lines: where}}
 	}
 	return n
 }
@@ -670,6 +715,8 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		_, err = a.IgnoreProblem(act.Problem, false)
 	case ActUnlinkPacks:
 		_, err = a.UnlinkPacks(false)
+	case ActSwap:
+		_, err = a.Swap(act.Refs[0], act.Refs[1])
 	default:
 		return "", fmt.Errorf("%s is not a data action", act.Kind)
 	}

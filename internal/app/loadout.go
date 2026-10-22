@@ -726,7 +726,7 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch bool) (*SaveResult, err
 		return nil, conflictError(st, c)
 	}
 	r := &SaveResult{State: st, Path: st.FilePath, DryRun: dryRun, Changes: st.Changes()}
-	mods, links, err := planLinks(st)
+	mods, links, err := planLinks(st, a.ModsCopies(st.Ix))
 	if err != nil {
 		return nil, err
 	}

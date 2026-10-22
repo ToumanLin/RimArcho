@@ -120,13 +120,14 @@ type App struct {
 
 	dataIdx *dataIndex // community data indexes (04 §6.3), loaded on first use
 
-	ixCache *Index
-	ixKey   string
-	stCache *LoadoutState
-	stKey   string
-	prCache *ProblemSet
-	prKey   string
-	planPS  map[int64]*planProblems // PlanProblems, by plan
+	ixCache    *Index
+	ixKey      string
+	stCache    *LoadoutState
+	stKey      string
+	modsCopies *modsCopiesCache
+	prCache    *ProblemSet
+	prKey      string
+	planPS     map[int64]*planProblems // PlanProblems, by plan
 
 	logCache   *logCacheEntry
 	harmonyDir string

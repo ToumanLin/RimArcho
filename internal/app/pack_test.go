@@ -88,9 +88,14 @@ func TestPackBuildAndLaunch(t *testing.T) {
 	}
 
 	e.MustRun("pack", "launch", "first")
+	// Versions is in Mods/ as it was built (the same content): its copy there stands in, so
+	// Mods/ never holds it twice (08 §5.3).
 	links, _ := filepath.Glob(filepath.Join(mods, "!ArchoPack_first_*"))
-	if len(links) != len(p.Entries)-1 {
-		t.Fatalf("K4: %d links for %d carried mods", len(links), len(p.Entries)-1)
+	if len(links) != len(p.Entries)-2 {
+		t.Fatalf("K4: %d links for %d carried mods, one of them already in Mods/", len(links), len(p.Entries)-1)
+	}
+	if dups := app.ModsDuplicates(e.App.ModsCopies(mustIndex(t, e))); len(dups) != 0 {
+		t.Fatalf("K4: Mods/ holds a mod twice: %+v", dups)
 	}
 	for _, l := range links {
 		if !source.IsLink(l) {
@@ -158,4 +163,13 @@ func TestPackExportImport(t *testing.T) {
 	if _, code := e.Run("pack", "import", full); code == 0 {
 		t.Fatal("importing over an existing pack must be refused")
 	}
+}
+
+func mustIndex(t *testing.T, e *testkit.Env) *app.Index {
+	t.Helper()
+	ix, err := e.App.Index()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ix
 }

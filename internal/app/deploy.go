@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -133,7 +134,7 @@ type LinkChange struct {
 }
 
 // planLinks compares the RimArcho links in Mods/ with the deployed instances of the list.
-func planLinks(st *LoadoutState) (string, []LinkChange, error) {
+func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, error) {
 	mods := modsDir(st.Ix)
 	want := map[string]*store.Mod{}
 	for _, e := range st.List {
@@ -179,6 +180,11 @@ func planLinks(st *LoadoutState) (string, []LinkChange, error) {
 			c.Mod = m.ID
 		}
 		out = append(out, c)
+	}
+	// A link next to another copy of the same packageId in Mods/ makes the game report an
+	// error and ignore one of them (08 §3): refuse instead of making the pair.
+	if dup := deployDuplicates(st, want, copies); dup != "" {
+		return "", nil, errors.New(dup)
 	}
 	for key, m := range want {
 		if !have[key] {
@@ -229,4 +235,24 @@ func applyLinks(mods string, plan []LinkChange) error {
 		}
 	}
 	return nil
+}
+
+// deployDuplicates names the instances to deploy that share a packageId with another copy in
+// Mods/ (a folder, or another tool's link; RimArcho's own links are replaced anyway).
+func deployDuplicates(st *LoadoutState, want map[string]*store.Mod, copies []ModsCopy) string {
+	byPkg := map[string][]string{}
+	for _, c := range copies {
+		if c.By == CopyPlayer {
+			byPkg[c.PackageID] = append(byPkg[c.PackageID], "Mods/"+c.Name)
+		}
+	}
+	var out []string
+	for _, m := range want {
+		if ns := byPkg[m.PackageID]; len(ns) > 0 {
+			out = append(out, fmt.Sprintf("%s %s and %s have packageId %s; linking it too would put two copies in Mods/ (use the copy in Mods/: archo swap %s, or move the folder out of Mods/)",
+				st.Ix.Ref(m.ID), m.DisplayName(), strings.Join(ns, ", "), m.PackageID, st.Ix.Ref(m.ID)))
+		}
+	}
+	sort.Strings(out)
+	return strings.Join(out, "; ")
 }

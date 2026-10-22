@@ -170,5 +170,5 @@ env:main  RimWorld 1.6.4633 rev1261
   changes: 1 discovered (archo changes)
   plan: plan:default
   loadout: 1 active, same as v1 (import)
-  problems: 0 error, 0 warning, 2 info in declarations; Defs and Patches not analysed yet (archo problems)
+  problems: 1 error, 0 warning, 2 info in declarations; Defs and Patches not analysed yet (archo problems)
 

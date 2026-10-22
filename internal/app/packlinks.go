@@ -24,6 +24,9 @@ type PackLinksLeft struct {
 	// Running: the game of this environment runs now, not as that pack (started from
 	// Steam, or from RimArcho before the links were made by another tool).
 	Running bool
+	// Duplicates: packageIds a link shares with another copy in Mods/: the game reports
+	// an error for each and ignores one of them.
+	Duplicates []ModsDuplicate
 }
 
 // LeftPackLinks finds the !ArchoPack_ links in the current environment's Mods/ that no
@@ -113,18 +116,32 @@ func (r *PackLinksLeft) Finding() *finding.Finding {
 	if r.Running {
 		claim = fmt.Sprintf("the game is running with %d links of pack %s in Mods/: it loaded the pack's copies instead of this plan's mods", len(r.Links), r.PackNames())
 	}
-	key := "links"
+	key, sev := "links", finding.Warning
 	if r.Running {
 		key = "running"
 	}
-	f := &finding.Finding{Code: CodePackLinks, Severity: finding.Warning, Claim: claim, Confidence: finding.Certain,
+	if n := len(r.Duplicates); n > 0 {
+		var pkgs []string
+		for _, d := range r.Duplicates {
+			pkgs = append(pkgs, d.PackageID)
+		}
+		key, sev = "duplicate", finding.Error
+		claim = fmt.Sprintf("Mods/ has %d links of pack %s next to other copies of the same mods (%s): the game reports an error for each and ignores one copy", len(r.Links), r.PackNames(), strings.Join(pkgs, ", "))
+	}
+	f := &finding.Finding{Code: CodePackLinks, Severity: sev, Claim: claim, Confidence: finding.Certain,
 		Key: key, Layer: "decl", Suggestions: []string{"archo pack unlink"}}
 	for _, p := range r.Packs {
 		if p != "" {
 			f.Subjects = append(f.Subjects, "pack:"+p)
 		}
 	}
+	for _, d := range r.Duplicates {
+		f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: d.Names()})
+	}
 	for i, l := range r.Links {
+		if len(r.Duplicates) > 0 {
+			break
+		}
 		if i == 3 {
 			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: fmt.Sprintf("and %d more", len(r.Links)-3)})
 			break

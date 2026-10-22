@@ -196,6 +196,13 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	ln.Truncate(10, "")
+	if len(r.InMods) > 0 {
+		n := root.KV("from Mods/", fmt.Sprintf("%d mods: the same version is already in Mods/, so the pack's copy is not linked next to it", len(r.InMods)))
+		for _, m := range r.InMods {
+			n.Add(m)
+		}
+		n.Truncate(10, "")
+	}
 	root.KV("list", fmt.Sprintf("%s (%d entries; the environment's ModsConfig.xml is not touched)", r.ModsConfig, len(r.Tokens)))
 	root.KV("saves", r.UserData)
 	if len(r.Copied) > 0 {

@@ -60,3 +60,46 @@ func TestPackLinksNeed(t *testing.T) {
 		t.Fatal("the item is still there after removing the links")
 	}
 }
+
+// Two folders of one packageId in Mods/ (08 §3): an item in 会让游戏出错; with RimArcho's link
+// among them the action changes the plan, with only the player's folders it lists them.
+func TestModsDuplicateNeed(t *testing.T) {
+	view.SetLang("en")
+	e := testkit.New(t)
+	e.AddEnv(true)
+	cmdDir := filepath.Join(e.SteamCMD, "8888")
+	e.WriteMod(cmdDir, testkit.Sample("tester.cmd", "CmdOnly"))
+	mods := filepath.Join(e.Game, "Mods")
+	e.WriteMod(filepath.Join(mods, "P1"), testkit.Sample("tester.same", "Same"))
+	e.WriteMod(filepath.Join(mods, "P2"), testkit.Sample("tester.same", "Same"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld")
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:tester.cmd")
+	e.MustRun("save")
+	e.WriteMod(filepath.Join(mods, "CmdCopy"), testkit.Sample("tester.cmd", "CmdOnly"))
+	e.MustRun("scan")
+	b, err := view.BuildBoard(e.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps, err := e.App.Problems(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := view.BuildNeeds(e.App, b.St, ps)
+	kinds := map[string]string{}
+	for _, it := range n.Items {
+		if strings.HasPrefix(it.Title, "Mods/ holds") {
+			if it.Section != view.SectionOf(view.GroupList) || !it.Counted || len(it.Actions) != 1 {
+				t.Fatalf("item: %+v", it)
+			}
+			kinds[it.Title] = it.Actions[0].Kind
+		}
+	}
+	if kinds["Mods/ holds tester.same twice"] != view.ActList {
+		t.Fatalf("the player's folders: %v", kinds)
+	}
+	if k := kinds["Mods/ holds tester.cmd twice"]; k != view.ActSwap && k != view.ActDisable {
+		t.Fatalf("RimArcho's link: %v", kinds)
+	}
+}

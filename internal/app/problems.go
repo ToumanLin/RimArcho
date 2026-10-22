@@ -51,17 +51,48 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	if err != nil || ps.State == nil {
 		return ps, err
 	}
-	if l := a.LeftPackLinks(ps.State.Ix); l != nil {
-		c := *ps
-		f := l.Finding()
-		i := 0
-		for i < len(ps.List) && ps.List[i].Severity == finding.Error {
-			i++
+	// What Mods/ holds now (08 §3, §5.3): a pack's links left there, and two folders of one
+	// packageId, which the game reports as an error.
+	ix := ps.State.Ix
+	dups := ModsDuplicates(a.ModsCopies(ix))
+	var extra []*finding.Finding
+	if l := a.LeftPackLinks(ix); l != nil {
+		for _, d := range dups {
+			if d.onlyPacks() {
+				l.Duplicates = append(l.Duplicates, d)
+			}
 		}
-		c.List = append(append(append([]*Problem{}, ps.List[:i]...), &Problem{Finding: f, Ref: ProblemRef(f, "")}), ps.List[i:]...)
+		extra = append(extra, l.Finding())
+	}
+	extra = append(extra, duplicateFindings(ps.State, dups)...)
+	if len(extra) > 0 {
+		c := *ps
+		c.List = append([]*Problem{}, ps.List...)
+		for _, f := range extra {
+			lin := ""
+			if m := ix.ByID[f.SubjectInstance()]; m != nil {
+				lin = m.LineageID
+			}
+			p := &Problem{Finding: f, Ref: ProblemRef(f, lin)}
+			i := 0
+			for i < len(c.List) && sevRank(c.List[i].Severity) <= sevRank(f.Severity) {
+				i++
+			}
+			c.List = append(c.List[:i], append([]*Problem{p}, c.List[i:]...)...)
+		}
 		ps = &c
 	}
 	return ps, nil
+}
+
+func sevRank(s string) int {
+	switch s {
+	case finding.Error:
+		return 0
+	case finding.Warning:
+		return 1
+	}
+	return 2
 }
 
 func (a *App) problems(ensure bool, progress func(string)) (*ProblemSet, error) {
