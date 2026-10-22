@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -33,16 +34,38 @@ type ChangeScan struct {
 	Events  []ChangeEvent `json:"events"`
 }
 
-// Changes lists the last scans of the state's environment (none: no scan yet).
-func Changes(a *app.App, st *app.LoadoutState) ([]ChangeScan, error) {
+// Changes lists the last scans of the state's environment (none: no scan yet). of, an
+// instance ID, narrows the page to the changes of that mod's Lineage: every scan that
+// changed one of its copies, not only the last ChangeScans (06 §2.9, the detail's history).
+func Changes(a *app.App, st *app.LoadoutState, of string) ([]ChangeScan, error) {
 	ix := st.Ix
-	scans, err := a.Store.Scans(ix.Env.ID, ChangeScans)
-	if err != nil || len(scans) == 0 {
-		return nil, err
-	}
-	evs, err := a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, MinScan: scans[len(scans)-1].ID})
-	if err != nil {
-		return nil, err
+	var evs []*store.Event
+	var scans []*store.Scan
+	if of != "" {
+		ids := LineageIDs(ix, of)
+		if len(ids) == 0 {
+			return nil, nil
+		}
+		var err error
+		if evs, err = a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, InstanceIDs: ids}); err != nil {
+			return nil, err
+		}
+		// the scans that changed it, newest first
+		for i := len(evs) - 1; i >= 0; i-- {
+			if len(scans) == 0 || scans[len(scans)-1].ID != evs[i].ScanID {
+				scans = append(scans, &store.Scan{ID: evs[i].ScanID, Started: evs[i].ScanTime})
+			}
+		}
+	} else {
+		var err error
+		scans, err = a.Store.Scans(ix.Env.ID, ChangeScans)
+		if err != nil || len(scans) == 0 {
+			return nil, err
+		}
+		evs, err = a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, MinScan: scans[len(scans)-1].ID})
+		if err != nil {
+			return nil, err
+		}
 	}
 	by := map[int64][]*store.Event{}
 	for _, e := range evs {
@@ -78,6 +101,26 @@ func Changes(a *app.App, st *app.LoadoutState) ([]ChangeScan, error) {
 		out = append(out, cs)
 	}
 	return out, nil
+}
+
+// LineageIDs is every instance of the Lineage of the instance id (the instance alone when it
+// has none).
+func LineageIDs(ix *app.Index, id string) []string {
+	m := ix.ByID[id]
+	if m == nil {
+		return nil
+	}
+	if m.LineageID == "" || len(ix.ByLineage[m.LineageID]) == 0 {
+		return []string{id}
+	}
+	var out []string
+	for _, x := range ix.ByLineage[m.LineageID] {
+		out = append(out, x.ID)
+	}
+	if !slices.Contains(out, id) {
+		out = append(out, id)
+	}
+	return out
 }
 
 // KindOrder puts what a player most wants to know first.

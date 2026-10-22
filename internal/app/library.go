@@ -25,18 +25,16 @@ import (
 
 // Library states, most important first: a row shows the first one it has (06 §2.9).
 const (
-	LibUnloadable  = "unloadable"  // no readable About.xml (mod.unloadable)
-	LibMissing     = "missing"     // subscribed in the Workshop ACF, no folder on disk
-	LibIgnored     = "ignored"     // another copy with the same packageId wins (pkg.duplicate-installed)
-	LibResidue     = "residue"     // a Workshop folder that is no longer subscribed
-	LibHidden      = "hidden"      // About.xml renamed to About.xml.disabled by another manager (08 §6)
-	LibUpdated     = "updated"     // a locked version whose upstream changed (04 §7.3)
-	LibUnsupported = "unsupported" // supportedVersions does not list the game's major.minor
-	LibUnused      = "unused"      // no plan or pack uses it
+	LibUnloadable = "unloadable" // no readable About.xml (mod.unloadable)
+	LibMissing    = "missing"    // subscribed in the Workshop ACF, no folder on disk
+	LibIgnored    = "ignored"    // another copy with the same packageId wins (pkg.duplicate-installed)
+	LibResidue    = "residue"    // a Workshop folder that is no longer subscribed
+	LibHidden     = "hidden"     // About.xml renamed to About.xml.disabled by another manager (08 §6)
+	LibUpdated    = "updated"    // a locked version whose upstream changed (04 §7.3)
 )
 
 // LibStates is the state order.
-var LibStates = []string{LibUnloadable, LibMissing, LibIgnored, LibResidue, LibHidden, LibUpdated, LibUnsupported, LibUnused}
+var LibStates = []string{LibUnloadable, LibMissing, LibIgnored, LibResidue, LibHidden, LibUpdated}
 
 // Library source values (the source: filter).
 const (
@@ -154,17 +152,12 @@ func (l *LibLineage) Bytes() (n int64, sized bool) {
 	return n, sized
 }
 
-// State is the most important state of any instance; "in no plan" only when no copy is
-// used.
+// State is the most important state of any instance.
 func (l *LibLineage) State() string {
 	best := len(LibStates)
-	used := len(l.UsedIn()) > 0
 	for _, i := range l.Instances {
-		for _, s := range i.States {
-			if s != LibUnused || !used {
-				best = min(best, slices.Index(LibStates, s))
-				break
-			}
+		if len(i.States) > 0 {
+			best = min(best, slices.Index(LibStates, i.States[0]))
 		}
 	}
 	if best == len(LibStates) {
@@ -336,7 +329,7 @@ func (a *App) Library() (*Library, error) {
 				i.UpstreamUpdates = a.Store.UpdatesSince(i.Locked.Upstream.ID, since)
 			}
 		}
-		i.States = libStates(st, lib.GameMM, m, i, i.Locked != nil && i.Locked.Updated || pinUpdated[m.ID])
+		i.States = libStates(st, m, i.Locked != nil && i.Locked.Updated || pinUpdated[m.ID])
 		add(m, i)
 	}
 	// Subscribed Workshop items with no folder (06 §2.9: "幽灵"). A tombstone of the item
@@ -421,7 +414,7 @@ func libName(ix *Index, id string, l *LibLineage) string {
 	return id
 }
 
-func libStates(st *LoadoutState, mm string, m *store.Mod, i *LibInstance, updated bool) []string {
+func libStates(st *LoadoutState, m *store.Mod, updated bool) []string {
 	var out []string
 	switch {
 	case m.Residue:
@@ -435,12 +428,6 @@ func libStates(st *LoadoutState, mm string, m *store.Mod, i *LibInstance, update
 	}
 	if updated {
 		out = append(out, LibUpdated)
-	}
-	if len(i.Versions) > 0 && mm != "" && !slices.Contains(i.Versions, mm) {
-		out = append(out, LibUnsupported)
-	}
-	if len(i.UsedIn) == 0 {
-		out = append(out, LibUnused)
 	}
 	slices.SortFunc(out, func(a, b string) int { return slices.Index(LibStates, a) - slices.Index(LibStates, b) })
 	return out

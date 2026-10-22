@@ -225,7 +225,7 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("launch_game", nil, "launch"),
 		s("plan_history", nil, "loadout", "log"),
 		// 06 §2.9: the library, moving a spare copy into the lock library, removing from plans.
-		s("list_library", map[string]any{"include": []string{"state:unused"}}, "library", "--include", "state:unused"),
+		s("list_library", map[string]any{"include": []string{"used:none"}}, "library", "--include", "used:none"),
 		func() manageStep {
 			a := pick("A", "local")
 			return manageStep{"manage_library", map[string]any{"action": "move_to_locked", "refs": []string{a}, "dry_run": true}, []string{"library", "move-to-locked", a, "--dry-run"}}

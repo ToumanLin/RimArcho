@@ -182,17 +182,12 @@ func libActionLabel(k string) string {
 	}[k]
 }
 
-// libRowStates are the states worth a look in a row (06 §2.9); the others ("不支持 1.7",
-// "不在任何方案里") stay in the filters and the detail.
-var libRowStates = map[string]bool{app.LibUnloadable: true, app.LibMissing: true, app.LibIgnored: true, app.LibResidue: true, app.LibHidden: true, app.LibUpdated: true}
-
+// rowState is the state a row shows: the most important one (06 §2.9).
 func rowState(states []string) string {
-	for _, s := range states {
-		if libRowStates[s] {
-			return s
-		}
+	if len(states) == 0 {
+		return ""
 	}
-	return ""
+	return states[0]
 }
 
 // LibStateText is a state as the page says it.
@@ -210,10 +205,6 @@ func LibStateText(s, mm string) string {
 		return T("hidden by another manager")
 	case app.LibUpdated:
 		return T("upstream has an update")
-	case app.LibUnsupported:
-		return Tf("does not support %s", mm)
-	case app.LibUnused:
-		return T("in no plan")
 	}
 	return s
 }

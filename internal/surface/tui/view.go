@@ -214,12 +214,14 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
+	case m.tab == tabChanges && m.chg.of != "":
+		pairs = [][2]string{{"esc", T("every mod")}, {"enter", T("file changes")}}
 	case m.tab == tabChanges:
 		pairs = [][2]string{{"esc", T("back")}, {"enter", T("file changes")}}
 	case m.tab == tabLibrary && m.libr.typing:
 		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"key:value", T("keep")}, {"-key:value", T("leave out")}}
 	case m.tab == tabLibrary:
-		pairs = [][2]string{{"↑↓", T("choose")}, {"/", T("filter")}, {"enter", T("copies")}, {"n", T("note")}, {"esc", T("back")}}
+		pairs = [][2]string{{"↑↓", T("choose")}, {"/", T("filter")}, {"enter", T("copies")}, {"n", T("note")}, {"ctrl+o ctrl+w", T("folder / Workshop page")}, {"C", T("this mod's changes")}, {"esc", T("back")}}
 	case m.selCount() > 0:
 		// 06 §3.4: what the selection can do, and that another list drops it.
 		prefix = Tf("selected %d", m.selCount())
@@ -231,7 +233,7 @@ func (m *model) hintLine() string {
 		}
 		pairs = append(pairs, [2]string{"?", T("all keys")})
 	case m.detailFocus:
-		pairs = [][2]string{{"↑↓", T("scroll")}, {"←", T("back to the list")}, {"enter", T("full screen")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"?", T("all keys")}}
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"←", T("back to the list")}, {"enter", T("full screen")}, {"#", T("tags")}, {"ctrl+o ctrl+w", T("folder / Workshop page")}, {"C", T("this mod's changes")}, {"?", T("all keys")}}
 	default:
 		pairs = append(m.verbPairs(), [2]string{"/", T("search")})
 		if m.layout().tabs {
@@ -273,13 +275,15 @@ func (m *model) verbPairs() [][2]string {
 	if m.col().cur() == nil {
 		return nil
 	}
+	// ctrl+o / ctrl+w: the cursor's mod's folder and Workshop page (06 §3.5)
+	one := [2]string{"ctrl+o ctrl+w", T("folder / Workshop page")}
 	switch m.focus {
 	case cInactive:
-		return [][2]string{{"space", T("enable")}, {"m", T("enable at…")}, {"t", T("stage")}, {"#", T("tags")}}
+		return [][2]string{{"space", T("enable")}, {"m", T("enable at…")}, {"t", T("stage")}, one, {"#", T("tags")}}
 	case cActive:
-		return [][2]string{{"space", T("disable")}, {"J K", T("move")}, {"m", T("move to…")}, {"t", T("stage")}, {"#", T("tags")}}
+		return [][2]string{{"space", T("disable")}, {"J K", T("move")}, {"m", T("move to…")}, {"t", T("stage")}, one, {"#", T("tags")}}
 	}
-	ps := [][2]string{{"space", T("put back")}, {"m", T("enable at…")}, {"#", T("tags")}}
+	ps := [][2]string{{"space", T("put back")}, {"m", T("enable at…")}, one, {"#", T("tags")}}
 	if m.selCount() == 0 {
 		ps = append(ps, [2]string{"T", T("put all back")})
 	}

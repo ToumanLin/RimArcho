@@ -238,6 +238,7 @@ export function help() {
       ["space · double-click", T("enable / disable / put back")], ["t", T("stage; in staging, put back")],
       ["m", T("move to a position or after a mod")], ["J K · alt+J K", T("move down / up 1 (10)")],
       ["g · #", T("tags")], ["enter", T("full details")], ["o", T("Workshop page")],
+      ["ctrl+o", T("open the folder (the plan and the library)")], ["ctrl+w", T("Workshop page (the plan and the library)")],
       ["S · w · L", T("sort · write to the game · launch (at once; the palette previews them)")], ["u · ctrl+z", T("undo")], ["ctrl+r · ctrl+y", T("redo")],
       ["/ · ctrl+f", T("search the list")], ["shift+1–7", T("go to a page in the sidebar")], ["l · c", T("game log · mod changes")],
       ["T", T("stage the whole enabled list; in staging, put all back")],

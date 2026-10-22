@@ -23,6 +23,7 @@ type chState struct {
 	rows        []chRow
 	cursor, off int
 	expanded    map[int64][]string // event id → file lines
+	of, ofName  string             // only this mod's Lineage (C); "" every mod
 }
 
 func (m *model) loadChanges() {
@@ -34,12 +35,19 @@ func (m *model) loadChanges() {
 	if m.st == nil {
 		return
 	}
-	scans, err := view.Changes(m.app, m.st)
+	scans, err := view.Changes(m.app, m.st, c.of)
 	if err != nil {
 		return
 	}
+	if c.of != "" {
+		c.rows = append(c.rows, chRow{text: Tf("only %s", c.ofName) + "  " + markDot + "  " + T("esc shows every mod"), style: 1})
+	}
 	if len(scans) == 0 {
-		c.rows = append(c.rows, chRow{text: T("no scan yet (R scans)"), style: 2})
+		text := T("no scan yet (R scans)")
+		if c.of != "" {
+			text = T("no change recorded for this mod")
+		}
+		c.rows = append(c.rows, chRow{text: text, style: 2})
 		return
 	}
 	for _, s := range scans {

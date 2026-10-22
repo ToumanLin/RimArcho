@@ -50,6 +50,25 @@ function detailFollow(force) {
   showDetail(it, k === 2);
 }
 
+// relang: the language changed (06 §2.14). The text comes again from Go (the page data and
+// the T() table); the same page opens again in the new language, with its scroll, the
+// lists' cursors and selections and the open details kept: no reload, no jump home.
+async function relang() {
+  const s = await api.Init();
+  S.start = s;
+  setText(s.text);
+  document.documentElement.lang = s.lang;
+  const screen = S.screen;
+  const top = $("#screen").scrollTop;
+  await reload();
+  detailFollow(true);
+  if (screen === "full") { await step(0); await scr.full(); }
+  else if (screen === "library") await library.relang();
+  else if (screen && screen !== "guide") await openPage(screen);
+  if (screen) $("#screen").scrollTop = top;
+  render();
+}
+
 // ---- drawing ----
 
 function render() {
@@ -142,7 +161,7 @@ async function openPage(id) {
     case "needs": return scr.needs();
     case "packs": return scr.packs();
     case "env": return scr.environment();
-    case "changes": return scr.changes();
+    case "changes": return scr.changes(S.screen === "changes" ? undefined : null);
     case "library": return library.open();
     case "log": return scr.gameLog(undefined, true);
     case "settings": return scr.settings();
@@ -182,7 +201,8 @@ function renderWhere() {
 function actions() {
   if (S.focus > 2) return [
     { key: "PgDn", label: T("scroll") }, { key: "enter", label: T("full details"), run: () => verb("full") },
-    { key: "o", label: T("Workshop page"), run: () => verb("workshop") }, { key: "g", label: T("tags"), run: () => verb("tags") },
+    { key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") },
+    { key: "g", label: T("tags"), run: () => verb("tags") },
   ];
   const sel = selection();
   const k = S.focus;
@@ -193,11 +213,12 @@ function actions() {
   if (k === 2) out.push({ key: "space", label: T("put back"), run: () => verb("toggle") });
   out.push({ key: "t", label: k === 2 ? T("put back") : T("stage"), run: () => verb("stage") });
   out.push({ key: "m", label: k === 1 ? T("move to…") : T("enable at…"), run: () => verb("move") });
+  // ctrl+o / ctrl+w: the folder and the Workshop page of the cursor's mod (06 §3.5)
+  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") });
   if (k === 1) out.push({ key: "J K", label: T("down / up"), run: null });
   out.push({ key: "g", label: T("tags"), run: () => verb("tags") });
   if (sel.length === 1) {
     out.push({ key: "enter", label: T("full details"), run: () => verb("full") });
-    if (sel[0].id && S.detail && S.detail.url) out.push({ key: "o", label: T("Workshop page"), run: () => verb("workshop") });
     if (k === 1 && sel[0].id) out.push({ key: "x", label: T("swap for another copy"), run: () => verb("swap") });
   }
   return out;
@@ -210,6 +231,8 @@ function renderHints() {
   if (S.screen === "full") list = [{ key: "esc", label: T("back") }];
   else if (S.screen === "library") list = library.hintList();
   else if (S.screen) list = [{ key: "shift+1–7", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
+  if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
+  list = foldShortcuts(list);
   const c = S.focus < 3 ? col() : null;
   if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)), el("span", "sep", "·"));
   list.slice(0, 7).forEach((a, i) => {
@@ -217,6 +240,15 @@ function renderHints() {
     h.append(el("b", "", a.key), " " + a.label);
   });
   if (c && c.sel.size && !S.screen) h.append(el("span", "sep", "·"), el("b", "", "esc"), " " + T("clear the selection"));
+}
+
+// foldShortcuts: ctrl+o and ctrl+w share one place in the hint line.
+export function foldShortcuts(list) {
+  const i = list.findIndex((a) => a.key === "ctrl+o");
+  if (i < 0 || !list.some((a) => a.key === "ctrl+w")) return list;
+  const out = list.filter((a) => a.key !== "ctrl+w");
+  out[i] = { key: "ctrl+o ctrl+w", label: T("folder / Workshop page") };
+  return out;
 }
 
 // ---- moving (navigation only: rule 1) ----
@@ -334,6 +366,13 @@ async function verb(name) {
     case "workshop":
       if (S.detail && S.detail.url) return api.OpenURL(S.detail.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
       return say("", T("not a workshop mod"));
+    // ctrl+o / ctrl+w: the cursor's mod, not the details (they may still be loading)
+    case "folder": case "workshop-id": {
+      const it = S.focus < 3 ? cur() : cur(lastList);
+      if (!it || !it.id) return say("", name === "folder" ? T("RimArcho has not seen this copy: no folder") : T("no Workshop ID: not a Workshop mod"));
+      if (name === "folder") return api.OpenFolder(it.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+      return api.OpenWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
+    }
     case "swap":
       if (sel.length === 1 && sel[0].id) return edited(api.Swap(sel[0].id), true, ids);
       return;
@@ -575,7 +614,10 @@ function onKey(e) {
   }
   // commands
   if (ctrl) {
-    const m = { k: () => pop.palette(), f: () => startSearch(), z: () => verb("undo"), y: () => verb("redo"), r: () => verb("redo") }[k.toLowerCase()];
+    // ctrl+w: the Wails window has no accelerator for it (no app menu, WebView2's
+    // accelerator keys off), so preventDefault keeps it ours
+    const m = { k: () => pop.palette(), f: () => startSearch(), z: () => verb("undo"), y: () => verb("redo"), r: () => verb("redo"),
+      o: () => verb("folder"), w: () => verb("workshop-id") }[k.toLowerCase()];
     if (m) { handled(); m(); }
     return;
   }
@@ -646,7 +688,7 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go,
+  reload, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go,
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => pop.menu(x, y, actions().filter((a) => a.run)),
   afterImport: null, // the first-run guide's next step once an import is applied
@@ -669,6 +711,8 @@ async function start() {
   wireSplits();
   document.addEventListener("keydown", onKey);
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
+  // a detail's 在变化页查看全部: 变化 with only that mod's Lineage (06 §2.9)
+  document.addEventListener("changes-of", async (e) => { shell.navigated(); await scr.changes(e.detail); renderWhere(); renderHints(); });
   $("#btn-launch").onclick = () => run("launch");
   // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {

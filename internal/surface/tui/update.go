@@ -22,10 +22,11 @@ verbs, on the selection or else the cursor's mod:
   J K      move down / up one     alt+J alt+K  ten
   #        tags                   enter  details full screen (←→ previous / next mod, tab sub-sections, I technical pages)
   o        Workshop page          i  technical information     x  swap for another copy    r  add a rule
+  ctrl+o   open the folder        ctrl+w  Workshop page    C  this mod's changes (the 变化 page, only its copies)
   S        sort                   w  save to the game    L  launch the game    (ctrl+k 预览… shows the dry run)
   u ctrl+r undo / redo           e  export the list (import: ctrl+k import a list)
 /          search the focused list; tab takes it to the next list with matches; esc clears
-!          needs attention        c  recent changes     R  rescan     E  switch environment     P  plans (switch, new, rename, delete)
+!          needs attention        c  recent changes (every mod)     R  rescan     E  switch environment     P  plans (switch, new, rename, delete)
 < > =      column width (= resets)    z  wrap names    [ ]  switch list (narrow)
 ctrl+k     command palette        :  run an archo command      ?  this help    q  quit
 mouse: click moves the cursor; ctrl+click adds or removes one; shift+click selects a range;
@@ -236,6 +237,9 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		}
 		return m.needsKey(s)
 	case tabChanges:
+		if s == "esc" && m.chg.of != "" {
+			return m.openChangesOf("", "") // esc first shows every mod again
+		}
 		if s == "esc" {
 			m.tab = tabList
 			return m.requestDetail()
@@ -321,9 +325,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		m.tab = tabProblems
 		return m.ensureProblems()
 	case "c":
-		m.tab = tabChanges
-		m.loadChanges()
-		return nil
+		return m.openChangesOf("", "")
 	case "e":
 		return m.exportChoice()
 	case "i":
@@ -384,6 +386,21 @@ func (m *model) listKey(s string) tea.Cmd {
 		return nil
 	case "o":
 		return m.openWorkshop()
+	case "ctrl+o":
+		if it := c.cur(); it != nil {
+			return m.openFolderOf(it.id)
+		}
+		return nil
+	case "ctrl+w":
+		if it := c.cur(); it != nil {
+			return m.openWorkshopID(m.workshopOf(it.id))
+		}
+		return nil
+	case "C":
+		if it := c.cur(); it != nil && it.id != "" {
+			return m.openChangesOf(it.id, it.name)
+		}
+		return nil
 	case "r":
 		it := c.cur()
 		if it == nil || it.id == "" {

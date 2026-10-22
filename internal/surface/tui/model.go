@@ -31,6 +31,8 @@ type Options struct {
 	Analyze AnalyzeRunner
 	// OpenURL opens the Workshop page (o); nil means the default browser.
 	OpenURL func(string) error
+	// OpenDir shows a folder (ctrl+o); nil means the file manager.
+	OpenDir func(string) error
 }
 
 // ChildScan runs `<exe> scan --env <name>` as a separate process (app.ChildScan with the

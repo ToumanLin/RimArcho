@@ -140,7 +140,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   用在 by default; 更新日期 版本 作者 标签 上次游玩 on request); the layout is kept in
   `ui.gui.library.columns`. The name cell holds only the name, the copy's kind is in 来源,
   tags are not in rows. Rows show only states to act on (hidden, leftover, upstream
-  updated, unloadable, missing, ignored); 不支持 1.7 and 不在任何方案里 are filters only.
+  updated, unloadable, missing, ignored). 不支持 1.7 and 不在任何方案里 are not states at all:
+  not in the filters, not `state:` values or completions, not in the CLI / MCP (`state:unsupported`
+  and `state:unused` are gone; `used:none` still finds copies no plan uses).
   The filters mark the game's version and add 更新日期 (一周内 / 一月内 / 半年内 / 更早,
   the Workshop update time, else the folder's). No environment chip on this page; the
   button says 重新扫描. A selection action bar; the TUI has the list in the palette.
@@ -165,6 +167,13 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - `archo library --sort` takes every column (name, size, changed, played, state, source,
   used, updated, version, author, tags; a leading `-` reverses) and `--include updated:week`
   (month, half-year, older); `--lineage` lists each copy's `updated:` and `note:`.
+- RimArcho's own copy note is in the normal text colour, like the player's; only the small
+  "RimArcho 写的 · 点击修改" line stays muted.
+- A detail's 历史 keeps the newest three changes and links to 在变化页查看全部: 变化 narrowed to
+  that mod's Lineage, every scan that changed one of its copies, with a removable "只看 <名字>"
+  (× or `esc` shows every mod again). The TUI opens it with `C`.
+- `ctrl+o` opens the cursor's mod's folder and `ctrl+w` its Workshop page, in the plan editor
+  and Mod 库存, in both interfaces; without a Workshop ID the status line says so.
 
 ### The window (06 §2)
 - A sidebar replaces the top tabs, in two groups: 在玩 (启动, 能不能跑 with its badge,
@@ -210,6 +219,8 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   stages; `3` opens it); two splitters, old four-column widths carried over.
 - "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
   the history stays in the editor's third column.
+- Switching the language in 设置 happens in place: the page keeps its place, the lists their
+  selection and scroll, the details stay open; it no longer reloads to the home page.
 - The plan editor: 排序 (`S`) is in the 已启用 column's header, 导入 / 导出 (`i`) in the
   toolbar. Rows no longer show tags, in any column or interface (they are in the detail and
   `tag:` search, 06 §3.8). The detail is one field list — Archo ID, 包名, 位置 [打开位置],

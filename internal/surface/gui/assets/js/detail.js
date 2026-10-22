@@ -98,7 +98,10 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   }
   box.append(desc);
   if (d.history) {
-    box.append(el("div", "sub", T("history")), el("div", "history", d.history));
+    // the three newest here; the whole history of its Lineage on 变化 (06 §2.9)
+    const all = el("div", "sub link", T("see all on the changes page"));
+    all.onclick = () => document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: d.id, name: d.name } }));
+    box.append(el("div", "sub", T("history")), el("div", "history", d.history), all);
   }
   if (!opts.page) {
     const more = el("div", "sub link", T("technical information · enter"));
