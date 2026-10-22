@@ -231,6 +231,19 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not installed", nm(x), dep, dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s})
 		case "dep.inactive":
 			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s})
+		case "dep.observed-missing": // undeclared, seen in shared logs (internal/known)
+			if strings.HasPrefix(y, "pkg:") {
+				dep := strings.TrimPrefix(y, "pkg:")
+				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not installed", nm(x), dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s})
+			} else {
+				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not enabled", nm(x), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s})
+			}
+		case "combo.known-bad":
+			if y != "" {
+				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s})
+			} else {
+				add(Need{Group: GroupConflict, Text: Tf("this version of %s often produces errors (seen in shared logs); other versions did not", nm(x)), Actions: []Action{disable(st, x, Tf("disable %s", nm(x)))}, Counted: true, Mods: ids, Status: s})
+			}
 		case "patch.no-match":
 			if y == "" {
 				continue // no inactive target: nothing the player can do (technical information)

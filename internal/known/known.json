@@ -1,0 +1,5752 @@
+{
+ "source": "RimArcho log corpus: 6,734 shared HugsLib logs of RimWorld 1.6 (2025-07..2026-10), attribution by RimArcho (final run v4). Aggregate counts only; every entry from the logs of at least 5 different players. Logs are shared because something went wrong: rates are of shared logs, not of all players.",
+ "game": "1.6",
+ "logs": 6734,
+ "prereqs": [
+  {
+   "mod": "hentailoliteam.axolotl",
+   "needs": "ludeon.rimworld.odyssey",
+   "logs": 70,
+   "players": 56,
+   "without": 76,
+   "items": [
+    "def ThingDef Apparel_Vacsuit",
+    "def ThingDef Apparel_VacsuitHelmet"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=individualPaths)",
+   "fix": {
+    "pairs": 14,
+    "gone": 0,
+    "same": 14,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "cp.rimmunation.2.security",
+   "needs": "cp.rimmunation.2.weapons",
+   "logs": 64,
+   "players": 38,
+   "without": 66,
+   "items": [
+    "def SoundDef RNShot50Cal"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.VerbProperties …(M#A#) (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 20,
+    "gone": 0,
+    "same": 20,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "momanacha.ratkinapparelexpanded",
+   "needs": "fxz.solaris.ratkinracemod.odyssey",
+   "logs": 48,
+   "players": 38,
+   "without": 53,
+   "items": [
+    "def ResearchProjectDef PiercingWeapon"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.ResearchProjectDef named … found to give to Verse.RecipeMakerProperties …",
+   "fix": {
+    "pairs": 10,
+    "gone": 1,
+    "same": 9,
+    "sameGone": 0,
+    "changes": {
+     "disabled momanacha.ratkinapparelexpanded": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "asf.deepstorage",
+   "needs": "ludeon.rimworld.biotech",
+   "logs": 45,
+   "players": 34,
+   "without": 47,
+   "items": [
+    "def ThingDef BabyFood"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=thingDefs)",
+   "fix": {
+    "pairs": 10,
+    "gone": 0,
+    "same": 10,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "avius.prisonlabor",
+   "needs": "ludeon.rimworld.ideology",
+   "logs": 43,
+   "players": 31,
+   "without": 43,
+   "items": [
+    "def SoundDef Speech_Ideoligious_Female",
+    "def SoundDef Speech_Ideoligious_Male"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to PrisonLabor.Core.Interrogation.Ritual.JobGiver_Interrogate … (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 11,
+    "gone": 0,
+    "same": 11,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "ferny.progressionhospitality",
+   "needs": "ferny.betterarchitect",
+   "logs": 40,
+   "players": 24,
+   "without": 133,
+   "items": [
+    "def DesignationCategoryDef Ferny_Hosting"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.DesignationCategoryDef named … found to give to Verse.ThingDef …",
+   "fix": {
+    "pairs": 16,
+    "gone": 1,
+    "same": 15,
+    "sameGone": 0,
+    "changes": {
+     "disabled ferny.progressionhospitality": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "killerbot.gtekv2arsenal",
+   "needs": "killerbot.armagear",
+   "logs": 31,
+   "players": 23,
+   "without": 78,
+   "items": [
+    "def SoundDef HID_Shot_A3UGLauncher"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to CombatExtended.VerbPropertiesCE …(range=#, defaultProjectile=Bullet_#\u003chex\u003emmVOG#Grenade_HE) (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 8,
+    "gone": 0,
+    "same": 8,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "gogatio.mechanoidupgrades",
+   "needs": "ludeon.rimworld.odyssey",
+   "logs": 26,
+   "players": 20,
+   "without": 30,
+   "items": [
+    "def SoundDef AncientHatchOpened"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to RimWorld.CompProperties_Hackable … (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 6,
+    "gone": 1,
+    "same": 5,
+    "sameGone": 0,
+    "changes": {
+     "enabled ludeon.rimworld.odyssey": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "lts.i",
+   "needs": "ludeon.rimworld.royalty",
+   "logs": 25,
+   "players": 20,
+   "without": 26,
+   "items": [
+    "def SoundDef Broadshield_Startup"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.VerbProperties …(range=#.#, defaultProjectile=null) (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "pakerwot.miliraeventandstortexpandthetaleofmilira",
+   "needs": "ludeon.rimworld.anomaly",
+   "logs": 26,
+   "players": 20,
+   "without": 31,
+   "items": [
+    "def EntityCategoryDef Basic",
+    "def ThingDef VoidMonolith"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named … found to give to RimWorld.PrefabThingData …",
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "gloomy.furniture.fix",
+   "needs": "solaris.furniturebase",
+   "logs": 20,
+   "players": 19,
+   "without": 67,
+   "items": [
+    "def DesignatorDropdownGroupDef GL_StreetLamp_DropDown",
+    "def ThingDef GL_ClassyDoubleBed",
+    "def ThingDef JukeBox",
+    "def ThingDef RGK_EndTableWithLamp",
+    "def ThingDef RGK_EndTableWithLampE"
+   ],
+   "class": "xml-load",
+   "example": "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=linkableFacilities)",
+   "loadAfter": true,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "dms.moredozer",
+   "needs": "aoba.deadmanswitch.ancientcorps",
+   "logs": 19,
+   "players": 15,
+   "without": 19,
+   "items": [
+    "def SoundDef DMS_AC_Shot_GuidedMissile"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.VerbProperties …(…) (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 4,
+    "gone": 0,
+    "same": 4,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "icc.fov.elves",
+   "needs": "ludeon.rimworld.odyssey",
+   "logs": 25,
+   "players": 15,
+   "without": 30,
+   "items": [
+    "def MemeDef Shipborn"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference to RimWorld.MemeDef named … (wanter=disallowedMemes)",
+   "fix": {
+    "pairs": 7,
+    "gone": 0,
+    "same": 7,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "darkkai.ratkinmechanoidexpaned",
+   "needs": "fxz.solaris.ratkinracemod.odyssey",
+   "logs": 19,
+   "players": 14,
+   "without": 50,
+   "items": [
+    "def WorkTypeDef RK_HamsterWheel"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference to Verse.WorkTypeDef named … (wanter=mechEnabledWorkTypes)",
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "limetreesnake.xenotech",
+   "needs": "ludeon.rimworld.anomaly",
+   "logs": 20,
+   "players": 14,
+   "without": 20,
+   "items": [
+    "def SoundDef Ability_SpineLaunch"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.VerbProperties …(range=#.#, defaultProjectile=null) (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 6,
+    "gone": 0,
+    "same": 6,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "aoba.framework",
+   "needs": "ludeon.rimworld.biotech",
+   "logs": 19,
+   "players": 12,
+   "without": 55,
+   "items": [
+    "def StatDef MechControlGroups"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No RimWorld.StatDef named … found to give to RimWorld.StatModifier (null stat)",
+   "fix": {
+    "pairs": 7,
+    "gone": 0,
+    "same": 7,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "ferny.progressionrobotics2",
+   "needs": "ferny.progressionscenarios",
+   "logs": 15,
+   "players": 12,
+   "without": 16,
+   "items": [
+    "def ResearchProjectTagDef FernySpacerStart"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference to Verse.ResearchProjectTagDef named … (wanter=startingResearchTags)",
+   "fix": {
+    "pairs": 4,
+    "gone": 1,
+    "same": 3,
+    "sameGone": 0,
+    "changes": {
+     "enabled ferny.progressionscenarios": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "berserk.deadmanswitch.experimentalweapons",
+   "needs": "ludeon.rimworld.anomaly",
+   "logs": 18,
+   "players": 11,
+   "without": 18,
+   "items": [
+    "def ShaderTypeDef Metalblood"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.ShaderTypeDef named … found to give to Verse.HediffDef …",
+   "fix": {
+    "pairs": 7,
+    "gone": 1,
+    "same": 6,
+    "sameGone": 0,
+    "changes": {
+     "disabled berserk.deadmanswitch.experimentalweapons": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "xxk.coffinbedcanbedeathrest",
+   "needs": "mingtuwuxiang.spacebasedecorative",
+   "logs": 71,
+   "players": 11,
+   "without": 102,
+   "items": [
+    "def DesignationCategoryDef Museum_Decoration"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.DesignationCategoryDef named … found to give to Verse.ThingDef …",
+   "fix": {
+    "pairs": 41,
+    "gone": 1,
+    "same": 40,
+    "sameGone": 0,
+    "changes": {
+     "disabled xxk.coffinbedcanbedeathrest": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "ferny.progressionaesthetics",
+   "needs": "mingtuwuxiang.spacebasedecorative",
+   "logs": 70,
+   "players": 10,
+   "without": 235,
+   "items": [
+    "def DesignationCategoryDef Museum_Decoration"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.DesignationCategoryDef named … found to give to Verse.ThingDef …",
+   "loadAfter": true,
+   "fix": {
+    "pairs": 41,
+    "gone": 1,
+    "same": 41,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "ratkin.extraordinary.mechanic",
+   "needs": "fxz.solaris.ratkinracemod.odyssey",
+   "logs": 18,
+   "players": 9,
+   "without": 58,
+   "items": [
+    "abstract BaseRatkinBackStory"
+   ],
+   "class": "xml-load",
+   "example": "xml-load|XML error: Could not find parent node named \"…\" for node \"…\". Full node: \u003cAlienRace.AlienBackstoryDef ParentName=\"…\"\u003e\u003cdefName\u003eTc_CFJXS\u003c/defName\u003e\u003ctitle\u003e鼠族超凡机械师\u003c/title\u003e\u003ctitleShort\u003e鼠族超凡机械师\u003c/titleShort\u003e\u003cdescription",
+   "fix": {
+    "pairs": 10,
+    "gone": 2,
+    "same": 10,
+    "sameGone": 2,
+    "changes": {
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "shavius.oreno.vfe.dubsbadhygiene",
+   "needs": "dubwise.dubsbadhygiene.lite",
+   "logs": 50,
+   "players": 9,
+   "without": 120,
+   "items": [
+    "def ResearchProjectDef Irrigation",
+    "def ThingDef IrrigationSprinkler"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Failed to find Verse.ThingDef named … There are # defs of this type …",
+   "fix": {
+    "pairs": 26,
+    "gone": 0,
+    "same": 26,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "vr.fantasy.biotech",
+   "needs": "ludeon.rimworld.royalty",
+   "logs": 22,
+   "players": 8,
+   "without": 24,
+   "items": [
+    "def SoundDef ActivatorCountdown_Ambience"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to RimWorld.CompProperties_FleckEmitter … (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 13,
+    "gone": 0,
+    "same": 13,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "oark.ratkinfaction.scenarioexpand.snowstorm",
+   "needs": "ludeon.rimworld.ideology",
+   "logs": 8,
+   "players": 7,
+   "without": 8,
+   "items": [
+    "def PawnKindDef PovertyPilgrim"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.PawnKindDef named … found to give to RimWorld.PawnGenOption (null w=#.# c=null)",
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "rimthunderteams.rimthunder.libertyofdelivery",
+   "needs": "aoba.rimthunder.roca",
+   "logs": 10,
+   "players": 7,
+   "without": 24,
+   "items": [
+    "def SoundDef RT_WheeledVehicleEngine"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Vehicles.VehicleSustainerEventEntry`#[Vehicles.VehicleEventDef] Vehicles.VehicleSustainerEventEntry`#[Vehicles.VehicleEventDef] (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "rimthunderteams.rimthunder.libertyofdelivery",
+   "needs": "zyszhao.rimthunder.westerngreen",
+   "logs": 10,
+   "players": 7,
+   "without": 40,
+   "items": [
+    "def SoundDef RT_WheeledVehicleEngine"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Vehicles.VehicleSustainerEventEntry`#[Vehicles.VehicleEventDef] Vehicles.VehicleSustainerEventEntry`#[Vehicles.VehicleEventDef] (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "botchjob.profaned",
+   "needs": "ludeon.rimworld.biotech",
+   "logs": 6,
+   "players": 6,
+   "without": 6,
+   "items": [
+    "def SoundDef HemogenPack_Consume"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to RimWorld.IngestibleProperties … (using undefined sound instead)",
+   "cosmetic": true
+  },
+  {
+   "mod": "grimworld.talonoftheemperor",
+   "needs": "grimworld.astramilitarum",
+   "logs": 11,
+   "players": 6,
+   "without": 12,
+   "items": [
+    "def SoundDef valkloop"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Vehicles.VehicleSustainerEventEntry`#[Vehicles.VehicleEventDef] Vehicles.VehicleSustainerEventEntry`#[Vehicles.VehicleEventDef] (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "bj.mechscanhaulurgently",
+   "needs": "keyz182.keyzallowutilities",
+   "logs": 15,
+   "players": 5,
+   "without": 17,
+   "items": [
+    "def WorkTypeDef KAU_UrgentHaul"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference to Verse.WorkTypeDef named … (wanter=mechEnabledWorkTypes)",
+   "loadAfter": true,
+   "fix": {
+    "pairs": 7,
+    "gone": 0,
+    "same": 7,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "fxz.moelotlzombie.update",
+   "needs": "ludeon.rimworld.royalty",
+   "logs": 7,
+   "players": 5,
+   "without": 7,
+   "items": [
+    "def ThingDef NatureShrine_Large",
+    "def ThingDef NatureShrine_Small"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named … found to give to QuestEditor_Library.ThingData …",
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "icc.fov.orbiter",
+   "needs": "rimsenal.core",
+   "logs": 14,
+   "players": 5,
+   "without": 54,
+   "items": [
+    "def ThingDef Apparel_SecurityArmor",
+    "def ThingDef Apparel_SecurityHelmet"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=apparelRequired)",
+   "fix": {
+    "pairs": 8,
+    "gone": 0,
+    "same": 8,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "kure.arom",
+   "needs": "ludeon.rimworld.royalty",
+   "logs": 9,
+   "players": 5,
+   "without": 9,
+   "items": [
+    "def HediffDef BloodRot"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.HediffDef named … found to give to AbilityUser.ApplyHediffs …",
+   "loadAfter": true,
+   "fix": {
+    "pairs": 4,
+    "gone": 1,
+    "same": 3,
+    "sameGone": 0,
+    "changes": {
+     "enabled ludeon.rimworld.royalty": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "q.m",
+   "needs": "ludeon.rimworld.anomaly",
+   "logs": 5,
+   "players": 5,
+   "without": 5,
+   "items": [
+    "def TraitDef BodyMastery"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference to RimWorld.TraitDef named … (wanter=conflictingTraits)",
+   "loadAfter": true
+  },
+  {
+   "mod": "seioch.kurin.har",
+   "needs": "ludeon.rimworld.biotech",
+   "logs": 5,
+   "players": 5,
+   "without": 5,
+   "items": [
+    "def PawnKindDef Mech_Cleansweeper",
+    "def PawnKindDef Mech_Constructoid",
+    "def PawnKindDef Mech_Fabricor",
+    "def PawnKindDef Mech_Lifter",
+    "def PawnKindDef Mech_Paramedic"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.PawnKindDef named … found to give to RimWorld.ScenPart_StartingMech …"
+  },
+  {
+   "mod": "silversol.consti",
+   "needs": "ludeon.rimworld.royalty",
+   "logs": 9,
+   "players": 5,
+   "without": 10,
+   "items": [
+    "def SoundDef MeleeHit_DrillArm",
+    "def SoundDef MeleeMiss_DrillArm"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.Tool … (using undefined sound instead)",
+   "cosmetic": true,
+   "fix": {
+    "pairs": 4,
+    "gone": 0,
+    "same": 4,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "torann.arimworldofmagic",
+   "needs": "ludeon.rimworld.royalty",
+   "logs": 9,
+   "players": 5,
+   "without": 29,
+   "items": [
+    "def HediffDef BloodRot"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.HediffDef named … found to give to AbilityUser.ApplyHediffs …",
+   "loadAfter": true,
+   "fix": {
+    "pairs": 4,
+    "gone": 1,
+    "same": 3,
+    "sameGone": 0,
+    "changes": {
+     "enabled ludeon.rimworld.royalty": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "vpe.umbra.sentinel",
+   "needs": "ludeon.rimworld.anomaly",
+   "logs": 10,
+   "players": 5,
+   "without": 10,
+   "items": [
+    "def SoundDef PsychicBanshee"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to VEF.Abilities.AbilityDef … (using undefined sound instead)",
+   "cosmetic": true,
+   "loadAfter": true,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mod": "wolfeinexpand.blackscience",
+   "needs": "ludeon.rimworld.anomaly",
+   "logs": 6,
+   "players": 5,
+   "without": 6,
+   "items": [
+    "def ShaderTypeDef TransparentAnimatedColorLerp",
+    "def ThingDef UnfinishedHealthItemGhoul"
+   ],
+   "class": "xref-missing",
+   "example": "xref-missing|Could not resolve cross-reference: No Verse.ShaderTypeDef named … found to give to Verse.GraphicData …",
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  }
+ ],
+ "combos": [
+  {
+   "mods": [
+    "aoba.fortress.industrial.citadel"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.VerbProperties …(flame thrower) (using undefined sound instead)"
+   ],
+   "logs": 698,
+   "players": 458,
+   "with": 1014,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 203,
+    "gone": 3,
+    "same": 201,
+    "sameGone": 1,
+    "changes": {
+     "disabled aoba.fortress.industrial.citadel": 2,
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 85,
+    "sameGone": 0,
+    "smallPairs": 61,
+    "smallGone": 1,
+    "fixes": {
+     "enable": 1,
+     "reorder": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "zetrith.prepatcher"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|FileNotFoundException: Cannot resolve dependency to assembly '…' because it has not been preloaded. When using the ReflectionOnly APIs, dependent assemblies must be pre-loaded or loaded on demand through the Reflectio"
+   ],
+   "logs": 552,
+   "players": 368,
+   "with": 1053,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 181,
+    "gone": 27,
+    "same": 180,
+    "sameGone": 26,
+    "changes": {
+     "disabled zetrith.prepatcher": 1,
+     "no change to these mods": 26
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "nozome.mapmodeframework"
+   ],
+   "class": "mod-report",
+   "templates": [
+    "mod-report|[Map Mode Framework] Assembly named … not found. Render patch not applied."
+   ],
+   "logs": 414,
+   "players": 292,
+   "with": 624,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 100,
+    "gone": 1,
+    "same": 100,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "kindseal.lol"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to SRA.CompProperties_ShipArtillery … (using undefined sound instead)"
+   ],
+   "logs": 429,
+   "players": 282,
+   "with": 448,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 105,
+    "gone": 2,
+    "same": 103,
+    "sameGone": 0,
+    "changes": {
+     "disabled kindseal.lol": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 46,
+    "sameGone": 0,
+    "smallPairs": 28,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "tot.celetech.mkiii"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.SoundDef … (using undefined sound instead)"
+   ],
+   "logs": 423,
+   "players": 271,
+   "with": 764,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 120,
+    "gone": 2,
+    "same": 118,
+    "sameGone": 0,
+    "changes": {
+     "disabled tot.celetech.mkiii": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 54,
+    "sameGone": 0,
+    "smallPairs": 32,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "rkk.ratknights.core"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.ThingDef … (using undefined sound instead)",
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.Tool … (using undefined sound instead)"
+   ],
+   "logs": 398,
+   "players": 269,
+   "with": 408,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 80,
+    "gone": 1,
+    "same": 79,
+    "sameGone": 0,
+    "changes": {
+     "disabled rkk.ratknights.core": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 34,
+    "sameGone": 0,
+    "smallPairs": 19,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "vamv.maruracemod"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to PawnKnockback_maru.DamageKnockbackDef … (using undefined sound instead)",
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.SkyfallerProperties … (using undefined sound instead)"
+   ],
+   "logs": 469,
+   "players": 229,
+   "with": 478,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 154,
+    "gone": 1,
+    "same": 153,
+    "sameGone": 0,
+    "changes": {
+     "disabled vamv.maruracemod": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "rku.ratkinunderground"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.ThingDef … (using undefined sound instead)"
+   ],
+   "logs": 401,
+   "players": 223,
+   "with": 405,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 127,
+    "gone": 2,
+    "same": 125,
+    "sameGone": 0,
+    "changes": {
+     "disabled rku.ratkinunderground": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 53,
+    "sameGone": 0,
+    "smallPairs": 30,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "lts.i",
+    "ebsg.framework"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.Tool … (using undefined sound instead)"
+   ],
+   "logs": 244,
+   "players": 146,
+   "with": 466,
+   "without": 421,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 80,
+    "gone": 0,
+    "same": 80,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 32,
+    "sameGone": 0,
+    "smallPairs": 20,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ceteam.combatextended",
+    "imranfish.xmlextensions"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Combat Extended] Verse.PatchOperationReplace(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 178,
+   "players": 121,
+   "with": 582,
+   "without": 541,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 53,
+    "gone": 3,
+    "same": 52,
+    "sameGone": 2,
+    "changes": {
+     "disabled ceteam.combatextended": 1,
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 27,
+    "sameGone": 0,
+    "smallPairs": 6,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "jikulopo.prepatcher"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|FileNotFoundException: Cannot resolve dependency to assembly '…' because it has not been preloaded. When using the ReflectionOnly APIs, dependent assemblies must be pre-loaded or loaded on demand through the Reflectio"
+   ],
+   "logs": 184,
+   "players": 121,
+   "with": 341,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 62,
+    "gone": 10,
+    "same": 62,
+    "sameGone": 10,
+    "changes": {
+     "no change to these mods": 10
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "aoba.rimthunder.mobileinfantry"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to MVCF.Reloading.Comps.VerbCompProperties_Reloadable … (using undefined sound instead)"
+   ],
+   "logs": 149,
+   "players": 108,
+   "with": 149,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 33,
+    "gone": 0,
+    "same": 33,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 19,
+    "sameGone": 0,
+    "smallPairs": 9,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "nozome.mapmodeframework",
+    "regrowth.botr.core"
+   ],
+   "class": "mod-report",
+   "templates": [
+    "mod-report|[Map Mode Framework] BiomesKitWorldLayer [ReGrowthCore] not found. Render patch not applied."
+   ],
+   "logs": 179,
+   "players": 107,
+   "with": 231,
+   "without": 393,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 63,
+    "gone": 2,
+    "same": 61,
+    "sameGone": 0,
+    "changes": {
+     "disabled regrowth.botr.core": 2
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "dms.proton.jointoperations"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.ProjectileProperties … (using undefined sound instead)"
+   ],
+   "logs": 150,
+   "players": 104,
+   "with": 151,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 44,
+    "gone": 0,
+    "same": 44,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 21,
+    "sameGone": 0,
+    "smallPairs": 14,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "jl.wolfeingfiexpanded"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to JL_WolfeinExpand.VerbProperties_EMPBlast …(range=#, defaultProjectile=null) (using undefined sound instead)"
+   ],
+   "logs": 167,
+   "players": 100,
+   "with": 172,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 48,
+    "gone": 0,
+    "same": 48,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 19,
+    "sameGone": 0,
+    "smallPairs": 11,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "krkr.rocketman"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---\u003e System.MissingMethodException: Method not found: void Verse.LongEventHandler.QueueLongEvent(System.Action,string,bool,System.Action",
+    "exception|Error in static constructor of RocketMan.RocketPatcher: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e System.MissingMethodException: Method not found: void Verse.GenText.AppendInNewLine(System.Text.StringBuilder,string)"
+   ],
+   "logs": 125,
+   "players": 96,
+   "with": 212,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 24,
+    "gone": 4,
+    "same": 20,
+    "sameGone": 0,
+    "changes": {
+     "disabled krkr.rocketman": 4
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 9,
+    "sameGone": 0,
+    "smallPairs": 8,
+    "smallGone": 4,
+    "fixes": {
+     "disable-other": 1,
+     "disable-source": 3,
+     "reorder": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "kindseal.ufpc"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.VerbProperties …(\"…\" Annihilation Missile Launcher) (using undefined sound instead)"
+   ],
+   "logs": 135,
+   "players": 92,
+   "with": 159,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 37,
+    "gone": 2,
+    "same": 35,
+    "sameGone": 0,
+    "changes": {
+     "disabled kindseal.ufpc": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 14,
+    "sameGone": 0,
+    "smallPairs": 9,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "asel.monolynrace"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.SubEffecterDef … (using undefined sound instead)"
+   ],
+   "logs": 168,
+   "players": 88,
+   "with": 183,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 76,
+    "gone": 2,
+    "same": 74,
+    "sameGone": 0,
+    "changes": {
+     "disabled asel.monolynrace": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 29,
+    "sameGone": 0,
+    "smallPairs": 23,
+    "smallGone": 1,
+    "fixes": {
+     "disable-source": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "rimthunder.core",
+    "ceteam.combatextended"
+   ],
+   "class": "texture-missing",
+   "templates": [
+    "texture-missing|Could not load Texture#D at '…' in any active mod or in base resources."
+   ],
+   "logs": 80,
+   "players": 67,
+   "with": 183,
+   "without": 361,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 12,
+    "gone": 1,
+    "same": 12,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "maux36.rimpsyche.disposition",
+    "vanillaexpanded.vfecore"
+   ],
+   "class": "mod-report",
+   "templates": [
+    "mod-report|[Rimpsyche - Disposition] Could not find JoyGiverDef named '…'."
+   ],
+   "logs": 88,
+   "players": 59,
+   "with": 113,
+   "without": 41,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 25,
+    "gone": 0,
+    "same": 25,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "ayameduki.bossrequeen"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.DamageDef … (using undefined sound instead)"
+   ],
+   "logs": 77,
+   "players": 57,
+   "with": 130,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 11,
+    "gone": 0,
+    "same": 11,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 5,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "chjees.androids14"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.RaceProperties … (using undefined sound instead)"
+   ],
+   "logs": 75,
+   "players": 55,
+   "with": 136,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 19,
+    "gone": 0,
+    "same": 19,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 8,
+    "sameGone": 0,
+    "smallPairs": 3,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "lanyv.bunnyarmourfromhoomancute"
+   ],
+   "class": "texture-missing",
+   "templates": [
+    "texture-missing|Could not load Texture#D at '…' in any active mod or in base resources."
+   ],
+   "logs": 86,
+   "players": 54,
+   "with": 110,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 29,
+    "gone": 2,
+    "same": 28,
+    "sameGone": 1,
+    "changes": {
+     "disabled lanyv.bunnyarmourfromhoomancute": 1,
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "ceteam.combatextended",
+    "redmattis.bigsmall.core"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationAdd(Defs/PawnKindDef[defName=…]) failed",
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationRemove(Defs/PawnKindDef[defName=…]/weaponTags/li[.=\"…\"]) failed",
+    "patch-failed|[Combat Extended] Verse.PatchOperationRemove(xpath=\"…\"NeolithicMeleeBasic\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 67,
+   "players": 50,
+   "with": 130,
+   "without": 993,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 17,
+    "gone": 2,
+    "same": 16,
+    "sameGone": 1,
+    "changes": {
+     "disabled ceteam.combatextended": 1,
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 4,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "unlimitedhugs.hugslib",
+    "krkr.rocketman"
+   ],
+   "class": "harmony-stack",
+   "templates": [
+    "harmony-stack|Exception: System.NullReferenceException: Object reference not set to an instance of an object"
+   ],
+   "logs": 70,
+   "players": 50,
+   "with": 210,
+   "without": 6147,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 20,
+    "gone": 1,
+    "same": 19,
+    "sameGone": 0,
+    "changes": {
+     "disabled krkr.rocketman": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 16,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "breadmo.cinders",
+    "erdelf.humanoidalienraces.dev"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Cinders of the Embergarden] Patch operation Verse.PatchOperationFindMod(Humanoid Alien Races ~ Dev) failed",
+    "patch-failed|[Cinders of the Embergarden] Verse.PatchOperationRemove(xpath=\"…\"Embergarden.CompProperties_AddHediff\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 74,
+   "players": 49,
+   "with": 78,
+   "without": 857,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 23,
+    "gone": 1,
+    "same": 22,
+    "sameGone": 0,
+    "changes": {
+     "disabled erdelf.humanoidalienraces.dev": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 7,
+    "sameGone": 0,
+    "smallPairs": 8,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "6224y.onewithdeath"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.RaceProperties … (using undefined sound instead)"
+   ],
+   "logs": 80,
+   "players": 46,
+   "with": 155,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 31,
+    "gone": 1,
+    "same": 30,
+    "sameGone": 0,
+    "changes": {
+     "disabled 6224y.onewithdeath": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 10,
+    "sameGone": 0,
+    "smallPairs": 10,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "defi.defensivepositions",
+    "mehni.pickupandhaul"
+   ],
+   "class": "xml-load",
+   "templates": [
+    "xml-load|Exception loading UnityEngine.Texture#D from file."
+   ],
+   "logs": 74,
+   "players": 45,
+   "with": 181,
+   "without": 40,
+   "withoutErr": 3,
+   "fix": {
+    "pairs": 11,
+    "gone": 1,
+    "same": 10,
+    "sameGone": 0,
+    "changes": {
+     "disabled defi.defensivepositions": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "oark.ratkinfaction.geneexpand",
+    "eoralmilk.ratkingeneexpanded"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[[OA]Ratkin Gene Expand] Patch operation Verse.PatchOperationRemove(Defs/AlienRace.ThingDef_AlienRace[defName = \"…\"]/alienRace/raceRestriction/whiteXenotypeList/li[text()=\"…\"]) failed",
+    "patch-failed|[[OA]Ratkin Gene Expand] Verse.PatchOperationRemove(xpath=\"…\"Ratkin\"…\"Baseliner\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 48,
+   "players": 39,
+   "with": 80,
+   "without": 723,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 9,
+    "gone": 2,
+    "same": 8,
+    "sameGone": 1,
+    "changes": {
+     "disabled eoralmilk.ratkingeneexpanded": 1,
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "spdskatr.projectrimfactory.drones",
+    "brrainz.achtung"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.WorkTypeDef named … (wanter=workTypes)"
+   ],
+   "logs": 52,
+   "players": 39,
+   "with": 53,
+   "without": 41,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 14,
+    "gone": 1,
+    "same": 13,
+    "sameGone": 0,
+    "changes": {
+     "disabled spdskatr.projectrimfactory.drones": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 5,
+    "sameGone": 0,
+    "smallPairs": 5,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "th3fr3d.extendedinjuries",
+    "dubwise.dubsbadhygiene"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=thingDefs)"
+   ],
+   "logs": 55,
+   "players": 39,
+   "with": 99,
+   "without": 42,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 15,
+    "gone": 0,
+    "same": 15,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 5,
+    "sameGone": 0,
+    "smallPairs": 6,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "unlimitedhugs.hugslib",
+    "404utopia.replacestuffcontinued"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Exception: System.Exception: UpdateFeatureDef contains invalid data. ---\u003e System.Exception: modIdentifier value has invalid format. Must start with a letter and contain any of [A-z, #-#, -, _, :].",
+    "mod-report|[HugsLib][ERR] Failed to parse UpdateFeatureDef from mod #Utopia.ReplaceStuffContinued:"
+   ],
+   "logs": 50,
+   "players": 39,
+   "with": 50,
+   "without": 6307,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 10,
+    "gone": 0,
+    "same": 10,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 5,
+    "sameGone": 0,
+    "smallPairs": 4,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "eoralmilk.ratkingeneexpanded",
+    "miho.fortifiedoutremer"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Error in static constructor of RatkinGeneExpanded.Patch: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e HarmonyLib.HarmonyException: Patching exception in method null ---\u003e System.ArgumentException: Undefined target method for patch me",
+    "harmony-stack|Error in static constructor of Meow.Patch: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e HarmonyLib.HarmonyException: Patching exception in method null ---\u003e System.ArgumentException: Undefined target method for patch method static System.Boolean R"
+   ],
+   "logs": 45,
+   "players": 37,
+   "with": 92,
+   "without": 112,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 8,
+    "gone": 1,
+    "same": 7,
+    "sameGone": 0,
+    "changes": {
+     "disabled eoralmilk.ratkingeneexpanded": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "vanillaexpanded.vanomalyeinsanity",
+    "sierra.rt.vanillatraitcolors"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Vanilla Anomaly Expanded - Insanity] Patch operation Verse.PatchOperationAdd(/Defs/TraitDef[defName=…]/degreeDatas/li[label=\"…\"]/statOffsets) failed",
+    "patch-failed|[Vanilla Anomaly Expanded - Insanity] Verse.PatchOperationAdd(xpath=\"…\"iron-willed\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[Vanilla Anomaly Expanded - Insanity] Verse.PatchOperationAdd(xpath=\"…\"nervous\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 70,
+   "players": 37,
+   "with": 152,
+   "without": 433,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 26,
+    "gone": 9,
+    "same": 23,
+    "sameGone": 6,
+    "changes": {
+     "disabled vanillaexpanded.vanomalyeinsanity": 3,
+     "no change to these mods": 6
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 4,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "el.mow"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to Verse.RaceProperties … (using undefined sound instead)"
+   ],
+   "logs": 58,
+   "players": 35,
+   "with": 116,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 20,
+    "gone": 0,
+    "same": 20,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 13,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "vanillaexpanded.backgrounds",
+    "arandomkiwi.rimthemes"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Could not execute post-long-event action. Exception: System.Collections.Generic.KeyNotFoundException: The given key '…' was not present in the dictionary."
+   ],
+   "logs": 45,
+   "players": 35,
+   "with": 73,
+   "without": 1167,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 9,
+    "gone": 2,
+    "same": 9,
+    "sameGone": 2,
+    "changes": {
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 3,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "wsp.groupedbuildings",
+    "vanillaexpanded.vaeaccessories"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[More grouped buildings] Verse.PatchOperationAdd(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 49,
+   "players": 35,
+   "with": 122,
+   "without": 83,
+   "withoutErr": 3,
+   "fix": {
+    "pairs": 16,
+    "gone": 3,
+    "same": 15,
+    "sameGone": 2,
+    "changes": {
+     "disabled wsp.groupedbuildings": 1,
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 6,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "vamv.maruracemod",
+    "vanillaracesexpanded.android"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Failed to find Verse.HediffDef named … There are # defs of this type …"
+   ],
+   "logs": 57,
+   "players": 34,
+   "with": 58,
+   "without": 420,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 24,
+    "gone": 1,
+    "same": 23,
+    "sameGone": 0,
+    "changes": {
+     "disabled vanillaracesexpanded.android": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "dms.moredozer",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[The Dead Man's Switch-more dozer] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationReplace(Defs/ThingDef[defName=…]/tools)) failed",
+    "patch-failed|[The Dead Man's Switch-more dozer] Verse.PatchOperationReplace(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 39,
+   "players": 32,
+   "with": 80,
+   "without": 263,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 7,
+    "gone": 1,
+    "same": 6,
+    "sameGone": 0,
+    "changes": {
+     "disabled ceteam.combatextended": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 4,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "tro.soundscape.enhanced",
+    "ray1203.simplecamerasetting"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Rimworld: Soundscape Enhanced] Patch operation Verse.PatchOperationReplace(/Defs/SoundDef[defName=…]/subSounds/li/grains/li[clipFolderPath=\"…\"]/clipFolderPath) failed"
+   ],
+   "logs": 77,
+   "players": 29,
+   "with": 218,
+   "without": 104,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 29,
+    "gone": 6,
+    "same": 29,
+    "sameGone": 6,
+    "changes": {
+     "no change to these mods": 6
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 13,
+    "sameGone": 0,
+    "smallPairs": 8,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "cephalopod.deadmanswitch.moresynthetics",
+    "nals.realisticbody"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[The Dead Man's Switch - More Synthetics] Patch operation Verse.PatchOperation failed"
+   ],
+   "logs": 34,
+   "players": 28,
+   "with": 34,
+   "without": 126,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 7,
+    "gone": 1,
+    "same": 6,
+    "sameGone": 0,
+    "changes": {
+     "disabled cephalopod.deadmanswitch.moresynthetics": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 4,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "oskarpotocki.vanillafactionsexpanded.core",
+    "roolo.dualwield"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Transpiler: static System.Collections.Generic.IEnumerable`#\u003cHarmonyLib.CodeInstruction\u003e MVCF.PatchSets.PatchSet_DualWield::AddNullCheck(System.Collections.Generic.IEnumerable`#\u003cHarmonyLib.CodeInstruction\u003e instructions, System.Reflection.Emit.ILGenerator generator): System.NullReferenceException: Nul"
+   ],
+   "logs": 43,
+   "players": 28,
+   "with": 56,
+   "without": 5758,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 14,
+    "gone": 0,
+    "same": 14,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 10,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "petetimessix.researchreinvented.steppingstones",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Research Reinvented: Stepping Stones] Patch operation RR.PatchOperationAddOrReplace(Defs/ThingDef[defName=…]/recipeMaker) failed",
+    "patch-failed|[Research Reinvented: Stepping Stones] Patch operation RR.PatchOperationAddOrReplace(Defs/ThingDef[defName=…]) failed",
+    "patch-failed|[Research Reinvented: Stepping Stones] Patch operation RR.PatchOperationAddOrReplace(Defs/ThingDef[defName=…]/statBases) failed"
+   ],
+   "logs": 36,
+   "players": 28,
+   "with": 42,
+   "without": 85,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 8,
+    "gone": 0,
+    "same": 8,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 4,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "neronix17.outland.terrain",
+    "regrowth.botr.core"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Outland - Terrain] Patch operation OutlandTerrain.PatchOperation_SettingActive failed",
+    "patch-failed|[Outland - Terrain] Verse.PatchOperationRemove(xpath=\"…\"RG_LavaBase\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 46,
+   "players": 27,
+   "with": 53,
+   "without": 81,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 20,
+    "gone": 3,
+    "same": 19,
+    "sameGone": 2,
+    "changes": {
+     "disabled neronix17.outland.terrain": 1,
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 9,
+    "sameGone": 0,
+    "smallPairs": 5,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "syrchalis.processor.framework",
+    "argon.saltedmeatremake"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[[SYR] Processor Framework] Patch operation Verse.PatchOperationRemove(*/ThingDef[defName = \"…\" or defName = \"…\"]/thingClass) failed",
+    "patch-failed|[[SYR] Processor Framework] Patch operation Verse.PatchOperationReplace(*/ThingDef[defName = \"…\"]/comps/li[@Class=\"…\"]) failed",
+    "patch-failed|[[SYR] Processor Framework] Patch operation Verse.PatchOperationReplace(*/ThingDef[defName = \"…\"]/comps/li[@Class=\"…\"]/consumeFuelOnlyWhenUsed) failed"
+   ],
+   "logs": 38,
+   "players": 27,
+   "with": 43,
+   "without": 1574,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 10,
+    "gone": 0,
+    "same": 10,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ab.hatweaker",
+    "cat2002.showhair"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---\u003e System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---\u003e System.Argu"
+   ],
+   "logs": 32,
+   "players": 26,
+   "with": 76,
+   "without": 809,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 6,
+    "gone": 2,
+    "same": 5,
+    "sameGone": 1,
+    "changes": {
+     "disabled ab.hatweaker": 1,
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 5,
+    "smallGone": 2,
+    "fixes": {
+     "disable-source": 1,
+     "enable": 1,
+     "reorder": 2
+    }
+   }
+  },
+  {
+   "mods": [
+    "kongkim.panelsframes",
+    "ferny.progressionaesthetics"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ResearchProjectDef named … (wanter=researchPrerequisites)"
+   ],
+   "logs": 99,
+   "players": 25,
+   "with": 107,
+   "without": 159,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 52,
+    "gone": 0,
+    "same": 52,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "river.tribal.shoes",
+    "dankpyon.medieval.overhaul"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=recipeUsers)"
+   ],
+   "logs": 73,
+   "players": 25,
+   "with": 81,
+   "without": 30,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 37,
+    "gone": 0,
+    "same": 37,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 6,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "wsp.groupedbuildings",
+    "sarg.alphabiomes"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[More grouped buildings] Patch operation Verse.PatchOperationFindMod(Vanilla Furniture Expanded - Architect) failed"
+   ],
+   "logs": 35,
+   "players": 25,
+   "with": 60,
+   "without": 145,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 11,
+    "gone": 1,
+    "same": 10,
+    "sameGone": 0,
+    "changes": {
+     "disabled sarg.alphabiomes": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 6,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "biomesteam.biomesprehistoric",
+    "biomesteam.biomesfossils"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Biomes! Prehistoric] Verse.PatchOperationAdd(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 38,
+   "players": 24,
+   "with": 98,
+   "without": 77,
+   "withoutErr": 4,
+   "fix": {
+    "pairs": 17,
+    "gone": 3,
+    "same": 16,
+    "sameGone": 2,
+    "changes": {
+     "disabled biomesteam.biomesfossils": 1,
+     "disabled biomesteam.biomesprehistoric": 1,
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 6,
+    "sameGone": 0,
+    "smallPairs": 7,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "killerbot.gtekv2arsenal",
+    "ceteam.combatextended"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to CombatExtended.VerbPropertiesCE …(range=#, defaultProjectile=Bullet_#\u003chex\u003emmVOG#Grenade_HE) (using undefined sound instead)"
+   ],
+   "logs": 31,
+   "players": 23,
+   "with": 75,
+   "without": 56,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 8,
+    "gone": 0,
+    "same": 8,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "vanillaexpanded.vpersonaweaponse",
+    "botchjob.medievalfantasyquestrewards"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Vanilla Persona Weapons Expanded] Patch operation Verse.PatchOperationFindMod(…) failed"
+   ],
+   "logs": 35,
+   "players": 23,
+   "with": 77,
+   "without": 1176,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 12,
+    "gone": 0,
+    "same": 12,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 8,
+    "sameGone": 0,
+    "smallPairs": 3,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "tro.soundscape.enhanced",
+    "bonible.medievalmeleesounds"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Rimworld: Soundscape Enhanced] Verse.PatchOperationReplace(xpath=\"…\"Impact/Deflect/Deflect_Metal\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 37,
+   "players": 21,
+   "with": 39,
+   "without": 283,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 10,
+    "gone": 0,
+    "same": 10,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 5,
+    "sameGone": 0,
+    "smallPairs": 4,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "zal.majesticfoilageframework",
+    "redmattis.dryads"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Majestic Foliage Framework[HH] (…)] Patch operation XmlExtensions.FindMod failed",
+    "patch-failed|[Majestic Foliage Framework[HH] (…)] Verse.PatchOperationReplace(xpath=\"…\"CompProperties_TreeConnection\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 68,
+   "players": 21,
+   "with": 75,
+   "without": 70,
+   "withoutErr": 3,
+   "fix": {
+    "pairs": 34,
+    "gone": 1,
+    "same": 33,
+    "sameGone": 0,
+    "changes": {
+     "disabled zal.majesticfoilageframework": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 5,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "asiimoves.deadmanswitch.modulemechweapons",
+    "ceteam.combatextended"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to CombatExtended.VerbPropertiesCE …(M#A# Torchwood recoilless rifle) (using undefined sound instead)"
+   ],
+   "logs": 30,
+   "players": 20,
+   "with": 86,
+   "without": 135,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 10,
+    "gone": 1,
+    "same": 9,
+    "sameGone": 0,
+    "changes": {
+     "disabled ceteam.combatextended": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 7,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "lanyv.hoomancutereborn",
+    "barbariank.hoomancute"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Hooman Cute Reborn] Patch operation Verse.PatchOperationFindMod(…) failed"
+   ],
+   "logs": 23,
+   "players": 20,
+   "with": 60,
+   "without": 231,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "accurex.medievalempireoverhaul",
+    "ferny.progressionaesthetics"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.DesignationCategoryDef named … found to give to Verse.ThingDef …"
+   ],
+   "logs": 28,
+   "players": 19,
+   "with": 33,
+   "without": 316,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 9,
+    "gone": 0,
+    "same": 9,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 5,
+    "sameGone": 0,
+    "smallPairs": 3,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "accurex.medievalempireoverhaul",
+    "ferny.progressionstorage"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.DesignatorDropdownGroupDef named … found to give to Verse.ThingDef …"
+   ],
+   "logs": 23,
+   "players": 19,
+   "with": 31,
+   "without": 318,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 4,
+    "gone": 0,
+    "same": 4,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "azrazalea.medievaloverhaulintegrationfixes",
+    "vanillaexpanded.vbookse"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Medieval Overhaul Integration Fixes] Patch operation Verse.PatchOperationReplace(Defs/RoomRoleDef[defName=…]/workerClass) failed",
+    "patch-failed|[Medieval Overhaul Integration Fixes] Verse.PatchOperationReplace(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 41,
+   "players": 19,
+   "with": 45,
+   "without": 85,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 16,
+    "gone": 0,
+    "same": 16,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 11,
+    "sameGone": 0,
+    "smallPairs": 3,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "biomesteam.biomesprehistoric",
+    "vanillaexpanded.vpersonaweaponse"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Biomes! Prehistoric] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName=…]/plant/sowTags) failed"
+   ],
+   "logs": 32,
+   "players": 19,
+   "with": 79,
+   "without": 96,
+   "withoutErr": 3,
+   "fix": {
+    "pairs": 15,
+    "gone": 2,
+    "same": 15,
+    "sameGone": 2,
+    "changes": {
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 7,
+    "sameGone": 0,
+    "smallPairs": 5,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "jecrell.doorsexpanded"
+   ],
+   "version": "1.5.0.0",
+   "class": "harmony-stack",
+   "templates": [
+    "harmony-stack|Error in static constructor of DoorsExpanded.HarmonyPatchesOnStartup: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e System.ArgumentException: Could not find any lambda method for type … and method",
+    "exception|Error in static constructor of DoorsExpanded.HarmonyPatchesOnStartup: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e System.ArgumentException: Could not find any lambda method for type … and method"
+   ],
+   "logs": 25,
+   "players": 19,
+   "with": 25,
+   "without": 353,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 1,
+    "same": 2,
+    "sameGone": 0,
+    "changes": {
+     "updated jecrell.doorsexpanded": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "rkk.ratknights.core",
+    "ceteam.combatextended"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to CombatExtended.ToolCE … (using undefined sound instead)"
+   ],
+   "logs": 24,
+   "players": 19,
+   "with": 47,
+   "without": 361,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "scurvyez.firefliestwo",
+    "vanillaexpanded.vanillaanimalsexpanded"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[FirefliesTwo] Patch operation Verse.PatchOperationAddModExtension(Defs/BiomeDef[defName=…]) failed",
+    "patch-failed|[FirefliesTwo] Verse.PatchOperationAddModExtension(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 60,
+   "players": 19,
+   "with": 190,
+   "without": 58,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 28,
+    "gone": 1,
+    "same": 28,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 10,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "zal.chimeracreation"
+   ],
+   "class": "mod-report",
+   "templates": [
+    "mod-report|[Chimera Creation (…)]: Could not find Prepatcher. Accessing NoPrepatcherFieldProvider.dll"
+   ],
+   "logs": 56,
+   "players": 19,
+   "with": 72,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 26,
+    "gone": 1,
+    "same": 26,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "zenlor.motweaks",
+    "vanillaexpanded.vplantse"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Medieval Overhaul Tweaks] Patch operation XmlExtensions.FindMod failed"
+   ],
+   "logs": 27,
+   "players": 19,
+   "with": 70,
+   "without": 45,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 4,
+    "gone": 0,
+    "same": 4,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "daria40k.biglittlemodpatch",
+    "linnun.linkablegroups"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=affected)"
+   ],
+   "logs": 30,
+   "players": 18,
+   "with": 30,
+   "without": 328,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 11,
+    "gone": 1,
+    "same": 10,
+    "sameGone": 0,
+    "changes": {
+     "disabled daria40k.biglittlemodpatch": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 3,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "fxz.ratkinanomaly.update",
+    "mrhydralisk.anomaliesexpected"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Error in static constructor of RatkinAnomaly.HarmonyInit: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e HarmonyLib.HarmonyException: Patching exception in method System.Void RimWorld.MainTabWindow_Research::DrawRightRect(UnityEngine"
+   ],
+   "logs": 26,
+   "players": 18,
+   "with": 28,
+   "without": 481,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 9,
+    "gone": 1,
+    "same": 8,
+    "sameGone": 0,
+    "changes": {
+     "disabled fxz.ratkinanomaly.update": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 5,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "inoshishi3.kttfde",
+    "dubwise.dubsbadhygiene"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named … found to give to KurinDeluxeEdition.KurinQuests.KurinQuestSite.KurinQuestSiteSpawnDescriptor …"
+   ],
+   "logs": 25,
+   "players": 18,
+   "with": 53,
+   "without": 72,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 6,
+    "gone": 0,
+    "same": 6,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "oppey.eyegenes2",
+    "resplice.xotr.core"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[[BT] EyeGenes# | Base - [NL] Facial Animation |] Verse.PatchOperationRemove(xpath=\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[[BT] EyeGenes# | Base - [NL] Facial Animation |] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationRemove(Defs/HediffDef[defName=…]/renderNodeProperties)) failed"
+   ],
+   "logs": 35,
+   "players": 18,
+   "with": 41,
+   "without": 87,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 15,
+    "gone": 1,
+    "same": 15,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 13,
+    "sameGone": 1,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "vanillaexpanded.vpersonaweaponse",
+    "accurex.medievalempireoverhaul"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Vanilla Persona Weapons Expanded] Verse.PatchOperationRemove(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 31,
+   "players": 18,
+   "with": 66,
+   "without": 1187,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 13,
+    "gone": 0,
+    "same": 13,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 9,
+    "sameGone": 0,
+    "smallPairs": 3,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ceteam.combatextended",
+    "biomesteam.biomespollutedlands"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationReplace(Defs/GeneDef[defName=…]/statOffsets/ArmorRating_Blunt) failed",
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationReplace(Defs/GeneDef[defName=…]/statOffsets/ArmorRating_Sharp) failed"
+   ],
+   "logs": 20,
+   "players": 17,
+   "with": 34,
+   "without": 1089,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "ferny.betterarchitect",
+    "ferny.progressionaesthetics"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Better Architect Menu] Verse.PatchOperationAddModExtension(xpath=\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[Better Architect Menu] Patch operation Verse.PatchOperationAddModExtension(Defs/DesignationCategoryDef[defName=…]) failed"
+   ],
+   "logs": 58,
+   "players": 17,
+   "with": 152,
+   "without": 681,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 29,
+    "gone": 1,
+    "same": 29,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 13,
+    "sameGone": 0,
+    "smallPairs": 4,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "unlimitedhugs.hugslib",
+    "thereallemon.mapreroll"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|[MapReroll][ERR] Failed to apply Harmony patches for TheRealLemon.MapReroll. Exception was: System.TypeLoadException: Could not load type …, Assembly-CSharp, Version=#.#.#.#, Culture=neutral, PublicKeyToken=null while decoding custom attribute: (…)"
+   ],
+   "logs": 21,
+   "players": 17,
+   "with": 63,
+   "without": 6294,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 4,
+    "gone": 1,
+    "same": 3,
+    "sameGone": 0,
+    "changes": {
+     "disabled thereallemon.mapreroll": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "oskarpotocki.vfe.medieval2",
+    "cgf1.gunsgalorecore"
+   ],
+   "class": "xml-load",
+   "templates": [
+    "xml-load|XML error: \u003cli\u003e#~#\u003c/li\u003e doesn't correspond to any field … type … Context: \u003cPawnKindDef ParentName=\"…\"\u003e\u003crace\u003eHuman\u003c/race\u003e\u003cdefaultFactionType\u003eVFEM#_CivilClan\u003c/defaultFactionType\u003e\u003cmaxGenerationAge\u003e#\u003c/maxGenerationAge\u003e\u003cchemicalAddictionChance\u003e#.#\u003c/chemicalAddictionChance\u003e\u003c",
+    "xml-load|XML error: \u003cli\u003e#~#\u003c/li\u003e doesn't correspond to any field … type … Context: \u003cPawnKindDef ParentName=\"…\"\u003e\u003crace\u003eHuman\u003c/race\u003e\u003cdefaultFactionType\u003eVFEM#_KingdomCivil\u003c/defaultFactionType\u003e\u003cmaxGenerationAge\u003e#\u003c/maxGenerationAge\u003e\u003cchemicalAddictionChance\u003e#.#\u003c/chemicalAddictionCha"
+   ],
+   "logs": 25,
+   "players": 16,
+   "with": 45,
+   "without": 1181,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 7,
+    "gone": 0,
+    "same": 7,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 4,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "privateger.nukes.shells",
+    "ceteam.combatextended"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named … found to give to Verse.ThingDefCountClass (#x null)"
+   ],
+   "logs": 22,
+   "players": 16,
+   "with": 23,
+   "without": 79,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 6,
+    "gone": 0,
+    "same": 6,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "fluffy.fluffyrelations"
+   ],
+   "version": "2.6.72",
+   "class": "exception",
+   "templates": [
+    "exception|Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---\u003e System.MissingMethodException: Method not found: void Verse.LongEventHandler.QueueLongEvent(System.Action,string,bool,Syste"
+   ],
+   "logs": 29,
+   "players": 15,
+   "with": 37,
+   "without": 67,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 12,
+    "gone": 2,
+    "same": 12,
+    "sameGone": 2,
+    "changes": {
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 7,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "nightkosh.zerocostimplants",
+    "rim.job.world"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[ZeroCostImplants] Patch operation Verse.PatchOperationFindMod(…) failed",
+    "patch-failed|[ZeroCostImplants] Verse.PatchOperationReplace(xpath=\"…\"true\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 24,
+   "players": 15,
+   "with": 24,
+   "without": 76,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 4,
+    "gone": 0,
+    "same": 4,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "teiwaz.craftableratkinapparel",
+    "solaris.ratkinracemod"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No RimWorld.ResearchTabDef named … found to give to Verse.ResearchProjectDef …"
+   ],
+   "logs": 19,
+   "players": 15,
+   "with": 58,
+   "without": 76,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 4,
+    "gone": 0,
+    "same": 4,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "teok25.mechanoidtweaks",
+    "ancot.milirarace"
+   ],
+   "class": "mod-report",
+   "templates": [
+    "mod-report|[Mechanoid Tweaks] XmlExtensions.Log(xpath='…'): Failed to find a node referenced by \u003cxpath\u003e",
+    "patch-failed|[Mechanoid Tweaks] Patch operation XmlExtensions.ForEachDescendant failed"
+   ],
+   "logs": 18,
+   "players": 15,
+   "with": 18,
+   "without": 88,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 4,
+    "gone": 1,
+    "same": 3,
+    "sameGone": 0,
+    "changes": {
+     "disabled teok25.mechanoidtweaks": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "unlimitedhugs.hugslib",
+    "falconne.heatmap"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|[HugsLib][ERR] HeatMap caused an exception during OnGUI: System.MissingMethodException: Method not found: bool RimWorld.Planet.WorldRendererUtility.get_WorldRenderedNow()"
+   ],
+   "logs": 17,
+   "players": 15,
+   "with": 18,
+   "without": 6339,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 1,
+    "same": 2,
+    "sameGone": 0,
+    "changes": {
+     "disabled falconne.heatmap": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "coldcrow.betterorbitaltraders",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Better Orbital Traders] Patch operation Verse.PatchOperationReplace(/Defs/TraderKindDef[defName=…]//tradeTag[text()=\"…\"]/../countRange) failed",
+    "patch-failed|[Better Orbital Traders] Patch operation Verse.PatchOperationReplace(/Defs/TraderKindDef[defName=…]//tradeTag[text()=\"…\"]/../thingDefCountRange) failed",
+    "patch-failed|[Better Orbital Traders] Verse.PatchOperationReplace(xpath=\"…\"MortarShell\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 16,
+   "players": 14,
+   "with": 25,
+   "without": 154,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 1,
+    "same": 2,
+    "sameGone": 0,
+    "changes": {
+     "disabled coldcrow.betterorbitaltraders": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ferny.progressionattire",
+    "dankpyon.medieval.overhaul"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Progression: Attire] Verse.PatchOperationReplace(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 48,
+   "players": 14,
+   "with": 88,
+   "without": 63,
+   "withoutErr": 4,
+   "fix": {
+    "pairs": 25,
+    "gone": 2,
+    "same": 25,
+    "sameGone": 2,
+    "changes": {
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 11,
+    "sameGone": 1,
+    "smallPairs": 4,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "tot.celetech.mkiii",
+    "myde.aerocraftframework"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to TOT_DLL_test.CompProperties_LaserData_Sustain … (using undefined sound instead)"
+   ],
+   "logs": 20,
+   "players": 14,
+   "with": 27,
+   "without": 737,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "niz.xenomorphtype",
+    "dubwise.dubsbadhygiene"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=things)"
+   ],
+   "logs": 28,
+   "players": 13,
+   "with": 66,
+   "without": 54,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 12,
+    "gone": 0,
+    "same": 12,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 4,
+    "sameGone": 0,
+    "smallPairs": 5,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "trigger.dms.mechweapons.autoequip",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[DMS: Mech Auto-Equip] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationReplace(Defs/ThingDef[defName=…]/comps/li[@Class=\"…\"]/fuelFilter)) failed",
+    "patch-failed|[DMS: Mech Auto-Equip] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationReplace(Defs/ThingDef[defName=…]/comps/li[@Class=\"…\"]/fuelMultiplier)) failed"
+   ],
+   "logs": 16,
+   "players": 13,
+   "with": 44,
+   "without": 87,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "unlimitedhugs.hugslib",
+    "linkolas.stabilize"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|[Linkolas.Stabilize][ERR] Failed to apply Harmony patches for Linkolas.Stabilize. Exception was: HarmonyLib.HarmonyException: Patching exception in method null ---\u003e System.ArgumentException: Undefined target method for patch method static System.Void Stabilize.FloatMenuMakerCarryAdder::AddHumanlikeO"
+   ],
+   "logs": 14,
+   "players": 13,
+   "with": 19,
+   "without": 6338,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 1,
+    "same": 1,
+    "sameGone": 0,
+    "changes": {
+     "disabled linkolas.stabilize": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "vanillaexpanded.skills",
+    "lakuna.preparemoderately"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|System.NullReferenceException: Null method for \u003cpkg\u003e"
+   ],
+   "logs": 42,
+   "players": 13,
+   "with": 69,
+   "without": 1750,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 20,
+    "gone": 1,
+    "same": 19,
+    "sameGone": 0,
+    "changes": {
+     "disabled lakuna.preparemoderately": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 5,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1,
+     "reorder": 1,
+     "update-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "det.sbcuisine",
+    "ceteam.combatextended"
+   ],
+   "class": "texture-missing",
+   "templates": [
+    "texture-missing|Failed to find any textures at … while constructing Multi(initPath=Things/Pawn/Animal/Thermalite/Dessicated_Moleroach, color=RGBA(#.#, #.#, #.#, #.#), colorTwo=RGBA(#.#, #.#, #.#, #.#))"
+   ],
+   "logs": 17,
+   "players": 12,
+   "with": 19,
+   "without": 84,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "lanyv.bunnyarmourfromhoomancute",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Bunny Armour From Hooman Cute] Patch operation Verse.PatchOperationReplace(Defs/ThingDef[defName=…]/comps/li[@Class=\"…\"]/EnergyShieldEnergyMax) failed",
+    "patch-failed|[Bunny Armour From Hooman Cute] Patch operation Verse.PatchOperationReplace(Defs/ThingDef[defName=…]/comps/li[@Class=\"…\"]/EnergyShieldRechargeRate) failed",
+    "patch-failed|[Bunny Armour From Hooman Cute] Verse.PatchOperationReplace(xpath=\"…\"VFECore.CompProperties_ShieldBubble\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 16,
+   "players": 12,
+   "with": 18,
+   "without": 92,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 5,
+    "gone": 1,
+    "same": 4,
+    "sameGone": 0,
+    "changes": {
+     "disabled lanyv.bunnyarmourfromhoomancute": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "regrowth.botr.core",
+    "zal.majesticcmt"
+   ],
+   "class": "texture-missing",
+   "templates": [
+    "texture-missing|Could not load Texture#D at '…' in any active mod or in base resources."
+   ],
+   "logs": 36,
+   "players": 12,
+   "with": 44,
+   "without": 999,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 19,
+    "gone": 0,
+    "same": 19,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "v.rooboid.faun",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Roo's Faun Xenotype] Verse.PatchOperationAdd(xpath=\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[Roo's Faun Xenotype] Patch operation Verse.PatchOperationFindMod(…) failed"
+   ],
+   "logs": 22,
+   "players": 12,
+   "with": 25,
+   "without": 127,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 10,
+    "gone": 2,
+    "same": 9,
+    "sameGone": 1,
+    "changes": {
+     "disabled v.rooboid.faun": 1,
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 5,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "wara.toomanymods",
+    "wvc.sergkart.races.biotech"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Too Many Mods - Compats and Rebalances] Patch operation Verse.PatchOperationFindMod(WVC - Xenotypes and Genes) failed"
+   ],
+   "logs": 13,
+   "players": 12,
+   "with": 38,
+   "without": 291,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "xxk.coffinbedcanbedeathrest",
+    "ferny.progressionaesthetics"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ResearchProjectDef named … (wanter=researchPrerequisites)"
+   ],
+   "logs": 74,
+   "players": 12,
+   "with": 74,
+   "without": 80,
+   "withoutErr": 3,
+   "fix": {
+    "pairs": 42,
+    "gone": 1,
+    "same": 41,
+    "sameGone": 0,
+    "changes": {
+     "disabled xxk.coffinbedcanbedeathrest": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 14,
+    "sameGone": 0,
+    "smallPairs": 4,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "crows.dragonbond",
+    "seti.medieval.implants"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ResearchProjectDef named … (wanter=researchPrerequisites)"
+   ],
+   "logs": 16,
+   "players": 11,
+   "with": 47,
+   "without": 105,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "eatkenny.leafzxg.dws.turretcollection",
+    "ceteam.combatextended"
+   ],
+   "class": "texture-missing",
+   "templates": [
+    "texture-missing|Could not load Texture#D at '…' for def '…' in any active mod or in base resources."
+   ],
+   "logs": 16,
+   "players": 11,
+   "with": 52,
+   "without": 73,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 6,
+    "gone": 1,
+    "same": 5,
+    "sameGone": 0,
+    "changes": {
+     "disabled eatkenny.leafzxg.dws.turretcollection": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "tro.soundscape.enhanced",
+    "bonible.vanilla.gun.sound.replacement"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Rimworld: Soundscape Enhanced] Verse.PatchOperationReplace(xpath=\"…\"Weapon/Artillery/Mortar_Fire\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[Rimworld: Soundscape Enhanced] Verse.PatchOperationReplace(xpath=\"…\"Weapon/AssaultRifle\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[Rimworld: Soundscape Enhanced] Verse.PatchOperationReplace(xpath=\"…\"Weapon/Autocannon\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 41,
+   "players": 11,
+   "with": 94,
+   "without": 228,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 17,
+    "gone": 6,
+    "same": 17,
+    "sameGone": 6,
+    "changes": {
+     "no change to these mods": 6
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 7,
+    "sameGone": 0,
+    "smallPairs": 3,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "wara.toomanymods",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Too Many Mods - Compats and Rebalances] Patch operation Verse.PatchOperationFindMod(Vanilla Furniture Expanded - Security) failed",
+    "patch-failed|[Too Many Mods - Compats and Rebalances] Verse.PatchOperationReplace(xpath=\"…\"CompProperties_Refuelable\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 20,
+   "players": 11,
+   "with": 56,
+   "without": 273,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 7,
+    "gone": 2,
+    "same": 7,
+    "sameGone": 2,
+    "changes": {
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 4,
+    "sameGone": 1,
+    "smallPairs": 2,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "zylle.mapdesigner",
+    "biomesteam.coreframework"
+   ],
+   "class": "mod-report",
+   "templates": [
+    "mod-report|[Map Designer] ERROR with settings: terrain : AridShrubland",
+    "mod-report|[Map Designer] ERROR with settings: terrain : BorealForest",
+    "mod-report|[Map Designer] ERROR with settings: terrain : ColdBog"
+   ],
+   "logs": 18,
+   "players": 11,
+   "with": 58,
+   "without": 1033,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "ceteam.combatextended",
+    "aoba.geryknights.dreadnought"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationRemove(Defs/VFEPirates.WarcasketDef["
+   ],
+   "logs": 13,
+   "players": 10,
+   "with": 13,
+   "without": 1110,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 4,
+    "gone": 1,
+    "same": 3,
+    "sameGone": 0,
+    "changes": {
+     "disabled aoba.geryknights.dreadnought": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ceteam.combatextended",
+    "biomesteam.biomescaverns"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[@Name=\"…\"]/comps) failed",
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationConditional(Defs/ThingDef[@Name=\"…\"]/comps) failed",
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationReplace(Defs/ThingDef[defName=…]/statBases/StuffPower_Armor_Heat) failed"
+   ],
+   "logs": 16,
+   "players": 10,
+   "with": 17,
+   "without": 1106,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ferny.progressionattire",
+    "memegoddess.giddyup"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Progression: Attire] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationReplace(Defs/ResearchProjectDef[defName=…]/tab)) failed"
+   ],
+   "logs": 36,
+   "players": 10,
+   "with": 78,
+   "without": 73,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 21,
+    "gone": 2,
+    "same": 21,
+    "sameGone": 2,
+    "changes": {
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 8,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "ferny.progressionscenarios",
+    "kentington.saveourship2"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Progression: Scenarios] Patch operation Verse.PatchOperationReplace(Defs/ScenarioDef[defName=…]/scenario/playerFaction/factionDef) failed",
+    "patch-failed|[Progression: Scenarios] Verse.PatchOperationReplace(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 13,
+   "players": 10,
+   "with": 20,
+   "without": 370,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "linnun.linkablegroups",
+    "smxrez.powerreexamined"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=affected)"
+   ],
+   "logs": 33,
+   "players": 10,
+   "with": 53,
+   "without": 69,
+   "withoutErr": 3,
+   "fix": {
+    "pairs": 10,
+    "gone": 0,
+    "same": 10,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "mingtuwuxiang.spacebasedecorative",
+    "ferny.progressionaesthetics"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.DesignationCategoryDef named … found to give to Verse.ThingDef …"
+   ],
+   "logs": 15,
+   "players": 10,
+   "with": 39,
+   "without": 782,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 4,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "cephalopod.deadmanswitch.moresynthetics",
+    "barbariank.hoomancute"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[The Dead Man's Switch - More Synthetics] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationReplace("
+   ],
+   "logs": 10,
+   "players": 9,
+   "with": 15,
+   "without": 145,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ceteam.combatextended",
+    "keeptpa.nivarianrace"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Error in ParallelForEach(): System.Exception: Nivarian_Continuum_AssaultCraft_First_Kind.lifeStages[#].bodyGraphicData ---\u003e System.Exception: BoundMap(,) ---\u003e System.Exception: Combat Extended :: CropVertical error while cropping Textures/Nivarian/transparent_side ---\u003e System.ArgumentException: Colo"
+   ],
+   "logs": 10,
+   "players": 9,
+   "with": 24,
+   "without": 1099,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "frozensnowfox.advancedbionicsexpansion",
+    "ykara.elstrages.epoe"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[[FSF] Advanced Bionics Expansion] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationReplace(/Defs/ThingDef[@Name = \"…\"]/graphicData/color)) failed",
+    "patch-failed|[[FSF] Advanced Bionics Expansion] Verse.PatchOperationReplace(xpath=\"…\"BodyPartArchotechBase\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[[FSF] Advanced Bionics Expansion] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationRemove(/Defs/ResearchProjectDef[defName = \"…\"]/hiddenPrerequisites)) failed"
+   ],
+   "logs": 13,
+   "players": 9,
+   "with": 17,
+   "without": 229,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "fxz.ratkinlifestyle.update",
+    "fxz.solaris.ratkinracemod.odyssey"
+   ],
+   "class": "xml-load",
+   "templates": [
+    "xml-load|XML error: \u003cfollowStuffColor\u003efalse\u003c/followStuffColor\u003e doesn't correspond to any field … type … Context: \u003cThingDef ParentName=\"…\"\u003e\u003cfollowStuffColor\u003efalse\u003c/followStuffColor\u003e\u003cthingClass\u003eApparel\u003c/thingClass\u003e\u003ccategory\u003eItem\u003c/category\u003e\u003cselectable\u003eTrue\u003c/selectable\u003e\u003cpathCos"
+   ],
+   "logs": 11,
+   "players": 9,
+   "with": 35,
+   "without": 90,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "kongkim.paintablespotsobjects",
+    "aoba.fortress.industrial"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Paintable Spots \u0026 Objects] Verse.PatchOperationAdd(xpath=\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[Paintable Spots \u0026 Objects] Patch operation Verse.PatchOperationFindMod(Fortifications - Industrial) failed"
+   ],
+   "logs": 14,
+   "players": 9,
+   "with": 27,
+   "without": 110,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "mlie.morefactioninteraction"
+   ],
+   "version": "1.5.1",
+   "class": "exception",
+   "templates": [
+    "exception|Error in static constructor of MoreFactionInteraction.HarmonyPatches: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e System.InvalidProgramException: Invalid IL code in (wrapper dynamic-method) MonoMod.Utils.DynamicMethodD"
+   ],
+   "logs": 18,
+   "players": 9,
+   "with": 19,
+   "without": 755,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 9,
+    "gone": 0,
+    "same": 9,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 5,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "rabiosus.takecover",
+    "brrainz.achtung"
+   ],
+   "class": "mod-report",
+   "templates": [
+    "mod-report|[TakeCover] Achtung compatibility patch skipped missing method AchtungMod.Controller.MouseUp."
+   ],
+   "logs": 33,
+   "players": 9,
+   "with": 34,
+   "without": 128,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 22,
+    "gone": 1,
+    "same": 21,
+    "sameGone": 0,
+    "changes": {
+     "disabled rabiosus.takecover": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "sarg.alphaarmoury",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Alpha Armoury] Patch operation Verse.PatchOperationAdd(Defs/WeaponTraitDef[defName = \"…\"]/exclusionTags) failed",
+    "patch-failed|[Alpha Armoury] Patch operation Verse.PatchOperationAddModExtension(Defs/ThingDef[defName = \"…\"]) failed",
+    "patch-failed|[Alpha Armoury] Patch operation Verse.PatchOperationAddModExtension(Defs/WeaponTraitDef[defName = \"…\"]) failed"
+   ],
+   "logs": 12,
+   "players": 9,
+   "with": 17,
+   "without": 231,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "sierra.rf.housedoyle",
+    "ferny.progressionworlds"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.ResearchProjectDef named … found to give to Verse.RecipeMakerProperties …",
+    "xref-missing|Could not resolve cross-reference to Verse.ResearchProjectDef named … (wanter=researchPrerequisites)"
+   ],
+   "logs": 11,
+   "players": 9,
+   "with": 16,
+   "without": 151,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "smxrez.nonlethalreexamined",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Non-Lethal: Re-Examined] Verse.PatchOperationReplace(xpath=\"…\"VWE_Gun_Taser\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[Non-Lethal: Re-Examined] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationReplace(/Defs/ThingDef[defName = \"…\"]/statBases/AccuracyShort)) failed"
+   ],
+   "logs": 16,
+   "players": 9,
+   "with": 19,
+   "without": 201,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 6,
+    "gone": 0,
+    "same": 6,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "wara.toomanymods",
+    "dimonsever000.socialinterface.specific"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ResearchProjectDef named … (wanter=prerequisites)"
+   ],
+   "logs": 41,
+   "players": 9,
+   "with": 134,
+   "without": 195,
+   "withoutErr": 4,
+   "fix": {
+    "pairs": 20,
+    "gone": 0,
+    "same": 20,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 6,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "xxk.coffinbedcanbedeathrest",
+    "mlie.realfactionguest"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.DesignationCategoryDef named … found to give to Verse.ThingDef …"
+   ],
+   "logs": 87,
+   "players": 9,
+   "with": 89,
+   "without": 65,
+   "withoutErr": 6,
+   "fix": {
+    "pairs": 55,
+    "gone": 1,
+    "same": 54,
+    "sameGone": 0,
+    "changes": {
+     "disabled xxk.coffinbedcanbedeathrest": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 17,
+    "sameGone": 0,
+    "smallPairs": 4,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "aoba.deadmanswitch.synthetic",
+    "wrk.thigappe"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[The Dead Man's Switch - Synthetic] Patch operation Verse.PatchOperationAdd(Defs/ApparelPaperPattern.ApparelPaperPatternDef[RaceName=\"…\"]/modExtensions/li[@Class=\"…\"]/alternativeRaceNames) failed"
+   ],
+   "logs": 10,
+   "players": 8,
+   "with": 30,
+   "without": 915,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "badoaks.campfirestews",
+    "dismarzero.vgp.vgpvegetablegarden"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=thingDefs)"
+   ],
+   "logs": 11,
+   "players": 8,
+   "with": 20,
+   "without": 108,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "biomesteam.biomescaverns",
+    "ceteam.combatextended"
+   ],
+   "class": "texture-missing",
+   "templates": [
+    "texture-missing|Failed to find any textures at … while constructing Multi(initPath=BMT_Caverns/Things/Animal/FreezerFrog/Dessicated_FreezerFrog, color=RGBA(#.#, #.#, #.#, #.#), colorTwo=RGBA(#.#, #.#, #.#, #.#))",
+    "texture-missing|Failed to find any textures at … while constructing Multi(initPath=Things/Pawn/Animal/BeardedYak/Dessicated_BeardedYak, color=RGBA(#.#, #.#, #.#, #.#), colorTwo=RGBA(#.#, #.#, #.#, #.#))",
+    "texture-missing|Failed to find any textures at … while constructing Multi(initPath=Things/Pawn/Animal/GlarralPenguin/Dessicated_GlarralPenguin, color=RGBA(#.#, #.#, #.#, #.#), colorTwo=RGBA(#.#, #.#, #.#, #.#))"
+   ],
+   "logs": 14,
+   "players": 8,
+   "with": 17,
+   "without": 64,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "chaotic.rvinterior",
+    "flammpfeil.rv"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Vehicle Interior Framework] Patch operation Verse.PatchOperationFindMod(Vanilla Vehicles Expanded) failed",
+    "patch-failed|[Vehicle Interior Framework] Patch operation Verse.PatchOperationRemove(Defs/ResearchProjectDef[defName = \"…\"]/tab) failed",
+    "patch-failed|[Vehicle Interior Framework] Patch operation Verse.PatchOperationRemove(Defs/ResearchTabDef[defName = \"…\"]) failed"
+   ],
+   "logs": 11,
+   "players": 8,
+   "with": 11,
+   "without": 120,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ferny.progressionattire",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Progression: Attire] Patch operation Verse.PatchOperationReplace(Defs/ThingDef[defName=…]/equippedStatOffsets) failed"
+   ],
+   "logs": 17,
+   "players": 8,
+   "with": 47,
+   "without": 104,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 7,
+    "gone": 1,
+    "same": 7,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 4,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 1,
+    "fixes": {
+     "disable-other": 1
+    }
+   }
+  },
+  {
+   "mods": [
+    "gaon.lowtoolcabinet",
+    "satpyn.medievalextras"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Medieval Tool Cabinet (…)] Patch operation Verse.PatchOperationReplace(/Defs/ThingDef[defName = \"…\"]/costList/Steel) failed",
+    "patch-failed|[Medieval Tool Cabinet (…)] Verse.PatchOperationReplace(xpath=\"…\"ToolCabinet\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 15,
+   "players": 8,
+   "with": 42,
+   "without": 87,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 7,
+    "gone": 0,
+    "same": 7,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 4,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "kidapparelexpanded.goblins4lyfe",
+    "ceteam.combatextended"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named … found to give to Verse.VerbProperties …(launch frag grenade)",
+    "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named … found to give to Verse.VerbProperties …(launch incendiary)"
+   ],
+   "logs": 9,
+   "players": 8,
+   "with": 13,
+   "without": 112,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "mlie.enterhere"
+   ],
+   "version": "1.6.0",
+   "class": "harmony-stack",
+   "templates": [
+    "harmony-stack|Error in static constructor of EnterHere.Main: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e HarmonyLib.HarmonyException: Patching exception in method null ---\u003e System.Exception: Method static System.Collections.Generic.IEnumerable`#\u003cSystem.Re"
+   ],
+   "logs": 12,
+   "players": 8,
+   "with": 27,
+   "without": 243,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 1,
+    "same": 2,
+    "sameGone": 0,
+    "changes": {
+     "disabled mlie.enterhere": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "moistestwhale.stuffontablesforked",
+    "childrentraitsaffectlearning.mod"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Stuff on Tables Forked] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName=… "
+   ],
+   "logs": 26,
+   "players": 8,
+   "with": 59,
+   "without": 183,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 9,
+    "gone": 1,
+    "same": 9,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "rah.rbse",
+    "ykara.elstrages.epoe"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[RBSE] Patch operation Verse.PatchOperationFindMod(…) failed",
+    "patch-failed|[RBSE] Verse.PatchOperationReplace(xpath=\"…\"Neurocalculator\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 20,
+   "players": 8,
+   "with": 25,
+   "without": 156,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 12,
+    "gone": 0,
+    "same": 12,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 4,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "redmattis.morexenos",
+    "com.abobashark.zoologymod"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.GeneDef named … (wanter=genes)"
+   ],
+   "logs": 11,
+   "players": 8,
+   "with": 14,
+   "without": 223,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "sierra.rf.medievaloverhaul",
+    "ferny.lightingcategory"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.DesignationCategoryDef named … found to give to Verse.ThingDef …"
+   ],
+   "logs": 13,
+   "players": 8,
+   "with": 13,
+   "without": 261,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "taggerung.customuiscales",
+    "mss.flavourpack"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Could not do PostLoadInit on CustomUIScales.Settings: System.NullReferenceException: Object reference not set to an instance of an object"
+   ],
+   "logs": 18,
+   "players": 8,
+   "with": 31,
+   "without": 113,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "unlimitedhugs.hugslib",
+    "unlimitedhugs.mapreroll"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|[MapReroll][ERR] Failed to apply Harmony patches for UnlimitedHugs.MapReroll. Exception was: System.TypeLoadException: Could not load type …, Assembly-CSharp, Version=#.#.#.#, Culture=neutral, PublicKeyToken=null while decoding custom attribute: (…)"
+   ],
+   "logs": 9,
+   "players": 8,
+   "with": 11,
+   "without": 6346,
+   "withoutErr": 0
+  },
+  {
+   "mods": [
+    "velc.hatsdisplayselection",
+    "ab.hatweaker"
+   ],
+   "class": "harmony-stack",
+   "templates": [
+    "harmony-stack|Error in static constructor of HatDisplaySelection.HarmonyPatches: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e HarmonyLib.HarmonyException: Patching exception in method System.Void Verse.PawnRenderTree::AdjustParms(Verse."
+   ],
+   "logs": 10,
+   "players": 8,
+   "with": 12,
+   "without": 173,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "wsp.groupedbuildings",
+    "dankpyon.medieval.overhaul"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[More grouped buildings] Patch operation Verse.PatchOperationFindMod(Medieval Overhaul) failed"
+   ],
+   "logs": 10,
+   "players": 8,
+   "with": 14,
+   "without": 191,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "akaster.equalmilking",
+    "euterpe.milkytitfuck"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Equal Milking] Patch operation Verse.PatchOperationRemove(Defs/HediffDef[defName=…]/comps/li[@Class=\"…\"]) failed",
+    "patch-failed|[Equal Milking] Verse.PatchOperationRemove(xpath=\"…\"HediffCompProperties_SeverityPerDay\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 14,
+   "players": 7,
+   "with": 22,
+   "without": 228,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 8,
+    "gone": 1,
+    "same": 7,
+    "sameGone": 0,
+    "changes": {
+     "disabled akaster.equalmilking": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 6,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ceteam.combatextended",
+    "gt.sam.glittertech"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationReplace(Defs/HediffDef[defName=…]/comps/li[@Class=\"…\"]/verbs) failed",
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[",
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationAddModExtension(Defs/PawnKindDef[@Name=\"…\" or @Name=\"…\"]) failed"
+   ],
+   "logs": 7,
+   "players": 7,
+   "with": 7,
+   "without": 1116,
+   "withoutErr": 0
+  },
+  {
+   "mods": [
+    "crows.dragonbond",
+    "addie.housevanilla"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ResearchProjectDef named … (wanter=prerequisites)"
+   ],
+   "logs": 8,
+   "players": 7,
+   "with": 13,
+   "without": 139,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 1,
+    "same": 1,
+    "sameGone": 0,
+    "changes": {
+     "disabled addie.housevanilla": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "epona.eponadynasticrise",
+    "ceteam.combatextended"
+   ],
+   "class": "texture-missing",
+   "templates": [
+    "texture-missing|Failed to find any textures at … while constructing Multi(initPath=Things/AnimalConch/Dessicated_Conch/Dessicated_Conch, color=RGBA(#.#, #.#, #.#, #.#), colorTwo=RGBA(#.#, #.#, #.#, #.#))"
+   ],
+   "logs": 7,
+   "players": 7,
+   "with": 21,
+   "without": 323,
+   "withoutErr": 0
+  },
+  {
+   "mods": [
+    "euterpe.milkytitfuck",
+    "akaster.equalmilking"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Lactation Expansion] Patch operation Verse.PatchOperationReplace(Defs/HediffDef[defName=…]/comps/li[@Class=\"…\"]) failed"
+   ],
+   "logs": 8,
+   "players": 7,
+   "with": 22,
+   "without": 107,
+   "withoutErr": 0
+  },
+  {
+   "mods": [
+    "limetreesnake.furnishing",
+    "ferny.progressionagriculture"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.RecipeDef named … (wanter=recipes)"
+   ],
+   "logs": 12,
+   "players": 7,
+   "with": 29,
+   "without": 271,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 4,
+    "gone": 0,
+    "same": 4,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "nemonian.my2.beta",
+    "nemonian.my2"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Moyo#.#-Blood stained business] Patch operation Verse.PatchOperationReplace(Defs/ScenarioDef[defName=…]/scenario/parts/li[@Class=\"…\"]) failed"
+   ],
+   "logs": 10,
+   "players": 7,
+   "with": 11,
+   "without": 212,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "plaxen.hamster"
+   ],
+   "class": "xml-load",
+   "templates": [
+    "xml-load|Exception loading UnityEngine.AudioClip from file."
+   ],
+   "logs": 43,
+   "players": 7,
+   "with": 50,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 23,
+    "gone": 2,
+    "same": 23,
+    "sameGone": 2,
+    "changes": {
+     "no change to these mods": 2
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "tiagocc0.justwoodfloor",
+    "vanillaexpanded.vfespacer"
+   ],
+   "class": "xml-load",
+   "templates": [
+    "xml-load|XML error: Could not find parent node named \"…\" for node \"…\". Full node: \u003cTerrainDef ParentName=\"…\"\u003e\u003cdefName\u003eWoodPlankFloorLight\u003c/defName\u003e\u003clabel\u003elight wood floor\u003c/label\u003e\u003ctexturePath\u003eTerrain/Surfaces/WoodFloorLight\u003c/texturePath\u003e\u003c/TerrainDef\u003e"
+   ],
+   "logs": 8,
+   "players": 7,
+   "with": 13,
+   "without": 104,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "vexedtrees980.rimelvesbiotech",
+    "turnovus.biotech.integratedgenes"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Rim-Elves] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationTest(/Defs/GeneDef[defName = \"…\"]/exclusionTags)) failed"
+   ],
+   "logs": 12,
+   "players": 7,
+   "with": 15,
+   "without": 83,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 5,
+    "gone": 0,
+    "same": 5,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "biomesteam.oasis",
+    "jintuzilamian.hairstyle.afumenshairstyles"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Biomes! Oasis] Patch operation Verse.PatchOperationAdd(Defs/VCE_Fishing.BiomeTempDef[defName=…]/biomes) failed"
+   ],
+   "logs": 9,
+   "players": 6,
+   "with": 20,
+   "without": 69,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "bonible.vanilla.gun.sound.replacement",
+    "demonx3.limitlessdeathless"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Enhanced Vanilla Gun Sounds Revived] Patch operation Verse.PatchOperationReplace(/Defs/SoundDef[defName=…]/subSounds/li/grains/li[clipFolderPath=\"…\"]/clipFolderPath) failed",
+    "patch-failed|[Enhanced Vanilla Gun Sounds Revived] Verse.PatchOperationReplace(xpath=\"…\"Weapon/Artillery/Mortar_Fire\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[Enhanced Vanilla Gun Sounds Revived] Verse.PatchOperationReplace(xpath=\"…\"Weapon/AssaultRifle\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 42,
+   "players": 6,
+   "with": 77,
+   "without": 50,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 26,
+    "gone": 7,
+    "same": 26,
+    "sameGone": 7,
+    "changes": {
+     "no change to these mods": 7
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 7,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ceteam.combatextended",
+    "vexedtrees980.rimrobots"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationRemove(Defs/AlienRace.ThingDef_AlienRace[defName=…]/statBases/MeleeDodgeChance) failed",
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationReplace(Defs/HediffDef[defName=…]/stages/li/statOffsets/ArmorRating_Blunt) failed",
+    "patch-failed|[Combat Extended] Patch operation Verse.PatchOperationReplace(Defs/HediffDef[defName=…]/stages/li/statOffsets/ArmorRating_Sharp) failed"
+   ],
+   "logs": 7,
+   "players": 6,
+   "with": 7,
+   "without": 1116,
+   "withoutErr": 0
+  },
+  {
+   "mods": [
+    "fxz.solaris.ratkinracemod.odyssey",
+    "oark.ratkinfaction.geneexpand.oldodyssey"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named … found to give to RimWorld.ScenPart_StartingThing_Defined …"
+   ],
+   "logs": 9,
+   "players": 6,
+   "with": 11,
+   "without": 852,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 3,
+    "gone": 1,
+    "same": 2,
+    "sameGone": 0,
+    "changes": {
+     "disabled oark.ratkinfaction.geneexpand.oldodyssey": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "icc.fov.orbiter",
+    "merthsoft.designatorshapes"
+   ],
+   "class": "texture-missing",
+   "templates": [
+    "texture-missing|Could not load Texture#D at '…' in any active mod or in base resources.",
+    "xref-missing|Could not resolve cross-reference to Verse.ThingDef named … (wanter=apparelRequired)"
+   ],
+   "logs": 20,
+   "players": 6,
+   "with": 30,
+   "without": 41,
+   "withoutErr": 2,
+   "fix": {
+    "pairs": 12,
+    "gone": 0,
+    "same": 12,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 7,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "petetimessix.simplesidearms",
+    "rick.fcp.ballisticweapons"
+   ],
+   "class": "harmony-stack",
+   "templates": [
+    "harmony-stack|Error in static constructor of PeteTimesSix.SimpleSidearms.SimpleSidearms_PostInit: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e System.NullReferenceException: Object reference not set to an instance of an"
+   ],
+   "logs": 8,
+   "players": 6,
+   "with": 9,
+   "without": 3028,
+   "withoutErr": 0
+  },
+  {
+   "mods": [
+    "resurrectionem.furniture",
+    "ferny.betterarchitect"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.DesignationCategoryDef named … found to give to Verse.ThingDef …"
+   ],
+   "logs": 18,
+   "players": 6,
+   "with": 46,
+   "without": 190,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 11,
+    "gone": 0,
+    "same": 11,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 3,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "salvador143.mthings.geysers",
+    "ceteam.combatextended"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Medieval Things: Geysers] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName=…]/recipeMaker/recipeUsers) failed"
+   ],
+   "logs": 17,
+   "players": 6,
+   "with": 29,
+   "without": 109,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 10,
+    "gone": 0,
+    "same": 10,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 9,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "sarg.alphaprefabs",
+    "ferny.progressiongenetics"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ResearchProjectDef named … (wanter=researchPrerequisites)"
+   ],
+   "logs": 52,
+   "players": 6,
+   "with": 103,
+   "without": 613,
+   "withoutErr": 5,
+   "fix": {
+    "pairs": 30,
+    "gone": 5,
+    "same": 30,
+    "sameGone": 5,
+    "changes": {
+     "no change to these mods": 5
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 8,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "unlimitedhugs.hugslib",
+    "roolo.giddyupcore"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|[GiddyUpCore][ERR] Failed to apply Harmony patches for \u003cpkg\u003e. Exception was: HarmonyLib.HarmonyException: Patching exception in method null ---\u003e System.ArgumentException: Undefined target method for patch method static System.Boolean GiddyUpCore.Harmony.SelfDefenceUtility_ShouldFleeFrom:"
+   ],
+   "logs": 7,
+   "players": 6,
+   "with": 8,
+   "without": 6349,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 1,
+    "same": 1,
+    "sameGone": 0,
+    "changes": {
+     "disabled roolo.giddyupcore": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "van.datools",
+    "ferny.progressionverticality"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ResearchProjectDef named … (wanter=researchPrerequisites)"
+   ],
+   "logs": 10,
+   "players": 6,
+   "with": 28,
+   "without": 391,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 4,
+    "gone": 0,
+    "same": 4,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "wara.toomanymods",
+    "com.abobashark.zoologymod"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.ThingDef named … found to give to TooManyMods.Loot …"
+   ],
+   "logs": 7,
+   "players": 6,
+   "with": 11,
+   "without": 318,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 1,
+    "same": 1,
+    "sameGone": 0,
+    "changes": {
+     "disabled com.abobashark.zoologymod": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "wuren.rimtalkcontextupgrade",
+    "m00nl1ght.geologicallandforms"
+   ],
+   "class": "harmony-stack",
+   "templates": [
+    "harmony-stack|Error in static constructor of RimtalkContext.RimtalkContextMod+PostLoadPatcher: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e HarmonyLib.HarmonyException: Patching exception in method null ---\u003e System.ArgumentException: Undefined target meth"
+   ],
+   "logs": 10,
+   "players": 6,
+   "with": 30,
+   "without": 30,
+   "withoutErr": 1,
+   "fix": {
+    "pairs": 5,
+    "gone": 1,
+    "same": 4,
+    "sameGone": 0,
+    "changes": {
+     "disabled m00nl1ght.geologicallandforms": 1,
+     "disabled wuren.rimtalkcontextupgrade": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 1,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "arandomkiwi.powerpp",
+    "peptide.androidsexpanded14"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|[Power++] Androids Null method for rimworld.aRandomKiwi.PPP [Ref #BDD#]"
+   ],
+   "logs": 5,
+   "players": 5,
+   "with": 13,
+   "without": 78,
+   "withoutErr": 0
+  },
+  {
+   "mods": [
+    "bj.mechscanhaulurgently"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.WorkTypeDef named … (wanter=mechEnabledWorkTypes)"
+   ],
+   "logs": 15,
+   "players": 5,
+   "with": 21,
+   "without": 0,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 7,
+    "gone": 0,
+    "same": 7,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 4,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ceteam.combatextended",
+    "zuoyao.ravenrace"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Error in ParallelForEach(): System.Exception: RavenPlant_SevenEmotions.graphicData ---\u003e System.Exception: BoundMap(,) ---\u003e System.Exception: Combat Extended :: CropVertical error while cropping Textures/Races/Raven/Hair/Transparent_side ---\u003e System.ArgumentException: Color[] has no pixels with alpha"
+   ],
+   "logs": 6,
+   "players": 5,
+   "with": 13,
+   "without": 1110,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "det.dwarvenstyle",
+    "hlx.ultratechalteredcarbon"
+   ],
+   "class": "xml-load",
+   "templates": [
+    "xml-load|XML error: Could not find parent node named \"…\" for node \"…\". Full node: \u003cThingStyleDef MayRequire=\"…\" ParentName=\"…\"\u003e\u003cdefName\u003eAC_Dwarven_ActiveNeuralStack\u003c/defName\u003e\u003cgraphicData\u003e\u003ctexPath\u003eThings/Item/NeuralStacksStyles/FriendlyStack\u003c/texP",
+    "xml-load|XML error: Could not find parent node named \"…\" for node \"…\". Full node: \u003cThingStyleDef MayRequire=\"…\" ParentName=\"…\"\u003e\u003cdefName\u003eAC_Dwarven_EmptyNeuralStack\u003c/defName\u003e\u003cgraphicData\u003e\u003ctexPath\u003eThings/Item/NeuralStacksStyles/EmptyStack\u003c/texPath\u003e"
+   ],
+   "logs": 26,
+   "players": 5,
+   "with": 85,
+   "without": 127,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 13,
+    "gone": 3,
+    "same": 13,
+    "sameGone": 3,
+    "changes": {
+     "no change to these mods": 3
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 5,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "ferny.progressiontemperature",
+    "m0ek.badhygienepatches"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Progression: Temperature] Verse.PatchOperationRemove(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 9,
+   "players": 5,
+   "with": 11,
+   "without": 313,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 1,
+    "same": 2,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "fluffy.fluffyrelations",
+    "brrainz.visualexceptions"
+   ],
+   "class": "harmony-stack",
+   "templates": [
+    "harmony-stack|Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---\u003e System.MissingMethodException: Method not found: void Verse.LongEventHandler.QueueLongEvent(System.Action,string,bool,Syste"
+   ],
+   "logs": 9,
+   "players": 5,
+   "with": 14,
+   "without": 90,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 5,
+    "gone": 2,
+    "same": 3,
+    "sameGone": 0,
+    "changes": {
+     "disabled brrainz.visualexceptions": 1,
+     "disabled fluffy.fluffyrelations": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "hourai.vanillahairsretex.1.6",
+    "pb3n.simplewarrants"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Vanilla Hairs and Beards Retextured] Verse.PatchOperationRemove(xpath=\"…\"HoraxianBase\"…\"): Failed to find a node with the given xpath",
+    "patch-failed|[Vanilla Hairs and Beards Retextured] Verse.PatchOperationReplace(xpath=\"…\"CultistHairBase\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 6,
+   "players": 5,
+   "with": 11,
+   "without": 50,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "ilyvion.loadingprogress",
+    "ogliss.admech.xenobiologis"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Could not execute post-long-event action. Exception: System.ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection."
+   ],
+   "logs": 7,
+   "players": 5,
+   "with": 7,
+   "without": 1196,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "joeownage.overlap.remover",
+    "ferny.progressionkitchen"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Medieval Overlap Remover] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationRemove(Defs/ThingDef[defName=…]/comps/li[@Class=\"…\"]/processes/li[.=\"…\"])) failed"
+   ],
+   "logs": 8,
+   "players": 5,
+   "with": 25,
+   "without": 158,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "kindseal.lol",
+    "tourswen.arachnaeswarm"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.SoundDef named … found to give to ArachnaeSwarm.CompProperties_ShipArtillery … (using undefined sound instead)"
+   ],
+   "logs": 12,
+   "players": 5,
+   "with": 12,
+   "without": 436,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 0,
+    "same": 3,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 0,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "mlie.badcanbegood",
+    "subtleguardspots.odevil"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Bad Can Be Good (…)] Patch operation Verse.PatchOperationSequence(count=#, lastFailedOperation=Verse.PatchOperationReplace(/Defs/TraitDef[defName=…]/degreeDatas/li/randomMentalStateMtbDaysMoodCurve)) failed",
+    "patch-failed|[Bad Can Be Good (…)] Verse.PatchOperationReplace(xpath=\"…\"): Failed to find a node with the given xpath"
+   ],
+   "logs": 31,
+   "players": 5,
+   "with": 93,
+   "without": 213,
+   "withoutErr": 3,
+   "fix": {
+    "pairs": 15,
+    "gone": 6,
+    "same": 14,
+    "sameGone": 5,
+    "changes": {
+     "disabled subtleguardspots.odevil": 1,
+     "no change to these mods": 5
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "nyar.nclvstw",
+    "tiagocc0.femalebodyvariants"
+   ],
+   "class": "harmony-stack",
+   "templates": [
+    "harmony-stack|Error in static constructor of NoBody.HarmonyInit+PatchMain: System.TypeInitializationException: The type … for '…' threw an exception. ---\u003e HarmonyLib.HarmonyException: Patching exception in method virtual Verse.Graphic Verse.PawnRenderNode_Body::GraphicFor(Verse.Pawn pawn) ---\u003e S"
+   ],
+   "logs": 6,
+   "players": 5,
+   "with": 10,
+   "without": 317,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "orion.therapy"
+   ],
+   "version": "1.5.0.3",
+   "class": "exception",
+   "templates": [
+    "exception|Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---\u003e System.MissingMethodException: Method not found: void Verse.LongEventHandler.QueueLongEvent(System.Action,string,bool,System.Action"
+   ],
+   "logs": 7,
+   "players": 5,
+   "with": 7,
+   "without": 263,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "qing.more.traits2",
+    "q.m"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to RimWorld.TraitDef named … (wanter=conflictingTraits)",
+    "xref-missing|Could not resolve cross-reference to RimWorld.TraitDef named … (wanter=nullifyingTraits)",
+    "xref-missing|Could not resolve cross-reference: No Verse.HediffDef named … found to give to RimWorld.CompProperties_AbilityGiveHediff …"
+   ],
+   "logs": 5,
+   "players": 5,
+   "with": 12,
+   "without": 137,
+   "withoutErr": 0
+  },
+  {
+   "mods": [
+    "rw.mod.simplestairs",
+    "gomi.simplestairs"
+   ],
+   "class": "xml-load",
+   "templates": [
+    "xml-load|XML error: \u003cplacingDraggableDimensions\u003e#\u003c/placingDraggableDimensions\u003e doesn't correspond to any field … type … Context: \u003cThingDef ParentName=\"…\"\u003e\u003ccategory\u003eBuilding\u003c/category\u003e\u003cthingClass\u003eBuilding\u003c/thingClass\u003e\u003csoundImpactDefault\u003eBulletImpact_Metal\u003c/soundImpactDefault\u003e\u003cselectable\u003etr"
+   ],
+   "logs": 5,
+   "players": 5,
+   "with": 5,
+   "without": 345,
+   "withoutErr": 0
+  },
+  {
+   "mods": [
+    "rwmt.multiplayercompatibility",
+    "aoba.exosuit.framework"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|MPCompat :: Exception loading \u003cpkg\u003e: System.Exception: Couldn't find parent method (…) ::GetGizmos"
+   ],
+   "logs": 6,
+   "players": 5,
+   "with": 6,
+   "without": 77,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "sierra.rt.medievaltalents",
+    "mlie.removeindustrialstuff"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Failed to find Verse.ThingDef named … There are # defs of this type …"
+   ],
+   "logs": 10,
+   "players": 5,
+   "with": 13,
+   "without": 275,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 4,
+    "gone": 0,
+    "same": 4,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "silversol.azur",
+    "dismarzero.vgp.vgpvegetablegarden"
+   ],
+   "class": "xml-load",
+   "templates": [
+    "xml-load|XML error: Could not find parent node named \"…\" for node \"…\". Full node: \u003cThingDef ParentName=\"…\"\u003e\u003cdefName\u003eHoneybombA\u003c/defName\u003e\u003clabel\u003eHoneybomb\u003c/label\u003e\u003cdescription\u003eA sweet raw ingredient. Safe to eat, even when raw.\u003c/description\u003e\u003cpossessionCount\u003e#\u003c/possessionCount"
+   ],
+   "logs": 11,
+   "players": 5,
+   "with": 25,
+   "without": 157,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 6,
+    "gone": 0,
+    "same": 6,
+    "sameGone": 0,
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 0,
+    "sameGone": 0,
+    "smallPairs": 2,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "unagi.a.bigpome",
+    "ceteam.combatextended"
+   ],
+   "class": "texture-missing",
+   "templates": [
+    "texture-missing|Failed to find any textures at … while constructing Multi(initPath=Things/Pawn/Animal/Dessicated_Muffalo, color=RGBA(#.#, #.#, #.#, #.#), colorTwo=RGBA(#.#, #.#, #.#, #.#))"
+   ],
+   "logs": 8,
+   "players": 5,
+   "with": 9,
+   "without": 83,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 3,
+    "gone": 1,
+    "same": 3,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "unlimitedhugs.hugslib",
+    "roolo.giddyupbattlemounts"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|[BattleMounts][ERR] Failed to apply Harmony patches for \u003cpkg\u003e. Exception was: HarmonyLib.HarmonyException: Patching exception in method null ---\u003e System.ArgumentException: Undefined target method for patch method static System.Void BattleMounts.Harmony.FloatMenuMakerMap_AddDrafte"
+   ],
+   "logs": 5,
+   "players": 5,
+   "with": 6,
+   "without": 6351,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 1,
+    "same": 0,
+    "sameGone": 0,
+    "changes": {
+     "disabled roolo.giddyupbattlemounts": 1
+    },
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "v1024.ebframework",
+    "ri.rimimmortals.seasonsofrule"
+   ],
+   "class": "exception",
+   "templates": [
+    "exception|Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---\u003e HarmonyLib.HarmonyException: Patching exception in method static System.Reflection.MethodBase EBF.Transpilations.Immortals"
+   ],
+   "logs": 5,
+   "players": 5,
+   "with": 8,
+   "without": 407,
+   "withoutErr": 0
+  },
+  {
+   "mods": [
+    "vanillaexpanded.varme",
+    "mlie.combatshieldsscifiaddon"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Vanilla Armour Expanded] Patch operation Verse.PatchOperationFindMod(Combat Shields, Combat Shields (…)) failed"
+   ],
+   "logs": 7,
+   "players": 5,
+   "with": 11,
+   "without": 2008,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 2,
+    "gone": 0,
+    "same": 2,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "vanillaexpanded.vee",
+    "mss.flavourpack"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference: No Verse.GameConditionDef named … found to give to MSSFP.Genes.GeneMutatorDef …"
+   ],
+   "logs": 7,
+   "players": 5,
+   "with": 19,
+   "without": 2499,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  },
+  {
+   "mods": [
+    "wara.toomanymods",
+    "linnun.kitchensinkfix"
+   ],
+   "class": "xref-missing",
+   "templates": [
+    "xref-missing|Could not resolve cross-reference to Verse.ResearchProjectDef named … (wanter=researchPrerequisites)"
+   ],
+   "logs": 27,
+   "players": 5,
+   "with": 57,
+   "without": 272,
+   "withoutErr": 3,
+   "fix": {
+    "pairs": 10,
+    "gone": 1,
+    "same": 10,
+    "sameGone": 1,
+    "changes": {
+     "no change to these mods": 1
+    },
+    "source": "sessions"
+   },
+   "g5": {
+    "samePairs": 2,
+    "sameGone": 0,
+    "smallPairs": 1,
+    "smallGone": 0
+   }
+  },
+  {
+   "mods": [
+    "zal.majesticcmt",
+    "dismarzero.vgp.vgpvegetablegarden"
+   ],
+   "class": "patch-failed",
+   "templates": [
+    "patch-failed|[Majestic Foliage - Djeeshka's CMT Retexture (…)] Patch operation XmlExtensions.FindMod failed"
+   ],
+   "logs": 6,
+   "players": 5,
+   "with": 10,
+   "without": 121,
+   "withoutErr": 0,
+   "fix": {
+    "pairs": 1,
+    "gone": 0,
+    "same": 1,
+    "sameGone": 0,
+    "source": "sessions"
+   }
+  }
+ ]
+}
