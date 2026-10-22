@@ -248,9 +248,33 @@ func readJSON[T any](path string) (*T, error) {
 	}
 	var v T
 	if err := json.Unmarshal(b, &v); err != nil {
-		return nil, err
+		// Agents write Windows paths into evidence text with lone backslashes ("C:\Users").
+		// That is a formatting slip, not a wrong answer: double them and try again.
+		if json.Unmarshal(fixEscapes(b), &v) != nil {
+			return nil, err
+		}
+		repairedJSON++
 	}
 	return &v, nil
+}
+
+var repairedJSON int
+
+// fixEscapes doubles each backslash that does not start a valid JSON escape.
+func fixEscapes(b []byte) []byte {
+	out := make([]byte, 0, len(b)+16)
+	for i := 0; i < len(b); i++ {
+		if b[i] == '\\' {
+			if i+1 < len(b) && strings.IndexByte(`"\/bfnrtu`, b[i+1]) >= 0 {
+				out = append(out, b[i], b[i+1])
+				i++
+				continue
+			}
+			out = append(out, '\\')
+		}
+		out = append(out, b[i])
+	}
+	return out
 }
 
 type row struct{ n, gold, hit, wrong, silent, over, quiet, stage, ctype, fix, verdict, missing int }
@@ -448,6 +472,9 @@ func score(cfg *Config, run, _ string, goldPath, split string, only []string, it
 	}
 	fmt.Printf("run %s, split %s: %d tasks, %d answered, %d invalid (touched gold/packets/config: %v), %d with other tool use %v\n",
 		run, label, len(ids), answered, len(invalid), invalid, len(offTool), offTool)
+	if repairedJSON > 0 {
+		fmt.Printf("%d answer files had lone backslashes (Windows paths) and were read after doubling them\n", repairedJSON)
+	}
 	diffs := []string{"L1", "L2", "L3"}
 	printTable("agent vs gold, by class", classOrder, agentBy, agentTot, true)
 	printTable("agent vs gold, by difficulty and tier", append(diffs, "tier 1", "tier 2"), agentBy, agentTot, true)
