@@ -60,6 +60,8 @@ type icons struct {
 	err, warn, logErr, unloadable             string
 	unsaved, lock, update, dep, staging       string
 	play, save, sort, search, fail            string
+	// the evidence chips of 能不能跑 (06 §2.4): declared, inferred, log, community, your rule
+	evDeclared, evInferred, evLog, evCommunity, evRule string
 }
 
 // Nerd Font: the Font Awesome 4 range, in every Nerd Font and WezTerm's built-in symbols.
@@ -68,6 +70,7 @@ var nerdIcons = icons{
 	err: "", warn: "", logErr: "", unloadable: "",
 	unsaved: "", lock: "", update: "", dep: "", staging: "",
 	play: "", save: "", sort: "", search: "", fail: "",
+	evDeclared: "", evInferred: "", evLog: "", evCommunity: "", evRule: "",
 }
 
 // Compatibility: East Asian width "neutral", present in Cascadia Mono, 1 cell (V0).
@@ -76,6 +79,7 @@ var compatIcons = icons{
 	err: "⨯", warn: "!", logErr: "◍", unloadable: "◌",
 	unsaved: "⬤", lock: "", update: "⇣", dep: "›", staging: "◫",
 	play: "►", save: "↲", sort: "↨", search: "/", fail: "⨯",
+	evDeclared: "≣", evInferred: "◊", evLog: "◍", evCommunity: "⬡", evRule: "⌂",
 }
 
 // Marks shared by both sets.

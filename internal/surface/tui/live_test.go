@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 06 §2.1: while the game runs the top bar says so and its errors lead 需要处理; when it
+// 06 §2.1: while the game runs the top bar says so and its errors lead their section; when it
 // exits both go.
 func TestLiveGame(t *testing.T) {
 	e := testkit.New(t)
@@ -34,8 +34,16 @@ func TestLiveGame(t *testing.T) {
 	if want := Tf("game running since %s · %d errors", since, m.live.Errors); !strings.Contains(bar, want) {
 		t.Fatalf("top bar %q, want %q", bar, want)
 	}
-	if len(m.prob.items) == 0 || m.prob.items[0].group != view.GroupThisRun {
-		t.Fatalf("needs do not start with this run: %+v", m.prob.items)
+	// this run leads its section, 上次运行的报错 (06 §2.4)
+	first := -1
+	for i, it := range m.prob.items {
+		if it.section == view.SectionRun {
+			first = i
+			break
+		}
+	}
+	if first < 0 || m.prob.items[first].group != view.GroupThisRun {
+		t.Fatalf("the run section does not start with this run: %+v", m.prob.items)
 	}
 	m.tab = tabProblems
 	if s := ansi.Strip(m.View()); !strings.Contains(s, T("this run")) {

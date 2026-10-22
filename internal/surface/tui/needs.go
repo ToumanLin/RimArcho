@@ -2,24 +2,17 @@ package tui
 
 import (
 	"errors"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // 需要处理 (06 §5). The items, their wording and their actions are view.BuildNeeds (06 §1);
 // here each action gets its key and the screen is drawn.
-
-// Groups, in screen order (06 §2.4).
-const (
-	gList     = view.GroupList
-	gDeps     = view.GroupDeps
-	gConflict = view.GroupConflict
-	gLastRun  = view.GroupLastRun
-	gConfirm  = view.GroupConfirm
-)
 
 type needKey struct {
 	key, label string
@@ -28,27 +21,60 @@ type needKey struct {
 
 // need is one item of the screen: the shared item and its keys.
 type need struct {
-	group   int
-	text    string
-	keys    []needKey
-	counted bool     // in the top bar's number; false for the folded stale log
-	mods    []string // instance ids: the first carries the row icon
-	status  int      // statusErr, statusWarn or statusLog for the row icon
-	dim     bool
-	parts   []string
-	fold    bool
+	group    int
+	section  int            // the section it is shown in (view.SectionOf, 06 §2.4)
+	evidence *view.Evidence // where the claim comes from: the chip under the item
+	text     string
+	keys     []needKey
+	counted  bool     // in the top bar's number; false for the folded stale log
+	mods     []string // instance ids: the first carries the row icon
+	status   int      // statusErr, statusWarn or statusLog for the row icon
+	dim      bool
+	parts    []string
+	fold     bool
 }
 
 func (m *model) toNeeds(items []view.Need) []need {
 	out := make([]need, 0, len(items))
 	for _, it := range items {
-		n := need{group: it.Group, text: it.Text, counted: it.Counted, mods: it.Mods, status: it.Status, dim: it.Dim, parts: it.Parts, fold: it.Fold}
+		n := need{group: it.Group, section: it.Section, evidence: it.Evidence, text: it.Text, counted: it.Counted, mods: it.Mods, status: it.Status, dim: it.Dim, parts: it.Parts, fold: it.Fold}
 		for _, a := range it.Actions {
 			n.keys = append(n.keys, m.actionKey(a, it.Text))
 		}
 		out = append(out, n)
 	}
+	// by section, stable: within a section the view's order (this run before the last run)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].section < out[j].section })
 	return out
+}
+
+// evIcon is the evidence chip's icon (06 §7, §9.3).
+func evIcon(kind string) string {
+	switch kind {
+	case view.EvDeclared:
+		return ic.evDeclared
+	case view.EvInferred:
+		return ic.evInferred
+	case view.EvLog:
+		return ic.evLog
+	case view.EvCommunity:
+		return ic.evCommunity
+	case view.EvRule:
+		return ic.evRule
+	}
+	return markDot
+}
+
+// chipText is the evidence chip as compact text: "≣ declared by the mod · About.xml modDependencies".
+func chipText(e *view.Evidence) string {
+	if e == nil {
+		return ""
+	}
+	s := evIcon(e.Kind) + " " + e.Label
+	if e.Source != "" {
+		s += " " + markDot + " " + e.Source
+	}
+	return s
 }
 
 // actionKey binds a shared action to its key (06 §5).
@@ -203,14 +229,14 @@ func (m *model) needLines(n int) []string {
 		item int
 	}
 	var rows []row
-	grp := -1
+	sec := -1
 	for i, it := range items {
-		if it.group != grp {
-			if grp >= 0 {
+		if it.section != sec {
+			if sec >= 0 {
 				rows = append(rows, row{"", -1})
 			}
-			grp = it.group
-			rows = append(rows, row{"  " + sDimS.Render(fit(T(view.GroupTitles[grp]), w-2)), -1})
+			sec = it.section
+			rows = append(rows, row{"  " + m.sectionHead(sec, w-2), -1})
 		}
 		icon := statusIcon(it.status)
 		if it.dim || it.status == statusNone {
@@ -253,6 +279,9 @@ func (m *model) needLines(n int) []string {
 				}
 			}
 		}
+		if c := chipText(it.evidence); c != "" {
+			rows = append(rows, row{"    " + sDimS.Render(fit(c, tw)), i})
+		}
 		if sel && hint != "" {
 			for _, l := range wrap(hint, tw) {
 				rows = append(rows, row{"    " + sSecond.Render(fit(l, tw)), i})
@@ -283,9 +312,82 @@ func (m *model) needLines(n int) []string {
 	return out
 }
 
+// sectionHead is a section's heading: its title, its count and, for the run errors, which
+// run they are from (06 §2.4).
+func (m *model) sectionHead(sec, w int) string {
+	n := 0
+	for _, it := range m.prob.items {
+		if it.section == sec && it.counted {
+			n++
+		}
+	}
+	title := T(view.SectionTitles[sec])
+	head := sDimS.Render(title)
+	if sec == view.SectionBreak {
+		head = sErrS.Render(title)
+	}
+	used := width.StringWidth(title)
+	add := func(s string, st lipgloss.Style) {
+		s = width.Truncate(s, max(w-used, 0), "…")
+		head += st.Render(s)
+		used += width.StringWidth(s)
+	}
+	if n > 0 {
+		add(" "+markDot+" ", sDimS)
+		add(itoa(n), sText)
+	}
+	if sec == view.SectionRun {
+		switch {
+		case m.live != nil && m.live.Running && m.live.Pack != "":
+			add(" "+markDot+" "+Tf("pack %s", m.live.Pack), sDimS)
+		case m.live != nil && m.live.Running:
+			add(" "+markDot+" "+T("this run"), sDimS)
+		case m.prob.lastRun != "":
+			add(" "+markDot+" "+m.prob.lastRun, sDimS)
+		}
+	}
+	return head
+}
+
+// sectionStep moves the cursor to the first item of the previous / next section.
+func (m *model) sectionStep(d int) {
+	p := &m.prob
+	if p.cursor >= len(p.items) {
+		return
+	}
+	sec := p.items[p.cursor].section
+	if d > 0 {
+		for i, it := range p.items {
+			if it.section > sec {
+				p.cursor = i
+				return
+			}
+		}
+		return
+	}
+	prev := -1
+	for _, it := range p.items {
+		if it.section < sec {
+			prev = it.section
+		}
+	}
+	for i, it := range p.items {
+		if it.section == prev {
+			p.cursor = i
+			return
+		}
+	}
+}
+
 func (m *model) needsKey(s string) tea.Cmd {
 	p := &m.prob
 	switch s {
+	case "left":
+		m.sectionStep(-1)
+		return nil
+	case "right":
+		m.sectionStep(1)
+		return nil
 	case "up", "k":
 		p.cursor = max(p.cursor-1, 0)
 		return nil
