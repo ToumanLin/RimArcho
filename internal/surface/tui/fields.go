@@ -28,11 +28,11 @@ func fieldLines(fs []view.Field, w int) []string {
 		case view.FieldTags:
 			v := strings.Join(f.List, " "+markDot+" ")
 			if len(f.List) == 0 {
-				v = sDimS.Render(T("none · # adds"))
+				v = sDimS.Render(T("none · g adds"))
 			}
 			vals = []string{v}
 		case view.FieldWorkshop:
-			vals = []string{f.Value + sDimS.Render(" "+markDot+" o "+T("opens the page"))}
+			vals = []string{f.Value + sDimS.Render(" "+markDot+" ctrl+w "+T("opens the page"))}
 		case view.FieldAlias:
 			vals = []string{f.Value + sDimS.Render("  ("+f.Extra+")")}
 		default:

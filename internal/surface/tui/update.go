@@ -177,8 +177,6 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.barTypeKey(k)
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
 		return m.barOpenKey(k)
-	case m.tab == tabLibrary && m.libr.typing:
-		return m.libTypeKey(k)
 	case m.full:
 		return m.fullKey(s)
 	}
@@ -239,15 +237,6 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		}
 		return m.changesKey(s)
 	case tabLibrary:
-		if s == "esc" {
-			if m.libr.query != "" {
-				m.libr.query = ""
-				m.loadLibrary()
-				return nil
-			}
-			m.tab = tabList
-			return m.requestDetail()
-		}
 		return m.libraryKey(s)
 	}
 	if m.detailFocus {
@@ -668,8 +657,13 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonRight && m.tab == tabLibrary && m.panel == nil && m.prompt == nil {
-		return m.libRightClick(e.X, e.Y)
+	if m.tab == tabLibrary && e.Action == tea.MouseActionPress && m.panel == nil && m.prompt == nil && m.pal == nil && m.tags == nil && m.pos == nil && !m.libr.full {
+		switch e.Button {
+		case tea.MouseButtonRight:
+			return m.libRightClick(e.X, e.Y)
+		case tea.MouseButtonLeft:
+			return m.libClick(e)
+		}
 	}
 	if m.prompt != nil || m.editing || m.panel != nil || m.insp != nil || m.tab != tabList || m.full || m.pal != nil || m.tags != nil || m.pos != nil {
 		var cmds []tea.Cmd

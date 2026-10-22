@@ -14,33 +14,6 @@ import (
 // The editor's and Mod 库存's shortcuts for one mod (06 §3.5): ctrl+o its folder, ctrl+w its
 // Workshop page, C the 变化 page narrowed to its Lineage.
 
-// libCopy is the copy the library's cursor row stands for: the one in the current plan,
-// else the first RimArcho has seen.
-func (m *model) libCopy() (view.LibInstRow, string, bool) {
-	l := &m.libr
-	if l.page == nil || l.cursor >= len(l.page.Rows) {
-		return view.LibInstRow{}, "", false
-	}
-	r := l.page.Rows[l.cursor]
-	var pick *view.LibInstRow
-	for k := range r.Insts {
-		i := &r.Insts[k]
-		if i.ID == "" {
-			continue
-		}
-		if pick == nil || i.InPlan && !pick.InPlan {
-			pick = i
-		}
-	}
-	if pick == nil {
-		if len(r.Insts) == 0 {
-			return view.LibInstRow{}, r.Name, false
-		}
-		return r.Insts[0], r.Name, true
-	}
-	return *pick, r.Name, true
-}
-
 // openFolderOf shows an instance's folder in the file manager.
 func (m *model) openFolderOf(id string) tea.Cmd {
 	if id == "" || m.st == nil {

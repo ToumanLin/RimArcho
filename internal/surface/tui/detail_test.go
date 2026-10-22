@@ -85,11 +85,11 @@ func TestDetailContent(t *testing.T) {
 	if full := plainLines(m.detailLayout(detailOpts{width: 50, full: true})); !strings.Contains(full, "[image · i.imgur.com]") || strings.Contains(full, "images ×") {
 		t.Fatalf("full-screen images:\n%s", full)
 	}
-	// the key appears once: "1001 · o opens the page" (not "o 按 o 打开页面")
+	// the key appears once: "1001 · ctrl+w opens the page"
 	SetLang("zh")
 	zh := plainLines(m.detailLayout(detailOpts{width: 50, descMax: 12}))
 	SetLang("en")
-	if !strings.Contains(got, "1001 · o opens the page") || !strings.Contains(zh, "1001 · o 打开页面") {
+	if !strings.Contains(got, "1001 · ctrl+w opens the page") || !strings.Contains(zh, "1001 · ctrl+w 打开页面") {
 		t.Fatalf("workshop line:\n%s\n%s", got, zh)
 	}
 	for _, l := range m.detailLayout(detailOpts{width: 50, descMax: 12}) {

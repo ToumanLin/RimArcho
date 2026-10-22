@@ -60,6 +60,9 @@ func (m *model) space() tea.Cmd {
 // applied reloads after an edit and reports a failure on the status line.
 func (m *model) applied(err error) bool {
 	m.reload()
+	if m.tab == tabLibrary {
+		m.loadLibrary() // a plan op from Mod 库存 (m, space)
+	}
 	if err != nil {
 		m.say(sayFail, m.humanize(err.Error()))
 		return false

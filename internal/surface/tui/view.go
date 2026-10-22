@@ -232,10 +232,10 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"esc", T("every mod")}, {"enter", T("file changes")}}
 	case m.tab == tabChanges:
 		pairs = [][2]string{{"esc", T("back")}, {"enter", T("file changes")}}
-	case m.tab == tabLibrary && m.libr.typing:
-		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"key:value", T("keep")}, {"-key:value", T("leave out")}}
+	case m.tab == tabLibrary && (m.libr.full || m.libr.detail):
+		pairs = [][2]string{{"↑↓", T("scroll")}, {"enter", T("full screen")}, {"esc", T("back")}, {"F10", T("menu")}, {"?", T("all keys")}}
 	case m.tab == tabLibrary:
-		pairs = [][2]string{{"↑↓", T("choose")}, {"/", T("filter")}, {"enter", T("copies")}, {"n", T("note")}, {"ctrl+o ctrl+w", T("folder / Workshop page")}, {"C", T("this mod's changes")}, {"esc", T("back")}}
+		pairs = m.libPairs()
 	case m.selCount() > 0:
 		// 06 §3.4: what the selection can do, and that another list drops it.
 		prefix = Tf("selected %d", m.selCount())

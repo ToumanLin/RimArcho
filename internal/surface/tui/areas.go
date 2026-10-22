@@ -126,6 +126,9 @@ func (m *model) position() string {
 		p = T("recent changes")
 	case m.tab == tabLibrary:
 		p = T("mod library")
+		if l := &m.libr; l.page != nil && len(l.flat) > 0 {
+			p += " " + markDot + " " + fmt.Sprintf("%d / %d", l.cursor+1, len(l.flat))
+		}
 	case m.full || m.insp != nil:
 		p = m.focus.title() + " › " + name() + Tf(" (%s)", idx())
 		if m.insp != nil {
@@ -168,9 +171,9 @@ func (m *model) popupName() string {
 		return strings.TrimRight(strings.TrimSpace(m.prompt.label), ":：")
 	case m.panel != nil:
 		return m.panel.title
-	case m.editing, m.tab == tabList && m.bar.typing:
+	case m.editing, (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
 		return T("search")
-	case m.tab == tabList && m.bar.open:
+	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
 		return T("filter")
 	case m.armed != nil:
 		return T("confirm")
