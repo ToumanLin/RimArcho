@@ -32,6 +32,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -869,26 +870,58 @@ func stats(dir string) error {
 	drops := map[string]int{}
 	missing := 0
 	t0 := time.Now()
-	for _, id := range ids {
-		b, err := os.ReadFile(rawPath(dir, id))
-		if err != nil {
-			missing++
-			continue
+	// Parse in parallel, chunk by chunk, and post-process in created order.
+	const chunk = 1024
+	for start := 0; start < len(ids); start += chunk {
+		part := ids[start:min(start+chunk, len(ids))]
+		got := make([]*Record, len(part))
+		var wg sync.WaitGroup
+		next := make(chan int)
+		for w := 0; w < runtime.NumCPU(); w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := range next {
+					b, err := os.ReadFile(rawPath(dir, part[i]))
+					if err != nil {
+						continue
+					}
+					r := parse(part[i], idx[part[i]].Created, b)
+					got[i] = &r
+				}
+			}()
 		}
-		r := parse(id, idx[id].Created, b)
-		if r.Status == "ok" && seenHash[r.Hash] {
-			r.Status, r.Drop = "dropped", "duplicate-content"
+		for i := range part {
+			next <- i
 		}
-		seenHash[r.Hash] = true
-		if r.Status == "ok" && r.MM != "1.6" && r.MM != "1.7" {
-			r.Status, r.Drop = "dropped", "version-out-of-scope"
+		close(next)
+		wg.Wait()
+		for k := range part {
+			if got[k] == nil {
+				missing++ // not on disk: dropped by the filter, or never downloaded
+				continue
+			}
+			r := *got[k]
+			if r.Status == "ok" && seenHash[r.Hash] {
+				r.Status, r.Drop = "dropped", "duplicate-content"
+			}
+			seenHash[r.Hash] = true
+			if r.Status == "ok" && r.MM != "1.6" && r.MM != "1.7" {
+				r.Status, r.Drop = "dropped", "version-out-of-scope"
+			}
+			if r.Status != "ok" {
+				drops[r.Drop]++
+			}
+			j, _ := json.Marshal(r)
+			out.Write(append(j, '\n'))
+			// The summary below needs neither the Harmony section nor the assemblies; dropping them
+			// keeps 40k records in a few GB instead of tens.
+			r.Harmony = nil
+			for i := range r.Mods {
+				r.Mods[i].Assemblies = nil
+			}
+			recs = append(recs, r)
 		}
-		if r.Status != "ok" {
-			drops[r.Drop]++
-		}
-		j, _ := json.Marshal(r)
-		out.Write(append(j, '\n'))
-		recs = append(recs, r)
 	}
 	parseTime := time.Since(t0)
 

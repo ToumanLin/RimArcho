@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -178,20 +179,46 @@ func keptHashes(dir string, ix *index) (map[string]bool, error) {
 	// Created order, so the first upload of identical content is the kept one.
 	ids := append([]string(nil), ix.order...)
 	sort.SliceStable(ids, func(a, b int) bool { return ix.m[ids[a]].Created < ix.m[ids[b]].Created })
-	for _, id := range ids {
+	// Judge in parallel (parsing is ~100 ms a log), then mark duplicates in created order.
+	type res struct{ verdict, mm, hash string }
+	got := make([]*res, len(ids))
+	var wg sync.WaitGroup
+	next := make(chan int)
+	for w := 0; w < runtime.NumCPU(); w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range next {
+				e := ix.m[ids[i]]
+				b, err := os.ReadFile(rawPath(dir, e.ID))
+				if err != nil {
+					continue
+				}
+				v, mm, h := judge(e.ID, e.Created, b, nil)
+				got[i] = &res{v, mm, h}
+			}
+		}()
+	}
+	for i, id := range ids {
+		if ix.m[id].Verdict == "" {
+			next <- i
+		}
+	}
+	close(next)
+	wg.Wait()
+	for i, id := range ids {
+		r := got[i]
+		if r == nil {
+			continue
+		}
 		e := ix.m[id]
-		if e.Verdict != "" {
-			continue
+		e.Verdict, e.MM, e.Hash, e.Legacy = r.verdict, r.mm, r.hash, true
+		if e.Verdict == verdictKept && seen[e.Hash] {
+			e.Verdict = dropDuplicate
 		}
-		b, err := os.ReadFile(rawPath(dir, id))
-		if err != nil {
-			continue
-		}
-		e.Verdict, e.MM, e.Hash = judge(id, e.Created, b, seen)
 		if e.Verdict == verdictKept {
 			seen[e.Hash] = true
 		}
-		e.Legacy = true
 		ix.m[id] = e
 		tagged++
 	}
@@ -298,9 +325,10 @@ func even(dir, from, until string, perMonth, workers, maxKept int) error {
 				// Not more than the month still needs (at the observed keep rate this
 				// over-fetches a little); the rest of the day is taken next round.
 				need := perMonth - kept[m]
-				if len(es) > need*2 {
-					batch = append(batch, es[:need*2]...)
-					todo[m][d] = es[need*2:]
+				need += need/8 + 2 // ~90% of judged logs are kept
+				if len(es) > need {
+					batch = append(batch, es[:need]...)
+					todo[m][d] = es[need:]
 				} else {
 					batch = append(batch, es...)
 					todo[m][d] = nil
@@ -371,6 +399,11 @@ func fetchJudge(dir string, ix *index, seen map[string]bool, todo []indexEntry, 
 				}
 				b, code, err := get(fmt.Sprintf("%s/%s/%s/raw", rawBase, account, e.ID))
 				now := time.Now().UTC().Format(time.RFC3339)
+				// Parse outside the lock; only the duplicate check needs the shared hashes.
+				var verdict, mm, hash string
+				if err == nil && code == 200 {
+					verdict, mm, hash = judge(e.ID, e.Created, b, nil)
+				}
 				mu.Lock()
 				switch {
 				case err == nil && code == 404:
@@ -379,7 +412,10 @@ func fetchJudge(dir string, ix *index, seen map[string]bool, todo []indexEntry, 
 					failed++ // no verdict: retried next run
 					fmt.Fprintf(os.Stderr, "raw %s: HTTP %d %v\n", e.ID, code, err)
 				default:
-					e.Verdict, e.MM, e.Hash = judge(e.ID, e.Created, b, seen)
+					e.Verdict, e.MM, e.Hash = verdict, mm, hash
+					if verdict == verdictKept && seen[hash] {
+						e.Verdict = dropDuplicate
+					}
 					e.Fetched = now
 					if e.Verdict == verdictKept && limit > 0 && keptN >= limit {
 						// Another worker reached the limit first: leave it for the next run.
