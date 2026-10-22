@@ -463,7 +463,7 @@ function drawGameLog() {
   if (!p || !p.path) { w.append(el("div", "card empty-state", T("no Player.log found"))); return; }
   const mon = p.monitor;
   if (!mon) L.tab = 0;
-  const grid = el("div", "cols two");
+  const grid = el("div", "cols two logcols");
   const list = el("section", "card col focus");
   if (mon) {
     const tabs = el("div", "ltabs");
@@ -501,9 +501,14 @@ function drawGameLog() {
   ana.hidden = true;
   ana.append(el("div", "col-head", ""), el("div", "scroll"));
   ana.firstChild.append(el("span", "anum", "3"), T("Archo log analysis"));
+  // the analysis above the log text it explains; the gaps between the three cards drag
   const side = el("div", "logside");
-  side.append(det, ana);
-  grid.append(list, side);
+  const hs = el("div", "hsplit");
+  hs.hidden = true;
+  side.append(ana, hs, det);
+  const vs = el("div", "split logsplit");
+  grid.append(list, vs, side);
+  logSplits(grid, list, vs, ana, hs);
   w.append(grid);
   // 1 the runs (or the monitor's entries), 2 the log text of the one picked
   resetAreas();
@@ -681,6 +686,47 @@ function showLines(box, lines, card) {
   setAna(card);
 }
 
+// logSplits: the gap between the list and the right side drags the list's width; the gap
+// under Archo 日志分析 drags its height. Kept in ui.gui.log.left / ui.gui.log.ana;
+// double-click goes back to the default.
+const LOG_LEFT = "ui.gui.log.left", LOG_ANA = "ui.gui.log.ana";
+const logSize = { left: null, ana: null };
+function applyLogSize(grid) {
+  if (logSize.left) grid.style.setProperty("--log-left", logSize.left + "px");
+  else grid.style.removeProperty("--log-left");
+  if (logSize.ana) grid.style.setProperty("--log-ana", logSize.ana + "px");
+  else grid.style.removeProperty("--log-ana");
+  grid.classList.toggle("ana-sized", !!logSize.ana);
+}
+function logSplits(grid, list, vs, ana, hs) {
+  if (logSize.left == null) {
+    Promise.all([api.Setting(LOG_LEFT), api.Setting(LOG_ANA)]).then(([l, a]) => {
+      logSize.left = +l || 0; logSize.ana = +a || 0; applyLogSize(grid);
+    }).catch(() => { logSize.left = 0; logSize.ana = 0; });
+  } else applyLogSize(grid);
+  const drag = (sp, key, axis, start, clamp) => {
+    sp.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      const p0 = axis === "x" ? e.clientX : e.clientY, v0 = start();
+      sp.classList.add("drag");
+      document.body.classList.add(axis === "x" ? "resizing" : "resizing-y");
+      const move = (m) => { logSize[key] = clamp(Math.round(v0 + (axis === "x" ? m.clientX : m.clientY) - p0)); applyLogSize(grid); };
+      const up = () => {
+        sp.classList.remove("drag");
+        document.body.classList.remove("resizing", "resizing-y");
+        removeEventListener("mousemove", move);
+        removeEventListener("mouseup", up);
+        api.SetSetting(key === "left" ? LOG_LEFT : LOG_ANA, String(logSize[key])).catch(() => {});
+      };
+      addEventListener("mousemove", move);
+      addEventListener("mouseup", up);
+    });
+    sp.addEventListener("dblclick", () => { logSize[key] = 0; applyLogSize(grid); api.SetSetting(key === "left" ? LOG_LEFT : LOG_ANA, "").catch(() => {}); });
+  };
+  drag(vs, "left", "x", () => list.getBoundingClientRect().width, (v) => Math.max(260, Math.min(grid.clientWidth - 320, v)));
+  drag(hs, "ana", "y", () => ana.getBoundingClientRect().height, (v) => Math.max(80, Math.min(grid.clientHeight - 140, v)));
+}
+
 // setAna fills the Archo 日志分析 card with a pattern card, or hides it (null).
 function setAna(card) {
   const ana = $("#screen .ana-card");
@@ -688,6 +734,8 @@ function setAna(card) {
   const sc = ana.querySelector(".scroll");
   sc.innerHTML = "";
   ana.hidden = !card;
+  const hs = ana.nextElementSibling;
+  if (hs && hs.classList.contains("hsplit")) hs.hidden = !card;
   if (card) sc.append(patternCard(card));
 }
 
@@ -696,17 +744,25 @@ function setAna(card) {
 // this list.
 function patternCard(c) {
   const d = el("div", "pcard");
-  const h = el("div", "ph");
-  h.append(el("span", "note", T("from shared logs, not a conclusion about your list")));
-  d.append(h);
+  // first what it does to the game and how much that matters, then what it usually is and
+  // what to try; the causes, the other fixes and the numbers are quieter, and the source
+  // (shared logs, not a verdict on this list) closes the card
+  if (c.levelText) {
+    const h = el("div", "psev");
+    h.append(el("span", "sev " + c.level, c.levelText), el("span", "impact", c.impact));
+    d.append(h);
+  }
   if (c.summary) d.append(el("div", "ps", c.summary));
-  const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v", v)); d.append(r); };
-  if (c.causes && c.causes.length) row(T("common causes"), c.causes.join(T("; ")));
-  row(T("next step"), c.next);
-  if (c.fixes && c.fixes.length) row(T("kinds of fix"), c.fixes.join(" · "));
+  if (c.next) d.append(el("div", "pnext", c.next));
   if (c.known) d.append(el("div", "ps known", c.known));
+  const more = el("div", "pmore");
+  const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v", v)); more.append(r); };
+  if (c.causes && c.causes.length) row(T("common causes"), c.causes.join(T("; ")));
+  if (c.fixes && c.fixes.length) row(T("kinds of fix"), c.fixes.join(" · "));
+  if (more.childNodes.length) d.append(more);
   const facts = [c.seen, c.gone].filter(Boolean).join(" · ");
   if (facts) d.append(el("div", "pm", facts));
+  d.append(el("div", "pm note", T("from shared logs, not a conclusion about your list")));
   return d;
 }
 

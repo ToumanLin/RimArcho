@@ -104,6 +104,10 @@ func TestPatternCard(t *testing.T) {
 		len(c.Causes) == 0 || !strings.HasPrefix(c.Next, "try first: ") || len(c.Fixes) < 2 || !strings.Contains(c.Seen, "shared 1.6 logs") {
 		t.Fatalf("card: %+v", c)
 	}
+	// a def that names a missing def: an error while loading, medium
+	if c.Level != "medium" || c.LevelText != "severity medium" || !strings.Contains(c.Impact, "while loading") {
+		t.Errorf("severity: %q %q %q", c.Level, c.LevelText, c.Impact)
+	}
 	lines := c.Lines()
 	if !strings.HasPrefix(lines[0], "community background · ") {
 		t.Errorf("card lines: %q", lines)

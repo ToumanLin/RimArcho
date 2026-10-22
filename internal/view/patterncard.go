@@ -13,13 +13,19 @@ import (
 // not a conclusion about the player's list: the attribution above it stays RimArcho's own.
 // Only clusters that match a pattern get one (fallback rules say nothing and get none).
 type PatternCard struct {
-	Ref     string   `json:"ref"`               // pattern:g:<id> (the CLI's and MCP's reference)
-	Summary string   `json:"summary,omitempty"` // "这类报错通常是：…"
-	Causes  []string `json:"causes,omitempty"`
-	Next    string   `json:"next,omitempty"` // the first kind of fix, as a step
-	Fixes   []string `json:"fixes,omitempty"`
-	Seen    string   `json:"seen,omitempty"` // how often shared logs show it
-	Gone    string   `json:"gone,omitempty"` // repeat uploads: went away after small list changes
+	Ref string `json:"ref"` // pattern:g:<id> (the CLI's and MCP's reference)
+	// Level is how much it matters, from the pattern's stage and its first fix: high (the
+	// save), medium (loading, play), low (noise, or "usually safe to ignore"); "" unknown.
+	// Impact says it in a sentence, LevelText in a word.
+	Level     string   `json:"level,omitempty"`
+	LevelText string   `json:"levelText,omitempty"`
+	Impact    string   `json:"impact,omitempty"`
+	Summary   string   `json:"summary,omitempty"` // "这类报错通常是：…"
+	Causes    []string `json:"causes,omitempty"`
+	Next      string   `json:"next,omitempty"` // the first kind of fix, as a step
+	Fixes     []string `json:"fixes,omitempty"`
+	Seen      string   `json:"seen,omitempty"` // how often shared logs show it
+	Gone      string   `json:"gone,omitempty"` // repeat uploads: went away after small list changes
 	// Known: a known error of the cluster's source mod (a mod-specific pattern).
 	Known string `json:"known,omitempty"`
 }
@@ -89,6 +95,10 @@ func patternCard(st *app.LoadoutState, lc *app.LogCluster) *PatternCard {
 		if len(c.Fixes) == 1 {
 			c.Fixes = nil // the next step says it already
 		}
+		c.Level, c.Impact = severity(g)
+		if c.Level != "" {
+			c.LevelText = T("severity " + c.Level)
+		}
 		c.Seen = Tf("seen in %s of %s shared %s logs", patterns.Thousands(g.Logs), patterns.Thousands(d.Logs), d.Game)
 		c.Gone = goneLine(g.Res)
 	}
@@ -104,6 +114,23 @@ func patternCard(st *app.LoadoutState, lc *app.LogCluster) *PatternCard {
 			TokName(st, sourceTok(st, p.Mod)), patterns.Thousands(p.Logs), when)
 	}
 	return c
+}
+
+// severity grades a pattern for the player: what it does to the game, and how much that
+// matters. A pattern whose first fix is "ignore" is low whatever its stage.
+func severity(g *patterns.Pattern) (string, string) {
+	if g.Stage == "noise" || len(g.Fixes) > 0 && g.Fixes[0] == "ignore" {
+		return "low", T("usually does not affect the game")
+	}
+	switch g.Stage {
+	case "save":
+		return "high", T("touches the save: it may not load, or lose things")
+	case "load":
+		return "medium", T("an error while loading: what it names may be missing or not work")
+	case "runtime":
+		return "medium", T("an error during play: it may repeat, stutter or break a feature")
+	}
+	return "", ""
 }
 
 // sourceTok is the instance token of the enabled mod with packageId pkg (else pkg:<pkg>).
@@ -196,6 +223,9 @@ func (c *PatternCard) Lines() []string {
 		if v != "" {
 			out = append(out, "  "+k+"  "+v)
 		}
+	}
+	if c.LevelText != "" {
+		out = append(out, "  "+c.LevelText+" · "+c.Impact)
 	}
 	if c.Summary != "" {
 		out = append(out, "  "+c.Summary)
