@@ -63,6 +63,8 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { m.tab = tabProblems; return m.ensureProblems() }
 	case "changes":
 		return func(m *model) tea.Cmd { m.tab = tabChanges; m.loadChanges(); return nil }
+	case "library":
+		return func(m *model) tea.Cmd { return m.openLibrary() }
 	case "rescan":
 		return func(m *model) tea.Cmd { return m.startScan() }
 	case "analyze":

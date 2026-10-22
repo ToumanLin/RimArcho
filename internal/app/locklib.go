@@ -80,6 +80,10 @@ type MoveResult struct {
 	After  *store.Mod
 	Swap   *EditResult // the plan entry moved to the instance at the new place
 	DryRun bool
+	// Origin: .rimarcho/origin.json is (or would be) written because the folder had none.
+	Origin bool
+	// Plans are the plans that use it; they keep using it (the instance is the same).
+	Plans []string
 }
 
 // MoveToLibrary moves a locked copy RimArcho made in Mods/ (one with .rimarcho/origin.json)
@@ -106,9 +110,11 @@ func (a *App) MoveToLibrary(ref string, dryRun bool) (*MoveResult, error) {
 	return a.moveToLibrary(st, l.Copy, dryRun)
 }
 
+// moveToLibrary moves a folder of Mods/ into the lock library and points its instance at
+// the new place, so the instance (and every plan's entry) stays the same (06 §2.9, 04 §7.4).
 func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (*MoveResult, error) {
-	if m.Kind != source.Local || m.Origin == "" {
-		return nil, fmt.Errorf("%s is not a copy RimArcho made in Mods/; RimArcho moves nothing else out of Mods/", st.Ix.Ref(m.ID))
+	if m.Kind != source.Local {
+		return nil, fmt.Errorf("%s is not in Mods/; RimArcho moves nothing else into the lock library", st.Ix.Ref(m.ID))
 	}
 	from := st.Ix.ModDir(m)
 	if source.IsLink(from) {
@@ -117,13 +123,21 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (*MoveR
 	if real, err := source.RealPath(from); err == nil {
 		from = real
 	}
+	if out := linksOutside(from); len(out) > 0 {
+		return nil, fmt.Errorf("%s has links that point outside it (%s); RimArcho does not move it, move it yourself", from, strings.Join(out, ", "))
+	}
 	root := a.lockRoot(st.Ix.Env)
 	r := &MoveResult{Mod: m, From: from, To: filepath.Join(root, freeName(root, filepath.Base(from))), DryRun: dryRun,
-		Copied: !strings.EqualFold(filepath.VolumeName(from), filepath.VolumeName(root))}
+		Copied: !strings.EqualFold(filepath.VolumeName(from), filepath.VolumeName(root)), Origin: !hasOrigin(from)}
+	var err error
+	if r.Plans, err = a.usedBy(st, m.ID); err != nil {
+		return nil, err
+	}
 	if dryRun {
 		return r, nil
 	}
-	if _, err := a.lockSource(st.Ix, true); err != nil {
+	src, err := a.lockSource(st.Ix, true)
+	if err != nil {
 		return nil, err
 	}
 	if err := a.checkRoots(from); err != nil {
@@ -135,6 +149,14 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (*MoveR
 		}
 	} else if err := a.copyMove(from, r.To); err != nil {
 		return nil, err
+	}
+	if r.Origin {
+		if err := a.writeOrigin(st.Ix, m, r.To); err != nil {
+			return r, fmt.Errorf("moved to %s, but .rimarcho/origin.json could not be written: %v", r.To, err)
+		}
+	}
+	if err := a.Store.RelocateInstance(m.ID, src.ID, filepath.Base(r.To), r.To); err != nil {
+		return r, err
 	}
 	if _, err := a.Scan(false); err != nil {
 		return nil, err

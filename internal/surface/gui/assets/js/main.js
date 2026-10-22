@@ -15,6 +15,7 @@ import * as shell from "./shell.js";
 import * as homePage from "./home.js";
 import * as guide from "./guide.js";
 import * as plans from "./plans.js";
+import * as library from "./library.js";
 import { initExchange, exchange } from "./exchange.js";
 import { icon } from "./icons.js";
 import * as motion from "./motion.js";
@@ -113,14 +114,13 @@ function planActions() {
 let lastList = 1;
 
 // The sidebar's entries in shift+1–7 order, 在玩 then 库 (06 §3.5; view.Nav).
-const NAV = ["home", "needs", "log", "changes", "plan", "packs", "env"];
+const NAV = ["home", "needs", "log", "library", "plan", "packs", "env"];
 
 // go opens a sidebar page; "plan" is the current plan's editor, "plan:<id>" a plan (it
 // becomes current: no game file is written), "plan:new" the new-plan dialog, "pack:<name>"
 // a pack on the packs page.
 async function go(id) {
   shell.navigated();
-  if (id === "library") id = "changes";
   if (id === "plan:new") return plans.newPlan();
   if (id.startsWith("plan:")) {
     if (!(await plans.openPlan(+id.slice(5)))) return;
@@ -143,6 +143,7 @@ async function openPage(id) {
     case "packs": return scr.packs();
     case "env": return scr.environment();
     case "changes": return scr.changes();
+    case "library": return library.open();
     case "log": return scr.gameLog(undefined, true);
     case "settings": return scr.settings();
     case "guide": return guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
@@ -207,6 +208,7 @@ function renderHints() {
   h.innerHTML = "";
   let list = actions();
   if (S.screen === "full") list = [{ key: "esc", label: T("back") }];
+  else if (S.screen === "library") list = library.hintList();
   else if (S.screen) list = [{ key: "shift+1–7", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
   const c = S.focus < 3 ? col() : null;
   if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)), el("span", "sep", "·"));
@@ -386,7 +388,7 @@ async function preview(what) {
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", log: "log", settings: "settings", packs: "packs", "env-page": "env" };
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", "env-page": "env" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
@@ -540,6 +542,7 @@ function onKey(e) {
     if (k === "?" && S.screen !== "full") { e.preventDefault(); return pop.help(); }
     if (S.screen === "home") return homePage.homeKey(e);
     if (S.screen === "needs") return scr.needsKey(e);
+    if (S.screen === "library") return library.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     if (S.screen === "full") return scr.fullKey(e);
     return;
@@ -661,6 +664,7 @@ async function start() {
   guide.initGuide(ui);
   initExchange(ui);
   plans.initPlans(ui);
+  library.initLibrary(ui);
   wireLists(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);

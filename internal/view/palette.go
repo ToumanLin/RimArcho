@@ -37,6 +37,7 @@ var Commands = []Command{
 	{"redo", "重做", "redo", "ctrl+r"},
 	{"needs", "需要处理", "needs attention", "! problems"},
 	{"changes", "最近变化", "recent changes", "c history"},
+	{"library", "Mod 库存", "mod library", "all mods, copies, sizes, filter, clean up"},
 	{"rescan", "重新扫描", "rescan", "R scan"},
 	{"analyze", "重新检查文件", "check the files again", "A analyze"},
 	{"log", "选择日志", "choose a log", "Player.log"},

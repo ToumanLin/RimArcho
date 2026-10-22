@@ -131,6 +131,9 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.tab == tabChanges {
 				m.loadChanges()
 			}
+			if m.tab == tabLibrary {
+				m.loadLibrary()
+			}
 		}
 		return m, m.requestDetail()
 	case analyzeLineMsg, analyzeDoneMsg:
@@ -188,6 +191,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.inspectKey(s)
 	case m.editing:
 		return m.filterKey(k)
+	case m.tab == tabLibrary && m.libr.typing:
+		return m.libTypeKey(k)
 	case m.full:
 		return m.fullKey(s)
 	}
@@ -236,6 +241,17 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 			return m.requestDetail()
 		}
 		return m.changesKey(s)
+	case tabLibrary:
+		if s == "esc" {
+			if m.libr.query != "" {
+				m.libr.query = ""
+				m.loadLibrary()
+				return nil
+			}
+			m.tab = tabList
+			return m.requestDetail()
+		}
+		return m.libraryKey(s)
 	}
 	if m.detailFocus {
 		if cmd, ok := m.detailKey(s); ok {

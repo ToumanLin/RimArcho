@@ -124,6 +124,8 @@ func (m *model) position() string {
 		}
 	case m.tab == tabChanges:
 		p = T("recent changes")
+	case m.tab == tabLibrary:
+		p = T("mod library")
 	case m.full || m.insp != nil:
 		p = m.focus.title() + " › " + name() + Tf(" (%s)", idx())
 		if m.insp != nil {

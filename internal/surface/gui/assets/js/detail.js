@@ -42,9 +42,14 @@ export async function showDetail(it, staged) {
 
 function draw(d, keepScroll) {
   S.detail = d;
-  const sc = $(".detail .scroll");
+  renderDetail(d, $("#detail"), $(".detail .scroll"), keepScroll);
+}
+
+// renderDetail draws a detail into box (scrolled by sc). Mod 库存 (06 §2.9) draws its
+// copies' details with it; opts.page leaves out what acts on the plan's selection (the tag
+// editor, the full detail).
+export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   const top = keepScroll ? sc.scrollTop : 0;
-  const box = $("#detail");
   box.innerHTML = "";
   const img = el("img", "thumb");
   img.alt = "";
@@ -87,7 +92,7 @@ function draw(d, keepScroll) {
       case "tags":
         if (!f.list || !f.list.length) v.append(el("span", "dim", T("none")));
         for (const t of f.list || []) v.append(el("span", "chip", t));
-        {
+        if (!opts.page) {
           const a = el("span", "link", " " + T("edit"));
           a.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "tags" }));
           v.append(a);
@@ -134,9 +139,11 @@ function draw(d, keepScroll) {
   if (d.history) {
     box.append(el("div", "sub", T("history")), el("div", "history", d.history));
   }
-  const more = el("div", "sub link", T("technical information · enter"));
-  more.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "full" }));
-  box.append(more);
+  if (!opts.page) {
+    const more = el("div", "sub link", T("technical information · enter"));
+    more.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "full" }));
+    box.append(more);
+  }
   sc.scrollTop = top;
 }
 

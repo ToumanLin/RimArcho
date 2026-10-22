@@ -36,6 +36,8 @@ func (m *model) View() string {
 		content = m.needLines(body)
 	case m.tab == tabChanges:
 		content = m.changeLines(body)
+	case m.tab == tabLibrary:
+		content = m.libraryLines(body)
 	case m.full:
 		content, ps = m.fullLines(body)
 	case m.pos != nil:
@@ -214,6 +216,10 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
 	case m.tab == tabChanges:
 		pairs = [][2]string{{"esc", T("back")}, {"enter", T("file changes")}}
+	case m.tab == tabLibrary && m.libr.typing:
+		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"key:value", T("keep")}, {"-key:value", T("leave out")}}
+	case m.tab == tabLibrary:
+		pairs = [][2]string{{"↑↓", T("choose")}, {"/", T("filter")}, {"enter", T("copies")}, {"esc", T("back")}}
 	case m.selCount() > 0:
 		// 06 §3.4: what the selection can do, and that another list drops it.
 		prefix = Tf("selected %d", m.selCount())

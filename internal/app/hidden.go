@@ -215,6 +215,12 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	case st.List.Index(m.ID) >= 0:
 		return nil, fmt.Errorf("%s is enabled; disable it first", st.Ix.Ref(m.ID))
 	}
+	// Another plan (of any environment of this game) would lose it too: say which (06 §2.9).
+	if ps, err := a.usedBy(st, m.ID); err != nil {
+		return nil, err
+	} else if len(ps) > 0 {
+		return nil, fmt.Errorf("%s is used by %s; take it out of them first (archo library remove-from-plans %s)", st.Ix.Ref(m.ID), joinPlans(ps), st.Ix.Ref(m.ID))
+	}
 	var root string
 	for _, s := range st.Ix.Sources {
 		if s.ID == m.SourceID {

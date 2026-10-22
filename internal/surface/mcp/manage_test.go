@@ -224,6 +224,24 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("launch_game", map[string]any{"dry_run": true}, "launch", "--dry-run"),
 		s("launch_game", nil, "launch"),
 		s("plan_history", nil, "loadout", "log"),
+		// 06 §2.9: the library, moving a spare copy into the lock library, removing from plans.
+		s("list_library", map[string]any{"include": []string{"state:unused"}}, "library", "--include", "state:unused"),
+		func() manageStep {
+			a := pick("A", "local")
+			return manageStep{"manage_library", map[string]any{"action": "move_to_locked", "refs": []string{a}, "dry_run": true}, []string{"library", "move-to-locked", a, "--dry-run"}}
+		},
+		func() manageStep {
+			a := pick("A", "local")
+			return manageStep{"manage_library", map[string]any{"action": "move_to_locked", "refs": []string{a}}, []string{"library", "move-to-locked", a}}
+		},
+		func() manageStep {
+			l := lineage("A", "workshop")
+			return manageStep{"list_library", map[string]any{"lineage": l}, []string{"library", "--lineage", l}}
+		},
+		func() manageStep {
+			h := r("Harmony")
+			return manageStep{"manage_library", map[string]any{"action": "remove_from_plans", "refs": []string{h}}, []string{"library", "remove-from-plans", h}}
+		},
 	}
 }
 
