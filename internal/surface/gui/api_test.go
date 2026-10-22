@@ -277,7 +277,7 @@ func TestPackBuildBackground(t *testing.T) {
 		return nil
 	}
 	start := time.Now()
-	if _, err := api.PackBuild("first"); err != nil {
+	if _, err := api.PackBuild("first", 0); err != nil {
 		t.Fatal(err)
 	}
 	if time.Since(start) > 2*time.Second {
@@ -298,7 +298,7 @@ func TestPackBuildBackground(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the pages wait for the build")
 	}
-	if _, err := api.PackBuild("second"); err == nil {
+	if _, err := api.PackBuild("second", 0); err == nil {
 		t.Fatal("a second build started")
 	}
 	waitPack := func(want string) string {

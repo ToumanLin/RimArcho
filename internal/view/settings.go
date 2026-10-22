@@ -212,6 +212,21 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	} else {
 		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
 	}
+	// 贴图优化 (08 §5.2): its own page (the interfaces open it; archo textures is not a
+	// settings command), and where the encoder is.
+	tool := a.TextureTool()
+	toolNote := T("the DDS encoder (todds) is not installed")
+	if tool.Err == "" {
+		toolNote = Tf("todds %s · %s", tool.Version, tool.Path)
+	} else if tool.Path != "" {
+		toolNote = tool.Err
+	}
+	out = append(out, SettingGroup{Title: T("texture optimisation"), Items: []SettingItem{
+		{Label: T("convert textures to DDS"), Note: T("the DDS of mods' PNG textures, next to them"),
+			Actions: []SettingAction{{Label: T("convert textures to DDS…"), Argv: []string{"textures"}}}},
+		{Label: T("the DDS encoder"), Value: cmds.Setting(a, "textures.todds"), Edit: "path", Argv: []string{"config", "set", "textures.todds", "{}"},
+			Note: toolNote + " · " + T("empty: RimArcho's own copy; or a todds you have, e.g. RimSort's")},
+	}})
 	out = append(out, SettingGroup{Title: T("packs"), Items: []SettingItem{
 		{Label: T("where packs are kept"), Value: cmds.Setting(a, "pack.dir"), Edit: "path", Argv: []string{"config", "set", "pack.dir", "{}"},
 			Note: T("a full pack takes as much space as its mods")},

@@ -29,6 +29,7 @@ const (
 	FieldVersions  = "versions"
 	FieldUpdated   = "updated"
 	FieldPlayed    = "played"
+	FieldTextures  = "textures" // 贴图优化: the DDS RimArcho wrote (Mod 库存)
 	FieldLanguages = "languages"
 	FieldDeps      = "deps"
 	FieldConflicts = "conflicts"
@@ -183,6 +184,7 @@ func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) 
 	if !i.Played.IsZero() {
 		add(FieldPlayed, T("last played"), LongDate(i.Played), nil)
 	}
+	add(FieldTextures, T("textures"), TextureField(i), nil)
 	if i.Mod != nil {
 		fs = append(fs, tailFields(a, st, i.Mod, d)...)
 	}

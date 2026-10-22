@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -221,6 +222,32 @@ func (s *Store) TextureMods() (map[string]TextureMod, error) {
 		}
 		m.Mips, m.MadeAt = mips != 0, time.Unix(0, made)
 		out[m.InstanceID] = m
+	}
+	return out, rows.Err()
+}
+
+// SnapshotsKey changes when a scan adds or removes snapshots (for caching SnapshotsWithPNG).
+func (s *Store) SnapshotsKey() string {
+	var n, mx int64
+	s.DB.QueryRow(`SELECT count(*), coalesce(max(id), 0) FROM snapshot`).Scan(&n, &mx)
+	return fmt.Sprintf("%d.%d", n, mx)
+}
+
+// SnapshotsWithPNG are the snapshots with a PNG under a Textures/ folder (the copies whose
+// textures can be converted). It reads every file row: cache it with SnapshotsKey.
+func (s *Store) SnapshotsWithPNG() (map[int64]bool, error) {
+	rows, err := s.DB.Query(`SELECT DISTINCT snapshot_id FROM snapshot_file WHERE rel_path LIKE '%textures/%.png'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
 	}
 	return out, rows.Err()
 }

@@ -156,6 +156,8 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		}
 	case "uninstall":
 		return func(m *model) tea.Cmd { return m.uninstallPanel() }
+	case "textures":
+		return func(m *model) tea.Cmd { return m.texturesPanel() }
 	case "help":
 		return func(m *model) tea.Cmd { return m.helpPage() }
 	case "quit":

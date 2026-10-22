@@ -7,6 +7,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 // The packs screen (08 §5, 08 §5.3): like choosing a version in a game launcher — the packs,
@@ -100,7 +101,7 @@ func PackVersions(a *app.App, p *app.Pack) string {
 // ---- building: the steps (preview and progress) ----
 
 // The steps of a build as the screen draws them, in order.
-var packSteps = []string{"check", "sort", "copy", "write", "ready"}
+var packSteps = []string{"check", "sort", "copy", "textures", "write", "ready"}
 
 // Levels of a step or a note: what the player must look at.
 const (
@@ -128,13 +129,33 @@ type PackPreview struct {
 }
 
 // PreviewPack runs a dry-run build and says what it found.
-func PreviewPack(a *app.App, name string) (*PackPreview, error) {
+func PreviewPack(a *app.App, name string, tex int) (*PackPreview, error) {
 	pl, err := a.PlanPack(name, false)
 	if err != nil {
 		return nil, err
 	}
+	PlanTextures(a, pl, tex)
 	pl.Measure(a.PacksDir())
 	return PreviewOf(pl, a.PacksDir()), nil
+}
+
+// PackTextureOptions reads the window's texture choice: 0 off, 100 预转换 (full size), a
+// smaller percent 精简.
+func PackTextureOptions(tex int) *textures.Options {
+	if tex <= 0 {
+		return nil
+	}
+	o := textures.Options{Scale: tex}.Normal()
+	return &o
+}
+
+// PlanTextures makes a plan convert textures as tex says (and finds the encoder for the
+// preview). Call it with the app held, before Measure.
+func PlanTextures(a *app.App, pl *app.PackPlan, tex int) {
+	if o := PackTextureOptions(tex); o != nil && pl.R.Pack != nil {
+		pl.WithTextures(o)
+		pl.R.Tool = a.TextureTool()
+	}
 }
 
 // PreviewOf turns a measured plan into the diagram. It reads only the plan, so the window
@@ -195,12 +216,12 @@ func PreviewOf(pl *app.PackPlan, packsDir string) *PackPreview {
 	switch {
 	case r.Free < 0:
 		cp.Facts = append(cp.Facts, T("free space unknown"))
-	case r.Free < r.Need+app.SpaceMargin:
+	case r.Free < max(r.Need, r.Peak)+app.SpaceMargin:
 		cp.Level = LevelBad
 		cp.Facts = append(cp.Facts, Tf("only %s free on %s: not enough", SizeText(r.Free), driveOf(packsDir)))
-	case r.Free-r.Need < 10<<30:
+	case r.Free-max(r.Need, r.Peak) < 10<<30:
 		cp.Level = LevelWarn
-		cp.Facts = append(cp.Facts, Tf("%s free on %s; %s left after", SizeText(r.Free), driveOf(packsDir), SizeText(r.Free-r.Need)))
+		cp.Facts = append(cp.Facts, Tf("%s free on %s; %s left after", SizeText(r.Free), driveOf(packsDir), SizeText(r.Free-r.Final)))
 	default:
 		cp.Facts = append(cp.Facts, Tf("%s free on %s", SizeText(r.Free), driveOf(packsDir)))
 	}
@@ -214,9 +235,46 @@ func PreviewOf(pl *app.PackPlan, packsDir string) *PackPreview {
 		write.Facts[1] = T("Core and the DLCs come from the game")
 	}
 	ready := PackStep{Key: "ready", Title: T("ready to play"), Facts: []string{Tf("for %s", r.Pack.Game), T("played with its own saves")}}
-	pv.Steps = append(pv.Steps, check, sorted, cp, write, ready)
-	pv.Ok = cp.Level != LevelBad
+	tex := textureStep(r)
+	pv.Steps = append(pv.Steps, check, sorted, cp, tex, write, ready)
+	pv.Ok = cp.Level != LevelBad && tex.Level != LevelBad
 	return pv
+}
+
+// textureStep is the build's 贴图 box: off (the PNGs are copied as they are), 预转换 at full
+// size or 精简 when scaled, with what it costs and saves (08 §5.2).
+func textureStep(r *app.PackBuild) PackStep {
+	o := r.TexOptions
+	if o == nil {
+		return PackStep{Key: "textures", Title: T("textures"), Level: LevelOff, Facts: []string{T("PNGs stay as they are")}}
+	}
+	title := T("pre-convert textures")
+	if o.Scale < 100 {
+		title = T("slim textures") + " · " + Tf("%d%%", o.Scale)
+	}
+	s := PackStep{Key: "textures", Title: title}
+	e := r.TexEst
+	if e.Files == 0 {
+		s.Facts = []string{T("nothing to convert")}
+		return s
+	}
+	s.Facts = append([]string{Tf("%d PNG become DDS; the PNGs are not copied", e.Files)}, EstimateFacts(e)[1:]...)
+	s.Facts = append(s.Facts, Tf("the pack is about %s after (up to %s while converting)", SizeText(r.Final), SizeText(r.Peak)))
+	if r.TexSkipped > 0 {
+		s.More = append(s.More, Tf("%d keep their PNG (a DDS or another format of the same name)", r.TexSkipped))
+	}
+	if r.Final > r.Need {
+		s.Level = LevelWarn
+		s.More = append(s.More, T("at full size the pack grows: DDS take more disk than PNG"))
+	}
+	if t := r.Tool; t != nil && t.Err != "" {
+		s.Level = LevelBad
+		s.More = append([]string{T("the DDS encoder (todds) is not installed")}, s.More...)
+		if t.Path != "" {
+			s.More[0] = t.Err
+		}
+	}
+	return s
 }
 
 func name(r *app.PackBuild) string {
@@ -234,6 +292,8 @@ func stepTitle(k string) string {
 		return T("sort for the pack")
 	case "copy":
 		return T("copy the mods")
+	case "textures":
+		return T("textures")
 	case "write":
 		return T("write pack.json")
 	}
@@ -277,10 +337,19 @@ func ProgressOf(p *app.BuildProgress) PackProgress {
 		if p.BytesTotal > 0 {
 			out.Frac = float64(p.Bytes) / float64(p.BytesTotal)
 		}
+	case app.StepTextures:
+		out.Step = 3
+		out.Text = Tf("converting %d of %d textures", p.Files, p.FilesTotal)
+		if p.Mod != "" {
+			out.Text += " · " + p.Mod
+		}
+		if p.FilesTotal > 0 {
+			out.Frac = float64(p.Files) / float64(p.FilesTotal)
+		}
 	case app.StepWrite:
-		out.Step, out.Text, out.Frac = 3, T("writing pack.json…"), 1
+		out.Step, out.Text, out.Frac = 4, T("writing pack.json…"), 1
 	case app.StepDone:
-		out.Step, out.Text, out.Frac, out.Done, out.Ok = 4, T("ready to play"), 1, true, true
+		out.Step, out.Text, out.Frac, out.Done, out.Ok = 5, T("ready to play"), 1, true, true
 	}
 	return out
 }

@@ -53,6 +53,8 @@ const (
 	ActUnpin           = "unpin"            // Refs[0]: restore the workshop copy (confirm first)
 	ActTrash           = "trash"            // Refs[0]: folder to the recycle bin (confirm first)
 	ActIgnore          = "ignore"           // Problem: keep as it is (ignore the problem)
+	ActTextures        = "textures"         // Refs: convert their textures to DDS again (confirm first)
+	ActTexClean        = "textures-clean"   // Refs: delete the DDS RimArcho wrote (confirm first)
 )
 
 // Option is one choice of a choose-disable action.
@@ -289,6 +291,16 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			add(Need{Group: GroupHidden, Text: Tf("%s is pinned to a copy, and the workshop version has been updated since", nm(x)),
 				Actions: []Action{viewAction(T("see what changed"), "mod", TokRef(st, y), "--diff", TokRef(st, x)), unpin(st, x)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("%s: the Workshop has a newer version", nm(x)), Why: T("the list uses a locked copy; see what changed, or use the Workshop version"), Evidence: ev})
+		case "texture.stale":
+			ref := TokRef(st, x)
+			add(Need{Group: GroupHidden, Text: Tf("%s changed since its textures were converted", nm(x)),
+				Actions: []Action{
+					{Kind: ActTextures, Key: "T", Label: T("convert again"), Refs: []string{ref}, Confirm: T("press T again to convert its textures again"),
+						Warn: T("RimArcho writes the DDS again next to the PNGs that changed"), Done: Tf("converted the textures of %s again", nm(x))},
+					{Kind: ActTexClean, Key: "C", Label: T("remove the converted textures"), Refs: []string{ref}, Confirm: T("press C again to delete the DDS RimArcho wrote"),
+						Warn: T("the DDS RimArcho wrote are deleted; the PNGs stay and the game uses them again"), Done: Tf("removed the converted textures of %s", nm(x))},
+				}, Counted: true, Mods: ids, Status: s,
+				Title: Tf("%s changed since its textures were converted", nm(x)), Why: T("the game may show its old textures: convert them again, or remove them"), Evidence: ev})
 		case "mod.hidden-residue":
 			add(Need{Group: GroupHidden, Text: Tf("%s is hidden and no longer subscribed; its folder is left over", nm(x)),
 				Actions: []Action{trash(st, x)}, Counted: true, Mods: ids, Status: s,
@@ -631,6 +643,14 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		_, err = a.Trash(act.Refs[0], false)
 	case ActIgnore:
 		_, err = a.IgnoreProblem(act.Problem, false)
+	case ActTextures:
+		r, err := a.OptimizeTextures(app.TextureRun{Refs: act.Refs})
+		if err != nil {
+			return "", err
+		}
+		return TextureRunText(r), nil
+	case ActTexClean:
+		_, err = a.CleanTextures(act.Refs, app.TexRefs, false)
 	default:
 		return "", fmt.Errorf("%s is not a data action", act.Kind)
 	}

@@ -2,6 +2,7 @@ package app
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -475,6 +476,27 @@ func (a *App) OptimizeTextures(run TextureRun) (*TextureReport, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	// A stop asked from another process (the window runs this as a child): the stop file.
+	stop := a.TextureStopFile()
+	os.Remove(stop)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		t := time.NewTicker(500 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if _, err := os.Stat(stop); err == nil {
+					os.Remove(stop)
+					cancel()
+					return
+				}
+			}
+		}
+	}()
 	p := TextureProgress{ModsTotal: len(r.Mods), FilesTotal: r.Est.Files}
 	for _, t := range r.Mods {
 		if ctx.Err() != nil {
@@ -599,6 +621,58 @@ func (a *App) optimizeMod(ctx context.Context, enc textures.Encoder, ix *Index, 
 	}
 	return a.Store.PutTextureMod(store.TextureMod{InstanceID: t.Mod.ID, SnapHash: t.Mod.SnapHash, Scale: o.Scale, Mips: !o.NoMips,
 		Files: files, Bytes: bytes, MadeAt: now})
+}
+
+// TextureStopFile asks a running optimisation (in any process) to stop between files.
+func (a *App) TextureStopFile() string { return filepath.Join(a.Home, "textures.stop") }
+
+// StopTextures asks a running optimisation to stop: what it converted stays recorded.
+func (a *App) StopTextures() error { return os.WriteFile(a.TextureStopFile(), nil, 0o644) }
+
+// ChildArcho runs `<exe> <args>` (exe "": this executable) with the same data directory and
+// passes each output line to progress; it returns the output lines that are not progress.
+func ChildArcho(exe, home, envName string, args []string, progress func(string)) ([]string, error) {
+	if exe == "" {
+		var err error
+		if exe, err = os.Executable(); err != nil {
+			return nil, err
+		}
+		if b := strings.ToLower(filepath.Base(exe)); strings.HasSuffix(b, ".test") || strings.HasSuffix(b, ".test.exe") {
+			return nil, errors.New("a child archo from a test binary: set the runner")
+		}
+	}
+	if envName != "" {
+		args = append(append([]string{}, args...), "--env", envName)
+	}
+	cmd := exec.Command(exe, args...)
+	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
+	hideWindow(cmd)
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	cmd.Stderr = cmd.Stdout
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	var lines []string
+	sc := bufio.NewScanner(out)
+	for sc.Scan() {
+		l := strings.TrimSpace(sc.Text())
+		if strings.HasPrefix(l, "progress:") {
+			if progress != nil {
+				progress(l)
+			}
+			continue
+		}
+		if l != "" {
+			lines = append(lines, l)
+		}
+	}
+	if err := cmd.Wait(); err != nil {
+		return lines, fmt.Errorf("%s", strings.TrimPrefix(strings.Join(lines, "\n"), "error: "))
+	}
+	return lines, nil
 }
 
 // removeOurs deletes a DDS RimArcho wrote, unless something else has rewritten it since.
@@ -853,8 +927,19 @@ func (a *App) TextureSummaries() map[string]TextureSummary {
 	return out
 }
 
-// HasTextures reports whether a copy has PNG textures at all (a quick look: any Textures/
-// folder), for offering the action.
-func HasTextures(dir string) bool {
-	return len(textures.AllFolders(dir)) > 0
+// HasPNGTextures reports whether a copy had PNGs under a Textures/ folder at its last scan
+// (from the stored file lists, cached until a scan changes the snapshots): Mod 库存 offers
+// 优化贴图 for those copies only.
+func (a *App) HasPNGTextures(m *store.Mod) bool {
+	if m == nil || m.SnapID == 0 {
+		return false
+	}
+	if k := a.Store.SnapshotsKey(); a.pngSnaps == nil || a.pngSnapsKey != k {
+		s, err := a.Store.SnapshotsWithPNG()
+		if err != nil {
+			return false
+		}
+		a.pngSnaps, a.pngSnapsKey = s, k
+	}
+	return a.pngSnaps[m.SnapID]
 }

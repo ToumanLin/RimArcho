@@ -57,6 +57,9 @@ type API struct {
 	quit        func() // closes the window (nil in the harness and in tests)
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
+	// TexRunner runs `archo textures optimize` in place of the child process (tests).
+	TexRunner func(args []string, progress func(string)) ([]string, error)
+	texLast   TextureEvent // the running conversion's last progress
 	// ScanRunner scans an environment in place of the child process (tests).
 	ScanRunner func(env string) (string, error)
 }
@@ -201,9 +204,12 @@ func (s *API) Packs() (*PackList, error) {
 
 // PackPreview is a dry-run build of the current list as a pack: checked and sorted under
 // the lock, measured (every mod's folder walked) outside it.
-func (s *API) PackPreview(name string) (*view.PackPreview, error) {
+func (s *API) PackPreview(name string, tex int) (*view.PackPreview, error) {
 	s.mu.Lock()
 	pl, err := s.a.PlanPack(name, false)
+	if err == nil {
+		view.PlanTextures(s.a, pl, tex) // tex: 0 off, 100 预转换, else 精简 to that percent
+	}
 	dir := s.a.PacksDir()
 	s.mu.Unlock()
 	if err != nil {
@@ -217,7 +223,7 @@ func (s *API) PackPreview(name string) (*view.PackPreview, error) {
 // once: the copy takes minutes and holds nothing here, so every page keeps working, and it
 // goes on when the window closes. "pack" events carry the progress (view.PackProgress) and
 // the end. One build at a time.
-func (s *API) PackBuild(name string) (string, error) {
+func (s *API) PackBuild(name string, tex int) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := app.CheckPackName(name); err != nil {
@@ -242,11 +248,12 @@ func (s *API) PackBuild(name string) (string, error) {
 	if run == nil {
 		home, env, exe := s.a.Home, s.a.EnvName, s.Exe
 		log := filepath.Join(home, "logs", "pack-build.log")
+		extra := app.PackBuildArgs(view.PackTextureOptions(tex))
 		run = func(name string) error {
 			if exe != "" {
-				return app.ChildPackBuildExe(exe, home, env, name, log)
+				return app.ChildPackBuildExe(exe, home, env, name, log, extra...)
 			}
-			return app.ChildPackBuild(home, env, name, log)
+			return app.ChildPackBuild(home, env, name, log, extra...)
 		}
 	}
 	go s.watchBuild(name, tmp, run)
@@ -266,7 +273,7 @@ func (s *API) watchBuild(name, tmp string, run func(string) error) {
 			s.mu.Lock()
 			s.busy["pack"], s.building = false, ""
 			s.mu.Unlock()
-			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 4, Frac: 1, Text: view.Tf("built pack %s", name)}
+			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 5, Frac: 1, Text: view.Tf("built pack %s", name)}
 			if err != nil {
 				ev.Step, ev.Frac, ev.Text = last.Step, last.Frac, ""
 				lines := strings.Split(view.Humanize(nil, err.Error()), "\n")

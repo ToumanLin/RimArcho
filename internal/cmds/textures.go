@@ -3,6 +3,8 @@ package cmds
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,6 +17,22 @@ import (
 // 贴图优化 (08 §5.2): the DDS of mods' PNGs, written next to them. The game loads the DDS in
 // their place; the PNGs stay. Packs convert their own copies (pack build --textures).
 func init() {
+	// an existing todds (a folder or the program, e.g. RimSort's); "" is RimArcho's own copy
+	freeKeys["textures.todds"] = struct {
+		def   string
+		check func(string) error
+	}{"", func(v string) error {
+		if v == "" {
+			return nil
+		}
+		if !filepath.IsAbs(v) {
+			return fmt.Errorf("textures.todds must be an absolute path")
+		}
+		if textures.FindTodds(v) == "" {
+			return fmt.Errorf("no todds program at %s", v)
+		}
+		return nil
+	}}
 	dry := Flag{Name: "dry-run", Help: "show what would happen"}
 	scope := []Flag{{Name: "plan", Help: "the current plan's mods"}, {Name: "all", Help: "every installed mod"}}
 	scale := Flag{Name: "scale", Value: "<percent>", Help: "scale textures down (20 25 40 50 60 75 80); a texture never goes below 128 px or off a multiple of 4, masks (_m) stay full size"}
@@ -68,6 +86,25 @@ func texScope(a *Args) (string, error) {
 		return "", &UsageError{Msg: "name the mods, or use --plan or --all"}
 	}
 	return app.TexRefs, nil
+}
+
+// TextureProgressLine is a run's progress line; ParseTextureProgress reads it back (the
+// window runs `textures optimize` as a child and follows these lines).
+func TextureProgressLine(p app.TextureProgress) string {
+	return fmt.Sprintf("progress: textures %d/%d · mods %d/%d · bytes %d · %s", p.Files, p.FilesTotal, p.Mods, p.ModsTotal, p.Bytes, p.Mod)
+}
+
+var texProgressRe = regexp.MustCompile(`^progress: textures (\d+)/(\d+) · mods (\d+)/(\d+) · bytes (\d+) · (.*)$`)
+
+// ParseTextureProgress reads a progress line (ok false: not one).
+func ParseTextureProgress(l string) (app.TextureProgress, bool) {
+	m := texProgressRe.FindStringSubmatch(strings.TrimSpace(l))
+	if m == nil {
+		return app.TextureProgress{}, false
+	}
+	n := func(s string) int { v, _ := strconv.Atoi(s); return v }
+	b, _ := strconv.ParseInt(m[5], 10, 64)
+	return app.TextureProgress{Files: n(m[1]), FilesTotal: n(m[2]), Mods: n(m[3]), ModsTotal: n(m[4]), Bytes: b, Mod: m[6]}, true
 }
 
 // TextureEstimateLine is an estimate in one line (also the interfaces' wording, in English).
@@ -169,7 +206,7 @@ func texOptimizeCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	run := app.TextureRun{Refs: a.Pos, Scope: sc, Options: o, Force: a.Bool("force"), DryRun: a.Bool("dry-run")}
 	if Progress != nil {
 		run.Progress = func(p app.TextureProgress) {
-			Progress(fmt.Sprintf("progress: textures %d/%d · %d/%d mods · %s", p.Files, p.FilesTotal, p.Mods, p.ModsTotal, p.Mod))
+			Progress(TextureProgressLine(p))
 		}
 	}
 	r, err := c.App.OptimizeTextures(run)

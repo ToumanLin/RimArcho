@@ -141,6 +141,8 @@ func evidenceFor(p *app.Problem) *Evidence {
 		return evidence(EvInferred, T("About.xml.disabled, and no longer subscribed"))
 	case "mod.hidden":
 		return evidence(EvInferred, T("About.xml is renamed to About.xml.disabled"))
+	case "texture.stale":
+		return evidence(EvInferred, T("the mod's files changed after RimArcho wrote its DDS"))
 	}
 	return nil
 }

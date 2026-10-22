@@ -615,7 +615,16 @@ func CopyNoteAuto(i *app.LibInstance) string {
 }
 
 // libConfirm: the actions that change files (a dry run first); the plan edits are undone with u.
-var libConfirm = map[string]bool{LibPin: true, LibPinUpdate: true, LibUnpin: true, LibUnhide: true, LibMove: true, LibDelete: true, LibUnsub: true}
+var libConfirm = map[string]bool{LibPin: true, LibPinUpdate: true, LibUnpin: true, LibUnhide: true, LibMove: true, LibDelete: true, LibUnsub: true,
+	OpTextures: true, OpTexClean: true}
+
+// texArgv is the textures command for copies (all of them in one run).
+func texArgv(kind string, refs []string) []string {
+	if kind == OpTexClean {
+		return append([]string{"textures", "clean"}, refs...)
+	}
+	return append([]string{"textures", "optimize"}, refs...)
+}
 
 // libArgv is an action's archo command (its dry run with --dry-run).
 func libArgv(kind string, refs []string) []string {
@@ -649,6 +658,17 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		return nil, err
 	}
 	p := &Preview{What: kind, Title: libActionLabel(kind), Apply: true}
+	if kind == OpTextures || kind == OpTexClean {
+		out, code := cmds.Execute(a, append(texArgv(kind, refs), "--dry-run"))
+		for _, l := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+			if strings.HasPrefix(l, "next:") {
+				break
+			}
+			p.Lines = append(p.Lines, Humanize(st, l))
+		}
+		p.Apply = code == 0 && !strings.Contains(out, "convert: 0 PNGs") && !strings.Contains(out, "would delete 0 DDS")
+		return p, nil
+	}
 	for _, ref := range refs {
 		out, code := cmds.Execute(a, append(libArgv(kind, []string{ref}), "--dry-run"))
 		for _, l := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
@@ -689,6 +709,18 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 			return "", err
 		}
 		return r.Text, nil
+	case OpTextures:
+		r, err := a.OptimizeTextures(app.TextureRun{Refs: refs})
+		if err != nil {
+			return "", err
+		}
+		return TextureRunText(r), nil
+	case OpTexClean:
+		c, err := a.CleanTextures(refs, app.TexRefs, false)
+		if err != nil {
+			return "", err
+		}
+		return Tf("deleted %d DDS RimArcho wrote into %s (%s); the game uses the PNGs again", c.Files, what, SizeText(c.Bytes)), nil
 	case LibRemove:
 		rs, err := a.RemoveFromPlans(refs)
 		if err != nil {

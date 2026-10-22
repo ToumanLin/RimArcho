@@ -125,11 +125,14 @@ type App struct {
 
 	ixCache *Index
 	ixKey   string
-	stCache *LoadoutState
-	stKey   string
-	prCache *ProblemSet
-	prKey   string
-	planPS  map[int64]*planProblems // PlanProblems, by plan
+	// pngSnaps: the snapshots with PNG textures (贴图优化), until the snapshots change
+	pngSnaps    map[int64]bool
+	pngSnapsKey string
+	stCache     *LoadoutState
+	stKey       string
+	prCache     *ProblemSet
+	prKey       string
+	planPS      map[int64]*planProblems // PlanProblems, by plan
 
 	logCache   *logCacheEntry
 	harmonyDir string
