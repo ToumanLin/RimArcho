@@ -35,10 +35,15 @@ type Packet struct {
 	Mods      int      `json:"mods"`
 	Resolved  int      `json:"resolved"`
 	LogMods   []string `json:"log_mods"` // every packageId of the log's list, in order (validation)
-	Involved  []PMod   `json:"involved"`
-	RimArcho  RArch    `json:"rimarcho"` // not in Text: the labeller is blind to RimArcho's verdict
-	Text      string   `json:"text"`
-	Bytes     int      `json:"bytes"`
+	// LogVers: packageId -> version written in the log header ([mv:]/[v:]/[ov:]), when any.
+	LogVers  map[string]string `json:"log_vers,omitempty"`
+	Created  string            `json:"created,omitempty"` // upload time of the log
+	Tier     int               `json:"tier,omitempty"`
+	Bench    string            `json:"bench,omitempty"`
+	Involved []PMod            `json:"involved"`
+	RimArcho RArch             `json:"rimarcho"` // not in Text: the labeller is blind to RimArcho's verdict
+	Text     string            `json:"text"`
+	Bytes    int               `json:"bytes"`
 }
 
 // PMod is a mod of the log's list that the cluster's evidence points at.
@@ -49,6 +54,9 @@ type PMod struct {
 	Version string   `json:"version,omitempty"`
 	InLib   bool     `json:"in_lib"`
 	Signals []string `json:"signals"`
+	// The research library's copy: About.xml modVersion and the Workshop update date.
+	Installed string `json:"installed,omitempty"`
+	Updated   string `json:"updated,omitempty"`
 }
 
 type RArch struct {
@@ -73,6 +81,7 @@ type parsedMod struct {
 
 type parsedRec struct {
 	ID      string      `json:"id"`
+	Created string      `json:"created"`
 	Version string      `json:"version"`
 	Mods    []parsedMod `json:"mods"`
 }
@@ -293,12 +302,15 @@ func loadLog(a *app.App, userData, corpus string, r *parsedRec) (*app.LoadoutSta
 	for _, m := range r.Mods {
 		pkgs = append(pkgs, strings.ToLower(m.Pkg))
 	}
+	marker := filepath.Join(a.Home, "corpuslabel-current.txt") // see execCmd
+	os.Remove(marker)
 	if err := writeModsConfig(userData, r.Version, pkgs); err != nil {
 		return nil, "", nil, err
 	}
 	if _, err := a.Loadout(); err != nil {
 		return nil, "", nil, err
 	}
+	defer os.WriteFile(marker, []byte(r.ID), 0o644)
 	if _, err := a.EnsureAnalysis(nil); err != nil {
 		return nil, "", nil, fmt.Errorf("analysis: %w", err)
 	}
@@ -310,26 +322,117 @@ func loadLog(a *app.App, userData, corpus string, r *parsedRec) (*app.LoadoutSta
 	return st, body, rep, err
 }
 
-func execCmd(home, corpus, gist string, argv []string) error {
-	recs, err := readParsed(filepath.Join(corpus, "parsed.jsonl"), map[string][]Item{gist: {{}}})
+// execCmd loads one log's mod list into the research environment and runs an archo command
+// (reviewers' and tier-2 agents' lookups). With -packet the gist and game version come from
+// the packet (no scan of parsed.jsonl). A lock file serialises callers sharing a home; a
+// marker skips rewriting the list when the home already holds this log. With -log every
+// command and its output is appended to a transcript, which validate checks "env:" quotes
+// against and score counts tool calls in.
+func execCmd(home, corpus, gist, packetPath, logPath string, argv []string) error {
+	if len(argv) == 0 {
+		return fmt.Errorf("no archo command after --")
+	}
+	// Fact commands only: `log` and `problems` would show RimArcho's own attribution, and
+	// commands that change the Loadout would break the research environment.
+	if !execAllowed[argv[0]] {
+		return fmt.Errorf("archo %s is not allowed here (allowed: %s)", argv[0], keys(execAllowed))
+	}
+	r := &parsedRec{ID: gist}
+	if packetPath != "" {
+		b, err := os.ReadFile(packetPath)
+		if err != nil {
+			return err
+		}
+		if m := packetHeadRe.FindSubmatch(b); m != nil { // the .txt the labeller reads
+			r.ID, r.Version = string(m[1]), string(m[2])
+		} else {
+			var p Packet
+			if err := json.Unmarshal(b, &p); err != nil {
+				return fmt.Errorf("%s: neither a packet .txt nor .json: %w", packetPath, err)
+			}
+			r.ID, r.Version = p.Gist, p.Game
+		}
+	} else {
+		recs, err := readParsed(filepath.Join(corpus, "parsed.jsonl"), map[string][]Item{gist: {{}}})
+		if err != nil {
+			return err
+		}
+		if r = recs[gist]; r == nil {
+			return fmt.Errorf("log %s not in parsed.jsonl", gist)
+		}
+	}
+	unlock, err := lockHome(home)
 	if err != nil {
 		return err
 	}
-	r := recs[gist]
-	if r == nil {
-		return fmt.Errorf("log %s not in parsed.jsonl", gist)
-	}
+	defer unlock()
+	t := time.Now()
 	a, userData, err := openEnv(home)
 	if err != nil {
 		return err
 	}
 	defer a.Close()
-	if _, _, _, err := loadLog(a, userData, corpus, r); err != nil {
+	marker := filepath.Join(home, "corpuslabel-current.txt")
+	if cur, _ := os.ReadFile(marker); string(cur) != r.ID {
+		os.Remove(marker)
+		head, _, err := readRaw(filepath.Join(corpus, "raw", r.ID+".txt"))
+		if err != nil {
+			return err
+		}
+		var pkgs []string
+		for _, m := range rawMods(head) {
+			pkgs = append(pkgs, m.Pkg)
+		}
+		if len(pkgs) == 0 {
+			return fmt.Errorf("no mod list in the raw log")
+		}
+		if err := writeModsConfig(userData, r.Version, pkgs); err != nil {
+			return err
+		}
+	}
+	if _, err := a.Loadout(); err != nil {
 		return err
 	}
+	if _, err := a.EnsureAnalysis(nil); err != nil {
+		return fmt.Errorf("analysis: %w", err)
+	}
+	os.WriteFile(marker, []byte(r.ID), 0o644)
 	out, _ := cmds.Execute(a, argv)
 	fmt.Print(out)
+	if logPath != "" {
+		f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		fmt.Fprintf(f, "\n=== %s  %s  (%s)\n$ archo %s\n%s", time.Now().Format(time.RFC3339), r.ID, time.Since(t).Round(time.Millisecond), strings.Join(argv, " "), out)
+	}
 	return nil
+}
+
+var execAllowed = set("mod", "describe", "def", "patches", "harmony", "why", "files", "source", "find", "list", "status")
+
+// lockHome takes <home>/corpuslabel.lock (waits up to 15 min; a lock older than 20 min is
+// stale).
+func lockHome(home string) (func(), error) {
+	p := filepath.Join(home, "corpuslabel.lock")
+	deadline := time.Now().Add(15 * time.Minute)
+	for {
+		f, err := os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		if err == nil {
+			fmt.Fprintf(f, "%d %s\n", os.Getpid(), time.Now().Format(time.RFC3339))
+			f.Close()
+			return func() { os.Remove(p) }, nil
+		}
+		if fi, e := os.Stat(p); e == nil && time.Since(fi.ModTime()) > 20*time.Minute {
+			os.Remove(p)
+			continue
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("home %s is locked (%s)", home, p)
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
 }
 
 func packetFor(a *app.App, userData, corpus string, r *parsedRec, it Item, co map[string]*CoocKey, steam map[string]string) (*Packet, error) {
@@ -348,7 +451,13 @@ func packetFor(a *app.App, userData, corpus string, r *parsedRec, it Item, co ma
 			break
 		}
 	}
-	p := &Packet{Item: it.Item, Gist: r.ID, Key: it.Key, Class: it.Class, Tpl: it.Tpl, Game: r.Version, LogLines: rep.Lines, Mods: len(r.Mods), LogMods: pkgs}
+	p := &Packet{Item: it.Item, Gist: r.ID, Key: it.Key, Class: it.Class, Tpl: it.Tpl, Game: r.Version, LogLines: rep.Lines, Mods: len(r.Mods), LogMods: pkgs,
+		Created: r.Created, Tier: it.Tier, Bench: it.Bench, LogVers: map[string]string{}}
+	for _, m := range r.Mods {
+		if m.MV != "" {
+			p.LogVers[strings.ToLower(m.Pkg)] = m.MV
+		}
+	}
 	if lc == nil { // the rules changed since the run that sampled it: same template, most frequent
 		for _, c := range rep.Clusters {
 			if c.Template == it.Tpl && (lc == nil || c.Count > lc.Count) {
@@ -409,6 +518,9 @@ func packetFor(a *app.App, userData, corpus string, r *parsedRec, it Item, co ma
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Evidence packet %s\n", it.Item)
 	fmt.Fprintf(&b, "log: %s  game %s  %d lines  %d mods in list (%d found in the research library)\n", r.ID, r.Version, rep.Lines, len(r.Mods), p.Resolved)
+	if r.Created != "" {
+		fmt.Fprintf(&b, "uploaded: %s (the research library holds current Workshop versions)\n", r.Created)
+	}
 	fmt.Fprintf(&b, "cluster: %s  class %s  occurs %d× (lines %v)\n", lc.ID, lc.Class, lc.Count, lc.Lines)
 	fmt.Fprintf(&b, "key: %s\n\n", clip(p.Key, 400))
 	b.WriteString("## Message\n" + clip(e.Message, maxMsg) + "\n")
@@ -624,6 +736,9 @@ func packetFor(a *app.App, userData, corpus string, r *parsedRec, it Item, co ma
 				continue
 			}
 			s := fmt.Sprintf("in %.0f%% of the %d corpus logs with this same error vs %.0f%% of the other logs", 100*c.With, ck.Logs, 100*c.Without)
+			if ck.Lists > 0 {
+				s = fmt.Sprintf("in %.0f%% of the %d distinct mod lists (%d logs) with this same error vs %.0f%% of the other logs", 100*c.With, ck.Lists, ck.Logs, 100*c.Without)
+			}
 			addSig(c.Pkg, "corpus: "+s)
 			coocLines = append(coocLines, c.Pkg+": "+s)
 		}
@@ -647,7 +762,7 @@ func packetFor(a *app.App, userData, corpus string, r *parsedRec, it Item, co ma
 		for i := range ls {
 			ls[i] = clip(ls[i], maxLine)
 		}
-		facts = append(facts, "$ archo "+strings.Join(argv, " ")+"\n"+strings.Join(ls, "\n"))
+		facts = append(facts, "$ archo "+deref(strings.Join(argv, " "))+"\n"+strings.Join(ls, "\n"))
 		return out
 	}
 	// search runs `files search` for the first term that matches and marks the matching mods.
@@ -741,10 +856,27 @@ func packetFor(a *app.App, userData, corpus string, r *parsedRec, it Item, co ma
 		pm := byPkg[pk]
 		m := instOf[pk]
 		x := PMod{Pkg: pk, Name: pm.Name, Pos: posOf[pk], Version: pm.MV, InLib: m != nil, Signals: sig[pk]}
+		if m != nil {
+			x.Installed = m.Decl().ModVersion
+			if m.ACFTimeUpdated > 0 {
+				x.Updated = time.Unix(m.ACFTimeUpdated, 0).UTC().Format("2006-01-02")
+			}
+		}
 		p.Involved = append(p.Involved, x)
 		fmt.Fprintf(&b, "- %s [%s] position %d/%d", pm.Name, pk, x.Pos, len(r.Mods))
 		if pm.MV != "" {
 			b.WriteString(" v" + pm.MV)
+		}
+		if m != nil {
+			iv := x.Installed
+			if iv == "" {
+				iv = "no modVersion"
+			}
+			fmt.Fprintf(&b, " (research library: %s", iv)
+			if x.Updated != "" {
+				b.WriteString(", Workshop updated " + x.Updated)
+			}
+			b.WriteString(")")
 		}
 		b.WriteString("\n    evidence: " + strings.Join(sig[pk], "; ") + "\n")
 		if m == nil {
@@ -835,6 +967,7 @@ func packetFor(a *app.App, userData, corpus string, r *parsedRec, it Item, co ma
 }
 
 var (
+	packetHeadRe = regexp.MustCompile(`(?m)^log: ([0-9a-f]+)  game (.+?)  \d+ lines`)
 	folderRe     = regexp.MustCompile(`(?i)(?:294100[\\/](\d+)|[\\/]Mods[\\/]([^\\/\]]+))[\\/]`)
 	searchHitRe  = regexp.MustCompile(`(?m)^\s{4}([a-z0-9][a-z0-9_.\-]*)\s{2}`)
 	texPathRe    = regexp.MustCompile(`at '([^']+)'`)

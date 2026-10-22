@@ -23,6 +23,10 @@ type Item struct {
 	Cov   float64 `json:"cov"`
 	// TplLogs is how many covered logs have a cluster of this template (the stratum's weight).
 	TplLogs int `json:"tpl_logs"`
+	// Benchmark v2 (bench.go): tier 1 or 2, benchmark class, "head" or "tail" stratum.
+	Tier    int    `json:"tier,omitempty"`
+	Bench   string `json:"bench,omitempty"`
+	Stratum string `json:"stratum,omitempty"`
 }
 
 type resultLine struct {

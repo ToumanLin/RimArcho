@@ -35,7 +35,7 @@ func TestValidate(t *testing.T) {
 		Causes: []Cause{{"a.mod", "source"}, {"missing.dep", "missing"}}, Stage: "tick", CauseType: "mod-bug",
 		Fix: Fix{Kind: "update", Mods: []string{"a.mod"}}, Confidence: "high",
 		Evidence: []string{"at AMod.Thing.Do ()", "log: something only the raw log has"}, Model: "m", Prompt: "p"}
-	if es := validate(&good, items, packets); len(es) != 0 {
+	if es := validate(&good, items, packets, nil); len(es) != 0 {
 		t.Fatalf("good label rejected: %v", es)
 	}
 	bad := good
@@ -44,7 +44,7 @@ func TestValidate(t *testing.T) {
 	bad.Stage = "loading"
 	bad.Evidence = []string{"a paraphrase"}
 	bad.Model = ""
-	es := validate(&bad, items, packets)
+	es := validate(&bad, items, packets, nil)
 	for _, want := range []string{"gist", "c.mod", "nowhere.mod", "culprit", "stage", "verbatim", "model"} {
 		if !strings.Contains(strings.Join(es, "\n"), want) {
 			t.Errorf("no error mentions %q: %v", want, es)
@@ -52,7 +52,7 @@ func TestValidate(t *testing.T) {
 	}
 	unknown := good
 	unknown.Verdict, unknown.Causes = "cause", nil
-	if es := validate(&unknown, items, packets); len(es) == 0 {
+	if es := validate(&unknown, items, packets, nil); len(es) == 0 {
 		t.Error("cause without causes accepted")
 	}
 }
