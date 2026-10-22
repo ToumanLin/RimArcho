@@ -768,7 +768,7 @@ function onKey(e) {
 
 // Three columns: 未启用, 已启用, and 详情 with 暂存 and 历史 under it. split 0 is between the
 // first two, split 1 before the third. Widths are fr values per environment.
-const COLS = () => [$('.area[data-area="0"]'), $('.area[data-area="1"]'), $("#board .stack")];
+const COLS = () => [$("#board > .fcol"), $('.area[data-area="1"]'), $("#board .stack")];
 
 function wireSplits() {
   const board = $("#board");
@@ -838,9 +838,9 @@ async function start() {
   plans.initPlans(ui);
   library.initLibrary(ui);
   S.bar = createBar({ data: () => S.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:plan",
-    column: () => $('.area[data-area="0"]'), resized: () => renderRows(0), leave: () => focusArea(S.focus < 2 ? S.focus : 0),
+    column: () => $("#board > .fcol"), resized: () => renderRows(0), leave: () => focusArea(S.focus < 2 ? S.focus : 0),
     placeholder: T("search: words, tag:, author:, type:, has:, version:, -not") + "  /" });
-  $(".barhost").append(S.bar.el);
+  $("#board .barhost").replaceWith(S.bar.el);
   $('.area[data-area="0"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
   wireLists(ui);
   wireSplits();
