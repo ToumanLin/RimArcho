@@ -6,84 +6,92 @@ import { S, $, el, api, T, Tf } from "./state.js";
 import { icon } from "./icons.js";
 import { liveCount } from "./screens.js";
 import { bump, slideNav } from "./motion.js";
+import * as pop from "./popups.js";
 
 let ui = null;
 
-// The sidebar's three modes, as magpie's NavigationView in Auto (06 §2.1): expanded (labels
-// and groups), compact (a 48px icon rail) and hidden. The window's width picks the class:
-// wide (≥ 920px) shows the player's choice, expanded or compact, kept in ui.gui.nav; medium
-// is compact; narrow (< 640px) hidden. In medium and narrow the toggle opens the expanded
-// pane over the page (esc, a click outside or picking a page closes it) until the class
-// changes.
-export const WIDE = 920, NARROW = 640;
+// Where the navigation sits (06 §2.1): at the side (the sidebar, groups 在玩 / 库) or at the
+// top (the same entries as one strip over the page: the groups are separators, an entry's
+// sub-entries a dropdown). The toggle heads the sidebar, or ends the strip; ctrl+b. The
+// choice is kept in ui.gui.nav ("top", or empty for the side).
 const NAV_KEY = "ui.gui.nav";
-let pref = "expanded";  // the wide class's mode, the player's choice
-let over = false;       // the expanded pane is open over the page
-const widthClass = () => (innerWidth >= WIDE ? "wide" : innerWidth >= NARROW ? "medium" : "narrow");
-let cls = widthClass();
+let layout = "side";
 
-export function navMode() {
-  if (over) return "over";
-  if (cls === "wide") return pref;
-  return cls === "medium" ? "compact" : "hidden";
-}
+export const navLayout = () => layout;
 
 export function initShell(u) {
   ui = u;
   const t = $("#navtoggle");
   t.innerHTML = icon.sidebar;
   t.onclick = () => toggleNav();
-  $("#scrim").onclick = () => closeOver();
   $("#env").onclick = () => ui.go("env");
   $("#nav-settings").onclick = () => ui.go("settings");
   $("#live").onclick = () => ui.go("needs");
+  $("#side").addEventListener("keydown", navKey);
   wireSideSplit();
-  api.Setting(NAV_KEY).then((v) => { if (v === "compact") { pref = v; applyNav(true); } }).catch(() => {});
-  addEventListener("resize", () => {
-    const c = widthClass();
-    if (c !== cls) { cls = c; over = false; applyNav(false); }
-  });
-  // the highlights follow the pane's width once it has moved
-  $("#side").addEventListener("transitionend", (e) => { if (e.target === $("#side")) slideNav($("#nav"), true); });
-  $("#app").addEventListener("transitionend", (e) => { if (e.target === $("#app")) slideNav($("#nav"), true); });
-  applyNav(true);
+  api.Setting(NAV_KEY).then((v) => { if (v === "top") { layout = "top"; applyNav(); } }).catch(() => {});
+  addEventListener("resize", () => slideNav($("#nav"), true));
+  applyNav();
 }
 
-// toggleNav is the sidebar's toggle (and ctrl+b): in the wide class it switches expanded and
-// compact and remembers it; otherwise it opens or closes the pane over the page.
+// toggleNav moves the navigation between the side and the top, and remembers it. The change
+// is a view transition (the entries move to their new places) unless motion is reduced.
 export function toggleNav() {
-  if (cls === "wide" && !over) {
-    pref = pref === "expanded" ? "compact" : "expanded";
-    api.SetSetting(NAV_KEY, pref === "compact" ? "compact" : "").catch(() => {});
-  } else over = !over;
-  applyNav(false);
+  layout = layout === "side" ? "top" : "side";
+  api.SetSetting(NAV_KEY, layout === "top" ? "top" : "").catch(() => {});
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (document.startViewTransition && !still) document.startViewTransition(() => applyNav());
+  else applyNav();
 }
 
-// closeOver closes the pane opened over the page; true when it was open (esc takes it).
-export function closeOver() {
-  if (!over) return false;
-  over = false;
-  applyNav(false);
-  return true;
-}
-
-function applyNav(jump) {
+function applyNav() {
   const app = $("#app");
-  const m = navMode();
-  if (jump) app.classList.add("still");
-  for (const k of ["expanded", "compact", "hidden", "over"]) app.classList.toggle("nav-" + k, m === k);
-  // the column the pane leaves while it lies over the page: the rail in medium, none in narrow
-  app.classList.toggle("over-rail", m === "over" && cls === "medium");
-  $("#scrim").hidden = m !== "over";
+  app.classList.toggle("nav-top", layout === "top");
+  app.classList.toggle("nav-side", layout === "side");
   const t = $("#navtoggle");
-  t.title = (m === "expanded" || m === "over" ? T("collapse the sidebar") : T("expand the sidebar")) + " · ctrl+b";
-  t.setAttribute("aria-expanded", m === "expanded" || m === "over" ? "true" : "false");
-  if (jump) { void app.offsetWidth; app.classList.remove("still"); }
+  t.title = (layout === "side" ? T("navigation at the top") : T("navigation at the side")) + " · ctrl+b";
   slideNav($("#nav"), true);
 }
 
-// navigated: picking a page closes the pane that lies over it.
-export function navigated() { closeOver(); }
+// navigated: nothing to close any more (the navigation never lies over the page).
+export function navigated() { pop.hideMenu(); }
+
+// navKey: the keyboard in the navigation itself. Tab reaches its buttons; ← → (↑ ↓ at the
+// side) move between them, enter opens one, and ↓ on a top entry with sub-entries opens
+// its dropdown (06 §2.1, rule 6 of §3.1).
+function navKey(e) {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const all = [...$("#side").querySelectorAll("button")].filter((x) => x.offsetParent);
+  const i = all.indexOf(b);
+  const next = layout === "top" ? "ArrowRight" : "ArrowDown", prev = layout === "top" ? "ArrowLeft" : "ArrowUp";
+  if (e.key === next || e.key === prev) {
+    if (layout === "top" && e.key === "ArrowDown") return;
+    e.preventDefault(); e.stopPropagation();
+    all[(i + (e.key === next ? 1 : all.length - 1)) % all.length].focus();
+    return;
+  }
+  if (layout === "top" && e.key === "ArrowDown" && b.classList.contains("parent")) {
+    e.preventDefault(); e.stopPropagation();
+    kidMenu(b, true);
+    return;
+  }
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); b.click(); return; }
+  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); b.blur(); }
+}
+
+// kidMenu: an entry's sub-entries as a dropdown under it (the top layout).
+function kidMenu(b, keys) {
+  const it = navItem(b.dataset.id);
+  if (!it || !it.kids) return;
+  const r = b.getBoundingClientRect();
+  pop.menu(r.left, r.bottom + 4, it.kids.map((k) => ({ label: k.label, cls: k.id === current() ? "on" : "", run: () => ui.go(k.id) })), keys);
+}
+
+function navItem(id) {
+  for (const g of (S.shell && S.shell.nav) || []) for (const it of g.items || []) if (it.id === id) return it;
+  return null;
+}
 
 // The sidebar's width: dragged on its right edge, kept in the settings (ui.gui.side),
 // double-click resets it (06 §2.1).
@@ -200,7 +208,13 @@ function renderSide() {
         const ic = el("span", "ic");
         ic.innerHTML = icon[ICONS[it.id]] || "";
         b.append(ic, el("span", "lbl", it.label));
-        if (kids.length) { const c = el("span", "chev"); c.innerHTML = icon.chev; b.append(c); }
+        if (kids.length) {
+          const c = el("span", "chev");
+          c.innerHTML = icon.chev;
+          // at the top, the chevron opens the sub-entries as a dropdown
+          c.onclick = (e) => { if (layout === "top") { e.stopPropagation(); kidMenu(b, false); } };
+          b.append(c);
+        }
         // Only 能不能跑 carries a number (06 §2.1): the board's count between two Shell
         // calls, plus this run's errors
         const badge = it.id === "needs" && S.board ? S.board.needs + liveCount() : it.badge;

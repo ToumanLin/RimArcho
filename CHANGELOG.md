@@ -387,11 +387,12 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   bar closed) in at most 3 presses, checked on every page of both interfaces (G5, T20). In the
   window, a row menu or ⋯ menu opened with the mouse now closes with `esc`, and `esc` on the
   rows of the editor or Mod 库存 clears and closes an open filter bar in one press.
-- The sidebar shows and hides like magpie's: expanded, a 48 px icon rail (labels as tooltips;
-  the highlight, 能不能跑's badge and the running game stay on the icons), or hidden. The
-  window's width picks it (≥ 920 px your choice, kept in `ui.gui.nav`; 640–919 the rail;
-  narrower hidden); there the toggle opens the full sidebar over the page, closed by `esc`, a
-  click outside or picking a page. The toggle heads the sidebar; `ctrl+b` does the same.
+- The navigation sits at the side or at the top: the toggle (heading the sidebar, or the
+  strip's left end; `ctrl+b`) moves it, and `ui.gui.nav` remembers it. At the top the same
+  entries form one strip, groups as thin separators, sub-entries as a dropdown from the
+  chevron (`↓` from the keyboard), 设置 and the running game at the right end; it scrolls
+  when the window is narrow. The change is a view transition. (This replaces the expanded /
+  icon rail / hidden sidebar made the same day.)
 - The top bar has no buttons on any page, only the breadcrumb and the environment chip. Page
   actions sit at the right end of the page's description line; the plan editor has that line
   too ("启用了 34 个，按游戏加载的顺序") with its undo, import / export, build a pack, write to the

@@ -688,9 +688,7 @@ function onKey(e) {
   const k = e.key;
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
   if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
-  // the sidebar's pane over the page closes with esc (06 §2.1)
-  if (k === "Escape" && !S.popup && shell.closeOver()) { e.preventDefault(); return; }
-  // ctrl+b shows / hides the sidebar, on every page (06 §2.1, magpie's pane toggle)
+  // ctrl+b moves the navigation between the side and the top, on every page (06 §2.1)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "b") { e.preventDefault(); shell.toggleNav(); return; }
   if (pop.popupKey(e)) return;
   if (document.activeElement && document.activeElement.tagName === "INPUT") return;
