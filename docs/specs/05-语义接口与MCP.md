@@ -306,10 +306,10 @@ next:
 | `launch_game` | `launch`（`dry_run`） | false | true |
 | `manage_plans` | `plan list/new/use/rename/remove --yes`、`loadout import --new` | false | true |
 | `plan_history` | `loadout log`、`loadout diff`、`history`（`action=steps`） | true | — |
-| `pin_mod` | `pin`（`ref`、`name`、`git`、`update`、`move_to_library`、`dry_run`） | false | false |
+| `pin_mod` | `pin`（`ref`、`name`、`git`、`update`、`move_to_library`、`reason`、`dry_run`）；`reason` 写进这份副本的来历，副本备注会说出来（06 §2.9） | false | false |
 | `copy_local` | `pin` 的旧名（`ref`、`name`、`git`） | false | false |
 | `unpin_mod` | `unpin`（`ref`、`dry_run`） | false | false |
-| `set_player_data` | `action`：`tag_add` / `tag_remove`（`refs`、`tags`）/ `alias` / `note`（`text`，空串清除） | false | false |
+| `set_player_data` | `action`：`tag_add` / `tag_remove`（`refs`、`tags`）/ `alias` / `note`（`text`，空串清除）/ `copy_note`（一份副本自己的备注，`note <引用> <文字> --copy`，空串清除，06 §2.9） | false | false |
 | `manage_rules` | `rule add/list/remove`（`action`、`kind`、`a`、`b`、`target`、`note`、`rule`） | false | false |
 | `add_rule` | `manage_rules` 的旧名（`action` 默认 add） | false | false |
 | `ignore_problem` | `problems ignore` / `unignore`（`undo`） | false | false |
@@ -320,7 +320,7 @@ next:
 | `manage_hidden` | `unhide`、`trash` | false | true |
 | `maintenance` | `data update`、`import rimcrow`、`gc` | false | true |
 | `list_library` | `library`（`search`、`include`、`exclude`、`sort`、`lineage`、`facets`、`all`） | true | — |
-| `manage_library` | `action`：`move_to_locked`（`library move-to-locked`，`dry_run`）/ `remove_from_plans`（`library remove-from-plans`）；`refs` | false | true |
+| `manage_library` | `action`：`move_to_locked`（`library move-to-locked`，`dry_run`、`reason`）/ `remove_from_plans`（`library remove-from-plans`）；`refs` | false | true |
 
 共 33 个（含两个别名）：15 个只读，18 个写；`destructiveHint: true` 的是 `save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
 
@@ -374,7 +374,7 @@ next:
 | `save_loadout` | 见 §5.2 |
 | `copy_local` | 改工坊 Mod 前先复制，工坊文件会被 Steam 覆盖；指向文件夹外的链接和上游 `.git` 不复制；已有文件夹从不覆盖 |
 | `get_description` | 推荐一个 Mod 前了解它做什么；工坊文本按需获取并缓存到条目更新为止；玩家可以关掉联网（`workshop.fetch`） |
-| `set_player_data` | 标签（`list --filter tag:<t>` 和 TUI 的 `tag:` 搜索用它）、别名、备注；挂在 Lineage 上，所有副本共享；不碰游戏 |
+| `set_player_data` | 标签（`list --filter tag:<t>` 和 TUI 的 `tag:` 搜索用它）、别名、备注；挂在 Lineage 上，所有副本共享；`copy_note` 是一份副本自己的备注（为什么留着这一份）；不碰游戏 |
 | `add_rule` | 方向错误的 About.xml / 社区约束用 `ignore` 去掉，这就是打破 `order.cycle` 的办法；规则影响排序和顺序类问题，本身不重排 |
 
 ## 6. 稳定性

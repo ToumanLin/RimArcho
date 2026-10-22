@@ -8,7 +8,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 `1.0.0-rc1` first.
 
 ### Breaking
-- Database schema v10 → v12: plans (v11) and analysis kept per plan (v12). Each environment's workspace, undo stack, versions and
+- Database schema v10 → v13: plans (v11), analysis kept per plan (v12), copy notes (v13). Each environment's workspace, undo stack, versions and
   staging become its first plan, `default`; each `loadout tag` name becomes a plan of its own
   with one `import` version (04 §1.4).
 - `launch --force` is removed: launching always writes the plan first (08 §2).
@@ -134,9 +134,30 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   undo step each). Moving now keeps the instance (`pin --move-to-library` too), so every plan
   keeps it. `trash` refuses while any plan uses the folder and names the plans.
 - MCP: `list_library` (read-only) and `manage_library` (destructive).
-- The window's Mod 库存 › 全部: filters, the Lineage list with size · state · used-in, a
-  copy's details in the right column, a selection action bar; the TUI has a minimal list in
-  the palette.
+- The window's Mod 库存 › 全部: filters and a table like a file manager's details view.
+  Click a header to sort (again reverses, with an arrow), drag it to move the column, drag
+  its edge to resize, right-click the headers to show or hide columns (名称 大小 状态 来源
+  用在 by default; 更新日期 版本 作者 标签 上次游玩 on request); the layout is kept in
+  `ui.gui.library.columns`. The name cell holds only the name, the copy's kind is in 来源,
+  tags are not in rows. Rows show only states to act on (hidden, leftover, upstream
+  updated, unloadable, missing, ignored); 不支持 1.7 and 不在任何方案里 are filters only.
+  The filters mark the game's version and add 更新日期 (一周内 / 一月内 / 半年内 / 更早,
+  the Workshop update time, else the folder's). No environment chip on this page; the
+  button says 重新扫描. A selection action bar; the TUI has the list in the palette.
+- A copy's details: its note at the top, then only the actions that apply — 恢复, 退订 /
+  删除, 重新订阅, 备份锁定版本, 打开文件夹, 打开网页 — then one field list. Steam lets no
+  other program subscribe or unsubscribe, so 退订 and 重新订阅 open the Workshop page and
+  say so. 删除 now also takes the player's own copies in `Mods/` and the lock library
+  (not links, not while a plan uses them).
+- Copy notes (schema v13 `instance_note`): each copy has its own note, apart from the mod's.
+  RimArcho writes the first version from how the copy was made ("锁定版本创建于 10 月 21 日，
+  为方案「测试」创建；之后上游有 2 次更新；原因：…"), worked out each time so the update
+  count stays current. Edit it in the window (click), the TUI (`n` in Mod 库存), the CLI
+  (`archo note <ref> <text> --copy`, `--clear`) or MCP (`set_player_data` `copy_note`);
+  `pin --reason`, `library move-to-locked --reason` and the MCP `reason` record why.
+- `archo library --sort` takes every column (name, size, changed, played, state, source,
+  used, updated, version, author, tags; a leading `-` reverses) and `--include updated:week`
+  (month, half-year, older); `--lineage` lists each copy's `updated:` and `note:`.
 
 ### The window (06 §2)
 - A sidebar replaces the top tabs, in two groups: 在玩 (启动, 能不能跑 with its badge,
@@ -182,6 +203,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   stages; `3` opens it); two splitters, old four-column widths carried over.
 - "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
   the history stays in the editor's third column.
+- The plan editor: 排序 (`S`) is in the 已启用 column's header, 导入 / 导出 (`i`) in the
+  toolbar. Rows no longer show tags, in any column or interface (they are in the detail and
+  `tag:` search, 06 §3.8). The detail is one field list — Archo ID, 包名, 位置 [打开位置],
+  工坊 [打开页面], 标签 [编辑], 语言, 依赖, 冲突 — shared with Mod 库存; clicking a value
+  copies it and says 已复制 (06 §4.1). The TUI detail draws the same list.
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
