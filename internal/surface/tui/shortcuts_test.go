@@ -56,10 +56,17 @@ func TestShortcutsFolderWorkshopChanges(t *testing.T) {
 	if m.tab != tabChanges || m.chg.of == "" {
 		t.Fatalf("C: tab %v of %q", m.tab, m.chg.of)
 	}
+	beta := 0
 	for _, r := range m.chg.rows {
-		if r.ev != nil && !strings.Contains(r.text, "Beta") {
+		if r.mod != nil && !strings.Contains(r.text, "Beta") {
 			t.Fatalf("another mod's change: %q", r.text)
 		}
+		if r.kind == chDay {
+			beta++
+		}
+	}
+	if beta == 0 {
+		t.Fatalf("no day listed for Beta: %+v", m.chg.rows)
 	}
 	if !strings.Contains(m.chg.rows[0].text, "Beta") {
 		t.Fatalf("no condition line: %q", m.chg.rows[0].text)
@@ -68,14 +75,8 @@ func TestShortcutsFolderWorkshopChanges(t *testing.T) {
 	if m.tab != tabChanges || m.chg.of != "" {
 		t.Fatalf("esc: tab %v of %q", m.tab, m.chg.of)
 	}
-	every := 0
-	for _, r := range m.chg.rows {
-		if r.ev != nil {
-			every++
-		}
-	}
-	if every < 2 {
-		t.Fatalf("every mod: %d changes", every)
+	if strings.Contains(m.chg.rows[0].text, "Beta") {
+		t.Fatalf("still only Beta: %q", m.chg.rows[0].text)
 	}
 	press(m, "esc")
 	if m.tab != tabList {

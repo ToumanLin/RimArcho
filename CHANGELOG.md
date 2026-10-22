@@ -255,6 +255,30 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - Mod 库存's page data is 0.77 MB instead of 1.47 MB on a 1,284-mod library: each copy
   carries op codes, the labels come once, and folder paths and Workshop URLs stay in Go.
 
+### 变化 (06 §2.9, §2.3)
+- One row per mod: its changes in the time range merged into "name · what it means", with a
+  tier pill (会影响启动 / 留意 / 只是内容), sorted by tier then name. The sentence comes only from
+  what the scans recorded: supported versions added or dropped (the game's own version
+  flagged), the mod's version, dependencies and incompatibilities with their installed /
+  enabled state, load rules (compared from the two declarations), files grouped as code / Defs /
+  Patches / About / textures / sounds / translations / other with size changes, the Workshop
+  update time, and a locked version left behind.
+- Default: the current plan's mods since that plan was last played (the last scan when it never
+  was); `a` / the two buttons switch to the whole library. Older changes fold under 更早 by
+  day; new and gone mods are one summary row. One mod's history (the detail's link, TUI `C`)
+  lists every change by scan.
+- Opening a row shows the grouped file summary first, then the raw file list behind `i`, then
+  its actions: 打开网页 (the Workshop change notes, `ctrl+w`), 看依赖 (`D`), 排序 (`S`),
+  锁定这个版本 (`p`, dry run first). `tab` goes to 全部.
+- `archo changes` prints the same page in English (`--library`, `--since`, a ref for one mod's
+  history); MCP `list_changes` gains `library`. The old per-event listing is gone. The builder
+  is the new `internal/modchanges`, shared by the GUI, the TUI, the CLI and MCP.
+- Home page: the 「从上次扫描以来」 line is replaced by one sentence about the current plan
+  ("当前方案自上次游玩以来 · 5 个 Mod 更新，1 个需要处理 →"), which opens 变化 with that scope and
+  time. The 上次游戏 line shows only the result ("上次游戏 · 10 月 21 日 · 3 个错误"), reads a newer
+  Player.log by itself when the page loads or the window regains focus, and is hidden when there
+  was never a run.
+
 ### The window (06 §2)
 - A sidebar replaces the top tabs, in two groups: 在玩 (启动, 能不能跑 with its badge,
   游戏日志) and 库 (Mod 库存 › 变化, 方案, 整合包, 环境), then 设置 (`shift+1`–`7`).

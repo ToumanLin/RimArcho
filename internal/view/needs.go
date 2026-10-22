@@ -117,7 +117,8 @@ type Needs struct {
 	Stale  bool           `json:"stale"`  // the files changed since the last check
 	// LastRun says which run wrote the last-run log: "the list · 9 月 29 日 19:41" or
 	// "pack X · …" (08 §5.3: a pack's errors are not the list's).
-	LastRun string `json:"lastRun,omitempty"`
+	LastRun    string `json:"lastRun,omitempty"`
+	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "10 月 21 日"
 }
 
 // BuildNeeds turns the problem set and the environment's open questions into items, and
@@ -138,6 +139,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 			continue
 		}
 		when := ShortDate(r.ModTime) + " " + r.ModTime.In(a.Loc).Format("15:04")
+		n.LastRunDay = ShortDate(r.ModTime)
 		if pack := a.RunOfLog(st.Ix.Env.ID, r.ModTime); pack != "" {
 			n.LastRun = Tf("pack %s", pack) + " · " + when
 		} else {

@@ -190,10 +190,11 @@ type ProblemsIn struct {
 }
 
 type ChangesIn struct {
-	Env   string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Ref   string `json:"ref,omitempty" jsonschema:"one mod's history"`
-	Since string `json:"since,omitempty" jsonschema:"scan:<n>, <days>d or YYYY-MM-DD"`
-	All   bool   `json:"all,omitempty"`
+	Env     string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Ref     string `json:"ref,omitempty" jsonschema:"one mod's history"`
+	Library bool   `json:"library,omitempty" jsonschema:"every mod, not only the current plan's"`
+	Since   string `json:"since,omitempty" jsonschema:"scan:<n>, <days>d or YYYY-MM-DD"`
+	All     bool   `json:"all,omitempty"`
 }
 
 type LogIn struct {
@@ -325,7 +326,7 @@ func toolList() []tool {
 		}),
 		reg("list_problems", true, false, descProblems, func(in ProblemsIn) []string { return ProblemsArgv(in) }),
 		reg("list_changes", true, false, descChanges, func(in ChangesIn) []string {
-			return argv("changes").pos(in.Ref).str("since", in.Since).flag("all", in.All).a
+			return argv("changes").pos(in.Ref).flag("library", in.Library).str("since", in.Since).flag("all", in.All).a
 		}),
 		reg("analyze_log", true, false, descLog, func(in LogIn) []string {
 			return gv(argv("log").str("cluster", in.Cluster).str("text", in.Text).str("file", in.File).flag("prev", in.Prev).flag("all", in.All), in.GameVersion)

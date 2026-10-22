@@ -27,7 +27,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     source <ref>                              decompile a mod's assemblies on demand (ilspycmd; cached per DLL hash)
     source search <pattern>                   search decompiled C# (uncached assemblies are decompiled first)
     analyze                                   rebuild the Def and Patch facts (normally run on demand as a child process)
-    changes [<ref>]                           change events (default: the last scan)
+    changes [<ref>]                           what changed in the mods, one row per mod (default: the current plan since it was last played)
     library                                   the mod library: every mod on this machine, its copies, sizes, states and the plans and packs using it
     library remove-from-plans <ref…>          take mods out of every plan that has them (one undo step per plan)
     library move-to-locked <ref>              move a spare copy out of Mods/ into the lock library; plans keep using it
@@ -273,17 +273,10 @@ error: Alpha matches nothing (archo find <words>)
 [exit 1]
 
 $ archo changes
-changes: 9 (scan:1)
-  scan:1  2026-10-01 10:00  9 discovered
-    discovered  #6olp  Harmony             src:workshop 2009463077
-    discovered  #hnyg  Versioned Mod 版本  src:workshop 3000000001
-    discovered  #nyh3  Alpha               src:workshop 3000000002
-    discovered  #z3bw  Beta                src:workshop 3000000003
-    discovered  #i4uc  Leftover            src:workshop 3000000009
-    discovered  #iqmu  Core                src:official Core
-    discovered  #gpto  Gamma               src:local Gamma
-    discovered  #xamx  Old Mod             src:local OldMod
-    discovered  #lqj2  Alpha Fork          src:local Twin
+changes: 0 mods (plan:default, the last scan · Oct 1 10:00)
+  nothing changed
+next:
+  archo changes --library
 
 $ archo scan
 scan:2  env:main  0s
@@ -296,9 +289,10 @@ scan:2  env:main  0s
   changes: none
 
 $ archo changes
-changes: 0 (scan:2)
+changes: 0 mods (plan:default, the last scan · Oct 1 10:00)
+  nothing changed
 next:
-  archo changes --since 30d
+  archo changes --library
 
 $ archo identity list
 questions: 0 open

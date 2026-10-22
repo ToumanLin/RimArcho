@@ -9,6 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -26,8 +27,9 @@ func init() {
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: findCmd})
 	register(&Command{Name: "mod", Args: "<ref>", Summary: "mod details", MinArgs: 1, MaxArgs: 1, Run: modCmd,
 		Flags: []Flag{{Name: "diff", Value: "<ref>", Help: "list the semantic files that differ from another instance"}}})
-	register(&Command{Name: "changes", Args: "[<ref>]", Summary: "change events (default: the last scan)", MaxArgs: 1,
-		Flags: []Flag{{Name: "since", Value: "scan:<n>|<days>d|YYYY-MM-DD"}, {Name: "all", Help: "no truncation"}}, Run: changesCmd})
+	register(&Command{Name: "changes", Args: "[<ref>]", Summary: "what changed in the mods, one row per mod (default: the current plan since it was last played)", MaxArgs: 1,
+		Flags: []Flag{{Name: "library", Help: "every mod, not only the current plan's"}, {Name: "since", Value: "scan:<n>|<days>d|YYYY-MM-DD"},
+			{Name: "all", Help: "no truncation"}}, Run: changesCmd})
 }
 
 // eventOrder fixes the order kinds are summarised in.
@@ -589,94 +591,154 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 	return d, nil
 }
 
+// changesCmd is the changes page (06 §2.9) in text: one row per mod, by tier, for the
+// current plan since it was last played (--library: every mod; --since: from then; a ref:
+// that mod's Lineage, every change by day).
 func changesCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	ix, err := c.App.Index()
+	st, err := c.App.Loadout()
 	if err != nil {
 		return nil, err
 	}
-	f := store.EventFilter{EnvID: ix.Env.ID}
-	scope := ""
+	ix := st.Ix
+	o := modchanges.Opts{Library: a.Bool("library")}
+	scope := "plan:" + st.Plan.Name
+	if o.Library {
+		scope = "library"
+	}
 	if len(a.Pos) == 1 {
 		ms, err := ix.Resolve(a.Pos[0])
 		if err != nil {
 			return nil, err
 		}
 		for _, m := range ms {
-			f.InstanceIDs = append(f.InstanceIDs, m.ID)
+			for _, id := range lineageIDs(ix, m.ID) {
+				if !slices.Contains(o.Of, id) {
+					o.Of = append(o.Of, id)
+				}
+			}
 		}
 		scope = a.Pos[0]
 	}
 	if since := a.Str("since"); since != "" {
+		var f store.EventFilter
 		if err := parseSince(c, since, &f); err != nil {
 			return nil, err
 		}
-		scope = strings.TrimSpace(scope + " since " + since)
-	} else if len(a.Pos) == 0 {
-		scans, err := c.App.Store.Scans(ix.Env.ID, 1)
-		if err != nil {
-			return nil, err
-		}
-		if len(scans) == 0 {
-			d, _ := render.New("changes: 0 (no scan yet)")
-			d.AddNext("archo scan")
-			return d, nil
-		}
-		f.MinScan, f.MaxScan = scans[0].ID, scans[0].ID
-		scope = fmt.Sprintf("scan:%d", scans[0].ID)
+		o.MinScan, o.Since = f.MinScan, f.SinceTime
 	}
-	evs, err := c.App.Store.Events(f)
+	tx := modchanges.English(c.App.Loc)
+	p, err := modchanges.Build(c.App, st, o, tx)
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("changes: %d (%s)", len(evs), scope))
+	if p.NoScan {
+		d, _ := render.New("changes: 0 (no scan yet)")
+		d.AddNext("archo scan")
+		return d, nil
+	}
+	n := len(p.Rows)
+	if p.Arrivals != nil {
+		n += len(p.Arrivals.Rows)
+	}
+	if p.Of != "" {
+		n = p.Count()
+	}
+	head := fmt.Sprintf("changes: %s (%s", render.Plural(n, "mod"), scope)
+	if p.Since != "" {
+		head += ", " + p.Since
+	}
+	d, root := render.New(head + ")")
 	limit := render.DefaultLimit
 	if a.Bool("all") {
 		limit = 0
 	}
-	shown := 0
-	var group *render.Node
-	var rows [][]string
-	counts := map[string]int{}
-	flush := func() {
-		if group != nil {
-			group.Line += "  " + eventSummary(counts)
-			group.AddColumns(rows)
+	shown, more := 0, 0
+	rows := func(parent *render.Node, rs []modchanges.Row) {
+		var cells [][]string
+		for _, r := range rs {
+			cells = append(cells, []string{r.Ref, r.Mod, r.Text})
 		}
-		rows, counts = nil, map[string]int{}
+		for i, l := range render.Columns(cells) {
+			if limit > 0 && shown >= limit {
+				more++
+				continue
+			}
+			shown++
+			n := parent.Add(l)
+			for _, x := range rs[i].Details {
+				if !strings.Contains(rs[i].Text, x) {
+					n.Add(x)
+				}
+			}
+		}
 	}
-	var cur int64 = -1
-	for _, ev := range evs {
-		if ev.ScanID != cur {
-			flush()
-			cur = ev.ScanID
-			group = root.Addf("scan:%d  %s", ev.ScanID, c.App.FormatTime(ev.ScanTime))
+	tiered := func(parent *render.Node, rs []modchanges.Row) {
+		for _, t := range []int{modchanges.TierLaunch, modchanges.TierWatch, modchanges.TierContent} {
+			var in []modchanges.Row
+			for _, r := range rs {
+				if r.Tier == t {
+					in = append(in, r)
+				}
+			}
+			if len(in) > 0 {
+				rows(parent.Section(modchanges.TierText(tx, t)), in)
+			}
 		}
-		counts[ev.Kind]++
-		if limit > 0 && shown >= limit {
-			continue
-		}
-		shown++
-		name := ""
-		if m := ix.ByID[ev.InstanceID]; m != nil {
-			name = m.DisplayName()
-		}
-		rows = append(rows, []string{ev.Kind, ix.Ref(ev.InstanceID), name, shortRefs(ix, ev.Detail)})
 	}
-	flush()
-	if shown < len(evs) {
+	tiered(root, p.Rows)
+	if g := p.Arrivals; g != nil {
+		rows(root.Section("new and gone: "+g.Text), g.Rows)
+	}
+	if len(p.Rows) == 0 && p.Arrivals == nil && p.Of == "" {
+		root.Add("nothing changed")
+	}
+	if len(p.Older) > 0 {
+		var sec *render.Node
+		if p.Of == "" {
+			sec = root.Section("earlier")
+		} else {
+			sec = root
+		}
+		for _, day := range p.Older {
+			dn := sec.Section(day.Day)
+			tiered(dn, day.Rows)
+			if g := day.Arrivals; g != nil {
+				rows(dn.Section("new and gone: "+g.Text), g.Rows)
+			}
+		}
+	}
+	if more > 0 {
 		expand := "archo changes"
 		if len(a.Pos) == 1 {
 			expand += " " + a.Pos[0]
 		}
+		if o.Library {
+			expand += " --library"
+		}
 		if s := a.Str("since"); s != "" {
 			expand += " --since " + s
 		}
-		root.Addf("… %d more (%s --all)", len(evs)-shown, expand)
+		root.Addf("… %d more (%s --all)", more, expand)
 	}
-	if len(evs) == 0 && len(a.Pos) == 0 && a.Str("since") == "" {
-		d.AddNext("archo changes --since 30d")
+	if !o.Library && len(a.Pos) == 0 {
+		d.AddNext("archo changes --library")
 	}
 	return d, nil
+}
+
+// lineageIDs is every instance of the Lineage of id (view.LineageIDs).
+func lineageIDs(ix *app.Index, id string) []string {
+	m := ix.ByID[id]
+	if m == nil || m.LineageID == "" || len(ix.ByLineage[m.LineageID]) == 0 {
+		return []string{id}
+	}
+	out := []string{id}
+	for _, x := range ix.ByLineage[m.LineageID] {
+		if x.ID != id {
+			out = append(out, x.ID)
+		}
+	}
+	return out
 }
 
 // activeList is `list --active`: the workspace in load order, missing entries included.

@@ -240,6 +240,8 @@ func (m *model) helpPage() tea.Cmd {
 		page = view.EditorPage
 	case tabLibrary:
 		page = view.LibraryPage
+	case tabChanges:
+		page = view.ChangesPage
 	}
 	rows := view.KeyHelp(page, true)
 	w := 0

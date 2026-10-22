@@ -143,8 +143,8 @@ func TestBuildHome(t *testing.T) {
 	if r := h.Rows[1]; r.Facts != "42 mods" || h.Rows[2].Mode != "" {
 		t.Fatalf("pack facts %+v, light %+v", r, h.Rows[2])
 	}
-	if h.ScanWhen == "" {
-		t.Fatalf("no scan time: %+v", h)
+	if h.Changes == nil || h.Changes.Text != "nothing changed" {
+		t.Fatalf("the plan's changes: %+v", h.Changes)
 	}
 }
 

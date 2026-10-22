@@ -160,6 +160,7 @@ func WhereOf(lib *app.Library, i *app.LibInstance) Where {
 const (
 	EditorPage  = "plan"
 	LibraryPage = "library"
+	ChangesPage = "changes"
 )
 
 // CopyOps are the codes that apply to a copy now, in menu order (06 §8.5): the plan ops by

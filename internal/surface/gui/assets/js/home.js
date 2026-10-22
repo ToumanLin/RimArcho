@@ -1,15 +1,21 @@
 // 首页 (06 §2.3): what is applied now as one large card with ▶ 启动游戏, then every other
 // plan and pack of every environment as one line — the game versions it runs on, the
-// name, its kind, its mods, and 应用 — then the last run and the last scan as two lines.
+// name, its kind, its mods, and 应用 — then the last game and the current plan's changes
+// since it was last played, one line each.
 // 应用 makes a row the applied one (its environment and plan become current; a pack becomes
 // the featured item); it writes no game file. Data: API.Home (view.BuildHome,
 // view.AddOtherEnvs, view.PickFeatured).
 import { S, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page } from "./screens.js";
+import { openScreen, page, changesPlan } from "./screens.js";
 import { icon } from "./icons.js";
 
 let ui = null;
-export function initHome(u) { ui = u; }
+export function initHome(u) {
+  ui = u;
+  // Back from a game: the page reads the new Player.log (API.Home reads it when it is newer
+  // than the last one read).
+  addEventListener("focus", () => { if (S.screen === "home") home(); });
+}
 
 let data = null;
 
@@ -114,20 +120,27 @@ async function apply(r) {
   await home();
 }
 
-// activity: the last run and the last scan, two lines of text, each a link.
+// activity: the last game (only once there was one) and the current plan's changes since
+// it was last played, each a line that is a link (06 §2.3).
 function activity() {
   const box = el("div", "hb-act");
-  const runText = S.live && S.live.running ? T("the game is running") + " · " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
-    : !data.lastRun ? T("no run read yet") : data.lastRun + " · " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : T("no errors"));
-  const runGo = (S.live && S.live.running) || data.lastRunErrors ? "needs" : "log";
-  box.append(actLine(T("last run"), runText, () => ui.go(runGo)));
-  const scanText = !data.scanWhen ? T("no scan yet (R scans)") : (data.changes || T("nothing changed")) + " · " + Tf("scanned %s", data.scanWhen);
-  box.append(actLine(T("since the last scan"), scanText, () => (data.scanWhen ? ui.go("changes") : ui.cmd("rescan"))));
+  const running = S.live && S.live.running;
+  if (running || data.lastRun) {
+    const runText = running ? T("the game is running") + " · " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
+      : (data.lastRunDay || data.lastRun) + " · " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : T("no errors"));
+    const runGo = running || data.lastRunErrors ? "needs" : "log";
+    box.append(actLine(T("last game"), runText, () => ui.go(runGo)));
+  }
+  const c = data.changes;
+  if (c) {
+    const go = c.noScan ? () => ui.cmd("rescan") : () => { changesPlan(); ui.go("changes"); };
+    box.append(actLine(c.title, c.text, go, true));
+  }
   return box;
 }
 
-function actLine(title, text, go) {
-  const b = el("button", "hb-actline");
+function actLine(title, text, go, wide) {
+  const b = el("button", "hb-actline" + (wide ? " wide" : ""));
   b.append(el("span", "t", title), el("span", "x", text), el("span", "go", "→"));
   b.onclick = go;
   return b;

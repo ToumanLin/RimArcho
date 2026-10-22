@@ -186,6 +186,7 @@ func TestGoldenLifecycle(t *testing.T) {
 		}),
 		cmd("scan"),
 		cmd("changes"),
+		cmd("changes", "--library"),
 		func(e *testkit.Env) []string { return []string{"changes", ref(e, "Beta Reborn")} },
 		cmd("mod", "pkg:tester.alpha"),
 		act(func(e *testkit.Env) {
@@ -212,6 +213,7 @@ func TestGoldenLifecycle(t *testing.T) {
 		},
 		cmd("mod", "pkg:brrainz.harmony"),
 		cmd("changes", "--since", "scan:2", "--all"),
+		cmd("changes", "--library", "--since", "scan:2", "--all"),
 		cmd("gc", "--dry-run"),
 		act(func(e *testkit.Env) { e.Advance(120 * 24 * time.Hour) }),
 		cmd("gc"),

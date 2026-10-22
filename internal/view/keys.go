@@ -88,6 +88,20 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			out = append(out, r("u", "undo applies to plan edits (space, m, t, x)"))
 		}
 	}
+	if page == ChangesPage {
+		out = append(out,
+			r("↑↓ · PgUp PgDn", "move"),
+			r("enter", "open or close a mod's changes"),
+			r("i", "the raw file list"),
+			r("a", "the current plan / the whole library"),
+			r("ctrl+w", "the Workshop change notes"),
+			r("ctrl+o", "open the location"),
+			r("D", "see dependencies (能不能跑)"),
+			r("S", "sort the plan"),
+			r("p", "lock this version (dry run first)"),
+			r("esc", "back; with one mod shown, every mod again"),
+		)
+	}
 	out = append(out,
 		r("tab · shift+tab", "next / previous page under the same sidebar entry"),
 		r("shift+1–7", "go to a page in the sidebar"),
