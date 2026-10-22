@@ -15,6 +15,7 @@ func init() {
 		Flags: []Flag{{Name: "cluster", Value: "<E#>"}, {Name: "file", Value: "<path>"}, {Name: "prev", Help: "Player-prev.log"},
 			{Name: "text", Value: "<log or stack text>"}, {Name: "all", Help: "include informational clusters"},
 			{Name: "select", Help: "include this log's clusters in archo problems"},
+			{Name: "since", Value: "<cursor>", Help: "only the clusters new or grown since an earlier archo log printed this cursor"},
 			{Name: "follow", Help: "follow Player.log while the game runs: new clusters as they appear"},
 			{Name: "once", Help: "with --follow: read what is there now and stop"}, {Name: "json", Help: "with --follow: one JSON object per cluster"}, gameVersionFlag}})
 }
@@ -65,11 +66,25 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if a.Bool("follow") {
 		return logFollow(c, a)
 	}
+	var cur app.LogCursor
+	since := a.Str("since")
+	if since != "" {
+		if a.Str("cluster") != "" || a.Str("text") != "" {
+			return nil, &UsageError{Msg: "--since lists the clusters of a log file: not with --cluster or --text"}
+		}
+		var err error
+		if cur, err = app.ParseLogCursor(since); err != nil {
+			return nil, &UsageError{Msg: err.Error()}
+		}
+	}
 	r, st, err := loadLog(c, a)
 	if err != nil {
 		return nil, err
 	}
 	ix := st.Ix
+	if since != "" {
+		return logSince(c, a, st, r, cur, since)
+	}
 	if id := strings.TrimPrefix(a.Str("cluster"), "log:"); id != "" {
 		for _, lc := range r.Clusters {
 			if lc.ID == id {
@@ -94,6 +109,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	d, root := render.New(fmt.Sprintf("log %s (%s%d lines%s): %d clusters", r.Label, ver, r.Lines, when, len(r.Clusters)))
 	if r.Path != "" {
 		root.KV("file", r.Path)
+		root.KV("cursor", r.Cursor)
 		if a.Bool("select") {
 			if err := c.App.SelectLog(st, r.Path); err != nil {
 				return nil, err
@@ -212,4 +228,60 @@ func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc
 		d.Next = d.Next[:6]
 	}
 	return d
+}
+
+// logSince lists the clusters new or grown after a cursor (03 §6.6, MCP analyze_log since).
+func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.LogCursor, since string) (*render.Doc, error) {
+	s, err := c.App.Since(r, cur)
+	if err != nil {
+		return nil, &UsageError{Msg: err.Error()}
+	}
+	shown, hidden := 0, 0
+	var lines []string
+	for _, lc := range s.New {
+		if logs.Informational(lc.Class) && !a.Bool("all") {
+			hidden++
+			continue
+		}
+		shown++
+		mark := "new"
+		if n := s.Then[lc.Key]; n > 0 && s.Stale == "" {
+			mark = fmt.Sprintf("+%d", lc.Count-n)
+		}
+		lines = append(lines, mark+"  "+clusterLine(st.Ix, lc))
+	}
+	head := fmt.Sprintf("log %s (%d lines): %d new or grown since the cursor, %d clusters in all", r.Label, r.Lines, shown, len(r.Clusters))
+	if s.Stale != "" {
+		head = fmt.Sprintf("log %s (%d lines): the cursor is stale, %d clusters", r.Label, r.Lines, len(r.Clusters))
+	}
+	d, root := render.New(head)
+	root.KV("file", r.Path)
+	if s.Stale != "" {
+		root.KV("stale", s.Stale+"; every cluster of the current log is listed")
+	} else {
+		root.KV("since", since)
+	}
+	root.KV("cursor", r.Cursor)
+	analysedAs(root, r)
+	lst := root.Section("list")
+	for _, l := range lines {
+		lst.Add(l)
+	}
+	if shown == 0 {
+		lst.Add("(nothing new)")
+	}
+	lst.Truncate(boolLimit(a, render.DefaultLimit), "archo log --all --since "+since)
+	if hidden > 0 {
+		root.KV("hidden", fmt.Sprintf("%d informational clusters (--all)", hidden))
+	}
+	if s.Moved != "" {
+		d.AddNext("archo log --prev --since " + since)
+	}
+	for _, lc := range s.New {
+		if !logs.Informational(lc.Class) {
+			d.AddNext("archo log --cluster " + lc.ID)
+			break
+		}
+	}
+	return d, nil
 }

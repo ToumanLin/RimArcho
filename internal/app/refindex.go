@@ -153,24 +153,20 @@ func refFiles(st *LoadoutState, mods []*store.Mod) []refFile {
 
 func (a *App) refIndexDir() string { return a.cacheDir("refindex") }
 
-// RefIndex returns the reference index of st's enabled set: from memory, from disk, or
-// built now and stored.
+// RefIndex returns the reference index of st's enabled set: from disk (about 10 ms for 485
+// mods), or built now and stored. It is not kept in memory (~5 MB; the GUI's limit is 32 MiB).
 func (a *App) RefIndex(st *LoadoutState) (*refIndex, error) {
 	mods, err := a.refMods(st)
 	if err != nil {
 		return nil, err
 	}
 	key := refIndexKey(st, mods)
-	if a.refIdx != nil && a.refIdx.key == key {
-		return a.refIdx, nil
-	}
 	path := filepath.Join(a.refIndexDir(), key+".idx")
 	x, err := readRefIndex(path, key)
 	if err != nil {
 		x = buildRefIndex(key, refFiles(st, mods))
 		a.writeRefIndex(path, x) // best effort: a failed write only costs the next build
 	}
-	a.refIdx = x
 	return x, nil
 }
 

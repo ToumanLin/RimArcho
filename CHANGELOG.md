@@ -8,8 +8,8 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 `1.0.0-rc1` first.
 
 ### Breaking
-- Database schema v10 → v14: plans (v11), analysis kept per plan (v12), copy notes (v13),
-  shared mod folders (v14, below). Each environment's workspace, undo stack, versions and
+- Database schema v10 → v15: plans (v11), analysis kept per plan (v12), copy notes (v13),
+  shared mod folders (v14, below), an index for looking defs up by `Name` (v15). Each environment's workspace, undo stack, versions and
   staging become its first plan, `default`; each `loadout tag` name becomes a plan of its own
   with one `import` version (04 §1.4).
 - `launch --force` is removed: launching always writes the plan first (08 §2).
@@ -142,6 +142,15 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - Analysis is kept per plan's enabled set: switching plans and back does not re-run it.
 - "分析本次日志" shows in the sidebar foot and the TUI top bar when Player.log is newer than
   the last launch and the log last seen.
+- `archo log` (MCP `analyze_log`) prints a cursor; `--since <cursor>` (MCP `since`) lists only
+  the clusters that are new (`new`) or whose count grew (`+N`) since then, ArchoMonitor.log
+  included, for an agent polling a running game (03 §6.6). When the game restarted, the cursor
+  is called stale and the old run is Player-prev.log (`--prev --since`).
+- The first query on a new log is fast again (07 §6): on corpus logs 1.1–14 s → 128–330 ms,
+  where it was 568 ms on the reference log. Looking defs up by `Name` has an index (schema v15);
+  the files mentioning each def name are indexed once per enabled set (`cache/refindex/`, built
+  after an analysis), so cross-reference referrers no longer read every mod file; repeated log
+  entries are classified once. Referrer evidence is listed by file.
 
 ### Search (06 §3.7)
 - `tag:` matches the start of any word in a tag: `tag:facial` finds Facial Hair and Facial

@@ -128,7 +128,6 @@ func (a *App) Analyze(progress func(string)) (*AnalyzeReport, error) {
 		progress("indexing def references")
 	}
 	a.RefIndex(st)
-	a.refIdx = nil
 	return &AnalyzeReport{ID: id, Key: key, MM: st.GameMM(), Stats: out.Stats}, nil
 }
 

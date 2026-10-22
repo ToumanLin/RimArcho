@@ -71,6 +71,9 @@ type LogReport struct {
 	// Companion is the companion log read with it (03 §6.7.4); CompanionBad its bad lines.
 	Companion    string `json:",omitempty"`
 	CompanionBad int    `json:",omitempty"`
+	// Cursor marks how much of the log and its companion this report covers: get_log
+	// since=<cursor> lists what is new after it (03 §6.6). Empty for pasted text.
+	Cursor string `json:",omitempty"`
 }
 
 // LogPaths returns the current and previous Player.log for the environment's (or the
@@ -104,7 +107,7 @@ type logCacheEntry struct {
 // read takes the stored report from the database again (the GUI calls it when the player
 // leaves 需要处理 or 日志, 07 §8.3).
 func (a *App) DropLogCaches() {
-	a.logCache, a.refIdx = nil, nil
+	a.logCache = nil
 	a.prCache, a.prKey = nil, ""
 }
 
@@ -115,7 +118,7 @@ func (a *App) DropPlanProblems() { a.planPS = nil }
 var ErrLogNotCached = errors.New("log not analysed yet")
 
 // logCacheVersion invalidates stored reports when attribution changes.
-const logCacheVersion = 3
+const logCacheVersion = 4
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -142,6 +145,7 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 	}
 	rep := &LogReport{Path: path, Label: filepath.Base(path), ModTime: fi.ModTime()}
 	var lf *logs.File
+	var mark logMark
 	row, _ := a.Store.LogCache(path)
 	fresh := row != nil && row.Size == fi.Size() && row.MTime == fi.ModTime().UnixNano()
 	switch {
@@ -150,7 +154,7 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 	case cacheOnly:
 		return nil, ErrLogNotCached
 	default:
-		if lf, err = parseLogFile(path); err != nil {
+		if lf, mark, err = readLog(path, fi.Size()); err != nil {
 			return nil, err
 		}
 		rep.Version = lf.Version
@@ -173,19 +177,23 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 		return nil, ErrLogNotCached
 	}
 	if lf == nil {
-		if lf, err = parseLogFile(path); err != nil {
+		if lf, mark, err = readLog(path, fi.Size()); err != nil {
 			return nil, err
 		}
 	}
 	rep.Lines = lf.Lines
 	fails, _ := analyze.ParseLogFailures(path)
 	var comp *logs.Companion
+	cur := LogCursor{Size: mark.size, Sum: mark.sum}
 	if compPath != "" {
-		comp, _ = logs.ReadCompanion(compPath)
+		var cm logMark
+		comp, cm = readCompanion(compPath, -1)
 		if comp != nil {
 			rep.Companion, rep.CompanionBad = filepath.Base(compPath), comp.BadLines
+			cur.CompSize, cur.CompSum = cm.size, cm.sum
 		}
 	}
+	rep.Cursor = cur.String()
 	only := companionOnly(lf, comp)
 	if err := a.attribute(st, rep, lf, fails, comp); err != nil {
 		return nil, err
@@ -201,15 +209,6 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 		a.Store.PutLogCache(&store.LogCache{Path: path, Size: fi.Size(), MTime: fi.ModTime().UnixNano(), Version: rep.Version, InputKey: ik, Report: b})
 	}
 	return rep, nil
-}
-
-func parseLogFile(path string) (*logs.File, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return logs.Parse(f)
 }
 
 // logInputKey fingerprints what attribution reads besides the log: the game version, the

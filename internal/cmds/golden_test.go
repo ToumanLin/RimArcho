@@ -23,6 +23,9 @@ var update = flag.Bool("update", false, "rewrite golden files")
 // msRe matches wall-clock durations (analysis timings), which vary between runs.
 var msRe = regexp.MustCompile(`(active mods, )[0-9.]+(?:ms|s|µs)`)
 
+// cursorRe matches log cursors (03 §6.6): a checksum of the fixture log, whose paths vary.
+var cursorRe = regexp.MustCompile(`log1\.[0-9a-z]+\.[0-9a-f]{8}(?:\.[0-9a-z]+\.[0-9a-f]{8})?`)
+
 type step func(e *testkit.Env) []string
 
 func cmd(args ...string) step { return func(*testkit.Env) []string { return args } }
@@ -72,6 +75,7 @@ func runGolden(t *testing.T, name string, e *testkit.Env, steps []step, scrub ..
 		out, code := e.Run(args...)
 		fmt.Fprintf(&sb, "$ archo %s\n", e.Scrub(strings.Join(args, " ")))
 		out = msRe.ReplaceAllString(e.Scrub(out), "${1}<dur>")
+		out = cursorRe.ReplaceAllString(out, "<cursor>")
 		for _, f := range scrub {
 			out = f(out)
 		}

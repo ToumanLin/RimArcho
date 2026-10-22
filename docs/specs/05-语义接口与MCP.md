@@ -210,7 +210,7 @@ next:
 | | `library [--search <词>] [--include <键:值>]… [--exclude <键:值>]… [--sort name\|size\|changed\|played] [--lineage <引用>] [--facets] [--all]` | Mod 库存（06 §2.9）：一行一个 Lineage（几份、合计大小、最要紧的状态、用在）；`--lineage` 列出每一份的路径、状态、方案、上次游玩和动作命令；`--facets` 列出每个筛选值和个数 |
 | | `library remove-from-plans <引用…>` | 从所有方案（同一游戏目录的所有环境）里拿掉，每个方案一步撤销 |
 | | `library move-to-locked <引用> [--dry-run]` | 把 `Mods/` 里的备用副本收进锁定库；Instance 不变，各方案照用（06 §2.9） |
-| | `log [--cluster <E#>] [--file <路径>] [--prev] [--text <文本>] [--select] [--all]` | 日志归因（03 §6）。`--prev` 读 Player-prev.log；`--text` 分析粘贴的日志或堆栈；`--select` 让 `problems` 纳入这份日志 |
+| | `log [--cluster <E#>] [--file <路径>] [--prev] [--text <文本>] [--select] [--all] [--since <游标>]` | 日志归因（03 §6）。`--prev` 读 Player-prev.log；`--text` 分析粘贴的日志或堆栈；`--select` 让 `problems` 纳入这份日志。簇列表带一行 `cursor: log1.…`；`--since <游标>` 只列这之后新出现（`new`）或次数增加（`+N`）的簇，游戏重启过时说明游标已过期并列出新一次运行的全部簇（03 §6.6）；不与 `--cluster`、`--text` 同用 |
 | | `log --follow [--once] [--json]` | 游戏运行时跟踪 Player.log，新簇出现就输出（03 §6.6）；`--once` 读完现有内容就停；`--json` 每簇一行 JSON |
 | | `files search <模式> [--mod <引用>] [--regex] [--languages] [--all]` | 在已启用 Mod 的生效内容（XML / TXT）里搜索，不区分大小写；默认跳过 `Languages/`（翻译会重复每个键），`--languages` 才搜 |
 | | `source <引用> [--type <Namespace.Type>] [--all]` | 按需反编译（ilspycmd，按 DLL 哈希缓存，03 §5.4） |
@@ -303,7 +303,7 @@ next:
 | `explain_relation` | `why`（`a`、`b`、`game_version`） | true | — |
 | `list_problems` | `problems`；`ref` 时为 `problems show`。默认加 `--min-severity warning`，给了 `severity`、`min_severity` 或 `all` 时不加 | true | — |
 | `list_changes` | `changes`（`ref`、`since`、`all`） | true | — |
-| `analyze_log` | `log`（`cluster`、`text`、`file`、`prev`、`all`、`game_version`） | true | — |
+| `analyze_log` | `log`（`cluster`、`text`、`file`、`prev`、`all`、`since`、`game_version`） | true | — |
 | `search_files` | `files search`（`pattern`、`mod`、`regex`、`languages`、`all`） | true | — |
 | `read_source` | 有 `search` 时 `source search`：给了 `in` 用 `--in`，`scope: "active"` 用 `--active --yes`，否则 `--implicated`；`budget` 默认 10。否则 `source`（`ref`、`type`） | true | — |
 | `edit_loadout` | `action`：`enable` / `disable` / `move` / `swap` / `sort`（`dry_run`）/ `undo` / `redo` / `stage`（`stage add`）/ `unstage`（`stage drop`）/ `restore`（`stage restore`）；位置参数 `at`、`before`、`after`、`up`、`down` | false | false |
@@ -373,7 +373,7 @@ next:
 | `explain_relation` | 问题点名了两个 Mod，或用户问“为什么 A 要在 B 后面” |
 | `list_problems` | 静态问题；`ref=<p:…>` 看证据和修复命令；`code` 接受前缀（`dep`、`patch`、`harmony`）；方案改变后 Def / Patch / Harmony 层自动重建（几秒） |
 | `list_changes` | 用户说“昨天还好好的”时找变化 |
-| `analyze_log` | 用户贴错误时一律用 `text`；簇的类别：exception、harmony-stack、xml-load、patch-failed、xref-missing、material、other；Player.log 位置：1.7 及以后 `Logs/Player.log`，更早在用户数据目录根部 |
+| `analyze_log` | 用户贴错误时一律用 `text`；簇的类别：exception、harmony-stack、xml-load、patch-failed、xref-missing、material、other；Player.log 位置：1.7 及以后 `Logs/Player.log`，更早在用户数据目录根部。游戏运行时轮询：把上次返回的 `cursor` 作为 `since` 传回，只得到新的或次数增加的簇（Player.log 与 ArchoMonitor.log 一起算）；回答说游标过期就是游戏重启了，旧的那次运行此时是 `prev=true` |
 | `search_files` | XML 证据（defName、XPath 目标、`uiIconColor`、XML 里的类名）；C# 用 `read_source` |
 | `read_source` | 看补丁类或帧所在类型；搜索时优先用短而具体的模式；`scope="active"` 只在用户要求时用（几百个程序集、很多分钟）；ilspycmd 缺失时文本说明怎么装，从不自动安装 |
 | `edit_loadout` | 改方案；每步可撤销 |
