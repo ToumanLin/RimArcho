@@ -173,8 +173,9 @@ func (d ModsDuplicate) Names() string {
 
 // duplicateFindings are the Mods/ duplicates the pack links finding does not cover: each a
 // pkg.duplicate-mods error (06 §2.4 会让游戏出错).
-func duplicateFindings(st *LoadoutState, dups []ModsDuplicate) []*finding.Finding {
+func (a *App) duplicateFindings(st *LoadoutState, dups []ModsDuplicate) []*finding.Finding {
 	var out []*finding.Finding
+	copies := a.ModsCopies(st.Ix)
 	for _, d := range dups {
 		if d.onlyPacks() {
 			continue
@@ -215,6 +216,12 @@ func duplicateFindings(st *LoadoutState, dups []ModsDuplicate) []*finding.Findin
 		default:
 			f.Suggestions = []string{"move all but one of them out of Mods/ (RimArcho does not move folders it did not make)"}
 		}
+		// First choice: move a plain folder into the lock library (收进锁定库), where plans
+		// still choose it; the one beside RimArcho's link, else one the current plan does not
+		// use, preferring one the game ignores (not the first).
+		if mv := a.folderToMove(st, d, copies); mv != nil {
+			f.Suggestions = append([]string{"archo library move-to-locked " + finding.Inst(mv.ID)}, f.Suggestions...)
+		}
 		out = append(out, f)
 	}
 	return out
@@ -223,4 +230,39 @@ func duplicateFindings(st *LoadoutState, dups []ModsDuplicate) []*finding.Findin
 // packSameContent: the instance m is what the pack entry carries (same semantic hash).
 func packSameContent(pe PackEntry, m *store.Mod) bool {
 	return m != nil && pe.Hash != "" && hex.EncodeToString(m.SnapHash) == pe.Hash
+}
+
+// folderToMove picks the plain folder of a Mods/ duplicate to move into the lock library
+// (nil when none can move).
+func (a *App) folderToMove(st *LoadoutState, d ModsDuplicate, copies []ModsCopy) *store.Mod {
+	deploy := false
+	var movable []int
+	for i, c := range d.Copies {
+		if c.By == CopyDeploy {
+			deploy = true
+		}
+		if c.By == CopyPlayer && !c.Link && a.whyNotMovable(st, c, copies) == "" {
+			movable = append(movable, i)
+		}
+	}
+	if len(movable) == 0 {
+		return nil
+	}
+	if deploy {
+		return d.Copies[movable[0]].Mod
+	}
+	best, score := -1, -1
+	for _, i := range movable {
+		s := 0
+		if st.List.Index(d.Copies[i].Mod.ID) < 0 {
+			s += 2
+		}
+		if i > 0 {
+			s++
+		}
+		if s > score {
+			best, score = i, s
+		}
+	}
+	return d.Copies[best].Mod
 }

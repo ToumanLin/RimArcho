@@ -14,7 +14,7 @@ export function initPacks(u) { ui = u; }
 let packPoll = 0;
 const L = { rows: [], un: [], others: 0, cur: 0, els: [] }; // the list page
 let P = null; // the pack page shown: view.PackPage
-const B = { page: null, full: null, light: false, name: "", nameErr: "", seq: 0 }; // the build page
+const B = { page: null, full: null, light: false, tex: 0, name: "", nameErr: "", seq: 0 }; // the build page
 
 // ---- the list (整合包) ----
 
@@ -90,7 +90,28 @@ export async function pack(name) {
 
 async function launch() {
   if (!P || P.light) return;
-  try { say("ok", await api.PackLaunch(P.name)); } catch (e) { say("fail", errText(e)); }
+  await launchPack(P.name);
+}
+
+// launchPack plays a pack (here and on 启动): when Mods/ holds another version of one of its
+// mods that can move into the lock library, one confirmation lists the moves, then it goes
+// on (08 §5.3).
+export async function launchPack(name) {
+  let o;
+  try { o = await api.PackLaunch(name, false); } catch (e) { return say("fail", errText(e)); }
+  if (o.moves) {
+    pop.confirm(T("move the other versions into the lock library"), o.moves, T("move and go on"), async () => {
+      say("busy", T("moving into the lock library…"));
+      let o2;
+      try { o2 = await api.PackLaunch(name, true); } catch (e) { return say("fail", errText(e)); }
+      say(o2.refused ? "fail" : "ok", o2.text);
+      if (o2.refused && o2.refused.length > 1) pop.text(T("launch"), o2.refused);
+      ui.reload();
+    });
+    return;
+  }
+  say(o.refused ? "fail" : "ok", o.text);
+  if (o.refused && o.refused.length > 1) pop.text(T("launch"), o.refused);
   ui.reload();
 }
 
@@ -203,7 +224,7 @@ export function packEvent(ev) {
 // the page shows at once and the sizes follow. again: a redraw keeps the name typed.
 export async function build(again = false) {
   const seq = ++B.seq;
-  if (!again) { B.full = null; B.light = false; B.name = ""; B.nameErr = ""; }
+  if (!again) { B.full = null; B.light = false; B.tex = 0; B.name = ""; B.nameErr = ""; }
   try { await loadList(); } catch { L.un = []; }
   if (!B.page || !again) {
     say("busy", T("checking the list…"));
@@ -228,6 +249,29 @@ async function setLight(light) {
     if (!light) B.full = B.page;
   }
   drawBuild();
+}
+
+// setTex changes the textures choice (full packs): the page is measured again, since the
+// files converted, the size after and the peak all depend on it.
+async function setTex(tex) {
+  if (B.light || B.tex === tex) return;
+  B.tex = tex;
+  const seq = ++B.seq;
+  say("busy", T("checking the list…"));
+  let p;
+  try { p = await api.BuildPage(false, tex); } catch (e) { return say("fail", errText(e)); }
+  if (seq !== B.seq) return;
+  say("", "");
+  B.page = B.full = p;
+  drawBuild();
+}
+
+// nextTex: the D key steps through the choices.
+function nextTex(d) {
+  const cs = (B.page && B.page.texChoices) || [];
+  if (!cs.length) return;
+  const i = cs.findIndex((c) => c.value === B.tex);
+  setTex(cs[(i + d + cs.length) % cs.length].value);
 }
 
 const building = () => !!(S.packBuild || L.un.some((u) => u.running));
@@ -283,12 +327,17 @@ function drawBuild() {
   const steps = el("section", "sec");
   steps.append(el("h2", "label", T("what building does")));
   const sc2 = el("div", "card bd-steps");
-  const at = S.packBuild ? ({ 0: 0, 2: 1, 3: 3, 4: 4 })[S.packBuild.step] ?? 0 : -1;
+  // A build's progress (view.ProgressOf: 0 check, 2 copy, 3 textures, 4 write, 5 done) marks
+  // the steps it is at; copying also locks the versions (origin.json in each copy).
+  const NOW = { 0: ["check"], 2: ["trim", "lock"], 3: ["textures"], 4: ["place"], 5: [] };
+  const now = S.packBuild ? NOW[S.packBuild.step] || ["check"] : null;
+  const first = now ? (now.length ? p.steps.findIndex((s) => now.includes(s.key)) : p.steps.length) : -1;
   p.steps.forEach((s, i) => {
     let cls = "bd-step" + (s.level ? " " + s.level : "");
-    if (at >= 0) cls += i < at ? " done" : i === at || (at === 1 && i === 2) ? " cur" : " wait";
+    const done = now && !now.includes(s.key) && (i < first || (s.key === "lock" && S.packBuild.step >= 3));
+    if (now) cls += done ? " done" : now.includes(s.key) ? " cur" : " wait";
     const r = el("div", cls);
-    const n = el("span", "n", at >= 0 && i < at ? "✓" : s.level === "bad" ? "!" : String(i + 1));
+    const n = el("span", "n", done ? "✓" : s.level === "bad" ? "!" : String(i + 1));
     const body = el("div", "b");
     body.append(el("div", "t", s.title), el("div", "x", s.text));
     if (s.more && s.more.length) {
@@ -297,6 +346,21 @@ function drawBuild() {
       body.append(ul);
     }
     r.append(n, body);
+    if (s.kind === "textures" && p.texChoices) {
+      // the choice itself, a native select: tab reaches it, ↑↓ change it
+      const sel = el("select", "field bd-tex");
+      sel.id = "pk-tex";
+      for (const c of p.texChoices) {
+        const o = el("option", "", c.label);
+        o.value = String(c.value);
+        sel.append(o);
+      }
+      sel.value = String(B.tex);
+      sel.onchange = () => setTex(+sel.value);
+      sel.onkeydown = (e) => { if (e.key === "Escape") { e.stopPropagation(); sel.blur(); } };
+      body.insertBefore(sel, body.children[1]);
+    }
+    if (s.go) r.append(button(T("install"), "", () => ui.go(s.go), "primary"));
     if (s.needs) r.append(button(T("fix them"), "", () => ui.go("needs"), "primary"));
     sc2.append(r);
   });
@@ -359,8 +423,8 @@ function syncButton() {
   if (!go1 || !p) return;
   if (head) head.textContent = B.name.trim() || p.plan;
   err.textContent = B.nameErr || "";
-  let reason = "", toNeeds = false;
-  if (!p.ok) { reason = p.why; toNeeds = p.toNeeds; }
+  let reason = "", toNeeds = false, toGo = "";
+  if (!p.ok) { reason = p.why; toNeeds = p.toNeeds; toGo = p.toGo || ""; }
   else if (S.packBuild) reason = Tf("building pack %s", S.packBuild.name);
   else if (building()) reason = T("another pack is being built; wait for it to finish");
   else if (B.nameErr) reason = B.nameErr;
@@ -369,10 +433,10 @@ function syncButton() {
   why.innerHTML = "";
   why.hidden = !reason;
   if (reason) {
-    if (toNeeds) {
+    if (toNeeds || toGo) {
       const a = el("button", "bd-link", reason + " →");
-      a.title = T("can it run");
-      a.onclick = () => ui.go("needs");
+      a.title = toGo ? T("texture optimisation") : T("can it run");
+      a.onclick = () => ui.go(toGo || "needs");
       why.append(a);
     } else why.append(el("span", "", reason));
   }
@@ -393,7 +457,7 @@ async function startBuild(name, light) {
 // dryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run.
 async function dryRun() {
   const name = (B.name || "").trim() || (B.page && B.page.name) || "";
-  try { pop.text(T("see the list first, write nothing"), await api.PackDryRun(name, B.light)); } catch (e) { say("fail", errText(e)); }
+  try { pop.text(T("see the list first, write nothing"), await api.PackDryRun(name, B.light, B.light ? 0 : B.tex)); } catch (e) { say("fail", errText(e)); }
 }
 
 // ---- keys ----
@@ -407,6 +471,7 @@ export function packsKey(e) {
     if (kk === "B" || (k === "Enter" && e.ctrlKey)) { e.preventDefault(); return go(); }
     if (kk === "V") { e.preventDefault(); return dryRun(); }
     if (kk === "T") { e.preventDefault(); return setLight(!B.light); }
+    if (kk === "D") { e.preventDefault(); return nextTex(1); }
     if (k === "n" || k === "/") { e.preventDefault(); const n = $("#pk-name"); if (n) n.focus(); return; }
     if (k === "Escape") { e.preventDefault(); return ui.go("plan"); }
     return;
@@ -432,7 +497,7 @@ export function hintList() {
   const tail = [{ key: "shift+1–7", label: T("pages") }, { key: "?", label: T("all keys") }];
   if (S.screen === "build") {
     return [{ key: "B", label: T("build") }, { key: "V", label: T("see the list first") }, { key: "T", label: T("full / light pack") },
-      { key: "n", label: T("name") }, { key: "esc", label: T("back to the plan") }, ...tail];
+      B.light ? { key: "n", label: T("name") } : { key: "D", label: T("textures") }, { key: "esc", label: T("back to the plan") }, ...tail];
   }
   if (S.packFocus) {
     return [...(P && !P.light ? [{ key: "L", label: T("play") }] : []), { key: "e", label: T("export") }, { key: "Del", label: T("move to the recycle bin") },

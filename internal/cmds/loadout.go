@@ -30,7 +30,7 @@ func init() {
 	register(&Command{Name: "undo", Args: "[<n>]", Summary: "undo the last workspace edit (or the last n: archo history)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, false) }})
 	register(&Command{Name: "redo", Args: "[<n>]", Summary: "redo an undone workspace edit (or n of them)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, true) }})
 	register(&Command{Name: "save", Summary: "write the list to the game without starting it: Mods/ links, ModsConfig.xml (backup + atomic replace)", MaxArgs: 0,
-		Flags: []Flag{{Name: "dry-run", Help: "show what would be written"}}, Run: saveCmd})
+		Flags: []Flag{{Name: "dry-run", Help: "show what would be written"}, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a mod to link into the lock library"}}, Run: saveCmd})
 	register(&Command{Name: "loadout log", Summary: "saved and imported Loadout versions", MaxArgs: 0, Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: loadoutLog})
 	register(&Command{Name: "loadout diff", Args: "[<v>] [<v>]", Summary: "differences between versions (default: newest version → workspace)", MaxArgs: 2,
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: loadoutDiff})
@@ -41,7 +41,7 @@ func init() {
 	register(&Command{Name: "rule list", Summary: "list user rules", MaxArgs: 0, Run: ruleList})
 	register(&Command{Name: "rule remove", Args: "<r:n>", Summary: "delete a user rule", MinArgs: 1, MaxArgs: 1, Run: ruleRemove})
 	register(&Command{Name: "launch", Summary: "write the list to the game and start it (one game at a time)", MaxArgs: 0,
-		Flags: []Flag{{Name: "dry-run", Help: "show what would be written and the command; write nothing"}}, Run: launchCmd})
+		Flags: []Flag{{Name: "dry-run", Help: "show what would be written and the command; write nothing"}, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a mod to link into the lock library"}}, Run: launchCmd})
 }
 
 // changeRows renders Loadout changes as aligned rows.
@@ -344,7 +344,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.Save(a.Bool("dry-run"))
+	r, err := c.App.SaveWith(a.Bool("dry-run"), a.Bool("move-duplicates"))
 	if err != nil {
 		return nil, err
 	}
@@ -370,6 +370,7 @@ func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 // writeBody is what save and launch write (08 §2, one preview for both dry runs): the file,
 // its version rewrite, the entries, the Mods/ links and the changes since the newest version.
 func writeBody(c *Ctx, root *render.Node, r *app.SaveResult) {
+	movedKV(root, r.Moved, r.DryRun)
 	root.KV("path", r.Path)
 	if r.Backup != "" {
 		root.KV("backup", r.Backup)
@@ -630,7 +631,7 @@ func ruleRemove(c *Ctx, a *Args) (*render.Doc, error) {
 
 func launchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	dry := a.Bool("dry-run")
-	r, err := c.App.Launch(dry)
+	r, err := c.App.LaunchWith(dry, a.Bool("move-duplicates"))
 	if err != nil {
 		return nil, err
 	}
@@ -655,4 +656,20 @@ func launchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	addLaunchChecks(c, root, r.State.Ix)
 	return d, nil
+}
+
+// movedKV lists the Mods/ folders moved into the lock library first (--move-duplicates).
+func movedKV(root *render.Node, moved []app.DuplicateMove, dry bool) {
+	if len(moved) == 0 {
+		return
+	}
+	head := fmt.Sprintf("%d folders moved into the lock library first (their plans keep them)", len(moved))
+	if dry {
+		head = fmt.Sprintf("%d folders would move into the lock library first (their plans keep them)", len(moved))
+	}
+	n := root.KV("moved", head)
+	for _, l := range (&app.DuplicatesError{Moves: moved}).Lines() {
+		n.Add(l)
+	}
+	n.Truncate(10, "")
 }

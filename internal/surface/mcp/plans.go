@@ -6,7 +6,9 @@ package mcp
 
 func planTools() []tool {
 	return []tool{
-		reg("launch_game", false, true, descLaunch, func(in LaunchIn) []string { return argv("launch").flag("dry-run", in.DryRun).a }),
+		reg("launch_game", false, true, descLaunch, func(in LaunchIn) []string {
+			return argv("launch").flag("dry-run", in.DryRun).flag("move-duplicates", in.MoveDuplicates).a
+		}),
 		// Removing a plan deletes its history and cannot be undone (04 §1.3), so the whole
 		// tool is marked destructive, like resolve_identity.
 		reg("manage_plans", false, true, descPlans, func(in PlansIn) []string { return PlansArgv(in) }),
@@ -51,8 +53,9 @@ func HistoryArgv(in HistoryIn) []string {
 // ---- tool arguments ----
 
 type LaunchIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would be written and the command line; write nothing, start nothing"`
+	Env            string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	DryRun         bool   `json:"dry_run,omitempty" jsonschema:"show what would be written and the command line; write nothing, start nothing"`
+	MoveDuplicates bool   `json:"move_duplicates,omitempty" jsonschema:"first move plain Mods/ folders holding another version of a mod RimArcho links into the lock library (the refusal names them; show the dry run first)"`
 }
 
 type PlansIn struct {

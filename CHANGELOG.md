@@ -458,6 +458,14 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   in `Mods/`. Such pairs already there are `pkg.duplicate-mods` errors in 能不能跑 › 会让游戏出错,
   whoever made them; the fix only ever changes RimArcho's own links or the plan, never the
   player's folders. Pack links that duplicate a copy raise `pack.links-left` to an error.
+- Another version in the way (08 §3, §5.3): when a pack or a plan's locked copy needs one
+  version and `Mods/` holds a plain folder with another, RimArcho offers to move that folder
+  into the lock library and go on, with one confirmation listing what moves where and what is
+  linked instead. Plans that used the folder keep it (it comes back through a link). The
+  refusal names the fix: `--move-duplicates` on `save`, `launch` and `pack launch` (MCP
+  `move_duplicates`), or `archo library move-to-locked <ref>`. Links, folders another tool's
+  link points at, and folders with links pointing outside never move. `pkg.duplicate-mods`
+  gets a 收进锁定库 action for the plain folder.
 - A pack's `!ArchoPack_` links left in `Mods/` while the pack is not being played (a game
   started from Steam would load the pack's copies) are a problem of the plan,
   `pack.links-left`: in 能不能跑 › 要你确认 with 移除链接, in the tab under 启动游戏, in
@@ -479,7 +487,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   pack's copies, which then drop their PNGs. Space is checked against the peak; `pack.json`
   records what was done.
 - GUI: a 贴图优化 page (estimate, scale, progress, stop, clean), Mod 库存's 优化贴图 /
-  清除贴图优化, the pack build's textures option (in the API; the new build page still needs its control); TUI palette panel; MCP `manage_textures`.
+  清除贴图优化, the pack build's textures choice on 编译成整合包 (its own step 贴图 for full packs: off / 预转换 /
+  精简 80–25%, with the PNGs converted, the size after and the peak while converting; `D` steps
+  through it; without todds the step says so and 编译 points to 设置 › 贴图优化); TUI palette panel; MCP `manage_textures`.
 
 ### Log corpus (03 §4.3, §4.3.1, §5.3, §6.3, §6.8; 04 §5; 08 §2)
 The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.

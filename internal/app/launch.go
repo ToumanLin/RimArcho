@@ -55,7 +55,11 @@ var ErrLaunchBlocked = errors.New("launch blocked")
 // a version with source "launch" unless the list equals the newest version), the launch is
 // recorded and the game started. Nothing blocks on edits since the last write: launching is
 // the write. dryRun computes the same preview and writes nothing.
-func (a *App) Launch(dryRun bool) (*SaveResult, error) {
+func (a *App) Launch(dryRun bool) (*SaveResult, error) { return a.LaunchWith(dryRun, false) }
+
+// LaunchWith is Launch that, with move, first moves plain Mods/ folders in the way of a
+// deployed copy into the lock library (08 §3; --move-duplicates).
+func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 	if err := a.checkNoGame(); err != nil {
 		return nil, err
 	}
@@ -72,7 +76,7 @@ func (a *App) Launch(dryRun bool) (*SaveResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, err := a.writeGame(st, dryRun, true)
+	r, err := a.writeGame(st, dryRun, true, move)
 	if err != nil {
 		return nil, err
 	}

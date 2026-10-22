@@ -225,7 +225,7 @@ func (s *API) BuildPage(light bool, tex int) (*view.BuildPage, error) {
 		return nil, err
 	}
 	pl.Measure(dir)
-	p := view.BuildPageOf(pl, plan, chip, dir, light)
+	p := view.BuildPageOf(pl, plan, chip, dir, light, tex)
 	p.Name = name
 	return p, nil
 }
@@ -248,12 +248,14 @@ func (s *API) PackNameCheck(name string) string {
 }
 
 // PackDryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run (nothing is written).
-func (s *API) PackDryRun(name string, light bool) []string {
+func (s *API) PackDryRun(name string, light bool, tex int) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	argv := []string{"pack", "build", strings.TrimSpace(name), "--dry-run"}
 	if light {
 		argv = append(argv, "--light")
+	} else {
+		argv = append(argv, app.PackBuildArgs(view.PackTextureOptions(tex))...)
 	}
 	text, _ := cmds.Execute(s.a, argv)
 	st := s.boardState()
@@ -411,14 +413,12 @@ func (s *API) PackRemoveUnfinished(name string) (string, error) {
 	return view.Tf("deleted the unfinished build of %s", name), nil
 }
 
-// PackLaunch plays a pack.
-func (s *API) PackLaunch(name string) (string, error) {
+// PackLaunch plays a pack. move: the player agreed to move the folders in the way into the
+// lock library first (Outcome.Moves, 08 §5.3).
+func (s *API) PackLaunch(name string, move bool) (*view.Outcome, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, err := s.a.LaunchPack(name, false); err != nil {
-		return "", err
-	}
-	return view.Tf("pack %s: the game is starting", name), nil
+	return view.LaunchPack(s.a, name, move), nil
 }
 
 // PackRemove moves a pack to the recycle bin.
@@ -793,6 +793,20 @@ func (s *API) Run(what string) (*view.Outcome, error) {
 		return nil, fmt.Errorf("no action %s", what)
 	}
 	return view.Run(s.a, what), nil
+}
+
+// RunMoving is Run after the player agreed to move the folders in the way into the lock
+// library (Outcome.Moves, 08 §3).
+func (s *API) RunMoving(what string) (*view.Outcome, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	switch what {
+	case view.ListSave, view.ListLaunch:
+	default:
+		return nil, fmt.Errorf("no action %s", what)
+	}
+	return view.RunMoving(s.a, what), nil
 }
 
 // ---- tags (06 §3.8) ----

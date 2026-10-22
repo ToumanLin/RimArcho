@@ -438,12 +438,26 @@ async function run(what) {
   const before = motion.snapshot();
   let o;
   try { o = await api.Run(what); } catch (e) { return say("fail", errText(e)); }
+  // another version in the way that can move into the lock library: one confirmation, then on
+  if (o.moves) return confirmMoves(o, () => api.RunMoving(what), async (o2) => { say(o2.refused ? "fail" : "ok", o2.text); await reload(); motion.play(before, null); });
   if (o.refused) {
     say("fail", o.text);
     if (o.refused.length > 1) pop.text({ sort: T("sort"), save: T("write to the game"), launch: T("launch") }[what], o.refused);
   } else say("ok", o.text, !!o.undo);
   await reload();
   motion.play(before, null);
+}
+
+// confirmMoves asks once about moving folders into the lock library (08 §3), then runs again.
+export function confirmMoves(o, again, then) {
+  say("", "");
+  pop.confirm(T("move the other versions into the lock library"), o.moves, T("move and go on"), async () => {
+    say("busy", T("moving into the lock library…"));
+    let o2;
+    try { o2 = await again(); } catch (e) { return say("fail", errText(e)); }
+    if (o2.refused && o2.refused.length > 1) pop.text(T("launch"), o2.refused);
+    then(o2);
+  });
 }
 
 // preview: the dry run of sort, save or launch, to read (the palette's 预览…); nothing to confirm.

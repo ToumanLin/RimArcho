@@ -55,6 +55,7 @@ const (
 	ActIgnore          = "ignore"           // Problem: keep as it is (ignore the problem)
 	ActUnlinkPacks     = "unlink-packs"     // remove the packs' links from Mods/ (08 §5.3)
 	ActSwap            = "swap"             // Refs[0] → Refs[1] in the plan (one undoable step)
+	ActMoveLocked      = "move-to-locked"   // Refs[0]: a Mods/ folder into the lock library (confirm first)
 	ActTextures        = "textures"         // Refs: convert their textures to DDS again (confirm first)
 	ActTexClean        = "textures-clean"   // Refs: delete the DDS RimArcho wrote (confirm first)
 )
@@ -589,15 +590,31 @@ func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need 
 	pkg := p.Key
 	var where []string
 	for _, e := range p.Evidence {
-		where = append(where, e.Text)
+		// "Mods/<name> (<who made it>)": the part in brackets in the UI language
+		t := e.Text
+		if i := strings.LastIndex(t, " ("); i > 0 && strings.HasSuffix(t, ")") {
+			t = t[:i] + " (" + T(t[i+2:len(t)-1]) + ")"
+		}
+		where = append(where, t)
 	}
 	n := Need{Group: GroupList, rank: 3, Counted: true, Status: StatusErr, Mods: ids,
 		Title:    Tf("Mods/ holds %s twice", pkg),
 		Text:     Tf("Mods/ has %d folders with packageId %s: the game reports an error and ignores all but one", len(where), pkg),
 		Evidence: evidence(EvInferred, strings.Join(where, ", "))}
+	var move *Action
+	sgs := p.Suggestions
+	if len(sgs) > 0 && strings.HasPrefix(sgs[0], "archo library move-to-locked ") {
+		tok := strings.TrimPrefix(sgs[0], "archo library move-to-locked ")
+		name := TokName(st, tok)
+		move = &Action{Kind: ActMoveLocked, Key: "M", Label: T("move into the lock library"), Refs: []string{TokRef(st, tok)},
+			Confirm: T("press M again to move the folder into the lock library"),
+			Warn:    Tf("the folder of %s leaves Mods/ for the lock library; plans that use it keep it and get it through a link", name),
+			Done:    Tf("%s is in the lock library", name)}
+		sgs = sgs[1:]
+	}
 	sg := ""
-	if len(p.Suggestions) > 0 {
-		sg = p.Suggestions[0]
+	if len(sgs) > 0 {
+		sg = sgs[0]
 	}
 	f := strings.Fields(sg)
 	switch {
@@ -612,6 +629,11 @@ func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need 
 	default:
 		n.Why = T("RimArcho did not make these folders and does not move them: move all but one out of Mods/ yourself")
 		n.Actions = []Action{{Kind: ActList, Key: "enter", Label: T("see which"), Title: Tf("Mods/ holds %s twice", pkg), Lines: where}}
+	}
+	if move != nil {
+		// 收进锁定库 first: the plain folder leaves Mods/, plans keep it (08 §3)
+		n.Why = T("move the plain folder into the lock library: it leaves Mods/, and plans that use it keep it and get it through a link")
+		n.Actions = append([]Action{*move}, n.Actions...)
 	}
 	return n
 }
@@ -787,6 +809,8 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		_, err = a.UnlinkPacks(false)
 	case ActSwap:
 		_, err = a.Swap(act.Refs[0], act.Refs[1])
+	case ActMoveLocked:
+		_, err = a.MoveToLocked(act.Refs[0], false)
 	case ActTextures:
 		r, err := a.OptimizeTextures(app.TextureRun{Refs: act.Refs})
 		if err != nil {

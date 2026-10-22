@@ -681,8 +681,9 @@ type PackLaunch struct {
 	UserData   string
 	Plan       *LaunchPlan
 	DryRun     bool
-	Copied     []string // settings files copied from the environment on the first run
-	InMods     []string // mods whose copy already in Mods/ (the same content) stands in for the pack's
+	Copied     []string        // settings files copied from the environment on the first run
+	InMods     []string        // mods whose copy already in Mods/ (the same content) stands in for the pack's
+	Moved      []DuplicateMove // folders moved into the lock library first (or, in a dry run, to move)
 }
 
 func packLink(name string) bool {
@@ -696,6 +697,12 @@ func packLinkName(pack, folder string) string {
 // LaunchPack plays a pack (08 §5.3): its mods are linked into Mods/, its list is written to
 // its own data folder, and the game starts with -savedatafolder pointing there.
 func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
+	return a.LaunchPackWith(name, dryRun, false)
+}
+
+// LaunchPackWith is LaunchPack that, with move, first moves plain Mods/ folders holding
+// another version of a pack copy into the lock library (08 §5.3; --move-duplicates).
+func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error) {
 	if err := a.checkNoGame(); err != nil { // one game at a time (08 §1)
 		return nil, err
 	}
@@ -728,14 +735,15 @@ func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 	// refused. A plan's _Archo_ link of the same packageId is removed for the run (writing
 	// the plan to the game makes it again).
 	byPkg := map[string][]ModsCopy{}
-	for _, c := range a.ModsCopies(st.Ix) {
+	copies := a.ModsCopies(st.Ix)
+	for _, c := range copies {
 		byPkg[c.PackageID] = append(byPkg[c.PackageID], c)
 	}
 	cands := Candidates(st.Ix, st.Aliases)
 	want := map[string]string{}         // link name (lower) → target
 	useLocal := map[string]*store.Mod{} // pack folder → the player's copy that stands in
 	dropDeploy := map[string]bool{}     // _Archo_ link names (lower) that would duplicate
-	var conflicts []string
+	var dups []DuplicateMove
 	for _, pe := range p.Entries {
 		if pe.Official {
 			continue
@@ -757,15 +765,36 @@ func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 		case len(player) == 1 && packSameContent(pe, player[0].Mod):
 			useLocal[pe.Folder] = player[0].Mod
 		default:
-			var ns []string
+			// Another version in the way: it may move into the lock library, after which
+			// the pack's copy is linked as usual (the dry run shows it so).
+			link := packLinkName(name, pe.Folder)
 			for _, c := range player {
-				ns = append(ns, "Mods/"+c.Name)
+				dups = append(dups, DuplicateMove{Copy: c, For: fmt.Sprintf("pack %s's copy of %s", name, pe.Name), Pack: name, Mod: pe.Name, Link: link})
 			}
-			conflicts = append(conflicts, fmt.Sprintf("%s: %s has the same packageId with other content than the pack's copy", pe.Name, strings.Join(ns, ", ")))
+			want[strings.ToLower(link)] = filepath.Join(dir, "mods", pe.Folder)
+			cands = append(cands, loadout.Candidate{ID: "pack:" + pe.Folder, PackageID: pe.PackageID, Kind: source.Local, Folder: link})
 		}
 	}
-	if len(conflicts) > 0 {
-		return nil, fmt.Errorf("%w: Mods/ already holds %d of the pack's mods in another version; the game would load both and report an error. Move those folders out of Mods/, or build the pack again from the current list:\n  %s", ErrLaunchBlocked, len(conflicts), strings.Join(conflicts, "\n  "))
+	if len(dups) > 0 {
+		de := &DuplicatesError{Moves: a.planMoves(st, copies, dups), Fix: "archo pack launch " + quoteRef(name) + " --move-duplicates"}
+		if !move || !de.Movable() {
+			if !de.Movable() {
+				de.Fix = ""
+			}
+			return nil, de
+		}
+		if !dryRun {
+			// Move them, then launch from the state after the move.
+			if _, err := a.doMoves(de.Moves); err != nil {
+				return nil, err
+			}
+			r2, err := a.LaunchPackWith(name, false, false)
+			if r2 != nil {
+				r2.Moved = de.Moves
+			}
+			return r2, err
+		}
+		r.Moved = de.Moves
 	}
 	reg := loadout.NewRegistry(cands)
 	for _, pe := range p.Entries {
@@ -1103,4 +1132,12 @@ func (a *App) RemovePack(name string, dryRun bool) (string, error) {
 		}
 	}
 	return dir, a.ToTrash(dir)
+}
+
+// quoteRef quotes a name for a command line when it has a space.
+func quoteRef(s string) string {
+	if strings.ContainsAny(s, " \t") {
+		return `"` + s + `"`
+	}
+	return s
 }

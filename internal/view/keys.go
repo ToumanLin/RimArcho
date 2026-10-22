@@ -116,6 +116,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		out = append(out,
 			r("n · /", "type the name"),
 			r("T", "full pack / light pack"),
+			r("D", "textures: next choice"),
 			r("B · enter in the name", "build"),
 			r("V", "see the list first, write nothing"),
 			r("tab", "the next field or button"),
