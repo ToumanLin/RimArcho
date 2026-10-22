@@ -207,6 +207,37 @@ pack first: the game is starting
   saves: $ROOT/ArchoHome/packs/first/userdata
   command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/ArchoHome/packs/first/userdata
 
+> list_problems {"code":"pack"}
+problems: 0 error, 1 warning, 0 info
+  analysis: a:1 2026-10-01 12:00
+  list:
+    warning pack.links-left  Mods/ still has 2 links of pack first: a game started from Steam, not from RimArcho, loads the pack's copies instead of this plan's mods  (p:9a4df2)
+      evidence: inferred Mods/!ArchoPack_first_2009463077
+      evidence: inferred Mods/!ArchoPack_first_A_Local
+      fix: archo pack unlink
+next:
+  archo pack unlink
+
+> manage_packs {"action":"unlink","dry_run":true}
+pack unlink: dry run, would remove 2 links of pack first
+  links: $ROOT/Steam/steamapps/common/RimWorld/Mods
+    - !ArchoPack_first_2009463077
+    - !ArchoPack_first_A_Local
+next:
+  archo pack unlink
+
+> manage_packs {"action":"unlink"}
+removed 2 links of pack first from Mods/ (the pack is unchanged)
+  links: $ROOT/Steam/steamapps/common/RimWorld/Mods
+    - !ArchoPack_first_2009463077
+    - !ArchoPack_first_A_Local
+
+> list_problems {"code":"pack"}
+problems: 0 error, 0 warning, 0 info
+  analysis: a:1 2026-10-01 12:00
+  list:
+    (none)
+
 > manage_packs {"action":"export","file":"$ROOT/first.archopack.json","light":true,"name":"first"}
 exported pack first to $ROOT/first.archopack.json (717 B)
 

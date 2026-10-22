@@ -44,8 +44,27 @@ func ProblemRef(f *finding.Finding, lineage string) string {
 }
 
 // Problems collects the declaration layer (computed now) and the stored Def/Patch layers.
-// With ensure, a stale or missing analysis is rebuilt first.
+// With ensure, a stale or missing analysis is rebuilt first. A pack's links left in Mods/
+// (08 §5.3) are looked at every time: they change on disk, outside what the cache knows.
 func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) {
+	ps, err := a.problems(ensure, progress)
+	if err != nil || ps.State == nil {
+		return ps, err
+	}
+	if l := a.LeftPackLinks(ps.State.Ix); l != nil {
+		c := *ps
+		f := l.Finding()
+		i := 0
+		for i < len(ps.List) && ps.List[i].Severity == finding.Error {
+			i++
+		}
+		c.List = append(append(append([]*Problem{}, ps.List[:i]...), &Problem{Finding: f, Ref: ProblemRef(f, "")}), ps.List[i:]...)
+		ps = &c
+	}
+	return ps, nil
+}
+
+func (a *App) problems(ensure bool, progress func(string)) (*ProblemSet, error) {
 	ps := &ProblemSet{}
 	if ensure {
 		ps.Analysis, ps.AnalysisErr = a.EnsureAnalysis(progress)

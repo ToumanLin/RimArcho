@@ -385,6 +385,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   saves (a game's `Saves/`, own save folders, save backups) and a game downloaded with
   SteamCMD. A link, or any other path, is refused whoever asks (`trash`, `pack remove`,
   Mod 库存, moving copies to the lock library, uninstall).
+- A pack's `!ArchoPack_` links left in `Mods/` while the pack is not being played (a game
+  started from Steam would load the pack's copies) are a problem of the plan,
+  `pack.links-left`: in 能不能跑 › 要你确认 with 移除链接, in the tab under 启动游戏, in
+  `archo problems` and MCP `list_problems`. `archo pack unlink [--dry-run]` / MCP
+  `manage_packs action=unlink` remove only the links; refused while a game runs.
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).

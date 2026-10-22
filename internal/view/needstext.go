@@ -77,5 +77,14 @@ func init() {
 		"they most likely come from this mod; see the log and evidence before changing anything": "最可能来自这个 Mod；先看看日志和证据再改。",
 		"this plan was changed after it too: load the outside list, or keep yours":               "这个方案之后也改过：可以载入外面的列表，或者保留你的。",
 		"they look alike; your answer decides whether lists and history treat them as one":       "它们很像；你的回答决定列表和历史是否把它们当成同一个。",
+		// a pack's links left in Mods/ (08 §5.3)
+		"remove the links":                      "移除链接",
+		"the links of pack %s are out of Mods/": "整合包 %s 的链接已从 Mods/ 移除",
+		"pack %s left its links in Mods/: a game started from Steam loads the pack's copies": "整合包 %s 的链接还在 Mods/：从 Steam 启动的游戏会读到包里的副本",
+		"pack %s left its links in Mods/": "整合包 %s 的链接还在 Mods/",
+		"a game started from Steam, not from RimArcho, loads the pack's copies instead of this plan's mods; launching from RimArcho removes them, and launching the pack makes them again": "不经过 RimArcho、直接从 Steam 启动时，游戏读到的是包里的副本，不是这个方案的 Mod。从 RimArcho 启动会自动移除它们，再启动这个包时会重新建立。",
+		"the game is running with pack %s's copies: it was not started from RimArcho":                                                                                                      "游戏正在用整合包 %s 的副本运行：它不是从 RimArcho 启动的",
+		"the game is running with pack %s's copies": "游戏正在用整合包 %s 的副本运行",
+		"it was started from Steam while the pack's links were in Mods/, so it loaded the pack's copies; close the game, then remove the links": "它是在包的链接还在 Mods/ 时从 Steam 启动的，所以读到了包里的副本。先关掉游戏，再移除链接。",
 	})
 }

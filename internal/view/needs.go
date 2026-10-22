@@ -53,6 +53,7 @@ const (
 	ActUnpin           = "unpin"            // Refs[0]: restore the workshop copy (confirm first)
 	ActTrash           = "trash"            // Refs[0]: folder to the recycle bin (confirm first)
 	ActIgnore          = "ignore"           // Problem: keep as it is (ignore the problem)
+	ActUnlinkPacks     = "unlink-packs"     // remove the packs' links from Mods/ (08 §5.3)
 )
 
 // Option is one choice of a choose-disable action.
@@ -297,6 +298,8 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			add(Need{Group: GroupHidden, Text: Tf("%s is hidden from the game (probably by another mod manager)", nm(x)),
 				Actions: []Action{keepHidden(p), unhide(st, x), trash(st, x)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("%s is hidden from the game", nm(x)), Why: T("probably by another mod manager; keep it hidden, show it again, or recycle it"), Evidence: ev})
+		case app.CodePackLinks:
+			add(packLinksNeed(p))
 		case "def.parent-missing":
 			merge("def|"+x, nm(x), "", Need{Group: GroupDeps, Text: Tf("part of %s builds on a definition no enabled mod provides; a dependency may be missing", nm(x)),
 				Actions: []Action{viewAction(T("see what"), "mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s,
@@ -462,6 +465,40 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		return out[i].rank < out[j].rank
 	})
 	return out
+}
+
+// packLinksNeed: a pack's links left in Mods/ (08 §5.3). Launching from RimArcho removes
+// them anyway, so it is something to decide, not something that breaks the game: in
+// 要你确认, with one action that removes only the links (no confirmation: launching the
+// pack makes them again).
+func packLinksNeed(p *app.Problem) Need {
+	var packs []string
+	for _, s := range p.Subjects {
+		if n, ok := strings.CutPrefix(s, "pack:"); ok {
+			packs = append(packs, n)
+		}
+	}
+	name := strings.Join(packs, ", ")
+	if name == "" {
+		name = "?"
+	}
+	var src []string
+	for _, e := range p.Evidence {
+		src = append(src, e.Text)
+	}
+	act := Action{Kind: ActUnlinkPacks, Key: "X", Label: T("remove the links"), Done: Tf("the links of pack %s are out of Mods/", name)}
+	n := Need{Group: GroupConfirm, rank: -1, Counted: true, Status: StatusWarn, Actions: []Action{act},
+		Text:     Tf("pack %s left its links in Mods/: a game started from Steam loads the pack's copies", name),
+		Title:    Tf("pack %s left its links in Mods/", name),
+		Why:      T("a game started from Steam, not from RimArcho, loads the pack's copies instead of this plan's mods; launching from RimArcho removes them, and launching the pack makes them again"),
+		Evidence: evidence(EvInferred, strings.Join(src, ", "))}
+	if p.Key == "running" {
+		n.Status = StatusErr
+		n.Text = Tf("the game is running with pack %s's copies: it was not started from RimArcho", name)
+		n.Title = Tf("the game is running with pack %s's copies", name)
+		n.Why = T("it was started from Steam while the pack's links were in Mods/, so it loaded the pack's copies; close the game, then remove the links")
+	}
+	return n
 }
 
 func questionNeed(st *app.LoadoutState, q *store.Question) Need {
@@ -631,6 +668,8 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		_, err = a.Trash(act.Refs[0], false)
 	case ActIgnore:
 		_, err = a.IgnoreProblem(act.Problem, false)
+	case ActUnlinkPacks:
+		_, err = a.UnlinkPacks(false)
 	default:
 		return "", fmt.Errorf("%s is not a data action", act.Kind)
 	}
