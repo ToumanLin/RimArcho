@@ -110,7 +110,8 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PageLog, Label: T("game log")},
 	}
 	library := []NavItem{
-		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageChanges, Label: T("changes")}}},
+		// The entry opens 全部, its first sub-entry (06 §2.9).
+		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all")}, {ID: PageChanges, Label: T("changes")}}},
 		{ID: PagePlan, Label: T("plans"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		{ID: PageEnv, Label: T("environment")},

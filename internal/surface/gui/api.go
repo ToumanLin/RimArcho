@@ -29,6 +29,9 @@ type API struct {
 	a       *app.App
 	emit    func(name string, data any) // Wails events; nil in tests
 	open    func(url string) error      // the system browser
+	openDir func(dir string) error      // the file manager (nil: the system's)
+	lib     *app.Library                // Mod 库存, as of libAt
+	libAt   string
 	board   *view.Board
 	needs   *view.Needs
 	needsAt string // the database state the needs were built at

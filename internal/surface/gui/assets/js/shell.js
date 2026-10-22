@@ -148,7 +148,7 @@ function renderSide() {
       nav.append(el("div", "grp", g.title));
       for (const it of g.items || []) {
         const kids = it.kids || [];
-        const kidOn = kids.some((k) => k.id === cur) || (it.id === "library" && cur === "changes");
+        const kidOn = kids.some((k) => k.id === cur);
         const on = it.id === cur || kidOn;
         // only the open entry shows its sub-entries (06 §2.1)
         if (on && kids.length) openNow = it.id;
@@ -165,7 +165,7 @@ function renderSide() {
         let n = null;
         if (badge) b.append(n = el("span", "badge-n num", String(badge)));
         bump("nav:" + it.id, n, badge || 0);
-        b.onclick = () => ui.go(it.id === "library" ? "changes" : it.id);
+        b.onclick = () => ui.go(it.id);
         nav.append(b);
         if (kids.length) nav.append(kidList(it, kids, cur, hls.get(it.id)));
       }
