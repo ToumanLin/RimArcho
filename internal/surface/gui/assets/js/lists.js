@@ -50,7 +50,7 @@ export async function refilter(k, keepKey) {
   } else {
     const r = await api.Filter(k, c.query);
     c.view = r.rows || [];
-    c.others = r.counts;
+    c.others = null; // no "other lists" line: tab no longer jumps lists (06 §3.7)
     c.complete = r.complete || "";
   }
   c.cursor = Math.max(0, Math.min(c.cursor, c.view.length - 1));

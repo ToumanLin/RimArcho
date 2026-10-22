@@ -552,24 +552,8 @@ function searchKey(k, e, inp) {
     if (acceptGhost(k, inp)) { e.preventDefault(); e.stopPropagation(); return; }
   }
   if (e.key === "ArrowLeft" || e.key === "Home" || e.key === "End") setTimeout(() => showGhost(k));
-  if (e.key === "Tab") {
-    // otherwise tab goes to the next list with matches, carrying the query
-    e.preventDefault();
-    e.stopPropagation();
-    const counts = col(k).others || [0, 0, 0];
-    for (let d = 1; d <= 2; d++) {
-      const j = (k + d) % 3;
-      if (counts[j] > 0) {
-        col(j).query = inp.value;
-        inp.blur();
-        col(k).searching = false;
-        startSearch(j);
-        search(j, inp.value);
-        return;
-      }
-    }
-    return;
-  }
+  // 未启用 and 已启用 share the filter bar: tab only takes the completion here (06 §3.7)
+  if (e.key === "Tab") { e.preventDefault(); e.stopPropagation(); return; }
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); moveCursor(e.key === "ArrowDown" ? 1 : -1, false); }
   e.stopPropagation();
 }
