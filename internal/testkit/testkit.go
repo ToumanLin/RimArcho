@@ -380,3 +380,15 @@ func (e *Env) ReadModsConfig() string {
 }
 
 const nl = string(rune(10))
+
+// OtherGame makes a second RimWorld install named name under the fixture root, outside any
+// Steam library (one environment is one game folder, 02 §0), and returns its folder.
+func (e *Env) OtherGame(name, version string) string {
+	e.T.Helper()
+	g := filepath.Join(e.Root, name)
+	e.WriteFile(filepath.Join(g, "RimWorldWin64.exe"), "")
+	e.WriteFile(filepath.Join(g, "Version.txt"), version+"\n")
+	e.MkdirAll(filepath.Join(g, "Mods"))
+	e.CopyTemplate("core", filepath.Join(g, "Data", "Core"))
+	return g
+}

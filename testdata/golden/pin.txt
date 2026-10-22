@@ -1,12 +1,12 @@
 $ archo pin #6olp --dry-run
-dry run, nothing changed: would copy #6olp Lockable to $ROOT/LocalAppData/RimArcho/locked/main/5100_local
+dry run, nothing changed: would copy #6olp Lockable to $ROOT/LocalAppData/RimArcho/locked/5100_local
   files: 2 (0.0 MB)
   plan: the copy would replace #6olp in the current plan
 next:
   archo pin #6olp
 
 $ archo pin #6olp
-#6olp Lockable locked: copied to $ROOT/LocalAppData/RimArcho/locked/main/5100_local
+#6olp Lockable locked: copied to $ROOT/LocalAppData/RimArcho/locked/5100_local
   copy: #mdx4  (same lineage, origin marker .rimarcho/origin.json)
   files: 2 (0.0 MB)
   plan: #mdx4 replaces #6olp in the current plan (archo undo reverts it); the game gets it through an _Archo_ link on save or launch
@@ -54,7 +54,7 @@ next:
   archo mod #mdx4 --diff #6olp
 
 $ archo pin #6olp --update --dry-run
-dry run, nothing changed: would copy #6olp Lockable to $ROOT/LocalAppData/RimArcho/locked/main/5100_local2
+dry run, nothing changed: would copy #6olp Lockable to $ROOT/LocalAppData/RimArcho/locked/5100_local2
   upstream changes: compared with #mdx4: 1 semantic file
     + defs/b.xml
   files: 3 (0.0 MB)
@@ -64,7 +64,7 @@ next:
   archo pin --update #6olp
 
 $ archo pin #mdx4 --update
-#6olp Lockable: new locked version copied to $ROOT/LocalAppData/RimArcho/locked/main/5100_local2
+#6olp Lockable: new locked version copied to $ROOT/LocalAppData/RimArcho/locked/5100_local2
   upstream changes: compared with #mdx4: 1 semantic file
     + defs/b.xml
   copy: #z3bw  (same lineage, origin marker .rimarcho/origin.json)
@@ -80,7 +80,7 @@ save: dry run, nothing written
   version: 1.6.4633 rev1261
   entries: 2
   links: 1 in Mods/ (08 §3: SteamCMD and extra mods are linked, never copied)
-    + _Archo_locked_5100_local2 → $ROOT/LocalAppData/RimArcho/locked/main/5100_local2
+    + _Archo_locked_5100_local2 → $ROOT/LocalAppData/RimArcho/locked/5100_local2
   changes: 1 since v1
     replaced  #z3bw  Lockable  replaces #6olp at 2
 next:
@@ -88,21 +88,21 @@ next:
 
 $ archo unpin #z3bw --dry-run
 dry run, nothing changed: would use #6olp instead of #z3bw Lockable in the current plan
-  copy: stays at $ROOT/LocalAppData/RimArcho/locked/main/5100_local2 (no files change)
+  copy: stays at $ROOT/LocalAppData/RimArcho/locked/5100_local2 (no files change)
   upstream: #6olp at $ROOT/Steam/steamapps/workshop/content/294100/5100
 next:
   archo unpin #z3bw
 
 $ archo unpin #z3bw
 unpinned: the current plan uses #6olp instead of #z3bw Lockable
-  copy: stays at $ROOT/LocalAppData/RimArcho/locked/main/5100_local2 (no files change)
+  copy: stays at $ROOT/LocalAppData/RimArcho/locked/5100_local2 (no files change)
   upstream: #6olp at $ROOT/Steam/steamapps/workshop/content/294100/5100
 next:
   archo save
 
 $ archo unpin #z3bw
 nothing changed: the current plan does not use #z3bw Lockable
-  copy: stays at $ROOT/LocalAppData/RimArcho/locked/main/5100_local2 (no files change)
+  copy: stays at $ROOT/LocalAppData/RimArcho/locked/5100_local2 (no files change)
   upstream: #6olp at $ROOT/Steam/steamapps/workshop/content/294100/5100
 
 $ archo undo

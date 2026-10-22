@@ -772,7 +772,7 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch bool) (*SaveResult, err
 	if dryRun {
 		return r, nil
 	}
-	if err := a.checkRoots(filepath.Dir(st.FilePath)); err != nil {
+	if err := a.checkUserData(filepath.Dir(st.FilePath)); err != nil { // own saves live in the data directory (02 §0)
 		return nil, err
 	}
 	if len(links) > 0 {

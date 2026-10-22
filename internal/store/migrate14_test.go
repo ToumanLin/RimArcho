@@ -104,6 +104,8 @@ func TestMigrateV14SharedFolders(t *testing.T) {
 		`INSERT INTO def_fact(instance_id, def_type, file, line) VALUES ('i2a', 'ThingDef', 'a.xml', 1), ('i1a', 'ThingDef', 'a.xml', 1)`,
 		`INSERT INTO analysis(id, environment_id, run_key, game_mm, version, started_at, finished_at) VALUES (1, 'e2', 'r', '1.6', 1, 1, 1)`,
 		`INSERT INTO meta(key, value) VALUES ('stage:2', '[{"i":"i2a","a":"i2b"}]'), ('current_env', 'e1')`,
+		`INSERT INTO launch(environment_id, started_at, method, command, plan_id, fingerprint, version_n) VALUES
+			('e2', 50, 'direct', 'x', 2, '`+EntriesFingerprint(`[{"i":"i2a"},{"i":"i2b"}]`)+`', 1)`,
 	)
 	s, err := Open(path)
 	if err != nil {
@@ -138,6 +140,9 @@ func TestMigrateV14SharedFolders(t *testing.T) {
 	}
 	if got := q1(t, s, `SELECT entries FROM loadout_version WHERE plan_id=2`); got != `[{"i":"i1a"},{"i":"i2b"}]` {
 		t.Fatalf("version: %s", got)
+	}
+	if got := q1(t, s, `SELECT fingerprint FROM launch`); got != EntriesFingerprint(`[{"i":"i1a"},{"i":"i2b"}]`) {
+		t.Fatalf("launch fingerprint %s follows the version it played", got)
 	}
 	if got := s.Meta("stage:2"); got != `[{"a":"i2b","i":"i1a"}]` {
 		t.Fatalf("staging: %s", got)

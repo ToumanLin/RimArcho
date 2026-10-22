@@ -246,7 +246,6 @@ func (a *App) Library() (*Library, error) {
 			pinUpdated[h.Copy.ID] = true
 		}
 	}
-	lockRoot := env.PathKey(a.lockRoot(ix.Env))
 	srcKind := map[string]string{}
 	for _, s := range ix.Sources {
 		switch {
@@ -256,7 +255,7 @@ func (a *App) Library() (*Library, error) {
 			srcKind[s.ID] = LibSteamCMD
 		case s.Kind == source.Local:
 			srcKind[s.ID] = LibLocal
-		case s.Kind == source.Extra && env.PathKey(s.Root) == lockRoot:
+		case a.IsLockSource(s):
 			srcKind[s.ID] = LibLocked
 		case s.Kind == source.Extra && s.Label == MonitorLabel:
 			srcKind[s.ID] = LibMonitor
@@ -449,9 +448,11 @@ func sortUses(us []LibUse) {
 	})
 }
 
-// libEnv is an environment whose plans count: the current one, and every other one of the
-// same game (the same game folder: they share Mods/ and the Workshop folder). here maps an
-// instance of it to the current environment's instance in the same folder ("" none).
+// libEnv is an environment whose plans count: every one (02 §0 item 11). here maps an
+// instance of its plans to the current environment's ("" none): a shared folder's instance
+// is the same in every environment; another environment's own Data/ and Mods/ are not this
+// game's, except for an environment made before migration v14 on the same game folder,
+// whose instances are matched by real path.
 type libEnv struct {
 	e    *env.Environment
 	here func(id string) string
@@ -467,28 +468,35 @@ func (a *App) libEnvs(st *LoadoutState) ([]libEnv, error) {
 	}
 	var byPath map[string]string
 	for _, e := range envs {
-		if e.ID == ix.Env.ID || env.PathKey(e.GameRoot) != env.PathKey(ix.Env.GameRoot) {
+		if e.ID == ix.Env.ID {
 			continue
 		}
-		if byPath == nil {
-			byPath = map[string]string{}
-			for _, m := range ix.Mods {
-				if m.Status == identity.Live && m.RealPath != "" {
-					byPath[env.PathKey(m.RealPath)] = m.ID
+		path := map[string]string{}
+		if env.PathKey(e.GameRoot) == env.PathKey(ix.Env.GameRoot) {
+			if byPath == nil {
+				byPath = map[string]string{}
+				for _, m := range ix.Mods {
+					if m.Status == identity.Live && m.RealPath != "" {
+						byPath[env.PathKey(m.RealPath)] = m.ID
+					}
+				}
+			}
+			mods, err := a.Store.Mods(e.ID)
+			if err != nil {
+				return nil, err
+			}
+			for _, m := range mods {
+				if m.RealPath != "" && ix.ByID[m.ID] == nil {
+					path[m.ID] = byPath[env.PathKey(m.RealPath)]
 				}
 			}
 		}
-		mods, err := a.Store.Mods(e.ID)
-		if err != nil {
-			return nil, err
-		}
-		path := map[string]string{}
-		for _, m := range mods {
-			if m.RealPath != "" {
-				path[m.ID] = byPath[env.PathKey(m.RealPath)]
+		out = append(out, libEnv{e: e, here: func(id string) string {
+			if ix.ByID[id] != nil {
+				return id
 			}
-		}
-		out = append(out, libEnv{e: e, here: func(id string) string { return path[id] }})
+			return path[id]
+		}})
 	}
 	return out, nil
 }

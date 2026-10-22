@@ -1,6 +1,7 @@
 package store
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,11 +14,11 @@ import (
 )
 
 // schemaV14: one environment = one game folder (02 §0). The Workshop, SteamCMD, extra,
-// monitor and lock-library folders are shared by every environment (source.environment_id
-// ''), and so are their instances, every lineage, the player's data on lineages and the
+// monitor and lock-library folders are shared by every environment (an empty
+// source.environment_id), and so are their instances, every lineage, the player's data on lineages and the
 // user rules. id_alias maps IDs merged away to the ones kept, for IDs written to disk before
 // the merge (pack.json, .rimarcho/origin.json). The merge itself is migrateV14.
-// source loses its foreign key to environment: a shared source has environment_id ''.
+// source loses its foreign key to environment: a shared source has an empty environment_id.
 const schemaV14 = `
 CREATE TABLE id_alias(old_id TEXT PRIMARY KEY, new_id TEXT NOT NULL, kind TEXT NOT NULL);
 CREATE TABLE source_v14(
@@ -299,7 +300,9 @@ func rewriteInstances14(tx *sql.Tx, m map[string]string) error {
 		WHERE status='open' AND instance_id=candidate_instance_id`); err != nil {
 		return err
 	}
-	// Plans: workspaces, undo stacks and versions hold instance IDs.
+	// Plans: workspaces, undo stacks and versions hold instance IDs. A launch record keeps
+	// its list's fingerprint (over instance IDs); it follows the rewritten list.
+	fps := map[string]string{}
 	for _, t := range []struct{ table, key string }{{"workspace", "plan_id"}, {"workspace_undo", "id"}, {"loadout_version", "id"}} {
 		type row struct {
 			k       int64
@@ -321,9 +324,15 @@ func rewriteInstances14(tx *sql.Tx, m map[string]string) error {
 			if !changed {
 				continue
 			}
+			fps[EntriesFingerprint(x.entries)] = EntriesFingerprint(out)
 			if _, err := tx.Exec(`UPDATE `+t.table+` SET entries=? WHERE `+t.key+`=?`, out, x.k); err != nil {
 				return err
 			}
+		}
+	}
+	for old, n := range fps {
+		if _, err := tx.Exec(`UPDATE launch SET fingerprint=? WHERE fingerprint=?`, n, old); err != nil {
+			return err
 		}
 	}
 	// Staged mods (stage:<plan>, JSON items with "i" and "a").
@@ -400,6 +409,25 @@ func remapEntries(s string, m map[string]string) (string, bool) {
 	}
 	b, _ := json.Marshal(out)
 	return string(b), true
+}
+
+// EntriesFingerprint is app.ListFingerprint of a stored list: sha256 over each entry's key
+// (the instance ID, or "missing:<token>") and a newline, hex, 24 characters.
+func EntriesFingerprint(s string) string {
+	var items []struct {
+		I string `json:"i"`
+		M string `json:"m"`
+	}
+	json.Unmarshal([]byte(s), &items)
+	h := sha256.New()
+	for _, it := range items {
+		k := it.I
+		if k == "" {
+			k = "missing:" + it.M
+		}
+		fmt.Fprintf(h, "%s\n", k)
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))[:24]
 }
 
 func mergeCopyNote14(tx *sql.Tx, old, keep string) error {

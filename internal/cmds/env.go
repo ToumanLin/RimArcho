@@ -12,21 +12,22 @@ import (
 
 var envFlags = []Flag{
 	{Name: "game", Value: "<dir>", Help: "game install (contains RimWorldWin64.exe / RimWorld.exe)"},
-	{Name: "user-data", Value: "<dir>", Help: "user data (contains Config/ModsConfig.xml)"},
-	{Name: "workshop", Value: "<dir>", Help: "workshop content dir …/workshop/content/294100"},
-	{Name: "steamcmd", Value: "<dir>", Multi: true, Help: "SteamCMD content dir (read-only)"},
-	{Name: "extra", Value: "<dir>", Multi: true, Help: "other mod folder"},
+	{Name: "saves", Value: "shared|own", Help: "shared: the game's default user data folder; own: a folder of its own (-savedatafolder)"},
+	{Name: "user-data", Value: "<dir>", Help: "a user data folder of your choice (contains Config/ModsConfig.xml)"},
 	{Name: "launch", Value: "direct|steam"},
+	{Name: "workshop", Value: "<dir>", Help: "= archo folder add workshop <dir>"},
+	{Name: "steamcmd", Value: "<dir>", Multi: true, Help: "= archo folder add steamcmd <dir>"},
+	{Name: "extra", Value: "<dir>", Multi: true, Help: "= archo folder add extra <dir>"},
 }
 
-var removeSourceFlag = Flag{Name: "remove-source", Value: "<src:label>", Multi: true, Help: "retire a steamcmd or extra source (env set)"}
+var removeSourceFlag = Flag{Name: "remove-source", Value: "<src:label>", Multi: true, Help: "= archo folder remove <src:label>"}
 
 func init() {
-	register(&Command{Name: "env list", Summary: "list environments and their sources", MaxArgs: 0, Run: envList})
+	register(&Command{Name: "env list", Summary: "list environments (one per game folder) and the shared mod folders", MaxArgs: 0, Run: envList})
 	register(&Command{Name: "env detect", Summary: "detect game, user data and workshop paths (suggestion only)", MaxArgs: 0, Run: envDetect})
-	register(&Command{Name: "env add", Args: "<name>", Summary: "add an environment", MinArgs: 1, MaxArgs: 1,
+	register(&Command{Name: "env add", Args: "<name>", Summary: "add an environment: one game folder", MinArgs: 1, MaxArgs: 1,
 		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}}, envFlags...), Run: envAdd})
-	register(&Command{Name: "env set", Args: "<name>", Summary: "change an environment's paths (re-binds moved sources)", MinArgs: 1, MaxArgs: 1,
+	register(&Command{Name: "env set", Args: "<name>", Summary: "change an environment's game folder, saves or launch (re-binds a moved game)", MinArgs: 1, MaxArgs: 1,
 		Flags: append(append([]Flag(nil), envFlags...), removeSourceFlag, Flag{Name: "launch-args", Value: "<args>", Help: "extra game arguments, e.g. -popupwindow (\"\" removes them)"}), Run: envSet})
 	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget an environment (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "yes", Help: "confirm"}}, Run: envRemove})
@@ -73,6 +74,7 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		n := root.Add(line)
 		n.KV("game", e.GameRoot)
+		n.KV("saves", c.App.Saves(e))
 		n.KV("user-data", e.UserDataRoot)
 		n.KV("launch", e.Launch)
 		if e.UserDataRoot != "" {
@@ -82,7 +84,18 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 		if err != nil {
 			return nil, err
 		}
-		addSourceLines(n.Section("sources"), srcs)
+		var own []*source.Source
+		for _, s := range srcs {
+			if s.EnvID == e.ID {
+				own = append(own, s)
+			}
+		}
+		addSourceLines(n.Section("sources"), own)
+	}
+	if fs, err := c.App.Folders(); err != nil {
+		return nil, err
+	} else if len(fs) > 0 {
+		addSourceLines(root.Section("mod folders (every environment)"), fs)
 	}
 	if len(envs) == 0 {
 		d.AddNext("archo env detect")
@@ -125,7 +138,7 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func specFromArgs(a *Args) app.EnvSpec {
-	return app.EnvSpec{GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), WorkshopRoot: a.Str("workshop"),
+	return app.EnvSpec{GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), Saves: a.Str("saves"), WorkshopRoot: a.Str("workshop"),
 		Launch: a.Str("launch"), SteamCMD: a.List("steamcmd"), Extra: a.List("extra"), RemoveSources: a.List("remove-source")}
 }
 
@@ -138,7 +151,7 @@ func envRemove(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	d, root := render.New(envRef(e) + "  removed")
-	root.KV("kept", "game, workshop and mod folders are untouched")
+	root.KV("kept", "the shared mod folders and what you noted on mods; game and mod files are untouched")
 	d.AddNext("archo env list")
 	return d, nil
 }
@@ -153,7 +166,7 @@ func envAdd(c *Ctx, a *Args) (*render.Doc, error) {
 		if spec.GameRoot == "" {
 			spec.GameRoot = det.GameRoot
 		}
-		if spec.UserDataRoot == "" {
+		if spec.UserDataRoot == "" && spec.Saves == "" {
 			spec.UserDataRoot = det.UserDataRoot
 		}
 		if spec.WorkshopRoot == "" {
@@ -191,6 +204,7 @@ func envDoc(c *Ctx, e *env.Environment, verb string, changes []app.SourceChange)
 	d, root := render.New(line)
 	root.KV("game", e.GameRoot)
 	root.KV("version", versionText(e.GameVersion))
+	root.KV("saves", c.App.Saves(e))
 	if e.UserDataRoot != "" {
 		root.KV("user-data", e.UserDataRoot)
 	} else {
@@ -205,7 +219,11 @@ func envDoc(c *Ctx, e *env.Environment, verb string, changes []app.SourceChange)
 	var pending []string
 	for _, ch := range changes {
 		s := ch.Source
-		n := srcs.Add(fmt.Sprintf("%s  %s  %s", s.Ref(), ch.Action, s.Root))
+		ref := s.Ref()
+		if s.EnvID == "" {
+			ref += " (shared)"
+		}
+		n := srcs.Add(fmt.Sprintf("%s  %s  %s", ref, ch.Action, s.Root))
 		if ch.Action == "added" && s.Status == source.StatusMissing {
 			n.Line += "  [missing]"
 		}

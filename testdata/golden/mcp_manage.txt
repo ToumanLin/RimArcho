@@ -2,12 +2,14 @@
 environments: 1
   env:main  1.6.4633 rev1261  [current]
     game: $ROOT/Steam/steamapps/common/RimWorld
+    saves: shared
     user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
     launch: direct
     sources:
       src:official  $ROOT/Steam/steamapps/common/RimWorld/Data
       src:local     $ROOT/Steam/steamapps/common/RimWorld/Mods
-      src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
+  mod folders (every environment):
+    src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 
 > status {"show":"settings"}
 settings
@@ -411,7 +413,7 @@ library: 4 of 5 mods match (used:none)
 > manage_library {"action":"move_to_locked","dry_run":true,"refs":["#iqmu"]}
 #iqmu A dry run, nothing changed: would move to the lock library
   from: $ROOT/Steam/steamapps/common/RimWorld/Mods/A Local
-  to: $ROOT/LocalAppData/RimArcho/locked/main/A Local
+  to: $ROOT/LocalAppData/RimArcho/locked/A Local
   how: renamed (same volume)
   marker: .rimarcho/origin.json would be written (the folder has none)
   plans: plan:raid night, plan:default, plan:first, plan:from file keep it: the same instance, linked into Mods/ (_Archo_) on save or launch
@@ -421,7 +423,7 @@ next:
 > manage_library {"action":"move_to_locked","refs":["#iqmu"]}
 #iqmu A moved to the lock library
   from: $ROOT/Steam/steamapps/common/RimWorld/Mods/A Local
-  to: $ROOT/LocalAppData/RimArcho/locked/main/A Local
+  to: $ROOT/LocalAppData/RimArcho/locked/A Local
   how: renamed (same volume)
   now: #iqmu
   marker: .rimarcho/origin.json written (the folder had none)
@@ -437,7 +439,7 @@ L#l4xt A  [2 copies, 1.3 KB]
     supports: 1.6
     updated: 2026-09-21 14:13
   #iqmu locked 2026-10-01 12:00  672 B  (current plan)
-    path: $ROOT/LocalAppData/RimArcho/locked/main/A Local
+    path: $ROOT/LocalAppData/RimArcho/locked/A Local
     supports: 1.6
     updated: 2026-10-01 10:00
     note: (by RimArcho) moved into the lock library 2026-10-01 for plan:raid night, plan:default, plan:first, plan:from file
@@ -473,7 +475,7 @@ L#l4xt A  [2 copies, 1.3 KB]
     supports: 1.6
     updated: 2026-09-21 14:13
   #iqmu locked 2026-10-01 12:00  672 B  (current plan)
-    path: $ROOT/LocalAppData/RimArcho/locked/main/A Local
+    path: $ROOT/LocalAppData/RimArcho/locked/A Local
     supports: 1.6
     updated: 2026-10-01 10:00
     note: kept for the 1.5 save

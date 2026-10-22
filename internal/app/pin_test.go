@@ -26,7 +26,7 @@ func pinFixture(t *testing.T) (*testkit.Env, string) {
 }
 
 func library(e *testkit.Env) string {
-	return filepath.Join(e.Root, "LocalAppData", "RimArcho", "locked", "main")
+	return filepath.Join(e.Root, "LocalAppData", "RimArcho", "locked")
 }
 
 func inPlan(t *testing.T, e *testkit.Env, id string) bool {

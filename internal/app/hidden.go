@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -262,7 +261,7 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 // isLockSource: the source is the environment's lock library (04 §7).
 func (ix *Index) isLockSource(a *App, id string) bool {
 	s := ix.Source(id)
-	return s != nil && s.Kind == source.Extra && env.PathKey(s.Root) == env.PathKey(a.lockRoot(ix.Env))
+	return a.IsLockSource(s)
 }
 
 // env0 reports whether p is the source root itself (never trashed).

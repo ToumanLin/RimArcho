@@ -234,3 +234,22 @@ func (s *Store) DeleteEnv(envID string) error {
 		return err
 	})
 }
+
+// LiveCounts counts the live instances of each source.
+func (s *Store) LiveCounts() (map[string]int, error) {
+	rows, err := s.DB.Query(`SELECT source_id, count(*) FROM instance WHERE status='live' GROUP BY source_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var id string
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, err
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
+}
