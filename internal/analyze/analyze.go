@@ -20,7 +20,7 @@ import (
 )
 
 // Version of the analyzers; facts written by another version are rebuilt (03 §2).
-const Version = 5 // 5: Lunar/Components DLLs
+const Version = 6 // 6: manual Harmony.Patch targets, HugsLib.dll in its own mod
 
 // Mod is one installed instance.
 type Mod struct {

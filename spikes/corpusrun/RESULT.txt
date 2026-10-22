@@ -248,3 +248,26 @@ G4: a subject mod is an error source, observed / chance (selected codes; full ta
   dep.missing (lib)      error     1.6% / 3.3%   below chance
   official.order         error     2.3% / 2.5%   at chance
   version.unsupported    mixed     6.7% / 3.7%
+
+== G9 manual Harmony targets (2026-10-22, branch claude/g9-harmony-5fddd6)
+
+IL scan of Harmony.Patch call sites and wrappers (internal/harmony/manual.go), HugsLib.dll read in
+its own mod. First 671 logs, two fresh homes: home-g9-base (master bc9e93a) and home-g9 (branch),
+82 / 88 min.
+                                  master      branch
+  exact (method, kind, target)     62.9%       80.9%
+  with the patch method found      71.9%       95.0%
+  missed                           28.1%        5.0%  (attr class 31%, Harmony.Patch 62%, neither 7%)
+  per-log median                    0.64        0.84
+  mods >= 90% / nothing found   74.4% / 140  94.4% / 9
+  static facts, no runtime match   20.7%       22.8%  (166k of 801k -> 242k of 1,059k)
+  harmony.multi-transpiler         4,559      11,078  (shared-target 93k -> 130k, skip-prefix 53k -> 72k)
+Per mod (exact / with method): HAR 0 -> 67.2 / 99.6 (BodyReferenceTranspiler patches every game
+method that matches at runtime), Vehicle Framework 0 -> 92.2 (rest: other version), Performance
+Optimizer 4.4 -> 97.8, Character Editor 0 -> 100, Pick Up And Haul 0 -> 58.5 (patch classes moved
+between versions), Facial Animation 0 -> 100, HugsLib 0 -> 100, VSE 0 -> 94.1 / 100, VEF core
+71.7 -> 77.6 / 89.8.
+Whole local library (3,465 mods, every version folder): 17,528 Harmony.Patch calls, 85.8% with
+the original resolved; top reasons: collection 494, computed type 475 (mostly Multiplayer Compat),
+null 234, Assembly.GetType 190, field 188.
+

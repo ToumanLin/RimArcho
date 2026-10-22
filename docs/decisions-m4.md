@@ -25,6 +25,12 @@ MCP server `archo mcp` (05 §4). Not in M4: `copy-local` and the `copy_local` to
   line's owner be matched to a mod when it is not a packageId.
 - **Skip list** (`DefaultSkip`, glob, case-insensitive, overridable): 0harmony, harmony, hugslib, 0multiplayerapi,
   0prepatcherapi, mono.cecil*, system.*, microsoft.*, newtonsoft.json, unityengine*, assembly-csharp*.
+  (Corpus G9: `HugsLib.dll` is read in its own mod, `unlimitedhugs.hugslib`, whose patches are its own;
+  it is skipped only as a copy inside another mod. `harmony.OwnLibrary`.)
+- **Manual targets** (corpus G9, `internal/harmony/manual.go`): the IL of every method is interpreted
+  abstractly to name the original and the patch methods of `Harmony.Patch` calls, and of calls to wrappers
+  shaped `(MethodBase, HarmonyMethod, …)` in other assemblies. Unresolved originals are stored as dynamic facts
+  `<manual: reason>` (patch method known); `harmony.manual` says how many calls were resolved and why not.
 - Findings: `harmony.shared-target` (info, one per method ≥ 2 mods), `harmony.multi-transpiler` (warning, ≥ 2 mods),
   `harmony.skip-prefix` (warning, possible: a bool prefix on a method other mods also patch), `harmony.manual` (info).
 - Facts go to schema v5 (`assembly_fact`, `type_fact`, `harmony_fact`, `harmony_id`); analyzer `Version = 3`.

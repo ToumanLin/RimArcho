@@ -24,7 +24,16 @@ type Assembly struct {
 	members  []pe.MemberRefTableRow
 	attrs    []pe.CustomAttributeTableRow
 	nestedIn map[uint32]uint32 // TypeDef row → enclosing TypeDef row (1-based)
+	// For IL reading (il.go): the file is read again on demand.
+	path      string
+	sections  []section
+	fields    []pe.FieldTableRow
+	typeSpecs []pe.TypeSpecTableRow
+	methSpecs []pe.MethodSpecTableRow
+	il        *ilState
 }
+
+type section struct{ va, vsize, raw, rawSize uint32 }
 
 func table[T any](f *pe.File, id int) []T {
 	t, ok := f.CLR.MetadataTables[id]
@@ -54,15 +63,23 @@ func Open(path string) (*Assembly, error) {
 		return nil, errors.New("not a .NET assembly")
 	}
 	a := &Assembly{
-		strs:     f.CLR.MetadataStreams["#Strings"],
-		blob:     f.CLR.MetadataStreams["#Blob"],
-		us:       f.CLR.MetadataStreams["#US"],
-		typeRefs: table[pe.TypeRefTableRow](f, pe.TypeRef),
-		typeDefs: table[pe.TypeDefTableRow](f, pe.TypeDef),
-		methods:  table[pe.MethodDefTableRow](f, pe.MethodDef),
-		members:  table[pe.MemberRefTableRow](f, pe.MemberRef),
-		attrs:    table[pe.CustomAttributeTableRow](f, pe.CustomAttribute),
-		nestedIn: map[uint32]uint32{},
+		strs:      f.CLR.MetadataStreams["#Strings"],
+		blob:      f.CLR.MetadataStreams["#Blob"],
+		us:        f.CLR.MetadataStreams["#US"],
+		typeRefs:  table[pe.TypeRefTableRow](f, pe.TypeRef),
+		typeDefs:  table[pe.TypeDefTableRow](f, pe.TypeDef),
+		methods:   table[pe.MethodDefTableRow](f, pe.MethodDef),
+		members:   table[pe.MemberRefTableRow](f, pe.MemberRef),
+		attrs:     table[pe.CustomAttributeTableRow](f, pe.CustomAttribute),
+		nestedIn:  map[uint32]uint32{},
+		path:      path,
+		fields:    table[pe.FieldTableRow](f, pe.Field),
+		typeSpecs: table[pe.TypeSpecTableRow](f, pe.TypeSpec),
+		methSpecs: table[pe.MethodSpecTableRow](f, pe.MethodSpec),
+	}
+	for _, sc := range f.Sections {
+		h := sc.Header
+		a.sections = append(a.sections, section{h.VirtualAddress, h.VirtualSize, h.PointerToRawData, h.SizeOfRawData})
 	}
 	for _, n := range table[pe.NestedClassTableRow](f, pe.NestedClass) {
 		a.nestedIn[n.NestedClass] = n.EnclosingClass
