@@ -125,6 +125,53 @@ func TestVerbsAndUndo(t *testing.T) {
 	}
 }
 
+// 06 §6: sort, write and launch act on one click (no confirmation); sort offers 撤销, and
+// a refusal comes back with the commands that resolve it, writing nothing.
+func TestRunAtOnce(t *testing.T) {
+	e, api, _ := fixture(t)
+	if _, err := api.Toggle(int(view.Inactive), []string{api.Board().Cols[view.Inactive][0].ID}, nil); err != nil {
+		t.Fatal(err)
+	}
+	before := names(api.Board().Cols[view.Active])
+	o, err := api.Run(view.ListSort)
+	if err != nil || o.Refused != nil {
+		t.Fatalf("sort: %+v %v", o, err)
+	}
+	if after := names(api.Board().Cols[view.Active]); after != before {
+		if !o.Undo {
+			t.Fatalf("sort moved mods but offers no undo: %+v", o)
+		}
+		if _, err := api.Undo(); err != nil || names(api.Board().Cols[view.Active]) != before {
+			t.Fatalf("undo after sort: %v %s", err, names(api.Board().Cols[view.Active]))
+		}
+	}
+	if o, _ := api.Run(view.ListSort); o.Undo == (o.Text == view.T("the order is already right")) {
+		t.Fatalf("sort undo flag: %+v", o)
+	}
+	o, err = api.Run(view.ListSave)
+	if err != nil || o.Refused != nil || !strings.Contains(o.Text, "v") {
+		t.Fatalf("save: %+v %v", o, err)
+	}
+	// An outside change not loaded: launch is refused, nothing is written or started.
+	e.MustRun("enable", "pkg:tester.b")
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
+	file := e.ReadModsConfig()
+	o, err = api.Run(view.ListLaunch)
+	if err != nil || len(o.Refused) < 2 || o.Text != o.Refused[0] || len(e.Launched) != 0 || e.ReadModsConfig() != file {
+		t.Fatalf("launch over an outside change: %+v %v, launched %v", o, err, e.Launched)
+	}
+	if strings.HasPrefix(o.Text, "unloaded external change") || !strings.Contains(strings.Join(o.Refused[1:], " "), "archo ") {
+		t.Fatalf("refusal lines: %q", o.Refused)
+	}
+	if _, err := api.Run("rm"); err == nil {
+		t.Fatal("Run took an unknown action")
+	}
+	// The preview stays reachable (the palette's 预览启动) and starts nothing.
+	if p, err := api.Preview(view.ListLaunch); err != nil || len(p.Lines) == 0 || len(e.Launched) != 0 {
+		t.Fatalf("launch preview: %+v %v", p, err)
+	}
+}
+
 func TestPreviewAndInspect(t *testing.T) {
 	_, api, _ := fixture(t)
 	p, err := api.Preview(view.ListSort)

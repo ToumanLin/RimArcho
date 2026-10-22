@@ -45,8 +45,7 @@ func (m *model) importChoice(imp *view.Import, p *view.ImportPreview) {
 			return m.importAsPlan(imp, p)
 		}
 		if v == show {
-			m.openPanel(p.Summary, strings.Join(p.Lines(), "\n"), nil)
-			m.afterPanel = nil
+			m.openPanel(p.Summary, strings.Join(p.Lines(), "\n"))
 			return nil
 		}
 		t, err := view.ApplyImport(m.app, imp, v == merge)

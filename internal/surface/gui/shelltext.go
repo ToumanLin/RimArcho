@@ -12,11 +12,10 @@ func init() {
 		"pages":                        "页面",
 		"go to a page in the sidebar":  "去侧栏的页面",
 		"the environment page":         "环境页",
-		"write to the game":            "写入游戏",
 		"build a pack":                 "编译成整合包",
 		"start the game with the list": "用这个列表启动游戏",
 		"different from the list last written to the game; launching or writing to the game writes them": "与上次写入游戏的列表不同；启动或写入游戏时写进去",
-		"sort · write to the game · launch (preview first)":                                              "排序 · 写入游戏 · 启动（先看预览）",
+		"sort · write to the game · launch (at once; the palette previews them)":                         "排序 · 写入游戏 · 启动（立即执行；命令面板里可以预览）",
 		// the home page
 		"playing now":               "正在玩",
 		"activity":                  "动态",

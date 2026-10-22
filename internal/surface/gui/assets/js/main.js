@@ -100,8 +100,8 @@ function planActions() {
     motion.bump("unwritten", n, u);
     out.push(n);
   } else motion.bump("unwritten", null, 0);
-  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("sort"), "S", () => preview("sort")),
-    btn(T("build a pack"), "", () => go("packs"), "wide-only"), btn(T("write to the game"), "w", () => preview("save"), u ? "hot" : ""));
+  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("sort"), "S", () => run("sort")),
+    btn(T("build a pack"), "", () => go("packs"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
   if (plan) {
     const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");
     more.title = T("the plan: rename, copy, delete") + " · P";
@@ -364,16 +364,23 @@ async function drop(from, to, items, at) {
   if (to === 0 && from === 2) return edited(api.Unstage(ids), true, ids);
 }
 
-// preview: sort, save and launch show what they will do first (06 §6).
+// run: sort, write to the game and launch act at once and say what they did (06 §6); sort
+// offers 撤销. A refusal says why in the status line and shows the commands that resolve it.
+async function run(what) {
+  const before = motion.snapshot();
+  let o;
+  try { o = await api.Run(what); } catch (e) { return say("fail", errText(e)); }
+  if (o.refused) {
+    say("fail", o.text);
+    if (o.refused.length > 1) pop.text({ sort: T("sort"), save: T("write to the game"), launch: T("launch") }[what], o.refused);
+  } else say("ok", o.text, !!o.undo);
+  await reload();
+  motion.play(before, null);
+}
+
+// preview: the dry run of sort, save or launch, to read (the palette's 预览…); nothing to confirm.
 async function preview(what) {
-  let p;
-  try { p = await api.Preview(what); } catch (e) { return say("fail", errText(e)); }
-  pop.confirm(p.title, p.lines, { sort: T("sort"), save: T("save to the game"), launch: T("launch") }[what], p.apply ? async () => {
-    const before = motion.snapshot();
-    try { say("ok", await api.Apply(what), what === "sort"); } catch (e) { say("fail", errText(e)); }
-    await reload();
-    motion.play(before, null);
-  } : null);
+  try { const p = await api.Preview(what); pop.text(p.title, p.lines); } catch (e) { say("fail", errText(e)); }
 }
 
 // cmd runs a palette command (view.Commands).
@@ -384,7 +391,8 @@ async function cmd(id) {
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
   switch (id) {
-    case "sort": case "save": case "launch": return preview(id);
+    case "sort": case "save": case "launch": return run(id);
+    case "preview-sort": case "preview-save": case "preview-launch": return preview(id.slice(8));
     case "undo": case "redo": case "restore-all": case "stage-all": return verb(id);
     case "rescan":
       if (await api.Scan()) { S.busy.scan = true; say("busy", T("scanning…")); scr.busyChanged(); }
@@ -524,6 +532,7 @@ function onKey(e) {
     if (S.screen === "full" && (k === "Escape" || k === "Backspace")) { e.preventDefault(); scr.closeScreen(); detailFollow(true); return; }
     if (e.ctrlKey && k === "k") { e.preventDefault(); return pop.palette(); }
     if (k === "?" && S.screen !== "full") { e.preventDefault(); return pop.help(); }
+    if (S.screen === "home") return homePage.homeKey(e);
     if (S.screen === "needs") return scr.needsKey(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     if (S.screen === "full") return scr.fullKey(e);
@@ -565,7 +574,7 @@ function onKey(e) {
   const map = {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
     g: () => verb("tags"), "#": () => verb("tags"), Enter: () => verb("full"), o: () => verb("workshop"), x: () => verb("swap"),
-    S: () => preview("sort"), w: () => preview("save"), L: () => preview("launch"), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
+    S: () => run("sort"), w: () => run("save"), L: () => run("launch"), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "!": () => go("needs"), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help(), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
   };
@@ -628,7 +637,7 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, renderWhere, renderHints, renderHeads, click, verb, drop, place, preview, cmd, step, search, searchKey, go,
+  reload, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go,
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => pop.menu(x, y, actions().filter((a) => a.run)),
   afterImport: null, // the first-run guide's next step once an import is applied
@@ -650,11 +659,11 @@ async function start() {
   wireSplits();
   document.addEventListener("keydown", onKey);
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
-  $("#btn-launch").onclick = () => preview("launch");
+  $("#btn-launch").onclick = () => run("launch");
   // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {
     const b = e.target.closest(".head [data-cmd]");
-    if (b) { e.stopPropagation(); b.dataset.cmd === "exchange" ? exchange(0) : preview(b.dataset.cmd); }
+    if (b) { e.stopPropagation(); b.dataset.cmd === "exchange" ? exchange(0) : run(b.dataset.cmd); }
   });
   $(".detail .scroll").addEventListener("scroll", () => { if (S.focus === 3) renderWhere(); }, { passive: true });
   $(".detail").addEventListener("mousedown", () => focusArea(3));
@@ -691,17 +700,11 @@ async function start() {
   if (S.board && S.board.neverScanned) cmd("rescan");
 }
 
-// A history row (06 §2.5): an unsaved step goes there at once (u / ctrl+r move back); a
-// version is loaded after a confirmation.
+// A history row (06 §2.5): a click goes there at once. Loading a version is one step: the
+// list it replaces stays in the history and 撤销 brings it back.
 setOnHistory(async (h) => {
-  const go = async () => {
-    try { say("ok", await api.HistoryGo(h.steps || 0, h.version || 0)); } catch (e) { say("fail", errText(e)); }
-    await reload();
-  };
-  if (h.kind === "version") {
-    return pop.confirm(T("load this version into the list"), [h.text, T("your current list stays in the history; u brings it back")], T("load this version into the list"), go);
-  }
-  return go();
+  try { say("ok", await api.HistoryGo(h.steps || 0, h.version || 0), h.kind === "version"); } catch (e) { say("fail", errText(e)); }
+  await reload();
 });
 
 // pollLive follows the running game every two seconds (06 §2.1): the sidebar's foot says

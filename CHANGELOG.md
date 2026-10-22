@@ -64,6 +64,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   `pack launch`, naming the environment and the plan or pack. The window disables launch.
 - Launch records carry the plan, the enabled list's fingerprint and the version played.
   A game in `RimWorld2` no longer counts as running in `RimWorld`.
+- Launch, write to the game and sort act on one click or key in the window and the TUI; the
+  status line says what happened (sort: 撤销 / u). A refusal names its reason and lists the
+  commands that resolve it. Loading a history version or an outside change is one undoable
+  step, with no confirmation. The palette's 预览排序 / 预览写入 / 预览启动 show the dry runs
+  (06 §6).
 
 ### Locked versions (04 §7)
 - `archo pin <instance> [--name] [--git] [--dry-run]` (`copy-local` is an alias) copies the

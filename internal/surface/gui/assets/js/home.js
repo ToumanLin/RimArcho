@@ -18,6 +18,15 @@ export async function home() {
   draw();
 }
 
+// homeKey: L launches the featured card, as its button does (one game at a time).
+export function homeKey(e) {
+  if (e.key !== "L" && !(e.key === "l" && e.shiftKey)) return;
+  const r = data && data.featured >= 0 && (data.rows || [])[data.featured];
+  if (!r || r.light || (S.live && (S.live.running || S.live.blocked))) return;
+  e.preventDefault();
+  launch(r);
+}
+
 // liveChanged redraws the launch button when the game starts or stops.
 export function liveChanged() { if (S.screen === "home" && data) draw(); }
 
@@ -124,9 +133,9 @@ function actLine(title, text, go) {
   return b;
 }
 
-// launch is the featured card's L (08 §2, §5.3): the plan's launch preview, or the pack
-// plays at once, as on the packs page.
+// launch is the featured card's L (08 §2, §5.3): the plan launches at once, as the pack
+// does on the packs page.
 async function launch(r) {
-  if (r.kind === "plan") return ui.preview("launch");
+  if (r.kind === "plan") return ui.run("launch");
   try { say("ok", await api.PackLaunch(r.name)); } catch (e) { say("fail", errText(e)); }
 }

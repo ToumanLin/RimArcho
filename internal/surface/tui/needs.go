@@ -6,7 +6,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -57,15 +56,15 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 	k := needKey{key: a.Key, label: a.Label}
 	switch a.Kind {
 	case view.ActSort:
-		k.run = func(m *model) tea.Cmd { return m.sortPreview() }
+		k.run = func(m *model) tea.Cmd { return m.listAction(view.ListSort) }
 	case view.ActSave:
-		k.run = func(m *model) tea.Cmd { return m.savePreview() }
+		k.run = func(m *model) tea.Cmd { return m.listAction(view.ListSave) }
 	case view.ActOpenURL:
 		k.run = func(m *model) tea.Cmd { return m.open(a.URL) }
 	case view.ActView:
 		k.run = func(m *model) tea.Cmd { return m.openInspect(a.Argv) }
 	case view.ActList:
-		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n"), nil); return nil }
+		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n")); return nil }
 	case view.ActFold:
 		k.run = func(m *model) tea.Cmd {
 			p := &m.prob
@@ -114,6 +113,8 @@ func (m *model) doAction(a view.Action, option int) {
 		m.say(sayInfo, done)
 	case err != nil:
 		m.say(sayFail, m.humanize(err.Error()))
+	case a.Undo:
+		m.say(sayOK, done+" · "+T("u undoes"))
 	default:
 		m.say(sayOK, done)
 	}
@@ -133,25 +134,43 @@ func (m *model) open(u string) tea.Cmd {
 	return nil
 }
 
-// sortPreview and savePreview are the S and w of the main screen.
-func (m *model) sortPreview() tea.Cmd {
-	out, code := m.run("sort", "--dry-run")
-	var confirm []string
-	if code == cmds.ExitOK && !strings.HasPrefix(out, "sort: 0 moved") {
-		confirm = []string{"sort"}
+// listAction is S, w and L (06 §6): it acts at once and says what it did; sort adds "u
+// undoes". A refusal says why and opens a panel with the commands that resolve it.
+func (m *model) listAction(what string) tea.Cmd {
+	o := view.Run(m.app, what)
+	m.reload()
+	m.detailRef = ""
+	switch {
+	case o.Refused != nil:
+		m.say(sayFail, o.Text)
+		if len(o.Refused) > 1 {
+			m.openPanel(listTitle(what), strings.Join(o.Refused, "\n"))
+		}
+	case o.Undo:
+		m.say(sayOK, o.Text+" · "+T("u undoes"))
+	default:
+		m.say(sayOK, o.Text)
 	}
-	m.openPanel(T("sort — preview"), out, confirm)
+	return m.requestDetail()
+}
+
+// listPreview is the palette's 预览排序 / 预览写入 / 预览启动: the dry run, to read.
+func (m *model) listPreview(what string) tea.Cmd {
+	out, _ := m.run(what, "--dry-run")
+	title := map[string]string{view.ListSort: "preview the sort", view.ListSave: "preview writing to the game", view.ListLaunch: "preview the launch"}[what]
+	m.openPanel(T(title), out)
 	return nil
 }
 
-func (m *model) savePreview() tea.Cmd {
-	out, code := m.run("save", "--dry-run")
-	var confirm []string
-	if code == cmds.ExitOK {
-		confirm = []string{"save"}
+// listTitle names a refused whole-list action.
+func listTitle(what string) string {
+	switch what {
+	case view.ListSort:
+		return T("sort")
+	case view.ListSave:
+		return T("write to the game")
 	}
-	m.openPanel(T("save to game — preview"), out, confirm)
-	return nil
+	return T("launch")
 }
 
 // ---- the screen ----

@@ -649,19 +649,26 @@ func (s *API) Swap(id string) (string, error) {
 	return s.text(view.Swap(s.a, st, id))
 }
 
-// Preview shows sort, save or launch before it happens (06 §6).
+// Preview is the dry run of sort, save or launch (the palette's 预览…; 06 §6).
 func (s *API) Preview(what string) (*view.Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return view.DryRun(s.a, what)
 }
 
-// Apply runs sort, save or launch after its preview.
-func (s *API) Apply(what string) (string, error) {
+// Run does sort, save or launch at once (S, w, L; 06 §6): no confirmation. A refusal comes
+// back in Outcome.Refused with the commands that resolve it.
+func (s *API) Run(what string) (*view.Outcome, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.needs = nil
-	return s.text(view.Apply(s.a, what))
+	s.board = nil
+	switch what {
+	case view.ListSort, view.ListSave, view.ListLaunch:
+	default:
+		return nil, fmt.Errorf("no action %s", what)
+	}
+	return view.Run(s.a, what), nil
 }
 
 // ---- tags (06 §3.8) ----

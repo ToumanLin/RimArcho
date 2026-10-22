@@ -259,7 +259,7 @@ function markNeeds() {
 async function runAction(it, act) {
   switch (act.kind) {
     case "sort": case "save":
-      return ui.preview(act.kind);
+      return ui.run(act.kind);
     case "open-url":
       try { await api.OpenURL(act.url); say("ok", act.done); } catch (e) { say("fail", errText(e)); }
       return;
@@ -282,7 +282,7 @@ async function runAction(it, act) {
 }
 
 async function doAction(act, option) {
-  try { say("ok", await api.DoAction(act, option), act.kind === "enable" || act.kind === "disable" || act.kind === "choose-disable"); } catch (e) { say("fail", errText(e)); }
+  try { say("ok", await api.DoAction(act, option), act.undo || act.kind === "enable" || act.kind === "disable" || act.kind === "choose-disable"); } catch (e) { say("fail", errText(e)); }
   await ui.reload();
   if (S.screen === "needs") needs(true);
 }

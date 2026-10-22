@@ -8,7 +8,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -23,7 +22,7 @@ verbs, on the selection or else the cursor's mod:
   J K      move down / up one     alt+J alt+K  ten
   #        tags                   enter  details full screen (←→ previous / next mod, tab sub-sections, I technical pages)
   o        Workshop page          i  technical information     x  swap for another copy    r  add a rule
-  S        sort (preview first)   w  save to the game (preview first)    L  launch the game
+  S        sort                   w  save to the game    L  launch the game    (ctrl+k 预览… shows the dry run)
   u ctrl+r undo / redo           e  export the list (import: ctrl+k import a list)
 /          search the focused list; tab takes it to the next list with matches; esc clears
 !          needs attention        c  recent changes     R  rescan     E  switch environment     P  plans (switch, new, rename, delete)
@@ -126,7 +125,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.reload()
 		m.detailRef = ""
 		if msg.err != nil {
-			m.openPanel(T("scan failed"), msg.out+"\n"+msg.err.Error(), nil)
+			m.openPanel(T("scan failed"), msg.out+"\n"+msg.err.Error())
 		} else {
 			m.say(sayOK, m.scanSummary(msg.out))
 			if m.tab == tabChanges {
@@ -197,7 +196,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		m.quitting = true
 		return tea.Quit
 	case "?":
-		m.openPanel(T("all keys"), T(helpText), nil)
+		m.openPanel(T("all keys"), T(helpText))
 		return nil
 	case ":":
 		m.prompt = &prompt{label: T("archo command: "), submit: func(m *model, text string) tea.Cmd {
@@ -212,7 +211,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 				return m.startScan() // never scan inside the TUI process
 			}
 			out, _ := m.run(argv...)
-			m.openPanel("archo "+strings.Join(argv, " "), out, nil)
+			m.openPanel("archo "+strings.Join(argv, " "), out)
 			return m.requestDetail()
 		}}
 		return nil
@@ -345,9 +344,9 @@ func (m *model) listKey(s string) tea.Cmd {
 		m.wrapKey()
 		return nil
 	case "S":
-		return m.sortPreview()
+		return m.listAction(view.ListSort)
 	case "w":
-		return m.savePreview()
+		return m.listAction(view.ListSave)
 	case "u":
 		m.act(T("undid the last change"), "undo")
 		return m.requestDetail()
@@ -355,13 +354,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		m.act(T("redid the change"), "redo")
 		return m.requestDetail()
 	case "L":
-		out, code := m.run("launch", "--dry-run")
-		var confirm []string
-		if code == cmds.ExitOK {
-			confirm = []string{"launch"}
-		}
-		m.openPanel(T("launch"), out, confirm)
-		return nil
+		return m.listAction(view.ListLaunch)
 	case "x":
 		if it := c.cur(); it != nil && it.id != "" {
 			m.act(Tf("swapped %s for another copy", it.name), "swap", it.ref)
@@ -540,43 +533,10 @@ func (m *model) panelKey(s string) tea.Cmd {
 		p.off = min(p.off+page, max(len(p.lines)-page, 0))
 	case "pgup":
 		p.off = max(p.off-page, 0)
-	case "y":
-		if p.confirm != nil {
-			m.panel = nil
-			out, code := m.run(p.confirm...)
-			if code == cmds.ExitOK {
-				m.say(sayOK, m.confirmedText(p.confirm, out))
-			} else {
-				m.openPanel("archo "+strings.Join(p.confirm, " "), out, nil)
-			}
-			if f := m.afterPanel; f != nil {
-				m.afterPanel = nil
-				f(m)
-			}
-			m.detailRef = ""
-			return m.requestDetail()
-		}
-	case "n", "esc", "q", "enter":
+	case "esc", "q", "enter":
 		m.panel = nil
-		m.afterPanel = nil
-		if p.confirm != nil {
-			m.say(sayInfo, T("cancelled"))
-		}
 	}
 	return nil
-}
-
-// confirmedText words the result of a confirmed command.
-func (m *model) confirmedText(argv []string, out string) string {
-	switch argv[0] {
-	case "sort":
-		return T("sorted the list")
-	case "save":
-		return T("saved to the game")
-	case "launch":
-		return T("the game is starting")
-	}
-	return m.humanize(firstLine(out))
 }
 
 func (m *model) chooseEnv() tea.Cmd {
