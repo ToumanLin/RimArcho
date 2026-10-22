@@ -10,6 +10,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/modchanges"
 )
 
 // The window's shell (06 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
@@ -201,12 +202,14 @@ type HomeRow struct {
 // Home is the home page: the rows, then the activity card.
 type Home struct {
 	Rows []HomeRow `json:"rows"`
-	// LastRun: "the list · 10 月 20 日 19:41"; LastRunErrors its errors in 能不能跑.
+	// LastRun: "the list · 10 月 20 日 19:41" ("" when no run was read: the line is
+	// hidden); LastRunDay its day; LastRunErrors its errors in 能不能跑.
 	LastRun       string `json:"lastRun,omitempty"`
+	LastRunDay    string `json:"lastRunDay,omitempty"`
 	LastRunErrors int    `json:"lastRunErrors"`
-	// Changes: the last scan's changes in words (ChangeSummary), ScanWhen when it ran.
-	Changes  string `json:"changes,omitempty"`
-	ScanWhen string `json:"scanWhen,omitempty"`
+	// Changes is the current plan's changes since it was last played (06 §2.3): one
+	// sentence that opens 变化 with that scope and time.
+	Changes *modchanges.Home `json:"changes,omitempty"`
 	// Featured is the row of what is applied now (PickFeatured): the large card with
 	// ▶ 启动游戏; -1 when there is none.
 	Featured int `json:"featured"`
@@ -251,13 +254,8 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 		h.Rows = append(h.Rows, packHomeRow(p, chip, b.EnvName))
 	}
 	SortHome(h.Rows)
-	h.LastRun, h.LastRunErrors = n.LastRun, LastRunErrors(n)
-	if len(b.LastEvents) > 0 {
-		h.Changes = ChangeSummary(b.LastEvents)
-	}
-	if sc, _, _ := a.LastScan(b.St.Ix.Env.ID); sc != nil {
-		h.ScanWhen = ShortDate(sc.Started) + " " + sc.Started.In(a.Loc).Format("15:04")
-	}
+	h.LastRun, h.LastRunDay, h.LastRunErrors = n.LastRun, n.LastRunDay, LastRunErrors(n)
+	h.Changes = ChangeHome(a, b.St)
 	return h
 }
 

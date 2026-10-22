@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/bbcode"
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
-	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -36,8 +36,7 @@ type API struct {
 	needs   *view.Needs
 	needsAt string // the database state the needs were built at
 	content view.ContentCache
-	events  map[int64]*store.Event // the changes list's events, by id
-	busy    map[string]bool        // scan, analyze, pack
+	busy    map[string]bool // scan, analyze, pack
 	// building is the pack this window's build child is making ("" none).
 	building string
 	live     view.LiveTracker // the running game's log (03 §6.6)
@@ -56,7 +55,7 @@ type API struct {
 }
 
 func newAPI(a *app.App) *API {
-	return &API{a: a, open: openURL, events: map[int64]*store.Event{}, busy: map[string]bool{}}
+	return &API{a: a, open: openURL, busy: map[string]bool{}}
 }
 
 func (s *API) send(name string, data any) {
@@ -795,31 +794,43 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 
 // ---- changes (06 §2.9) ----
 
-// Changes lists the last scans' changes; of (an instance ID) narrows them to its Lineage's.
-func (s *API) Changes(of string) ([]view.ChangeScan, error) {
+// Changes is the 变化 page: the current plan's mods since it was last played, or the whole
+// library; of (an instance ID) narrows it to that mod's Lineage, every change by day.
+func (s *API) Changes(library bool, of string) (*modchanges.Page, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	st := s.boardState()
 	if st == nil {
 		return nil, errors.New("no list")
 	}
-	cs, err := view.Changes(s.a, st, of)
-	for _, c := range cs {
-		for _, e := range c.Events {
-			s.events[e.ID] = e.Event
+	o := modchanges.Opts{Library: library}
+	if of != "" {
+		o.Of = view.LineageIDs(st.Ix, of)
+		if len(o.Of) == 0 {
+			return nil, errors.New(view.T("that mod is not known"))
 		}
+		o.OfName = st.Ix.ByID[of].DisplayName()
 	}
-	return cs, err
+	return view.BuildChanges(s.a, st, o)
 }
 
-// FileDiff lists the files a change touched.
-func (s *API) FileDiff(eventID int64) []string {
+// ChangeFiles is the raw file list behind a row: the files that differ between two
+// snapshots.
+func (s *API) ChangeFiles(before, after int64) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if e := s.events[eventID]; e != nil {
-		return view.FileDiff(s.a, e)
+	return view.ChangeFiles(s.a, before, after)
+}
+
+// OpenChangeNotes opens a Workshop item's change notes (ctrl+w on 变化).
+func (s *API) OpenChangeNotes(ws string) (string, error) {
+	if !view.IsNumber(ws) {
+		return "", errors.New(view.T("no Workshop ID: not a Workshop mod"))
 	}
-	return nil
+	if err := s.open(view.ChangeNotesURL(ws)); err != nil {
+		return "", err
+	}
+	return view.T("opened the change notes"), nil
 }
 
 // ---- environments, logs, scans ----

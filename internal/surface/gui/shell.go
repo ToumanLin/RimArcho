@@ -72,13 +72,19 @@ func (s *API) Shell() *Shell {
 func (s *API) Home() *view.Home {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.boardState() == nil {
+	st := s.boardState()
+	if st == nil {
 		return &view.Home{}
+	}
+	// The last run's line reads Player.log when it is newer than the one read last (06
+	// §2.3): the page loads, or the window comes back into focus, after a game.
+	if _, newer := s.a.NewLog(st); newer {
+		s.needsLocked(true)
 	}
 	packs, _, _ := view.PackRows(s.a)
 	plans, _ := view.PlanRows(s.a)
 	h := view.BuildHome(s.a, s.board, s.needsLocked(false), plans, packs)
-	st := s.board.St
+	st = s.board.St
 	view.AddOtherEnvs(s.a, h, st.Ix.Env.ID)
 	view.PickFeatured(h, s.a.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
 	return h

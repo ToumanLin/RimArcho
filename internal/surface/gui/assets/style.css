@@ -432,7 +432,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .mrow pre.details { margin: 8px 0 0; padding: 8px 10px; max-height: 260px; overflow: auto; border-radius: 8px; background: var(--card-2); color: var(--fg-2); font: 11px/1.5 var(--code); white-space: pre; cursor: text; user-select: text; }
 .mrow .go { margin-top: 6px; padding: 0; color: var(--accent); font-size: 12px; }
 .mrow .go:hover { text-decoration: underline; }
-.chg-of { flex: none; display: flex; }
 .ev { display: flex; gap: 10px; align-items: baseline; padding: 7px 14px; cursor: default; }
 .ev + .ev { border-top: 1px solid var(--line-2); }
 .ev:hover { background: var(--card-2); }
@@ -443,6 +442,28 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .ev .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); flex: none; align-self: center; }
 pre.lines { white-space: pre-wrap; overflow-wrap: anywhere; font: 11.5px/1.55 var(--code); color: var(--fg-2); margin: 0; user-select: text; }
 pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 1px solid var(--line-2); }
+/* 变化 (06 §2.9): one row per mod with its tier as a pill */
+.chg-bar { flex: none; display: flex; align-items: center; gap: 12px; min-height: 28px; }
+.chg-scope { display: flex; gap: 4px; }
+.chg-older { margin: 6px 2px 0; }
+.chg-row { display: flex; gap: 10px; align-items: baseline; padding: 7px 14px; cursor: default; min-width: 0; }
+.chg-row + .chg-row, .chg-open + .chg-row { border-top: 1px solid var(--line-2); }
+.chg-row:hover { background: var(--card-2); }
+.chg-row.cur { background: var(--accent-soft); }
+.chg-row .mod { font-weight: 500; white-space: nowrap; flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
+.chg-row .txt { color: var(--fg-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.chg-row .chev { color: var(--faint); flex: none; margin-left: auto; }
+.chg-row .tier { flex: none; line-height: 18px; padding: 0 7px; border-radius: 999px; font-size: 11.5px; background: var(--pill); color: var(--muted); }
+.chg-row .tier.launch { background: var(--red-soft); color: var(--red); }
+.chg-row .tier.watch { background: var(--amber-soft); color: var(--amber); }
+.chg-day .mod { font-weight: 600; }
+.chg-open { padding: 2px 14px 10px 24px; display: flex; flex-direction: column; gap: 3px; color: var(--fg-2); font-size: 12.5px; }
+.chg-open .line:first-child { color: var(--fg); }
+.chg-files { align-self: flex-start; color: var(--muted); font-size: 12px; padding: 2px 0; }
+.chg-files:hover { color: var(--fg); }
+.chg-open pre.lines.files { padding: 4px 0 4px 12px; border-top: 0; max-height: 320px; overflow: auto; }
+.chg-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.chg-acts .btn { height: 24px; padding: 0 9px; border-radius: 6px; font-size: 12px; }
 
 /* settings (06 §2.14) and packs (08 §5): rows on a card */
 .settings .set, .packs .pack { display: flex; gap: 16px; align-items: center; min-height: 48px; padding: 8px 14px; }
@@ -604,6 +625,7 @@ button.problem:hover { text-decoration: underline; }
 .hb-actline { display: flex; align-items: baseline; gap: 12px; height: 32px; padding: 0 12px; border-radius: 8px; text-align: left; min-width: 0; }
 .hb-actline:hover { background: var(--pill); }
 .hb-actline .t { flex: none; width: 96px; font-size: 12px; color: var(--muted); }
+.hb-actline.wide .t { width: auto; min-width: 96px; }
 .hb-actline .x { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }
 .hb-actline .go { color: var(--accent); }
 .card.empty-state { padding: 32px 16px; }

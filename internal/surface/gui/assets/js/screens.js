@@ -318,7 +318,7 @@ export function analyzeEvent(ev) {
 // and the entries whose details are open).
 const L = { path: "", page: null, loading: false, pending: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "" };
 // of: only this mod's Lineage ({id, name}), from a detail's history; null every mod.
-const C = { scans: [], cur: 0, rows: [], open: new Map(), els: [], of: null };
+const C = { page: null, cur: 0, items: [], els: [], open: new Set(), raw: new Map(), of: null, library: false };
 
 // logPage keeps the page's head and gives a fresh body below it; the actions go to the top
 // bar.
@@ -590,15 +590,28 @@ function showLines(box, lines) {
   box.append(pre);
 }
 
+// ---- Mod 库存 › 变化 (06 §2.9): one row per mod, what its changes mean, by tier ----
+// The current plan's mods since that plan was last played (a: the whole library); new and
+// gone mods are one summary row; older changes follow by day. enter opens a row (the
+// grouped summary, then every fact, then its actions), i its raw file list. ctrl+w opens
+// the Workshop change notes, ctrl+o the folder, S sorts, ! goes to 能不能跑, p locks this
+// version. tab / shift+tab go to the other sub-page (全部). Data: API.Changes
+// (view.BuildChanges → modchanges.Build).
+
 // changesFiltered: 变化 shows one mod's Lineage (the hint line offers esc).
 export function changesFiltered() { return S.screen === "changes" && !!C.of; }
+
+// changesPlan: the next 变化 shows the current plan since it was last played (the home
+// page's line opens it so).
+export function changesPlan() { C.library = false; C.of = null; C.cur = 0; }
 
 // changes shows the page; of: {id, name} narrows it to that mod's Lineage, null shows every
 // mod, undefined keeps what it shows.
 export async function changes(of) {
-  if (of !== undefined && (of && of.id) !== (C.of && C.of.id)) { C.of = of; C.cur = 0; }
-  try { C.scans = (await api.Changes(C.of ? C.of.id : "")) || []; } catch (e) { say("fail", errText(e)); return; }
-  C.cur = Math.min(C.cur, 1e9);
+  if (of !== undefined && (of && of.id) !== (C.of && C.of.id)) { C.of = of; C.cur = 0; C.open.clear(); }
+  let p;
+  try { p = await api.Changes(C.library, C.of ? C.of.id : ""); } catch (e) { say("fail", errText(e)); return; }
+  C.page = p;
   drawChanges();
 }
 
@@ -621,52 +634,185 @@ export function busyChanged() {
   if (b) b.replaceWith(rescanButton(b.dataset.label));
 }
 
+const rowKey = (r) => r.id + "|" + (r.before || 0) + "|" + (r.after || 0);
+const TIER = { 1: "launch", 2: "watch", 3: "content" };
+
 function drawChanges() {
-  const w = logPage("changes", T("what each scan found: mods added, updated and gone"), rescanButton());
-  const scroll = el("div", "scroll page-scroll");
+  const top = ($("#screen .page-scroll") || {}).scrollTop || 0;
+  const w = logPage("changes", T("what changed in your mods"), rescanButton());
+  const scroll = el("div", "scroll page-scroll chg");
   w.append(scroll);
+  const p = C.page || {};
+  // the scope and time, or the one condition (removable as on Mod 库存)
+  const bar = el("div", "chg-bar");
   if (C.of) {
-    // the one condition, removable as on Mod 库存
-    const bar = el("div", "chg-of");
     const b = el("button", "lib-cond");
     b.append(el("span", "", Tf("only %s", C.of.name)), el("span", "x", "×"));
     b.title = T("esc shows every mod");
     b.onclick = () => changes(null).then(() => ui.renderHints());
     bar.append(b);
-    scroll.append(bar);
+  } else {
+    const seg = el("div", "chg-scope");
+    for (const [lib, label] of [[false, T("the current plan")], [true, T("the whole library")]]) {
+      const b = el("button", "pill" + (C.library === lib ? " on" : ""), label);
+      b.title = "a";
+      b.onclick = () => { if (C.library !== lib) toggleScope(); };
+      seg.append(b);
+    }
+    bar.append(seg);
+    if (p.since) bar.append(el("span", "muted", p.since));
   }
-  if (!C.scans.length) { scroll.append(el("div", "card empty-state", C.of ? T("no change recorded for this mod") : T("no scan yet (R scans)"))); return; }
-  C.rows = [];
+  scroll.append(bar);
+  C.items = [];
   C.els = [];
-  for (const s of C.scans) {
-    const card = el("section", "card");
-    const head = el("div", "card-head");
-    head.append(el("span", "label", Tf("scan %s", s.time)), el("span", "muted", s.summary));
+  if (p.noScan) { scroll.append(el("div", "card empty-state", T("no scan yet (R scans)"))); return finish(); }
+  if (!C.of) {
+    const card = el("section", "card chg-card");
+    for (const r of p.rows || []) modRow(card, r);
+    if (p.arrivals) group(card, p.arrivals, "now");
+    if (!card.children.length) card.append(el("div", "empty-state", T("nothing changed")));
+    scroll.append(card);
+  }
+  const older = p.older || [];
+  if (older.length && !C.of) scroll.append(el("h2", "label chg-older", T("earlier")));
+  for (const d of older) {
+    const k = "day:" + d.day;
+    const open = !!C.of || C.open.has(k);
+    const card = el("section", "card chg-card");
+    const n = (d.rows || []).length + ((d.arrivals && d.arrivals.rows) || []).length;
+    const head = el("div", "chg-row chg-day");
+    head.append(el("span", "mod", d.day), el("span", "muted", Tf("%d mods", n)), el("span", "chev", open ? "▾" : "▸"));
+    item(head, { t: "day", key: k });
     card.append(head);
-    for (const e of s.events || []) {
-      const i = C.rows.length;
-      C.rows.push(e);
-      const r = el("div", "ev");
-      r.append(el("span", "mod", e.mod), el("span", "muted", e.text));
-      if (e.files) r.append(el("span", "faint", C.open.has(e.id) ? "▾" : "▸"));
-      r.onclick = () => { C.cur = i; toggleFiles(e); };
-      C.els.push(r);
-      card.append(r);
-      if (C.open.has(e.id)) card.append(el("pre", "lines files", C.open.get(e.id).join("\n")));
+    if (open) {
+      for (const r of d.rows || []) modRow(card, r);
+      if (d.arrivals) group(card, d.arrivals, d.day);
     }
     scroll.append(card);
   }
-  C.cur = Math.min(C.cur, Math.max(C.rows.length - 1, 0));
-  markRows(C);
+  finish();
+  function finish() {
+    C.cur = Math.min(C.cur, Math.max(C.items.length - 1, 0));
+    markRows(C);
+    const sc = $("#screen .page-scroll");
+    if (sc) sc.scrollTop = top;
+    ui.renderHints();
+  }
 }
 
-async function toggleFiles(e) {
-  const top = ($("#screen .page-scroll") || {}).scrollTop || 0;
-  if (C.open.has(e.id)) C.open.delete(e.id);
-  else if (e.files) C.open.set(e.id, (await api.FileDiff(e.id)) || []);
+// item registers a selectable row: a click selects it and opens or closes it.
+function item(node, it) {
+  const i = C.items.length;
+  C.items.push(it);
+  C.els.push(node);
+  node.onclick = (e) => { if (e.target.closest("button")) return; C.cur = i; toggle(it); };
+}
+
+// modRow: [tier] name · sentence ▸, opened: the summary, every fact, the files, the actions.
+function modRow(card, r) {
+  const k = rowKey(r);
+  const open = C.open.has(k);
+  const row = el("div", "chg-row");
+  row.append(el("span", "tier " + (TIER[r.tier] || ""), r.tierText), el("span", "mod", r.mod), el("span", "txt", r.text));
+  if ((r.details && r.details.length) || r.actions || hasFiles(r)) row.append(el("span", "chev", open ? "▾" : "▸"));
+  item(row, { t: "mod", key: k, r });
+  card.append(row);
+  if (!open) return;
+  const box = el("div", "chg-open");
+  for (const d of r.details || []) box.append(el("div", "line", d));
+  if (hasFiles(r)) {
+    const f = el("button", "chg-files", (C.raw.has(k) ? "▾ " : "▸ ") + T("files"));
+    f.title = "i";
+    f.onclick = () => rawFiles(r);
+    box.append(f);
+    if (C.raw.has(k)) {
+      const pre = el("pre", "lines files");
+      pre.textContent = C.raw.get(k).join("\n");
+      box.append(pre);
+    }
+  }
+  if (r.actions && r.actions.length) {
+    const acts = el("div", "chg-acts");
+    for (const a of r.actions) {
+      const b = el("button", "btn", a.label);
+      b.append(el("kbd", "", a.key));
+      b.onclick = () => changeAct(r, a.kind);
+      acts.append(b);
+    }
+    box.append(acts);
+  }
+  card.append(box);
+}
+
+const hasFiles = (r) => r.before && r.after && r.before !== r.after;
+
+// group: the one row of new and gone mods; opened, each of them.
+function group(card, g, where) {
+  const k = "group:" + where;
+  const open = C.open.has(k);
+  const row = el("div", "chg-row chg-group");
+  row.append(el("span", "tier content", T("new and gone")), el("span", "txt", g.text), el("span", "chev", open ? "▾" : "▸"));
+  item(row, { t: "group", key: k });
+  card.append(row);
+  if (open) for (const r of g.rows || []) modRow(card, r);
+}
+
+function toggle(it) {
+  C.open.has(it.key) ? C.open.delete(it.key) : C.open.add(it.key);
   drawChanges();
-  const sc = $("#screen .page-scroll");
-  if (sc) sc.scrollTop = top;
+}
+
+async function rawFiles(r) {
+  const k = rowKey(r);
+  if (C.raw.has(k)) C.raw.delete(k);
+  else {
+    try { C.raw.set(k, (await api.ChangeFiles(r.before, r.after)) || []); } catch (e) { return say("fail", errText(e)); }
+    C.open.add(k);
+  }
+  drawChanges();
+}
+
+function toggleScope() {
+  if (C.of) return;
+  C.library = !C.library;
+  C.cur = 0;
+  changes();
+}
+
+// changeAct runs a row's action (each also has its key on the page).
+async function changeAct(r, kind) {
+  switch (kind) {
+    case "workshop":
+      try { say("ok", await api.OpenChangeNotes(r.workshopId)); } catch (e) { say("fail", errText(e)); }
+      return;
+    case "deps": return ui.go("needs");
+    case "sort": return ui.run("sort");
+    case "lock": {
+      // a copy in the lock library: the dry run first, as on Mod 库存 (06 §6)
+      let p;
+      try { p = await api.LibraryPreview("pin", [r.ref]); } catch (e) { return say("fail", errText(e)); }
+      pop.confirm(p.title, p.lines, T("lock this one"), p.apply ? async () => {
+        try { say("ok", await api.LibraryDo("pin", [r.ref])); } catch (e) { say("fail", errText(e)); }
+        await ui.reload();
+        changes();
+      } : null);
+    }
+  }
+}
+
+// changesHints: the hint line on 变化 — the moves, then what the row under the cursor offers.
+export function changesHints() {
+  const it = C.items[C.cur];
+  const out = [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }];
+  if (it && it.r) {
+    if (hasFiles(it.r)) out.push({ key: "i", label: T("files") });
+    // ctrl+o first: the hint line folds it with ctrl+w into one place
+    out.push({ key: "ctrl+o", label: T("open the folder") });
+    for (const a of it.r.actions || []) out.push({ key: a.key, label: a.label });
+  }
+  if (!C.of) out.push({ key: "a", label: C.library ? T("the current plan") : T("the whole library") });
+  out.push({ key: "tab", label: T("all mods") });
+  return out;
 }
 
 function markRows(X) {
@@ -695,10 +841,34 @@ export function logsKey(e) {
     if (m != null) { e.preventDefault(); L.cur = m; return markLog(); }
     return;
   }
-  if (k === "Escape" && C.of) { e.preventDefault(); return changes(null).then(() => ui.renderHints()); }
-  const m = C.rows.length ? moveIn(C.cur, C.rows.length, k) : null;
-  if (m != null) { e.preventDefault(); C.cur = m; return markRows(C); }
-  if (k === "Enter" && C.rows[C.cur]) { e.preventDefault(); return toggleFiles(C.rows[C.cur]); }
+  return changesKey(e);
+}
+
+// changesKey: the keys of 变化 (every action on the page has one).
+function changesKey(e) {
+  const k = e.key;
+  const ctrl = e.ctrlKey || e.metaKey;
+  const done = () => e.preventDefault();
+  if (k === "Escape" && C.of) { done(); return changes(null).then(() => ui.renderHints()); }
+  if (k === "Tab") { done(); return ui.go("library"); }
+  const m = C.items.length ? moveIn(C.cur, C.items.length, k) : null;
+  if (m != null) { done(); C.cur = m; markRows(C); return ui.renderHints(); }
+  const it = C.items[C.cur];
+  const r = it && it.r;
+  const has = (kind) => r && (r.actions || []).some((a) => a.kind === kind);
+  if (ctrl) {
+    const lk = k.toLowerCase();
+    if (lk === "o" && r) { done(); return api.OpenFolder(r.id).then(() => say("ok", T("opened the folder")), (x) => say("fail", errText(x))); }
+    if (lk === "w" && r) { done(); return changeAct(r, "workshop"); }
+    return;
+  }
+  if (k === "Enter" && it) { done(); return toggle(it); }
+  if (k === "i" && r && hasFiles(r)) { done(); return rawFiles(r); }
+  if (k === "a" && !C.of) { done(); return toggleScope(); }
+  if (k === "R") { done(); return ui.cmd("rescan"); }
+  if (k === "S" && has("sort")) { done(); return changeAct(r, "sort"); }
+  if (k === "!" && has("deps")) { done(); return changeAct(r, "deps"); }
+  if (k === "p" && has("lock")) { done(); return changeAct(r, "lock"); }
 }
 
 // ---- the full detail (06 §4.2): ←→ the previous / next mod, tab the sub-sections ----
