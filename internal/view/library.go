@@ -116,15 +116,15 @@ type LibInstRow struct {
 	LibCells
 	// Note is the copy's own note (the player's or an agent's); Auto what RimArcho knows
 	// about how it made the copy, shown (and offered as a first version) while there is none.
-	Note     string      `json:"note,omitempty"`
-	Auto     string      `json:"auto,omitempty"`
-	InPlan   bool        `json:"inPlan,omitempty"`
-	Path     string      `json:"path,omitempty"`
-	URL      string      `json:"url,omitempty"`
-	States   []string    `json:"states,omitempty"` // every state (the detail lists them all)
-	UsedIn   []string    `json:"usedIn,omitempty"`
-	Versions string      `json:"versions,omitempty"`
-	Played   string      `json:"played,omitempty"`
+	Note     string   `json:"note,omitempty"`
+	Auto     string   `json:"auto,omitempty"`
+	InPlan   bool     `json:"inPlan,omitempty"`
+	Path     string   `json:"path,omitempty"`
+	URL      string   `json:"url,omitempty"`
+	States   []string `json:"states,omitempty"` // every state (the detail lists them all)
+	UsedIn   []string `json:"usedIn,omitempty"`
+	Versions string   `json:"versions,omitempty"`
+	Played   string   `json:"played,omitempty"`
 	// Ops are the op codes that apply (ops.go, CopyOps); the labels and keys are the page's
 	// Ops table, sent once.
 	Ops []string `json:"ops,omitempty"`
