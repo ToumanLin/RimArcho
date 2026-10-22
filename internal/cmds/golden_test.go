@@ -61,7 +61,7 @@ func goldenDir() string {
 	return filepath.Join(filepath.Dir(file), "..", "..", "testdata", "golden")
 }
 
-func runGolden(t *testing.T, name string, e *testkit.Env, steps []step) {
+func runGolden(t *testing.T, name string, e *testkit.Env, steps []step, scrub ...func(string) string) {
 	t.Helper()
 	var sb strings.Builder
 	for _, s := range steps {
@@ -71,7 +71,11 @@ func runGolden(t *testing.T, name string, e *testkit.Env, steps []step) {
 		}
 		out, code := e.Run(args...)
 		fmt.Fprintf(&sb, "$ archo %s\n", e.Scrub(strings.Join(args, " ")))
-		sb.WriteString(msRe.ReplaceAllString(e.Scrub(out), "${1}<dur>"))
+		out = msRe.ReplaceAllString(e.Scrub(out), "${1}<dur>")
+		for _, f := range scrub {
+			out = f(out)
+		}
+		sb.WriteString(out)
 		if code != 0 {
 			fmt.Fprintf(&sb, "[exit %d]\n", code)
 		}

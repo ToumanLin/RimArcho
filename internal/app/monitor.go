@@ -53,14 +53,7 @@ func (a *App) MonitorDir() string {
 	if v := a.Store.Meta("cfg:monitor.dir"); v != "" {
 		return v
 	}
-	base := a.LockBase
-	if base == "" {
-		base = os.Getenv("LOCALAPPDATA")
-	}
-	if base == "" {
-		base, _ = os.UserCacheDir()
-	}
-	return filepath.Join(base, "RimArcho", "monitor")
+	return filepath.Join(a.LocalDir(), "monitor")
 }
 
 // MonitorDefault reports whether the monitor is added to plans by default (04 §1.5).

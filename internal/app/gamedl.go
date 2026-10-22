@@ -43,14 +43,7 @@ type steamCMDRunner struct {
 
 // SteamCMDDir is where RimArcho keeps the SteamCMD it downloads: %LOCALAPPDATA%\RimArcho\steamcmd.
 func (a *App) SteamCMDDir() string {
-	base := a.LockBase
-	if base == "" {
-		base = os.Getenv("LOCALAPPDATA")
-	}
-	if base == "" {
-		base, _ = os.UserCacheDir()
-	}
-	return filepath.Join(base, "RimArcho", "steamcmd")
+	return filepath.Join(a.LocalDir(), "steamcmd")
 }
 
 // SteamCMDPath finds steamcmd: config steamcmd.path, RimArcho's own copy, then PATH. ""

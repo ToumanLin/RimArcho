@@ -22,14 +22,7 @@ func (a *App) LockDir() string {
 	if v := a.Store.Meta("cfg:lock.dir"); v != "" {
 		return v
 	}
-	base := a.LockBase
-	if base == "" {
-		base = os.Getenv("LOCALAPPDATA")
-	}
-	if base == "" {
-		base, _ = os.UserCacheDir()
-	}
-	return filepath.Join(base, "RimArcho", "locked")
+	return filepath.Join(a.LocalDir(), "locked")
 }
 
 // lockRoot is the lock library's folder. The library is shared by every environment

@@ -11,6 +11,12 @@ import (
 // gameProcesses lists the running RimWorld processes (08 §4): executable name starting with
 // "rimworld", with full path, start time and, when readable, -savedatafolder.
 func gameProcesses() []*GameRun {
+	return listProcesses(func(name string) bool { return strings.HasPrefix(name, "rimworld") }, true)
+}
+
+// listProcesses lists the processes whose lower-case executable name matches, with full
+// path, start time and, with cmdline, -savedatafolder.
+func listProcesses(match func(name string) bool, cmdline bool) []*GameRun {
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
 		return nil
@@ -21,7 +27,7 @@ func gameProcesses() []*GameRun {
 	pe.Size = uint32(unsafe.Sizeof(pe))
 	for err = windows.Process32First(snap, &pe); err == nil; err = windows.Process32Next(snap, &pe) {
 		name := strings.ToLower(windows.UTF16ToString(pe.ExeFile[:]))
-		if !strings.HasPrefix(name, "rimworld") {
+		if !match(name) {
 			continue
 		}
 		h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pe.ProcessID)
@@ -39,14 +45,17 @@ func gameProcesses() []*GameRun {
 		if windows.GetProcessTimes(h, &c, &x, &k, &u) == nil {
 			started = time.Unix(0, c.Nanoseconds())
 		}
-		cmdline, known := processCommandLine(h)
+		line, known := "", false
+		if cmdline {
+			line, known = processCommandLine(h)
+		}
 		windows.CloseHandle(h)
 		if exe == "" {
 			continue
 		}
 		r := &GameRun{PID: int(pe.ProcessID), Exe: exe, Started: started, ArgsKnown: known}
 		if known {
-			r.SaveData = SaveDataArg(cmdline)
+			r.SaveData = SaveDataArg(line)
 		}
 		out = append(out, r)
 	}

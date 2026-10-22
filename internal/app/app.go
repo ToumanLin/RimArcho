@@ -100,7 +100,20 @@ type App struct {
 	SteamAPI       string
 	// SteamCollectionAPI reads Workshop collections (04 §9.5); "" is the public endpoint.
 	SteamCollectionAPI string
-	analyzing          *pendingAnalysis
+	// Uninstall (uninstall.go): UninstallExe is the program to remove ("" this one; a
+	// development build is never removed), UninstallKeepBase replaces Documents as the
+	// default home of kept saves and packs, ArchoProbe lists the other RimArcho processes and
+	// AfterExitFunc replaces starting the clean-up script (tests).
+	UninstallExe      string
+	UninstallKeepBase string
+	UninstallLog      string // where the script lists what it could not delete ("" %TEMP%)
+	ArchoProbe        func() []int
+	AfterExitFunc     func(AfterExit) error
+	// Uninstalled is set once an uninstall has run: every command is refused after it.
+	Uninstalled bool
+	sizes       map[string]int64
+
+	analyzing *pendingAnalysis
 
 	dataIdx *dataIndex // community data indexes (04 §6.3), loaded on first use
 

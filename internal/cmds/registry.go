@@ -95,7 +95,7 @@ func register(c *Command) { registry = append(registry, c) }
 // order is the documented command order (05 §4.2); registration order depends on file names.
 var commandOrder = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "env remove", "scan", "status", "list", "find",
 	"mod", "describe", "def", "patches", "harmony", "why", "log", "problems", "problems show", "problems ignore", "problems unignore", "files search", "source", "source search", "analyze", "changes", "library", "library remove-from-plans", "library move-to-locked", "enable", "disable", "move", "swap", "sort", "undo", "redo", "save", "loadout log", "loadout diff",
-	"loadout checkout", "loadout ignore-external", "loadout export", "loadout import", "plan list", "plan new", "plan use", "plan rename", "plan remove", "stage list", "stage add", "stage drop", "stage restore", "pin", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule list", "rule remove", "launch", "identity list", "identity resolve", "lineage split", "lineage merge", "gc", "config get", "config set", "mcp", "gui", "version"}
+	"loadout checkout", "loadout ignore-external", "loadout export", "loadout import", "plan list", "plan new", "plan use", "plan rename", "plan remove", "stage list", "stage add", "stage drop", "stage restore", "pin", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule list", "rule remove", "launch", "identity list", "identity resolve", "lineage split", "lineage merge", "gc", "config get", "config set", "mcp", "gui", "version", "uninstall"}
 
 // Commands returns the command table in documented order.
 func Commands() []*Command {
@@ -214,6 +214,9 @@ const (
 func Execute(ap *app.App, argv []string) (string, int) {
 	if len(argv) == 0 || argv[0] == "help" || argv[0] == "--help" || argv[0] == "-h" {
 		return Help().String(), ExitOK
+	}
+	if ap.Uninstalled {
+		return "error: RimArcho was uninstalled; close it\n", ExitError
 	}
 	c, rest := lookup(argv)
 	if c == nil {

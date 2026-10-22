@@ -244,14 +244,7 @@ func (a *App) SteamRuntime() (string, error) {
 	if src == "" {
 		return "", fmt.Errorf("the game install has no steam_api64.dll")
 	}
-	base := a.LockBase
-	if base == "" {
-		base = os.Getenv("LOCALAPPDATA")
-	}
-	if base == "" {
-		base, _ = os.UserCacheDir()
-	}
-	dir := filepath.Join(base, "RimArcho", "steam")
+	dir := filepath.Join(a.LocalDir(), "steam")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
