@@ -199,6 +199,15 @@ func TestCLIParity(t *testing.T) {
 			t.Errorf("%s %v: %d lines (I5: at most 40)", c.tool, c.args, n)
 		}
 	}
+	// L7: the cursor analyze_log returned, given back as since.
+	m := regexp.MustCompile(`cursor: (\S+)`).FindStringSubmatch(e.MustRun("log"))
+	if m == nil {
+		t.Fatal("archo log printed no cursor")
+	}
+	got, _ := call(t, cs, "analyze_log", map[string]any{"since": m[1]})
+	if want, _ := e.Run("log", "--since", m[1]); got != want || !strings.Contains(got, "(nothing new)") {
+		t.Errorf("analyze_log since: MCP text differs from `archo log --since`:\n--- mcp\n%s\n--- cli\n%s", got, want)
+	}
 }
 
 // I2: references printed by one tool are accepted by the others.

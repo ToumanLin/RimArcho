@@ -204,6 +204,7 @@ type LogIn struct {
 	File        string `json:"file,omitempty" jsonschema:"another log file path"`
 	Prev        bool   `json:"prev,omitempty" jsonschema:"Player-prev.log (the run before the last)"`
 	All         bool   `json:"all,omitempty" jsonschema:"include informational clusters"`
+	Since       string `json:"since,omitempty" jsonschema:"the cursor an earlier analyze_log call returned: only clusters new or grown after it (poll a running game)"`
 	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
 }
 
@@ -349,7 +350,7 @@ func toolList() []tool {
 			return argv("changes").pos(in.Ref).flag("library", in.Library).str("since", in.Since).flag("all", in.All).a
 		}),
 		reg("analyze_log", true, false, descLog, func(in LogIn) []string {
-			return gv(argv("log").str("cluster", in.Cluster).str("text", in.Text).str("file", in.File).flag("prev", in.Prev).flag("all", in.All), in.GameVersion)
+			return gv(argv("log").str("cluster", in.Cluster).str("text", in.Text).str("file", in.File).flag("prev", in.Prev).flag("all", in.All).str("since", in.Since), in.GameVersion)
 		}),
 		reg("search_files", true, false, descFiles, func(in FilesIn) []string {
 			return argv("files", "search", in.Pattern).str("mod", in.Mod).flag("regex", in.Regex).flag("languages", in.Languages).flag("all", in.All).a

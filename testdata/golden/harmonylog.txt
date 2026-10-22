@@ -62,6 +62,7 @@ $ archo why #gpto #xamx
 $ archo log
 log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Player.log
+  cursor: <cursor>
   classes: harmony-stack 2, patch-failed 1, xref-missing 1
   list:
     log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)
@@ -151,6 +152,7 @@ next:
 $ archo log --select
 log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Player.log
+  cursor: <cursor>
   selected: archo problems now includes these clusters as log.* problems
   classes: harmony-stack 2, patch-failed 1, xref-missing 1
   list:

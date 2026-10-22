@@ -378,7 +378,11 @@ func HintFrom(c *Companion) Hint {
 
 // ClusterKeyHint is ClusterKey with a companion's hint applied.
 func ClusterKeyHint(e *Entry, hint Hint) (key, template, class string) {
-	key, template, class = ClusterKey(e)
+	return clusterKeyHint(e, Classify(e), hint)
+}
+
+func clusterKeyHint(e *Entry, cls string, hint Hint) (key, template, class string) {
+	key, template, class = clusterKey(e, cls)
 	if hint == nil || (class != ClassOther && class != ClassException) {
 		return
 	}
@@ -394,11 +398,33 @@ func ClusterKeyHint(e *Entry, hint Hint) (key, template, class string) {
 func ClustersHint(f *File, hint Hint) []*Cluster {
 	by := map[string]*Cluster{}
 	var out []*Cluster
+	// The regular expressions cost tens of µs an entry on long messages and logs repeat the
+	// same entry thousands of times: classify each distinct entry once (07 §6).
+	type kind struct {
+		interesting          bool
+		key, template, class string
+	}
+	memo := map[string]kind{}
+	var sb strings.Builder
 	for _, e := range f.Entries {
-		if !Interesting(e) {
+		sb.Reset()
+		entrySig(&sb, e)
+		sig := sb.String()
+		k, ok := memo[sig]
+		if !ok {
+			var cls string
+			if k.interesting, cls = interesting(e); k.interesting {
+				if cls == "" {
+					cls = Classify(e)
+				}
+				k.key, k.template, k.class = clusterKeyHint(e, cls, hint)
+			}
+			memo[sig] = k
+		}
+		if !k.interesting {
 			continue
 		}
-		key, tmpl, cls := ClusterKeyHint(e, hint)
+		key, tmpl, cls := k.key, k.template, k.class
 		c := by[key]
 		if c == nil {
 			c = &Cluster{Key: key, Template: tmpl, Class: cls, First: e}
@@ -412,6 +438,30 @@ func ClustersHint(f *File, hint Hint) []*Cluster {
 		}
 	}
 	return out
+}
+
+// entrySig writes everything Interesting and ClusterKey read from an entry: equal
+// signatures classify and cluster the same.
+func entrySig(sb *strings.Builder, e *Entry) {
+	sb.WriteString(e.Level)
+	sb.WriteByte(0)
+	sb.WriteString(e.Message)
+	for _, x := range e.Extra {
+		sb.WriteByte(0)
+		sb.WriteString(x)
+	}
+	for _, fr := range e.Frames {
+		sb.WriteByte(1)
+		sb.WriteString(fr.Type)
+		sb.WriteByte('.')
+		sb.WriteString(fr.Method)
+		if fr.Caller {
+			sb.WriteByte('c')
+		}
+		if len(fr.Harmony) > 0 {
+			sb.WriteByte('h')
+		}
+	}
 }
 
 // EntryOf parses a companion entry's message and details as a log entry (an entry that is

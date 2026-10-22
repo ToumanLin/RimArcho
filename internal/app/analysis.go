@@ -122,6 +122,12 @@ func (a *App) Analyze(progress func(string)) (*AnalyzeReport, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The log attribution's reference index for this set (03 §6.5), so the first query on a
+	// new log does not read every mod file.
+	if progress != nil {
+		progress("indexing def references")
+	}
+	a.RefIndex(st)
 	return &AnalyzeReport{ID: id, Key: key, MM: st.GameMM(), Stats: out.Stats}, nil
 }
 
