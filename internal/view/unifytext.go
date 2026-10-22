@@ -32,6 +32,8 @@ func init() {
 		"%d more…":    "还有 %d 个…",
 		"Mod library": "Mod 库存",
 		"search: words, tag:, author:, type:, has:, version:, -not": "搜索：词、tag:、author:、type:、has:、version:、-排除",
+		"a note on this mod…": "这个 Mod 的备注…",
+		"one mod at a time":   "一次一个 Mod",
 		// the filter bar
 		"content":       "内容",
 		"has":           "有",

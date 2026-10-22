@@ -208,10 +208,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		ks = append(ks, OpRemove)
 	}
 	if m != nil {
-		ks = append(ks, OpTags)
-		if page == LibraryPage {
-			ks = append(ks, OpNote)
-		}
+		ks = append(ks, OpTags, OpNote) // the editor: the mod's note; Mod 库存: this copy's
 	}
 	url := IsNumber(i.WorkshopID)
 	if live && i.Path != "" {
@@ -262,7 +259,7 @@ func RowOps(lib *app.Library, id string, col Column) []string {
 			}
 		}
 	}
-	return fixColumn([]string{OpTags}, col)
+	return fixColumn([]string{OpTags, OpNote}, col)
 }
 
 // fixColumn keeps the plan ops of the row's column.

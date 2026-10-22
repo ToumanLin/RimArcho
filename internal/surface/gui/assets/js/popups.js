@@ -228,26 +228,15 @@ export function ask(title, placeholder, done, value = null) {
   });
 }
 
-// help: every key (06 §3.1 rule 4).
-export function help() {
+// help: the keys of the page it is asked on (06 §3.1 rule 4, view.KeyHelp): the plan
+// editor and Mod 库存 share one table, then each page's own.
+export async function help(page = "plan") {
+  let rows = [];
+  try { rows = await api.Keys(page === "full" ? "plan" : page); } catch { rows = []; }
   open("help", T("all keys"), (pop) => {
     pop.append(el("div", "ttl", T("the arrows only move; keys that change things act at once, u undoes")));
     const body = el("div", "body help");
-    const rows = [
-      ["↑ ↓", T("move the cursor (scroll in the details)")], ["← → · 1–4", T("go to an area")],
-      ["PgUp PgDn", T("scroll the details from anywhere")], ["shift+↑↓ · shift+click", T("select a range")],
-      ["ctrl+space · ctrl+click", T("select or unselect one")], ["esc", T("clear the selection, close a popup")],
-      ["space · double-click", T("enable / disable / put back")], ["t", T("stage; in staging, put back")],
-      ["m", T("move to a position or after a mod")], ["J K · alt+J K", T("move down / up 1 (10)")],
-      ["g · #", T("tags")], ["enter", T("full details")], ["o", T("Workshop page")],
-      ["ctrl+o", T("open the folder (the plan and the library)")], ["ctrl+w", T("Workshop page (the plan and the library)")],
-      ["S · w · L", T("sort · write to the game · launch (at once; the palette previews them)")], ["u · ctrl+z", T("undo")], ["ctrl+r · ctrl+y", T("redo")],
-      ["/ · ctrl+f", T("search the list")], ["shift+1–7", T("go to a page in the sidebar")], ["l · c", T("game log · mod changes")],
-      ["T", T("stage the whole enabled list; in staging, put all back")],
-      ["R · A", T("rescan · check the files again")], ["E", T("the environment page")], ["P", T("plans: switch, new, rename, delete")], ["i · e", T("import · export the mod list")], ["ctrl+k", T("command palette")],
-      [T("drag"), T("between lists: enable, disable, stage; within Enabled: reorder")], [T("right click"), T("what you can do with it")],
-    ];
-    for (const [k, v] of rows) body.append(el("b", "", k), el("span", "", v));
+    for (const r of rows) body.append(el("b", "", r.keys), el("span", "", r.what));
     pop.append(body);
   });
 }

@@ -20,6 +20,7 @@ import * as library from "./library.js";
 import { initExchange, exchange } from "./exchange.js";
 import { icon } from "./icons.js";
 import * as motion from "./motion.js";
+import * as ops from "./ops.js";
 
 // ---- loading ----
 
@@ -380,6 +381,16 @@ async function verb(name) {
     case "swap":
       if (sel.length === 1 && sel[0].id) return edited(api.Swap(sel[0].id), true, ids);
       return;
+    case "note": {
+      // the mod's own note (06 §3.5): one line, from what is there; empty clears it
+      const it = sel.length === 1 ? sel[0] : null;
+      if (!it || !it.id) return say("", T("one mod at a time"));
+      const now = await api.ModNote(it.id).catch(() => "");
+      return pop.ask(Tf("note on %s", it.name), T("a note on this mod…"), async (text) => {
+        try { say("ok", await api.SetModNote(it.id, text)); } catch (err) { say("fail", errText(err)); }
+        await reload();
+      }, now);
+    }
     case "undo": return edited(api.Undo(), false);
     case "redo": return edited(api.Redo(), false);
     case "restore-all":
@@ -455,7 +466,7 @@ async function cmd(id) {
     case "cli": return commandLine();
     case "import": return exchange(0);
     case "export": return exchange(1);
-    case "help": return pop.help();
+    case "help": return pop.help(S.screen || "plan");
     case "quit": return window.close();
   }
 }
@@ -579,6 +590,65 @@ async function barChanged() {
   detailFollow();
 }
 
+// subPage: tab / shift+tab go to the next / previous page under the open sidebar entry.
+function subPage(d) {
+  const cur = shell.current();
+  for (const g of (S.shell && S.shell.nav) || []) for (const it of g.items || []) {
+    const kids = (it.kids || []).filter((x) => !x.add);
+    const i = kids.findIndex((x) => x.id === cur);
+    if (i >= 0 && kids.length > 1) return go(kids[(i + d + kids.length) % kids.length].id);
+  }
+}
+
+// ---- the row menu (06 §8.5): the same groups and order as Mod 库存's, from view.RowOps ----
+
+async function openRowMenu(x, y, keys) {
+  const k = S.focus < 3 ? S.focus : lastList;
+  const it = cur(k);
+  if (!it) return;
+  let codes = [];
+  // a list entry with no mod: only out of the list
+  if (!it.id) codes = k === 1 ? ["disable"] : [];
+  else try { codes = await api.RowOps(k, it.id); } catch { codes = []; }
+  const n = S.focus < 3 ? selection().length : 1;
+  if (n > 1) codes = codes.filter((c) => !ops.op(c).one);
+  ops.openMenu(x, y, codes, (c) => rowOp(c), keys);
+}
+
+function menuAtCursor() {
+  const k = S.focus < 3 ? S.focus : lastList;
+  const r = $(`.area[data-area="${k}"] .row.cur`) || $(`.area[data-area="${k}"] .rows`);
+  const b = r.getBoundingClientRect();
+  openRowMenu(b.left + 40, b.bottom, true);
+}
+
+// rowOp runs an op of the menu on the object: the plan's own as their verbs, the version
+// and disk ops as Mod 库存 runs them (a dry run first when they change files).
+async function rowOp(code) {
+  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", workshop: "workshop-id" };
+  if (verbs[code]) return verb(verbs[code]);
+  const sel = S.focus < 3 ? selection() : (cur(lastList) ? [cur(lastList)] : []);
+  const ids = idsOf(sel);
+  if (!ids.length) return;
+  const o = ops.op(code);
+  const run = () => edited(api.RunOp(code, ids), code === "remove", ids);
+  if (!o.confirm) return run();
+  let p;
+  try { p = await api.OpPreview(code, ids); } catch (e) { return say("fail", errText(e)); }
+  pop.confirm(p.title, p.lines, o.label, p.apply ? run : null);
+}
+
+// delKey: Del unsubscribes the Workshop copy or deletes one of the player's own (asks first).
+async function delKey() {
+  const k = S.focus < 3 ? S.focus : lastList;
+  const it = cur(k);
+  if (!it || !it.id) return;
+  const codes = await api.RowOps(k, it.id).catch(() => []);
+  const c = ops.keyed(codes, "Del");
+  if (!c) return say("", T("nothing to do with this row"));
+  return rowOp(c);
+}
+
 // ---- the keyboard ----
 
 function onKey(e) {
@@ -595,12 +665,15 @@ function onKey(e) {
     if (NAV[+dig[1] - 1]) go(NAV[+dig[1] - 1]);
     return;
   }
+  // tab / shift+tab: the next / previous page under the same sidebar entry (Mod 库存's 全部 and
+  // 变化, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
+  if (k === "Tab" && !e.ctrlKey && !e.altKey && S.screen !== "full") { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
   if (S.screen) {
-    // esc leaves the full detail for the plan; the sidebar's pages are side by side, so
-    // esc does not go from one to another (06 §3.1)
-    if (S.screen === "full" && (k === "Escape" || k === "Backspace")) { e.preventDefault(); scr.closeScreen(); detailFollow(true); return; }
+    // esc (and enter) leave the full detail for the plan; the sidebar's pages are side by
+    // side, so esc does not go from one to another (06 §3.1)
+    if (S.screen === "full" && (k === "Escape" || k === "Backspace" || k === "Enter")) { e.preventDefault(); scr.closeScreen(); detailFollow(true); return; }
     if (e.ctrlKey && k === "k") { e.preventDefault(); return pop.palette(); }
-    if (k === "?" && S.screen !== "full") { e.preventDefault(); return pop.help(); }
+    if (k === "?" && S.screen !== "full") { e.preventDefault(); return pop.help(S.screen); }
     if (S.screen === "home") return homePage.homeKey(e);
     if (S.screen === "needs") return scr.needsKey(e);
     if (S.screen === "library") return library.key(e);
@@ -617,15 +690,30 @@ function onKey(e) {
     return moveCursor(k === "ArrowDown" ? 1 : -1, e.shiftKey);
   }
   if (k === "ArrowLeft" || k === "ArrowRight") { handled(); return focusArea(Math.max(0, Math.min(3, S.focus + (k === "ArrowRight" ? 1 : -1)))); }
-  if (k === "PageDown" || k === "PageUp") { handled(); scrollDetail(k === "PageDown" ? 1 : -1, true); return renderWhere(); }
+  // PgUp / PgDn move the cursor a page (06 §3.3); in the details they scroll them
+  if (k === "PageDown" || k === "PageUp") {
+    handled();
+    if (S.focus === 3) { scrollDetail(k === "PageDown" ? 1 : -1, true); return renderWhere(); }
+    const box = $(`.area[data-area="${S.focus}"] .rows`);
+    const page = Math.max(1, Math.floor(box.clientHeight / 28) - 1);
+    return moveCursor(k === "PageDown" ? page : -page, e.shiftKey);
+  }
   if (k === "Home" || k === "End") { handled(); if (S.focus < 3) moveCursor(k === "End" ? 1e9 : -1e9, e.shiftKey); return; }
   if (!ctrl && "1234".includes(k) && k.length === 1) { handled(); return focusArea(+k - 1); }
-  if (k === "Tab") { handled(); return focusArea((S.focus + (e.shiftKey ? 3 : 1)) % 4); }
   if (k === "Escape") {
     handled();
     if (S.focus < 3 && col().sel.size) { col().sel.clear(); renderLists(); renderWhere(); renderHints(); }
     else if (S.focus < 2 && barOn()) { S.bar.clear(); }
     else if (S.focus === 2 && col().query) { col().query = ""; $(`.area[data-area="${S.focus}"] .search input`).value = ""; search(S.focus, ""); }
+    return;
+  }
+  if (ops.menuKey(e)) { handled(); return menuAtCursor(); }
+  if (k === "Delete") { handled(); return delKey(); }
+  if (ctrl && k.toLowerCase() === "a" && S.focus < 3) {
+    handled();
+    const c = col();
+    for (const i of c.view) c.sel.add(key(c.items[i]));
+    renderRows(S.focus); renderWhere(); renderHints();
     return;
   }
   if (ctrl && (k === " " || k === "Spacebar")) {
@@ -647,10 +735,10 @@ function onKey(e) {
   if (e.altKey && (k === "J" || k === "j" || k === "K" || k === "k")) { handled(); return verb(k.toLowerCase() === "j" ? "down10" : "up10"); }
   const map = {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
-    g: () => verb("tags"), "#": () => verb("tags"), Enter: () => verb("full"), o: () => verb("workshop"), x: () => verb("swap"),
+    g: () => verb("tags"), n: () => verb("note"), Enter: () => verb("full"), x: () => verb("swap"),
     S: () => run("sort"), w: () => run("save"), L: () => run("launch"), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
-    "/": () => startSearch(), "\\": () => S.bar.toggle(), "!": () => go("needs"), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
-    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help(), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
+    "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
+    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
@@ -713,7 +801,7 @@ async function loadWidths() {
 const ui = {
   reload, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go,
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
-  menu: (x, y) => pop.menu(x, y, actions().filter((a) => a.run)),
+  menu: (x, y) => openRowMenu(x, y, false),
   afterImport: null, // the first-run guide's next step once an import is applied
 };
 
