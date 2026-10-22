@@ -253,7 +253,7 @@ export function menu(x, y, actions) {
   const m = $("#menu");
   m.innerHTML = "";
   for (const a of actions) {
-    const b = el("button");
+    const b = el("button", a.cls || "");
     b.append(el("span", "", a.label));
     if (a.key) b.append(el("span", "key", a.key));
     b.onclick = () => { hideMenu(); a.run(); };

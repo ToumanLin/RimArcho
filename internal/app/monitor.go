@@ -474,19 +474,9 @@ func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (Mon
 		c.Reason = "monitor.default is off"
 		return c, nil
 	}
-	at := -1
-	for i, e := range list {
-		if m := ix.ByID[e.Instance]; m != nil && strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam") == harmonyPkg {
-			at = i + 1
-			break
-		}
-	}
-	if at < 0 {
-		c.Reason = "no Harmony in the plan; Archo Monitor needs it"
-		return c, nil
-	}
-	if fs := a.modsVolumeFS(ix); noLinks(fs) {
-		c.Reason = fmt.Sprintf("Mods/ is on %s, which cannot hold the link Archo Monitor needs (08 §9)", fs)
+	at, why := a.monitorSlot(ix, list)
+	if why != "" {
+		c.Reason = why
 		return c, nil
 	}
 	after := insert(list.Clone(), at, loadout.Entry{Instance: newest.Mod.ID})
@@ -496,6 +486,59 @@ func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (Mon
 	a.Store.SetMeta(monitorAddedKey(p.ID), "1")
 	c.Change = "added after Harmony"
 	return c, nil
+}
+
+// monitorSlot is where the monitor goes in a list: right after Harmony. why says why it
+// cannot go in (no Harmony, Mods/ cannot hold links).
+func (a *App) monitorSlot(ix *Index, list loadout.List) (at int, why string) {
+	at = -1
+	for i, e := range list {
+		if m := ix.ByID[e.Instance]; m != nil && strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam") == harmonyPkg {
+			at = i + 1
+			break
+		}
+	}
+	if at < 0 {
+		return -1, "no Harmony in the plan; Archo Monitor needs it"
+	}
+	if fs := a.modsVolumeFS(ix); noLinks(fs) {
+		return -1, fmt.Sprintf("Mods/ is on %s, which cannot hold the link Archo Monitor needs (08 §9)", fs)
+	}
+	return at, ""
+}
+
+// MonitorAddUserOp names AddMonitor's step in the undo stack.
+const MonitorAddUserOp = "add Archo Monitor after Harmony"
+
+// AddMonitor puts the newest installed Archo Monitor right after Harmony in the current
+// plan, as one undoable edit: the default insertion (04 §1.5) on the player's request, also
+// after they removed it. It returns the instance added.
+func (a *App) AddMonitor() (*store.Mod, error) {
+	var added *store.Mod
+	var planID int64
+	_, err := a.edit(MonitorAddUserOp, func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+		planID = st.Plan.ID
+		for _, e := range l {
+			if IsMonitor(st.Ix.ByID[e.Instance]) {
+				return nil, nil, errors.New("Archo Monitor is already in the plan")
+			}
+		}
+		ms := monitorInstances(st.Ix)
+		if len(ms) == 0 {
+			return nil, nil, errors.New("Archo Monitor is not installed (archo monitor install)")
+		}
+		at, why := a.monitorSlot(st.Ix, l)
+		if why != "" {
+			return nil, nil, errors.New(why)
+		}
+		added = ms[0].Mod
+		return insert(l, at, loadout.Entry{Instance: added.ID}), nil, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	a.Store.SetMeta(monitorAddedKey(planID), "1")
+	return added, nil
 }
 
 // editPlan replaces a plan's list as one undoable edit of that plan (current or not).

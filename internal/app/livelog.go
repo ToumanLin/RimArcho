@@ -148,6 +148,9 @@ func (lv *LiveLog) classify(e *logs.Entry) liveKey {
 // Clusters are the clusters so far, in order of first occurrence.
 func (lv *LiveLog) Clusters() []*LiveCluster { return lv.order }
 
+// CompanionLog is the companion log read so far (nil when none is followed).
+func (lv *LiveLog) CompanionLog() *logs.Companion { return lv.comp }
+
 // Poll reads what was appended since the last poll and returns the clusters that appeared.
 func (lv *LiveLog) Poll(a *App) ([]*LiveCluster, error) {
 	fi, err := os.Stat(lv.Path)

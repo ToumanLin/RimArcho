@@ -38,7 +38,9 @@ type API struct {
 	// building is the pack this window's build child is making ("" none).
 	building string
 	live     view.LiveTracker // the running game's log (03 §6.6)
-	x        exchange         // import and export (exchange.go)
+	logPath  string           // the log page's Player.log and its clusters' first lines
+	logLinks map[string]string
+	x        exchange // import and export (exchange.go)
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string
@@ -848,7 +850,35 @@ func (s *API) LogPage(path string) (*view.LogPage, error) {
 	s.a.AnalyzeExe = s.Exe
 	s.a.AnalyzeWait = 200 * time.Millisecond
 	defer func() { s.a.AnalyzeWait = 0 }()
-	return view.BuildLogPage(s.a, st, path)
+	p, err := view.BuildLogPage(s.a, st, path, &s.live)
+	if err == nil && p.Path != "" {
+		s.logLinks, s.logPath = p.Links, p.Path
+	}
+	return p, err
+}
+
+// LogMonitor is the companion section of path as the running game writes it, for the log
+// page's refresh on the live tick (nil when the game does not write path).
+func (s *API) LogMonitor(path string) (*view.MonitorLog, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.boardState()
+	if st == nil {
+		return nil, errors.New("no list")
+	}
+	var links map[string]string
+	if strings.EqualFold(s.logPath, path) {
+		links = s.logLinks
+	}
+	return view.LiveMonitor(s.a, st, &s.live, path, links), nil
+}
+
+// AddMonitor puts Archo Monitor after Harmony in the current plan (the log page's action;
+// one undoable step).
+func (s *API) AddMonitor() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.text(view.MonitorAdd(s.a))
 }
 
 // LogCluster is one cluster's evidence (archo log --cluster), names for #refs.

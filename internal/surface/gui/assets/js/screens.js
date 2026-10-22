@@ -314,7 +314,9 @@ export function analyzeEvent(ev) {
 }
 
 // ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
-const L = { path: "", page: null, loading: false, pending: "", cur: 0, detail: new Map(), seq: 0, els: [] };
+// tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
+// and the entries whose details are open).
+const L = { path: "", page: null, loading: false, pending: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "" };
 const C = { scans: [], cur: 0, rows: [], open: new Map(), els: [] };
 
 // logPage keeps the page's head and gives a fresh body below it; the actions go to the top
@@ -375,64 +377,186 @@ function drawGameLog() {
       gameLog(p.path);
     }));
   }
+  const keep = $("#screen .page.logs .col.focus .scroll");
+  const was = keep ? keep.scrollTop : 0;
   const w = logPage("log", T("each run's errors, grouped by mod; pick one to read the log"), ...right);
   const files = (p && p.files) || [];
   const bar = el("div", "subbar");
-  if (files.length) {
-    bar.append(seg(files.map((f) => f.label + (f.when ? " · " + f.when : "")), Math.max(0, files.findIndex((f) => f.path === L.path)), (i) => { L.path = files[i].path; L.page = null; gameLog(files[i].path); }));
-  }
+  if (files.length) bar.append(filePicker(files));
   if (p && p.facts && !L.loading) bar.append(el("span", "muted", p.facts));
   w.append(bar);
+  if (p && p.noMonitor && !L.loading) w.append(noMonitor(p));
   if (L.pending) { w.append(el("div", "card empty-state", Tf("the mods are analysed for %s first (once per game version)…", L.pending))); return; }
   if (L.loading) { const c = el("div", "card pad"); c.append(shimmer(T("reading the log…"), 6)); w.append(c); return; }
   if (!p || !p.path) { w.append(el("div", "card empty-state", T("no Player.log found"))); return; }
+  const mon = p.monitor;
+  if (!mon) L.tab = 0;
   const grid = el("div", "cols two");
   const list = el("section", "card col focus");
+  if (mon) {
+    const tabs = el("div", "ltabs");
+    tabs.append(seg([Tf("Player.log · %d", (p.rows || []).length), mon.title + " · " + mon.entries.length], L.tab, (i) => { L.tab = i; drawGameLog(); }, ["←", "→"]));
+    list.append(tabs);
+  }
   const scroll = el("div", "scroll");
   L.els = [];
-  if (!(p.rows || []).length) scroll.append(el("div", "empty-state", "✓ " + T("no errors in this log")));
-  (p.rows || []).forEach((r, i) => {
-    const row = el("div", "lrow" + (r.info ? " dimmed" : ""));
-    const ic = el("span", "ic");
-    ic.innerHTML = statusIcon(r.status);
-    const body = el("div", "body");
-    const top = el("div", "top");
-    top.append(el("span", "chip", r.class), el("span", "count", "×" + r.count));
-    if (r.mods) top.append(el("span", "mods", r.mods));
-    body.append(top, el("div", "text", r.text));
-    row.append(ic, body);
-    row.onclick = () => { L.cur = i; markLog(); };
-    L.els.push(row);
-    scroll.append(row);
-  });
+  if (L.tab === 1) monitorRows(scroll, mon);
+  else {
+    if (!(p.rows || []).length) scroll.append(el("div", "empty-state", "✓ " + T("no errors in this log")));
+    (p.rows || []).forEach((r, i) => {
+      const row = el("div", "lrow" + (r.info ? " dimmed" : ""));
+      const ic = el("span", "ic");
+      ic.innerHTML = statusIcon(r.status);
+      const body = el("div", "body");
+      const top = el("div", "top");
+      top.append(el("span", "chip", r.class), el("span", "count", "×" + r.count));
+      if (r.mods) top.append(el("span", "mods", r.mods));
+      body.append(top, el("div", "text", r.text));
+      row.append(ic, body);
+      row.onclick = () => { L.cur = i; markLog(); };
+      L.els.push(row);
+      scroll.append(row);
+    });
+  }
   list.append(scroll);
   const det = el("section", "card col detail-card");
   det.append(el("div", "scroll", ""));
   grid.append(list, det);
   w.append(grid);
+  scroll.scrollTop = was;
+  markLog(true);
+}
+
+// filePicker: the log shown, and a menu of the logs — each Player.log with the companion
+// log of its run under it (03 §6.7.4); picking a companion shows its section.
+function filePicker(files) {
+  const shown = files.find((f) => f.path === L.path) || files[0];
+  const b = el("button", "btn quiet picker");
+  b.append(el("span", "", shown.label), el("span", "muted num", shown.when || ""), el("span", "chev", "⌄"));
+  b.onclick = (e) => {
+    e.stopPropagation();
+    const r = b.getBoundingClientRect();
+    pop.menu(r.left, r.bottom + 4, files.map((f) => ({
+      label: f.label, key: f.when, cls: (f.of ? "sub" : "") + ((f.of ? f.of === L.path && L.tab === 1 : f.path === L.path && L.tab === 0) ? " on" : ""),
+      run: () => {
+        L.tab = f.of ? 1 : 0;
+        if ((f.of || f.path) === L.path) return drawGameLog();
+        L.path = f.of || f.path; L.page = null; L.cur = 0; L.mcur = 0;
+        gameLog(L.path);
+      },
+    })));
+  };
+  return b;
+}
+
+// noMonitor: one line when the current plan has no Archo Monitor, with the default edit.
+function noMonitor(p) {
+  const n = el("div", "lognote");
+  n.append(el("span", "", p.noMonitor));
+  if (p.addMonitor) n.append(button(T("add Archo Monitor"), "", async () => {
+    try { say("ok", await api.AddMonitor(), true); } catch (e) { say("fail", errText(e)); }
+    await ui.reload();
+    gameLog(L.path);
+  }, "small"));
+  return n;
+}
+
+// monitorRows: the companion log of the run — time, level, kind, ×count, related mods and
+// files; a click opens its details and the Player.log cluster it matches.
+function monitorRows(scroll, mon) {
+  const head = el("div", "mhead");
+  if (mon.running) head.append(el("span", "live-dot"));
+  head.append(el("span", "", mon.facts));
+  scroll.append(head);
+  if (!mon.entries.length) { scroll.append(el("div", "empty-state", "✓ " + T("nothing reported in this run"))); return; }
+  mon.entries.forEach((m, i) => {
+    const open = L.open.has(m.key);
+    const row = el("div", "lrow mrow" + (open ? " open" : ""));
+    const ic = el("span", "ic");
+    ic.innerHTML = statusIcon(m.status);
+    const body = el("div", "body");
+    const top = el("div", "top");
+    top.append(el("span", "time num", m.time || ""));
+    if (m.kind) top.append(el("span", "chip", m.kind));
+    if (m.count > 1) top.append(el("span", "count", "×" + m.count));
+    if (m.mods && m.mods.length) { const s = el("span", "mods", m.mods.join(" · ")); s.title = m.mods.join("\n"); top.append(s); }
+    body.append(top, el("div", "text", m.text));
+    if (m.files && m.files.length) body.append(el("div", "files", m.files.join(" · ")));
+    if (open) {
+      if (m.details) { const pre = el("pre", "details"); pre.textContent = m.details; pre.onclick = (e) => e.stopPropagation(); body.append(pre); }
+      if (m.cluster) {
+        const go = el("button", "go", Tf("%s in Player.log", m.cluster) + " →");
+        go.onclick = (e) => { e.stopPropagation(); toCluster(m.cluster); };
+        body.append(go);
+      } else if (m.only) body.append(el("div", "files", Tf("only in %s: the game had stopped writing Player.log", mon.label)));
+    }
+    row.append(ic, body);
+    row.onclick = () => {
+      L.mcur = i;
+      L.open.has(m.key) ? L.open.delete(m.key) : L.open.add(m.key);
+      drawGameLog();
+    };
+    L.els.push(row);
+    scroll.append(row);
+  });
+}
+
+// toCluster shows a Player.log cluster in the errors tab.
+function toCluster(id) {
+  const i = ((L.page && L.page.rows) || []).findIndex((r) => r.cluster === id);
+  L.tab = 0;
+  if (i >= 0) L.cur = i;
+  drawGameLog();
   markLog();
 }
 
+// logLive refreshes the companion section from the live tracker (pollLive's 2 s tick,
+// while the game runs).
+export async function logLive() {
+  if (S.screen !== "log" || !L.page || !L.page.path) return;
+  let m;
+  try { m = await api.LogMonitor(L.page.path); } catch { return; }
+  if (!m || S.screen !== "log" || !L.page) return;
+  if (JSON.stringify(m) === JSON.stringify(L.page.monitor)) return;
+  L.page.monitor = m;
+  drawGameLog();
+}
+
 let detailTimer = 0;
-function markLog() {
-  L.els.forEach((r, i) => r.classList.toggle("cur", i === L.cur));
-  const on = L.els[L.cur];
-  if (on) on.scrollIntoView({ block: "nearest" });
-  const r = L.page && L.page.rows && L.page.rows[L.cur];
+function markLog(keepScroll) {
+  const at = L.tab === 1 ? L.mcur : L.cur;
+  L.els.forEach((r, i) => r.classList.toggle("cur", i === at));
+  const on = L.els[at];
+  if (on && !keepScroll) on.scrollIntoView({ block: "nearest" });
   const box = $("#screen .detail-card .scroll");
   if (!box) return;
-  if (!r) { box.innerHTML = ""; box.append(el("div", "empty-state", T("pick an error on the left"))); return; }
-  const k = L.page.path + "|" + r.cluster;
+  let id = "";
+  if (L.tab === 1) {
+    const mon = L.page && L.page.monitor;
+    const m = mon && mon.entries[at];
+    if (!m) { box.innerHTML = ""; box.append(el("div", "empty-state", T("pick an entry on the left"))); return; }
+    if (!m.cluster) {
+      const why = m.only ? Tf("only in %s: the game had stopped writing Player.log", mon.label) : T("no matching error in Player.log");
+      showLines(box, [why, "", m.text, ...(m.details ? ["", m.details] : [])]);
+      return;
+    }
+    id = m.cluster;
+  } else {
+    const r = L.page && L.page.rows && L.page.rows[at];
+    if (!r) { box.innerHTML = ""; box.append(el("div", "empty-state", T("pick an error on the left"))); return; }
+    id = r.cluster;
+  }
+  const k = L.page.path + "|" + id;
   if (L.detail.has(k)) return showLines(box, L.detail.get(k));
   box.innerHTML = "";
   box.append(shimmer(T("loading…"), 8));
   clearTimeout(detailTimer);
+  L.want = k;
   detailTimer = setTimeout(async () => {
     let lines;
-    try { lines = await api.LogCluster(L.page.path, r.cluster); } catch (e) { lines = [errText(e)]; }
+    try { lines = await api.LogCluster(L.page.path, id); } catch (e) { lines = [errText(e)]; }
     L.detail.set(k, lines);
-    const now = L.page && L.page.rows && L.page.rows[L.cur];
-    if (now && L.page.path + "|" + now.cluster === k) showLines($("#screen .detail-card .scroll"), lines);
+    if (L.want === k) showLines($("#screen .detail-card .scroll"), lines);
   }, 90);
 }
 
@@ -515,6 +639,16 @@ function markRows(X) {
 export function logsKey(e) {
   const k = e.key;
   if (S.screen === "log") {
+    const mon = L.page && L.page.monitor;
+    if (mon && (k === "ArrowLeft" || k === "ArrowRight")) { e.preventDefault(); L.tab = k === "ArrowRight" ? 1 : 0; return drawGameLog(); }
+    if (L.tab === 1 && mon) {
+      const n = mon.entries.length;
+      const m = n ? moveIn(L.mcur, n, k) : null;
+      if (m != null) { e.preventDefault(); L.mcur = m; return markLog(); }
+      const it = mon.entries[L.mcur];
+      if (k === "Enter" && it) { e.preventDefault(); L.open.has(it.key) ? L.open.delete(it.key) : L.open.add(it.key); return drawGameLog(); }
+      return;
+    }
     const n = (L.page && L.page.rows && L.page.rows.length) || 0;
     const m = n ? moveIn(L.cur, n, k) : null;
     if (m != null) { e.preventDefault(); L.cur = m; return markLog(); }

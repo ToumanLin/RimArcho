@@ -386,6 +386,26 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .lrow .mods { margin-left: auto; color: var(--accent); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lrow .text { margin-top: 3px; color: var(--fg-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .detail-card .scroll { padding: 12px 14px; }
+/* 游戏日志's file picker and the companion section (06 §2.10) */
+.btn.picker { display: inline-flex; align-items: center; gap: 8px; }
+.btn.picker .chev { color: var(--faint); font-size: 11px; }
+#menu button.sub { padding-left: 22px; color: var(--muted); }
+#menu button.sub::before { content: "↳"; margin-right: -12px; color: var(--faint); }
+#menu button.on { color: var(--fg); font-weight: 600; }
+.lognote { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; }
+.ltabs { padding: 8px 8px 2px; }
+.ltabs .seg { max-width: 100%; }
+.ltabs .seg button { overflow: hidden; text-overflow: ellipsis; }
+.mhead { display: flex; align-items: center; gap: 6px; padding: 4px 10px 8px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mhead .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex: none; }
+.lrow .time { color: var(--muted); font-size: 11.5px; flex: none; }
+.lrow .top .chip { white-space: nowrap; flex: none; }
+.lrow .files { margin-top: 3px; color: var(--muted); font-size: 11.5px; overflow-wrap: anywhere; }
+.mrow { cursor: pointer; }
+.mrow.open .text { -webkit-line-clamp: unset; display: block; }
+.mrow pre.details { margin: 8px 0 0; padding: 8px 10px; max-height: 260px; overflow: auto; border-radius: 8px; background: var(--card-2); color: var(--fg-2); font: 11px/1.5 var(--code); white-space: pre; cursor: text; user-select: text; }
+.mrow .go { margin-top: 6px; padding: 0; color: var(--accent); font-size: 12px; }
+.mrow .go:hover { text-decoration: underline; }
 .ev { display: flex; gap: 10px; align-items: baseline; padding: 7px 14px; cursor: default; }
 .ev + .ev { border-top: 1px solid var(--line-2); }
 .ev:hover { background: var(--card-2); }

@@ -32,6 +32,12 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - The log analysis and the live tracker read `ArchoMonitor.log` (and RimCrow's
   `RimCrow_Realtime.log` / `RMM_Realtime.log`): files become source evidence and the 日志 chip
   in 能不能跑, counts and times come from it, errors only it saw become clusters.
+- The 游戏日志 page shows the run's companion log as its own section, "Archo Monitor · 本次运行":
+  one row per entry (time, level, kind such as 补丁错误 / 程序集冲突, first line, ×count, related
+  mods by name and files), details on click, a link to the matching Player.log cluster, and
+  the session's version, game and start–end as its header. It follows the live tracker while
+  the game runs. The file picker lists ArchoMonitor.log under its Player.log. A plan without
+  the monitor gets one line with 加入 Archo Monitor (one undoable step) (06 §2.10).
 - The release zip has `monitor/ArchoMonitor/`; building it needs the .NET SDK 10.
 
 ### Plans (04 §1)

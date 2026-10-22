@@ -718,6 +718,7 @@ async function pollLive() {
     shell.renderLive();
     syncLaunch();
     if (JSON.stringify(l.items) !== before) { scr.liveChanged(); shell.sync(); }
+    if (l.running) scr.logLive();
     if (was !== !!l.running) homePage.liveChanged();
   } catch { /* the next poll tries again */ }
   setTimeout(pollLive, 2000);
