@@ -1105,3 +1105,52 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .tex-rows .tr.stale .n { color: var(--amber); }
 .packpv .packtex { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
 .packpv .packtex select { height: 26px; background: var(--card-2); color: var(--fg); border: 1px solid var(--line); border-radius: 7px; padding: 0 6px; font: inherit; }
+
+/* ---- the full detail (06 §4.2): one page for the editor and Mod 库存. The mod on the left,
+   wide; its copies, where they are used, the fields and the history on the right; the
+   technical information under both, full width. Each part is a numbered card (1–6). ---- */
+.page.mod-page { padding-left: max(20px, calc(50% - 720px)); padding-right: max(20px, calc(50% - 720px)); }
+.fd { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: var(--card-gap); align-items: start; }
+.fd-main, .fd-side { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; }
+.fd-h { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.fd-copies .fd-h, .fd-tech .fd-h { padding: 12px 14px 0; }
+.fd-desc img.thumb { display: block; width: 100%; max-height: 360px; object-fit: contain; border-radius: 10px; background: var(--card-2); margin-bottom: 14px; }
+.fd-desc h1 { margin: 0; font-size: 22px; font-weight: 650; color: var(--fg); }
+.fd-desc .who { color: var(--muted); margin-top: 2px; }
+.fd-desc .desc { margin-top: 16px; color: var(--fg-2); line-height: 1.6; overflow-wrap: anywhere; }
+.fd-desc .desc img { max-width: 100%; border-radius: 6px; }
+.fd-desc .desc .sub { font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
+.fd-state { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.fd-state.bad { color: var(--amber); }
+.fd-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; }
+.fd-tags .chip { margin: 0; }
+/* a copy: its label and state, size · version · folder, its note; the selected one raised,
+   with its actions */
+.fd-copy { padding: 10px 14px; border-top: 1px solid var(--line-2); cursor: default; outline: none; transition: background var(--t-press); }
+.fd-copy:first-of-type { border-top: 0; }
+.fd-copy:hover:not(.on) { background: color-mix(in srgb, var(--fg) 3%, transparent); }
+.fd-copy.on { background: color-mix(in srgb, var(--accent) 7%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
+.fd-copy .top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fd-copy .lbl { font-weight: 600; color: var(--fg); margin-right: 2px; }
+.fd-copy .chip { margin: 0; }
+.fd-copy .facts { margin-top: 3px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.fd-copy .note { margin-top: 6px; padding: 6px 8px; border-radius: 6px; font-size: 12.5px; white-space: pre-wrap; background: color-mix(in srgb, var(--amber) 9%, transparent); color: var(--fg); }
+.fd-copy .note.auto { background: var(--pill); color: var(--muted); }
+.fd-copy .acts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.fd-copy .acts kbd { margin-left: 5px; }
+.fd-useline { display: flex; gap: 10px; font-size: 12.5px; padding: 2px 0; }
+.fd-useline .lbl { flex: none; color: var(--fg-2); min-width: 72px; }
+.fd-useline .x { color: var(--muted); overflow-wrap: anywhere; }
+.fd-now { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-2); font-size: 12.5px; color: var(--fg-2); }
+.fd-hist .history { color: var(--muted); font-size: 12.5px; white-space: pre-wrap; }
+.fd-hist .link { margin-top: 6px; color: var(--accent); font-size: 12.5px; }
+.fd-tabs { padding: 8px 14px 0; }
+.fd-tech pre.lines { padding: 10px 14px 14px; max-height: 60vh; overflow: auto; }
+@media (max-width: 900px) { .fd { grid-template-columns: minmax(0, 1fr); } }
+.fd-desc .desc p { margin: 0 0 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fd-desc .desc p.gap { height: 8px; }
+.fd-desc .desc h3 { font-size: 14px; margin: 12px 0 4px; color: var(--fg); }
+.fd-desc .desc .item { display: flex; gap: 6px; }
+.fd-desc .desc .quote { color: var(--muted); padding-left: 14px; border-left: 2px solid var(--line); }
+.fd-desc .desc s { color: var(--faint); }
+.fd-desc .desc .link { color: var(--accent); cursor: pointer; }

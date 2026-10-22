@@ -312,6 +312,13 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   was never a run.
 
 ### The window (06 §2)
+- One full detail page (06 §4.2): `enter` in the plan editor and in Mod 库存 › 全部 opens the
+  same page. The mod on the left (picture, name, author, state, tags, description); its
+  copies (state, size, version, folder, note, and the selected copy's actions), where each is
+  used with the current plan's `space`, the fields and the history on the right; 技术信息 under
+  both, one tab per section of `view.Sections`. `← →` the previous / next mod of the list it
+  came from, `esc` back there, `[ ]` another copy, the row menu and copy keys on that copy,
+  `1`–`6` its parts. The editor's detail column and Mod 库存's details stay as its short form.
 - `1`–`9` focus a page's areas on every page, as `1`–`4` do in the editor, and each area's
   heading shows its number: Mod 库存 (filter, table, details), 能不能跑's sections, 游戏日志 (the
   errors, the log text), 环境, 设置's groups, the build page's parts. The TUI's 能不能跑 and

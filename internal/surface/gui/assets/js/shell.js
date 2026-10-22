@@ -143,6 +143,8 @@ export async function loadShell() {
 // its full detail), or one pack.
 export function current() {
   // 编译成整合包 is the current plan's sub-page (06 §2.1)
+  // the full detail belongs to the list it was opened from (06 §4.2)
+  if (S.screen === "full" && S.fullFrom === "library") return "library";
   if (!S.screen || S.screen === "full" || S.screen === "build") return (S.shell && S.shell.plan && S.shell.plan.page) || "plan";
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
   // 卸载 RimArcho is under 设置
@@ -309,7 +311,7 @@ export function crumbs() {
   const cur = current();
   let out = (sh && sh.crumbs && sh.crumbs[cur]) || [];
   if (S.screen === "guide") out = (S.guideFrom === "env" ? out : []).concat([{ label: S.guideFrom === "env" ? T("add an environment") : T("getting started"), id: "guide" }]);
-  if (S.screen === "full" && S.detail) out = out.concat([{ label: S.detail.name, id: "full" }]);
+  if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
   if (S.screen === "build") out = out.concat([{ label: T("build a pack"), id: "build" }]);
   return out;

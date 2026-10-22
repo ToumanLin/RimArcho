@@ -6,6 +6,20 @@ import "github.com/ToumanLin/RimArcho/internal/view"
 func init() {
 	view.Register(map[string]string{
 		// the sidebar and the top bar
+		"another copy":               "另一份",
+		"copies · %d":                "副本 · %d",
+		"fields":                     "字段",
+		"in no plan or pack":         "没有方案或整合包在用",
+		"in the current plan":        "在当前方案里",
+		"its parts":                  "各部分",
+		"menu":                       "菜单",
+		"no changes recorded":        "还没有记录到变化",
+		"no copy on this machine":    "这台电脑上没有副本",
+		"not in the current plan":    "不在当前方案里",
+		"nothing technical recorded": "没有技术信息",
+		"the copy's note":            "这一份的备注",
+		"the mod":                    "Mod",
+		"← → the previous / next mod · esc back · 1–6 its parts": "← → 上一个 / 下一个 Mod · esc 返回 · 1–6 各部分",
 		"every environment":      "所有环境",
 		"the errors":             "报错",
 		"the log text":           "日志原文",

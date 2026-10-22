@@ -13,7 +13,7 @@ import { icon } from "./icons.js";
 import { renderDetail } from "./detail.js";
 import { fieldList } from "./fields.js";
 import * as pop from "./popups.js";
-import { openScreen, page, rescanButton, area } from "./screens.js";
+import { openScreen, page, rescanButton, area, full } from "./screens.js";
 import { createBar } from "./filterbar.js";
 import * as ops from "./ops.js";
 
@@ -801,7 +801,15 @@ export function key(e) {
     if (x.t === "lin" && L.open.has(x.r.id)) return toggle(x.r);
     return;
   }
-  if (k === "Enter") { done(); return setFull(!L.full); }
+  // enter: the full detail, the same page the editor opens (06 §4.2); in a narrow window
+  // the details still lie over the table first (→)
+  if (k === "Enter") {
+    done();
+    if (L.full) return setFull(false);
+    const i = cursorCopy();
+    if (i && (i.id || i.ref)) return full("library", i.id || i.ref);
+    return;
+  }
   if (k === "Escape") {
     done();
     if (L.full) return setFull(false);
@@ -831,6 +839,15 @@ export function key(e) {
   if (k === "s") { done(); return tableMenu(); }
   if (k === "C") { done(); const i = cursorCopy(); if (i && i.id) document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: i.id, name: (L.flat[L.cur] || {}).r ? L.flat[L.cur].r.name : i.label } })); return; }
   if (k === "R") { done(); return ui.cmd("rescan"); }
+}
+
+// stepCopy is the full detail's ← →: the cursor moves one row and the page shows that row's
+// copy (its id, or its ref when RimArcho never saw it).
+export function stepCopy(d) {
+  if (!L.page || !L.flat.length) return "";
+  L.cur = Math.max(0, Math.min(L.flat.length - 1, L.cur + d));
+  const i = cursorCopy();
+  return i ? i.id || i.ref : "";
 }
 
 // where: the position line on this page (06 §3.2): the cursor's row of the rows shown.

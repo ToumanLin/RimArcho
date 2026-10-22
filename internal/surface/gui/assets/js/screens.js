@@ -943,66 +943,8 @@ function changesKey(e) {
   if (k === "p" && has("lock")) { done(); return changeAct(r, "lock"); }
 }
 
-// ---- the full detail (06 §4.2): ←→ the previous / next mod, tab the sub-sections ----
-const F = { tab: 0, secs: null, id: "" };
-
-export async function full() {
-  const it = cur();
-  if (!it || !it.id) return;
-  if (F.id !== it.id) { F.tab = 0; F.secs = null; F.id = it.id; }
-  openScreen("full");
-  drawFull();
-  try { F.secs = await api.Sections(it.id); } catch (e) { F.secs = []; say("fail", errText(e)); }
-  if (S.screen === "full" && F.id === it.id) drawFull();
-}
-
-function drawFull() {
-  const sc = $("#screen");
-  sc.innerHTML = "";
-  const d = S.detail;
-  const names = [T("summary"), ...(F.secs || []).map((s) => s.title + (s.count >= 0 ? " · " + s.count : ""))];
-  const w = page("full", T("← → the previous / next mod · tab the sections"));
-  const bar = el("div", "subbar");
-  bar.append(seg(names, F.tab, (i) => { F.tab = i; drawFull(); }));
-  w.append(bar);
-  const card = el("section", "card pad");
-  if (F.tab === 0) {
-    const src = $("#detail");
-    card.append(src.cloneNode(true));
-    // re-bind the links of the copy through the original's handlers
-    card.querySelectorAll(".link").forEach((a, i) => { const o = src.querySelectorAll(".link")[i]; if (o) a.onclick = o.onclick; });
-  } else if (F.secs) {
-    const s = F.secs[F.tab - 1];
-    const pre = el("pre", "lines");
-    pre.textContent = (s.lines || []).join("\n");
-    card.append(pre);
-  } else card.append(shimmer(T("loading…"), 8));
-  w.append(card);
-  sc.append(w);
-  ui.renderWhere();
-}
-
-export function fullKey(e) {
-  const n = 1 + (F.secs ? F.secs.length : 0);
-  if (e.key === "Tab") { F.tab = (F.tab + (e.shiftKey ? n - 1 : 1)) % n; drawFull(); e.preventDefault(); return; }
-  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-    e.preventDefault();
-    ui.step(e.key === "ArrowRight" ? 1 : -1).then(() => full());
-    return;
-  }
-  const sc = $("#screen");
-  if (e.key === "ArrowDown") sc.scrollTop += 40;
-  else if (e.key === "ArrowUp") sc.scrollTop -= 40;
-  else if (e.key === "PageDown" || e.key === " ") sc.scrollTop += sc.clientHeight * 0.9;
-  else if (e.key === "PageUp") sc.scrollTop -= sc.clientHeight * 0.9;
-  else return;
-  e.preventDefault();
-}
-
-export function fullSection() {
-  if (S.screen !== "full" || !F.secs || F.tab === 0) return "";
-  return F.secs[F.tab - 1].title;
-}
+// ---- the full detail (06 §4.2): one page for the editor and Mod 库存 (fulldetail.js) ----
+export { full, fullKey, fullSection } from "./fulldetail.js";
 
 // ---- settings (06 §2.14) ----
 // Every row is a value and the command that changes it (view.SettingsPage); the page runs

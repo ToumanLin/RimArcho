@@ -14,6 +14,7 @@ import * as pop from "./popups.js";
 import * as scr from "./screens.js";
 import * as shell from "./shell.js";
 import * as homePage from "./home.js";
+import * as fullPage from "./fulldetail.js";
 import * as guide from "./guide.js";
 import * as plans from "./plans.js";
 import * as library from "./library.js";
@@ -191,9 +192,7 @@ function renderWhere() {
   if (S.screen === "library") s = library.where(); // a table like the plan's lists
   else if (S.screen && S.screen !== "full") s = ""; // a page: the breadcrumb is enough
   else if (S.screen === "full") {
-    const it = cur(lastList);
-    s = `${T(AREAS[lastList])} › ${S.detail ? S.detail.name : ""}`;
-    if (it) s += `（${col(lastList).cursor + 1} / ${col(lastList).view.length}）`;
+    s = fullPage.fullName();
     const sec = scr.fullSection();
     if (sec) s += " › " + sec;
   } else if (S.focus === 3) {
@@ -240,7 +239,7 @@ function renderHints() {
   const h = $("#hints");
   h.innerHTML = "";
   let list = actions();
-  if (S.screen === "full") list = [{ key: "esc", label: T("back") }];
+  if (S.screen === "full") list = fullPage.fullHints();
   else if (S.screen === "library") list = library.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "home") list = homePage.hintList();
@@ -708,11 +707,11 @@ function onKey(e) {
   if (S.screen) {
     // esc (and enter) leave the full detail for the plan; the sidebar's pages are side by
     // side, so esc does not go from one to another (06 §3.1)
-    if (S.screen === "full" && (k === "Escape" || k === "Backspace" || k === "Enter")) { e.preventDefault(); scr.closeScreen(); detailFollow(true); return; }
+    if (S.screen === "full" && (k === "Escape" || k === "Backspace")) { e.preventDefault(); return fullPage.back(); }
     if (e.ctrlKey && k === "k") { e.preventDefault(); return pop.palette(); }
     if (k === "?" && S.screen !== "full") { e.preventDefault(); return pop.help(S.screen); }
     // 1–9 focus the page's numbered areas (06 §3.5)
-    if (S.screen !== "full" && S.screen !== "home" && scr.areaKey(e)) return;
+    if (S.screen !== "home" && scr.areaKey(e)) return;
     if (S.screen === "home") return homePage.homeKey(e);
     if (S.screen === "packs" || S.screen === "build") return packsPage.packsKey(e);
     if (S.screen === "needs") return scr.needsKey(e);
@@ -844,6 +843,7 @@ const ui = {
   reload, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go,
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
+  detailFollow: (f) => detailFollow(f),
   afterImport: null, // the first-run guide's next step once an import is applied
 };
 
@@ -856,6 +856,7 @@ async function start() {
   scr.initScreens(ui);
   shell.initShell(ui);
   homePage.initHome(ui);
+  fullPage.initFull(ui);
   packsPage.initPacks(ui);
   guide.initGuide(ui);
   initExchange(ui);

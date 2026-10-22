@@ -37,9 +37,10 @@ async function go(id) {
     if (!b && id === "changes") { $(`#nav [data-id="library"]`).click(); await wait(600); b = $(`#nav [data-id="changes"]`); }
     b.click();
   }
-  // a page shows once its data is in: wait for it (up to 4 s)
+  // a page shows once its data is in: wait for it (up to 20 s: the first read of a real Player.log parses it)
   const want = { plan: null, guide: "guide", uninstall: "uninstall" }[id] !== undefined ? { plan: null, guide: "guide", uninstall: "uninstall" }[id] : id;
-  for (let i = 0; i < 40 && S.screen !== want; i++) await wait(100);
+  for (let i = 0; i < 200 && S.screen !== want; i++) await wait(100);
+  if (S.screen !== want) throw new Error(`${id} did not open (still ${S.screen || "plan"}; status: ${document.querySelector("#status").textContent.slice(0, 60)})`);
   await wait(300);
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 }
