@@ -18,6 +18,22 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   (04 §4.1, §4.3).
 - Locked copies made by `pin` live in the lock library, not in `Mods/` (04 §7).
 
+### Archo Monitor (03 §6.7, 04 §1.5, 08 §9)
+- RimArcho ships its own in-game companion mod, Archo Monitor (`toumanlin.archomonitor`,
+  1.5 / 1.6 / 1.7). It writes `ArchoMonitor.log` in the save data folder: the XML file and def
+  being loaded at an error, the mods on the stack and their Harmony patches, and errors after
+  the game stops logging; its JSON lines are a superset of RimCrow Companion's.
+- It is installed to `%LOCALAPPDATA%\RimArcho\monitor\ArchoMonitor-<version>` (`monitor.dir`),
+  registered as `src:monitor` and linked into `Mods/` as `_Archo_monitor_…`. New plans, and
+  every existing plan once, get it right after Harmony as one undoable edit;
+  `config set monitor.default off` turns that off. Newer versions replace older ones in plans.
+- `archo monitor`, `archo monitor install [--dry-run]`; `status` and `scan` report it; the
+  settings page has a 游戏日志 group.
+- The log analysis and the live tracker read `ArchoMonitor.log` (and RimCrow's
+  `RimCrow_Realtime.log` / `RMM_Realtime.log`): files become source evidence and the 日志 chip
+  in 能不能跑, counts and times come from it, errors only it saw become clusters.
+- The release zip has `monitor/ArchoMonitor/`; building it needs the .NET SDK 10.
+
 ### Plans (04 §1)
 - `plan list|new <name> [--from current|v<n>|<file>]|use|rename|remove --yes`;
   `loadout import <file> --new [<name>]`. The last plan cannot be removed; names ignore case.
