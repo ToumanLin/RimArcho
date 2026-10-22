@@ -66,6 +66,8 @@ function bar() {
   if (!L.bar) {
     L.bar = createBar({
       cls: "lib-fbar",
+      splitKey: "ui.gui.filter.split:library",
+      column: () => els.detail,
       data: () => L.page,
       change: () => { L.cur = 0; load(); },
       leave: () => els && els.rows.focus(),
@@ -132,7 +134,7 @@ function build() {
   const scroll = el("div", "scroll");
   scroll.tabIndex = -1;
   detail.append(bar().el, dhead, scroll);
-  dhead.addEventListener("click", () => { if (L.bar.open) L.bar.toggle(false); });
+  dhead.addEventListener("click", () => { if (L.bar.fills()) L.bar.toggle(false); });
   const split = el("div", "split lib-split");
   wireSplit(split, root);
   const selbar = el("div", "lib-bar");

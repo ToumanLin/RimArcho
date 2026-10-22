@@ -39,7 +39,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("enter", "open / close the details"),
 			r("esc", "back one level: the details, the selection, the search and filters"),
 			r("/ · ctrl+f", "search"),
-			r(`\`, "open / close the filter bar"),
+			r(`\`, "open / close the filter bar (in it, ctrl+↑↓ moves its lower edge)"),
 			r("space", space),
 			r("m", "enable at… / move to…"),
 			r("t", "stage / put back"),

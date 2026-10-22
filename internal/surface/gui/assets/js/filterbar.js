@@ -10,9 +10,9 @@
 // The page gives: data() → { groups, conds, complete } of its last answer; change(search,
 // filters) when either changed; and the place it lives in. The bar keeps search, filters
 // and open; the page reads them.
-import { el, T, Tf } from "./state.js";
+import { el, T, Tf, api } from "./state.js";
 
-const LINE = 8; // values on a group's line before the box
+const LINE = 24; // values of a group before its box (open, the bar has its column's height)
 
 export function createBar(opts) {
   const b = { search: "", filters: [], open: false, opts };
@@ -31,7 +31,11 @@ export function createBar(opts) {
   const panel = el("div", "fbar-panel");
   panel.hidden = true;
   row.append(box, chips, tog);
-  root.append(row, panel);
+  // the gap under the open bar: drag it to share the column with what is below (the list,
+  // the details); double click, or the bar's first state, gives the bar the whole column
+  const gap = el("div", "fbar-gap");
+  gap.title = T("drag: share the column · double click: the filter takes it all");
+  root.append(row, panel, gap);
   b.el = root;
   b.input = inp;
   const finds = {}; // group key → typed text in its box
@@ -84,6 +88,38 @@ export function createBar(opts) {
   };
   b.clear = () => { b.filters = []; b.search = ""; inp.value = ""; opts.change(); };
   b.active = () => !!(b.search.trim() || b.filters.length);
+  // h: the open bar's height in px; 0 fills the column (what is below shrinks to its title)
+  b.h = 0;
+  const KEY = opts.splitKey;
+  if (KEY) api.Setting(KEY).then((v) => { b.h = +v || 0; place(); }).catch(() => {});
+  const colH = () => (opts.column ? opts.column() : root.parentElement).getBoundingClientRect().height;
+  function place() {
+    root.classList.toggle("fill", b.open && !b.h);
+    if (b.h) root.style.setProperty("--fbar-h", b.h + "px");
+    else root.style.removeProperty("--fbar-h");
+  }
+  // setH keeps at least the bar and a few values, and leaves what is below its title and a
+  // few rows; dragged near the bottom it fills the column again
+  b.setH = (h, save = true) => {
+    const max = colH() - 34;
+    b.h = !h || h > max - 40 ? 0 : Math.max(120, Math.round(h));
+    place();
+    if (save && KEY) api.SetSetting(KEY, b.h ? String(b.h) : "").catch(() => {});
+    opts.resized && opts.resized();
+  };
+  b.nudge = (d) => b.setH((b.h || colH() - 34) + d);
+  gap.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const y0 = e.clientY, h0 = root.getBoundingClientRect().height;
+    gap.classList.add("drag");
+    const move = (m) => b.setH(h0 + m.clientY - y0, false);
+    const up = () => { gap.classList.remove("drag"); removeEventListener("mousemove", move); removeEventListener("mouseup", up); b.setH(b.h || 0); };
+    addEventListener("mousemove", move);
+    addEventListener("mouseup", up);
+  });
+  gap.addEventListener("dblclick", () => b.setH(0));
+  b.fills = () => b.open && !b.h;
+
   b.toggle = (v = !b.open) => {
     b.open = v;
     draw();
@@ -120,6 +156,7 @@ export function createBar(opts) {
     tog.append(el("kbd", "", "\\"));
     tog.classList.toggle("on", b.open);
     panel.hidden = !b.open;
+    place();
     root.classList.toggle("open", b.open);
     if (!b.open) return;
     if (opts.width) root.style.setProperty("--fbar-w", opts.width() + "px");
@@ -177,6 +214,8 @@ export function createBar(opts) {
     const k = e.key;
     const li = lines().findIndex((l) => +l.dataset.g === gi);
     if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); e.stopPropagation(); return focusValue(li, vi + (k === "ArrowRight" ? 1 : -1)); }
+    // ctrl+↑↓: the gap (what a drag does)
+    if ((e.ctrlKey || e.metaKey) && (k === "ArrowUp" || k === "ArrowDown")) { e.preventDefault(); e.stopPropagation(); return b.nudge(k === "ArrowDown" ? 40 : -40); }
     if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); e.stopPropagation(); return focusValue(li + (k === "ArrowDown" ? 1 : -1), vi); }
     if (k === "Enter" || k === " ") { e.preventDefault(); e.stopPropagation(); cur = { g: li, v: vi }; return b.set(v.filter, v.on === 1 ? 0 : 1); }
     if (k === "x" || k === "X" || k === "-" || k === "Delete") { e.preventDefault(); e.stopPropagation(); cur = { g: li, v: vi }; return b.set(v.filter, v.on === -1 ? 0 : -1); }
