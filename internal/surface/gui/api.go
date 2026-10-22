@@ -426,6 +426,13 @@ func (s *API) Filter(col int, query string) (*Filtered, error) {
 		f.Content = c
 	}
 	out := &Filtered{}
+	var tags []string
+	for k := range s.board.Cols {
+		for i := range s.board.Cols[k] {
+			tags = append(tags, s.board.Cols[k][i].Tags...)
+		}
+	}
+	out.Complete = view.CompleteQuery(query, tags)
 	for k := range s.board.Cols {
 		ix := q.Filter(s.board.Cols[k], f)
 		out.Counts[k] = len(ix)
@@ -440,6 +447,8 @@ func (s *API) Filter(col int, query string) (*Filtered, error) {
 type Filtered struct {
 	Rows   []int  `json:"rows"`
 	Counts [3]int `json:"counts"`
+	// Complete is the grey text after the query that tab accepts (06 §3.7).
+	Complete string `json:"complete,omitempty"`
 }
 
 // ---- the detail ----

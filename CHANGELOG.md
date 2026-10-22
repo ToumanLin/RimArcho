@@ -87,6 +87,13 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - "分析本次日志" shows in the sidebar foot and the TUI top bar when Player.log is newer than
   the last launch and the log last seen.
 
+### Search (06 §3.7)
+- `tag:` matches the start of any word in a tag: `tag:facial` finds Facial Hair and Facial
+  Animation, `tag:animation` finds Facial Animation.
+- From the second letter, grey ghost text completes field names (`au` → `author:`) and
+  values after `tag:`, `type:` and `has:`; Tab (or → in the GUI) takes it, otherwise Tab
+  still jumps to the next list with matches.
+
 ### MCP (05 §1.2, §5.2)
 - New tools: `manage_packs`, `ignore_problem`, `resolve_identity`, `scan`, `exchange_list`,
   `manage_rules` (`add_rule` stays as an alias), `manage_hidden`, `maintenance`, `pin_mod`

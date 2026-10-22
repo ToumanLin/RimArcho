@@ -24,16 +24,45 @@ export async function refilter(k, keepKey) {
   if (!c.query.trim()) {
     c.view = c.items.map((_, i) => i);
     c.others = null;
+    c.complete = "";
   } else {
     const r = await api.Filter(k, c.query);
     c.view = r.rows || [];
     c.others = r.counts;
+    c.complete = r.complete || "";
   }
   c.cursor = Math.max(0, Math.min(c.cursor, c.view.length - 1));
   if (keepKey) {
     const i = c.view.findIndex((vi) => key(c.items[vi]) === keepKey);
     if (i >= 0) c.cursor = i;
   }
+}
+
+// showGhost draws column k's completion after its query, only while the caret is at the end
+// of a query that fits in the box; the query's own text goes in invisibly, so the grey part
+// starts exactly where the typed text ends.
+export function showGhost(k) {
+  const box = $(`.area[data-area="${k}"] .search`);
+  if (!box) return;
+  const input = $("input", box), g = $(".ghost", box);
+  if (!g) return;
+  const c = S.cols[k];
+  const sfx = c.complete && input.value === c.query ? c.complete : "";
+  const atEnd = document.activeElement === input && input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
+  const show = !!sfx && atEnd && input.scrollLeft === 0;
+  g.hidden = !show;
+  if (show) { $(".typed", g).textContent = input.value; $(".sfx", g).textContent = sfx; }
+}
+
+// acceptGhost puts column k's completion into its query; false when there is none to take.
+export function acceptGhost(k, input) {
+  const c = S.cols[k];
+  if (!c.complete || input.value !== c.query || input.selectionStart !== input.value.length) return false;
+  input.value += c.complete;
+  c.complete = "";
+  input.setSelectionRange(input.value.length, input.value.length);
+  input.dispatchEvent(new Event("input"));
+  return true;
 }
 
 // ---- drawing ----
@@ -245,9 +274,14 @@ export function wireLists(ui) {
     wireDrag(ui, k, box);
     const input = $(`.area[data-area="${k}"] .search input`);
     input.placeholder = T("search: words, tag:, author:, type:, has:, -not");
-    input.addEventListener("input", () => ui.search(k, input.value));
+    // the grey completion after the query (06 §3.7): the typed text, invisible, then the rest
+    const ghost = el("span", "ghost");
+    ghost.append(el("span", "typed"), el("span", "sfx"));
+    input.after(ghost);
+    input.addEventListener("input", () => { showGhost(k); ui.search(k, input.value); });
     input.addEventListener("keydown", (e) => ui.searchKey(k, e, input));
-    input.addEventListener("blur", () => { S.cols[k].searching = false; renderHeads(); });
+    input.addEventListener("scroll", () => showGhost(k));
+    input.addEventListener("blur", () => { S.cols[k].searching = false; showGhost(k); renderHeads(); });
   }
 }
 

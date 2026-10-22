@@ -7,7 +7,7 @@
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
 import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
-import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen } from "./lists.js";
+import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost } from "./lists.js";
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
@@ -473,6 +473,7 @@ async function search(k, q) {
   c.cursor = 0;
   await refilter(k, "");
   if (n !== searchSeq) return;
+  showGhost(k);
   renderHeads();
   renderRows(k);
   renderWhere();
@@ -482,8 +483,13 @@ async function search(k, q) {
 function searchKey(k, e, inp) {
   if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); inp.value = ""; search(k, ""); col(k).searching = false; inp.blur(); renderHeads(); return; }
   if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); col(k).searching = false; inp.blur(); renderHeads(); return; }
+  // tab or → at the end takes the grey completion (06 §3.7)
+  if ((e.key === "Tab" && !e.shiftKey) || e.key === "ArrowRight") {
+    if (acceptGhost(k, inp)) { e.preventDefault(); e.stopPropagation(); return; }
+  }
+  if (e.key === "ArrowLeft" || e.key === "Home" || e.key === "End") setTimeout(() => showGhost(k));
   if (e.key === "Tab") {
-    // tab goes to the next list with matches, carrying the query
+    // otherwise tab goes to the next list with matches, carrying the query
     e.preventDefault();
     e.stopPropagation();
     const counts = col(k).others || [0, 0, 0];
