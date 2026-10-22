@@ -54,6 +54,7 @@ type API struct {
 	Exe string
 
 	monitorOnce sync.Once
+	quit        func() // closes the window (nil in the harness and in tests)
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
 	// ScanRunner scans an environment in place of the child process (tests).

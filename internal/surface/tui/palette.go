@@ -154,6 +154,8 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			m.openPanel(T("settings"), b.String())
 			return nil
 		}
+	case "uninstall":
+		return func(m *model) tea.Cmd { return m.uninstallPanel() }
 	case "help":
 		return func(m *model) tea.Cmd { return m.helpPage() }
 	case "quit":

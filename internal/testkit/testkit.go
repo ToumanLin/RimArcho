@@ -90,6 +90,12 @@ func (e *Env) Open() {
 	a.Detect = env.DetectOptions{SteamRoots: []string{e.Steam}, ManualRoots: []string{}, Home: e.Root, GOOS: "windows", SkipRegistry: true}
 	// The lock library (04 §7) stays inside the fixture.
 	a.LockBase = filepath.Join(e.Root, "LocalAppData")
+	// Uninstall stays inside the fixture: kept saves and packs go to <root>/Documents, no
+	// other RimArcho is found, and the clean-up script is never started.
+	a.UninstallKeepBase = filepath.Join(e.Root, "Documents")
+	a.UninstallLog = filepath.Join(e.Root, "uninstall.log")
+	a.ArchoProbe = func() []int { return nil }
+	a.AfterExitFunc = func(app.AfterExit) error { return nil }
 	// No bundled Archo Monitor unless a test brings one (08 §9).
 	a.MonitorBundle = app.MonitorNone
 	// Never start a process from a test: launches are only recorded.

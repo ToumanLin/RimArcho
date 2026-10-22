@@ -74,6 +74,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     gui                                       open the desktop window (RimArcho.exe does this on a double click)
     version                                   print the RimArcho version
+    uninstall                                 remove what RimArcho put on this machine and restore what it changed (a dry run; --yes runs it)
     collection <link|ID>                      read a Steam Workshop collection and compare it with the installed mods (uses the network)
     data update [<dataset>…]                  download the community data (rules, steamdb, replacements); the only command that fetches it
     data status                               the community data: source, version, when it was fetched, entries

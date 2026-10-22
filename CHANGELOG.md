@@ -155,12 +155,35 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   `manage_rules` (`add_rule` stays as an alias), `manage_hidden`, `maintenance`, `pin_mod`
   (`copy_local` stays as an alias), `unpin_mod`; `status` gains `show` pages (envs,
   settings, data, db, cache); `launch_game`, `manage_plans`, `plan_history`;
-  `edit_loadout` gains `checkout` and `ignore_external`; `list_library`, `manage_library`. 33 tools in all.
+  `edit_loadout` gains `checkout` and `ignore_external`; `list_library`, `manage_library`;
+  `preview_uninstall` (read-only; there is no tool that uninstalls). 34 tools in all.
 - `exchange_list` and `maintenance` are open-world; the destructive ones (`save_loadout`,
   `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`, `manage_hidden`,
   `manage_library`, `maintenance`) are listed in the server instructions with "show the dry run and ask first".
 - Instructions and descriptions speak of the current plan, writing to the game and locked
   versions.
+
+### Uninstall (01 §4.1)
+- `archo uninstall` shows what RimArcho put on the machine and what happens to each piece;
+  `--yes` runs it. Every row of the write list (01 §4) has an uninstall step or a stated
+  reason; a test keeps the two in step.
+- RimArcho's `_Archo_` / `!ArchoPack_` links leave every game's `Mods/` (never their targets;
+  a same-named folder that is not a link stays and is listed). Each ModsConfig.xml RimArcho
+  wrote keeps the player's list without Archo Monitor and the mods only reached through a
+  removed link, and loses `.rimarcho.bak` (`--restore-modsconfig-backup` puts the backup back
+  instead). Monitor and the SteamCMD RimArcho downloaded are deleted.
+- Choices, defaults first: lock library copies to the recycle bin (`--keep-locked
+  [--locked-to <env>]`: into a game's `Mods/` as ordinary mods); packs kept, moved out of the
+  data folder (`--remove-packs`, `--packs-to`); own save folders and save backups moved out
+  (`--remove-saves`, `--saves-to`; default `Documents\RimArcho saves`); downloaded games kept
+  (`--remove-games`). Refused while a game or another RimArcho from the same folder runs.
+- The data folders and the program go last, by a script that waits for RimArcho to close; it
+  deletes only the release zip's files, the program folder only when empty, and lists what it
+  could not delete in `%TEMP%\RimArcho-uninstall.log`. A failed step keeps them, so it can
+  run again.
+- GUI 设置 › 卸载 RimArcho: the plan with the questions inline, one button, progress, the
+  report and 关闭 RimArcho; TUI palette 卸载 RimArcho asks for the word `uninstall`; MCP
+  `preview_uninstall` is the dry run only.
 
 ### Mod 库存 (06 §2.9)
 - `archo library` lists every mod on this machine, one line per Lineage (copies, size,

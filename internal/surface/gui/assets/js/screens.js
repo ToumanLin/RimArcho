@@ -1017,6 +1017,8 @@ function renderGroups(w, groups, again) {
         right.append(el("span", "muted", it.value));
       }
       for (const a of it.actions || []) {
+        // 卸载 RimArcho is its own page with the plan; every other action is a command
+        if (a.argv[0] === "uninstall") { right.append(button(a.label, "", () => ui.go("uninstall"))); continue; }
         right.append(button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, () => run(a.argv)) : run(a.argv)));
       }
       row.append(left, right);

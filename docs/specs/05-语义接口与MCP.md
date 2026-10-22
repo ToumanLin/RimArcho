@@ -50,6 +50,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 隐藏的 Mod：恢复显示、移到回收站（08 §6、§7） | 已完成 | 工具 `manage_hidden`，`destructiveHint: true` |
 | 环境管理、设置 | 已完成（`status` 的 `show`：envs / settings / data / db / cache） | 只读部分并入 `status`；修改留给玩家（这些改的是 RimArcho 自己的配置，影响面大） |
 | 社区数据更新、RimCrow 导入、`gc` | 已完成 | 工具 `maintenance`，`destructiveHint: true` |
+| 卸载 RimArcho（01 §4.1） | 已完成 | 只有预览：只读工具 `preview_uninstall`（`uninstall --dry-run`，参数同 CLI）。没有执行卸载的工具，理由见 01 §4.1 |
 | 存档：列出、看一份、没碰过的内容；备份、移到回收站（10 §1.6、§4） | 都没有（1.1） | CLI `saves list/show/backup/trash`、`unplayed`；只读工具 `list_saves`、`get_save`、`list_unplayed`；写工具 `manage_saves`，`destructiveHint: true` |
 
 旧规则“`launch`、`import rimcrow`、`gc`、`identity resolve` 不通过 MCP 开放”取消：这些动作也要有工具，用注解标出会写文件或难以撤回，是否放行交给外部 agent 的 harness；Archo 一律放进“要玩家确认”档（09 §2.2）。
@@ -247,6 +248,7 @@ next:
 | | `cache status` / `cache clear <类别>` | 缓存大小；清空一类缓存（`previews`、`workshop`、`images`、`source`、`logs`），用到时重建 |
 | 设置 | `config get [<键>]` / `config set <键> <值>` | 见下 |
 | Archo Monitor | `monitor` / `monitor install [--dry-run]` | 随附与已安装的版本、来源、当前方案里的位置；安装、更新、默认加入方案（08 §9、04 §1.5） |
+| 卸载 | `uninstall [--dry-run] [--yes] [--keep-locked [--locked-to <环境>]] [--remove-packs] [--packs-to <目录>] [--remove-saves] [--saves-to <目录>] [--remove-games] [--restore-modsconfig-backup] [--all]` | 删除 RimArcho 放在这台电脑上的东西、恢复它改过的（01 §4.1）。不带 `--yes` 只显示计划（与 `--dry-run` 相同），`--yes` 与 `--dry-run` 同时给是用法错误。参数都是非默认的那一边：`--keep-locked` 锁定库副本放进游戏的 `Mods/`（默认进回收站），`--remove-*` 进回收站（默认保留），`--*-to` 是保留的东西移到哪里，`--restore-modsconfig-backup` 换回备份（默认清理当前列表）。游戏或别的 RimArcho 在运行时拒绝 |
 | 存档（1.1，待实现） | `saves list [--colony <名>]` / `saves show <存档>` / `unplayed [--group never\|partial\|functional] [--mod <引用>]` | 只读（10 §1.6） |
 | | `saves backup <存档…>` / `saves trash <存档…>` | 要玩家确认（10 §4.4） |
 
@@ -324,8 +326,9 @@ next:
 | `maintenance` | `data update`、`import rimcrow`、`gc` | false | true |
 | `list_library` | `library`（`search`、`include`、`exclude`、`sort`、`lineage`、`facets`、`all`） | true | — |
 | `manage_library` | `action`：`move_to_locked`（`library move-to-locked`，`dry_run`、`reason`）/ `remove_from_plans`（`library remove-from-plans`）/ `unsubscribe`、`subscribe`（`workshop unsubscribe|subscribe`，`dry_run`）/ `steam_state`（`workshop state`）；`refs` | false | true |
+| `preview_uninstall` | `uninstall --dry-run`（`keep_locked`、`locked_to`、`remove_packs`、`packs_to`、`remove_saves`、`saves_to`、`remove_games`、`restore_modsconfig_backup`、`all`）；从不带 `--yes` | true | — |
 
-共 33 个（含两个别名）：15 个只读，18 个写；`destructiveHint: true` 的是 `save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
+共 34 个（含两个别名）：16 个只读，18 个写；`destructiveHint: true` 的是 `save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
 
 **描述的改写**（已完成；2026-10-21 之前的描述与代码不符，留作记录）：
 

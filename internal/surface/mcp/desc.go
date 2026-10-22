@@ -140,3 +140,14 @@ Example: get_description {"ref": "#uuhe"}
 const descPlayer = `Change the player's own data on mods (shared by all copies of a mod): action=tag_add / tag_remove (tags on one or more refs; tags are what list --filter tag:<t> and the TUI's tag: search use), alias (the name RimArcho shows; text "" clears), note (free text; "" clears), copy_note (a note on one copy only, e.g. why this locked version exists; list_library lineage=… shows it, and RimArcho's own first version until one is written). Nothing reaches the game.
 Example: set_player_data {"action": "tag_add", "refs": ["#uuhe", "#vpcd"], "tags": ["vehicles"]}
   tagged 2 mods: vehicles`
+
+const descUninstall = `Preview what uninstalling RimArcho would do (archo uninstall --dry-run): every step with its folders and sizes — RimArcho's links in the games' Mods/ deleted (never their targets), the ModsConfig.xml lists it wrote cleaned of Archo Monitor and mods only reached through a removed link (restore_modsconfig_backup: the backup put back), the lock library's copies (default recycle bin; keep_locked: into a game's Mods/ as ordinary mods, locked_to picks the environment), Archo Monitor, packs (default kept; remove_packs), the environments' own save folders (default moved out to Documents; remove_saves), game folders downloaded with SteamCMD (default kept; remove_games), RimArcho's SteamCMD, then its data folders and the program once it has closed. Read-only: nothing changes. There is no tool that uninstalls — removing RimArcho is the player's decision alone; to go ahead they run archo uninstall --yes themselves or use 设置 › 卸载 RimArcho in the window. Use this to answer "what would uninstalling remove or keep?".
+Example: preview_uninstall {"keep_locked":true}
+  uninstall: dry run, nothing changed
+    links: delete 2 links in the games' Mods/ (never their targets)
+      unlink      C:\Games\RimWorld\Mods\_Archo_locked_1001_local → C:\Users\me\AppData\Local\RimArcho\locked\1001_local
+    locked: 1 lock library copy into env:main's Mods/ as ordinary mods, 12.0 KB
+      move        C:\Users\me\AppData\Local\RimArcho\locked\1001_local → C:\Games\RimWorld\Mods\1001_local  (A)  12.0 KB
+    data: once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder (2 folders), 48.3 MB
+  next:
+    archo uninstall --keep-locked --yes`

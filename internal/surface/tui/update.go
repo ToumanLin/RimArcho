@@ -136,8 +136,8 @@ func (m *model) scanSummary(out string) string {
 
 func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	s := k.String()
-	if s == "ctrl+c" {
-		m.quitting = true
+	if s == "ctrl+c" || (m.app.Uninstalled && m.panel == nil) {
+		m.quitting = true // after an uninstall nothing else runs
 		return tea.Quit
 	}
 	if m.prompt == nil && !m.editing && m.pos == nil {
