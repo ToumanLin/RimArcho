@@ -401,3 +401,54 @@ versions: 1 (plan:raid night, env:main)
   workspace: 3 active, saved (plan:raid night, env:main)
   v1  2026-10-01 12:00  import  3 entries  1.6.4633 rev1261  copied from default v1
 
+> list_library {"include":["state:unused"]}
+library: 4 of 5 mods match (state:unused)
+  L#l4xt  A         [1 of 2 copies, 1.3 KB, plan:raid night +3]
+  L#a6o7  Alone     [workshop, 538 B, in no plan]
+  L#gpto  Bee       [local, 518 B, in no plan]
+  L#xamx  Leftover  [local, 554 B, in no plan]
+
+> manage_library {"action":"move_to_locked","dry_run":true,"refs":["#iqmu"]}
+#iqmu A dry run, nothing changed: would move to the lock library
+  from: $ROOT/Steam/steamapps/common/RimWorld/Mods/A Local
+  to: $ROOT/LocalAppData/RimArcho/locked/main/A Local
+  how: renamed (same volume)
+  marker: .rimarcho/origin.json would be written (the folder has none)
+  plans: plan:raid night, plan:default, plan:first, plan:from file keep it: the same instance, linked into Mods/ (_Archo_) on save or launch
+next:
+  archo library move-to-locked #iqmu
+
+> manage_library {"action":"move_to_locked","refs":["#iqmu"]}
+#iqmu A moved to the lock library
+  from: $ROOT/Steam/steamapps/common/RimWorld/Mods/A Local
+  to: $ROOT/LocalAppData/RimArcho/locked/main/A Local
+  how: renamed (same volume)
+  now: #iqmu
+  marker: .rimarcho/origin.json written (the folder had none)
+  plans: plan:raid night, plan:default, plan:first, plan:from file keep it: the same instance, linked into Mods/ (_Archo_) on save or launch
+next:
+  archo save
+
+> list_library {"lineage":"L#l4xt"}
+L#l4xt A  [2 copies, 1.3 KB]
+  #6olp workshop  672 B
+    path: $ROOT/Steam/steamapps/workshop/content/294100/1001
+    workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=1001
+    supports: 1.6
+    states: in no plan
+  #iqmu locked 2026-10-01 12:00  672 B  (current plan)
+    path: $ROOT/LocalAppData/RimArcho/locked/main/A Local
+    supports: 1.6
+    upstream: #6olp A
+    used in: plan:raid night, plan:default, plan:first, plan:from file
+    played: 2026-10-01 12:00
+
+> manage_library {"action":"remove_from_plans","refs":["#hnyg"]}
+removed #hnyg Harmony from 4 plans
+  plan:default: 1 entry (undo it in that plan: archo plan use default, then archo undo)
+  plan:raid night: 1 entry (archo undo reverts it)
+  plan:first: 1 entry (undo it in that plan: archo plan use first, then archo undo)
+  plan:from file: 1 entry (undo it in that plan: archo plan use "from file", then archo undo)
+next:
+  archo save
+

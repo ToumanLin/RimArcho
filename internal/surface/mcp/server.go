@@ -349,7 +349,9 @@ func toolList() []tool {
 }
 
 // Tools returns the tool table.
-func Tools() []tool { return append(append(toolList(), manageTools()...), planTools()...) }
+func Tools() []tool {
+	return append(append(append(toolList(), manageTools()...), planTools()...), libraryTools()...)
+}
 
 // ProblemsArgv maps list_problems: warning and above by default (03 §4.5).
 func ProblemsArgv(in ProblemsIn) []string {

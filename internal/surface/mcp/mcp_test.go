@@ -65,6 +65,8 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"pin_mod": "write", "unpin_mod": "write",
 		// 0.9: launching, plans and their history.
 		"launch_game": "destructive", "manage_plans": "destructive", "plan_history": "ro",
+		// 06 §2.9: Mod 库存.
+		"list_library": "ro", "manage_library": "destructive",
 	}
 	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true}
 	seen := map[string]bool{}
@@ -172,6 +174,13 @@ func TestCLIParity(t *testing.T) {
 		{"plan_history", map[string]any{"action": "steps", "all": true}, []string{"history", "--all"}},
 		{"manage_plans", nil, []string{"plan", "list"}},
 		{"launch_game", map[string]any{"dry_run": true}, []string{"launch", "--dry-run"}},
+		// 06 §2.9: the library (its write actions: TestGoldenManageTools).
+		{"list_library", nil, []string{"library"}},
+		{"list_library", map[string]any{"search": "mod", "include": []string{"source:local", "state:unused"}, "exclude": []string{"tag:x"}, "sort": "size"},
+			[]string{"library", "--search", "mod", "--include", "source:local", "--include", "state:unused", "--exclude", "tag:x", "--sort", "size"}},
+		{"list_library", map[string]any{"facets": true}, []string{"library", "--facets"}},
+		{"list_library", map[string]any{"lineage": modA}, []string{"library", "--lineage", modA}},
+		{"manage_library", map[string]any{"action": "move_to_locked", "refs": []string{modA}, "dry_run": true}, []string{"library", "move-to-locked", modA, "--dry-run"}},
 	}
 	for _, c := range cases {
 		got, isErr := call(t, cs, c.tool, c.args)
