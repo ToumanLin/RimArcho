@@ -103,3 +103,111 @@ Where RimArcho is silent but the cause is findable (rules for G1):
 Limits: 4 clusters per class; strata are frequent templates, not a random sample, so the
 per-class rates do not weight to the corpus. One reviewer; the reviewer saw RimArcho's verdict
 for a few items while checking packets (P19, P29). Mods are current Workshop versions.
+
+== Benchmark v2 (G6, 2026-10-22): 140 labelled clusters in two tiers, RimArcho accuracy by class
+
+Only aggregates here. Sample, packets, labels, transcripts and tasks are in
+corpus-kb\labels\v2\ (not in any repository). Schema: SCHEMA.md (corpuslabel/2).
+
+Sample (bench-sample, results-v4, logs >= 80% library coverage, pilot logs excluded, one
+cluster per log): tier 1 patch-failed, xref-missing, texture-missing, xml-load, 20 each;
+tier 2 exception, harmony-stack, assembly (TypeLoad, ReflectionTypeLoad, MissingMethod,
+"Cannot resolve dependency"), static-ctor (static constructor / TypeInitialization), 15 each.
+assembly and static-ctor are RimArcho exception/harmony-stack clusters picked by key pattern.
+~60% "head" (most frequent templates, one per template family) and ~40% "tail" (uniform over
+(log, template) pairs of the other templates, at most 4 per template, 2 in tier 2).
+Packets: as the pilot plus the log upload date, each involved mod's version in the log vs the
+research library's, and co-occurrence over distinct mod lists (near-identical lists, Jaccard
+>= 0.8, count once; >= 15 lists). The old count let one player's repeat uploads make
+unrelated mods look 88% vs 1%.
+
+Labellers (blind to RimArcho's verdict):
+  tier 1   claude-haiku on the packet only, 10 agents x 8 items, three prompt rounds
+  tier 2   claude-sonnet, one agent per cluster, with the packet, the raw log and `corpuslabel
+           exec` on its own research home (fact commands only; log and problems are blocked):
+           source, source search, harmony, def, patches, files search, mod, why. Every call is
+           logged; validate checks code quotes against the decompiled .cs (file, type, method,
+           lines +-3) and env:/log: quotes against the transcript and the raw log.
+  reviewer claude-opus-5-5: all 60 tier-2 labels; 32 of 80 tier-1 labels (8 per class, the
+           odd items 01..15, head and tail), labelled independently from packet and raw log.
+
+-- Labeller vs reviewer
+
+                     source mods  cause/none  cause type  fix kind  stage  difficulty
+  pilot p3 (n 32)       78.1%        78%         34%        19%      75%       -
+  tier 1 round 1        68.8%        68.8%       68.8%      25.0%    93.8%    40.6%
+  tier 1 round 2        87.5%        87.5%       71.9%      40.6%    93.8%    43.8%
+  tier 1 round 3        87.5%        90.6%       68.8%      87.5%    96.9%    46.9%
+  tier 2 (n 60)         91.7%        91.7%       96.7%      93.3%    100%     95.0%
+
+  Source-mod disagreement: 12.5% in tier 1 (Haiku), 8.3% in tier 2 (Sonnet; 6 of 60 labels
+  corrected). Round 1 tied "verdict unknown" to "cause type unknown" both ways, so Haiku
+  dropped clear sources (a failed patch's owner) when the reason was unclear; round 2
+  separates who from why. Round 3 states that the class default fix applies without a named
+  source (13 of 19 fix disagreements were ignore vs unknown). Cause type stays the weakest
+  tier-1 field: optional-absent vs outdated-mod needs to know whether the patched mod is in
+  the list, which the packet shows only for "involved" mods. Haiku's difficulty is not
+  reliable (it calls most unknowns L3).
+  Tier-2 corrections: 4 of 6 were the same who-vs-why slip (the mod's own static constructor
+  or patch throws, but its code is not in the library, so the agent said unknown); 1 wrong
+  inference about which mod ships a stale AchtungMod.dll (the log header disproves it); 1
+  added co-source (Explicit Timings' unguarded GetTypes).
+
+-- RimArcho (final run v4) vs gold (reviewed label, else labeller label)
+
+  class            n  gold-src  hit wrong silent overclaim none  precision  recall
+  patch-failed    20     20      15    0     5       0       0     100%      75%
+  xref-missing    20      6       6    0     0       0      14     100%     100%
+  texture-missing 20      7       4    0     3       0      13     100%      57%
+  xml-load        20      7       2    0     5       2      11      50%      29%
+  exception       15      5       2    0     3       2       8      50%      40%
+  harmony-stack   15      4       3    0     1       2       9      60%      75%
+  assembly        15     11       4    1     6       0       4      80%      36%
+  static-ctor     15     13       4    3     6       1       1      50%      31%
+  all            140     73      40    4    29       7      60      78%      55%
+
+  precision = hit / clusters where RimArcho names a source; recall = hit / clusters whose gold
+  names a source. Reviewed labels only (92): precision 70%, recall 45%. The packet re-run on a
+  fresh home gives the same picture (78% / 53%).
+  The 11 named-but-wrong clusters were checked against the evidence after scoring; no gold
+  label changed. 4 are debatable (HugsLib's own log-upload error; Humanoid Alien Races code
+  or patch on the stack where some race def supplies the null; VEF's unguarded patch on a
+  method missing in an old RPG Style Inventory). 7 are clear errors from two rules:
+    - "<F>V</F> doesn't correspond to any field": the literal search matches the same value
+      in unrelated def types (selectionWeight in GeneDefs/PreceptDefs for a LayoutRoomDef
+      error). Restrict the search to the def type and context of the message.
+    - topmost mod frame: names infrastructure callers instead of the failing mod: Mod Error
+      Checker (scans assemblies), Loading Progress (runs static constructors), Defaults and
+      HugsLib Quickstart (trigger vanilla code that hits another mod's broken def). "Error in
+      static constructor of X" should attribute X's owner; such callers should be "mentioned".
+  Against the pilot: "never wrong" holds for the tier-1 classes except xml-load; the code
+  classes are 50-80% precise. Silence is still the larger gap (29 silent vs 11 wrong).
+  Gold distribution: many clusters have no decidable source even with code (tier 2: 17 of 60
+  unknown: NREs inside vanilla code with null-safe patches, save data of removed mods, machine
+  problems such as an unwritable harmony.log.txt). Version mismatch (the player's copy older
+  than the library's, and the library code fixed) decides 11 clusters, mostly in tier 2.
+
+-- Tier-2 cost (claude-sonnet, per cluster, 60 runs)
+
+  class          median time  median tool calls  median archo exec  median tokens
+  exception          64 s            12                 2               81k
+  harmony-stack      88 s            12                 4               90k
+  assembly           76 s            11                 2               83k
+  static-ctor        99 s            17                 5               85k
+  All 60: 99 min of agent time (6 in parallel, one research home each), 5.3 M tokens.
+  Tier 1 (Haiku): about 13k tokens and 14 s per cluster. ilspycmd 10.1 is installed;
+  decompiling VEF (1,393 files) takes ~10 s; the first exec of a log in a fresh home ~7 s.
+
+-- Task set for G7 (corpus-kb\labels\v2\tasks.jsonl)
+
+  140 tasks: gist, cluster key, Loadout source (raw log header) and rebuild command, packet,
+  question, answer (corpuslabel/2 label; code quotes copied to code\), answer status (92
+  reviewed, 48 Haiku labels), difficulty (L1 21, L2 59, L3 60), split: 44 held out (~30% per
+  class, by hash; G7 must not tune on them).
+
+Limits: one reviewer; 48 tier-1 gold labels are unreviewed labeller labels; strata are
+frequent templates plus a tail, not weighted to the corpus; research mods are current Workshop
+versions (version mismatch is decided from code differences when headers carry no version).
+Packet bug found and fixed after labelling: GetNamed def names kept the sentence's period
+("konf."), so those packets' def lookups and searches came back empty. `patches --failed`
+prints the filtered count as "N operations", which reads as "this mod has no patches".

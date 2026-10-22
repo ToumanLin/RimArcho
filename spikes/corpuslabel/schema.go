@@ -286,7 +286,8 @@ func validate(l *Label, items map[string]Item, packets map[string]*Packet, o *vo
 		if lv, ok := p.LogVers[strings.ToLower(vc.Pkg)]; ok && norm(lv) != norm(vc.Log) {
 			bad("versions: log version of %s is %q, not %q", vc.Pkg, lv, vc.Log)
 		}
-		if vc.Same == "no" && causePk[strings.ToLower(vc.Pkg)] {
+		// the game itself may be the differing party (a mod written for a newer 1.6 build)
+		if vc.Same == "no" && (causePk[strings.ToLower(vc.Pkg)] || strings.ToLower(vc.Pkg) == "ludeon.rimworld") {
 			verMismatch = true
 		}
 	}
