@@ -590,6 +590,37 @@ async function barChanged() {
   detailFollow();
 }
 
+// historyChooser: the history's steps and versions as a list (H): the keyboard's way to what
+// a click on the history fold does (06 §2.5, §3.1 rule 6).
+function historyChooser() {
+  const hs = (S.history || []).filter((h) => h.kind !== "now");
+  if (!hs.length) return say("", T("no history yet"));
+  pop.choose(T("history"), hs.map((h) => (h.kind === "version" ? "◆ " : "") + h.text), (i) => onHistoryPick(hs[i]));
+}
+let onHistoryPick = () => {};
+
+// changesOfCursor: the 变化 page with only the cursor's mod (C; the detail's link).
+function changesOfCursor() {
+  const it = cur(S.focus < 3 ? S.focus : lastList);
+  if (it && it.id) document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: it.id, name: it.name } }));
+}
+
+// widthKey: < > make the focused column narrower or wider, = gives the default widths back
+// (the splits' drag and double click, 06 §2.5).
+function widthKey(d) {
+  const board = $("#board");
+  const k = S.focus < 2 ? S.focus : 2;
+  if (!d) { [0, 1, 2].forEach((j) => board.style.removeProperty(`--c${j}`)); api.SetSetting("ui.gui.columns:" + ((S.board && S.board.env) || ""), "").catch(() => {}); return; }
+  const ws = COLS().map((a) => a.getBoundingClientRect().width);
+  const other = k === 2 ? 1 : k + 1;
+  const step = 24 * d;
+  if (ws[k] + step < 160 || ws[other] - step < 160) return;
+  ws[k] += step; ws[other] -= step;
+  ws.forEach((v, j) => board.style.setProperty(`--c${j}`, v + "fr"));
+  api.SetSetting("ui.gui.columns:" + ((S.board && S.board.env) || ""), [0, 1, 2].map((j) => board.style.getPropertyValue(`--c${j}`)).join(",")).catch(() => {});
+  for (const j of [0, 1, 2]) renderRows(j);
+}
+
 // subPage: tab / shift+tab go to the next / previous page under the open sidebar entry.
 function subPage(d) {
   const cur = shell.current();
@@ -667,7 +698,8 @@ function onKey(e) {
   }
   // tab / shift+tab: the next / previous page under the same sidebar entry (Mod 库存's 全部 and
   // 变化, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
-  if (k === "Tab" && !e.ctrlKey && !e.altKey && S.screen !== "full") { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
+  // (on the pages with forms, settings and the like, tab keeps moving the focus)
+  if (k === "Tab" && !e.ctrlKey && !e.altKey && (!S.screen || S.screen === "library" || S.screen === "changes")) { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
   if (S.screen) {
     // esc (and enter) leave the full detail for the plan; the sidebar's pages are side by
     // side, so esc does not go from one to another (06 §3.1)
@@ -738,6 +770,7 @@ function onKey(e) {
     g: () => verb("tags"), n: () => verb("note"), Enter: () => verb("full"), x: () => verb("swap"),
     S: () => run("sort"), w: () => run("save"), L: () => run("launch"), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
+    H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
     E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
@@ -872,10 +905,12 @@ async function start() {
 
 // A history row (06 §2.5): a click goes there at once. Loading a version is one step: the
 // list it replaces stays in the history and 撤销 brings it back.
-setOnHistory(async (h) => {
+onHistoryPick = (h) => goHistory(h);
+setOnHistory((h) => goHistory(h));
+async function goHistory(h) {
   try { say("ok", await api.HistoryGo(h.steps || 0, h.version || 0), h.kind === "version"); } catch (e) { say("fail", errText(e)); }
   await reload();
-});
+}
 
 // pollLive follows the running game every two seconds (06 §2.1): the sidebar's foot says
 // it is running, its errors lead 能不能跑, and launching waits until it exits (08 §4).

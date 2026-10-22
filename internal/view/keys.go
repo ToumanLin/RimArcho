@@ -55,6 +55,8 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		if lib {
 			out = append(out,
 				r("→ ←", "open / close a mod's copies; → on a copy goes to its details"),
+				r("s", "sort and columns (the headers' menu)"),
+				r("C", "this mod's changes"),
 				r("R", "rescan"),
 			)
 		} else {
@@ -67,13 +69,14 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("R · A", "rescan · check the files again"),
 				r("P · E", "plans · environments"),
 				r(":", "run an archo command"),
+				r("H", "the history: steps and versions"),
+				r("C", "this mod's changes"),
+				r("< > =", "column width (= resets)"),
 			)
 			if tui {
 				out = append(out,
 					r("i", "technical information in the details"),
 					r("r", "add a rule"),
-					r("C", "this mod's changes"),
-					r("< > =", "column width (= resets)"),
 					r("z", "wrap names"),
 					r("[ ]", "switch list (narrow)"),
 				)

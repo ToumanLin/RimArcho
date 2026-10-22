@@ -821,3 +821,13 @@ func SetModNote(a *app.App, ref, text string) (string, error) {
 	}
 	return Tf("saved the note of %s", name), nil
 }
+
+// LibDoes reports whether LibDo runs op kind (the plan ops, 从所有方案里拿掉, the version and
+// disk ops); the rest are the interface's own (a page, a folder, a note, a position).
+func LibDoes(kind string) bool {
+	switch kind {
+	case LibUnsub, LibResub, LibRemove, OpAdd, OpEnable, OpTakeOut, OpDisable, OpPutBack, OpStage, OpUse, OpSwap:
+		return true
+	}
+	return libConfirm[kind]
+}

@@ -304,6 +304,32 @@ function colMenu(x, y) {
   pop.menu(x, y, items);
 }
 
+// tableMenu (s): what the headers do with the mouse, from the keyboard (06 §3.1 rule 6):
+// sort by a column (again reverses), move or size the sorted column, show or hide columns.
+function tableMenu() {
+  const redraw = () => { saveCols(); drawHead(); els.rows.dataset.sig = ""; drawRows(); };
+  const sc = L.cols.find((c) => c.key === sortKey());
+  const shift = (d) => {
+    const vis = shownCols(), i = vis.indexOf(sc), to = vis[i + d];
+    if (!sc || !to) return;
+    L.cols.splice(L.cols.indexOf(sc), 1);
+    L.cols.splice(L.cols.indexOf(to) + (d > 0 ? 1 : 0), 0, sc);
+    redraw();
+  };
+  const items = shownCols().map((c) => ({
+    label: Tf("sort by %s", c.title), key: sortKey() === c.key ? (ASC.has(c.key) !== L.sort.startsWith("-") ? "▲" : "▼") : "", run: () => sortBy(c.key),
+  }));
+  if (sc) items.push({ sep: true },
+    { label: Tf("move %s left", sc.title), run: () => shift(-1) }, { label: Tf("move %s right", sc.title), run: () => shift(1) },
+    { label: Tf("widen %s", sc.title), run: () => { sc.w += 24; layout(); saveCols(); } },
+    { label: Tf("narrow %s", sc.title), run: () => { sc.w = Math.max(sc.key === "name" ? 120 : 40, sc.w - 24); layout(); saveCols(); } });
+  items.push({ sep: true });
+  for (const c of L.cols.filter((c) => c.key !== "name")) items.push({ label: c.title, key: c.shown ? "✓" : "", run: () => { c.shown = !c.shown; redraw(); } });
+  items.push({ sep: true }, { label: T("reset the columns"), run: () => { L.cols = mergeCols(L.page.columns || [], ""); redraw(); } });
+  const b = els.th.getBoundingClientRect();
+  pop.menu(b.left + 20, b.bottom, items, true);
+}
+
 // ---- the rows ----
 
 function drawRows() {
@@ -753,6 +779,8 @@ export function key(e) {
   if (ctrl || e.altKey) return;
   const keys = { " ": "space", m: "m", t: "t", x: "x", g: "g", n: "n", Delete: "Del" };
   if (keys[k]) { done(); return byKey(keys[k]); }
+  if (k === "s") { done(); return tableMenu(); }
+  if (k === "C") { done(); const i = cursorCopy(); if (i && i.id) document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: i.id, name: (L.flat[L.cur] || {}).r ? L.flat[L.cur].r.name : i.label } })); return; }
   if (k === "R") { done(); return ui.cmd("rescan"); }
 }
 
