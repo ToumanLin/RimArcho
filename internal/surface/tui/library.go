@@ -99,7 +99,7 @@ func (m *model) libraryKey(s string) tea.Cmd {
 		if l.cursor < n {
 			r := l.page.Rows[l.cursor]
 			out, _ := cmds.Execute(m.app, []string{"library", "--lineage", r.Ref})
-			m.openPanel(r.Name, out, nil)
+			m.openPanel(r.Name, out)
 		}
 	}
 	return nil
