@@ -115,13 +115,15 @@ type Start struct {
 	Text     map[string]string `json:"text"`
 	Commands []view.Command    `json:"commands"`
 	Version  string            `json:"version"`
+	// Ops is the op table both pages' menus, hint lines and keys come from (06 §8.5).
+	Ops []view.Op `json:"ops"`
 }
 
 // Init returns the page's start data.
 func (s *API) Init() *Start {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Start{Lang: view.Lang(), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String()}
+	return &Start{Lang: view.Lang(), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
 }
 
 // ---- the board ----
