@@ -457,27 +457,27 @@ type Filtered struct {
 
 // Detail is one mod's detail (06 §4.1), in the order the page shows it.
 type Detail struct {
-	ID         string         `json:"id"`
-	Name       string         `json:"name"`
-	Authors    string         `json:"authors,omitempty"`
-	Kind       string         `json:"kind"`
-	Header     []string       `json:"header"`
-	Status     int            `json:"status"`
-	StatusText string         `json:"statusText"`
-	Facts      []view.Fact    `json:"facts"`
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
+	Authors    string      `json:"authors,omitempty"`
+	Kind       string      `json:"kind"`
+	Header     []string    `json:"header"`
+	Status     int         `json:"status"`
+	StatusText string      `json:"statusText"`
+	Facts      []view.Fact `json:"facts"`
 	// Fields is the detail's one field list (06 §4.1): Archo ID, package, location, Workshop,
 	// tags, languages, dependencies, conflicts.
-	Fields []view.Field `json:"fields"`
-	Deps       []view.Dep     `json:"deps"`
-	Show       string         `json:"show"`
-	Note       string         `json:"note,omitempty"`
-	State      string         `json:"state,omitempty"` // the Workshop page's state
-	About      []bbcode.Block `json:"about"`
-	Workshop   []bbcode.Block `json:"workshop"`
-	History    string         `json:"history,omitempty"`
-	Missing    bool           `json:"missing,omitempty"`
-	URL        string         `json:"url,omitempty"` // the Workshop page
-	Pos        int            `json:"pos,omitempty"`
+	Fields   []view.Field   `json:"fields"`
+	Deps     []view.Dep     `json:"deps"`
+	Show     string         `json:"show"`
+	Note     string         `json:"note,omitempty"`
+	State    string         `json:"state,omitempty"` // the Workshop page's state
+	About    []bbcode.Block `json:"about"`
+	Workshop []bbcode.Block `json:"workshop"`
+	History  string         `json:"history,omitempty"`
+	Missing  bool           `json:"missing,omitempty"`
+	URL      string         `json:"url,omitempty"` // the Workshop page
+	Pos      int            `json:"pos,omitempty"`
 }
 
 // Detail returns the detail of an instance; fetch allows the network for the Workshop
