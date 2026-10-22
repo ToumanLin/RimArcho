@@ -100,12 +100,27 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 		}
 	}()
 	ts := now.Unix()
+	// An instance belongs where its source does: a shared mod folder's to every environment
+	// (environment_id ''), Data/ and Mods/ to the environment (02 §0).
+	srcEnv := map[string]string{}
+	if err = eachRow(tx, `SELECT id, environment_id FROM source`, func(r *sql.Rows) error {
+		var id, e string
+		if err := r.Scan(&id, &e); err != nil {
+			return err
+		}
+		srcEnv[id] = e
+		return nil
+	}); err != nil {
+		return err
+	}
+	instEnv := map[string]string{}
 	snapOf := map[*identity.Assignment]int64{}
 	for _, a := range res.Assignments {
 		ob := a.Obs
+		instEnv[a.InstanceID] = srcEnv[ob.Loc.SourceID]
 		if a.NewLineage {
 			if _, err = tx.Exec(`INSERT INTO lineage(id, environment_id, primary_instance_id, created_at) VALUES(?,?,?,?)`,
-				a.LineageID, envID, a.InstanceID, ts); err != nil {
+				a.LineageID, Shared, a.InstanceID, ts); err != nil {
 				return err
 			}
 		}
@@ -117,12 +132,12 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 		if a.Known == nil {
 			if _, err = tx.Exec(`INSERT INTO instance(id, environment_id, lineage_id, lineage_basis, source_id, rel_path, real_path, status,
 				residue, unloadable, first_seen, last_seen) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
-				a.InstanceID, envID, a.LineageID, a.LineageBasis, ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, residue, unloadable, ts, ts); err != nil {
+				a.InstanceID, instEnv[a.InstanceID], a.LineageID, a.LineageBasis, ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, residue, unloadable, ts, ts); err != nil {
 				return err
 			}
 		} else {
-			if _, err = tx.Exec(`UPDATE instance SET source_id=?, rel_path=?, real_path=?, status=?, residue=?, unloadable=?, last_seen=?, tombstone_at=NULL WHERE id=?`,
-				ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, residue, unloadable, ts, a.InstanceID); err != nil {
+			if _, err = tx.Exec(`UPDATE instance SET environment_id=?, source_id=?, rel_path=?, real_path=?, status=?, residue=?, unloadable=?, last_seen=?, tombstone_at=NULL WHERE id=?`,
+				instEnv[a.InstanceID], ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, residue, unloadable, ts, a.InstanceID); err != nil {
 				return err
 			}
 		}
@@ -182,7 +197,7 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 	}
 	for _, q := range res.Questions {
 		if _, err = tx.Exec(`INSERT INTO identity_question(environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score)
-			VALUES(?,?,?,?,?,?)`, envID, scanID, q.New.InstanceID, snapOf[q.New], q.Candidate.ID, q.Score); err != nil {
+			VALUES(?,?,?,?,?,?)`, instEnv[q.New.InstanceID], scanID, q.New.InstanceID, snapOf[q.New], q.Candidate.ID, q.Score); err != nil {
 			return err
 		}
 	}
@@ -194,10 +209,13 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 
 // recomputePrimaries sets each lineage's primary instance (02 §6): a live instance before a
 // tombstone, then a workshop-like source, then the earliest first_seen. Empty lineages are
-// deleted.
-func recomputePrimaries(tx *sql.Tx, envID string) error {
-	rows, err := tx.Query(`SELECT i.id, i.lineage_id, i.status, s.kind, i.first_seen FROM instance i JOIN source s ON s.id=i.source_id
-		WHERE i.environment_id=?`, envID)
+// deleted. Lineages are shared by every environment (02 §0), so this runs over all of them;
+// envID is kept for the callers.
+func recomputePrimaries(tx *sql.Tx, envID string) error { return recomputeAllPrimaries(tx) }
+
+func recomputeAllPrimaries(tx *sql.Tx) error {
+	rows, err := tx.Query(`SELECT i.id, i.lineage_id, i.status, s.kind, i.first_seen, coalesce(l.primary_instance_id, '')
+		FROM instance i JOIN source s ON s.id=i.source_id JOIN lineage l ON l.id=i.lineage_id`)
 	if err != nil {
 		return err
 	}
@@ -207,15 +225,17 @@ func recomputePrimaries(tx *sql.Tx, envID string) error {
 		first               int64
 	}
 	byLineage := map[string][]row{}
+	cur := map[string]string{}
 	for rows.Next() {
 		var r row
-		var kind string
-		if err := rows.Scan(&r.id, &r.lineage, &r.status, &kind, &r.first); err != nil {
+		var kind, p string
+		if err := rows.Scan(&r.id, &r.lineage, &r.status, &kind, &r.first, &p); err != nil {
 			rows.Close()
 			return err
 		}
 		r.kind = source.Kind(kind)
 		byLineage[r.lineage] = append(byLineage[r.lineage], r)
+		cur[r.lineage] = p
 	}
 	rows.Close()
 	for lin, rs := range byLineage {
@@ -232,11 +252,14 @@ func recomputePrimaries(tx *sql.Tx, envID string) error {
 			}
 			return a.id < b.id
 		})
+		if cur[lin] == rs[0].id {
+			continue
+		}
 		if _, err := tx.Exec(`UPDATE lineage SET primary_instance_id=? WHERE id=?`, rs[0].id, lin); err != nil {
 			return err
 		}
 	}
-	_, err = tx.Exec(`DELETE FROM lineage WHERE environment_id=? AND id NOT IN (SELECT lineage_id FROM instance WHERE environment_id=?)`, envID, envID)
+	_, err = tx.Exec(`DELETE FROM lineage WHERE id NOT IN (SELECT lineage_id FROM instance)`)
 	return err
 }
 

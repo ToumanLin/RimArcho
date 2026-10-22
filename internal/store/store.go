@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 13
+const SchemaVersion = 14
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -352,6 +352,10 @@ func migrateV11(tx *sql.Tx) error {
 	return nil
 }
 
+// Shared is the environment ID of what every environment shares (02 §0): the mod folders
+// and their instances, the lineages, the player's data on lineages and the user rules.
+const Shared = ""
+
 // Store wraps the database handle.
 type Store struct {
 	DB   *sql.DB
@@ -394,9 +398,9 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13, schemaV14}
 	// post runs after a step's SQL, in the same transaction.
-	post := map[int]func(*sql.Tx) error{11: migrateV11}
+	post := map[int]func(*sql.Tx) error{11: migrateV11, 14: migrateV14}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {

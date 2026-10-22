@@ -223,15 +223,15 @@ func (s *Store) AddRule(envID string, r *UserRule) (int64, error) {
 	s.DB.QueryRow(`SELECT coalesce(max(id), 0) FROM user_rule`).Scan(&maxID)
 	r.ID = max(seq, maxID) + 1
 	if _, err := s.DB.Exec(`INSERT INTO user_rule(id, environment_id, kind, a_lineage, b_lineage, target, note, created_at) VALUES(?,?,?,?,?,?,?,?)`,
-		r.ID, envID, r.Kind, r.A, r.B, r.Target, r.Note, r.Created.Unix()); err != nil {
+		r.ID, Shared, r.Kind, r.A, r.B, r.Target, r.Note, r.Created.Unix()); err != nil {
 		return 0, err
 	}
 	return r.ID, s.SetMeta("rule_seq", fmt.Sprint(r.ID))
 }
 
-// Rules lists an environment's user rules.
+// Rules lists the user rules. They are global (02 §0 item 6): envID is kept for the callers.
 func (s *Store) Rules(envID string) ([]*UserRule, error) {
-	rows, err := s.DB.Query(`SELECT id, kind, a_lineage, b_lineage, target, note, created_at FROM user_rule WHERE environment_id=? ORDER BY id`, envID)
+	rows, err := s.DB.Query(`SELECT id, kind, a_lineage, b_lineage, target, note, created_at FROM user_rule ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func (s *Store) Rules(envID string) ([]*UserRule, error) {
 
 // RemoveRule deletes a rule; it reports whether one was deleted.
 func (s *Store) RemoveRule(envID string, id int64) (bool, error) {
-	res, err := s.DB.Exec(`DELETE FROM user_rule WHERE environment_id=? AND id=?`, envID, id)
+	res, err := s.DB.Exec(`DELETE FROM user_rule WHERE id=?`, id)
 	if err != nil {
 		return false, err
 	}
@@ -262,7 +262,7 @@ func (s *Store) RemoveRule(envID string, id int64) (bool, error) {
 // AllAliases maps instance ID → alias locations for an environment.
 func (s *Store) AllAliases(envID string) (map[string][]Alias, error) {
 	rows, err := s.DB.Query(`SELECT a.instance_id, a.source_id, s.label, a.rel_path, a.real_path FROM instance_alias a
-		JOIN source s ON s.id=a.source_id JOIN instance i ON i.id=a.instance_id WHERE i.environment_id=? ORDER BY s.label, a.rel_path`, envID)
+		JOIN source s ON s.id=a.source_id JOIN instance i ON i.id=a.instance_id WHERE i.environment_id IN ('', ?) ORDER BY s.label, a.rel_path`, envID)
 	if err != nil {
 		return nil, err
 	}

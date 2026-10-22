@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -84,10 +85,21 @@ func (s *Store) CurrentEnv() (*env.Environment, error) {
 // SetCurrentEnv selects the current environment.
 func (s *Store) SetCurrentEnv(id string) error { return s.SetMeta(metaCurrentEnv, id) }
 
-// Sources lists an environment's sources in insertion order of kinds.
+// Sources lists the sources an environment sees: its own (official, local) and the shared
+// mod folders (02 §0), by kind, then label.
 func (s *Store) Sources(envID string) ([]*source.Source, error) {
-	rows, err := s.DB.Query(`SELECT id,environment_id,kind,label,root,status,pending_root FROM source WHERE environment_id=?
-		ORDER BY CASE kind WHEN 'official' THEN 0 WHEN 'local' THEN 1 WHEN 'workshop' THEN 2 WHEN 'steamcmd' THEN 3 ELSE 4 END, label`, envID)
+	return s.sources(`environment_id IN ('', ?)`, envID)
+}
+
+// SharedSources lists the shared mod folders (every environment sees them).
+func (s *Store) SharedSources() ([]*source.Source, error) { return s.sources(`environment_id=''`) }
+
+// AllSources lists every source of every environment and the shared ones.
+func (s *Store) AllSources() ([]*source.Source, error) { return s.sources(`1`) }
+
+func (s *Store) sources(where string, args ...any) ([]*source.Source, error) {
+	rows, err := s.DB.Query(`SELECT id,environment_id,kind,label,root,status,pending_root FROM source WHERE `+where+`
+		ORDER BY CASE kind WHEN 'official' THEN 0 WHEN 'local' THEN 1 WHEN 'workshop' THEN 2 WHEN 'steamcmd' THEN 3 ELSE 4 END, label`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -161,8 +173,10 @@ func (s *Store) SourceSemantics(sourceID string) (map[string]map[string][16]byte
 	return out, rows2.Err()
 }
 
-// DeleteEnv removes an environment and everything RimArcho stored for it. Only RimArcho's
-// own database is touched; no game or mod file is.
+// DeleteEnv removes an environment and everything RimArcho stored for it: its own sources
+// (Data/, Mods/) and their instances, its plans, launches, analyses and ignores. The shared
+// mod folders, their instances and the player's data on lineages stay (02 §0); a lineage
+// left without instances goes. Only RimArcho's own database is touched; no game or mod file is.
 func (s *Store) DeleteEnv(envID string) error {
 	return s.inTx(func(tx *sql.Tx) error {
 		inst := `(SELECT id FROM instance WHERE environment_id=?)`
@@ -174,17 +188,19 @@ func (s *Store) DeleteEnv(envID string) error {
 			`DELETE FROM harmony_fact WHERE instance_id IN ` + inst,
 			`DELETE FROM harmony_id WHERE instance_id IN ` + inst,
 			`DELETE FROM content_state WHERE instance_id IN ` + inst,
+			`DELETE FROM instance_note WHERE instance_id IN ` + inst,
 			`DELETE FROM patch_fact WHERE analysis_id IN (SELECT id FROM analysis WHERE environment_id=?)`,
 			`DELETE FROM finding WHERE analysis_id IN (SELECT id FROM analysis WHERE environment_id=?)`,
 			`DELETE FROM analysis WHERE environment_id=?`,
 			`DELETE FROM finding_ignore WHERE environment_id=?`,
 			`DELETE FROM snapshot WHERE instance_id IN ` + inst,
 			`DELETE FROM instance_alias WHERE instance_id IN ` + inst,
-			`DELETE FROM change_event WHERE scan_id IN (SELECT id FROM scan WHERE environment_id=?)`,
+			`DELETE FROM instance_alias WHERE source_id IN (SELECT id FROM source WHERE environment_id=?)`,
+			`DELETE FROM change_event WHERE instance_id IN ` + inst,
+			`DELETE FROM identity_question WHERE instance_id IN ` + inst + ` OR candidate_instance_id IN ` + inst,
 			`DELETE FROM instance WHERE environment_id=?`,
-			`DELETE FROM lineage WHERE environment_id=?`,
-			`DELETE FROM identity_question WHERE environment_id=?`,
-			`DELETE FROM scan WHERE environment_id=?`,
+			`DELETE FROM scan WHERE environment_id=? AND id NOT IN (SELECT scan_id FROM change_event)`,
+			`UPDATE scan SET environment_id='' WHERE environment_id=?`,
 			`DELETE FROM source WHERE environment_id=?`,
 			// The ModsConfig.xml write record belongs to the user data folder, which other
 			// environments may share; it stays.
@@ -193,13 +209,24 @@ func (s *Store) DeleteEnv(envID string) error {
 			`DELETE FROM workspace_undo WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
 			`DELETE FROM loadout_version WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
 			`DELETE FROM plan WHERE environment_id=?`,
-			`DELETE FROM user_rule WHERE environment_id=?`,
-			`DELETE FROM lineage_data WHERE environment_id=?`,
-			`DELETE FROM lineage_tag WHERE environment_id=?`,
 			`DELETE FROM launch WHERE environment_id=?`,
 			`DELETE FROM environment WHERE id=?`,
 		} {
-			if _, err := tx.Exec(q, envID); err != nil {
+			args := make([]any, strings.Count(q, "?"))
+			for i := range args {
+				args[i] = envID
+			}
+			if _, err := tx.Exec(q, args...); err != nil {
+				return err
+			}
+		}
+		for _, q := range []string{
+			`DELETE FROM lineage WHERE id NOT IN (SELECT lineage_id FROM instance)`,
+			`DELETE FROM lineage_data WHERE lineage_id NOT IN (SELECT id FROM lineage)`,
+			`DELETE FROM lineage_tag WHERE lineage_id NOT IN (SELECT id FROM lineage)`,
+			`DELETE FROM user_rule WHERE (a_lineage<>'' AND a_lineage NOT IN (SELECT id FROM lineage)) OR (b_lineage<>'' AND b_lineage NOT IN (SELECT id FROM lineage))`,
+		} {
+			if _, err := tx.Exec(q); err != nil {
 				return err
 			}
 		}

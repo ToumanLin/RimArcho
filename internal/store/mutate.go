@@ -44,8 +44,9 @@ func (s *Store) ResolveSame(q *Question, now time.Time) error {
 			q    string
 			args []any
 		}{
-			{`UPDATE instance SET source_id=?, rel_path=?, real_path=?, residue=?, last_seen=?, status=?, tombstone_at=NULL, current_snapshot_id=? WHERE id=?`,
-				[]any{src, rel, real, residue, lastSeen, identity.Live, newSnap, q.CandidateID}},
+			{`UPDATE instance SET source_id=?, rel_path=?, real_path=?, residue=?, last_seen=?, status=?, tombstone_at=NULL, current_snapshot_id=?,
+				environment_id=coalesce((SELECT environment_id FROM source WHERE id=?), environment_id) WHERE id=?`,
+				[]any{src, rel, real, residue, lastSeen, identity.Live, newSnap, src, q.CandidateID}},
 			{`UPDATE snapshot SET instance_id=? WHERE instance_id=?`, []any{q.CandidateID, q.InstanceID}},
 			{`DELETE FROM change_event WHERE instance_id=? AND kind=?`, []any{q.InstanceID, identity.EvDiscovered}},
 			{`UPDATE change_event SET instance_id=? WHERE instance_id=?`, []any{q.CandidateID, q.InstanceID}},
@@ -92,7 +93,7 @@ func (s *Store) ResolveUnrelated(q *Question, now time.Time) error {
 // SplitLineage moves an Instance into a new lineage of its own.
 func (s *Store) SplitLineage(envID, instanceID, newLineageID string, now time.Time) error {
 	return s.inTx(func(tx *sql.Tx) error {
-		if _, err := tx.Exec(`INSERT INTO lineage(id, environment_id, primary_instance_id, created_at) VALUES(?,?,?,?)`, newLineageID, envID, instanceID, now.Unix()); err != nil {
+		if _, err := tx.Exec(`INSERT INTO lineage(id, environment_id, primary_instance_id, created_at) VALUES(?,?,?,?)`, newLineageID, Shared, instanceID, now.Unix()); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE instance SET lineage_id=?, lineage_basis=? WHERE id=?`, newLineageID, identity.BasisManual, instanceID); err != nil {
@@ -126,7 +127,7 @@ func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, erro
 	r := &GCResult{}
 	err := s.inTx(func(tx *sql.Tx) error {
 		rows, err := tx.Query(`SELECT id, EXISTS(SELECT 1 FROM identity_question q WHERE q.status='open' AND (q.instance_id=i.id OR q.candidate_instance_id=i.id))
-			FROM instance i WHERE environment_id=? AND status=? AND tombstone_at < ? ORDER BY id`, envID, identity.Tombstone, cutoff.Unix())
+			FROM instance i WHERE environment_id IN ('', ?) AND status=? AND tombstone_at < ? ORDER BY id`, envID, identity.Tombstone, cutoff.Unix())
 		if err != nil {
 			return err
 		}
@@ -166,7 +167,7 @@ func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, erro
 			}
 		}
 		// Superseded snapshots: not current, not referenced by any event or question.
-		orphan := `SELECT n.id FROM snapshot n JOIN instance i ON i.id=n.instance_id WHERE i.environment_id=? AND n.id <> coalesce(i.current_snapshot_id, -1)
+		orphan := `SELECT n.id FROM snapshot n JOIN instance i ON i.id=n.instance_id WHERE i.environment_id IN ('', ?) AND n.id <> coalesce(i.current_snapshot_id, -1)
 			AND NOT EXISTS(SELECT 1 FROM change_event e WHERE e.before_snapshot=n.id OR e.after_snapshot=n.id)
 			AND NOT EXISTS(SELECT 1 FROM identity_question q WHERE q.observation_snapshot_id=n.id)`
 		rows, err = tx.Query(orphan, envID)

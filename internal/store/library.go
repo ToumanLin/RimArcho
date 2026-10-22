@@ -10,7 +10,7 @@ import (
 // recorded a change for it (Mod 库存's "最近变化" sort, 06 §2.9).
 func (s *Store) LastChanged(envID string) (map[string]time.Time, error) {
 	rows, err := s.DB.Query(`SELECT c.instance_id, max(s.started_at) FROM change_event c JOIN scan s ON s.id=c.scan_id
-		WHERE s.environment_id=? GROUP BY c.instance_id`, envID)
+		JOIN instance i ON i.id=c.instance_id WHERE i.environment_id IN ('', ?) GROUP BY c.instance_id`, envID)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,9 @@ func (s *Store) LastChanged(envID string) (map[string]time.Time, error) {
 // the next scan finds it there by source and path (R1), so its ID, lineage, history and
 // every plan's reference stay the same.
 func (s *Store) RelocateInstance(id, sourceID, rel, realPath string) error {
-	_, err := s.DB.Exec(`UPDATE instance SET source_id=?, rel_path=?, real_path=? WHERE id=?`, sourceID, rel, realPath, id)
+	// It belongs where its new source does (a copy moved into the lock library is shared, 02 §0).
+	_, err := s.DB.Exec(`UPDATE instance SET source_id=?, rel_path=?, real_path=?,
+		environment_id=coalesce((SELECT environment_id FROM source WHERE id=?), environment_id) WHERE id=?`, sourceID, rel, realPath, sourceID, id)
 	return err
 }
 
@@ -54,7 +56,7 @@ type CopyNote struct {
 // CopyNotes are the notes of an environment's instances.
 func (s *Store) CopyNotes(envID string) (map[string]*CopyNote, error) {
 	rows, err := s.DB.Query(`SELECT n.instance_id, n.text, n.made, n.updated_at FROM instance_note n
-		JOIN instance i ON i.id=n.instance_id WHERE i.environment_id=?`, envID)
+		JOIN instance i ON i.id=n.instance_id WHERE i.environment_id IN ('', ?)`, envID)
 	if err != nil {
 		return nil, err
 	}
