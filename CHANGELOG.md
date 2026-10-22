@@ -32,6 +32,16 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - The log analysis and the live tracker read `ArchoMonitor.log` (and RimCrow's
   `RimCrow_Realtime.log` / `RMM_Realtime.log`): files become source evidence and the 日志 chip
   in 能不能跑, counts and times come from it, errors only it saw become clusters.
+- The 游戏日志 page shows the run's companion log as its own section, "Archo Monitor · 本次运行":
+  one row per entry (time, level, kind such as 补丁错误 / 程序集冲突, first line, ×count, related
+  mods by name and files), details on click, a link to the matching Player.log cluster, and
+  the session's version, game and start–end as its header. It follows the live tracker while
+  the game runs. The file picker lists ArchoMonitor.log under its Player.log. A plan without
+  the monitor gets one line with 加入 Archo Monitor (one undoable step) (06 §2.10).
+- Log lines on that page take RimWorld's own debug-log colours (error #ff6666, warning
+  #ffeb04, message white; darkened for the light theme with the hue kept), and mods' Unity
+  rich text (`<color>`, `<b>`, `<i>`) is shown as styled text, parsed in Go; other tags stay
+  plain text. The first visit to the page no longer stays blank when the log reads quickly.
 - The release zip has `monitor/ArchoMonitor/`; building it needs the .NET SDK 10.
 
 ### Plans (04 §1)
@@ -64,6 +74,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   `pack launch`, naming the environment and the plan or pack. The window disables launch.
 - Launch records carry the plan, the enabled list's fingerprint and the version played.
   A game in `RimWorld2` no longer counts as running in `RimWorld`.
+- Launch, write to the game and sort act on one click or key in the window and the TUI; the
+  status line says what happened (sort: 撤销 / u). A refusal names its reason and lists the
+  commands that resolve it. Loading a history version or an outside change is one undoable
+  step, with no confirmation. The palette's 预览排序 / 预览写入 / 预览启动 show the dry runs
+  (06 §6).
 
 ### Locked versions (04 §7)
 - `archo pin <instance> [--name] [--git] [--dry-run]` (`copy-local` is an alias) copies the

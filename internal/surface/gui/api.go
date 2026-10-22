@@ -38,7 +38,9 @@ type API struct {
 	// building is the pack this window's build child is making ("" none).
 	building string
 	live     view.LiveTracker // the running game's log (03 §6.6)
-	x        exchange         // import and export (exchange.go)
+	logPath  string           // the log page's Player.log and its clusters' first lines
+	logLinks map[string]string
+	x        exchange // import and export (exchange.go)
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string
@@ -658,19 +660,26 @@ func (s *API) Swap(id string) (string, error) {
 	return s.text(view.Swap(s.a, st, id))
 }
 
-// Preview shows sort, save or launch before it happens (06 §6).
+// Preview is the dry run of sort, save or launch (the palette's 预览…; 06 §6).
 func (s *API) Preview(what string) (*view.Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return view.DryRun(s.a, what)
 }
 
-// Apply runs sort, save or launch after its preview.
-func (s *API) Apply(what string) (string, error) {
+// Run does sort, save or launch at once (S, w, L; 06 §6): no confirmation. A refusal comes
+// back in Outcome.Refused with the commands that resolve it.
+func (s *API) Run(what string) (*view.Outcome, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.needs = nil
-	return s.text(view.Apply(s.a, what))
+	s.board = nil
+	switch what {
+	case view.ListSort, view.ListSave, view.ListLaunch:
+	default:
+		return nil, fmt.Errorf("no action %s", what)
+	}
+	return view.Run(s.a, what), nil
 }
 
 // ---- tags (06 §3.8) ----
@@ -850,7 +859,35 @@ func (s *API) LogPage(path string) (*view.LogPage, error) {
 	s.a.AnalyzeExe = s.Exe
 	s.a.AnalyzeWait = 200 * time.Millisecond
 	defer func() { s.a.AnalyzeWait = 0 }()
-	return view.BuildLogPage(s.a, st, path)
+	p, err := view.BuildLogPage(s.a, st, path, &s.live)
+	if err == nil && p.Path != "" {
+		s.logLinks, s.logPath = p.Links, p.Path
+	}
+	return p, err
+}
+
+// LogMonitor is the companion section of path as the running game writes it, for the log
+// page's refresh on the live tick (nil when the game does not write path).
+func (s *API) LogMonitor(path string) (*view.MonitorLog, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.boardState()
+	if st == nil {
+		return nil, errors.New("no list")
+	}
+	var links map[string]string
+	if strings.EqualFold(s.logPath, path) {
+		links = s.logLinks
+	}
+	return view.LiveMonitor(s.a, st, &s.live, path, links), nil
+}
+
+// AddMonitor puts Archo Monitor after Harmony in the current plan (the log page's action;
+// one undoable step).
+func (s *API) AddMonitor() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.text(view.MonitorAdd(s.a))
 }
 
 // LogCluster is one cluster's evidence (archo log --cluster), names for #refs.

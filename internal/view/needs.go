@@ -72,6 +72,7 @@ type Action struct {
 	Done    string   `json:"done,omitempty"`
 	Confirm string   `json:"confirm,omitempty"` // the TUI's "press again" line
 	Warn    string   `json:"warn,omitempty"`    // what a confirmation dialog says
+	Undo    bool     `json:"undo,omitempty"`    // one workspace step: the status line offers u
 	Refs    []string `json:"refs,omitempty"`
 	Options []Option `json:"options,omitempty"`
 	Title   string   `json:"title,omitempty"`
@@ -436,8 +437,8 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		add(Need{Group: GroupConfirm, Text: T("ModsConfig.xml was changed outside RimArcho"), Counted: true, Status: StatusWarn,
 			Why: T("this plan was changed after it too: load the outside list, or keep yours"), Evidence: evidence(EvInferred, T("ModsConfig.xml differs from what RimArcho wrote")), Actions: []Action{
 				viewAction(T("see the difference"), "loadout", "diff", fmt.Sprintf("v%d", v), "workspace"),
-				{Kind: ActLoadExternal, Key: "L", Label: T("load it into the list"), Version: v,
-					Confirm: T("press L again to load it; your unsaved edits are replaced"), Warn: T("your unsaved edits are replaced"),
+				// One step: u brings the list back (06 §6), so no confirmation.
+				{Kind: ActLoadExternal, Key: "L", Label: T("load it into the list"), Version: v, Undo: true,
 					Done: T("the outside change is loaded into the list")},
 				{Kind: ActDismissConflict, Key: "I", Label: T("ignore it"), Done: T("the outside change is ignored (it stays in the history)")},
 			}})

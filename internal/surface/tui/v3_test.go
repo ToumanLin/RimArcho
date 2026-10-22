@@ -81,7 +81,7 @@ var v3States = []v3State{
 	{"command palette", func(m *model) { m.update(tea.KeyMsg{Type: tea.KeyCtrlK}) }},
 	{"tags", func(m *model) { press(m, "2"); pressAll(m, "shift+down", "#") }},
 	{"move to", func(m *model) { press(m, "2"); pressAll(m, "down", "m") }},
-	{"confirm", func(m *model) { press(m, "S") }},
+	{"preview", func(m *model) { m.palRun("preview-sort")(m) }},
 	{"help", func(m *model) { press(m, "?") }},
 	{"needs attention", func(m *model) { press(m, "!") }},
 	{"recent changes", func(m *model) { press(m, "c") }},
@@ -258,7 +258,7 @@ func TestT19PositionLine(t *testing.T) {
 		"command palette": `Enabled · 1 / \d+ › command palette$`,
 		"tags":            `Enabled · 2 / \d+ · selected 2 › tags$`,
 		"move to":         `Enabled · 2 / \d+ › move to…$`,
-		"confirm":         `Enabled · 1 / \d+ › sort — preview$`,
+		"preview":         `Enabled · 1 / \d+ › preview the sort$`,
 		"help":            `Enabled · 1 / \d+ › all keys$`,
 		"needs attention": `› needs attention · 1 / \d+`,
 		"recent changes":  `› recent changes`,
@@ -298,7 +298,7 @@ func TestT20EscBack(t *testing.T) {
 		{"full + technical pages two deep + selection", func(m *model) {
 			pressAll(m, "shift+down", "enter", "I", "down", "down", "enter", "down", "enter")
 		}},
-		{"detail + selection + confirm", func(m *model) { pressAll(m, "shift+down", "4", "S") }},
+		{"detail + selection + preview", func(m *model) { pressAll(m, "shift+down", "4"); m.palRun("preview-sort")(m) }},
 		{"armed", func(m *model) {
 			m.arm("d", "press d again", func(*model) tea.Cmd { return nil })
 		}},

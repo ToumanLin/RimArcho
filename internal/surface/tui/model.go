@@ -45,12 +45,11 @@ const (
 	tabChanges
 )
 
-// panel is a secondary screen: command output, optionally waiting for y/n, or a chooser.
+// panel is a secondary screen: command output to read, or a chooser.
 type panel struct {
 	title   string
 	lines   []string
 	off     int
-	confirm []string // argv to run on "y"
 	choices []string // chooser values (env names)
 	choice  int
 	onPick  func(m *model, value string) tea.Cmd
@@ -114,8 +113,6 @@ type model struct {
 	hist    []view.HistItem // the history area, shown in empty staging (06 §2.5)
 	histCur int
 	histOff int
-	// afterPanel runs once after a confirmed panel command (the Changes view reloads).
-	afterPanel func(m *model)
 
 	panel   *panel
 	prompt  *prompt
@@ -289,7 +286,7 @@ func (m *model) runToStatus(argv ...string) {
 		m.say(sayOK, m.humanize(firstLine(out)))
 		return
 	}
-	m.openPanel("archo "+strings.Join(argv, " "), out, nil)
+	m.openPanel("archo "+strings.Join(argv, " "), out)
 }
 
 // humanize replaces instance references by mod names and drops the "error: " prefix.
@@ -303,8 +300,8 @@ func firstLine(s string) string {
 	return s
 }
 
-func (m *model) openPanel(title, text string, confirm []string) {
-	m.panel = &panel{title: title, lines: strings.Split(strings.TrimRight(text, "\n"), "\n"), confirm: confirm}
+func (m *model) openPanel(title, text string) {
+	m.panel = &panel{title: title, lines: strings.Split(strings.TrimRight(text, "\n"), "\n")}
 }
 
 func (m *model) col() *column { return &m.cols[m.focus] }

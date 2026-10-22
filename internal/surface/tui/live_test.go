@@ -86,18 +86,14 @@ func TestHistoryArea(t *testing.T) {
 	if s := ansi.Strip(m.View()); !strings.Contains(s, step) {
 		t.Fatalf("redo row not drawn:\n%s", s)
 	}
-	// A saved version: the first enter only warns, the second loads it.
+	// A saved version: one enter loads it (one step, u brings the list back; 06 §6).
 	press(m, "G")
 	h := m.hist[m.histCur]
 	if h.Kind != "version" {
 		t.Fatalf("no version at the end: %+v", m.hist)
 	}
 	press(m, "enter")
-	if m.armed == nil || !strings.Contains(m.status, T("load this version into the list")) {
-		t.Fatalf("not asked: %q", m.status)
-	}
-	press(m, "enter")
-	if want := Tf("loaded v%d into the list (not saved yet)", h.Version); m.status != want {
+	if want := Tf("loaded v%d into the list (not saved yet)", h.Version) + " · " + T("u undoes"); m.armed != nil || m.status != want {
 		t.Fatalf("status %q, want %q", m.status, want)
 	}
 	// Staged mods take the place back from the history.

@@ -282,3 +282,30 @@ func TestMonitorInPack(t *testing.T) {
 		t.Fatalf("no monitor copy in the pack (%v):\n%s", matches, out)
 	}
 }
+
+// 06 §2.10: the log page's "add Archo Monitor" puts it back after Harmony in the current
+// plan, also after the player removed it; one step that undo takes back.
+func TestAddMonitor(t *testing.T) {
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	if _, err := e.App.AddMonitor(); err == nil || !strings.Contains(err.Error(), "not installed") {
+		t.Fatalf("no monitor installed: %v", err)
+	}
+	e.App.MonitorBundle = monitorBundle(t, e, "0.9.0")
+	e.MustRun("monitor", "install")
+	if _, err := e.App.AddMonitor(); err == nil || !strings.Contains(err.Error(), "already") {
+		t.Fatalf("already in the plan: %v", err)
+	}
+	e.MustRun("disable", "pkg:toumanlin.archomonitor")
+	before := active(t, e)
+	m, err := e.App.AddMonitor()
+	if err != nil || !app.IsMonitor(m) {
+		t.Fatalf("add: %v %v", m, err)
+	}
+	if got := active(t, e); !contains(got, monName) || strings.Join(got, ",") != strings.Join(insertAfter(got, "Harmony"), ",") {
+		t.Fatalf("not right after Harmony: %v", got)
+	}
+	if _, _, err := e.App.UndoRedo(false); err != nil || strings.Join(active(t, e), ",") != strings.Join(before, ",") {
+		t.Fatalf("undo: %v %v", err, active(t, e))
+	}
+}

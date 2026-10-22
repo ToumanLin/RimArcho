@@ -142,7 +142,7 @@ func (m *model) analyzeMsg(msg tea.Msg) tea.Cmd {
 	case analyzeDoneMsg:
 		m.analyzing = false
 		if msg.err != nil {
-			m.openPanel(T("analysis failed"), msg.err.Error(), nil)
+			m.openPanel(T("analysis failed"), msg.err.Error())
 		} else {
 			m.status = T("analysis done")
 		}
@@ -169,7 +169,7 @@ func (m *model) chooseLog() tea.Cmd {
 	}
 	p.onPick = func(m *model, path string) tea.Cmd {
 		if err := m.app.SelectLog(m.st, path); err != nil {
-			m.openPanel(T("error: "), err.Error(), nil)
+			m.openPanel(T("error: "), err.Error())
 			return nil
 		}
 		m.newLog = false

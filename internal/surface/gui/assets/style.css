@@ -39,6 +39,9 @@
   --row-h: 28px;
   --font: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
   --code: "Cascadia Mono", Consolas, "Microsoft YaHei UI", "Microsoft YaHei", monospace;
+  /* log lines in the game's debug-log colours (view.GameLogColors), darkened for white
+     with the hue kept (view.LightLogColors); info is the text colour */
+  --log-error: #eb0000; --log-warning: #7e7400; --log-info: var(--fg);
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -47,6 +50,7 @@
     --line: #333339; --line-2: #2c2c32; --fg: #ededf1; --fg-2: #b9b9c1; --muted: #8b8b94; --faint: #56565f; --ctl-fg: #a1a1aa;
     --accent: #a5b4fc; --accent-soft: #2b2c47; --accent-fg: #14142a; --sel: #33345a;
     --green: #6fd99b; --green-soft: #1e3a2b; --red: #f28b82; --red-soft: #45272a; --amber: #f2b544; --amber-soft: #3f3220; --log: #f5a97f;
+    --log-error: #ff6666; --log-warning: #ffeb04; --log-info: #ffffff;
     --pop-bg: rgba(38, 38, 43, .96);
     --shadow: 0 16px 44px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .3), 0 0 0 .5px rgba(255, 255, 255, .1);
   }
@@ -391,6 +395,34 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .lrow .mods { margin-left: auto; color: var(--accent); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lrow .text { margin-top: 3px; color: var(--fg-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .detail-card .scroll { padding: 12px 14px; }
+/* 游戏日志's file picker and the companion section (06 §2.10) */
+.btn.picker { display: inline-flex; align-items: center; gap: 8px; }
+.btn.picker .chev { color: var(--faint); font-size: 11px; }
+#menu button.sub { padding-left: 22px; color: var(--muted); }
+#menu button.sub::before { content: "↳"; margin-right: -12px; color: var(--faint); }
+#menu button.on { color: var(--fg); font-weight: 600; }
+.lognote { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; }
+.ltabs { padding: 8px 8px 2px; }
+.ltabs .seg { max-width: 100%; }
+.ltabs .seg button { overflow: hidden; text-overflow: ellipsis; }
+.mhead { display: flex; align-items: center; gap: 6px; padding: 4px 10px 8px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mhead .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex: none; }
+.lrow .time { color: var(--muted); font-size: 11.5px; flex: none; }
+.lrow .top .chip { white-space: nowrap; flex: none; }
+.lrow .files { margin-top: 3px; color: var(--muted); font-size: 11.5px; overflow-wrap: anywhere; }
+.mrow { cursor: pointer; }
+/* a log line's level colour and a mod's own <color> (--c dark, --l light; 06 §7) */
+.lrow .text.lv-error { color: var(--log-error); }
+.lrow .text.lv-warning { color: var(--log-warning); }
+.lrow .text.lv-info { color: var(--log-info); }
+.lrow .text .rc { color: var(--l); }
+@media (prefers-color-scheme: dark) { .lrow .text .rc { color: var(--c); } }
+.lrow .text .rb { font-weight: 600; }
+.lrow .text .ri { font-style: italic; }
+.mrow.open .text { -webkit-line-clamp: unset; display: block; }
+.mrow pre.details { margin: 8px 0 0; padding: 8px 10px; max-height: 260px; overflow: auto; border-radius: 8px; background: var(--card-2); color: var(--fg-2); font: 11px/1.5 var(--code); white-space: pre; cursor: text; user-select: text; }
+.mrow .go { margin-top: 6px; padding: 0; color: var(--accent); font-size: 12px; }
+.mrow .go:hover { text-decoration: underline; }
 .ev { display: flex; gap: 10px; align-items: baseline; padding: 7px 14px; cursor: default; }
 .ev + .ev { border-top: 1px solid var(--line-2); }
 .ev:hover { background: var(--card-2); }

@@ -185,29 +185,21 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
 		t.Fatalf("after undo: %s", got)
 	}
+	// S, w and L act at once and say what they did (06 §6); sort offers u.
 	keys(tm, "S")
-	waitFor(t, tm, "sort — preview")
-	keys(tm, "y")
-	waitFor(t, tm, "sorted the list")
+	waitFor(t, tm, "sorted: 1 moved · u undoes")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
 		t.Fatalf("after sort: %s", got)
 	}
-	before := e.ReadModsConfig()
 	keys(tm, "w")
-	waitFor(t, tm, "save to game — preview")
-	if e.ReadModsConfig() != before {
-		t.Fatal("the preview wrote the file")
-	}
-	keys(tm, "y")
-	waitFor(t, tm, "saved to the game")
+	waitFor(t, tm, "saved to the game as v")
 	if !strings.Contains(e.ReadModsConfig(), "<li>tester.b</li>") {
 		t.Fatal("save did not write the list")
 	}
 	keys(tm, "L")
-	waitFor(t, tm, "launch: dry run (steam)")
-	keys(tm, "n")
+	waitFor(t, tm, "the game is starting")
 	m := finish(t, tm)
-	if len(e.Launched) != 0 || m.unsaved != 0 || *scans != 0 {
+	if len(e.Launched) != 1 || m.unsaved != 0 || *scans != 0 {
 		t.Fatalf("launched %v, unsaved %d, scans %d", e.Launched, m.unsaved, *scans)
 	}
 }
@@ -624,21 +616,6 @@ func TestChangesView(t *testing.T) {
 		t.Fatalf("items: %q", needItems(m))
 	}
 	m.prob.cursor = i
-	// L replaces the unsaved edits: the first press only warns, another key cancels,
-	// and two presses load it (06 §6).
-	L := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")}
-	m.update(L)
-	if m.armed == nil || !strings.Contains(m.status, "press L again") {
-		t.Fatalf("first L: %q", m.status)
-	}
-	press(m, "j")
-	if m.armed != nil || m.status != "cancelled" {
-		t.Fatalf("other key: %q", m.status)
-	}
-	if st, _ := e.App.Loadout(); st.WS.Conflict == 0 {
-		t.Fatal("loaded after a cancelled L")
-	}
-	m.prob.cursor = findNeed(m, "changed outside RimArcho")
 	m.needsKey("I")
 	st, _ := e.App.Loadout()
 	if st.WS.Conflict != 0 || !strings.Contains(m.status, "ignored") {
@@ -816,8 +793,9 @@ func TestColumnSearch(t *testing.T) {
 	}
 }
 
-// 06 §6: L pressed twice loads an outside change of ModsConfig.xml into the list.
-func TestDoublePressLoad(t *testing.T) {
+// 06 §6: L loads an outside change of ModsConfig.xml into the list at once; it is one
+// step, so u brings the player's list back.
+func TestLoadExternalAtOnce(t *testing.T) {
 	e, _ := fixture(t)
 	e.MustRun("enable", "pkg:tester.b")
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
@@ -825,11 +803,13 @@ func TestDoublePressLoad(t *testing.T) {
 	m.tab = tabProblems
 	m.loadProblems()
 	m.prob.cursor = findNeed(m, "changed outside RimArcho")
-	L := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")}
-	m.update(L)
-	m.update(L)
+	before := activeNames(t, e)
+	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")})
 	st, _ := e.App.Loadout()
-	if st.WS.Conflict != 0 || activeNames(t, e) != "Core, Harmony" {
-		t.Fatalf("after L L: conflict %d, list %q, status %q", st.WS.Conflict, activeNames(t, e), m.status)
+	if st.WS.Conflict != 0 || activeNames(t, e) != "Core, Harmony" || m.armed != nil || !strings.Contains(m.status, T("u undoes")) {
+		t.Fatalf("after L: conflict %d, list %q, status %q", st.WS.Conflict, activeNames(t, e), m.status)
+	}
+	if _, _, err := e.App.UndoRedo(false); err != nil || activeNames(t, e) != before {
+		t.Fatalf("undo: %v, list %q, want %q", err, activeNames(t, e), before)
 	}
 }

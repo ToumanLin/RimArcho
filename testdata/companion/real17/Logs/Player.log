@@ -1,0 +1,1800 @@
+=== Waylith log ===
+Started:   2026-10-21 17:51:37.497 -07:00
+Version:   1.7.4985.1269
+OS:        Microsoft Windows 10.0.26200 (X64)
+Runtime:   .NET 10.0.13-waylithclr.dev
+Process:   pid 73644
+Log file:  C:\Users\p\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Logs\Player.log
+Command:   D:\SteamLibrary\steamapps\common\RimWorld\RimWorld.dll
+
+2026-10-21 17:51:37.942  INFO [VulkanStartup] Vulkan loader: bundled 'D:\SteamLibrary\steamapps\common\RimWorld\vulkan\vulkan-1.dll' (file version 1.4.363.0, system 1.4.341.0, bundled 1.4.363.0).
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Graphics.VulkanStartup.SelectWindowsLoader(String bundledPath) [0x334]
+    at Waylith.Graphics.VulkanStartup.Prepare(EngineApplicationOptions options) [0xDB]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x149]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:38.311  INFO [VulkanStartup] Vulkan binding is using the bundled loader.
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Graphics.VulkanStartup.VerifyBinding() [0x79]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x59E]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:38.339  WARN [Vulkan] [General] [Loader Message] windows_read_data_files_in_registry: Registry lookup failed to get layer manifest files.
+Objects: 1
+    [0] VkInstance 0x280c0b7a2c0
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Graphics.GraphicsDevice+<>c.<.cctor>b__126_1(String s) [0x0]
+    at Waylith.Graphics.GraphicsDevice.DebugUtilsCallback(VkDebugUtilsMessageSeverityFlagsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, Void* pUserData) [0xFB]
+    at Brutal.VulkanApi.Vulkan+PInvoke.vkCreateInstance(VkInstanceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkInstance* pInstance) [0x0]
+    at Brutal.VulkanApi.Vulkan+PInvoke.vkCreateInstance(VkInstanceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkInstance* pInstance) [0x0]
+    at Brutal.VulkanApi.Instance..ctor(CreateInfo createInfo) [0x2DA]
+    at Brutal.VulkanApi.Vulkan.CreateInstance(CreateInfo createInfo) [0x0]
+    at Waylith.Graphics.GraphicsDevice.CreateInstance(String applicationName, String engineName, Boolean disallowFullscreenExclusive) [0x253]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x5A8]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:38.579  INFO [GraphicsDevice] GPU [0] 'NVIDIA GeForce RTX 4090' (DiscreteGpu, Vulkan 1.4.341, driver NvidiaProprietaryKHR 'NVIDIA' '610.88', 24138 MB device-local, uuid 8526C5C16A67C4994B01484F603657D4) - usable (score 288230376151810047).
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Graphics.GraphicsDevice.SelectQueueFamilies(Instance instance, VkSurfaceKHR surface, GpuPreference preference, HashSet`1& deviceExtensions) [0x311]
+    at Waylith.Graphics.GraphicsDevice.Create(Instance instance, VkSurfaceKHR surface, Int32 framesInFlight, GpuPreference preference, Boolean enableVideoDecode, Boolean disallowFullscreenExclusive) [0x0]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x65D]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:38.579  INFO [GraphicsDevice] GPU [1] 'AMD Radeon(TM) Graphics' (IntegratedGpu, Vulkan 1.3.302, driver AMDProprietaryKHR 'AMD proprietary driver' '24.30.18 (AMD proprietary shader compiler)', 512 MB device-local, uuid 00000000170000000000000000000000) - usable (score 216172782113787902).
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Graphics.GraphicsDevice.SelectQueueFamilies(Instance instance, VkSurfaceKHR surface, GpuPreference preference, HashSet`1& deviceExtensions) [0x311]
+    at Waylith.Graphics.GraphicsDevice.Create(Instance instance, VkSurfaceKHR surface, Int32 framesInFlight, GpuPreference preference, Boolean enableVideoDecode, Boolean disallowFullscreenExclusive) [0x0]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x65D]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:38.582  INFO [GraphicsDevice] Selected GPU 'NVIDIA GeForce RTX 4090' (driver NvidiaProprietaryKHR 'NVIDIA' '610.88') - best automatic match of 2 device(s).
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Graphics.GraphicsDevice.<SelectQueueFamilies>g__Finalize|109_0(GpuDescription gpu, QueueSelection selection, String reason) [0x69]
+    at Waylith.Graphics.GraphicsDevice.SelectQueueFamilies(Instance instance, VkSurfaceKHR surface, GpuPreference preference, HashSet`1& deviceExtensions) [0x74F]
+    at Waylith.Graphics.GraphicsDevice.Create(Instance instance, VkSurfaceKHR surface, Int32 framesInFlight, GpuPreference preference, Boolean enableVideoDecode, Boolean disallowFullscreenExclusive) [0x0]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x65D]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:38.722  INFO [GraphicsDevice] Vulkan Video decode enabled on queue family 3.
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Graphics.GraphicsDevice..ctor(Instance instance, PhysicalDevice physicalDevice, DeviceEx device, Int32 graphicsFamilyIndex, Int32 presentFamilyIndex, Int32 videoDecodeFamilyIndex, HashSet`1 instanceEnabledExtensions, HashSet`1 instanceEnabledLayers, HashSet`1 deviceEnabledExtensions, Boolean dualSourceBlendEnabled, Boolean validationEnabled, Int32 framesInFlight, Boolean disallowFullscreenExclusive) [0xEF]
+    at Waylith.Graphics.GraphicsDevice.Create(Instance instance, VkSurfaceKHR surface, Int32 framesInFlight, GpuPreference preference, Boolean enableVideoDecode, Boolean disallowFullscreenExclusive) [0x4B]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x65D]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:38.722  INFO [GraphicsDevice] Effective Vulkan version 1.2.0 (instance 1.2.0, device 1.4.341).
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Graphics.GraphicsDevice..ctor(Instance instance, PhysicalDevice physicalDevice, DeviceEx device, Int32 graphicsFamilyIndex, Int32 presentFamilyIndex, Int32 videoDecodeFamilyIndex, HashSet`1 instanceEnabledExtensions, HashSet`1 instanceEnabledLayers, HashSet`1 deviceEnabledExtensions, Boolean dualSourceBlendEnabled, Boolean validationEnabled, Int32 framesInFlight, Boolean disallowFullscreenExclusive) [0x19B]
+    at Waylith.Graphics.GraphicsDevice.Create(Instance instance, VkSurfaceKHR surface, Int32 framesInFlight, GpuPreference preference, Boolean enableVideoDecode, Boolean disallowFullscreenExclusive) [0x4B]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x65D]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:38.729  INFO [GraphicsDevice] VK_EXT_memory_budget enabled, VRAM budget figures are driver-reported.
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Graphics.GraphicsDevice..ctor(Instance instance, PhysicalDevice physicalDevice, DeviceEx device, Int32 graphicsFamilyIndex, Int32 presentFamilyIndex, Int32 videoDecodeFamilyIndex, HashSet`1 instanceEnabledExtensions, HashSet`1 instanceEnabledLayers, HashSet`1 deviceEnabledExtensions, Boolean dualSourceBlendEnabled, Boolean validationEnabled, Int32 framesInFlight, Boolean disallowFullscreenExclusive) [0x329]
+    at Waylith.Graphics.GraphicsDevice.Create(Instance instance, VkSurfaceKHR surface, Int32 framesInFlight, GpuPreference preference, Boolean enableVideoDecode, Boolean disallowFullscreenExclusive) [0x4B]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x65D]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:38.994  INFO [TextureResidency] Textures are uploaded to heap index 0 (23.57 GiB). Under pressure GameTextures get moved to memory type 0 (heap 1).
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Rendering.TextureResidency.Configure(GraphicsDevice graphicsDevice) [0x3FF]
+    at Waylith.Rendering.GpuTextureService.Configure(GraphicsDevice graphicsDevice, Int32 framesInFlight) [0xB2]
+    at Waylith.EngineApplication.ConfigureGpuServices() [0x36]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x6F0]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:39.138  INFO [TextureResidency] Textures are uploaded to heap index 0 (23.57 GiB) and upload on-demand. Under pressure, least-recently used ones are evicted to the disk cache, if possible, or get moved to memory type 0 (heap 1) if not.
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Rendering.TextureResidency.Configure(GraphicsDevice graphicsDevice) [0x332]
+    at Waylith.Rendering.GpuTextureService.Configure(GraphicsDevice graphicsDevice, Int32 framesInFlight) [0xB2]
+    at RimWorldWaylith.Bootstrap.ConfigureTextureRuntime(EngineApplication app) [0x5B]
+    at RimWorldWaylith.Bootstrap.Initialize(EngineApplication app) [0x128]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x9A]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:39.148  INFO [Vulkan] HardwareProfile: loaded cached GPU probe: 69950 GFLOP/s (sat @ 1048576 threads), 956.9 GB/s -> compute 67.52x, bandwidth 13.37x, overall 30.04x (High)
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Hardware.HardwareProfile.ProbeJob(GraphicsDevice graphicsDevice) [0x2F]
+    at Waylith.Hardware.HardwareProfile+<>c__DisplayClass4_0.<BeginProbe>b__0() [0x0]
+    at Waylith.Jobs.WaylithJobRuntime+HandleState.ExecuteRun() [0x32]
+    at Waylith.Jobs.WaylithJobRuntime+HandleState.Execute() [0x8]
+    at Waylith.Jobs.WaylithJobRuntime.WorkerLoop(Int32 workerIndex) [0x34]
+    at Waylith.Jobs.WaylithJobRuntime+<>c__DisplayClass13_0.<.cctor>b__0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:40.963  INFO [Verse] RimWorld 1.7.4985 rev1269
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at RimWorld.VersionControl.LogVersionNumber() [0x0]
+    at Verse.Root.CheckGlobalInit() [0x62]
+    at Verse.Root.Start() [0xF]
+    at Verse.Root_Entry.Start() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Start(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.FlushPendingStart() [0x9E]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x17]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:51:42.054  WARN [Verse] Mod  is missing supported versions list in About.xml! (example: <supportedVersions><li>1.0</li></supportedVersions>)
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.TryParseSupportedVersions(Boolean logIssues) [0x6B]
+    at Verse.ModMetaData.Init() [0x69]
+    at Verse.ModMetaData..ctor(String localAbsPath, Boolean official) [0x4E]
+    at Verse.ModLister.RebuildModList() [0x131]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.054  WARN [Verse] Mod _2773943594_ is missing packageId in About.xml! (example: <packageId>AuthorName.ModName.Specific</packageId>)
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.TryParsePackageId(Boolean isOfficial, Boolean logIssues) [0x8D]
+    at Verse.ModMetaData.Init() [0xD0]
+    at Verse.ModMetaData..ctor(String localAbsPath, Boolean official) [0x4E]
+    at Verse.ModLister.RebuildModList() [0x131]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.055  WARN [Verse] Mod  is missing supported versions list in About.xml! (example: <supportedVersions><li>1.0</li></supportedVersions>)
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.TryParseSupportedVersions(Boolean logIssues) [0x6B]
+    at Verse.ModMetaData.Init() [0x69]
+    at Verse.ModMetaData..ctor(String localAbsPath, Boolean official) [0x4E]
+    at Verse.ModLister.RebuildModList() [0x131]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.055  WARN [Verse] Mod _2800857642_ is missing packageId in About.xml! (example: <packageId>AuthorName.ModName.Specific</packageId>)
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.TryParsePackageId(Boolean isOfficial, Boolean logIssues) [0x8D]
+    at Verse.ModMetaData.Init() [0xD0]
+    at Verse.ModMetaData..ctor(String localAbsPath, Boolean official) [0x4E]
+    at Verse.ModLister.RebuildModList() [0x131]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.063  WARN [Verse] Mod  is missing supported versions list in About.xml! (example: <supportedVersions><li>1.0</li></supportedVersions>)
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.TryParseSupportedVersions(Boolean logIssues) [0x6B]
+    at Verse.ModMetaData.Init() [0x69]
+    at Verse.ModMetaData..ctor(String localAbsPath, Boolean official) [0x4E]
+    at Verse.ModLister.RebuildModList() [0x131]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.063  WARN [Verse] Mod _3563882422_ is missing packageId in About.xml! (example: <packageId>AuthorName.ModName.Specific</packageId>)
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.TryParsePackageId(Boolean isOfficial, Boolean logIssues) [0x8D]
+    at Verse.ModMetaData.Init() [0xD0]
+    at Verse.ModMetaData..ctor(String localAbsPath, Boolean official) [0x4E]
+    at Verse.ModLister.RebuildModList() [0x131]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.064  WARN [Verse] Mod RimTalk - Expand Literature dependency (cj.rimtalk) needs to have <downloadUrl> and/or <steamWorkshopUrl> specified.
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.ValidateDependencies(Boolean logIssues) [0x107]
+    at Verse.ModMetaData.Init() [0x116]
+    at Verse.ModMetaData..ctor(String localAbsPath, Boolean official) [0x4E]
+    at Verse.ModLister.RebuildModList() [0x131]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.066  WARN [Verse] Mod  is missing supported versions list in About.xml! (example: <supportedVersions><li>1.0</li></supportedVersions>)
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.TryParseSupportedVersions(Boolean logIssues) [0x6B]
+    at Verse.ModMetaData.Init() [0x69]
+    at Verse.ModMetaData..ctor(String localAbsPath, Boolean official) [0x4E]
+    at Verse.ModLister.RebuildModList() [0x131]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.066  WARN [Verse] Mod _3729878405_ is missing packageId in About.xml! (example: <packageId>AuthorName.ModName.Specific</packageId>)
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.TryParsePackageId(Boolean isOfficial, Boolean logIssues) [0x8D]
+    at Verse.ModMetaData.Init() [0xD0]
+    at Verse.ModMetaData..ctor(String localAbsPath, Boolean official) [0x4E]
+    at Verse.ModLister.RebuildModList() [0x131]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.075  WARN [Verse] Mod RimCrow 辅助模组 (RimCrow Companion) dependency (brrainz.harmony) needs to have <downloadUrl> and/or <steamWorkshopUrl> specified.
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.ValidateDependencies(Boolean logIssues) [0x107]
+    at Verse.ModMetaData.Init() [0x116]
+    at Verse.ModMetaData..ctor(String localAbsPath, Boolean official) [0x4E]
+    at Verse.ModLister.RebuildModList() [0x131]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.079  WARN [Verse] Mod Quest Maker dependency (OskarPotocki.VanillaFactionsExpanded.Core) needs to have <downloadUrl> and/or <steamWorkshopUrl> specified.
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.ValidateDependencies(Boolean logIssues) [0x107]
+    at Verse.ModMetaData.Init() [0x116]
+    at Verse.ModMetaData..ctor(WorkshopItem workshopItem) [0x48]
+    at Verse.ModLister.RebuildModList() [0x1BE]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.079  WARN [Verse] Mod Quest Maker dependency (brrainz.harmony) needs to have <downloadUrl> and/or <steamWorkshopUrl> specified.
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.ValidateDependencies(Boolean logIssues) [0x107]
+    at Verse.ModMetaData.Init() [0x116]
+    at Verse.ModMetaData..ctor(WorkshopItem workshopItem) [0x48]
+    at Verse.ModLister.RebuildModList() [0x1BE]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.084  WARN [Verse] Mod Dynamic Trails dependency (brrainz.harmony) needs to have <downloadUrl> and/or <steamWorkshopUrl> specified.
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.ValidateDependencies(Boolean logIssues) [0x107]
+    at Verse.ModMetaData.Init() [0x116]
+    at Verse.ModMetaData..ctor(WorkshopItem workshopItem) [0x48]
+    at Verse.ModLister.RebuildModList() [0x1BE]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:42.108  WARN [Verse] Mod More Gravship Workbenches dependency (vanillaexpanded.gravship) needs to have <downloadUrl> and/or <steamWorkshopUrl> specified.
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Warning(String text) [0x19]
+    at Verse.ModMetaData+ModMetaDataInternal.ValidateDependencies(Boolean logIssues) [0x107]
+    at Verse.ModMetaData.Init() [0x116]
+    at Verse.ModMetaData..ctor(WorkshopItem workshopItem) [0x48]
+    at Verse.ModLister.RebuildModList() [0x1BE]
+    at Verse.ModLister..cctor() [0x28]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModLister.GetModWithIdentifier(String identifier, Boolean ignorePostfix) [0x0]
+    at Verse.ModsConfig..cctor() [0x19C]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassHelper(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.InitHelpers.InitClassSlow(MethodTable* mt) [0x0]
+    at System.Runtime.CompilerServices.StaticsHelpers.GetNonGCStaticBaseSlow(MethodTable* mt) [0x0]
+    at Verse.ModsConfig.get_ActiveModsInLoadOrder() [0x0]
+    at Verse.LoadedModManager.InitializeMods() [0x2]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x24]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:43.133  INFO [Verse] Harmony Mod v3.0.1.0; Harmony library v3.0.0.0-rc.3
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at HarmonyMod.Main..cctor() [0x21E]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:43.166  INFO [Verse] [Archo Monitor] 0.9.0-dev session 0d599f880992: C:\Users\p\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\ArchoMonitor.log
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at ArchoMonitor.Monitor.Start(MonitorSettings settings) [0x77]
+    at ArchoMonitor.ArchoMonitorMod..ctor(ModContentPack content) [0x21]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:43.503 ERROR [Verse] Error while instantiating a mod of type RimCrowCompanion.RimCrowCompanionMod: System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> System.TypeLoadException: Could not load type 'UnityEngine.StackTraceLogType' from assembly 'UnityStubs, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null'.
+[Ref CD84C645]
+   at MonoMod.Core.Interop.CoreCLR.V60.InvokeCompileMethod(IntPtr functionPtr, IntPtr thisPtr, IntPtr corJitInfo, CORINFO_METHOD_INFO* methodInfo, UInt32 flags, Byte** nativeEntry, UInt32* nativeSizeOfCode)
+   at MonoMod.Core.Platforms.Runtimes.Core60Runtime.JitHookDelegateHolder.CompileMethodHook(IntPtr jit, IntPtr corJitInfo, CORINFO_METHOD_INFO* methodInfo, UInt32 flags, Byte** nativeEntry, UInt32* nativeSizeOfCode)
+   at RimCrowCompanion.RimCrowCompanionMod.EnsureStackTraceLogTypeAtLeastScriptOnly(LogType logType)
+   at RimCrowCompanion.RimCrowCompanionMod.EnsureStackTraceLogTypeAtLeastScriptOnly(LogType logType)
+   at RimCrowCompanion.RimCrowCompanionMod..ctor(ModContentPack content)
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   --- End of inner exception stack trace ---
+[Ref 91942063]
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture)
+   at System.Activator.CreateInstance(Type type, Object[] args)
+   at Verse.LoadedModManager.CreateModClasses()
+    at .Verse.Log.Error_Patch1(String text) [0xFFFFFFFF]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:43.568  INFO [Verse] [HAT]: Transpiler of ProcessApparel finished.
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at HeadApparelTweaker.HarmonyPatchA5+<TranProcessApparel>d__9.MoveNext() [0x292]
+    at System.Collections.Generic.List`1.AddRange(IEnumerable`1 collection) [0x83]
+    at HarmonyLib.CodeTranspiler.ConvertToGeneralInstructions(MethodInfo transpiler, IEnumerable enumerable, Dictionary`2& unassignedValues) [0x70]
+    at HarmonyLib.CodeTranspiler+<>c__DisplayClass11_0.<GetResult>b__0(MethodInfo transpiler) [0x0]
+    at System.Collections.Generic.List`1.ForEach(Action`1 action) [0x1E]
+    at HarmonyLib.CodeTranspiler.GetResult(ILGenerator generator, MethodBase method) [0x32]
+    at HarmonyLib.MethodBodyReader.FinalizeILCodes(List`1 transpilers, Boolean stripLastReturn, Boolean& hasReturnCode, Boolean& methodEndsInDeadCode, List`1 endLabels) [0x12B]
+    at HarmonyLib.MethodCopier.Finalize(Boolean stripLastReturn, Boolean& hasReturnCode, Boolean& methodEndsInDeadCode, List`1 endLabels) [0x0]
+    at HarmonyLib.MethodCreator.CreateReplacement() [0x4D2]
+    at HarmonyLib.PatchFunctions.UpdateWrapper(MethodBase original, PatchInfo patchInfo) [0xCD]
+    at HarmonyLib.PatchProcessor.Patch() [0x1CB]
+    at HarmonyLib.Harmony.Patch(MethodBase original, HarmonyMethod prefix, HarmonyMethod postfix, HarmonyMethod transpiler, HarmonyMethod finalizer) [0x2A]
+    at HeadApparelTweaker.HarmonyPatchA5.PatchAllByHAT(Harmony harmony) [0xE7]
+    at HeadApparelTweaker.HATweakerMod..ctor(ModContentPack content) [0x87]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:43.593  INFO [Verse] [HAT]:Transpiler of AdjustParms finished. Position:
+AdjustParms - callvirt System.Collections.Generic.List`1[RimWorld.Apparel] get_WornApparel(),
+AdjustParms - ldfld System.Collections.Generic.List`1[RimWorld.RenderSkipFlagDef] renderSkipFlags [0],
+AdjustParms - brfalse.s System.Reflection.Emit.Label,
+AdjustParms - ldfld System.Collections.Generic.List`1[RimWorld.RenderSkipFlagDef] renderSkipFlags [1],
+AdjustParms - ldloc.1 null
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at HeadApparelTweaker.HarmonyPatchA5+<TranAdjustParms>d__8.MoveNext() [0x498]
+    at System.Collections.Generic.List`1.AddRange(IEnumerable`1 collection) [0x83]
+    at HarmonyLib.CodeTranspiler.ConvertToGeneralInstructions(MethodInfo transpiler, IEnumerable enumerable, Dictionary`2& unassignedValues) [0x70]
+    at HarmonyLib.CodeTranspiler+<>c__DisplayClass11_0.<GetResult>b__0(MethodInfo transpiler) [0x0]
+    at System.Collections.Generic.List`1.ForEach(Action`1 action) [0x1E]
+    at HarmonyLib.CodeTranspiler.GetResult(ILGenerator generator, MethodBase method) [0x32]
+    at HarmonyLib.MethodBodyReader.FinalizeILCodes(List`1 transpilers, Boolean stripLastReturn, Boolean& hasReturnCode, Boolean& methodEndsInDeadCode, List`1 endLabels) [0x12B]
+    at HarmonyLib.MethodCopier.Finalize(Boolean stripLastReturn, Boolean& hasReturnCode, Boolean& methodEndsInDeadCode, List`1 endLabels) [0x0]
+    at HarmonyLib.MethodCreator.CreateReplacement() [0x4D2]
+    at HarmonyLib.PatchFunctions.UpdateWrapper(MethodBase original, PatchInfo patchInfo) [0xCD]
+    at HarmonyLib.PatchProcessor.Patch() [0x1CB]
+    at HarmonyLib.Harmony.Patch(MethodBase original, HarmonyMethod prefix, HarmonyMethod postfix, HarmonyMethod transpiler, HarmonyMethod finalizer) [0x2A]
+    at HeadApparelTweaker.HarmonyPatchA5.PatchAllByHAT(Harmony harmony) [0x178]
+    at HeadApparelTweaker.HATweakerMod..ctor(ModContentPack content) [0x87]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:43.648  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> Hello, world!
+Build date: 4/13/2026 8:02 AM
+Loaded assemblies (9):
+0BetterFloatMenu, Version=16.0.0.0, Culture=neutral, PublicKeyToken=null,
+0ColourPicker, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+AMRetextureSupport, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null,
+Meta.Numerics, Version=3.1.0.0, Culture=neutral, PublicKeyToken=67d25c65a6631347,
+ModRequestAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+ModRequestAPI.Models, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+Unity.Newtonsoft.Json, Version=7.0.0.0, Culture=neutral, PublicKeyToken=null,
+zAnimationMod, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+AM.FacialAnimationPatch, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.Core..ctor(ModContentPack content) [0xB2]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:43.715  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> Scanning 35 mods for animation data...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.Data.AnimDataSourceManager.ScanForDataFiles() [0x29]
+    at AM.Core..ctor(ModContentPack content) [0x2E2]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:43.716  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> Found 1 mod folders with animation data, total 69 loadable files.
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.Data.AnimDataSourceManager.ScanForDataFiles() [0x146]
+    at AM.Core..ctor(ModContentPack content) [0x2E2]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:43.717  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> [<color=#63e0ff>Facial Animation Patch</color>] Successfully loaded Facial Animation patch.
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.FacialAnimationPatch.PatchCore.Log(String msg) [0x0]
+    at AM.FacialAnimationPatch.PatchCore..ctor(ModContentPack content) [0x17]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:43.735  INFO [Verse] [神之手] 版本更新 2.0 到 3.0 重置提示
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at GodHandMod.GodHandModMain..ctor(ModContentPack content) [0xCA]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:44.004  INFO [Verse] [神之手] 已加载
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at GodHandMod.GodHandModMain..ctor(ModContentPack content) [0x134]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:51:45.335  INFO [Verse] [HAT]:Transpiler of AdjustParms finished. Position:
+AdjustParms - callvirt System.Collections.Generic.List`1[RimWorld.Apparel] get_WornApparel(),
+AdjustParms - ldfld System.Collections.Generic.List`1[RimWorld.RenderSkipFlagDef] renderSkipFlags [0],
+AdjustParms - brfalse.s System.Reflection.Emit.Label,
+AdjustParms - ldfld System.Collections.Generic.List`1[RimWorld.RenderSkipFlagDef] renderSkipFlags [1],
+AdjustParms - ldloc.1 null
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at HeadApparelTweaker.HarmonyPatchA5+<TranAdjustParms>d__8.MoveNext() [0x498]
+    at System.Collections.Generic.List`1.AddRange(IEnumerable`1 collection) [0x83]
+    at HarmonyLib.CodeTranspiler.ConvertToGeneralInstructions(MethodInfo transpiler, IEnumerable enumerable, Dictionary`2& unassignedValues) [0x70]
+    at HarmonyLib.CodeTranspiler+<>c__DisplayClass11_0.<GetResult>b__0(MethodInfo transpiler) [0x0]
+    at System.Collections.Generic.List`1.ForEach(Action`1 action) [0x1E]
+    at HarmonyLib.CodeTranspiler.GetResult(ILGenerator generator, MethodBase method) [0x32]
+    at HarmonyLib.MethodBodyReader.FinalizeILCodes(List`1 transpilers, Boolean stripLastReturn, Boolean& hasReturnCode, Boolean& methodEndsInDeadCode, List`1 endLabels) [0x12B]
+    at HarmonyLib.MethodCopier.Finalize(Boolean stripLastReturn, Boolean& hasReturnCode, Boolean& methodEndsInDeadCode, List`1 endLabels) [0x0]
+    at HarmonyLib.MethodCreator.CreateReplacement() [0x4D2]
+    at HarmonyLib.PatchFunctions.UpdateWrapper(MethodBase original, PatchInfo patchInfo) [0xCD]
+    at HarmonyLib.PatchClassProcessor.ProcessPatchJob(Job job) [0x151]
+    at HarmonyLib.PatchClassProcessor.PatchWithAttributes(MethodBase& lastOriginal, Boolean unpatch) [0xA4]
+    at HarmonyLib.PatchClassProcessor.Patch() [0x64]
+    at HarmonyLib.Harmony.<PatchAll>b__10_1(Type type) [0x0]
+    at HarmonyLib.CollectionExtensions.Do(IEnumerable`1 sequence, Action`1 action) [0xD]
+    at HarmonyLib.CollectionExtensions.DoIf(IEnumerable`1 sequence, Func`2 condition, Action`1 action) [0x0]
+    at HarmonyLib.Harmony.PatchAll(Assembly assembly) [0x31]
+    at HarmonyLib.Harmony.PatchAll() [0x1D]
+    at CaptureExpansion.CaptureExpansionMod..ctor(ModContentPack pack) [0x16]
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Constructor(Object obj, IntPtr* args) [0x0]
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr) [0x7E]
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x98]
+    at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) [0x5A]
+    at System.RuntimeType.CreateInstanceImpl(BindingFlags bindingAttr, Binder binder, Object[] args, CultureInfo culture) [0x196]
+    at System.Activator.CreateInstance(Type type, Object[] args) [0x0]
+    at Verse.LoadedModManager.CreateModClasses() [0x85]
+    at Verse.LoadedModManager.LoadAllActiveMods(Boolean hotReload) [0x58]
+    at Verse.PlayDataLoader.DoPlayLoad() [0x2B]
+    at Verse.PlayDataLoader.LoadAllPlayData(Boolean recovering) [0x1C]
+    at Verse.Root+<>c.<Start>b__10_1() [0x0]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:52:36.800  WARN [Verse] Translation data for language English has 19 errors. Generate translation report for more info.
+    at .Verse.Log.Warning_Patch1(String text) [0xFFFFFFFF]
+    at Verse.LoadedLanguage.InjectIntoData_AfterImpliedDefs() [0x89]
+    at Verse.PlayDataLoader+<>c.<DoPlayLoad>b__4_3() [0xA]
+    at Verse.LongEventHandler.ExecuteToExecuteWhenFinished() [0x0]
+    at Verse.LongEventHandler.UpdateCurrentAsynchronousEvent() [0x8C]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x29]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:36.922  INFO [Verse] [HAT]:Transpiler of AdjustParms finished. Position:
+AdjustParms - callvirt System.Collections.Generic.List`1[RimWorld.Apparel] get_WornApparel(),
+AdjustParms - ldfld System.Collections.Generic.List`1[RimWorld.RenderSkipFlagDef] renderSkipFlags [0],
+AdjustParms - brfalse.s System.Reflection.Emit.Label,
+AdjustParms - ldfld System.Collections.Generic.List`1[RimWorld.RenderSkipFlagDef] renderSkipFlags [1],
+AdjustParms - ldloc.1 null
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at HeadApparelTweaker.HarmonyPatchA5+<TranAdjustParms>d__8.MoveNext() [0x498]
+    at System.Collections.Generic.List`1.AddRange(IEnumerable`1 collection) [0x83]
+    at HarmonyLib.CodeTranspiler.ConvertToGeneralInstructions(MethodInfo transpiler, IEnumerable enumerable, Dictionary`2& unassignedValues) [0x70]
+    at HarmonyLib.CodeTranspiler+<>c__DisplayClass11_0.<GetResult>b__0(MethodInfo transpiler) [0x0]
+    at System.Collections.Generic.List`1.ForEach(Action`1 action) [0x1E]
+    at HarmonyLib.CodeTranspiler.GetResult(ILGenerator generator, MethodBase method) [0x32]
+    at HarmonyLib.MethodBodyReader.FinalizeILCodes(List`1 transpilers, Boolean stripLastReturn, Boolean& hasReturnCode, Boolean& methodEndsInDeadCode, List`1 endLabels) [0x12B]
+    at HarmonyLib.MethodCopier.Finalize(Boolean stripLastReturn, Boolean& hasReturnCode, Boolean& methodEndsInDeadCode, List`1 endLabels) [0x0]
+    at HarmonyLib.MethodCreator.CreateReplacement() [0x4D2]
+    at HarmonyLib.PatchFunctions.UpdateWrapper(MethodBase original, PatchInfo patchInfo) [0xCD]
+    at HarmonyLib.PatchProcessor.Patch() [0x1CB]
+    at HarmonyLib.Harmony.Patch(MethodBase original, HarmonyMethod prefix, HarmonyMethod postfix, HarmonyMethod transpiler, HarmonyMethod finalizer) [0x2A]
+    at LayeredApparel.HarmonyPatches..cctor() [0xBE] in D:\SteamLibrary\steamapps\common\RimWorld\Mods\_3632480044_\Source\LayeredApparel\HarmonyPatches.cs:44
+    at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(QCallTypeHandle type) [0x0]
+    at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(QCallTypeHandle type) [0x0]
+    at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(RuntimeTypeHandle type) [0x23]
+    at Verse.StaticConstructorOnStartupUtility.CallAll() [0x1F]
+    at Verse.PlayDataLoader+<>c.<DoPlayLoad>b__4_4() [0xA]
+    at Verse.LongEventHandler.ExecuteToExecuteWhenFinished() [0x0]
+    at Verse.LongEventHandler.UpdateCurrentAsynchronousEvent() [0x8C]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x29]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:36.997  WARN [UnityStubs] hideFlags (Object.cs:193): Stub! You may not get expected results!
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at UnityStubs.Internal.StubWarner.LogStub(String stubName, String filePath, Int32 lineNumber) [0x85]
+    at UnityEngine.Object.set_hideFlags(HideFlags value) [0x0]
+    at AM.Video.VideoPlayerUtil..cctor() [0xB]
+    at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(QCallTypeHandle type) [0x0]
+    at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(QCallTypeHandle type) [0x0]
+    at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(RuntimeTypeHandle type) [0x23]
+    at Verse.StaticConstructorOnStartupUtility.CallAll() [0x1F]
+    at Verse.PlayDataLoader+<>c.<DoPlayLoad>b__4_4() [0xA]
+    at Verse.LongEventHandler.ExecuteToExecuteWhenFinished() [0x0]
+    at Verse.LongEventHandler.UpdateCurrentAsynchronousEvent() [0x8C]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x29]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:37.524  INFO [Verse] [HAT]:Transpiler of AdjustParms finished. Position:
+AdjustParms - callvirt System.Collections.Generic.List`1[RimWorld.Apparel] get_WornApparel(),
+AdjustParms - ldfld System.Collections.Generic.List`1[RimWorld.RenderSkipFlagDef] renderSkipFlags [0],
+AdjustParms - brfalse.s System.Reflection.Emit.Label,
+AdjustParms - ldfld System.Collections.Generic.List`1[RimWorld.RenderSkipFlagDef] renderSkipFlags [1],
+AdjustParms - ldloc.1 null
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at HeadApparelTweaker.HarmonyPatchA5+<TranAdjustParms>d__8.MoveNext() [0x498]
+    at System.Collections.Generic.List`1.AddRange(IEnumerable`1 collection) [0x83]
+    at HarmonyLib.CodeTranspiler.ConvertToGeneralInstructions(MethodInfo transpiler, IEnumerable enumerable, Dictionary`2& unassignedValues) [0x70]
+    at HarmonyLib.CodeTranspiler+<>c__DisplayClass11_0.<GetResult>b__0(MethodInfo transpiler) [0x0]
+    at System.Collections.Generic.List`1.ForEach(Action`1 action) [0x1E]
+    at HarmonyLib.CodeTranspiler.GetResult(ILGenerator generator, MethodBase method) [0x32]
+    at HarmonyLib.MethodBodyReader.FinalizeILCodes(List`1 transpilers, Boolean stripLastReturn, Boolean& hasReturnCode, Boolean& methodEndsInDeadCode, List`1 endLabels) [0x12B]
+    at HarmonyLib.MethodCopier.Finalize(Boolean stripLastReturn, Boolean& hasReturnCode, Boolean& methodEndsInDeadCode, List`1 endLabels) [0x0]
+    at HarmonyLib.MethodCreator.CreateReplacement() [0x4D2]
+    at HarmonyLib.PatchFunctions.UpdateWrapper(MethodBase original, PatchInfo patchInfo) [0xCD]
+    at HarmonyLib.PatchProcessor.Patch() [0x1CB]
+    at HarmonyLib.Harmony.Patch(MethodBase original, HarmonyMethod prefix, HarmonyMethod postfix, HarmonyMethod transpiler, HarmonyMethod finalizer) [0x2A]
+    at RWBeheading.DollCaptureExpansionCompat.PatchPostfix(Harmony harmony, MethodBase original, String patchName) [0x1D]
+    at RWBeheading.DollCaptureExpansionCompat.InstallPatches(Harmony harmony) [0x7D]
+    at RWBeheading.DollCaptureExpansionCompat.Patch(Harmony harmony) [0x52]
+    at RWBeheading.HarmonyPatches.EnsureInitialized() [0x56E]
+    at RWBeheading.HarmonyPatches..cctor() [0x0]
+    at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(QCallTypeHandle type) [0x0]
+    at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(QCallTypeHandle type) [0x0]
+    at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(RuntimeTypeHandle type) [0x23]
+    at Verse.StaticConstructorOnStartupUtility.CallAll() [0x1F]
+    at Verse.PlayDataLoader+<>c.<DoPlayLoad>b__4_4() [0xA]
+    at Verse.LongEventHandler.ExecuteToExecuteWhenFinished() [0x0]
+    at Verse.LongEventHandler.UpdateCurrentAsynchronousEvent() [0x8C]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x29]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:41.523  INFO [Verse] MVCF successfully applied 0 patches
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at MVCF.Patch.PrintSummary() [0x15]
+    at MVCF.MVCF+<>c.<CollectFeatureData>b__15_0() [0x78]
+    at Verse.LongEventHandler.ExecuteToExecuteWhenFinished() [0x0]
+    at Verse.LongEventHandler.UpdateCurrentAsynchronousEvent() [0x8C]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x29]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:41.783  INFO [Verse] [神之手] 视觉资源加载: 轮廓着色器=成功, 遮罩着色器=成功, JFA着色器=成功, 奇点着色器=成功, 奇点抓屏着色器=成功, 奇点图标着色器=成功
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at GodHandMod.AssetLoader.LoadAssets() [0x170]
+    at Verse.LongEventHandler.ExecuteToExecuteWhenFinished() [0x0]
+    at Verse.LongEventHandler.UpdateCurrentAsynchronousEvent() [0x8C]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x29]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:41.885  INFO [Verse] CharacterEditor v1.7.1 initializing...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor..ctor() [0x17] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1297
+    at CharacterEditor.CEditor.OnMainMenuInit() [0xD] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:208
+    at Verse.UIRoot_Entry.Init() [0x10]
+    at Verse.Root.<Start>b__10_0() [0x4A]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:41.896  INFO [Verse] updating labels for english...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.Label.UpdateLabels() [0x5F] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\ZLabel\Labels.cs:716
+    at CharacterEditor.CEditor+ModOptions.ReInit() [0x54] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:406
+    at CharacterEditor.CEditor+ModOptions..ctor() [0x8] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:394
+    at CharacterEditor.CEditor+ModData.CreateType(EType eType) [0x599] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1010
+    at CharacterEditor.CEditor+ModData.Get(EType eType) [0x15] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:808
+    at CharacterEditor.CEditor+ModData..ctor() [0x21] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:776
+    at CharacterEditor.CEditor..ctor() [0x1E4] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1320
+    at CharacterEditor.CEditor.OnMainMenuInit() [0xD] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:208
+    at Verse.UIRoot_Entry.Init() [0x10]
+    at Verse.Root.<Start>b__10_0() [0x4A]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:41.917  INFO [Verse] loading pawn slot content from file...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor+ModOptions.LoadSlots(String filepath) [0x2D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:523
+    at CharacterEditor.CEditor+ModOptions.ReInit() [0x6E] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:411
+    at CharacterEditor.CEditor+ModOptions..ctor() [0x8] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:394
+    at CharacterEditor.CEditor+ModData.CreateType(EType eType) [0x599] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1010
+    at CharacterEditor.CEditor+ModData.Get(EType eType) [0x15] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:808
+    at CharacterEditor.CEditor+ModData..ctor() [0x21] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:776
+    at CharacterEditor.CEditor..ctor() [0x1E4] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1320
+    at CharacterEditor.CEditor.OnMainMenuInit() [0xD] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:208
+    at Verse.UIRoot_Entry.Init() [0x10]
+    at Verse.Root.<Start>b__10_0() [0x4A]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:41.937  INFO [Verse] character editor instance created
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor..ctor() [0x1EF] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1321
+    at CharacterEditor.CEditor.OnMainMenuInit() [0xD] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:208
+    at Verse.UIRoot_Entry.Init() [0x10]
+    at Verse.Root.<Start>b__10_0() [0x4A]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:41.938  INFO [Verse] checking editor settings...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor+ModData.OnSettingsChanged(Boolean updateRenderOnly, Boolean updateKeyCode) [0x2] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:826
+    at CharacterEditor.CEditor.OnSettingsChanged(Boolean updateRender, Boolean updateKeyCode) [0x0] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1385
+    at CharacterEditor.CEditor.OnMainMenuInit() [0x3D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:217
+    at Verse.UIRoot_Entry.Init() [0x10]
+    at Verse.Root.<Start>b__10_0() [0x4A]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:41.941  INFO [Verse] bodysizes genes are active
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.GeneTool.EnDisableBodySizeGenes() [0xFD] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Tools\XenoTool.cs:1414
+    at CharacterEditor.CEditor+ModData.OnSettingsChanged(Boolean updateRenderOnly, Boolean updateKeyCode) [0x58] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:835
+    at CharacterEditor.CEditor.OnSettingsChanged(Boolean updateRender, Boolean updateKeyCode) [0x0] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1385
+    at CharacterEditor.CEditor.OnMainMenuInit() [0x3D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:217
+    at Verse.UIRoot_Entry.Init() [0x10]
+    at Verse.Root.<Start>b__10_0() [0x4A]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:41.966  INFO [Verse] CharacterEditor v1.7.1 ...done
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor.OnMainMenuInit() [0x54] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:219
+    at Verse.UIRoot_Entry.Init() [0x10]
+    at Verse.Root.<Start>b__10_0() [0x4A]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.017  WARN [Verse] <color=#66ffb5>[MeleeAnim]</color> Potential patch conflicts (11):
+    at .Verse.Log.Warning_Patch1(String text) [0xFFFFFFFF]
+    at AM.Core.Warn(String msg) [0xC]
+    at AM.Core.LogPotentialConflicts(Harmony h) [0x245]
+    at AM.Core+<>c.<.ctor>b__25_3() [0x0]
+    at AM.Core.<AddLateLoadEvents>b__28_0() [0x34]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:52:42.017  WARN [Verse] <color=#66ffb5>[MeleeAnim]</color> 
+static System.Void Verse.PawnRenderUtility::DrawEquipmentAiming(Verse.Thing eq, UnityEngine.Vector3 drawLoc, System.Single aimAngle)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+  [OskarPotocki.VEF] Prefix
+  [OskarPotocki.VEF] Prefix
+  [OskarPotocki.VEF] DrawEquipmentAimingPrefix
+Transpilers:
+Postfixes:
+
+Verse.PreRenderResults Verse.PawnRenderer::ParallelGetPreRenderResults(UnityEngine.Vector3 drawLoc, System.Nullable`1<Verse.Rot4> rotOverride, System.Boolean neverAimWeapon, System.Boolean disableCache)
+Prefixes:
+  [OskarPotocki.VEF] Prefix
+  [com.yayo.yayoAni] Prefix
+  [rimworld.Nals.FacialAnimation] PrefixParallelGetPreRenderResults
+  [rimworld.rawzbeef.beheading] PawnRenderer_ParallelGetPreRenderResults_Prefix
+Transpilers:
+  [com.yayo.yayoAni] Transpiler
+Postfixes:
+  [co.uk.epicguru.meleeanimation] Postfix
+
+System.Void Verse.PawnRenderer::RenderPawnAt(UnityEngine.Vector3 drawLoc, System.Nullable`1<Verse.Rot4> rotOverride, System.Boolean neverAimWeapon)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+  [Palpha.godhands] Prefix
+Transpilers:
+Postfixes:
+  [co.uk.epicguru.meleeanimation] Postfix
+
+System.Void Verse.PawnRenderTree::ParallelPreDraw(Verse.PawnDrawParms parms)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+  [co.uk.epicguru.meleeanimation] Postfix
+  [rimworld.Nals.FacialAnimation] PostfixParallelPreDraw
+
+System.Void RimWorld.Pawn_ApparelTracker::Notify_ApparelChanged()
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+  [costel.layeredapparel] Postfix_NotifyApparelChanged
+
+    at .Verse.Log.Warning_Patch1(String text) [0xFFFFFFFF]
+    at AM.Core.Warn(String msg) [0xC]
+    at AM.Core.LogPotentialConflicts(Harmony h) [0x251]
+    at AM.Core+<>c.<.ctor>b__25_3() [0x0]
+    at AM.Core.<AddLateLoadEvents>b__28_0() [0x34]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:52:42.017  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> Full patch list:
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.Core.LogPotentialConflicts(Harmony h) [0x267]
+    at AM.Core+<>c.<.ctor>b__25_3() [0x0]
+    at AM.Core.<AddLateLoadEvents>b__28_0() [0x34]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:52:42.017  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> 
+System.Void RimWorld.Building_ProximityDetector::RunDetection()
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+  [co.uk.epicguru.meleeanimation] Postfix
+
+static System.Collections.Generic.List`1<Verse.FloatMenuOption> RimWorld.FloatMenuMakerMap::GetOptions(System.Collections.Generic.List`1<Verse.Pawn> selectedPawns, UnityEngine.Vector3 clickPos, RimWorld.FloatMenuContext& context)
+Prefixes:
+Transpilers:
+Postfixes:
+  [co.uk.epicguru.meleeanimation] Postfix
+
+System.Boolean Verse.HediffSet::get_HasHead()
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+
+static System.Boolean RimWorld.InvisibilityUtility::IsPsychologicallyInvisible(Verse.Pawn pawn)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+
+static System.Void Verse.PawnGenerator::GenerateGearFor(Verse.Pawn pawn, Verse.PawnGenerationRequest request)
+Prefixes:
+Transpilers:
+Postfixes:
+  [co.uk.epicguru.meleeanimation] Postfix
+
+static System.Void Verse.PawnRenderUtility::DrawEquipmentAiming(Verse.Thing eq, UnityEngine.Vector3 drawLoc, System.Single aimAngle)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+  [OskarPotocki.VEF] Prefix
+  [OskarPotocki.VEF] Prefix
+  [OskarPotocki.VEF] DrawEquipmentAimingPrefix
+Transpilers:
+Postfixes:
+
+System.Void Verse.PawnRenderer::DrawShadowInternal(UnityEngine.Vector3 drawLoc)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+
+Verse.PreRenderResults Verse.PawnRenderer::ParallelGetPreRenderResults(UnityEngine.Vector3 drawLoc, System.Nullable`1<Verse.Rot4> rotOverride, System.Boolean neverAimWeapon, System.Boolean disableCache)
+Prefixes:
+  [OskarPotocki.VEF] Prefix
+  [com.yayo.yayoAni] Prefix
+  [rimworld.Nals.FacialAnimation] PrefixParallelGetPreRenderResults
+  [rimworld.rawzbeef.beheading] PawnRenderer_ParallelGetPreRenderResults_Prefix
+Transpilers:
+  [com.yayo.yayoAni] Transpiler
+Postfixes:
+  [co.uk.epicguru.meleeanimation] Postfix
+
+System.Void Verse.PawnRenderer::ParallelPreRenderPawnAt(UnityEngine.Vector3 drawLoc, System.Nullable`1<Verse.Rot4> rotOverride, System.Boolean neverAimWeapon)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+
+System.Void Verse.PawnRenderer::RenderPawnAt(UnityEngine.Vector3 drawLoc, System.Nullable`1<Verse.Rot4> rotOverride, System.Boolean neverAimWeapon)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+  [Palpha.godhands] Prefix
+Transpilers:
+Postfixes:
+  [co.uk.epicguru.meleeanimation] Postfix
+
+System.Void Verse.PawnRenderTree::ParallelPreDraw(Verse.PawnDrawParms parms)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+  [co.uk.epicguru.meleeanimation] Postfix
+  [rimworld.Nals.FacialAnimation] PostfixParallelPreDraw
+
+static Verse.Pawn RimWorld.PawnUtility::PawnBlockingPathAt(Verse.IntVec3 c, Verse.Pawn forPawn, System.Boolean actAsIfHadCollideWithPawnsJob, System.Boolean collideOnlyWithStandingPawns, System.Boolean forPathFinder, System.Boolean useId)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+
+System.Void RimWorld.Pawn_ApparelTracker::Notify_ApparelChanged()
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+  [costel.layeredapparel] Postfix_NotifyApparelChanged
+
+virtual System.Void Verse.Pawn::DrawGUIOverlay()
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+
+System.Void Verse.Pawn_DrawTracker::Notify_MeleeAttackOn(Verse.Thing Target)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+
+Verse.BattleLogEntry_MeleeCombat RimWorld.Verb_MeleeAttack::CreateCombatLog(System.Func`2<Verse.ManeuverDef, Verse.RulePackDef> rulePackGetter, System.Boolean alwaysShow)
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+
+virtual System.Boolean RimWorld.Verb_MeleeAttack::TryCastShot()
+Prefixes:
+  [co.uk.epicguru.meleeanimation] Prefix
+Transpilers:
+Postfixes:
+
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.Core.LogPotentialConflicts(Harmony h) [0x278]
+    at AM.Core+<>c.<.ctor>b__25_3() [0x0]
+    at AM.Core.<AddLateLoadEvents>b__28_0() [0x34]
+    at Verse.LongEventHandler.RunEventFromAnotherThread(Action action) [0x8]
+    at Verse.LongEventHandler+<>c.<UpdateCurrentAsynchronousEvent>b__28_0() [0x0]
+    at System.Threading.Thread+StartHelper.Callback(Object state) [0x0]
+    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state) [0x40]
+2026-10-21 17:52:42.155  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> PreCached all retexture info in 15.2ms
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.Core.PreCacheAllRetextures() [0x3D]
+    at AM.Core.<AddLateLoadEvents>b__28_1() [0x2F]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.369  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> Loaded tweak data for 21 weapons.
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.Core.LoadAllTweakData() [0x98]
+    at AM.Core.<AddLateLoadEvents>b__28_1() [0x2F]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.370  WARN [Verse] <color=#66ffb5>[MeleeAnim]</color> ludeon.rimworld.odyssey 'Odyssey' has 2 missing weapon tweak data.
+    at .Verse.Log.Warning_Patch1(String text) [0xFFFFFFFF]
+    at AM.Core.Warn(String msg) [0xC]
+    at AM.Core.LoadAllTweakData() [0xF5]
+    at AM.Core.<AddLateLoadEvents>b__28_1() [0x2F]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.370  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> Skipping reporting of missing mod/weapons because user opted out or the feature is disabled by the developer.
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.Core.LoadAllTweakData() [0x1CB]
+    at AM.Core.<AddLateLoadEvents>b__28_1() [0x2F]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.386  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> Patched 2 classes that directly inherit from Verb_MeleeAttack in 15.2 ms to detect hits:
+RimWorld.Verb_MeleeApplyHediff from Assembly-CSharp
+RimWorld.Verb_MeleeAttackDamage from Assembly-CSharp
+
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.Patches.Patch_Verb_MeleeAttack_ApplyMeleeDamageToTarget.PatchAll() [0x186]
+    at AM.Core.<AddLateLoadEvents>b__28_1() [0x2F]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.387  INFO [Verse] <color=#66ffb5>[MeleeAnim]</color> Found 0 items of clothing that cover hands, took 0.36 ms:
+
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at AM.Core.Log(String msg) [0xC]
+    at AM.Hands.HandUtility.DoInitialLoading() [0xF3]
+    at AM.Core.<AddLateLoadEvents>b__28_1() [0x2F]
+    at Verse.LongEventHandler.UpdateCurrentSynchronousEvent(Boolean& sceneChanged) [0x1D]
+    at Verse.LongEventHandler.LongEventsUpdate(Boolean& sceneChanged) [0x30]
+    at Verse.Root.Update() [0x33]
+    at Verse.Root_Entry.Update() [0x0]
+    at .InvokeMessageMethod_Verse.Root_Entry.Update(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Update(Single deltaTime, Single elapsedTime) [0x19]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x7A]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.428  INFO [Verse] CE is trying to create default parameter lists ...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor+ModOptions.CreateDefaultLists() [0x2] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:683
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x1D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:193
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.429  INFO [Verse] creating default parameter list for genes...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor+ModData.CreateType(EType eType) [0x526] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:996
+    at CharacterEditor.CEditor+ModData.Get(EType eType) [0x15] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:808
+    at CharacterEditor.CEditor.Get(EType t) [0x0] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1391
+    at CharacterEditor.CEditor+ModOptions.CreateDefaultLists() [0x12] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:684
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x1D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:193
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.454  INFO [Verse] 250 default entities for genes created
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.Preset.CreateDefaults(HashSet`1 list, Func`2 idGetter, Func`2 createAction, String type) [0x7B] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Presets\Preset.cs:99
+    at CharacterEditor.PresetGene.CreateDefaults() [0x3D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Presets\PresetGene.cs:112
+    at CharacterEditor.CEditor+ModData.CreateType(EType eType) [0x531] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:997
+    at CharacterEditor.CEditor+ModData.Get(EType eType) [0x15] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:808
+    at CharacterEditor.CEditor.Get(EType t) [0x0] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1391
+    at CharacterEditor.CEditor+ModOptions.CreateDefaultLists() [0x12] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:684
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x1D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:193
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.454  INFO [Verse] creating default parameter list for objects...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor+ModData.CreateType(EType eType) [0x4FC] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:991
+    at CharacterEditor.CEditor+ModData.Get(EType eType) [0x15] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:808
+    at CharacterEditor.CEditor.Get(EType t) [0x0] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1391
+    at CharacterEditor.CEditor+ModOptions.CreateDefaultLists() [0x1F] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:685
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x1D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:193
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.736  INFO [Verse] 1741 default entities for objects created
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.Preset.CreateDefaults(HashSet`1 list, Func`2 idGetter, Func`2 createAction, String type) [0x7B] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Presets\Preset.cs:99
+    at CharacterEditor.PresetObject.CreateDefaultObjects() [0x3D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Presets\PresetObject.cs:141
+    at CharacterEditor.CEditor+ModData.CreateType(EType eType) [0x507] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:992
+    at CharacterEditor.CEditor+ModData.Get(EType eType) [0x15] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:808
+    at CharacterEditor.CEditor.Get(EType t) [0x0] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1391
+    at CharacterEditor.CEditor+ModOptions.CreateDefaultLists() [0x1F] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:685
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x1D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:193
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.737  INFO [Verse] creating default parameter list for turrets...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor+ModData.CreateType(EType eType) [0x4D2] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:986
+    at CharacterEditor.CEditor+ModData.Get(EType eType) [0x15] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:808
+    at CharacterEditor.CEditor.Get(EType t) [0x0] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1391
+    at CharacterEditor.CEditor+ModOptions.CreateDefaultLists() [0x2C] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:686
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x1D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:193
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.740  INFO [Verse] 12 default entities for turrets created
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.Preset.CreateDefaults(HashSet`1 list, Func`2 idGetter, Func`2 createAction, String type) [0x7B] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Presets\Preset.cs:99
+    at CharacterEditor.PresetObject.CreateDefaultTurrets() [0x3D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Presets\PresetObject.cs:142
+    at CharacterEditor.CEditor+ModData.CreateType(EType eType) [0x4DD] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:987
+    at CharacterEditor.CEditor+ModData.Get(EType eType) [0x15] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:808
+    at CharacterEditor.CEditor.Get(EType t) [0x0] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:1391
+    at CharacterEditor.CEditor+ModOptions.CreateDefaultLists() [0x2C] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:686
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x1D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:193
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.740  INFO [Verse] ...lists created
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor+ModOptions.CreateDefaultLists() [0x34] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:687
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x1D] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:193
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.740  INFO [Verse] CE is trying to apply modified parameters...
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor+ModOptions.UpdatingCustoms() [0x2] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:695
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x40] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:198
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.743  INFO [Verse] no modifications for genes
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.Preset.LoadAllModifications(String custom, Action`1 loadAction, String type) [0x17] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Presets\Preset.cs:45
+    at CharacterEditor.PresetGene.LoadAllModifications(String custom) [0x1A] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Presets\PresetGene.cs:114
+    at CharacterEditor.CEditor+ModOptions.UpdatingCustoms() [0xA5] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:711
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x40] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:198
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.754  INFO [Verse] no modifications for lifestages
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.Preset.LoadAllModifications(String custom, Action`1 loadAction, String type) [0x17] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Presets\Preset.cs:45
+    at CharacterEditor.PresetLifeStage.LoadAllModifications(String custom) [0x1A] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\Presets\PresetLifestage.cs:75
+    at CharacterEditor.CEditor+ModOptions.UpdatingCustoms() [0xD3] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:713
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x40] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:198
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.754  INFO [Verse] ...done
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at CharacterEditor.CEditor+ModOptions.UpdatingCustoms() [0xDE] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\CEditor.cs:714
+    at CharacterEditor.CEditor.OnMainMenuOnGUI() [0x40] in C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\CharacterEditor\Source\CharacterEditor1.7\HarmonyPatches.cs:198
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.758  INFO [Verse] [ShowMeYourHands]: Defined hand definitions of 94 weapons
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at ShowMeYourHands.ShowMeYourHandsMain.LogMessage(String message, Boolean forced, Boolean warning) [0x29]
+    at ShowMeYourHands.RimWorld_MainMenuDrawer_MainMenuOnGUI.UpdateHandDefinitions() [0x44]
+    at ShowMeYourHands.ShowMeYourHandsMod.WriteSettings() [0xB]
+    at ShowMeYourHands.RimWorld_MainMenuDrawer_MainMenuOnGUI.UpdateValidRaces() [0x8D]
+    at ShowMeYourHands.RimWorld_MainMenuDrawer_MainMenuOnGUI.MainMenuOnGUI() [0x14]
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:52:42.759  INFO [Verse] [ShowMeYourHands]: Defined hand definitions of 94 weapons
+    at Brutal.Logging.LogCategory.Info(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Verse.Log.Message(String text) [0x19]
+    at ShowMeYourHands.ShowMeYourHandsMain.LogMessage(String message, Boolean forced, Boolean warning) [0x29]
+    at ShowMeYourHands.RimWorld_MainMenuDrawer_MainMenuOnGUI.UpdateHandDefinitions() [0x44]
+    at ShowMeYourHands.RimWorld_MainMenuDrawer_MainMenuOnGUI.MainMenuOnGUI() [0x19]
+    at .RimWorld.MainMenuDrawer.MainMenuOnGUI_Patch2() [0xFFFFFFFF]
+    at .Verse.UIRoot_Entry.DoMainMenu_Patch1(UIRoot_Entry this) [0xFFFFFFFF]
+    at Verse.UIRoot_Entry.UIRootOnGUI() [0x1C]
+    at Verse.Root.OnGUI() [0x40]
+    at .InvokeMessageMethod_Verse.Root.OnGUI(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.DispatchOnGUI(Boolean repaint, Action`1 beforeEach, Action`1 afterEach) [0x106]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Dispatch(Vector2 physMouse, Boolean drawing) [0x112]
+    at RimWorldWaylith.Imgui.ImguiDispatch.RunPass(EventType type, Int32 button, Vector2 physMouse, EventModifiers mods, Boolean drawing, Vector2 delta) [0x5B]
+    at RimWorldWaylith.Imgui.ImguiDispatch.Draw(ImGuiHost host) [0x1D]
+    at RimWorldWaylith.Bootstrap+<>c.<ConfigureFrameRenderer>b__32_2(ImGuiHost host) [0x0]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.CaptureFrame(FrameTiming& timing) [0x18]
+    at RimWorldWaylith.Imgui.ImGuiRenderFeature.Waylith.Rendering.IRenderFeature.CaptureFrame(FrameTiming& timing) [0x0]
+    at Waylith.Rendering.FrameRenderer.CaptureFrame(FrameTiming& timing, NativeList`1 clearValues, Boolean requestRenderContextRebuild) [0x4C]
+    at Waylith.EngineApplication.RunLoop() [0x5CC]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x1E6]
+2026-10-21 17:55:55.636  INFO Log closed.

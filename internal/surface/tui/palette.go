@@ -47,11 +47,14 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 	}
 	switch id {
 	case "sort":
-		return func(m *model) tea.Cmd { m.tab = tabList; return m.sortPreview() }
+		return list("S")
 	case "save":
-		return func(m *model) tea.Cmd { m.tab = tabList; return m.savePreview() }
+		return list("w")
 	case "launch":
 		return list("L")
+	case "preview-sort", "preview-save", "preview-launch":
+		what := strings.TrimPrefix(id, "preview-")
+		return func(m *model) tea.Cmd { m.tab = tabList; return m.listPreview(what) }
 	case "undo":
 		return list("u")
 	case "redo":
@@ -126,7 +129,7 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 				b.WriteString(T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves") + "\n\n")
 			}
 			b.WriteString(": archo pack build <name>\n")
-			m.openPanel(T("packs"), b.String(), nil)
+			m.openPanel(T("packs"), b.String())
 			return nil
 		}
 	case "settings":
@@ -146,11 +149,11 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 				}
 				b.WriteString("\n")
 			}
-			m.openPanel(T("settings"), b.String(), nil)
+			m.openPanel(T("settings"), b.String())
 			return nil
 		}
 	case "help":
-		return func(m *model) tea.Cmd { m.openPanel(T("help"), T(helpText), nil); return nil }
+		return func(m *model) tea.Cmd { m.openPanel(T("help"), T(helpText)); return nil }
 	case "quit":
 		return func(m *model) tea.Cmd { m.quitting = true; return tea.Quit }
 	}

@@ -164,7 +164,7 @@ export function position(obj, from) {
   });
 }
 
-// ---- a preview with a confirmation (sort, save, launch; 06 §6) ----
+// ---- a confirmation, for what u cannot undo (06 §6); text() shows lines with none ----
 export function confirm(title, lines, goLabel, go) {
   const pre = el("pre", "lines");
   pre.textContent = (lines || []).join("\n");
@@ -180,7 +180,7 @@ export function panel(title, content, goLabel, go, cls = "") {
     body.append(content);
     pop.append(body);
     const btns = el("div", "btns");
-    const no = el("button", "", T("cancel") + "  esc");
+    const no = el("button", "", (go ? T("cancel") : T("close")) + "  esc");
     no.onclick = close;
     btns.append(no);
     if (go) {
@@ -237,7 +237,7 @@ export function help() {
       ["space · double-click", T("enable / disable / put back")], ["t", T("stage; in staging, put back")],
       ["m", T("move to a position or after a mod")], ["J K · alt+J K", T("move down / up 1 (10)")],
       ["g · #", T("tags")], ["enter", T("full details")], ["o", T("Workshop page")],
-      ["S · w · L", T("sort · write to the game · launch (preview first)")], ["u · ctrl+z", T("undo")], ["ctrl+r · ctrl+y", T("redo")],
+      ["S · w · L", T("sort · write to the game · launch (at once; the palette previews them)")], ["u · ctrl+z", T("undo")], ["ctrl+r · ctrl+y", T("redo")],
       ["/ · ctrl+f", T("search the list")], ["shift+1–7", T("go to a page in the sidebar")], ["l · c", T("game log · mod changes")],
       ["T", T("stage the whole enabled list; in staging, put all back")],
       ["R · A", T("rescan · check the files again")], ["E", T("the environment page")], ["P", T("plans: switch, new, rename, delete")], ["i · e", T("import · export the mod list")], ["ctrl+k", T("command palette")],
@@ -253,7 +253,7 @@ export function menu(x, y, actions) {
   const m = $("#menu");
   m.innerHTML = "";
   for (const a of actions) {
-    const b = el("button");
+    const b = el("button", a.cls || "");
     b.append(el("span", "", a.label));
     if (a.key) b.append(el("span", "key", a.key));
     b.onclick = () => { hideMenu(); a.run(); };

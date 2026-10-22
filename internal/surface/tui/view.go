@@ -204,8 +204,6 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("confirm")}, {"esc", T("back")}}
 	case m.tags != nil:
 		pairs = [][2]string{{"←→", T("choose")}, {"enter", T("apply")}, {"esc", T("close")}, {"←", T("type a new tag")}}
-	case m.panel != nil && m.panel.confirm != nil:
-		pairs = [][2]string{{"y", T("confirm")}, {"n", T("cancel")}, {"↑↓", T("scroll")}}
 	case m.panel != nil:
 		pairs = [][2]string{{"esc", T("back")}, {"↑↓", T("scroll")}}
 	case m.insp != nil:

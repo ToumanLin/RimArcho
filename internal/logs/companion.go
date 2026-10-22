@@ -60,7 +60,10 @@ type Companion struct {
 	Monitor  bool   // the file is Archo Monitor's (its first line is a session line)
 	Session  string // Archo Monitor's session id
 	Version  string // Archo Monitor's version
+	Game     string // the game version the session line names
 	Started  time.Time
+	Ended    time.Time // the exit line's time: the game closed normally
+	Full     bool      // the monitor stopped adding entries (32 MiB, 03 §6.7.3)
 	BadLines int
 	Entries  []*CompanionEntry
 
@@ -107,6 +110,7 @@ type companionLine struct {
 		Def           string            `json:"def"`
 		Session       string            `json:"session"`
 		Version       string            `json:"version"`
+		Game          string            `json:"game"`
 	} `json:"context"`
 	Source string `json:"source"`
 	Schema int    `json:"schema"`
@@ -159,10 +163,14 @@ func (c *Companion) line(b []byte) *CompanionEntry {
 	switch j.Kind {
 	case "session":
 		if c.lines == 1 {
-			c.Monitor, c.Session, c.Version, c.Started = true, j.Context.Session, j.Context.Version, at
+			c.Monitor, c.Session, c.Version, c.Game, c.Started = true, j.Context.Session, j.Context.Version, j.Context.Game, at
 		}
 		return nil
-	case "exit", "full":
+	case "exit":
+		c.Ended = at
+		return nil
+	case "full":
+		c.Full = true
 		return nil
 	}
 	if j.Source == "archo-monitor" {
