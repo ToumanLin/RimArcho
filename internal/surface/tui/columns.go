@@ -339,12 +339,20 @@ func (m *model) columnTitle(c *column, focused bool, w int) string {
 	used := 2 + min(width.StringWidth(t), w-2)
 	if c.filter != "" || (focused && m.editing) {
 		f := "  " + ic.search + " " + c.filter
+		// while typing: the grey completion tab takes (06 §3.7), else the cursor mark
+		tail := ""
 		if focused && m.editing {
-			f += "_"
+			if tail = m.searchGhost(); tail == "" {
+				tail = "_"
+			}
 		}
 		fw := min(width.StringWidth(f), w-used)
 		title += sSecond.Render(fit(f, fw))
 		used += fw
+		if tw := min(width.StringWidth(tail), w-used); tw > 0 {
+			title += sDimS.Render(fit(tail, tw))
+			used += tw
+		}
 	}
 	return title + strings.Repeat(" ", max(w-used, 0))
 }

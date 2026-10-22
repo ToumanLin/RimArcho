@@ -407,7 +407,13 @@ func (m *model) filterKey(k tea.KeyMsg) tea.Cmd {
 	case tea.KeyEsc:
 		m.editing, c.filter = false, ""
 	case tea.KeyTab:
-		return m.searchJump()
+		// tab takes the grey completion when there is one (06 §3.7), else goes to the
+		// next list with matches
+		g := m.searchGhost()
+		if g == "" {
+			return m.searchJump()
+		}
+		c.filter += g
 	case tea.KeyBackspace:
 		if r := []rune(c.filter); len(r) > 0 {
 			c.filter = string(r[:len(r)-1])
@@ -455,6 +461,18 @@ func (m *model) otherMatches() [3]int {
 		}
 	}
 	return n
+}
+
+// searchGhost is the completion of the focused list's search: a field name or a value
+// (view.CompleteQuery), from the tags of every list.
+func (m *model) searchGhost() string {
+	var tags []string
+	for k := range m.cols {
+		for i := range m.cols[k].items {
+			tags = append(tags, m.cols[k].items[i].tags...)
+		}
+	}
+	return view.CompleteQuery(m.col().filter, tags)
 }
 
 // searchJump: tab while searching takes the search to the next list (to the right, round)
