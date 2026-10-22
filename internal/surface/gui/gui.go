@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -33,14 +34,18 @@ func Run(o Options) error {
 	view.SetLang(cmds.Setting(a, "ui.lang"))
 	a.LazyLog = true // the newest log is parsed when 需要处理 opens (as in the TUI)
 	a.LogCacheOnly = true
+	tuneProcess(a)
 	api := newAPI(a)
+	api.free.on = true
 	page, err := PageHandler(api)
 	if err != nil {
 		return err
 	}
+	ico := windowIcon()
+	debug.FreeOSMemory() // the drawing's buffers
 	w := application.New(application.Options{
 		Name:     "RimArcho",
-		Icon:     icon.PNG(256), // used when the exe has no icon resource (development builds, 06 §8.6)
+		Icon:     ico, // used when the exe has no icon resource (development builds, 06 §8.6)
 		Services: []application.Service{application.NewService(api)},
 		Assets:   application.AssetOptions{Handler: page},
 		Windows: application.WindowsOptions{

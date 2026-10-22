@@ -44,6 +44,7 @@ type API struct {
 	logPath  string           // the log page's Player.log and its clusters' first lines
 	logLinks map[string]string
 	x        exchange // import and export (exchange.go)
+	free     releaser // returns memory to the OS after heavy work (memory.go)
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string
@@ -143,6 +144,7 @@ type Board struct {
 func (s *API) Board() *Board {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.free.soon()
 	return s.boardLocked()
 }
 
@@ -731,6 +733,7 @@ func (s *API) SetTag(ids []string, tag string, remove bool) (string, error) {
 func (s *API) Needs() *view.Needs {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.free.soon()
 	n := s.needsLocked(true)
 	if (n.Stale || n.Never) && !s.busy["analyze"] {
 		s.startAnalyze()
@@ -856,6 +859,7 @@ func (s *API) Logs() []string {
 func (s *API) LogPage(path string) (*view.LogPage, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.free.soon()
 	st := s.boardState()
 	if st == nil {
 		return nil, errors.New("no list")
@@ -952,6 +956,7 @@ func (s *API) Scan() bool {
 			ev["text"] = view.T("scan complete · nothing changed")
 		}
 		s.mu.Unlock()
+		s.free.soon()
 		s.send("scan", ev)
 	}()
 	return true
