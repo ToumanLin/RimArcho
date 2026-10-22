@@ -31,7 +31,7 @@ func init() {
 	register(&Command{Name: "env set", Args: "<name>", Summary: "change an environment's game folder, saves or launch (re-binds a moved game)", MinArgs: 1, MaxArgs: 1,
 		Flags: append(append([]Flag(nil), envFlags...), removeSourceFlag, Flag{Name: "launch-args", Value: "<args>", Help: "extra game arguments, e.g. -popupwindow (\"\" removes them)"}), Run: envSet})
 	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget an environment (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
-		Flags: []Flag{{Name: "yes", Help: "confirm"}}, Run: envRemove})
+		Flags: []Flag{{Name: "yes", Help: "remove (without it: the dry run)"}}, Run: envRemove})
 	register(&Command{Name: "env use", Args: "<name>", Summary: "select the current environment", MinArgs: 1, MaxArgs: 1, Run: envUse})
 	register(&Command{Name: "env rebind", Args: "<src:label> yes|no", Summary: "answer a pending source re-binding", MinArgs: 2, MaxArgs: 2, Run: envRebind})
 }
@@ -145,16 +145,40 @@ func specFromArgs(a *Args) app.EnvSpec {
 
 func envRemove(c *Ctx, a *Args) (*render.Doc, error) {
 	if !a.Bool("yes") {
-		return nil, &UsageError{Msg: fmt.Sprintf("this forgets env:%s and its instance IDs, history and rules; add --yes to confirm", a.Pos[0])}
+		r, err := c.App.EnvRemovePreview(a.Pos[0])
+		if err != nil {
+			return nil, err
+		}
+		d, root := render.New("env remove: dry run, nothing changed")
+		envRemovalLines(root, r)
+		d.AddNext("archo env remove " + quoteArg(r.Env.Name) + " --yes")
+		return d, nil
 	}
-	e, err := c.App.EnvRemove(a.Pos[0])
+	r, err := c.App.EnvRemove(a.Pos[0])
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(envRef(e) + "  removed")
-	root.KV("kept", "the shared mod folders and what you noted on mods; game and mod files are untouched")
-	d.AddNext("archo env list")
+	d, root := render.New(envRef(r.Env) + "  removed")
+	envRemovalLines(root, r)
+	if r.Next == "" && r.Current {
+		d.AddNext("archo env add <name> --game <dir>")
+	} else {
+		d.AddNext("archo env list")
+	}
 	return d, nil
+}
+
+// envRemovalLines says what removing an environment forgets and what stays (06 §2.14).
+func envRemovalLines(n *render.Node, r *app.EnvRemoval) {
+	n.KV("forgets", fmt.Sprintf("%d plans, %d launch records, %d mods read from its Data/ and Mods/, its history", r.Plans, r.Launches, r.Mods))
+	n.KV("keeps", "game files, mods and saves; the shared mod folders and what you noted on mods")
+	if r.Current {
+		if r.Next != "" {
+			n.KV("current", "env:"+r.Next)
+		} else {
+			n.KV("current", "none left")
+		}
+	}
 }
 
 func envAdd(c *Ctx, a *Args) (*render.Doc, error) {

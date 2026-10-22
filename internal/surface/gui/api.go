@@ -954,6 +954,34 @@ func (s *API) UseEnv(name string) (string, error) {
 	return s.text(view.Tf("switched to %s", name), err)
 }
 
+// EnvRemoval is the dry run of removing an environment (06 §2.14): the confirmation's
+// title and lines. Nothing changes.
+type EnvRemoval struct {
+	Title string   `json:"title"`
+	Lines []string `json:"lines"`
+}
+
+func (s *API) EnvRemovePreview(name string) (*EnvRemoval, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, err := s.a.EnvRemovePreview(name)
+	if err != nil {
+		return nil, err
+	}
+	return &EnvRemoval{Title: view.EnvRemovalTitle(r), Lines: view.EnvRemovalLines(r)}, nil
+}
+
+// RemoveEnv removes an environment from RimArcho's records; another one becomes current
+// when it was in use. Refused while its game runs.
+func (s *API) RemoveEnv(name string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.a.EnvName = ""
+	_, err := s.a.EnvRemove(name)
+	s.board, s.needs, s.lib = nil, nil, nil
+	return s.text(view.Tf("removed environment %s", name), err)
+}
+
 // Logs are the logs the player may choose (Player.log, Player-prev.log).
 func (s *API) Logs() []string {
 	s.mu.Lock()

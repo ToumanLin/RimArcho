@@ -369,6 +369,8 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .envrow .name { font-weight: 500; }
 .envrow .sub { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .envrow.on .name { color: var(--accent); }
+.envrow .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--muted); }
+.envrow .btn.quiet:hover, .envrow .btn.quiet:focus-visible { color: var(--fg); background: var(--pill); }
 .chip.cur { color: var(--accent); background: var(--accent-soft); margin: 0; }
 @media (prefers-reduced-motion: reduce) { .page.enter, .seg > .thumb { animation: none; transition: none; } }
 .page-head { display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; color: var(--muted); min-height: 28px; }

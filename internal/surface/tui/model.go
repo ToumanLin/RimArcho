@@ -56,6 +56,8 @@ type panel struct {
 	choices []string // chooser values (env names)
 	choice  int
 	onPick  func(m *model, value string) tea.Cmd
+	// onDelete: d / delete on a choice (the environment chooser's 删除环境, 06 §2.14)
+	onDelete func(m *model, value string) tea.Cmd
 	// onEnter: enter runs it (a confirmation: the dry run is the text, 06 §6)
 	onEnter func(m *model) tea.Cmd
 }

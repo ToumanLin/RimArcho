@@ -243,6 +243,9 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"↑↓", T("group")}, {"←→", T("value")}, {"enter", T("only these")}, {"x", T("leave out")}, {T("type"), T("find a value")}, {"esc", T("close")}}
 	case m.panel != nil && m.panel.choices != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("confirm")}, {"esc", T("back")}}
+		if m.panel.onDelete != nil {
+			pairs = append(pairs, [2]string{"d", T("remove environment")})
+		}
 	case m.tags != nil:
 		pairs = [][2]string{{"←→", T("choose")}, {"enter", T("apply")}, {"esc", T("close")}, {"←", T("type a new tag")}}
 	case m.panel != nil:

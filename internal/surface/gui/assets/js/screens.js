@@ -1102,9 +1102,25 @@ export async function environment() {
         environment();
       }));
     }
+    row.append(button(T("remove environment"), "", () => removeEnv(e.name), "quiet"));
     card.append(row);
   }
   w.append(card);
   renderGroups(w, p.groups || [], environment);
   sc.scrollTop = top;
+}
+
+// removeEnv: the dry run says what RimArcho forgets and what stays, one confirmation removes
+// it (06 §2.14). Another environment takes over when it was in use; with none left, the
+// guide opens.
+export async function removeEnv(name) {
+  let p;
+  try { p = await api.EnvRemovePreview(name); } catch (e) { say("fail", errText(e)); return; }
+  pop.confirm(p.title, p.lines, T("remove environment"), async () => {
+    try { say("ok", await api.RemoveEnv(name)); } catch (e) { say("fail", errText(e)); return; }
+    for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
+    await ui.reload();
+    if (!(S.board && S.board.envs && S.board.envs.length)) return ui.go("guide");
+    if (S.screen === "env") environment();
+  });
 }

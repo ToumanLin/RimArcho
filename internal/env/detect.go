@@ -235,6 +235,12 @@ func WorkshopRootFor(gameRoot string) string {
 	return filepath.Join(steamapps, "workshop", "content", WorkshopAppID)
 }
 
+// GameWorkshopFor is the Workshop folder a SteamCMD download keeps inside the game folder
+// (force_install_dir puts steamapps there). It is not the Steam client's Workshop folder.
+func GameWorkshopFor(gameRoot string) string {
+	return filepath.Join(filepath.Clean(gameRoot), "steamapps", "workshop", "content", WorkshopAppID)
+}
+
 func isDir(p string) bool {
 	st, err := os.Stat(p)
 	return err == nil && st.IsDir()

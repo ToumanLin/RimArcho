@@ -460,6 +460,29 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 	}
 }
 
+// 06 §2.14: E, then d on an environment: the dry run, enter removes it; the other one is
+// then in use.
+func TestEnvRemoveFromChooser(t *testing.T) {
+	e, scans := fixture(t)
+	other := filepath.Join(e.Root, "Second", "RimWorld")
+	e.CopyTemplate("core", filepath.Join(other, "Data", "Core"))
+	e.WriteFile(filepath.Join(other, "RimWorldWin64.exe"), "")
+	e.MustRun("env", "add", "second", "--game", other)
+	tm := start(t, e, scans, 120, 30)
+	waitFor(t, tm, " main ")
+	keys(tm, "E", "d")
+	waitFor(t, tm, "then second is in use")
+	keys(tm, "enter")
+	waitFor(t, tm, "removed environment main")
+	m := finish(t, tm)
+	if m.envName != "second" {
+		t.Fatalf("env %q", m.envName)
+	}
+	if envs, _ := e.App.Store.Envs(); len(envs) != 1 {
+		t.Fatalf("%d environments", len(envs))
+	}
+}
+
 // keep io imported for teatest's reader type in older toolchains
 var _ io.Reader
 

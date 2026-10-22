@@ -194,7 +194,7 @@ next:
 | | `env branches [--install-steamcmd]` / `env download <分支> --to <目录> --account <账户名> [--name <环境>] [--saves …] [--install-steamcmd]` | 用 SteamCMD 列出 RimWorld 的分支、下载一个版本并加为环境；登录在 SteamCMD 里（08 §11） |
 | Mod 文件夹 | `folder list` / `folder add workshop\|steamcmd\|extra <目录>` / `folder remove src:<标签>` | 所有环境共用的 Mod 文件夹（02 §3.1）。MCP：`status show=folders`（只读） |
 | | `env rebind src:<标签> yes\|no` | 回答“这是原来的来源吗？” |
-| | `env remove <名> --yes` | 忘掉一个环境，只删 RimArcho 的数据，不动游戏文件 |
+| | `env remove <名> [--yes]` | 忘掉一个环境，只删 RimArcho 的数据，不动游戏文件；不带 `--yes` 是预演（忘掉什么、留下什么、之后用哪个环境）。那个游戏在运行时拒绝；删当前环境时换到另一个。GUI 环境页和 TUI `E` 同样（06 §2.8）；MCP 不提供（环境修改留给玩家） |
 | 扫描 | `scan [--full] [--game-only]` | 扫描并对账（02 §4）；`--full` 重新哈希全部语义文件；`--game-only` 只扫当前游戏的 `Data`、`Mods` |
 | 查询 | `status` | 当前环境概况：游戏版本、各来源 Mod 数、残留、Lineage、上次扫描、变化、方案（启用数、缺失项、与游戏里的列表的差异）、ModsConfig 版本不符的提示、问题数、游戏运行状态 |
 | | `list [--active] [--filter <表达式>] [--all]` | 列出 Mod。`--active` 按加载顺序列出当前方案；`--filter` 支持 `source:<标签\|类型>`、`status:live\|tombstone\|all`、`residue`、`unloadable`、`copies`、`pkg:`、`ws:`、`tag:<标签>`、`lineage:` 和普通词。默认只列活着的 Instance |
