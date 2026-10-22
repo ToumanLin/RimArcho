@@ -970,3 +970,25 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 #menu hr { border: 0; border-top: 1px solid var(--line-2); margin: 3px 4px; }
 #menu button.danger { color: var(--red); }
 #menu button:focus { outline: 0; background: var(--pill); }
+
+/* 设置 › 卸载 RimArcho (06 §2.14): one row per step, the answer inline, the items folded */
+.uninstall .un-step + .un-step { border-top: 1px solid var(--line-2); }
+.uninstall .un-step .set { border-top: 0; }
+.uninstall .un-toggle { display: flex; gap: 6px; align-items: center; cursor: pointer; white-space: nowrap; }
+.uninstall .un-ask { display: flex; gap: 6px; align-items: center; padding: 0 14px 8px calc(38% + 30px); }
+.uninstall .un-ask .field { max-width: 420px; }
+.uninstall .un-items { padding: 0 14px 8px; font-size: 12px; }
+.uninstall .un-items > summary { color: var(--muted); cursor: pointer; width: max-content; }
+.uninstall .un-items > summary.err { color: var(--red); }
+.uninstall .un-item { display: flex; gap: 8px; align-items: baseline; padding: 2px 0 2px 16px; min-width: 0; }
+.uninstall .un-item .mk { flex: 0 0 12px; }
+.uninstall .un-item .vb { flex: 0 0 auto; color: var(--muted); }
+.uninstall .un-item .p { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uninstall .un-item .x { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uninstall .un-item.bad .p { color: var(--red); }
+.un-result { margin: 0 0 12px; }
+.un-foot { display: flex; justify-content: flex-end; margin: 14px 0 24px; }
+.un-foot .prog { flex: 1; }
+.page .btn.primary.danger-go { background: var(--red); border-color: var(--red); color: #fff; }
+.page .btn.primary.danger-go:disabled { opacity: .45; cursor: default; }
+.uninstall .set .sub { white-space: normal; }

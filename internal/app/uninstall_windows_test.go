@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -65,5 +66,43 @@ func TestAfterExitScript(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(log); strings.TrimSpace(string(b)) != "" {
 		t.Fatalf("log: %s", b)
+	}
+}
+
+// The script waits while the process runs, even with another find first on PATH (Git's
+// usr/bin): a folder is deleted only after the process has ended.
+func TestAfterExitScriptWaits(t *testing.T) {
+	root := t.TempDir()
+	data := filepath.Join(root, "data")
+	if err := os.MkdirAll(data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	decoy := filepath.Join(root, "decoy")
+	os.MkdirAll(decoy, 0o755)
+	os.WriteFile(filepath.Join(decoy, "find.cmd"), []byte("@exit /b 1\r\n"), 0o644)
+	running := exec.Command(filepath.Join(os.Getenv("SystemRoot"), "System32", "ping.exe"), "-n", "4", "127.0.0.1")
+	if err := running.Start(); err != nil {
+		t.Fatal(err)
+	}
+	ended := make(chan time.Time, 1)
+	go func() { running.Wait(); ended <- time.Now() }()
+	script := filepath.Join(root, "run.cmd")
+	os.WriteFile(script, []byte(app.AfterExitScript(app.AfterExit{Dirs: []string{data}}, running.Process.Pid, filepath.Join(root, "log"))), 0o644)
+	c := exec.Command("cmd", "/d", "/c", script)
+	c.Env = append(os.Environ(), "PATH="+decoy+";"+os.Getenv("PATH"))
+	if out, err := c.CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	done := time.Now()
+	select {
+	case e := <-ended:
+		if done.Before(e) {
+			t.Fatal("the script finished before the process ended")
+		}
+	default:
+		t.Fatal("the script did not wait for the process")
+	}
+	if exists(data) {
+		t.Fatal("not deleted after the process ended")
 	}
 }

@@ -219,3 +219,17 @@ func UninstallOutline(n *render.Node, p *app.UninstallPlan, all, done bool) {
 		}
 	}
 }
+
+// ParseUninstall reads an `uninstall …` command line's answers (the TUI's typed
+// confirmation); --yes and --dry-run are ignored.
+func ParseUninstall(argv []string) (app.UninstallOptions, error) {
+	c, rest := lookup(argv)
+	if c == nil || c.Name != "uninstall" {
+		return app.UninstallOptions{}, &UsageError{Msg: "not an uninstall command"}
+	}
+	a, err := parse(c, rest)
+	if err != nil {
+		return app.UninstallOptions{}, err
+	}
+	return UninstallOptions(a), nil
+}

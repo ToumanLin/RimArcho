@@ -32,24 +32,27 @@ func AfterExitScript(x AfterExit, pid int, log string) string {
 	q := func(p string) string { return `"` + strings.ReplaceAll(p, "%", "%%") + `"` }
 	var b strings.Builder
 	w := func(f string, a ...any) { fmt.Fprintf(&b, f+"\r\n", a...) }
+	// System32's tools by full path: a PATH with Git's usr/bin first finds its own find.
+	const sys = `"%SystemRoot%\System32\`
+	sleep := sys + `ping.exe" -n 2 127.0.0.1 >nul`
 	w("@echo off")
 	w("chcp 65001 >nul")
 	w("rem RimArcho uninstall: deletes RimArcho's folders and program once it has closed.")
 	w("set n=0")
 	w(":wait")
-	w(`tasklist /fi "PID eq %d" /nh 2>nul | find " %d " >nul`, pid, pid)
+	w(`%stasklist.exe" /fi "PID eq %d" /nh 2>nul | %sfind.exe" " %d " >nul`, sys, pid, sys, pid)
 	w("if errorlevel 1 goto gone")
 	w("set /a n+=1")
 	w("if %%n%% geq 300 goto gone")
-	w("ping -n 2 127.0.0.1 >nul")
+	w("%s", sleep)
 	w("goto wait")
 	w(":gone")
 	w("del /f /q %s 2>nul", q(log))
 	for _, d := range x.Dirs {
-		w(`for /l %%%%i in (1,1,10) do if exist %s (rd /s /q %s 2>nul & if exist %s ping -n 2 127.0.0.1 >nul)`, q(d), q(d), q(d))
+		w(`for /l %%%%i in (1,1,10) do if exist %s (rd /s /q %s 2>nul & if exist %s %s)`, q(d), q(d), q(d), sleep)
 	}
 	for _, f := range x.Files {
-		w(`for /l %%%%i in (1,1,10) do if exist %s (del /f /q %s 2>nul & if exist %s ping -n 2 127.0.0.1 >nul)`, q(f), q(f), q(f))
+		w(`for /l %%%%i in (1,1,10) do if exist %s (del /f /q %s 2>nul & if exist %s %s)`, q(f), q(f), q(f), sleep)
 	}
 	for _, d := range x.Empty {
 		w("rd %s 2>nul", q(d))

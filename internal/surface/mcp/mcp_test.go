@@ -67,6 +67,8 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"launch_game": "destructive", "manage_plans": "destructive", "plan_history": "ro",
 		// 06 §2.9: Mod 库存.
 		"list_library": "ro", "manage_library": "destructive",
+		// Uninstall: only its dry run (05 §5.2).
+		"preview_uninstall": "ro",
 	}
 	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true}
 	seen := map[string]bool{}
@@ -146,6 +148,7 @@ func TestCLIParity(t *testing.T) {
 		{"analyze_log", map[string]any{"cluster": "E1", "game_version": "1.6"}, []string{"log", "--cluster", "E1", "--game-version", "1.6"}},
 		{"search_files", map[string]any{"pattern": "Lib_Gun"}, []string{"files", "search", "Lib_Gun"}},
 		{"save_loadout", map[string]any{"dry_run": true}, []string{"save", "--dry-run"}},
+		{"preview_uninstall", map[string]any{"keep_locked": true}, []string{"uninstall", "--dry-run", "--keep-locked"}},
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},
 		{"edit_loadout", map[string]any{"action": "ignore_external"}, []string{"loadout", "ignore-external"}},
 		{"get_description", map[string]any{"ref": modA, "offline": true}, []string{"describe", modA, "--offline"}},

@@ -216,6 +216,12 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		{Label: T("where packs are kept"), Value: cmds.Setting(a, "pack.dir"), Edit: "path", Argv: []string{"config", "set", "pack.dir", "{}"},
 			Note: T("a full pack takes as much space as its mods")},
 	}})
+	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
+	// settings command).
+	out = append(out, SettingGroup{Title: T("uninstall"), Items: []SettingItem{
+		{Label: T("uninstall RimArcho"), Note: T("remove what RimArcho put on this machine and put back what it changed"),
+			Actions: []SettingAction{{Label: T("uninstall RimArcho…"), Argv: []string{"uninstall"}}}},
+	}})
 	return out
 }
 

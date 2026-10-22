@@ -21,6 +21,7 @@ import { initExchange, exchange } from "./exchange.js";
 import { icon } from "./icons.js";
 import * as motion from "./motion.js";
 import * as ops from "./ops.js";
+import * as uninst from "./uninstall.js";
 
 // ---- loading ----
 
@@ -141,6 +142,7 @@ const NAV = ["home", "needs", "log", "library", "plan", "packs", "env"];
 // becomes current: no game file is written), "plan:new" the new-plan dialog, "pack:<name>"
 // a pack on the packs page.
 async function go(id) {
+  if (uninst.locked()) return; // an uninstall runs, or has run (06 §2.14)
   shell.navigated();
   if (id === "plan:new") return plans.newPlan();
   if (id.startsWith("plan:")) {
@@ -167,6 +169,7 @@ async function openPage(id) {
     case "library": return library.open();
     case "log": return scr.gameLog(undefined, true);
     case "settings": return scr.settings();
+    case "uninstall": return uninst.open();
     case "guide": return guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
   }
 }
@@ -444,7 +447,7 @@ async function preview(what) {
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", "env-page": "env" };
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", "env-page": "env", uninstall: "uninstall" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
@@ -872,6 +875,7 @@ async function start() {
     if (ev.done && S.screen === "home") homePage.home();
   });
   on("pack", (ev) => scr.packEvent(ev));
+  on("uninstall", (ev) => uninst.event(ev));
   on("guide", (ev) => guide.guideEvent(ev));
   on("download", (ev) => guide.downloadEvent(ev));
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again

@@ -297,6 +297,26 @@ type UnpinIn struct {
 	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would change"`
 }
 
+// UninstallIn is preview_uninstall: the player's answers, as archo uninstall's flags.
+type UninstallIn struct {
+	KeepLocked    bool   `json:"keep_locked,omitempty" jsonschema:"move the lock library's copies into a game's Mods/ as ordinary mods (default: recycle bin)"`
+	LockedTo      string `json:"locked_to,omitempty" jsonschema:"the environment whose Mods/ gets them (default: the current one)"`
+	RemovePacks   bool   `json:"remove_packs,omitempty" jsonschema:"packs to the recycle bin (default: kept)"`
+	PacksTo       string `json:"packs_to,omitempty" jsonschema:"where kept packs inside the data folder go (default: Documents/RimArcho packs)"`
+	RemoveSaves   bool   `json:"remove_saves,omitempty" jsonschema:"the environments' own save folders to the recycle bin (default: moved out)"`
+	SavesTo       string `json:"saves_to,omitempty" jsonschema:"where they are moved (default: Documents/RimArcho saves)"`
+	RemoveGames   bool   `json:"remove_games,omitempty" jsonschema:"game folders downloaded with SteamCMD to the recycle bin (default: kept)"`
+	RestoreBackup bool   `json:"restore_modsconfig_backup,omitempty" jsonschema:"put ModsConfig.xml.rimarcho.bak back instead of cleaning the current list"`
+	All           bool   `json:"all,omitempty" jsonschema:"no truncation"`
+}
+
+// UninstallArgv maps preview_uninstall: always the dry run, never --yes (05 §5.2).
+func UninstallArgv(in UninstallIn) []string {
+	return argv("uninstall", "--dry-run").flag("keep-locked", in.KeepLocked).str("locked-to", in.LockedTo).flag("remove-packs", in.RemovePacks).
+		str("packs-to", in.PacksTo).flag("remove-saves", in.RemoveSaves).str("saves-to", in.SavesTo).flag("remove-games", in.RemoveGames).
+		flag("restore-modsconfig-backup", in.RestoreBackup).flag("all", in.All).a
+}
+
 func gv(b *builder, mm string) []string { return b.str("game-version", mm).a }
 
 func toolList() []tool {
@@ -346,6 +366,7 @@ func toolList() []tool {
 		reg("pin_mod", false, false, descPin, func(in PinIn) []string {
 			return argv("pin", in.Ref).str("name", in.Name).flag("git", in.Git).flag("update", in.Update).flag("move-to-library", in.MoveToLibrary).str("reason", in.Reason).flag("dry-run", in.DryRun).a
 		}),
+		reg("preview_uninstall", true, false, descUninstall, UninstallArgv),
 		reg("unpin_mod", false, false, descUnpin, func(in UnpinIn) []string { return argv("unpin", in.Ref).flag("dry-run", in.DryRun).a }),
 	}
 }
