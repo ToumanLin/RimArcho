@@ -351,7 +351,7 @@ WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI �
 | `dep.inactive` | A 需要 B，但 B 没有启用 | `space` 启用 B |
 | `order.violated` | 只有一条时：A 应该排在 B 之后；多条时合并成一项：10 个 Mod 的顺序不对（数的是需要挪动的 Mod），`enter` 展开逐条列出 | `S` 自动排序 |
 | `official.order` | Core 和 DLC 要排在最前面 | `S` 自动排序 |
-| `order.cycle` | 3 个 Mod 的顺序要求互相矛盾 | `enter` 查看，`x` 忽略建议的那一条 |
+| `order.cycle` | 3 个 Mod 的顺序要求互相矛盾（info：淡色，不计入顶栏数字，03 §4.3.1） | `enter` 查看，`x` 忽略建议的那一条 |
 | `incompat.active` | A 与 B 不兼容 | 选择停用哪一个 |
 | `pkg.duplicate-active` | 同一个 Mod 启用了两份 | 选择保留哪一份 |
 | `patch.no-match` | A 的部分内容没有生效（它针对的 B 没有启用） | `space` 启用 B，或 `enter` 查看 |
@@ -362,7 +362,7 @@ WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI �
 - `patch.no-match` 只有在它针对的 Mod 已安装但未启用时（target-inactive）才出现，归入“缺少的前置”；目标根本不存在、版本路由错误等情况玩家无法处理，留在“技术信息”。
 - `def.parent-missing`（错误）写成“A 的部分内容继承的定义不存在，可能缺少前置 Mod”，归入“缺少的前置”，`enter` 查看。
 - `mod.unloadable`（已启用但游戏无法加载）写成“A 已启用，但游戏无法加载它”，`space` 停用；`entry.missing` 写成“列表里有 X，但没有安装它”，`o` 在工坊搜索、`space` 从列表中移除；列表为旧版本保存写成一项，`w` 保存。这三项都归入“这个列表”。
-- `version.unsupported` 只有在其中有 Mod 连上一个版本都不支持（warning）时才出现；全部只是支持上一版本时，按 info 处理，不出现。
+- `version.unsupported` 只有在其中有 Mod 停在上一个版本（warning）时才出现；全部只写了更早的版本时按 info 处理，不出现（日志语料 G8 把两者的严重度对调了，03 §4.3.1）。
 - 合并规则：同一种问题如果一个键就能全部解决，就合并成一项，`enter` 展开逐条显示；目前只有 `order.violated`（`S` 一次排好）。缺失的列表条目、未启用的依赖、日志等每条要单独处理，不合并。
 - 顶栏的数字 = 这个页面上可以操作的项数（折叠的旧日志那一行不算），合并后的一项算 1，所以数字反映的是要做几件事，而不是有几条发现。列表行上的状态图标也只标在这些项涉及的 Mod 上，所以图标和数字一致。
 
@@ -386,6 +386,7 @@ WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI �
 - **按键提示**：最后一行，`键 说明 · 键 说明`，随当前列和界面变化。按键用文字色，说明用次要色，分隔点用淡色。
 - **危险操作双击确认**：例如在详情中删除本地副本，第一次按显示 `✗ 再按一次 d 删除 XXX`，按其他键取消。目前用于：载入外部修改的 ModsConfig.xml（`L`，会替换未保存的修改）、回答身份问题（`s` `c` `u`，合并或拆分 Lineage 不能用 `u` 撤销）。能用 `u` 撤销的操作不需要双击。
 - **保存前确认**：保存是写游戏文件的唯一动作，所以保留一个确认界面，显示差异和版本改写说明（04 §2.2）。
+- **启动预览**：`L` 先显示 `launch --dry-run` 的输出，其中包括最常导致报错的问题（04 §8），确认后启动；这些问题不阻止启动。
 
 ## 10. 实施顺序
 

@@ -195,4 +195,8 @@ M0 时玩家的实际环境（485 个启用的 Mod）中没有本地与工坊同
 | `steam` | 通过 Steam 启动：`steam -applaunch 294100 [参数]` |
 
 - 工作区有未保存的修改时，先询问是否保存。
+- **启动前提示**：`archo launch`（含 `--dry-run`）在启动命令下列出当前列表中最常导致游戏报错的问题，**不阻止启动**。TUI（`L`）和 GUI 的启动预览显示的就是 `launch --dry-run` 的输出，所以三处一致。
+  - 哪些问题由 `internal/app/launchcheck.go` 的 `LaunchChecks` 表决定，按日志语料的“观察 / 机会”从高到低（03 §4.3.1）：`patch.no-match`、`def.parent-missing`、`incompat.active`、`dep.inactive`、`dep.missing`。新的问题代码（例如缺失前置数据集）加一行即可：代码、一句原因、多条时的汇总句。
+  - 每种问题一行：只有一条时写它的结论和第一条建议；多条时写汇总（“5 个补丁在 2 个 Mod 中落空：#a A, #b B”），建议取它们共同的第一条建议，否则 `archo problems --code <code>`。下面各一行 `why:`（原因和语料数字）和 `fix:`。
+  - 已忽略的问题、来自日志的问题不列。启动不等待分析：Def/Patch 层用已存的分析；从未分析或已过期时多一行 `checks:` 说明。
 - 启动后，RimArcho 记录启动时间。下次打开 TUI，或在 TUI 中检测到游戏进程退出时，如果 Player.log 比启动时间新，提示“分析本次日志”。

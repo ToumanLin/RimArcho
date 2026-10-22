@@ -174,7 +174,9 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			versions = append(versions, p)
 			continue
 		}
-		if p.Severity != finding.Error && p.Severity != finding.Warning {
+		// A cycle is info (the corpus saw no effect, 03 §4.3), but only the player can resolve
+		// it: listed with its actions, dimmed and not counted.
+		if p.Severity != finding.Error && p.Severity != finding.Warning && p.Code != "order.cycle" {
 			continue // info: technical information only (06 §7.3)
 		}
 		subj := subjects(p)
@@ -197,7 +199,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			order = append(order, Need{rank: 1, Group: GroupList, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{sortAction()}, Counted: true, Mods: ids, Status: s})
 		case "order.cycle":
 			add(Need{rank: 2, Group: GroupList, Text: Tf("the order requirements of %d mods contradict each other", len(subj)),
-				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: true, Mods: ids, Status: s})
+				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: p.Severity != finding.Info, Dim: p.Severity == finding.Info, Mods: ids, Status: s})
 		case "pkg.duplicate-active":
 			add(Need{rank: 3, Group: GroupList, Text: Tf("%s is enabled twice", nm(x)), Actions: []Action{keepOne(st, ids)}, Counted: true, Mods: ids, Status: s})
 		case "entry.missing":
@@ -283,7 +285,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			mm := st.GameMM()
 			text := Tf("%d mods do not list %s as supported", n, mm)
 			if prev := app.PrevMinor(mm); prev != "" {
-				text = Tf("%d mods do not list %s as supported (%d of them list %s)", n, mm, n-warn, prev)
+				text = Tf("%d mods do not list %s as supported (%d of them list %s)", n, mm, warn, prev)
 			}
 			names := make([]string, 0, n)
 			for _, v := range versions {

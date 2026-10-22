@@ -24,6 +24,8 @@ Research design: `docs/research/00-日志语料顶层设计.md`. Measurements: `
 | (branch claude/g2-sorter-5f1419) | Sorter reports by constraint strength (04 §4.4). Per kind, violated vs kept pairs (same pair, same list-size band), observed/expected error sources: dependency 1.41, loadBefore 1.34 → warning; loadAfter 1.14, community 1.13 → info; a mod declaring it loads before Core/DLC 1.05 → info (harmless); a mod needing a DLC that loads after it 3–4.5 → part of `official.order`. 74 rules observed harmless and 7 harmful ship in `internal/order/observed.json` (aggregate counts; embedded: `data update` only fetches third-party datasets). A rule putting a mod before official content that other constraints keep after it, or a rule between DLCs against the official order, is not used, with the reason, instead of a cycle. `official.order` suggests the cheapest `archo move` (DLC back after its predecessor, or the few mods ahead of it down) | Sort-only rerun of 6,734 logs (`spikes/g2sev`): `order.violated` warnings 19,945 → 2,274 (16,677 info, 8,147 of them observed harmless); logs with such a warning 65.4% → 18.8%; 35 constraints not used (35 logs), logs with a cycle 746 → 716; `official.order` in 1,533 logs: a move suggested in 1,381 (DLC back 571, mods down 810; one move in 1,152), sort only 152 |
 | d268a93, 0ad44ae, a7117bd | Rules for the RESULT gaps (below): missing textures and `GetNamed` names looked up in the enabled mods' XML and DLL string literals; a mod that defines and uses the missing def; reflection-only resolvers for `Cannot resolve dependency to assembly`; save holders (`curParent`); `absFilePath:` files; `<F>V</F>` field errors; Lunar/Components DLLs analysed; a library several mods ship is not the topmost frame | Same 671 logs: with a source 28.4% → 35.6%, attributed 59.0% → 63.6% |
 
+| (branch claude/g8-severity-a2d627) | G8: severities from the G4 measurement (03 §4.3.1). `official.order` error → warning (mod subjects 7.4% / 3.6%, 2.1×; the overall 2.3% / 2.5% is not usable, half its subjects are DLCs and Core/DLC are never sources); `order.cycle` warning → info (6.8% / 6.1%; still listed, dimmed and uncounted, in the needs view); `version.unsupported` reversed: stopping at the previous minor 10.4% / 4.0% → warning, older only 0.8% / 3.2% → info. Kept: `dep.missing` error (the 1.6% / 3.3% "(lib)" rows are a research artefact: the player had the dependency, the library did not; real missing dependencies 9.9% / 4.4%), `patch.contested` info (6.3× overall, 3.2× when its mods have no `patch.no-match`, the same as `def.override`), `harmony.multi-transpiler` and `def.abstract-collision` warning (3.0× and 3.2× with Harmony-stack errors excluded, so not only circular). `archo launch` (and the TUI/GUI launch previews, which show its dry run) lists the problems of a code table (`app.LaunchChecks`: patch.no-match, def.parent-missing, incompat.active, dep.inactive, dep.missing), one row per code with why and fix, never blocking (04 §8) | Same 6,727 logs, mapping only. Error findings 41,710 → 40,081, logs with any 65.5% → 59.6%, subject is an error source 12.3% → 12.7% (chance 4.4%); without the `dep.missing (lib)` artefact 30,769 → 29,140, logs 52.6% → 41.5%, 16.1% → 16.9%. Warnings 188,614 → 190,607 (median 16 → 17 per log), 25.9% → 25.8%. Pre-launch list: shown in 60.6% of logs (median 1 problem, p90 34, grouped into ≤ 5 rows), 29.6% of its problems have their mod as an error source (chance 4.7%) |
+
 ### 2.1 G1 gap rules (d268a93 … a7117bd), measured
 
 Compared on the same warmed research home (`home-g1`, every log's mods analysed once before;
@@ -96,11 +98,18 @@ logs of 1.6 with full mod lists. Numbers in `spikes/corpusrun/RESULT.txt` "Final
    `dep.missing (lib)` 1.6% / 3.3% and `official.order` 2.3% / 2.5% (error, at or below chance:
    too severe); `def.override` 25% / 8.1% (info, hidden by default). Harmony codes look 2–3×
    above chance, but attribution names Harmony patchers from the same stack lines, so that ratio is
-   partly circular.
+   partly circular. G8 (§2) acted on this: two of the "too severe" readings did not hold up — the
+   `dep.missing (lib)` rows are a research artefact, and `official.order`'s overall rate is blind to
+   DLC subjects — and the error tier (16.9%) still predicts less than the warning tier (25.8%),
+   because the most predictive problem, `patch.no-match`, is too common to block packs. Precision
+   is what the pre-launch list (04 §8) selects on, not severity.
 
 ## 4. Next
 
-- Lower `dep.missing (lib)` and `official.order` from error; consider `patch.contested` as warning.
+- ~~Lower `dep.missing (lib)` and `official.order` from error; consider `patch.contested` as warning.~~
+  Done in G8 (§2): `official.order` warning; `dep.missing` and `patch.contested` kept, with reasons.
+- Pre-launch list (04 §8): add the G10 missing-dependency / known-bad-combination codes to
+  `app.LaunchChecks` once measured; check the list's precision on new corpus runs.
 - IL scan for manual `Harmony.Patch` targets; scan HugsLib.dll.
 - Feed the G5 patterns into MCP `Instructions` / `analyze_log` (draft:
   `docs/research/01-范式库接入草案.md`); 41% of clusters are in kinds the diagnosis workflow does
