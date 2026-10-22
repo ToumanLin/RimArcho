@@ -573,8 +573,10 @@ func inRange(from string) func(indexEntry) bool {
 // Mod is one line of "Loaded mods:".
 type Mod struct {
 	Name       string   `json:"name"`
-	Pkg        string   `json:"pkg"` // lower-case
-	MV         string   `json:"mv,omitempty"`
+	Pkg        string   `json:"pkg"`          // lower-case
+	MV         string   `json:"mv,omitempty"` // [mv:] Manifest version
+	V          string   `json:"v,omitempty"`  // [v:] About.xml modVersion
+	OV         string   `json:"ov,omitempty"` // [ov:] override version
 	Assemblies []string `json:"asm,omitempty"`
 }
 
@@ -615,9 +617,8 @@ type Record struct {
 }
 
 var (
-	modRe = regexp.MustCompile(`\(([^()\s]+)\)(?:\[mv:([^\]]*)\])?: (.*)$`)
-	hpRe  = regexp.MustCompile(`(PRE|post|TRANS|FIN|ILM): `)
-	mmRe  = regexp.MustCompile(`^(\d+\.\d+)\.`)
+	hpRe = regexp.MustCompile(`(PRE|post|TRANS|FIN|ILM): `)
+	mmRe = regexp.MustCompile(`^(\d+\.\d+)\.`)
 )
 
 func parse(id, created string, raw []byte) Record {
@@ -662,18 +663,9 @@ func parse(id, created string, raw []byte) Record {
 			if l == "" {
 				continue
 			}
-			m := modRe.FindStringSubmatchIndex(l)
-			if m == nil {
+			mod, ok := parseModLine(l)
+			if !ok {
 				continue
-			}
-			mod := Mod{Name: strings.TrimSpace(l[:m[0]]), Pkg: strings.ToLower(l[m[2]:m[3]])}
-			if m[4] >= 0 {
-				mod.MV = l[m[4]:m[5]]
-			}
-			if asm := l[m[6]:m[7]]; asm != "(no assemblies)" {
-				for _, a := range splitTop(asm) {
-					mod.Assemblies = append(mod.Assemblies, a)
-				}
 			}
 			r.Mods = append(r.Mods, mod)
 		case "harmony":
@@ -730,6 +722,90 @@ func parse(id, created string, raw []byte) Record {
 	}
 	r.Status = "ok"
 	return r
+}
+
+// parseModLine reads one "Loaded mods:" line:
+//
+//	Name(package.id)[v:1.2][mv:1.2.0]: Asm(av:1.0,fv:1.2), Other(1.0)
+//
+// HugsLib writes none, one or two version markers: [mv:] (Manifest), [v:] (About.xml
+// modVersion), [ov:] (override). Values can contain brackets ("[v:[1.6.1]2026.1.10]") and
+// package ids can contain spaces, so the line is read from the ": " that ends the markers.
+func parseModLine(l string) (Mod, bool) {
+	var mod Mod
+	i := -1
+	for k := 1; k+1 < len(l); k++ {
+		if l[k] == ':' && l[k+1] == ' ' && (l[k-1] == ')' || l[k-1] == ']') {
+			i = k
+			break
+		}
+	}
+	if i < 0 {
+		return mod, false
+	}
+	head, asm := l[:i], strings.TrimSpace(l[i+2:])
+	// version markers, right to left
+	for strings.HasSuffix(head, "]") {
+		depth, j := 0, len(head)-1
+		for ; j >= 0; j-- {
+			if head[j] == ']' {
+				depth++
+			} else if head[j] == '[' {
+				if depth--; depth == 0 {
+					break
+				}
+			}
+		}
+		if j < 0 {
+			return mod, false
+		}
+		key, val, ok := strings.Cut(head[j+1:len(head)-1], ":")
+		if !ok {
+			return mod, false
+		}
+		switch key {
+		case "mv":
+			mod.MV = val
+		case "v":
+			mod.V = val
+		case "ov":
+			mod.OV = val
+		}
+		head = head[:j]
+	}
+	if !strings.HasSuffix(head, ")") {
+		return mod, false
+	}
+	depth, j := 0, len(head)-1
+	for ; j >= 0; j-- {
+		if head[j] == ')' {
+			depth++
+		} else if head[j] == '(' {
+			if depth--; depth == 0 {
+				break
+			}
+		}
+	}
+	if j < 0 || j == len(head)-2 {
+		return mod, false
+	}
+	mod.Name = strings.TrimSpace(head[:j])
+	mod.Pkg = strings.ToLower(strings.TrimSpace(head[j+1 : len(head)-1]))
+	if asm != "(no assemblies)" && asm != "" {
+		mod.Assemblies = splitTop(asm)
+	}
+	return mod, true
+}
+
+// Version is the mod's version as HugsLib reports it: override, then About.xml, then Manifest.
+func (m Mod) Version() string {
+	switch {
+	case m.OV != "":
+		return m.OV
+	case m.V != "":
+		return m.V
+	}
+	return m.MV
 }
 
 // splitTop splits "A(1.0), B(av:1,fv:2)" on commas outside parentheses.

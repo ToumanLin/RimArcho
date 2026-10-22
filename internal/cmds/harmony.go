@@ -26,7 +26,12 @@ func harmonyLine(ix *app.Index, h *store.HarmonyRow, withMod, withTarget bool) s
 	if h.Skips {
 		l += "  (bool prefix: may skip the original)"
 	}
-	if h.Dynamic {
+	switch {
+	case h.Manual && h.Dynamic:
+		// the target says why it was not resolved: <manual: …>
+	case h.Manual:
+		l += "  (Harmony.Patch call in code)"
+	case h.Dynamic:
 		l += "  (target chosen at runtime by TargetMethod())"
 	}
 	return l
@@ -156,7 +161,24 @@ func harmonyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			ps.Truncate(limit, "archo harmony --mod "+ix.Ref(m.ID)+" --all")
 		}
 		if manual {
-			root.KV("manual", "targets patched from code are not statically known (archo source search \".Patch(\" --in "+ix.Ref(m.ID)+")")
+			// G9 (03 §5.3): the targets of Harmony.Patch calls read from IL, and why the
+			// others could not be resolved.
+			found := 0
+			var open []*store.HarmonyRow
+			for _, h := range rows {
+				switch {
+				case h.Manual && h.Dynamic:
+					open = append(open, h)
+				case h.Manual:
+					found++
+				}
+			}
+			mn := root.Add(fmt.Sprintf("manual: %d patch targets found in Harmony.Patch calls, %d not resolved (archo source search \".Patch(\" --in %s)", found, len(open), ix.Ref(m.ID)))
+			for _, h := range open {
+				why := strings.TrimSuffix(strings.TrimPrefix(h.Target, "<manual: "), ">")
+				mn.Addf("%-10s %s.%s  not resolved: %s", h.Kind, h.PatchType, h.PatchMethod, why)
+			}
+			mn.Truncate(limit, "archo harmony --mod "+ix.Ref(m.ID)+" --all")
 		} else if len(rows) == 0 && len(asms) > 0 {
 			root.Add("no Harmony patches declared")
 		}

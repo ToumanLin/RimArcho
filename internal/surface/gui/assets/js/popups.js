@@ -204,11 +204,26 @@ export function panel(title, content, goLabel, go, cls = "") {
 // text shows lines (an inspection, a list, help).
 export function text(title, lines) { confirm(title, lines, "", null); }
 
-// choose offers a few choices; pick gets the chosen index.
-export function choose(title, labels, pick, current = 0) {
+// choose offers a few choices; pick gets the chosen index. other is a second action on
+// the highlighted choice ({key, label, run}), shown under the list (the environment
+// chooser's 删除环境).
+export function choose(title, labels, pick, current = 0, other = null) {
   open("choose", title, (pop, p) => {
     pop.append(el("div", "ttl", title));
     optionList(pop, p, labels.map((l, i) => ({ l, i })), (d, o) => d.append(o.l), (o) => { close(); pick(o.i); });
+    if (other) {
+      const btns = el("div", "btns");
+      const b = el("button", "", other.label + "  " + (other.key === "Delete" ? "del" : other.key));
+      const run = () => { const i = p.opts[p.sel] && p.opts[p.sel].i; close(); if (i !== undefined) other.run(i); };
+      b.onclick = run;
+      btns.append(b);
+      pop.append(btns);
+      const keys = p.keys;
+      p.keys = (e) => {
+        if (e.key === other.key) { e.preventDefault(); run(); return true; }
+        return keys(e);
+      };
+    }
     p.sel = current;
     p.redraw();
   });

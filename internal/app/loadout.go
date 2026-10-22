@@ -665,6 +665,9 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 // SaveResult describes a write to the game: archo save, or the writing part of a launch
 // (04 §4.1, 08 §2).
 type SaveResult struct {
+	// Moved: plain Mods/ folders moved into the lock library first (--move-duplicates); in a
+	// dry run, the ones that would move.
+	Moved      []DuplicateMove
 	State      *LoadoutState
 	Path       string
 	Backup     string
@@ -691,12 +694,16 @@ type SaveResult struct {
 // Save writes the workspace to ModsConfig.xml without starting the game (08 §2 "写入游戏":
 // steps 1–5 and 7). It is allowed while the game runs; the game reads the file on its next
 // start.
-func (a *App) Save(dryRun bool) (*SaveResult, error) {
+func (a *App) Save(dryRun bool) (*SaveResult, error) { return a.SaveWith(dryRun, false) }
+
+// SaveWith is Save that, with move, first moves plain Mods/ folders in the way of a deployed
+// copy into the lock library (08 §3; --move-duplicates). The dry run lists those moves.
+func (a *App) SaveWith(dryRun, move bool) (*SaveResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
 	}
-	r, err := a.writeGame(st, dryRun, false)
+	r, err := a.writeGame(st, dryRun, false, move)
 	if err != nil {
 		return nil, err
 	}
@@ -711,7 +718,8 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) {
 // (step 2 happened in Loadout): Mods/ links, ModsConfig.xml by the 04 §4.1 rules, and a
 // version — source "launch" when launch is set (none when the list equals the newest
 // version), else "user" or "undo". dryRun computes the same result and writes nothing.
-func (a *App) writeGame(st *LoadoutState, dryRun, launch bool) (*SaveResult, error) {
+// move: plain Mods/ folders in the way move into the lock library first (08 §3).
+func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool) (*SaveResult, error) {
 	e := st.Ix.Env
 	if st.FilePath == "" {
 		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
@@ -725,11 +733,55 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch bool) (*SaveResult, err
 	} else if c != nil {
 		return nil, conflictError(st, c)
 	}
-	r := &SaveResult{State: st, Path: st.FilePath, DryRun: dryRun, Changes: st.Changes()}
-	mods, links, err := planLinks(st, a.ModsCopies(st.Ix))
+	copies := a.ModsCopies(st.Ix)
+	mods, links, dups, err := planLinks(st, copies)
 	if err != nil {
 		return nil, err
 	}
+	var moved []DuplicateMove
+	if len(dups) > 0 {
+		de := &DuplicatesError{Moves: a.planMoves(st, copies, dups), Fix: "archo save --move-duplicates"}
+		if launch {
+			de.Fix = "archo launch --move-duplicates"
+		}
+		if !move || !de.Movable() {
+			if !de.Movable() {
+				de.Fix = ""
+			}
+			return nil, de
+		}
+		if !dryRun {
+			// Move them, then write from the state after the move (the instances moved).
+			if _, err := a.doMoves(de.Moves); err != nil {
+				return nil, err
+			}
+			st2, err := a.Loadout()
+			if err != nil {
+				return nil, err
+			}
+			r, err := a.writeGame(st2, false, launch, false)
+			if r != nil {
+				r.Moved = de.Moves
+			}
+			return r, err
+		}
+		// The dry run: what would be linked once they have moved.
+		moved = de.Moves
+		var rest []ModsCopy
+		for _, c := range copies {
+			gone := false
+			for _, m := range de.Moves {
+				gone = gone || m.Copy.Name == c.Name
+			}
+			if !gone {
+				rest = append(rest, c)
+			}
+		}
+		if mods, links, _, err = planLinks(st, rest); err != nil {
+			return nil, err
+		}
+	}
+	r := &SaveResult{State: st, Path: st.FilePath, DryRun: dryRun, Changes: st.Changes(), Moved: moved}
 	r.Links = links
 	r.Tokens = st.Reg.Tokens(st.List, func(id string) string {
 		if m := st.Ix.ByID[id]; m != nil {

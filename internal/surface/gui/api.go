@@ -225,7 +225,7 @@ func (s *API) BuildPage(light bool, tex int) (*view.BuildPage, error) {
 		return nil, err
 	}
 	pl.Measure(dir)
-	p := view.BuildPageOf(pl, plan, chip, dir, light)
+	p := view.BuildPageOf(pl, plan, chip, dir, light, tex)
 	p.Name = name
 	return p, nil
 }
@@ -248,12 +248,14 @@ func (s *API) PackNameCheck(name string) string {
 }
 
 // PackDryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run (nothing is written).
-func (s *API) PackDryRun(name string, light bool) []string {
+func (s *API) PackDryRun(name string, light bool, tex int) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	argv := []string{"pack", "build", strings.TrimSpace(name), "--dry-run"}
 	if light {
 		argv = append(argv, "--light")
+	} else {
+		argv = append(argv, app.PackBuildArgs(view.PackTextureOptions(tex))...)
 	}
 	text, _ := cmds.Execute(s.a, argv)
 	st := s.boardState()
@@ -411,14 +413,12 @@ func (s *API) PackRemoveUnfinished(name string) (string, error) {
 	return view.Tf("deleted the unfinished build of %s", name), nil
 }
 
-// PackLaunch plays a pack.
-func (s *API) PackLaunch(name string) (string, error) {
+// PackLaunch plays a pack. move: the player agreed to move the folders in the way into the
+// lock library first (Outcome.Moves, 08 §5.3).
+func (s *API) PackLaunch(name string, move bool) (*view.Outcome, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, err := s.a.LaunchPack(name, false); err != nil {
-		return "", err
-	}
-	return view.Tf("pack %s: the game is starting", name), nil
+	return view.LaunchPack(s.a, name, move), nil
 }
 
 // PackRemove moves a pack to the recycle bin.
@@ -795,6 +795,20 @@ func (s *API) Run(what string) (*view.Outcome, error) {
 	return view.Run(s.a, what), nil
 }
 
+// RunMoving is Run after the player agreed to move the folders in the way into the lock
+// library (Outcome.Moves, 08 §3).
+func (s *API) RunMoving(what string) (*view.Outcome, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	switch what {
+	case view.ListSave, view.ListLaunch:
+	default:
+		return nil, fmt.Errorf("no action %s", what)
+	}
+	return view.RunMoving(s.a, what), nil
+}
+
 // ---- tags (06 §3.8) ----
 
 // TagCandidates for the mods.
@@ -954,6 +968,34 @@ func (s *API) UseEnv(name string) (string, error) {
 	return s.text(view.Tf("switched to %s", name), err)
 }
 
+// EnvRemoval is the dry run of removing an environment (06 §2.14): the confirmation's
+// title and lines. Nothing changes.
+type EnvRemoval struct {
+	Title string   `json:"title"`
+	Lines []string `json:"lines"`
+}
+
+func (s *API) EnvRemovePreview(name string) (*EnvRemoval, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, err := s.a.EnvRemovePreview(name)
+	if err != nil {
+		return nil, err
+	}
+	return &EnvRemoval{Title: view.EnvRemovalTitle(r), Lines: view.EnvRemovalLines(r)}, nil
+}
+
+// RemoveEnv removes an environment from RimArcho's records; another one becomes current
+// when it was in use. Refused while its game runs.
+func (s *API) RemoveEnv(name string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.a.EnvName = ""
+	_, err := s.a.EnvRemove(name)
+	s.board, s.needs, s.lib = nil, nil, nil
+	return s.text(view.Tf("removed environment %s", name), err)
+}
+
 // Logs are the logs the player may choose (Player.log, Player-prev.log).
 func (s *API) Logs() []string {
 	s.mu.Lock()
@@ -1027,10 +1069,18 @@ func (s *API) LogCluster(path, id string) ([]string, error) {
 	text, _ := cmds.Execute(s.a, []string{"log", "--file", path, "--cluster", id})
 	st := s.boardState()
 	var out []string
-	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+	for _, l := range view.WithoutPatternBlock(strings.Split(strings.TrimRight(text, "\n"), "\n")) {
 		out = append(out, view.Humanize(st, l))
 	}
 	return out, nil
+}
+
+// LogPattern is the pattern card of a cluster (06 §2.10): community background shown apart
+// from the evidence; nil when the cluster matches no pattern.
+func (s *API) LogPattern(path, id string) *view.PatternCard {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.PatternCardOf(s.a, s.boardState(), path, id)
 }
 
 // SelectLog picks the log whose errors join 需要处理.

@@ -61,6 +61,8 @@ func evIcon(kind string) string {
 		return ic.evCommunity
 	case view.EvRule:
 		return ic.evRule
+	case view.EvCorpus:
+		return ic.evCorpus
 	}
 	return markDot
 }

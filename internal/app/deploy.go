@@ -1,7 +1,6 @@
 package app
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -134,7 +133,7 @@ type LinkChange struct {
 }
 
 // planLinks compares the RimArcho links in Mods/ with the deployed instances of the list.
-func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, error) {
+func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []DuplicateMove, error) {
 	mods := modsDir(st.Ix)
 	want := map[string]*store.Mod{}
 	for _, e := range st.List {
@@ -144,15 +143,15 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, error
 	}
 	if mods == "" {
 		if len(want) > 0 {
-			return "", nil, fmt.Errorf("the environment has no Mods/ folder to link %d mod(s) into; set the game folder with archo env set --game <dir>", len(want))
+			return "", nil, nil, fmt.Errorf("the environment has no Mods/ folder to link %d mod(s) into; set the game folder with archo env set --game <dir>", len(want))
 		}
-		return "", nil, nil
+		return "", nil, nil, nil
 	}
 	var out []LinkChange
 	have := map[string]bool{}
 	ents, err := os.ReadDir(mods)
 	if err != nil && !os.IsNotExist(err) {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	for _, d := range ents {
 		name := d.Name()
@@ -167,7 +166,7 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, error
 		}
 		p := filepath.Join(mods, name)
 		if !source.IsLink(p) {
-			return "", nil, fmt.Errorf("%s starts with %s but is not a link; RimArcho does not touch it (rename or remove it yourself)", p, DeployPrefix)
+			return "", nil, nil, fmt.Errorf("%s starts with %s but is not a link; RimArcho does not touch it (rename or remove it yourself)", p, DeployPrefix)
 		}
 		m := want[strings.ToLower(name)]
 		if m != nil && sameDir(p, m.RealPath) {
@@ -183,14 +182,14 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, error
 	}
 	// A link next to another copy of the same packageId in Mods/ makes the game report an
 	// error and ignore one of them (08 §3): refuse instead of making the pair.
-	if dup := deployDuplicates(st, want, copies); dup != "" {
-		return "", nil, errors.New(dup)
+	if dups := deployDuplicates(st, want, copies); len(dups) > 0 {
+		return "", nil, dups, nil
 	}
 	for key, m := range want {
 		if !have[key] {
 			if p := filepath.Join(mods, DeployName(m)); !source.IsLink(p) {
 				if _, err := os.Lstat(p); err == nil {
-					return "", nil, fmt.Errorf("%s already exists and is not a link; RimArcho does not touch it", p)
+					return "", nil, nil, fmt.Errorf("%s already exists and is not a link; RimArcho does not touch it", p)
 				}
 			}
 			out = append(out, LinkChange{Op: "add", Name: DeployName(m), Target: m.RealPath, Mod: m.ID})
@@ -202,7 +201,7 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, error
 		}
 		return out[i].Name < out[j].Name
 	})
-	return mods, out, nil
+	return mods, out, nil, nil
 }
 
 func sameDir(link, target string) bool {
@@ -237,22 +236,21 @@ func applyLinks(mods string, plan []LinkChange) error {
 	return nil
 }
 
-// deployDuplicates names the instances to deploy that share a packageId with another copy in
-// Mods/ (a folder, or another tool's link; RimArcho's own links are replaced anyway).
-func deployDuplicates(st *LoadoutState, want map[string]*store.Mod, copies []ModsCopy) string {
-	byPkg := map[string][]string{}
+// deployDuplicates lists the plain Mods/ entries in the way of instances to deploy: a
+// folder, or another tool's link, with the packageId of one (RimArcho's own links are
+// replaced anyway).
+func deployDuplicates(st *LoadoutState, want map[string]*store.Mod, copies []ModsCopy) []DuplicateMove {
+	byPkg := map[string][]ModsCopy{}
 	for _, c := range copies {
 		if c.By == CopyPlayer {
-			byPkg[c.PackageID] = append(byPkg[c.PackageID], "Mods/"+c.Name)
+			byPkg[c.PackageID] = append(byPkg[c.PackageID], c)
 		}
 	}
-	var out []string
+	var out []DuplicateMove
 	for _, m := range want {
-		if ns := byPkg[m.PackageID]; len(ns) > 0 {
-			out = append(out, fmt.Sprintf("%s %s and %s have packageId %s; linking it too would put two copies in Mods/ (use the copy in Mods/: archo swap %s, or move the folder out of Mods/)",
-				st.Ix.Ref(m.ID), m.DisplayName(), strings.Join(ns, ", "), m.PackageID, st.Ix.Ref(m.ID)))
+		for _, c := range byPkg[m.PackageID] {
+			out = append(out, DuplicateMove{Copy: c, For: st.Ix.Ref(m.ID) + " " + m.DisplayName(), Link: DeployName(m)})
 		}
 	}
-	sort.Strings(out)
-	return strings.Join(out, "; ")
+	return out
 }

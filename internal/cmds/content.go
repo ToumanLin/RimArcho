@@ -270,7 +270,28 @@ func patchesCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			unknown++
 		}
 	}
-	d, root := render.New(fmt.Sprintf("patches: %d operations, %d failed, %d not simulated", len(pfs), failed, unknown))
+	head := fmt.Sprintf("patches: %d operations, %d failed, %d not simulated", len(pfs), failed, unknown)
+	if f.FailedOnly {
+		// The filtered list holds only failures: say how many operations were looked at, so
+		// "0 failed" does not read as "this mod has no patches" (G6/G7 agent traces).
+		all := f
+		all.FailedOnly = false
+		total, err := c.App.Store.PatchFacts(s.Run.ID, all)
+		if err != nil {
+			return nil, err
+		}
+		unknown = 0
+		for _, p := range total {
+			if p.Result == analyze.ResultUnknown {
+				unknown++
+			}
+		}
+		head = fmt.Sprintf("patches: %d failed of %d operations simulated, %d not simulated", failed, len(total), unknown)
+		if len(total) == 0 {
+			head = "patches: no operations (nothing to simulate)"
+		}
+	}
+	d, root := render.New(head)
 	if !s.Fresh {
 		root.KV("analysis", "stale (archo analyze)")
 	}

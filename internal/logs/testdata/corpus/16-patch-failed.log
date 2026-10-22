@@ -1,0 +1,4 @@
+[Combat Extended - Start of stack trace]
+Verse.PatchOperationReplace(xpath="Defs/ThingDef[defName="GR_Catalope"]/verbs"): Failed to find a node with the given xpath
+[End of stack trace]
+Source file: C:\Steam\steamapps\workshop\content\294100\3495749827\ModPatches\Vanilla Genetics Expanded\Patches\Vanilla Genetics Expanded\Patch_VerbShoot.xml

@@ -75,6 +75,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | `scan:<n>` | 一次扫描 | `scan:17` | `changes --since scan:<n>` |
 | `env:<名称>` | 环境 | `env:main` | 只出现在输出里；命令参数和 `--env` 直接写名称 |
 | `v<n>` | 方案的一个版本 | `v3` | `loadout diff/checkout` 使用；也接受 `workspace`（当前编辑状态） |
+| `pattern:<id>` | 一个错误范式（03 §6.8） | `pattern:g:xml.type-missing` | 不属于某个环境；`pattern:m:<packageId>:<hash>` 是某个 Mod 的已知错误 |
 
 - 不带 `#` 的 ID 前缀也被接受，因为 `#` 在 bash 和 PowerShell 里是注释符，命令行里带 `#` 的引用要加引号（`'#a3f9'`）。TUI、GUI 和 MCP 没有这个问题。
 - `harmony:<Type.Method>`（如 `harmony:Verse.Pawn.Tick`）只出现在 `harmony --target` 输出的标题里；作为参数时直接写方法名（`harmony --target Verse.Pawn.Tick`），带 `harmony:` 前缀的输入（待实现）。
@@ -193,7 +194,7 @@ next:
 | | `env branches [--install-steamcmd]` / `env download <分支> --to <目录> --account <账户名> [--name <环境>] [--saves …] [--install-steamcmd]` | 用 SteamCMD 列出 RimWorld 的分支、下载一个版本并加为环境；登录在 SteamCMD 里（08 §11） |
 | Mod 文件夹 | `folder list` / `folder add workshop\|steamcmd\|extra <目录>` / `folder remove src:<标签>` | 所有环境共用的 Mod 文件夹（02 §3.1）。MCP：`status show=folders`（只读） |
 | | `env rebind src:<标签> yes\|no` | 回答“这是原来的来源吗？” |
-| | `env remove <名> --yes` | 忘掉一个环境，只删 RimArcho 的数据，不动游戏文件 |
+| | `env remove <名> [--yes]` | 忘掉一个环境，只删 RimArcho 的数据，不动游戏文件；不带 `--yes` 是预演（忘掉什么、留下什么、之后用哪个环境）。那个游戏在运行时拒绝；删当前环境时换到另一个。GUI 环境页和 TUI `E` 同样（06 §2.8）；MCP 不提供（环境修改留给玩家） |
 | 扫描 | `scan [--full] [--game-only]` | 扫描并对账（02 §4）；`--full` 重新哈希全部语义文件；`--game-only` 只扫当前游戏的 `Data`、`Mods` |
 | 查询 | `status` | 当前环境概况：游戏版本、各来源 Mod 数、残留、Lineage、上次扫描、变化、方案（启用数、缺失项、与游戏里的列表的差异）、ModsConfig 版本不符的提示、问题数、游戏运行状态 |
 | | `list [--active] [--filter <表达式>] [--all]` | 列出 Mod。`--active` 按加载顺序列出当前方案；`--filter` 支持 `source:<标签\|类型>`、`status:live\|tombstone\|all`、`residue`、`unloadable`、`copies`、`pkg:`、`ws:`、`tag:<标签>`、`lineage:` 和普通词。默认只列活着的 Instance |
@@ -211,6 +212,7 @@ next:
 | | `library remove-from-plans <引用…>` | 从所有方案（同一游戏目录的所有环境）里拿掉，每个方案一步撤销 |
 | | `library move-to-locked <引用> [--dry-run]` | 把 `Mods/` 里的备用副本收进锁定库；Instance 不变，各方案照用（06 §2.9） |
 | | `log [--cluster <E#>] [--file <路径>] [--prev] [--text <文本>] [--select] [--all] [--since <游标>]` | 日志归因（03 §6）。`--prev` 读 Player-prev.log；`--text` 分析粘贴的日志或堆栈；`--select` 让 `problems` 纳入这份日志。簇列表带一行 `cursor: log1.…`；`--since <游标>` 只列这之后新出现（`new`）或次数增加（`+N`）的簇，游戏重启过时说明游标已过期并列出新一次运行的全部簇（03 §6.6）；不与 `--cluster`、`--text` 同用 |
+| | `pattern [<pattern:id>] [--mod <packageId>] [--all]` | 错误范式库（03 §6.8）：一个范式的识别规则、常见原因、诊断路线、修法和语料中的出现次数；不带参数列出所有通用范式，`--mod` 列出某 Mod 的已知错误 |
 | | `log --follow [--once] [--json]` | 游戏运行时跟踪 Player.log，新簇出现就输出（03 §6.6）；`--once` 读完现有内容就停；`--json` 每簇一行 JSON |
 | | `files search <模式> [--mod <引用>] [--regex] [--languages] [--all]` | 在已启用 Mod 的生效内容（XML / TXT）里搜索，不区分大小写；默认跳过 `Languages/`（翻译会重复每个键），`--languages` 才搜 |
 | | `source <引用> [--type <Namespace.Type>] [--all]` | 按需反编译（ilspycmd，按 DLL 哈希缓存，03 §5.4） |
@@ -303,7 +305,7 @@ next:
 | `explain_relation` | `why`（`a`、`b`、`game_version`） | true | — |
 | `list_problems` | `problems`；`ref` 时为 `problems show`。默认加 `--min-severity warning`，给了 `severity`、`min_severity` 或 `all` 时不加 | true | — |
 | `list_changes` | `changes`（`ref`、`since`、`all`） | true | — |
-| `analyze_log` | `log`（`cluster`、`text`、`file`、`prev`、`all`、`since`、`game_version`） | true | — |
+| `analyze_log` | `log`（`cluster`、`text`、`file`、`prev`、`all`、`since`、`game_version`）；`pattern=<引用>` 对应 `pattern`（`list` 列出全部） | true | — |
 | `search_files` | `files search`（`pattern`、`mod`、`regex`、`languages`、`all`） | true | — |
 | `read_source` | 有 `search` 时 `source search`：给了 `in` 用 `--in`，`scope: "active"` 用 `--active --yes`，否则 `--implicated`；`budget` 默认 10。否则 `source`（`ref`、`type`） | true | — |
 | `edit_loadout` | `action`：`enable` / `disable` / `move` / `swap` / `sort`（`dry_run`）/ `undo` / `redo` / `stage`（`stage add`）/ `unstage`（`stage drop`）/ `restore`（`stage restore`）；位置参数 `at`、`before`、`after`、`up`、`down` | false | false |
@@ -347,7 +349,7 @@ next:
 
 **Instructions**（初始化时发给客户端，原文英文）的内容：
 
-- 开头：RimArcho 认识一套 RimWorld 安装——每个 Mod 实例、启用列表、Def、Patch 模拟结果、Harmony 补丁、Player.log 错误簇和反编译的 C#。每个工具返回大纲文本，其中的引用（`#id`、`L#id`、`pkg:`、`ws:`、`def:Type/name`、`p:<hex>`、`log:E<n>`、`r:<n>`）可以直接传给别的工具。
+- 开头：RimArcho 认识一套 RimWorld 安装——每个 Mod 实例、启用列表、Def、Patch 模拟结果、Harmony 补丁、Player.log 错误簇和反编译的 C#。每个工具返回大纲文本，其中的引用（`#id`、`L#id`、`pkg:`、`ws:`、`def:Type/name`、`p:<hex>`、`log:E<n>`、`r:<n>`、`pattern:<id>`）可以直接传给别的工具。
 - 诊断流程（用原样证据，不转述）：
   1. **从错误开始。** 用户贴了日志就 `analyze_log text=…`；否则 `analyze_log` 看当前 Player.log，再 `analyze_log cluster=E<n>` 看具体的簇。每个簇列出候选 Mod 和角色：source（它的代码或数据产生了错误）、patcher（只是在某一帧上有 Harmony 补丁）、dependency（提供的东西缺失或被停用）、mentioned（出现在消息或较低的帧里）。没有进一步证据时，不能把 patcher 或 mentioned 说成原因。
   2. **用 `get_mod` 确认身份和状态**：确切的实例、是否启用及位置、路径、同一 Lineage 的其他副本。
@@ -359,6 +361,8 @@ next:
   4. `list_problems` 给静态全貌（依赖、不兼容、加载顺序、Def 覆盖、Patch 落空、Harmony 冲突）；`explain_relation` 解释两个具体的 Mod。
   5. **报告**：失败阶段、XML / 程序集 / 混合、确切的 Mod 实例和路径、文件+行或类+方法、为什么失败、点名的 Mod 是原因、依赖还是旁观者，以及最小的修复。
 - 编辑：先 `pin_mod`（从不原地改工坊文件），再改副本；`edit_loadout` 只改 RimArcho 里的方案；`save_loadout` 写游戏的 ModsConfig.xml（先问用户）。破坏性工具（`save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`maintenance`）先用 dry run 给用户看，再经用户同意调用。诊断流程加一步：以前能跑时，用 `list_changes` 和 `plan_history action=diff` 找出变化。
+- 工具结果上限 24 KB：用 `mod=`、`target=`、模式或簇缩小范围，不用 `all=true`（日志语料 G7）。
+- 最后附错误范式检查清单（`patternChecklist`，03 §6.8）：按语料中的实际分布排序，覆盖诊断流程未讲到的类别——读档、缺资源、配置检查、程序集加载，以及噪音；每类给出 `pattern=<id>` 追问。
 
 各工具描述的要点（示例调用与输出见 `internal/surface/mcp/desc.go`）：
 
@@ -373,7 +377,7 @@ next:
 | `explain_relation` | 问题点名了两个 Mod，或用户问“为什么 A 要在 B 后面” |
 | `list_problems` | 静态问题；`ref=<p:…>` 看证据和修复命令；`code` 接受前缀（`dep`、`patch`、`harmony`）；方案改变后 Def / Patch / Harmony 层自动重建（几秒） |
 | `list_changes` | 用户说“昨天还好好的”时找变化 |
-| `analyze_log` | 用户贴错误时一律用 `text`；簇的类别：exception、harmony-stack、xml-load、patch-failed、xref-missing、material、other；Player.log 位置：1.7 及以后 `Logs/Player.log`，更早在用户数据目录根部。游戏运行时轮询：把上次返回的 `cursor` 作为 `since` 传回，只得到新的或次数增加的簇（Player.log 与 ArchoMonitor.log 一起算）；回答说游标过期就是游戏重启了，旧的那次运行此时是 `prev=true` |
+| `analyze_log` | 用户贴错误时一律用 `text`；簇的类别：exception、harmony-stack、xml-load、patch-failed、xref-missing、material、other；Player.log 位置：1.7 及以后 `Logs/Player.log`，更早在用户数据目录根部。游戏运行时轮询：把上次返回的 `cursor` 作为 `since` 传回，只得到新的或次数增加的簇（Player.log 与 ArchoMonitor.log 一起算）；回答说游标过期就是游戏重启了，旧的那次运行此时是 `prev=true`。已知类别的簇带 `pattern:<id>`（社区背景，不是这份列表的证据），`pattern=<id>` 展开 |
 | `search_files` | XML 证据（defName、XPath 目标、`uiIconColor`、XML 里的类名）；C# 用 `read_source` |
 | `read_source` | 看补丁类或帧所在类型；搜索时优先用短而具体的模式；`scope="active"` 只在用户要求时用（几百个程序集、很多分钟）；ilspycmd 缺失时文本说明怎么装，从不自动安装 |
 | `edit_loadout` | 改方案；每步可撤销 |
@@ -386,7 +390,7 @@ next:
 ## 6. 稳定性
 
 - 输出中的英文关键词（`depends:`、`evidence:`、`next:`、问题代码等）属于接口，改动要记入 CHANGELOG（07 §5）。
-- 引用格式稳定。Instance ID 不随路径、包名变化（02）；`p:` 引用跨分析稳定；日志问题的 key 只保留绝对路径的最后三段，库目录移动后 `p:` 和忽略记录仍然有效。
+- 引用格式稳定。Instance ID 不随路径、包名变化（02）；`p:` 引用跨分析稳定；日志问题的 key 只保留绝对路径的最后三段，库目录移动后 `p:` 和忽略记录仍然有效。范式引用 `pattern:g:<id>`、`pattern:m:<packageId>:<hash>` 在同一数据集版本内稳定；通用范式的 id 跨版本保留，Mod 特定范式的 hash 取自模板，模板不变则不变。
 - 新增字段只追加，不改变已有行的含义。
 - MCP 工具改名时保留旧名作别名至少一个次版本。
 

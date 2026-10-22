@@ -233,10 +233,12 @@ func (s *Store) SnapshotsKey() string {
 	return fmt.Sprintf("%d.%d", n, mx)
 }
 
-// SnapshotsWithPNG are the snapshots with a PNG under a Textures/ folder (the copies whose
-// textures can be converted). It reads every file row: cache it with SnapshotsKey.
+// SnapshotsWithPNG are the current snapshots with a PNG under a Textures/ folder (the copies
+// whose textures can be converted). Each instance's file rows are read until the first PNG,
+// through the primary key; cache the result with SnapshotsKey.
 func (s *Store) SnapshotsWithPNG() (map[int64]bool, error) {
-	rows, err := s.DB.Query(`SELECT DISTINCT snapshot_id FROM snapshot_file WHERE rel_path LIKE '%textures/%.png'`)
+	rows, err := s.DB.Query(`SELECT i.current_snapshot_id FROM instance i WHERE i.current_snapshot_id IS NOT NULL
+		AND EXISTS(SELECT 1 FROM snapshot_file f WHERE f.snapshot_id=i.current_snapshot_id AND f.rel_path LIKE '%textures/%.png')`)
 	if err != nil {
 		return nil, err
 	}

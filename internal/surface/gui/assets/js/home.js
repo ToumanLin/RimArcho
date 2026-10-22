@@ -10,6 +10,7 @@
 import { S, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, changesPlan } from "./screens.js";
 import { icon } from "./icons.js";
+import { launchPack } from "./packs.js";
 
 let ui = null;
 export function initHome(u) {
@@ -174,9 +175,23 @@ function launcher(r) {
 }
 
 // problem: what is wrong with the applied list, as a tab under the button; nothing when
-// all is well. The current plan's goes to 能不能跑: problems that break the game, else a
-// pack's links left in Mods/ (08 §5.3), else an outside version not loaded.
+// all is well. The current plan's goes to 能不能跑: the most likely trouble of a launch
+// (view.LaunchHint: the most predictive problem in the shared logs, with its reason), else
+// problems that break the game, else a pack's links left in Mods/ (08 §5.3), else an
+// outside version not loaded. It never blocks the launch.
 function problem(r) {
+  const h = r.current && data.launch;
+  if (h) {
+    const p = el("button", "issue bad hint");
+    const i = el("span", "ic");
+    i.innerHTML = icon.warn;
+    const t = el("span", "t");
+    t.append(el("span", "what", h.text), el("span", "why", h.why));
+    p.append(i, t, el("span", "go", "→"));
+    p.title = h.text + "\n" + h.why;
+    p.onclick = () => ui.go("needs");
+    return p;
+  }
   if (r.level !== "bad" && !r.mark && !r.links) return null;
   const links = r.level !== "bad" && r.links;
   const p = el(r.current && (r.level === "bad" || links) ? "button" : "div", "issue" + (r.level === "bad" ? " bad" : ""));
@@ -232,5 +247,5 @@ function actLine(title, text, go, wide) {
 // does on the packs page.
 async function launch(r) {
   if (r.kind === "plan") return ui.run("launch");
-  try { say("ok", await api.PackLaunch(r.name)); } catch (e) { say("fail", errText(e)); }
+  await launchPack(r.name);
 }

@@ -97,6 +97,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     pack remove <name>                        move a pack to the recycle bin; --unfinished deletes what a build cut short copied
     pack unlink                               remove the packs' links from Mods/ (only the links, never the packs)
     pack stop <name>                          stop a running pack build (what it copied is removed)
+    pattern [<pattern:id>]                    error patterns from public logs: what a kind of log error usually is, its causes, route and fixes
     db status                                 the database: path, size, backups
     db backup                                 write a consistent copy of the database to <data>/backups
     db vacuum                                 compact the database
@@ -109,7 +110,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while enabled, in a plan, or the game runs)
     workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
     workshop state <ref…>                     ask Steam whether items are subscribed, installed, waiting for an update
-  references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>
+  references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern
   global flags: --env <name> (use another environment for this command)
 
 $ archo status

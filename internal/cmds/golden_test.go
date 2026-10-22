@@ -397,6 +397,7 @@ func TestGoldenProblems(t *testing.T) {
 </ModMetaData>
 `)
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.over1", "tester.compat", "tester.over2", "tester.needy")
+	e.WriteFile(filepath.Join(e.Steam, "steam.exe"), "") // for launch --dry-run
 	e.AddEnv(false)
 	e.MustRun("scan")
 	firstRef := func(code string) step {
@@ -417,6 +418,7 @@ func TestGoldenProblems(t *testing.T) {
 	runGolden(t, "problems", e, []step{
 		cmd("status"),
 		cmd("problems"),
+		cmd("launch", "--dry-run"), // 08 §2: the problems that most often cause errors, not blocking
 		cmd("problems", "--code", "patch", "--detail"),
 		firstRef("dep.missing"),
 		cmd("def", "ThingDef/Shared_Gun"),
@@ -430,6 +432,7 @@ func TestGoldenProblems(t *testing.T) {
 			return []string{"problems", "ignore", s[2]}
 		},
 		cmd("problems", "--ignored"),
+		cmd("launch", "--dry-run"), // the ignored incompatibility is gone from the list
 		func(e *testkit.Env) []string { return []string{"mod", ref(e, "Compat")} },
 		func(e *testkit.Env) []string { return []string{"enable", ref(e, "Lib"), "--before", ref(e, "Compat")} },
 		cmd("status"),

@@ -201,3 +201,22 @@ func TestParseXMLExtensionsBlock(t *testing.T) {
 		t.Fatalf("line after a block: %q", f.Entries[2].Message)
 	}
 }
+
+// "Exception loading … from file." names the file on the next line; each file is its own cluster.
+func TestParseAbsFilePath(t *testing.T) {
+	text := "Exception loading UnityEngine.AudioClip from file.\n" +
+		"absFilePath: [Rimworld_dir]/Mods/A/Sounds/x.mp3\n" +
+		"Exception: System.ArgumentNullException: Value cannot be null.\n" +
+		"Exception loading UnityEngine.AudioClip from file.\n" +
+		"absFilePath: [Rimworld_dir]/Mods/B/Sounds/y.mp3\n"
+	f, err := Parse(strings.NewReader(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Entries) != 3 || len(f.Entries[0].Extra) != 1 || f.Entries[0].Extra[0] != "absFilePath: [Rimworld_dir]/Mods/A/Sounds/x.mp3" {
+		t.Fatalf("entries: %+v", f.Entries)
+	}
+	if k0, _, _ := ClusterKey(f.Entries[0]); k0 == func() string { k, _, _ := ClusterKey(f.Entries[2]); return k }() {
+		t.Fatalf("two files share a cluster key %q", k0)
+	}
+}

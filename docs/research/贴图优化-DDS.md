@@ -178,7 +178,7 @@ todds -f BC1 -af BC7 -vf -fs -o|-on -t -p [-nm] [-sc <百分比> | -ms <最大�
 
 ## 8. 实现记录（2026-10-22，分支 `claude/texture-opt-3d7a51`）
 
-- 第 1 条定了：同意后下载（`archo textures tool --install`、设置 › 贴图优化），或用设置项 `textures.todds` 指向已有的一份。GitHub 不给这个 zip 的摘要，所以按发布页的大小（3,846,213 字节）和 `--help` 报的版本检查。
+- 第 1 条定了：同意后下载（`archo textures tool --install`、库 › 贴图优化），或用设置项 `textures.todds` 指向已有的一份。GitHub 不给这个 zip 的摘要，所以按发布页的大小（3,846,213 字节）和 `--help` 报的版本检查。
 - todds 先把源图补到 4 的倍数，再缩放，缩放后不再补。所以缩放比例只给能让宽高仍是 4 的倍数、短边不小于 128 像素的（`ScaleSteps`），遮罩不缩放。DDS 大小按实际写出的格式算，和 todds 的输出逐字节一致。
 - RGBA 但完全不透明的 PNG（例如很多 `_m` 遮罩）todds 会写成 BC1，校验按文件头里的格式算，不按 PNG 的颜色类型猜。
 - 原 Mod 里 RimArcho 生成的 DDS 不算进扫描指纹，复制到别的文件夹或整合包时也不带。

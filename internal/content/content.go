@@ -278,6 +278,13 @@ func Assets(root string, folders []string, sub string) []Asset {
 	return Files(root, folders, sub, ".xml")
 }
 
+// CodeFiles lists a mod's DLLs: <folder>/Assemblies, plus <folder>/Lunar/Components, where
+// Lunar framework mods (Map Preview, Geological Landforms …) keep the code their loader
+// DLL loads at run time (log corpus: their stack frames had no owner).
+func CodeFiles(root string, folders []string) []Asset {
+	return append(Files(root, folders, "Assemblies", ".dll"), Files(root, folders, "Lunar/Components", ".dll")...)
+}
+
 // Files is Assets for another extension (".dll" for Assemblies).
 func Files(root string, folders []string, sub, ext string) []Asset {
 	seen := map[string]bool{}

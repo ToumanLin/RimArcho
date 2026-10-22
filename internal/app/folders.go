@@ -230,3 +230,55 @@ func (a *App) SharedUnread() bool {
 	}
 	return false
 }
+
+// adoptGameWorkshop registers the Workshop folder a SteamCMD game keeps inside its own
+// folder (steamapps\workshop\content\294100) as a shared SteamCMD folder (02 §0). It is
+// never the Workshop folder: that one is the Steam client's, and a game's own folder must
+// not move it. Nothing happens when the folder is missing, is the Steam client's, or is
+// known already, retired included: a folder the player removed stays removed.
+func (a *App) adoptGameWorkshop(e *env.Environment) (*SourceChange, error) {
+	w := env.GameWorkshopFor(e.GameRoot)
+	if !dirExists(w) {
+		return nil, nil
+	}
+	for _, s := range env.WorkshopFolders(a.Detect) {
+		if env.PathKey(s) == env.PathKey(w) {
+			return nil, nil
+		}
+	}
+	all, err := a.Store.AllSources()
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range all {
+		if env.PathKey(s.Root) == env.PathKey(w) {
+			return nil, nil
+		}
+	}
+	if a.checkRoots(w) != nil {
+		return nil, nil
+	}
+	if o, err := a.overlapping(w, nil); err != nil || o != nil {
+		return nil, err
+	}
+	ch, err := a.FolderAdd(source.SteamCMD, w)
+	if err != nil {
+		return nil, err
+	}
+	return &ch, nil
+}
+
+// adoptGameWorkshops runs adoptGameWorkshop for every environment: environments added
+// before RimArcho knew these folders get theirs on the next scan.
+func (a *App) adoptGameWorkshops() error {
+	envs, err := a.Store.Envs()
+	if err != nil {
+		return err
+	}
+	for _, e := range envs {
+		if _, err := a.adoptGameWorkshop(e); err != nil {
+			return err
+		}
+	}
+	return nil
+}

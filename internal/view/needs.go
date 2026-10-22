@@ -55,6 +55,7 @@ const (
 	ActIgnore          = "ignore"           // Problem: keep as it is (ignore the problem)
 	ActUnlinkPacks     = "unlink-packs"     // remove the packs' links from Mods/ (08 §5.3)
 	ActSwap            = "swap"             // Refs[0] → Refs[1] in the plan (one undoable step)
+	ActMoveLocked      = "move-to-locked"   // Refs[0]: a Mods/ folder into the lock library (confirm first)
 	ActTextures        = "textures"         // Refs: convert their textures to DDS again (confirm first)
 	ActTexClean        = "textures-clean"   // Refs: delete the DDS RimArcho wrote (confirm first)
 )
@@ -110,6 +111,7 @@ type Need struct {
 	Parts []string `json:"parts,omitempty"`
 	Fold  bool     `json:"fold,omitempty"`
 	rank  int      // order within the group (06 §5's order)
+	code  string   // the problem code it stands for (LaunchHint)
 }
 
 // Needs is the screen's content and what it means for the rest of the interface.
@@ -119,6 +121,9 @@ type Needs struct {
 	Count  int            `json:"count"`  // the top bar's number
 	Never  bool           `json:"never"`  // the mods' files were never checked
 	Stale  bool           `json:"stale"`  // the files changed since the last check
+	// Launch is the most likely trouble of a launch (app.LaunchChecks among the counted
+	// items), for the launch page's tab and the TUI's launch line (06 §2.3); nil when none.
+	Launch *LaunchHint `json:"launch,omitempty"`
 	// LastRun says which run wrote the last-run log: "the list · 9 月 29 日 19:41" or
 	// "pack X · …" (08 §5.3: a pack's errors are not the list's).
 	LastRun    string `json:"lastRun,omitempty"`
@@ -138,6 +143,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	for i := range n.Items {
 		n.Items[i].Section = SectionOf(n.Items[i].Group)
 	}
+	n.Launch = launchHint(n.Items)
 	for _, r := range ps.Logs {
 		if r.Stale() || r.ModTime.IsZero() {
 			continue
@@ -179,9 +185,16 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	ix := st.Ix
 	nm := func(tok string) string { return TokName(st, tok) }
 	var out []Need
-	add := func(n Need) { out = append(out, n) }
+	cur := "" // the code of the problem being turned into an item
+	add := func(n Need) {
+		if n.code == "" {
+			n.code = cur
+		}
+		out = append(out, n)
+	}
 	var versions []*app.Problem
 	var order []Need                    // order.violated: folded into one item when there are several
+	var weak []Need                     // order.violated of weak or harmless constraints: one dimmed item (04 §5.3)
 	logs := map[string][]*app.Problem{} // current log problems by subject mod ("" unattributed)
 	// A mod's patches that miss the same inactive target, and its definitions whose parent
 	// is missing, are one item each: one action covers them all (06 §5's merge rule).
@@ -195,6 +208,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	merge := func(key, x, y string, n Need) {
 		m := merges[key]
 		if m == nil {
+			n.code = cur
 			m = &merged{n: n, x: x, y: y}
 			merges[key] = m
 			mergeKeys = append(mergeKeys, key)
@@ -214,9 +228,15 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			versions = append(versions, p)
 			continue
 		}
-		if p.Severity != finding.Error && p.Severity != finding.Warning {
+		// A cycle is info (the corpus saw no effect, 03 §4.3), but only the player can resolve
+		// it: listed with its actions, dimmed and not counted. So are weak order preferences
+		// (folded) and a mod's own known error (a note): the player sees them, they are not
+		// what stops the game.
+		if p.Severity != finding.Error && p.Severity != finding.Warning &&
+			p.Code != "order.cycle" && p.Code != "order.violated" && p.Code != "mod.known-error" {
 			continue // info: technical information only (06 §5)
 		}
+		cur = p.Code
 		subj := subjects(p)
 		x, y := "", ""
 		if len(subj) > 0 {
@@ -236,11 +256,20 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			add(Need{rank: 0, Group: GroupList, Text: T("Core and the DLCs must come first in the list"), Actions: []Action{sortAction()}, Counted: true, Status: s,
 				Title: T("Core and the DLCs are out of place"), Why: T("Core and the DLCs must come first in the list"), Evidence: ev})
 		case "order.violated":
+			if p.Severity == finding.Info {
+				weak = append(weak, Need{Text: Tf("%s should load after %s", nm(x), nm(y)), Mods: ids})
+				continue
+			}
 			order = append(order, Need{rank: 1, Group: GroupList, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{sortAction()}, Counted: true, Mods: ids, Status: s,
-				Why: T("out of order, part of it may not take effect; sorting puts it right"), Evidence: ev})
+				Why: T("a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right"), Evidence: ev})
+		case "mod.known-error":
+			// The mod's own problem (03 §4.3): whatever else is enabled, shared logs show it.
+			add(Need{rank: 9, Group: GroupConflict, Text: Tf("%s has a known error: this is the mod's own problem", nm(x)),
+				Actions: []Action{viewAction(T("see the error"), "problems", "show", p.Ref)}, Mods: ids, Status: StatusWarn, Dim: true,
+				Title: Tf("%s has a known error: this is the mod's own problem", nm(x)), Why: T("not your list's: shared logs show it whatever else is enabled; an update may fix it"), Evidence: ev})
 		case "order.cycle":
 			add(Need{rank: 2, Group: GroupList, Text: Tf("the order requirements of %d mods contradict each other", len(subj)),
-				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: true, Mods: ids, Status: s,
+				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: p.Severity != finding.Info, Dim: p.Severity == finding.Info, Mods: ids, Status: s,
 				Why: T("they stay in the current order; ignoring the suggested requirement lets sorting work"), Evidence: ev})
 		case "pkg.duplicate-active":
 			add(Need{rank: 3, Group: GroupList, Text: Tf("%s is enabled twice", nm(x)), Actions: []Action{keepOne(st, ids)}, Counted: true, Mods: ids, Status: s,
@@ -279,6 +308,23 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		case "dep.inactive":
 			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("missing dependency: %s", nm(y)), Why: Tf("%s needs it, but it is not enabled.", nm(x)), Evidence: ev})
+		case "dep.observed-missing": // undeclared, seen in shared logs (internal/known)
+			if strings.HasPrefix(y, "pkg:") {
+				dep := strings.TrimPrefix(y, "pkg:")
+				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not installed", nm(x), dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("probably missing: %s", dep), Why: Tf("%s does not declare it, but in shared logs it fails without it. It is not installed.", nm(x)), Evidence: ev})
+			} else {
+				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not enabled", nm(x), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("probably missing: %s", nm(y)), Why: Tf("%s does not declare it, but in shared logs it fails without it. It is not enabled.", nm(x)), Evidence: ev})
+			}
+		case "combo.known-bad":
+			if y != "" {
+				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("%s and %s often fail together", nm(x), nm(y)), Why: T("in shared logs this pair produces errors far more often than either one alone. Disable one if you see errors."), Evidence: ev})
+			} else {
+				add(Need{Group: GroupConflict, Text: Tf("this version of %s often produces errors (seen in shared logs); other versions did not", nm(x)), Actions: []Action{disable(st, x, Tf("disable %s", nm(x)))}, Counted: true, Mods: ids, Status: s,
+					Title: Tf("this version of %s often fails", nm(x)), Why: T("in shared logs this version produces errors; other versions did not. Updating it usually helps."), Evidence: ev})
+			}
 		case "patch.no-match":
 			if y == "" {
 				continue // no inactive target: nothing the player can do (technical information)
@@ -345,12 +391,25 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		}
 		add(n)
 	}
+	if len(weak) > 0 {
+		// Weak and harmless constraints (04 §5.3): breaking them went with no more errors in
+		// shared logs. One dimmed, uncounted item; sorting still puts them right.
+		f := Need{rank: 8, Group: GroupList, Status: StatusWarn, Dim: true, Fold: true, code: "order.violated",
+			Text:     Tf("%d weaker order preferences are not met", len(weak)),
+			Why:      T("loadAfter and community rules: breaking them showed no more errors in shared logs; sorting puts them right"),
+			Evidence: evidence(EvCorpus, T("load-order constraint strength"))}
+		for _, w := range weak {
+			f.Parts = append(f.Parts, w.Text)
+		}
+		f.Actions = []Action{sortAction(), {Kind: ActFold, Key: "f", Label: T("show which")}}
+		add(f)
+	}
 	switch len(order) {
 	case 0:
 	case 1:
 		add(order[0])
 	default:
-		f := Need{rank: 1, Group: GroupList, Counted: true, Status: StatusWarn, Fold: true}
+		f := Need{rank: 1, Group: GroupList, Counted: true, Status: StatusWarn, Fold: true, code: "order.violated"}
 		seen := map[string]bool{}
 		for _, o := range order {
 			f.Parts = append(f.Parts, o.Text)
@@ -376,7 +435,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			mm := st.GameMM()
 			text := Tf("%d mods do not list %s as supported", n, mm)
 			if prev := app.PrevMinor(mm); prev != "" {
-				text = Tf("%d mods do not list %s as supported (%d of them list %s)", n, mm, n-warn, prev)
+				text = Tf("%d mods do not list %s as supported (%d of them list %s)", n, mm, warn, prev)
 			}
 			names := make([]string, 0, n)
 			for _, v := range versions {
@@ -531,15 +590,31 @@ func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need 
 	pkg := p.Key
 	var where []string
 	for _, e := range p.Evidence {
-		where = append(where, e.Text)
+		// "Mods/<name> (<who made it>)": the part in brackets in the UI language
+		t := e.Text
+		if i := strings.LastIndex(t, " ("); i > 0 && strings.HasSuffix(t, ")") {
+			t = t[:i] + " (" + T(t[i+2:len(t)-1]) + ")"
+		}
+		where = append(where, t)
 	}
 	n := Need{Group: GroupList, rank: 3, Counted: true, Status: StatusErr, Mods: ids,
 		Title:    Tf("Mods/ holds %s twice", pkg),
 		Text:     Tf("Mods/ has %d folders with packageId %s: the game reports an error and ignores all but one", len(where), pkg),
 		Evidence: evidence(EvInferred, strings.Join(where, ", "))}
+	var move *Action
+	sgs := p.Suggestions
+	if len(sgs) > 0 && strings.HasPrefix(sgs[0], "archo library move-to-locked ") {
+		tok := strings.TrimPrefix(sgs[0], "archo library move-to-locked ")
+		name := TokName(st, tok)
+		move = &Action{Kind: ActMoveLocked, Key: "M", Label: T("move into the lock library"), Refs: []string{TokRef(st, tok)},
+			Confirm: T("press M again to move the folder into the lock library"),
+			Warn:    Tf("the folder of %s leaves Mods/ for the lock library; plans that use it keep it and get it through a link", name),
+			Done:    Tf("%s is in the lock library", name)}
+		sgs = sgs[1:]
+	}
 	sg := ""
-	if len(p.Suggestions) > 0 {
-		sg = p.Suggestions[0]
+	if len(sgs) > 0 {
+		sg = sgs[0]
 	}
 	f := strings.Fields(sg)
 	switch {
@@ -554,6 +629,11 @@ func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need 
 	default:
 		n.Why = T("RimArcho did not make these folders and does not move them: move all but one out of Mods/ yourself")
 		n.Actions = []Action{{Kind: ActList, Key: "enter", Label: T("see which"), Title: Tf("Mods/ holds %s twice", pkg), Lines: where}}
+	}
+	if move != nil {
+		// 收进锁定库 first: the plain folder leaves Mods/, plans keep it (08 §3)
+		n.Why = T("move the plain folder into the lock library: it leaves Mods/, and plans that use it keep it and get it through a link")
+		n.Actions = append([]Action{*move}, n.Actions...)
 	}
 	return n
 }
@@ -729,6 +809,8 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		_, err = a.UnlinkPacks(false)
 	case ActSwap:
 		_, err = a.Swap(act.Refs[0], act.Refs[1])
+	case ActMoveLocked:
+		_, err = a.MoveToLocked(act.Refs[0], false)
 	case ActTextures:
 		r, err := a.OptimizeTextures(app.TextureRun{Refs: act.Refs})
 		if err != nil {

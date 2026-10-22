@@ -187,7 +187,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	}
 	// S, w and L act at once and say what they did (06 §6); sort offers u.
 	keys(tm, "S")
-	waitFor(t, tm, "sorted: 1 moved · u undoes")
+	waitFor(t, tm, "sorted: 1 moved · strong requirements put right: 1 · u undoes")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
 		t.Fatalf("after sort: %s", got)
 	}
@@ -457,6 +457,29 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 	m := finish(t, tm)
 	if m.envName != "second" {
 		t.Fatalf("env %q", m.envName)
+	}
+}
+
+// 06 §2.14: E, then d on an environment: the dry run, enter removes it; the other one is
+// then in use.
+func TestEnvRemoveFromChooser(t *testing.T) {
+	e, scans := fixture(t)
+	other := filepath.Join(e.Root, "Second", "RimWorld")
+	e.CopyTemplate("core", filepath.Join(other, "Data", "Core"))
+	e.WriteFile(filepath.Join(other, "RimWorldWin64.exe"), "")
+	e.MustRun("env", "add", "second", "--game", other)
+	tm := start(t, e, scans, 120, 30)
+	waitFor(t, tm, " main ")
+	keys(tm, "E", "d")
+	waitFor(t, tm, "then second is in use")
+	keys(tm, "enter")
+	waitFor(t, tm, "removed environment main")
+	m := finish(t, tm)
+	if m.envName != "second" {
+		t.Fatalf("env %q", m.envName)
+	}
+	if envs, _ := e.App.Store.Envs(); len(envs) != 1 {
+		t.Fatalf("%d environments", len(envs))
 	}
 }
 

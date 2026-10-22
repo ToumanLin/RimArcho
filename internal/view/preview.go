@@ -1,12 +1,27 @@
 package view
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/order"
 )
+
+// launchHintNow is the current plan's LaunchHint from the stored problems (no analysis).
+func launchHintNow(a *app.App) *LaunchHint {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil
+	}
+	ps, err := a.Problems(false, nil)
+	if err != nil {
+		return nil
+	}
+	return BuildNeeds(a, st, ps).Launch
+}
 
 // Whole-list actions (06 §6): sort, save and launch act on one key or click and say what
 // they did (sort: u undoes it). The preview is the CLI's dry run (read-only), reached from
@@ -33,23 +48,57 @@ type Outcome struct {
 	Text    string   `json:"text"`
 	Undo    bool     `json:"undo,omitempty"`    // u takes it back (sort)
 	Refused []string `json:"refused,omitempty"` // refused: why, then the commands that resolve it
+	// Moves: refused because Mods/ holds another version that can move into the lock
+	// library (08 §3): what moving them does, for the one confirmation; RunMoving goes on.
+	Moves []string `json:"moves,omitempty"`
 }
 
 // Run carries out sort, save or launch at once (06 §6). A refusal (a game is running, an
 // outside change not loaded, no user data folder …) is an Outcome with Refused set, not an
 // error: the interface shows it and asks nothing.
-func Run(a *app.App, what string) *Outcome {
+func Run(a *app.App, what string) *Outcome { return run(a, what, false) }
+
+// RunMoving is Run after the player agreed to move the folders in the way into the lock
+// library (Outcome.Moves).
+func RunMoving(a *app.App, what string) *Outcome { return run(a, what, true) }
+
+func run(a *app.App, what string, move bool) *Outcome {
 	o := &Outcome{What: what}
-	text, err := Apply(a, what)
+	text, err := apply(a, what, move)
 	if err != nil {
-		st, _ := a.Loadout()
-		o.Refused = RefusalLines(Humanize(st, err.Error()))
-		o.Text = o.Refused[0]
-		return o
+		return refused(a, o, err)
 	}
 	o.Text = text
 	o.Undo = what == ListSort && text != T("the order is already right")
 	return o
+}
+
+// refused fills an outcome from a refusal; a movable one carries the moves.
+func refused(a *app.App, o *Outcome, err error) *Outcome {
+	st, _ := a.Loadout()
+	var de *app.DuplicatesError
+	if errors.As(err, &de) && de.Movable() {
+		o.Text = T("Mods/ holds another version of mods RimArcho must link")
+		o.Refused = []string{o.Text}
+		o.Moves = MoveLines(de)
+		return o
+	}
+	o.Refused = RefusalLines(Humanize(st, err.Error()))
+	o.Text = o.Refused[0]
+	return o
+}
+
+// MoveLines say what moving the folders in the way does (the confirmation's lines).
+func MoveLines(de *app.DuplicatesError) []string {
+	out := []string{T("these folders move from Mods/ into the lock library; plans that use them keep them and get them through a link:")}
+	for _, m := range de.Moves {
+		what := m.For
+		if m.Pack != "" {
+			what = Tf("pack %s's copy of %s", m.Pack, m.Mod)
+		}
+		out = append(out, Tf("Mods/%s → %s, so that Mods/%s can be linked for %s", m.Copy.Name, m.To, m.Link, what))
+	}
+	return out
 }
 
 // RefusalLines splits a refusal into its reason and the commands it names: "reason (a: archo
@@ -90,7 +139,9 @@ func DryRun(a *app.App, what string) (*Preview, error) {
 }
 
 // Apply runs sort, save or launch and says what it did.
-func Apply(a *app.App, what string) (string, error) {
+func Apply(a *app.App, what string) (string, error) { return apply(a, what, false) }
+
+func apply(a *app.App, what string, move bool) (string, error) {
 	switch what {
 	case ListSort:
 		r, err := a.Sort(false)
@@ -100,9 +151,19 @@ func Apply(a *app.App, what string) (string, error) {
 		if len(r.Changes) == 0 {
 			return T("the order is already right"), nil
 		}
-		return Tf("sorted: %d moved", len(r.Changes)), nil
+		strong := 0
+		for _, b := range order.Broken(r.Input, r.Result) {
+			if b.Strength == order.Strong {
+				strong++
+			}
+		}
+		if strong > 0 {
+			// Strong ones first (04 §5.3): they are what the sort mattered for.
+			return Tf("sorted: %d moved · strong requirements put right: %d", len(r.Changes), strong), nil
+		}
+		return Tf("sorted: %d moved · only weaker preferences were out of order", len(r.Changes)), nil
 	case ListSave:
-		r, err := a.Save(false)
+		r, err := a.SaveWith(false, move)
 		if err != nil {
 			return "", err
 		}
@@ -118,8 +179,13 @@ func Apply(a *app.App, what string) (string, error) {
 		}
 		return msg, nil
 	case ListLaunch:
-		if _, err := a.Launch(false); err != nil {
+		if _, err := a.LaunchWith(false, move); err != nil {
 			return "", err
+		}
+		// The most likely trouble goes with it (06 §2.3, never blocking): the TUI has no
+		// launch page, so its status line is where the player reads it.
+		if h := launchHintNow(a); h != nil {
+			return T("the game is starting") + " · " + Tf("watch for: %s", h.Text), nil
 		}
 		return T("the game is starting"), nil
 	}
@@ -162,4 +228,19 @@ func Swap(a *app.App, st *app.LoadoutState, id string) (string, error) {
 		return "", err
 	}
 	return Tf("swapped %s for another copy", Named(st, []string{id})), nil
+}
+
+// LaunchPack plays a pack as an Outcome: a refusal because of folders that can move into the
+// lock library carries the moves (08 §5.3).
+func LaunchPack(a *app.App, name string, move bool) *Outcome {
+	o := &Outcome{What: "pack"}
+	r, err := a.LaunchPackWith(name, false, move)
+	if err != nil {
+		return refused(a, o, err)
+	}
+	o.Text = Tf("pack %s: the game is starting", name)
+	if len(r.Moved) > 0 {
+		o.Text += " · " + Tf("%d folders moved into the lock library", len(r.Moved))
+	}
+	return o
 }

@@ -1,0 +1,8 @@
+Error while resolving references for def konf: System.NullReferenceException: Object reference not set to an instance of an object
+[Ref F8CA26D2]
+  at Verse.RaceProperties.get_AnyPawnKind () [0x00019] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at Kz.CompProperties_KemomimiKz.SetSpawn () [0x00016] in <28fa1372e6414688bafb035d33380109>:0
+  at Kz.CompProperties_KemomimiKz.ResolveReferences (Verse.ThingDef parentDef) [0x001b0] in <28fa1372e6414688bafb035d33380109>:0
+  at Verse.ThingDef.ResolveReferences () [0x001e5] in <fcfab19af5d14a608a65ebd77f29482f>:0
+    - TRANSPILER net.pardeike.rimworld.lib.harmony: IEnumerable`1 VisualExceptions.ExceptionsAndActivatorHandler:Transpiler(IEnumerable`1 instructions, MethodBase original)
+  at Verse.DefDatabase`1+<>c__DisplayClass15_0[T].<ResolveAllReferences>b__0 (T def) [0x0002f] in <fcfab19af5d14a608a65ebd77f29482f>:0

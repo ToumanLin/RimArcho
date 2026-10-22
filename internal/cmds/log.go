@@ -164,24 +164,34 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 		}
 		who += ")"
 	}
-	return fmt.Sprintf("log:%s %s x%d  %s%s", lc.ID, lc.Class, lc.Count, msg, who)
+	return fmt.Sprintf("log:%s %s x%d  %s%s%s", lc.ID, lc.Class, lc.Count, msg, who, patternTag(ix, lc))
 }
 
 func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc {
 	at := ""
-	if len(lc.Lines) > 0 {
+	if len(lc.Lines) > 0 && lc.Lines[0] > 0 { // 0: only the companion log has it
 		at = fmt.Sprintf("  first at %s:%d", r.Label, lc.Lines[0])
 	}
 	d, root := render.New(fmt.Sprintf("log:%s %s x%d%s", lc.ID, lc.Class, lc.Count, at))
+	// The whole message up to 1200 bytes: the inner exception at its end is often the cause
+	// (G7 agents re-read the raw log for what a 300-byte cut hid).
 	msg := lc.First.Message
-	if len(msg) > 300 {
-		msg = msg[:297] + "..."
+	if len(msg) > 1200 {
+		msg = msg[:1197] + "..."
 	}
 	analysedAs(root, r)
 	root.KV("message", msg)
+	extra := 0
 	for _, x := range lc.First.Extra {
 		if strings.HasPrefix(x, "file: ") {
 			root.KV("file", strings.TrimPrefix(x, "file: "))
+			continue
+		}
+		if extra++; extra <= 6 {
+			if len(x) > 300 {
+				x = x[:297] + "..."
+			}
+			root.KV("also", x)
 		}
 	}
 	if len(lc.First.Frames) > 0 {
@@ -204,6 +214,12 @@ func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc
 	for _, x := range lc.Details {
 		root.KV("detail", x)
 	}
+	if len(lc.Near) > 0 {
+		nb := root.Section("nearby (other log messages around the first occurrence)")
+		for _, x := range lc.Near {
+			nb.Add(x)
+		}
+	}
 	att := root.Section("attribution")
 	if len(lc.Attr) == 0 {
 		att.Add("(no mod identified)")
@@ -217,6 +233,7 @@ func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc
 		conf += " (" + lc.Why + ")"
 	}
 	root.KV("confidence", conf)
+	addClusterPatterns(root, ix, lc)
 	if len(lc.Checklist) > 0 {
 		cl := root.Section("checklist")
 		for _, x := range lc.Checklist {

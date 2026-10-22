@@ -16,7 +16,8 @@ func init() {
 			{Name: "textures", Help: "convert the copies' PNG textures to DDS and delete the PNGs (pre-convert; with --texture-scale: slim)"},
 			{Name: "texture-scale", Value: "<percent>", Help: "with --textures: scale textures down (20 25 40 50 60 75 80; never below 128 px or off a multiple of 4)"}, dry}})
 	register(&Command{Name: "pack list", Summary: "the packs: mods, size, game version, last played", MaxArgs: 0, Run: packListCmd})
-	register(&Command{Name: "pack launch", Args: "<name>", Summary: "play a pack: link its mods into Mods/, its own list and saves, start the game", MinArgs: 1, MaxArgs: 1, Run: packLaunchCmd, Flags: []Flag{dry}})
+	register(&Command{Name: "pack launch", Args: "<name>", Summary: "play a pack: link its mods into Mods/, its own list and saves, start the game", MinArgs: 1, MaxArgs: 1, Run: packLaunchCmd,
+		Flags: []Flag{dry, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a pack's mod into the lock library"}}})
 	register(&Command{Name: "pack export", Args: "<name> <file>", Summary: "write a pack to a file (.archopack zip, or --light .archopack.json)", MinArgs: 2, MaxArgs: 2, Run: packExportCmd,
 		Flags: []Flag{{Name: "light", Help: "the list only"}}})
 	register(&Command{Name: "pack import", Args: "<file>", Summary: "unpack a .archopack, or compare a light pack with the installed mods", MinArgs: 1, MaxArgs: 1, Run: packImportCmd,
@@ -212,7 +213,7 @@ func packStopCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.LaunchPack(a.Pos[0], a.Bool("dry-run"))
+	r, err := c.App.LaunchPackWith(a.Pos[0], a.Bool("dry-run"), a.Bool("move-duplicates"))
 	if err != nil {
 		return nil, err
 	}
@@ -221,6 +222,7 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		head = "pack launch: dry run, nothing written"
 	}
 	d, root := render.New(head)
+	movedKV(root, r.Moved, r.DryRun)
 	ln := root.KV("links", fmt.Sprintf("%d changes in Mods/", len(r.Links)))
 	for _, l := range r.Links {
 		if l.Op == "remove" {

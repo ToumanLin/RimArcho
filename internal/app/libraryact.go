@@ -138,8 +138,15 @@ func (a *App) MoveToLockedFor(ref string, dryRun bool, reason string) (*MoveResu
 			other = true
 		}
 	}
-	if !other && m.Origin == "" {
+	// The only copy of its mod moves too when it shares a packageId with another entry of
+	// Mods/ (08 §3): there the game would report an error, and in the lock library plans
+	// still choose it.
+	if !other && m.Origin == "" && !a.inModsDuplicate(st, m.ID) {
 		return nil, fmt.Errorf("%s is the only copy of its mod; RimArcho moves only spare copies out of Mods/", st.Ix.Ref(m.ID))
+	}
+	// Another tool's link to it would break (RimCrow's _Link_…).
+	if by := linkedBy(st, m.RealPath, a.ModsCopies(st.Ix)); by != "" {
+		return nil, fmt.Errorf("%s: %s", st.Ix.Ref(m.ID), by)
 	}
 	r, err := a.moveToLibrary(st, m, dryRun)
 	if err != nil || dryRun {

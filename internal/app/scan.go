@@ -72,6 +72,9 @@ func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
 		return nil, err
 	}
 	started := a.Now()
+	if err := a.adoptGameWorkshops(); err != nil {
+		return nil, err
+	}
 	srcs, err := a.Store.Sources(e.ID)
 	if err != nil {
 		return nil, err

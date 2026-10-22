@@ -13,6 +13,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   staging become its first plan, `default`; each `loadout tag` name becomes a plan of its own
   with one `import` version (04 §1.4).
 - `launch --force` is removed: launching always writes the plan first (08 §2).
+- Severities follow the log corpus (03 §4.3.1): `official.order` error → warning,
+  `order.cycle` warning → info, `version.unsupported` reversed (stopping at the previous minor
+  version → warning, older only → info), `harmony.multi-transpiler` warning → info (warning when
+  a current log's stack passes through the method); `order.violated` is info for weak and
+  harmless constraints (04 §5.3). Analyzer version 7: stored analyses are rebuilt once.
 - `loadout tag` is removed: a named list is a plan (05 §4.3).
 - `archo save` means "write to the game without launching" (04 §4.1).
 - `save` and `launch` refuse while ModsConfig.xml holds an outside change that was not loaded
@@ -42,6 +47,15 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   versions, staging, aliases, snapshots and origin markers, events, questions, notes, rules,
   player data, ignores, launch fingerprints). IDs on disk (pack.json, origin.json) resolve
   through the new `id_alias` table.
+- A SteamCMD game's own Workshop folder (`<game>\steamapps\workshop\content\294100`) is a
+  shared SteamCMD folder, added on `env add`, on a download and, for games added earlier, on
+  the next scan. It never replaces or moves the Steam client's Workshop folder; a removed one
+  stays removed.
+- 删除环境 on the environment page, in the window's environment chooser (`Delete`) and in the
+  TUI's `E` (`d`): a dry run, then one confirmation. Only RimArcho's records go (plans, launch
+  records, the mods read from its `Data`/`Mods`, history); game files, mods, saves and the
+  shared folders stay. Refused while that game runs; another environment takes over, or the
+  guide opens when none is left. `env remove <name>` without `--yes` is now that dry run.
 - The environment page shows only the game folder, version, launch, saves and arguments. The
   add-environment guide offers 已有的游戏 (detected installs, a typed folder or the folder
   dialog; named after the version, e.g. 1.6) or 下载一个版本, and after adding reads only the
@@ -458,6 +472,14 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   in `Mods/`. Such pairs already there are `pkg.duplicate-mods` errors in 能不能跑 › 会让游戏出错,
   whoever made them; the fix only ever changes RimArcho's own links or the plan, never the
   player's folders. Pack links that duplicate a copy raise `pack.links-left` to an error.
+- Another version in the way (08 §3, §5.3): when a pack or a plan's locked copy needs one
+  version and `Mods/` holds a plain folder with another, RimArcho offers to move that folder
+  into the lock library and go on, with one confirmation listing what moves where and what is
+  linked instead. Plans that used the folder keep it (it comes back through a link). The
+  refusal names the fix: `--move-duplicates` on `save`, `launch` and `pack launch` (MCP
+  `move_duplicates`), or `archo library move-to-locked <ref>`. Links, folders another tool's
+  link points at, and folders with links pointing outside never move. `pkg.duplicate-mods`
+  gets a 收进锁定库 action for the plain folder.
 - A pack's `!ArchoPack_` links left in `Mods/` while the pack is not being played (a game
   started from Steam would load the pack's copies) are a problem of the plan,
   `pack.links-left`: in 能不能跑 › 要你确认 with 移除链接, in the tab under 启动游戏, in
@@ -479,7 +501,57 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   pack's copies, which then drop their PNGs. Space is checked against the peak; `pack.json`
   records what was done.
 - GUI: a 贴图优化 page (estimate, scale, progress, stop, clean), Mod 库存's 优化贴图 /
-  清除贴图优化, the pack build's textures option (in the API; the new build page still needs its control); TUI palette panel; MCP `manage_textures`.
+  清除贴图优化, the pack build's textures choice on 编译成整合包 (its own step 贴图 for full packs: off / 预转换 /
+  精简 80–25%, with the PNGs converted, the size after and the peak while converting; `D` steps
+  through it; without todds the step says so and 编译 points to 设置 › 贴图优化); TUI palette panel; MCP `manage_textures`.
+
+### Log corpus (03 §4.3, §4.3.1, §5.3, §6.3, §6.8; 04 §5; 08 §2)
+The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
+- **Severities from the corpus** (G8): each code graded by how often its mods are error
+  sources in the same log against chance; see Breaking. `official.order`'s first suggestion is
+  the cheapest `archo move` (a DLC enabled late goes back after the previous official package).
+- **Constraint strength** (G2, `internal/order/strength.go`, `observed.json`): dependencies,
+  loadBefore, forced orders and user rules are strong (warning); loadAfter and community rules
+  weak (info); rules the corpus saw broken without effect harmless (info, with the counts and an
+  `ignore` suggestion). Constraints that cannot be satisfied (two official packages against the
+  official order, a "load before Core" that closes a cycle) are left out and listed under
+  "not used" in `archo sort`.
+- **Before you play** (`app.LaunchChecks`): `archo launch` and its dry run list the problems
+  that most often end in red errors (`patch.no-match`, `def.parent-missing`, `incompat.active`,
+  `dep.inactive`, `dep.missing`, `dep.observed-missing`, `combo.known-bad`), one row per code
+  with why (the corpus numbers) and fix. It never blocks the launch.
+- **The log corpus layer** (G10, `internal/known`): `dep.observed-missing` (an undeclared
+  prerequisite seen in shared logs), `combo.known-bad` (a pair or a version that errors),
+  `mod.known-error` (a mod's own error), evidence `community`.
+- **Manual Harmony targets** (G9, `internal/harmony/manual.go`, `internal/dotnet/il.go`):
+  `Harmony.Patch` calls and `(MethodBase, HarmonyMethod, …)` wrappers are read from IL; resolved
+  targets are ordinary patches, unresolved ones say why. `HugsLib.dll` is read in its own mod.
+- **Log attribution** (G1/G7): callers of failing code, HugsLib's log upload, Harmony 1.x
+  references, field errors with their Context, XML Extensions blocks, absolute file paths,
+  texture providers, missing assemblies loaded reflection-only, save-load holders. The cluster
+  view shows the full message, its extra lines and the messages around it (`nearby`). The
+  referrer search keeps using the reference index (03 §6.5).
+- **Error patterns** (G5/G11, `internal/patterns`): `[pattern:g:<id>]` on cluster lines, a
+  `pattern:` section in the cluster view (community background: usual causes, route, fixes,
+  repeat-upload evidence), `archo pattern` and MCP `analyze_log pattern=`; MCP Instructions end
+  with a checklist for save loading, missing assets, config errors, assembly loading and noise,
+  and say tool results are capped at 24 KB.
+- Privacy: pattern templates with HugsLib's `[Rimworld_dir]` paths are dropped (2 of 1,036).
+- **In the pages** (06 §2.3, §2.4, §2.5, §2.10, §4.2; TUI the same):
+  - 启动: the tab under 启动游戏 names the most likely trouble (the first `LaunchChecks` code
+    with an item in 能不能跑) and its one-line reason with the corpus numbers; it opens
+    能不能跑 and never blocks. The TUI's `L` says it on the status line (“留意：…”).
+  - 能不能跑: a 社区日志 evidence chip with the measured share (“缺了它时 40/50（80%）出错”);
+    `dep.observed-missing` with the dependencies, `combo.known-bad` with the conflicts,
+    `mod.known-error` a dimmed “这是 Mod 自己的问题” note. Weak and harmless order
+    preferences are one dimmed, uncounted item; counts and the sidebar badge leave them out.
+  - 游戏日志 (and the Archo Monitor view): a cluster's detail shows the whole message, extra
+    lines and nearby messages (none for an entry only ArchoMonitor.log has), then a pattern card (“这类报错通常是…”, common causes, next
+    step, kinds of fix) marked as community background, only when a pattern matches.
+  - 方案编辑 › 排序: the status line counts the strong requirements the sort put right; the
+    sort preview (`archo sort`) has a `why` section, strong / weak / harmless, strong first.
+  - Mod detail › 技术信息 › Harmony (`archo harmony --mod`): patches from `Harmony.Patch`
+    calls are marked, and every unresolved call is listed with its reason.
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
