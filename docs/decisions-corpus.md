@@ -62,30 +62,50 @@ Remaining misses: texture paths built at run time from a prefix, and mods shippi
 framework under another file name (5 clusters). Spot-check of 10 newly sourced clusters: 8
 right, 2 plausible (a mod that defines and uses a def the player's game lacked).
 
-## 3. Conclusions
+## 3. Conclusions (final run v4, 2026-10-22)
 
-1. **Attribution is limited by rules, not by missing mods.** Logs with ≥ 80% of their mods in the
-   library have the same source rate as all logs (21.6% vs 21.2%). More downloads will not help;
-   the gaps listed in RESULT (textures without a def, missing assemblies, save-load references,
-   `_MainTex`, `Failed to find … named`) need rules.
-2. **A small sample overstates.** The first 671 logs gave 28.4% with a source, the full 6,734
-   logs 21.2%. Rule changes are compared on the same logs; rates are reported on the full sample.
-3. **Declared-constraint violations are common and mostly harmless.** Half of the logs violate a
-   dependency or load rule, 45% a community rule. Above 100 mods, logs with and without violations
-   have errors equally often. The most violated constraints rarely involve the mods the errors point
-   at. `modoptionssort` before Core (651 logs) can be satisfied (Harmony does it; 12 logs keep it) but
-   breaking it is harmless (1 log with an error source). The sorter's output should
-   distinguish "will break" from "declared but unenforced".
-4. **Odyssey loaded late** is the main official-order violation (23% of logs): a DLC enabled after
-   the list was built is appended to its end.
-5. **Coverage, not accuracy.** No labelled causes yet; the author defers labelling until RimArcho
-   has the scaffolding for an agent to do it (design §10 item 3).
+Merged master (e993ff4: G1 rules, G2 grading, labelling, G3/G4 capture, parser fix), all 6,734
+logs of 1.6 with full mod lists. Numbers in `spikes/corpusrun/RESULT.txt` "Final run".
+
+1. **Attribution: 21.2% → 29.9% of problem clusters have a source** on the full sample (attributed
+   to any mod 47.8% → 53.7%; certain 25k → 43k). Logs with ≥ 80% library coverage: 32.0%. Core and
+   DLCs are never named as a source. The first accuracy pilot (32 labelled clusters) found every
+   source RimArcho named correct; the gap is silence, not wrong blame — preliminary, 4 per class.
+2. **The rest are rules, not mods.** Coverage barely matters (32.0% vs 29.9%). Largest remaining
+   gaps: harmony-stack sources (32%: the Harmony lines name patchers, rarely the cause), texture
+   paths built at run time, save references (deliberately not guessed), `_MainTex` shaders.
+3. **A small sample overstates.** The first 671 logs run 6–7 points above the full sample; compare
+   rule changes on the same logs, report rates on the full sample.
+4. **Declared-constraint violations are common and mostly harmless.** Half of the logs break a
+   dependency or load rule, 61% a community rule (now that HugsLib is in the lists, the most broken
+   is the community rule "XML Extensions before HugsLib": 1,550 logs, 184 with either as a source).
+   Above 100 mods, logs with and without violations have errors equally often. The sorter now
+   grades by observed effect (04 §4.4): dependency and loadBefore warn, loadAfter and community
+   rules inform; load-order warnings 19,945 → 2,274.
+5. **Odyssey loaded late** is the main official-order violation (24% of logs): a DLC enabled after
+   the list was built is appended to its end; 1,381 of 1,533 such logs get a specific move.
+6. **Harmony static recall 60% (71% with the patch method found).** 82% of the misses are in
+   assemblies that call `Harmony.Patch` directly; 96% are owned by mods flagged `harmony.manual`.
+   Humanoid Alien Races, Vehicle Framework, Performance Optimizer, Character Editor and HugsLib (its
+   DLL is skipped by the scanner) are 0–1%. The backlog item "IL scan for manual Harmony.Patch
+   targets" is worth about 23 points (81.7% of the 28.7% missed).
+7. **Problem severities, checked against the logs** (a subject mod is an error source: observed /
+   chance): `patch.no-match` 37% / 4.5% (and 30% / 1.3% for patch-failed clusters) — the most
+   predictive warning; `patch.contested` 42% / 6.6% (info, could be warning); `def.parent-missing`
+   16% / 4.1% and `incompat.active` 26% / 7.3% (error, justified); `dep.inactive` 18% / 7.5%;
+   `dep.missing (lib)` 1.6% / 3.3% and `official.order` 2.3% / 2.5% (error, at or below chance:
+   too severe); `def.override` 25% / 8.1% (info, hidden by default). Harmony codes look 2–3×
+   above chance, but attribution names Harmony patchers from the same stack lines, so that ratio is
+   partly circular.
 
 ## 4. Next
 
-- Rules for the remaining gaps in RESULT, measured on the full sample before and after.
-- Sorter: a move action for `official.order` in the TUI/GUI needs list (today: sort only); refresh
-  `observed.json` when the corpus grows.
-- Labelling scaffolding, then accuracy (G1) and the agent evaluation set (design §6.5).
-- G5 patterns: templates and sessions are ready (40% of logs are repeat uploads; 327 of 410
-  small-change pairs lose an error cluster).
+- Lower `dep.missing (lib)` and `official.order` from error; consider `patch.contested` as warning.
+- IL scan for manual `Harmony.Patch` targets; scan HugsLib.dll.
+- Feed the G5 patterns into MCP `Instructions` / `analyze_log` (draft:
+  `docs/research/01-范式库接入草案.md`); 41% of clusters are in kinds the diagnosis workflow does
+  not cover (save-load, missing resources, assembly dependencies, config checks).
+- Labelling: tighten the fix and cause-type fields, label a larger stratified set (≥ 20 per class),
+  then accuracy per class and the agent evaluation set (design §6.5).
+- Sorter: a move action for `official.order` in the TUI/GUI needs list; refresh `observed.json`
+  when the corpus grows.
