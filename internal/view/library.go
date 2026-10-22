@@ -116,11 +116,16 @@ type LibInstRow struct {
 	LibCells
 	// Note is the copy's own note (the player's or an agent's); Auto what RimArcho knows
 	// about how it made the copy, shown (and offered as a first version) while there is none.
-	Note     string   `json:"note,omitempty"`
-	Auto     string   `json:"auto,omitempty"`
-	InPlan   bool     `json:"inPlan,omitempty"`
-	Path     string   `json:"path,omitempty"`
-	URL      string   `json:"url,omitempty"`
+	Note   string `json:"note,omitempty"`
+	Auto   string `json:"auto,omitempty"`
+	InPlan bool   `json:"inPlan,omitempty"`
+	// Path and URL stay on the Go side (the TUI, the field list); the page asks for a
+	// copy's fields when it shows it and opens folders and pages by instance (06 §2.9).
+	Path string `json:"-"`
+	URL  string `json:"-"`
+	// Page is the Workshop page of a subscribed item RimArcho never saw (no instance to
+	// open it by).
+	Page     string   `json:"page,omitempty"`
 	States   []string `json:"states,omitempty"` // every state (the detail lists them all)
 	UsedIn   []string `json:"usedIn,omitempty"`
 	Versions string   `json:"versions,omitempty"`
@@ -487,6 +492,9 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 	r.Played = libDate(i.Played)
 	if IsNumber(i.WorkshopID) {
 		r.URL = WorkshopURL(i.WorkshopID)
+		if r.ID == "" {
+			r.Page = r.URL
+		}
 	}
 	r.Ops = CopyOps(lib, l, i, LibraryPage)
 	return r

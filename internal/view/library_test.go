@@ -1,6 +1,7 @@
 package view_test
 
 import (
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"slices"
@@ -256,5 +257,25 @@ func TestLibSteam(t *testing.T) {
 	msg, err := view.LibDo(e.App, view.LibUnsub, []string{idle.Ref})
 	if err != nil || !strings.Contains(msg, "Idle") || strings.Join(got, " ") != "unsubscribe 5200" {
 		t.Fatalf("unsubscribe %q %v %v", msg, err, got)
+	}
+}
+
+// 06 §2.9: the rows carry op codes only; the labels go once, in the page's op table, and
+// the copies' paths and Workshop URLs stay on the Go side.
+func TestLibraryPayload(t *testing.T) {
+	view.SetLang("zh")
+	defer view.SetLang("en")
+	p := libPage(t, libEnv(t), "")
+	rows, err := json.Marshal(p.Rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{"打开文件夹", `"path"`, `"url"`, `"actions"`} {
+		if strings.Contains(string(rows), s) {
+			t.Errorf("rows carry %s", s)
+		}
+	}
+	if len(p.Ops) != len(view.OpTable()) || p.Ops[0].Label == "" {
+		t.Errorf("op table %+v", p.Ops)
 	}
 }
