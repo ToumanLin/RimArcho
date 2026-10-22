@@ -90,7 +90,28 @@ export async function pack(name) {
 
 async function launch() {
   if (!P || P.light) return;
-  try { say("ok", await api.PackLaunch(P.name)); } catch (e) { say("fail", errText(e)); }
+  await launchPack(P.name);
+}
+
+// launchPack plays a pack (here and on 启动): when Mods/ holds another version of one of its
+// mods that can move into the lock library, one confirmation lists the moves, then it goes
+// on (08 §5.3).
+export async function launchPack(name) {
+  let o;
+  try { o = await api.PackLaunch(name, false); } catch (e) { return say("fail", errText(e)); }
+  if (o.moves) {
+    pop.confirm(T("move the other versions into the lock library"), o.moves, T("move and go on"), async () => {
+      say("busy", T("moving into the lock library…"));
+      let o2;
+      try { o2 = await api.PackLaunch(name, true); } catch (e) { return say("fail", errText(e)); }
+      say(o2.refused ? "fail" : "ok", o2.text);
+      if (o2.refused && o2.refused.length > 1) pop.text(T("launch"), o2.refused);
+      ui.reload();
+    });
+    return;
+  }
+  say(o.refused ? "fail" : "ok", o.text);
+  if (o.refused && o.refused.length > 1) pop.text(T("launch"), o.refused);
   ui.reload();
 }
 

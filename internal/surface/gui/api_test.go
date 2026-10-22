@@ -419,3 +419,29 @@ func TestBuildPageG14(t *testing.T) {
 type fakeEncoder struct{}
 
 func (fakeEncoder) Encode(context.Context, []string, int, bool) error { return nil }
+
+// Another version in the way of a pack copy (08 §5.3): the launch comes back with the moves
+// for one confirmation; with move it goes on.
+func TestPackLaunchMovesConfirm(t *testing.T) {
+	e, api, _ := fixture(t)
+	e.MustRun("enable", "pkg:brrainz.harmony")
+	e.MustRun("enable", "pkg:tester.b")
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	e.MustRun("pack", "build", "p")
+	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Defs", "New.xml"), "<Defs/>")
+	e.MustRun("scan")
+	o, err := api.PackLaunch("p", false)
+	if err != nil || len(o.Moves) < 2 || !strings.Contains(strings.Join(o.Moves, "\n"), "Mods/B →") {
+		t.Fatalf("first: %+v %v", o, err)
+	}
+	if _, err := os.Stat(filepath.Join(e.Game, "Mods", "B")); err != nil {
+		t.Fatal("moved before the confirmation")
+	}
+	o, err = api.PackLaunch("p", true)
+	if err != nil || o.Refused != nil {
+		t.Fatalf("with move: %+v %v", o, err)
+	}
+	if _, err := os.Stat(filepath.Join(e.Game, "Mods", "B")); err == nil {
+		t.Fatal("Mods/B is still there")
+	}
+}

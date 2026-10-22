@@ -61,6 +61,15 @@ func init() {
 		"textures: next choice":                                                       "贴图：换下一个选项",
 		"install":                                                                     "去安装",
 		"the pack grows: DDS take more disk than PNG":                                 "整合包会变大：DDS 比 PNG 占磁盘",
+		// another version in the way (08 §3, §5.3)
+		"Mods/ holds another version of mods RimArcho must link":                                                          "Mods/ 里有 RimArcho 要链接的 Mod 的另一个版本",
+		"these folders move from Mods/ into the lock library; plans that use them keep them and get them through a link:": "这些文件夹会从 Mods/ 收进锁定库；用到它们的方案照样用，经链接进入游戏：",
+		"Mods/%s → %s, so that Mods/%s can be linked for %s":                                                              "Mods/%s → %s，然后为 %[4]s 链接 Mods/%[3]s",
+		"move the other versions into the lock library":                                                                   "把另一个版本收进锁定库",
+		"pack %s's copy of %s":                   "整合包 %s 里的 %s",
+		"move and go on":                         "收进锁定库并继续",
+		"moving into the lock library…":          "正在收进锁定库…",
+		"%d folders moved into the lock library": "%d 个文件夹已收进锁定库",
 		// a pack's page and the list
 		"%d mods · %s":                       "%d 个 Mod · %s",
 		"runs on %s":                         "能在 %s 上运行",

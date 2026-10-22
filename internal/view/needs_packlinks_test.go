@@ -90,16 +90,14 @@ func TestModsDuplicateNeed(t *testing.T) {
 	kinds := map[string]string{}
 	for _, it := range n.Items {
 		if strings.HasPrefix(it.Title, "Mods/ holds") {
-			if it.Section != view.SectionOf(view.GroupList) || !it.Counted || len(it.Actions) != 1 {
+			if it.Section != view.SectionOf(view.GroupList) || !it.Counted || len(it.Actions) != 2 {
 				t.Fatalf("item: %+v", it)
 			}
 			kinds[it.Title] = it.Actions[0].Kind
 		}
 	}
-	if kinds["Mods/ holds tester.same twice"] != view.ActList {
-		t.Fatalf("the player's folders: %v", kinds)
-	}
-	if k := kinds["Mods/ holds tester.cmd twice"]; k != view.ActSwap && k != view.ActDisable {
-		t.Fatalf("RimArcho's link: %v", kinds)
+	// 收进锁定库 first, for the player's folders and beside RimArcho's link alike (08 §3)
+	if kinds["Mods/ holds tester.same twice"] != view.ActMoveLocked || kinds["Mods/ holds tester.cmd twice"] != view.ActMoveLocked {
+		t.Fatalf("first actions: %v", kinds)
 	}
 }

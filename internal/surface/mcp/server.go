@@ -266,8 +266,9 @@ type CopyIn struct {
 }
 
 type SaveIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would be written without writing"`
+	Env            string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	DryRun         bool   `json:"dry_run,omitempty" jsonschema:"show what would be written without writing"`
+	MoveDuplicates bool   `json:"move_duplicates,omitempty" jsonschema:"first move plain Mods/ folders holding another version of a mod RimArcho links into the lock library (the refusal names them; show the dry run first)"`
 }
 
 type RuleIn struct {
@@ -357,7 +358,9 @@ func toolList() []tool {
 		}),
 		reg("read_source", true, false, descSource, func(in SourceIn) []string { return SourceArgv(in) }),
 		reg("edit_loadout", false, false, descEdit, func(in EditIn) []string { return EditArgv(in) }),
-		reg("save_loadout", false, true, descSave, func(in SaveIn) []string { return argv("save").flag("dry-run", in.DryRun).a }),
+		reg("save_loadout", false, true, descSave, func(in SaveIn) []string {
+			return argv("save").flag("dry-run", in.DryRun).flag("move-duplicates", in.MoveDuplicates).a
+		}),
 		reg("copy_local", false, false, descCopy, func(in CopyIn) []string {
 			return argv("copy-local", in.Ref).str("name", in.Name).flag("git", in.Git).a
 		}),

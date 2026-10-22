@@ -64,7 +64,7 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 		}
 		extra = append(extra, l.Finding())
 	}
-	extra = append(extra, duplicateFindings(ps.State, dups)...)
+	extra = append(extra, a.duplicateFindings(ps.State, dups)...)
 	if len(extra) > 0 {
 		c := *ps
 		c.List = append([]*Problem{}, ps.List...)

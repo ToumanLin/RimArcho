@@ -10,6 +10,7 @@
 import { S, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, changesPlan } from "./screens.js";
 import { icon } from "./icons.js";
+import { launchPack } from "./packs.js";
 
 let ui = null;
 export function initHome(u) {
@@ -232,5 +233,5 @@ function actLine(title, text, go, wide) {
 // does on the packs page.
 async function launch(r) {
   if (r.kind === "plan") return ui.run("launch");
-  try { say("ok", await api.PackLaunch(r.name)); } catch (e) { say("fail", errText(e)); }
+  await launchPack(r.name);
 }
