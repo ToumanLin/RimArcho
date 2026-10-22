@@ -1,6 +1,6 @@
 # 05 · 语义接口与 MCP
 
-> 状态：CLI 与 MCP 已实现（31 个 MCP 工具，含别名 `add_rule`、`copy_local`）。还缺 1.1 的存档工具和少数引用形式，逐条标在文中。
+> 状态：CLI 与 MCP 已实现（33 个 MCP 工具，含别名 `add_rule`、`copy_local`）。还缺 1.1 的存档工具和少数引用形式，逐条标在文中。
 > 依据：00、00a；02、03、04、08 的命令语义；09（Archo 用同一套工具）。
 
 ## 1. 一套命令与工具层
@@ -44,7 +44,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 忽略 / 取消忽略问题（03 §4.2） | 已完成 | 工具 `ignore_problem` |
 | 回答身份待确认项、拆分 / 合并 Lineage（02 §5.4、§6） | 已完成 | 工具 `resolve_identity`，`destructiveHint: true` |
 | 扫描 | 已完成 | 工具 `scan` |
-| Mod 库存：列出、筛选、排序（06 §2.9） | 无 | CLI `library`；只读工具 `list_library`（**待实现**） |
+| Mod 库存：列出、筛选、排序；收进锁定库、从所有方案里拿掉（06 §2.9） | 已完成 | CLI `library`、`library move-to-locked`、`library remove-from-plans`；只读工具 `list_library`，写工具 `manage_library`（`destructiveHint: true`：会移动 `Mods/` 里的文件夹）。其他动作已有工具：加入当前方案 `edit_loadout`，锁定 / 更新 / 解除 `pin_mod`、`unpin_mod`，恢复给游戏和回收站 `manage_hidden` |
 | 列表导入、导出、工坊合集对照（04 §9） | 已完成 | 工具 `exchange_list`（导入是一步可撤销的方案编辑） |
 | 用户规则列出 / 删除 | 已完成 | `manage_rules`（`add_rule` 保留为别名） |
 | 隐藏的 Mod：恢复显示、移到回收站（08 §6、§7） | 已完成 | 工具 `manage_hidden`，`destructiveHint: true` |
@@ -204,6 +204,9 @@ next:
 | | `problems [--subject <引用>] [--code <代码或前缀>] [--severity <级别>] [--min-severity <级别>] [--all] [--detail] [--ignored] [--no-analyze]` | 问题列表（03 §4）。分析过期时先在子进程重建，`--no-analyze` 不重建 |
 | | `problems show\|ignore\|unignore <p:引用>` | 一个问题的证据和修复命令；忽略到它的 Mod 变化为止；取消忽略 |
 | | `changes [<引用>] [--since scan:<n>\|<天数>d\|YYYY-MM-DD] [--all]` | 变化事件，默认最近一次扫描 |
+| | `library [--search <词>] [--include <键:值>]… [--exclude <键:值>]… [--sort name\|size\|changed\|played] [--lineage <引用>] [--facets] [--all]` | Mod 库存（06 §2.9）：一行一个 Lineage（几份、合计大小、最要紧的状态、用在）；`--lineage` 列出每一份的路径、状态、方案、上次游玩和动作命令；`--facets` 列出每个筛选值和个数 |
+| | `library remove-from-plans <引用…>` | 从所有方案（同一游戏目录的所有环境）里拿掉，每个方案一步撤销 |
+| | `library move-to-locked <引用> [--dry-run]` | 把 `Mods/` 里的备用副本收进锁定库；Instance 不变，各方案照用（06 §2.9） |
 | | `log [--cluster <E#>] [--file <路径>] [--prev] [--text <文本>] [--select] [--all]` | 日志归因（03 §6）。`--prev` 读 Player-prev.log；`--text` 分析粘贴的日志或堆栈；`--select` 让 `problems` 纳入这份日志 |
 | | `log --follow [--once] [--json]` | 游戏运行时跟踪 Player.log，新簇出现就输出（03 §6.6）；`--once` 读完现有内容就停；`--json` 每簇一行 JSON |
 | | `files search <模式> [--mod <引用>] [--regex] [--languages] [--all]` | 在已启用 Mod 的生效内容（XML / TXT）里搜索，不区分大小写；默认跳过 `Languages/`（翻译会重复每个键），`--languages` 才搜 |
@@ -316,8 +319,10 @@ next:
 | `resolve_identity` | `identity list/resolve`、`lineage split/merge` | false | true |
 | `manage_hidden` | `unhide`、`trash` | false | true |
 | `maintenance` | `data update`、`import rimcrow`、`gc` | false | true |
+| `list_library` | `library`（`search`、`include`、`exclude`、`sort`、`lineage`、`facets`、`all`） | true | — |
+| `manage_library` | `action`：`move_to_locked`（`library move-to-locked`，`dry_run`）/ `remove_from_plans`（`library remove-from-plans`）；`refs` | false | true |
 
-共 31 个（含两个别名）：14 个只读，17 个写；`destructiveHint: true` 的是 `save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
+共 33 个（含两个别名）：15 个只读，18 个写；`destructiveHint: true` 的是 `save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
 
 **描述的改写**（已完成；2026-10-21 之前的描述与代码不符，留作记录）：
 

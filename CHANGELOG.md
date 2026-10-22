@@ -92,12 +92,29 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   `manage_rules` (`add_rule` stays as an alias), `manage_hidden`, `maintenance`, `pin_mod`
   (`copy_local` stays as an alias), `unpin_mod`; `status` gains `show` pages (envs,
   settings, data, db, cache); `launch_game`, `manage_plans`, `plan_history`;
-  `edit_loadout` gains `checkout` and `ignore_external`. 31 tools in all.
+  `edit_loadout` gains `checkout` and `ignore_external`; `list_library`, `manage_library`. 33 tools in all.
 - `exchange_list` and `maintenance` are open-world; the destructive ones (`save_loadout`,
   `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`, `manage_hidden`,
-  `maintenance`) are listed in the server instructions with "show the dry run and ask first".
+  `manage_library`, `maintenance`) are listed in the server instructions with "show the dry run and ask first".
 - Instructions and descriptions speak of the current plan, writing to the game and locked
   versions.
+
+### Mod 库存 (06 §2.9)
+- `archo library` lists every mod on this machine, one line per Lineage (copies, size,
+  the most important state, the plans using it), with `--search`, `--include` /
+  `--exclude key:value` (tag, source, version, state, used), `--sort name|size|changed|played`,
+  `--facets` and `--lineage <ref>` for every copy's path, states, plans and last launch.
+  "Used in" covers every environment of the same game and the packs; states include
+  subscribed items with no folder, unsubscribed leftovers, copies the game ignores and
+  locked versions whose upstream changed.
+- `archo library move-to-locked <ref> [--dry-run]` moves a spare copy out of `Mods/` into the
+  lock library; `archo library remove-from-plans <ref…>` takes mods out of every plan (one
+  undo step each). Moving now keeps the instance (`pin --move-to-library` too), so every plan
+  keeps it. `trash` refuses while any plan uses the folder and names the plans.
+- MCP: `list_library` (read-only) and `manage_library` (destructive).
+- The window's Mod 库存 › 全部: filters, the Lineage list with size · state · used-in, a
+  copy's details in the right column, a selection action bar; the TUI has a minimal list in
+  the palette.
 
 ### The window (06 §2)
 - A sidebar replaces the top tabs, in two groups: 在玩 (启动, 能不能跑 with its badge,
