@@ -43,6 +43,7 @@ const (
 	tabList = iota
 	tabProblems
 	tabChanges
+	tabLibrary // Mod 库存 (06 §2.9), from the palette
 )
 
 // panel is a secondary screen: command output, optionally waiting for y/n, or a chooser.
@@ -106,7 +107,8 @@ type model struct {
 	analyzing   bool
 	analyzeWait func() tea.Msg
 
-	chg chState
+	chg  chState
+	libr libState
 
 	liveTr view.LiveTracker
 	live   *view.Live // the running game (06 §2.1); nil until the first poll
