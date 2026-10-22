@@ -366,6 +366,8 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			}
 		}
 	}
+	// What the log corpus observed (undeclared prerequisites, known-bad combinations).
+	a.knownFindings(active, activeByPkg, installed, add)
 	// Duplicated packages.
 	var pkgs []string
 	for p := range installed {
