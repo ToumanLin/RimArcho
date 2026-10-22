@@ -14,6 +14,7 @@ settings
   data.replacements.url: https://raw.githubusercontent.com/emipa606/UseThisInstead/main/replacements.json.gz
   data.rules.url: https://raw.githubusercontent.com/RimSort/Community-Rules-Database/main/communityRules.json
   data.steamdb.url: https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json
+  monitor.default: on
   tags.pinned: 框架,美化,服装,种族,武器,建筑,家具,QoL,平衡,剧情,性能,语言包,测试中,待删除
   terminal.host: auto
   ui.icons: auto

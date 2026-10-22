@@ -239,12 +239,13 @@ next:
 | 维护 | `db status` / `db backup` / `db vacuum` | 数据库路径、大小、备份；写一份一致的副本到 `<数据目录>/backups`；压缩 |
 | | `cache status` / `cache clear <类别>` | 缓存大小；清空一类缓存（`previews`、`workshop`、`images`、`source`、`logs`），用到时重建 |
 | 设置 | `config get [<键>]` / `config set <键> <值>` | 见下 |
+| Archo Monitor | `monitor` / `monitor install [--dry-run]` | 随附与已安装的版本、来源、当前方案里的位置；安装、更新、默认加入方案（08 §9、04 §1.5） |
 | 存档（1.1，待实现） | `saves list [--colony <名>]` / `saves show <存档>` / `unplayed [--group never\|partial\|functional] [--mod <引用>]` | 只读（10 §1.6） |
 | | `saves backup <存档…>` / `saves trash <存档…>` | 要玩家确认（10 §4.4） |
 
 **分析参数**：`--game-version X.Y` 用于 `analyze`、`problems`、`def`、`patches`、`harmony`、`why`、`log`，按另一个游戏主次版本分析（格式必须像 `1.6`，命令结束后恢复）。MCP 对应工具有同名参数 `game_version`。
 
-**设置键**（`config set`）：`ui.lang auto|en|zh`；`ui.icons auto|nerd|compat`；`ui.mouse on|off`（关掉终端的鼠标上报，方便选中文字）；`workshop.fetch on|off`（是否联网获取工坊简介）；`workshop.images on|off`（是否下载简介里的图片）；`terminal.host auto|wezterm|none`；`ui.previews on|off`；`ui.preview_dwell_ms 0–5000`；`tags.pinned <逗号分隔的标签>`。设置存在数据库的 meta 表（键 `cfg:<键>`）；`config.toml` 只有 `tombstone_days`（07 §3）。
+**设置键**（`config set`）：`ui.lang auto|en|zh`；`ui.icons auto|nerd|compat`；`ui.mouse on|off`（关掉终端的鼠标上报，方便选中文字）；`workshop.fetch on|off`（是否联网获取工坊简介）；`workshop.images on|off`（是否下载简介里的图片）；`terminal.host auto|wezterm|none`；`ui.previews on|off`；`ui.preview_dwell_ms 0–5000`；`tags.pinned <逗号分隔的标签>`；`monitor.default on|off`（是否把 Archo Monitor 自动加进方案，04 §1.5）；`monitor.dir <绝对路径>`（Monitor 目录，08 §9）。设置存在数据库的 meta 表（键 `cfg:<键>`）；`config.toml` 只有 `tombstone_days`（07 §3）。
 
 ### 4.3 方案管理
 

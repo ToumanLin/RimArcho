@@ -148,6 +148,9 @@ type NewPlanResult struct {
 	// installed mod has (they are not in the list).
 	Imported   *ImportedList
 	Unresolved []string
+	// Monitor says what the Archo Monitor default did to the new plan (04 §1.5): "" or
+	// "added after Harmony", one undoable edit after v1.
+	Monitor string
 }
 
 var versionArgRe = regexp.MustCompile(`^[vV]?\d+$`)
@@ -204,7 +207,11 @@ func (a *App) NewPlan(name, from string) (*NewPlanResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &NewPlanResult{Plan: p, List: list, Version: v, State: st, Imported: il, Unresolved: unresolved}, nil
+	mon, err := a.MonitorForNewPlan(p)
+	if err != nil {
+		return nil, err
+	}
+	return &NewPlanResult{Plan: p, List: list, Version: v, State: st, Imported: il, Unresolved: unresolved, Monitor: mon}, nil
 }
 
 // ImportLoadoutAsPlan imports a list file (or share code) as a new plan (04 §9.1 "import
@@ -260,7 +267,11 @@ func (a *App) NewPlanFromImport(name string, il *ImportedList, source string) (*
 	if err != nil {
 		return nil, err
 	}
-	return &NewPlanResult{Plan: p, List: list, Version: v, State: st, Imported: il, Unresolved: unresolved}, nil
+	mon, err := a.MonitorForNewPlan(p)
+	if err != nil {
+		return nil, err
+	}
+	return &NewPlanResult{Plan: p, List: list, Version: v, State: st, Imported: il, Unresolved: unresolved, Monitor: mon}, nil
 }
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }

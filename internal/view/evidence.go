@@ -145,14 +145,41 @@ func evidenceFor(p *app.Problem) *Evidence {
 	return nil
 }
 
-var logIDRe = regexp.MustCompile(`^log:(\S+) x\d+:`)
+var (
+	logIDRe = regexp.MustCompile(`^log:(\S+) x\d+:`)
+	// a file the companion log tied to the error (03 §6.7.4): "log file (ArchoMonitor.log): Defs/X.xml"
+	companionFileRe = regexp.MustCompile(`log file \(([^)]+\.log)\): (\S+)`)
+)
 
-// logEvidence: the clusters of a mod's errors in the last log and when it was written.
+// companionChips are the files the companion log names in evidence texts, as
+// "ArchoMonitor.log · Defs/X.xml".
+func companionChips(texts []string) []string {
+	var out []string
+	for _, t := range texts {
+		if m := companionFileRe.FindStringSubmatch(t); m != nil {
+			c := m[1] + " · " + m[2]
+			dup := false
+			for _, o := range out {
+				dup = dup || o == c
+			}
+			if !dup {
+				out = append(out, c)
+			}
+		}
+	}
+	return out
+}
+
+// logEvidence: the clusters of a mod's errors in the last log and when it was written; a
+// file from the companion log when it names one (03 §6.7.4).
 func logEvidence(ps []*app.Problem, when string) *Evidence {
-	var ids []string
+	var ids, texts []string
 	for _, p := range ps {
 		if m := logIDRe.FindStringSubmatch(p.Claim); m != nil {
 			ids = append(ids, "log:"+m[1])
+		}
+		for _, e := range p.Evidence {
+			texts = append(texts, e.Text)
 		}
 	}
 	src := "Player.log"
@@ -161,6 +188,12 @@ func logEvidence(ps []*app.Problem, when string) *Evidence {
 		src = ids[0]
 	case len(ids) > 1:
 		src = Tf("%s and %d more", ids[0], len(ids)-1)
+	}
+	switch files := companionChips(texts); {
+	case len(files) == 1:
+		src = files[0]
+	case len(files) > 1:
+		src = Tf("%s and %d more", files[0], len(files)-1)
 	}
 	if when != "" {
 		src += " · " + when

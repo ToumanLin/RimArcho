@@ -220,6 +220,10 @@ func applyLinks(mods string, plan []LinkChange) error {
 				return fmt.Errorf("cannot link %s: %v", c.Name, err)
 			}
 			if err := CreateLink(p, c.Target); err != nil {
+				if strings.Contains(strings.ToLower(c.Name), strings.ToLower(monitorFolder)) {
+					// 08 §9: the monitor never falls back to a copy.
+					return fmt.Errorf("Archo Monitor reaches the game only through a link, and %s cannot hold one: %v (the Mods/ volume must support junctions, e.g. NTFS; FAT and exFAT cannot). Disable it in this plan: archo disable pkg:%s", mods, err, MonitorPackage)
+				}
 				return fmt.Errorf("cannot link %s into %s: %v (the Mods/ volume must support junctions, e.g. NTFS)", c.Target, mods, err)
 			}
 		}

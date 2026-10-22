@@ -237,6 +237,9 @@ func switchToNew(a *app.App, r *app.NewPlanResult) (*store.Plan, string, error) 
 	if len(r.Unresolved) > 0 {
 		t += " · " + Tf("%d not installed", len(r.Unresolved))
 	}
+	if r.Monitor != "" {
+		t += " · " + T("Archo Monitor added after Harmony (undo removes it)")
+	}
 	return r.Plan, t, nil
 }
 

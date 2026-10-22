@@ -4,7 +4,9 @@
 # the WezTerm host (06 §9.2): Maple Mono NF CN Regular and Bold with its SIL OFL license under
 # fonts/. The font is fetched at build time from the official Maple Mono GitHub release
 # (pinned by -MapleTag, checked against the release's .sha256) and cached in dist/cache/;
-# it is never committed to the repository.
+# it is never committed to the repository. Archo Monitor, the in-game companion mod (08 §9), is
+# built by monitor/build.ps1 (needs the .NET SDK 10; game references come from NuGet) and
+# shipped under monitor/ArchoMonitor/.
 #
 #   pwsh scripts/release.ps1 -Version 0.5.0            # tests, then dist/archo-0.5.0-windows-amd64.zip
 #   pwsh scripts/release.ps1 -Version 0.5.0 -SkipTests
@@ -74,6 +76,12 @@ try {
 }
 
 Copy-Item README.md, CHANGELOG.md, LICENSE $out
+
+# Archo Monitor (08 §9): the in-game companion, built for 1.5, 1.6 and 1.7 with the release's
+# version and shipped as monitor/ArchoMonitor/, where RimArcho finds it next to the exe.
+Write-Host "building Archo Monitor $Version"
+& (Join-Path $PSScriptRoot "..\monitor\build.ps1") -Version $Version -Out (Join-Path $out "monitor\ArchoMonitor")
+if (-not (Test-Path (Join-Path $out "monitor\ArchoMonitor\About\About.xml"))) { throw "Archo Monitor build produced no About.xml" }
 
 # The bundled font (06 §9.2): Maple Mono NF CN, Regular and Bold, and the OFL.
 $maple = "https://github.com/subframe7536/maple-font/releases/download/$MapleTag"

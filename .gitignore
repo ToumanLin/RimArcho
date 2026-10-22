@@ -18,3 +18,10 @@
 
 # generated Windows resources (08 §15.2)
 *.syso
+
+# Archo Monitor build output (07 §5)
+/monitor/out/
+/monitor/obj/
+/monitor/bin/
+/monitor/test/obj/
+/monitor/test/bin/
