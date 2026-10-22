@@ -178,7 +178,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	m := i.Mod
 	live := m != nil && !i.Missing()
 	workshop := i.Source == app.LibWorkshop || i.Source == app.LibSteamCMD
-	own := i.Source == app.LibLocal || i.Source == app.LibLocked
+	own := i.Source == app.LibLocal || i.Source == app.LibLocked || i.Source == app.LibSteamCMD // no subscription brings these back
 	loadable := live && !has(app.LibUnloadable) && !has(app.LibHidden) && !has(app.LibResidue)
 	others := 0
 	if l != nil {

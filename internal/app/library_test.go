@@ -267,3 +267,14 @@ func TestLibraryTrashNamesPlans(t *testing.T) {
 		t.Fatalf("want a refusal naming plan:other, got %v", err)
 	}
 }
+
+// A SteamCMD download may go like a copy of the player's own: no subscription brings it
+// back.
+func TestTrashSteamCMDCopy(t *testing.T) {
+	e := setup(t, true)
+	e.WriteMod(filepath.Join(e.SteamCMD, "5001"), testkit.Sample("tester.cmd", "Via SteamCMD"))
+	scanNow(t, e)
+	if _, err := e.App.Trash(refOf(t, e, "Via SteamCMD", ""), true); err != nil {
+		t.Fatalf("a SteamCMD copy: %v", err)
+	}
+}

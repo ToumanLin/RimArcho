@@ -191,10 +191,11 @@ func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 	return op, err
 }
 
-// ErrNotTrashable: Trash only removes hidden or unsubscribed workshop and SteamCMD folders.
+// ErrNotTrashable: Trash only removes the player's own copies (Mods/, the lock library,
+// SteamCMD) and hidden or unsubscribed workshop folders.
 var ErrNotTrashable = errors.New("not trashable")
 
-// Trash moves a hidden or unsubscribed workshop (or SteamCMD) folder to the recycle bin
+// Trash moves a copy of the player's own, or a hidden or unsubscribed workshop folder, to the recycle bin
 // (08 §6, §2.4), then rescans.
 func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
@@ -205,15 +206,15 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if err != nil {
 		return nil, err
 	}
-	// A copy of the player's own (in Mods/ or the lock library) may go; a Workshop or
-	// SteamCMD folder only when it is hidden or no longer subscribed: Steam would download a
-	// subscribed one again (06 §2.9, 01 §4).
-	own := m.Kind == source.Local || m.Kind == source.Extra && st.Ix.isLockSource(a, m.SourceID)
+	// A copy of the player's own (in Mods/, the lock library, or a SteamCMD download: no
+	// subscription brings it back) may go; a Workshop folder only when it is hidden or no
+	// longer subscribed: Steam would download a subscribed one again (06 §2.9, 01 §4).
+	own := m.Kind == source.Local || m.Kind == source.SteamCMD || m.Kind == source.Extra && st.Ix.isLockSource(a, m.SourceID)
 	switch {
 	case m.Status != identity.Live:
 		return nil, fmt.Errorf("%s is no longer on disk", st.Ix.Ref(m.ID))
 	case !own && m.Kind != source.Workshop && m.Kind != source.SteamCMD:
-		return nil, fmt.Errorf("%w: %s is in src:%s; RimArcho only moves copies in Mods/ or the lock library, and hidden or unsubscribed workshop folders, to the recycle bin", ErrNotTrashable, st.Ix.Ref(m.ID), m.SourceLabel)
+		return nil, fmt.Errorf("%w: %s is in src:%s; RimArcho only moves copies in Mods/, the lock library or SteamCMD, and hidden or unsubscribed workshop folders, to the recycle bin", ErrNotTrashable, st.Ix.Ref(m.ID), m.SourceLabel)
 	case !own && m.Unloadable != scan.UnloadableAboutDisabled && !m.Residue:
 		return nil, fmt.Errorf("%w: %s is a subscribed, loadable mod; unsubscribe it in Steam instead", ErrNotTrashable, st.Ix.Ref(m.ID))
 	case own && source.IsLink(st.Ix.ModDir(m)):
