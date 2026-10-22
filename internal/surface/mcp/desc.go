@@ -72,11 +72,13 @@ Example: list_problems {"code": "dep"}
     analysis: a:1 2026-10-19 07:21
     list:`
 
-const descChanges = `Change events from scans: discovered, updated, moved, copied, reappeared, tombstoned mods. ref=<mod> gives one mod's history; since=scan:<n>|<days>d|YYYY-MM-DD. Use when the user says "it worked yesterday" to find what changed.
-Example: list_changes {"since": "7d"}
-  changes since 2026-10-12: 3 updated, 1 discovered
-    updated  #a3f9 Combat Extended  2026-10-17
-    updated  #51aa Yayo's Combat 3  2026-10-16`
+const descChanges = `What changed in the mods, one row per mod: its change events merged, with a sentence built from what the scans recorded (supported versions added or dropped, the mod's version, dependencies and incompatibilities added or removed with their installed/enabled state, load rules, files changed grouped as code / Defs / Patches / About / textures / sounds / translations, the Workshop update time, a locked version left behind). Rows are tiered: "affects launch" (a new dependency not installed or enabled, dropped support for the game version, a new incompatibility with an enabled mod, a package id change), "worth a look", "content only". Default: the current plan's mods since that plan was last played (the last scan when it never was); library=true: every mod; since=scan:<n>|<days>d|YYYY-MM-DD; ref=<mod>: that mod's Lineage, every change by day. New and gone mods are one summary group; older changes follow under "earlier", by day. Use when the user says "it worked yesterday" to find what changed.
+Example: list_changes {"library": true}
+  changes: 2 mods (library, since you last played · Oct 17)
+    affects launch:
+      #a3f9  Combat Extended  needs Harmony now (not enabled)
+    content only:
+      #51aa  Yayo's Combat 3  only textures changed`
 
 const descLog = `Attribute Player.log errors to mods. Without cluster: the current Player.log (1.7+: Logs/Player.log; older: the user data folder; prev=true for Player-prev.log) as clusters log:E<n> with class (exception, harmony-stack, xml-load, patch-failed, xref-missing, material, other), count and the main candidate. cluster=E<n>: message, top frames with their Harmony patch lines, every candidate with role (source / patcher / dependency / mentioned) and evidence, confidence, a checklist for hot spots (Pawn.Tick, ThingWithComps.Tick) and next tool calls. text=<pasted stack trace or log excerpt> analyses that instead — use it whenever the user pastes an error. Patch failures are matched to the simulation (file, line, reason); cross-reference errors list referencing files and whether any provider exists.
 Example: analyze_log {"cluster": "E3"}
