@@ -8,6 +8,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -32,14 +33,28 @@ type TexturePage struct {
 
 // Textures is the 贴图优化 page: scope "plan" or "all", scale a percent (100: full size).
 func (s *API) Textures(scope string, scale int) (*TexturePage, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	defer s.free.soon()
-	p, err := view.TexturePageOf(s.a, scope, scale)
+	ctx, cancel := s.beginTextureRead()
+	defer cancel()
+	s.texRead.mu.Lock()
+	defer s.texRead.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if scope != app.TexAll {
+		scope = app.TexPlan
+	}
+	r, targets, err := s.textureSession(scope)
 	if err != nil {
 		return nil, err
 	}
-	out := &TexturePage{TexturePage: p}
+	report, err := r.TextureSummaryTargets(ctx, targets, textures.Options{Scale: scale})
+	if err != nil {
+		return nil, err
+	}
+	out := &TexturePage{TexturePage: view.TexturePageReport(r, report, scope)}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.busy["textures"] {
 		ev := s.texLast
 		out.Running = &ev

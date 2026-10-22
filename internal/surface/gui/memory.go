@@ -10,16 +10,16 @@ import (
 
 // The window process's memory (07 §8.3). Go does not collect on its own while the window
 // sits idle, so what a page built stays resident after the page is gone; the window returns
-// it a moment after heavy work, and forgets a page's caches when the player leaves the page.
+// it a moment after heavy work. Small, change-keyed inventory/log caches survive navigation
+// so revisiting a page does not repeat the same database queries or log analysis.
 
-// MemoryLimit is the window process's Go soft memory cap. The live heap is 6–10 MB; the cap
-// keeps a page's build (Mod 库存) from growing the heap far past that: the peak there went
-// from 97 to 78 MB. Releasing after heavy work does the rest (measured in 07 §6).
+// MemoryLimit is the window process's Go soft memory cap. Page summaries discard their
+// per-file objects; releasing after heavy work returns the remaining free memory.
 const MemoryLimit = 32 << 20
 
 // tuneProcess applies the window's memory settings: the soft cap, and a 256 KiB SQLite page
-// cache on the one connection, as in the TUI (the default 2 MB stays resident in modernc's
-// allocator).
+// cache on the main connection, as in the TUI. ReadSession applies the same cache size to
+// each page connection (the default 2 MB stays resident in modernc's allocator).
 func tuneProcess(a *app.App) {
 	debug.SetMemoryLimit(MemoryLimit)
 	a.Store.DB.Exec("PRAGMA cache_size=-256")
@@ -49,14 +49,17 @@ func (r *releaser) soon() {
 	r.timer = time.AfterFunc(releaseAfter, debug.FreeOSMemory)
 }
 
-// Leave is called by the page when the player leaves a page (screens.js): what only that
-// page used is forgotten and the memory goes back to the OS.
+// Leave cancels abandoned texture reads and drops transient page state. The inventory and
+// dedicated log reader keep their change-keyed caches for the next visit.
 func (s *API) Leave(page string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch page {
-	case "library":
-		s.lib, s.libAt = nil, ""
+	case "textures":
+		if s.texCancel != nil {
+			s.texCancel()
+			s.texCancel = nil
+		}
 	case "needs", "log":
 		s.a.DropLogCaches()
 		s.logLinks = nil

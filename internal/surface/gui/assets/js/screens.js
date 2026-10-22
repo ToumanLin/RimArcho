@@ -8,6 +8,7 @@ import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
 import { bgSection } from "./bg.js";
+import { virtualRows } from "./virtualrows.js";
 
 let ui = null;
 export function initScreens(u) { ui = u; }
@@ -18,11 +19,15 @@ let fresh = false;
 
 // left tells Go the player left a page, which forgets what only that page used (07 §8.3).
 function left(next) {
-  if (S.screen && S.screen !== next) api.Leave(S.screen).catch(() => {});
+  if (S.screen && S.screen !== next) {
+    if (S.screen === "log") { L.list?.destroy(); L.list = null; L.want = ""; clearTimeout(detailTimer); }
+    api.Leave(S.screen).catch(() => {});
+  }
 }
 
 export function openScreen(name) {
   fresh = S.screen !== name;
+  if (fresh) S.screenSeq++;
   if (fresh) onArea = 0;
   left(name);
   S.screen = name;
@@ -38,6 +43,7 @@ export function openScreen(name) {
 export function closeScreen() {
   if (!S.screen) return false;
   left(null);
+  S.screenSeq++;
   S.screen = null;
   dropBackdrop();
   $("#screen").hidden = true;
@@ -376,7 +382,7 @@ export function analyzeEvent(ev) {
 // ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
-const L = { path: "", page: null, loading: false, pending: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "" };
+const L = { path: "", page: null, loading: false, pending: "", error: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "", list: null };
 // of: only this mod's Lineage ({id, name}), from a detail's history; null every mod.
 const C = { page: null, cur: 0, items: [], els: [], open: new Set(), raw: new Map(), of: null, library: false };
 
@@ -403,42 +409,43 @@ function logPage(name, title, ...right) {
   return w;
 }
 
-// gameLog reads the log page; open: it was navigated to, so it is drawn even when the read
-// comes back before the loading line would show (unless another page opened meanwhile).
+// gameLog shows the page immediately; late responses cannot reopen it after navigation.
 export async function gameLog(path = L.path, open = false) {
   const n = ++L.seq;
-  const from = S.screen;
-  const show = () => S.screen === "log" || (open && S.screen === from);
-  // What was read before shows at once and is replaced when the new read is in; a log not
-  // read yet says so only if it takes a moment (no flash of a loading line).
-  let slow = 0;
-  if (L.page && L.page.path && (L.page.path === path || !path)) drawGameLog();
-  else slow = setTimeout(() => { if (n === L.seq) { L.loading = true; drawGameLog(); } }, 150);
+  if (!open && S.screen !== "log") return;
+  L.error = "";
+  L.pending = "";
+  L.loading = !(L.page && L.page.path && (L.page.path === path || !path));
+  drawGameLog(); // switch the page and breadcrumb before waiting for any I/O
+  const epoch = S.screenSeq;
+  const current = () => n === L.seq && S.screen === "log" && S.screenSeq === epoch;
   let p;
-  try { p = await api.LogPage(path || ""); } catch (e) { L.loading = false; if (n === L.seq) { say("fail", errText(e)); drawGameLog(); } return; }
-  clearTimeout(slow);
-  if (n !== L.seq) return;
+  try { p = await api.LogPage(path || ""); } catch (e) {
+    if (current()) { L.loading = false; L.error = errText(e); say("fail", L.error); drawGameLog(); }
+    return;
+  }
+  if (!current()) return;
   if (p.pending) {
     // the mods are being analysed for the log's game version: look again shortly
     L.pending = p.pending;
     L.loading = false;
     L.page = { files: p.files, path: "" };
     L.path = p.path;
-    if (show()) drawGameLog();
-    setTimeout(() => { if (S.screen === "log" && n === L.seq) gameLog(p.path); }, 1500);
+    drawGameLog();
+    setTimeout(() => { if (current()) gameLog(p.path); }, 1500);
     return;
   }
   L.pending = "";
-  const same = L.page && !L.loading && JSON.stringify(L.page) === JSON.stringify(p);
   if (!L.page || L.page.path !== p.path) L.cur = 0;
   L.page = p;
-  if (same) return;
   L.path = p.path;
   L.loading = false;
-  if (show()) drawGameLog();
+  drawGameLog();
 }
 
 function drawGameLog() {
+  L.list?.destroy(); L.list = null;
+  clearTimeout(detailTimer); L.want = "";
   const p = L.page;
   const right = [];
   if (p && p.path && !L.loading) {
@@ -457,6 +464,7 @@ function drawGameLog() {
   if (files.length) bar.append(filePicker(files));
   if (p && p.facts && !L.loading) bar.append(el("span", "muted", p.facts));
   w.append(bar);
+  if (L.error) { w.append(el("div", "card empty-state err", L.error)); return; }
   if (p && p.noMonitor && !L.loading) w.append(noMonitor(p));
   if (L.pending) { w.append(el("div", "card empty-state", Tf("the mods are analysed for %s first (once per game version)…", L.pending))); return; }
   if (L.loading) { const c = el("div", "card pad"); c.append(shimmer(T("reading the log…"), 6)); w.append(c); return; }
@@ -475,7 +483,10 @@ function drawGameLog() {
   if (L.tab === 1) monitorRows(scroll, mon);
   else {
     if (!(p.rows || []).length) scroll.append(el("div", "empty-state", "✓ " + T("no errors in this log")));
-    (p.rows || []).forEach((r, i) => {
+    const rows = p.rows || [];
+    L.cur = Math.min(L.cur, Math.max(0, rows.length - 1));
+    L.list = virtualRows(scroll, rows.length, (i) => {
+      const r = rows[i];
       const row = el("div", "lrow" + (r.info ? " dimmed" : ""));
       const ic = el("span", "ic");
       ic.innerHTML = statusIcon(r.status);
@@ -486,8 +497,7 @@ function drawGameLog() {
       body.append(top, logText(r));
       row.append(ic, body);
       row.onclick = () => { L.cur = i; markLog(); };
-      L.els.push(row);
-      scroll.append(row);
+      return row;
     });
   }
   list.append(scroll);
@@ -580,7 +590,9 @@ function monitorRows(scroll, mon) {
   head.append(el("span", "", mon.facts));
   scroll.append(head);
   if (!mon.entries.length) { scroll.append(el("div", "empty-state", "✓ " + T("nothing reported in this run"))); return; }
-  mon.entries.forEach((m, i) => {
+  L.mcur = Math.min(L.mcur, Math.max(0, mon.entries.length - 1));
+  L.list = virtualRows(scroll, mon.entries.length, (i) => {
+    const m = mon.entries[i];
     const open = L.open.has(m.key);
     const row = el("div", "lrow mrow" + (open ? " open" : ""));
     const ic = el("span", "ic");
@@ -607,8 +619,7 @@ function monitorRows(scroll, mon) {
       L.open.has(m.key) ? L.open.delete(m.key) : L.open.add(m.key);
       drawGameLog();
     };
-    L.els.push(row);
-    scroll.append(row);
+    return row;
   });
 }
 
@@ -625,9 +636,10 @@ function toCluster(id) {
 // while the game runs).
 export async function logLive() {
   if (S.screen !== "log" || !L.page || !L.page.path) return;
+  const path = L.page.path, epoch = S.screenSeq;
   let m;
-  try { m = await api.LogMonitor(L.page.path); } catch { return; }
-  if (!m || S.screen !== "log" || !L.page) return;
+  try { m = await api.LogMonitor(path); } catch { return; }
+  if (!m || S.screen !== "log" || S.screenSeq !== epoch || L.page?.path !== path) return;
   if (JSON.stringify(m) === JSON.stringify(L.page.monitor)) return;
   L.page.monitor = m;
   drawGameLog();
@@ -635,10 +647,9 @@ export async function logLive() {
 
 let detailTimer = 0;
 function markLog(keepScroll) {
+  clearTimeout(detailTimer); L.want = "";
   const at = L.tab === 1 ? L.mcur : L.cur;
-  L.els.forEach((r, i) => r.classList.toggle("cur", i === at));
-  const on = L.els[at];
-  if (on && !keepScroll) on.scrollIntoView({ block: "nearest" });
+  L.list?.select(at, !keepScroll);
   const box = $("#screen .detail-card .scroll");
   if (!box) return;
   setAna(null);
@@ -671,7 +682,7 @@ function markLog(keepScroll) {
       [lines, card] = await Promise.all([api.LogCluster(path, id), api.LogPattern(path, id).catch(() => null)]);
     } catch (e) { lines = [errText(e)]; }
     L.detail.set(k, { lines, card });
-    if (L.want === k) showLines($("#screen .detail-card .scroll"), lines, card);
+    if (S.screen === "log" && L.want === k) showLines($("#screen .detail-card .scroll"), lines, card);
   }, 90);
 }
 

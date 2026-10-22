@@ -1,6 +1,7 @@
 package view
 
 import (
+	"context"
 	"sort"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -63,14 +64,24 @@ type TextureRow struct {
 
 // TexturePageOf builds the page for scope at scale.
 func TexturePageOf(a *app.App, scope string, scale int) (*TexturePage, error) {
+	return TexturePageContext(context.Background(), a, scope, scale)
+}
+
+func TexturePageContext(ctx context.Context, a *app.App, scope string, scale int) (*TexturePage, error) {
 	if scope != app.TexAll {
 		scope = app.TexPlan
 	}
 	o := textures.Options{Scale: scale}.Normal()
-	r, err := a.TextureStatus(nil, scope, o)
+	r, err := a.TextureSummary(ctx, nil, scope, o)
 	if err != nil {
 		return nil, err
 	}
+	return TexturePageReport(a, r, scope), nil
+}
+
+// TexturePageReport formats an already measured summary, without loading another index.
+func TexturePageReport(a *app.App, r *app.TextureReport, scope string) *TexturePage {
+	o := r.Options
 	p := &TexturePage{Scope: scope, Scale: o.Scale, Scales: TextureScales, Mods: len(r.Mods)}
 	for _, s := range TextureScales {
 		p.Labels = append(p.Labels, TextureScaleLabel(s))
@@ -122,7 +133,7 @@ func TexturePageOf(a *app.App, scope string, scale int) (*TexturePage, error) {
 	}
 	p.Convert = r.Est.Files
 	p.EstFacts = EstimateFacts(r.Est)
-	return p, nil
+	return p
 }
 
 // EstimateFacts says what converting costs and saves, in the interface's words.

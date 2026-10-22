@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -267,6 +268,27 @@ func modDir(ix *Index, m *store.Mod) string {
 	return d
 }
 
+// TextureTarget is the small, immutable input of a page read. Capture it while the UI
+// App is locked; a separate reader then needs no second copy of the full Mod index.
+type TextureTarget struct {
+	Mod      *store.Mod
+	Ref, Dir string
+}
+
+func (a *App) TextureTargets(refs []string, scope string) ([]TextureTarget, error) {
+	st, mods, err := a.textureMods(refs, scope)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TextureTarget, 0, len(mods))
+	for _, m := range mods {
+		// Only these fields are read by the summary/view, with no shared mutable Mod.
+		copy := &store.Mod{ID: m.ID, Name: m.Name, Alias: m.Alias, Rel: m.Rel}
+		out = append(out, TextureTarget{Mod: copy, Ref: st.Ix.Ref(m.ID), Dir: st.Ix.ModDir(m)})
+	}
+	return out, nil
+}
+
 // ---- the state of one mod ----
 
 // TextureMod is one mod's textures: what is there, what RimArcho made, what a run would do.
@@ -293,7 +315,15 @@ type TextureMod struct {
 // textureMod reads one mod's textures and decides what a run with o would do; the records
 // of DDS files that no longer exist are dropped.
 func (a *App) textureMod(ix *Index, m *store.Mod, o textures.Options, force bool, last map[string]store.TextureMod) *TextureMod {
-	t := &TextureMod{Mod: m, Ref: ix.Ref(m.ID), Dir: modDir(ix, m), rows: map[string]store.TextureFile{}}
+	return a.textureModContext(context.Background(), ix, m, o, force, last)
+}
+
+func (a *App) textureModContext(ctx context.Context, ix *Index, m *store.Mod, o textures.Options, force bool, last map[string]store.TextureMod) *TextureMod {
+	return a.readTextureMod(ctx, m, ix.Ref(m.ID), modDir(ix, m), o, force, last)
+}
+
+func (a *App) readTextureMod(ctx context.Context, m *store.Mod, ref, dir string, o textures.Options, force bool, last map[string]store.TextureMod) *TextureMod {
+	t := &TextureMod{Mod: m, Ref: ref, Dir: dir, rows: map[string]store.TextureFile{}}
 	if l, ok := last[m.ID]; ok {
 		t.Last = &l
 	}
@@ -316,7 +346,8 @@ func (a *App) textureMod(ix *Index, m *store.Mod, o textures.Options, force bool
 		t.rows[store.PathKey(r.Path)] = r
 	}
 	a.Store.DeleteTextureFiles(gone)
-	set, err := textures.Collect(t.Dir, textures.AllFolders(t.Dir))
+	cache := filepath.Join(a.Home, "cache", "textures", fmt.Sprintf("%x.json", sha256.Sum256([]byte(store.PathKey(t.Dir)))))
+	set, err := textures.CollectCached(ctx, t.Dir, textures.AllFolders(t.Dir), cache)
 	if err != nil {
 		t.Err = err.Error()
 		return t
@@ -390,8 +421,55 @@ func (r *TextureReport) Totals() (png int, pngBytes int64, ours int, oursBytes i
 }
 
 // TextureStatus reads the textures of mods (refs, or scope TexPlan / TexAll) and what an
-// optimisation with o would do. Nothing is written but the records of DDS files that are gone.
+// optimisation with o would do. It updates the PNG header cache and forgets records of
+// DDS files that are gone; no texture file is changed.
 func (a *App) TextureStatus(refs []string, scope string, o textures.Options) (*TextureReport, error) {
+	return a.textureStatus(context.Background(), refs, scope, o)
+}
+
+// TextureSummary reads one mod at a time and retains its totals, not all the PNGs and
+// conversion jobs. Page reads can be cancelled between files when the player leaves.
+func (a *App) TextureSummary(ctx context.Context, refs []string, scope string, o textures.Options) (*TextureReport, error) {
+	targets, err := a.TextureTargets(refs, scope)
+	if err != nil {
+		return nil, err
+	}
+	return a.TextureSummaryTargets(ctx, targets, o)
+}
+
+// TextureSummaryTargets uses only captured names/paths and this reader's own connection.
+func (a *App) TextureSummaryTargets(ctx context.Context, targets []TextureTarget, o textures.Options) (*TextureReport, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	last, err := a.Store.TextureMods()
+	if err != nil {
+		return nil, err
+	}
+	r := &TextureReport{Options: o.Normal(), Tool: a.TextureTool(), DryRun: true}
+	for _, target := range targets {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		dir := target.Dir
+		if real, err := source.RealPath(dir); err == nil {
+			dir = real
+		}
+		t := a.readTextureMod(ctx, target.Mod, target.Ref, dir, o, false, last)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		t.set, t.rows = nil, nil
+		if t.Plan != nil {
+			t.Plan.Jobs, t.Plan.Fresh = nil, nil
+			r.Est.Plus(t.Plan.Est)
+		}
+		r.Mods = append(r.Mods, t)
+	}
+	return r, nil
+}
+
+func (a *App) textureStatus(ctx context.Context, refs []string, scope string, o textures.Options) (*TextureReport, error) {
 	st, mods, err := a.textureMods(refs, scope)
 	if err != nil {
 		return nil, err
@@ -402,7 +480,13 @@ func (a *App) TextureStatus(refs []string, scope string, o textures.Options) (*T
 	}
 	r := &TextureReport{Options: o.Normal(), Tool: a.TextureTool(), DryRun: true}
 	for _, m := range mods {
-		t := a.textureMod(st.Ix, m, o, false, last)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		t := a.textureModContext(ctx, st.Ix, m, o, false, last)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		r.Mods = append(r.Mods, t)
 		if t.Plan != nil {
 			r.Est.Plus(t.Plan.Est)

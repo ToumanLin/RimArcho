@@ -36,6 +36,7 @@ func Run(o Options) error {
 	a.LogCacheOnly = true
 	tuneProcess(a)
 	api := newAPI(a)
+	defer api.Close()
 	api.free.on = true
 	page, err := PageHandler(api)
 	if err != nil {

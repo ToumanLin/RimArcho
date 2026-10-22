@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -21,6 +22,58 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
+
+func TestTextureSummaryMatchesFullReport(t *testing.T) {
+	e, _, _ := texSetup(t)
+	refs := []string{"pkg:tester.tex"}
+	check := func() {
+		t.Helper()
+		full, err := e.App.TextureStatus(refs, app.TexRefs, textures.Options{Scale: 50})
+		if err != nil {
+			t.Fatal(err)
+		}
+		summary, err := e.App.TextureSummary(context.Background(), refs, app.TexRefs, textures.Options{Scale: 50})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if summary.Est != full.Est || len(summary.Mods) != len(full.Mods) {
+			t.Fatal("summary totals differ")
+		}
+		for i, m := range summary.Mods {
+			f := full.Mods[i]
+			if m.PNG != f.PNG || m.PNGBytes != f.PNGBytes || m.Ours != f.Ours || m.Stale != f.Stale || m.Foreign != f.Foreign || m.Plan.Est != f.Plan.Est || !reflect.DeepEqual(m.Plan.Skipped, f.Plan.Skipped) {
+				t.Fatalf("summary differs: %+v / %+v", m, f)
+			}
+			if len(m.Plan.Jobs) != 0 || len(m.Plan.Fresh) != 0 {
+				t.Fatal("summary retains conversion jobs")
+			}
+		}
+	}
+	check()
+	if _, err := e.App.OptimizeTextures(app.TextureRun{Refs: refs}); err != nil {
+		t.Fatal(err)
+	}
+	check() // freshness counts survive after dropping per-file jobs
+	targets, err := e.App.TextureTargets(refs, app.TexRefs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, err := e.App.ReadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	// The reader needs only the captured targets, even with no resolvable environment.
+	reader.EnvName = "missing"
+	if _, err := reader.TextureSummaryTargets(context.Background(), targets, textures.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := e.App.TextureSummary(ctx, refs, app.TexRefs, textures.Options{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled summary: %v", err)
+	}
+}
 
 func texPNG(t *testing.T, p string, w, h int) {
 	t.Helper()

@@ -6,16 +6,9 @@ import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button } from "./screens.js";
 import * as pop from "./popups.js";
 
-const X = { scope: "plan", scale: 100, page: null, prog: null };
+const X = { scope: "plan", scale: 100, page: null, prog: null, seq: 0, loading: false, error: "" };
 
-export async function open() { return draw(true); }
-
-async function load() {
-  try { X.page = await api.Textures(X.scope, X.scale); } catch (e) { say("fail", errText(e)); return false; }
-  X.prog = X.page.running || X.prog;
-  if (!X.page.running && X.prog && !X.prog.done) X.prog = null;
-  return true;
-}
+export async function open() { openScreen("textures"); return draw(true); }
 
 // event is a "textures" event: the run's progress, then its end.
 export function event(ev) {
@@ -54,20 +47,40 @@ function select(f, values, labels, value, onchange) {
     s.append(o);
   });
   s.onchange = () => onchange(s.value);
-  s.disabled = !!X.prog;
+  s.disabled = !!X.prog || X.loading;
   return s;
 }
 
 async function draw(fetch) {
-  if (fetch && !(await load())) return;
+  if (S.screen !== "textures") return;
+  if (fetch) {
+    const n = ++X.seq, epoch = S.screenSeq;
+    X.loading = true; X.error = "";
+    draw(false);
+    const current = () => n === X.seq && S.screen === "textures" && S.screenSeq === epoch;
+    try {
+      const p = await api.Textures(X.scope, X.scale);
+      if (!current()) return;
+      X.page = p;
+      X.prog = p.running || X.prog;
+      if (!p.running && X.prog && !X.prog.done) X.prog = null;
+    } catch (e) {
+      if (!current()) return;
+      X.error = errText(e); say("fail", X.error);
+    }
+    if (!current()) return;
+    X.loading = false;
+  }
   const p = X.page;
-  if (!p) return;
-  const sc = S.screen === "textures" ? $("#screen") : openScreen("textures");
+  const sc = $("#screen");
+  if (!p) { sc.innerHTML = ""; sc.append(page("textures", X.error || T("reading textures…"))); return; }
   const top = sc.scrollTop;
   const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.f;
   sc.innerHTML = "";
   const w = page("textures", T("the game loads a .dds in place of the .png of the same name: no PNG to decode at start, and opaque textures take half the video memory"));
   sc.append(w);
+  w.setAttribute("aria-busy", String(X.loading));
+  if (X.loading || X.error) w.append(el("div", "muted", X.error || T("reading textures…")));
 
   // the encoder
   w.append(el("div", "label section", T("encoder")));
@@ -116,6 +129,7 @@ async function draw(fetch) {
     w.append(t);
   }
   sc.scrollTop = top;
+  if (X.loading) w.querySelectorAll("button, select").forEach((b) => { b.disabled = true; });
   if (focused) { const n = sc.querySelector(`[data-f="${focused}"]`); if (n) n.focus(); }
 }
 
@@ -135,7 +149,7 @@ function foot(p) {
     return f;
   }
   const go = button(T("convert"), "", () => convert(p), "primary");
-  go.disabled = !p.toolOk || !p.convert;
+  go.disabled = X.loading || !p.toolOk || !p.convert;
   f.append(go);
   return f;
 }

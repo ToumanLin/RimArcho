@@ -18,7 +18,7 @@ import (
 // ChangeText is the interfaces' wording of the page.
 func ChangeText() modchanges.Text {
 	return modchanges.Text{T: T, Date: func(t time.Time) string {
-		if lang == "zh" {
+		if Lang() == "zh" {
 			return fmt.Sprintf("%d 月 %d 日", int(t.Month()), t.Day())
 		}
 		return t.Format("Jan 2")

@@ -194,7 +194,7 @@ func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) 
 // LongDate is a date with the year: 2026 年 10 月 21 日 / Oct 21, 2026.
 func LongDate(t time.Time) string {
 	t = t.Local()
-	if lang == "zh" {
+	if Lang() == "zh" {
 		return t.Format("2006 年 1 月 2 日")
 	}
 	return t.Format("Jan 2, 2006")

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 )
 
 // Package view holds what the TUI and the GUI show, independent of how they draw it
@@ -12,10 +13,15 @@ import (
 // The interfaces speak Chinese or English (06 §9.2, "跟随配置"); command output shown in panels
 // is the fixed-English CLI text (05 §1.1). Strings are looked up by their English text.
 
-var lang = "en"
+var chinese atomic.Bool
 
 // Lang is the selected language: "zh" or "en".
-func Lang() string { return lang }
+func Lang() string {
+	if chinese.Load() {
+		return "zh"
+	}
+	return "en"
+}
 
 // Register adds a surface's own translations (its key hints, its help text).
 func Register(zh map[string]string) {
@@ -27,7 +33,7 @@ func Register(zh map[string]string) {
 // Table is the whole translation table of the selected language (empty for English); the
 // GUI fetches it once.
 func Table() map[string]string {
-	if lang != "zh" {
+	if !chinese.Load() {
 		return map[string]string{}
 	}
 	return zhText
@@ -42,16 +48,12 @@ func SetLang(v string) {
 	if v == "" || v == "auto" {
 		v = systemLang()
 	}
-	if strings.HasPrefix(strings.ToLower(v), "zh") {
-		lang = "zh"
-	} else {
-		lang = "en"
-	}
+	chinese.Store(strings.HasPrefix(strings.ToLower(v), "zh"))
 }
 
 // T translates an interface string.
 func T(s string) string {
-	if lang == "zh" {
+	if chinese.Load() {
 		if z, ok := zhText[s]; ok {
 			return z
 		}
@@ -230,6 +232,8 @@ var zhText = map[string]string{
 	"mod thumbnails":               "Mod 缩略图",
 	"decompiled C#":                "反编译的 C#",
 	"Player.log analyses":          "日志分析结果",
+	"PNG header cache":             "PNG 文件头缓存",
+	"reading textures…":            "正在读取贴图统计…",
 	"%s · %d items":                "%s · %d 项",
 	"packs":                        "整合包",
 	"list only":                    "仅列表",

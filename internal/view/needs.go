@@ -938,7 +938,7 @@ func Humanize(st *app.LoadoutState, s string) string {
 // ShortDate: "Oct 17" / "10 月 17 日".
 func ShortDate(t time.Time) string {
 	t = t.Local()
-	if lang == "zh" {
+	if Lang() == "zh" {
 		return fmt.Sprintf("%d 月 %d 日", int(t.Month()), t.Day())
 	}
 	return t.Format("Jan 2")

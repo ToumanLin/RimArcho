@@ -30,6 +30,7 @@ func fixture(t *testing.T) (*testkit.Env, *API, chan string) {
 		b, _ := json.Marshal(data)
 		events <- name + " " + string(b)
 	})
+	t.Cleanup(api.Close)
 	return e, api, events
 }
 

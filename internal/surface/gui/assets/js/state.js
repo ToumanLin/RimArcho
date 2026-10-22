@@ -15,6 +15,7 @@ export const S = {
   placed: null, // the mods space just placed: "m changes it" (06 §3.5)
   popup: null,  // the open popup (06 §3.1 rule 5)
   screen: null, // "needs" | "changes" | "full"
+  screenSeq: 0, // late reads from a page that was left must not reopen it
   busy: {},     // scan, analyze
   packBuild: null, // the last "pack" event of the build this window runs
   live: null,   // Live(): the running game and its errors (06 §2.1)

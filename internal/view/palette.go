@@ -19,7 +19,7 @@ type Command struct {
 
 // Name is the command's name in the interface language.
 func (c Command) Name() string {
-	if lang == "zh" {
+	if Lang() == "zh" {
 		return c.Zh
 	}
 	return c.En

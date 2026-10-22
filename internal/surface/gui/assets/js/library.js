@@ -50,6 +50,11 @@ export function initLibrary(u) {
 // open shows the page (the sidebar's Mod 库存 › 全部).
 export async function open() {
   if (S.screen !== "library") { L.full = false; L.focus = "rows"; }
+  if (L.page) build();
+  else {
+    const sc = openScreen("library");
+    sc.append(page("fill library", T("loading…")));
+  }
   await load(true);
 }
 
@@ -79,12 +84,13 @@ function bar() {
 
 async function load(fresh) {
   const n = ++L.seq;
+  const epoch = S.screenSeq;
   const b = bar();
   let p, saved;
   try {
     [p, saved] = await Promise.all([api.Library(b.search, b.filters, L.sort), L.cols ? null : api.Setting(COLS_KEY).catch(() => "")]);
-  } catch (e) { say("fail", errText(e)); return; }
-  if (n !== L.seq) return;
+  } catch (e) { if (n === L.seq && S.screen === "library" && epoch === S.screenSeq) say("fail", errText(e)); return; }
+  if (n !== L.seq || S.screen !== "library" || epoch !== S.screenSeq) return;
   L.page = p;
   ops.setTable(p.opTable);
   if (!L.cols) L.cols = mergeCols(p.columns || [], saved);

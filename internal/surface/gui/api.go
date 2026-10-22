@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -22,8 +23,8 @@ import (
 // internal/view, or runs a view verb. No business rule lives here.
 //
 // The app is not safe for concurrent use and Wails calls methods concurrently, so each
-// method holds mu; the slow reads (the detail's description, which may fetch the Workshop
-// page) run outside it on a snapshot of the index, as the TUI's loaders do.
+// method locks its App. Slow texture/log reads use separate sessions; descriptions use
+// a snapshot of the index. Only snapshotting settings/results needs the shared mu.
 type API struct {
 	mu      sync.Mutex
 	a       *app.App
@@ -60,6 +61,9 @@ type API struct {
 	// TexRunner runs `archo textures optimize` in place of the child process (tests).
 	TexRunner func(args []string, progress func(string)) ([]string, error)
 	texLast   TextureEvent // the running conversion's last progress
+	texCancel context.CancelFunc
+	logRead   logReader
+	texRead   logReader
 	// ScanRunner scans an environment in place of the child process (tests).
 	ScanRunner func(env string) (string, error)
 }
@@ -1016,21 +1020,29 @@ func (s *API) Logs() []string {
 
 // LogPage analyses a log for the 日志 tab (the newest when path is empty).
 func (s *API) LogPage(path string) (*view.LogPage, error) {
+	// Serialise log reads with each other, not with the board, navigation or textures.
+	// Keeping this reader also preserves pending cross-version analysis between polls.
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return nil, err
+	}
+	readState, err := r.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	p, err := view.BuildLogPage(r, readState, path, nil)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	defer s.free.soon()
-	st := s.boardState()
-	if st == nil {
-		return nil, errors.New("no list")
-	}
-	// A log of another game version needs an analysis for that version first (seconds):
-	// it runs in the background and the page says so instead of holding every other call.
-	s.a.AnalyzeExe = s.Exe
-	s.a.AnalyzeWait = 200 * time.Millisecond
-	defer func() { s.a.AnalyzeWait = 0 }()
-	p, err := view.BuildLogPage(s.a, st, path, &s.live)
 	if err == nil && p.Path != "" {
-		s.logLinks, s.logPath = p.Links, p.Path
+		if current := s.boardState(); current != nil && current.Ix.Env.ID == readState.Ix.Env.ID {
+			s.logLinks, s.logPath = p.Links, p.Path
+			if m := view.LiveMonitor(s.a, current, &s.live, p.Path, p.Links); m != nil {
+				p.Monitor, p.NoMonitor, p.AddMonitor = m, "", false
+			}
+		}
 	}
 	return p, err
 }
@@ -1061,13 +1073,21 @@ func (s *API) AddMonitor() (string, error) {
 
 // LogCluster is one cluster's evidence (archo log --cluster), names for #refs.
 func (s *API) LogCluster(path, id string) ([]string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if path == "" || id == "" || strings.HasPrefix(path, "-") || strings.HasPrefix(id, "-") {
 		return nil, errors.New("no cluster")
 	}
-	text, _ := cmds.Execute(s.a, []string{"log", "--file", path, "--cluster", id})
-	st := s.boardState()
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return nil, err
+	}
+	st, err := r.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	text, _ := cmds.Execute(r, []string{"log", "--file", path, "--cluster", id})
 	var out []string
 	for _, l := range view.WithoutPatternBlock(strings.Split(strings.TrimRight(text, "\n"), "\n")) {
 		out = append(out, view.Humanize(st, l))
@@ -1078,9 +1098,18 @@ func (s *API) LogCluster(path, id string) ([]string, error) {
 // LogPattern is the pattern card of a cluster (06 §2.10): community background shown apart
 // from the evidence; nil when the cluster matches no pattern.
 func (s *API) LogPattern(path, id string) *view.PatternCard {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.PatternCardOf(s.a, s.boardState(), path, id)
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return nil
+	}
+	st, err := r.Loadout()
+	if err != nil {
+		return nil
+	}
+	return view.PatternCardOf(r, st, path, id)
 }
 
 // SelectLog picks the log whose errors join 需要处理.
