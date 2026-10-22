@@ -192,6 +192,10 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.inspectKey(s)
 	case m.editing:
 		return m.filterKey(k)
+	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
+		return m.barTypeKey(k)
+	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
+		return m.barOpenKey(k)
 	case m.tab == tabLibrary && m.libr.typing:
 		return m.libTypeKey(k)
 	case m.full:
@@ -309,15 +313,28 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.goArea((int(m.focus)+2)%3 + 1)
 	case "]":
 		return m.goArea((int(m.focus)+1)%3 + 1)
-	case "/":
-		m.editing, m.detailFocus = true, false
+	case "/", "ctrl+f":
+		m.detailFocus = false
+		if m.focus == cStaging {
+			m.editing = true // 暂存 keeps its own search
+			return nil
+		}
+		m.bar.typing = true
 		return nil
+	case `\`:
+		return m.toggleBar()
 	case "esc":
-		if c.filter != "" {
+		// back one level (06 §3.1): the selection, then the search and the filters
+		switch {
+		case m.selCount() > 0:
+			m.clearSel()
+		case c.filter != "":
 			c.filter = ""
 			m.refilterCol(m.focus, c.curID())
+		case m.bar.active():
+			m.bar.search, m.bar.filters = "", nil
+			return m.barChanged()
 		}
-		m.clearSel()
 		return nil
 	case "ctrl+@", "ctrl+ ", "v":
 		return m.selToggle()
@@ -515,10 +532,14 @@ func (m *model) searchJump() tea.Cmd {
 		m.cols[from].filter = ""
 		m.refilterCol(from, m.cols[from].curID())
 		m.setFocus(k)
+		m.editing = false
+		if k != cStaging {
+			m.bar.search = q // the other lists share the filter bar
+			return m.barChanged()
+		}
 		c := m.col()
 		c.filter, c.cursor = q, 0
 		m.refilterCol(k, "")
-		m.editing = false
 		return m.requestDetail()
 	}
 	m.say(sayInfo, T("no other list has a match"))
@@ -630,10 +651,11 @@ func (m *model) hit(x, y int) (colKind, int, bool) {
 			continue
 		}
 		rm := m.rowMap[s.kind]
-		if y-2 < 0 || y-2 >= len(rm) {
+		y := y - 2 - m.barLines()
+		if y < 0 || y >= len(rm) {
 			return s.kind, -1, true
 		}
-		return s.kind, rm[y-2], true
+		return s.kind, rm[y], true
 	}
 	return 0, -1, false
 }

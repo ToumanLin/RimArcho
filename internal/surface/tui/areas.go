@@ -140,7 +140,7 @@ func (m *model) position() string {
 		}
 	default:
 		p = m.focus.title() + " " + markDot + " " + idx()
-		if c.filter != "" {
+		if c.filter != "" || c.kind != cStaging && m.bar.active() {
 			p += " " + markDot + " " + T("filtered")
 		}
 	}
@@ -166,8 +166,10 @@ func (m *model) popupName() string {
 		return strings.TrimRight(strings.TrimSpace(m.prompt.label), ":：")
 	case m.panel != nil:
 		return m.panel.title
-	case m.editing:
+	case m.editing, m.tab == tabList && m.bar.typing:
 		return T("search")
+	case m.tab == tabList && m.bar.open:
+		return T("filter")
 	case m.armed != nil:
 		return T("confirm")
 	}

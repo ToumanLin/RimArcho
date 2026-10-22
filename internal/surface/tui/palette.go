@@ -331,7 +331,13 @@ func (m *model) jumpTo(id string) tea.Cmd {
 			}
 		}
 		if !in {
-			c.filter = ""
+			if colKind(k) == cStaging {
+				c.filter = ""
+			} else {
+				m.bar.search, m.bar.filters = "", nil // the bar hides it: show every row
+				m.barCache = nil
+				m.refilterBar()
+			}
 			m.refilterCol(colKind(k), id)
 		} else {
 			m.refilterCol(colKind(k), id)

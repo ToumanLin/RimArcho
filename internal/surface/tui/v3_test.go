@@ -134,14 +134,15 @@ func TestT18TaskSteps(t *testing.T) {
 	}
 	pos := func(name string) int { return m.st.Position(m.st.Ix.ByID[idOf(t, m, name)].ID) }
 
-	// 1. Enable a mod by name at the right place, focus in Enabled: / name tab space.
+	// 1. Enable a mod by name at the right place, focus in Enabled: / name enter 1 space
+	// (the bar filters both lists, 06 §2.5).
 	press(m, "2")
 	n = 0
 	key("/")
 	typeIn(m, "late")
-	key2(tea.KeyTab)
-	key("space")
-	task("enable Late", 3)
+	key2(tea.KeyEnter)
+	key("1", "space")
+	task("enable Late", 4)
 	if p := pos("Late"); p != pos("P050")+1 {
 		t.Fatalf("Late at %d, P050 at %d (status %q)", p, pos("P050"), m.status)
 	}
@@ -400,11 +401,13 @@ func TestSearchOtherLists(t *testing.T) {
 	press(m, "2")
 	press(m, "/")
 	typeIn(m, "beta")
-	if l := ansi.Strip(m.statusLine()); !strings.Contains(l, "other lists: Disabled 1 · Staging 0") {
-		t.Fatalf("status %q", l)
+	// the bar's search filters both lists at once (06 §2.5): Beta shows in Disabled
+	press(m, "enter")
+	press(m, "1")
+	if m.focus != cInactive || m.bar.typing || m.current() == nil || m.current().name != "Beta" || len(m.cols[cActive].view) != 0 {
+		t.Fatalf("bar: focus %d, typing %v, %v", m.focus, m.bar.typing, m.current())
 	}
-	pressKey(m, tea.KeyTab)
-	if m.focus != cInactive || m.editing || m.current().name != "Beta" || m.cols[cActive].filter != "" || m.cols[cInactive].filter != "beta" {
-		t.Fatalf("tab: focus %d, editing %v, %s", m.focus, m.editing, m.current().name)
+	if l := ansi.Strip(m.columnTitle(&m.cols[cActive], false, 40)); !strings.Contains(l, "Enabled 0 / ") {
+		t.Fatalf("title %q", l)
 	}
 }

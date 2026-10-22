@@ -20,6 +20,7 @@ type libState struct {
 	cursor, off int
 	query       string
 	typing      bool
+	bar         barState
 }
 
 func (m *model) loadLibrary() {

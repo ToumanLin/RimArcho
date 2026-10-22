@@ -399,26 +399,26 @@ func TestMouseClicks(t *testing.T) {
 		m.update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Shift: shift, Ctrl: ctrl})
 		m.View()
 	}
-	// Disabled rows start at y=3: Beta, N1 … N5, 中文
-	click(xOf(cInactive), 3, false, false)
+	// Disabled rows start at y=4 (the filter bar is above the lists): Beta, N1 … N5, 中文
+	click(xOf(cInactive), 4, false, false)
 	if m.focus != cInactive || m.current().name != "Beta" || len(m.marked) != 0 {
 		t.Fatalf("click: focus %d on %+v, selected %d", m.focus, m.current(), len(m.marked))
 	}
-	click(xOf(cInactive), 5, false, true) // ctrl: N2
-	click(xOf(cInactive), 7, false, true) // ctrl: N4
+	click(xOf(cInactive), 6, false, true) // ctrl: N2
+	click(xOf(cInactive), 8, false, true) // ctrl: N4
 	if len(m.marked) != 2 {
 		t.Fatalf("ctrl+click: %d selected", len(m.marked))
 	}
-	click(xOf(cInactive), 8, true, false) // shift: N4 … N5 added to the range from N4
+	click(xOf(cInactive), 9, true, false) // shift: N4 … N5 added to the range from N4
 	if names := pickedNames(m); names != "N2 N4 N5" {
 		t.Fatalf("shift+click: %q", names)
 	}
-	click(xOf(cInactive), 3, false, false) // a plain click in the same list keeps the selection
+	click(xOf(cInactive), 4, false, false) // a plain click in the same list keeps the selection
 	if names := pickedNames(m); names != "N2 N4 N5" || m.current().name != "Beta" {
 		t.Fatalf("plain click: %q on %s", names, m.current().name)
 	}
 	// A click in another list moves the focus there and drops the selection (06 §3.4).
-	click(xOf(cActive), 4, false, false)
+	click(xOf(cActive), 5, false, false)
 	if len(m.marked) != 0 || m.focus != cActive || m.current().name != "Alpha" {
 		t.Fatalf("click in Enabled: selected %d, %+v", len(m.marked), m.current())
 	}
@@ -426,7 +426,7 @@ func TestMouseClicks(t *testing.T) {
 		t.Fatalf("a click changed the list: %s", got)
 	}
 	// The wheel scrolls the detail wherever it is; the cursor and the focus stay (06 §3.3).
-	m.update(tea.MouseMsg{X: xOf(cActive), Y: 5, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
+	m.update(tea.MouseMsg{X: xOf(cActive), Y: 6, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
 	if m.cols[cActive].cursor != 1 || m.focus != cActive || m.detailFocus || m.detailOff != 3 {
 		t.Fatalf("wheel: cursor %d, focus %d/%v, detail scrolled %d", m.cols[cActive].cursor, m.focus, m.detailFocus, m.detailOff)
 	}
@@ -730,10 +730,8 @@ func TestColumnSearch(t *testing.T) {
 		return strings.Join(out, ",")
 	}
 	all := func(q string) string {
-		for k := range m.cols {
-			m.cols[k].filter = q
-			m.refilterCol(colKind(k), "")
-		}
+		m.bar.search = q // the filter bar filters 未启用 and 已启用 together (06 §2.5)
+		m.barChanged()
 		return names(cActive) + " | " + names(cInactive)
 	}
 	for q, want := range map[string]string{
@@ -768,28 +766,23 @@ func TestColumnSearch(t *testing.T) {
 	if got := all("id:" + ref); got != "Alpha | " {
 		t.Errorf("id:%s: %q", ref, got)
 	}
-	// The query stays with its column until esc there; the header shows N/M and the query.
+	// The bar's query holds for both lists; the headers say N / M; esc clears it.
 	all("")
 	m.focus = cInactive
 	press(m, "/")
 	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("tag:core-lib")})
 	press(m, "enter")
-	press(m, "l") // to "enabled": its own query is empty
-	if names(cActive) != "Core,Alpha,Harmony" || names(cInactive) != "Beta" {
-		t.Fatalf("per column: %q / %q", names(cActive), names(cInactive))
+	press(m, "l")
+	if names(cActive) != "Harmony" || names(cInactive) != "Beta" {
+		t.Fatalf("both lists: %q / %q", names(cActive), names(cInactive))
 	}
 	title := m.columnTitle(&m.cols[cInactive], false, 40)
-	if !strings.Contains(title, "Disabled 1/2") || !strings.Contains(title, "tag:core-lib") {
+	if !strings.Contains(title, "Disabled 1 / 2") {
 		t.Fatalf("title %q", title)
 	}
-	press(m, "esc") // in "enabled": nothing to clear there
-	if names(cInactive) != "Beta" {
-		t.Fatal("esc cleared another column's query")
-	}
-	press(m, "h")
 	press(m, "esc")
-	if names(cInactive) == "Beta" {
-		t.Fatal("esc did not clear the query")
+	if names(cInactive) == "Beta" || names(cActive) == "Harmony" {
+		t.Fatal("esc did not clear the bar")
 	}
 }
 
