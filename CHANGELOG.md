@@ -42,6 +42,15 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   versions, staging, aliases, snapshots and origin markers, events, questions, notes, rules,
   player data, ignores, launch fingerprints). IDs on disk (pack.json, origin.json) resolve
   through the new `id_alias` table.
+- A SteamCMD game's own Workshop folder (`<game>\steamapps\workshop\content\294100`) is a
+  shared SteamCMD folder, added on `env add`, on a download and, for games added earlier, on
+  the next scan. It never replaces or moves the Steam client's Workshop folder; a removed one
+  stays removed.
+- 删除环境 on the environment page, in the window's environment chooser (`Delete`) and in the
+  TUI's `E` (`d`): a dry run, then one confirmation. Only RimArcho's records go (plans, launch
+  records, the mods read from its `Data`/`Mods`, history); game files, mods, saves and the
+  shared folders stay. Refused while that game runs; another environment takes over, or the
+  guide opens when none is left. `env remove <name>` without `--yes` is now that dry run.
 - The environment page shows only the game folder, version, launch, saves and arguments. The
   add-environment guide offers 已有的游戏 (detected installs, a typed folder or the folder
   dialog; named after the version, e.g. 1.6) or 下载一个版本, and after adding reads only the

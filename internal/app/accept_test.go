@@ -658,8 +658,11 @@ func TestEnvRemoveAndSourceRemove(t *testing.T) {
 	e.MustRun("env", "set", "main", "--remove-source", "src:steamcmd")
 	sid := scanNow(t, e)
 	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvDisappeared: 1})
-	if _, code := e.Run("env", "remove", "main"); code != 2 {
-		t.Fatal("env remove without --yes must be refused")
+	if out, code := e.Run("env", "remove", "main"); code != 0 || !strings.Contains(out, "dry run") {
+		t.Fatalf("env remove without --yes is the dry run: exit %d\n%s", code, out)
+	}
+	if out := e.MustRun("env", "list"); !strings.Contains(out, "environments: 1") {
+		t.Fatal("the dry run removes nothing: " + out)
 	}
 	e.MustRun("env", "remove", "main", "--yes")
 	if out := e.MustRun("env", "list"); !strings.Contains(out, "environments: 0") {

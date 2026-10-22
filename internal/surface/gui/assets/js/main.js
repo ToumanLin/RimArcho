@@ -492,7 +492,7 @@ async function chooseEnv() {
     try { say("ok", await api.UseEnv(envs[i])); } catch (e) { say("fail", errText(e)); }
     for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
     await reload();
-  }, Math.max(0, envs.indexOf(S.board.env)));
+  }, Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove environment"), run: (i) => scr.removeEnv(envs[i]) });
 }
 
 function commandLine() {

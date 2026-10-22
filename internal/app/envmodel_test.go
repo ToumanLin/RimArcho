@@ -373,3 +373,90 @@ func downgradeWithTwin(t *testing.T, e *testkit.Env) map[string]string {
 	exec(`UPDATE meta SET value='13' WHERE key='schema_version'`)
 	return twin
 }
+
+// 02 §0: a SteamCMD game keeps its own Workshop folder inside the game folder. It becomes a
+// shared SteamCMD folder on env add (and, for an environment added earlier, on a scan); it
+// never moves the Steam client's Workshop folder, and a removed one stays removed.
+func TestGameWorkshopIsSteamCMD(t *testing.T) {
+	e := testkit.New(t)
+	e.AddWorkshop("5100", testkit.Sample("tester.shared", "Shared"))
+	e.AddEnv(false)
+	scanNow(t, e)
+	wsRoot := sourcesOf(t, e)["workshop"].Root
+
+	g2 := secondGame(e, "Game16")
+	own := filepath.Join(g2, "steamapps", "workshop", "content", "294100")
+	e.WriteMod(filepath.Join(own, "7000"), testkit.Sample("tester.cmd", "FromSteamCMD"))
+	out := e.MustRun("env", "add", "old", "--game", g2, "--workshop", own)
+	if !strings.Contains(out, "src:steamcmd") {
+		t.Fatalf("env add: the game's own Workshop folder is a SteamCMD folder:\n%s", out)
+	}
+	if got := sourcesOf(t, e)["workshop"]; got == nil || got.Root != wsRoot {
+		t.Fatalf("the Steam client's Workshop folder stays: %+v", got)
+	}
+	cmd := sourcesOf(t, e)["steamcmd"]
+	if cmd == nil || cmd.EnvID != store.Shared || cmd.Root != own {
+		t.Fatalf("a shared steamcmd folder for %s: %+v", own, cmd)
+	}
+
+	// An environment added before its game had a Workshop folder: the next scan adds it.
+	g3 := secondGame(e, "Game16b")
+	e.MustRun("env", "add", "third", "--game", g3)
+	own3 := filepath.Join(g3, "steamapps", "workshop", "content", "294100")
+	e.WriteMod(filepath.Join(own3, "7001"), testkit.Sample("tester.cmd2", "Later"))
+	scanNow(t, e)
+	var label string
+	for l, s := range sourcesOf(t, e) {
+		if s.Root == own3 {
+			label = l
+		}
+	}
+	if label == "" || sourcesOf(t, e)[label].Kind != source.SteamCMD {
+		t.Fatalf("a scan registers the game's Workshop folder as steamcmd: %v", sourcesOf(t, e))
+	}
+	if got := sourcesOf(t, e)["workshop"]; got == nil || got.Root != wsRoot {
+		t.Fatalf("the Steam client's Workshop folder stays: %+v", got)
+	}
+	e.MustRun("folder", "remove", "src:"+label)
+	scanNow(t, e)
+	for _, s := range sourcesOf(t, e) {
+		if s.Root == own3 && s.Status != source.StatusRetired {
+			t.Fatalf("a removed folder stays removed: %+v", s)
+		}
+	}
+}
+
+// 06 §2.14: removing an environment is refused while its game runs; removing the current
+// one makes another current, and removing the last leaves none (the guide).
+func TestEnvRemoveCurrent(t *testing.T) {
+	e := testkit.New(t)
+	e.AddEnv(false)
+	g2 := secondGame(e, "Game15")
+	e.MustRun("env", "add", "old", "--game", g2)
+	scanNow(t, e)
+	e.App.GameProbe = func(root string) *app.GameRun {
+		if root == e.Game {
+			return &app.GameRun{PID: 42, Started: e.Now()}
+		}
+		return nil
+	}
+	if out, code := e.Run("env", "remove", "main", "--yes"); code == 0 || !strings.Contains(out, "running") {
+		t.Fatalf("removing a running game's environment is refused: exit %d\n%s", code, out)
+	}
+	e.App.GameProbe = func(string) *app.GameRun { return nil }
+	r, err := e.App.EnvRemovePreview("main")
+	if err != nil || !r.Current || r.Next != "old" || r.Mods == 0 {
+		t.Fatalf("dry run: %+v %v", r, err)
+	}
+	e.MustRun("env", "remove", "main", "--yes")
+	if cur, _ := e.App.Store.CurrentEnv(); cur == nil || cur.Name != "old" {
+		t.Fatalf("the other environment becomes current: %+v", cur)
+	}
+	out := e.MustRun("env", "remove", "old", "--yes")
+	if !strings.Contains(out, "none left") {
+		t.Fatalf("the last environment: none left\n%s", out)
+	}
+	if cur, _ := e.App.Store.CurrentEnv(); cur != nil {
+		t.Fatalf("no current environment: %+v", cur)
+	}
+}

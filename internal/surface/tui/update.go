@@ -566,6 +566,11 @@ func (m *model) panelKey(s string) tea.Cmd {
 		case "enter":
 			m.panel = nil
 			return p.onPick(m, p.choices[p.choice])
+		case "d", "delete":
+			if p.onDelete != nil {
+				m.panel = nil
+				return p.onDelete(m, p.choices[p.choice])
+			}
 		case "esc", "q":
 			m.panel = nil
 		}
@@ -616,8 +621,32 @@ func (m *model) chooseEnv() tea.Cmd {
 		}
 		return m.requestDetail()
 	}
+	p.onDelete = func(m *model, name string) tea.Cmd { m.removeEnv(name); return nil }
 	m.panel = p
 	return nil
+}
+
+// removeEnv shows the dry run of removing an environment; enter removes it (06 §2.14).
+func (m *model) removeEnv(name string) {
+	r, err := m.app.EnvRemovePreview(name)
+	if err != nil {
+		m.say(sayFail, m.humanize(err.Error()))
+		return
+	}
+	lines := append(view.EnvRemovalLines(r), "", Tf("enter: %s · esc: cancel", T("remove environment")))
+	m.panel = &panel{title: view.EnvRemovalTitle(r), lines: lines,
+		onEnter: func(m *model) tea.Cmd {
+			m.app.EnvName = ""
+			if m.act(Tf("removed environment %s", name), "env", "remove", name, "--yes") {
+				for k := range m.cols {
+					m.cols[k].cursor, m.cols[k].off, m.cols[k].filter = 0, 0, ""
+					m.refilterCol(colKind(k), "")
+				}
+				m.detailRef = ""
+				m.prob.loaded = false
+			}
+			return m.requestDetail()
+		}}
 }
 
 // ---- mouse (06 §3.3, §13.5) ----

@@ -237,7 +237,7 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		srcs = append(srcs, s)
 		changes = append(changes, SourceChange{Source: s, Action: "added"})
 	}
-	more, err := a.foldersFromSpec(e, spec, true)
+	more, err := a.foldersFromSpec(e, spec, true, true)
 	changes = append(changes, more...)
 	if err != nil {
 		return e, changes, err
@@ -271,8 +271,9 @@ func (a *App) checkFolderRoots(spec EnvSpec) error {
 
 // foldersFromSpec applies the spec's shared folders (the older --workshop / --steamcmd /
 // --extra flags) and, when adding a game from a Steam library while no Workshop folder is
-// known, that library's Workshop folder.
-func (a *App) foldersFromSpec(e *env.Environment, spec EnvSpec, adding bool) ([]SourceChange, error) {
+// known, that library's Workshop folder. A game folder that is new (adding) or moved
+// brings its own Workshop folder as a SteamCMD folder (adoptGameWorkshop).
+func (a *App) foldersFromSpec(e *env.Environment, spec EnvSpec, adding, moved bool) ([]SourceChange, error) {
 	var out []SourceChange
 	add := func(kind source.Kind, root string) error {
 		ch, err := a.FolderAdd(kind, root)
@@ -292,6 +293,11 @@ func (a *App) foldersFromSpec(e *env.Environment, spec EnvSpec, adding bool) ([]
 			}
 		}
 	}
+	// A game's own Workshop folder (a SteamCMD download) is a SteamCMD folder, never the
+	// Workshop folder: naming it must not move the Steam client's one.
+	if ws != "" && env.PathKey(ws) == env.PathKey(env.GameWorkshopFor(e.GameRoot)) {
+		spec.SteamCMD, ws = append([]string{ws}, spec.SteamCMD...), ""
+	}
 	if ws != "" {
 		if err := add(source.Workshop, ws); err != nil {
 			return out, err
@@ -305,6 +311,15 @@ func (a *App) foldersFromSpec(e *env.Environment, spec EnvSpec, adding bool) ([]
 	for _, r := range spec.Extra {
 		if err := add(source.Extra, r); err != nil {
 			return out, err
+		}
+	}
+	if adding || moved {
+		ch, err := a.adoptGameWorkshop(e)
+		if err != nil {
+			return out, err
+		}
+		if ch != nil {
+			out = append(out, *ch)
 		}
 	}
 	return out, nil
@@ -403,7 +418,7 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		}
 		changes = append(changes, ch)
 	}
-	more, err := a.foldersFromSpec(e, spec, false)
+	more, err := a.foldersFromSpec(e, spec, false, gameChanged)
 	changes = append(changes, more...)
 	if err != nil {
 		return nil, nil, err
@@ -421,10 +436,20 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	return e, changes, nil
 }
 
-// EnvRemove deletes an environment from RimArcho's database: its Data/ and Mods/ instances,
-// plans, launches and history. The shared mod folders and the player's data on mods stay.
-// Game and mod files are not touched.
-func (a *App) EnvRemove(name string) (*env.Environment, error) {
+// EnvRemoval is what removing an environment forgets (06 §2.14), for the dry run and the
+// result. Only RimArcho's records go: game files, mods and saves stay, and so do the shared
+// mod folders with their mods and what the player noted on them.
+type EnvRemoval struct {
+	Env      *env.Environment
+	Plans    int    // its plans (lists, versions, undo steps)
+	Launches int    // its launch records
+	Mods     int    // instances RimArcho read from its Data/ and Mods/
+	Current  bool   // it is the current environment
+	Next     string // the environment that becomes current ("" none left: the guide)
+}
+
+// EnvRemovePreview is the dry run of EnvRemove: nothing changes.
+func (a *App) EnvRemovePreview(name string) (*EnvRemoval, error) {
 	e, err := a.Store.EnvByName(name)
 	if err != nil {
 		return nil, err
@@ -432,7 +457,51 @@ func (a *App) EnvRemove(name string) (*env.Environment, error) {
 	if e == nil {
 		return nil, fmt.Errorf("no environment named %q (archo env list)", name)
 	}
-	return e, a.Store.DeleteEnv(e.ID)
+	r := &EnvRemoval{Env: e}
+	db := a.Store.DB
+	if err := db.QueryRow(`SELECT (SELECT count(*) FROM plan WHERE environment_id=?), (SELECT count(*) FROM launch WHERE environment_id=?),
+		(SELECT count(*) FROM instance WHERE environment_id=? AND status='live')`, e.ID, e.ID, e.ID).Scan(&r.Plans, &r.Launches, &r.Mods); err != nil {
+		return nil, err
+	}
+	if cur, _ := a.Store.CurrentEnv(); cur != nil && cur.ID == e.ID {
+		r.Current = true
+		envs, err := a.Store.Envs()
+		if err != nil {
+			return nil, err
+		}
+		for _, o := range envs {
+			if o.ID != e.ID {
+				r.Next = o.Name
+				break
+			}
+		}
+	}
+	return r, nil
+}
+
+// EnvRemove deletes an environment from RimArcho's database: its Data/ and Mods/ instances,
+// plans, launches and history. The shared mod folders and the player's data on mods stay.
+// Game and mod files are not touched. It is refused while that game runs. Removing the
+// current environment makes another one current (EnvRemoval.Next), or none.
+func (a *App) EnvRemove(name string) (*EnvRemoval, error) {
+	r, err := a.EnvRemovePreview(name)
+	if err != nil {
+		return nil, err
+	}
+	if g := a.probe()(r.Env.GameRoot); g != nil {
+		return nil, fmt.Errorf("env:%s's game is running (pid %d); close it before removing the environment", r.Env.Name, g.PID)
+	}
+	if err := a.Store.DeleteEnv(r.Env.ID); err != nil {
+		return nil, err
+	}
+	if r.Next != "" {
+		if n, err := a.Store.EnvByName(r.Next); err == nil && n != nil {
+			if err := a.Store.SetCurrentEnv(n.ID); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return r, nil
 }
 
 // rebind evaluates moving source s to newRoot and applies it when the sample matches.
