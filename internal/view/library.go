@@ -603,9 +603,34 @@ func CopyNoteAuto(i *app.LibInstance) string {
 		parts = append(parts, Tf("locked version made on %s", ShortDate(made.At))+plans())
 	case i.Locked != nil && !i.Created.IsZero():
 		parts = append(parts, Tf("locked version made on %s", ShortDate(i.Created)))
+	case i.Locked != nil || i.Missing():
+	default:
+		// a copy RimArcho did not make: where it came from and when RimArcho first saw it
+		from := map[string]string{
+			app.LibWorkshop: T("subscribed on the Workshop"),
+			app.LibLocal:    T("put in the game's Mods folder"),
+			app.LibLocked:   T("in the lock library"),
+			app.LibSteamCMD: T("downloaded with SteamCMD"),
+			app.LibExtra:    T("in an extra mod folder"),
+			app.LibMonitor:  T("RimArcho's own companion mod"),
+		}[i.Source]
+		if slices.Contains(i.States, app.LibResidue) {
+			from = T("unsubscribed; Steam left the folder")
+		}
+		if from != "" {
+			if !i.Created.IsZero() && i.Source != app.LibMonitor {
+				from += Tf(", first seen on %s", ShortDate(i.Created))
+			}
+			parts = append(parts, from)
+		}
 	}
-	if i.Locked != nil && i.UpstreamUpdates > 0 {
+	switch {
+	case i.Locked != nil && i.UpstreamUpdates > 0:
 		parts = append(parts, Tf("the upstream has updated %d times since", i.UpstreamUpdates))
+	case i.Locked != nil && i.Locked.Upstream != nil && len(parts) > 0:
+		parts = append(parts, T("the upstream has not updated since"))
+	case i.UpstreamWorkshop && i.UpstreamUpdates > 0:
+		parts = append(parts, Tf("the Workshop copy has updated %d times since", i.UpstreamUpdates))
 	}
 	if made != nil && made.Reason != "" {
 		parts = append(parts, Tf("reason: %s", made.Reason))

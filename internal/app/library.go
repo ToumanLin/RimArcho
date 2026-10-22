@@ -93,7 +93,8 @@ type LibInstance struct {
 	Source     string // LibSources
 	WorkshopID string
 	Path       string
-	// Created: a lock library copy's copy time (origin.json, else when RimArcho first saw it).
+	// Created: when RimArcho first saw the copy; a lock library copy's copy time when
+	// origin.json has it.
 	Created  time.Time
 	Bytes    int64
 	Sized    bool // Bytes comes from a scan (else "—")
@@ -110,9 +111,12 @@ type LibInstance struct {
 	Updated time.Time
 	Authors string
 	// Note is this copy's own note and what RimArcho recorded when it made the copy (nil:
-	// none); UpstreamUpdates counts the upstream's updates since the copy was made.
-	Note            *store.CopyNote
-	UpstreamUpdates int
+	// none); UpstreamUpdates counts the upstream's updates since the copy was made: a locked
+	// version's upstream, or for another copy beside a Workshop copy of the same mod, that
+	// Workshop copy (UpstreamWorkshop).
+	Note             *store.CopyNote
+	UpstreamUpdates  int
+	UpstreamWorkshop bool
 }
 
 // Missing reports a subscribed item with no folder.
@@ -313,8 +317,8 @@ func (a *App) Library() (*Library, error) {
 				i.Versions = append(i.Versions, v)
 			}
 		}
+		i.Created = m.FirstSeen
 		if i.Source == LibLocked {
-			i.Created = m.FirstSeen
 			var og scan.Origin
 			if json.Unmarshal([]byte(m.Origin), &og) == nil && og.CopiedAt != "" {
 				if t, err := time.Parse(time.RFC3339, og.CopiedAt); err == nil {
@@ -373,6 +377,19 @@ func (a *App) Library() (*Library, error) {
 			l.Name = libName(ix, id, l)
 		}
 		l.search = strings.ToLower(l.Name) + l.search
+		// a copy beside a Workshop copy of the same mod: how often the Workshop updated since
+		var ws *LibInstance
+		for _, i := range l.Instances {
+			if i.Source == LibWorkshop && i.Mod != nil && !i.Missing() {
+				ws = i
+			}
+		}
+		for _, i := range l.Instances {
+			if ws == nil || i == ws || i.Locked != nil || i.Source == LibWorkshop || i.Created.IsZero() {
+				continue
+			}
+			i.UpstreamUpdates, i.UpstreamWorkshop = a.Store.UpdatesSince(ws.Mod.ID, i.Created), true
+		}
 		sort.SliceStable(l.Instances, func(x, y int) bool {
 			a, b := l.Instances[x], l.Instances[y]
 			if ra, rb := slices.Index(LibSources, a.Source), slices.Index(LibSources, b.Source); ra != rb {

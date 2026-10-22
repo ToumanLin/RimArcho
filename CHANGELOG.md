@@ -148,9 +148,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   删除, 重新订阅, 备份锁定版本, 打开文件夹, 打开网页 — then one field list. 删除 now also takes the player's own copies in `Mods/` and the lock library
   (not links, not while a plan uses them).
 - Copy notes (schema v13 `instance_note`): each copy has its own note, apart from the mod's.
-  RimArcho writes the first version from how the copy was made ("锁定版本创建于 10 月 21 日，
-  为方案「测试」创建；之后上游有 2 次更新；原因：…"), worked out each time so the update
-  count stays current. Edit it in the window (click), the TUI (`n` in Mod 库存), the CLI
+  RimArcho writes the first version from how the copy was made ("该锁定版本创建于 10 月 21 日，
+  为方案「测试」创建，自从创建后上游有 2 次更新，原因：…"), worked out each time so the update
+  count stays current. Copies RimArcho did not make get one too: where they came from, the
+  day RimArcho first saw them and, beside a Workshop copy, how often it updated since. Edit it in the window (click), the TUI (`n` in Mod 库存), the CLI
   (`archo note <ref> <text> --copy`, `--clear`) or MCP (`set_player_data` `copy_note`);
   `pin --reason`, `library move-to-locked --reason` and the MCP `reason` record why.
 - 退订 and 重新订阅 go through the running Steam client, as RimCrow does (08 §10): a
@@ -212,8 +213,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - The plan editor: 排序 (`S`) is in the 已启用 column's header, 导入 / 导出 (`i`) in the
   toolbar. Rows no longer show tags, in any column or interface (they are in the detail and
   `tag:` search, 06 §3.8). The detail is one field list — Archo ID, 包名, 位置 [打开位置],
-  工坊 [打开页面], 标签 [编辑], 语言, 依赖, 冲突 — shared with Mod 库存; clicking a value
-  copies it and says 已复制 (06 §4.1). The TUI detail draws the same list.
+  工坊 [打开页面], 标签 [编辑], 语言, 依赖, 冲突 — shared with Mod 库存; clicking Archo ID,
+  包名, 位置 or the Workshop ID copies it and says 已复制 (06 §4.1); the list has no
+  background and long values wrap. The TUI detail draws the same list.
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).

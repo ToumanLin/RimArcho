@@ -7,11 +7,14 @@ import * as rt from "/wails/runtime.js";
 
 const Clipboard = rt.Clipboard || { SetText: () => Promise.reject(new Error("no clipboard")) };
 
+// Only these values copy on a click; the rest are just shown.
+const copyable = new Set(["id", "package", "path", "workshop"]);
+
 // fieldList draws fields; acts.tags runs the tag bar, acts.folder opens the location.
 export function fieldList(fields, acts = {}) {
   const box = el("div", "fields");
   for (const f of fields || []) {
-    const r = el("div", "field " + f.kind);
+    const r = el("div", "frow " + f.kind);
     r.append(el("span", "k", f.label));
     const v = el("span", "v");
     if (f.items && f.items.length) {
@@ -20,19 +23,16 @@ export function fieldList(fields, acts = {}) {
         const ic = { enabled: f.kind === "conflicts" ? icon.err : icon.ok, disabled: icon.warn, missing: f.kind === "conflicts" ? icon.ok : icon.err }[x.state] || "";
         const note = x.state === "disabled" ? T(" (not enabled)") : x.state === "missing" ? T(" (not installed)") : "";
         line.innerHTML = ic + `<span class="n">${esc(x.name)}</span>` + (note ? `<span class="dim">${esc(note)}</span>` : "");
-        line.querySelector(".n").onclick = () => copy(x.name, line);
         v.append(line);
       }
     } else if (f.kind === "tags") {
       if (!f.list || !f.list.length) v.append(el("span", "dim", T("none")));
       for (const t of f.list || []) {
-        const c = el("span", "chip", t);
-        c.onclick = () => copy(t, c);
-        v.append(c);
+        v.append(el("span", "chip", t));
       }
     } else {
-      const t = el("span", "copy", f.value || "—");
-      if (f.value) {
+      const t = el("span", copyable.has(f.kind) && f.value ? "copy" : "", f.value || "—");
+      if (f.value && copyable.has(f.kind)) {
         t.title = T("click to copy");
         t.onclick = () => copy(f.value, t);
       }
@@ -69,7 +69,7 @@ export async function copy(text, node) {
     t.remove();
   }
   if (!ok) return say("fail", T("could not copy"));
-  const row = node.closest(".field") || node.parentNode;
+  const row = node.closest(".frow") || node.parentNode;
   const old = row.querySelector(".copied");
   if (old) old.remove();
   const tip = el("span", "copied", T("copied"));
