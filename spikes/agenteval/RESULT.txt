@@ -1,0 +1,110 @@
+G7 agent evaluation: RimArcho MCP tools only, scored against the G6 benchmark (corpuslabel/2)
+=========================================================================================
+
+Setup
+-----
+- 140 tasks (G6 tasks.jsonl): 96 dev (tuning), 44 held-out. Held-out was run and scored once,
+  at the end, for both builds. No held-out item was looked at while tuning.
+- Agent: Claude Sonnet subagent, one per task. It sees the task (log cluster, mod list,
+  Player.log through read_upload) and calls only read-only archo MCP tools through
+  `agenteval call` (8 research homes, one Loadout each). No answers, packets or review files
+  are reachable; every trace was checked for reads of labels/packets/config: 0 invalid.
+- base = master before G7 (31b195b tools); v1 = 8c32023 (G7 attribution, output and Instructions).
+- "RimArcho alone" = `archo log --cluster` on the same build and homes, no agent.
+- Scoring: a source hit means the agent's sources meet the gold sources. Precision and recall
+  are over named sources. "undecidable-ok" means the gold says unknown and the agent named no
+  source. Stage, cause type and fix kind are agreement rates.
+- 4 answer files (2 base, 2 v1) had Windows paths with lone backslashes. The scorer now repairs
+  them; before that they counted as "no answer".
+
+Agent results (agree = verdict agrees with gold overall)
+--------------------------------------------------------
+                       n   agree  precision  recall  undecidable-ok  stage  cause-type  fix-kind
+dev       base        96   79.2%    69.1%    84.4%      74.5%       91.7%    57.3%     64.6%
+dev       v1          96   85.4%    75.5%    88.9%      82.4%       88.5%    70.8%     75.0%
+held-out  base        44   70.5%    69.0%    71.4%      68.8%       79.5%    45.5%     61.4%
+held-out  v1          44   72.7%    69.0%    71.4%      75.0%       75.0%    56.8%     65.9%
+
+held-out by tier       n   agree  precision  recall  undecidable-ok
+  tier 1  base        24   79.2%    78.6%    78.6%      80.0%
+  tier 1  v1          24   87.5%    84.6%    78.6%     100.0%
+  tier 2  base        20   60.0%    60.0%    64.3%      50.0%
+  tier 2  v1          20   55.0%    56.2%    64.3%      33.3%
+
+held-out by difficulty  n   agree base / v1   recall base / v1
+  L1                    8   87.5% / 100.0%    83.3% / 100.0%
+  L2                   11   81.8% / 72.7%     85.7% / 71.4%
+  L3                   25   60.0% / 64.0%     60.0% / 60.0%
+
+RimArcho alone (no agent)
+-------------------------
+                       n   agree  precision  recall  undecidable-ok
+dev       base        96   74.0%    80.6%    55.6%      90.2%
+dev       v1          96   80.2%    96.4%    60.0%      98.0%
+held-out  base        44   65.9%    75.0%    53.6%      87.5%
+held-out  v1          44   65.9%    75.0%    53.6%      87.5%
+(v1 changes 5 held-out outputs, but none changes which mod is named as the source.)
+
+Cost per task (agent)
+---------------------
+             median time  tool calls  archo calls  final context   total archo calls / input tokens
+dev  base       43 s          7           8           80k            893 / 85.6 M
+dev  v1         42 s          6           6           79k            704 / 74.1 M
+h/o  base       44 s          7           9           80k            439 / 39.9 M
+h/o  v1         49 s          7           8           81k            405 / 37.5 M
+
+Reading
+-------
+- Dev improved on every axis except stage. The largest gains are cause type (+13.5) and
+  fix kind (+10.4). RimArcho alone on dev went from 80.6% to 96.4% precision.
+- Held-out: source finding is unchanged (20 of 28 gold sources hit in both runs; precision
+  and recall are identical). The gains that carried over are knowing when to say unknown
+  (+6.2 undecidable-ok) and cause type (+11.3). Tier 1 (clearer gold) improved; tier 2 got
+  slightly worse. With 28 gold sources, one task moves recall by about 3.6 points, so the
+  held-out source difference is within noise.
+- RimArcho-alone gains did not reach held-out. The new attribution rules fix patterns
+  that were frequent in dev (HugsLib upload, Quickstart/Defaults callers, field-error
+  context, Harmony 1.x, harmony.log.txt); held-out has few of them.
+- Agents use fewer calls with v1 (about 20% fewer archo calls on dev). The cluster view now
+  shows the full message, extra lines and nearby messages. On dev, raw-log reads (read_upload)
+  fell from 351 to 230, and the largest search output fell from 324 KB to 18 KB.
+
+Improvements (done / not done)
+------------------------------
+Done (internal/app, internal/cmds, internal/surface):
+  1. MCP output capped at 24 KB with a "narrow the call" note (searches had returned up to 324 KB).
+  2. patches --failed header: "N failed of M operations simulated, K not simulated".
+  3. Failing type's owner is the source; mods that only call into it are demoted.
+  4. HugsLib log upload errors and HugsLib Quickstart / Defaults callers are not the source.
+  5. Errors writing harmony.log.txt are a machine problem; every mod is demoted.
+  6. Harmony 1.x type references: no dependency providers listed; the failing assembly's loader
+     becomes the source, else a detail says no enabled mod loads it.
+  7. Typeref errors: the assembly named on the following lines is used.
+  8. "Could not load type of field": the declaring type's mod.
+  9. Field errors count a file only if it holds the Context's def type.
+ 10. Cluster view: full message (1200 bytes), up to 6 extra lines, nearby log messages.
+ 11. Patch-failed owner stays the source, with a detail (also when it no longer fails here).
+ 12. Instructions: framework vs caller vs source, when to say undecided, patch-reason meanings,
+     assembly loading, the 24 KB cap.
+ Tests: internal/app/logcallers_test.go, catalog_test.go, golden files; logCacheVersion 3 -> 6.
+Not done:
+  - Lowercase packageId display in some outputs.
+  - Version-mismatch reasoning (installed copy newer than the player's): agents still mostly
+    say "unknown" there.
+  - Tier-2 tasks (multi-mod, weaker gold): no targeted change; held-out tier 2 is weakest.
+  - Missing mods in the research library limit both agent and RimArcho alone (several dev
+    silences), a research-environment limit, not a product one.
+
+Caveats
+-------
+- Gold is packet-based. On dev, several baseline "overclaims" looked right on inspection
+  (gold says unknown). They are kept as scored; agents were not tuned toward them.
+- One model (Sonnet), one run per task: no variance estimate.
+- Data stays outside the repo (corpus-kb, agenteval/runs). This file holds aggregates only.
+
+Rerun
+-----
+  agenteval prepare | brief -run <r> (rewrites AGENT.md from mcp.Instructions + Catalog)
+  agenteval warm -run <r> -slot <s> -ids ...       RimArcho alone
+  agent prompt: agenteval prompt -run <r> -task <id>; one subagent per home at a time
+  agenteval score -run <r> -gold <tasks.jsonl> -split dev|heldout -traces <subagents dir>

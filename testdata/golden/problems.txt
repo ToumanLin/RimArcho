@@ -72,7 +72,7 @@ $ archo def --mod #i4uc
     Shared_Gun  Defs/Shared.xml:2
 
 $ archo patches --failed
-patches: 1 operations, 1 failed, 0 not simulated
+patches: 1 failed of 3 operations simulated, 0 not simulated
   list:
     #hnyg Compat  Patches/Compat.xml:2  Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"])  hit 0  (patch.no-match: target-inactive, unguarded-optional)
       detail: ThingDef/Lib_Gun is defined by #nyh3, which is not active; the patch is not wrapped in PatchOperationFindMod, a Conditional or a MayRequire list item
@@ -163,7 +163,7 @@ next:
   archo save
 
 $ archo patches --failed
-patches: 0 operations, 0 failed, 0 not simulated
+patches: 0 failed of 3 operations simulated, 0 not simulated
   list:
     (none)
 
