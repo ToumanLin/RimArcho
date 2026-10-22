@@ -738,6 +738,7 @@ async function start() {
   });
   on("pack", (ev) => scr.packEvent(ev));
   on("guide", (ev) => guide.guideEvent(ev));
+  on("download", (ev) => guide.downloadEvent(ev));
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again
   // when the window gets the focus (G8).
   addEventListener("focus", async () => {

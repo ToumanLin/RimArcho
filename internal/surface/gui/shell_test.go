@@ -162,3 +162,16 @@ func TestPlansInWindow(t *testing.T) {
 	}
 	_ = e
 }
+
+// A game added after the shared folders were read is scanned alone: the guide counts its
+// Data/ and Mods/ (02 §0 item 8).
+func TestScanLineGameOnly(t *testing.T) {
+	view.SetLang("en")
+	out := "scan:3  env:1.5  1s  [game only]\n  sources:\n    src:official  1 mod\n    src:local     2 mods (1 about-disabled)\n  instances: 900 live, 0 tombstones\n"
+	if got := scanLine(out); got != "3 mods in its Data and Mods" {
+		t.Fatalf("game only: %q", got)
+	}
+	if got := scanLine(strings.Replace(out, "  [game only]", "", 1)); got != "900 mods found" {
+		t.Fatalf("whole scan: %q", got)
+	}
+}

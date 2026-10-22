@@ -3,6 +3,8 @@ package gui
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -288,10 +290,24 @@ func (s *API) GuideScan(names []string) bool {
 	return true
 }
 
-var liveRe = regexp.MustCompile(`(\d+) live`)
+var (
+	liveRe   = regexp.MustCompile(`(\d+) live`)
+	srcModRe = regexp.MustCompile(`^src:\S+\s+(\d+) mods?\b`)
+)
 
-// scanLine is the scan's "instances" line in words: how many mods it found.
+// scanLine is the scan's "instances" line in words: how many mods it found. A scan of a
+// game's own folders (--game-only) counts its Data/ and Mods/.
 func scanLine(out string) string {
+	if strings.Contains(out, "[game only]") {
+		n := 0
+		for _, l := range strings.Split(out, "\n") {
+			if m := srcModRe.FindStringSubmatch(strings.TrimSpace(l)); m != nil {
+				k, _ := strconv.Atoi(m[1])
+				n += k
+			}
+		}
+		return view.Tf("%d mods in its Data and Mods", n)
+	}
 	for _, l := range strings.Split(out, "\n") {
 		l = strings.TrimSpace(l)
 		if m := liveRe.FindStringSubmatch(l); m != nil && strings.HasPrefix(l, "instances") {
@@ -314,4 +330,99 @@ func (s *API) PackImport(path string) (string, error) {
 		return "", errors.New(view.Humanize(nil, err.Error()))
 	}
 	return view.PackImportText(m), nil
+}
+
+// ---- the guide's "download a version" (08 §10) ----
+
+// DownloadInfo is what the download step shows: SteamCMD (or the offer to download it from
+// Valve, with its size), RimWorld's branches, and a folder for the game.
+type DownloadInfo struct {
+	SteamCMD string             `json:"steamcmd"` // "" when it is not installed
+	Offer    *app.SteamCMDOffer `json:"offer,omitempty"`
+	Branches []app.GameBranch   `json:"branches,omitempty"`
+	Games    string             `json:"games"` // a folder to put the new game in
+	Error    string             `json:"error,omitempty"`
+}
+
+// GuideDownloadInfo asks SteamCMD (anonymously) which branches RimWorld has. SteamCMD
+// runs without the API's lock: the first run updates itself and takes a while.
+func (s *API) GuideDownloadInfo() *DownloadInfo {
+	s.mu.Lock()
+	a := s.a
+	games := gamesFolder(a)
+	s.mu.Unlock()
+	d := &DownloadInfo{SteamCMD: a.SteamCMDPath(), Games: games}
+	if d.SteamCMD == "" {
+		d.Offer, _ = a.OfferSteamCMD()
+		return d
+	}
+	bs, err := a.GameBranches()
+	if err != nil {
+		d.Error = view.Humanize(nil, err.Error())
+	}
+	d.Branches = bs
+	return d
+}
+
+// gamesFolder suggests where a downloaded game goes: <drive>\Games next to the games there
+// are (not inside a Steam library), else the system drive's.
+func gamesFolder(a *app.App) string {
+	envs, _ := a.Store.Envs()
+	for _, e := range envs {
+		if v := filepath.VolumeName(e.GameRoot); v != "" {
+			return v + `\Games`
+		}
+	}
+	if v := os.Getenv("SystemDrive"); v != "" {
+		return v + `\Games`
+	}
+	return filepath.Join(os.Getenv("HOME"), "Games")
+}
+
+// GuideInstallSteamCMD downloads SteamCMD from Valve (the player said yes to the offer).
+func (s *API) GuideInstallSteamCMD() (string, error) {
+	p, err := s.a.InstallSteamCMD()
+	if err != nil {
+		return "", errors.New(view.Humanize(nil, err.Error()))
+	}
+	return p, nil
+}
+
+// GuideDownload starts SteamCMD for a version and returns at once: SteamCMD opens its own
+// window for the login, and "download" events carry its progress and the end (with the
+// environment added, as for a game the player has).
+func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
+	s.mu.Lock()
+	if s.busy["download"] {
+		s.mu.Unlock()
+		return false, nil
+	}
+	if _, err := s.a.CheckDownloadDir(dir); err != nil {
+		s.mu.Unlock()
+		return false, errors.New(view.Humanize(nil, err.Error()))
+	}
+	s.busy["download"] = true
+	s.mu.Unlock()
+	spec := app.DownloadSpec{Branch: branch, Dir: dir, Account: strings.TrimSpace(account), Name: strings.TrimSpace(name), Console: true}
+	go func() {
+		var r *app.SourceChangeEnv
+		got, err := s.a.FetchGame(spec, func(p app.DownloadProgress) { s.send("download", p) })
+		end := map[string]any{"end": true}
+		s.mu.Lock()
+		if err == nil {
+			if r, err = s.a.AddDownloaded(spec, got); err == nil {
+				s.a.EnvName = ""
+				_, err = s.a.EnvUse(r.Env.Name)
+			}
+		}
+		s.busy["download"], s.board, s.needs = false, nil, nil
+		s.mu.Unlock()
+		if err != nil {
+			end["ok"], end["error"] = false, view.DownloadErrorText(err)
+		} else {
+			end["ok"], end["env"] = true, r.Env.Name
+		}
+		s.send("download", end)
+	}()
+	return true, nil
 }

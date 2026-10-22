@@ -311,6 +311,14 @@ type DownloadError struct {
 }
 
 func (e *DownloadError) Error() string {
+	if e.Line != "" {
+		return e.Why() + " (SteamCMD: " + e.Line + ")"
+	}
+	return e.Why()
+}
+
+// Why is the reason alone, in plain words.
+func (e *DownloadError) Why() string {
 	var why string
 	switch e.Kind {
 	case "ownership":
@@ -329,9 +337,6 @@ func (e *DownloadError) Error() string {
 		why = "the login did not finish (the SteamCMD window was closed?)"
 	default:
 		why = "SteamCMD did not finish the download"
-	}
-	if e.Line != "" {
-		return why + " (SteamCMD: " + e.Line + ")"
 	}
 	return why
 }
@@ -369,33 +374,43 @@ func (a *App) CheckDownloadDir(dir string) (string, error) {
 // [-beta <branch>] validate +quit) and, when it succeeds, adds the folder as an environment,
 // as a game the player already has. progress is called with each step SteamCMD's log shows.
 func (a *App) DownloadGame(spec DownloadSpec, progress func(DownloadProgress)) (*SourceChangeEnv, error) {
+	dir, err := a.FetchGame(spec, progress)
+	if err != nil {
+		return nil, err
+	}
+	return a.AddDownloaded(spec, dir)
+}
+
+// FetchGame is DownloadGame's SteamCMD run: it returns the game folder. It only reads
+// RimArcho's database, so the window runs it without its lock.
+func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (string, error) {
 	exe := a.SteamCMDPath()
 	if exe == "" {
-		return nil, ErrNoSteamCMD
+		return "", ErrNoSteamCMD
 	}
 	if !accountRe.MatchString(spec.Account) || strings.EqualFold(spec.Account, "anonymous") {
-		return nil, errors.New("type the Steam account name that owns RimWorld (only the name; the password is typed in SteamCMD's window)")
+		return "", errors.New("type the Steam account name that owns RimWorld (only the name; the password is typed in SteamCMD's window)")
 	}
 	if spec.Branch == "" {
 		spec.Branch = "public"
 	}
 	if !regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`).MatchString(spec.Branch) {
-		return nil, fmt.Errorf("%q is not a Steam branch name", spec.Branch)
+		return "", fmt.Errorf("%q is not a Steam branch name", spec.Branch)
 	}
 	dir, err := a.CheckDownloadDir(spec.Dir)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if spec.Name != "" {
 		if err := ValidEnvName(spec.Name); err != nil {
-			return nil, err
+			return "", err
 		}
 		if e, _ := a.Store.EnvByName(spec.Name); e != nil {
-			return nil, fmt.Errorf("environment %q already exists", spec.Name)
+			return "", fmt.Errorf("environment %q already exists", spec.Name)
 		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
+		return "", err
 	}
 	args := []string{"+force_install_dir", dir, "+login", spec.Account, "+app_update", env.WorkshopAppID}
 	if spec.Branch != "public" {
@@ -413,7 +428,7 @@ func (a *App) DownloadGame(spec DownloadSpec, progress func(DownloadProgress)) (
 	progress(DownloadProgress{State: "starting"})
 	proc, err := a.steamCMD().start(exe, args, spec.Console)
 	if err != nil {
-		return nil, fmt.Errorf("starting SteamCMD: %w", err)
+		return "", fmt.Errorf("starting SteamCMD: %w", err)
 	}
 	done := make(chan error, 1)
 	go func() { done <- proc.Wait() }()
@@ -435,7 +450,7 @@ func (a *App) DownloadGame(spec DownloadSpec, progress func(DownloadProgress)) (
 		}
 	}
 	if res.err != nil {
-		return nil, res.err
+		return "", res.err
 	}
 	if !res.success {
 		line := res.last
@@ -443,14 +458,20 @@ func (a *App) DownloadGame(spec DownloadSpec, progress func(DownloadProgress)) (
 			line = werr.Error()
 		}
 		if !res.loggedIn {
-			return nil, &DownloadError{Kind: "login", Line: line}
+			return "", &DownloadError{Kind: "login", Line: line}
 		}
-		return nil, &DownloadError{Kind: "other", Line: line}
+		return "", &DownloadError{Kind: "other", Line: line}
 	}
 	if !env.LooksLikeGameRoot(dir) {
-		return nil, fmt.Errorf("SteamCMD says it finished, but %s has no RimWorld", dir)
+		return "", fmt.Errorf("SteamCMD says it finished, but %s has no RimWorld", dir)
 	}
 	progress(DownloadProgress{State: "done", Percent: 100})
+	return dir, nil
+}
+
+// AddDownloaded adds a downloaded game folder as an environment named spec.Name, else after
+// its version ("1.6").
+func (a *App) AddDownloaded(spec DownloadSpec, dir string) (*SourceChangeEnv, error) {
 	name := spec.Name
 	if name == "" {
 		name = a.freeEnvName(env.MajorMinor(env.ReadGameVersion(dir)))
