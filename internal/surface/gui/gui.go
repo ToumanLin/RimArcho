@@ -45,7 +45,8 @@ func Run(o Options) error {
 		Assets:   application.AssetOptions{Handler: page},
 		Windows: application.WindowsOptions{
 			// WebView2's profile lives in RimArcho's data directory, not %APPDATA%\RimArcho.exe.
-			WebviewUserDataPath: filepath.Join(a.Home, "webview2"),
+			WebviewUserDataPath:   filepath.Join(a.Home, "webview2"),
+			AdditionalBrowserArgs: BrowserArgs(cmds.Setting(a, "ui.gpu") != "off"),
 		},
 	})
 	api.emit = func(name string, data any) { w.Event.Emit(name, data) }
@@ -56,6 +57,19 @@ func Run(o Options) error {
 		DefaultContextMenuDisabled: true, // the page draws its own (06 §8.5)
 	})
 	return w.Run()
+}
+
+// BrowserArgs are WebView2's command-line switches (07 §8.3). Always: the network service
+// runs inside the browser process (the page loads nothing from the network, 06 §8.2) and
+// there is one renderer, which saves a process of about 7 MB. Without GPU acceleration
+// (ui.gpu off, 06 §2.14) the GPU process goes too and the page is drawn in software.
+// WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS has no effect under Wails, so they go here.
+func BrowserArgs(gpu bool) []string {
+	args := []string{"--enable-features=NetworkServiceInProcess2", "--renderer-process-limit=1"}
+	if !gpu {
+		args = append(args, "--disable-gpu", "--disable-gpu-compositing", "--in-process-gpu")
+	}
+	return args
 }
 
 // NewAPI makes the service for an app; emit receives its events (scan, analyze). The

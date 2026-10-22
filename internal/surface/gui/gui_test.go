@@ -48,3 +48,17 @@ func compactStrings(s []string) []string {
 	}
 	return out
 }
+
+// ui.gpu off adds the software-drawing switches; both keep the network service in the
+// browser process and one renderer (07 §8.3).
+func TestBrowserArgs(t *testing.T) {
+	on, off := strings.Join(BrowserArgs(true), " "), strings.Join(BrowserArgs(false), " ")
+	for _, s := range []string{on, off} {
+		if !strings.Contains(s, "NetworkServiceInProcess2") || !strings.Contains(s, "--renderer-process-limit=1") {
+			t.Fatalf("missing the shared switches: %s", s)
+		}
+	}
+	if strings.Contains(on, "--disable-gpu") || !strings.Contains(off, "--disable-gpu --disable-gpu-compositing --in-process-gpu") {
+		t.Fatalf("gpu switches: on %q, off %q", on, off)
+	}
+}
