@@ -67,7 +67,7 @@ function bar() {
     L.bar = createBar({
       cls: "lib-fbar",
       splitKey: "ui.gui.filter.split:library",
-      column: () => els.detail,
+      column: () => els.side,
       data: () => L.page,
       change: () => { L.cur = 0; load(); },
       leave: () => els && els.rows.focus(),
@@ -133,16 +133,19 @@ function build() {
   const dhead = el("div", "head");
   const scroll = el("div", "scroll");
   scroll.tabIndex = -1;
-  detail.append(bar().el, dhead, scroll);
+  detail.append(dhead, scroll);
+  // the filter bar and the details are two cards, one above the other (06 §2.9)
+  const side = el("div", "fcol lib-side");
+  side.append(bar().el, detail);
   dhead.addEventListener("click", () => { if (L.bar.fills()) L.bar.toggle(false); });
   const split = el("div", "split lib-split");
   wireSplit(split, root);
   const selbar = el("div", "lib-bar");
   selbar.hidden = true;
-  root.append(detail, split, main);
+  root.append(side, split, main);
   w.append(root, selbar);
   sc.append(w);
-  els = { root, main, head, rows, th, sizer, detail, dhead, scroll, bar: selbar, lead: w.querySelector(".lead") };
+  els = { root, main, head, rows, th, sizer, side, detail, dhead, scroll, bar: selbar, lead: w.querySelector(".lead") };
   rows.addEventListener("scroll", drawRows, { passive: true });
   rows.addEventListener("mousedown", () => { L.focus = "rows"; rows.focus(); markFocus(); });
   scroll.addEventListener("mousedown", () => { L.focus = "detail"; markFocus(); });
