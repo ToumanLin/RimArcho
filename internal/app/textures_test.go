@@ -88,7 +88,6 @@ func texSetup(t *testing.T) (*testkit.Env, *texEnc, string) {
 	return e, enc, dir
 }
 
-
 // Optimising writes the DDS next to every PNG of a key (the 1.5 folder too: the Workshop
 // folder serves every game version), never touches the author's DDS, is not an update of
 // the mod, does nothing the second time, and clean takes back only its own files.

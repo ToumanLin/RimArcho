@@ -858,4 +858,3 @@ func (a *App) TextureSummaries() map[string]TextureSummary {
 func HasTextures(dir string) bool {
 	return len(textures.AllFolders(dir)) > 0
 }
-

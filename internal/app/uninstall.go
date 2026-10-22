@@ -29,7 +29,7 @@ const (
 	UnLinks      = "links"      // _Archo_ and !ArchoPack_ links in each game's Mods/
 	UnModsConfig = "modsconfig" // ModsConfig.xml in each user data folder RimArcho wrote
 	UnTextures   = "textures"   // the DDS RimArcho wrote next to mods' PNGs (贴图优化)
-	UnLocked    = "locked"     // the lock library's copies
+	UnLocked     = "locked"     // the lock library's copies
 	UnMonitor    = "monitor"    // Archo Monitor's folder
 	UnPacks      = "packs"      // packs and the saves inside them
 	UnSaves      = "saves"      // the "own" save folders and save backups in the data folder
