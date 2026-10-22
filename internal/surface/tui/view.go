@@ -214,10 +214,21 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"#", T("tags")}, {"o", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
-	case m.tab == tabChanges && m.chg.of != "":
-		pairs = [][2]string{{"esc", T("every mod")}, {"enter", T("file changes")}}
 	case m.tab == tabChanges:
-		pairs = [][2]string{{"esc", T("back")}, {"enter", T("file changes")}}
+		pairs = [][2]string{{"esc", T("back")}, {"enter", T("open")}, {"i", T("files")}}
+		if m.chg.of != "" {
+			pairs[0][1] = T("every mod")
+		} else if m.chg.library {
+			pairs = append(pairs, [2]string{"a", T("the current plan")})
+		} else {
+			pairs = append(pairs, [2]string{"a", T("the whole library")})
+		}
+		if c := &m.chg; c.cursor < len(c.rows) && c.rows[c.cursor].mod != nil {
+			for _, a := range c.rows[c.cursor].mod.Actions {
+				pairs = append(pairs, [2]string{a.Key, a.Label})
+			}
+		}
+		pairs = append(pairs, [2]string{"tab", T("all mods")})
 	case m.tab == tabLibrary && m.libr.typing:
 		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"key:value", T("keep")}, {"-key:value", T("leave out")}}
 	case m.tab == tabLibrary:

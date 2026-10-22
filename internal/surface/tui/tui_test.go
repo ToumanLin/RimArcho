@@ -219,7 +219,7 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	keys(tm, ":", "list --active", "enter")
 	waitFor(t, tm, "archo list --active")
 	keys(tm, "esc", "c")
-	waitAll(t, tm, "recent changes", "scan 2026-10-01 10:00", "nothing changed")
+	waitAll(t, tm, "recent changes", "the last scan", "nothing changed")
 	keys(tm, "esc")
 	m := finish(t, tm)
 	if *scans != 2 || m.tab != tabList {
@@ -600,9 +600,13 @@ func TestChangesView(t *testing.T) {
 	keys(tm, "R")
 	waitFor(t, tm, "1 mods updated")
 	keys(tm, "c")
-	waitAll(t, tm, "Beta", "updated")
+	waitFor(t, tm, "a: the whole library") // Beta is not in the plan
+	keys(tm, "a")
+	waitAll(t, tm, "worth a look", "Beta", "Defs, Patches changed")
 	keys(tm, "enter")
-	waitAll(t, tm, "~ defs/thingdefs/beta.xml", "+ patches/new.xml")
+	waitFor(t, tm, "Defs 1 changed; Patches 1 new")
+	keys(tm, "i")
+	waitAll(t, tm, "~ Defs/ThingDefs/beta.xml", "+ Patches/new.xml")
 	keys(tm, "esc")
 	finish(t, tm)
 
