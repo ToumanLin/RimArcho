@@ -1,0 +1,151 @@
+package view_test
+
+import (
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/view"
+)
+
+func libEnv(t *testing.T) *testkit.Env {
+	e := testkit.New(t)
+	ws := e.AddWorkshop("5100", testkit.Sample("tester.lock", "Lockable"))
+	e.AddWorkshop("5200", testkit.Sample("tester.idle", "Idle"))
+	hidden := e.AddWorkshop("5600", testkit.Sample("tester.hid", "Hid"))
+	e.Move(filepath.Join(hidden, "About", "About.xml"), filepath.Join(hidden, "About", "About.xml.disabled"))
+	e.Subscribe("5300")
+	e.CopyTree(ws, filepath.Join(e.Game, "Mods", "Lockable Copy"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.lock")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	return e
+}
+
+func libPage(t *testing.T, e *testkit.Env, search string, filters ...string) *view.LibPage {
+	t.Helper()
+	lib, err := e.App.Library()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := view.BuildLibrary(lib, search, filters, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func libRow(t *testing.T, p *view.LibPage, name string) view.LibRow {
+	t.Helper()
+	for _, r := range p.Rows {
+		if r.Name == name {
+			return r
+		}
+	}
+	t.Fatalf("no row %q", name)
+	return view.LibRow{}
+}
+
+func kinds(as []view.LibAction) []string {
+	var out []string
+	for _, a := range as {
+		out = append(out, a.Kind)
+	}
+	return out
+}
+
+func TestLibraryPage(t *testing.T) {
+	view.SetLang("zh")
+	defer view.SetLang("en")
+	e := libEnv(t)
+	p := libPage(t, e, "")
+	if p.Total != 4 || p.Shown != 4 {
+		t.Fatalf("total %d shown %d", p.Total, p.Shown)
+	}
+	lock := libRow(t, p, "Lockable")
+	if lock.Single || len(lock.Insts) != 2 || lock.Insts[0].Label != "工坊" || lock.Insts[1].Label != "本地" {
+		t.Fatalf("Lockable rows: %+v", lock.Insts)
+	}
+	if lock.State != "" || lock.Used != "default" {
+		t.Errorf("a lineage with a used copy is not \"in no plan\": %q %q", lock.State, lock.Used)
+	}
+	if got := kinds(lock.Insts[1].Actions); !slices.Equal(got, []string{"remove", "move", "folder"}) {
+		t.Errorf("the Mods/ copy: %v", got)
+	}
+	if got := kinds(lock.Insts[0].Actions); !slices.Equal(got, []string{"pin", "folder", "workshop"}) {
+		t.Errorf("the unused workshop copy beside it (enabling it would clash): %v", got)
+	}
+	hid := libRow(t, p, "Hid")
+	if !hid.Single || hid.State != "被其它管理器隐藏" || hid.Insts[0].Note != hid.State {
+		t.Errorf("hidden: %+v", hid)
+	}
+	if got := kinds(hid.Insts[0].Actions); !slices.Equal(got, []string{"unhide", "trash", "folder", "workshop"}) {
+		t.Errorf("hidden actions: %v", got)
+	}
+	ghost := libRow(t, p, "工坊条目 5300")
+	if ghost.Insts[0].ID != "" || ghost.Size != "—" || ghost.State != "订阅了但不在磁盘上" || !slices.Equal(kinds(ghost.Insts[0].Actions), []string{"workshop"}) {
+		t.Errorf("ghost: %+v", ghost)
+	}
+	idle := libRow(t, p, "Idle")
+	if got := kinds(idle.Insts[0].Actions); !slices.Contains(got, "enable") {
+		t.Errorf("idle: %v", got)
+	}
+	// filters and conditions
+	p = libPage(t, e, "", "state:unused", "-source:local")
+	if p.Shown != 3 || len(p.Conds) != 2 || !p.Conds[1].Exclude || p.Conds[0].Label != "状态 不在任何方案里" {
+		t.Errorf("filtered: shown %d conds %+v", p.Shown, p.Conds)
+	}
+	for _, g := range p.Groups {
+		if g.Key == "source" && g.Title != "来源" {
+			t.Errorf("source title %q", g.Title)
+		}
+	}
+	if _, err := view.BuildLibrary(mustLibrary(t, e), "", []string{"nope:x"}, ""); err == nil {
+		t.Error("bad filter")
+	}
+}
+
+func mustLibrary(t *testing.T, e *testkit.Env) *app.Library {
+	t.Helper()
+	lib, err := e.App.Library()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return lib
+}
+
+func TestLibraryDo(t *testing.T) {
+	e := libEnv(t)
+	p := libPage(t, e, "Idle")
+	idle := p.Rows[0].Insts[0]
+	if _, err := view.LibDo(e.App, view.LibEnable, []string{idle.Ref}); err != nil {
+		t.Fatal(err)
+	}
+	if !libRow(t, libPage(t, e, ""), "Idle").Insts[0].InPlan {
+		t.Fatal("enable did not add it")
+	}
+	msg, err := view.LibDo(e.App, view.LibRemove, []string{idle.Ref})
+	if err != nil || !strings.Contains(msg, "1 plans") {
+		t.Fatalf("remove: %q %v", msg, err)
+	}
+	cp := libRow(t, libPage(t, e, ""), "Lockable").Insts[1]
+	pv, err := view.LibPreview(e.App, view.LibMove, []string{cp.Ref})
+	if err != nil || !pv.Apply || !strings.Contains(strings.Join(pv.Lines, "\n"), "would move to the lock library") {
+		t.Fatalf("preview: %+v %v", pv, err)
+	}
+	if _, err := view.LibDo(e.App, view.LibMove, []string{cp.Ref}); err != nil {
+		t.Fatal(err)
+	}
+	after := libRow(t, libPage(t, e, ""), "Lockable")
+	if after.Insts[1].ID != cp.ID || !strings.HasPrefix(after.Insts[1].Label, "locked version · ") || !after.Insts[1].InPlan {
+		t.Fatalf("after the move: %+v", after.Insts[1])
+	}
+	// the dry run of a refused action cannot be applied
+	pv, err = view.LibPreview(e.App, view.LibTrash, []string{libRow(t, libPage(t, e, ""), "Idle").Insts[0].Ref})
+	if err != nil || pv.Apply {
+		t.Fatalf("trash of a subscribed mod: %+v %v", pv, err)
+	}
+}
