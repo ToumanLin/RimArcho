@@ -798,7 +798,8 @@ export function key(e) {
     if (L.full) return setFull(false);
     if (L.focus === "detail") { L.focus = "rows"; els.rows.focus(); markFocus(); return hints(); }
     if (L.sel.size) { L.sel.clear(); els.rows.dataset.sig = ""; drawRows(); drawBar(); return hints(); }
-    if (L.bar.active()) return L.bar.clear();
+    // the filter bar: one press clears it and closes it (G5)
+    if (L.bar.active() || L.bar.open) { if (L.bar.active()) L.bar.clear(); if (L.bar.open) L.bar.toggle(false); }
     return;
   }
   if (ctrl && (k === " " || k === "Spacebar")) {

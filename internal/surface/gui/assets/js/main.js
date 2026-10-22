@@ -674,6 +674,8 @@ async function delKey() {
 function onKey(e) {
   if (e.isComposing) return;
   const k = e.key;
+  // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
+  if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
   if (pop.popupKey(e)) return;
   if (document.activeElement && document.activeElement.tagName === "INPUT") return;
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
@@ -724,7 +726,8 @@ function onKey(e) {
   if (k === "Escape") {
     handled();
     if (S.focus < 3 && col().sel.size) { col().sel.clear(); renderLists(); renderWhere(); renderHints(); }
-    else if (S.focus < 2 && barOn()) { S.bar.clear(); }
+    // the filter bar: one press clears it and closes it (G5: back to the base in at most 3)
+    else if (S.focus < 2 && (barOn() || S.bar.open)) { if (barOn()) S.bar.clear(); if (S.bar.open) S.bar.toggle(false); }
     else if (S.focus === 2 && col().query) { col().query = ""; $(`.area[data-area="${S.focus}"] .search input`).value = ""; search(S.focus, ""); }
     return;
   }

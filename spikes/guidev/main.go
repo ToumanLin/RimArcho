@@ -7,6 +7,7 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -39,6 +40,11 @@ const es = new EventSource("/events");
 es.onmessage = (m) => { const e = JSON.parse(m.data); (subs[e.name] || []).forEach((f) => f({ name: e.name, data: e.data })); };
 export const Events = { On: (n, f) => { (subs[n] = subs[n] || []).push(f); } };
 `
+
+// escCheck is G5's check of esc on every page, run in the page (esccheck.js says how).
+//
+//go:embed esccheck.js
+var escCheck string
 
 type hub struct {
 	mu   sync.Mutex
@@ -101,6 +107,18 @@ func main() {
 	mux.HandleFunc("/wails/runtime.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		fmt.Fprint(w, shim)
+	})
+	mux.HandleFunc("/dev/esccheck.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript")
+		w.Header().Set("Cache-Control", "no-store")
+		if *assets != "" {
+			// with -assets the page's files come from disk; so does this one
+			if b, err := os.ReadFile(filepath.Join("spikes", "guidev", "esccheck.js")); err == nil {
+				w.Write(b)
+				return
+			}
+		}
+		fmt.Fprint(w, escCheck)
 	})
 	mux.HandleFunc("/call", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
