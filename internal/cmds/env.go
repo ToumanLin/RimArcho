@@ -296,7 +296,7 @@ func envRebind(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// ---- a game version downloaded with SteamCMD (08 §10) ----
+// ---- a game version downloaded with SteamCMD (08 §11) ----
 
 var steamcmdFlag = Flag{Name: "install-steamcmd", Help: "download SteamCMD from Valve first when it is not installed"}
 

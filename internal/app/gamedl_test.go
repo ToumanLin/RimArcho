@@ -57,7 +57,7 @@ func steamZip(t *testing.T) []byte {
 	return buf.Bytes()
 }
 
-// 08 §10: SteamCMD is downloaded from Valve only after the player saw the size, into
+// 08 §11: SteamCMD is downloaded from Valve only after the player saw the size, into
 // %LOCALAPPDATA%\RimArcho\steamcmd.
 func TestInstallSteamCMD(t *testing.T) {
 	e := testkit.New(t)
@@ -151,7 +151,7 @@ var okRun = []string{
 	"Success! App '294100' fully installed.",
 }
 
-// 08 §10: a version downloaded with SteamCMD becomes an environment named after its
+// 08 §11: a version downloaded with SteamCMD becomes an environment named after its
 // version; only the account name reaches SteamCMD; progress comes from SteamCMD's log.
 func TestDownloadGame(t *testing.T) {
 	e := testkit.New(t)
@@ -190,7 +190,7 @@ func TestDownloadGame(t *testing.T) {
 	}
 }
 
-// 08 §10: failures in plain words; the folder must not be RimArcho's or inside a source.
+// 08 §11: failures in plain words; the folder must not be RimArcho's or inside a source.
 func TestDownloadGameErrors(t *testing.T) {
 	e := testkit.New(t)
 	e.AddEnv(false)

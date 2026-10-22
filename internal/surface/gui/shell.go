@@ -332,7 +332,7 @@ func (s *API) PackImport(path string) (string, error) {
 	return view.PackImportText(m), nil
 }
 
-// ---- the guide's "download a version" (08 §10) ----
+// ---- the guide's "download a version" (08 §11) ----
 
 // DownloadInfo is what the download step shows: SteamCMD (or the offer to download it from
 // Valve, with its size), RimWorld's branches, and a folder for the game.

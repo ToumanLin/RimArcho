@@ -22,7 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/vdf"
 )
 
-// Downloading a game version with SteamCMD (01 §3, 08 §10). RimArcho runs Valve's SteamCMD;
+// Downloading a game version with SteamCMD (01 §3, 08 §11). RimArcho runs Valve's SteamCMD;
 // the player logs in inside SteamCMD's own console window (account, password, Steam Guard)
 // and RimArcho never asks for, receives, stores or passes a credential: only the account
 // name the player typed, for +login <name>. SteamCMD keeps the login after the first time.

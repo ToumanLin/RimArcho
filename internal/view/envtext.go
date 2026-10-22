@@ -41,7 +41,7 @@ func init() {
 		"or a game folder":             "或者一个游戏目录",
 		"reading the game's own mods…": "正在读取游戏自己的 Mod…",
 		"%d mods in its Data and Mods": "Data 和 Mods 里有 %d 个 Mod",
-		// the guide's "download a version" (08 §10)
+		// the guide's "download a version" (08 §11)
 		"current version":         "当前正式版",
 		"test version (unstable)": "测试版（unstable）",
 		"asking Steam which versions RimWorld has… (SteamCMD may update itself first)": "正在问 Steam 有哪些版本…（SteamCMD 可能先更新自己）",
@@ -76,7 +76,7 @@ func init() {
 	})
 }
 
-// DownloadErrorText is a failed download in the player's words (08 §10): why, then
+// DownloadErrorText is a failed download in the player's words (08 §11): why, then
 // SteamCMD's own line.
 func DownloadErrorText(err error) string {
 	var de *app.DownloadError

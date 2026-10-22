@@ -1,7 +1,7 @@
 // The first-run guide (06 §2.15): three steps, each with a way back.
 //   1. find the game: 已有的游戏 — what detection finds (tick several), a folder typed in or
 //      chosen in the folder dialog; or 下载一个版本 — a branch, a folder and the Steam account
-//      name, downloaded by SteamCMD in its own window (08 §10);
+//      name, downloaded by SteamCMD in its own window (08 §11);
 //   2. read the mods: a scan per environment in a child process, with its progress (a game
 //      added once the shared mod folders were read: only its own Data/ and Mods/);
 //   3. where to start: the game's own list, a list from RimSort / RimCrow (previewed, then
@@ -162,7 +162,7 @@ async function added(names) {
   scanAll();
 }
 
-// ---- 1b. download a version (SteamCMD, 08 §10) ----
+// ---- 1b. download a version (SteamCMD, 08 §11) ----
 
 async function loadDownload() {
   D.loading = true;
