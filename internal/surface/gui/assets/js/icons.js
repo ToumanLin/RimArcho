@@ -2,6 +2,8 @@
 const svg = (body, cls = "") => `<svg class="i ${cls}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 export const icon = {
+  // 贴图优化: a picture
+  textures: svg('<rect x="2.2" y="2.8" width="11.6" height="10.4" rx="1.8"/><circle cx="5.8" cy="6.2" r="1.2"/><path d="M2.6 11.6l3.6-3.2 2.6 2.2 2-1.6 2.8 2.4"/>'),
   official: svg('<path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/>'),
   workshop: svg('<circle cx="8" cy="8" r="5.6"/><circle cx="8" cy="8" r="2"/>'),
   local: svg('<rect x="2.5" y="3" width="11" height="10" rx="1.6"/><path d="M2.5 6h11"/>'),

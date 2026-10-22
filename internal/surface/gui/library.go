@@ -118,6 +118,35 @@ var openDir = func(dir string) error {
 	return exec.Command("xdg-open", dir).Start()
 }
 
+// ModCopies is the full detail's Mod 库存 part (06 §4.2): the Lineage row of the mod with
+// the instance id (or the copy ref), every copy with its state, place, size, version, note,
+// plans and ops, and the op table they refer to.
+type ModCopies struct {
+	Row *view.LibRow `json:"row"`
+	Ops []view.Op    `json:"opTable"`
+}
+
+func (s *API) ModCopies(id string) (*ModCopies, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	lib, err := s.library()
+	if err != nil {
+		return nil, err
+	}
+	p, err := view.BuildLibrary(lib, "", nil, "")
+	if err != nil {
+		return nil, err
+	}
+	for i := range p.Rows {
+		for _, c := range p.Rows[i].Insts {
+			if (id != "" && c.ID == id) || c.Ref == id {
+				return &ModCopies{Row: &p.Rows[i], Ops: p.Ops}, nil
+			}
+		}
+	}
+	return &ModCopies{Ops: p.Ops}, nil
+}
+
 // LibraryFields is a copy's field list (06 §2.9): one list, the editor's fields with the
 // library's (state, used in, size, versions, update date, last played) among them.
 func (s *API) LibraryFields(ref string) ([]view.Field, error) {

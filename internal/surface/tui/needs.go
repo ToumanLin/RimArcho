@@ -325,11 +325,13 @@ func (m *model) sectionHead(sec, w int) string {
 		}
 	}
 	title := T(view.SectionTitles[sec])
-	head := sDimS.Render(title)
+	// its number among the sections shown: 1–4 jump to it (06 §3.5)
+	num := itoa(m.sectionNumber(sec)) + " "
+	head := sDimS.Render(num) + sDimS.Render(title)
 	if sec == view.SectionBreak {
-		head = sErrS.Render(title)
+		head = sDimS.Render(num) + sErrS.Render(title)
 	}
-	used := width.StringWidth(title)
+	used := width.StringWidth(num + title)
 	add := func(s string, st lipgloss.Style) {
 		s = width.Truncate(s, max(w-used, 0), "…")
 		head += st.Render(s)
@@ -350,6 +352,34 @@ func (m *model) sectionHead(sec, w int) string {
 		}
 	}
 	return head
+}
+
+// sectionNumber is a section's number among the sections shown (1 first).
+func (m *model) sectionNumber(sec int) int {
+	n, last := 0, -1
+	for _, it := range m.prob.items {
+		if it.section != last {
+			n, last = n+1, it.section
+		}
+		if it.section == sec {
+			return n
+		}
+	}
+	return n
+}
+
+// sectionGo moves the cursor to the first item of the n-th section shown.
+func (m *model) sectionGo(n int) {
+	k, last := 0, -1
+	for i, it := range m.prob.items {
+		if it.section != last {
+			k, last = k+1, it.section
+			if k == n {
+				m.prob.cursor = i
+				return
+			}
+		}
+	}
 }
 
 // sectionStep moves the cursor to the first item of the previous / next section.
@@ -390,6 +420,9 @@ func (m *model) needsKey(s string) tea.Cmd {
 		return nil
 	case "right":
 		m.sectionStep(1)
+		return nil
+	case "1", "2", "3", "4":
+		m.sectionGo(int(s[0] - '0'))
 		return nil
 	case "up", "k":
 		p.cursor = max(p.cursor-1, 0)

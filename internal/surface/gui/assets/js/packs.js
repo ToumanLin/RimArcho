@@ -5,7 +5,7 @@
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, button, act } from "./screens.js";
+import { openScreen, page, button, act, area } from "./screens.js";
 import * as pop from "./popups.js";
 
 let ui = null;
@@ -289,7 +289,9 @@ function drawBuild() {
 
   // the name and the kind
   const basics = el("section", "sec");
-  basics.append(el("h2", "label", T("the pack")));
+  const basicsH = el("h2", "label", T("the pack"));
+  basics.append(basicsH);
+  area(basics, basicsH);
   const bc = el("div", "card bd-basics");
   const nameRow = el("label", "bd-row");
   const name = el("input", "field");
@@ -325,7 +327,9 @@ function drawBuild() {
 
   // the four things building does; while it builds, where it is
   const steps = el("section", "sec");
-  steps.append(el("h2", "label", T("what building does")));
+  const stepsH = el("h2", "label", T("what building does"));
+  steps.append(stepsH);
+  area(steps, stepsH);
   const sc2 = el("div", "card bd-steps");
   // A build's progress (view.ProgressOf: 0 check, 2 copy, 3 textures, 4 write, 5 done) marks
   // the steps it is at; copying also locks the versions (origin.json in each copy).
@@ -494,7 +498,7 @@ export function packsKey(e) {
 }
 
 export function hintList() {
-  const tail = [{ key: "shift+1–7", label: T("pages") }, { key: "?", label: T("all keys") }];
+  const tail = [{ key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
   if (S.screen === "build") {
     return [{ key: "B", label: T("build") }, { key: "V", label: T("see the list first") }, { key: "T", label: T("full / light pack") },
       B.light ? { key: "n", label: T("name") } : { key: "D", label: T("textures") }, { key: "esc", label: T("back to the plan") }, ...tail];

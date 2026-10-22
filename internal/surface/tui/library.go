@@ -563,6 +563,22 @@ func (m *model) libraryKey(s string) tea.Cmd {
 		return nil
 	case `\`:
 		return m.toggleBar()
+	// the page's areas (06 §3.5): 1 the filter, 2 the table, 3 the details
+	case "1":
+		if !l.bar.open {
+			return m.toggleBar()
+		}
+		return nil
+	case "2":
+		l.detail, l.full = false, false
+		return nil
+	case "3":
+		if tw, _ := m.libWidths(); tw < m.w {
+			l.detail = true
+		} else {
+			l.full = true // no room beside the table: the details over the page
+		}
+		return nil
 	case " ":
 		return m.libSpace()
 	case "m":
@@ -699,7 +715,7 @@ func (m *model) libraryLines(n int) []string {
 		count += "  " + markDot + "  " + Tf("selected %d", k)
 	}
 	top := len(out)
-	table := []string{sDimS.Render(fit(count+"  "+markDot+"  "+p.Size, tw))}
+	table := []string{sDimS.Render(fit("2 "+count+"  "+markDot+"  "+p.Size, tw))}
 	rows := max(n-top-1, 1)
 	l.rowY = 2 + top + 1 // screen row of the first table row (0-based)
 	if len(l.flat) == 0 {
@@ -795,7 +811,7 @@ func (m *model) libDetailLines(w, n int) []string {
 		st = sAccent
 	}
 	if i == nil {
-		return []string{st.Render(fit(T("details"), w))}
+		return []string{st.Render(fit("3 "+T("details"), w))}
 	}
 	var body []string
 	body = append(body, sBold.Render(fit(name, w)), sSecond.Render(fit(i.Label, w)), "")
@@ -836,7 +852,7 @@ func (m *model) libDetailLines(w, n int) []string {
 	}
 	off := max(0, min(l.detailOff, len(body)-(n-1)))
 	l.detailOff = off
-	title := T("details")
+	title := "3 " + T("details")
 	if off > 0 {
 		title = "▲ " + name
 	}

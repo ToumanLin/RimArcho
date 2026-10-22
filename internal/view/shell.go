@@ -79,6 +79,7 @@ const (
 	PageChanges  = "changes"
 	PageLog      = "log"
 	PageSettings = "settings"
+	PageTextures = "textures" // 贴图优化 (08 §5.2), under 库
 )
 
 // NavItem is one sidebar entry. Kids show only under the open entry.
@@ -86,7 +87,7 @@ type NavItem struct {
 	ID    string    `json:"id"`
 	Label string    `json:"label"`
 	Badge int       `json:"badge,omitempty"` // 能不能跑: the actionable items (06 §5)
-	Key   string    `json:"key,omitempty"`   // shift+1–7
+	Key   string    `json:"key,omitempty"`   // shift+1–8
 	Kids  []NavItem `json:"kids,omitempty"`
 	// Mark is a plan's "有未载入的外部版本" (04 §4.3); Current the plan being edited;
 	// InGame the plan the game's ModsConfig.xml holds (a small mark when there are several).
@@ -104,7 +105,7 @@ type NavGroup struct {
 	Items []NavItem `json:"items"`
 }
 
-// Nav builds the sidebar: the 在玩 and 库 entries in the shift+1–7 order, every plan and "+ 新方案"
+// Nav builds the sidebar: the 在玩 and 库 entries in the shift+1–8 order, every plan and "+ 新方案"
 // under 方案, every pack under 整合包. 没玩到 and 值得玩 have no pages yet (10) and are
 // left out.
 func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
@@ -128,6 +129,8 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all")}, {ID: PageChanges, Label: T("changes")}}},
 		{ID: PagePlan, Label: T("plans"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
+		// what the game loads faster: next to the packs, which convert the same way (08 §5.2)
+		{ID: PageTextures, Label: T("texture optimisation")},
 		{ID: PageEnv, Label: T("environment")},
 	}
 	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: T("library"), Items: library}}

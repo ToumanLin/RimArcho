@@ -19,7 +19,7 @@ type BuildStep struct {
 	More  []string `json:"more,omitempty"`  // the problems, the mods that cannot be copied, …
 	Needs bool     `json:"needs,omitempty"` // the step's problems are fixed on 能不能跑
 	// Kind "textures": the step holds the textures choice (BuildPage.Tex); Go a page that
-	// fixes it ("textures": 设置 › 贴图优化, where todds is installed).
+	// fixes it ("textures": the 贴图优化 page under 库, where todds is installed).
 	Kind string `json:"kind,omitempty"`
 	Go   string `json:"go,omitempty"`
 }
@@ -260,7 +260,7 @@ func textureStep(r *app.PackBuild, tex int) BuildStep {
 	}
 	if t := r.Tool; t != nil && t.Err != "" {
 		s.Level, s.Go = LevelBad, "textures"
-		msg := T("the DDS encoder (todds) is not installed: install it in 设置 › 贴图优化")
+		msg := T("the DDS encoder (todds) is not installed: install it in 库 › 贴图优化")
 		if t.Path != "" {
 			msg = t.Err
 		}

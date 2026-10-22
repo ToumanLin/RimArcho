@@ -57,7 +57,7 @@ export function homeKey(e) {
 
 export function hintList() {
   return [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("apply / edit") }, { key: "L", label: T("launch") },
-    { key: "shift+1–7", label: T("pages") }, { key: "?", label: T("all keys") }];
+    { key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
 }
 
 // focusLaunch is the editor's 启动游戏 (06 §2.5): the current plan becomes the applied row

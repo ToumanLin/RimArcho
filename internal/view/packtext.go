@@ -56,7 +56,7 @@ func init() {
 		"%d PNG become DDS; the PNGs are not copied.":                                 "%d 个 PNG 转成 DDS，包里不再带 PNG。",
 		"Video memory about %s → %s.":                                                 "显存约 %s → %s。",
 		"The pack is about %s after, up to %s while converting.":                      "编译后包约 %s，转换时最多占 %s。",
-		"the DDS encoder (todds) is not installed: install it in 设置 › 贴图优化":           "没有安装 DDS 转换工具（todds）：在 设置 › 贴图优化 安装",
+		"the DDS encoder (todds) is not installed: install it in 库 › 贴图优化":            "没有安装 DDS 转换工具（todds）：在 库 › 贴图优化 安装",
 		"install the DDS encoder (todds) first, or build without converting textures": "先安装 todds，或者不转换贴图再编译",
 		"textures: next choice":                                                       "贴图：换下一个选项",
 		"install":                                                                     "去安装",

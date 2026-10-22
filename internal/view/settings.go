@@ -212,8 +212,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	} else {
 		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
 	}
-	// 贴图优化 (08 §5.2): its own page (the interfaces open it; archo textures is not a
-	// settings command), and where the encoder is.
+	// 贴图优化 is a page under 库 (06 §2.1); here only where its encoder is (08 §5.2).
 	tool := a.TextureTool()
 	toolNote := T("the DDS encoder (todds) is not installed")
 	if tool.Err == "" {
@@ -222,8 +221,6 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		toolNote = tool.Err
 	}
 	out = append(out, SettingGroup{Title: T("texture optimisation"), Items: []SettingItem{
-		{Label: T("convert textures to DDS"), Note: T("the DDS of mods' PNG textures, next to them"),
-			Actions: []SettingAction{{Label: T("convert textures to DDS…"), Argv: []string{"textures"}}}},
 		{Label: T("the DDS encoder"), Value: cmds.Setting(a, "textures.todds"), Edit: "path", Argv: []string{"config", "set", "textures.todds", "{}"},
 			Note: toolNote + " · " + T("empty: RimArcho's own copy; or a todds you have, e.g. RimSort's")},
 	}})

@@ -1,4 +1,4 @@
-// 设置 › 贴图优化 (08 §5.2, 06 §2.14): the current plan's (or every mod's) PNG textures, what
+// 库 › 贴图优化 (08 §5.2, 06 §2.1): the current plan's (or every mod's) PNG textures, what
 // RimArcho converted and what went stale, what converting at a scale would take and save,
 // then the run in the background ("textures" events), stop, and take everything back. The
 // encoder (todds) is downloaded only after the player saw where from and how big.

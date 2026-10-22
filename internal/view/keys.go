@@ -123,12 +123,15 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("esc", "back to the plan"),
 		)
 	}
+	if page != EditorPage {
+		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
+	}
 	out = append(out,
 		r("tab · shift+tab", "next / previous page under the same sidebar entry"),
-		r("shift+1–7", "go to a page in the sidebar"),
+		r("shift+1–8", "go to a page in the sidebar"),
 	)
 	if !tui {
-		out = append(out, r("ctrl+b", "show / hide the sidebar"))
+		out = append(out, r("ctrl+b", "navigation at the side / at the top"))
 	}
 	out = append(out,
 		r(pick("c · l", "c"), pick("mod changes · game log", "mod changes")),
