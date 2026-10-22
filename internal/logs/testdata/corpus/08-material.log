@@ -1,0 +1,5 @@
+Could not execute post-long-event action. Exception: System.NullReferenceException: Object reference not set to an instance of an object
+  at Verse.RaceProperties.get_AnyPawnKind () [0x00019] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at Verse.ThingDef.ResolveIcon () [0x00042] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at Verse.BuildableDef.<PostLoad>b__78_0 () [0x00021] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at Verse.LongEventHandler.ExecuteToExecuteWhenFinished () [0x0007c] in <fcfab19af5d14a608a65ebd77f29482f>:0

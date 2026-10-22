@@ -1,0 +1,14 @@
+2026-10-15 21:54:20.656  WARN [Vulkan] [General] [Loader Message] windows_read_data_files_in_registry: Registry lookup failed to get layer manifest files.
+Objects: 1
+    [0] VkInstance 0x2b021c92070
+    at Brutal.Logging.LogCategory.Warning(LogString`1 message, String sourceMemberName, String sourceFilePath, Int32 sourceLineNumber) [0x0]
+    at Waylith.Graphics.GraphicsDevice+<>c.<.cctor>b__123_1(String s) [0x0]
+    at Waylith.Graphics.GraphicsDevice.DebugUtilsCallback(VkDebugUtilsMessageSeverityFlagsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, Void* pUserData) [0xFB]
+    at Brutal.VulkanApi.Vulkan+PInvoke.vkCreateInstance(VkInstanceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkInstance* pInstance) [0x0]
+    at Brutal.VulkanApi.Vulkan+PInvoke.vkCreateInstance(VkInstanceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkInstance* pInstance) [0x0]
+    at Brutal.VulkanApi.Instance..ctor(CreateInfo createInfo) [0x2DA]
+    at Brutal.VulkanApi.Vulkan.CreateInstance(CreateInfo createInfo) [0x0]
+    at Waylith.Graphics.GraphicsDevice.CreateInstance(String applicationName, String engineName, Boolean disallowFullscreenExclusive) [0x253]
+    at Waylith.EngineApplication..ctor(EngineApplicationOptions options) [0x544]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0x81]
+    at RimWorldWaylith.Program.Main(String[] args) [0x19E]

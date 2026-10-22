@@ -1,0 +1,4 @@
+System.NullReferenceException: Object reference not set to an instance of an object
+[Ref 118BEB25]
+  at Verse.AI.Group.Lord.LordTick () [0x0007d] in <fcfab19af5d14a608a65ebd77f29482f>:0
+  at Verse.AI.Group.LordManager.LordManagerTick () [0x00011] in <fcfab19af5d14a608a65ebd77f29482f>:0

@@ -1,0 +1,51 @@
+2026-10-15 23:08:04.938 ERROR [Verse] Error in static constructor of RandomsGeneAssistant.HarmonyPatcher: System.TypeInitializationException: The type initializer for 'RandomsGeneAssistant.HarmonyPatcher' threw an exception.
+ ---> HarmonyLib.HarmonyException: Patching exception in method static System.Void RimWorld.GeneUIUtility::DrawGeneBasics(Verse.GeneDef gene, UnityEngine.Rect geneRect, RimWorld.GeneType geneType, System.Boolean doBackground, System.Boolean clickable, System.Boolean overridden)
+ ---> System.ArgumentException: Unrelated classes cannot describe the same non-null object: original static System.Void RimWorld.GeneUIUtility::DrawGeneBasics(Verse.GeneDef gene, UnityEngine.Rect geneRect, RimWorld.GeneType geneType, System.Boolean doBackground, System.Boolean clickable, System.Boolean overridden), patch static System.Void RandomsGeneAssistant.PatchGeneBackgroundColor::DrawGeneBasics_Prefix(Verse.Gene gene, UnityEngine.Rect geneRect, RimWorld.GeneType geneType, System.Boolean& doBackground, System.Boolean clickable, System.Boolean overridden), parameter gene bound to argument 0 (gene), operation static System.Void RimWorld.GeneUIUtility::DrawGeneBasics(Verse.GeneDef gene, UnityEngine.Rect geneRect, RimWorld.GeneType geneType, System.Boolean doBackground, System.Boolean clickable, System.Boolean overridden), supplied Verse.GeneDef, requested Verse.Gene
+[Ref A69D1D5C]
+   at HarmonyLib.MethodCreatorTools.ValidateBinding(MethodCreator creator, MethodInfo patch, InjectedParameter injection, PatchBindingContext context, Type source, Boolean boxes, Boolean valueOnly, String sourceName, Boolean uncheckedReferenceBinding)
+   at HarmonyLib.MethodCreatorTools.EmitStorage(MethodCreator creator, MethodInfo patch, InjectedParameter injection, PatchBindingContext context, InjectionStorage argument, Boolean infix, List`1 tmpBoxVars, String sourceName, Boolean uncheckedReferenceBinding)
+   at HarmonyLib.MethodCreatorTools.EmitCallParameter(MethodCreator creator, MethodInfo patch, PatchBindingContext innerContext, PatchBindingContext outerContext, Boolean allowFirsParamPassthrough, LocalBuilder& tmpObjectVar, Boolean& refResultUsed, List`1 tmpInstanceBoxes, List`1 tmpBoxVars, Boolean uncheckedReferenceBinding)
+   at HarmonyLib.MethodCreatorTools.EmitPatchCall(MethodCreator creator, MethodInfo patch, PatchBindingContext context, Boolean allowFirstParamPassthrough, PatchBindingContext outerContext, Boolean uncheckedReferenceBinding)
+   at HarmonyLib.MethodCreator.EmitPrefixes(IEnumerable`1 prefixes, PatchBindingContext context, PatchBindingContext outerContext)
+   at HarmonyLib.MethodCreator.AddPrefixes()
+   at HarmonyLib.MethodCreator.CreateReplacement()
+   at HarmonyLib.PatchFunctions.UpdateWrapper(MethodBase original, PatchInfo patchInfo)
+   at HarmonyLib.PatchClassProcessor.ProcessPatchJob(Job job)
+   --- End of inner exception stack trace ---
+[Ref C70E0962]
+   at HarmonyLib.PatchClassProcessor.ReportException(Exception exception, MethodBase original)
+   at HarmonyLib.PatchClassProcessor.Patch()
+   at HarmonyLib.Harmony.<PatchAll>b__10_1(Type type)
+   at HarmonyLib.CollectionExtensions.Do[T](IEnumerable`1 sequence, Action`1 action)
+   at HarmonyLib.CollectionExtensions.DoIf[T](IEnumerable`1 sequence, Func`2 condition, Action`1 action)
+   at HarmonyLib.Harmony.PatchAll(Assembly assembly)
+   at HarmonyLib.Harmony.PatchAll()
+   at RandomsGeneAssistant.HarmonyPatcher..cctor()
+   --- End of inner exception stack trace ---
+[Ref 4745A5DF]
+   at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(QCallTypeHandle type)
+   at System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(RuntimeTypeHandle type)
+   at MonoMod.Utils.DynamicMethodDefinition.Verse.StaticConstructorOnStartupUtility.CallAll_Patch6()
+    - TRANSPILER wowgag.guiperformancepatch.initgate: Verse.StaticConstructorOnStartupUtility.CallAll <- IEnumerable`1 GUIPerformancePatch.GppInitGate:Transpiler(IEnumerable`1 instructions, MethodBase __originalMethod)
+    - POSTFIX LunarFramework.Bootstrap: Verse.StaticConstructorOnStartupUtility.CallAll <- Void LunarFramework.Internal.Patches.Patch_Verse_StaticConstructorOnStartupUtility:CallAll_Postfix()
+    - POSTFIX net.avilmask.rimworld.mod.NonUnoPinata: Verse.StaticConstructorOnStartupUtility.CallAll <- Void NonUnoPinata.Patches.StaticConstructorOnStartupUtility_CallAll_NonUnoPinataPatch:Postfix()
+    - POSTFIX wowgag.guiperformancepatch.scangate: Verse.StaticConstructorOnStartupUtility.CallAll <- Void GUIPerformancePatch.GppScanGate:PostCallAll()
+    - POSTFIX wowgag.guiperformancepatch.ilfast: Verse.StaticConstructorOnStartupUtility.CallAll <- Void GUIPerformancePatch.GppIlFast:PostCallAll()
+    - POSTFIX wowgag.guiperformancepatch.patchlookup: Verse.StaticConstructorOnStartupUtility.CallAll <- Void GUIPerformancePatch.GppPatchLookup:PostCallAll()
+    at MonoMod.Utils.DynamicMethodDefinition.Verse.Log.Error_Patch3(String text) [0xFFFFFFFF]
+    at MonoMod.Utils.DynamicMethodDefinition.Verse.StaticConstructorOnStartupUtility.CallAll_Patch6() [0xFFFFFFFF]
+    at Verse.PlayDataLoader+<>c.<DoPlayLoad>b__4_4() [0xA]
+    at Verse.LongEventHandler.ExecuteToExecuteWhenFinished() [0x71]
+    at Verse.LongEventHandler.UpdateCurrentAsynchronousEvent() [0x8C]
+    at .Verse.LongEventHandler.LongEventsUpdate_Patch1(Boolean& sceneChanged) [0xFFFFFFFF]
+    at MonoMod.Utils.DynamicMethodDefinition.Verse.Root.Update_Patch2(Root this) [0xFFFFFFFF]
+    at Verse.Root_Entry.Update() [0x0]
+    at .lambda_method5(Closure , Object ) [0xFFFFFFFF]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessage(UnityComponentState component, UnityMessageType messageType) [0x2A]
+    at Waylith.UnityCompat.UnityWorld.InvokeMessagesForActiveBehaviours(UnityMessageType messageType) [0x4D]
+    at Waylith.UnityCompat.UnityWorld.Update(UnityFrame& frame) [0x34]
+    at Waylith.UnityCompat.UnityRuntime.Step(Single deltaTime, Single elapsedTime) [0x26]
+    at RimWorldWaylith.Bootstrap+<>c__DisplayClass23_0.<Initialize>b__3() [0x49]
+    at Waylith.EngineApplication.RunLoop() [0x52F]
+    at Waylith.EngineApplication.Run(EngineApplicationOptions options, Action`1 initialize) [0xB0]
+    at RimWorldWaylith.Program.Main(String[] args) [0x19E]
