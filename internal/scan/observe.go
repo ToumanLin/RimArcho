@@ -22,6 +22,8 @@ type Origin struct {
 	WorkshopID   string `json:"workshop_id,omitempty"`
 	SnapshotHash string `json:"origin_snapshot,omitempty"`
 	CopiedAt     string `json:"copied_at,omitempty"`
+	// Textures: a pack's copy whose PNGs were converted to DDS ("dds", "dds 50%"; 08 §5.2).
+	Textures string `json:"textures,omitempty"`
 }
 
 // UnloadableAboutDisabled marks a folder with only About/About.xml.disabled (02 §4.2).

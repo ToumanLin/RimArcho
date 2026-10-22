@@ -198,6 +198,37 @@ func TestTexturesStaleAndFailures(t *testing.T) {
 	}
 }
 
+// The commands: status, a dry run, the run, clean (05 §4.2).
+func TestTexturesCLI(t *testing.T) {
+	e, _, dir := texSetup(t)
+	out := e.MustRun("textures", "status", "pkg:tester.tex")
+	if !strings.Contains(out, "textures of 1 mods: 4 PNGs") || !strings.Contains(out, "1 DDS of its own") || !strings.Contains(out, "3 to convert") {
+		t.Fatalf("status:\n%s", out)
+	}
+	out = e.MustRun("textures", "optimize", "pkg:tester.tex", "--scale", "50", "--dry-run")
+	if !strings.Contains(out, "dry run, nothing written (slim to 50%)") || !strings.Contains(out, "left alone") || exists(filepath.Join(dir, "Textures", "Things", "A.dds")) {
+		t.Fatalf("dry run:\n%s", out)
+	}
+	if out, code := e.Run("textures", "optimize", "pkg:tester.tex", "--scale", "33"); code == 0 || !strings.Contains(out, "one of 20 25 40 50 60 75 80 100") {
+		t.Fatalf("bad scale: %d\n%s", code, out)
+	}
+	if out, code := e.Run("textures", "optimize"); code == 0 || !strings.Contains(out, "--plan or --all") {
+		t.Fatalf("no mods: %d\n%s", code, out)
+	}
+	out = e.MustRun("textures", "optimize", "--all")
+	if !strings.Contains(out, "converted 3 textures") {
+		t.Fatalf("run:\n%s", out)
+	}
+	out = e.MustRun("textures", "clean", "--all", "--dry-run")
+	if !strings.Contains(out, "would delete 3 DDS") {
+		t.Fatalf("clean dry run:\n%s", out)
+	}
+	e.MustRun("textures", "clean", "--all")
+	if exists(filepath.Join(dir, "Textures", "Things", "A.dds")) {
+		t.Fatal("clean left a DDS")
+	}
+}
+
 // A game running, Core, and a DDS that appeared since the plan are refused.
 func TestTexturesRefusals(t *testing.T) {
 	e, _, _ := texSetup(t)
