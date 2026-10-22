@@ -939,12 +939,20 @@ func (a *App) HasPNGTextures(m *store.Mod) bool {
 	if m == nil || m.SnapID == 0 {
 		return false
 	}
+	return a.pngSnapshots()[m.SnapID]
+}
+
+// pngSnapshots is the set of snapshots with PNG textures, read again only when a scan
+// changed the snapshots. Checking that (SnapshotsKey counts the snapshots) costs a table
+// scan, so a caller going through many mods takes the set once (Mod 库存: once per mod made
+// opening the page take 0.4 s on 3,500 instances).
+func (a *App) pngSnapshots() map[int64]bool {
 	if k := a.Store.SnapshotsKey(); a.pngSnaps == nil || a.pngSnapsKey != k {
 		s, err := a.Store.SnapshotsWithPNG()
 		if err != nil {
-			return false
+			return nil
 		}
 		a.pngSnaps, a.pngSnapsKey = s, k
 	}
-	return a.pngSnaps[m.SnapID]
+	return a.pngSnaps
 }

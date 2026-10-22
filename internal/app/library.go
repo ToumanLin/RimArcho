@@ -303,6 +303,7 @@ func (a *App) Library() (*Library, error) {
 			staged[it.Instance] = true
 		}
 	}
+	png := a.pngSnapshots()
 	for _, m := range ix.Mods {
 		if m.Status != identity.Live || m.Kind == source.Official || srcKind[m.SourceID] == "" {
 			continue
@@ -311,7 +312,7 @@ func (a *App) Library() (*Library, error) {
 			Bytes: m.TotalSize, Sized: m.SnapID != 0 && (m.FileCount > 0 || m.TotalSize > 0),
 			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Staged: staged[m.ID], Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID],
 			Authors: strings.TrimSpace(m.Authors), Note: notes[m.ID]}
-		i.PNG = a.HasPNGTextures(m)
+		i.PNG = m.SnapID != 0 && png[m.SnapID]
 		if t, ok := texs[m.ID]; ok {
 			i.Textures = &t
 		}
