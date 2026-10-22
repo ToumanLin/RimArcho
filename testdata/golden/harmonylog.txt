@@ -2,12 +2,12 @@ $ archo analyze
 analysis a:1 for 1.6: 8 active mods, <dur>
   defs: 2 from 2 files (9 installed mods indexed, 0 from cache)
   patches: 1 operations in 1 files: 1 failed, 0 of mod-defined classes
-  harmony: 6 patches in 5 assemblies (16 types indexed)
+  harmony: 7 patches in 5 assemblies (18 types indexed)
 next:
   archo problems
 
 $ archo harmony
-harmony: 6 patches in 5 assemblies
+harmony: 7 patches in 5 assemblies
   shared-targets:
     Verse.Pawn.Tick  3 mods: #gpto #iqmu #xamx
 next:
@@ -29,10 +29,12 @@ next:
   archo source #xamx --type ModC.Pawn_Tick_C
 
 $ archo harmony --mod #i4uc
-#i4uc Manual Patcher  harmony: 0 patches
+#i4uc Manual Patcher  harmony: 1 patches
   assemblies:
-    Assemblies/ModManual.dll  types 1, patches 0  (calls Harmony.Patch from code)
-  manual: targets patched from code are not statically known (archo source search ".Patch(" --in #i4uc)
+    Assemblies/ModManual.dll  types 1, patches 1  (calls Harmony.Patch from code)
+  patches:
+    postfix    Verse.ThingWithComps.Tick  ← ModManual.Boot.After
+  manual: Harmony.Patch calls: targets computed at runtime are not listed (archo source search ".Patch(" --in #i4uc)
 
 $ archo problems --code harmony
 problems: 0 error, 2 warning, 2 info
@@ -41,7 +43,7 @@ problems: 0 error, 2 warning, 2 info
     warning harmony.skip-prefix  #iqmu Mod A has a bool prefix on Verse.Pawn.Tick that can skip the original; 2 other mods patch it  (p:9c9994)
     warning harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict  (p:cc6232)
     info harmony.shared-target  3 mods patch Verse.Pawn.Tick  (p:280e07)
-    info harmony.manual  #i4uc Manual Patcher calls Harmony.Patch from code; those targets cannot be determined statically  (p:3b74ac)
+    info harmony.manual  #i4uc Manual Patcher calls Harmony.Patch from code; 1 of 1 calls have a target found statically  (p:3b74ac)
 next:
   archo problems show p:9c9994
 
@@ -184,7 +186,7 @@ problems: 3 error, 5 warning, 2 info
     warning harmony.multi-transpiler  2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict  (p:cc6232)
     warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
     info harmony.shared-target  3 mods patch Verse.Pawn.Tick  (p:280e07)
-    info harmony.manual  #i4uc Manual Patcher calls Harmony.Patch from code; those targets cannot be determined statically  (p:3b74ac)
+    info harmony.manual  #i4uc Manual Patcher calls Harmony.Patch from code; 1 of 1 calls have a target found statically  (p:3b74ac)
   logs:
     log Player.log 1.6.4633 2026-10-01 10:00, current (written after the Loadout's last change): 2 error, 2 warning
       error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  (p:4c087a)

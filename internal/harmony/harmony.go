@@ -15,10 +15,11 @@ import (
 
 // Patch kinds.
 const (
-	Prefix     = "prefix"
-	Postfix    = "postfix"
-	Transpiler = "transpiler"
-	Finalizer  = "finalizer"
+	Prefix        = "prefix"
+	Postfix       = "postfix"
+	Transpiler    = "transpiler"
+	Finalizer     = "finalizer"
+	ILManipulator = "ilmanipulator"
 )
 
 // Patch is one declared patch method.
@@ -30,11 +31,16 @@ type Patch struct {
 	TargetMethod string // method name; get_X / set_X / .ctor / .cctor for MethodType
 	Args         string // "(int, string)" when given, else ""
 	Skips        bool   // a prefix returning bool can skip the original
-	Dynamic      bool   // TargetMethod()/TargetMethods(): not statically known
+	Dynamic      bool   // TargetMethod()/TargetMethods(), or a manual target not statically known
+	Manual       bool   // found at a Harmony.Patch call site (manual.go), not from attributes
+	Unresolved   string // manual patch whose original was not resolved: why
 }
 
 // Target is "Type.Method" (or "Type.Method(args)").
 func (p *Patch) Target() string {
+	if p.Dynamic && p.Unresolved != "" {
+		return "<manual: " + p.Unresolved + ">"
+	}
 	if p.Dynamic && p.TargetType == "" {
 		return "<dynamic " + p.PatchType + ".TargetMethod()>"
 	}
@@ -50,12 +56,31 @@ type Assembly struct {
 	UsesHarm  bool // references Harmony at all
 	IDs       []string
 	AttrError int // HarmonyPatch attributes that could not be decoded
+	// Manual patching (manual.go): Harmony.Patch calls evaluated (helper calls counted at each
+	// call site), those with a resolved original and patch method, and why the others were not.
+	ManualCalls    int
+	ManualResolved int
+	Unresolved     map[string]int
 }
 
 // DefaultSkip are library assemblies whose Harmony facts are not the mod's own (03 §5.3).
 // Their TypeDefs are still indexed (frames inside them are attributed as "library").
 var DefaultSkip = []string{"0harmony.dll", "harmony.dll", "harmonylib.dll", "hugslib.dll", "0multiplayerapi.dll", "0prepatcherapi.dll",
 	"mono.cecil*.dll", "system.*.dll", "microsoft.*.dll", "newtonsoft.json.dll", "unityengine*.dll", "assembly-csharp*.dll"}
+
+// OwnLibrary maps a skipped library DLL to the mod that is that library. In its own mod the DLL's
+// patches are the mod's own (HugsLib patches the game itself), so it is read there and skipped only
+// when another mod ships a copy.
+var OwnLibrary = map[string]string{"hugslib.dll": "unlimitedhugs.hugslib"}
+
+// SkippedFor is Skipped for a DLL of the mod with packageId pkg (any case, "_steam" ignored).
+func SkippedFor(file, pkg string, list []string) bool {
+	own := OwnLibrary[strings.ToLower(file)]
+	if own != "" && own == strings.TrimSuffix(strings.ToLower(pkg), "_steam") {
+		return false
+	}
+	return Skipped(file, list)
+}
 
 // Skipped reports whether a DLL file name matches the skip list (simple * globs, case-insensitive).
 func Skipped(file string, list []string) bool {
@@ -250,6 +275,11 @@ func Read(path string, skipHarmony bool) (*Assembly, error) {
 			}
 			out.Patches = append(out.Patches, p)
 		}
+	}
+	// Harmony.Patch calls, direct or through a wrapper taking HarmonyMethods (manual.go).
+	if out.Manual || a.References("HarmonyLib.HarmonyMethod") || a.References("Harmony.HarmonyMethod") {
+		scanManual(a, out)
+		out.Manual = out.Manual || out.ManualCalls > 0
 	}
 	out.IDs = idCandidates(a.UserStrings())
 	return out, nil
