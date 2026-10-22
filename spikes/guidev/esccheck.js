@@ -37,7 +37,10 @@ async function go(id) {
     if (!b && id === "changes") { $(`#nav [data-id="library"]`).click(); await wait(600); b = $(`#nav [data-id="changes"]`); }
     b.click();
   }
-  await wait(900);
+  // a page shows once its data is in: wait for it (up to 4 s)
+  const want = { plan: null, guide: "guide", uninstall: "uninstall" }[id] !== undefined ? { plan: null, guide: "guide", uninstall: "uninstall" }[id] : id;
+  for (let i = 0; i < 40 && S.screen !== want; i++) await wait(100);
+  await wait(300);
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 }
 

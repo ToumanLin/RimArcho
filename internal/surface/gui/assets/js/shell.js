@@ -9,27 +9,81 @@ import { bump, slideNav } from "./motion.js";
 
 let ui = null;
 
-// Below this width the sidebar starts collapsed and opens over the page (06 §2.1).
-export const NARROW = 760;
-let collapsed = innerWidth < NARROW;
-let narrow = innerWidth < NARROW;
+// The sidebar's three modes, as magpie's NavigationView in Auto (06 §2.1): expanded (labels
+// and groups), compact (a 48px icon rail) and hidden. The window's width picks the class:
+// wide (≥ 920px) shows the player's choice, expanded or compact, kept in ui.gui.nav; medium
+// is compact; narrow (< 640px) hidden. In medium and narrow the toggle opens the expanded
+// pane over the page (esc, a click outside or picking a page closes it) until the class
+// changes.
+export const WIDE = 920, NARROW = 640;
+const NAV_KEY = "ui.gui.nav";
+let pref = "expanded";  // the wide class's mode, the player's choice
+let over = false;       // the expanded pane is open over the page
+const widthClass = () => (innerWidth >= WIDE ? "wide" : innerWidth >= NARROW ? "medium" : "narrow");
+let cls = widthClass();
+
+export function navMode() {
+  if (over) return "over";
+  if (cls === "wide") return pref;
+  return cls === "medium" ? "compact" : "hidden";
+}
 
 export function initShell(u) {
   ui = u;
-  $("#collapse").innerHTML = icon.sidebar;
-  $("#collapse").onclick = () => setCollapsed(!collapsed);
-  $("#scrim").onclick = () => setCollapsed(true);
+  const t = $("#navtoggle");
+  t.innerHTML = icon.sidebar;
+  t.onclick = () => toggleNav();
+  $("#scrim").onclick = () => closeOver();
   $("#env").onclick = () => ui.go("env");
   $("#nav-settings").onclick = () => ui.go("settings");
   $("#live").onclick = () => ui.go("needs");
   wireSideSplit();
+  api.Setting(NAV_KEY).then((v) => { if (v === "compact") { pref = v; applyNav(true); } }).catch(() => {});
   addEventListener("resize", () => {
-    const n = innerWidth < NARROW;
-    if (n !== narrow) { narrow = n; collapsed = n; }
-    applyCollapse();
+    const c = widthClass();
+    if (c !== cls) { cls = c; over = false; applyNav(false); }
   });
-  applyCollapse();
+  // the highlights follow the pane's width once it has moved
+  $("#side").addEventListener("transitionend", (e) => { if (e.target === $("#side")) slideNav($("#nav"), true); });
+  $("#app").addEventListener("transitionend", (e) => { if (e.target === $("#app")) slideNav($("#nav"), true); });
+  applyNav(true);
 }
+
+// toggleNav is the sidebar's toggle (and ctrl+b): in the wide class it switches expanded and
+// compact and remembers it; otherwise it opens or closes the pane over the page.
+export function toggleNav() {
+  if (cls === "wide" && !over) {
+    pref = pref === "expanded" ? "compact" : "expanded";
+    api.SetSetting(NAV_KEY, pref === "compact" ? "compact" : "").catch(() => {});
+  } else over = !over;
+  applyNav(false);
+}
+
+// closeOver closes the pane opened over the page; true when it was open (esc takes it).
+export function closeOver() {
+  if (!over) return false;
+  over = false;
+  applyNav(false);
+  return true;
+}
+
+function applyNav(jump) {
+  const app = $("#app");
+  const m = navMode();
+  if (jump) app.classList.add("still");
+  for (const k of ["expanded", "compact", "hidden", "over"]) app.classList.toggle("nav-" + k, m === k);
+  // the column the pane leaves while it lies over the page: the rail in medium, none in narrow
+  app.classList.toggle("over-rail", m === "over" && cls === "medium");
+  $("#scrim").hidden = m !== "over";
+  const t = $("#navtoggle");
+  t.title = (m === "expanded" || m === "over" ? T("collapse the sidebar") : T("expand the sidebar")) + " · ctrl+b";
+  t.setAttribute("aria-expanded", m === "expanded" || m === "over" ? "true" : "false");
+  if (jump) { void app.offsetWidth; app.classList.remove("still"); }
+  slideNav($("#nav"), true);
+}
+
+// navigated: picking a page closes the pane that lies over it.
+export function navigated() { closeOver(); }
 
 // The sidebar's width: dragged on its right edge, kept in the settings (ui.gui.side),
 // double-click resets it (06 §2.1).
@@ -71,22 +125,6 @@ function wireSideSplit() {
     api.SetSetting(SIDE_KEY, "").catch(() => {});
   });
 }
-
-function setCollapsed(v) {
-  collapsed = v;
-  applyCollapse();
-}
-
-function applyCollapse() {
-  const app = $("#app");
-  app.classList.toggle("collapsed", collapsed);
-  app.classList.toggle("narrow", narrow);
-  $("#scrim").hidden = collapsed || !narrow;
-  $("#collapse").title = (collapsed ? T("show the sidebar") : T("hide the sidebar"));
-}
-
-// navigated: a narrow window's sidebar closes once a page is picked.
-export function navigated() { if (narrow && !collapsed) setCollapsed(true); }
 
 export async function loadShell() {
   try { S.shell = await api.Shell(); } catch { /* keep the last one */ }
@@ -156,7 +194,8 @@ function renderSide() {
         if (on && kids.length) openNow = it.id;
         const b = el("button", "nav-item" + (on ? " on" : "") + (kids.length ? " parent" : ""));
         b.dataset.id = it.id;
-        b.title = it.key ? it.key.replace("shift", "Shift") : "";
+        // the label is the tooltip in the compact rail (magpie's); the key follows it
+        b.title = it.label + (it.key ? " · " + it.key.replace("shift", "Shift") : "");
         const ic = el("span", "ic");
         ic.innerHTML = icon[ICONS[it.id]] || "";
         b.append(ic, el("span", "lbl", it.label));
@@ -190,6 +229,7 @@ function renderSide() {
     set.prepend(ic);
   }
   $(".lbl", set).textContent = T("settings");
+  set.title = T("settings");
   renderLive();
 }
 
@@ -286,12 +326,15 @@ function renderCrumbs() {
   });
 }
 
-// setActs puts the page's actions on the right of the top bar.
+// setActs puts the page's actions at the right end of its description line (06 §2.2): the
+// page's own .page-head, or the plan editor's #planhead. The top bar has no buttons.
 let actsKey = "";
 export function setActs(key, ...nodes) {
-  const box = $("#acts");
-  if (key && key === actsKey) return;
+  const box = S.screen ? $("#screen .page-head .page-acts") : $("#planhead .page-acts");
+  if (!box) return;
+  if (key && key === actsKey && box.dataset.filled) return;
   actsKey = key || "";
+  box.dataset.filled = "1";
   box.innerHTML = "";
   for (const n of nodes) if (n) box.append(n);
 }

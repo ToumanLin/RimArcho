@@ -5,7 +5,6 @@
 import { S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
 import { icon } from "./icons.js";
 import { statusIcon } from "./icons.js";
-import { setActs } from "./shell.js";
 import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
 import { bgSection } from "./bg.js";
@@ -56,7 +55,8 @@ function dropBackdrop() {
 
 // page builds a page: one muted sentence that says what the page is for (the breadcrumb
 // names it, 06 §2.2), then the body. The buttons and fields among right are the page's
-// actions: they go to the top bar, quiet unless primary; anything else joins the lead.
+// actions: they sit at the right end of that line, quiet unless primary; anything else
+// joins the lead. The top bar has no buttons.
 export function page(cls, lead, ...right) {
   const w = el("div", "page " + cls + (fresh ? " enter" : ""));
   fresh = false;
@@ -70,7 +70,11 @@ export function page(cls, lead, ...right) {
       acts.push(r);
     } else head.append(r);
   }
-  setActs("", ...acts);
+  if (acts.length) {
+    const box = el("div", "page-acts");
+    for (const a of acts) box.append(a);
+    head.append(box);
+  }
   if (head.childNodes.length) w.append(head);
   return w;
 }
@@ -337,8 +341,7 @@ const L = { path: "", page: null, loading: false, pending: "", cur: 0, detail: n
 // of: only this mod's Lineage ({id, name}), from a detail's history; null every mod.
 const C = { page: null, cur: 0, items: [], els: [], open: new Set(), raw: new Map(), of: null, library: false };
 
-// logPage keeps the page's head and gives a fresh body below it; the actions go to the top
-// bar.
+// logPage keeps the page's head and gives a fresh body below it, and its actions.
 function logPage(name, title, ...right) {
   let w = S.screen === name ? $("#screen .page.logs") : null;
   if (!w) {
@@ -347,7 +350,15 @@ function logPage(name, title, ...right) {
     sc.append(w);
   } else {
     while (w.children.length > 1) w.lastChild.remove();
-    setActs("", ...right.filter((r) => r && r.matches("button, input, select")));
+    let box = $(".page-head .page-acts", w);
+    if (!box) {
+      let head = $(".page-head", w);
+      if (!head) { head = el("div", "page-head"); w.prepend(head); }
+      box = el("div", "page-acts");
+      head.append(box);
+    }
+    box.innerHTML = "";
+    for (const r of right) if (r && r.matches("button, input, select")) { if (r.matches("button.btn") && !r.classList.contains("primary")) r.classList.add("quiet"); box.append(r); }
   }
   ui.renderWhere();
   return w;
@@ -647,7 +658,7 @@ export function rescanButton(label) {
 export function busyChanged() {
   if (S.screen === "env") return environment();
   if (S.screen === "changes") return changes();
-  const b = document.querySelector("#acts .rescan, .page .rescan");
+  const b = document.querySelector(".page .rescan");
   if (b) b.replaceWith(rescanButton(b.dataset.label));
 }
 

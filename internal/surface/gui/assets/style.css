@@ -75,25 +75,37 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 
 /* ---- the shell (06 §2.1, §2.2): the sidebar, then the top bar, the page and the bottom line ---- */
 /* --side-w: the width the player dragged the sidebar to (06 §2.1); unset = the default */
-#app { display: grid; grid-template-columns: var(--side-w, 212px) minmax(0, 1fr); height: 100%; }
-#app.collapsed { grid-template-columns: 0 minmax(0, 1fr); }
-#app.collapsed #side { visibility: hidden; }
+#app { display: grid; grid-template-columns: var(--side-w, 212px) minmax(0, 1fr); height: 100%; transition: grid-template-columns var(--t-enter) var(--ease); }
+/* the sidebar's modes (06 §2.1, magpie's NavigationView): expanded, compact (the icon rail),
+   hidden, and over (expanded, lying over the page in a medium or narrow window) */
+#app.nav-compact, #app.over-rail { grid-template-columns: 48px minmax(0, 1fr); }
+#app.nav-hidden, #app.nav-over:not(.over-rail) { grid-template-columns: 0 minmax(0, 1fr); }
+#app.still, #app.still #side, body.resizing #app { transition: none; }
 /* each keeps its column: the sidebar floats over the page in a narrow window */
 #side { grid-column: 1; grid-row: 1; }
 #main { grid-column: 2; grid-row: 1; display: grid; grid-template-rows: 50px minmax(0, 1fr) 30px; min-width: 0; min-height: 0; }
-#body { position: relative; display: grid; min-height: 0; min-width: 0; }
+#body { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; min-width: 0; }
+/* the plan editor's description line, like every page's (06 §2.5): the lead, its actions */
+#planhead { grid-row: 1; padding: 0 12px 10px; min-height: 28px; }
+#planhead[hidden] { display: none; }
+#body > #board { grid-row: 2; }
 
 #side { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-right: 1px solid var(--line-2); background: var(--bg); }
 /* the sidebar's right edge drags its width; double-click goes back to the default */
 #side-split { position: absolute; top: 0; bottom: 0; right: 0; width: 6px; z-index: 2; cursor: col-resize; }
 #side-split:hover, #side-split.drag { background: linear-gradient(to left, var(--line) 0 2px, transparent 2px); }
-#app.narrow #side-split, #app.collapsed #side-split { display: none; }
+#app:not(.nav-expanded) #side-split { display: none; }
 body.resizing, body.resizing * { cursor: col-resize !important; }
 /* The sidebar follows magpie's: 212px (184px in a smaller window), 10px sides, entries
    30px high with the icon, the name and the count on the same edges in every row. */
 /* No name or icon at the top (the window's title bar has them) and no empty head: the
    sidebar starts with its first group title, level with the top bar's breadcrumb. */
-#nav { position: relative; flex: 1; min-height: 0; overflow-y: auto; padding: 16px 10px 10px; display: flex; flex-direction: column; gap: 1px; }
+#nav { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 10px 10px; display: flex; flex-direction: column; gap: 1px; }
+/* the toggle heads the sidebar, level with the top bar; in the rail it stays at the top */
+.side-head { flex: none; height: 50px; display: flex; align-items: center; padding: 0 10px; }
+.navtoggle { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 7px; color: var(--muted); transition: background var(--t-press), color var(--t-press); }
+.navtoggle:hover { background: var(--pill); color: var(--fg); }
+.navtoggle svg.i { width: 15px; height: 15px; }
 /* a group's title: small, muted, apart from the entries above it (06 §2.1) */
 #nav .grp { padding: 14px 8px 4px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; }
 #nav > .grp:first-of-type { padding-top: 2px; }
@@ -127,7 +139,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .kid-hl { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 6px; background: color-mix(in srgb, var(--fg) 6.5%, transparent); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
 .side-foot .nav-item.on { background: var(--card); box-shadow: var(--seg-edge); }
 .side-foot { flex: none; padding: 8px 10px 10px; border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
-@media (max-width: 859px) { #app:not(.collapsed):not(.narrow) { grid-template-columns: var(--side-w, 184px) minmax(0, 1fr); } }
 /* the foot's one line, only while the game runs or a new log waits (06 §2.1): a dot in the
    icon column, then the text, on the entries' edges */
 #live { width: 100%; height: 30px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 8px; border-radius: 7px; color: var(--fg-2); font-size: 12px; text-align: left; white-space: nowrap; overflow: hidden; transition: background var(--t-press), color var(--t-press); animation: view-in var(--t-enter) var(--ease); }
@@ -136,11 +147,29 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 #live.newlog::before { background: var(--accent); }
 #live:hover { background: var(--pill); color: var(--fg); }
 #live .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* a narrow window: the sidebar opens over the page */
-#scrim { position: fixed; inset: 0; z-index: 14; background: rgba(0, 0, 0, .28); animation: fade var(--t-press) ease-out; }
-#app.narrow { grid-template-columns: 0 minmax(0, 1fr); }
-#app.narrow #side { position: fixed; top: 0; bottom: 0; left: 0; width: 212px; z-index: 15; box-shadow: var(--shadow); transition: transform var(--t-enter) var(--ease); }
-#app.narrow.collapsed #side { transform: translateX(-100%); visibility: hidden; }
+/* over: the expanded pane opens over the page, a light scrim behind it */
+#scrim { position: fixed; inset: 0; z-index: 14; background: rgba(0, 0, 0, .18); animation: fade var(--t-press) ease-out; }
+#side { transition: width var(--t-enter) var(--ease), box-shadow var(--t-enter) var(--ease); }
+#app.nav-over #side { position: fixed; top: 0; bottom: 30px; left: 0; width: 212px; z-index: 15; box-shadow: var(--shadow); animation: pane-in var(--t-enter) var(--ease); }
+@keyframes pane-in { from { transform: translateX(-24px); opacity: 0; } }
+/* compact: the rail. Icons keep their order; the group titles, labels, chevrons and
+   sub-entries go; the label is the tooltip; the highlight and the badge stay on the icon */
+#app.nav-compact #side { width: 48px; }
+#app.nav-compact #nav, #app.nav-compact .side-foot { padding-left: 6px; padding-right: 6px; }
+#app.nav-compact .side-head { padding: 0 10px; }
+#app.nav-compact #nav .grp { height: 10px; padding: 0; font-size: 0; }
+#app.nav-compact #nav > .grp:first-of-type { height: 0; }
+#app.nav-compact .nav-item { justify-content: center; padding: 0; gap: 0; }
+#app.nav-compact .nav-item .lbl, #app.nav-compact .nav-item .chev, #app.nav-compact .kids-wrap, #app.nav-compact #live .t { display: none; }
+#app.nav-compact .nav-item { position: relative; }
+#app.nav-compact .nav-item .badge-n, #app.nav-compact #live .badge-n { position: absolute; top: 1px; right: 0; margin: 0; min-width: 14px; padding: 0 3px; font-size: 9.5px; line-height: 14px; }
+#app.nav-compact #live { position: relative; justify-content: center; padding: 0; gap: 0; }
+#app.nav-compact #live::before { margin: 0; }
+/* hidden: only the toggle stays, at the window's top left; the breadcrumb moves over for it */
+#app.nav-hidden #side { visibility: hidden; }
+#app.nav-hidden #nav, #app.nav-hidden .side-foot { display: none; }
+#app.nav-hidden #navtoggle { visibility: visible; position: fixed; top: 11px; left: 10px; z-index: 16; }
+#app.nav-hidden #top { padding-left: 46px; }
 
 /* ---- the top bar: collapse, the breadcrumb, the environment chip, the page's actions ---- */
 #top { position: relative; display: flex; align-items: center; gap: 8px; padding: 0 16px 0 12px; min-width: 0; }
@@ -149,24 +178,24 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 #crumbs .crumb:hover { color: var(--fg); background: var(--pill); }
 #crumbs .crumb.last { color: var(--fg); font-weight: 600; }
 #crumbs .sep { color: var(--muted); flex: none; margin: 0 2px; font-size: 15px; }
-#acts { display: flex; align-items: center; gap: 8px; min-width: 0; }
-#acts .btn { border: 1px solid var(--line); background: var(--card); color: var(--fg-2); box-shadow: 0 1px 1px rgba(0, 0, 0, .04); }
-#acts .btn:hover { border-color: var(--muted); background: var(--card-2); color: var(--fg); }
-#acts .btn.primary { color: var(--accent-fg); background: var(--accent); border-color: transparent; }
-#acts .btn.hot { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-#acts .field { flex: 0 1 200px; }
-#acts .unwritten { color: var(--accent); font-size: 11.5px; white-space: nowrap; margin-right: 2px; }
-#acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+.page-acts { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.page-acts .btn { border: 1px solid var(--line); background: var(--card); color: var(--fg-2); box-shadow: 0 1px 1px rgba(0, 0, 0, .04); }
+.page-acts .btn:hover { border-color: var(--muted); background: var(--card-2); color: var(--fg); }
+.page-acts .btn.primary { color: var(--accent-fg); background: var(--accent); border-color: transparent; }
+.page-acts .btn.hot { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.page-acts .field { flex: 0 1 200px; }
+.page-acts .unwritten { color: var(--accent); font-size: 11.5px; white-space: nowrap; margin-right: 2px; }
+.page-acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
 #top #env { flex: 0 1 auto; }
 /* the chip beside the page's name: the environment (and the plan on 能不能跑) */
 .envchip { height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 6px; background: var(--pill); color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background var(--t-press), color var(--t-press); }
 .envchip:hover, .envchip.on { background: var(--pill-hover); color: var(--fg); }
 /* a page's actions: quiet icon + text, no border (06 §2.2) */
-#acts .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); font-size: 13px; padding: 0 6px; }
-#acts .btn.quiet:hover { background: var(--pill); color: var(--fg); }
-#acts .btn.quiet kbd { display: none; }
-#acts .btn.quiet .ic { margin-right: 6px; }
-@media (max-width: 1100px) { #acts .wide-only, #acts kbd { display: none; } }
+.page-acts .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); font-size: 13px; padding: 0 6px; }
+.page-acts .btn.quiet:hover { background: var(--pill); color: var(--fg); }
+.page-acts .btn.quiet kbd { display: none; }
+.page-acts .btn.quiet .ic { margin-right: 6px; }
+@media (max-width: 1100px) { .page-acts .wide-only, .page-acts kbd { display: none; } }
 @media (max-width: 640px) { #top #env { display: none; } }
 .pill { height: 24px; display: inline-flex; align-items: center; background: var(--pill); color: var(--fg-2); border-radius: 999px; padding: 0 11px; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background var(--t-press); }
 .pill:hover { background: var(--pill-hover); color: var(--fg); }
@@ -335,7 +364,9 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .envrow.on .name { color: var(--accent); }
 .chip.cur { color: var(--accent); background: var(--accent-soft); margin: 0; }
 @media (prefers-reduced-motion: reduce) { .page.enter, .seg > .thumb { animation: none; transition: none; } }
-.page-head { display: flex; gap: 6px 12px; align-items: baseline; flex-wrap: wrap; color: var(--muted); }
+.page-head { display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; color: var(--muted); min-height: 28px; }
+/* the page's actions at the right end of its description line (06 §2.2) */
+.page-head .page-acts { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 /* one line under the breadcrumb that says what the page is for (06 §2.2) */
 .page-head .lead { margin: 0; color: var(--muted); font-size: 13px; }
 .subbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
@@ -533,7 +564,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 /* a number that changed bumps */
 .bump { animation: bump var(--t-layout) var(--ease); }
 @keyframes bump { 40% { transform: scale(1.18); } }
-.badge-n, .cnt, .area .head .num, .need-sec .n, #acts .unwritten { display: inline-block; }
+.badge-n, .cnt, .area .head .num, .need-sec .n, .page-acts .unwritten { display: inline-block; }
 /* the status line slides in from below */
 #status.in { animation: status-in var(--t-enter) var(--ease); }
 @keyframes status-in { from { opacity: 0; transform: translateY(6px); } }
@@ -650,6 +681,8 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .hm-launch .issue { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; margin-top: -14px; padding: 20px 14px 8px; border-radius: 0 0 12px 12px; border: 1px solid var(--line); border-top: 0; background: color-mix(in srgb, var(--fg) 7%, transparent); backdrop-filter: blur(14px); color: var(--fg-2); font-size: 12.5px; text-align: left; }
 .hm-launch .issue.bad { color: var(--amber); background: color-mix(in srgb, var(--amber) 16%, transparent); border-color: color-mix(in srgb, var(--amber) 28%, transparent); }
 .hm-launch .issue .ic { display: inline-flex; }
+/* the editor's 启动游戏 lands here with the focus on it (06 §2.5): L or enter starts the game */
+.hm-launch .btn.launch:focus { outline: 2px solid var(--fg); outline-offset: 3px; }
 .hm-launch .issue svg.i { width: 13px; height: 13px; }
 .hm-launch .issue .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-launch .issue .go { margin-left: auto; opacity: .7; }
@@ -775,7 +808,7 @@ svg.i.fill { fill: currentColor; }
 .dl-state { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; }
 .dl-state .t { font-weight: 500; }
 .dl-line { margin-top: 8px; font: 11.5px var(--code); color: var(--muted); overflow-wrap: anywhere; }
-@media (prefers-reduced-motion: reduce) { .prog .bar.busy i { animation: none; } #app.narrow #side { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .prog .bar.busy i { animation: none; } #app, #side { transition: none; } #app.nav-over #side { animation: none; } }
 
 /* ---- import / export (js/exchange.js) ---- */
 .pop.xc { width: min(760px, 94vw); display: flex; flex-direction: column; max-height: 80vh; }
@@ -832,12 +865,12 @@ details.xc-sec > summary { cursor: pointer; }
 .nav-kid.add { color: var(--faint); }
 .nav-kid.add:hover { color: var(--accent); }
 .chip.mark { color: var(--amber); background: var(--amber-soft); }
-#acts .chip.mark { margin: 0; white-space: nowrap; flex: none; cursor: pointer; border: 0; display: inline-flex; align-items: center; gap: 6px; }
-#acts .chip.mark .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.page-acts .chip.mark { margin: 0; white-space: nowrap; flex: none; cursor: pointer; border: 0; display: inline-flex; align-items: center; gap: 6px; }
+.page-acts .chip.mark .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
 #crumbs { min-width: 0; }
 #top #env { margin-left: 2px; }
-@media (max-width: 1280px) { #acts .chip.mark .t { display: none; } #acts .chip.mark { padding: 0 7px; line-height: 22px; } }
-#acts .icon-btn { padding: 0 8px; letter-spacing: 1px; }
+@media (max-width: 1280px) { .page-acts .chip.mark .t { display: none; } .page-acts .chip.mark { padding: 0 7px; line-height: 22px; } }
+.page-acts .icon-btn { padding: 0 8px; letter-spacing: 1px; }
 /* the plan the game has, when there are several plans: a small green dot by its name */
 .ingame-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 .plan-pop .label { padding: 10px 16px 2px; }

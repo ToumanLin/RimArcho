@@ -376,6 +376,18 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   bar closed) in at most 3 presses, checked on every page of both interfaces (G5, T20). In the
   window, a row menu or ⋯ menu opened with the mouse now closes with `esc`, and `esc` on the
   rows of the editor or Mod 库存 clears and closes an open filter bar in one press.
+- The sidebar shows and hides like magpie's: expanded, a 48 px icon rail (labels as tooltips;
+  the highlight, 能不能跑's badge and the running game stay on the icons), or hidden. The
+  window's width picks it (≥ 920 px your choice, kept in `ui.gui.nav`; 640–919 the rail;
+  narrower hidden); there the toggle opens the full sidebar over the page, closed by `esc`, a
+  click outside or picking a page. The toggle heads the sidebar; `ctrl+b` does the same.
+- The top bar has no buttons on any page, only the breadcrumb and the environment chip. Page
+  actions sit at the right end of the page's description line; the plan editor has that line
+  too ("启用了 34 个，按游戏加载的顺序") with its undo, import / export, build a pack, write to the
+  game, ⋯ and 启动游戏.
+- In the window, the editor's 启动游戏 (button, `L`, the palette's 启动) opens the 启动 page with
+  the current plan applied and the focus on ▶ 启动游戏; `L` or enter there starts the game. The
+  TUI's `L` and the CLI / MCP `launch` still launch at once.
 
 ### Memory (07 §8.3)
 - 设置 › 界面 has GPU 加速 (`config set ui.gpu on|off`, default on). Off draws the window in

@@ -44,6 +44,8 @@ export function homeKey(e) {
     return;
   }
   if (k === "Home" || k === "End") { e.preventDefault(); if (rows.length) setCur(k === "Home" ? 0 : rows.length - 1); return; }
+  // enter on the focused launch button (focusLaunch) launches, as clicking it does
+  if (k === "Enter" && document.activeElement && document.activeElement.matches(".hm-launch .btn.launch")) { e.preventDefault(); document.activeElement.click(); return; }
   if (k === "Enter") { e.preventDefault(); if (rows[cur]) act(rows[cur]); return; }
   if (k !== "L" && !(k === "l" && e.shiftKey)) return;
   const r = featured();
@@ -55,6 +57,20 @@ export function homeKey(e) {
 export function hintList() {
   return [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("apply / edit") }, { key: "L", label: T("launch") },
     { key: "shift+1–7", label: T("pages") }, { key: "?", label: T("all keys") }];
+}
+
+// focusLaunch is the editor's 启动游戏 (06 §2.5): the current plan becomes the applied row
+// (it usually is; a pack applied here gives way) and the focus goes to ▶ 启动游戏, so L or
+// enter starts the game.
+export async function focusLaunch() {
+  if (!data) return;
+  const f = featured();
+  if (!f || f.kind !== "plan" || !f.current) {
+    const r = rows.find((x) => x.kind === "plan" && x.current);
+    if (r) await apply(r);
+  }
+  const b = document.querySelector(".hm-launch .btn.launch");
+  if (b) b.focus();
 }
 
 // liveChanged redraws the launch button when the game starts or stops.

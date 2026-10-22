@@ -81,20 +81,18 @@ function render() {
   renderHints();
 }
 
+// renderTop: the plan editor's description line, like every page's (06 §2.2, §2.5): how many
+// mods the plan enables; its actions sit at the right end of the line (renderWhere).
 function renderTop() {
   if (!S.board) return;
-  $("#btn-launch").textContent = T("launch") + " ▶";
-  $("#btn-launch").title = T("write the list to the game and start it") + " · L";
-  syncLaunch();
+  $("#planhead .lead").textContent = Tf("%d enabled, in the order the game loads them", col(1).items.length);
 }
 
-// syncLaunch: launch sits in the top bar on the plan only, and not while a game runs.
-function syncLaunch() {
-  const l = S.live || {};
-  $("#btn-launch").hidden = !!S.screen || !!l.running;
-  // another environment's game runs: one game at a time (08 §1)
-  $("#btn-launch").disabled = !!l.blocked;
-  $("#btn-launch").title = (l.blocked || T("write the list to the game and start it")) + " · L";
+// goLaunch is the editor's 启动游戏 (and its L): the game starts from 启动, so it opens that
+// page with the current plan applied and the focus on its launch button (06 §2.5).
+async function goLaunch() {
+  await go("home");
+  await homePage.focusLaunch();
 }
 
 // planActions: the plan's actions in the top bar (06 §2.5): undo, sort, build a pack, write
@@ -130,6 +128,10 @@ function planActions() {
     more.title = T("the plan: rename, copy, delete") + " · P";
     out.push(more);
   }
+  // 启动游戏 opens 启动, where the game starts (06 §2.5)
+  const l = btn(T("launch the game"), "L", goLaunch, "primary");
+  l.title = T("opens the launch page, where the game starts") + " · L";
+  out.push(l);
   return out;
 }
 
@@ -177,7 +179,7 @@ async function openPage(id) {
 // renderWhere: the position line (06 §3.2), the sidebar and the breadcrumb.
 function renderWhere() {
   shell.sync();
-  syncLaunch();
+  $("#planhead").hidden = !!S.screen;
   if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + T("undo") + "|" + JSON.stringify(S.shell && S.shell.plan), ...planActions());
   // A page's place is its breadcrumb; the position line says more only on the plan (where
   // the cursor is in which list) and in the full detail.
@@ -452,7 +454,9 @@ async function cmd(id) {
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
   switch (id) {
-    case "sort": case "save": case "launch": return run(id);
+    // from the editor, 启动 opens the launch page, as L does there (06 §2.5)
+    case "launch": return S.screen ? run(id) : goLaunch();
+    case "sort": case "save": return run(id);
     case "preview-sort": case "preview-save": case "preview-launch": return preview(id.slice(8));
     case "undo": case "redo": case "restore-all": case "stage-all": return verb(id);
     case "rescan":
@@ -676,6 +680,10 @@ function onKey(e) {
   const k = e.key;
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
   if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
+  // the sidebar's pane over the page closes with esc (06 §2.1)
+  if (k === "Escape" && !S.popup && shell.closeOver()) { e.preventDefault(); return; }
+  // ctrl+b shows / hides the sidebar, on every page (06 §2.1, magpie's pane toggle)
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "b") { e.preventDefault(); shell.toggleNav(); return; }
   if (pop.popupKey(e)) return;
   if (document.activeElement && document.activeElement.tagName === "INPUT") return;
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
@@ -760,7 +768,7 @@ function onKey(e) {
   const map = {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
     g: () => verb("tags"), n: () => verb("note"), Enter: () => verb("full"), x: () => verb("swap"),
-    S: () => run("sort"), w: () => run("save"), L: () => run("launch"), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
+    S: () => run("sort"), w: () => run("save"), L: () => goLaunch(), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
     E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
@@ -854,7 +862,6 @@ async function start() {
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
   // a detail's 在变化页查看全部: 变化 with only that mod's Lineage (06 §2.9)
   document.addEventListener("changes-of", async (e) => { shell.navigated(); await scr.changes(e.detail); renderWhere(); renderHints(); });
-  $("#btn-launch").onclick = () => run("launch");
   // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {
     const b = e.target.closest(".head [data-cmd]");
@@ -915,7 +922,6 @@ async function pollLive() {
     const was = !!(S.live && S.live.running);
     S.live = l;
     shell.renderLive();
-    syncLaunch();
     if (JSON.stringify(l.items) !== before) { scr.liveChanged(); shell.sync(); }
     if (l.running) scr.logLive();
     if (was !== !!l.running) homePage.liveChanged();
