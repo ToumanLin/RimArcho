@@ -11,27 +11,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-const helpText = `the arrows only move: the cursor, the focus, the scroll; keys that change things act at once, u undoes
-areas      1 Disabled  2 Enabled  3 Staging  4 detail      ←→ the next area    tab round all areas
-  ↑↓ j k   cursor (in the detail: scroll)    PgUp PgDn  scroll the detail from anywhere   g G  top / bottom
-selection  shift+↑↓ a range    ctrl+space (v) add or remove one    esc clear    (another list clears it)
-verbs, on the selection or else the cursor's mod:
-  space    enable where the order wants it / disable / put back from staging
-  t        stage; in Staging: put back where it was     T  put everything back from staging
-  m        move to…: a number, a mod's name (tab: before / after), enter alone = the suggested place
-  J K      move down / up one     alt+J alt+K  ten
-  #        tags                   enter  details full screen (←→ previous / next mod, tab sub-sections, I technical pages)
-  o        Workshop page          i  technical information     x  swap for another copy    r  add a rule
-  ctrl+o   open the folder        ctrl+w  Workshop page    C  this mod's changes (the 变化 page, only its copies)
-  S        sort                   w  save to the game    L  launch the game    (ctrl+k 预览… shows the dry run)
-  u ctrl+r undo / redo           e  export the list (import: ctrl+k import a list)
-/          search the focused list; tab takes it to the next list with matches; esc clears
-!          needs attention        c  recent changes (every mod)     R  rescan     E  switch environment     P  plans (switch, new, rename, delete)
-< > =      column width (= resets)    z  wrap names    [ ]  switch list (narrow)
-ctrl+k     command palette        :  run an archo command      ?  this help    q  quit
-mouse: click moves the cursor; ctrl+click adds or removes one; shift+click selects a range;
-the wheel scrolls the detail; drag a column gap to resize it`
-
 // idleAfter is how long the TUI waits without input before returning freed memory to the
 // OS, so the resident size stays near the live heap while idle (06 §3.5 T5).
 const idleAfter = 2 * time.Second
@@ -206,8 +185,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		m.quitting = true
 		return tea.Quit
 	case "?":
-		m.openPanel(T("all keys"), T(helpText))
-		return nil
+		return m.helpPage()
 	case ":":
 		m.prompt = &prompt{label: T("archo command: "), submit: func(m *model, text string) tea.Cmd {
 			argv := strings.Fields(text)
@@ -231,6 +209,13 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.choosePlan()
 	case "R":
 		return m.startScan()
+	case "tab":
+		return m.subPage(1)
+	case "shift+tab":
+		return m.subPage(-1)
+	}
+	if n, ok := navKeys[s]; ok && !(m.tab == tabList && m.detailFocus) {
+		return m.goPage(n)
 	}
 	switch m.tab {
 	case tabProblems:
@@ -291,22 +276,26 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.selExtend(-1)
 	case "shift+down":
 		return m.selExtend(1)
-	case "home", "g":
+	case "home":
 		return m.moveCursor(-len(c.view))
-	case "end", "G":
+	case "end":
 		return m.moveCursor(len(c.view))
 	case "pgup":
-		return m.scrollDetail(-m.detailPage())
+		return m.moveCursor(-m.detailPage()) // the list's cursor, a page (06 §3.3)
 	case "pgdown":
-		return m.scrollDetail(m.detailPage())
+		return m.moveCursor(m.detailPage())
+	case "ctrl+a":
+		return m.selectAll()
+	case "g":
+		return m.tagKey()
+	case "n":
+		return m.noteKey()
+	case "delete":
+		return m.delKey(m.editorOps(), m.runEditorOp)
 	case "left", "h":
 		return m.areaStep(-1)
 	case "right", "l":
 		return m.areaStep(1)
-	case "tab":
-		return m.areaCycle(1)
-	case "shift+tab":
-		return m.areaCycle(-1)
 	case "1", "2", "3", "4":
 		return m.goArea(int(s[0] - '0'))
 	case "[":
@@ -338,9 +327,6 @@ func (m *model) listKey(s string) tea.Cmd {
 		return nil
 	case "ctrl+@", "ctrl+ ", "v":
 		return m.selToggle()
-	case "!":
-		m.tab = tabProblems
-		return m.ensureProblems()
 	case "c":
 		return m.openChangesOf("", "")
 	case "e":
@@ -353,8 +339,6 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.space()
 	case "t":
 		return m.stageKey()
-	case "#":
-		return m.tagKey()
 	case "T":
 		n := len(m.cols[cStaging].items)
 		if n == 0 {
@@ -382,10 +366,10 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.listAction(view.ListSort)
 	case "w":
 		return m.listAction(view.ListSave)
-	case "u":
+	case "u", "ctrl+z":
 		m.act(T("undid the last change"), "undo")
 		return m.requestDetail()
-	case "ctrl+r":
+	case "ctrl+r", "ctrl+y":
 		m.act(T("redid the change"), "redo")
 		return m.requestDetail()
 	case "L":
@@ -401,8 +385,6 @@ func (m *model) listKey(s string) tea.Cmd {
 			return tea.Batch(m.requestDetail(), m.loadFullSecs())
 		}
 		return nil
-	case "o":
-		return m.openWorkshop()
 	case "ctrl+o":
 		if it := c.cur(); it != nil {
 			return m.openFolderOf(it.id)
@@ -605,7 +587,12 @@ func (m *model) panelKey(s string) tea.Cmd {
 		p.off = min(p.off+page, max(len(p.lines)-page, 0))
 	case "pgup":
 		p.off = max(p.off-page, 0)
-	case "esc", "q", "enter":
+	case "enter":
+		m.panel = nil
+		if p.onEnter != nil {
+			return p.onEnter(m)
+		}
+	case "esc", "q":
 		m.panel = nil
 	}
 	return nil

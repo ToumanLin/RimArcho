@@ -56,6 +56,8 @@ type panel struct {
 	choices []string // chooser values (env names)
 	choice  int
 	onPick  func(m *model, value string) tea.Cmd
+	// onEnter: enter runs it (a confirmation: the dry run is the text, 06 §6)
+	onEnter func(m *model) tea.Cmd
 }
 
 // prompt is an input line: ":" command line, "m" move target, "r" rule.
@@ -116,6 +118,8 @@ type model struct {
 	boardSeq int
 	barCache *view.BarFilter
 	barKey   string
+	libCache *app.Library // the library as of board build libAt (the rows' ops)
+	libAt    int
 
 	liveTr view.LiveTracker
 	live   *view.Live // the running game (06 §2.1); nil until the first poll

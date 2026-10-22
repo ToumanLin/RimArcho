@@ -48,8 +48,8 @@ func keyLatency(t *testing.T, m *model) map[string][]time.Duration {
 		for i := 0; i < 10; i++ {
 			step("page", key("pgdown"))
 		}
-		step("ends", key("G"))
-		step("ends", key("g"))
+		step("ends", key("end"))
+		step("ends", key("home"))
 		step("filter", key("/"))
 		for _, r := range "harmony" {
 			step("filter", key(string(r)))

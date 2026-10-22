@@ -155,7 +155,7 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			return nil
 		}
 	case "help":
-		return func(m *model) tea.Cmd { m.openPanel(T("help"), T(helpText)); return nil }
+		return func(m *model) tea.Cmd { return m.helpPage() }
 	case "quit":
 		return func(m *model) tea.Cmd { m.quitting = true; return tea.Quit }
 	}

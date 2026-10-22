@@ -175,7 +175,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
 		t.Fatalf("after space: %s", got)
 	}
-	keys(tm, "esc", "l", "g", "down", "J") // to Enabled; move Alpha down one
+	keys(tm, "esc", "l", "home", "down", "J") // to Enabled; move Alpha down one
 	waitFor(t, tm, "Alpha is now number 3")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
 		t.Fatalf("after J: %s", got)
@@ -272,13 +272,13 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			check("start")
 			// Staging is reachable at every width: focus it (it takes the first slot when
 			// hidden), stage a mod from "enabled", put it back.
-			press(m, "tab") // Enabled → Staging
+			press(m, "right") // Enabled → Staging
 			if m.focus != cStaging || !m.layout().has(cStaging) {
 				t.Fatalf("staging not shown when focused: %+v", m.layout())
 			}
 			check("staging focused")
 			press(m, "h")
-			press(m, "g")
+			press(m, "home")
 			press(m, "down") // Alpha
 			press(m, "t")
 			if !strings.Contains(m.status, "staged Alpha") {
@@ -290,7 +290,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			}
 			// Not enabled: the CJK row, enable and disable again.
 			press(m, "h")
-			press(m, "G")
+			press(m, "end")
 			check("CJK row selected")
 			if it := m.current(); it == nil || !strings.HasPrefix(it.name, "中文") {
 				t.Fatalf("cursor on %+v", m.current())
@@ -299,7 +299,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			if got := activeNames(t, e); !strings.HasSuffix(got, "中文汉化补丁（简体）加长的名字用来测试截断") || m.focus != cInactive {
 				t.Fatalf("enable: %s, focus %d", got, m.focus)
 			}
-			for _, k := range []string{"l", "G", "space", "h"} { // Enabled, the last row, disable, back
+			for _, k := range []string{"l", "end", "space", "h"} { // Enabled, the last row, disable, back
 				press(m, k)
 			}
 			if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
@@ -309,7 +309,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			if m.focus != cInactive {
 				t.Fatalf("focus %d", m.focus)
 			}
-			press(m, "G")
+			press(m, "end")
 			for _, s := range m.layout().slots {
 				if s.kind != cInactive {
 					continue
@@ -350,7 +350,7 @@ func TestStagingT9(t *testing.T) {
 	e.MustRun("scan")
 	before := activeNames(t, e)
 	m := direct(t, e, 160, 40)
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // M01
 	for i := 0; i < 26; i++ {
 		if i%4 != 3 { // picks 20 of 26; ctrl+↓ moves the cursor alone (06 §3.4)
@@ -448,7 +448,7 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 	e.MustRun("env", "add", "second", "--game", other)
 	tm := start(t, e, scans, 120, 30)
 	waitFor(t, tm, " main ")
-	keys(tm, "g", "enter") // the full-screen detail, then I: the technical pages
+	keys(tm, "home", "enter") // the full-screen detail, then I: the technical pages
 	waitFor(t, tm, "ludeon.rimworld")
 	keys(tm, "I")
 	waitFor(t, tm, "package: ludeon.rimworld")
@@ -522,7 +522,7 @@ func TestNeedsView(t *testing.T) {
 	e.MustRun("disable", "pkg:brrainz.harmony")
 	tm := start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "contradict each other")
 	time.Sleep(300 * time.Millisecond)
 	fm := finish(t, tm)
@@ -539,7 +539,7 @@ func TestNeedsView(t *testing.T) {
 	// Second session: x on the cycle, space on the dependency.
 	tm = start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "contradict each other")
 	for i := 0; i < ci; i++ {
 		keys(tm, "down")
@@ -559,7 +559,7 @@ func TestNeedsView(t *testing.T) {
 	}
 	tm = start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "is not enabled")
 	fm3 := finish(t, tm)
 	m := direct(t, e, 140, 40)
@@ -634,7 +634,7 @@ func TestNeedsLogs(t *testing.T) {
 	e.HarmonyLogFixture()
 	scans := new(int)
 	tm := start(t, e, scans, 160, 50)
-	keys(tm, "!")
+	keys(tm, "@")
 	waitFor(t, tm, "last run")
 	time.Sleep(200 * time.Millisecond)
 	fm := finish(t, tm)

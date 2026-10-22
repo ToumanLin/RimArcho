@@ -79,11 +79,11 @@ var v3States = []v3State{
 	{"technical pages", func(m *model) { press(m, "2"); press(m, "enter"); press(m, "I") }},
 	{"search", func(m *model) { press(m, "1"); press(m, "/"); typeIn(m, "p0") }},
 	{"command palette", func(m *model) { m.update(tea.KeyMsg{Type: tea.KeyCtrlK}) }},
-	{"tags", func(m *model) { press(m, "2"); pressAll(m, "shift+down", "#") }},
+	{"tags", func(m *model) { press(m, "2"); pressAll(m, "shift+down", "g") }},
 	{"move to", func(m *model) { press(m, "2"); pressAll(m, "down", "m") }},
 	{"preview", func(m *model) { m.palRun("preview-sort")(m) }},
 	{"help", func(m *model) { press(m, "?") }},
-	{"needs attention", func(m *model) { press(m, "!") }},
+	{"needs attention", func(m *model) { press(m, "@") }},
 	{"recent changes", func(m *model) { press(m, "c") }},
 }
 
@@ -152,7 +152,7 @@ func TestT18TaskSteps(t *testing.T) {
 	// 2. Move a mod after another, 120 apart: m name enter.
 	press(m, "esc")
 	press(m, "2")
-	press(m, "g")
+	press(m, "home")
 	for m.current().name != "P003" {
 		press(m, "down")
 	}
@@ -165,7 +165,7 @@ func TestT18TaskSteps(t *testing.T) {
 		t.Fatalf("P003 at %d, P124 at %d", pos("P003"), pos("P124"))
 	}
 	// 3. Disable three mods that are not next to each other: moves, ctrl+space ×3, space.
-	press(m, "g")
+	press(m, "home")
 	n = 0
 	for _, name := range []string{"P010", "P020", "P030"} {
 		for m.current().name != name {
@@ -178,19 +178,22 @@ func TestT18TaskSteps(t *testing.T) {
 	if got := activeNames(t, e); strings.Contains(got, "P010") || strings.Contains(got, "P020") || strings.Contains(got, "P030") || !strings.Contains(got, "P011") {
 		t.Fatalf("after space: %s", got)
 	}
-	// 4. Read the current mod's description to the end: PgDn PgDn.
-	press(m, "g")
+	// 4. Read the current mod's description to the end: 4 PgDn PgDn (PgDn pages the list
+	// cursor, and the detail once it has the focus, 06 §3.3).
+	press(m, "home")
 	for m.current().name != "P001" {
 		press(m, "down")
 	}
 	runCmd(m, m.loadData(m.current().id, false, false))
 	m.View()
 	n = 0
+	key("4")
 	key2(tea.KeyPgDown)
 	m.View()
 	key2(tea.KeyPgDown)
 	out := ansi.Strip(m.View())
-	task("read the description", 2)
+	task("read the description", 3)
+	press(m, "esc")
 	if !strings.Contains(out, "technical information · i") || m.detailFocus || m.current().name != "P001" {
 		t.Fatalf("not at the end, or the focus moved (detail %v, %s):\n%s", m.detailFocus, m.current().name, out)
 	}
@@ -200,7 +203,7 @@ func TestT18TaskSteps(t *testing.T) {
 		press(m, "down")
 	}
 	n = 0
-	key("shift+down", "shift+down", "shift+down", "shift+down", "#", "right", "enter")
+	key("shift+down", "shift+down", "shift+down", "shift+down", "g", "right", "enter")
 	task("tag five", 7)
 	tagged := e.MustRun("list", "--filter", "tag:"+m.tagsDefault(1))
 	for _, name := range []string{"P040", "P041", "P042", "P043", "P044"} {
@@ -210,7 +213,7 @@ func TestT18TaskSteps(t *testing.T) {
 	}
 	// 6. Half of the list into staging: shift+↓ N times, t.
 	press(m, "esc")
-	press(m, "g")
+	press(m, "home")
 	n = 0
 	half := len(m.cols[cActive].items) / 2
 	for i := 0; i < half-1; i++ {
@@ -290,7 +293,7 @@ func TestT20EscBack(t *testing.T) {
 	e, _ := v3Fixture(t)
 	deep := []v3State{
 		{"selection + search", func(m *model) { pressAll(m, "shift+down", "/"); typeIn(m, "p") }},
-		{"detail + selection + tags", func(m *model) { pressAll(m, "shift+down", "4", "#") }},
+		{"detail + selection + tags", func(m *model) { pressAll(m, "shift+down", "4", "g") }},
 		{"detail + selection + move to", func(m *model) { pressAll(m, "shift+down", "4", "m") }},
 		{"full + selection + palette", func(m *model) {
 			pressAll(m, "shift+down", "enter")
@@ -327,7 +330,7 @@ func TestPositionInput(t *testing.T) {
 	e, m := v3Fixture(t)
 	pos := func(name string) int { return m.st.Position(idOf(t, m, name)) }
 	press(m, "2")
-	press(m, "g")
+	press(m, "home")
 	press(m, "down") // Alpha
 	press(m, "m")
 	typeIn(m, "5")
@@ -378,7 +381,7 @@ func TestPositionInput(t *testing.T) {
 	press(m, "esc")
 	// J K move by one, alt+J by ten.
 	press(m, "2")
-	press(m, "g")
+	press(m, "home")
 	for m.current().name != "Harmony" {
 		press(m, "down")
 	}

@@ -678,8 +678,8 @@ func openURL(u string) error {
 func (m *model) fullKey(s string) tea.Cmd {
 	page := max(m.h-6, 1)
 	switch s {
-	case "esc", "q", "backspace":
-		m.full = false // the cursor is on the last mod shown
+	case "esc", "q", "backspace", "enter":
+		m.full = false // the cursor is on the last mod shown (enter opens and closes, 06 §3.5)
 		return m.requestDetail()
 	case "down", "j":
 		m.fullOff++
@@ -693,9 +693,9 @@ func (m *model) fullKey(s string) tea.Cmd {
 	case "pgup":
 		m.fullOff -= page
 		m.syncFullSec()
-	case "home", "g":
+	case "home":
 		m.fullOff, m.fullSec = 0, 0
-	case "end", "G":
+	case "end":
 		m.fullOff = 1 << 30
 		m.syncFullSec()
 	case "left", "h", "right", "l":
@@ -739,10 +739,18 @@ func (m *model) fullKey(s string) tea.Cmd {
 			m.say(sayBusy, T("fetching the Workshop page…"))
 			return m.loadData(it.id, true, true)
 		}
-	case "o":
-		return m.openWorkshop()
-	case "#":
+	case "ctrl+o":
+		if it := m.current(); it != nil {
+			return m.openFolderOf(it.id)
+		}
+	case "ctrl+w":
+		if it := m.current(); it != nil {
+			return m.openWorkshopID(m.workshopOf(it.id))
+		}
+	case "g":
 		return m.tagKey()
+	case "n":
+		return m.noteKey()
 	case "I":
 		if it := m.current(); it != nil && it.id != "" {
 			m.insp, m.inspHist = nil, nil
@@ -794,10 +802,14 @@ func (m *model) detailKey(s string) (tea.Cmd, bool) {
 		m.detailOff++
 	case "up", "k":
 		m.detailOff = max(m.detailOff-1, 0)
-	case "home", "g":
+	case "home":
 		m.detailOff = 0
-	case "end", "G":
+	case "end":
 		m.detailOff = 1 << 30
+	case "pgdown":
+		m.detailOff += m.detailPage() // PgUp PgDn scroll the detail only while it has the focus
+	case "pgup":
+		m.detailOff = max(m.detailOff-m.detailPage(), 0)
 	case "left", "h", "esc":
 		m.detailFocus = false
 	case "right", "l", "shift+up", "shift+down":
