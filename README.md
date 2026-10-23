@@ -1,6 +1,6 @@
 # RimArcho
 
-<img src="docs/assets/rimarcho.svg" width="96" alt="RimArcho icon: a stone arch with an amber keystone">
+<img src="docs/assets/rimarcho.svg" width="96" alt="RimArcho icon: Archo chan">
 
 A one-stop RimWorld launcher that understands its players. Pick your mods, put them in order, check
 that the game will run, launch it, and find out why when something breaks, all in one place. It is
@@ -41,12 +41,17 @@ What it knows about your installation:
   dependency or mentioned) together with the evidence, the file and line, and the next step.
 - **Code.** It decompiles assemblies on demand with ilspycmd and caches the result per DLL hash.
 
-RimArcho never writes to the game, Workshop or `Mods/` folders, with two exceptions that you ask for
-yourself: `save` (ModsConfig.xml) and `copy-local` (a new folder in `Mods/`). When you enable a mod
+Requested actions write game files: `save` writes ModsConfig.xml and `copy-local` creates a new
+folder in `Mods/`. When you enable a mod
 from a SteamCMD or extra folder, `save` also links it into `Mods/` as `_Archo_<source>_<folder>` (a
 junction, no admin rights needed) and removes that link once you disable it. It only creates and
 deletes links with that prefix and never writes into their targets. Its own data lives in
 `%APPDATA%\RimArcho\`.
+
+Switching environments also prepares missing links needed by the destination's mod list
+before scanning it: shared mods such as Archo Monitor, and local mods from the previous
+environment. Local links use `_Archo_env_<instance>` and stay installed across plan changes.
+Existing local copies are kept; switching does not write ModsConfig.xml.
 
 ## Install
 
