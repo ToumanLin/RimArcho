@@ -16,7 +16,7 @@ export const S = {
   popup: null,  // the open popup (06 §3.1 rule 5)
   screen: null, // "needs" | "changes" | "full"
   screenSeq: 0, // late reads from a page that was left must not reopen it
-  busy: {},     // scan, analyze
+  busy: {},     // scan, analyze, env
   packBuild: null, // the last "pack" event of the build this window runs
   live: null,   // Live(): the running game and its errors (06 §2.1)
   history: null, // History(): unsaved steps and versions (06 §2.5)
@@ -56,7 +56,7 @@ export function say(kind, text, undo = false) {
   statusIn(s);
 }
 export function clearSay() {
-  if (!S.busy.scan && !S.busy.analyze) say("", "");
+  if (!S.busy.scan && !S.busy.analyze && !S.busy.env) say("", "");
 }
 
 // ---- columns ----

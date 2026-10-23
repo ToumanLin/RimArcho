@@ -114,10 +114,19 @@ var companionFor = struct {
 // quick. live, when it follows path, supplies the companion section as read so far.
 func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTracker) (*LogPage, error) {
 	p := &LogPage{Files: LogFiles(a, st)}
+	matched := false
 	for _, f := range p.Files {
-		if f.Of != "" && strings.EqualFold(f.Path, path) {
-			path = f.Of
+		if strings.EqualFold(f.Path, path) {
+			matched = true
+			if f.Of != "" {
+				path = f.Of
+			}
+			break
 		}
+	}
+	// A previous environment's selection must not override this environment's logs.
+	if !matched {
+		path = ""
 	}
 	if path == "" && len(p.Files) > 0 {
 		path = p.Files[0].Path

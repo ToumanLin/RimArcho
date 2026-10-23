@@ -34,6 +34,11 @@ func (s *API) pageReader() (*app.App, error) {
 func (s *API) logSession() (*app.App, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if e, err := s.a.Env(); err != nil {
+		return nil, err
+	} else if s.board != nil && s.board.St != nil && s.board.St.Ix.Env.ID != e.ID {
+		s.board, s.logLinks, s.logPath = nil, nil, ""
+	}
 	st := s.boardState()
 	if st == nil {
 		return nil, errors.New("no list")

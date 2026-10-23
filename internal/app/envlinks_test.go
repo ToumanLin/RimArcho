@@ -9,7 +9,10 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -173,4 +176,153 @@ func TestEnvUseScansExistingDestinationWithoutNewLinks(t *testing.T) {
 	if got := active(t, e); !slices.Equal(got, []string{"Core", "Only Here"}) {
 		t.Fatalf("existing destination mod is missing before its first scan: %v", got)
 	}
+}
+
+func TestEnvUseMonitorKeepsSharedIdentityAcrossSwitches(t *testing.T) {
+	e, _ := envLinksFixture(t)
+	monitorID := refID(t, e, monName, source.Extra)
+	for _, name := range []string{"other", "main", "other", "main", "other"} {
+		e.MustRun("env", "use", name)
+		st, err := e.App.Loadout()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var enabled string
+		for _, entry := range st.List {
+			if app.IsMonitor(st.Ix.ByID[entry.Instance]) {
+				enabled = entry.Instance
+			}
+		}
+		if enabled != monitorID {
+			t.Fatalf("%s selected Monitor #%s instead of shared #%s", name, enabled, monitorID)
+		}
+		m := st.Ix.ByID[monitorID]
+		if m == nil || m.Status != identity.Live || !st.Reg.Loadable(monitorID) {
+			t.Fatalf("%s cannot load shared Monitor: %+v", name, m)
+		}
+		e.MustRun("save")
+		link := filepath.Join(st.Ix.Env.GameRoot, "Mods", app.DeployName(m))
+		if !source.IsLink(link) {
+			t.Fatalf("%s save removed Monitor's link", name)
+		}
+		scanNow(t, e)
+	}
+	aliases, err := e.App.Store.Aliases(monitorID)
+	if err != nil || len(aliases) != 2 {
+		t.Fatalf("scanning one environment lost the other's Monitor alias: %+v, %v", aliases, err)
+	}
+	st, _ := e.App.Loadout()
+	link := filepath.Join(st.Ix.Env.GameRoot, "Mods", app.DeployName(st.Ix.ByID[monitorID]))
+	if err := source.RemoveLink(link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.ScanWith(app.ScanOptions{GameOnly: true}); err != nil {
+		t.Fatal(err)
+	}
+	aliases, err = e.App.Store.Aliases(monitorID)
+	if err != nil || len(aliases) != 1 || aliases[0].SourceID == sourcesOf(t, e)["local"].ID {
+		t.Fatalf("partial scan did not remove just the vanished alias: %+v, %v", aliases, err)
+	}
+	e.MustRun("save")
+	if !source.IsLink(link) {
+		t.Fatal("saving did not restore the missing Monitor link")
+	}
+}
+
+func TestGameOnlyScanKeepsLinkedWorkshopMetadata(t *testing.T) {
+	e := setup(t, false)
+	target := e.AddWorkshop("1011", testkit.Sample("tester.linked", "Linked"))
+	e.Junction(filepath.Join(e.Game, "Mods", "_Link_1011"), target)
+	scanNow(t, e)
+	before := one(t, e, "Linked")
+	r, err := e.App.ScanWith(app.ScanOptions{GameOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := one(t, e, "Linked")
+	if after.ID != before.ID || after.Kind != source.Workshop || after.ACFManifest != before.ACFManifest || after.ACFSize != before.ACFSize || after.Residue != before.Residue {
+		t.Fatalf("partial scan changed the linked Workshop instance: before %+v; after %+v", before, after)
+	}
+	for _, s := range r.Stats.Sources {
+		if s.Kind == string(source.Workshop) {
+			t.Fatal("game-only scan enumerated the Workshop folder")
+		}
+	}
+}
+
+func TestEnvUseRepairsLegacyLocalMonitorReferences(t *testing.T) {
+	for _, status := range []string{identity.Live, identity.Tombstone} {
+		t.Run(status, func(t *testing.T) {
+			e, g2 := envLinksFixture(t)
+			monitorID := refID(t, e, monName, source.Extra)
+			e.MustRun("env", "use", "other")
+			st, err := e.App.Loadout()
+			if err != nil {
+				t.Fatal(err)
+			}
+			m := st.Ix.ByID[monitorID]
+			legacyID := e.App.NewID()
+			local := sourcesOf(t, e)["local"]
+			// Reproduce the record created by the old game-only scan. The same
+			// directory has a second identity, selected by its environment's plans.
+			if _, err := e.App.Store.DB.Exec(`INSERT INTO instance(id,environment_id,lineage_id,source_id,rel_path,real_path,status,current_snapshot_id,first_seen,last_seen)
+				VALUES(?,?,?,?,?,?,?,?,?,?)`, legacyID, st.Ix.Env.ID, m.LineageID, local.ID, app.DeployName(m), m.RealPath, status, m.SnapID, m.FirstSeen.Unix(), m.LastSeen.Unix()); err != nil {
+				t.Fatal(err)
+			}
+			list := st.List.Clone()
+			list[list.Index(monitorID)] = loadout.Entry{Instance: legacyID}
+			st.WS.Entries = list.Encode()
+			if err := e.App.Store.SetWorkspace(st.WS); err != nil {
+				t.Fatal(err)
+			}
+			if err := e.App.Store.PushStep(st.Plan.ID, "undo", list.Encode(), "legacy Monitor"); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := e.App.Store.AddVersion(st.Plan.ID, &store.Version{Created: e.Now(), Source: "save", Entries: list.Encode()}); err != nil {
+				t.Fatal(err)
+			}
+			link := filepath.Join(g2, "Mods", app.DeployName(m))
+			if err := source.RemoveLink(link); err != nil {
+				t.Fatal(err)
+			}
+			e.MustRun("env", "use", "main")
+			e.MustRun("env", "use", "other")
+			st, err = e.App.Loadout()
+			if err != nil || st.List.Index(monitorID) < 0 || st.List.Index(legacyID) >= 0 || !st.Reg.Loadable(monitorID) {
+				t.Fatalf("legacy Monitor did not heal: %+v, %v", st, err)
+			}
+			if old, err := e.App.Store.Mod(legacyID); err != nil || old != nil {
+				t.Fatalf("duplicate local Monitor still exists: %+v, %v", old, err)
+			}
+			if err := e.App.Store.MergeLinkedInstances(map[string]string{legacyID: monitorID}); err != nil {
+				t.Fatalf("repeating the same repair failed: %v", err)
+			}
+			v, err := e.App.Store.LatestVersion(st.Plan.ID)
+			if err != nil || v == nil || loadout.Decode(v.Entries).Index(legacyID) >= 0 {
+				t.Fatalf("history still references local Monitor: %+v, %v", v, err)
+			}
+			e.MustRun("undo")
+			st, _ = e.App.Loadout()
+			if st.List.Index(monitorID) < 0 || st.List.Index(legacyID) >= 0 {
+				t.Fatal("undo resurrected the obsolete Monitor identity")
+			}
+			e.MustRun("save")
+			if !source.IsLink(link) || !sameTarget(t, link, m.RealPath) {
+				t.Fatal("repaired Monitor link did not survive save")
+			}
+		})
+	}
+}
+
+func sameTarget(t *testing.T, a, b string) bool {
+	t.Helper()
+	x, err := source.RealPath(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	y, err := source.RealPath(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.EqualFold(x, y)
 }

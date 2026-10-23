@@ -89,7 +89,7 @@ func insertFiles(tx *sql.Tx, snapID int64, files []scan.File) error {
 }
 
 // ApplyScan persists one reconciliation result in a single transaction.
-func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identity.Result) (err error) {
+func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identity.Result, scanned []string) (err error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
@@ -115,6 +115,17 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 	}
 	instEnv := map[string]string{}
 	snapOf := map[*identity.Assignment]int64{}
+	// Refresh aliases only in the sources actually enumerated. This also drops
+	// vanished links of shared instances that did not appear in this partial scan.
+	if len(scanned) > 0 {
+		args := make([]any, len(scanned))
+		for i, id := range scanned {
+			args[i] = id
+		}
+		if _, err = tx.Exec(`DELETE FROM instance_alias WHERE source_id IN (`+placeholders(len(scanned))+`)`, args...); err != nil {
+			return err
+		}
+	}
 	for _, a := range res.Assignments {
 		ob := a.Obs
 		instEnv[a.InstanceID] = srcEnv[ob.Loc.SourceID]
@@ -167,9 +178,6 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 			}
 		}
 		snapOf[a] = snapID
-		if _, err = tx.Exec(`DELETE FROM instance_alias WHERE instance_id=?`, a.InstanceID); err != nil {
-			return err
-		}
 		for _, al := range ob.Aliases {
 			if _, err = tx.Exec(`INSERT OR REPLACE INTO instance_alias(instance_id, source_id, rel_path, real_path) VALUES(?,?,?,?)`,
 				a.InstanceID, al.SourceID, al.Rel, ob.RealPath); err != nil {

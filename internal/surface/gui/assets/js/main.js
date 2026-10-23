@@ -25,6 +25,7 @@ import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
 import * as tex from "./textures.js";
+import { withEnvironmentSwitch } from "./environment.js";
 
 // ---- loading ----
 
@@ -44,6 +45,7 @@ async function reload() {
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
   render();
   detailFollow();
+  await scr.logEnvironmentChanged();
 }
 
 let detailKey = "";
@@ -501,11 +503,23 @@ async function cmd(id) {
 async function chooseEnv() {
   const envs = (S.board && S.board.envs) || [];
   if (!envs.length) return say("", T("no environments (archo env add)"));
-  pop.choose(T("switch environment"), envs, async (i) => {
-    try { say("ok", await api.UseEnv(envs[i])); } catch (e) { say("fail", errText(e)); }
-    for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
-    await reload();
-  }, Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove environment"), run: (i) => scr.removeEnv(envs[i]) });
+  pop.choose(T("switch environment"), envs, (i) => useEnv(envs[i]),
+    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove environment"), run: (i) => scr.removeEnv(envs[i]) });
+}
+
+async function useEnv(name, refresh) {
+  try {
+    return await withEnvironmentSwitch(name, async () => {
+      const text = await api.UseEnv(name);
+      for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
+      await reload();
+      if (refresh) await refresh();
+      say("ok", text);
+    });
+  } catch (e) {
+    say("fail", errText(e));
+    return false;
+  }
 }
 
 function commandLine() {
@@ -520,8 +534,7 @@ async function paletteChoice(o) {
   if (o.kind === 0) return cmd(o.id);
   if (o.kind === 3) return go(o.id);
   if (o.kind === 2) {
-    try { say("ok", await api.UseEnv(o.id)); } catch (e) { say("fail", errText(e)); }
-    return reload();
+    return useEnv(o.id);
   }
   // a mod: go to its list and row; a filter that hides it is cleared (06 §3.5)
   for (const k of [1, 0, 2]) {
@@ -697,6 +710,7 @@ async function delKey() {
 // ---- the keyboard ----
 
 function onKey(e) {
+  if (S.busy.env) { e.preventDefault(); return; }
   if (e.isComposing) return;
   const k = e.key;
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
@@ -854,7 +868,7 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go,
+  reload, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),

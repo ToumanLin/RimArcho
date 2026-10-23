@@ -226,7 +226,7 @@ func (s *Store) Known(envID string) ([]*identity.Known, error) {
 	}
 	out := make([]*identity.Known, 0, len(mods))
 	for _, m := range mods {
-		k := &identity.Known{ID: m.ID, LineageID: m.LineageID, SourceID: m.SourceID, Kind: m.Kind, Label: m.SourceLabel, Rel: m.Rel, Status: m.Status}
+		k := &identity.Known{ID: m.ID, LineageID: m.LineageID, SourceID: m.SourceID, Kind: m.Kind, Label: m.SourceLabel, Rel: m.Rel, RealPath: m.RealPath, Status: m.Status}
 		if m.SnapID != 0 {
 			sn := &identity.Snap{ID: m.SnapID, Decl: m.Decl(), WorkshopID: m.WorkshopID(), ACFManifest: m.ACFManifest, GitHead: m.GitHead}
 			copy(sn.Hash[:], m.SnapHash)

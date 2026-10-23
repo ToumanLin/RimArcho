@@ -11,6 +11,7 @@ import { S, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, changesPlan } from "./screens.js";
 import { icon } from "./icons.js";
 import { launchPack } from "./packs.js";
+import { withEnvironmentSwitch } from "./environment.js";
 
 let ui = null;
 export function initHome(u) {
@@ -211,10 +212,17 @@ function problem(r) {
 
 // apply: 应用 (06 §2.3) — the row becomes the applied one, at the top.
 async function apply(r) {
-  try { say("ok", await api.HomeApply(r.kind, r.envName, r.plan || 0, r.kind === "pack" ? r.name : "")); } catch (e) { return say("fail", errText(e)); }
-  cur = 0;
-  await ui.reload();
-  await home();
+  const run = async () => {
+    const text = await api.HomeApply(r.kind, r.envName, r.plan || 0, r.kind === "pack" ? r.name : "");
+    cur = 0;
+    await ui.reload();
+    await home();
+    say("ok", text);
+  };
+  try {
+    if (r.otherEnv) await withEnvironmentSwitch(r.envName, run);
+    else await run();
+  } catch (e) { say("fail", errText(e)); }
 }
 
 // activity: the last game (only once there was one) and the current plan's changes since

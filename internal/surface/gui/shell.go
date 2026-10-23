@@ -105,6 +105,7 @@ func (s *API) HomeApply(kind, envName string, plan int64, pack string) (string, 
 			return "", err
 		}
 		s.needs, s.board = nil, nil
+		s.logLinks, s.logPath = nil, ""
 	}
 	if kind == view.RowPlan {
 		_, t, err := view.UsePlan(s.a, plan)

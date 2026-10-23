@@ -968,6 +968,9 @@ func (s *API) UseEnv(name string) (string, error) {
 	defer s.mu.Unlock()
 	s.a.EnvName = ""
 	_, err := s.a.EnvUse(name)
+	if err == nil {
+		s.board, s.logLinks, s.logPath = nil, nil, ""
+	}
 	s.needs = nil
 	return s.text(view.Tf("switched to %s", name), err)
 }

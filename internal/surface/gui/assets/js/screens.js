@@ -382,7 +382,7 @@ export function analyzeEvent(ev) {
 // ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
-const L = { path: "", page: null, loading: false, pending: "", error: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "", list: null };
+const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "", list: null };
 // of: only this mod's Lineage ({id, name}), from a detail's history; null every mod.
 const C = { page: null, cur: 0, items: [], els: [], open: new Set(), raw: new Map(), of: null, library: false };
 
@@ -409,8 +409,29 @@ function logPage(name, title, ...right) {
   return w;
 }
 
+// Called by every board reload, including home-page applies and external switches.
+// A shared file path can contain different attribution in a different environment.
+function syncLogEnvironment() {
+  const env = S.board?.env || "";
+  if (L.env === env) return false;
+  L.env = env;
+  L.seq++;
+  L.list?.destroy(); L.list = null;
+  clearTimeout(detailTimer);
+  L.path = ""; L.page = null; L.loading = false; L.pending = ""; L.error = "";
+  L.cur = 0; L.mcur = 0; L.tab = 0; L.want = ""; L.els = [];
+  L.detail.clear(); L.open.clear();
+  return true;
+}
+
+export async function logEnvironmentChanged() {
+  if (syncLogEnvironment() && S.screen === "log") await gameLog("", true);
+}
+
 // gameLog shows the page immediately; late responses cannot reopen it after navigation.
-export async function gameLog(path = L.path, open = false) {
+export async function gameLog(path, open = false) {
+  const changed = syncLogEnvironment();
+  path = changed ? "" : path ?? L.path;
   const n = ++L.seq;
   if (!open && S.screen !== "log") return;
   L.error = "";
@@ -636,10 +657,10 @@ function toCluster(id) {
 // while the game runs).
 export async function logLive() {
   if (S.screen !== "log" || !L.page || !L.page.path) return;
-  const path = L.page.path, epoch = S.screenSeq;
+  const path = L.page.path, epoch = S.screenSeq, seq = L.seq;
   let m;
   try { m = await api.LogMonitor(path); } catch { return; }
-  if (!m || S.screen !== "log" || S.screenSeq !== epoch || L.page?.path !== path) return;
+  if (!m || S.screen !== "log" || S.screenSeq !== epoch || L.seq !== seq || L.page?.path !== path) return;
   if (JSON.stringify(m) === JSON.stringify(L.page.monitor)) return;
   L.page.monitor = m;
   drawGameLog();
@@ -675,12 +696,14 @@ function markLog(keepScroll) {
   box.append(shimmer(T("loading…"), 8));
   clearTimeout(detailTimer);
   L.want = k;
+  const env = L.env, seq = L.seq;
   detailTimer = setTimeout(async () => {
     const path = L.page.path;
     let lines, card = null;
     try {
       [lines, card] = await Promise.all([api.LogCluster(path, id), api.LogPattern(path, id).catch(() => null)]);
     } catch (e) { lines = [errText(e)]; }
+    if (L.env !== env || L.seq !== seq) return;
     L.detail.set(k, { lines, card });
     if (S.screen === "log" && L.want === k) showLines($("#screen .detail-card .scroll"), lines, card);
   }, 90);
@@ -1177,12 +1200,7 @@ export async function environment() {
     row.append(l);
     if (e.current) row.append(el("span", "chip cur", T("in use")));
     else {
-      row.append(button(T("use this one"), "", async () => {
-        try { say("ok", await api.UseEnv(e.name)); } catch (err) { say("fail", errText(err)); }
-        for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
-        await ui.reload();
-        environment();
-      }));
+      row.append(button(T("use this one"), "", () => ui.useEnv(e.name, environment)));
     }
     row.append(button(T("remove environment"), "", () => removeEnv(e.name), "quiet"));
     card.append(row);

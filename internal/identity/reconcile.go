@@ -68,6 +68,7 @@ type Known struct {
 	Kind      source.Kind
 	Label     string
 	Rel       string
+	RealPath  string
 	Status    string
 	Snap      *Snap
 

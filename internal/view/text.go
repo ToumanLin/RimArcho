@@ -65,6 +65,8 @@ func T(s string) string {
 func Tf(f string, a ...any) string { return fmt.Sprintf(T(f), a...) }
 
 var zhText = map[string]string{
+	"switching to %s…":                      "正在切换到 %s…",
+	"loading the environment, please wait…": "正在载入环境，请稍候…",
 	// top bar, columns, status and hint lines (06 §7: short, verb first)
 	"no environment": "无环境",
 	// whole-list actions shared by both interfaces (view/preview.go)

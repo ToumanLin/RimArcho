@@ -50,11 +50,18 @@ func (a *App) loadIndex(e *env.Environment) (*Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	lins, err := a.Store.Lineages(e.ID)
+	srcs, err := a.Store.Sources(e.ID)
 	if err != nil {
 		return nil, err
 	}
-	srcs, err := a.Store.Sources(e.ID)
+	if repaired, err := a.repairSharedLinkInstances(mods, srcs); err != nil {
+		return nil, err
+	} else if repaired {
+		if mods, err = a.Store.Mods(e.ID); err != nil {
+			return nil, err
+		}
+	}
+	lins, err := a.Store.Lineages(e.ID)
 	if err != nil {
 		return nil, err
 	}
