@@ -86,7 +86,7 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 		saves.Choices = append([]string{app.SavesCustom}, saves.Choices...)
 		saves.ChoiceLabels = append([]string{T("a folder you chose")}, saves.ChoiceLabels...)
 	}
-	return []SettingGroup{{Title: T("game"), Items: []SettingItem{
+	return []SettingGroup{{Title: T("this game"), Items: []SettingItem{
 		{Label: T("game folder"), Value: e.GameRoot, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"},
 			Note: T("RimArcho checks that the mods are still the same before it moves them over")},
 		{Label: T("game version"), Value: version},

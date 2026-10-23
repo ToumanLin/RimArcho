@@ -91,7 +91,7 @@ func TestLibraryPage(t *testing.T) {
 	}
 	// filters and conditions
 	p = libPage(t, e, "", "used:none", "-source:local")
-	if p.Shown != 4 || len(p.Conds) != 2 || !p.Conds[1].Exclude || p.Conds[0].Label != "用在 不在任何方案里" {
+	if p.Shown != 4 || len(p.Conds) != 2 || !p.Conds[1].Exclude || p.Conds[0].Label != "用在 不在任何列表里" {
 		t.Errorf("filtered: shown %d conds %+v", p.Shown, p.Conds)
 	}
 	for _, g := range p.Groups {

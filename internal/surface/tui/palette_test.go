@@ -61,7 +61,7 @@ func TestPalette(t *testing.T) {
 	}
 	m.update(tea.KeyMsg{Type: tea.KeyCtrlU})
 	typeIn(m, "save")
-	if r := m.pal.results[0]; r.name != "保存到游戏" {
+	if r := m.pal.results[0]; r.name != "写入游戏" {
 		t.Fatalf("save: first result %q", r.name)
 	}
 	m.update(tea.KeyMsg{Type: tea.KeyEsc})

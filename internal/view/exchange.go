@@ -117,7 +117,7 @@ func fileExists(p string) bool {
 // FormatName is a list format as the player knows it.
 func FormatName(f string) string {
 	n := map[string]string{
-		app.FormatText: "text list", app.FormatModsConfig: "ModsConfig.xml", app.FormatSave: "save", app.FormatRML: "RimWorld mod list (.rml)",
+		app.FormatText: "text list", app.FormatModsConfig: "ModsConfig.xml", app.FormatSave: "save file", app.FormatRML: "RimWorld mod list (.rml)",
 		"rimcrow-modlist": "RimCrow ModList.xml", "rimcrow-json": "RimCrow JSON list", "rimcrow-share": "RimCrow share code",
 		"rimsort-json": "RimSort JSON list", "rimsort-text": "RimSort clipboard list", "rentry": "Rentry list", "collection": "Workshop collection",
 	}[f]

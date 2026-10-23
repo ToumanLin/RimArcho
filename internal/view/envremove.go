@@ -26,12 +26,12 @@ func EnvRemovalLines(r *app.EnvRemoval) []string {
 
 func init() {
 	Register(map[string]string{
-		"remove environment %s": "删除环境 %s",
-		"remove environment":    "删除环境",
-		"RimArcho forgets: %d plans, %d launch records, %d mods read from its Data/ and Mods/, its history": "RimArcho 忘掉：%d 个方案、%d 条启动记录、从它的 Data/ 和 Mods/ 读到的 %d 个 mod，以及它的历史",
+		"remove environment %s": "移除游戏 %s",
+		"remove environment":    "移除游戏",
+		"RimArcho forgets: %d plans, %d launch records, %d mods read from its Data/ and Mods/, its history": "RimArcho 忘掉：%d 个列表、%d 条启动记录、从它的 Data/ 和 Mods/ 读到的 %d 个 Mod，以及它的历史",
 		"stays: the game folder, every mod and save; the shared mod folders and what you noted on mods":     "保留：游戏文件夹、所有 mod 和存档；共享的 Mod 文件夹和你给 mod 记下的内容",
 		"then %s is in use":      "之后使用 %s",
-		"no environment is left": "之后不再有环境",
-		"removed environment %s": "已删除环境 %s",
+		"no environment is left": "之后不再有游戏",
+		"removed environment %s": "已移除游戏 %s",
 	})
 }

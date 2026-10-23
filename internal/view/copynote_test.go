@@ -24,8 +24,8 @@ func TestCopyNoteAutoEveryCopy(t *testing.T) {
 		{app.LibInstance{Source: app.LibWorkshop, Created: day, States: []string{app.LibResidue}}, "已退订，Steam 留下了文件夹，10 月 19 日首次发现"},
 		{app.LibInstance{Source: app.LibMonitor, Created: day}, "RimArcho 自带的伴生模组"},
 		{app.LibInstance{Source: app.LibWorkshop, States: []string{app.LibMissing}}, ""},
-		{app.LibInstance{Source: app.LibLocked, Created: day, Locked: &app.Locked{}, UpstreamUpdates: 3}, "该锁定版本创建于 10 月 19 日，自从创建后上游有 3 次更新"},
-		{app.LibInstance{Source: app.LibLocked, Created: day, Locked: &app.Locked{Upstream: &store.Mod{}}}, "该锁定版本创建于 10 月 19 日，自从创建后上游没有更新"},
+		{app.LibInstance{Source: app.LibLocked, Created: day, Locked: &app.Locked{}, UpstreamUpdates: 3}, "该锁定版本创建于 10 月 19 日，之后出了 3 次更新"},
+		{app.LibInstance{Source: app.LibLocked, Created: day, Locked: &app.Locked{Upstream: &store.Mod{}}}, "该锁定版本创建于 10 月 19 日，之后没有新的更新"},
 	} {
 		if got := view.CopyNoteAuto(&c.i); got != c.want {
 			t.Errorf("%s %v: %q, want %q", c.i.Source, c.i.States, got, c.want)

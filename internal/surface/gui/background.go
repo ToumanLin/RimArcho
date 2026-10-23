@@ -153,7 +153,7 @@ func (s *API) Backgrounds() *BgPage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := &BgPage{Setting: s.bgSettingLocked(), Dialogs: s.x.native != nil}
-	game := BgGroup{Name: view.T("in the game"), Items: []BgItem{}}
+	game := BgGroup{Name: view.T("the game's own"), Items: []BgItem{}}
 	files := BgGroup{Name: view.T("your images"), Files: true, Items: []BgItem{}}
 	var mods []BgGroup
 	for _, b := range s.bgListLocked(true) {
