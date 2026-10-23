@@ -124,7 +124,7 @@ func TestLibraryDo(t *testing.T) {
 		t.Fatal("enable did not add it")
 	}
 	msg, err := view.LibDo(e.App, view.LibRemove, []string{idle.Ref})
-	if err != nil || !strings.Contains(msg, "1 plans") {
+	if err != nil || !strings.Contains(msg, "1 lists") {
 		t.Fatalf("remove: %q %v", msg, err)
 	}
 	cp := libRow(t, libPage(t, e, ""), "Lockable").Insts[1]

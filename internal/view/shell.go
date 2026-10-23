@@ -57,7 +57,7 @@ func LastRunErrors(n *Needs) int {
 // EnvChip is an environment as a chip: "steam · 1.6".
 func EnvChip(name, gameVersion string) string {
 	if name == "" {
-		return T("no environment")
+		return T("no game")
 	}
 	if mm := env.MajorMinor(gameVersion); mm != "" {
 		return name + " · " + mm
@@ -113,7 +113,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	for _, p := range plans {
 		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, InGame: p.InGame})
 	}
-	planKids = append(planKids, NavItem{ID: PagePlanNew, Label: "+ " + T("new plan"), Add: true})
+	planKids = append(planKids, NavItem{ID: PagePlanNew, Label: "+ " + T("new list"), Add: true})
 	var packKids []NavItem
 	for _, p := range packs {
 		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name})
@@ -127,11 +127,11 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	library := []NavItem{
 		// The entry opens 全部, its first sub-entry (06 §2.9).
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all")}, {ID: PageChanges, Label: T("changes")}}},
-		{ID: PagePlan, Label: T("plans"), Kids: planKids},
+		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// what the game loads faster: next to the packs, which convert the same way (08 §5.2)
 		{ID: PageTextures, Label: T("texture optimisation")},
-		{ID: PageEnv, Label: T("environment")},
+		{ID: PageEnv, Label: T("game")},
 	}
 	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: T("library"), Items: library}}
 	n := 0
@@ -294,7 +294,7 @@ func packHomeRow(p PackRow, chip, envName string) HomeRow {
 	} else {
 		r.Mode = T("versions locked · own saves")
 		// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
-		r.State, r.Level = T("checked when built"), HomeOK
+		r.State, r.Level = T("checked when created"), HomeOK
 	}
 	return r
 }

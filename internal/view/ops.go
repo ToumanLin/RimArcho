@@ -91,10 +91,10 @@ var opTable = []Op{
 
 func opLabel(code string) string {
 	return map[string]string{
-		OpEnable: T("enable"), OpAdd: T("add to the current plan"), OpUse: T("use this copy in the current plan"),
-		OpDisable: T("disable"), OpTakeOut: T("take out of the current plan"), OpPutBack: T("put back"),
-		OpEnableAt: T("enable at…"), OpMoveTo: T("move to…"), OpStage: T("stage"), OpSwap: T("swap for another copy"),
-		OpRemove: T("take out of every plan"), OpTags: T("tags"), OpNote: T("note"),
+		OpEnable: T("enable"), OpAdd: T("enable"), OpUse: T("use this one in the current list"),
+		OpDisable: T("disable"), OpTakeOut: T("disable"), OpPutBack: T("put back"),
+		OpEnableAt: T("enable at…"), OpMoveTo: T("move to…"), OpStage: T("stage"), OpSwap: T("switch version…"),
+		OpRemove: T("disable in every list"), OpTags: T("tags"), OpNote: T("note"),
 		OpFolder: T("open the folder"), OpWorkshop: T("open the Workshop page"),
 		OpPin: T("lock this version"), OpPinUpdate: T("update the locked version"), OpUnpin: T("unlock"),
 		OpMove: T("move into the lock library"), OpUnhide: T("unhide"), OpResub: T("subscribe again"),

@@ -32,7 +32,7 @@ export async function list() {
   const sc = S.screen === "packs" && !S.packFocus ? $("#screen") : openScreen("packs");
   sc.innerHTML = "";
   const w = page("packs", T("a pack copies every mod of the list as it is now and plays with its own saves"),
-    act(T("build a pack"), "packs", () => ui.go("build"), "B"));
+    act(T("create a pack"), "packs", () => ui.go("build"), "B"));
   sc.append(w);
   for (const u of L.un) w.append(buildCard(u));
   const card = el("section", "card");
@@ -51,7 +51,7 @@ export async function list() {
     card.append(row);
   });
   w.append(card);
-  if (L.others) w.append(el("div", "muted note", Tf("%d packs belong to other environments; switch the environment to see them", L.others)));
+  if (L.others) w.append(el("div", "muted note", Tf("%d packs belong to other games; switch the game to see them", L.others)));
   ui.renderHints();
   pollWhileBuilding(list);
 }
@@ -160,15 +160,15 @@ function buildCard(u) {
   card.dataset.build = u.name;
   const head = el("div", "pack");
   const left = el("div", "l");
-  left.append(el("div", "name", u.running ? Tf("building pack %s", u.name) : u.name), el("div", "sub", u.facts || ""));
+  left.append(el("div", "name", u.running ? Tf("creating pack %s", u.name) : u.name), el("div", "sub", u.facts || ""));
   const right = el("div", "r");
   if (u.running) {
     right.append(button(T("stop"), "", async () => {
       try { say("ok", await api.PackStop(u.name)); } catch (e) { say("fail", errText(e)); }
     }));
   } else {
-    right.append(button(T("build again"), "", () => startBuild(u.name, false)));
-    right.append(button(T("delete what it copied"), "", () => pop.confirm(T("delete what it copied"), [Tf("the unfinished build of %s and what it copied (%s) are deleted; your mods are not touched", u.name, u.copied || "?")], T("delete what it copied"), async () => {
+    right.append(button(T("create again"), "", () => startBuild(u.name, false)));
+    right.append(button(T("delete what it copied"), "", () => pop.confirm(T("delete what it copied"), [Tf("the unfinished pack %s and what it copied (%s) are deleted; your mods are not touched", u.name, u.copied || "?")], T("delete what it copied"), async () => {
       say("busy", T("deleting what it copied…"));
       try { say("ok", await api.PackRemoveUnfinished(u.name)); } catch (e) { say("fail", errText(e)); }
       redraw();
@@ -210,12 +210,12 @@ export function packEvent(ev) {
     return redraw();
   }
   if (S.screen === "build") return drawBuild();
-  if (S.screen !== "packs" || S.packFocus) { say("busy", Tf("building pack %s", ev.name) + " · " + ev.text); return; }
+  if (S.screen !== "packs" || S.packFocus) { say("busy", Tf("creating pack %s", ev.name) + " · " + ev.text); return; }
   const card = document.querySelector(`.card.build[data-build="${CSS.escape(ev.name)}"]`);
   if (!card) return list();
   const body = card.querySelector(".progwrap");
   if (body) { body.innerHTML = ""; body.append(progressBox(ev)); }
-  card.querySelector(".sub").textContent = T("building") + " · " + ev.text;
+  card.querySelector(".sub").textContent = T("creating") + " · " + ev.text;
 }
 
 // ---- 编译成整合包 (the plan's sub-page) ----
@@ -282,7 +282,7 @@ function drawBuild() {
   const sc = S.screen === "build" ? $("#screen") : openScreen("build");
   const focusName = document.activeElement && document.activeElement.id === "pk-name";
   sc.innerHTML = "";
-  const w = page("build", T("a pack locks every mod's version: later Workshop updates do not change it, and it has its own saves and settings; the plan stays as it is"),
+  const w = page("build", T("a pack locks every mod's version: later Workshop updates do not change it, and it has its own saves and settings; the list stays as it is"),
     button(T("cancel"), "esc", () => ui.go("plan")));
   const cols = el("div", "bd-cols");
   const left = el("div", "bd-left");
@@ -327,7 +327,7 @@ function drawBuild() {
 
   // the four things building does; while it builds, where it is
   const steps = el("section", "sec");
-  const stepsH = el("h2", "label", T("what building does"));
+  const stepsH = el("h2", "label", T("what creating does"));
   steps.append(stepsH);
   area(steps, stepsH);
   const sc2 = el("div", "card bd-steps");
@@ -385,7 +385,7 @@ function drawBuild() {
   side.append(el("div", "h", B.name || p.plan));
   const kv = el("div", "bd-kv");
   const row = (k, v) => kv.append(el("span", "k", k), v instanceof Node ? v : el("span", "v", v));
-  row(T("environment"), p.env);
+  row(T("game"), p.env);
   row(T("mods"), el("span", "v num", String(p.mods)));
   if (p.light) row(T("size"), T("list only"));
   else if (p.before) {
@@ -397,7 +397,7 @@ function drawBuild() {
   row(T("location"), el("span", "v path", p.dir));
   side.append(kv);
   const go1 = el("button", "btn primary bd-go");
-  go1.append(T("build"), el("kbd", "", "B"));
+  go1.append(T("create pack"), el("kbd", "", "B"));
   go1.onclick = () => go();
   const why = el("div", "bd-why");
   const dry = button(T("see the list first, write nothing"), "V", () => dryRun());
@@ -410,7 +410,7 @@ function drawBuild() {
   const un = L.un.filter((u) => !(S.packBuild && S.packBuild.name === u.name));
   if (un.length) {
     const s = el("section", "sec");
-    s.append(el("h2", "label", T("unfinished builds")));
+    s.append(el("h2", "label", T("unfinished packs")));
     for (const u of un) s.append(buildCard(u));
     w.append(s);
   }
@@ -429,8 +429,8 @@ function syncButton() {
   err.textContent = B.nameErr || "";
   let reason = "", toNeeds = false, toGo = "";
   if (!p.ok) { reason = p.why; toNeeds = p.toNeeds; toGo = p.toGo || ""; }
-  else if (S.packBuild) reason = Tf("building pack %s", S.packBuild.name);
-  else if (building()) reason = T("another pack is being built; wait for it to finish");
+  else if (S.packBuild) reason = Tf("creating pack %s", S.packBuild.name);
+  else if (building()) reason = T("another pack is being created; wait for it to finish");
   else if (B.nameErr) reason = B.nameErr;
   go1.disabled = !!reason;
   why.classList.toggle("busy", !!S.packBuild && p.ok);
@@ -500,12 +500,12 @@ export function packsKey(e) {
 export function hintList() {
   const tail = [{ key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
   if (S.screen === "build") {
-    return [{ key: "B", label: T("build") }, { key: "V", label: T("see the list first") }, { key: "T", label: T("full / light pack") },
-      B.light ? { key: "n", label: T("name") } : { key: "D", label: T("textures") }, { key: "esc", label: T("back to the plan") }, ...tail];
+    return [{ key: "B", label: T("create pack") }, { key: "V", label: T("see the list first") }, { key: "T", label: T("full / light pack") },
+      B.light ? { key: "n", label: T("name") } : { key: "D", label: T("textures") }, { key: "esc", label: T("back to the list") }, ...tail];
   }
   if (S.packFocus) {
     return [...(P && !P.light ? [{ key: "L", label: T("play") }] : []), { key: "e", label: T("export") }, { key: "Del", label: T("move to the recycle bin") },
       { key: "tab", label: T("next pack") }, ...tail];
   }
-  return [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }, { key: "B", label: T("build a pack") }, { key: "tab", label: T("first pack") }, ...tail];
+  return [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }, { key: "B", label: T("create a pack") }, { key: "tab", label: T("first pack") }, ...tail];
 }

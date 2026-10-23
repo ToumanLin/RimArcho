@@ -13,7 +13,7 @@ export async function withEnvironmentSwitch(name, action) {
   const card = el("div", "env-progress-card");
   card.setAttribute("role", "status");
   card.setAttribute("aria-live", "polite");
-  card.append(el("div", "title", title), el("div", "note", T("loading the environment, please wait…")));
+  card.append(el("div", "title", title), el("div", "note", T("loading the game, please wait…")));
   const bar = el("div", "env-progress-bar");
   bar.setAttribute("role", "progressbar");
   bar.setAttribute("aria-label", title);

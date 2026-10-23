@@ -1187,9 +1187,9 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", T("an environment is one game folder: its version, how it starts, its saves"), act(T("add an environment"), "plus", () => ui.go("guide")), rescanButton());
+  const w = page("env", T("each game is one game folder: its version, how it starts, its saves"), act(T("add a game"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
-  const envLab = el("div", "label section", T("every environment"));
+  const envLab = el("div", "label section", T("every game"));
   w.append(envLab);
   const card = el("section", "card");
   area(card, envLab);
@@ -1202,7 +1202,7 @@ export async function environment() {
     else {
       row.append(button(T("use this one"), "", () => ui.useEnv(e.name, environment)));
     }
-    row.append(button(T("remove environment"), "", () => removeEnv(e.name), "quiet"));
+    row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet"));
     card.append(row);
   }
   w.append(card);
@@ -1216,7 +1216,7 @@ export async function environment() {
 export async function removeEnv(name) {
   let p;
   try { p = await api.EnvRemovePreview(name); } catch (e) { say("fail", errText(e)); return; }
-  pop.confirm(p.title, p.lines, T("remove environment"), async () => {
+  pop.confirm(p.title, p.lines, T("remove the game"), async () => {
     try { say("ok", await api.RemoveEnv(name)); } catch (e) { say("fail", errText(e)); return; }
     for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
     await ui.reload();

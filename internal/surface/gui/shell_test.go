@@ -129,7 +129,7 @@ func TestPlansInWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err = api.ImportAsPlan("Pasted")
-	if err != nil || !strings.HasPrefix(d.Text, "new plan Pasted: 2 mods") {
+	if err != nil || !strings.HasPrefix(d.Text, "new list Pasted: 2 mods") {
 		t.Fatalf("import as plan %+v %v", d, err)
 	}
 	if names(api.Board().Cols[view.Active]) != "Beta,Core" {
@@ -157,7 +157,7 @@ func TestPlansInWindow(t *testing.T) {
 			plans = append(plans, p.Name)
 		}
 	}
-	if strings.Join(plans, ",") != "plan Empty" {
+	if strings.Join(plans, ",") != "list Empty" {
 		t.Fatalf("palette plans %v", plans)
 	}
 	_ = e

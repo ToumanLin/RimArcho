@@ -86,12 +86,12 @@ function inputLine(pop, prompt, placeholder) {
 // ---- the command palette (06 §3.5) ----
 export function palette() {
   open("palette", T("command palette"), (pop, p) => {
-    const inp = inputLine(pop, "❯", T("a command, a mod, an environment"));
+    const inp = inputLine(pop, "❯", T("a command, a mod, a game"));
     const run = (o) => { close(); ui.palette(o); };
     optionList(pop, p, [], (d, o) => {
       d.append(el("span", "", o.name));
       if (o.kind === 0 && o.alias !== o.name) d.append(el("span", "dim", o.alias));
-      d.append(el("span", "d", o.kind === 0 ? o.desc.split(" ")[0] : o.kind === 2 ? T("environment") : o.kind === 3 ? T("plan") : o.desc));
+      d.append(el("span", "d", o.kind === 0 ? o.desc.split(" ")[0] : o.kind === 2 ? T("game") : o.kind === 3 ? T("list") : o.desc));
     }, run, inp);
     const refresh = async () => p.redraw(await api.Palette(inp.value));
     inp.addEventListener("input", refresh);

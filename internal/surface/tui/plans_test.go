@@ -46,7 +46,7 @@ func TestPlansInTUI(t *testing.T) {
 	view.SetLang("en")
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
-	if !strings.Contains(m.topBar(), "plan default") {
+	if !strings.Contains(m.topBar(), "list default") {
 		t.Fatalf("top bar %q", m.topBar())
 	}
 	enabled := len(m.cols[cActive].items)
@@ -56,20 +56,20 @@ func TestPlansInTUI(t *testing.T) {
 	if cs := choicesOf(t, m); !strings.HasPrefix(cs[0], "default") || !strings.Contains(cs[0], "editing") {
 		t.Fatalf("chooser %q", cs)
 	}
-	pick(t, m, "new plan…")
+	pick(t, m, "new list…")
 	pick(t, m, "an empty list")
-	if m.prompt == nil || m.prompt.text != "new plan" {
+	if m.prompt == nil || m.prompt.text != "new list" {
 		t.Fatalf("name prompt %+v", m.prompt)
 	}
 	press(m, "enter")
-	if m.st.Plan.Name != "new plan" || len(m.cols[cActive].items) != 0 || !strings.Contains(m.topBar(), "plan new plan") {
+	if m.st.Plan.Name != "new list" || len(m.cols[cActive].items) != 0 || !strings.Contains(m.topBar(), "list new list") {
 		t.Fatalf("after new: plan %s, %d enabled, status %q", m.st.Plan.Name, len(m.cols[cActive].items), m.status)
 	}
 
 	// A taken name asks again.
 	press(m, "P")
-	pick(t, m, "rename new plan")
-	for range "new plan" {
+	pick(t, m, "rename new list")
+	for range "new list" {
 		m.update(tea.KeyMsg{Type: tea.KeyBackspace})
 	}
 	typeText(m, "DEFAULT")
@@ -100,13 +100,13 @@ func TestPlansInTUI(t *testing.T) {
 	press(m, "P")
 	pick(t, m, "delete default")
 	pick(t, m, "delete default")
-	if m.st.Plan.Name != "new plan" || !strings.HasPrefix(m.status, "deleted default") {
+	if m.st.Plan.Name != "new list" || !strings.HasPrefix(m.status, "deleted default") {
 		t.Fatalf("after delete: %s, %q", m.st.Plan.Name, m.status)
 	}
 	// The last plan cannot go.
 	press(m, "P")
-	pick(t, m, "delete new plan")
-	if m.panel != nil || !strings.Contains(m.status, "only plan") {
+	pick(t, m, "delete new list")
+	if m.panel != nil || !strings.Contains(m.status, "only list") {
 		t.Fatalf("last plan: panel %v, status %q", m.panel, m.status)
 	}
 }

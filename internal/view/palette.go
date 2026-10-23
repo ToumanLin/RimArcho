@@ -28,7 +28,7 @@ func (c Command) Name() string {
 // Commands of the main screen.
 var Commands = []Command{
 	{"sort", "自动排序", "sort", "S"},
-	{"save", "写入游戏", "save", "w ModsConfig.xml"},
+	{"save", "写入游戏", "write to the game", "w save ModsConfig.xml"},
 	{"launch", "启动游戏", "launch", "L RimWorld"},
 	{"preview-sort", "预览排序", "preview the sort", "S dry run"},
 	{"preview-save", "预览写入", "preview writing to the game", "w dry run ModsConfig.xml"},
@@ -41,11 +41,11 @@ var Commands = []Command{
 	{"rescan", "重新扫描", "rescan", "R scan"},
 	{"analyze", "重新检查文件", "check the files again", "A analyze"},
 	{"log", "选择日志", "choose a log", "Player.log"},
-	{"env", "切换游戏", "switch environment", "E env"},
-	{"plans", "列表", "plans", "P switch, new, rename, delete a plan"},
-	{"new-plan", "新列表", "new plan", "+ plan copy import"},
+	{"env", "切换游戏", "switch game", "E env environment"},
+	{"plans", "列表", "lists", "P switch, new, rename, delete a list"},
+	{"new-plan", "新列表", "new list", "+ list copy import"},
 	{"restore-all", "全部从暂存放回", "put all back", "T staging"},
-	{"stage-all", "把已启用的全部放进暂存", "stage the whole enabled list", "T in the window"},
+	{"stage-all", "把已启用的全部放进暂存", "stage everything enabled", "T in the window"},
 	{"import", "导入列表", "import a list", "i RimSort RimCrow .rml share code collection"},
 	{"export", "导出列表", "export the list", "e RimSort RimCrow .rml share code"},
 	{"filter", "筛选这一列", "filter", "/ search"},
@@ -112,7 +112,7 @@ func PlanEntries(rows []PlanRow) []PalEntry {
 	var out []PalEntry
 	for _, r := range rows {
 		if !r.Current {
-			out = append(out, PalEntry{Kind: PalPlan, ID: r.Page, Name: Tf("plan %s", r.Name), Alias: r.Name, Desc: "plan"})
+			out = append(out, PalEntry{Kind: PalPlan, ID: r.Page, Name: Tf("list %s", r.Name), Alias: r.Name, Desc: "list"})
 		}
 	}
 	return out

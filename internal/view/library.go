@@ -186,7 +186,7 @@ func LibStateText(s, mm string) string {
 	case app.LibHidden:
 		return T("hidden by another manager")
 	case app.LibUpdated:
-		return T("upstream has an update")
+		return T("a newer version is out")
 	}
 	return s
 }
@@ -395,7 +395,7 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 		us := m.UsedIn()
 		r.Used, r.UsedAt = libUsed(us)
 		if len(us) > 1 {
-			r.Used = Tf("in %d plans", len(us))
+			r.Used = Tf("in %d lists", len(us))
 		}
 		var srcs []string
 		best := len(app.LibStates)
@@ -568,7 +568,7 @@ func CopyNoteAuto(i *app.LibInstance) string {
 		for j, p := range made.Plans {
 			q[j] = Tf("“%s”", p)
 		}
-		return Tf(", for plan %s", strings.Join(q, T(", ")))
+		return Tf(", for list %s", strings.Join(q, T(", ")))
 	}
 	switch {
 	case made != nil && made.Kind == "move":
@@ -602,9 +602,9 @@ func CopyNoteAuto(i *app.LibInstance) string {
 	}
 	switch {
 	case i.Locked != nil && i.UpstreamUpdates > 0:
-		parts = append(parts, Tf("the upstream has updated %d times since", i.UpstreamUpdates))
+		parts = append(parts, Tf("%d updates came out since", i.UpstreamUpdates))
 	case i.Locked != nil && i.Locked.Upstream != nil && len(parts) > 0:
-		parts = append(parts, T("the upstream has not updated since"))
+		parts = append(parts, T("no update since"))
 	case i.UpstreamWorkshop && i.UpstreamUpdates > 0:
 		parts = append(parts, Tf("the Workshop copy has updated %d times since", i.UpstreamUpdates))
 	}
@@ -727,9 +727,9 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 			return "", err
 		}
 		if len(rs) == 0 {
-			return Tf("no plan uses %s", what), nil
+			return Tf("no list uses %s", what), nil
 		}
-		return Tf("took %s out of %d plans · each plan's u undoes it", what, len(rs)), nil
+		return Tf("disabled %s in %d lists · each list's u undoes it", what, len(rs)), nil
 	}
 	if !libConfirm[kind] {
 		return "", fmt.Errorf("unknown action %s", kind)
@@ -795,7 +795,7 @@ func LibPlan(a *app.App, kind string, refs []string) (*Result, error) {
 				if _, err := a.Swap(st.Ix.Ref(other.ID), o.Refs[0]); err != nil {
 					return nil, err
 				}
-				return &Result{Text: Tf("the current plan now uses %s", libCopyName(st, mod)), Placed: ids[:1]}, nil
+				return &Result{Text: Tf("the current list now uses %s", libCopyName(st, mod)), Placed: ids[:1]}, nil
 			}
 		}
 		return Toggle(a, Inactive, o)

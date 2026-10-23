@@ -33,7 +33,7 @@ func init() {
 		"choose…":                              "选择…",
 		"choose a folder":                      "选择文件夹",
 		"no folder dialog here; type the path": "这里不能打开文件夹对话框，请输入路径",
-		"an environment is one game folder: its version, how it starts, its saves": "每个游戏对应一个游戏目录：版本、启动方式和存档",
+		"each game is one game folder: its version, how it starts, its saves": "每个游戏对应一个游戏目录：版本、启动方式和存档",
 		// the guide's first step
 		"a game you have":    "已有的游戏",
 		"download a version": "下载一个版本",
@@ -60,7 +60,7 @@ func init() {
 		"logging in (in the SteamCMD window)…":                       "正在登录（在 SteamCMD 窗口里）…",
 		"downloading":                                                "正在下载",
 		"checking the files":                                         "正在校验文件",
-		"downloaded; environment %s added":                           "下载完成，已加入游戏 %s",
+		"downloaded; game %s added":                                  "下载完成，已加入游戏 %s",
 		"the download did not finish":                                "下载没有完成",
 		"%s of %s":                                                   "%s / %s",
 		"try again":                                                  "重试",

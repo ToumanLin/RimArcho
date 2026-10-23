@@ -135,7 +135,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		return p, nil
 	}
 	if ms, err := a.MonitorState(); err == nil && ms.InPlan == nil {
-		p.NoMonitor = T("this plan has no Archo Monitor: errors will not say which file or def was loading")
+		p.NoMonitor = T("this list has no Archo Monitor: errors will not say which file or def was loading")
 		p.AddMonitor = ms.Newest != nil
 		if !p.AddMonitor {
 			p.NoMonitor = T("Archo Monitor is not installed: errors will not say which file or def was loading (archo monitor install)")

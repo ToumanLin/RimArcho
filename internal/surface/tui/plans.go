@@ -42,7 +42,7 @@ func (m *model) choosePlan() tea.Cmd {
 		m.say(sayFail, m.humanize(err.Error()))
 		return nil
 	}
-	p := &panel{title: T("plans")}
+	p := &panel{title: T("lists")}
 	runs := map[string]func(m *model) tea.Cmd{}
 	add := func(label string, run func(m *model) tea.Cmd) {
 		p.choices = append(p.choices, label)
@@ -72,7 +72,7 @@ func (m *model) choosePlan() tea.Cmd {
 			return m.usePlan(id)
 		})
 	}
-	add(T("new plan…"), func(m *model) tea.Cmd { return m.newPlan() })
+	add(T("new list…"), func(m *model) tea.Cmd { return m.newPlan() })
 	if cur != nil {
 		c := *cur
 		add(Tf("rename %s…", c.Name), func(m *model) tea.Cmd { return m.renamePlan(c) })
@@ -91,7 +91,7 @@ func (m *model) newPlan() tea.Cmd {
 		return nil
 	}
 	fromImport := T("from an import: a file, a share code, a link…")
-	p := &panel{title: T("new plan") + " " + markDot + " " + T("start from")}
+	p := &panel{title: T("new list") + " " + markDot + " " + T("start from")}
 	by := map[string]string{}
 	for _, f := range froms {
 		p.choices = append(p.choices, f.Label)
@@ -100,10 +100,10 @@ func (m *model) newPlan() tea.Cmd {
 	p.choices = append(p.choices, fromImport)
 	p.onPick = func(m *model, v string) tea.Cmd {
 		if v == fromImport {
-			return m.importPrompt() // its preview offers "as a new plan"
+			return m.importPrompt() // its preview offers "as a new list"
 		}
 		from := by[v]
-		m.namePrompt(T("new plan")+" "+markDot+" ", view.FreePlanName(m.app, ""), 0, func(m *model, name string) tea.Cmd {
+		m.namePrompt(T("new list")+" "+markDot+" ", view.FreePlanName(m.app, ""), 0, func(m *model, name string) tea.Cmd {
 			_, t, err := view.NewPlan(m.app, name, from)
 			if err != nil {
 				m.say(sayFail, m.humanize(err.Error()))
@@ -123,7 +123,7 @@ func (m *model) importAsPlan(imp *view.Import, p *view.ImportPreview) tea.Cmd {
 	if base == "" {
 		base = T(imp.Label)
 	}
-	m.namePrompt(T("as a new plan")+" "+markDot+" ", view.FreePlanName(m.app, base), 0, func(m *model, name string) tea.Cmd {
+	m.namePrompt(T("as a new list")+" "+markDot+" ", view.FreePlanName(m.app, base), 0, func(m *model, name string) tea.Cmd {
 		_, t, err := view.ImportAsPlan(m.app, imp, name)
 		if err != nil {
 			m.say(sayFail, m.humanize(err.Error()))

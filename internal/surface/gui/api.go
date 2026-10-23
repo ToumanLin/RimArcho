@@ -324,15 +324,15 @@ func (s *API) PackBuild(name string, light bool, tex int) (string, error) {
 		if _, err := s.a.BuildPack(name, true, false); err != nil {
 			return "", err
 		}
-		return view.Tf("built pack %s", name), nil
+		return view.Tf("created pack %s", name), nil
 	}
 	if s.busy["pack"] {
-		return "", errors.New(view.T("another pack is being built; wait for it to finish"))
+		return "", errors.New(view.T("another pack is being created; wait for it to finish"))
 	}
 	if un, err := s.a.UnfinishedPacks(); err == nil {
 		for _, u := range un {
 			if u.Running {
-				return "", errors.New(view.T("another pack is being built; wait for it to finish"))
+				return "", errors.New(view.T("another pack is being created; wait for it to finish"))
 			}
 		}
 	}
@@ -354,7 +354,7 @@ func (s *API) PackBuild(name string, light bool, tex int) (string, error) {
 		}
 	}
 	go s.watchBuild(name, tmp, run)
-	return view.Tf("build pack %s: it goes on in the background; you can use the other pages, or close the window", name), nil
+	return view.Tf("create pack %s: it goes on in the background; you can use the other pages, or close the window", name), nil
 }
 
 // watchBuild runs the build and passes its progress file on as events until it ends.
@@ -370,7 +370,7 @@ func (s *API) watchBuild(name, tmp string, run func(string) error) {
 			s.mu.Lock()
 			s.busy["pack"], s.building = false, ""
 			s.mu.Unlock()
-			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 5, Frac: 1, Text: view.Tf("built pack %s", name)}
+			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 5, Frac: 1, Text: view.Tf("created pack %s", name)}
 			if err != nil {
 				ev.Step, ev.Frac, ev.Text = last.Step, last.Frac, ""
 				lines := strings.Split(view.Humanize(nil, err.Error()), "\n")
@@ -399,7 +399,7 @@ func (s *API) PackStop(name string) (string, error) {
 	if err := s.a.StopBuild(name); err != nil {
 		return "", err
 	}
-	return view.Tf("asked the build of %s to stop", name), nil
+	return view.Tf("asked %s to stop", name), nil
 }
 
 // PackRemoveUnfinished deletes what a build cut short copied (its folder in the packs
@@ -414,7 +414,7 @@ func (s *API) PackRemoveUnfinished(name string) (string, error) {
 	if err := os.RemoveAll(dir); err != nil { // off the lock: gigabytes take a while
 		return "", err
 	}
-	return view.Tf("deleted the unfinished build of %s", name), nil
+	return view.Tf("deleted the unfinished pack %s", name), nil
 }
 
 // PackLaunch plays a pack. move: the player agreed to move the folders in the way into the
@@ -495,7 +495,7 @@ func (s *API) HistoryGo(steps, version int) (string, error) {
 		if _, _, err := s.a.Checkout(fmt.Sprintf("v%d", version)); err != nil {
 			return "", err
 		}
-		return view.Tf("loaded v%d into the list (not saved yet)", version), nil
+		return view.Tf("back at v%d (not written to the game yet)", version), nil
 	}
 	r, err := s.a.StepTo(steps)
 	if err != nil {
@@ -1000,7 +1000,7 @@ func (s *API) RemoveEnv(name string) (string, error) {
 	s.a.EnvName = ""
 	_, err := s.a.EnvRemove(name)
 	s.board, s.needs, s.lib = nil, nil, nil
-	return s.text(view.Tf("removed environment %s", name), err)
+	return s.text(view.Tf("removed game %s", name), err)
 }
 
 // Logs are the logs the player may choose (Player.log, Player-prev.log).

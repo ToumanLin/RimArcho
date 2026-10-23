@@ -127,10 +127,10 @@ function planActions() {
     out.push(n);
   } else motion.bump("unwritten", null, 0);
   out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("import / export"), "i", () => exchange(0)),
-    btn(T("build a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
+    btn(T("create a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
   if (plan) {
     const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");
-    more.title = T("the plan: rename, copy, delete") + " · P";
+    more.title = T("the list: rename, copy, delete") + " · P";
     out.push(more);
   }
   // 启动游戏 opens 启动, where the game starts (06 §2.5)
@@ -232,7 +232,7 @@ function actions() {
   out.push({ key: "g", label: T("tags"), run: () => verb("tags") });
   if (sel.length === 1) {
     out.push({ key: "enter", label: T("full details"), run: () => verb("full") });
-    if (k === 1 && sel[0].id) out.push({ key: "x", label: T("swap for another copy"), run: () => verb("swap") });
+    if (k === 1 && sel[0].id) out.push({ key: "x", label: T("switch version…"), run: () => verb("swap") });
   }
   return out;
 }
@@ -502,9 +502,9 @@ async function cmd(id) {
 
 async function chooseEnv() {
   const envs = (S.board && S.board.envs) || [];
-  if (!envs.length) return say("", T("no environments (archo env add)"));
-  pop.choose(T("switch environment"), envs, (i) => useEnv(envs[i]),
-    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove environment"), run: (i) => scr.removeEnv(envs[i]) });
+  if (!envs.length) return say("", T("no games yet (archo env add)"));
+  pop.choose(T("switch game"), envs, (i) => useEnv(envs[i]),
+    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove the game"), run: (i) => scr.removeEnv(envs[i]) });
 }
 
 async function useEnv(name, refresh) {

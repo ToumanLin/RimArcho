@@ -26,9 +26,9 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	switch page {
 	case EditorPage, LibraryPage:
 		lib := page == LibraryPage
-		space := "enable / disable; in staging, put back"
+		space := "enable / disable; in staging, put back in the list"
 		if lib {
-			space = "add to the current plan and enable / take out of it"
+			space = "enable / disable (the current list)"
 		}
 		out = append(out,
 			r("↑↓ · j k", "move the cursor (in the details: scroll)"),
@@ -43,13 +43,13 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("space", space),
 			r("m", "enable at… / move to…"),
 			r("t", "stage / put back"),
-			r("x", "swap for another copy"),
+			r("x", "switch version…"),
 			r("g", "tags"),
 			r("n", "note"),
 			r("ctrl+o · ctrl+w", "open the folder · the Workshop page"),
 			r("u · ctrl+z", pick("undo", "undo")),
 			r("ctrl+y · ctrl+r", "redo"),
-			r("Del", "unsubscribe / delete (asks first)"),
+			r("Del", "unsubscribe / move to the recycle bin (asks first)"),
 			r(pick("menu · shift+F10 · right click", "menu · shift+F10"), "the row's menu: everything it can do"),
 		)
 		if lib {
@@ -63,11 +63,11 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			out = append(out,
 				r(pick("← → · 1–4", "← → · 1–4 · h l"), "go to an area"),
 				r("J K · alt+J K", "move down / up 1 (10); with a filter, past the rows shown"),
-				r("T", "put everything back from staging; elsewhere, stage the enabled list"),
+				r("T", "put everything back from staging; elsewhere, stage everything enabled"),
 				r("S · w · L", pick("sort · write to the game · to the launch page (the palette previews them)", "sort · write to the game · launch (the palette previews them)")),
 				r(pick("i · e", "e"), pick("import · export the mod list", "export the mod list")),
 				r("R · A", "rescan · check the files again"),
-				r("P · E", "plans · environments"),
+				r("P · E", "lists · games"),
 				r(":", "run an archo command"),
 				r("H", "the history: steps and versions"),
 				r("C", "this mod's changes"),
@@ -78,14 +78,14 @@ func KeyHelp(page string, tui bool) []KeyRow {
 					r("i", "technical information in the details"),
 					r("r", "add a rule"),
 					r("z", "wrap names"),
-					r("[ ]", "switch list (narrow)"),
+					r("[ ]", "switch area (narrow)"),
 				)
 			} else {
-				out = append(out, r(T("drag"), "between lists: enable, disable, stage; within Enabled: reorder"))
+				out = append(out, r(T("drag"), "between areas: enable, disable, stage; within Enabled: reorder"))
 			}
 		}
 		if lib {
-			out = append(out, r("u", "undo applies to plan edits (space, m, t, x)"))
+			out = append(out, r("u", "undo applies to list edits (space, m, t, x)"))
 		}
 	}
 	if page == ChangesPage {
@@ -93,11 +93,11 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("↑↓ · PgUp PgDn", "move"),
 			r("enter", "open or close a mod's changes"),
 			r("i", "the raw file list"),
-			r("a", "the current plan / the whole library"),
+			r("a", "the current list / the whole library"),
 			r("ctrl+w", "the Workshop change notes"),
 			r("ctrl+o", "open the location"),
 			r("D", "see dependencies (能不能跑)"),
-			r("S", "sort the plan"),
+			r("S", "sort the list"),
 			r("p", "lock this version (dry run first)"),
 			r("esc", "back; with one mod shown, every mod again"),
 		)
@@ -120,7 +120,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("B · enter in the name", "build"),
 			r("V", "see the list first, write nothing"),
 			r("tab", "the next field or button"),
-			r("esc", "back to the plan"),
+			r("esc", "back to the list"),
 		)
 	}
 	if page != EditorPage {

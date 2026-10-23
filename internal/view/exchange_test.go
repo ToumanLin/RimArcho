@@ -146,7 +146,7 @@ func TestImportApplyIsOneStep(t *testing.T) {
 	if got := enabled(t, e); got != "Core,Harmony,Beta,Alpha,missing:someone.gone" {
 		t.Fatalf("replace: %s", got)
 	}
-	if !strings.Contains(text, "not saved yet") {
+	if !strings.Contains(text, "not written to the game yet") {
 		t.Fatalf("status: %s", text)
 	}
 	e.MustRun("undo")

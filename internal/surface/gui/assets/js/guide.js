@@ -6,7 +6,7 @@
 //      added once the shared mod folders were read: only its own Data/ and Mods/);
 //   3. where to start: the game's own list, a list from RimSort / RimCrow (previewed, then
 //      applied: view.ReadImport → PreviewImport → ApplyImport), or a pack / a collection.
-// The environment page's "add an environment" starts at step 1.
+// The environment page's "add a game" starts at step 1.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button, seg, pickFolder } from "./screens.js";
 import { exchange, importFrom } from "./exchange.js";
@@ -43,7 +43,7 @@ function draw() {
   if (S.screen !== "guide") return;
   const sc = $("#screen");
   sc.innerHTML = "";
-  const lead = S.guideFrom === "env" ? T("find the install, read its mods once, and it is ready") : T("find the game, read the mods once, then pick where your first plan comes from");
+  const lead = S.guideFrom === "env" ? T("find the install, read its mods once, and it is ready") : T("find the game, read the mods once, then pick where your first list comes from");
   const w = page("guide", lead);
   sc.append(w);
   // the steps: where you are, where you can go back to
@@ -102,13 +102,13 @@ function step1(card) {
     const body = el("div", "b");
     const top = el("div", "top");
     top.append(el("span", "v", "RimWorld " + (g.version || "—")), el("span", "chip", g.launch === "steam" ? "Steam" : T("started directly")));
-    if (g.env) top.append(el("span", "chip cur", Tf("already environment %s", g.env)));
+    if (g.env) top.append(el("span", "chip cur", Tf("added as %s", g.env)));
     body.append(top, el("div", "path", g.game));
     if (!g.env) {
       const name = el("input", "field small");
       name.value = g.name;
       name.spellcheck = false;
-      name.title = T("the environment's name");
+      name.title = T("the game's name");
       name.onclick = (e) => e.preventDefault();
       name.oninput = () => { g.name = name.value.trim(); };
       const nm = el("div", "nm");
@@ -143,7 +143,7 @@ function step1(card) {
   typed.append(inp, choose, add);
   card.append(typed);
   const picked = [...G.picked].filter((i) => G.games[i] && !G.games[i].env);
-  const next = button(picked.length > 1 ? Tf("add %d environments", picked.length) : T("add and continue"), "", async () => {
+  const next = button(picked.length > 1 ? Tf("add %d games", picked.length) : T("add and continue"), "", async () => {
     next.disabled = true;
     let names;
     try { names = await api.GuideAdd(picked.map((i) => G.games[i])); } catch (e) { G.error = errText(e); return draw(); }
@@ -263,7 +263,7 @@ function download(card) {
 const DL_STATES = { starting: "starting SteamCMD…", login: "logging in (in the SteamCMD window)…", downloading: "downloading", verifying: "checking the files", done: "done" };
 
 function downloading(card, r) {
-  const t = r.end ? (r.ok ? Tf("downloaded; environment %s added", r.env) : T("the download did not finish")) : T(DL_STATES[r.state] || r.state);
+  const t = r.end ? (r.ok ? Tf("downloaded; game %s added", r.env) : T("the download did not finish")) : T(DL_STATES[r.state] || r.state);
   const head = el("div", "dl-state");
   head.append(el("span", "t", t));
   if (!r.end && r.total > 0) head.append(el("span", "muted", Tf("%s of %s", sizeText(r.done), sizeText(r.total))));
@@ -357,11 +357,11 @@ function step2(card) {
 // ---- 3. where to start ----
 
 function step3(card) {
-  card.append(el("div", "guide-q", T("where does your first plan come from?")));
+  card.append(el("div", "guide-q", T("where does your first list come from?")));
   const ways = el("div", "ways");
   const n = S.board && S.board.cols ? (S.board.cols[1] || []).length : 0;
-  ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; it becomes your first plan", n),
-    button(T("use this list"), "", () => finish(T("the game's list is your first plan")), "primary")));
+  ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n),
+    button(T("use this list"), "", () => finish(T("use the game's list as it is")), "primary")));
   const imp = button(T("import a list…"), "", () => { ui.afterImport = () => finish(""); exchange(0); });
   ways.append(way(T("move over from RimSort or RimCrow"), T("a list file, a share code or pasted text; you see what changes before it is applied"), imp));
   const src = el("input", "field");

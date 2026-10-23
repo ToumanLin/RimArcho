@@ -137,7 +137,7 @@ export function renderHeads() {
     if (c.searching && c.others) {
       if (!o) { o = el("div", "others"); s.after(o); }
       const parts = [0, 1, 2].filter((x) => x !== k).map((x) => `${T(AREAS[x])} ${c.others[x]}`);
-      o.textContent = Tf("other lists: %s · tab goes to the next list with matches", parts.join(" · "));
+      o.textContent = Tf("other areas: %s · tab goes to the next area with matches", parts.join(" · "));
     } else if (o) o.remove();
   }
 }
@@ -221,11 +221,11 @@ function historyPanel() {
   for (const h of S.history) {
     if (h.kind === "version" && !versions) {
       versions = true;
-      p.append(el("div", "hh", T("saved versions")));
+      p.append(el("div", "hh", T("versions written to the game")));
     }
     const r = el("div", "h " + h.kind, h.text);
     if (h.kind !== "now") {
-      r.title = h.kind === "version" ? T("load this version into the list") : T("go back to here");
+      r.title = h.kind === "version" ? T("go back to this version (u undoes)") : T("go back to here");
       r.onclick = (e) => { e.stopPropagation(); onHistory(h); };
     }
     p.append(r);

@@ -138,12 +138,12 @@ function draw(loading) {
   us.append(usHead);
   for (const x of copies()) {
     const line = el("div", "fd-useline");
-    line.append(el("span", "lbl", x.label), el("span", "x", (x.usedIn || []).join(" · ") || T("in no plan or pack")));
+    line.append(el("span", "lbl", x.label), el("span", "x", (x.usedIn || []).join(" · ") || T("in no list or pack")));
     us.append(line);
   }
   if (c) {
     const now = el("div", "fd-now");
-    now.append(el("span", "", c.inPlan ? T("in the current plan") : T("not in the current plan")));
+    now.append(el("span", "", c.inPlan ? T("in the current list") : T("not in the current list")));
     const sp = ops.keyed(c.ops || [], "space");
     if (sp) now.append(button(ops.op(sp).label, "space", () => runOp(sp), "small"));
     us.append(now);
@@ -204,7 +204,7 @@ function copyCard(x) {
   const top = el("div", "top");
   top.append(el("span", "lbl", x.label));
   if (x.state) top.append(el("span", "chip st " + (x.code || ""), x.state));
-  if (x.inPlan) top.append(el("span", "chip cur", T("in the current plan")));
+  if (x.inPlan) top.append(el("span", "chip cur", T("in the current list")));
   b.append(top);
   b.append(el("div", "facts", [x.size, x.version, x.name].filter(Boolean).join(" · ")));
   if (x.note || x.auto) b.append(el("div", "note" + (x.note ? "" : " auto"), x.note || x.auto));

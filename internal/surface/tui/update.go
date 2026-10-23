@@ -369,7 +369,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.listAction(view.ListLaunch)
 	case "x":
 		if it := c.cur(); it != nil && it.id != "" {
-			m.act(Tf("swapped %s for another copy", it.name), "swap", it.ref)
+			m.act(Tf("switched the version of %s", it.name), "swap", it.ref)
 		}
 		return m.requestDetail()
 	case "enter":
@@ -517,7 +517,7 @@ func (m *model) searchJump() tea.Cmd {
 		m.refilterCol(k, "")
 		return m.requestDetail()
 	}
-	m.say(sayInfo, T("no other list has a match"))
+	m.say(sayInfo, T("no other area has a match"))
 	return nil
 }
 
@@ -533,7 +533,7 @@ func (m *model) searchLine() string {
 			parts = append(parts, fmt.Sprintf("%s %d", k.title(), n[k]))
 		}
 	}
-	return T("other lists: ") + strings.Join(parts, " "+markDot+" ") + " " + markDot + " " + T("tab jumps to the next list with matches")
+	return T("other areas: ") + strings.Join(parts, " "+markDot+" ") + " " + markDot + " " + T("tab jumps to the next area with matches")
 }
 
 func (m *model) promptKey(k tea.KeyMsg) tea.Cmd {
@@ -599,10 +599,10 @@ func (m *model) panelKey(s string) tea.Cmd {
 func (m *model) chooseEnv() tea.Cmd {
 	envs, err := m.app.Store.Envs()
 	if err != nil || len(envs) == 0 {
-		m.say(sayInfo, T("no environments (archo env add)"))
+		m.say(sayInfo, T("no games yet (archo env add)"))
 		return nil
 	}
-	p := &panel{title: T("switch environment")}
+	p := &panel{title: T("switch game")}
 	for i, e := range envs {
 		p.choices = append(p.choices, e.Name)
 		if e.Name == m.envName {
@@ -633,11 +633,11 @@ func (m *model) removeEnv(name string) {
 		m.say(sayFail, m.humanize(err.Error()))
 		return
 	}
-	lines := append(view.EnvRemovalLines(r), "", Tf("enter: %s · esc: cancel", T("remove environment")))
+	lines := append(view.EnvRemovalLines(r), "", Tf("enter: %s · esc: cancel", T("remove the game")))
 	m.panel = &panel{title: view.EnvRemovalTitle(r), lines: lines,
 		onEnter: func(m *model) tea.Cmd {
 			m.app.EnvName = ""
-			if m.act(Tf("removed environment %s", name), "env", "remove", name, "--yes") {
+			if m.act(Tf("removed game %s", name), "env", "remove", name, "--yes") {
 				for k := range m.cols {
 					m.cols[k].cursor, m.cols[k].off, m.cols[k].filter = 0, 0, ""
 					m.refilterCol(colKind(k), "")

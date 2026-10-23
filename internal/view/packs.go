@@ -45,7 +45,7 @@ func packRows(a *app.App, ps []*app.PackInfo) (out []PackRow) {
 		if p.Light {
 			size = T("list only")
 		}
-		r := PackRow{Name: p.Name, Light: p.Light, Mods: len(p.Entries), Versions: PackVersions(a, p.Pack), Facts: Tf("%d mods · %s · %s · built %s", len(p.Entries), size, p.Game, ShortDate(p.Created)), Played: T("never played")}
+		r := PackRow{Name: p.Name, Light: p.Light, Mods: len(p.Entries), Versions: PackVersions(a, p.Pack), Facts: Tf("%d mods · %s · %s · created %s", len(p.Entries), size, p.Game, ShortDate(p.Created)), Played: T("never played")}
 		if !p.LastPlayed.IsZero() {
 			r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 			r.PlayedAt = p.LastPlayed
@@ -202,10 +202,10 @@ func UnfinishedRows(a *app.App) ([]UnfinishedRow, error) {
 		switch {
 		case u.Running:
 			p := ProgressOf(u.Progress)
-			r.Progress, r.Facts = &p, T("building")+" · "+p.Text
+			r.Progress, r.Facts = &p, T("creating")+" · "+p.Text
 		case u.Progress != nil:
 			r.Copied = SizeText(u.Progress.Bytes)
-			r.Facts = Tf("an unfinished build, stopped at %d of %d mods (%s copied) · %s", u.Progress.Mods, u.Progress.ModsTotal, SizeText(u.Progress.Bytes), ShortDate(u.Progress.Beat))
+			r.Facts = Tf("an unfinished pack, stopped at %d of %d mods (%s copied) · %s", u.Progress.Mods, u.Progress.ModsTotal, SizeText(u.Progress.Bytes), ShortDate(u.Progress.Beat))
 		default:
 			r.Facts = T("an unfinished build")
 		}

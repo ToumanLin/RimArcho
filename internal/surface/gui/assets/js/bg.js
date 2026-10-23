@@ -31,7 +31,7 @@ function draw(focusGrid = false) {
   const head = el("div", "bg-head");
   head.append(preview(), controls());
   card.append(head, el("div", "bg-rule"), tabs(), grid());
-  card.append(el("div", "bg-note", T("background mods are found by name (\"background\" in it) and need not be in a plan; add any other image under your images")));
+  card.append(el("div", "bg-note", T("background mods are found by name (\"background\" in it) and need not be in a list; add any other image under your images")));
   box.append(card);
   if (focusGrid) box.querySelector(".bg-grid").focus();
 }

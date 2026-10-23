@@ -139,7 +139,7 @@ func evidenceFor(p *app.Problem) *Evidence {
 		}
 		return evidence(EvInferred, src)
 	case "mod.pinned":
-		return evidence(EvInferred, T("the Workshop copy changed after the copy was made"))
+		return evidence(EvInferred, T("the Workshop copy changed after it was locked"))
 	case "mod.hidden-residue":
 		return evidence(EvInferred, T("About.xml.disabled, and no longer subscribed"))
 	case "mod.hidden":

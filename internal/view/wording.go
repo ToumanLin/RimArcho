@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -40,6 +41,10 @@ var retired = []struct{ Old, New string }{
 	{"拿掉", "停用"},
 }
 
+// retiredEn are the English words the interface no longer uses: list, game, a newer
+// version, switch version, locked, not written to the game, go back to a version.
+var retiredEn = regexp.MustCompile(`(?i)\b(plans?|environments?|upstream|workspace|swap(s|ped)?|pinned|unsaved|checkout)\b`)
+
 // wordingExempt are texts whose Chinese is right although it holds a retired word.
 var wordingExempt = map[string]bool{
 	"decompiled C#": true, // 反编译
@@ -58,13 +63,24 @@ func WordingProblems() []string {
 			}
 		}
 	}
+	checkEn := func(where, en string) {
+		if w := retiredEn.FindString(en); w != "" {
+			out = append(out, fmt.Sprintf("%s: the English %q uses %q", where, en, w))
+		}
+	}
 	for k, v := range zhText {
 		if !wordingExempt[k] {
 			check(fmt.Sprintf("%q", k), v)
 		}
+		en := k
+		if e, ok := enText[k]; ok {
+			en = e
+		}
+		checkEn("key", en)
 	}
 	for _, c := range Commands {
 		check("palette "+c.ID, c.Zh)
+		checkEn("palette "+c.ID, c.En)
 	}
 	for k, v := range clashes {
 		out = append(out, fmt.Sprintf("%q is translated twice: %q and %q", k, v[0], v[1]))

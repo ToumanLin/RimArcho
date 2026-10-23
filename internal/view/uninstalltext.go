@@ -43,7 +43,7 @@ func init() {
 		"keep %d where they are":                                                          "保留 %d 个，留在原处",
 		"keep %d: moved to the folder below":                                              "保留 %d 个，移到下面的文件夹",
 		"%d to the recycle bin":                                                           "%d 个移到回收站",
-		"delete %d unfinished builds":                                                     "删除 %d 个没创建完的整合包",
+		"delete %d unfinished packs":                                                      "删除 %d 个没创建完的整合包",
 		"keep %d save folders: moved to the folder below":                                 "保留 %d 个存档文件夹，移到下面的文件夹",
 		"%d save folders to the recycle bin":                                              "%d 个存档文件夹移到回收站",
 		"keep %d game folders downloaded with SteamCMD":                                   "保留 %d 个用 SteamCMD 下载的游戏",

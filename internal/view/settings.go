@@ -157,7 +157,7 @@ func FolderGroup(a *app.App) SettingGroup {
 	g.Items = append(g.Items, own...)
 	g.Items = append(g.Items,
 		SettingItem{Label: T("add a SteamCMD folder"), Edit: "path", Argv: []string{"folder", "add", "steamcmd", "{}"},
-			Note: T("mods there can be enabled; saving links them into Mods/")},
+			Note: T("mods there can be enabled; writing to the game links them into Mods/")},
 		SettingItem{Label: T("add another mod folder"), Edit: "path", Argv: []string{"folder", "add", "extra", "{}"}})
 	return g
 }
@@ -201,8 +201,8 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			Actions: []SettingAction{{Label: T("clear"), Argv: []string{"cache", "clear", c.Kind}}}})
 	}
 	out = append(out, caches)
-	mon := SettingItem{Label: T("add Archo Monitor to plans"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
-		Argv: []string{"config", "set", "monitor.default", "{}"}, Note: T("new plans, and each plan once; after that it is a normal mod you can disable or move")}
+	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
+		Argv: []string{"config", "set", "monitor.default", "{}"}, Note: T("new lists, and each list once; after that it is a normal mod you can disable or move")}
 	if s, err := a.MonitorState(); err == nil {
 		v := T("not installed")
 		if len(s.Installed) > 0 {

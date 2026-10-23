@@ -66,7 +66,7 @@ func UnloadableWhy(st *app.LoadoutState, mod *store.Mod) string {
 	switch {
 	case mod.Unloadable != "" && st != nil:
 		if h := st.HiddenOf(mod.ID); h != nil && h.Kind == app.HiddenPinned {
-			return Tf("pinned: the game uses %s", h.Copy.DisplayName())
+			return Tf("locked: the game uses %s", h.Copy.DisplayName())
 		}
 		return T("About.xml is renamed: the game cannot load it")
 	case mod.Unloadable != "":

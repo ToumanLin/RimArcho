@@ -117,7 +117,7 @@ func (s *API) HomeApply(kind, envName string, plan int64, pack string) (string, 
 	}
 	st = s.boardState()
 	if st == nil {
-		return "", fmt.Errorf("no environment")
+		return "", fmt.Errorf("no game")
 	}
 	return view.Tf("%s is ready to launch", pack), s.a.Store.SetMeta(view.FeaturedKey, view.FeaturedValue(envName, pack, st.Plan.ID))
 }

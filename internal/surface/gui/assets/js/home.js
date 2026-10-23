@@ -85,7 +85,7 @@ function draw() {
   // no page actions: rescanning is Mod 库's, a new plan is 方案's
   const w = page("home", "");
   sc.append(w);
-  if (!rows.length) { w.append(el("div", "card empty-state", T("no environment yet: add one on the environment page"))); return; }
+  if (!rows.length) { w.append(el("div", "card empty-state", T("no game yet: add one on the games page"))); return; }
   const menu = el("div", "hm-menu");
   const list = el("div", "hm-list");
   rows.forEach((r, i) => list.append(line(r, i)));
@@ -128,7 +128,7 @@ function setCur(i) {
   if (d) d.scrollIntoView({ block: "nearest" });
 }
 
-const kindTag = (r) => el("span", "kind", r.kind === "plan" ? T("plan") : T("pack"));
+const kindTag = (r) => el("span", "kind", r.kind === "plan" ? T("list") : T("pack"));
 
 // line: [kind] name / versions · mods · played, and 编辑 ↵ or 应用 ↵ on the right.
 function line(r, i) {

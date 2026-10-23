@@ -286,7 +286,7 @@ func (m *model) libSpace() tea.Cmd {
 			return m.runLibOp(c)
 		}
 	}
-	m.say(sayInfo, T("this copy cannot be used in the current plan"))
+	m.say(sayInfo, T("this copy cannot be used in the current list"))
 	return nil
 }
 

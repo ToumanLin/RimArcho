@@ -129,7 +129,7 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, light bool, t
 	check := BuildStep{Key: "check", Title: T("check that it runs")}
 	if n := len(r.Blockers); n > 0 {
 		check.Level, check.Needs = LevelBad, true
-		check.Text = Tf("%d problems still break the game; fix them first. The load order is sorted when the pack is built.", n)
+		check.Text = Tf("%d problems still break the game; fix them first. The load order is sorted when the pack is created.", n)
 		for i, b := range r.Blockers {
 			if i == 8 {
 				check.More = append(check.More, Tf("… %d more", n-8))
@@ -144,7 +144,7 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, light bool, t
 		}
 		p.Why, p.ToNeed = Tf("fix %d problems first", n), true
 	} else {
-		check.Text = T("nothing breaks the game.") + sp() + Tf("The load order is sorted for the pack (%d moved); your plan does not change.", r.Moved)
+		check.Text = T("nothing breaks the game.") + sp() + Tf("The load order is sorted for the pack (%d moved); your list does not change.", r.Moved)
 		if n := len(r.Mismatch); n > 0 {
 			check.Level = LevelWarn
 			check.Text += sp() + Tf("%d mods do not list game version %s.", n, mm)
@@ -219,7 +219,7 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, light bool, t
 	if !light {
 		t := textureStep(r, tex)
 		if t.Go != "" && p.Why == "" && len(r.Blockers) == 0 {
-			p.Why, p.ToGo = T("install the DDS encoder (todds) first, or build without converting textures"), t.Go
+			p.Why, p.ToGo = T("install the DDS encoder (todds) first, or create it without converting textures"), t.Go
 		}
 		p.Steps = append(p.Steps, t)
 	}
@@ -322,7 +322,7 @@ func BuildPackPage(a *app.App, name string) (*PackPage, error) {
 	if v := PackVersions(a, p.Pack); v != "" {
 		pg.Facts = append(pg.Facts, Tf("runs on %s", v))
 	}
-	built := Tf("built %s", ShortDate(p.Created))
+	built := Tf("created %s", ShortDate(p.Created))
 	if p.Env != "" {
 		built += " · " + p.Env
 	}

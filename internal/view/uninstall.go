@@ -178,7 +178,7 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		add(app.DoKeep, "keep %d where they are")
 		add(app.DoMove, "keep %d: moved to the folder below")
 		add(app.DoTrash, "%d to the recycle bin")
-		add(app.DoDelete, "delete %d unfinished builds")
+		add(app.DoDelete, "delete %d unfinished packs")
 	case app.UnSaves:
 		add(app.DoMove, "keep %d save folders: moved to the folder below")
 		add(app.DoTrash, "%d save folders to the recycle bin")
