@@ -128,6 +128,17 @@ disable, drag between lists (enable, disable, stage) or within Enabled (reorder)
 what you can do with the mod. The language follows the system; change it with
 `archo config set ui.lang zh|en|auto`.
 
+Settings lists every registered game, Workshop, SteamCMD and other mod directory, together with
+RimArcho's lock library and packs directory. Each entry shows its actual path, including default
+locations. **Locate** reconnects a folder you moved yourself; **Move to…** moves it to a new path.
+Mod identities, tags and lists stay attached to the directory. A destination already in use is
+never overwritten. For moves across drives, move the folder with your file manager and use Locate.
+
+RimArcho checks these directories at every start. If one is missing or changed, it asks for its
+new location; you can skip the prompt and return through Settings or **Can it run**. Directory
+issues appear there as warnings. CLI users can run `archo folder check`, then
+`archo folder set <directory-id> <new-directory>` or `archo folder move <directory-id> <new-directory>`.
+
 ## Connecting an agent (`archo mcp`)
 
 `archo mcp` serves the RimArcho tools over stdio:

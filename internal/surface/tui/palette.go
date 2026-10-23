@@ -142,8 +142,14 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 				b.WriteString(g.Title + "\n")
 				for _, it := range g.Items {
 					fmt.Fprintf(&b, "  %s: %s\n", it.Label, it.Value)
+					if it.Note != "" {
+						fmt.Fprintf(&b, "    %s\n", it.Note)
+					}
 					if len(it.Argv) > 0 {
 						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.Argv, " "))
+					}
+					if len(it.MoveArgv) > 0 {
+						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.MoveArgv, " "))
 					}
 					for _, a := range it.Actions {
 						fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, strings.Join(a.Argv, " "))

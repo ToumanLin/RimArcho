@@ -23,6 +23,8 @@ type SettingItem struct {
 	// ChoiceLabels are the words shown for Choices (same order); empty shows the values.
 	ChoiceLabels []string        `json:"choiceLabels,omitempty"`
 	Argv         []string        `json:"argv,omitempty"`
+	MoveArgv     []string        `json:"moveArgv,omitempty"`
+	Directory    string          `json:"directory,omitempty"`
 	Note         string          `json:"note,omitempty"`
 	Actions      []SettingAction `json:"actions,omitempty"`
 }
@@ -116,7 +118,7 @@ func FolderGroup(a *app.App) SettingGroup {
 		return t
 	}
 	var ws *source.Source
-	var others, own []SettingItem
+	var others []SettingItem
 	for _, s := range fs {
 		if s.Status == source.StatusRetired {
 			continue
@@ -125,14 +127,7 @@ func FolderGroup(a *app.App) SettingGroup {
 		case s.Kind == source.Workshop:
 			ws = s
 		case app.OwnFolder(s):
-			label := T("Archo Monitor folder")
-			if s.Label != app.MonitorLabel {
-				label = T("lock library")
-				if s.Label != app.LockLabel {
-					label = Tf("lock library (%s, older)", strings.TrimPrefix(s.Label, app.LockLabel+"-"))
-				}
-			}
-			own = append(own, SettingItem{Label: label, Value: s.Root, Note: note(s)})
+			continue // listed with relocation controls in DirectoryGroup
 		default:
 			label := T("mod folder")
 			if s.Kind == source.SteamCMD {
@@ -154,7 +149,6 @@ func FolderGroup(a *app.App) SettingGroup {
 	}
 	g.Items = append(g.Items, w)
 	g.Items = append(g.Items, others...)
-	g.Items = append(g.Items, own...)
 	g.Items = append(g.Items,
 		SettingItem{Label: T("add a SteamCMD folder"), Edit: "path", Argv: []string{"folder", "add", "steamcmd", "{}"},
 			Note: T("mods there can be enabled; writing to the game links them into Mods/")},
@@ -162,10 +156,19 @@ func FolderGroup(a *app.App) SettingGroup {
 	return g
 }
 
-// SettingsPage builds the settings page: what is RimArcho's, for every environment — the
-// mod folders first (the game's own folder and launch are on the environment page).
+// SettingsPage starts with every managed directory. Game launch and save options
+// also remain available on the environment page.
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
-	out := []SettingGroup{FolderGroup(a), {Title: "SteamCMD", Items: []SettingItem{
+	folders := FolderGroup(a)
+	// Existing folders have one row, with relocation controls, in DirectoryGroup.
+	var add []SettingItem
+	for _, item := range folders.Items {
+		if item.Value == "" {
+			add = append(add, item)
+		}
+	}
+	folders.Items = add
+	out := []SettingGroup{DirectoryGroup(a), folders, {Title: "SteamCMD", Items: []SettingItem{
 		{Label: T("SteamCMD account (optional)"), Value: cmds.Setting(a, "steamcmd.account"), Edit: "text", Argv: []string{"config", "set", "steamcmd.account", "{}"},
 			Note: T("empty or anonymous: anonymous login; enter an account name to log in. Password and Steam Guard are entered only in SteamCMD")},
 		{Label: T("SteamCMD program"), Value: cmds.Setting(a, "steamcmd.path"), Edit: "path", Argv: []string{"config", "set", "steamcmd.path", "{}"},
@@ -229,10 +232,6 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		{Label: T("the DDS encoder"), Value: cmds.Setting(a, "textures.todds"), Edit: "path", Argv: []string{"config", "set", "textures.todds", "{}"},
 			Note: toolNote + " · " + T("empty: RimArcho's own copy; or a todds you have, e.g. RimSort's")},
 	}})
-	out = append(out, SettingGroup{Title: T("packs"), Items: []SettingItem{
-		{Label: T("where packs are kept"), Value: cmds.Setting(a, "pack.dir"), Edit: "path", Argv: []string{"config", "set", "pack.dir", "{}"},
-			Note: T("a pack takes as much space as its mods")},
-	}})
 	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
 	// settings command).
 	out = append(out, SettingGroup{Title: T("uninstall"), Items: []SettingItem{
@@ -253,7 +252,7 @@ func SettingCommand(argv []string) error {
 		two += " " + argv[1]
 	}
 	switch two {
-	case "env set", "folder add", "folder remove", "config set", "db backup", "db vacuum", "cache clear", "data update":
+	case "env set", "env rebind", "folder add", "folder remove", "folder set", "folder move", "config set", "db backup", "db vacuum", "cache clear", "data update":
 		return nil
 	}
 	if argv[0] == "gc" {

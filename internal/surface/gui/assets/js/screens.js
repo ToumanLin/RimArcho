@@ -371,6 +371,8 @@ async function runAction(it, act) {
     case "open-url":
       try { await api.OpenURL(act.url); say("ok", act.done); } catch (e) { say("fail", errText(e)); }
       return;
+    case "locate-directory":
+      return directoryPrompt({ id: act.refs[0], label: it.title || act.label, path: act.lines?.[0] || "" }, false, async () => { await ui.reload(); needs(true); });
     case "view":
       try { pop.text(act.label, await api.Inspect(act.argv)); } catch (e) { say("fail", errText(e)); }
       return;
@@ -1156,6 +1158,56 @@ export async function settings() {
   read.finish();
 }
 
+// Each startup checks the disk, including environments other than the selected one.
+export async function checkDirectories() {
+  let dirs;
+  try { dirs = await api.Directories(); } catch (e) { say("fail", errText(e)); return; }
+  const missing = (dirs || []).filter(d => d.status !== "ok" && d.status !== "unused");
+  if (!missing.length) return;
+  const body = el("div");
+  body.append(el("p", "sub", T("directories are checked each time RimArcho starts; you can skip this and locate them in settings later")));
+  for (const d of missing) {
+    const row = el("div", "set");
+    const left = el("div", "l");
+    left.append(el("div", "name", d.label), el("div", "sub", d.path));
+    row.append(left, button(T("locate"), "", () => directoryPrompt(d, false, async () => { await ui.reload(); checkDirectories(); })));
+    body.append(row);
+  }
+  pop.panel(T("some directories need their new location"), body, T("skip for now"), () => {});
+}
+
+function directoryPrompt(d, moving, after) {
+  pop.open("directory", d.label, (box, p) => {
+    box.append(el("div", "ttl", d.label), el("p", "sub", d.path));
+    const input = el("input", "field");
+    input.spellcheck = false;
+    input.placeholder = T("new directory path");
+    const error = el("div", "err");
+    const actions = el("div", "actions");
+    let busy = false;
+    const apply = async () => {
+      const path = input.value.trim();
+      if (!path || busy) return;
+      busy = true;
+      error.textContent = "";
+      try {
+        const lines = await api.ApplySetting(["folder", moving ? "move" : "set", d.id, "{}"], path);
+        pop.close();
+        say("ok", lines?.[0] || T("done"));
+        if (after) await after();
+      } catch (e) { error.textContent = errText(e); busy = false; }
+    };
+    if (moving) box.append(el("p", "sub", T("move this directory and its files to the new path?")));
+    actions.append(button(T(moving ? "choose parent folder…" : "choose…"), "", () => pickFolder(d.path, path => {
+      input.value = moving ? path.replace(/[\\/]$/, "") + "/" + d.path.split(/[\\/]/).pop() : path;
+    })),
+      button(T(moving ? "move to…" : "locate"), "", apply, "primary"), button(T("skip for now"), "", () => pop.close()));
+    box.append(input, error, actions);
+    p.keys = e => { if (e.key === "Enter") { e.preventDefault(); apply(); return true; } return false; };
+    setTimeout(() => input.focus(), 0);
+  });
+}
+
 // settingRunner runs a setting's command, then redraws the page with again.
 function settingRunner(again) {
   return async (argv, value, after) => {
@@ -1196,6 +1248,13 @@ function renderGroups(w, groups, again) {
         // A new language: the page's text again, in place (main.js relang).
         s.onchange = () => run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : null);
         right.append(s);
+      } else if (it.edit === "directory") {
+        const value = el("span", "muted", it.value);
+        value.style.overflowWrap = "anywhere";
+        const d = { id: it.directory, label: it.label, path: it.value };
+        const after = async () => { await ui.reload(); again(); };
+        right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after)),
+          button(T("move to…"), "", () => directoryPrompt(d, true, after)));
       } else if (it.edit) {
         const inp = el("input", "field");
         inp.value = it.value || "";

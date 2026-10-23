@@ -2,6 +2,7 @@ package cmds_test
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -59,5 +60,30 @@ func TestLaunchChecksGrouped(t *testing.T) {
 	out = e.MustRun("launch", "--dry-run")
 	if strings.Contains(out, "before you play") {
 		t.Fatalf("still listed after the fix:\n%s", out)
+	}
+}
+
+// A managed directory moved while RimArcho was away is listed before a launch, with how to
+// locate it; it never blocks the launch.
+func TestLaunchChecksDirectories(t *testing.T) {
+	e := testkit.New(t)
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld")
+	e.WriteFile(filepath.Join(e.Steam, "steam.exe"), "")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	if out := e.MustRun("launch", "--dry-run"); strings.Contains(out, "directories:") {
+		t.Fatalf("listed with nothing moved:\n%s", out)
+	}
+	if err := os.Rename(e.Workshop, e.Workshop+"-moved"); err != nil {
+		t.Fatal(err)
+	}
+	out, code := e.Run("launch", "--dry-run")
+	if code != 0 {
+		t.Fatalf("launch blocked: %s", out)
+	}
+	for _, want := range []string{"directories: 1 not where they were (they do not block the launch)", "missing", "fix: archo folder set source:"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
 	}
 }

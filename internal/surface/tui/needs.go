@@ -89,6 +89,8 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 		k.run = func(m *model) tea.Cmd { return m.listAction(view.ListSave) }
 	case view.ActOpenURL:
 		k.run = func(m *model) tea.Cmd { return m.open(a.URL) }
+	case view.ActLocateDirectory:
+		k.run = func(m *model) tea.Cmd { return m.locateDirectory(a.Refs[0], a.Label) }
 	case view.ActView:
 		k.run = func(m *model) tea.Cmd { return m.openInspect(a.Argv) }
 	case view.ActList:
