@@ -60,7 +60,9 @@ const pageContexts = new Map();
 export const pageLoading = () => !!$("#screen .page-loading, #screen .page-read-error");
 // Every page starts navigation before I/O and owns a ticket for its reply. Refreshes
 // keep the visible content; a new page/subview shows a placeholder immediately.
-export function beginPageRead(name, { replace = false, label = "loading…" } = {}) {
+// keep: a page that is already drawn stays as it is while it reads, even when the game or
+// list changed (the launch page shows that change itself).
+export function beginPageRead(name, { replace = false, keep = false, label = "loading…" } = {}) {
   const same = S.screen === name;
   const sc = same ? $("#screen") : openScreen(name);
   const n = (pageReads.get(name) || 0) + 1;
@@ -70,7 +72,7 @@ export function beginPageRead(name, { replace = false, label = "loading…" } = 
   const changed = pageContexts.get(name) !== context;
   pageContexts.set(name, context);
   const current = () => S.screen === name && S.screenSeq === epoch && S.board?.env === env && S.shell?.plan?.id === plan && pageReads.get(name) === n;
-  if (!same || changed || replace || !sc.children.length) {
+  if ((!same || changed || replace || !sc.children.length) && !(keep && same && sc.children.length)) {
     sc.innerHTML = "";
     const w = page(name, "");
     const card = el("section", "card pad page-loading");

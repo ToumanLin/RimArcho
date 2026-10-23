@@ -714,13 +714,13 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 #main { position: relative; }
 #top, #body { z-index: 1; }
 /* the image behind the top bar and the page; the shade darkens it (--dim, the setting) and
-   more where the text is: down the left, the bottom right corner, under the top bar */
+   more where the text is: down the left, along the bottom (the three steps), under the top bar */
 #backdrop { position: absolute; left: 0; right: 0; top: 0; bottom: 30px; z-index: 0; overflow: hidden; pointer-events: none; background: #0e0e12; }
 #backdrop .img { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; animation: fade var(--t-enter) ease-out; }
 #backdrop .shade { position: absolute; inset: 0; background:
   linear-gradient(rgba(0, 0, 0, var(--dim, .3)), rgba(0, 0, 0, var(--dim, .3))),
   linear-gradient(90deg, rgba(14, 14, 18, .86) 0, rgba(14, 14, 18, .55) 340px, rgba(14, 14, 18, 0) 600px),
-  radial-gradient(70% 60% at 100% 100%, rgba(10, 10, 14, .8), rgba(10, 10, 14, 0) 70%),
+  linear-gradient(0deg, rgba(10, 10, 14, .82) 0, rgba(10, 10, 14, .5) 30%, rgba(10, 10, 14, 0) 55%),
   linear-gradient(180deg, rgba(10, 10, 14, .5), rgba(10, 10, 14, 0) 72px); }
 /* over the image the text is light whatever the theme */
 #app.photo #top, #app.photo #body { --fg: #f1f1f4; --fg-2: #cfcfd6; --muted: #a2a2ab; --faint: #6c6c75; --line: rgba(255, 255, 255, .2); --pill: rgba(255, 255, 255, .1); --pill-hover: rgba(255, 255, 255, .16);
@@ -729,61 +729,122 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 #app.photo #board { visibility: hidden; }
 #app.photo #crumbs .crumb.last { text-shadow: 0 1px 8px rgba(0, 0, 0, .5); }
 
-.page.home { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 24px; padding: 4px 32px 28px 28px; }
-.hm-menu { display: flex; flex-direction: column; min-height: 0; }
-.hm-list { flex: 0 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin: 0 -4px; padding: 0 4px; }
-.hm-menu .grow { flex: 1 0 16px; }
-.hm-row { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; padding: 9px 12px; border-radius: 10px; cursor: default; transition: background var(--t-press); }
-.hm-row:hover, .hm-row.cur { background: color-mix(in srgb, var(--fg) 4.5%, transparent); }
-.hm-row.on { background: color-mix(in srgb, var(--fg) 9%, transparent); }
-.hm-row .n { display: flex; align-items: center; gap: 10px; min-width: 0; }
-/* the kind first, one width for 方案 and 整合包, so the names start on one line */
-.hm-row .kind { width: 48px; text-align: center; padding: 0; }
-.hm-row .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; color: var(--fg-2); }
-.hm-row.on .t { color: var(--fg); font-weight: 600; }
-.hm-row .s { grid-column: 1; padding-left: 58px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hm-row .act { grid-column: 2; grid-row: 1 / 3; align-self: center; height: 26px; padding: 0 8px; border-radius: 6px; font-size: 12px; color: var(--accent); opacity: 0; transition: opacity var(--t-press), background var(--t-press); }
-.hm-row.on .act { color: var(--fg-2); }
-.hm-row.on .act, .hm-row.cur .act, .hm-row:hover .act, .hm-row .act:focus-visible { opacity: 1; }
-.hm-row .act:hover { background: var(--pill); }
-.hm-act { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: max-content; max-width: min(620px, calc(100vw - 520px)); min-width: 100%; }
-.hm-actline { max-width: 100%; display: flex; align-items: baseline; gap: 10px; height: 28px; padding: 0 12px; border-radius: 8px; text-align: left; min-width: 0; font-size: 12.5px; }
-.hm-actline:hover { background: var(--pill); }
-.hm-actline .t { flex: none; color: var(--fg-2); }
-.hm-actline .x { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
-.hm-actline .go { color: var(--muted); }
-.hm-launch { align-self: end; justify-self: end; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; text-align: right; min-width: 0; }
-.hm-launch .where { font-size: 13px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hm-launch .where b { color: var(--fg); font-weight: 600; }
-.hm-launch .stack { display: flex; flex-direction: column; width: 200px; }
-.hm-launch .btn.launch { position: relative; z-index: 2; height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; font-size: 15px; font-weight: 600; box-shadow: 0 8px 28px color-mix(in srgb, var(--accent) 30%, transparent); }
+/* 启动 (06 §2.3) on a 12-column grid: the headline carries the page; under a rule the three
+   steps read left to right; ▶ 启动游戏 is the one block of colour. */
+.page.home { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr) auto auto;
+  column-gap: 24px; padding: 8px 48px 36px; overflow-y: auto; }
+.hm-act { grid-column: 8 / 13; grid-row: 1; justify-self: end; width: 100%; max-width: 380px; display: flex; flex-direction: column; }
+.hm-actline { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; text-align: left; color: var(--fg-2); }
+.hm-actline .t { font-weight: 600; color: var(--fg); }
+.hm-actline .x { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-actline .go { color: var(--muted); transition: transform var(--t-layout) var(--ease); }
+.hm-actline:hover .go { transform: translateX(4px); color: var(--fg); }
+.hm-hero { grid-column: 1 / 13; grid-row: 2; align-self: end; padding-bottom: 34px; min-width: 0; }
+.hm-kick { display: flex; gap: 14px; align-items: baseline; font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 12px; min-width: 0; }
+.hm-kick span { color: var(--muted); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-headline { overflow: hidden; margin-bottom: -.08em; }
+.hm-headline h1 { margin: 0; padding-bottom: .1em; font: 700 clamp(48px, 7.6vw, 124px)/1 var(--font); letter-spacing: -.03em; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-headline h1.in { animation: hm-up .7s var(--ease) both; }
+.hm-facts { display: flex; flex-wrap: wrap; gap: 6px 26px; margin-top: 18px; font-size: 14px; color: var(--fg-2); }
+.hm-facts.in { animation: hm-fade .6s .12s var(--ease) both; }
+.hm-state { display: inline-flex; align-items: center; gap: 8px; }
+.hm-state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.hm-state.bad { color: var(--amber); }
+.hm-state.bad::before { background: var(--amber); border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.hm-state.none::before { background: none; box-shadow: inset 0 0 0 1.5px var(--muted); }
+.hm-rule { grid-column: 1 / 13; grid-row: 3; height: 2px; background: var(--fg); transform-origin: left; }
+.hm-rule.in { animation: hm-draw 1s .1s var(--ease) both; }
+.hm-step { grid-row: 4; position: relative; padding-top: 16px; min-width: 0; }
+.hm-s1 { grid-column: 1 / 4; } .hm-s2 { grid-column: 4 / 9; } .hm-s3 { grid-column: 9 / 13; }
+.hm-step h3 { display: flex; gap: 12px; margin: 0 0 14px; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--muted); }
+.hm-step h3 b { color: var(--fg); }
+.hm-picks { position: relative; display: flex; flex-direction: column; }
+/* the steps' rows: unpicked ones recede, the picked one is the text colour and bold */
+.hm-pick { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 12px; height: 40px; padding: 0; border-bottom: 1px solid var(--line);
+  font-size: 17px; text-align: left; color: color-mix(in srgb, var(--fg) 42%, var(--bg)); transition: color var(--t-layout); }
+#app.photo .hm-pick { color: color-mix(in srgb, var(--fg) 46%, transparent); }
+#app.photo .hm-pick.on, #app.photo .hm-pick:hover { color: var(--fg); }
+.hm-pick:hover { color: var(--fg); }
+.hm-pick.on { color: var(--fg); font-weight: 600; }
+.hm-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hm-pick .nm { line-height: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-pick small { font-size: 11.5px; font-weight: 400; color: var(--muted); }
+.hm-pick .flag { font-size: 9px; margin-left: 8px; vertical-align: 3px; color: var(--muted); }
+.hm-pick .flag.bad { color: var(--amber); }
+.hm-mark { position: absolute; left: -16px; top: 0; width: 7px; height: 7px; background: var(--accent); transition: transform .45s var(--ease); pointer-events: none; }
+.hm-picks.enter .hm-pick { animation: hm-rise .5s var(--ease) both; animation-delay: calc(var(--d) * 55ms); }
+.hm-go { position: relative; overflow: hidden; width: 100%; height: 136px; padding: 16px 18px; background: var(--accent); color: var(--accent-fg); display: flex; flex-direction: column;
+  justify-content: space-between; text-align: left; transition: filter var(--t-layout); }
+.hm-go:hover:not(:disabled) { filter: brightness(1.1); }
 /* the editor's 启动游戏 lands here with the focus on it (06 §2.5): L or enter starts the game */
-.hm-launch .btn.launch:focus { outline: 2px solid var(--fg); outline-offset: 3px; }
-.hm-launch .btn.launch .ic { display: inline-flex; margin: 0; }
-.hm-launch .btn.launch kbd { font: 600 11px/1 var(--code); padding: 3px 5px; border-radius: 4px; background: rgba(20, 21, 43, .14); color: inherit; }
-.hm-launch .btn.launch:disabled { filter: saturate(.3) brightness(.8); box-shadow: none; }
-/* the problem: a rounded tab whose top hides behind the button */
-.hm-launch .issue { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; margin-top: -14px; padding: 20px 14px 8px; border-radius: 0 0 12px 12px; border: 1px solid var(--line); border-top: 0; background: color-mix(in srgb, var(--fg) 7%, transparent); backdrop-filter: blur(14px); color: var(--fg-2); font-size: 12.5px; text-align: left; }
-.hm-launch .issue.bad { color: var(--amber); background: color-mix(in srgb, var(--amber) 16%, transparent); border-color: color-mix(in srgb, var(--amber) 28%, transparent); }
-.hm-launch .issue .ic { display: inline-flex; }
-.hm-launch .issue svg.i { width: 13px; height: 13px; }
-.hm-launch .issue .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hm-launch .issue .go { margin-left: auto; opacity: .7; }
-.hm-launch button.issue:hover { background: color-mix(in srgb, var(--amber) 24%, transparent); }
-/* the launch hint (06 §2.3): the most likely trouble on the first line, its reason below */
-.hm-launch .issue.hint { align-items: flex-start; }
-.hm-launch .issue.hint .ic { margin-top: 2px; }
-.hm-launch .issue.hint .t { display: flex; flex-direction: column; gap: 2px; white-space: normal; }
-.hm-launch .issue.hint .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hm-launch .issue.hint .why { font-size: 11.5px; opacity: .8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hm-go:focus-visible, .hm-go:focus { outline: 2px solid var(--fg); outline-offset: 3px; }
+.hm-go .top, .hm-go .bottom { display: flex; justify-content: space-between; gap: 12px; }
+.hm-go .top { align-items: flex-start; } .hm-go .bottom { align-items: flex-end; }
+.hm-go .title { font-size: 26px; font-weight: 700; letter-spacing: -.01em; line-height: 1; }
+.hm-go kbd { font: 600 11px var(--code); border: 1px solid currentColor; opacity: .6; padding: 2px 6px; }
+.hm-go .sub { font-size: 12.5px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-go .arrow { font-size: 40px; line-height: .8; font-weight: 300; transition: transform .35s var(--ease); }
+.hm-go:hover:not(:disabled) .arrow { transform: translateX(8px); }
+.hm-go::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(0, 0, 0, .16); }
+.hm-go.starting::after { animation: hm-fill 1.6s var(--ease) forwards; }
+.hm-go:disabled { cursor: default; }
+.hm-go.running { background: var(--fg); color: var(--bg); }
+#app.photo .hm-go.running { color: #14142a; }
+/* switching (06 §2.3): ▶ says what is loading, a bar sweeps along its foot; the new pick
+   comes in when the page is read again */
+.hm-go.switching { cursor: progress; filter: saturate(.85); }
+.hm-go.switching .title { font-size: 20px; line-height: 1.15; animation: hm-fade .35s var(--ease) both; }
+.hm-go.switching .sub { animation: hm-fade .35s .08s var(--ease) both; }
+.hm-go.switching::before { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .16) 50%, transparent 70%);
+  transform: translateX(-100%); animation: hm-sweep 1.6s ease-in-out infinite; }
+.hm-go .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: color-mix(in srgb, var(--accent-fg) 18%, transparent); overflow: hidden; }
+.hm-go .bar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 38%; background: var(--accent-fg); opacity: .7; animation: hm-bar 1.2s var(--ease) infinite; }
+.hm-go.arrived .top, .hm-go.arrived .bottom { animation: hm-land .55s var(--ease) both; }
+.hm-go.arrived .bottom { animation-delay: .06s; }
+.hm-go.arrived::before { content: ""; position: absolute; inset: 0; background: var(--accent-fg); opacity: 0; animation: hm-flash .6s ease-out; pointer-events: none; }
+.hm-pick.leaving { animation: hm-leave .25s var(--ease) forwards; }
+.hm-go .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--green); margin-right: 10px; animation: hm-blink 1.4s infinite; }
+/* the applied row's problem under ▶; × hides it until something about the row changes */
+.hm-note { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .3s var(--ease), opacity .3s; }
+.hm-note > div { min-height: 0; overflow: hidden; }
+.hm-note .box { position: relative; margin-top: 12px; padding: 10px 30px 0 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+.hm-note.bad .box { border-top-color: var(--amber); }
+.hm-note .what { display: block; font-weight: 600; color: var(--fg); text-align: left; }
+.hm-note.bad .what { color: var(--amber); }
+.hm-note button.what:hover { text-decoration: underline; }
+.hm-note .why { color: var(--muted); margin-top: 3px; font-size: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.hm-note .x { position: absolute; right: 0; top: 7px; width: 22px; height: 22px; font-size: 17px; line-height: 22px; text-align: center; color: var(--muted); border-radius: 4px; }
+.hm-note .x:hover { color: var(--fg); background: var(--pill); }
+.hm-note.enter { animation: hm-fade .45s var(--ease) both; }
+.hm-note.leaving { grid-template-rows: 0fr; opacity: 0; }
+.hm-empty { grid-column: 1 / 13; grid-row: 2; align-self: center; }
+.hm-empty h1 { margin: 0 0 24px; font: 700 clamp(32px, 4.5vw, 64px)/1.1 var(--font); letter-spacing: -.02em; color: var(--fg); }
+@keyframes hm-up { from { transform: translateY(105%); } to { transform: none; } }
+@keyframes hm-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes hm-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes hm-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes hm-fill { to { width: 100%; } }
+@keyframes hm-blink { 50% { opacity: .25; } }
+@keyframes hm-sweep { to { transform: translateX(100%); } }
+@keyframes hm-bar { from { left: -38%; } to { left: 100%; } }
+@keyframes hm-land { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes hm-flash { 0% { opacity: .22; } 100% { opacity: 0; } }
+@keyframes hm-leave { to { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .page.home * { animation: none !important; transition: none !important; } }
 .kind { flex: none; font-size: 11px; line-height: 16px; padding: 0 5px; border-radius: 4px; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); white-space: nowrap; }
 .card.empty-state { padding: 32px 16px; }
 svg.i.fill { fill: currentColor; }
 .packs .pack.hl { background: var(--accent-soft); }
+@media (max-width: 1000px) {
+  .page.home { padding: 8px 28px 28px; }
+  .hm-act { display: none; }
+  .hm-s1 { grid-column: 1 / 5; } .hm-s2 { grid-column: 5 / 13; } .hm-s3 { grid-column: 1 / 13; grid-row: 5; margin-top: 20px; }
+}
 @media (max-width: 720px) {
-  .page.home { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; padding: 4px 16px 16px; }
-  .hm-launch { justify-self: stretch; align-items: stretch; }
-  .hm-launch .stack { width: auto; }
+  .page.home { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; column-gap: 0; padding: 8px 16px 24px; }
+  .page.home > * { grid-column: 1 / -1 !important; grid-row: auto !important; }
+  .hm-hero { padding: 28px 0 24px; }
+  .hm-mark { display: none; }
 }
 
 /* ---- 设置 › 启动页背景 (06 §2.14): the launch page in small, the controls beside it, the
@@ -793,7 +854,7 @@ svg.i.fill { fill: currentColor; }
 .bg-pv { position: relative; aspect-ratio: 16 / 9.6; border-radius: 9px; overflow: hidden; border: 1px solid var(--line); background: #0e0e12; }
 .bg-pv.plain { background: var(--bg); }
 .bg-pv .img { position: absolute; inset: 0; background-size: cover; }
-.bg-pv .shade { position: absolute; inset: 0; background: linear-gradient(rgba(0, 0, 0, var(--dim, .3)), rgba(0, 0, 0, var(--dim, .3))), linear-gradient(90deg, rgba(14, 14, 18, .86) 0, rgba(14, 14, 18, .5) 32%, rgba(14, 14, 18, 0) 55%), radial-gradient(70% 60% at 100% 100%, rgba(10, 10, 14, .8), rgba(10, 10, 14, 0) 70%); }
+.bg-pv .shade { position: absolute; inset: 0; background: linear-gradient(rgba(0, 0, 0, var(--dim, .3)), rgba(0, 0, 0, var(--dim, .3))), linear-gradient(90deg, rgba(14, 14, 18, .86) 0, rgba(14, 14, 18, .5) 32%, rgba(14, 14, 18, 0) 55%), linear-gradient(0deg, rgba(10, 10, 14, .82) 0, rgba(10, 10, 14, .5) 30%, rgba(10, 10, 14, 0) 55%); }
 .bg-pv.plain .shade { display: none; }
 .bg-pv .ls { position: absolute; left: 14px; top: 20px; width: 30%; display: flex; flex-direction: column; gap: 8px; }
 .bg-pv .ls i { display: block; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .5); }

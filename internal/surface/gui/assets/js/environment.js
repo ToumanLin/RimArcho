@@ -1,8 +1,10 @@
 // Environment changes may prepare links and scan folders before the new board is ready.
 // Keep feedback visible for the whole operation, including the destination's refresh.
+// quiet: the caller shows the progress itself (the launch page's ▶ block, 06 §2.3); the
+// window is still busy and inert until the switch is done.
 import { S, $, el, T, Tf, say } from "./state.js";
 
-export async function withEnvironmentSwitch(name, action) {
+export async function withEnvironmentSwitch(name, action, { quiet = false } = {}) {
   if (S.busy.env) return false;
   const app = $("#app"), focus = document.activeElement;
   const wasInert = app.inert, wasBusy = app.getAttribute("aria-busy");
@@ -23,12 +25,15 @@ export async function withEnvironmentSwitch(name, action) {
   S.busy.env = true;
   app.inert = true;
   app.setAttribute("aria-busy", "true");
-  document.body.append(overlay);
-  overlay.focus({ preventScroll: true });
+  if (!quiet) {
+    document.body.append(overlay);
+    overlay.focus({ preventScroll: true });
+  }
   say("busy", title);
   try {
-    // Let the browser paint before asking Go to do the potentially slow switch.
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    // Let the browser paint before asking Go to do the potentially slow switch (a hidden or
+    // minimised window gets no frames: go on after a moment anyway).
+    await new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); setTimeout(resolve, 100); });
     await action();
     return true;
   } finally {
