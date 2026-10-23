@@ -866,6 +866,7 @@ func stats(dir string) error {
 	}
 	defer out.Close()
 	var recs []Record
+	harmonyLen := map[string]int{} // Harmony section size per id, kept after the section is dropped
 	seenHash := map[string]bool{}
 	drops := map[string]int{}
 	missing := 0
@@ -916,6 +917,7 @@ func stats(dir string) error {
 			out.Write(append(j, '\n'))
 			// The summary below needs neither the Harmony section nor the assemblies; dropping them
 			// keeps 40k records in a few GB instead of tens.
+			harmonyLen[r.ID] = len(r.Harmony)
 			r.Harmony = nil
 			for i := range r.Mods {
 				r.Mods[i].Assemblies = nil
@@ -964,7 +966,7 @@ func stats(dir string) error {
 	tplLogs := map[string]int{} // logs per cluster template
 	for _, r := range ok {
 		nMods = append(nMods, len(r.Mods))
-		nHar = append(nHar, len(r.Harmony))
+		nHar = append(nHar, harmonyLen[r.ID])
 		nClus = append(nClus, len(r.Clusters))
 		if r.Truncated {
 			tr++
@@ -972,7 +974,7 @@ func stats(dir string) error {
 		if len(r.Clusters) > 0 {
 			withErr = append(withErr, 1)
 		}
-		if len(r.Harmony) > 0 {
+		if harmonyLen[r.ID] > 0 {
 			withHar = append(withHar, 1)
 		}
 		seenC := map[string]bool{}
