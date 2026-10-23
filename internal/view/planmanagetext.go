@@ -56,7 +56,13 @@ func init() {
 		"recommended":               "推荐",
 		"workshop links":            "工坊链接",
 		"Markdown links for subscribing by hand; reads back as workshop IDs": "每行一个工坊链接，没装的人照着订阅",
-		"pick a list to export": "选一个要导出的列表",
-		"the game's lists":      "这个游戏的列表",
+		"pick a list to export":              "选一个要导出的列表",
+		"the game's lists":                   "这个游戏的列表",
+		"the collection changed":             "合集有变化",
+		"pick a list":                        "选列表",
+		"more":                               "更多",
+		"copy":                               "复制",
+		"follow this collection from now on": "以后跟着这个合集",
+		"RimArcho tells you when it changes; catching up is one undoable step": "合集有变化时 RimArcho 会告诉你，跟上合集是一步可撤销的操作",
 	})
 }

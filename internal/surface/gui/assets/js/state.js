@@ -50,7 +50,8 @@ export function say(kind, text, undo = false) {
   undoLink = undo;
   if (undo && text) {
     const a = el("a", "", T("undo"));
-    a.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "undo" }));
+    // undo is true (the current list's undo) or the function that undoes this one thing
+    a.onclick = typeof undo === "function" ? () => undo() : () => document.dispatchEvent(new CustomEvent("verb", { detail: "undo" }));
     s.appendChild(a);
   }
   statusIn(s);

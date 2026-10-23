@@ -33,13 +33,16 @@ function forget() {
   });
 }
 
-async function done(p) {
+// done: after a dialog's verb the window shows the plan's page, or what after opens (the
+// list management page stays where it is, 06 §2.17).
+async function done(p, after) {
   let d;
   try { d = await p; } catch (e) { say("fail", errText(e)); return null; }
   pop.close();
   forget();
   await ui.reload();
-  await ui.go(d.page);
+  if (after) await after(d);
+  else await ui.go(d.page);
   say("ok", d.text);
   return d;
 }
@@ -66,7 +69,7 @@ function nameField(box, value, self) {
 }
 
 // newPlan: the new-plan dialog (04 §1.3): a name and where the list comes from.
-export async function newPlan(from = "") {
+export async function newPlan(from = "", after = null) {
   let froms, nm;
   try { [froms, nm] = await Promise.all([api.PlanFroms(), api.CheckPlanName("", "", 0)]); } catch (e) { return say("fail", errText(e)); }
   const opts = froms.concat([{ from: "import", label: T("from an import: a file, a share code, a link…") }]);
@@ -105,7 +108,7 @@ export async function newPlan(from = "") {
       }
       await f.check();
       if (f.bad()) return f.inp.focus();
-      done(api.NewPlan(f.inp.value, o.from));
+      done(api.NewPlan(f.inp.value, o.from), after);
     }
     p.keys = (e) => {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); sel = Math.max(0, Math.min(opts.length - 1, sel + (e.key === "ArrowDown" ? 1 : -1))); draw(); return true; }
@@ -117,7 +120,7 @@ export async function newPlan(from = "") {
 }
 
 // renamePlan: the rename dialog; the history stays.
-export function renamePlan(id) {
+export function renamePlan(id, after = null) {
   const p0 = planOf(id);
   if (!p0) return;
   pop.open("plan-rename", T("rename the list"), (box, p) => {
@@ -128,7 +131,7 @@ export function renamePlan(id) {
     const no = el("button", "", T("cancel") + "  esc");
     no.onclick = pop.close;
     const yes = el("button", "go", T("rename") + "  enter");
-    const go = async () => { await f.check(); if (f.bad()) return f.inp.focus(); done(api.RenamePlan(id, f.inp.value)); };
+    const go = async () => { await f.check(); if (f.bad()) return f.inp.focus(); done(api.RenamePlan(id, f.inp.value), after); };
     yes.onclick = go;
     btns.append(no, yes);
     box.append(btns);
@@ -137,10 +140,10 @@ export function renamePlan(id) {
 }
 
 // deletePlan asks first (it cannot be undone); the last plan cannot go.
-export async function deletePlan(id) {
+export async function deletePlan(id, after = null) {
   let warn;
   try { warn = await api.RemovePlanWarn(id); } catch (e) { return say("fail", errText(e)); }
-  pop.confirm(T("delete the list"), [warn], T("delete"), () => done(api.RemovePlan(id)));
+  pop.confirm(T("delete the list"), [warn], T("delete"), () => done(api.RemovePlan(id), after));
 }
 
 // actions are what can be done with a plan: the sidebar entry's context menu, the

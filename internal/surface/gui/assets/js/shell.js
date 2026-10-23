@@ -159,6 +159,8 @@ export function current() {
   if (S.screen === "full" && S.fullFrom === "library") return "library";
   if (!S.screen || S.screen === "full" || S.screen === "build") return (S.shell && S.shell.plan && S.shell.plan.page) || "plan";
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
+  // a list's export: under 管理, or under the list when the editor opened it (06 §2.17)
+  if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : "plans";
   // 卸载 RimArcho is under 设置
   if (S.screen === "uninstall") return "settings";
   // adding an environment belongs to the environment page
@@ -235,7 +237,8 @@ function renderSide() {
         let n = null;
         if (badge) b.append(n = el("span", "badge-n num", String(badge)));
         bump("nav:" + it.id, n, badge || 0);
-        b.onclick = () => ui.go(it.id);
+        // 列表 opens its first sub-entry, 管理 (06 §2.17)
+        b.onclick = () => ui.go(it.id === "plan" ? "plans" : it.id);
         nav.append(b);
         if (kids.length) nav.append(kidList(it, kids, cur, hls.get(it.id)));
       }
@@ -328,6 +331,7 @@ export function crumbs() {
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
   if (S.screen === "build") out = out.concat([{ label: T("create a pack"), id: "build" }]);
+  if (S.screen === "plan-export" && S.planExport) out = ((sh && sh.crumbs && sh.crumbs["plan:" + S.planExport.id]) || []).concat([{ label: T("export"), id: "plan-export" }]);
   return out;
 }
 

@@ -136,6 +136,16 @@ async function preview(kind, src, name) {
     await asPlan(p),
   );
   body.append(ways);
+  // a Steam Workshop collection: the list can follow it (04 §9.6); ticked by default
+  if (p.collection) {
+    const lb = el("label", "xc-check");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.checked = true;
+    cb.onchange = () => api.ImportFollow(cb.checked).catch((e) => say("fail", errText(e)));
+    lb.append(cb, el("span", "", T("follow this collection from now on")), el("span", "xc-hint", T("RimArcho tells you when it changes; catching up is one undoable step")));
+    body.append(lb);
+  }
   body.append(el("div", "xc-hint", T("one step: u undoes it; the game's ModsConfig.xml changes only when you write to the game")));
 
   if (p.missing.length) {
