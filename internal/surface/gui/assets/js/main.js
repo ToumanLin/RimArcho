@@ -902,6 +902,7 @@ const ui = {
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
+  manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   afterImport: null, // the first-run guide's next step once an import is applied
 };
 

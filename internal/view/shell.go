@@ -253,6 +253,12 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 		r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: p.Played, at: p.PlayedAt, Plan: p.ID, Page: p.Page,
 			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"),
 			EnvName: b.EnvName, Versions: ver, Mods: p.Entries}
+		// a list says the game versions it allows (04 §1.6, 06 §2.3)
+		if sp, err := a.Store.PlanByID(p.ID); err == nil && sp != nil {
+			if vs := app.FormatVersions(a.PlanAllowedVersions(b.St, sp)); vs != "" {
+				r.Versions = vs
+			}
+		}
 		k, checked := 0, false
 		if p.Current {
 			r.Mods = len(b.Cols[Active])
@@ -314,6 +320,9 @@ func AddOtherEnvs(a *app.App, h *Home, current string) {
 		for _, p := range ps {
 			r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: T("never played"), at: p.LastPlayed, Plan: p.ID,
 				Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"), EnvName: e.Name, Versions: ver, Mods: p.Entries, OtherEnv: true}
+			if len(p.Plan.Versions) > 0 { // the player's choice; the default needs that game's mods loaded
+				r.Versions = app.FormatVersions(p.Plan.Versions)
+			}
 			if !p.LastPlayed.IsZero() {
 				r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 			}

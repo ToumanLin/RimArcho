@@ -91,7 +91,7 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 		k.run = func(m *model) tea.Cmd { return m.open(a.URL) }
 	case view.ActLocateDirectory:
 		k.run = func(m *model) tea.Cmd { return m.locateDirectory(a.Refs[0], a.Label) }
-	case view.ActView:
+	case view.ActView, view.ActManageLists: // the TUI has no list management page: its CLI view
 		k.run = func(m *model) tea.Cmd { return m.openInspect(a.Argv) }
 	case view.ActList:
 		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n")); return nil }

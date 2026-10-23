@@ -21,6 +21,9 @@ const sel = () => (M.data && M.data.sel) || null;
 
 // ---- the page ----
 
+// select picks the list the page opens on next (0: the current one).
+export function select(id) { M.sel = id; }
+
 // open draws the page with the list id picked (0: the one picked before, else the current).
 export async function open(id) {
   if (id !== undefined) M.sel = id;
