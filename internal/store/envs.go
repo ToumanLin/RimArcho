@@ -208,6 +208,7 @@ func (s *Store) DeleteEnv(envID string) error {
 			`DELETE FROM workspace WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
 			`DELETE FROM workspace_undo WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
 			`DELETE FROM loadout_version WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
+			`DELETE FROM plan_collection WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
 			`DELETE FROM plan WHERE environment_id=?`,
 			`DELETE FROM launch WHERE environment_id=?`,
 			`DELETE FROM environment WHERE id=?`,

@@ -2,6 +2,8 @@ package cmds
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -18,6 +20,8 @@ func init() {
 	register(&Command{Name: "plan rename", Args: "<old> <new>", Summary: "rename a plan (its history stays)", MinArgs: 2, MaxArgs: 2, Run: planRename})
 	register(&Command{Name: "plan remove", Args: "<name>", Summary: "delete a plan and its history (not the last one)", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "yes", Help: "confirm"}}, Run: planRemove})
+	register(&Command{Name: "plan versions", Args: "[<name> [<versions…>|default]]", Summary: "show or set the game versions a plan is meant for (1.6, 1.5-1.7, default)",
+		MinArgs: 0, MaxArgs: -1, Run: planVersions})
 }
 
 func planList(c *Ctx, a *Args) (*render.Doc, error) {
@@ -125,4 +129,84 @@ func planRemove(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("current", app.PlanRef(cur))
 	}
 	return d, nil
+}
+
+// planVersions shows a plan's game versions (04 §1.6), or sets them: versions such as
+// "1.6 1.7" or "1.5-1.7", or "default" to follow the mods again.
+func planVersions(c *Ctx, a *Args) (*render.Doc, error) {
+	name := ""
+	if len(a.Pos) > 0 {
+		name = a.Pos[0]
+	} else if st := c.Loadout(); st != nil {
+		name = st.Plan.Name
+	}
+	if len(a.Pos) > 1 {
+		r, err := c.App.SetPlanVersions(name, a.Pos[1:])
+		if err != nil {
+			return nil, err
+		}
+		d, root := render.New(fmt.Sprintf("%s game versions: %s%s", app.PlanRef(r.After.Plan), app.FormatVersions(r.After.Allowed), customNote(r.After)))
+		root.KV("was", app.FormatVersions(r.Before.Allowed)+customNote(r.Before))
+		if r.After.Custom {
+			d.AddNext("archo plan versions " + quoteArg(r.After.Plan.Name) + " default")
+		}
+		return d, nil
+	}
+	p, err := c.App.FindPlan(name)
+	if err != nil {
+		return nil, err
+	}
+	st, err := c.App.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	pv, err := c.App.PlanVersionsOf(st, p)
+	if err != nil {
+		return nil, err
+	}
+	d, root := render.New(fmt.Sprintf("%s game versions: %s%s", app.PlanRef(p), app.FormatVersions(pv.Allowed), customNote(pv)))
+	why := "no version every mod lists"
+	if len(pv.Common) > 0 {
+		why = "every mod lists " + app.FormatVersions(pv.Common)
+	}
+	made := pv.Created
+	if made == "" {
+		made = pv.Game
+	}
+	root.KV("default", fmt.Sprintf("%s (%s; made on %s)", app.FormatVersions(pv.Default), why, made))
+	n := root.KV("mods", fmt.Sprintf("%d list their game versions (official content and mods without supportedVersions are not counted)", pv.Counted))
+	for i := len(pv.Shown) - 1; i >= 0; i-- {
+		v := pv.Shown[i]
+		line := fmt.Sprintf("%s  %s", v, render.Plural(pv.Missing[v], "mod")+" do not list it")
+		if pv.Missing[v] == 0 {
+			line = v + "  every mod lists it"
+		}
+		var tags []string
+		if slices.Contains(pv.Allowed, v) {
+			tags = append(tags, "allowed")
+		}
+		if v == pv.Game {
+			tags = append(tags, "the game now")
+		}
+		if len(tags) > 0 {
+			line += "  [" + strings.Join(tags, ", ") + "]"
+		}
+		n.Add(line)
+	}
+	if pv.Game != "" && !slices.Contains(pv.Allowed, pv.Game) {
+		root.KV("note", fmt.Sprintf("the game now (%s) is not one of them", pv.Game))
+		d.AddNext(fmt.Sprintf("archo plan versions %s %s", quoteArg(p.Name), strings.Join(append(append([]string(nil), pv.Allowed...), pv.Game), " ")))
+	} else if pv.Custom {
+		d.AddNext("archo plan versions " + quoteArg(p.Name) + " default")
+	} else {
+		d.AddNext("archo plan versions " + quoteArg(p.Name) + " <versions, e.g. 1.5-1.7>")
+	}
+	return d, nil
+}
+
+func customNote(pv *app.PlanVersions) string {
+	if pv.Custom {
+		return " (chosen)"
+	}
+	return " (default)"
 }

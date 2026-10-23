@@ -31,6 +31,9 @@ type Import struct {
 	Label  string            // what the undo step calls it
 	Source string            // the file, "share code", the link
 	Titles map[string]string // workshop ID → title (collections)
+	// Collection is the Workshop collection read (nil for other sources): applying the
+	// import can make the list follow it (04 §9.1, §9.6).
+	Collection *app.Collection
 }
 
 var (
@@ -84,7 +87,7 @@ func ReadImport(a *app.App, kind, src string) (*Import, error) {
 				titles[it.WorkshopID] = it.Title
 			}
 		}
-		return checked(&Import{List: il, Label: "collection ws:" + c.ID, Source: "https://steamcommunity.com/sharedfiles/filedetails/?id=" + c.ID, Titles: titles})
+		return checked(&Import{List: il, Label: "collection ws:" + c.ID, Source: "https://steamcommunity.com/sharedfiles/filedetails/?id=" + c.ID, Titles: titles, Collection: c})
 	case ImportText:
 		il, err := app.ParseList([]byte(src))
 		if err != nil {
@@ -166,6 +169,8 @@ type ImportPreview struct {
 	Replace   ImportEffect `json:"replace"`
 	Merge     ImportEffect `json:"merge"`
 	Summary   string       `json:"summary"`
+	// Collection: the list is a Steam Workshop collection the list can follow (04 §9.6).
+	Collection bool `json:"collection,omitempty"`
 }
 
 // PreviewImport compares an imported list with the installed mods and the workspace;
@@ -176,7 +181,7 @@ func PreviewImport(a *app.App, imp *Import) (*ImportPreview, error) {
 		return nil, err
 	}
 	il := imp.List
-	p := &ImportPreview{Format: FormatName(il.Format), Source: imp.Source, Name: il.Title, Game: il.Game, Installed: []ImportRow{}, Missing: []ImportRow{}}
+	p := &ImportPreview{Format: FormatName(il.Format), Source: imp.Source, Name: il.Title, Game: il.Game, Installed: []ImportRow{}, Missing: []ImportRow{}, Collection: imp.Collection != nil}
 	if mm := st.GameMM(); il.Game != "" && mm != "" && !strings.HasPrefix(il.Game, mm) {
 		p.GameNote = Tf("the list is for RimWorld %s, this game runs %s", majorMinor(il.Game), mm)
 	}
@@ -351,6 +356,20 @@ func ApplyImport(a *app.App, imp *Import, merge bool) (string, error) {
 	return Tf("imported %s: %d added, %d removed, %d moved · not written to the game yet, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved), nil
 }
 
+// FollowImported makes a list follow the collection an import read (no network: the
+// collection read for the preview is the snapshot). Nothing for other sources.
+func FollowImported(a *app.App, imp *Import, planID int64) error {
+	if imp == nil || imp.Collection == nil {
+		return nil
+	}
+	p, err := planByID(a, planID)
+	if err != nil {
+		return err
+	}
+	_, err = a.FollowReadCollection(p, imp.Collection, "")
+	return err
+}
+
 // ---- export ----
 
 // ExportFormat is one way to write the list.
@@ -377,6 +396,7 @@ func ExportFormats(a *app.App) []ExportFormat {
 		{app.FormatRimCrow, T("share code"), T("one line to paste in RimCrow or here"), base + ".txt", true},
 		{app.FormatText, T("plain text"), T("one packageId per line, with names"), base + ".txt", true},
 		{app.FormatModsConfig, "ModsConfig.xml", T("the game's file format, for copying to another computer"), "ModsConfig.xml", false},
+		{app.FormatWorkshop, T("workshop links"), T("Markdown links for subscribing by hand; reads back as workshop IDs"), base + "-workshop.md", true},
 	}
 }
 

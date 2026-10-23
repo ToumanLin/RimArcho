@@ -77,7 +77,7 @@ func TestNavAndPath(t *testing.T) {
 	for id, want := range map[string]string{
 		"plan":        "library=library / lists=plan",
 		plans[0].Page: "library=library / lists=plan / default=" + plans[0].Page,
-		"plan:new":    "library=library / lists=plan / + new list=plan:new",
+		"plans":       "library=library / lists=plan / manage=plans",
 		"needs":       "playing=home / can it run=needs",
 		"log":         "playing=home / game log=log",
 		"changes":     "library=library / mod library=library / changes=changes",

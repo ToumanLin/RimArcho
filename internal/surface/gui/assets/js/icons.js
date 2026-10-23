@@ -30,6 +30,11 @@ export const icon = {
   // 后台任务: stacked bars, the work in a queue
   tasks: svg('<path d="M3 4.5h10M3 8h10M3 11.5h6"/>'),
   chev: svg('<path d="M6 4l4 4-4 4"/>'),
+  // the list management page (06 §2.17)
+  import: svg('<path d="M8 2.4v7.2M5.2 6.8L8 9.6l2.8-2.8"/><path d="M2.8 10.4v2.2h10.4v-2.2"/>'),
+  export: svg('<path d="M8 9.6V2.4M5.2 5.2L8 2.4l2.8 2.8"/><path d="M2.8 10.4v2.2h10.4v-2.2"/>'),
+  more: svg('<circle cx="3.6" cy="8" r=".9"/><circle cx="8" cy="8" r=".9"/><circle cx="12.4" cy="8" r=".9"/>', "fill"),
+  ext: svg('<path d="M9.4 2.6h4v4M13.2 2.8L7.6 8.4"/><path d="M11.8 9.6v3.6H2.8V4.2h3.6"/>'),
 };
 
 export function sourceIcon(kind) { return icon[kind] || icon.local; }

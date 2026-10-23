@@ -43,9 +43,14 @@ type Pack struct {
 	Game    string    `json:"game"` // the game version it was built for
 	Env     string    `json:"env"`
 	// Light: the list only, no files — a RimArcho list (04 §9.3) or a pack's exported list.
-	Light   bool        `json:"light,omitempty"`
-	Entries []PackEntry `json:"entries"`
-	Trimmed int64       `json:"trimmed_bytes,omitempty"`
+	Light bool `json:"light,omitempty"`
+	// PlanID is the plan the pack was created from, in the database that created it (the
+	// list management page shows a plan's newest pack, 06 §2.17).
+	PlanID int64 `json:"plan_id,omitempty"`
+	// Versions are the game versions the list is meant for (a RimArcho list, 04 §1.6, §9.3).
+	Versions []string    `json:"versions,omitempty"`
+	Entries  []PackEntry `json:"entries"`
+	Trimmed  int64       `json:"trimmed_bytes,omitempty"`
 	// Textures: the copies' PNGs were converted to DDS and deleted (08 §5.2).
 	Textures *PackTextures `json:"textures,omitempty"`
 }
@@ -297,7 +302,7 @@ func (a *App) PlanPack(name string) (*PackPlan, error) {
 	for _, m := range mods {
 		active[m.PackageID] = true
 	}
-	p := &Pack{Format: PackFormat, Name: name, Created: a.Now().UTC(), Game: st.Ix.Env.GameVersion, Env: st.Ix.Env.Name}
+	p := &Pack{Format: PackFormat, Name: name, Created: a.Now().UTC(), Game: st.Ix.Env.GameVersion, Env: st.Ix.Env.Name, PlanID: st.Plan.ID}
 	used := map[string]bool{}
 	for _, m := range mods {
 		pe := packEntryOf(m)

@@ -185,9 +185,15 @@ func (s *API) ImportAsPlan(name string) (*PlanDone, error) {
 	if s.x.imp == nil {
 		return nil, errors.New(view.T("nothing to import"))
 	}
-	p, t, err := view.ImportAsPlan(s.a, s.x.imp, name)
+	imp := s.x.imp
+	p, t, err := view.ImportAsPlan(s.a, imp, name)
 	if err == nil {
 		s.x.imp = nil
+		if s.x.follow && p != nil {
+			if e := view.FollowImported(s.a, imp, p.ID); e != nil {
+				t += " · " + e.Error()
+			}
+		}
 	}
 	if p == nil {
 		return s.planDone(0, t, err)

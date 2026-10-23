@@ -30,6 +30,15 @@ type native interface {
 type exchange struct {
 	native native
 	imp    *view.Import
+	// follow: once applied, the list follows the collection imported (04 §9.6)
+	follow bool
+}
+
+// ImportFollow says whether applying the previewed collection makes the list follow it.
+func (s *API) ImportFollow(on bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.x.follow = on
 }
 
 var listFilters = [][2]string{
@@ -123,6 +132,7 @@ func (s *API) ImportPreview(kind, src string) (*view.ImportPreview, error) {
 		return nil, err
 	}
 	s.x.imp = imp
+	s.x.follow = imp.Collection != nil // ticked by default (06 §2.17)
 	return p, nil
 }
 
@@ -138,7 +148,15 @@ func (s *API) ImportApply(merge bool) (string, error) {
 	imp := s.x.imp
 	s.x.imp = nil
 	s.needs = nil
-	return s.text(view.ApplyImport(s.a, imp, merge))
+	t, err := view.ApplyImport(s.a, imp, merge)
+	if err == nil && s.x.follow {
+		if st, e := s.a.Loadout(); e == nil {
+			if e := view.FollowImported(s.a, imp, st.Plan.ID); e != nil {
+				t += " · " + e.Error()
+			}
+		}
+	}
+	return s.text(t, err)
 }
 
 // ExportSave writes the list to a file. overwrite is for paths the save dialog chose (it

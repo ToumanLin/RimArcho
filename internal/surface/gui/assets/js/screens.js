@@ -378,6 +378,8 @@ async function runAction(it, act) {
       return;
     case "list":
       return pop.text(act.title, act.lines);
+    case "manage-lists":
+      return ui.manageLists(0);
     case "fold":
       N.open.has(it.text) ? N.open.delete(it.text) : N.open.add(it.text);
       return drawNeeds();

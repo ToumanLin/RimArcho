@@ -474,7 +474,7 @@ export function packsKey(e) {
     if (kk === "V") { e.preventDefault(); return dryRun(); }
     if (kk === "D") { e.preventDefault(); return nextTex(1); }
     if (k === "n" || k === "/") { e.preventDefault(); const n = $("#pk-name"); if (n) n.focus(); return; }
-    if (k === "Escape") { e.preventDefault(); return ui.go("plan"); }
+    if (k === "Escape") { e.preventDefault(); return ui.go(S.buildFrom || "plan"); }
     return;
   }
   if (S.packFocus) {

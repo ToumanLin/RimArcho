@@ -24,6 +24,7 @@ import * as motion from "./motion.js";
 import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
+import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
 import { withEnvironmentSwitch } from "./environment.js";
@@ -96,6 +97,13 @@ function renderTop() {
 
 // goLaunch is the editor's 启动游戏 (and its L): the game starts from 启动, so it opens that
 // page with the current plan applied and the focus on its launch button (06 §2.5).
+// exportCurrent is the editor's e: the current list's export sub-page (06 §2.5, §2.17).
+function exportCurrent() {
+  const p = S.shell && S.shell.plan;
+  if (!p) return exchange(1);
+  return planManage.exportOf(p.id, "editor");
+}
+
 async function goLaunch() {
   await go("home");
   await homePage.focusLaunch();
@@ -144,7 +152,7 @@ function planActions() {
 let lastList = 1;
 
 // The sidebar's entries in shift+1–8 order, 在玩 then 库 (06 §3.5; view.Nav).
-const NAV = ["home", "needs", "log", "library", "plan", "packs", "textures", "env"];
+const NAV = ["home", "needs", "log", "library", "plans", "packs", "textures", "env"];
 
 // go opens a sidebar page; "plan" is the current plan's editor, "plan:<id>" a plan (it
 // becomes current: no game file is written), "plan:new" the new-plan dialog, "pack:<name>"
@@ -158,6 +166,8 @@ async function go(id) {
     id = "plan";
   }
   S.packFocus = id.startsWith("pack:") ? id.slice(5) : null;
+  if (id !== "build") S.buildFrom = null;
+  if (id !== "plan-export") S.planExport = null;
   await openPage(id);
   // a page already shown is redrawn in place: its sub-entry and breadcrumb follow too
   renderWhere();
@@ -172,6 +182,8 @@ async function openPage(id) {
     case "home": return homePage.home();
     case "needs": return scr.needs();
     case "packs": return packsPage.list();
+    case "plans": return planManage.open();
+    case "plan-export": return planManage.exportOf(planManage.exportPlan(), planManage.exportFrom());
     case "build": return packsPage.build();
     case "env": return scr.environment();
     case "changes": return scr.changes(S.screen === "changes" ? undefined : null);
@@ -252,6 +264,7 @@ function renderHints() {
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "home") list = homePage.hintList();
   else if (S.screen === "packs" || S.screen === "build") list = packsPage.hintList();
+  else if (S.screen === "plans" || S.screen === "plan-export") list = planManage.hintList();
   else if (S.screen) list = [{ key: "shift+1–8", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);
@@ -501,7 +514,7 @@ async function cmd(id) {
     case "tags": return verb("tags");
     case "cli": return commandLine();
     case "import": return exchange(0);
-    case "export": return exchange(1);
+    case "export": return exportCurrent();
     case "help": return pop.help(S.screen || "plan");
     case "quit": return window.close();
   }
@@ -750,7 +763,7 @@ function onKey(e) {
     // Navigation stays available while a new page is loading. Its object shortcuts
     // must wait for data, including after an initial read failed.
     if (scr.pageLoading()) {
-      if (S.screen === "build" && k === "Escape") { e.preventDefault(); return go("plan"); }
+      if (S.screen === "build" && k === "Escape") { e.preventDefault(); return go(S.buildFrom || "plan"); }
       return;
     }
     // 1–9 focus the page's numbered areas (06 §3.5)
@@ -758,6 +771,7 @@ function onKey(e) {
     if (S.screen !== "home" && scr.areaKey(e)) return;
     if (S.screen === "home") return homePage.homeKey(e);
     if (S.screen === "packs" || S.screen === "build") return packsPage.packsKey(e);
+    if (S.screen === "plans" || S.screen === "plan-export") return planManage.key(e);
     if (S.screen === "needs") return scr.needsKey(e);
     if (S.screen === "library") return library.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
@@ -823,7 +837,7 @@ function onKey(e) {
     S: () => run("sort"), w: () => run("save"), L: () => goLaunch(), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
-    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exchange(1),
+    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exportCurrent(),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
@@ -888,6 +902,7 @@ const ui = {
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
+  manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   afterImport: null, // the first-run guide's next step once an import is applied
 };
 
@@ -902,6 +917,7 @@ async function start() {
   homePage.initHome(ui);
   fullPage.initFull(ui);
   packsPage.initPacks(ui);
+  planManage.initPlanManage(ui);
   guide.initGuide(ui);
   initExchange(ui);
   plans.initPlans(ui);

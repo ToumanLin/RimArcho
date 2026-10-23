@@ -1,0 +1,489 @@
+// 列表管理 (06 §2.17): the sidebar's 列表 › 管理. On the left every list of the game, on the
+// right the picked one: its game versions (04 §1.6), the Steam Workshop collections it
+// follows (04 §9.6) and how to share it (export, pack). The export is a sub-page of its own
+// (库 / 列表 / <列表> / 导出). Editing what a list holds stays in the editor (§2.5).
+// Data: API.PlanManage (view.BuildPlanManage), API.PlanExport (view.BuildPlanExport).
+import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { openScreen, page, button, act, area, seg, beginPageRead } from "./screens.js";
+import { icon } from "./icons.js";
+import * as pop from "./popups.js";
+import * as plans from "./plans.js";
+
+let ui = null;
+export function initPlanManage(u) { ui = u; }
+
+const M = { data: null, sel: 0, open: new Set(), checked: new Set() };
+const X = { data: null, id: 0, from: "plans", format: "", info: null };
+const FORMAT_KEY = "ui.gui.export.format";
+
+const ic = (name, cls = "ic") => { const s = el("span", cls); s.innerHTML = icon[name] || ""; return s; };
+const sel = () => (M.data && M.data.sel) || null;
+
+// ---- the page ----
+
+// select picks the list the page opens on next (0: the current one).
+export function select(id) { M.sel = id; }
+
+// open draws the page with the list id picked (0: the one picked before, else the current).
+export async function open(id) {
+  if (id !== undefined) M.sel = id;
+  const read = beginPageRead("plans");
+  let d;
+  try { d = await api.PlanManage(M.sel || 0); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
+  M.data = d;
+  M.sel = d.sel ? d.sel.id : 0;
+  draw();
+  read.finish();
+  // a followed collection not read for ten minutes is read now; the page follows
+  const s = d.sel;
+  if (s && s.stale && !M.checked.has(s.id)) {
+    M.checked.add(s.id);
+    api.PlanCheck(s.id).then((changed) => { if (changed && S.screen === "plans" && M.sel === s.id) open(); }).catch(() => {});
+  }
+}
+
+function draw() {
+  const d = M.data;
+  const sc = S.screen === "plans" ? $("#screen") : openScreen("plans");
+  const top = sc.scrollTop;
+  sc.innerHTML = "";
+  const add = act(T("new list"), "plus", () => newList(), "n");
+  add.classList.add("primary");
+  const w = page("plans pm-page", d.lead, act(T("import"), "import", () => ui.cmd("import"), "i"), add);
+  const grid = el("div", "pm");
+  grid.append(listCard(d), detailCard(d.sel));
+  w.append(grid);
+  sc.append(w);
+  sc.scrollTop = top;
+  ui.renderHints();
+}
+
+function listCard(d) {
+  const card = el("section", "card pm-list");
+  const box = el("div", "scroll");
+  for (const r of d.rows) {
+    const b = el("button", "pm-row" + (r.id === M.sel ? " on" : ""));
+    const n = el("div", "n");
+    n.append(el("b", "", r.name));
+    if (r.current) n.append(el("span", "pill cur", T("current")));
+    if (r.inGame) { const g = el("span", "gdot"); g.title = T("in the game"); n.append(g); }
+    if (r.mark) { const m = el("span", "adot"); m.title = r.mark; n.append(m); }
+    b.append(n, el("div", "m", r.meta));
+    if (r.follows) {
+      const f = ic("workshop", "ri" + (r.changed ? " changed" : ""));
+      f.title = r.changed ? T("the collection changed") : T("follows Steam collections");
+      b.append(f);
+    }
+    b.onclick = () => pick(r.id);
+    b.ondblclick = () => ui.go(r.page);
+    box.append(b);
+  }
+  card.append(box);
+  area(card, null, () => { const on = card.querySelector(".pm-row.on"); if (on) on.focus({ preventScroll: true }); });
+  requestAnimationFrame(() => { const on = card.querySelector(".pm-row.on"); if (on) on.scrollIntoView({ block: "nearest" }); });
+  return card;
+}
+
+function pick(id) {
+  if (id === M.sel) return;
+  M.sel = id;
+  open();
+}
+
+function detailCard(p) {
+  const card = el("section", "card pm-detail");
+  if (!p) { card.append(el("div", "empty-state", T("pick a list"))); return card; }
+  // the head: name, marks, facts; edit, make current, ⋯
+  const head = el("div", "pm-head");
+  const l = el("div", "l");
+  const n = el("div", "n");
+  n.append(el("h2", "", p.name));
+  if (p.current) n.append(el("span", "pill cur", T("current")));
+  if (p.mark) { const m = el("span", "adot"); m.title = p.mark; n.append(m); }
+  const facts = el("div", "facts", p.facts);
+  if (p.inGame) facts.append(" · ", el("span", "green", p.inGame));
+  l.append(n, facts);
+  const r = el("div", "r");
+  r.append(button(T("edit"), "↵", () => ui.go(p.page)));
+  if (!p.current) r.append(button(T("make current"), "", () => makeCurrent(p.id)));
+  const more = el("button", "btn icon", "");
+  more.append(ic("more"));
+  more.title = T("more");
+  more.onclick = (e) => { e.stopPropagation(); const b = more.getBoundingClientRect(); pop.menu(b.left, b.bottom + 4, menuOf(p)); };
+  r.append(more);
+  head.append(l, r);
+  card.append(head);
+
+  card.append(versions(p), follows(p), share(p));
+  return card;
+}
+
+function menuOf(p) {
+  const out = [{ label: T("rename…"), run: () => plans.renamePlan(p.id, stay) }];
+  out.push({ label: T("copy as a new list…"), run: () => newList(p) });
+  out.push({ label: T("delete…"), run: () => plans.deletePlan(p.id, () => open(0)) });
+  return out;
+}
+
+// stay: after a dialog the page shows the list it made or renamed.
+const stay = (d) => open(+String(d.page || "").replace(/^plan:/, "") || 0);
+
+// newList: the new-list dialog, copying p when given (its game versions go with it).
+async function newList(p) {
+  if (p && !p.current && !(await plans.openPlan(p.id))) return;
+  plans.newPlan(p ? "current" : "", stay);
+}
+
+async function makeCurrent(id) {
+  if (await plans.openPlan(id)) open(id);
+}
+
+function section(title, right) {
+  const s = el("div", "pm-sec");
+  const h = el("div", "pm-sub");
+  h.append(el("span", "", title));
+  if (right) h.append(el("span", "r", right));
+  s.append(h);
+  return s;
+}
+
+// ---- 游戏版本 (04 §1.6): one small button per version, the allowed ones raised ----
+
+function versions(p) {
+  const s = section(T("game versions"));
+  const row = el("div", "vrow");
+  const strip = el("div", "vstrip");
+  const on = p.versions.filter((c) => c.on).map((c) => c.v);
+  for (const c of p.versions) {
+    const b = el("button", "v" + (c.on ? " on" : ""), c.v);
+    if (c.game) b.append(el("span", "cur"));
+    b.title = c.tip;
+    b.onclick = () => {
+      const next = c.on ? on.filter((v) => v !== c.v) : on.concat([c.v]);
+      if (!next.length) return say("fail", T("keep at least one version"));
+      setVersions(p, next);
+    };
+    strip.append(b);
+  }
+  row.append(strip);
+  if (p.custom) {
+    const r = el("button", "btn link", T("reset to default"));
+    r.title = Tf("default: %s", p.default);
+    r.onclick = () => setVersions(p, []);
+    row.append(r);
+  }
+  s.append(row);
+  return s;
+}
+
+async function setVersions(p, vs) {
+  const before = p.custom ? p.versions.filter((c) => c.on).map((c) => c.v) : [];
+  let t;
+  try { t = await api.PlanVersionsSet(p.id, vs); } catch (e) { return say("fail", errText(e)); }
+  await open();
+  // the undo puts the versions back (the list's own undo is for its mods)
+  say("ok", t, async () => {
+    try { say("ok", await api.PlanVersionsSet(p.id, before)); } catch (e) { return say("fail", errText(e)); }
+    if (S.screen === "plans") open();
+  });
+}
+
+// ---- 跟着 Steam 合集 (04 §9.6) ----
+
+function follows(p) {
+  const s = section(T("follows Steam collections"), p.follows.length ? String(p.follows.length) : "");
+  for (const f of p.follows) s.append(collection(p, f));
+  if (!p.follows.length) s.append(el("div", "muted pm-note", T("no collection yet")));
+  const add = el("div", "addcoll");
+  const inp = el("input", "xc-input");
+  inp.placeholder = T("paste a Steam collection link to make this list follow it");
+  inp.spellcheck = false;
+  const go = el("button", "btn", T("follow"));
+  go.onclick = async () => {
+    const link = inp.value.trim();
+    if (!link) return inp.focus();
+    go.disabled = true;
+    say("busy", T("reading the collection…"));
+    let t;
+    try { t = await api.PlanFollow(p.id, link, "add"); } catch (e) { go.disabled = false; return say("fail", errText(e)); }
+    await open();
+    say("ok", t);
+  };
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go.click(); } });
+  add.append(inp, go);
+  s.append(add);
+  return s;
+}
+
+function collection(p, f) {
+  const c = el("div", "coll");
+  const t = el("div", "t");
+  t.append(ic("workshop"), el("b", "", f.title), el("span", "muted", Tf("%d items", f.items)));
+  const r = el("span", "r");
+  const ext = el("button", "btn icon", "");
+  ext.append(ic("ext"));
+  ext.title = T("open in Steam");
+  ext.onclick = () => api.OpenURL(f.link).catch((e) => say("fail", errText(e)));
+  const un = el("button", "btn link", T("stop following"));
+  un.onclick = async () => {
+    let tx;
+    try { tx = await api.PlanUnfollow(p.id, f.id); } catch (e) { return say("fail", errText(e)); }
+    await open();
+    say("ok", tx);
+  };
+  r.append(ext, un);
+  t.append(r);
+  c.append(t);
+
+  const meta = el("div", "meta", f.meta);
+  if (f.notInstalled) {
+    meta.append(" · " + Tf("%d not installed", f.notInstalled) + " · ");
+    const sub = el("a", "xc-link", T("subscribe in the Workshop"));
+    sub.title = f.link;
+    sub.onclick = (e) => { e.preventDefault(); api.OpenURL(f.link).catch((x) => say("fail", errText(x))); };
+    meta.append(sub);
+  }
+  c.append(meta);
+
+  if (f.changes) {
+    const key = p.id + ":" + f.id;
+    const chg = el("div", "chg");
+    chg.append(el("b", "", Tf("the collection changed: %s", f.changes)));
+    const see = el("button", "btn link", M.open.has(key) ? T("hide the changes") : T("see the changes"));
+    see.onclick = () => { M.open.has(key) ? M.open.delete(key) : M.open.add(key); draw(); };
+    const sync = el("button", "btn primary small", T("catch up"));
+    sync.onclick = async () => {
+      sync.disabled = true;
+      let tx;
+      try { tx = await api.PlanSync(p.id, f.id); } catch (e) { sync.disabled = false; return say("fail", errText(e)); }
+      M.open.delete(key);
+      await ui.reload();
+      await open();
+      // one undoable edit of that list: the undo link is the current list's only
+      say("ok", tx, p.current);
+    };
+    chg.append(see, el("span", "sp"), sync);
+    c.append(chg);
+    if (M.open.has(key)) {
+      const diff = el("div", "diff");
+      for (const a of f.added || []) diff.append(el("div", "a", a));
+      for (const x of f.removed || []) diff.append(el("div", "d", x));
+      c.append(diff);
+    }
+  } else if (f.checked) {
+    const same = el("div", "same");
+    same.append(ic("ok"), T("same as the collection"));
+    c.append(same);
+  }
+
+  const mode = el("div", "follow");
+  mode.append(el("span", "", T("when catching up:")));
+  mode.append(seg([T("add new only"), T("also disable dropped")], f.mode === "follow" ? 1 : 0, async (i) => {
+    try { await api.PlanFollowMode(p.id, f.id, i ? "follow" : "add"); } catch (e) { say("fail", errText(e)); }
+    open();
+  }));
+  c.append(mode);
+  return c;
+}
+
+// ---- 分享: the newest pack made from it, export and create a pack ----
+
+function share(p) {
+  const s = section(T("share"));
+  if (p.pack) {
+    const r = el("div", "packrow");
+    r.append(ic("packs"), el("b", "", p.pack.name), el("span", "meta", p.pack.facts));
+    const o = el("button", "btn link r", T("open"));
+    o.onclick = () => ui.go("pack:" + p.pack.name);
+    r.append(o);
+    s.append(r);
+  }
+  const acts = el("div", "acts-row");
+  acts.append(act(T("export…"), "export", () => exportOf(p.id, "plans"), "e"), act(T("create a pack…"), "packs", () => buildOf(p), "B"));
+  s.append(acts);
+  return s;
+}
+
+// buildOf opens 编译成整合包 (§2.6) for the list: it becomes current first (no game file is
+// written), and esc comes back here.
+async function buildOf(p) {
+  if (!p.current && !(await plans.openPlan(p.id))) return;
+  S.buildFrom = "plans";
+  ui.go("build");
+}
+
+// ---- keys and hints ----
+
+function step(k) {
+  const rows = (M.data && M.data.rows) || [];
+  const i = rows.findIndex((r) => r.id === M.sel);
+  if (!rows.length) return;
+  let j = i;
+  if (k === "ArrowDown" || k === "j") j = Math.min(rows.length - 1, i + 1);
+  else if (k === "ArrowUp" || k === "k") j = Math.max(0, i - 1);
+  else if (k === "Home") j = 0;
+  else if (k === "End") j = rows.length - 1;
+  pick(rows[j].id);
+}
+
+export function key(e) {
+  const k = e.key;
+  const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
+  if (S.screen === "plan-export") return exportKey(e);
+  const p = sel();
+  if (["ArrowDown", "ArrowUp", "j", "k", "Home", "End"].includes(k)) { e.preventDefault(); return step(k); }
+  if (!p) return;
+  const map = {
+    Enter: () => ui.go(p.page), n: () => newList(), i: () => ui.cmd("import"), e: () => exportOf(p.id, "plans"),
+    B: () => buildOf(p), F2: () => plans.renamePlan(p.id, stay), Delete: () => plans.deletePlan(p.id, () => open(0)),
+  };
+  if (map[kk]) { e.preventDefault(); map[kk](); }
+}
+
+export function hintList() {
+  if (S.screen === "plan-export") {
+    return [{ key: "↑↓", label: T("format") }, { key: "ctrl+s", label: T("save as a file…") }, { key: "ctrl+c", label: T("copy") },
+      { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
+  }
+  return [{ key: "↑↓", label: T("pick a list") }, { key: "enter", label: T("edit") }, { key: "n", label: T("new list") }, { key: "i", label: T("import") },
+    { key: "e", label: T("export") }, { key: "B", label: T("create a pack") }, { key: "?", label: T("all keys") }];
+}
+
+// ---- the export sub-page (库 / 列表 / <列表> / 导出) ----
+
+// exportOf opens the export of list id; from is where esc goes back to: "plans" (this
+// page) or "editor" (the plan editor's e).
+export async function exportOf(id, from = "plans") {
+  X.id = id; X.from = from;
+  S.planExport = { id, from };
+  if (!X.format) X.format = await api.Setting(FORMAT_KEY).catch(() => "") || "";
+  return exportPage();
+}
+
+export const exportPlan = () => X.id;
+export const exportFrom = () => X.from;
+
+async function exportPage() {
+  const read = beginPageRead("plan-export");
+  let d, info;
+  try { [d, info] = await Promise.all([api.PlanExport(X.id, X.format), X.info ? X.info : api.ExchangeInfo()]); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
+  X.data = d; X.info = info; X.format = d.format;
+  drawExport();
+  read.finish();
+}
+
+const fmtOf = () => X.data.formats.find((f) => f.id === X.data.format) || X.data.formats[0];
+const extOf = (f) => (f.file.match(/(\.archolist\.json|-ModList\.xml|-workshop\.md|\.[^.]+)$/) || [""])[0].replace(/^-/, "");
+
+function drawExport() {
+  const d = X.data;
+  const sc = S.screen === "plan-export" ? $("#screen") : openScreen("plan-export");
+  sc.innerHTML = "";
+  const w = page("plans pm-export", d.lead, button(T("cancel"), "esc", back));
+  const grid = el("div", "pm-x");
+  const left = el("section", "card pad");
+  left.append(el("div", "pm-sub", T("format")));
+  const list = el("div", "fmts");
+  d.formats.forEach((f, i) => {
+    const b = el("button", "fmt" + (f.id === d.format ? " on" : ""));
+    b.append(el("span", "rd"));
+    const nm = el("span", "nm", f.name);
+    if (i === 0) nm.append(el("small", "", T("recommended")));
+    b.append(nm, el("span", "ext", extOf(f)), el("span", "ds", f.desc));
+    b.onclick = () => choose(f.id);
+    list.append(b);
+  });
+  left.append(list);
+  area(left, null, () => { const on = left.querySelector(".fmt.on"); if (on) on.focus({ preventScroll: true }); });
+
+  const right = el("section", "card pad");
+  const h = el("div", "pm-sub");
+  h.append(el("span", "", T("content")), el("span", "r", d.facts));
+  const pre = el("pre", "prev", d.text);
+  const out = el("div", "xc-out");
+  const acts = el("div", "acts-row");
+  const f = fmtOf();
+  if (f.id === "rimcrow") {
+    const c = button(T("copy the share code"), "", () => copy(out));
+    c.classList.add("primary");
+    acts.append(c);
+  } else {
+    const s = button(T("save as a file…"), "", () => save(out));
+    s.classList.add("primary");
+    acts.append(s, button(T("copy"), "", () => copy(out)));
+  }
+  right.append(h, pre, acts, out);
+  area(right, null);
+  grid.append(left, right);
+  w.append(grid);
+  sc.append(w);
+  ui.renderHints();
+}
+
+async function choose(id) {
+  if (id === X.format) return;
+  X.format = id;
+  document.querySelectorAll("#screen .fmt").forEach((b, i) => b.classList.toggle("on", X.data.formats[i].id === id));
+  api.SetSetting(FORMAT_KEY, id).catch(() => {});
+  let d;
+  try { d = await api.PlanExport(X.id, id); } catch (e) { return say("fail", errText(e)); }
+  if (S.screen !== "plan-export" || X.format !== id) return;
+  X.data = d;
+  drawExport();
+}
+
+function back() {
+  S.planExport = null;
+  if (X.from === "editor") return ui.go("plan");
+  return ui.go("plans");
+}
+
+function result(out, ok, text) { out.textContent = text; out.className = "xc-out " + (ok ? "ok" : "err"); say(ok ? "ok" : "fail", text); }
+
+// save: the save dialog in the window (it asked before replacing a file), a typed path in
+// the development harness (nothing is overwritten).
+async function save(out) {
+  const f = fmtOf();
+  const write = async (path, overwrite) => {
+    try { result(out, true, await api.PlanExportSave(X.id, f.id, path, overwrite)); } catch (e) { result(out, false, errText(e)); }
+  };
+  if (X.info && X.info.dialogs) {
+    let path = "";
+    try { path = await api.PickExportFile(f.id); } catch (e) { return say("fail", errText(e)); }
+    if (path) write(path, true);
+    return;
+  }
+  const dir = X.info && X.info.dir ? X.info.dir + (X.info.dir.includes("/") ? "/" : "\\") : "";
+  pop.ask(T("save as a file…"), T("the new file"), (path) => { if (path) write(path, false); }, dir + f.file);
+}
+
+async function copy(out) {
+  let c;
+  try { c = await api.PlanExportCopy(X.id, X.format); } catch (e) { return result(out, false, errText(e)); }
+  let ok = c.copied;
+  if (!ok && navigator.clipboard) { try { await navigator.clipboard.writeText(c.text); ok = true; } catch { /* shown below */ } }
+  if (ok) return result(out, true, c.line);
+  out.className = "xc-out";
+  out.textContent = T("copy it from here:");
+  say("", T("copy it from here:"));
+  const pre = $("#screen .pm-export pre.prev");
+  if (pre) { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+}
+
+function exportKey(e) {
+  const k = e.key;
+  if (k === "Escape") { e.preventDefault(); return back(); }
+  if (!X.data) return;
+  if (k === "ArrowDown" || k === "ArrowUp" || k === "j" || k === "k") {
+    e.preventDefault();
+    const fs = X.data.formats;
+    const i = fs.findIndex((f) => f.id === X.format); // the one picked, before its text is in
+    const j = Math.max(0, Math.min(fs.length - 1, i + (k === "ArrowDown" || k === "j" ? 1 : -1)));
+    return choose(fs[j].id);
+  }
+  const out = $("#screen .pm-export .xc-out");
+  if ((e.ctrlKey || e.metaKey) && k === "s" && fmtOf().id !== "rimcrow") { e.preventDefault(); return save(out); }
+  if ((e.ctrlKey || e.metaKey) && k === "c" && !String(getSelection())) { e.preventDefault(); return copy(out); }
+}

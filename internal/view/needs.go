@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -59,6 +60,8 @@ const (
 	ActMoveLocked      = "move-to-locked"   // Refs[0]: a Mods/ folder into the lock library (confirm first)
 	ActTextures        = "textures"         // Refs: convert their textures to DDS again (confirm first)
 	ActTexClean        = "textures-clean"   // Refs: delete the DDS RimArcho wrote (confirm first)
+	ActAddVersion      = "add-version"      // Refs[0]: the list's name, Refs[1]: a game version to allow (04 §1.6)
+	ActManageLists     = "manage-lists"     // the list management page (06 §2.17); Argv: the CLI's view of it
 )
 
 // Option is one choice of a choose-disable action.
@@ -523,6 +526,20 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				{Kind: ActDismissConflict, Key: "I", Label: T("ignore it"), Done: T("the outside change is ignored (it stays in the history)")},
 			}})
 	}
+	// The game now is not among the versions the list allows (04 §1.6): something to
+	// confirm, not a block; version.unsupported still checks each mod against the game.
+	if pv, err := a.PlanVersionsOf(st, st.Plan); err == nil && pv.Game != "" && len(pv.Allowed) > 0 && !slices.Contains(pv.Allowed, pv.Game) {
+		name, allowed := st.Plan.Name, app.FormatVersions(pv.Allowed)
+		add(Need{Group: GroupConfirm, Counted: true, Status: StatusWarn,
+			Text:     Tf("%s allows %s; the game now is %s", name, allowed, pv.Game),
+			Title:    Tf("%s allows %s; the game now is %s", name, allowed, pv.Game),
+			Why:      T("the list says which game versions it is for; add this one if you play it here. Launching is not stopped."),
+			Evidence: evidence(EvInferred, T("game versions")),
+			Actions: []Action{
+				{Kind: ActAddVersion, Key: "V", Label: Tf("add %s", pv.Game), Refs: []string{name, pv.Game}},
+				{Kind: ActManageLists, Key: "M", Label: T("go to list management"), Argv: []string{"plan", "versions", name}},
+			}})
+	}
 	// Other plans of the environment with an unloaded outside change (04 §4.3): resolved
 	// after switching to them.
 	if cs, err := a.Conflicts(st); err == nil {
@@ -820,6 +837,21 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		return TextureRunText(r), nil
 	case ActTexClean:
 		_, err = a.CleanTextures(act.Refs, app.TexRefs, false)
+	case ActAddVersion:
+		st, err := a.Loadout()
+		if err != nil {
+			return "", err
+		}
+		p, err := a.FindPlan(act.Refs[0])
+		if err != nil {
+			return "", err
+		}
+		vs := append(append([]string{}, a.PlanAllowedVersions(st, p)...), act.Refs[1])
+		r, err := a.SetPlanVersions(p.Name, vs)
+		if err != nil {
+			return "", err
+		}
+		return Tf("%s: game versions %s", p.Name, app.FormatVersions(r.After.Allowed)), nil
 	default:
 		return "", fmt.Errorf("%s is not a data action", act.Kind)
 	}

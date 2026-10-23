@@ -27,6 +27,9 @@ const (
 	FormatRimCrow = "rimcrow" // share code
 	// FormatRimCrowXML is RimCrow's ModList.xml.
 	FormatRimCrowXML = "rimcrow-xml"
+	// FormatWorkshop is a list of Workshop links in Markdown (04 §9.3): for someone who
+	// subscribes by hand; it reads back as a list of workshop IDs.
+	FormatWorkshop = "workshop"
 )
 
 // ParseList reads a list in any supported format. Tokens are lower-case packageIds (with
@@ -256,7 +259,7 @@ func parseJSONList(b []byte) (*ImportedList, error) {
 // names, workshop IDs and content hashes.
 func archoList(p *Pack) *ImportedList {
 	l := newList(FormatArcho)
-	l.Title, l.Game, l.Hashes = p.Name, p.Game, map[string]string{}
+	l.Title, l.Game, l.Hashes, l.Versions = p.Name, p.Game, map[string]string{}, p.Versions
 	for _, pe := range p.Entries {
 		l.add(pe.PackageID, pe.Name, pe.WorkshopID)
 		if pe.Hash != "" {
@@ -274,6 +277,8 @@ var (
 	wsIDRe       = regexp.MustCompile(`[?&]id=(\d+)`)
 	digitsRe     = regexp.MustCompile(`^\d{7,}$`)
 	rentryNameRe = regexp.MustCompile(`\[([^\]]+)\]\(`)
+	// mdWorkshopRe is a Markdown link to a Workshop item (the workshop export).
+	mdWorkshopRe = regexp.MustCompile(`^(?:[-*]\s+)?\[([^\]]*)\]\(https?://steamcommunity\.com/[^)\s]*[?&]id=(\d+)[^)]*\)`)
 )
 
 func parseTextList(s string) *ImportedList {
@@ -303,6 +308,10 @@ func parseTextList(s string) *ImportedList {
 				name = n[len(n)-1][1]
 			}
 			l.add(pkg, name, ws)
+			continue
+		}
+		if m := mdWorkshopRe.FindStringSubmatch(line); m != nil {
+			l.add("", m[1], m[2])
 			continue
 		}
 		if i := strings.IndexByte(line, '#'); i >= 0 {

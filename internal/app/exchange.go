@@ -40,6 +40,30 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	return a.exportList(st, format)
+}
+
+// ExportPlan renders one of the environment's plans (current or not) in a format.
+func (a *App) ExportPlan(planID int64, format string) ([]byte, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	p, err := a.Store.PlanByID(planID)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil || p.EnvID != st.Ix.Env.ID {
+		return nil, fmt.Errorf("no plan %d in env:%s", planID, st.Ix.Env.Name)
+	}
+	ps, err := a.PlanState(st, p)
+	if err != nil {
+		return nil, err
+	}
+	return a.exportList(ps, format)
+}
+
+func (a *App) exportList(st *LoadoutState, format string) ([]byte, error) {
 	tokens := st.Reg.Tokens(st.List, func(id string) string {
 		if m := st.Ix.ByID[id]; m != nil {
 			return m.PackageID
@@ -63,7 +87,8 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 	}
 	switch format {
 	case FormatArcho:
-		p := &Pack{Format: PackFormat, Name: st.Plan.Name, Created: a.Now().UTC(), Game: game, Env: st.Ix.Env.Name, Light: true}
+		p := &Pack{Format: PackFormat, Name: st.Plan.Name, Created: a.Now().UTC(), Game: game, Env: st.Ix.Env.Name, Light: true,
+			Versions: a.PlanAllowedVersions(st, st.Plan)}
 		for _, e := range st.List {
 			if m := st.Ix.ByID[e.Instance]; m != nil {
 				p.Entries = append(p.Entries, packEntryOf(m))
@@ -81,6 +106,8 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 		return []byte(code + "\n"), err
 	case FormatRimCrowXML:
 		return RimCrowXML(tokens, ws, names), nil
+	case FormatWorkshop:
+		return a.workshopLinks(st), nil
 	case FormatRimSort:
 		format = FormatModsConfig
 	}
@@ -114,7 +141,34 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 		}
 		return loadout.Render(nil, version, tokens, known)
 	}
-	return nil, fmt.Errorf("unknown format %q (archo, text, modsconfig, rimsort, rml, rimcrow, rimcrow-xml)", format)
+	return nil, fmt.Errorf("unknown format %q (archo, text, modsconfig, rimsort, rml, rimcrow, rimcrow-xml, workshop)", format)
+}
+
+// workshopLinks writes the list as Workshop links in load order, then names what is not in
+// the Workshop (official content, local mods, missing entries) in a comment (04 §9.3).
+func (a *App) workshopLinks(st *LoadoutState) []byte {
+	var links, other []string
+	for _, e := range st.List {
+		m := st.Ix.ByID[e.Instance]
+		switch {
+		case m == nil:
+			other = append(other, strings.TrimSuffix(e.Missing, "_steam")+" (not installed)")
+		case m.WorkshopID() != "":
+			name := strings.NewReplacer("[", "(", "]", ")").Replace(m.DisplayName())
+			links = append(links, fmt.Sprintf("- [%s](https://steamcommunity.com/sharedfiles/filedetails/?id=%s)", name, m.WorkshopID()))
+		default:
+			other = append(other, m.DisplayName())
+		}
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s: %d mods, %d in the Workshop (%s)\n", st.Plan.Name, len(st.List), len(links), a.Now().In(a.Loc).Format("2006-01-02"))
+	for _, l := range links {
+		b.WriteString(l + "\n")
+	}
+	if len(other) > 0 {
+		fmt.Fprintf(&b, "\n# not in the Workshop: %s\n", strings.Join(other, ", "))
+	}
+	return []byte(b.String())
 }
 
 // ImportedList is a mod list read from a file.
@@ -133,6 +187,8 @@ type ImportedList struct {
 	// Hashes maps packageIds to content hashes (RimArcho lists): an import uses the copy
 	// with that content when there is one, and the preview tells the others apart.
 	Hashes map[string]string
+	// Versions are the game versions a RimArcho list was meant for (04 §1.6).
+	Versions []string
 }
 
 // Hash is the content hash a RimArcho list gives pkg ("" for none).
@@ -334,10 +390,15 @@ func sameContentCopy(st *LoadoutState, pkg, hash string) string {
 // in the list (else before the nearest one after it, else at the end), so the imported
 // order is kept around what is there.
 func MergedEntries(st *LoadoutState, il *ImportedList) loadout.List {
+	return mergeEntries(st, il, nil)
+}
+
+// mergeEntries is MergedEntries adding only the entries keep accepts (nil: all).
+func mergeEntries(st *LoadoutState, il *ImportedList, keep func(loadout.Entry) bool) loadout.List {
 	imported, _ := ImportedEntries(st, il)
 	out := st.List.Clone()
 	for i, e := range imported {
-		if e.Instance == "" || out.Index(e.Instance) >= 0 {
+		if e.Instance == "" || out.Index(e.Instance) >= 0 || (keep != nil && !keep(e)) {
 			continue
 		}
 		at := len(out)
