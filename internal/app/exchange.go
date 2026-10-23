@@ -82,6 +82,8 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 		return []byte(code + "\n"), err
 	case FormatRimCrowXML:
 		return RimCrowXML(tokens, ws, names), nil
+	case FormatWorkshop:
+		return a.workshopLinks(st), nil
 	case FormatRimSort:
 		format = FormatModsConfig
 	}
@@ -115,7 +117,34 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 		}
 		return loadout.Render(nil, version, tokens, known)
 	}
-	return nil, fmt.Errorf("unknown format %q (archo, text, modsconfig, rimsort, rml, rimcrow, rimcrow-xml)", format)
+	return nil, fmt.Errorf("unknown format %q (archo, text, modsconfig, rimsort, rml, rimcrow, rimcrow-xml, workshop)", format)
+}
+
+// workshopLinks writes the list as Workshop links in load order, then names what is not in
+// the Workshop (official content, local mods, missing entries) in a comment (04 §9.3).
+func (a *App) workshopLinks(st *LoadoutState) []byte {
+	var links, other []string
+	for _, e := range st.List {
+		m := st.Ix.ByID[e.Instance]
+		switch {
+		case m == nil:
+			other = append(other, strings.TrimSuffix(e.Missing, "_steam")+" (not installed)")
+		case m.WorkshopID() != "":
+			name := strings.NewReplacer("[", "(", "]", ")").Replace(m.DisplayName())
+			links = append(links, fmt.Sprintf("- [%s](https://steamcommunity.com/sharedfiles/filedetails/?id=%s)", name, m.WorkshopID()))
+		default:
+			other = append(other, m.DisplayName())
+		}
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s: %d mods, %d in the Workshop (%s)\n", st.Plan.Name, len(st.List), len(links), a.Now().In(a.Loc).Format("2006-01-02"))
+	for _, l := range links {
+		b.WriteString(l + "\n")
+	}
+	if len(other) > 0 {
+		fmt.Fprintf(&b, "\n# not in the Workshop: %s\n", strings.Join(other, ", "))
+	}
+	return []byte(b.String())
 }
 
 // ImportedList is a mod list read from a file.

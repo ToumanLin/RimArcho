@@ -11,7 +11,7 @@ import (
 
 func init() {
 	register(&Command{Name: "loadout export", Summary: "write the workspace as a list file: a RimArcho list (each mod with its version), text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code", MaxArgs: 0, Run: loadoutExport,
-		Flags: []Flag{{Name: "format", Value: "text|archo|modsconfig|rimsort|rml|rimcrow|rimcrow-xml"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"}}})
+		Flags: []Flag{{Name: "format", Value: "text|archo|modsconfig|rimsort|rml|rimcrow|rimcrow-xml|workshop"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"}}})
 	register(&Command{Name: "loadout import", Args: "<file|share code> [<name>]", Summary: "replace the workspace with a list (RimArcho, text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs; undoable), or with --new make it a new plan",
 		MinArgs: 1, MaxArgs: 2, Flags: []Flag{{Name: "new", Help: "import as a new plan named <name> (default: the list's own name or the file name)"}}, Run: loadoutImport})
 }

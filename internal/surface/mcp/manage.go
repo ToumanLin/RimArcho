@@ -178,7 +178,7 @@ type ScanIn struct {
 type ExchangeIn struct {
 	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
 	Action string `json:"action" jsonschema:"export, import or collection"`
-	Format string `json:"format,omitempty" jsonschema:"export: text (default), archo (a RimArcho list: each mod with its version), modsconfig, rimsort, rml, rimcrow or rimcrow-xml"`
+	Format string `json:"format,omitempty" jsonschema:"export: text (default), archo (a RimArcho list: each mod with its version), modsconfig, rimsort, rml, rimcrow, rimcrow-xml or workshop (Markdown Workshop links, for subscribing by hand)"`
 	Out    string `json:"out,omitempty" jsonschema:"export: write to this new file (never overwrites); default: return the text"`
 	From   string `json:"from,omitempty" jsonschema:"import: a list file path or a RimCrow share code; collection: a Workshop collection link or ID"`
 	Import bool   `json:"import,omitempty" jsonschema:"collection: also replace the Loadout with the collection's installed mods in its order (undoable)"`

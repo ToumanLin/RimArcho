@@ -144,3 +144,25 @@ func TestParseAndFormatVersions(t *testing.T) {
 		}
 	}
 }
+
+// The workshop export (04 §9.3): Markdown links in load order, the rest named in a
+// comment; it reads back as the installed mods with those workshop IDs.
+func TestExportWorkshopLinks(t *testing.T) {
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	out := e.MustRun("loadout", "export", "--format", "workshop")
+	for _, want := range []string{"# default: 4 mods, 2 in the Workshop", "- [Harmony](https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077)\n- [A](https://steamcommunity.com/sharedfiles/filedetails/?id=1001)", "# not in the Workshop: Core, gone.mod (not installed)"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q:\n%s", want, out)
+		}
+	}
+	f := filepath.Join(t.TempDir(), "links.md")
+	if err := os.WriteFile(f, []byte(out), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e.MustRun("plan", "new", "links", "--from", f)
+	e.MustRun("plan", "use", "links")
+	if got := joined(active(t, e)); got != "Harmony, A" {
+		t.Fatalf("read back: %s", got)
+	}
+}
