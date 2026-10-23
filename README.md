@@ -116,6 +116,13 @@ under the cursor) and `u` undoes them. The top line always says where you are.
 | `R`, `A`, `E` | rescan; check the files again; switch environment |
 | `ctrl+k`, `?` | command palette; all keys |
 
+The filter bar in the plan editor and mod library includes **Location**: the registered
+source folder (for example, the game's `Mods/`, Workshop, or an individual SteamCMD or extra
+folder). Pick several locations to include any of them, or exclude a location with a right
+click. Locations combine with the other filter groups. Search also accepts
+`location:"D:\Steam Library\steamapps\common\RimWorld\Mods"`; the CLI uses
+`archo library --include 'location:D:\Steam Library\steamapps\common\RimWorld\Mods'`.
+
 In the window, the mouse does the same: click, `shift`/`ctrl`+click, double-click to enable or
 disable, drag between lists (enable, disable, stage) or within Enabled (reorder), right-click for
 what you can do with the mod. The language follows the system; change it with

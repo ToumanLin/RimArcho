@@ -162,6 +162,59 @@ func TestLibraryFilter(t *testing.T) {
 	}
 }
 
+func TestLibraryLocations(t *testing.T) {
+	e := libFixture(t)
+	local := filepath.Join(e.Game, "Mods")
+	// Multiple copies in one folder count as one lineage in that folder's facet.
+	e.CopyTree(filepath.Join(local, "Lockable Copy"), filepath.Join(local, "Lockable Copy 2"))
+	scanNow(t, e)
+	lib := mustLib(t, e)
+	q := app.LibQuery{Include: []string{"location:" + strings.ToUpper(local)}}
+	r, err := lib.Filter(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Matches) != 1 || r.Matches[0].Name != "Lockable" || len(r.Matches[0].Shown) != 2 {
+		t.Fatalf("local copies: %+v", r.Matches)
+	}
+	for _, i := range r.Matches[0].Shown {
+		if i.Location != local {
+			t.Errorf("location %q, want %q", i.Location, local)
+		}
+	}
+	found := false
+	for _, f := range r.Facets {
+		if f.Key != "location" {
+			continue
+		}
+		found = true
+		for _, v := range f.Values {
+			if v.Value == local && (v.Count != 1 || v.On != 1) || v.Value == e.Workshop && v.Count != 5 {
+				t.Errorf("location facet %+v", v)
+			}
+		}
+		if len(f.Values) != 2 {
+			t.Errorf("location values: %+v", f.Values)
+		}
+	}
+	if !found {
+		t.Fatal("no location facet")
+	}
+	ghost := libLineage(t, lib, "Workshop item 5300").Instances[0]
+	if ghost.Location != e.Workshop {
+		t.Errorf("missing item's location: %q", ghost.Location)
+	}
+	if got := filtered(t, lib, app.LibQuery{Include: []string{"location:" + e.Workshop, "location:" + local}}); len(got) != 5 {
+		t.Errorf("either location: %v", got)
+	}
+	if got := filtered(t, lib, app.LibQuery{Exclude: []string{"location:" + e.Workshop}}); !slices.Equal(got, []string{"Lockable"}) {
+		t.Errorf("exclude workshop: %v", got)
+	}
+	if got := filtered(t, lib, app.LibQuery{Include: []string{"location:" + local, "source:workshop"}}); len(got) != 0 {
+		t.Errorf("conditions must hold on the same copy: %v", got)
+	}
+}
+
 // 06 §2.9: removing from every plan is one undo step in each plan that had it.
 func TestLibraryRemoveFromPlans(t *testing.T) {
 	e := libFixture(t)

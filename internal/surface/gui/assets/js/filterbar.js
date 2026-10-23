@@ -145,7 +145,7 @@ export function createBar(opts) {
     for (const c of d.conds || []) {
       const x = el("button", "fbar-chip" + (c.exclude ? " ex" : ""));
       x.append(el("span", "", c.label), el("span", "x", "×"));
-      x.title = c.exclude ? T("left out") : "";
+      x.title = c.label + (c.exclude ? " · " + T("left out") : "");
       x.onclick = () => b.set(c.filter.replace(/^-/, ""), 0);
       chips.append(x);
     }
@@ -173,7 +173,7 @@ export function createBar(opts) {
         x.append(el("span", "l", v.label));
         if (v.cur) x.append(el("span", "curv", T("this game")));
         x.append(el("span", "n", String(v.count)));
-        x.title = T("left click: only these · right click or x: leave these out");
+        x.title = v.label + "\n" + T("left click: only these · right click or x: leave these out");
         x.dataset.at = gi + ":" + vi;
         x.tabIndex = -1;
         x.onclick = () => b.set(v.filter, v.on === 1 ? 0 : 1);

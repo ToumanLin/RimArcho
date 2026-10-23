@@ -211,7 +211,7 @@ func LibSourceText(s string) string {
 }
 
 func libKeyTitle(k string) string {
-	return map[string]string{"tag": T("tags"), "source": T("library source"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
+	return map[string]string{"tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
 }
 
 func libUseText(v string) string {
@@ -314,7 +314,7 @@ func LibQueryOf(search string, filters []string, sort string) app.LibQuery {
 // right click in the filter column.
 func LibSplitQuery(text string) (words string, filters []string) {
 	var ws []string
-	for _, w := range strings.Fields(text) {
+	for _, w := range queryTokens(text) {
 		if _, _, err := app.ParseLibFilter(strings.TrimPrefix(w, "-")); err == nil {
 			filters = append(filters, w)
 		} else {

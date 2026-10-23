@@ -14,7 +14,7 @@ import (
 func init() {
 	flags := []Flag{
 		{Name: "search", Value: "<words>", Help: "all words in a name, package id, author, alias, tag, note, Workshop ID or folder"},
-		{Name: "include", Value: "<key:value>", Multi: true, Help: "keep copies with this value; keys tag, source, version, state, used, updated (week, month, half-year, older); one key's values: either, different keys: all"},
+		{Name: "include", Value: "<key:value>", Multi: true, Help: "keep copies with this value; keys tag, source, location (source folder path), version, state, used, updated (week, month, half-year, older); one key's values: either, different keys: all"},
 		{Name: "exclude", Value: "<key:value>", Multi: true, Help: "drop copies with this value"},
 		{Name: "sort", Value: "name|size|state|source|used|updated|version|author|tags|changed|played", Help: "default name; a leading - reverses"},
 		{Name: "lineage", Value: "<ref>", Help: "one mod: every copy with its path, states, plans and last launch"},

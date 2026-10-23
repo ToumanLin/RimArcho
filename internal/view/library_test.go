@@ -104,6 +104,32 @@ func TestLibraryPage(t *testing.T) {
 	}
 }
 
+func TestLocationFiltersAcrossPages(t *testing.T) {
+	e := libEnv(t)
+	local := filepath.Join(e.Game, "Mods")
+	b, err := view.BuildBoard(e.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := view.FilterBoard(b, "", []string{"location:" + local}, view.MatchFacts{}, false, "1.6")
+	if len(r.Rows[view.Active]) != 1 || b.Cols[view.Active][r.Rows[view.Active][0]].Name != "Lockable" {
+		t.Fatalf("board's local copy: %+v", r.Rows)
+	}
+	p := libPage(t, e, "", "location:"+local)
+	if p.Shown != 1 || len(p.Rows[0].Insts) != 1 || p.Rows[0].Insts[0].Label != "local" {
+		t.Fatalf("library's local copy: %+v", p.Rows)
+	}
+	// The same quoted path syntax works in both search boxes, including spaces and colons.
+	words, filters := view.LibSplitQuery(`Lockable location:"D:\Steam Library\Mods" -location:"E:\Other Mods"`)
+	if words != "Lockable" || !slices.Equal(filters, []string{`location:D:\Steam Library\Mods`, `-location:E:\Other Mods`}) {
+		t.Fatalf("quoted path filters: %q %v", words, filters)
+	}
+	p = libPage(t, e, `location:"`+local+`"`)
+	if p.Shown != 1 {
+		t.Fatalf("typed location: %d rows", p.Shown)
+	}
+}
+
 func mustLibrary(t *testing.T, e *testkit.Env) *app.Library {
 	t.Helper()
 	lib, err := e.App.Library()

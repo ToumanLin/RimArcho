@@ -7,6 +7,10 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- The plan editor and mod library filter bars now include Location, with one value per
+  registered source folder. Multiple locations, exclusions and quoted paths in search are
+  supported; CLI/MCP library queries accept `location:<source folder path>` too.
+
 ### Breaking
 - Database schema v10 → v16: plans (v11), analysis kept per plan (v12), copy notes (v13),
   shared mod folders (v14, below), an index for looking defs up by `Name` (v15), the DDS RimArcho wrote (v16). Each environment's workspace, undo stack, versions and

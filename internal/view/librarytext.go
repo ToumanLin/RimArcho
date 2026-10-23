@@ -21,6 +21,7 @@ func init() {
 		"other folder":                  "其他目录",
 		"locked version":                "锁定版本",
 		"library source":                "来源",
+		"location":                      "位置",
 		"supported versions":            "版本",
 		"state":                         "状态",
 		"used in":                       "用在",

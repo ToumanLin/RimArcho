@@ -4,6 +4,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -18,7 +19,7 @@ type term struct {
 	neg   bool
 }
 
-var queryFields = map[string]bool{"name": true, "author": true, "tag": true, "id": true, "type": true, "has": true, "version": true}
+var queryFields = map[string]bool{"name": true, "author": true, "tag": true, "id": true, "type": true, "has": true, "version": true, "location": true}
 
 // Query is a parsed column search.
 type Query struct{ terms []term }
@@ -26,25 +27,8 @@ type Query struct{ terms []term }
 // ParseQuery splits a query into terms; an unknown field: prefix is free text.
 func ParseQuery(q string) Query {
 	var out []term
-	rs := []rune(q)
-	for i := 0; i < len(rs); {
-		for i < len(rs) && rs[i] == ' ' {
-			i++
-		}
-		if i == len(rs) {
-			break
-		}
-		inQuote := false
-		var tok []rune
-		for i < len(rs) && (inQuote || rs[i] != ' ') {
-			if rs[i] == '"' {
-				inQuote = !inQuote
-			} else {
-				tok = append(tok, rs[i])
-			}
-			i++
-		}
-		t := term{value: strings.ToLower(string(tok))}
+	for _, tok := range queryTokens(q) {
+		t := term{value: strings.ToLower(tok)}
 		if strings.HasPrefix(t.value, "-") && len(t.value) > 1 {
 			t.neg, t.value = true, t.value[1:]
 		}
@@ -57,6 +41,33 @@ func ParseQuery(q string) Query {
 		out = append(out, t)
 	}
 	return Query{out}
+}
+
+// queryTokens keeps quoted filter values together, including paths containing spaces.
+// Backslashes are literal, so Windows paths need no escaping.
+func queryTokens(q string) []string {
+	var out []string
+	rs := []rune(q)
+	for i := 0; i < len(rs); {
+		for i < len(rs) && unicode.IsSpace(rs[i]) {
+			i++
+		}
+		if i == len(rs) {
+			break
+		}
+		inQuote := false
+		var tok []rune
+		for i < len(rs) && (inQuote || !unicode.IsSpace(rs[i])) {
+			if rs[i] == '"' {
+				inQuote = !inQuote
+			} else {
+				tok = append(tok, rs[i])
+			}
+			i++
+		}
+		out = append(out, string(tok))
+	}
+	return out
 }
 
 // Empty: no terms (everything matches).
@@ -141,6 +152,8 @@ func termMatch(t term, it *Item, f MatchFacts) bool {
 		return slices.ContainsFunc(it.Tags, func(tg string) bool { return strings.EqualFold(tg, v) })
 	case "version":
 		return slices.Contains(it.Versions, v)
+	case "location":
+		return v != "" && strings.EqualFold(it.Location, v)
 	case "id":
 		return v != "" && (strings.Contains(it.Package, v) || it.Workshop == v || strings.EqualFold(it.Ref, v) || strings.EqualFold(strings.TrimPrefix(it.Ref, "#"), v))
 	case "type":
@@ -242,7 +255,7 @@ func TagMatch(tag, v string) bool { return app.TagMatch(tag, v) }
 func isTagSep(c byte) bool { return app.IsTagSep(c) }
 
 // queryFieldOrder is the order completion offers fields in when several share a prefix.
-var queryFieldOrder = []string{"name", "author", "tag", "id", "type", "has", "version"}
+var queryFieldOrder = []string{"name", "author", "tag", "id", "type", "has", "version", "location"}
 
 // queryValues are the fixed values of type: and has: (06 §3.7), in the order offered.
 var queryValues = map[string][]string{
