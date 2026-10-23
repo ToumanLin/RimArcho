@@ -72,6 +72,15 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
       st.append(b);
     }
     box.append(st);
+    if (d.canSeparate) {
+      const b = el("button", "btn", T("do not list as a copy"));
+      b.title = T("list this copy as an independent mod; package ID conflicts still apply");
+      b.onclick = () => {
+        b.disabled = true;
+        document.dispatchEvent(new CustomEvent("separate-mod", { detail: d.id }));
+      };
+      box.append(b);
+    }
     // the field list (06 §4.1): a click on a value copies it
     box.append(fieldList(d.fields, {
       tags: () => document.dispatchEvent(new CustomEvent("verb", { detail: "tags" })),

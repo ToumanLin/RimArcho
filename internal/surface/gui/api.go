@@ -623,17 +623,18 @@ type Detail struct {
 	Facts      []view.Fact `json:"facts"`
 	// Fields is the detail's one field list (06 §4.1): Archo ID, package, location, Workshop,
 	// tags, languages, dependencies, conflicts.
-	Fields   []view.Field   `json:"fields"`
-	Deps     []view.Dep     `json:"deps"`
-	Show     string         `json:"show"`
-	Note     string         `json:"note,omitempty"`
-	State    string         `json:"state,omitempty"` // the Workshop page's state
-	About    []bbcode.Block `json:"about"`
-	Workshop []bbcode.Block `json:"workshop"`
-	History  string         `json:"history,omitempty"`
-	Missing  bool           `json:"missing,omitempty"`
-	URL      string         `json:"url,omitempty"` // the Workshop page
-	Pos      int            `json:"pos,omitempty"`
+	Fields      []view.Field   `json:"fields"`
+	Deps        []view.Dep     `json:"deps"`
+	Show        string         `json:"show"`
+	Note        string         `json:"note,omitempty"`
+	State       string         `json:"state,omitempty"` // the Workshop page's state
+	About       []bbcode.Block `json:"about"`
+	Workshop    []bbcode.Block `json:"workshop"`
+	History     string         `json:"history,omitempty"`
+	Missing     bool           `json:"missing,omitempty"`
+	CanSeparate bool           `json:"canSeparate,omitempty"`
+	URL         string         `json:"url,omitempty"` // the Workshop page
+	Pos         int            `json:"pos,omitempty"`
 }
 
 // Detail returns the detail of an instance; fetch allows the network for the Workshop
@@ -660,7 +661,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 	d := &Detail{ID: id, Name: mod.DisplayName(), Authors: strings.TrimSpace(mod.Authors), Kind: view.SourceKind(mod), Pos: pos,
 		Header: view.HeaderFacts(mod, pos, staged), Facts: view.Facts(mod, data), Deps: view.Deps(st, data), Fields: view.ModFields(s.a, st, mod, data),
 		Show: data.Desc.Show, Note: view.DescNote(data), State: data.Desc.WorkshopState,
-		About: data.About, Workshop: data.Workshop, History: view.HistoryLine(data.Events)}
+		About: data.About, Workshop: data.Workshop, History: view.HistoryLine(data.Events), CanSeparate: st.Ix.CanSeparate(mod)}
 	d.Status = view.RowStatus(&item, n.Status)
 	switch d.Status {
 	case view.StatusNone:

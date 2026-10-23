@@ -68,10 +68,10 @@ func TestLibraryPage(t *testing.T) {
 	if lock.State != "" || lock.Used != "default" {
 		t.Errorf("a lineage with a used copy is not \"in no plan\": %q %q", lock.State, lock.Used)
 	}
-	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"take-out", "move-to", "stage", "swap", "remove", "tags", "note", "folder", "move", "textures", "delete"}) {
+	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"take-out", "move-to", "stage", "swap", "remove", "tags", "note", "separate", "folder", "move", "textures", "delete"}) {
 		t.Errorf("the Mods/ copy: %v", got)
 	}
-	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"use", "tags", "note", "folder", "workshop", "steam", "pin", "textures", "unsubscribe"}) {
+	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"use", "tags", "note", "separate", "folder", "workshop", "steam", "pin", "textures", "unsubscribe"}) {
 		t.Errorf("the unused workshop copy beside it (enabling it would clash): %v", got)
 	}
 	hid := libRow(t, p, "Hid")

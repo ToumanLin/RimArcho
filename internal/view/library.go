@@ -728,6 +728,21 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 	}
 	what := Named(st, idsOfRefs(st, refs))
 	switch kind {
+	case OpSeparate:
+		if len(refs) != 1 {
+			return "", errors.New(T("choose one copy to list independently"))
+		}
+		m, err := st.Ix.ResolveOne(refs[0])
+		if err != nil {
+			return "", err
+		}
+		if !st.Ix.CanSeparate(m) {
+			return "", errors.New(T("this copy is already listed independently or is no longer available"))
+		}
+		if _, err := a.SplitLineage(st.Ix, m); err != nil {
+			return "", err
+		}
+		return Tf("%s is now listed independently", m.DisplayName()), nil
 	case LibUnsub, LibResub:
 		return libSteam(a, kind, refs, what)
 	case OpAdd, OpEnable, OpTakeOut, OpDisable, OpPutBack, OpStage, OpUse, OpSwap:
@@ -910,7 +925,7 @@ func SetModNote(a *app.App, ref, text string) (string, error) {
 // disk ops); the rest are the interface's own (a page, a folder, a note, a position).
 func LibDoes(kind string) bool {
 	switch kind {
-	case LibUnsub, LibResub, LibRemove, OpAdd, OpEnable, OpTakeOut, OpDisable, OpPutBack, OpStage, OpUse, OpSwap:
+	case OpSeparate, LibUnsub, LibResub, LibRemove, OpAdd, OpEnable, OpTakeOut, OpDisable, OpPutBack, OpStage, OpUse, OpSwap:
 		return true
 	}
 	return libConfirm[kind]

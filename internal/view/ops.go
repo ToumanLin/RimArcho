@@ -45,6 +45,7 @@ const (
 	OpRemove    = "remove"     // 在所有列表里停用
 	OpTags      = "tags"       // 标签
 	OpNote      = "note"       // 备注 (Mod 库: this copy's note)
+	OpSeparate  = "separate"   // 不列为副本
 	OpFolder    = "folder"     // 打开文件夹
 	OpWorkshop  = "workshop"   // 打开工坊页面
 	OpSteam     = "steam"      // Steam 客户端页面
@@ -76,6 +77,7 @@ var opTable = []Op{
 	{Code: OpRemove, Group: 1},
 	{Code: OpTags, Key: "g", Group: 2},
 	{Code: OpNote, Key: "n", Group: 2, One: true},
+	{Code: OpSeparate, Group: 2, Detail: true, One: true},
 	{Code: OpFolder, Key: "ctrl+o", Group: 3, Detail: true, One: true},
 	{Code: OpWorkshop, Key: "ctrl+w", Group: 3, Detail: true, One: true},
 	{Code: OpSteam, Key: "ctrl+s", Group: 3, Detail: true, One: true},
@@ -97,7 +99,8 @@ func opLabel(code string) string {
 		OpDisable: T("disable"), OpTakeOut: T("disable"), OpPutBack: T("put back"),
 		OpEnableAt: T("enable at…"), OpMoveTo: T("move to…"), OpStage: T("stage"), OpSwap: T("switch version…"),
 		OpRemove: T("disable in every list"), OpTags: T("tags"), OpNote: T("note"),
-		OpFolder: T("open the folder"), OpWorkshop: T("open the Workshop page"),
+		OpSeparate: T("do not list as a copy"),
+		OpFolder:   T("open the folder"), OpWorkshop: T("open the Workshop page"),
 		OpSteam: T("steam page"),
 		OpPin:   T("lock this version"), OpPinUpdate: T("update the locked version"), OpUnpin: T("unlock"),
 		OpMove: T("move into the lock library"), OpUnhide: T("unhide"), OpResub: T("subscribe again"),
@@ -220,6 +223,9 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	}
 	if m != nil {
 		ks = append(ks, OpTags, OpNote) // the editor: the mod's note; Mod 库存: this copy's
+	}
+	if live && others > 0 {
+		ks = append(ks, OpSeparate)
 	}
 	url := IsNumber(i.WorkshopID)
 	if live && i.Path != "" {

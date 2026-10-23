@@ -258,6 +258,19 @@ func (a *App) ResolveQuestion(qid int64, answer string) (*store.Question, error)
 	return q, nil
 }
 
+// CanSeparate reports whether the detail can list this live copy as an independent mod.
+func (ix *Index) CanSeparate(m *store.Mod) bool {
+	if m == nil || m.Status != identity.Live || m.Kind == source.Official {
+		return false
+	}
+	for _, other := range ix.ByLineage[m.LineageID] {
+		if other.ID != m.ID && other.Status == identity.Live {
+			return true
+		}
+	}
+	return false
+}
+
 // SplitLineage gives an instance a lineage of its own; returns the new lineage ID.
 func (a *App) SplitLineage(ix *Index, m *store.Mod) (string, error) {
 	if len(ix.ByLineage[m.LineageID]) == 1 {

@@ -916,6 +916,11 @@ async function start() {
   wireSplits();
   document.addEventListener("keydown", onKey);
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
+  // The detail button always acts on the shown instance, independently of list selection.
+  document.addEventListener("separate-mod", async (e) => {
+    await edited(api.RunOp("separate", [e.detail]), false, [e.detail]);
+    detailFollow(true);
+  });
   // a detail's 在变化页查看全部: 变化 with only that mod's Lineage (06 §2.9)
   document.addEventListener("changes-of", async (e) => { shell.navigated(); await scr.changes(e.detail); renderWhere(); renderHints(); });
   // the enabled list's head: import / export

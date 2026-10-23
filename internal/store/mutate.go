@@ -90,10 +90,30 @@ func (s *Store) ResolveUnrelated(q *Question, now time.Time) error {
 	return err
 }
 
-// SplitLineage moves an Instance into a new lineage of its own.
+// SplitLineage moves an Instance into a new lineage of its own, inheriting the player's
+// alias, note and tags. Rules and finding ignores remain attached to the original lineage.
 func (s *Store) SplitLineage(envID, instanceID, newLineageID string, now time.Time) error {
 	return s.inTx(func(tx *sql.Tx) error {
+		var oldLineage string
+		if err := tx.QueryRow(`SELECT lineage_id FROM instance WHERE id=?`, instanceID).Scan(&oldLineage); err != nil {
+			return err
+		}
+		var members int
+		if err := tx.QueryRow(`SELECT count(*) FROM instance WHERE lineage_id=?`, oldLineage).Scan(&members); err != nil {
+			return err
+		}
+		if members < 2 {
+			return fmt.Errorf("instance #%s is already alone in its lineage", instanceID)
+		}
 		if _, err := tx.Exec(`INSERT INTO lineage(id, environment_id, primary_instance_id, created_at) VALUES(?,?,?,?)`, newLineageID, Shared, instanceID, now.Unix()); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO lineage_data(environment_id, lineage_id, alias, note)
+			SELECT environment_id, ?, alias, note FROM lineage_data WHERE lineage_id=?`, newLineageID, oldLineage); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO lineage_tag(environment_id, lineage_id, tag)
+			SELECT environment_id, ?, tag FROM lineage_tag WHERE lineage_id=?`, newLineageID, oldLineage); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE instance SET lineage_id=?, lineage_basis=? WHERE id=?`, newLineageID, identity.BasisManual, instanceID); err != nil {

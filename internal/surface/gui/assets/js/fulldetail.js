@@ -32,7 +32,7 @@ const PLAN = new Set(["add", "take-out", "put-back", "stage", "use", "swap", "re
 
 export async function full(from, id) {
   from = from || "plan";
-  if (from === "plan") {
+  if (from === "plan" && !id) {
     const it = cur();
     if (!it || !it.id) return;
     id = it.id;
@@ -233,7 +233,11 @@ async function runOp(code) {
   if (!c) return;
   const o = ops.op(code);
   const done = async (p, undo) => {
-    try { const t = await p; say("ok", typeof t === "string" ? t : t && t.text, undo); } catch (e) { say("fail", errText(e)); }
+    try {
+      const t = await p;
+      say("ok", typeof t === "string" ? t : t && t.text, undo);
+      if (code === "separate") { F.id = c.id; F.copy = c.ref; }
+    } catch (e) { say("fail", errText(e)); }
     await ui.reload();
     if (S.screen === "full") await full(F.from, F.id);
   };

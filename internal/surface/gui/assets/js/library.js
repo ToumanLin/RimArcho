@@ -94,7 +94,7 @@ function bar() {
   return L.bar;
 }
 
-async function load(fresh) {
+async function load(fresh, focusRef) {
   const n = ++L.seq;
   const epoch = S.screenSeq;
   const b = bar();
@@ -107,8 +107,13 @@ async function load(fresh) {
   ops.setTable(p.opTable);
   if (!L.cols) L.cols = mergeCols(p.columns || [], saved);
   flatten();
+  if (focusRef) {
+    const at = L.flat.findIndex((x) => x.t === "inst" && x.i.ref === focusRef);
+    if (at >= 0) L.cur = at;
+  }
   if (fresh || !els || S.screen !== "library" || !document.body.contains(els.root)) build();
   else draw();
+  if (focusRef) { ensureVisible(); drawRows(); }
 }
 
 // flatten lists the rows: a Lineage, and its copies when it is open (or when the filters
@@ -748,7 +753,7 @@ async function run(code, copies) {
   const done = async (p, undo) => {
     try { const t = await p; say("ok", typeof t === "string" ? t : t && t.text, undo); } catch (e) { say("fail", errText(e)); }
     L.sel.clear();
-    await load();
+    await load(false, code === "separate" ? i0.ref : "");
     ui.reload();
   };
   switch (code) {
