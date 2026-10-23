@@ -3,10 +3,10 @@
 // button that runs it, the progress, then the same rows as the report. Everything is a
 // native control, so tab, space and enter do what the mouse does.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, button, pickFolder } from "./screens.js";
+import { openScreen, page, button, pickFolder, beginPageRead } from "./screens.js";
 
 const fresh = () => ({ keepLocked: false, lockedTo: "", removePacks: false, packsTo: "", removeSaves: false, savesTo: "", removeGames: false, restoreBackup: false });
-const U = { choice: fresh(), page: null, running: false, prog: null };
+const U = { choice: fresh(), page: null, running: false, prog: null, loading: false };
 
 // locked: while it runs, and once it has run without a failure, no other page opens (every
 // command is refused after an uninstall).
@@ -15,10 +15,6 @@ export function locked() { return U.running || !!(U.page && U.page.ran && !U.pag
 export async function open() {
   if (S.screen !== "uninstall" && !locked()) { U.choice = fresh(); U.page = null; }
   return draw(!locked());
-}
-
-async function plan() {
-  try { U.page = await api.UninstallPlan(U.choice); return true; } catch (e) { say("fail", errText(e)); return false; }
 }
 
 // answer sets one answer and draws the plan again, keeping the focus on the same control.
@@ -30,7 +26,17 @@ async function answer(k, v) {
 }
 
 async function draw(fetch) {
-  if (fetch && !(await plan())) return;
+  if (fetch) {
+    const read = beginPageRead("uninstall", { replace: true });
+    U.loading = true;
+    try {
+      const p = await api.UninstallPlan({ ...U.choice });
+      if (!read.current()) return;
+      U.page = p;
+    } catch (e) { read.fail(e); return; }
+    finally { if (read.current()) { U.loading = false; read.finish(); } }
+  }
+  if (S.screen !== "uninstall") return;
   const pg = U.page;
   if (!pg) return;
   const sc = S.screen === "uninstall" ? $("#screen") : openScreen("uninstall");
@@ -152,13 +158,13 @@ function foot(pg) {
   }
   // The one confirmation: this button, under the whole plan.
   const go = button(T("uninstall RimArcho"), "", run, "primary danger-go");
-  go.disabled = !!pg.blocked;
+  go.disabled = U.loading || !!pg.blocked;
   f.append(go);
   return f;
 }
 
 async function run() {
-  if (U.running) return;
+  if (U.running || U.loading) return;
   try { await api.UninstallRun(U.choice); } catch (e) { say("fail", errText(e)); return draw(true); }
   U.running = true;
   U.prog = null;

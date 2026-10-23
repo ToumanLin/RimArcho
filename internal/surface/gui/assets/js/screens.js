@@ -34,6 +34,7 @@ export function openScreen(name) {
   if (name !== "home") dropBackdrop();
   const sc = $("#screen");
   sc.hidden = false;
+  sc.removeAttribute("aria-busy");
   sc.innerHTML = "";
   ui.renderWhere();
   ui.renderHints();
@@ -47,10 +48,48 @@ export function closeScreen() {
   S.screen = null;
   dropBackdrop();
   $("#screen").hidden = true;
+  $("#screen").removeAttribute("aria-busy");
   $("#screen").innerHTML = "";
   ui.renderWhere();
   ui.renderHints();
   return true;
+}
+
+const pageReads = new Map();
+const pageContexts = new Map();
+export const pageLoading = () => !!$("#screen .page-loading, #screen .page-read-error");
+// Every page starts navigation before I/O and owns a ticket for its reply. Refreshes
+// keep the visible content; a new page/subview shows a placeholder immediately.
+export function beginPageRead(name, { replace = false, label = "loading…" } = {}) {
+  const same = S.screen === name;
+  const sc = same ? $("#screen") : openScreen(name);
+  const n = (pageReads.get(name) || 0) + 1;
+  pageReads.set(name, n);
+  const epoch = S.screenSeq, env = S.board?.env, plan = S.shell?.plan?.id;
+  const context = JSON.stringify([env, plan]);
+  const changed = pageContexts.get(name) !== context;
+  pageContexts.set(name, context);
+  const current = () => S.screen === name && S.screenSeq === epoch && S.board?.env === env && S.shell?.plan?.id === plan && pageReads.get(name) === n;
+  if (!same || changed || replace || !sc.children.length) {
+    sc.innerHTML = "";
+    const w = page(name, "");
+    const card = el("section", "card pad page-loading");
+    card.append(shimmer(T(label), 6));
+    w.append(card); sc.append(w);
+  }
+  sc.setAttribute("aria-busy", "true");
+  return {
+    current,
+    finish() { if (current()) sc.removeAttribute("aria-busy"); },
+    fail(error) {
+      if (!current()) return;
+      sc.removeAttribute("aria-busy");
+      const message = errText(error);
+      const placeholder = sc.querySelector(".page-loading");
+      if (placeholder) { placeholder.className = "card pad err page-read-error"; placeholder.textContent = message; }
+      say("fail", message);
+    },
+  };
 }
 
 // dropBackdrop takes the launch page's image away with the page (home.js setBackdrop).
@@ -185,7 +224,7 @@ const N = { data: null, items: [], cur: 0, open: new Set(), els: [] };
 export const archo = { ask: null };
 
 export function liveChanged() {
-  if (S.screen === "needs" && N.data) { orderNeeds(); drawNeeds(); }
+  if (S.screen === "needs" && N.data && !pageLoading()) { orderNeeds(); drawNeeds(); }
 }
 
 // liveCount: this run's counted errors (the sidebar's badge adds them, 06 §2.1).
@@ -201,12 +240,15 @@ function orderNeeds() {
 }
 
 export async function needs(keepCursor) {
+  const read = beginPageRead("needs");
   let data;
-  try { data = await api.Needs(); } catch (e) { say("fail", errText(e)); return; }
+  try { data = await api.Needs(); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   N.data = data;
   if (!keepCursor) N.cur = 0;
   orderNeeds();
   drawNeeds();
+  read.finish();
 }
 
 // lead: what the page says about the plan in one sentence.
@@ -820,9 +862,12 @@ export function changesPlan() { C.library = false; C.of = null; C.cur = 0; }
 export async function changes(of) {
   if (of !== undefined && (of && of.id) !== (C.of && C.of.id)) { C.of = of; C.cur = 0; C.open.clear(); }
   let p;
-  try { p = await api.Changes(C.library, C.of ? C.of.id : ""); } catch (e) { say("fail", errText(e)); return; }
+  const read = beginPageRead("changes");
+  try { p = await api.Changes(C.library, C.of ? C.of.id : ""); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   C.page = p;
   drawChanges();
+  read.finish();
 }
 
 export function rescanButton(label) {
@@ -973,10 +1018,14 @@ function toggle(it) {
 }
 
 async function rawFiles(r) {
+  const epoch = S.screenSeq;
   const k = rowKey(r);
   if (C.raw.has(k)) C.raw.delete(k);
   else {
-    try { C.raw.set(k, (await api.ChangeFiles(r.before, r.after)) || []); } catch (e) { return say("fail", errText(e)); }
+    let lines;
+    try { lines = (await api.ChangeFiles(r.before, r.after)) || []; } catch (e) { if (S.screen === "changes" && S.screenSeq === epoch) say("fail", errText(e)); return; }
+    if (S.screen !== "changes" || S.screenSeq !== epoch) return;
+    C.raw.set(k, lines);
     C.open.add(k);
   }
   drawChanges();
@@ -1091,8 +1140,10 @@ export { full, fullKey, fullSection } from "./fulldetail.js";
 // only those commands (API.ApplySetting).
 
 export async function settings() {
+  const read = beginPageRead("settings");
   let groups, bg;
-  try { [groups, bg] = await Promise.all([api.Settings(), bgSection()]); } catch (e) { say("fail", errText(e)); return; }
+  try { [groups, bg] = await Promise.all([api.Settings(), bgSection(read.current)]); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   groups = groups || [];
   const sc = S.screen === "settings" ? $("#screen") : openScreen("settings");
   const top = sc.scrollTop;
@@ -1102,18 +1153,21 @@ export async function settings() {
   w.append(bg);
   renderGroups(w, groups, settings);
   sc.scrollTop = top;
+  read.finish();
 }
 
 // settingRunner runs a setting's command, then redraws the page with again.
 function settingRunner(again) {
   return async (argv, value, after) => {
+    const screen = S.screen, epoch = S.screenSeq;
     try {
       const out = await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
     } catch (e) { say("fail", errText(e)); }
+    if (S.screen !== screen || S.screenSeq !== epoch) return;
     if (after) return after();
     await ui.reload();
-    again();
+    if (S.screen === screen && S.screenSeq === epoch) again();
   };
 }
 
@@ -1182,8 +1236,10 @@ export async function pickFolder(start, then) {
 // settings page.
 
 export async function environment() {
+  const read = beginPageRead("env");
   let p;
-  try { p = await api.Environment(); } catch (e) { say("fail", errText(e)); return; }
+  try { p = await api.Environment(); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
@@ -1208,6 +1264,7 @@ export async function environment() {
   w.append(card);
   renderGroups(w, p.groups || [], environment);
   sc.scrollTop = top;
+  read.finish();
 }
 
 // removeEnv: the dry run says what RimArcho forgets and what stays, one confirmation removes

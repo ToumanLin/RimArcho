@@ -8,7 +8,7 @@
 //      applied: view.ReadImport → PreviewImport → ApplyImport), or a pack / a collection.
 // The environment page's "add an environment" starts at step 1.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, button, seg, pickFolder } from "./screens.js";
+import { page, button, seg, pickFolder, beginPageRead } from "./screens.js";
 import { exchange, importFrom } from "./exchange.js";
 
 let ui = null;
@@ -29,14 +29,18 @@ export async function start(from = "first") {
   G.picked.clear();
   if (D.run && D.run.end) D.run = null;
   G.way = D.run ? 1 : 0;
-  openScreen("guide");
   await find();
 }
 
 async function find() {
-  try { G.games = (await api.GuideFind()) || []; } catch (e) { G.games = []; say("fail", errText(e)); }
+  const read = beginPageRead("guide", { replace: true });
+  let games;
+  try { games = (await api.GuideFind()) || []; } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
+  G.games = games;
   G.games.forEach((g, i) => { if (!g.env) G.picked.add(i); });
   draw();
+  read.finish();
 }
 
 function draw() {

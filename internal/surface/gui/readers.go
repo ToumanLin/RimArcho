@@ -14,6 +14,23 @@ type logReader struct {
 	a  *app.App
 }
 
+// detachedReader snapshots invocation options without building the board. It also works
+// before the first environment exists (settings, detection and uninstall previews).
+// The caller owns the connection and closes it after constructing the view model.
+func (s *API) detachedReader() (*app.App, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, err := s.a.ReadSession()
+	if err != nil {
+		return nil, err
+	}
+	if e, err := s.a.Env(); err == nil {
+		r.EnvName = e.Name
+	}
+	r.AnalyzeExe, r.AnalyzeWait = s.Exe, 200*time.Millisecond
+	return r, nil
+}
+
 // pageReader is called with s.mu held, only to snapshot the invocation settings.
 // All slow work then uses this separate connection without the shared API mutex.
 func (s *API) pageReader() (*app.App, error) {

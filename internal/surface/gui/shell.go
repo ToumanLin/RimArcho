@@ -39,7 +39,7 @@ func (s *API) Shell() *Shell {
 	}
 	count := 0
 	if st := s.boardState(); st != nil {
-		count = s.needsLocked(false).Count
+		count = s.needsLocked().Count
 		out.Env = view.EnvChip(s.board.EnvName, s.board.GameVersion)
 	} else {
 		out.Env = view.EnvChip("", "")
@@ -72,23 +72,27 @@ func (s *API) Shell() *Shell {
 
 // Home is the home page (06 §2.3).
 func (s *API) Home() *view.Home {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.boardState()
-	if st == nil {
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return &view.Home{Featured: -1}
+	}
+	b, err := view.BuildBoard(r)
+	if err != nil || b.St == nil {
 		return &view.Home{}
 	}
+	st := b.St
 	// The last run's line reads Player.log when it is newer than the one read last (06
 	// §2.3): the page loads, or the window comes back into focus, after a game.
-	if _, newer := s.a.NewLog(st); newer {
-		s.needsLocked(true)
-	}
-	packs, _, _ := view.PackRows(s.a)
-	plans, _ := view.PlanRows(s.a)
-	h := view.BuildHome(s.a, s.board, s.needsLocked(false), plans, packs)
-	st = s.board.St
-	view.AddOtherEnvs(s.a, h, st.Ix.Env.ID)
-	view.PickFeatured(h, s.a.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
+	_, newer := r.NewLog(st)
+	n, _ := readNeeds(r, newer)
+	packs, _, _ := view.PackRows(r)
+	plans, _ := view.PlanRows(r)
+	h := view.BuildHome(r, b, n, plans, packs)
+	view.AddOtherEnvs(r, h, st.Ix.Env.ID)
+	view.PickFeatured(h, r.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
 	return h
 }
 
@@ -226,9 +230,12 @@ func (s *API) RemovePlan(id int64) (*PlanDone, error) {
 
 // GuideFind lists the RimWorld installs detection finds.
 func (s *API) GuideFind() []view.GameFound {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.FindGames(s.a)
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil
+	}
+	defer r.Close()
+	return view.FindGames(r)
 }
 
 // GuideGame checks a game folder the player typed.

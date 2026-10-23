@@ -179,7 +179,7 @@ func (s *API) boardLocked() *Board {
 		sc, _, _ := s.a.LastScan(e.ID)
 		out.Never = sc == nil
 	}
-	n := s.needsLocked(false)
+	n := s.needsLocked()
 	out.Status, out.Needs = n.Status, n.Count
 	return out
 }
@@ -196,35 +196,43 @@ type PackList struct {
 
 // Packs lists the current environment's packs (08 §5).
 func (s *API) Packs() (*PackList, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	rows, others, err := view.PackRows(s.a)
+	r, err := s.detachedReader()
 	if err != nil {
 		return nil, err
 	}
-	un, err := view.UnfinishedRows(s.a)
+	defer r.Close()
+	defer s.free.soon()
+	rows, others, err := view.PackRows(r)
+	if err != nil {
+		return nil, err
+	}
+	un, err := view.UnfinishedRows(r)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return &PackList{Rows: rows, Others: others, Unfinished: un, Building: s.building}, err
 }
 
 // BuildPage is 编译成整合包 for the current plan (06 §2.6): checked and sorted under the
-// lock, measured (every mod's folder walked) outside it; a light pack is not measured.
+// reader's own connection, including texture planning and folder measurement.
 // tex is the textures choice (view.PackTextureOptions): 0 off, 100 预转换, less 精简.
 func (s *API) BuildPage(light bool, tex int) (*view.BuildPage, error) {
-	s.mu.Lock()
-	plan, chip := "", ""
-	if st := s.boardState(); st != nil {
-		chip = view.EnvChip(s.board.EnvName, s.board.GameVersion)
-		if st.Plan != nil {
-			plan = st.Plan.Name
-		}
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
 	}
-	name := view.DefaultPackName(s.a, plan)
-	pl, err := s.a.PlanPack(name, light)
+	defer r.Close()
+	defer s.free.soon()
+	st, err := r.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	plan, chip := st.Plan.Name, view.EnvChip(st.Ix.Env.Name, st.Ix.Env.GameVersion)
+	name := view.DefaultPackName(r, plan)
+	pl, err := r.PlanPack(name, light)
 	if err == nil && !light {
-		view.PlanTextures(s.a, pl, tex)
+		view.PlanTextures(r, pl, tex)
 	}
-	dir := s.a.PacksDir()
-	s.mu.Unlock()
+	dir := r.PacksDir()
 	if err != nil {
 		return nil, err
 	}
@@ -278,9 +286,13 @@ func (s *API) PackDryRun(name string, light bool, tex int) []string {
 
 // Pack is one pack's page (06 §2.7).
 func (s *API) Pack(name string) (*view.PackPage, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.BuildPackPage(s.a, name)
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	defer s.free.soon()
+	return view.BuildPackPage(r, name)
 }
 
 // PackExport writes a pack to a file the player picks (pack export): the save dialog in
@@ -437,17 +449,30 @@ func (s *API) PackRemove(name string) (string, error) {
 
 // Settings is the settings page (06 §2.14).
 func (s *API) Settings() []view.SettingGroup {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.SettingsPage(s.a, s.boardState())
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil
+	}
+	defer r.Close()
+	defer s.free.soon()
+	return view.SettingsPage(r, nil)
 }
 
 // Environment is the environment page: the environments, the current one's folders and
 // launch.
 func (s *API) Environment() *view.EnvPage {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.BuildEnvPage(s.a, s.boardState())
+	r, err := s.detachedReader()
+	if err != nil {
+		return &view.EnvPage{}
+	}
+	defer r.Close()
+	defer s.free.soon()
+	// This view needs only the environment's settings, not every installed Mod.
+	var st *app.LoadoutState
+	if e, err := r.Env(); err == nil {
+		st = &app.LoadoutState{Ix: &app.Index{Env: e}}
+	}
+	return view.BuildEnvPage(r, st)
 }
 
 // ApplySetting runs one of the settings page's commands, with value in place of {}.
@@ -530,7 +555,7 @@ func (s *API) Filter(col int, query string) (*Filtered, error) {
 		return &Filtered{}, nil
 	}
 	q := view.ParseQuery(query)
-	f := view.MatchFacts{Status: s.needsLocked(false).Status}
+	f := view.MatchFacts{Status: s.needsLocked().Status}
 	if q.NeedsContent() {
 		c, err := s.content.Get(s.a, s.board.St)
 		if err != nil {
@@ -606,7 +631,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 		s.mu.Unlock()
 		return nil, fmt.Errorf("no mod %s", id)
 	}
-	n := s.needsLocked(false)
+	n := s.needsLocked()
 	pos := st.Position(id)
 	item := view.ModItem(st, mod)
 	s.mu.Unlock()
@@ -633,13 +658,17 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 
 // Sections are the full detail's sub-sections (06 §4.2), #refs replaced by names.
 func (s *API) Sections(id string) ([]view.Section, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.boardState()
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	defer s.free.soon()
+	st, _ := r.Loadout()
 	if st == nil || st.Ix.ByID[id] == nil {
 		return nil, fmt.Errorf("no mod %s", id)
 	}
-	secs := view.Sections(s.a, st.Ix, st.Ix.ByID[id])
+	secs := view.Sections(r, st.Ix, st.Ix.ByID[id])
 	for i := range secs {
 		for j, l := range secs[i].Lines {
 			secs[i].Lines[j] = view.Humanize(st, l)
@@ -854,34 +883,51 @@ func (s *API) SetTag(ids []string, tag string, remove bool) (string, error) {
 // Needs builds the screen. Opening it includes the newest log (parsing it if needed) and
 // starts the files' check when it is stale, as the TUI does.
 func (s *API) Needs() *view.Needs {
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return &view.Needs{Status: map[string]int{}}
+	}
+	n, st := readNeeds(r, true)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	defer s.free.soon()
-	n := s.needsLocked(true)
-	if (n.Stale || n.Never) && !s.busy["analyze"] {
+	current, _ := s.a.Loadout()
+	if st != nil && current != nil && st.Ix.Env.ID == current.Ix.Env.ID && st.Plan.ID == current.Plan.ID && app.ListFingerprint(st.List) == app.ListFingerprint(current.List) && (n.Stale || n.Never) && !s.busy["analyze"] {
 		s.startAnalyze()
 	}
 	return n
 }
 
-func (s *API) needsLocked(withLog bool) *view.Needs {
-	key := s.a.Store.ChangeKey()
-	if !withLog && s.needs != nil && s.needsAt == key {
-		return s.needs
-	}
+// readNeeds is shared by slow page readers. The board and sidebar keep their cheap,
+// cache-only path and never inherit a page's eager log parsing options.
+func readNeeds(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState) {
 	if withLog {
-		s.a.LazyLog, s.a.LogCacheOnly = false, false
+		a.LazyLog, a.LogCacheOnly = false, false
+	}
+	ps, err := a.Problems(false, nil)
+	if err != nil || ps.State == nil {
+		return &view.Needs{Status: map[string]int{}}, nil
+	}
+	st := ps.State
+	if withLog {
+		if cur, _ := a.LogPaths(st); cur != "" && a.ProblemLog(st) == cur {
+			a.SelectLog(st, cur)
+		}
+	}
+	return view.BuildNeeds(a, st, ps), st
+}
+
+func (s *API) needsLocked() *view.Needs {
+	key := s.a.Store.ChangeKey()
+	if s.needs != nil && s.needsAt == key {
+		return s.needs
 	}
 	st := s.boardState()
 	ps, err := s.a.Problems(false, nil)
 	if err != nil || st == nil {
 		return &view.Needs{Status: map[string]int{}}
-	}
-	if withLog {
-		// The newest log was parsed into this list (03 §6.4): it has been seen.
-		if cur, _ := s.a.LogPaths(st); cur != "" && s.a.ProblemLog(st) == cur {
-			s.a.SelectLog(st, cur)
-		}
 	}
 	s.needs, s.needsAt = view.BuildNeeds(s.a, st, ps), s.a.Store.ChangeKey()
 	return s.needs
@@ -924,9 +970,13 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 // Changes is the 变化 page: the current plan's mods since it was last played, or the whole
 // library; of (an instance ID) narrows it to that mod's Lineage, every change by day.
 func (s *API) Changes(library bool, of string) (*modchanges.Page, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.boardState()
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	defer s.free.soon()
+	st, _ := r.Loadout()
 	if st == nil {
 		return nil, errors.New("no list")
 	}
@@ -938,7 +988,7 @@ func (s *API) Changes(library bool, of string) (*modchanges.Page, error) {
 		}
 		o.OfName = st.Ix.ByID[of].DisplayName()
 	}
-	return view.BuildChanges(s.a, st, o)
+	return view.BuildChanges(r, st, o)
 }
 
 // ChangeFiles is the raw file list behind a row: the files that differ between two

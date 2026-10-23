@@ -13,9 +13,13 @@ import (
 
 // UninstallPlan is the plan for these answers (nothing changes).
 func (s *API) UninstallPlan(c view.UninstallChoice) (*view.UninstallPage, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	p, err := s.a.PlanUninstall(c.Options())
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	defer s.free.soon()
+	p, err := r.PlanUninstall(c.Options())
 	if err != nil {
 		return nil, err
 	}

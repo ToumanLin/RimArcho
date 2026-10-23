@@ -8,7 +8,7 @@
 // Data: API.Home (view.BuildHome, view.AddOtherEnvs, view.PickFeatured) and
 // API.HomeBackground (the image, its dimming, blur and focus; 06 §2.14).
 import { S, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, changesPlan } from "./screens.js";
+import { openScreen, page, changesPlan, beginPageRead } from "./screens.js";
 import { icon } from "./icons.js";
 import { launchPack } from "./packs.js";
 import { withEnvironmentSwitch } from "./environment.js";
@@ -27,11 +27,16 @@ let rows = []; // the applied row first, then the others in the home order
 let cur = 0;   // the keyboard's row
 
 export async function home() {
-  try { [data, bg] = await Promise.all([api.Home(), api.HomeBackground()]); } catch (e) { say("fail", errText(e)); return; }
+  const read = beginPageRead("home");
+  let next, backdrop;
+  try { [next, backdrop] = await Promise.all([api.Home(), api.HomeBackground()]); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
+  data = next; bg = backdrop;
   const all = data.rows || [];
   rows = data.featured >= 0 ? [all[data.featured], ...all.filter((_, i) => i !== data.featured)] : all;
   cur = Math.min(cur, Math.max(rows.length - 1, 0));
   draw();
+  read.finish();
 }
 
 const featured = () => (data && data.featured >= 0 ? rows[0] : null);

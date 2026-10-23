@@ -57,14 +57,34 @@ const bgMinWidth = 1280
 
 // Backgrounds lists the game's and the background mods' images in the index's environment.
 func (a *App) Backgrounds(ix *Index) []Background {
-	var game, mods []Background
-	seen := map[string]bool{}
+	return CollectBackgrounds(a.BackgroundTargets(ix))
+}
+
+// BackgroundTarget holds the small immutable input to filesystem discovery. GUI readers
+// capture these from the existing index, without retaining or reloading every Mod.
+type BackgroundTarget struct {
+	Dir, Name, PackageID, LineageID string
+	Official                        bool
+}
+
+func (a *App) BackgroundTargets(ix *Index) []BackgroundTarget {
+	var out []BackgroundTarget
 	for _, m := range ix.Mods {
-		if !m.TombstoneAt.IsZero() || m.Residue {
+		if !m.TombstoneAt.IsZero() || m.Residue || (m.Kind != source.Official && !strings.Contains(strings.ToLower(m.Name), "background")) {
 			continue
 		}
-		dir := a.ModPath(ix, m)
-		if m.Kind == source.Official {
+		out = append(out, BackgroundTarget{Dir: a.ModPath(ix, m), Name: m.Name, PackageID: m.PackageID, LineageID: m.LineageID, Official: m.Kind == source.Official})
+	}
+	return out
+}
+
+// CollectBackgrounds does the slow file reads without an App or database connection.
+func CollectBackgrounds(targets []BackgroundTarget) []Background {
+	var game, mods []Background
+	seen := map[string]bool{}
+	for _, m := range targets {
+		dir := m.Dir
+		if m.Official {
 			src := findPreview(filepath.Join(dir, "About"))
 			if src == "" {
 				continue
@@ -76,7 +96,7 @@ func (a *App) Backgrounds(ix *Index) []Background {
 			game = append(game, Background{Key: "game:" + strings.ToLower(m.PackageID), Label: label, Src: src})
 			continue
 		}
-		if !strings.Contains(strings.ToLower(m.Name), "background") || seen[m.LineageID] {
+		if seen[m.LineageID] {
 			continue
 		}
 		seen[m.LineageID] = true
