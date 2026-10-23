@@ -47,7 +47,7 @@ var Commands = []Command{
 	{"restore-all", "全部从暂存放回", "put all back", "T staging"},
 	{"stage-all", "把已启用的全部放进暂存", "stage everything enabled", "T in the window"},
 	{"import", "导入列表", "import a list", "i RimSort RimCrow .rml share code collection"},
-	{"export", "导出列表", "export the list", "e RimSort RimCrow .rml share code"},
+	{"export", "导出列表", "export the list", "e RimArcho RimSort RimCrow .rml share code"},
 	{"filter", "筛选这一列", "filter", "/ search"},
 	{"details", "详情", "details", "enter"},
 	{"tech", "技术信息", "technical information", "i"},

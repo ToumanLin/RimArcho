@@ -228,16 +228,16 @@ next:
 | 写入与启动 | `save [--dry-run]` | **写入游戏但不启动**（界面上叫“写入游戏”），给从 Steam 等其他途径开游戏的玩家：渲染当前方案的 ModsConfig.xml（备份、原子替换、写当前游戏版本）、同步 `_Archo_` 链接、移除整合包链接（04 §4.1、08 §3）。`--dry-run` 显示会写什么 |
 | | `launch [--dry-run]` | 启动当前方案（08 §2）。`--dry-run` 只显示启动命令。先写入再启动、已有游戏运行就拒绝、记启动记录和 `launch` 版本；`--dry-run` 显示与 `save --dry-run` 同一份预览加启动命令行 |
 | 方案管理 | 见 §4.3 | |
-| 列表交换 | `loadout export [--format text\|modsconfig\|rimsort\|rml\|rimcrow] [--out <文件>]` | 导出当前方案；`--out` 从不覆盖已有文件 |
+| 列表交换 | `loadout export [--format text\|archo\|modsconfig\|rimsort\|rml\|rimcrow\|rimcrow-xml] [--out <文件>]` | 导出当前方案；`--out` 从不覆盖已有文件 |
 | | `loadout import <文件\|分享码> [--new [<名字>]]` | 用一份列表替换当前方案（文本、ModsConfig.xml、存档、`.rml`、RimSort、RimCrow 分享码、工坊 ID），一步可撤销，不写游戏文件（04 §9）；`--new` 导入为新方案（待实现） |
 | | `collection <链接\|ID> [--import]` | 读工坊合集并与已安装的 Mod 对照（联网）；`--import` 按合集顺序把已安装的部分放进当前方案（可撤销） |
 | 锁定版本 | `pin <实例> [--name <文件夹>] [--git] [--dry-run]` | 创建锁定版本（04 §7）：复制到锁定库（默认 `<文件夹>_local`），写 `.rimarcho/origin.json`，`--git` 建基线提交，并只在当前方案里换成这份副本；`--update` 更新锁定版本，`--move-to-library` 把 `Mods/` 里的旧副本移进锁定库。`copy-local` 是别名 |
 | | `unpin <引用> [--dry-run]` | 解除锁定：恢复工坊那份并改用它（含 RimCrow 风格的锁定） |
 | 隐藏的 Mod | `unhide <引用> [--dry-run]` / `trash <引用> [--dry-run]` | 把 `About.xml.disabled` 改回 `About.xml`；把自己的副本（`Mods/`、锁定库、SteamCMD）或隐藏、已退订的工坊文件夹移到回收站（08 §6、§7） |
 | 工坊订阅 | `workshop unsubscribe <引用…> [--dry-run]` / `workshop subscribe <引用…> [--dry-run]` / `workshop state <引用…>` | 经 Steam 客户端退订（Steam 删掉文件夹）、重新订阅、读状态；连不上 Steam 时报错并给出工坊页面（08 §10） |
-| 整合包 | `pack build <名> [--light] [--dry-run]` / `pack stop <名>` | 把当前方案编译成整合包；`--light` 只有列表不带文件；停止进行中的编译并删除已复制的部分（08 §5.2） |
+| 整合包 | `pack build <名> [--dry-run]` / `pack stop <名>` | 把当前方案编译成整合包；停止进行中的编译并删除已复制的部分（08 §5.2） |
 | | `pack list` / `pack launch <名> [--dry-run]` / `pack unlink [--dry-run]` | 列出整合包；启动整合包；只删掉 `Mods/` 里整合包的 `!ArchoPack_` 链接（08 §5.3；`problems` 报 `pack.links-left` 时的修法） |
-| | `pack export <名> <文件> [--light]` / `pack import <文件> [--as-plan]` / `pack remove <名> [--dry-run] [--unfinished]` | 导出为 `.archopack`（zip）或 `.archopack.json`（轻包）；导入或对照轻包，`--as-plan` 同时把列表载入当前方案；移到回收站，`--unfinished` 删除被中断的编译（08 §5.4） |
+| | `pack export <名> <文件> [--list]` / `pack import <文件> [--as-plan]` / `pack remove <名> [--dry-run] [--unfinished]` | 导出为 `.archopack`（zip），`--list` 只导出它的列表（RimArcho 列表 `.archolist.json`，04 §9.3）；解开包，或对照 RimArcho 列表，`--as-plan` 同时把列表载入当前方案；移到回收站，`--unfinished` 删除被中断的编译（08 §5.4） |
 | 规则 | `rule add after\|before\|incompatible\|attach <A> <B> [--note <文本>]` / `rule add ignore <约束> [--note]` | 用户规则（04 §6）；`ignore` 的目标是 `sort` / `problems` 打印的约束引用 |
 | | `rule list` / `rule remove <r:n>` | |
 | 玩家数据 | `alias <引用> [<名称>] [--clear]` / `note <引用> [<文本>] [--clear]` | 显示名、备注，挂在 Lineage 上 |

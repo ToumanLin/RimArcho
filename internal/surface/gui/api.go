@@ -215,7 +215,7 @@ func (s *API) Packs() (*PackList, error) {
 // BuildPage is 编译成整合包 for the current plan (06 §2.6): checked and sorted under the
 // reader's own connection, including texture planning and folder measurement.
 // tex is the textures choice (view.PackTextureOptions): 0 off, 100 预转换, less 精简.
-func (s *API) BuildPage(light bool, tex int) (*view.BuildPage, error) {
+func (s *API) BuildPage(tex int) (*view.BuildPage, error) {
 	r, err := s.detachedReader()
 	if err != nil {
 		return nil, err
@@ -228,8 +228,8 @@ func (s *API) BuildPage(light bool, tex int) (*view.BuildPage, error) {
 	}
 	plan, chip := st.Plan.Name, view.EnvChip(st.Ix.Env.Name, st.Ix.Env.GameVersion)
 	name := view.DefaultPackName(r, plan)
-	pl, err := r.PlanPack(name, light)
-	if err == nil && !light {
+	pl, err := r.PlanPack(name)
+	if err == nil {
 		view.PlanTextures(r, pl, tex)
 	}
 	dir := r.PacksDir()
@@ -237,7 +237,7 @@ func (s *API) BuildPage(light bool, tex int) (*view.BuildPage, error) {
 		return nil, err
 	}
 	pl.Measure(dir)
-	p := view.BuildPageOf(pl, plan, chip, dir, light, tex)
+	p := view.BuildPageOf(pl, plan, chip, dir, tex)
 	p.Name = name
 	return p, nil
 }
@@ -260,15 +260,10 @@ func (s *API) PackNameCheck(name string) string {
 }
 
 // PackDryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run (nothing is written).
-func (s *API) PackDryRun(name string, light bool, tex int) []string {
+func (s *API) PackDryRun(name string, tex int) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	argv := []string{"pack", "build", strings.TrimSpace(name), "--dry-run"}
-	if light {
-		argv = append(argv, "--light")
-	} else {
-		argv = append(argv, app.PackBuildArgs(view.PackTextureOptions(tex))...)
-	}
+	argv := append([]string{"pack", "build", strings.TrimSpace(name), "--dry-run"}, app.PackBuildArgs(view.PackTextureOptions(tex))...)
 	text, _ := cmds.Execute(s.a, argv)
 	st := s.boardState()
 	var out []string
@@ -296,11 +291,12 @@ func (s *API) Pack(name string) (*view.PackPage, error) {
 }
 
 // PackExport writes a pack to a file the player picks (pack export): the save dialog in
-// the window; file is the typed path where there is none. "" when it was cancelled.
-func (s *API) PackExport(name, file string, light bool) (string, error) {
+// the window; file is the typed path where there is none. "" when it was cancelled. With
+// list it writes only the pack's list, as a RimArcho list.
+func (s *API) PackExport(name, file string, list bool) (string, error) {
 	ext := ".archopack"
-	if light {
-		ext = ".archopack.json"
+	if list {
+		ext = ".archolist.json"
 	}
 	if file == "" {
 		if s.x.native == nil {
@@ -314,9 +310,12 @@ func (s *API) PackExport(name, file string, light bool) (string, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	n, err := s.a.ExportPack(name, file, light)
+	n, err := s.a.ExportPack(name, file, list)
 	if err != nil {
 		return "", err
+	}
+	if list {
+		return view.Tf("exported the list of pack %s to %s", name, file), nil
 	}
 	return view.Tf("exported pack %s to %s (%s)", name, file, view.SizeText(n)), nil
 }
@@ -325,18 +324,11 @@ func (s *API) PackExport(name, file string, light bool) (string, error) {
 // once: the copy takes minutes and holds nothing here, so every page keeps working, and it
 // goes on when the window closes. "pack" events carry the progress (view.PackProgress) and
 // the end. One build at a time.
-func (s *API) PackBuild(name string, light bool, tex int) (string, error) {
+func (s *API) PackBuild(name string, tex int) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := app.CheckPackName(name); err != nil {
 		return "", err
-	}
-	if light {
-		// The list only: nothing to copy, done at once.
-		if _, err := s.a.BuildPack(name, true, false); err != nil {
-			return "", err
-		}
-		return view.Tf("created pack %s", name), nil
 	}
 	if s.busy["pack"] {
 		return "", errors.New(view.T("another pack is being created; wait for it to finish"))

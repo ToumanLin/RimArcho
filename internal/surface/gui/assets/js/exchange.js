@@ -43,7 +43,7 @@ export async function exchange(tab = 0) {
 // ---- import, step 1: where the list comes from ----
 
 function importSource(body) {
-  body.append(el("div", "xc-note", T("RimSort, RimCrow and RimWorld lists, share codes, packageIds or workshop links. Nothing changes before you confirm.")));
+  body.append(el("div", "xc-note", T("RimArcho, RimSort, RimCrow and RimWorld lists, share codes, packageIds or workshop links. Nothing changes before you confirm.")));
 
   // a file: the window's open dialog, a typed path, or a dropped file
   const file = section(body, T("from a file"));
@@ -159,12 +159,17 @@ async function preview(kind, src, name) {
     sec.append(list);
   }
   if (p.installed.length) {
+    // a RimArcho list names each mod's version: the ones installed in another version are
+    // marked, and the list opens to show them
     const det = el("details", "xc-sec");
-    det.append(el("summary", "", Tf("installed: %d (%d enabled now)", p.installed.length, p.installed.filter((r) => r.enabled).length)));
+    let sum = Tf("installed: %d (%d enabled now)", p.installed.length, p.installed.filter((r) => r.enabled).length);
+    if (p.other) { sum += " · " + Tf("%d in another version", p.other); det.open = true; }
+    det.append(el("summary", "", sum));
     const list = el("div", "xc-list");
     p.installed.forEach((r, i) => {
       const d = el("div", "xc-mod");
       d.append(el("span", "pos", String(i + 1)), el("span", r.enabled ? "" : "accent", r.name));
+      if (r.other) d.append(el("span", "chip mark", T("another version")));
       if (!r.enabled) d.append(el("span", "dim", T("not enabled now")));
       list.append(d);
     });

@@ -108,6 +108,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("tab · shift+tab", "the next / previous pack"),
 			r("L", "play the pack"),
 			r("e", "export the pack to a file"),
+			r("E", "export only its list, each mod with its version"),
 			r("Del", "move the pack to the recycle bin (asks first)"),
 			r("B", "build a pack from the current plan"),
 		)
@@ -115,7 +116,6 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	if page == BuildPageID {
 		out = append(out,
 			r("n · /", "type the name"),
-			r("T", "full pack / light pack"),
 			r("D", "textures: next choice"),
 			r("B · enter in the name", "build"),
 			r("V", "see the list first, write nothing"),

@@ -194,10 +194,8 @@ type HomeRow struct {
 	// change: a plan follows Workshop updates, a pack keeps its versions (08 §5).
 	Facts string `json:"facts"`
 	Mode  string `json:"mode,omitempty"`
-	// Played is "played 10 月 20 日" or "never played"; Light packs are a list only and do
-	// not launch.
+	// Played is "played 10 月 20 日" or "never played".
 	Played string `json:"played"`
-	Light  bool   `json:"light,omitempty"`
 	// A plan's row: its ID and page, whether it is the one being edited, its
 	// "有未载入的外部版本" mark, and whether the game holds it now.
 	Plan    int64  `json:"plan,omitempty"`
@@ -284,18 +282,14 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 }
 
 func packHomeRow(p PackRow, chip, envName string) HomeRow {
-	r := HomeRow{Kind: RowPack, Name: p.Name, Env: chip, Facts: p.Facts, Played: p.Played, Light: p.Light, at: p.PlayedAt,
+	r := HomeRow{Kind: RowPack, Name: p.Name, Env: chip, Facts: p.Facts, Played: p.Played, at: p.PlayedAt,
 		EnvName: envName, Versions: p.Versions, Mods: p.Mods}
 	if p.Mods > 0 {
 		r.Facts = Tf("%d mods", p.Mods)
 	}
-	if p.Light {
-		r.State = T("list only")
-	} else {
-		r.Mode = T("versions locked · own saves")
-		// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
-		r.State, r.Level = T("checked when created"), HomeOK
-	}
+	r.Mode = T("versions locked · own saves")
+	// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
+	r.State, r.Level = T("checked when created"), HomeOK
 	return r
 }
 
@@ -486,17 +480,10 @@ func AddGames(a *app.App, games []GameFound) ([]string, error) {
 	return out, nil
 }
 
-// PackImportText says what importing a pack did (pack import, 08 §5.4).
+// PackImportText says what unpacking a pack did (pack import, 08 §5.4).
 func PackImportText(m *app.PackMatch) string {
 	if m == nil || m.Pack == nil {
 		return ""
 	}
-	if m.Dir != "" {
-		return Tf("pack %s is in the packs folder; play it from the home page", m.Pack.Name)
-	}
-	s := Tf("pack %s: %d installed, %d another version, %d missing", m.Pack.Name, len(m.Same), len(m.Different), len(m.Missing))
-	if m.Imported != nil {
-		s += " · " + T("its list is now the current list; u undoes")
-	}
-	return s
+	return Tf("pack %s is in the packs folder; play it from the home page", m.Pack.Name)
 }

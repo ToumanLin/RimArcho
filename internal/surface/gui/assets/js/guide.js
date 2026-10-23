@@ -369,18 +369,19 @@ function step3(card) {
   const imp = button(T("import a list…"), "", () => { ui.afterImport = () => finish(""); exchange(0); });
   ways.append(way(T("move over from RimSort or RimCrow"), T("a list file, a share code or pasted text; you see what changes before it is applied"), imp));
   const src = el("input", "field");
-  src.placeholder = T("a pack file, or a Steam Workshop collection link");
+  src.placeholder = T("a pack or list file, or a Steam Workshop collection link");
   src.spellcheck = false;
   const open = button(T("open"), "", async () => {
     const v = src.value.trim();
     if (!v) return src.focus();
-    if (/steamcommunity\.com|^\s*\d{6,}\s*$/.test(v)) { ui.afterImport = () => finish(""); return importFrom("text", v); }
+    // a list or a collection is previewed first; only a pack is unpacked at once
+    if (!/\.archopack["']?$/i.test(v)) { ui.afterImport = () => finish(""); return importFrom("text", v); }
     try { finish(await api.PackImport(v)); } catch (e) { G.error = errText(e); draw(); }
   });
   src.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); open.click(); } };
   const row = el("div", "typed");
   row.append(src, open);
-  ways.append(way(T("open a pack or a Steam collection"), T("a pack someone shared (.archopack or pack.json), or a Workshop collection"), row));
+  ways.append(way(T("open a pack or a Steam collection"), T("a pack (.archopack) or a RimArcho list someone shared, or a Workshop collection"), row));
   card.append(ways);
   footer(card, button(T("skip"), "", () => finish("")));
 }

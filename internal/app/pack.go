@@ -37,12 +37,13 @@ const PackFormat = 1
 
 // Pack is pack.json.
 type Pack struct {
-	Format  int         `json:"format"`
-	Name    string      `json:"name"`
-	Created time.Time   `json:"created"`
-	Game    string      `json:"game"` // the game version it was built for
-	Env     string      `json:"env"`
-	Light   bool        `json:"light,omitempty"` // the list only, no files
+	Format  int       `json:"format"`
+	Name    string    `json:"name"`
+	Created time.Time `json:"created"`
+	Game    string    `json:"game"` // the game version it was built for
+	Env     string    `json:"env"`
+	// Light: the list only, no files — a RimArcho list (04 §9.3) or a pack's exported list.
+	Light   bool        `json:"light,omitempty"`
 	Entries []PackEntry `json:"entries"`
 	Trimmed int64       `json:"trimmed_bytes,omitempty"`
 	// Textures: the copies' PNGs were converted to DDS and deleted (08 §5.2).
@@ -171,8 +172,8 @@ type PackBuild struct {
 	DryRun   bool
 	Blockers []string // why it cannot be built (需要处理)
 	Moved    int      // entries the sort moved
-	// Measured (not for a light pack): what the copy needs, and what the packs drive has
-	// (-1: unknown). A build is refused when Free < Need + SpaceMargin.
+	// Measured: what the copy needs, and what the packs drive has (-1: unknown). A build is
+	// refused when Free < Need + SpaceMargin.
 	Need, Free int64
 	CannotCopy []string // mods whose folder cannot be read: the build is refused
 	Mismatch   []string // mods that do not list the game's version (warnings)
@@ -190,8 +191,8 @@ type PackBuild struct {
 
 // BuildOptions for BuildPackWith.
 type BuildOptions struct {
-	Light, DryRun bool
-	Progress      func(BuildProgress) // each step, and while copying
+	DryRun   bool
+	Progress func(BuildProgress) // each step, and while copying
 	// Textures converts the copies' PNGs to DDS and deletes them (nil: they are copied as
 	// they are). Full size is 预转换, a scale 精简.
 	Textures *textures.Options
@@ -208,9 +209,9 @@ const SpaceMargin = 256 << 20
 
 // BuildPack compiles the workspace into a pack (08 §5.2): nothing must be left to fix,
 // the list is sorted (for the pack only), and each mod is copied without the version
-// folders this game does not load. light writes the list only.
-func (a *App) BuildPack(name string, light, dryRun bool) (*PackBuild, error) {
-	return a.BuildPackWith(name, BuildOptions{Light: light, DryRun: dryRun})
+// folders this game does not load. (Sharing the list alone is an export: 04 §9.3.)
+func (a *App) BuildPack(name string, dryRun bool) (*PackBuild, error) {
+	return a.BuildPackWith(name, BuildOptions{DryRun: dryRun})
 }
 
 // PackPlan is a build before anything is measured or copied: the checked, sorted list
@@ -218,7 +219,7 @@ func (a *App) BuildPack(name string, light, dryRun bool) (*PackBuild, error) {
 type PackPlan struct {
 	St    *LoadoutState
 	R     *PackBuild
-	roots []string // per entry: the folder copied ("" for Core, the DLCs, a light pack)
+	roots []string // per entry: the folder copied ("" for Core and the DLCs)
 	free  func(string) int64
 	tex   *textures.Options
 	gen   []map[string]bool // per entry: RimArcho's DDS in the mod (not copied, not the mod's)
@@ -235,7 +236,7 @@ func (a *App) WithTextures(pl *PackPlan, o *textures.Options) {
 }
 
 // PlanPack checks the list and sorts it for the pack (the first two steps of a build).
-func (a *App) PlanPack(name string, light bool) (*PackPlan, error) {
+func (a *App) PlanPack(name string) (*PackPlan, error) {
 	if err := checkPackName(name); err != nil {
 		return nil, err
 	}
@@ -296,35 +297,32 @@ func (a *App) PlanPack(name string, light bool) (*PackPlan, error) {
 	for _, m := range mods {
 		active[m.PackageID] = true
 	}
-	p := &Pack{Format: PackFormat, Name: name, Created: a.Now().UTC(), Game: st.Ix.Env.GameVersion, Env: st.Ix.Env.Name, Light: light}
+	p := &Pack{Format: PackFormat, Name: name, Created: a.Now().UTC(), Game: st.Ix.Env.GameVersion, Env: st.Ix.Env.Name}
 	used := map[string]bool{}
 	for _, m := range mods {
-		if m.Kind == source.Official {
-			p.Entries = append(p.Entries, PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Official: true})
+		pe := packEntryOf(m)
+		if pe.Official {
+			p.Entries = append(p.Entries, pe)
 			pl.roots = append(pl.roots, "")
 			pl.gen = append(pl.gen, nil)
 			continue
 		}
-		pe := PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Lineage: m.LineageID, Instance: m.ID, WorkshopID: m.WorkshopID(), Hash: hex.EncodeToString(m.SnapHash)}
-		root := ""
-		if !light {
-			pe.Folder = packFolder(m, used)
-			root = st.Ix.ModDir(m)
-			if real, err := source.RealPath(root); err == nil {
-				root = real
+		pe.Folder = packFolder(m, used)
+		root := st.Ix.ModDir(m)
+		if real, err := source.RealPath(root); err == nil {
+			root = real
+		}
+		res := content.Resolve(root, m.Decl().LoadFolders, st.GameMM(), func(pkg string) bool { return active[strings.TrimSuffix(strings.ToLower(pkg), "_steam")] })
+		keep := map[string]bool{}
+		for _, f := range res.Folders {
+			if rel, err := filepath.Rel(root, f); err == nil && rel != "." {
+				keep[strings.ToLower(strings.Split(filepath.ToSlash(rel), "/")[0])] = true
 			}
-			res := content.Resolve(root, m.Decl().LoadFolders, st.GameMM(), func(pkg string) bool { return active[strings.TrimSuffix(strings.ToLower(pkg), "_steam")] })
-			keep := map[string]bool{}
-			for _, f := range res.Folders {
-				if rel, err := filepath.Rel(root, f); err == nil && rel != "." {
-					keep[strings.ToLower(strings.Split(filepath.ToSlash(rel), "/")[0])] = true
-				}
-			}
-			ents, _ := os.ReadDir(root)
-			for _, de := range ents {
-				if de.IsDir() && content.IsVersionFolder(de.Name()) && !keep[strings.ToLower(de.Name())] {
-					pe.TrimmedDir = append(pe.TrimmedDir, de.Name())
-				}
+		}
+		ents, _ := os.ReadDir(root)
+		for _, de := range ents {
+			if de.IsDir() && content.IsVersionFolder(de.Name()) && !keep[strings.ToLower(de.Name())] {
+				pe.TrimmedDir = append(pe.TrimmedDir, de.Name())
 			}
 		}
 		p.Entries = append(p.Entries, pe)
@@ -335,12 +333,22 @@ func (a *App) PlanPack(name string, light bool) (*PackPlan, error) {
 	return pl, nil
 }
 
+// packEntryOf is a mod as a pack or a RimArcho list records it: Core and the DLCs by
+// packageId (they come from the game), the others with their lineage, instance, workshop ID
+// and content hash.
+func packEntryOf(m *store.Mod) PackEntry {
+	if m.Kind == source.Official {
+		return PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Official: true}
+	}
+	return PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Lineage: m.LineageID, Instance: m.ID, WorkshopID: m.WorkshopID(), Hash: hex.EncodeToString(m.SnapHash)}
+}
+
 // Measure sizes each mod's copy, finds the folders that cannot be read and the free
 // space of the packs drive. It only reads the file system, so the window runs it without
 // holding the app.
 func (pl *PackPlan) Measure(packsDir string) {
 	r := pl.R
-	if r.Pack == nil || r.Pack.Light {
+	if r.Pack == nil {
 		return
 	}
 	r.Need, r.Pack.Trimmed, r.CannotCopy = 0, 0, nil
@@ -418,7 +426,7 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 		}
 	}
 	bs.update(func(p *BuildProgress) { p.Step = StepCheck })
-	pl, err := a.PlanPack(name, o.Light)
+	pl, err := a.PlanPack(name)
 	if err != nil {
 		cleanup()
 		return nil, err
@@ -429,7 +437,7 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 		cleanup()
 		return r, nil
 	}
-	if o.Textures != nil && !o.Light {
+	if o.Textures != nil {
 		a.WithTextures(pl, o.Textures)
 		r.Tool = a.TextureTool()
 	}
@@ -649,14 +657,14 @@ func (a *App) Packs() ([]*PackInfo, error) {
 			continue
 		}
 		p, err := a.ReadPack(de.Name())
-		if err != nil {
-			continue
+		if err != nil || p.Light {
+			continue // a list without files (light packs before 2026-10-22) is not a pack
 		}
 		pi := &PackInfo{Pack: p, Dir: a.packPath(de.Name())}
 		for _, pe := range p.Entries {
 			pi.Bytes += pe.Bytes // measured when it was built: listing does not walk the copies
 		}
-		if pi.Bytes == 0 && !p.Light {
+		if pi.Bytes == 0 {
 			pi.Bytes = dirSize(filepath.Join(pi.Dir, "mods"))
 		}
 		if b, err := os.ReadFile(filepath.Join(pi.Dir, "state.json")); err == nil {
@@ -711,7 +719,7 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 		return nil, err
 	}
 	if p.Light {
-		return nil, fmt.Errorf("%q is a light pack (a list without files): archo pack import can load it into the workspace", name)
+		return nil, fmt.Errorf("%q is a list without files, not a pack: archo loadout import %s loads it", name, filepath.Join(a.packPath(name), "pack.json"))
 	}
 	st, err := a.Loadout()
 	if err != nil {
@@ -909,9 +917,9 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 
 // ---- export, import, remove ----
 
-// ExportPack writes a pack to a file: a full pack as a zip (.archopack, without its saves),
-// a light pack (or --light) as its pack.json (.archopack.json).
-func (a *App) ExportPack(name, file string, light bool) (int64, error) {
+// ExportPack writes a pack to a file: the pack as a zip (.archopack, without its saves), or
+// with listOnly its list as a RimArcho list (.archolist.json, 04 §9.3).
+func (a *App) ExportPack(name, file string, listOnly bool) (int64, error) {
 	p, err := a.ReadPack(name)
 	if err != nil {
 		return 0, err
@@ -919,13 +927,13 @@ func (a *App) ExportPack(name, file string, light bool) (int64, error) {
 	if _, err := os.Stat(file); err == nil {
 		return 0, fmt.Errorf("%s exists; nothing is overwritten", file)
 	}
-	if light || p.Light {
+	if listOnly || p.Light {
 		q := *p
 		q.Light = true
 		for i := range q.Entries {
 			q.Entries[i].Folder, q.Entries[i].Bytes, q.Entries[i].Trimmed, q.Entries[i].TrimmedDir = "", 0, 0, nil
 		}
-		q.Trimmed, q.Textures = 0, nil // a light pack carries no files
+		q.Trimmed, q.Textures = 0, nil // a list carries no files
 		b, _ := json.MarshalIndent(&q, "", "  ")
 		return int64(len(b)), os.WriteFile(file, append(b, '\n'), 0o644)
 	}
@@ -974,18 +982,29 @@ func (a *App) ExportPack(name, file string, light bool) (int64, error) {
 	return fi.Size(), nil
 }
 
-// PackMatch compares a light pack with the installed mods (08 §5.4).
+// PackMatch compares a RimArcho list (a pack.json without files) with the installed mods
+// (08 §5.4), or says where a pack was unpacked.
 type PackMatch struct {
 	Pack            *Pack
 	Same, Different []PackEntry // installed with the same content / another version
 	Missing         []PackEntry
-	Imported        *EditResult // with asPlan: the workspace now holds the pack's list
-	Dir             string      // a full pack: where it was unpacked
+	Imported        *EditResult // with asPlan: the workspace now holds the list
+	Dir             string      // a pack: where it was unpacked
 }
 
-// ImportPack reads a pack file. A full pack (.archopack) is unpacked into the packs folder;
-// a light pack is compared with the installed mods and, with asPlan, loaded into the
-// workspace.
+// IsPackZip says whether file is a pack (.archopack, a zip) rather than a list.
+func IsPackZip(file string) bool {
+	zr, err := zip.OpenReader(file)
+	if err != nil {
+		return false
+	}
+	zr.Close()
+	return true
+}
+
+// ImportPack reads a pack file. A pack (.archopack) is unpacked into the packs folder; a
+// RimArcho list (.archolist.json, or a pack.json) is compared with the installed mods and,
+// with asPlan, loaded into the workspace (loadout import reads it too, 04 §9.2).
 func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
 	zr, err := zip.OpenReader(file)
 	if err == nil {
@@ -998,16 +1017,17 @@ func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
 	}
 	var p Pack
 	if err := json.Unmarshal(b, &p); err != nil || p.Format == 0 {
-		return nil, fmt.Errorf("%s is not a pack (a .archopack zip or a pack.json)", file)
+		return nil, fmt.Errorf("%s is neither a pack (.archopack) nor a RimArcho list (.archolist.json)", file)
+	}
+	if p.Format > PackFormat {
+		return nil, fmt.Errorf("%s has format %d; this RimArcho reads up to %d", file, p.Format, PackFormat)
 	}
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
 	}
 	r := &PackMatch{Pack: &p}
-	var tokens []string
 	for _, pe := range p.Entries {
-		tokens = append(tokens, pe.PackageID)
 		if pe.Official {
 			continue
 		}
@@ -1032,12 +1052,7 @@ func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
 		}
 	}
 	if asPlan {
-		il := newList("pack")
-		il.Title = p.Name
-		for _, t := range tokens {
-			il.add(t, "", "")
-		}
-		if r.Imported, err = a.importList(il, "pack "+p.Name); err != nil {
+		if r.Imported, err = a.importList(archoList(&p), p.Name); err != nil {
 			return nil, err
 		}
 	}

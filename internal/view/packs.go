@@ -19,7 +19,6 @@ type PackRow struct {
 	Facts  string `json:"facts"` // "42 mods · 1.2 GB · 1.6 · built 10 月 20 日"
 	Played string `json:"played"`
 	Mods   int    `json:"mods"`
-	Light  bool   `json:"light,omitempty"`
 	// Versions are the game versions it runs on: "1.6", or "1.5–1.6" (PackVersions).
 	Versions string `json:"versions,omitempty"`
 	// PlayedAt is when it was last played (zero: never); the home page sorts by it.
@@ -41,11 +40,7 @@ func PackRows(a *app.App) (out []PackRow, others int, err error) {
 
 func packRows(a *app.App, ps []*app.PackInfo) (out []PackRow) {
 	for _, p := range ps {
-		size := SizeText(p.Bytes)
-		if p.Light {
-			size = T("list only")
-		}
-		r := PackRow{Name: p.Name, Light: p.Light, Mods: len(p.Entries), Versions: PackVersions(a, p.Pack), Facts: Tf("%d mods · %s · %s · created %s", len(p.Entries), size, p.Game, ShortDate(p.Created)), Played: T("never played")}
+		r := PackRow{Name: p.Name, Mods: len(p.Entries), Versions: PackVersions(a, p.Pack), Facts: Tf("%d mods · %s · %s · created %s", len(p.Entries), SizeText(p.Bytes), p.Game, ShortDate(p.Created)), Played: T("never played")}
 		if !p.LastPlayed.IsZero() {
 			r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 			r.PlayedAt = p.LastPlayed

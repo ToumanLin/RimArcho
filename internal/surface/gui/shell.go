@@ -332,13 +332,16 @@ func scanLine(out string) string {
 	return view.T("scan complete")
 }
 
-// PackImport reads a pack file (pack import, 08 §5.4): a full pack goes to the packs
-// folder; a light pack's list becomes the current list (one undo step).
+// PackImport unpacks a pack file (.archopack) into the packs folder (pack import, 08
+// §5.4). A RimArcho list goes through the import preview like any other list.
 func (s *API) PackImport(path string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	path = strings.Trim(strings.TrimSpace(path), `"'`)
-	m, err := s.a.ImportPack(path, true)
+	if !app.IsPackZip(path) {
+		return "", errors.New(view.Tf("%s is not a pack (.archopack)", path))
+	}
+	m, err := s.a.ImportPack(path, false)
 	s.board, s.needs = nil, nil
 	if err != nil {
 		return "", errors.New(view.Humanize(nil, err.Error()))

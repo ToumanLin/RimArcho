@@ -10,9 +10,9 @@ import (
 )
 
 func init() {
-	register(&Command{Name: "loadout export", Summary: "write the workspace as a list file: text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code", MaxArgs: 0, Run: loadoutExport,
-		Flags: []Flag{{Name: "format", Value: "text|modsconfig|rimsort|rml|rimcrow"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"}}})
-	register(&Command{Name: "loadout import", Args: "<file|share code> [<name>]", Summary: "replace the workspace with a list (text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs; undoable), or with --new make it a new plan",
+	register(&Command{Name: "loadout export", Summary: "write the workspace as a list file: a RimArcho list (each mod with its version), text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code", MaxArgs: 0, Run: loadoutExport,
+		Flags: []Flag{{Name: "format", Value: "text|archo|modsconfig|rimsort|rml|rimcrow|rimcrow-xml"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"}}})
+	register(&Command{Name: "loadout import", Args: "<file|share code> [<name>]", Summary: "replace the workspace with a list (RimArcho, text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs; undoable), or with --new make it a new plan",
 		MinArgs: 1, MaxArgs: 2, Flags: []Flag{{Name: "new", Help: "import as a new plan named <name> (default: the list's own name or the file name)"}}, Run: loadoutImport})
 }
 
@@ -62,8 +62,13 @@ func loadoutImport(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d := editDoc(c, r)
 	missing := 0
-	var names []string
+	var names, other []string
 	for _, e := range r.State.List {
+		if m := r.State.Ix.ByID[e.Instance]; m != nil {
+			if h := il.Hash(m.PackageID); h != "" && !app.SameContent(m, h) {
+				other = append(other, m.DisplayName())
+			}
+		}
 		if e.Instance == "" {
 			missing++
 			n := e.Missing
@@ -73,7 +78,7 @@ func loadoutImport(c *Ctx, a *Args) (*render.Doc, error) {
 			names = append(names, n)
 		}
 	}
-	kind := map[string]string{app.FormatText: "text list", app.FormatModsConfig: "ModsConfig.xml", app.FormatSave: "save", app.FormatRML: "RimWorld mod list (.rml)",
+	kind := map[string]string{app.FormatArcho: "RimArcho list", app.FormatText: "text list", app.FormatModsConfig: "ModsConfig.xml", app.FormatSave: "save", app.FormatRML: "RimWorld mod list (.rml)",
 		"rimcrow-modlist": "RimCrow ModList.xml", "rimcrow-json": "RimCrow JSON list", "rimcrow-share": "RimCrow share code", "rimsort-json": "RimSort JSON list",
 		"rimsort-text": "RimSort clipboard list", "rentry": "Rentry list"}[il.Format]
 	line := fmt.Sprintf("imported %d entries from a %s", len(r.State.List), kind)
@@ -100,6 +105,17 @@ func loadoutImport(c *Ctx, a *Args) (*render.Doc, error) {
 		for i, x := range names {
 			if i == 8 {
 				n.Children = append(n.Children, &render.Node{Line: fmt.Sprintf("… %d more", missing-8)})
+				break
+			}
+			n.Children = append(n.Children, &render.Node{Line: x})
+		}
+		head = append(head, n)
+	}
+	if len(other) > 0 {
+		n := &render.Node{Line: fmt.Sprintf("another version installed: %d (the list was made with a different version of these)", len(other))}
+		for i, x := range other {
+			if i == 8 {
+				n.Children = append(n.Children, &render.Node{Line: fmt.Sprintf("… %d more", len(other)-8)})
 				break
 			}
 			n.Children = append(n.Children, &render.Node{Line: x})

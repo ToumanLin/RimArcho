@@ -24,8 +24,6 @@ func init() {
 		"type the game folder":        "输入游戏目录",
 		"%s does not look like a RimWorld folder (no game executable or Data/Core)": "%s 不像 RimWorld 的目录（没有游戏程序或 Data/Core）",
 		"pack %s is in the packs folder; play it from the home page":                "整合包 %s 已放进整合包目录，可以在“启动”页开玩",
-		"pack %s: %d installed, %d another version, %d missing":                     "整合包 %s：已安装 %d，版本不同 %d，缺少 %d",
-		"its list is now the current list; u undoes":                                "它的列表已成为当前列表，u 可撤销",
 		// plans (plans.go)
 		"list %s":                 "列表 %s",
 		"copied from %s":          "复制自 %s",

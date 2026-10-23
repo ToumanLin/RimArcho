@@ -212,6 +212,18 @@ func parseJSONList(b []byte) (*ImportedList, error) {
 		}
 		return l, nil
 	case map[string]any:
+		if _, ok := y["entries"].([]any); ok {
+			if _, ok := y["format"].(float64); ok {
+				var p Pack
+				if err := json.Unmarshal(b, &p); err != nil {
+					return nil, fmt.Errorf("RimArcho list: %v", err)
+				}
+				if p.Format > PackFormat {
+					return nil, fmt.Errorf("RimArcho list format %d; this RimArcho reads up to %d", p.Format, PackFormat)
+				}
+				return archoList(&p), nil
+			}
+		}
 		if y["format"] == "rimcrow_json" {
 			l := newList("rimcrow-json")
 			if ml, ok := y["modlist"].([]any); ok && len(ml) > 0 {
@@ -238,6 +250,20 @@ func parseJSONList(b []byte) (*ImportedList, error) {
 		return nil, errors.New("JSON list without activeMods or mods")
 	}
 	return nil, errors.New("JSON list is neither an object nor an array")
+}
+
+// archoList reads a RimArcho list, or a pack's pack.json: its entries in order, with
+// names, workshop IDs and content hashes.
+func archoList(p *Pack) *ImportedList {
+	l := newList(FormatArcho)
+	l.Title, l.Game, l.Hashes = p.Name, p.Game, map[string]string{}
+	for _, pe := range p.Entries {
+		l.add(pe.PackageID, pe.Name, pe.WorkshopID)
+		if pe.Hash != "" {
+			l.Hashes[strings.ToLower(pe.PackageID)] = pe.Hash
+		}
+	}
+	return l
 }
 
 // ---- text: packageIds, RimSort clipboard and Rentry, workshop IDs ----

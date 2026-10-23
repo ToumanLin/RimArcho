@@ -256,18 +256,20 @@ problems: 0 error, 0 warning, 0 info
   list:
     (none)
 
-> manage_packs {"action":"export","file":"$ROOT/first.archopack.json","light":true,"name":"first"}
-exported pack first to $ROOT/first.archopack.json (717 B)
+> manage_packs {"action":"export","file":"$ROOT/first.archolist.json","list":true,"name":"first"}
+exported the list of pack first to $ROOT/first.archolist.json
+next:
+  archo loadout import $ROOT/first.archolist.json
 
-> manage_packs {"action":"import","file":"$ROOT/first.archopack.json"}
-light pack first: 3 mods
+> manage_packs {"action":"import","file":"$ROOT/first.archolist.json"}
+list first: 3 mods
   same version installed: 2
     Harmony  pkg:brrainz.harmony  https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077
     A  pkg:tester.a
   another version installed: 0
   not installed: 0
 next:
-  archo pack import $ROOT/first.archopack.json --as-plan
+  archo pack import $ROOT/first.archolist.json --as-plan
 
 > manage_packs {"action":"stop","name":"first"}
 error: no build of "first" is running

@@ -56,7 +56,7 @@ export function homeKey(e) {
   if (k === "Enter") { e.preventDefault(); if (rows[cur]) act(rows[cur]); return; }
   if (k !== "L" && !(k === "l" && e.shiftKey)) return;
   const r = featured();
-  if (!r || r.light || running()) return;
+  if (!r || running()) return;
   e.preventDefault();
   launch(r);
 }
@@ -164,7 +164,6 @@ function launcher(r) {
   const where = el("div", "where");
   where.append(r.env + " · ", el("b", "", r.name));
   box.append(where);
-  if (r.light) return box;
   const stack = el("div", "stack");
   const b = el("button", "btn launch primary");
   const i = el("span", "ic");

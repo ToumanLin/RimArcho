@@ -101,7 +101,7 @@ func TestBuildHome(t *testing.T) {
 	packs := []view.PackRow{
 		{Name: "Old", Facts: "f", Played: "played", PlayedAt: t0.Add(-48 * time.Hour)},
 		{Name: "Zed", Played: "never played"},
-		{Name: "Light", Light: true, Played: "never played"},
+		{Name: "Amber", Played: "never played"},
 	}
 	// The list was launched yesterday (a pack launch later does not count for it).
 	e.App.Store.AddLaunch(b.St.Ix.Env.ID, t0.Add(-24*time.Hour), "steam", "x")
@@ -112,7 +112,7 @@ func TestBuildHome(t *testing.T) {
 	for _, r := range h.Rows {
 		order = append(order, r.Name)
 	}
-	if strings.Join(order, ",") != "default,Old,Light,Zed" {
+	if strings.Join(order, ",") != "default,Old,Amber,Zed" {
 		t.Fatalf("order %v", order)
 	}
 	plan := h.Rows[0]
@@ -132,16 +132,16 @@ func TestBuildHome(t *testing.T) {
 	if r := h.Rows[0]; r.State != "1 problems break the game" || r.Level != view.LevelBad {
 		t.Fatalf("plan state %+v", r)
 	}
-	if r := h.Rows[2]; !r.Light || r.State != "list only" {
-		t.Fatalf("light pack %+v", r)
+	if r := h.Rows[2]; r.State != "checked when created" || r.Level != view.HomeOK {
+		t.Fatalf("pack state %+v", r)
 	}
 	if r := h.Rows[1]; r.Mode != "versions locked · own saves" || r.Facts != "f" {
 		t.Fatalf("pack meta %+v", r)
 	}
 	packs[0].Mods = 42
 	h = view.BuildHome(e.App, b, n, plans, packs)
-	if r := h.Rows[1]; r.Facts != "42 mods" || h.Rows[2].Mode != "" {
-		t.Fatalf("pack facts %+v, light %+v", r, h.Rows[2])
+	if r := h.Rows[1]; r.Facts != "42 mods" {
+		t.Fatalf("pack facts %+v", r)
 	}
 	if h.Changes == nil || h.Changes.Text != "nothing changed" {
 		t.Fatalf("the plan's changes: %+v", h.Changes)

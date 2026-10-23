@@ -226,7 +226,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}})
 	out = append(out, SettingGroup{Title: T("packs"), Items: []SettingItem{
 		{Label: T("where packs are kept"), Value: cmds.Setting(a, "pack.dir"), Edit: "path", Argv: []string{"config", "set", "pack.dir", "{}"},
-			Note: T("a full pack takes as much space as its mods")},
+			Note: T("a pack takes as much space as its mods")},
 	}})
 	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
 	// settings command).

@@ -1,7 +1,8 @@
 // 整合包 (06 §2.6, §2.7, 08 §5): the packs (the sidebar's 整合包), each pack's own page
-// (its sub-entries), and 编译成整合包, the plan's sub-page: on the left the name, the kind
-// and the four things building does, on the right the summary and 编译, disabled with the
-// reason when something stops the build (G14); the builds cut short below.
+// (its sub-entries), and 编译成整合包, the plan's sub-page: on the left the name and the
+// things building does, on the right the summary and 编译, disabled with the reason when
+// something stops the build (G14); the builds cut short below. A pack's list alone is
+// exported from its page as a RimArcho list (E).
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
@@ -14,7 +15,7 @@ export function initPacks(u) { ui = u; }
 let packPoll = 0;
 const L = { rows: [], un: [], others: 0, cur: 0, els: [] }; // the list page
 let P = null; // the pack page shown: view.PackPage
-const B = { page: null, full: null, light: false, tex: 0, name: "", nameErr: "", seq: 0, loading: false }; // the build page
+const B = { page: null, tex: 0, name: "", nameErr: "", seq: 0, loading: false }; // the build page
 
 // ---- the list (整合包) ----
 
@@ -77,13 +78,10 @@ export async function pack(name) {
   P = p;
   const sc = S.screen === "packs" && S.packFocus === name ? $("#screen") : openScreen("packs");
   sc.innerHTML = "";
-  const acts = [button(T("export"), "e", () => exportPack()), button(T("move to the recycle bin"), "Del", () => removePack())];
-  if (!P.light) {
-    const play = act(T("play"), "play", () => launch(), "L");
-    play.classList.add("primary");
-    acts.push(play);
-  }
-  const w = page("packs pack-page", P.facts.join(" · "), ...acts);
+  const play = act(T("play"), "play", () => launch(), "L");
+  play.classList.add("primary");
+  const w = page("packs pack-page", P.facts.join(" · "), button(T("export"), "e", () => exportPack(false)),
+    button(T("export the list"), "E", () => exportPack(true)), button(T("move to the recycle bin"), "Del", () => removePack()), play);
   sc.append(w);
   const sec = el("section", "sec");
   sec.append(el("h2", "label", T("the mods, in load order")));
@@ -100,7 +98,7 @@ export async function pack(name) {
 }
 
 async function launch() {
-  if (!P || P.light) return;
+  if (!P) return;
   await launchPack(P.name);
 }
 
@@ -126,18 +124,19 @@ export async function launchPack(name) {
   ui.reload();
 }
 
-// exportPack writes the pack to a file: the save dialog in the window, a typed path in the
+// exportPack writes the pack to a file, or with list only its list (a RimArcho list: each
+// mod with its version, for sharing): the save dialog in the window, a typed path in the
 // development harness.
-async function exportPack() {
+async function exportPack(list) {
   if (!P) return;
   const name = P.name;
   try {
-    const t = await api.PackExport(name, "", !!P.light);
+    const t = await api.PackExport(name, "", list);
     if (t) say("ok", t);
   } catch (e) {
-    pop.ask(T("export the pack"), T("the new file") + " · " + name + (P.light ? ".archopack.json" : ".archopack"), async (file) => {
+    pop.ask(list ? T("export the list") : T("export the pack"), T("the new file") + " · " + name + (list ? ".archolist.json" : ".archopack"), async (file) => {
       if (!file) return;
-      try { say("ok", await api.PackExport(name, file, !!P.light)); } catch (e2) { say("fail", errText(e2)); }
+      try { say("ok", await api.PackExport(name, file, list)); } catch (e2) { say("fail", errText(e2)); }
     });
   }
 }
@@ -178,7 +177,7 @@ function buildCard(u) {
       try { say("ok", await api.PackStop(u.name)); } catch (e) { say("fail", errText(e)); }
     }));
   } else {
-    right.append(button(T("create again"), "", () => startBuild(u.name, false)));
+    right.append(button(T("create again"), "", () => startBuild(u.name)));
     right.append(button(T("delete what it copied"), "", () => pop.confirm(T("delete what it copied"), [Tf("the unfinished pack %s and what it copied (%s) are deleted; your mods are not touched", u.name, u.copied || "?")], T("delete what it copied"), async () => {
       say("busy", T("deleting what it copied…"));
       try { say("ok", await api.PackRemoveUnfinished(u.name)); } catch (e) { say("fail", errText(e)); }
@@ -235,17 +234,16 @@ export function packEvent(ev) {
 // the page shows at once and the sizes follow. again: a redraw keeps the name typed.
 export async function build(again = false) {
   const seq = ++B.seq;
-  if (!again) { B.page = B.full = null; B.light = false; B.tex = 0; B.name = ""; B.nameErr = ""; }
+  if (!again) { B.page = null; B.tex = 0; B.name = ""; B.nameErr = ""; }
   const read = beginPageRead("build", { replace: !again, label: "checking the list…" });
   B.loading = true;
   try {
     const [p] = await Promise.all([
-      B.page || api.BuildPage(B.light, B.tex || 0),
+      B.page || api.BuildPage(B.tex || 0),
       loadList(read.current).catch(() => { if (read.current()) L.un = []; }),
     ]);
     if (!read.current() || seq !== B.seq) return;
     B.page = p;
-    if (!B.light) B.full = p;
     if (!B.name) B.name = p.name;
     const error = await api.PackNameCheck(B.name);
     if (!read.current() || seq !== B.seq) return;
@@ -257,28 +255,22 @@ export async function build(again = false) {
   read.finish();
 }
 
-async function setLight(light) {
-  if (B.loading || B.light === light) return;
-  return measureBuild(light, B.tex);
-}
-
-// setTex changes the textures choice (full packs): the page is measured again, since the
-// files converted, the size after and the peak all depend on it.
+// setTex changes the textures choice: the page is measured again, since the files
+// converted, the size after and the peak all depend on it.
 async function setTex(tex) {
-  if (B.loading || B.light || B.tex === tex) return;
-  return measureBuild(false, tex);
+  if (B.loading || B.tex === tex) return;
+  return measureBuild(tex);
 }
 
-async function measureBuild(light, tex) {
-  B.light = light; B.tex = tex;
+async function measureBuild(tex) {
+  B.tex = tex;
   const seq = ++B.seq;
   const read = beginPageRead("build", { replace: true, label: "checking the list…" });
   B.loading = true;
   let p;
-  try { p = await api.BuildPage(light, tex); } catch (e) { if (read.current()) B.loading = false; read.fail(e); return; }
+  try { p = await api.BuildPage(tex); } catch (e) { if (read.current()) B.loading = false; read.fail(e); return; }
   if (!read.current() || seq !== B.seq) return;
   B.page = p;
-  if (!light) B.full = p;
   B.loading = false;
   drawBuild();
   read.finish();
@@ -305,7 +297,7 @@ function drawBuild() {
   const cols = el("div", "bd-cols");
   const left = el("div", "bd-left");
 
-  // the name and the kind
+  // the name
   const basics = el("section", "sec");
   const basicsH = el("h2", "label", T("the pack"));
   basics.append(basicsH);
@@ -329,19 +321,7 @@ function drawBuild() {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); name.blur(); }
   };
   nameRow.append(el("span", "k", T("name")), name);
-  const kinds = el("div", "bd-row");
-  kinds.setAttribute("role", "radiogroup");
-  const pick = el("div", "bd-kinds");
-  for (const [light, title, sub] of [[false, T("full pack"), T("carries the mods' files; plays on its own, offline too")], [true, T("light pack"), T("the list only, for sharing; the other side gets the mods from the Workshop")]]) {
-    const b = el("button", "bd-kind" + (B.light === light ? " on" : ""));
-    b.setAttribute("role", "radio");
-    b.setAttribute("aria-checked", String(B.light === light));
-    b.append(el("div", "t", title), el("div", "s", sub));
-    b.onclick = () => setLight(light);
-    pick.append(b);
-  }
-  kinds.append(el("span", "k", T("kind")), pick);
-  bc.append(nameRow, el("div", "bd-err", ""), kinds);
+  bc.append(nameRow, el("div", "bd-err", ""));
   basics.append(bc);
 
   // the four things building does; while it builds, where it is
@@ -406,8 +386,7 @@ function drawBuild() {
   const row = (k, v) => kv.append(el("span", "k", k), v instanceof Node ? v : el("span", "v", v));
   row(T("game"), p.env);
   row(T("mods"), el("span", "v num", String(p.mods)));
-  if (p.light) row(T("size"), T("list only"));
-  else if (p.before) {
+  if (p.before) {
     const v = el("span", "v");
     v.append(p.before + " → ", el("b", "", p.after));
     row(T("size"), v);
@@ -468,12 +447,11 @@ function syncButton() {
 function go() {
   const p = B.page;
   if (!p || B.loading || !p.ok || B.nameErr || building()) return;
-  startBuild(B.name.trim(), B.light);
+  startBuild(B.name.trim());
 }
 
-async function startBuild(name, light) {
-  try { say("ok", await api.PackBuild(name, light, B.tex || 0)); } catch (e) { return say("fail", errText(e)); }
-  if (light) { await ui.reload(); return ui.go("pack:" + name); }
+async function startBuild(name) {
+  try { say("ok", await api.PackBuild(name, B.tex || 0)); } catch (e) { return say("fail", errText(e)); }
   redraw();
 }
 
@@ -481,20 +459,19 @@ async function startBuild(name, light) {
 async function dryRun() {
   if (B.loading) return;
   const name = (B.name || "").trim() || (B.page && B.page.name) || "";
-  try { pop.text(T("see the list first, write nothing"), await api.PackDryRun(name, B.light, B.light ? 0 : B.tex)); } catch (e) { say("fail", errText(e)); }
+  try { pop.text(T("see the list first, write nothing"), await api.PackDryRun(name, B.tex || 0)); } catch (e) { say("fail", errText(e)); }
 }
 
 // ---- keys ----
 
-// packsKey: the list (↑↓, enter, B), a pack's page (L, e, Del) and the build page (B, V,
-// T, esc back to the plan).
+// packsKey: the list (↑↓, enter, B), a pack's page (L, e, E, Del) and the build page (B,
+// V, D, esc back to the plan).
 export function packsKey(e) {
   const k = e.key;
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
   if (S.screen === "build") {
     if (kk === "B" || (k === "Enter" && e.ctrlKey)) { e.preventDefault(); return go(); }
     if (kk === "V") { e.preventDefault(); return dryRun(); }
-    if (kk === "T") { e.preventDefault(); return setLight(!B.light); }
     if (kk === "D") { e.preventDefault(); return nextTex(1); }
     if (k === "n" || k === "/") { e.preventDefault(); const n = $("#pk-name"); if (n) n.focus(); return; }
     if (k === "Escape") { e.preventDefault(); return ui.go("plan"); }
@@ -502,7 +479,8 @@ export function packsKey(e) {
   }
   if (S.packFocus) {
     if (kk === "L") { e.preventDefault(); return launch(); }
-    if (k === "e") { e.preventDefault(); return exportPack(); }
+    if (k === "e") { e.preventDefault(); return exportPack(false); }
+    if (kk === "E") { e.preventDefault(); return exportPack(true); }
     if (k === "Delete") { e.preventDefault(); return removePack(); }
     return;
   }
@@ -520,11 +498,11 @@ export function packsKey(e) {
 export function hintList() {
   const tail = [{ key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
   if (S.screen === "build") {
-    return [{ key: "B", label: T("create pack") }, { key: "V", label: T("see the list first") }, { key: "T", label: T("full / light pack") },
-      B.light ? { key: "n", label: T("name") } : { key: "D", label: T("textures") }, { key: "esc", label: T("back to the list") }, ...tail];
+    return [{ key: "B", label: T("create pack") }, { key: "V", label: T("see the list first") }, { key: "D", label: T("textures") },
+      { key: "esc", label: T("back to the list") }, ...tail];
   }
   if (S.packFocus) {
-    return [...(P && !P.light ? [{ key: "L", label: T("play") }] : []), { key: "e", label: T("export") }, { key: "Del", label: T("move to the recycle bin") },
+    return [{ key: "L", label: T("play") }, { key: "e", label: T("export") }, { key: "E", label: T("export the list") }, { key: "Del", label: T("move to the recycle bin") },
       { key: "tab", label: T("next pack") }, ...tail];
   }
   return [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }, { key: "B", label: T("create a pack") }, { key: "tab", label: T("first pack") }, ...tail];

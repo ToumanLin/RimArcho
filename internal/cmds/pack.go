@@ -12,16 +12,15 @@ import (
 func init() {
 	dry := Flag{Name: "dry-run", Help: "show what would happen"}
 	register(&Command{Name: "pack build", Args: "<name>", Summary: "compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load", MinArgs: 1, MaxArgs: 1, Run: packBuildCmd,
-		Flags: []Flag{{Name: "light", Help: "the list only, no files (for sharing)"},
-			{Name: "textures", Help: "convert the copies' PNG textures to DDS and delete the PNGs (pre-convert; with --texture-scale: slim)"},
+		Flags: []Flag{{Name: "textures", Help: "convert the copies' PNG textures to DDS and delete the PNGs (pre-convert; with --texture-scale: slim)"},
 			{Name: "texture-scale", Value: "<percent>", Help: "with --textures: scale textures down (20 25 40 50 60 75 80; never below 128 px or off a multiple of 4)"}, dry}})
 	register(&Command{Name: "pack list", Summary: "the packs: mods, size, game version, last played", MaxArgs: 0, Run: packListCmd})
 	register(&Command{Name: "pack launch", Args: "<name>", Summary: "play a pack: link its mods into Mods/, its own list and saves, start the game", MinArgs: 1, MaxArgs: 1, Run: packLaunchCmd,
 		Flags: []Flag{dry, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a pack's mod into the lock library"}}})
-	register(&Command{Name: "pack export", Args: "<name> <file>", Summary: "write a pack to a file (.archopack zip, or --light .archopack.json)", MinArgs: 2, MaxArgs: 2, Run: packExportCmd,
-		Flags: []Flag{{Name: "light", Help: "the list only"}}})
-	register(&Command{Name: "pack import", Args: "<file>", Summary: "unpack a .archopack, or compare a light pack with the installed mods", MinArgs: 1, MaxArgs: 1, Run: packImportCmd,
-		Flags: []Flag{{Name: "as-plan", Help: "light pack: also load its list into the workspace (undoable)"}}})
+	register(&Command{Name: "pack export", Args: "<name> <file>", Summary: "write a pack to a file (.archopack zip, or with --list its list as a RimArcho list .archolist.json)", MinArgs: 2, MaxArgs: 2, Run: packExportCmd,
+		Flags: []Flag{{Name: "list", Help: "only the list, each mod with its version, no files"}}})
+	register(&Command{Name: "pack import", Args: "<file>", Summary: "unpack a .archopack, or compare a RimArcho list (.archolist.json) with the installed mods", MinArgs: 1, MaxArgs: 1, Run: packImportCmd,
+		Flags: []Flag{{Name: "as-plan", Help: "a list: also load it into the workspace (undoable)"}}})
 	register(&Command{Name: "pack remove", Args: "<name>", Summary: "move a pack to the recycle bin; --unfinished deletes what a build cut short copied", MinArgs: 1, MaxArgs: 1, Run: packRemoveCmd,
 		Flags: []Flag{dry, {Name: "unfinished", Help: "the unfinished build of <name> (its folder in the packs folder)"}}})
 	register(&Command{Name: "pack unlink", Summary: "remove the packs' links from Mods/ (only the links, never the packs)", MaxArgs: 0, Run: packUnlinkCmd, Flags: []Flag{dry}})
@@ -56,7 +55,7 @@ func BuildProgressLine(p app.BuildProgress) string {
 }
 
 func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	o := app.BuildOptions{Light: a.Bool("light"), DryRun: a.Bool("dry-run")}
+	o := app.BuildOptions{DryRun: a.Bool("dry-run")}
 	if a.Bool("textures") || a.Str("texture-scale") != "" {
 		to, err := textureOptions(a)
 		if err != nil {
@@ -97,54 +96,52 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	root.KV("folder", r.Dir)
 	root.KV("mods", fmt.Sprintf("%d carried, %d from the game (Core and DLCs)", carried, official))
-	if !r.Pack.Light {
-		root.KV("size", fmt.Sprintf("%s; %s of other game versions left out", mb(bytes), mb(r.Pack.Trimmed)))
-		if r.DryRun && r.Free >= 0 {
-			free := fmt.Sprintf("%s free on the packs drive", mb(r.Free))
-			if r.Free < max(r.Need, r.Peak)+app.SpaceMargin {
-				free += " — NOT ENOUGH: the build is refused"
-			}
-			root.KV("space", free)
+	root.KV("size", fmt.Sprintf("%s; %s of other game versions left out", mb(bytes), mb(r.Pack.Trimmed)))
+	if r.DryRun && r.Free >= 0 {
+		free := fmt.Sprintf("%s free on the packs drive", mb(r.Free))
+		if r.Free < max(r.Need, r.Peak)+app.SpaceMargin {
+			free += " — NOT ENOUGH: the build is refused"
 		}
-		if len(r.CannotCopy) > 0 {
-			n := root.KV("cannot copy", fmt.Sprintf("%d mods (their folders cannot be read; the build is refused)", len(r.CannotCopy)))
-			for _, x := range r.CannotCopy {
-				n.Add(x)
-			}
-			n.Truncate(10, "")
-		}
-		if r.Skipped > 0 {
-			root.KV("skipped", fmt.Sprintf("%d links that leave their mod's folder", r.Skipped))
-		}
-		if r.TexOptions != nil {
-			n := root.KV("textures", app.TextureLabel(*r.TexOptions))
-			if pt := r.Pack.Textures; pt != nil && !r.DryRun {
-				n.Addf("%d PNGs converted to DDS and deleted: %s of PNG → %s of DDS", pt.Converted, mb(pt.PNGBytes), mb(pt.DDSBytes))
-				if pt.Kept > 0 {
-					n.Addf("%d keep their PNG (%d failed to convert; the rest share a name with a DDS or another format)", pt.Kept, pt.Failed)
-				}
-			} else {
-				est := r.TexEst
-				n.Addf("%d PNGs: %s of PNG → about %s of DDS; video memory about %s → %s", est.Files, mb(est.PNGBytes), mb(est.DDSBytes), mb(est.VRAMBefore), mb(est.VRAMAfter))
-				n.Addf("pack size about %s after; up to %s while converting", mb(r.Final), mb(r.Peak))
-				if r.TexSkipped > 0 {
-					n.Addf("%d keep their PNG (a DDS or another format of the same name)", r.TexSkipped)
-				}
-				if r.Tool != nil && r.Tool.Err != "" {
-					n.Add("encoder: " + r.Tool.Err + " — the build is refused")
-				}
-			}
-		}
-		n := root.Add("trimmed:")
-		for _, e := range r.Pack.Entries {
-			if len(e.TrimmedDir) > 0 {
-				n.Addf("%s: %s (%s)", e.Name, strings.Join(e.TrimmedDir, ", "), mb(e.Trimmed))
-			}
+		root.KV("space", free)
+	}
+	if len(r.CannotCopy) > 0 {
+		n := root.KV("cannot copy", fmt.Sprintf("%d mods (their folders cannot be read; the build is refused)", len(r.CannotCopy)))
+		for _, x := range r.CannotCopy {
+			n.Add(x)
 		}
 		n.Truncate(10, "")
-		if len(n.Children) == 0 {
-			n.Line = "trimmed: nothing (no folders for other game versions)"
+	}
+	if r.Skipped > 0 {
+		root.KV("skipped", fmt.Sprintf("%d links that leave their mod's folder", r.Skipped))
+	}
+	if r.TexOptions != nil {
+		n := root.KV("textures", app.TextureLabel(*r.TexOptions))
+		if pt := r.Pack.Textures; pt != nil && !r.DryRun {
+			n.Addf("%d PNGs converted to DDS and deleted: %s of PNG → %s of DDS", pt.Converted, mb(pt.PNGBytes), mb(pt.DDSBytes))
+			if pt.Kept > 0 {
+				n.Addf("%d keep their PNG (%d failed to convert; the rest share a name with a DDS or another format)", pt.Kept, pt.Failed)
+			}
+		} else {
+			est := r.TexEst
+			n.Addf("%d PNGs: %s of PNG → about %s of DDS; video memory about %s → %s", est.Files, mb(est.PNGBytes), mb(est.DDSBytes), mb(est.VRAMBefore), mb(est.VRAMAfter))
+			n.Addf("pack size about %s after; up to %s while converting", mb(r.Final), mb(r.Peak))
+			if r.TexSkipped > 0 {
+				n.Addf("%d keep their PNG (a DDS or another format of the same name)", r.TexSkipped)
+			}
+			if r.Tool != nil && r.Tool.Err != "" {
+				n.Add("encoder: " + r.Tool.Err + " — the build is refused")
+			}
 		}
+	}
+	n := root.Add("trimmed:")
+	for _, e := range r.Pack.Entries {
+		if len(e.TrimmedDir) > 0 {
+			n.Addf("%s: %s (%s)", e.Name, strings.Join(e.TrimmedDir, ", "), mb(e.Trimmed))
+		}
+	}
+	n.Truncate(10, "")
+	if len(n.Children) == 0 {
+		n.Line = "trimmed: nothing (no folders for other game versions)"
 	}
 	if r.Moved > 0 {
 		root.KV("order", fmt.Sprintf("sorted for the pack: %d moved (the workspace is unchanged)", r.Moved))
@@ -172,10 +169,6 @@ func packListCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d, root := render.New(fmt.Sprintf("packs: %d (%s)", len(ps), c.App.PacksDir()))
 	for _, p := range ps {
-		kind := mb(p.Bytes)
-		if p.Light {
-			kind = "light"
-		}
 		played := "never played"
 		if !p.LastPlayed.IsZero() {
 			played = "played " + c.App.FormatDate(p.LastPlayed)
@@ -184,7 +177,7 @@ func packListCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		if p.Env != "" {
 			where = "  env " + p.Env
 		}
-		root.Addf("%s  %d mods  %s  %s%s  built %s  %s", p.Name, len(p.Entries), kind, p.Game, where, c.App.FormatDate(p.Created), played)
+		root.Addf("%s  %d mods  %s  %s%s  built %s  %s", p.Name, len(p.Entries), mb(p.Bytes), p.Game, where, c.App.FormatDate(p.Created), played)
 	}
 	if us, err := c.App.UnfinishedPacks(); err == nil {
 		for _, u := range us {
@@ -249,9 +242,14 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func packExportCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	n, err := c.App.ExportPack(a.Pos[0], a.Pos[1], a.Bool("light"))
+	n, err := c.App.ExportPack(a.Pos[0], a.Pos[1], a.Bool("list"))
 	if err != nil {
 		return nil, err
+	}
+	if a.Bool("list") {
+		d, _ := render.New(fmt.Sprintf("exported the list of pack %s to %s", a.Pos[0], a.Pos[1]))
+		d.AddNext("archo loadout import " + quoteArg(a.Pos[1]))
+		return d, nil
 	}
 	d, _ := render.New(fmt.Sprintf("exported pack %s to %s (%s)", a.Pos[0], a.Pos[1], mb(n)))
 	return d, nil
@@ -268,7 +266,7 @@ func packImportCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo pack launch " + quoteArg(r.Pack.Name))
 		return d, nil
 	}
-	d, root := render.New(fmt.Sprintf("light pack %s: %d mods", r.Pack.Name, len(r.Pack.Entries)))
+	d, root := render.New(fmt.Sprintf("list %s: %d mods", r.Pack.Name, len(r.Pack.Entries)))
 	for _, g := range []struct {
 		k  string
 		es []app.PackEntry
@@ -284,7 +282,7 @@ func packImportCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		n.Truncate(10, "")
 	}
 	if r.Imported != nil {
-		root.KV("workspace", fmt.Sprintf("now holds the pack's list (%d changes, unsaved; archo undo)", len(r.Imported.Changes)))
+		root.KV("workspace", fmt.Sprintf("now holds the list (%d changes, unsaved; archo undo)", len(r.Imported.Changes)))
 	} else {
 		d.AddNext("archo pack import " + quoteArg(a.Pos[0]) + " --as-plan")
 	}
