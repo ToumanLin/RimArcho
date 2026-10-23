@@ -121,14 +121,19 @@ func TestHiddenAlone(t *testing.T) {
 	e.Remove(filepath.Join(ws, "About", "About.xml"))
 	e.MustRun("unhide", ref)
 	e.MustRun("enable", refOf(t, e, "Alone", ""))
-	// H6 (06 §2.9 删除): a copy in Mods/ may go to the recycle bin, unless a plan uses it.
+	// H6 (06 §2.9 删除): a copy in Mods/ may go to the recycle bin; one a plan uses too (the
+	// player's word goes): the plan is named, and keeps the entry as missing.
 	mine := refOf(t, e, "Mine", "")
-	if out, code := e.Run("trash", mine, "--dry-run"); code != 0 || !strings.Contains(out, "Mods") {
+	if out, code := e.Run("trash", mine, "--dry-run"); code != 0 || !strings.Contains(out, "Mods") || strings.Contains(out, "warning") {
 		t.Fatalf("H6: exit %d\n%s", code, out)
 	}
 	e.MustRun("enable", mine)
-	if out, code := e.Run("trash", mine); code == 0 || !strings.Contains(out, "enabled") {
+	id := refID(t, e, "Mine", "")
+	if out, code := e.Run("trash", mine); code != 0 || !strings.Contains(out, "warning: used by plan:default") {
 		t.Fatalf("H6 enabled: exit %d\n%s", code, out)
+	}
+	if st, err := e.App.Loadout(); err != nil || st.List.Index(id) < 0 {
+		t.Fatalf("H6: the plan lost the entry instead of keeping it as missing: %v", err)
 	}
 }
 

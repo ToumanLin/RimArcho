@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -37,6 +38,9 @@ func fileOpDoc(c *Ctx, a *Args, name string, f func(ref string, dryRun bool) (*a
 		root.KV("to", op.To)
 	case "trash":
 		root.KV("folder", op.Path)
+		if len(op.UsedBy) > 0 {
+			root.KV("warning", usedByWarning(op.UsedBy))
+		}
 	}
 	if op.Swap != nil {
 		root.KV("workspace", fmt.Sprintf("%d change unsaved: the workshop copy replaces the pinning copy", len(op.Swap.Changes)))
@@ -49,6 +53,12 @@ func fileOpDoc(c *Ctx, a *Args, name string, f func(ref string, dryRun bool) (*a
 		d.AddNext("archo " + name + " " + a.Pos[0])
 	}
 	return d, nil
+}
+
+// usedByWarning: a folder the plans use goes anyway (the player decides); they keep the
+// entry and show it missing.
+func usedByWarning(plans []string) string {
+	return "used by " + strings.Join(plans, ", ") + "; it still goes, and they show it as missing"
 }
 
 // unpinCopyDoc reports unpinning a locked version RimArcho made (04 §7.5): no files change.

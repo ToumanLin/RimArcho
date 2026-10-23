@@ -120,5 +120,7 @@ func init() {
 		"columns":                                      "列",
 		"reset the columns":                            "恢复默认列",
 		"the library":                                  "Mod 库",
+
+		"⚠ %s is in list %s: it still goes, and the list shows it as missing": "⚠ %s 在列表%s中：照样执行，列表里会标为缺失",
 	})
 }

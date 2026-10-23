@@ -316,8 +316,10 @@ func TestLibraryTrashNamesPlans(t *testing.T) {
 	if err := e.App.Store.SetWorkspace(ws); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.App.Trash(gone, true); err == nil || !strings.Contains(err.Error(), "plan:other") {
-		t.Fatalf("want a refusal naming plan:other, got %v", err)
+	// the player's word goes: no refusal, the plan is named and shows it missing afterwards
+	op, err := e.App.Trash(gone, true)
+	if err != nil || !slices.Contains(op.UsedBy, "plan:other") {
+		t.Fatalf("want plan:other named, no refusal: %+v %v", op, err)
 	}
 }
 

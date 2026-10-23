@@ -256,7 +256,8 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	if live && i.Source == app.LibWorkshop && !has(app.LibResidue) && url {
 		ks = append(ks, OpUnsub)
 	}
-	if live && !plans && (own || workshop && has(app.LibResidue)) && !source.IsLink(i.Path) {
+	// a copy the lists use may go too: the confirm warns, and the lists show it missing
+	if live && (own || workshop && has(app.LibResidue)) && !source.IsLink(i.Path) {
 		ks = append(ks, OpDelete)
 	}
 	return sortOps(ks)

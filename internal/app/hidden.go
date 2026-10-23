@@ -90,6 +90,9 @@ type FileOp struct {
 	// the upstream; InPlan says whether the current plan uses the copy.
 	Locked *Locked
 	InPlan bool
+	// Op "trash": the plans that use the copy (every environment of this game). The
+	// player's word goes: it still goes, and they show it as missing (06 §2.9).
+	UsedBy []string
 }
 
 func aboutDisabledPath(m *store.Mod) (string, error) {
@@ -219,14 +222,12 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 		return nil, fmt.Errorf("%w: %s is a subscribed, loadable mod; unsubscribe it in Steam instead", ErrNotTrashable, st.Ix.Ref(m.ID))
 	case own && source.IsLink(st.Ix.ModDir(m)):
 		return nil, fmt.Errorf("%w: %s is a link, not a folder; RimArcho does not move it", ErrNotTrashable, st.Ix.ModDir(m))
-	case st.List.Index(m.ID) >= 0:
-		return nil, fmt.Errorf("%s is enabled; disable it first", st.Ix.Ref(m.ID))
 	}
-	// Another plan (of any environment of this game) would lose it too: say which (06 §2.9).
-	if ps, err := a.usedBy(st, m.ID); err != nil {
+	// The plans that use it (the current one when it is enabled, any environment of this
+	// game) only hear about it: they keep the entry and show it missing (06 §2.9).
+	ps, err := a.usedBy(st, m.ID)
+	if err != nil {
 		return nil, err
-	} else if len(ps) > 0 {
-		return nil, fmt.Errorf("%s is used by %s; take it out of them first (archo library remove-from-plans %s)", st.Ix.Ref(m.ID), joinPlans(ps), st.Ix.Ref(m.ID))
 	}
 	var root string
 	for _, s := range st.Ix.Sources {
@@ -244,7 +245,7 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if root == "" || !source.Within(real, root) || env0(real, root) {
 		return nil, fmt.Errorf("%w: %s is not inside its source folder %s", ErrNotTrashable, real, root)
 	}
-	op := &FileOp{Op: "trash", Path: real, DryRun: dryRun}
+	op := &FileOp{Op: "trash", Path: real, DryRun: dryRun, UsedBy: ps}
 	if dryRun {
 		return op, nil
 	}

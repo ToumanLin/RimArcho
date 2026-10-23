@@ -158,14 +158,12 @@ func TestLibraryPlanOps(t *testing.T) {
 	}
 	press(m, "esc")
 	// Del: the dry run, then enter does it (here: Steam is out of reach, the page opens);
-	// an enabled copy is refused in the dry run
+	// an enabled copy only warns which list has it
 	press(m, "delete")
-	if m.panel == nil || m.panel.onEnter != nil {
+	if m.panel == nil || m.panel.onEnter == nil || !strings.Contains(strings.Join(m.panel.lines, "\n"), "is in list") {
 		t.Fatalf("Del on an enabled copy: %+v", m.panel)
 	}
 	press(m, "esc")
-	press(m, "space") // take Alpha out of the plan first
-	libAt(t, m, "Alpha")
 	var opened string
 	m.opts.OpenURL = func(u string) error { opened = u; return nil }
 	press(m, "delete")

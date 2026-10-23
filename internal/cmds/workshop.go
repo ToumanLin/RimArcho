@@ -13,7 +13,7 @@ import (
 // Subscribing through the Steam client (06 §2.9, 08 §10).
 func init() {
 	dry := []Flag{{Name: "dry-run", Help: "show what would happen"}}
-	register(&Command{Name: "workshop unsubscribe", Args: "<ref…>", Summary: "unsubscribe in Steam: Steam deletes the Workshop folder (refused while enabled, in a plan, or the game runs)",
+	register(&Command{Name: "workshop unsubscribe", Args: "<ref…>", Summary: "unsubscribe in Steam: Steam deletes the Workshop folder (refused while the game runs; plans that use it show it missing)",
 		MinArgs: 1, MaxArgs: -1, Flags: dry, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return workshopCmd(c, a, steamworks.Unsubscribe) }})
 	register(&Command{Name: "workshop subscribe", Args: "<ref…>", Summary: "subscribe again in Steam to an unsubscribed leftover",
 		MinArgs: 1, MaxArgs: -1, Flags: dry, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return workshopCmd(c, a, steamworks.Subscribe) }})
@@ -48,6 +48,9 @@ func workshopCmd(c *Ctx, a *Args, action string) (*render.Doc, error) {
 				what = "Steam would delete"
 			}
 			n.KV("folder", what+" "+it.Folder)
+		}
+		if len(it.UsedBy) > 0 {
+			n.KV("warning", usedByWarning(it.UsedBy))
 		}
 		if it.Result != "" {
 			n.KV("steam", it.Result+" · "+steamworks.StateText(it.State))

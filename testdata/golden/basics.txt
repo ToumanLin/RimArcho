@@ -107,7 +107,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     textures optimize [<mod>...]              write the DDS of mods' PNG textures next to them (the game loads them instead; the PNGs stay)
     textures clean [<mod>...]                 delete the DDS RimArcho wrote (only those; the game goes back to the PNGs)
     textures tool                             the DDS encoder (todds): where it is, or --install to download it
-    workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while enabled, in a plan, or the game runs)
+    workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while the game runs; plans that use it show it missing)
     workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
     workshop state <ref…>                     ask Steam whether items are subscribed, installed, waiting for an update
   references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern

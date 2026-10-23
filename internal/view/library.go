@@ -675,6 +675,9 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			if strings.HasPrefix(l, "next:") {
 				break
 			}
+			if strings.HasPrefix(strings.TrimSpace(l), "warning: used by ") {
+				continue // said below, in the interface language
+			}
 			l = Humanize(st, l)
 			// "#ref Name" became "Name Name"
 			if m, err := st.Ix.ResolveOne(ref); err == nil {
@@ -686,8 +689,32 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		if code != 0 {
 			p.Apply = false
 		}
+		if w := usedWarning(a, st, kind, ref); w != "" {
+			p.Lines = append(p.Lines, w)
+		}
 	}
 	return p, nil
+}
+
+// usedWarning: deleting or unsubscribing a copy the lists use only warns; the player's word
+// goes, and the lists show it as missing (06 §2.9). "" when no list uses it.
+func usedWarning(a *app.App, st *app.LoadoutState, kind, ref string) string {
+	if kind != LibDelete && kind != LibUnsub {
+		return ""
+	}
+	m, err := st.Ix.ResolveOne(ref)
+	if err != nil {
+		return ""
+	}
+	ps, err := a.PlansUsing(st, m.ID)
+	if err != nil || len(ps) == 0 {
+		return ""
+	}
+	q := make([]string, len(ps))
+	for j, p := range ps {
+		q[j] = Tf("“%s”", libUseText(p))
+	}
+	return Tf("⚠ %s is in list %s: it still goes, and the list shows it as missing", m.DisplayName(), strings.Join(q, T(", ")))
 }
 
 // LibDo runs an action on copies and says what it did.

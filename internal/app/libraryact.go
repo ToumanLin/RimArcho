@@ -261,4 +261,5 @@ func (a *App) usedBy(st *LoadoutState, id string) ([]string, error) {
 	return out, nil
 }
 
-func joinPlans(ps []string) string { return strings.Join(ps, ", ") }
+// PlansUsing is usedBy for the pages: deleting or unsubscribing such a copy warns, and goes.
+func (a *App) PlansUsing(st *LoadoutState, id string) ([]string, error) { return a.usedBy(st, id) }
