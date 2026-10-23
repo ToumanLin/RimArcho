@@ -11,7 +11,7 @@ import (
 // second apply needs a new preview. Without the window there are no dialogs.
 func TestExchangeAPI(t *testing.T) {
 	_, api, _ := fixture(t)
-	if x := api.ExchangeInfo(); x.Dialogs || len(x.Formats) != 7 || x.Formats[0].ID != "archo" {
+	if x := api.ExchangeInfo(); x.Dialogs || len(x.Formats) != 8 || x.Formats[0].ID != "archo" {
 		t.Fatalf("info: %+v", x)
 	}
 	if f, err := api.PickImportFile(); f != "" || err != nil || api.Clipboard() != "" {

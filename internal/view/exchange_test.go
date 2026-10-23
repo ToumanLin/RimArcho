@@ -216,6 +216,9 @@ func TestExport(t *testing.T) {
 	e := exchangeEnv(t)
 	dir := t.TempDir()
 	for _, f := range view.ExportFormats(e.App) {
+		if f.ID == app.FormatWorkshop {
+			continue // links only: Core and local mods have none (TestExportWorkshopLinks)
+		}
 		path := filepath.Join(dir, f.ID+"-"+f.File)
 		if _, err := view.ExportTo(e.App, f.ID, path, false); err != nil {
 			t.Fatalf("%s: %v", f.ID, err)

@@ -179,13 +179,13 @@ func TestInGameAndMarks(t *testing.T) {
 	}
 	nav := view.Nav(0, rows, nil)
 	kids := nav[1].Items[1].Kids
-	if len(kids) != 3 || kids[1].Mark == "" || !kids[1].Current || kids[2].ID != view.PagePlanNew || !kids[2].Add {
+	if len(kids) != 3 || kids[0].ID != view.PagePlans || kids[2].Mark == "" || !kids[2].Current {
 		t.Fatalf("plan kids %+v", kids)
 	}
 	// the plan the game has is marked on its entry, not on the status line
 	for i, r := range rows {
-		if kids[i].InGame != r.InGame {
-			t.Fatalf("in-game mark %d: %+v vs %+v", i, kids[i], r)
+		if kids[i+1].InGame != r.InGame {
+			t.Fatalf("in-game mark %d: %+v vs %+v", i, kids[i+1], r)
 		}
 	}
 }

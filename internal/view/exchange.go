@@ -377,6 +377,7 @@ func ExportFormats(a *app.App) []ExportFormat {
 		{app.FormatRimCrow, T("share code"), T("one line to paste in RimCrow or here"), base + ".txt", true},
 		{app.FormatText, T("plain text"), T("one packageId per line, with names"), base + ".txt", true},
 		{app.FormatModsConfig, "ModsConfig.xml", T("the game's file format, for copying to another computer"), "ModsConfig.xml", false},
+		{app.FormatWorkshop, T("workshop links"), T("Markdown links for subscribing by hand; reads back as workshop IDs"), base + "-workshop.md", true},
 	}
 }
 

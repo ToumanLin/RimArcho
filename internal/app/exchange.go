@@ -40,6 +40,30 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	return a.exportList(st, format)
+}
+
+// ExportPlan renders one of the environment's plans (current or not) in a format.
+func (a *App) ExportPlan(planID int64, format string) ([]byte, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	p, err := a.Store.PlanByID(planID)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil || p.EnvID != st.Ix.Env.ID {
+		return nil, fmt.Errorf("no plan %d in env:%s", planID, st.Ix.Env.Name)
+	}
+	ps, err := a.PlanState(st, p)
+	if err != nil {
+		return nil, err
+	}
+	return a.exportList(ps, format)
+}
+
+func (a *App) exportList(st *LoadoutState, format string) ([]byte, error) {
 	tokens := st.Reg.Tokens(st.List, func(id string) string {
 		if m := st.Ix.ByID[id]; m != nil {
 			return m.PackageID

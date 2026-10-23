@@ -113,7 +113,8 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	for _, p := range plans {
 		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, InGame: p.InGame})
 	}
-	planKids = append(planKids, NavItem{ID: PagePlanNew, Label: "+ " + T("new list"), Add: true})
+	// 管理 heads the lists (06 §2.17); new lists are made there.
+	planKids = append([]NavItem{{ID: PagePlans, Label: T("manage")}}, planKids...)
 	var packKids []NavItem
 	for _, p := range packs {
 		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name})
