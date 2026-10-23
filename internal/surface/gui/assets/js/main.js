@@ -25,6 +25,7 @@ import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
 import * as tex from "./textures.js";
+import * as tasksPage from "./tasks.js";
 import { withEnvironmentSwitch } from "./environment.js";
 
 // ---- loading ----
@@ -179,6 +180,7 @@ async function openPage(id) {
     case "settings": return scr.settings();
     case "uninstall": return uninst.open();
     case "textures": return tex.open();
+    case "tasks": return tasksPage.open();
     case "guide": return guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
   }
 }
@@ -192,6 +194,7 @@ function renderWhere() {
   // the cursor is in which list) and in the full detail.
   let s = "";
   if (S.screen === "library") s = library.where(); // a table like the plan's lists
+  else if (S.screen === "tasks") s = tasksPage.where();
   else if (S.screen && S.screen !== "full") s = ""; // a page: the breadcrumb is enough
   else if (S.screen === "full") {
     s = fullPage.fullName();
@@ -243,6 +246,7 @@ function renderHints() {
   let list = actions();
   if (S.screen === "full") list = fullPage.fullHints();
   else if (S.screen === "library") list = library.hintList();
+  else if (S.screen === "tasks") list = tasksPage.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "home") list = homePage.hintList();
   else if (S.screen === "packs" || S.screen === "build") list = packsPage.hintList();
@@ -469,7 +473,7 @@ async function preview(what) {
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures" };
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures", tasks: "tasks" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
@@ -717,6 +721,8 @@ function onKey(e) {
   if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
   // ctrl+b moves the navigation between the side and the top, on every page (06 §2.1)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "b") { e.preventDefault(); shell.toggleNav(); return; }
+  // ctrl+j: 后台任务 from any page; again goes back (06 §2.16)
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "j" && !S.popup) { e.preventDefault(); shell.navigated(); tasksPage.toggle(); renderWhere(); return; }
   if (pop.popupKey(e)) return;
   if (document.activeElement && document.activeElement.tagName === "INPUT") return;
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
@@ -745,6 +751,7 @@ function onKey(e) {
       return;
     }
     // 1–9 focus the page's numbered areas (06 §3.5)
+    if (S.screen === "tasks") return tasksPage.key(e);
     if (S.screen !== "home" && scr.areaKey(e)) return;
     if (S.screen === "home") return homePage.homeKey(e);
     if (S.screen === "packs" || S.screen === "build") return packsPage.packsKey(e);
@@ -896,6 +903,7 @@ async function start() {
   initExchange(ui);
   plans.initPlans(ui);
   library.initLibrary(ui);
+  tasksPage.initTasks(ui);
   S.bar = createBar({ data: () => S.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:plan",
     column: () => $("#board > .fcol"), resized: () => renderRows(0), leave: () => focusArea(S.focus < 2 ? S.focus : 0),
     placeholder: T("search: words, tag:, author:, type:, has:, version:, -not") + "  /" });
@@ -932,6 +940,10 @@ async function start() {
   on("pack", (ev) => packsPage.packEvent(ev));
   on("uninstall", (ev) => uninst.event(ev));
   on("textures", (ev) => tex.event(ev));
+  on("tasks", (ev) => tasksPage.event(ev));
+  // a task's o on a mod: Mod 库存 searching for it (06 §2.16)
+  document.addEventListener("library-search", async (e) => { shell.navigated(); await library.openSearch(e.detail); renderWhere(); });
+  tasksPage.refreshFoot();
   on("guide", (ev) => guide.guideEvent(ev));
   on("download", (ev) => guide.downloadEvent(ev));
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again

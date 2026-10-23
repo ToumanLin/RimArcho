@@ -103,7 +103,15 @@ func (s *API) TexturesRun(scope string, scale int, refs []string) (string, error
 	}
 	s.busy["textures"] = true
 	s.texLast = TextureEvent{Text: view.T("converting textures")}
-	go s.watchTextures(args, run)
+	obj := view.T("the current plan")
+	switch {
+	case len(refs) > 0:
+		obj = view.Tf("%d mods", len(refs))
+	case scope == "all":
+		obj = view.T("every installed mod")
+	}
+	task := s.beginSelf(view.TaskTextures, obj, func() error { _, err := s.TexturesStop(); return err })
+	go s.watchTextures(task, args, run)
 	return view.T("converting textures") + " · " + view.T("it goes on in the background"), nil
 }
 
@@ -113,7 +121,7 @@ var (
 	texFailedRe  = regexp.MustCompile(`^failed: (\d+) `)
 )
 
-func (s *API) watchTextures(args []string, run func([]string, func(string)) ([]string, error)) {
+func (s *API) watchTextures(task string, args []string, run func([]string, func(string)) ([]string, error)) {
 	lines, err := run(args, func(l string) {
 		p, ok := cmds.ParseTextureProgress(l)
 		if !ok {
@@ -126,6 +134,7 @@ func (s *API) watchTextures(args []string, run func([]string, func(string)) ([]s
 		s.mu.Lock()
 		s.texLast = ev
 		s.mu.Unlock()
+		s.tasks.Update(task, func(t *app.Task) { t.Frac, t.Phase = ev.Frac, ev.Text })
 		s.send("textures", ev)
 	})
 	ev := TextureEvent{Done: true, Ok: err == nil, Frac: 1}
@@ -137,6 +146,14 @@ func (s *API) watchTextures(args []string, run func([]string, func(string)) ([]s
 	s.mu.Lock()
 	s.busy["textures"], s.lib, s.needs, s.board = false, nil, nil, nil
 	s.mu.Unlock()
+	switch {
+	case err != nil:
+		s.endSelf(task, err, "")
+	case s.tasks.StopAsked(task):
+		s.tasks.Finish(task, app.TaskStopped, ev.Text)
+	default:
+		s.endSelf(task, nil, ev.Text)
+	}
 	s.send("textures", ev)
 }
 
@@ -186,10 +203,17 @@ func (s *API) TexturesClean(scope string) (string, error) {
 	if scope == "all" {
 		sc = app.TexAll
 	}
+	obj := view.T("the current plan")
+	if scope == "all" {
+		obj = view.T("every installed mod")
+	}
+	task := s.beginSelf(view.TaskTexClean, obj, nil)
 	c, err := s.a.CleanTextures(nil, sc, false)
 	s.lib, s.needs, s.board = nil, nil, nil
 	if err != nil {
+		s.endSelf(task, err, "")
 		return "", err
 	}
+	s.endSelf(task, nil, view.Tf("deleted %d DDS RimArcho wrote (%s); the game uses the PNGs again", c.Files, view.SizeText(c.Bytes)))
 	return view.Tf("deleted %d DDS RimArcho wrote (%s); the game uses the PNGs again", c.Files, view.SizeText(c.Bytes)), nil
 }

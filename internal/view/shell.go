@@ -150,6 +150,9 @@ func NavPath(groups []NavGroup, id string) []Crumb {
 	if id == PageSettings {
 		return []Crumb{{Label: T("settings"), ID: PageSettings}}
 	}
+	if id == PageTasks {
+		return []Crumb{{Label: T("background tasks"), ID: PageTasks}}
+	}
 	for _, g := range groups {
 		for _, it := range g.Items {
 			head := []Crumb{{Label: g.Title, ID: g.Items[0].ID}, {Label: it.Label, ID: it.ID}}

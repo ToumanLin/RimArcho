@@ -55,7 +55,7 @@ func (s *API) Shell() *Shell {
 		}
 	}
 	out.Nav = view.Nav(count, out.Plans, packs)
-	ids := []string{view.PageSettings}
+	ids := []string{view.PageSettings, view.PageTasks}
 	for _, g := range out.Nav {
 		for _, it := range g.Items {
 			ids = append(ids, it.ID)
@@ -421,6 +421,7 @@ func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
 	s.busy["download"] = true
 	s.mu.Unlock()
 	spec := app.DownloadSpec{Branch: branch, Dir: dir, Account: strings.TrimSpace(account), Name: strings.TrimSpace(name), Console: true}
+	task := s.beginSelf(view.TaskDownload, branch, nil)
 	go func() {
 		var r *app.SourceChangeEnv
 		got, err := s.a.FetchGame(spec, func(p app.DownloadProgress) { s.send("download", p) })
@@ -436,8 +437,10 @@ func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
 		s.mu.Unlock()
 		if err != nil {
 			end["ok"], end["error"] = false, view.DownloadErrorText(err)
+			s.tasks.Finish(task, app.TaskFailed, view.DownloadErrorText(err))
 		} else {
 			end["ok"], end["env"] = true, r.Env.Name
+			s.endSelf(task, nil, r.Env.Name)
 		}
 		s.send("download", end)
 	}()

@@ -123,6 +123,23 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("esc", "back to the list"),
 		)
 	}
+	if page == PageTasks {
+		out = append(out,
+			r("↑↓ · PgUp PgDn · Home End", "move the cursor a page / to the top or the bottom"),
+			r("enter · →", "the task's items"),
+			r("←", "back to the tasks"),
+			r("x", "stop the rest / cancel the wait"),
+			r("r", "try the failed again / do the ones left"),
+			r("J K", "a waiting task later / sooner"),
+			r("o", "go to the page it changed"),
+			r("ctrl+o", "open the folder"),
+			r("Del · ctrl+z", "take off the record · put it back"),
+			r("C", "take the done ones off the record"),
+			r("s · < > =", "the items' headers: sort and columns · the sorted column's width"),
+			r("shift+↑↓ · ctrl+space · ctrl+a", "select tasks"),
+			r("menu · shift+F10 · right click", "the row's menu: everything it can do"),
+		)
+	}
 	if page != EditorPage {
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}
@@ -131,7 +148,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		r("shift+1–8", "go to a page in the sidebar"),
 	)
 	if !tui {
-		out = append(out, r("ctrl+b", "navigation at the side / at the top"))
+		out = append(out, r("ctrl+b", "navigation at the side / at the top"), r("ctrl+j", "background tasks; again goes back"))
 	}
 	out = append(out,
 		r(pick("c · l", "c"), pick("mod changes · game log", "mod changes")),

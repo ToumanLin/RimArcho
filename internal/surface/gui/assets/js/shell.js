@@ -27,6 +27,7 @@ export function initShell(u) {
   $("#env").onclick = () => ui.go("env");
   $("#nav-settings").onclick = () => ui.go("settings");
   $("#live").onclick = () => ui.go("needs");
+  $("#tasks-line").onclick = () => ui.go("tasks");
   $("#side").addEventListener("keydown", navKey);
   wireSideSplit();
   api.Setting(NAV_KEY).then((v) => { if (v === "top") { layout = "top"; applyNav(); } }).catch(() => {});
@@ -338,7 +339,7 @@ function renderCrumbs() {
   let chip = (sh && sh.env) || "";
   if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + " · " + chip;
   env.textContent = chip;
-  env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "uninstall" || S.screen === "textures";
+  env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "uninstall" || S.screen === "textures" || S.screen === "tasks";
   env.title = T("game") + " · E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");

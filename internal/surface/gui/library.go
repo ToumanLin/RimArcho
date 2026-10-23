@@ -51,6 +51,11 @@ func (s *API) LibraryDo(kind string, refs []string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.board, s.needs, s.lib = nil, nil, nil
+	// the actions on folders and through Steam are background tasks (06 §2.16): queued
+	// here, one item at a time, one failure does not stop the rest
+	if view.TaskLane(kind) != "" && len(refs) > 0 {
+		return s.submitTask(kind, refs)
+	}
 	t, err := view.LibDo(s.a, kind, refs)
 	// Steam out of reach (not running, no DLL): the Workshop pages instead, said so (06 §2.9)
 	var pages *view.OpenPages

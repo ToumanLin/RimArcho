@@ -127,6 +127,11 @@ export function createBar(opts) {
     if (v) wantFocus = true; // once the groups are in (draw)
     else if (root.contains(document.activeElement)) { document.activeElement.blur(); opts.leave && opts.leave(); }
   };
+  // the open bar folds the moment the focus leaves it: a click elsewhere, tab, a key that
+  // moves the focus (06 §3.1 rule 8); what it filters stays in force on its one line
+  const left = (t) => b.open && root.isConnected && t instanceof Node && !root.contains(t) && !(t.closest && t.closest("#menu"));
+  document.addEventListener("mousedown", (e) => { if (left(e.target)) b.toggle(false); }, true);
+  document.addEventListener("focusin", (e) => { if (left(e.target)) b.toggle(false); });
   b.focus = () => { inp.focus(); inp.select(); };
   b.focused = () => root.contains(document.activeElement);
 

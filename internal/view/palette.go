@@ -57,6 +57,7 @@ var Commands = []Command{
 	{"cli", "运行 archo 命令", "command line", ": archo"},
 	{"uninstall", "卸载 RimArcho", "uninstall RimArcho", "remove what RimArcho put on this machine"},
 	{"textures", "贴图优化", "texture optimisation", "convert mods' PNG textures to DDS"},
+	{"tasks", "后台任务", "background tasks", "ctrl+j running waiting failed queue"},
 	{"help", "帮助", "help", "?"},
 	{"quit", "退出", "quit", "q"},
 }

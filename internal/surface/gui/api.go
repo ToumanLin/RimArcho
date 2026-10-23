@@ -56,6 +56,9 @@ type API struct {
 
 	monitorOnce sync.Once
 	quit        func() // closes the window (nil in the harness and in tests)
+	// tasks is the 后台任务 record and its lanes (tasks.go, 06 §2.16)
+	tasks  *app.Tasks
+	taskEv taskEvents
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
 	// TexRunner runs `archo textures optimize` in place of the child process (tests).
@@ -69,7 +72,9 @@ type API struct {
 }
 
 func newAPI(a *app.App) *API {
-	return &API{a: a, open: openURL, busy: map[string]bool{}}
+	s := &API{a: a, open: openURL, busy: map[string]bool{}}
+	s.startTasks()
+	return s
 }
 
 func (s *API) send(name string, data any) {
@@ -357,12 +362,14 @@ func (s *API) PackBuild(name string, tex int) (string, error) {
 			return app.ChildPackBuild(home, env, name, log, extra...)
 		}
 	}
-	go s.watchBuild(name, tmp, run)
+	task := s.beginSelf(view.TaskPack, name, func() error { _, err := s.PackStop(name); return err })
+	s.tasks.Update(task, func(t *app.Task) { t.Target = name })
+	go s.watchBuild(task, name, tmp, run)
 	return view.Tf("create pack %s: it goes on in the background; you can use the other pages, or close the window", name), nil
 }
 
 // watchBuild runs the build and passes its progress file on as events until it ends.
-func (s *API) watchBuild(name, tmp string, run func(string) error) {
+func (s *API) watchBuild(task, name, tmp string, run func(string) error) {
 	done := make(chan error, 1)
 	go func() { done <- run(name) }()
 	t := time.NewTicker(300 * time.Millisecond)
@@ -382,6 +389,15 @@ func (s *API) watchBuild(name, tmp string, run func(string) error) {
 					lines[i] = view.T(strings.TrimPrefix(strings.TrimSpace(l), "error: "))
 				}
 				ev.Error = strings.Join(lines, "\n")
+				s.tasks.Update(task, func(t *app.Task) { t.Step = last.Step })
+				end := app.TaskFailed
+				if s.tasks.StopAsked(task) {
+					end = app.TaskStopped
+				}
+				s.tasks.Finish(task, end, ev.Error)
+			} else {
+				s.tasks.Update(task, func(t *app.Task) { t.Step = 5 })
+				s.endSelf(task, nil, ev.Text)
 			}
 			s.send("pack", ev)
 			return
@@ -389,6 +405,7 @@ func (s *API) watchBuild(name, tmp string, run func(string) error) {
 			if p := app.ReadBuildProgress(tmp); p != nil {
 				if pp := view.ProgressOf(p); pp != last {
 					last = pp
+					s.tasks.Update(task, func(t *app.Task) { t.Step, t.Frac, t.Phase = pp.Step, pp.Frac, pp.Text })
 					s.send("pack", pp)
 				}
 			}
@@ -1178,6 +1195,7 @@ func (s *API) Scan() bool {
 	}
 	s.busy["scan"] = true
 	home, env := s.a.Home, s.a.EnvName
+	task := s.beginSelf(view.TaskScan, env, nil)
 	go func() {
 		var out string
 		var err error
@@ -1197,6 +1215,11 @@ func (s *API) Scan() bool {
 			ev["text"] = view.T("scan complete · nothing changed")
 		}
 		s.mu.Unlock()
+		if err != nil {
+			s.endSelf(task, errors.New(ev["error"].(string)), "")
+		} else {
+			s.endSelf(task, nil, ev["text"].(string))
+		}
 		s.free.soon()
 		s.send("scan", ev)
 	}()
@@ -1218,8 +1241,17 @@ func (s *API) startAnalyze() bool {
 	s.busy["analyze"] = true
 	run := s.a.AnalyzeRunner
 	home, env, exe := s.a.Home, s.a.EnvName, s.Exe
+	obj := env
+	if s.board != nil && s.board.St != nil && s.board.St.Plan != nil {
+		obj = s.board.St.Plan.Name
+	}
+	task := s.beginSelf(view.TaskAnalyze, obj, nil)
 	go func() {
-		progress := func(l string) { s.send("analyze", map[string]any{"line": strings.TrimPrefix(l, "progress: ")}) }
+		progress := func(l string) {
+			l = strings.TrimPrefix(l, "progress: ")
+			s.tasks.Update(task, func(t *app.Task) { t.Phase = l })
+			s.send("analyze", map[string]any{"line": l})
+		}
 		var err error
 		switch {
 		case run != nil:
@@ -1232,6 +1264,7 @@ func (s *API) startAnalyze() bool {
 		s.mu.Lock()
 		s.busy["analyze"], s.needs = false, nil
 		s.mu.Unlock()
+		s.endSelf(task, err, view.T("analysis done"))
 		ev := map[string]any{"done": true, "ok": err == nil}
 		if err != nil {
 			ev["error"] = err.Error()

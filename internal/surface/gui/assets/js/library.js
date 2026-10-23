@@ -44,6 +44,8 @@ export function initLibrary(u) {
   // A scan, or another process (the CLI, an agent), changes what is there.
   on("scan", () => { if (S.screen === "library") load(); });
   addEventListener("focus", () => { if (S.screen === "library") load(); });
+  // a background task on the copies ended (06 §2.16): what is there changed
+  document.addEventListener("task-ended", () => { if (S.screen === "library") load(); });
   addEventListener("resize", () => { if (S.screen === "library") drawRows(); });
 }
 
@@ -56,6 +58,16 @@ export async function open() {
     sc.append(page("fill library", T("loading…")));
   }
   await load(true);
+}
+
+// openSearch shows the page searching for q (a background task's mod, 06 §2.16).
+export async function openSearch(q) {
+  const b = bar();
+  b.filters = [];
+  b.search = q;
+  b.input.value = q;
+  L.cur = 0;
+  await open();
 }
 
 // relang: the language changed; the page is drawn again in it, where it was (the column
