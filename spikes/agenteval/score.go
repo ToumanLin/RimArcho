@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,7 +12,7 @@ import (
 	"time"
 )
 
-// Label is a corpuslabel/2 answer (spikes/corpuslabel/SCHEMA.md), the fields scored here.
+// Label is a corpuslabel/2 or /3 answer (spikes/corpuslabel/SCHEMA.md), the fields scored here.
 type Label struct {
 	Schema     string   `json:"schema"`
 	Item       string   `json:"item"`
@@ -19,6 +20,8 @@ type Label struct {
 	Causes     []Cause  `json:"causes"`
 	Stage      string   `json:"stage"`
 	CauseType  string   `json:"cause_type"`
+	Repro      string   `json:"repro"`       // corpuslabel/3
+	UnknownWhy string   `json:"unknown_why"` // corpuslabel/3
 	Fix        Fix      `json:"fix"`
 	Confidence string   `json:"confidence"`
 	Difficulty string   `json:"difficulty"`
@@ -341,6 +344,51 @@ func printTable(title string, groups []string, by map[string]*row, tot *row, wit
 	line("all", tot)
 }
 
+// wilson is the 95% Wilson score interval of k successes in n trials, in percent.
+func wilson(k, n int) (lo, hi float64) {
+	if n == 0 {
+		return 0, 0
+	}
+	const z = 1.959964
+	p, nf := float64(k)/float64(n), float64(n)
+	d := 1 + z*z/nf
+	c := (p + z*z/(2*nf)) / d
+	h := z * math.Sqrt(p*(1-p)/nf+z*z/(4*nf*nf)) / d
+	return 100 * (c - h), 100 * (c + h)
+}
+
+func ci(k, n int) string {
+	if n == 0 {
+		return fmt.Sprintf("%20s", "-")
+	}
+	lo, hi := wilson(k, n)
+	return fmt.Sprintf("%5.1f [%5.1f-%5.1f]", 100*float64(k)/float64(n), lo, hi)
+}
+
+// printCI repeats a table's rates with 95% Wilson intervals: agree and the field rates are over
+// all tasks of the group, precision over tasks where a source is named, recall over gold sources.
+func printCI(title string, groups []string, by map[string]*row, tot *row, withFields bool) {
+	fmt.Printf("\n== %s, 95%% Wilson intervals\n", title)
+	fmt.Printf("  %-15s %4s  %-20s  %-20s  %-20s", "group", "n", "agree", "precision", "recall")
+	if withFields {
+		fmt.Printf("  %-20s  %-20s", "cause-type", "fix-kind")
+	}
+	fmt.Println()
+	line := func(name string, x *row) {
+		fmt.Printf("  %-15s %4d  %s  %s  %s", name, x.n, ci(x.hit+x.quiet, x.n), ci(x.hit, x.hit+x.wrong+x.over), ci(x.hit, x.gold))
+		if withFields {
+			fmt.Printf("  %s  %s", ci(x.ctype, x.n), ci(x.fix, x.n))
+		}
+		fmt.Println()
+	}
+	for _, g := range groups {
+		if x := by[g]; x != nil {
+			line(g, x)
+		}
+	}
+	line("all", tot)
+}
+
 var classOrder = []string{"patch-failed", "xref-missing", "texture-missing", "xml-load", "exception", "harmony-stack", "assembly", "static-ctor"}
 
 func median(xs []float64) float64 {
@@ -480,6 +528,8 @@ func score(cfg *Config, run, _ string, goldPath, split string, only []string, it
 	printTable("agent vs gold, by difficulty and tier", append(diffs, "tier 1", "tier 2"), agentBy, agentTot, true)
 	printTable("RimArcho alone (same build, same homes) vs gold, by class", classOrder, raBy, raTot, false)
 	printTable("RimArcho alone, by difficulty", diffs, raBy, raTot, false)
+	printCI("agent vs gold, by class", append(append([]string{}, classOrder...), "tier 1", "tier 2"), agentBy, agentTot, true)
+	printCI("RimArcho alone vs gold, by class", classOrder, raBy, raTot, false)
 	if len(secs) > 0 {
 		sum := func(xs []float64) float64 {
 			t := 0.0

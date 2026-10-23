@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -353,10 +354,29 @@ const taskQuestion = "This RimWorld 1.6 player's log (HugsLib upload) has the er
 // exportTasks writes tasks.jsonl: every item with a valid gold label; ~30% per benchmark
 // class held out (deterministic by hash). Code-quote files are copied under out/code/<item>/
 // and the answer points at the copies.
-func exportTasks(samplePath, packetDir, labelDir, reviewDir, out string, o *vopts) error {
+//
+// With keep (benchmark v3, G12), items of that earlier tasks.jsonl keep their split and the
+// other items are held out ~30% per class by a new hash; the held-out ids are written to
+// out/heldout.txt and its SHA-256 printed, so the split can be shown unchanged later.
+func exportTasks(samplePath, packetDir, labelDir, reviewDir, out, keep string, o *vopts) error {
 	items, ps, err := loadAll(samplePath, packetDir)
 	if err != nil {
 		return err
+	}
+	kept := map[string]string{} // id -> split of the earlier task set
+	question := taskQuestion
+	if keep != "" {
+		ts, err := os.ReadFile(keep)
+		if err != nil {
+			return err
+		}
+		for _, line := range strings.Split(string(ts), "\n") {
+			var t struct{ ID, Split string }
+			if json.Unmarshal([]byte(line), &t) == nil && t.ID != "" {
+				kept[t.ID] = t.Split
+			}
+		}
+		question = strings.Replace(taskQuestion, "corpuslabel/2", "corpuslabel/3", 1)
 	}
 	lab, _, err := readLabels(labelDir)
 	if err != nil {
@@ -369,12 +389,20 @@ func exportTasks(samplePath, packetDir, labelDir, reviewDir, out string, o *vopt
 		}
 	}
 	byClass := map[string][]string{}
+	held := map[string]bool{}
 	for n, it := range items {
+		if s, ok := kept[n]; ok {
+			held[n] = s == "heldout"
+			continue
+		}
 		byClass[it.Bench] = append(byClass[it.Bench], n)
 	}
-	held := map[string]bool{}
+	seed := "heldout-v2"
+	if keep != "" {
+		seed = "heldout-v3"
+	}
 	for _, ns := range byClass {
-		sort.Slice(ns, func(i, j int) bool { return pickHash("heldout-v2", ns[i], "") < pickHash("heldout-v2", ns[j], "") })
+		sort.Slice(ns, func(i, j int) bool { return pickHash(seed, ns[i], "") < pickHash(seed, ns[j], "") })
 		for i := 0; i < (len(ns)*3+5)/10; i++ {
 			held[ns[i]] = true
 		}
@@ -405,7 +433,7 @@ func exportTasks(samplePath, packetDir, labelDir, reviewDir, out string, o *vopt
 			ans.Code = append(ans.Code, c)
 		}
 		t := Task{ID: n, Tier: it.Tier, Class: it.Bench, RClass: it.Class, Stratum: it.Stratum, Gist: it.Gist, ClusterKey: p.Key, Template: it.Tpl,
-			Packet: "packets/" + n + ".txt", Question: taskQuestion, Answer: &ans, AnswerStatus: status, Difficulty: g.Difficulty, Split: "dev"}
+			Packet: "packets/" + n + ".txt", Question: question, Answer: &ans, AnswerStatus: status, Difficulty: g.Difficulty, Split: "dev"}
 		if held[n] {
 			t.Split = "heldout"
 		}
@@ -432,5 +460,17 @@ func exportTasks(samplePath, packetDir, labelDir, reviewDir, out string, o *vopt
 		fmt.Printf("  %-15s %3d tasks, %d held out\n", bc.Name, by[bc.Name][0], by[bc.Name][1])
 	}
 	fmt.Printf("%d tasks (%d held out), %d items without a valid gold label\n", len(tasks), nh, skipped)
+	var ho []string
+	for _, t := range tasks {
+		if t.Split == "heldout" {
+			ho = append(ho, t.ID)
+		}
+	}
+	sort.Strings(ho)
+	list := strings.Join(ho, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(out, "heldout.txt"), []byte(list), 0o644); err != nil {
+		return err
+	}
+	fmt.Printf("held-out ids: %s, sha256 %x\n", filepath.ToSlash(filepath.Join(out, "heldout.txt")), sha256.Sum256([]byte(list)))
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -93,8 +94,15 @@ type RimArchoV4 struct {
 // logs, one cluster each, one per family) and the rest "tail" (clusters drawn uniformly from
 // the other templates, again one per template and family). At most one cluster per log over
 // the whole sample; logs of the exclude samples (the pilot) are skipped.
-func benchSample(results, out string, n1, n2 int, minCov float64, seed string, exclude []string) error {
+//
+// Benchmark v3 (G12): items continue the numbering of the exclude samples (PF21 after v2's
+// PF20), candidates with higher library coverage come first (coverage in steps of 5%, then the
+// hash), and with balance each class is split about evenly between clusters RimArcho names a
+// source for and clusters it is silent on (a proxy for difficulty, which is known only after
+// labelling: v2's silent clusters were mostly L2/L3).
+func benchSample(results, out string, n1, n2 int, minCov float64, seed string, exclude []string, balance bool) error {
 	skip := map[string]bool{}
+	start := map[string]int{} // item prefix -> highest number in the exclude samples
 	for _, x := range exclude {
 		if x == "" {
 			continue
@@ -105,6 +113,11 @@ func benchSample(results, out string, n1, n2 int, minCov float64, seed string, e
 		}
 		for _, it := range its {
 			skip[it.Gist] = true
+			if len(it.Item) > 2 {
+				if k, err := strconv.Atoi(it.Item[2:]); err == nil && k > start[it.Item[:2]] {
+					start[it.Item[:2]] = k
+				}
+			}
 		}
 	}
 	f, err := os.Open(results)
@@ -112,12 +125,6 @@ func benchSample(results, out string, n1, n2 int, minCov float64, seed string, e
 		return err
 	}
 	defer f.Close()
-	type cand struct {
-		gist, key, tpl, hash string
-		count                int
-		cov                  float64
-		cl                   v4Cluster
-	}
 	byClass := map[string]map[string][]cand{} // bclass -> tpl -> clusters
 	tplLogs := map[string]int{}
 	tplClass := map[string]string{}
@@ -183,10 +190,14 @@ func benchSample(results, out string, n1, n2 int, minCov float64, seed string, e
 		})
 		usedTpl, usedFam := map[string]bool{}, map[string]bool{}
 		k := 0
+		quota := (n + 1) / 2
+		nGroup := map[bool]int{} // named by RimArcho -> items taken
+		full := func(x cand) bool { return balance && nGroup[x.named()] >= quota }
 		take := func(x cand, stratum string) {
 			usedLog[x.gist], usedTpl[x.tpl], usedFam[family(x.tpl)] = true, true, true
 			k++
-			id := fmt.Sprintf("%s%02d", bcl.Prefix, k)
+			nGroup[x.named()]++
+			id := fmt.Sprintf("%s%02d", bcl.Prefix, start[bcl.Prefix]+k)
 			items = append(items, Item{Item: id, Gist: x.gist, Key: x.key, Tpl: x.tpl, Class: x.cl.Class, Count: x.count, Cov: x.cov,
 				TplLogs: tplLogs[x.tpl], Tier: bcl.Tier, Bench: bcl.Name, Stratum: stratum})
 			r := RimArchoV4{Item: id, Conf: x.cl.Conf, Found: true}
@@ -196,10 +207,12 @@ func benchSample(results, out string, n1, n2 int, minCov float64, seed string, e
 			ra = append(ra, r)
 		}
 		pick := func(cs []cand) (cand, bool) {
-			sort.Slice(cs, func(i, j int) bool { return cs[i].hash < cs[j].hash })
-			for _, x := range cs {
-				if !usedLog[x.gist] {
-					return x, true
+			sort.Slice(cs, func(i, j int) bool { return better(cs[i], cs[j]) })
+			for pass := 0; pass < 2; pass++ {
+				for _, x := range cs {
+					if !usedLog[x.gist] && (pass == 1 || !full(x)) {
+						return x, true
+					}
 				}
 			}
 			return cand{}, false
@@ -227,7 +240,7 @@ func benchSample(results, out string, n1, n2 int, minCov float64, seed string, e
 				}
 			}
 		}
-		sort.Slice(rest, func(i, j int) bool { return rest[i].hash < rest[j].hash })
+		sort.Slice(rest, func(i, j int) bool { return better(rest[i], rest[j]) })
 		tailCap := 4
 		if bcl.Tier == 2 {
 			tailCap = 2
@@ -239,18 +252,22 @@ func benchSample(results, out string, n1, n2 int, minCov float64, seed string, e
 				nFam[family(it.Tpl)]++
 			}
 		}
-		for _, x := range rest {
-			if k == n {
-				break
+		// pass 0 keeps the balance, pass 1 drops it, pass 2 (a class still short, such as
+		// texture-missing, whose templates mostly share one family) drops the family cap.
+		for pass := 0; pass < 3; pass++ {
+			for _, x := range rest {
+				if k == n {
+					break
+				}
+				if usedLog[x.gist] || nTpl[x.tpl] >= tailCap || (pass < 2 && nFam[family(x.tpl)] >= tailCap) || (pass == 0 && full(x)) {
+					continue
+				}
+				nTpl[x.tpl]++
+				nFam[family(x.tpl)]++
+				take(x, "tail")
 			}
-			if usedLog[x.gist] || nTpl[x.tpl] >= tailCap || nFam[family(x.tpl)] >= tailCap {
-				continue
-			}
-			nTpl[x.tpl]++
-			nFam[family(x.tpl)]++
-			take(x, "tail")
 		}
-		fmt.Printf("%-16s %3d items (%d templates in %d covered logs)\n", bcl.Name, k, len(tpls), nLogs)
+		fmt.Printf("%-16s %3d items (%d templates in %d covered logs; RimArcho names a source in %d)\n", bcl.Name, k, len(tpls), nLogs, nGroup[true])
 	}
 	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
 		return err
@@ -259,6 +276,32 @@ func benchSample(results, out string, n1, n2 int, minCov float64, seed string, e
 		return err
 	}
 	return writeJSONL(filepath.Join(filepath.Dir(out), "rimarcho-v4.jsonl"), ra)
+}
+
+type cand struct {
+	gist, key, tpl, hash string
+	count                int
+	cov                  float64
+	cl                   v4Cluster
+}
+
+// named: RimArcho's final corpus run names a source for this cluster.
+func (c cand) named() bool {
+	for _, a := range c.cl.Attr {
+		if a.Role == "source" {
+			return true
+		}
+	}
+	return false
+}
+
+// better orders candidates: higher library coverage (in 5% steps) first, then the hash.
+func better(a, b cand) bool {
+	ba, bb := int(a.cov*20+1e-9), int(b.cov*20+1e-9)
+	if ba != bb {
+		return ba > bb
+	}
+	return a.hash < b.hash
 }
 
 func writeJSONL[T any](path string, xs []T) error {

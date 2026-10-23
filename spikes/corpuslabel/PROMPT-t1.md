@@ -1,7 +1,7 @@
-# Labelling prompt — version corpuslabel-v2.2-t1 (tier 1: evidence packet only)
+# Labelling prompt — version corpuslabel-v3-t1 (tier 1: evidence packet only)
 
-(v2.2: the fix-kind class default applies without a named source; optional-absent only when the target mod is not in the list. v2.1: who and why are separate: a named source may have cause_type unknown. Builds on corpuslabel-p3. v2: schema corpuslabel/2 with ordered cause-type rules, fix kind
-tied to cause type, difficulty; packets show the library's version of each mod.)
+(v3, G12: schema corpuslabel/3 — new fields `repro` and `unknown_why`; cause type by ordered
+questions with a patch-failed checklist; fix kind is a fixed rule. v2.2: who and why are separate.)
 
 You label the real cause of one error cluster from a RimWorld 1.6 Player.log (shared through
 HugsLib). The evidence packet is everything you know: the cluster's message, extra lines and
@@ -11,80 +11,88 @@ textures and sounds were stripped from the research copy, so a file search never
 You do not see any automatic verdict. Work only from the packet and general RimWorld modding
 knowledge; do not use outside knowledge of specific mods.
 
-## Who to name
+## Step 1 — who (verdict and causes)
 
-Name a mod only when the packet shows that it is responsible (its patch, file or def is the one failing), not merely that it is present.
-**Who and why are separate questions.** When the packet shows whose patch/file/def fails (e.g. the
-`[Mod name]` prefix of a failed patch) but not why, still give verdict `cause` with that `source`
-and set `cause_type` to `unknown`.
+Name a mod only when the packet shows that it is responsible (its patch, file or def is the one
+failing), not merely that it is present. **Who and why are separate**: when the packet shows whose
+patch/file/def fails but not why, give verdict `cause` with that `source` and cause type `unknown`.
 
 | Class | What usually causes it | Who to name |
 |---|---|---|
-| patch-failed | A patch file's XPath matches nothing: the target def/node is absent (the other mod is missing or changed, or the patch is not guarded) | `source` = the mod that owns the patch (the `[Mod name]` prefix, path, `patches --failed`). `partner` = an *active* mod whose def the patch targets, if the packet shows it |
-| xref-missing | A def references a def that nobody defines | `source` = the mod whose files contain the reference (`files search`, "defines"). `missing` = the mod that would define it, only if the packet names it |
-| xml-load | A def's XML has a field or class the game does not know (often from an older version), or a malformed value; or an asset file fails to load | `source` = the mod whose files contain that XML or file (`files search`, a path in its folder) |
+| patch-failed | A patch's XPath matches nothing: the target def/node is absent | `source` = the mod that owns the patch (`[Mod name]` prefix, the file path, `patches --failed`); `partner` = an *active* mod whose def the patch targets, only for load-order/incompatible-mods |
+| xref-missing | A def references a def that nobody defines | `source` = the mod whose files contain the reference; `missing` = the mod that would define it, only if the packet names it |
+| xml-load | A def's XML has a field or class the game does not know, or a malformed value; or an asset file fails to load | `source` = the mod whose files contain that XML or file |
 | texture-missing | A def or code asks for a texture/sound path that no active mod provides | `source` = the mod whose def or files name the path; if only Core/DLC match, verdict `unknown` |
 
 Ludeon packages (`ludeon.rimworld*`) are the game: never a `source`.
+**Corpus co-occurrence** is correlation, not proof: only when the log itself names no mod, a mod in
+nearly all those logs and rare in others (e.g. 95% vs 5%) whose kind fits the error may be the
+`source`, with confidence `low` or `medium`.
 
-**Corpus co-occurrence** lists mods of this list far more common in other players' logs with
-the same error. Correlation, not proof. Only when the log itself names no mod, a mod in nearly
-all those logs and rare in others (e.g. 95% vs 5%) whose kind fits the error may be the
-`source` with confidence `low` or `medium`. Weak ratios (60% vs 25%) are not enough; popular
-mods (`erdelf.humanoidalienraces`, translations) co-occur with everything.
+If you name no source, set `unknown_why`:
+`game-or-save` (vanilla data, or save data / references of mods not in the list — e.g. "Could not
+load reference to …" of a removed mod) · `machine` (a file that cannot be read or written, the
+player's install) · `several-candidates` (two or more mods fit, nothing picks one) · `no-evidence`
+(nothing points at any mod) · `not-in-library` (the deciding mod is "not in the research library").
 
-## cause_type: take the FIRST rule that applies
+## Step 2 — repro (only with a named source)
 
-1. `unknown` — your verdict is `unknown`, or you named a source but cannot tell which rule below applies.
-2. `missing-dependency` — the source needs a mod that is not in the list, unconditionally (the
-   packet says "depends on … NOT in the log's list", or its content uses that mod's
-   defs/classes without a guard). Add that mod with role `missing`.
-3. `optional-absent` — the source's content targets a mod/DLC that is **not in the player's list** and is
-   meant as optional (a compatibility patch, a patch for another mod's def, a reference to an
-   inactive mod's def), but the guard is missing or broken.
-   If the target mod IS in the list but no longer has that def/node, it is `outdated-mod` (rule 7).
-4. `load-order` — everything involved is active and moving one mod before/after another fixes
-   it (packet: "declared rules broken here", or the target def comes from a mod later in the
-   list). Add that other mod as `partner`.
-5. `incompatible-mods` — everything is active, order is not the issue, and two mods change the
+Does the research copy (same list, current versions) still show the defect?
+`no` = the packet says "simulation: this operation does not fail now", or the def/node/path the
+error names now exists in the research copy. `yes` = the simulation still fails, or the
+def/node/field is still missing. `unknown` = the source is "not in the research library", or the
+packet has no fact either way.
+
+## Step 3 — cause_type: answer in order, take the first "yes"
+
+1. **missing-dependency** — the source needs a mod/DLC that is NOT in the list, unconditionally
+   ("depends on … NOT in the log's list", or it uses that mod's defs without a guard). Add that
+   mod with role `missing`.
+2. **optional-absent** — the source's content targets a mod/DLC that is NOT in the player's list
+   and is meant as optional (a compatibility patch, a patch folder named after that mod, a
+   `PatchOperationFindMod`, a reference to that mod's def). If the target mod IS in the list, this
+   is not optional-absent: go on.
+3. **load-order** — everything is active and the target def comes from a mod loaded later, or a
+   declared loadAfter/loadBefore is broken here. Add the other mod as `partner`.
+4. **incompatible-mods** — everything is active, order is not the issue, and two mods change the
    same thing in conflicting ways. Add the other mod as `partner`.
-6. `version-mismatch` — the packet shows the player's version of the source differs from the
-   research library's **and** the library copy does not have the problem. (Rare in tier 1;
-   needs a `versions` entry with `"same": "no"`.)
-7. `outdated-mod` — the source uses an XML field, def, class or method that no longer exists in
-   the current game or in the mod it builds on ("doesn't correspond to any field", "Could not
-   find class/type" of another mod's namespace that is active).
-8. `mod-bug` — the defect is in the source itself while everything it needs is there: a wrong
-   path or def name in its own files, a texture it names but does not ship, malformed XML.
+5. **version-mismatch** — `repro` is `no` AND the player's copy differs: the header version
+   differs from the library's (`versions` `same: "no"`), or the header has no version and the
+   packet's "Workshop updated <date>" is after the log's "uploaded:" date (`same: "unknown"`,
+   `updated: "<date>"`). Put that mod in `versions`.
+6. **outdated-mod** — the missing or wrong thing belongs to the game or ANOTHER mod that is in the
+   list (its def, node or field was removed or renamed): e.g. "doesn't correspond to any field",
+   an XPath into another active mod's def that lacks that node.
+7. **mod-bug** — the defect is inside the source itself: its own def name or path, a texture it
+   names but does not ship, malformed XML in its own files.
+8. none decidable → `unknown` with `unknown_why` `reason-unclear` (say in the note which question
+   you could not answer) or `not-in-library`.
 
-## fix.kind: must fit the cause type
+`repro: "no"` without a version difference is never outdated-mod or mod-bug (rule 5 fails →
+`unknown`, `reason-unclear`). outdated-mod and mod-bug need `repro` `yes` or `unknown`.
 
-| cause_type | allowed fix.kind | fix.mods |
-|---|---|---|
-| missing-dependency | `enable-dependency` | the missing mod |
-| optional-absent | `ignore` (default) or `enable-dependency` | (the optional mod) |
-| load-order | `reorder` | the mod to move |
-| incompatible-mods | `disable`, `report`, `ignore` | the source |
-| version-mismatch | `update` | the source |
-| outdated-mod | `disable`, `report`, `ignore` | the source |
-| mod-bug | `report`, `disable`, `ignore` | the source |
-| unknown | `unknown` or `ignore` (also `report`/`disable` when a source is named) | (the source) |
+**Patch-failed checklist.** (a) Read the target: the XPath's `defName` and the patch file's folder
+(`Patches/<OtherMod>/…`). (b) Target mod not in the list → 2. (c) Target in the list: the packet's
+`def` lookup — defined by a mod loaded after the patch's mod → 3; the def exists but not the node →
+5 or 6; the def exists nowhere → 6 if the name belongs to the game or another mod, else 7.
+(d) `repro` from the simulation line.
 
-Choose by impact: `ignore` = only a missing texture/sound/compat tweak, the game recovers
-(default for patch-failed, texture-missing, and "doesn't correspond to any field");
-`report` = one feature of the mod breaks (default for "Could not find class/type");
-`disable` = loading or a core loop breaks. `fix.mods` is required except for `ignore`/`unknown`.
-The class default applies whether or not you name a source: a failed patch, a missing texture or
-sound, an unknown XML field and a save reference to a removed mod are `ignore` even with verdict
-`unknown`. Use `unknown` only for errors whose impact you cannot tell (exceptions without a known
-source).
+## Step 4 — fix.kind: a fixed rule (do not judge impact)
 
+Take the first row that applies:
+1. missing-dependency → `enable-dependency` (mods = the missing mod)
+2. load-order → `reorder` (mods = the mod to move; note says before/after which)
+3. version-mismatch → `update` (mods = the mod to update)
+4. optional-absent → `ignore`
+5. otherwise, in tier 1 (patch-failed, xref-missing, texture-missing, xml-load) → `ignore`
+
+So every tier-1 label without rows 1-3 has `"fix": {"kind": "ignore", "mods": [], "note": "…"}`.
 
 ## stage (default by class)
 
 patch-failed → `patch-apply`; xml-load → `xml-load`; "Could not resolve cross-reference" →
-`def-resolve`; "Failed to find X named" → the stage the stack shows (`static-init` when a
-static constructor calls it, else `def-resolve`); "Could not load reference to" → `save-load`;
+`def-resolve`; "Failed to find X named" → the stage the stack shows (`static-init` when a static
+constructor calls it, else `def-resolve`); "Could not load reference to" → `save-load`;
 texture-missing → `static-init` (or `tick`/`ui` when it happens in play).
 
 ## difficulty
@@ -95,11 +103,11 @@ references, a missing dependency, load order, co-occurrence) · `L3` only code w
 
 ## Output
 
-Write exactly one JSON object, no comments, no markdown fence, all fields required:
+Write exactly one JSON object, no comments, no markdown fence:
 
 ```json
 {
-  "schema": "corpuslabel/2",
+  "schema": "corpuslabel/3",
   "item": "<item id from the packet title>",
   "gist": "<log id from the packet's 'log:' line>",
   "key": "<copy the packet's 'key:' line, without 'key: '>",
@@ -107,18 +115,24 @@ Write exactly one JSON object, no comments, no markdown fence, all fields requir
   "causes": [{"pkg": "<packageId as written in the packet>", "role": "source | partner | missing"}],
   "stage": "...",
   "cause_type": "...",
+  "repro": "yes | no | unknown",
+  "unknown_why": "game-or-save | machine | several-candidates | no-evidence | not-in-library | reason-unclear",
   "fix": {"kind": "...", "mods": ["<packageId>"], "note": "<one short sentence>"},
   "confidence": "high | medium | low",
   "difficulty": "L1 | L2 | L3",
   "evidence": ["<verbatim quote from the packet>"],
+  "versions": [{"pkg": "<packageId>", "log": "<header version or \"\">", "installed": "<library version or \"\">", "same": "yes | no | unknown", "updated": "<Workshop date or \"\">"}],
   "model": "<your model name>",
-  "prompt": "corpuslabel-v2.2-t1",
+  "prompt": "corpuslabel-v3-t1",
   "note": "<one or two sentences: your reasoning>"
 }
 ```
 
-Checked by the validator: `causes` is empty unless `verdict` is `cause`; `source`/`partner`
-packageIds come from the packet's list of mods; `missing` ones appear in the packet; `evidence`
-holds 1–4 short quotes copied character for character from the packet (part of one line each);
-`fix.kind` fits `cause_type` per the table; `missing-dependency` needs a `missing` cause;
-`load-order` and `incompatible-mods` need a `partner`.
+Write `repro` only with verdict `cause` (leave the field out otherwise) and `unknown_why` only
+when the verdict or the cause type is `unknown` (leave it out otherwise).
+`versions` is required for version-mismatch, optional otherwise. Checked by the validator:
+`causes` empty unless `verdict` is `cause`; `source`/`partner` packageIds come from the packet's
+list of mods; `missing` ones appear in the packet; `evidence` holds 1–4 short quotes copied
+character for character from the packet; `repro` and `unknown_why` as above; `fix.kind` equals the
+rule; `missing-dependency` needs a `missing` cause; `load-order` and `incompatible-mods` need a
+`partner`; a version's `log` equals the header version in the packet.

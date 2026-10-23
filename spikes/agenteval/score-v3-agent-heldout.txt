@@ -1,0 +1,88 @@
+run v3, split heldout: 156 tasks, 156 answered, 0 invalid (touched gold/packets/config: []), 0 with other tool use []
+2 answer files had lone backslashes (Windows paths) and were read after doubling them
+
+== agent vs gold, by class
+  group             n gold-src  hit wrong silent over  both-none   agree  precision  recall  undecidable-ok   stage  cause-type  fix-kind
+  patch-failed     20     20     19     0      1    0        0     95.0%   100.0%    95.0%         -     100.0%      45.0%     80.0%
+  xref-missing     20      5      5     0      0    4       11     80.0%    55.6%   100.0%      73.3%     65.0%      55.0%     70.0%
+  texture-missing  20      7      4     0      3    2       11     75.0%    66.7%    57.1%      84.6%     95.0%      60.0%     80.0%
+  xml-load         20     14      9     3      2    2        4     65.0%    64.3%    64.3%      66.7%     75.0%      25.0%     80.0%
+  exception        19     13     12     1      0    0        6     94.7%    92.3%    92.3%     100.0%     47.4%      52.6%     47.4%
+  harmony-stack    19     12     10     1      1    1        6     84.2%    83.3%    83.3%      85.7%     68.4%      57.9%     78.9%
+  assembly         19     16     13     1      2    0        3     84.2%    92.9%    81.2%     100.0%     57.9%      47.4%     52.6%
+  static-ctor      19     18     12     5      1    1        0     63.2%    66.7%    66.7%       0.0%    100.0%      57.9%     52.6%
+  all             156    105     84    11     10   10       41     80.1%    80.0%    80.0%      80.4%     76.3%      50.0%     67.9%
+
+== agent vs gold, by difficulty and tier
+  group             n gold-src  hit wrong silent over  both-none   agree  precision  recall  undecidable-ok   stage  cause-type  fix-kind
+  L1               19     15     13     1      1    0        4     89.5%    92.9%    86.7%     100.0%     84.2%      63.2%     78.9%
+  L2               73     44     38     1      5    8       21     80.8%    80.9%    86.4%      72.4%     82.2%      50.7%     76.7%
+  L3               64     46     33     9      4    2       16     76.6%    75.0%    71.7%      88.9%     67.2%      45.3%     54.7%
+  tier 1           80     46     37     3      6    8       26     78.8%    77.1%    80.4%      76.5%     83.8%      46.2%     77.5%
+  tier 2           76     59     47     8      4    2       15     81.6%    82.5%    79.7%      88.2%     68.4%      53.9%     57.9%
+  all             156    105     84    11     10   10       41     80.1%    80.0%    80.0%      80.4%     76.3%      50.0%     67.9%
+
+== RimArcho alone (same build, same homes) vs gold, by class
+  group             n gold-src  hit wrong silent over  both-none   agree  precision  recall  undecidable-ok
+  patch-failed     20     20     13     0      7    0        0     65.0%   100.0%    65.0%         -    (20 without answer)
+  xref-missing     20      5      4     0      1    5       10     70.0%    44.4%    80.0%      66.7%   (20 without answer)
+  texture-missing  20      7      1     0      6    2       11     60.0%    33.3%    14.3%      84.6%   (20 without answer)
+  xml-load         20     14      6     1      7    0        6     60.0%    85.7%    42.9%     100.0%   (20 without answer)
+  exception        19     13      7     1      5    0        6     68.4%    87.5%    53.8%     100.0%   (19 without answer)
+  harmony-stack    19     12      7     0      5    1        6     68.4%    87.5%    58.3%      85.7%   (19 without answer)
+  assembly         19     16      6     4      6    1        2     42.1%    54.5%    37.5%      66.7%   (19 without answer)
+  static-ctor      19     18      5     4      9    1        0     26.3%    50.0%    27.8%       0.0%   (19 without answer)
+  all             156    105     49    10     46   10       41     57.7%    71.0%    46.7%      80.4%   (156 without answer)
+
+== RimArcho alone, by difficulty
+  group             n gold-src  hit wrong silent over  both-none   agree  precision  recall  undecidable-ok
+  L1               19     15      6     0      9    0        4     52.6%   100.0%    40.0%     100.0%   (19 without answer)
+  L2               73     44     20     2     22    7       22     57.5%    69.0%    45.5%      75.9%   (73 without answer)
+  L3               64     46     23     8     15    3       15     59.4%    67.6%    50.0%      83.3%   (64 without answer)
+  all             156    105     49    10     46   10       41     57.7%    71.0%    46.7%      80.4%   (156 without answer)
+
+== agent vs gold, by class, 95% Wilson intervals
+  group              n  agree                 precision             recall                cause-type            fix-kind            
+  patch-failed      20   95.0 [ 76.4- 99.1]  100.0 [ 83.2-100.0]   95.0 [ 76.4- 99.1]   45.0 [ 25.8- 65.8]   80.0 [ 58.4- 91.9]
+  xref-missing      20   80.0 [ 58.4- 91.9]   55.6 [ 26.7- 81.1]  100.0 [ 56.6-100.0]   55.0 [ 34.2- 74.2]   70.0 [ 48.1- 85.5]
+  texture-missing   20   75.0 [ 53.1- 88.8]   66.7 [ 30.0- 90.3]   57.1 [ 25.0- 84.2]   60.0 [ 38.7- 78.1]   80.0 [ 58.4- 91.9]
+  xml-load          20   65.0 [ 43.3- 81.9]   64.3 [ 38.8- 83.7]   64.3 [ 38.8- 83.7]   25.0 [ 11.2- 46.9]   80.0 [ 58.4- 91.9]
+  exception         19   94.7 [ 75.4- 99.1]   92.3 [ 66.7- 98.6]   92.3 [ 66.7- 98.6]   52.6 [ 31.7- 72.7]   47.4 [ 27.3- 68.3]
+  harmony-stack     19   84.2 [ 62.4- 94.5]   83.3 [ 55.2- 95.3]   83.3 [ 55.2- 95.3]   57.9 [ 36.3- 76.9]   78.9 [ 56.7- 91.5]
+  assembly          19   84.2 [ 62.4- 94.5]   92.9 [ 68.5- 98.7]   81.2 [ 57.0- 93.4]   47.4 [ 27.3- 68.3]   52.6 [ 31.7- 72.7]
+  static-ctor       19   63.2 [ 41.0- 80.9]   66.7 [ 43.7- 83.7]   66.7 [ 43.7- 83.7]   57.9 [ 36.3- 76.9]   52.6 [ 31.7- 72.7]
+  tier 1            80   78.8 [ 68.6- 86.3]   77.1 [ 63.5- 86.7]   80.4 [ 66.8- 89.3]   46.2 [ 35.7- 57.1]   77.5 [ 67.2- 85.3]
+  tier 2            76   81.6 [ 71.4- 88.7]   82.5 [ 70.6- 90.2]   79.7 [ 67.7- 88.0]   53.9 [ 42.8- 64.7]   57.9 [ 46.7- 68.4]
+  all              156   80.1 [ 73.2- 85.6]   80.0 [ 71.4- 86.5]   80.0 [ 71.4- 86.5]   50.0 [ 42.2- 57.8]   67.9 [ 60.3- 74.8]
+
+== RimArcho alone vs gold, by class, 95% Wilson intervals
+  group              n  agree                 precision             recall              
+  patch-failed      20   65.0 [ 43.3- 81.9]  100.0 [ 77.2-100.0]   65.0 [ 43.3- 81.9]
+  xref-missing      20   70.0 [ 48.1- 85.5]   44.4 [ 18.9- 73.3]   80.0 [ 37.6- 96.4]
+  texture-missing   20   60.0 [ 38.7- 78.1]   33.3 [  6.1- 79.2]   14.3 [  2.6- 51.3]
+  xml-load          20   60.0 [ 38.7- 78.1]   85.7 [ 48.7- 97.4]   42.9 [ 21.4- 67.4]
+  exception         19   68.4 [ 46.0- 84.6]   87.5 [ 52.9- 97.8]   53.8 [ 29.1- 76.8]
+  harmony-stack     19   68.4 [ 46.0- 84.6]   87.5 [ 52.9- 97.8]   58.3 [ 32.0- 80.7]
+  assembly          19   42.1 [ 23.1- 63.7]   54.5 [ 28.0- 78.7]   37.5 [ 18.5- 61.4]
+  static-ctor       19   26.3 [ 11.8- 48.8]   50.0 [ 23.7- 76.3]   27.8 [ 12.5- 50.9]
+  all              156   57.7 [ 49.8- 65.2]   71.0 [ 59.4- 80.4]   46.7 [ 37.4- 56.2]
+
+== tool calls (1436 calls in 156 tasks)
+  tool                 calls  tasks  errors  median bytes  max bytes
+  read_upload            407    138       3           285      15558
+  get_mod                189    127      13          1189      24701
+  analyze_log            158    156       0          2208      10682
+  task                   156    156       0           666       1311
+  search_files           117     69       4           255      24661
+  read_source search     112     49       3           466      24702
+  read_source            108     48       7          1730      24690
+  find_mods               49     39       0           137       2522
+  get_def                 46     39       0           180       3054
+  get_patches             31     22       4            81       1675
+  get_harmony             21     16       2           670       7019
+  list_changes            16     16       0           114        135
+  explain_relation        10     10       0          1583       2529
+  list_problems            9      9       0          1114       7303
+  status                   3      3       0           718        721
+  get_description          3      3       0           789        891
+  list_library             1      1       0           274        274

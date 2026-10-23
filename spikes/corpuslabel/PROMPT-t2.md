@@ -1,4 +1,7 @@
-# Labelling prompt — version corpuslabel-v2-t2 (tier 2: code-level research)
+# Labelling prompt — version corpuslabel-v3-t2 (tier 2: code-level research)
+
+(v3, G12: schema corpuslabel/3 — new fields `repro` and `unknown_why`; cause type by ordered
+questions; fix kind is a fixed rule. Method unchanged from corpuslabel-v2-t2.)
 
 You find the real cause of one error cluster from a RimWorld 1.6 Player.log (shared through
 HugsLib): exceptions, Harmony stacks, assembly / TypeLoad errors and static constructor
@@ -58,32 +61,54 @@ labels: they contain automatic verdicts.
 6. It is fine to answer `unknown` (undecidable): e.g. an NRE inside vanilla code with several
    patchers and nothing showing which input is null. Do not guess.
 
-## cause_type: take the FIRST rule that applies
+## repro (only with a named source)
 
-1. `unknown` — verdict `unknown`, or a source is named but none of the rules below can be decided.
-2. `missing-dependency` — the source needs a mod that is not in the list (declared dependency,
-   or its code references that mod's assembly/types without a guard). Add it with role `missing`.
-3. `optional-absent` — the source's code targets an optional mod/DLC that is not active and
-   the guard is missing or broken.
-4. `load-order` — all active; moving one mod before/after another fixes it. Add `partner`.
-5. `incompatible-mods` — all active, order is not the issue, two mods conflict (one patches,
+Does the library copy (current version, same list) still have the defect? `yes` = the failing
+line, the missing member or the missing guard is still in the library code; `no` = the library
+code no longer has it (null check added, member exists, line changed); `unknown` = the code is not
+in the library or does not decide.
+
+## unknown_why (whenever verdict or cause type is unknown)
+
+With verdict `unknown`: `game-or-save` (fails in vanilla code, or on save data / references of
+mods not in the list; no active mod's own code fails) · `machine` (the player's machine or
+install: a file that cannot be read or written, a missing Unity module such as
+UnityEngine.InputLegacyModule, out of memory) · `several-candidates` (two or more mods fit, the
+code does not pick one) · `no-evidence` · `not-in-library` (the deciding mod's code is not in the
+library). With a named source and cause type `unknown`: `reason-unclear` (say in the note which
+question below you could not answer) or `not-in-library`.
+
+## cause_type: answer in order, take the first "yes"
+
+1. `missing-dependency` — the source needs a mod that is not in the list (declared dependency, or
+   its code references that mod's assembly/types without a guard). Add it with role `missing`.
+2. `optional-absent` — the source's code targets an optional mod/DLC that is not active and the
+   guard is missing or broken.
+3. `load-order` — all active; moving one mod before/after another fixes it. Add `partner`.
+4. `incompatible-mods` — all active, order is not the issue, two mods conflict (one patches,
    replaces or removes what the other relies on). Add the other as `partner`.
-6. `version-mismatch` — the player's copy differs from the library's and the library copy no
-   longer has the defect (`versions` entry with `"same": "no"`).
-7. `outdated-mod` — the source calls or references a type/member/field that no longer exists
-   in the current game or in the mod it builds on, and the current copy still does.
-8. `mod-bug` — the defect is in the source's own code with everything it needs present and
-   current (a missing null check, wrong assumption).
+5. `version-mismatch` — `repro` is `no` AND the player's copy differs: header version ≠ library
+   version (`versions` `same: "no"`), or the header has no version and the packet's "Workshop
+   updated <date>" is after the log's "uploaded:" date (`same: "unknown"`, `updated: "<date>"`).
+6. `outdated-mod` — the source calls or references a type/member/field of the game or ANOTHER mod
+   that no longer exists there (MissingMethod, TypeLoad of another assembly's type), and the
+   library copy still does (`repro` yes/unknown).
+7. `mod-bug` — the defect is in the source's own code with everything it needs present and
+   current (a missing null check, a wrong assumption), and the library copy still has it.
+8. none decidable → `unknown` with `unknown_why`.
 
-## fix.kind (must fit the cause type)
+`repro: "no"` without a version difference is never outdated-mod or mod-bug (→ `unknown`,
+`reason-unclear`).
 
-missing-dependency → `enable-dependency` (mods = the missing mod) · optional-absent → `ignore`
-or `enable-dependency` · load-order → `reorder` (mods = the mod to move; note says where) ·
-incompatible-mods → `disable` / `report` / `ignore` · version-mismatch → `update` ·
-outdated-mod and mod-bug → `disable` / `report` / `ignore` · unknown → `unknown` / `ignore` (also `report` / `disable` when a source is named).
-By impact: `ignore` = log noise or a cosmetic glitch the game recovers from; `report` = one
-feature of the mod breaks; `disable` = loading, saving or a core loop breaks (exceptions every
-tick, a failed static constructor or Mod constructor aborting the mod's setup).
+## fix.kind: a fixed rule (do not judge impact)
+
+First row that applies: missing-dependency → `enable-dependency` (mods = the missing mod) ·
+load-order → `reorder` (mods = the mod to move) · version-mismatch → `update` (mods = the mod to
+update) · optional-absent → `ignore` · verdict `unknown` with `unknown_why` game-or-save or
+machine → `ignore` · other verdict `unknown` → `unknown` · static-ctor or assembly class (the
+packet's class line / item prefix SC, AS) with a named source → `disable` · exception or
+harmony-stack class (EX, HS) with a named source → `report`. `fix.mods` = the source unless the
+row says otherwise; empty for ignore/unknown.
 
 ## stage
 
@@ -103,19 +128,21 @@ one line: the verdict, the source mods and the cause type. Schema:
 
 ```json
 {
-  "schema": "corpuslabel/2",
+  "schema": "corpuslabel/3",
   "item": "<ITEM>", "gist": "<log id>", "key": "<the packet's key: line, without 'key: '>",
   "verdict": "cause | unknown",
   "causes": [{"pkg": "<packageId>", "role": "source | partner | missing"}],
   "stage": "...", "cause_type": "...",
+  "repro": "yes | no | unknown",
+  "unknown_why": "game-or-save | machine | several-candidates | no-evidence | not-in-library | reason-unclear",
   "fix": {"kind": "...", "mods": ["<packageId>"], "note": "<one sentence>"},
   "confidence": "high | medium | low",
   "difficulty": "L1 | L2 | L3",
   "evidence": ["<verbatim packet quote>", "log: <verbatim raw-log line>", "env: <verbatim exec output line>"],
   "code": [{"file": "<absolute path of the decompiled .cs file>", "type": "Ns.Type", "method": "Method",
             "lines": "<first>-<last>", "text": "<the decisive lines, verbatim>"}],
-  "versions": [{"pkg": "<packageId>", "log": "<version in the log header, or \"\">", "installed": "<library modVersion, or \"\">", "same": "yes | no | unknown"}],
-  "model": "<your model name>", "prompt": "corpuslabel-v2-t2",
+  "versions": [{"pkg": "<packageId>", "log": "<version in the log header, or \"\">", "installed": "<library modVersion, or \"\">", "same": "yes | no | unknown", "updated": "<library Workshop date from the packet, or \"\">"}],
+  "model": "<your model name>", "prompt": "corpuslabel-v3-t2",
   "note": "<2-4 sentences: what fails, why, and how the code shows it>"
 }
 ```
@@ -132,5 +159,7 @@ Checked by the validator (run it; fix your label until it passes):
   raw log; `env:` ones verbatim from your exec transcript.
 - `versions`: one entry per mod your conclusion rests on; `log` must equal the header version.
 - packageIds of `source`/`partner` must be in the log's list; Ludeon packages are never a source.
+- `repro` only with verdict `cause`; `unknown_why` only when verdict or cause type is `unknown`
+  (leave the fields out otherwise); `fix.kind` must equal the rule above.
 - `causes` empty unless `cause`; `fix.mods` required except for `ignore`/`unknown`;
   `missing-dependency` needs a `missing` cause; `load-order`/`incompatible-mods` need a `partner`.
