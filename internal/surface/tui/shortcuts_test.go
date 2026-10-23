@@ -43,12 +43,25 @@ func TestShortcutsFolderWorkshopChanges(t *testing.T) {
 	if url != "https://steamcommunity.com/sharedfiles/filedetails/?id=1001" {
 		t.Fatalf("ctrl+w opened %q", url)
 	}
+	m.update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	if url != "steam://url/CommunityFilePage/1001" {
+		t.Fatalf("ctrl+s opened %q", url)
+	}
+	url = ""
+	m.runEditorOp("steam")
+	if url != "steam://url/CommunityFilePage/1001" {
+		t.Fatalf("Steam menu opened %q", url)
+	}
 
 	cursorOn(t, m, "Beta")
 	url = ""
 	m.update(tea.KeyMsg{Type: tea.KeyCtrlW})
 	if url != "" || !strings.Contains(m.status, "no Workshop ID") {
 		t.Fatalf("ctrl+w on a local mod: opened %q, said %q", url, m.status)
+	}
+	m.update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	if url != "" || !strings.Contains(m.status, "no Workshop ID") {
+		t.Fatalf("ctrl+s on a local mod: opened %q, said %q", url, m.status)
 	}
 
 	// C: only Beta's changes; esc first shows every mod, then leaves
@@ -95,5 +108,9 @@ func TestShortcutsFolderWorkshopChanges(t *testing.T) {
 	m.update(tea.KeyMsg{Type: tea.KeyCtrlW})
 	if filepath.Base(dir) != "1001" || !strings.HasSuffix(url, "?id=1001") {
 		t.Fatalf("library: folder %q page %q", dir, url)
+	}
+	m.update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	if url != "steam://url/CommunityFilePage/1001" {
+		t.Fatalf("library ctrl+s opened %q", url)
 	}
 }

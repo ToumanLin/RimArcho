@@ -388,6 +388,11 @@ func (m *model) listKey(s string) tea.Cmd {
 			return m.openWorkshopID(m.workshopOf(it.id))
 		}
 		return nil
+	case "ctrl+s":
+		if it := c.cur(); it != nil {
+			return m.openWorkshopSteamID(m.workshopOf(it.id))
+		}
+		return nil
 	case "C":
 		if it := c.cur(); it != nil && it.id != "" {
 			return m.openChangesOf(it.id, it.name)

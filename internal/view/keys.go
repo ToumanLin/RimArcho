@@ -47,6 +47,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("g", "tags"),
 			r("n", "note"),
 			r("ctrl+o · ctrl+w", "open the folder · the Workshop page"),
+			r("ctrl+s", "steam page"),
 			r("u · ctrl+z", pick("undo", "undo")),
 			r("ctrl+y · ctrl+r", "redo"),
 			r("Del", "unsubscribe / move to the recycle bin (asks first)"),

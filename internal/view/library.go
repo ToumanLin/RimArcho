@@ -816,20 +816,37 @@ func libSteam(a *app.App, kind string, refs []string, what string) (string, erro
 		action = steamworks.Subscribe
 	}
 	_, err := a.Workshop(action, refs, false)
-	var u *app.SteamUnavailable
 	switch {
-	case errors.As(err, &u):
-		msg := Tf("Steam could not be reached (%s): the Workshop page is open, unsubscribe there", u.Why)
-		if kind == LibResub {
-			msg = Tf("Steam could not be reached (%s): the Workshop page is open, subscribe there", u.Why)
-		}
-		return "", &OpenPages{Msg: msg, URLs: u.URLs}
+	case SteamPages(kind, err) != nil:
+		return "", SteamPages(kind, err)
 	case err != nil:
 		return "", err
 	case kind == LibResub:
 		return Tf("subscribed to %s again · Steam downloads it", what), nil
 	}
 	return Tf("unsubscribed from %s · Steam deletes the folder", what), nil
+}
+
+// SteamPages is the answer when Steam is out of reach (06 §2.9): the Workshop pages to open
+// and what to say; nil for any other error.
+func SteamPages(kind string, err error) *OpenPages {
+	var u *app.SteamUnavailable
+	if !errors.As(err, &u) {
+		return nil
+	}
+	msg := Tf("Steam could not be reached (%s): the Workshop page is open, unsubscribe there", u.Why)
+	if kind == LibResub {
+		msg = Tf("Steam could not be reached (%s): the Workshop page is open, subscribe there", u.Why)
+	}
+	return &OpenPages{Msg: msg, URLs: u.URLs}
+}
+
+// SteamAction is the Steam client's action for a Mod 库 op.
+func SteamAction(kind string) string {
+	if kind == LibResub {
+		return steamworks.Subscribe
+	}
+	return steamworks.Unsubscribe
 }
 
 func idsOfRefs(st *app.LoadoutState, refs []string) []string {

@@ -71,18 +71,18 @@ func TestLibraryPage(t *testing.T) {
 	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"take-out", "move-to", "stage", "swap", "remove", "tags", "note", "folder", "move", "textures"}) {
 		t.Errorf("the Mods/ copy: %v", got)
 	}
-	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"use", "tags", "note", "folder", "workshop", "pin", "textures", "unsubscribe"}) {
+	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"use", "tags", "note", "folder", "workshop", "steam", "pin", "textures", "unsubscribe"}) {
 		t.Errorf("the unused workshop copy beside it (enabling it would clash): %v", got)
 	}
 	hid := libRow(t, p, "Hid")
 	if !hid.Single || hid.State != "被其它管理器隐藏" || hid.Source != "工坊" || hid.Insts[0].Name != "5600" {
 		t.Errorf("hidden: %+v", hid)
 	}
-	if got := kinds(hid.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "folder", "workshop", "unhide", "unsubscribe"}) {
+	if got := kinds(hid.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "folder", "workshop", "steam", "unhide", "unsubscribe"}) {
 		t.Errorf("hidden actions: %v", got)
 	}
 	ghost := libRow(t, p, "工坊条目 5300")
-	if ghost.Insts[0].ID != "" || ghost.Size != "—" || ghost.State != "订阅了但不在磁盘上" || !slices.Equal(kinds(ghost.Insts[0].Ops), []string{"workshop"}) {
+	if ghost.Insts[0].ID != "" || ghost.Size != "—" || ghost.State != "订阅了但不在磁盘上" || !slices.Equal(kinds(ghost.Insts[0].Ops), []string{"workshop", "steam"}) {
 		t.Errorf("ghost: %+v", ghost)
 	}
 	idle := libRow(t, p, "Idle")

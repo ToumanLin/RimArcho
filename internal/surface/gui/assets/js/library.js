@@ -734,7 +734,7 @@ function byKey(k) {
   const c = ops.keyed([...by.keys()], k);
   if (c) return run(c, by.get(c));
   const i = cursorCopy();
-  if (k === "ctrl+w") return say("", T("no Workshop ID: not a Workshop mod"));
+  if (k === "ctrl+w" || k === "ctrl+s") return say("", T("no Workshop ID: not a Workshop mod"));
   if (k === "ctrl+o") return say("", i && i.id ? T("the folder is not there") : T("RimArcho has not seen this copy: no folder"));
   say("", T("nothing to do with this row"));
 }
@@ -753,6 +753,7 @@ async function run(code, copies) {
   };
   switch (code) {
     case "folder": return api.OpenFolder(i0.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+    case "steam": return api.OpenSteamWorkshop(i0.id || i0.ref).then((t) => say("ok", t), (e) => say("fail", errText(e)));
     case "workshop":
       if (i0.id) return api.OpenWorkshop(i0.id).then((t) => say("ok", t), (e) => say("", errText(e)));
       return api.OpenURL(i0.page).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
@@ -847,7 +848,7 @@ export function key(e) {
   if (ctrl && k.toLowerCase() === "a") { done(); return selectAll(); }
   // ctrl+o / ctrl+w: the cursor's copy's folder and Workshop page (06 §3.5); the Wails
   // window does not take them, preventDefault keeps them from the browser
-  if (ctrl && !e.shiftKey && !e.altKey && (k.toLowerCase() === "o" || k.toLowerCase() === "w")) { done(); return byKey("ctrl+" + k.toLowerCase()); }
+  if (ctrl && !e.shiftKey && !e.altKey && ["o", "w", "s"].includes(k.toLowerCase())) { done(); return byKey("ctrl+" + k.toLowerCase()); }
   if (k === "/" || (ctrl && k.toLowerCase() === "f")) { done(); return L.bar.focus(); }
   if (k === "\\") { done(); return L.bar.toggle(); }
   // undo / redo: the plan edits (space, m, t, x) are the current plan's steps
@@ -890,6 +891,7 @@ export function hintList() {
   if (x && x.t === "lin") list.push({ key: "→ ←", label: T("open / close") });
   list.push({ key: "enter", label: L.full ? T("back") : T("details") });
   if (codes.includes("folder") || codes.includes("workshop")) list.push({ key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") });
+  if (codes.includes("steam")) list.push({ key: "ctrl+s", label: T("steam page") });
   list.push({ key: "/", label: T("search") }, { key: "\\", label: T("filter") });
   list.push({ key: "?", label: T("all keys") });
   return list;

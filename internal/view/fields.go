@@ -39,6 +39,7 @@ const (
 const (
 	ActFolder = "folder" // 打开位置
 	ActURL    = "url"    // 打开页面
+	ActSteam  = "steam"  // Steam 客户端页面
 	ActTags   = "tags"   // 编辑 (the tag bar)
 )
 
@@ -48,13 +49,26 @@ type Field struct {
 	Label string `json:"label"`
 	// Value is what the row shows and what a click copies; List the parts of a list value
 	// (tags, languages), Items the mods of deps / conflicts with their state.
-	Value string   `json:"value"`
-	List  []string `json:"list,omitempty"`
-	Items []Dep    `json:"items,omitempty"`
-	Act   string   `json:"act,omitempty"`
-	ActAt string   `json:"actLabel,omitempty"`
-	URL   string   `json:"url,omitempty"`
-	Extra string   `json:"extra,omitempty"` // the alias's original name
+	Value   string        `json:"value"`
+	List    []string      `json:"list,omitempty"`
+	Items   []Dep         `json:"items,omitempty"`
+	Act     string        `json:"act,omitempty"`
+	ActAt   string        `json:"actLabel,omitempty"`
+	URL     string        `json:"url,omitempty"`
+	Extra   string        `json:"extra,omitempty"` // the alias's original name
+	Actions []FieldAction `json:"actions,omitempty"`
+}
+
+// FieldAction is an additional button beside a field's primary action.
+type FieldAction struct {
+	Act   string `json:"act"`
+	Label string `json:"label"`
+}
+
+func workshopField(id string) Field {
+	return Field{Kind: FieldWorkshop, Label: T("workshop"), Value: id,
+		Act: ActURL, ActAt: T("web page"), URL: WorkshopURL(id),
+		Actions: []FieldAction{{Act: ActSteam, Label: T("steam page")}}}
 }
 
 // ModFields: Archo ID, package, location [open], Workshop [open], tags [edit], alias and
@@ -82,11 +96,11 @@ func headFields(st *app.LoadoutState, mod *store.Mod) []Field {
 	}
 	if st != nil && mod.Status == identity.Live {
 		if p := st.Ix.ModDir(mod); p != "" {
-			fs = append(fs, Field{Kind: FieldPath, Label: T("path"), Value: p, Act: ActFolder, ActAt: T("open the location")})
+			fs = append(fs, Field{Kind: FieldPath, Label: T("path"), Value: p, Act: ActFolder, ActAt: T("location")})
 		}
 	}
 	if ws := mod.WorkshopID(); IsNumber(ws) {
-		fs = append(fs, Field{Kind: FieldWorkshop, Label: T("workshop"), Value: ws, Act: ActURL, ActAt: T("open the page"), URL: WorkshopURL(ws)})
+		fs = append(fs, workshopField(ws))
 	}
 	return fs
 }
@@ -157,7 +171,7 @@ func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) 
 		fs = headFields(st, i.Mod)
 		fs = append(fs, Field{Kind: FieldTags, Label: T("tags"), Value: strings.Join(i.Mod.Tags, " · "), List: i.Mod.Tags, Act: ActTags, ActAt: T("edit")})
 	} else if IsNumber(i.WorkshopID) {
-		fs = append(fs, Field{Kind: FieldWorkshop, Label: T("workshop"), Value: i.WorkshopID, Act: ActURL, ActAt: T("open the page"), URL: WorkshopURL(i.WorkshopID)})
+		fs = append(fs, workshopField(i.WorkshopID))
 	}
 	var states []string
 	for _, s := range i.States {

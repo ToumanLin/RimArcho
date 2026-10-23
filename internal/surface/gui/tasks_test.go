@@ -1,7 +1,9 @@
 package gui
 
 import (
+	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -96,4 +98,36 @@ func hasAct(r view.TaskRow, id string) bool {
 		}
 	}
 	return false
+}
+
+// 移到回收站 runs as one batch (06 §2.16): every item checked, the folders moved together,
+// one failure kept on its item, and the library rescanned once at the end.
+func TestTrashBatch(t *testing.T) {
+	e, api, _ := fixture(t)
+	var mu sync.Mutex
+	var moved []string
+	e.App.TrashFunc = func(p string) error {
+		mu.Lock()
+		defer mu.Unlock()
+		moved = append(moved, p)
+		return os.RemoveAll(p)
+	}
+	if _, err := api.LibraryDo(view.LibDelete, []string{"pkg:tester.b", "no.such.mod"}); err != nil {
+		t.Fatal(err)
+	}
+	r := endedTask(t, api, view.LibDelete)
+	if r.State != app.TaskPartial || len(moved) != 1 {
+		t.Fatalf("state %s, moved %v", r.State, moved)
+	}
+	if r.Items[0].State != app.ItemOK || r.Items[1].State != app.ItemFail || r.Items[1].Why == "" {
+		t.Fatalf("items %+v", r.Items)
+	}
+	// the scan after the batch: the mod is gone from the library
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m, err := st.Ix.ResolveOne("pkg:tester.b"); err == nil && m.Status == "live" {
+		t.Fatal("the library was not rescanned")
+	}
 }

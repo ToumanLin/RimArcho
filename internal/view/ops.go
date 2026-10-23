@@ -47,6 +47,7 @@ const (
 	OpNote      = "note"       // 备注 (Mod 库: this copy's note)
 	OpFolder    = "folder"     // 打开文件夹
 	OpWorkshop  = "workshop"   // 打开工坊页面
+	OpSteam     = "steam"      // Steam 客户端页面
 	OpPin       = "pin"        // 锁定这个版本
 	OpPinUpdate = "pin-update" // 更新锁定版本
 	OpUnpin     = "unpin"      // 解除锁定
@@ -77,6 +78,7 @@ var opTable = []Op{
 	{Code: OpNote, Key: "n", Group: 2, One: true},
 	{Code: OpFolder, Key: "ctrl+o", Group: 3, Detail: true, One: true},
 	{Code: OpWorkshop, Key: "ctrl+w", Group: 3, Detail: true, One: true},
+	{Code: OpSteam, Key: "ctrl+s", Group: 3, Detail: true, One: true},
 	{Code: OpPin, Group: 4, Confirm: true},
 	{Code: OpPinUpdate, Group: 4, Confirm: true},
 	{Code: OpUnpin, Group: 4, Confirm: true},
@@ -96,7 +98,8 @@ func opLabel(code string) string {
 		OpEnableAt: T("enable at…"), OpMoveTo: T("move to…"), OpStage: T("stage"), OpSwap: T("switch version…"),
 		OpRemove: T("disable in every list"), OpTags: T("tags"), OpNote: T("note"),
 		OpFolder: T("open the folder"), OpWorkshop: T("open the Workshop page"),
-		OpPin: T("lock this version"), OpPinUpdate: T("update the locked version"), OpUnpin: T("unlock"),
+		OpSteam: T("steam page"),
+		OpPin:   T("lock this version"), OpPinUpdate: T("update the locked version"), OpUnpin: T("unlock"),
 		OpMove: T("move into the lock library"), OpUnhide: T("unhide"), OpResub: T("subscribe again"),
 		OpUnsub: T("unsubscribe"), OpDelete: T("move to the recycle bin"),
 		OpTextures: T("convert textures to DDS"), OpTexClean: T("remove the converted textures"),
@@ -223,7 +226,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		ks = append(ks, OpFolder)
 	}
 	if url {
-		ks = append(ks, OpWorkshop)
+		ks = append(ks, OpWorkshop, OpSteam)
 	}
 	if loadable && workshop {
 		ks = append(ks, OpPin)

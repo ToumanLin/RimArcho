@@ -101,7 +101,11 @@ const TaskLimit = 200
 // files lane waits for a scan); Changed is told after every change; Ended after a task
 // ends. None is called with the record's lock held.
 type Tasks struct {
-	Do      func(kind, ref string) error
+	Do func(kind, ref string) error
+	// Batch, when it takes the kind (true), runs a whole task at once: it may check every
+	// item first, work on several together and rescan once at the end. It reports each item
+	// through b; an item it never reports was not touched.
+	Batch   func(kind string, refs []string, b BatchCalls) bool
 	Gate    func(lane string) bool
 	Changed func()
 	Ended   func(t Task)
@@ -115,6 +119,13 @@ type Tasks struct {
 	seq      int
 	now      func() time.Time
 	forgot   [][2]any // the last Forget: tasks and their places, for Unforget
+}
+
+// BatchCalls are how a Batch reports on its items (by their index in the task).
+type BatchCalls struct {
+	Stopped func() bool // the player asked the task to stop
+	Start   func(i int) // item i is being worked on
+	Done    func(i int, err error)
 }
 
 // OpenTasks reads the record at path (missing: empty). Tasks that were running or queued
@@ -487,6 +498,11 @@ func (ts *Tasks) run(lane string) {
 }
 
 func (ts *Tasks) runTask(t *Task) {
+	if ts.runBatch(t) {
+		ts.mu.Lock()
+		ts.endLocked(t)
+		return
+	}
 	for i := 0; ; i++ {
 		ts.mu.Lock()
 		if i >= len(t.Items) || ts.stopping[t.ID] || t.State != TaskRunning {
@@ -527,10 +543,62 @@ func (ts *Tasks) runTask(t *Task) {
 		ts.mu.Unlock()
 		ts.changed()
 	}
-	// still locked
+	ts.endLocked(t)
+}
+
+// runBatch hands the whole task to Batch when it takes the kind.
+func (ts *Tasks) runBatch(t *Task) bool {
+	if ts.Batch == nil {
+		return false
+	}
+	stopped := func() bool {
+		ts.mu.Lock()
+		defer ts.mu.Unlock()
+		return ts.stopping[t.ID] || t.State != TaskRunning
+	}
+	for ts.Gate != nil && !ts.Gate(t.Lane) {
+		if stopped() {
+			return true
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	ts.mu.Lock()
+	refs := make([]string, len(t.Items))
+	for i := range t.Items {
+		refs[i] = t.Items[i].Ref
+	}
+	ts.mu.Unlock()
+	b := BatchCalls{Stopped: stopped,
+		Start: func(i int) {
+			ts.mu.Lock()
+			if i >= 0 && i < len(t.Items) && t.Items[i].State == ItemWait {
+				t.Items[i].State = ItemRun
+				t.Phase = t.Items[i].Name
+			}
+			ts.mu.Unlock()
+			ts.changed()
+		},
+		Done: func(i int, err error) {
+			ts.mu.Lock()
+			if i >= 0 && i < len(t.Items) && (t.Items[i].State == ItemWait || t.Items[i].State == ItemRun) {
+				if err != nil {
+					t.Items[i].State, t.Items[i].Why = ItemFail, err.Error()
+				} else {
+					t.Items[i].State = ItemOK
+				}
+				t.Done++
+			}
+			ts.mu.Unlock()
+			ts.changed()
+		}}
+	return ts.Batch(t.Kind, refs, b)
+}
+
+// endLocked ends a lane task after its items (the lock is held; it is released).
+func (ts *Tasks) endLocked(t *Task) {
 	if t.State == TaskRunning {
 		for i := range t.Items {
-			if t.Items[i].State == ItemWait {
+			if t.Items[i].State == ItemWait || t.Items[i].State == ItemRun {
 				t.Items[i].State = ItemSkip
 			}
 		}

@@ -218,6 +218,7 @@ function actions() {
   if (S.focus > 2) return [
     { key: "PgDn", label: T("scroll") }, { key: "enter", label: T("full details"), run: () => verb("full") },
     { key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") },
+    { key: "ctrl+s", label: T("steam page"), run: () => verb("steam") },
     { key: "g", label: T("tags"), run: () => verb("tags") },
   ];
   const sel = selection();
@@ -231,6 +232,7 @@ function actions() {
   out.push({ key: "m", label: k === 1 ? T("move to…") : T("enable at…"), run: () => verb("move") });
   // ctrl+o / ctrl+w: the folder and the Workshop page of the cursor's mod (06 §3.5)
   if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") });
+  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+s", label: T("steam page"), run: () => verb("steam") });
   if (k === 1) out.push({ key: "J K", label: T("down / up"), run: null });
   out.push({ key: "g", label: T("tags"), run: () => verb("tags") });
   if (sel.length === 1) {
@@ -389,10 +391,11 @@ async function verb(name) {
       if (S.detail && S.detail.url) return api.OpenURL(S.detail.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
       return say("", T("not a workshop mod"));
     // ctrl+o / ctrl+w: the cursor's mod, not the details (they may still be loading)
-    case "folder": case "workshop-id": {
+    case "folder": case "workshop-id": case "steam": {
       const it = S.focus < 3 ? cur() : cur(lastList);
       if (!it || !it.id) return say("", name === "folder" ? T("RimArcho has not seen this copy: no folder") : T("no Workshop ID: not a Workshop mod"));
       if (name === "folder") return api.OpenFolder(it.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+      if (name === "steam") return api.OpenSteamWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
       return api.OpenWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
     }
     case "swap":
@@ -687,7 +690,7 @@ function menuAtCursor() {
 // rowOp runs an op of the menu on the object: the plan's own as their verbs, the version
 // and disk ops as Mod 库存 runs them (a dry run first when they change files).
 async function rowOp(code) {
-  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", workshop: "workshop-id" };
+  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", workshop: "workshop-id", steam: "steam" };
   if (verbs[code]) return verb(verbs[code]);
   const sel = S.focus < 3 ? selection() : (cur(lastList) ? [cur(lastList)] : []);
   const ids = idsOf(sel);
@@ -809,7 +812,7 @@ function onKey(e) {
     // ctrl+w: the Wails window has no accelerator for it (no app menu, WebView2's
     // accelerator keys off), so preventDefault keeps it ours
     const m = { k: () => pop.palette(), f: () => startSearch(), z: () => verb("undo"), y: () => verb("redo"), r: () => verb("redo"),
-      o: () => verb("folder"), w: () => verb("workshop-id") }[k.toLowerCase()];
+      o: () => verb("folder"), w: () => verb("workshop-id"), s: () => verb("steam") }[k.toLowerCase()];
     if (m) { handled(); m(); }
     return;
   }

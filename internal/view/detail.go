@@ -120,6 +120,11 @@ func WorkshopURL(id string) string {
 	return "https://steamcommunity.com/sharedfiles/filedetails/?id=" + id
 }
 
+// WorkshopSteamURL opens the item inside the Steam client, as RimCrow does.
+func WorkshopSteamURL(id string) string {
+	return "steam://url/CommunityFilePage/" + id
+}
+
 // IsNumber: s is a non-empty string of digits.
 func IsNumber(s string) bool {
 	for _, r := range s {

@@ -43,26 +43,26 @@ let els = null;
 
 export function initTasks(u) { ui = u; }
 
-// ---- the sidebar's foot line (06 §2.1): only while something runs, waits or failed ----
+// ---- the sidebar's foot line (06 §2.1): always there, where it is; it says more while
+// something runs, waits or failed ----
 export function foot(p) {
   const b = $("#tasks-line");
   if (!b) return;
-  const show = p && (p.running || p.queued || p.unseen);
-  b.hidden = !show;
-  if (!show) return;
-  const sig = [p.foot, p.pct, p.unseen, p.running].join("|");
+  b.hidden = false;
   b.classList.toggle("on", S.screen === "tasks");
-  if (b.dataset.sig === sig) return;
+  const busy = !!(p && (p.running || p.queued));
+  const sig = p ? [p.foot, p.pct, p.unseen, p.running, p.queued].join("|") : "";
+  if (b.dataset.sig === sig && b.firstChild) return;
   b.dataset.sig = sig;
   b.innerHTML = "";
   const ic = el("span", "ic");
-  if (p.running || p.queued) {
+  if (busy) {
     const f = (p.pct / 100) * 34.6;
     ic.innerHTML = `<svg class="ring" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><circle class="v" cx="8" cy="8" r="5.5" style="stroke-dasharray:${f.toFixed(1)} 40"/></svg>`;
-  } else ic.innerHTML = icon.warn;
-  b.append(ic, el("span", "lbl", p.foot));
-  if (p.running) b.append(el("span", "cnt num", p.pct + "%"));
-  if (p.unseen) b.append(el("span", "badge-n red num", String(p.unseen)));
+  } else ic.innerHTML = icon.tasks;
+  b.append(ic, el("span", "lbl", busy ? p.foot : T("background tasks")));
+  if (p && p.running) b.append(el("span", "cnt num", p.pct + "%"));
+  if (p && p.unseen) b.append(el("span", "badge-n red num", String(p.unseen)));
   b.title = T("background tasks") + " · ctrl+j";
 }
 

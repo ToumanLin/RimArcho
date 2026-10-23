@@ -2,8 +2,11 @@ package gui
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -32,6 +35,7 @@ func (s *API) startTasks() {
 	}
 	ts := app.OpenTasks(path)
 	ts.Do = s.taskItem
+	ts.Batch = s.taskBatch
 	ts.Gate = func(lane string) bool {
 		if lane != app.LaneFiles {
 			return true
@@ -251,6 +255,7 @@ func (s *API) endSelf(id string, err error, text string) {
 func init() {
 	view.Register(map[string]string{
 		"%s · %s: in the %s queue":                                  "%s · %s：已排进%s队列",
+		"Steam did not confirm it (%s)":                             "Steam 没有确认（%s）",
 		"no task":                                                   "没有选中任务",
 		"%s cannot be stopped part way":                             "%s 不能中途停止",
 		"cancelled %s · %s: nothing was touched":                    "已取消 %s · %s：什么都没动",
@@ -301,4 +306,153 @@ func init() {
 		"time":                      "时间",
 		"put %d back on the record": "放回记录 %d 项",
 	})
+}
+
+// fileWorkers is how many folders go to the recycle bin at once. The shell spends most of
+// its time per folder (it walks it), not per byte, so several in parallel go much faster;
+// memory is not the concern here.
+const fileWorkers = 8
+
+// steamChunk is how many items go to the Steam client per call (its worker takes 50).
+const steamChunk = 50
+
+// taskBatch runs a whole lane task at once when its kind allows (app.Tasks.Batch): 移到回收站
+// and 取消隐藏 check every item, move the folders several at a time and rescan once;
+// 退订 and 重新订阅 check every item and hand Steam 50 at a time. The rest (锁定, 移入锁定库…)
+// need a scan after each item to know the new copy, and go one by one.
+func (s *API) taskBatch(kind string, refs []string, b app.BatchCalls) bool {
+	switch kind {
+	case view.LibDelete, view.LibUnhide:
+		s.batchFiles(kind, refs, b)
+	case view.LibUnsub, view.LibResub:
+		s.batchSteam(kind, refs, b)
+	default:
+		return false
+	}
+	return true
+}
+
+func (s *API) batchFiles(kind string, refs []string, b app.BatchCalls) {
+	type job struct {
+		i        int
+		from, to string
+	}
+	var jobs []job
+	s.mu.Lock()
+	st, _ := s.a.Loadout()
+	for i, ref := range refs {
+		if b.Stopped() {
+			break
+		}
+		j := job{i: i}
+		var err error
+		if kind == view.LibDelete {
+			j.from, err = s.a.TrashPlan(ref)
+		} else {
+			j.from, j.to, err = s.a.UnhidePlan(ref)
+		}
+		if err != nil {
+			b.Done(i, errors.New(view.Humanize(st, err.Error())))
+			continue
+		}
+		jobs = append(jobs, j)
+	}
+	s.mu.Unlock()
+	ch := make(chan job)
+	var wg sync.WaitGroup
+	var moved atomic.Int32
+	for w := 0; w < fileWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			runtime.LockOSThread() // the shell's file operation stays on one thread
+			defer runtime.UnlockOSThread()
+			for j := range ch {
+				b.Start(j.i)
+				var err error
+				if kind == view.LibDelete {
+					err = s.a.TrashPath(j.from)
+				} else {
+					err = os.Rename(j.from, j.to)
+				}
+				if err == nil {
+					moved.Add(1)
+				}
+				b.Done(j.i, err)
+			}
+		}()
+	}
+	for _, j := range jobs {
+		if b.Stopped() {
+			break // the rest are not touched
+		}
+		ch <- j
+	}
+	close(ch)
+	wg.Wait()
+	if moved.Load() == 0 {
+		return
+	}
+	// one scan for the whole batch, so the library sees what moved
+	s.mu.Lock()
+	s.a.Scan(false)
+	s.board, s.needs, s.lib = nil, nil, nil
+	s.mu.Unlock()
+}
+
+func (s *API) batchSteam(kind string, refs []string, b app.BatchCalls) {
+	action := view.SteamAction(kind)
+	var ok []int
+	s.mu.Lock()
+	st, _ := s.a.Loadout()
+	for i, ref := range refs {
+		if _, err := s.a.Workshop(action, []string{ref}, true); err != nil {
+			b.Done(i, errors.New(view.Humanize(st, err.Error())))
+			continue
+		}
+		ok = append(ok, i)
+	}
+	s.mu.Unlock()
+	opened := false
+	for c := 0; c < len(ok); c += steamChunk {
+		if b.Stopped() {
+			return
+		}
+		part := ok[c:min(c+steamChunk, len(ok))]
+		var chunk []string
+		for _, i := range part {
+			b.Start(i)
+			chunk = append(chunk, refs[i])
+		}
+		s.mu.Lock()
+		op, err := s.a.Workshop(action, chunk, false)
+		s.board, s.needs, s.lib = nil, nil, nil
+		s.mu.Unlock()
+		if pages := view.SteamPages(kind, err); pages != nil {
+			// Steam out of reach: the Workshop pages instead, as before (06 §2.9); once
+			if !opened {
+				for _, u := range pages.URLs {
+					s.open(u)
+				}
+				opened = true
+			}
+			for _, i := range part {
+				b.Done(i, errors.New(pages.Msg))
+			}
+			continue
+		}
+		if op == nil {
+			for _, i := range part {
+				b.Done(i, errors.New(view.Humanize(st, err.Error())))
+			}
+			continue
+		}
+		for k, i := range part {
+			if k < len(op.Items) && op.Items[k].Result != "ok" {
+				b.Done(i, errors.New(view.Tf("Steam did not confirm it (%s)", op.Items[k].Result)))
+			} else {
+				b.Done(i, nil)
+			}
+		}
+	}
 }

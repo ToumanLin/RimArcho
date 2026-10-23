@@ -43,6 +43,14 @@ func (m *model) openFolderOf(id string) tea.Cmd {
 
 // openWorkshopID opens a Workshop page; without an ID the status line says so.
 func (m *model) openWorkshopID(ws string) tea.Cmd {
+	return m.openWorkshopPage(ws, false)
+}
+
+func (m *model) openWorkshopSteamID(ws string) tea.Cmd {
+	return m.openWorkshopPage(ws, true)
+}
+
+func (m *model) openWorkshopPage(ws string, steam bool) tea.Cmd {
 	if !view.IsNumber(ws) {
 		m.say(sayInfo, T("no Workshop ID: not a Workshop mod"))
 		return nil
@@ -51,10 +59,14 @@ func (m *model) openWorkshopID(ws string) tea.Cmd {
 	if open == nil {
 		open = openURL
 	}
-	if err := open(view.WorkshopURL(ws)); err != nil {
+	u, done := view.WorkshopURL(ws), T("opened the Workshop page")
+	if steam {
+		u, done = view.WorkshopSteamURL(ws), T("opened the Steam page")
+	}
+	if err := open(u); err != nil {
 		m.say(sayFail, err.Error())
 	} else {
-		m.say(sayOK, T("opened the Workshop page"))
+		m.say(sayOK, done)
 	}
 	return nil
 }

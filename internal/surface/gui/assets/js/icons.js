@@ -27,6 +27,8 @@ export const icon = {
   settings: svg('<circle cx="8" cy="8" r="2.2"/><path d="M8 1.6v2M8 12.4v2M1.6 8h2M12.4 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4"/>'),
   play: svg('<path d="M5 3.2v9.6L12.6 8z"/>', "fill"),
   plus: svg('<path d="M8 3v10M3 8h10"/>'),
+  // 后台任务: stacked bars, the work in a queue
+  tasks: svg('<path d="M3 4.5h10M3 8h10M3 11.5h6"/>'),
   chev: svg('<path d="M6 4l4 4-4 4"/>'),
 };
 

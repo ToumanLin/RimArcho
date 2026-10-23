@@ -88,6 +88,7 @@ function draw(loading) {
   const acts = [];
   if (c && (c.ops || []).includes("folder")) acts.push(button(T("open the folder"), "ctrl+o", () => runOp("folder")));
   if (c && (c.ops || []).includes("workshop")) acts.push(button(T("Workshop page"), "ctrl+w", () => runOp("workshop")));
+  if (c && (c.ops || []).includes("steam")) acts.push(button(T("steam page"), "ctrl+s", () => runOp("steam")));
   const w = page("full mod-page", T("← → the previous / next mod · esc back · 1–6 its parts"), ...acts);
   sc.append(w);
   if (loading && !F.d) {
@@ -238,6 +239,7 @@ async function runOp(code) {
   };
   switch (code) {
     case "folder": return api.OpenFolder(c.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+    case "steam": return api.OpenSteamWorkshop(c.id || c.ref).then((t) => say("ok", t), (e) => say("fail", errText(e)));
     case "workshop":
       if (c.id) return api.OpenWorkshop(c.id).then((t) => say("ok", t), (e) => say("", errText(e)));
       return api.OpenURL(c.page).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
@@ -311,7 +313,7 @@ export async function fullKey(e) {
     const b = (document.querySelector("#screen .fd-copy.on") || sc).getBoundingClientRect();
     return ops.openMenu(b.left + 24, b.top + 24, c.ops || [], runOp, true);
   }
-  if (ctrl && c && (k.toLowerCase() === "o" || k.toLowerCase() === "w")) { e.preventDefault(); return runOp(k.toLowerCase() === "o" ? "folder" : "workshop"); }
+  if (ctrl && c && ["o", "w", "s"].includes(k.toLowerCase())) { e.preventDefault(); return runOp({ o: "folder", w: "workshop", s: "steam" }[k.toLowerCase()]); }
   if (!ctrl && !e.altKey && c) {
     const name = k === " " ? "space" : k === "Delete" ? "Del" : k;
     const code = ops.keyed(c.ops || [], name);

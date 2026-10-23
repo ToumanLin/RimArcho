@@ -252,6 +252,8 @@ function renderSide() {
   slideNav(nav, !settled);
   const set = $("#nav-settings");
   set.classList.toggle("on", cur === "settings");
+  const tl = $("#tasks-line");
+  if (tl) tl.classList.toggle("on", cur === "tasks");
   if (!set.firstChild || !set.querySelector(".ic")) {
     const ic = el("span", "ic");
     ic.innerHTML = icon.settings;
