@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RimArcho</title>
+<link rel="stylesheet" href="/app/style.css">
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">{"imports":{"/wails/runtime.js":"/runtime.js"}}</script>
+</head>
+<body>
+<div class="native-title"><img src="/app-icon.svg" alt=""><span>RimArcho</span><span class="title-controls" aria-hidden="true">─　 □　 ×</span></div>
+<div id="app">
+  <aside id="side">
+    <div id="side-split"></div>
+    <div class="side-head"><button id="navtoggle" class="navtoggle" aria-label="切换侧边或顶部导航"></button></div>
+    <nav id="nav"></nav>
+    <div class="side-foot">
+      <button id="tasks-line" class="nav-item tasks-line"></button>
+      <button id="live" class="live" hidden></button>
+      <button id="nav-settings" class="nav-item" data-page="settings"><span class="lbl"></span></button>
+    </div>
+  </aside>
+  <div id="main">
+    <header id="top"><nav id="crumbs"></nav><button id="env" class="envchip" hidden></button></header>
+    <div id="body"><div id="screen"></div></div>
+    <footer id="bottom"><span id="where" class="where"></span><span id="status" role="status"></span><span class="grow"></span><span id="hints"></span></footer>
+  </div>
+  <div id="popup" hidden></div><div id="menu" hidden></div>
+</div>
+<script type="module" src="./drafts.js"></script>
+</body>
+</html>

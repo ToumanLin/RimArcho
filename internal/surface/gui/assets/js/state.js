@@ -14,7 +14,7 @@ export const S = {
   detail: null, // the shown Detail
   placed: null, // the mods space just placed: "m changes it" (06 §3.5)
   popup: null,  // the open popup (06 §3.1 rule 5)
-  screen: null, // "needs" | "changes" | "full"
+  screen: "home", // start on the launch page; null is the plan editor
   screenSeq: 0, // late reads from a page that was left must not reopen it
   busy: {},     // scan, analyze, env
   packBuild: null, // the last "pack" event of the build this window runs

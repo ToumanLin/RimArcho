@@ -955,13 +955,15 @@ async function start() {
     try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
   });
   await reload();
+  // No environment yet: the first-run guide (06 §2.15); else the home page (06 §2.3).
+  const first = !S.shell || !S.shell.envs;
+  if (first) await guide.start("first");
+  else await go("home");
+  shell.settle();
   requestAnimationFrame(() => api.Ready().catch(() => {}));
   pollLive();
   await loadWidths();
-  // No environment yet: the first-run guide (06 §2.15); else the home page (06 §2.3).
-  if (!S.shell || !S.shell.envs) { await guide.start("first"); shell.settle(); return; }
-  await go("home");
-  shell.settle();
+  if (first) return;
   await scr.checkDirectories();
   if (S.board && S.board.neverScanned) cmd("rescan");
 }

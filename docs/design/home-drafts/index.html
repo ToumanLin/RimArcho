@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RimArcho · 启动页排布对比</title>
+<style>
+:root{color-scheme:light;font:12px/1.5 "Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI",sans-serif;color:#4b4b53;background:#f4f4f6}*{box-sizing:border-box}body{margin:0;height:100vh;display:grid;grid-template-rows:52px minmax(0,1fr) 52px;overflow:hidden}button,select{font:inherit;color:inherit}a{color:inherit;text-decoration:none}.review-head{display:flex;align-items:center;gap:22px;padding:0 18px;border-bottom:1px solid #e3e3e8;background:#fff}.review-title{font-size:12px;white-space:nowrap}.review-title small{font-size:10px;color:#85858d;margin-left:10px}.layouts{display:flex;gap:3px;margin:auto;white-space:nowrap}.layouts a{padding:5px 10px;border-radius:6px;color:#85858d}.layouts a[aria-current=page]{background:#f1f1f4;color:#1c1c21;box-shadow:0 1px 2px #0002}.layouts a:hover{background:#f1f1f4}.tools{display:flex;align-items:center;gap:10px;font-size:10px;white-space:nowrap}.tools label{display:flex;align-items:center;gap:4px}.tools select{font-size:10px;border:1px solid #e3e3e8;border-radius:4px;background:#fff;padding:3px 4px}.tools input{accent-color:#4f46e5}iframe{width:100%;height:100%;border:0;background:#f4f4f6}.review-note{display:flex;align-items:center;gap:14px;padding:8px 18px;border-top:1px solid #e3e3e8;background:#fff;font-size:11px;min-width:0}.review-note strong{font-size:11px;white-space:nowrap;font-weight:600}.review-note p{margin:0;color:#85858d}.review-note a{margin-left:auto;white-space:nowrap;color:#63636b;font-size:10px}.review-note a:hover{color:#4f46e5}@media(max-width:1050px){.review-head{gap:10px}.review-title small{display:none}.layouts a{padding:5px 7px;font-size:11px}.tools{gap:6px}.tools label:first-child>span{display:none}}@media(max-width:760px){body{grid-template-rows:86px minmax(0,1fr) 70px}.review-head{flex-wrap:wrap;align-content:center;gap:8px}.review-title{display:none}.layouts{width:100%;justify-content:center}.tools{margin:auto}.review-note{gap:8px;padding:7px 12px}.review-note p{font-size:10px}.review-note a{display:none}}
+</style>
+</head>
+<body>
+<header class="review-head">
+  <div class="review-title">RimArcho <small>启动页排布对比</small></div>
+  <nav class="layouts" aria-label="首页排布">
+    <a href="?design=original" data-design="original">原版对照</a>
+    <a href="?design=a" data-design="a">A · 底部并排</a>
+    <a href="?design=b" data-design="b">B · 上部并排</a>
+    <a href="?design=c" data-design="c">C · 分列选择</a>
+  </nav>
+  <div class="tools">
+    <label><span>背景</span><select id="background" aria-label="预览背景"><option value="image">游戏原图</option><option value="plain">纯色</option></select></label>
+    <label><select id="scenario" aria-label="预览状态"><option value="issue">有启动提示</option><option value="clear">无问题</option><option value="unchecked">还没检查</option><option value="running">游戏运行中</option><option value="empty">没有游戏</option></select></label>
+  </div>
+</header>
+<iframe id="preview" title="RimArcho 启动页草案"></iframe>
+<footer class="review-note"><strong id="variant-title"></strong><p id="variant-note"></p><a href="./README.md" target="_blank">设计依据 · 示例数据，不操作游戏</a></footer>
+<script src="./gallery.js"></script>
+</body>
+</html>

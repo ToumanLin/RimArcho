@@ -88,8 +88,8 @@ func (s *API) send(name string, data any) {
 // processStart is when this process began (close enough: package initialisation).
 var processStart = time.Now()
 
-// Ready is called once the page has drawn the list; it logs the start-up time to
-// <data>/logs/gui.log (06 §10: cold start to an interactive list).
+// Ready is called once the launch page or first-run guide has drawn; it logs the
+// start-up time to <data>/logs/gui.log.
 func (s *API) Ready() {
 	s.monitorOnce.Do(s.checkMonitor)
 	ms := time.Since(processStart).Milliseconds()
