@@ -20,7 +20,7 @@ func (s *API) BarFilter(search string, filters []string, groups bool) (*view.Bar
 	if s.board == nil || s.board.St == nil {
 		return &view.BarFilter{}, nil
 	}
-	f := view.MatchFacts{Status: s.needsLocked(false).Status}
+	f := view.MatchFacts{Status: s.needsLocked().Status}
 	if view.BarNeedsContent(search, filters, groups) {
 		c, err := s.content.Get(s.a, s.board.St)
 		if err != nil {

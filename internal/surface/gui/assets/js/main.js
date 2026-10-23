@@ -738,6 +738,12 @@ function onKey(e) {
     if (S.screen === "full" && (k === "Escape" || k === "Backspace")) { e.preventDefault(); return fullPage.back(); }
     if (e.ctrlKey && k === "k") { e.preventDefault(); return pop.palette(); }
     if (k === "?" && S.screen !== "full") { e.preventDefault(); return pop.help(S.screen); }
+    // Navigation stays available while a new page is loading. Its object shortcuts
+    // must wait for data, including after an initial read failed.
+    if (scr.pageLoading()) {
+      if (S.screen === "build" && k === "Escape") { e.preventDefault(); return go("plan"); }
+      return;
+    }
     // 1–9 focus the page's numbered areas (06 §3.5)
     if (S.screen !== "home" && scr.areaKey(e)) return;
     if (S.screen === "home") return homePage.homeKey(e);

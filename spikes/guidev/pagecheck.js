@@ -5,6 +5,11 @@ import { S } from "/js/state.js";
 import * as screens from "/js/screens.js";
 import * as library from "/js/library.js";
 import * as textures from "/js/textures.js";
+import * as home from "/js/home.js";
+import * as packs from "/js/packs.js";
+import * as guide from "/js/guide.js";
+import * as uninstall from "/js/uninstall.js";
+import * as full from "/js/fulldetail.js";
 import { withEnvironmentSwitch } from "/js/environment.js";
 
 const output = document.querySelector("#results"), results = [];
@@ -21,6 +26,7 @@ const visibleSelection = () => {
 const ui = { renderWhere() {}, renderHints() {}, reload() {}, cmd() {}, go() {} };
 screens.initScreens(ui);
 library.initLibrary(ui);
+home.initHome(ui); packs.initPacks(ui); guide.initGuide(ui); full.initFull(ui);
 handlers.set("Setting", () => "");
 handlers.set("LogCluster", () => ["fixture detail"]);
 handlers.set("LogPattern", () => null);
@@ -28,6 +34,87 @@ handlers.set("LogPattern", () => null);
 async function test(name, run) { await run(); results.push("PASS " + name); output.textContent = results.join("\n"); }
 
 try {
+  const backgrounds = { setting: { key: "plain", stars: [], files: [] }, groups: [{ name: "game", items: [{ key: "plain", label: "plain" }] }] };
+  const buildPreview = { name: "fixture pack", plan: "fixture plan", steps: [], mods: 0, ok: true };
+  handlers.set("HomeBackground", () => ({})); handlers.set("Backgrounds", () => backgrounds);
+  handlers.set("Packs", () => ({ rows: [] })); handlers.set("PackNameCheck", () => "");
+  handlers.set("Detail", () => null); handlers.set("Sections", () => []);
+  const pages = [
+    ["home", "Home", () => home.home(), { rows: [], featured: -1 }],
+    ["needs", "Needs", () => screens.needs(), { items: [] }],
+    ["changes", "Changes", () => screens.changes(null), { rows: [] }],
+    ["settings", "Settings", () => screens.settings(), []],
+    ["env", "Environment", () => screens.environment(), { envs: [], groups: [] }],
+    ["packs", "Packs", () => packs.list(), { rows: [] }],
+    ["packs", "Pack", () => packs.pack("fixture"), { name: "fixture", facts: [], mods: [] }],
+    ["build", "BuildPage", () => packs.build(), buildPreview],
+    ["guide", "GuideFind", () => guide.start(), []],
+    ["uninstall", "UninstallPlan", () => uninstall.open(), { steps: [] }],
+    ["full", "ModCopies", () => full.full("library", "fixture"), { row: null }],
+  ];
+  for (const [screen, method, open, payload] of pages) {
+    await test(method + " shows loading immediately; late success/failure cannot navigate", async () => {
+      for (const fail of [false, true]) {
+        screens.openScreen("other");
+        const d = deferred(); handlers.set(method, () => d.promise);
+        const pending = open(); await Promise.resolve();
+        assert(S.screen === screen, method + " waited before navigation");
+        assert(document.querySelector('#screen [role="status"]') || document.querySelector('#screen[aria-busy="true"]'), method + " has no feedback");
+        screens.openScreen("other");
+        if (fail) d.reject(new Error("late " + method)); else d.resolve(payload);
+        await pending;
+        assert(S.screen === "other" && !document.querySelector('#screen[aria-busy="true"]'), method + " overwrote destination");
+      }
+      handlers.set(method, () => payload);
+      await open();
+      assert(S.screen === screen && !document.querySelector('#screen[aria-busy="true"]'), method + " did not finish rendering");
+      assert(!document.querySelector('.page-loading'), method + " left a loading placeholder");
+      assert(!screens.pageLoading(), method + " left object shortcuts suspended");
+    });
+  }
+  await test("same-page replies use only the latest request, including after close/re-entry", async () => {
+    screens.openScreen("other");
+    const old = deferred(), next = deferred();
+    handlers.set("Environment", () => old.promise);
+    const p1 = screens.environment(); await Promise.resolve();
+    screens.closeScreen();
+    handlers.set("Environment", () => next.promise);
+    const p2 = screens.environment(); await Promise.resolve();
+    next.resolve({ envs: [{ name: "new environment", game: "fixture", current: true }], groups: [] }); await p2;
+    old.resolve({ envs: [{ name: "old environment", game: "fixture" }], groups: [] }); await p1;
+    assert(document.querySelector('#screen').textContent.includes("new environment") && !document.querySelector('#screen').textContent.includes("old environment"), "old environment reply won");
+  });
+  await test("failed page load shows an error and can retry", async () => {
+    screens.openScreen("other"); handlers.set("Environment", () => { throw new Error("fixture read failed"); });
+    await screens.environment();
+    assert(document.querySelector('#screen').textContent.includes("fixture read failed") && !document.querySelector('#screen[aria-busy]'), "failure left a spinner");
+    assert(screens.pageLoading(), "failed initial read permits old object shortcuts");
+    handlers.set("Environment", () => ({ envs: [], groups: [] })); await screens.environment();
+    assert(!document.querySelector('#screen').textContent.includes("fixture read failed"), "retry kept old error");
+  });
+  await test("changing environment or plan replaces old page controls while loading", async () => {
+    const board = S.board, shell = S.shell;
+    S.board = { env: "first" }; S.shell = { plan: { id: 1 } };
+    handlers.set("Environment", () => ({ envs: [{ name: "old context", current: true }], groups: [] }));
+    await screens.environment();
+    const d = deferred(); handlers.set("Environment", () => d.promise);
+    S.board = { env: "second" }; S.shell = { plan: { id: 2 } };
+    const pending = screens.environment(); await Promise.resolve();
+    assert(screens.pageLoading() && !document.querySelector('#screen').textContent.includes("old context"), "old environment controls survived the switch");
+    d.resolve({ envs: [{ name: "new context", current: true }], groups: [] }); await pending;
+    assert(document.querySelector('#screen').textContent.includes("new context"), "destination did not load");
+    S.board = board; S.shell = shell;
+  });
+  await test("build keyboard cannot run a stale preview while remeasuring", async () => {
+    handlers.set("BuildPage", () => buildPreview); await packs.build();
+    const d = deferred(); let builds = 0;
+    handlers.set("BuildPage", () => d.promise); handlers.set("PackBuild", () => { builds++; });
+    packs.packsKey(new KeyboardEvent("keydown", { key: "T", cancelable: true })); await Promise.resolve();
+    packs.packsKey(new KeyboardEvent("keydown", { key: "B", cancelable: true })); await Promise.resolve();
+    assert(builds === 0, "build used a stale preview");
+    screens.openScreen("other"); d.resolve(buildPreview); await settle();
+    assert(S.screen === "other", "option response reopened the build page");
+  });
   await test("environment switch shows progress immediately and rejects repeat clicks", async () => {
     const d = deferred(); let calls = 0;
     const pending = withEnvironmentSwitch("1.5", () => { calls++; return d.promise; });

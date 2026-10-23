@@ -13,7 +13,7 @@
 // The editor's detail column and Mod 库存's details are the short form of the same parts
 // (detail.js renderDetail, library.js drawDetail).
 import { S, $, el, api, T, Tf, errText, say, cur } from "./state.js";
-import { openScreen, closeScreen, page, seg, button, area } from "./screens.js";
+import { closeScreen, page, seg, button, area, beginPageRead } from "./screens.js";
 import { shimmer } from "./motion.js";
 import { renderDetail } from "./detail.js";
 import { fieldList } from "./fields.js";
@@ -25,7 +25,7 @@ export function initFull(u) { ui = u; }
 
 // F: where the page came from ("plan" or "library"), the mod (an instance id, or a copy
 // ref for a subscribed item RimArcho never saw), and what was loaded for it.
-const F = { from: "plan", id: "", d: null, row: null, secs: null, tab: 0, copy: "", seq: 0 };
+const F = { from: "plan", id: "", env: "", d: null, row: null, secs: null, tab: 0, copy: "", seq: 0 };
 
 // PLAN: the ops that are one plan step (u undoes them), as on Mod 库存.
 const PLAN = new Set(["add", "take-out", "put-back", "stage", "use", "swap", "remove"]);
@@ -38,12 +38,13 @@ export async function full(from, id) {
     id = it.id;
   }
   if (!id) return;
-  if (F.id !== id) { F.tab = 0; F.copy = ""; }
+  if (F.id !== id || F.env !== S.board?.env) { F.tab = 0; F.copy = ""; F.d = F.row = F.secs = null; }
+  F.env = S.board?.env;
   F.from = from;
   F.id = id;
   S.fullFrom = from;
   const n = ++F.seq;
-  openScreen("full");
+  const read = beginPageRead("full");
   draw(true);
   let d = null, cp = null, secs = [];
   try {
@@ -52,8 +53,8 @@ export async function full(from, id) {
       api.ModCopies(id),
       api.Sections(id).catch(() => []),
     ]);
-  } catch (e) { say("fail", errText(e)); }
-  if (n !== F.seq || S.screen !== "full") return;
+  } catch (e) { read.fail(e); return; }
+  if (n !== F.seq || !read.current()) return;
   F.d = d;
   F.row = cp && cp.row;
   S.fullName = fullName();
@@ -65,11 +66,12 @@ export async function full(from, id) {
     F.copy = own ? own.ref : "";
   }
   draw(false);
+  read.finish();
   // the Workshop description once the cursor rested on the mod (06 §4.3 item 3)
   if (d && d.state === "not cached") {
     setTimeout(async () => {
-      if (n !== F.seq) return;
-      try { const f = await api.Detail(id, false, true, false); if (n === F.seq && S.screen === "full") { F.d = f; draw(false); } } catch { /* the note stays */ }
+      if (n !== F.seq || !read.current()) return;
+      try { const f = await api.Detail(id, false, true, false); if (n === F.seq && read.current()) { F.d = f; draw(false); } } catch { /* the note stays */ }
     }, 400);
   }
 }

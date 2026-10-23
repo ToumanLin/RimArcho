@@ -5,7 +5,7 @@
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, button, act, area } from "./screens.js";
+import { openScreen, page, button, act, area, beginPageRead } from "./screens.js";
 import * as pop from "./popups.js";
 
 let ui = null;
@@ -14,12 +14,13 @@ export function initPacks(u) { ui = u; }
 let packPoll = 0;
 const L = { rows: [], un: [], others: 0, cur: 0, els: [] }; // the list page
 let P = null; // the pack page shown: view.PackPage
-const B = { page: null, full: null, light: false, tex: 0, name: "", nameErr: "", seq: 0 }; // the build page
+const B = { page: null, full: null, light: false, tex: 0, name: "", nameErr: "", seq: 0, loading: false }; // the build page
 
 // ---- the list (整合包) ----
 
-async function loadList() {
+async function loadList(current = () => true) {
   const l = await api.Packs();
+  if (!current()) return;
   L.rows = (l && l.rows) || []; L.others = (l && l.others) || 0; L.un = (l && l.unfinished) || [];
   // This window's build before its child wrote its first state.
   if (l && l.building && !L.un.some((u) => u.name === l.building)) L.un.unshift({ name: l.building, running: true, facts: T("checking the list…") });
@@ -28,7 +29,10 @@ async function loadList() {
 
 // list: every pack of the environment, one row each; enter (or a click) opens its page.
 export async function list() {
-  try { await loadList(); } catch (e) { return say("fail", errText(e)); }
+  const read = beginPageRead("packs", { replace: !!P });
+  S.packFocus = null; P = null;
+  try { await loadList(read.current); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   const sc = S.screen === "packs" && !S.packFocus ? $("#screen") : openScreen("packs");
   sc.innerHTML = "";
   const w = page("packs", T("a pack copies every mod of the list as it is now and plays with its own saves"),
@@ -54,6 +58,7 @@ export async function list() {
   if (L.others) w.append(el("div", "muted note", Tf("%d packs belong to other games; switch the game to see them", L.others)));
   ui.renderHints();
   pollWhileBuilding(list);
+  read.finish();
 }
 
 function markList() {
@@ -64,7 +69,12 @@ function markList() {
 // ---- one pack (a sub-entry of 整合包) ----
 
 export async function pack(name) {
-  try { P = await api.Pack(name); } catch (e) { say("fail", errText(e)); return ui.go("packs"); }
+  const read = beginPageRead("packs", { replace: !P || P.name !== name });
+  S.packFocus = name; P = null;
+  let p;
+  try { p = await api.Pack(name); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
+  P = p;
   const sc = S.screen === "packs" && S.packFocus === name ? $("#screen") : openScreen("packs");
   sc.innerHTML = "";
   const acts = [button(T("export"), "e", () => exportPack()), button(T("move to the recycle bin"), "Del", () => removePack())];
@@ -86,6 +96,7 @@ export async function pack(name) {
   sec.append(card);
   w.append(sec, el("div", "muted note dir", T("folder") + ": " + P.dir));
   ui.renderHints(); // the list and a pack's page share the screen: their keys differ
+  read.finish();
 }
 
 async function launch() {
@@ -189,8 +200,8 @@ function buildCard(u) {
 function pollWhileBuilding(again) {
   clearTimeout(packPoll);
   if (L.un.some((u) => u.running && !(S.packBuild && S.packBuild.name === u.name))) {
-    const screen = S.screen;
-    packPoll = setTimeout(() => { if (S.screen === screen && !S.popup) again(); }, 1500);
+    const screen = S.screen, epoch = S.screenSeq, focus = S.packFocus;
+    packPoll = setTimeout(() => { if (S.screen === screen && S.screenSeq === epoch && S.packFocus === focus && !S.popup) again(); }, 1500);
   }
 }
 
@@ -224,46 +235,53 @@ export function packEvent(ev) {
 // the page shows at once and the sizes follow. again: a redraw keeps the name typed.
 export async function build(again = false) {
   const seq = ++B.seq;
-  if (!again) { B.full = null; B.light = false; B.tex = 0; B.name = ""; B.nameErr = ""; }
-  try { await loadList(); } catch { L.un = []; }
-  if (!B.page || !again) {
-    say("busy", T("checking the list…"));
-    try { B.page = await api.BuildPage(B.light, B.tex || 0); } catch (e) { return say("fail", errText(e)); }
-    if (seq !== B.seq) return;
-    say("", "");
-    if (!B.light) B.full = B.page;
-    if (!B.name) B.name = B.page.name;
-  }
-  B.nameErr = await api.PackNameCheck(B.name);
-  if (seq !== B.seq) return;
+  if (!again) { B.page = B.full = null; B.light = false; B.tex = 0; B.name = ""; B.nameErr = ""; }
+  const read = beginPageRead("build", { replace: !again, label: "checking the list…" });
+  B.loading = true;
+  try {
+    const [p] = await Promise.all([
+      B.page || api.BuildPage(B.light, B.tex || 0),
+      loadList(read.current).catch(() => { if (read.current()) L.un = []; }),
+    ]);
+    if (!read.current() || seq !== B.seq) return;
+    B.page = p;
+    if (!B.light) B.full = p;
+    if (!B.name) B.name = p.name;
+    const error = await api.PackNameCheck(B.name);
+    if (!read.current() || seq !== B.seq) return;
+    B.nameErr = error;
+  } catch (e) { if (read.current()) B.loading = false; read.fail(e); return; }
+  B.loading = false;
   drawBuild();
   pollWhileBuilding(() => build(true));
+  read.finish();
 }
 
 async function setLight(light) {
-  if (B.light === light) return;
-  B.light = light;
-  if (!light && B.full) B.page = B.full;
-  else {
-    try { B.page = await api.BuildPage(light, B.tex || 0); } catch (e) { return say("fail", errText(e)); }
-    if (!light) B.full = B.page;
-  }
-  drawBuild();
+  if (B.loading || B.light === light) return;
+  return measureBuild(light, B.tex);
 }
 
 // setTex changes the textures choice (full packs): the page is measured again, since the
 // files converted, the size after and the peak all depend on it.
 async function setTex(tex) {
-  if (B.light || B.tex === tex) return;
-  B.tex = tex;
+  if (B.loading || B.light || B.tex === tex) return;
+  return measureBuild(false, tex);
+}
+
+async function measureBuild(light, tex) {
+  B.light = light; B.tex = tex;
   const seq = ++B.seq;
-  say("busy", T("checking the list…"));
+  const read = beginPageRead("build", { replace: true, label: "checking the list…" });
+  B.loading = true;
   let p;
-  try { p = await api.BuildPage(false, tex); } catch (e) { return say("fail", errText(e)); }
-  if (seq !== B.seq) return;
-  say("", "");
-  B.page = B.full = p;
+  try { p = await api.BuildPage(light, tex); } catch (e) { if (read.current()) B.loading = false; read.fail(e); return; }
+  if (!read.current() || seq !== B.seq) return;
+  B.page = p;
+  if (!light) B.full = p;
+  B.loading = false;
   drawBuild();
+  read.finish();
 }
 
 // nextTex: the D key steps through the choices.
@@ -278,7 +296,7 @@ const building = () => !!(S.packBuild || L.un.some((u) => u.running));
 
 function drawBuild() {
   const p = B.page;
-  if (!p) return;
+  if (!p || S.screen !== "build" || B.loading) return;
   const sc = S.screen === "build" ? $("#screen") : openScreen("build");
   const focusName = document.activeElement && document.activeElement.id === "pk-name";
   sc.innerHTML = "";
@@ -300,8 +318,9 @@ function drawBuild() {
   name.value = B.name;
   name.oninput = async () => {
     B.name = name.value;
+    const epoch = S.screenSeq, seq = B.seq;
     const n = B.name, err = await api.PackNameCheck(n);
-    if (n !== B.name) return;
+    if (n !== B.name || epoch !== S.screenSeq || seq !== B.seq || S.screen !== "build") return;
     B.nameErr = err;
     syncButton();
   };
@@ -448,7 +467,7 @@ function syncButton() {
 
 function go() {
   const p = B.page;
-  if (!p || !p.ok || B.nameErr || building()) return;
+  if (!p || B.loading || !p.ok || B.nameErr || building()) return;
   startBuild(B.name.trim(), B.light);
 }
 
@@ -460,6 +479,7 @@ async function startBuild(name, light) {
 
 // dryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run.
 async function dryRun() {
+  if (B.loading) return;
   const name = (B.name || "").trim() || (B.page && B.page.name) || "";
   try { pop.text(T("see the list first, write nothing"), await api.PackDryRun(name, B.light, B.light ? 0 : B.tex)); } catch (e) { say("fail", errText(e)); }
 }

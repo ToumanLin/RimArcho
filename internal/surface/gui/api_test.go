@@ -57,7 +57,7 @@ func TestSameViewModels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := api.needsLocked(false)
+	n := api.needsLocked()
 	vn := view.BuildNeeds(e.App, want.St, ps)
 	if !reflect.DeepEqual(n.Items, vn.Items) || n.Count != vn.Count {
 		t.Fatalf("needs differ:\n%+v\n%+v", n.Items, vn.Items)
