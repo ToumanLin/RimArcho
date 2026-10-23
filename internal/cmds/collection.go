@@ -8,7 +8,8 @@ import (
 
 func init() {
 	register(&Command{Name: "collection", Args: "<link|ID>", Summary: "read a Steam Workshop collection and compare it with the installed mods (uses the network)", MinArgs: 1, MaxArgs: 1, Run: collectionCmd,
-		Flags: []Flag{{Name: "import", Help: "replace the workspace with the collection's installed mods, in its order (undoable)"}}})
+		Flags: []Flag{{Name: "import", Help: "replace the workspace with the collection's installed mods, in its order (undoable)"},
+			{Name: "follow", Help: "with --import: the current plan follows the collection from now on (archo plan sync)"}}})
 }
 
 func collectionCmd(c *Ctx, a *Args) (*render.Doc, error) {
@@ -52,6 +53,12 @@ func collectionCmd(c *Ctx, a *Args) (*render.Doc, error) {
 				n.Children = append(n.Children, &render.Node{Line: m})
 			}
 			head = append(head, n)
+		}
+		if a.Bool("follow") {
+			if _, err := c.App.FollowReadCollection(r.State.Plan, col, ""); err != nil {
+				return nil, err
+			}
+			head = append(head, &render.Node{Line: fmt.Sprintf("%s follows the collection (archo plan sync)", "plan:"+r.State.Plan.Name)})
 		}
 		d.Nodes[0].Children = append(head, d.Nodes[0].Children...)
 		return d, nil

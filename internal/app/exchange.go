@@ -337,10 +337,15 @@ func sameContentCopy(st *LoadoutState, pkg, hash string) string {
 // in the list (else before the nearest one after it, else at the end), so the imported
 // order is kept around what is there.
 func MergedEntries(st *LoadoutState, il *ImportedList) loadout.List {
+	return mergeEntries(st, il, nil)
+}
+
+// mergeEntries is MergedEntries adding only the entries keep accepts (nil: all).
+func mergeEntries(st *LoadoutState, il *ImportedList, keep func(loadout.Entry) bool) loadout.List {
 	imported, _ := ImportedEntries(st, il)
 	out := st.List.Clone()
 	for i, e := range imported {
-		if e.Instance == "" || out.Index(e.Instance) >= 0 {
+		if e.Instance == "" || out.Index(e.Instance) >= 0 || (keep != nil && !keep(e)) {
 			continue
 		}
 		at := len(out)

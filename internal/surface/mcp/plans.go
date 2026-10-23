@@ -41,6 +41,12 @@ func PlansArgv(in PlansIn) []string {
 			b.pos(v)
 		}
 		return b.a
+	case "follow":
+		return argv("plan", "follow").pos(in.Name).pos(in.Collection).str("mode", in.Mode).a
+	case "unfollow":
+		return argv("plan", "unfollow").pos(in.Name).pos(in.Collection).a
+	case "sync":
+		return argv("plan", "sync").pos(in.Name).pos(in.Collection).flag("check", in.Check).flag("dry-run", in.DryRun).a
 	}
 	return unknown("manage_plans", in.Action)
 }
@@ -68,12 +74,17 @@ type LaunchIn struct {
 
 type PlansIn struct {
 	Env     string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action  string `json:"action,omitempty" jsonschema:"list (default), new, use, rename, remove, import or versions"`
+	Action  string `json:"action,omitempty" jsonschema:"list (default), new, use, rename, remove, import, versions, follow, unfollow or sync"`
 	Name    string `json:"name,omitempty" jsonschema:"the plan (new, use, rename, remove); import: the new plan's name (default: the list's own name or the file name)"`
 	NewName string `json:"new_name,omitempty" jsonschema:"rename: the new name"`
 	From    string `json:"from,omitempty" jsonschema:"new: current, v<n> (a version of the current plan) or a list file (default: an empty list); import: the list file or RimCrow share code"`
 	// Versions sets a plan's game versions (04 §1.6).
 	Versions string `json:"versions,omitempty" jsonschema:"versions: the game versions to set, e.g. 1.5-1.7 or 1.6 1.7, or default (needs name; leave empty to show them)"`
+	// Following a Steam Workshop collection (04 §9.6).
+	Collection string `json:"collection,omitempty" jsonschema:"follow, unfollow, sync: the Steam Workshop collection link or ID (sync: optional when the plan follows one)"`
+	Mode       string `json:"mode,omitempty" jsonschema:"follow: add (default: catching up enables the new mods) or follow (also disables the mods the collection dropped)"`
+	Check      bool   `json:"check,omitempty" jsonschema:"sync: only read the collections and list what changed"`
+	DryRun     bool   `json:"dry_run,omitempty" jsonschema:"sync: show what catching up would enable and disable, change nothing"`
 }
 
 type HistoryIn struct {
