@@ -207,6 +207,13 @@ func (a *App) NewPlan(name, from string) (*NewPlanResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A copy keeps the player's choice of game versions; a RimArcho list brings its own.
+	switch {
+	case il != nil:
+		a.adoptVersions(p, il.Versions)
+	case strings.TrimSpace(from) != "" && len(st.Plan.Versions) > 0:
+		a.adoptVersions(p, st.Plan.Versions)
+	}
 	mon, err := a.MonitorForNewPlan(p)
 	if err != nil {
 		return nil, err
@@ -267,6 +274,7 @@ func (a *App) NewPlanFromImport(name string, il *ImportedList, source string) (*
 	if err != nil {
 		return nil, err
 	}
+	a.adoptVersions(p, il.Versions)
 	mon, err := a.MonitorForNewPlan(p)
 	if err != nil {
 		return nil, err

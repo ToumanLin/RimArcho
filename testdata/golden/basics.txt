@@ -101,6 +101,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     pack unlink                               remove the packs' links from Mods/ (only the links, never the packs)
     pack stop <name>                          stop a running pack build (what it copied is removed)
     pattern [<pattern:id>]                    error patterns from public logs: what a kind of log error usually is, its causes, route and fixes
+    plan versions [<name> [<versions…>|default]]  show or set the game versions a plan is meant for (1.6, 1.5-1.7, default)
     db status                                 the database: path, size, backups
     db backup                                 write a consistent copy of the database to <data>/backups
     db vacuum                                 compact the database

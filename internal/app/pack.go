@@ -43,9 +43,11 @@ type Pack struct {
 	Game    string    `json:"game"` // the game version it was built for
 	Env     string    `json:"env"`
 	// Light: the list only, no files — a RimArcho list (04 §9.3) or a pack's exported list.
-	Light   bool        `json:"light,omitempty"`
-	Entries []PackEntry `json:"entries"`
-	Trimmed int64       `json:"trimmed_bytes,omitempty"`
+	Light bool `json:"light,omitempty"`
+	// Versions are the game versions the list is meant for (a RimArcho list, 04 §1.6, §9.3).
+	Versions []string    `json:"versions,omitempty"`
+	Entries  []PackEntry `json:"entries"`
+	Trimmed  int64       `json:"trimmed_bytes,omitempty"`
 	// Textures: the copies' PNGs were converted to DDS and deleted (08 §5.2).
 	Textures *PackTextures `json:"textures,omitempty"`
 }

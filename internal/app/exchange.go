@@ -63,7 +63,8 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 	}
 	switch format {
 	case FormatArcho:
-		p := &Pack{Format: PackFormat, Name: st.Plan.Name, Created: a.Now().UTC(), Game: game, Env: st.Ix.Env.Name, Light: true}
+		p := &Pack{Format: PackFormat, Name: st.Plan.Name, Created: a.Now().UTC(), Game: game, Env: st.Ix.Env.Name, Light: true,
+			Versions: a.PlanAllowedVersions(st, st.Plan)}
 		for _, e := range st.List {
 			if m := st.Ix.ByID[e.Instance]; m != nil {
 				p.Entries = append(p.Entries, packEntryOf(m))
@@ -133,6 +134,8 @@ type ImportedList struct {
 	// Hashes maps packageIds to content hashes (RimArcho lists): an import uses the copy
 	// with that content when there is one, and the preview tells the others apart.
 	Hashes map[string]string
+	// Versions are the game versions a RimArcho list was meant for (04 §1.6).
+	Versions []string
 }
 
 // Hash is the content hash a RimArcho list gives pkg ("" for none).

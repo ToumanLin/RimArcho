@@ -15,6 +15,10 @@ type Plan struct {
 	Name    string
 	Created time.Time
 	Updated time.Time // the workspace's last change
+	// CreatedGame is the environment's game version when the plan was made; Versions are
+	// the game versions the player chose for it, empty for the default (04 §1.6).
+	CreatedGame string
+	Versions    []string
 }
 
 // DefaultPlanName names an environment's first plan: the one imported from ModsConfig.xml
@@ -24,14 +28,16 @@ const DefaultPlanName = "default"
 // StageKey is the meta key of a plan's staging list (04 §2.2).
 func StageKey(planID int64) string { return fmt.Sprintf("stage:%d", planID) }
 
-const planCols = `id, environment_id, name, created_at, updated_at`
+const planCols = `id, environment_id, name, created_at, updated_at, created_game, versions`
 
 func scanPlan(row interface{ Scan(...any) error }) (*Plan, error) {
 	var p Plan
 	var c, u int64
-	if err := row.Scan(&p.ID, &p.EnvID, &p.Name, &c, &u); err != nil {
+	var vs string
+	if err := row.Scan(&p.ID, &p.EnvID, &p.Name, &c, &u, &p.CreatedGame, &vs); err != nil {
 		return nil, err
 	}
+	p.Versions = strings.Fields(vs)
 	p.Created, p.Updated = time.Unix(c, 0).UTC(), time.Unix(u, 0).UTC()
 	return &p, nil
 }
@@ -85,9 +91,11 @@ func (s *Store) PlanByName(envID, name string) (*Plan, error) {
 	return nil, nil
 }
 
-// CreatePlan stores a new, empty plan (no workspace, no versions).
+// CreatePlan stores a new, empty plan (no workspace, no versions). Its created_game is the
+// environment's game version now (04 §1.6).
 func (s *Store) CreatePlan(envID, name string, at time.Time) (*Plan, error) {
-	res, err := s.DB.Exec(`INSERT INTO plan(environment_id, name, created_at, updated_at) VALUES(?,?,?,?)`, envID, name, at.Unix(), at.Unix())
+	res, err := s.DB.Exec(`INSERT INTO plan(environment_id, name, created_at, updated_at, created_game)
+		VALUES(?,?,?,?, coalesce((SELECT game_version FROM environment WHERE id=?), ''))`, envID, name, at.Unix(), at.Unix(), envID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +103,7 @@ func (s *Store) CreatePlan(envID, name string, at time.Time) (*Plan, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Plan{ID: id, EnvID: envID, Name: name, Created: at.UTC(), Updated: at.UTC()}, nil
+	return s.PlanByID(id)
 }
 
 // RenamePlan changes a plan's name; its history is unchanged.
@@ -113,6 +121,7 @@ func (s *Store) DeletePlan(id int64) error {
 			`DELETE FROM workspace_undo WHERE plan_id=?`,
 			`DELETE FROM loadout_version WHERE plan_id=?`,
 			`UPDATE environment SET current_plan=0 WHERE current_plan=?`,
+			`DELETE FROM plan_collection WHERE plan_id=?`,
 			`DELETE FROM plan WHERE id=?`,
 		} {
 			if _, err := tx.Exec(q, id); err != nil {

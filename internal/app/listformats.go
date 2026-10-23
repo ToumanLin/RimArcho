@@ -256,7 +256,7 @@ func parseJSONList(b []byte) (*ImportedList, error) {
 // names, workshop IDs and content hashes.
 func archoList(p *Pack) *ImportedList {
 	l := newList(FormatArcho)
-	l.Title, l.Game, l.Hashes = p.Name, p.Game, map[string]string{}
+	l.Title, l.Game, l.Hashes, l.Versions = p.Name, p.Game, map[string]string{}, p.Versions
 	for _, pe := range p.Entries {
 		l.add(pe.PackageID, pe.Name, pe.WorkshopID)
 		if pe.Hash != "" {
