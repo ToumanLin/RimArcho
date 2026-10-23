@@ -22,11 +22,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/vdf"
 )
 
-// Downloading a game version with SteamCMD (01 §3, 08 §11). RimArcho runs Valve's SteamCMD;
-// the player logs in inside SteamCMD's own console window (account, password, Steam Guard)
-// and RimArcho never asks for, receives, stores or passes a credential: only the account
-// name the player typed, for +login <name>. SteamCMD keeps the login after the first time.
-// RimArcho follows SteamCMD's own log (logs/console_log.txt) for progress and the result.
+// Downloading a game version with SteamCMD (01 §3, 08 §11). Anonymous by default; an
+// optional account name comes from settings or the download form. Passwords and Steam
+// Guard codes are entered only in SteamCMD's own console. Progress comes from its log.
 
 // SteamCMDURL is Valve's SteamCMD for Windows.
 const SteamCMDURL = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip"
@@ -280,7 +278,7 @@ func ParseBranches(out string) []GameBranch {
 type DownloadSpec struct {
 	Branch  string // "public" or a branch from GameBranches
 	Dir     string // the new game folder
-	Account string // the Steam account name the player typed (only the name)
+	Account string // override; empty uses settings, then anonymous
 	Name    string // the environment's name ("" = the version, e.g. "1.6")
 	Saves   string // SavesShared or SavesOwn ("" = shared)
 	// Console: SteamCMD gets a console window of its own for the login (the window);
@@ -299,7 +297,7 @@ type DownloadProgress struct {
 
 // DownloadError is a failed download in plain words.
 type DownloadError struct {
-	Kind string // ownership | password | guard | disk | branch | network | login | other
+	Kind string // ownership | anonymous-license | anonymous-login | password | guard | disk | branch | network | login | other
 	Line string // SteamCMD's line
 }
 
@@ -314,6 +312,10 @@ func (e *DownloadError) Error() string {
 func (e *DownloadError) Why() string {
 	var why string
 	switch e.Kind {
+	case "anonymous-license":
+		why = "Steam refused the anonymous download (a license is required); choose an account in settings, or add a game folder you already have"
+	case "anonymous-login":
+		why = "the anonymous Steam connection did not finish; check the connection and try again"
 	case "ownership":
 		why = "this Steam account does not own RimWorld"
 	case "password":
@@ -335,6 +337,30 @@ func (e *DownloadError) Why() string {
 }
 
 var accountRe = regexp.MustCompile(`^[A-Za-z0-9_.@-]{1,64}$`)
+
+// ValidSteamCMDAccount accepts a name or empty (anonymous); never a password or command.
+func ValidSteamCMDAccount(account string) error {
+	if account != "" && !accountRe.MatchString(account) {
+		return errors.New("the SteamCMD account must be empty (anonymous), or a name using letters, digits and _ . @ -")
+	}
+	return nil
+}
+
+// SteamCMDAccount resolves a per-run override, then settings, then anonymous. Public
+// metadata queries keep using anonymous even when the player has configured an account.
+func (a *App) SteamCMDAccount(override string) (string, error) {
+	account := strings.TrimSpace(override)
+	if account == "" {
+		account = strings.TrimSpace(a.Store.Meta("cfg:steamcmd.account"))
+	}
+	if account == "" || strings.EqualFold(account, "anonymous") {
+		account = "anonymous"
+	}
+	if err := ValidSteamCMDAccount(account); err != nil {
+		return "", err
+	}
+	return account, nil
+}
 
 // CheckDownloadDir: the new game folder may not be inside RimArcho's data directory, nor
 // inside or around any source (another game, a mod folder).
@@ -381,8 +407,9 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 	if exe == "" {
 		return "", ErrNoSteamCMD
 	}
-	if !accountRe.MatchString(spec.Account) || strings.EqualFold(spec.Account, "anonymous") {
-		return "", errors.New("type the Steam account name that owns RimWorld (only the name; the password is typed in SteamCMD's window)")
+	account, err := a.SteamCMDAccount(spec.Account)
+	if err != nil {
+		return "", err
 	}
 	if spec.Branch == "" {
 		spec.Branch = "public"
@@ -405,7 +432,7 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	args := []string{"+force_install_dir", dir, "+login", spec.Account, "+app_update", env.WorkshopAppID}
+	args := []string{"+force_install_dir", dir, "+login", account, "+app_update", env.WorkshopAppID}
 	if spec.Branch != "public" {
 		args = append(args, "-beta", spec.Branch)
 	}
@@ -443,6 +470,14 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 		}
 	}
 	if res.err != nil {
+		if account == "anonymous" {
+			switch res.err.Kind {
+			case "ownership":
+				res.err.Kind = "anonymous-license"
+			case "login":
+				res.err.Kind = "anonymous-login"
+			}
+		}
 		return "", res.err
 	}
 	if !res.success {
@@ -451,7 +486,11 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 			line = werr.Error()
 		}
 		if !res.loggedIn {
-			return "", &DownloadError{Kind: "login", Line: line}
+			kind := "login"
+			if account == "anonymous" {
+				kind = "anonymous-login"
+			}
+			return "", &DownloadError{Kind: kind, Line: line}
 		}
 		return "", &DownloadError{Kind: "other", Line: line}
 	}
@@ -596,7 +635,7 @@ func (r *steamResult) read(line string) (DownloadProgress, bool) {
 		r.last = l
 	}
 	switch {
-	case strings.Contains(low, "logging in user"):
+	case strings.Contains(low, "logging in user") || strings.Contains(low, "connecting anonymously"):
 		switch {
 		case strings.Contains(low, "invalid password") || strings.Contains(low, "invalidpassword"):
 			r.err = &DownloadError{Kind: "password", Line: l}

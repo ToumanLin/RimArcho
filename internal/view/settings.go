@@ -165,7 +165,12 @@ func FolderGroup(a *app.App) SettingGroup {
 // SettingsPage builds the settings page: what is RimArcho's, for every environment — the
 // mod folders first (the game's own folder and launch are on the environment page).
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
-	out := []SettingGroup{FolderGroup(a)}
+	out := []SettingGroup{FolderGroup(a), {Title: "SteamCMD", Items: []SettingItem{
+		{Label: T("SteamCMD account (optional)"), Value: cmds.Setting(a, "steamcmd.account"), Edit: "text", Argv: []string{"config", "set", "steamcmd.account", "{}"},
+			Note: T("empty or anonymous: anonymous login; enter an account name to log in. Password and Steam Guard are entered only in SteamCMD")},
+		{Label: T("SteamCMD program"), Value: cmds.Setting(a, "steamcmd.path"), Edit: "path", Argv: []string{"config", "set", "steamcmd.path", "{}"},
+			Note: T("empty: RimArcho's own copy, then PATH")},
+	}}}
 	lang := cmds.Setting(a, "ui.lang")
 	out = append(out, SettingGroup{Title: T("interface"), Items: []SettingItem{
 		{Label: T("language"), Value: lang, Edit: "choice", Choices: []string{"auto", "zh", "en"}, Argv: []string{"config", "set", "ui.lang", "{}"}},

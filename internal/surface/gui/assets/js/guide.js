@@ -1,7 +1,7 @@
 // The first-run guide (06 §2.15): three steps, each with a way back.
 //   1. find the game: 已有的游戏 — what detection finds (tick several), a folder typed in or
-//      chosen in the folder dialog; or 下载一个版本 — a branch, a folder and the Steam account
-//      name, downloaded by SteamCMD in its own window (08 §11);
+//      chosen in the folder dialog; or 下载一个版本 — a branch, a folder and an optional
+//      account override, downloaded by SteamCMD in its own window (08 §11);
 //   2. read the mods: a scan per environment in a child process, with its progress (a game
 //      added once the shared mod folders were read: only its own Data/ and Mods/);
 //   3. where to start: the game's own list, a list from RimSort / RimCrow (previewed, then
@@ -242,16 +242,15 @@ function download(card) {
   card.append(where);
   const who = el("div", "typed");
   const acc = el("input", "field");
-  acc.placeholder = T("your Steam account name");
+  acc.placeholder = Tf("empty: %s (from settings)", info.account || "anonymous");
   acc.spellcheck = false;
   acc.autocomplete = "username";
   acc.value = D.account;
   acc.oninput = () => { D.account = acc.value.trim(); };
-  who.append(el("span", "muted lbl", T("Steam account")), acc);
+  who.append(el("span", "muted lbl", T("SteamCMD account (optional)")), acc);
   card.append(who);
-  card.append(el("div", "dl-note", T("SteamCMD opens a window of its own: type the password and the Steam Guard code there. RimArcho never sees them; it only gives SteamCMD the account name.")));
+  card.append(el("div", "dl-note", T("Anonymous by default; you can choose an account in settings or here. Enter anonymous to override a saved account. Password and Steam Guard are entered only in SteamCMD.")));
   const start1 = button(T("download and add"), "", async () => {
-    if (!D.account) { G.error = T("type your Steam account name"); return draw(); }
     let ok;
     try { ok = await api.GuideDownload(D.branch, D.dir, D.account, ""); } catch (e) { G.error = errText(e); return draw(); }
     if (!ok) { G.error = T("a download is already running"); return draw(); }

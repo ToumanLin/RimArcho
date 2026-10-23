@@ -354,6 +354,7 @@ func (s *API) PackImport(path string) (string, error) {
 // DownloadInfo is what the download step shows: SteamCMD (or the offer to download it from
 // Valve, with its size), RimWorld's branches, and a folder for the game.
 type DownloadInfo struct {
+	Account  string             `json:"account"`  // effective default; no password
 	SteamCMD string             `json:"steamcmd"` // "" when it is not installed
 	Offer    *app.SteamCMDOffer `json:"offer,omitempty"`
 	Branches []app.GameBranch   `json:"branches,omitempty"`
@@ -368,7 +369,8 @@ func (s *API) GuideDownloadInfo() *DownloadInfo {
 	a := s.a
 	games := gamesFolder(a)
 	s.mu.Unlock()
-	d := &DownloadInfo{SteamCMD: a.SteamCMDPath(), Games: games}
+	account, _ := a.SteamCMDAccount("")
+	d := &DownloadInfo{SteamCMD: a.SteamCMDPath(), Games: games, Account: account}
 	if d.SteamCMD == "" {
 		d.Offer, _ = a.OfferSteamCMD()
 		return d
@@ -418,9 +420,14 @@ func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
 		s.mu.Unlock()
 		return false, errors.New(view.Humanize(nil, err.Error()))
 	}
+	account, err := s.a.SteamCMDAccount(account)
+	if err != nil {
+		s.mu.Unlock()
+		return false, errors.New(view.Humanize(nil, err.Error()))
+	}
+	spec := app.DownloadSpec{Branch: branch, Dir: dir, Account: account, Name: strings.TrimSpace(name), Console: true}
 	s.busy["download"] = true
 	s.mu.Unlock()
-	spec := app.DownloadSpec{Branch: branch, Dir: dir, Account: strings.TrimSpace(account), Name: strings.TrimSpace(name), Console: true}
 	task := s.beginSelf(view.TaskDownload, branch, nil)
 	go func() {
 		var r *app.SourceChangeEnv

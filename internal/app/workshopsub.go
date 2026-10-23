@@ -29,6 +29,8 @@ type WorkshopOp struct {
 	Action string
 	DryRun bool
 	Items  []WorkshopItem
+	Local  bool   // Steam unavailable: local folders only; account state is unknown
+	Note   string // why the live state is unavailable
 }
 
 // WorkshopItem is one item of the call.
@@ -39,6 +41,7 @@ type WorkshopItem struct {
 	Folder     string // unsubscribe: what Steam deletes
 	Result     string // ok, failed:<EResult>, timeout
 	State      uint32
+	Installed  bool // local fallback: the folder exists now, not a Steam account state
 	// unsubscribe: the plans that use it. The player's word goes: it still goes, and they
 	// show it as missing (06 §2.9).
 	UsedBy []string
@@ -134,7 +137,8 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (*WorkshopOp, 
 	return op, nil
 }
 
-// WorkshopState asks Steam for the items' state (subscribed, installed, needs update…).
+// WorkshopState asks Steam for live state; when unavailable it reports only local folder
+// presence, with subscription and update state explicitly unknown.
 func (a *App) WorkshopState(refs []string) (*WorkshopOp, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -154,9 +158,23 @@ func (a *App) WorkshopState(refs []string) (*WorkshopOp, error) {
 		op.Items = append(op.Items, WorkshopItem{ID: m.ID, Name: m.DisplayName(), WorkshopID: ws})
 		ids = append(ids, ws)
 	}
+	if len(ids) == 0 {
+		return op, nil
+	}
 	rep, err := a.runSteam(steamworks.State, ids)
 	if err != nil {
-		return nil, a.unavailable(err, op.Items)
+		if !errors.Is(err, ErrSteamUnavailable) {
+			return nil, err
+		}
+		op.Local, op.Note = true, err.Error()
+		for k := range op.Items {
+			it := &op.Items[k]
+			m := st.Ix.ByID[it.ID]
+			it.Folder = st.Ix.ModDir(m)
+			it.Installed = m.Status == identity.Live && dirExists(it.Folder)
+			it.Result = "local; subscription and update state unknown"
+		}
+		return op, nil
 	}
 	by := map[string]uint32{}
 	for _, x := range rep.Items {

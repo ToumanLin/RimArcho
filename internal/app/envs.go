@@ -209,7 +209,7 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		GameVersion: env.ReadGameVersion(spec.GameRoot), Launch: spec.Launch, CreatedAt: a.Now().UTC()}
 	if e.Launch == "" {
 		e.Launch = "direct"
-		if env.WorkshopRootFor(spec.GameRoot) != "" || spec.WorkshopRoot != "" {
+		if env.WorkshopRootFor(spec.GameRoot) != "" {
 			e.Launch = "steam"
 		}
 	}

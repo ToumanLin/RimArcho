@@ -184,8 +184,9 @@ func TestDownloadGame(t *testing.T) {
 	}
 	// The public branch has no -beta; a second 1.5 gets a free name.
 	f.args = nil
-	r, err = e.App.DownloadGame(app.DownloadSpec{Branch: "public", Dir: filepath.Join(e.Root, "Games", "Again"), Account: "player"}, nil)
-	if err != nil || slices.Contains(f.args, "-beta") || r.Env.Name != "1.5-2" {
+	f.lines = append([]string{"Connecting anonymously to Steam Public...OK"}, okRun[2:]...)
+	r, err = e.App.DownloadGame(app.DownloadSpec{Branch: "public", Dir: filepath.Join(e.Root, "Games", "Again")}, nil)
+	if err != nil || slices.Contains(f.args, "-beta") || f.args[3] != "anonymous" || r.Env.Name != "1.5-2" {
 		t.Fatalf("public: %v %v %+v", err, f.args, r)
 	}
 }
@@ -220,9 +221,6 @@ func TestDownloadGameErrors(t *testing.T) {
 		if _, err := e.App.DownloadGame(app.DownloadSpec{Dir: bad, Account: "player"}, nil); err == nil {
 			t.Errorf("%s must be refused", bad)
 		}
-	}
-	if _, err := e.App.DownloadGame(app.DownloadSpec{Dir: dir, Account: "anonymous"}, nil); err == nil || !strings.Contains(err.Error(), "account name") {
-		t.Errorf("anonymous: %v", err)
 	}
 	if _, err := e.App.DownloadGame(app.DownloadSpec{Dir: dir, Account: "a b"}, nil); err == nil {
 		t.Error("a name with a space is not an account name")
