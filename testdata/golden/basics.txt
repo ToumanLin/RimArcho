@@ -80,6 +80,9 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     data status                               the community data: source, version, when it was fetched, entries
     env branches                              list RimWorld's Steam branches (versions) SteamCMD can download
     env download <branch>                     download a RimWorld version with SteamCMD and add it as an environment (you log in in SteamCMD)
+    folder check                              check all managed directories, including games, the lock library and packs
+    folder set <directory-id> <dir>           locate a directory you moved; keep its mods and lists
+    folder move <directory-id> <dir>          move a managed directory to a new location
     folder list                               list the mod folders every environment shares (Workshop, SteamCMD, others)
     folder add workshop|steamcmd|extra <dir>  add a shared mod folder (a second Workshop folder replaces the first)
     folder remove <src:label>                 forget a shared mod folder (its files stay)

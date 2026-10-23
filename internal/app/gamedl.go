@@ -43,6 +43,9 @@ type steamCMDRunner struct {
 
 // SteamCMDDir is where RimArcho keeps the SteamCMD it downloads: %LOCALAPPDATA%\RimArcho\steamcmd.
 func (a *App) SteamCMDDir() string {
+	if p := a.Store.Meta("cfg:steamcmd.path"); p != "" {
+		return filepath.Dir(p)
+	}
 	return filepath.Join(a.LocalDir(), "steamcmd")
 }
 
@@ -162,6 +165,9 @@ func (a *App) InstallSteamCMD() (string, error) {
 	}
 	if exe == "" {
 		return "", errors.New("the SteamCMD download has no steamcmd program")
+	}
+	if err := a.Store.SetMeta(directoryKey("steamcmd-tool"), dir); err != nil {
+		return "", err
 	}
 	return exe, nil
 }

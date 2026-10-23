@@ -407,6 +407,9 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 	}
 	bs := &buildState{report: o.Progress}
 	if !o.DryRun {
+		if err := a.managedRootReady("packs", a.PacksDir()); err != nil {
+			return nil, err
+		}
 		if _, err := os.Stat(a.packPath(name)); err == nil {
 			return nil, fmt.Errorf("pack %q exists (%s); remove it first or pick another name", name, a.packPath(name))
 		}
@@ -415,6 +418,9 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 			return nil, err
 		}
 		if err := os.MkdirAll(tmp, 0o755); err != nil {
+			return nil, err
+		}
+		if err := a.Store.SetMeta(directoryKey("packs"), a.PacksDir()); err != nil {
 			return nil, err
 		}
 		bs.start(tmp, BuildProgress{Name: name, Step: StepCheck})
@@ -1060,6 +1066,9 @@ func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
 }
 
 func (a *App) unpackPack(zr *zip.Reader) (*PackMatch, error) {
+	if err := a.managedRootReady("packs", a.PacksDir()); err != nil {
+		return nil, err
+	}
 	var p Pack
 	for _, f := range zr.File {
 		if f.Name == "pack.json" {
@@ -1121,6 +1130,9 @@ func (a *App) unpackPack(zr *zip.Reader) (*PackMatch, error) {
 	}
 	if err := os.Rename(tmp, dir); err != nil {
 		os.RemoveAll(tmp)
+		return nil, err
+	}
+	if err := a.Store.SetMeta(directoryKey("packs"), a.PacksDir()); err != nil {
 		return nil, err
 	}
 	return &PackMatch{Pack: &p, Dir: dir}, nil

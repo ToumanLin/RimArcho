@@ -36,6 +36,7 @@ var GroupTitles = []string{"this list", "missing dependencies", "conflicts", "la
 
 // Action kinds. An action is data; each interface binds it to a key or a button.
 const (
+	ActLocateDirectory = "locate-directory" // Refs[0]: managed directory ID; Lines[0]: old path
 	ActSort            = "sort"             // open the sort preview (S)
 	ActSave            = "save"             // open the save preview (w)
 	ActEnable          = "enable"           // Refs
@@ -139,7 +140,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	if st == nil {
 		return n
 	}
-	n.Items = buildItems(a, st, ps)
+	n.Items = append(buildItems(a, st, ps), directoryNeeds(a)...)
 	for i := range n.Items {
 		n.Items[i].Section = SectionOf(n.Items[i].Group)
 	}

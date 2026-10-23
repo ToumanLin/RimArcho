@@ -239,6 +239,9 @@ type detailMsg struct {
 func (m *model) Init() tea.Cmd {
 	m.reload()
 	m.problemCounts()
+	if m.promptDirectories() {
+		return liveNext()
+	}
 	if m.opts.ScanOnStart && m.loadErr == nil && m.neverScanned() {
 		return tea.Batch(m.startScan(), liveNext())
 	}

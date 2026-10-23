@@ -456,6 +456,17 @@ func (s *API) PackRemove(name string) (string, error) {
 	return view.Tf("pack %s is in the recycle bin", name), nil
 }
 
+// Directories checks paths on disk even when no database row changed.
+func (s *API) Directories() ([]app.ManagedDirectory, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	dirs, err := s.a.ManagedDirectories()
+	for i := range dirs {
+		dirs[i].Label = view.DirectoryLabel(dirs[i])
+	}
+	return dirs, err
+}
+
 // Settings is the settings page (06 §2.14).
 func (s *API) Settings() []view.SettingGroup {
 	r, err := s.detachedReader()
@@ -962,7 +973,8 @@ var inspectable = map[string]bool{"problems": true, "patches": true, "mod": true
 func (s *API) Inspect(argv []string) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(argv) == 0 || !inspectable[argv[0]] {
+	directoryCheck := len(argv) == 2 && argv[0] == "folder" && argv[1] == "check"
+	if len(argv) == 0 || (!directoryCheck && !inspectable[argv[0]]) {
 		return nil, fmt.Errorf("not a read-only command: %v", argv)
 	}
 	text, _ := cmds.Execute(s.a, argv)

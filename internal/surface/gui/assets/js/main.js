@@ -962,6 +962,7 @@ async function start() {
   if (!S.shell || !S.shell.envs) { await guide.start("first"); shell.settle(); return; }
   await go("home");
   shell.settle();
+  await scr.checkDirectories();
   if (S.board && S.board.neverScanned) cmd("rescan");
 }
 

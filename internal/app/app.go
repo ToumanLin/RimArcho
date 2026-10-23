@@ -77,6 +77,9 @@ type App struct {
 	GameProbe func(gameRoot string) *GameRun
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
+	// SameVolume says whether a folder can be renamed from one path to another (MoveDirectory);
+	// nil compares the volume names (tests replace it to copy on one drive).
+	SameVolume func(from, to string) bool
 	// trashAllow replaces the recycle bin's allow-list check (08 §7) in tests of a bare App
 	// with no store; nil means trashAllowed.
 	trashAllow func(path string) error
@@ -159,7 +162,15 @@ func Open(home string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}, nil
+	a := &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}
+	// The interfaces check the managed directories at each start (ManagedDirectories is
+	// read after Open, once overrides such as LockBase are installed); it never blocks.
+	// Older installations have no usage metadata. Packs are under Home or an
+	// explicit config path; unlike LockDir this never depends on LockBase.
+	if dirExists(a.PacksDir()) && st.Meta(directoryKey("packs")) == "" {
+		_ = st.SetMeta(directoryKey("packs"), a.PacksDir())
+	}
+	return a, nil
 }
 
 // Close releases the database.
