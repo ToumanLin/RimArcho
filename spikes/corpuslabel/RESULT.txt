@@ -211,3 +211,60 @@ versions (version mismatch is decided from code differences when headers carry n
 Packet bug found and fixed after labelling: GetNamed def names kept the sentence's period
 ("konf."), so those packets' def lookups and searches came back empty. `patches --failed`
 prints the filtered count as "N operations", which reads as "this mod has no patches".
+
+
+==========================================================================================
+G12: benchmark v3 (corpuslabel/3)
+==========================================================================================
+
+Why: v2 had 140 tasks, 8 classes, 4-8 reviewed per class in places, and its per-class numbers
+had intervals too wide to read. G7's failures also pointed at gaps in the research library.
+
+Library gaps (done first): 30 mods that the G7 failures needed were downloaded and decompiled;
+RimArcho alone went from 3/14 to 12/14 gold sources on the RimArcho-specific failures.
+
+Composition: 500 tasks = v2's 140 (same split) + 360 new clusters, at least 40 per class and
+60-65 per class in total (patch-failed, xref-missing, texture-missing, xml-load 65 each;
+exception, harmony-stack, assembly, static-ctor 60 each). Same protocol as v2: tier 1
+(packet-only, Haiku labeller, 180 items), tier 2 (code-level, Sonnet labeller, 180 items), then
+an Opus reviewer: every third new tier-1 item (60) labelled independently from the packet and
+the raw log, every tier-2 item (180) checked in the code. v2 gold was migrated to corpuslabel/3
+(140). Gold = review label if there is one, else the labeller's.
+Split: v2's split kept; new items split by hash; 156 held-out ids frozen before any scoring
+(sha256 of the id list 39766c172fc46432bff258652fef0016143105c5f1129cd9632486ac54aa9247, in corpus-kb/labels/v3/heldout.txt). Dev 344,
+held-out 156 (about 31%).
+
+Schema (corpuslabel/3, spikes/corpuslabel/SCHEMA.md):
+  - new fields: repro (can the problem be reproduced with the installed copy) and unknown_why
+    (game-or-save, reason-unclear, no-evidence, not-in-library, several-candidates, machine);
+    every cause type "unknown" must say why.
+  - fix kind is a fixed rule of the benchmark class, not a free choice.
+  - verdict "cause" with a named source is allowed when the log itself shows whose code fails
+    (static constructor throws, patch fails to apply) even if that code is not in the library.
+  - rule added mid-review: game older than the mod -> version-mismatch, repro no, fix update
+    with fix.mods = ludeon.rimworld and a versions entry for it.
+
+Agreement (overlap sets, two labellers per item):
+  tier 1, cause type kappa 0.61 -> 0.81 after the prompt was reworked.
+  tier 2, 12 items, new vs old prompt: cause type 11/12 (kappa 0.89) vs 8/12 (0.57);
+  fix kind 10/12 (0.80) vs 8/12 (0.59); source 11/12 both.
+Labeller vs reviewer (gold decided by the reviewer):
+  tier 1 (60): source 47/60, cause type 40/60 (kappa 0.50), fix kind 55/60 (0.72);
+  tier 2 (180): source 142/180, cause type 146/180 (0.75), fix kind 131/180 (0.67).
+"Unknown" rates, new gold vs v2 gold: fix kind 3% vs 16%, cause type 49% vs 63%, verdict 32% vs
+48%. Reasons for the 49% unknown cause types: game-or-save 51, reason-unclear 41, no-evidence
+35, not-in-library 25, several-candidates 22, machine 4.
+
+Cost (tokens summed over API calls, from the traces; corpus-kb/labels/v3/costs.jsonl):
+  tier-1 labelling   Haiku   180 items    8.7 M tokens   14 s per item
+  tier-2 labelling   Sonnet  180 items  147 M tokens    103 s per item
+  tier-1 review      Opus     60 items   15 M tokens
+  tier-2 review      Opus    180 items  141 M tokens
+  v2 migration       Opus                 25 M tokens
+  overlap studies                       34 M tokens
+  (agent scoring cost is in spikes/agenteval/RESULT.txt)
+
+Reproduce: corpuslabel tasks -corpus <hugslogs> -execlogs <execlogs> -keep (both flags are
+needed, else validation silently drops items: the first export lost EX02, SC12 and AS59);
+corpuslabel validate; scoring by agenteval score (Wilson intervals added to agenteval).
+Data stays outside the repo (corpus-kb/labels/v3); this file holds aggregates only.

@@ -108,3 +108,78 @@ Rerun
   agenteval warm -run <r> -slot <s> -ids ...       RimArcho alone
   agent prompt: agenteval prompt -run <r> -task <id>; one subagent per home at a time
   agenteval score -run <r> -gold <tasks.jsonl> -split dev|heldout -traces <subagents dir>
+
+
+==========================================================================================
+G12: benchmark v3 (500 tasks), dev 344 + held-out 156, with 95% Wilson intervals
+==========================================================================================
+
+Build scored: the agenteval binary built once from 882cd9c (dev/0.9.0 of 2026-10-22, plus the G12
+harness); it was not rebuilt, so all 500 agent runs and all RimArcho-alone runs are one build.
+This branch (f2bd8b4) is merged with dev/0.9.0 at 3907f7b; that merge brought UI/app/task-page
+changes and I found no log-analysis change in its diff, but it was not re-measured.
+Model: all 500 agent answers are claude-sonnet-5-5 (one agent per task, one run per task).
+A mid-run attempt to switch to another model failed at the API (model_not_found, 0 answers),
+so nothing is pooled across models. Aggregates are in score-v3-agent-dev.txt and
+score-v3-agent-heldout.txt next to this file (no per-task lines).
+Held-out was scored once, after the dev run finished; the brief and the product were not
+changed between the two.
+
+Agent (RimArcho MCP) vs gold:
+                    dev n=344                     held-out n=156
+  agree             85.2 [81.0-88.5]              80.1 [73.2-85.6]
+  precision         85.6 [80.4-89.6]              80.0 [71.4-86.5]
+  recall            86.8 [81.6-90.6]              80.0 [71.4-86.5]
+  cause type        63.1 [57.9-68.0]              50.0 [42.2-57.8]
+  fix kind          74.7 [69.9-79.0]              67.9 [60.3-74.8]
+RimArcho alone (no agent), same build:
+  agree             66.6 [61.4-71.3]              57.7 [49.8-65.2]
+  precision         76.4 [69.2-82.4]              71.0 [59.4-80.4]
+  recall            54.8 [48.2-61.2]              46.7 [37.4-56.2]
+
+Per class, agree [95%] (agent / alone), dev then held-out:
+  patch-failed     100.0 [92-100] / 71.1    95.0 [76-99] / 65.0
+  xref-missing      84.4 [71-92]  / 86.7    80.0 [58-92] / 70.0
+  texture-missing   75.6 [61-86]  / 71.1    75.0 [53-89] / 60.0
+  xml-load          66.7 [52-79]  / 80.0    65.0 [43-82] / 60.0
+  exception         90.2 [78-96]  / 65.9    94.7 [75-99] / 68.4
+  harmony-stack     85.4 [72-93]  / 58.5    84.2 [62-95] / 68.4
+  assembly          95.1 [84-99]  / 26.8    84.2 [62-95] / 42.1
+  static-ctor       85.4 [72-93]  / 68.3    63.2 [41-81] / 26.3
+Per class recall of RimArcho alone (dev): patch-failed 70.5, xref 93.3, texture 40.0, xml-load
+64.0, exception 45.8, harmony-stack 40.9, assembly 18.9 [9.5-34], static-ctor 70.3.
+Tiers: tier 1 (180 dev / 80 held-out) agree 81.7 / 78.8; tier 2 (164 / 76) 89.0 / 81.6.
+Difficulty L1 / L2 / L3 agree: dev 100 / 84.4 / 83.0; held-out 89.5 / 80.8 / 76.6.
+
+Reading:
+- The intervals are wide per class on held-out (n 19-20, about +-15 points). Only large gaps
+  are real: the agent beats RimArcho alone overall (+18.6 dev, +22.4 held-out, intervals do not
+  overlap) and in assembly (+68 dev, +42 held-out), exception, harmony-stack and patch-failed;
+  xref-missing and xml-load show no agent gain (alone is equal or higher on agree because it
+  stays silent where gold is "unknown" and the agent over-claims).
+- Held-out is 5 points below dev for both the agent and RimArcho alone. The product and the
+  brief were not tuned on either, so it is not overfitting; the two intervals overlap. Classes are in
+  the same proportions in both splits.
+- Cause type (about 50-63%) is the weakest field and the part gold is least sure of (see
+  below); fix kind 68-75%.
+- static-ctor held-out 63.2% (alone 26.3%): 5 wrong, the one class that dropped clearly
+  (dev 85.4%).
+
+Cost (agent, dev, from the 219 transcripts that were available): median 39 s, 6 tool calls,
+8 archo calls, 85k final context, 2.0k output tokens; total 158 min agent time, 1,851 archo
+calls, 176 M input tokens processed. Held-out: 1,436 tool calls over 156 tasks.
+
+Limits:
+- Gold is one reviewer (Opus) over a labeller (Haiku tier 1, Sonnet tier 2); 140 v2 tasks
+  keep their v2 gold (migrated to corpuslabel/3). Reviewer-vs-labeller agreement: tier 1
+  cause type 40/60, kappa 0.50; tier 2 146/180, kappa 0.75. Gold "unknown" for cause type is
+  49% (v2: 63%); every unknown carries a reason.
+- Two items describe the same thing with different labels (EX47 Bees: version-mismatch;
+  HS47 Biomes framework: optional-absent).
+- Rule "game older than the mod -> version-mismatch, fix update ludeon.rimworld" was added to
+  the review brief after the first reviewers had started; EX37 and PF48 were fixed by hand,
+  the rest of the earlier reviewed items were not re-checked.
+- SC22 and SC24 quote files in corpus-kb/home-g12s/vanilla (kept for that reason).
+- One run per task, one model: no variance estimate; agree can move several points between
+  two runs of the same build (G11 saw 8 of 140 tasks differ).
+- Cost lines cover 219 of 344 dev transcripts (the rest did not match a kept transcript).
