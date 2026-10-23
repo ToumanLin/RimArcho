@@ -192,7 +192,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 		t.Fatalf("after sort: %s", got)
 	}
 	keys(tm, "w")
-	waitFor(t, tm, "saved to the game as v")
+	waitFor(t, tm, "written to the game as v")
 	if !strings.Contains(e.ReadModsConfig(), "<li>tester.b</li>") {
 		t.Fatal("save did not write the list")
 	}
@@ -473,7 +473,7 @@ func TestEnvRemoveFromChooser(t *testing.T) {
 	keys(tm, "E", "d")
 	waitFor(t, tm, "then second is in use")
 	keys(tm, "enter")
-	waitFor(t, tm, "removed environment main")
+	waitFor(t, tm, "removed game main")
 	m := finish(t, tm)
 	if m.envName != "second" {
 		t.Fatalf("env %q", m.envName)

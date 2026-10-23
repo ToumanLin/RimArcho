@@ -474,6 +474,9 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 		it := &UninstallItem{Path: dir, Do: DoDelete, Bytes: a.sizeOf(dir)}
 		ws := filepath.Join(dir, "steamapps", "workshop", "content", env.WorkshopAppID)
 		switch {
+		case a.Store.Meta("cfg:steamcmd.path") != "" && !source.Within(dir, a.LocalDir()):
+			it.Do, it.Note = DoLeave, "SteamCMD is in a custom directory: left alone"
+			keep = append(keep, dir)
 		case !emptyDir(ws) || holdsAny(dir, keep):
 			it.Do, it.Note = DoLeave, "holds mods downloaded with SteamCMD: left alone"
 			keep = append(keep, dir)

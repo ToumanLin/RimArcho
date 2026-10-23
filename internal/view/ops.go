@@ -20,11 +20,11 @@ type Op struct {
 	// Key runs it ("" only from the menu: the menu key or shift+F10 opens the menu, so the
 	// keyboard reaches every op).
 	Key   string `json:"key,omitempty"`
-	Group int    `json:"group"` // the menu's group: 1 方案 2 整理 3 打开 4 版本 5 磁盘
+	Group int    `json:"group"` // the menu's group: 1 列表 2 整理 3 打开 4 版本 5 磁盘
 	// Confirm: it changes files, so the dry run shows first (LibPreview).
 	Confirm bool `json:"confirm,omitempty"`
 	Danger  bool `json:"danger,omitempty"` // red, last in the menu
-	// Detail: a button in a copy's detail (Mod 库存).
+	// Detail: a button in a copy's detail (Mod 库).
 	Detail bool `json:"detail,omitempty"`
 	// One: it acts on one row at a time (the folder, a page, a note, a position).
 	One bool `json:"one,omitempty"`
@@ -33,28 +33,29 @@ type Op struct {
 // Op codes. The library's LibDo takes the codes of groups 1, 4 and 5.
 const (
 	OpEnable    = "enable"     // 启用 (the editor's 未启用)
-	OpAdd       = "add"        // 加入当前方案 (Mod 库存)
-	OpUse       = "use"        // 换成这一份: the current plan uses another copy of the mod
+	OpAdd       = "add"        // 启用 (Mod 库: into the current list)
+	OpUse       = "use"        // 在当前列表里用这一份: the current plan uses another copy of the mod
 	OpDisable   = "disable"    // 停用 (the editor's 已启用)
-	OpTakeOut   = "take-out"   // 从当前方案拿掉 (Mod 库存)
-	OpPutBack   = "put-back"   // 放回原位 (暂存)
+	OpTakeOut   = "take-out"   // 停用 (Mod 库: out of the current list)
+	OpPutBack   = "put-back"   // 放回列表 (暂存)
 	OpEnableAt  = "enable-at"  // 启用到…
 	OpMoveTo    = "move-to"    // 移动到…
-	OpStage     = "stage"      // 暂存
-	OpSwap      = "swap"       // 换成另一份
-	OpRemove    = "remove"     // 从所有方案里拿掉
+	OpStage     = "stage"      // 放进暂存
+	OpSwap      = "swap"       // 切换版本…
+	OpRemove    = "remove"     // 在所有列表里停用
 	OpTags      = "tags"       // 标签
-	OpNote      = "note"       // 备注 (Mod 库存: this copy's note)
+	OpNote      = "note"       // 备注 (Mod 库: this copy's note)
 	OpFolder    = "folder"     // 打开文件夹
 	OpWorkshop  = "workshop"   // 打开工坊页面
+	OpSteam     = "steam"      // Steam 客户端页面
 	OpPin       = "pin"        // 锁定这个版本
 	OpPinUpdate = "pin-update" // 更新锁定版本
 	OpUnpin     = "unpin"      // 解除锁定
-	OpMove      = "move"       // 备份锁定版本 (收进锁定库)
-	OpUnhide    = "unhide"     // 恢复
+	OpMove      = "move"       // 移入锁定库
+	OpUnhide    = "unhide"     // 取消隐藏
 	OpResub     = "resubscribe"
 	OpUnsub     = "unsubscribe"    // 退订, through the Steam client
-	OpDelete    = "delete"         // 删除 (to the recycle bin)
+	OpDelete    = "delete"         // 移到回收站
 	OpTextures  = "textures"       // 优化贴图: the DDS of its PNGs next to them (08 §5.2)
 	OpTexClean  = "textures-clean" // 清除贴图优化: the DDS RimArcho wrote go
 )
@@ -77,6 +78,7 @@ var opTable = []Op{
 	{Code: OpNote, Key: "n", Group: 2, One: true},
 	{Code: OpFolder, Key: "ctrl+o", Group: 3, Detail: true, One: true},
 	{Code: OpWorkshop, Key: "ctrl+w", Group: 3, Detail: true, One: true},
+	{Code: OpSteam, Key: "ctrl+s", Group: 3, Detail: true, One: true},
 	{Code: OpPin, Group: 4, Confirm: true},
 	{Code: OpPinUpdate, Group: 4, Confirm: true},
 	{Code: OpUnpin, Group: 4, Confirm: true},
@@ -91,14 +93,15 @@ var opTable = []Op{
 
 func opLabel(code string) string {
 	return map[string]string{
-		OpEnable: T("enable"), OpAdd: T("add to the current plan"), OpUse: T("use this copy in the current plan"),
-		OpDisable: T("disable"), OpTakeOut: T("take out of the current plan"), OpPutBack: T("put back"),
-		OpEnableAt: T("enable at…"), OpMoveTo: T("move to…"), OpStage: T("stage"), OpSwap: T("swap for another copy"),
-		OpRemove: T("take out of every plan"), OpTags: T("tags"), OpNote: T("note"),
+		OpEnable: T("enable"), OpAdd: T("enable"), OpUse: T("use this one in the current list"),
+		OpDisable: T("disable"), OpTakeOut: T("disable"), OpPutBack: T("put back"),
+		OpEnableAt: T("enable at…"), OpMoveTo: T("move to…"), OpStage: T("stage"), OpSwap: T("switch version…"),
+		OpRemove: T("disable in every list"), OpTags: T("tags"), OpNote: T("note"),
 		OpFolder: T("open the folder"), OpWorkshop: T("open the Workshop page"),
-		OpPin: T("lock this version"), OpPinUpdate: T("update the locked version"), OpUnpin: T("unlock"),
-		OpMove: T("back up as a locked version"), OpUnhide: T("restore"), OpResub: T("subscribe again"),
-		OpUnsub: T("unsubscribe"), OpDelete: T("delete"),
+		OpSteam: T("steam page"),
+		OpPin:   T("lock this version"), OpPinUpdate: T("update the locked version"), OpUnpin: T("unlock"),
+		OpMove: T("move into the lock library"), OpUnhide: T("unhide"), OpResub: T("subscribe again"),
+		OpUnsub: T("unsubscribe"), OpDelete: T("move to the recycle bin"),
 		OpTextures: T("convert textures to DDS"), OpTexClean: T("remove the converted textures"),
 	}[code]
 }
@@ -223,7 +226,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		ks = append(ks, OpFolder)
 	}
 	if url {
-		ks = append(ks, OpWorkshop)
+		ks = append(ks, OpWorkshop, OpSteam)
 	}
 	if loadable && workshop {
 		ks = append(ks, OpPin)
@@ -253,7 +256,8 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	if live && i.Source == app.LibWorkshop && !has(app.LibResidue) && url {
 		ks = append(ks, OpUnsub)
 	}
-	if live && !plans && (own || workshop && has(app.LibResidue)) && !source.IsLink(i.Path) {
+	// a copy the lists use may go too: the confirm warns, and the lists show it missing
+	if live && (own || workshop && has(app.LibResidue)) && !source.IsLink(i.Path) {
 		ks = append(ks, OpDelete)
 	}
 	return sortOps(ks)

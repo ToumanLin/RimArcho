@@ -66,7 +66,7 @@ func UnloadableWhy(st *app.LoadoutState, mod *store.Mod) string {
 	switch {
 	case mod.Unloadable != "" && st != nil:
 		if h := st.HiddenOf(mod.ID); h != nil && h.Kind == app.HiddenPinned {
-			return Tf("pinned: the game uses %s", h.Copy.DisplayName())
+			return Tf("locked: the game uses %s", h.Copy.DisplayName())
 		}
 		return T("About.xml is renamed: the game cannot load it")
 	case mod.Unloadable != "":
@@ -118,6 +118,11 @@ func Facts(mod *store.Mod, d *DetailData) []Fact {
 // WorkshopURL is the Workshop page of an item id.
 func WorkshopURL(id string) string {
 	return "https://steamcommunity.com/sharedfiles/filedetails/?id=" + id
+}
+
+// WorkshopSteamURL opens the item inside the Steam client, as RimCrow does.
+func WorkshopSteamURL(id string) string {
+	return "steam://url/CommunityFilePage/" + id
 }
 
 // IsNumber: s is a non-empty string of digits.

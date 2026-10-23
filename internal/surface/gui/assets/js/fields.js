@@ -40,11 +40,14 @@ export function fieldList(fields, acts = {}) {
       if (f.extra) v.append(el("span", "dim", `  (${f.extra})`));
     }
     r.append(v);
-    if (f.act) {
-      const b = el("button", "fact", f.actLabel);
+    const actions = [...(f.act ? [{ act: f.act, label: f.actLabel }] : []), ...(f.actions || [])];
+    for (const a of actions) {
+      const b = el("button", "fact", a.label);
+      if (a.act === "steam") b.title = "ctrl+s";
       b.onclick = () => {
-        if (f.act === "url") return api.OpenURL(f.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
-        if (acts[f.act]) return acts[f.act](f);
+        if (a.act === "url") return api.OpenURL(f.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
+        if (a.act === "steam") return api.OpenSteamWorkshop("ws:" + f.value).then((t) => say("ok", t), (e) => say("fail", errText(e)));
+        if (acts[a.act]) return acts[a.act](f);
       };
       r.append(b);
     }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -51,6 +52,11 @@ func (s *API) LibraryDo(kind string, refs []string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.board, s.needs, s.lib = nil, nil, nil
+	// the actions on folders and through Steam are background tasks (06 §2.16): queued
+	// here, one item at a time, one failure does not stop the rest
+	if view.TaskLane(kind) != "" && len(refs) > 0 {
+		return s.submitTask(kind, refs)
+	}
 	t, err := view.LibDo(s.a, kind, refs)
 	// Steam out of reach (not running, no DLL): the Workshop pages instead, said so (06 §2.9)
 	var pages *view.OpenPages
@@ -105,6 +111,31 @@ func (s *API) OpenWorkshop(id string) (string, error) {
 		return "", err
 	}
 	return view.T("opened the Workshop page"), nil
+}
+
+// OpenSteamWorkshop opens a known copy or an uninstalled Workshop reference in Steam.
+func (s *API) OpenSteamWorkshop(ref string) (string, error) {
+	ws := ""
+	if strings.HasPrefix(ref, "ws:") {
+		ws = strings.TrimPrefix(ref, "ws:")
+	} else {
+		s.mu.Lock()
+		ix, err := s.a.Index()
+		s.mu.Unlock()
+		if err != nil {
+			return "", err
+		}
+		if mod := ix.ByID[ref]; mod != nil {
+			ws = mod.WorkshopID()
+		}
+	}
+	if !view.IsNumber(ws) {
+		return "", errors.New(view.T("no Workshop ID: not a Workshop mod"))
+	}
+	if err := s.open(view.WorkshopSteamURL(ws)); err != nil {
+		return "", err
+	}
+	return view.T("opened the Steam page"), nil
 }
 
 // A variable so tests can never start the real program (noopen_test.go).

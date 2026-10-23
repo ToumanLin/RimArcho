@@ -90,7 +90,7 @@ func refused(a *app.App, o *Outcome, err error) *Outcome {
 
 // MoveLines say what moving the folders in the way does (the confirmation's lines).
 func MoveLines(de *app.DuplicatesError) []string {
-	out := []string{T("these folders move from Mods/ into the lock library; plans that use them keep them and get them through a link:")}
+	out := []string{T("these folders move from Mods/ into the lock library; lists that use them keep them and get them through a link:")}
 	for _, m := range de.Moves {
 		what := m.For
 		if m.Pack != "" {
@@ -168,11 +168,11 @@ func apply(a *app.App, what string, move bool) (string, error) {
 			return "", err
 		}
 		if r.Unchanged {
-			return T("nothing to save"), nil
+			return T("nothing to write to the game"), nil
 		}
-		msg := Tf("saved to the game as v%d", r.Version)
+		msg := Tf("written to the game as v%d", r.Version)
 		if len(r.Links) > 0 {
-			msg = Tf("saved to the game as v%d; %d Mods/ links updated", r.Version, len(r.Links))
+			msg = Tf("written to the game as v%d; %d Mods/ links updated", r.Version, len(r.Links))
 		}
 		if r.Running != nil {
 			msg += " · " + T("the game reads it on its next start")
@@ -227,7 +227,7 @@ func Swap(a *app.App, st *app.LoadoutState, id string) (string, error) {
 	if _, err := a.Swap(st.Ix.Ref(id), ""); err != nil {
 		return "", err
 	}
-	return Tf("swapped %s for another copy", Named(st, []string{id})), nil
+	return Tf("switched the version of %s", Named(st, []string{id})), nil
 }
 
 // LaunchPack plays a pack as an Outcome: a refusal because of folders that can move into the

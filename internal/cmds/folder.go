@@ -12,10 +12,52 @@ import (
 // status show=folders; changing them is left to the player, like environments.
 
 func init() {
+	register(&Command{Name: "folder check", Summary: "check all managed directories, including games, the lock library and packs", MaxArgs: 0, Run: folderCheck})
+	register(&Command{Name: "folder set", Args: "<directory-id> <dir>", Summary: "locate a directory you moved; keep its mods and lists", MinArgs: 2, MaxArgs: 2, Run: folderSet})
+	register(&Command{Name: "folder move", Args: "<directory-id> <dir>", Summary: "move a managed directory to a new location", MinArgs: 2, MaxArgs: 2, Run: folderMove})
 	register(&Command{Name: "folder list", Summary: "list the mod folders every environment shares (Workshop, SteamCMD, others)", MaxArgs: 0, Run: folderList})
 	register(&Command{Name: "folder add", Args: "workshop|steamcmd|extra <dir>", Summary: "add a shared mod folder (a second Workshop folder replaces the first)",
 		MinArgs: 2, MaxArgs: 2, Run: folderAdd})
 	register(&Command{Name: "folder remove", Args: "<src:label>", Summary: "forget a shared mod folder (its files stay)", MinArgs: 1, MaxArgs: 1, Run: folderRemove})
+}
+
+func folderCheck(c *Ctx, a *Args) (*render.Doc, error) {
+	dirs, err := c.App.ManagedDirectories()
+	if err != nil {
+		return nil, err
+	}
+	d, root := render.New("managed directories")
+	var rows [][]string
+	for _, dir := range dirs {
+		rows = append(rows, []string{dir.ID, dir.Label, dir.Path, dir.Status})
+		if dir.Status != "ok" && dir.Status != "unused" {
+			d.AddNext("archo folder set " + quoteArg(dir.ID) + " <new-dir>")
+		}
+	}
+	root.AddColumns(rows)
+	return d, nil
+}
+
+func folderSet(c *Ctx, a *Args) (*render.Doc, error) {
+	if err := c.App.SetDirectory(a.Pos[0], a.Pos[1]); err != nil {
+		return nil, err
+	}
+	d, _ := render.New("directory located: " + a.Pos[1])
+	return d, nil
+}
+
+func folderMove(c *Ctx, a *Args) (*render.Doc, error) {
+	copied, err := c.App.MoveDirectory(a.Pos[0], a.Pos[1])
+	if err != nil {
+		return nil, err
+	}
+	d, root := render.New("directory moved: " + a.Pos[1])
+	if copied {
+		root.KV("how", "copied and checked (another drive; the old directory is in the recycle bin)")
+	} else {
+		root.KV("how", "renamed (same drive)")
+	}
+	return d, nil
 }
 
 func folderList(c *Ctx, a *Args) (*render.Doc, error) {

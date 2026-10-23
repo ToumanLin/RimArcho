@@ -7,6 +7,7 @@ package textures
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"io"
 	"io/fs"
@@ -59,8 +60,15 @@ type Set struct {
 // highest priority first, as content.Resolve returns them). Folders named Source (an
 // author's working files) are skipped, as are links leaving the folder.
 func Collect(root string, folders []string) (*Set, error) {
+	return collect(context.Background(), root, folders, func(p string, _ os.FileInfo) (PNGHeader, bool) { return ReadPNGHeader(p) })
+}
+
+func collect(ctx context.Context, root string, folders []string, header func(string, os.FileInfo) (PNGHeader, bool)) (*Set, error) {
 	s := &Set{Root: root}
 	for prio, f := range folders {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		dir := filepath.Join(f, "Textures")
 		if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
 			// the folder's own name may differ in case on another file system
@@ -71,6 +79,9 @@ func Collect(root string, folders []string) (*Set, error) {
 			}
 		}
 		err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			if err != nil {
 				return nil
 			}
@@ -96,7 +107,7 @@ func Collect(root string, folders []string) (*Set, error) {
 			rel, _ := filepath.Rel(root, p)
 			rel = filepath.ToSlash(rel)
 			if ext == ".png" {
-				if h, ok := ReadPNGHeader(p); ok {
+				if h, ok := header(p, info); ok {
 					s.Sources = append(s.Sources, &Source{Path: p, Rel: rel, Key: key, Prio: prio, Size: info.Size(),
 						MTime: info.ModTime().UnixNano(), W: h.W, H: h.H, Alpha: h.Alpha,
 						Mask: strings.HasSuffix(strings.ToLower(strings.TrimSuffix(d.Name(), filepath.Ext(d.Name()))), "_m")})

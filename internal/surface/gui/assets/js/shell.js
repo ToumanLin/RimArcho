@@ -27,6 +27,7 @@ export function initShell(u) {
   $("#env").onclick = () => ui.go("env");
   $("#nav-settings").onclick = () => ui.go("settings");
   $("#live").onclick = () => ui.go("needs");
+  $("#tasks-line").onclick = () => ui.go("tasks");
   $("#side").addEventListener("keydown", navKey);
   wireSideSplit();
   api.Setting(NAV_KEY).then((v) => { if (v === "top") { layout = "top"; applyNav(); } }).catch(() => {});
@@ -178,7 +179,7 @@ function inGameMark(isInGame) {
   const sh = S.shell;
   if (!isInGame || !sh || !sh.inGame || !sh.plans || sh.plans.length < 2) return null;
   const m = el("span", "ingame-dot");
-  m.title = sh.inGame.text + " · " + T("switching plans writes no game file; writing to the game or launching does");
+  m.title = sh.inGame.text + " · " + T("switching lists writes no game file; writing to the game or launching does");
   return m;
 }
 
@@ -251,6 +252,8 @@ function renderSide() {
   slideNav(nav, !settled);
   const set = $("#nav-settings");
   set.classList.toggle("on", cur === "settings");
+  const tl = $("#tasks-line");
+  if (tl) tl.classList.toggle("on", cur === "tasks");
   if (!set.firstChild || !set.querySelector(".ic")) {
     const ic = el("span", "ic");
     ic.innerHTML = icon.settings;
@@ -321,10 +324,10 @@ export function crumbs() {
   const sh = S.shell;
   const cur = current();
   let out = (sh && sh.crumbs && sh.crumbs[cur]) || [];
-  if (S.screen === "guide") out = (S.guideFrom === "env" ? out : []).concat([{ label: S.guideFrom === "env" ? T("add an environment") : T("getting started"), id: "guide" }]);
+  if (S.screen === "guide") out = (S.guideFrom === "env" ? out : []).concat([{ label: S.guideFrom === "env" ? T("add a game") : T("getting started"), id: "guide" }]);
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
-  if (S.screen === "build") out = out.concat([{ label: T("build a pack"), id: "build" }]);
+  if (S.screen === "build") out = out.concat([{ label: T("create a pack"), id: "build" }]);
   return out;
 }
 
@@ -338,8 +341,8 @@ function renderCrumbs() {
   let chip = (sh && sh.env) || "";
   if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + " · " + chip;
   env.textContent = chip;
-  env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "uninstall" || S.screen === "textures";
-  env.title = T("environment") + " · E";
+  env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "uninstall" || S.screen === "textures" || S.screen === "tasks";
+  env.title = T("game") + " · E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");
   let cs = crumbs();

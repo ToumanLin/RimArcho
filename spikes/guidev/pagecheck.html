@@ -1,0 +1,12 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Page responsiveness regression</title>
+<link rel="stylesheet" href="/style.css">
+<script type="importmap">{"imports":{"/wails/runtime.js":"/dev/pagecheck-runtime.js"}}</script>
+<style>
+  #results { position: fixed; top: 0; right: 0; background: #fff; color: #111; padding: 12px; z-index: 10000; white-space: pre-wrap; }
+  #screen { position: absolute; inset: 80px 0 30px; }
+</style>
+<pre id="results">Running…</pre>
+<div id="app"><div id="screen"></div><div id="status"></div></div>
+<script type="module" src="/dev/pagecheck.js"></script>

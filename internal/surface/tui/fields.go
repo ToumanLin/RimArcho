@@ -32,7 +32,7 @@ func fieldLines(fs []view.Field, w int) []string {
 			}
 			vals = []string{v}
 		case view.FieldWorkshop:
-			vals = []string{f.Value + sDimS.Render(" "+markDot+" ctrl+w "+T("opens the page"))}
+			vals = []string{f.Value + sDimS.Render(" "+markDot+" ctrl+w "+T("web page")+" · ctrl+s "+T("steam page"))}
 		case view.FieldAlias:
 			vals = []string{f.Value + sDimS.Render("  ("+f.Extra+")")}
 		default:

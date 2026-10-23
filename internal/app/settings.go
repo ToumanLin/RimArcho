@@ -84,6 +84,7 @@ var cacheKinds = []struct{ kind, dir, desc string }{
 	{"workshop", "workshop", "Workshop descriptions"},
 	{"images", "workshop-img", "images in descriptions"},
 	{"source", "source", "decompiled C#"},
+	{"textures", "textures", "PNG header cache"},
 	{"logs", "", "Player.log analyses"},
 }
 

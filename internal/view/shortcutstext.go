@@ -5,8 +5,8 @@ package view
 func init() {
 	Register(map[string]string{
 		"no Workshop ID: not a Workshop mod":         "没有工坊 ID：不是创意工坊 Mod",
-		"open the folder (the plan and the library)": "打开文件夹（方案和 Mod 库存）",
-		"Workshop page (the plan and the library)":   "工坊页面（方案和 Mod 库存）",
+		"open the folder (the list and the library)": "打开文件夹（列表和 Mod 库）",
+		"Workshop page (the list and the library)":   "工坊页面（列表和 Mod 库）",
 		"opened the folder":                          "已打开文件夹",
 		"RimArcho has not seen this copy: no folder": "RimArcho 没见过这一份：没有文件夹",
 		"folder / Workshop page":                     "文件夹 / 工坊页面",

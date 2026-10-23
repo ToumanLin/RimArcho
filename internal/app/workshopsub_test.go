@@ -40,8 +40,8 @@ func steamDLL(e *testkit.Env) {
 }
 
 // 06 §2.9: 退订 and 重新订阅 go through the Steam client, in a worker run in a runtime
-// folder outside the game; unsubscribing is refused while the mod is enabled, in a plan or
-// the game runs; without Steam the error carries the Workshop pages.
+// folder outside the game; unsubscribing is refused while the game runs, and only names the
+// plans that use the mod; without Steam the error carries the Workshop pages.
 func TestWorkshopSubscribe(t *testing.T) {
 	e := setup(t, false)
 	e.AddWorkshop("7100", testkit.Sample("tester.keep", "Keep"))
@@ -66,8 +66,9 @@ func TestWorkshopSubscribe(t *testing.T) {
 	if err != nil || len(calls) != 0 || !op.DryRun || !strings.HasSuffix(op.Items[0].Folder, "7200") {
 		t.Fatalf("dry run: %+v %v %v", op, err, calls)
 	}
-	if _, err := e.App.Workshop(steamworks.Unsubscribe, []string{keep}, true); err == nil || !strings.Contains(err.Error(), "enabled") {
-		t.Fatalf("enabled: %v", err)
+	// enabled: the player's word goes; the plan using it is named, nothing is refused
+	if op, err := e.App.Workshop(steamworks.Unsubscribe, []string{keep}, true); err != nil || len(op.Items[0].UsedBy) != 1 || op.Items[0].UsedBy[0] != "plan:default" {
+		t.Fatalf("enabled: %+v %v", op, err)
 	}
 	if _, err := e.App.Workshop(steamworks.Unsubscribe, []string{left}, true); err == nil || !strings.Contains(err.Error(), "not subscribed") {
 		t.Fatalf("leftover: %v", err)

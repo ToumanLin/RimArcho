@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -22,8 +23,8 @@ import (
 // internal/view, or runs a view verb. No business rule lives here.
 //
 // The app is not safe for concurrent use and Wails calls methods concurrently, so each
-// method holds mu; the slow reads (the detail's description, which may fetch the Workshop
-// page) run outside it on a snapshot of the index, as the TUI's loaders do.
+// method locks its App. Slow texture/log reads use separate sessions; descriptions use
+// a snapshot of the index. Only snapshotting settings/results needs the shared mu.
 type API struct {
 	mu      sync.Mutex
 	a       *app.App
@@ -55,17 +56,25 @@ type API struct {
 
 	monitorOnce sync.Once
 	quit        func() // closes the window (nil in the harness and in tests)
+	// tasks is the 后台任务 record and its lanes (tasks.go, 06 §2.16)
+	tasks  *app.Tasks
+	taskEv taskEvents
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
 	// TexRunner runs `archo textures optimize` in place of the child process (tests).
 	TexRunner func(args []string, progress func(string)) ([]string, error)
 	texLast   TextureEvent // the running conversion's last progress
+	texCancel context.CancelFunc
+	logRead   logReader
+	texRead   logReader
 	// ScanRunner scans an environment in place of the child process (tests).
 	ScanRunner func(env string) (string, error)
 }
 
 func newAPI(a *app.App) *API {
-	return &API{a: a, open: openURL, busy: map[string]bool{}}
+	s := &API{a: a, open: openURL, busy: map[string]bool{}}
+	s.startTasks()
+	return s
 }
 
 func (s *API) send(name string, data any) {
@@ -175,7 +184,7 @@ func (s *API) boardLocked() *Board {
 		sc, _, _ := s.a.LastScan(e.ID)
 		out.Never = sc == nil
 	}
-	n := s.needsLocked(false)
+	n := s.needsLocked()
 	out.Status, out.Needs = n.Status, n.Count
 	return out
 }
@@ -192,40 +201,48 @@ type PackList struct {
 
 // Packs lists the current environment's packs (08 §5).
 func (s *API) Packs() (*PackList, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	rows, others, err := view.PackRows(s.a)
+	r, err := s.detachedReader()
 	if err != nil {
 		return nil, err
 	}
-	un, err := view.UnfinishedRows(s.a)
+	defer r.Close()
+	defer s.free.soon()
+	rows, others, err := view.PackRows(r)
+	if err != nil {
+		return nil, err
+	}
+	un, err := view.UnfinishedRows(r)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return &PackList{Rows: rows, Others: others, Unfinished: un, Building: s.building}, err
 }
 
 // BuildPage is 编译成整合包 for the current plan (06 §2.6): checked and sorted under the
-// lock, measured (every mod's folder walked) outside it; a light pack is not measured.
+// reader's own connection, including texture planning and folder measurement.
 // tex is the textures choice (view.PackTextureOptions): 0 off, 100 预转换, less 精简.
-func (s *API) BuildPage(light bool, tex int) (*view.BuildPage, error) {
-	s.mu.Lock()
-	plan, chip := "", ""
-	if st := s.boardState(); st != nil {
-		chip = view.EnvChip(s.board.EnvName, s.board.GameVersion)
-		if st.Plan != nil {
-			plan = st.Plan.Name
-		}
+func (s *API) BuildPage(tex int) (*view.BuildPage, error) {
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
 	}
-	name := view.DefaultPackName(s.a, plan)
-	pl, err := s.a.PlanPack(name, light)
-	if err == nil && !light {
-		view.PlanTextures(s.a, pl, tex)
+	defer r.Close()
+	defer s.free.soon()
+	st, err := r.Loadout()
+	if err != nil {
+		return nil, err
 	}
-	dir := s.a.PacksDir()
-	s.mu.Unlock()
+	plan, chip := st.Plan.Name, view.EnvChip(st.Ix.Env.Name, st.Ix.Env.GameVersion)
+	name := view.DefaultPackName(r, plan)
+	pl, err := r.PlanPack(name)
+	if err == nil {
+		view.PlanTextures(r, pl, tex)
+	}
+	dir := r.PacksDir()
 	if err != nil {
 		return nil, err
 	}
 	pl.Measure(dir)
-	p := view.BuildPageOf(pl, plan, chip, dir, light, tex)
+	p := view.BuildPageOf(pl, plan, chip, dir, tex)
 	p.Name = name
 	return p, nil
 }
@@ -248,15 +265,10 @@ func (s *API) PackNameCheck(name string) string {
 }
 
 // PackDryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run (nothing is written).
-func (s *API) PackDryRun(name string, light bool, tex int) []string {
+func (s *API) PackDryRun(name string, tex int) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	argv := []string{"pack", "build", strings.TrimSpace(name), "--dry-run"}
-	if light {
-		argv = append(argv, "--light")
-	} else {
-		argv = append(argv, app.PackBuildArgs(view.PackTextureOptions(tex))...)
-	}
+	argv := append([]string{"pack", "build", strings.TrimSpace(name), "--dry-run"}, app.PackBuildArgs(view.PackTextureOptions(tex))...)
 	text, _ := cmds.Execute(s.a, argv)
 	st := s.boardState()
 	var out []string
@@ -274,17 +286,22 @@ func (s *API) PackDryRun(name string, light bool, tex int) []string {
 
 // Pack is one pack's page (06 §2.7).
 func (s *API) Pack(name string) (*view.PackPage, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.BuildPackPage(s.a, name)
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	defer s.free.soon()
+	return view.BuildPackPage(r, name)
 }
 
 // PackExport writes a pack to a file the player picks (pack export): the save dialog in
-// the window; file is the typed path where there is none. "" when it was cancelled.
-func (s *API) PackExport(name, file string, light bool) (string, error) {
+// the window; file is the typed path where there is none. "" when it was cancelled. With
+// list it writes only the pack's list, as a RimArcho list.
+func (s *API) PackExport(name, file string, list bool) (string, error) {
 	ext := ".archopack"
-	if light {
-		ext = ".archopack.json"
+	if list {
+		ext = ".archolist.json"
 	}
 	if file == "" {
 		if s.x.native == nil {
@@ -298,9 +315,12 @@ func (s *API) PackExport(name, file string, light bool) (string, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	n, err := s.a.ExportPack(name, file, light)
+	n, err := s.a.ExportPack(name, file, list)
 	if err != nil {
 		return "", err
+	}
+	if list {
+		return view.Tf("exported the list of pack %s to %s", name, file), nil
 	}
 	return view.Tf("exported pack %s to %s (%s)", name, file, view.SizeText(n)), nil
 }
@@ -309,26 +329,19 @@ func (s *API) PackExport(name, file string, light bool) (string, error) {
 // once: the copy takes minutes and holds nothing here, so every page keeps working, and it
 // goes on when the window closes. "pack" events carry the progress (view.PackProgress) and
 // the end. One build at a time.
-func (s *API) PackBuild(name string, light bool, tex int) (string, error) {
+func (s *API) PackBuild(name string, tex int) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := app.CheckPackName(name); err != nil {
 		return "", err
 	}
-	if light {
-		// The list only: nothing to copy, done at once.
-		if _, err := s.a.BuildPack(name, true, false); err != nil {
-			return "", err
-		}
-		return view.Tf("built pack %s", name), nil
-	}
 	if s.busy["pack"] {
-		return "", errors.New(view.T("another pack is being built; wait for it to finish"))
+		return "", errors.New(view.T("another pack is being created; wait for it to finish"))
 	}
 	if un, err := s.a.UnfinishedPacks(); err == nil {
 		for _, u := range un {
 			if u.Running {
-				return "", errors.New(view.T("another pack is being built; wait for it to finish"))
+				return "", errors.New(view.T("another pack is being created; wait for it to finish"))
 			}
 		}
 	}
@@ -349,12 +362,14 @@ func (s *API) PackBuild(name string, light bool, tex int) (string, error) {
 			return app.ChildPackBuild(home, env, name, log, extra...)
 		}
 	}
-	go s.watchBuild(name, tmp, run)
-	return view.Tf("build pack %s: it goes on in the background; you can use the other pages, or close the window", name), nil
+	task := s.beginSelf(view.TaskPack, name, func() error { _, err := s.PackStop(name); return err })
+	s.tasks.Update(task, func(t *app.Task) { t.Target = name })
+	go s.watchBuild(task, name, tmp, run)
+	return view.Tf("create pack %s: it goes on in the background; you can use the other pages, or close the window", name), nil
 }
 
 // watchBuild runs the build and passes its progress file on as events until it ends.
-func (s *API) watchBuild(name, tmp string, run func(string) error) {
+func (s *API) watchBuild(task, name, tmp string, run func(string) error) {
 	done := make(chan error, 1)
 	go func() { done <- run(name) }()
 	t := time.NewTicker(300 * time.Millisecond)
@@ -366,7 +381,7 @@ func (s *API) watchBuild(name, tmp string, run func(string) error) {
 			s.mu.Lock()
 			s.busy["pack"], s.building = false, ""
 			s.mu.Unlock()
-			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 5, Frac: 1, Text: view.Tf("built pack %s", name)}
+			ev := view.PackProgress{Name: name, Done: true, Ok: err == nil, Step: 5, Frac: 1, Text: view.Tf("created pack %s", name)}
 			if err != nil {
 				ev.Step, ev.Frac, ev.Text = last.Step, last.Frac, ""
 				lines := strings.Split(view.Humanize(nil, err.Error()), "\n")
@@ -374,6 +389,15 @@ func (s *API) watchBuild(name, tmp string, run func(string) error) {
 					lines[i] = view.T(strings.TrimPrefix(strings.TrimSpace(l), "error: "))
 				}
 				ev.Error = strings.Join(lines, "\n")
+				s.tasks.Update(task, func(t *app.Task) { t.Step = last.Step })
+				end := app.TaskFailed
+				if s.tasks.StopAsked(task) {
+					end = app.TaskStopped
+				}
+				s.tasks.Finish(task, end, ev.Error)
+			} else {
+				s.tasks.Update(task, func(t *app.Task) { t.Step = 5 })
+				s.endSelf(task, nil, ev.Text)
 			}
 			s.send("pack", ev)
 			return
@@ -381,6 +405,7 @@ func (s *API) watchBuild(name, tmp string, run func(string) error) {
 			if p := app.ReadBuildProgress(tmp); p != nil {
 				if pp := view.ProgressOf(p); pp != last {
 					last = pp
+					s.tasks.Update(task, func(t *app.Task) { t.Step, t.Frac, t.Phase = pp.Step, pp.Frac, pp.Text })
 					s.send("pack", pp)
 				}
 			}
@@ -395,7 +420,7 @@ func (s *API) PackStop(name string) (string, error) {
 	if err := s.a.StopBuild(name); err != nil {
 		return "", err
 	}
-	return view.Tf("asked the build of %s to stop", name), nil
+	return view.Tf("asked %s to stop", name), nil
 }
 
 // PackRemoveUnfinished deletes what a build cut short copied (its folder in the packs
@@ -410,7 +435,7 @@ func (s *API) PackRemoveUnfinished(name string) (string, error) {
 	if err := os.RemoveAll(dir); err != nil { // off the lock: gigabytes take a while
 		return "", err
 	}
-	return view.Tf("deleted the unfinished build of %s", name), nil
+	return view.Tf("deleted the unfinished pack %s", name), nil
 }
 
 // PackLaunch plays a pack. move: the player agreed to move the folders in the way into the
@@ -431,19 +456,43 @@ func (s *API) PackRemove(name string) (string, error) {
 	return view.Tf("pack %s is in the recycle bin", name), nil
 }
 
-// Settings is the settings page (06 §2.14).
-func (s *API) Settings() []view.SettingGroup {
+// Directories checks paths on disk even when no database row changed.
+func (s *API) Directories() ([]app.ManagedDirectory, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return view.SettingsPage(s.a, s.boardState())
+	dirs, err := s.a.ManagedDirectories()
+	for i := range dirs {
+		dirs[i].Label = view.DirectoryLabel(dirs[i])
+	}
+	return dirs, err
+}
+
+// Settings is the settings page (06 §2.14).
+func (s *API) Settings() []view.SettingGroup {
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil
+	}
+	defer r.Close()
+	defer s.free.soon()
+	return view.SettingsPage(r, nil)
 }
 
 // Environment is the environment page: the environments, the current one's folders and
 // launch.
 func (s *API) Environment() *view.EnvPage {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.BuildEnvPage(s.a, s.boardState())
+	r, err := s.detachedReader()
+	if err != nil {
+		return &view.EnvPage{}
+	}
+	defer r.Close()
+	defer s.free.soon()
+	// This view needs only the environment's settings, not every installed Mod.
+	var st *app.LoadoutState
+	if e, err := r.Env(); err == nil {
+		st = &app.LoadoutState{Ix: &app.Index{Env: e}}
+	}
+	return view.BuildEnvPage(r, st)
 }
 
 // ApplySetting runs one of the settings page's commands, with value in place of {}.
@@ -491,7 +540,7 @@ func (s *API) HistoryGo(steps, version int) (string, error) {
 		if _, _, err := s.a.Checkout(fmt.Sprintf("v%d", version)); err != nil {
 			return "", err
 		}
-		return view.Tf("loaded v%d into the list (not saved yet)", version), nil
+		return view.Tf("back at v%d (not written to the game yet)", version), nil
 	}
 	r, err := s.a.StepTo(steps)
 	if err != nil {
@@ -526,7 +575,7 @@ func (s *API) Filter(col int, query string) (*Filtered, error) {
 		return &Filtered{}, nil
 	}
 	q := view.ParseQuery(query)
-	f := view.MatchFacts{Status: s.needsLocked(false).Status}
+	f := view.MatchFacts{Status: s.needsLocked().Status}
 	if q.NeedsContent() {
 		c, err := s.content.Get(s.a, s.board.St)
 		if err != nil {
@@ -602,7 +651,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 		s.mu.Unlock()
 		return nil, fmt.Errorf("no mod %s", id)
 	}
-	n := s.needsLocked(false)
+	n := s.needsLocked()
 	pos := st.Position(id)
 	item := view.ModItem(st, mod)
 	s.mu.Unlock()
@@ -629,13 +678,17 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 
 // Sections are the full detail's sub-sections (06 §4.2), #refs replaced by names.
 func (s *API) Sections(id string) ([]view.Section, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.boardState()
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	defer s.free.soon()
+	st, _ := r.Loadout()
 	if st == nil || st.Ix.ByID[id] == nil {
 		return nil, fmt.Errorf("no mod %s", id)
 	}
-	secs := view.Sections(s.a, st.Ix, st.Ix.ByID[id])
+	secs := view.Sections(r, st.Ix, st.Ix.ByID[id])
 	for i := range secs {
 		for j, l := range secs[i].Lines {
 			secs[i].Lines[j] = view.Humanize(st, l)
@@ -850,34 +903,51 @@ func (s *API) SetTag(ids []string, tag string, remove bool) (string, error) {
 // Needs builds the screen. Opening it includes the newest log (parsing it if needed) and
 // starts the files' check when it is stale, as the TUI does.
 func (s *API) Needs() *view.Needs {
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return &view.Needs{Status: map[string]int{}}
+	}
+	n, st := readNeeds(r, true)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	defer s.free.soon()
-	n := s.needsLocked(true)
-	if (n.Stale || n.Never) && !s.busy["analyze"] {
+	current, _ := s.a.Loadout()
+	if st != nil && current != nil && st.Ix.Env.ID == current.Ix.Env.ID && st.Plan.ID == current.Plan.ID && app.ListFingerprint(st.List) == app.ListFingerprint(current.List) && (n.Stale || n.Never) && !s.busy["analyze"] {
 		s.startAnalyze()
 	}
 	return n
 }
 
-func (s *API) needsLocked(withLog bool) *view.Needs {
-	key := s.a.Store.ChangeKey()
-	if !withLog && s.needs != nil && s.needsAt == key {
-		return s.needs
-	}
+// readNeeds is shared by slow page readers. The board and sidebar keep their cheap,
+// cache-only path and never inherit a page's eager log parsing options.
+func readNeeds(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState) {
 	if withLog {
-		s.a.LazyLog, s.a.LogCacheOnly = false, false
+		a.LazyLog, a.LogCacheOnly = false, false
+	}
+	ps, err := a.Problems(false, nil)
+	if err != nil || ps.State == nil {
+		return &view.Needs{Status: map[string]int{}}, nil
+	}
+	st := ps.State
+	if withLog {
+		if cur, _ := a.LogPaths(st); cur != "" && a.ProblemLog(st) == cur {
+			a.SelectLog(st, cur)
+		}
+	}
+	return view.BuildNeeds(a, st, ps), st
+}
+
+func (s *API) needsLocked() *view.Needs {
+	key := s.a.Store.ChangeKey()
+	if s.needs != nil && s.needsAt == key {
+		return s.needs
 	}
 	st := s.boardState()
 	ps, err := s.a.Problems(false, nil)
 	if err != nil || st == nil {
 		return &view.Needs{Status: map[string]int{}}
-	}
-	if withLog {
-		// The newest log was parsed into this list (03 §6.4): it has been seen.
-		if cur, _ := s.a.LogPaths(st); cur != "" && s.a.ProblemLog(st) == cur {
-			s.a.SelectLog(st, cur)
-		}
 	}
 	s.needs, s.needsAt = view.BuildNeeds(s.a, st, ps), s.a.Store.ChangeKey()
 	return s.needs
@@ -903,7 +973,8 @@ var inspectable = map[string]bool{"problems": true, "patches": true, "mod": true
 func (s *API) Inspect(argv []string) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(argv) == 0 || !inspectable[argv[0]] {
+	directoryCheck := len(argv) == 2 && argv[0] == "folder" && argv[1] == "check"
+	if len(argv) == 0 || (!directoryCheck && !inspectable[argv[0]]) {
 		return nil, fmt.Errorf("not a read-only command: %v", argv)
 	}
 	text, _ := cmds.Execute(s.a, argv)
@@ -920,9 +991,13 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 // Changes is the 变化 page: the current plan's mods since it was last played, or the whole
 // library; of (an instance ID) narrows it to that mod's Lineage, every change by day.
 func (s *API) Changes(library bool, of string) (*modchanges.Page, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.boardState()
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	defer s.free.soon()
+	st, _ := r.Loadout()
 	if st == nil {
 		return nil, errors.New("no list")
 	}
@@ -934,7 +1009,7 @@ func (s *API) Changes(library bool, of string) (*modchanges.Page, error) {
 		}
 		o.OfName = st.Ix.ByID[of].DisplayName()
 	}
-	return view.BuildChanges(s.a, st, o)
+	return view.BuildChanges(r, st, o)
 }
 
 // ChangeFiles is the raw file list behind a row: the files that differ between two
@@ -964,6 +1039,9 @@ func (s *API) UseEnv(name string) (string, error) {
 	defer s.mu.Unlock()
 	s.a.EnvName = ""
 	_, err := s.a.EnvUse(name)
+	if err == nil {
+		s.board, s.logLinks, s.logPath = nil, nil, ""
+	}
 	s.needs = nil
 	return s.text(view.Tf("switched to %s", name), err)
 }
@@ -993,7 +1071,7 @@ func (s *API) RemoveEnv(name string) (string, error) {
 	s.a.EnvName = ""
 	_, err := s.a.EnvRemove(name)
 	s.board, s.needs, s.lib = nil, nil, nil
-	return s.text(view.Tf("removed environment %s", name), err)
+	return s.text(view.Tf("removed game %s", name), err)
 }
 
 // Logs are the logs the player may choose (Player.log, Player-prev.log).
@@ -1016,21 +1094,29 @@ func (s *API) Logs() []string {
 
 // LogPage analyses a log for the 日志 tab (the newest when path is empty).
 func (s *API) LogPage(path string) (*view.LogPage, error) {
+	// Serialise log reads with each other, not with the board, navigation or textures.
+	// Keeping this reader also preserves pending cross-version analysis between polls.
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return nil, err
+	}
+	readState, err := r.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	p, err := view.BuildLogPage(r, readState, path, nil)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	defer s.free.soon()
-	st := s.boardState()
-	if st == nil {
-		return nil, errors.New("no list")
-	}
-	// A log of another game version needs an analysis for that version first (seconds):
-	// it runs in the background and the page says so instead of holding every other call.
-	s.a.AnalyzeExe = s.Exe
-	s.a.AnalyzeWait = 200 * time.Millisecond
-	defer func() { s.a.AnalyzeWait = 0 }()
-	p, err := view.BuildLogPage(s.a, st, path, &s.live)
 	if err == nil && p.Path != "" {
-		s.logLinks, s.logPath = p.Links, p.Path
+		if current := s.boardState(); current != nil && current.Ix.Env.ID == readState.Ix.Env.ID {
+			s.logLinks, s.logPath = p.Links, p.Path
+			if m := view.LiveMonitor(s.a, current, &s.live, p.Path, p.Links); m != nil {
+				p.Monitor, p.NoMonitor, p.AddMonitor = m, "", false
+			}
+		}
 	}
 	return p, err
 }
@@ -1061,13 +1147,21 @@ func (s *API) AddMonitor() (string, error) {
 
 // LogCluster is one cluster's evidence (archo log --cluster), names for #refs.
 func (s *API) LogCluster(path, id string) ([]string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if path == "" || id == "" || strings.HasPrefix(path, "-") || strings.HasPrefix(id, "-") {
 		return nil, errors.New("no cluster")
 	}
-	text, _ := cmds.Execute(s.a, []string{"log", "--file", path, "--cluster", id})
-	st := s.boardState()
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return nil, err
+	}
+	st, err := r.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	text, _ := cmds.Execute(r, []string{"log", "--file", path, "--cluster", id})
 	var out []string
 	for _, l := range view.WithoutPatternBlock(strings.Split(strings.TrimRight(text, "\n"), "\n")) {
 		out = append(out, view.Humanize(st, l))
@@ -1078,9 +1172,18 @@ func (s *API) LogCluster(path, id string) ([]string, error) {
 // LogPattern is the pattern card of a cluster (06 §2.10): community background shown apart
 // from the evidence; nil when the cluster matches no pattern.
 func (s *API) LogPattern(path, id string) *view.PatternCard {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.PatternCardOf(s.a, s.boardState(), path, id)
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return nil
+	}
+	st, err := r.Loadout()
+	if err != nil {
+		return nil
+	}
+	return view.PatternCardOf(r, st, path, id)
 }
 
 // SelectLog picks the log whose errors join 需要处理.
@@ -1104,6 +1207,7 @@ func (s *API) Scan() bool {
 	}
 	s.busy["scan"] = true
 	home, env := s.a.Home, s.a.EnvName
+	task := s.beginSelf(view.TaskScan, env, nil)
 	go func() {
 		var out string
 		var err error
@@ -1123,6 +1227,11 @@ func (s *API) Scan() bool {
 			ev["text"] = view.T("scan complete · nothing changed")
 		}
 		s.mu.Unlock()
+		if err != nil {
+			s.endSelf(task, errors.New(ev["error"].(string)), "")
+		} else {
+			s.endSelf(task, nil, ev["text"].(string))
+		}
 		s.free.soon()
 		s.send("scan", ev)
 	}()
@@ -1144,8 +1253,17 @@ func (s *API) startAnalyze() bool {
 	s.busy["analyze"] = true
 	run := s.a.AnalyzeRunner
 	home, env, exe := s.a.Home, s.a.EnvName, s.Exe
+	obj := env
+	if s.board != nil && s.board.St != nil && s.board.St.Plan != nil {
+		obj = s.board.St.Plan.Name
+	}
+	task := s.beginSelf(view.TaskAnalyze, obj, nil)
 	go func() {
-		progress := func(l string) { s.send("analyze", map[string]any{"line": strings.TrimPrefix(l, "progress: ")}) }
+		progress := func(l string) {
+			l = strings.TrimPrefix(l, "progress: ")
+			s.tasks.Update(task, func(t *app.Task) { t.Phase = l })
+			s.send("analyze", map[string]any{"line": l})
+		}
 		var err error
 		switch {
 		case run != nil:
@@ -1158,6 +1276,7 @@ func (s *API) startAnalyze() bool {
 		s.mu.Lock()
 		s.busy["analyze"], s.needs = false, nil
 		s.mu.Unlock()
+		s.endSelf(task, err, view.T("analysis done"))
 		ev := map[string]any{"done": true, "ok": err == nil}
 		if err != nil {
 			ev["error"] = err.Error()

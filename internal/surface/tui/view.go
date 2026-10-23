@@ -25,7 +25,7 @@ func (m *model) View() string {
 	switch {
 	case m.loadErr != nil:
 		content = []string{"", "  " + sErrS.Render(fit(T("error: ")+m.loadErr.Error(), m.w-2)),
-			"  " + sSecond.Render(fit(T("Set up an environment first: archo env detect, archo env add <name> --detected"), m.w-2))}
+			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected"), m.w-2))}
 	case m.pal != nil:
 		content = m.paletteLines(body)
 	case m.panel != nil:
@@ -87,7 +87,7 @@ func (m *model) topBar() string {
 		add(sSecond.Render(fit(c, min(cw, m.w-lw))), min(cw, m.w-lw))
 		return left + strings.Repeat(" ", max(m.w-lw, 0))
 	}
-	envText := T("no environment")
+	envText := T("no game")
 	if m.envName != "" {
 		envText = m.envName
 		if mm := env.MajorMinor(m.gameVer); mm != "" {
@@ -99,10 +99,10 @@ func (m *model) topBar() string {
 	add(sPill.Render(pill), width.StringWidth(pill))
 	// the plan being edited (06 §9.1) and its "有未载入的外部版本" (04 §4.3)
 	if m.st != nil && m.st.Plan != nil {
-		t := T("plan") + " " + m.st.Plan.Name
+		t := T("list") + " " + m.st.Plan.Name
 		add("  "+sText.Render(t), 2+width.StringWidth(t))
 		if m.st.WS != nil && m.st.WS.Conflict != 0 && m.w >= 110 {
-			t := Tf("an external version was not loaded (v%d)", m.st.WS.Conflict)
+			t := Tf("an outside change is not used yet (v%d)", m.st.WS.Conflict)
 			add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
 		}
 	}
@@ -236,7 +236,7 @@ func (m *model) hintLine() string {
 	case m.prompt != nil:
 		return sAccent.Render(markPrompt+" ") + sSecond.Render(m.prompt.label) + sText.Render(m.prompt.text+"_")
 	case m.editing:
-		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"tab", T("next list with matches")}, {"↑↓", T("move")}}
+		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"tab", T("next area with matches")}, {"↑↓", T("move")}}
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
 		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"tab", T("complete")}, {"backspace", T("drops the last filter")}, {"↑↓", T("move")}}
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
@@ -244,7 +244,7 @@ func (m *model) hintLine() string {
 	case m.panel != nil && m.panel.choices != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("confirm")}, {"esc", T("back")}}
 		if m.panel.onDelete != nil {
-			pairs = append(pairs, [2]string{"d", T("remove environment")})
+			pairs = append(pairs, [2]string{"d", T("remove the game")})
 		}
 	case m.tags != nil:
 		pairs = [][2]string{{"←→", T("choose")}, {"enter", T("apply")}, {"esc", T("close")}, {"←", T("type a new tag")}}
@@ -278,7 +278,7 @@ func (m *model) hintLine() string {
 	case m.selCount() > 0:
 		// 06 §3.4: what the selection can do, and that another list drops it.
 		prefix = Tf("selected %d", m.selCount())
-		pairs = append(m.verbPairs(), [2]string{"esc", T("clear the selection")}, [2]string{"←→", T("another list clears it")})
+		pairs = append(m.verbPairs(), [2]string{"esc", T("clear the selection")}, [2]string{"←→", T("another area clears it")})
 	case m.histActive():
 		pairs = [][2]string{{"↑↓", T("choose")}}
 		if l := m.histLabel(); l != "" {
@@ -290,7 +290,7 @@ func (m *model) hintLine() string {
 	default:
 		pairs = append(m.verbPairs(), [2]string{"/", T("search")})
 		if m.layout().tabs {
-			pairs = append([][2]string{{"[ ]", T("lists")}}, pairs...) // the only way to the other lists
+			pairs = append([][2]string{{"[ ]", T("areas")}}, pairs...) // the only way to the other lists
 		} else if m.layout().detailW == 0 {
 			pairs = append(pairs, [2]string{"enter", T("details")})
 		}

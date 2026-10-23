@@ -127,6 +127,11 @@ export function createBar(opts) {
     if (v) wantFocus = true; // once the groups are in (draw)
     else if (root.contains(document.activeElement)) { document.activeElement.blur(); opts.leave && opts.leave(); }
   };
+  // the open bar folds the moment the focus leaves it: a click elsewhere, tab, a key that
+  // moves the focus (06 §3.1 rule 8); what it filters stays in force on its one line
+  const left = (t) => b.open && root.isConnected && t instanceof Node && !root.contains(t) && !(t.closest && t.closest("#menu"));
+  document.addEventListener("mousedown", (e) => { if (left(e.target)) b.toggle(false); }, true);
+  document.addEventListener("focusin", (e) => { if (left(e.target)) b.toggle(false); });
   b.focus = () => { inp.focus(); inp.select(); };
   b.focused = () => root.contains(document.activeElement);
 
@@ -145,7 +150,7 @@ export function createBar(opts) {
     for (const c of d.conds || []) {
       const x = el("button", "fbar-chip" + (c.exclude ? " ex" : ""));
       x.append(el("span", "", c.label), el("span", "x", "×"));
-      x.title = c.exclude ? T("left out") : "";
+      x.title = c.label + (c.exclude ? " · " + T("left out") : "");
       x.onclick = () => b.set(c.filter.replace(/^-/, ""), 0);
       chips.append(x);
     }
@@ -173,7 +178,7 @@ export function createBar(opts) {
         x.append(el("span", "l", v.label));
         if (v.cur) x.append(el("span", "curv", T("this game")));
         x.append(el("span", "n", String(v.count)));
-        x.title = T("left click: only these · right click or x: leave these out");
+        x.title = v.label + "\n" + T("left click: only these · right click or x: leave these out");
         x.dataset.at = gi + ":" + vi;
         x.tabIndex = -1;
         x.onclick = () => b.set(v.filter, v.on === 1 ? 0 : 1);

@@ -327,10 +327,10 @@ var steamcmdFlag = Flag{Name: "install-steamcmd", Help: "download SteamCMD from 
 func init() {
 	register(&Command{Name: "env branches", Summary: "list RimWorld's Steam branches (versions) SteamCMD can download", MaxArgs: 0,
 		Flags: []Flag{steamcmdFlag}, Run: envBranches})
-	register(&Command{Name: "env download", Args: "<branch>", Summary: "download a RimWorld version with SteamCMD and add it as an environment (you log in in SteamCMD)",
+	register(&Command{Name: "env download", Args: "<branch>", Summary: "download a RimWorld version with SteamCMD and add it as an environment (anonymous by default)",
 		MinArgs: 1, MaxArgs: 1, Flags: []Flag{
 			{Name: "to", Value: "<dir>", Help: "the new game folder"},
-			{Name: "account", Value: "<name>", Help: "your Steam account name (the password is typed in SteamCMD, never in RimArcho)"},
+			{Name: "account", Value: "<name>", Help: "override steamcmd.account for this download; anonymous forces anonymous login (the default when no account is set)"},
 			{Name: "name", Value: "<env>", Help: "the environment's name (default: the version, e.g. 1.6)"},
 			{Name: "saves", Value: "shared|own"},
 			steamcmdFlag,
@@ -379,19 +379,25 @@ func envBranches(c *Ctx, a *Args) (*render.Doc, error) {
 		rows = append(rows, []string{b.Name, v, b.Description, when})
 	}
 	root.AddColumns(rows)
-	d.AddNext("archo env download <branch> --to <dir> --account <name>")
+	d.AddNext("archo env download <branch> --to <dir>")
 	return d, nil
 }
 
 func envDownload(c *Ctx, a *Args) (*render.Doc, error) {
-	if a.Str("to") == "" || a.Str("account") == "" {
-		return nil, &UsageError{Msg: "give the folder (--to) and your Steam account name (--account)"}
+	if a.Str("to") == "" {
+		return nil, &UsageError{Msg: "give the folder (--to)"}
 	}
 	if err := needSteamCMD(c, a); err != nil {
 		return nil, err
 	}
-	fmt.Fprintln(os.Stderr, "SteamCMD asks for the password and the Steam Guard code below; RimArcho does not see them.")
-	r, err := c.App.DownloadGame(app.DownloadSpec{Branch: a.Pos[0], Dir: a.Str("to"), Account: a.Str("account"), Name: a.Str("name"), Saves: a.Str("saves")}, nil)
+	account, err := c.App.SteamCMDAccount(a.Str("account"))
+	if err != nil {
+		return nil, err
+	}
+	if account != "anonymous" {
+		fmt.Fprintln(os.Stderr, "SteamCMD asks for the password and the Steam Guard code below; RimArcho does not see them.")
+	}
+	r, err := c.App.DownloadGame(app.DownloadSpec{Branch: a.Pos[0], Dir: a.Str("to"), Account: account, Name: a.Str("name"), Saves: a.Str("saves")}, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -42,7 +42,7 @@ func HistoryItems(a *app.App, st *app.LoadoutState) ([]HistItem, error) {
 		if i == 20 {
 			break
 		}
-		src := map[string]string{"user": T("saved"), "external": T("changed outside RimArcho"), "import": T("first seen"), "undo": T("restored")}[v.Source]
+		src := map[string]string{"user": T("written to the game"), "external": T("changed outside RimArcho"), "import": T("first seen"), "undo": T("went back")}[v.Source]
 		if src == "" {
 			src = v.Source
 		}
@@ -75,9 +75,16 @@ func StepText(st *app.LoadoutState, s app.HistoryStep) string {
 			return Tf("switched to %s", name(c.Entry))
 		}
 	}
-	op := T(s.Op)
+	op := s.Op
+	if w, ok := stepWords[op]; ok {
+		op = w
+	}
+	op = T(op)
 	if rest, ok := strings.CutPrefix(s.Op, "import "); ok {
 		op = Tf("import %s", rest)
 	}
 	return Tf("%s · %d changes", op, len(s.Changes))
 }
+
+// stepWords are the edit names (app's op codes) the interface says in other words (06 §7.2).
+var stepWords = map[string]string{"checkout": "back to an older version", "swap": "switch version", "restore": "put back"}

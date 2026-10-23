@@ -15,7 +15,7 @@ import (
 // of §3.7 and may hold tag: type: has: version: words of its own.
 
 // BarKeys are the editor bar's groups in the order shown.
-var BarKeys = []string{"tag", "source", "version", "content", "has"}
+var BarKeys = []string{"tag", "source", "location", "version", "content", "has"}
 
 // barValues are the fixed values of a group, in the order shown (tags and versions come
 // from the rows).
@@ -94,6 +94,11 @@ func barRowValues(it *Item, key string, f MatchFacts) []string {
 		return it.Tags
 	case "version":
 		return it.Versions
+	case "location":
+		if it.Location != "" {
+			return []string{it.Location}
+		}
+		return nil
 	}
 	var out []string
 	for _, v := range barValues[key] {
@@ -217,7 +222,7 @@ func sortBar(k string, vs []LibChoice) {
 		switch k {
 		case "version":
 			return versionNewer(val(a), val(b))
-		case "tag":
+		case "tag", "location":
 			if a.Count != b.Count {
 				return a.Count > b.Count
 			}
@@ -228,7 +233,7 @@ func sortBar(k string, vs []LibChoice) {
 }
 
 func barKeyTitle(k string) string {
-	return map[string]string{"tag": T("tags"), "source": T("library source"), "version": T("supported versions"), "content": T("content"), "has": T("has")}[k]
+	return map[string]string{"tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "content": T("content"), "has": T("has")}[k]
 }
 
 func barValueText(k, v string) string {

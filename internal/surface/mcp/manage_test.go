@@ -141,7 +141,7 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 	}
 	var ignored string
 	list := filepath.Join(e.Root, "list.txt")
-	light := filepath.Join(e.Root, "first.archopack.json")
+	packList := filepath.Join(e.Root, "first.archolist.json")
 	crowDB := filepath.Join(e.Root, "RimCrow", "data", "mod_manager.db")
 	s := func(tool string, args map[string]any, cli ...string) func() manageStep {
 		return func() manageStep { return manageStep{tool, args, cli} }
@@ -196,8 +196,8 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("manage_packs", map[string]any{"action": "unlink", "dry_run": true}, "pack", "unlink", "--dry-run"),
 		s("manage_packs", map[string]any{"action": "unlink"}, "pack", "unlink"),
 		s("list_problems", map[string]any{"code": "pack"}, "problems", "--code", "pack", "--min-severity", "warning"),
-		s("manage_packs", map[string]any{"action": "export", "name": "first", "file": light, "light": true}, "pack", "export", "first", light, "--light"),
-		s("manage_packs", map[string]any{"action": "import", "file": light}, "pack", "import", light),
+		s("manage_packs", map[string]any{"action": "export", "name": "first", "file": packList, "list": true}, "pack", "export", "first", packList, "--list"),
+		s("manage_packs", map[string]any{"action": "import", "file": packList}, "pack", "import", packList),
 		s("manage_packs", map[string]any{"action": "stop", "name": "first"}, "pack", "stop", "first"),
 		s("manage_packs", map[string]any{"action": "remove", "name": "first", "dry_run": true}, "pack", "remove", "first", "--dry-run"),
 		s("manage_packs", map[string]any{"action": "remove", "name": "first"}, "pack", "remove", "first"),

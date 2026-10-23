@@ -13,11 +13,11 @@ import (
 // Subscribing through the Steam client (06 §2.9, 08 §10).
 func init() {
 	dry := []Flag{{Name: "dry-run", Help: "show what would happen"}}
-	register(&Command{Name: "workshop unsubscribe", Args: "<ref…>", Summary: "unsubscribe in Steam: Steam deletes the Workshop folder (refused while enabled, in a plan, or the game runs)",
+	register(&Command{Name: "workshop unsubscribe", Args: "<ref…>", Summary: "unsubscribe in Steam: Steam deletes the Workshop folder (refused while the game runs; plans that use it show it missing)",
 		MinArgs: 1, MaxArgs: -1, Flags: dry, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return workshopCmd(c, a, steamworks.Unsubscribe) }})
 	register(&Command{Name: "workshop subscribe", Args: "<ref…>", Summary: "subscribe again in Steam to an unsubscribed leftover",
 		MinArgs: 1, MaxArgs: -1, Flags: dry, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return workshopCmd(c, a, steamworks.Subscribe) }})
-	register(&Command{Name: "workshop state", Args: "<ref…>", Summary: "ask Steam whether items are subscribed, installed, waiting for an update",
+	register(&Command{Name: "workshop state", Args: "<ref…>", Summary: "ask Steam for item state; without Steam, show local folders with account state unknown",
 		MinArgs: 1, MaxArgs: -1, Run: workshopStateCmd})
 }
 
@@ -49,6 +49,9 @@ func workshopCmd(c *Ctx, a *Args, action string) (*render.Doc, error) {
 			}
 			n.KV("folder", what+" "+it.Folder)
 		}
+		if len(it.UsedBy) > 0 {
+			n.KV("warning", usedByWarning(it.UsedBy))
+		}
 		if it.Result != "" {
 			n.KV("steam", it.Result+" · "+steamworks.StateText(it.State))
 		}
@@ -73,9 +76,26 @@ func workshopStateCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("Steam state of %d Workshop items", len(op.Items)))
+	head := fmt.Sprintf("Steam state of %d Workshop items", len(op.Items))
+	if op.Local {
+		head = fmt.Sprintf("Local state of %d Workshop items (Steam account state unknown)", len(op.Items))
+	}
+	d, root := render.New(head)
+	if op.Local {
+		root.KV("note", op.Note+"; showing local folders only; subscription and update state unknown")
+	}
 	for _, it := range op.Items {
-		root.Add(fmt.Sprintf("%s %s  ws:%s  %s", ix.Ref(it.ID), it.Name, it.WorkshopID, steamworks.StateText(it.State)))
+		state := steamworks.StateText(it.State)
+		if op.Local {
+			state = "no local folder found"
+			if it.Installed {
+				state = "local folder present"
+			}
+		}
+		n := root.Add(fmt.Sprintf("%s %s  ws:%s  %s", ix.Ref(it.ID), it.Name, it.WorkshopID, state))
+		if op.Local {
+			n.KV("folder", it.Folder)
+		}
 	}
 	return d, nil
 }

@@ -130,22 +130,31 @@ func TestPackBuildAndLaunch(t *testing.T) {
 	}
 }
 
-// K5 and export/import: a light pack compared with the installed mods; a full pack exported,
-// removed and unpacked again.
+// K5 and export/import: a pack's list (a RimArcho list) compared with the installed mods; a
+// pack exported, removed and unpacked again.
 func TestPackExportImport(t *testing.T) {
 	e := packEnv(t)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("pack", "build", "first")
-	light := filepath.Join(e.Root, "first.archopack.json")
-	e.MustRun("pack", "export", "first", light, "--light")
-	out := e.MustRun("pack", "import", light)
-	if !strings.Contains(out, "same version installed: 2") || !strings.Contains(out, "not installed: 0") {
+	list := filepath.Join(e.Root, "first.archolist.json")
+	if out := e.MustRun("pack", "export", "first", list, "--list"); !strings.Contains(out, "exported the list of pack first") {
+		t.Fatalf("export --list:\n%s", out)
+	}
+	if b, _ := os.ReadFile(list); strings.Contains(string(b), `"folder"`) || strings.Contains(string(b), `"bytes"`) {
+		t.Fatalf("the list carries file details:\n%s", b)
+	}
+	out := e.MustRun("pack", "import", list)
+	if !strings.Contains(out, "list first: ") || !strings.Contains(out, "same version installed: 2") || !strings.Contains(out, "not installed: 0") {
 		t.Fatalf("K5:\n%s", out)
 	}
 	e.WriteFile(filepath.Join(e.Workshop, "1001", "Defs", "Changed.xml"), "<Defs><ThingDef><defName>C</defName></ThingDef></Defs>")
 	scanNow(t, e)
-	if out := e.MustRun("pack", "import", light, "--as-plan"); !strings.Contains(out, "another version installed: 1") || !strings.Contains(out, "now holds the pack's list") {
+	if out := e.MustRun("pack", "import", list, "--as-plan"); !strings.Contains(out, "another version installed: 1") || !strings.Contains(out, "now holds the list") {
 		t.Fatalf("K5 after an update:\n%s", out)
+	}
+	// loadout import reads the same file and names the mods in another version
+	if out := e.MustRun("loadout", "import", list); !strings.Contains(out, "from a RimArcho list") || !strings.Contains(out, "another version installed: 1") {
+		t.Fatalf("loadout import of the list:\n%s", out)
 	}
 
 	full := filepath.Join(e.Root, "first.archopack")

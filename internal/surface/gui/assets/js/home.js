@@ -8,9 +8,10 @@
 // Data: API.Home (view.BuildHome, view.AddOtherEnvs, view.PickFeatured) and
 // API.HomeBackground (the image, its dimming, blur and focus; 06 §2.14).
 import { S, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, changesPlan } from "./screens.js";
+import { openScreen, page, changesPlan, beginPageRead } from "./screens.js";
 import { icon } from "./icons.js";
 import { launchPack } from "./packs.js";
+import { withEnvironmentSwitch } from "./environment.js";
 
 let ui = null;
 export function initHome(u) {
@@ -26,11 +27,16 @@ let rows = []; // the applied row first, then the others in the home order
 let cur = 0;   // the keyboard's row
 
 export async function home() {
-  try { [data, bg] = await Promise.all([api.Home(), api.HomeBackground()]); } catch (e) { say("fail", errText(e)); return; }
+  const read = beginPageRead("home");
+  let next, backdrop;
+  try { [next, backdrop] = await Promise.all([api.Home(), api.HomeBackground()]); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
+  data = next; bg = backdrop;
   const all = data.rows || [];
   rows = data.featured >= 0 ? [all[data.featured], ...all.filter((_, i) => i !== data.featured)] : all;
   cur = Math.min(cur, Math.max(rows.length - 1, 0));
   draw();
+  read.finish();
 }
 
 const featured = () => (data && data.featured >= 0 ? rows[0] : null);
@@ -50,7 +56,7 @@ export function homeKey(e) {
   if (k === "Enter") { e.preventDefault(); if (rows[cur]) act(rows[cur]); return; }
   if (k !== "L" && !(k === "l" && e.shiftKey)) return;
   const r = featured();
-  if (!r || r.light || running()) return;
+  if (!r || running()) return;
   e.preventDefault();
   launch(r);
 }
@@ -84,7 +90,7 @@ function draw() {
   // no page actions: rescanning is Mod 库's, a new plan is 方案's
   const w = page("home", "");
   sc.append(w);
-  if (!rows.length) { w.append(el("div", "card empty-state", T("no environment yet: add one on the environment page"))); return; }
+  if (!rows.length) { w.append(el("div", "card empty-state", T("no game yet: add one on the games page"))); return; }
   const menu = el("div", "hm-menu");
   const list = el("div", "hm-list");
   rows.forEach((r, i) => list.append(line(r, i)));
@@ -127,7 +133,7 @@ function setCur(i) {
   if (d) d.scrollIntoView({ block: "nearest" });
 }
 
-const kindTag = (r) => el("span", "kind", r.kind === "plan" ? T("plan") : T("pack"));
+const kindTag = (r) => el("span", "kind", r.kind === "plan" ? T("list") : T("pack"));
 
 // line: [kind] name / versions · mods · played, and 编辑 ↵ or 应用 ↵ on the right.
 function line(r, i) {
@@ -158,7 +164,6 @@ function launcher(r) {
   const where = el("div", "where");
   where.append(r.env + " · ", el("b", "", r.name));
   box.append(where);
-  if (r.light) return box;
   const stack = el("div", "stack");
   const b = el("button", "btn launch primary");
   const i = el("span", "ic");
@@ -211,10 +216,17 @@ function problem(r) {
 
 // apply: 应用 (06 §2.3) — the row becomes the applied one, at the top.
 async function apply(r) {
-  try { say("ok", await api.HomeApply(r.kind, r.envName, r.plan || 0, r.kind === "pack" ? r.name : "")); } catch (e) { return say("fail", errText(e)); }
-  cur = 0;
-  await ui.reload();
-  await home();
+  const run = async () => {
+    const text = await api.HomeApply(r.kind, r.envName, r.plan || 0, r.kind === "pack" ? r.name : "");
+    cur = 0;
+    await ui.reload();
+    await home();
+    say("ok", text);
+  };
+  try {
+    if (r.otherEnv) await withEnvironmentSwitch(r.envName, run);
+    else await run();
+  } catch (e) { say("fail", errText(e)); }
 }
 
 // activity: the last game (only once there was one) and the current plan's changes since

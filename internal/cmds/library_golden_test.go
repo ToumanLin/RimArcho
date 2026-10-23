@@ -38,6 +38,8 @@ func TestGoldenLibrary(t *testing.T) {
 	runGolden(t, "library", e, []step{
 		cmd("library"),
 		cmd("library", "--facets"),
+		cmd("library", "--include", "location:"+filepath.Join(e.Game, "Mods")),
+		cmd("library", "--exclude", "location:"+e.Workshop),
 		cmd("library", "--include", "used:none", "--exclude", "source:workshop"),
 		cmd("library", "--include", "state:residue", "--include", "state:missing"),
 		cmd("library", "--search", "qol"),

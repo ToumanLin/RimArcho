@@ -1,6 +1,6 @@
 # RimArcho
 
-<img src="docs/assets/rimarcho.svg" width="96" alt="RimArcho icon: a stone arch with an amber keystone">
+<img src="docs/assets/rimarcho.svg" width="96" alt="RimArcho icon: Archo chan">
 
 A one-stop RimWorld launcher that understands its players. Pick your mods, put them in order, check
 that the game will run, launch it, and find out why when something breaks, all in one place. It is
@@ -41,12 +41,17 @@ What it knows about your installation:
   dependency or mentioned) together with the evidence, the file and line, and the next step.
 - **Code.** It decompiles assemblies on demand with ilspycmd and caches the result per DLL hash.
 
-RimArcho never writes to the game, Workshop or `Mods/` folders, with two exceptions that you ask for
-yourself: `save` (ModsConfig.xml) and `copy-local` (a new folder in `Mods/`). When you enable a mod
+Requested actions write game files: `save` writes ModsConfig.xml and `copy-local` creates a new
+folder in `Mods/`. When you enable a mod
 from a SteamCMD or extra folder, `save` also links it into `Mods/` as `_Archo_<source>_<folder>` (a
 junction, no admin rights needed) and removes that link once you disable it. It only creates and
 deletes links with that prefix and never writes into their targets. Its own data lives in
 `%APPDATA%\RimArcho\`.
+
+Switching environments also prepares missing links needed by the destination's mod list
+before scanning it: shared mods such as Archo Monitor, and local mods from the previous
+environment. Local links use `_Archo_env_<instance>` and stay installed across plan changes.
+Existing local copies are kept; switching does not write ModsConfig.xml.
 
 ## Install
 
@@ -111,10 +116,28 @@ under the cursor) and `u` undoes them. The top line always says where you are.
 | `R`, `A`, `E` | rescan; check the files again; switch environment |
 | `ctrl+k`, `?` | command palette; all keys |
 
+The filter bar in the plan editor and mod library includes **Location**: the registered
+source folder (for example, the game's `Mods/`, Workshop, or an individual SteamCMD or extra
+folder). Pick several locations to include any of them, or exclude a location with a right
+click. Locations combine with the other filter groups. Search also accepts
+`location:"D:\Steam Library\steamapps\common\RimWorld\Mods"`; the CLI uses
+`archo library --include 'location:D:\Steam Library\steamapps\common\RimWorld\Mods'`.
+
 In the window, the mouse does the same: click, `shift`/`ctrl`+click, double-click to enable or
 disable, drag between lists (enable, disable, stage) or within Enabled (reorder), right-click for
 what you can do with the mod. The language follows the system; change it with
 `archo config set ui.lang zh|en|auto`.
+
+Settings lists every registered game, Workshop, SteamCMD and other mod directory, together with
+RimArcho's lock library and packs directory. Each entry shows its actual path, including default
+locations. **Locate** reconnects a folder you moved yourself; **Move to…** moves it to a new path.
+Mod identities, tags and lists stay attached to the directory. A destination already in use is
+never overwritten. For moves across drives, move the folder with your file manager and use Locate.
+
+RimArcho checks these directories at every start. If one is missing or changed, it asks for its
+new location; you can skip the prompt and return through Settings or **Can it run**. Directory
+issues appear there as warnings. CLI users can run `archo folder check`, then
+`archo folder set <directory-id> <new-directory>` or `archo folder move <directory-id> <new-directory>`.
 
 ## Connecting an agent (`archo mcp`)
 

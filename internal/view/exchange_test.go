@@ -146,7 +146,7 @@ func TestImportApplyIsOneStep(t *testing.T) {
 	if got := enabled(t, e); got != "Core,Harmony,Beta,Alpha,missing:someone.gone" {
 		t.Fatalf("replace: %s", got)
 	}
-	if !strings.Contains(text, "not saved yet") {
+	if !strings.Contains(text, "not written to the game yet") {
 		t.Fatalf("status: %s", text)
 	}
 	e.MustRun("undo")
@@ -228,9 +228,36 @@ func TestExport(t *testing.T) {
 			t.Fatalf("%s: overwrote without asking", f.ID)
 		}
 	}
-	il, _ := app.ReadLoadoutFile(filepath.Join(dir, "rimcrow-xml-"+view.ExportFormats(e.App)[2].File))
+	file := map[string]string{}
+	for _, f := range view.ExportFormats(e.App) {
+		file[f.ID] = filepath.Join(dir, f.ID+"-"+f.File)
+	}
+	il, _ := app.ReadLoadoutFile(file[app.FormatRimCrowXML])
 	if il.Format != "rimcrow-modlist" || il.Workshop["tester.a"] != "1001" || il.Names["tester.a"] != "Alpha" {
 		t.Fatalf("RimCrow ModList.xml: %+v", il)
+	}
+	// a RimArcho list carries each mod's version: the preview marks the ones installed in
+	// another version once the Workshop copy has changed
+	if !strings.HasSuffix(file[app.FormatArcho], ".archolist.json") {
+		t.Fatalf("RimArcho list file %s", file[app.FormatArcho])
+	}
+	e.WriteFile(filepath.Join(e.Workshop, "1001", "Defs", "Changed.xml"), "<Defs><ThingDef><defName>C</defName></ThingDef></Defs>")
+	e.MustRun("scan")
+	imp, err := view.ReadImport(e.App, view.ImportFile, file[app.FormatArcho])
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := view.PreviewImport(e.App, imp)
+	if err != nil || p.Format != "RimArcho list" || p.Other != 1 || !strings.Contains(p.Summary, "1 in another version") {
+		t.Fatalf("RimArcho list preview: %v %+v", err, p)
+	}
+	for _, r := range p.Installed {
+		if r.Other != (r.Package == "tester.a") {
+			t.Fatalf("row %+v", r)
+		}
+	}
+	if lines := strings.Join(p.Lines(), "\n"); !strings.Contains(lines, "another version installed: 1") || !strings.Contains(lines, "  Alpha") {
+		t.Fatalf("preview lines:\n%s", lines)
 	}
 	before, _ := os.ReadFile(e.ModsConfig)
 	if _, err := view.ExportTo(e.App, app.FormatModsConfig, e.ModsConfig, true); err == nil {

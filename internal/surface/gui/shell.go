@@ -39,7 +39,7 @@ func (s *API) Shell() *Shell {
 	}
 	count := 0
 	if st := s.boardState(); st != nil {
-		count = s.needsLocked(false).Count
+		count = s.needsLocked().Count
 		out.Env = view.EnvChip(s.board.EnvName, s.board.GameVersion)
 	} else {
 		out.Env = view.EnvChip("", "")
@@ -55,7 +55,7 @@ func (s *API) Shell() *Shell {
 		}
 	}
 	out.Nav = view.Nav(count, out.Plans, packs)
-	ids := []string{view.PageSettings}
+	ids := []string{view.PageSettings, view.PageTasks}
 	for _, g := range out.Nav {
 		for _, it := range g.Items {
 			ids = append(ids, it.ID)
@@ -72,23 +72,27 @@ func (s *API) Shell() *Shell {
 
 // Home is the home page (06 §2.3).
 func (s *API) Home() *view.Home {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.boardState()
-	if st == nil {
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return &view.Home{Featured: -1}
+	}
+	b, err := view.BuildBoard(r)
+	if err != nil || b.St == nil {
 		return &view.Home{}
 	}
+	st := b.St
 	// The last run's line reads Player.log when it is newer than the one read last (06
 	// §2.3): the page loads, or the window comes back into focus, after a game.
-	if _, newer := s.a.NewLog(st); newer {
-		s.needsLocked(true)
-	}
-	packs, _, _ := view.PackRows(s.a)
-	plans, _ := view.PlanRows(s.a)
-	h := view.BuildHome(s.a, s.board, s.needsLocked(false), plans, packs)
-	st = s.board.St
-	view.AddOtherEnvs(s.a, h, st.Ix.Env.ID)
-	view.PickFeatured(h, s.a.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
+	_, newer := r.NewLog(st)
+	n, _ := readNeeds(r, newer)
+	packs, _, _ := view.PackRows(r)
+	plans, _ := view.PlanRows(r)
+	h := view.BuildHome(r, b, n, plans, packs)
+	view.AddOtherEnvs(r, h, st.Ix.Env.ID)
+	view.PickFeatured(h, r.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
 	return h
 }
 
@@ -105,6 +109,7 @@ func (s *API) HomeApply(kind, envName string, plan int64, pack string) (string, 
 			return "", err
 		}
 		s.needs, s.board = nil, nil
+		s.logLinks, s.logPath = nil, ""
 	}
 	if kind == view.RowPlan {
 		_, t, err := view.UsePlan(s.a, plan)
@@ -116,7 +121,7 @@ func (s *API) HomeApply(kind, envName string, plan int64, pack string) (string, 
 	}
 	st = s.boardState()
 	if st == nil {
-		return "", fmt.Errorf("no environment")
+		return "", fmt.Errorf("no game")
 	}
 	return view.Tf("%s is ready to launch", pack), s.a.Store.SetMeta(view.FeaturedKey, view.FeaturedValue(envName, pack, st.Plan.ID))
 }
@@ -225,9 +230,12 @@ func (s *API) RemovePlan(id int64) (*PlanDone, error) {
 
 // GuideFind lists the RimWorld installs detection finds.
 func (s *API) GuideFind() []view.GameFound {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.FindGames(s.a)
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil
+	}
+	defer r.Close()
+	return view.FindGames(r)
 }
 
 // GuideGame checks a game folder the player typed.
@@ -324,13 +332,16 @@ func scanLine(out string) string {
 	return view.T("scan complete")
 }
 
-// PackImport reads a pack file (pack import, 08 §5.4): a full pack goes to the packs
-// folder; a light pack's list becomes the current list (one undo step).
+// PackImport unpacks a pack file (.archopack) into the packs folder (pack import, 08
+// §5.4). A RimArcho list goes through the import preview like any other list.
 func (s *API) PackImport(path string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	path = strings.Trim(strings.TrimSpace(path), `"'`)
-	m, err := s.a.ImportPack(path, true)
+	if !app.IsPackZip(path) {
+		return "", errors.New(view.Tf("%s is not a pack (.archopack)", path))
+	}
+	m, err := s.a.ImportPack(path, false)
 	s.board, s.needs = nil, nil
 	if err != nil {
 		return "", errors.New(view.Humanize(nil, err.Error()))
@@ -343,6 +354,7 @@ func (s *API) PackImport(path string) (string, error) {
 // DownloadInfo is what the download step shows: SteamCMD (or the offer to download it from
 // Valve, with its size), RimWorld's branches, and a folder for the game.
 type DownloadInfo struct {
+	Account  string             `json:"account"`  // effective default; no password
 	SteamCMD string             `json:"steamcmd"` // "" when it is not installed
 	Offer    *app.SteamCMDOffer `json:"offer,omitempty"`
 	Branches []app.GameBranch   `json:"branches,omitempty"`
@@ -357,7 +369,8 @@ func (s *API) GuideDownloadInfo() *DownloadInfo {
 	a := s.a
 	games := gamesFolder(a)
 	s.mu.Unlock()
-	d := &DownloadInfo{SteamCMD: a.SteamCMDPath(), Games: games}
+	account, _ := a.SteamCMDAccount("")
+	d := &DownloadInfo{SteamCMD: a.SteamCMDPath(), Games: games, Account: account}
 	if d.SteamCMD == "" {
 		d.Offer, _ = a.OfferSteamCMD()
 		return d
@@ -407,9 +420,15 @@ func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
 		s.mu.Unlock()
 		return false, errors.New(view.Humanize(nil, err.Error()))
 	}
+	account, err := s.a.SteamCMDAccount(account)
+	if err != nil {
+		s.mu.Unlock()
+		return false, errors.New(view.Humanize(nil, err.Error()))
+	}
+	spec := app.DownloadSpec{Branch: branch, Dir: dir, Account: account, Name: strings.TrimSpace(name), Console: true}
 	s.busy["download"] = true
 	s.mu.Unlock()
-	spec := app.DownloadSpec{Branch: branch, Dir: dir, Account: strings.TrimSpace(account), Name: strings.TrimSpace(name), Console: true}
+	task := s.beginSelf(view.TaskDownload, branch, nil)
 	go func() {
 		var r *app.SourceChangeEnv
 		got, err := s.a.FetchGame(spec, func(p app.DownloadProgress) { s.send("download", p) })
@@ -425,8 +444,10 @@ func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
 		s.mu.Unlock()
 		if err != nil {
 			end["ok"], end["error"] = false, view.DownloadErrorText(err)
+			s.tasks.Finish(task, app.TaskFailed, view.DownloadErrorText(err))
 		} else {
 			end["ok"], end["env"] = true, r.Env.Name
+			s.endSelf(task, nil, r.Env.Name)
 		}
 		s.send("download", end)
 	}()

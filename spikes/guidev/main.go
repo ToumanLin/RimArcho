@@ -7,7 +7,7 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -45,6 +45,9 @@ export const Events = { On: (n, f) => { (subs[n] = subs[n] || []).push(f); } };
 //
 //go:embed esccheck.js
 var escCheck string
+
+//go:embed pagecheck.html pagecheck.js pagecheck-runtime.js
+var pageCheck embed.FS
 
 type hub struct {
 	mu   sync.Mutex
@@ -98,12 +101,24 @@ func main() {
 	}
 	h := &hub{}
 	api := gui.NewAPI(a, h.emit)
+	defer api.Close()
 	api.Exe, _ = filepath.Abs(*exe)
 	page, err := gui.PageHandler(api)
 	if err != nil {
 		log.Fatal(err)
 	}
 	mux := http.NewServeMux()
+	mux.Handle("/dev/pagecheck", http.RedirectHandler("/dev/pagecheck.html", http.StatusTemporaryRedirect))
+	for _, name := range []string{"pagecheck.html", "pagecheck.js", "pagecheck-runtime.js"} {
+		mux.HandleFunc("/dev/"+name, func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
+			if *assets != "" {
+				http.ServeFile(w, r, filepath.Join("spikes", "guidev", name))
+				return
+			}
+			http.StripPrefix("/dev/", http.FileServer(http.FS(pageCheck))).ServeHTTP(w, r)
+		})
+	}
 	mux.HandleFunc("/wails/runtime.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		fmt.Fprint(w, shim)

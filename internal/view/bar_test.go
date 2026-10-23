@@ -76,6 +76,50 @@ func TestFilterBoardGroups(t *testing.T) {
 	}
 }
 
+func TestFilterBoardLocations(t *testing.T) {
+	b := barBoard()
+	workshop, local := `D:\Steam Library\workshop`, `D:\RimWorld\Mods`
+	for col := 0; col < 2; col++ {
+		for i := range b.Cols[col] {
+			it := &b.Cols[col][i]
+			it.Location = local
+			if it.Kind == "workshop" {
+				it.Location = workshop
+			}
+		}
+	}
+	cases := []struct {
+		search  string
+		filters []string
+		want    string
+	}{
+		{"", []string{"location:" + strings.ToLower(workshop)}, "[[0 2] [0]]"},
+		{"", []string{"location:" + workshop, "location:" + local}, "[[0 1 2] [0 1]]"},
+		{"", []string{"-location:" + workshop}, "[[1] [1]]"},
+		{"", []string{"location:" + workshop, "tag:美化"}, "[[0] [0]]"},
+		{`location:"D:\Steam Library\workshop"`, nil, "[[0 2] [0]]"},
+		{`-location:"D:\Steam Library\workshop"`, nil, "[[1] [1]]"},
+		{"", []string{`location:D:\Steam`}, "[[] []]"}, // exact root, not a prefix
+	}
+	for _, c := range cases {
+		got := FilterBoard(b, c.search, c.filters, MatchFacts{}, false, "1.6")
+		if fmt.Sprint(got.Rows) != c.want {
+			t.Errorf("%q %v: got %v, want %s", c.search, c.filters, got.Rows, c.want)
+		}
+	}
+	got := FilterBoard(b, "", []string{"location:" + workshop}, MatchFacts{}, true, "1.6")
+	for _, g := range got.Groups {
+		if g.Key != "location" {
+			continue
+		}
+		if len(g.Values) != 2 || g.Values[0].Filter != "location:"+workshop || g.Values[0].Count != 3 || g.Values[0].On != 1 || g.Values[1].Count != 2 {
+			t.Fatalf("location choices: %+v", g.Values)
+		}
+		return
+	}
+	t.Fatal("no location group")
+}
+
 // J / K while the bar filters: the rows trade places with the shown rows (06 §3.5).
 func TestStepAt(t *testing.T) {
 	// 10 enabled mods; the bar shows 2, 5, 8, 9

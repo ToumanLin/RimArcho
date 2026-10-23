@@ -30,7 +30,7 @@ func init() {
 		"converting textures":                         "正在转换贴图",
 		"the DDS of mods' PNG textures, next to them": "把 Mod 的 PNG 贴图转成 DDS，放在 PNG 旁边",
 		"todds (the DDS encoder) is downloaded":       "已下载贴图编码器 todds",
-		"the current plan":                            "当前方案",
+		"the current plan":                            "当前列表",
 		"every installed mod":                         "全部已安装的 Mod",
 		"scale":                                       "缩放",
 		"encoder":                                     "编码器",

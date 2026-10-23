@@ -25,6 +25,8 @@ import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
 import * as tex from "./textures.js";
+import * as tasksPage from "./tasks.js";
+import { withEnvironmentSwitch } from "./environment.js";
 
 // ---- loading ----
 
@@ -44,6 +46,7 @@ async function reload() {
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
   render();
   detailFollow();
+  await scr.logEnvironmentChanged();
 }
 
 let detailKey = "";
@@ -125,10 +128,10 @@ function planActions() {
     out.push(n);
   } else motion.bump("unwritten", null, 0);
   out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("import / export"), "i", () => exchange(0)),
-    btn(T("build a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
+    btn(T("create a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
   if (plan) {
     const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");
-    more.title = T("the plan: rename, copy, delete") + " · P";
+    more.title = T("the list: rename, copy, delete") + " · P";
     out.push(more);
   }
   // 启动游戏 opens 启动, where the game starts (06 §2.5)
@@ -177,6 +180,7 @@ async function openPage(id) {
     case "settings": return scr.settings();
     case "uninstall": return uninst.open();
     case "textures": return tex.open();
+    case "tasks": return tasksPage.open();
     case "guide": return guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
   }
 }
@@ -190,6 +194,7 @@ function renderWhere() {
   // the cursor is in which list) and in the full detail.
   let s = "";
   if (S.screen === "library") s = library.where(); // a table like the plan's lists
+  else if (S.screen === "tasks") s = tasksPage.where();
   else if (S.screen && S.screen !== "full") s = ""; // a page: the breadcrumb is enough
   else if (S.screen === "full") {
     s = fullPage.fullName();
@@ -213,6 +218,7 @@ function actions() {
   if (S.focus > 2) return [
     { key: "PgDn", label: T("scroll") }, { key: "enter", label: T("full details"), run: () => verb("full") },
     { key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") },
+    { key: "ctrl+s", label: T("steam page"), run: () => verb("steam") },
     { key: "g", label: T("tags"), run: () => verb("tags") },
   ];
   const sel = selection();
@@ -226,11 +232,12 @@ function actions() {
   out.push({ key: "m", label: k === 1 ? T("move to…") : T("enable at…"), run: () => verb("move") });
   // ctrl+o / ctrl+w: the folder and the Workshop page of the cursor's mod (06 §3.5)
   if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") });
+  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+s", label: T("steam page"), run: () => verb("steam") });
   if (k === 1) out.push({ key: "J K", label: T("down / up"), run: null });
   out.push({ key: "g", label: T("tags"), run: () => verb("tags") });
   if (sel.length === 1) {
     out.push({ key: "enter", label: T("full details"), run: () => verb("full") });
-    if (k === 1 && sel[0].id) out.push({ key: "x", label: T("swap for another copy"), run: () => verb("swap") });
+    if (k === 1 && sel[0].id) out.push({ key: "x", label: T("switch version…"), run: () => verb("swap") });
   }
   return out;
 }
@@ -241,6 +248,7 @@ function renderHints() {
   let list = actions();
   if (S.screen === "full") list = fullPage.fullHints();
   else if (S.screen === "library") list = library.hintList();
+  else if (S.screen === "tasks") list = tasksPage.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "home") list = homePage.hintList();
   else if (S.screen === "packs" || S.screen === "build") list = packsPage.hintList();
@@ -383,10 +391,11 @@ async function verb(name) {
       if (S.detail && S.detail.url) return api.OpenURL(S.detail.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
       return say("", T("not a workshop mod"));
     // ctrl+o / ctrl+w: the cursor's mod, not the details (they may still be loading)
-    case "folder": case "workshop-id": {
+    case "folder": case "workshop-id": case "steam": {
       const it = S.focus < 3 ? cur() : cur(lastList);
       if (!it || !it.id) return say("", name === "folder" ? T("RimArcho has not seen this copy: no folder") : T("no Workshop ID: not a Workshop mod"));
       if (name === "folder") return api.OpenFolder(it.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+      if (name === "steam") return api.OpenSteamWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
       return api.OpenWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
     }
     case "swap":
@@ -467,7 +476,7 @@ async function preview(what) {
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures" };
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures", tasks: "tasks" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
@@ -500,12 +509,24 @@ async function cmd(id) {
 
 async function chooseEnv() {
   const envs = (S.board && S.board.envs) || [];
-  if (!envs.length) return say("", T("no environments (archo env add)"));
-  pop.choose(T("switch environment"), envs, async (i) => {
-    try { say("ok", await api.UseEnv(envs[i])); } catch (e) { say("fail", errText(e)); }
-    for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
-    await reload();
-  }, Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove environment"), run: (i) => scr.removeEnv(envs[i]) });
+  if (!envs.length) return say("", T("no games yet (archo env add)"));
+  pop.choose(T("switch game"), envs, (i) => useEnv(envs[i]),
+    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove the game"), run: (i) => scr.removeEnv(envs[i]) });
+}
+
+async function useEnv(name, refresh) {
+  try {
+    return await withEnvironmentSwitch(name, async () => {
+      const text = await api.UseEnv(name);
+      for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
+      await reload();
+      if (refresh) await refresh();
+      say("ok", text);
+    });
+  } catch (e) {
+    say("fail", errText(e));
+    return false;
+  }
 }
 
 function commandLine() {
@@ -520,8 +541,7 @@ async function paletteChoice(o) {
   if (o.kind === 0) return cmd(o.id);
   if (o.kind === 3) return go(o.id);
   if (o.kind === 2) {
-    try { say("ok", await api.UseEnv(o.id)); } catch (e) { say("fail", errText(e)); }
-    return reload();
+    return useEnv(o.id);
   }
   // a mod: go to its list and row; a filter that hides it is cleared (06 §3.5)
   for (const k of [1, 0, 2]) {
@@ -670,7 +690,7 @@ function menuAtCursor() {
 // rowOp runs an op of the menu on the object: the plan's own as their verbs, the version
 // and disk ops as Mod 库存 runs them (a dry run first when they change files).
 async function rowOp(code) {
-  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", workshop: "workshop-id" };
+  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", workshop: "workshop-id", steam: "steam" };
   if (verbs[code]) return verb(verbs[code]);
   const sel = S.focus < 3 ? selection() : (cur(lastList) ? [cur(lastList)] : []);
   const ids = idsOf(sel);
@@ -697,12 +717,15 @@ async function delKey() {
 // ---- the keyboard ----
 
 function onKey(e) {
+  if (S.busy.env) { e.preventDefault(); return; }
   if (e.isComposing) return;
   const k = e.key;
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
   if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
   // ctrl+b moves the navigation between the side and the top, on every page (06 §2.1)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "b") { e.preventDefault(); shell.toggleNav(); return; }
+  // ctrl+j: 后台任务 from any page; again goes back (06 §2.16)
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "j" && !S.popup) { e.preventDefault(); shell.navigated(); tasksPage.toggle(); renderWhere(); return; }
   if (pop.popupKey(e)) return;
   if (document.activeElement && document.activeElement.tagName === "INPUT") return;
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
@@ -724,7 +747,14 @@ function onKey(e) {
     if (S.screen === "full" && (k === "Escape" || k === "Backspace")) { e.preventDefault(); return fullPage.back(); }
     if (e.ctrlKey && k === "k") { e.preventDefault(); return pop.palette(); }
     if (k === "?" && S.screen !== "full") { e.preventDefault(); return pop.help(S.screen); }
+    // Navigation stays available while a new page is loading. Its object shortcuts
+    // must wait for data, including after an initial read failed.
+    if (scr.pageLoading()) {
+      if (S.screen === "build" && k === "Escape") { e.preventDefault(); return go("plan"); }
+      return;
+    }
     // 1–9 focus the page's numbered areas (06 §3.5)
+    if (S.screen === "tasks") return tasksPage.key(e);
     if (S.screen !== "home" && scr.areaKey(e)) return;
     if (S.screen === "home") return homePage.homeKey(e);
     if (S.screen === "packs" || S.screen === "build") return packsPage.packsKey(e);
@@ -782,7 +812,7 @@ function onKey(e) {
     // ctrl+w: the Wails window has no accelerator for it (no app menu, WebView2's
     // accelerator keys off), so preventDefault keeps it ours
     const m = { k: () => pop.palette(), f: () => startSearch(), z: () => verb("undo"), y: () => verb("redo"), r: () => verb("redo"),
-      o: () => verb("folder"), w: () => verb("workshop-id") }[k.toLowerCase()];
+      o: () => verb("folder"), w: () => verb("workshop-id"), s: () => verb("steam") }[k.toLowerCase()];
     if (m) { handled(); m(); }
     return;
   }
@@ -854,7 +884,7 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go,
+  reload, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
@@ -876,6 +906,7 @@ async function start() {
   initExchange(ui);
   plans.initPlans(ui);
   library.initLibrary(ui);
+  tasksPage.initTasks(ui);
   S.bar = createBar({ data: () => S.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:plan",
     column: () => $("#board > .fcol"), resized: () => renderRows(0), leave: () => focusArea(S.focus < 2 ? S.focus : 0),
     placeholder: T("search: words, tag:, author:, type:, has:, version:, -not") + "  /" });
@@ -912,6 +943,10 @@ async function start() {
   on("pack", (ev) => packsPage.packEvent(ev));
   on("uninstall", (ev) => uninst.event(ev));
   on("textures", (ev) => tex.event(ev));
+  on("tasks", (ev) => tasksPage.event(ev));
+  // a task's o on a mod: Mod 库存 searching for it (06 §2.16)
+  document.addEventListener("library-search", async (e) => { shell.navigated(); await library.openSearch(e.detail); renderWhere(); });
+  tasksPage.refreshFoot();
   on("guide", (ev) => guide.guideEvent(ev));
   on("download", (ev) => guide.downloadEvent(ev));
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again
@@ -927,6 +962,7 @@ async function start() {
   if (!S.shell || !S.shell.envs) { await guide.start("first"); shell.settle(); return; }
   await go("home");
   shell.settle();
+  await scr.checkDirectories();
   if (S.board && S.board.neverScanned) cmd("rescan");
 }
 

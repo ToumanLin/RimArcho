@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func parse(t *testing.T, s string) *app.ImportedList {
@@ -91,7 +92,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
 	want := strings.Join(active(t, e), ", ")
-	for _, f := range []string{"text", "modsconfig", "rimsort", "rml", "rimcrow"} {
+	for _, f := range []string{"text", "archo", "modsconfig", "rimsort", "rml", "rimcrow", "rimcrow-xml"} {
 		out := filepath.Join(e.Root, "export."+f)
 		e.MustRun("loadout", "export", "--format", f, "--out", out)
 		e.MustRun("disable", "pkg:tester.a")
@@ -111,5 +112,44 @@ func TestExportImportRoundTrip(t *testing.T) {
 	out := e.MustRun("loadout", "import", ids)
 	if got := strings.Join(active(t, e), ", "); got != "Harmony, A" || !strings.Contains(out, "skipped: 1 workshop IDs") {
 		t.Errorf("workshop IDs: %s\n%s", got, out)
+	}
+}
+
+// A RimArcho list names each mod's content (04 §9.3): an import takes the installed copy
+// with that content where the packageId alone would pick another, and says which mods it
+// only has in another version.
+func TestArchoListPrefersSameContent(t *testing.T) {
+	e := loadoutEnv(t)
+	local := testkit.Sample("tester.a", "A local")
+	local.Files = map[string]string{"Defs/Local.xml": "<Defs><ThingDef><defName>L</defName></ThingDef></Defs>"}
+	e.WriteMod(filepath.Join(e.Game, "Mods", "ALocal"), local)
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony", "tester.a_steam")
+	scanNow(t, e)
+	if got := joined(active(t, e)); got != "Core, Harmony, A" {
+		t.Fatalf("before: %s", got)
+	}
+	list := filepath.Join(e.Root, "w.archolist.json")
+	e.MustRun("loadout", "export", "--format", "archo", "--out", list)
+	if il, err := app.ReadLoadoutFile(list); err != nil || il.Format != app.FormatArcho || il.Hash("tester.a") == "" || il.Workshop["tester.a"] != "1001" {
+		t.Fatalf("read back: %v %+v", err, il)
+	}
+
+	// packageIds alone pick the local copy
+	text := filepath.Join(e.Root, "ids.txt")
+	os.WriteFile(text, []byte("ludeon.rimworld\nbrrainz.harmony\ntester.a\n"), 0o644)
+	e.MustRun("loadout", "import", text)
+	if got := joined(active(t, e)); got != "Core, Harmony, A local" {
+		t.Fatalf("by packageId: %s", got)
+	}
+	// the RimArcho list picks the copy it was made with
+	if out := e.MustRun("loadout", "import", list); joined(active(t, e)) != "Core, Harmony, A" || strings.Contains(out, "another version") {
+		t.Fatalf("by content: %s\n%s", joined(active(t, e)), out)
+	}
+
+	// once the Workshop copy updates, no copy has the list's version: the import says so
+	e.WriteFile(filepath.Join(e.Workshop, "1001", "Defs", "Changed.xml"), "<Defs><ThingDef><defName>C</defName></ThingDef></Defs>")
+	scanNow(t, e)
+	if out := e.MustRun("loadout", "import", list); !strings.Contains(out, "another version installed: 1") {
+		t.Fatalf("after an update:\n%s", out)
 	}
 }

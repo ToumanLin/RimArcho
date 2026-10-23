@@ -68,21 +68,21 @@ func TestLibraryPage(t *testing.T) {
 	if lock.State != "" || lock.Used != "default" {
 		t.Errorf("a lineage with a used copy is not \"in no plan\": %q %q", lock.State, lock.Used)
 	}
-	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"take-out", "move-to", "stage", "swap", "remove", "tags", "note", "folder", "move", "textures"}) {
+	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"take-out", "move-to", "stage", "swap", "remove", "tags", "note", "folder", "move", "textures", "delete"}) {
 		t.Errorf("the Mods/ copy: %v", got)
 	}
-	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"use", "tags", "note", "folder", "workshop", "pin", "textures", "unsubscribe"}) {
+	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"use", "tags", "note", "folder", "workshop", "steam", "pin", "textures", "unsubscribe"}) {
 		t.Errorf("the unused workshop copy beside it (enabling it would clash): %v", got)
 	}
 	hid := libRow(t, p, "Hid")
 	if !hid.Single || hid.State != "被其它管理器隐藏" || hid.Source != "工坊" || hid.Insts[0].Name != "5600" {
 		t.Errorf("hidden: %+v", hid)
 	}
-	if got := kinds(hid.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "folder", "workshop", "unhide", "unsubscribe"}) {
+	if got := kinds(hid.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "folder", "workshop", "steam", "unhide", "unsubscribe"}) {
 		t.Errorf("hidden actions: %v", got)
 	}
 	ghost := libRow(t, p, "工坊条目 5300")
-	if ghost.Insts[0].ID != "" || ghost.Size != "—" || ghost.State != "订阅了但不在磁盘上" || !slices.Equal(kinds(ghost.Insts[0].Ops), []string{"workshop"}) {
+	if ghost.Insts[0].ID != "" || ghost.Size != "—" || ghost.State != "订阅了但不在磁盘上" || !slices.Equal(kinds(ghost.Insts[0].Ops), []string{"workshop", "steam"}) {
 		t.Errorf("ghost: %+v", ghost)
 	}
 	idle := libRow(t, p, "Idle")
@@ -91,7 +91,7 @@ func TestLibraryPage(t *testing.T) {
 	}
 	// filters and conditions
 	p = libPage(t, e, "", "used:none", "-source:local")
-	if p.Shown != 4 || len(p.Conds) != 2 || !p.Conds[1].Exclude || p.Conds[0].Label != "用在 不在任何方案里" {
+	if p.Shown != 4 || len(p.Conds) != 2 || !p.Conds[1].Exclude || p.Conds[0].Label != "用在 不在任何列表里" {
 		t.Errorf("filtered: shown %d conds %+v", p.Shown, p.Conds)
 	}
 	for _, g := range p.Groups {
@@ -101,6 +101,32 @@ func TestLibraryPage(t *testing.T) {
 	}
 	if _, err := view.BuildLibrary(mustLibrary(t, e), "", []string{"nope:x"}, ""); err == nil {
 		t.Error("bad filter")
+	}
+}
+
+func TestLocationFiltersAcrossPages(t *testing.T) {
+	e := libEnv(t)
+	local := filepath.Join(e.Game, "Mods")
+	b, err := view.BuildBoard(e.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := view.FilterBoard(b, "", []string{"location:" + local}, view.MatchFacts{}, false, "1.6")
+	if len(r.Rows[view.Active]) != 1 || b.Cols[view.Active][r.Rows[view.Active][0]].Name != "Lockable" {
+		t.Fatalf("board's local copy: %+v", r.Rows)
+	}
+	p := libPage(t, e, "", "location:"+local)
+	if p.Shown != 1 || len(p.Rows[0].Insts) != 1 || p.Rows[0].Insts[0].Label != "local" {
+		t.Fatalf("library's local copy: %+v", p.Rows)
+	}
+	// The same quoted path syntax works in both search boxes, including spaces and colons.
+	words, filters := view.LibSplitQuery(`Lockable location:"D:\Steam Library\Mods" -location:"E:\Other Mods"`)
+	if words != "Lockable" || !slices.Equal(filters, []string{`location:D:\Steam Library\Mods`, `-location:E:\Other Mods`}) {
+		t.Fatalf("quoted path filters: %q %v", words, filters)
+	}
+	p = libPage(t, e, `location:"`+local+`"`)
+	if p.Shown != 1 {
+		t.Fatalf("typed location: %d rows", p.Shown)
 	}
 }
 
@@ -124,7 +150,7 @@ func TestLibraryDo(t *testing.T) {
 		t.Fatal("enable did not add it")
 	}
 	msg, err := view.LibDo(e.App, view.LibRemove, []string{idle.Ref})
-	if err != nil || !strings.Contains(msg, "1 plans") {
+	if err != nil || !strings.Contains(msg, "1 lists") {
 		t.Fatalf("remove: %q %v", msg, err)
 	}
 	cp := libRow(t, libPage(t, e, ""), "Lockable").Insts[1]

@@ -3,8 +3,8 @@ package view
 // Archo Monitor's text (settings.go, plans.go, live.go; 08 §9, 04 §1.5).
 func init() {
 	Register(map[string]string{
-		"add Archo Monitor to plans": "自动把 Archo Monitor 加进方案",
-		"new plans, and each plan once; after that it is a normal mod you can disable or move": "只管新方案和还没处理过的方案，每个方案只加一次；加进来以后它是普通 Mod，可以停用、移动",
+		"add Archo Monitor to lists": "自动把 Archo Monitor 加进列表",
+		"new lists, and each list once; after that it is a normal mod you can disable or move": "只管新列表和还没处理过的列表，每个列表只加一次；加进来以后它是普通 Mod，可以停用、移动",
 		"Archo Monitor installed":                             "已安装的 Archo Monitor",
 		"Archo Monitor added after Harmony (undo removes it)": "已在 Harmony 后面加入 Archo Monitor（撤销即可去掉）",
 		"not installed":                                       "未安装",
@@ -18,7 +18,7 @@ func init() {
 		"game %s": "游戏 %s", "since %s": "%s 起",
 		"%s, no exit line (it crashed or was killed)":                                                               "%s 起 · 没有退出记录（崩溃或被强制关闭）",
 		"full: no new entries after 32 MiB":                                                                         "已满：32 MiB 之后不再记新条目",
-		"this plan has no Archo Monitor: errors will not say which file or def was loading":                         "这个方案没有 Archo Monitor：报错不会说明当时在加载哪个文件、哪个 Def",
+		"this list has no Archo Monitor: errors will not say which file or def was loading":                         "这个列表没有 Archo Monitor：报错不会说明当时在加载哪个文件、哪个 Def",
 		"Archo Monitor is not installed: errors will not say which file or def was loading (archo monitor install)": "Archo Monitor 未安装：报错不会说明当时在加载哪个文件、哪个 Def（archo monitor install）",
 		"add Archo Monitor":                 "加入 Archo Monitor",
 		"added Archo Monitor after Harmony": "已在 Harmony 后面加入 Archo Monitor",

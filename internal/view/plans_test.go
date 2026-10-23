@@ -57,7 +57,7 @@ func TestPlanVerbs(t *testing.T) {
 	}
 
 	p, text, err := view.NewPlan(a, "Copy", "current")
-	if err != nil || !strings.Contains(text, "new plan Copy: 2 mods") {
+	if err != nil || !strings.Contains(text, "new list Copy: 2 mods") {
 		t.Fatalf("new: %v %q", err, text)
 	}
 	if cur, _ := a.CurrentPlan(); cur.ID != p.ID {
@@ -112,7 +112,7 @@ func TestPlanVerbs(t *testing.T) {
 	if text, err := view.RemovePlan(a, rows[2].ID); err != nil || !strings.HasPrefix(text, "deleted Empty; now editing ") {
 		t.Fatalf("remove: %v %q", err, text)
 	}
-	if _, _, err := view.UsePlan(a, rows[2].ID); err == nil || err.Error() != "that plan is gone" {
+	if _, _, err := view.UsePlan(a, rows[2].ID); err == nil || err.Error() != "that list is gone" {
 		t.Fatalf("a deleted plan: %v", err)
 	}
 	rows = mustPlans(t, a)
@@ -129,7 +129,7 @@ func TestPlanVerbs(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, text, err = view.ImportAsPlan(a, imp, "Pasted")
-	if err != nil || !strings.HasPrefix(text, "new plan Pasted: 3 mods") {
+	if err != nil || !strings.HasPrefix(text, "new list Pasted: 3 mods") {
 		t.Fatalf("import: %v %q", err, text)
 	}
 	st, _ := a.Loadout()
@@ -218,7 +218,7 @@ func TestHomePerPlan(t *testing.T) {
 	for _, r := range h.Rows {
 		order = append(order, r.Name+"="+r.State)
 	}
-	want := "Beta=not checked yet,Pack=checked when built,default=not checked yet,Alpha=1 problems break the game,Zeta=not checked yet"
+	want := "Beta=not checked yet,Pack=checked when created,default=not checked yet,Alpha=1 problems break the game,Zeta=not checked yet"
 	if strings.Join(order, ",") != want {
 		t.Fatalf("order\n got %v\nwant %s", order, want)
 	}

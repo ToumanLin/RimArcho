@@ -14,7 +14,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
-	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Subscribing and unsubscribing through the Steam client (06 §2.9, 08 §10). The call runs in
@@ -30,6 +29,8 @@ type WorkshopOp struct {
 	Action string
 	DryRun bool
 	Items  []WorkshopItem
+	Local  bool   // Steam unavailable: local folders only; account state is unknown
+	Note   string // why the live state is unavailable
 }
 
 // WorkshopItem is one item of the call.
@@ -40,6 +41,10 @@ type WorkshopItem struct {
 	Folder     string // unsubscribe: what Steam deletes
 	Result     string // ok, failed:<EResult>, timeout
 	State      uint32
+	Installed  bool // local fallback: the folder exists now, not a Steam account state
+	// unsubscribe: the plans that use it. The player's word goes: it still goes, and they
+	// show it as missing (06 §2.9).
+	UsedBy []string
 }
 
 // SteamUnavailable is ErrSteamUnavailable with why, and the Workshop pages to open instead.
@@ -55,7 +60,7 @@ func (e *SteamUnavailable) Unwrap() error { return ErrSteamUnavailable }
 
 // Workshop subscribes to (action "subscribe") or unsubscribes from ("unsubscribe") the
 // Workshop items of refs. Unsubscribing makes Steam delete the item's folder, so it is
-// refused while the game runs, while the mod is enabled, or while any plan uses it.
+// refused while the game runs; the plans that use it (UsedBy) show it missing afterwards.
 func (a *App) Workshop(action string, refs []string, dryRun bool) (*WorkshopOp, error) {
 	if action != steamworks.Subscribe && action != steamworks.Unsubscribe {
 		return nil, fmt.Errorf("unknown action %s: want subscribe or unsubscribe", action)
@@ -84,7 +89,7 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (*WorkshopOp, 
 			if m.Residue {
 				return nil, fmt.Errorf("%s is not subscribed (an unsubscribed leftover: archo trash %s moves the folder to the recycle bin)", st.Ix.Ref(m.ID), st.Ix.Ref(m.ID))
 			}
-			if err := a.unsubscribable(st, m); err != nil {
+			if it.UsedBy, err = a.usedBy(st, m.ID); err != nil {
 				return nil, err
 			}
 			if m.Status == identity.Live {
@@ -132,22 +137,8 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (*WorkshopOp, 
 	return op, nil
 }
 
-// unsubscribable: not enabled, in no plan.
-func (a *App) unsubscribable(st *LoadoutState, m *store.Mod) error {
-	if st.List.Index(m.ID) >= 0 {
-		return fmt.Errorf("%s is enabled; disable it first (Steam deletes the folder)", st.Ix.Ref(m.ID))
-	}
-	ps, err := a.usedBy(st, m.ID)
-	if err != nil {
-		return err
-	}
-	if len(ps) > 0 {
-		return fmt.Errorf("%s is used by %s; take it out of them first (archo library remove-from-plans %s)", st.Ix.Ref(m.ID), joinPlans(ps), st.Ix.Ref(m.ID))
-	}
-	return nil
-}
-
-// WorkshopState asks Steam for the items' state (subscribed, installed, needs update…).
+// WorkshopState asks Steam for live state; when unavailable it reports only local folder
+// presence, with subscription and update state explicitly unknown.
 func (a *App) WorkshopState(refs []string) (*WorkshopOp, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -167,9 +158,23 @@ func (a *App) WorkshopState(refs []string) (*WorkshopOp, error) {
 		op.Items = append(op.Items, WorkshopItem{ID: m.ID, Name: m.DisplayName(), WorkshopID: ws})
 		ids = append(ids, ws)
 	}
+	if len(ids) == 0 {
+		return op, nil
+	}
 	rep, err := a.runSteam(steamworks.State, ids)
 	if err != nil {
-		return nil, a.unavailable(err, op.Items)
+		if !errors.Is(err, ErrSteamUnavailable) {
+			return nil, err
+		}
+		op.Local, op.Note = true, err.Error()
+		for k := range op.Items {
+			it := &op.Items[k]
+			m := st.Ix.ByID[it.ID]
+			it.Folder = st.Ix.ModDir(m)
+			it.Installed = m.Status == identity.Live && dirExists(it.Folder)
+			it.Result = "local; subscription and update state unknown"
+		}
+		return op, nil
 	}
 	by := map[string]uint32{}
 	for _, x := range rep.Items {

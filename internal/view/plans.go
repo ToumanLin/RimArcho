@@ -65,7 +65,7 @@ func PlanRows(a *app.App) ([]PlanRow, error) {
 			r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 		}
 		if ws, err := a.Store.Workspace(p.ID); err == nil && ws != nil && ws.Conflict != 0 {
-			r.Conflict, r.ConflictText = true, Tf("an external version was not loaded (v%d)", ws.Conflict)
+			r.Conflict, r.ConflictText = true, Tf("an outside change is not used yet (v%d)", ws.Conflict)
 		}
 		out = append(out, r)
 	}
@@ -193,7 +193,7 @@ func sourceWord(s string) string {
 func FreePlanName(a *app.App, base string) string {
 	base = strings.TrimSpace(base)
 	if base == "" {
-		base = T("new plan")
+		base = T("new list")
 	}
 	ps, _ := a.Plans()
 	taken := map[string]bool{}
@@ -233,7 +233,7 @@ func switchToNew(a *app.App, r *app.NewPlanResult) (*store.Plan, string, error) 
 	if _, err := a.UsePlan(r.Plan.Name); err != nil {
 		return r.Plan, "", err
 	}
-	t := Tf("new plan %s: %d mods; the game's list is unchanged until you write or launch", r.Plan.Name, len(r.List))
+	t := Tf("new list %s: %d mods; the game's list is unchanged until you write or launch", r.Plan.Name, len(r.List))
 	if len(r.Unresolved) > 0 {
 		t += " · " + Tf("%d not installed", len(r.Unresolved))
 	}
@@ -280,7 +280,7 @@ func RemovePlanWarn(a *app.App, id int64) (string, error) {
 		return "", err
 	}
 	if len(ps) <= 1 {
-		return "", errors.New(Tf("%s is the environment's only plan; it cannot be deleted", p.Name))
+		return "", errors.New(Tf("%s is the game's only list; it cannot be deleted", p.Name))
 	}
 	return Tf("delete %s with its history, versions and staging? This cannot be undone. Mods and the game's list stay.", p.Name), nil
 }
@@ -327,7 +327,7 @@ func planByID(a *app.App, id int64) (*store.Plan, error) {
 			return p.Plan, nil
 		}
 	}
-	return nil, errors.New(T("that plan is gone"))
+	return nil, errors.New(T("that list is gone"))
 }
 
 // planErr words app's plan errors for the interfaces (no CLI hints).
@@ -340,7 +340,7 @@ func planErr(err error) error {
 	case s == "a plan needs a name":
 		return errors.New(T(s))
 	case strings.Contains(s, "only plan"):
-		return errors.New(T("the environment's only plan cannot be deleted"))
+		return errors.New(T("the game's only list cannot be deleted"))
 	}
 	return err
 }

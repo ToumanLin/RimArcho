@@ -13,7 +13,7 @@
 // The editor's detail column and Mod 库存's details are the short form of the same parts
 // (detail.js renderDetail, library.js drawDetail).
 import { S, $, el, api, T, Tf, errText, say, cur } from "./state.js";
-import { openScreen, closeScreen, page, seg, button, area } from "./screens.js";
+import { closeScreen, page, seg, button, area, beginPageRead } from "./screens.js";
 import { shimmer } from "./motion.js";
 import { renderDetail } from "./detail.js";
 import { fieldList } from "./fields.js";
@@ -25,7 +25,7 @@ export function initFull(u) { ui = u; }
 
 // F: where the page came from ("plan" or "library"), the mod (an instance id, or a copy
 // ref for a subscribed item RimArcho never saw), and what was loaded for it.
-const F = { from: "plan", id: "", d: null, row: null, secs: null, tab: 0, copy: "", seq: 0 };
+const F = { from: "plan", id: "", env: "", d: null, row: null, secs: null, tab: 0, copy: "", seq: 0 };
 
 // PLAN: the ops that are one plan step (u undoes them), as on Mod 库存.
 const PLAN = new Set(["add", "take-out", "put-back", "stage", "use", "swap", "remove"]);
@@ -38,12 +38,13 @@ export async function full(from, id) {
     id = it.id;
   }
   if (!id) return;
-  if (F.id !== id) { F.tab = 0; F.copy = ""; }
+  if (F.id !== id || F.env !== S.board?.env) { F.tab = 0; F.copy = ""; F.d = F.row = F.secs = null; }
+  F.env = S.board?.env;
   F.from = from;
   F.id = id;
   S.fullFrom = from;
   const n = ++F.seq;
-  openScreen("full");
+  const read = beginPageRead("full");
   draw(true);
   let d = null, cp = null, secs = [];
   try {
@@ -52,8 +53,8 @@ export async function full(from, id) {
       api.ModCopies(id),
       api.Sections(id).catch(() => []),
     ]);
-  } catch (e) { say("fail", errText(e)); }
-  if (n !== F.seq || S.screen !== "full") return;
+  } catch (e) { read.fail(e); return; }
+  if (n !== F.seq || !read.current()) return;
   F.d = d;
   F.row = cp && cp.row;
   S.fullName = fullName();
@@ -65,11 +66,12 @@ export async function full(from, id) {
     F.copy = own ? own.ref : "";
   }
   draw(false);
+  read.finish();
   // the Workshop description once the cursor rested on the mod (06 §4.3 item 3)
   if (d && d.state === "not cached") {
     setTimeout(async () => {
-      if (n !== F.seq) return;
-      try { const f = await api.Detail(id, false, true, false); if (n === F.seq && S.screen === "full") { F.d = f; draw(false); } } catch { /* the note stays */ }
+      if (n !== F.seq || !read.current()) return;
+      try { const f = await api.Detail(id, false, true, false); if (n === F.seq && read.current()) { F.d = f; draw(false); } } catch { /* the note stays */ }
     }, 400);
   }
 }
@@ -86,6 +88,7 @@ function draw(loading) {
   const acts = [];
   if (c && (c.ops || []).includes("folder")) acts.push(button(T("open the folder"), "ctrl+o", () => runOp("folder")));
   if (c && (c.ops || []).includes("workshop")) acts.push(button(T("Workshop page"), "ctrl+w", () => runOp("workshop")));
+  if (c && (c.ops || []).includes("steam")) acts.push(button(T("steam page"), "ctrl+s", () => runOp("steam")));
   const w = page("full mod-page", T("← → the previous / next mod · esc back · 1–6 its parts"), ...acts);
   sc.append(w);
   if (loading && !F.d) {
@@ -138,12 +141,12 @@ function draw(loading) {
   us.append(usHead);
   for (const x of copies()) {
     const line = el("div", "fd-useline");
-    line.append(el("span", "lbl", x.label), el("span", "x", (x.usedIn || []).join(" · ") || T("in no plan or pack")));
+    line.append(el("span", "lbl", x.label), el("span", "x", (x.usedIn || []).join(" · ") || T("in no list or pack")));
     us.append(line);
   }
   if (c) {
     const now = el("div", "fd-now");
-    now.append(el("span", "", c.inPlan ? T("in the current plan") : T("not in the current plan")));
+    now.append(el("span", "", c.inPlan ? T("in the current list") : T("not in the current list")));
     const sp = ops.keyed(c.ops || [], "space");
     if (sp) now.append(button(ops.op(sp).label, "space", () => runOp(sp), "small"));
     us.append(now);
@@ -204,7 +207,7 @@ function copyCard(x) {
   const top = el("div", "top");
   top.append(el("span", "lbl", x.label));
   if (x.state) top.append(el("span", "chip st " + (x.code || ""), x.state));
-  if (x.inPlan) top.append(el("span", "chip cur", T("in the current plan")));
+  if (x.inPlan) top.append(el("span", "chip cur", T("in the current list")));
   b.append(top);
   b.append(el("div", "facts", [x.size, x.version, x.name].filter(Boolean).join(" · ")));
   if (x.note || x.auto) b.append(el("div", "note" + (x.note ? "" : " auto"), x.note || x.auto));
@@ -236,6 +239,7 @@ async function runOp(code) {
   };
   switch (code) {
     case "folder": return api.OpenFolder(c.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+    case "steam": return api.OpenSteamWorkshop(c.id || c.ref).then((t) => say("ok", t), (e) => say("fail", errText(e)));
     case "workshop":
       if (c.id) return api.OpenWorkshop(c.id).then((t) => say("ok", t), (e) => say("", errText(e)));
       return api.OpenURL(c.page).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
@@ -309,7 +313,7 @@ export async function fullKey(e) {
     const b = (document.querySelector("#screen .fd-copy.on") || sc).getBoundingClientRect();
     return ops.openMenu(b.left + 24, b.top + 24, c.ops || [], runOp, true);
   }
-  if (ctrl && c && (k.toLowerCase() === "o" || k.toLowerCase() === "w")) { e.preventDefault(); return runOp(k.toLowerCase() === "o" ? "folder" : "workshop"); }
+  if (ctrl && c && ["o", "w", "s"].includes(k.toLowerCase())) { e.preventDefault(); return runOp({ o: "folder", w: "workshop", s: "steam" }[k.toLowerCase()]); }
   if (!ctrl && !e.altKey && c) {
     const name = k === " " ? "space" : k === "Delete" ? "Del" : k;
     const code = ops.keyed(c.ops || [], name);

@@ -96,7 +96,7 @@ func PackArgv(in PackIn) []string {
 	case "list":
 		return []string{"pack", "list"}
 	case "build":
-		b := argv("pack", "build").pos(in.Name).flag("light", in.Light).flag("textures", in.Textures && in.TextureScale == 0)
+		b := argv("pack", "build").pos(in.Name).flag("textures", in.Textures && in.TextureScale == 0)
 		if in.TextureScale > 0 && in.TextureScale < 100 {
 			b.flag("textures", true).str("texture-scale", fmt.Sprint(in.TextureScale))
 		}
@@ -104,7 +104,7 @@ func PackArgv(in PackIn) []string {
 	case "launch":
 		return argv("pack", "launch").pos(in.Name).flag("dry-run", in.DryRun).flag("move-duplicates", in.MoveDuplicates).a
 	case "export":
-		return argv("pack", "export").pos(in.Name).pos(in.File).flag("light", in.Light).a
+		return argv("pack", "export").pos(in.Name).pos(in.File).flag("list", in.List).a
 	case "import":
 		return argv("pack", "import").pos(in.File).flag("as-plan", in.AsPlan).a
 	case "remove":
@@ -178,7 +178,7 @@ type ScanIn struct {
 type ExchangeIn struct {
 	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
 	Action string `json:"action" jsonschema:"export, import or collection"`
-	Format string `json:"format,omitempty" jsonschema:"export: text (default), modsconfig, rimsort, rml or rimcrow"`
+	Format string `json:"format,omitempty" jsonschema:"export: text (default), archo (a RimArcho list: each mod with its version), modsconfig, rimsort, rml, rimcrow or rimcrow-xml"`
 	Out    string `json:"out,omitempty" jsonschema:"export: write to this new file (never overwrites); default: return the text"`
 	From   string `json:"from,omitempty" jsonschema:"import: a list file path or a RimCrow share code; collection: a Workshop collection link or ID"`
 	Import bool   `json:"import,omitempty" jsonschema:"collection: also replace the Loadout with the collection's installed mods in its order (undoable)"`
@@ -188,11 +188,11 @@ type PackIn struct {
 	Env            string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
 	Action         string `json:"action" jsonschema:"list, build, launch, export, import, remove, stop or unlink"`
 	Name           string `json:"name,omitempty" jsonschema:"the pack (build, launch, export, remove, stop)"`
-	File           string `json:"file,omitempty" jsonschema:"export: the new .archopack / .archopack.json file; import: the file to read"`
-	Light          bool   `json:"light,omitempty" jsonschema:"build / export: the list only, no mod files"`
+	File           string `json:"file,omitempty" jsonschema:"export: the new .archopack (or with list .archolist.json) file; import: the file to read"`
+	List           bool   `json:"list,omitempty" jsonschema:"export: only the pack's list, as a RimArcho list (each mod with its version, no files)"`
 	Textures       bool   `json:"textures,omitempty" jsonschema:"build: convert the copies' PNG textures to DDS and delete the PNGs (pre-convert; lighter loading and video memory, a bigger pack at full size)"`
 	TextureScale   int    `json:"texture_scale,omitempty" jsonschema:"build: also scale textures down to this percent (20 25 40 50 60 75 80): slim"`
-	AsPlan         bool   `json:"as_plan,omitempty" jsonschema:"import of a light pack: also load its list into the Loadout (undoable)"`
+	AsPlan         bool   `json:"as_plan,omitempty" jsonschema:"import of a RimArcho list: also load it into the Loadout (undoable)"`
 	Unfinished     bool   `json:"unfinished,omitempty" jsonschema:"remove: delete what an interrupted build of name copied"`
 	DryRun         bool   `json:"dry_run,omitempty" jsonschema:"build / launch / remove / unlink: show what would happen, change nothing"`
 	MoveDuplicates bool   `json:"move_duplicates,omitempty" jsonschema:"launch: first move plain Mods/ folders holding another version of a pack's mod into the lock library (the refusal names them; show the dry run first)"`

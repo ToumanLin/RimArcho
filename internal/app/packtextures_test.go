@@ -83,17 +83,17 @@ func TestPackTextures(t *testing.T) {
 	if !strings.Contains(string(b), `"converted": 2`) {
 		t.Fatalf("pack.json:\n%s", b)
 	}
-	// the CLI flags reach the same build; a light export drops the textures record
+	// the CLI flags reach the same build; the exported list drops the textures record
 	out := e.MustRun("pack", "build", "tex2", "--textures", "--texture-scale", "50", "--dry-run")
 	if !strings.Contains(out, "textures: slim to 50%") {
 		t.Fatalf("cli dry run:\n%s", out)
 	}
-	file := filepath.Join(e.Root, "tex.archopack.json")
+	file := filepath.Join(e.Root, "tex.archolist.json")
 	if _, err := e.App.ExportPack("tex", file, true); err != nil {
 		t.Fatal(err)
 	}
 	if b, _ := os.ReadFile(file); strings.Contains(string(b), "textures") {
-		t.Fatal("a light pack kept the textures record")
+		t.Fatal("the exported list kept the textures record")
 	}
 	if got := strings.Join(app.PackBuildArgs(&textures.Options{Scale: 50}), " "); got != "--textures --texture-scale 50" {
 		t.Fatal(got)

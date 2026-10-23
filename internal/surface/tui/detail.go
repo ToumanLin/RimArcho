@@ -748,6 +748,10 @@ func (m *model) fullKey(s string) tea.Cmd {
 		if it := m.current(); it != nil {
 			return m.openWorkshopID(m.workshopOf(it.id))
 		}
+	case "ctrl+s":
+		if it := m.current(); it != nil {
+			return m.openWorkshopSteamID(m.workshopOf(it.id))
+		}
 	case "g":
 		return m.tagKey()
 	case "n":

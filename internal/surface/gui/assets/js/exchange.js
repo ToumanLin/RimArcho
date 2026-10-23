@@ -43,7 +43,7 @@ export async function exchange(tab = 0) {
 // ---- import, step 1: where the list comes from ----
 
 function importSource(body) {
-  body.append(el("div", "xc-note", T("RimSort, RimCrow and RimWorld lists, share codes, packageIds or workshop links. Nothing changes before you confirm.")));
+  body.append(el("div", "xc-note", T("RimArcho, RimSort, RimCrow and RimWorld lists, share codes, packageIds or workshop links. Nothing changes before you confirm.")));
 
   // a file: the window's open dialog, a typed path, or a dropped file
   const file = section(body, T("from a file"));
@@ -131,12 +131,12 @@ async function preview(kind, src, name) {
   // the two ways to apply it, each with what it does
   const ways = el("div", "xc-ways");
   ways.append(
-    way(T("replace the enabled list"), p.replace, true, () => apply(false)),
+    way(T("replace the whole list"), p.replace, true, () => apply(false)),
     way(T("add the ones you lack"), p.merge, false, () => apply(true)),
     await asPlan(p),
   );
   body.append(ways);
-  body.append(el("div", "xc-hint", T("one step: u undoes it; the game's ModsConfig.xml changes only when you save")));
+  body.append(el("div", "xc-hint", T("one step: u undoes it; the game's ModsConfig.xml changes only when you write to the game")));
 
   if (p.missing.length) {
     const sec = section(body, Tf("not installed: %d", p.missing.length));
@@ -159,12 +159,17 @@ async function preview(kind, src, name) {
     sec.append(list);
   }
   if (p.installed.length) {
+    // a RimArcho list names each mod's version: the ones installed in another version are
+    // marked, and the list opens to show them
     const det = el("details", "xc-sec");
-    det.append(el("summary", "", Tf("installed: %d (%d enabled now)", p.installed.length, p.installed.filter((r) => r.enabled).length)));
+    let sum = Tf("installed: %d (%d enabled now)", p.installed.length, p.installed.filter((r) => r.enabled).length);
+    if (p.other) { sum += " · " + Tf("%d in another version", p.other); det.open = true; }
+    det.append(el("summary", "", sum));
     const list = el("div", "xc-list");
     p.installed.forEach((r, i) => {
       const d = el("div", "xc-mod");
       d.append(el("span", "pos", String(i + 1)), el("span", r.enabled ? "" : "accent", r.name));
+      if (r.other) d.append(el("span", "chip mark", T("another version")));
       if (!r.enabled) d.append(el("span", "dim", T("not enabled now")));
       list.append(d);
     });
@@ -202,11 +207,11 @@ async function asPlan(p) {
   let free = base;
   try { free = (await api.CheckPlanName(base, "", 0)).free; } catch { /* keep the base */ }
   const d = el("div", "xc-way");
-  d.append(el("div", "t", T("as a new plan")), el("div", "xc-note", Tf("%d mods; the current plan stays as it is", p.total)));
+  d.append(el("div", "t", T("as a new list")), el("div", "xc-note", Tf("%d mods; the current list stays as it is", p.total)));
   const name = el("input", "xc-input");
   name.value = free;
   name.spellcheck = false;
-  const b = el("button", "btn", T("create the plan"));
+  const b = el("button", "btn", T("create the list"));
   b.onclick = async () => {
     let r;
     try { r = await api.ImportAsPlan(name.value); } catch (e) { return say("fail", errText(e)); }

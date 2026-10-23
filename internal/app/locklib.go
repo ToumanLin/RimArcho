@@ -41,6 +41,11 @@ func (a *App) IsLockSource(s *source.Source) bool {
 // reach it only through _Archo_ links (08 §3).
 func (a *App) lockSource(ix *Index, create bool) (*source.Source, error) {
 	root := a.LockDir()
+	if create {
+		if err := a.managedRootReady("lock", root); err != nil {
+			return nil, err
+		}
+	}
 	shared, err := a.Store.SharedSources()
 	if err != nil {
 		return nil, err
@@ -174,6 +179,19 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (*MoveR
 // copyMove copies a folder to another volume, checks every file arrived, then moves the
 // original to the recycle bin (RimArcho never deletes; 08 §7).
 func (a *App) copyMove(from, to string) error {
+	if err := copyChecked(from, to); err != nil {
+		return err
+	}
+	if err := a.ToTrash(from); err != nil {
+		return fmt.Errorf("copied to %s, but the original could not go to the recycle bin: %v (remove %s yourself)", to, err, from)
+	}
+	return nil
+}
+
+// copyChecked copies a folder to to (which must not exist) through a temporary folder and
+// checks every file arrived before it takes the new name; from is left as it is. A link
+// that points outside the folder stops the copy.
+func copyChecked(from, to string) error {
 	tmp := to + ".archo-tmp"
 	os.RemoveAll(tmp)
 	res := &CopyResult{keepAll: true}
@@ -200,9 +218,6 @@ func (a *App) copyMove(from, to string) error {
 	if err := os.Rename(tmp, to); err != nil {
 		os.RemoveAll(tmp)
 		return err
-	}
-	if err := a.ToTrash(from); err != nil {
-		return fmt.Errorf("copied to %s, but the original could not go to the recycle bin: %v (remove %s yourself)", to, err, from)
 	}
 	return nil
 }

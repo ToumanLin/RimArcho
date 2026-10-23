@@ -11,10 +11,23 @@ library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
   filters:
     tag: QoL 1
     source: workshop 5, local 1
+    location: $ROOT/Steam/steamapps/common/RimWorld/Mods 1, $ROOT/Steam/steamapps/workshop/content/294100 5
     version: 1.6 3, 1.4 1
     state: missing 1, residue 1
     used: none 5, plan:default 1
     updated: week 2, month 4, half-year 4
+
+$ archo library --include location:$ROOT/Steam/steamapps/common/RimWorld/Mods
+library: 1 of 5 mods match (location:$ROOT/Steam/steamapps/common/RimWorld/Mods)
+  L#l4xt  Lockable  [1 of 2 copies, 1.1 KB, plan:default]
+next:
+  archo library --lineage L#l4xt
+
+$ archo library --exclude location:$ROOT/Steam/steamapps/workshop/content/294100
+library: 1 of 5 mods match (-location:$ROOT/Steam/steamapps/workshop/content/294100)
+  L#l4xt  Lockable  [1 of 2 copies, 1.1 KB, plan:default]
+next:
+  archo library --lineage L#l4xt
 
 $ archo library --include used:none --exclude source:workshop
 library: 0 of 5 mods match (used:none, -source:workshop)
@@ -37,6 +50,7 @@ library: 1 of 5 mods match (tag:QoL)
   filters:
     tag: +QoL 1
     source: workshop 1, local 0
+    location: $ROOT/Steam/steamapps/common/RimWorld/Mods 0, $ROOT/Steam/steamapps/workshop/content/294100 1
     version: 1.6 1, 1.4 0
     state: missing 0, residue 0
     used: none 1, plan:default 0
@@ -72,7 +86,7 @@ ws:5300 Workshop item 5300  [1 copy, —]
     states: subscribed, not on disk
 
 $ archo library --include colour:red
-error: bad filter "colour:red": want key:value with key tag, source, version, state, used, updated
+error: bad filter "colour:red": want key:value with key tag, source, location, version, state, used, updated
 [exit 1]
 
 $ archo library --include state:hidden

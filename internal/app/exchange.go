@@ -3,6 +3,8 @@ package app
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -16,6 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Loadout exchange (05 §4.2): a text list of packageIds, a ModsConfig.xml, or the mod list
@@ -26,6 +29,9 @@ const (
 	FormatText       = "text"
 	FormatModsConfig = "modsconfig"
 	FormatSave       = "save"
+	// FormatArcho is a RimArcho list (04 §9.3): a pack.json without files, so each mod
+	// carries its lineage, workshop ID and content hash and an import sees which match.
+	FormatArcho = "archo"
 )
 
 // ExportLoadout renders the workspace in a format.
@@ -56,6 +62,17 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 		game = st.File.Version
 	}
 	switch format {
+	case FormatArcho:
+		p := &Pack{Format: PackFormat, Name: st.Plan.Name, Created: a.Now().UTC(), Game: game, Env: st.Ix.Env.Name, Light: true}
+		for _, e := range st.List {
+			if m := st.Ix.ByID[e.Instance]; m != nil {
+				p.Entries = append(p.Entries, packEntryOf(m))
+			} else {
+				p.Entries = append(p.Entries, PackEntry{PackageID: strings.TrimSuffix(e.Missing, "_steam")})
+			}
+		}
+		b, _ := json.MarshalIndent(p, "", "  ")
+		return append(b, '\n'), nil
 	case FormatRML:
 		return RML(game, tokens, ws, names), nil
 	case FormatRimCrow:
@@ -97,7 +114,7 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 		}
 		return loadout.Render(nil, version, tokens, known)
 	}
-	return nil, fmt.Errorf("unknown format %q (text, modsconfig, rimsort, rml, rimcrow, rimcrow-xml)", format)
+	return nil, fmt.Errorf("unknown format %q (archo, text, modsconfig, rimsort, rml, rimcrow, rimcrow-xml)", format)
 }
 
 // ImportedList is a mod list read from a file.
@@ -113,7 +130,13 @@ type ImportedList struct {
 	WorkshopOnly []string
 	// Unresolved are WorkshopOnly IDs no installed mod has (import notes them, 04 §9).
 	Unresolved []string
+	// Hashes maps packageIds to content hashes (RimArcho lists): an import uses the copy
+	// with that content when there is one, and the preview tells the others apart.
+	Hashes map[string]string
 }
+
+// Hash is the content hash a RimArcho list gives pkg ("" for none).
+func (l *ImportedList) Hash(pkg string) string { return l.Hashes[strings.ToLower(pkg)] }
 
 // ReadLoadoutFile reads a list file in any supported format (04 §9), or a RimCrow share
 // code given instead of a path.
@@ -283,7 +306,27 @@ func ImportedEntries(st *LoadoutState, il *ImportedList) (list loadout.List, unr
 		}
 	}
 	list, _ = st.Reg.FromTokens(tokens)
+	for i, e := range list {
+		if m := st.Ix.ByID[e.Instance]; m != nil && il.Hash(m.PackageID) != "" && !SameContent(m, il.Hash(m.PackageID)) {
+			if c := sameContentCopy(st, m.PackageID, il.Hash(m.PackageID)); c != "" && list.Index(c) < 0 {
+				list[i].Instance = c
+			}
+		}
+	}
 	return list, unresolved
+}
+
+// SameContent says whether m's content hash is hash (a RimArcho list's entry).
+func SameContent(m *store.Mod, hash string) bool { return hex.EncodeToString(m.SnapHash) == hash }
+
+// sameContentCopy is a live copy of pkg with that content the game can load ("" for none).
+func sameContentCopy(st *LoadoutState, pkg, hash string) string {
+	for _, m := range st.Ix.Mods {
+		if m.Status == identity.Live && m.PackageID == pkg && SameContent(m, hash) && st.Reg.Loadable(m.ID) {
+			return m.ID
+		}
+	}
+	return ""
 }
 
 // MergedEntries keeps the workspace list and adds the imported list's installed mods it

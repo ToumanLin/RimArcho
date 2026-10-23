@@ -35,10 +35,10 @@ func (m *model) importPrompt() tea.Cmd {
 
 // importChoice offers the two ways to apply the list, and the whole preview.
 func (m *model) importChoice(imp *view.Import, p *view.ImportPreview) {
-	replace := T("replace the enabled list") + " — " + p.Replace.Text
+	replace := T("replace the whole list") + " — " + p.Replace.Text
 	merge := T("add the ones you lack") + " — " + p.Merge.Text
 	show := T("show the whole preview")
-	asPlan := T("as a new plan") + " — " + Tf("%d mods; the current plan stays as it is", p.Total)
+	asPlan := T("as a new list") + " — " + Tf("%d mods; the current list stays as it is", p.Total)
 	pn := &panel{title: p.Summary, choices: []string{replace, merge, asPlan, show}}
 	pn.onPick = func(m *model, v string) tea.Cmd {
 		if v == asPlan {

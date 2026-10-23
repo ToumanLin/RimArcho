@@ -38,6 +38,8 @@ type EnvSpec struct {
 	Extra        []string
 	// RemoveSources lists shared folder labels to forget (env set only; = FolderRemove).
 	RemoveSources []string
+	// directoryOnly relocates this game without guessing a new shared Workshop.
+	directoryOnly bool
 }
 
 // SourceChange reports what happened to one source.
@@ -209,7 +211,7 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		GameVersion: env.ReadGameVersion(spec.GameRoot), Launch: spec.Launch, CreatedAt: a.Now().UTC()}
 	if e.Launch == "" {
 		e.Launch = "direct"
-		if env.WorkshopRootFor(spec.GameRoot) != "" || spec.WorkshopRoot != "" {
+		if env.WorkshopRootFor(spec.GameRoot) != "" {
 			e.Launch = "steam"
 		}
 	}
@@ -274,6 +276,9 @@ func (a *App) checkFolderRoots(spec EnvSpec) error {
 // known, that library's Workshop folder. A game folder that is new (adding) or moved
 // brings its own Workshop folder as a SteamCMD folder (adoptGameWorkshop).
 func (a *App) foldersFromSpec(e *env.Environment, spec EnvSpec, adding, moved bool) ([]SourceChange, error) {
+	if spec.directoryOnly {
+		return nil, nil
+	}
 	var out []SourceChange
 	add := func(kind source.Kind, root string) error {
 		ch, err := a.FolderAdd(kind, root)
@@ -385,7 +390,7 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 			return nil, nil, err
 		}
 		// The game moved to another Steam library: its Workshop folder moved with it.
-		if ws := env.WorkshopRootFor(e.GameRoot); ws != "" && spec.WorkshopRoot == "" && dirExists(ws) {
+		if ws := env.WorkshopRootFor(e.GameRoot); !spec.directoryOnly && ws != "" && spec.WorkshopRoot == "" && dirExists(ws) {
 			spec.WorkshopRoot = ws
 		}
 	}
@@ -513,8 +518,8 @@ func (a *App) rebind(s *source.Source, newRoot string) (SourceChange, error) {
 	r := source.EvaluateRebind(newRoot, old, scan.SemanticOnly, scan.Similarity)
 	ch := SourceChange{Source: s, OldRoot: s.Root, Rebind: &r}
 	if r.Accept {
-		s.Root, s.Status, s.PendingRoot = newRoot, source.StatusOK, ""
 		ch.Action = "rebound"
+		return ch, a.Store.RebindSource(s, newRoot)
 	} else {
 		s.Status, s.PendingRoot = source.StatusRebindPending, newRoot
 		ch.Action = "rebind-pending"
@@ -544,8 +549,7 @@ func (a *App) EnvRebind(e *env.Environment, label string, yes bool) (*source.Sou
 		return nil, nil, fmt.Errorf("src:%s has no pending re-binding (status %s)", label, s.Status)
 	}
 	if yes {
-		s.Root, s.Status, s.PendingRoot = s.PendingRoot, source.StatusOK, ""
-		return s, nil, a.Store.UpdateSource(s)
+		return s, nil, a.Store.RebindSource(s, s.PendingRoot)
 	}
 	if s.EnvID == store.Shared {
 		if srcs, err = a.Store.AllSources(); err != nil {
@@ -563,7 +567,7 @@ func (a *App) EnvRebind(e *env.Environment, label string, yes bool) (*source.Sou
 	return s, n, a.Store.InsertSource(n)
 }
 
-// EnvUse selects the current environment.
+// EnvUse prepares missing Mods/ links before selecting the current environment.
 func (a *App) EnvUse(name string) (*env.Environment, error) {
 	e, err := a.Store.EnvByName(name)
 	if err != nil {
@@ -571,6 +575,9 @@ func (a *App) EnvUse(name string) (*env.Environment, error) {
 	}
 	if e == nil {
 		return nil, fmt.Errorf("no environment named %q (archo env list)", name)
+	}
+	if err := a.prepareEnvLinks(e); err != nil {
+		return nil, err
 	}
 	return e, a.Store.SetCurrentEnv(e.ID)
 }

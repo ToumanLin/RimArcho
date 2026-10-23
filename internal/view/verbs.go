@@ -69,7 +69,7 @@ func Named(st *app.LoadoutState, ids []string) string {
 
 // Plural: "1 mod" / "3 mods" (English), "3 个Mod" (Chinese, T(noun)).
 func Plural(n int, noun string) string {
-	if lang == "zh" {
+	if Lang() == "zh" {
 		return fmt.Sprintf("%d 个%s", n, T(noun))
 	}
 	if n == 1 {

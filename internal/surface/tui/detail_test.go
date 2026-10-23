@@ -85,11 +85,11 @@ func TestDetailContent(t *testing.T) {
 	if full := plainLines(m.detailLayout(detailOpts{width: 50, full: true})); !strings.Contains(full, "[image · i.imgur.com]") || strings.Contains(full, "images ×") {
 		t.Fatalf("full-screen images:\n%s", full)
 	}
-	// the key appears once: "1001 · ctrl+w opens the page"
+	// Both page shortcuts are shown, with the shorter button labels.
 	SetLang("zh")
 	zh := plainLines(m.detailLayout(detailOpts{width: 50, descMax: 12}))
 	SetLang("en")
-	if !strings.Contains(got, "1001 · ctrl+w opens the page") || !strings.Contains(zh, "1001 · ctrl+w 打开页面") {
+	if !strings.Contains(got, "1001 · ctrl+w web page") || !strings.Contains(strings.Join(strings.Fields(got), " "), "ctrl+s steam page") || !strings.Contains(zh, "1001 · ctrl+w 网页") || !strings.Contains(zh, "ctrl+s Steam 页面") {
 		t.Fatalf("workshop line:\n%s\n%s", got, zh)
 	}
 	for _, l := range m.detailLayout(detailOpts{width: 50, descMax: 12}) {
@@ -121,6 +121,10 @@ func TestDetailContent(t *testing.T) {
 	press(m, "ctrl+w")
 	if opened != "https://steamcommunity.com/sharedfiles/filedetails/?id=1001" {
 		t.Fatalf("opened %q", opened)
+	}
+	m.update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	if opened != "steam://url/CommunityFilePage/1001" {
+		t.Fatalf("Steam page opened %q", opened)
 	}
 	press(m, "esc")
 	if m.full {

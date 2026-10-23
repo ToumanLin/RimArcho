@@ -2,6 +2,7 @@ package app
 
 import (
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -170,6 +171,9 @@ func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
 		},
 		Known: func(l scan.Location) bool { return knownLoc[l.Key()] },
 	})
+	if o.GameOnly {
+		sharedLinkObservations(obs, known, srcs, present, sstats)
+	}
 	prev, prevHash = nil, nil // release the caches before reconciliation
 	lineages, err := a.Store.LineageIDs(e.ID)
 	if err != nil {
@@ -201,7 +205,11 @@ func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
 		},
 	})
 	now := a.Now()
-	if err := a.Store.ApplyScan(e.ID, scanID, now, res); err != nil {
+	var scanned []string
+	for _, s := range active {
+		scanned = append(scanned, s.ID)
+	}
+	if err := a.Store.ApplyScan(e.ID, scanID, now, res, scanned); err != nil {
 		return nil, err
 	}
 	if v := env.ReadGameVersion(e.GameRoot); v != "" && v != e.GameVersion {
@@ -255,6 +263,57 @@ func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
 		rep.Notices = []string{"loadout: " + err.Error()}
 	}
 	return rep, nil
+}
+
+// A game-only scan still sees links into shared folders. They are aliases of the
+// shared instance, even though that source was not enumerated during this scan.
+func sharedLinkObservations(obs []*scan.Observation, known []*identity.Known, sources []*source.Source, present map[string]bool, stats map[string]*scan.SourceStats) {
+	byReal := map[string]*identity.Known{}
+	bySource := map[string]*source.Source{}
+	for _, s := range sources {
+		bySource[s.ID] = s
+	}
+	for _, k := range known {
+		if present[k.SourceID] && k.Status == identity.Live && k.RealPath != "" {
+			byReal[env.PathKey(k.RealPath)] = k
+		}
+	}
+	acfs := map[string]*scan.ACF{}
+	for _, ob := range obs {
+		if !ob.Loc.IsLink {
+			continue
+		}
+		k := byReal[env.PathKey(ob.RealPath)]
+		if k == nil {
+			continue
+		}
+		s := bySource[k.SourceID]
+		if s == nil {
+			continue
+		}
+		path := filepath.Join(s.Root, k.Rel)
+		if !sameDir(path, ob.RealPath) {
+			continue // a moved or missing shared source does not own this link
+		}
+		if st := stats[ob.Loc.SourceID]; st != nil {
+			st.Mods--
+			st.Aliases++
+		}
+		ob.Aliases = append(ob.Aliases, ob.Loc)
+		ob.Loc = scan.Location{SourceID: s.ID, Kind: s.Kind, Label: s.Label, Rel: k.Rel, Path: path}
+		if s.Kind.WorkshopLike() {
+			ob.WorkshopID = k.Rel
+			acf, loaded := acfs[s.ID]
+			if !loaded {
+				acf = scan.ReadACF(s.Root)
+				acfs[s.ID] = acf
+			}
+			if acf != nil {
+				ob.ACF = acf.Items[k.Rel]
+				ob.Residue = s.Kind == source.Workshop && (ob.ACF == nil || !ob.ACF.Subscribed)
+			}
+		}
+	}
 }
 
 // LastScan returns the newest finished scan of the environment, or nil.

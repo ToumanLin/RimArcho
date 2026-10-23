@@ -71,9 +71,9 @@ export async function newPlan(from = "") {
   try { [froms, nm] = await Promise.all([api.PlanFroms(), api.CheckPlanName("", "", 0)]); } catch (e) { return say("fail", errText(e)); }
   const opts = froms.concat([{ from: "import", label: T("from an import: a file, a share code, a link…") }]);
   let sel = Math.max(0, opts.findIndex((o) => o.from === from));
-  pop.open("plan-new", T("new plan"), (box, p) => {
+  pop.open("plan-new", T("new list"), (box, p) => {
     box.classList.add("plan-pop");
-    box.append(el("div", "ttl", T("new plan")));
+    box.append(el("div", "ttl", T("new list")));
     const f = nameField(box, nm.free, 0);
     box.append(el("div", "label", T("start from")));
     const list = el("div", "opts plan-from");
@@ -99,7 +99,7 @@ export async function newPlan(from = "") {
     async function go() {
       const o = opts[sel];
       if (o.from === "import") {
-        // the import popup reads and previews the list; "as a new plan" applies it
+        // the import popup reads and previews the list; "as a new list" applies it
         pop.close();
         return ui.cmd("import");
       }
@@ -120,7 +120,7 @@ export async function newPlan(from = "") {
 export function renamePlan(id) {
   const p0 = planOf(id);
   if (!p0) return;
-  pop.open("plan-rename", T("rename the plan"), (box, p) => {
+  pop.open("plan-rename", T("rename the list"), (box, p) => {
     box.classList.add("plan-pop");
     box.append(el("div", "ttl", Tf("rename %s", p0.name)));
     const f = nameField(box, p0.name, id);
@@ -140,7 +140,7 @@ export function renamePlan(id) {
 export async function deletePlan(id) {
   let warn;
   try { warn = await api.RemovePlanWarn(id); } catch (e) { return say("fail", errText(e)); }
-  pop.confirm(T("delete the plan"), [warn], T("delete"), () => done(api.RemovePlan(id)));
+  pop.confirm(T("delete the list"), [warn], T("delete"), () => done(api.RemovePlan(id)));
 }
 
 // actions are what can be done with a plan: the sidebar entry's context menu, the
@@ -151,8 +151,8 @@ export function actions(id) {
   const out = [];
   if (!p.current) out.push({ label: T("open"), run: () => ui.go(p.page) });
   out.push({ label: T("rename…"), run: () => renamePlan(id) });
-  if (p.current) out.push({ label: T("copy as a new plan…"), run: () => newPlan("current") });
-  out.push({ label: T("new plan…"), run: () => newPlan() });
+  if (p.current) out.push({ label: T("copy as a new list…"), run: () => newPlan("current") });
+  out.push({ label: T("new list…"), run: () => newPlan() });
   out.push({ label: T("delete…"), run: () => deletePlan(id) });
   return out;
 }
@@ -163,10 +163,10 @@ export function chooser() {
   const cur = current();
   const labels = ps.map((p) => p.name + (p.current ? "  · " + T("editing") : "") + (p.conflict ? "  · " + p.conflictText : ""));
   const runs = ps.map((p) => () => ui.go(p.page));
-  const extra = [[T("new plan…"), () => newPlan()]];
+  const extra = [[T("new list…"), () => newPlan()]];
   if (cur) extra.push([Tf("rename %s…", cur.name), () => renamePlan(cur.id)], [Tf("delete %s…", cur.name), () => deletePlan(cur.id)]);
   for (const [l, r] of extra) { labels.push(l); runs.push(r); }
-  pop.choose(T("plans"), labels, (i) => runs[i](), Math.max(0, ps.findIndex((p) => p.current)));
+  pop.choose(T("lists"), labels, (i) => runs[i](), Math.max(0, ps.findIndex((p) => p.current)));
 }
 
 // menuAt opens a plan's actions as a context menu.

@@ -60,9 +60,9 @@ func TestPalette(t *testing.T) {
 		t.Fatalf("排序: first result %q", r.name)
 	}
 	m.update(tea.KeyMsg{Type: tea.KeyCtrlU})
-	typeIn(m, "save")
-	if r := m.pal.results[0]; r.name != "保存到游戏" {
-		t.Fatalf("save: first result %q", r.name)
+	typeIn(m, "write")
+	if r := m.pal.results[0]; r.name != "写入游戏" {
+		t.Fatalf("write: first result %q", r.name)
 	}
 	m.update(tea.KeyMsg{Type: tea.KeyEsc})
 	SetLang("en")

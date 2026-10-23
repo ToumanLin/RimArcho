@@ -37,6 +37,15 @@ var freeKeys = map[string]struct {
 	def   string
 	check func(string) error
 }{
+	// Empty uses anonymous; passwords and Steam Guard codes stay in SteamCMD.
+	"steamcmd.account": {"", app.ValidSteamCMDAccount},
+	// a steamcmd the player already has; "" finds RimArcho's own copy, then PATH
+	"steamcmd.path": {"", func(v string) error {
+		if v != "" && !filepath.IsAbs(v) {
+			return fmt.Errorf("steamcmd.path must be an absolute program path")
+		}
+		return nil
+	}},
 	// the tags offered first by the tag bar, comma separated; the preset is the default
 	"tags.pinned": {DefaultPinnedTags, func(string) error { return nil }},
 	// the lock library (04 §7): "" is %LOCALAPPDATA%\RimArcho\locked
@@ -81,7 +90,7 @@ func Setting(a *app.App, key string) string {
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.gpu: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.gpu: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.

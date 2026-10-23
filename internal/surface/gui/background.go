@@ -53,21 +53,13 @@ func (s *API) bgSettingLocked() BgSetting {
 	return b
 }
 
-// bgListLocked is every background: the environment's (cached until the settings page
-// asks again) and the player's files.
-func (s *API) bgListLocked(fresh bool) []app.Background {
-	st := s.boardState()
-	envID := ""
-	if st != nil {
-		envID = st.Ix.Env.ID
+// bgListLocked uses only the allow-list published by prepareBackgrounds. Image lookups
+// must not trigger folder discovery or rebuild the board under the shared lock.
+func (s *API) bgListLocked() []app.Background {
+	var out []app.Background
+	if e, err := s.a.Env(); err == nil && s.bgsEnv == e.ID {
+		out = slices.Clone(s.bgs)
 	}
-	if fresh || s.bgs == nil || s.bgsEnv != envID {
-		s.bgs, s.bgsEnv = []app.Background{}, envID
-		if st != nil {
-			s.bgs = s.a.Backgrounds(st.Ix)
-		}
-	}
-	out := slices.Clone(s.bgs)
 	for _, f := range s.bgSettingLocked().Files {
 		out = append(out, app.Background{Key: "file:" + f, Label: filepath.Base(f), Group: "\x00file", Src: f})
 	}
@@ -75,7 +67,7 @@ func (s *API) bgListLocked(fresh bool) []app.Background {
 }
 
 func (s *API) bgFind(key string) *app.Background {
-	for _, b := range s.bgListLocked(false) {
+	for _, b := range s.bgListLocked() {
 		if b.Key == key {
 			return &b
 		}
@@ -99,9 +91,38 @@ type HomeBg struct {
 	Focus string `json:"focus"`
 }
 
+// Capture small background targets, then discover files outside the API lock. Image
+// handlers resolve only the published allow-list; an environment switch rejects old data.
+func (s *API) prepareBackgrounds(fresh bool) {
+	s.mu.Lock()
+	e, err := s.a.Env()
+	if err != nil || (!fresh && s.bgs != nil && s.bgsEnv == e.ID) {
+		s.mu.Unlock()
+		return
+	}
+	ix, err := s.a.Index()
+	if err != nil {
+		s.mu.Unlock()
+		return
+	}
+	targets := s.a.BackgroundTargets(ix)
+	s.mu.Unlock()
+	defer s.free.soon()
+	backgrounds := app.CollectBackgrounds(targets)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if current, err := s.a.Env(); err == nil && current.ID == e.ID {
+		s.bgs, s.bgsEnv = backgrounds, e.ID
+		if s.bgs == nil {
+			s.bgs = []app.Background{}
+		}
+	}
+}
+
 // HomeBackground is the launch page's background. With rotation on, one starred image is
 // picked the first time the window asks and kept until it closes.
 func (s *API) HomeBackground() *HomeBg {
+	s.prepareBackgrounds(false)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	b := s.bgSettingLocked()
@@ -150,13 +171,14 @@ type BgPage struct {
 
 // Backgrounds lists the images by group (reading the background mods again).
 func (s *API) Backgrounds() *BgPage {
+	s.prepareBackgrounds(true)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := &BgPage{Setting: s.bgSettingLocked(), Dialogs: s.x.native != nil}
-	game := BgGroup{Name: view.T("in the game"), Items: []BgItem{}}
+	game := BgGroup{Name: view.T("the game's own"), Items: []BgItem{}}
 	files := BgGroup{Name: view.T("your images"), Files: true, Items: []BgItem{}}
 	var mods []BgGroup
-	for _, b := range s.bgListLocked(true) {
+	for _, b := range s.bgListLocked() {
 		it := BgItem{Key: b.Key, Label: b.Label, Thumb: bgURL(b.Key, true), Full: bgURL(b.Key, false)}
 		switch b.Group {
 		case "":

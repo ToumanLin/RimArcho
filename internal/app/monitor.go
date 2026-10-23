@@ -290,6 +290,11 @@ func (a *App) EnsureMonitor(dryRun bool) (*MonitorResult, error) {
 	if b := r.Bundled; b != nil {
 		dir := a.MonitorDir()
 		r.Target = filepath.Join(dir, monitorFolder+b.Version)
+		if err := a.managedRootReady("monitor", dir); err != nil {
+			r.Notes = append(r.Notes, err.Error())
+			r.Deferred = "The monitor directory is unavailable. Choose its current location before installing an update."
+			return r, nil
+		}
 		changed, err := a.installMonitor(r, b, dryRun)
 		if err != nil {
 			return r, err

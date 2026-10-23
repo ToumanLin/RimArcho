@@ -24,7 +24,7 @@ func readyPackEnv(t *testing.T) *app.App {
 // nothing of the build folder is left.
 func TestPackBuildProgress(t *testing.T) {
 	a := readyPackEnv(t)
-	dry, err := a.BuildPack("first", false, true)
+	dry, err := a.BuildPack("first", true)
 	if err != nil || dry.Need == 0 || dry.Free == 0 {
 		t.Fatalf("dry run: %+v %v", dry, err)
 	}
@@ -88,13 +88,13 @@ func TestPackBuildStopAndSpace(t *testing.T) {
 	}
 
 	a.FreeSpace = func(string) int64 { return 1 << 20 }
-	if _, err := a.BuildPack("first", false, false); !errors.Is(err, app.ErrNoSpace) {
+	if _, err := a.BuildPack("first", false); !errors.Is(err, app.ErrNoSpace) {
 		t.Fatalf("no space: %v", err)
 	}
 	if _, err := os.Stat(tmp); err == nil {
 		t.Fatal("a refused build left its folder")
 	}
-	if r, err := a.BuildPack("first", false, true); err != nil || r.Free != 1<<20 {
+	if r, err := a.BuildPack("first", true); err != nil || r.Free != 1<<20 {
 		t.Fatalf("dry run with no space: %+v %v", r, err)
 	}
 }
@@ -143,7 +143,7 @@ func TestPackUnfinished(t *testing.T) {
 		t.Fatalf("build folders listed as packs: %+v", ps)
 	}
 
-	if _, err := a.BuildPack("live", false, false); !errors.Is(err, app.ErrBuildRunning) {
+	if _, err := a.BuildPack("live", false); !errors.Is(err, app.ErrBuildRunning) {
 		t.Fatalf("build over a running build: %v", err)
 	}
 	if err := a.RemoveUnfinished("live"); !errors.Is(err, app.ErrBuildRunning) {
@@ -159,7 +159,7 @@ func TestPackUnfinished(t *testing.T) {
 		t.Fatal("a name with a path was accepted")
 	}
 	// Built again: the leftover is replaced by the pack.
-	if _, err := a.BuildPack("old", false, false); err != nil {
+	if _, err := a.BuildPack("old", false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(stale); err == nil {

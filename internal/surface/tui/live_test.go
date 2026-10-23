@@ -110,7 +110,7 @@ func TestHistoryArea(t *testing.T) {
 		t.Fatalf("no version at the end: %+v", m.hist)
 	}
 	press(m, "enter")
-	if want := Tf("loaded v%d into the list (not saved yet)", h.Version) + " · " + T("u undoes"); m.armed != nil || m.status != want {
+	if want := Tf("back at v%d (not written to the game yet)", h.Version) + " · " + T("u undoes"); m.armed != nil || m.status != want {
 		t.Fatalf("status %q, want %q", m.status, want)
 	}
 	// Staged mods take the place back from the history.

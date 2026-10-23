@@ -36,6 +36,7 @@ var GroupTitles = []string{"this list", "missing dependencies", "conflicts", "la
 
 // Action kinds. An action is data; each interface binds it to a key or a button.
 const (
+	ActLocateDirectory = "locate-directory" // Refs[0]: managed directory ID; Lines[0]: old path
 	ActSort            = "sort"             // open the sort preview (S)
 	ActSave            = "save"             // open the save preview (w)
 	ActEnable          = "enable"           // Refs
@@ -139,7 +140,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	if st == nil {
 		return n
 	}
-	n.Items = buildItems(a, st, ps)
+	n.Items = append(buildItems(a, st, ps), directoryNeeds(a)...)
 	for i := range n.Items {
 		n.Items[i].Section = SectionOf(n.Items[i].Group)
 	}
@@ -336,7 +337,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s,
 				Why: T("one of them says so; with both enabled the game misbehaves. Disable one."), Evidence: ev})
 		case "mod.pinned":
-			add(Need{Group: GroupHidden, Text: Tf("%s is pinned to a copy, and the workshop version has been updated since", nm(x)),
+			add(Need{Group: GroupHidden, Text: Tf("%s is locked to another copy, and the workshop version has been updated since", nm(x)),
 				Actions: []Action{viewAction(T("see what changed"), "mod", TokRef(st, y), "--diff", TokRef(st, x)), unpin(st, x)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("%s: the Workshop has a newer version", nm(x)), Why: T("the list uses a locked copy; see what changed, or use the Workshop version"), Evidence: ev})
 		case "texture.stale":
@@ -356,7 +357,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		case "mod.hidden":
 			add(Need{Group: GroupHidden, Text: Tf("%s is hidden from the game (probably by another mod manager)", nm(x)),
 				Actions: []Action{keepHidden(p), unhide(st, x), trash(st, x)}, Counted: true, Mods: ids, Status: s,
-				Title: Tf("%s is hidden from the game", nm(x)), Why: T("probably by another mod manager; keep it hidden, show it again, or recycle it"), Evidence: ev})
+				Title: Tf("%s is hidden from the game", nm(x)), Why: T("probably by another mod manager; keep it hidden, unhide it, or recycle it"), Evidence: ev})
 		case app.CodePackLinks:
 			add(packLinksNeed(p))
 		case app.CodeModsDuplicate:
@@ -448,9 +449,9 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		}
 	}
 	if v := env.MajorMinor(st.FileVersionMismatch()); v != "" {
-		add(Need{rank: 6, Group: GroupList, Text: Tf("the list was saved for %s; the game resets it when it starts — launching from RimArcho or saving once writes it for the current version", v),
-			Actions: []Action{{Kind: ActSave, Key: "w", Label: T("save")}}, Counted: true, Status: StatusWarn,
-			Title: Tf("the list was saved for %s", v), Why: T("the game resets it when it starts; writing it to the game once fixes that"), Evidence: evidence(EvInferred, Tf("ModsConfig.xml says %s", v))})
+		add(Need{rank: 6, Group: GroupList, Text: Tf("the list was written for %s; the game resets it when it starts — launching from RimArcho or writing to the game once writes it for the current version", v),
+			Actions: []Action{{Kind: ActSave, Key: "w", Label: T("write to the game")}}, Counted: true, Status: StatusWarn,
+			Title: Tf("the list was written for %s", v), Why: T("the game resets it when it starts; writing it to the game once fixes that"), Evidence: evidence(EvInferred, Tf("ModsConfig.xml says %s", v))})
 	}
 	// Last run: the current log's errors, one item per mod (06 §2.4).
 	logWhen := ""
@@ -514,11 +515,11 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	}
 	if v := st.WS.Conflict; v != 0 {
 		add(Need{Group: GroupConfirm, Text: T("ModsConfig.xml was changed outside RimArcho"), Counted: true, Status: StatusWarn,
-			Why: T("this plan was changed after it too: load the outside list, or keep yours"), Evidence: evidence(EvInferred, T("ModsConfig.xml differs from what RimArcho wrote")), Actions: []Action{
+			Why: T("this list was changed after it too: use the outside change, or keep yours"), Evidence: evidence(EvInferred, T("ModsConfig.xml differs from what RimArcho wrote")), Actions: []Action{
 				viewAction(T("see the difference"), "loadout", "diff", fmt.Sprintf("v%d", v), "workspace"),
 				// One step: u brings the list back (06 §6), so no confirmation.
-				{Kind: ActLoadExternal, Key: "L", Label: T("load it into the list"), Version: v, Undo: true,
-					Done: T("the outside change is loaded into the list")},
+				{Kind: ActLoadExternal, Key: "L", Label: T("use the outside change"), Version: v, Undo: true,
+					Done: T("the outside change is in use")},
 				{Kind: ActDismissConflict, Key: "I", Label: T("ignore it"), Done: T("the outside change is ignored (it stays in the history)")},
 			}})
 	}
@@ -527,7 +528,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	if cs, err := a.Conflicts(st); err == nil {
 		for _, c := range cs {
 			if !c.Current {
-				add(Need{Group: GroupConfirm, Text: Tf("ModsConfig.xml was changed outside RimArcho; plan %s has it as v%d, not loaded", c.Plan.Name, c.Version),
+				add(Need{Group: GroupConfirm, Text: Tf("ModsConfig.xml was changed outside RimArcho; list %s keeps it as v%d, not used yet", c.Plan.Name, c.Version),
 					Counted: true, Status: StatusWarn})
 			}
 		}
@@ -564,7 +565,7 @@ func packLinksNeed(p *app.Problem) Need {
 	n := Need{Group: GroupConfirm, rank: -1, Counted: true, Status: StatusWarn, Actions: []Action{act},
 		Text:     Tf("pack %s left its links in Mods/: a game started from Steam loads the pack's copies", name),
 		Title:    Tf("pack %s left its links in Mods/", name),
-		Why:      T("a game started from Steam, not from RimArcho, loads the pack's copies instead of this plan's mods; launching from RimArcho removes them, and launching the pack makes them again"),
+		Why:      T("a game started from Steam, not from RimArcho, loads the pack's copies instead of this list's mods; launching from RimArcho removes them, and launching the pack makes them again"),
 		Evidence: evidence(EvInferred, strings.Join(src, ", "))}
 	if p.Key == "duplicate" {
 		// Next to other copies of the same mods: the game reports an error at every start
@@ -608,7 +609,7 @@ func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need 
 		name := TokName(st, tok)
 		move = &Action{Kind: ActMoveLocked, Key: "M", Label: T("move into the lock library"), Refs: []string{TokRef(st, tok)},
 			Confirm: T("press M again to move the folder into the lock library"),
-			Warn:    Tf("the folder of %s leaves Mods/ for the lock library; plans that use it keep it and get it through a link", name),
+			Warn:    Tf("the folder of %s leaves Mods/ for the lock library; lists that use it keep it and get it through a link", name),
 			Done:    Tf("%s is in the lock library", name)}
 		sgs = sgs[1:]
 	}
@@ -620,19 +621,19 @@ func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need 
 	switch {
 	case len(f) == 4 && f[1] == "swap":
 		from, to := f[2], f[3]
-		n.Why = Tf("RimArcho links %s for this plan, and Mods/ already has the same mod; use the copy in Mods/ (the link goes the next time the plan is written to the game)", TokName(st, from))
+		n.Why = Tf("RimArcho links %s for this list, and Mods/ already has the same mod; use the copy in Mods/ (the link goes the next time the list is written to the game)", TokName(st, from))
 		n.Actions = []Action{{Kind: ActSwap, Key: "x", Label: T("use the copy in Mods/"), Refs: []string{TokRef(st, from), TokRef(st, to)}, Undo: true,
-			Done: Tf("the plan uses the copy of %s in Mods/ (not written yet)", TokName(st, to))}}
+			Done: Tf("the list uses the copy of %s in Mods/ (not written yet)", TokName(st, to))}}
 	case len(f) == 3 && f[1] == "disable":
-		n.Why = Tf("RimArcho links %s for this plan, and Mods/ has another mod with the same packageId; take it out of the plan, or move the folder out of Mods/", TokName(st, f[2]))
-		n.Actions = []Action{disable(st, f[2], T("take it out of the plan"))}
+		n.Why = Tf("RimArcho links %s for this list, and Mods/ has another mod with the same packageId; disable it, or move the folder out of Mods/", TokName(st, f[2]))
+		n.Actions = []Action{disable(st, f[2], T("disable it"))}
 	default:
 		n.Why = T("RimArcho did not make these folders and does not move them: move all but one out of Mods/ yourself")
 		n.Actions = []Action{{Kind: ActList, Key: "enter", Label: T("see which"), Title: Tf("Mods/ holds %s twice", pkg), Lines: where}}
 	}
 	if move != nil {
 		// 收进锁定库 first: the plain folder leaves Mods/, plans keep it (08 §3)
-		n.Why = T("move the plain folder into the lock library: it leaves Mods/, and plans that use it keep it and get it through a link")
+		n.Why = T("move the plain folder into the lock library: it leaves Mods/, and lists that use it keep it and get it through a link")
 		n.Actions = append([]Action{*move}, n.Actions...)
 	}
 	return n
@@ -661,7 +662,7 @@ func sortAction() Action { return Action{Kind: ActSort, Key: "S", Label: T("sort
 
 func unhide(st *app.LoadoutState, tok string) Action {
 	name := TokName(st, tok)
-	return Action{Kind: ActUnhide, Key: "R", Label: T("show it to the game again"), Refs: []string{TokRef(st, tok)},
+	return Action{Kind: ActUnhide, Key: "R", Label: T("unhide"), Refs: []string{TokRef(st, tok)},
 		Confirm: T("press R again to rename About.xml.disabled back to About.xml"), Warn: Tf("RimArcho renames About.xml.disabled back to About.xml in %s", name),
 		Done: Tf("%s is visible to the game again", name)}
 }
@@ -669,8 +670,8 @@ func unhide(st *app.LoadoutState, tok string) Action {
 func unpin(st *app.LoadoutState, tok string) Action {
 	name := TokName(st, tok)
 	return Action{Kind: ActUnpin, Key: "P", Label: T("use the workshop version"), Refs: []string{TokRef(st, tok)},
-		Confirm: T("press P again to restore the workshop copy and use it"), Warn: Tf("RimArcho restores the workshop copy of %s and uses it instead of the pinned copy; the copy stays on disk", name),
-		Done: Tf("the list now uses the workshop version of %s (not saved yet)", name)}
+		Confirm: T("press P again to unhide the workshop copy and use it"), Warn: Tf("RimArcho unhides the workshop copy of %s and uses it instead of the locked one; that one stays on disk", name),
+		Done: Tf("the list now uses the workshop version of %s (not written to the game yet)", name)}
 }
 
 func trash(st *app.LoadoutState, tok string) Action {
@@ -938,7 +939,7 @@ func Humanize(st *app.LoadoutState, s string) string {
 // ShortDate: "Oct 17" / "10 月 17 日".
 func ShortDate(t time.Time) string {
 	t = t.Local()
-	if lang == "zh" {
+	if Lang() == "zh" {
 		return fmt.Sprintf("%d 月 %d 日", int(t.Month()), t.Day())
 	}
 	return t.Format("Jan 2")

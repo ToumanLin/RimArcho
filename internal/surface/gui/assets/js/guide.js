@@ -1,14 +1,14 @@
 // The first-run guide (06 §2.15): three steps, each with a way back.
 //   1. find the game: 已有的游戏 — what detection finds (tick several), a folder typed in or
-//      chosen in the folder dialog; or 下载一个版本 — a branch, a folder and the Steam account
-//      name, downloaded by SteamCMD in its own window (08 §11);
+//      chosen in the folder dialog; or 下载一个版本 — a branch, a folder and an optional
+//      account override, downloaded by SteamCMD in its own window (08 §11);
 //   2. read the mods: a scan per environment in a child process, with its progress (a game
 //      added once the shared mod folders were read: only its own Data/ and Mods/);
 //   3. where to start: the game's own list, a list from RimSort / RimCrow (previewed, then
 //      applied: view.ReadImport → PreviewImport → ApplyImport), or a pack / a collection.
-// The environment page's "add an environment" starts at step 1.
+// The environment page's "add a game" starts at step 1.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, button, seg, pickFolder } from "./screens.js";
+import { page, button, seg, pickFolder, beginPageRead } from "./screens.js";
 import { exchange, importFrom } from "./exchange.js";
 
 let ui = null;
@@ -29,21 +29,25 @@ export async function start(from = "first") {
   G.picked.clear();
   if (D.run && D.run.end) D.run = null;
   G.way = D.run ? 1 : 0;
-  openScreen("guide");
   await find();
 }
 
 async function find() {
-  try { G.games = (await api.GuideFind()) || []; } catch (e) { G.games = []; say("fail", errText(e)); }
+  const read = beginPageRead("guide", { replace: true });
+  let games;
+  try { games = (await api.GuideFind()) || []; } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
+  G.games = games;
   G.games.forEach((g, i) => { if (!g.env) G.picked.add(i); });
   draw();
+  read.finish();
 }
 
 function draw() {
   if (S.screen !== "guide") return;
   const sc = $("#screen");
   sc.innerHTML = "";
-  const lead = S.guideFrom === "env" ? T("find the install, read its mods once, and it is ready") : T("find the game, read the mods once, then pick where your first plan comes from");
+  const lead = S.guideFrom === "env" ? T("find the install, read its mods once, and it is ready") : T("find the game, read the mods once, then pick where your first list comes from");
   const w = page("guide", lead);
   sc.append(w);
   // the steps: where you are, where you can go back to
@@ -102,13 +106,13 @@ function step1(card) {
     const body = el("div", "b");
     const top = el("div", "top");
     top.append(el("span", "v", "RimWorld " + (g.version || "—")), el("span", "chip", g.launch === "steam" ? "Steam" : T("started directly")));
-    if (g.env) top.append(el("span", "chip cur", Tf("already environment %s", g.env)));
+    if (g.env) top.append(el("span", "chip cur", Tf("added as %s", g.env)));
     body.append(top, el("div", "path", g.game));
     if (!g.env) {
       const name = el("input", "field small");
       name.value = g.name;
       name.spellcheck = false;
-      name.title = T("the environment's name");
+      name.title = T("the game's name");
       name.onclick = (e) => e.preventDefault();
       name.oninput = () => { g.name = name.value.trim(); };
       const nm = el("div", "nm");
@@ -143,7 +147,7 @@ function step1(card) {
   typed.append(inp, choose, add);
   card.append(typed);
   const picked = [...G.picked].filter((i) => G.games[i] && !G.games[i].env);
-  const next = button(picked.length > 1 ? Tf("add %d environments", picked.length) : T("add and continue"), "", async () => {
+  const next = button(picked.length > 1 ? Tf("add %d games", picked.length) : T("add and continue"), "", async () => {
     next.disabled = true;
     let names;
     try { names = await api.GuideAdd(picked.map((i) => G.games[i])); } catch (e) { G.error = errText(e); return draw(); }
@@ -238,16 +242,15 @@ function download(card) {
   card.append(where);
   const who = el("div", "typed");
   const acc = el("input", "field");
-  acc.placeholder = T("your Steam account name");
+  acc.placeholder = Tf("empty: %s (from settings)", info.account || "anonymous");
   acc.spellcheck = false;
   acc.autocomplete = "username";
   acc.value = D.account;
   acc.oninput = () => { D.account = acc.value.trim(); };
-  who.append(el("span", "muted lbl", T("Steam account")), acc);
+  who.append(el("span", "muted lbl", T("SteamCMD account (optional)")), acc);
   card.append(who);
-  card.append(el("div", "dl-note", T("SteamCMD opens a window of its own: type the password and the Steam Guard code there. RimArcho never sees them; it only gives SteamCMD the account name.")));
+  card.append(el("div", "dl-note", T("Anonymous by default; you can choose an account in settings or here. Enter anonymous to override a saved account. Password and Steam Guard are entered only in SteamCMD.")));
   const start1 = button(T("download and add"), "", async () => {
-    if (!D.account) { G.error = T("type your Steam account name"); return draw(); }
     let ok;
     try { ok = await api.GuideDownload(D.branch, D.dir, D.account, ""); } catch (e) { G.error = errText(e); return draw(); }
     if (!ok) { G.error = T("a download is already running"); return draw(); }
@@ -263,7 +266,7 @@ function download(card) {
 const DL_STATES = { starting: "starting SteamCMD…", login: "logging in (in the SteamCMD window)…", downloading: "downloading", verifying: "checking the files", done: "done" };
 
 function downloading(card, r) {
-  const t = r.end ? (r.ok ? Tf("downloaded; environment %s added", r.env) : T("the download did not finish")) : T(DL_STATES[r.state] || r.state);
+  const t = r.end ? (r.ok ? Tf("downloaded; game %s added", r.env) : T("the download did not finish")) : T(DL_STATES[r.state] || r.state);
   const head = el("div", "dl-state");
   head.append(el("span", "t", t));
   if (!r.end && r.total > 0) head.append(el("span", "muted", Tf("%s of %s", sizeText(r.done), sizeText(r.total))));
@@ -357,26 +360,27 @@ function step2(card) {
 // ---- 3. where to start ----
 
 function step3(card) {
-  card.append(el("div", "guide-q", T("where does your first plan come from?")));
+  card.append(el("div", "guide-q", T("where does your first list come from?")));
   const ways = el("div", "ways");
   const n = S.board && S.board.cols ? (S.board.cols[1] || []).length : 0;
-  ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; it becomes your first plan", n),
-    button(T("use this list"), "", () => finish(T("the game's list is your first plan")), "primary")));
+  ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n),
+    button(T("use this list"), "", () => finish(T("use the game's list as it is")), "primary")));
   const imp = button(T("import a list…"), "", () => { ui.afterImport = () => finish(""); exchange(0); });
   ways.append(way(T("move over from RimSort or RimCrow"), T("a list file, a share code or pasted text; you see what changes before it is applied"), imp));
   const src = el("input", "field");
-  src.placeholder = T("a pack file, or a Steam Workshop collection link");
+  src.placeholder = T("a pack or list file, or a Steam Workshop collection link");
   src.spellcheck = false;
   const open = button(T("open"), "", async () => {
     const v = src.value.trim();
     if (!v) return src.focus();
-    if (/steamcommunity\.com|^\s*\d{6,}\s*$/.test(v)) { ui.afterImport = () => finish(""); return importFrom("text", v); }
+    // a list or a collection is previewed first; only a pack is unpacked at once
+    if (!/\.archopack["']?$/i.test(v)) { ui.afterImport = () => finish(""); return importFrom("text", v); }
     try { finish(await api.PackImport(v)); } catch (e) { G.error = errText(e); draw(); }
   });
   src.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); open.click(); } };
   const row = el("div", "typed");
   row.append(src, open);
-  ways.append(way(T("open a pack or a Steam collection"), T("a pack someone shared (.archopack or pack.json), or a Workshop collection"), row));
+  ways.append(way(T("open a pack or a Steam collection"), T("a pack (.archopack) or a RimArcho list someone shared, or a Workshop collection"), row));
   card.append(ways);
   footer(card, button(T("skip"), "", () => finish("")));
 }

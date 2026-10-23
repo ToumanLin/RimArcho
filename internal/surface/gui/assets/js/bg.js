@@ -11,11 +11,14 @@ let tab = 0;    // the open group
 let kb = 0;     // the grid's keyboard item
 let box = null; // the section, redrawn in place
 
-export async function bgSection() {
-  try { P = await api.Backgrounds(); } catch (e) { say("fail", errText(e)); return el("div"); }
+export async function bgSection(current = () => true) {
+  let p;
+  try { p = await api.Backgrounds(); } catch (e) { if (current()) say("fail", errText(e)); return el("div"); }
+  if (!current()) return el("div");
+  P = p;
   const i = P.groups.findIndex((g) => g.items.some((it) => it.key === P.setting.key));
   tab = i >= 0 ? i : 0;
-  kb = Math.max(0, P.groups[tab].items.findIndex((it) => it.key === P.setting.key));
+  kb = Math.max(0, (P.groups[tab]?.items || []).findIndex((it) => it.key === P.setting.key));
   box = el("section", "bg-sec");
   draw();
   return box;
@@ -31,7 +34,7 @@ function draw(focusGrid = false) {
   const head = el("div", "bg-head");
   head.append(preview(), controls());
   card.append(head, el("div", "bg-rule"), tabs(), grid());
-  card.append(el("div", "bg-note", T("background mods are found by name (\"background\" in it) and need not be in a plan; add any other image under your images")));
+  card.append(el("div", "bg-note", T("background mods are found by name (\"background\" in it) and need not be in a list; add any other image under your images")));
   box.append(card);
   if (focusGrid) box.querySelector(".bg-grid").focus();
 }

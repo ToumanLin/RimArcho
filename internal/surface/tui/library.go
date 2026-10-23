@@ -248,12 +248,12 @@ func (m *model) runLibOp(code string) tea.Cmd {
 	switch code {
 	case view.OpFolder:
 		return m.openFolderOf(i0.ID)
-	case view.OpWorkshop:
+	case view.OpWorkshop, view.OpSteam:
 		ws := strings.TrimPrefix(i0.Ref, "ws:")
 		if i0.ID != "" {
 			ws = m.workshopOf(i0.ID)
 		}
-		return m.openWorkshopID(ws)
+		return m.openWorkshopPage(ws, code == view.OpSteam)
 	case view.OpNote:
 		return m.editCopyNote(name, *i0)
 	case view.OpTags:
@@ -286,7 +286,7 @@ func (m *model) libSpace() tea.Cmd {
 			return m.runLibOp(c)
 		}
 	}
-	m.say(sayInfo, T("this copy cannot be used in the current plan"))
+	m.say(sayInfo, T("this copy cannot be used in the current list"))
 	return nil
 }
 
@@ -599,6 +599,12 @@ func (m *model) libraryKey(s string) tea.Cmd {
 			return nil
 		}
 		return m.libFirst(view.OpWorkshop)
+	case "ctrl+s":
+		if i, _ := m.cursorCopy(); i != nil && !slices.Contains(i.Ops, view.OpSteam) {
+			m.say(sayInfo, T("no Workshop ID: not a Workshop mod"))
+			return nil
+		}
+		return m.libFirst(view.OpSteam)
 	case "delete":
 		return m.delKey(targetOps(m.targets()), m.runLibOp)
 	case "u", "ctrl+z":

@@ -13,6 +13,7 @@ import (
 // (app.LaunchChecks, 08 §2), one row per code with why and what to do. It never blocks the
 // launch: a failure to compute them is a line of its own.
 func addLaunchChecks(c *Ctx, root *render.Node, ix *app.Index) {
+	defer addDirectoryWarnings(c, root)
 	ws, as, err := c.App.LaunchWarnings()
 	if err != nil {
 		root.KV("checks", "not available: "+err.Error())
@@ -71,6 +72,31 @@ func addLaunchChecks(c *Ctx, root *render.Node, ix *app.Index) {
 		row := sec.Add(fmt.Sprintf("%s %s  %s", sev, w.Check.Code, text))
 		row.Add("why: " + w.Check.Why)
 		row.Add("fix: " + fix)
+	}
+}
+
+// addDirectoryWarnings lists the managed directories that are missing or have changed
+// (moved, renamed, a drive unplugged) before a launch: a warning, never a block (08 §2).
+// Their mods are not read until the directory is located again.
+func addDirectoryWarnings(c *Ctx, root *render.Node) {
+	dirs, err := c.App.ManagedDirectories()
+	if err != nil {
+		root.KV("directories", "not checked: "+err.Error())
+		return
+	}
+	var bad []app.ManagedDirectory
+	for _, d := range dirs {
+		if d.Status != "ok" && d.Status != "unused" {
+			bad = append(bad, d)
+		}
+	}
+	if len(bad) == 0 {
+		return
+	}
+	sec := root.Add(fmt.Sprintf("directories: %d not where they were (they do not block the launch)", len(bad)))
+	for _, d := range bad {
+		row := sec.Add(fmt.Sprintf("%s %s  %s", d.Status, d.Label, d.Path))
+		row.Add("fix: archo folder set " + quoteArg(d.ID) + " <new-dir>")
 	}
 }
 

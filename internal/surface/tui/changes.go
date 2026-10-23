@@ -73,9 +73,9 @@ func (c *chState) build() {
 	case c.of != "":
 		add(Tf("only %s", c.ofName)+"  "+markDot+"  "+T("esc shows every mod"), chHead)
 	case c.library:
-		add(T("the whole library")+"  "+markDot+"  "+p.Since+"  "+markDot+"  "+T("a: only the current plan"), chHead)
+		add(T("the whole library")+"  "+markDot+"  "+p.Since+"  "+markDot+"  "+T("a: only the current list"), chHead)
 	default:
-		add(Tf("plan %s", p.Plan)+"  "+markDot+"  "+p.Since+"  "+markDot+"  "+T("a: the whole library"), chHead)
+		add(Tf("list %s", p.Plan)+"  "+markDot+"  "+p.Since+"  "+markDot+"  "+T("a: the whole library"), chHead)
 	}
 	if p.NoScan {
 		add("  "+T("no scan yet (R scans)"), chDim)

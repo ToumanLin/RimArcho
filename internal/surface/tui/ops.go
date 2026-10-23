@@ -58,7 +58,7 @@ func (m *model) runEditorOp(code string) tea.Cmd {
 		return m.stageKey()
 	case view.OpSwap:
 		if it := m.current(); it != nil && it.id != "" {
-			m.act(Tf("swapped %s for another copy", it.name), "swap", it.ref)
+			m.act(Tf("switched the version of %s", it.name), "swap", it.ref)
 		}
 		return m.requestDetail()
 	case view.OpTags:
@@ -70,9 +70,9 @@ func (m *model) runEditorOp(code string) tea.Cmd {
 			return m.openFolderOf(it.id)
 		}
 		return nil
-	case view.OpWorkshop:
+	case view.OpWorkshop, view.OpSteam:
 		if it := m.current(); it != nil {
-			return m.openWorkshopID(m.workshopOf(it.id))
+			return m.openWorkshopPage(m.workshopOf(it.id), code == view.OpSteam)
 		}
 		return nil
 	}
@@ -136,7 +136,7 @@ func (m *model) delKey(ops []string, run func(code string) tea.Cmd) tea.Cmd {
 			return run(c)
 		}
 	}
-	m.say(sayInfo, T("nothing to unsubscribe or delete here"))
+	m.say(sayInfo, T("nothing to unsubscribe or recycle here"))
 	return nil
 }
 
@@ -220,7 +220,7 @@ func (m *model) subPage(d int) tea.Cmd {
 	case tabList:
 		rows, err := view.PlanRows(m.app)
 		if err != nil || len(rows) < 2 {
-			m.say(sayInfo, T("one plan only · P makes another"))
+			m.say(sayInfo, T("one list only · P makes another"))
 			return nil
 		}
 		at := 0

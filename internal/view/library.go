@@ -186,7 +186,7 @@ func LibStateText(s, mm string) string {
 	case app.LibHidden:
 		return T("hidden by another manager")
 	case app.LibUpdated:
-		return T("upstream has an update")
+		return T("a newer version is out")
 	}
 	return s
 }
@@ -211,7 +211,7 @@ func LibSourceText(s string) string {
 }
 
 func libKeyTitle(k string) string {
-	return map[string]string{"tag": T("tags"), "source": T("library source"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
+	return map[string]string{"tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
 }
 
 func libUseText(v string) string {
@@ -314,7 +314,7 @@ func LibQueryOf(search string, filters []string, sort string) app.LibQuery {
 // right click in the filter column.
 func LibSplitQuery(text string) (words string, filters []string) {
 	var ws []string
-	for _, w := range strings.Fields(text) {
+	for _, w := range queryTokens(text) {
 		if _, _, err := app.ParseLibFilter(strings.TrimPrefix(w, "-")); err == nil {
 			filters = append(filters, w)
 		} else {
@@ -395,7 +395,7 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 		us := m.UsedIn()
 		r.Used, r.UsedAt = libUsed(us)
 		if len(us) > 1 {
-			r.Used = Tf("in %d plans", len(us))
+			r.Used = Tf("in %d lists", len(us))
 		}
 		var srcs []string
 		best := len(app.LibStates)
@@ -568,7 +568,7 @@ func CopyNoteAuto(i *app.LibInstance) string {
 		for j, p := range made.Plans {
 			q[j] = Tf("“%s”", p)
 		}
-		return Tf(", for plan %s", strings.Join(q, T(", ")))
+		return Tf(", for list %s", strings.Join(q, T(", ")))
 	}
 	switch {
 	case made != nil && made.Kind == "move":
@@ -602,9 +602,9 @@ func CopyNoteAuto(i *app.LibInstance) string {
 	}
 	switch {
 	case i.Locked != nil && i.UpstreamUpdates > 0:
-		parts = append(parts, Tf("the upstream has updated %d times since", i.UpstreamUpdates))
+		parts = append(parts, Tf("%d updates came out since", i.UpstreamUpdates))
 	case i.Locked != nil && i.Locked.Upstream != nil && len(parts) > 0:
-		parts = append(parts, T("the upstream has not updated since"))
+		parts = append(parts, T("no update since"))
 	case i.UpstreamWorkshop && i.UpstreamUpdates > 0:
 		parts = append(parts, Tf("the Workshop copy has updated %d times since", i.UpstreamUpdates))
 	}
@@ -675,6 +675,9 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			if strings.HasPrefix(l, "next:") {
 				break
 			}
+			if strings.HasPrefix(strings.TrimSpace(l), "warning: used by ") {
+				continue // said below, in the interface language
+			}
 			l = Humanize(st, l)
 			// "#ref Name" became "Name Name"
 			if m, err := st.Ix.ResolveOne(ref); err == nil {
@@ -686,8 +689,32 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		if code != 0 {
 			p.Apply = false
 		}
+		if w := usedWarning(a, st, kind, ref); w != "" {
+			p.Lines = append(p.Lines, w)
+		}
 	}
 	return p, nil
+}
+
+// usedWarning: deleting or unsubscribing a copy the lists use only warns; the player's word
+// goes, and the lists show it as missing (06 §2.9). "" when no list uses it.
+func usedWarning(a *app.App, st *app.LoadoutState, kind, ref string) string {
+	if kind != LibDelete && kind != LibUnsub {
+		return ""
+	}
+	m, err := st.Ix.ResolveOne(ref)
+	if err != nil {
+		return ""
+	}
+	ps, err := a.PlansUsing(st, m.ID)
+	if err != nil || len(ps) == 0 {
+		return ""
+	}
+	q := make([]string, len(ps))
+	for j, p := range ps {
+		q[j] = Tf("“%s”", libUseText(p))
+	}
+	return Tf("⚠ %s is in list %s: it still goes, and the list shows it as missing", m.DisplayName(), strings.Join(q, T(", ")))
 }
 
 // LibDo runs an action on copies and says what it did.
@@ -727,9 +754,9 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 			return "", err
 		}
 		if len(rs) == 0 {
-			return Tf("no plan uses %s", what), nil
+			return Tf("no list uses %s", what), nil
 		}
-		return Tf("took %s out of %d plans · each plan's u undoes it", what, len(rs)), nil
+		return Tf("disabled %s in %d lists · each list's u undoes it", what, len(rs)), nil
 	}
 	if !libConfirm[kind] {
 		return "", fmt.Errorf("unknown action %s", kind)
@@ -795,7 +822,7 @@ func LibPlan(a *app.App, kind string, refs []string) (*Result, error) {
 				if _, err := a.Swap(st.Ix.Ref(other.ID), o.Refs[0]); err != nil {
 					return nil, err
 				}
-				return &Result{Text: Tf("the current plan now uses %s", libCopyName(st, mod)), Placed: ids[:1]}, nil
+				return &Result{Text: Tf("the current list now uses %s", libCopyName(st, mod)), Placed: ids[:1]}, nil
 			}
 		}
 		return Toggle(a, Inactive, o)
@@ -816,20 +843,37 @@ func libSteam(a *app.App, kind string, refs []string, what string) (string, erro
 		action = steamworks.Subscribe
 	}
 	_, err := a.Workshop(action, refs, false)
-	var u *app.SteamUnavailable
 	switch {
-	case errors.As(err, &u):
-		msg := Tf("Steam could not be reached (%s): the Workshop page is open, unsubscribe there", u.Why)
-		if kind == LibResub {
-			msg = Tf("Steam could not be reached (%s): the Workshop page is open, subscribe there", u.Why)
-		}
-		return "", &OpenPages{Msg: msg, URLs: u.URLs}
+	case SteamPages(kind, err) != nil:
+		return "", SteamPages(kind, err)
 	case err != nil:
 		return "", err
 	case kind == LibResub:
 		return Tf("subscribed to %s again · Steam downloads it", what), nil
 	}
 	return Tf("unsubscribed from %s · Steam deletes the folder", what), nil
+}
+
+// SteamPages is the answer when Steam is out of reach (06 §2.9): the Workshop pages to open
+// and what to say; nil for any other error.
+func SteamPages(kind string, err error) *OpenPages {
+	var u *app.SteamUnavailable
+	if !errors.As(err, &u) {
+		return nil
+	}
+	msg := Tf("Steam could not be reached (%s): the Workshop page is open, unsubscribe there", u.Why)
+	if kind == LibResub {
+		msg = Tf("Steam could not be reached (%s): the Workshop page is open, subscribe there", u.Why)
+	}
+	return &OpenPages{Msg: msg, URLs: u.URLs}
+}
+
+// SteamAction is the Steam client's action for a Mod 库 op.
+func SteamAction(kind string) string {
+	if kind == LibResub {
+		return steamworks.Subscribe
+	}
+	return steamworks.Unsubscribe
 }
 
 func idsOfRefs(st *app.LoadoutState, refs []string) []string {

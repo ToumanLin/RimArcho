@@ -30,6 +30,7 @@ func fixture(t *testing.T) (*testkit.Env, *API, chan string) {
 		b, _ := json.Marshal(data)
 		events <- name + " " + string(b)
 	})
+	t.Cleanup(api.Close)
 	return e, api, events
 }
 
@@ -56,7 +57,7 @@ func TestSameViewModels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := api.needsLocked(false)
+	n := api.needsLocked()
 	vn := view.BuildNeeds(e.App, want.St, ps)
 	if !reflect.DeepEqual(n.Items, vn.Items) || n.Count != vn.Count {
 		t.Fatalf("needs differ:\n%+v\n%+v", n.Items, vn.Items)
@@ -278,7 +279,7 @@ func TestPackBuildBackground(t *testing.T) {
 		return nil
 	}
 	start := time.Now()
-	if _, err := api.PackBuild("first", false, 0); err != nil {
+	if _, err := api.PackBuild("first", 0); err != nil {
 		t.Fatal(err)
 	}
 	if time.Since(start) > 2*time.Second {
@@ -299,7 +300,7 @@ func TestPackBuildBackground(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the pages wait for the build")
 	}
-	if _, err := api.PackBuild("second", false, 0); err == nil {
+	if _, err := api.PackBuild("second", 0); err == nil {
 		t.Fatal("a second build started")
 	}
 	waitPack := func(want string) string {
@@ -350,7 +351,7 @@ func TestPackUnfinishedRows(t *testing.T) {
 // pointing to 能不能跑; 先看清单 writes nothing; once fixed, 编译 is enabled with the sizes.
 func TestBuildPageG14(t *testing.T) {
 	e, api, _ := fixture(t)
-	p, err := api.BuildPage(false, 0)
+	p, err := api.BuildPage(0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +361,7 @@ func TestBuildPageG14(t *testing.T) {
 	if p.Name == "" || api.PackNameCheck(p.Name) != "" {
 		t.Fatalf("default name %q: %s", p.Name, api.PackNameCheck(p.Name))
 	}
-	lines := api.PackDryRun(p.Name, false, 0)
+	lines := api.PackDryRun(p.Name, 0)
 	if len(lines) == 0 || !strings.Contains(strings.Join(lines, "\n"), "cannot build") {
 		t.Fatalf("dry run: %v", lines)
 	}
@@ -369,32 +370,26 @@ func TestBuildPageG14(t *testing.T) {
 	}
 	e.MustRun("enable", "pkg:brrainz.harmony")
 	api.board, api.needs = nil, nil
-	p, err = api.BuildPage(false, 0)
+	p, err = api.BuildPage(0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !p.Ok || p.Why != "" || p.Before == "" || p.After == "" || p.Mods != 2 || p.Steps[0].Level == view.LevelBad {
 		t.Fatalf("fixed: %+v", p)
 	}
-	if l, _ := api.BuildPage(true, 0); l == nil || !l.Light || l.Before != "" || l.Steps[1].Level != view.LevelOff {
-		t.Fatalf("light: %+v", l)
-	}
-	// Textures (08 §5.2): a step of a full pack with the choices; without todds, 编译 says
+	// Textures (08 §5.2): a step of the build with the choices; without todds, 编译 says
 	// to install it there; with an encoder the step says what it converts.
 	if p.Steps[2].Kind != "textures" || p.Tex != 0 || len(p.TexChoices) != 8 {
 		t.Fatalf("textures step: %+v", p.Steps[2])
 	}
-	if p, _ := api.BuildPage(false, 100); p.Steps[2].Go == "textures" && (p.Ok || p.ToGo != "textures") {
+	if p, _ := api.BuildPage(100); p.Steps[2].Go == "textures" && (p.Ok || p.ToGo != "textures") {
 		t.Fatalf("no todds: %+v", p)
 	}
 	e.App.TextureEncoder = fakeEncoder{}
-	if p, _ := api.BuildPage(false, 75); !p.Ok || p.Tex != 75 || p.Steps[2].Go != "" || p.Steps[2].Level == view.LevelBad {
+	if p, _ := api.BuildPage(75); !p.Ok || p.Tex != 75 || p.Steps[2].Go != "" || p.Steps[2].Level == view.LevelBad {
 		t.Fatalf("with an encoder: %+v", p)
 	}
-	if l, _ := api.BuildPage(true, 75); len(l.Steps) != 4 || l.TexChoices != nil {
-		t.Fatalf("a light pack has no textures step: %+v", l)
-	}
-	if lines := strings.Join(api.PackDryRun("tex one", false, 75), " | "); !strings.Contains(lines, "dry run") {
+	if lines := strings.Join(api.PackDryRun("tex one", 75), " | "); !strings.Contains(lines, "dry run") {
 		t.Fatalf("dry run with textures: %s", lines)
 	}
 	e.App.TextureEncoder = nil
@@ -403,15 +398,25 @@ func TestBuildPageG14(t *testing.T) {
 			t.Errorf("name %q: %q", name, api.PackNameCheck(name))
 		}
 	}
-	if _, err := api.PackBuild("light one", true, 0); err != nil {
-		t.Fatal(err)
-	}
-	if api.PackNameCheck("light one") == "" {
+	e.MustRun("pack", "build", "one")
+	if api.PackNameCheck("one") == "" {
 		t.Fatal("the name of an existing pack is accepted")
 	}
-	pg, err := api.Pack("light one")
-	if err != nil || !pg.Light || len(pg.Mods) == 0 {
+	pg, err := api.Pack("one")
+	if err != nil || len(pg.Mods) == 0 {
 		t.Fatalf("pack page: %+v %v", pg, err)
+	}
+	// its list alone, as a RimArcho list (no dialog here: the path is typed); the guide's
+	// 打开 unpacks packs only, a list goes through the import preview
+	list := filepath.Join(e.Root, "one.archolist.json")
+	if text, err := api.PackExport("one", list, true); err != nil || !strings.Contains(text, "exported the list") {
+		t.Fatalf("export the list: %q %v", text, err)
+	}
+	if b, _ := os.ReadFile(list); !strings.Contains(string(b), `"hash"`) || strings.Contains(string(b), `"folder"`) {
+		t.Fatalf("the list:\n%s", b)
+	}
+	if _, err := api.PackImport(list); err == nil || !strings.Contains(err.Error(), "not a pack") {
+		t.Fatalf("a list was unpacked as a pack: %v", err)
 	}
 }
 

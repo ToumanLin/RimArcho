@@ -50,7 +50,7 @@ const (
 var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibExtra, LibMonitor}
 
 // Library filter keys (LibQuery Include / Exclude are "key:value").
-var LibKeys = []string{"tag", "source", "version", "state", "used", "updated"}
+var LibKeys = []string{"tag", "source", "location", "version", "state", "used", "updated"}
 
 // LibAges are the updated: values (06 §2.9): within a week, a month, half a year, and
 // older. They nest: a copy updated three days ago is in week, month and half-year.
@@ -91,6 +91,7 @@ type LibInstance struct {
 	Source     string // LibSources
 	WorkshopID string
 	Path       string
+	Location   string // registered source root; retained for subscribed items not on disk
 	// Created: when RimArcho first saw the copy; a lock library copy's copy time when
 	// origin.json has it.
 	Created  time.Time
@@ -312,6 +313,9 @@ func (a *App) Library() (*Library, error) {
 			Bytes: m.TotalSize, Sized: m.SnapID != 0 && (m.FileCount > 0 || m.TotalSize > 0),
 			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Staged: staged[m.ID], Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID],
 			Authors: strings.TrimSpace(m.Authors), Note: notes[m.ID]}
+		if s := ix.Source(m.SourceID); s != nil {
+			i.Location = s.Root
+		}
 		i.PNG = m.SnapID != 0 && png[m.SnapID]
 		if t, ok := texs[m.ID]; ok {
 			i.Textures = &t
@@ -372,7 +376,7 @@ func (a *App) Library() (*Library, error) {
 					ghost = m
 				}
 			}
-			i := &LibInstance{Source: LibWorkshop, WorkshopID: id, Ref: "ws:" + id, States: []string{LibMissing}}
+			i := &LibInstance{Source: LibWorkshop, Location: s.Root, WorkshopID: id, Ref: "ws:" + id, States: []string{LibMissing}}
 			if ghost == nil {
 				byLin["ws:"+id] = &LibLineage{ID: "ws:" + id, Ref: "ws:" + id, Name: "Workshop item " + id, Instances: []*LibInstance{i}, search: " " + id}
 				continue
@@ -736,7 +740,7 @@ func ParseLibFilter(f string) (key, value string, err error) {
 	if !ok || v == "" || !slices.Contains(LibKeys, k) {
 		return "", "", fmt.Errorf("bad filter %q: want key:value with key %s", f, strings.Join(LibKeys, ", "))
 	}
-	if k != "used" && k != "tag" {
+	if k != "used" && k != "tag" && k != "location" {
 		v = strings.ToLower(v)
 	}
 	return k, strings.TrimSpace(v), nil
@@ -751,6 +755,11 @@ func libValues(l *LibLineage, i *LibInstance, key string, now time.Time) []strin
 		return l.Tags
 	case "source":
 		return []string{i.Source}
+	case "location":
+		if i.Location != "" {
+			return []string{i.Location}
+		}
+		return nil
 	case "version":
 		return i.Versions
 	case "state":

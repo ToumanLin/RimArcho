@@ -22,6 +22,12 @@ func (a *App) ToTrash(path string) error {
 	if err := check(path); err != nil {
 		return err
 	}
+	return a.trash(path)
+}
+
+// trash moves path to the recycle bin without the allow-list. Only a caller that has its
+// own reason uses it: MoveDirectory, once a managed directory's checked copy is in place.
+func (a *App) trash(path string) error {
 	trash := a.TrashFunc
 	if trash == nil {
 		trash = source.Trash

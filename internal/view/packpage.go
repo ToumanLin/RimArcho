@@ -1,6 +1,7 @@
 package view
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
@@ -30,7 +31,7 @@ type TexChoice struct {
 	Label string `json:"label"`
 }
 
-// PackTextureChoices are the values a full pack's textures can take: off, 预转换 (DDS at full
+// PackTextureChoices are the values a pack's textures can take: off, 预转换 (DDS at full
 // size), 精简 at a percent of the size (08 §5.2).
 func PackTextureChoices() []TexChoice {
 	out := []TexChoice{{0, T("off: copy the PNGs")}, {100, T("pre-convert (full size)")}}
@@ -43,9 +44,8 @@ func PackTextureChoices() []TexChoice {
 // BuildPage is the build page: on the left the four steps, on the right the summary and
 // the 编译 button, which is disabled with Why when something stops the build (G14).
 type BuildPage struct {
-	Plan  string `json:"plan"`
-	Name  string `json:"name"` // a free name to start from
-	Light bool   `json:"light"`
+	Plan string `json:"plan"`
+	Name string `json:"name"` // a free name to start from
 	// The summary: environment, mods carried, size before → after, saves, location.
 	Env    string      `json:"env"`
 	Mods   int         `json:"mods"`
@@ -58,8 +58,7 @@ type BuildPage struct {
 	Why    string      `json:"why,omitempty"`     // why 编译 is disabled
 	ToNeed bool        `json:"toNeeds,omitempty"` // Why is fixed on 能不能跑
 	ToGo   string      `json:"toGo,omitempty"`    // Why is fixed on that page ("textures")
-	// Tex is the textures choice the page was measured with; TexChoices its values (full
-	// packs only).
+	// Tex is the textures choice the page was measured with; TexChoices its values.
 	Tex        int         `json:"tex"`
 	TexChoices []TexChoice `json:"texChoices,omitempty"`
 }
@@ -96,19 +95,13 @@ func exists(a *app.App, name string) bool {
 	return err == nil
 }
 
-// BuildPageOf turns a checked (and, for a full pack, measured) plan into the page. It reads
-// only the plan, so the window builds it without holding the app.
-func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, light bool, tex int) *BuildPage {
+// BuildPageOf turns a checked and measured plan into the page. It reads only the plan, so
+// the window builds it without holding the app.
+func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, tex int) *BuildPage {
 	r := pl.R
 	st := pl.St
 	mm := st.GameMM()
-	p := &BuildPage{Plan: plan, Light: light, Env: envChip, Dir: packsDir, Saves: T("its own, empty the first time it starts")}
-	if !light {
-		p.Tex, p.TexChoices = tex, PackTextureChoices()
-	}
-	if light {
-		p.Saves = T("none: a light pack is a list for sharing, it does not start")
-	}
+	p := &BuildPage{Plan: plan, Env: envChip, Dir: packsDir, Saves: T("its own, empty the first time it starts"), Tex: tex, TexChoices: PackTextureChoices()}
 	carried := 0
 	if r.Pack != nil {
 		for _, e := range r.Pack.Entries {
@@ -129,7 +122,7 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, light bool, t
 	check := BuildStep{Key: "check", Title: T("check that it runs")}
 	if n := len(r.Blockers); n > 0 {
 		check.Level, check.Needs = LevelBad, true
-		check.Text = Tf("%d problems still break the game; fix them first. The load order is sorted when the pack is built.", n)
+		check.Text = Tf("%d problems still break the game; fix them first. The load order is sorted when the pack is created.", n)
 		for i, b := range r.Blockers {
 			if i == 8 {
 				check.More = append(check.More, Tf("… %d more", n-8))
@@ -144,7 +137,7 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, light bool, t
 		}
 		p.Why, p.ToNeed = Tf("fix %d problems first", n), true
 	} else {
-		check.Text = T("nothing breaks the game.") + sp() + Tf("The load order is sorted for the pack (%d moved); your plan does not change.", r.Moved)
+		check.Text = T("nothing breaks the game.") + sp() + Tf("The load order is sorted for the pack (%d moved); your list does not change.", r.Moved)
 		if n := len(r.Mismatch); n > 0 {
 			check.Level = LevelWarn
 			check.Text += sp() + Tf("%d mods do not list game version %s.", n, mm)
@@ -160,12 +153,9 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, light bool, t
 
 	// 2 · trim
 	trim := BuildStep{Key: "trim", Title: T("leave out what is not used")}
-	switch {
-	case light:
-		trim.Level, trim.Text = LevelOff, T("a light pack is the list only: nothing is copied")
-	case r.Pack == nil:
+	if r.Pack == nil {
 		trim.Level, trim.Text = LevelOff, T("worked out once the problems are fixed")
-	default:
+	} else {
 		withOld := 0
 		for _, e := range r.Pack.Entries {
 			if len(e.TrimmedDir) > 0 {
@@ -201,29 +191,15 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, light bool, t
 	}
 
 	// 3 · lock the versions
-	lock := BuildStep{Key: "lock", Title: T("lock the versions")}
-	if light {
-		lock.Text = Tf("Records what %d mods are now; whoever imports it is told which match.", carried)
-	} else {
-		lock.Text = Tf("Records what %d mods are now and copies them: Workshop updates no longer change the pack.", carried)
-	}
+	lock := BuildStep{Key: "lock", Title: T("lock the versions"), Text: Tf("Records what %d mods are now and copies them: Workshop updates no longer change the pack.", carried)}
 
 	// 4 · put it in place
-	place := BuildStep{Key: "place", Title: T("put it in place")}
-	if light {
-		place.Text = T("Writes the list (pack.json) to the packs folder; export it to share.")
-	} else {
-		place.Text = Tf("Goes into RimArcho's packs folder, never the Workshop folder. It starts with its own saves and settings; the saves of %s are not touched.", plan)
+	place := BuildStep{Key: "place", Title: T("put it in place"), Text: Tf("Goes into RimArcho's packs folder, never the Workshop folder. It starts with its own saves and settings; the saves of %s are not touched.", plan)}
+	t := textureStep(r, tex)
+	if t.Go != "" && p.Why == "" && len(r.Blockers) == 0 {
+		p.Why, p.ToGo = T("install the DDS encoder (todds) first, or create it without converting textures"), t.Go
 	}
-	p.Steps = []BuildStep{check, trim}
-	if !light {
-		t := textureStep(r, tex)
-		if t.Go != "" && p.Why == "" && len(r.Blockers) == 0 {
-			p.Why, p.ToGo = T("install the DDS encoder (todds) first, or build without converting textures"), t.Go
-		}
-		p.Steps = append(p.Steps, t)
-	}
-	p.Steps = append(p.Steps, lock, place)
+	p.Steps = []BuildStep{check, trim, t, lock, place}
 	for i := range p.Steps {
 		p.Steps[i].Title = Tf("%d · %s", i+1, p.Steps[i].Title)
 	}
@@ -231,7 +207,7 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, light bool, t
 	return p
 }
 
-// textureStep is the 贴图 step of a full pack (08 §5.2): the choice, and what it costs and
+// textureStep is the 贴图 step (08 §5.2): the choice, and what it costs and
 // saves (the PNGs converted, the pack's size after, the most the drive needs meanwhile).
 func textureStep(r *app.PackBuild, tex int) BuildStep {
 	s := BuildStep{Key: "textures", Title: T("textures"), Kind: "textures"}
@@ -281,7 +257,6 @@ type PackPageEntry struct {
 // PackPage is a pack's own page: what it is, and its mods in load order.
 type PackPage struct {
 	Name     string          `json:"name"`
-	Light    bool            `json:"light,omitempty"`
 	Facts    []string        `json:"facts"` // "42 mods · 1.2 GB", "runs on 1.6", "built 10 月 20 日 in main", "played …"
 	Dir      string          `json:"dir"`
 	Mods     []PackPageEntry `json:"mods"`
@@ -305,24 +280,23 @@ func BuildPackPage(a *app.App, name string) (*PackPage, error) {
 		if err != nil {
 			return nil, err
 		}
+		if pk.Light {
+			return nil, errors.New(Tf("%s is a list without files, not a pack", name))
+		}
 		p = &app.PackInfo{Pack: pk}
 	}
-	pg := &PackPage{Name: p.Name, Light: p.Light, Dir: p.Dir, Exported: DefaultExportDir()}
+	pg := &PackPage{Name: p.Name, Dir: p.Dir, Exported: DefaultExportDir()}
 	carried := 0
 	for _, e := range p.Entries {
 		if !e.Official {
 			carried++
 		}
 	}
-	size := SizeText(p.Bytes)
-	if p.Light {
-		size = T("list only")
-	}
-	pg.Facts = append(pg.Facts, Tf("%d mods · %s", carried, size))
+	pg.Facts = append(pg.Facts, Tf("%d mods · %s", carried, SizeText(p.Bytes)))
 	if v := PackVersions(a, p.Pack); v != "" {
 		pg.Facts = append(pg.Facts, Tf("runs on %s", v))
 	}
-	built := Tf("built %s", ShortDate(p.Created))
+	built := Tf("created %s", ShortDate(p.Created))
 	if p.Env != "" {
 		built += " · " + p.Env
 	}
@@ -337,7 +311,7 @@ func BuildPackPage(a *app.App, name string) (*PackPage, error) {
 		switch {
 		case e.Official:
 			r.Note = T("from the game")
-		case !p.Light:
+		default:
 			r.Size = SizeText(e.Bytes)
 			if len(e.TrimmedDir) > 0 {
 				r.Note = Tf("left out %s", strings.Join(e.TrimmedDir, ", "))

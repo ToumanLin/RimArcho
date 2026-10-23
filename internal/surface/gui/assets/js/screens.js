@@ -8,6 +8,7 @@ import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
 import { bgSection } from "./bg.js";
+import { virtualRows } from "./virtualrows.js";
 
 let ui = null;
 export function initScreens(u) { ui = u; }
@@ -18,17 +19,22 @@ let fresh = false;
 
 // left tells Go the player left a page, which forgets what only that page used (07 §8.3).
 function left(next) {
-  if (S.screen && S.screen !== next) api.Leave(S.screen).catch(() => {});
+  if (S.screen && S.screen !== next) {
+    if (S.screen === "log") { L.list?.destroy(); L.list = null; L.want = ""; clearTimeout(detailTimer); }
+    api.Leave(S.screen).catch(() => {});
+  }
 }
 
 export function openScreen(name) {
   fresh = S.screen !== name;
+  if (fresh) S.screenSeq++;
   if (fresh) onArea = 0;
   left(name);
   S.screen = name;
   if (name !== "home") dropBackdrop();
   const sc = $("#screen");
   sc.hidden = false;
+  sc.removeAttribute("aria-busy");
   sc.innerHTML = "";
   ui.renderWhere();
   ui.renderHints();
@@ -38,13 +44,52 @@ export function openScreen(name) {
 export function closeScreen() {
   if (!S.screen) return false;
   left(null);
+  S.screenSeq++;
   S.screen = null;
   dropBackdrop();
   $("#screen").hidden = true;
+  $("#screen").removeAttribute("aria-busy");
   $("#screen").innerHTML = "";
   ui.renderWhere();
   ui.renderHints();
   return true;
+}
+
+const pageReads = new Map();
+const pageContexts = new Map();
+export const pageLoading = () => !!$("#screen .page-loading, #screen .page-read-error");
+// Every page starts navigation before I/O and owns a ticket for its reply. Refreshes
+// keep the visible content; a new page/subview shows a placeholder immediately.
+export function beginPageRead(name, { replace = false, label = "loading…" } = {}) {
+  const same = S.screen === name;
+  const sc = same ? $("#screen") : openScreen(name);
+  const n = (pageReads.get(name) || 0) + 1;
+  pageReads.set(name, n);
+  const epoch = S.screenSeq, env = S.board?.env, plan = S.shell?.plan?.id;
+  const context = JSON.stringify([env, plan]);
+  const changed = pageContexts.get(name) !== context;
+  pageContexts.set(name, context);
+  const current = () => S.screen === name && S.screenSeq === epoch && S.board?.env === env && S.shell?.plan?.id === plan && pageReads.get(name) === n;
+  if (!same || changed || replace || !sc.children.length) {
+    sc.innerHTML = "";
+    const w = page(name, "");
+    const card = el("section", "card pad page-loading");
+    card.append(shimmer(T(label), 6));
+    w.append(card); sc.append(w);
+  }
+  sc.setAttribute("aria-busy", "true");
+  return {
+    current,
+    finish() { if (current()) sc.removeAttribute("aria-busy"); },
+    fail(error) {
+      if (!current()) return;
+      sc.removeAttribute("aria-busy");
+      const message = errText(error);
+      const placeholder = sc.querySelector(".page-loading");
+      if (placeholder) { placeholder.className = "card pad err page-read-error"; placeholder.textContent = message; }
+      say("fail", message);
+    },
+  };
 }
 
 // dropBackdrop takes the launch page's image away with the page (home.js setBackdrop).
@@ -179,7 +224,7 @@ const N = { data: null, items: [], cur: 0, open: new Set(), els: [] };
 export const archo = { ask: null };
 
 export function liveChanged() {
-  if (S.screen === "needs" && N.data) { orderNeeds(); drawNeeds(); }
+  if (S.screen === "needs" && N.data && !pageLoading()) { orderNeeds(); drawNeeds(); }
 }
 
 // liveCount: this run's counted errors (the sidebar's badge adds them, 06 §2.1).
@@ -195,12 +240,15 @@ function orderNeeds() {
 }
 
 export async function needs(keepCursor) {
+  const read = beginPageRead("needs");
   let data;
-  try { data = await api.Needs(); } catch (e) { say("fail", errText(e)); return; }
+  try { data = await api.Needs(); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   N.data = data;
   if (!keepCursor) N.cur = 0;
   orderNeeds();
   drawNeeds();
+  read.finish();
 }
 
 // lead: what the page says about the plan in one sentence.
@@ -323,6 +371,8 @@ async function runAction(it, act) {
     case "open-url":
       try { await api.OpenURL(act.url); say("ok", act.done); } catch (e) { say("fail", errText(e)); }
       return;
+    case "locate-directory":
+      return directoryPrompt({ id: act.refs[0], label: it.title || act.label, path: act.lines?.[0] || "" }, false, async () => { await ui.reload(); needs(true); });
     case "view":
       try { pop.text(act.label, await api.Inspect(act.argv)); } catch (e) { say("fail", errText(e)); }
       return;
@@ -376,7 +426,7 @@ export function analyzeEvent(ev) {
 // ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
-const L = { path: "", page: null, loading: false, pending: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "" };
+const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "", list: null };
 // of: only this mod's Lineage ({id, name}), from a detail's history; null every mod.
 const C = { page: null, cur: 0, items: [], els: [], open: new Set(), raw: new Map(), of: null, library: false };
 
@@ -403,42 +453,64 @@ function logPage(name, title, ...right) {
   return w;
 }
 
-// gameLog reads the log page; open: it was navigated to, so it is drawn even when the read
-// comes back before the loading line would show (unless another page opened meanwhile).
-export async function gameLog(path = L.path, open = false) {
+// Called by every board reload, including home-page applies and external switches.
+// A shared file path can contain different attribution in a different environment.
+function syncLogEnvironment() {
+  const env = S.board?.env || "";
+  if (L.env === env) return false;
+  L.env = env;
+  L.seq++;
+  L.list?.destroy(); L.list = null;
+  clearTimeout(detailTimer);
+  L.path = ""; L.page = null; L.loading = false; L.pending = ""; L.error = "";
+  L.cur = 0; L.mcur = 0; L.tab = 0; L.want = ""; L.els = [];
+  L.detail.clear(); L.open.clear();
+  return true;
+}
+
+export async function logEnvironmentChanged() {
+  if (syncLogEnvironment() && S.screen === "log") await gameLog("", true);
+}
+
+// gameLog shows the page immediately; late responses cannot reopen it after navigation.
+export async function gameLog(path, open = false) {
+  const changed = syncLogEnvironment();
+  path = changed ? "" : path ?? L.path;
   const n = ++L.seq;
-  const from = S.screen;
-  const show = () => S.screen === "log" || (open && S.screen === from);
-  // What was read before shows at once and is replaced when the new read is in; a log not
-  // read yet says so only if it takes a moment (no flash of a loading line).
-  let slow = 0;
-  if (L.page && L.page.path && (L.page.path === path || !path)) drawGameLog();
-  else slow = setTimeout(() => { if (n === L.seq) { L.loading = true; drawGameLog(); } }, 150);
+  if (!open && S.screen !== "log") return;
+  L.error = "";
+  L.pending = "";
+  L.loading = !(L.page && L.page.path && (L.page.path === path || !path));
+  drawGameLog(); // switch the page and breadcrumb before waiting for any I/O
+  const epoch = S.screenSeq;
+  const current = () => n === L.seq && S.screen === "log" && S.screenSeq === epoch;
   let p;
-  try { p = await api.LogPage(path || ""); } catch (e) { L.loading = false; if (n === L.seq) { say("fail", errText(e)); drawGameLog(); } return; }
-  clearTimeout(slow);
-  if (n !== L.seq) return;
+  try { p = await api.LogPage(path || ""); } catch (e) {
+    if (current()) { L.loading = false; L.error = errText(e); say("fail", L.error); drawGameLog(); }
+    return;
+  }
+  if (!current()) return;
   if (p.pending) {
     // the mods are being analysed for the log's game version: look again shortly
     L.pending = p.pending;
     L.loading = false;
     L.page = { files: p.files, path: "" };
     L.path = p.path;
-    if (show()) drawGameLog();
-    setTimeout(() => { if (S.screen === "log" && n === L.seq) gameLog(p.path); }, 1500);
+    drawGameLog();
+    setTimeout(() => { if (current()) gameLog(p.path); }, 1500);
     return;
   }
   L.pending = "";
-  const same = L.page && !L.loading && JSON.stringify(L.page) === JSON.stringify(p);
   if (!L.page || L.page.path !== p.path) L.cur = 0;
   L.page = p;
-  if (same) return;
   L.path = p.path;
   L.loading = false;
-  if (show()) drawGameLog();
+  drawGameLog();
 }
 
 function drawGameLog() {
+  L.list?.destroy(); L.list = null;
+  clearTimeout(detailTimer); L.want = "";
   const p = L.page;
   const right = [];
   if (p && p.path && !L.loading) {
@@ -457,6 +529,7 @@ function drawGameLog() {
   if (files.length) bar.append(filePicker(files));
   if (p && p.facts && !L.loading) bar.append(el("span", "muted", p.facts));
   w.append(bar);
+  if (L.error) { w.append(el("div", "card empty-state err", L.error)); return; }
   if (p && p.noMonitor && !L.loading) w.append(noMonitor(p));
   if (L.pending) { w.append(el("div", "card empty-state", Tf("the mods are analysed for %s first (once per game version)…", L.pending))); return; }
   if (L.loading) { const c = el("div", "card pad"); c.append(shimmer(T("reading the log…"), 6)); w.append(c); return; }
@@ -475,7 +548,10 @@ function drawGameLog() {
   if (L.tab === 1) monitorRows(scroll, mon);
   else {
     if (!(p.rows || []).length) scroll.append(el("div", "empty-state", "✓ " + T("no errors in this log")));
-    (p.rows || []).forEach((r, i) => {
+    const rows = p.rows || [];
+    L.cur = Math.min(L.cur, Math.max(0, rows.length - 1));
+    L.list = virtualRows(scroll, rows.length, (i) => {
+      const r = rows[i];
       const row = el("div", "lrow" + (r.info ? " dimmed" : ""));
       const ic = el("span", "ic");
       ic.innerHTML = statusIcon(r.status);
@@ -486,8 +562,7 @@ function drawGameLog() {
       body.append(top, logText(r));
       row.append(ic, body);
       row.onclick = () => { L.cur = i; markLog(); };
-      L.els.push(row);
-      scroll.append(row);
+      return row;
     });
   }
   list.append(scroll);
@@ -580,7 +655,9 @@ function monitorRows(scroll, mon) {
   head.append(el("span", "", mon.facts));
   scroll.append(head);
   if (!mon.entries.length) { scroll.append(el("div", "empty-state", "✓ " + T("nothing reported in this run"))); return; }
-  mon.entries.forEach((m, i) => {
+  L.mcur = Math.min(L.mcur, Math.max(0, mon.entries.length - 1));
+  L.list = virtualRows(scroll, mon.entries.length, (i) => {
+    const m = mon.entries[i];
     const open = L.open.has(m.key);
     const row = el("div", "lrow mrow" + (open ? " open" : ""));
     const ic = el("span", "ic");
@@ -607,8 +684,7 @@ function monitorRows(scroll, mon) {
       L.open.has(m.key) ? L.open.delete(m.key) : L.open.add(m.key);
       drawGameLog();
     };
-    L.els.push(row);
-    scroll.append(row);
+    return row;
   });
 }
 
@@ -625,9 +701,10 @@ function toCluster(id) {
 // while the game runs).
 export async function logLive() {
   if (S.screen !== "log" || !L.page || !L.page.path) return;
+  const path = L.page.path, epoch = S.screenSeq, seq = L.seq;
   let m;
-  try { m = await api.LogMonitor(L.page.path); } catch { return; }
-  if (!m || S.screen !== "log" || !L.page) return;
+  try { m = await api.LogMonitor(path); } catch { return; }
+  if (!m || S.screen !== "log" || S.screenSeq !== epoch || L.seq !== seq || L.page?.path !== path) return;
   if (JSON.stringify(m) === JSON.stringify(L.page.monitor)) return;
   L.page.monitor = m;
   drawGameLog();
@@ -635,10 +712,9 @@ export async function logLive() {
 
 let detailTimer = 0;
 function markLog(keepScroll) {
+  clearTimeout(detailTimer); L.want = "";
   const at = L.tab === 1 ? L.mcur : L.cur;
-  L.els.forEach((r, i) => r.classList.toggle("cur", i === at));
-  const on = L.els[at];
-  if (on && !keepScroll) on.scrollIntoView({ block: "nearest" });
+  L.list?.select(at, !keepScroll);
   const box = $("#screen .detail-card .scroll");
   if (!box) return;
   setAna(null);
@@ -664,14 +740,16 @@ function markLog(keepScroll) {
   box.append(shimmer(T("loading…"), 8));
   clearTimeout(detailTimer);
   L.want = k;
+  const env = L.env, seq = L.seq;
   detailTimer = setTimeout(async () => {
     const path = L.page.path;
     let lines, card = null;
     try {
       [lines, card] = await Promise.all([api.LogCluster(path, id), api.LogPattern(path, id).catch(() => null)]);
     } catch (e) { lines = [errText(e)]; }
+    if (L.env !== env || L.seq !== seq) return;
     L.detail.set(k, { lines, card });
-    if (L.want === k) showLines($("#screen .detail-card .scroll"), lines, card);
+    if (S.screen === "log" && L.want === k) showLines($("#screen .detail-card .scroll"), lines, card);
   }, 90);
 }
 
@@ -786,9 +864,12 @@ export function changesPlan() { C.library = false; C.of = null; C.cur = 0; }
 export async function changes(of) {
   if (of !== undefined && (of && of.id) !== (C.of && C.of.id)) { C.of = of; C.cur = 0; C.open.clear(); }
   let p;
-  try { p = await api.Changes(C.library, C.of ? C.of.id : ""); } catch (e) { say("fail", errText(e)); return; }
+  const read = beginPageRead("changes");
+  try { p = await api.Changes(C.library, C.of ? C.of.id : ""); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   C.page = p;
   drawChanges();
+  read.finish();
 }
 
 export function rescanButton(label) {
@@ -939,10 +1020,14 @@ function toggle(it) {
 }
 
 async function rawFiles(r) {
+  const epoch = S.screenSeq;
   const k = rowKey(r);
   if (C.raw.has(k)) C.raw.delete(k);
   else {
-    try { C.raw.set(k, (await api.ChangeFiles(r.before, r.after)) || []); } catch (e) { return say("fail", errText(e)); }
+    let lines;
+    try { lines = (await api.ChangeFiles(r.before, r.after)) || []; } catch (e) { if (S.screen === "changes" && S.screenSeq === epoch) say("fail", errText(e)); return; }
+    if (S.screen !== "changes" || S.screenSeq !== epoch) return;
+    C.raw.set(k, lines);
     C.open.add(k);
   }
   drawChanges();
@@ -1057,8 +1142,10 @@ export { full, fullKey, fullSection } from "./fulldetail.js";
 // only those commands (API.ApplySetting).
 
 export async function settings() {
+  const read = beginPageRead("settings");
   let groups, bg;
-  try { [groups, bg] = await Promise.all([api.Settings(), bgSection()]); } catch (e) { say("fail", errText(e)); return; }
+  try { [groups, bg] = await Promise.all([api.Settings(), bgSection(read.current)]); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   groups = groups || [];
   const sc = S.screen === "settings" ? $("#screen") : openScreen("settings");
   const top = sc.scrollTop;
@@ -1068,18 +1155,71 @@ export async function settings() {
   w.append(bg);
   renderGroups(w, groups, settings);
   sc.scrollTop = top;
+  read.finish();
+}
+
+// Each startup checks the disk, including environments other than the selected one.
+export async function checkDirectories() {
+  let dirs;
+  try { dirs = await api.Directories(); } catch (e) { say("fail", errText(e)); return; }
+  const missing = (dirs || []).filter(d => d.status !== "ok" && d.status !== "unused");
+  if (!missing.length) return;
+  const body = el("div");
+  body.append(el("p", "sub", T("directories are checked each time RimArcho starts; you can skip this and locate them in settings later")));
+  for (const d of missing) {
+    const row = el("div", "set");
+    const left = el("div", "l");
+    left.append(el("div", "name", d.label), el("div", "sub", d.path));
+    row.append(left, button(T("locate"), "", () => directoryPrompt(d, false, async () => { await ui.reload(); checkDirectories(); })));
+    body.append(row);
+  }
+  pop.panel(T("some directories need their new location"), body, T("skip for now"), () => {});
+}
+
+function directoryPrompt(d, moving, after) {
+  pop.open("directory", d.label, (box, p) => {
+    box.append(el("div", "ttl", d.label), el("p", "sub", d.path));
+    const input = el("input", "field");
+    input.spellcheck = false;
+    input.placeholder = T("new directory path");
+    const error = el("div", "err");
+    const actions = el("div", "actions");
+    let busy = false;
+    const apply = async () => {
+      const path = input.value.trim();
+      if (!path || busy) return;
+      busy = true;
+      error.textContent = "";
+      try {
+        const lines = await api.ApplySetting(["folder", moving ? "move" : "set", d.id, "{}"], path);
+        pop.close();
+        say("ok", lines?.[0] || T("done"));
+        if (after) await after();
+      } catch (e) { error.textContent = errText(e); busy = false; }
+    };
+    if (moving) box.append(el("p", "sub", T("move this directory and its files to the new path?")));
+    actions.append(button(T(moving ? "choose parent folder…" : "choose…"), "", () => pickFolder(d.path, path => {
+      input.value = moving ? path.replace(/[\\/]$/, "") + "/" + d.path.split(/[\\/]/).pop() : path;
+    })),
+      button(T(moving ? "move to…" : "locate"), "", apply, "primary"), button(T("skip for now"), "", () => pop.close()));
+    box.append(input, error, actions);
+    p.keys = e => { if (e.key === "Enter") { e.preventDefault(); apply(); return true; } return false; };
+    setTimeout(() => input.focus(), 0);
+  });
 }
 
 // settingRunner runs a setting's command, then redraws the page with again.
 function settingRunner(again) {
   return async (argv, value, after) => {
+    const screen = S.screen, epoch = S.screenSeq;
     try {
       const out = await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
     } catch (e) { say("fail", errText(e)); }
+    if (S.screen !== screen || S.screenSeq !== epoch) return;
     if (after) return after();
     await ui.reload();
-    again();
+    if (S.screen === screen && S.screenSeq === epoch) again();
   };
 }
 
@@ -1108,6 +1248,13 @@ function renderGroups(w, groups, again) {
         // A new language: the page's text again, in place (main.js relang).
         s.onchange = () => run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : null);
         right.append(s);
+      } else if (it.edit === "directory") {
+        const value = el("span", "muted", it.value);
+        value.style.overflowWrap = "anywhere";
+        const d = { id: it.directory, label: it.label, path: it.value };
+        const after = async () => { await ui.reload(); again(); };
+        right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after)),
+          button(T("move to…"), "", () => directoryPrompt(d, true, after)));
       } else if (it.edit) {
         const inp = el("input", "field");
         inp.value = it.value || "";
@@ -1148,14 +1295,16 @@ export async function pickFolder(start, then) {
 // settings page.
 
 export async function environment() {
+  const read = beginPageRead("env");
   let p;
-  try { p = await api.Environment(); } catch (e) { say("fail", errText(e)); return; }
+  try { p = await api.Environment(); } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", T("an environment is one game folder: its version, how it starts, its saves"), act(T("add an environment"), "plus", () => ui.go("guide")), rescanButton());
+  const w = page("env", T("each game is one game folder: its version, how it starts, its saves"), act(T("add a game"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
-  const envLab = el("div", "label section", T("every environment"));
+  const envLab = el("div", "label section", T("every game"));
   w.append(envLab);
   const card = el("section", "card");
   area(card, envLab);
@@ -1166,19 +1315,15 @@ export async function environment() {
     row.append(l);
     if (e.current) row.append(el("span", "chip cur", T("in use")));
     else {
-      row.append(button(T("use this one"), "", async () => {
-        try { say("ok", await api.UseEnv(e.name)); } catch (err) { say("fail", errText(err)); }
-        for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
-        await ui.reload();
-        environment();
-      }));
+      row.append(button(T("use this one"), "", () => ui.useEnv(e.name, environment)));
     }
-    row.append(button(T("remove environment"), "", () => removeEnv(e.name), "quiet"));
+    row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet"));
     card.append(row);
   }
   w.append(card);
   renderGroups(w, p.groups || [], environment);
   sc.scrollTop = top;
+  read.finish();
 }
 
 // removeEnv: the dry run says what RimArcho forgets and what stays, one confirmation removes
@@ -1187,7 +1332,7 @@ export async function environment() {
 export async function removeEnv(name) {
   let p;
   try { p = await api.EnvRemovePreview(name); } catch (e) { say("fail", errText(e)); return; }
-  pop.confirm(p.title, p.lines, T("remove environment"), async () => {
+  pop.confirm(p.title, p.lines, T("remove the game"), async () => {
     try { say("ok", await api.RemoveEnv(name)); } catch (e) { say("fail", errText(e)); return; }
     for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
     await ui.reload();

@@ -112,13 +112,13 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 				b.WriteString(err.Error() + "\n")
 			}
 			if others > 0 {
-				b.WriteString(Tf("%d packs belong to other environments (archo pack list)", others) + "\n\n")
+				b.WriteString(Tf("%d packs belong to other games (archo pack list)", others) + "\n\n")
 			}
 			// Builds running (the window's, the CLI's) or cut short.
 			if un, err := view.UnfinishedRows(m.app); err == nil {
 				for _, u := range un {
 					if u.Running {
-						fmt.Fprintf(&b, "%s\n  %s\n  : archo pack stop %q\n\n", Tf("building pack %s", u.Name), u.Facts, u.Name)
+						fmt.Fprintf(&b, "%s\n  %s\n  : archo pack stop %q\n\n", Tf("creating pack %s", u.Name), u.Facts, u.Name)
 					} else {
 						fmt.Fprintf(&b, "⚠ %s\n  %s\n  : archo pack build %q\n  : archo pack remove %q --unfinished\n\n", u.Name, u.Facts, u.Name, u.Name)
 					}
@@ -142,8 +142,14 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 				b.WriteString(g.Title + "\n")
 				for _, it := range g.Items {
 					fmt.Fprintf(&b, "  %s: %s\n", it.Label, it.Value)
+					if it.Note != "" {
+						fmt.Fprintf(&b, "    %s\n", it.Note)
+					}
 					if len(it.Argv) > 0 {
 						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.Argv, " "))
+					}
+					if len(it.MoveArgv) > 0 {
+						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.MoveArgv, " "))
 					}
 					for _, a := range it.Actions {
 						fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, strings.Join(a.Argv, " "))
@@ -288,7 +294,7 @@ func (m *model) paletteLines(n int) []string {
 	p := m.pal
 	w := m.w
 	out := []string{"  " + sAccent.Render(markPrompt+" ") + sText.Render(fit(p.query+"_", w-4)), ""}
-	kinds := map[palKind]string{palCommand: T("command"), palMod: "Mod", palEnv: T("environment"), palPlan: T("plan")}
+	kinds := map[palKind]string{palCommand: T("command"), palMod: "Mod", palEnv: T("game"), palPlan: T("list")}
 	rows := max(n-len(out), 1)
 	off := max(0, p.sel-rows+1)
 	for i := off; i < len(p.results) && len(out) < n; i++ {

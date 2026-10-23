@@ -57,7 +57,7 @@ func LastRunErrors(n *Needs) int {
 // EnvChip is an environment as a chip: "steam · 1.6".
 func EnvChip(name, gameVersion string) string {
 	if name == "" {
-		return T("no environment")
+		return T("no game")
 	}
 	if mm := env.MajorMinor(gameVersion); mm != "" {
 		return name + " · " + mm
@@ -113,7 +113,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	for _, p := range plans {
 		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, InGame: p.InGame})
 	}
-	planKids = append(planKids, NavItem{ID: PagePlanNew, Label: "+ " + T("new plan"), Add: true})
+	planKids = append(planKids, NavItem{ID: PagePlanNew, Label: "+ " + T("new list"), Add: true})
 	var packKids []NavItem
 	for _, p := range packs {
 		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name})
@@ -127,11 +127,11 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	library := []NavItem{
 		// The entry opens 全部, its first sub-entry (06 §2.9).
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all")}, {ID: PageChanges, Label: T("changes")}}},
-		{ID: PagePlan, Label: T("plans"), Kids: planKids},
+		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// what the game loads faster: next to the packs, which convert the same way (08 §5.2)
 		{ID: PageTextures, Label: T("texture optimisation")},
-		{ID: PageEnv, Label: T("environment")},
+		{ID: PageEnv, Label: T("game")},
 	}
 	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: T("library"), Items: library}}
 	n := 0
@@ -149,6 +149,9 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 func NavPath(groups []NavGroup, id string) []Crumb {
 	if id == PageSettings {
 		return []Crumb{{Label: T("settings"), ID: PageSettings}}
+	}
+	if id == PageTasks {
+		return []Crumb{{Label: T("background tasks"), ID: PageTasks}}
 	}
 	for _, g := range groups {
 		for _, it := range g.Items {
@@ -194,10 +197,8 @@ type HomeRow struct {
 	// change: a plan follows Workshop updates, a pack keeps its versions (08 §5).
 	Facts string `json:"facts"`
 	Mode  string `json:"mode,omitempty"`
-	// Played is "played 10 月 20 日" or "never played"; Light packs are a list only and do
-	// not launch.
+	// Played is "played 10 月 20 日" or "never played".
 	Played string `json:"played"`
-	Light  bool   `json:"light,omitempty"`
 	// A plan's row: its ID and page, whether it is the one being edited, its
 	// "有未载入的外部版本" mark, and whether the game holds it now.
 	Plan    int64  `json:"plan,omitempty"`
@@ -284,18 +285,14 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 }
 
 func packHomeRow(p PackRow, chip, envName string) HomeRow {
-	r := HomeRow{Kind: RowPack, Name: p.Name, Env: chip, Facts: p.Facts, Played: p.Played, Light: p.Light, at: p.PlayedAt,
+	r := HomeRow{Kind: RowPack, Name: p.Name, Env: chip, Facts: p.Facts, Played: p.Played, at: p.PlayedAt,
 		EnvName: envName, Versions: p.Versions, Mods: p.Mods}
 	if p.Mods > 0 {
 		r.Facts = Tf("%d mods", p.Mods)
 	}
-	if p.Light {
-		r.State = T("list only")
-	} else {
-		r.Mode = T("versions locked · own saves")
-		// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
-		r.State, r.Level = T("checked when built"), HomeOK
-	}
+	r.Mode = T("versions locked · own saves")
+	// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
+	r.State, r.Level = T("checked when created"), HomeOK
 	return r
 }
 
@@ -486,17 +483,10 @@ func AddGames(a *app.App, games []GameFound) ([]string, error) {
 	return out, nil
 }
 
-// PackImportText says what importing a pack did (pack import, 08 §5.4).
+// PackImportText says what unpacking a pack did (pack import, 08 §5.4).
 func PackImportText(m *app.PackMatch) string {
 	if m == nil || m.Pack == nil {
 		return ""
 	}
-	if m.Dir != "" {
-		return Tf("pack %s is in the packs folder; play it from the home page", m.Pack.Name)
-	}
-	s := Tf("pack %s: %d installed, %d another version, %d missing", m.Pack.Name, len(m.Same), len(m.Different), len(m.Missing))
-	if m.Imported != nil {
-		s += " · " + T("its list is now the current list; u undoes")
-	}
-	return s
+	return Tf("pack %s is in the packs folder; play it from the home page", m.Pack.Name)
 }

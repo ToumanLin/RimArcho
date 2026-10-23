@@ -117,7 +117,7 @@ func fileExists(p string) bool {
 // FormatName is a list format as the player knows it.
 func FormatName(f string) string {
 	n := map[string]string{
-		app.FormatText: "text list", app.FormatModsConfig: "ModsConfig.xml", app.FormatSave: "save", app.FormatRML: "RimWorld mod list (.rml)",
+		app.FormatArcho: "RimArcho list", app.FormatText: "text list", app.FormatModsConfig: "ModsConfig.xml", app.FormatSave: "save file", app.FormatRML: "RimWorld mod list (.rml)",
 		"rimcrow-modlist": "RimCrow ModList.xml", "rimcrow-json": "RimCrow JSON list", "rimcrow-share": "RimCrow share code",
 		"rimsort-json": "RimSort JSON list", "rimsort-text": "RimSort clipboard list", "rentry": "Rentry list", "collection": "Workshop collection",
 	}[f]
@@ -134,6 +134,8 @@ type ImportRow struct {
 	ID      string `json:"id,omitempty"`      // the installed instance
 	Enabled bool   `json:"enabled,omitempty"` // already in the enabled list
 	URL     string `json:"url,omitempty"`     // its Workshop page (subscribe there)
+	// Other: a RimArcho list was made with another version of it than the one installed.
+	Other bool `json:"other,omitempty"`
 	// Instead is a mod the community data names as its replacement.
 	Instead    string `json:"instead,omitempty"`
 	InsteadURL string `json:"insteadUrl,omitempty"`
@@ -160,6 +162,7 @@ type ImportPreview struct {
 	Total     int          `json:"total"`
 	Installed []ImportRow  `json:"installed"`
 	Missing   []ImportRow  `json:"missing"`
+	Other     int          `json:"other"` // installed rows with Other
 	Replace   ImportEffect `json:"replace"`
 	Merge     ImportEffect `json:"merge"`
 	Summary   string       `json:"summary"`
@@ -175,7 +178,7 @@ func PreviewImport(a *app.App, imp *Import) (*ImportPreview, error) {
 	il := imp.List
 	p := &ImportPreview{Format: FormatName(il.Format), Source: imp.Source, Name: il.Title, Game: il.Game, Installed: []ImportRow{}, Missing: []ImportRow{}}
 	if mm := st.GameMM(); il.Game != "" && mm != "" && !strings.HasPrefix(il.Game, mm) {
-		p.GameNote = Tf("the list is for RimWorld %s, this environment runs %s", majorMinor(il.Game), mm)
+		p.GameNote = Tf("the list is for RimWorld %s, this game runs %s", majorMinor(il.Game), mm)
 	}
 	list, unresolved := app.ImportedEntries(st, il)
 	p.Total = len(list) + len(unresolved)
@@ -184,6 +187,10 @@ func PreviewImport(a *app.App, imp *Import) (*ImportPreview, error) {
 			r := ImportRow{ID: e.Instance, Enabled: st.List.Index(e.Instance) >= 0}
 			if m := st.Ix.ByID[e.Instance]; m != nil {
 				r.Name, r.Package = m.DisplayName(), m.PackageID
+				if h := il.Hash(m.PackageID); h != "" && !app.SameContent(m, h) {
+					r.Other = true
+					p.Other++
+				}
 			}
 			p.Installed = append(p.Installed, r)
 			continue
@@ -214,6 +221,9 @@ func PreviewImport(a *app.App, imp *Import) (*ImportPreview, error) {
 	p.Replace = effect(st, list)
 	p.Merge = effect(st, app.MergedEntries(st, il))
 	p.Summary = Tf("%s: %d mods, %d installed, %d not installed", p.Format, p.Total, len(p.Installed), len(p.Missing))
+	if p.Other > 0 {
+		p.Summary += " · " + Tf("%d in another version", p.Other)
+	}
 	return p, nil
 }
 
@@ -259,14 +269,14 @@ func effect(st *app.LoadoutState, after loadout.List) ImportEffect {
 		}
 	}
 	if e.Same {
-		e.Text = T("the enabled list already is this")
+		e.Text = T("the list already is this")
 		return e
 	}
 	var parts []string
 	for _, x := range []struct {
 		n int
 		f string
-	}{{e.Added, "%d added"}, {e.Removed, "%d removed"}, {e.Moved, "%d moved"}, {e.Swapped, "%d swapped for another copy"}} {
+	}{{e.Added, "%d added"}, {e.Removed, "%d removed"}, {e.Moved, "%d moved"}, {e.Swapped, "%d switched to another version"}} {
 		if x.n > 0 {
 			parts = append(parts, Tf(x.f, x.n))
 		}
@@ -284,7 +294,15 @@ func (p *ImportPreview) Lines() []string {
 	if p.GameNote != "" {
 		out = append(out, p.GameNote)
 	}
-	out = append(out, "", T("replace the enabled list")+": "+p.Replace.Text, T("add the ones you lack")+": "+p.Merge.Text)
+	out = append(out, "", T("replace the whole list")+": "+p.Replace.Text, T("add the ones you lack")+": "+p.Merge.Text)
+	if p.Other > 0 {
+		out = append(out, "", Tf("another version installed: %d (the list was made with a different version)", p.Other))
+		for _, r := range p.Installed {
+			if r.Other {
+				out = append(out, "  "+r.Name)
+			}
+		}
+	}
 	if len(p.Missing) > 0 {
 		out = append(out, "", Tf("not installed: %d", len(p.Missing)))
 		for _, r := range p.Missing {
@@ -312,7 +330,7 @@ func ApplyImport(a *app.App, imp *Import, merge bool) (string, error) {
 		return "", err
 	}
 	if len(r.Changes) == 0 {
-		return T("the enabled list already is this"), nil
+		return T("the list already is this"), nil
 	}
 	e := ImportEffect{}
 	for _, c := range r.Changes {
@@ -328,9 +346,9 @@ func ApplyImport(a *app.App, imp *Import, merge bool) (string, error) {
 		}
 	}
 	if merge {
-		return Tf("added %s from %s · not saved yet, u undoes", Plural(e.Added, "mod"), imp.Source), nil
+		return Tf("added %s from %s · not written to the game yet, u undoes", Plural(e.Added, "mod"), imp.Source), nil
 	}
-	return Tf("imported %s: %d added, %d removed, %d moved · not saved yet, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved), nil
+	return Tf("imported %s: %d added, %d removed, %d moved · not written to the game yet, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved), nil
 }
 
 // ---- export ----
@@ -352,6 +370,7 @@ func ExportFormats(a *app.App) []ExportFormat {
 	}
 	base += "-" + a.Now().In(a.Loc).Format("20060102")
 	return []ExportFormat{
+		{app.FormatArcho, T("RimArcho list"), T("each mod with its version: whoever imports it sees which of theirs match"), base + ".archolist.json", false},
 		{app.FormatRimSort, "RimSort", T("a ModsConfig-style XML that RimSort imports"), base + ".xml", false},
 		{app.FormatRML, T("RimWorld (.rml)"), T("the game's own saved mod list; RimCrow reads it too"), base + ".rml", false},
 		{app.FormatRimCrowXML, "RimCrow", T("RimCrow's ModList.xml"), base + "-ModList.xml", false},
@@ -402,7 +421,7 @@ func ExportTo(a *app.App, format, path string, overwrite bool) (string, error) {
 	}
 	if st, err := a.Loadout(); err == nil && st.FilePath != "" {
 		if game, err := filepath.Abs(st.FilePath); err == nil && strings.EqualFold(game, abs) {
-			return "", errors.New(T("that is the game's own ModsConfig.xml: save writes it (with a preview and a version)"))
+			return "", errors.New(T("that is the game's own ModsConfig.xml: write to the game instead (with a preview and a version)"))
 		}
 	}
 	if fi, err := os.Stat(abs); err == nil {

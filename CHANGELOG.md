@@ -7,6 +7,10 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- The plan editor and mod library filter bars now include Location, with one value per
+  registered source folder. Multiple locations, exclusions and quoted paths in search are
+  supported; CLI/MCP library queries accept `location:<source folder path>` too.
+
 ### Breaking
 - Database schema v10 → v16: plans (v11), analysis kept per plan (v12), copy notes (v13),
   shared mod folders (v14, below), an index for looking defs up by `Name` (v15), the DDS RimArcho wrote (v16). Each environment's workspace, undo stack, versions and
@@ -60,16 +64,26 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   add-environment guide offers 已有的游戏 (detected installs, a typed folder or the folder
   dialog; named after the version, e.g. 1.6) or 下载一个版本, and after adding reads only the
   new game's `Data` and `Mods`.
+- A game outside a Steam library launches `direct` by default even when a Workshop folder is
+  given (`env add --workshop`); only a game inside a Steam library defaults to `steam`.
 
 ### Downloading a game version (08 §11)
 - `archo env branches` lists RimWorld's Steam branches from SteamCMD (anonymous
-  `app_info_print`); `archo env download <branch> --to <dir> --account <name>` downloads one
+  `app_info_print`); `archo env download <branch> --to <dir>` downloads one
   with SteamCMD and adds it as an environment. The guide's 下载一个版本 does the same with a
   progress bar.
-- The player logs in inside SteamCMD's own window; RimArcho never asks for, receives, stores
-  or passes a password or Steam Guard code, only the account name. Progress and the result
-  come from SteamCMD's `logs/console_log.txt`; failures are said plainly (no ownership,
-  password, Steam Guard, disk full, branch, network).
+- Anonymous Steam login is the default — RimArcho also serves players without a Steam
+  account. An account name can be stored in the `steamcmd.account` setting (settings page,
+  SteamCMD group) or given for one download (the download form / `--account`); `anonymous`
+  there overrides a saved account, and clearing the setting goes back to anonymous. The
+  branch list is always read anonymously. The password and Steam Guard code are typed in
+  SteamCMD's own window — RimArcho never asks for, receives, stores or passes them, only the
+  account name. Progress and the result come from SteamCMD's `logs/console_log.txt`;
+  failures are said plainly (no ownership, password, Steam Guard, disk full, branch,
+  network; for an anonymous login, Steam refusing it without a license, with the way out:
+  an account, or a game folder the player already has).
+- `steamcmd.path` can be set (settings page, SteamCMD group) to a steamcmd the player
+  already has.
 - SteamCMD is downloaded from Valve into `%LOCALAPPDATA%\RimArcho\steamcmd` only after the
   player saw its size (`--install-steamcmd` in the CLI).
 
@@ -250,7 +264,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   first and is refused while the mod is enabled, used by a plan, or the game runs. Only when
   Steam is not running or the DLL cannot be loaded does the window open the Workshop page
   instead, and say why. CLI `archo workshop unsubscribe|subscribe|state <ref…>`; MCP
-  `manage_library` actions `unsubscribe`, `subscribe`, `steam_state`.
+  `manage_library` actions `unsubscribe`, `subscribe`, `steam_state`. Without Steam,
+  `workshop state` / `steam_state` show whether each item's local folder is there, marked
+  local, with the subscription and update state unknown (never "not subscribed");
+  subscribing and unsubscribing still need Steam and say so.
 - `archo library --sort` takes every column (name, size, changed, played, state, source,
   used, updated, version, author, tags; a leading `-` reverses) and `--include updated:week`
   (month, half-year, older); `--lineage` lists each copy's `updated:` and `note:`.
