@@ -747,6 +747,8 @@ function onKey(e) {
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "b") { e.preventDefault(); shell.toggleNav(); return; }
   // ctrl+j: 后台任务 from any page; again goes back (06 §2.16)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "j" && !S.popup) { e.preventDefault(); shell.navigated(); tasksPage.toggle(); renderWhere(); return; }
+  // Native tab order reaches paths, including the first one; activation stays local.
+  if (k === "Tab" && (S.popup ? $("#popup") : S.screen ? $("#screen") : $("#detail"))?.querySelector(".path-copy")) return;
   if (pop.popupKey(e)) return;
   if (k === "Escape" && S.screen === "plan-import") return importKey(e);
   if (k === "Escape" && S.screen === "plans") return planManage.key(e);

@@ -4,6 +4,7 @@
 // pick columns). Not a popup: the work goes on while the player is on other pages, and the
 // sidebar's foot line and ctrl+j bring them back here. "tasks" events say the record
 // changed; a lane task that ended also brings its result for the status line.
+import { pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, page, act as pageAct, area } from "./screens.js";
 import { createBar } from "./filterbar.js";
@@ -440,9 +441,9 @@ function drawItems() {
       const cell = el("div", "c c-" + c.key + (d.num ? " r" : ""));
       if (c.key === "name") cell.textContent = it.name;
       else if (c.key === "state") cell.append(itemState(it));
-      else if (c.key === "why") { cell.textContent = it.why || "—"; cell.title = it.why || ""; }
+      else if (c.key === "why") { pathContent(cell, it.why || "—"); cell.title = it.why || ""; }
       else if (c.key === "size") cell.textContent = it.size || "—";
-      else cell.textContent = it.ref;
+      else pathContent(cell, it.ref);
       e.append(cell);
     }
     els.ibody.append(e);

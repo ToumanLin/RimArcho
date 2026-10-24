@@ -16,7 +16,7 @@ import { S, $, el, api, T, Tf, errText, say, cur } from "./state.js";
 import { closeScreen, page, seg, button, area, beginPageRead } from "./screens.js";
 import { shimmer } from "./motion.js";
 import { renderDetail } from "./detail.js";
-import { fieldList } from "./fields.js";
+import { fieldList, pathContent } from "./fields.js";
 import * as pop from "./popups.js";
 import * as ops from "./ops.js";
 import { updateFromForm } from "./subscribe.js";
@@ -191,7 +191,7 @@ function draw(loading) {
     bar.append(seg(names, F.tab, (i) => { F.tab = i; draw(false); }));
     tech.append(bar);
     const pre = el("pre", "lines");
-    pre.textContent = (secs[F.tab].lines || []).join("\n");
+    pathContent(pre, (secs[F.tab].lines || []).join("\n"), [...(secs[F.tab].paths || []), ...(F.d?.fields || []).filter(f => f.kind === "path").map(f => f.value)]);
     tech.append(pre);
   } else tech.append(el("div", "empty-state", F.secs ? T("nothing technical recorded") : T("loading…")));
   w.append(tech);

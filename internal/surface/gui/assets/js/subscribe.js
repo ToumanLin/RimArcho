@@ -1,3 +1,4 @@
+import { pathContent } from "./fields.js";
 import { el, api, T, Tf, errText, say } from "./state.js";
 import * as pop from "./popups.js";
 
@@ -80,7 +81,7 @@ export function subscribeForm(close) {
     const p = await api.SubscribePreview(pending);
     if (JSON.stringify(pending) !== JSON.stringify(args())) return;
     request = pending;
-    preview.textContent = (p.lines || []).join("\n");
+    pathContent(preview, (p.lines || []).join("\n"), [pending.from]);
     ready = p.apply ? JSON.stringify(request) : "";
     apply.disabled = !canApply();
   });

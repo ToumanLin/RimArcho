@@ -48,7 +48,7 @@ func DirectoryGroup(a *app.App) SettingGroup {
 		} else if d.Status == "unused" {
 			note = T("not used yet")
 		}
-		item := SettingItem{Label: DirectoryLabel(d), Value: d.Path, Edit: "directory", Directory: d.ID,
+		item := SettingItem{Label: DirectoryLabel(d), Value: d.Path, ValuePath: true, Edit: "directory", Directory: d.ID,
 			Argv: []string{"folder", "set", d.ID, "{}"}, MoveArgv: []string{"folder", "move", d.ID, "{}"}, Note: note}
 		if d.Kind == "steamcmd" || d.Kind == "extra" {
 			item.Actions = []SettingAction{{Label: T("remove"), Argv: []string{"folder", "remove", "src:" + d.Label},

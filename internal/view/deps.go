@@ -12,7 +12,7 @@ func DependencyGroup(a *app.App) SettingGroup {
 	g := SettingGroup{Title: T("external tools")}
 	labels := map[string]string{deps.Font: T("bundled font"), deps.Todds: "todds", deps.SteamCMD: "SteamCMD", deps.WezTerm: "WezTerm"}
 	for _, i := range a.Deps().All() {
-		item := SettingItem{Label: labels[i.Name], Value: T("not installed"), Note: i.Path}
+		item := SettingItem{Label: labels[i.Name], Value: T("not installed"), Note: i.Path, NotePaths: []string{i.Path}}
 		if i.Version != "" {
 			item.Value = i.Version
 			if i.Name == deps.Font {

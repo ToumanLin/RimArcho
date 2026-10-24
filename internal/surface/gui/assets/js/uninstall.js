@@ -2,6 +2,7 @@
 // answers inline on the steps that have them (a checkbox, and where kept things go), one
 // button that runs it, the progress, then the same rows as the report. Everything is a
 // native control, so tab, space and enter do what the mouse does.
+import { copyablePath } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button, pickFolder, beginPageRead } from "./screens.js";
 
@@ -125,8 +126,9 @@ function items(s) {
     const li = el("div", "un-item" + (it.err ? " bad" : ""));
     const mark = it.err ? "✗" : it.done ? "✓" : it.later ? "…" : "";
     li.append(el("span", "mk " + (it.err ? "err" : "ok"), mark), el("span", "vb", it.verb));
-    const p = el("span", "p", it.path + (it.to ? " → " + it.to : ""));
-    p.title = p.textContent;
+    const p = el("span", "p");
+    p.append(copyablePath(el("span", "", it.path), it.path));
+    if (it.to) p.append(" → ", copyablePath(el("span", "", it.to), it.to));
     li.append(p);
     const extra = [it.name, it.size, it.note, it.err].filter(Boolean).join("  ");
     if (extra) li.append(el("span", "x muted word-facts", extra));

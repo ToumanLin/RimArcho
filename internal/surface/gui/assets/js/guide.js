@@ -1,3 +1,4 @@
+import { copyablePath, pathContent } from "./fields.js";
 // The first-run guide (06 §2.15): three steps, each with a way back.
 //   1. find the game: 已有的游戏 — what detection finds (tick several), a folder typed in or
 //      chosen in the folder dialog; or 下载一个版本 — a branch, a folder and an optional
@@ -137,7 +138,7 @@ function step1(card) {
     const top = el("div", "top");
     top.append(el("span", "v", "RimWorld " + (g.version || "—")), el("span", "chip", g.launch === "steam" ? "Steam" : T("started directly")));
     if (g.env) top.append(el("span", "chip cur", Tf("added as %s", g.env)));
-    body.append(top, el("div", "path", g.game));
+    body.append(top, copyablePath(el("div", "path", g.game), g.game));
     if (!g.env) {
       const name = el("input", "field small");
       name.value = g.name;
@@ -253,7 +254,7 @@ function download(card) {
   if (!info.steamcmd) {
     const o = info.offer || {};
     const size = o.bytes > 0 ? sizeText(o.bytes) : T("size unknown");
-    card.append(el("div", "dl-note", Tf("RimArcho downloads game versions with Valve's SteamCMD, which is not on this computer. Download it from Valve (%s) into %s?", size, o.dir || "")));
+    card.append(pathContent(el("div", "dl-note"), Tf("RimArcho downloads game versions with Valve's SteamCMD, which is not on this computer. Download it from Valve (%s) into %s?", size, o.dir || ""), [o.dir]));
     const get = button(T("download SteamCMD"), "", async () => {
       get.disabled = true;
       C.submitting = true; C.row = null;
