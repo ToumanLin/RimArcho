@@ -69,6 +69,51 @@ func TestMajorMinorAndPlayerLog(t *testing.T) {
 	}
 }
 
+func TestParseVersion(t *testing.T) {
+	for _, tt := range []struct {
+		input, full, short       string
+		major, minor, build, rev int
+	}{
+		{"1.6.4633 rev1261", "1.6.4633 rev1261", "1.6", 1, 6, 4633, 1261},
+		{"1.7.4985 rev1269", "1.7.4985 rev1269", "1.7", 1, 7, 4985, 1269},
+		{" 1.6.4871 rev590 ", "1.6.4871 rev590", "1.6", 1, 6, 4871, 590},
+		{"1.6", "1.6", "1.6", 1, 6, -1, -1},
+		{"1.6.4871", "1.6.4871", "1.6", 1, 6, 4871, -1},
+		{"", "", "", -1, -1, -1, -1},
+		{"garbage", "garbage", "", -1, -1, -1, -1},
+		{"1", "1", "", -1, -1, -1, -1},
+		{"1.nope", "1.nope", "", -1, -1, -1, -1},
+		{"1.6.4871 rev590 extra", "1.6.4871 rev590 extra", "1.6", 1, 6, -1, -1},
+		{"1.6.x", "1.6.x", "1.6", 1, 6, -1, -1},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			v := ParseVersion(tt.input)
+			want := Version{Full: tt.full, Major: tt.major, Minor: tt.minor, Build: tt.build, Rev: tt.rev}
+			if v != want || v.String() != tt.full || v.Short() != tt.short || MajorMinor(tt.input) != tt.short || v.HasBuild() != (tt.build >= 0) {
+				t.Fatalf("ParseVersion(%q) = %+v, want %+v (short %q)", tt.input, v, want, tt.short)
+			}
+		})
+	}
+}
+
+func TestSameBuild(t *testing.T) {
+	for _, tt := range []struct {
+		a, b        string
+		same, known bool
+	}{
+		{"1.6.4871 rev590", "1.6.4871 rev590", true, true},
+		{"1.6.4871 rev590", "1.6.4871 rev591", false, true},
+		{"1.6.4871 rev590", "1.7.4985 rev1269", false, true},
+		{"1.6", "1.6.4871 rev590", false, false},
+		{"1.6.4871 rev590", "1.6", false, false},
+		{"", "garbage", false, false},
+	} {
+		if same, known := ParseVersion(tt.a).SameBuild(ParseVersion(tt.b)); same != tt.same || known != tt.known {
+			t.Errorf("SameBuild(%q, %q) = (%v, %v), want (%v, %v)", tt.a, tt.b, same, known, tt.same, tt.known)
+		}
+	}
+}
+
 func TestReadModsConfig(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "ModsConfig.xml")
 	write(t, p, "\xef\xbb\xbf<?xml version=\"1.0\" encoding=\"utf-8\"?><ModsConfigData><version>1.6.4871 rev591</version><activeMods><li>Ludeon.RimWorld</li><li>brrainz.harmony</li></activeMods></ModsConfigData>")

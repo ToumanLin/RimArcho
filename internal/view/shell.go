@@ -189,11 +189,12 @@ const HomeOK = "ok"
 
 // HomeRow is one row of "正在玩": a plan or a pack, its state, and what launches it.
 type HomeRow struct {
-	Kind  string `json:"kind"`
-	Name  string `json:"name"`
-	Env   string `json:"env"`   // the environment chip
-	State string `json:"state"` // "2 problems break the game", "ready to play", "not checked yet"
-	Level string `json:"level"` // LevelBad, HomeOK, or "" for not checked
+	GameVersion string `json:"gameVersion"`
+	Kind        string `json:"kind"`
+	Name        string `json:"name"`
+	Env         string `json:"env"`   // the environment chip
+	State       string `json:"state"` // "2 problems break the game", "ready to play", "not checked yet"
+	Level       string `json:"level"` // LevelBad, HomeOK, or "" for not checked
 	// Facts: "312 mods" (and what is not written to the game yet); Mode how its mods
 	// change: a plan follows Workshop updates, a pack keeps its versions (08 §5).
 	Facts string `json:"facts"`
@@ -252,7 +253,7 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 	for _, p := range plans {
 		r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: p.Played, at: p.PlayedAt, Plan: p.ID, Page: p.Page,
 			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"),
-			EnvName: b.EnvName, Versions: ver, Mods: p.Entries}
+			EnvName: b.EnvName, GameVersion: b.GameVersion, Versions: ver, Mods: p.Entries}
 		// a list says the game versions it allows (04 §1.6, 06 §2.3)
 		if sp, err := a.Store.PlanByID(p.ID); err == nil && sp != nil {
 			if vs := app.FormatVersions(a.PlanAllowedVersions(b.St, sp)); vs != "" {
@@ -282,7 +283,7 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 		h.Rows = append(h.Rows, r)
 	}
 	for _, p := range packs {
-		h.Rows = append(h.Rows, packHomeRow(p, chip, b.EnvName))
+		h.Rows = append(h.Rows, packHomeRow(p, chip, b.EnvName, b.GameVersion))
 	}
 	SortHome(h.Rows)
 	h.LastRun, h.LastRunDay, h.LastRunErrors = n.LastRun, n.LastRunDay, LastRunErrors(n)
@@ -291,9 +292,9 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 	return h
 }
 
-func packHomeRow(p PackRow, chip, envName string) HomeRow {
+func packHomeRow(p PackRow, chip, envName, gameVersion string) HomeRow {
 	r := HomeRow{Kind: RowPack, Name: p.Name, Env: chip, Facts: p.Facts, Played: p.Played, at: p.PlayedAt,
-		EnvName: envName, Versions: p.Versions, Mods: p.Mods}
+		EnvName: envName, GameVersion: gameVersion, Versions: p.Versions, Mods: p.Mods}
 	if p.Mods > 0 {
 		r.Facts = Tf("%d mods", p.Mods)
 	}
@@ -319,7 +320,7 @@ func AddOtherEnvs(a *app.App, h *Home, current string) {
 		ps, _ := a.PlansIn(e.ID)
 		for _, p := range ps {
 			r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: T("never played"), at: p.LastPlayed, Plan: p.ID,
-				Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"), EnvName: e.Name, Versions: ver, Mods: p.Entries, OtherEnv: true}
+				Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"), EnvName: e.Name, GameVersion: e.GameVersion, Versions: ver, Mods: p.Entries, OtherEnv: true}
 			if len(p.Plan.Versions) > 0 { // the player's choice; the default needs that game's mods loaded
 				r.Versions = app.FormatVersions(p.Plan.Versions)
 			}
@@ -336,7 +337,7 @@ func AddOtherEnvs(a *app.App, h *Home, current string) {
 		}
 		if packs, _, err := a.PacksOf(e); err == nil {
 			for _, p := range packRows(a, packs) {
-				r := packHomeRow(p, chip, e.Name)
+				r := packHomeRow(p, chip, e.Name, e.GameVersion)
 				r.OtherEnv = true
 				h.Rows = append(h.Rows, r)
 			}

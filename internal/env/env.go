@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -20,18 +21,77 @@ type Environment struct {
 	CreatedAt    time.Time
 }
 
-// MajorMinor returns the "1.6" part of a RimWorld version string, or "" if unknown.
-func MajorMinor(v string) string {
-	v = strings.TrimSpace(v)
-	if i := strings.IndexAny(v, " \t"); i >= 0 {
-		v = v[:i]
+// Version retains the full game version; unknown numeric components are -1.
+type Version struct {
+	Full                     string
+	Major, Minor, Build, Rev int
+}
+
+// ParseVersion accepts a major.minor version with an optional build and revision.
+func ParseVersion(s string) Version {
+	v := Version{Full: strings.TrimSpace(s), Major: -1, Minor: -1, Build: -1, Rev: -1}
+	fields := strings.Fields(v.Full)
+	if len(fields) == 0 {
+		return v
 	}
-	parts := strings.Split(v, ".")
+	parts := strings.Split(fields[0], ".")
 	if len(parts) < 2 {
+		return v
+	}
+	// major.minor stands on its own (MajorMinor has always read only those two);
+	// build and revision count only in the exact "X.Y.B revR" form
+	mj, err1 := strconv.Atoi(parts[0])
+	mn, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil || mj < 0 || mn < 0 {
+		return v
+	}
+	v.Major, v.Minor = mj, mn
+	if len(parts) > 3 || len(fields) > 2 {
+		return v
+	}
+	nums := []int{-1, -1, -1, -1}
+	if len(fields) == 2 {
+		if len(parts) != 3 || !strings.HasPrefix(fields[1], "rev") {
+			return v
+		}
+		parts = append(parts, strings.TrimPrefix(fields[1], "rev"))
+	}
+	for i, p := range parts {
+		if p == "" || strings.Trim(p, "0123456789") != "" {
+			return v
+		}
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			return v
+		}
+		nums[i] = n
+	}
+	v.Build, v.Rev = nums[2], nums[3]
+	return v
+}
+
+// Short returns the major.minor version, or "" if unknown.
+func (v Version) Short() string {
+	if v.Major < 0 || v.Minor < 0 {
 		return ""
 	}
-	return parts[0] + "." + parts[1]
+	return strconv.Itoa(v.Major) + "." + strconv.Itoa(v.Minor)
 }
+
+func (v Version) HasBuild() bool { return v.Build >= 0 }
+
+// SameBuild compares build and revision only when both builds are recorded.
+func (v Version) SameBuild(o Version) (same bool, known bool) {
+	if !v.HasBuild() || !o.HasBuild() {
+		return false, false
+	}
+	return v.Build == o.Build && v.Rev == o.Rev, true
+}
+
+func (v Version) String() string { return v.Full }
+
+// MajorMinor returns the "1.6" part of a RimWorld version string, or "" if unknown.
+func MajorMinor(v string) string { return ParseVersion(v).Short() }
 
 // ReadGameVersion reads <game_root>/Version.txt.
 func ReadGameVersion(gameRoot string) string {
