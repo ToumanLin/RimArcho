@@ -36,6 +36,9 @@ func TestReadPage(t *testing.T) {
 	if calls != 1 || p.Name != "Example Colony Tweaks" || p.Stamp() != "1.4.1 @ 2025-09-05T05:06:09Z" || strings.Join(p.Repos, ",") != "https://gitgud.io/Example/colony,https://github.com/Example/SharedFramework,https://gitlab.com/Example/colony" {
 		t.Fatalf("page: %+v calls %d", p, calls)
 	}
+	if p.Main != "https://gitgud.io/Example/colony" {
+		t.Fatalf("main repository: %q", p.Main)
+	}
 	body = `<meta property="og:title" content="Example fallback"><meta property="og:updated_time" content="2026-10-23T15:16:59Z">`
 	p, err = subscribe.ReadPage(context.Background(), client, srv.URL)
 	if err != nil || p.Name != "Example fallback" || p.Stamp() != "2026-10-23T15:16:59Z" {

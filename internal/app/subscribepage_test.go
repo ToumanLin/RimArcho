@@ -98,7 +98,13 @@ func TestSubscribePage(t *testing.T) {
 	if gitHead(t, op.Items[0].Folder) != second {
 		t.Fatal("Git update used page URL")
 	}
+	// A dependency's releases link does not hide the repository the page deep-links into.
 	links += `<a href="https://github.com/Example/framework/releases">another</a>`
+	if _, err := e.App.SubscribePage(srv.URL, true, "", false); err == nil || !strings.Contains(err.Error(), "subscribed already") {
+		t.Fatalf("main repo with a dependency link: %v", err)
+	}
+	// Two repositories linked the same way: the player has to choose.
+	links = `<a href="https://gitgud.io/Example/colony">a</a><a href="https://github.com/Example/framework">b</a>`
 	if _, err := e.App.SubscribePage(srv.URL, true, "", false); err == nil || !strings.Contains(err.Error(), "https://github.com/Example/framework") {
 		t.Fatalf("multiple repos: %v", err)
 	}

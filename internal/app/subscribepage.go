@@ -22,10 +22,13 @@ func (a *App) SubscribePage(pageURL string, useGit bool, from string, dryRun boo
 		return nil, err
 	}
 	if useGit {
-		if len(p.Repos) != 1 {
-			return nil, fmt.Errorf("page must link exactly one repository; found %d: %s", len(p.Repos), strings.Join(p.Repos, ", "))
+		repo := p.Main
+		if repo == "" && len(p.Repos) == 1 {
+			repo = p.Repos[0]
 		}
-		repo := p.Repos[0]
+		if repo == "" {
+			return nil, fmt.Errorf("cannot tell which linked repository is the mod (%d: %s); subscribe to it with archo subscribe git <repository>", len(p.Repos), strings.Join(p.Repos, ", "))
+		}
 		if a.pageRepo != nil {
 			repo = a.pageRepo(repo)
 		}

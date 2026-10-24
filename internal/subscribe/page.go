@@ -18,6 +18,10 @@ type PageInfo struct {
 	Version      string
 	DateModified time.Time
 	Repos        []string
+	// Main is the repository the page deep-links into (its tree, a file in it), which
+	// on a mod's page is the mod itself; links to repo roots or releases alone are
+	// usually dependencies. Empty when no single repository stands out.
+	Main string
 }
 
 func (p *PageInfo) Stamp() string {
@@ -75,6 +79,7 @@ func ReadPage(ctx context.Context, client *http.Client, pageURL string) (*PageIn
 	p := &PageInfo{}
 	var title, date string
 	seen := map[string]bool{}
+	deep := map[string]int{}
 	var visit func(*html.Node)
 	visit = func(n *html.Node) {
 		attrs := map[string]string{}
@@ -104,9 +109,14 @@ func ReadPage(ctx context.Context, client *http.Client, pageURL string) (*PageIn
 					date = attrs["content"]
 				}
 			case "a":
-				if repo := repoRoot(attrs["href"]); repo != "" && !seen[repo] {
-					p.Repos = append(p.Repos, repo)
-					seen[repo] = true
+				if repo := repoRoot(attrs["href"]); repo != "" {
+					if !seen[repo] {
+						p.Repos = append(p.Repos, repo)
+						seen[repo] = true
+					}
+					if deepLink(attrs["href"]) {
+						deep[repo]++
+					}
 				}
 			}
 		}
@@ -115,6 +125,18 @@ func ReadPage(ctx context.Context, client *http.Client, pageURL string) (*PageIn
 		}
 	}
 	visit(root)
+	best, tie := 0, false
+	for _, r := range p.Repos {
+		switch n := deep[r]; {
+		case n > best:
+			p.Main, best, tie = r, n, false
+		case n == best && n > 0:
+			tie = true
+		}
+	}
+	if tie {
+		p.Main = ""
+	}
 	if p.Name == "" {
 		p.Name = title
 	}
@@ -165,6 +187,21 @@ func readLD(v any, p *PageInfo) {
 			readLD(graph, p)
 		}
 	}
+}
+
+// deepLink: a link into a repository's files (GitLab /-/tree, /-/blob; GitHub /tree, /blob).
+func deepLink(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	p := "/" + strings.Trim(u.Path, "/") + "/"
+	for _, s := range []string{"/-/tree/", "/-/blob/", "/tree/", "/blob/"} {
+		if strings.Contains(p, s) {
+			return true
+		}
+	}
+	return false
 }
 
 func repoRoot(raw string) string {
