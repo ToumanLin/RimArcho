@@ -16,6 +16,7 @@ export function initPlanManage(u) { ui = u; }
 const M = { data: null, sel: 0, open: new Set(), checked: new Set(), draft: null, created: 0 };
 const X = { data: null, id: 0, from: "plans", format: "", info: null };
 const FORMAT_KEY = "ui.gui.export.format";
+const C = { seq: 0, page: null, slot: null, progress: null };
 
 const ic = (name, cls = "ic") => { const s = el("span", cls); s.innerHTML = icon[name] || ""; return s; };
 const sel = () => (M.data && M.data.sel) || null;
@@ -27,6 +28,8 @@ export function select(id) { M.sel = id; }
 
 // open draws the page with the list id picked (0: the one picked before, else the current).
 export async function open(id) {
+  const costSeq = ++C.seq;
+  C.page = C.slot = C.progress = null;
   if (id !== undefined) M.sel = id;
   const read = beginPageRead("plans");
   let d;
@@ -36,6 +39,7 @@ export async function open(id) {
   M.sel = d.sel ? d.sel.id : 0;
   draw();
   read.finish();
+  if (d.sel && !M.draft) readCost(d.sel.id, costSeq);
   // a followed collection not read for ten minutes is read now; the page follows
   const s = d.sel;
   if (s && s.stale && !M.checked.has(s.id)) {
@@ -131,7 +135,7 @@ function detailCard(p) {
   head.append(l, r);
   card.append(head);
 
-  card.append(versions(p), follows(p), share(p));
+  card.append(versions(p), costSection(p), follows(p), share(p));
   return card;
 }
 
@@ -231,7 +235,7 @@ function newForm() {
 }
 
 // Leave a form behind when navigating to another sidebar page (06 §2.17).
-export function abandon() { M.draft = null; M.created = 0; }
+export function abandon() { M.draft = null; M.created = 0; C.seq++; C.slot = null; }
 export const selected = () => M.sel || S.shell?.plan?.id || 0;
 
 async function makeCurrent(id) {
@@ -245,6 +249,84 @@ function section(title, right) {
   if (right) h.append(el("span", "r", right));
   s.append(h);
   return s;
+}
+
+// Measurements update this section only; polls leave the shimmer and page controls intact.
+function costSection(p) {
+  const s = section(T("Loaded memory (estimate)"));
+  s.classList.add("pm-cost");
+  C.slot = s;
+  if (C.page && !C.page.loading) showCost(C.page, p.id);
+  else {
+    const pending = el("div", "skel");
+    pending.setAttribute("aria-label", T("Loaded memory (estimate)"));
+    pending.setAttribute("aria-busy", "true");
+    pending.append(el("span", "bar"), el("span", "bar"));
+    C.progress = el("div", "muted pm-note", C.page?.progress || "");
+    C.progress.setAttribute("aria-live", "polite");
+    s.append(pending, C.progress);
+  }
+  return s;
+}
+
+async function readCost(id, seq) {
+  const epoch = S.screenSeq, env = S.envSeq;
+  const current = () => seq === C.seq && S.screen === "plans" && S.screenSeq === epoch && S.envSeq === env && M.sel === id && !M.draft;
+  const apply = p => {
+    C.page = p;
+    if (p.loading) { if (C.progress) C.progress.textContent = p.progress || ""; }
+    else showCost(p, id);
+  };
+  try {
+    const first = await api.PlanLoadCost(id);
+    if (!current() || !first) return;
+    apply(first);
+    const poll = async () => {
+      if (!current()) return;
+      try {
+        const p = await api.PlanLoadCostMeasure(first.request);
+        if (!current() || !p) return;
+        apply(p);
+        if (p.loading) setTimeout(poll, 100);
+      } catch (e) { if (current()) apply({ error: errText(e) }); }
+    };
+    if (first.loading) setTimeout(poll, 100);
+  } catch (e) { if (current()) apply({ error: errText(e) }); }
+}
+
+function costTable(headers, rows) {
+  const wrap = el("div", "scroll"), table = el("table", "pm-cost-table");
+  const head = el("thead"), tr = el("tr");
+  for (const title of headers) { const th = el("th", "", T(title)); th.setAttribute("scope", "col"); tr.append(th); }
+  head.append(tr); table.append(head);
+  const body = el("tbody");
+  for (const values of rows) {
+    const tr = el("tr");
+    for (const value of values) tr.append(el("td", "", value));
+    body.append(tr);
+  }
+  table.append(body); wrap.append(table);
+  return wrap;
+}
+
+function showCost(p, id) {
+  const s = C.slot;
+  if (!s) return;
+  s.replaceChildren(el("div", "pm-sub", T("Loaded memory (estimate)")));
+  if (p.error) { s.append(el("div", "muted pm-note", p.error)); return; }
+  s.append(el("div", "word-facts", p.summary), el("div", "muted pm-note", p.detail));
+  const details = el("details"), summary = el("summary", "muted pm-note", T("what is counted"));
+  details.open = M.open.has("cost:" + id);
+  details.ontoggle = () => { if (details.open) M.open.add("cost:" + id); else M.open.delete("cost:" + id); };
+  details.append(summary, el("div", "muted pm-note", p.mods));
+  details.append(costTable(["category", "files", "size on disk", "RAM range", "VRAM range"],
+    (p.parts || []).map(r => [r.category, r.files, r.disk, r.ram, r.vram])));
+  if (p.top?.length) {
+    details.append(el("div", "pm-sub", T("largest contributors (five by RAM and VRAM)")));
+    details.append(costTable(["mod", "RAM upper bound", "VRAM upper bound"], p.top.map(m => [m.name, m.ram, m.vram])));
+  }
+  for (const note of p.notes || []) details.append(el("div", "muted pm-note", note));
+  s.append(details);
 }
 
 // ---- 游戏版本 (04 §1.6): one small button per version, the allowed ones raised ----
@@ -438,7 +520,7 @@ export function key(e) {
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
   if (S.screen === "plan-export") return exportKey(e);
   if (M.draft) {
-    if (k === "Escape") { e.preventDefault(); M.draft = null; draw(); }
+    if (k === "Escape") { e.preventDefault(); M.draft = null; open(); }
     return;
   }
   const p = sel();

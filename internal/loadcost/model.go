@@ -1,0 +1,170 @@
+package loadcost
+
+import "math"
+
+// Game selects the loading rules used by Estimate.
+type Game int
+
+const (
+	Game16 Game = 16
+	Game17 Game = 17
+)
+
+// Coef holds all model coefficients. Texture rates are bytes per pixel; unknown
+// dimensions are pixels per file byte, with a geometric mip-chain multiplier.
+// The Tex17 rates multiply the 1.7 texture payload (BC7 with mips, plus DDS payload);
+// they are measured, not derived: docs/research/2026-10-24_小文件读取与加载占用.md §4.
+// RAM rates multiply texture VRAM, XML/DLL bytes, or sound bytes.
+// Sound16Decoded rates multiply PCM16 bytes; streamed sounds use a fixed buffer.
+// AIFF-family and unreadable WAV files approximate PCM16 by file size.
+// Re-measure cached Mods after changing audio thresholds or CompressedPCM16.
+// Configure before concurrent use; concurrent mutation is unsupported.
+var Coef = struct {
+	CompressedBytesPerPixel float64
+	RawBytesPerPixel        float64
+	AtlasBytesPerPixel      float64
+	UnknownPixelsLow        float64
+	UnknownPixelsHigh       float64
+	UnknownMips             float64
+	Tex17VRAMLow            float64
+	Tex17VRAMHigh           float64
+	Tex17RAMLow             float64
+	Tex17RAMHigh            float64
+	TextureRAM16High        float64
+	CompressedPCM16         float64
+	Sound16FileLimit        int64
+	Sound17PCM16Limit       int64
+	Sound16DecodedLow       float64
+	Sound16DecodedHigh      float64
+	Sound16StreamBuffer     int64
+	Sound17ResidentLow      float64
+	Sound17ResidentHigh     float64
+	DefsLow                 float64
+	DefsHigh                float64
+	PatchesLow              float64
+	PatchesHigh             float64
+	AssembliesLow           float64
+	AssembliesHigh          float64
+}{
+	CompressedBytesPerPixel: 1, // BC7 (1.7) or DXT (1.6), with mips measured separately.
+	RawBytesPerPixel:        4, // RGBA32: tiny PNGs in 1.7; non-block-aligned PNGs in 1.6.
+	AtlasBytesPerPixel:      1, // Extra 1.6 static atlas copy, upper bound only.
+	UnknownPixelsLow:        4, // JPG/PSD dimensions: midpoint would be 8 pixels/file byte.
+	UnknownPixelsHigh:       12,
+	UnknownMips:             4.0 / 3,
+	// 1.7, RTX 4090, 100 / 250 / 484 mods, first and later launches: VRAM 0.9–2.6× and
+	// private bytes 1.5–3.5× the payload (the engine also keeps Vulkan host memory).
+	Tex17VRAMLow:        0.9,
+	Tex17VRAMHigh:       2.6,
+	Tex17RAMLow:         1.5,
+	Tex17RAMHigh:        3.5,
+	TextureRAM16High:    0.10, // 1.6 (not measured): transient/staging RAM; lower bound is zero.
+	CompressedPCM16:     11,   // OGG/MP3: roughly 128 kbit/s versus 1411 kbit/s PCM16.
+	Sound16FileLimit:    300 << 10,
+	Sound17PCM16Limit:   2 << 20,
+	Sound16DecodedLow:   1, // PCM16 versus float32 at the upper bound.
+	Sound16DecodedHigh:  2,
+	Sound16StreamBuffer: 64 << 10,
+	Sound17ResidentLow:  1, // File bytes of the decoded-size-selected subset.
+	Sound17ResidentHigh: 1.5,
+	DefsLow:             3,
+	DefsHigh:            8,
+	PatchesLow:          0.5, // The merged XmlDocument is freed after loading.
+	PatchesHigh:         2,
+	AssembliesLow:       2,
+	AssembliesHigh:      5,
+}
+
+// Part attributes a range to one resource category. Bytes is on-disk size,
+// except for DDS payload bytes. Languages are informational and not modeled.
+type Part struct {
+	Key      string `json:"key"`
+	Count    int    `json:"count"`
+	Bytes    int64  `json:"bytes"`
+	RAMLow   int64  `json:"ramLow"`
+	RAMHigh  int64  `json:"ramHigh"`
+	VRAMLow  int64  `json:"vramLow"`
+	VRAMHigh int64  `json:"vramHigh"`
+}
+
+// Report contains mod-only byte ranges; callers add a measured vanilla baseline.
+type Report struct {
+	RAMLow   int64  `json:"ramLow"`
+	RAMHigh  int64  `json:"ramHigh"`
+	VRAMLow  int64  `json:"vramLow"`
+	VRAMHigh int64  `json:"vramHigh"`
+	Parts    []Part `json:"parts"`
+}
+
+// Estimate combines measurements using Coef. It panics for an unsupported Game.
+// Bounds round outward to whole bytes, after summing all mods in each part.
+func Estimate(g Game, mods []Mod) Report {
+	if g != Game16 && g != Game17 {
+		panic("loadcost: unsupported game version")
+	}
+	var m Mod
+	for _, mod := range mods {
+		m.Plus(mod)
+	}
+	c := Coef
+	textures := m.PNG
+	textures.add(m.JPG)
+	textures.add(m.PSD)
+	unknown := float64(m.JPG.Bytes+m.PSD.Bytes) * c.UnknownMips * c.CompressedBytesPerPixel
+	png := float64(m.PNGPixelsMip) * c.CompressedBytesPerPixel
+	raw := m.PNGNot4
+	if g == Game17 {
+		raw = m.PNGRaw16.PixelsMip
+	}
+	png += float64(raw) * (c.RawBytesPerPixel - c.CompressedBytesPerPixel)
+	vLow := png + unknown*c.UnknownPixelsLow
+	vHigh := png + unknown*c.UnknownPixelsHigh
+	dLow, dHigh := float64(m.DDS.Bytes), float64(m.DDS.Bytes)
+	// RAM per texture part: 1.6 only transient copies; 1.7 measured rates of the payload.
+	if g == Game16 {
+		vHigh += float64(m.PNGSmall512Pixels) * c.AtlasBytesPerPixel
+	}
+	tRAMLow, tRAMHigh := 0.0, vHigh*c.TextureRAM16High
+	dRAMLow, dRAMHigh := 0.0, dHigh*c.TextureRAM16High
+	if g == Game17 {
+		tRAMLow, tRAMHigh = vLow*c.Tex17RAMLow, vHigh*c.Tex17RAMHigh
+		dRAMLow, dRAMHigh = dLow*c.Tex17RAMLow, dHigh*c.Tex17RAMHigh
+		vLow, vHigh = vLow*c.Tex17VRAMLow, vHigh*c.Tex17VRAMHigh
+		dLow, dHigh = dLow*c.Tex17VRAMLow, dHigh*c.Tex17VRAMHigh
+	}
+	var sounds Files
+	var smallPCM, residentBytes int64
+	var streamed int
+	for _, s := range m.Sounds {
+		sounds.add(s.Files)
+		smallPCM += s.SmallPCM16Bytes
+		residentBytes += s.Resident.Bytes
+		streamed += s.Count - s.Small.Count
+	}
+	sLow := float64(residentBytes) * c.Sound17ResidentLow
+	sHigh := float64(residentBytes) * c.Sound17ResidentHigh
+	if g == Game16 {
+		buffer := float64(streamed) * float64(c.Sound16StreamBuffer)
+		sLow = float64(smallPCM)*c.Sound16DecodedLow + buffer
+		sHigh = float64(smallPCM)*c.Sound16DecodedHigh + buffer
+	}
+	r := Report{Parts: []Part{
+		part("textures", textures, tRAMLow, tRAMHigh, vLow, vHigh),
+		part("dds", m.DDS, dRAMLow, dRAMHigh, dLow, dHigh),
+		part("sounds", sounds, sLow, sHigh, 0, 0),
+		part("defs", m.Defs, float64(m.Defs.Bytes)*c.DefsLow, float64(m.Defs.Bytes)*c.DefsHigh, 0, 0),
+		part("patches", m.Patches, float64(m.Patches.Bytes)*c.PatchesLow, float64(m.Patches.Bytes)*c.PatchesHigh, 0, 0),
+		part("assemblies", m.Assemblies, float64(m.Assemblies.Bytes)*c.AssembliesLow, float64(m.Assemblies.Bytes)*c.AssembliesHigh, 0, 0),
+	}}
+	for _, p := range r.Parts {
+		r.RAMLow += p.RAMLow
+		r.RAMHigh += p.RAMHigh
+		r.VRAMLow += p.VRAMLow
+		r.VRAMHigh += p.VRAMHigh
+	}
+	return r
+}
+
+func part(key string, files Files, rLow, rHigh, vLow, vHigh float64) Part {
+	return Part{key, files.Count, files.Bytes, int64(math.Floor(rLow)), int64(math.Ceil(rHigh)), int64(math.Floor(vLow)), int64(math.Ceil(vHigh))}
+}
