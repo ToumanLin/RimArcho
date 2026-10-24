@@ -324,7 +324,7 @@ next:
   archo log --cluster E4
 
 $ archo pattern
-patterns v0: 46 kinds of log errors and 9305 mod-specific errors from 40,326 public 1.6 logs
+patterns v0: 46 kinds of log errors and 3947 mod-specific errors from 40,326 public 1.6 logs
   evidence: community: what a kind of error usually is, never which mod causes it in one list
   list:
     pattern:g:xref.def  load  15.9%  22,998 logs  a def references another def by name that no active mod defines
@@ -392,10 +392,10 @@ pattern:g:rt.nre  a null reference in mod or game code
   fixes: disable, update
   repeat-uploads: after 1-3 list changes it went away in 26% of 887 repeat uploads (without any change: 7% of 2291)
   changed-when-gone: disable-other 148, reorder 107, enable 86, update-other 18, disable-source 17 (co-occurs with the change, not causal)
-  mod-specific: 471 known errors of single mods are of this kind (archo pattern --mod <packageId>)
+  mod-specific: 148 known errors of single mods are of this kind (archo pattern --mod <packageId>)
 
 $ archo pattern --mod krkr.rocketman
-patterns of krkr.rocketman: 15 known errors in public 1.6 logs
+patterns of krkr.rocketman: 13 known errors in public 1.6 logs
   list:
     pattern:m:krkr.rocketman:c107d596  743 logs 2025-07–2026-10  Error in static constructor of RocketMan.RocketPatcher: System.TypeInitializationException: The type … fo...
     pattern:m:krkr.rocketman:e84d5a3b  725 logs 2025-07–2026-10  Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been...
@@ -410,8 +410,6 @@ patterns of krkr.rocketman: 15 known errors in public 1.6 logs
     pattern:m:krkr.rocketman:12592d3d  41 logs 2025-07–2026-10  Exception processing alert RocketMan.Alert_StatsLearning: System.NullReferenceException: Object reference n...
     pattern:m:krkr.rocketman:5c91685a  34 logs 2025-09–2026-07  System.IO.Enumeration.FileSystemEnumerable`#[[System.String, mscorlib, Version=#.#.#.#, Culture=neutral, Pu...
     pattern:m:krkr.rocketman:5a120cd2  33 logs 2025-09–2026-07  System.Collections.Generic.List`#[[System.Reflection.Assembly, mscorlib, Version=#.#.#.#, Culture=neutral, ...
-    pattern:m:krkr.rocketman:a0989b95  21 logs 2025-07–2026-09  Exception filling window for Verse.ImmediateWindow: System.Collections.Generic.KeyNotFoundException: The gi...
-    pattern:m:krkr.rocketman:cf81819d  15 logs 2025-07–2026-04  Exception filling window for Verse.ImmediateWindow: System.MissingMethodException: Method not found: void L...
 next:
   archo pattern pattern:m:krkr.rocketman:c107d596
 
