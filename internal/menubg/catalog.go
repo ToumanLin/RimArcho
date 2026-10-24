@@ -33,25 +33,12 @@ type entry struct {
 }
 
 func catalog(game, lang string, files []*zip.File) ([]entry, error) {
-	b, err := os.ReadFile(filepath.Join(game, "Data", "Core", "Defs", "Misc", "ExpansionDefs", "ExpansionDefs.xml"))
+	defs, err := expansions(game, lang)
 	if err != nil {
 		return nil, err
 	}
-	var defs struct {
-		Expansions []expansion `xml:"ExpansionDef"`
-	}
-	if err := xml.Unmarshal(b, &defs); err != nil {
-		return nil, err
-	}
-	labels := map[string]string{}
-	if lang == "zh" {
-		labels = chineseLabels(game)
-	}
 	var out []entry
-	for _, d := range defs.Expansions {
-		if d.Name == "" || d.Path == "" || strings.ContainsAny(d.Name, `/\`) || d.Name == "." || d.Name == ".." {
-			continue
-		}
+	for _, d := range defs {
 		prefix := "resources/textures/" + strings.ToLower(strings.Trim(d.Path, "/")) + "."
 		var matches []*zip.File
 		for _, f := range files {
@@ -66,7 +53,32 @@ func catalog(game, lang string, files []*zip.File) ([]entry, error) {
 			continue
 		}
 		if len(matches) != 1 {
-			// A missing/ambiguous texture falls back to plain, never a DLC cover.
+			// Missing/ambiguous entries leave room for the official preview fallback.
+			continue
+		}
+		out = append(out, entry{d, matches[0]})
+	}
+	return out, nil
+}
+
+func expansions(game, lang string) ([]expansion, error) {
+	b, err := os.ReadFile(filepath.Join(game, "Data", "Core", "Defs", "Misc", "ExpansionDefs", "ExpansionDefs.xml"))
+	if err != nil {
+		return nil, err
+	}
+	var defs struct {
+		Expansions []expansion `xml:"ExpansionDef"`
+	}
+	if err := xml.Unmarshal(b, &defs); err != nil {
+		return nil, err
+	}
+	labels := map[string]string{}
+	if lang == "zh" {
+		labels = chineseLabels(game)
+	}
+	var out []expansion
+	for _, d := range defs.Expansions {
+		if d.Name == "" || d.Path == "" || strings.ContainsAny(d.Name, `/\`) || d.Name == "." || d.Name == ".." {
 			continue
 		}
 		if d.Name == "Core" {
@@ -81,9 +93,9 @@ func catalog(game, lang string, files []*zip.File) ([]entry, error) {
 		if strings.TrimSpace(d.Label) == "" {
 			d.Label = d.Name
 		}
-		out = append(out, entry{d, matches[0]})
+		out = append(out, d)
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].def.Name == "Core" && out[j].def.Name != "Core" })
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Name == "Core" && out[j].Name != "Core" })
 	return out, nil
 }
 
@@ -158,10 +170,21 @@ func readLabels(r io.Reader, labels map[string]string) {
 	}
 }
 
-// Stamp identifies one game's archive, independently of which environment uses it.
+// Stamp identifies the ZIP or Unity source files independently of the environment.
 // Stat is the only game filesystem work needed by the UI thread (06 §3.1).
 func Stamp(game string) string {
 	path, _ := filepath.Abs(filepath.Join(game, "Assets.zip"))
+	stamp := fileStamp(path)
+	if _, err := os.Stat(path); err == nil {
+		return stamp
+	}
+	for _, name := range []string{"resources.assets", "resources.assets.resS", "globalgamemanagers"} {
+		stamp += "|" + fileStamp(filepath.Join(filepath.Dir(path), "RimWorldWin64_Data", name))
+	}
+	return stamp
+}
+
+func fileStamp(path string) string {
 	st, err := os.Stat(path)
 	if err != nil {
 		return path + "|missing"

@@ -56,6 +56,7 @@ switch ($Command) {
         Write-Host "tools: $(VM checkToolsState)"
         Write-Host "guest IP: $(GuestIP)"
     }
+    'ip' { GuestIP }
     'build' {
         Push-Location $repo
         try {

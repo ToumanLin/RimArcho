@@ -25,7 +25,7 @@ import (
 )
 
 // Launch page backgrounds (06 §2.3, §2.14). The images come from three places:
-//   - the game: menu art streamed from Assets.zip by internal/menubg (06 §2.14);
+//   - the game: menu art streamed from ZIP/Unity by internal/menubg, with Preview.png fallback (06 §2.14);
 //   - mods whose name has "background" in it: the images their VBE.BackgroundImageDefs
 //     name (Vanilla Backgrounds Expanded, Shella Backgrounds, ...), or, with no such Def,
 //     the large landscape images under Textures/;
@@ -56,8 +56,8 @@ const BgDefault = "game:ludeon.rimworld"
 // bgMinWidth: without Defs, a mod's texture counts as a background from this width on.
 const bgMinWidth = 1280
 
-// Backgrounds lists background mods in the index's environment. Official menu art
-// is prepared separately in the background by menubg (06 §2.14).
+// Backgrounds lists official preview fallbacks and background mods. Menu art
+// replaces successful official entries in the GUI worker (06 §2.14).
 func (a *App) Backgrounds(ix *Index) []Background {
 	return CollectBackgrounds(a.BackgroundTargets(ix))
 }
@@ -72,7 +72,7 @@ type BackgroundTarget struct {
 func (a *App) BackgroundTargets(ix *Index) []BackgroundTarget {
 	var out []BackgroundTarget
 	for _, m := range ix.Mods {
-		if !m.TombstoneAt.IsZero() || m.Residue || m.Kind == source.Official || !strings.Contains(strings.ToLower(m.Name), "background") {
+		if !m.TombstoneAt.IsZero() || m.Residue || (m.Kind != source.Official && !strings.Contains(strings.ToLower(m.Name), "background")) {
 			continue
 		}
 		out = append(out, BackgroundTarget{Dir: a.ModPath(ix, m), Name: m.Name, PackageID: m.PackageID, LineageID: m.LineageID, Official: m.Kind == source.Official})
@@ -82,11 +82,18 @@ func (a *App) BackgroundTargets(ix *Index) []BackgroundTarget {
 
 // CollectBackgrounds does the slow file reads without an App or database connection.
 func CollectBackgrounds(targets []BackgroundTarget) []Background {
-	var mods []Background
+	var game, mods []Background
 	seen := map[string]bool{}
 	for _, m := range targets {
 		dir := m.Dir
 		if m.Official {
+			if src := findPreview(filepath.Join(dir, "About")); src != "" {
+				label := m.Name
+				if strings.EqualFold(m.PackageID, "ludeon.rimworld") {
+					label = "RimWorld"
+				}
+				game = append(game, Background{Key: "game:" + strings.ToLower(m.PackageID), Label: label, Src: src})
+			}
 			continue
 		}
 		if seen[m.LineageID] {
@@ -100,7 +107,8 @@ func CollectBackgrounds(targets []BackgroundTarget) []Background {
 		}
 	}
 	sort.SliceStable(mods, func(i, j int) bool { return mods[i].Group < mods[j].Group })
-	return mods
+	sort.SliceStable(game, func(i, j int) bool { return game[i].Key == BgDefault && game[j].Key != BgDefault })
+	return append(game, mods...)
 }
 
 // modBackgrounds reads one background mod: its BackgroundImageDefs (Key = defName), or

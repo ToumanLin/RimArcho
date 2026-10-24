@@ -79,7 +79,7 @@ export async function openPage(id, plan = null, entry = null) {
 }
 
 const visits = [];
-let position = -1, revision = 0, replay = null, opening = false;
+let position = -1, revision = 0, replay = null, opening = false, pendingVisit = false;
 const LIMIT = 50;
 
 function target() {
@@ -94,17 +94,24 @@ function target() {
 const same = (a, b) => a && b && a.id === b.id &&
   (a.id !== "plan-export" || a.planExport?.id === b.planExport?.id);
 
-// A new navigation/read supersedes an unfinished history traversal, just as its
-// page ticket supersedes the old load. The traversal's own synchronous entry is kept.
-export function pageEntering() {
-  if (!opening) { revision++; replay = null; }
+// go() and direct entries to a different screen start visits. A same-screen read
+// only replaces its data ticket: it still belongs to the pending visit or replay.
+export function pageEntering(name) {
+  if (arguments.length && name === S.screen) return;
+  if (!opening) { revision++; replay = null; pendingVisit = true; }
 }
 
 export function pageEntered() {
   const entry = target();
   if (!entry || scr.pageLoading()) return;
   if (replay && same(entry, replay.entry)) { replay.done = true; return; }
-  if (same(entry, visits[position])) { visits[position] = entry; return; }
+  if (same(entry, visits[position])) { visits[position] = entry; pendingVisit = false; return; }
+  if (!pendingVisit) return;
+  recordVisit(entry);
+}
+
+function recordVisit(entry) {
+  pendingVisit = false;
   revision++; replay = null;
   visits.splice(position + 1);
   visits.push(entry);
@@ -128,9 +135,14 @@ export async function travel(direction) {
   }
   if (uninst.locked()) return;
   if (direction < 0 && S.screen === "full") return fullPage.back();
+  const current = target();
+  // Back can arrive as soon as the destination's sidebar item lights up. Keep
+  // that explicitly requested route available to Forward while its read is pending.
+  if (direction < 0 && pendingVisit && current && !same(current, visits[position]) && scr.pendingPageRead()) recordVisit(current);
   const request = ++revision, previous = position;
-  // An ordinary page still loading has no completed visit yet: back returns to
-  // the last completed page. During replay position already names the pending page.
+  pendingVisit = false;
+  // During replay position already names the pending page. A failed ordinary
+  // entry has no visit: back returns to the last completed page.
   const start = direction < 0 && !same(target(), visits[position]) ? position : position + direction;
   let attempted = false;
   for (let i = start; i >= 0 && i < visits.length; i += direction) {
@@ -143,6 +155,8 @@ export async function travel(direction) {
     let pending;
     try { pending = go(entry.id, entry); } finally { opening = false; }
     try { await pending; } catch { /* removed/unavailable page: try the next visit */ }
+    // A refresh may have superseded go's read. Its completion owns this replay.
+    while (revision === request && !attempt.done && scr.pendingPageRead()) await scr.pendingPageRead();
     if (revision !== request) return;
     if (attempt.done) { replay = null; return; }
   }
@@ -155,6 +169,7 @@ export async function travel(direction) {
     let pending;
     try { pending = go(entry.id, entry); } finally { opening = false; }
     try { await pending; } catch { /* keep the page's own error state */ }
+    while (revision === request && !attempt.done && scr.pendingPageRead()) await scr.pendingPageRead();
     if (replay === attempt) replay = null;
   }
 }

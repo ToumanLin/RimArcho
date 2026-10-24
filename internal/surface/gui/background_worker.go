@@ -64,23 +64,18 @@ func (s *API) prepareBackgrounds(fresh bool) {
 			return
 		}
 	}
-	first := job == nil
 	job = &backgroundResult{}
 	s.bgRead.jobs[key] = job
 	ctx, home, game, lang := s.bgRead.ctx, s.a.Home, e.GameRoot, view.Lang()
 	s.bgRead.workers.Add(1)
 	go func() {
 		defer s.bgRead.workers.Done()
-		mods := app.CollectBackgrounds(targets)
+		fallbacks := app.CollectBackgrounds(targets)
 		menu, err := menubg.Prepare(ctx, game, filepath.Join(home, "cache", "backgrounds"), lang)
 		if err != nil && ctx.Err() == nil {
 			log.Printf("menu backgrounds: %v", err)
 		}
-		items := make([]app.Background, 0, len(menu)+len(mods))
-		for _, b := range menu {
-			items = append(items, app.Background{Key: b.Key, Label: b.Label, Src: b.Full, Thumb: b.Thumb})
-		}
-		items = append(items, mods...)
+		items := mergeMenuBackgrounds(menu, fallbacks)
 		s.mu.Lock()
 		job.items, job.done = items, true
 		current, envErr := s.a.Env()
@@ -90,8 +85,39 @@ func (s *API) prepareBackgrounds(fresh bool) {
 			s.bgs = items
 		}
 		s.mu.Unlock()
-		if publish && (first || changed) {
+		if publish && changed {
 			s.send("backgrounds", nil)
 		} // one refresh after the whole batch (06 §2.14)
 	}()
+}
+
+// Prefer extracted art per package, retaining previews for individual failures.
+func mergeMenuBackgrounds(menu []menubg.Item, fallbacks []app.Background) []app.Background {
+	items := make([]app.Background, 0, len(menu)+len(fallbacks))
+	seen := map[string]bool{}
+	for _, b := range menu {
+		items = append(items, app.Background{Key: b.Key, Label: b.Label, Src: b.Full, Thumb: b.Thumb})
+		seen[b.Key] = true
+	}
+	for _, b := range fallbacks {
+		if !seen[b.Key] {
+			items = append(items, b)
+		}
+	}
+	slices.SortStableFunc(items, func(a, b app.Background) int {
+		if a.Key == app.BgDefault && b.Key != app.BgDefault {
+			return -1
+		}
+		if b.Key == app.BgDefault && a.Key != app.BgDefault {
+			return 1
+		}
+		if a.Group == "" && b.Group != "" {
+			return -1
+		}
+		if b.Group == "" && a.Group != "" {
+			return 1
+		}
+		return 0
+	})
+	return items
 }

@@ -28,6 +28,7 @@ const pageCache = new Map();
 // left tells Go the player left a page, which forgets what only that page used (07 §8.3).
 function left(next) {
   if (S.screen && S.screen !== next) {
+    settlePageRead();
     if (S.screen === "log") { L.list?.destroy(); L.list = null; L.want = ""; clearTimeout(detailTimer); }
     api.Leave(S.screen).catch(() => {});
   }
@@ -71,15 +72,22 @@ export function closeScreen() {
 
 const pageReads = new Map();
 const pageContexts = new Map();
+let activeRead = null;
+export const pendingPageRead = () => activeRead?.done;
+function settlePageRead() { activeRead?.resolve(); activeRead = null; }
 export const pageLoading = () => !!$("#screen .page-loading, #screen .page-read-error");
 // Every page starts navigation before I/O and owns a ticket for its reply. Refreshes
 // keep the visible content; a new page/subview shows a placeholder immediately.
 // keep: a page that is already drawn stays as it is while it reads, even when the game or
 // list changed (the launch page shows that change itself).
 export function beginPageRead(name, { replace = false, keep = false, label = "loading…", retry } = {}) {
-  ui.pageEntering?.();
+  ui.pageEntering?.(name);
   const same = S.screen === name;
   const sc = same ? $("#screen") : openScreen(name);
+  settlePageRead();
+  let resolve;
+  const done = new Promise(r => { resolve = r; });
+  activeRead = { done, resolve };
   const n = (pageReads.get(name) || 0) + 1;
   pageReads.set(name, n);
   const epoch = S.screenSeq, gameRequest = S.envSeq;
@@ -119,6 +127,7 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
       sc.removeAttribute("aria-busy");
       if (editor && $("#status")?.textContent === T(label)) say("", "");
       ui.pageEntered?.();
+      settlePageRead();
     },
     fail(error) {
       if (!current()) return;
@@ -130,6 +139,7 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
         if (retry) placeholder.append(button(T("try again"), "", retry));
       }
       say("fail", message);
+      settlePageRead();
     },
   };
 }

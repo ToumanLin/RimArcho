@@ -12,6 +12,11 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/menubg"
+	"github.com/ToumanLin/RimArcho/internal/view"
+	"image"
+	"image/color"
+	"image/png"
 )
 
 func menuGame(t *testing.T, game string) {
@@ -138,11 +143,112 @@ func TestMenuBackgroundSettingsAndVersionRefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	api.HomeBackground()
-	awaitBackgrounds(t, events)
+	api.bgRead.workers.Wait()
 	if got := api.HomeBackground().URL; got != "" {
 		t.Fatalf("previous game's background leaked: %s", got)
 	}
 	if got := api.Backgrounds().Groups[0].Items; len(got) != 1 || got[0].Key != BgPlain {
 		t.Fatalf("missing assets should fall back to plain: %+v", got)
+	}
+}
+
+func TestBackgroundEventsOnlyWhenListChanges(t *testing.T) {
+	e, api, events := fixture(t)
+	noRefresh := func() {
+		t.Helper()
+		api.bgRead.workers.Wait()
+		for {
+			select {
+			case event := <-events:
+				if strings.HasPrefix(event, "backgrounds ") {
+					t.Fatal("unchanged list emitted a background refresh")
+				}
+			default:
+				return
+			}
+		}
+	}
+	// Discovering an empty list for the first time does not change the plain page.
+	api.HomeBackground()
+	noRefresh()
+	// A new worker key alone is not a change to the empty image list.
+	lang := view.Lang()
+	t.Cleanup(func() { view.SetLang(lang) })
+	if lang == "zh" {
+		view.SetLang("en")
+	} else {
+		view.SetLang("zh")
+	}
+	api.HomeBackground()
+	noRefresh()
+	view.SetLang(lang)
+	menuGame(t, e.Game)
+	api.HomeBackground()
+	awaitBackgrounds(t, events)
+	api.bgRead.workers.Wait()
+	for range 3 {
+		api.HomeBackground()
+		api.Backgrounds() // recheck assets without changing their published choices
+		noRefresh()
+	}
+}
+
+func TestMenuPreviewMerge(t *testing.T) {
+	previews := []app.Background{
+		{Key: app.BgDefault, Src: "core-preview.png"},
+		{Key: "game:ludeon.rimworld.royalty", Src: "dlc-preview.png"},
+		{Key: "mod:background/x", Group: "Background mod", Src: "mod.png"},
+	}
+	for _, menu := range [][]menubg.Item{nil, {{Key: "game:ludeon.rimworld.royalty", Full: "royalty.jpg", Thumb: "royalty-thumb.jpg"}}} {
+		got := mergeMenuBackgrounds(menu, previews)
+		if len(got) != 3 || got[0].Key != app.BgDefault || got[2].Group != "Background mod" {
+			t.Fatalf("fallback merge: %+v", got)
+		}
+		if len(menu) > 0 && (got[1].Src != "royalty.jpg" || got[1].Thumb != "royalty-thumb.jpg") {
+			t.Fatalf("extracted image lost to preview: %+v", got)
+		}
+	}
+}
+
+func TestMissingAndBrokenAssetsKeepOfficialPreview(t *testing.T) {
+	for _, brokenZIP := range []bool{false, true} {
+		t.Run(map[bool]string{false: "no-resources", true: "broken-zip"}[brokenZIP], func(t *testing.T) {
+			e, api, events := fixture(t)
+			path := filepath.Join(e.Game, "Data", "Core", "About", "Preview.png")
+			img := image.NewNRGBA(image.Rect(0, 0, 32, 16))
+			for y := 0; y < 16; y++ {
+				for x := 0; x < 32; x++ {
+					img.SetNRGBA(x, y, color.NRGBA{100, 50, 200, 255})
+				}
+			}
+			f, err := os.Create(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = png.Encode(f, img)
+			f.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if brokenZIP {
+				if err := os.WriteFile(filepath.Join(e.Game, "Assets.zip"), []byte("broken zip"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			api.HomeBackground()
+			awaitBackgrounds(t, events)
+			bg := api.HomeBackground()
+			if bg.URL == "" {
+				t.Fatal("official preview regressed to plain")
+			}
+			res := httptest.NewRecorder()
+			api.serveBg(res, httptest.NewRequest("GET", bg.URL, nil))
+			if res.Code != 200 {
+				t.Fatalf("preview status %d", res.Code)
+			}
+			if cfg, err := jpeg.DecodeConfig(res.Body); err != nil || cfg.Width != 32 || cfg.Height != 16 {
+				t.Fatalf("preview: %+v %v", cfg, err)
+			}
+		})
 	}
 }
