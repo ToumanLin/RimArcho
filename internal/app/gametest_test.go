@@ -17,6 +17,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/gametest"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/logs"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
@@ -101,7 +102,13 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	e.MustRun("disable", "pkg:test.only")
 	e.MustRun("env", "set", "main", "--launch", "steam")
 	e.Junction(filepath.Join(e.Game, "Mods", "ExistingLink"), filepath.Join(extra, "Linked"))
-	e.WriteFile(filepath.Join(e.UserData, "Config", "Prefs.xml"), "<Prefs>new settings</Prefs>")
+	prefs, err := os.ReadFile("../gametest/testdata/Prefs.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.WriteFile(filepath.Join(e.UserData, "Config", "Prefs.xml"), string(prefs))
+	e.WriteFile(filepath.Join(e.UserData, "Config", "KeyPrefs.xml"), "<KeyPrefs/>")
+	e.WriteFile(filepath.Join(e.UserData, "Config", "ModSettings.xml"), "<Settings>keep</Settings>")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "Knowledge.xml"), "player knowledge")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "skip.txt"), "not config")
 	e.WriteFile(filepath.Join(e.UserData, "Logs", "Player.log"), "player log")
@@ -121,6 +128,15 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	e.WriteFile(filepath.Join(base, "runs", "keep-other", "keep"), "owned elsewhere")
 	// Attribution must find OnlyTest even though it is disabled in the current plan.
 	e.App.TestGameStart = fakeTestGame(t, "menu", "[OnlyTest] Exception: test failure\n  at OnlyTest.Mod.Start()\n")
+	start := e.App.TestGameStart
+	e.App.TestGameStart = func(cmd *exec.Cmd) error {
+		for _, name := range []string{"Prefs.xml", "KeyPrefs.xml"} {
+			if _, err := os.Lstat(filepath.Join(data, "Config", name)); !os.IsNotExist(err) {
+				t.Errorf("player preferences reached test launch: %s: %v", name, err)
+			}
+		}
+		return start(cmd)
+	}
 	var progress []string
 	r, err := e.App.TestRun(context.Background(), app.TestRunOptions{
 		Env: "main", Plan: "tested", Timeout: 5 * time.Second, Settle: time.Millisecond,
@@ -148,7 +164,9 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 		t.Fatalf("test config %+v", config)
 	}
 	for path, want := range map[string]string{
-		filepath.Join(data, "Config", "Prefs.xml"):           "<Prefs>new settings</Prefs>",
+		filepath.Join(e.UserData, "Config", "Prefs.xml"):     string(prefs),
+		filepath.Join(e.UserData, "Config", "KeyPrefs.xml"):  "<KeyPrefs/>",
+		filepath.Join(data, "Config", "ModSettings.xml"):     "<Settings>keep</Settings>",
 		filepath.Join(data, "ShaderCache", "keep"):           "cached",
 		filepath.Join(e.UserData, "Config", "Knowledge.xml"): "player knowledge",
 		filepath.Join(e.UserData, "Logs", "Player.log"):      "player log",
@@ -253,6 +271,41 @@ func TestTestRunCLIOutcomes(t *testing.T) {
 		if code != cmds.ExitUsage || !strings.HasPrefix(out, "error: ") {
 			t.Fatalf("bad flags %v: %d, %s", flags, code, out)
 		}
+	}
+}
+
+func TestTestRunSettingsReport(t *testing.T) {
+	e := testRunEnv(t)
+	e.AddWorkshop("1001", testkit.Sample("test.settingsowner", "SettingsOwner"))
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:test.settingsowner")
+	var text strings.Builder
+	for _, field := range []string{"windowPositionX", "windowPositionY", "scaleRelativeToSystem"} {
+		fmt.Fprintf(&text, "[SettingsOwner] XML error: <%s>-27</%s> doesn't correspond to any field in type PrefsData\n", field, field)
+	}
+	text.WriteString("[SettingsOwner] XML error: <unknown>1</unknown> doesn't correspond to any field in type KeyPrefs\n")
+	text.WriteString("[SettingsOwner] XML error: <bad>1</bad> doesn't correspond to any field in type ThingDef\n")
+	e.App.TestGameStart = fakeTestGame(t, "menu", text.String())
+	out, code := e.Run("test", "run", "--timeout", "5s", "--settle", "1ms", "--json")
+	var r app.TestRunReport
+	if code != 1 || json.Unmarshal([]byte(out), &r) != nil {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if r.Status != "menu" || r.Counts[gametest.ClassSettings] != 4 || r.Counts[logs.ClassXMLLoad] != 1 || r.Success() {
+		t.Fatalf("settings report: %+v", r)
+	}
+	for _, c := range r.Clusters {
+		if c.Class == gametest.ClassSettings && (len(c.Mods) != 0 || c.Confidence != "certain") {
+			t.Fatalf("settings error attributed to a mod: %+v", c)
+		}
+		if c.Class == logs.ClassXMLLoad && !slices.Contains(c.Mods, "SettingsOwner") {
+			t.Fatalf("ordinary XML attribution lost: %+v", c)
+		}
+	}
+	e.App.TestGameStart = fakeTestGame(t, "menu", "XML error: unknown field in type PrefsData\n")
+	out, code = e.Run("test", "run", "--timeout", "5s", "--settle", "1ms")
+	if code != 1 || !strings.Contains(out, "settings x1:") || !strings.Contains(out, "source: game preferences") || strings.Contains(out, "mods:") {
+		t.Fatalf("settings text report: exit %d: %s", code, out)
 	}
 }
 

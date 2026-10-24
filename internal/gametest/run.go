@@ -100,6 +100,9 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 			return nil, fmt.Errorf("gametest: create %q: %w", dir, err)
 		}
 	}
+	if err := resetPreferences(o.DataDir); err != nil {
+		return nil, err
+	}
 	knowledge := filepath.Join(o.DataDir, "Config", "Knowledge.xml")
 	if err := os.Remove(knowledge); err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("gametest: remove old marker %q: %w", knowledge, err)

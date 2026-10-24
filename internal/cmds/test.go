@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/gametest"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -65,6 +66,10 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	clusters := root.Section(fmt.Sprintf("error clusters: %d", r.ClustersTotal))
 	for _, cluster := range r.Clusters {
 		n := clusters.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+		if cluster.Class == gametest.ClassSettings {
+			n.KV("source", "game preferences")
+			continue
+		}
 		mods := "no mod identified"
 		if len(cluster.Mods) > 0 {
 			mods = strings.Join(cluster.Mods, ", ")
