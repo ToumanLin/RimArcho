@@ -449,37 +449,7 @@ func (a *App) TextureSummaryTargets(ctx context.Context, targets []TextureTarget
 
 // TextureSummaryProgress publishes each measured mod so pages can fill rows as they finish (06 §2.13).
 func (a *App) TextureSummaryProgress(ctx context.Context, targets []TextureTarget, o textures.Options, progress func(*TextureMod)) (*TextureReport, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	last, err := a.Store.TextureMods()
-	if err != nil {
-		return nil, err
-	}
-	r := &TextureReport{Options: o.Normal(), Tool: a.TextureTool(), DryRun: true}
-	for _, target := range targets {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		dir := target.Dir
-		if real, err := source.RealPath(dir); err == nil {
-			dir = real
-		}
-		t := a.readTextureMod(ctx, target.Mod, target.Ref, dir, o, false, last)
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		t.set, t.rows = nil, nil
-		if t.Plan != nil {
-			t.Plan.Jobs, t.Plan.Fresh = nil, nil
-			r.Est.Plus(t.Plan.Est)
-		}
-		r.Mods = append(r.Mods, t)
-		if progress != nil {
-			progress(t)
-		}
-	}
-	return r, nil
+	return a.textureSummaries(ctx, targets, o, progress, textureSummaryWorkers)
 }
 
 func (a *App) textureStatus(ctx context.Context, refs []string, scope string, o textures.Options) (*TextureReport, error) {

@@ -82,10 +82,11 @@ async function draw(fetch, measurements = false, entryRead = null) {
       if (X.prog === progress) X.prog = p.running || null;
       // Both the request and the page visit must still match after every await (06 §3.1).
       while (current() && p) {
+        const changed = JSON.stringify(X.page) !== JSON.stringify(p);
         X.page = p;
         X.loading = !!p.loading;
         X.error = p.error || "";
-        draw(false, true);
+        if (changed) draw(false, true);
         if (X.error) say("fail", X.error);
         if (!p.loading) { read.finish(); return; }
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -163,7 +164,8 @@ async function draw(fetch, measurements = false, entryRead = null) {
   w.append(est);
   w.append(slot(foot(p), "foot"));
 
-  w.append(slot(textureRows(p), "rows"));
+  if (previous) textureRows(p, previous.querySelector('[data-tex="rows"]'));
+  else w.append(slot(textureRows(p), "rows"));
   if (previous) {
     // Keep live select elements in place while estimates arrive (06 §3.1).
     previous.setAttribute("aria-busy", String(X.loading));
@@ -179,22 +181,32 @@ const textureTable = createTable({ key: "ui.gui.textures.columns", columns: text
   state: { cols: null, sort: "estimate", dir: 1 }, redraw: () => draw(false, true),
 });
 let columnsLoaded = false;
-function textureRows(p) {
+function textureRows(p, old = null) {
   if (!columnsLoaded) {
     columnsLoaded = true;
     textureTable.load().then(() => { if (S.screen === "textures" && X.page) draw(false, true); });
   }
-  const t = el("section", "card data-table tex-rows");
+  const t = old || el("section", "card data-table tex-rows");
   t.tabIndex = 0;
   t.setAttribute("role", "table");
   t.hidden = !(p.rows || []).length;
   const head = el("div", "lib-th");
-  t.append(head);
   textureTable.draw(t, head);
+  // Keep the pointer capture target during updates (06 §3.9).
+  if (old && old.children[0].dataset.columns === head.dataset.columns) textureTable.adopt(t, old.children[0]);
+  else if (old) old.children[0].replaceWith(head);
+  else t.append(head);
+  const keep = new Map([...t.children].slice(1).map(row => [row.dataset.ref, row]));
+  const stamp = JSON.stringify(textureTable.visible().map(c => [c.key, T(textureTable.column(c.key).title)]));
+  const nodes = [];
   for (const r of textureTable.sorted(p.rows || [])) {
+    const signature = stamp + JSON.stringify(r);
+    const was = keep.get(r.ref);
+    if (was && was.texSignature === signature) { nodes.push(was); continue; }
     const tr = el("div", "data-row" + (r.stale ? " stale" : ""));
     tr.setAttribute("role", "row");
     tr.dataset.ref = r.ref;
+    tr.texSignature = signature;
     for (const c of textureTable.visible()) {
       if (c.key !== "name" && r.pending) { tr.append(pending()); continue; }
       const cell = el("span", "cell" + (c.key === "name" ? " n" : "") + (textureTable.column(c.key).num ? " num" : ""));
@@ -206,8 +218,11 @@ function textureRows(p) {
       cell.title = cell.textContent;
       tr.append(cell);
     }
-    t.append(tr);
+    nodes.push(tr);
   }
+  // Reuse untouched cells and their shimmer; sorting moves only existing rows (06 §2.13).
+  nodes.forEach((row, i) => { if (t.children[i + 1] !== row) t.insertBefore(row, t.children[i + 1] || null); });
+  while (t.children.length > nodes.length + 1) t.lastChild.remove();
   return t;
 }
 export function key(e) { return textureTable.key(e); }
@@ -216,19 +231,7 @@ function slot(node, key) { node.dataset.tex = key; return node; }
 
 // Preserve unchanged placeholders so their shimmer can finish (06 §7.1).
 function updateMeasurement(old, next) {
-  if (next.dataset.tex === "rows") {
-    const keep = new Map([...old.children].map((row) => [row.dataset.ref || "header", row]));
-    const nodes = [...next.children].map((row) => {
-      const was = keep.get(row.dataset.ref || "header");
-      const sameHeader = was && !row.dataset.ref && was.dataset.columns === row.dataset.columns;
-      return was && (sameHeader || was.isEqualNode(row)) ? was : row;
-    });
-    // Move existing rows in place: another estimate completing must not restart their shimmer (06 §7.1).
-    nodes.forEach((row, i) => { if (old.children[i] !== row) old.insertBefore(row, old.children[i] || null); });
-    while (old.children.length > nodes.length) old.lastChild.remove();
-    old.hidden = next.hidden;
-    textureTable.adopt(old, old.children[0]);
-  } else if (!old.isEqualNode(next)) { next.scrollLeft = old.scrollLeft; old.replaceWith(next); }
+  if (!old.isEqualNode(next)) { next.scrollLeft = old.scrollLeft; old.replaceWith(next); }
 }
 
 function fillModCount(node, p) {

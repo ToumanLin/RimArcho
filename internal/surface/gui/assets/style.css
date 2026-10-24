@@ -1226,6 +1226,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 
 /* 库 › 贴图优化 (08 §5.2): settings rows, the run's foot, the mods table */
 .textures .set .sub { white-space: normal; }
+/* 06 §2.13: offscreen texture cells need no layout/paint during background estimates. */
+.tex-rows .data-row { content-visibility: auto; contain-intrinsic-size: auto 30px; }
 .textures .set .sub.warn, .tex-rows .warn { color: var(--amber); }
 .tex-foot { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin: 14px 0 18px; }
 .tex-foot .prog { flex: 1; }
