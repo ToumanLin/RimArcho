@@ -83,6 +83,7 @@ type MoveResult struct {
 	Origin bool
 	// Plans are the plans that use it; they keep using it (the instance is the same).
 	Plans []string
+	Links *LinkLifecyclePlan // affected games and entries, also in the existing preview
 }
 
 // MoveToLibrary moves a locked copy RimArcho made in Mods/ (one with .rimarcho/origin.json)
@@ -111,7 +112,7 @@ func (a *App) MoveToLibrary(ref string, dryRun bool) (*MoveResult, error) {
 
 // moveToLibrary moves a folder of Mods/ into the lock library and points its instance at
 // the new place, so the instance (and every plan's entry) stays the same (06 §2.9, 04 §7.4).
-func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (*MoveResult, error) {
+func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (result *MoveResult, moveErr error) {
 	if m.Kind != source.Local {
 		return nil, fmt.Errorf("%s is not in Mods/; RimArcho moves nothing else into the lock library", st.Ix.Ref(m.ID))
 	}
@@ -128,7 +129,17 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (*MoveR
 	root := a.lockRoot(st.Ix.Env)
 	r := &MoveResult{Mod: m, From: from, To: filepath.Join(root, freeName(root, filepath.Base(from))), DryRun: dryRun,
 		Copied: !strings.EqualFold(filepath.VolumeName(from), filepath.VolumeName(root)), Origin: !hasOrigin(from)}
+	if a.SameVolume != nil {
+		r.Copied = !a.SameVolume(from, root)
+	}
 	var err error
+	r.Links, err = a.PlanIncomingLinks(from, r.To)
+	if err != nil {
+		return nil, err
+	}
+	if st.List.Index(m.ID) >= 0 {
+		r.Links.ensureEntry(st.Ix.Env.GameRoot, modsDir(st.Ix), DeployPrefix+LockLabel+"_"+filepath.Base(r.To), r.To, m.ID)
+	}
 	if r.Plans, err = a.usedBy(st, m.ID); err != nil {
 		return nil, err
 	}
@@ -142,6 +153,15 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (*MoveR
 	if err := a.checkRoots(from); err != nil {
 		return nil, err
 	}
+	if err := a.beginLinkLifecycle(r.Links); err != nil {
+		return nil, err
+	}
+	finished := false
+	defer func() {
+		if !finished {
+			moveErr = a.abortLinkLifecycle(r.Links, moveErr)
+		}
+	}()
 	if !r.Copied {
 		if err := os.Rename(from, r.To); err != nil {
 			return nil, err
@@ -155,6 +175,10 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (*MoveR
 		}
 	}
 	if err := a.Store.RelocateInstance(m.ID, src.ID, filepath.Base(r.To), r.To); err != nil {
+		return r, err
+	}
+	finished = true
+	if err := a.finishLinkLifecycle(r.Links); err != nil {
 		return r, err
 	}
 	if _, err := a.Scan(false); err != nil {
@@ -182,7 +206,7 @@ func (a *App) copyMove(from, to string) error {
 	if err := copyChecked(from, to); err != nil {
 		return err
 	}
-	if err := a.ToTrash(from); err != nil {
+	if err := a.recycleTarget(from); err != nil {
 		return fmt.Errorf("copied to %s, but the original could not go to the recycle bin: %v (remove %s yourself)", to, err, from)
 	}
 	return nil

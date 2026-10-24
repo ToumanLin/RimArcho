@@ -156,6 +156,10 @@ func (a *App) UpdateSubscriptionFrom(ref, from string, dryRun bool) (*SubscribeO
 	}
 	op := &SubscribeOp{Action: "update", DryRun: dryRun, Items: []SubscribeItem{subscriptionItem(s)}}
 	op.Items[0].To = stamp
+	op.Items[0].Links, err = a.PlanIncomingLinks(s.Folder, s.Folder)
+	if err != nil {
+		return nil, err
+	}
 	if dryRun {
 		return op, nil
 	}
@@ -177,17 +181,19 @@ func (a *App) UpdateSubscriptionFrom(ref, from string, dryRun bool) (*SubscribeO
 	if err := subscribe.Write(mod, r); err != nil {
 		return nil, err
 	}
-	if err := a.ToTrash(s.Folder); err != nil {
-		return nil, err
-	}
-	if err := os.Rename(mod, s.Folder); err != nil {
-		cleanup = false
-		return op, fmt.Errorf("old folder is in the recycle bin; replacement remains at %s: %w", mod, err)
+	if err := a.withIncomingLinks(s.Folder, s.Folder, func() error {
+		if err := a.recycleTarget(s.Folder); err != nil {
+			return err
+		}
+		if err := os.Rename(mod, s.Folder); err != nil {
+			cleanup = false
+			return fmt.Errorf("old folder is in the recycle bin; replacement remains at %s: %w", mod, err)
+		}
+		return a.scanSubscriptionItem(&op.Items[0])
+	}); err != nil {
+		return op, err
 	}
 	delete(a.subscriptionCache, s.Folder)
 	op.Items[0].Result = "updated"
-	if err := a.scanSubscriptionItem(&op.Items[0]); err != nil {
-		return op, err
-	}
 	return op, nil
 }

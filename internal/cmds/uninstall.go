@@ -213,6 +213,9 @@ func UninstallOutline(n *render.Node, p *app.UninstallPlan, all, done bool) {
 				l = "       " + l
 			}
 			sec.Add(l)
+			for _, line := range it.Links.Lines() {
+				sec.KV("affected link", line)
+			}
 		}
 		if !all {
 			sec.Truncate(30, "archo uninstall --all")

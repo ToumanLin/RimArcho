@@ -8,6 +8,7 @@ uninstall: dry run, nothing changed
     clean       $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml  (main)  takes out tester.cmd
   locked: 1 lock library copy to the recycle bin, <size> (--keep-locked: into a game's Mods/)
     recycle bin $ROOT/LocalAppData/RimArcho/locked/1001_local  (A)  <size>
+    affected link: $ROOT/Steam/steamapps/common/RimWorld: $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local -> $ROOT/LocalAppData/RimArcho/locked/1001_local; detach link
   monitor: delete Archo Monitor (1 folder), <size>
     delete      $ROOT/LocalAppData/RimArcho/monitor/ArchoMonitor-0.9.0  <size>
   packs: keep 1 pack: moved to $ROOT/Documents/RimArcho packs, <size> (--remove-packs: recycle bin)
@@ -36,6 +37,7 @@ uninstall: dry run, nothing changed
     restore     $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml  (main)  — the list from before RimArcho's last write
   locked: 1 lock library copy into env:main's Mods/ as ordinary mods, <size>
     move        $ROOT/LocalAppData/RimArcho/locked/1001_local → $ROOT/Steam/steamapps/common/RimWorld/Mods/1001_local  (A)  <size>
+    affected link: $ROOT/Steam/steamapps/common/RimWorld: $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local -> $ROOT/LocalAppData/RimArcho/locked/1001_local; detach link
   monitor: delete Archo Monitor (1 folder), <size>
     delete      $ROOT/LocalAppData/RimArcho/monitor/ArchoMonitor-0.9.0  <size>
   packs: 1 pack to the recycle bin, <size>
@@ -64,6 +66,7 @@ uninstall: dry run, nothing changed
     clean       $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml  (main)  takes out tester.cmd
   locked: 1 lock library copy into env:old's Mods/ as ordinary mods, <size>
     move        $ROOT/LocalAppData/RimArcho/locked/1001_local → $ROOT/old/Mods/1001_local  (A)  <size>
+    affected link: $ROOT/Steam/steamapps/common/RimWorld: $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local -> $ROOT/LocalAppData/RimArcho/locked/1001_local; detach link
   monitor: delete Archo Monitor (1 folder), <size>
     delete      $ROOT/LocalAppData/RimArcho/monitor/ArchoMonitor-0.9.0  <size>
   packs: keep 1 pack: moved to $ROOT/Documents/RimArcho packs, <size> (--remove-packs: recycle bin)
@@ -96,6 +99,7 @@ uninstalled: RimArcho's folders and program are deleted once this command ends
     done   clean       $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml  (main)  takes out tester.cmd
   locked: 1 lock library copy to the recycle bin, <size> (--keep-locked: into a game's Mods/)
     done   recycle bin $ROOT/LocalAppData/RimArcho/locked/1001_local  (A)  <size>
+    affected link: $ROOT/Steam/steamapps/common/RimWorld: $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local -> $ROOT/LocalAppData/RimArcho/locked/1001_local; detach link
   monitor: delete Archo Monitor (1 folder), <size>
     done   delete      $ROOT/LocalAppData/RimArcho/monitor/ArchoMonitor-0.9.0  <size>
   packs: keep 1 pack: moved to $ROOT/Documents/RimArcho packs, <size> (--remove-packs: recycle bin)

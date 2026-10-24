@@ -117,7 +117,14 @@ func TestLinkHealthUnknownReparseType(t *testing.T) {
 		t.Fatal("unknown reparse type removed")
 	}
 	e.MustRun("links", "repair", "--all", "--yes", "--include", path)
-	if _, err := os.Lstat(path); err != nil {
-		t.Fatal("unknown reparse entry removed")
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
 	}
+	for _, entry := range entries {
+		if entry.Name() == filepath.Base(path) {
+			return // Some Windows versions cannot Lstat an application-defined tag.
+		}
+	}
+	t.Fatal("unknown reparse entry removed")
 }

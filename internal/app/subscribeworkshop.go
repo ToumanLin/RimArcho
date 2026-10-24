@@ -119,7 +119,7 @@ var workshopFailure = regexp.MustCompile(`ERROR! Download item (\d+) failed(?: \
 
 // downloadWorkshop uses the same runner/account policy as game downloads. root is
 // the existing source during updates; new subscriptions use the configured root.
-func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (*SubscribeOp, error) {
+func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *SubscribeOp, downloadErr error) {
 	if err := a.refuseSubscriptionGameRunning(); err != nil {
 		return nil, err
 	}
@@ -180,6 +180,16 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (*Subscri
 	for _, id := range ids {
 		op.Items = append(op.Items, SubscribeItem{Name: "Workshop " + id, Folder: filepath.Join(root, id), Record: &subscribe.Record{Kind: "steamcmd", WorkshopID: id}, Result: "would download with SteamCMD"})
 	}
+	var incoming *LinkLifecyclePlan
+	if existing {
+		incoming, err = a.PlanIncomingLinks(root, root)
+		if err != nil {
+			return nil, err
+		}
+		for i := range op.Items {
+			op.Items[i].Links = incoming
+		}
+	}
 	if dryRun {
 		return op, nil
 	}
@@ -201,6 +211,17 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (*Subscri
 		args = append(args, "+workshop_download_item", env.WorkshopAppID, id)
 	}
 	args = append(args, "+quit")
+	if incoming != nil && !relocate {
+		if err := a.beginLinkLifecycle(incoming); err != nil {
+			return op, err
+		}
+	}
+	finished := false
+	defer func() {
+		if incoming != nil && !relocate && !finished {
+			downloadErr = a.abortLinkLifecycle(incoming, downloadErr)
+		}
+	}()
 	out, runErr := a.runWorkshopSteamCMD(exe, args, account != "anonymous")
 	okIDs := map[string]bool{}
 	for _, m := range workshopSuccess.FindAllStringSubmatch(out, -1) {
@@ -267,7 +288,16 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (*Subscri
 			}
 		}
 	}
-	return op, errors.Join(errs...)
+	if err := errors.Join(errs...); err != nil {
+		return op, err
+	}
+	if incoming != nil && !relocate {
+		finished = true
+		if err := a.finishLinkLifecycle(incoming); err != nil {
+			return op, err
+		}
+	}
+	return op, nil
 }
 
 func (a *App) replaceWorkshopImport(from, target string) error {
@@ -285,14 +315,16 @@ func (a *App) replaceWorkshopImport(from, target string) error {
 	if err != nil {
 		return err
 	}
-	if err := a.ToTrash(target); err != nil {
-		return err
-	}
-	if err := os.Rename(mod, target); err != nil {
-		cleanup = false
-		return fmt.Errorf("old folder is in the recycle bin; replacement remains at %s: %w", mod, err)
-	}
-	return nil
+	return a.withIncomingLinks(target, target, func() error {
+		if err := a.recycleTarget(target); err != nil {
+			return err
+		}
+		if err := os.Rename(mod, target); err != nil {
+			cleanup = false
+			return fmt.Errorf("old folder is in the recycle bin; replacement remains at %s: %w", mod, err)
+		}
+		return nil
+	})
 }
 
 func (a *App) runWorkshopSteamCMD(exe string, args []string, console bool) (string, error) {

@@ -371,6 +371,7 @@ func downgradeWithTwin(t *testing.T, e *testkit.Env) map[string]string {
 	exec(`DROP TABLE texture_file`) // v16
 	exec(`DROP TABLE texture_mod`)
 	exec(`DROP TABLE plan_collection`) // v17
+	exec(`DROP TABLE managed_link`)    // v18
 	exec(`ALTER TABLE plan DROP COLUMN created_game`)
 	exec(`ALTER TABLE plan DROP COLUMN versions`)
 	exec(`UPDATE meta SET value='13' WHERE key='schema_version'`)

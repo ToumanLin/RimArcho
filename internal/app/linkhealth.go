@@ -1,6 +1,8 @@
 package app
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 const (
@@ -17,6 +20,7 @@ const (
 	CodeLinkForeign  = "mods.link-foreign"
 	CodeLinkUnknown  = "mods.link-check-failed"
 	CodeLinkOccupied = "mods.link-occupied"
+	CodeLinkRecovery = "mods.link-recovery"
 )
 
 // GameLink is a fresh first-level filesystem observation, independent of mod caches.
@@ -33,6 +37,9 @@ type GameLink struct {
 	Owned    bool               `json:"owned"`
 	Action   string             `json:"action"`
 	snapshot *source.LinkInfo
+	Instance string `json:"instance,omitempty"`
+	Pack     string `json:"pack,omitempty"`
+	recovery *linkRecovery
 }
 
 type gameMods struct{ game, mods string }
@@ -65,6 +72,16 @@ func (a *App) knownGameMods() ([]gameMods, error) {
 			roots = append(roots, gameMods{game, s.Root})
 		}
 	}
+	ledger, err := a.Store.ManagedLinks()
+	if err != nil {
+		return nil, err
+	}
+	for _, l := range ledger {
+		roots = append(roots, gameMods{filepath.Dir(l.Mods), l.Mods})
+		if l.NextPath != "" {
+			roots = append(roots, gameMods{filepath.Dir(filepath.Dir(l.NextPath)), filepath.Dir(l.NextPath)})
+		}
+	}
 	seen := map[string]bool{}
 	out := []gameMods{}
 	for _, r := range roots {
@@ -89,6 +106,23 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 	}
 	expected := map[string]string{}
 	evidence := map[string]string{}
+	instances, packIDs := map[string]string{}, map[string]string{}
+	ledger, err := a.Store.ManagedLinks()
+	if err != nil {
+		return nil, err
+	}
+	registered := map[string]store.ManagedLink{}
+	for _, l := range ledger {
+		if l.Phase == "complete" && l.NextTarget != "" {
+			delete(registered, env.PathKey(filepath.Join(l.Mods, l.Name)))
+			registered[env.PathKey(l.NextPath)] = l
+		} else if l.Phase == "rolled-back" && l.Target != "" {
+			l.NextTarget = l.Target
+			registered[env.PathKey(filepath.Join(l.Mods, l.Name))] = l
+		} else if store.LinkFinished(l.Phase) {
+			delete(registered, env.PathKey(filepath.Join(l.Mods, l.Name)))
+		}
+	}
 	es, err := a.Store.Envs()
 	if err != nil {
 		return nil, err
@@ -102,6 +136,7 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 			for _, name := range []string{DeployName(m), DeployPrefix + "env_" + m.ID} {
 				key := strings.ToLower(name)
 				expected[key] = m.RealPath
+				instances[key] = m.ID
 				evidence[key] = "known instance " + m.ID + "; expected target: " + m.RealPath
 			}
 		}
@@ -123,6 +158,7 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 			if !e.Official && e.Folder != "" {
 				key := strings.ToLower(packLinkName(p.Name(), e.Folder))
 				expected[key] = filepath.Join(a.packPath(p.Name()), "mods", e.Folder)
+				packIDs[key] = p.Name()
 				evidence[key] = "known pack " + p.Name() + "; expected target: " + expected[key]
 			}
 		}
@@ -156,8 +192,17 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 			}
 			l.snapshot, l.Target, l.Kind, l.State = info, info.RawTarget, info.Kind, info.State
 			exp := expected[strings.ToLower(name)]
+			l.Instance, l.Pack = instances[strings.ToLower(name)], packIDs[strings.ToLower(name)]
 			if exp != "" {
 				l.Owned, l.Evidence = true, evidence[strings.ToLower(name)]
+			}
+			if row, ok := registered[env.PathKey(l.Path)]; ok {
+				exp, l.Owned, l.Instance, l.Pack = row.NextTarget, true, row.Instance, row.Pack
+				l.Evidence = "managed link ledger; operation " + row.Operation + "; expected target: " + exp
+				if row.Kind != info.Kind {
+					l.Owned = false
+					l.Evidence += "; reparse type differs from ledger"
+				}
 			}
 			switch {
 			case info.Kind == "plain":
@@ -184,12 +229,23 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 			out = append(out, l)
 		}
 	}
-	return out, nil
+	recoveries, err := a.linkRecoveries(ledger)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range recoveries {
+		for _, l := range out {
+			if env.PathKey(l.Path) == env.PathKey(r.Path) {
+				l.Action = "keep"
+			}
+		}
+	}
+	return append(out, recoveries...), nil
 }
 
 func (l *GameLink) Finding() *finding.Finding {
 	severity := finding.Warning
-	if l.Code == CodeLinkDangling || l.Code == CodeLinkUnknown {
+	if l.Code == CodeLinkDangling || l.Code == CodeLinkUnknown || l.Code == CodeLinkRecovery {
 		severity = finding.Error
 	}
 	return &finding.Finding{Code: l.Code, Severity: severity, Key: env.PathKey(l.Path), Layer: "decl", Confidence: finding.Certain,
@@ -204,7 +260,7 @@ func (a *App) CheckGameLinks(mods string) ([]*GameLink, error) {
 	}
 	out := []*GameLink{}
 	for _, l := range all {
-		if env.PathKey(l.Mods) == env.PathKey(realOrAbs(mods)) && (l.Code == CodeLinkDangling || l.Code == CodeLinkUnknown) {
+		if env.PathKey(l.Mods) == env.PathKey(realOrAbs(mods)) && (l.Code == CodeLinkDangling || l.Code == CodeLinkUnknown || l.Code == CodeLinkRecovery) {
 			out = append(out, l)
 		}
 	}
@@ -326,6 +382,9 @@ func (a *App) ApplyLinkRepair(plan *LinkRepairPlan) error {
 			}
 		}
 	}
+	if err := a.applyLinkRecoveries(plan); err != nil {
+		return err
+	}
 	for _, l := range plan.Links {
 		if l.Action == "remove link" {
 			if a.probe()(l.Game) != nil {
@@ -335,7 +394,19 @@ func (a *App) ApplyLinkRepair(plan *LinkRepairPlan) error {
 			if state == source.TargetUnknown || l.Code == CodeLinkDangling && state != source.TargetMissing || envLink(filepath.Base(l.Path)) && state == source.TargetPresent {
 				return fmt.Errorf("target changed since preview: %s", l.Path)
 			}
+			var id [16]byte
+			if _, err := rand.Read(id[:]); err != nil {
+				return err
+			}
+			op := hex.EncodeToString(id[:])
+			row := store.ManagedLink{Operation: op, Mods: l.Mods, Name: filepath.Base(l.Path), Kind: l.Kind, Instance: l.Instance, Pack: l.Pack, Target: l.snapshot.Target}
+			if err := a.Store.RecordLinkIntent([]store.ManagedLink{row}); err != nil {
+				return err
+			}
 			if err := source.RemoveLinkChecked(l.snapshot); err != nil {
+				return err
+			}
+			if err := a.Store.LinkPhase(op, "complete"); err != nil {
 				return err
 			}
 			plan.Removed = append(plan.Removed, l.Path)

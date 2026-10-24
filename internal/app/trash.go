@@ -23,6 +23,19 @@ func (a *App) ToTrash(path string) error {
 	if err := check(path); err != nil {
 		return err
 	}
+	return a.withIncomingLinks(path, "", func() error { return a.recycleTarget(path) })
+}
+
+// recycleTarget is used inside an already journalled lifecycle. It retains the
+// existing trash allow-list; detaching a link never goes through this function.
+func (a *App) recycleTarget(path string) error {
+	check := a.trashAllow
+	if check == nil {
+		check = a.trashAllowed
+	}
+	if err := check(path); err != nil {
+		return err
+	}
 	return a.trash(path)
 }
 

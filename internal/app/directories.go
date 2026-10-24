@@ -258,6 +258,21 @@ func (a *App) SetDirectory(id, path string) error {
 }
 
 func (a *App) setDirectory(d *ManagedDirectory, path string) error {
+	p, err := a.PlanIncomingLinks(d.Path, path)
+	if err != nil {
+		return err
+	}
+	p.Directory = d.ID
+	if err := a.beginLinkLifecycle(p); err != nil {
+		return err
+	}
+	if err := a.setDirectoryRecords(d, path); err != nil {
+		return a.abortLinkLifecycle(p, err)
+	}
+	return a.finishLinkLifecycle(p)
+}
+
+func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 	if d.ID == "steamcmd-tool" && steamCMDIn(path) == "" {
 		return fmt.Errorf("%s contains no SteamCMD program", path)
 	}
@@ -339,21 +354,37 @@ func (a *App) setDirectory(d *ManagedDirectory, path string) error {
 		return err
 	}
 	a.ixCache, a.stCache, a.prCache = nil, nil, nil
-	if err := a.relocateDirectoryLinks(linkRoot, path); err != nil {
-		return err
-	}
-	if env.PathKey(linkRoot) != env.PathKey(d.Path) {
-		if err := a.relocateDirectoryLinks(d.Path, path); err != nil {
-			return err
-		}
-	}
 	return a.Store.SetMeta(linkKey, "")
 }
 
-// MoveDirectory carries a directory to a new location, then records it there. The
-// same volume is one rename; another drive is a checked copy and the original goes
-// to the recycle bin (moveDir/copyMove; copied reports which). No target is
-// overwritten. Errors after the files moved name the actual new location.
+// PlanDirectoryMove previews the common incoming-link plan without writing files.
+func (a *App) PlanDirectoryMove(id, path string) (*LinkLifecyclePlan, error) {
+	d, err := a.managedDirectory(id)
+	if err != nil {
+		return nil, err
+	}
+	path, err = directoryPath(path)
+	if err != nil {
+		return nil, err
+	}
+	if source.IsLink(d.Path) || directoriesOverlap(d.Path, path) {
+		return nil, fmt.Errorf("source is a link or old and new directories overlap")
+	}
+	if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("destination is occupied or inaccessible: %s", path)
+	}
+	if err := a.validateDirectory(d, path); err != nil {
+		return nil, err
+	}
+	p, err := a.PlanIncomingLinks(d.Path, path)
+	if err == nil {
+		p.Directory = d.ID
+	}
+	return p, err
+}
+
+// MoveDirectory detaches incoming links before a rename or checked copy/recycle,
+// updates the records, then recreates entries at their new locations.
 func (a *App) MoveDirectory(id, path string) (copied bool, err error) {
 	d, err := a.managedDirectory(id)
 	if err != nil {
@@ -407,164 +438,34 @@ func (a *App) MoveDirectory(id, path string) (copied bool, err error) {
 		}
 	}
 	copied = !same(d.Path, path)
+	links, err := a.PlanIncomingLinks(d.Path, path)
+	if err != nil {
+		return false, err
+	}
+	links.Directory = d.ID
+	if err := a.beginLinkLifecycle(links); err != nil {
+		return false, err
+	}
 	var trashErr error
 	if copied {
-		trashErr, err = a.copyDirectory(d.Path, path)
+		err = copyChecked(d.Path, path)
 		if err != nil {
-			return false, fmt.Errorf("could not copy the directory: %w; move it manually and use SetDirectory", err)
+			return false, a.abortLinkLifecycle(links, fmt.Errorf("could not copy the directory: %w; move it manually and use SetDirectory", err))
 		}
+		trashErr = a.trash(d.Path)
 	} else if err := os.Rename(d.Path, path); err != nil {
-		return false, fmt.Errorf("could not safely rename the directory: %w; move it manually and use SetDirectory", err)
+		return false, a.abortLinkLifecycle(links, fmt.Errorf("could not safely rename the directory: %w; move it manually and use SetDirectory", err))
 	}
-	if err := a.setDirectory(d, path); err != nil {
-		return copied, fmt.Errorf("the directory was moved to %s, but updating records or links failed: %w; use SetDirectory with this location to finish", path, err)
+	if err := a.setDirectoryRecords(d, path); err != nil {
+		return copied, a.abortLinkLifecycle(links, fmt.Errorf("the directory was moved to %s, but updating records or links failed: %w; use SetDirectory with this location to finish", path, err))
+	}
+	if err := a.finishLinkLifecycle(links); err != nil {
+		return copied, err
 	}
 	if trashErr != nil {
 		return copied, fmt.Errorf("the directory was copied to %s and RimArcho uses it there, but the original could not go to the recycle bin: %v (remove %s yourself)", path, trashErr, d.Path)
 	}
 	return copied, nil
-}
-
-// copyDirectory carries a managed directory to another drive: RimArcho's own links in
-// the game Mods/ folders inside it are taken out first (they point outside, so a copy
-// cannot carry them) and made again at the new place; then a checked copy, and the
-// original goes to the recycle bin. The player chose this move and every file was
-// checked, so the recycle bin's allow-list (which guards single mod folders) is not asked.
-// trashErr is the recycle bin's failure once the copy is in place.
-func (a *App) copyDirectory(from, to string) (trashErr, err error) {
-	links, err := a.detachLinks(from)
-	if err != nil {
-		reattachLinks(links, from, from)
-		return nil, err
-	}
-	if err := copyChecked(from, to); err != nil {
-		reattachLinks(links, from, from)
-		return nil, err
-	}
-	if err := reattachLinks(links, from, to); err != nil {
-		return nil, err
-	}
-	return a.trash(from), nil
-}
-
-type detachedLink struct{ path, target string }
-
-// detachLinks removes RimArcho's links (_Archo_ and pack links) from every game Mods/
-// folder inside dir and returns them so they can be made again.
-func (a *App) detachLinks(dir string) ([]detachedLink, error) {
-	es, err := a.Store.Envs()
-	if err != nil {
-		return nil, err
-	}
-	var out []detachedLink
-	for _, e := range es {
-		if e.GameRoot == "" || !source.Within(e.GameRoot, dir) {
-			continue
-		}
-		mods := filepath.Join(e.GameRoot, "Mods")
-		ents, err := os.ReadDir(mods)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return out, err
-		}
-		for _, ent := range ents {
-			link := filepath.Join(mods, ent.Name())
-			if !managedLink(ent.Name()) && !packLink(ent.Name()) || !source.IsLink(link) {
-				continue
-			}
-			target, err := os.Readlink(link)
-			if err != nil {
-				return out, fmt.Errorf("reading managed link %s: %w", link, err)
-			}
-			if !filepath.IsAbs(target) {
-				target = filepath.Join(mods, target)
-			}
-			if err := source.RemoveLink(link); err != nil {
-				return out, err
-			}
-			out = append(out, detachedLink{link, target})
-		}
-	}
-	return out, nil
-}
-
-// reattachLinks makes detached links again with from rebased onto to, both where each
-// link lives and, when it pointed inside from, its target.
-func reattachLinks(links []detachedLink, from, to string) error {
-	rebase := func(p string) string {
-		if !source.Within(p, from) {
-			return p
-		}
-		rel, err := filepath.Rel(from, p)
-		if err != nil {
-			return p
-		}
-		return filepath.Join(to, rel)
-	}
-	var first error
-	for _, l := range links {
-		if err := CreateLink(rebase(l.path), rebase(l.target)); err != nil && first == nil {
-			first = fmt.Errorf("making link %s again: %w", rebase(l.path), err)
-		}
-	}
-	return first
-}
-
-// relocateDirectoryLinks repairs only RimArcho-owned links, including dangling
-// junctions. os.Readlink reads the saved target without requiring it to exist.
-func (a *App) relocateDirectoryLinks(old, root string) error {
-	old, root = directoryReal(old), directoryReal(root)
-	if env.PathKey(old) == env.PathKey(root) {
-		return nil
-	}
-	es, err := a.Store.Envs()
-	if err != nil {
-		return err
-	}
-	for _, e := range es {
-		mods := filepath.Join(e.GameRoot, "Mods")
-		ents, err := os.ReadDir(mods)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		for _, ent := range ents {
-			if !managedLink(ent.Name()) && !packLink(ent.Name()) {
-				continue
-			}
-			link := filepath.Join(mods, ent.Name())
-			if !source.IsLink(link) {
-				continue
-			}
-			target, err := os.Readlink(link)
-			if err != nil {
-				return fmt.Errorf("reading managed link %s: %w", link, err)
-			}
-			if !filepath.IsAbs(target) {
-				target = filepath.Join(mods, target)
-			}
-			if !source.Within(target, old) {
-				continue
-			}
-			rel, err := filepath.Rel(old, target)
-			if err != nil {
-				return err
-			}
-			to := filepath.Join(root, rel)
-			if err := source.RemoveLink(link); err != nil {
-				return err
-			}
-			if err := CreateLink(link, to); err != nil {
-				_ = CreateLink(link, target)
-				return fmt.Errorf("repairing managed link %s: %w", link, err)
-			}
-		}
-	}
-	return nil
 }
 
 // managedRootReady prevents a previously used managed root from silently being

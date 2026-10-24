@@ -396,7 +396,7 @@ func libraryMoveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	plans := "none"
 	if len(r.Plans) > 0 {
-		plans = strings.Join(r.Plans, ", ") + " keep it: the same instance, linked into Mods/ (_Archo_) on save or launch"
+		plans = strings.Join(r.Plans, ", ") + " keep it: the same instance; affected game links are restored during the move"
 	}
 	root.KV("plans", plans)
 	switch {

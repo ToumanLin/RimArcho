@@ -116,6 +116,9 @@ func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 		}
 		for _, it := range s.Items {
 			u := UnItem{Path: it.Path, To: it.To, Name: it.Name, Verb: T(unVerbs[it.Do]), Note: unNote(it.Note), Done: it.Done, Err: it.Err, Later: ran && it.Do == app.DoLater}
+			if lines := it.Links.Lines(); len(lines) > 0 {
+				u.Note += "\n" + strings.Join(lines, "\n")
+			}
 			if it.Bytes > 0 {
 				u.Size = render.Size(it.Bytes)
 			}

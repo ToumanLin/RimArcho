@@ -37,11 +37,17 @@ func linkNeeds(a *app.App, links []*app.GameLink) []Need {
 		if include != "" {
 			label = Tf("include unproven link: %s", include)
 		}
-		return Action{Kind: ActRepairLinks, Key: "R", Label: label, Refs: []string{a.RememberLinkRepair(plan)}, Confirm: T("press R again to remove the previewed links"), Warn: strings.Join(preview, "\n\n"), Lines: preview, Done: T("removed the previewed links")}
+		for _, l := range issues {
+			if l.Code == app.CodeLinkRecovery {
+				label = T("repair the previewed links")
+				break
+			}
+		}
+		return Action{Kind: ActRepairLinks, Key: "R", Label: label, Refs: []string{a.RememberLinkRepair(plan)}, Confirm: T("press R again to apply the previewed link repair"), Warn: strings.Join(preview, "\n\n"), Lines: preview, Done: T("applied the previewed link repair")}
 	}
 	owned := false
 	for _, l := range issues {
-		if l.Action == "remove link" {
+		if l.Action == "remove link" || l.Action == "recover link" || l.Action == "complete recovery" {
 			owned = true
 		}
 	}

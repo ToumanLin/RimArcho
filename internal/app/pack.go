@@ -914,7 +914,7 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	if err := a.checkRoots(mods); err != nil {
 		return nil, err
 	}
-	if err := applyLinks(mods, r.Links); err != nil {
+	if err := a.applyLinks(mods, r.Links); err != nil {
 		return nil, err
 	}
 	// First run: the pack starts with the environment's settings (not its mod list).
@@ -1090,19 +1090,11 @@ func (a *App) RemovePack(name string, dryRun bool) (string, error) {
 		return "", err
 	}
 	dir := a.packPath(name)
+	if _, err := a.PlanIncomingLinks(dir, ""); err != nil {
+		return "", err
+	}
 	if dryRun {
 		return dir, nil
-	}
-	if ix, err := a.Index(); err == nil {
-		mods := modsDir(ix)
-		ents, _ := os.ReadDir(mods)
-		for _, de := range ents {
-			if strings.HasPrefix(strings.ToLower(de.Name()), strings.ToLower(packLinkName(name, ""))) && source.IsLink(filepath.Join(mods, de.Name())) {
-				if err := source.RemoveLink(filepath.Join(mods, de.Name())); err != nil {
-					return "", err
-				}
-			}
-		}
 	}
 	return dir, a.ToTrash(dir)
 }

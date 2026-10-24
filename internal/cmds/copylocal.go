@@ -124,6 +124,9 @@ func pinPlanText(ix *app.Index, res *app.PinResult) string {
 
 // moveKVs describes moving a copy out of Mods/ into the lock library.
 func moveKVs(ix *app.Index, n *render.Node, r *app.MoveResult) {
+	for _, line := range r.Links.Lines() {
+		n.KV("affected link", line)
+	}
 	n.KV("from", r.From)
 	n.KV("to", r.To)
 	how := "renamed (same volume)"

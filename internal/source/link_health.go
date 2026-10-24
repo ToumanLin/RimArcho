@@ -34,26 +34,31 @@ func ReadLink(path string) (*LinkInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	l := &LinkInfo{Path: p, State: TargetUnknown}
+	l := &LinkInfo{Path: p, Kind: "unknown", State: TargetUnknown}
+	unknown := func(err error) (*LinkInfo, error) {
+		l.Reason = err.Error()
+		return l, nil
+	}
 	l.physicalParent, err = RealPath(filepath.Dir(p))
 	if err != nil {
-		return nil, err
+		return unknown(err)
 	}
 	l.parent, err = os.Stat(l.physicalParent)
 	if err != nil {
-		return nil, err
+		return unknown(err)
 	}
 	l.entry, err = os.Lstat(p)
 	if err != nil {
-		return nil, err
+		return unknown(err)
 	}
 	// Windows FileInfo may load its file ID lazily. Freeze both IDs now, while
 	// taking the preview, so a later SameFile cannot inspect the replacement.
 	if !os.SameFile(l.parent, l.parent) || !os.SameFile(l.entry, l.entry) {
-		return nil, fmt.Errorf("cannot read link or parent identity: %s", p)
+		return unknown(fmt.Errorf("cannot read link or parent identity: %s", p))
 	}
 	l.Kind, l.RawTarget, err = rawLink(p)
 	if err != nil {
+		l.Kind = "unknown"
 		l.Reason = err.Error()
 		return l, nil
 	}
@@ -138,7 +143,7 @@ func RemoveLinkChecked(l *LinkInfo) error { return removeLinkChecked(l) }
 func VerifyLink(l *LinkInfo) error { return l.verify() }
 
 func SameLink(a, b *LinkInfo) bool {
-	return a != nil && b != nil && a.Kind == b.Kind && a.RawTarget == b.RawTarget && a.physicalParent == b.physicalParent && os.SameFile(a.parent, b.parent) && os.SameFile(a.entry, b.entry)
+	return a != nil && b != nil && a.parent != nil && b.parent != nil && a.entry != nil && b.entry != nil && a.Kind == b.Kind && a.RawTarget == b.RawTarget && a.physicalParent == b.physicalParent && os.SameFile(a.parent, b.parent) && os.SameFile(a.entry, b.entry)
 }
 
 // CheckModsLinks is the low-level test runner's read-only preflight. Application

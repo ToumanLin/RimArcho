@@ -170,5 +170,5 @@ func (a *App) UnlinkPacks(dryRun bool) (*PackLinksLeft, error) {
 	if err := a.checkRoots(mods); err != nil {
 		return nil, err
 	}
-	return r, applyLinks(mods, r.Links)
+	return r, a.applyLinks(mods, r.Links)
 }

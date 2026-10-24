@@ -489,22 +489,24 @@ library: 4 of 5 mods match (used:none)
 
 > manage_library {"action":"move_to_locked","dry_run":true,"refs":["#iqmu"]}
 #iqmu A dry run, nothing changed: would move to the lock library
+  affected link: $ROOT/Steam/steamapps/common/RimWorld: $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_A Local -> ; create link -> $ROOT/LocalAppData/RimArcho/locked/A Local
   from: $ROOT/Steam/steamapps/common/RimWorld/Mods/A Local
   to: $ROOT/LocalAppData/RimArcho/locked/A Local
   how: renamed (same volume)
   marker: .rimarcho/origin.json would be written (the folder has none)
-  plans: plan:raid night, plan:default, plan:first, plan:from file keep it: the same instance, linked into Mods/ (_Archo_) on save or launch
+  plans: plan:raid night, plan:default, plan:first, plan:from file keep it: the same instance; affected game links are restored during the move
 next:
   archo library move-to-locked #iqmu
 
 > manage_library {"action":"move_to_locked","refs":["#iqmu"]}
 #iqmu A moved to the lock library
+  affected link: $ROOT/Steam/steamapps/common/RimWorld: $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_A Local -> ; create link -> $ROOT/LocalAppData/RimArcho/locked/A Local
   from: $ROOT/Steam/steamapps/common/RimWorld/Mods/A Local
   to: $ROOT/LocalAppData/RimArcho/locked/A Local
   how: renamed (same volume)
   now: #iqmu
   marker: .rimarcho/origin.json written (the folder had none)
-  plans: plan:raid night, plan:default, plan:first, plan:from file keep it: the same instance, linked into Mods/ (_Archo_) on save or launch
+  plans: plan:raid night, plan:default, plan:first, plan:from file keep it: the same instance; affected game links are restored during the move
 next:
   archo save
 

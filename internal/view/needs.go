@@ -366,7 +366,18 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		case app.CodePackLinks:
 			add(packLinksNeed(p))
 		case app.CodeModsDuplicate:
-			add(modsDuplicateNeed(st, p, ids))
+			n := modsDuplicateNeed(st, p, ids)
+			for i := range n.Actions {
+				act := &n.Actions[i]
+				if act.Kind == ActMoveLocked && len(act.Refs) > 0 {
+					if r, err := a.MoveToLocked(act.Refs[0], true); err == nil {
+						act.Warn += "\n" + strings.Join(r.Links.Lines(), "\n")
+					} else {
+						act.Warn += "\n" + err.Error()
+					}
+				}
+			}
+			add(n)
 		case "def.parent-missing":
 			merge("def|"+x, nm(x), "", Need{Group: GroupDeps, Text: Tf("part of %s builds on a definition no enabled mod provides; a dependency may be missing", nm(x)),
 				Actions: []Action{viewAction(T("see what"), "mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s,

@@ -377,7 +377,14 @@ func packRemoveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	if a.Bool("dry-run") {
-		d, _ := render.New("dry run: would move " + dir + " to the recycle bin")
+		d, root := render.New("dry run: would move " + dir + " to the recycle bin")
+		links, err := c.App.PlanIncomingLinks(dir, "")
+		if err != nil {
+			return nil, err
+		}
+		for _, line := range links.Lines() {
+			root.KV("affected link", line)
+		}
 		return d, nil
 	}
 	d, _ := render.New("moved " + dir + " to the recycle bin")

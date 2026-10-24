@@ -52,6 +52,9 @@ func workshopCmd(c *Ctx, a *Args, action string) (*render.Doc, error) {
 		if len(it.UsedBy) > 0 {
 			n.KV("warning", usedByWarning(it.UsedBy))
 		}
+		for _, line := range it.Links.Lines() {
+			n.KV("affected link", line)
+		}
 		if it.Result != "" {
 			n.KV("steam", it.Result+" · "+steamworks.StateText(it.State))
 		}

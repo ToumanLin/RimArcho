@@ -14,7 +14,7 @@ import (
 func init() {
 	register(&Command{Name: "folder check", Summary: "check all managed directories, including games, the lock library and packs", MaxArgs: 0, Run: folderCheck})
 	register(&Command{Name: "folder set", Args: "<directory-id> <dir>", Summary: "locate a directory you moved; keep its mods and lists", MinArgs: 2, MaxArgs: 2, Run: folderSet})
-	register(&Command{Name: "folder move", Args: "<directory-id> <dir>", Summary: "move a managed directory to a new location", MinArgs: 2, MaxArgs: 2, Run: folderMove})
+	register(&Command{Name: "folder move", Args: "<directory-id> <dir>", Summary: "move a managed directory to a new location", MinArgs: 2, MaxArgs: 2, Flags: []Flag{{Name: "dry-run", Help: "preview the move and affected links"}}, Run: folderMove})
 	register(&Command{Name: "folder list", Summary: "list the mod folders every environment shares (Workshop, SteamCMD, others)", MaxArgs: 0, Run: folderList})
 	register(&Command{Name: "folder add", Args: "workshop|steamcmd|extra <dir>", Summary: "add a shared mod folder (a second Workshop folder replaces the first)",
 		MinArgs: 2, MaxArgs: 2, Run: folderAdd})
@@ -47,6 +47,17 @@ func folderSet(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func folderMove(c *Ctx, a *Args) (*render.Doc, error) {
+	preview, err := c.App.PlanDirectoryMove(a.Pos[0], a.Pos[1])
+	if err != nil {
+		return nil, err
+	}
+	if a.Bool("dry-run") {
+		d, root := render.New("directory move preview: " + a.Pos[1])
+		for _, line := range preview.Lines() {
+			root.KV("affected link", line)
+		}
+		return d, nil
+	}
 	copied, err := c.App.MoveDirectory(a.Pos[0], a.Pos[1])
 	if err != nil {
 		return nil, err

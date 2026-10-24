@@ -11,8 +11,8 @@ import (
 func init() {
 	common := []Flag{{Name: "all", Help: "inspect every known game"}, {Name: "json", Help: "print structured JSON"}}
 	register(&Command{Name: "links check", Summary: "check RimArcho links without changing files", MaxArgs: 0, Flags: common, Run: linksCheck})
-	flags := append(append([]Flag{}, common...), Flag{Name: "dry-run", Help: "preview without changing files"}, Flag{Name: "yes", Help: "confirm removing the listed owned links"}, Flag{Name: "include", Value: "<link-path>", Multi: true, Help: "explicitly include an unproven prefixed link after reviewing its evidence"})
-	register(&Command{Name: "links repair", Summary: "preview or confirm removing broken or wrong RimArcho links", MaxArgs: 0, Flags: flags, Run: linksRepair})
+	flags := append(append([]Flag{}, common...), Flag{Name: "dry-run", Help: "preview without changing files"}, Flag{Name: "yes", Help: "confirm the listed link removals and ledger recovery"}, Flag{Name: "include", Value: "<link-path>", Multi: true, Help: "explicitly include an unproven prefixed link after reviewing its evidence"})
+	register(&Command{Name: "links repair", Summary: "preview or confirm link repair and unfinished-operation recovery", MaxArgs: 0, Flags: flags, Run: linksRepair})
 }
 
 func linksCheck(c *Ctx, args *Args) (*render.Doc, error) {
@@ -21,7 +21,7 @@ func linksCheck(c *Ctx, args *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	for _, l := range p.Links {
-		if l.Code == app.CodeLinkDangling || l.Code == app.CodeLinkUnknown {
+		if l.Code == app.CodeLinkDangling || l.Code == app.CodeLinkUnknown || l.Code == app.CodeLinkRecovery {
 			c.ExitCode = ExitError
 		}
 	}
@@ -64,6 +64,8 @@ func linksDoc(p *app.LinkRepairPlan, asJSON bool, title string) (*render.Doc, er
 		n.KV("evidence", l.Evidence)
 		n.KV("action", l.Action)
 	}
-	root.KV("removed", fmt.Sprint(len(p.Removed)))
+	if title != "links check" {
+		root.KV("removed", fmt.Sprint(len(p.Removed)))
+	}
 	return d, nil
 }
