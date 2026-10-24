@@ -1,6 +1,6 @@
 // Plans in the window (04 §1.3, 06 §2.1, §2.5): each plan is a sidebar entry whose page is
 // its editor. Opening one switches the current plan (no game file is written); new (empty,
-// a copy, a version, an import), rename and delete are dialogs. Every verb is a view
+// a copy, a version, an import) opens management; delete asks for confirmation. Every verb is a view
 // call through the API (view.NewPlan, UsePlan, RenamePlan, RemovePlan, ImportAsPlan).
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import * as pop from "./popups.js";
@@ -68,56 +68,8 @@ function nameField(box, value, self) {
   return { inp, check, bad: () => why.textContent !== "" };
 }
 
-// newPlan: the new-plan dialog (04 §1.3): a name and where the list comes from.
-export async function newPlan(from = "", after = null) {
-  let froms, nm;
-  try { [froms, nm] = await Promise.all([api.PlanFroms(), api.CheckPlanName("", "", 0)]); } catch (e) { return say("fail", errText(e)); }
-  const opts = froms.concat([{ from: "import", label: T("from an import: a file, a share code, a link…") }]);
-  let sel = Math.max(0, opts.findIndex((o) => o.from === from));
-  pop.open("plan-new", T("new list"), (box, p) => {
-    box.classList.add("plan-pop");
-    box.append(el("div", "ttl", T("new list")));
-    const f = nameField(box, nm.free, 0);
-    box.append(el("div", "label", T("start from")));
-    const list = el("div", "opts plan-from");
-    box.append(list);
-    const draw = () => {
-      list.innerHTML = "";
-      opts.forEach((o, i) => {
-        const d = el("div", "opt" + (i === sel ? " on" : ""), o.label);
-        d.onclick = () => { sel = i; draw(); f.inp.focus(); };
-        d.ondblclick = go;
-        list.append(d);
-      });
-      const on = list.children[sel];
-      if (on) on.scrollIntoView({ block: "nearest" });
-    };
-    const btns = el("div", "btns");
-    const no = el("button", "", T("cancel") + "  esc");
-    no.onclick = pop.close;
-    const yes = el("button", "go", T("create") + "  enter");
-    yes.onclick = () => go();
-    btns.append(no, yes);
-    box.append(btns, el("div", "plan-note", T("the game's list stays as it is until you write or launch")));
-    async function go() {
-      const o = opts[sel];
-      if (o.from === "import") {
-        // the import popup reads and previews the list; "as a new list" applies it
-        pop.close();
-        return ui.cmd("import");
-      }
-      await f.check();
-      if (f.bad()) return f.inp.focus();
-      done(api.NewPlan(f.inp.value, o.from), after);
-    }
-    p.keys = (e) => {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); sel = Math.max(0, Math.min(opts.length - 1, sel + (e.key === "ArrowDown" ? 1 : -1))); draw(); return true; }
-      if (e.key === "Enter") { e.preventDefault(); go(); return true; }
-      return false; // typing goes to the name
-    };
-    draw();
-  });
-}
+// New lists live in the management page's right column (06 §2.17).
+export function newPlan(from = "current") { pop.close(); return ui.newList(from); }
 
 // renamePlan: the rename dialog; the history stays.
 export function renamePlan(id, after = null) {
@@ -131,11 +83,12 @@ export function renamePlan(id, after = null) {
     const no = el("button", "", T("cancel") + "  esc");
     no.onclick = pop.close;
     const yes = el("button", "go", T("rename") + "  enter");
+    yes.dataset.envWrite = "rename-plan";
     const go = async () => { await f.check(); if (f.bad()) return f.inp.focus(); done(api.RenamePlan(id, f.inp.value), after); };
     yes.onclick = go;
     btns.append(no, yes);
     box.append(btns);
-    p.keys = (e) => { if (e.key === "Enter") { e.preventDefault(); go(); return true; } return false; };
+    p.keys = (e) => { if (e.key === "Enter") { e.preventDefault(); yes.click(); return true; } return false; };
   });
 }
 
@@ -153,10 +106,10 @@ export function actions(id) {
   if (!p) return [];
   const out = [];
   if (!p.current) out.push({ label: T("open"), run: () => ui.go(p.page) });
-  out.push({ label: T("rename…"), run: () => renamePlan(id) });
-  if (p.current) out.push({ label: T("copy as a new list…"), run: () => newPlan("current") });
-  out.push({ label: T("new list…"), run: () => newPlan() });
-  out.push({ label: T("delete…"), run: () => deletePlan(id) });
+  out.push({ label: T("rename…"), envWrite: "rename-plan", run: () => renamePlan(id) });
+  if (p.current) out.push({ label: T("copy as a new list…"), envWrite: "new-plan", run: () => newPlan("current") });
+  out.push({ label: T("new list…"), envWrite: "new-plan", run: () => newPlan() });
+  out.push({ label: T("delete…"), envWrite: "remove-plan", run: () => deletePlan(id) });
   return out;
 }
 
@@ -164,7 +117,7 @@ export function actions(id) {
 export function chooser() {
   const ps = (S.shell && S.shell.plans) || [];
   const cur = current();
-  const labels = ps.map((p) => p.name + (p.current ? "  · " + T("editing") : "") + (p.conflict ? "  · " + p.conflictText : ""));
+  const labels = ps.map((p) => p.name + (p.current ? "  " + T("editing") : "") + (p.conflict ? "  " + p.conflictText : ""));
   const runs = ps.map((p) => () => ui.go(p.page));
   const extra = [[T("new list…"), () => newPlan()]];
   if (cur) extra.push([Tf("rename %s…", cur.name), () => renamePlan(cur.id)], [Tf("delete %s…", cur.name), () => deletePlan(cur.id)]);

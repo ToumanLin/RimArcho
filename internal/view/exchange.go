@@ -169,6 +169,7 @@ type ImportPreview struct {
 	Replace   ImportEffect `json:"replace"`
 	Merge     ImportEffect `json:"merge"`
 	Summary   string       `json:"summary"`
+	Allowed   string       `json:"allowed"`
 	// Collection: the list is a Steam Workshop collection the list can follow (04 §9.6).
 	Collection bool `json:"collection,omitempty"`
 }
@@ -176,9 +177,27 @@ type ImportPreview struct {
 // PreviewImport compares an imported list with the installed mods and the workspace;
 // it changes nothing.
 func PreviewImport(a *app.App, imp *Import) (*ImportPreview, error) {
+	return PreviewImportFor(a, imp, 0)
+}
+
+// PreviewImportFor compares with the explicit management selection without switching it (06 §2.17).
+func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
+	}
+	if id != 0 && id != st.Plan.ID {
+		plan, e := a.Store.PlanByID(id)
+		if e != nil {
+			return nil, e
+		}
+		if plan == nil || plan.EnvID != st.Ix.Env.ID {
+			return nil, errors.New(T("that list is gone"))
+		}
+		st, err = a.PlanState(st, plan)
+		if err != nil {
+			return nil, err
+		}
 	}
 	il := imp.List
 	p := &ImportPreview{Format: FormatName(il.Format), Source: imp.Source, Name: il.Title, Game: il.Game, Installed: []ImportRow{}, Missing: []ImportRow{}, Collection: imp.Collection != nil}
@@ -186,6 +205,20 @@ func PreviewImport(a *app.App, imp *Import) (*ImportPreview, error) {
 		p.GameNote = Tf("the list is for RimWorld %s, this game runs %s", majorMinor(il.Game), mm)
 	}
 	list, unresolved := app.ImportedEntries(st, il)
+	// The suggested versions use the imported content and its declared versions (06 §2.17).
+	suggested := *st
+	suggested.List = list
+	plan := *st.Plan
+	plan.Versions = il.Versions
+	if il.Game != "" {
+		plan.CreatedGame = il.Game
+	} else {
+		plan.CreatedGame = st.GameMM()
+	}
+	suggested.Plan = &plan
+	if versions, e := a.PlanVersionsOf(&suggested, &plan); e == nil {
+		p.Allowed = app.FormatVersions(versions.Allowed)
+	}
 	p.Total = len(list) + len(unresolved)
 	for _, e := range list {
 		if e.Instance != "" {
@@ -227,7 +260,7 @@ func PreviewImport(a *app.App, imp *Import) (*ImportPreview, error) {
 	p.Merge = effect(st, app.MergedEntries(st, il))
 	p.Summary = Tf("%s: %d mods, %d installed, %d not installed", p.Format, p.Total, len(p.Installed), len(p.Missing))
 	if p.Other > 0 {
-		p.Summary += " · " + Tf("%d in another version", p.Other)
+		p.Summary += "  " + Tf("%d in another version", p.Other)
 	}
 	return p, nil
 }
@@ -286,7 +319,7 @@ func effect(st *app.LoadoutState, after loadout.List) ImportEffect {
 			parts = append(parts, Tf(x.f, x.n))
 		}
 	}
-	e.Text = Tf("%s · %d enabled after it", strings.Join(parts, ", "), e.Count)
+	e.Text = Tf("%s  %d enabled after it", strings.Join(parts, ", "), e.Count)
 	return e
 }
 
@@ -351,9 +384,9 @@ func ApplyImport(a *app.App, imp *Import, merge bool) (string, error) {
 		}
 	}
 	if merge {
-		return Tf("added %s from %s · not written to the game yet, u undoes", Plural(e.Added, "mod"), imp.Source), nil
+		return Tf("added %s from %s, not written to the game yet, u undoes", Plural(e.Added, "mod"), imp.Source), nil
 	}
-	return Tf("imported %s: %d added, %d removed, %d moved · not written to the game yet, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved), nil
+	return Tf("imported %s: %d added, %d removed, %d moved, not written to the game yet, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved), nil
 }
 
 // FollowImported makes a list follow the collection an import read (no network: the

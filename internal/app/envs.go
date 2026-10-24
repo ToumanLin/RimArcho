@@ -569,6 +569,16 @@ func (a *App) EnvRebind(e *env.Environment, label string, yes bool) (*source.Sou
 
 // EnvUse prepares missing Mods/ links before selecting the current environment.
 func (a *App) EnvUse(name string) (*env.Environment, error) {
+	e, err := a.PrepareEnv(name)
+	if err != nil {
+		return nil, err
+	}
+	return e, a.Store.SetCurrentEnv(e.ID)
+}
+
+// PrepareEnv prepares links and scans without selecting the game (06 §3.1).
+// GUI workers select it only after checking that their request is still current.
+func (a *App) PrepareEnv(name string) (*env.Environment, error) {
 	e, err := a.Store.EnvByName(name)
 	if err != nil {
 		return nil, err
@@ -579,5 +589,5 @@ func (a *App) EnvUse(name string) (*env.Environment, error) {
 	if err := a.prepareEnvLinks(e); err != nil {
 		return nil, err
 	}
-	return e, a.Store.SetCurrentEnv(e.ID)
+	return e, nil
 }

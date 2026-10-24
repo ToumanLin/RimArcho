@@ -1,10 +1,12 @@
 package gui
 
 import (
+	"context"
 	"errors"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
@@ -12,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 贴图优化 (08 §5.2, 06 §2.14): its page, and the runs of Mod 库存's 优化贴图. A run takes
+// 贴图优化 (08 §5.2, 06 §2.13): its page, and the runs of Mod 库存's 优化贴图. A run takes
 // minutes, so it is an `archo textures optimize` child, like a scan: the window keeps
 // working, and "textures" events carry its progress (TextureEvent) and its end.
 
@@ -28,47 +30,117 @@ type TextureEvent struct {
 // TexturePage is the page with the run going on, if any.
 type TexturePage struct {
 	*view.TexturePage
+	Request uint64        `json:"request"`
+	Error   string        `json:"error,omitempty"`
 	Running *TextureEvent `json:"running,omitempty"`
 }
 
-// Textures is the 贴图优化 page: scope "plan" or "all", scale a percent (100: full size).
+type textureMeasurement struct {
+	mu      sync.Mutex
+	request uint64
+	page    *view.TexturePage
+	err     string
+}
+
+// Textures returns choices immediately; disk reads run in the background (06 §3.1).
 func (s *API) Textures(scope string, scale int) (*TexturePage, error) {
-	defer s.free.soon()
-	ctx, cancel := s.beginTextureRead()
-	defer cancel()
-	s.texRead.mu.Lock()
-	defer s.texRead.mu.Unlock()
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if scope != app.TexAll {
 		scope = app.TexPlan
 	}
-	r, targets, err := s.textureSession(scope)
-	if err != nil {
-		return nil, err
+	m := &s.texMeasure
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ctx, cancel := s.beginTextureRead()
+	m.request++
+	m.page, m.err = view.TexturePageLoading(scope, scale), ""
+	request := m.request
+	go func() {
+		defer cancel()
+		s.measureTextures(ctx, request, scope, scale)
+	}()
+	return s.textureSnapshot(), nil
+}
+
+// TextureMeasure polls only the current request; previous options have no result (06 §3.1).
+func (s *API) TextureMeasure(request uint64) *TexturePage {
+	s.texMeasure.mu.Lock()
+	defer s.texMeasure.mu.Unlock()
+	if request != s.texMeasure.request || s.texMeasure.page == nil {
+		return nil
 	}
-	report, err := r.TextureSummaryTargets(ctx, targets, textures.Options{Scale: scale})
-	if err != nil {
-		return nil, err
-	}
-	out := &TexturePage{TexturePage: view.TexturePageReport(r, report, scope)}
+	return s.textureSnapshot()
+}
+
+// textureSnapshot copies mutable rows with texMeasure.mu held.
+func (s *API) textureSnapshot() *TexturePage {
+	m := &s.texMeasure
+	p := *m.page
+	p.Rows = append([]view.TextureRow(nil), p.Rows...)
+	out := &TexturePage{TexturePage: &p, Request: m.request, Error: m.err}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.busy["textures"] {
 		ev := s.texLast
 		out.Running = &ev
 	}
-	return out, nil
+	return out
+}
+
+// publishTextureMeasure also guards the final write after a cancelled disk read (06 §3.1).
+func (s *API) publishTextureMeasure(ctx context.Context, request uint64, update func(*textureMeasurement)) {
+	m := &s.texMeasure
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if ctx.Err() == nil && request == m.request {
+		update(m)
+	}
+}
+
+func (s *API) measureTextures(ctx context.Context, request uint64, scope string, scale int) {
+	defer s.free.soon()
+	s.texRead.mu.Lock()
+	defer s.texRead.mu.Unlock()
+	if ctx.Err() != nil {
+		return
+	}
+	fail := func(err error) {
+		s.publishTextureMeasure(ctx, request, func(m *textureMeasurement) {
+			m.page.Loading, m.err = false, view.Humanize(nil, err.Error())
+		})
+	}
+	r, targets, err := s.textureSession(scope)
+	if err != nil {
+		fail(err)
+		return
+	}
+	rows := make([]view.TextureRow, 0, len(targets))
+	index := make(map[string]int, len(targets))
+	for _, target := range targets {
+		index[target.Ref] = len(rows)
+		rows = append(rows, view.TextureRow{Ref: target.Ref, Name: target.Mod.DisplayName(), Pending: true})
+	}
+	s.publishTextureMeasure(ctx, request, func(m *textureMeasurement) {
+		m.page.Mods, m.page.Rows = len(targets), rows
+	})
+	report, err := r.TextureSummaryProgress(ctx, targets, textures.Options{Scale: scale}, func(mod *app.TextureMod) {
+		row := view.TextureRowOf(mod)
+		s.publishTextureMeasure(ctx, request, func(m *textureMeasurement) {
+			m.page.Rows[index[mod.Ref]] = row
+		})
+	})
+	if err != nil {
+		fail(err)
+		return
+	}
+	p := view.TexturePageReport(r, report, scope)
+	s.publishTextureMeasure(ctx, request, func(m *textureMeasurement) { m.page = p })
 }
 
 // TexturesInstall downloads todds; the page asked the player first (source, size, folder).
 func (s *API) TexturesInstall() (string, error) {
-	// not under the lock: a slow download must not hold the other pages
-	if _, err := s.a.InstallTodds(); err != nil {
-		return "", err
-	}
-	return view.T("todds (the DDS encoder) is downloaded"), nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return settingQueued(s.queueSettingTaskLocked(view.TaskTodds, nil, "")), nil
 }
 
 // TexturesRun starts converting: the mods refs (Mod 库存's selection), else scope "plan" or
@@ -112,7 +184,7 @@ func (s *API) TexturesRun(scope string, scale int, refs []string) (string, error
 	}
 	task := s.beginSelf(view.TaskTextures, obj, func() error { _, err := s.TexturesStop(); return err })
 	go s.watchTextures(task, args, run)
-	return view.T("converting textures") + " · " + view.T("it goes on in the background"), nil
+	return view.T("converting textures") + "  " + view.T("it goes on in the background"), nil
 }
 
 var (
@@ -174,7 +246,7 @@ func textureDoneText(lines []string) string {
 		}
 	}
 	if failed > 0 {
-		out += view.Tf(" · %d failed (they keep their PNG)", failed)
+		out += view.Tf(", %d failed (they keep their PNG)", failed)
 	}
 	return out
 }

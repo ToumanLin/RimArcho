@@ -27,8 +27,8 @@ func TestG13NeedsSectionsTUI(t *testing.T) {
 				t.Fatalf("tab %d", m.tab)
 			}
 			s := ansi.Strip(m.View())
-			chip := ic.evDeclared + " " + T("declared by the mod") + " · About.xml modDependencies"
-			for _, want := range []string{T(view.SectionTitles[view.SectionBreak]) + " · 1", "Alpha should load after Harmony", chip} {
+			chip := ic.evDeclared + " " + T("declared by the mod") + "  About.xml modDependencies"
+			for _, want := range []string{T(view.SectionTitles[view.SectionBreak]) + "  1", "Alpha should load after Harmony", chip} {
 				if !strings.Contains(s, want) {
 					t.Fatalf("no %q:\n%s", want, s)
 				}
@@ -57,7 +57,7 @@ func TestNeedsSectionsLive(t *testing.T) {
 	m.Update(liveTick{})
 	press(m, "@")
 	s := ansi.Strip(m.View())
-	brk, run := strings.Index(s, T(view.SectionTitles[view.SectionBreak])), strings.Index(s, T(view.SectionTitles[view.SectionRun])+" · ")
+	brk, run := strings.Index(s, T(view.SectionTitles[view.SectionBreak])), strings.Index(s, T(view.SectionTitles[view.SectionRun])+"  ")
 	if brk < 0 || run < brk || !strings.Contains(s[run:], T("this run")) {
 		t.Fatalf("sections out of order:\n%s", s)
 	}

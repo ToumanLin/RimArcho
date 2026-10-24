@@ -95,12 +95,12 @@ func (m *model) libOp(code string, refs []string, what string) tea.Cmd {
 		m.say(sayFail, m.humanize(err.Error()))
 		return nil
 	}
-	pn := &panel{title: o.Label + " " + markDot + " " + what, lines: append([]string{}, p.Lines...)}
+	pn := &panel{title: o.Label + "  " + what, lines: append([]string{}, p.Lines...)}
 	if p.Apply {
-		pn.lines = append(pn.lines, "", Tf("enter: %s · esc: cancel", o.Label))
+		pn.lines = append(pn.lines, "", Tf("enter: %s, esc: cancel", o.Label))
 		pn.onEnter = func(m *model) tea.Cmd { return m.libDo(code, refs) }
 	} else {
-		pn.lines = append(pn.lines, "", T("this cannot be done now · esc goes back"))
+		pn.lines = append(pn.lines, "", T("this cannot be done now, esc goes back"))
 	}
 	m.panel = pn
 	return nil
@@ -187,7 +187,7 @@ func (m *model) goPage(n int) tea.Cmd {
 	m.full, m.insp, m.panel = false, nil, nil
 	switch n {
 	case 1:
-		m.say(sayInfo, T("the start page is in the window only · ctrl+k goes anywhere"))
+		m.say(sayInfo, T("the start page is in the window only, ctrl+k goes anywhere"))
 		return nil
 	case 2:
 		m.tab = tabProblems
@@ -220,7 +220,7 @@ func (m *model) subPage(d int) tea.Cmd {
 	case tabList:
 		rows, err := view.PlanRows(m.app)
 		if err != nil || len(rows) < 2 {
-			m.say(sayInfo, T("one list only · P makes another"))
+			m.say(sayInfo, T("one list only, P makes another"))
 			return nil
 		}
 		at := 0

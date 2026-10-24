@@ -634,7 +634,7 @@ func (m *model) libSortChooser() tea.Cmd {
 	for _, c := range l.page.Columns {
 		label := c.Title
 		if strings.TrimPrefix(l.sort, "-") == c.Key || l.sort == "" && c.Key == "name" {
-			label += "  " + markDot + " " + T("again reverses")
+			label += "  " + T("again reverses")
 			p.choice = len(p.choices)
 		}
 		p.choices = append(p.choices, label)
@@ -718,10 +718,10 @@ func (m *model) libraryLines(n int) []string {
 		count = Tf("%d of %d mods", p.Shown, p.Total)
 	}
 	if k := len(l.marked); k > 0 {
-		count += "  " + markDot + "  " + Tf("selected %d", k)
+		count += "  " + Tf("selected %d", k)
 	}
 	top := len(out)
-	table := []string{sDimS.Render(fit("2 "+count+"  "+markDot+"  "+p.Size, tw))}
+	table := []string{sDimS.Render(fit("2 "+count+"  "+p.Size, tw))}
 	rows := max(n-top-1, 1)
 	l.rowY = 2 + top + 1 // screen row of the first table row (0-based)
 	if len(l.flat) == 0 {
@@ -767,11 +767,8 @@ func (m *model) libRowLine(i, w, right int) string {
 	name := r.Name
 	sel := m.libRowSelected(i)
 	mark := "  "
-	switch {
-	case i == l.cursor && !l.detail:
+	if i == l.cursor && !l.detail {
 		mark = markSel + " "
-	case sel:
-		mark = "▌ "
 	}
 	switch {
 	case x.lone:
@@ -798,13 +795,14 @@ func (m *model) libRowLine(i, w, right int) string {
 		}
 	}
 	line := mark + fit(name, w-right-4) + "  " + fit(strings.Join(info, "  "), right)
+	st := plainStyle
 	switch {
 	case i == l.cursor:
-		return sSel.Render(line)
+		st = sSel
 	case sel:
-		return sAccent.Render(line)
+		st = sAccent
 	}
-	return line
+	return rowBackground(st, sel, i == l.cursor && !l.detail).Render(line)
 }
 
 // libDetailLines: the cursor's copy (06 §2.9): its note (RimArcho's grey first version
@@ -839,7 +837,7 @@ func (m *model) libDetailLines(w, n int) []string {
 		}
 	}
 	acts = append(acts, "F10 "+T("menu"))
-	for _, ln := range wrap(strings.Join(acts, "  ·  "), w-2) {
+	for _, ln := range wrap(strings.Join(acts, "  "), w-2) {
 		body = append(body, "  "+sSecond.Render(ln))
 	}
 	if len(i.States) > 0 {

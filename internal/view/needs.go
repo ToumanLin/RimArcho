@@ -155,9 +155,9 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		when := ShortDate(r.ModTime) + " " + r.ModTime.In(a.Loc).Format("15:04")
 		n.LastRunDay = ShortDate(r.ModTime)
 		if pack := a.RunOfLog(st.Ix.Env.ID, r.ModTime); pack != "" {
-			n.LastRun = Tf("pack %s", pack) + " · " + when
+			n.LastRun = Tf("pack %s", pack) + "  " + when
 		} else {
-			n.LastRun = T("the list") + " · " + when
+			n.LastRun = T("the list") + "  " + when
 		}
 		break
 	}
@@ -506,7 +506,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	}
 	for _, r := range ps.Logs {
 		if r.Stale() {
-			add(Need{Group: GroupLastRun, Text: Tf("earlier log · %s · %s", ShortDate(r.ModTime), r.MM), Dim: true,
+			add(Need{Group: GroupLastRun, Text: Tf("earlier log  %s  %s", ShortDate(r.ModTime), r.MM), Dim: true,
 				Actions: []Action{viewAction(T("see it"), "problems", "--code", "log", "--all")}})
 		}
 	}
@@ -738,7 +738,7 @@ func keepOne(st *app.LoadoutState, ids []string) Action {
 				off = append(off, st.Ix.Ref(other))
 			}
 		}
-		act.Options = append(act.Options, Option{Label: Tf("keep the one from %s", SourceText(mod)+" · "+mod.Rel), Refs: off, Done: T("kept one copy")})
+		act.Options = append(act.Options, Option{Label: Tf("keep the one from %s", SourceText(mod)+"  "+mod.Rel), Refs: off, Done: T("kept one copy")})
 	}
 	return act
 }
@@ -947,7 +947,7 @@ func EdgeWords(st *app.LoadoutState, t string) string {
 		s = Tf("%s wants to load after %s", x, y)
 	}
 	if sug {
-		s += "  ·  " + T("suggested to ignore (x)")
+		s += "  " + T("suggested to ignore (x)")
 	}
 	return s
 }

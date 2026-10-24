@@ -42,7 +42,7 @@ func PlacedText(ps []int) string {
 	if len(ps) > 1 {
 		where = fmt.Sprintf("%d–%d", ps[0], ps[len(ps)-1])
 	}
-	return Tf("placed at position %s · m changes it", where)
+	return Tf("placed at position %s, m changes it", where)
 }
 
 // NowAt: "Alpha is now number 3" / "3 mods are now at 3–5".

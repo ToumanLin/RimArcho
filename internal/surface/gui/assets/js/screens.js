@@ -2,20 +2,28 @@
 // game log (§2.10), Mod 库 › 变化 (§2.9), the full detail (§4.2), packs, the environment
 // and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
-import { S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
 import { icon } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
 import { bgSection } from "./bg.js";
 import { virtualRows } from "./virtualrows.js";
+import { on } from "./api.js";
+import { wireSeparator } from "./separator.js";
 
 let ui = null;
-export function initScreens(u) { ui = u; }
+export function initScreens(u) {
+  ui = u;
+  on("tasks", (ev) => {
+    if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
+  });
+}
 
 // fresh: the next page built is a new page (not a redraw of the one shown); only a new page
 // fades in, so a redraw after an action or a sub-view switch does not flicker.
 let fresh = false;
+const pageCache = new Map();
 
 // left tells Go the player left a page, which forgets what only that page used (07 §8.3).
 function left(next) {
@@ -29,13 +37,19 @@ export function openScreen(name) {
   fresh = S.screen !== name;
   if (fresh) S.screenSeq++;
   if (fresh) onArea = 0;
+  const previous = $("#screen");
+  if (fresh && S.screen && previous.children.length && !pageLoading()) {
+    pageCache.set(S.screen, { nodes: [...previous.childNodes], top: previous.scrollTop });
+  }
   left(name);
   S.screen = name;
   if (name !== "home") dropBackdrop();
   const sc = $("#screen");
   sc.hidden = false;
   sc.removeAttribute("aria-busy");
-  sc.innerHTML = "";
+  sc.replaceChildren();
+  const cached = S.busy.env && pageCache.get(name);
+  if (cached) { sc.append(...cached.nodes); sc.scrollTop = cached.top; }
   ui.renderWhere();
   ui.renderHints();
   return sc;
@@ -62,33 +76,57 @@ export const pageLoading = () => !!$("#screen .page-loading, #screen .page-read-
 // keep the visible content; a new page/subview shows a placeholder immediately.
 // keep: a page that is already drawn stays as it is while it reads, even when the game or
 // list changed (the launch page shows that change itself).
-export function beginPageRead(name, { replace = false, keep = false, label = "loading…" } = {}) {
+export function beginPageRead(name, { replace = false, keep = false, label = "loading…", retry } = {}) {
   const same = S.screen === name;
   const sc = same ? $("#screen") : openScreen(name);
   const n = (pageReads.get(name) || 0) + 1;
   pageReads.set(name, n);
-  const epoch = S.screenSeq, env = S.board?.env, plan = S.shell?.plan?.id;
+  const epoch = S.screenSeq, gameRequest = S.envSeq;
+  let env = S.board?.env, plan = S.shell?.plan?.id;
   const context = JSON.stringify([env, plan]);
   const changed = pageContexts.get(name) !== context;
   pageContexts.set(name, context);
-  const current = () => S.screen === name && S.screenSeq === epoch && S.board?.env === env && S.shell?.plan?.id === plan && pageReads.get(name) === n;
-  if ((!same || changed || replace || !sc.children.length) && !(keep && same && sc.children.length)) {
+  const current = () => S.envSeq === gameRequest && S.screen === name && S.screenSeq === epoch && S.board?.env === env && S.shell?.plan?.id === plan && pageReads.get(name) === n;
+  const editor = name === null, board = editor && $("#board");
+  // Old object controls cannot remain usable across a game/list switch (06 §8.2).
+  const objectPage = editor || name === "library";
+  const hasContent = sc.children.length || (editor && same && sc.hidden && S.board);
+  if ((!same || (changed && (!S.busy.env || objectPage)) || replace || !hasContent || sc.querySelector(".page-read-error")) && !((keep && same || S.busy.env && !objectPage) && hasContent && !pageLoading())) {
+    sc.hidden = false;
     sc.innerHTML = "";
-    const w = page(name, "");
+    const w = page(name || "plan", "");
     const card = el("section", "card pad page-loading");
     card.append(shimmer(T(label), 6));
     w.append(card); sc.append(w);
   }
   sc.setAttribute("aria-busy", "true");
+  if (board) board.inert = !sc.hidden;
+  if (editor && $("#planhead")) $("#planhead").inert = !sc.hidden;
+  if (editor && sc.hidden) say("busy", T(label));
   return {
     current,
-    finish() { if (current()) sc.removeAttribute("aria-busy"); },
+    // A workspace reply can itself change the current game/list (06 §8.2).
+    commit(apply) {
+      if (!current()) return false;
+      apply();
+      env = S.board?.env; plan = S.shell?.plan?.id;
+      pageContexts.set(name, JSON.stringify([env, plan]));
+      return true;
+    },
+    finish() {
+      if (!current()) return;
+      sc.removeAttribute("aria-busy");
+      if (editor && $("#status")?.textContent === T(label)) say("", "");
+    },
     fail(error) {
       if (!current()) return;
       sc.removeAttribute("aria-busy");
       const message = errText(error);
       const placeholder = sc.querySelector(".page-loading");
-      if (placeholder) { placeholder.className = "card pad err page-read-error"; placeholder.textContent = message; }
+      if (placeholder) {
+        placeholder.className = "card pad err page-read-error"; placeholder.textContent = message;
+        if (retry) placeholder.append(button(T("try again"), "", retry));
+      }
       say("fail", message);
     },
   };
@@ -110,7 +148,7 @@ export function page(cls, lead, ...right) {
   fresh = false;
   resetAreas();
   const head = el("div", "page-head");
-  if (lead) head.append(el("p", "lead", lead));
+  if (lead) head.append(el("p", "lead word-facts", lead));
   const acts = [];
   for (const r of right) {
     if (!r) continue;
@@ -162,16 +200,17 @@ export function areaKey(e) {
   return true;
 }
 
-export function button(label, keyName, run, cls = "") {
+export function button(label, keyName, run, cls = "", envWrite = "") {
   const b = el("button", "btn " + cls, label);
+  if (envWrite) b.dataset.envWrite = envWrite;
   if (keyName) b.append(el("kbd", "", keyName));
   b.onclick = (e) => { e.stopPropagation(); run(); };
   return b;
 }
 
 // act is a page action with an icon (the top bar's quiet buttons, 06 §2.2).
-export function act(label, ic, run, keyName) {
-  const b = button(label, keyName, run);
+export function act(label, ic, run, keyName, envWrite = "") {
+  const b = button(label, keyName, run, "", envWrite);
   const i = el("span", "ic");
   i.innerHTML = icon[ic] || "";
   b.prepend(i);
@@ -184,7 +223,7 @@ export function seg(names, on, pick, keys) {
   const s = el("div", "seg sub");
   s.append(el("span", "thumb"));
   names.forEach((n, i) => {
-    const b = el("button", i === on ? "on" : "", n);
+    const b = el("button", i === on ? "on word-facts" : "word-facts", n);
     if (keys) b.title = keys[i];
     b.onclick = () => pick(i);
     s.append(b);
@@ -258,7 +297,7 @@ function needsLead(d) {
   const plan = (S.shell && S.shell.plan && S.shell.plan.name) || T("the list");
   const breaks = N.items.filter((x) => x.counted && x.section === 0).length;
   const count = N.items.filter((x) => x.counted).length;
-  if (breaks) return Tf("%s is not safe to play yet: fix the %d problems below; every step can be undone.", plan, breaks);
+  if (breaks) return Tf("%s is not safe to play yet: fix the %d problems below.", plan, breaks);
   if (count) return Tf("%s can run; %d things below are worth a look.", plan, count);
   if (d.never) return Tf("%s: the mods' files are not checked yet.", plan);
   return Tf("%s can run: nothing to handle.", plan);
@@ -275,7 +314,7 @@ function drawNeeds() {
   else if (d.stale) state = T("the files changed since the last check");
   const w = page("needs", needsLead(d),
     state ? el("span", "state-note", state) : null,
-    act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A"),
+    act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A", "analyze"),
     act(T("game log"), "log", () => ui.go("log"), "l"));
   N.els = [];
   if (!N.items.length) {
@@ -292,12 +331,13 @@ function drawNeeds() {
     area(sec, h, () => { N.cur = first; markNeeds(); });
     if (n) {
       const c = el("span", "n num", String(n));
-      h.append(el("span", "", " · "), c);
+      h.classList.add("word-facts");
+      h.append(c);
       bump("needs:" + si, c, n);
     }
     // which run the log is from: the list, or a pack (08 §5.3)
-    if (si === 1 && S.live && S.live.running) h.append(el("span", "muted", " · " + (S.live.pack ? Tf("pack %s", S.live.pack) : T("this run"))));
-    else if (si === 1 && d.lastRun) h.append(el("span", "muted", " · " + d.lastRun));
+    if (si === 1 && S.live && S.live.running) h.append(el("span", "muted", (S.live.pack ? Tf("pack %s", S.live.pack) : T("this run"))));
+    else if (si === 1 && d.lastRun) h.append(el("span", "muted word-facts", d.lastRun));
     sec.append(h);
     const card = el("div", "card need-list");
     for (const it of its) {
@@ -319,10 +359,10 @@ function needCard(it, i) {
   const top = el("div", "top");
   const body = el("div", "body");
   if (it.dim) {
-    body.append(el("div", "why", it.text));
+    body.append(el("div", "why word-facts", it.text));
     if (it.why) body.append(el("div", "why sub", it.why));
   } else {
-    body.append(el("div", "title", it.title || it.text));
+    body.append(el("div", "title word-facts", it.title || it.text));
     if (it.why) body.append(el("div", "why", it.why));
   }
   top.append(body);
@@ -331,14 +371,14 @@ function needCard(it, i) {
   if (archo.ask && it.section === 1) right.append(button(T("ask Archo"), "", () => archo.ask(it), "small"));
   if (acts.length) {
     const a = acts[0];
-    right.append(button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, it.dim ? "" : "primary"));
+    right.append(button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, it.dim ? "" : "primary", actionWrite(a)));
     if (acts.length > 1) {
       const more = button("⋯", "", () => {
         N.cur = i; markNeeds();
         const r = more.getBoundingClientRect();
-        pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, key: x.key, run: () => runAction(it, x) })));
+        pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, key: x.key, envWrite: actionWrite(x), run: () => runAction(it, x) })));
       }, "more");
-      more.title = acts.slice(1).map((x) => x.label).join(" · ");
+      more.title = acts.slice(1).map((x) => x.label).join(T("; "));
       right.append(more);
     }
   }
@@ -346,7 +386,7 @@ function needCard(it, i) {
   row.append(top);
   if (it.fold && N.open.has(it.text)) {
     const parts = el("div", "parts");
-    for (const p of it.parts || []) parts.append(el("div", "", "· " + p));
+    for (const p of it.parts || []) parts.append(el("div", "", ", " + p));
     row.append(parts);
   }
   if (it.evidence) {
@@ -365,6 +405,9 @@ function markNeeds() {
   const on = N.els[N.cur];
   if (on) on.scrollIntoView({ block: "nearest" });
 }
+
+// Read-only needs actions stay available during a game switch (06 §3.1).
+const actionWrite = (a) => ["open-url", "view", "list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
 
 async function runAction(it, act) {
   switch (act.kind) {
@@ -480,20 +523,20 @@ export async function logEnvironmentChanged() {
 export async function gameLog(path, open = false) {
   const changed = syncLogEnvironment();
   path = changed ? "" : path ?? L.path;
-  const n = ++L.seq;
   if (!open && S.screen !== "log") return;
+  ++L.seq;
   L.error = "";
   L.pending = "";
   L.loading = !(L.page && L.page.path && (L.page.path === path || !path));
-  drawGameLog(); // switch the page and breadcrumb before waiting for any I/O
-  const epoch = S.screenSeq;
-  const current = () => n === L.seq && S.screen === "log" && S.screenSeq === epoch;
+  const read = beginPageRead("log", { replace: L.loading, label: "reading the log…", retry: () => gameLog(path, true) });
+  const current = read.current;
   let p;
   try { p = await api.LogPage(path || ""); } catch (e) {
-    if (current()) { L.loading = false; L.error = errText(e); say("fail", L.error); drawGameLog(); }
+    if (current()) { L.loading = false; L.error = errText(e); read.fail(e); }
     return;
   }
   if (!current()) return;
+  read.finish();
   if (p.pending) {
     // the mods are being analysed for the log's game version: look again shortly
     L.pending = p.pending;
@@ -527,11 +570,11 @@ function drawGameLog() {
   }
   const keep = $("#screen .page.logs .col.focus .scroll");
   const was = keep ? keep.scrollTop : 0;
-  const w = logPage("log", T("each run's errors, grouped by mod; pick one to read the log"), ...right);
+  const w = logPage("log", "", ...right);
   const files = (p && p.files) || [];
   const bar = el("div", "subbar");
   if (files.length) bar.append(filePicker(files));
-  if (p && p.facts && !L.loading) bar.append(el("span", "muted", p.facts));
+  if (p && p.facts && !L.loading) bar.append(el("span", "muted word-facts", p.facts));
   w.append(bar);
   if (L.error) { w.append(el("div", "card empty-state err", L.error)); return; }
   if (p && p.noMonitor && !L.loading) w.append(noMonitor(p));
@@ -544,7 +587,7 @@ function drawGameLog() {
   const list = el("section", "card col focus");
   if (mon) {
     const tabs = el("div", "ltabs");
-    tabs.append(seg([Tf("Player.log · %d", (p.rows || []).length), mon.title + " · " + mon.entries.length], L.tab, (i) => { L.tab = i; drawGameLog(); }, ["←", "→"]));
+    tabs.append(seg([Tf("Player.log  %d", (p.rows || []).length), mon.title + "  " + mon.entries.length], L.tab, (i) => { L.tab = i; drawGameLog(); }, ["←", "→"]));
     list.append(tabs);
   }
   const scroll = el("div", "scroll");
@@ -647,7 +690,7 @@ function noMonitor(p) {
     try { say("ok", await api.AddMonitor(), true); } catch (e) { say("fail", errText(e)); }
     await ui.reload();
     gameLog(L.path);
-  }, "small"));
+  }, "small", "add-monitor"));
   return n;
 }
 
@@ -656,7 +699,7 @@ function noMonitor(p) {
 function monitorRows(scroll, mon) {
   const head = el("div", "mhead");
   if (mon.running) head.append(el("span", "live-dot"));
-  head.append(el("span", "", mon.facts));
+  head.append(el("span", "word-facts", mon.facts));
   scroll.append(head);
   if (!mon.entries.length) { scroll.append(el("div", "empty-state", "✓ " + T("nothing reported in this run"))); return; }
   L.mcur = Math.min(L.mcur, Math.max(0, mon.entries.length - 1));
@@ -671,9 +714,9 @@ function monitorRows(scroll, mon) {
     top.append(el("span", "time num", m.time || ""));
     if (m.kind) top.append(el("span", "chip", m.kind));
     if (m.count > 1) top.append(el("span", "count", "×" + m.count));
-    if (m.mods && m.mods.length) { const s = el("span", "mods", m.mods.join(" · ")); s.title = m.mods.join("\n"); top.append(s); }
+    if (m.mods && m.mods.length) { const s = el("span", "mods word-facts", m.mods.join("  ")); s.title = m.mods.join("\n"); top.append(s); }
     body.append(top, logText(m));
-    if (m.files && m.files.length) body.append(el("div", "files", m.files.join(" · ")));
+    if (m.files && m.files.length) body.append(el("div", "files word-facts", m.files.join("  ")));
     if (open) {
       if (m.details) { const pre = el("pre", "details"); pre.textContent = m.details; pre.onclick = (e) => e.stopPropagation(); body.append(pre); }
       if (m.cluster) {
@@ -781,32 +824,17 @@ function applyLogSize(grid) {
   grid.classList.toggle("ana-sized", !!logSize.ana);
 }
 function logSplits(grid, list, vs, ana, hs) {
-  if (logSize.left == null) {
-    Promise.all([api.Setting(LOG_LEFT), api.Setting(LOG_ANA)]).then(([l, a]) => {
-      logSize.left = +l || 0; logSize.ana = +a || 0; applyLogSize(grid);
-    }).catch(() => { logSize.left = 0; logSize.ana = 0; });
-  } else applyLogSize(grid);
-  const drag = (sp, key, axis, start, clamp) => {
-    sp.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      const p0 = axis === "x" ? e.clientX : e.clientY, v0 = start();
-      sp.classList.add("drag");
-      document.body.classList.add(axis === "x" ? "resizing" : "resizing-y");
-      const move = (m) => { logSize[key] = clamp(Math.round(v0 + (axis === "x" ? m.clientX : m.clientY) - p0)); applyLogSize(grid); };
-      const up = () => {
-        sp.classList.remove("drag");
-        document.body.classList.remove("resizing", "resizing-y");
-        removeEventListener("mousemove", move);
-        removeEventListener("mouseup", up);
-        api.SetSetting(key === "left" ? LOG_LEFT : LOG_ANA, String(logSize[key])).catch(() => {});
-      };
-      addEventListener("mousemove", move);
-      addEventListener("mouseup", up);
+  applyLogSize(grid);
+  const wire = (sp, name, axis, get, range) => {
+    const set = (v) => { logSize[name] = v; applyLogSize(grid); };
+    wireSeparator(sp, {
+      axis, key: name === "left" ? LOG_LEFT : LOG_ANA, get, range, set, reset: () => set(0),
+      restore: (v) => set(+v || 0), serialize: () => String(logSize[name]),
+      enabled: () => !matchMedia("(max-width: 900px)").matches,
     });
-    sp.addEventListener("dblclick", () => { logSize[key] = 0; applyLogSize(grid); api.SetSetting(key === "left" ? LOG_LEFT : LOG_ANA, "").catch(() => {}); });
   };
-  drag(vs, "left", "x", () => list.getBoundingClientRect().width, (v) => Math.max(260, Math.min(grid.clientWidth - 320, v)));
-  drag(hs, "ana", "y", () => ana.getBoundingClientRect().height, (v) => Math.max(80, Math.min(grid.clientHeight - 140, v)));
+  wire(vs, "left", "x", () => list.getBoundingClientRect().width, () => [260, grid.clientWidth - 320]);
+  wire(hs, "ana", "y", () => ana.getBoundingClientRect().height, () => [80, grid.clientHeight - 140]);
 }
 
 // setAna fills the Archo 日志分析 card with a pattern card, or hides it (null).
@@ -838,12 +866,12 @@ function patternCard(c) {
   if (c.next) d.append(el("div", "pnext", c.next));
   if (c.known) d.append(el("div", "ps known", c.known));
   const more = el("div", "pmore");
-  const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v", v)); more.append(r); };
+  const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v word-facts", v)); more.append(r); };
   if (c.causes && c.causes.length) row(T("common causes"), c.causes.join(T("; ")));
-  if (c.fixes && c.fixes.length) row(T("kinds of fix"), c.fixes.join(" · "));
+  if (c.fixes && c.fixes.length) row(T("kinds of fix"), c.fixes.join("  "));
   if (more.childNodes.length) d.append(more);
-  const facts = [c.seen, c.gone].filter(Boolean).join(" · ");
-  if (facts) d.append(el("div", "pm", facts));
+  const facts = [c.seen, c.gone].filter(Boolean).join("  ");
+  if (facts) d.append(el("div", "pm word-facts", facts));
   d.append(el("div", "pm note", T("from shared logs, not a conclusion about your list")));
   return d;
 }
@@ -877,7 +905,7 @@ export async function changes(of) {
 }
 
 export function rescanButton(label) {
-  const b = button(S.busy.scan ? T("scanning…") : label || T("rescan the mod folders"), "R", () => ui.cmd("rescan"));
+  const b = button(S.busy.scan ? T("scanning…") : label || T("rescan the mod folders"), "R", () => ui.cmd("rescan"), "", "rescan");
   b.classList.add("rescan");
   if (label) b.dataset.label = label;
   b.prepend(el("span", "ic" + (S.busy.scan ? " spin" : "")));
@@ -900,7 +928,7 @@ const TIER = { 1: "launch", 2: "watch", 3: "content" };
 
 function drawChanges() {
   const top = ($("#screen .page-scroll") || {}).scrollTop || 0;
-  const w = logPage("changes", T("what changed in your mods"), rescanButton());
+  const w = logPage("changes", "", rescanButton());
   const scroll = el("div", "scroll page-scroll chg");
   w.append(scroll);
   const p = C.page || {};
@@ -921,7 +949,7 @@ function drawChanges() {
       seg.append(b);
     }
     bar.append(seg);
-    if (p.since) bar.append(el("span", "muted", p.since));
+    if (p.since) bar.append(el("span", "muted word-facts", p.since));
   }
   scroll.append(bar);
   C.items = [];
@@ -974,13 +1002,13 @@ function modRow(card, r) {
   const k = rowKey(r);
   const open = C.open.has(k);
   const row = el("div", "chg-row");
-  row.append(el("span", "tier " + (TIER[r.tier] || ""), r.tierText), el("span", "mod", r.mod), el("span", "txt", r.text));
+  row.append(el("span", "tier " + (TIER[r.tier] || ""), r.tierText), el("span", "mod", r.mod), el("span", "txt word-facts", r.text));
   if ((r.details && r.details.length) || r.actions || hasFiles(r)) row.append(el("span", "chev", open ? "▾" : "▸"));
   item(row, { t: "mod", key: k, r });
   card.append(row);
   if (!open) return;
   const box = el("div", "chg-open");
-  for (const d of r.details || []) box.append(el("div", "line", d));
+  for (const d of r.details || []) box.append(el("div", "line word-facts", d));
   if (hasFiles(r)) {
     const f = el("button", "chg-files", (C.raw.has(k) ? "▾ " : "▸ ") + T("files"));
     f.title = "i";
@@ -997,6 +1025,7 @@ function modRow(card, r) {
     for (const a of r.actions) {
       const b = el("button", "btn", a.label);
       b.append(el("kbd", "", a.key));
+      if (!["workshop", "deps"].includes(a.kind)) b.dataset.envWrite = a.kind;
       b.onclick = () => changeAct(r, a.kind);
       acts.append(b);
     }
@@ -1012,7 +1041,7 @@ function group(card, g, where) {
   const k = "group:" + where;
   const open = C.open.has(k);
   const row = el("div", "chg-row chg-group");
-  row.append(el("span", "tier content", T("new and gone")), el("span", "txt", g.text), el("span", "chev", open ? "▾" : "▸"));
+  row.append(el("span", "tier content", T("new and gone")), el("span", "txt word-facts", g.text), el("span", "chev", open ? "▾" : "▸"));
   item(row, { t: "group", key: k });
   card.append(row);
   if (open) for (const r of g.rows || []) modRow(card, r);
@@ -1147,19 +1176,52 @@ export { full, fullKey, fullSection } from "./fulldetail.js";
 
 export async function settings() {
   const read = beginPageRead("settings");
-  let groups, bg;
-  try { [groups, bg] = await Promise.all([api.Settings(), bgSection(read.current)]); } catch (e) { read.fail(e); return; }
+  const taskVersion = settingTaskRead;
+  let groups, bg, tasks;
+  try { [groups, bg, tasks] = await Promise.all([api.Settings(), bgSection(read.current), api.Tasks()]); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   groups = groups || [];
   const sc = S.screen === "settings" ? $("#screen") : openScreen("settings");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("settings", T("how RimArcho looks and works; each row shows the command that changes it"));
+  const w = page("settings", "");
   sc.append(w);
   w.append(bg);
   renderGroups(w, groups, settings);
+  markSettingTasks(tasks);
   sc.scrollTop = top;
   read.finish();
+  if (taskVersion !== settingTaskRead) refreshSettingTasks(true);
+}
+
+// Task events update the affected values without replacing edits or focus (06 §2.14).
+let settingTaskRead = 0;
+let settingValueRead = 0;
+async function refreshSettingTasks(values = false) {
+  const n = ++settingTaskRead, epoch = S.screenSeq;
+  const v = values ? ++settingValueRead : 0;
+  try {
+    const [tasks, groups] = await Promise.all([api.Tasks(), values ? api.Settings() : null]);
+    if (S.screen !== "settings" || S.screenSeq !== epoch) return;
+    if (n === settingTaskRead) markSettingTasks(tasks);
+    if (!groups || v !== settingValueRead) return;
+    const rows = [...$("#screen").querySelectorAll("[data-setting-row]")];
+    for (const g of groups) for (const it of g.items || []) {
+      const row = rows.find(r => r.dataset.settingRow === g.title + "/" + it.label);
+      if (!row) continue;
+      const note = row.querySelector(".setting-note"), value = row.querySelector(".setting-value");
+      if (note) { factText(note, it.note || ""); note.hidden = !it.note; }
+      if (value) factText(value, it.value || "");
+    }
+  } catch (e) { if (S.screen === "settings" && S.screenSeq === epoch) say("fail", errText(e)); }
+}
+
+function markSettingTasks(tasks) {
+  const active = new Set((tasks?.rows || []).filter(t => t.state === "queue" || t.state === "run").map(t => t.kind));
+  for (const b of $("#screen").querySelectorAll("button[data-setting-task]")) {
+    b.disabled = active.has(b.dataset.settingTask);
+    b.textContent = b.disabled ? b.dataset.pending : b.dataset.label;
+  }
 }
 
 // Each startup checks the disk, including environments other than the selected one.
@@ -1205,7 +1267,7 @@ function directoryPrompt(d, moving, after) {
     actions.append(button(T(moving ? "choose parent folder…" : "choose…"), "", () => pickFolder(d.path, path => {
       input.value = moving ? path.replace(/[\\/]$/, "") + "/" + d.path.split(/[\\/]/).pop() : path;
     })),
-      button(T(moving ? "move to…" : "locate"), "", apply, "primary"), button(T("skip for now"), "", () => pop.close()));
+      button(T(moving ? "move to…" : "locate"), "", apply, "primary", "apply-setting"), button(T("skip for now"), "", () => pop.close()));
     box.append(input, error, actions);
     p.keys = e => { if (e.key === "Enter") { e.preventDefault(); apply(); return true; } return false; };
     setTimeout(() => input.focus(), 0);
@@ -1214,13 +1276,14 @@ function directoryPrompt(d, moving, after) {
 
 // settingRunner runs a setting's command, then redraws the page with again.
 function settingRunner(again) {
-  return async (argv, value, after) => {
+  return async (argv, value, after, background = false) => {
     const screen = S.screen, epoch = S.screenSeq;
     try {
       const out = await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
     } catch (e) { say("fail", errText(e)); }
     if (S.screen !== screen || S.screenSeq !== epoch) return;
+    if (background) return refreshSettingTasks(true);
     if (after) return after();
     await ui.reload();
     if (S.screen === screen && S.screenSeq === epoch) again();
@@ -1237,9 +1300,13 @@ function renderGroups(w, groups, again) {
     area(card, lab);
     for (const it of g.items || []) {
       const row = el("div", "set");
+      row.dataset.settingRow = g.title + "/" + it.label;
+      row.title = it.hover || "";
       const left = el("div", "l");
       left.append(el("div", "name", it.label));
-      if (it.note) left.append(el("div", "sub", it.note));
+      const note = el("div", "sub setting-note word-facts", it.note || "");
+      note.hidden = !it.note;
+      left.append(note);
       const right = el("div", "r");
       if (it.edit === "choice") {
         const s = el("select");
@@ -1252,30 +1319,41 @@ function renderGroups(w, groups, again) {
         // A new language: the page's text again, in place (main.js relang).
         s.onchange = () => run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : null);
         right.append(s);
+        if (it.valueNote) right.append(el("span", "muted word-facts", it.valueNote));
       } else if (it.edit === "directory") {
-        const value = el("span", "muted", it.value);
+        const value = el("span", "muted word-facts", it.value);
         value.style.overflowWrap = "anywhere";
         const d = { id: it.directory, label: it.label, path: it.value };
         const after = async () => { await ui.reload(); again(); };
-        right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after)),
-          button(T("move to…"), "", () => directoryPrompt(d, true, after)));
+        right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after), "", "apply-setting"),
+          button(T("move to…"), "", () => directoryPrompt(d, true, after), "", "apply-setting"));
       } else if (it.edit) {
         const inp = el("input", "field");
         inp.value = it.value || "";
         inp.spellcheck = false;
-        const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim()));
+        const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim()), "", "apply-setting");
         inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
         right.append(inp);
         // A folder: the window's folder dialog; the chosen folder is applied at once.
-        if (it.edit === "path") right.append(button(T("choose…"), "", () => pickFolder(inp.value, (p) => run(it.argv, p))));
+        if (it.edit === "path") right.append(button(T("choose…"), "", () => pickFolder(inp.value, (p) => run(it.argv, p)), "", "apply-setting"));
         right.append(ok);
-      } else if (it.value) {
-        right.append(el("span", "muted", it.value));
+      } else {
+        right.append(el("span", "muted setting-value word-facts", it.value || ""));
       }
       for (const a of it.actions || []) {
         // 卸载 RimArcho is its own page with the plan; every other action is a command
         if (a.argv[0] === "uninstall") { right.append(button(a.label, "", () => ui.go(a.argv[0]))); continue; }
-        right.append(button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, () => run(a.argv)) : run(a.argv)));
+        const submit = () => {
+          if (a.task) { b.disabled = true; b.textContent = a.pending; }
+          return run(a.argv, "", null, !!a.task);
+        };
+        const b = button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, submit) : submit(), "", a.argv.join(" "));
+        if (a.task) {
+          b.dataset.settingTask = a.task;
+          b.dataset.label = a.label;
+          b.dataset.pending = a.pending;
+        }
+        right.append(b);
       }
       row.append(left, right);
       card.append(row);
@@ -1306,7 +1384,7 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", T("each game is one game folder: its version, how it starts, its saves"), act(T("add a game"), "plus", () => ui.go("guide")), rescanButton());
+  const w = page("env", "", act(T("add a game"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
   const envLab = el("div", "label section", T("every game"));
   w.append(envLab);
@@ -1315,13 +1393,16 @@ export async function environment() {
   for (const e of p.envs || []) {
     const row = el("div", "envrow" + (e.current ? " on" : ""));
     const l = el("div", "l");
-    l.append(el("div", "name", e.name), el("div", "sub", e.game));
+    l.append(el("div", "name", e.name), el("div", "sub word-facts", e.game));
     row.append(l);
-    if (e.current) row.append(el("span", "chip cur", T("in use")));
-    else {
-      row.append(button(T("use this one"), "", () => ui.useEnv(e.name, environment)));
+    if (e.current) {
+      const current = el("button", "chip cur", T("in use"));
+      current.onclick = () => { if (S.busy.env && S.busy.env !== e.name) ui.useEnv(e.name); };
+      row.append(current);
+    } else {
+      row.append(button(T("use this one"), "", () => ui.useEnv(e.name)));
     }
-    row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet"));
+    row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet", "remove-env"));
     card.append(row);
   }
   w.append(card);

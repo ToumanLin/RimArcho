@@ -16,6 +16,7 @@ export const S = {
   popup: null,  // the open popup (06 §3.1 rule 5)
   screen: "home", // start on the launch page; null is the plan editor
   screenSeq: 0, // late reads from a page that was left must not reopen it
+  envSeq: 0,   // latest game request, including reads started before it (06 §3.1)
   busy: {},     // scan, analyze, env
   packBuild: null, // the last "pack" event of the build this window runs
   live: null,   // Live(): the running game and its errors (06 §2.1)
@@ -28,8 +29,19 @@ export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
+  if (text != null) {
+    if (e.classList.contains("word-facts")) factText(e, text);
+    else e.textContent = text;
+  }
   return e;
+}
+
+// View models separate facts with two terminal cells; the GUI gives each fact its own span.
+export function factText(node, ...values) {
+  const parts = values.flat().filter(v => v != null && v !== "").flatMap(v => String(v).split(/ {2,}/)).filter(Boolean);
+  node.classList.add("word-facts");
+  node.replaceChildren(...parts.map(v => el("span", "", v)));
+  return node;
 }
 
 export function esc(s) {
@@ -46,7 +58,7 @@ let undoLink = false;
 export function say(kind, text, undo = false) {
   const s = $("#status");
   s.className = kind || "";
-  s.textContent = text || "";
+  factText(s, text || "");
   undoLink = undo;
   if (undo && text) {
     const a = el("a", "", T("undo"));
@@ -55,6 +67,11 @@ export function say(kind, text, undo = false) {
     s.appendChild(a);
   }
   statusIn(s);
+}
+// Page-level edits can supply their own undo (06 §2.17, 06 §6).
+export function undoStatus() {
+  if (typeof undoLink !== "function") return false;
+  const undo = undoLink; say("", ""); undo(); return true;
 }
 export function clearSay() {
   if (!S.busy.scan && !S.busy.analyze && !S.busy.env) say("", "");

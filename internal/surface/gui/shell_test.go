@@ -16,7 +16,7 @@ func TestShellAndHome(t *testing.T) {
 	_, api, _ := fixture(t)
 	b := api.Board()
 	sh := api.Shell()
-	if sh.Envs != 1 || sh.Env != "main · 1.6" {
+	if sh.Envs != 1 || sh.Env != "main  1.6" {
 		t.Fatalf("shell %+v", sh)
 	}
 	items := sh.Nav[0].Items
@@ -39,7 +39,11 @@ func TestGuide(t *testing.T) {
 	view.SetLang("en")
 	e := testkit.New(t)
 	events := make(chan map[string]any, 16)
+	added := make(chan *EnvironmentResult, 1)
 	api := NewAPI(e.App, func(name string, data any) {
+		if name == "environment" {
+			added <- data.(*EnvironmentResult)
+		}
 		if name != "guide" {
 			return
 		}
@@ -63,9 +67,22 @@ func TestGuide(t *testing.T) {
 	if len(found) != 1 || found[0].Name != "1.6" {
 		t.Fatalf("found %+v", found)
 	}
-	names, err := api.GuideAdd(found)
-	if err != nil || strings.Join(names, ",") != "1.6" {
-		t.Fatalf("added %v %v", names, err)
+	if !api.GuideAdd(1, found) {
+		t.Fatal("add did not start")
+	}
+	var result *EnvironmentResult
+	select {
+	case result = <-added:
+	case <-time.After(30 * time.Second):
+		t.Fatal("no add result")
+	}
+	names := result.Names
+	if result.Error != "" || strings.Join(names, ",") != "1.6" {
+		t.Fatalf("added %+v", result)
+	}
+	current, _ := e.App.Env()
+	if scan, _, err := e.App.LastScan(current.ID); err != nil || scan != nil {
+		t.Fatalf("GuideAdd scanned before GuideScan: %+v %v", scan, err)
 	}
 	if !api.GuideScan(names) {
 		t.Fatal("scan did not start")

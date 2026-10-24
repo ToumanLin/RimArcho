@@ -75,6 +75,27 @@ func TestTextureSummaryMatchesFullReport(t *testing.T) {
 	}
 }
 
+func TestTextureSummaryPublishesRowsBeforeCompletion(t *testing.T) {
+	e, _, _ := texSetup(t)
+	targets, err := e.App.TextureTargets([]string{"pkg:tester.tex"}, app.TexRefs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	count := 0
+	_, err = e.App.TextureSummaryProgress(ctx, append(targets, targets...), textures.Options{Scale: 50}, func(m *app.TextureMod) {
+		count++
+		if m.Plan == nil || m.Plan.Est.Files == 0 || len(m.Plan.Jobs) != 0 {
+			t.Fatalf("incomplete row or retained jobs: %+v", m)
+		}
+		cancel()
+	})
+	if count != 1 || !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected a row before cancellation, got %d, %v", count, err)
+	}
+}
+
 func texPNG(t *testing.T, p string, w, h int) {
 	t.Helper()
 	img := image.NewNRGBA(image.Rect(0, 0, w, h))

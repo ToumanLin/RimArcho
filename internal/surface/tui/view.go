@@ -91,7 +91,7 @@ func (m *model) topBar() string {
 	if m.envName != "" {
 		envText = m.envName
 		if mm := env.MajorMinor(m.gameVer); mm != "" {
-			envText += " " + markDot + " " + mm
+			envText += "  " + mm
 		}
 	}
 	pill := " " + envText + " "
@@ -140,7 +140,7 @@ func (m *model) topBar() string {
 // an open popup in the text colour.
 func (m *model) renderPos(p string) string {
 	head, rest := p, ""
-	if i := strings.Index(p, " "+markDot+" "); i >= 0 {
+	if i := strings.Index(p, "  "); i >= 0 {
 		head, rest = p[:i], p[i:]
 	}
 	pop := ""
@@ -308,7 +308,7 @@ func (m *model) hintLine() string {
 	for i, p := range pairs {
 		sep := ""
 		if i > 0 || prefix != "" {
-			sep = "  " + markDot + "  "
+			sep = "   "
 		}
 		w := width.StringWidth(sep + p[0] + " " + p[1])
 		if used+w > m.w {

@@ -27,7 +27,7 @@ const HIDDEN_KEY = "ui.gui.home.hidden";
 let data = null;
 let bg = null;
 let hidden = null;
-let busy = false;      // an apply is running: keys wait for it
+let pendingRow = null; // latest pick while the previous page data remains visible
 let launching = 0;     // until when ▶ says it is starting (the live state takes over)
 let arrived = false;   // the last apply just finished: ▶ shows the new pick coming in
 const picks = new Map(); // game → the row last applied in it this session
@@ -60,29 +60,40 @@ function games() {
   const seen = new Map();
   for (const r of rows()) {
     if (seen.has(r.envName)) continue;
-    const p = r.envName + " · ";
+    const p = r.envName + "  ";
     seen.set(r.envName, { name: r.envName, version: r.env && r.env.startsWith(p) ? r.env.slice(p.length) : "" });
   }
   return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
 const gameOf = (r) => games().find((g) => g.name === r.envName) || { name: r.envName, version: "" };
 
-// homeKey: ↑↓ the applied game's lists and packs, ←→ the games (each applies it), enter
-// opens the applied row, L launches.
+// Numbered columns are focus keys (06 §2.3, 06 §3.5): ↑↓ in 01 changes games;
+// elsewhere it applies lists and packs. Enter on 03 launches, elsewhere it opens the row.
+function focusedStep() { return document.activeElement?.closest(".hm-step")?.dataset.step; }
+
+function focusStep(n) {
+  const s = document.querySelector(`.page.home .hm-s${n}`);
+  if (!s) return;
+  const target = s.querySelector(".hm-pick.on") || s.querySelector(".hm-pick") || (!S.busy.env && s.querySelector(".hm-go:not(:disabled)")) || s;
+  target.focus();
+}
+
 export function homeKey(e) {
-  const k = e.key, f = applied();
-  if (k === "Enter" && document.activeElement && document.activeElement.matches(".hm-go")) { e.preventDefault(); document.activeElement.click(); return; }
+  const k = e.key, f = pendingRow || applied();
+  if (/^[1-3]$/.test(k) && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); focusStep(k); return; }
+  if (k === "Enter" && document.activeElement?.matches(".hm-go, .hm-s3")) { e.preventDefault(); document.querySelector(".hm-go")?.click(); return; }
   if (!f) return;
-  if (k === "ArrowDown" || k === "ArrowUp") {
+  const vertical = k === "ArrowDown" || k === "ArrowUp";
+  if (vertical && focusedStep() !== "1") {
     e.preventDefault();
     const list = rowsOf(f.envName), i = list.findIndex((r) => key(r) === key(f));
-    if (list.length > 1 && !busy) apply(list[(i + (k === "ArrowDown" ? 1 : list.length - 1)) % list.length]);
+    if (list.length > 1) apply(list[(i + (k === "ArrowDown" ? 1 : list.length - 1)) % list.length]);
     return;
   }
-  if (k === "ArrowLeft" || k === "ArrowRight") {
+  if (vertical || k === "ArrowLeft" || k === "ArrowRight") {
     e.preventDefault();
     const gs = games(), i = gs.findIndex((g) => g.name === f.envName);
-    if (gs.length > 1 && !busy) pickGame(gs[(i + (k === "ArrowRight" ? 1 : gs.length - 1)) % gs.length].name);
+    if (gs.length > 1) pickGame(gs[(i + (k === "ArrowRight" || k === "ArrowDown" ? 1 : gs.length - 1)) % gs.length].name);
     return;
   }
   if (k === "Enter") { e.preventDefault(); edit(f); return; }
@@ -93,7 +104,7 @@ export function homeKey(e) {
 }
 
 export function hintList() {
-  return [{ key: "↑↓", label: T("list") }, { key: "←→", label: T("game") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
+  return [{ key: "1–3", label: T("column") }, { key: "↑↓", label: T("list") }, { key: "←→", label: T("game") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
     { key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
 }
 
@@ -107,14 +118,14 @@ export async function focusLaunch() {
     const r = rows().find((x) => x.kind === "plan" && x.current);
     if (r) await apply(r);
   }
-  const b = document.querySelector(".hm-go");
-  if (b) b.focus();
+  focusStep(3);
 }
 
 // liveChanged redraws the launch button when the game starts or stops.
 export function liveChanged() { if (S.screen === "home" && data) { launching = 0; draw(); } }
 
 function draw() {
+  const focus = focusedStep();
   const sc = S.screen === "home" ? document.querySelector("#screen") : openScreen("home");
   sc.innerHTML = "";
   setBackdrop(bg);
@@ -136,6 +147,8 @@ function draw() {
   w.append(el("div", "hm-rule" + (shown.drawn ? "" : " in")));
   w.append(gameStep(env), rowStep(f, env, gameMoved), launchStep(f));
   placeMarks(gameMoved);
+  if (pendingRow && S.busy.env) showSwitch(pendingRow);
+  if (focus) focusStep(focus);
   shown.game = env; shown.row = f ? key(f) : null; shown.drawn = true;
   shown.note = !!w.querySelector(".hm-note");
 }
@@ -179,13 +192,13 @@ function hero(f, moved) {
     return box;
   }
   const kick = el("div", "hm-kick", kindText(f));
-  kick.append(el("span", "num", [f.env, f.mode].filter(Boolean).join(" · ")));
+  kick.append(el("span", "num word-facts", [f.env, f.mode].filter(Boolean).join("  ")));
   const head = el("div", "hm-headline");
   const h1 = el("h1", moved ? "in" : "", f.name);
   h1.title = f.name;
   head.append(h1);
   const facts = el("div", "hm-facts num" + (moved ? " in" : ""));
-  facts.append(el("span", "", f.facts || Tf("%d mods", f.mods)));
+  facts.append(el("span", "word-facts", f.facts || Tf("%d mods", f.mods)));
   if (f.versions) facts.append(el("span", "", Tf("versions %s", f.versions)));
   if (f.played) facts.append(el("span", "", f.played));
   facts.append(el("span", "hm-state " + stateClass(f), f.state));
@@ -195,6 +208,8 @@ function hero(f, moved) {
 
 function step(n, cls, title) {
   const s = el("section", "hm-step " + cls);
+  s.dataset.step = String(Number(n));
+  s.tabIndex = -1; // Disabled launch controls leave their column reachable (06 §2.3).
   const h = el("h3");
   h.append(el("b", "num", n), title);
   s.append(h);
@@ -231,7 +246,7 @@ function rowStep(f, env, moved) {
     const nm = el("span", "nm", r.name);
     if (r.level === "bad") nm.append(el("span", "flag bad", "▲"));
     else if (r.level !== "ok") nm.append(el("span", "flag", "○"));
-    b.append(nm, el("small", "num", kindText(r) + " · " + r.mods));
+    b.append(nm, el("small", "num word-facts", kindText(r) + "  " + r.mods));
     b.title = on ? T("pick again to open it") : r.otherEnv ? Tf("switch to %s and use this; no game file is written", r.envName) : T("use this; no game file is written");
     b.onclick = () => (on ? edit(r) : apply(r));
     list.append(b);
@@ -245,6 +260,7 @@ function launchStep(f) {
   const s = step("03", "hm-s3", T("launch"));
   const live = running(), starting = !live && launching > Date.now();
   const b = el("button", "hm-go" + (live ? " running" : "") + (starting ? " starting" : "") + (arrived ? " arrived" : ""));
+  b.dataset.envWrite = "launch";
   arrived = false;
   const top = el("div", "top");
   const title = el("span", "title", live ? T("the game is running") : starting ? T("starting…") : T("launch the game"));
@@ -331,7 +347,7 @@ function edit(r) { ui.go(r.kind === "plan" ? r.page : "pack:" + r.name); }
 
 function pickGame(env) {
   const f = applied();
-  if (f && f.envName === env) return;
+  if (!S.busy.env && f && f.envName === env) return;
   const want = picks.get(env);
   const r = rows().find((x) => key(x) === want) || rows().find((x) => x.envName === env);
   if (r) apply(r);
@@ -342,25 +358,30 @@ function pickGame(env) {
 // main…", which can take a while; another row: "applying X…") until the new page is read,
 // then the new pick comes in on it.
 async function apply(r) {
-  if (busy) return;
-  busy = true;
+  pendingRow = r;
   showSwitch(r);
-  const run = async () => {
-    const text = await api.HomeApply(r.kind, r.envName, r.plan || 0, r.kind === "pack" ? r.name : "");
-    picks.set(r.envName, key(r));
-    await ui.reload();
-    arrived = true;
-    await home({ keep: true });
-    say("ok", text);
-  };
   try {
-    if (r.otherEnv) await withEnvironmentSwitch(r.envName, run, { quiet: true });
-    else await run();
+    const switched = await withEnvironmentSwitch(r.envName, async (current) => {
+      const result = await api.HomeApply(r.kind, r.envName, r.plan || 0, r.kind === "pack" ? r.name : "");
+      if (!current() || result.stale) return;
+      picks.set(r.envName, key(r));
+      await ui.reload(result);
+      if (!current()) return;
+      pendingRow = null;
+      arrived = true;
+      await ui.refreshEnvironment();
+      if (current()) say("ok", result.text);
+    });
+    if (switched) {
+      pendingRow = null;
+      if (focusedStep() === "3") focusStep(3);
+    }
   } catch (e) {
+    pendingRow = null;
     arrived = false;
     if (S.screen === "home" && data) draw();
     say("fail", errText(e));
-  } finally { busy = false; }
+  }
 }
 
 // showSwitch marks the pick in 01 and 02 and turns ▶ into the switch's progress.
@@ -374,6 +395,8 @@ function showSwitch(r) {
   placeMarks(false);
   const b = root.querySelector(".hm-go");
   if (!b) return;
+  // Keep 03 focused while its launch control is disabled (06 §2.3).
+  if (document.activeElement === b) b.closest(".hm-step").focus();
   b.className = "hm-go switching";
   b.disabled = true;
   const top = el("div", "top"), bottom = el("div", "bottom");
@@ -392,8 +415,8 @@ function activity() {
   const box = el("div", "hm-act");
   const live = S.live && S.live.running;
   if (live || data.lastRun) {
-    const runText = live ? T("the game is running") + " · " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
-      : (data.lastRunDay || data.lastRun) + " · " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : T("no errors"));
+    const runText = live ? T("the game is running") + "  " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
+      : (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : T("no errors"));
     const runGo = live || data.lastRunErrors ? "needs" : "log";
     box.append(actLine(T("last game"), runText, () => ui.go(runGo)));
   }
@@ -407,7 +430,7 @@ function activity() {
 
 function actLine(title, text, go) {
   const b = el("button", "hm-actline");
-  b.append(el("span", "t", title), el("span", "x", text), el("span", "go", "→"));
+  b.append(el("span", "t", title), el("span", "x word-facts", text), el("span", "go", "→"));
   b.title = text;
   b.onclick = go;
   return b;
@@ -416,6 +439,7 @@ function actLine(title, text, go) {
 // launch is the applied row's L (08 §2, §5.3): the plan launches at once, as the pack
 // does on the packs page. ▶ says it is starting until the game's live state arrives.
 async function launch(r) {
+  if (S.busy.env) return say("busy", Tf("switching to %s…", S.busy.env));
   launching = Date.now() + 4000;
   draw();
   setTimeout(() => { if (S.screen === "home" && launching && launching <= Date.now()) { launching = 0; draw(); } }, 4100);

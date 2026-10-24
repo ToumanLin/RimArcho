@@ -119,6 +119,7 @@ export async function tags(items, after) {
         const b = el("button", "c" + (i === p.sel ? " on" : ""));
         if (all || some) b.append(el("span", "h", all ? "✓" : "~"));
         b.append(c.tag);
+        b.dataset.envWrite = "tags";
         b.title = all ? T("enter removes it") : T("enter gives it to all");
         b.onclick = () => apply(c.tag, all);
         chips.append(b);
@@ -166,14 +167,14 @@ export function position(obj, from, done = null) {
 }
 
 // ---- a confirmation, for what u cannot undo (06 §6); text() shows lines with none ----
-export function confirm(title, lines, goLabel, go) {
+export function confirm(title, lines, goLabel, go, envWrite = "apply") {
   const pre = el("pre", "lines");
   pre.textContent = (lines || []).join("\n");
-  panel(title, pre, goLabel, go);
+  panel(title, pre, goLabel, go, "", envWrite);
 }
 
 // panel is a confirmation whose body is an element (the pack build's steps); cls widens it.
-export function panel(title, content, goLabel, go, cls = "") {
+export function panel(title, content, goLabel, go, cls = "", envWrite = "") {
   open("confirm", title, (pop, p) => {
     if (cls) pop.classList.add(cls);
     pop.append(el("div", "ttl", title));
@@ -186,12 +187,13 @@ export function panel(title, content, goLabel, go, cls = "") {
     btns.append(no);
     if (go) {
       const yes = el("button", "go", goLabel + "  enter");
+      if (envWrite) yes.dataset.envWrite = envWrite;
       yes.onclick = () => { close(); go(); };
       btns.append(yes);
     }
     pop.append(btns);
     p.keys = (e) => {
-      if (e.key === "Enter" && go) { e.preventDefault(); close(); go(); }
+      if (e.key === "Enter" && go) { e.preventDefault(); pop.querySelector(".btns .go").click(); }
       else if (e.key === "PageDown") body.scrollTop += body.clientHeight * 0.9;
       else if (e.key === "PageUp") body.scrollTop -= body.clientHeight * 0.9;
       else if (e.key === "ArrowDown") body.scrollTop += 40;
@@ -210,17 +212,18 @@ export function text(title, lines) { confirm(title, lines, "", null); }
 export function choose(title, labels, pick, current = 0, other = null) {
   open("choose", title, (pop, p) => {
     pop.append(el("div", "ttl", title));
-    optionList(pop, p, labels.map((l, i) => ({ l, i })), (d, o) => d.append(o.l), (o) => { close(); pick(o.i); });
+    optionList(pop, p, labels.map((l, i) => ({ l, i })), (d, o) => d.append(el("span", "word-facts", o.l)), (o) => { close(); pick(o.i); });
     if (other) {
       const btns = el("div", "btns");
-      const b = el("button", "", other.label + "  " + (other.key === "Delete" ? "del" : other.key));
+      const b = el("button", "word-facts", other.label + "  " + (other.key === "Delete" ? "del" : other.key));
+      if (other.envWrite) b.dataset.envWrite = other.envWrite;
       const run = () => { const i = p.opts[p.sel] && p.opts[p.sel].i; close(); if (i !== undefined) other.run(i); };
       b.onclick = run;
       btns.append(b);
       pop.append(btns);
       const keys = p.keys;
       p.keys = (e) => {
-        if (e.key === other.key) { e.preventDefault(); run(); return true; }
+        if (e.key === other.key) { e.preventDefault(); b.click(); return true; }
         return keys(e);
       };
     }
@@ -251,7 +254,7 @@ export async function help(page = "plan") {
   open("help", T("all keys"), (pop) => {
     pop.append(el("div", "ttl", T("the arrows only move; keys that change things act at once, u undoes")));
     const body = el("div", "body help");
-    for (const r of rows) body.append(el("b", "", r.keys), el("span", "", r.what));
+    for (const r of rows) body.append(el("b", "word-facts", r.keys), el("span", "word-facts", r.what));
     pop.append(body);
   });
 }
@@ -268,11 +271,13 @@ export function menu(x, y, actions, keys = false) {
     const b = el("button", a.cls || "");
     b.append(el("span", "", a.label));
     if (a.key) b.append(el("span", "key", a.key));
+    if (a.envWrite) b.dataset.envWrite = a.envWrite;
     b.onclick = () => { hideMenu(); a.run(); };
     m.append(b);
   }
   if (m.lastChild && m.lastChild.tagName === "HR") m.lastChild.remove();
   if (!m.childNodes.length) return;
+  m.inert = false;
   m.hidden = false;
   const r = m.getBoundingClientRect();
   m.style.left = Math.max(6, Math.min(x, innerWidth - r.width - 6)) + "px";
@@ -295,8 +300,8 @@ export function menu(x, y, actions, keys = false) {
       if (i >= 0) bs[i].click();
     } else {
       // a key the menu shows runs its item
-      const hit = actions.find((a) => !a.sep && a.key && a.key.split(" · ").some((k) => k.toLowerCase() === e.key.toLowerCase()));
-      if (hit) { e.preventDefault(); hideMenu(); hit.run(); }
+      const hit = actions.find((a) => !a.sep && a.key && a.key.split(" / ").some((k) => k.toLowerCase() === e.key.toLowerCase()));
+      if (hit) { e.preventDefault(); bs[actions.filter((a) => !a.sep).indexOf(hit)].click(); }
     }
     e.stopPropagation();
   };
@@ -304,4 +309,4 @@ export function menu(x, y, actions, keys = false) {
   setTimeout(() => document.addEventListener("mousedown", hideMenuOutside, { once: true }), 0);
 }
 function hideMenuOutside(e) { if (!$("#menu").contains(e.target)) hideMenu(); else document.addEventListener("mousedown", hideMenuOutside, { once: true }); }
-export function hideMenu() { $("#menu").hidden = true; }
+export function hideMenu() { const m = $("#menu"); m.inert = true; m.hidden = true; }

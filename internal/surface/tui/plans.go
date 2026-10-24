@@ -53,15 +53,15 @@ func (m *model) choosePlan() tea.Cmd {
 		r := rows[i]
 		label := r.Name
 		if r.Current {
-			label += "  " + markDot + " " + T("editing")
+			label += "  " + T("editing")
 			cur = &rows[i]
 			p.choice = i
 		}
 		if r.InGame {
-			label += "  " + markDot + " " + T("in the game")
+			label += "  " + T("in the game")
 		}
 		if r.Conflict {
-			label += "  " + markDot + " " + r.ConflictText
+			label += "  " + r.ConflictText
 		}
 		id := r.ID
 		add(label, func(m *model) tea.Cmd {
@@ -91,7 +91,7 @@ func (m *model) newPlan() tea.Cmd {
 		return nil
 	}
 	fromImport := T("from an import: a file, a share code, a link…")
-	p := &panel{title: T("new list") + " " + markDot + " " + T("start from")}
+	p := &panel{title: T("new list") + "  " + T("start from")}
 	by := map[string]string{}
 	for _, f := range froms {
 		p.choices = append(p.choices, f.Label)
@@ -103,7 +103,7 @@ func (m *model) newPlan() tea.Cmd {
 			return m.importPrompt() // its preview offers "as a new list"
 		}
 		from := by[v]
-		m.namePrompt(T("new list")+" "+markDot+" ", view.FreePlanName(m.app, ""), 0, func(m *model, name string) tea.Cmd {
+		m.namePrompt(T("new list")+"  ", view.FreePlanName(m.app, ""), 0, func(m *model, name string) tea.Cmd {
 			_, t, err := view.NewPlan(m.app, name, from)
 			if err != nil {
 				m.say(sayFail, m.humanize(err.Error()))
@@ -123,7 +123,7 @@ func (m *model) importAsPlan(imp *view.Import, p *view.ImportPreview) tea.Cmd {
 	if base == "" {
 		base = T(imp.Label)
 	}
-	m.namePrompt(T("as a new list")+" "+markDot+" ", view.FreePlanName(m.app, base), 0, func(m *model, name string) tea.Cmd {
+	m.namePrompt(T("as a new list")+"  ", view.FreePlanName(m.app, base), 0, func(m *model, name string) tea.Cmd {
 		_, t, err := view.ImportAsPlan(m.app, imp, name)
 		if err != nil {
 			m.say(sayFail, m.humanize(err.Error()))
@@ -135,7 +135,7 @@ func (m *model) importAsPlan(imp *view.Import, p *view.ImportPreview) tea.Cmd {
 }
 
 func (m *model) renamePlan(r view.PlanRow) tea.Cmd {
-	m.namePrompt(Tf("rename %s", r.Name)+" "+markDot+" ", r.Name, r.ID, func(m *model, name string) tea.Cmd {
+	m.namePrompt(Tf("rename %s", r.Name)+"  ", r.Name, r.ID, func(m *model, name string) tea.Cmd {
 		t, err := view.RenamePlan(m.app, r.ID, name)
 		if err != nil {
 			m.say(sayFail, m.humanize(err.Error()))

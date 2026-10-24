@@ -278,11 +278,11 @@ func (m *model) drawColumn(s slot, n int, tabs bool) []string {
 		var msg string
 		switch {
 		case c.filter != "":
-			msg = T("nothing matches · esc clears the filter")
+			msg = T("nothing matches, esc clears the filter")
 		case c.kind == cStaging:
-			msg = T("staging is empty · t puts the selected mod here")
+			msg = T("staging is empty, t puts the selected mod here")
 		case c.kind == cActive:
-			msg = T("no mod is enabled · space enables one")
+			msg = T("no mod is enabled, space enables one")
 		default:
 			msg = T("every mod is enabled")
 		}
@@ -398,23 +398,14 @@ func (m *model) drawRow(c *column, vi int, focused bool, w int) string {
 func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bool) []string {
 	it := &c.items[c.view[vi]]
 	isCur := vi == c.cursor
-	// The focused area's cursor row has a faint background, so one place on the screen is
-	// the brightest (06 §3.2). Every piece of the row carries it.
-	bg := func(st lipgloss.Style) lipgloss.Style { return st }
-	if isCur && focused {
-		bg = func(st lipgloss.Style) lipgloss.Style { return st.Background(cRowBg) }
+	selected := m.marked[it.id] && it.id != ""
+	bg := func(st lipgloss.Style) lipgloss.Style {
+		return rowBackground(st, selected, isCur && focused)
 	}
 	pad := func(n int) string { return bg(plainStyle).Render(strings.Repeat(" ", max(n, 0))) }
 	mark := pad(2)
-	selected := m.marked[it.id] && it.id != ""
 	if isCur && focused {
 		mark = bg(sAccent).Render(markSel + " ")
-	}
-	if selected {
-		mark = bg(sAccent).Render("▌ ") // 06 §3.4
-		if isCur && focused {
-			mark = bg(sAccent).Render("▌" + markSel)
-		}
 	}
 	used := 2
 	var b strings.Builder
@@ -477,19 +468,16 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 	lines := []string{b.String()}
 	pre := w - nameW - statusW // the cells before the name
 	for i, l := range more {
-		lead := strings.Repeat(" ", pre)
-		if selected {
-			lead = sAccent.Render("▌") + strings.Repeat(" ", pre-1)
-		}
+		lead := pad(pre)
 		d := ""
 		if i == len(more)-1 && it.unsaved && width.StringWidth(l)+2 <= nameW {
 			d = " " + ic.unsaved
 		}
-		t := ns.Render(fit(l, width.StringWidth(l)))
+		t := bg(ns).Render(fit(l, width.StringWidth(l)))
 		if d != "" {
-			t += sAccent.Render(d)
+			t += bg(sAccent).Render(d)
 		}
-		lines = append(lines, lead+t+strings.Repeat(" ", max(w-pre-width.StringWidth(l)-width.StringWidth(d), 0)))
+		lines = append(lines, lead+t+pad(w-pre-width.StringWidth(l)-width.StringWidth(d)))
 	}
 	return lines
 }

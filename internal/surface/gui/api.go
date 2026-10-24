@@ -39,12 +39,13 @@ type API struct {
 	content view.ContentCache
 	busy    map[string]bool // scan, analyze, pack
 	// building is the pack this window's build child is making ("" none).
-	building string
-	live     view.LiveTracker // the running game's log (03 §6.6)
-	logPath  string           // the log page's Player.log and its clusters' first lines
-	logLinks map[string]string
-	x        exchange // import and export (exchange.go)
-	free     releaser // returns memory to the OS after heavy work (memory.go)
+	building  string
+	buildRead buildPageReader
+	live      view.LiveTracker // the running game's log (03 §6.6)
+	logPath   string           // the log page's Player.log and its clusters' first lines
+	logLinks  map[string]string
+	x         exchange // import and export (exchange.go)
+	free      releaser // returns memory to the OS after heavy work (memory.go)
 	// bgs are the environment bgsEnv's backgrounds; bgPick the image rotation chose for
 	// this window (background.go)
 	bgs    []app.Background
@@ -54,6 +55,7 @@ type API struct {
 	// development harness points it at archo.exe).
 	Exe string
 
+	environment environmentWorker
 	monitorOnce sync.Once
 	quit        func() // closes the window (nil in the harness and in tests)
 	// tasks is the 后台任务 record and its lanes (tasks.go, 06 §2.16)
@@ -62,11 +64,12 @@ type API struct {
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
 	// TexRunner runs `archo textures optimize` in place of the child process (tests).
-	TexRunner func(args []string, progress func(string)) ([]string, error)
-	texLast   TextureEvent // the running conversion's last progress
-	texCancel context.CancelFunc
-	logRead   logReader
-	texRead   logReader
+	TexRunner  func(args []string, progress func(string)) ([]string, error)
+	texLast    TextureEvent // the running conversion's last progress
+	texCancel  context.CancelFunc
+	texMeasure textureMeasurement
+	logRead    logReader
+	texRead    logReader
 	// ScanRunner scans an environment in place of the child process (tests).
 	ScanRunner func(env string) (string, error)
 }
@@ -215,36 +218,6 @@ func (s *API) Packs() (*PackList, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return &PackList{Rows: rows, Others: others, Unfinished: un, Building: s.building}, err
-}
-
-// BuildPage is 编译成整合包 for the current plan (06 §2.6): checked and sorted under the
-// reader's own connection, including texture planning and folder measurement.
-// tex is the textures choice (view.PackTextureOptions): 0 off, 100 预转换, less 精简.
-func (s *API) BuildPage(tex int) (*view.BuildPage, error) {
-	r, err := s.detachedReader()
-	if err != nil {
-		return nil, err
-	}
-	defer r.Close()
-	defer s.free.soon()
-	st, err := r.Loadout()
-	if err != nil {
-		return nil, err
-	}
-	plan, chip := st.Plan.Name, view.EnvChip(st.Ix.Env.Name, st.Ix.Env.GameVersion)
-	name := view.DefaultPackName(r, plan)
-	pl, err := r.PlanPack(name)
-	if err == nil {
-		view.PlanTextures(r, pl, tex)
-	}
-	dir := r.PacksDir()
-	if err != nil {
-		return nil, err
-	}
-	pl.Measure(dir)
-	p := view.BuildPageOf(pl, plan, chip, dir, tex)
-	p.Name = name
-	return p, nil
 }
 
 // PackNameCheck says what is wrong with a new pack's name ("" when it can be used).
@@ -508,6 +481,10 @@ func (s *API) ApplySetting(argv []string, value string) ([]string, error) {
 			x = value
 		}
 		run[i] = x
+	}
+	if kind := view.SettingTask(run); kind != "" {
+		t := s.queueSettingTaskLocked(kind, run, "")
+		return []string{settingQueued(t)}, nil
 	}
 	text, code := cmds.Execute(s.a, run)
 	s.board, s.needs = nil, nil
@@ -1034,19 +1011,6 @@ func (s *API) OpenChangeNotes(ws string) (string, error) {
 
 // ---- environments, logs, scans ----
 
-// UseEnv switches the environment.
-func (s *API) UseEnv(name string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.a.EnvName = ""
-	_, err := s.a.EnvUse(name)
-	if err == nil {
-		s.board, s.logLinks, s.logPath = nil, nil, ""
-	}
-	s.needs = nil
-	return s.text(view.Tf("switched to %s", name), err)
-}
-
 // EnvRemoval is the dry run of removing an environment (06 §2.14): the confirmation's
 // title and lines. Nothing changes.
 type EnvRemoval struct {
@@ -1223,9 +1187,9 @@ func (s *API) Scan() bool {
 		if err != nil {
 			ev["error"] = view.Humanize(nil, firstLine(out)+" "+err.Error())
 		} else if b := s.boardLocked(); b.Board != nil && b.Changes > 0 {
-			ev["text"] = view.T("scan complete") + " · " + view.ChangeSummary(b.LastEvents)
+			ev["text"] = view.T("scan complete") + "  " + view.ChangeSummary(b.LastEvents)
 		} else {
-			ev["text"] = view.T("scan complete · nothing changed")
+			ev["text"] = view.T("scan complete, nothing changed")
 		}
 		s.mu.Unlock()
 		if err != nil {

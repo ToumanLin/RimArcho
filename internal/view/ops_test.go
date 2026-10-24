@@ -2,6 +2,7 @@ package view
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -9,6 +10,17 @@ import (
 // have is in the table with a key or a menu group (the menu key and shift+F10 open the
 // menu), and every menu group's ops come in the menu's order.
 func TestOpsReachable(t *testing.T) {
+	for _, page := range []string{LibraryPage, "packs", "textures", PageTasks} {
+		reached := false
+		for _, row := range KeyHelp(page, false) {
+			if strings.Contains(row.Keys, "s") && strings.Contains(row.Keys, "< > =") {
+				reached = true
+			}
+		}
+		if !reached {
+			t.Errorf("%s: table keyboard actions are absent from help", page)
+		}
+	}
 	seen := map[string]bool{}
 	last := 0
 	for _, o := range OpTable() {
@@ -37,6 +49,18 @@ func TestOpsReachable(t *testing.T) {
 		for _, c := range RowOps(nil, "x", col) {
 			if !seen[c] {
 				t.Errorf("editor op %s is no op", c)
+			}
+		}
+	}
+	// Form pages expose their verbs and cancellation to keyboard users (06 §2.17).
+	for page, required := range map[string][]string{PagePlans: {"n", "i", "e", "F2", "Delete", "esc"}, "plan-import": {"tab", "enter", "esc"}, "plan-export": {"↑↓", "ctrl+s", "ctrl+c", "esc"}} {
+		keys := map[string]bool{}
+		for _, row := range KeyHelp(page, false) {
+			keys[row.Keys] = true
+		}
+		for _, key := range required {
+			if !keys[key] {
+				t.Errorf("%s has no %s", page, key)
 			}
 		}
 	}
@@ -94,6 +118,13 @@ func TestKeyHelpText(t *testing.T) {
 				t.Errorf("bar %s:%s = %q", k, v, x)
 			}
 		}
+	}
+}
+
+// The launch page's numbered columns are focus keys (06 §2.3, 06 §3.5).
+func TestHomeFocusKeyHelp(t *testing.T) {
+	if !slices.ContainsFunc(KeyHelp("home", false), func(r KeyRow) bool { return r.Keys == "1–3" }) {
+		t.Fatal("home help does not list its three focus keys")
 	}
 }
 

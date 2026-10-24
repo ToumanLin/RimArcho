@@ -64,7 +64,7 @@ func evIcon(kind string) string {
 	case view.EvCorpus:
 		return ic.evCorpus
 	}
-	return markDot
+	return "—"
 }
 
 // chipText is the evidence chip as compact text: "≣ declared by the mod · About.xml modDependencies".
@@ -74,7 +74,7 @@ func chipText(e *view.Evidence) string {
 	}
 	s := evIcon(e.Kind) + " " + e.Label
 	if e.Source != "" {
-		s += " " + markDot + " " + e.Source
+		s += "  " + e.Source
 	}
 	return s
 }
@@ -144,7 +144,7 @@ func (m *model) doAction(a view.Action, option int) {
 	case err != nil:
 		m.say(sayFail, m.humanize(err.Error()))
 	case a.Undo:
-		m.say(sayOK, done+" · "+T("u undoes"))
+		m.say(sayOK, done+Tf(", %s", T("u undoes")))
 	default:
 		m.say(sayOK, done)
 	}
@@ -177,7 +177,7 @@ func (m *model) listAction(what string) tea.Cmd {
 			m.openPanel(listTitle(what), strings.Join(o.Refused, "\n"))
 		}
 	case o.Undo:
-		m.say(sayOK, o.Text+" · "+T("u undoes"))
+		m.say(sayOK, o.Text+Tf(", %s", T("u undoes")))
 	default:
 		m.say(sayOK, o.Text)
 	}
@@ -220,9 +220,9 @@ func (m *model) needLines(n int) []string {
 	case m.analyzing:
 		head += "   " + T("checking the mods' files…")
 	case p.never:
-		head += "   " + T("the mods' files are not checked yet · A checks them")
+		head += "   " + T("the mods' files are not checked yet, A checks them")
 	case p.stale:
-		head += "   " + T("the files changed since the last check · A checks again")
+		head += "   " + T("the files changed since the last check, A checks again")
 	}
 	out := []string{"  " + sText.Render(fit(head, w-2)), ""}
 	if len(items) == 0 {
@@ -256,7 +256,7 @@ func (m *model) needLines(n int) []string {
 		for _, k := range it.keys {
 			keys = append(keys, k.key+" "+k.label)
 		}
-		hint := strings.Join(keys, "  "+markDot+"  ")
+		hint := strings.Join(keys, "   ")
 		tw := w - 6
 		lines := wrap(it.text, tw)
 		for j, l := range lines {
@@ -276,7 +276,7 @@ func (m *model) needLines(n int) []string {
 		if it.fold && p.open[it.text] {
 			for _, part := range it.parts {
 				for j, l := range wrap(part, tw-2) {
-					lead := "    " + sDimS.Render(markDot) + " "
+					lead := "    " + sDimS.Render("–") + " "
 					if j > 0 {
 						lead = "      "
 					}
@@ -340,17 +340,17 @@ func (m *model) sectionHead(sec, w int) string {
 		used += width.StringWidth(s)
 	}
 	if n > 0 {
-		add(" "+markDot+" ", sDimS)
+		add("  ", sDimS)
 		add(itoa(n), sText)
 	}
 	if sec == view.SectionRun {
 		switch {
 		case m.live != nil && m.live.Running && m.live.Pack != "":
-			add(" "+markDot+" "+Tf("pack %s", m.live.Pack), sDimS)
+			add("  "+Tf("pack %s", m.live.Pack), sDimS)
 		case m.live != nil && m.live.Running:
-			add(" "+markDot+" "+T("this run"), sDimS)
+			add("  "+T("this run"), sDimS)
 		case m.prob.lastRun != "":
-			add(" "+markDot+" "+m.prob.lastRun, sDimS)
+			add("  "+m.prob.lastRun, sDimS)
 		}
 	}
 	return head

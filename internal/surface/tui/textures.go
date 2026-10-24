@@ -21,9 +21,8 @@ func texturesText(p *view.TexturePage) string {
 	if !p.ToolOK && p.Offer != "" {
 		fmt.Fprintf(&b, "  %s → %s\n  : archo textures tool --install\n", p.Offer, p.OfferTo)
 	}
-	b.WriteString("\n" + T("the game loads a .dds in place of the .png of the same name: no PNG to decode at start, and opaque textures take half the video memory") + "\n")
 	b.WriteString(T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back") + "\n\n")
-	fmt.Fprintf(&b, "%s · %s\n", T("what is there"), Tf("%d mods", p.Mods))
+	fmt.Fprintf(&b, "%s  %s\n", T("what is there"), Tf("%d mods", p.Mods))
 	fmt.Fprintf(&b, "  %s\n", p.PNG)
 	if p.Ours != "" {
 		fmt.Fprintf(&b, "  %s: %s\n", T("RimArcho's DDS"), p.Ours)
@@ -31,7 +30,7 @@ func texturesText(p *view.TexturePage) string {
 	if p.StaleText != "" {
 		fmt.Fprintf(&b, "  ⚠ %s\n", p.StaleText)
 	}
-	fmt.Fprintf(&b, "\n%s · %s\n", T("what converting does"), view.TextureScaleLabel(p.Scale))
+	fmt.Fprintf(&b, "\n%s  %s\n", T("what converting does"), view.TextureScaleLabel(p.Scale))
 	for _, f := range p.EstFacts {
 		fmt.Fprintf(&b, "  %s\n", f)
 	}

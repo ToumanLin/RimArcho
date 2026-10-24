@@ -2,11 +2,12 @@
 // top bar (collapse, breadcrumb, environment chip, the page's actions) and, at the
 // sidebar's foot, the environment and the running game. What it lists comes from
 // view.Nav and view.NavPath through API.Shell.
-import { S, $, el, api, T, Tf } from "./state.js";
+import { factText, S, $, el, api, T, Tf } from "./state.js";
 import { icon } from "./icons.js";
 import { liveCount, seg, setSeg } from "./screens.js";
 import { bump, slideNav } from "./motion.js";
 import * as pop from "./popups.js";
+import { wireSeparator } from "./separator.js";
 
 let ui = null;
 
@@ -50,7 +51,7 @@ function applyNav() {
   app.classList.toggle("nav-top", layout === "top");
   app.classList.toggle("nav-side", layout === "side");
   const t = $("#navtoggle");
-  t.title = (layout === "side" ? T("navigation at the top") : T("navigation at the side")) + " · ctrl+b";
+  t.title = (layout === "side" ? T("navigation at the top") : T("navigation at the side")) + T("; ") + "ctrl+b";
   slideNav($("#nav"), true);
   renderCrumbs();
 }
@@ -119,30 +120,11 @@ function setSideWidth(px) {
 function wireSideSplit() {
   const sp = $("#side-split");
   sp.title = T("drag to change the width; double-click to reset");
-  api.Setting(SIDE_KEY).then((v) => { if (+v) setSideWidth(Math.min(SIDE_MAX, Math.max(SIDE_MIN, +v))); }).catch(() => {});
-  sp.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    const x0 = e.clientX, w0 = $("#side").getBoundingClientRect().width;
-    let w = w0;
-    sp.classList.add("drag");
-    document.body.classList.add("resizing");
-    const move = (ev) => {
-      w = Math.min(SIDE_MAX, Math.max(SIDE_MIN, w0 + ev.clientX - x0));
-      setSideWidth(w);
-    };
-    const up = () => {
-      sp.classList.remove("drag");
-      document.body.classList.remove("resizing");
-      removeEventListener("mousemove", move);
-      removeEventListener("mouseup", up);
-      if (w !== w0) api.SetSetting(SIDE_KEY, String(Math.round(w))).catch(() => {});
-    };
-    addEventListener("mousemove", move);
-    addEventListener("mouseup", up);
-  });
-  sp.addEventListener("dblclick", () => {
-    setSideWidth(0);
-    api.SetSetting(SIDE_KEY, "").catch(() => {});
+  wireSeparator(sp, {
+    key: SIDE_KEY, range: () => [SIDE_MIN, SIDE_MAX],
+    get: () => $("#side").getBoundingClientRect().width,
+    set: setSideWidth, reset: () => setSideWidth(0),
+    restore: (v) => { if (+v) setSideWidth(Math.min(SIDE_MAX, Math.max(SIDE_MIN, +v))); },
   });
 }
 
@@ -161,6 +143,7 @@ export function current() {
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
   // a list's export: under 管理, or under the list when the editor opened it (06 §2.17)
   if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : "plans";
+  if (S.screen === "plan-import") return "plans"; // 06 §2.17
   // 卸载 RimArcho is under 设置
   if (S.screen === "uninstall") return "settings";
   // adding an environment belongs to the environment page
@@ -181,7 +164,7 @@ function inGameMark(isInGame) {
   const sh = S.shell;
   if (!isInGame || !sh || !sh.inGame || !sh.plans || sh.plans.length < 2) return null;
   const m = el("span", "ingame-dot");
-  m.title = sh.inGame.text + " · " + T("switching lists writes no game file; writing to the game or launching does");
+  m.title = sh.inGame.text + T("; ") + T("switching lists writes no game file; writing to the game or launching does");
   return m;
 }
 
@@ -220,7 +203,7 @@ function renderSide() {
         const b = el("button", "nav-item" + (on ? " on" : "") + (kids.length ? " parent" : ""));
         b.dataset.id = it.id;
         // the label is the tooltip in the compact rail (magpie's); the key follows it
-        b.title = it.label + (it.key ? " · " + it.key.replace("shift", "Shift") : "");
+        b.title = it.label + (it.key ? T("; ") + it.key.replace("shift", "Shift") : "");
         const ic = el("span", "ic");
         ic.innerHTML = icon[ICONS[it.id]] || "";
         b.append(ic, el("span", "lbl", it.label));
@@ -315,11 +298,11 @@ export function renderLive() {
   if (box.dataset.sig !== text + "|" + errs) {
     box.dataset.sig = text + "|" + errs;
     box.innerHTML = "";
-    box.append(el("span", "t", text));
+    box.append(el("span", "t word-facts", text));
     if (errs) box.append(el("span", "badge-n num", errs));
   }
-  const full = text + (errs ? " · " + Tf("%d errors", +errs) : "");
-  box.title = full + " · " + (l && l.guess ? T("which list runs is taken from the launch records") : T("can it run"));
+  const full = text + (errs ? "  " + Tf("%d errors", +errs) : "");
+  box.title = full + T("; ") + (l && l.guess ? T("which list runs is taken from the launch records") : T("can it run"));
 }
 
 // crumbs: the breadcrumb of what is shown; every level opens its page (06 §2.2).
@@ -332,6 +315,7 @@ export function crumbs() {
   if (S.screen === "uninstall") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
   if (S.screen === "build") out = out.concat([{ label: T("create a pack"), id: "build" }]);
   if (S.screen === "plan-export" && S.planExport) out = ((sh && sh.crumbs && sh.crumbs["plan:" + S.planExport.id]) || []).concat([{ label: T("export"), id: "plan-export" }]);
+  if (S.screen === "plan-import") out = out.slice(0, -1).concat([{ label: T("import"), id: "plan-import" }]);
   return out;
 }
 
@@ -343,10 +327,10 @@ function renderCrumbs() {
   const env = $("#env");
   const sh = S.shell;
   let chip = (sh && sh.env) || "";
-  if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + " · " + chip;
-  env.textContent = chip;
+  if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + "  " + chip;
+  factText(env, chip);
   env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "uninstall" || S.screen === "textures" || S.screen === "tasks";
-  env.title = T("game") + " · E";
+  env.title = T("game") + T("; ") + "E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");
   let cs = crumbs();

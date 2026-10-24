@@ -40,7 +40,7 @@ func TestPreviewReadsDoNotHoldSharedLock(t *testing.T) {
 			go func() {
 				var err error
 				if page == "build" {
-					_, err = api.BuildPage(0)
+					_, err = buildPage(t, api, 0)
 				} else {
 					_, err = api.UninstallPlan(view.UninstallChoice{})
 				}

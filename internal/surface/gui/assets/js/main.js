@@ -6,8 +6,8 @@
 //   4. the hint line lists what you can do with the object now;
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
-import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
-import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
+import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
+import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
@@ -18,7 +18,7 @@ import * as fullPage from "./fulldetail.js";
 import * as guide from "./guide.js";
 import * as plans from "./plans.js";
 import * as library from "./library.js";
-import { initExchange, exchange } from "./exchange.js";
+import { initExchange, exchange, key as importKey, hintList as importHints } from "./exchange.js";
 import { icon } from "./icons.js";
 import * as motion from "./motion.js";
 import * as ops from "./ops.js";
@@ -27,27 +27,36 @@ import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
-import { withEnvironmentSwitch } from "./environment.js";
+import { environmentReason, withEnvironmentSwitch } from "./environment.js";
+import { wireSeparator } from "./separator.js";
 
 // ---- loading ----
 
-async function reload() {
-  let b;
-  try { b = await api.Board(); } catch (e) { say("fail", errText(e)); return; }
-  S.board = b;
+let reloadSeq = 0;
+async function reload(snapshot = null, read = null) {
+  if (S.busy.env && !snapshot && !read) return;
+  if (!read && !S.screen) return openEditor((ticket) => reload(snapshot, ticket), false, () => { render(); detailFollow(true); });
+  const seq = ++reloadSeq, gameRequest = S.envSeq;
+  const current = () => seq === reloadSeq && gameRequest === S.envSeq && (!read || read.current());
+  let b, sh, history;
+  try {
+    const result = snapshot || await api.Workspace();
+    if (!current() || result.stale) return;
+    b = result.board; sh = result.shell; history = result.history;
+  } catch (e) { if (read) throw e; if (current()) say("fail", errText(e)); return; }
+  if (!current()) return;
+  const apply = () => { S.board = b; S.shell = sh; S.history = history; };
+  if (read) read.commit(apply); else apply();
   S.busy.scan = b.scanning;
   S.busy.analyze = b.analyzing;
-  // no environment yet: the first-run guide says so, not an error
   if (b.error && b.envs && b.envs.length) say("fail", b.error);
   const cols = b.cols || [[], [], []];
-  const sh = shell.loadShell();
-  try { S.history = await api.History(); } catch { S.history = null; }
-  await sh;
   const keep = [0, 1, 2].map((k) => setItems(k, cols[k] || []));
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
-  render();
-  detailFollow();
+  if (!current()) return;
+  if (!read) { render(); detailFollow(); }
   await scr.logEnvironmentChanged();
+  return true;
 }
 
 let detailKey = "";
@@ -100,11 +109,12 @@ function renderTop() {
 // exportCurrent is the editor's e: the current list's export sub-page (06 §2.5, §2.17).
 function exportCurrent() {
   const p = S.shell && S.shell.plan;
-  if (!p) return exchange(1);
+  if (!p) return go("plans");
   return planManage.exportOf(p.id, "editor");
 }
 
 async function goLaunch() {
+  if (environmentReason()) return say("busy", environmentReason());
   await go("home");
   await homePage.focusLaunch();
 }
@@ -114,8 +124,9 @@ async function goLaunch() {
 // own menu (rename, copy, delete) and its "有未载入的外部版本" mark (04 §4.3).
 function planActions() {
   const u = (S.board && S.board.unsaved) || 0;
-  const btn = (label, k, run, cls = "") => {
+  const btn = (label, k, run, cls = "", envWrite = "") => {
     const b = el("button", "btn " + cls, label);
+    if (envWrite) b.dataset.envWrite = envWrite;
     if (k) { b.append(el("kbd", "", k)); b.title = k; }
     b.onclick = (e) => { e.stopPropagation(); run(); };
     return b;
@@ -125,7 +136,7 @@ function planActions() {
   if (plan && plan.conflict) {
     const m = el("button", "chip mark");
     m.append(el("span", "dot"), el("span", "t", plan.conflictText));
-    m.title = plan.conflictText + " · " + T("can it run › needs your answer");
+    m.title = plan.conflictText + T("; ") + T("can it run › needs your answer");
     m.onclick = (e) => { e.stopPropagation(); go("needs"); };
     out.push(m);
   }
@@ -135,16 +146,16 @@ function planActions() {
     motion.bump("unwritten", n, u);
     out.push(n);
   } else motion.bump("unwritten", null, 0);
-  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("import / export"), "i", () => exchange(0)),
-    btn(T("create a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
+  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only", "undo"), btn(T("import"), "i", () => exchange()), btn(T("export"), "e", exportCurrent),
+    btn(T("create a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : "", "save"));
   if (plan) {
     const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");
-    more.title = T("the list: rename, copy, delete") + " · P";
+    more.title = T("the list: rename, copy, delete") + T("; ") + "P";
     out.push(more);
   }
   // 启动游戏 opens 启动, where the game starts (06 §2.5)
-  const l = btn(T("launch the game"), "L", goLaunch, "primary");
-  l.title = T("opens the launch page, where the game starts") + " · L";
+  const l = btn(T("launch the game"), "L", goLaunch, "primary", "launch");
+  l.title = T("opens the launch page, where the game starts") + T("; ") + "L";
   out.push(l);
   return out;
 }
@@ -155,34 +166,44 @@ let lastList = 1;
 const NAV = ["home", "needs", "log", "library", "plans", "packs", "textures", "env"];
 
 // go opens a sidebar page; "plan" is the current plan's editor, "plan:<id>" a plan (it
-// becomes current: no game file is written), "plan:new" the new-plan dialog, "pack:<name>"
+// becomes current: no game file is written), "plan:new" the new-list form, "pack:<name>"
 // a pack on the packs page.
 async function go(id) {
   if (uninst.locked()) return; // an uninstall runs, or has run (06 §2.14)
   shell.navigated();
   if (id === "plan:new") return plans.newPlan();
-  if (id.startsWith("plan:")) {
-    if (!(await plans.openPlan(+id.slice(5)))) return;
-    id = "plan";
-  }
+  const plan = id.startsWith("plan:") ? +id.slice(5) : null;
+  if (plan !== null) id = "plan";
   S.packFocus = id.startsWith("pack:") ? id.slice(5) : null;
+  if (id !== "plans") planManage.abandon();
   if (id !== "build") S.buildFrom = null;
   if (id !== "plan-export") S.planExport = null;
-  await openPage(id);
+  await openPage(id, plan);
   // a page already shown is redrawn in place: its sub-entry and breadcrumb follow too
   renderWhere();
 }
 
-async function openPage(id) {
+async function openPage(id, plan = null) {
   if (S.packFocus) return packsPage.pack(S.packFocus);
   switch (id) {
     case "plan":
-      if (scr.closeScreen()) detailFollow(true);
-      return renderWhere();
+      return openEditor(async (read) => {
+        if (plan !== null && plan !== S.shell?.plan?.id && !S.busy.env) {
+          await api.UsePlan(plan);
+          if (!read.current()) return false;
+          S.cols.forEach((c, k) => {
+            c.query = ""; c.cursor = 0; c.sel.clear(); c.searching = false;
+            const input = $(`.area[data-area="${k}"] .search input`);
+            if (input) input.value = "";
+          });
+        }
+        return reload(null, read);
+      }, plan !== null && plan !== S.shell?.plan?.id, () => { render(); detailFollow(true); });
     case "home": return homePage.home();
     case "needs": return scr.needs();
     case "packs": return packsPage.list();
     case "plans": return planManage.open();
+    case "plan-import": return exchange();
     case "plan-export": return planManage.exportOf(planManage.exportPlan(), planManage.exportFrom());
     case "build": return packsPage.build();
     case "env": return scr.environment();
@@ -215,14 +236,14 @@ function renderWhere() {
   } else if (S.focus === 3) {
     const sc = $(".detail .scroll");
     const pct = sc.scrollHeight > sc.clientHeight ? Math.round(100 * sc.scrollTop / (sc.scrollHeight - sc.clientHeight)) : 100;
-    s = `${T("details")} · ${S.detail ? S.detail.name : "—"} · ${pct}%`;
+    s = `${T("details")}    ${S.detail ? S.detail.name : "—"}    ${pct}%`;
   } else {
     const c = col();
-    s = `${T(AREAS[S.focus])} · ${c.view.length ? c.cursor + 1 : 0} / ${c.view.length}`;
-    if (c.sel.size) s += " · " + Tf("%d selected", c.sel.size);
+    s = `${T(AREAS[S.focus])}    ${c.view.length ? c.cursor + 1 : 0} / ${c.view.length}`;
+    if (c.sel.size) s += "  " + Tf("%d selected", c.sel.size);
   }
   if (S.popup) s += " › " + S.popup.title;
-  $("#where").textContent = s;
+  factText($("#where"), s);
 }
 
 // actions: what can be done with the object now (the hint line and the context menu).
@@ -264,17 +285,23 @@ function renderHints() {
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "home") list = homePage.hintList();
   else if (S.screen === "packs" || S.screen === "build") list = packsPage.hintList();
+  else if (S.screen === "plan-import") list = importHints();
   else if (S.screen === "plans" || S.screen === "plan-export") list = planManage.hintList();
   else if (S.screen) list = [{ key: "shift+1–8", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);
   const c = S.focus < 3 ? col() : null;
-  if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)), el("span", "sep", "·"));
-  list.slice(0, 7).forEach((a, i) => {
-    if (i) h.append(el("span", "sep", "·"));
-    h.append(el("b", "", a.key), " " + a.label);
+  if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
+  list.slice(0, 7).forEach((a) => {
+    const group = el("span", "hint-group");
+    group.append(el("b", "", a.key), " " + a.label);
+    h.append(group);
   });
-  if (c && c.sel.size && !S.screen) h.append(el("span", "sep", "·"), el("b", "", "esc"), " " + T("clear the selection"));
+  if (c && c.sel.size && !S.screen) {
+    const group = el("span", "hint-group");
+    group.append(el("b", "", "esc"), " " + T("clear the selection"));
+    h.append(group);
+  }
 }
 
 // foldShortcuts: ctrl+o and ctrl+w share one place in the hint line.
@@ -372,6 +399,7 @@ async function edited(p, undoable = true, ids = null) {
 }
 
 async function verb(name) {
+  if (environmentReason() && !["full", "workshop", "folder", "workshop-id", "steam", "needs"].includes(name)) return say("busy", environmentReason());
   const k = S.focus < 3 ? S.focus : lastList;
   const sel = S.focus < 3 ? selection() : (cur(lastList) ? [cur(lastList)] : []);
   const ids = idsOf(sel);
@@ -488,6 +516,7 @@ async function preview(what) {
 
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
+  if (environmentReason() && ["launch", "sort", "save", "undo", "redo", "restore-all", "stage-all", "rescan", "analyze"].includes(id)) return say("busy", environmentReason());
   // A page replaces the page shown once its data is in: the mod list never shows between.
   const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures", tasks: "tasks" };
   if (pages[id]) return go(pages[id]);
@@ -524,22 +553,31 @@ async function chooseEnv() {
   const envs = (S.board && S.board.envs) || [];
   if (!envs.length) return say("", T("no games yet (archo env add)"));
   pop.choose(T("switch game"), envs, (i) => useEnv(envs[i]),
-    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove the game"), run: (i) => scr.removeEnv(envs[i]) });
+    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove the game"), envWrite: "remove-env", run: (i) => scr.removeEnv(envs[i]) });
 }
 
-async function useEnv(name, refresh) {
+async function useEnv(name) {
   try {
-    return await withEnvironmentSwitch(name, async () => {
-      const text = await api.UseEnv(name);
+    const switched = await withEnvironmentSwitch(name, async (current) => {
+      const result = await api.UseEnv(name);
+      if (!current() || result.stale) return;
       for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
-      await reload();
-      if (refresh) await refresh();
-      say("ok", text);
+      await reload(result);
+      if (current()) await refreshEnvironment();
+      if (current()) say("ok", result.text);
     });
+    return switched;
   } catch (e) {
     say("fail", errText(e));
     return false;
   }
+}
+
+// Refresh whichever page is visible now; completing a switch never returns to its caller.
+async function refreshEnvironment() {
+  S.screenSeq++;
+  if (!S.screen) return openPage("plan");
+  if (S.screen && S.screen !== "guide") await openPage(S.screen);
 }
 
 function commandLine() {
@@ -730,8 +768,7 @@ async function delKey() {
 // ---- the keyboard ----
 
 function onKey(e) {
-  if (S.busy.env) { e.preventDefault(); return; }
-  if (e.isComposing) return;
+  if (e.isComposing || e.defaultPrevented) return;
   const k = e.key;
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
   if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
@@ -740,7 +777,10 @@ function onKey(e) {
   // ctrl+j: 后台任务 from any page; again goes back (06 §2.16)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "j" && !S.popup) { e.preventDefault(); shell.navigated(); tasksPage.toggle(); renderWhere(); return; }
   if (pop.popupKey(e)) return;
-  if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+  if (k === "Escape" && S.screen === "plan-import") return importKey(e);
+  if (k === "Escape" && S.screen === "plans") return planManage.key(e);
+  if (document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
+  if ((k === "u" || ((e.ctrlKey || e.metaKey) && k === "z")) && !S.busy.env && undoStatus()) { e.preventDefault(); return; }
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
   // shift+1–8: the sidebar's entries. By the physical key, so it works on any layout
   // (shift+1 is "!" on a US keyboard, shift+3 is "#").
@@ -753,7 +793,13 @@ function onKey(e) {
   // tab / shift+tab: the next / previous page under the same sidebar entry (Mod 库存's 全部 and
   // 变化, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
   // (on the pages with forms, settings and the like, tab keeps moving the focus)
-  if (k === "Tab" && !e.ctrlKey && !e.altKey && (!S.screen || S.screen === "library" || S.screen === "changes" || S.screen === "packs")) { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
+  // Pages with adjustable cards keep native tab order to reach their gaps (06 §3.1).
+  if (e.target.closest?.('[role="separator"]') && k === "Tab") return;
+  if (k === "Tab" && !e.ctrlKey && !e.altKey && (S.screen === "changes" || S.screen === "packs")) { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
+  if (!S.screen && scr.pageLoading()) {
+    if ((e.ctrlKey || e.metaKey) && k === "k") { e.preventDefault(); pop.palette(); }
+    return;
+  }
   if (S.screen) {
     // esc (and enter) leave the full detail for the plan; the sidebar's pages are side by
     // side, so esc does not go from one to another (06 §3.1)
@@ -771,9 +817,11 @@ function onKey(e) {
     if (S.screen !== "home" && scr.areaKey(e)) return;
     if (S.screen === "home") return homePage.homeKey(e);
     if (S.screen === "packs" || S.screen === "build") return packsPage.packsKey(e);
+    if (S.screen === "plan-import") return importKey(e);
     if (S.screen === "plans" || S.screen === "plan-export") return planManage.key(e);
     if (S.screen === "needs") return scr.needsKey(e);
     if (S.screen === "library") return library.key(e);
+    if (S.screen === "textures") return tex.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     if (S.screen === "full") return scr.fullKey(e);
     return;
@@ -853,35 +901,39 @@ const COLS = () => [$("#board > .fcol"), $('.area[data-area="1"]'), $("#board .s
 function wireSplits() {
   const board = $("#board");
   const key = () => "ui.gui.columns:" + ((S.board && S.board.env) || "");
-  $$(".split").forEach((sp) => {
-    sp.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      const widths = COLS().map((a) => a.getBoundingClientRect().width);
-      const lo = +sp.dataset.split, hi = lo + 1;
-      const x0 = e.clientX;
-      sp.classList.add("drag");
-      const move = (ev) => {
-        const dx = ev.clientX - x0;
-        const w = widths.slice();
-        w[lo] = Math.max(160, widths[lo] + dx);
-        w[hi] = Math.max(160, widths[hi] - dx);
-        // a hidden column (a narrow window) keeps a usable width for when it shows again
-        w.forEach((v, j) => board.style.setProperty(`--c${j}`, (v || 220) + "fr"));
-      };
-      const up = () => {
-        sp.classList.remove("drag");
-        removeEventListener("mousemove", move);
-        removeEventListener("mouseup", up);
-        const vals = [0, 1, 2].map((j) => board.style.getPropertyValue(`--c${j}`)).join(",");
-        api.SetSetting(key(), vals).catch(() => {});
-        for (const k of [0, 1, 2]) renderRows(k);
-      };
-      addEventListener("mousemove", move);
-      addEventListener("mouseup", up);
+  $$("#board > .split").forEach((sp) => {
+    const lo = +sp.dataset.split, hi = lo + 1;
+    wireSeparator(sp, {
+      key, get: () => COLS()[lo].getBoundingClientRect().width,
+      range: () => [160, COLS()[lo].getBoundingClientRect().width + COLS()[hi].getBoundingClientRect().width - 160],
+      set: (value) => {
+        const widths = COLS().map((a) => a.getBoundingClientRect().width);
+        widths[hi] -= value - widths[lo]; widths[lo] = value;
+        // Hidden columns keep a usable width for when they show again (06 §2.5).
+        widths.forEach((v, j) => board.style.setProperty(`--c${j}`, (v || 220) + "fr"));
+      },
+      reset: () => [0, 1, 2].forEach((j) => board.style.removeProperty(`--c${j}`)),
+      serialize: () => [0, 1, 2].map((j) => board.style.getPropertyValue(`--c${j}`)).join(","),
+      changed: () => { for (const k of [0, 1, 2]) renderRows(k); },
     });
-    sp.addEventListener("dblclick", () => {
-      [0, 1, 2].forEach((j) => board.style.removeProperty(`--c${j}`));
-      api.SetSetting(key(), "").catch(() => {});
+  });
+  // Expanded staging/history share the detail column (06 §3.1, 06 §2.5).
+  const stack = board.querySelector(".stack");
+  stack.querySelectorAll(".fold").forEach((card, i) => {
+    const gap = el("div", "hsplit stack-split");
+    stack.insertBefore(gap, card);
+    const set = (v) => {
+      card.classList.toggle("stack-sized", !!v);
+      if (v) card.style.setProperty("--stack-size", v + "px");
+      else card.style.removeProperty("--stack-size");
+    };
+    wireSeparator(gap, {
+      axis: "y", direction: -1, key: "ui.gui.plan." + (i ? "history" : "stage"),
+      enabled: () => card.classList.contains("open") && !card.hidden,
+      range: () => [72, stack.clientHeight - 148 - [...stack.querySelectorAll(".fold")]
+        .filter((other) => other !== card).reduce((h, other) => h + other.getBoundingClientRect().height, 0)],
+      get: () => card.getBoundingClientRect().height, set, reset: () => set(0), restore: (v) => set(+v || 0),
+      changed: () => renderRows(2),
     });
   });
 }
@@ -898,10 +950,13 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
+  reload, refreshEnvironment, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
+  newList: (from) => planManage.newList(null, from),
+  selectedList: () => planManage.selected(),
+  resumeGuide: () => guide.resume(),
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   afterImport: null, // the first-run guide's next step once an import is applied
 };

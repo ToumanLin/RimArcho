@@ -26,13 +26,13 @@ func fieldLines(fs []view.Field, w int) []string {
 				vals = append(vals, depLine(x, f.Kind == view.FieldConflicts))
 			}
 		case view.FieldTags:
-			v := strings.Join(f.List, " "+markDot+" ")
+			v := strings.Join(f.List, "  ")
 			if len(f.List) == 0 {
-				v = sDimS.Render(T("none · g adds"))
+				v = sDimS.Render(T("none, g adds"))
 			}
 			vals = []string{v}
 		case view.FieldWorkshop:
-			vals = []string{f.Value + sDimS.Render(" "+markDot+" ctrl+w "+T("web page")+" · ctrl+s "+T("steam page"))}
+			vals = []string{f.Value + sDimS.Render("  ctrl+w "+T("web page")+"   ctrl+s "+T("steam page"))}
 		case view.FieldAlias:
 			vals = []string{f.Value + sDimS.Render("  ("+f.Extra+")")}
 		default:

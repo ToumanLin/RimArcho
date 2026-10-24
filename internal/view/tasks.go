@@ -21,6 +21,13 @@ const (
 	TaskTextures  = OpTextures
 	TaskTexClean  = OpTexClean
 	TaskDownload  = "download"
+	TaskSteamCMD  = "install-steamcmd"
+	TaskTodds     = "install-todds"
+	TaskData      = "data-update"
+	TaskCache     = "cache-clear"
+	TaskBackup    = "db-backup"
+	TaskVacuum    = "db-vacuum"
+	TaskGC        = "gc"
 	PageTasks     = "tasks"
 	taskKeyStop   = "x"
 	taskKeyRetry  = "r"
@@ -28,6 +35,15 @@ const (
 	taskKeyFolder = "ctrl+o"
 	taskKeyForget = "Del"
 )
+
+// IsSettingTask identifies maintenance tasks shared by settings and the guide.
+func IsSettingTask(kind string) bool {
+	switch kind {
+	case TaskSteamCMD, TaskTodds, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
+		return true
+	}
+	return false
+}
 
 // TaskLane returns the lane a Mod 库 op runs in ("" when it is not a background task:
 // plan edits run at once).
@@ -73,7 +89,7 @@ type TaskRow struct {
 	Steps     []TaskStep    `json:"steps,omitempty"`
 	Acts      []TaskAct     `json:"acts"`
 	Items     []TaskItemRow `json:"items,omitempty"`
-	Counts    string        `json:"counts,omitempty"` // "完成 12 · 失败 2"
+	Counts    string        `json:"counts,omitempty"` // "完成 12  失败 2"
 	NoItems   string        `json:"noItems,omitempty"`
 	Target    string        `json:"target,omitempty"` // the page o opens
 	Seen      bool          `json:"seen"`
@@ -118,6 +134,20 @@ func TaskTitle(kind string) string {
 		return T("create a pack")
 	case TaskDownload:
 		return T("download the game")
+	case TaskSteamCMD:
+		return T("download SteamCMD")
+	case TaskTodds:
+		return T("download todds…")
+	case TaskData:
+		return T("update the community data")
+	case TaskCache:
+		return T("clear cache")
+	case TaskBackup:
+		return T("back up the database")
+	case TaskVacuum:
+		return T("compact the database")
+	case TaskGC:
+		return T("remove old tombstones")
 	}
 	if l := opLabel(kind); l != "" {
 		return l
@@ -132,7 +162,7 @@ func TaskLaneText(l string) (string, string) {
 	case app.LaneSteam:
 		return "Steam", T("handed to the running Steam client one by one")
 	}
-	return "RimArcho", T("in its own process; the window stays free")
+	return "RimArcho", T("one of each kind at a time; different kinds can run together")
 }
 
 // TaskStateText is a task state in words.
@@ -308,7 +338,7 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 		}
 	}
 	if t.Closed {
-		result = joinDot(T("stopped when the window closed"), result)
+		result = joinFacts(T("stopped when the window closed"), result)
 	}
 	phase := t.Phase
 	if phase != "" && t.Lane == app.LaneFiles {
@@ -319,14 +349,14 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	switch t.State {
 	case app.TaskRunning:
 		r.Line = phase
-		r.Say = joinDot(T("running"), r.Count, phase)
+		r.Say = joinFacts(T("running"), r.Count, phase)
 		r.Bar = true
 	case app.TaskQueued:
 		r.Line = Tf("waiting in the %s queue for the one before", r.LaneText)
-		r.Say = joinDot(T("queued"), r.Line)
+		r.Say = joinFacts(T("queued"), r.Line)
 	default:
 		r.Line = result
-		r.Say = joinDot(r.StateText, result)
+		r.Say = joinFacts(r.StateText, result)
 		r.Bar = t.State == app.TaskStopped || t.State == app.TaskPartial || (t.State == app.TaskFailed && t.Total > 1)
 	}
 	if t.Kind == TaskPack {
@@ -358,7 +388,7 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 				parts = append(parts, itemStateText(s)+" "+fmt.Sprint(c[s]))
 			}
 		}
-		r.Counts = strings.Join(parts, " · ")
+		r.Counts = strings.Join(parts, "  ")
 	}
 	r.Target = taskTarget(t)
 	if len(t.Items) == 0 {
@@ -374,18 +404,20 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	return r
 }
 
-func joinDot(parts ...string) string {
+func joinFacts(parts ...string) string {
 	var out []string
 	for _, p := range parts {
 		if p != "" {
 			out = append(out, p)
 		}
 	}
-	return strings.Join(out, " · ")
+	return strings.Join(out, "  ")
 }
 
 func taskTarget(t *app.Task) string {
 	switch t.Kind {
+	case TaskSteamCMD, TaskTodds, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
+		return PageSettings
 	case TaskScan:
 		return PageChanges
 	case TaskAnalyze:
@@ -416,6 +448,8 @@ func TaskTargetName(target string) string {
 		return T("texture optimisation")
 	case target == PageEnv:
 		return T("game")
+	case target == PageSettings:
+		return T("settings")
 	}
 	return T("mod library")
 }
@@ -439,10 +473,13 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 		switch {
 		case c[app.ItemFail] > 0:
 			a = append(a, TaskAct{ID: "retry", Label: Tf("try the %d failed again", c[app.ItemFail]), Key: taskKeyRetry, Primary: true})
-		case t.Lane == app.LaneSelf && (t.Kind == TaskScan || t.Kind == TaskAnalyze):
+		case t.Lane == app.LaneSelf && (t.Kind == TaskScan || t.Kind == TaskAnalyze || IsSettingTask(t.Kind)):
 			a = append(a, TaskAct{ID: "retry", Label: T("try again"), Key: taskKeyRetry, Primary: true})
 		}
 	case app.TaskStopped:
+		if IsSettingTask(t.Kind) {
+			a = append(a, TaskAct{ID: "retry", Label: T("try again"), Key: taskKeyRetry, Primary: true})
+		}
 		if c[app.ItemSkip] > 0 {
 			a = append(a, TaskAct{ID: "resume", Label: Tf("do the %d left", c[app.ItemSkip]), Key: taskKeyRetry, Primary: true})
 		}
@@ -459,13 +496,16 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 
 func init() {
 	Register(map[string]string{
+		"clear cache":             "清除缓存",
+		"back up the database":    "备份数据库",
+		"compact the database":    "压缩数据库",
 		"scan the mods":           "扫描 Mod",
 		"check whether it runs":   "检查能不能跑",
 		"download the game":       "下载游戏",
 		"files":                   "文件",
 		"one at a time, in order": "一次一项，按顺序做",
-		"handed to the running Steam client one by one": "一项一项交给正在运行的 Steam 客户端",
-		"in its own process; the window stays free":     "在自己的进程里做，不卡界面",
+		"handed to the running Steam client one by one":                "一项一项交给正在运行的 Steam 客户端",
+		"one of each kind at a time; different kinds can run together": "同一种一次一个，不同种可以同时",
 		"queued":                             "排队中",
 		"running":                            "进行中",
 		"done":                               "完成",
@@ -504,16 +544,16 @@ func init() {
 
 func init() {
 	Register(map[string]string{
-		"the task's items":                                                 "这个任务的每一项",
-		"back to the tasks":                                                "回到任务",
-		"stop the rest / cancel the wait":                                  "停止后续 / 取消排队",
-		"try the failed again / do the ones left":                          "重试失败的 / 继续剩下的",
-		"a waiting task later / sooner":                                    "排队的任务往后 / 往前",
-		"go to the page it changed":                                        "去它改动的页面",
-		"take off the record · put it back":                                "从记录里去掉 · 放回",
-		"take the done ones off the record":                                "清除已完成",
-		"the items' headers: sort and columns · the sorted column's width": "每一项的表头：排序和列 · 排序列的宽度",
-		"select tasks":                                                     "选择任务",
-		"background tasks; again goes back":                                "后台任务；再按一次回去",
+		"the task's items":                                                "这个任务的每一项",
+		"back to the tasks":                                               "回到任务",
+		"stop the rest / cancel the wait":                                 "停止后续 / 取消排队",
+		"try the failed again / do the ones left":                         "重试失败的 / 继续剩下的",
+		"a waiting task later / sooner":                                   "排队的任务往后 / 往前",
+		"go to the page it changed":                                       "去它改动的页面",
+		"take off the record, put it back":                                "从记录里去掉，放回",
+		"take the done ones off the record":                               "清除已完成",
+		"the items' headers: sort and columns, the sorted column's width": "每一项的表头：排序和列，排序列的宽度",
+		"select tasks":                                                    "选择任务",
+		"background tasks; again goes back":                               "后台任务；再按一次回去",
 	})
 }

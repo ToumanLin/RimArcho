@@ -16,13 +16,15 @@ import (
 // PackRow is one pack on the screen.
 type PackRow struct {
 	Name   string `json:"name"`
-	Facts  string `json:"facts"` // "42 mods · 1.2 GB · 1.6 · built 10 月 20 日"
+	Facts  string `json:"facts"` // "42 mods  1.2 GB  1.6  built 10 月 20 日"
 	Played string `json:"played"`
 	Mods   int    `json:"mods"`
+	Size   string `json:"size"`
+	Bytes  int64  `json:"bytes"`
 	// Versions are the game versions it runs on: "1.6", or "1.5–1.6" (PackVersions).
 	Versions string `json:"versions,omitempty"`
 	// PlayedAt is when it was last played (zero: never); the home page sorts by it.
-	PlayedAt time.Time `json:"-"`
+	PlayedAt time.Time `json:"playedAt"`
 }
 
 // PackRows lists the current environment's packs; others counts the other environments'.
@@ -40,7 +42,7 @@ func PackRows(a *app.App) (out []PackRow, others int, err error) {
 
 func packRows(a *app.App, ps []*app.PackInfo) (out []PackRow) {
 	for _, p := range ps {
-		r := PackRow{Name: p.Name, Mods: len(p.Entries), Versions: PackVersions(a, p.Pack), Facts: Tf("%d mods · %s · %s · created %s", len(p.Entries), SizeText(p.Bytes), p.Game, ShortDate(p.Created)), Played: T("never played")}
+		r := PackRow{Name: p.Name, Mods: len(p.Entries), Size: SizeText(p.Bytes), Bytes: p.Bytes, Versions: PackVersions(a, p.Pack), Facts: Tf("%d mods  %s  %s  created %s", len(p.Entries), SizeText(p.Bytes), p.Game, ShortDate(p.Created)), Played: T("never played")}
 		if !p.LastPlayed.IsZero() {
 			r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 			r.PlayedAt = p.LastPlayed
@@ -152,9 +154,9 @@ func ProgressOf(p *app.BuildProgress) PackProgress {
 		out.Step, out.Text = 2, Tf("measuring %d mods…", p.ModsTotal)
 	case app.StepCopy:
 		out.Step = 2
-		out.Text = Tf("%d of %d mods · %s of %s", p.Mods, p.ModsTotal, SizeText(p.Bytes), SizeText(p.BytesTotal))
+		out.Text = Tf("%d of %d mods  %s of %s", p.Mods, p.ModsTotal, SizeText(p.Bytes), SizeText(p.BytesTotal))
 		if p.Mod != "" {
-			out.Text += " · " + p.Mod
+			out.Text += "  " + p.Mod
 		}
 		if p.BytesTotal > 0 {
 			out.Frac = float64(p.Bytes) / float64(p.BytesTotal)
@@ -163,7 +165,7 @@ func ProgressOf(p *app.BuildProgress) PackProgress {
 		out.Step = 3
 		out.Text = Tf("converting %d of %d textures", p.Files, p.FilesTotal)
 		if p.Mod != "" {
-			out.Text += " · " + p.Mod
+			out.Text += "  " + p.Mod
 		}
 		if p.FilesTotal > 0 {
 			out.Frac = float64(p.Files) / float64(p.FilesTotal)
@@ -197,10 +199,10 @@ func UnfinishedRows(a *app.App) ([]UnfinishedRow, error) {
 		switch {
 		case u.Running:
 			p := ProgressOf(u.Progress)
-			r.Progress, r.Facts = &p, T("creating")+" · "+p.Text
+			r.Progress, r.Facts = &p, T("creating")+"  "+p.Text
 		case u.Progress != nil:
 			r.Copied = SizeText(u.Progress.Bytes)
-			r.Facts = Tf("an unfinished pack, stopped at %d of %d mods (%s copied) · %s", u.Progress.Mods, u.Progress.ModsTotal, SizeText(u.Progress.Bytes), ShortDate(u.Progress.Beat))
+			r.Facts = Tf("an unfinished pack, stopped at %d of %d mods (%s copied), %s", u.Progress.Mods, u.Progress.ModsTotal, SizeText(u.Progress.Bytes), ShortDate(u.Progress.Beat))
 		default:
 			r.Facts = T("an unfinished build")
 		}

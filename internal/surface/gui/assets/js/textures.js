@@ -1,14 +1,19 @@
-// 库 › 贴图优化 (08 §5.2, 06 §2.1): the current plan's (or every mod's) PNG textures, what
+// 库 › 贴图优化 (08 §5.2, 06 §2.13): the current plan's (or every mod's) PNG textures, what
 // RimArcho converted and what went stale, what converting at a scale would take and save,
 // then the run in the background ("textures" events), stop, and take everything back. The
 // encoder (todds) is downloaded only after the player saw where from and how big.
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, button } from "./screens.js";
+import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { beginPageRead, pageLoading, page, button } from "./screens.js";
 import * as pop from "./popups.js";
+import { createTable } from "./datatable.js";
+import { textureColumns } from "./tabledefs.js";
 
 const X = { scope: "plan", scale: 100, page: null, prog: null, seq: 0, loading: false, error: "" };
 
-export async function open() { openScreen("textures"); return draw(true); }
+export async function open() {
+  const read = beginPageRead("textures", { label: "reading textures…", retry: open });
+  return draw(true, false, read);
+}
 
 // event is a "textures" event: the run's progress, then its end.
 export function event(ev) {
@@ -19,16 +24,17 @@ export function event(ev) {
     return;
   }
   X.prog = ev;
-  if (S.screen !== "textures") { say("busy", T("converting textures") + " · " + ev.text); return; }
+  if (S.screen !== "textures") { say("busy", T("converting textures") + "  " + ev.text); return; }
+  $("#screen").querySelectorAll("select").forEach((s) => { s.disabled = true; });
   const f = $("#screen .tex-foot");
-  if (f) f.replaceWith(foot(X.page));
+  if (f) f.replaceWith(slot(foot(X.page), "foot"));
 }
 
 function setRow(card, name, sub, ...right) {
   const row = el("div", "set");
   const l = el("div", "l");
   l.append(el("div", "name", name));
-  if (sub) for (const s of [].concat(sub)) if (s) l.append(el("div", "sub", s));
+  if (sub) for (const s of [].concat(sub)) if (s) l.append(el("div", "sub word-facts", s));
   const r = el("div", "r");
   for (const x of right) if (x) r.append(x);
   row.append(l, r);
@@ -47,58 +53,101 @@ function select(f, values, labels, value, onchange) {
     s.append(o);
   });
   s.onchange = () => onchange(s.value);
-  s.disabled = !!X.prog || X.loading;
+  s.disabled = !!X.prog;
   return s;
 }
 
-async function draw(fetch) {
+// Pending values use the shared shimmer, with text for screen readers (06 §7.1).
+function pending(lines = 1) {
+  const s = el("span", "skel tex-pending");
+  s.setAttribute("role", "img");
+  s.setAttribute("aria-label", T("reading textures…"));
+  for (let i = 0; i < lines; i++) s.append(el("span", "bar"));
+  return s;
+}
+
+async function draw(fetch, measurements = false, entryRead = null) {
   if (S.screen !== "textures") return;
   if (fetch) {
-    const n = ++X.seq, epoch = S.screenSeq;
+    const read = entryRead || beginPageRead("textures", { label: "reading textures…", retry: open });
+    const n = ++X.seq;
+    const progress = X.prog;
     X.loading = true; X.error = "";
-    draw(false);
-    const current = () => n === X.seq && S.screen === "textures" && S.screenSeq === epoch;
+    if (X.page) X.page = { ...X.page, loading: true, rows: (X.page.rows || []).map((r) => ({ ...r, pending: true })) };
+    if (!pageLoading() && !entryRead) draw(false);
+    const current = () => n === X.seq && read.current();
     try {
-      const p = await api.Textures(X.scope, X.scale);
+      let p = await api.Textures(X.scope, X.scale);
       if (!current()) return;
-      X.page = p;
-      X.prog = p.running || X.prog;
-      if (!p.running && X.prog && !X.prog.done) X.prog = null;
+      if (X.prog === progress) X.prog = p.running || null;
+      // Both the request and the page visit must still match after every await (06 §3.1).
+      while (current() && p) {
+        X.page = p;
+        X.loading = !!p.loading;
+        X.error = p.error || "";
+        draw(false, true);
+        if (X.error) say("fail", X.error);
+        if (!p.loading) { read.finish(); return; }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        if (!current()) return;
+        p = await api.TextureMeasure(p.request);
+        if (!current()) return;
+      }
     } catch (e) {
       if (!current()) return;
-      X.error = errText(e); say("fail", X.error);
+      X.loading = false;
+      X.error = errText(e); read.fail(e);
+      if (pageLoading()) return;
+      if (X.page) X.page = { ...X.page, loading: false, rows: (X.page.rows || []).map((r) => ({ ...r, pending: false })) };
     }
     if (!current()) return;
     X.loading = false;
+    read.finish();
   }
   const p = X.page;
   const sc = $("#screen");
-  if (!p) { sc.innerHTML = ""; sc.append(page("textures", X.error || T("reading textures…"))); return; }
+  if (!p) {
+    sc.innerHTML = "";
+    const w = page("textures", X.error);
+    w.setAttribute("aria-busy", String(X.loading));
+    if (!X.error) w.append(pending(3));
+    sc.append(w);
+    return;
+  }
   const top = sc.scrollTop;
   const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.f;
-  sc.innerHTML = "";
-  const w = page("textures", T("the game loads a .dds in place of the .png of the same name: no PNG to decode at start, and opaque textures take half the video memory"));
-  sc.append(w);
+  const oldPage = sc.querySelector(".textures");
+  const previous = measurements && oldPage && oldPage.querySelector("[data-tex]") && oldPage;
+  if (!previous) sc.innerHTML = "";
+  const w = page("textures", "");
+  if (!previous) sc.append(w);
   w.setAttribute("aria-busy", String(X.loading));
-  if (X.loading || X.error) w.append(el("div", "muted", X.error || T("reading textures…")));
+  const error = el("div", "muted", X.error);
+  error.hidden = !X.error;
+  w.append(slot(error, "error"));
 
   // the encoder
   w.append(el("div", "label section", T("encoder")));
   const enc = el("section", "card settings");
-  setRow(enc, T("the DDS encoder"), p.toolOk ? null : [p.offer, p.offerTo && "→ " + p.offerTo], p.toolOk ? el("span", "muted", p.tool) : null,
-    p.toolOk ? null : button(T("download todds…"), "", () => install(p), "primary"));
-  if (!p.toolOk) enc.querySelector(".name").after(el("div", "sub warn", p.tool));
-  w.append(enc);
+  if (!p.tool) setRow(enc, T("the DDS encoder"), null, X.error ? null : pending());
+  else {
+    setRow(enc, T("the DDS encoder"), p.toolOk ? null : [p.offer, p.offerTo && "→ " + p.offerTo], p.toolOk ? el("span", "muted word-facts", p.tool) : null,
+      p.toolOk ? null : button(T("download todds…"), "", () => install(p), "primary"));
+    if (!p.toolOk) enc.querySelector(".name").after(el("div", "sub warn", p.tool));
+  }
+  w.append(slot(enc, "encoder"));
 
   // what is there
   w.append(el("div", "label section", T("what is there")));
   const now = el("section", "card settings");
-  setRow(now, T("mods"), Tf("%d mods", p.mods),
+  const mods = setRow(now, T("mods"), Tf("%d mods", p.mods),
     select("scope", ["plan", "all"], [T("the current plan"), T("every installed mod")], X.scope, (v) => { X.scope = v; draw(true); }));
-  setRow(now, "PNG", p.png);
-  if (p.ours) {
-    setRow(now, T("RimArcho's DDS"), [p.ours, p.staleText], button(T("remove every converted texture…"), "", () => clean(), "danger"));
-  }
+  const modCount = mods.querySelector(".sub");
+  modCount.dataset.texMods = "";
+  fillModCount(modCount, p);
+  slot(setRow(now, "PNG", p.loading ? null : p.png, p.loading ? pending() : null), "png");
+  const ours = slot(setRow(now, T("RimArcho's DDS"), [p.ours, p.staleText], button(T("remove every converted texture…"), "", () => clean(), "danger", "textures-clean")), "ours");
+  ours.hidden = !p.ours || !!p.loading;
   w.append(now);
 
   // what converting does
@@ -109,28 +158,84 @@ async function draw(fetch) {
   const facts = [...(p.estFacts || [])];
   if (p.upToDate) facts.push(Tf("%d up to date", p.upToDate));
   if (p.leftAlone) facts.push(Tf("%d left alone (a DDS of the mod's own, or another format of the same name)", p.leftAlone));
-  setRow(est, T("convert"), facts);
+  slot(setRow(est, T("convert"), p.loading ? null : facts, p.loading ? pending() : null), "estimate");
   setRow(est, "", T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back"));
   w.append(est);
-  w.append(foot(p));
+  w.append(slot(foot(p), "foot"));
 
-  // the mods, the biggest first
-  if ((p.rows || []).length) {
-    const t = el("section", "card tex-rows");
-    const head = el("div", "tr th");
-    for (const h of [T("mod"), "PNG", T("to convert"), T("RimArcho's DDS"), T("stale"), T("own DDS")]) head.append(el("span", "", h));
-    t.append(head);
-    for (const r of p.rows.slice(0, 200)) {
-      const tr = el("div", "tr" + (r.stale ? " stale" : ""));
-      tr.append(el("span", "n", r.name), el("span", "", r.png), el("span", "", r.convert ? String(r.convert) : ""), el("span", "", r.dds || ""),
-        el("span", r.stale ? "warn" : "", r.stale ? String(r.stale) : ""), el("span", "muted", r.own ? String(r.own) : ""));
-      t.append(tr);
-    }
-    w.append(t);
+  w.append(slot(textureRows(p), "rows"));
+  if (previous) {
+    // Keep live select elements in place while estimates arrive (06 §3.1).
+    previous.setAttribute("aria-busy", String(X.loading));
+    for (const next of w.querySelectorAll("[data-tex]")) updateMeasurement(previous.querySelector(`[data-tex="${next.dataset.tex}"]`), next);
+    fillModCount(previous.querySelector("[data-tex-mods]"), p);
+    return;
   }
   sc.scrollTop = top;
-  if (X.loading) w.querySelectorAll("button, select").forEach((b) => { b.disabled = true; });
   if (focused) { const n = sc.querySelector(`[data-f="${focused}"]`); if (n) n.focus(); }
+}
+
+const textureTable = createTable({ key: "ui.gui.textures.columns", columns: textureColumns,
+  state: { cols: null, sort: "estimate", dir: 1 }, redraw: () => draw(false, true),
+});
+let columnsLoaded = false;
+function textureRows(p) {
+  if (!columnsLoaded) {
+    columnsLoaded = true;
+    textureTable.load().then(() => { if (S.screen === "textures" && X.page) draw(false, true); });
+  }
+  const t = el("section", "card data-table tex-rows");
+  t.tabIndex = 0;
+  t.setAttribute("role", "table");
+  t.hidden = !(p.rows || []).length;
+  const head = el("div", "lib-th");
+  t.append(head);
+  textureTable.draw(t, head);
+  for (const r of textureTable.sorted(p.rows || [])) {
+    const tr = el("div", "data-row" + (r.stale ? " stale" : ""));
+    tr.setAttribute("role", "row");
+    tr.dataset.ref = r.ref;
+    for (const c of textureTable.visible()) {
+      if (c.key !== "name" && r.pending) { tr.append(pending()); continue; }
+      const cell = el("span", "cell" + (c.key === "name" ? " n" : "") + (textureTable.column(c.key).num ? " num" : ""));
+      if (c.key === "state") {
+        factText(cell, [r.stale ? Tf("%d stale", r.stale) : "", r.convert ? Tf("%d to convert", r.convert) : !r.stale ? T(r.dds ? "up to date" : "nothing to convert") : "",
+          r.dds ? T("RimArcho's DDS") + ": " + r.dds : "", r.own ? Tf("%d own DDS", r.own) : ""].filter(Boolean));
+        if (r.stale) cell.classList.add("warn");
+      } else factText(cell, String(r[c.key] ?? "—"));
+      cell.title = cell.textContent;
+      tr.append(cell);
+    }
+    t.append(tr);
+  }
+  return t;
+}
+export function key(e) { return textureTable.key(e); }
+
+function slot(node, key) { node.dataset.tex = key; return node; }
+
+// Preserve unchanged placeholders so their shimmer can finish (06 §7.1).
+function updateMeasurement(old, next) {
+  if (next.dataset.tex === "rows") {
+    const keep = new Map([...old.children].map((row) => [row.dataset.ref || "header", row]));
+    const nodes = [...next.children].map((row) => {
+      const was = keep.get(row.dataset.ref || "header");
+      const sameHeader = was && !row.dataset.ref && was.dataset.columns === row.dataset.columns;
+      return was && (sameHeader || was.isEqualNode(row)) ? was : row;
+    });
+    // Move existing rows in place: another estimate completing must not restart their shimmer (06 §7.1).
+    nodes.forEach((row, i) => { if (old.children[i] !== row) old.insertBefore(row, old.children[i] || null); });
+    while (old.children.length > nodes.length) old.lastChild.remove();
+    old.hidden = next.hidden;
+    textureTable.adopt(old, old.children[0]);
+  } else if (!old.isEqualNode(next)) { next.scrollLeft = old.scrollLeft; old.replaceWith(next); }
+}
+
+function fillModCount(node, p) {
+  if (p.loading && p.rows == null && node.querySelector(".tex-pending")) return;
+  const unknown = p.loading && p.rows == null;
+  node.textContent = unknown ? "" : Tf("%d mods", p.mods);
+  if (unknown) node.append(pending());
 }
 
 // foot: the run's progress and stop, or the convert button.
@@ -142,14 +247,14 @@ function foot(p) {
     const fill = el("i");
     fill.style.width = Math.round((X.prog.frac || 0) * 100) + "%";
     bar.append(fill);
-    w.append(bar, el("div", "ptext", X.prog.text || T("converting textures")));
+    w.append(bar, el("div", "ptext word-facts", X.prog.text || T("converting textures")));
     f.append(w, button(T("stop"), "", async () => {
       try { say("ok", await api.TexturesStop()); } catch (e) { say("fail", errText(e)); }
     }));
     return f;
   }
-  const go = button(T("convert"), "", () => convert(p), "primary");
-  go.disabled = X.loading || !p.toolOk || !p.convert;
+  const go = button(T("convert"), "", () => convert(p), "primary", "textures-run");
+  go.disabled = X.loading || !!p.loading || !!X.error || !p.toolOk || !p.convert;
   f.append(go);
   return f;
 }

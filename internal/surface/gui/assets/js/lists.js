@@ -1,10 +1,32 @@
 // The three lists (06 §2.5): virtual rows, the cursor, selection, search, dragging. The
 // board has three columns: 未启用 | 已启用 | 详情, with 暂存 and 历史 folded under 详情.
-import { S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
+import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { bump } from "./motion.js";
+import { beginPageRead, pageLoading } from "./screens.js";
 
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
+
+// The editor lives under the page overlay; old virtual rows must stay inert until its
+// new object is ready, including after a failed read (06 §8.2).
+export async function openEditor(load, replace = false, ready = () => {}) {
+  const read = beginPageRead(null, { replace, retry: () => openEditor(load, replace, ready) });
+  const board = $("#board");
+  if (pageLoading()) for (const k of [0, 1, 2]) {
+    rowsEl(k)?.replaceChildren();
+    pools[k].clear();
+  }
+  try {
+    if (!(await load(read)) || !read.current()) return;
+    read.finish();
+    $("#screen").replaceChildren();
+    $("#screen").hidden = true;
+    if (board) board.inert = false;
+    if ($("#planhead")) $("#planhead").inert = false;
+    ready();
+    return true;
+  } catch (e) { read.fail(e); }
+}
 
 // ---- building the views ----
 
@@ -29,17 +51,19 @@ function fetchBar() {
     barSig = sig;
     barCall = (on ? api.BarFilter(S.bar.search, S.bar.filters, S.bar.open) : Promise.resolve(null)).catch(() => null);
   }
-  const p = barCall;
-  return p.then((r) => { if (p === barCall) S.barData = r; return r; });
+  const p = barCall, gameRequest = S.envSeq;
+  return p.then((r) => { if (gameRequest === S.envSeq && p === barCall) S.barData = r; return r; });
 }
 export const barOn = () => !!(S.bar && S.bar.active());
 
 // refilter applies the column's query (view.Query in Go; the bar for 未启用 and 已启用) and
 // keeps the cursor on keepKey.
 export async function refilter(k, keepKey) {
-  const c = S.cols[k];
+  const c = S.cols[k], gameRequest = S.envSeq, items = c.items;
+  const current = () => gameRequest === S.envSeq && c.items === items;
   if (k < 2) {
     const r = await fetchBar();
+    if (!current()) return;
     c.view = barOn() && r ? r.rows[k] || [] : c.items.map((_, i) => i);
     c.others = null;
     c.complete = "";
@@ -49,6 +73,7 @@ export async function refilter(k, keepKey) {
     c.complete = "";
   } else {
     const r = await api.Filter(k, c.query);
+    if (!current()) return;
     c.view = r.rows || [];
     c.others = null; // no "other lists" line: tab no longer jumps lists (06 §3.7)
     c.complete = r.complete || "";
@@ -137,7 +162,7 @@ export function renderHeads() {
     if (c.searching && c.others) {
       if (!o) { o = el("div", "others"); s.after(o); }
       const parts = [0, 1, 2].filter((x) => x !== k).map((x) => `${T(AREAS[x])} ${c.others[x]}`);
-      o.textContent = Tf("other areas: %s · tab goes to the next area with matches", parts.join(" · "));
+      factText(o, Tf("other areas: %s, tab goes to the next area with matches", parts.join("  ")));
     } else if (o) o.remove();
   }
 }
@@ -145,13 +170,14 @@ export function renderHeads() {
 // listActions: sort sits in the enabled list's head, since it orders that list; import /
 // export and the plan's other actions are in the top bar. main.js runs it by data-cmd.
 function listActions() {
-  return `<span class="acts"><button class="btn small" data-cmd="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
+  return `<span class="acts"><button class="btn small" data-cmd="sort" data-env-write="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
 }
 
 const pools = [new Map(), new Map(), new Map()];
 
 // renderRows draws the visible rows of one list (virtual: only what is on screen).
 export function renderRows(k) {
+  if (!S.screen && pageLoading()) return;
   const box = rowsEl(k);
   if (!box) return;
   const c = S.cols[k];
@@ -168,7 +194,7 @@ export function renderRows(k) {
   let empty = $(".empty", box);
   if (!c.view.length) {
     if (!empty) box.appendChild(empty = el("div", "empty"));
-    empty.textContent = c.query ? T("nothing matches") : [T("every installed mod is enabled"), T("nothing enabled yet"), T("staging is empty · t puts the selected mods here")][k];
+    empty.textContent = c.query ? T("nothing matches") : [T("every installed mod is enabled"), T("nothing enabled yet"), T("staging is empty, t puts the selected mods here")][k];
   } else if (empty) empty.remove();
   const first = Math.max(0, Math.floor(box.scrollTop / ROW_H) - 4);
   const last = Math.min(c.view.length, first + Math.ceil(box.clientHeight / ROW_H) + 8);

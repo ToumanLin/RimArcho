@@ -72,6 +72,7 @@ func main() {
 	lang := flag.String("lang", "", "zh or en (default: the setting)")
 	exe := flag.String("exe", "bin/archo.exe", "the archo executable for scan and analyze children")
 	assets := flag.String("assets", "", "serve the page's files from this folder (edits show on reload)")
+	steam := flag.String("steam-api", "", "local Steam fixture server URL (collection at /collection, titles at /api)")
 	fake := flag.String("fakegame", "", "while this file exists the current environment's game counts as running (started at its time)")
 	flag.Parse()
 	if !strings.HasPrefix(*addr, "127.0.0.1:") {
@@ -82,6 +83,12 @@ func main() {
 		log.Fatal(err)
 	}
 	defer a.Close()
+	if *steam != "" {
+		if !strings.HasPrefix(*steam, "http://127.0.0.1:") {
+			log.Fatal("Steam fixture must be loopback")
+		}
+		a.SteamAPI, a.SteamCollectionAPI = *steam+"/api", *steam+"/collection"
+	}
 	l := *lang
 	if l == "" {
 		l = cmds.Setting(a, "ui.lang")

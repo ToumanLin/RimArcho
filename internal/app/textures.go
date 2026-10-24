@@ -123,6 +123,11 @@ func (a *App) OfferTodds() *ToddsOffer {
 // todds.exe and its licence into ToddsDir and checks that it runs and is the right version.
 // It runs only when the player said yes to OfferTodds.
 func (a *App) InstallTodds() (string, error) {
+	return a.InstallToddsProgress(nil)
+}
+
+// InstallToddsProgress reports the download to the task record (06 §2.16).
+func (a *App) InstallToddsProgress(progress func(done, total int64)) (string, error) {
 	dir := a.ToddsDir()
 	c := a.httpClient()
 	if c.Timeout != 0 && c.Timeout < 2*time.Minute {
@@ -138,7 +143,7 @@ func (a *App) InstallTodds() (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("downloading todds: %s", resp.Status)
 	}
-	b, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	b, err := readToolDownload(resp, progress)
 	if err != nil {
 		return "", fmt.Errorf("downloading todds: %w", err)
 	}
@@ -439,6 +444,11 @@ func (a *App) TextureSummary(ctx context.Context, refs []string, scope string, o
 
 // TextureSummaryTargets uses only captured names/paths and this reader's own connection.
 func (a *App) TextureSummaryTargets(ctx context.Context, targets []TextureTarget, o textures.Options) (*TextureReport, error) {
+	return a.TextureSummaryProgress(ctx, targets, o, nil)
+}
+
+// TextureSummaryProgress publishes each measured mod so pages can fill rows as they finish (06 §2.13).
+func (a *App) TextureSummaryProgress(ctx context.Context, targets []TextureTarget, o textures.Options, progress func(*TextureMod)) (*TextureReport, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -465,6 +475,9 @@ func (a *App) TextureSummaryTargets(ctx context.Context, targets []TextureTarget
 			r.Est.Plus(t.Plan.Est)
 		}
 		r.Mods = append(r.Mods, t)
+		if progress != nil {
+			progress(t)
+		}
 	}
 	return r, nil
 }

@@ -62,3 +62,34 @@ func TestBrowserArgs(t *testing.T) {
 		t.Fatalf("gpu switches: on %q, off %q", on, off)
 	}
 }
+
+// The same embedded files used by TestPageTextTranslated also contain untranslated
+// separators and template literals. Inspect the whole source, excluding comments.
+func TestWording(t *testing.T) {
+	commentsAndStrings := regexp.MustCompile("(?s)//[^\n]*|/\\*.*?\\*/|\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'|`(?:[^`\\\\]|\\\\.)*`")
+	err := fs.WalkDir(assets, "assets/js", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".js") {
+			return nil
+		}
+		b, err := fs.ReadFile(assets, path)
+		if err != nil {
+			return err
+		}
+		for _, token := range commentsAndStrings.FindAllString(string(b), -1) {
+			if strings.HasPrefix(token, "//") || strings.HasPrefix(token, "/*") {
+				continue
+			}
+			text := strings.ReplaceAll(token, `\u00b7`, string(rune(0xB7)))
+			for _, p := range view.WordingTextProblems(path, text) {
+				t.Error(p)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

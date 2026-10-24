@@ -361,7 +361,7 @@ func (b *changeBuilder) build(evs []*store.Event) ([]Row, *Group) {
 	if len(gone) > 0 {
 		parts = append(parts, tx.Tf("%d gone", len(gone)))
 	}
-	g.Text = strings.Join(parts, " · ")
+	g.Text = strings.Join(parts, tx.T(" · "))
 	g.Rows = append(arrived, gone...)
 	return rows, g
 }
@@ -874,7 +874,7 @@ func groupText(tx Text, gs []fileGroup, delta int64) string {
 	}
 	s := strings.Join(parts, tx.T("; "))
 	if delta != 0 && len(gs) > 1 {
-		s += " · " + tx.Tf("in all %s", signedSize(delta))
+		s += tx.T(" · ") + tx.Tf("in all %s", signedSize(delta))
 	}
 	return s
 }

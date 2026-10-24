@@ -10,8 +10,8 @@ import (
 
 // The history area (06 §2.5): where the staging list is when staging is empty, the
 // unsaved steps around "now" (redo dimmed above, undo below), then the saved versions. The
-// rows are view.HistoryItems; enter on a step goes there at once (u / ctrl+r move back), on
-// a version asks first (press twice).
+// rows are view.HistoryItems; enter on a step or version goes there at once
+// (u / ctrl+r move back).
 
 // loadHistory reads the history area when staging is empty; the cursor starts on "now".
 func (m *model) loadHistory() {
@@ -136,7 +136,7 @@ func (m *model) histGo() tea.Cmd {
 		if err != nil {
 			m.say(sayFail, m.humanize(err.Error()))
 		} else {
-			m.say(sayOK, Tf("back at v%d (not written to the game yet)", h.Version)+" · "+T("u undoes"))
+			m.say(sayOK, Tf("back at v%d (not written to the game yet)", h.Version)+Tf(", %s", T("u undoes")))
 		}
 		return m.requestDetail()
 	}

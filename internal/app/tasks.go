@@ -17,7 +17,7 @@ import (
 // came to. Two lanes run here, one task at a time, one item at a time: "files" (Mod 库's
 // actions on folders) and "steam" (退订 and 重新订阅 through the Steam client). The third
 // lane, "self", is RimArcho's own jobs (scan, analysis, packs, textures, downloads); they
-// keep their own runners and only report into the record (Begin, Update, Finish).
+// keep their own runners (Begin, Update, Finish), or queue work by kind (EnqueueSelf).
 //
 // The record survives the window in <data>/tasks.json; what still runs when the window
 // closes is marked stopped (00 §4 principle 6: RimArcho does not stay in the background).
@@ -60,7 +60,7 @@ type TaskItem struct {
 // Task is one background task.
 type Task struct {
 	ID     string     `json:"id"`
-	Kind   string     `json:"kind"` // the Mod 库 op (view.Lib*) or scan, analyze, pack, textures, textures-clean, download
+	Kind   string     `json:"kind"` // a Mod 库 op (view.Lib*) or one of view.Task* kinds
 	Lane   string     `json:"lane"`
 	Obj    string     `json:"obj"` // what it works on: "14 mods", a pack's name
 	State  string     `json:"state"`
@@ -77,6 +77,8 @@ type Task struct {
 	Items  []TaskItem `json:"items,omitempty"`
 	Seen   bool       `json:"seen,omitempty"`   // a failure the player has looked at
 	Target string     `json:"target,omitempty"` // a pack's name, for its page
+	Args   []string   `json:"args,omitempty"`   // maintenance command, for retry after reopening
+	Env    string     `json:"env,omitempty"`    // the environment captured at submission
 }
 
 // Ended reports whether the task has finished one way or another.
@@ -116,6 +118,7 @@ type Tasks struct {
 	stopping map[string]bool
 	stops    map[string]func() error // a self task's stop
 	working  map[string]bool         // lanes with a runner
+	selfRuns map[string]func(string) (string, error)
 	seq      int
 	now      func() time.Time
 	forgot   [][2]any // the last Forget: tasks and their places, for Unforget
@@ -178,6 +181,7 @@ func (ts *Tasks) List() []Task {
 	for i, t := range ts.list {
 		out[i] = *t
 		out[i].Items = slices.Clone(t.Items)
+		out[i].Args = slices.Clone(t.Args)
 	}
 	return out
 }
@@ -224,6 +228,66 @@ func (ts *Tasks) Begin(kind, obj string, stop func() error) string {
 	ts.mu.Unlock()
 	ts.changed()
 	return t.ID
+}
+
+// EnqueueSelf schedules work in the RimArcho lane: one of each kind at a time,
+// different kinds concurrently (06 §2.16). run reports progress through Update.
+func (ts *Tasks) EnqueueSelf(request Task, run func(string) (string, error)) Task {
+	ts.mu.Lock()
+	if ts.selfRuns == nil {
+		ts.selfRuns = map[string]func(string) (string, error){}
+	}
+	t := &Task{ID: ts.newID(), Kind: request.Kind, Lane: LaneSelf, Obj: request.Obj, Args: slices.Clone(request.Args), Env: request.Env, State: TaskQueued, Queued: ts.stamp()}
+	ts.list = append([]*Task{t}, ts.list...)
+	ts.selfRuns[t.ID] = run
+	key := LaneSelf + ":" + t.Kind
+	start := !ts.working[key]
+	ts.working[key] = true
+	cp := *t
+	kind := t.Kind
+	ts.mu.Unlock()
+	ts.changed()
+	if start {
+		go ts.runSelf(kind, key)
+	}
+	return cp
+}
+
+func (ts *Tasks) runSelf(kind, key string) {
+	for {
+		ts.mu.Lock()
+		var next *Task
+		for _, t := range ts.queuedLocked(LaneSelf) {
+			if t.Kind == kind {
+				next = t
+				break
+			}
+		}
+		if next == nil {
+			delete(ts.working, key)
+			ts.mu.Unlock()
+			return
+		}
+		next.State, next.Start = TaskRunning, ts.ms()
+		run := ts.selfRuns[next.ID]
+		delete(ts.selfRuns, next.ID)
+		id := next.ID
+		ts.mu.Unlock()
+		ts.changed()
+		result, err := func() (result string, err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("%v", r)
+				}
+			}()
+			return run(id)
+		}()
+		state := TaskDone
+		if err != nil {
+			state, result = TaskFailed, err.Error()
+		}
+		ts.Finish(id, state, result)
+	}
 }
 
 // Update changes a running task (a self task's progress).
@@ -278,6 +342,7 @@ func (ts *Tasks) Stop(id string) error {
 	switch {
 	case t.State == TaskQueued:
 		t.State, t.End = TaskStopped, ts.ms()
+		delete(ts.selfRuns, id)
 		for i := range t.Items {
 			t.Items[i].State = ItemSkip
 		}
@@ -344,6 +409,9 @@ func (ts *Tasks) Move(id string, d int) error {
 		return errors.New("only a waiting task moves")
 	}
 	q := ts.queuedLocked(t.Lane)
+	if t.Lane == LaneSelf {
+		q = slices.DeleteFunc(q, func(x *Task) bool { return x.Kind != t.Kind })
+	}
 	i := slices.Index(q, t)
 	j := i + d
 	if j < 0 || j >= len(q) {
@@ -458,6 +526,7 @@ func (ts *Tasks) Close() {
 			ts.closeLocked(t)
 		}
 	}
+	clear(ts.selfRuns)
 	ts.saveLocked()
 }
 

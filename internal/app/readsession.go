@@ -1,6 +1,10 @@
 package app
 
-import "github.com/ToumanLin/RimArcho/internal/store"
+import (
+	"strings"
+
+	"github.com/ToumanLin/RimArcho/internal/store"
+)
 
 // ReadSession gives a slow page its own database connection and application caches.
 // Call while the original App is locked; the returned App is used by one reader at a
@@ -26,7 +30,26 @@ func (b *App) ReadOptions(a *App) {
 	b.LazyLog, b.LogCacheOnly = a.LazyLog, a.LogCacheOnly
 	b.GameProbe, b.LockBase, b.MonitorBundle = a.GameProbe, a.LockBase, a.MonitorBundle
 	b.HTTP, b.SteamAPI = a.HTTP, a.SteamAPI
+	b.SteamCMDZip, b.SteamCMDNoPath = a.SteamCMDZip, a.SteamCMDNoPath
+	b.SteamCMDStart, b.SteamCMDRun, b.SteamCMDPoll = a.SteamCMDStart, a.SteamCMDRun, a.SteamCMDPoll
 	b.TextureEncoder, b.ToddsNoPath, b.ToddsZip = a.TextureEncoder, a.ToddsNoPath, a.ToddsZip
 	b.UninstallExe, b.UninstallKeepBase, b.ArchoProbe = a.UninstallExe, a.UninstallKeepBase, a.ArchoProbe
 	b.UninstallLog = a.UninstallLog
+}
+
+// AdoptReadState transfers a finished worker's index/workspace to the GUI session,
+// avoiding a second large load while holding its page mutex (06 §8.4).
+// Both sessions must use the same database and environment and be idle.
+func (a *App) AdoptReadState(r *App) {
+	stamp := a.Store.ChangeKey()
+	rekey := func(key string) string {
+		if i := strings.IndexByte(key, '|'); i >= 0 {
+			return stamp + key[i:]
+		}
+		return ""
+	}
+	a.ixCache, a.ixKey = r.ixCache, rekey(r.ixKey)
+	a.stCache, a.stKey = r.stCache, rekey(r.stKey)
+	a.prCache, a.prKey = nil, ""
+	a.Store.MM = r.Store.MM
 }

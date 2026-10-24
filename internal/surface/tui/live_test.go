@@ -71,8 +71,8 @@ func TestLiveGame(t *testing.T) {
 	}
 }
 
-// 06 §2.5: empty staging shows the history; enter on a step goes there, on a version
-// asks first.
+// 06 §2.5: empty staging shows the history; enter on a step or version goes there
+// immediately, and u restores the previous list.
 func TestHistoryArea(t *testing.T) {
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
@@ -81,7 +81,7 @@ func TestHistoryArea(t *testing.T) {
 	press(m, "3")
 	s := ansi.Strip(m.View())
 	step := Tf("disabled %s", "Alpha")
-	for _, want := range []string{T("history"), Tf("now · %d not written", 1), step} {
+	for _, want := range []string{T("history"), Tf("now  %d not written", 1), step} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("no %q in the history area:\n%s", want, s)
 		}
@@ -103,15 +103,43 @@ func TestHistoryArea(t *testing.T) {
 	if s := ansi.Strip(m.View()); !strings.Contains(s, step) {
 		t.Fatalf("redo row not drawn:\n%s", s)
 	}
+	// Make the current list differ from the saved version, so checkout must do work.
+	e.MustRun("disable", "pkg:tester.a")
+	m.reload()
+	before := m.st.List.Encode()
+	steps := e.App.Store.StepCount(m.st.Plan.ID, "undo")
 	// A saved version: one enter loads it (one step, u brings the list back; 06 §6).
 	press(m, "end")
 	h := m.hist[m.histCur]
 	if h.Kind != "version" {
 		t.Fatalf("no version at the end: %+v", m.hist)
 	}
+	SetLang("zh")
+	t.Cleanup(func() { SetLang("en") })
 	press(m, "enter")
-	if want := Tf("back at v%d (not written to the game yet)", h.Version) + " · " + T("u undoes"); m.armed != nil || m.status != want {
+	if want := Tf("back at v%d (not written to the game yet)", h.Version) + Tf(", %s", T("u undoes")); m.armed != nil || m.status != want {
 		t.Fatalf("status %q, want %q", m.status, want)
+	}
+	if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
+		t.Fatalf("one enter did not load the version: %s", got)
+	}
+	history, err := e.App.History()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history.Undo) != steps+1 || history.Undo[0].Op != "checkout" {
+		t.Fatalf("checkout is not one history step: %+v", history.Undo)
+	}
+	if line := ansi.Strip(m.statusLine()); !strings.Contains(line, "u 可撤销") {
+		t.Fatalf("checkout status: %q", line)
+	}
+	SetLang("en")
+	press(m, "u")
+	if got := m.st.List.Encode(); got != before {
+		t.Fatalf("u did not restore the previous list: %s, want %s", got, before)
+	}
+	if got := e.App.Store.StepCount(m.st.Plan.ID, "undo"); got != steps {
+		t.Fatalf("undo stack after u: %d, want %d", got, steps)
 	}
 	// Staged mods take the place back from the history.
 	press(m, "1")

@@ -28,29 +28,29 @@ func runAlias(m *model, alias string) {
 
 var escPages = []escPage{
 	{"能不能跑", tabProblems, func(m *model) { press(m, "@") }},
-	{"能不能跑 · help", tabProblems, func(m *model) { pressAll(m, "@", "?") }},
-	{"能不能跑 · palette", tabProblems, func(m *model) { press(m, "@"); m.update(ctrlK) }},
-	{"能不能跑 · an item's keys armed", tabProblems, func(m *model) {
+	{"能不能跑，help", tabProblems, func(m *model) { pressAll(m, "@", "?") }},
+	{"能不能跑，palette", tabProblems, func(m *model) { press(m, "@"); m.update(ctrlK) }},
+	{"能不能跑，an item's keys armed", tabProblems, func(m *model) {
 		press(m, "@")
 		m.arm("x", "press x again", func(*model) tea.Cmd { return nil })
 	}},
-	{"游戏日志 · choose a log", tabList, func(m *model) { press(m, "#") }},
+	{"游戏日志，choose a log", tabList, func(m *model) { press(m, "#") }},
 	{"Mod 库存 › 全部", tabLibrary, func(m *model) { press(m, "$") }},
-	{"Mod 库存 › 全部 · filter open", tabLibrary, func(m *model) { pressAll(m, "$", `\`) }},
-	{"Mod 库存 › 全部 · search typed", tabLibrary, func(m *model) { pressAll(m, "$", "/"); typeIn(m, "a") }},
-	{"Mod 库存 › 全部 · filters set, filter open", tabLibrary, func(m *model) { pressAll(m, "$", "/"); typeIn(m, "a"); pressAll(m, "enter", `\`) }},
-	{"Mod 库存 › 全部 · selection + details over the page", tabLibrary, func(m *model) { pressAll(m, "$", "shift+down", "shift+down", "enter") }},
-	{"Mod 库存 › 全部 · selection + filters + details", tabLibrary, func(m *model) {
+	{"Mod 库存 › 全部，filter open", tabLibrary, func(m *model) { pressAll(m, "$", `\`) }},
+	{"Mod 库存 › 全部，search typed", tabLibrary, func(m *model) { pressAll(m, "$", "/"); typeIn(m, "a") }},
+	{"Mod 库存 › 全部，filters set, filter open", tabLibrary, func(m *model) { pressAll(m, "$", "/"); typeIn(m, "a"); pressAll(m, "enter", `\`) }},
+	{"Mod 库存 › 全部，selection + details over the page", tabLibrary, func(m *model) { pressAll(m, "$", "shift+down", "shift+down", "enter") }},
+	{"Mod 库存 › 全部，selection + filters + details", tabLibrary, func(m *model) {
 		pressAll(m, "$", "/")
 		typeIn(m, "a")
 		pressAll(m, "enter", "shift+down", "enter")
 	}},
-	{"Mod 库存 › 全部 · filters set + selection + details + filter open", tabLibrary, func(m *model) {
+	{"Mod 库存 › 全部，filters set + selection + details + filter open", tabLibrary, func(m *model) {
 		pressAll(m, "$", "/")
 		typeIn(m, "a")
 		pressAll(m, "enter", "shift+down", "enter", `\`)
 	}},
-	{"Mod 库存 › 全部 · focus in a copy's details", tabLibrary, func(m *model) {
+	{"Mod 库存 › 全部，focus in a copy's details", tabLibrary, func(m *model) {
 		press(m, "$")
 		for i := 0; i < 4 && !m.libr.detail; i++ {
 			pressAll(m, "right", "right")
@@ -59,18 +59,18 @@ var escPages = []escPage{
 			}
 		}
 	}},
-	{"Mod 库存 › 全部 · row menu", tabLibrary, func(m *model) { press(m, "$"); pressKey(m, tea.KeyF10) }},
-	{"Mod 库存 › 全部 · help", tabLibrary, func(m *model) { pressAll(m, "$", "?") }},
+	{"Mod 库存 › 全部，row menu", tabLibrary, func(m *model) { press(m, "$"); pressKey(m, tea.KeyF10) }},
+	{"Mod 库存 › 全部，help", tabLibrary, func(m *model) { pressAll(m, "$", "?") }},
 	{"Mod 库存 › 变化", tabChanges, func(m *model) { press(m, "c") }},
-	{"Mod 库存 › 变化 · one mod's + help", tabChanges, func(m *model) {
+	{"Mod 库存 › 变化，one mod's + help", tabChanges, func(m *model) {
 		m.openChangesOf(m.current().id, m.current().name)
 		press(m, "?")
 	}},
 	{"整合包", tabList, func(m *model) { press(m, "^") }},
 	{"环境", tabList, func(m *model) { press(m, "&") }},
 	{"设置", tabList, func(m *model) { runAlias(m, "settings") }},
-	{"卸载 · the typed confirmation", tabList, func(m *model) { runAlias(m, "uninstall"); press(m, "enter") }},
-	{"方案 · help", tabList, func(m *model) { press(m, "?") }},
+	{"卸载，the typed confirmation", tabList, func(m *model) { runAlias(m, "uninstall"); press(m, "enter") }},
+	{"方案，help", tabList, func(m *model) { press(m, "?") }},
 }
 
 // atBase: the page shown has nothing over it, nothing selected and no open filter (06 §11
@@ -122,7 +122,7 @@ func TestT20PagesBuilt(t *testing.T) {
 		m := direct(t, e, 160, 40)
 		s.setup(m)
 		built := m.tab == s.page && (s.page != tabList || m.popupName() != "")
-		if strings.Contains(s.name, "·") && atBase(m, s.page) {
+		if strings.Contains(s.name, ", ") && atBase(m, s.page) {
 			built = false
 		}
 		if !built {

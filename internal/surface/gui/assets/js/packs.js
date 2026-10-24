@@ -5,9 +5,12 @@
 // exported from its page as a RimArcho list (E).
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { shimmer } from "./motion.js";
 import { openScreen, page, button, act, area, beginPageRead } from "./screens.js";
 import * as pop from "./popups.js";
+import { createTable } from "./datatable.js";
+import { packColumns, packModColumns } from "./tabledefs.js";
 
 let ui = null;
 export function initPacks(u) { ui = u; }
@@ -15,7 +18,46 @@ export function initPacks(u) { ui = u; }
 let packPoll = 0;
 const L = { rows: [], un: [], others: 0, cur: 0, els: [] }; // the list page
 let P = null; // the pack page shown: view.PackPage
-const B = { page: null, tex: 0, name: "", nameErr: "", seq: 0, loading: false }; // the build page
+const B = { dry: null, drySeq: 0, page: null, tex: 0, name: "", nameErr: "", seq: 0, loading: false, error: "" }; // the build page
+
+const packTable = createTable({ key: "ui.gui.packs.columns", columns: packColumns,
+  state: { cols: null, sort: "played", dir: 1 }, redraw: () => drawPackRows(),
+});
+const modTable = createTable({ key: "ui.gui.pack.mods.columns", columns: packModColumns,
+  state: { cols: null, sort: "order", dir: 1 }, redraw: () => drawModRows(),
+});
+let packCard, modCard;
+function drawPackRows() {
+  if (!packCard) return;
+  const current = L.rows[L.cur];
+  L.rows = packTable.sorted(L.rows);
+  L.cur = Math.max(0, L.rows.indexOf(current));
+  packCard.innerHTML = "";
+  const head = el("div", "lib-th");
+  packCard.append(head);
+  packTable.draw(packCard, head);
+  L.els = [];
+  L.rows.forEach((r, i) => {
+    const row = el("div", "data-row link" + (i === L.cur ? " cur" : ""));
+    row.setAttribute("role", "row");
+    for (const c of packTable.visible()) row.append(el("span", "cell" + (c.key === "name" ? " n" : "") + (packTable.column(c.key).num ? " num" : ""), String(r[c.key] ?? "—")));
+    row.onclick = () => ui.go("pack:" + r.name);
+    L.els.push(row); packCard.append(row);
+  });
+}
+function drawModRows() {
+  if (!modCard || !P) return;
+  modCard.innerHTML = "";
+  const head = el("div", "lib-th");
+  modCard.append(head);
+  modTable.draw(modCard, head);
+  for (const m of modTable.sorted(P.mods)) {
+    const row = el("div", "data-row");
+    row.setAttribute("role", "row");
+    for (const c of modTable.visible()) row.append(el("span", "cell" + (c.key === "name" ? " n" : "") + (modTable.column(c.key).num ? " num" : ""), String(m[c.key] || "—")));
+    modCard.append(row);
+  }
+}
 
 // ---- the list (整合包) ----
 
@@ -32,29 +74,20 @@ async function loadList(current = () => true) {
 export async function list() {
   const read = beginPageRead("packs", { replace: !!P });
   S.packFocus = null; P = null;
-  try { await loadList(read.current); } catch (e) { read.fail(e); return; }
+  try { await Promise.all([loadList(read.current), packTable.load()]); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   const sc = S.screen === "packs" && !S.packFocus ? $("#screen") : openScreen("packs");
   sc.innerHTML = "";
-  const w = page("packs", T("a pack copies every mod of the list as it is now and plays with its own saves"),
+  const w = page("packs", "",
     act(T("create a pack"), "packs", () => ui.go("build"), "B"));
   sc.append(w);
   for (const u of L.un) w.append(buildCard(u));
-  const card = el("section", "card");
-  L.els = [];
-  if (!L.rows.length) {
-    card.append(el("div", "empty-state", T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves")));
-  }
+  const card = packCard = el("section", "card data-table");
+  card.tabIndex = 0;
+  card.setAttribute("role", "table");
   L.cur = Math.min(L.cur, Math.max(L.rows.length - 1, 0));
-  L.rows.forEach((r, i) => {
-    const row = el("div", "pack link" + (i === L.cur ? " cur" : ""));
-    const left = el("div", "l");
-    left.append(el("div", "name", r.name), el("div", "sub", r.facts + " · " + r.played));
-    row.append(left, el("span", "go", "→"));
-    row.onclick = () => ui.go("pack:" + r.name);
-    L.els.push(row);
-    card.append(row);
-  });
+  drawPackRows();
+  if (!L.rows.length) card.append(el("div", "empty-state", T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves")));
   w.append(card);
   if (L.others) w.append(el("div", "muted note", Tf("%d packs belong to other games; switch the game to see them", L.others)));
   ui.renderHints();
@@ -73,24 +106,22 @@ export async function pack(name) {
   const read = beginPageRead("packs", { replace: !P || P.name !== name });
   S.packFocus = name; P = null;
   let p;
-  try { p = await api.Pack(name); } catch (e) { read.fail(e); return; }
+  try { [p] = await Promise.all([api.Pack(name), modTable.load()]); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   P = p;
   const sc = S.screen === "packs" && S.packFocus === name ? $("#screen") : openScreen("packs");
   sc.innerHTML = "";
-  const play = act(T("play"), "play", () => launch(), "L");
+  const play = act(T("play"), "play", () => launch(), "L", "pack-launch");
   play.classList.add("primary");
-  const w = page("packs pack-page", P.facts.join(" · "), button(T("export"), "e", () => exportPack(false)),
-    button(T("export the list"), "E", () => exportPack(true)), button(T("move to the recycle bin"), "Del", () => removePack()), play);
+  const w = page("packs pack-page", P.facts.join("  "), button(T("export"), "e", () => exportPack(false)),
+    button(T("export the list"), "E", () => exportPack(true)), button(T("move to the recycle bin"), "Del", () => removePack(), "", "pack-remove"), play);
   sc.append(w);
   const sec = el("section", "sec");
   sec.append(el("h2", "label", T("the mods, in load order")));
-  const card = el("div", "card pack-mods");
-  for (const m of P.mods) {
-    const r = el("div", "pm");
-    r.append(el("span", "n", m.name), el("span", "x muted", [m.note, m.size].filter(Boolean).join(" · ")));
-    card.append(r);
-  }
+  const card = modCard = el("div", "card data-table pack-mods");
+  card.tabIndex = 0;
+  card.setAttribute("role", "table");
+  drawModRows();
   sec.append(card);
   w.append(sec, el("div", "muted note dir", T("folder") + ": " + P.dir));
   ui.renderHints(); // the list and a pack's page share the screen: their keys differ
@@ -134,7 +165,7 @@ async function exportPack(list) {
     const t = await api.PackExport(name, "", list);
     if (t) say("ok", t);
   } catch (e) {
-    pop.ask(list ? T("export the list") : T("export the pack"), T("the new file") + " · " + name + (list ? ".archolist.json" : ".archopack"), async (file) => {
+    pop.ask(list ? T("export the list") : T("export the pack"), T("the new file") + ": " + name + (list ? ".archolist.json" : ".archopack"), async (file) => {
       if (!file) return;
       try { say("ok", await api.PackExport(name, file, list)); } catch (e2) { say("fail", errText(e2)); }
     });
@@ -159,7 +190,7 @@ function progressBox(p) {
   const fill = el("i");
   fill.style.width = Math.round((p.frac || 0) * 100) + "%";
   bar.append(fill);
-  w.append(bar, el("div", "ptext" + (p.error ? " bad" : ""), p.error || p.text || ""));
+  w.append(bar, el("div", "ptext word-facts" + (p.error ? " bad" : ""), p.error || p.text || ""));
   return w;
 }
 
@@ -170,19 +201,19 @@ function buildCard(u) {
   card.dataset.build = u.name;
   const head = el("div", "pack");
   const left = el("div", "l");
-  left.append(el("div", "name", u.running ? Tf("creating pack %s", u.name) : u.name), el("div", "sub", u.facts || ""));
+  left.append(el("div", "name", u.running ? Tf("creating pack %s", u.name) : u.name), el("div", "sub word-facts", u.facts || ""));
   const right = el("div", "r");
   if (u.running) {
     right.append(button(T("stop"), "", async () => {
       try { say("ok", await api.PackStop(u.name)); } catch (e) { say("fail", errText(e)); }
     }));
   } else {
-    right.append(button(T("create again"), "", () => startBuild(u.name)));
+    right.append(button(T("create again"), "", () => startBuild(u.name), "", "pack-build"));
     right.append(button(T("delete what it copied"), "", () => pop.confirm(T("delete what it copied"), [Tf("the unfinished pack %s and what it copied (%s) are deleted; your mods are not touched", u.name, u.copied || "?")], T("delete what it copied"), async () => {
       say("busy", T("deleting what it copied…"));
       try { say("ok", await api.PackRemoveUnfinished(u.name)); } catch (e) { say("fail", errText(e)); }
       redraw();
-    }), "danger"));
+    }), "danger", "pack-remove-unfinished"));
   }
   head.append(left, right);
   card.append(head);
@@ -220,12 +251,12 @@ export function packEvent(ev) {
     return redraw();
   }
   if (S.screen === "build") return drawBuild();
-  if (S.screen !== "packs" || S.packFocus) { say("busy", Tf("creating pack %s", ev.name) + " · " + ev.text); return; }
+  if (S.screen !== "packs" || S.packFocus) { say("busy", Tf("creating pack %s", ev.name) + "  " + ev.text); return; }
   const card = document.querySelector(`.card.build[data-build="${CSS.escape(ev.name)}"]`);
   if (!card) return list();
   const body = card.querySelector(".progwrap");
   if (body) { body.innerHTML = ""; body.append(progressBox(ev)); }
-  card.querySelector(".sub").textContent = T("creating") + " · " + ev.text;
+  factText(card.querySelector(".sub"), T("creating"), ev.text);
 }
 
 // ---- 编译成整合包 (the plan's sub-page) ----
@@ -233,13 +264,14 @@ export function packEvent(ev) {
 // build opens the page: the check is quick, the sizes need every mod's folder walked, so
 // the page shows at once and the sizes follow. again: a redraw keeps the name typed.
 export async function build(again = false) {
+  if (again && B.loading) return;
   const seq = ++B.seq;
-  if (!again) { B.page = null; B.tex = 0; B.name = ""; B.nameErr = ""; }
+  if (!again) { B.dry = null; ++B.drySeq; B.page = null; B.tex = 0; B.name = ""; B.nameErr = ""; B.error = ""; }
   const read = beginPageRead("build", { replace: !again, label: "checking the list…" });
   B.loading = true;
   try {
     const [p] = await Promise.all([
-      B.page || api.BuildPage(B.tex || 0),
+      B.page || readBuild(B.tex || 0, read.current),
       loadList(read.current).catch(() => { if (read.current()) L.un = []; }),
     ]);
     if (!read.current() || seq !== B.seq) return;
@@ -258,22 +290,63 @@ export async function build(again = false) {
 // setTex changes the textures choice: the page is measured again, since the files
 // converted, the size after and the peak all depend on it.
 async function setTex(tex) {
-  if (B.loading || B.tex === tex) return;
+  if (!B.page || (B.tex === tex && !B.error)) return;
   return measureBuild(tex);
 }
 
 async function measureBuild(tex) {
+  closeDryRun();
   B.tex = tex;
   const seq = ++B.seq;
-  const read = beginPageRead("build", { replace: true, label: "checking the list…" });
+  const read = beginPageRead("build", { keep: true });
   B.loading = true;
+  B.error = "";
+  syncMeasure();
+  syncButton();
   let p;
-  try { p = await api.BuildPage(tex); } catch (e) { if (read.current()) B.loading = false; read.fail(e); return; }
+  try { p = await readBuild(tex, read.current); } catch (e) {
+    if (!read.current() || seq !== B.seq) return;
+    B.loading = false;
+    B.error = errText(e);
+    syncMeasure();
+    syncButton();
+    read.fail(e);
+    return;
+  }
   if (!read.current() || seq !== B.seq) return;
   B.page = p;
   B.loading = false;
   drawBuild();
   read.finish();
+}
+
+// 06 §3.1: polling never holds navigation; late replies belong to their old ticket.
+async function readBuild(tex, current) {
+  const id = await api.BuildPage(tex);
+  while (current()) {
+    const p = await api.BuildPageResult(id);
+    if (!current()) return null;
+    if (p) return p;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return null;
+}
+
+// 06 §2.6, 06 §7.1: keep the form alive and replace only facts being measured.
+function syncMeasure() {
+  const select = $("#pk-tex");
+  if (select) select.value = String(B.tex);
+  if (!B.loading && !B.error) return;
+  for (const key of ["trim", "textures"]) {
+    const step = document.querySelector(`.bd-step[data-key="${key}"]`);
+    if (!step) continue;
+    step.classList.remove("bad", "warn");
+    const text = step.querySelector(".x");
+    text.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), key === "textures" ? 3 : 1));
+    step.querySelectorAll("ul, button").forEach((n) => n.remove());
+  }
+  const size = $("#pk-size");
+  if (size) size.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), 1));
 }
 
 // nextTex: the D key steps through the choices.
@@ -288,11 +361,12 @@ const building = () => !!(S.packBuild || L.un.some((u) => u.running));
 
 function drawBuild() {
   const p = B.page;
-  if (!p || S.screen !== "build" || B.loading) return;
+  if (!p || S.screen !== "build") return;
   const sc = S.screen === "build" ? $("#screen") : openScreen("build");
   const focusName = document.activeElement && document.activeElement.id === "pk-name";
+  const focusTex = document.activeElement && document.activeElement.id === "pk-tex";
   sc.innerHTML = "";
-  const w = page("build", T("a pack locks every mod's version: later Workshop updates do not change it, and it has its own saves and settings; the list stays as it is"),
+  const w = page("build", "",
     button(T("cancel"), "esc", () => ui.go("plan")));
   const cols = el("div", "bd-cols");
   const left = el("div", "bd-left");
@@ -309,16 +383,16 @@ function drawBuild() {
   name.spellcheck = false;
   name.value = B.name;
   name.oninput = async () => {
-    B.name = name.value;
-    const epoch = S.screenSeq, seq = B.seq;
+    closeDryRun(); B.name = name.value;
+    const epoch = S.screenSeq;
     const n = B.name, err = await api.PackNameCheck(n);
-    if (n !== B.name || epoch !== S.screenSeq || seq !== B.seq || S.screen !== "build") return;
+    if (n !== B.name || epoch !== S.screenSeq || S.screen !== "build") return;
     B.nameErr = err;
     syncButton();
   };
   name.onkeydown = (e) => {
     if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); go(); }
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); name.blur(); }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (B.dry !== null) closeDryRun(); else name.blur(); }
   };
   nameRow.append(el("span", "k", T("name")), name);
   bc.append(nameRow, el("div", "bd-err", ""));
@@ -340,6 +414,7 @@ function drawBuild() {
     const done = now && !now.includes(s.key) && (i < first || (s.key === "lock" && S.packBuild.step >= 3));
     if (now) cls += done ? " done" : now.includes(s.key) ? " cur" : " wait";
     const r = el("div", cls);
+    r.dataset.key = s.key;
     const n = el("span", "n", done ? "✓" : s.level === "bad" ? "!" : String(i + 1));
     const body = el("div", "b");
     body.append(el("div", "t", s.title), el("div", "x", s.text));
@@ -388,19 +463,32 @@ function drawBuild() {
   row(T("mods"), el("span", "v num", String(p.mods)));
   if (p.before) {
     const v = el("span", "v");
+    v.id = "pk-size";
     v.append(p.before + " → ", el("b", "", p.after));
     row(T("size"), v);
-  } else row(T("size"), el("span", "v muted", T("worked out once the problems are fixed")));
+  } else {
+    const v = el("span", "v muted", T("worked out once the problems are fixed"));
+    v.id = "pk-size";
+    row(T("size"), v);
+  }
   row(T("saves"), p.saves);
   row(T("location"), el("span", "v path", p.dir));
   side.append(kv);
   const go1 = el("button", "btn primary bd-go");
+  go1.dataset.envWrite = "pack-build";
   go1.append(T("create pack"), el("kbd", "", "B"));
   go1.onclick = () => go();
   const why = el("div", "bd-why");
   const dry = button(T("see the list first, write nothing"), "V", () => dryRun());
   dry.classList.add("bd-dry");
+  dry.setAttribute("aria-expanded", String(B.dry !== null));
+  dry.setAttribute("aria-controls", "pk-dry-output");
   side.append(go1, why, dry);
+  const output = el("pre", "bd-dry-output");
+  output.id = "pk-dry-output";
+  output.tabIndex = 0;
+  output.setAttribute("aria-live", "polite");
+  side.append(output);
   cols.append(left, side);
   w.append(cols);
 
@@ -413,7 +501,10 @@ function drawBuild() {
     w.append(s);
   }
   sc.append(w);
+  syncDryRun();
+  syncMeasure();
   syncButton();
+  if (focusTex) $("#pk-tex")?.focus();
   if (focusName) { const n = $("#pk-name"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
 }
 
@@ -426,11 +517,12 @@ function syncButton() {
   if (head) head.textContent = B.name.trim() || p.plan;
   err.textContent = B.nameErr || "";
   let reason = "", toNeeds = false, toGo = "";
-  if (!p.ok) { reason = p.why; toNeeds = p.toNeeds; toGo = p.toGo || ""; }
+  if (B.error) reason = B.error;
+  else if (!B.loading && !p.ok) { reason = p.why; toNeeds = p.toNeeds; toGo = p.toGo || ""; }
   else if (S.packBuild) reason = Tf("creating pack %s", S.packBuild.name);
   else if (building()) reason = T("another pack is being created; wait for it to finish");
   else if (B.nameErr) reason = B.nameErr;
-  go1.disabled = !!reason;
+  go1.disabled = B.loading || !!B.error || B.tex !== p.tex || !!reason;
   why.classList.toggle("busy", !!S.packBuild && p.ok);
   why.innerHTML = "";
   why.hidden = !reason;
@@ -446,7 +538,7 @@ function syncButton() {
 
 function go() {
   const p = B.page;
-  if (!p || B.loading || !p.ok || B.nameErr || building()) return;
+  if (!p || B.loading || B.error || B.tex !== p.tex || !p.ok || B.nameErr || building()) return;
   startBuild(B.name.trim());
 }
 
@@ -455,11 +547,28 @@ async function startBuild(name) {
   redraw();
 }
 
-// dryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run.
+// The preview stays beneath the summary; leaving or changing inputs discards late replies (06 §2.6).
+function syncDryRun() {
+  const out = $("#pk-dry-output"), button = $(".bd-dry");
+  if (!out) return;
+  out.hidden = B.dry === null;
+  out.textContent = B.dry || "";
+  if (button) button.setAttribute("aria-expanded", String(B.dry !== null));
+}
+function closeDryRun() { B.dry = null; ++B.drySeq; syncDryRun(); }
 async function dryRun() {
+  if (B.dry !== null) return closeDryRun();
   if (B.loading) return;
-  const name = (B.name || "").trim() || (B.page && B.page.name) || "";
-  try { pop.text(T("see the list first, write nothing"), await api.PackDryRun(name, B.tex || 0)); } catch (e) { say("fail", errText(e)); }
+  const entered = B.name;
+  const name = (entered || "").trim() || (B.page && B.page.name) || "";
+  const seq = ++B.drySeq, epoch = S.screenSeq, tex = B.tex || 0;
+  B.dry = T("loading…"); syncDryRun();
+  const current = () => seq === B.drySeq && S.screen === "build" && epoch === S.screenSeq && entered === B.name && tex === B.tex;
+  try {
+    const lines = await api.PackDryRun(name, tex);
+    if (!current()) return;
+    B.dry = lines.join("\n"); syncDryRun();
+  } catch (e) { if (current()) { B.dry = errText(e); syncDryRun(); say("fail", B.dry); } }
 }
 
 // ---- keys ----
@@ -474,9 +583,10 @@ export function packsKey(e) {
     if (kk === "V") { e.preventDefault(); return dryRun(); }
     if (kk === "D") { e.preventDefault(); return nextTex(1); }
     if (k === "n" || k === "/") { e.preventDefault(); const n = $("#pk-name"); if (n) n.focus(); return; }
-    if (k === "Escape") { e.preventDefault(); return ui.go(S.buildFrom || "plan"); }
+    if (k === "Escape") { e.preventDefault(); if (B.dry !== null) return closeDryRun(); return ui.go(S.buildFrom || "plan"); }
     return;
   }
+  if ((S.packFocus ? modTable : packTable).key(e)) return;
   if (S.packFocus) {
     if (kk === "L") { e.preventDefault(); return launch(); }
     if (k === "e") { e.preventDefault(); return exportPack(false); }

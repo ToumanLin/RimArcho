@@ -60,7 +60,7 @@ func EnvChip(name, gameVersion string) string {
 		return T("no game")
 	}
 	if mm := env.MajorMinor(gameVersion); mm != "" {
-		return name + " · " + mm
+		return name + "  " + mm
 	}
 	return name
 }
@@ -264,7 +264,7 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 			r.Mods = len(b.Cols[Active])
 			r.Facts = Tf("%d mods", len(b.Cols[Active]))
 			if b.Unsaved > 0 {
-				r.Facts += " · " + Tf("%d not written", b.Unsaved)
+				r.Facts += "  " + Tf("%d not written", b.Unsaved)
 			}
 			k, checked = BreakCount(n), !n.Never
 			r.Links = PackLinksText(n)
@@ -297,7 +297,7 @@ func packHomeRow(p PackRow, chip, envName string) HomeRow {
 	if p.Mods > 0 {
 		r.Facts = Tf("%d mods", p.Mods)
 	}
-	r.Mode = T("versions locked · own saves")
+	r.Mode = T("versions locked  own saves")
 	// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
 	r.State, r.Level = T("checked when created"), HomeOK
 	return r
@@ -471,24 +471,26 @@ func freeName(base string, taken map[string]bool) string {
 // one current: the guide's next steps scan it and choose its starting list. It returns
 // the environments created.
 func AddGames(a *app.App, games []GameFound) ([]string, error) {
+	out, err := CreateGames(a, games)
+	if err == nil && len(out) > 0 {
+		a.EnvName = ""
+		_, err = a.EnvUse(out[0])
+	}
+	return out, err
+}
+
+// CreateGames registers installs without scanning or selecting them (06 §8.4).
+func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 	var out []string
 	for _, g := range games {
 		if g.Env != "" {
 			continue
 		}
 		name := strings.TrimSpace(g.Name)
-		// The Workshop folder of the game's Steam library is added by env add when RimArcho
-		// has none yet (02 §0 item 3); naming it here would move an existing one.
 		if _, _, err := a.EnvAdd(name, app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch}); err != nil {
 			return out, err
 		}
 		out = append(out, name)
-	}
-	if len(out) > 0 {
-		a.EnvName = ""
-		if _, err := a.EnvUse(out[0]); err != nil {
-			return out, err
-		}
 	}
 	return out, nil
 }

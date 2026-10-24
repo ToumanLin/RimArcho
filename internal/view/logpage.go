@@ -45,7 +45,7 @@ type LogRow struct {
 type LogPage struct {
 	Files    []LogFile `json:"files"`
 	Path     string    `json:"path"`
-	Facts    string    `json:"facts"` // "1.6.4633 · 12 840 lines"
+	Facts    string    `json:"facts"` // "1.6.4633  12 840 lines"
 	Rows     []LogRow  `json:"rows"`
 	Selected bool      `json:"selected"` // its errors are in 需要处理
 	// Pending is the game version whose analysis is still running: no rows yet, ask again.
@@ -161,7 +161,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 	if r.AnalysedAs != "" {
 		facts = append(facts, Tf("read as %s", r.AnalysedAs))
 	}
-	p.Facts = strings.Join(facts, " · ")
+	p.Facts = strings.Join(facts, "  ")
 	p.Links = logLinks(r.Clusters)
 	if m := LiveMonitor(a, st, live, path, p.Links); m != nil {
 		p.Monitor = m

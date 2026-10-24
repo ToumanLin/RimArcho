@@ -351,7 +351,7 @@ func TestPackUnfinishedRows(t *testing.T) {
 // pointing to 能不能跑; 先看清单 writes nothing; once fixed, 编译 is enabled with the sizes.
 func TestBuildPageG14(t *testing.T) {
 	e, api, _ := fixture(t)
-	p, err := api.BuildPage(0)
+	p, err := buildPage(t, api, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,7 +370,7 @@ func TestBuildPageG14(t *testing.T) {
 	}
 	e.MustRun("enable", "pkg:brrainz.harmony")
 	api.board, api.needs = nil, nil
-	p, err = api.BuildPage(0)
+	p, err = buildPage(t, api, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,11 +382,11 @@ func TestBuildPageG14(t *testing.T) {
 	if p.Steps[2].Kind != "textures" || p.Tex != 0 || len(p.TexChoices) != 8 {
 		t.Fatalf("textures step: %+v", p.Steps[2])
 	}
-	if p, _ := api.BuildPage(100); p.Steps[2].Go == "textures" && (p.Ok || p.ToGo != "textures") {
+	if p, _ := buildPage(t, api, 100); p.Steps[2].Go == "textures" && (p.Ok || p.ToGo != "textures") {
 		t.Fatalf("no todds: %+v", p)
 	}
 	e.App.TextureEncoder = fakeEncoder{}
-	if p, _ := api.BuildPage(75); !p.Ok || p.Tex != 75 || p.Steps[2].Go != "" || p.Steps[2].Level == view.LevelBad {
+	if p, _ := buildPage(t, api, 75); !p.Ok || p.Tex != 75 || p.Steps[2].Go != "" || p.Steps[2].Level == view.LevelBad {
 		t.Fatalf("with an encoder: %+v", p)
 	}
 	if lines := strings.Join(api.PackDryRun("tex one", 75), " | "); !strings.Contains(lines, "dry run") {
@@ -405,6 +405,19 @@ func TestBuildPageG14(t *testing.T) {
 	pg, err := api.Pack("one")
 	if err != nil || len(pg.Mods) == 0 {
 		t.Fatalf("pack page: %+v %v", pg, err)
+	}
+	for i, m := range pg.Mods {
+		if m.Order != i+1 || (m.Size != "" && m.Size != view.SizeText(m.Bytes)) {
+			t.Errorf("pack mod has no raw sort values: %+v", m)
+		}
+	}
+	rows, err := api.Packs()
+	if err != nil || len(rows.Rows) != 1 || rows.Rows[0].Size != view.SizeText(rows.Rows[0].Bytes) {
+		t.Fatalf("pack table values: %+v %v", rows, err)
+	}
+	wire, _ := json.Marshal(rows.Rows[0])
+	if !strings.Contains(string(wire), `"playedAt":`) || !strings.Contains(string(wire), `"bytes":`) {
+		t.Fatalf("pack table sort values absent from JSON: %s", wire)
 	}
 	// its list alone, as a RimArcho list (no dialog here: the path is typed); the guide's
 	// 打开 unpacks packs only, a list goes through the import preview

@@ -29,8 +29,8 @@ func init() {
 		"a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right": "强要求（依赖或 loadBefore）：分享的日志里违反它时出错更多；自动排序能排好",
 		"%d weaker order preferences are not met": "%d 条较弱的顺序要求没满足",
 		"loadAfter and community rules: breaking them showed no more errors in shared logs; sorting puts them right": "loadAfter 和社区规则：分享的日志里违反它们并没有多出错；自动排序会顺带排好",
-		"sorted: %d moved · strong requirements put right: %d":                                                       "已排序：移动了 %d 个 · 排好的强要求：%d 条",
-		"sorted: %d moved · only weaker preferences were out of order":                                               "已排序：移动了 %d 个 · 只有较弱的顺序要求没满足",
+		"sorted: %d moved, strong requirements put right: %d":                                                        "已排序：移动了 %d 个，排好的强要求：%d 条",
+		"sorted: %d moved, only weaker preferences were out of order":                                                "已排序：移动了 %d 个，只有较弱的顺序要求没满足",
 		// the launch hint (06 §2.3)
 		"%s, and %d more like it": "%s，另有 %d 项同类",
 		"watch for: %s":           "留意：%s",
