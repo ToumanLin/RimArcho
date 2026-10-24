@@ -767,11 +767,8 @@ func (m *model) libRowLine(i, w, right int) string {
 	name := r.Name
 	sel := m.libRowSelected(i)
 	mark := "  "
-	switch {
-	case i == l.cursor && !l.detail:
+	if i == l.cursor && !l.detail {
 		mark = markSel + " "
-	case sel:
-		mark = "▌ "
 	}
 	switch {
 	case x.lone:
@@ -798,13 +795,14 @@ func (m *model) libRowLine(i, w, right int) string {
 		}
 	}
 	line := mark + fit(name, w-right-4) + "  " + fit(strings.Join(info, "  "), right)
+	st := plainStyle
 	switch {
 	case i == l.cursor:
-		return sSel.Render(line)
+		st = sSel
 	case sel:
-		return sAccent.Render(line)
+		st = sAccent
 	}
-	return line
+	return rowBackground(st, sel, i == l.cursor && !l.detail).Render(line)
 }
 
 // libDetailLines: the cursor's copy (06 §2.9): its note (RimArcho's grey first version

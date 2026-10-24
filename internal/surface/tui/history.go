@@ -10,8 +10,8 @@ import (
 
 // The history area (06 §2.5): where the staging list is when staging is empty, the
 // unsaved steps around "now" (redo dimmed above, undo below), then the saved versions. The
-// rows are view.HistoryItems; enter on a step goes there at once (u / ctrl+r move back), on
-// a version asks first (press twice).
+// rows are view.HistoryItems; enter on a step or version goes there at once
+// (u / ctrl+r move back).
 
 // loadHistory reads the history area when staging is empty; the cursor starts on "now".
 func (m *model) loadHistory() {
