@@ -26,6 +26,8 @@ func (b *App) ReadOptions(a *App) {
 	b.LazyLog, b.LogCacheOnly = a.LazyLog, a.LogCacheOnly
 	b.GameProbe, b.LockBase, b.MonitorBundle = a.GameProbe, a.LockBase, a.MonitorBundle
 	b.HTTP, b.SteamAPI = a.HTTP, a.SteamAPI
+	b.SteamCMDZip, b.SteamCMDNoPath = a.SteamCMDZip, a.SteamCMDNoPath
+	b.SteamCMDStart, b.SteamCMDRun, b.SteamCMDPoll = a.SteamCMDStart, a.SteamCMDRun, a.SteamCMDPoll
 	b.TextureEncoder, b.ToddsNoPath, b.ToddsZip = a.TextureEncoder, a.ToddsNoPath, a.ToddsZip
 	b.UninstallExe, b.UninstallKeepBase, b.ArchoProbe = a.UninstallExe, a.UninstallKeepBase, a.ArchoProbe
 	b.UninstallLog = a.UninstallLog

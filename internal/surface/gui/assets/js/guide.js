@@ -10,14 +10,37 @@
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, seg, pickFolder, beginPageRead } from "./screens.js";
 import { exchange, importFrom } from "./exchange.js";
+import { on } from "./api.js";
 
 let ui = null;
-export function initGuide(u) { ui = u; }
+export function initGuide(u) {
+  ui = u;
+  on("tasks", () => updateSteamCMD());
+}
 
 const STEPS = ["find the game", "read the mods", "where to start"];
 const G = { step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "" };
 // The download way: SteamCMD's info (DownloadInfo), the choices, and a run's progress.
 const D = { info: null, loading: false, branch: "", dir: "", dirTyped: false, account: "", run: null };
+const C = { id: "", row: null, submitting: false };
+
+// The guide follows the same durable task as the background page (06 §2.15, 06 §2.16).
+async function updateSteamCMD() {
+  if (!C.id) return;
+  const id = C.id;
+  let tasks;
+  try { tasks = await api.Tasks(); } catch (e) { G.error = errText(e); draw(); return; }
+  if (id !== C.id) return;
+  const row = tasks?.rows?.find(t => t.id === id);
+  if (!row) return;
+  C.row = row;
+  if (row.state === "queue" || row.state === "run") return draw();
+  C.id = "";
+  if (row.state !== "done") { G.error = row.line || row.stateText; draw(); return; }
+  G.error = "";
+  D.info = null;
+  loadDownload();
+}
 
 // start opens the guide at step 1; from is "first" (no environment yet) or "env".
 export async function start(from = "first") {
@@ -195,6 +218,16 @@ function suggestDir() {
 }
 
 function download(card) {
+  if (C.id || C.submitting) {
+    const row = C.row;
+    card.append(el("div", "dl-state", row ? row.say : T("downloading…")));
+    const prog = el("div", "prog");
+    const bar = el("div", "bar" + (row?.pct > 0 ? "" : " busy"));
+    const fill = el("i");
+    fill.style.width = (row?.pct || 0) + "%";
+    bar.append(fill); prog.append(bar); card.append(prog);
+    return footer(card);
+  }
   if (D.run) return downloading(card, D.run);
   if (D.loading || !D.info) {
     card.append(el("div", "dl-note", T("asking Steam which versions RimWorld has… (SteamCMD may update itself first)")));
@@ -212,10 +245,16 @@ function download(card) {
     card.append(el("div", "dl-note", Tf("RimArcho downloads game versions with Valve's SteamCMD, which is not on this computer. Download it from Valve (%s) into %s?", size, o.dir || "")));
     const get = button(T("download SteamCMD"), "", async () => {
       get.disabled = true;
-      try { await api.GuideInstallSteamCMD(); } catch (e) { G.error = errText(e); return draw(); }
+      C.submitting = true; C.row = null;
+      draw();
+      try {
+        C.id = await api.GuideInstallSteamCMD();
+        say("ok", Tf("%s · %s: in the %s queue", T("download SteamCMD"), "RimArcho", "RimArcho"));
+      } catch (e) { G.error = errText(e); }
+      finally { C.submitting = false; }
+      if (!C.id) return draw();
       G.error = "";
-      D.info = null;
-      loadDownload();
+      updateSteamCMD();
     }, "primary");
     return footer(card, get);
   }

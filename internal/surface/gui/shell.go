@@ -404,13 +404,12 @@ func gamesFolder(a *app.App) string {
 	return filepath.Join(os.Getenv("HOME"), "Games")
 }
 
-// GuideInstallSteamCMD downloads SteamCMD from Valve (the player said yes to the offer).
+// GuideInstallSteamCMD queues the confirmed download and returns its task ID (06 §2.15).
 func (s *API) GuideInstallSteamCMD() (string, error) {
-	p, err := s.a.InstallSteamCMD()
-	if err != nil {
-		return "", errors.New(view.Humanize(nil, err.Error()))
-	}
-	return p, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t := s.queueSettingTaskLocked(view.TaskSteamCMD, nil, "")
+	return t.ID, nil
 }
 
 // GuideDownload starts SteamCMD for a version and returns at once: SteamCMD opens its own
