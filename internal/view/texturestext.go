@@ -1,6 +1,6 @@
 package view
 
-// The text of 贴图优化 (08 §5.2, 06 §2.14): Mod 库存's ops and detail line, the settings page,
+// The text of 贴图优化 (08 §5.2, 06 §2.13): Mod 库存's ops and detail line, the settings page,
 // the pack build's step.
 func init() {
 	Register(map[string]string{
@@ -55,6 +55,7 @@ func init() {
 		"mod":            "Mod",
 		"PNG":            "PNG",
 		"to convert":     "要转换",
+		"estimated DDS":  "预计 DDS 大小",
 		"RimArcho's DDS": "RimArcho 的 DDS",
 		"stale":          "过期",
 		"own DDS":        "自带 DDS",
