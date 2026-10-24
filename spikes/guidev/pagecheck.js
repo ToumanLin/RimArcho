@@ -1,7 +1,7 @@
 // Open /dev/pagecheck in guidev. Test real modules/DOM with delayed API replies and
 // synthetic large logs; the mock runtime makes this page independent of user data.
-import { handlers } from "./pagecheck-runtime.js";
-import { S } from "/js/state.js";
+import { handlers, emit } from "./pagecheck-runtime.js";
+import { S, api } from "/js/state.js";
 import * as screens from "/js/screens.js";
 import * as library from "/js/library.js";
 import * as textures from "/js/textures.js";
@@ -23,7 +23,7 @@ const visibleSelection = () => {
   const r = row.getBoundingClientRect(), s = scroll.getBoundingClientRect();
   return r.top < s.bottom && r.bottom > s.top;
 };
-const ui = { renderWhere() {}, renderHints() {}, reload() {}, cmd() {}, go() {} };
+const ui = { renderWhere() {}, renderHints() {}, reload() {}, refreshEnvironment() {}, cmd() {}, go() {} };
 screens.initScreens(ui);
 library.initLibrary(ui);
 home.initHome(ui); packs.initPacks(ui); guide.initGuide(ui); full.initFull(ui);
@@ -35,7 +35,7 @@ async function test(name, run) { await run(); results.push("PASS " + name); outp
 
 try {
   const backgrounds = { setting: { key: "plain", stars: [], files: [] }, groups: [{ name: "game", items: [{ key: "plain", label: "plain" }] }] };
-  const buildPreview = { name: "fixture pack", plan: "fixture plan", steps: [], mods: 0, ok: true };
+  const buildPreview = { name: "fixture pack", plan: "fixture plan", steps: [], mods: 0, ok: true, texChoices: [{ value: 0, label: "keep" }, { value: 1, label: "convert" }] };
   handlers.set("HomeBackground", () => ({})); handlers.set("Backgrounds", () => backgrounds);
   handlers.set("Packs", () => ({ rows: [] })); handlers.set("PackNameCheck", () => "");
   handlers.set("Detail", () => null); handlers.set("Sections", () => []);
@@ -109,31 +109,59 @@ try {
     handlers.set("BuildPage", () => buildPreview); await packs.build();
     const d = deferred(); let builds = 0;
     handlers.set("BuildPage", () => d.promise); handlers.set("PackBuild", () => { builds++; });
-    packs.packsKey(new KeyboardEvent("keydown", { key: "T", cancelable: true })); await Promise.resolve();
+    packs.packsKey(new KeyboardEvent("keydown", { key: "D", cancelable: true })); await Promise.resolve();
     packs.packsKey(new KeyboardEvent("keydown", { key: "B", cancelable: true })); await Promise.resolve();
     assert(builds === 0, "build used a stale preview");
     screens.openScreen("other"); d.resolve(buildPreview); await settle();
     assert(S.screen === "other", "option response reopened the build page");
   });
-  await test("environment switch shows progress immediately and rejects repeat clicks", async () => {
-    const d = deferred(); let calls = 0;
-    const pending = withEnvironmentSwitch("1.5", () => { calls++; return d.promise; });
-    const app = document.querySelector("#app");
-    assert(document.querySelector('#env-progress [role="progressbar"]') && app.inert, "no immediate progress or input lock");
-    assert(document.querySelector("#env-progress").textContent.includes("1.5"), "progress does not name the destination");
-    assert(await withEnvironmentSwitch("1.6", () => { calls++; }) === false, "repeat click started another switch");
-    await settle();
-    assert(calls === 1 && document.querySelector("#env-progress"), "progress disappeared while switch was pending");
-    d.resolve(); await pending;
-    assert(!S.busy.env && !app.inert && !document.querySelector("#env-progress"), "switch did not release progress and input");
+  await test("environment switch keeps navigation live and only the latest result applies", async () => {
+    const old = deferred(), next = deferred(); let selected = "";
+    const button = document.createElement("button"); button.className = "hm-go";
+    document.querySelector("#app").append(button);
+    const p1 = withEnvironmentSwitch("1.5", async (current) => { await old.promise; if (current()) selected = "1.5"; });
+    assert(!document.querySelector("#app").inert && !document.querySelector("#env-progress"), "switch locked the window");
+    assert(button.disabled && button.title.includes("1.5"), "launch action has no reason");
+    screens.openScreen("env");
+    assert(S.screen === "env", "navigation was blocked");
+    const p2 = withEnvironmentSwitch("1.6", async (current) => { await next.promise; if (current()) selected = "1.6"; });
+    old.resolve(); await p1;
+    assert(S.busy.env === "1.6" && button.disabled && button.title.includes("1.6"), "old completion unlocked the newer switch");
+    next.resolve(); await p2;
+    assert(selected === "1.6" && !S.busy.env && !button.disabled, "newest result did not win");
+    button.remove();
   });
   await test("environment progress stays through destination refresh", async () => {
     const reply = deferred(), refresh = deferred();
     const pending = withEnvironmentSwitch("1.5", async () => { await reply.promise; await refresh.promise; });
-    await settle(); reply.resolve(); await settle();
-    assert(document.querySelector("#env-progress") && S.busy.env, "progress ended before destination refresh");
+    reply.resolve(); await settle();
+    assert(S.busy.env === "1.5" && !document.querySelector("#app").inert, "progress ended before destination refresh");
     refresh.resolve(); await pending;
-    assert(!document.querySelector("#env-progress"), "progress did not finish after refresh");
+    assert(!S.busy.env, "progress did not finish after refresh");
+  });
+  await test("environment API waits for its matching event, even before acknowledgement", async () => {
+    handlers.set("UseEnv", (request, name) => {
+      emit("environment", { request, text: name });
+      return true;
+    });
+    assert((await api.UseEnv("fixture")).text === "fixture", "event was lost before acknowledgement");
+    const pending = withEnvironmentSwitch("1.6", async () => {
+      try { await api.Run("save"); throw new Error("write was allowed"); }
+      catch (e) { assert(e.message.includes("1.6"), "write rejection has no destination"); }
+    });
+    await pending;
+  });
+  await test("pre-switch page results cannot overwrite the destination", async () => {
+    screens.openScreen("other");
+    const old = deferred(), switchEnd = deferred();
+    handlers.set("Environment", () => old.promise);
+    const read = screens.environment();
+    const switching = withEnvironmentSwitch("1.6", () => switchEnd.promise);
+    old.resolve({ envs: [{ name: "obsolete destination", game: "fixture" }], groups: [] });
+    await read;
+    assert(!document.querySelector("#screen").textContent.includes("obsolete destination"), "old page read was installed");
+    switchEnd.resolve(); await switching;
+    handlers.set("Environment", () => ({ envs: [], groups: [] }));
   });
   await test("failed environment switch restores focus and input", async () => {
     const app = document.querySelector("#app"), button = document.createElement("button");

@@ -31,20 +31,28 @@ import { withEnvironmentSwitch } from "./environment.js";
 
 // ---- loading ----
 
-async function reload() {
-  let b;
-  try { b = await api.Board(); } catch (e) { say("fail", errText(e)); return; }
+let reloadSeq = 0;
+async function reload(snapshot = null) {
+  if (S.busy.env && !snapshot) return;
+  const seq = ++reloadSeq, gameRequest = S.envSeq;
+  const current = () => seq === reloadSeq && gameRequest === S.envSeq;
+  let b, sh, history;
+  try {
+    const result = snapshot || await api.Workspace();
+    if (!current() || result.stale) return;
+    b = result.board; sh = result.shell; history = result.history;
+  } catch (e) { if (current()) say("fail", errText(e)); return; }
+  if (!current()) return;
   S.board = b;
+  S.shell = sh;
+  S.history = history;
   S.busy.scan = b.scanning;
   S.busy.analyze = b.analyzing;
-  // no environment yet: the first-run guide says so, not an error
   if (b.error && b.envs && b.envs.length) say("fail", b.error);
   const cols = b.cols || [[], [], []];
-  const sh = shell.loadShell();
-  try { S.history = await api.History(); } catch { S.history = null; }
-  await sh;
   const keep = [0, 1, 2].map((k) => setItems(k, cols[k] || []));
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
+  if (!current()) return;
   render();
   detailFollow();
   await scr.logEnvironmentChanged();
@@ -162,7 +170,7 @@ async function go(id) {
   shell.navigated();
   if (id === "plan:new") return plans.newPlan();
   if (id.startsWith("plan:")) {
-    if (!(await plans.openPlan(+id.slice(5)))) return;
+    if (!S.busy.env && !(await plans.openPlan(+id.slice(5)))) return;
     id = "plan";
   }
   S.packFocus = id.startsWith("pack:") ? id.slice(5) : null;
@@ -527,19 +535,27 @@ async function chooseEnv() {
     Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove the game"), run: (i) => scr.removeEnv(envs[i]) });
 }
 
-async function useEnv(name, refresh) {
+async function useEnv(name) {
   try {
-    return await withEnvironmentSwitch(name, async () => {
-      const text = await api.UseEnv(name);
+    const switched = await withEnvironmentSwitch(name, async (current) => {
+      const result = await api.UseEnv(name);
+      if (!current() || result.stale) return;
       for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
-      await reload();
-      if (refresh) await refresh();
-      say("ok", text);
+      await reload(result);
+      if (current()) await refreshEnvironment();
+      if (current()) say("ok", result.text);
     });
+    return switched;
   } catch (e) {
     say("fail", errText(e));
     return false;
   }
+}
+
+// Refresh whichever page is visible now; completing a switch never returns to its caller.
+async function refreshEnvironment() {
+  S.screenSeq++;
+  if (S.screen && S.screen !== "guide") await openPage(S.screen);
 }
 
 function commandLine() {
@@ -730,7 +746,6 @@ async function delKey() {
 // ---- the keyboard ----
 
 function onKey(e) {
-  if (S.busy.env) { e.preventDefault(); return; }
   if (e.isComposing) return;
   const k = e.key;
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
@@ -898,7 +913,7 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
+  reload, refreshEnvironment, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),

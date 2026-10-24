@@ -471,24 +471,26 @@ func freeName(base string, taken map[string]bool) string {
 // one current: the guide's next steps scan it and choose its starting list. It returns
 // the environments created.
 func AddGames(a *app.App, games []GameFound) ([]string, error) {
+	out, err := CreateGames(a, games)
+	if err == nil && len(out) > 0 {
+		a.EnvName = ""
+		_, err = a.EnvUse(out[0])
+	}
+	return out, err
+}
+
+// CreateGames registers installs without scanning or selecting them (06 §8.4).
+func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 	var out []string
 	for _, g := range games {
 		if g.Env != "" {
 			continue
 		}
 		name := strings.TrimSpace(g.Name)
-		// The Workshop folder of the game's Steam library is added by env add when RimArcho
-		// has none yet (02 §0 item 3); naming it here would move an existing one.
 		if _, _, err := a.EnvAdd(name, app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch}); err != nil {
 			return out, err
 		}
 		out = append(out, name)
-	}
-	if len(out) > 0 {
-		a.EnvName = ""
-		if _, err := a.EnvUse(out[0]); err != nil {
-			return out, err
-		}
 	}
 	return out, nil
 }

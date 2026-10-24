@@ -16,6 +16,7 @@ export function initScreens(u) { ui = u; }
 // fresh: the next page built is a new page (not a redraw of the one shown); only a new page
 // fades in, so a redraw after an action or a sub-view switch does not flicker.
 let fresh = false;
+const pageCache = new Map();
 
 // left tells Go the player left a page, which forgets what only that page used (07 §8.3).
 function left(next) {
@@ -29,13 +30,19 @@ export function openScreen(name) {
   fresh = S.screen !== name;
   if (fresh) S.screenSeq++;
   if (fresh) onArea = 0;
+  const previous = $("#screen");
+  if (fresh && S.screen && previous.children.length && !pageLoading()) {
+    pageCache.set(S.screen, { nodes: [...previous.childNodes], top: previous.scrollTop });
+  }
   left(name);
   S.screen = name;
   if (name !== "home") dropBackdrop();
   const sc = $("#screen");
   sc.hidden = false;
   sc.removeAttribute("aria-busy");
-  sc.innerHTML = "";
+  sc.replaceChildren();
+  const cached = S.busy.env && pageCache.get(name);
+  if (cached) { sc.append(...cached.nodes); sc.scrollTop = cached.top; }
   ui.renderWhere();
   ui.renderHints();
   return sc;
@@ -67,12 +74,12 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
   const sc = same ? $("#screen") : openScreen(name);
   const n = (pageReads.get(name) || 0) + 1;
   pageReads.set(name, n);
-  const epoch = S.screenSeq, env = S.board?.env, plan = S.shell?.plan?.id;
+  const epoch = S.screenSeq, gameRequest = S.envSeq, env = S.board?.env, plan = S.shell?.plan?.id;
   const context = JSON.stringify([env, plan]);
   const changed = pageContexts.get(name) !== context;
   pageContexts.set(name, context);
-  const current = () => S.screen === name && S.screenSeq === epoch && S.board?.env === env && S.shell?.plan?.id === plan && pageReads.get(name) === n;
-  if ((!same || changed || replace || !sc.children.length) && !(keep && same && sc.children.length)) {
+  const current = () => S.envSeq === gameRequest && S.screen === name && S.screenSeq === epoch && S.board?.env === env && S.shell?.plan?.id === plan && pageReads.get(name) === n;
+  if ((!same || (changed && !S.busy.env) || replace || !sc.children.length) && !((keep && same || S.busy.env) && sc.children.length && !pageLoading())) {
     sc.innerHTML = "";
     const w = page(name, "");
     const card = el("section", "card pad page-loading");
@@ -1317,9 +1324,12 @@ export async function environment() {
     const l = el("div", "l");
     l.append(el("div", "name", e.name), el("div", "sub", e.game));
     row.append(l);
-    if (e.current) row.append(el("span", "chip cur", T("in use")));
-    else {
-      row.append(button(T("use this one"), "", () => ui.useEnv(e.name, environment)));
+    if (e.current) {
+      const current = el("button", "chip cur", T("in use"));
+      current.onclick = () => { if (S.busy.env && S.busy.env !== e.name) ui.useEnv(e.name); };
+      row.append(current);
+    } else {
+      row.append(button(T("use this one"), "", () => ui.useEnv(e.name)));
     }
     row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet"));
     card.append(row);

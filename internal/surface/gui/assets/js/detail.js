@@ -11,7 +11,8 @@ let fetchTimer = 0;
 // show loads and draws the detail of a row; the Workshop page is fetched only after the
 // cursor rested on the mod (06 §4.3 item 3).
 export async function showDetail(it, staged) {
-  const n = ++seq;
+  const n = ++seq, gameRequest = S.envSeq;
+  const current = () => n === seq && S.envSeq === gameRequest;
   clearTimeout(fetchTimer);
   const box = $("#detail");
   if (!it) { box.innerHTML = ""; S.detail = null; return; }
@@ -23,21 +24,21 @@ export async function showDetail(it, staged) {
   }
   try {
     const d = await api.Detail(it.id, !!staged, false, false);
-    if (n !== seq) return;
+    if (!current()) return;
     draw(d);
     if (d.state === "not cached") {
       fetchTimer = setTimeout(async () => {
-        if (n !== seq) return;
+        if (!current()) return;
         const note = $("#detail .desc-note");
         if (note) note.textContent = T("fetching the Workshop page…");
         try {
           const f = await api.Detail(it.id, !!staged, true, false);
-          if (n === seq) draw(f, true);
+          if (current()) draw(f, true);
         } catch (e) { /* the note stays */ }
       }, 400);
     }
   } catch (e) {
-    if (n === seq) { box.innerHTML = ""; box.append(el("p", "err", errText(e))); }
+    if (current()) { box.innerHTML = ""; box.append(el("p", "err", errText(e))); }
   }
 }
 

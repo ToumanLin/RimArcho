@@ -27,7 +27,7 @@ const HIDDEN_KEY = "ui.gui.home.hidden";
 let data = null;
 let bg = null;
 let hidden = null;
-let busy = false;      // an apply is running: keys wait for it
+let pendingRow = null; // latest pick while the previous page data remains visible
 let launching = 0;     // until when ▶ says it is starting (the live state takes over)
 let arrived = false;   // the last apply just finished: ▶ shows the new pick coming in
 const picks = new Map(); // game → the row last applied in it this session
@@ -70,19 +70,19 @@ const gameOf = (r) => games().find((g) => g.name === r.envName) || { name: r.env
 // homeKey: ↑↓ the applied game's lists and packs, ←→ the games (each applies it), enter
 // opens the applied row, L launches.
 export function homeKey(e) {
-  const k = e.key, f = applied();
+  const k = e.key, f = pendingRow || applied();
   if (k === "Enter" && document.activeElement && document.activeElement.matches(".hm-go")) { e.preventDefault(); document.activeElement.click(); return; }
   if (!f) return;
   if (k === "ArrowDown" || k === "ArrowUp") {
     e.preventDefault();
     const list = rowsOf(f.envName), i = list.findIndex((r) => key(r) === key(f));
-    if (list.length > 1 && !busy) apply(list[(i + (k === "ArrowDown" ? 1 : list.length - 1)) % list.length]);
+    if (list.length > 1) apply(list[(i + (k === "ArrowDown" ? 1 : list.length - 1)) % list.length]);
     return;
   }
   if (k === "ArrowLeft" || k === "ArrowRight") {
     e.preventDefault();
     const gs = games(), i = gs.findIndex((g) => g.name === f.envName);
-    if (gs.length > 1 && !busy) pickGame(gs[(i + (k === "ArrowRight" ? 1 : gs.length - 1)) % gs.length].name);
+    if (gs.length > 1) pickGame(gs[(i + (k === "ArrowRight" ? 1 : gs.length - 1)) % gs.length].name);
     return;
   }
   if (k === "Enter") { e.preventDefault(); edit(f); return; }
@@ -136,6 +136,7 @@ function draw() {
   w.append(el("div", "hm-rule" + (shown.drawn ? "" : " in")));
   w.append(gameStep(env), rowStep(f, env, gameMoved), launchStep(f));
   placeMarks(gameMoved);
+  if (pendingRow && S.busy.env) showSwitch(pendingRow);
   shown.game = env; shown.row = f ? key(f) : null; shown.drawn = true;
   shown.note = !!w.querySelector(".hm-note");
 }
@@ -331,7 +332,7 @@ function edit(r) { ui.go(r.kind === "plan" ? r.page : "pack:" + r.name); }
 
 function pickGame(env) {
   const f = applied();
-  if (f && f.envName === env) return;
+  if (!S.busy.env && f && f.envName === env) return;
   const want = picks.get(env);
   const r = rows().find((x) => key(x) === want) || rows().find((x) => x.envName === env);
   if (r) apply(r);
@@ -342,25 +343,27 @@ function pickGame(env) {
 // main…", which can take a while; another row: "applying X…") until the new page is read,
 // then the new pick comes in on it.
 async function apply(r) {
-  if (busy) return;
-  busy = true;
+  pendingRow = r;
   showSwitch(r);
-  const run = async () => {
-    const text = await api.HomeApply(r.kind, r.envName, r.plan || 0, r.kind === "pack" ? r.name : "");
-    picks.set(r.envName, key(r));
-    await ui.reload();
-    arrived = true;
-    await home({ keep: true });
-    say("ok", text);
-  };
   try {
-    if (r.otherEnv) await withEnvironmentSwitch(r.envName, run, { quiet: true });
-    else await run();
+    const switched = await withEnvironmentSwitch(r.envName, async (current) => {
+      const result = await api.HomeApply(r.kind, r.envName, r.plan || 0, r.kind === "pack" ? r.name : "");
+      if (!current() || result.stale) return;
+      picks.set(r.envName, key(r));
+      await ui.reload(result);
+      if (!current()) return;
+      pendingRow = null;
+      arrived = true;
+      await ui.refreshEnvironment();
+      if (current()) say("ok", result.text);
+    });
+    if (switched) pendingRow = null;
   } catch (e) {
+    pendingRow = null;
     arrived = false;
     if (S.screen === "home" && data) draw();
     say("fail", errText(e));
-  } finally { busy = false; }
+  }
 }
 
 // showSwitch marks the pick in 01 and 02 and turns ▶ into the switch's progress.
@@ -416,6 +419,7 @@ function actLine(title, text, go) {
 // launch is the applied row's L (08 §2, §5.3): the plan launches at once, as the pack
 // does on the packs page. ▶ says it is starting until the game's live state arrives.
 async function launch(r) {
+  if (S.busy.env) return say("busy", Tf("switching to %s…", S.busy.env));
   launching = Date.now() + 4000;
   draw();
   setTimeout(() => { if (S.screen === "home" && launching && launching <= Date.now()) { launching = 0; draw(); } }, 4100);

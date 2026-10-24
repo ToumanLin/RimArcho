@@ -112,7 +112,7 @@ func TestTextureReadSupersededAndCancelledOnLeave(t *testing.T) {
 }
 
 func TestLogPageSwitchesEnvironmentAndRejectsPreviousPath(t *testing.T) {
-	e, api, _ := fixture(t)
+	e, api, events := fixture(t)
 	old := filepath.Join(e.UserData, "Player.log")
 	e.WriteFile(old, "RimWorld 1.6.4633 rev1261\n")
 	if p, err := api.LogPage(""); err != nil || p.Path != old {
@@ -126,8 +126,9 @@ func TestLogPageSwitchesEnvironmentAndRejectsPreviousPath(t *testing.T) {
 	}
 	next := filepath.Join(other.UserDataRoot, "Player.log")
 	e.WriteFile(next, "RimWorld 1.6.4633 rev1261\n")
-	if _, err := api.UseEnv("other"); err != nil {
-		t.Fatal(err)
+	api.UseEnv(1, "other")
+	if r := environmentResult(t, events, 1); r.Error != "" {
+		t.Fatal(r.Error)
 	}
 	// No intervening Board call: the backend itself must use the new environment.
 	for _, path := range []string{"", old} {
@@ -136,8 +137,9 @@ func TestLogPageSwitchesEnvironmentAndRejectsPreviousPath(t *testing.T) {
 		}
 	}
 	e.MustRun("env", "add", "empty", "--game", e.OtherGame("Empty", "1.6.4633 rev1261"), "--saves", "own")
-	if _, err := api.UseEnv("empty"); err != nil {
-		t.Fatal(err)
+	api.UseEnv(2, "empty")
+	if r := environmentResult(t, events, 2); r.Error != "" {
+		t.Fatal(r.Error)
 	}
 	if p, err := api.LogPage(next); err != nil || p.Path != "" || len(p.Files) != 0 {
 		t.Fatalf("empty environment retained old log: %+v, %v", p, err)

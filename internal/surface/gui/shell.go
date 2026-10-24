@@ -96,36 +96,6 @@ func (s *API) Home() *view.Home {
 	return h
 }
 
-// HomeApply is a home row's 应用 (06 §2.3): its environment becomes current if it is not,
-// then a plan becomes the current plan, a pack the featured item. No game file is written;
-// ▶ 启动游戏 on the featured card does that. The page reloads the board afterwards.
-func (s *API) HomeApply(kind, envName string, plan int64, pack string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.boardState()
-	if st == nil || st.Ix.Env.Name != envName {
-		s.a.EnvName = ""
-		if _, err := s.a.EnvUse(envName); err != nil {
-			return "", err
-		}
-		s.needs, s.board = nil, nil
-		s.logLinks, s.logPath = nil, ""
-	}
-	if kind == view.RowPlan {
-		_, t, err := view.UsePlan(s.a, plan)
-		if err != nil {
-			return "", err
-		}
-		s.board = nil
-		return t, s.a.Store.SetMeta(view.FeaturedKey, "")
-	}
-	st = s.boardState()
-	if st == nil {
-		return "", fmt.Errorf("no game")
-	}
-	return view.Tf("%s is ready to launch", pack), s.a.Store.SetMeta(view.FeaturedKey, view.FeaturedValue(envName, pack, st.Plan.ID))
-}
-
 // ---- plans (04 §1.3, 06 §2.5) ----
 
 // PlanFroms are the new-plan dialog's starting lists.
@@ -251,48 +221,53 @@ func (s *API) GuideGame(path string) (*view.GameFound, error) {
 	return view.GameAt(s.a, path)
 }
 
-// GuideAdd creates the chosen environments; the first becomes current.
-func (s *API) GuideAdd(games []view.GameFound) ([]string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	names, err := view.AddGames(s.a, games)
-	s.board, s.needs = nil, nil
-	if err != nil {
-		return names, errors.New(view.Humanize(nil, err.Error()))
-	}
-	return names, nil
-}
-
 // GuideScan scans the environments one after another in child processes and returns at
 // once; "guide" events carry which one is being read and the end (06 §8.4).
 func (s *API) GuideScan(names []string) bool {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.busy["scan"] || len(names) == 0 {
+		s.mu.Unlock()
 		return false
 	}
 	s.busy["scan"] = true
-	run := s.ScanRunner
-	if run == nil {
-		// A game added once the shared mod folders were read: only its own Data/ and Mods/
-		// (02 §0 item 8). The first game reads the shared folders as well.
-		var flags []string
-		if !s.a.SharedUnread() {
-			flags = append(flags, "--game-only")
-		}
-		home, exe := s.a.Home, s.Exe
-		run = func(env string) (string, error) {
-			if exe != "" {
-				return app.ChildScanExe(exe, home, env, flags...)
-			}
-			return app.ChildScan(home, env, flags...)
-		}
-	}
+	run, home, exe := s.ScanRunner, s.a.Home, s.Exe
+	s.mu.Unlock()
+	names = append([]string(nil), names...)
 	go func() {
 		ok := true
+		r, setupErr := s.detachedReader()
+		if r != nil {
+			defer r.Close()
+		}
+		var flags []string
+		if setupErr == nil && !r.SharedUnread() {
+			flags = append(flags, "--game-only")
+		}
 		for i, n := range names {
+			task := s.beginSelf(view.TaskScan, n, nil)
 			s.send("guide", map[string]any{"i": i, "n": len(names), "env": n, "text": view.Tf("reading the mods of %s…", n)})
-			out, err := run(n)
+			out, err := "", setupErr
+			if err == nil {
+				// The first link preparation can scan too: it belongs here, never in
+				// GuideAdd or the GUI call (06 §8.4).
+				s.environment.gate.Lock()
+				_, err = r.PrepareEnv(n)
+				s.environment.gate.Unlock()
+			}
+			if err == nil {
+				switch {
+				case run != nil:
+					out, err = run(n)
+				case exe != "":
+					out, err = app.ChildScanExe(exe, home, n, flags...)
+				default:
+					out, err = app.ChildScan(home, n, flags...)
+				}
+			}
+			if err == nil {
+				r.EnvName, r.AnalyzeWait = n, 0
+				_, err = r.EnsureAnalysis(nil)
+			}
 			ev := map[string]any{"i": i, "n": len(names), "env": n, "ok": err == nil, "step": true}
 			if err != nil {
 				ok = false
@@ -300,6 +275,7 @@ func (s *API) GuideScan(names []string) bool {
 			} else {
 				ev["text"] = fmt.Sprintf("%s: %s", n, scanLine(out))
 			}
+			s.endSelf(task, err, scanLine(out))
 			s.send("guide", ev)
 		}
 		s.mu.Lock()
@@ -439,13 +415,21 @@ func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
 		var r *app.SourceChangeEnv
 		got, err := s.a.FetchGame(spec, func(p app.DownloadProgress) { s.send("download", p) })
 		end := map[string]any{"end": true}
-		s.mu.Lock()
 		if err == nil {
-			if r, err = s.a.AddDownloaded(spec, got); err == nil {
-				s.a.EnvName = ""
-				_, err = s.a.EnvUse(r.Env.Name)
+			reader, openErr := s.detachedReader()
+			if openErr != nil {
+				err = openErr
+			} else {
+				r, err = reader.AddDownloaded(spec, got)
+				reader.Close()
 			}
 		}
+		s.mu.Lock()
+		if err == nil {
+			err = s.a.Store.SetCurrentEnv(r.Env.ID)
+			s.a.EnvName = r.Env.Name
+		}
+		// GuideScan owns link preparation and the first scan (06 §8.4).
 		s.busy["download"], s.board, s.needs = false, nil, nil
 		s.mu.Unlock()
 		if err != nil {

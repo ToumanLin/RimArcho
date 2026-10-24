@@ -10,6 +10,7 @@
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, seg, pickFolder, beginPageRead } from "./screens.js";
 import { exchange, importFrom } from "./exchange.js";
+import { withEnvironmentSwitch } from "./environment.js";
 
 let ui = null;
 export function initGuide(u) { ui = u; }
@@ -150,8 +151,13 @@ function step1(card) {
   const next = button(picked.length > 1 ? Tf("add %d games", picked.length) : T("add and continue"), "", async () => {
     next.disabled = true;
     let names;
-    try { names = await api.GuideAdd(picked.map((i) => G.games[i])); } catch (e) { G.error = errText(e); return draw(); }
-    added(names || []);
+    try {
+      const games = picked.map((i) => G.games[i]);
+      const accepted = await withEnvironmentSwitch(games[0].name, async () => {
+        names = await api.GuideAdd(games);
+      });
+      if (accepted) await added(names || []);
+    } catch (e) { G.error = errText(e); draw(); }
   }, "primary");
   next.disabled = !picked.length;
   footer(card, G.added.length ? button(T("next"), "", () => go(1)) : null, next);
@@ -162,8 +168,7 @@ async function added(names) {
   G.added = names;
   G.games = (await api.GuideFind()) || G.games;
   G.picked.clear();
-  await ui.reload();
-  scanAll();
+  await scanAll();
 }
 
 // ---- 1b. download a version (SteamCMD, 08 §11) ----
@@ -311,6 +316,7 @@ async function scanAll() {
   G.step = 1;
   G.scan = { rows: G.added.map((n) => ({ env: n, text: T("waiting"), state: "wait" })), done: false, ok: true };
   draw();
+  S.busy.scan = true;
   if (!(await api.GuideScan(G.added))) {
     G.scan.done = true;
     G.error = T("a scan is already running; wait for it to finish");
@@ -323,6 +329,7 @@ export function guideEvent(ev) {
   if (!G.scan) return;
   if (ev.done) {
     G.scan.done = true;
+    S.busy.scan = false;
     G.scan.ok = ev.ok;
     ui.reload();
     return draw();
