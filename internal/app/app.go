@@ -141,8 +141,9 @@ type App struct {
 	prKey       string
 	planPS      map[int64]*planProblems // PlanProblems, by plan
 
-	logCache   *logCacheEntry
-	harmonyDir string
+	logCache          *logCacheEntry
+	harmonyDir        string
+	subscriptionCache map[string]subscriptionCacheEntry
 }
 
 // Open opens (creating if needed) the data directory home.

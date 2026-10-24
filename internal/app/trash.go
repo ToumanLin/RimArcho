@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
 // ErrNotInTrashList: a path outside the recycle bin's allow-list (08 §7).
@@ -69,6 +70,17 @@ func (a *App) trashAllowed(path string) error {
 	// Mod folders: every source of every environment, and each game's Mods/.
 	if srcs, err := a.Store.AllSources(); err == nil {
 		for _, s := range srcs {
+			if s.Status != source.StatusRetired && (s.Label == SubscribedLabel || s.Kind == source.SteamCMD) {
+				if child(s.Root) {
+					if s.Kind == source.SteamCMD {
+						return nil
+					}
+					if _, err := subscribe.Read(path); err == nil {
+						return nil
+					}
+				}
+				continue
+			}
 			if s.Status != source.StatusRetired && s.Kind != source.Official && inside(s.Root) {
 				return nil
 			}
