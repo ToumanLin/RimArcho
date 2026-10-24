@@ -10,6 +10,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 )
 
@@ -501,5 +502,19 @@ func PackImportText(m *app.PackMatch) string {
 	if m == nil || m.Pack == nil {
 		return ""
 	}
-	return Tf("pack %s is in the packs folder; play it from the home page", m.Pack.Name)
+	parts := []string{Tf("pack %s is in the packs folder; play it from the home page", m.Pack.Name)}
+	if m.Verified {
+		parts = append(parts, T("every mod's files match the pack"))
+	} else {
+		parts = append(parts, T("files not checked (a pack from an older RimArcho)"))
+	}
+	// what differs from this game (08 §5.5); info stays on the pack's page
+	if c := PackCheckOf(m.Check); c != nil {
+		for _, it := range c.Items {
+			if it.Level == finding.Warning || it.Level == finding.Error {
+				parts = append(parts, it.Text)
+			}
+		}
+	}
+	return strings.Join(parts, "  ")
 }

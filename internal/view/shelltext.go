@@ -23,6 +23,8 @@ func init() {
 		"checked when created":       "创建时检查过",
 		"type the game folder":       "输入游戏目录",
 		"%s does not look like a RimWorld folder (no game executable or Data/Core)": "%s 不像 RimWorld 的目录（没有游戏程序或 Data/Core）",
+		"every mod's files match the pack":                                          "每个 Mod 的文件都与包一致",
+		"files not checked (a pack from an older RimArcho)":                         "没有核对文件（旧版 RimArcho 做的包）",
 		"pack %s is in the packs folder; play it from the home page":                "整合包 %s 已放进整合包目录，可以在“启动”页开玩",
 		// plans (plans.go)
 		"list %s":                 "列表 %s",
