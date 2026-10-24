@@ -795,7 +795,7 @@ svg.i.fill { fill: currentColor; }
 /* Column focus is shown only by its number (06 §2.3); other controls keep their focus rings. */
 .hm-step:focus, .hm-pick:focus-visible, .hm-go:focus { outline: none; }
 .hm-pick .nm { line-height: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hm-pick small { font-size: 11.5px; font-weight: 400; color: var(--muted); }
+.hm-pick small { font-size: 11.5px; font-weight: 400; color: var(--muted); white-space: nowrap; }
 .hm-pick .flag { font-size: 9px; margin-left: 8px; vertical-align: 3px; color: var(--muted); }
 .hm-pick .flag.bad { color: var(--amber); }
 .hm-mark { position: absolute; left: -16px; top: 0; width: 7px; height: 7px; background: var(--accent); transition: transform var(--t-layout) var(--ease); pointer-events: none; }

@@ -113,9 +113,21 @@ export async function pack(name) {
   sc.innerHTML = "";
   const play = act(T("play"), "play", () => launch(), "L", "pack-launch");
   play.classList.add("primary");
+  play.disabled = P.blocked;
+  if (P.blocked) play.title = P.why;
   const w = page("packs pack-page", P.facts.join("  "), button(T("export"), "e", () => exportPack(false)),
     button(T("export the list"), "E", () => exportPack(true)), button(T("move to the recycle bin"), "Del", () => removePack(), "", "pack-remove"), play);
   sc.append(w);
+  const items = P.check?.items || [];
+  const tooltip = items.map((item) => item.text).join("\n");
+  const facts = w.querySelector(".page-head .lead");
+  if (facts && tooltip) facts.title = tooltip;
+  const visible = items.filter((item) => item.level === "warning" || item.level === "error");
+  if (visible.length) {
+    const note = el("p", "note word-facts " + (P.blocked ? "err" : "warn"), visible.map((item) => item.text).join("; "));
+    note.title = tooltip;
+    w.querySelector(".page-head").after(note);
+  }
   const sec = el("section", "sec");
   sec.append(el("h2", "label", T("the mods, in load order")));
   const card = modCard = el("div", "card data-table pack-mods");
@@ -129,7 +141,7 @@ export async function pack(name) {
 }
 
 async function launch() {
-  if (!P) return;
+  if (!P || P.blocked) return;
   await launchPack(P.name);
 }
 

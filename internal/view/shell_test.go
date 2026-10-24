@@ -112,6 +112,9 @@ func TestBuildHome(t *testing.T) {
 	var order []string
 	for _, r := range h.Rows {
 		order = append(order, r.Name)
+		if r.GameVersion != "1.6.4633 rev1261" {
+			t.Fatalf("full game version on plan and pack rows: %+v", r)
+		}
 	}
 	if strings.Join(order, ",") != "default,Old,Amber,Zed" {
 		t.Fatalf("order %v", order)
@@ -146,6 +149,28 @@ func TestBuildHome(t *testing.T) {
 	}
 	if h.Changes == nil || h.Changes.Text != "nothing changed" {
 		t.Fatalf("the plan's changes: %+v", h.Changes)
+	}
+	game := e.OtherGame("other", "1.7.4985 rev1269")
+	e.MustRun("env", "add", "other", "--game", game)
+	other, err := e.App.Store.EnvByName("other")
+	if err != nil || other == nil {
+		t.Fatalf("other environment: %v", err)
+	}
+	if _, err := e.App.Store.CreatePlan(other.ID, "Other list", e.Now()); err != nil {
+		t.Fatal(err)
+	}
+	view.AddOtherEnvs(e.App, h, b.St.Ix.Env.ID)
+	found := false
+	for _, r := range h.Rows {
+		if r.OtherEnv {
+			found = true
+			if r.GameVersion != "1.7.4985 rev1269" || r.Env != "other  1.7" {
+				t.Fatalf("other environment version: %+v", r)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("missing other environment rows")
 	}
 }
 

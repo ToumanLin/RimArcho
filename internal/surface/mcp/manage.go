@@ -111,6 +111,12 @@ func PackArgv(in PackIn) []string {
 	switch in.Action {
 	case "list":
 		return []string{"pack", "list"}
+	case "check":
+		ref := in.Name
+		if in.File != "" {
+			ref = in.File
+		}
+		return argv("pack", "check").pos(ref).a
 	case "build":
 		b := argv("pack", "build").pos(in.Name).flag("textures", in.Textures && in.TextureScale == 0)
 		if in.TextureScale > 0 && in.TextureScale < 100 {
@@ -202,9 +208,9 @@ type ExchangeIn struct {
 
 type PackIn struct {
 	Env            string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action         string `json:"action" jsonschema:"list, build, launch, export, import, remove, stop or unlink"`
-	Name           string `json:"name,omitempty" jsonschema:"the pack (build, launch, export, remove, stop)"`
-	File           string `json:"file,omitempty" jsonschema:"export: the new .archopack (or with list .archolist.json) file; import: the file to read"`
+	Action         string `json:"action" jsonschema:"list, check, build, launch, export, import, remove, stop or unlink"`
+	Name           string `json:"name,omitempty" jsonschema:"the pack (check, build, launch, export, remove, stop)"`
+	File           string `json:"file,omitempty" jsonschema:"check: an archive to verify without extracting; export: the new .archopack (or with list .archolist.json) file; import: the file to read"`
 	List           bool   `json:"list,omitempty" jsonschema:"export: only the pack's list, as a RimArcho list (each mod with its version, no files)"`
 	Textures       bool   `json:"textures,omitempty" jsonschema:"build: convert the copies' PNG textures to DDS and delete the PNGs (pre-convert; lighter loading and video memory, a bigger pack at full size)"`
 	TextureScale   int    `json:"texture_scale,omitempty" jsonschema:"build: also scale textures down to this percent (20 25 40 50 60 75 80): slim"`

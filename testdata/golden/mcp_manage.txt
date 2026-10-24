@@ -209,8 +209,18 @@ built pack first
 next:
   archo pack launch first
 
+> manage_packs {"action":"check","name":"first"}
+pack first: checked
+  content: verified
+  game: no differences reported
+  DLC: no differences reported
+  mods: no differences reported
+
 > manage_packs {"action":"launch","dry_run":true,"name":"first"}
 pack launch: dry run, nothing written
+  game: no differences reported
+  DLC: no differences reported
+  mods: no differences reported
   links: 1 changes in Mods/
     + !ArchoPack_first_2009463077
   from Mods/: 1 mods: the same version is already in Mods/, so the pack's copy is not linked next to it
@@ -221,6 +231,9 @@ pack launch: dry run, nothing written
 
 > manage_packs {"action":"launch","name":"first"}
 pack first: the game is starting
+  game: no differences reported
+  DLC: no differences reported
+  mods: no differences reported
   links: 1 changes in Mods/
     + !ArchoPack_first_2009463077
   from Mods/: 1 mods: the same version is already in Mods/, so the pack's copy is not linked next to it
@@ -264,6 +277,9 @@ next:
 
 > manage_packs {"action":"import","file":"$ROOT/first.archolist.json"}
 list first: 3 mods
+  game: no differences reported
+  DLC: no differences reported
+  mods: no differences reported
   same version installed: 2
     Harmony  pkg:brrainz.harmony  https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077
     A  pkg:tester.a

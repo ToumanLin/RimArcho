@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -17,10 +18,11 @@ func init() {
 	register(&Command{Name: "pack list", Summary: "the packs: mods, size, game version, last played", MaxArgs: 0, Run: packListCmd})
 	register(&Command{Name: "pack launch", Args: "<name>", Summary: "play a pack: link its mods into Mods/, its own list and saves, start the game", MinArgs: 1, MaxArgs: 1, Run: packLaunchCmd,
 		Flags: []Flag{dry, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a pack's mod into the lock library"}}})
-	register(&Command{Name: "pack export", Args: "<name> <file>", Summary: "write a pack to a file (.archopack zip, or with --list its list as a RimArcho list .archolist.json)", MinArgs: 2, MaxArgs: 2, Run: packExportCmd,
+	register(&Command{Name: "pack export", Args: "<name> <file>", Summary: "write a pack to a file (.archopack tar + zstd, or with --list its list as a RimArcho list .archolist.json)", MinArgs: 2, MaxArgs: 2, Run: packExportCmd,
 		Flags: []Flag{{Name: "list", Help: "only the list, each mod with its version, no files"}}})
 	register(&Command{Name: "pack import", Args: "<file>", Summary: "unpack a .archopack, or compare a RimArcho list (.archolist.json) with the installed mods", MinArgs: 1, MaxArgs: 1, Run: packImportCmd,
 		Flags: []Flag{{Name: "as-plan", Help: "a list: also load it into the workspace (undoable)"}}})
+	register(&Command{Name: "pack check", Args: "<name|file>", Summary: "verify a pack's copies or check an archive without extracting it", MinArgs: 1, MaxArgs: 1, Run: packCheckCmd})
 	register(&Command{Name: "pack remove", Args: "<name>", Summary: "move a pack to the recycle bin; --unfinished deletes what a build cut short copied", MinArgs: 1, MaxArgs: 1, Run: packRemoveCmd,
 		Flags: []Flag{dry, {Name: "unfinished", Help: "the unfinished build of <name> (its folder in the packs folder)"}}})
 	register(&Command{Name: "pack unlink", Summary: "remove the packs' links from Mods/ (only the links, never the packs)", MaxArgs: 0, Run: packUnlinkCmd, Flags: []Flag{dry}})
@@ -215,6 +217,7 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		head = "pack launch: dry run, nothing written"
 	}
 	d, root := render.New(head)
+	addPackCheck(root, r.Check)
 	movedKV(root, r.Moved, r.DryRun)
 	ln := root.KV("links", fmt.Sprintf("%d changes in Mods/", len(r.Links)))
 	for _, l := range r.Links {
@@ -263,10 +266,17 @@ func packImportCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if r.Dir != "" {
 		d, root := render.New("unpacked pack " + r.Pack.Name)
 		root.KV("folder", r.Dir)
+		if r.Verified {
+			root.KV("content", "verified")
+		} else {
+			root.KV("content", "not verified (old format)")
+		}
+		addPackCheck(root, r.Check)
 		d.AddNext("archo pack launch " + quoteArg(r.Pack.Name))
 		return d, nil
 	}
 	d, root := render.New(fmt.Sprintf("list %s: %d mods", r.Pack.Name, len(r.Pack.Entries)))
+	addPackCheck(root, r.Check)
 	for _, g := range []struct {
 		k  string
 		es []app.PackEntry
@@ -287,6 +297,67 @@ func packImportCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo pack import " + quoteArg(a.Pos[0]) + " --as-plan")
 	}
 	return d, nil
+}
+
+func packCheckCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	var problems []app.PackProblem
+	var p *app.Pack
+	var err error
+	fileInfo, statErr := os.Stat(a.Pos[0])
+	if app.IsPackZip(a.Pos[0]) || (statErr == nil && !fileInfo.IsDir()) {
+		p, problems, err = c.App.VerifyPackFile(a.Pos[0])
+	} else {
+		p, err = c.App.ReadPack(a.Pos[0])
+		if err == nil {
+			problems, err = c.App.VerifyPack(a.Pos[0])
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	e, _ := c.App.Env() // a file can be checked before any game is set up
+	check := c.App.CheckPack(p, e, problems)
+	head := "pack " + p.Name + ": checked"
+	if check.Blocked() {
+		head = "pack " + p.Name + ": blocked"
+	}
+	d, root := render.New(head)
+	if p.Format < 2 {
+		root.KV("content", "not verified (old format)")
+	} else if len(problems) == 0 {
+		root.KV("content", "verified")
+	}
+	addPackCheck(root, check)
+	if check.Blocked() {
+		return nil, fmt.Errorf("%s", d.String())
+	}
+	return d, nil
+}
+
+func addPackCheck(root *render.Node, check *app.PackCheck) {
+	if check == nil {
+		return
+	}
+	for _, part := range []string{"game", "dlc", "mods"} {
+		var items []app.PackCheckItem
+		for _, item := range check.Items {
+			if item.Part == part {
+				items = append(items, item)
+			}
+		}
+		label := part
+		if part == "dlc" {
+			label = "DLC"
+		}
+		if len(items) == 0 {
+			root.KV(label, "no differences reported")
+			continue
+		}
+		n := root.Add(label)
+		for _, item := range items {
+			n.Add(item.Level + ": " + item.Text)
+		}
+	}
 }
 
 func packRemoveCmd(c *Ctx, a *Args) (*render.Doc, error) {

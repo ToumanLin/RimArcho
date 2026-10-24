@@ -260,6 +260,9 @@ type PackPage struct {
 	Dir      string          `json:"dir"`
 	Mods     []PackPageEntry `json:"mods"`
 	Exported string          `json:"exportDir"` // where 导出 offers to write
+	Check    *app.PackCheck  `json:"check"`
+	Blocked  bool            `json:"blocked"`
+	Why      string          `json:"why,omitempty"`
 }
 
 // BuildPackPage reads a pack for its page.
@@ -285,6 +288,10 @@ func BuildPackPage(a *app.App, name string) (*PackPage, error) {
 		p = &app.PackInfo{Pack: pk}
 	}
 	pg := &PackPage{Name: p.Name, Dir: p.Dir, Exported: DefaultExportDir()}
+	e, _ := a.Env() // no game chosen yet: CheckPack says so instead of failing the page
+	pg.Check = PackCheckOf(a.CheckPack(p.Pack, e, nil))
+	pg.Blocked = pg.Check.Blocked()
+	pg.Why = strings.Join(pg.Check.Errors(), "; ")
 	carried := 0
 	for _, e := range p.Entries {
 		if !e.Official {

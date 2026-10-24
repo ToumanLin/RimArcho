@@ -55,13 +55,13 @@ const running = () => !!(S.live && (S.live.running || S.live.blocked));
 const key = (r) => [r.kind, r.envName, r.plan || "", r.kind === "pack" ? r.name : ""].join("|");
 // a game's rows: its lists, then its packs, each by the last time played (view.SortHome)
 const rowsOf = (env) => rows().filter((r) => r.envName === env).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "plan" ? -1 : 1));
-// the games with something on the page, by name; the version comes from the chip ("main · 1.7")
+// the games with something on the page, by name
 function games() {
   const seen = new Map();
   for (const r of rows()) {
     if (seen.has(r.envName)) continue;
     const p = r.envName + "  ";
-    seen.set(r.envName, { name: r.envName, version: r.env && r.env.startsWith(p) ? r.env.slice(p.length) : "" });
+    seen.set(r.envName, { name: r.envName, version: r.gameVersion || (r.env && r.env.startsWith(p) ? r.env.slice(p.length) : "") });
   }
   return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
@@ -225,7 +225,9 @@ function gameStep(env) {
   for (const g of games()) {
     const b = el("button", "hm-pick" + (g.name === env ? " on" : ""));
     b.dataset.game = g.name;
-    b.append(el("span", "nm", g.name), el("small", "num", g.version));
+    const version = el("small", "num", g.version);
+    version.title = g.version;
+    b.append(el("span", "nm", g.name), version);
     b.onclick = () => pickGame(g.name);
     list.append(b);
   }

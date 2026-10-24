@@ -189,6 +189,7 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("manage_packs", map[string]any{"action": "build", "name": "first", "texture_scale": 50, "dry_run": true}, "pack", "build", "first", "--textures", "--texture-scale", "50", "--dry-run"),
 		s("manage_packs", map[string]any{"action": "build", "name": "first", "textures": true}, "pack", "build", "first", "--textures"),
 		s("manage_packs", map[string]any{"action": "build", "name": "first"}, "pack", "build", "first"),
+		s("manage_packs", map[string]any{"action": "check", "name": "first"}, "pack", "check", "first"),
 		s("manage_packs", map[string]any{"action": "launch", "name": "first", "dry_run": true}, "pack", "launch", "first", "--dry-run"),
 		s("manage_packs", map[string]any{"action": "launch", "name": "first"}, "pack", "launch", "first"),
 		// 08 §5.3: the pack's links stay in Mods/ after the game; a launch from Steam would load them.
