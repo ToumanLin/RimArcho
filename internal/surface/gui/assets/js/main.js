@@ -500,7 +500,7 @@ async function cmd(id) {
     case "tech": return verb("full");
     case "tags": return verb("tags");
     case "cli": return commandLine();
-    case "import": return exchange(0);
+    case "import": return S.screen === "plans" ? planManage.newList(null, "import") : exchange(0);
     case "export": return exportCurrent();
     case "help": return pop.help(S.screen || "plan");
     case "quit": return window.close();

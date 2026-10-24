@@ -6,10 +6,91 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
+
+func TestPlanSourcesIncludesImportedHistoryWithoutSwitching(t *testing.T) {
+	e, api, _ := fixture(t)
+	id := api.Shell().Plan.ID
+	before, _ := os.ReadFile(e.ModsConfig)
+	sources, err := api.PlanSources(id)
+	if err != nil || sources.Count != 2 || len(sources.Versions) == 0 {
+		t.Fatalf("sources: %+v %v", sources, err)
+	}
+	// The first version comes from importing ModsConfig, not a save/launch/user write.
+	version := sources.Versions[len(sources.Versions)-1]
+	if !strings.Contains(version.Label, "2 mods") || !strings.Contains(version.Label, ":") {
+		t.Fatalf("history needs count and time: %+v", version)
+	}
+	other, err := api.NewPlan("Other", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = api.PlanSources(id); err != nil {
+		t.Fatal(err)
+	}
+	if api.Shell().Plan.ID != view.PlanOfPage(other.Page) {
+		t.Fatal("reading sources switched the current list")
+	}
+	if _, err = api.CreatePlan(id, "Historic copy", version.From); err != nil {
+		t.Fatal(err)
+	}
+	if names(api.Board().Cols[view.Active]) != "Core,Alpha" {
+		t.Fatal("copied a different list/version")
+	}
+	after, _ := os.ReadFile(e.ModsConfig)
+	if string(before) != string(after) {
+		t.Fatal("source selection or creation wrote game files")
+	}
+}
+
+func TestNewListImportUsesOnlyItsPreview(t *testing.T) {
+	e, api, _ := fixture(t)
+	id := api.Shell().Plan.ID
+	before, _ := os.ReadFile(e.ModsConfig)
+	old, err := api.ImportPreviewFor(id, view.ImportText, "tester.a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	latest, err := api.ImportPreviewFor(id, view.ImportText, "tester.b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.ImportAsPlanPreview("Old preview", old.Request, false); err == nil {
+		t.Fatal("stale preview created a different import")
+	}
+	if api.Shell().Plan.ID != id {
+		t.Fatal("rejected preview changed current list")
+	}
+	// A request from another game's draft must be rejected even if no newer import ran.
+	api.x.envID = "another-game"
+	if _, err := api.ImportAsPlanPreview("Wrong game", latest.Request, false); err == nil {
+		t.Fatal("cross-game preview accepted")
+	}
+	env, _ := e.App.Env()
+	api.x.envID = env.ID
+	done, err := api.ImportAsPlanPreview("My chosen name", latest.Request, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if names(api.Board().Cols[view.Active]) != "Beta" {
+		t.Fatal("created content differs from preview")
+	}
+	managed, err := api.PlanManage(view.PlanOfPage(done.Page))
+	if err != nil || managed.Sel.Name != "My chosen name" {
+		t.Fatalf("name lost: %+v %v", managed, err)
+	}
+	if _, err := api.ImportAsPlanPreview("Duplicate submit", latest.Request, false); err == nil {
+		t.Fatal("consumed preview accepted twice")
+	}
+	after, _ := os.ReadFile(e.ModsConfig)
+	if string(before) != string(after) {
+		t.Fatal("import creation wrote game files")
+	}
+}
 
 // Management targets the selected list; preview and cancelled/failed creation do not
 // switch the editor. Versions/saves and copied version constraints survive (06 §2.17).

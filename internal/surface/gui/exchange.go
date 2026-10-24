@@ -33,6 +33,7 @@ type exchange struct {
 	// follow: once applied, the list follows the collection imported (04 §9.6)
 	follow bool
 	seq    uint64
+	envID  string // game that owns the checked new-list preview
 }
 
 // ImportFollow says whether applying the previewed collection makes the list follow it.

@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Element, loadModules, deferred, flush } from "./dom.mjs";
 
-async function setup() {
+async function setup(overrides = {}) {
   const screen = new Element("div"), requests = [], polls = [], timers = [];
-  const S = { screen: "plans", screenSeq: 1, envSeq: 0 };
+  const S = { screen: "plans", screenSeq: 1, envSeq: 0, board: { env: "game-a" }, shell: { plan: { id: 1 } } };
   const el = (tag, cls, text) => Object.assign(new Element(tag, cls, text), { addEventListener() {}, select() {} });
   const $ = selector => selector === "#screen" ? screen : screen.querySelector(selector);
   const detail = id => ({ id, name: "List " + id, page: "plan:" + id, versions: [], follows: [], facts: "", stale: false });
@@ -12,8 +12,9 @@ async function setup() {
     PlanManage: async id => ({ sel: detail(id || 1), rows: [1, 2].map(id => ({ ...detail(id), meta: "" })) }),
     PlanLoadCost: id => { const d = deferred(); requests.push({ ...d, id }); return d.promise; },
     PlanLoadCostMeasure: request => { const d = deferred(); polls.push({ ...d, request }); return d.promise; },
-    PlanSources: async () => ({ copy: "copy list", versions: [], saves: [] }),
-    CheckPlanName: async () => ({ free: "New list" }),
+    PlanSources: async id => ({ copy: "copy list", count: id * 10, versions: [{ from: "v" + id, label: "History " + id }], saves: [] }),
+    CheckPlanName: async (base, name) => ({ free: base || "New list", problem: name === "taken" ? "name taken" : "" }),
+    ...overrides,
   };
   const button = (label, key, onclick, cls) => Object.assign(el("button", cls, label), { onclick });
   const deps = {
@@ -24,10 +25,13 @@ async function setup() {
     "./popups.js": {},
     "./plans.js": {},
     "./separator.js": { wireSeparator() {} },
+    "./exchange.js": { showImportSummary() {}, showImportContents() {} },
   };
   const pm = await loadModules("./planmanage.js", deps, { document: { activeElement: null }, setTimeout: f => timers.push(f), requestAnimationFrame: f => f() });
-  pm.initPlanManage({ renderHints() {}, go: async () => {} });
-  return { pm, screen, requests, polls, timers, S };
+  const routes = [];
+  const ui = { renderHints() {}, reload: async () => {}, go: async id => { routes.push(id); if (id === "plans") { S.screen = "plans"; await pm.open(); } else { S.screen = id; S.screenSeq++; } } };
+  pm.initPlanManage(ui);
+  return { pm, screen, requests, polls, timers, S, routes, api };
 }
 
 const result = (request, label) => ({
@@ -85,4 +89,96 @@ test("cancelling a new-list form resumes the selected list measurement", async (
   h.requests[1].resolve(result(2, "resumed range")); await flush();
   assert.ok(h.screen.textContent.includes("resumed range"));
   assert.equal(h.screen.querySelector(".skel"), null);
+});
+
+const buttonNamed = (screen, text) => screen.querySelectorAll("button").find(b => b.textContent === text);
+const inputName = async (h, value) => { const input = h.screen.querySelector(".pm-name"); input.value = value; input.oninput(); await flush(); };
+const mode = (h, value) => h.screen.querySelectorAll(".pm-modes button").find(b => b.dataset.mode === value).onclick();
+
+test("copy chooses another list and its own version without changing the current list", async () => {
+  const copies = [], h = await setup({ CreatePlan: async (...a) => { copies.push(a); return { page: "plan:3", text: "created" }; } });
+  await h.pm.open(1); await h.pm.newList(); await inputName(h, "My copy");
+  const source = h.screen.querySelector(".pm-source"); source.value = "2"; source.onchange(); await flush();
+  assert.equal(h.S.shell.plan.id, 1, "source browsing does not switch current list");
+  assert.ok(h.screen.querySelector(".pm-version").textContent.includes("History 2"));
+  assert.ok(!h.screen.querySelector(".pm-version").textContent.includes("History 1"));
+  const version = h.screen.querySelector(".pm-version"); version.value = "v2"; version.onchange();
+  await buttonNamed(h.screen, "create and edit").onclick();
+  assert.deepEqual(copies, [[2, "My copy", "v2"]]);
+  assert.equal(h.routes.at(-1), "plan:3");
+});
+
+test("draft name, source and version survive browsing, leaving, and switching games", async () => {
+  const h = await setup(); await h.pm.open(1); await h.pm.newList(); await inputName(h, "Draft A");
+  const version = h.screen.querySelector(".pm-version"); version.value = "v1"; version.onchange();
+  h.pm.key({ key: "Escape", preventDefault() {} }); await flush();
+  assert.equal(h.screen.querySelector(".pm-new"), null);
+  assert.ok(h.screen.querySelector(".pm-draft").textContent.includes("Draft A"));
+  await h.pm.newList();
+  assert.equal(h.screen.querySelector(".pm-name").value, "Draft A");
+  assert.equal(h.screen.querySelector(".pm-version").value, "v1");
+  h.pm.abandon(); h.S.screen = "home"; h.S.screenSeq++;
+  h.S.board.env = "game-b"; h.S.envSeq++; h.S.screen = "plans"; await h.pm.open(1);
+  assert.equal(h.screen.querySelector(".pm-draft"), null, "other game never sees draft A");
+  await h.pm.newList(); await inputName(h, "Draft B");
+  h.S.board.env = "game-a"; h.S.envSeq++; await h.pm.open();
+  assert.equal(h.screen.querySelector(".pm-name").value, "Draft A");
+  assert.equal(h.screen.querySelector(".pm-version").value, "v1");
+});
+
+test("late source replies never replace a newer selection", async () => {
+  const pending = [], h = await setup({ PlanSources: id => { const d = deferred(); pending.push({ id, ...d }); return d.promise; } });
+  await h.pm.open(1); const initial = h.pm.newList(); await flush();
+  await inputName(h, "Keep input");
+  const source = h.screen.querySelector(".pm-source"); source.value = "2"; source.onchange();
+  pending[1].resolve({ count: 20, versions: [{ from: "v2", label: "Latest source" }], saves: [] }); await flush();
+  pending[0].resolve({ count: 10, versions: [{ from: "v1", label: "Stale source" }], saves: [] }); await initial;
+  assert.equal(h.screen.querySelector(".pm-name").value, "Keep input");
+  assert.equal(h.screen.querySelector(".pm-source").value, "2");
+  assert.ok(h.screen.querySelector(".pm-version").textContent.includes("Latest source"));
+  assert.ok(!h.screen.textContent.includes("Stale source"));
+});
+
+test("inline import preserves the chosen name and invalidates changed preview content", async () => {
+  const previews = [], creates = [], h = await setup({
+    ImportPreviewFor: async (...args) => { previews.push(args); return { request: 42, summary: "2 mods", installed: [], missing: [] }; },
+    ImportAsPlanPreview: async (...args) => { creates.push(args); return { page: "plan:3", text: "created" }; },
+  });
+  await h.pm.open(1); await h.pm.newList(); await inputName(h, "My own name"); mode(h, "import");
+  let text = h.screen.querySelector("textarea"); text.value = "mod.a\nmod.b"; text.oninput();
+  await buttonNamed(h.screen, "preview").onclick();
+  assert.equal(h.screen.querySelector(".pm-name").value, "My own name");
+  assert.equal(buttonNamed(h.screen, "create only").disabled, false);
+  h.pm.key({ key: "Escape", preventDefault() {} }); await flush(); await h.pm.newList();
+  assert.equal(h.screen.querySelector("textarea").value, "mod.a\nmod.b");
+  text = h.screen.querySelector("textarea"); text.value = "mod.c"; text.oninput();
+  assert.equal(buttonNamed(h.screen, "create only").disabled, true);
+  await buttonNamed(h.screen, "preview").onclick();
+  await buttonNamed(h.screen, "create only").onclick();
+  assert.deepEqual(creates, [["My own name", 42, true]]);
+  assert.deepEqual(previews.at(-1), [1, "text", "mod.c"]);
+  assert.equal(h.S.screen, "plans", "create only stays in management");
+});
+
+test("leaving during import preview ignores the late result and permits retry", async () => {
+  const d = deferred(), h = await setup({ ImportPreviewFor: () => d.promise });
+  await h.pm.open(1); await h.pm.newList(); await inputName(h, "Keep me"); mode(h, "import");
+  const text = h.screen.querySelector("textarea"); text.value = "mod.a"; text.oninput();
+  const read = buttonNamed(h.screen, "preview").onclick();
+  h.pm.backToManagement(); await flush(); d.resolve({ request: 7 }); await read;
+  await h.pm.newList();
+  assert.equal(h.screen.querySelector(".pm-name").value, "Keep me");
+  assert.equal(buttonNamed(h.screen, "create only").disabled, true);
+  assert.ok(!h.screen.textContent.includes("reading the list…"));
+});
+
+test("name validation and a double submission preserve the draft and create at most once", async () => {
+  const d = deferred(), copies = [], h = await setup({ CreatePlan: (...args) => { copies.push(args); return d.promise; } });
+  await h.pm.open(1); await h.pm.newList(); await inputName(h, "taken");
+  assert.equal(buttonNamed(h.screen, "create and edit").disabled, true);
+  await buttonNamed(h.screen, "create and edit").onclick(); assert.equal(copies.length, 0);
+  await inputName(h, "Good name");
+  const first = buttonNamed(h.screen, "create and edit").onclick();
+  const second = buttonNamed(h.screen, "create only").onclick(); await flush();
+  assert.equal(copies.length, 1); d.resolve({ page: "plan:3", text: "created" }); await Promise.all([first, second]);
 });

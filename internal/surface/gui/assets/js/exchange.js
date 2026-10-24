@@ -11,6 +11,7 @@ export function initExchange(u) {
   // File drops anywhere in the window enter the same import flow (06 §2.17).
   document.addEventListener("dragover", e => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); });
   document.addEventListener("drop", async e => {
+    if (e.defaultPrevented) return;
     const f = e.dataTransfer?.files?.[0];
     if (!f) return;
     e.preventDefault();
@@ -138,15 +139,7 @@ async function preview(kind, src, fileName) {
   if (fileName) p.source = fileName;
   body.innerHTML = "";
 
-  const top = el("div", "xc-sum");
-  top.append(el("div", "xc-big", p.summary));
-  const facts = [p.source];
-  if (p.name) facts.push(Tf("list: %s", p.name));
-  if (p.game) facts.push("RimWorld " + p.game);
-  if (p.allowed) facts.push(Tf("suggested game versions: %s", p.allowed));
-  top.append(el("div", "xc-note word-facts", facts.filter(Boolean).join("  ")));
-  if (p.gameNote) top.append(el("div", "xc-note warn", p.gameNote));
-  body.append(top);
+  showImportSummary(body, p);
 
   // A destination is selected first; only the final import button changes data (06 §2.17).
   const ways = el("fieldset", "xc-sec");
@@ -219,6 +212,23 @@ async function preview(kind, src, fileName) {
     if (e.key === "Enter" && !e.target.matches("button, a, select")) { e.preventDefault(); e.stopPropagation(); perform(); }
   };
 
+  showImportContents(body, p);
+}
+
+// Shared by the standalone destination flow and the new-list form's inline source.
+export function showImportSummary(body, p) {
+  const top = el("div", "xc-sum");
+  top.append(el("div", "xc-big", p.summary));
+  const facts = [p.source];
+  if (p.name) facts.push(Tf("list: %s", p.name));
+  if (p.game) facts.push("RimWorld " + p.game);
+  if (p.allowed) facts.push(Tf("suggested game versions: %s", p.allowed));
+  top.append(el("div", "xc-note word-facts", facts.filter(Boolean).join("  ")));
+  if (p.gameNote) top.append(el("div", "xc-note warn", p.gameNote));
+  body.append(top);
+}
+
+export function showImportContents(body, p) {
   if (p.missing.length) {
     const sec = section(body, Tf("not installed: %d", p.missing.length));
     const list = el("div", "xc-list");

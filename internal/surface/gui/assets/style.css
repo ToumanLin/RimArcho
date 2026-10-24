@@ -997,7 +997,10 @@ svg.i.fill { fill: currentColor; }
 details.xc-sec > summary { cursor: pointer; }
 .xc-row { display: flex; gap: 8px; align-items: center; }
 .xc-row.end { justify-content: flex-end; }
-.xc-input { flex: 1; min-width: 0; height: 28px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 8px; background: var(--card); font-size: 13px; }
+.xc-input { flex: 1; min-width: 0; height: 28px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 8px; background: var(--card); color: var(--fg); font-size: 13px; }
+.xc-input option, .xc-input optgroup { color: var(--fg); background: var(--card); }
+:root { color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { color-scheme: dark; } }
 .xc-input:focus { border-color: var(--accent); }
 .xc-text { width: 100%; box-sizing: border-box; min-height: 110px; resize: vertical; border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 8px; background: var(--card); color: var(--fg); font: 12px/1.45 var(--code); outline: 0; }
 .xc-text:focus { border-color: var(--accent); }
@@ -1500,6 +1503,27 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 
 /* New-list and import forms stay in the page (06 §2.17). */
 .pm-new form { display: flex; flex-direction: column; gap: 8px; }
+.pm-new .pm-head { margin-bottom: 16px; }
+.pm-new .pm-head > .btn { margin-left: auto; }
+.pm-new .plan-why:empty { display: none; }
+.pm-new .pm-sub { color: var(--fg-2); }
+.pm-fields { min-width: 0; border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
+.pm-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-weight: 500; }
+.pm-field > input, .pm-field > select, .pm-field > textarea { font-weight: 400; width: 100%; color: var(--fg); }
+.pm-field .xc-input { flex: none; height: 34px; }
+.pm-modes { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: var(--hairline) solid var(--line-2); padding-bottom: 10px; }
+.pm-modes .on { color: var(--accent); background: var(--accent-soft); }
+.pm-source-summary { background: var(--card-2); border-radius: var(--r-sm); padding: 12px; display: grid; gap: 5px; }
+.pm-new .pm-note, .pm-draft .m { color: var(--fg-2); font-size: 12px; }
+.pm-create-bottom { display: grid; gap: 12px; margin-top: 12px; padding-top: 16px; border-top: var(--hairline) solid var(--line-2); }
+.pm-create-bottom .acts-row { justify-content: flex-end; }
+.pm-draft { border: var(--hairline) dashed var(--line); }
+.pm-draft .pill { color: var(--fg-2); }
+.pm-inline-import { display: grid; gap: 10px; }
+.pm-inline-import .xc-text { width: 100%; min-height: 100px; color: var(--fg); background: var(--card-2); }
+.pm-inline-preview:empty { display: none; }
+.pm-inline-preview { padding-top: 10px; border-top: var(--hairline) solid var(--line-2); }
+.pm-new .pm-modes button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pm-new label.xc-sec { display: grid; gap: 8px; }
 .pm-new .xc-check .xc-input { flex: 1; min-width: 140px; }
 .pm-new .xc-check input[type=radio], .pm-import input[type=radio], .pm-import input[type=checkbox] { flex: none; width: auto; }
@@ -1517,6 +1541,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .separator:hover::after, .separator.drag::after, .separator:focus-visible::after { background: var(--accent); }
 #side-split.separator:focus-visible { background: var(--accent-soft); }
 .pm-page > .pm { grid-template-columns: var(--pm-side, 320px) var(--card-gap) minmax(0, 1fr); column-gap: 0; }
+@media (max-width: 760px) { .pm-page > .pm { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .pm-split { display: none; } }
 .pm-split { align-self: stretch; margin: 0; }
 #board > .stack { gap: 0; }
 .stack > .stack-split { margin: 0; }

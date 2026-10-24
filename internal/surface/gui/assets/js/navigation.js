@@ -30,6 +30,9 @@ export async function go(id, entry = null) {
   if (entry) {
     S.buildFrom = entry.buildFrom;
     S.planExport = entry.planExport;
+    if (id === "plans") planManage.restoreHistory(entry.listManage);
+  } else if (id === "plans" && S.screen === "plans") {
+    planManage.restoreHistory({ creating: false, selected: planManage.selected() });
   }
   if (id === "plan:new") return plans.newPlan();
   const plan = id.startsWith("plan:") ? +id.slice(5) : null;
@@ -89,9 +92,11 @@ function target() {
   if (id === "packs" && S.packFocus) id = "pack:" + S.packFocus;
   return { id, env: S.board?.env, guide: id === "guide" ? guide.historySession() : null,
     buildFrom: id === "build" ? S.buildFrom : null,
-    planExport: id === "plan-export" && S.planExport ? { ...S.planExport } : null };
+    planExport: id === "plan-export" && S.planExport ? { ...S.planExport } : null,
+    listManage: id === "plans" ? planManage.historyState() : null };
 }
 const same = (a, b) => a && b && a.id === b.id &&
+  (a.id !== "plans" || !!a.listManage?.creating === !!b.listManage?.creating) &&
   (a.id !== "plan-export" || a.planExport?.id === b.planExport?.id);
 
 // go() and direct entries to a different screen start visits. A same-screen read

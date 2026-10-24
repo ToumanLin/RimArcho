@@ -316,6 +316,7 @@ export function crumbs() {
   if (S.screen === "build") out = out.concat([{ label: T("create a pack"), id: "build" }]);
   if (S.screen === "plan-export" && S.planExport) out = ((sh && sh.crumbs && sh.crumbs["plan:" + S.planExport.id]) || []).concat([{ label: T("export"), id: "plan-export" }]);
   if (S.screen === "plan-import") out = out.slice(0, -1).concat([{ label: T("import"), id: "plan-import" }]);
+  if (S.screen === "plans" && S.listCreating) out = out.concat([{ label: T("new list"), id: "plan:new" }]);
   return out;
 }
 
