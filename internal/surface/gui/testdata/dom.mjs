@@ -26,11 +26,18 @@ export class Element {
     n.parent = this; this.children.splice(i, 0, n);
   }
   remove() { if (this.parent) { this.parent.children.splice(this.parent.children.indexOf(this), 1); this.parent = null; } }
+  get childNodes() { return this.children; }
+  get parentNode() { return this.parent; }
+  get nodeType() { return this.tag === "#text" ? 3 : 1; }
+  get isConnected() { return !!this.parent; }
+  addEventListener(type, fn) { (this.listeners ||= {})[type] ||= []; this.listeners[type].push(fn); }
+  dispatchEvent(e) { for (const fn of this.listeners?.[e.type] || []) fn(e); }
+  closest(s) { for (let n = this; n; n = n.parent) if (n.matches(s)) return n; return null; }
   get firstChild() { return this.children[0]; }
   get lastChild() { return this.children.at(-1); }
   set innerHTML(_) { for (const c of [...this.children]) c.remove(); this.text = ""; }
   set textContent(t) { this.innerHTML = ""; this.text = t; }
-  get textContent() { return this.text + this.children.map((n) => n.textContent).join(" "); }
+  get textContent() { return this.text + this.children.map((n) => n.textContent).join(""); }
   setAttribute(k, v) { this.attributes[k] = v; }
   focus() {}
   blur() {}
@@ -79,17 +86,22 @@ export class Element {
   querySelector(s) { return this.querySelectorAll(s)[0] || null; }
 }
 
+Element.TEXT_NODE = 3;
+
 export async function loadModules(entry, deps, globals = {}) {
+  deps["/wails/runtime.js"] ||= {};
+  const state = deps["./state.js"];
+  if (state) { state.esc ||= s => String(s); state.T ||= s => s; }
+  const document = globals.document || {};
+  document.createElement ||= state?.el || (tag => new Element(tag));
+  globals = { ...globals, document };
   const context = createContext({ Node: Element, ...globals }), cache = new Map();
-  if (deps["./state.js"] && !deps["./state.js"].factText) {
+  let factFactory;
+  if (state?.el && !state.factText) {
     const source = await readFile(new URL("../assets/js/state.js", import.meta.url), "utf8");
-    const helper = source.match(/export function factText[\s\S]*?\n}/)[0].replace("export ", "");
-    const factory = new SourceTextModule(helper + "\nexport default factText;", { context });
-    await factory.link(() => { throw new Error("text helper has no imports"); });
-    // el is the DOM factory already supplied by this harness.
-    context.el = deps["./state.js"].el;
-    await factory.evaluate();
-    deps["./state.js"].factText = factory.namespace.default;
+    const helper = source.match(/export function factText[\s\S]*?\n}/)[0];
+    factFactory = new SourceTextModule('import { pathContent } from "./fields.js";\n' + helper, { context });
+    state.factText = (...args) => factFactory.namespace.factText(...args);
   }
   async function get(name) {
     if (cache.has(name)) return cache.get(name);
@@ -102,6 +114,7 @@ export async function loadModules(entry, deps, globals = {}) {
     await module.link(get);
     return module;
   }
+  if (factFactory) { await factFactory.link(get); await factFactory.evaluate(); }
   const module = await get(entry);
   await module.evaluate();
   return module.namespace;

@@ -17,8 +17,11 @@ import (
 type SettingItem struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
-	// Edit: "path", "text" or "choice" (Choices); the new value replaces {} in Argv. "" has
-	// no editor, only Actions.
+	// Path markers identify filesystem text independently of editing/status text.
+	ValuePath bool     `json:"valuePath,omitempty"`
+	NotePaths []string `json:"notePaths,omitempty"`
+	// Edit: "path", "text", "choice", "swatches" or "segments" (Choices). The new
+	// value replaces {} in Argv; "" has no editor, only Actions.
 	Edit string `json:"edit,omitempty"`
 	// EditValue separates an editable path from its displayed status/version.
 	EditValue *string  `json:"editValue,omitempty"`
@@ -90,13 +93,16 @@ func TaskPending(kind string) string {
 
 // SettingGroup is a heading and its rows.
 type SettingGroup struct {
-	Title string        `json:"title"`
+	Title string `json:"title"`
+	// Note is said once under the heading instead of on every row.
+	Note  string        `json:"note,omitempty"`
 	Items []SettingItem `json:"items"`
 }
 
 // EnvRow is an environment on the environment page.
 type EnvRow struct {
 	Name    string `json:"name"`
+	Path    string `json:"path"`
 	Game    string `json:"game"` // "1.6.4633  D:\…\RimWorld"
 	Current bool   `json:"current"`
 }
@@ -118,7 +124,7 @@ func BuildEnvPage(a *app.App, st *app.LoadoutState) *EnvPage {
 	}
 	if envs, err := a.Store.Envs(); err == nil {
 		for _, e := range envs {
-			p.Envs = append(p.Envs, EnvRow{Name: e.Name, Game: e.GameVersion + "  " + e.GameRoot, Current: e.ID == cur})
+			p.Envs = append(p.Envs, EnvRow{Name: e.Name, Game: e.GameVersion + "  " + e.GameRoot, Path: e.GameRoot, Current: e.ID == cur})
 		}
 	}
 	return p
@@ -135,13 +141,13 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 		version = T("unknown")
 	}
 	saves := SettingItem{Label: T("saves"), Value: a.Saves(e), Edit: "choice", Choices: []string{app.SavesShared, app.SavesOwn},
-		ChoiceLabels: []string{T("shared (the game's default folder)"), T("its own")}, Argv: []string{"env", "set", e.Name, "--saves", "{}"}, Note: e.UserDataRoot}
+		ChoiceLabels: []string{T("shared (the game's default folder)"), T("its own")}, Argv: []string{"env", "set", e.Name, "--saves", "{}"}, Note: e.UserDataRoot, NotePaths: []string{e.UserDataRoot}}
 	if saves.Value == app.SavesCustom {
 		saves.Choices = append([]string{app.SavesCustom}, saves.Choices...)
 		saves.ChoiceLabels = append([]string{T("a folder you chose")}, saves.ChoiceLabels...)
 	}
 	return []SettingGroup{{Title: T("this game"), Items: []SettingItem{
-		{Label: T("game folder"), Value: e.GameRoot, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"},
+		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"},
 			Note: T("RimArcho checks that the mods are still the same before it moves them over")},
 		{Label: T("game version"), Value: version},
 		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"},
@@ -185,7 +191,7 @@ func FolderGroup(a *app.App) SettingGroup {
 			if s.Kind == source.SteamCMD {
 				label = T("SteamCMD folder")
 			}
-			others = append(others, SettingItem{Label: label, Value: s.Root, Note: note(s),
+			others = append(others, SettingItem{Label: label, Value: s.Root, ValuePath: true, Note: note(s), NotePaths: []string{s.PendingRoot},
 				Actions: []SettingAction{{Label: T("remove"), Argv: []string{"folder", "remove", s.Ref()},
 					Confirm: T("RimArcho forgets this folder; the files stay where they are")}}})
 		}
@@ -193,8 +199,10 @@ func FolderGroup(a *app.App) SettingGroup {
 	w := SettingItem{Label: T("Workshop folder"), Edit: "path", Argv: []string{"folder", "add", "workshop", "{}"}}
 	if ws != nil {
 		w.Value, w.Note = ws.Root, note(ws)
+		w.ValuePath, w.NotePaths = true, []string{ws.PendingRoot}
 	} else if d := a.DetectWorkshop(); d != "" {
 		w.Note = Tf("Steam has one at %s", d)
+		w.NotePaths = []string{d}
 		w.Actions = []SettingAction{{Label: T("use it"), Argv: []string{"folder", "add", "workshop", d}}}
 	} else {
 		w.Note = T("none found in the Steam libraries")
@@ -220,7 +228,13 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		}
 	}
 	folders.Items = add
-	out := []SettingGroup{DirectoryGroup(a), folders, {Title: "SteamCMD", Items: []SettingItem{
+	out := []SettingGroup{{Title: T("appearance"), Items: []SettingItem{
+		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "swatches", Choices: cmds.SettingChoices("ui.accent"),
+			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
+			Argv:         []string{"config", "set", "ui.accent", "{}"}},
+		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
+			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
+	}}, DirectoryGroup(a), folders, {Title: "SteamCMD", Items: []SettingItem{
 		{Label: T("SteamCMD account (optional)"), Value: cmds.Setting(a, "steamcmd.account"), Edit: "text", Argv: []string{"config", "set", "steamcmd.account", "{}"},
 			Note: T("empty or anonymous: anonymous login; enter an account name to log in. Password and Steam Guard are entered only in SteamCMD")},
 	}}}
@@ -232,9 +246,6 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}
 	out = append(out, SettingGroup{Title: T("interface"), Items: []SettingItem{
 		{Label: T("language"), Value: lang, Edit: "choice", Choices: []string{"auto", "zh", "en"}, Argv: []string{"config", "set", "ui.lang", "{}"}},
-		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "choice", Choices: cmds.SettingChoices("ui.accent"),
-			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
-			Argv:         []string{"config", "set", "ui.accent", "{}"}},
 		{Label: T("Workshop descriptions"), Value: cmds.Setting(a, "workshop.fetch"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "workshop.fetch", "{}"}},
 		{Label: T("images in descriptions"), Value: cmds.Setting(a, "workshop.images"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "workshop.images", "{}"}},
 		{Label: T("GPU acceleration"), Value: cmds.Setting(a, "ui.gpu"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "ui.gpu", "{}"},
@@ -255,7 +266,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	out = append(out, data)
 	db, _ := a.DBInfo()
 	out = append(out, SettingGroup{Title: T("database"), Items: []SettingItem{
-		{Label: T("size"), Value: SizeText(db.Bytes), Note: db.Path, Actions: []SettingAction{
+		{Label: T("size"), Value: SizeText(db.Bytes), Note: db.Path, NotePaths: []string{db.Path}, Actions: []SettingAction{
 			{Label: T("back up"), Argv: []string{"db", "backup"}},
 			{Label: T("compact"), Argv: []string{"db", "vacuum"}},
 			{Label: T("remove old tombstones"), Argv: []string{"gc"}, Confirm: T("mods gone for longer than the tombstone time are forgotten")},
@@ -274,7 +285,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		if len(s.Installed) > 0 {
 			v = s.Installed[0]
 		}
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Label: T("Archo Monitor installed"), Value: v, Note: s.Dir}}})
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Label: T("Archo Monitor installed"), Value: v, Note: s.Dir, NotePaths: []string{s.Dir}}}})
 	} else {
 		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
 	}

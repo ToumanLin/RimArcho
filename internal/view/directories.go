@@ -39,14 +39,16 @@ func DirectoryGroup(a *app.App) SettingGroup {
 		g.Items = append(g.Items, SettingItem{Label: T("directory check failed"), Note: err.Error()})
 		return g
 	}
+	// One note for the whole group; a row only says what is different about it.
+	g.Note = T("locate it after moving it yourself, or move it to a new location")
 	for _, d := range dirs {
-		note := T("locate it after moving it yourself, or move it to a new location")
+		note := ""
 		if DirectoryNeedsLocation(d) {
-			note = T("directory unavailable; enter its new location, or reconnect the drive") + "  " + note
+			note = T("directory unavailable; enter its new location, or reconnect the drive")
 		} else if d.Status == "unused" {
-			note = T("not used yet") + "  " + note
+			note = T("not used yet")
 		}
-		item := SettingItem{Label: DirectoryLabel(d), Value: d.Path, Edit: "directory", Directory: d.ID,
+		item := SettingItem{Label: DirectoryLabel(d), Value: d.Path, ValuePath: true, Edit: "directory", Directory: d.ID,
 			Argv: []string{"folder", "set", d.ID, "{}"}, MoveArgv: []string{"folder", "move", d.ID, "{}"}, Note: note}
 		if d.Kind == "steamcmd" || d.Kind == "extra" {
 			item.Actions = []SettingAction{{Label: T("remove"), Argv: []string{"folder", "remove", "src:" + d.Label},

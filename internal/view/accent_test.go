@@ -31,7 +31,7 @@ func TestAccentSettingsRow(t *testing.T) {
 					if lang == "zh" {
 						label, labels = "强调色", zhLabels
 					}
-					if group.Title != view.T("interface") || item.Label != label || item.Edit != "choice" || item.Value != value ||
+					if group.Title != view.T("appearance") || item.Label != label || item.Edit != "swatches" || item.Value != value ||
 						!slices.Equal(item.Choices, choices) || !slices.Equal(item.ChoiceLabels, labels) || view.SettingCommand(item.Argv) != nil {
 						t.Fatalf("%s accent row: %+v in %s", lang, item, group.Title)
 					}
@@ -40,6 +40,35 @@ func TestAccentSettingsRow(t *testing.T) {
 			if found != 1 {
 				t.Fatalf("%s: found %d accent rows", lang, found)
 			}
+		}
+	}
+}
+
+func TestAppearanceThemeRow(t *testing.T) {
+	e := testkit.New(t)
+	defer view.SetLang("en")
+	for _, lang := range []string{"en", "zh"} {
+		view.SetLang(lang)
+		groups := view.SettingsPage(e.App, nil)
+		if groups[0].Title != view.T("appearance") {
+			t.Fatalf("first group: %s", groups[0].Title)
+		}
+		found := 0
+		for _, item := range groups[0].Items {
+			if strings.Join(item.Argv, " ") != "config set ui.theme {}" {
+				continue
+			}
+			found++
+			labels := []string{"follow system", "light", "dark"}
+			if lang == "zh" {
+				labels = []string{"跟随系统", "浅色", "深色"}
+			}
+			if item.Edit != "segments" || item.Value != "auto" || !slices.Equal(item.Choices, cmds.SettingChoices("ui.theme")) || !slices.Equal(item.ChoiceLabels, labels) || view.SettingCommand(item.Argv) != nil {
+				t.Fatalf("theme row: %+v", item)
+			}
+		}
+		if found != 1 {
+			t.Fatalf("found %d theme rows", found)
 		}
 	}
 }

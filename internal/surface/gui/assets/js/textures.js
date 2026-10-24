@@ -2,6 +2,7 @@
 // RimArcho converted and what went stale, what converting at a scale would take and save,
 // then the run in the background ("textures" events), stop, and take everything back. The
 // encoder (todds) is downloaded only after the player saw where from and how big.
+import { pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, pageLoading, page, button } from "./screens.js";
 import * as pop from "./popups.js";
@@ -132,9 +133,9 @@ async function draw(fetch, measurements = false, entryRead = null) {
   const enc = el("section", "card settings");
   if (!p.tool) setRow(enc, T("the DDS encoder"), null, X.error ? null : pending());
   else {
-    setRow(enc, T("the DDS encoder"), p.toolOk ? null : [p.offer, p.offerTo && "→ " + p.offerTo], p.toolOk ? el("span", "muted word-facts", p.tool) : null,
+    setRow(enc, T("the DDS encoder"), p.toolOk ? null : [p.offer, p.offerTo && { text: "→ " + p.offerTo, paths: [p.offerTo] }], p.toolOk ? factText(el("span", "muted"), { text: p.tool, paths: [p.toolPath] }) : null,
       p.toolOk ? null : button(T("download todds…"), "", () => install(p), "primary"));
-    if (!p.toolOk) enc.querySelector(".name").after(el("div", "sub warn", p.tool));
+    if (!p.toolOk) enc.querySelector(".name").after(pathContent(el("div", "sub warn"), p.tool, [p.toolPath]));
   }
   w.append(slot(enc, "encoder"));
 

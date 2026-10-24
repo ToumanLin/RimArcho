@@ -2,7 +2,7 @@
 // own .rml, share codes, Rentry and Workshop collections. An import is previewed first —
 // what is installed, what is missing and where to get it, what the enabled list becomes —
 // and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, beginPageRead } from "./screens.js";
 
 let ui = null;
@@ -139,7 +139,7 @@ async function preview(kind, src, fileName) {
   if (fileName) p.source = fileName;
   body.innerHTML = "";
 
-  showImportSummary(body, p);
+  showImportSummary(body, p, !!(p.sourcePath || fileName));
 
   // A destination is selected first; only the final import button changes data (06 §2.17).
   const ways = el("fieldset", "xc-sec");
@@ -216,14 +216,15 @@ async function preview(kind, src, fileName) {
 }
 
 // Shared by the standalone destination flow and the new-list form's inline source.
-export function showImportSummary(body, p) {
+// sourceIsPath: the source is a file the player picked, so it copies on a click (06 §3.1 rule 12).
+export function showImportSummary(body, p, sourceIsPath = !!p.sourcePath) {
   const top = el("div", "xc-sum");
   top.append(el("div", "xc-big", p.summary));
-  const facts = [p.source];
+  const facts = [sourceIsPath && p.source ? { text: p.source, paths: [p.source] } : p.source];
   if (p.name) facts.push(Tf("list: %s", p.name));
   if (p.game) facts.push("RimWorld " + p.game);
   if (p.allowed) facts.push(Tf("suggested game versions: %s", p.allowed));
-  top.append(el("div", "xc-note word-facts", facts.filter(Boolean).join("  ")));
+  top.append(factText(el("div", "xc-note"), facts.filter(Boolean)));
   if (p.gameNote) top.append(el("div", "xc-note warn", p.gameNote));
   body.append(top);
 }

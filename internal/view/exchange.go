@@ -27,10 +27,11 @@ const (
 
 // Import is a list read for import, kept between its preview and its apply.
 type Import struct {
-	List   *app.ImportedList
-	Label  string            // what the undo step calls it
-	Source string            // the file, "share code", the link
-	Titles map[string]string // workshop ID → title (collections)
+	List       *app.ImportedList
+	Label      string            // what the undo step calls it
+	SourcePath bool              // Source is a file path, including a relative one.
+	Source     string            // the file, "share code", the link
+	Titles     map[string]string // workshop ID → title (collections)
 	// Collection is the Workshop collection read (nil for other sources): applying the
 	// import can make the list follow it (04 §9.1, §9.6).
 	Collection *app.Collection
@@ -73,7 +74,7 @@ func ReadImport(a *app.App, kind, src string) (*Import, error) {
 		if err != nil {
 			return nil, err
 		}
-		return checked(&Import{List: il, Label: filepath.Base(path), Source: path})
+		return checked(&Import{List: il, Label: filepath.Base(path), Source: path, SourcePath: true})
 	case ImportCollection:
 		c, err := a.ReadCollection(src)
 		if err != nil {
@@ -157,19 +158,20 @@ type ImportEffect struct {
 
 // ImportPreview is what an interface shows before an import.
 type ImportPreview struct {
-	Format    string       `json:"format"`
-	Source    string       `json:"source"`
-	Name      string       `json:"name,omitempty"` // the list's own title
-	Game      string       `json:"game,omitempty"`
-	GameNote  string       `json:"gameNote,omitempty"` // the list is for another game version
-	Total     int          `json:"total"`
-	Installed []ImportRow  `json:"installed"`
-	Missing   []ImportRow  `json:"missing"`
-	Other     int          `json:"other"` // installed rows with Other
-	Replace   ImportEffect `json:"replace"`
-	Merge     ImportEffect `json:"merge"`
-	Summary   string       `json:"summary"`
-	Allowed   string       `json:"allowed"`
+	Format     string       `json:"format"`
+	Source     string       `json:"source"`
+	SourcePath bool         `json:"sourcePath,omitempty"`
+	Name       string       `json:"name,omitempty"` // the list's own title
+	Game       string       `json:"game,omitempty"`
+	GameNote   string       `json:"gameNote,omitempty"` // the list is for another game version
+	Total      int          `json:"total"`
+	Installed  []ImportRow  `json:"installed"`
+	Missing    []ImportRow  `json:"missing"`
+	Other      int          `json:"other"` // installed rows with Other
+	Replace    ImportEffect `json:"replace"`
+	Merge      ImportEffect `json:"merge"`
+	Summary    string       `json:"summary"`
+	Allowed    string       `json:"allowed"`
 	// Collection: the list is a Steam Workshop collection the list can follow (04 §9.6).
 	Collection bool `json:"collection,omitempty"`
 }
@@ -200,7 +202,7 @@ func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error)
 		}
 	}
 	il := imp.List
-	p := &ImportPreview{Format: FormatName(il.Format), Source: imp.Source, Name: il.Title, Game: il.Game, Installed: []ImportRow{}, Missing: []ImportRow{}, Collection: imp.Collection != nil}
+	p := &ImportPreview{Format: FormatName(il.Format), Source: imp.Source, SourcePath: imp.SourcePath, Name: il.Title, Game: il.Game, Installed: []ImportRow{}, Missing: []ImportRow{}, Collection: imp.Collection != nil}
 	if mm := st.GameMM(); il.Game != "" && mm != "" && !strings.HasPrefix(il.Game, mm) {
 		p.GameNote = Tf("the list is for RimWorld %s, this game runs %s", majorMinor(il.Game), mm)
 	}

@@ -87,7 +87,6 @@ export const scales = {
   }
 };
 
-const scheme = matchMedia("(prefers-color-scheme: dark)");
 let selected = "default";
 const properties = ["--accent", "--accent-soft", "--sel", "--accent-fg",
   ...Array.from({ length: 12 }, (_, i) => `--accent-${i + 1}`),
@@ -102,7 +101,7 @@ export function applyAccent(value) {
     return;
   }
   root.dataset.accent = selected;
-  const dark = scheme.matches, palette = scales[selected];
+  const dark = document.documentElement.dataset.scheme === "dark", palette = scales[selected];
   const steps = palette[dark ? "dark" : "light"];
   steps.forEach((hex, i) => style.setProperty(`--accent-${i + 1}`, hex));
   style.setProperty("--accent", steps[dark ? 10 : 8]);
@@ -111,8 +110,8 @@ export function applyAccent(value) {
   // Amber is the only bright solid-fill scale offered here (Radix also names yellow,
   // lime, mint and sky); white text cannot read against its light step 9.
   style.setProperty("--accent-fg", dark ? steps[0] : selected === "amber" ? steps[11] : "#ffffff");
-  // Photo backdrops always use dark colours, including when the OS theme is light.
+  // Photo backdrops always use dark colours, including when the page theme is light.
   for (const step of [1, 3, 5, 11]) style.setProperty(`--accent-dark-${step}`, palette.dark[step - 1]);
 }
 
-scheme.addEventListener("change", () => applyAccent(selected));
+globalThis.archoTheme?.subscribe(() => applyAccent(selected));

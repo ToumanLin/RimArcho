@@ -10,6 +10,69 @@ const Clipboard = rt.Clipboard || { SetText: () => Promise.reject(new Error("no 
 // Only these values copy on a click; the rest are just shown.
 const copyable = new Set(["id", "package", "path", "workshop", "subscription-url", "subscription-repo"]);
 
+// copyablePath decorates an existing element; the displayed text may be shortened.
+// Only activation keys are consumed: arrows, page keys and esc keep their page behavior.
+export function copyablePath(node, path) {
+  if (!path) return node;
+  if (node.querySelector(".path-copy")) node.textContent = node.textContent;
+  node.classList.add("copy", "path-copy");
+  node.dataset.path = path;
+  node.tabIndex = 0;
+  node.setAttribute("role", "button");
+  node.title = path + "\n" + T("click to copy");
+  node.addEventListener("mousedown", e => e.stopPropagation());
+  node.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); copy(path, node); });
+  node.addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault(); e.stopPropagation();
+    if (!e.repeat) copy(path, node);
+  });
+  return node;
+}
+
+// Render known paths before splitting facts, preserving spaces (even double spaces)
+// inside a filename. Paths may also be { text, path } to resolve a displayed relative
+// filename. The fallback is limited to rooted paths in legacy command output.
+export function pathContent(node, text, paths = []) {
+  text = String(text ?? "");
+  node.replaceChildren();
+  const known = [...new Map(paths.filter(Boolean)
+    .map(p => typeof p === "string" ? { text: p, path: p } : p)
+    .filter(p => p.text && p.path).map(p => [p.text, p])).values()]
+    .sort((a, b) => b.text.length - a.text.length);
+  const append = (value, path = value) => {
+    const span = document.createElement("span");
+    span.textContent = value;
+    node.append(copyablePath(span, path));
+  };
+  const plain = value => {
+    // Legacy command/task text has no metadata. Only rooted paths with a clear
+    // boundary qualify; URLs and keyboard shortcuts cannot match that boundary.
+    const rooted = /(^|[\s("'（：])((?:[a-z]:[\\/]|\\\\[^\\\s]+\\|\/[^/\s:]+\/)[^<>"|\n]*?)(?=:\s|:\d+\b|["'?？。；，）]|$)/gi;
+    for (const part of value.split(/( {2,}|\n| → )/)) {
+      if (!part) continue;
+      let at = 0;
+      for (const m of part.matchAll(rooted)) {
+        const start = m.index + m[1].length;
+        if (start > at) node.append(part.slice(at, start));
+        append(m[2]); at = start + m[2].length;
+      }
+      if (part.slice(at)) node.append(part.slice(at));
+    }
+  };
+  let at = 0;
+  while (at < text.length) {
+    let next = -1, found;
+    for (const p of known) {
+      const i = text.indexOf(p.text, at);
+      if (i >= 0 && (next < 0 || i < next)) { next = i; found = p; }
+    }
+    if (next < 0) { plain(text.slice(at)); break; }
+    plain(text.slice(at, next)); append(found.text, found.path); at = next + found.text.length;
+  }
+  return node;
+}
+
 // fieldList draws fields; acts.tags runs the tag bar, acts.folder opens the location.
 export function fieldList(fields, acts = {}) {
   const box = el("div", "fields");
@@ -33,8 +96,8 @@ export function fieldList(fields, acts = {}) {
     } else {
       const t = el("span", copyable.has(f.kind) && f.value ? "copy" : "", f.value || "—");
       if (f.value && copyable.has(f.kind)) {
-        t.title = T("click to copy");
-        t.onclick = () => copy(f.value, t);
+        copyablePath(t, f.value);
+        if (f.kind !== "path") t.classList.remove("path-copy");
       }
       v.append(t);
       if (f.extra) v.append(el("span", "dim", `  (${f.extra})`));
@@ -68,15 +131,19 @@ export async function copy(text, node) {
     t.style.position = "fixed";
     t.style.opacity = "0";
     document.body.append(t);
+    const focused = document.activeElement;
     t.select();
     try { ok = document.execCommand("copy"); } catch { ok = false; }
     t.remove();
+    focused?.focus({ preventScroll: true });
   }
   if (!ok) return say("fail", T("could not copy"));
   const row = node.closest(".frow") || node.parentNode;
+  if (!row || !node.isConnected) return;
   const old = row.querySelector(".copied");
   if (old) old.remove();
   const tip = el("span", "copied", T("copied"));
-  row.append(tip);
+  tip.setAttribute("role", "status");
+  node.after(tip);
   setTimeout(() => tip.remove(), 1600);
 }
