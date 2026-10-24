@@ -32,7 +32,7 @@ type tool struct {
 	readOnly    bool
 	destructive bool
 	desc        string
-	add         func(s *sdk.Server, run func(env string, argv []string) (*sdk.CallToolResult, any, error), t *sdk.Tool)
+	add         func(s *sdk.Server, run func(context.Context, string, []string) (*sdk.CallToolResult, any, error), t *sdk.Tool)
 	in          reflect.Type                       // the argument struct
 	argvOf      func(raw []byte) ([]string, error) // JSON arguments → argv, as a tool call does
 }
@@ -46,6 +46,10 @@ type Server struct {
 
 // Execute runs argv like the CLI and returns its text and exit code.
 func (s *Server) Execute(env string, argv []string) (string, int) {
+	return s.executeContext(context.Background(), env, argv)
+}
+
+func (s *Server) executeContext(ctx context.Context, env string, argv []string) (string, int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if env != "" {
@@ -53,10 +57,10 @@ func (s *Server) Execute(env string, argv []string) (string, int) {
 		s.app.EnvName = env
 		defer func() { s.app.EnvName = prev }()
 	}
-	return cmds.Execute(s.app, argv)
+	return cmds.ExecuteContext(ctx, s.app, argv)
 }
 
-// MaxOutput caps one tool result. An agent that asked for --all on a large mod got 225-325 KB
+// MaxOutput caps outline results. An agent that asked for --all on a large mod got 225-325 KB
 // (G7 traces): more than fits in a useful context, and nothing it could not get by narrowing.
 const MaxOutput = 24 << 10
 
@@ -73,9 +77,12 @@ func ClipOutput(out string) string {
 	return out[:cut] + fmt.Sprintf("\n… output clipped at %d KB of %d KB (%d more lines): narrow the call (mod=, target=, pattern, cluster) instead of all=true\n", cut>>10, len(out)>>10, rest)
 }
 
-func (s *Server) run(env string, argv []string) (*sdk.CallToolResult, any, error) {
-	out, code := s.Execute(env, argv)
-	out = ClipOutput(out)
+func (s *Server) run(ctx context.Context, env string, argv []string) (*sdk.CallToolResult, any, error) {
+	out, code := s.executeContext(ctx, env, argv)
+	// Test reports already limit clusters; clipping their JSON would corrupt it.
+	if len(argv) < 2 || argv[0] != "test" || argv[1] != "run" {
+		out = ClipOutput(out)
+	}
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: out}}, IsError: code == cmds.ExitError || code == cmds.ExitUsage}, nil, nil
 }
 
@@ -121,9 +128,9 @@ func reg[In any](name string, readOnly, destructive bool, desc string, argv func
 			}
 			return argv(in), nil
 		},
-		add: func(s *sdk.Server, run func(string, []string) (*sdk.CallToolResult, any, error), t *sdk.Tool) {
-			sdk.AddTool(s, t, func(_ context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, any, error) {
-				return run(reflect.ValueOf(in).FieldByName("Env").String(), argv(in))
+		add: func(s *sdk.Server, run func(context.Context, string, []string) (*sdk.CallToolResult, any, error), t *sdk.Tool) {
+			sdk.AddTool(s, t, func(ctx context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, any, error) {
+				return run(ctx, reflect.ValueOf(in).FieldByName("Env").String(), argv(in))
 			})
 		}}
 }

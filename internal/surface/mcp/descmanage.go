@@ -1,5 +1,9 @@
 package mcp
 
+const descTestRun = `Launch the game directly with a plan in isolated test data, wait for the main menu (or a quick test map with map=true), capture startup errors, then stop the process. This can take minutes (timeout_seconds defaults to 600). Never touches the player's saves, configuration or logs, and never writes the game directory. Refuses while a game is already running. Mod folders the game cannot see are reported as missing; no links are created. Returns a JSON report with status, timings, peak memory, missing mods and error clusters attributed against the tested plan. Keeps the newest 10 run directories and reuses the test data's caches. Use to check whether a plan can finish loading; status menu/map with no error clusters is success.
+Example: test_run {"plan": "small", "timeout_seconds": 300}
+  {"env":"main","plan":"plan:small","status":"menu","load_seconds":42.5,"clusters_total":0}`
+
 // Descriptions of the tools in manage.go (05 §5.3): what the tool does, when to use it,
 // what it writes, and an example call with the first lines of output.
 

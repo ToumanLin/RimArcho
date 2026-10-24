@@ -12,6 +12,7 @@ var openWorld = map[string]bool{"get_description": true, "exchange_list": true, 
 
 func manageTools() []tool {
 	return []tool{
+		reg("test_run", false, false, descTestRun, TestRunArgv),
 		reg("manage_rules", false, false, descRules, func(in RuleIn) []string { return RulesArgv(in) }),
 		reg("ignore_problem", false, false, descIgnore, func(in IgnoreIn) []string { return IgnoreArgv(in) }),
 		reg("scan", false, false, descScan, func(in ScanIn) []string { return argv("scan").flag("full", in.Full).a }),
@@ -21,6 +22,21 @@ func manageTools() []tool {
 		reg("manage_hidden", false, true, descHidden, func(in HiddenIn) []string { return HiddenArgv(in) }),
 		reg("maintenance", false, true, descMaintenance, func(in MaintenanceIn) []string { return MaintenanceArgv(in) }),
 	}
+}
+
+type TestRunIn struct {
+	Env            string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Plan           string `json:"plan,omitempty" jsonschema:"plan name or plan:name (default: the environment's current plan)"`
+	Map            bool   `json:"map,omitempty" jsonschema:"load a quick test map instead of the main menu"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"maximum run time in seconds (default 600)"`
+}
+
+func TestRunArgv(in TestRunIn) []string {
+	b := argv("test", "run").pos(in.Plan).flag("map", in.Map)
+	if in.TimeoutSeconds != 0 {
+		b.str("timeout", fmt.Sprintf("%ds", in.TimeoutSeconds))
+	}
+	return b.flag("json", true).a
 }
 
 func unknown(tool, action string) []string {

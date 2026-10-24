@@ -227,6 +227,7 @@ next:
 | | `loadout log [--all]` / `loadout diff [<v>] [<v>]` / `loadout checkout <v>` | 版本列表；版本之间的差异（默认最新版本 → 当前状态）；把一个版本载入当前方案（一步可撤销的编辑） |
 | 写入与启动 | `save [--dry-run]` | **写入游戏但不启动**（界面上叫“写入游戏”），给从 Steam 等其他途径开游戏的玩家：渲染当前方案的 ModsConfig.xml（备份、原子替换、写当前游戏版本）、同步 `_Archo_` 链接、移除整合包链接（04 §4.1、08 §3）。`--dry-run` 显示会写什么 |
 | | `launch [--dry-run]` | 启动当前方案（08 §2）。`--dry-run` 只显示启动命令。先写入再启动、已有游戏运行就拒绝、记启动记录和 `launch` 版本；`--dry-run` 显示与 `save --dry-run` 同一份预览加启动命令行 |
+| | `test run [<方案>] [--env <环境>] [--map] [--timeout <时长>] [--settle <时长>] [--json]` | 隔离数据测试运行（08 §12）：默认当前方案，直接启动、收集加载日志后停止；超时默认 `10m`，主菜单后等 `5s`。到达目标且没有错误簇返回 0，否则 1；报告始终写 stdout，进度写 stderr |
 | 方案管理 | 见 §4.3 | |
 | 列表交换 | `loadout export [--format text\|archo\|modsconfig\|rimsort\|rml\|rimcrow\|rimcrow-xml] [--out <文件>]` | 导出当前方案；`--out` 从不覆盖已有文件 |
 | | `loadout import <文件\|分享码> [--new [<名字>]]` | 用一份列表替换当前方案（文本、ModsConfig.xml、存档、`.rml`、RimSort、RimCrow 分享码、工坊 ID），一步可撤销，不写游戏文件（04 §9）；`--new` 导入为新方案（待实现） |
@@ -311,6 +312,7 @@ next:
 | `edit_loadout` | `action`：`enable` / `disable` / `move` / `swap` / `sort`（`dry_run`）/ `undo` / `redo` / `stage`（`stage add`）/ `unstage`（`stage drop`）/ `restore`（`stage restore`）；位置参数 `at`、`before`、`after`、`up`、`down` | false | false |
 | `save_loadout` | `save`（`dry_run`） | false | true |
 | `launch_game` | `launch`（`dry_run`） | false | true |
+| `test_run` | `test run --json`（`env`、`plan`、`map`、`timeout_seconds`）；启动游戏可能耗时数分钟，隔离玩家存档、配置和日志（08 §12），`openWorldHint: false` | false | false |
 | `manage_plans` | `plan list/new/use/rename/remove --yes`、`loadout import --new` | false | true |
 | `plan_history` | `loadout log`、`loadout diff`、`history`（`action=steps`） | true | — |
 | `pin_mod` | `pin`（`ref`、`name`、`git`、`update`、`move_to_library`、`reason`、`dry_run`）；`reason` 写进这份副本的来历，副本备注会说出来（06 §2.9） | false | false |
@@ -330,7 +332,7 @@ next:
 | `manage_library` | `action`：`move_to_locked`（`library move-to-locked`，`dry_run`、`reason`）/ `remove_from_plans`（`library remove-from-plans`）/ `unsubscribe`、`subscribe`（`workshop unsubscribe|subscribe`，`dry_run`）/ `steam_state`（`workshop state`）；`refs` | false | true |
 | `preview_uninstall` | `uninstall --dry-run`（`keep_locked`、`locked_to`、`remove_packs`、`packs_to`、`remove_saves`、`saves_to`、`remove_games`、`restore_modsconfig_backup`、`all`）；从不带 `--yes` | true | — |
 
-共 34 个（含两个别名）：16 个只读，18 个写；`destructiveHint: true` 的是 `save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
+工具和注解以 `internal/surface/mcp/server.go` 的 `Tools()` 为准（含别名）；`destructiveHint: true` 的是 `save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
 
 **描述的改写**（已完成；2026-10-21 之前的描述与代码不符，留作记录）：
 

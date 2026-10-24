@@ -4,6 +4,7 @@
 package cmds
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -51,7 +52,10 @@ func (c *Command) Usage() string {
 
 // Ctx is passed to every command.
 type Ctx struct {
-	App *app.App
+	App     *app.App
+	Context context.Context
+	// ExitCode reports an unsuccessful outcome with normal command output.
+	ExitCode int
 
 	st     *app.LoadoutState
 	stErr  error
@@ -95,7 +99,7 @@ func register(c *Command) { registry = append(registry, c) }
 // order is the documented command order (05 §4.2); registration order depends on file names.
 var commandOrder = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "env remove", "scan", "status", "list", "find",
 	"mod", "describe", "def", "patches", "harmony", "why", "log", "problems", "problems show", "problems ignore", "problems unignore", "files search", "source", "source search", "analyze", "changes", "library", "library remove-from-plans", "library move-to-locked", "enable", "disable", "move", "swap", "sort", "undo", "redo", "save", "loadout log", "loadout diff",
-	"loadout checkout", "loadout ignore-external", "loadout export", "loadout import", "plan list", "plan new", "plan use", "plan rename", "plan remove", "stage list", "stage add", "stage drop", "stage restore", "pin", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule list", "rule remove", "launch", "identity list", "identity resolve", "lineage split", "lineage merge", "gc", "config get", "config set", "mcp", "gui", "version", "uninstall"}
+	"loadout checkout", "loadout ignore-external", "loadout export", "loadout import", "plan list", "plan new", "plan use", "plan rename", "plan remove", "stage list", "stage add", "stage drop", "stage restore", "pin", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule list", "rule remove", "launch", "test run", "identity list", "identity resolve", "lineage split", "lineage merge", "gc", "config get", "config set", "mcp", "gui", "version", "uninstall"}
 
 // Commands returns the command table in documented order.
 func Commands() []*Command {
@@ -212,6 +216,11 @@ const (
 // Execute runs one command line (without the program name) and returns its output text and
 // exit code. Errors are rendered as text too, so every surface prints the same thing.
 func Execute(ap *app.App, argv []string) (string, int) {
+	return ExecuteContext(context.Background(), ap, argv)
+}
+
+// ExecuteContext is Execute with cancellation for commands that wait for a process.
+func ExecuteContext(ctx context.Context, ap *app.App, argv []string) (string, int) {
 	if len(argv) == 0 || argv[0] == "help" || argv[0] == "--help" || argv[0] == "-h" {
 		return Help().String(), ExitOK
 	}
@@ -237,7 +246,8 @@ func Execute(ap *app.App, argv []string) (string, int) {
 		ap.GameVersion = v
 		defer func() { ap.GameVersion = prev }()
 	}
-	doc, err := c.Run(&Ctx{App: ap}, a)
+	cctx := &Ctx{App: ap, Context: ctx}
+	doc, err := c.Run(cctx, a)
 	if err != nil {
 		var amb *app.Ambiguous
 		if errors.As(err, &amb) {
@@ -252,7 +262,7 @@ func Execute(ap *app.App, argv []string) (string, int) {
 		}
 		return "error: " + err.Error() + "\n", ExitError
 	}
-	return doc.String(), ExitOK
+	return doc.String(), cctx.ExitCode
 }
 
 // Help lists every command.
