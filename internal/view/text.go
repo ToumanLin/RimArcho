@@ -91,6 +91,8 @@ var enText = map[string]string{
 func Tf(f string, a ...any) string { return fmt.Sprintf(T(f), a...) }
 
 var zhText = map[string]string{
+	"switching to %s":                "正在切换到 %s",
+	"the window is closing":          "窗口正在关闭",
 	"switching to %s…":               "正在切换到 %s…",
 	"loading the game, please wait…": "正在读取游戏，请稍候…",
 	// top bar, columns, status and hint lines (06 §7: short, verb first)

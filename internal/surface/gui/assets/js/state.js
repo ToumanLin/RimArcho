@@ -16,6 +16,7 @@ export const S = {
   popup: null,  // the open popup (06 §3.1 rule 5)
   screen: "home", // start on the launch page; null is the plan editor
   screenSeq: 0, // late reads from a page that was left must not reopen it
+  envSeq: 0,   // latest game request, including reads started before it (06 §3.1)
   busy: {},     // scan, analyze, env
   packBuild: null, // the last "pack" event of the build this window runs
   live: null,   // Live(): the running game and its errors (06 §2.1)

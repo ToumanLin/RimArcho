@@ -55,6 +55,7 @@ type API struct {
 	// development harness points it at archo.exe).
 	Exe string
 
+	environment environmentWorker
 	monitorOnce sync.Once
 	quit        func() // closes the window (nil in the harness and in tests)
 	// tasks is the 后台任务 record and its lanes (tasks.go, 06 §2.16)
@@ -1004,19 +1005,6 @@ func (s *API) OpenChangeNotes(ws string) (string, error) {
 }
 
 // ---- environments, logs, scans ----
-
-// UseEnv switches the environment.
-func (s *API) UseEnv(name string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.a.EnvName = ""
-	_, err := s.a.EnvUse(name)
-	if err == nil {
-		s.board, s.logLinks, s.logPath = nil, nil, ""
-	}
-	s.needs = nil
-	return s.text(view.Tf("switched to %s", name), err)
-}
 
 // EnvRemoval is the dry run of removing an environment (06 §2.14): the confirmation's
 // title and lines. Nothing changes.

@@ -29,17 +29,19 @@ function fetchBar() {
     barSig = sig;
     barCall = (on ? api.BarFilter(S.bar.search, S.bar.filters, S.bar.open) : Promise.resolve(null)).catch(() => null);
   }
-  const p = barCall;
-  return p.then((r) => { if (p === barCall) S.barData = r; return r; });
+  const p = barCall, gameRequest = S.envSeq;
+  return p.then((r) => { if (gameRequest === S.envSeq && p === barCall) S.barData = r; return r; });
 }
 export const barOn = () => !!(S.bar && S.bar.active());
 
 // refilter applies the column's query (view.Query in Go; the bar for 未启用 and 已启用) and
 // keeps the cursor on keepKey.
 export async function refilter(k, keepKey) {
-  const c = S.cols[k];
+  const c = S.cols[k], gameRequest = S.envSeq, items = c.items;
+  const current = () => gameRequest === S.envSeq && c.items === items;
   if (k < 2) {
     const r = await fetchBar();
+    if (!current()) return;
     c.view = barOn() && r ? r.rows[k] || [] : c.items.map((_, i) => i);
     c.others = null;
     c.complete = "";
@@ -49,6 +51,7 @@ export async function refilter(k, keepKey) {
     c.complete = "";
   } else {
     const r = await api.Filter(k, c.query);
+    if (!current()) return;
     c.view = r.rows || [];
     c.others = null; // no "other lists" line: tab no longer jumps lists (06 §3.7)
     c.complete = r.complete || "";
