@@ -26,6 +26,7 @@ settings
   ui.mouse: on
   ui.preview_dwell_ms: 0
   ui.previews: on
+  ui.theme: auto
   workshop.fetch: on
   workshop.images: on
 
