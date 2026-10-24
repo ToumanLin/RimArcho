@@ -16,6 +16,8 @@ import (
 // are Mod 库's ops (LibDelete, LibUnsub, …).
 const (
 	TaskScan             = "scan"
+	TaskAccount          = "account-operation"
+	TaskSiteDownload     = "site-download"
 	TaskAnalyze          = "analyze"
 	TaskPack             = "pack"
 	TaskTextures         = OpTextures
@@ -130,6 +132,10 @@ type TaskItemRow struct {
 // TaskTitle names a kind.
 func TaskTitle(kind string) string {
 	switch kind {
+	case TaskAccount:
+		return "账户操作"
+	case TaskSiteDownload:
+		return "LoversLab 下载 / 安装"
 	case TaskSubscribe:
 		return T("subscribe")
 	case TaskSubscriptionFrom:
@@ -428,6 +434,8 @@ func joinFacts(parts ...string) string {
 
 func taskTarget(t *app.Task) string {
 	switch t.Kind {
+	case TaskAccount:
+		return PageSettings
 	case TaskSteamCMD, TaskTodds, TaskWezTerm, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
 		return PageSettings
 	case TaskScan:
@@ -479,8 +487,10 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 			a = append(a, TaskAct{ID: "stop", Label: T("stop the rest"), Key: taskKeyStop})
 		}
 	case app.TaskQueued:
-		a = append(a, TaskAct{ID: "stop", Label: T("cancel the wait"), Key: taskKeyStop},
-			TaskAct{ID: "up", Label: T("sooner"), Key: "K"}, TaskAct{ID: "down", Label: T("later"), Key: "J"})
+		if t.Kind != TaskAccount && t.Kind != TaskSiteDownload {
+			a = append(a, TaskAct{ID: "stop", Label: T("cancel the wait"), Key: taskKeyStop},
+				TaskAct{ID: "up", Label: T("sooner"), Key: "K"}, TaskAct{ID: "down", Label: T("later"), Key: "J"})
+		}
 	case app.TaskFailed, app.TaskPartial:
 		switch {
 		case c[app.ItemFail] > 0:

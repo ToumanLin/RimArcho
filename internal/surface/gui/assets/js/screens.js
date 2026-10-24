@@ -1318,7 +1318,7 @@ function settingRunner(again) {
   return async (argv, value, after, background = false) => {
     const screen = S.screen, epoch = S.screenSeq;
     try {
-      const out = await api.ApplySetting(argv, value || "");
+      const out = argv[0] === "account" ? await api.AccountAction(argv[1], argv[2]) : await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
     } catch (e) { say("fail", errText(e)); }
     if (S.screen !== screen || S.screenSeq !== epoch) return;
@@ -1405,6 +1405,10 @@ function renderSettingActions(right, actions, run) {
       right.append(b); continue;
     }
     const submit = () => {
+      if (a.argv[0] === "account") {
+        b.disabled = true; b.textContent = a.label + "…"; say("busy", a.label + "…");
+        return run(a.argv, "").finally(() => { b.disabled = false; b.textContent = a.label; });
+      }
       if (a.task) { b.disabled = true; b.textContent = a.pending; }
       return run(a.argv, "", null, !!a.task);
     };
