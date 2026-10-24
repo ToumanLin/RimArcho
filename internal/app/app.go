@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/ids"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -110,6 +111,10 @@ type App struct {
 	TextureEncoder textures.Encoder
 	ToddsZip       string
 	ToddsNoPath    bool
+	// WezTermAPI replaces the portable release endpoint in tests.
+	WezTermAPI string
+	depFinder  *deps.Finder
+	depFake    bool
 	// SteamCollectionAPI reads Workshop collections (04 §9.5); "" is the public endpoint.
 	SteamCollectionAPI string
 	// Uninstall (uninstall.go): UninstallExe is the program to remove ("" this one; a

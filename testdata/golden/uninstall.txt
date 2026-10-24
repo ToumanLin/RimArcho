@@ -19,8 +19,8 @@ uninstall: dry run, nothing changed
   steamcmd: delete the SteamCMD RimArcho downloaded, <size>
     delete      $ROOT/LocalAppData/RimArcho/steamcmd  <size>
   data: once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder (2 folders), <size>
-    after exit  $ROOT/ArchoHome  <size>
-    after exit  $ROOT/LocalAppData/RimArcho  <size>
+    after exit  $ROOT/ArchoHome  <size>  — includes the downloaded WezTerm
+    after exit  $ROOT/LocalAppData/RimArcho  <size>  — includes the downloaded todds
   program: once RimArcho has closed, delete the program
     after exit  $ROOT/Program  <size>  — only RimArcho's own files; the folder goes when nothing else is in it
 next:
@@ -47,8 +47,8 @@ uninstall: dry run, nothing changed
   steamcmd: delete the SteamCMD RimArcho downloaded, <size>
     delete      $ROOT/LocalAppData/RimArcho/steamcmd  <size>
   data: once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder (2 folders), <size>
-    after exit  $ROOT/ArchoHome  <size>
-    after exit  $ROOT/LocalAppData/RimArcho  <size>
+    after exit  $ROOT/ArchoHome  <size>  — includes the downloaded WezTerm
+    after exit  $ROOT/LocalAppData/RimArcho  <size>  — includes the downloaded todds
   program: once RimArcho has closed, delete the program
     after exit  $ROOT/Program  <size>  — only RimArcho's own files; the folder goes when nothing else is in it
 next:
@@ -75,8 +75,8 @@ uninstall: dry run, nothing changed
   steamcmd: delete the SteamCMD RimArcho downloaded, <size>
     delete      $ROOT/LocalAppData/RimArcho/steamcmd  <size>
   data: once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder (2 folders), <size>
-    after exit  $ROOT/ArchoHome  <size>
-    after exit  $ROOT/LocalAppData/RimArcho  <size>
+    after exit  $ROOT/ArchoHome  <size>  — includes the downloaded WezTerm
+    after exit  $ROOT/LocalAppData/RimArcho  <size>  — includes the downloaded todds
   program: once RimArcho has closed, delete the program
     after exit  $ROOT/Program  <size>  — only RimArcho's own files; the folder goes when nothing else is in it
   refused: the copies would go into $ROOT/old, which is removed too; pick another game or keep the downloaded games
@@ -107,8 +107,8 @@ uninstalled: RimArcho's folders and program are deleted once this command ends
   steamcmd: delete the SteamCMD RimArcho downloaded, <size>
     done   delete      $ROOT/LocalAppData/RimArcho/steamcmd  <size>
   data: once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder (2 folders), <size>
-    later  after exit  $ROOT/ArchoHome  <size>
-    later  after exit  $ROOT/LocalAppData/RimArcho  <size>
+    later  after exit  $ROOT/ArchoHome  <size>  — includes the downloaded WezTerm
+    later  after exit  $ROOT/LocalAppData/RimArcho  <size>  — includes the downloaded todds
   program: once RimArcho has closed, delete the program
     later  after exit  $ROOT/Program  <size>  — only RimArcho's own files; the folder goes when nothing else is in it
   left over: anything that could not be deleted is listed in $ROOT/uninstall.log

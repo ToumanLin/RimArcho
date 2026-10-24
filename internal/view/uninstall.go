@@ -140,6 +140,15 @@ func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 }
 
 func unNote(n string) string {
+	if parts := strings.Split(n, "; "); len(parts) > 1 {
+		for i, part := range parts {
+			parts[i] = unNote(part)
+		}
+		return strings.Join(parts, T("; "))
+	}
+	if rest, ok := strings.CutPrefix(n, "includes the downloaded "); ok {
+		return Tf("includes the downloaded %s", rest)
+	}
 	if rest, ok := strings.CutPrefix(n, "keeps "); ok {
 		return Tf("keeps %s", rest)
 	}

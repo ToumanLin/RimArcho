@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -107,13 +108,7 @@ func (a *App) ManagedDirectories() ([]ManagedDirectory, error) {
 }
 
 func steamCMDIn(path string) string {
-	for _, name := range []string{"steamcmd.exe", "steamcmd.sh", "steamcmd"} {
-		p := filepath.Join(path, name)
-		if st, err := os.Stat(p); err == nil && !st.IsDir() {
-			return p
-		}
-	}
-	return ""
+	return deps.SteamCMDIn(path)
 }
 
 func directoryKey(id string) string { return "directory.used:" + id }

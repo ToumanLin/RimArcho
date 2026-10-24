@@ -6,6 +6,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
@@ -18,8 +19,11 @@ type SettingItem struct {
 	Value string `json:"value"`
 	// Edit: "path", "text" or "choice" (Choices); the new value replaces {} in Argv. "" has
 	// no editor, only Actions.
-	Edit    string   `json:"edit,omitempty"`
-	Choices []string `json:"choices,omitempty"`
+	Edit string `json:"edit,omitempty"`
+	// EditValue separates an editable path from its displayed status/version.
+	EditValue *string  `json:"editValue,omitempty"`
+	File      bool     `json:"file,omitempty"` // choose a program file rather than a directory
+	Choices   []string `json:"choices,omitempty"`
 	// ChoiceLabels are the words shown for Choices (same order); empty shows the values.
 	ChoiceLabels []string        `json:"choiceLabels,omitempty"`
 	Argv         []string        `json:"argv,omitempty"`
@@ -42,6 +46,14 @@ type SettingAction struct {
 
 // SettingTask identifies commands that queue after confirmation (06 §2.14, 06 §2.16).
 func SettingTask(argv []string) string {
+	if len(argv) == 3 && argv[0] == "deps" {
+		if argv[1] == "remove" {
+			return TaskDepRemove
+		}
+		if argv[1] == "install" {
+			return map[string]string{deps.Todds: TaskTodds, deps.SteamCMD: TaskSteamCMD, deps.WezTerm: TaskWezTerm}[argv[2]]
+		}
+	}
 	if len(argv) > 0 && argv[0] == "gc" {
 		return TaskGC
 	}
@@ -57,8 +69,10 @@ func SettingTask(argv []string) string {
 // TaskPending is the action's label while this kind runs or waits.
 func TaskPending(kind string) string {
 	switch kind {
-	case TaskSteamCMD, TaskTodds:
+	case TaskSteamCMD, TaskTodds, TaskWezTerm:
 		return T("downloading…")
+	case TaskDepRemove:
+		return T("removing…")
 	case TaskData:
 		return T("updating…")
 	case TaskBackup:
@@ -205,9 +219,8 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	out := []SettingGroup{DirectoryGroup(a), folders, {Title: "SteamCMD", Items: []SettingItem{
 		{Label: T("SteamCMD account (optional)"), Value: cmds.Setting(a, "steamcmd.account"), Edit: "text", Argv: []string{"config", "set", "steamcmd.account", "{}"},
 			Note: T("empty or anonymous: anonymous login; enter an account name to log in. Password and Steam Guard are entered only in SteamCMD")},
-		{Label: T("SteamCMD program"), Value: cmds.Setting(a, "steamcmd.path"), Edit: "path", Argv: []string{"config", "set", "steamcmd.path", "{}"},
-			Note: T("empty: RimArcho's own copy, then PATH")},
 	}}}
+	out = append(out, DependencyGroup(a))
 	lang := cmds.Setting(a, "ui.lang")
 	gpuNote := ""
 	if cmds.Setting(a, "ui.gpu") == "off" {
@@ -215,6 +228,9 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}
 	out = append(out, SettingGroup{Title: T("interface"), Items: []SettingItem{
 		{Label: T("language"), Value: lang, Edit: "choice", Choices: []string{"auto", "zh", "en"}, Argv: []string{"config", "set", "ui.lang", "{}"}},
+		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "choice", Choices: cmds.SettingChoices("ui.accent"),
+			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
+			Argv:         []string{"config", "set", "ui.accent", "{}"}},
 		{Label: T("Workshop descriptions"), Value: cmds.Setting(a, "workshop.fetch"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "workshop.fetch", "{}"}},
 		{Label: T("images in descriptions"), Value: cmds.Setting(a, "workshop.images"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "workshop.images", "{}"}},
 		{Label: T("GPU acceleration"), Value: cmds.Setting(a, "ui.gpu"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "ui.gpu", "{}"},
@@ -258,18 +274,6 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	} else {
 		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
 	}
-	// 贴图优化 is a page under 库 (06 §2.1); here only where its encoder is (08 §5.2).
-	tool := a.TextureTool()
-	toolNote := T("the DDS encoder (todds) is not installed")
-	if tool.Err == "" {
-		toolNote = Tf("todds %s  %s", tool.Version, tool.Path)
-	} else if tool.Path != "" {
-		toolNote = tool.Err
-	}
-	out = append(out, SettingGroup{Title: T("texture optimisation"), Items: []SettingItem{
-		{Label: T("the DDS encoder"), Value: cmds.Setting(a, "textures.todds"), Edit: "path", Argv: []string{"config", "set", "textures.todds", "{}"},
-			Note: toolNote + "  " + T("empty: RimArcho's own copy; or a todds you have, e.g. RimSort's")},
-	}})
 	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
 	// settings command).
 	out = append(out, SettingGroup{Title: T("uninstall"), Items: []SettingItem{
@@ -297,6 +301,7 @@ func init() {
 		"backing up…":  "正在备份…",
 		"compacting…":  "正在压缩…",
 		"clearing…":    "正在清理…",
+		"removing…":    "正在移除…",
 	})
 }
 
@@ -311,7 +316,7 @@ func SettingCommand(argv []string) error {
 		two += " " + argv[1]
 	}
 	switch two {
-	case "env set", "env rebind", "folder add", "folder remove", "folder set", "folder move", "config set", "db backup", "db vacuum", "cache clear", "data update":
+	case "env set", "env rebind", "folder add", "folder remove", "folder set", "folder move", "config set", "db backup", "db vacuum", "cache clear", "data update", "deps install", "deps remove":
 		return nil
 	}
 	if argv[0] == "gc" {

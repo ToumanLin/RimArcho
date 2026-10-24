@@ -83,6 +83,14 @@ func (s *API) PickFolder(start string) (string, error) {
 	return s.x.native.openDir(view.T("choose a folder"), start)
 }
 
+// PickProgram chooses an external tool's executable; every path can also be typed.
+func (s *API) PickProgram() (string, error) {
+	if s.x.native == nil {
+		return "", errors.New(view.T("no file dialog here; type the path"))
+	}
+	return s.x.native.openFile(view.T("choose a program"), nil)
+}
+
 // PickImportFile shows the open dialog; "" when it was cancelled or there is none.
 func (s *API) PickImportFile() (string, error) {
 	if s.x.native == nil {

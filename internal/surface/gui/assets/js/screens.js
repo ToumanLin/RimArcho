@@ -1224,7 +1224,14 @@ async function refreshSettingTasks(values = false) {
       const note = row.querySelector(".setting-note"), value = row.querySelector(".setting-value");
       if (note) { factText(note, it.note || ""); note.hidden = !it.note; }
       if (value) factText(value, it.value || "");
+      const actions = JSON.stringify(it.actions || []);
+      if (row.dataset.settingActions !== actions) {
+        row.querySelectorAll("[data-setting-action]").forEach(b => b.remove());
+        renderSettingActions(row.querySelector(".r"), it.actions, settingRunner(settings));
+        row.dataset.settingActions = actions;
+      }
     }
+    if (n === settingTaskRead) markSettingTasks(tasks);
   } catch (e) { if (S.screen === "settings" && S.screenSeq === epoch) say("fail", errText(e)); }
 }
 
@@ -1313,6 +1320,7 @@ function renderGroups(w, groups, again) {
     for (const it of g.items || []) {
       const row = el("div", "set");
       row.dataset.settingRow = g.title + "/" + it.label;
+      row.dataset.settingActions = JSON.stringify(it.actions || []);
       row.title = it.hover || "";
       const left = el("div", "l");
       left.append(el("div", "name", it.label));
@@ -1329,7 +1337,8 @@ function renderGroups(w, groups, again) {
           s.append(o);
         }
         // A new language: the page's text again, in place (main.js relang).
-        s.onchange = () => run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : null);
+        s.onchange = () => run(it.argv, s.value,
+          it.argv[2] === "ui.lang" ? () => ui.relang() : it.argv[2] === "ui.accent" ? () => ui.reaccent() : null);
         right.append(s);
         if (it.valueNote) right.append(el("span", "muted word-facts", it.valueNote));
       } else if (it.edit === "directory") {
@@ -1341,36 +1350,49 @@ function renderGroups(w, groups, again) {
           button(T("move to…"), "", () => directoryPrompt(d, true, after), "", "apply-setting"));
       } else if (it.edit) {
         const inp = el("input", "field");
-        inp.value = it.value || "";
+        inp.value = it.editValue ?? it.value ?? "";
         inp.spellcheck = false;
         const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim()), "", "apply-setting");
         inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
+        if (it.editValue !== undefined) right.append(el("span", "muted setting-value word-facts", it.value || ""));
         right.append(inp);
-        // A folder: the window's folder dialog; the chosen folder is applied at once.
-        if (it.edit === "path") right.append(button(T("choose…"), "", () => pickFolder(inp.value, (p) => run(it.argv, p)), "", "apply-setting"));
+        // Apply the file or folder chosen through the window's dialog.
+        if (it.edit === "path") right.append(button(T("choose…"), "", async () => {
+          if (!it.file) return pickFolder(inp.value, (p) => run(it.argv, p));
+          try { const p = await api.PickProgram(); if (p) run(it.argv, p); } catch (e) { say("fail", errText(e)); }
+        }, "", "apply-setting"));
         right.append(ok);
       } else {
         right.append(el("span", "muted setting-value word-facts", it.value || ""));
       }
-      for (const a of it.actions || []) {
-        // 卸载 RimArcho is its own page with the plan; every other action is a command
-        if (a.argv[0] === "uninstall") { right.append(button(a.label, "", () => ui.go(a.argv[0]))); continue; }
-        const submit = () => {
-          if (a.task) { b.disabled = true; b.textContent = a.pending; }
-          return run(a.argv, "", null, !!a.task);
-        };
-        const b = button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, submit) : submit(), "", a.argv.join(" "));
-        if (a.task) {
-          b.dataset.settingTask = a.task;
-          b.dataset.label = a.label;
-          b.dataset.pending = a.pending;
-        }
-        right.append(b);
-      }
+      renderSettingActions(right, it.actions, run);
       row.append(left, right);
       card.append(row);
     }
     w.append(card);
+  }
+}
+
+function renderSettingActions(right, actions, run) {
+  for (const a of actions || []) {
+    // 卸载 RimArcho is its own page with the plan; every other action is a command
+    if (a.argv[0] === "uninstall") {
+      const b = button(a.label, "", () => ui.go(a.argv[0]));
+      b.dataset.settingAction = a.argv.join(" ");
+      right.append(b); continue;
+    }
+    const submit = () => {
+      if (a.task) { b.disabled = true; b.textContent = a.pending; }
+      return run(a.argv, "", null, !!a.task);
+    };
+    const b = button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, submit) : submit(), "", a.argv.join(" "));
+    b.dataset.settingAction = a.argv.join(" ");
+    if (a.task) {
+      b.dataset.settingTask = a.task;
+      b.dataset.label = a.label;
+      b.dataset.pending = a.pending;
+    }
+    right.append(b);
   }
 }
 

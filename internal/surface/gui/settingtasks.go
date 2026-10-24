@@ -6,6 +6,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -25,7 +26,9 @@ func (s *API) queueSettingTaskLocked(kind string, argv []string, env string) app
 		snapshot.EnvName = env
 	}
 	obj := "RimArcho"
-	if kind == view.TaskCache && len(argv) > 2 {
+	if len(argv) == 3 && argv[0] == "deps" {
+		obj = argv[2]
+	} else if kind == view.TaskCache && len(argv) > 2 {
 		obj = argv[2]
 	} else if kind == view.TaskGC {
 		obj = snapshot.EnvName
@@ -66,10 +69,14 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		})
 	}
 	switch kind {
-	case view.TaskSteamCMD, view.TaskTodds:
+	case view.TaskSteamCMD, view.TaskTodds, view.TaskWezTerm:
 		var path string
 		var err error
-		if kind == view.TaskSteamCMD {
+		if len(argv) == 3 && argv[0] == "deps" && argv[1] == "install" {
+			path, err = a.InstallDep(argv[2], progress)
+		} else if kind == view.TaskWezTerm {
+			path, err = a.InstallDep(deps.WezTerm, progress)
+		} else if kind == view.TaskSteamCMD {
 			path, err = a.InstallSteamCMDProgress(progress)
 		} else {
 			path, err = a.InstallToddsProgress(progress)
