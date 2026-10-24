@@ -3,6 +3,16 @@ package view
 // The list management page (06 §2.17), its export sub-page and the plan verbs it calls.
 func init() {
 	Register(map[string]string{
+		"create list":                              "创建",
+		"import as a new list":                     "导入为新列表",
+		"import destination":                       "导入到",
+		"suggested game versions: %s":              "建议允许的版本：%s",
+		"a version written to the game":            "复制它写入过的一版",
+		"a save file":                              "照一个存档",
+		"import a file, share code or collection…": "导入文件、分享码或合集…",
+		"does not write game files":                "不写游戏文件",
+		"replace %s":                               "替换选中的列表：%s",
+
 		"manage": "管理",
 		"%s has %d lists. Pick one to see which game versions it is for, which collections it follows and how to share it.": "%s 里有 %d 个列表。选一个，看它能在哪些版本上玩、跟着哪个合集、怎么分享出去。",
 		"%s has 1 list. See which game versions it is for, which collections it follows and how to share it.":               "%s 里有 1 个列表。看它能在哪些版本上玩、跟着哪个合集、怎么分享出去。",

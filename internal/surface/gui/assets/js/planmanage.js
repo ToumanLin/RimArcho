@@ -12,7 +12,7 @@ import * as plans from "./plans.js";
 let ui = null;
 export function initPlanManage(u) { ui = u; }
 
-const M = { data: null, sel: 0, open: new Set(), checked: new Set() };
+const M = { data: null, sel: 0, open: new Set(), checked: new Set(), draft: null, created: 0 };
 const X = { data: null, id: 0, from: "plans", format: "", info: null };
 const FORMAT_KEY = "ui.gui.export.format";
 
@@ -50,9 +50,9 @@ function draw() {
   sc.innerHTML = "";
   const add = act(T("new list"), "plus", () => newList(), "n");
   add.classList.add("primary");
-  const w = page("plans pm-page", d.lead, act(T("import"), "import", () => ui.cmd("import"), "i"), add);
+  const w = page("plans pm-page", "", act(T("import"), "import", () => ui.cmd("import"), "i"), add);
   const grid = el("div", "pm");
-  grid.append(listCard(d), detailCard(d.sel));
+  grid.append(listCard(d), M.draft ? newForm() : detailCard(d.sel));
   w.append(grid);
   sc.append(w);
   sc.scrollTop = top;
@@ -62,8 +62,14 @@ function draw() {
 function listCard(d) {
   const card = el("section", "card pm-list");
   const box = el("div", "scroll");
-  for (const r of d.rows) {
-    const b = el("button", "pm-row" + (r.id === M.sel ? " on" : ""));
+  if (M.draft) {
+    const row = el("button", "pm-row on", T("new list"));
+    row.onclick = () => $(".pm-new input")?.focus();
+    box.append(row);
+  }
+  const rows = M.created ? d.rows.filter(r => r.id === M.created).concat(d.rows.filter(r => r.id !== M.created)) : d.rows;
+  for (const r of rows) {
+    const b = el("button", "pm-row" + (!M.draft && r.id === M.sel ? " on" : ""));
     const n = el("div", "n");
     n.append(el("b", "", r.name));
     if (r.current) n.append(el("span", "pill cur", T("current")));
@@ -86,7 +92,8 @@ function listCard(d) {
 }
 
 function pick(id) {
-  if (id === M.sel) return;
+  if (id === M.sel && !M.draft) return;
+  M.draft = null;
   M.sel = id;
   open();
 }
@@ -129,11 +136,94 @@ function menuOf(p) {
 // stay: after a dialog the page shows the list it made or renamed.
 const stay = (d) => open(+String(d.page || "").replace(/^plan:/, "") || 0);
 
-// newList: the new-list dialog, copying p when given (its game versions go with it).
-async function newList(p) {
-  if (p && !p.current && !(await plans.openPlan(p.id))) return;
-  plans.newPlan(p ? "current" : "", stay);
+// The draft is a selected row, abandoned by esc or another selection (06 §2.17).
+export async function newList(p = null, from = "current") {
+  M.draft = null;
+  await ui.go("plans");
+  if (S.screen !== "plans") return;
+  if (p) await open(p.id);
+  const source = sel()?.id || S.shell?.plan?.id;
+  const read = beginPageRead("plans");
+  try {
+    const [sources, nm] = await Promise.all([api.PlanSources(source), api.CheckPlanName("", "", 0)]);
+    if (!read.current()) return;
+    M.draft = { source, sources, name: nm.free, from, previous: S.shell?.plan?.id };
+    draw(); read.finish();
+  } catch (e) { read.fail(e); }
 }
+
+function newForm() {
+  const draft = M.draft;
+  const card = el("section", "card pad pm-new");
+  const form = el("form");
+  const label = el("label", "xc-sec", T("name"));
+  const name = el("input", "xc-input"); name.value = draft.name; name.spellcheck = false;
+  label.append(name);
+  const why = el("div", "plan-why");
+  const create = button(T("create list"), "enter", () => form.requestSubmit(), "primary");
+  create.type = "button";
+  let seq = 0;
+  async function check() {
+    const n = ++seq, value = name.value;
+    draft.name = value; create.disabled = true;
+    try {
+      const r = await api.CheckPlanName("", value, 0);
+      if (n !== seq || M.draft !== draft) return false;
+      why.textContent = r.problem; create.disabled = !!r.problem;
+      return !r.problem;
+    } catch (e) { why.textContent = errText(e); return false; }
+  }
+  name.oninput = check;
+  form.append(label, why, el("div", "pm-sub", T("start from")));
+  const groups = [["", T("an empty list"), null], ["current", draft.sources.copy, null],
+    ["version", T("a version written to the game"), draft.sources.versions], ["save", T("a save file"), draft.sources.saves]];
+  for (const [value, text, options] of groups) {
+    const row = el("label", "xc-check");
+    const radio = el("input"); radio.type = "radio"; radio.name = "start"; radio.value = value;
+    radio.checked = draft.from === value; radio.disabled = !!options && !options.length;
+    radio.onchange = () => { draft.from = value; };
+    row.append(radio, el("span", "", text));
+    if (options) {
+      const select = el("select", "xc-input");
+      options.forEach(o => { const op = el("option", "", o.label); op.value = o.from; select.append(op); });
+      select.disabled = !options.length;
+      select.onchange = () => { radio.checked = true; draft.from = value; draft[value] = select.value; };
+      draft[value] ||= select.value; select.value = draft[value]; row.append(select);
+    }
+    form.append(row);
+  }
+  const imp = button(T("import a file, share code or collection…"), "", () => { M.draft = null; ui.cmd("import"); }, "link"); imp.type = "button";
+  form.append(imp, el("div", "acts-row")); form.lastChild.append(create);
+  let submitting = false;
+  form.onkeydown = e => {
+    if (e.key === "Enter" && !e.target.matches("button, select")) { e.preventDefault(); e.stopPropagation(); form.requestSubmit(); }
+  };
+  form.onsubmit = async e => {
+    e.preventDefault();
+    if (submitting || !(await check())) return;
+    submitting = true; create.disabled = true;
+    try {
+      const from = draft.from === "version" || draft.from === "save" ? draft[draft.from] : draft.from;
+      const r = await api.CreatePlan(draft.source, name.value, from);
+      M.draft = null; M.created = +r.page.slice(5);
+      await ui.reload(); await open(M.created);
+      say("ok", r.text, async () => {
+        try {
+          if (draft.previous) await api.UsePlan(draft.previous);
+          const t = await api.RemovePlan(+r.page.slice(5));
+          await ui.reload(); await open(draft.previous || 0); say("ok", t.text);
+        } catch (e) { say("fail", errText(e)); }
+      });
+    } catch (e) { why.textContent = errText(e); submitting = false; create.disabled = false; }
+  };
+  card.append(form);
+  requestAnimationFrame(() => { if (M.draft === draft) { name.focus(); name.select(); } });
+  return card;
+}
+
+// Leave a form behind when navigating to another sidebar page (06 §2.17).
+export function abandon() { M.draft = null; M.created = 0; }
+export const selected = () => M.sel || S.shell?.plan?.id || 0;
 
 async function makeCurrent(id) {
   if (await plans.openPlan(id)) open(id);
@@ -316,7 +406,8 @@ async function buildOf(p) {
 // ---- keys and hints ----
 
 function step(k) {
-  const rows = (M.data && M.data.rows) || [];
+  const all = (M.data && M.data.rows) || [];
+  const rows = M.created ? all.filter(r => r.id === M.created).concat(all.filter(r => r.id !== M.created)) : all;
   const i = rows.findIndex((r) => r.id === M.sel);
   if (!rows.length) return;
   let j = i;
@@ -331,7 +422,12 @@ export function key(e) {
   const k = e.key;
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
   if (S.screen === "plan-export") return exportKey(e);
+  if (M.draft) {
+    if (k === "Escape") { e.preventDefault(); M.draft = null; draw(); }
+    return;
+  }
   const p = sel();
+  if (document.activeElement?.closest(".pm-detail") && ["Enter", "ArrowUp", "ArrowDown", "Home", "End"].includes(k)) return;
   if (["ArrowDown", "ArrowUp", "j", "k", "Home", "End"].includes(k)) { e.preventDefault(); return step(k); }
   if (!p) return;
   const map = {
@@ -342,6 +438,7 @@ export function key(e) {
 }
 
 export function hintList() {
+  if (M.draft && S.screen === "plans") return [{ key: "enter", label: T("create list") }, { key: "esc", label: T("cancel") }];
   if (S.screen === "plan-export") {
     return [{ key: "↑↓", label: T("format") }, { key: "ctrl+s", label: T("save as a file…") }, { key: "ctrl+c", label: T("copy") },
       { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
