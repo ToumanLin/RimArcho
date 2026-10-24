@@ -27,6 +27,7 @@ import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
+import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
 
@@ -1020,6 +1021,11 @@ async function start() {
   on("uninstall", (ev) => uninst.event(ev));
   on("textures", (ev) => tex.event(ev));
   on("tasks", (ev) => tasksPage.event(ev));
+  // Menu art is prepared after the first draw, outside the task page (06 §2.14).
+  on("backgrounds", () => {
+    if (S.screen === "home") homePage.home({ keep: true });
+    if (S.screen === "settings") refreshBackgrounds();
+  });
   // a task's o on a mod: Mod 库存 searching for it (06 §2.16)
   document.addEventListener("library-search", async (e) => { shell.navigated(); await library.openSearch(e.detail); renderWhere(); });
   tasksPage.refreshFoot();

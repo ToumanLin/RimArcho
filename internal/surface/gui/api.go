@@ -51,6 +51,7 @@ type API struct {
 	bgs    []app.Background
 	bgsEnv string
 	bgPick string
+	bgRead backgroundReader
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string
@@ -94,6 +95,7 @@ var processStart = time.Now()
 // Ready is called once the launch page or first-run guide has drawn; it logs the
 // start-up time to <data>/logs/gui.log.
 func (s *API) Ready() {
+	s.prepareBackgrounds(false) // menu extraction starts after the first draw (06 §3.1)
 	s.monitorOnce.Do(s.checkMonitor)
 	ms := time.Since(processStart).Milliseconds()
 	dir := filepath.Join(s.a.Home, "logs")

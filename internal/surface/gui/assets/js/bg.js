@@ -24,6 +24,25 @@ export async function bgSection(current = () => true) {
   return box;
 }
 
+// Replace only the image choices after background extraction. Keep the live slider
+// values, focus and scroll while the player edits settings (06 §2.14, 06 §3.1).
+export async function refreshBackgrounds() {
+  const section = box;
+  if (!section?.isConnected || !P) return;
+  const group = P.groups[tab], picked = group?.items[kb]?.key;
+  let p;
+  try { p = await api.Backgrounds(); } catch { return; }
+  if (box !== section || !section.isConnected) return;
+  const gridFocus = section.querySelector(".bg-grid")?.contains(document.activeElement);
+  P.groups = p.groups;
+  tab = Math.max(0, P.groups.findIndex((g) => g.name === group?.name && g.files === group?.files));
+  kb = Math.max(0, P.groups[tab].items.findIndex((it) => it.key === picked));
+  section.querySelector(".bg-tabs").replaceWith(tabs());
+  section.querySelector(".bg-grid").replaceWith(grid());
+  section.querySelector(".bg-pv-wrap").replaceWith(preview());
+  if (gridFocus) section.querySelector(".bg-grid").focus({ preventScroll: true });
+}
+
 const B = () => P.setting;
 const item = (key) => { for (const g of P.groups) for (const it of g.items) if (it.key === key) return [it, g]; return [null, null]; };
 

@@ -9,11 +9,13 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/charmbracelet/x/ansi v0.11.4
 	github.com/charmbracelet/x/exp/teatest v0.0.0-20261018003744-cb897cb4ed72
+	github.com/klauspost/compress v1.20.3
 	github.com/mattn/go-runewidth v0.0.31
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/muesli/termenv v0.16.0
 	github.com/saferwall/pe v1.6.5
 	github.com/wailsapp/wails/v3 v3.0.0-beta.28
+	github.com/woozymasta/bcn v0.7.0
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/sys v0.48.0
 	golang.org/x/text v0.39.0

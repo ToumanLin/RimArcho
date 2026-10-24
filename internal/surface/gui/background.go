@@ -1,8 +1,10 @@
 package gui
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand/v2"
 	"net/http"
 	"net/url"
@@ -75,12 +77,18 @@ func (s *API) bgFind(key string) *app.Background {
 	return nil
 }
 
-func bgURL(key string, thumb bool) string {
+func bgURL(b app.Background, thumb bool) string {
 	w := "full"
 	if thumb {
 		w = "thumb"
 	}
-	return "/bg?w=" + w + "&k=" + url.QueryEscape(key)
+	// A different game version can use the same package key (06 §2.14).
+	return "/bg?w=" + w + "&k=" + url.QueryEscape(b.Key) + "&v=" + bgRevision(b.Src)
+}
+
+func bgRevision(src string) string {
+	v := sha256.Sum256([]byte(src))
+	return fmt.Sprintf("%x", v[:8])
 }
 
 // HomeBg is what the launch page draws: URL "" is the plain background.
@@ -89,34 +97,6 @@ type HomeBg struct {
 	Dim   int    `json:"dim"`
 	Blur  int    `json:"blur"`
 	Focus string `json:"focus"`
-}
-
-// Capture small background targets, then discover files outside the API lock. Image
-// handlers resolve only the published allow-list; an environment switch rejects old data.
-func (s *API) prepareBackgrounds(fresh bool) {
-	s.mu.Lock()
-	e, err := s.a.Env()
-	if err != nil || (!fresh && s.bgs != nil && s.bgsEnv == e.ID) {
-		s.mu.Unlock()
-		return
-	}
-	ix, err := s.a.Index()
-	if err != nil {
-		s.mu.Unlock()
-		return
-	}
-	targets := s.a.BackgroundTargets(ix)
-	s.mu.Unlock()
-	defer s.free.soon()
-	backgrounds := app.CollectBackgrounds(targets)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if current, err := s.a.Env(); err == nil && current.ID == e.ID {
-		s.bgs, s.bgsEnv = backgrounds, e.ID
-		if s.bgs == nil {
-			s.bgs = []app.Background{}
-		}
-	}
 }
 
 // HomeBackground is the launch page's background. With rotation on, one starred image is
@@ -143,7 +123,7 @@ func (s *API) HomeBackground() *HomeBg {
 			return out
 		}
 	}
-	out.URL = bgURL(key, false)
+	out.URL = bgURL(*s.bgFind(key), false)
 	return out
 }
 
@@ -179,7 +159,7 @@ func (s *API) Backgrounds() *BgPage {
 	files := BgGroup{Name: view.T("your images"), Files: true, Items: []BgItem{}}
 	var mods []BgGroup
 	for _, b := range s.bgListLocked() {
-		it := BgItem{Key: b.Key, Label: b.Label, Thumb: bgURL(b.Key, true), Full: bgURL(b.Key, false)}
+		it := BgItem{Key: b.Key, Label: b.Label, Thumb: bgURL(b, true), Full: bgURL(b, false)}
 		switch b.Group {
 		case "":
 			game.Items = append(game.Items, it)
@@ -270,7 +250,7 @@ func (s *API) serveBg(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	b := s.bgFind(r.URL.Query().Get("k"))
 	s.mu.Unlock()
-	if b == nil {
+	if b == nil || (r.URL.Query().Get("v") != "" && r.URL.Query().Get("v") != bgRevision(b.Src)) {
 		http.NotFound(w, r)
 		return
 	}
@@ -278,6 +258,14 @@ func (s *API) serveBg(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("w") == "thumb" {
 		width = app.BgThumb
 	}
-	path, err := s.a.BackgroundImage(b.Src, width)
+	path := b.Src
+	var err error
+	if b.Thumb != "" {
+		if width == app.BgThumb {
+			path = b.Thumb
+		}
+	} else {
+		path, err = s.a.BackgroundImage(b.Src, width)
+	}
 	serveFile(w, r, path, err)
 }
