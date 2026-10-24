@@ -235,3 +235,14 @@ Same method and thresholds (mod-specific: >= 10 logs from >= 5 sessions; templat
 The jump is mostly the long tail (more mods reach 10 logs / 5 sessions), not new kinds of error. If the
 4 MB embedded file is too big for the binary, raise -minlogs (e.g. 25 keeps ~1,900) rather than touching the
 session threshold.
+
+Product file at -minlogs 25 (2026-10-24): the 4.2 MB file was too big to embed. Rerun on the same inputs
+with -minlogs 25 (sessions >= 5 unchanged), exported from that run:
+  $E/patterns-min25.exe -parsed $E/hugslogs/parsed.jsonl -results $E/results-v5.jsonl -minlogs 25 -out $E/patterns-v5-min25.json
+  go run ./spikes/patterns -export internal/patterns/patterns.json -dataset $E/patterns-v5-min25.json
+  (E = D:/Game/RimModManager_Upgrade/corpus-expand)
+  internal/patterns/patterns.json  4.2 MB -> 1.86 MB; mod-specific 9,305 -> 3,947 (716 mods, was 1,186).
+  Checked: the 46 generic rules and the header are identical; the 3,947 are exactly the old entries
+  with >= 25 logs, each unchanged. spikes/patterns/patterns-v0.json stays the -minlogs 10 research
+  dataset (spikes/knowndeps reads its resolution evidence; internal/known/known.json is unchanged).
+  The earlier "25 keeps ~1,900" estimate was wrong.
