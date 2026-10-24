@@ -75,33 +75,57 @@ export const pageLoading = () => !!$("#screen .page-loading, #screen .page-read-
 // keep the visible content; a new page/subview shows a placeholder immediately.
 // keep: a page that is already drawn stays as it is while it reads, even when the game or
 // list changed (the launch page shows that change itself).
-export function beginPageRead(name, { replace = false, keep = false, label = "loading…" } = {}) {
+export function beginPageRead(name, { replace = false, keep = false, label = "loading…", retry } = {}) {
   const same = S.screen === name;
   const sc = same ? $("#screen") : openScreen(name);
   const n = (pageReads.get(name) || 0) + 1;
   pageReads.set(name, n);
-  const epoch = S.screenSeq, gameRequest = S.envSeq, env = S.board?.env, plan = S.shell?.plan?.id;
+  const epoch = S.screenSeq, gameRequest = S.envSeq;
+  let env = S.board?.env, plan = S.shell?.plan?.id;
   const context = JSON.stringify([env, plan]);
   const changed = pageContexts.get(name) !== context;
   pageContexts.set(name, context);
   const current = () => S.envSeq === gameRequest && S.screen === name && S.screenSeq === epoch && S.board?.env === env && S.shell?.plan?.id === plan && pageReads.get(name) === n;
-  if ((!same || (changed && !S.busy.env) || replace || !sc.children.length) && !((keep && same || S.busy.env) && sc.children.length && !pageLoading())) {
+  const editor = name === null, board = editor && $("#board");
+  // Old object controls cannot remain usable across a game/list switch (06 §8.2).
+  const objectPage = editor || name === "library";
+  const hasContent = sc.children.length || (editor && same && sc.hidden && S.board);
+  if ((!same || (changed && (!S.busy.env || objectPage)) || replace || !hasContent || sc.querySelector(".page-read-error")) && !((keep && same || S.busy.env && !objectPage) && hasContent && !pageLoading())) {
+    sc.hidden = false;
     sc.innerHTML = "";
-    const w = page(name, "");
+    const w = page(name || "plan", "");
     const card = el("section", "card pad page-loading");
     card.append(shimmer(T(label), 6));
     w.append(card); sc.append(w);
   }
   sc.setAttribute("aria-busy", "true");
+  if (board) board.inert = !sc.hidden;
+  if (editor && $("#planhead")) $("#planhead").inert = !sc.hidden;
+  if (editor && sc.hidden) say("busy", T(label));
   return {
     current,
-    finish() { if (current()) sc.removeAttribute("aria-busy"); },
+    // A workspace reply can itself change the current game/list (06 §8.2).
+    commit(apply) {
+      if (!current()) return false;
+      apply();
+      env = S.board?.env; plan = S.shell?.plan?.id;
+      pageContexts.set(name, JSON.stringify([env, plan]));
+      return true;
+    },
+    finish() {
+      if (!current()) return;
+      sc.removeAttribute("aria-busy");
+      if (editor && $("#status")?.textContent === T(label)) say("", "");
+    },
     fail(error) {
       if (!current()) return;
       sc.removeAttribute("aria-busy");
       const message = errText(error);
       const placeholder = sc.querySelector(".page-loading");
-      if (placeholder) { placeholder.className = "card pad err page-read-error"; placeholder.textContent = message; }
+      if (placeholder) {
+        placeholder.className = "card pad err page-read-error"; placeholder.textContent = message;
+        if (retry) placeholder.append(button(T("try again"), "", retry));
+      }
       say("fail", message);
     },
   };
@@ -493,20 +517,20 @@ export async function logEnvironmentChanged() {
 export async function gameLog(path, open = false) {
   const changed = syncLogEnvironment();
   path = changed ? "" : path ?? L.path;
-  const n = ++L.seq;
   if (!open && S.screen !== "log") return;
+  ++L.seq;
   L.error = "";
   L.pending = "";
   L.loading = !(L.page && L.page.path && (L.page.path === path || !path));
-  drawGameLog(); // switch the page and breadcrumb before waiting for any I/O
-  const epoch = S.screenSeq;
-  const current = () => n === L.seq && S.screen === "log" && S.screenSeq === epoch;
+  const read = beginPageRead("log", { replace: L.loading, label: "reading the log…", retry: () => gameLog(path, true) });
+  const current = read.current;
   let p;
   try { p = await api.LogPage(path || ""); } catch (e) {
-    if (current()) { L.loading = false; L.error = errText(e); say("fail", L.error); drawGameLog(); }
+    if (current()) { L.loading = false; L.error = errText(e); read.fail(e); }
     return;
   }
   if (!current()) return;
+  read.finish();
   if (p.pending) {
     // the mods are being analysed for the log's game version: look again shortly
     L.pending = p.pending;

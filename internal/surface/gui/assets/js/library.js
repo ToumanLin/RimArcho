@@ -13,7 +13,7 @@ import { icon } from "./icons.js";
 import { renderDetail } from "./detail.js";
 import { fieldList } from "./fields.js";
 import * as pop from "./popups.js";
-import { openScreen, page, rescanButton, area, full } from "./screens.js";
+import { beginPageRead, pageLoading, openScreen, page, rescanButton, area, full } from "./screens.js";
 import { createBar } from "./filterbar.js";
 import * as ops from "./ops.js";
 
@@ -33,7 +33,6 @@ const L = {
   sel: new Set(),    // selected copies, by ref
   full: false,       // the details over the whole page (enter)
   focus: "rows",     // "rows" or "detail" (→ on a copy, ← back)
-  seq: 0,
   cols: null,        // [{key, title, shown, w}], in the player's order
 };
 let ui = null;
@@ -52,12 +51,8 @@ export function initLibrary(u) {
 // open shows the page (the sidebar's Mod 库存 › 全部).
 export async function open() {
   if (S.screen !== "library") { L.full = false; L.focus = "rows"; }
-  if (L.page) build();
-  else {
-    const sc = openScreen("library");
-    sc.append(page("fill library", T("loading…")));
-  }
-  await load(true);
+  const read = beginPageRead("library", { retry: open });
+  await load(true, undefined, read);
 }
 
 // openSearch shows the page searching for q (a background task's mod, 06 §2.16).
@@ -94,15 +89,15 @@ function bar() {
   return L.bar;
 }
 
-async function load(fresh, focusRef) {
-  const n = ++L.seq;
-  const epoch = S.screenSeq;
+async function load(fresh, focusRef, read = null) {
+  if (!read && S.screen !== "library") return;
+  read ||= beginPageRead("library", { retry: () => load(fresh, focusRef) });
   const b = bar();
   let p, saved;
   try {
     [p, saved] = await Promise.all([api.Library(b.search, b.filters, L.sort), L.cols ? null : api.Setting(COLS_KEY).catch(() => "")]);
-  } catch (e) { if (n === L.seq && S.screen === "library" && epoch === S.screenSeq) say("fail", errText(e)); return; }
-  if (n !== L.seq || S.screen !== "library" || epoch !== S.screenSeq) return;
+  } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   L.page = p;
   ops.setTable(p.opTable);
   if (!L.cols) L.cols = mergeCols(p.columns || [], saved);
@@ -114,6 +109,7 @@ async function load(fresh, focusRef) {
   if (fresh || !els || S.screen !== "library" || !document.body.contains(els.root)) build();
   else draw();
   if (focusRef) { ensureVisible(); drawRows(); }
+  read.finish();
 }
 
 // flatten lists the rows: a Lineage, and its copies when it is open (or when the filters
@@ -404,7 +400,7 @@ function tableMenu() {
 // ---- the rows ----
 
 function drawRows() {
-  if (!els) return;
+  if (!els || !els.root.isConnected) return;
   const box = els.rows;
   const top = Math.max(0, box.scrollTop - HEAD), h = box.clientHeight || 600;
   const a = Math.max(0, Math.floor(top / ROW) - 8), b = Math.min(L.flat.length, Math.ceil((top + h) / ROW) + 8);
@@ -792,6 +788,7 @@ async function run(code, copies) {
 // ---- keys (06 §3.5): the plan editor's table; the arrows only move ----
 
 export function key(e) {
+  if (pageLoading()) return;
   const k = e.key;
   const ctrl = e.ctrlKey || e.metaKey;
   const x = L.flat[L.cur];

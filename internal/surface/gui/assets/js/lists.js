@@ -3,8 +3,30 @@
 import { S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { bump } from "./motion.js";
+import { beginPageRead, pageLoading } from "./screens.js";
 
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
+
+// The editor lives under the page overlay; old virtual rows must stay inert until its
+// new object is ready, including after a failed read (06 §8.2).
+export async function openEditor(load, replace = false, ready = () => {}) {
+  const read = beginPageRead(null, { replace, retry: () => openEditor(load, replace, ready) });
+  const board = $("#board");
+  if (pageLoading()) for (const k of [0, 1, 2]) {
+    rowsEl(k)?.replaceChildren();
+    pools[k].clear();
+  }
+  try {
+    if (!(await load(read)) || !read.current()) return;
+    read.finish();
+    $("#screen").replaceChildren();
+    $("#screen").hidden = true;
+    if (board) board.inert = false;
+    if ($("#planhead")) $("#planhead").inert = false;
+    ready();
+    return true;
+  } catch (e) { read.fail(e); }
+}
 
 // ---- building the views ----
 
@@ -155,6 +177,7 @@ const pools = [new Map(), new Map(), new Map()];
 
 // renderRows draws the visible rows of one list (virtual: only what is on screen).
 export function renderRows(k) {
+  if (!S.screen && pageLoading()) return;
   const box = rowsEl(k);
   if (!box) return;
   const c = S.cols[k];

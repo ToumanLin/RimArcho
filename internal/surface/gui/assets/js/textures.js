@@ -3,12 +3,15 @@
 // then the run in the background ("textures" events), stop, and take everything back. The
 // encoder (todds) is downloaded only after the player saw where from and how big.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, button } from "./screens.js";
+import { beginPageRead, pageLoading, page, button } from "./screens.js";
 import * as pop from "./popups.js";
 
 const X = { scope: "plan", scale: 100, page: null, prog: null, seq: 0, loading: false, error: "" };
 
-export async function open() { openScreen("textures"); return draw(true); }
+export async function open() {
+  const read = beginPageRead("textures", { label: "reading textures…", retry: open });
+  return draw(true, false, read);
+}
 
 // event is a "textures" event: the run's progress, then its end.
 export function event(ev) {
@@ -61,15 +64,16 @@ function pending(lines = 1) {
   return s;
 }
 
-async function draw(fetch, measurements = false) {
+async function draw(fetch, measurements = false, entryRead = null) {
   if (S.screen !== "textures") return;
   if (fetch) {
-    const n = ++X.seq, epoch = S.screenSeq;
+    const read = entryRead || beginPageRead("textures", { label: "reading textures…", retry: open });
+    const n = ++X.seq;
     const progress = X.prog;
     X.loading = true; X.error = "";
     if (X.page) X.page = { ...X.page, loading: true, rows: (X.page.rows || []).map((r) => ({ ...r, pending: true })) };
-    draw(false);
-    const current = () => n === X.seq && S.screen === "textures" && S.screenSeq === epoch;
+    if (!pageLoading() && !entryRead) draw(false);
+    const current = () => n === X.seq && read.current();
     try {
       let p = await api.Textures(X.scope, X.scale);
       if (!current()) return;
@@ -81,7 +85,7 @@ async function draw(fetch, measurements = false) {
         X.error = p.error || "";
         draw(false, true);
         if (X.error) say("fail", X.error);
-        if (!p.loading) return;
+        if (!p.loading) { read.finish(); return; }
         await new Promise((resolve) => setTimeout(resolve, 100));
         if (!current()) return;
         p = await api.TextureMeasure(p.request);
@@ -89,10 +93,14 @@ async function draw(fetch, measurements = false) {
       }
     } catch (e) {
       if (!current()) return;
-      X.error = errText(e); say("fail", X.error);
+      X.loading = false;
+      X.error = errText(e); read.fail(e);
+      if (pageLoading()) return;
+      if (X.page) X.page = { ...X.page, loading: false, rows: (X.page.rows || []).map((r) => ({ ...r, pending: false })) };
     }
     if (!current()) return;
     X.loading = false;
+    read.finish();
   }
   const p = X.page;
   const sc = $("#screen");
