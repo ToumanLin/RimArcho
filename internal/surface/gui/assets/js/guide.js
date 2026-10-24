@@ -67,6 +67,8 @@ async function find() {
   read.finish();
 }
 
+export function resume() { beginPageRead("guide"); draw(); $("#screen").removeAttribute("aria-busy"); }
+
 function draw() {
   if (S.screen !== "guide") return;
   const sc = $("#screen");

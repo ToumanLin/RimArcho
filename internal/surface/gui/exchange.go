@@ -32,6 +32,7 @@ type exchange struct {
 	imp    *view.Import
 	// follow: once applied, the list follows the collection imported (04 §9.6)
 	follow bool
+	seq    uint64
 }
 
 // ImportFollow says whether applying the previewed collection makes the list follow it.
@@ -53,7 +54,7 @@ type Exchange struct {
 	Formats []view.ExportFormat `json:"formats"`
 }
 
-// ExchangeInfo is the import/export popup's start data.
+// ExchangeInfo supplies file and clipboard capabilities for the sub-pages (06 §2.17).
 func (s *API) ExchangeInfo() *Exchange {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -122,6 +123,7 @@ func (s *API) Clipboard() string {
 func (s *API) ImportPreview(kind, src string) (*view.ImportPreview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.x.seq++
 	s.x.imp = nil
 	imp, err := view.ReadImport(s.a, kind, src)
 	if err != nil {

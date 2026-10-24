@@ -89,6 +89,16 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			out = append(out, r("u", "undo applies to list edits (space, m, t, x)"))
 		}
 	}
+	// Management and its forms use native tab focus, with esc cancelling the draft (06 §2.17).
+	if page == PagePlans {
+		out = append(out, r("↑↓", "pick a list"), r("enter", "edit"), r("n", "new list"), r("i", "import"), r("e", "export"), r("B", "create a pack"), r("F2", "rename"), r("Delete", "delete…"), r("esc", "cancel"), r("tab", "the next field or button"))
+	}
+	if page == "plan-import" {
+		out = append(out, r("tab", "the next field or button"), r("enter", "import"), r("esc", "cancel"))
+	}
+	if page == "plan-export" {
+		out = append(out, r("↑↓", "format"), r("ctrl+s", "save as a file…"), r("ctrl+c", "copy"), r("esc", "cancel"))
+	}
 	if page == ChangesPage {
 		out = append(out,
 			r("↑↓ · PgUp PgDn", "move"),

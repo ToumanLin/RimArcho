@@ -57,6 +57,11 @@ export function say(kind, text, undo = false) {
   }
   statusIn(s);
 }
+// Page-level edits can supply their own undo (06 §2.17, 06 §6).
+export function undoStatus() {
+  if (typeof undoLink !== "function") return false;
+  const undo = undoLink; say("", ""); undo(); return true;
+}
 export function clearSay() {
   if (!S.busy.scan && !S.busy.analyze && !S.busy.env) say("", "");
 }

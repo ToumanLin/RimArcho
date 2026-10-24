@@ -40,6 +40,18 @@ func TestOpsReachable(t *testing.T) {
 			}
 		}
 	}
+	// Form pages expose their verbs and cancellation to keyboard users (06 §2.17).
+	for page, required := range map[string][]string{PagePlans: {"n", "i", "e", "F2", "Delete", "esc"}, "plan-import": {"tab", "enter", "esc"}, "plan-export": {"↑↓", "ctrl+s", "ctrl+c", "esc"}} {
+		keys := map[string]bool{}
+		for _, row := range KeyHelp(page, false) {
+			keys[row.Keys] = true
+		}
+		for _, key := range required {
+			if !keys[key] {
+				t.Errorf("%s has no %s", page, key)
+			}
+		}
+	}
 	// 退订 / 删除 last, in red
 	tab := OpTable()
 	for _, o := range tab[len(tab)-2:] {

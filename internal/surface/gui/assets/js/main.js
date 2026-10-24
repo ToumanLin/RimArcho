@@ -6,7 +6,7 @@
 //   4. the hint line lists what you can do with the object now;
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
-import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
+import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
 import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
 import { showDetail, scrollDetail } from "./detail.js";
@@ -18,7 +18,7 @@ import * as fullPage from "./fulldetail.js";
 import * as guide from "./guide.js";
 import * as plans from "./plans.js";
 import * as library from "./library.js";
-import { initExchange, exchange } from "./exchange.js";
+import { initExchange, exchange, key as importKey, hintList as importHints } from "./exchange.js";
 import { icon } from "./icons.js";
 import * as motion from "./motion.js";
 import * as ops from "./ops.js";
@@ -108,7 +108,7 @@ function renderTop() {
 // exportCurrent is the editor's e: the current list's export sub-page (06 §2.5, §2.17).
 function exportCurrent() {
   const p = S.shell && S.shell.plan;
-  if (!p) return exchange(1);
+  if (!p) return go("plans");
   return planManage.exportOf(p.id, "editor");
 }
 
@@ -143,7 +143,7 @@ function planActions() {
     motion.bump("unwritten", n, u);
     out.push(n);
   } else motion.bump("unwritten", null, 0);
-  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("import / export"), "i", () => exchange(0)),
+  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("import"), "i", () => exchange()), btn(T("export"), "e", exportCurrent),
     btn(T("create a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
   if (plan) {
     const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");
@@ -163,7 +163,7 @@ let lastList = 1;
 const NAV = ["home", "needs", "log", "library", "plans", "packs", "textures", "env"];
 
 // go opens a sidebar page; "plan" is the current plan's editor, "plan:<id>" a plan (it
-// becomes current: no game file is written), "plan:new" the new-plan dialog, "pack:<name>"
+// becomes current: no game file is written), "plan:new" the new-list form, "pack:<name>"
 // a pack on the packs page.
 async function go(id) {
   if (uninst.locked()) return; // an uninstall runs, or has run (06 §2.14)
@@ -172,6 +172,7 @@ async function go(id) {
   const plan = id.startsWith("plan:") ? +id.slice(5) : null;
   if (plan !== null) id = "plan";
   S.packFocus = id.startsWith("pack:") ? id.slice(5) : null;
+  if (id !== "plans") planManage.abandon();
   if (id !== "build") S.buildFrom = null;
   if (id !== "plan-export") S.planExport = null;
   await openPage(id, plan);
@@ -199,6 +200,7 @@ async function openPage(id, plan = null) {
     case "needs": return scr.needs();
     case "packs": return packsPage.list();
     case "plans": return planManage.open();
+    case "plan-import": return exchange();
     case "plan-export": return planManage.exportOf(planManage.exportPlan(), planManage.exportFrom());
     case "build": return packsPage.build();
     case "env": return scr.environment();
@@ -280,6 +282,7 @@ function renderHints() {
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "home") list = homePage.hintList();
   else if (S.screen === "packs" || S.screen === "build") list = packsPage.hintList();
+  else if (S.screen === "plan-import") list = importHints();
   else if (S.screen === "plans" || S.screen === "plan-export") list = planManage.hintList();
   else if (S.screen) list = [{ key: "shift+1–8", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
@@ -764,7 +767,10 @@ function onKey(e) {
   // ctrl+j: 后台任务 from any page; again goes back (06 §2.16)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "j" && !S.popup) { e.preventDefault(); shell.navigated(); tasksPage.toggle(); renderWhere(); return; }
   if (pop.popupKey(e)) return;
-  if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+  if (k === "Escape" && S.screen === "plan-import") return importKey(e);
+  if (k === "Escape" && S.screen === "plans") return planManage.key(e);
+  if (document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
+  if ((k === "u" || ((e.ctrlKey || e.metaKey) && k === "z")) && undoStatus()) { e.preventDefault(); return; }
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
   // shift+1–8: the sidebar's entries. By the physical key, so it works on any layout
   // (shift+1 is "!" on a US keyboard, shift+3 is "#").
@@ -799,6 +805,7 @@ function onKey(e) {
     if (S.screen !== "home" && scr.areaKey(e)) return;
     if (S.screen === "home") return homePage.homeKey(e);
     if (S.screen === "packs" || S.screen === "build") return packsPage.packsKey(e);
+    if (S.screen === "plan-import") return importKey(e);
     if (S.screen === "plans" || S.screen === "plan-export") return planManage.key(e);
     if (S.screen === "needs") return scr.needsKey(e);
     if (S.screen === "library") return library.key(e);
@@ -930,6 +937,9 @@ const ui = {
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
+  newList: (from) => planManage.newList(null, from),
+  selectedList: () => planManage.selected(),
+  resumeGuide: () => guide.resume(),
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   afterImport: null, // the first-run guide's next step once an import is applied
 };

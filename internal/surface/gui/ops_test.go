@@ -47,3 +47,31 @@ func TestOpsRunnable(t *testing.T) {
 		}
 	}
 }
+
+// Player-invoked forms are pages; irreversible list deletion still confirms (06 §3.1, 06 §6).
+func TestFormRoutesRunnable(t *testing.T) {
+	read := func(p string) string {
+		b, err := fs.ReadFile(assets, "assets/js/"+p+".js")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	main, plans, exchange := read("main"), read("plans"), read("exchange")
+	for _, route := range []string{`case "plan-import"`, `case "plan-export"`, `case "new-plan"`, `newList:`, `undoStatus()`} {
+		if !strings.Contains(main, route) {
+			t.Errorf("missing route %s", route)
+		}
+	}
+	if strings.Contains(exchange, "pop.open") || strings.Contains(plans, `pop.open("plan-new"`) {
+		t.Fatal("form still opens a popup")
+	}
+	if !strings.Contains(plans, `pop.confirm(T("delete the list")`) {
+		t.Fatal("delete lost confirmation")
+	}
+	history := main[strings.Index(main, "async function goHistory"):]
+	history = history[:strings.Index(history, "// pollLive")]
+	if strings.Contains(history, "confirm") || !strings.Contains(history, "api.HistoryGo") || !strings.Contains(history, `h.kind === "version"`) {
+		t.Fatal("history checkout must run directly with undo")
+	}
+}

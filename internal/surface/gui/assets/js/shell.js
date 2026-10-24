@@ -161,6 +161,7 @@ export function current() {
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
   // a list's export: under 管理, or under the list when the editor opened it (06 §2.17)
   if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : "plans";
+  if (S.screen === "plan-import") return "plans"; // 06 §2.17
   // 卸载 RimArcho is under 设置
   if (S.screen === "uninstall") return "settings";
   // adding an environment belongs to the environment page
@@ -332,6 +333,7 @@ export function crumbs() {
   if (S.screen === "uninstall") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
   if (S.screen === "build") out = out.concat([{ label: T("create a pack"), id: "build" }]);
   if (S.screen === "plan-export" && S.planExport) out = ((sh && sh.crumbs && sh.crumbs["plan:" + S.planExport.id]) || []).concat([{ label: T("export"), id: "plan-export" }]);
+  if (S.screen === "plan-import") out = out.slice(0, -1).concat([{ label: T("import"), id: "plan-import" }]);
   return out;
 }
 
