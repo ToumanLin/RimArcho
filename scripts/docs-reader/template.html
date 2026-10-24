@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>RimArcho · 文档阅读器</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#253044;--muted:#758094;--line:#e5e9f0;--accent:#4f66cf;--soft:#edf0fd;--code:#f3f5f9;--shadow:0 8px 32px #23314b08;font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;color-scheme:light}
+:root[data-theme=dark]{--bg:#171b24;--panel:#1d2330;--ink:#dce3ee;--muted:#96a3b8;--line:#30394b;--accent:#a2b3ff;--soft:#2b3552;--code:#252d3c;--shadow:none;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}button,input{font:inherit}button,a,input{ -webkit-tap-highlight-color:transparent}button{cursor:pointer;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 11px}button:hover{border-color:var(--accent);color:var(--accent)}button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.sidebar{width:290px;position:fixed;inset:0 auto 0 0;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:20}.brand{padding:28px 24px 20px}.brand b{font-size:23px;letter-spacing:-.7px}.brand b span{color:var(--accent)}.eyebrow{font-size:11px;font-weight:600;letter-spacing:2px;color:var(--muted);margin-top:8px}.searchbox{padding:0 16px 16px}.searchbox input{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:12px;border-radius:9px;font-size:13px}.searchhint{font-size:11px;color:var(--muted);margin:8px 2px 0}.files{overflow:auto;flex:1;padding:0 12px 20px}.group{font-size:11px;color:var(--muted);letter-spacing:1px;margin:20px 12px 8px}.file{display:block;text-align:left;width:100%;border:0;background:none;border-radius:7px;padding:10px 12px;margin:2px 0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}.file.active{color:var(--accent);background:var(--soft);font-weight:600}.file small{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:3px}.sidefoot{border-top:1px solid var(--line);padding:14px 24px;font-size:11px;color:var(--muted)}
+.shell{margin-left:290px}.topbar{position:sticky;top:0;z-index:10;min-height:65px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:12px 28px;gap:16px}.breadcrumb{font:12px ui-monospace,Consolas,monospace;color:var(--muted);overflow-wrap:anywhere}.actions{display:flex;gap:7px;flex-shrink:0}.actions button{font-size:12px}.mobile{display:none}.layout{display:grid;grid-template-columns:minmax(0,1fr) 210px;max-width:1440px;margin:auto;gap:34px;padding:38px 38px 60px}.paper{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);min-width:0;padding:36px 46px}.metadata{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted);padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:28px}.content{font-size:16px;line-height:1.95;overflow-wrap:anywhere}.content h1{font-size:30px;line-height:1.4;letter-spacing:-.7px;margin:0 0 28px}.content h2{font-size:23px;margin:44px 0 18px;padding-bottom:12px;border-bottom:1px solid var(--line)}.content h3{font-size:19px;margin:30px 0 14px}.content h4,.content h5,.content h6{font-size:16px;margin:24px 0 10px}.content :is(h1,h2,h3,h4,h5,h6){scroll-margin-top:90px}.content p{margin:15px 0}.content ul,.content ol{padding-left:26px}.content li{margin:6px 0}.content li p{margin:6px 0}.content blockquote{margin:22px 0;padding:4px 20px;border-left:3px solid var(--accent);background:var(--soft);color:var(--ink);border-radius:0 7px 7px 0}.content code{font-family:ui-monospace,Consolas,monospace;font-size:.87em;background:var(--code);padding:3px 6px;border-radius:4px}.content pre{background:var(--code);padding:20px;overflow:auto;border:1px solid var(--line);border-radius:8px;line-height:1.65;overflow-wrap:normal}.content pre code{padding:0;background:none}.tablewrap{overflow:auto;margin:22px 0;border:1px solid var(--line);border-radius:8px}.content table{border-collapse:collapse;width:100%;font-size:.88em;line-height:1.7}.content th,.content td{padding:11px 14px;border-bottom:1px solid var(--line);min-width:100px;text-align:left}.content th{background:var(--code);font-weight:600}.content tr:last-child td{border-bottom:0}.content hr{border:0;border-top:1px solid var(--line);margin:30px 0}.content img{max-width:100%;height:auto}.content mark{background:#ffe399;color:#352800;border-radius:3px;padding:1px 0}.toc{position:sticky;top:99px;align-self:start;max-height:calc(100vh - 130px);overflow:auto;font-size:12px}.toc-title{font-size:11px;letter-spacing:2px;color:var(--muted);padding-bottom:14px}.toc a{display:block;color:var(--muted);line-height:1.6;padding:6px 0 6px 12px;border-left:1px solid var(--line);overflow-wrap:anywhere}.toc a:hover,.toc a.current{color:var(--accent);border-left-color:var(--accent);text-decoration:none}.toc .sub{padding-left:23px;font-size:11px}.docnav{margin-top:36px;padding-top:20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:16px}.docnav button{font-size:12px;max-width:48%;text-align:left}.empty{padding:22px 12px;color:var(--muted);font-size:13px}.raw{white-space:pre-wrap;font:13px/1.9 ui-monospace,Consolas,monospace}.progress{position:fixed;top:0;left:290px;height:3px;background:var(--accent);z-index:30;width:0}.notice{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 20px;background:var(--ink);color:var(--panel);border-radius:9px;z-index:50;font-size:13px}.notice:empty{display:none}.backdrop{display:none}
+@media(min-width:1600px){.paper{padding:44px 60px}}@media(max-width:1200px){.layout{grid-template-columns:minmax(0,1fr);padding:24px}.toc{display:none}}@media(max-width:760px){.sidebar{transform:translateX(-100%);transition:transform .18s}.sidebar.open{transform:translateX(0)}.shell{margin-left:0}.topbar{padding:10px 14px;gap:8px}.mobile{display:inline-block}.breadcrumb{font-size:10px}.actions{gap:4px}.actions button{padding:7px}.layout{padding:16px 10px}.paper{padding:24px 20px}.content h1{font-size:25px}.content{font-size:15px}.progress{left:0}.backdrop.open{display:block;position:fixed;inset:0;background:#0006;z-index:19}}
+@media print{.sidebar,.topbar,.toc,.docnav,.progress,.metadata,.notice{display:none}.shell{margin:0}.layout{display:block;padding:0}.paper{padding:0;border:0;box-shadow:none}.content{color:#000;font-size:11pt}.content pre,.tablewrap{overflow:visible}.content a{color:inherit}.content h2{break-after:avoid}body{background:#fff}}
+</style>
+</head>
+<body>
+<div id="progress" class="progress"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="brand"><b>Rim<span>Archo</span></b><div class="eyebrow">DOCUMENTATION / 文档库</div></div>
+  <div class="searchbox"><input id="search" type="search" placeholder="搜索标题或正文…" aria-label="搜索全部文档"><div id="searchhint" class="searchhint">Ctrl / ⌘ K 搜索 · 全部离线可读</div></div>
+  <nav id="files" class="files" aria-label="文档列表"></nav>
+  <div id="sidefoot" class="sidefoot"></div>
+</aside>
+<div id="backdrop" class="backdrop"></div>
+<div class="shell">
+  <header class="topbar"><button class="mobile" id="menu" aria-label="切换文档列表" aria-expanded="false">☰</button><div class="breadcrumb" id="breadcrumb"></div><div class="actions"><button id="source" aria-pressed="false">源码</button><button id="smaller" aria-label="缩小字号">A−</button><button id="larger" aria-label="放大字号">A+</button><button id="theme" aria-label="切换深浅色主题">深色</button><button id="print">打印</button></div></header>
+  <div class="layout"><main class="paper"><div class="metadata" id="metadata"></div><article class="content" id="content"></article><nav class="docnav" id="docnav" aria-label="前后文档"></nav></main><aside class="toc" aria-label="本文目录"><div class="toc-title">本文目录</div><nav id="toc"></nav></aside></div>
+</div>
+<div class="notice" role="status" id="notice"></div>
+<script id="documents" type="application/json">/*__DOCUMENTS__*/[]</script>
+<script>
+'use strict';
+const docs=JSON.parse(document.getElementById('documents').textContent);
+const docsBase=new URL('../../docs/',location.href);
+const $=id=>document.getElementById(id);
+const store={get(key){try{return localStorage.getItem('rimarcho-docs:'+key)}catch{return null}},set(key,value){try{localStorage.setItem('rimarcho-docs:'+key,value)}catch{}}};
+let active=null,raw=false,query='',observer=null,font=Math.max(13,Math.min(22,Number(store.get('font'))||16));
+let theme=store.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+const groupNames={'':'总览',specs:'功能规格','specs/06-界面':'界面与交互',research:'研究笔记',design:'设计草案'};
+const groups=['','specs','specs/06-界面','research','design'];
+const groupOf=doc=>doc.path.startsWith('specs/06-界面/')?'specs/06-界面':doc.path.split('/').length===1?'':doc.path.split('/')[0];
+function element(tag,cls,text){const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el}
+function setTheme(){document.documentElement.dataset.theme=theme;$('theme').textContent=theme==='dark'?'浅色':'深色';store.set('theme',theme)}
+setTheme();
+function notice(text){$('notice').textContent=text;clearTimeout(notice.timer);notice.timer=setTimeout(()=>$('notice').textContent='',4000)}
+function closeMenu(){$('sidebar').classList.remove('open');$('backdrop').classList.remove('open');$('menu').setAttribute('aria-expanded','false')}
+function route(path,anchor=''){const hash='#'+encodeURIComponent(path)+(anchor?'@'+encodeURIComponent(anchor):'');if(location.hash===hash)render(path,anchor);else location.hash=hash}
+function readRoute(){try{const [path,anchor='']=location.hash.slice(1).split('@');return {path:decodeURIComponent(path||''),anchor:decodeURIComponent(anchor)}}catch{return {path:'',anchor:''}}}
+function list(){
+  const needle=query.toLocaleLowerCase();
+  const found=docs.filter(d=>!needle||(d.title+'\n'+d.path+'\n'+d.source).toLocaleLowerCase().includes(needle));
+  $('files').replaceChildren();
+  for(const group of groups){const items=found.filter(d=>groupOf(d)===group);if(!items.length)continue;$('files').append(element('div','group',groupNames[group]));for(const doc of items){const button=element('button','file'+(active?.path===doc.path?' active':''),doc.title);button.title=doc.path;if(active?.path===doc.path)button.setAttribute('aria-current','page');if(needle){const pos=doc.source.toLocaleLowerCase().indexOf(needle);if(pos>=0)button.append(element('small','',doc.source.slice(Math.max(0,pos-24),pos+80).replace(/\n/g,' ')))}button.onclick=()=>{route(doc.path);closeMenu()};$('files').append(button)}}
+  if(!found.length)$('files').append(element('div','empty','没有匹配的文档，请尝试其他关键词。'));
+  $('searchhint').textContent=needle?`找到 ${found.length} / ${docs.length} 篇 · 正文匹配已高亮`:'Ctrl / ⌘ K 搜索 · 全部离线可读';
+  $('sidefoot').textContent=`${docs.length} 篇文档 · 内置快照 · 无需联网`;
+}
+function highlight(){
+  if(!query)return;const walker=document.createTreeWalker($('content'),NodeFilter.SHOW_TEXT,{acceptNode(node){return node.parentElement.closest('pre,code,mark')?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT}});const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+  for(const node of nodes){const value=node.nodeValue,lower=value.toLocaleLowerCase(),needle=query.toLocaleLowerCase();let start=0,pos=lower.indexOf(needle);if(pos<0)continue;const fragment=document.createDocumentFragment();while(pos>=0){fragment.append(document.createTextNode(value.slice(start,pos)),element('mark','',value.slice(pos,pos+query.length)));start=pos+query.length;pos=lower.indexOf(needle,start)}fragment.append(document.createTextNode(value.slice(start)));node.replaceWith(fragment)}
+}
+function render(path,anchor='',keepScroll=false){
+  const previousScroll=window.scrollY;
+  active=docs.find(d=>d.path===path)||docs.find(d=>d.path==='00-顶层设计.md')||docs[0];if(!active)return;
+  document.title=active.title+' · RimArcho 文档';store.set('last',active.path);$('breadcrumb').textContent='docs / '+active.path;
+  const count=active.source.replace(/\s/g,'').length;$('metadata').replaceChildren(element('span','','MARKDOWN'),element('span','',`${count.toLocaleString()} 字 · 约 ${Math.max(1,Math.ceil(count/650))} 分钟`),element('span','',`文件更新 ${active.modified.slice(0,10)}`));
+  $('source').textContent=raw?'阅读':'源码';$('source').setAttribute('aria-pressed',String(raw));$('content').style.fontSize=font+'px';$('toc').replaceChildren();if(observer)observer.disconnect();
+  if(raw){$('content').replaceChildren(element('pre','raw',active.source))}else{
+    $('content').innerHTML=active.html;
+    const headings=[...$('content').querySelectorAll('h1,h2,h3,h4,h5,h6')];const used=new Map();
+    headings.forEach((heading,i)=>{const base=heading.textContent.trim().toLowerCase().replace(/[^\p{L}\p{N}_\-\s]/gu,'').replace(/\s/g,'-')||'section';const n=used.get(base)||0;used.set(base,n+1);heading.id=base+(n?'-'+n:'');const link=element('a',Number(heading.tagName.slice(1))>2?'sub':'',heading.textContent);link.href='#'+encodeURIComponent(active.path)+'@'+encodeURIComponent(heading.id);link.dataset.heading=heading.id;$('toc').append(link)});
+    for(const table of $('content').querySelectorAll('table')){const wrapper=element('div','tablewrap');table.replaceWith(wrapper);wrapper.append(table)}
+    for(const img of $('content').querySelectorAll('img')){const src=img.getAttribute('src');if(!/^[a-z][a-z\d+.-]*:/i.test(src)&&!src.startsWith('//'))img.src=new URL(resolvePath(active.path,src),docsBase).href;img.loading='lazy'}
+    observer=new IntersectionObserver(entries=>{const visible=entries.filter(e=>e.isIntersecting);if(!visible.length)return;for(const a of $('toc').querySelectorAll('a'))a.classList.toggle('current',a.dataset.heading===visible[0].target.id)},{rootMargin:'-80px 0px -65% 0px'});headings.forEach(h=>observer.observe(h));
+    highlight();
+  }
+  $('docnav').replaceChildren();const index=docs.indexOf(active);for(const [offset,label] of [[-1,'← 上一篇'],[1,'下一篇 →']]){const doc=docs[index+offset];if(doc){const button=element('button','',label+' · '+doc.title);button.onclick=()=>route(doc.path);$('docnav').append(button)}else $('docnav').append(element('span'))}
+  list();requestAnimationFrame(()=>{if(anchor){const target=document.getElementById(anchor);if(target&&$('content').contains(target))target.scrollIntoView();else notice('未找到该章节，可在右侧目录中选择。')}else window.scrollTo(0,keepScroll?previousScroll:0);updateProgress()});
+}
+function resolvePath(base,target){const parts=base.split('/');parts.pop();for(const part of target.split('/')){if(part==='..'){if(parts.length&&parts.at(-1)!=='..')parts.pop();else parts.push('..')}else if(part!=='.'&&part)parts.push(part)}return parts.join('/')}
+$('content').addEventListener('click',event=>{const link=event.target.closest('a');if(!link)return;const href=link.getAttribute('href');if(!href)return;if(/^[a-z][a-z\d+.-]*:/i.test(href)||href.startsWith('//')){link.target='_blank';link.rel='noopener noreferrer';return}event.preventDefault();try{const [file,hash='']=href.split('#');const resolved=file?resolvePath(active.path,decodeURIComponent(file)):active.path;const doc=docs.find(d=>d.path===resolved)||docs.find(d=>d.path===resolved.replace(/\/$/,'')+'/README.md');if(doc)route(doc.path,decodeURIComponent(hash));else window.open(new URL(resolved+(hash?'#'+hash:''),docsBase).href,'_blank','noopener')}catch{notice('该链接格式有误。')}});
+let searchTimer;$('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{query=$('search').value.trim();render(active.path,'',true)},180)});
+$('source').onclick=()=>{raw=!raw;render(active.path,'',true)};
+$('theme').onclick=()=>{theme=theme==='dark'?'light':'dark';setTheme()};
+function resize(delta){font=Math.max(13,Math.min(22,font+delta));$('content').style.fontSize=font+'px';store.set('font',font)}
+$('smaller').onclick=()=>resize(-1);$('larger').onclick=()=>resize(1);$('print').onclick=()=>window.print();
+$('menu').onclick=()=>{const open=$('sidebar').classList.toggle('open');$('backdrop').classList.toggle('open',open);$('menu').setAttribute('aria-expanded',String(open))};$('backdrop').onclick=closeMenu;
+document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();$('sidebar').classList.add('open');if(innerWidth<=760){$('backdrop').classList.add('open');$('menu').setAttribute('aria-expanded','true')}$('search').focus()}if(event.key==='Escape'){closeMenu();$('search').blur()}});
+function updateProgress(){const max=document.documentElement.scrollHeight-innerHeight;$('progress').style.width=(innerWidth<=760?innerWidth:innerWidth-290)*(max>0?Math.min(1,scrollY/max):1)+'px'}
+addEventListener('scroll',updateProgress,{passive:true});addEventListener('resize',updateProgress);
+addEventListener('hashchange',()=>{const r=readRoute();render(r.path,r.anchor)});
+const initial=readRoute();render(initial.path||store.get('last'),initial.anchor);
+</script>
+</body>
+</html>
