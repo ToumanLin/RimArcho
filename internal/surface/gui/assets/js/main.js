@@ -28,6 +28,7 @@ import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
 import { withEnvironmentSwitch } from "./environment.js";
+import { wireSeparator } from "./separator.js";
 
 // ---- loading ----
 
@@ -758,7 +759,7 @@ async function delKey() {
 // ---- the keyboard ----
 
 function onKey(e) {
-  if (e.isComposing) return;
+  if (e.isComposing || e.defaultPrevented) return;
   const k = e.key;
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
   if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
@@ -783,7 +784,9 @@ function onKey(e) {
   // tab / shift+tab: the next / previous page under the same sidebar entry (Mod 库存's 全部 and
   // 变化, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
   // (on the pages with forms, settings and the like, tab keeps moving the focus)
-  if (k === "Tab" && !e.ctrlKey && !e.altKey && (!S.screen || S.screen === "library" || S.screen === "changes" || S.screen === "packs")) { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
+  // Pages with adjustable cards keep native tab order to reach their gaps (06 §3.1).
+  if (e.target.closest?.('[role="separator"]') && k === "Tab") return;
+  if (k === "Tab" && !e.ctrlKey && !e.altKey && (S.screen === "changes" || S.screen === "packs")) { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
   if (!S.screen && scr.pageLoading()) {
     if ((e.ctrlKey || e.metaKey) && k === "k") { e.preventDefault(); pop.palette(); }
     return;
@@ -889,35 +892,39 @@ const COLS = () => [$("#board > .fcol"), $('.area[data-area="1"]'), $("#board .s
 function wireSplits() {
   const board = $("#board");
   const key = () => "ui.gui.columns:" + ((S.board && S.board.env) || "");
-  $$(".split").forEach((sp) => {
-    sp.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      const widths = COLS().map((a) => a.getBoundingClientRect().width);
-      const lo = +sp.dataset.split, hi = lo + 1;
-      const x0 = e.clientX;
-      sp.classList.add("drag");
-      const move = (ev) => {
-        const dx = ev.clientX - x0;
-        const w = widths.slice();
-        w[lo] = Math.max(160, widths[lo] + dx);
-        w[hi] = Math.max(160, widths[hi] - dx);
-        // a hidden column (a narrow window) keeps a usable width for when it shows again
-        w.forEach((v, j) => board.style.setProperty(`--c${j}`, (v || 220) + "fr"));
-      };
-      const up = () => {
-        sp.classList.remove("drag");
-        removeEventListener("mousemove", move);
-        removeEventListener("mouseup", up);
-        const vals = [0, 1, 2].map((j) => board.style.getPropertyValue(`--c${j}`)).join(",");
-        api.SetSetting(key(), vals).catch(() => {});
-        for (const k of [0, 1, 2]) renderRows(k);
-      };
-      addEventListener("mousemove", move);
-      addEventListener("mouseup", up);
+  $$("#board > .split").forEach((sp) => {
+    const lo = +sp.dataset.split, hi = lo + 1;
+    wireSeparator(sp, {
+      key, get: () => COLS()[lo].getBoundingClientRect().width,
+      range: () => [160, COLS()[lo].getBoundingClientRect().width + COLS()[hi].getBoundingClientRect().width - 160],
+      set: (value) => {
+        const widths = COLS().map((a) => a.getBoundingClientRect().width);
+        widths[hi] -= value - widths[lo]; widths[lo] = value;
+        // Hidden columns keep a usable width for when they show again (06 §2.5).
+        widths.forEach((v, j) => board.style.setProperty(`--c${j}`, (v || 220) + "fr"));
+      },
+      reset: () => [0, 1, 2].forEach((j) => board.style.removeProperty(`--c${j}`)),
+      serialize: () => [0, 1, 2].map((j) => board.style.getPropertyValue(`--c${j}`)).join(","),
+      changed: () => { for (const k of [0, 1, 2]) renderRows(k); },
     });
-    sp.addEventListener("dblclick", () => {
-      [0, 1, 2].forEach((j) => board.style.removeProperty(`--c${j}`));
-      api.SetSetting(key(), "").catch(() => {});
+  });
+  // Expanded staging/history share the detail column (06 §3.1, 06 §2.5).
+  const stack = board.querySelector(".stack");
+  stack.querySelectorAll(".fold").forEach((card, i) => {
+    const gap = el("div", "hsplit stack-split");
+    stack.insertBefore(gap, card);
+    const set = (v) => {
+      card.classList.toggle("stack-sized", !!v);
+      if (v) card.style.setProperty("--stack-size", v + "px");
+      else card.style.removeProperty("--stack-size");
+    };
+    wireSeparator(gap, {
+      axis: "y", direction: -1, key: "ui.gui.plan." + (i ? "history" : "stage"),
+      enabled: () => card.classList.contains("open") && !card.hidden,
+      range: () => [72, stack.clientHeight - 148 - [...stack.querySelectorAll(".fold")]
+        .filter((other) => other !== card).reduce((h, other) => h + other.getBoundingClientRect().height, 0)],
+      get: () => card.getBoundingClientRect().height, set, reset: () => set(0), restore: (v) => set(+v || 0),
+      changed: () => renderRows(2),
     });
   });
 }

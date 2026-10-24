@@ -7,6 +7,7 @@ import { icon } from "./icons.js";
 import { liveCount, seg, setSeg } from "./screens.js";
 import { bump, slideNav } from "./motion.js";
 import * as pop from "./popups.js";
+import { wireSeparator } from "./separator.js";
 
 let ui = null;
 
@@ -119,30 +120,11 @@ function setSideWidth(px) {
 function wireSideSplit() {
   const sp = $("#side-split");
   sp.title = T("drag to change the width; double-click to reset");
-  api.Setting(SIDE_KEY).then((v) => { if (+v) setSideWidth(Math.min(SIDE_MAX, Math.max(SIDE_MIN, +v))); }).catch(() => {});
-  sp.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    const x0 = e.clientX, w0 = $("#side").getBoundingClientRect().width;
-    let w = w0;
-    sp.classList.add("drag");
-    document.body.classList.add("resizing");
-    const move = (ev) => {
-      w = Math.min(SIDE_MAX, Math.max(SIDE_MIN, w0 + ev.clientX - x0));
-      setSideWidth(w);
-    };
-    const up = () => {
-      sp.classList.remove("drag");
-      document.body.classList.remove("resizing");
-      removeEventListener("mousemove", move);
-      removeEventListener("mouseup", up);
-      if (w !== w0) api.SetSetting(SIDE_KEY, String(Math.round(w))).catch(() => {});
-    };
-    addEventListener("mousemove", move);
-    addEventListener("mouseup", up);
-  });
-  sp.addEventListener("dblclick", () => {
-    setSideWidth(0);
-    api.SetSetting(SIDE_KEY, "").catch(() => {});
+  wireSeparator(sp, {
+    key: SIDE_KEY, range: () => [SIDE_MIN, SIDE_MAX],
+    get: () => $("#side").getBoundingClientRect().width,
+    set: setSideWidth, reset: () => setSideWidth(0),
+    restore: (v) => { if (+v) setSideWidth(Math.min(SIDE_MAX, Math.max(SIDE_MIN, +v))); },
   });
 }
 

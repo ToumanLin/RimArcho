@@ -10,6 +10,7 @@ import * as pop from "./popups.js";
 import { bgSection } from "./bg.js";
 import { virtualRows } from "./virtualrows.js";
 import { on } from "./api.js";
+import { wireSeparator } from "./separator.js";
 
 let ui = null;
 export function initScreens(u) {
@@ -818,32 +819,17 @@ function applyLogSize(grid) {
   grid.classList.toggle("ana-sized", !!logSize.ana);
 }
 function logSplits(grid, list, vs, ana, hs) {
-  if (logSize.left == null) {
-    Promise.all([api.Setting(LOG_LEFT), api.Setting(LOG_ANA)]).then(([l, a]) => {
-      logSize.left = +l || 0; logSize.ana = +a || 0; applyLogSize(grid);
-    }).catch(() => { logSize.left = 0; logSize.ana = 0; });
-  } else applyLogSize(grid);
-  const drag = (sp, key, axis, start, clamp) => {
-    sp.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      const p0 = axis === "x" ? e.clientX : e.clientY, v0 = start();
-      sp.classList.add("drag");
-      document.body.classList.add(axis === "x" ? "resizing" : "resizing-y");
-      const move = (m) => { logSize[key] = clamp(Math.round(v0 + (axis === "x" ? m.clientX : m.clientY) - p0)); applyLogSize(grid); };
-      const up = () => {
-        sp.classList.remove("drag");
-        document.body.classList.remove("resizing", "resizing-y");
-        removeEventListener("mousemove", move);
-        removeEventListener("mouseup", up);
-        api.SetSetting(key === "left" ? LOG_LEFT : LOG_ANA, String(logSize[key])).catch(() => {});
-      };
-      addEventListener("mousemove", move);
-      addEventListener("mouseup", up);
+  applyLogSize(grid);
+  const wire = (sp, name, axis, get, range) => {
+    const set = (v) => { logSize[name] = v; applyLogSize(grid); };
+    wireSeparator(sp, {
+      axis, key: name === "left" ? LOG_LEFT : LOG_ANA, get, range, set, reset: () => set(0),
+      restore: (v) => set(+v || 0), serialize: () => String(logSize[name]),
+      enabled: () => !matchMedia("(max-width: 900px)").matches,
     });
-    sp.addEventListener("dblclick", () => { logSize[key] = 0; applyLogSize(grid); api.SetSetting(key === "left" ? LOG_LEFT : LOG_ANA, "").catch(() => {}); });
   };
-  drag(vs, "left", "x", () => list.getBoundingClientRect().width, (v) => Math.max(260, Math.min(grid.clientWidth - 320, v)));
-  drag(hs, "ana", "y", () => ana.getBoundingClientRect().height, (v) => Math.max(80, Math.min(grid.clientHeight - 140, v)));
+  wire(vs, "left", "x", () => list.getBoundingClientRect().width, () => [260, grid.clientWidth - 320]);
+  wire(hs, "ana", "y", () => ana.getBoundingClientRect().height, () => [80, grid.clientHeight - 140]);
 }
 
 // setAna fills the Archo 日志分析 card with a pattern card, or hides it (null).

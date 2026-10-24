@@ -11,6 +11,7 @@ import * as pop from "./popups.js";
 import { icon } from "./icons.js";
 import { still } from "./motion.js";
 import { createTable, mergeColumns } from "./datatable.js";
+import { wireSeparator } from "./separator.js";
 
 const COLS_KEY = "ui.gui.tasks.items.columns";
 const SIDE_KEY = "ui.gui.tasks.side";
@@ -245,35 +246,20 @@ function mark() {
   ui.renderWhere();
 }
 
-// ---- the gaps (06 §7): left | right, and the summary over the items; double click resets ----
+// ---- the gaps (06 §2.16): left | right, and the summary over the items ----
 function wireGaps(root, split, right, hsplit) {
   const setSide = (v) => { if (v) root.style.setProperty("--tk-side", v + "px"); else root.style.removeProperty("--tk-side"); };
   const setTop = (v) => { if (v) right.style.setProperty("--tk-top", v + "px"); else right.style.removeProperty("--tk-top"); };
-  api.Setting(SIDE_KEY).then((v) => setSide(+v || 0)).catch(() => {});
-  api.Setting(SPLIT_KEY).then((v) => setTop(+v || 0)).catch(() => {});
-  drag(split, "x", () => els.side.getBoundingClientRect().width,
-    (v) => setSide(Math.max(220, Math.min(root.clientWidth - 420, v))), () => setSide(0), SIDE_KEY, () => els.side.getBoundingClientRect().width);
-  drag(hsplit, "y", () => els.sum.getBoundingClientRect().height,
-    (v) => setTop(Math.max(90, Math.min(right.clientHeight - 140, v))), () => setTop(0), SPLIT_KEY, () => els.sum.getBoundingClientRect().height);
-}
-function drag(h, axis, get, set, reset, key, now) {
-  h.title = T("drag to resize · double click: back to the default");
-  h.addEventListener("mousedown", (e) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const p0 = axis === "x" ? e.clientX : e.clientY, v0 = get();
-    h.classList.add("drag");
-    document.body.classList.add(axis === "x" ? "resizing" : "vresizing");
-    const move = (m) => set(Math.round(v0 + (axis === "x" ? m.clientX : m.clientY) - p0));
-    const up = () => {
-      h.classList.remove("drag");
-      document.body.classList.remove("resizing", "vresizing");
-      removeEventListener("mousemove", move); removeEventListener("mouseup", up);
-      api.SetSetting(key, String(Math.round(now()))).catch(() => {});
-    };
-    addEventListener("mousemove", move); addEventListener("mouseup", up);
+  wireSeparator(split, {
+    key: SIDE_KEY, range: () => [220, root.clientWidth - 420],
+    get: () => els.side.getBoundingClientRect().width, set: setSide, reset: () => setSide(0),
+    restore: (v) => setSide(+v || 0),
   });
-  h.addEventListener("dblclick", () => { reset(); api.SetSetting(key, "").catch(() => {}); });
+  wireSeparator(hsplit, {
+    axis: "y", key: SPLIT_KEY, range: () => [90, right.clientHeight - 140],
+    get: () => els.sum.getBoundingClientRect().height, set: setTop, reset: () => setTop(0),
+    restore: (v) => setTop(+v || 0),
+  });
 }
 
 // ---- drawing ----

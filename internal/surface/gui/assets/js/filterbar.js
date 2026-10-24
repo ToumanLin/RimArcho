@@ -11,6 +11,7 @@
 // filters) when either changed; and the place it lives in. The bar keeps search, filters
 // and open; the page reads them.
 import { el, T, Tf, api } from "./state.js";
+import { wireSeparator } from "./separator.js";
 
 const LINE = 24; // values of a group before its box (open, the bar has its column's height)
 
@@ -63,7 +64,7 @@ export function createBar(opts) {
       opts.change();
       return;
     }
-    if (e.key === "Tab") { e.preventDefault(); return; }
+    if (e.key === "Tab") return;
     if (e.key === "Escape") {
       e.preventDefault();
       if (inp.value) { inp.value = ""; b.search = ""; opts.change(); }
@@ -91,8 +92,7 @@ export function createBar(opts) {
   // h: the open bar's height in px; 0 fills the column (what is below shrinks to its title)
   b.h = 0;
   const KEY = opts.splitKey;
-  if (KEY) api.Setting(KEY).then((v) => { b.h = +v || 0; place(); }).catch(() => {});
-  const colH = () => (opts.column ? opts.column() : root.parentElement).getBoundingClientRect().height;
+  const colH = () => root.isConnected ? (opts.column ? opts.column() : root.parentElement)?.getBoundingClientRect().height || 0 : 0;
   function place() {
     root.classList.toggle("fill", b.open && !b.h);
     if (b.h) root.style.setProperty("--fbar-h", b.h + "px");
@@ -106,18 +106,17 @@ export function createBar(opts) {
     place();
     if (save && KEY) api.SetSetting(KEY, b.h ? String(b.h) : "").catch(() => {});
     opts.resized && opts.resized();
+    separator.refresh();
   };
   b.nudge = (d) => b.setH((b.h || colH() - 34) + d);
-  gap.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    const y0 = e.clientY, h0 = root.getBoundingClientRect().height;
-    gap.classList.add("drag");
-    const move = (m) => b.setH(h0 + m.clientY - y0, false);
-    const up = () => { gap.classList.remove("drag"); removeEventListener("mousemove", move); removeEventListener("mouseup", up); b.setH(b.h || 0); };
-    addEventListener("mousemove", move);
-    addEventListener("mouseup", up);
+  const separator = wireSeparator(gap, {
+    axis: "y", key: KEY, enabled: () => b.open,
+    range: () => [120, colH() - 34],
+    get: () => b.h || colH() - 34,
+    set: (h) => b.setH(h, false), reset: () => b.setH(0, false),
+    serialize: () => b.h ? String(b.h) : "",
+    restore: (v) => { b.h = +v || 0; place(); },
   });
-  gap.addEventListener("dblclick", () => b.setH(0));
   b.fills = () => b.open && !b.h;
 
   b.toggle = (v = !b.open) => {
