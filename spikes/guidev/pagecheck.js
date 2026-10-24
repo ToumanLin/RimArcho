@@ -65,6 +65,31 @@ try {
     steps: [{ key: "trim", title: "trim", text: "fixture trim" }, { key: "textures", title: "textures", kind: "textures", text: "fixture textures" }],
     before: "100 MB", after: "80 MB", mods: 0, ok: true };
   handlers.set("BuildPageResult", () => buildPreview);
+  handlers.set("Backgrounds", () => backgrounds);
+  await test("accounts stay offline on entry, mask secrets, focus actions, and ignore late completion", async () => {
+    const accountGroups = [{ title: "账户", items: [
+      { label: "SteamCMD", value: "匿名；尚未验证", editValue: "", edit: "text", argv: ["config", "set", "steamcmd.account", "{}"],
+        note: "C:\\fixture\\steamcmd.exe；最后验证：-；到期未知", notePaths: ["C:\\fixture\\steamcmd.exe"],
+        actions: [{ label: "验证", argv: ["account", "steamcmd", "verify"] }] },
+      { label: "LoversLab", value: "未连接；默认关闭", note: "站点含成人内容并有自己的规则，请使用你自己的账户。",
+        actions: [{ label: "启用", argv: ["account", "loverslab", "enable"], confirm: "保存加密会话 Cookie，不保存密码。" }] },
+    ] }];
+    handlers.set("Settings", () => accountGroups); handlers.set("Tasks", () => ({ rows: [] }));
+    let actions = 0; const pending = deferred();
+    handlers.set("AccountAction", () => { actions++; return pending.promise; });
+    await screens.settings(); await settle();
+    const rows = document.querySelectorAll("[data-setting-row]");
+    assert(rows.length === 2 && actions === 0, "settings ran account authentication");
+    assert(!document.querySelector('input[type=password], iframe, webview'), "main settings hosts a login page");
+    assert(document.querySelector(".path-copy"), "tool path is not copyable");
+    const verify = document.querySelector('[data-setting-action="account steamcmd verify"]');
+    verify.focus(); assert(document.activeElement === verify, "account action cannot receive keyboard focus");
+    verify.click(); assert(verify.disabled && verify.textContent.includes("…"), "account action has no immediate feedback");
+    await Promise.resolve(); assert(actions === 1, "verification did not use the player API");
+    screens.openScreen("other"); pending.resolve(["完成"]); await settle();
+    assert(S.screen === "other", "late account completion reopened settings");
+    handlers.set("Settings", () => []); handlers.delete("AccountAction");
+  });
   handlers.set("HomeBackground", () => ({})); handlers.set("Backgrounds", () => backgrounds);
   handlers.set("Packs", () => ({ rows: [] })); handlers.set("PackNameCheck", () => "");
   handlers.set("Detail", () => null); handlers.set("Sections", () => []);
