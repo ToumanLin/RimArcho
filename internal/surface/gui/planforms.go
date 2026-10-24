@@ -7,12 +7,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // PlanSources supplies the four starting points without changing the current list (06 §2.17).
 type PlanSources struct {
 	Copy     string          `json:"copy"`
+	Count    int             `json:"count"`
 	Versions []view.PlanFrom `json:"versions"`
 	Saves    []view.PlanFrom `json:"saves"`
 }
@@ -32,15 +34,14 @@ func (s *API) PlanSources(id int64) (*PlanSources, error) {
 		}
 		found = true
 		out.Copy = view.Tf("a copy of %s", p.Name)
+		out.Count = p.Entries
 		vs, err := s.a.Store.Versions(id)
 		if err != nil {
 			return nil, err
 		}
 		for _, v := range vs {
-			if v.Source != "save" && v.Source != "launch" && v.Source != "user" {
-				continue
-			}
-			out.Versions = append(out.Versions, view.PlanFrom{From: fmt.Sprintf("v%d", v.N), Label: fmt.Sprintf("%s v%d, %s", p.Name, v.N, view.ShortDate(v.Created))})
+			label := fmt.Sprintf("v%d  %s %s  %s", v.N, view.ShortDate(v.Created), v.Created.Local().Format("15:04"), view.Tf("%d mods", len(loadout.Decode(v.Entries))))
+			out.Versions = append(out.Versions, view.PlanFrom{From: fmt.Sprintf("v%d", v.N), Label: label})
 		}
 	}
 	if !found {
@@ -104,7 +105,12 @@ func (s *API) CreatePlan(source int64, name, from string) (done *PlanDone, err e
 }
 
 // ImportPreviewFor compares with the selected list and restores the editor's list (06 §2.17).
-func (s *API) ImportPreviewFor(id int64, kind, src string) (*view.ImportPreview, error) {
+type PlanImportPreview struct {
+	*view.ImportPreview
+	Request uint64 `json:"request"`
+}
+
+func (s *API) ImportPreviewFor(id int64, kind, src string) (*PlanImportPreview, error) {
 	s.mu.Lock()
 	s.x.seq++
 	seq := s.x.seq
@@ -142,8 +148,30 @@ func (s *API) ImportPreviewFor(id int64, kind, src string) (*view.ImportPreview,
 	preview, err := view.PreviewImportFor(s.a, imp, id)
 	if err == nil {
 		s.x.imp, s.x.follow = imp, imp.Collection != nil
+		s.x.envID = envID
 	}
-	return preview, err
+	if err != nil {
+		return nil, err
+	}
+	return &PlanImportPreview{ImportPreview: preview, Request: seq}, nil
+}
+
+// Create only the import the form actually previewed, even after another page read one.
+func (s *API) ImportAsPlanPreview(name string, request uint64, follow bool) (*PlanDone, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if request == 0 || request != s.x.seq || s.x.imp == nil {
+		return nil, errors.New(view.T("the import preview changed; preview the content again"))
+	}
+	env, err := s.a.Env()
+	if err != nil {
+		return nil, err
+	}
+	if env.ID != s.x.envID {
+		return nil, errors.New(view.T("the import preview changed; preview the content again"))
+	}
+	s.x.follow = follow
+	return s.importAsPlan(name)
 }
 
 // ImportApplyTo edits the selected destination in one undoable step (06 §2.17).

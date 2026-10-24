@@ -152,6 +152,11 @@ func (s *API) NewPlan(name, from string) (*PlanDone, error) {
 func (s *API) ImportAsPlan(name string) (*PlanDone, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.importAsPlan(name)
+}
+
+// importAsPlan requires s.mu (both legacy import and the checked new-list preview).
+func (s *API) importAsPlan(name string) (*PlanDone, error) {
 	if s.x.imp == nil {
 		return nil, errors.New(view.T("nothing to import"))
 	}

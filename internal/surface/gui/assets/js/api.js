@@ -12,7 +12,7 @@ export function setEnvironmentGuard(fn) { actionGuard = fn; }
 const writesGame = new Set([
   "Run", "RunMoving", "RunCLI", "Toggle", "Stage", "Unstage", "StageAll", "RestoreAll",
   "MoveBy", "MoveShown", "Place", "Swap", "Undo", "Redo", "HistoryGo", "RunOp", "DoAction",
-  "CreatePlan", "ImportApplyTo", "UsePlan", "NewPlan", "RenamePlan", "RemovePlan", "ImportApply", "ImportAsPlan", "ImportFollow",
+  "CreatePlan", "ImportApplyTo", "UsePlan", "NewPlan", "RenamePlan", "RemovePlan", "ImportApply", "ImportAsPlan", "ImportAsPlanPreview", "ImportFollow",
   "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetTag",
   "LibraryDo", "LibrarySetNote", "Subscribe", "SubscriptionFrom", "Scan", "Analyze", "RemoveEnv", "ApplySetting", "AddMonitor",
   "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean",
