@@ -23,10 +23,16 @@ import (
 var decodeMu sync.Mutex
 
 // Prepare performs the slow, cancellable work in the caller's background goroutine.
-// Errors leave the affected image out; the GUI uses plain until a pair is ready.
+// Errors leave the affected image out; the GUI retains its official preview fallback.
 // It must not be called while holding the GUI mutex (06 §3.1, 06 §2.14).
 func Prepare(ctx context.Context, game, cache, lang string) ([]Item, error) {
 	stamp := Stamp(game)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(filepath.Join(game, "Assets.zip")); os.IsNotExist(err) {
+		return prepareUnity(ctx, game, cache, lang, stamp)
+	}
 	archive, err := zip.OpenReader(filepath.Join(game, "Assets.zip"))
 	if err != nil {
 		return nil, err

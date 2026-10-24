@@ -12,6 +12,10 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/menubg"
+	"image"
+	"image/color"
+	"image/png"
 )
 
 func menuGame(t *testing.T, game string) {
@@ -144,5 +148,65 @@ func TestMenuBackgroundSettingsAndVersionRefresh(t *testing.T) {
 	}
 	if got := api.Backgrounds().Groups[0].Items; len(got) != 1 || got[0].Key != BgPlain {
 		t.Fatalf("missing assets should fall back to plain: %+v", got)
+	}
+}
+
+func TestMenuPreviewMerge(t *testing.T) {
+	previews := []app.Background{
+		{Key: app.BgDefault, Src: "core-preview.png"},
+		{Key: "game:ludeon.rimworld.royalty", Src: "dlc-preview.png"},
+		{Key: "mod:background/x", Group: "Background mod", Src: "mod.png"},
+	}
+	for _, menu := range [][]menubg.Item{nil, {{Key: "game:ludeon.rimworld.royalty", Full: "royalty.jpg", Thumb: "royalty-thumb.jpg"}}} {
+		got := mergeMenuBackgrounds(menu, previews)
+		if len(got) != 3 || got[0].Key != app.BgDefault || got[2].Group != "Background mod" {
+			t.Fatalf("fallback merge: %+v", got)
+		}
+		if len(menu) > 0 && (got[1].Src != "royalty.jpg" || got[1].Thumb != "royalty-thumb.jpg") {
+			t.Fatalf("extracted image lost to preview: %+v", got)
+		}
+	}
+}
+
+func TestMissingAndBrokenAssetsKeepOfficialPreview(t *testing.T) {
+	for _, brokenZIP := range []bool{false, true} {
+		t.Run(map[bool]string{false: "no-resources", true: "broken-zip"}[brokenZIP], func(t *testing.T) {
+			e, api, events := fixture(t)
+			path := filepath.Join(e.Game, "Data", "Core", "About", "Preview.png")
+			img := image.NewNRGBA(image.Rect(0, 0, 32, 16))
+			for y := 0; y < 16; y++ {
+				for x := 0; x < 32; x++ {
+					img.SetNRGBA(x, y, color.NRGBA{100, 50, 200, 255})
+				}
+			}
+			f, err := os.Create(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = png.Encode(f, img)
+			f.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if brokenZIP {
+				if err := os.WriteFile(filepath.Join(e.Game, "Assets.zip"), []byte("broken zip"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			api.HomeBackground()
+			awaitBackgrounds(t, events)
+			bg := api.HomeBackground()
+			if bg.URL == "" {
+				t.Fatal("official preview regressed to plain")
+			}
+			res := httptest.NewRecorder()
+			api.serveBg(res, httptest.NewRequest("GET", bg.URL, nil))
+			if res.Code != 200 {
+				t.Fatalf("preview status %d", res.Code)
+			}
+			if cfg, err := jpeg.DecodeConfig(res.Body); err != nil || cfg.Width != 32 || cfg.Height != 16 {
+				t.Fatalf("preview: %+v %v", cfg, err)
+			}
+		})
 	}
 }

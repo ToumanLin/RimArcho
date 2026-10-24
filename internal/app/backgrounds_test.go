@@ -96,3 +96,17 @@ func TestScaleDownAlpha(t *testing.T) {
 		t.Fatalf("transparent became %v", out.At(1, 0))
 	}
 }
+
+func TestOfficialBackgroundPreviewFallbacks(t *testing.T) {
+	core, dlc := t.TempDir(), t.TempDir()
+	writePNG(t, filepath.Join(core, "About", "pReViEw.PNG"), 40, 20)
+	writePNG(t, filepath.Join(dlc, "About", "Preview.png"), 40, 20)
+	got := CollectBackgrounds([]BackgroundTarget{
+		{Dir: dlc, Name: "Royalty", PackageID: "Ludeon.RimWorld.Royalty", Official: true},
+		{Dir: core, Name: "Core", PackageID: "Ludeon.RimWorld", Official: true},
+		{Dir: t.TempDir(), Name: "Missing", PackageID: "Ludeon.RimWorld.Missing", Official: true},
+	})
+	if len(got) != 2 || got[0].Key != BgDefault || got[1].Key != "game:ludeon.rimworld.royalty" || got[0].Group != "" || got[0].Thumb != "" {
+		t.Fatalf("official previews: %+v", got)
+	}
+}

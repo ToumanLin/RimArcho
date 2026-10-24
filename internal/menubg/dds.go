@@ -18,6 +18,7 @@ type DDS struct {
 	r             io.Reader
 	format        bcn.Format
 	blockSize     int
+	flip          bool // Unity textures have bottom-first rows
 }
 
 // ReadDDS accepts single 2D BC1/BC3/BC7 textures, including DX10 headers.
@@ -67,6 +68,22 @@ func ReadDDS(r io.Reader) (*DDS, error) {
 // Rows decodes four source rows at a time. The callback must not retain the reused
 // pixels. This bounds the full-resolution storage to 4×width pixels (06 §2.14).
 func (d *DDS) Rows(ctx context.Context, visit func(y int, rows *image.NRGBA) error) error {
+	if d.blockSize == 0 {
+		rows := image.NewNRGBA(image.Rect(0, 0, d.Width, 4))
+		for y := 0; y < d.Height; y += 4 {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			rows.Rect.Max.Y = min(4, d.Height-y)
+			if _, err := io.ReadFull(d.r, rows.Pix[:rows.Stride*rows.Rect.Dy()]); err != nil {
+				return err
+			}
+			if err := visit(y, rows); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	blocks := make([]byte, ((d.Width+3)/4)*d.blockSize)
 	var rows *image.NRGBA
 	for y := 0; y < d.Height; y += 4 {
@@ -102,7 +119,11 @@ func (d *DDS) Scaled(ctx context.Context, widths ...int) ([]*image.RGBA, error) 
 	err := d.Rows(ctx, func(y int, rows *image.NRGBA) error {
 		for yy := 0; yy < rows.Rect.Dy(); yy++ {
 			for _, s := range scalers {
-				s.row(y+yy, rows.Pix[yy*rows.Stride:][:d.Width*4])
+				sy := y + yy
+				if d.flip {
+					sy = d.Height - 1 - sy
+				}
+				s.row(sy, rows.Pix[yy*rows.Stride:][:d.Width*4], d.flip)
 			}
 		}
 		return nil
@@ -123,7 +144,7 @@ type boxScaler struct {
 	w, h int
 }
 
-func (s *boxScaler) row(y int, pixels []byte) {
+func (s *boxScaler) row(y int, pixels []byte, reverse bool) {
 	w, h := s.dst.Rect.Dx(), s.dst.Rect.Dy()
 	dy := ((y+1)*h - 1) / s.h
 	y0, y1 := dy*s.h/h, (dy+1)*s.h/h
@@ -137,7 +158,7 @@ func (s *boxScaler) row(y int, pixels []byte) {
 			s.sums[i+1] += uint32(p[1]) * a / 255
 			s.sums[i+2] += uint32(p[2]) * a / 255
 		}
-		if y+1 == y1 {
+		if !reverse && y+1 == y1 || reverse && y == y0 {
 			n := uint32((x1 - x0) * (y1 - y0))
 			p := s.dst.Pix[dy*s.dst.Stride+x*4:][:4]
 			p[0], p[1], p[2], p[3] = uint8(s.sums[i]/n), uint8(s.sums[i+1]/n), uint8(s.sums[i+2]/n), 255
