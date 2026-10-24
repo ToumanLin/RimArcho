@@ -78,6 +78,7 @@ function detailFollow(force) {
 // lists' cursors and selections and the open details kept: no reload, no jump home.
 async function relang() {
   const s = await api.Init();
+  archoTheme.apply(s.theme);
   applyAccent(s.accent);
   S.start = s;
   setText(s.text);
@@ -96,6 +97,8 @@ async function relang() {
 async function reaccent() {
   const s = await api.Init();
   S.start.accent = s.accent;
+  S.start.theme = s.theme;
+  archoTheme.apply(s.theme);
   applyAccent(s.accent);
 }
 
@@ -931,6 +934,7 @@ const ui = {
 
 async function start() {
   const s = await api.Init();
+  archoTheme.apply(s.theme);
   applyAccent(s.accent);
   S.start = s;
   setText(s.text);

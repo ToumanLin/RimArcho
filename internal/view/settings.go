@@ -17,8 +17,8 @@ import (
 type SettingItem struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
-	// Edit: "path", "text" or "choice" (Choices); the new value replaces {} in Argv. "" has
-	// no editor, only Actions.
+	// Edit: "path", "text", "choice", "swatches" or "segments" (Choices). The new
+	// value replaces {} in Argv; "" has no editor, only Actions.
 	Edit string `json:"edit,omitempty"`
 	// EditValue separates an editable path from its displayed status/version.
 	EditValue *string  `json:"editValue,omitempty"`
@@ -222,7 +222,13 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		}
 	}
 	folders.Items = add
-	out := []SettingGroup{DirectoryGroup(a), folders, {Title: "SteamCMD", Items: []SettingItem{
+	out := []SettingGroup{{Title: T("appearance"), Items: []SettingItem{
+		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "swatches", Choices: cmds.SettingChoices("ui.accent"),
+			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
+			Argv:         []string{"config", "set", "ui.accent", "{}"}},
+		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
+			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
+	}}, DirectoryGroup(a), folders, {Title: "SteamCMD", Items: []SettingItem{
 		{Label: T("SteamCMD account (optional)"), Value: cmds.Setting(a, "steamcmd.account"), Edit: "text", Argv: []string{"config", "set", "steamcmd.account", "{}"},
 			Note: T("empty or anonymous: anonymous login; enter an account name to log in. Password and Steam Guard are entered only in SteamCMD")},
 	}}}
@@ -234,9 +240,6 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}
 	out = append(out, SettingGroup{Title: T("interface"), Items: []SettingItem{
 		{Label: T("language"), Value: lang, Edit: "choice", Choices: []string{"auto", "zh", "en"}, Argv: []string{"config", "set", "ui.lang", "{}"}},
-		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "choice", Choices: cmds.SettingChoices("ui.accent"),
-			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
-			Argv:         []string{"config", "set", "ui.accent", "{}"}},
 		{Label: T("Workshop descriptions"), Value: cmds.Setting(a, "workshop.fetch"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "workshop.fetch", "{}"}},
 		{Label: T("images in descriptions"), Value: cmds.Setting(a, "workshop.images"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "workshop.images", "{}"}},
 		{Label: T("GPU acceleration"), Value: cmds.Setting(a, "ui.gpu"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "ui.gpu", "{}"},

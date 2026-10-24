@@ -82,3 +82,26 @@ func TestAccentStartupAndSettings(t *testing.T) {
 		t.Fatalf("rejected setting changed startup accent: %q", got)
 	}
 }
+
+func TestThemeStartupAndSettings(t *testing.T) {
+	e := testkit.New(t)
+	api := NewAPI(e.App, nil)
+	t.Cleanup(api.Close)
+	if api.Init().Theme != "auto" {
+		t.Fatal("default theme is not auto")
+	}
+	for _, value := range cmds.SettingChoices("ui.theme") {
+		if _, err := api.ApplySetting([]string{"config", "set", "ui.theme", "{}"}, value); err != nil {
+			t.Fatal(err)
+		}
+		if got := api.Init().Theme; got != value {
+			t.Fatalf("saved theme %q, got %q", value, got)
+		}
+	}
+	if _, err := api.ApplySetting([]string{"config", "set", "ui.theme", "{}"}, "invalid"); err == nil {
+		t.Fatal("GUI accepted invalid theme")
+	}
+	if api.Init().Theme != "dark" {
+		t.Fatal("invalid theme overwrote saved value")
+	}
+}

@@ -8,6 +8,7 @@ import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
 import { bgSection } from "./bg.js";
+import { appearanceControl } from "./appearance.js";
 import { virtualRows } from "./virtualrows.js";
 import { on } from "./api.js";
 import { wireSeparator } from "./separator.js";
@@ -1198,8 +1199,10 @@ export async function settings() {
   sc.innerHTML = "";
   const w = page("settings", "");
   sc.append(w);
-  w.append(bg);
-  renderGroups(w, groups, settings);
+  const appearance = groups.filter(g => g.items?.some(it => it.edit === "swatches"));
+  renderGroups(w, appearance, settings);
+  w.querySelector(".settings")?.append(bg);
+  renderGroups(w, groups.filter(g => !appearance.includes(g)), settings);
   markSettingTasks(tasks);
   sc.scrollTop = top;
   read.finish();
@@ -1329,7 +1332,10 @@ function renderGroups(w, groups, again) {
       note.hidden = !it.note;
       left.append(note);
       const right = el("div", "r");
-      if (it.edit === "choice") {
+      if (it.edit === "swatches" || it.edit === "segments") {
+        row.classList.add("appearance-row");
+        right.append(appearanceControl(it, () => ui.reaccent()));
+      } else if (it.edit === "choice") {
         const s = el("select");
         for (const [i, c] of it.choices.entries()) {
           const o = el("option", "", (it.choiceLabels && it.choiceLabels[i]) || c);

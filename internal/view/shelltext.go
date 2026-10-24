@@ -3,6 +3,11 @@ package view
 // The shell's text (shell.go): the sidebar, the home page, the first-run guide.
 func init() {
 	Register(map[string]string{
+		"appearance":                 "外观",
+		"day/night theme":            "日夜切换",
+		"follow system":              "跟随系统",
+		"light":                      "浅色",
+		"dark":                       "深色",
 		"home":                       "首页",
 		"can it run":                 "能不能跑",
 		"lists":                      "列表",

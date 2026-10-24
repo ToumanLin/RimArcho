@@ -48,8 +48,8 @@ const item = (key) => { for (const g of P.groups) for (const it of g.items) if (
 
 function draw(focusGrid = false) {
   box.innerHTML = "";
-  box.append(el("div", "label section", T("launch page background")));
-  const card = el("div", "card bg-card");
+  const card = el("div", "bg-card");
+  card.append(el("div", "name bg-title", T("launch page background")));
   const head = el("div", "bg-head");
   head.append(preview(), controls());
   card.append(head, el("div", "bg-rule"), tabs(), grid());

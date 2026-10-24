@@ -137,6 +137,7 @@ func (s *API) checkMonitor() {
 type Start struct {
 	Lang     string            `json:"lang"`
 	Accent   string            `json:"accent"`
+	Theme    string            `json:"theme"`
 	Text     map[string]string `json:"text"`
 	Commands []view.Command    `json:"commands"`
 	Version  string            `json:"version"`
@@ -148,7 +149,7 @@ type Start struct {
 func (s *API) Init() *Start {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
+	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
 }
 
 // ---- the board ----
