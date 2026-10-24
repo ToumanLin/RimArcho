@@ -94,6 +94,10 @@ func TestKeyHelpText(t *testing.T) {
 	for _, page := range []string{EditorPage, LibraryPage, "home"} {
 		for _, tui := range []bool{false, true} {
 			rows := KeyHelp(page, tui)
+			history := slices.ContainsFunc(rows, func(r KeyRow) bool { return r.Keys == "alt+← / alt+→" })
+			if history == tui {
+				t.Errorf("%s tui=%v: page history help must be GUI-only", page, tui)
+			}
 			if len(rows) < 5 {
 				t.Fatalf("%s: %d rows", page, len(rows))
 			}

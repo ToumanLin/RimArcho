@@ -469,7 +469,6 @@ export function hintList() {
 export async function exportOf(id, from = "plans") {
   X.id = id; X.from = from;
   S.planExport = { id, from };
-  if (!X.format) X.format = await api.Setting(FORMAT_KEY).catch(() => "") || "";
   return exportPage();
 }
 
@@ -478,6 +477,8 @@ export const exportFrom = () => X.from;
 
 async function exportPage() {
   const read = beginPageRead("plan-export");
+  if (!X.format) X.format = await api.Setting(FORMAT_KEY).catch(() => "") || "";
+  if (!read.current()) return;
   let d, info;
   try { [d, info] = await Promise.all([api.PlanExport(X.id, X.format), X.info ? X.info : api.ExchangeInfo()]); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
