@@ -7,7 +7,7 @@
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
 import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
-import { setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
+import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
@@ -32,20 +32,20 @@ import { withEnvironmentSwitch } from "./environment.js";
 // ---- loading ----
 
 let reloadSeq = 0;
-async function reload(snapshot = null) {
-  if (S.busy.env && !snapshot) return;
+async function reload(snapshot = null, read = null) {
+  if (S.busy.env && !snapshot && !read) return;
+  if (!read && !S.screen) return openEditor((ticket) => reload(snapshot, ticket), false, () => { render(); detailFollow(true); });
   const seq = ++reloadSeq, gameRequest = S.envSeq;
-  const current = () => seq === reloadSeq && gameRequest === S.envSeq;
+  const current = () => seq === reloadSeq && gameRequest === S.envSeq && (!read || read.current());
   let b, sh, history;
   try {
     const result = snapshot || await api.Workspace();
     if (!current() || result.stale) return;
     b = result.board; sh = result.shell; history = result.history;
-  } catch (e) { if (current()) say("fail", errText(e)); return; }
+  } catch (e) { if (read) throw e; if (current()) say("fail", errText(e)); return; }
   if (!current()) return;
-  S.board = b;
-  S.shell = sh;
-  S.history = history;
+  const apply = () => { S.board = b; S.shell = sh; S.history = history; };
+  if (read) read.commit(apply); else apply();
   S.busy.scan = b.scanning;
   S.busy.analyze = b.analyzing;
   if (b.error && b.envs && b.envs.length) say("fail", b.error);
@@ -53,9 +53,9 @@ async function reload(snapshot = null) {
   const keep = [0, 1, 2].map((k) => setItems(k, cols[k] || []));
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
   if (!current()) return;
-  render();
-  detailFollow();
+  if (!read) { render(); detailFollow(); }
   await scr.logEnvironmentChanged();
+  return true;
 }
 
 let detailKey = "";
@@ -169,24 +169,32 @@ async function go(id) {
   if (uninst.locked()) return; // an uninstall runs, or has run (06 §2.14)
   shell.navigated();
   if (id === "plan:new") return plans.newPlan();
-  if (id.startsWith("plan:")) {
-    if (!S.busy.env && !(await plans.openPlan(+id.slice(5)))) return;
-    id = "plan";
-  }
+  const plan = id.startsWith("plan:") ? +id.slice(5) : null;
+  if (plan !== null) id = "plan";
   S.packFocus = id.startsWith("pack:") ? id.slice(5) : null;
   if (id !== "build") S.buildFrom = null;
   if (id !== "plan-export") S.planExport = null;
-  await openPage(id);
+  await openPage(id, plan);
   // a page already shown is redrawn in place: its sub-entry and breadcrumb follow too
   renderWhere();
 }
 
-async function openPage(id) {
+async function openPage(id, plan = null) {
   if (S.packFocus) return packsPage.pack(S.packFocus);
   switch (id) {
     case "plan":
-      if (scr.closeScreen()) detailFollow(true);
-      return renderWhere();
+      return openEditor(async (read) => {
+        if (plan !== null && plan !== S.shell?.plan?.id && !S.busy.env) {
+          await api.UsePlan(plan);
+          if (!read.current()) return false;
+          S.cols.forEach((c, k) => {
+            c.query = ""; c.cursor = 0; c.sel.clear(); c.searching = false;
+            const input = $(`.area[data-area="${k}"] .search input`);
+            if (input) input.value = "";
+          });
+        }
+        return reload(null, read);
+      }, plan !== null && plan !== S.shell?.plan?.id, () => { render(); detailFollow(true); });
     case "home": return homePage.home();
     case "needs": return scr.needs();
     case "packs": return packsPage.list();
@@ -555,6 +563,7 @@ async function useEnv(name) {
 // Refresh whichever page is visible now; completing a switch never returns to its caller.
 async function refreshEnvironment() {
   S.screenSeq++;
+  if (!S.screen) return openPage("plan");
   if (S.screen && S.screen !== "guide") await openPage(S.screen);
 }
 
@@ -769,6 +778,10 @@ function onKey(e) {
   // 变化, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
   // (on the pages with forms, settings and the like, tab keeps moving the focus)
   if (k === "Tab" && !e.ctrlKey && !e.altKey && (!S.screen || S.screen === "library" || S.screen === "changes" || S.screen === "packs")) { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
+  if (!S.screen && scr.pageLoading()) {
+    if ((e.ctrlKey || e.metaKey) && k === "k") { e.preventDefault(); pop.palette(); }
+    return;
+  }
   if (S.screen) {
     // esc (and enter) leave the full detail for the plan; the sidebar's pages are side by
     // side, so esc does not go from one to another (06 §3.1)

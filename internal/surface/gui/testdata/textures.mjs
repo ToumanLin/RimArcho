@@ -54,9 +54,16 @@ async function setup() {
     Textures: (...args) => { const d = deferred(); requests.push({ ...d, args }); return d.promise; },
     TextureMeasure: (id) => { const d = deferred(); polls.push({ ...d, id }); return d.promise; },
   };
+  let readSeq = 0;
+  const beginPageRead = (name) => {
+    S.screen = name;
+    const seq = ++readSeq, epoch = S.screenSeq;
+    const current = () => seq === readSeq && S.screen === name && S.screenSeq === epoch;
+    return { current, finish() {}, fail(e) { if (current()) messages.push(["fail", e.message]); } };
+  };
   const deps = {
     "./state.js": { S, $, el, api, T: (s) => s, Tf: (s, ...args) => { let i = 0; return s.replace(/%[sd]/g, () => args[i++]); }, errText: (e) => e.message, say: (...args) => messages.push(args) },
-    "./screens.js": { openScreen: () => { screen.innerHTML = ""; }, page: (cls) => el("div", cls), button: (label, _, run, cls) => Object.assign(el("button", cls, label), { onclick: run }) },
+    "./screens.js": { beginPageRead, pageLoading: () => false, page: (cls) => el("div", cls), button: (label, _, run, cls) => Object.assign(el("button", cls, label), { onclick: run }) },
     "./popups.js": { confirm: () => {} },
   };
   const context = createContext({ document: { activeElement: null }, setTimeout: (f) => timers.push(f) });

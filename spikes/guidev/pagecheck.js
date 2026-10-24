@@ -4,6 +4,8 @@ import { handlers, emit } from "./pagecheck-runtime.js";
 import { S, api } from "/js/state.js";
 import * as screens from "/js/screens.js";
 import * as library from "/js/library.js";
+import * as lists from "/js/lists.js";
+import * as tasks from "/js/tasks.js";
 import * as textures from "/js/textures.js";
 import * as home from "/js/home.js";
 import * as packs from "/js/packs.js";
@@ -26,6 +28,7 @@ const visibleSelection = () => {
 const ui = { renderWhere() {}, renderHints() {}, reload() {}, refreshEnvironment() {}, cmd() {}, go() {} };
 screens.initScreens(ui);
 library.initLibrary(ui);
+tasks.initTasks(ui);
 home.initHome(ui); packs.initPacks(ui); guide.initGuide(ui); full.initFull(ui);
 handlers.set("Setting", () => "");
 handlers.set("LogCluster", () => ["fixture detail"]);
@@ -34,6 +37,22 @@ handlers.set("LogPattern", () => null);
 async function test(name, run) { await run(); results.push("PASS " + name); output.textContent = results.join("\n"); }
 
 try {
+  // Use the product's editor markup so the virtual-row checks exercise its real DOM.
+  const markup = new DOMParser().parseFromString(await (await fetch("/")).text(), "text/html");
+  document.querySelector("#app").prepend(markup.querySelector("#board"));
+  const editor = () => lists.openEditor(async (read) => {
+    const workspace = await api.Workspace();
+    if (!read.current()) return false;
+    read.commit(() => { S.board = workspace.board; S.shell = workspace.shell; });
+    for (let k = 0; k < 3; k++) {
+      lists.setItems(k, workspace.board.cols[k]);
+      await lists.refilter(k);
+      if (!read.current()) return false;
+    }
+    return true;
+  }, false, () => { for (let k = 0; k < 3; k++) lists.renderRows(k); });
+  const workspace = { board: { env: "fixture", cols: [[], [], []] }, shell: { plan: { id: 1 } } };
+  const texturePage = { scales: [100], labels: ["100%"], rows: [] };
   const backgrounds = { setting: { key: "plain", stars: [], files: [] }, groups: [{ name: "game", items: [{ key: "plain", label: "plain" }] }] };
   const buildPreview = { name: "fixture pack", plan: "fixture plan", tex: 0,
     texChoices: [0, 100, 50, 75].map((value) => ({ value, label: String(value) })),
@@ -55,9 +74,15 @@ try {
     ["guide", "GuideFind", () => guide.start(), []],
     ["uninstall", "UninstallPlan", () => uninstall.open(), { steps: [] }],
     ["full", "ModCopies", () => full.full("library", "fixture"), { row: null }],
+    [null, "Workspace", editor, workspace],
+    ["library", "Library", () => library.open(), { rows: [], columns: [] }],
+    ["tasks", "Tasks", () => tasks.open(), { rows: [] }],
+    ["textures", "Textures", () => textures.open(), texturePage],
+    ["log", "LogPage", () => screens.gameLog("fixture", true), { path: "fixture", files: [], rows: [] }],
   ];
   for (const [screen, method, open, payload] of pages) {
-    await test(method + " shows loading immediately; late success/failure cannot navigate", async () => {
+    const remaining = ["Workspace", "Library", "Tasks", "Textures", "LogPage"].includes(method);
+    await test(method + " shows loading immediately; late success/failure cannot navigate" + (remaining ? "; failure can retry" : ""), async () => {
       for (const fail of [false, true]) {
         screens.openScreen("other");
         const d = deferred(); handlers.set(method, () => d.promise);
@@ -69,13 +94,81 @@ try {
         await pending;
         assert(S.screen === "other" && !document.querySelector('#screen[aria-busy="true"]'), method + " overwrote destination");
       }
+      if (remaining) {
+        screens.openScreen("other");
+        handlers.set(method, () => { throw new Error("fixture " + method + " failed"); });
+        await open();
+        assert(S.screen === screen && document.querySelector("#screen").textContent.includes("fixture " + method + " failed"), method + " hid the read error");
+        assert(!document.querySelector('#screen[aria-busy="true"]'), method + " left loading after failure");
+        const retry = document.querySelector("#screen .page-read-error button");
+        assert(retry, method + " has no retry action");
+        const retryReply = deferred(); handlers.set(method, () => retryReply.promise);
+        retry.click(); await Promise.resolve();
+        assert(document.querySelector('#screen[aria-busy="true"] .skel'), method + " retry did not show loading");
+        retryReply.resolve(payload); await settle();
+        assert(!screens.pageLoading() && !document.querySelector('#screen[aria-busy="true"]'), method + " retry did not finish");
+      }
       handlers.set(method, () => payload);
       await open();
       assert(S.screen === screen && !document.querySelector('#screen[aria-busy="true"]'), method + " did not finish rendering");
       assert(!document.querySelector('.page-loading'), method + " left a loading placeholder");
       assert(!screens.pageLoading(), method + " left object shortcuts suspended");
     });
+    if (!remaining) continue;
+    await test(method + " refresh keeps content; only the latest same-page read applies", async () => {
+      const sc = document.querySelector("#screen"), shown = sc.firstChild;
+      const old = deferred(), next = deferred();
+      handlers.set(method, () => old.promise);
+      const first = open(); await Promise.resolve();
+      assert(sc.firstChild === shown && !screens.pageLoading(), method + " replaced content during refresh");
+      handlers.set(method, () => next.promise);
+      const second = open(); await Promise.resolve();
+      next.resolve(payload); await second;
+      const newest = sc.firstChild;
+      old.resolve(payload); await first;
+      assert(sc.firstChild === newest && !sc.hasAttribute("aria-busy"), method + " installed the old same-page reply");
+    });
+    await test(method + " rejects results from the previous environment and plan", async () => {
+      for (const field of ["env", "plan"]) {
+        const old = deferred(), next = deferred();
+        handlers.set(method, () => old.promise);
+        const first = open(); await Promise.resolve();
+        if (field === "env") S.board = { ...S.board, env: "next-" + method };
+        else S.shell = { ...S.shell, plan: { id: (S.shell?.plan?.id || 0) + 1 } };
+        handlers.set(method, () => next.promise);
+        const second = open(); await Promise.resolve();
+        assert(screens.pageLoading(), method + " kept old object controls");
+        const placeholder = document.querySelector("#screen").firstChild;
+        const status = document.querySelector("#status").textContent;
+        old.reject(new Error("obsolete " + field)); await first;
+        assert(document.querySelector("#screen").firstChild === placeholder && document.querySelector("#status").textContent === status, method + " installed an obsolete error");
+        next.resolve(payload); await second;
+        assert(!screens.pageLoading(), method + " did not complete the new context");
+      }
+    });
   }
+  await test("editor and inventory hide old virtual rows during object switches, including game switching", async () => {
+    const oldMod = { id: 17, name: "old editor mod" };
+    handlers.set("Workspace", () => ({ ...workspace, board: { ...workspace.board, cols: [[oldMod], [], []] } }));
+    await editor();
+    assert(document.querySelector("#board .row"), "editor fixture has no virtual rows");
+    const d = deferred(); handlers.set("Workspace", () => d.promise);
+    S.board = { ...S.board, env: "other game" }; S.busy.env = "other game";
+    const reading = editor();
+    lists.renderRows(0);
+    assert(document.querySelector("#board").inert && !document.querySelector("#board .row"), "old editor rows survived the object switch");
+    d.resolve(workspace); await reading; S.busy.env = false;
+    assert(!document.querySelector("#board").inert, "accepted editor stayed inert");
+    handlers.set("Library", () => ({ rows: [{ id: 1, name: "old inventory mod", insts: [], copies: 0 }], columns: [{ key: "name", title: "mod", shown: true }] }));
+    await library.open();
+    assert(document.querySelector("#screen .lib-row"), "inventory fixture has no virtual rows");
+    const libReply = deferred(); handlers.set("Library", () => libReply.promise);
+    S.shell = { ...S.shell, plan: { id: 101 } }; S.busy.env = "other game";
+    const inventory = library.open();
+    dispatchEvent(new Event("resize"));
+    assert(screens.pageLoading() && !document.querySelector("#screen .lib-row"), "old inventory rows survived the object switch");
+    libReply.resolve({ rows: [], columns: [] }); await inventory; S.busy.env = false;
+  });
   await test("same-page replies use only the latest request, including after close/re-entry", async () => {
     screens.openScreen("other");
     const old = deferred(), next = deferred();
@@ -203,7 +296,7 @@ try {
   await test("inventory opens before its reply and ignores late navigation", async () => {
     const d = deferred(); handlers.set("Library", () => d.promise);
     const pending = library.open();
-    assert(S.screen === "library" && document.querySelector("#screen").textContent.includes("loading"), "inventory did not show loading immediately");
+    assert(S.screen === "library" && document.querySelector("#screen .skel"), "inventory did not show loading immediately");
     screens.openScreen("other"); d.resolve({}); await pending;
     assert(S.screen === "other", "late inventory reply reopened inventory");
   });
@@ -211,11 +304,11 @@ try {
     const old = deferred(), fresh = deferred();
     handlers.set("Textures", () => old.promise);
     const p1 = textures.open(); await Promise.resolve();
-    assert(S.screen === "textures" && document.querySelector("#screen").textContent.includes("reading textures"), "textures did not show loading immediately");
+    assert(S.screen === "textures" && document.querySelector('#screen [role="status"]')?.getAttribute("aria-label") === "reading textures…", "textures did not show loading immediately");
     screens.closeScreen(); handlers.set("Textures", () => fresh.promise);
     const p2 = textures.open(); await Promise.resolve();
     old.resolve({}); await p1;
-    assert(document.querySelector("#screen").textContent.includes("reading textures"), "old reply replaced new loading state");
+    assert(document.querySelector("#screen .page-loading .skel"), "old reply replaced new loading state");
     screens.openScreen("other"); fresh.reject(new Error("late failure")); await p2;
     assert(S.screen === "other", "late texture failure reopened page");
   });

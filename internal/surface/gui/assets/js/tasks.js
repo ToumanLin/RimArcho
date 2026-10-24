@@ -5,7 +5,7 @@
 // sidebar's foot line and ctrl+j bring them back here. "tasks" events say the record
 // changed; a lane task that ended also brings its result for the status line.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, act as pageAct, area } from "./screens.js";
+import { beginPageRead, page, act as pageAct, area } from "./screens.js";
 import { createBar } from "./filterbar.js";
 import * as pop from "./popups.js";
 import { icon } from "./icons.js";
@@ -27,7 +27,7 @@ const GROUPS = ["run", "queue", "today", "yesterday", "earlier"];
 const GROUP_TITLE = { run: "running", queue: "queued", today: "today", yesterday: "yesterday", earlier: "earlier" };
 
 const X = {
-  page: null, seq: 0,
+  page: null,
   cur: null,          // the task under the cursor (its id)
   sel: new Set(),     // selected tasks
   anchor: null,
@@ -89,24 +89,25 @@ export function toggle() {
 
 export async function open() {
   if (S.screen !== "tasks") X.focus = "list";
-  openScreen("tasks");
-  build();
-  await load();
+  const read = beginPageRead("tasks", { retry: open });
+  await load(read);
   api.TasksSeen().then(refreshFoot).catch(() => {});
 }
 
-async function load() {
-  const n = ++X.seq, epoch = S.screenSeq;
+async function load(read = null) {
+  if (!read && S.screen !== "tasks") return;
+  read ||= beginPageRead("tasks", { retry: () => load() });
   let p, saved;
   try {
     [p, saved] = await Promise.all([api.Tasks(), X.cols ? null : api.Setting(COLS_KEY).catch(() => "")]);
-  } catch (e) { if (n === X.seq) say("fail", errText(e)); return; }
+  } catch (e) { read.fail(e); return; }
+  if (!read.current()) return;
   foot(p);
-  if (n !== X.seq || S.screen !== "tasks" || epoch !== S.screenSeq) return;
   X.page = p;
   if (!X.cols) X.cols = mergeCols(saved);
   if (!els || !document.body.contains(els.root)) build();
   draw();
+  read.finish();
 }
 
 function mergeCols(saved) {
