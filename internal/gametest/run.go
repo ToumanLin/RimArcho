@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 type Options struct {
@@ -34,7 +35,8 @@ type Options struct {
 }
 
 type Result struct {
-	Status       string // menu, map, timeout, exited or start-failed
+	Links        []*source.LinkInfo `json:"links,omitempty"`
+	Status       string             // menu, map, timeout, exited, start-failed or links-blocked
 	ExitCode     *int
 	LoadSeconds  float64 // launch to menu marker or confirmed map quiet period
 	TotalSeconds float64
@@ -58,6 +60,16 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 		case "savedatafolder", "logfile", "nofilelog", "quicktest":
 			return nil, fmt.Errorf("gametest: extra argument %q overrides a managed option", arg)
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	links, err := source.CheckModsLinks(filepath.Join(o.GameRoot, "Mods"))
+	if err != nil {
+		return nil, err
+	}
+	if len(links) > 0 {
+		return &Result{Status: "links-blocked", Links: links}, nil
 	}
 	if err := preparePaths(&o); err != nil {
 		return nil, err

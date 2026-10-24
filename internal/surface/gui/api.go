@@ -922,10 +922,6 @@ func readNeeds(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState) {
 }
 
 func (s *API) needsLocked() *view.Needs {
-	key := s.a.Store.ChangeKey()
-	if s.needs != nil && s.needsAt == key {
-		return s.needs
-	}
 	st := s.boardState()
 	ps, err := s.a.Problems(false, nil)
 	if err != nil || st == nil {

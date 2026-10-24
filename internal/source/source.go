@@ -143,7 +143,7 @@ func List(root string) (entries []Entry, realRoot string, err error) {
 			}
 			rp, err := RealPath(p)
 			if err != nil {
-				continue // dangling link
+				continue // InspectGameLinks reports link failures independently of mod observations.
 			}
 			e.IsLink, e.RealPath = true, rp
 		}

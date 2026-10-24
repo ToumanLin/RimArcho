@@ -45,12 +45,13 @@ type ScanStats struct {
 
 // ScanReport is the result of Scan.
 type ScanReport struct {
-	Env      *env.Environment
-	ScanID   int64
-	Full     bool
-	GameOnly bool // only the game's own Data/ and Mods/ were read
-	Stats    ScanStats
-	Notices  []string // Loadout sync messages
+	GameLinks []*GameLink
+	Env       *env.Environment
+	ScanID    int64
+	Full      bool
+	GameOnly  bool // only the game's own Data/ and Mods/ were read
+	Stats     ScanStats
+	Notices   []string // Loadout sync messages
 }
 
 // ScanOptions choose what a scan reads.
@@ -262,7 +263,8 @@ func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
 	} else {
 		rep.Notices = []string{"loadout: " + err.Error()}
 	}
-	return rep, nil
+	rep.GameLinks, err = a.InspectGameLinks()
+	return rep, err
 }
 
 // A game-only scan still sees links into shared folders. They are aliases of the

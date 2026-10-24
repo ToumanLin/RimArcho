@@ -12,6 +12,8 @@ var openWorld = map[string]bool{"get_description": true, "exchange_list": true, 
 
 func manageTools() []tool {
 	return []tool{
+		reg("check_links", true, false, "Read fresh link health and ownership evidence for the selected game, or all known games. Does not change files.\nExample: check_links {\"all\":true} → JSON links with path, target, reason, evidence and action; check failures set isError.", func(in LinksCheckIn) []string { return argv("links", "check").flag("all", in.All).flag("json", true).a }),
+		reg("repair_links", false, true, "Preview with dry_run; execution requires explicit player confirm=true. Only removes eligible links, never targets. Unproven links require explicit include paths. Refuses running games.\nExample: repair_links {\"all\":true,\"dry_run\":true,\"confirm\":false} → JSON preview, with no files changed. After player approval: repair_links {\"all\":true,\"confirm\":true} → JSON links and removed paths.", LinksRepairArgv),
 		reg("test_run", false, false, descTestRun, TestRunArgv),
 		reg("manage_rules", false, false, descRules, func(in RuleIn) []string { return RulesArgv(in) }),
 		reg("ignore_problem", false, false, descIgnore, func(in IgnoreIn) []string { return IgnoreArgv(in) }),

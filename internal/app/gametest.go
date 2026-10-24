@@ -42,6 +42,7 @@ type TestRunCluster struct {
 }
 
 type TestRunReport struct {
+	Links         []*GameLink      `json:"links,omitempty"`
 	Env           string           `json:"env"`
 	Plan          string           `json:"plan"`
 	GameVersion   string           `json:"game_version"`
@@ -107,6 +108,13 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, er
 		return nil, fmt.Errorf("test run: no current plan (archo plan list)")
 	}
 	e := st.Ix.Env
+	links, err := a.CheckGameLinks(modsDir(st.Ix))
+	if err != nil {
+		return nil, err
+	}
+	if len(links) > 0 {
+		return &TestRunReport{Env: e.Name, Plan: PlanRef(st.Plan), GameVersion: e.GameVersion, Status: "links-blocked", Links: links, Counts: map[string]int{}, Clusters: []TestRunCluster{}}, nil
+	}
 	base := filepath.Join(a.Home, "tests", e.ID)
 	data := filepath.Join(base, "userdata")
 	runs := filepath.Join(base, "runs")

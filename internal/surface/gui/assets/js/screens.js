@@ -445,7 +445,7 @@ async function runAction(it, act) {
   }
   if (act.confirm) {
     // Not undone with u: ask first (06 §6).
-    return pop.confirm(act.label, [act.warn || act.label], act.label, () => doAction(act, 0));
+    return pop.confirm(act.label, act.kind === "repair-links" ? act.lines : [act.warn || act.label], act.label, () => doAction(act, 0));
   }
   return doAction(act, 0);
 }

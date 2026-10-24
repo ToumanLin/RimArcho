@@ -121,6 +121,12 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 			m.panel = p
 			return nil
 		}
+	case view.ActRepairLinks:
+		k.run = func(m *model) tea.Cmd {
+			m.openPanel(a.Label, strings.Join(a.Lines, "\n\n"))
+			m.panel.onEnter = func(m *model) tea.Cmd { m.doAction(a, 0); return nil }
+			return nil
+		}
 	default:
 		k.run = func(m *model) tea.Cmd {
 			if a.Confirm != "" {

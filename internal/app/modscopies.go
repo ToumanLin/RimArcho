@@ -99,7 +99,7 @@ func (a *App) ModsCopies(ix *Index) []ModsCopy {
 		if c.Link {
 			c.Target, _ = source.RealPath(p)
 			if c.Target == "" {
-				continue // a dangling link: the game sees nothing there
+				continue // InspectGameLinks reports this separately as a game-level problem.
 			}
 			c.Mod = byReal[env.PathKey(c.Target)]
 		} else {

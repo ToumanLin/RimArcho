@@ -56,12 +56,13 @@ const (
 	ActTrash           = "trash"            // Refs[0]: folder to the recycle bin (confirm first)
 	ActIgnore          = "ignore"           // Problem: keep as it is (ignore the problem)
 	ActUnlinkPacks     = "unlink-packs"     // remove the packs' links from Mods/ (08 §5.3)
-	ActSwap            = "swap"             // Refs[0] → Refs[1] in the plan (one undoable step)
-	ActMoveLocked      = "move-to-locked"   // Refs[0]: a Mods/ folder into the lock library (confirm first)
-	ActTextures        = "textures"         // Refs: convert their textures to DDS again (confirm first)
-	ActTexClean        = "textures-clean"   // Refs: delete the DDS RimArcho wrote (confirm first)
-	ActAddVersion      = "add-version"      // Refs[0]: the list's name, Refs[1]: a game version to allow (04 §1.6)
-	ActManageLists     = "manage-lists"     // the list management page (06 §2.17); Argv: the CLI's view of it
+	ActRepairLinks     = "repair-links"
+	ActSwap            = "swap"           // Refs[0] → Refs[1] in the plan (one undoable step)
+	ActMoveLocked      = "move-to-locked" // Refs[0]: a Mods/ folder into the lock library (confirm first)
+	ActTextures        = "textures"       // Refs: convert their textures to DDS again (confirm first)
+	ActTexClean        = "textures-clean" // Refs: delete the DDS RimArcho wrote (confirm first)
+	ActAddVersion      = "add-version"    // Refs[0]: the list's name, Refs[1]: a game version to allow (04 §1.6)
+	ActManageLists     = "manage-lists"   // the list management page (06 §2.17); Argv: the CLI's view of it
 )
 
 // Option is one choice of a choose-disable action.
@@ -144,6 +145,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		return n
 	}
 	n.Items = append(buildItems(a, st, ps), directoryNeeds(a)...)
+	n.Items = append(n.Items, linkNeeds(a, ps.GameLinks)...)
 	for i := range n.Items {
 		n.Items[i].Section = SectionOf(n.Items[i].Group)
 	}
@@ -825,6 +827,11 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		_, err = a.IgnoreProblem(act.Problem, false)
 	case ActUnlinkPacks:
 		_, err = a.UnlinkPacks(false)
+	case ActRepairLinks:
+		if len(act.Refs) != 1 {
+			return "", fmt.Errorf("missing link repair preview")
+		}
+		err = a.ConfirmLinkRepair(act.Refs[0])
 	case ActSwap:
 		_, err = a.Swap(act.Refs[0], act.Refs[1])
 	case ActMoveLocked:

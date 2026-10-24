@@ -774,6 +774,9 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	}
 	e := st.Ix.Env
 	check := a.CheckPack(p, e, nil)
+	if err := a.refuseUnhealthyLinks(modsDir(st.Ix)); err != nil {
+		return nil, err
+	}
 	if check.Blocked() {
 		return nil, fmt.Errorf("%w: pack %q: %s", ErrLaunchBlocked, name, strings.Join(check.Errors(), "; "))
 	}
