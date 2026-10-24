@@ -75,6 +75,9 @@ func workshopField(id string) Field {
 // note when set, languages, dependencies, conflicts (06 §4.1).
 func ModFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) []Field {
 	fs := headFields(st, mod)
+	if a != nil {
+		fs = appendSubscriptionFields(fs, a.SubscriptionOf(mod))
+	}
 	fs = append(fs, Field{Kind: FieldTags, Label: T("tags"), Value: strings.Join(mod.Tags, "  "), List: mod.Tags, Act: ActTags, ActAt: T("edit")})
 	if mod.Alias != "" {
 		fs = append(fs, Field{Kind: FieldAlias, Label: T("alias"), Value: mod.Alias, Extra: mod.Name})
@@ -174,6 +177,7 @@ func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) 
 		fs = append(fs, workshopField(i.WorkshopID))
 	}
 	var states []string
+	fs = appendSubscriptionFields(fs, i.Subscription)
 	for _, s := range i.States {
 		states = append(states, LibStateText(s, lib.GameMM))
 	}

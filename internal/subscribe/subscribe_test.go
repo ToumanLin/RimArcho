@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -153,6 +155,16 @@ func TestNormalizeRepo(t *testing.T) {
 	}
 	if subscribe.NormalizeRepo(dir) != subscribe.NormalizeRepo(u.String()) {
 		t.Fatal("file URL and local path differ")
+	}
+	// The same folder through a junction (as with an 8.3 short name) is the same repository.
+	if runtime.GOOS == "windows" {
+		link := filepath.Join(t.TempDir(), "alias")
+		if out, err := exec.Command("cmd", "/c", "mklink", "/J", link, dir).CombinedOutput(); err != nil {
+			t.Fatalf("mklink: %v %s", err, out)
+		}
+		if subscribe.NormalizeRepo(link) != subscribe.NormalizeRepo(dir) {
+			t.Fatal("junction and target differ")
+		}
 	}
 }
 

@@ -29,6 +29,8 @@ func (s *API) queueSettingTaskLocked(kind string, argv []string, env string) app
 		obj = argv[2]
 	} else if kind == view.TaskGC {
 		obj = snapshot.EnvName
+	} else if (kind == view.TaskSubscribe || kind == view.TaskSubscriptionFrom) && len(argv) > 2 {
+		obj = argv[2]
 	}
 	request := app.Task{Kind: kind, Obj: obj, Args: argv, Env: snapshot.EnvName}
 	return s.tasks.EnqueueSelf(request, func(id string) (string, error) {
@@ -66,6 +68,8 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		})
 	}
 	switch kind {
+	case view.TaskSubscribe, view.TaskSubscriptionFrom:
+		return s.runSubscriptionTask(a, id, kind, argv)
 	case view.TaskSteamCMD, view.TaskTodds:
 		var path string
 		var err error

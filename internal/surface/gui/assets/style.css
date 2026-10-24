@@ -1060,6 +1060,14 @@ details.xc-sec > summary { cursor: pointer; }
 /* the grey completion over the input (the plan's .search .ghost, in this box) */
 
 .lib-main { display: flex; flex-direction: column; min-height: 0; position: relative; }
+.subscribe-form { flex: none; display: flex; flex-direction: column; gap: 12px; padding: 12px; max-height: 60vh; overflow: auto; border-bottom: var(--hairline) solid var(--line); }
+.subscribe-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.subscribe-field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 120px; }
+.subscribe-field:has(input[type="checkbox"]) { flex-direction: row; align-items: center; }
+.subscribe-field input:not([type="checkbox"]) { width: 100%; }
+.subscribe-page { display: flex; flex-direction: column; gap: 12px; }
+.subscribe-preview { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.subscribe-preview:empty { display: none; }
 .lib-head { flex: none; display: flex; align-items: center; height: 32px; padding: 0 12px 0 14px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .lib-head .lib-count { color: var(--fg-2); }
 .lib-rows { flex: 1; min-height: 0; overflow: auto; position: relative; outline: 0; }
@@ -1104,7 +1112,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-row .kind { color: var(--fg-2); }
 .lib-row .here { color: var(--accent); font-size: 12px; flex: none; }
 .lib-row .c.unloadable, .lib-row .c.missing { color: var(--red); }
-.lib-row .c.ignored, .lib-row .c.residue, .lib-row .c.hidden, .lib-row .c.updated.state, .lib-row .c.state.updated { color: var(--amber); }
+.lib-row .c.ignored, .lib-row .c.residue, .lib-row .c.hidden, .lib-row .c.updated.state, .lib-row .c.state.updated, .lib-row .c.state.source-update { color: var(--amber); }
 .lib-row.empty { position: absolute; top: 28px; left: 0; right: 0; display: flex; justify-content: center; height: 80px; color: var(--muted); }
 .lib-row.empty:hover { background: none; }
 /* a copy's details over the right of the table */

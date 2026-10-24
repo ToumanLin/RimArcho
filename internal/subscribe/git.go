@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -37,6 +38,10 @@ func NormalizeRepo(raw string) string {
 	}
 	if abs, err := filepath.Abs(p); err == nil {
 		p = abs
+	}
+	// The same folder by a link or an 8.3 short name is the same repository.
+	if real, err := source.RealPath(p); err == nil {
+		p = real
 	}
 	return env.PathKey(p)
 }

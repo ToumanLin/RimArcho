@@ -557,6 +557,7 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		root.KV("workshop", w)
 	}
 	root.KV("git", m.GitHead)
+	subscriptionLines(c, root, c.App.SubscriptionOf(m))
 	if m.Origin != "" {
 		root.KV("origin", ".rimarcho/origin.json")
 	}

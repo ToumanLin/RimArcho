@@ -18,6 +18,7 @@ import * as fullPage from "./fulldetail.js";
 import * as guide from "./guide.js";
 import * as plans from "./plans.js";
 import * as library from "./library.js";
+import { updateFromForm } from "./subscribe.js";
 import { initExchange, exchange, key as importKey, hintList as importHints } from "./exchange.js";
 import { icon } from "./icons.js";
 import * as motion from "./motion.js";
@@ -696,6 +697,16 @@ async function rowOp(code) {
   const ids = idsOf(sel);
   if (!ids.length) return;
   const o = ops.op(code);
+  if (code === "subscription-update" && ids.length === 1) {
+    const copies = await api.ModCopies(ids[0]);
+    const copy = copies?.row?.insts?.find((c) => c.id === ids[0]);
+    if (copy?.subscriptionKind === "page") {
+      const host = document.querySelector(".detail .scroll") || document.querySelector("#screen");
+      let panel;
+      panel = updateFromForm(host, copy.ref, () => panel.remove());
+      return;
+    }
+  }
   const run = () => edited(api.RunOp(code, ids), code === "remove", ids);
   if (!o.confirm) return run();
   let p;
@@ -971,6 +982,9 @@ async function start() {
   on("uninstall", (ev) => uninst.event(ev));
   on("textures", (ev) => tex.event(ev));
   on("tasks", (ev) => tasksPage.event(ev));
+  document.addEventListener("task-ended", (e) => {
+    if (!S.screen && ["subscribe", "subscription-from", "subscription-check", "subscription-update", "subscription-remove"].includes(e.detail?.kind)) reload();
+  });
   // Menu art is prepared after the first draw, outside the task page (06 §2.14).
   on("backgrounds", () => {
     if (S.screen === "home") homePage.home({ keep: true });

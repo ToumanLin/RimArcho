@@ -5,7 +5,51 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
+
+func subscriptionLines(c *Ctx, n *render.Node, r *subscribe.Record) {
+	if r == nil {
+		return
+	}
+	n.KV("subscription", r.Kind)
+	n.KV("origin URL", r.URL)
+	n.KV("repository", r.Repo)
+	if r.Kind == "steamcmd" {
+		n.KV("workshop ID", r.WorkshopID)
+		if !r.InstalledAt.IsZero() {
+			n.KV("last download", c.App.FormatTime(r.InstalledAt))
+		}
+		return
+	}
+	if r.RefType != "" {
+		tracking := r.RefType + " " + r.Ref
+		if r.RefType == "branch" && r.Ref == "" {
+			tracking = "default branch"
+		}
+		n.KV("tracking", tracking)
+	}
+	installed := r.Installed
+	if r.Kind == "git" && len(installed) > 7 {
+		installed = installed[:7]
+	}
+	if !r.InstalledAt.IsZero() {
+		installed += "  " + c.App.FormatTime(r.InstalledAt)
+	}
+	n.KV("installed", installed)
+	checked := "not checked"
+	if !r.CheckedAt.IsZero() {
+		state := "up to date"
+		if r.HasUpdate() {
+			state = "update available"
+		}
+		checked = c.App.FormatTime(r.CheckedAt) + "  " + state
+	}
+	if r.CheckError != "" {
+		checked = c.App.FormatTime(r.CheckedAt) + "  failed: " + r.CheckError
+	}
+	n.KV("last check", checked)
+}
 
 func init() {
 	dry := []Flag{{Name: "dry-run", Help: "show what would happen"}}
