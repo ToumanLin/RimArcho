@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -17,10 +18,11 @@ func init() {
 	register(&Command{Name: "pack list", Summary: "the packs: mods, size, game version, last played", MaxArgs: 0, Run: packListCmd})
 	register(&Command{Name: "pack launch", Args: "<name>", Summary: "play a pack: link its mods into Mods/, its own list and saves, start the game", MinArgs: 1, MaxArgs: 1, Run: packLaunchCmd,
 		Flags: []Flag{dry, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a pack's mod into the lock library"}}})
-	register(&Command{Name: "pack export", Args: "<name> <file>", Summary: "write a pack to a file (.archopack zip, or with --list its list as a RimArcho list .archolist.json)", MinArgs: 2, MaxArgs: 2, Run: packExportCmd,
+	register(&Command{Name: "pack export", Args: "<name> <file>", Summary: "write a pack to a file (.archopack tar + zstd, or with --list its list as a RimArcho list .archolist.json)", MinArgs: 2, MaxArgs: 2, Run: packExportCmd,
 		Flags: []Flag{{Name: "list", Help: "only the list, each mod with its version, no files"}}})
 	register(&Command{Name: "pack import", Args: "<file>", Summary: "unpack a .archopack, or compare a RimArcho list (.archolist.json) with the installed mods", MinArgs: 1, MaxArgs: 1, Run: packImportCmd,
 		Flags: []Flag{{Name: "as-plan", Help: "a list: also load it into the workspace (undoable)"}}})
+	register(&Command{Name: "pack check", Args: "<name|file>", Summary: "verify a pack's copies or check an archive without extracting it", MinArgs: 1, MaxArgs: 1, Run: packCheckCmd})
 	register(&Command{Name: "pack remove", Args: "<name>", Summary: "move a pack to the recycle bin; --unfinished deletes what a build cut short copied", MinArgs: 1, MaxArgs: 1, Run: packRemoveCmd,
 		Flags: []Flag{dry, {Name: "unfinished", Help: "the unfinished build of <name> (its folder in the packs folder)"}}})
 	register(&Command{Name: "pack unlink", Summary: "remove the packs' links from Mods/ (only the links, never the packs)", MaxArgs: 0, Run: packUnlinkCmd, Flags: []Flag{dry}})
@@ -263,6 +265,11 @@ func packImportCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if r.Dir != "" {
 		d, root := render.New("unpacked pack " + r.Pack.Name)
 		root.KV("folder", r.Dir)
+		if r.Verified {
+			root.KV("content", "verified")
+		} else {
+			root.KV("content", "not verified (old format)")
+		}
 		d.AddNext("archo pack launch " + quoteArg(r.Pack.Name))
 		return d, nil
 	}
@@ -285,6 +292,34 @@ func packImportCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("workspace", fmt.Sprintf("now holds the list (%d changes, unsaved; archo undo)", len(r.Imported.Changes)))
 	} else {
 		d.AddNext("archo pack import " + quoteArg(a.Pos[0]) + " --as-plan")
+	}
+	return d, nil
+}
+
+func packCheckCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	var problems []app.PackProblem
+	var p *app.Pack
+	var err error
+	fileInfo, statErr := os.Stat(a.Pos[0])
+	if app.IsPackZip(a.Pos[0]) || (statErr == nil && !fileInfo.IsDir()) {
+		p, problems, err = c.App.VerifyPackFile(a.Pos[0])
+	} else {
+		p, err = c.App.ReadPack(a.Pos[0])
+		if err == nil {
+			problems, err = c.App.VerifyPack(a.Pos[0])
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	d, root := render.New(fmt.Sprintf("pack %s: %d verification problems", p.Name, len(problems)))
+	if p.Format < 2 {
+		root.KV("content", "not verified (old format)")
+	} else if len(problems) == 0 {
+		root.KV("content", "verified")
+	}
+	for _, problem := range problems {
+		root.Add(fmt.Sprintf("%s (pkg:%s, mods/%s): %s", problem.Name, problem.PackageID, problem.Folder, problem.Why))
 	}
 	return d, nil
 }

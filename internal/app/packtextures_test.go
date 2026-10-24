@@ -54,6 +54,9 @@ func TestPackTextures(t *testing.T) {
 	if pt == nil || pt.Converted != 2 || pt.Failed != 1 || pt.Kept != 2 || pt.PNGBytes == 0 {
 		t.Fatalf("pack textures %+v", pt)
 	}
+	if problems, err := e.App.VerifyPack("tex"); err != nil || len(problems) != 0 {
+		t.Fatalf("digest must cover the converted textures: %+v %v", problems, err)
+	}
 	var folder string
 	for _, pe := range r.Pack.Entries {
 		if pe.PackageID == "tester.textured" {

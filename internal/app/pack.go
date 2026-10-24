@@ -1,12 +1,10 @@
 package app
 
 import (
-	"archive/zip"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -33,7 +31,7 @@ import (
 // saves stay as they were.
 
 // PackFormat is the pack.json format version.
-const PackFormat = 1
+const PackFormat = 2
 
 // Pack is pack.json.
 type Pack struct {
@@ -80,17 +78,21 @@ func TextureLabel(o textures.Options) string {
 
 // PackEntry is one mod of a pack, in load order.
 type PackEntry struct {
-	PackageID  string   `json:"package_id"`
-	Name       string   `json:"name"`
-	Official   bool     `json:"official,omitempty"` // Core or a DLC: from the game, not carried
-	Lineage    string   `json:"lineage,omitempty"`
-	Instance   string   `json:"instance,omitempty"`
-	WorkshopID string   `json:"workshop_id,omitempty"`
-	Hash       string   `json:"hash,omitempty"`   // semantic snapshot hash (02 §4)
-	Folder     string   `json:"folder,omitempty"` // under mods/ (carried entries)
-	Bytes      int64    `json:"bytes,omitempty"`
-	Trimmed    int64    `json:"trimmed_bytes,omitempty"`
-	TrimmedDir []string `json:"trimmed,omitempty"` // version folders left out
+	PackageID       string   `json:"package_id"`
+	Name            string   `json:"name"`
+	Official        bool     `json:"official,omitempty"` // Core or a DLC: from the game, not carried
+	Lineage         string   `json:"lineage,omitempty"`
+	Instance        string   `json:"instance,omitempty"`
+	WorkshopID      string   `json:"workshop_id,omitempty"`
+	Hash            string   `json:"hash,omitempty"`   // semantic snapshot hash (02 §4)
+	Folder          string   `json:"folder,omitempty"` // under mods/ (carried entries)
+	Bytes           int64    `json:"bytes,omitempty"`
+	Trimmed         int64    `json:"trimmed_bytes,omitempty"`
+	TrimmedDir      []string `json:"trimmed,omitempty"` // version folders left out
+	Files           int      `json:"files,omitempty"`
+	SHA256          string   `json:"sha256,omitempty"`
+	WorkshopUpdated int64    `json:"workshop_updated,omitempty"`
+	GitHead         string   `json:"git_head,omitempty"`
 }
 
 // PacksDir is where packs are kept: config pack.dir, else <data>/packs.
@@ -143,7 +145,7 @@ func (a *App) ReadPack(name string) (*Pack, error) {
 	if err := json.Unmarshal(b, &p); err != nil {
 		return nil, fmt.Errorf("pack %q: %v", name, err)
 	}
-	if p.Format > PackFormat {
+	if p.Format < 1 || p.Format > PackFormat {
 		return nil, fmt.Errorf("pack %q has format %d; this RimArcho reads up to %d", name, p.Format, PackFormat)
 	}
 	a.aliasPack(&p)
@@ -345,7 +347,7 @@ func packEntryOf(m *store.Mod) PackEntry {
 	if m.Kind == source.Official {
 		return PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Official: true}
 	}
-	return PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Lineage: m.LineageID, Instance: m.ID, WorkshopID: m.WorkshopID(), Hash: hex.EncodeToString(m.SnapHash)}
+	return PackEntry{PackageID: m.PackageID, Name: m.DisplayName(), Lineage: m.LineageID, Instance: m.ID, WorkshopID: m.WorkshopID(), Hash: hex.EncodeToString(m.SnapHash), WorkshopUpdated: m.ACFTimeUpdated, GitHead: m.GitHead}
 }
 
 // Measure sizes each mod's copy, finds the folders that cannot be read and the free
@@ -489,6 +491,17 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 		}
 	}
 	bs.update(func(p *BuildProgress) { p.Step, p.Mod = StepWrite, "" })
+	for i := range r.Pack.Entries {
+		pe := &r.Pack.Entries[i]
+		if pe.Official || pe.Folder == "" {
+			continue
+		}
+		pe.Files, pe.SHA256, err = copyDigest(filepath.Join(tmp, "mods", pe.Folder))
+		if err != nil {
+			cleanup()
+			return nil, fmt.Errorf("%s: %w", pe.Name, err)
+		}
+	}
 	b, _ := json.MarshalIndent(r.Pack, "", "  ")
 	if err := os.WriteFile(filepath.Join(tmp, "pack.json"), append(b, '\n'), 0o644); err != nil {
 		cleanup()
@@ -928,69 +941,39 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 
 // ---- export, import, remove ----
 
-// ExportPack writes a pack to a file: the pack as a zip (.archopack, without its saves), or
+// ExportPack writes a pack to a file (.archopack, without its saves), or
 // with listOnly its list as a RimArcho list (.archolist.json, 04 §9.3).
 func (a *App) ExportPack(name, file string, listOnly bool) (int64, error) {
 	p, err := a.ReadPack(name)
 	if err != nil {
 		return 0, err
 	}
-	if _, err := os.Stat(file); err == nil {
+	if _, err := os.Lstat(file); err == nil {
 		return 0, fmt.Errorf("%s exists; nothing is overwritten", file)
+	} else if !os.IsNotExist(err) {
+		return 0, err
 	}
 	if listOnly || p.Light {
 		q := *p
 		q.Light = true
+		q.Entries = append([]PackEntry(nil), p.Entries...)
 		for i := range q.Entries {
 			q.Entries[i].Folder, q.Entries[i].Bytes, q.Entries[i].Trimmed, q.Entries[i].TrimmedDir = "", 0, 0, nil
+			q.Entries[i].Files, q.Entries[i].SHA256 = 0, ""
 		}
 		q.Trimmed, q.Textures = 0, nil // a list carries no files
 		b, _ := json.MarshalIndent(&q, "", "  ")
-		return int64(len(b)), os.WriteFile(file, append(b, '\n'), 0o644)
-	}
-	f, err := os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
-	if err != nil {
-		return 0, err
-	}
-	zw := zip.NewWriter(f)
-	root := a.packPath(name)
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		f, err := os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
 		if err != nil {
-			return err
+			return 0, err
 		}
-		rel, _ := filepath.Rel(root, path)
-		rel = filepath.ToSlash(rel)
-		if rel == "userdata" || rel == "state.json" {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
+		n, err := f.Write(append(b, '\n'))
+		if cerr := f.Close(); err == nil {
+			err = cerr
 		}
-		if d.IsDir() {
-			return nil
-		}
-		w, err := zw.Create(rel)
-		if err != nil {
-			return err
-		}
-		in, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(w, in)
-		in.Close()
-		return err
-	})
-	if cerr := zw.Close(); err == nil {
-		err = cerr
+		return int64(n), err
 	}
-	f.Close()
-	if err != nil {
-		os.Remove(file)
-		return 0, err
-	}
-	fi, _ := os.Stat(file)
-	return fi.Size(), nil
+	return a.exportPackArchive(name, file, p)
 }
 
 // PackMatch compares a RimArcho list (a pack.json without files) with the installed mods
@@ -1001,26 +984,27 @@ type PackMatch struct {
 	Missing         []PackEntry
 	Imported        *EditResult // with asPlan: the workspace now holds the list
 	Dir             string      // a pack: where it was unpacked
+	Verified        bool        // false for format 1, whose copies have no content digests
 }
 
-// IsPackZip says whether file is a pack (.archopack, a zip) rather than a list.
+// IsPackZip recognizes both ZIP and zstd packs by magic, for existing GUI callers.
 func IsPackZip(file string) bool {
-	zr, err := zip.OpenReader(file)
+	f, err := os.Open(file)
 	if err != nil {
 		return false
 	}
-	zr.Close()
-	return true
+	defer f.Close()
+	var magic [4]byte
+	_, err = f.Read(magic[:])
+	return err == nil && (string(magic[:]) == "PK\x03\x04" || string(magic[:]) == "\x28\xb5\x2f\xfd")
 }
 
 // ImportPack reads a pack file. A pack (.archopack) is unpacked into the packs folder; a
 // RimArcho list (.archolist.json, or a pack.json) is compared with the installed mods and,
 // with asPlan, loaded into the workspace (loadout import reads it too, 04 §9.2).
 func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
-	zr, err := zip.OpenReader(file)
-	if err == nil {
-		defer zr.Close()
-		return a.unpackPack(&zr.Reader)
+	if IsPackZip(file) {
+		return a.importPackArchive(file)
 	}
 	b, err := os.ReadFile(file)
 	if err != nil {
@@ -1030,7 +1014,7 @@ func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
 	if err := json.Unmarshal(b, &p); err != nil || p.Format == 0 {
 		return nil, fmt.Errorf("%s is neither a pack (.archopack) nor a RimArcho list (.archolist.json)", file)
 	}
-	if p.Format > PackFormat {
+	if p.Format < 1 || p.Format > PackFormat {
 		return nil, fmt.Errorf("%s has format %d; this RimArcho reads up to %d", file, p.Format, PackFormat)
 	}
 	st, err := a.Loadout()
@@ -1068,79 +1052,6 @@ func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
 		}
 	}
 	return r, nil
-}
-
-func (a *App) unpackPack(zr *zip.Reader) (*PackMatch, error) {
-	if err := a.managedRootReady("packs", a.PacksDir()); err != nil {
-		return nil, err
-	}
-	var p Pack
-	for _, f := range zr.File {
-		if f.Name == "pack.json" {
-			rc, err := f.Open()
-			if err != nil {
-				return nil, err
-			}
-			err = json.NewDecoder(io.LimitReader(rc, 64<<20)).Decode(&p)
-			rc.Close()
-			if err != nil {
-				return nil, fmt.Errorf("pack.json: %v", err)
-			}
-		}
-	}
-	if p.Format == 0 {
-		return nil, errors.New("the file has no pack.json")
-	}
-	if err := checkPackName(p.Name); err != nil {
-		return nil, err
-	}
-	dir := a.packPath(p.Name)
-	if _, err := os.Stat(dir); err == nil {
-		return nil, fmt.Errorf("pack %q exists; remove it first", p.Name)
-	}
-	tmp := dir + TmpSuffix
-	if ReadBuildProgress(tmp).Running() {
-		return nil, fmt.Errorf("%w (%s)", ErrBuildRunning, p.Name)
-	}
-	os.RemoveAll(tmp)
-	for _, f := range zr.File {
-		name := filepath.FromSlash(f.Name)
-		dst := filepath.Join(tmp, name)
-		if !within(tmp, dst) || strings.Contains(f.Name, "..") || filepath.IsAbs(name) {
-			os.RemoveAll(tmp)
-			return nil, fmt.Errorf("unsafe path in the pack: %s", f.Name)
-		}
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			os.RemoveAll(tmp)
-			return nil, err
-		}
-		rc, err := f.Open()
-		if err != nil {
-			os.RemoveAll(tmp)
-			return nil, err
-		}
-		out, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
-		if err == nil {
-			_, err = io.Copy(out, io.LimitReader(rc, 4<<30))
-			out.Close()
-		}
-		rc.Close()
-		if err != nil {
-			os.RemoveAll(tmp)
-			return nil, err
-		}
-	}
-	if err := os.Rename(tmp, dir); err != nil {
-		os.RemoveAll(tmp)
-		return nil, err
-	}
-	if err := a.Store.SetMeta(directoryKey("packs"), a.PacksDir()); err != nil {
-		return nil, err
-	}
-	return &PackMatch{Pack: &p, Dir: dir}, nil
 }
 
 // RemovePack moves a pack to the recycle bin, after removing its links.
