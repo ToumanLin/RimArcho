@@ -707,6 +707,7 @@ func (a *App) Packs() ([]*PackInfo, error) {
 // PackLaunch is what LaunchPack does (or would do).
 type PackLaunch struct {
 	Pack       *Pack
+	Check      *PackCheck
 	Links      []LinkChange // in Mods/: this pack's links added, other packs' removed
 	ModsConfig string       // the pack's own ModsConfig.xml
 	Tokens     []string
@@ -750,15 +751,16 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 		return nil, err
 	}
 	e := st.Ix.Env
-	if pm, gm := env.MajorMinor(p.Game), st.GameMM(); pm != "" && gm != "" && pm != gm {
-		return nil, fmt.Errorf("%w: pack %q was built for %s, the game is %s", ErrLaunchBlocked, name, pm, gm)
+	check := a.CheckPack(p, e, nil)
+	if check.Blocked() {
+		return nil, fmt.Errorf("%w: pack %q: %s", ErrLaunchBlocked, name, strings.Join(check.Errors(), "; "))
 	}
 	mods := modsDir(st.Ix)
 	if mods == "" {
 		return nil, fmt.Errorf("%w: the environment has no Mods/ folder", ErrLaunchBlocked)
 	}
 	dir := a.packPath(name)
-	r := &PackLaunch{Pack: p, UserData: filepath.Join(dir, "userdata"), DryRun: dryRun}
+	r := &PackLaunch{Pack: p, Check: check, UserData: filepath.Join(dir, "userdata"), DryRun: dryRun}
 	r.ModsConfig = env.ModsConfigPath(r.UserData)
 	// What Mods/ holds besides this pack (08 §5.3 step 2): a second folder with a pack copy's
 	// packageId makes the game report an error and ignore one of them, so a pack copy is
@@ -906,8 +908,8 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 		}
 	}
 	var known []string
-	for _, m := range st.Ix.Mods {
-		if m.Kind == source.Official && m.PackageID != "ludeon.rimworld" && m.Status == identity.Live {
+	for _, m := range installedOfficial(st.Ix.Mods) {
+		if m.PackageID != "ludeon.rimworld" {
 			known = append(known, m.PackageID)
 		}
 	}
@@ -985,6 +987,7 @@ type PackMatch struct {
 	Imported        *EditResult // with asPlan: the workspace now holds the list
 	Dir             string      // a pack: where it was unpacked
 	Verified        bool        // false for format 1, whose copies have no content digests
+	Check           *PackCheck
 }
 
 // IsPackZip recognizes both ZIP and zstd packs by magic, for existing GUI callers.
@@ -1051,6 +1054,8 @@ func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
 			return nil, err
 		}
 	}
+	r.Check = a.CheckPack(&p, st.Ix.Env, nil)
+	r.Check.missingMods(r.Missing)
 	return r, nil
 }
 

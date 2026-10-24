@@ -217,6 +217,7 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		head = "pack launch: dry run, nothing written"
 	}
 	d, root := render.New(head)
+	addPackCheck(root, r.Check)
 	movedKV(root, r.Moved, r.DryRun)
 	ln := root.KV("links", fmt.Sprintf("%d changes in Mods/", len(r.Links)))
 	for _, l := range r.Links {
@@ -270,10 +271,12 @@ func packImportCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		} else {
 			root.KV("content", "not verified (old format)")
 		}
+		addPackCheck(root, r.Check)
 		d.AddNext("archo pack launch " + quoteArg(r.Pack.Name))
 		return d, nil
 	}
 	d, root := render.New(fmt.Sprintf("list %s: %d mods", r.Pack.Name, len(r.Pack.Entries)))
+	addPackCheck(root, r.Check)
 	for _, g := range []struct {
 		k  string
 		es []app.PackEntry
@@ -312,16 +315,49 @@ func packCheckCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("pack %s: %d verification problems", p.Name, len(problems)))
+	e, _ := c.App.Env() // a file can be checked before any game is set up
+	check := c.App.CheckPack(p, e, problems)
+	head := "pack " + p.Name + ": checked"
+	if check.Blocked() {
+		head = "pack " + p.Name + ": blocked"
+	}
+	d, root := render.New(head)
 	if p.Format < 2 {
 		root.KV("content", "not verified (old format)")
 	} else if len(problems) == 0 {
 		root.KV("content", "verified")
 	}
-	for _, problem := range problems {
-		root.Add(fmt.Sprintf("%s (pkg:%s, mods/%s): %s", problem.Name, problem.PackageID, problem.Folder, problem.Why))
+	addPackCheck(root, check)
+	if check.Blocked() {
+		return nil, fmt.Errorf("%s", d.String())
 	}
 	return d, nil
+}
+
+func addPackCheck(root *render.Node, check *app.PackCheck) {
+	if check == nil {
+		return
+	}
+	for _, part := range []string{"game", "dlc", "mods"} {
+		var items []app.PackCheckItem
+		for _, item := range check.Items {
+			if item.Part == part {
+				items = append(items, item)
+			}
+		}
+		label := part
+		if part == "dlc" {
+			label = "DLC"
+		}
+		if len(items) == 0 {
+			root.KV(label, "no differences reported")
+			continue
+		}
+		n := root.Add(label)
+		for _, item := range items {
+			n.Add(item.Level + ": " + item.Text)
+		}
+	}
 }
 
 func packRemoveCmd(c *Ctx, a *Args) (*render.Doc, error) {

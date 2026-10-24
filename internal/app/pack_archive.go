@@ -599,7 +599,8 @@ func (a *App) extractPackArchive(ar *packArchive) (*PackMatch, error) {
 	if err := os.Rename(tmp, dir); err != nil {
 		return nil, err
 	}
-	return &PackMatch{Pack: p, Dir: dir, Verified: p.Format >= 2}, nil
+	e, _ := a.Env() // importing on a new installation can precede choosing a game
+	return &PackMatch{Pack: p, Dir: dir, Verified: p.Format >= 2, Check: a.CheckPack(p, e, problems)}, nil
 }
 
 func (a *App) exportPackArchive(name, file string, p *Pack) (int64, error) {

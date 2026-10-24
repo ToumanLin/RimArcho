@@ -417,8 +417,8 @@ func TestPackImportVerifies(t *testing.T) {
 	if _, problems, err := e.App.VerifyPackFile(bad); err != nil || len(problems) != 1 || problems[0].PackageID != target.PackageID {
 		t.Fatalf("tampered streaming verify: %+v %v", problems, err)
 	}
-	if out := e.MustRun("pack", "check", bad); !strings.Contains(out, target.Name) || !strings.Contains(out, "content differs") {
-		t.Fatal(out)
+	if out, code := e.Run("pack", "check", bad); code == 0 || !strings.Contains(out, "blocked") || !strings.Contains(out, target.Name) || !strings.Contains(out, "content differs") {
+		t.Fatalf("exit %d: %s", code, out)
 	}
 	// Missing carried folders are also named, even in the old format.
 	for _, format := range []int{1, 2} {
@@ -437,8 +437,8 @@ func TestPackImportVerifies(t *testing.T) {
 	if err != nil || len(problems) != 1 || problems[0].Name != target.Name {
 		t.Fatalf("installed verify: %+v %v", problems, err)
 	}
-	if out := e.MustRun("pack", "check", p.Name); !strings.Contains(out, target.Name) {
-		t.Fatal(out)
+	if out, code := e.Run("pack", "check", p.Name); code == 0 || !strings.Contains(out, "blocked") || !strings.Contains(out, target.Name) {
+		t.Fatalf("exit %d: %s", code, out)
 	}
 	refused := filepath.Join(e.Root, "refused.archopack")
 	if _, err := e.App.ExportPack(p.Name, refused, false); err == nil || !strings.Contains(err.Error(), target.Name) {
