@@ -2,6 +2,7 @@
 // game log (§2.10), Mod 库 › 变化 (§2.9), the full detail (§4.2), packs, the environment
 // and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
+import { linkRows } from "./linkrows.js";
 import { copyablePath, pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
 import { icon } from "./icons.js";
@@ -377,7 +378,7 @@ function needCard(it, i) {
     if (it.why) body.append(el("div", "why sub", it.why));
   } else {
     body.append(el("div", "title word-facts", it.title || it.text));
-    if (it.why) body.append(el("div", "why", it.why));
+    if (it.why && !it.linkGroups?.length) body.append(el("div", "why", it.why));
   }
   top.append(body);
   const acts = it.actions || [];
@@ -398,6 +399,7 @@ function needCard(it, i) {
   }
   top.append(right);
   row.append(top);
+  if (it.linkGroups?.length) row.append(linkRows(it.linkGroups));
   if (it.fold && N.open.has(it.text)) {
     const parts = el("div", "parts");
     for (const p of it.parts || []) parts.append(el("div", "", ", " + p));
@@ -447,7 +449,10 @@ async function runAction(it, act) {
   }
   if (act.confirm) {
     // Not undone with u: ask first (06 §6).
-    return pop.confirm(act.label, act.kind === "repair-links" ? act.lines : [act.warn || act.label], act.label, () => doAction(act, 0));
+    if (act.kind === "repair-links" && act.linkGroups?.length) {
+      return pop.panel(act.label, linkRows(act.linkGroups), act.label, () => doAction(act, 0), "link-repair", act.kind);
+    }
+    return pop.confirm(act.label, [act.warn || act.label], act.label, () => doAction(act, 0));
   }
   return doAction(act, 0);
 }

@@ -53,7 +53,7 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	d, root := render.New("test run: " + r.Plan + "  env:" + r.Env)
 	root.KV("status", r.Status)
 	for _, l := range r.Links {
-		root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.Reason)
+		root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.ShortReason())
 	}
 	root.KV("game", r.GameVersion)
 	root.KV("load", fmt.Sprintf("%.1fs (total %.1fs)", r.LoadSeconds, r.TotalSeconds))
