@@ -6,6 +6,7 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -76,6 +77,12 @@ func BrowserArgs(gpu bool) []string {
 	args := []string{"--enable-features=NetworkServiceInProcess2", "--renderer-process-limit=1"}
 	if !gpu {
 		args = append(args, "--disable-gpu", "--disable-gpu-compositing", "--in-process-gpu")
+	}
+	// Testing only (07 §4): RIMARCHO_DEVTOOLS_PORT opens WebView2's DevTools protocol on
+	// 127.0.0.1 so a test script can drive the real window, for example in the test VM.
+	// Unset for players, so nothing listens.
+	if port := os.Getenv("RIMARCHO_DEVTOOLS_PORT"); port != "" {
+		args = append(args, "--remote-debugging-port="+port)
 	}
 	return args
 }

@@ -69,8 +69,13 @@ func TestFormRoutesRunnable(t *testing.T) {
 		}
 		return string(b)
 	}
-	main, plans, exchange := read("main"), read("plans"), read("exchange")
-	for _, route := range []string{`case "plan-import"`, `case "plan-export"`, `case "new-plan"`, `newList:`, `undoStatus()`} {
+	main, navigation, plans, exchange := read("main"), read("navigation"), read("plans"), read("exchange")
+	for _, route := range []string{`case "plan-import"`, `case "plan-export"`} {
+		if !strings.Contains(navigation, route) {
+			t.Errorf("missing page route %s", route)
+		}
+	}
+	for _, route := range []string{`case "new-plan"`, `newList:`, `undoStatus()`} {
 		if !strings.Contains(main, route) {
 			t.Errorf("missing route %s", route)
 		}

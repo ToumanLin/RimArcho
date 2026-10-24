@@ -27,8 +27,10 @@ import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
+import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
+import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } from "./navigation.js";
 
 // ---- loading ----
 
@@ -164,59 +166,6 @@ let lastList = 1;
 
 // The sidebar's entries in shift+1–8 order, 在玩 then 库 (06 §3.5; view.Nav).
 const NAV = ["home", "needs", "log", "library", "plans", "packs", "textures", "env"];
-
-// go opens a sidebar page; "plan" is the current plan's editor, "plan:<id>" a plan (it
-// becomes current: no game file is written), "plan:new" the new-list form, "pack:<name>"
-// a pack on the packs page.
-async function go(id) {
-  if (uninst.locked()) return; // an uninstall runs, or has run (06 §2.14)
-  shell.navigated();
-  if (id === "plan:new") return plans.newPlan();
-  const plan = id.startsWith("plan:") ? +id.slice(5) : null;
-  if (plan !== null) id = "plan";
-  S.packFocus = id.startsWith("pack:") ? id.slice(5) : null;
-  if (id !== "plans") planManage.abandon();
-  if (id !== "build") S.buildFrom = null;
-  if (id !== "plan-export") S.planExport = null;
-  await openPage(id, plan);
-  // a page already shown is redrawn in place: its sub-entry and breadcrumb follow too
-  renderWhere();
-}
-
-async function openPage(id, plan = null) {
-  if (S.packFocus) return packsPage.pack(S.packFocus);
-  switch (id) {
-    case "plan":
-      return openEditor(async (read) => {
-        if (plan !== null && plan !== S.shell?.plan?.id && !S.busy.env) {
-          await api.UsePlan(plan);
-          if (!read.current()) return false;
-          S.cols.forEach((c, k) => {
-            c.query = ""; c.cursor = 0; c.sel.clear(); c.searching = false;
-            const input = $(`.area[data-area="${k}"] .search input`);
-            if (input) input.value = "";
-          });
-        }
-        return reload(null, read);
-      }, plan !== null && plan !== S.shell?.plan?.id, () => { render(); detailFollow(true); });
-    case "home": return homePage.home();
-    case "needs": return scr.needs();
-    case "packs": return packsPage.list();
-    case "plans": return planManage.open();
-    case "plan-import": return exchange();
-    case "plan-export": return planManage.exportOf(planManage.exportPlan(), planManage.exportFrom());
-    case "build": return packsPage.build();
-    case "env": return scr.environment();
-    case "changes": return scr.changes(S.screen === "changes" ? undefined : null);
-    case "library": return library.open();
-    case "log": return scr.gameLog(undefined, true);
-    case "settings": return scr.settings();
-    case "uninstall": return uninst.open();
-    case "textures": return tex.open();
-    case "tasks": return tasksPage.open();
-    case "guide": return guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
-  }
-}
 
 // renderWhere: the position line (06 §3.2), the sidebar and the breadcrumb.
 function renderWhere() {
@@ -950,7 +899,7 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, refreshEnvironment, relang, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
+  reload, refreshEnvironment, relang, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
@@ -966,6 +915,8 @@ async function start() {
   S.start = s;
   setText(s.text);
   document.documentElement.lang = s.lang;
+  initNavigation(ui);
+  wireHistory();
   pop.initPopups(ui);
   scr.initScreens(ui);
   shell.initShell(ui);
@@ -1020,6 +971,11 @@ async function start() {
   on("uninstall", (ev) => uninst.event(ev));
   on("textures", (ev) => tex.event(ev));
   on("tasks", (ev) => tasksPage.event(ev));
+  // Menu art is prepared after the first draw, outside the task page (06 §2.14).
+  on("backgrounds", () => {
+    if (S.screen === "home") homePage.home({ keep: true });
+    if (S.screen === "settings") refreshBackgrounds();
+  });
   // a task's o on a mod: Mod 库存 searching for it (06 §2.16)
   document.addEventListener("library-search", async (e) => { shell.navigated(); await library.openSearch(e.detail); renderWhere(); });
   tasksPage.refreshFoot();

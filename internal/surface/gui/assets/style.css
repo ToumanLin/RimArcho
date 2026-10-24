@@ -717,6 +717,12 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
    are reached by their keys and the command palette) */
 @media (max-width: 680px) { #board { grid-template-columns: 1fr var(--card-gap) 1.2fr 0 0; } #board > .stack, #board [data-split="1"] { display: none; } }
 
+.kind { flex: none; font-size: 12px; line-height: 16px; padding: 0 5px; border-radius: var(--r-sm); color: var(--muted); border: var(--hairline) solid var(--line); white-space: nowrap; }
+.card.empty-state { padding: 32px 16px; }
+svg.i.fill { fill: currentColor; }
+.packs .pack.hl { background: var(--accent-soft); }
+
+/* home: special case, 06 §7.3 */
 /* ---- 启动 (06 §2.3): like the game's main menu — the plans and packs down the left over a
    background image, the last run and scan under them, ▶ 启动游戏 in the bottom right with the
    applied list's problem tucked under it like a tab ---- */
@@ -732,7 +738,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
   linear-gradient(0deg, rgba(10, 10, 14, .82) 0, rgba(10, 10, 14, .5) 30%, rgba(10, 10, 14, 0) 55%),
   linear-gradient(180deg, rgba(10, 10, 14, .5), rgba(10, 10, 14, 0) 72px); }
 /* over the image the text is light whatever the theme */
-#app.photo #top, #app.photo #body { --fg: #f1f1f4; --fg-2: #cfcfd6; --muted: #a2a2ab; --faint: #6c6c75; --line: rgba(255, 255, 255, .2); --line-2: rgba(255, 255, 255, .12); --pill: rgba(255, 255, 255, .1); --pill-hover: rgba(255, 255, 255, .16);
+#app.photo #top, #app.photo #body { --fg: #f1f1f4; --fg-2: #cfcfd6; --muted: #a2a2ab; --faint: #6c6c75; --line: rgba(255, 255, 255, .2); --pill: rgba(255, 255, 255, .1); --pill-hover: rgba(255, 255, 255, .16);
   --accent: #a5b4fc; --accent-fg: #14142a; --amber: #f2b544; }
 #app.photo #screen { background: transparent; }
 #app.photo #board { visibility: hidden; }
@@ -741,9 +747,10 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 /* 启动 (06 §2.3) on a 12-column grid: the headline carries the page; under a rule the three
    steps read left to right; ▶ 启动游戏 is the one block of colour. */
 .page.home { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr) auto auto;
-  column-gap: 24px; padding: 8px 48px 36px; overflow-y: auto; }
+  gap: 12px 24px; padding: 8px 48px 36px; overflow-y: auto; font-variant-numeric: normal; }
+.page.home::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 10px; }
 .hm-act { grid-column: 8 / 13; grid-row: 1; justify-self: end; width: 100%; max-width: 380px; display: flex; flex-direction: column; }
-.hm-actline { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; padding: 6px 0; border-bottom: var(--hairline) solid var(--line-2); font-size: 12px; text-align: left; color: var(--fg-2); }
+.hm-actline { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; text-align: left; color: var(--fg-2); }
 .hm-actline .t { font-weight: 600; color: var(--fg); }
 .hm-actline .x { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-actline .go { color: var(--muted); transition: transform var(--t-layout) var(--ease); }
@@ -752,20 +759,20 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .hm-kick { display: flex; gap: 14px; align-items: baseline; font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 12px; min-width: 0; }
 .hm-kick span { color: var(--muted); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-headline { overflow: hidden; margin-bottom: -.08em; }
-.hm-headline h1 { margin: 0; padding-bottom: .1em; font: 700 32px/1 var(--font); letter-spacing: -.03em; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-headline h1 { margin: 0; padding-bottom: .1em; font: 700 clamp(48px, 7.6vw, 124px)/1 var(--font); letter-spacing: -.03em; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hm-headline h1.in { animation: hm-up var(--t-enter) var(--ease) both; }
-.hm-facts { display: flex; flex-wrap: wrap; gap: 6px 26px; margin-top: 18px; font-size: 13px; color: var(--fg-2); }
+.hm-facts { display: flex; flex-wrap: wrap; gap: 6px 26px; margin-top: 18px; font-size: 14px; color: var(--fg-2); }
 .hm-facts.in { animation: hm-fade var(--t-enter) .12s var(--ease) both; }
 .hm-state { display: inline-flex; align-items: center; gap: 8px; }
 .hm-state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
 .hm-state.bad { color: var(--amber); }
-.hm-state.bad::before { background: var(--amber); border-radius: var(--r-sm); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-.hm-state.none::before { background: none; border: var(--hairline) solid var(--muted); }
-.hm-rule { grid-column: 1 / 13; grid-row: 3; height: var(--hairline); background: color-mix(in srgb, var(--line) 60%, transparent); transform-origin: left; }
+.hm-state.bad::before { background: var(--amber); border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.hm-state.none::before { background: none; box-shadow: inset 0 0 0 1.5px var(--muted); }
+.hm-rule { grid-column: 1 / 13; grid-row: 3; height: 2px; background: var(--fg); transform-origin: left; }
 .hm-rule.in { animation: hm-draw var(--t-layout) .1s var(--ease) both; }
 .hm-step { grid-row: 4; position: relative; padding-top: 16px; min-width: 0; }
 .hm-s1 { grid-column: 1 / 4; } .hm-s2 { grid-column: 4 / 9; } .hm-s3 { grid-column: 9 / 13; }
-.hm-step h3 { display: flex; gap: 12px; margin: 0 0 14px; font-size: 12px; font-weight: 600; letter-spacing: .1em; color: var(--muted); }
+.hm-step h3 { display: flex; gap: 12px; margin: 0 0 14px; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--muted); }
 .hm-step h3 b { color: var(--fg); }
 .hm-step:focus-within h3 b { color: var(--accent); } /* The number is the focus key (06 §7.3). */
 /* Startup hints use 16px gaps (06 §2.3); the shared renderer supplies the separators. */
@@ -773,30 +780,29 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 #app:has(.page.home) #hints b { color: var(--fg); }
 .hm-picks { position: relative; display: flex; flex-direction: column; }
 /* the steps' rows: unpicked ones recede, the picked one is the text colour and bold */
-.hm-pick { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 12px; height: 40px; padding: 0; border-bottom: var(--hairline) solid var(--line-2);
-  font-size: 15px; text-align: left; color: color-mix(in srgb, var(--fg) 42%, var(--bg)); transition: color var(--t-layout); }
+.hm-pick { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 12px; height: 40px; padding: 0; border-bottom: 1px solid var(--line);
+  font-size: 17px; text-align: left; color: color-mix(in srgb, var(--fg) 42%, var(--bg)); transition: color var(--t-layout); }
 #app.photo .hm-pick { color: color-mix(in srgb, var(--fg) 46%, transparent); }
 #app.photo .hm-pick.on, #app.photo .hm-pick:hover { color: var(--fg); }
 .hm-pick:hover { color: var(--fg); }
 .hm-pick.on { color: var(--fg); font-weight: 600; }
-.hm-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Column focus is shown only by its number (06 §2.3); other controls keep their focus rings. */
+.hm-step:focus, .hm-pick:focus-visible, .hm-go:focus { outline: none; }
 .hm-pick .nm { line-height: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hm-pick small { font-size: 12px; font-weight: 400; color: var(--muted); }
-.hm-pick .flag { font-size: 12px; margin-left: 8px; vertical-align: 3px; color: var(--muted); }
+.hm-pick small { font-size: 11.5px; font-weight: 400; color: var(--muted); }
+.hm-pick .flag { font-size: 9px; margin-left: 8px; vertical-align: 3px; color: var(--muted); }
 .hm-pick .flag.bad { color: var(--amber); }
 .hm-mark { position: absolute; left: -16px; top: 0; width: 7px; height: 7px; background: var(--accent); transition: transform var(--t-layout) var(--ease); pointer-events: none; }
 .hm-picks.enter .hm-pick { animation: hm-rise var(--t-enter) var(--ease) both; animation-delay: calc(var(--d) * 55ms); }
 .hm-go { position: relative; overflow: hidden; width: 100%; height: 136px; padding: 16px 18px; background: var(--accent); color: var(--accent-fg); display: flex; flex-direction: column;
   justify-content: space-between; text-align: left; transition: filter var(--t-layout); }
 .hm-go:hover:not(:disabled) { filter: brightness(1.1); }
-/* the editor's 启动游戏 lands here with the focus on it (06 §2.5): L or enter starts the game */
-.hm-go:focus-visible, .hm-go:focus { outline: 2px solid var(--fg); outline-offset: 3px; }
 .hm-go .top, .hm-go .bottom { display: flex; justify-content: space-between; gap: 12px; }
 .hm-go .top { align-items: flex-start; } .hm-go .bottom { align-items: flex-end; }
-.hm-go .title { font-size: 15px; font-weight: 700; letter-spacing: -.01em; line-height: 1; }
-.hm-go kbd { font: 600 12px var(--code); border: var(--hairline) solid currentColor; opacity: .6; padding: 2px 6px; }
-.hm-go .sub { font-size: 13px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hm-go .arrow { font-size: 15px; line-height: .8; font-weight: 300; transition: transform var(--t-layout) var(--ease); }
+.hm-go .title { font-size: 26px; font-weight: 700; letter-spacing: -.01em; line-height: 1; }
+.hm-go kbd { font: 600 11px var(--code); border: 1px solid currentColor; opacity: .6; padding: 2px 6px; }
+.hm-go .sub { font-size: 12.5px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-go .arrow { font-size: 40px; line-height: .8; font-weight: 300; transition: transform var(--t-layout) var(--ease); }
 .hm-go:hover:not(:disabled) .arrow { transform: translateX(8px); }
 .hm-go::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(0, 0, 0, .16); }
 .hm-go.starting::after { animation: hm-fill 1.6s var(--ease) forwards; }
@@ -806,7 +812,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 /* switching (06 §2.3): ▶ says what is loading, a bar sweeps along its foot; the new pick
    comes in when the page is read again */
 .hm-go.switching { cursor: progress; filter: saturate(.85); }
-.hm-go.switching .title { font-size: 15px; line-height: 1.15; animation: hm-fade var(--t-enter) var(--ease) both; }
+.hm-go.switching .title { font-size: 20px; line-height: 1.15; animation: hm-fade var(--t-enter) var(--ease) both; }
 .hm-go.switching .sub { animation: hm-fade var(--t-enter) .08s var(--ease) both; }
 .hm-go.switching::before { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .16) 50%, transparent 70%);
   transform: translateX(-100%); animation: hm-sweep 1.6s ease-in-out infinite; }
@@ -820,18 +826,19 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 /* the applied row's problem under ▶; × hides it until something about the row changes */
 .hm-note { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--t-enter) var(--ease), opacity var(--t-enter) var(--ease); }
 .hm-note > div { min-height: 0; overflow: hidden; }
-.hm-note .box { position: relative; margin-top: 12px; padding: 10px 30px 0 0; border-top: var(--hairline) solid var(--line-2); font-size: 13px; }
+.hm-note .box { position: relative; margin-top: 12px; padding: 10px 30px 0 0; border-top: 1px solid var(--line); font-size: 12.5px; }
 .hm-note.bad .box { border-top-color: var(--amber); }
 .hm-note .what { display: block; font-weight: 600; color: var(--fg); text-align: left; }
 .hm-note.bad .what { color: var(--amber); }
 .hm-note button.what:hover { text-decoration: underline; }
 .hm-note .why { color: var(--muted); margin-top: 3px; font-size: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.hm-note .x { position: absolute; right: 0; top: 7px; width: 22px; height: 22px; font-size: 15px; line-height: 22px; text-align: center; color: var(--muted); border-radius: var(--r-sm); }
+.hm-note .x { position: absolute; right: 0; top: 7px; width: 22px; height: 22px; font-size: 17px; line-height: 22px; text-align: center; color: var(--muted); border-radius: 4px; }
 .hm-note .x:hover { color: var(--fg); background: var(--pill); }
 .hm-note.enter { animation: hm-fade var(--t-enter) var(--ease) both; }
 .hm-note.leaving { grid-template-rows: 0fr; opacity: 0; transition-duration: var(--t-exit); transition-timing-function: var(--ease-in); }
 .hm-empty { grid-column: 1 / 13; grid-row: 2; align-self: center; }
-.hm-empty h1 { margin: 0 0 24px; font: 700 32px/1.1 var(--font); letter-spacing: -.02em; color: var(--fg); }
+.hm-empty .btn { font-size: 12px; border: 1px solid var(--line); }
+.hm-empty h1 { margin: 0 0 24px; font: 700 clamp(32px, 4.5vw, 64px)/1.1 var(--font); letter-spacing: -.02em; color: var(--fg); }
 @keyframes hm-up { from { transform: translateY(105%); } to { transform: none; } }
 @keyframes hm-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes hm-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
@@ -844,10 +851,6 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 @keyframes hm-flash { 0% { opacity: .22; } 100% { opacity: 0; } }
 @keyframes hm-leave { to { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .page.home * { animation: none !important; transition: none !important; } }
-.kind { flex: none; font-size: 12px; line-height: 16px; padding: 0 5px; border-radius: var(--r-sm); color: var(--muted); border: var(--hairline) solid var(--line); white-space: nowrap; }
-.card.empty-state { padding: 32px 16px; }
-svg.i.fill { fill: currentColor; }
-.packs .pack.hl { background: var(--accent-soft); }
 @media (max-width: 1000px) {
   .page.home { padding: 8px 28px 28px; }
   .hm-act { display: none; }
@@ -859,6 +862,7 @@ svg.i.fill { fill: currentColor; }
   .hm-hero { padding: 28px 0 24px; }
   .hm-mark { display: none; }
 }
+/* end home */
 
 /* ---- 设置 › 启动页背景 (06 §2.14): the launch page in small, the controls beside it, the
    images by group below ---- */
@@ -1222,6 +1226,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 
 /* 库 › 贴图优化 (08 §5.2): settings rows, the run's foot, the mods table */
 .textures .set .sub { white-space: normal; }
+/* 06 §2.13: offscreen texture cells need no layout/paint during background estimates. */
+.tex-rows .data-row { content-visibility: auto; contain-intrinsic-size: auto 30px; }
 .textures .set .sub.warn, .tex-rows .warn { color: var(--amber); }
 .tex-foot { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin: 14px 0 18px; }
 .tex-foot .prog { flex: 1; }

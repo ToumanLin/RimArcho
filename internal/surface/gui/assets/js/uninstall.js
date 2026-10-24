@@ -26,15 +26,16 @@ async function answer(k, v) {
 }
 
 async function draw(fetch) {
+  let read;
   if (fetch) {
-    const read = beginPageRead("uninstall", { replace: true });
+    read = beginPageRead("uninstall", { replace: true });
     U.loading = true;
     try {
       const p = await api.UninstallPlan({ ...U.choice });
       if (!read.current()) return;
       U.page = p;
     } catch (e) { read.fail(e); return; }
-    finally { if (read.current()) { U.loading = false; read.finish(); } }
+    finally { if (read.current()) U.loading = false; }
   }
   if (S.screen !== "uninstall") return;
   const pg = U.page;
@@ -51,6 +52,7 @@ async function draw(fetch) {
   w.append(card);
   w.append(foot(pg));
   sc.scrollTop = top;
+  read?.finish();
 }
 
 function stepRow(pg, s) {

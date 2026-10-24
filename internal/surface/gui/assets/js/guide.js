@@ -19,6 +19,9 @@ export function initGuide(u) {
   on("tasks", () => updateSteamCMD());
 }
 
+let session = 0, activeSession = null;
+export const historySession = () => activeSession;
+
 const STEPS = ["find the game", "read the mods", "where to start"];
 const G = { step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "" };
 // The download way: SteamCMD's info (DownloadInfo), the choices, and a run's progress.
@@ -45,6 +48,7 @@ async function updateSteamCMD() {
 
 // start opens the guide at step 1; from is "first" (no environment yet) or "env".
 export async function start(from = "first") {
+  activeSession = ++session;
   S.guideFrom = from;
   G.step = 0;
   G.added = [];
@@ -67,7 +71,7 @@ async function find() {
   read.finish();
 }
 
-export function resume() { beginPageRead("guide"); draw(); $("#screen").removeAttribute("aria-busy"); }
+export function resume() { beginPageRead("guide"); draw(); $("#screen").removeAttribute("aria-busy"); ui.pageEntered?.(); }
 
 function draw() {
   if (S.screen !== "guide") return;
@@ -440,6 +444,7 @@ function way(title, text, action) {
 }
 
 async function finish(text) {
+  activeSession = null;
   ui.afterImport = null;
   G.scan = null;
   if (text) say("ok", text);

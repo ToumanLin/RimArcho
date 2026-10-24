@@ -4,6 +4,7 @@ package view
 // in both interfaces.
 func init() {
 	Register(map[string]string{
+		"page back / forward": "页面后退 / 前进",
 		// ops
 		"use this one in the current list":      "在当前列表里用这一份",
 		"disable":                               "停用",

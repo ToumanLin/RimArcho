@@ -26,6 +26,19 @@ func TestStyleRules(t *testing.T) {
 }
 
 func styleProblems(source string) []string {
+	// The Swiss-grid home design has its own sizes, rules and radii (06 §2.3, 06 §7.3).
+	// Only these three checks are exempt inside the explicit home section; side strips
+	// and token definitions still obey the shared rules. Keep offsets for diagnostics.
+	const homeStart = "/* home: special case, 06 §7.3 */"
+	const homeEnd = "/* end home */"
+	start, end := strings.Index(source, homeStart), strings.Index(source, homeEnd)
+	var problems []string
+	if start >= 0 || end >= 0 {
+		if strings.Count(source, homeStart) != 1 || strings.Count(source, homeEnd) != 1 || end < start {
+			problems = append(problems, "assets/style.css: invalid home exception boundaries")
+			start, end = -1, -1
+		}
+	}
 	css := cssComments.ReplaceAllStringFunc(source, func(s string) string {
 		b := []byte(s)
 		for i := range b {
@@ -58,11 +71,11 @@ func styleProblems(source string) []string {
 		}
 		return styleFontSizeOK(value)
 	}
-	var problems []string
 	for _, d := range decls {
 		name, value := css[d[2]:d[3]], strings.TrimSpace(css[d[4]:d[5]])
 		value = strings.TrimSpace(strings.TrimSuffix(value, "!important"))
 		bad := false
+		home := start >= 0 && d[2] > start && d[2] < end
 		switch {
 		case name == "--r-lg":
 			bad = value != "12px"
@@ -70,15 +83,15 @@ func styleProblems(source string) []string {
 			bad = value != "6px"
 		case name == "--hairline":
 			bad = value != "1px" && value != "0.5px"
-		case strings.HasPrefix(name, "border-") && strings.HasSuffix(name, "radius"):
+		case !home && strings.HasPrefix(name, "border-") && strings.HasSuffix(name, "radius"):
 			for _, v := range cssTokens.FindAllString(value, -1) {
 				if v != "var(--r-lg)" && v != "var(--r-sm)" && v != "50%" && v != "999px" && v != "inherit" && v != "/" {
 					bad = true
 				}
 			}
-		case name == "font-size":
+		case !home && name == "font-size":
 			bad = !fontOK(value)
-		case name == "font" && value != "inherit":
+		case !home && name == "font" && value != "inherit":
 			found := false
 			for _, v := range cssTokens.FindAllString(value, -1) {
 				if cssFontSize.MatchString(v) {
@@ -87,7 +100,7 @@ func styleProblems(source string) []string {
 				}
 			}
 			bad = bad || !found
-		case name == "border" || cssBorderWidth.MatchString(name):
+		case !home && (name == "border" || cssBorderWidth.MatchString(name)):
 			// Shorthands must name their width first; width lists must use only the token or zero.
 			tokens := cssTokens.FindAllString(value, -1)
 			if len(tokens) == 0 {
@@ -181,6 +194,34 @@ func TestStyleRulesDetection(t *testing.T) {
 		}
 		if strings.Contains(tc.css, "ignored") && len(got) > 0 && !strings.Contains(got[0], ":4: font-size: 7px") {
 			t.Errorf("wrong source location: %v", got)
+		}
+	}
+}
+
+// The exception must stop at its closing marker and must not bypass other rules (06 §7.3).
+func TestStyleRulesHomeException(t *testing.T) {
+	const start = "/* home: special case, 06 §7.3 */"
+	const end = "/* end home */"
+	const sizes = ".hm-example { font-size: 17px; font: 700 clamp(48px, 7.6vw, 124px)/1 sans-serif; border-top: 2px solid var(--fg); border-radius: 4px; }"
+	for _, tc := range []struct {
+		css  string
+		want int
+	}{
+		{start + sizes + end, 0},
+		{sizes + start + sizes + end + sizes, 8},
+		{start + ".hm-example { border-left: 2px solid var(--accent); box-shadow: inset 2px 0 0 var(--accent); }" + end, 2},
+		{start + ":root { --r-sm: 4px; --hairline: 2px; }" + end, 2},
+		{start + sizes, 5},
+		{end + start + sizes, 5},
+		{start + start + sizes + end, 5},
+		{start + "\n" + sizes + "\n" + end + "\n.a { font-size: 7px; }", 1},
+	} {
+		got := styleProblems(tc.css)
+		if len(got) != tc.want {
+			t.Errorf("%s: got %v; want %d failures", tc.css, got, tc.want)
+		}
+		if strings.Contains(tc.css, ".a {") && len(got) > 0 && !strings.Contains(got[0], ":4: font-size: 7px") {
+			t.Errorf("wrong source location after home exception: %v", got)
 		}
 	}
 }

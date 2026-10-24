@@ -75,6 +75,13 @@ func (s *API) logSession() (*app.App, error) {
 
 // Close releases the page reader's database connection (also used by the dev harness).
 func (s *API) Close() {
+	s.mu.Lock()
+	s.bgRead.closed = true
+	if s.bgRead.cancel != nil {
+		s.bgRead.cancel()
+	}
+	s.mu.Unlock()
+	s.bgRead.workers.Wait()
 	s.buildRead.workers.Wait()
 	s.environment.mu.Lock()
 	s.environment.closed = true
