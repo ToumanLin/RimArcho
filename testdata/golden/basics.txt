@@ -116,6 +116,13 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     db vacuum                                 compact the database
     cache status                              the caches and their sizes
     cache clear <kind>                        empty one cache (previews, workshop, images, source, logs); rebuilt on demand
+    subscribe git <url>                       install a Git mod and track its branch, tag or commit
+    subscribe list                            list installed subscriptions and their last update check
+    subscribe page <url>                      inspect a download page or install its Git repository or a downloaded archive
+    subscribe workshop <id|url…>              subscribe through Steam, with SteamCMD fallback when Steam is unavailable
+    subscribe check [ref…]                    check upstream references for updates (default: all subscriptions)
+    subscribe update [ref…]                   update subscriptions; page subscriptions require --from (refused while the game runs)
+    subscribe remove <ref…>                   move subscription folders to the recycle bin; warn when plans use them
     textures status [<mod>...]                PNG textures, the DDS RimArcho made (and stale ones), and what converting them would take and save
     textures optimize [<mod>...]              write the DDS of mods' PNG textures next to them (the game loads them instead; the PNGs stay)
     textures clean [<mod>...]                 delete the DDS RimArcho wrote (only those; the game goes back to the PNGs)

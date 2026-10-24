@@ -44,11 +44,19 @@ func libStateText(s, mm string) string {
 		return "hidden by another manager"
 	case app.LibUpdated:
 		return "upstream updated"
+	case app.LibSourceUpdate:
+		return "source update available"
 	}
 	return s
 }
 
 func libKind(c *Ctx, i *app.LibInstance) string {
+	if i.Source == app.LibGit {
+		return "Git"
+	}
+	if i.Source == app.LibPage {
+		return "download page"
+	}
 	if i.Source == app.LibLocked && !i.Created.IsZero() {
 		return "locked " + c.App.FormatTime(i.Created)
 	}
@@ -208,6 +216,7 @@ func libraryLineageDoc(c *Ctx, lib *app.Library, l *app.LibLineage) *render.Doc 
 			line += "  (current plan)"
 		}
 		x := root.Add(line)
+		subscriptionLines(c, x, i.Subscription)
 		if i.Path != "" {
 			x.KV("path", i.Path)
 		}
@@ -303,6 +312,12 @@ func libNext(i *app.LibInstance, inPlan bool) []string {
 			out = append(out, "archo workshop subscribe "+i.Ref, "archo trash "+i.Ref+" --dry-run")
 		case app.LibUpdated:
 			out = append(out, "archo pin --update "+i.Ref+" --dry-run")
+		case app.LibSourceUpdate:
+			from := ""
+			if i.Subscription != nil && i.Subscription.Kind == "page" {
+				from = " --from <zip|folder>"
+			}
+			out = append(out, "archo subscribe update "+i.Ref+from+" --dry-run")
 		}
 	}
 	if i.Spare && i.Source == app.LibLocal {

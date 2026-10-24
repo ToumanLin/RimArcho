@@ -15,33 +15,35 @@ import (
 // Task kinds of RimArcho's own jobs (the lane "self"); the files and Steam lanes' kinds
 // are Mod 库's ops (LibDelete, LibUnsub, …).
 const (
-	TaskScan      = "scan"
-	TaskAnalyze   = "analyze"
-	TaskPack      = "pack"
-	TaskTextures  = OpTextures
-	TaskTexClean  = OpTexClean
-	TaskDownload  = "download"
-	TaskSteamCMD  = "install-steamcmd"
-	TaskTodds     = "install-todds"
-	TaskWezTerm   = "install-wezterm"
-	TaskDepRemove = "remove-dependency"
-	TaskData      = "data-update"
-	TaskCache     = "cache-clear"
-	TaskBackup    = "db-backup"
-	TaskVacuum    = "db-vacuum"
-	TaskGC        = "gc"
-	PageTasks     = "tasks"
-	taskKeyStop   = "x"
-	taskKeyRetry  = "r"
-	taskKeyGoto   = "o"
-	taskKeyFolder = "ctrl+o"
-	taskKeyForget = "Del"
+	TaskScan             = "scan"
+	TaskAnalyze          = "analyze"
+	TaskPack             = "pack"
+	TaskTextures         = OpTextures
+	TaskTexClean         = OpTexClean
+	TaskDownload         = "download"
+	TaskSteamCMD         = "install-steamcmd"
+	TaskTodds            = "install-todds"
+	TaskWezTerm          = "install-wezterm"
+	TaskDepRemove        = "remove-dependency"
+	TaskData             = "data-update"
+	TaskCache            = "cache-clear"
+	TaskBackup           = "db-backup"
+	TaskVacuum           = "db-vacuum"
+	TaskGC               = "gc"
+	TaskSubscribe        = "subscribe"
+	TaskSubscriptionFrom = "subscription-from"
+	PageTasks            = "tasks"
+	taskKeyStop          = "x"
+	taskKeyRetry         = "r"
+	taskKeyGoto          = "o"
+	taskKeyFolder        = "ctrl+o"
+	taskKeyForget        = "Del"
 )
 
 // IsSettingTask identifies maintenance tasks shared by settings and the guide.
 func IsSettingTask(kind string) bool {
 	switch kind {
-	case TaskSteamCMD, TaskTodds, TaskWezTerm, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
+	case TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskWezTerm, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
 		return true
 	}
 	return false
@@ -53,7 +55,7 @@ func TaskLane(kind string) string {
 	switch kind {
 	case LibUnsub, LibResub:
 		return app.LaneSteam
-	case LibDelete, LibMove, LibUnhide, LibPin, LibPinUpdate, LibUnpin:
+	case OpSubRemove, OpSubCheck, OpSubUpdate, LibDelete, LibMove, LibUnhide, LibPin, LibPinUpdate, LibUnpin:
 		return app.LaneFiles
 	}
 	return ""
@@ -128,6 +130,10 @@ type TaskItemRow struct {
 // TaskTitle names a kind.
 func TaskTitle(kind string) string {
 	switch kind {
+	case TaskSubscribe:
+		return T("subscribe")
+	case TaskSubscriptionFrom:
+		return T("update subscription")
 	case TaskScan:
 		return T("scan the mods")
 	case TaskAnalyze:

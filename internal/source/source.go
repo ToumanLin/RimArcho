@@ -132,6 +132,9 @@ func List(root string) (entries []Entry, realRoot string, err error) {
 		return nil, realRoot, err
 	}
 	for _, de := range des {
+		if strings.HasPrefix(strings.ToLower(de.Name()), ".archo-") {
+			continue
+		}
 		p := filepath.Join(root, de.Name())
 		e := Entry{Name: de.Name(), Path: p, RealPath: filepath.Join(realRoot, de.Name())}
 		if IsLink(p) {

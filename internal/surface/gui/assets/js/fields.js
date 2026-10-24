@@ -8,7 +8,7 @@ import * as rt from "/wails/runtime.js";
 const Clipboard = rt.Clipboard || { SetText: () => Promise.reject(new Error("no clipboard")) };
 
 // Only these values copy on a click; the rest are just shown.
-const copyable = new Set(["id", "package", "path", "workshop"]);
+const copyable = new Set(["id", "package", "path", "workshop", "subscription-url", "subscription-repo"]);
 
 // fieldList draws fields; acts.tags runs the tag bar, acts.folder opens the location.
 export function fieldList(fields, acts = {}) {
@@ -46,7 +46,7 @@ export function fieldList(fields, acts = {}) {
       if (a.act === "tags") b.dataset.envWrite = a.act;
       if (a.act === "steam") b.title = "ctrl+s";
       b.onclick = () => {
-        if (a.act === "url") return api.OpenURL(f.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
+        if (a.act === "url") return api.OpenURL(f.url).then(() => say("ok", T("opened the page")), (e) => say("fail", errText(e)));
         if (a.act === "steam") return api.OpenSteamWorkshop("ws:" + f.value).then((t) => say("ok", t), (e) => say("fail", errText(e)));
         if (acts[a.act]) return acts[a.act](f);
       };

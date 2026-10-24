@@ -109,9 +109,10 @@ type LibRow struct {
 
 // LibInstRow is one copy.
 type LibInstRow struct {
-	ID    string `json:"id"` // the instance ("" for a subscribed item RimArcho never saw)
-	Ref   string `json:"ref"`
-	Label string `json:"label"` // 工坊  本地  锁定版本  26/10/21 14:27 …
+	SubscriptionKind string `json:"subscriptionKind,omitempty"`
+	ID               string `json:"id"` // the instance ("" for a subscribed item RimArcho never saw)
+	Ref              string `json:"ref"`
+	Label            string `json:"label"` // 工坊  本地  锁定版本  26/10/21 14:27 …
 	// Cells: Name is the copy's folder; Source its Label.
 	LibCells
 	// Note is the copy's own note (the player's or an agent's); Auto what RimArcho knows
@@ -187,6 +188,8 @@ func LibStateText(s, mm string) string {
 		return T("hidden by another manager")
 	case app.LibUpdated:
 		return T("a newer version is out")
+	case app.LibSourceUpdate:
+		return T("source update available")
 	}
 	return s
 }
@@ -194,6 +197,10 @@ func LibStateText(s, mm string) string {
 // LibSourceText names a source value.
 func LibSourceText(s string) string {
 	switch s {
+	case app.LibGit:
+		return "Git"
+	case app.LibPage:
+		return T("download page")
 	case app.LibWorkshop:
 		return T("workshop")
 	case app.LibLocal:
@@ -467,6 +474,9 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 
 func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow {
 	r := LibInstRow{Ref: i.Ref, Label: libLabel(i), InPlan: i.InPlan, Path: i.Path}
+	if i.Subscription != nil {
+		r.SubscriptionKind = i.Subscription.Kind
+	}
 	r.Size, r.Source = libSize(i.Bytes, i.Sized), r.Label
 	if i.Mod != nil {
 		r.ID = i.Mod.ID
@@ -616,7 +626,7 @@ func CopyNoteAuto(i *app.LibInstance) string {
 
 // libConfirm: the actions that change files (a dry run first); the plan edits are undone with u.
 var libConfirm = map[string]bool{LibPin: true, LibPinUpdate: true, LibUnpin: true, LibUnhide: true, LibMove: true, LibDelete: true, LibUnsub: true,
-	OpTextures: true, OpTexClean: true}
+	OpTextures: true, OpTexClean: true, OpSubRemove: true, OpSubUpdate: true}
 
 // texArgv is the textures command for copies (all of them in one run).
 func texArgv(kind string, refs []string) []string {
@@ -629,6 +639,10 @@ func texArgv(kind string, refs []string) []string {
 // libArgv is an action's archo command (its dry run with --dry-run).
 func libArgv(kind string, refs []string) []string {
 	switch kind {
+	case OpSubRemove:
+		return append([]string{"subscribe", "remove"}, refs...)
+	case OpSubUpdate:
+		return append([]string{"subscribe", "update"}, refs...)
 	case LibPin:
 		return []string{"pin", refs[0]}
 	case LibPinUpdate:
@@ -670,6 +684,14 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		return p, nil
 	}
 	for _, ref := range refs {
+		if kind == OpSubUpdate {
+			if m, err := st.Ix.ResolveOne(ref); err == nil {
+				if r := a.SubscriptionOf(m); r != nil && r.Kind == "page" {
+					p.Lines = append(p.Lines, m.DisplayName()+": "+T("page items skipped; choose downloaded files to update them"))
+					continue
+				}
+			}
+		}
 		out, code := cmds.Execute(a, append(libArgv(kind, []string{ref}), "--dry-run"))
 		for _, l := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
 			if strings.HasPrefix(l, "next:") {
@@ -699,7 +721,7 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 // usedWarning: deleting or unsubscribing a copy the lists use only warns; the player's word
 // goes, and the lists show it as missing (06 §2.9). "" when no list uses it.
 func usedWarning(a *app.App, st *app.LoadoutState, kind, ref string) string {
-	if kind != LibDelete && kind != LibUnsub {
+	if kind != LibDelete && kind != LibUnsub && kind != OpSubRemove {
 		return ""
 	}
 	m, err := st.Ix.ResolveOne(ref)
@@ -728,6 +750,28 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 	}
 	what := Named(st, idsOfRefs(st, refs))
 	switch kind {
+	case OpSubRemove, OpSubCheck, OpSubUpdate:
+		var op *app.SubscribeOp
+		var err error
+		switch kind {
+		case OpSubRemove:
+			op, err = a.RemoveSubscriptions(refs, false)
+		case OpSubCheck:
+			op, err = a.CheckSubscriptions(refs)
+		case OpSubUpdate:
+			op, err = a.UpdateSubscriptions(refs, false)
+		}
+		return SubscriptionResult(op), err
+	case OpSubPage:
+		m, err := st.Ix.ResolveOne(refs[0])
+		if err != nil {
+			return "", err
+		}
+		r := a.SubscriptionOf(m)
+		if r == nil || r.URL == "" {
+			return "", errors.New("no subscription page")
+		}
+		return "", &OpenPages{URLs: []string{r.URL}, Msg: T("open download page")}
 	case OpSeparate:
 		if len(refs) != 1 {
 			return "", errors.New(T("choose one copy to list independently"))
@@ -925,7 +969,7 @@ func SetModNote(a *app.App, ref, text string) (string, error) {
 // disk ops); the rest are the interface's own (a page, a folder, a note, a position).
 func LibDoes(kind string) bool {
 	switch kind {
-	case OpSeparate, LibUnsub, LibResub, LibRemove, OpAdd, OpEnable, OpTakeOut, OpDisable, OpPutBack, OpStage, OpUse, OpSwap:
+	case OpSubCheck, OpSubPage, OpSeparate, LibUnsub, LibResub, LibRemove, OpAdd, OpEnable, OpTakeOut, OpDisable, OpPutBack, OpStage, OpUse, OpSwap:
 		return true
 	}
 	return libConfirm[kind]

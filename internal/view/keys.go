@@ -60,6 +60,9 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("C", "this mod's changes"),
 				r("R", "rescan"),
 			)
+			if !tui {
+				out = append(out, r("+", "subscribe…"))
+			}
 		} else {
 			out = append(out,
 				r(pick("← → / 1–4", "← → / 1–4 / h l"), "go to an area"),

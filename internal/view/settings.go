@@ -69,6 +69,10 @@ func SettingTask(argv []string) string {
 // TaskPending is the action's label while this kind runs or waits.
 func TaskPending(kind string) string {
 	switch kind {
+	case TaskSubscribe:
+		return T("subscribe")
+	case TaskSubscriptionFrom:
+		return T("updating…")
 	case TaskSteamCMD, TaskTodds, TaskWezTerm:
 		return T("downloading…")
 	case TaskDepRemove:

@@ -19,9 +19,13 @@ import { renderDetail } from "./detail.js";
 import { fieldList } from "./fields.js";
 import * as pop from "./popups.js";
 import * as ops from "./ops.js";
+import { updateFromForm } from "./subscribe.js";
 
 let ui = null;
-export function initFull(u) { ui = u; }
+export function initFull(u) {
+  ui = u;
+  document.addEventListener("task-ended", () => { if (S.screen === "full" && F.id) full(F.from, F.id); });
+}
 
 // F: where the page came from ("plan" or "library"), the mod (an instance id, or a copy
 // ref for a subscribed item RimArcho never saw), and what was loaded for it.
@@ -244,6 +248,14 @@ async function runOp(code) {
     if (S.screen === "full") await full(F.from, F.id);
   };
   switch (code) {
+    case "subscription-update":
+      if (c.subscriptionKind === "page") {
+        const host = document.querySelector(".fd-main");
+        let panel;
+        panel = updateFromForm(host, c.ref, () => panel.remove());
+        return;
+      }
+      break;
     case "folder": return api.OpenFolder(c.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
     case "steam": return api.OpenSteamWorkshop(c.id || c.ref).then((t) => say("ok", t), (e) => say("fail", errText(e)));
     case "workshop":

@@ -31,7 +31,7 @@ func SharedKind(k source.Kind) bool {
 // folder, the lock library and its older per-environment folders): the player does not
 // add or remove those.
 func OwnFolder(s *source.Source) bool {
-	return s.Kind == source.Extra && (s.Label == MonitorLabel || s.Label == LockLabel || strings.HasPrefix(s.Label, LockLabel+"-"))
+	return s.Kind == source.Extra && (s.Label == MonitorLabel || s.Label == SubscribedLabel || s.Label == LockLabel || strings.HasPrefix(s.Label, LockLabel+"-"))
 }
 
 // Folders lists the shared mod folders, retired ones last.

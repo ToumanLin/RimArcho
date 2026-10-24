@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -52,7 +53,11 @@ func (s *API) startTasks() {
 		}
 		r := view.BuildTasks([]app.Task{t}, time.Now()).Rows[0]
 		ok := t.State == app.TaskDone
-		s.send("tasks", map[string]any{"ended": map[string]any{"ok": ok, "id": t.ID, "kind": t.Kind, "text": r.Title + "  " + r.Obj + "：" + r.Line}})
+		ref := ""
+		if ok && (t.Kind == view.TaskSubscribe || t.Kind == view.TaskSubscriptionFrom) {
+			ref = t.Target
+		}
+		s.send("tasks", map[string]any{"ended": map[string]any{"ok": ok, "id": t.ID, "kind": t.Kind, "ref": ref, "text": r.Title + "  " + r.Obj + "：" + r.Line}})
 	}
 	s.tasks = ts
 }
@@ -76,6 +81,20 @@ func (s *API) tasksChanged() {
 
 // taskItem runs one item of a lane's task: Mod 库's action on one copy.
 func (s *API) taskItem(kind, ref string) error {
+	if kind == view.OpSubCheck || kind == view.OpSubUpdate || kind == view.OpSubRemove {
+		s.mu.Lock()
+		a, err := s.a.ReadSession()
+		s.mu.Unlock()
+		if err != nil {
+			return err
+		}
+		defer a.Close()
+		_, err = view.LibDo(a, kind, []string{ref})
+		s.mu.Lock()
+		s.board, s.needs, s.lib = nil, nil, nil
+		s.mu.Unlock()
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	st, _ := s.a.Loadout() // for the reasons: a copy's reference becomes its name
@@ -103,18 +122,32 @@ func (s *API) submitTask(kind string, refs []string) (string, error) {
 	}
 	var items []app.TaskItem
 	var names []string
+	skipped := false
 	for _, ref := range refs {
 		it := app.TaskItem{Ref: ref, Name: ref}
 		if m, err := st.Ix.ResolveOne(ref); err == nil {
+			if kind == view.OpSubUpdate {
+				if r := s.a.SubscriptionOf(m); r != nil && r.Kind == "page" {
+					skipped = true
+					continue
+				}
+			}
 			it.Name, it.Bytes = m.DisplayName(), m.TotalSize
 		}
 		items = append(items, it)
 		names = append(names, it.Name)
 	}
 	lane := view.TaskLane(kind)
+	note := ""
+	if skipped {
+		note = view.T("page items skipped; choose downloaded files to update them")
+	}
+	if len(items) == 0 {
+		return note, nil
+	}
 	t := s.tasks.Submit(kind, lane, view.TaskObj(names), items)
 	ln, _ := view.TaskLaneText(lane)
-	return view.Tf("%s, %s: in the %s queue", view.TaskTitle(kind), t.Obj, ln), nil
+	return strings.TrimSpace(view.Tf("%s, %s: in the %s queue", view.TaskTitle(kind), t.Obj, ln) + "  " + note), nil
 }
 
 // Tasks is the 后台任务 page (and the sidebar's line).

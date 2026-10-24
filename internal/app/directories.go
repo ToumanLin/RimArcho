@@ -61,6 +61,8 @@ func (a *App) ManagedDirectories() ([]ManagedDirectory, error) {
 			special = "lock"
 		case s.Label == MonitorLabel:
 			special = "monitor"
+		case s.Label == SubscribedLabel:
+			special = SubscribedLabel
 		}
 		if special != "" {
 			used[special] = true
@@ -75,17 +77,17 @@ func (a *App) ManagedDirectories() ([]ManagedDirectory, error) {
 		}
 		out = append(out, d)
 	}
-	for _, x := range []struct{ id, label, path string }{{"lock", "Lock library", a.LockDir()}, {"packs", "Packs", a.PacksDir()}, {"monitor", "Archo Monitor", a.MonitorDir()}} {
+	for _, x := range []struct{ id, label, path string }{{"lock", "Lock library", a.LockDir()}, {"packs", "Packs", a.PacksDir()}, {"monitor", "Archo Monitor", a.MonitorDir()}, {SubscribedLabel, "Subscriptions", a.SubscribedDir()}} {
 		configuredPack := x.id == "packs" && a.Store.Meta("cfg:pack.dir") != ""
 		d := a.directoryState(x.id, x.id, x.label, x.path, used[x.id] || configuredPack || a.Store.Meta(directoryKey(x.id)) != "")
 		for _, s := range ss {
 			if s.Status == source.StatusRetired {
 				continue
 			}
-			if (x.id == "lock" && s.Label == LockLabel || x.id == "monitor" && s.Label == MonitorLabel) && env.PathKey(s.Root) != env.PathKey(x.path) {
+			if (x.id == "lock" && s.Label == LockLabel || x.id == "monitor" && s.Label == MonitorLabel || x.id == SubscribedLabel && s.Label == SubscribedLabel) && env.PathKey(s.Root) != env.PathKey(x.path) {
 				d.Status, d.Note = "changed", "The configured location differs from the registered source. Set the current location to keep the same records."
 			}
-			if (x.id == "lock" && (s.Label == LockLabel || a.IsLockSource(s)) || x.id == "monitor" && s.Label == MonitorLabel) && s.Status == source.StatusRebindPending {
+			if (x.id == "lock" && (s.Label == LockLabel || a.IsLockSource(s)) || x.id == "monitor" && s.Label == MonitorLabel || x.id == SubscribedLabel && s.Label == SubscribedLabel) && s.Status == source.StatusRebindPending {
 				d.Status, d.Note = "rebind-pending", "A folder change is waiting for confirmation. Set its current location to keep the same records."
 			}
 		}
@@ -202,7 +204,7 @@ func (a *App) validateDirectory(d *ManagedDirectory, path string) error {
 		if s.Status == source.StatusRetired || "source:"+s.ID == d.ID {
 			continue
 		}
-		if (d.ID == "lock" && (s.Label == LockLabel || a.IsLockSource(s))) || (d.ID == "monitor" && s.Label == MonitorLabel) {
+		if (d.ID == "lock" && (s.Label == LockLabel || a.IsLockSource(s))) || (d.ID == "monitor" && s.Label == MonitorLabel) || (d.ID == SubscribedLabel && s.Label == SubscribedLabel) {
 			continue
 		}
 		if d.Kind == "game" && s.EnvID == strings.TrimPrefix(d.ID, "game:") {
@@ -308,7 +310,7 @@ func (a *App) setDirectory(d *ManagedDirectory, path string) error {
 			if s.Status == source.StatusRetired {
 				continue
 			}
-			match := "source:"+s.ID == d.ID || d.ID == "lock" && (s.Label == LockLabel || a.IsLockSource(s)) || d.ID == "monitor" && s.Label == MonitorLabel || d.ID == "steamcmd-tool" && source.Within(s.Root, d.Path)
+			match := "source:"+s.ID == d.ID || d.ID == "lock" && (s.Label == LockLabel || a.IsLockSource(s)) || d.ID == "monitor" && s.Label == MonitorLabel || d.ID == SubscribedLabel && s.Label == SubscribedLabel || d.ID == "steamcmd-tool" && source.Within(s.Root, d.Path)
 			if !match {
 				continue
 			}
@@ -326,7 +328,7 @@ func (a *App) setDirectory(d *ManagedDirectory, path string) error {
 				return err
 			}
 		}
-		key := map[string]string{"lock": "lock.dir", "packs": "pack.dir", "monitor": "monitor.dir"}[d.ID]
+		key := map[string]string{"lock": "lock.dir", "packs": "pack.dir", "monitor": "monitor.dir", SubscribedLabel: "subscribed.dir"}[d.ID]
 		if key != "" {
 			if err := a.Store.SetMeta("cfg:"+key, path); err != nil {
 				return err
@@ -577,9 +579,9 @@ func (a *App) managedRootReady(id, path string) error {
 		if s.Status == source.StatusRetired {
 			continue
 		}
-		if id == "lock" && (s.Label == LockLabel || a.IsLockSource(s)) || id == "monitor" && s.Label == MonitorLabel {
+		if id == "lock" && (s.Label == LockLabel || a.IsLockSource(s)) || id == "monitor" && s.Label == MonitorLabel || id == SubscribedLabel && s.Label == SubscribedLabel {
 			used = true
-			if s.Status == source.StatusRebindPending || ((s.Label == LockLabel || s.Label == MonitorLabel) && env.PathKey(s.Root) != env.PathKey(path)) {
+			if s.Status == source.StatusRebindPending || ((s.Label == LockLabel || s.Label == MonitorLabel || s.Label == SubscribedLabel) && env.PathKey(s.Root) != env.PathKey(path)) {
 				return fmt.Errorf("the %s directory has an unresolved location change; use SetDirectory before writing to it", id)
 			}
 		}

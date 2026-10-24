@@ -16,6 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
 // Mod 库存 (06 §2.9): every mod on this machine for the environment, one Lineage with each
@@ -25,16 +26,17 @@ import (
 
 // Library states, most important first: a row shows the first one it has (06 §2.9).
 const (
-	LibUnloadable = "unloadable" // no readable About.xml (mod.unloadable)
-	LibMissing    = "missing"    // subscribed in the Workshop ACF, no folder on disk
-	LibIgnored    = "ignored"    // another copy with the same packageId wins (pkg.duplicate-installed)
-	LibResidue    = "residue"    // a Workshop folder that is no longer subscribed
-	LibHidden     = "hidden"     // About.xml renamed to About.xml.disabled by another manager (08 §6)
-	LibUpdated    = "updated"    // a locked version whose upstream changed (04 §7.3)
+	LibUnloadable   = "unloadable" // no readable About.xml (mod.unloadable)
+	LibMissing      = "missing"    // subscribed in the Workshop ACF, no folder on disk
+	LibIgnored      = "ignored"    // another copy with the same packageId wins (pkg.duplicate-installed)
+	LibResidue      = "residue"    // a Workshop folder that is no longer subscribed
+	LibHidden       = "hidden"     // About.xml renamed to About.xml.disabled by another manager (08 §6)
+	LibUpdated      = "updated"    // a locked version whose upstream changed (04 §7.3)
+	LibSourceUpdate = "source-update"
 )
 
 // LibStates is the state order.
-var LibStates = []string{LibUnloadable, LibMissing, LibIgnored, LibResidue, LibHidden, LibUpdated}
+var LibStates = []string{LibUnloadable, LibMissing, LibIgnored, LibResidue, LibHidden, LibUpdated, LibSourceUpdate}
 
 // Library source values (the source: filter).
 const (
@@ -44,10 +46,12 @@ const (
 	LibSteamCMD = "steamcmd"
 	LibExtra    = "extra"
 	LibMonitor  = "monitor" // Archo Monitor's folder (08 §9)
+	LibGit      = "git"
+	LibPage     = "page"
 )
 
 // LibSources is the source order (rows and filters).
-var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibExtra, LibMonitor}
+var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibGit, LibPage, LibExtra, LibMonitor}
 
 // Library filter keys (LibQuery Include / Exclude are "key:value").
 var LibKeys = []string{"tag", "source", "location", "version", "state", "used", "updated"}
@@ -84,6 +88,7 @@ func (u LibUse) Value() string { return u.Kind + ":" + u.Name }
 
 // LibInstance is one copy of a mod: an Instance, or a subscribed Workshop item with no folder.
 type LibInstance struct {
+	Subscription *subscribe.Record
 	// Mod is the instance (a tombstone for a missing item RimArcho saw before; nil for one it
 	// never saw).
 	Mod        *store.Mod
@@ -313,6 +318,15 @@ func (a *App) Library() (*Library, error) {
 			Bytes: m.TotalSize, Sized: m.SnapID != 0 && (m.FileCount > 0 || m.TotalSize > 0),
 			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Staged: staged[m.ID], Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID],
 			Authors: strings.TrimSpace(m.Authors), Note: notes[m.ID]}
+		i.Subscription = a.SubscriptionOf(m)
+		if r := i.Subscription; r != nil {
+			if r.Kind == "git" || r.Kind == "page" {
+				i.Source = r.Kind
+			}
+			if r.WorkshopID != "" {
+				i.WorkshopID = r.WorkshopID
+			}
+		}
 		if s := ix.Source(m.SourceID); s != nil {
 			i.Location = s.Root
 		}
@@ -350,6 +364,9 @@ func (a *App) Library() (*Library, error) {
 			}
 		}
 		i.States = libStates(st, m, i.Locked != nil && i.Locked.Updated || pinUpdated[m.ID])
+		if i.Subscription != nil && i.Subscription.HasUpdate() {
+			i.States = append(i.States, LibSourceUpdate)
+		}
 		add(m, i)
 	}
 	// Subscribed Workshop items with no folder (06 §2.9: "幽灵"). A tombstone of the item

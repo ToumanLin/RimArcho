@@ -59,6 +59,10 @@ const (
 	OpDelete    = "delete"         // 移到回收站
 	OpTextures  = "textures"       // 优化贴图: the DDS of its PNGs next to them (08 §5.2)
 	OpTexClean  = "textures-clean" // 清除贴图优化: the DDS RimArcho wrote go
+	OpSubRemove = "subscription-remove"
+	OpSubCheck  = "subscription-check"
+	OpSubUpdate = "subscription-update"
+	OpSubPage   = "subscription-page"
 )
 
 // opTable is every op in menu order (06 §8.5): within a group in this order, and 退订 /
@@ -81,6 +85,7 @@ var opTable = []Op{
 	{Code: OpFolder, Key: "ctrl+o", Group: 3, One: true},
 	{Code: OpWorkshop, Key: "ctrl+w", Group: 3, One: true},
 	{Code: OpSteam, Key: "ctrl+s", Group: 3, One: true},
+	{Code: OpSubPage, Group: 3, Detail: true, One: true},
 	{Code: OpPin, Group: 4, Confirm: true},
 	{Code: OpPinUpdate, Group: 4, Confirm: true},
 	{Code: OpUnpin, Group: 4, Confirm: true},
@@ -89,12 +94,16 @@ var opTable = []Op{
 	{Code: OpTextures, Group: 5, Confirm: true, Detail: true},
 	{Code: OpTexClean, Group: 5, Confirm: true, Detail: true},
 	{Code: OpResub, Group: 5, Detail: true},
+	{Code: OpSubCheck, Group: 5, Detail: true},
+	{Code: OpSubUpdate, Group: 5, Confirm: true, Detail: true},
+	{Code: OpSubRemove, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
 	{Code: OpUnsub, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
 	{Code: OpDelete, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
 }
 
 func opLabel(code string) string {
 	return map[string]string{
+		OpSubRemove: T("remove subscription"), OpSubCheck: T("check for updates"), OpSubUpdate: T("update subscription"), OpSubPage: T("open download page"),
 		OpEnable: T("enable"), OpAdd: T("enable"), OpUse: T("use this one in the current list"),
 		OpDisable: T("disable"), OpTakeOut: T("disable"), OpPutBack: T("put back"),
 		OpEnableAt: T("enable at…"), OpMoveTo: T("move to…"), OpStage: T("stage"), OpSwap: T("switch version…"),
@@ -263,7 +272,20 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		ks = append(ks, OpUnsub)
 	}
 	// a copy the lists use may go too: the confirm warns, and the lists show it missing
-	if live && (own || workshop && has(app.LibResidue)) && !source.IsLink(i.Path) {
+	if live && i.Subscription != nil {
+		if !source.IsLink(i.Path) {
+			ks = append(ks, OpSubRemove)
+		}
+		if i.Subscription.Kind != "steamcmd" {
+			ks = append(ks, OpSubCheck)
+		}
+		if i.Subscription.HasUpdate() {
+			ks = append(ks, OpSubUpdate)
+		}
+		if i.Subscription.Kind == "page" {
+			ks = append(ks, OpSubPage)
+		}
+	} else if live && (own || workshop && has(app.LibResidue)) && !source.IsLink(i.Path) {
 		ks = append(ks, OpDelete)
 	}
 	return sortOps(ks)

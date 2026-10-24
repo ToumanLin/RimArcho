@@ -43,6 +43,15 @@ func (s *API) Library(search string, filters []string, sort string) (*view.LibPa
 // LibraryPreview is the dry run of an action that changes files, for the confirmation.
 func (s *API) LibraryPreview(kind string, refs []string) (*view.Preview, error) {
 	s.mu.Lock()
+	if kind == view.OpSubUpdate || kind == view.OpSubRemove {
+		a, err := s.a.ReadSession()
+		s.mu.Unlock()
+		if err != nil {
+			return nil, err
+		}
+		defer a.Close()
+		return view.LibPreview(a, kind, refs)
+	}
 	defer s.mu.Unlock()
 	return view.LibPreview(s.a, kind, refs)
 }
