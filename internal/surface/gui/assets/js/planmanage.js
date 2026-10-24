@@ -122,7 +122,7 @@ function detailCard(p) {
   l.append(n, facts);
   const r = el("div", "r");
   r.append(button(T("edit"), "↵", () => ui.go(p.page)));
-  if (!p.current) r.append(button(T("make current"), "", () => makeCurrent(p.id)));
+  if (!p.current) r.append(button(T("make current"), "", () => makeCurrent(p.id), "", "use-plan"));
   const more = el("button", "btn icon", "");
   more.append(ic("more"));
   more.title = T("more");
@@ -136,9 +136,9 @@ function detailCard(p) {
 }
 
 function menuOf(p) {
-  const out = [{ label: T("rename…"), run: () => plans.renamePlan(p.id, stay) }];
-  out.push({ label: T("copy as a new list…"), run: () => newList(p) });
-  out.push({ label: T("delete…"), run: () => plans.deletePlan(p.id, () => open(0)) });
+  const out = [{ label: T("rename…"), envWrite: "rename-plan", run: () => plans.renamePlan(p.id, stay) }];
+  out.push({ label: T("copy as a new list…"), envWrite: "create-plan", run: () => newList(p) });
+  out.push({ label: T("delete…"), envWrite: "remove-plan", run: () => plans.deletePlan(p.id, () => open(0)) });
   return out;
 }
 
@@ -169,7 +169,7 @@ function newForm() {
   const name = el("input", "xc-input"); name.value = draft.name; name.spellcheck = false;
   label.append(name);
   const why = el("div", "plan-why");
-  const create = button(T("create list"), "enter", () => form.requestSubmit(), "primary");
+  const create = button(T("create list"), "enter", () => form.requestSubmit(), "primary", "create-plan");
   create.type = "button";
   let seq = 0;
   async function check() {
@@ -257,6 +257,7 @@ function versions(p) {
   for (const c of p.versions) {
     const b = el("button", "v" + (c.on ? " on" : ""), c.v);
     if (c.game) b.append(el("span", "cur"));
+    b.dataset.envWrite = "plan-versions";
     b.title = c.tip;
     b.onclick = () => {
       const next = c.on ? on.filter((v) => v !== c.v) : on.concat([c.v]);
@@ -268,6 +269,7 @@ function versions(p) {
   row.append(strip);
   if (p.custom) {
     const r = el("button", "btn link", T("reset to default"));
+    r.dataset.envWrite = "plan-versions";
     r.title = Tf("default: %s", p.default);
     r.onclick = () => setVersions(p, []);
     row.append(r);
@@ -299,6 +301,7 @@ function follows(p) {
   inp.placeholder = T("paste a Steam collection link to make this list follow it");
   inp.spellcheck = false;
   const go = el("button", "btn", T("follow"));
+  go.dataset.envWrite = "plan-follow";
   go.onclick = async () => {
     const link = inp.value.trim();
     if (!link) return inp.focus();
@@ -325,6 +328,7 @@ function collection(p, f) {
   ext.title = T("open in Steam");
   ext.onclick = () => api.OpenURL(f.link).catch((e) => say("fail", errText(e)));
   const un = el("button", "btn link", T("stop following"));
+  un.dataset.envWrite = "plan-unfollow";
   un.onclick = async () => {
     let tx;
     try { tx = await api.PlanUnfollow(p.id, f.id); } catch (e) { return say("fail", errText(e)); }
@@ -352,6 +356,7 @@ function collection(p, f) {
     const see = el("button", "btn link", M.open.has(key) ? T("hide the changes") : T("see the changes"));
     see.onclick = () => { M.open.has(key) ? M.open.delete(key) : M.open.add(key); draw(); };
     const sync = el("button", "btn primary small", T("catch up"));
+    sync.dataset.envWrite = "plan-sync";
     sync.onclick = async () => {
       sync.disabled = true;
       let tx;
@@ -382,6 +387,7 @@ function collection(p, f) {
     try { await api.PlanFollowMode(p.id, f.id, i ? "follow" : "add"); } catch (e) { say("fail", errText(e)); }
     open();
   }));
+  for (const b of mode.querySelectorAll("button")) b.dataset.envWrite = "plan-follow-mode";
   c.append(mode);
   return c;
 }

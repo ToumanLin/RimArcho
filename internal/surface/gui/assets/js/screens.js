@@ -200,16 +200,17 @@ export function areaKey(e) {
   return true;
 }
 
-export function button(label, keyName, run, cls = "") {
+export function button(label, keyName, run, cls = "", envWrite = "") {
   const b = el("button", "btn " + cls, label);
+  if (envWrite) b.dataset.envWrite = envWrite;
   if (keyName) b.append(el("kbd", "", keyName));
   b.onclick = (e) => { e.stopPropagation(); run(); };
   return b;
 }
 
 // act is a page action with an icon (the top bar's quiet buttons, 06 §2.2).
-export function act(label, ic, run, keyName) {
-  const b = button(label, keyName, run);
+export function act(label, ic, run, keyName, envWrite = "") {
+  const b = button(label, keyName, run, "", envWrite);
   const i = el("span", "ic");
   i.innerHTML = icon[ic] || "";
   b.prepend(i);
@@ -313,7 +314,7 @@ function drawNeeds() {
   else if (d.stale) state = T("the files changed since the last check");
   const w = page("needs", needsLead(d),
     state ? el("span", "state-note", state) : null,
-    act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A"),
+    act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A", "analyze"),
     act(T("game log"), "log", () => ui.go("log"), "l"));
   N.els = [];
   if (!N.items.length) {
@@ -369,12 +370,12 @@ function needCard(it, i) {
   if (archo.ask && it.section === 1) right.append(button(T("ask Archo"), "", () => archo.ask(it), "small"));
   if (acts.length) {
     const a = acts[0];
-    right.append(button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, it.dim ? "" : "primary"));
+    right.append(button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, it.dim ? "" : "primary", actionWrite(a)));
     if (acts.length > 1) {
       const more = button("⋯", "", () => {
         N.cur = i; markNeeds();
         const r = more.getBoundingClientRect();
-        pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, key: x.key, run: () => runAction(it, x) })));
+        pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, key: x.key, envWrite: actionWrite(x), run: () => runAction(it, x) })));
       }, "more");
       more.title = acts.slice(1).map((x) => x.label).join(" · ");
       right.append(more);
@@ -403,6 +404,9 @@ function markNeeds() {
   const on = N.els[N.cur];
   if (on) on.scrollIntoView({ block: "nearest" });
 }
+
+// Read-only needs actions stay available during a game switch (06 §3.1).
+const actionWrite = (a) => ["open-url", "view", "list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
 
 async function runAction(it, act) {
   switch (act.kind) {
@@ -685,7 +689,7 @@ function noMonitor(p) {
     try { say("ok", await api.AddMonitor(), true); } catch (e) { say("fail", errText(e)); }
     await ui.reload();
     gameLog(L.path);
-  }, "small"));
+  }, "small", "add-monitor"));
   return n;
 }
 
@@ -900,7 +904,7 @@ export async function changes(of) {
 }
 
 export function rescanButton(label) {
-  const b = button(S.busy.scan ? T("scanning…") : label || T("rescan the mod folders"), "R", () => ui.cmd("rescan"));
+  const b = button(S.busy.scan ? T("scanning…") : label || T("rescan the mod folders"), "R", () => ui.cmd("rescan"), "", "rescan");
   b.classList.add("rescan");
   if (label) b.dataset.label = label;
   b.prepend(el("span", "ic" + (S.busy.scan ? " spin" : "")));
@@ -1020,6 +1024,7 @@ function modRow(card, r) {
     for (const a of r.actions) {
       const b = el("button", "btn", a.label);
       b.append(el("kbd", "", a.key));
+      if (!["workshop", "deps"].includes(a.kind)) b.dataset.envWrite = a.kind;
       b.onclick = () => changeAct(r, a.kind);
       acts.append(b);
     }
@@ -1261,7 +1266,7 @@ function directoryPrompt(d, moving, after) {
     actions.append(button(T(moving ? "choose parent folder…" : "choose…"), "", () => pickFolder(d.path, path => {
       input.value = moving ? path.replace(/[\\/]$/, "") + "/" + d.path.split(/[\\/]/).pop() : path;
     })),
-      button(T(moving ? "move to…" : "locate"), "", apply, "primary"), button(T("skip for now"), "", () => pop.close()));
+      button(T(moving ? "move to…" : "locate"), "", apply, "primary", "apply-setting"), button(T("skip for now"), "", () => pop.close()));
     box.append(input, error, actions);
     p.keys = e => { if (e.key === "Enter") { e.preventDefault(); apply(); return true; } return false; };
     setTimeout(() => input.focus(), 0);
@@ -1317,17 +1322,17 @@ function renderGroups(w, groups, again) {
         value.style.overflowWrap = "anywhere";
         const d = { id: it.directory, label: it.label, path: it.value };
         const after = async () => { await ui.reload(); again(); };
-        right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after)),
-          button(T("move to…"), "", () => directoryPrompt(d, true, after)));
+        right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after), "", "apply-setting"),
+          button(T("move to…"), "", () => directoryPrompt(d, true, after), "", "apply-setting"));
       } else if (it.edit) {
         const inp = el("input", "field");
         inp.value = it.value || "";
         inp.spellcheck = false;
-        const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim()));
+        const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim()), "", "apply-setting");
         inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
         right.append(inp);
         // A folder: the window's folder dialog; the chosen folder is applied at once.
-        if (it.edit === "path") right.append(button(T("choose…"), "", () => pickFolder(inp.value, (p) => run(it.argv, p))));
+        if (it.edit === "path") right.append(button(T("choose…"), "", () => pickFolder(inp.value, (p) => run(it.argv, p)), "", "apply-setting"));
         right.append(ok);
       } else {
         right.append(el("span", "muted setting-value", it.value || ""));
@@ -1339,7 +1344,7 @@ function renderGroups(w, groups, again) {
           if (a.task) { b.disabled = true; b.textContent = a.pending; }
           return run(a.argv, "", null, !!a.task);
         };
-        const b = button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, submit) : submit());
+        const b = button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, submit) : submit(), "", a.argv.join(" "));
         if (a.task) {
           b.dataset.settingTask = a.task;
           b.dataset.label = a.label;
@@ -1394,7 +1399,7 @@ export async function environment() {
     } else {
       row.append(button(T("use this one"), "", () => ui.useEnv(e.name)));
     }
-    row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet"));
+    row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet", "remove-env"));
     card.append(row);
   }
   w.append(card);

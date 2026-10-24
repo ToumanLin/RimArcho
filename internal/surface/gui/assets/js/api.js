@@ -13,9 +13,9 @@ const writesGame = new Set([
   "Run", "RunMoving", "RunCLI", "Toggle", "Stage", "Unstage", "StageAll", "RestoreAll",
   "MoveBy", "MoveShown", "Place", "Swap", "Undo", "Redo", "HistoryGo", "RunOp", "DoAction",
   "CreatePlan", "ImportApplyTo", "UsePlan", "NewPlan", "RenamePlan", "RemovePlan", "ImportApply", "ImportAsPlan", "ImportFollow",
-  "PlanSync", "PlanFollow", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetTag",
+  "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetTag",
   "LibraryDo", "LibrarySetNote", "Scan", "Analyze", "RemoveEnv", "ApplySetting", "AddMonitor",
-  "PackLaunch", "PackBuild", "PackRemove", "TexturesRun", "TexturesClean",
+  "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean",
 ]);
 on("environment", (result) => {
   const p = pending.get(result.request);

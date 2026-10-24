@@ -75,6 +75,7 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
     box.append(st);
     if (d.canSeparate) {
       const b = el("button", "btn", T("do not list as a copy"));
+      b.dataset.envWrite = "separate";
       b.title = T("list this copy as an independent mod; package ID conflicts still apply");
       b.onclick = () => {
         b.disabled = true;

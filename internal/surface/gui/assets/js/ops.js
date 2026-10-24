@@ -34,7 +34,7 @@ export function menuItems(codes, run) {
     const o = op(c);
     if (group && o.group !== group) out.push({ sep: true });
     group = o.group;
-    out.push({ label: o.label, key: o.key || "", cls: o.danger ? "danger" : "", run: () => run(c) });
+    out.push({ label: o.label, key: o.key || "", cls: o.danger ? "danger" : "", envWrite: o.group !== 3 ? c : "", run: () => run(c) });
   }
   return out;
 }

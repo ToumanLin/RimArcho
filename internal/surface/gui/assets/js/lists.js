@@ -170,7 +170,7 @@ export function renderHeads() {
 // listActions: sort sits in the enabled list's head, since it orders that list; import /
 // export and the plan's other actions are in the top bar. main.js runs it by data-cmd.
 function listActions() {
-  return `<span class="acts"><button class="btn small" data-cmd="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
+  return `<span class="acts"><button class="btn small" data-cmd="sort" data-env-write="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
 }
 
 const pools = [new Map(), new Map(), new Map()];
