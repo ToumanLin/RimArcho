@@ -94,6 +94,8 @@ type Action struct {
 	QID     int64    `json:"question,omitempty"`
 	Answer  string   `json:"answer,omitempty"`
 	Problem string   `json:"problem,omitempty"` // p:<ref> for ignore
+
+	LinkGroups []LinkGroup `json:"linkGroups,omitempty"`
 }
 
 // Need is one item of 需要处理.
@@ -115,8 +117,11 @@ type Need struct {
 	// are shown on demand; every mod in Mods gets the row icon.
 	Parts []string `json:"parts,omitempty"`
 	Fold  bool     `json:"fold,omitempty"`
-	rank  int      // order within the group (06 §5's order)
-	code  string   // the problem code it stands for (LaunchHint)
+
+	LinkGroups []LinkGroup `json:"linkGroups,omitempty"`
+
+	rank int    // order within the group (06 §5's order)
+	code string // the problem code it stands for (LaunchHint)
 }
 
 // Needs is the screen's content and what it means for the rest of the interface.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -105,6 +106,7 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 		return nil, err
 	}
 	expected := map[string]string{}
+	liveTargets := map[string]*store.Mod{}
 	evidence := map[string]string{}
 	instances, packIDs := map[string]string{}, map[string]string{}
 	ledger, err := a.Store.ManagedLinks()
@@ -133,6 +135,9 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 			return nil, err
 		}
 		for _, m := range ms {
+			if m.Status == identity.Live && m.RealPath != "" {
+				liveTargets[env.PathKey(realOrAbs(m.RealPath))] = m
+			}
 			for _, name := range []string{DeployName(m), DeployPrefix + "env_" + m.ID} {
 				key := strings.ToLower(name)
 				expected[key] = m.RealPath
@@ -202,6 +207,13 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 				if row.Kind != info.Kind {
 					l.Owned = false
 					l.Evidence += "; reparse type differs from ledger"
+				}
+			}
+			// A surviving target proves ownership even after the name's ID was retired.
+			if (info.Kind == "junction" || info.Kind == "symlink") && info.State == source.TargetPresent {
+				if m := liveTargets[env.PathKey(realOrAbs(info.Target))]; m != nil {
+					exp, l.Owned, l.Instance, l.Pack = m.RealPath, true, m.ID, ""
+					l.Evidence = "target is known instance " + m.ID
 				}
 			}
 			switch {
@@ -453,4 +465,27 @@ func (a *App) ConfirmLinkRepair(token string) error {
 		return fmt.Errorf("link preview expired; reopen the needs page")
 	}
 	return a.ApplyLinkRepair(plan)
+}
+
+// ShortReason is the shared diagnostic wording; surfaces may localize it.
+func (l *GameLink) ShortReason() string {
+	switch l.Code {
+	case CodeLinkDangling:
+		return "target is missing"
+	case CodeLinkForeign:
+		if !l.Owned {
+			return "unknown target; RimArcho ownership is unconfirmed"
+		}
+		return "target differs from the expected location"
+	case CodeLinkUnknown:
+		return "cannot read (offline or access denied)"
+	case CodeLinkOccupied:
+		return "a real file or folder occupies this name"
+	case CodeModsDuplicate:
+		return "duplicate entry"
+	case CodeLinkRecovery:
+		return "link operation needs recovery"
+	default:
+		return "target exists"
+	}
 }

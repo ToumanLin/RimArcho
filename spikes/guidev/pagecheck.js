@@ -68,6 +68,31 @@ try {
   handlers.set("HomeBackground", () => ({})); handlers.set("Backgrounds", () => backgrounds);
   handlers.set("Packs", () => ({ rows: [] })); handlers.set("PackNameCheck", () => "");
   handlers.set("Detail", () => null); handlers.set("Sections", () => []);
+  await test("needs link rows group games and reuse repair preview with full path tooltips", async () => {
+    const popup = document.createElement("div");
+    popup.id = "popup"; popup.hidden = true; document.querySelector("#app").append(popup);
+    pop.initPopups({ renderWhere() {}, renderHeads() {} });
+    const groups = ["1.6", "1.7"].map(version => ({ game: "RimWorld " + version, path: "D:/games/" + version,
+      rows: [{ name: "_Archo_env_old_" + version, path: "D:/games/" + version + "/Mods/_Archo_env_old_" + version,
+        target: "D:/very long library folder/".repeat(8) + "KnownMod", reason: "目标不存在", action: "保留" }] }));
+    const preview = groups.map(g => ({ ...g, rows: g.rows.map(r => ({ ...r, action: "将删除" })) }));
+    handlers.set("Needs", () => ({ items: [{ title: "Links", text: "Links", why: "raw evidence must be hidden", section: 0,
+      counted: true, status: 2, linkGroups: groups, actions: [{ kind: "repair-links", label: "Repair", confirm: "Confirm",
+      refs: ["fixture-preview"], linkGroups: preview }] }] }));
+    await screens.needs(); await settle();
+    assert(document.querySelectorAll("#screen .link-game").length === 2, "games are not grouped");
+    assert(document.querySelectorAll("#screen .link-row").length === 2, "missing link rows");
+    assert(!document.querySelector("#screen").textContent.includes("raw evidence"), "raw paragraph rendered");
+    const target = document.querySelector("#screen .link-row .link-path:nth-child(3)");
+    assert(target.dataset.path === groups[0].rows[0].target && target.title.includes(groups[0].rows[0].target), "full target lost");
+    assert(target.scrollWidth <= target.clientWidth + 1, "long path overflows row");
+    document.querySelector("#screen .need .acts button").click(); await settle();
+    assert(document.querySelectorAll("#popup .link-game").length === 2, "preview lost game groups");
+    assert([...document.querySelectorAll("#popup .link-tag")].every(n => n.textContent === "将删除"), "preview action tag is wrong");
+    assert(document.querySelector("#popup .link-row .link-path:nth-child(3)").dataset.path === groups[0].rows[0].target, "preview lost full path");
+    pop.close(); popup.remove();
+    handlers.set("Needs", () => ({ items: [] }));
+  });
   const pages = [
     ["home", "Home", () => home.home(), { rows: [], featured: -1 }],
     ["needs", "Needs", () => screens.needs(), { items: [] }],

@@ -517,3 +517,41 @@ func testWorkshopUnsubscribeIncomingLinks(t *testing.T, partial bool) {
 		t.Fatal("unsubscribe left link or skipped worker")
 	}
 }
+
+func TestIncomingStaleIDLinkMove(t *testing.T) {
+	e, from, id, links := incomingFixture(t)
+	old := links[0]
+	if err := source.RemoveLink(old); err != nil {
+		t.Fatal(err)
+	}
+	adopted := filepath.Join(mustReal(t, filepath.Dir(old)), "_Archo_env_deleted-instance")
+	e.Junction(adopted, from)
+	incoming, err := e.App.IncomingInstanceLinks(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, l := range incoming {
+		if l.Path == adopted {
+			found = l.Owned && l.Instance == id
+		}
+	}
+	if !found {
+		t.Fatal("adopted link missing from incoming links")
+	}
+	moved, err := e.App.MoveToLocked("#"+id[:6], false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := source.ReadLink(adopted)
+	if err != nil || info.State != source.TargetPresent || mustReal(t, adopted) != mustReal(t, moved.To) {
+		t.Fatalf("adopted link after move: %+v %v", info, err)
+	}
+	if _, err := os.Lstat(old); !os.IsNotExist(err) {
+		t.Fatal("move renamed the adopted link")
+	}
+	l := healthByName(t, e)[filepath.Base(adopted)]
+	if !l.Owned || l.Code != "" || l.Instance != id {
+		t.Fatalf("moved link health: %+v", l)
+	}
+}
