@@ -263,3 +263,17 @@ pairs: 1,554 next uploads; gone 117. A or B changed in 48, gone in all 48 (23 af
   27 after disabling A); unchanged 1,506, gone 69 (4.6%, the G5 baseline for load-stage errors is 0-6%).
 versions: 29 next uploads; updated in 2, gone in 2 (1 by the update itself).
 Small counts: co-occurrence, not proof.
+
+== Rerun on the 40k corpus (2026-10-24; 40,326 logs of 1.6, 4,849-package library, results-v5)
+
+Thresholds unchanged (>= 5 players, cover 90%, prerequisite rate 25%, combination 30% with / a quarter without).
+  prerequisites   38 -> 95 kept (127 pass the rate; 32 (25%) already declared in A's About.xml, dropped).
+                  95: 59 name a DLC (21 before), 12 only on the Workshop page, 18 only in loadAfter, 21 only sounds/textures.
+                  27 of the 38 old pairs remain; 11 fell out (mostly rate just under 25% at 6x the logs).
+  combinations    180 -> 486 (424 pairs, 18 versions, 44 single mods; 498 entries before the kept filter);
+                  122 of the 180 old entries remain.
+  Spot check (random new non-DLC prerequisites): tyll.core -> tyll.valley (32 players, defs), aoba.fortress.*
+  -> aoba.framework (types), regrowth.botr.core -> VEF core, scorpio.voefactory -> vanillaexpanded.outposts
+  (type VOE.Outpost_Encampment), pt.deadmanswitch.implants -> lts.i: all are real framework/base-mod
+  requirements; none are Core/DLC-as-source artefacts. internal/known/known.json 139 KB -> 410 KB.
+Not rerun here: the research-environment verification (`-verify`, 20+ lists per code) of the new entries.
