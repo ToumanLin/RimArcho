@@ -2,6 +2,7 @@
 // game log (§2.10), Mod 库 › 变化 (§2.9), the full detail (§4.2), packs, the environment
 // and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
+import { copyablePath, pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
 import { icon } from "./icons.js";
 import { statusIcon } from "./icons.js";
@@ -728,9 +729,9 @@ function monitorRows(scroll, mon) {
     if (m.count > 1) top.append(el("span", "count", "×" + m.count));
     if (m.mods && m.mods.length) { const s = el("span", "mods word-facts", m.mods.join("  ")); s.title = m.mods.join("\n"); top.append(s); }
     body.append(top, logText(m));
-    if (m.files && m.files.length) body.append(el("div", "files word-facts", m.files.join("  ")));
+    if (m.files && m.files.length) body.append(factText(el("div", "files"), m.files.map((text, i) => ({ text, paths: [{ text, path: m.filePaths?.[i] || text }] }))));
     if (open) {
-      if (m.details) { const pre = el("pre", "details"); pre.textContent = m.details; pre.onclick = (e) => e.stopPropagation(); body.append(pre); }
+      if (m.details) { const pre = el("pre", "details"); pathContent(pre, m.details); pre.onclick = (e) => e.stopPropagation(); body.append(pre); }
       if (m.cluster) {
         const go = el("button", "go", Tf("%s in Player.log", m.cluster) + " →");
         go.onclick = (e) => { e.stopPropagation(); toCluster(m.cluster); };
@@ -818,7 +819,7 @@ function showLines(box, lines, card) {
   if (!box) return;
   box.innerHTML = "";
   const pre = el("pre", "lines");
-  pre.textContent = (lines || []).join("\n");
+  pathContent(pre, (lines || []).join("\n"));
   box.append(pre);
   setAna(card);
 }
@@ -1028,7 +1029,7 @@ function modRow(card, r) {
     box.append(f);
     if (C.raw.has(k)) {
       const pre = el("pre", "lines files");
-      pre.textContent = C.raw.get(k).join("\n");
+      pathContent(pre, C.raw.get(k).join("\n"));
       box.append(pre);
     }
   }
@@ -1222,8 +1223,8 @@ async function refreshSettingTasks(values = false) {
       const row = rows.find(r => r.dataset.settingRow === g.title + "/" + it.label);
       if (!row) continue;
       const note = row.querySelector(".setting-note"), value = row.querySelector(".setting-value");
-      if (note) { factText(note, it.note || ""); note.hidden = !it.note; }
-      if (value) factText(value, it.value || "");
+      if (note) { factText(note, { text: it.note || "", paths: it.notePaths }); note.hidden = !it.note; }
+      if (value) factText(value, { text: it.value || "", paths: it.valuePath ? [it.value] : [] });
       const actions = JSON.stringify(it.actions || []);
       if (row.dataset.settingActions !== actions) {
         row.querySelectorAll("[data-setting-action]").forEach(b => b.remove());
@@ -1254,7 +1255,7 @@ export async function checkDirectories() {
   for (const d of missing) {
     const row = el("div", "set");
     const left = el("div", "l");
-    left.append(el("div", "name", d.label), el("div", "sub", d.path));
+    left.append(el("div", "name", d.label), copyablePath(el("div", "sub", d.path), d.path));
     row.append(left, button(T("locate"), "", () => directoryPrompt(d, false, async () => { await ui.reload(); checkDirectories(); })));
     body.append(row);
   }
@@ -1263,7 +1264,7 @@ export async function checkDirectories() {
 
 function directoryPrompt(d, moving, after) {
   pop.open("directory", d.label, (box, p) => {
-    box.append(el("div", "ttl", d.label), el("p", "sub", d.path));
+    box.append(el("div", "ttl", d.label), copyablePath(el("p", "sub", d.path), d.path));
     const input = el("input", "field");
     input.spellcheck = false;
     input.placeholder = T("new directory path");
@@ -1325,7 +1326,7 @@ function renderGroups(w, groups, again) {
       row.title = it.hover || "";
       const left = el("div", "l");
       left.append(el("div", "name", it.label));
-      const note = el("div", "sub setting-note word-facts", it.note || "");
+      const note = factText(el("div", "sub setting-note"), { text: it.note || "", paths: it.notePaths });
       note.hidden = !it.note;
       left.append(note);
       const right = el("div", "r");
@@ -1343,8 +1344,7 @@ function renderGroups(w, groups, again) {
         right.append(s);
         if (it.valueNote) right.append(el("span", "muted word-facts", it.valueNote));
       } else if (it.edit === "directory") {
-        const value = el("span", "muted word-facts", it.value);
-        value.style.overflowWrap = "anywhere";
+        const value = factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] });
         const d = { id: it.directory, label: it.label, path: it.value };
         const after = async () => { await ui.reload(); again(); };
         right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after), "", "apply-setting"),
@@ -1355,7 +1355,7 @@ function renderGroups(w, groups, again) {
         inp.spellcheck = false;
         const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim()), "", "apply-setting");
         inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
-        if (it.editValue !== undefined) right.append(el("span", "muted setting-value word-facts", it.value || ""));
+        if (it.editValue !== undefined) right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
         right.append(inp);
         // Apply the file or folder chosen through the window's dialog.
         if (it.edit === "path") right.append(button(T("choose…"), "", async () => {
@@ -1364,7 +1364,7 @@ function renderGroups(w, groups, again) {
         }, "", "apply-setting"));
         right.append(ok);
       } else {
-        right.append(el("span", "muted setting-value word-facts", it.value || ""));
+        right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
       }
       renderSettingActions(right, it.actions, run);
       row.append(left, right);
@@ -1428,7 +1428,7 @@ export async function environment() {
   for (const e of p.envs || []) {
     const row = el("div", "envrow" + (e.current ? " on" : ""));
     const l = el("div", "l");
-    l.append(el("div", "name", e.name), el("div", "sub word-facts", e.game));
+    l.append(el("div", "name", e.name), factText(el("div", "sub"), { text: e.game, paths: [e.path] }));
     row.append(l);
     if (e.current) {
       const current = el("button", "chip cur", T("in use"));

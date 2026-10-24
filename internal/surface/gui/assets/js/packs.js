@@ -5,6 +5,7 @@
 // exported from its page as a RimArcho list (E).
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
+import { copyablePath, pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { shimmer } from "./motion.js";
 import { openScreen, page, button, act, area, beginPageRead } from "./screens.js";
@@ -135,7 +136,7 @@ export async function pack(name) {
   card.setAttribute("role", "table");
   drawModRows();
   sec.append(card);
-  w.append(sec, el("div", "muted note dir", T("folder") + ": " + P.dir));
+  w.append(sec, pathContent(el("div", "muted note dir"), T("folder") + ": " + P.dir, [P.dir]));
   ui.renderHints(); // the list and a pack's page share the screen: their keys differ
   read.finish();
 }
@@ -484,7 +485,7 @@ function drawBuild() {
     row(T("size"), v);
   }
   row(T("saves"), p.saves);
-  row(T("location"), el("span", "v path", p.dir));
+  row(T("location"), copyablePath(el("span", "v path", p.dir), p.dir));
   side.append(kv);
   const go1 = el("button", "btn primary bd-go");
   go1.dataset.envWrite = "pack-build";
@@ -564,7 +565,7 @@ function syncDryRun() {
   const out = $("#pk-dry-output"), button = $(".bd-dry");
   if (!out) return;
   out.hidden = B.dry === null;
-  out.textContent = B.dry || "";
+  pathContent(out, B.dry || "", [B.page?.dir]);
   if (button) button.setAttribute("aria-expanded", String(B.dry !== null));
 }
 function closeDryRun() { B.dry = null; ++B.drySeq; syncDryRun(); }

@@ -31,10 +31,11 @@ type TexturePage struct {
 	Scales  []int    `json:"scales"`
 	Labels  []string `json:"labels"` // of Scales
 	// The encoder: ready, or what is wrong and the offer to download it.
-	Tool    string `json:"tool"`
-	ToolOK  bool   `json:"toolOk"`
-	Offer   string `json:"offer,omitempty"`   // "todds 0.4.1  3.7 MB  from github.com/…"
-	OfferTo string `json:"offerTo,omitempty"` // where it goes
+	Tool     string `json:"tool"`
+	ToolPath string `json:"toolPath,omitempty"`
+	ToolOK   bool   `json:"toolOk"`
+	Offer    string `json:"offer,omitempty"`   // "todds 0.4.1  3.7 MB  from github.com/…"
+	OfferTo  string `json:"offerTo,omitempty"` // where it goes
 	// What is there now.
 	Mods     int    `json:"mods"`
 	PNG      string `json:"png"`      // "13208 PNG  412 MB"
@@ -116,6 +117,9 @@ func TexturePageReport(a *app.App, r *app.TextureReport, scope string) *TextureP
 	o := r.Options
 	p := TexturePageLoading(scope, o.Scale)
 	p.Loading, p.Mods = false, len(r.Mods)
+	if r.Tool != nil {
+		p.ToolPath = r.Tool.Path
+	}
 	if t := r.Tool; t != nil && t.Err == "" {
 		p.Tool, p.ToolOK = Tf("todds %s  %s", t.Version, t.Path), true
 	} else {

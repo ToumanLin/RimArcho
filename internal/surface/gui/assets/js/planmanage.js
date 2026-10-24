@@ -3,6 +3,7 @@
 // follows (04 §9.6) and how to share it (export, pack). The export is a sub-page of its own
 // (库 / 列表 / <列表> / 导出). Editing what a list holds stays in the editor (§2.5).
 // Data: API.PlanManage (view.BuildPlanManage), API.PlanExport (view.BuildPlanExport).
+import { pathContent } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button, act, area, seg, beginPageRead } from "./screens.js";
 import { icon } from "./icons.js";
@@ -635,14 +636,14 @@ function back() {
   return ui.go("plans");
 }
 
-function result(out, ok, text) { out.textContent = text; out.className = "xc-out " + (ok ? "ok" : "err"); say(ok ? "ok" : "fail", text); }
+function result(out, ok, text, paths = []) { pathContent(out, text, paths); out.className = "xc-out " + (ok ? "ok" : "err"); say(ok ? "ok" : "fail", text, false, paths); }
 
 // save: the save dialog in the window (it asked before replacing a file), a typed path in
 // the development harness (nothing is overwritten).
 async function save(out) {
   const f = fmtOf();
   const write = async (path, overwrite) => {
-    try { result(out, true, await api.PlanExportSave(X.id, f.id, path, overwrite)); } catch (e) { result(out, false, errText(e)); }
+    try { result(out, true, await api.PlanExportSave(X.id, f.id, path, overwrite), [path]); } catch (e) { result(out, false, errText(e)); }
   };
   if (X.info && X.info.dialogs) {
     let path = "";

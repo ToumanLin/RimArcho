@@ -1,6 +1,7 @@
 // The page's state and the helpers every part uses.
 import { api, T, Tf } from "./api.js";
 import { statusIn } from "./motion.js";
+import { pathContent } from "./fields.js";
 
 export const AREAS = ["Disabled", "Enabled", "Staging", "details"];
 export const ROW_H = 28;
@@ -31,16 +32,28 @@ export function el(tag, cls, text) {
   if (cls) e.className = cls;
   if (text != null) {
     if (e.classList.contains("word-facts")) factText(e, text);
-    else e.textContent = text;
+    else if (["INPUT", "TEXTAREA", "SELECT", "OPTION", "BUTTON", "A", "KBD"].includes(e.tagName)) e.textContent = text;
+    else pathContent(e, text);
   }
   return e;
 }
 
 // View models separate facts with two terminal cells; the GUI gives each fact its own span.
 export function factText(node, ...values) {
-  const parts = values.flat().filter(v => v != null && v !== "").flatMap(v => String(v).split(/ {2,}/)).filter(Boolean);
   node.classList.add("word-facts");
-  node.replaceChildren(...parts.map(v => el("span", "", v)));
+  node.replaceChildren();
+  for (const v of values.flat().filter(v => v != null && v !== "")) {
+    const tmp = pathContent(document.createElement("span"), v.text ?? v, v.paths || []);
+    for (const child of [...tmp.childNodes]) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        for (const part of child.textContent.split(/ {2,}/).filter(Boolean)) {
+          const span = document.createElement("span");
+          span.textContent = part;
+          node.append(span);
+        }
+      } else node.append(child);
+    }
+  }
   return node;
 }
 
@@ -55,10 +68,10 @@ export function errText(e) {
 
 // ---- the status line (06 §6): one sentence, cleared by the next key ----
 let undoLink = false;
-export function say(kind, text, undo = false) {
+export function say(kind, text, undo = false, paths = []) {
   const s = $("#status");
   s.className = kind || "";
-  factText(s, text || "");
+  factText(s, { text: text || "", paths });
   undoLink = undo;
   if (undo && text) {
     const a = el("a", "", T("undo"));

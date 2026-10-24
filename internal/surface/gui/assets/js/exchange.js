@@ -2,7 +2,7 @@
 // own .rml, share codes, Rentry and Workshop collections. An import is previewed first —
 // what is installed, what is missing and where to get it, what the enabled list becomes —
 // and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, beginPageRead } from "./screens.js";
 
 let ui = null;
@@ -140,11 +140,11 @@ async function preview(kind, src, fileName) {
 
   const top = el("div", "xc-sum");
   top.append(el("div", "xc-big", p.summary));
-  const facts = [p.source];
+  const facts = [p.sourcePath || fileName ? { text: p.source, paths: [p.source] } : p.source];
   if (p.name) facts.push(Tf("list: %s", p.name));
   if (p.game) facts.push("RimWorld " + p.game);
   if (p.allowed) facts.push(Tf("suggested game versions: %s", p.allowed));
-  top.append(el("div", "xc-note word-facts", facts.filter(Boolean).join("  ")));
+  top.append(factText(el("div", "xc-note"), facts.filter(Boolean)));
   if (p.gameNote) top.append(el("div", "xc-note warn", p.gameNote));
   body.append(top);
 

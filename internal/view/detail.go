@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -253,12 +254,22 @@ func HistoryLine(evs []*store.Event) string {
 
 // ---- the full detail's sub-sections (06 §4.2) ----
 
+// PathText keeps the displayed relative name separate from the full copy target.
+type PathText struct {
+	Text string `json:"text"`
+	Path string `json:"path"`
+}
+
 // Section is one sub-section of the full detail.
 type Section struct {
-	Title string   `json:"title"`
-	Count int      `json:"count"` // -1: no count
-	Lines []string `json:"lines"` // indented text lines
+	Title string     `json:"title"`
+	Count int        `json:"count"` // -1: no count
+	Lines []string   `json:"lines"` // indented text lines
+	Paths []PathText `json:"paths,omitempty"`
 }
+
+var sectionFileRe = regexp.MustCompile(`^([^:\n]+\.xml):[0-9]+`)
+var sectionFactsRe = regexp.MustCompile(` {2,}`)
 
 var countRe = regexp.MustCompile(`(?:defs|harmony|patches): (\d+)`)
 
@@ -271,6 +282,7 @@ func Sections(a *app.App, ix *app.Index, mod *store.Mod) []Section {
 		text, _ := cmds.Execute(a, argv)
 		ls := strings.Split(strings.TrimRight(text, "\n"), "\n")
 		sec := Section{Title: title, Count: -1}
+		seenPaths := map[string]bool{}
 		if len(ls) > 0 {
 			if mt := countRe.FindStringSubmatch(ls[0]); mt != nil {
 				fmt.Sscan(mt[1], &sec.Count)
@@ -288,6 +300,29 @@ func Sections(a *app.App, ix *app.Index, mod *store.Mod) []Section {
 				continue // a heading with nothing under it
 			}
 			sec.Lines = append(sec.Lines, l)
+			// These command rows render XML filenames followed by a line number.
+			// They are relative to the mod, unlike the path field in its overview.
+			for _, fact := range sectionFactsRe.Split(l, -1) {
+				match := sectionFileRe.FindStringSubmatch(strings.TrimSpace(fact))
+				if match == nil || seenPaths[match[1]] {
+					continue
+				}
+				file := match[1]
+				seenPaths[file] = true
+				full := file
+				if !filepath.IsAbs(file) {
+					full = filepath.Join(ix.ModDir(mod), filepath.FromSlash(file))
+				}
+				sec.Paths = append(sec.Paths, PathText{Text: file, Path: full})
+			}
+		}
+		if title == "Harmony" {
+			asms, _ := a.Store.Assemblies(mod.ID)
+			for _, asm := range asms {
+				if asm.File != "" {
+					sec.Paths = append(sec.Paths, PathText{Text: asm.File, Path: filepath.Join(ix.ModDir(mod), filepath.FromSlash(asm.File))})
+				}
+			}
 		}
 		out = append(out, sec)
 	}

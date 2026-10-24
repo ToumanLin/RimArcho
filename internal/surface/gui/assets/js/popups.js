@@ -1,6 +1,7 @@
 // Popups (06 §3.1 rule 5): the command palette, the tag bar, the position input, a
 // confirmation, a text or choice panel, help. Each has a title, shows in the position
 // line, closes with esc, and never nests: opening one closes the other.
+import { pathContent } from "./fields.js";
 import { S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
 
 let ui = null;
@@ -169,7 +170,7 @@ export function position(obj, from, done = null) {
 // ---- a confirmation, for what u cannot undo (06 §6); text() shows lines with none ----
 export function confirm(title, lines, goLabel, go, envWrite = "apply") {
   const pre = el("pre", "lines");
-  pre.textContent = (lines || []).join("\n");
+  pathContent(pre, (lines || []).join("\n"));
   panel(title, pre, goLabel, go, "", envWrite);
 }
 
