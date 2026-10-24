@@ -207,7 +207,7 @@ func (d *Data) Share(p *Pattern) float64 {
 	return 100 * float64(p.NClusters) / float64(d.Clusters)
 }
 
-// Seen says how often the pattern occurs: "2,248 of 6,734 public 1.6 logs".
+// Seen says how often the pattern occurs: "22,998 of 40,326 public 1.6 logs".
 func (d *Data) Seen(p *Pattern) string {
 	return fmt.Sprintf("%s of %s public %s logs", Thousands(p.Logs), Thousands(d.Logs), d.Game)
 }

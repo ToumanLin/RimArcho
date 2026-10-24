@@ -145,4 +145,3 @@ func TestAPIBadToken(t *testing.T) {
 		t.Fatal("bad token: want an error, not a retry loop")
 	}
 }
-

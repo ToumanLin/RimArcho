@@ -276,4 +276,10 @@ Thresholds unchanged (>= 5 players, cover 90%, prerequisite rate 25%, combinatio
   -> aoba.framework (types), regrowth.botr.core -> VEF core, scorpio.voefactory -> vanillaexpanded.outposts
   (type VOE.Outpost_Encampment), pt.deadmanswitch.implants -> lts.i: all are real framework/base-mod
   requirements; none are Core/DLC-as-source artefacts. internal/known/known.json 139 KB -> 410 KB.
-Not rerun here: the research-environment verification (`-verify`, 20+ lists per code) of the new entries.
+Verification (same research environment corpus-kb/home-g10 and command as G10, -lists 20, the new embedded data):
+  combo.known-bad        lists  32  expected   87  raised   87 (100%)  not in the research library 24
+  dep.observed-missing   lists  20  expected   29  raised   29 (100%)  not in the research library 10
+  mod.known-error        lists  34  expected   67  raised   67 (100%)  not in the research library  8
+  What it checks: RimArcho raises every entry whose mods are enabled as the entry says. It does not
+  re-check that the error still happens with today's mod versions. New dep.observed-missing warnings
+  include installed DLCs that are not enabled (e.g. a mod using Anomaly or Odyssey content).

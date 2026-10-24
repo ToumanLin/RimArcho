@@ -554,6 +554,9 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   with a checklist for save loading, missing assets, config errors, assembly loading and noise,
   and say tool results are capped at 24 KB.
 - Privacy: pattern templates with HugsLib's `[Rimworld_dir]` paths are dropped (2 of 1,036).
+- **Data from 40,326 logs** (corpus expansion): `internal/patterns` now has 9,305 mod-specific
+  errors (was 1,034) and `internal/known` 95 prerequisites and 486 combinations (was 38 and 180),
+  same thresholds. Severities (G8) and constraint strength (G2) keep their 6,734-log measurements.
 - **In the pages** (06 §2.3, §2.4, §2.5, §2.10, §4.2; TUI the same):
   - 启动: the tab under 启动游戏 names the most likely trouble (the first `LaunchChecks` code
     with an item in 能不能跑) and its one-line reason with the corpus numbers; it opens

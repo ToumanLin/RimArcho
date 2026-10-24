@@ -22,15 +22,15 @@ import (
 // Verdicts. "kept" or a drop reason; parse's own drop reasons (no-log-section, empty-log,
 // no-mod-list, log-parse-error, no-game-version) pass through unchanged.
 const (
-	verdictKept     = "kept"
-	dropGone        = "gone"                 // raw URL 404: the gist was deleted
-	dropDuplicate   = "duplicate-content"    // same bytes as a log already kept
-	dropVersion     = "version-out-of-scope" // not 1.6 or 1.7
-	dropNoProblems  = "no-problems"          // 1.6 without a single problem cluster
-	dropTooShort    = "too-short"            // fewer than minLogLines log lines: upload cut off or junk
-	dropTooLarge    = "too-large"            // over maxRawBytes: GitHub refuses files over 100 MB
-	maxRawBytes     = 90 << 20
-	minLogLines     = 20
+	verdictKept    = "kept"
+	dropGone       = "gone"                 // raw URL 404: the gist was deleted
+	dropDuplicate  = "duplicate-content"    // same bytes as a log already kept
+	dropVersion    = "version-out-of-scope" // not 1.6 or 1.7
+	dropNoProblems = "no-problems"          // 1.6 without a single problem cluster
+	dropTooShort   = "too-short"            // fewer than minLogLines log lines: upload cut off or junk
+	dropTooLarge   = "too-large"            // over maxRawBytes: GitHub refuses files over 100 MB
+	maxRawBytes    = 90 << 20
+	minLogLines    = 20
 	notProblems    = "other,mod-report" // cluster classes that are not problems
 )
 
