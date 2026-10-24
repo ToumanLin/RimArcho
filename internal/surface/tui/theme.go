@@ -19,15 +19,17 @@ var width = &runewidth.Condition{EastAsianWidth: false}
 
 // Palette (06 §7, dark).
 var (
-	cText   = lipgloss.Color("#E6E6E6")
-	cSecond = lipgloss.Color("#7C8290")
-	cDim    = lipgloss.Color("#4A4F5A")
-	cAccent = lipgloss.Color("#A5B4FC")
-	cPill   = lipgloss.Color("#2C2E4A")
-	cRowBg  = lipgloss.Color("#1A1C24") // the focused area's cursor row (06 §3.2)
-	cOK     = lipgloss.Color("#7EE2A8")
-	cWarn   = lipgloss.Color("#F2C46D")
-	cErr    = lipgloss.Color("#FF8A80")
+	cText     = lipgloss.Color("#E6E6E6")
+	cSecond   = lipgloss.Color("#7C8290")
+	cDim      = lipgloss.Color("#4A4F5A")
+	cAccent   = lipgloss.Color("#A5B4FC")
+	cPill     = lipgloss.Color("#2C2E4A")
+	cRowBg    = lipgloss.Color("#1A1C24") // the focused area's cursor row (06 §3.2)
+	cSelBg    = lipgloss.Color("#232539") // selected rows (06 §3.4)
+	cSelCurBg = lipgloss.Color("#303450") // selected row under the focused cursor
+	cOK       = lipgloss.Color("#7EE2A8")
+	cWarn     = lipgloss.Color("#F2C46D")
+	cErr      = lipgloss.Color("#FF8A80")
 )
 
 var (
@@ -42,6 +44,20 @@ var (
 	sWarnS  = lipgloss.NewStyle().Foreground(cWarn)
 	sErrS   = lipgloss.NewStyle().Foreground(cErr)
 )
+
+// rowBackground keeps selection and the focused cursor distinct across list views.
+func rowBackground(st lipgloss.Style, selected, cursor bool) lipgloss.Style {
+	switch {
+	case selected && cursor:
+		return st.Background(cSelCurBg)
+	case selected:
+		return st.Background(cSelBg)
+	case cursor:
+		return st.Background(cRowBg)
+	default:
+		return st
+	}
+}
 
 // Styles used by the Problems, Changes and Inspect screens (kept from v1 until V3/V4,
 // restyled: selection is a colour change, not a reversed bar; 06 §7).
