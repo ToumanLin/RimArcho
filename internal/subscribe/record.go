@@ -12,16 +12,23 @@ const File = ".rimarcho/source.json"
 
 type Record struct {
 	Kind        string    `json:"kind"`
-	URL         string    `json:"url"`
-	ID          string    `json:"id"`
-	WorkshopID  string    `json:"workshop_id"`
-	RefType     string    `json:"ref_type"`
-	Ref         string    `json:"ref"`
+	URL         string    `json:"url,omitempty"`
+	Repo        string    `json:"repo,omitempty"`
+	WorkshopID  string    `json:"workshop_id,omitempty"`
+	RefType     string    `json:"ref_type,omitempty"`
+	Ref         string    `json:"ref,omitempty"`
 	Installed   string    `json:"installed"`
 	InstalledAt time.Time `json:"installed_at"`
-	Latest      string    `json:"latest"`
-	CheckedAt   time.Time `json:"checked_at"`
-	CheckError  string    `json:"check_error"`
+	Latest      string    `json:"latest,omitempty"`
+	CheckedAt   time.Time `json:"checked_at,omitempty,omitzero"`
+	CheckError  string    `json:"check_error,omitempty"`
+}
+
+func (r *Record) GitURL() string {
+	if r.Repo != "" {
+		return r.Repo
+	}
+	return r.URL
 }
 
 func (r *Record) HasUpdate() bool { return r.Latest != "" && r.Latest != r.Installed }

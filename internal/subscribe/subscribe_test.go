@@ -40,13 +40,22 @@ func TestRecord(t *testing.T) {
 	if err := json.Unmarshal(b, &fields); err != nil {
 		t.Fatal(err)
 	}
-	if len(fields) != 11 {
-		t.Fatalf("JSON fields: %s", b)
-	}
-	for _, k := range []string{"kind", "url", "id", "workshop_id", "ref_type", "ref", "installed", "installed_at", "latest", "checked_at", "check_error"} {
+	for _, k := range []string{"kind", "url", "ref_type", "ref", "installed", "installed_at", "latest", "checked_at"} {
 		if _, ok := fields[k]; !ok {
 			t.Errorf("missing %s", k)
 		}
+	}
+	for _, k := range []string{"id", "repo", "workshop_id", "check_error"} {
+		if _, ok := fields[k]; ok {
+			t.Errorf("optional/removed field %s present", k)
+		}
+	}
+	if err := subscribe.Write(dir, &subscribe.Record{Kind: "git", Repo: "repo"}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(filepath.Join(dir, subscribe.File))
+	if !strings.Contains(string(b), `"repo": "repo"`) || strings.Contains(string(b), `"checked_at"`) {
+		t.Fatalf("optional fields: %s", b)
 	}
 }
 
@@ -100,8 +109,11 @@ func TestGit(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, "untracked.txt"), []byte("player edits"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if dirty, err := subscribe.Dirty(dir); err != nil || !dirty {
-				t.Fatalf("untracked not dirty: %v %v", dirty, err)
+			if dirty, err := subscribe.Dirty(dir); err != nil || dirty {
+				t.Fatalf("untracked dirty: %v %v", dirty, err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "About", "About.xml"), []byte("tracked edit"), 0o644); err != nil {
+				t.Fatal(err)
 			}
 			if _, err := subscribe.Update(ctx, dir, r); err == nil || !strings.Contains(err.Error(), "dirty") {
 				t.Fatalf("dirty update: %v", err)
@@ -125,6 +137,148 @@ func TestGit(t *testing.T) {
 	}
 	if got, err := subscribe.RemoteCommit(ctx, g.Bare, "branch", "missing"); err == nil {
 		t.Fatalf("missing branch: %s", got)
+	}
+}
+
+func TestNormalizeRepo(t *testing.T) {
+	for _, raw := range []string{"https://gitgud.io/Example/colony", "HTTPS://GITGUD.IO/Example/colony.git", "https://gitgud.io/Example/colony.git/", "https://gitgud.io/Example/colony/"} {
+		if got := subscribe.NormalizeRepo(raw); got != "https://gitgud.io/Example/colony" {
+			t.Errorf("normalize %s: %s", raw, got)
+		}
+	}
+	dir := t.TempDir()
+	u := &url.URL{Scheme: "file", Path: filepath.ToSlash(dir)}
+	if !strings.HasPrefix(u.Path, "/") {
+		u.Path = "/" + u.Path
+	}
+	if subscribe.NormalizeRepo(dir) != subscribe.NormalizeRepo(u.String()) {
+		t.Fatal("file URL and local path differ")
+	}
+}
+
+func TestUpdateTrackedRefAndUntracked(t *testing.T) {
+	for _, refType := range []string{"branch", "default", "tag", "commit"} {
+		t.Run(refType, func(t *testing.T) {
+			g := testkit.NewGitRepo(t, "")
+			ctx := context.Background()
+			typ, ref := refType, "main"
+			if typ == "default" {
+				typ, ref = "branch", ""
+			}
+			if typ == "tag" {
+				ref = "v1"
+			}
+			if typ == "commit" {
+				ref = g.First
+			}
+			dir := filepath.Join(t.TempDir(), "clone")
+			if _, err := subscribe.Clone(ctx, g.Bare, typ, ref, dir); err != nil {
+				t.Fatal(err)
+			}
+			second := g.Commit(t, "Defs/test.xml", "<Defs/>")
+			bare, err := git.PlainOpen(g.Bare)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []plumbing.ReferenceName{plumbing.NewBranchReferenceName("unrelated"), plumbing.NewTagReferenceName("unrelated")} {
+				if err := bare.Storer.SetReference(plumbing.NewHashReference(name, plumbing.NewHash(second))); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if typ == "tag" {
+				if err := bare.Storer.SetReference(plumbing.NewHashReference(plumbing.NewTagReferenceName("v1"), plumbing.NewHash(second))); err != nil {
+					t.Fatal(err)
+				}
+			}
+			dds := filepath.Join(dir, "Textures", "generated.dds")
+			if err := os.MkdirAll(filepath.Dir(dds), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(dds, []byte("generated DDS"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if dirty, err := subscribe.Dirty(dir); err != nil || dirty {
+				t.Fatalf("untracked DDS blocks update: %v %v", dirty, err)
+			}
+			want := second
+			if typ == "commit" {
+				want = g.First
+			}
+			if got, err := subscribe.Update(ctx, dir, &subscribe.Record{URL: "https://unused.invalid/page", Repo: g.Bare, RefType: typ, Ref: ref}); err != nil || got != want {
+				t.Fatalf("update: %s %v", got, err)
+			}
+			if b, err := os.ReadFile(dds); err != nil || string(b) != "generated DDS" {
+				t.Fatalf("untracked file lost: %q %v", b, err)
+			}
+			r, _ := git.PlainOpen(dir)
+			if typ != "commit" {
+				for _, name := range []plumbing.ReferenceName{plumbing.NewRemoteReferenceName("origin", "unrelated"), plumbing.NewTagReferenceName("unrelated")} {
+					if _, err := r.Reference(name, true); err == nil {
+						t.Errorf("fetched unrelated ref %s", name)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestUpdatePreservesUntrackedCollision(t *testing.T) {
+	g := testkit.NewGitRepo(t, "")
+	dir := filepath.Join(t.TempDir(), "clone")
+	ctx := context.Background()
+	if _, err := subscribe.Clone(ctx, g.Bare, "branch", "main", dir); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "texture.dds")
+	if err := os.WriteFile(path, []byte("local DDS"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g.Commit(t, "texture.dds", "upstream DDS")
+	if _, err := subscribe.Update(ctx, dir, &subscribe.Record{URL: g.Bare, RefType: "branch", Ref: "main"}); err == nil || !strings.Contains(err.Error(), "untracked") {
+		t.Fatalf("collision not refused: %v", err)
+	}
+	if b, err := os.ReadFile(path); err != nil || string(b) != "local DDS" {
+		t.Fatalf("local data changed: %q %v", b, err)
+	}
+	r, _ := git.PlainOpen(dir)
+	h, _ := r.Head()
+	if h.Hash().String() != g.First {
+		t.Fatal("checkout advanced despite collision")
+	}
+}
+
+func TestDirtyTrackedChanges(t *testing.T) {
+	g := testkit.NewGitRepo(t, "")
+	for _, change := range []string{"modified", "deleted", "staged", "added"} {
+		t.Run(change, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "clone")
+			if _, err := subscribe.Clone(context.Background(), g.Bare, "branch", "main", dir); err != nil {
+				t.Fatal(err)
+			}
+			path := "About/About.xml"
+			if change == "added" {
+				path = "new.xml"
+			}
+			var err error
+			if change == "deleted" {
+				err = os.Remove(filepath.Join(dir, filepath.FromSlash(path)))
+			} else {
+				err = os.WriteFile(filepath.Join(dir, filepath.FromSlash(path)), []byte("local edit"), 0o644)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if change == "staged" || change == "added" {
+				r, _ := git.PlainOpen(dir)
+				w, _ := r.Worktree()
+				if _, err := w.Add(path); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if dirty, err := subscribe.Dirty(dir); err != nil || !dirty {
+				t.Fatalf("tracked %s not dirty: %v %v", change, dirty, err)
+			}
+		})
 	}
 }
 

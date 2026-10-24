@@ -68,6 +68,12 @@ var freeKeys = map[string]struct {
 		}
 		return nil
 	}},
+	"steamcmd-mods.dir": {"", func(v string) error {
+		if !filepath.IsAbs(v) {
+			return fmt.Errorf("steamcmd-mods.dir must be an absolute folder path")
+		}
+		return nil
+	}},
 	// how long the cursor must rest on a mod before its thumbnail is drawn
 	"ui.preview_dwell_ms": {"0", func(v string) error {
 		if n, err := strconv.Atoi(v); err != nil || n < 0 || n > 5000 {

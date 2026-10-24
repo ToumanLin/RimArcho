@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/env"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -19,6 +21,25 @@ import (
 )
 
 var commitRE = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
+
+// NormalizeRepo compares repository identities without changing their transport URL.
+func NormalizeRepo(raw string) string {
+	p, err := repositoryURL(raw)
+	if err != nil {
+		return raw
+	}
+	u, err := url.Parse(p)
+	if err == nil && strings.EqualFold(u.Scheme, "https") {
+		u.Scheme, u.Host = "https", strings.ToLower(u.Host)
+		u.Path = strings.TrimSuffix(strings.TrimRight(u.Path, "/"), ".git")
+		u.RawPath, u.RawQuery, u.Fragment = "", "", ""
+		return u.String()
+	}
+	if abs, err := filepath.Abs(p); err == nil {
+		p = abs
+	}
+	return env.PathKey(p)
+}
 
 func init() {
 	// go-git's default file transport starts git-upload-pack from PATH.
@@ -209,6 +230,9 @@ func Dirty(dir string) (bool, error) {
 		if path == ".rimarcho" || strings.HasPrefix(filepath.ToSlash(path), ".rimarcho/") {
 			continue
 		}
+		if status.Staging == git.Untracked {
+			continue
+		}
 		if status.Staging != git.Unmodified || status.Worktree != git.Unmodified {
 			return true, nil
 		}
@@ -225,7 +249,7 @@ func Update(ctx context.Context, dir string, rec *Record) (string, error) {
 	if dirty {
 		return "", fmt.Errorf("dirty Git worktree at %s; save or discard local changes before updating", dir)
 	}
-	commit, err := RemoteCommit(ctx, rec.URL, rec.RefType, rec.Ref)
+	commit, err := RemoteCommit(ctx, rec.GitURL(), rec.RefType, rec.Ref)
 	if err != nil {
 		return "", err
 	}
@@ -233,13 +257,34 @@ func Update(ctx context.Context, dir string, rec *Record) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	u, _ := repositoryURL(rec.URL)
+	u, _ := repositoryURL(rec.GitURL())
 	depth := 1
+	ref := rec.Ref
+	if rec.RefType == "branch" && ref == "" {
+		remote := git.NewRemote(memory.NewStorage(), &config.RemoteConfig{Name: "origin", URLs: []string{u}})
+		refs, err := remote.ListContext(ctx, &git.ListOptions{})
+		if err != nil {
+			return "", err
+		}
+		for _, r := range refs {
+			if r.Name() == plumbing.HEAD && r.Type() == plumbing.SymbolicReference {
+				ref = r.Target().Short()
+			}
+		}
+		if ref == "" {
+			return "", fmt.Errorf("remote HEAD does not name a branch")
+		}
+	}
+	specs := []config.RefSpec{config.RefSpec("+refs/heads/" + ref + ":refs/remotes/origin/" + ref)}
+	if rec.RefType == "tag" {
+		specs = []config.RefSpec{config.RefSpec("+refs/tags/" + ref + ":refs/tags/" + ref)}
+	}
 	if rec.RefType == "commit" {
 		depth = 0
+		specs = []config.RefSpec{"+refs/heads/*:refs/remotes/origin/*", "+refs/tags/*:refs/tags/*"}
 	}
 	err = r.FetchContext(ctx, &git.FetchOptions{RemoteURL: u, Force: true, Depth: depth, Tags: git.NoTags,
-		RefSpecs: []config.RefSpec{"+refs/heads/*:refs/remotes/origin/*", "+refs/tags/*:refs/tags/*"}})
+		RefSpecs: specs})
 	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) && !errors.Is(err, transport.ErrEmptyRemoteRepository) {
 		return "", err
 	}
@@ -247,10 +292,64 @@ func Update(ctx context.Context, dir string, rec *Record) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := w.Checkout(&git.CheckoutOptions{Hash: plumbing.NewHash(commit), Force: true}); err != nil {
+	if err := protectUntracked(r, dir, plumbing.NewHash(commit)); err != nil {
+		return "", err
+	}
+	// The worktree is clean apart from untracked files. Merge checkout limits
+	// replacement to tracked paths; go-git's Force checkout deletes untracked files.
+	if err := w.Checkout(&git.CheckoutOptions{Hash: plumbing.NewHash(commit)}); err != nil {
 		return "", err
 	}
 	return commit, nil
+}
+
+// A clean worktree can still contain generated textures. Refuse a checkout that
+// would overwrite any of those paths (or an untracked parent file).
+func protectUntracked(r *git.Repository, dir string, hash plumbing.Hash) error {
+	dir = filepath.Clean(dir)
+	idx, err := r.Storer.Index()
+	if err != nil {
+		return err
+	}
+	tracked := make(map[string]bool, len(idx.Entries))
+	for _, e := range idx.Entries {
+		tracked[env.PathKey(filepath.Join(dir, filepath.FromSlash(e.Name)))] = true
+	}
+	commit, err := r.CommitObject(hash)
+	if err != nil {
+		return err
+	}
+	tree, err := commit.Tree()
+	if err != nil {
+		return err
+	}
+	files := tree.Files()
+	defer files.Close()
+	for {
+		file, err := files.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		path := filepath.Join(dir, filepath.FromSlash(file.Name))
+		for p := path; p != dir; p = filepath.Dir(p) {
+			if tracked[env.PathKey(p)] {
+				break
+			}
+			st, err := os.Lstat(p)
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if p == path || !st.IsDir() {
+				return fmt.Errorf("update would overwrite untracked path %s; move it before updating", p)
+			}
+		}
+	}
 }
 
 // FolderName derives a portable directory name, including for Windows local paths.

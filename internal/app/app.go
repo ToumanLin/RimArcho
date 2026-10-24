@@ -104,7 +104,10 @@ type App struct {
 	SteamCMDPoll   time.Duration
 	SteamCMDNoPath bool
 	HTTP           *http.Client
-	SteamAPI       string
+	// FindTool delegates dependency lookup; subscriptions never install tools.
+	FindTool func(name string) (path string, ok bool)
+	pageRepo func(string) string // resolved-repository override in local tests
+	SteamAPI string
 	// 贴图优化 (textures.go): TextureEncoder replaces todds, ToddsZip its download URL,
 	// ToddsNoPath leaves PATH out when looking for it (tests).
 	TextureEncoder textures.Encoder

@@ -163,7 +163,7 @@ func (a *App) SubscribeGit(url, refType, ref string, dryRun bool) (*SubscribeOp,
 		if err != nil {
 			return nil, fmt.Errorf("subscription %s: %w", e.Path, err)
 		}
-		if r.Kind == "git" && r.URL == url && r.RefType == refType && r.Ref == ref {
+		if r.Kind == "git" && subscribe.NormalizeRepo(r.GitURL()) == subscribe.NormalizeRepo(url) && r.RefType == refType && r.Ref == ref {
 			return nil, fmt.Errorf("%s (%s %q) is subscribed already at %s", url, refType, ref, e.Path)
 		}
 	}
@@ -302,16 +302,35 @@ func (a *App) CheckSubscriptions(refs []string) (*SubscribeOp, error) {
 		return nil, err
 	}
 	op := &SubscribeOp{Action: "check"}
+	if len(refs) > 0 {
+		for _, s := range ss {
+			if s.Record.Kind != "git" && s.Record.Kind != "page" {
+				return nil, fmt.Errorf("%s: update check unavailable offline for %s", s.Ref, s.Record.Kind)
+			}
+		}
+	}
 	var failures []error
 	for _, s := range ss {
 		it := subscriptionItem(s)
 		r := s.Record
-		if r.Kind == "git" {
-			commit, checkErr := subscribe.RemoteCommit(context.Background(), r.URL, r.RefType, r.Ref)
+		if r.Kind == "git" || r.Kind == "page" {
+			var commit string
+			var checkErr error
+			if r.Kind == "git" {
+				commit, checkErr = subscribe.RemoteCommit(context.Background(), r.GitURL(), r.RefType, r.Ref)
+			} else {
+				var page *subscribe.PageInfo
+				page, checkErr = a.readSubscriptionPage(r.URL)
+				if checkErr == nil {
+					commit = page.Stamp()
+				}
+			}
 			r.CheckedAt, r.CheckError = a.Now(), ""
 			if checkErr != nil {
 				r.CheckError = checkErr.Error()
-				failures = append(failures, fmt.Errorf("%s: %w", s.Ref, checkErr))
+				if r.Kind == "git" {
+					failures = append(failures, fmt.Errorf("%s: %w", s.Ref, checkErr))
+				}
 			} else {
 				r.Latest = commit
 			}
@@ -327,7 +346,7 @@ func (a *App) CheckSubscriptions(refs []string) (*SubscribeOp, error) {
 				it.Result = "check failed: " + checkErr.Error()
 			}
 		} else {
-			it.Result = "update check unavailable for " + r.Kind
+			it.Result = "skipped: update check unavailable offline for " + r.Kind
 		}
 		op.Items = append(op.Items, it)
 	}
@@ -347,14 +366,22 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (*SubscribeOp, err
 	op := &SubscribeOp{Action: "update", DryRun: dryRun}
 	for _, s := range ss {
 		it := subscriptionItem(s)
-		if s.Record.Kind != "git" {
-			return nil, fmt.Errorf("%s: updating %s subscriptions is not supported yet", s.Ref, s.Record.Kind)
+		if s.Record.Kind != "git" && s.Record.Kind != "steamcmd" {
+			if len(refs) > 0 {
+				return nil, fmt.Errorf("%s: updating %s requires --from <zip|folder>", s.Ref, s.Record.Kind)
+			}
+			it.Result = "skipped: update requires --from <zip|folder>"
+			op.Items = append(op.Items, it)
+			continue
 		}
-		if dryRun {
-			it.To, err = subscribe.RemoteCommit(context.Background(), s.Record.URL, s.Record.RefType, s.Record.Ref)
+		if dryRun && s.Record.Kind == "git" {
+			it.To, err = subscribe.RemoteCommit(context.Background(), s.Record.GitURL(), s.Record.RefType, s.Record.Ref)
 			if err != nil {
 				return op, err
 			}
+		}
+		if s.Record.Kind == "steamcmd" {
+			it.Result = "would download Workshop " + s.Record.WorkshopID + " with SteamCMD"
 		}
 		op.Items = append(op.Items, it)
 	}
@@ -364,6 +391,23 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (*SubscribeOp, err
 	// Rescan successful updates even if a later repository fails.
 	changed := false
 	for i, s := range ss {
+		if s.Record.Kind != "git" && s.Record.Kind != "steamcmd" {
+			continue
+		}
+		if s.Record.Kind == "steamcmd" {
+			result, downloadErr := a.downloadWorkshop([]string{s.Record.WorkshopID}, filepath.Dir(s.Folder), false)
+			if result != nil && len(result.Items) > 0 {
+				op.Items[i].To, op.Items[i].Result = result.Items[0].To, result.Items[0].Result
+				op.Items[i].Record = result.Items[0].Record
+			}
+			if downloadErr != nil {
+				if changed {
+					_, err = a.Scan(false)
+				}
+				return op, errors.Join(downloadErr, err)
+			}
+			continue
+		}
 		commit, updateErr := subscribe.Update(context.Background(), s.Folder, s.Record)
 		if updateErr != nil {
 			if changed {

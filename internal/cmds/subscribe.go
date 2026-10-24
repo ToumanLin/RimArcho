@@ -12,11 +12,31 @@ func init() {
 	register(&Command{Name: "subscribe git", Args: "<url>", Summary: "install a Git mod and track its branch, tag or commit", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "branch", Value: "name", Help: "track a branch (default: remote HEAD)"}, {Name: "tag", Value: "name", Help: "track a tag"}, {Name: "commit", Value: "sha", Help: "pin a full commit SHA"}, dry[0]}, Run: subscribeGitCmd})
 	register(&Command{Name: "subscribe list", Summary: "list installed subscriptions and their last update check", Run: subscriptionsCmd})
+	register(&Command{Name: "subscribe page", Args: "<url>", Summary: "inspect a download page or install its Git repository or a downloaded archive", MinArgs: 1, MaxArgs: 1,
+		Flags: []Flag{{Name: "git", Help: "subscribe to the page's single linked repository"}, {Name: "from", Value: "zip|folder", Help: "install files downloaded in your browser"}, dry[0]}, Run: func(c *Ctx, a *Args) (*render.Doc, error) {
+			if a.Bool("from") && (a.Str("from") == "" || a.Bool("git")) {
+				return nil, fmt.Errorf("--from requires a zip or folder and cannot be combined with --git")
+			}
+			op, err := c.App.SubscribePage(a.Pos[0], a.Bool("git"), a.Str("from"), a.Bool("dry-run"))
+			return subscriptionDoc(op, err)
+		}})
+	register(&Command{Name: "subscribe workshop", Args: "<id|url…>", Summary: "subscribe through Steam, with SteamCMD fallback when Steam is unavailable", MinArgs: 1, MaxArgs: -1,
+		Flags: []Flag{{Name: "steamcmd", Help: "download with SteamCMD directly"}, dry[0]}, Run: func(c *Ctx, a *Args) (*render.Doc, error) {
+			op, err := c.App.SubscribeWorkshop(a.Pos, a.Bool("steamcmd"), a.Bool("dry-run"))
+			return subscriptionDoc(op, err)
+		}})
 	register(&Command{Name: "subscribe check", Args: "[ref…]", Summary: "check upstream references for updates (default: all subscriptions)", MaxArgs: -1, Run: func(c *Ctx, a *Args) (*render.Doc, error) {
 		op, err := c.App.CheckSubscriptions(a.Pos)
 		return subscriptionDoc(op, err)
 	}})
-	register(&Command{Name: "subscribe update", Args: "[ref…]", Summary: "update subscriptions in place (refused while the game runs)", MaxArgs: -1, Flags: dry, Run: func(c *Ctx, a *Args) (*render.Doc, error) {
+	register(&Command{Name: "subscribe update", Args: "[ref…]", Summary: "update subscriptions; page subscriptions require --from (refused while the game runs)", MaxArgs: -1, Flags: append([]Flag{{Name: "from", Value: "zip|folder", Help: "replace one page subscription with downloaded files"}}, dry...), Run: func(c *Ctx, a *Args) (*render.Doc, error) {
+		if a.Bool("from") {
+			if len(a.Pos) != 1 || a.Str("from") == "" {
+				return nil, fmt.Errorf("--from requires one subscription reference and a zip or folder")
+			}
+			op, err := c.App.UpdateSubscriptionFrom(a.Pos[0], a.Str("from"), a.Bool("dry-run"))
+			return subscriptionDoc(op, err)
+		}
 		op, err := c.App.UpdateSubscriptions(a.Pos, a.Bool("dry-run"))
 		return subscriptionDoc(op, err)
 	}})
@@ -56,6 +76,9 @@ func subscriptionsCmd(c *Ctx, _ *Args) (*render.Doc, error) {
 		n.KV("folder", s.Folder)
 		if r.URL != "" {
 			n.KV("url", r.URL)
+		}
+		if r.Repo != "" {
+			n.KV("repo", r.Repo)
 		}
 		if r.WorkshopID != "" {
 			n.KV("workshop", r.WorkshopID)
@@ -106,7 +129,7 @@ func subscriptionDoc(op *app.SubscribeOp, err error) (*render.Doc, error) {
 			if it.From != "" {
 				commit = it.From + " → " + it.To
 			}
-			n.KV("commit", commit)
+			n.KV("version", commit)
 		}
 		if it.Result != "" {
 			n.KV("result", it.Result)
