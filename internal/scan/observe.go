@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/fsscan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
@@ -92,15 +92,12 @@ type Options struct {
 	// Generated lists the files RimArcho wrote into a mod folder (by its real path; lower-
 	// cased paths relative to it), left out of the fingerprint.
 	Generated func(realDir string) map[string]bool
-	Workers   int // per-source concurrency; default runtime.NumCPU()
+	Workers   int // per-source concurrency; default fsscan.Workers(source root)
 }
 
 // Collect scans every source and returns the observations in reconciliation order
 // (workshop, steamcmd, official, local, extra; then by relative path).
 func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*SourceStats) {
-	if o.Workers <= 0 {
-		o.Workers = runtime.NumCPU()
-	}
 	stats := map[string]*SourceStats{}
 	type cand struct {
 		loc      Location
@@ -207,13 +204,17 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 		bySource[ob.Loc.SourceID] = append(bySource[ob.Loc.SourceID], ob)
 	}
 	var wg sync.WaitGroup
-	for _, list := range bySource {
+	for id, list := range bySource {
+		workers := o.Workers
+		if workers <= 0 {
+			workers = fsscan.Workers(sources[sourceIndex(sources, id)].Root)
+		}
 		wg.Add(1)
-		go func(list []*Observation) {
+		go func(list []*Observation, workers int) {
 			defer wg.Done()
 			jobs := make(chan *Observation)
 			var inner sync.WaitGroup
-			for w := 0; w < o.Workers; w++ {
+			for w := 0; w < workers; w++ {
 				inner.Add(1)
 				go func() {
 					defer inner.Done()
@@ -227,7 +228,7 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 			}
 			close(jobs)
 			inner.Wait()
-		}(list)
+		}(list, workers)
 	}
 	wg.Wait()
 

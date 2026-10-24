@@ -1,14 +1,15 @@
 package scan
 
 import (
+	"context"
 	"encoding/binary"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/fsscan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/zeebo/xxh3"
 )
@@ -93,38 +94,30 @@ func ComputeSkip(dir string, prev map[string]File, generated func(realDir string
 	if generated != nil {
 		skip = generated(dir)
 	}
-	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if p == dir {
-				return err
-			}
-			return nil // unreadable entry: skip, like the game would fail to load it
-		}
-		if d.IsDir() {
-			if p != dir && skipDir(d.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !d.Type().IsRegular() {
-			return nil // links, junctions and devices inside a mod are not followed
-		}
-		info, err := d.Info()
-		if err != nil {
-			return nil
-		}
-		rel, _ := filepath.Rel(dir, p)
-		rel = filepath.ToSlash(rel)
-		if skip[strings.ToLower(rel)] {
-			return nil
-		}
-		f := File{Rel: rel, Size: info.Size(), MTime: info.ModTime().UnixNano()}
+	opts := fsscan.Options{
+		Workers: 1,
+		SkipDir: func(_, name string) bool { return skipDir(name) },
+		Sorted:  true,
+	}
+	if len(skip) > 0 {
+		opts.Keep = func(rel, _ string) bool { return !skip[strings.ToLower(rel)] }
+	}
+	tree, err := fsscan.Walk(context.Background(), dir, opts)
+	if err != nil {
+		return fp, err
+	}
+	if len(tree.Entries) > 0 {
+		fp.Files = make([]File, 0, len(tree.Entries))
+	}
+	for _, entry := range tree.Entries {
+		rel := entry.Rel
+		f := File{Rel: rel, Size: entry.Size, MTime: entry.MTime}
 		if IsSemantic(rel) {
 			key := strings.ToLower(rel)
 			if pf, ok := prev[key]; ok && pf.HasHash && pf.Size == f.Size && pf.MTime == f.MTime {
 				f.Hash, f.HasHash = pf.Hash, true
 				fp.Reused++
-			} else if h, err := hashFile(p); err == nil {
+			} else if h, err := hashFile(filepath.Join(tree.Root, filepath.FromSlash(rel))); err == nil {
 				f.Hash, f.HasHash = h, true
 				fp.Hashed++
 			}
@@ -134,12 +127,7 @@ func ComputeSkip(dir string, prev map[string]File, generated func(realDir string
 		}
 		fp.TotalSize += f.Size
 		fp.Files = append(fp.Files, f)
-		return nil
-	})
-	if err != nil {
-		return fp, err
 	}
-	SortFiles(fp.Files)
 	fp.SnapshotHash = SnapshotHash(fp.Files)
 	fp.Count = len(fp.Files)
 	return fp, nil
