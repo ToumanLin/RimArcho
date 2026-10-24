@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// 贴图优化 (08 §5.2, 06 §2.14): the page that converts the current plan's (or every mod's)
+// 贴图优化 (08 §5.2, 06 §2.13): the page that converts the current plan's (or every mod's)
 // PNG textures to DDS next to them, and takes them back; Mod 库存 does the same per copy
 // (OpTextures, OpTexClean), packs on their own copies (PackPreview's textures step).
 
@@ -25,10 +25,11 @@ func TextureScaleLabel(s int) string {
 
 // TexturePage is the 贴图优化 page.
 type TexturePage struct {
-	Scope  string   `json:"scope"` // app.TexPlan or app.TexAll
-	Scale  int      `json:"scale"`
-	Scales []int    `json:"scales"`
-	Labels []string `json:"labels"` // of Scales
+	Loading bool     `json:"loading,omitempty"`
+	Scope   string   `json:"scope"` // app.TexPlan or app.TexAll
+	Scale   int      `json:"scale"`
+	Scales  []int    `json:"scales"`
+	Labels  []string `json:"labels"` // of Scales
 	// The encoder: ready, or what is wrong and the offer to download it.
 	Tool    string `json:"tool"`
 	ToolOK  bool   `json:"toolOk"`
@@ -53,13 +54,37 @@ type TexturePage struct {
 
 // TextureRow is one mod of the page: the biggest first.
 type TextureRow struct {
-	Ref     string `json:"ref"`
-	Name    string `json:"name"`
-	PNG     string `json:"png"`
-	Convert int    `json:"convert"`
-	DDS     string `json:"dds,omitempty"` // RimArcho's DDS there now
-	Stale   int    `json:"stale,omitempty"`
-	Own     int    `json:"own,omitempty"` // DDS of the mod's own
+	Pending  bool   `json:"pending,omitempty"`
+	Estimate string `json:"estimate"`
+	Ref      string `json:"ref"`
+	Name     string `json:"name"`
+	PNG      string `json:"png"`
+	Convert  int    `json:"convert"`
+	DDS      string `json:"dds,omitempty"` // RimArcho's DDS there now
+	Stale    int    `json:"stale,omitempty"`
+	Own      int    `json:"own,omitempty"` // DDS of the mod's own
+}
+
+// TexturePageLoading offers choices before any disk measurements finish (06 §3.1).
+func TexturePageLoading(scope string, scale int) *TexturePage {
+	p := &TexturePage{Scope: scope, Scale: textures.Options{Scale: scale}.Normal().Scale, Scales: TextureScales, Loading: true}
+	for _, s := range TextureScales {
+		p.Labels = append(p.Labels, TextureScaleLabel(s))
+	}
+	return p
+}
+
+// TextureRowOf formats one completed measurement (06 §2.13).
+func TextureRowOf(m *app.TextureMod) TextureRow {
+	row := TextureRow{Ref: m.Ref, Name: m.Mod.DisplayName(), PNG: Tf("%d · %s", m.PNG, SizeText(m.PNGBytes)), Stale: m.Stale + m.Orphans, Own: m.Foreign}
+	if m.Plan != nil {
+		row.Convert = m.Plan.Est.Files
+		row.Estimate = SizeText(m.Plan.Est.DDSBytes)
+	}
+	if m.Ours > 0 {
+		row.DDS = Tf("%d · %s", m.Ours, SizeText(m.OursSize))
+	}
+	return row
 }
 
 // TexturePageOf builds the page for scope at scale.
@@ -82,10 +107,8 @@ func TexturePageContext(ctx context.Context, a *app.App, scope string, scale int
 // TexturePageReport formats an already measured summary, without loading another index.
 func TexturePageReport(a *app.App, r *app.TextureReport, scope string) *TexturePage {
 	o := r.Options
-	p := &TexturePage{Scope: scope, Scale: o.Scale, Scales: TextureScales, Mods: len(r.Mods)}
-	for _, s := range TextureScales {
-		p.Labels = append(p.Labels, TextureScaleLabel(s))
-	}
+	p := TexturePageLoading(scope, o.Scale)
+	p.Loading, p.Mods = false, len(r.Mods)
 	if t := r.Tool; t != nil && t.Err == "" {
 		p.Tool, p.ToolOK = Tf("todds %s · %s", t.Version, t.Path), true
 	} else {
@@ -114,14 +137,7 @@ func TexturePageReport(a *app.App, r *app.TextureReport, scope string) *TextureP
 		if m.PNG == 0 && m.Ours == 0 {
 			continue
 		}
-		row := TextureRow{Ref: m.Ref, Name: m.Mod.DisplayName(), PNG: Tf("%d · %s", m.PNG, SizeText(m.PNGBytes)), Stale: m.Stale + m.Orphans, Own: m.Foreign}
-		if m.Plan != nil {
-			row.Convert = m.Plan.Est.Files
-		}
-		if m.Ours > 0 {
-			row.DDS = Tf("%d · %s", m.Ours, SizeText(m.OursSize))
-		}
-		p.Rows = append(p.Rows, row)
+		p.Rows = append(p.Rows, TextureRowOf(m))
 	}
 	size := map[string]int64{}
 	for _, m := range r.Mods {

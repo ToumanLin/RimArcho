@@ -64,11 +64,12 @@ type API struct {
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
 	// TexRunner runs `archo textures optimize` in place of the child process (tests).
-	TexRunner func(args []string, progress func(string)) ([]string, error)
-	texLast   TextureEvent // the running conversion's last progress
-	texCancel context.CancelFunc
-	logRead   logReader
-	texRead   logReader
+	TexRunner  func(args []string, progress func(string)) ([]string, error)
+	texLast    TextureEvent // the running conversion's last progress
+	texCancel  context.CancelFunc
+	texMeasure textureMeasurement
+	logRead    logReader
+	texRead    logReader
 	// ScanRunner scans an environment in place of the child process (tests).
 	ScanRunner func(env string) (string, error)
 }
