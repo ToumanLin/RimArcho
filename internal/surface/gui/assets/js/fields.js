@@ -43,6 +43,7 @@ export function fieldList(fields, acts = {}) {
     const actions = [...(f.act ? [{ act: f.act, label: f.actLabel }] : []), ...(f.actions || [])];
     for (const a of actions) {
       const b = el("button", "fact", a.label);
+      if (a.act === "tags") b.dataset.envWrite = a.act;
       if (a.act === "steam") b.title = "ctrl+s";
       b.onclick = () => {
         if (a.act === "url") return api.OpenURL(f.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));

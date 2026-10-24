@@ -27,7 +27,7 @@ import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
-import { withEnvironmentSwitch } from "./environment.js";
+import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 
 // ---- loading ----
 
@@ -113,6 +113,7 @@ function exportCurrent() {
 }
 
 async function goLaunch() {
+  if (environmentReason()) return say("busy", environmentReason());
   await go("home");
   await homePage.focusLaunch();
 }
@@ -122,8 +123,9 @@ async function goLaunch() {
 // own menu (rename, copy, delete) and its "有未载入的外部版本" mark (04 §4.3).
 function planActions() {
   const u = (S.board && S.board.unsaved) || 0;
-  const btn = (label, k, run, cls = "") => {
+  const btn = (label, k, run, cls = "", envWrite = "") => {
     const b = el("button", "btn " + cls, label);
+    if (envWrite) b.dataset.envWrite = envWrite;
     if (k) { b.append(el("kbd", "", k)); b.title = k; }
     b.onclick = (e) => { e.stopPropagation(); run(); };
     return b;
@@ -143,15 +145,15 @@ function planActions() {
     motion.bump("unwritten", n, u);
     out.push(n);
   } else motion.bump("unwritten", null, 0);
-  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only"), btn(T("import"), "i", () => exchange()), btn(T("export"), "e", exportCurrent),
-    btn(T("create a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
+  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only", "undo"), btn(T("import"), "i", () => exchange()), btn(T("export"), "e", exportCurrent),
+    btn(T("create a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : "", "save"));
   if (plan) {
     const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");
     more.title = T("the list: rename, copy, delete") + " · P";
     out.push(more);
   }
   // 启动游戏 opens 启动, where the game starts (06 §2.5)
-  const l = btn(T("launch the game"), "L", goLaunch, "primary");
+  const l = btn(T("launch the game"), "L", goLaunch, "primary", "launch");
   l.title = T("opens the launch page, where the game starts") + " · L";
   out.push(l);
   return out;
@@ -391,6 +393,7 @@ async function edited(p, undoable = true, ids = null) {
 }
 
 async function verb(name) {
+  if (environmentReason() && !["full", "workshop", "folder", "workshop-id", "steam", "needs"].includes(name)) return say("busy", environmentReason());
   const k = S.focus < 3 ? S.focus : lastList;
   const sel = S.focus < 3 ? selection() : (cur(lastList) ? [cur(lastList)] : []);
   const ids = idsOf(sel);
@@ -507,6 +510,7 @@ async function preview(what) {
 
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
+  if (environmentReason() && ["launch", "sort", "save", "undo", "redo", "restore-all", "stage-all", "rescan", "analyze"].includes(id)) return say("busy", environmentReason());
   // A page replaces the page shown once its data is in: the mod list never shows between.
   const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures", tasks: "tasks" };
   if (pages[id]) return go(pages[id]);
@@ -543,7 +547,7 @@ async function chooseEnv() {
   const envs = (S.board && S.board.envs) || [];
   if (!envs.length) return say("", T("no games yet (archo env add)"));
   pop.choose(T("switch game"), envs, (i) => useEnv(envs[i]),
-    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove the game"), run: (i) => scr.removeEnv(envs[i]) });
+    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove the game"), envWrite: "remove-env", run: (i) => scr.removeEnv(envs[i]) });
 }
 
 async function useEnv(name) {
@@ -770,7 +774,7 @@ function onKey(e) {
   if (k === "Escape" && S.screen === "plan-import") return importKey(e);
   if (k === "Escape" && S.screen === "plans") return planManage.key(e);
   if (document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
-  if ((k === "u" || ((e.ctrlKey || e.metaKey) && k === "z")) && undoStatus()) { e.preventDefault(); return; }
+  if ((k === "u" || ((e.ctrlKey || e.metaKey) && k === "z")) && !S.busy.env && undoStatus()) { e.preventDefault(); return; }
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
   // shift+1–8: the sidebar's entries. By the physical key, so it works on any layout
   // (shift+1 is "!" on a US keyboard, shift+3 is "#").

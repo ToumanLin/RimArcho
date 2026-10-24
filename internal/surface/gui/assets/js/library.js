@@ -460,6 +460,7 @@ async function drawDetail() {
   for (const c of ops.sorted((i.ops || []).filter((c) => ops.op(c).detail))) {
     const o = ops.op(c);
     const b = el("button", "btn" + (o.danger ? " danger" : ""), o.label);
+    if (o.group !== 3) b.dataset.envWrite = c;
     if (o.key) b.append(el("kbd", "", o.key));
     b.onclick = () => run(c, [i]);
     acts.append(b);
@@ -574,6 +575,7 @@ function drawBar() {
     const o = ops.op(c), copies = by.get(c);
     const b = el("button", "btn" + (o.danger ? " danger" : ""), o.label);
     if (copies.length < L.sel.size) b.append(el("span", "faint", " " + copies.length));
+    if (o.group !== 3) b.dataset.envWrite = c;
     if (o.key) b.append(el("kbd", "", o.key));
     b.onclick = () => run(c, copies);
     bar.append(b);
@@ -614,6 +616,7 @@ async function run(code, copies) {
   const refs = copies.map((i) => i.ref);
   const i0 = copies[0];
   const o = ops.op(code);
+  if (S.busy.env && o.group !== 3) return say("busy", Tf("switching to %s", S.busy.env));
   const done = async (p, undo) => {
     try { const t = await p; say("ok", typeof t === "string" ? t : t && t.text, undo); } catch (e) { say("fail", errText(e)); }
     L.sel.clear();

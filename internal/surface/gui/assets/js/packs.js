@@ -111,10 +111,10 @@ export async function pack(name) {
   P = p;
   const sc = S.screen === "packs" && S.packFocus === name ? $("#screen") : openScreen("packs");
   sc.innerHTML = "";
-  const play = act(T("play"), "play", () => launch(), "L");
+  const play = act(T("play"), "play", () => launch(), "L", "pack-launch");
   play.classList.add("primary");
   const w = page("packs pack-page", P.facts.join(" · "), button(T("export"), "e", () => exportPack(false)),
-    button(T("export the list"), "E", () => exportPack(true)), button(T("move to the recycle bin"), "Del", () => removePack()), play);
+    button(T("export the list"), "E", () => exportPack(true)), button(T("move to the recycle bin"), "Del", () => removePack(), "", "pack-remove"), play);
   sc.append(w);
   const sec = el("section", "sec");
   sec.append(el("h2", "label", T("the mods, in load order")));
@@ -208,12 +208,12 @@ function buildCard(u) {
       try { say("ok", await api.PackStop(u.name)); } catch (e) { say("fail", errText(e)); }
     }));
   } else {
-    right.append(button(T("create again"), "", () => startBuild(u.name)));
+    right.append(button(T("create again"), "", () => startBuild(u.name), "", "pack-build"));
     right.append(button(T("delete what it copied"), "", () => pop.confirm(T("delete what it copied"), [Tf("the unfinished pack %s and what it copied (%s) are deleted; your mods are not touched", u.name, u.copied || "?")], T("delete what it copied"), async () => {
       say("busy", T("deleting what it copied…"));
       try { say("ok", await api.PackRemoveUnfinished(u.name)); } catch (e) { say("fail", errText(e)); }
       redraw();
-    }), "danger"));
+    }), "danger", "pack-remove-unfinished"));
   }
   head.append(left, right);
   card.append(head);
@@ -475,6 +475,7 @@ function drawBuild() {
   row(T("location"), el("span", "v path", p.dir));
   side.append(kv);
   const go1 = el("button", "btn primary bd-go");
+  go1.dataset.envWrite = "pack-build";
   go1.append(T("create pack"), el("kbd", "", "B"));
   go1.onclick = () => go();
   const why = el("div", "bd-why");

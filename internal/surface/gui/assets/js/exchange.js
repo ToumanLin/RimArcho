@@ -158,7 +158,7 @@ async function preview(kind, src, fileName) {
   if (!current()) return;
   name.value = free.free;
   const why = el("div", "plan-why");
-  const submit = button(T("import"), "enter", perform, "primary");
+  const submit = button(T("import"), "enter", perform, "primary", "import-apply");
   submit.title = T("does not write game files");
   const options = [["new", T("import as a new list"), Tf("%d mods; the current list stays as it is", p.total)],
     ["replace", Tf("replace %s", active.name), p.replace.text], ["merge", T("add the ones you lack"), p.merge.text]];

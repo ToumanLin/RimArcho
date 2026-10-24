@@ -260,6 +260,7 @@ function launchStep(f) {
   const s = step("03", "hm-s3", T("launch"));
   const live = running(), starting = !live && launching > Date.now();
   const b = el("button", "hm-go" + (live ? " running" : "") + (starting ? " starting" : "") + (arrived ? " arrived" : ""));
+  b.dataset.envWrite = "launch";
   arrived = false;
   const top = el("div", "top");
   const title = el("span", "title", live ? T("the game is running") : starting ? T("starting…") : T("launch the game"));

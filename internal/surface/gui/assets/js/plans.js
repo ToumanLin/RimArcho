@@ -83,11 +83,12 @@ export function renamePlan(id, after = null) {
     const no = el("button", "", T("cancel") + "  esc");
     no.onclick = pop.close;
     const yes = el("button", "go", T("rename") + "  enter");
+    yes.dataset.envWrite = "rename-plan";
     const go = async () => { await f.check(); if (f.bad()) return f.inp.focus(); done(api.RenamePlan(id, f.inp.value), after); };
     yes.onclick = go;
     btns.append(no, yes);
     box.append(btns);
-    p.keys = (e) => { if (e.key === "Enter") { e.preventDefault(); go(); return true; } return false; };
+    p.keys = (e) => { if (e.key === "Enter") { e.preventDefault(); yes.click(); return true; } return false; };
   });
 }
 
@@ -105,10 +106,10 @@ export function actions(id) {
   if (!p) return [];
   const out = [];
   if (!p.current) out.push({ label: T("open"), run: () => ui.go(p.page) });
-  out.push({ label: T("rename…"), run: () => renamePlan(id) });
-  if (p.current) out.push({ label: T("copy as a new list…"), run: () => newPlan("current") });
-  out.push({ label: T("new list…"), run: () => newPlan() });
-  out.push({ label: T("delete…"), run: () => deletePlan(id) });
+  out.push({ label: T("rename…"), envWrite: "rename-plan", run: () => renamePlan(id) });
+  if (p.current) out.push({ label: T("copy as a new list…"), envWrite: "new-plan", run: () => newPlan("current") });
+  out.push({ label: T("new list…"), envWrite: "new-plan", run: () => newPlan() });
+  out.push({ label: T("delete…"), envWrite: "remove-plan", run: () => deletePlan(id) });
   return out;
 }
 

@@ -216,6 +216,7 @@ function copyCard(x) {
     for (const code of ops.sorted((x.ops || []).filter((k) => ops.op(k).detail || k === "note"))) {
       const o = ops.op(code);
       const btn = el("button", "btn small" + (o.danger ? " danger" : ""), o.label);
+      if (o.group !== 3) btn.dataset.envWrite = code;
       if (o.key) btn.append(el("kbd", "", o.key));
       btn.onclick = (e) => { e.stopPropagation(); runOp(code); };
       acts.append(btn);
@@ -232,6 +233,7 @@ async function runOp(code) {
   const c = theCopy();
   if (!c) return;
   const o = ops.op(code);
+  if (S.busy.env && o.group !== 3) return say("busy", Tf("switching to %s", S.busy.env));
   const done = async (p, undo) => {
     try {
       const t = await p;

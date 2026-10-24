@@ -1,7 +1,7 @@
 // Open /dev/pagecheck in guidev. Test real modules/DOM with delayed API replies and
 // synthetic large logs; the mock runtime makes this page independent of user data.
 import { handlers, emit } from "./pagecheck-runtime.js";
-import { S, api } from "/js/state.js";
+import { S, api, T } from "/js/state.js";
 import * as screens from "/js/screens.js";
 import * as library from "/js/library.js";
 import * as lists from "/js/lists.js";
@@ -12,6 +12,9 @@ import * as packs from "/js/packs.js";
 import * as guide from "/js/guide.js";
 import * as uninstall from "/js/uninstall.js";
 import * as full from "/js/fulldetail.js";
+import { setText } from "/js/api.js";
+import * as ops from "/js/ops.js";
+import * as pop from "/js/popups.js";
 import { withEnvironmentSwitch } from "/js/environment.js";
 
 const output = document.querySelector("#results"), results = [];
@@ -303,7 +306,7 @@ try {
   });
   await test("environment switch keeps navigation live and only the latest result applies", async () => {
     const old = deferred(), next = deferred(); let selected = "";
-    const button = document.createElement("button"); button.className = "hm-go";
+    const button = document.createElement("button"); button.className = "hm-go"; button.dataset.envWrite = "launch";
     document.querySelector("#app").append(button);
     const p1 = withEnvironmentSwitch("1.5", async (current) => { await old.promise; if (current()) selected = "1.5"; });
     assert(!document.querySelector("#app").inert && !document.querySelector("#env-progress"), "switch locked the window");
@@ -316,6 +319,75 @@ try {
     next.resolve(); await p2;
     assert(selected === "1.6" && !S.busy.env && !button.disabled, "newest result did not win");
     button.remove();
+  });
+  // Attribute guards must survive translated text, icons and redraws (06 §2.3, 06 §3.1).
+  await test("Chinese environment actions disable by code, navigation stays live, and state restores", async () => {
+    const start = S.start, lang = document.documentElement.lang, live = S.live;
+    const host = document.createElement("section"), menu = document.createElement("div"), popup = document.createElement("div");
+    menu.id = "menu"; menu.hidden = true; popup.id = "popup"; popup.hidden = true;
+    host.append(menu, popup); document.querySelector("#app").append(host);
+    pop.initPopups({ renderWhere() {}, renderHeads() {} });
+    const text = { "write to the game": "写入游戏", "launch the game": "启动游戏", undo: "撤销", redo: "重做", "switching to %s": "正在切换到 %s" };
+    setText(text); document.documentElement.lang = "zh"; S.live = null;
+    const table = [
+      { code: "enable", label: "启用", key: "space", group: 1 },
+      { code: "tags", label: "标签", key: "g", group: 2 },
+      { code: "folder", label: "打开文件夹", key: "ctrl+o", group: 3 },
+      { code: "pin", label: "锁定这个版本", group: 4 },
+      { code: "delete", label: "移到回收站", key: "Del", group: 5 },
+    ];
+    S.start = { ...S.start, ops: table }; ops.setTable(table);
+    const writes = ["save", "launch", "undo", "redo"].map((code, i) => {
+      const b = screens.button("① ▶ " + T(["write to the game", "launch the game", "undo", "redo"][i]), "", () => {}, "", code);
+      host.append(b); return b;
+    });
+    writes[0].title = "w"; writes[1].title = ""; writes[3].disabled = true; writes[3].title = "没有可重做的操作";
+    const navigation = screens.button(T("write to the game"), "", () => {}); navigation.title = "导航"; host.append(navigation);
+    const before = writes.map(b => ({ disabled: b.disabled, title: b.getAttribute("title") }));
+    const finish = deferred(), pending = withEnvironmentSwitch("游戏乙", () => finish.promise);
+    const allDisabled = buttons => buttons.forEach(b => assert(b.disabled && b.title === "正在切换到 游戏乙", "unguarded Chinese action " + b.dataset.envWrite));
+    try {
+      allDisabled(writes);
+      assert(!navigation.disabled && navigation.title === "导航", "matching navigation text was disabled");
+      const newButton = screens.rescanButton(); host.append(newButton); writes.push(newButton);
+      await settle(); allDisabled([newButton]);
+      ops.openMenu(0, 0, table.map(o => o.code), () => { throw new Error("guarded menu key ran"); });
+      await settle();
+      allDisabled([...menu.querySelectorAll("[data-env-write]")]);
+      assert(menu.querySelectorAll("[data-env-write]").length === 4 && !menu.querySelector("button:not([data-env-write])").disabled, "op groups were classified incorrectly");
+      menu.dispatchEvent(new KeyboardEvent("keydown", { key: "g", bubbles: true, cancelable: true }));
+      let confirms = 0;
+      pop.confirm("删除", [], "删除", () => confirms++);
+      await settle();
+      allDisabled([...popup.querySelectorAll("[data-env-write]")]);
+      pop.popupKey(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+      assert(!confirms && S.popup, "confirmation keyboard bypassed disabled");
+      pop.close(); pop.hideMenu();
+      handlers.set("Home", () => ({ rows: [{ kind: "plan", envName: "游戏乙", env: "游戏乙", plan: 1, page: "plan:1", name: "方案", current: true }], featured: 0 }));
+      await home.home(); await settle();
+      const launch = document.querySelector(".hm-go"); allDisabled([launch]);
+      home.homeKey(new KeyboardEvent("keydown", { key: "L", cancelable: true }));
+      for (const [method, args] of [["Run", ["save"]], ["Run", ["launch"]], ["Run", ["sort"]], ["Undo", []], ["Redo", []], ["Scan", []], ["Analyze", []], ["RunOp", ["delete", []]], ["LibraryDo", ["enable", []]]]) {
+        let called = false; handlers.set(method, () => { called = true; });
+        try {
+          let reason = "";
+          try { await api[method](...args); } catch (error) { reason = error.message; }
+          assert(!called && reason === "正在切换到 游戏乙", method + " shortcut escaped API guard");
+        } finally { handlers.delete(method); }
+      }
+      writes[0].disabled = false; writes[0].title = "late validation";
+      await settle(); allDisabled([writes[0]]);
+      finish.resolve(); await pending;
+      before.forEach((old, i) => assert(writes[i].disabled === old.disabled && writes[i].getAttribute("title") === old.title, "disabled/title not restored for " + writes[i].dataset.envWrite));
+      assert(!newButton.disabled && !launch.disabled && !launch.hasAttribute("title"), "redrawn actions stayed disabled");
+      assert(!navigation.disabled && navigation.title === "导航", "navigation state changed");
+      try { await withEnvironmentSwitch("游戏丙", async () => { throw new Error("fixture failure"); }); } catch (error) { assert(error.message === "fixture failure", error.message); }
+      before.forEach((old, i) => assert(writes[i].disabled === old.disabled && writes[i].getAttribute("title") === old.title, "failure lost original state"));
+    } finally {
+      finish.resolve(); await pending; pop.close(); host.remove();
+      S.start = start; S.live = live; ops.setTable(start?.ops || table); setText(start?.text); document.documentElement.lang = lang;
+      handlers.set("Home", () => ({ rows: [], featured: -1 })); screens.openScreen("other");
+    }
   });
   await test("environment progress stays through destination refresh", async () => {
     const reply = deferred(), refresh = deferred();

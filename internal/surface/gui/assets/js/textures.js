@@ -146,7 +146,7 @@ async function draw(fetch, measurements = false, entryRead = null) {
   modCount.dataset.texMods = "";
   fillModCount(modCount, p);
   slot(setRow(now, "PNG", p.loading ? null : p.png, p.loading ? pending() : null), "png");
-  const ours = slot(setRow(now, T("RimArcho's DDS"), [p.ours, p.staleText], button(T("remove every converted texture…"), "", () => clean(), "danger")), "ours");
+  const ours = slot(setRow(now, T("RimArcho's DDS"), [p.ours, p.staleText], button(T("remove every converted texture…"), "", () => clean(), "danger", "textures-clean")), "ours");
   ours.hidden = !p.ours || !!p.loading;
   w.append(now);
 
@@ -253,7 +253,7 @@ function foot(p) {
     }));
     return f;
   }
-  const go = button(T("convert"), "", () => convert(p), "primary");
+  const go = button(T("convert"), "", () => convert(p), "primary", "textures-run");
   go.disabled = X.loading || !!p.loading || !!X.error || !p.toolOk || !p.convert;
   f.append(go);
   return f;
