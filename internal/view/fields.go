@@ -75,7 +75,7 @@ func workshopField(id string) Field {
 // note when set, languages, dependencies, conflicts (06 §4.1).
 func ModFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) []Field {
 	fs := headFields(st, mod)
-	fs = append(fs, Field{Kind: FieldTags, Label: T("tags"), Value: strings.Join(mod.Tags, " · "), List: mod.Tags, Act: ActTags, ActAt: T("edit")})
+	fs = append(fs, Field{Kind: FieldTags, Label: T("tags"), Value: strings.Join(mod.Tags, "  "), List: mod.Tags, Act: ActTags, ActAt: T("edit")})
 	if mod.Alias != "" {
 		fs = append(fs, Field{Kind: FieldAlias, Label: T("alias"), Value: mod.Alias, Extra: mod.Name})
 	}
@@ -110,7 +110,7 @@ func tailFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData)
 	var fs []Field
 	if a != nil && mod.SnapID != 0 {
 		if ls, err := a.Store.Languages(mod.SnapID); err == nil && len(ls) > 0 {
-			fs = append(fs, Field{Kind: FieldLanguages, Label: T("languages"), Value: strings.Join(ls, " · "), List: ls})
+			fs = append(fs, Field{Kind: FieldLanguages, Label: T("languages"), Value: strings.Join(ls, "  "), List: ls})
 		}
 	}
 	if deps := Deps(st, d); len(deps) > 0 {
@@ -127,7 +127,7 @@ func depNames(ds []Dep) string {
 	for i, x := range ds {
 		names[i] = x.Name
 	}
-	return strings.Join(names, " · ")
+	return strings.Join(names, "  ")
 }
 
 // Conflicts: the declared incompatibilities (plus the current version's), each once, with
@@ -169,7 +169,7 @@ func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) 
 	var fs []Field
 	if i.Mod != nil {
 		fs = headFields(st, i.Mod)
-		fs = append(fs, Field{Kind: FieldTags, Label: T("tags"), Value: strings.Join(i.Mod.Tags, " · "), List: i.Mod.Tags, Act: ActTags, ActAt: T("edit")})
+		fs = append(fs, Field{Kind: FieldTags, Label: T("tags"), Value: strings.Join(i.Mod.Tags, "  "), List: i.Mod.Tags, Act: ActTags, ActAt: T("edit")})
 	} else if IsNumber(i.WorkshopID) {
 		fs = append(fs, workshopField(i.WorkshopID))
 	}
@@ -182,12 +182,12 @@ func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) 
 			fs = append(fs, Field{Kind: kind, Label: label, Value: v, List: list})
 		}
 	}
-	add(FieldState, T("state"), strings.Join(states, " · "), states)
+	add(FieldState, T("state"), strings.Join(states, "  "), states)
 	var uses []string
 	for _, u := range i.UsedIn {
 		uses = append(uses, libUseText(u.Value()))
 	}
-	add(FieldUsed, T("used in"), strings.Join(uses, " · "), uses)
+	add(FieldUsed, T("used in"), strings.Join(uses, "  "), uses)
 	if i.Sized {
 		add(FieldSize, T("size"), render.Size(i.Bytes), nil)
 	}

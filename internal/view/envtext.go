@@ -33,7 +33,6 @@ func init() {
 		"choose…":                              "选择…",
 		"choose a folder":                      "选择文件夹",
 		"no folder dialog here; type the path": "这里不能打开文件夹对话框，请输入路径",
-		"each game is one game folder: its version, how it starts, its saves": "每个游戏对应一个游戏目录：版本、启动方式和存档",
 		// the guide's first step
 		"a game you have":    "已有的游戏",
 		"download a version": "下载一个版本",
@@ -89,7 +88,7 @@ func DownloadErrorText(err error) string {
 	}
 	s := T(de.Why())
 	if de.Line != "" {
-		s += " · " + Tf("SteamCMD: %s", de.Line)
+		s += "  " + Tf("SteamCMD: %s", de.Line)
 	}
 	return s
 }

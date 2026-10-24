@@ -159,9 +159,9 @@ func apply(a *app.App, what string, move bool) (string, error) {
 		}
 		if strong > 0 {
 			// Strong ones first (04 §5.3): they are what the sort mattered for.
-			return Tf("sorted: %d moved · strong requirements put right: %d", len(r.Changes), strong), nil
+			return Tf("sorted: %d moved, strong requirements put right: %d", len(r.Changes), strong), nil
 		}
-		return Tf("sorted: %d moved · only weaker preferences were out of order", len(r.Changes)), nil
+		return Tf("sorted: %d moved, only weaker preferences were out of order", len(r.Changes)), nil
 	case ListSave:
 		r, err := a.SaveWith(false, move)
 		if err != nil {
@@ -175,7 +175,7 @@ func apply(a *app.App, what string, move bool) (string, error) {
 			msg = Tf("written to the game as v%d; %d Mods/ links updated", r.Version, len(r.Links))
 		}
 		if r.Running != nil {
-			msg += " · " + T("the game reads it on its next start")
+			msg += "  " + T("the game reads it on its next start")
 		}
 		return msg, nil
 	case ListLaunch:
@@ -185,7 +185,7 @@ func apply(a *app.App, what string, move bool) (string, error) {
 		// The most likely trouble goes with it (06 §2.3, never blocking): the TUI has no
 		// launch page, so its status line is where the player reads it.
 		if h := launchHintNow(a); h != nil {
-			return T("the game is starting") + " · " + Tf("watch for: %s", h.Text), nil
+			return T("the game is starting") + "  " + Tf("watch for: %s", h.Text), nil
 		}
 		return T("the game is starting"), nil
 	}
@@ -240,7 +240,7 @@ func LaunchPack(a *app.App, name string, move bool) *Outcome {
 	}
 	o.Text = Tf("pack %s: the game is starting", name)
 	if len(r.Moved) > 0 {
-		o.Text += " · " + Tf("%d folders moved into the lock library", len(r.Moved))
+		o.Text += "  " + Tf("%d folders moved into the lock library", len(r.Moved))
 	}
 	return o
 }

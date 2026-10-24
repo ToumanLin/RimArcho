@@ -209,7 +209,7 @@ func companionChips(texts []string) []string {
 	var out []string
 	for _, t := range texts {
 		if m := companionFileRe.FindStringSubmatch(t); m != nil {
-			c := m[1] + " · " + m[2]
+			c := m[1] + "  " + m[2]
 			dup := false
 			for _, o := range out {
 				dup = dup || o == c
@@ -248,7 +248,7 @@ func logEvidence(ps []*app.Problem, when string) *Evidence {
 		src = Tf("%s and %d more", files[0], len(files)-1)
 	}
 	if when != "" {
-		src += " · " + when
+		src += "  " + when
 	}
 	return evidence(EvLog, src)
 }

@@ -33,12 +33,12 @@ type TexturePage struct {
 	// The encoder: ready, or what is wrong and the offer to download it.
 	Tool    string `json:"tool"`
 	ToolOK  bool   `json:"toolOk"`
-	Offer   string `json:"offer,omitempty"`   // "todds 0.4.1 · 3.7 MB · from github.com/…"
+	Offer   string `json:"offer,omitempty"`   // "todds 0.4.1  3.7 MB  from github.com/…"
 	OfferTo string `json:"offerTo,omitempty"` // where it goes
 	// What is there now.
 	Mods     int    `json:"mods"`
-	PNG      string `json:"png"`      // "13208 PNG · 412 MB"
-	Ours     string `json:"ours"`     // "3201 DDS · 1.2 GB" ("" none)
+	PNG      string `json:"png"`      // "13208 PNG  412 MB"
+	Ours     string `json:"ours"`     // "3201 DDS  1.2 GB" ("" none)
 	OursN    int    `json:"oursN"`    // files
 	Stale    int    `json:"stale"`    // DDS whose PNG changed or is gone
 	StaleMod int    `json:"staleMod"` // mods with any
@@ -81,7 +81,7 @@ func TexturePageLoading(scope string, scale int) *TexturePage {
 
 // TextureRowOf formats one completed measurement (06 §2.13).
 func TextureRowOf(m *app.TextureMod) TextureRow {
-	row := TextureRow{Ref: m.Ref, Name: m.Mod.DisplayName(), PNG: Tf("%d · %s", m.PNG, SizeText(m.PNGBytes)), PNGCount: m.PNG, PNGBytes: m.PNGBytes, CurrentSize: SizeText(m.PNGBytes), Stale: m.Stale + m.Orphans, Own: m.Foreign}
+	row := TextureRow{Ref: m.Ref, Name: m.Mod.DisplayName(), PNG: Tf("%d  %s", m.PNG, SizeText(m.PNGBytes)), PNGCount: m.PNG, PNGBytes: m.PNGBytes, CurrentSize: SizeText(m.PNGBytes), Stale: m.Stale + m.Orphans, Own: m.Foreign}
 	if m.Plan != nil {
 		row.Convert = m.Plan.Est.Files
 		row.Estimate = SizeText(m.Plan.Est.DDSBytes)
@@ -89,7 +89,7 @@ func TextureRowOf(m *app.TextureMod) TextureRow {
 		row.SavedBytes = m.Plan.Est.PNGBytes - m.Plan.Est.DDSBytes
 	}
 	if m.Ours > 0 {
-		row.DDS = Tf("%d · %s", m.Ours, SizeText(m.OursSize))
+		row.DDS = Tf("%d  %s", m.Ours, SizeText(m.OursSize))
 	}
 	return row
 }
@@ -117,20 +117,20 @@ func TexturePageReport(a *app.App, r *app.TextureReport, scope string) *TextureP
 	p := TexturePageLoading(scope, o.Scale)
 	p.Loading, p.Mods = false, len(r.Mods)
 	if t := r.Tool; t != nil && t.Err == "" {
-		p.Tool, p.ToolOK = Tf("todds %s · %s", t.Version, t.Path), true
+		p.Tool, p.ToolOK = Tf("todds %s  %s", t.Version, t.Path), true
 	} else {
 		p.Tool = T("the DDS encoder (todds) is not installed")
 		if t != nil && t.Path != "" {
 			p.Tool = t.Err
 		}
 		off := a.OfferTodds()
-		p.Offer = Tf("todds %s · %s · from %s (MPL-2.0)", off.Version, SizeText(off.Bytes), off.URL)
+		p.Offer = Tf("todds %s  %s  from %s (MPL-2.0)", off.Version, SizeText(off.Bytes), off.URL)
 		p.OfferTo = off.Dir
 	}
 	png, pngBytes, ours, oursBytes, stale := r.Totals()
-	p.PNG = Tf("%d PNG · %s", png, SizeText(pngBytes))
+	p.PNG = Tf("%d PNG  %s", png, SizeText(pngBytes))
 	if ours > 0 {
-		p.Ours, p.OursN = Tf("%d DDS · %s", ours, SizeText(oursBytes)), ours
+		p.Ours, p.OursN = Tf("%d DDS  %s", ours, SizeText(oursBytes)), ours
 	}
 	p.Stale = stale
 	for _, m := range r.Mods {
@@ -177,19 +177,19 @@ func TextureRunText(r *app.TextureReport) string {
 		s = Tf("stopped: %d textures converted, %d not", r.Converted, r.Incomplete)
 	}
 	if len(r.Failed) > 0 {
-		s += Tf(" · %d failed (they keep their PNG)", len(r.Failed))
+		s += Tf(", %d failed (they keep their PNG)", len(r.Failed))
 	}
 	if r.Removed > 0 {
-		s += Tf(" · %d stale DDS removed", r.Removed)
+		s += Tf(", %d stale DDS removed", r.Removed)
 	}
 	return s
 }
 
 // TextureProgressText is a run as it goes.
 func TextureProgressText(p app.TextureProgress) string {
-	s := Tf("%d of %d textures · %d of %d mods", p.Files, p.FilesTotal, p.Mods, p.ModsTotal)
+	s := Tf("%d of %d textures  %d of %d mods", p.Files, p.FilesTotal, p.Mods, p.ModsTotal)
 	if p.Mod != "" {
-		s += " · " + p.Mod
+		s += "  " + p.Mod
 	}
 	return s
 }
@@ -200,12 +200,12 @@ func TextureField(i *app.LibInstance) string {
 	if t == nil || t.Files == 0 {
 		return ""
 	}
-	s := Tf("%d DDS by RimArcho · %s", t.Files, SizeText(t.Bytes))
+	s := Tf("%d DDS by RimArcho  %s", t.Files, SizeText(t.Bytes))
 	if t.Scale > 0 && t.Scale < 100 {
-		s += " · " + Tf("%d%%", t.Scale)
+		s += "  " + Tf("%d%%", t.Scale)
 	}
 	if t.Stale {
-		s += " · " + T("the mod changed since: convert again")
+		s += "  " + T("the mod changed since: convert again")
 	}
 	return s
 }

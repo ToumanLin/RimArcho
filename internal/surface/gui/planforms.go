@@ -40,7 +40,7 @@ func (s *API) PlanSources(id int64) (*PlanSources, error) {
 			if v.Source != "save" && v.Source != "launch" && v.Source != "user" {
 				continue
 			}
-			out.Versions = append(out.Versions, view.PlanFrom{From: fmt.Sprintf("v%d", v.N), Label: fmt.Sprintf("%s v%d · %s", p.Name, v.N, view.ShortDate(v.Created))})
+			out.Versions = append(out.Versions, view.PlanFrom{From: fmt.Sprintf("v%d", v.N), Label: fmt.Sprintf("%s v%d, %s", p.Name, v.N, view.ShortDate(v.Created))})
 		}
 	}
 	if !found {
@@ -163,7 +163,7 @@ func (s *API) ImportApplyTo(id int64, merge bool) (text string, err error) {
 		s.x.imp = nil
 		if s.x.follow {
 			if e := view.FollowImported(s.a, imp, id); e != nil {
-				text += " · " + e.Error()
+				text += "  " + e.Error()
 			}
 		}
 		s.board, s.needs = nil, nil

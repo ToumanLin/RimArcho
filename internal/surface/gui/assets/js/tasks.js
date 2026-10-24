@@ -4,7 +4,7 @@
 // pick columns). Not a popup: the work goes on while the player is on other pages, and the
 // sidebar's foot line and ctrl+j bring them back here. "tasks" events say the record
 // changed; a lane task that ended also brings its result for the status line.
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, page, act as pageAct, area } from "./screens.js";
 import { createBar } from "./filterbar.js";
 import * as pop from "./popups.js";
@@ -62,10 +62,10 @@ export function foot(p) {
     const f = (p.pct / 100) * 34.6;
     ic.innerHTML = `<svg class="ring" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><circle class="v" cx="8" cy="8" r="5.5" style="stroke-dasharray:${f.toFixed(1)} 40"/></svg>`;
   } else ic.innerHTML = icon.tasks;
-  b.append(ic, el("span", "lbl", busy ? p.foot : T("background tasks")));
+  b.append(ic, el("span", "lbl word-facts", busy ? p.foot : T("background tasks")));
   if (p && p.running) b.append(el("span", "cnt num", p.pct + "%"));
   if (p && p.unseen) b.append(el("span", "badge-n red num", String(p.unseen)));
-  b.title = T("background tasks") + " · ctrl+j";
+  b.title = T("background tasks") + T("; ") + "ctrl+j";
 }
 
 export async function refreshFoot() {
@@ -75,7 +75,7 @@ export async function refreshFoot() {
 // event: the record changed; a lane task that ended says so on the status line.
 export async function event(ev) {
   if (ev && ev.ended) {
-    say(ev.ended.ok ? "ok" : "fail", ev.ended.text + (ev.ended.ok || S.screen === "tasks" ? "" : " · ctrl+j"));
+    say(ev.ended.ok ? "ok" : "fail", ev.ended.text + (ev.ended.ok || S.screen === "tasks" ? "" : ", ctrl+j"));
     document.dispatchEvent(new CustomEvent("task-ended", { detail: ev.ended }));
   }
   if (S.screen === "tasks") return load();
@@ -186,7 +186,7 @@ function shown() {
 function build() {
   const sc = $("#screen");
   sc.innerHTML = "";
-  const w = page("fill tasks", T("what RimArcho does in the background; pick a task to see every item it touched and how it went"),
+  const w = page("fill tasks", "",
     pageAct(T("take the done ones off the record"), "ok", () => run("clear", []), "C"));
   const root = el("div", "tk");
   const side = el("div", "fcol tk-side");
@@ -308,12 +308,12 @@ function drawList(list) {
       } else if (r.group !== "queue") {
         l2.append(stateWord(r));
       }
-      l2.append(el("span", "txt", r.line || ""));
+      l2.append(el("span", "txt word-facts", r.line || ""));
       e.append(l1, el("span", "tm num", r.time || ""), l2);
     }
     frag.append(e);
   }
-  if (!list.length) frag.append(el("div", "empty-state", X.page.rows.length ? T("no task matches the filter · esc clears it") : T("nothing has run in the background yet")));
+  if (!list.length) frag.append(el("div", "empty-state", X.page.rows.length ? T("no task matches the filter, esc clears it") : T("nothing has run in the background yet")));
   box.innerHTML = "";
   box.append(frag);
   if (before) slide(before);
@@ -368,7 +368,7 @@ function drawSum() {
   const h = el("h3", "", r.title);
   h.append(el("span", "o", r.obj));
   top.append(h);
-  box.append(top, el("p", "say s-" + r.state, r.say));
+  box.append(top, el("p", "say word-facts s-" + r.state, r.say));
   if (r.bar) {
     const p = el("div", "prog");
     const b = el("div", "bar" + (r.state === "fail" ? " bad" : "") + (r.state === "run" ? " busy" : ""));
@@ -396,8 +396,8 @@ function drawSum() {
   }
   box.append(acts);
   const facts = el("div", "facts");
-  const fact = (k, v) => { if (!v) return; const s = el("span", "", k); s.append(el("b", "", v)); facts.append(s); };
-  fact(T("queue"), r.laneText + " · " + r.laneNote);
+  const fact = (k, v) => { if (!v) return; const s = el("span", "", k); s.append(el("b", " word-facts", v)); facts.append(s); };
+  fact(T("queue"), r.laneText + "  " + r.laneNote);
   fact(T("started"), r.time);
   fact(T("took"), r.dur);
   box.append(facts);
@@ -416,11 +416,11 @@ function drawItems() {
   const has = !!(r && r.items && r.items.length);
   els.ihead.innerHTML = "";
   els.ihead.append(el("span", "anum", "3"), el("span", "t", T("every item")), el("span", "num", has ? String(r.items.length) : ""));
-  if (has) els.ihead.append(el("span", "r", r.counts));
+  if (has) els.ihead.append(el("span", "r word-facts", r.counts));
   els.iscroll.hidden = !has;
   els.none.hidden = has;
   if (!has) {
-    els.none.textContent = r ? r.noItems + (r.line ? " · " + r.line : "") : "";
+    factText(els.none, r ? [r.noItems, r.line] : []);
     if (r) {
       const g = r.acts.find((a) => a.id === "goto");
       if (g) { const b = el("button", "btn", g.label); b.append(el("kbd", "", g.key)); b.onclick = () => run("goto", [r]); els.none.append(el("br"), b); }
@@ -626,11 +626,11 @@ export function where() {
   const list = shown(), i = list.findIndex((r) => r.id === X.cur);
   if (X.focus === "items") {
     const r = current();
-    return `${r ? r.title : ""} › ${T("every item")} · ${X.icur + 1} / ${(r && r.items && r.items.length) || 0}`;
+    return `${r ? r.title : ""} › ${T("every item")}    ${X.icur + 1} / ${(r && r.items && r.items.length) || 0}`;
   }
-  let s = `${T("tasks")} · ${i + 1} / ${list.length}`;
-  if (X.sel.size) s += " · " + Tf("%d selected", X.sel.size);
-  if (X.bar && X.bar.active()) s += " · " + T("filtered");
+  let s = `${T("tasks")}    ${i + 1} / ${list.length}`;
+  if (X.sel.size) s += "  " + Tf("%d selected", X.sel.size);
+  if (X.bar && X.bar.active()) s += "  " + T("filtered");
   return s;
 }
 export function hintList() {

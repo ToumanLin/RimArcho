@@ -153,7 +153,7 @@ func TestSettingsConfirmationsAndRefresh(t *testing.T) {
 						t.Fatalf("no pending label: %+v", action)
 					}
 					confirmed[action.Task] = action.Confirm != ""
-					if action.Task == view.TaskCache && action.Argv[2] == "previews" && cleared && item.Value != view.Tf("%s · %d items", view.SizeText(0), 0) {
+					if action.Task == view.TaskCache && action.Argv[2] == "previews" && cleared && item.Value != view.Tf("%s  %d items", view.SizeText(0), 0) {
 						t.Fatalf("size not refreshed: %+v", item)
 					}
 				}

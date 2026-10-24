@@ -17,7 +17,8 @@ import (
 
 // ChangeText is the interfaces' wording of the page.
 func ChangeText() modchanges.Text {
-	return modchanges.Text{T: T, Date: func(t time.Time) string {
+	// Shared format keys keep CLI punctuation; only the interface removes the separator.
+	return modchanges.Text{T: func(s string) string { return T(strings.ReplaceAll(s, string('\u00b7'), "")) }, Date: func(t time.Time) string {
 		if Lang() == "zh" {
 			return fmt.Sprintf("%d 月 %d 日", int(t.Month()), t.Day())
 		}
@@ -108,5 +109,5 @@ func ChangeSummary(counts map[string]int) string {
 			parts = append(parts, fmt.Sprintf("%d %s", n, EventText(k)))
 		}
 	}
-	return strings.Join(parts, " · ")
+	return strings.Join(parts, "  ")
 }

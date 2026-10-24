@@ -5,7 +5,6 @@ package view
 func init() {
 	Register(map[string]string{
 		// the build page
-		"a pack locks every mod's version: later Workshop updates do not change it, and it has its own saves and settings; the list stays as it is": "整合包把每个 Mod 的版本锁住，工坊以后怎么更新都不影响它；它有自己的存档和设置。原来的列表不变。",
 		"the pack":                   "基本信息",
 		"what creating does":         "创建时会做的事",
 		"check that it runs":         "检查能不能跑",
@@ -61,7 +60,7 @@ func init() {
 		"moving into the lock library…":          "正在移入锁定库…",
 		"%d folders moved into the lock library": "%d 个文件夹已移入锁定库",
 		// a pack's page and the list
-		"%d mods · %s":                "%d 个 Mod · %s",
+		"%d mods  %s":                 "%d 个 Mod  %s",
 		"runs on %s":                  "能在 %s 上运行",
 		"created %s":                  "%s 创建",
 		"from the game":               "来自游戏",

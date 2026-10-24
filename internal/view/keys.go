@@ -31,14 +31,14 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			space = "enable / disable (the current list)"
 		}
 		out = append(out,
-			r("↑↓ · j k", "move the cursor (in the details: scroll)"),
-			r("PgUp PgDn · Home End", "move the cursor a page / to the top or the bottom"),
-			r(pick("shift+↑↓ · shift+click", "shift+↑↓"), "select a range"),
-			r(pick("ctrl+space · ctrl+click", "ctrl+space · v"), "select or unselect one"),
+			r("↑↓ / j k", "move the cursor (in the details: scroll)"),
+			r("PgUp PgDn / Home End", "move the cursor a page / to the top or the bottom"),
+			r(pick("shift+↑↓ / shift+click", "shift+↑↓"), "select a range"),
+			r(pick("ctrl+space / ctrl+click", "ctrl+space / v"), "select or unselect one"),
 			r("ctrl+a", "select everything shown"),
 			r("enter", "open / close the details"),
 			r("esc", "back one level: the details, the selection, the search and filters"),
-			r("/ · ctrl+f", "search"),
+			r("/  ctrl+f", "search"),
 			r(`\`, "open / close the filter bar (in it, ctrl+↑↓ moves its lower edge)"),
 			r("space", space),
 			r("m", "enable at… / move to…"),
@@ -46,12 +46,12 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("x", "switch version…"),
 			r("g", "tags"),
 			r("n", "note"),
-			r("ctrl+o · ctrl+w", "open the folder · the Workshop page"),
+			r("ctrl+o / ctrl+w", "open the folder, the Workshop page"),
 			r("ctrl+s", "steam page"),
-			r("u · ctrl+z", pick("undo", "undo")),
-			r("ctrl+y · ctrl+r", "redo"),
+			r("u / ctrl+z", pick("undo", "undo")),
+			r("ctrl+y / ctrl+r", "redo"),
 			r("Del", "unsubscribe / move to the recycle bin (asks first)"),
-			r(pick("menu · shift+F10 · right click", "menu · shift+F10"), "the row's menu: everything it can do"),
+			r(pick("menu / shift+F10 / right click", "menu / shift+F10"), "the row's menu: everything it can do"),
 		)
 		if lib {
 			out = append(out,
@@ -62,13 +62,13 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			)
 		} else {
 			out = append(out,
-				r(pick("← → · 1–4", "← → · 1–4 · h l"), "go to an area"),
-				r("J K · alt+J K", "move down / up 1 (10); with a filter, past the rows shown"),
+				r(pick("← → / 1–4", "← → / 1–4 / h l"), "go to an area"),
+				r("J K / alt+J K", "move down / up 1 (10); with a filter, past the rows shown"),
 				r("T", "put everything back from staging; elsewhere, stage everything enabled"),
-				r("S · w · L", pick("sort · write to the game · to the launch page (the palette previews them)", "sort · write to the game · launch (the palette previews them)")),
-				r(pick("i · e", "e"), pick("import · export the mod list", "export the mod list")),
-				r("R · A", "rescan · check the files again"),
-				r("P · E", "lists · games"),
+				r("S / w / L", pick("sort, write to the game, to the launch page (the palette previews them)", "sort, write to the game, launch (the palette previews them)")),
+				r(pick("i / e", "e"), pick("import, export the mod list", "export the mod list")),
+				r("R / A", "rescan, check the files again"),
+				r("P / E", "lists, games"),
 				r(":", "run an archo command"),
 				r("H", "the history: steps and versions"),
 				r("C", "this mod's changes"),
@@ -101,7 +101,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	if page == ChangesPage {
 		out = append(out,
-			r("↑↓ · PgUp PgDn", "move"),
+			r("↑↓ / PgUp PgDn", "move"),
 			r("enter", "open or close a mod's changes"),
 			r("i", "the raw file list"),
 			r("a", "the current list / the whole library"),
@@ -115,8 +115,8 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	if page == PackPages {
 		out = append(out,
-			r("↑↓ · enter", "the packs: move, open one"),
-			r("tab · shift+tab", "the next / previous pack"),
+			r("↑↓ / enter", "the packs: move, open one"),
+			r("tab / shift+tab", "the next / previous pack"),
 			r("L", "play the pack"),
 			r("e", "export the pack to a file"),
 			r("E", "export only its list, each mod with its version"),
@@ -126,9 +126,9 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	if page == BuildPageID {
 		out = append(out,
-			r("n · /", "type the name"),
+			r("n  /", "type the name"),
 			r("D", "textures: next choice"),
-			r("B · enter in the name", "build"),
+			r("B / enter in the name", "build"),
 			r("V", "see the list first, write nothing"),
 			r("tab", "the next field or button"),
 			r("esc", "close the preview / back to the list"),
@@ -136,23 +136,23 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	if page == PageTasks {
 		out = append(out,
-			r("↑↓ · PgUp PgDn · Home End", "move the cursor a page / to the top or the bottom"),
-			r("enter · →", "the task's items"),
+			r("↑↓ / PgUp PgDn / Home End", "move the cursor a page / to the top or the bottom"),
+			r("enter / →", "the task's items"),
 			r("←", "back to the tasks"),
 			r("x", "stop the rest / cancel the wait"),
 			r("r", "try the failed again / do the ones left"),
 			r("J K", "a waiting task later / sooner"),
 			r("o", "go to the page it changed"),
 			r("ctrl+o", "open the folder"),
-			r("Del · ctrl+z", "take off the record · put it back"),
+			r("Del / ctrl+z", "take off the record, put it back"),
 			r("C", "take the done ones off the record"),
-			r("s · < > =", "the items' headers: sort and columns · the sorted column's width"),
-			r("shift+↑↓ · ctrl+space · ctrl+a", "select tasks"),
-			r("menu · shift+F10 · right click", "the row's menu: everything it can do"),
+			r("s / < > =", "the items' headers: sort and columns, the sorted column's width"),
+			r("shift+↑↓ / ctrl+space / ctrl+a", "select tasks"),
+			r("menu / shift+F10 / right click", "the row's menu: everything it can do"),
 		)
 	}
 	if !tui && (page == LibraryPage || page == "packs" || page == "textures") {
-		out = append(out, r("s · < > =", "the headers: sort and columns; < > = changes or resets the sorted column's width"))
+		out = append(out, r("s / < > =", "the headers: sort and columns; < > = changes or resets the sorted column's width"))
 	}
 	if page == "home" && !tui {
 		// The launch page has three numbered columns (06 §2.3).
@@ -161,14 +161,14 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}
 	out = append(out,
-		r("tab · shift+tab", "next / previous page under the same sidebar entry"),
+		r("tab / shift+tab", "next / previous page under the same sidebar entry"),
 		r("shift+1–8", "go to a page in the sidebar"),
 	)
 	if !tui {
 		out = append(out, r("ctrl+b", "navigation at the side / at the top"), r("ctrl+j", "background tasks; again goes back"))
 	}
 	out = append(out,
-		r(pick("c · l", "c"), pick("mod changes · game log", "mod changes")),
+		r(pick("c / l", "c"), pick("mod changes, game log", "mod changes")),
 		r("ctrl+k", "command palette"),
 		r("?", "this help"),
 	)

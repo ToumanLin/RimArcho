@@ -26,7 +26,7 @@ func uninstallText(pg *view.UninstallPage) string {
 	for _, s := range pg.Steps {
 		line := s.Title + " — " + s.Text
 		if s.Size != "" {
-			line += " · " + s.Size
+			line += "  " + s.Size
 		}
 		b.WriteString(line + "\n")
 		for _, it := range s.Items {
@@ -48,10 +48,10 @@ func uninstallText(pg *view.UninstallPage) string {
 				l += "  " + it.Size
 			}
 			if it.Note != "" {
-				l += "  · " + it.Note
+				l += "  " + it.Note
 			}
 			if it.Err != "" {
-				l += "  · " + it.Err
+				l += "  " + it.Err
 			}
 			b.WriteString(l + "\n")
 		}

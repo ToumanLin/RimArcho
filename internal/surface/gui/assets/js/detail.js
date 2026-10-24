@@ -1,7 +1,7 @@
 // The detail (06 §4): who the mod is, its state, one field list (fields.js), the
 // description, the history. The description is built from Go's BBCode blocks with
 // elements and textContent only: outside text is never inserted as HTML (06 §8.2).
-import { S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
+import { factText, S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { fieldList } from "./fields.js";
 
@@ -62,7 +62,8 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   // a copy's details on Mod 库存 draw their own note, actions and field list (06 §2.9)
   if (!opts.page) {
     const facts = el("div", "facts");
-    facts.innerHTML = sourceIcon(d.kind) + `<span>${esc(d.header.join(" · "))}</span>`;
+    facts.innerHTML = sourceIcon(d.kind);
+    facts.append(factText(el("span"), d.header));
     box.append(facts);
     // state
     const st = el("div", "state");
@@ -92,19 +93,19 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   // description (06 §4.3 item 2)
   const desc = el("div", "desc");
   const head = (title, note) => {
-    const h = el("div", "sub", title);
-    if (note) { const s = el("span", "desc-note", "  ·  " + note); h.append(s); }
+    const h = el("div", "sub word-facts", title);
+    if (note) { const s = el("span", "desc-note", note); h.append(s); }
     desc.append(h);
   };
   let note = d.note;
   if (d.show === "about" || d.show === "both") {
-    head(T("description · About.xml"), note);
+    head(T("description / About.xml"), note);
     note = "";
     if (!d.about || !d.about.length) desc.append(el("p", "dim", T("(empty)")));
     else blocks(desc, d.about);
   }
   if (d.show === "workshop" || d.show === "both") {
-    head(T("description · Workshop page"), note);
+    head(T("description / Workshop page"), note);
     blocks(desc, d.workshop || []);
   }
   box.append(desc);
@@ -112,10 +113,10 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
     // the three newest here; the whole history of its Lineage on 变化 (06 §2.9)
     const all = el("div", "sub link", T("see all on the changes page"));
     all.onclick = () => document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: d.id, name: d.name } }));
-    box.append(el("div", "sub", T("history")), el("div", "history", d.history), all);
+    box.append(el("div", "sub", T("history")), el("div", "history word-facts", d.history), all);
   }
   if (!opts.page) {
-    const more = el("div", "sub link", T("technical information · enter"));
+    const more = el("div", "sub link", T("technical information, enter"));
     more.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "full" }));
     box.append(more);
   }
@@ -153,7 +154,7 @@ export function blocks(root, bs) {
         e = el("img");
         e.loading = "lazy";
         e.alt = "";
-        e.onerror = () => { e.replaceWith(el("p", "dim", Tf("[image · %s]", host(b.URL)))); };
+        e.onerror = () => { e.replaceWith(el("p", "dim", Tf("[image, %s]", host(b.URL)))); };
         e.src = "/img?u=" + encodeURIComponent(b.URL);
         break;
       default:

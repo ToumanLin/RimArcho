@@ -212,10 +212,10 @@ export function text(title, lines) { confirm(title, lines, "", null); }
 export function choose(title, labels, pick, current = 0, other = null) {
   open("choose", title, (pop, p) => {
     pop.append(el("div", "ttl", title));
-    optionList(pop, p, labels.map((l, i) => ({ l, i })), (d, o) => d.append(o.l), (o) => { close(); pick(o.i); });
+    optionList(pop, p, labels.map((l, i) => ({ l, i })), (d, o) => d.append(el("span", "word-facts", o.l)), (o) => { close(); pick(o.i); });
     if (other) {
       const btns = el("div", "btns");
-      const b = el("button", "", other.label + "  " + (other.key === "Delete" ? "del" : other.key));
+      const b = el("button", "word-facts", other.label + "  " + (other.key === "Delete" ? "del" : other.key));
       if (other.envWrite) b.dataset.envWrite = other.envWrite;
       const run = () => { const i = p.opts[p.sel] && p.opts[p.sel].i; close(); if (i !== undefined) other.run(i); };
       b.onclick = run;
@@ -254,7 +254,7 @@ export async function help(page = "plan") {
   open("help", T("all keys"), (pop) => {
     pop.append(el("div", "ttl", T("the arrows only move; keys that change things act at once, u undoes")));
     const body = el("div", "body help");
-    for (const r of rows) body.append(el("b", "", r.keys), el("span", "", r.what));
+    for (const r of rows) body.append(el("b", "word-facts", r.keys), el("span", "word-facts", r.what));
     pop.append(body);
   });
 }
@@ -300,7 +300,7 @@ export function menu(x, y, actions, keys = false) {
       if (i >= 0) bs[i].click();
     } else {
       // a key the menu shows runs its item
-      const hit = actions.find((a) => !a.sep && a.key && a.key.split(" · ").some((k) => k.toLowerCase() === e.key.toLowerCase()));
+      const hit = actions.find((a) => !a.sep && a.key && a.key.split(" / ").some((k) => k.toLowerCase() === e.key.toLowerCase()));
       if (hit) { e.preventDefault(); bs[actions.filter((a) => !a.sep).indexOf(hit)].click(); }
     }
     e.stopPropagation();

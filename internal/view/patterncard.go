@@ -218,25 +218,25 @@ func (c *PatternCard) Lines() []string {
 	if c == nil {
 		return nil
 	}
-	out := []string{T("community background") + " · " + T("from shared logs, not a conclusion about your list")}
+	out := []string{T("community background") + "  " + T("from shared logs, not a conclusion about your list")}
 	add := func(k, v string) {
 		if v != "" {
 			out = append(out, "  "+k+"  "+v)
 		}
 	}
 	if c.LevelText != "" {
-		out = append(out, "  "+c.LevelText+" · "+c.Impact)
+		out = append(out, "  "+c.LevelText+"  "+c.Impact)
 	}
 	if c.Summary != "" {
 		out = append(out, "  "+c.Summary)
 	}
 	add(T("common causes"), strings.Join(c.Causes, T("; ")))
 	add(T("next step"), c.Next)
-	add(T("kinds of fix"), strings.Join(c.Fixes, " · "))
+	add(T("kinds of fix"), strings.Join(c.Fixes, "  "))
 	if c.Known != "" {
 		out = append(out, "  "+c.Known)
 	}
-	if f := strings.Join(nonEmpty(c.Seen, c.Gone), " · "); f != "" {
+	if f := strings.Join(nonEmpty(c.Seen, c.Gone), "  "); f != "" {
 		out = append(out, "  "+f)
 	}
 	return out

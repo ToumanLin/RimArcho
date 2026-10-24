@@ -2,7 +2,7 @@
 // game log (§2.10), Mod 库 › 变化 (§2.9), the full detail (§4.2), packs, the environment
 // and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
-import { S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
 import { icon } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
@@ -148,7 +148,7 @@ export function page(cls, lead, ...right) {
   fresh = false;
   resetAreas();
   const head = el("div", "page-head");
-  if (lead) head.append(el("p", "lead", lead));
+  if (lead) head.append(el("p", "lead word-facts", lead));
   const acts = [];
   for (const r of right) {
     if (!r) continue;
@@ -223,7 +223,7 @@ export function seg(names, on, pick, keys) {
   const s = el("div", "seg sub");
   s.append(el("span", "thumb"));
   names.forEach((n, i) => {
-    const b = el("button", i === on ? "on" : "", n);
+    const b = el("button", i === on ? "on word-facts" : "word-facts", n);
     if (keys) b.title = keys[i];
     b.onclick = () => pick(i);
     s.append(b);
@@ -297,7 +297,7 @@ function needsLead(d) {
   const plan = (S.shell && S.shell.plan && S.shell.plan.name) || T("the list");
   const breaks = N.items.filter((x) => x.counted && x.section === 0).length;
   const count = N.items.filter((x) => x.counted).length;
-  if (breaks) return Tf("%s is not safe to play yet: fix the %d problems below; every step can be undone.", plan, breaks);
+  if (breaks) return Tf("%s is not safe to play yet: fix the %d problems below.", plan, breaks);
   if (count) return Tf("%s can run; %d things below are worth a look.", plan, count);
   if (d.never) return Tf("%s: the mods' files are not checked yet.", plan);
   return Tf("%s can run: nothing to handle.", plan);
@@ -331,12 +331,13 @@ function drawNeeds() {
     area(sec, h, () => { N.cur = first; markNeeds(); });
     if (n) {
       const c = el("span", "n num", String(n));
-      h.append(el("span", "", " · "), c);
+      h.classList.add("word-facts");
+      h.append(c);
       bump("needs:" + si, c, n);
     }
     // which run the log is from: the list, or a pack (08 §5.3)
-    if (si === 1 && S.live && S.live.running) h.append(el("span", "muted", " · " + (S.live.pack ? Tf("pack %s", S.live.pack) : T("this run"))));
-    else if (si === 1 && d.lastRun) h.append(el("span", "muted", " · " + d.lastRun));
+    if (si === 1 && S.live && S.live.running) h.append(el("span", "muted", (S.live.pack ? Tf("pack %s", S.live.pack) : T("this run"))));
+    else if (si === 1 && d.lastRun) h.append(el("span", "muted word-facts", d.lastRun));
     sec.append(h);
     const card = el("div", "card need-list");
     for (const it of its) {
@@ -358,10 +359,10 @@ function needCard(it, i) {
   const top = el("div", "top");
   const body = el("div", "body");
   if (it.dim) {
-    body.append(el("div", "why", it.text));
+    body.append(el("div", "why word-facts", it.text));
     if (it.why) body.append(el("div", "why sub", it.why));
   } else {
-    body.append(el("div", "title", it.title || it.text));
+    body.append(el("div", "title word-facts", it.title || it.text));
     if (it.why) body.append(el("div", "why", it.why));
   }
   top.append(body);
@@ -377,7 +378,7 @@ function needCard(it, i) {
         const r = more.getBoundingClientRect();
         pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, key: x.key, envWrite: actionWrite(x), run: () => runAction(it, x) })));
       }, "more");
-      more.title = acts.slice(1).map((x) => x.label).join(" · ");
+      more.title = acts.slice(1).map((x) => x.label).join(T("; "));
       right.append(more);
     }
   }
@@ -385,7 +386,7 @@ function needCard(it, i) {
   row.append(top);
   if (it.fold && N.open.has(it.text)) {
     const parts = el("div", "parts");
-    for (const p of it.parts || []) parts.append(el("div", "", "· " + p));
+    for (const p of it.parts || []) parts.append(el("div", "", ", " + p));
     row.append(parts);
   }
   if (it.evidence) {
@@ -569,11 +570,11 @@ function drawGameLog() {
   }
   const keep = $("#screen .page.logs .col.focus .scroll");
   const was = keep ? keep.scrollTop : 0;
-  const w = logPage("log", T("each run's errors, grouped by mod; pick one to read the log"), ...right);
+  const w = logPage("log", "", ...right);
   const files = (p && p.files) || [];
   const bar = el("div", "subbar");
   if (files.length) bar.append(filePicker(files));
-  if (p && p.facts && !L.loading) bar.append(el("span", "muted", p.facts));
+  if (p && p.facts && !L.loading) bar.append(el("span", "muted word-facts", p.facts));
   w.append(bar);
   if (L.error) { w.append(el("div", "card empty-state err", L.error)); return; }
   if (p && p.noMonitor && !L.loading) w.append(noMonitor(p));
@@ -586,7 +587,7 @@ function drawGameLog() {
   const list = el("section", "card col focus");
   if (mon) {
     const tabs = el("div", "ltabs");
-    tabs.append(seg([Tf("Player.log · %d", (p.rows || []).length), mon.title + " · " + mon.entries.length], L.tab, (i) => { L.tab = i; drawGameLog(); }, ["←", "→"]));
+    tabs.append(seg([Tf("Player.log  %d", (p.rows || []).length), mon.title + "  " + mon.entries.length], L.tab, (i) => { L.tab = i; drawGameLog(); }, ["←", "→"]));
     list.append(tabs);
   }
   const scroll = el("div", "scroll");
@@ -698,7 +699,7 @@ function noMonitor(p) {
 function monitorRows(scroll, mon) {
   const head = el("div", "mhead");
   if (mon.running) head.append(el("span", "live-dot"));
-  head.append(el("span", "", mon.facts));
+  head.append(el("span", "word-facts", mon.facts));
   scroll.append(head);
   if (!mon.entries.length) { scroll.append(el("div", "empty-state", "✓ " + T("nothing reported in this run"))); return; }
   L.mcur = Math.min(L.mcur, Math.max(0, mon.entries.length - 1));
@@ -713,9 +714,9 @@ function monitorRows(scroll, mon) {
     top.append(el("span", "time num", m.time || ""));
     if (m.kind) top.append(el("span", "chip", m.kind));
     if (m.count > 1) top.append(el("span", "count", "×" + m.count));
-    if (m.mods && m.mods.length) { const s = el("span", "mods", m.mods.join(" · ")); s.title = m.mods.join("\n"); top.append(s); }
+    if (m.mods && m.mods.length) { const s = el("span", "mods word-facts", m.mods.join("  ")); s.title = m.mods.join("\n"); top.append(s); }
     body.append(top, logText(m));
-    if (m.files && m.files.length) body.append(el("div", "files", m.files.join(" · ")));
+    if (m.files && m.files.length) body.append(el("div", "files word-facts", m.files.join("  ")));
     if (open) {
       if (m.details) { const pre = el("pre", "details"); pre.textContent = m.details; pre.onclick = (e) => e.stopPropagation(); body.append(pre); }
       if (m.cluster) {
@@ -865,12 +866,12 @@ function patternCard(c) {
   if (c.next) d.append(el("div", "pnext", c.next));
   if (c.known) d.append(el("div", "ps known", c.known));
   const more = el("div", "pmore");
-  const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v", v)); more.append(r); };
+  const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v word-facts", v)); more.append(r); };
   if (c.causes && c.causes.length) row(T("common causes"), c.causes.join(T("; ")));
-  if (c.fixes && c.fixes.length) row(T("kinds of fix"), c.fixes.join(" · "));
+  if (c.fixes && c.fixes.length) row(T("kinds of fix"), c.fixes.join("  "));
   if (more.childNodes.length) d.append(more);
-  const facts = [c.seen, c.gone].filter(Boolean).join(" · ");
-  if (facts) d.append(el("div", "pm", facts));
+  const facts = [c.seen, c.gone].filter(Boolean).join("  ");
+  if (facts) d.append(el("div", "pm word-facts", facts));
   d.append(el("div", "pm note", T("from shared logs, not a conclusion about your list")));
   return d;
 }
@@ -927,7 +928,7 @@ const TIER = { 1: "launch", 2: "watch", 3: "content" };
 
 function drawChanges() {
   const top = ($("#screen .page-scroll") || {}).scrollTop || 0;
-  const w = logPage("changes", T("what changed in your mods"), rescanButton());
+  const w = logPage("changes", "", rescanButton());
   const scroll = el("div", "scroll page-scroll chg");
   w.append(scroll);
   const p = C.page || {};
@@ -948,7 +949,7 @@ function drawChanges() {
       seg.append(b);
     }
     bar.append(seg);
-    if (p.since) bar.append(el("span", "muted", p.since));
+    if (p.since) bar.append(el("span", "muted word-facts", p.since));
   }
   scroll.append(bar);
   C.items = [];
@@ -1001,13 +1002,13 @@ function modRow(card, r) {
   const k = rowKey(r);
   const open = C.open.has(k);
   const row = el("div", "chg-row");
-  row.append(el("span", "tier " + (TIER[r.tier] || ""), r.tierText), el("span", "mod", r.mod), el("span", "txt", r.text));
+  row.append(el("span", "tier " + (TIER[r.tier] || ""), r.tierText), el("span", "mod", r.mod), el("span", "txt word-facts", r.text));
   if ((r.details && r.details.length) || r.actions || hasFiles(r)) row.append(el("span", "chev", open ? "▾" : "▸"));
   item(row, { t: "mod", key: k, r });
   card.append(row);
   if (!open) return;
   const box = el("div", "chg-open");
-  for (const d of r.details || []) box.append(el("div", "line", d));
+  for (const d of r.details || []) box.append(el("div", "line word-facts", d));
   if (hasFiles(r)) {
     const f = el("button", "chg-files", (C.raw.has(k) ? "▾ " : "▸ ") + T("files"));
     f.title = "i";
@@ -1040,7 +1041,7 @@ function group(card, g, where) {
   const k = "group:" + where;
   const open = C.open.has(k);
   const row = el("div", "chg-row chg-group");
-  row.append(el("span", "tier content", T("new and gone")), el("span", "txt", g.text), el("span", "chev", open ? "▾" : "▸"));
+  row.append(el("span", "tier content", T("new and gone")), el("span", "txt word-facts", g.text), el("span", "chev", open ? "▾" : "▸"));
   item(row, { t: "group", key: k });
   card.append(row);
   if (open) for (const r of g.rows || []) modRow(card, r);
@@ -1183,7 +1184,7 @@ export async function settings() {
   const sc = S.screen === "settings" ? $("#screen") : openScreen("settings");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("settings", T("how RimArcho looks and works; each row shows the command that changes it"));
+  const w = page("settings", "");
   sc.append(w);
   w.append(bg);
   renderGroups(w, groups, settings);
@@ -1209,8 +1210,8 @@ async function refreshSettingTasks(values = false) {
       const row = rows.find(r => r.dataset.settingRow === g.title + "/" + it.label);
       if (!row) continue;
       const note = row.querySelector(".setting-note"), value = row.querySelector(".setting-value");
-      if (note) { note.textContent = it.note || ""; note.hidden = !it.note; }
-      if (value) value.textContent = it.value || "";
+      if (note) { factText(note, it.note || ""); note.hidden = !it.note; }
+      if (value) factText(value, it.value || "");
     }
   } catch (e) { if (S.screen === "settings" && S.screenSeq === epoch) say("fail", errText(e)); }
 }
@@ -1300,9 +1301,10 @@ function renderGroups(w, groups, again) {
     for (const it of g.items || []) {
       const row = el("div", "set");
       row.dataset.settingRow = g.title + "/" + it.label;
+      row.title = it.hover || "";
       const left = el("div", "l");
       left.append(el("div", "name", it.label));
-      const note = el("div", "sub setting-note", it.note || "");
+      const note = el("div", "sub setting-note word-facts", it.note || "");
       note.hidden = !it.note;
       left.append(note);
       const right = el("div", "r");
@@ -1317,8 +1319,9 @@ function renderGroups(w, groups, again) {
         // A new language: the page's text again, in place (main.js relang).
         s.onchange = () => run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : null);
         right.append(s);
+        if (it.valueNote) right.append(el("span", "muted word-facts", it.valueNote));
       } else if (it.edit === "directory") {
-        const value = el("span", "muted", it.value);
+        const value = el("span", "muted word-facts", it.value);
         value.style.overflowWrap = "anywhere";
         const d = { id: it.directory, label: it.label, path: it.value };
         const after = async () => { await ui.reload(); again(); };
@@ -1335,7 +1338,7 @@ function renderGroups(w, groups, again) {
         if (it.edit === "path") right.append(button(T("choose…"), "", () => pickFolder(inp.value, (p) => run(it.argv, p)), "", "apply-setting"));
         right.append(ok);
       } else {
-        right.append(el("span", "muted setting-value", it.value || ""));
+        right.append(el("span", "muted setting-value word-facts", it.value || ""));
       }
       for (const a of it.actions || []) {
         // 卸载 RimArcho is its own page with the plan; every other action is a command
@@ -1381,7 +1384,7 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", T("each game is one game folder: its version, how it starts, its saves"), act(T("add a game"), "plus", () => ui.go("guide")), rescanButton());
+  const w = page("env", "", act(T("add a game"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
   const envLab = el("div", "label section", T("every game"));
   w.append(envLab);
@@ -1390,7 +1393,7 @@ export async function environment() {
   for (const e of p.envs || []) {
     const row = el("div", "envrow" + (e.current ? " on" : ""));
     const l = el("div", "l");
-    l.append(el("div", "name", e.name), el("div", "sub", e.game));
+    l.append(el("div", "name", e.name), el("div", "sub word-facts", e.game));
     row.append(l);
     if (e.current) {
       const current = el("button", "chip cur", T("in use"));

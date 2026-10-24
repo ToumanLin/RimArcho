@@ -103,7 +103,7 @@ func InGame(a *app.App) *InGameState {
 	name := p.Name
 	if g.Other {
 		if pe, err := a.Store.EnvByID(p.EnvID); err == nil && pe != nil {
-			name = pe.Name + " · " + p.Name
+			name = pe.Name + "  " + p.Name
 		}
 	}
 	if g.Version > 0 {
@@ -154,9 +154,9 @@ func PlanFroms(a *app.App) ([]PlanFrom, error) {
 		if i == 30 {
 			break
 		}
-		l := Tf("a copy of %s v%d", p.Name, v.N) + " · " + ShortDate(v.Created) + " · " + T(sourceWord(v.Source))
+		l := Tf("a copy of %s v%d", p.Name, v.N) + "  " + ShortDate(v.Created) + "  " + T(sourceWord(v.Source))
 		if n := versionNote(v); n != "" {
-			l += " · " + n
+			l += "  " + n
 		}
 		out = append(out, PlanFrom{From: fmt.Sprintf("v%d", v.N), Label: l})
 	}
@@ -235,10 +235,10 @@ func switchToNew(a *app.App, r *app.NewPlanResult) (*store.Plan, string, error) 
 	}
 	t := Tf("new list %s: %d mods; the game's list is unchanged until you write or launch", r.Plan.Name, len(r.List))
 	if len(r.Unresolved) > 0 {
-		t += " · " + Tf("%d not installed", len(r.Unresolved))
+		t += "  " + Tf("%d not installed", len(r.Unresolved))
 	}
 	if r.Monitor != "" {
-		t += " · " + T("Archo Monitor added after Harmony (undo removes it)")
+		t += "  " + T("Archo Monitor added after Harmony (undo removes it)")
 	}
 	return r.Plan, t, nil
 }

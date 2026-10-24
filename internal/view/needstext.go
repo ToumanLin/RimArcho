@@ -34,7 +34,7 @@ func init() {
 		"About.xml.disabled, and no longer subscribed":    "About.xml.disabled，而且已经退订",
 		"About.xml is renamed to About.xml.disabled":      "About.xml 被改名为 About.xml.disabled",
 		"%s and %d more":                                  "%s 等 %d 处",
-		"Player.log · this run, %d times":                 "Player.log · 本次运行，%d 次",
+		"Player.log, this run, %d times":                  "Player.log，本次运行，%d 次",
 		"ModsConfig.xml says %s":                          "ModsConfig.xml 写的是 %s",
 		"ModsConfig.xml differs from what RimArcho wrote": "ModsConfig.xml 和 RimArcho 写入的不一样",
 		"RimArcho compared their folders":                 "RimArcho 比较了它们的文件夹",

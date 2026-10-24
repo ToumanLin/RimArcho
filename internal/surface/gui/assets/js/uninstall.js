@@ -58,7 +58,7 @@ function stepRow(pg, s) {
   const row = el("div", "set");
   const l = el("div", "l");
   l.append(el("div", "name", s.title));
-  l.append(el("div", "sub", s.text + (s.size ? " · " + s.size : "")));
+  l.append(el("div", "sub word-facts", s.text + (s.size ? "  " + s.size : "")));
   const r = el("div", "r");
   if (s.toggle && !pg.ran) {
     const lab = el("label", "un-toggle");
@@ -117,7 +117,7 @@ function items(s) {
   const d = el("details", "un-items");
   const n = (s.items || []).length;
   const bad = (s.items || []).filter((it) => it.err).length;
-  d.append(el("summary", bad ? "err" : "", bad ? `${n} · ${T("failed")} ${bad}` : String(n)));
+  d.append(el("summary", bad ? "err word-facts" : "word-facts", bad ? `${n}    ${T("failed")} ${bad}` : String(n)));
   if (bad) d.open = true;
   for (const it of s.items || []) {
     const li = el("div", "un-item" + (it.err ? " bad" : ""));
@@ -126,8 +126,8 @@ function items(s) {
     const p = el("span", "p", it.path + (it.to ? " → " + it.to : ""));
     p.title = p.textContent;
     li.append(p);
-    const extra = [it.name, it.size, it.note, it.err].filter(Boolean).join(" · ");
-    if (extra) li.append(el("span", "x muted", extra));
+    const extra = [it.name, it.size, it.note, it.err].filter(Boolean).join("  ");
+    if (extra) li.append(el("span", "x muted word-facts", extra));
     d.append(li);
   }
   return d;

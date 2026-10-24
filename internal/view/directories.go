@@ -42,9 +42,9 @@ func DirectoryGroup(a *app.App) SettingGroup {
 	for _, d := range dirs {
 		note := T("locate it after moving it yourself, or move it to a new location")
 		if DirectoryNeedsLocation(d) {
-			note = T("directory unavailable; enter its new location, or reconnect the drive") + " · " + note
+			note = T("directory unavailable; enter its new location, or reconnect the drive") + "  " + note
 		} else if d.Status == "unused" {
-			note = T("not used yet") + " · " + note
+			note = T("not used yet") + "  " + note
 		}
 		item := SettingItem{Label: DirectoryLabel(d), Value: d.Path, Edit: "directory", Directory: d.ID,
 			Argv: []string{"folder", "set", d.ID, "{}"}, MoveArgv: []string{"folder", "move", d.ID, "{}"}, Note: note}
@@ -69,7 +69,7 @@ func directoryNeeds(a *app.App) []Need {
 		}
 		title := Tf("locate %s", DirectoryLabel(d))
 		why := T("the saved directory is unavailable or has changed; enter its new location in settings. You can keep playing")
-		out = append(out, Need{Group: GroupConfirm, Title: title, Text: title + " · " + d.Path, Why: why + " · " + d.Path,
+		out = append(out, Need{Group: GroupConfirm, Title: title, Text: title + "  " + d.Path, Why: why + "  " + d.Path,
 			Status: StatusWarn, Counted: true, Actions: []Action{{Kind: ActLocateDirectory, Key: "o", Label: T("locate directory"), Refs: []string{d.ID}, Lines: []string{d.Path}},
 				{Kind: ActView, Key: "v", Label: T("directory details"), Argv: []string{"folder", "check"}}}})
 	}

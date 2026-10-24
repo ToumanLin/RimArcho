@@ -81,7 +81,7 @@ func TestHistoryArea(t *testing.T) {
 	press(m, "3")
 	s := ansi.Strip(m.View())
 	step := Tf("disabled %s", "Alpha")
-	for _, want := range []string{T("history"), Tf("now · %d not written", 1), step} {
+	for _, want := range []string{T("history"), Tf("now  %d not written", 1), step} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("no %q in the history area:\n%s", want, s)
 		}
@@ -117,7 +117,7 @@ func TestHistoryArea(t *testing.T) {
 	SetLang("zh")
 	t.Cleanup(func() { SetLang("en") })
 	press(m, "enter")
-	if want := Tf("back at v%d (not written to the game yet)", h.Version) + " · " + T("u undoes"); m.armed != nil || m.status != want {
+	if want := Tf("back at v%d (not written to the game yet)", h.Version) + Tf(", %s", T("u undoes")); m.armed != nil || m.status != want {
 		t.Fatalf("status %q, want %q", m.status, want)
 	}
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony" {

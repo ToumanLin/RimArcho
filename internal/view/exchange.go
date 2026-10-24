@@ -260,7 +260,7 @@ func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error)
 	p.Merge = effect(st, app.MergedEntries(st, il))
 	p.Summary = Tf("%s: %d mods, %d installed, %d not installed", p.Format, p.Total, len(p.Installed), len(p.Missing))
 	if p.Other > 0 {
-		p.Summary += " · " + Tf("%d in another version", p.Other)
+		p.Summary += "  " + Tf("%d in another version", p.Other)
 	}
 	return p, nil
 }
@@ -319,7 +319,7 @@ func effect(st *app.LoadoutState, after loadout.List) ImportEffect {
 			parts = append(parts, Tf(x.f, x.n))
 		}
 	}
-	e.Text = Tf("%s · %d enabled after it", strings.Join(parts, ", "), e.Count)
+	e.Text = Tf("%s  %d enabled after it", strings.Join(parts, ", "), e.Count)
 	return e
 }
 
@@ -384,9 +384,9 @@ func ApplyImport(a *app.App, imp *Import, merge bool) (string, error) {
 		}
 	}
 	if merge {
-		return Tf("added %s from %s · not written to the game yet, u undoes", Plural(e.Added, "mod"), imp.Source), nil
+		return Tf("added %s from %s, not written to the game yet, u undoes", Plural(e.Added, "mod"), imp.Source), nil
 	}
-	return Tf("imported %s: %d added, %d removed, %d moved · not written to the game yet, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved), nil
+	return Tf("imported %s: %d added, %d removed, %d moved, not written to the game yet, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved), nil
 }
 
 // FollowImported makes a list follow the collection an import read (no network: the

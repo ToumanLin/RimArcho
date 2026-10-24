@@ -268,7 +268,7 @@ func (m *model) posLines(w int) []string {
 		out = append(out, line)
 	}
 	if len(edges) > 0 {
-		out = append(out, " "+strings.Join(edges, sDimS.Render("  "+markDot)))
+		out = append(out, " "+strings.Join(edges, sDimS.Render("  ")))
 	}
 	return out
 }

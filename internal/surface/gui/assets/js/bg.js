@@ -58,10 +58,10 @@ function preview() {
   [78, 56, 64, 50].forEach((x, i) => { const b = el("i", i === 0 ? "c" : ""); b.style.width = x + "%"; ls.append(b, el("i", "s")); });
   pv.append(img, shade, ls, el("div", "ln"), el("div", "lb"));
   w.append(pv);
-  const cap = el("div", "bg-cap");
+  const cap = el("div", "bg-cap word-facts");
   cap.append(el("span", "", it ? it.label : "—"));
-  if (g && !g.files && g !== P.groups[0]) cap.append(el("span", "m", " · " + Tf("from %s", g.name)));
-  if (B().rotate && B().stars.length) cap.append(el("span", "m", " · " + T("rotation is on: the launch page picks a starred one")));
+  if (g && !g.files && g !== P.groups[0]) cap.append(el("span", "m",  Tf("from %s", g.name)));
+  if (B().rotate && B().stars.length) cap.append(el("span", "m",  T("rotation is on: the launch page picks a starred one")));
   w.append(cap);
   return w;
 }
@@ -84,9 +84,9 @@ function controls() {
   cb.type = "checkbox";
   cb.checked = B().rotate;
   cb.onchange = () => save({ rotate: cb.checked });
-  const t = el("span", "tg");
+  const t = el("span", "tg word-facts");
   t.append(cb, el("span", "", T("a different one each time the window opens")));
-  t.append(el("small", "", " · " + (B().stars.length ? Tf("among the %d starred", B().stars.length) : T("star some with *"))));
+  t.append(el("small", "", (B().stars.length ? Tf("among the %d starred", B().stars.length) : T("star some with *"))));
   rr.append(t);
   c.append(fr, rr);
   return c;
@@ -155,13 +155,13 @@ function tile(it, i, g) {
   }
   if (it.key !== "plain") {
     const st = el("button", "star" + (B().stars.includes(it.key) ? " on" : ""), "★");
-    st.title = T("star: rotation picks among the starred") + " · *";
+    st.title = T("star: rotation picks among the starred") + T("; ") + "*";
     st.onclick = (e) => { e.stopPropagation(); star(it.key); };
     th.append(st);
   }
   if (g.files) {
     const x = el("button", "rm", "×");
-    x.title = T("forget this image (the file stays)") + " · delete";
+    x.title = T("forget this image (the file stays)") + T("; ") + "delete";
     x.onclick = (e) => { e.stopPropagation(); forget(it.key); };
     th.append(x);
   }

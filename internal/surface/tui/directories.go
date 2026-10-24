@@ -17,7 +17,7 @@ func (m *model) promptDirectories() bool {
 	ids := map[string]string{}
 	for _, d := range dirs {
 		if view.DirectoryNeedsLocation(d) {
-			label := view.DirectoryLabel(d) + " · " + d.Path
+			label := view.DirectoryLabel(d) + "  " + d.Path
 			p.choices = append(p.choices, label)
 			ids[label] = d.ID
 		}
@@ -37,7 +37,7 @@ func (m *model) promptDirectories() bool {
 }
 
 func (m *model) locateDirectory(id, label string) tea.Cmd {
-	m.prompt = &prompt{label: label + " · " + T("new directory path") + ": ", submit: func(m *model, text string) tea.Cmd {
+	m.prompt = &prompt{label: label + "  " + T("new directory path") + ": ", submit: func(m *model, text string) tea.Cmd {
 		if strings.TrimSpace(text) == "" {
 			return nil
 		}

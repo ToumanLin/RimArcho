@@ -111,7 +111,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		return nil
 	}
 	facts := view.HeaderFacts(mod, it.pos, m.focus == cStaging)
-	out = append(out, m.headerLines(it, mod, strings.Join(facts, " "+markDot+" "), w, o)...)
+	out = append(out, m.headerLines(it, mod, strings.Join(facts, "  "), w, o)...)
 	add("")
 	marked := func(mark, text string, st lipgloss.Style) {
 		for i, l := range wrap(text, w-2) {
@@ -129,7 +129,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		why := view.UnloadableWhy(m.st, mod)
 		marked(statusIcon(s), why, sSecond)
 	default:
-		marked(statusIcon(s), T("needs attention · ! shows what"), sText)
+		marked(statusIcon(s), T("needs attention, ! shows what"), sText)
 	}
 	add("")
 	var d *detailData
@@ -152,13 +152,13 @@ func (m *model) detailLayout(o detailOpts) []dline {
 			add("  " + sSecond.Render(fit(l, w-2)))
 		}
 		// the whole history of its Lineage is on the 变化 page (06 §2.9)
-		for _, l := range wrap(T("see all on the changes page")+" · C", w-2) {
+		for _, l := range wrap(T("see all on the changes page")+", C", w-2) {
 			add("  " + sDimS.Render(l))
 		}
 		add("")
 	}
 	if !m.detailTech {
-		addWrapped(T("technical information · i"), sDimS, 0)
+		addWrapped(T("technical information, i"), sDimS, 0)
 		return out
 	}
 	addWrapped(T("technical information"), sDimS, 0)
@@ -259,7 +259,7 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	var out []dline
 	head := func(title, note string) {
 		if note != "" {
-			title += "  " + markDot + "  " + note
+			title += "  " + note
 		}
 		for _, l := range wrap(title, w) {
 			out = append(out, dline{text: sDimS.Render(fit(l, w))})
@@ -273,7 +273,7 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	show := d.Desc.Show
 	var parts [][]dline
 	if show == "about" || show == "both" {
-		title := T("description · About.xml")
+		title := T("description / About.xml")
 		if len(d.About) == 0 {
 			head(title, note)
 			out = append(out, dline{text: "  " + sDimS.Render(fit(T("(empty)"), w-2))})
@@ -288,7 +288,7 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 		if show == "both" {
 			out = append(out, dline{})
 		}
-		head(T("description · Workshop page"), note)
+		head(T("description / Workshop page"), note)
 		out = append(out, m.renderBlocks(d.Workshop, w, o)...)
 	}
 	if o.descMax > 0 && len(out) > o.descMax {
@@ -315,7 +315,7 @@ func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 		if nimg == 0 {
 			return
 		}
-		t := Tf("[images ×%d · enter shows them full screen]", nimg)
+		t := Tf("[images ×%d, enter shows them full screen]", nimg)
 		if !o.images {
 			t = Tf("[images ×%d]", nimg)
 		}
@@ -375,7 +375,7 @@ func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 				host = u.Host
 			}
 			if !o.images {
-				add(strings.Repeat(" ", ind) + sDimS.Render(fit("["+T("image")+" "+markDot+" "+host+"]", bw)))
+				add(strings.Repeat(" ", ind) + sDimS.Render(fit("["+T("image")+"  "+host+"]", bw)))
 				continue
 			}
 			cols := min(bw, 60)
@@ -390,7 +390,7 @@ func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 				// one line until the size is known
 				out = append(out, dline{text: strings.Repeat(" ", ind) + sDimS.Render(fit(T("image loading… ")+host, bw)), imgURL: b.URL, imgRows: 1, imgCols: cols, imgMax: maxR, imgInd: ind})
 			case e.state == imgFailed:
-				add(strings.Repeat(" ", ind) + sDimS.Render(fit("["+T("image")+" "+markDot+" "+host+" "+markDot+" "+e.err+"]", bw)))
+				add(strings.Repeat(" ", ind) + sDimS.Render(fit("["+T("image")+"  "+host+"  "+e.err+"]", bw)))
 			default:
 				out = append(out, dline{text: "", imgURL: b.URL, imgRows: e.rows, imgCols: cols, imgMax: maxR, imgInd: ind})
 				for r := 1; r < e.rows; r++ {
@@ -865,7 +865,7 @@ func (m *model) fullLines(n int) ([]string, []placement) {
 	}
 	if maxOff > 0 && len(out) == n {
 		pct := 100 * m.fullOff / maxOff
-		out[n-1] = "  " + sDimS.Render(fit(Tf("%d%% · ↑↓ PgUp PgDn scroll", pct), w))
+		out[n-1] = "  " + sDimS.Render(fit(Tf("%d%%, ↑↓ PgUp PgDn scroll", pct), w))
 	}
 	return out, ps
 }

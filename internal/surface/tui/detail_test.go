@@ -76,20 +76,20 @@ func TestDetailContent(t *testing.T) {
 	}
 	got := plainLines(m.detailLayout(detailOpts{width: 50, descMax: 12}))
 	for _, want := range []string{"Alpha Plus", "package", "tester.a", "workshop", "1001", "tags", "weapons", "alias", "(Alpha)", "note", "keep after Harmony",
-		"requires", "Harmony (not enabled)", "description · Workshop page", "Alpha adds things.", "• one", "[images ×1]", "… enter shows all", "technical information · i"} {
+		"requires", "Harmony (not enabled)", "description / Workshop page", "Alpha adds things.", "• one", "[images ×1]", "… enter shows all", "technical information, i"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("detail lacks %q:\n%s", want, got)
 		}
 	}
 	// the full-screen detail lists each image (no WezTerm: as text)
-	if full := plainLines(m.detailLayout(detailOpts{width: 50, full: true})); !strings.Contains(full, "[image · i.imgur.com]") || strings.Contains(full, "images ×") {
+	if full := plainLines(m.detailLayout(detailOpts{width: 50, full: true})); !strings.Contains(full, "[image  i.imgur.com]") || strings.Contains(full, "images ×") {
 		t.Fatalf("full-screen images:\n%s", full)
 	}
 	// Both page shortcuts are shown, with the shorter button labels.
 	SetLang("zh")
 	zh := plainLines(m.detailLayout(detailOpts{width: 50, descMax: 12}))
 	SetLang("en")
-	if !strings.Contains(got, "1001 · ctrl+w web page") || !strings.Contains(strings.Join(strings.Fields(got), " "), "ctrl+s steam page") || !strings.Contains(zh, "1001 · ctrl+w 网页") || !strings.Contains(zh, "ctrl+s Steam 页面") {
+	if !strings.Contains(got, "1001  ctrl+w web page") || !strings.Contains(strings.Join(strings.Fields(got), " "), "ctrl+s steam page") || !strings.Contains(zh, "1001  ctrl+w 网页") || !strings.Contains(zh, "ctrl+s Steam 页面") {
 		t.Fatalf("workshop line:\n%s\n%s", got, zh)
 	}
 	for _, l := range m.detailLayout(detailOpts{width: 50, descMax: 12}) {
@@ -107,7 +107,7 @@ func TestDetailContent(t *testing.T) {
 	if strings.Contains(plainLines(all), "enter shows all") || len(all) <= 16 {
 		t.Fatalf("full detail: %d lines", len(all))
 	}
-	if !strings.Contains(ansi.Strip(lines[len(lines)-1]), "0% · ↑↓") {
+	if !strings.Contains(ansi.Strip(lines[len(lines)-1]), "0%, ↑↓") {
 		t.Fatalf("scroll line %q", ansi.Strip(lines[len(lines)-1]))
 	}
 	press(m, "end")
@@ -439,7 +439,7 @@ func TestFullSections(t *testing.T) {
 	m.fullLines(36)
 	all := plainLines(m.lastLines)
 	t.Log(all)
-	for _, want := range []string{"1  Defs · ", "2  patches · ", "3  Harmony", "4  rules", "5  full history · 1", "Alpha loads after Harmony (your rule)", "first seen"} {
+	for _, want := range []string{"1  Defs  ", "2  patches  ", "3  Harmony", "4  rules", "5  full history  1", "Alpha loads after Harmony (your rule)", "first seen"} {
 		if !strings.Contains(all, want) {
 			t.Fatalf("full detail lacks %q:\n%s", want, all)
 		}

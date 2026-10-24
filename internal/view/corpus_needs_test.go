@@ -81,7 +81,7 @@ func TestCorpusNeeds(t *testing.T) {
 	}
 }
 
-// The pattern card of a log cluster (06 §2.10): community background, in the player's
+// The pattern card of a log cluster (06 §2.10): community background  in the player's
 // words; the CLI's English pattern section is left out of the text the interfaces show.
 func TestPatternCard(t *testing.T) {
 	view.SetLang("en")
@@ -109,7 +109,7 @@ func TestPatternCard(t *testing.T) {
 		t.Errorf("severity: %q %q %q", c.Level, c.LevelText, c.Impact)
 	}
 	lines := c.Lines()
-	if !strings.HasPrefix(lines[0], "community background · ") {
+	if !strings.HasPrefix(lines[0], "community background  ") {
 		t.Errorf("card lines: %q", lines)
 	}
 	text := []string{"log:E1 xref-missing x1", "  message: m", "  pattern: pattern:g:xref.def  a def …", "    evidence: community", "    causes: x", "  known-error: pattern:m:x  …", "    repeat-uploads: y", "next:", "  archo x"}

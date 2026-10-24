@@ -136,7 +136,7 @@ func (m *model) histGo() tea.Cmd {
 		if err != nil {
 			m.say(sayFail, m.humanize(err.Error()))
 		} else {
-			m.say(sayOK, Tf("back at v%d (not written to the game yet)", h.Version)+" · "+T("u undoes"))
+			m.say(sayOK, Tf("back at v%d (not written to the game yet)", h.Version)+Tf(", %s", T("u undoes")))
 		}
 		return m.requestDetail()
 	}

@@ -84,7 +84,7 @@ func MonitorOf(a *app.App, st *app.LoadoutState, c *logs.Companion, links map[st
 	if c.Full {
 		facts = append(facts, T("full: no new entries after 32 MiB"))
 	}
-	m.Facts = strings.Join(facts, " · ")
+	m.Facts = strings.Join(facts, "  ")
 	for _, e := range c.Entries {
 		if e.Level == "INFO" && e.Inferred == "" {
 			continue

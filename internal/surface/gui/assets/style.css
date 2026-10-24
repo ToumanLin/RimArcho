@@ -1503,3 +1503,8 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
   .pm-split { display: none; }
 }
 @media (max-width: 900px) { .logside > .hsplit { display: none; } }
+
+/* Text groups (06 §7.3): facts and key hints use space between elements. */
+.word-facts.word-facts, #detail .word-facts { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+#hints:has(.hint-group) { display: flex; align-items: center; gap: 16px; }
+.hint-group { white-space: nowrap; }

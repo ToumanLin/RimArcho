@@ -41,7 +41,7 @@ func (m *model) goArea(a int) tea.Cmd {
 		return m.requestDetail()
 	case a == 4:
 		if !m.hasDetailArea() {
-			m.say(sayInfo, T("the terminal is too narrow for the detail column · enter shows the details"))
+			m.say(sayInfo, T("the terminal is too narrow for the detail column, enter shows the details"))
 			return nil
 		}
 		m.detailFocus = true
@@ -120,14 +120,14 @@ func (m *model) position() string {
 	case m.tab == tabProblems:
 		p = T("needs attention")
 		if n := len(m.prob.items); n > 0 {
-			p += " " + markDot + " " + fmt.Sprintf("%d / %d", min(m.prob.cursor+1, n), n)
+			p += "  " + fmt.Sprintf("%d / %d", min(m.prob.cursor+1, n), n)
 		}
 	case m.tab == tabChanges:
 		p = T("recent changes")
 	case m.tab == tabLibrary:
 		p = T("mod library")
 		if l := &m.libr; l.page != nil && len(l.flat) > 0 {
-			p += " " + markDot + " " + fmt.Sprintf("%d / %d", l.cursor+1, len(l.flat))
+			p += "  " + fmt.Sprintf("%d / %d", l.cursor+1, len(l.flat))
 		}
 	case m.full || m.insp != nil:
 		p = m.focus.title() + " › " + name() + Tf(" (%s)", idx())
@@ -137,18 +137,18 @@ func (m *model) position() string {
 			p += " › " + s
 		}
 	case m.detailFocus:
-		p = T("details") + " " + markDot + " " + name()
+		p = T("details") + "  " + name()
 		if s := m.detailSection(); s != "" {
-			p += " " + markDot + " " + s
+			p += "  " + s
 		}
 	default:
-		p = m.focus.title() + " " + markDot + " " + idx()
+		p = m.focus.title() + "  " + idx()
 		if c.filter != "" || c.kind != cStaging && m.bar.active() {
-			p += " " + markDot + " " + T("filtered")
+			p += "  " + T("filtered")
 		}
 	}
 	if n := m.selCount(); n > 0 && m.tab == tabList {
-		p += " " + markDot + " " + Tf("selected %d", n)
+		p += "  " + Tf("selected %d", n)
 	}
 	if pop := m.popupName(); pop != "" {
 		p += " › " + pop

@@ -29,3 +29,40 @@ func TestSettingsMonitor(t *testing.T) {
 	}
 	t.Fatal("no game log group")
 }
+
+// GPU and Monitor help is available on hover; only the restart note sits by the value.
+func TestSettingsWording(t *testing.T) {
+	e, _, _ := shellEnv(t)
+	e.MustRun("config", "set", "ui.gpu", "off")
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { view.SetLang("en") })
+	for _, lang := range []string{"en", "zh"} {
+		view.SetLang(lang)
+		found := 0
+		for _, group := range view.SettingsPage(e.App, st) {
+			for _, it := range group.Items {
+				if len(it.Argv) < 3 {
+					continue
+				}
+				switch it.Argv[2] {
+				case "ui.gpu":
+					found++
+					if it.Note != "" || it.Hover != view.T("uses about 20–35 MB less memory and draws in software") || it.ValueNote != view.T("takes effect next time you open RimArcho") {
+						t.Errorf("GPU help: %+v", it)
+					}
+				case "monitor.default":
+					found++
+					if it.Note != "" || it.Hover != view.T("only new lists and lists not handled yet") {
+						t.Errorf("Monitor help: %+v", it)
+					}
+				}
+			}
+		}
+		if found != 2 {
+			t.Fatalf("found %d settings", found)
+		}
+	}
+}

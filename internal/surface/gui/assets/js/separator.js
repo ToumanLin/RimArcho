@@ -32,7 +32,7 @@ export function wireSeparator(handle, opts) {
   handle.classList.add("separator");
   handle.setAttribute("role", "separator");
   handle.setAttribute("aria-orientation", axis === "x" ? "vertical" : "horizontal");
-  handle.title ||= T("drag to resize · double click: back to the default");
+  handle.title ||= T("drag to resize, double click: back to the default");
   handle.setAttribute("aria-label", handle.title);
   handle.addEventListener("focus", refresh);
   handle.addEventListener("keydown", (e) => {

@@ -10,6 +10,7 @@ export class Element {
     this.classList = {
       add: (...cs) => { this.className = [...new Set([...this.className.split(" "), ...cs])].join(" "); },
       remove: (...cs) => { this.className = this.className.split(" ").filter((c) => !cs.includes(c)).join(" "); },
+      contains: (c) => this.className.split(" ").includes(c),
       toggle: (c, on) => { if (on ?? !this.className.split(" ").includes(c)) this.classList.add(c); else this.classList.remove(c); },
     };
   }
@@ -80,6 +81,16 @@ export class Element {
 
 export async function loadModules(entry, deps, globals = {}) {
   const context = createContext({ Node: Element, ...globals }), cache = new Map();
+  if (deps["./state.js"] && !deps["./state.js"].factText) {
+    const source = await readFile(new URL("../assets/js/state.js", import.meta.url), "utf8");
+    const helper = source.match(/export function factText[\s\S]*?\n}/)[0].replace("export ", "");
+    const factory = new SourceTextModule(helper + "\nexport default factText;", { context });
+    await factory.link(() => { throw new Error("text helper has no imports"); });
+    // el is the DOM factory already supplied by this harness.
+    context.el = deps["./state.js"].el;
+    await factory.evaluate();
+    deps["./state.js"].factText = factory.namespace.default;
+  }
   async function get(name) {
     if (cache.has(name)) return cache.get(name);
     let module;

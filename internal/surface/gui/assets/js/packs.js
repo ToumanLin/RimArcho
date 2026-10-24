@@ -5,7 +5,7 @@
 // exported from its page as a RimArcho list (E).
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { shimmer } from "./motion.js";
 import { openScreen, page, button, act, area, beginPageRead } from "./screens.js";
 import * as pop from "./popups.js";
@@ -78,7 +78,7 @@ export async function list() {
   if (!read.current()) return;
   const sc = S.screen === "packs" && !S.packFocus ? $("#screen") : openScreen("packs");
   sc.innerHTML = "";
-  const w = page("packs", T("a pack copies every mod of the list as it is now and plays with its own saves"),
+  const w = page("packs", "",
     act(T("create a pack"), "packs", () => ui.go("build"), "B"));
   sc.append(w);
   for (const u of L.un) w.append(buildCard(u));
@@ -113,7 +113,7 @@ export async function pack(name) {
   sc.innerHTML = "";
   const play = act(T("play"), "play", () => launch(), "L", "pack-launch");
   play.classList.add("primary");
-  const w = page("packs pack-page", P.facts.join(" · "), button(T("export"), "e", () => exportPack(false)),
+  const w = page("packs pack-page", P.facts.join("  "), button(T("export"), "e", () => exportPack(false)),
     button(T("export the list"), "E", () => exportPack(true)), button(T("move to the recycle bin"), "Del", () => removePack(), "", "pack-remove"), play);
   sc.append(w);
   const sec = el("section", "sec");
@@ -165,7 +165,7 @@ async function exportPack(list) {
     const t = await api.PackExport(name, "", list);
     if (t) say("ok", t);
   } catch (e) {
-    pop.ask(list ? T("export the list") : T("export the pack"), T("the new file") + " · " + name + (list ? ".archolist.json" : ".archopack"), async (file) => {
+    pop.ask(list ? T("export the list") : T("export the pack"), T("the new file") + ": " + name + (list ? ".archolist.json" : ".archopack"), async (file) => {
       if (!file) return;
       try { say("ok", await api.PackExport(name, file, list)); } catch (e2) { say("fail", errText(e2)); }
     });
@@ -190,7 +190,7 @@ function progressBox(p) {
   const fill = el("i");
   fill.style.width = Math.round((p.frac || 0) * 100) + "%";
   bar.append(fill);
-  w.append(bar, el("div", "ptext" + (p.error ? " bad" : ""), p.error || p.text || ""));
+  w.append(bar, el("div", "ptext word-facts" + (p.error ? " bad" : ""), p.error || p.text || ""));
   return w;
 }
 
@@ -201,7 +201,7 @@ function buildCard(u) {
   card.dataset.build = u.name;
   const head = el("div", "pack");
   const left = el("div", "l");
-  left.append(el("div", "name", u.running ? Tf("creating pack %s", u.name) : u.name), el("div", "sub", u.facts || ""));
+  left.append(el("div", "name", u.running ? Tf("creating pack %s", u.name) : u.name), el("div", "sub word-facts", u.facts || ""));
   const right = el("div", "r");
   if (u.running) {
     right.append(button(T("stop"), "", async () => {
@@ -251,12 +251,12 @@ export function packEvent(ev) {
     return redraw();
   }
   if (S.screen === "build") return drawBuild();
-  if (S.screen !== "packs" || S.packFocus) { say("busy", Tf("creating pack %s", ev.name) + " · " + ev.text); return; }
+  if (S.screen !== "packs" || S.packFocus) { say("busy", Tf("creating pack %s", ev.name) + "  " + ev.text); return; }
   const card = document.querySelector(`.card.build[data-build="${CSS.escape(ev.name)}"]`);
   if (!card) return list();
   const body = card.querySelector(".progwrap");
   if (body) { body.innerHTML = ""; body.append(progressBox(ev)); }
-  card.querySelector(".sub").textContent = T("creating") + " · " + ev.text;
+  factText(card.querySelector(".sub"), T("creating"), ev.text);
 }
 
 // ---- 编译成整合包 (the plan's sub-page) ----
@@ -366,7 +366,7 @@ function drawBuild() {
   const focusName = document.activeElement && document.activeElement.id === "pk-name";
   const focusTex = document.activeElement && document.activeElement.id === "pk-tex";
   sc.innerHTML = "";
-  const w = page("build", T("a pack locks every mod's version: later Workshop updates do not change it, and it has its own saves and settings; the list stays as it is"),
+  const w = page("build", "",
     button(T("cancel"), "esc", () => ui.go("plan")));
   const cols = el("div", "bd-cols");
   const left = el("div", "bd-left");

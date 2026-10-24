@@ -152,7 +152,7 @@ func TestTexturesBackground(t *testing.T) {
 	}
 	close(release)
 	ev := wait(`"done":true`)
-	if !strings.Contains(ev, "converted 4 textures to DDS (1.0 MB written) · 1 failed") {
+	if !strings.Contains(ev, "converted 4 textures to DDS (1.0 MB written), 1 failed") {
 		t.Fatalf("end: %s", ev)
 	}
 	if strings.Join(got, " ") != "textures optimize --plan --scale 50" {

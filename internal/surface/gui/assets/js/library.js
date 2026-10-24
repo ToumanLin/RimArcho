@@ -252,7 +252,8 @@ function drawHead() {
   h.innerHTML = "";
   h.append(el("span", "anum", "2"));
   const n = p.shown === p.total ? Tf("%d mods", p.total) : Tf("%d of %d mods", p.shown, p.total);
-  h.append(el("span", "lib-count", n), el("span", "faint", " · " + p.size));
+  h.classList.add("word-facts");
+  h.append(el("span", "lib-count", n), el("span", "faint", p.size));
   table.draw(els.rows, els.th);
 }
 
@@ -288,7 +289,7 @@ function rowEl(x, k) {
   for (const c of shownCols()) {
     if (c.key === "name") { r.append(nameCell(x)); continue; }
     const v = cells[c.key] || "";
-    const cell = el("span", "c " + c.key + (c.key === "state" && cells.code ? " " + cells.code : ""), v);
+    const cell = el("span", "word-facts c " + c.key + (c.key === "state" && cells.code ? " " + cells.code : ""), v);
     if (c.key === "size") cell.classList.add("num");
     if (c.key === "used" && cells.usedTitle) cell.title = cells.usedTitle;
     else if (v) cell.title = v;
@@ -436,7 +437,7 @@ async function drawDetail() {
   const row = i && (L.page.rows || []).find((r) => r.insts.some((x) => x.ref === i.ref));
   els.dhead.innerHTML = "";
   els.dhead.append(el("span", "n", "3"), el("span", "t", T("details")));
-  if (i) els.dhead.append(el("span", "q", (row ? row.name : "") + " · " + i.label));
+  if (i) els.dhead.append(el("span", "q word-facts", (row ? row.name : "") + "  " + i.label));
   if (!i) { box.innerHTML = ""; box.dataset.ref = ""; return; }
   const same = box.dataset.ref === i.ref && box.dataset.stamp === stampOf(i);
   if (same) return;
@@ -488,11 +489,11 @@ function noteEl(i) {
     box.innerHTML = "";
     box.classList.remove("editing");
     box.append(el("div", "txt", i.note || i.auto || T("write a note")));
-    if (!i.note && i.auto) box.append(el("div", "by", T("by RimArcho · click to edit")));
+    if (!i.note && i.auto) box.append(el("div", "by", T("by RimArcho, click to edit")));
   };
   show();
   if (!i.id) return box;
-  box.title = T("click to edit") + " · n";
+  box.title = T("click to edit") + T("; ") + "n";
   box.onclick = () => {
     if (box.classList.contains("editing")) return;
     box.classList.add("editing");
@@ -502,7 +503,7 @@ function noteEl(i) {
     ta.value = start;
     ta.placeholder = T("a note on this copy…");
     ta.rows = Math.min(6, Math.max(2, start.split("\n").length + 1));
-    box.append(ta, el("div", "by", T("enter saves · esc cancels")));
+    box.append(ta, el("div", "by", T("enter saves, esc cancels")));
     ta.focus();
     ta.setSelectionRange(ta.value.length, ta.value.length);
     let done = false;
@@ -738,8 +739,8 @@ export function stepCopy(d) {
 // where: the position line on this page (06 §3.2): the cursor's row of the rows shown.
 export function where() {
   if (!L.page) return "";
-  let s = `${T("Mod library")} · ${L.flat.length ? L.cur + 1 : 0} / ${L.flat.length}`;
-  if (L.sel.size) s += " · " + Tf("%d selected", L.sel.size);
+  let s = `${T("Mod library")}    ${L.flat.length ? L.cur + 1 : 0} / ${L.flat.length}`;
+  if (L.sel.size) s += "  " + Tf("%d selected", L.sel.size);
   if (L.full) s += " › " + T("details");
   return s;
 }

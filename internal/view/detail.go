@@ -105,7 +105,7 @@ func Facts(mod *store.Mod, d *DetailData) []Fact {
 	if ws := mod.WorkshopID(); IsNumber(ws) {
 		fs = append(fs, Fact{Kind: FactWorkshop, Label: T("workshop"), Value: ws})
 	}
-	fs = append(fs, Fact{Kind: FactTags, Label: T("tags"), Value: strings.Join(mod.Tags, " · "), List: mod.Tags})
+	fs = append(fs, Fact{Kind: FactTags, Label: T("tags"), Value: strings.Join(mod.Tags, "  "), List: mod.Tags})
 	if mod.Alias != "" {
 		fs = append(fs, Fact{Kind: FactAlias, Label: T("alias"), Value: mod.Alias, Extra: mod.Name})
 	}
@@ -248,7 +248,7 @@ func HistoryLine(evs []*store.Event) string {
 	for i := len(evs) - 1; i >= 0 && len(parts) < 3; i-- {
 		parts = append(parts, ShortDate(evs[i].ScanTime)+" "+EventText(evs[i].Kind))
 	}
-	return strings.Join(parts, " · ")
+	return strings.Join(parts, "  ")
 }
 
 // ---- the full detail's sub-sections (06 §4.2) ----
@@ -352,7 +352,7 @@ func rulesSection(a *app.App, ix *app.Index, mod *store.Mod) Section {
 			continue
 		}
 		if r.Note != "" {
-			l += "  ·  " + r.Note
+			l += "  " + r.Note
 		}
 		sec.Lines = append(sec.Lines, "  "+l)
 	}
