@@ -213,6 +213,7 @@ try {
       handlers.set("Home", () => ({ rows: [], featured: -1 })); handlers.delete("HomeApply");
       screens.openScreen("other");
     }
+  });
   await test("editor and inventory hide old virtual rows during object switches, including game switching", async () => {
     const oldMod = { id: 17, name: "old editor mod" };
     handlers.set("Workspace", () => ({ ...workspace, board: { ...workspace.board, cols: [[oldMod], [], []] } }));
