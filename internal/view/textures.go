@@ -54,15 +54,20 @@ type TexturePage struct {
 
 // TextureRow is one mod of the page: the biggest first.
 type TextureRow struct {
-	Pending  bool   `json:"pending,omitempty"`
-	Estimate string `json:"estimate"`
-	Ref      string `json:"ref"`
-	Name     string `json:"name"`
-	PNG      string `json:"png"`
-	Convert  int    `json:"convert"`
-	DDS      string `json:"dds,omitempty"` // RimArcho's DDS there now
-	Stale    int    `json:"stale,omitempty"`
-	Own      int    `json:"own,omitempty"` // DDS of the mod's own
+	PNGCount      int    `json:"pngCount"`
+	PNGBytes      int64  `json:"pngBytes"`
+	CurrentSize   string `json:"currentSize"`
+	EstimateBytes int64  `json:"estimateBytes"`
+	SavedBytes    int64  `json:"savedBytes"`
+	Pending       bool   `json:"pending,omitempty"`
+	Estimate      string `json:"estimate"`
+	Ref           string `json:"ref"`
+	Name          string `json:"name"`
+	PNG           string `json:"png"`
+	Convert       int    `json:"convert"`
+	DDS           string `json:"dds,omitempty"` // RimArcho's DDS there now
+	Stale         int    `json:"stale,omitempty"`
+	Own           int    `json:"own,omitempty"` // DDS of the mod's own
 }
 
 // TexturePageLoading offers choices before any disk measurements finish (06 §3.1).
@@ -76,10 +81,12 @@ func TexturePageLoading(scope string, scale int) *TexturePage {
 
 // TextureRowOf formats one completed measurement (06 §2.13).
 func TextureRowOf(m *app.TextureMod) TextureRow {
-	row := TextureRow{Ref: m.Ref, Name: m.Mod.DisplayName(), PNG: Tf("%d · %s", m.PNG, SizeText(m.PNGBytes)), Stale: m.Stale + m.Orphans, Own: m.Foreign}
+	row := TextureRow{Ref: m.Ref, Name: m.Mod.DisplayName(), PNG: Tf("%d · %s", m.PNG, SizeText(m.PNGBytes)), PNGCount: m.PNG, PNGBytes: m.PNGBytes, CurrentSize: SizeText(m.PNGBytes), Stale: m.Stale + m.Orphans, Own: m.Foreign}
 	if m.Plan != nil {
 		row.Convert = m.Plan.Est.Files
 		row.Estimate = SizeText(m.Plan.Est.DDSBytes)
+		row.EstimateBytes = m.Plan.Est.DDSBytes
+		row.SavedBytes = m.Plan.Est.PNGBytes - m.Plan.Est.DDSBytes
 	}
 	if m.Ours > 0 {
 		row.DDS = Tf("%d · %s", m.Ours, SizeText(m.OursSize))

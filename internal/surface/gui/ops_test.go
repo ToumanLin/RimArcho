@@ -41,6 +41,18 @@ func TestOpsRunnable(t *testing.T) {
 		}
 	}
 	// the keys the table names are the ones the pages read
+	// Data table headers share mouse and keyboard behavior (06 §3.9).
+	for _, name := range []string{"library", "tasks", "packs", "textures"} {
+		source := read("assets/js/" + name + ".js")
+		for _, marker := range []string{`from "./datatable.js"`, `.key(e)`} {
+			if !strings.Contains(source, marker) {
+				t.Errorf("%s: missing shared table entry %s", name, marker)
+			}
+		}
+	}
+	if !strings.Contains(main, `return tex.key(e)`) {
+		t.Error("texture table keys do not reach the page")
+	}
 	for _, k := range []string{`Delete`, `"\\"`, `menuKey`} {
 		if !strings.Contains(main, k) || !strings.Contains(lib, k) {
 			t.Errorf("%s: not read on both pages", k)
