@@ -6,8 +6,8 @@ import { S, $$, key, ROW_H } from "./state.js";
 const reduce = matchMedia("(prefers-reduced-motion: reduce)");
 export const still = () => reduce.matches;
 
-const LAYOUT_MS = 260;
-const FLASH_MS = 600;
+const LAYOUT_MS = 250;
+const FLASH_MS = 400;
 
 // ---- the lists: FLIP the visible rows to their new place, flash the changed ones ----
 
