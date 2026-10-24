@@ -1477,3 +1477,8 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-import fieldset { border: 0; padding: 0; min-width: 0; }
 .pm-import .xc-check .xc-note { flex-basis: 100%; padding-left: 22px; }
 .pm-import .xc-preview[hidden] { display: none; }
+
+/* Text groups (06 §7.3): facts and key hints use space between elements. */
+.word-facts.word-facts, #detail .word-facts { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+#hints:has(.hint-group) { display: flex; align-items: center; gap: 16px; }
+.hint-group { white-space: nowrap; }

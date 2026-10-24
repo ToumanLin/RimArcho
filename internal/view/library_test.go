@@ -162,7 +162,7 @@ func TestLibraryDo(t *testing.T) {
 		t.Fatal(err)
 	}
 	after := libRow(t, libPage(t, e, ""), "Lockable")
-	if after.Insts[1].ID != cp.ID || !strings.HasPrefix(after.Insts[1].Label, "locked version · ") || !after.Insts[1].InPlan {
+	if after.Insts[1].ID != cp.ID || !strings.HasPrefix(after.Insts[1].Label, "locked version  ") || !after.Insts[1].InPlan {
 		t.Fatalf("after the move: %+v", after.Insts[1])
 	}
 	// the dry run of a refused action cannot be applied

@@ -1,6 +1,7 @@
 package view_test
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -145,4 +146,44 @@ func rowsOf(g *modchanges.Group) []modchanges.Row {
 		return nil
 	}
 	return g.Rows
+}
+
+// Shared modchanges output keeps CLI punctuation while both interface languages use gaps.
+func TestChangesWording(t *testing.T) {
+	e := testkit.New(t)
+	e.AddEnv(false)
+	e.MustRun("scan")
+	e.Advance(time.Hour)
+	e.AddWorkshop("1001", testkit.Sample("tester.alpha", "Alpha"))
+	e.AddWorkshop("1002", testkit.Sample("tester.beta", "Beta"))
+	e.MustRun("scan")
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { view.SetLang("en") })
+	for _, lang := range []string{"en", "zh"} {
+		view.SetLang(lang)
+		p, err := view.BuildChanges(e.App, st, modchanges.Opts{Library: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := json.Marshal(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Arrivals == nil || p.Arrivals.Text == "" || !strings.Contains(p.Since, "  ") {
+			t.Fatalf("missing fixture text: %+v", p)
+		}
+		for _, problem := range view.WordingTextProblems(lang+" changes", string(b)) {
+			t.Error(problem)
+		}
+	}
+	p, err := modchanges.Build(e.App, st, modchanges.Opts{Library: true}, modchanges.English(e.App.Loc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.ContainsRune(p.Since, '\u00b7') {
+		t.Errorf("CLI punctuation changed: %q", p.Since)
+	}
 }

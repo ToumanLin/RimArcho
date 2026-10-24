@@ -10,7 +10,7 @@ import (
 )
 
 func settingQueued(t app.Task) string {
-	return view.Tf("%s · %s: in the %s queue", view.TaskTitle(t.Kind), t.Obj, "RimArcho")
+	return view.Tf("%s, %s: in the %s queue", view.TaskTitle(t.Kind), t.Obj, "RimArcho")
 }
 
 // queueSettingTaskLocked captures the target at submission. Slow work uses its own
@@ -92,9 +92,9 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 			}
 		}
 		if err != nil {
-			return "", errors.New(err.Error() + " · " + strings.Join(parts, " · "))
+			return "", errors.New(err.Error() + "  " + strings.Join(parts, "  "))
 		}
-		return view.T("community data updated") + " · " + strings.Join(parts, " · "), nil
+		return view.T("community data updated") + "  " + strings.Join(parts, "  "), nil
 	default:
 		return executeSettingTask(a, argv)
 	}

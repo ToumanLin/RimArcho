@@ -52,12 +52,12 @@ func (m *model) secLines(w int) []dline {
 	for i, s := range m.fsecs.secs {
 		title := fmt.Sprintf("%d  %s", i+1, s.Title)
 		if s.Count >= 0 {
-			title += " " + markDot + " " + fmt.Sprint(s.Count)
+			title += "  " + fmt.Sprint(s.Count)
 		}
 		out = append(out, dline{text: sBold.Render(fit(title, w)), sec: i + 1})
 		for j, l := range s.Lines {
 			if j == secCap {
-				out = append(out, dline{text: "  " + sDimS.Render(fit(Tf("… %d more · tab shows all", len(s.Lines)-secCap), w-2))})
+				out = append(out, dline{text: "  " + sDimS.Render(fit(Tf("… %d more, tab shows all", len(s.Lines)-secCap), w-2))})
 				break
 			}
 			ind := min(len(l)-len(strings.TrimLeft(l, " ")), w/2)

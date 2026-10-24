@@ -146,7 +146,7 @@ func TestT18TaskSteps(t *testing.T) {
 	if p := pos("Late"); p != pos("P050")+1 {
 		t.Fatalf("Late at %d, P050 at %d (status %q)", p, pos("P050"), m.status)
 	}
-	if !strings.Contains(m.status, fmt.Sprintf("placed at position %d · m changes it", pos("Late"))) {
+	if !strings.Contains(m.status, fmt.Sprintf("placed at position %d, m changes it", pos("Late"))) {
 		t.Fatalf("status %q", m.status)
 	}
 	// 2. Move a mod after another, 120 apart: m name enter.
@@ -194,7 +194,7 @@ func TestT18TaskSteps(t *testing.T) {
 	out := ansi.Strip(m.View())
 	task("read the description", 3)
 	press(m, "esc")
-	if !strings.Contains(out, "technical information · i") || m.detailFocus || m.current().name != "P001" {
+	if !strings.Contains(out, "technical information, i") || m.detailFocus || m.current().name != "P001" {
 		t.Fatalf("not at the end, or the focus moved (detail %v, %s):\n%s", m.detailFocus, m.current().name, out)
 	}
 	// 5. A pinned tag for five mods in a row: shift+↓ ×4, # → enter.
@@ -251,20 +251,20 @@ func TestT19PositionLine(t *testing.T) {
 	e, m := v3Fixture(t)
 	// The states share one environment (Staging stages a mod), so the counts are patterns.
 	want := map[string]string{
-		"Disabled":        `Disabled · 1 / \d+$`,
-		"Enabled":         `Enabled · 1 / \d+$`,
-		"Staging":         `Staging · 1 / \d+$`,
-		"selection":       `Enabled · 4 / \d+ · selected 3$`,
-		"detail":          `details · \S+`,
+		"Disabled":        `Disabled  1 / \d+$`,
+		"Enabled":         `Enabled  1 / \d+$`,
+		"Staging":         `Staging  1 / \d+$`,
+		"selection":       `Enabled  4 / \d+  selected 3$`,
+		"detail":          `details  \S+`,
 		"full screen":     `Enabled › \S+ \(2 / \d+\) › summary`,
 		"technical pages": `Enabled › \S+ \(1 / \d+\) › technical pages`,
-		"search":          `Disabled · \d+ / \d+ · filtered › search$`,
-		"command palette": `Enabled · 1 / \d+ › command palette$`,
-		"tags":            `Enabled · 2 / \d+ · selected 2 › tags$`,
-		"move to":         `Enabled · 2 / \d+ › move to…$`,
-		"preview":         `Enabled · 1 / \d+ › preview the sort$`,
-		"help":            `Enabled · 1 / \d+ › all keys$`,
-		"needs attention": `› needs attention · 1 / \d+`,
+		"search":          `Disabled  \d+ / \d+  filtered › search$`,
+		"command palette": `Enabled  1 / \d+ › command palette$`,
+		"tags":            `Enabled  2 / \d+  selected 2 › tags$`,
+		"move to":         `Enabled  2 / \d+ › move to…$`,
+		"preview":         `Enabled  1 / \d+ › preview the sort$`,
+		"help":            `Enabled  1 / \d+ › all keys$`,
+		"needs attention": `› needs attention  1 / \d+`,
 		"recent changes":  `› recent changes`,
 	}
 	for _, s := range v3States {
@@ -282,7 +282,7 @@ func TestT19PositionLine(t *testing.T) {
 	defer SetLang("en")
 	m = direct(t, e, 160, 40)
 	pressAll(m, "down", "shift+down")
-	if top := ansi.Strip(strings.Split(m.View(), "\n")[0]); !regexp.MustCompile(`已启用 · 3 / \d+ · 已选 2`).MatchString(top) {
+	if top := ansi.Strip(strings.Split(m.View(), "\n")[0]); !regexp.MustCompile(`已启用  3 / \d+  已选 2`).MatchString(top) {
 		t.Fatalf("zh: %q", top)
 	}
 }

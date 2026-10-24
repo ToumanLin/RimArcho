@@ -71,11 +71,11 @@ func (c *chState) build() {
 	add := func(text string, kind int) { c.rows = append(c.rows, chRow{text: text, kind: kind}) }
 	switch {
 	case c.of != "":
-		add(Tf("only %s", c.ofName)+"  "+markDot+"  "+T("esc shows every mod"), chHead)
+		add(Tf("only %s", c.ofName)+"  "+T("esc shows every mod"), chHead)
 	case c.library:
-		add(T("the whole library")+"  "+markDot+"  "+p.Since+"  "+markDot+"  "+T("a: only the current list"), chHead)
+		add(T("the whole library")+"  "+p.Since+"  "+T("a: only the current list"), chHead)
 	default:
-		add(Tf("list %s", p.Plan)+"  "+markDot+"  "+p.Since+"  "+markDot+"  "+T("a: the whole library"), chHead)
+		add(Tf("list %s", p.Plan)+"  "+p.Since+"  "+T("a: the whole library"), chHead)
 	}
 	if p.NoScan {
 		add("  "+T("no scan yet (R scans)"), chDim)
@@ -100,7 +100,7 @@ func (c *chState) build() {
 		if open {
 			mark = "▾ "
 		}
-		c.rows = append(c.rows, chRow{text: "  " + mark + d.Day + "  " + markDot + "  " + Tf("%d mods", n), kind: chDay, key: k})
+		c.rows = append(c.rows, chRow{text: "  " + mark + d.Day + "  " + Tf("%d mods", n), kind: chDay, key: k})
 		if open {
 			c.tiered(d.Rows, "    ")
 			c.group(d.Arrivals, d.Day, "    ")
@@ -123,7 +123,7 @@ func (c *chState) tiered(rs []modchanges.Row, ind string) {
 
 func (c *chState) mod(r *modchanges.Row, ind string) {
 	k := rowKey(r)
-	c.rows = append(c.rows, chRow{text: ind + r.Mod + "  " + markDot + "  " + r.Text, kind: chMod, mod: r, key: k})
+	c.rows = append(c.rows, chRow{text: ind + r.Mod + "  " + r.Text, kind: chMod, mod: r, key: k})
 	if c.open[k] {
 		for _, d := range r.Details {
 			c.rows = append(c.rows, chRow{text: ind + "    " + d, kind: chDim})

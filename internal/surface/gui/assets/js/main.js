@@ -6,7 +6,7 @@
 //   4. the hint line lists what you can do with the object now;
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
-import { S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
+import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
 import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
 import { showDetail, scrollDetail } from "./detail.js";
@@ -133,7 +133,7 @@ function planActions() {
   if (plan && plan.conflict) {
     const m = el("button", "chip mark");
     m.append(el("span", "dot"), el("span", "t", plan.conflictText));
-    m.title = plan.conflictText + " · " + T("can it run › needs your answer");
+    m.title = plan.conflictText + T("; ") + T("can it run › needs your answer");
     m.onclick = (e) => { e.stopPropagation(); go("needs"); };
     out.push(m);
   }
@@ -147,12 +147,12 @@ function planActions() {
     btn(T("create a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : ""));
   if (plan) {
     const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");
-    more.title = T("the list: rename, copy, delete") + " · P";
+    more.title = T("the list: rename, copy, delete") + T("; ") + "P";
     out.push(more);
   }
   // 启动游戏 opens 启动, where the game starts (06 §2.5)
   const l = btn(T("launch the game"), "L", goLaunch, "primary");
-  l.title = T("opens the launch page, where the game starts") + " · L";
+  l.title = T("opens the launch page, where the game starts") + T("; ") + "L";
   out.push(l);
   return out;
 }
@@ -233,14 +233,14 @@ function renderWhere() {
   } else if (S.focus === 3) {
     const sc = $(".detail .scroll");
     const pct = sc.scrollHeight > sc.clientHeight ? Math.round(100 * sc.scrollTop / (sc.scrollHeight - sc.clientHeight)) : 100;
-    s = `${T("details")} · ${S.detail ? S.detail.name : "—"} · ${pct}%`;
+    s = `${T("details")}    ${S.detail ? S.detail.name : "—"}    ${pct}%`;
   } else {
     const c = col();
-    s = `${T(AREAS[S.focus])} · ${c.view.length ? c.cursor + 1 : 0} / ${c.view.length}`;
-    if (c.sel.size) s += " · " + Tf("%d selected", c.sel.size);
+    s = `${T(AREAS[S.focus])}    ${c.view.length ? c.cursor + 1 : 0} / ${c.view.length}`;
+    if (c.sel.size) s += "  " + Tf("%d selected", c.sel.size);
   }
   if (S.popup) s += " › " + S.popup.title;
-  $("#where").textContent = s;
+  factText($("#where"), s);
 }
 
 // actions: what can be done with the object now (the hint line and the context menu).
@@ -288,12 +288,17 @@ function renderHints() {
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);
   const c = S.focus < 3 ? col() : null;
-  if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)), el("span", "sep", "·"));
-  list.slice(0, 7).forEach((a, i) => {
-    if (i) h.append(el("span", "sep", "·"));
-    h.append(el("b", "", a.key), " " + a.label);
+  if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
+  list.slice(0, 7).forEach((a) => {
+    const group = el("span", "hint-group");
+    group.append(el("b", "", a.key), " " + a.label);
+    h.append(group);
   });
-  if (c && c.sel.size && !S.screen) h.append(el("span", "sep", "·"), el("b", "", "esc"), " " + T("clear the selection"));
+  if (c && c.sel.size && !S.screen) {
+    const group = el("span", "hint-group");
+    group.append(el("b", "", "esc"), " " + T("clear the selection"));
+    h.append(group);
+  }
 }
 
 // foldShortcuts: ctrl+o and ctrl+w share one place in the hint line.

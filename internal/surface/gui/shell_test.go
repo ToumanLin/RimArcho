@@ -16,7 +16,7 @@ func TestShellAndHome(t *testing.T) {
 	_, api, _ := fixture(t)
 	b := api.Board()
 	sh := api.Shell()
-	if sh.Envs != 1 || sh.Env != "main · 1.6" {
+	if sh.Envs != 1 || sh.Env != "main  1.6" {
 		t.Fatalf("shell %+v", sh)
 	}
 	items := sh.Nav[0].Items

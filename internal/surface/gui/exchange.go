@@ -154,7 +154,7 @@ func (s *API) ImportApply(merge bool) (string, error) {
 	if err == nil && s.x.follow {
 		if st, e := s.a.Loadout(); e == nil {
 			if e := view.FollowImported(s.a, imp, st.Plan.ID); e != nil {
-				t += " · " + e.Error()
+				t += "    " + e.Error()
 			}
 		}
 	}

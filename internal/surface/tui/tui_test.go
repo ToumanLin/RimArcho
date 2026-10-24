@@ -171,7 +171,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	// Enabled is focused; h goes to "Disabled", where a filter finds Beta. space enables it
 	// where the order wants it: the end, nothing constrains it (06 §3.5).
 	keys(tm, "h", "/", "Beta", "enter", "space")
-	waitFor(t, tm, "placed at position 4 · m changes it")
+	waitFor(t, tm, "placed at position 4, m changes it")
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
 		t.Fatalf("after space: %s", got)
 	}
@@ -187,7 +187,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	}
 	// S, w and L act at once and say what they did (06 §6); sort offers u.
 	keys(tm, "S")
-	waitFor(t, tm, "sorted: 1 moved · strong requirements put right: 1 · u undoes")
+	waitFor(t, tm, "sorted: 1 moved, strong requirements put right: 1, u undoes")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
 		t.Fatalf("after sort: %s", got)
 	}
@@ -497,7 +497,7 @@ func TestChineseUI(t *testing.T) {
 	keys(tm, "?")
 	waitFor(t, tm, "方向键只移动")
 	keys(tm, "esc", "h", "space")
-	waitFor(t, tm, "已放在第 4 位 · m 改位置")
+	waitFor(t, tm, "已放在第 4 位，m 改位置")
 	m := finish(t, tm)
 	for _, l := range strings.Split(m.View(), "\n") {
 		if w := lipgloss.Width(l); w > 100 {
@@ -704,7 +704,7 @@ func TestIconWidths(t *testing.T) {
 		for i, s := range []string{set.official, set.workshop, set.local, set.localCopy, set.git, set.err, set.warn, set.logErr,
 			set.unloadable, set.unsaved, set.lock, set.update, set.dep, set.staging, set.play, set.save, set.sort, set.search, set.fail,
 			set.evDeclared, set.evInferred, set.evLog, set.evCommunity, set.evRule,
-			markSel, markOK, markPrompt, markBusy, markDot} {
+			markSel, markOK, markPrompt, markBusy} {
 			if s == "" {
 				continue // "not shown" in compatibility mode
 			}
@@ -721,8 +721,8 @@ func TestWrap(t *testing.T) {
 		w    int
 		want string
 	}{
-		{"staging is empty · t puts the selected mod here", 20, "staging is empty · t|puts the selected|mod here"},
-		{"暂存是空的 · 按 t 把选中的 Mod 放进来", 12, "暂存是空的 ·|按 t 把选中|的 Mod 放进|来"},                                        // CJK breaks between characters
+		{"staging is empty, t puts the selected mod here", 20, "staging is empty, t|puts the selected|mod here"},
+		{"暂存是空的，按 t 把选中的 Mod 放进来", 12, "暂存是空的，|按 t 把选中|的 Mod 放进|来"},                                           // CJK breaks between characters
 		{"使用Harmony库的模组", 10, "使用|Harmony库|的模组"},                                                              // never inside a Latin word
 		{`  path: D:\SteamLibrary\steamapps\workshop`, 20, `  path:|  D:\SteamLibrary\|  steamapps\workshop`}, // indent kept; paths break after \
 		{"中文中文中文", 5, "中文|中文|中文"},

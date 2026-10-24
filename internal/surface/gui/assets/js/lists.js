@@ -1,6 +1,6 @@
 // The three lists (06 §2.5): virtual rows, the cursor, selection, search, dragging. The
 // board has three columns: 未启用 | 已启用 | 详情, with 暂存 and 历史 folded under 详情.
-import { S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
+import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { bump } from "./motion.js";
 import { beginPageRead, pageLoading } from "./screens.js";
@@ -162,7 +162,7 @@ export function renderHeads() {
     if (c.searching && c.others) {
       if (!o) { o = el("div", "others"); s.after(o); }
       const parts = [0, 1, 2].filter((x) => x !== k).map((x) => `${T(AREAS[x])} ${c.others[x]}`);
-      o.textContent = Tf("other areas: %s · tab goes to the next area with matches", parts.join(" · "));
+      factText(o, Tf("other areas: %s, tab goes to the next area with matches", parts.join("  ")));
     } else if (o) o.remove();
   }
 }
@@ -194,7 +194,7 @@ export function renderRows(k) {
   let empty = $(".empty", box);
   if (!c.view.length) {
     if (!empty) box.appendChild(empty = el("div", "empty"));
-    empty.textContent = c.query ? T("nothing matches") : [T("every installed mod is enabled"), T("nothing enabled yet"), T("staging is empty · t puts the selected mods here")][k];
+    empty.textContent = c.query ? T("nothing matches") : [T("every installed mod is enabled"), T("nothing enabled yet"), T("staging is empty, t puts the selected mods here")][k];
   } else if (empty) empty.remove();
   const first = Math.max(0, Math.floor(box.scrollTop / ROW_H) - 4);
   const last = Math.min(c.view.length, first + Math.ceil(box.clientHeight / ROW_H) + 8);

@@ -89,7 +89,7 @@ type TaskRow struct {
 	Steps     []TaskStep    `json:"steps,omitempty"`
 	Acts      []TaskAct     `json:"acts"`
 	Items     []TaskItemRow `json:"items,omitempty"`
-	Counts    string        `json:"counts,omitempty"` // "完成 12 · 失败 2"
+	Counts    string        `json:"counts,omitempty"` // "完成 12  失败 2"
 	NoItems   string        `json:"noItems,omitempty"`
 	Target    string        `json:"target,omitempty"` // the page o opens
 	Seen      bool          `json:"seen"`
@@ -338,7 +338,7 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 		}
 	}
 	if t.Closed {
-		result = joinDot(T("stopped when the window closed"), result)
+		result = joinFacts(T("stopped when the window closed"), result)
 	}
 	phase := t.Phase
 	if phase != "" && t.Lane == app.LaneFiles {
@@ -349,14 +349,14 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	switch t.State {
 	case app.TaskRunning:
 		r.Line = phase
-		r.Say = joinDot(T("running"), r.Count, phase)
+		r.Say = joinFacts(T("running"), r.Count, phase)
 		r.Bar = true
 	case app.TaskQueued:
 		r.Line = Tf("waiting in the %s queue for the one before", r.LaneText)
-		r.Say = joinDot(T("queued"), r.Line)
+		r.Say = joinFacts(T("queued"), r.Line)
 	default:
 		r.Line = result
-		r.Say = joinDot(r.StateText, result)
+		r.Say = joinFacts(r.StateText, result)
 		r.Bar = t.State == app.TaskStopped || t.State == app.TaskPartial || (t.State == app.TaskFailed && t.Total > 1)
 	}
 	if t.Kind == TaskPack {
@@ -388,7 +388,7 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 				parts = append(parts, itemStateText(s)+" "+fmt.Sprint(c[s]))
 			}
 		}
-		r.Counts = strings.Join(parts, " · ")
+		r.Counts = strings.Join(parts, "  ")
 	}
 	r.Target = taskTarget(t)
 	if len(t.Items) == 0 {
@@ -404,14 +404,14 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	return r
 }
 
-func joinDot(parts ...string) string {
+func joinFacts(parts ...string) string {
 	var out []string
 	for _, p := range parts {
 		if p != "" {
 			out = append(out, p)
 		}
 	}
-	return strings.Join(out, " · ")
+	return strings.Join(out, "  ")
 }
 
 func taskTarget(t *app.Task) string {
@@ -544,16 +544,16 @@ func init() {
 
 func init() {
 	Register(map[string]string{
-		"the task's items":                                                 "这个任务的每一项",
-		"back to the tasks":                                                "回到任务",
-		"stop the rest / cancel the wait":                                  "停止后续 / 取消排队",
-		"try the failed again / do the ones left":                          "重试失败的 / 继续剩下的",
-		"a waiting task later / sooner":                                    "排队的任务往后 / 往前",
-		"go to the page it changed":                                        "去它改动的页面",
-		"take off the record · put it back":                                "从记录里去掉 · 放回",
-		"take the done ones off the record":                                "清除已完成",
-		"the items' headers: sort and columns · the sorted column's width": "每一项的表头：排序和列 · 排序列的宽度",
-		"select tasks":                                                     "选择任务",
-		"background tasks; again goes back":                                "后台任务；再按一次回去",
+		"the task's items":                                                "这个任务的每一项",
+		"back to the tasks":                                               "回到任务",
+		"stop the rest / cancel the wait":                                 "停止后续 / 取消排队",
+		"try the failed again / do the ones left":                         "重试失败的 / 继续剩下的",
+		"a waiting task later / sooner":                                   "排队的任务往后 / 往前",
+		"go to the page it changed":                                       "去它改动的页面",
+		"take off the record, put it back":                                "从记录里去掉，放回",
+		"take the done ones off the record":                               "清除已完成",
+		"the items' headers: sort and columns, the sorted column's width": "每一项的表头：排序和列，排序列的宽度",
+		"select tasks":                                                    "选择任务",
+		"background tasks; again goes back":                               "后台任务；再按一次回去",
 	})
 }

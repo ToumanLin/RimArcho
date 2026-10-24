@@ -161,7 +161,7 @@ func (s *API) ImportAsPlan(name string) (*PlanDone, error) {
 		s.x.imp = nil
 		if s.x.follow && p != nil {
 			if e := view.FollowImported(s.a, imp, p.ID); e != nil {
-				t += " · " + e.Error()
+				t += "  " + e.Error()
 			}
 		}
 	}

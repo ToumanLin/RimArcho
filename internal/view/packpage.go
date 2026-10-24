@@ -200,9 +200,6 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, tex int) *Bui
 		p.Why, p.ToGo = T("install the DDS encoder (todds) first, or create it without converting textures"), t.Go
 	}
 	p.Steps = []BuildStep{check, trim, t, lock, place}
-	for i := range p.Steps {
-		p.Steps[i].Title = Tf("%d · %s", i+1, p.Steps[i].Title)
-	}
 	p.Ok = p.Why == ""
 	return p
 }
@@ -259,7 +256,7 @@ type PackPageEntry struct {
 // PackPage is a pack's own page: what it is, and its mods in load order.
 type PackPage struct {
 	Name     string          `json:"name"`
-	Facts    []string        `json:"facts"` // "42 mods · 1.2 GB", "runs on 1.6", "built 10 月 20 日 in main", "played …"
+	Facts    []string        `json:"facts"` // "42 mods  1.2 GB", "runs on 1.6", "built 10 月 20 日 in main", "played …"
 	Dir      string          `json:"dir"`
 	Mods     []PackPageEntry `json:"mods"`
 	Exported string          `json:"exportDir"` // where 导出 offers to write
@@ -294,13 +291,13 @@ func BuildPackPage(a *app.App, name string) (*PackPage, error) {
 			carried++
 		}
 	}
-	pg.Facts = append(pg.Facts, Tf("%d mods · %s", carried, SizeText(p.Bytes)))
+	pg.Facts = append(pg.Facts, Tf("%d mods  %s", carried, SizeText(p.Bytes)))
 	if v := PackVersions(a, p.Pack); v != "" {
 		pg.Facts = append(pg.Facts, Tf("runs on %s", v))
 	}
 	built := Tf("created %s", ShortDate(p.Created))
 	if p.Env != "" {
-		built += " · " + p.Env
+		built += "  " + p.Env
 	}
 	pg.Facts = append(pg.Facts, built)
 	if p.LastPlayed.IsZero() {

@@ -89,7 +89,7 @@ function draw(loading) {
   if (c && (c.ops || []).includes("folder")) acts.push(button(T("open the folder"), "ctrl+o", () => runOp("folder")));
   if (c && (c.ops || []).includes("workshop")) acts.push(button(T("Workshop page"), "ctrl+w", () => runOp("workshop")));
   if (c && (c.ops || []).includes("steam")) acts.push(button(T("steam page"), "ctrl+s", () => runOp("steam")));
-  const w = page("full mod-page", T("← → the previous / next mod · esc back · 1–6 its parts"), ...acts);
+  const w = page("full mod-page", "", ...acts);
   sc.append(w);
   if (loading && !F.d) {
     const card = el("section", "card pad");
@@ -128,7 +128,7 @@ function draw(loading) {
 
   // 2 the copies
   const cs = el("section", "card fd-copies");
-  const csHead = el("div", "fd-h", Tf("copies · %d", copies().length));
+  const csHead = el("div", "fd-h word-facts", Tf("copies  %d", copies().length));
   cs.append(csHead);
   for (const x of copies()) cs.append(copyCard(x));
   if (!copies().length) cs.append(el("div", "empty-state", T("no copy on this machine")));
@@ -141,7 +141,7 @@ function draw(loading) {
   us.append(usHead);
   for (const x of copies()) {
     const line = el("div", "fd-useline");
-    line.append(el("span", "lbl", x.label), el("span", "x", (x.usedIn || []).join(" · ") || T("in no list or pack")));
+    line.append(el("span", "lbl", x.label), el("span", "x word-facts", (x.usedIn || []).join("  ") || T("in no list or pack")));
     us.append(line);
   }
   if (c) {
@@ -167,7 +167,7 @@ function draw(loading) {
   const hs = el("section", "card pad fd-hist");
   const hsHead = el("div", "fd-h", T("history"));
   hs.append(hsHead);
-  if (F.d && F.d.history) hs.append(el("div", "history", F.d.history));
+  if (F.d && F.d.history) hs.append(el("div", "history word-facts", F.d.history));
   else hs.append(el("div", "muted", T("no changes recorded")));
   const all = el("button", "link", T("see all on the changes page"));
   all.onclick = () => document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: F.id, name: fullName() } }));
@@ -182,7 +182,7 @@ function draw(loading) {
   const secs = F.secs || [];
   if (secs.length) {
     F.tab = Math.min(F.tab, secs.length - 1);
-    const names = secs.map((s) => s.title + (s.count >= 0 ? " · " + s.count : ""));
+    const names = secs.map((s) => s.title + (s.count >= 0 ? "  " + s.count : ""));
     const bar = el("div", "fd-tabs");
     bar.append(seg(names, F.tab, (i) => { F.tab = i; draw(false); }));
     tech.append(bar);
@@ -209,7 +209,7 @@ function copyCard(x) {
   if (x.state) top.append(el("span", "chip st " + (x.code || ""), x.state));
   if (x.inPlan) top.append(el("span", "chip cur", T("in the current list")));
   b.append(top);
-  b.append(el("div", "facts", [x.size, x.version, x.name].filter(Boolean).join(" · ")));
+  b.append(el("div", "facts word-facts", [x.size, x.version, x.name].filter(Boolean).join("  ")));
   if (x.note || x.auto) b.append(el("div", "note" + (x.note ? "" : " auto"), x.note || x.auto));
   if (on) {
     const acts = el("div", "acts");

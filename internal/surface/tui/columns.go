@@ -278,11 +278,11 @@ func (m *model) drawColumn(s slot, n int, tabs bool) []string {
 		var msg string
 		switch {
 		case c.filter != "":
-			msg = T("nothing matches · esc clears the filter")
+			msg = T("nothing matches, esc clears the filter")
 		case c.kind == cStaging:
-			msg = T("staging is empty · t puts the selected mod here")
+			msg = T("staging is empty, t puts the selected mod here")
 		case c.kind == cActive:
-			msg = T("no mod is enabled · space enables one")
+			msg = T("no mod is enabled, space enables one")
 		default:
 			msg = T("every mod is enabled")
 		}

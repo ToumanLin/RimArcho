@@ -60,7 +60,7 @@ func EnvChip(name, gameVersion string) string {
 		return T("no game")
 	}
 	if mm := env.MajorMinor(gameVersion); mm != "" {
-		return name + " · " + mm
+		return name + "  " + mm
 	}
 	return name
 }
@@ -264,7 +264,7 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 			r.Mods = len(b.Cols[Active])
 			r.Facts = Tf("%d mods", len(b.Cols[Active]))
 			if b.Unsaved > 0 {
-				r.Facts += " · " + Tf("%d not written", b.Unsaved)
+				r.Facts += "  " + Tf("%d not written", b.Unsaved)
 			}
 			k, checked = BreakCount(n), !n.Never
 			r.Links = PackLinksText(n)
@@ -297,7 +297,7 @@ func packHomeRow(p PackRow, chip, envName string) HomeRow {
 	if p.Mods > 0 {
 		r.Facts = Tf("%d mods", p.Mods)
 	}
-	r.Mode = T("versions locked · own saves")
+	r.Mode = T("versions locked  own saves")
 	// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
 	r.State, r.Level = T("checked when created"), HomeOK
 	return r

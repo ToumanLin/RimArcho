@@ -98,7 +98,7 @@ func TestT8NeedsReal(t *testing.T) {
 			continue
 		}
 		folds++
-		if !strings.HasSuffix(it.text, "mods are out of order") || len(it.parts) < 2 || keyList(it) != "S sort · enter show which" {
+		if !strings.HasSuffix(it.text, "mods are out of order") || len(it.parts) < 2 || keyList(it) != "S sort, enter show which" {
 			t.Errorf("fold %q: %d parts, keys %s", it.text, len(it.parts), keyList(it))
 		}
 		m.prob.cursor = i
@@ -180,7 +180,7 @@ func keyList(it need) string {
 	for _, k := range it.keys {
 		ks = append(ks, k.key+" "+k.label)
 	}
-	return strings.Join(ks, " · ")
+	return strings.Join(ks, "  ")
 }
 
 func copyFile(t *testing.T, from, to string) {

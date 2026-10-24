@@ -111,7 +111,7 @@ type LibRow struct {
 type LibInstRow struct {
 	ID    string `json:"id"` // the instance ("" for a subscribed item RimArcho never saw)
 	Ref   string `json:"ref"`
-	Label string `json:"label"` // 工坊 · 本地 · 锁定版本 · 26/10/21 14:27 …
+	Label string `json:"label"` // 工坊  本地  锁定版本  26/10/21 14:27 …
 	// Cells: Name is the copy's folder; Source its Label.
 	LibCells
 	// Note is the copy's own note (the player's or an agent's); Auto what RimArcho knows
@@ -266,10 +266,10 @@ func libLabel(i *app.LibInstance) string {
 		if i.Created.IsZero() {
 			return T("locked version")
 		}
-		return T("locked version") + " · " + libStamp(i.Created)
+		return T("locked version") + "  " + libStamp(i.Created)
 	}
 	if i.Source == app.LibLocal && i.Locked != nil {
-		return T("locked version") + " · " + T("local") // made in Mods/ before the lock library
+		return T("locked version") + "  " + T("local") // made in Mods/ before the lock library
 	}
 	return LibSourceText(i.Source)
 }
@@ -414,13 +414,13 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 				played = i.Played
 			}
 		}
-		r.Source = strings.Join(srcs, " · ")
+		r.Source = strings.Join(srcs, "  ")
 		if best < len(app.LibStates) {
 			r.Code = app.LibStates[best]
 			r.State = LibStateText(r.Code, lib.GameMM)
 		}
 		r.Updated, r.Played = libDate(updated), libDate(played)
-		r.Version, r.Author, r.LibCells.Tags = lineageVersion(m.LibLineage), lineageAuthor(m.LibLineage), strings.Join(m.Tags, " · ")
+		r.Version, r.Author, r.LibCells.Tags = lineageVersion(m.LibLineage), lineageAuthor(m.LibLineage), strings.Join(m.Tags, "  ")
 		for _, i := range m.Shown {
 			if i.Sized {
 				bytes += i.Bytes
@@ -433,7 +433,7 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 		p.Rows = append(p.Rows, r)
 	}
 	p.Size = render.Size(bytes)
-	p.Lead = T("the mods on this machine: how many copies, where, used where, how big")
+	p.Lead = ""
 	for _, f := range res.Facets {
 		g := LibGroup{Key: f.Key, Title: libKeyTitle(f.Key)}
 		for _, v := range f.Values {
@@ -476,7 +476,7 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 		r.State, r.Code = LibStateText(s, lib.GameMM), s
 	}
 	r.Updated, r.Version, r.Author = libDate(i.Updated), newest(i.Versions), i.Authors
-	r.LibCells.Tags = strings.Join(l.Tags, " · ")
+	r.LibCells.Tags = strings.Join(l.Tags, "  ")
 	if i.Note != nil {
 		r.Note = i.Note.Text
 	}
@@ -771,7 +771,7 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 		if len(rs) == 0 {
 			return Tf("no list uses %s", what), nil
 		}
-		return Tf("disabled %s in %d lists · each list's u undoes it", what, len(rs)), nil
+		return Tf("disabled %s in %d lists, each list's u undoes it", what, len(rs)), nil
 	}
 	if !libConfirm[kind] {
 		return "", fmt.Errorf("unknown action %s", kind)
@@ -864,9 +864,9 @@ func libSteam(a *app.App, kind string, refs []string, what string) (string, erro
 	case err != nil:
 		return "", err
 	case kind == LibResub:
-		return Tf("subscribed to %s again · Steam downloads it", what), nil
+		return Tf("subscribed to %s again, Steam downloads it", what), nil
 	}
-	return Tf("unsubscribed from %s · Steam deletes the folder", what), nil
+	return Tf("unsubscribed from %s, Steam deletes the folder", what), nil
 }
 
 // SteamPages is the answer when Steam is out of reach (06 §2.9): the Workshop pages to open

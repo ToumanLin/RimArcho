@@ -60,7 +60,7 @@ function games() {
   const seen = new Map();
   for (const r of rows()) {
     if (seen.has(r.envName)) continue;
-    const p = r.envName + " · ";
+    const p = r.envName + "  ";
     seen.set(r.envName, { name: r.envName, version: r.env && r.env.startsWith(p) ? r.env.slice(p.length) : "" });
   }
   return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
@@ -192,13 +192,13 @@ function hero(f, moved) {
     return box;
   }
   const kick = el("div", "hm-kick", kindText(f));
-  kick.append(el("span", "num", [f.env, f.mode].filter(Boolean).join(" · ")));
+  kick.append(el("span", "num word-facts", [f.env, f.mode].filter(Boolean).join("  ")));
   const head = el("div", "hm-headline");
   const h1 = el("h1", moved ? "in" : "", f.name);
   h1.title = f.name;
   head.append(h1);
   const facts = el("div", "hm-facts num" + (moved ? " in" : ""));
-  facts.append(el("span", "", f.facts || Tf("%d mods", f.mods)));
+  facts.append(el("span", "word-facts", f.facts || Tf("%d mods", f.mods)));
   if (f.versions) facts.append(el("span", "", Tf("versions %s", f.versions)));
   if (f.played) facts.append(el("span", "", f.played));
   facts.append(el("span", "hm-state " + stateClass(f), f.state));
@@ -246,7 +246,7 @@ function rowStep(f, env, moved) {
     const nm = el("span", "nm", r.name);
     if (r.level === "bad") nm.append(el("span", "flag bad", "▲"));
     else if (r.level !== "ok") nm.append(el("span", "flag", "○"));
-    b.append(nm, el("small", "num", kindText(r) + " · " + r.mods));
+    b.append(nm, el("small", "num word-facts", kindText(r) + "  " + r.mods));
     b.title = on ? T("pick again to open it") : r.otherEnv ? Tf("switch to %s and use this; no game file is written", r.envName) : T("use this; no game file is written");
     b.onclick = () => (on ? edit(r) : apply(r));
     list.append(b);
@@ -414,8 +414,8 @@ function activity() {
   const box = el("div", "hm-act");
   const live = S.live && S.live.running;
   if (live || data.lastRun) {
-    const runText = live ? T("the game is running") + " · " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
-      : (data.lastRunDay || data.lastRun) + " · " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : T("no errors"));
+    const runText = live ? T("the game is running") + "  " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
+      : (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : T("no errors"));
     const runGo = live || data.lastRunErrors ? "needs" : "log";
     box.append(actLine(T("last game"), runText, () => ui.go(runGo)));
   }
@@ -429,7 +429,7 @@ function activity() {
 
 function actLine(title, text, go) {
   const b = el("button", "hm-actline");
-  b.append(el("span", "t", title), el("span", "x", text), el("span", "go", "→"));
+  b.append(el("span", "t", title), el("span", "x word-facts", text), el("span", "go", "→"));
   b.title = text;
   b.onclick = go;
   return b;

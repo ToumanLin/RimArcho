@@ -54,7 +54,15 @@ var wordingExempt = map[string]bool{
 	"the mod was built for another version of the game or of the target mod": true, // a DLL compiled for another version
 }
 
-// WordingProblems lists every interface text that still uses a retired word, and every key
+// WordingTextProblems checks text from surface-specific literals as well as tables.
+func WordingTextProblems(where, text string) []string {
+	if strings.ContainsRune(text, '\u00b7') {
+		return []string{fmt.Sprintf("%s: %q uses a middle dot (06 §7.3)", where, text)}
+	}
+	return nil
+}
+
+// WordingProblems lists every interface text that still uses a retired word or middle dot, and every key
 // two tables translate differently (the later table wins and the other text is lost). It
 // sees the tables of every package linked in, so call it where all surfaces are.
 func WordingProblems() []string {
@@ -72,6 +80,8 @@ func WordingProblems() []string {
 		}
 	}
 	for k, v := range zhText {
+		out = append(out, WordingTextProblems("key", k)...)
+		out = append(out, WordingTextProblems(k, v)...)
 		if !wordingExempt[k] {
 			check(fmt.Sprintf("%q", k), v)
 		}
@@ -81,7 +91,14 @@ func WordingProblems() []string {
 		}
 		checkEn("key", en)
 	}
+	for k, v := range enText {
+		out = append(out, WordingTextProblems("English key", k)...)
+		out = append(out, WordingTextProblems(k, v)...)
+		checkEn(k, v)
+	}
 	for _, c := range Commands {
+		out = append(out, WordingTextProblems("palette "+c.ID, c.Zh)...)
+		out = append(out, WordingTextProblems("palette "+c.ID, c.En)...)
 		check("palette "+c.ID, c.Zh)
 		checkEn("palette "+c.ID, c.En)
 	}

@@ -75,7 +75,7 @@ function listCard(d) {
     if (r.current) n.append(el("span", "pill cur", T("current")));
     if (r.inGame) { const g = el("span", "gdot"); g.title = T("in the game"); n.append(g); }
     if (r.mark) { const m = el("span", "adot"); m.title = r.mark; n.append(m); }
-    b.append(n, el("div", "m", r.meta));
+    b.append(n, el("div", "m word-facts", r.meta));
     if (r.follows) {
       const f = ic("workshop", "ri" + (r.changed ? " changed" : ""));
       f.title = r.changed ? T("the collection changed") : T("follows Steam collections");
@@ -108,8 +108,8 @@ function detailCard(p) {
   n.append(el("h2", "", p.name));
   if (p.current) n.append(el("span", "pill cur", T("current")));
   if (p.mark) { const m = el("span", "adot"); m.title = p.mark; n.append(m); }
-  const facts = el("div", "facts", p.facts);
-  if (p.inGame) facts.append(" · ", el("span", "green", p.inGame));
+  const facts = el("div", "facts word-facts", p.facts);
+  if (p.inGame) facts.append(el("span", "green", p.inGame));
   l.append(n, facts);
   const r = el("div", "r");
   r.append(button(T("edit"), "↵", () => ui.go(p.page)));
@@ -326,9 +326,9 @@ function collection(p, f) {
   t.append(r);
   c.append(t);
 
-  const meta = el("div", "meta", f.meta);
+  const meta = el("div", "meta word-facts", f.meta);
   if (f.notInstalled) {
-    meta.append(" · " + Tf("%d not installed", f.notInstalled) + " · ");
+    meta.append(el("span", "", Tf("%d not installed", f.notInstalled)));
     const sub = el("a", "xc-link", T("subscribe in the Workshop"));
     sub.title = f.link;
     sub.onclick = (e) => { e.preventDefault(); api.OpenURL(f.link).catch((x) => say("fail", errText(x))); };
@@ -383,7 +383,7 @@ function share(p) {
   const s = section(T("share"));
   if (p.pack) {
     const r = el("div", "packrow");
-    r.append(ic("packs"), el("b", "", p.pack.name), el("span", "meta", p.pack.facts));
+    r.append(ic("packs"), el("b", "", p.pack.name), el("span", "meta word-facts", p.pack.facts));
     const o = el("button", "btn link r", T("open"));
     o.onclick = () => ui.go("pack:" + p.pack.name);
     r.append(o);
@@ -497,7 +497,7 @@ function drawExport() {
 
   const right = el("section", "card pad");
   const h = el("div", "pm-sub");
-  h.append(el("span", "", T("content")), el("span", "r", d.facts));
+  h.append(el("span", "", T("content")), el("span", "r word-facts", d.facts));
   const pre = el("pre", "prev", d.text);
   const out = el("div", "xc-out");
   const acts = el("div", "acts-row");

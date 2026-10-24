@@ -256,7 +256,7 @@ function download(card) {
       draw();
       try {
         C.id = await api.GuideInstallSteamCMD();
-        say("ok", Tf("%s · %s: in the %s queue", T("download SteamCMD"), "RimArcho", "RimArcho"));
+        say("ok", Tf("%s, %s: in the %s queue", T("download SteamCMD"), "RimArcho", "RimArcho"));
       } catch (e) { G.error = errText(e); }
       finally { C.submitting = false; }
       if (!C.id) return draw();
@@ -387,7 +387,7 @@ function step2(card) {
   const list = el("div", "scanlist");
   for (const r of s.rows) {
     const d = el("div", "scanrow " + r.state);
-    d.append(el("span", "n", r.state === "ok" ? "✓" : r.state === "bad" ? "✗" : r.state === "cur" ? "…" : "·"), el("span", "env", r.env), el("span", "t", r.text));
+    d.append(el("span", "n", r.state === "ok" ? "✓" : r.state === "bad" ? "✗" : r.state === "cur" ? "…" : "—"), el("span", "env", r.env), el("span", "t", r.text));
     list.append(d);
   }
   card.append(list);

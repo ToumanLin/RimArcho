@@ -2,7 +2,7 @@
 // RimArcho converted and what went stale, what converting at a scale would take and save,
 // then the run in the background ("textures" events), stop, and take everything back. The
 // encoder (todds) is downloaded only after the player saw where from and how big.
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, pageLoading, page, button } from "./screens.js";
 import * as pop from "./popups.js";
 import { createTable } from "./datatable.js";
@@ -24,7 +24,7 @@ export function event(ev) {
     return;
   }
   X.prog = ev;
-  if (S.screen !== "textures") { say("busy", T("converting textures") + " · " + ev.text); return; }
+  if (S.screen !== "textures") { say("busy", T("converting textures") + "  " + ev.text); return; }
   $("#screen").querySelectorAll("select").forEach((s) => { s.disabled = true; });
   const f = $("#screen .tex-foot");
   if (f) f.replaceWith(slot(foot(X.page), "foot"));
@@ -34,7 +34,7 @@ function setRow(card, name, sub, ...right) {
   const row = el("div", "set");
   const l = el("div", "l");
   l.append(el("div", "name", name));
-  if (sub) for (const s of [].concat(sub)) if (s) l.append(el("div", "sub", s));
+  if (sub) for (const s of [].concat(sub)) if (s) l.append(el("div", "sub word-facts", s));
   const r = el("div", "r");
   for (const x of right) if (x) r.append(x);
   row.append(l, r);
@@ -119,7 +119,7 @@ async function draw(fetch, measurements = false, entryRead = null) {
   const oldPage = sc.querySelector(".textures");
   const previous = measurements && oldPage && oldPage.querySelector("[data-tex]") && oldPage;
   if (!previous) sc.innerHTML = "";
-  const w = page("textures", T("the game loads a .dds in place of the .png of the same name: no PNG to decode at start, and opaque textures take half the video memory"));
+  const w = page("textures", "");
   if (!previous) sc.append(w);
   w.setAttribute("aria-busy", String(X.loading));
   const error = el("div", "muted", X.error);
@@ -131,7 +131,7 @@ async function draw(fetch, measurements = false, entryRead = null) {
   const enc = el("section", "card settings");
   if (!p.tool) setRow(enc, T("the DDS encoder"), null, X.error ? null : pending());
   else {
-    setRow(enc, T("the DDS encoder"), p.toolOk ? null : [p.offer, p.offerTo && "→ " + p.offerTo], p.toolOk ? el("span", "muted", p.tool) : null,
+    setRow(enc, T("the DDS encoder"), p.toolOk ? null : [p.offer, p.offerTo && "→ " + p.offerTo], p.toolOk ? el("span", "muted word-facts", p.tool) : null,
       p.toolOk ? null : button(T("download todds…"), "", () => install(p), "primary"));
     if (!p.toolOk) enc.querySelector(".name").after(el("div", "sub warn", p.tool));
   }
@@ -199,10 +199,10 @@ function textureRows(p) {
       if (c.key !== "name" && r.pending) { tr.append(pending()); continue; }
       const cell = el("span", "cell" + (c.key === "name" ? " n" : "") + (textureTable.column(c.key).num ? " num" : ""));
       if (c.key === "state") {
-        cell.textContent = [r.stale ? Tf("%d stale", r.stale) : "", r.convert ? Tf("%d to convert", r.convert) : !r.stale ? T(r.dds ? "up to date" : "nothing to convert") : "",
-          r.dds ? T("RimArcho's DDS") + ": " + r.dds : "", r.own ? Tf("%d own DDS", r.own) : ""].filter(Boolean).join(" · ");
+        factText(cell, [r.stale ? Tf("%d stale", r.stale) : "", r.convert ? Tf("%d to convert", r.convert) : !r.stale ? T(r.dds ? "up to date" : "nothing to convert") : "",
+          r.dds ? T("RimArcho's DDS") + ": " + r.dds : "", r.own ? Tf("%d own DDS", r.own) : ""].filter(Boolean));
         if (r.stale) cell.classList.add("warn");
-      } else cell.textContent = String(r[c.key] ?? "—");
+      } else factText(cell, String(r[c.key] ?? "—"));
       cell.title = cell.textContent;
       tr.append(cell);
     }
@@ -247,7 +247,7 @@ function foot(p) {
     const fill = el("i");
     fill.style.width = Math.round((X.prog.frac || 0) * 100) + "%";
     bar.append(fill);
-    w.append(bar, el("div", "ptext", X.prog.text || T("converting textures")));
+    w.append(bar, el("div", "ptext word-facts", X.prog.text || T("converting textures")));
     f.append(w, button(T("stop"), "", async () => {
       try { say("ok", await api.TexturesStop()); } catch (e) { say("fail", errText(e)); }
     }));

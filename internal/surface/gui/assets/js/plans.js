@@ -116,7 +116,7 @@ export function actions(id) {
 export function chooser() {
   const ps = (S.shell && S.shell.plans) || [];
   const cur = current();
-  const labels = ps.map((p) => p.name + (p.current ? "  · " + T("editing") : "") + (p.conflict ? "  · " + p.conflictText : ""));
+  const labels = ps.map((p) => p.name + (p.current ? "  " + T("editing") : "") + (p.conflict ? "  " + p.conflictText : ""));
   const runs = ps.map((p) => () => ui.go(p.page));
   const extra = [[T("new list…"), () => newPlan()]];
   if (cur) extra.push([Tf("rename %s…", cur.name), () => renamePlan(cur.id)], [Tf("delete %s…", cur.name), () => deletePlan(cur.id)]);

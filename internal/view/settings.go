@@ -26,6 +26,8 @@ type SettingItem struct {
 	MoveArgv     []string        `json:"moveArgv,omitempty"`
 	Directory    string          `json:"directory,omitempty"`
 	Note         string          `json:"note,omitempty"`
+	Hover        string          `json:"hover,omitempty"`
+	ValueNote    string          `json:"valueNote,omitempty"`
 	Actions      []SettingAction `json:"actions,omitempty"`
 }
 
@@ -77,7 +79,7 @@ type SettingGroup struct {
 // EnvRow is an environment on the environment page.
 type EnvRow struct {
 	Name    string `json:"name"`
-	Game    string `json:"game"` // "1.6.4633 · D:\…\RimWorld"
+	Game    string `json:"game"` // "1.6.4633  D:\…\RimWorld"
 	Current bool   `json:"current"`
 }
 
@@ -98,7 +100,7 @@ func BuildEnvPage(a *app.App, st *app.LoadoutState) *EnvPage {
 	}
 	if envs, err := a.Store.Envs(); err == nil {
 		for _, e := range envs {
-			p.Envs = append(p.Envs, EnvRow{Name: e.Name, Game: e.GameVersion + " · " + e.GameRoot, Current: e.ID == cur})
+			p.Envs = append(p.Envs, EnvRow{Name: e.Name, Game: e.GameVersion + "  " + e.GameRoot, Current: e.ID == cur})
 		}
 	}
 	return p
@@ -143,9 +145,9 @@ func FolderGroup(a *app.App) SettingGroup {
 		t := Tf("%d mods", counts[s.ID])
 		switch s.Status {
 		case source.StatusMissing:
-			t += " · " + T("not there now")
+			t += "  " + T("not there now")
 		case source.StatusRebindPending:
-			t += " · " + Tf("moving to %s waits for your answer", s.PendingRoot)
+			t += "  " + Tf("moving to %s waits for your answer", s.PendingRoot)
 		}
 		return t
 	}
@@ -207,19 +209,23 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			Note: T("empty: RimArcho's own copy, then PATH")},
 	}}}
 	lang := cmds.Setting(a, "ui.lang")
+	gpuNote := ""
+	if cmds.Setting(a, "ui.gpu") == "off" {
+		gpuNote = T("takes effect next time you open RimArcho")
+	}
 	out = append(out, SettingGroup{Title: T("interface"), Items: []SettingItem{
 		{Label: T("language"), Value: lang, Edit: "choice", Choices: []string{"auto", "zh", "en"}, Argv: []string{"config", "set", "ui.lang", "{}"}},
 		{Label: T("Workshop descriptions"), Value: cmds.Setting(a, "workshop.fetch"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "workshop.fetch", "{}"}},
 		{Label: T("images in descriptions"), Value: cmds.Setting(a, "workshop.images"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "workshop.images", "{}"}},
 		{Label: T("GPU acceleration"), Value: cmds.Setting(a, "ui.gpu"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "ui.gpu", "{}"},
-			Note: T("the window; off uses about 20–35 MB less memory and draws in software. Takes effect the next time RimArcho opens")},
+			Hover: T("uses about 20–35 MB less memory and draws in software"), ValueNote: gpuNote},
 	}})
 	data := SettingGroup{Title: T("community data")}
 	status := a.DataStatus()
 	for _, d := range app.Datasets {
 		v := T("not downloaded")
 		if di := status[d.Key]; di != nil {
-			v = Tf("%d entries · %s", di.Entries, ShortDate(di.Fetched))
+			v = Tf("%d entries  %s", di.Entries, ShortDate(di.Fetched))
 		}
 		data.Items = append(data.Items, SettingItem{Label: T(d.Desc), Value: a.DataSource(d), Edit: "text", Argv: []string{"config", "set", "data." + d.Key + ".url", "{}"},
 			Note: v})
@@ -237,12 +243,12 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}})
 	caches := SettingGroup{Title: T("caches")}
 	for _, c := range a.Caches() {
-		caches.Items = append(caches.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s · %d items", SizeText(c.Bytes), c.Files),
+		caches.Items = append(caches.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),
 			Actions: []SettingAction{{Label: T("clear"), Argv: []string{"cache", "clear", c.Kind}}}})
 	}
 	out = append(out, caches)
 	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
-		Argv: []string{"config", "set", "monitor.default", "{}"}, Note: T("new lists, and each list once; after that it is a normal mod you can disable or move")}
+		Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("only new lists and lists not handled yet")}
 	if s, err := a.MonitorState(); err == nil {
 		v := T("not installed")
 		if len(s.Installed) > 0 {
@@ -256,13 +262,13 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	tool := a.TextureTool()
 	toolNote := T("the DDS encoder (todds) is not installed")
 	if tool.Err == "" {
-		toolNote = Tf("todds %s · %s", tool.Version, tool.Path)
+		toolNote = Tf("todds %s  %s", tool.Version, tool.Path)
 	} else if tool.Path != "" {
 		toolNote = tool.Err
 	}
 	out = append(out, SettingGroup{Title: T("texture optimisation"), Items: []SettingItem{
 		{Label: T("the DDS encoder"), Value: cmds.Setting(a, "textures.todds"), Edit: "path", Argv: []string{"config", "set", "textures.todds", "{}"},
-			Note: toolNote + " · " + T("empty: RimArcho's own copy; or a todds you have, e.g. RimSort's")},
+			Note: toolNote + "  " + T("empty: RimArcho's own copy; or a todds you have, e.g. RimSort's")},
 	}})
 	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
 	// settings command).

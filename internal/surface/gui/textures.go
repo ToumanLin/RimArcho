@@ -184,7 +184,7 @@ func (s *API) TexturesRun(scope string, scale int, refs []string) (string, error
 	}
 	task := s.beginSelf(view.TaskTextures, obj, func() error { _, err := s.TexturesStop(); return err })
 	go s.watchTextures(task, args, run)
-	return view.T("converting textures") + " · " + view.T("it goes on in the background"), nil
+	return view.T("converting textures") + "  " + view.T("it goes on in the background"), nil
 }
 
 var (
@@ -246,7 +246,7 @@ func textureDoneText(lines []string) string {
 		}
 	}
 	if failed > 0 {
-		out += view.Tf(" · %d failed (they keep their PNG)", failed)
+		out += view.Tf(", %d failed (they keep their PNG)", failed)
 	}
 	return out
 }

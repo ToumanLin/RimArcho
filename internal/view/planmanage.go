@@ -35,7 +35,7 @@ type PlanManageRow struct {
 	Current bool   `json:"current,omitempty"`
 	InGame  bool   `json:"inGame,omitempty"`
 	Mark    string `json:"mark,omitempty"` // an outside change not used yet
-	Meta    string `json:"meta"`           // "1.5–1.7 · 412 mods · played 10 月 21 日"
+	Meta    string `json:"meta"`           // "1.5–1.7  412 mods  played 10 月 21 日"
 	Follows int    `json:"follows,omitempty"`
 	Changed bool   `json:"changed,omitempty"` // a followed collection changed
 }
@@ -53,7 +53,7 @@ type FollowRow struct {
 	ID           string   `json:"id"`
 	Title        string   `json:"title"`
 	Items        int      `json:"items"`
-	Meta         string   `json:"meta"` // "checked today 14:02"
+	Meta         string   `json:"meta"` // "1.5–1.7  412 mods  played 10 月 21 日"
 	NotInstalled int      `json:"notInstalled,omitempty"`
 	Missing      []string `json:"missing,omitempty"` // their Workshop links
 	Changes      string   `json:"changes,omitempty"` // "3 new, 1 dropped"; "" unchanged
@@ -113,9 +113,9 @@ func BuildPlanManage(a *app.App, sel int64) (*PlanManage, error) {
 	if err != nil {
 		return nil, err
 	}
-	pg := &PlanManage{Lead: Tf("%s has %d lists. Pick one to see which game versions it is for, which collections it follows and how to share it.", st.Ix.Env.Name, len(rows))}
+	pg := &PlanManage{Lead: Tf("%s has %d lists", st.Ix.Env.Name, len(rows))}
 	if len(rows) == 1 {
-		pg.Lead = Tf("%s has 1 list. See which game versions it is for, which collections it follows and how to share it.", st.Ix.Env.Name)
+		pg.Lead = Tf("%s has 1 list", st.Ix.Env.Name)
 	}
 	var selRow *PlanRow
 	for i := range rows {
@@ -126,7 +126,7 @@ func BuildPlanManage(a *app.App, sel int64) (*PlanManage, error) {
 		}
 		mr := PlanManageRow{ID: r.ID, Page: r.Page, Name: r.Name, Current: r.Current, InGame: r.InGame, Mark: r.ConflictText}
 		vs := app.FormatVersions(a.PlanAllowedVersions(st, p))
-		mr.Meta = vs + " · " + Tf("%d mods", r.Entries) + " · " + r.Played
+		mr.Meta = vs + "  " + Tf("%d mods", r.Entries) + "  " + r.Played
 		if fs, err := a.PlanFollowed(st, p); err == nil {
 			mr.Follows = len(fs)
 			for _, f := range fs {
@@ -171,10 +171,10 @@ func planDetail(a *app.App, st *app.LoadoutState, r *PlanRow) (*PlanDetail, erro
 	made := Tf("created %s", ShortDate(p.Created))
 	if vs, err := a.Store.Versions(p.ID); err == nil && len(vs) > 0 {
 		if n := versionNote(vs[len(vs)-1]); n != "" {
-			made += " · " + n
+			made += "  " + n
 		}
 	}
-	d.Facts = strings.Join(append(facts, made), " · ")
+	d.Facts = strings.Join(append(facts, made), "  ")
 
 	pv, err := a.PlanVersionsOf(st, p)
 	if err != nil {
@@ -189,7 +189,7 @@ func planDetail(a *app.App, st *app.LoadoutState, r *PlanRow) (*PlanDetail, erro
 			c.Tip = Tf("every mod lists %s", v)
 		}
 		if c.Game {
-			c.Tip = T("the game now") + " · " + c.Tip
+			c.Tip = T("the game now") + "  " + c.Tip
 		}
 		d.Versions = append(d.Versions, c)
 	}
@@ -239,7 +239,7 @@ func planDetail(a *app.App, st *app.LoadoutState, r *PlanRow) (*PlanDetail, erro
 		if newest != nil {
 			rs := packRows(a, []*app.PackInfo{newest})
 			d.Pack = &rs[0]
-			d.Pack.Facts = Tf("%s · created %s", SizeText(newest.Bytes), ShortDate(newest.Created))
+			d.Pack.Facts = Tf("%s  created %s", SizeText(newest.Bytes), ShortDate(newest.Created))
 		}
 	}
 	return d, nil
@@ -324,7 +324,7 @@ func SyncPlan(a *app.App, id int64, ws string) (string, error) {
 		t += ", " + Tf("%d disabled", len(r.Disabled))
 	}
 	if len(r.NotInstalled) > 0 {
-		t += " · " + Tf("%d not installed", len(r.NotInstalled))
+		t += "  " + Tf("%d not installed", len(r.NotInstalled))
 	}
 	return t, nil
 }
@@ -368,7 +368,7 @@ type PlanExport struct {
 	Name    string         `json:"name"`
 	Page    string         `json:"page"`
 	Lead    string         `json:"lead"`
-	Facts   string         `json:"facts"` // "412 mods · 1.5–1.7"
+	Facts   string         `json:"facts"` // "412 mods  1.5–1.7"
 	Formats []ExportFormat `json:"formats"`
 	Format  string         `json:"format"`
 	Text    string         `json:"text"`
@@ -401,8 +401,7 @@ func BuildPlanExport(a *app.App, id int64, format string) (*PlanExport, error) {
 		return nil, err
 	}
 	return &PlanExport{ID: id, Name: p.Name, Page: PlanPage(id), Format: format, Formats: fs, Text: string(b),
-		Lead:  Tf("Export %s as a file or a share code. Read-only: the list and the game stay as they are.", p.Name),
-		Facts: Tf("%d mods", len(ps.List)) + " · " + app.FormatVersions(a.PlanAllowedVersions(st, p))}, nil
+		Facts: Tf("%d mods", len(ps.List)) + "  " + app.FormatVersions(a.PlanAllowedVersions(st, p))}, nil
 }
 
 // ExportPlanTo writes a list to a file (as ExportTo does for the current list).

@@ -129,9 +129,9 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // scanSummary: "scan complete · 12 changes" (06 §2.9); the CLI line keeps the scan id.
 func (m *model) scanSummary(out string) string {
 	if m.changes > 0 {
-		return T("scan complete") + " " + markDot + " " + view.ChangeSummary(m.lastEvents) + " " + markDot + " " + T("c shows them")
+		return T("scan complete") + "  " + view.ChangeSummary(m.lastEvents) + "  " + T("c shows them")
 	}
-	return T("scan complete · nothing changed")
+	return T("scan complete, nothing changed")
 }
 
 func (m *model) key(k tea.KeyMsg) tea.Cmd {
@@ -538,7 +538,7 @@ func (m *model) searchLine() string {
 			parts = append(parts, fmt.Sprintf("%s %d", k.title(), n[k]))
 		}
 	}
-	return T("other areas: ") + strings.Join(parts, " "+markDot+" ") + " " + markDot + " " + T("tab jumps to the next area with matches")
+	return T("other areas: ") + strings.Join(parts, "  ") + "  " + T("tab jumps to the next area with matches")
 }
 
 func (m *model) promptKey(k tea.KeyMsg) tea.Cmd {
@@ -638,7 +638,7 @@ func (m *model) removeEnv(name string) {
 		m.say(sayFail, m.humanize(err.Error()))
 		return
 	}
-	lines := append(view.EnvRemovalLines(r), "", Tf("enter: %s · esc: cancel", T("remove the game")))
+	lines := append(view.EnvRemovalLines(r), "", Tf("enter: %s, esc: cancel", T("remove the game")))
 	m.panel = &panel{title: view.EnvRemovalTitle(r), lines: lines,
 		onEnter: func(m *model) tea.Cmd {
 			m.app.EnvName = ""

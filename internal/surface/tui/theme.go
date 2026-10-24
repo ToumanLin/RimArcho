@@ -105,7 +105,6 @@ const (
 	markOK     = "✓"
 	markPrompt = "❯"
 	markBusy   = "…"
-	markDot    = "·"
 )
 
 var ic = compatIcons

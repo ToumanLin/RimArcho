@@ -1187,9 +1187,9 @@ func (s *API) Scan() bool {
 		if err != nil {
 			ev["error"] = view.Humanize(nil, firstLine(out)+" "+err.Error())
 		} else if b := s.boardLocked(); b.Board != nil && b.Changes > 0 {
-			ev["text"] = view.T("scan complete") + " · " + view.ChangeSummary(b.LastEvents)
+			ev["text"] = view.T("scan complete") + "  " + view.ChangeSummary(b.LastEvents)
 		} else {
-			ev["text"] = view.T("scan complete · nothing changed")
+			ev["text"] = view.T("scan complete, nothing changed")
 		}
 		s.mu.Unlock()
 		if err != nil {

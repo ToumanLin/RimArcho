@@ -125,7 +125,7 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 				}
 			}
 			for _, r := range rows {
-				fmt.Fprintf(&b, "%s\n  %s · %s\n  : archo pack launch %q\n\n", r.Name, r.Facts, r.Played, r.Name)
+				fmt.Fprintf(&b, "%s\n  %s, %s\n  : archo pack launch %q\n\n", r.Name, r.Facts, r.Played, r.Name)
 			}
 			if len(rows) == 0 {
 				b.WriteString(T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves") + "\n\n")
@@ -141,7 +141,11 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			for _, g := range append(view.EnvGroups(m.app, m.st), view.SettingsPage(m.app, m.st)...) {
 				b.WriteString(g.Title + "\n")
 				for _, it := range g.Items {
-					fmt.Fprintf(&b, "  %s: %s\n", it.Label, it.Value)
+					fmt.Fprintf(&b, "  %s: %s", it.Label, it.Value)
+					if it.ValueNote != "" {
+						fmt.Fprintf(&b, "  %s", it.ValueNote)
+					}
+					b.WriteString("\n")
 					if it.Note != "" {
 						fmt.Fprintf(&b, "    %s\n", it.Note)
 					}

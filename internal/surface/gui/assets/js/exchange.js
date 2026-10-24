@@ -144,7 +144,7 @@ async function preview(kind, src, fileName) {
   if (p.name) facts.push(Tf("list: %s", p.name));
   if (p.game) facts.push("RimWorld " + p.game);
   if (p.allowed) facts.push(Tf("suggested game versions: %s", p.allowed));
-  top.append(el("div", "xc-note", facts.filter(Boolean).join(" · ")));
+  top.append(el("div", "xc-note word-facts", facts.filter(Boolean).join("  ")));
   if (p.gameNote) top.append(el("div", "xc-note warn", p.gameNote));
   body.append(top);
 
@@ -244,8 +244,8 @@ async function preview(kind, src, fileName) {
     // marked, and the list opens to show them
     const det = el("details", "xc-sec");
     let sum = Tf("installed: %d (%d enabled now)", p.installed.length, p.installed.filter((r) => r.enabled).length);
-    if (p.other) { sum += " · " + Tf("%d in another version", p.other); det.open = true; }
-    det.append(el("summary", "", sum));
+    if (p.other) { sum += "  " + Tf("%d in another version", p.other); det.open = true; }
+    det.append(el("summary", "word-facts", sum));
     const list = el("div", "xc-list");
     p.installed.forEach((r, i) => {
       const d = el("div", "xc-mod");

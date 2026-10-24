@@ -29,8 +29,19 @@ export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
+  if (text != null) {
+    if (e.classList.contains("word-facts")) factText(e, text);
+    else e.textContent = text;
+  }
   return e;
+}
+
+// View models separate facts with two terminal cells; the GUI gives each fact its own span.
+export function factText(node, ...values) {
+  const parts = values.flat().filter(v => v != null && v !== "").flatMap(v => String(v).split(/ {2,}/)).filter(Boolean);
+  node.classList.add("word-facts");
+  node.replaceChildren(...parts.map(v => el("span", "", v)));
+  return node;
 }
 
 export function esc(s) {
@@ -47,7 +58,7 @@ let undoLink = false;
 export function say(kind, text, undo = false) {
   const s = $("#status");
   s.className = kind || "";
-  s.textContent = text || "";
+  factText(s, text || "");
   undoLink = undo;
   if (undo && text) {
     const a = el("a", "", T("undo"));

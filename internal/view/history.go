@@ -30,9 +30,9 @@ func HistoryItems(a *app.App, st *app.LoadoutState) ([]HistItem, error) {
 	for i := len(h.Redo) - 1; i >= 0; i-- {
 		out = append(out, HistItem{Kind: "redo", Text: StepText(st, h.Redo[i]), Steps: h.Redo[i].Steps})
 	}
-	now := T("now · same as the game")
+	now := T("now  same as the game")
 	if n := len(st.Changes()); n > 0 {
-		now = Tf("now · %d not written", n)
+		now = Tf("now  %d not written", n)
 	}
 	out = append(out, HistItem{Kind: "now", Text: now})
 	for _, s := range h.Undo {
@@ -46,7 +46,7 @@ func HistoryItems(a *app.App, st *app.LoadoutState) ([]HistItem, error) {
 		if src == "" {
 			src = v.Source
 		}
-		out = append(out, HistItem{Kind: "version", Text: Tf("v%d · %s · %s", v.N, ShortDate(v.Created), src), Version: v.N})
+		out = append(out, HistItem{Kind: "version", Text: Tf("v%d  %s  %s", v.N, ShortDate(v.Created), src), Version: v.N})
 	}
 	return out, nil
 }
@@ -66,7 +66,7 @@ func StepText(st *app.LoadoutState, s app.HistoryStep) string {
 		c := s.Changes[0]
 		switch c.Kind {
 		case loadout.Added:
-			return Tf("enabled %s · position %d", name(c.Entry), c.To)
+			return Tf("enabled %s, position %d", name(c.Entry), c.To)
 		case loadout.Removed:
 			return Tf("disabled %s", name(c.Entry))
 		case loadout.Moved:
@@ -83,7 +83,7 @@ func StepText(st *app.LoadoutState, s app.HistoryStep) string {
 	if rest, ok := strings.CutPrefix(s.Op, "import "); ok {
 		op = Tf("import %s", rest)
 	}
-	return Tf("%s · %d changes", op, len(s.Changes))
+	return Tf("%s, %d changes", op, len(s.Changes))
 }
 
 // stepWords are the edit names (app's op codes) the interface says in other words (06 §7.2).

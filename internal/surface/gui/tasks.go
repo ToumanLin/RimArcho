@@ -52,7 +52,7 @@ func (s *API) startTasks() {
 		}
 		r := view.BuildTasks([]app.Task{t}, time.Now()).Rows[0]
 		ok := t.State == app.TaskDone
-		s.send("tasks", map[string]any{"ended": map[string]any{"ok": ok, "id": t.ID, "kind": t.Kind, "text": r.Title + " · " + r.Obj + "：" + r.Line}})
+		s.send("tasks", map[string]any{"ended": map[string]any{"ok": ok, "id": t.ID, "kind": t.Kind, "text": r.Title + "  " + r.Obj + "：" + r.Line}})
 	}
 	s.tasks = ts
 }
@@ -114,7 +114,7 @@ func (s *API) submitTask(kind string, refs []string) (string, error) {
 	lane := view.TaskLane(kind)
 	t := s.tasks.Submit(kind, lane, view.TaskObj(names), items)
 	ln, _ := view.TaskLaneText(lane)
-	return view.Tf("%s · %s: in the %s queue", view.TaskTitle(kind), t.Obj, ln), nil
+	return view.Tf("%s, %s: in the %s queue", view.TaskTitle(kind), t.Obj, ln), nil
 }
 
 // Tasks is the 后台任务 page (and the sidebar's line).
@@ -152,9 +152,9 @@ func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 		if len(ids) == 1 {
 			t := byID[ids[0]]
 			if t.State == app.TaskQueued {
-				return view.Tf("cancelled %s · %s: nothing was touched", view.TaskTitle(t.Kind), t.Obj), nil
+				return view.Tf("cancelled %s, %s: nothing was touched", view.TaskTitle(t.Kind), t.Obj), nil
 			}
-			return view.Tf("%s · %s stops after the item it is on; what is done stays", view.TaskTitle(t.Kind), t.Obj), nil
+			return view.Tf("%s, %s stops after the item it is on; what is done stays", view.TaskTitle(t.Kind), t.Obj), nil
 		}
 		return view.Tf("stopping %d tasks", n), nil
 	case "retry", "resume":
@@ -198,7 +198,7 @@ func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 			return "", err
 		}
 		ln, _ := view.TaskLaneText(nt.Lane)
-		return view.Tf("%s · %s: in the %s queue", view.TaskTitle(nt.Kind), nt.Obj, ln), nil
+		return view.Tf("%s, %s: in the %s queue", view.TaskTitle(nt.Kind), nt.Obj, ln), nil
 	case "up", "down":
 		d := -1
 		if act == "down" {
@@ -263,45 +263,45 @@ func (s *API) endSelf(id string, err error, text string) {
 
 func init() {
 	view.Register(map[string]string{
-		"%s · %s: in the %s queue":                                  "%s · %s：已排进%s队列",
-		"Steam did not confirm it (%s)":                             "Steam 没有确认（%s）",
-		"no task":                                                   "没有选中任务",
-		"%s cannot be stopped part way":                             "%s 不能中途停止",
-		"cancelled %s · %s: nothing was touched":                    "已取消 %s · %s：什么都没动",
-		"%s · %s stops after the item it is on; what is done stays": "%s · %s 做完手上这一项就停，做完的留着",
-		"stopping %d tasks":                                         "正在停止 %d 个任务",
-		"a scan is running":                                         "正在扫描",
-		"a check is running":                                        "正在检查",
-		"do it again from its page":                                 "到它的页面上再做一次",
-		"it is the next one already":                                "已经是下一个要做的",
-		"it is the last one already":                                "已经排在最后",
-		"moved one place sooner":                                    "往前排了一位",
-		"moved one place later":                                     "往后排了一位",
-		"took %d off the record (no file is touched)":               "从记录里去掉 %d 项（文件不受影响）",
-		"no task is done":                                           "没有完成的任务",
-		"%s cannot do that now":                                     "%s 现在不能这样做",
-		"copied %s":                                                 "已复制 %s",
-		"copy the name":                                             "复制名字",
-		"default columns":                                           "恢复默认列",
-		"drag to resize · double click: back to the default":        "拖动改大小 · 双击恢复",
-		"every item":                                                "每一项",
-		"leave out":                                                 "去掉",
-		"narrower: %s":                                              "变窄“%s”",
-		"no task matches the filter · esc clears it":                "没有符合筛选的任务 · esc 清掉筛选",
-		"nothing has run in the background yet":                     "后台还没有做过任何事",
-		"pick a task":                                               "选一个任务",
-		"only these":                                                "只看这些",
-		"pick a value":                                              "选值",
-		"queue":                                                     "队列",
-		"search tasks and mod names":                                "搜索任务、Mod 名",
-		"see it in the mod library":                                 "在 Mod 库里看",
-		"sort and columns":                                          "排序和列",
-		"sorted by %s":                                              "按%s排序",
-		"sort by %s":                                                "按%s排序",
-		"started":                                                   "开始",
-		"tasks":                                                     "任务",
-		"took":                                                      "用时",
-		"try only this one again":                                   "只重试这一项",
+		"%s, %s: in the %s queue":                                  "%s，%s：已排进%s队列",
+		"Steam did not confirm it (%s)":                            "Steam 没有确认（%s）",
+		"no task":                                                  "没有选中任务",
+		"%s cannot be stopped part way":                            "%s 不能中途停止",
+		"cancelled %s, %s: nothing was touched":                    "已取消 %s，%s：什么都没动",
+		"%s, %s stops after the item it is on; what is done stays": "%s，%s 做完手上这一项就停，做完的留着",
+		"stopping %d tasks":                                        "正在停止 %d 个任务",
+		"a scan is running":                                        "正在扫描",
+		"a check is running":                                       "正在检查",
+		"do it again from its page":                                "到它的页面上再做一次",
+		"it is the next one already":                               "已经是下一个要做的",
+		"it is the last one already":                               "已经排在最后",
+		"moved one place sooner":                                   "往前排了一位",
+		"moved one place later":                                    "往后排了一位",
+		"took %d off the record (no file is touched)":              "从记录里去掉 %d 项（文件不受影响）",
+		"no task is done":                                          "没有完成的任务",
+		"%s cannot do that now":                                    "%s 现在不能这样做",
+		"copied %s":                                                "已复制 %s",
+		"copy the name":                                            "复制名字",
+		"default columns":                                          "恢复默认列",
+		"drag to resize, double click: back to the default":        "拖动改大小，双击恢复",
+		"every item":                                               "每一项",
+		"leave out":                                                "去掉",
+		"narrower: %s":                                             "变窄“%s”",
+		"no task matches the filter, esc clears it":                "没有符合筛选的任务，esc 清掉筛选",
+		"nothing has run in the background yet":                    "后台还没有做过任何事",
+		"pick a task":                                              "选一个任务",
+		"only these":                                               "只看这些",
+		"pick a value":                                             "选值",
+		"queue":                                                    "队列",
+		"search tasks and mod names":                               "搜索任务、Mod 名",
+		"see it in the mod library":                                "在 Mod 库里看",
+		"sort and columns":                                         "排序和列",
+		"sorted by %s":                                             "按%s排序",
+		"sort by %s":                                               "按%s排序",
+		"started":                                                  "开始",
+		"tasks":                                                    "任务",
+		"took":                                                     "用时",
+		"try only this one again":                                  "只重试这一项",
 		"what RimArcho does in the background; pick a task to see every item it touched and how it went": "RimArcho 在后台做的事。选一个任务，右边是它碰过的每一项和结果。",
 		"wider: %s":                 "加宽“%s”",
 		"now":                       "现在",

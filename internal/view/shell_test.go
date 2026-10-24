@@ -116,11 +116,11 @@ func TestBuildHome(t *testing.T) {
 		t.Fatalf("order %v", order)
 	}
 	plan := h.Rows[0]
-	if plan.Kind != view.RowPlan || plan.Env != "main · 1.6" || !strings.HasPrefix(plan.Played, "played ") {
+	if plan.Kind != view.RowPlan || plan.Env != "main  1.6" || !strings.HasPrefix(plan.Played, "played ") {
 		t.Fatalf("plan row %+v", plan)
 	}
 	// the meta line: how many mods, and how they change (06 §2.3)
-	if !strings.HasSuffix(plan.Facts, " mods") && !strings.Contains(plan.Facts, " mods ·") || plan.Mode != "follows Workshop updates" {
+	if !strings.HasSuffix(plan.Facts, " mods") && !strings.Contains(plan.Facts, " mods  ") || plan.Mode != "follows Workshop updates" {
 		t.Fatalf("plan meta %q / %q", plan.Facts, plan.Mode)
 	}
 	// Never analysed: the state says so instead of a count that may be short.
@@ -135,7 +135,7 @@ func TestBuildHome(t *testing.T) {
 	if r := h.Rows[2]; r.State != "checked when created" || r.Level != view.HomeOK {
 		t.Fatalf("pack state %+v", r)
 	}
-	if r := h.Rows[1]; r.Mode != "versions locked · own saves" || r.Facts != "f" {
+	if r := h.Rows[1]; r.Mode != "versions locked  own saves" || r.Facts != "f" {
 		t.Fatalf("pack meta %+v", r)
 	}
 	packs[0].Mods = 42

@@ -75,7 +75,7 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
     root = box; head = th;
     layout();
     head.innerHTML = "";
-    head.title = T("drag to move · right click: columns");
+    head.title = T("drag to move, right click: columns");
     head.dataset.columns = JSON.stringify([state.sort, state.dir, visible().map((c) => [c.key, T(def(c.key).title)])]);
     for (const c of visible()) {
       const d = def(c.key), active = state.sort === c.key;
