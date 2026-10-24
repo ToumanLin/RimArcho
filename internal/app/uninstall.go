@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
@@ -472,12 +473,11 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 	var scmd []*UninstallItem
 	if dir := a.SteamCMDDir(); dirExists(dir) {
 		it := &UninstallItem{Path: dir, Do: DoDelete, Bytes: a.sizeOf(dir)}
-		ws := filepath.Join(dir, "steamapps", "workshop", "content", env.WorkshopAppID)
 		switch {
 		case a.Store.Meta("cfg:steamcmd.path") != "" && !source.Within(dir, a.LocalDir()):
 			it.Do, it.Note = DoLeave, "SteamCMD is in a custom directory: left alone"
 			keep = append(keep, dir)
-		case !emptyDir(ws) || holdsAny(dir, keep):
+		case a.steamCMDContentCheck(dir) != nil || holdsAny(dir, keep):
 			it.Do, it.Note = DoLeave, "holds mods downloaded with SteamCMD: left alone"
 			keep = append(keep, dir)
 		}
@@ -524,6 +524,32 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 			p.AfterExit.Empty = append(p.AfterExit.Empty, p.Local)
 		}
 		data = append(data, it)
+	}
+	// Name only managed tools actually covered by the scheduled data deletions.
+	for _, name := range []string{deps.Todds, deps.WezTerm} {
+		i := a.Deps().Status(name)
+		if !i.Own {
+			continue
+		}
+		deleted := false
+		for _, dir := range p.AfterExit.Dirs {
+			deleted = deleted || source.Within(i.Dir, dir)
+		}
+		if !deleted {
+			continue
+		}
+		label := name
+		if name == deps.WezTerm {
+			label = "WezTerm"
+		}
+		for _, it := range data {
+			if it.Do == DoLater && source.Within(i.Dir, it.Path) {
+				if it.Note != "" {
+					it.Note += "; "
+				}
+				it.Note += "includes the downloaded " + label
+			}
+		}
 	}
 	add(UnData, data)
 

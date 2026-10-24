@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/vdf"
@@ -50,24 +51,7 @@ func (a *App) SteamCMDDir() string {
 // SteamCMDPath finds steamcmd: config steamcmd.path, RimArcho's own copy, then PATH. ""
 // when there is none.
 func (a *App) SteamCMDPath() string {
-	if p := a.Store.Meta("cfg:steamcmd.path"); p != "" {
-		if st, err := os.Stat(p); err == nil && !st.IsDir() {
-			return p
-		}
-	}
-	for _, n := range []string{"steamcmd.exe", "steamcmd.sh", "steamcmd"} {
-		p := filepath.Join(a.SteamCMDDir(), n)
-		if st, err := os.Stat(p); err == nil && !st.IsDir() {
-			return p
-		}
-	}
-	if a.SteamCMDNoPath {
-		return ""
-	}
-	if p, err := exec.LookPath("steamcmd"); err == nil {
-		return p
-	}
-	return ""
+	return a.Deps().Status(deps.SteamCMD).Path
 }
 
 // SteamCMDOffer is what downloading SteamCMD would do: from where, to where, how big.
@@ -111,7 +95,10 @@ func (a *App) InstallSteamCMD() (string, error) {
 
 // InstallSteamCMDProgress also reports bytes received to the guide and task (06 §2.15).
 func (a *App) InstallSteamCMDProgress(progress func(done, total int64)) (string, error) {
-	dir := a.SteamCMDDir()
+	return a.installSteamCMDProgress(a.SteamCMDDir(), progress)
+}
+
+func (a *App) installSteamCMDProgress(dir string, progress func(done, total int64)) (string, error) {
 	if err := a.checkRoots(dir); err != nil {
 		return "", err
 	}

@@ -6,6 +6,7 @@
 //   4. the hint line lists what you can do with the object now;
 //   5. few popups, each closed with esc, never nested.
 import { api, on, setText } from "./api.js";
+import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
 import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
@@ -76,6 +77,7 @@ function detailFollow(force) {
 // lists' cursors and selections and the open details kept: no reload, no jump home.
 async function relang() {
   const s = await api.Init();
+  applyAccent(s.accent);
   S.start = s;
   setText(s.text);
   document.documentElement.lang = s.lang;
@@ -88,6 +90,12 @@ async function relang() {
   else if (screen && screen !== "guide") await openPage(screen);
   if (screen) $("#screen").scrollTop = top;
   render();
+}
+
+async function reaccent() {
+  const s = await api.Init();
+  S.start.accent = s.accent;
+  applyAccent(s.accent);
 }
 
 // ---- drawing ----
@@ -899,7 +907,7 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, refreshEnvironment, relang, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
+  reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
@@ -912,6 +920,7 @@ const ui = {
 
 async function start() {
   const s = await api.Init();
+  applyAccent(s.accent);
   S.start = s;
   setText(s.text);
   document.documentElement.lang = s.lang;

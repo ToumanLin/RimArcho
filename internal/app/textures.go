@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/textures"
@@ -35,21 +36,7 @@ func (a *App) ToddsDir() string { return filepath.Join(a.LocalDir(), "todds") }
 
 // ToddsPath finds todds: config textures.todds, RimArcho's own copy, then PATH ("" none).
 func (a *App) ToddsPath() string {
-	if p := a.Store.Meta("cfg:textures.todds"); p != "" {
-		if f := textures.FindTodds(p); f != "" {
-			return f
-		}
-	}
-	if f := textures.FindTodds(a.ToddsDir()); f != "" {
-		return f
-	}
-	if a.ToddsNoPath {
-		return ""
-	}
-	if p, err := exec.LookPath("todds"); err == nil {
-		return p
-	}
-	return ""
+	return a.Deps().Status(deps.Todds).Path
 }
 
 // TextureTool is the encoder found, or why there is none.
@@ -64,21 +51,11 @@ func (a *App) TextureTool() *TextureTool {
 	if a.TextureEncoder != nil {
 		return &TextureTool{Path: "(test)", Version: textures.ToddsVersion}
 	}
-	t := &TextureTool{Path: a.ToddsPath()}
+	i := a.Deps().Status(deps.Todds)
+	t := &TextureTool{Path: i.Path, Version: i.Version, Err: i.Err}
 	if t.Path == "" {
 		t.Err = ErrNoTodds.Error()
 		return t
-	}
-	td := &textures.Todds{Path: t.Path, Prepare: hideWindow}
-	v, err := td.Version()
-	switch {
-	case err != nil:
-		t.Err = err.Error()
-	case v != textures.ToddsVersion:
-		t.Version = v
-		t.Err = fmt.Sprintf("todds %s found at %s; RimArcho works with %s", v, t.Path, textures.ToddsVersion)
-	default:
-		t.Version = v
 	}
 	return t
 }

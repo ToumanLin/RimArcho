@@ -136,6 +136,7 @@ func (s *API) checkMonitor() {
 // Start is what the page needs once: the language, its text table, the commands.
 type Start struct {
 	Lang     string            `json:"lang"`
+	Accent   string            `json:"accent"`
 	Text     map[string]string `json:"text"`
 	Commands []view.Command    `json:"commands"`
 	Version  string            `json:"version"`
@@ -147,7 +148,7 @@ type Start struct {
 func (s *API) Init() *Start {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Start{Lang: view.Lang(), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
+	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
 }
 
 // ---- the board ----

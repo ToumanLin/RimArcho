@@ -23,6 +23,8 @@ const (
 	TaskDownload  = "download"
 	TaskSteamCMD  = "install-steamcmd"
 	TaskTodds     = "install-todds"
+	TaskWezTerm   = "install-wezterm"
+	TaskDepRemove = "remove-dependency"
 	TaskData      = "data-update"
 	TaskCache     = "cache-clear"
 	TaskBackup    = "db-backup"
@@ -39,7 +41,7 @@ const (
 // IsSettingTask identifies maintenance tasks shared by settings and the guide.
 func IsSettingTask(kind string) bool {
 	switch kind {
-	case TaskSteamCMD, TaskTodds, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
+	case TaskSteamCMD, TaskTodds, TaskWezTerm, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
 		return true
 	}
 	return false
@@ -138,6 +140,10 @@ func TaskTitle(kind string) string {
 		return T("download SteamCMD")
 	case TaskTodds:
 		return T("download todds…")
+	case TaskWezTerm:
+		return T("download WezTerm")
+	case TaskDepRemove:
+		return T("remove external tool")
 	case TaskData:
 		return T("update the community data")
 	case TaskCache:
@@ -416,7 +422,7 @@ func joinFacts(parts ...string) string {
 
 func taskTarget(t *app.Task) string {
 	switch t.Kind {
-	case TaskSteamCMD, TaskTodds, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
+	case TaskSteamCMD, TaskTodds, TaskWezTerm, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
 		return PageSettings
 	case TaskScan:
 		return PageChanges

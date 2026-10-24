@@ -134,19 +134,12 @@ var runHost = func(ap *app.App, envName string, out io.Writer) (bool, error) {
 		args = []string{"--env", envName}
 	}
 	h := &host.Host{
-		Home: ap.Home, ProgramDir: filepath.Dir(exe), Exe: exe, Args: args, API: host.GitHubAPI,
+		Finder: ap.Deps(),
+		Home:   ap.Home, ProgramDir: filepath.Dir(exe), Exe: exe, Args: args, API: host.GitHubAPI,
 		Out: out, Getenv: os.Getenv, LookPath: exec.LookPath,
 		Start:   func(name string, args ...string) error { return startAlive(ap.Home, name, args...) },
 		Pref:    func() string { return ap.Store.Meta("cfg:terminal.host") },
 		SetPref: func(v string) error { return ap.Store.SetMeta("cfg:terminal.host", v) },
-	}
-	for _, k := range []string{"ProgramW6432", "ProgramFiles", "LOCALAPPDATA"} {
-		if d := os.Getenv(k); d != "" {
-			if k == "LOCALAPPDATA" {
-				d = filepath.Join(d, "Programs")
-			}
-			h.ProgramFiles = append(h.ProgramFiles, d)
-		}
 	}
 	if st, err := os.Stdin.Stat(); err == nil && st.Mode()&os.ModeCharDevice != 0 {
 		h.In = os.Stdin // a console to ask on

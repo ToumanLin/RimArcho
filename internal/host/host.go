@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/wezterm"
 )
 
@@ -32,11 +33,12 @@ const maxDownload = 300 << 20
 
 // Host is the environment of the decision; tests replace every outside effect.
 type Host struct {
-	Home       string   // the data directory: wezterm/ and wezterm.lua go here
-	ProgramDir string   // the directory of archo.exe: the bundled fonts are in fonts/
-	Exe        string   // archo itself, started inside WezTerm
-	Args       []string // passed on to `archo tui` (for example --env <name>)
-	API        string   // GitHubAPI, or a test server
+	Finder     *deps.Finder // shared application lookup, including wezterm.path
+	Home       string       // the data directory: wezterm/ and wezterm.lua go here
+	ProgramDir string       // the directory of archo.exe: the bundled fonts are in fonts/
+	Exe        string       // archo itself, started inside WezTerm
+	Args       []string     // passed on to `archo tui` (for example --env <name>)
+	API        string       // GitHubAPI, or a test server
 	HTTP       *http.Client
 	// In is the console to ask on; nil when there is none (output redirected, a pipe): then
 	// RimArcho never asks and runs in the current terminal.
@@ -103,28 +105,11 @@ func (h *Host) ask() bool {
 
 // Find looks for wezterm-gui: on PATH, in Program Files, then in <data dir>/wezterm/.
 func (h *Host) Find() string {
-	if p, err := h.LookPath("wezterm-gui"); err == nil {
-		return p
+	f := h.Finder
+	if f == nil {
+		f = &deps.Finder{Home: h.Home, ProgramDir: h.ProgramDir, LookPath: h.LookPath, ProgramFiles: h.ProgramFiles}
 	}
-	for _, pf := range h.ProgramFiles {
-		if p := filepath.Join(pf, "WezTerm", "wezterm-gui.exe"); isFile(p) {
-			return p
-		}
-	}
-	dir := filepath.Join(h.Home, "wezterm")
-	if p := filepath.Join(dir, "wezterm-gui.exe"); isFile(p) {
-		return p
-	}
-	ms, _ := filepath.Glob(filepath.Join(dir, "*", "wezterm-gui.exe"))
-	if len(ms) > 0 {
-		return ms[len(ms)-1] // the newest name sorts last (WezTerm-windows-<date>-…)
-	}
-	return ""
-}
-
-func isFile(p string) bool {
-	st, err := os.Stat(p)
-	return err == nil && !st.IsDir()
+	return f.Status(deps.WezTerm).Path
 }
 
 type release struct {
@@ -141,6 +126,12 @@ var portableRe = regexp.MustCompile(`^WezTerm-windows-[0-9A-Za-z._-]+\.zip$`)
 // Download fetches the latest stable portable zip, checks it against the release's .sha256
 // file and extracts it into <data dir>/wezterm/. It returns wezterm-gui's path.
 func (h *Host) Download() (string, error) {
+	return h.DownloadProgress(nil)
+}
+
+// DownloadProgress downloads and verifies the portable release, reporting bytes received.
+// It returns the downloaded copy even when another installation takes lookup priority.
+func (h *Host) DownloadProgress(progress func(done, total int64)) (string, error) {
 	var rel release
 	if err := h.getJSON(strings.TrimRight(h.API, "/")+"/repos/wezterm/wezterm/releases/latest", &rel); err != nil {
 		return "", fmt.Errorf("release lookup: %w", err)
@@ -171,7 +162,7 @@ func (h *Host) Download() (string, error) {
 	tmp := filepath.Join(dest, zipName+".part")
 	defer os.Remove(tmp)
 	fmt.Fprintf(h.Out, "downloading %s (%s, %.0f MB)…\n", zipName, rel.Tag, float64(size)/(1<<20))
-	got, err := h.fetch(zipURL, tmp)
+	got, err := h.fetch(zipURL, tmp, progress)
 	if err != nil {
 		return "", err
 	}
@@ -182,7 +173,8 @@ func (h *Host) Download() (string, error) {
 	if err := extract(tmp, dest); err != nil {
 		return "", err
 	}
-	if gui := h.Find(); gui != "" && strings.HasPrefix(gui, dest) {
+	gui := filepath.Join(dest, strings.TrimSuffix(zipName, ".zip"), "wezterm-gui.exe")
+	if st, err := os.Stat(gui); err == nil && !st.IsDir() {
 		return gui, nil
 	}
 	return "", errors.New("the zip has no wezterm-gui.exe")
@@ -240,7 +232,7 @@ func (h *Host) getSHA(url string) (string, error) {
 }
 
 // fetch downloads url into path and returns its sha256.
-func (h *Host) fetch(url, path string) (string, error) {
+func (h *Host) fetch(url, path string, progress func(done, total int64)) (string, error) {
 	resp, err := h.get(url)
 	if err != nil {
 		return "", err
@@ -251,7 +243,8 @@ func (h *Host) fetch(url, path string) (string, error) {
 		return "", err
 	}
 	sum := sha256.New()
-	n, err := io.Copy(io.MultiWriter(f, sum), io.LimitReader(resp.Body, maxDownload+1))
+	w := &downloadWriter{Writer: io.MultiWriter(f, sum), total: resp.ContentLength, progress: progress}
+	n, err := io.Copy(w, io.LimitReader(resp.Body, maxDownload+1))
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
@@ -262,6 +255,21 @@ func (h *Host) fetch(url, path string) (string, error) {
 		return "", errors.New("download larger than expected")
 	}
 	return hex.EncodeToString(sum.Sum(nil)), nil
+}
+
+type downloadWriter struct {
+	io.Writer
+	done, total int64
+	progress    func(done, total int64)
+}
+
+func (w *downloadWriter) Write(b []byte) (int, error) {
+	n, err := w.Writer.Write(b)
+	w.done += int64(n)
+	if w.progress != nil {
+		w.progress(w.done, w.total)
+	}
+	return n, err
 }
 
 // extract unpacks a zip into dest; an entry that would land outside dest fails it.

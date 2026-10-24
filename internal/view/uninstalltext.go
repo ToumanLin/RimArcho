@@ -31,6 +31,7 @@ func init() {
 		"delete them (recycle bin)":                                   "删除（移到回收站）",
 		"takes out %s":                                                "去掉 %s",
 		"keeps %s":                                                    "保留 %s",
+		"includes the downloaded %s":                                  "包含下载的 %s",
 		"%d steps failed; RimArcho's data stays so you can run it again":                                                                 "%d 步没有完成；RimArcho 的数据先留着，可以再卸载一次",
 		"done. RimArcho deletes its data and the program once it has closed; anything left is listed in %s":                              "完成。RimArcho 关闭后会删除自己的数据和程序；删不掉的会记在 %s",
 		"delete %d links in the games' Mods folders; the folders they point to stay":                                                     "删除各游戏 Mods 里的 %d 个链接，链接指向的文件夹不动",
