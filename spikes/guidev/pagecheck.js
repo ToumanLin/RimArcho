@@ -35,7 +35,11 @@ async function test(name, run) { await run(); results.push("PASS " + name); outp
 
 try {
   const backgrounds = { setting: { key: "plain", stars: [], files: [] }, groups: [{ name: "game", items: [{ key: "plain", label: "plain" }] }] };
-  const buildPreview = { name: "fixture pack", plan: "fixture plan", steps: [], mods: 0, ok: true };
+  const buildPreview = { name: "fixture pack", plan: "fixture plan", tex: 0,
+    texChoices: [0, 100, 50, 75].map((value) => ({ value, label: String(value) })),
+    steps: [{ key: "trim", title: "trim", text: "fixture trim" }, { key: "textures", title: "textures", kind: "textures", text: "fixture textures" }],
+    before: "100 MB", after: "80 MB", mods: 0, ok: true };
+  handlers.set("BuildPageResult", () => buildPreview);
   handlers.set("HomeBackground", () => ({})); handlers.set("Backgrounds", () => backgrounds);
   handlers.set("Packs", () => ({ rows: [] })); handlers.set("PackNameCheck", () => "");
   handlers.set("Detail", () => null); handlers.set("Sections", () => []);
@@ -47,7 +51,7 @@ try {
     ["env", "Environment", () => screens.environment(), { envs: [], groups: [] }],
     ["packs", "Packs", () => packs.list(), { rows: [] }],
     ["packs", "Pack", () => packs.pack("fixture"), { name: "fixture", facts: [], mods: [] }],
-    ["build", "BuildPage", () => packs.build(), buildPreview],
+    ["build", "BuildPage", () => packs.build(), 1],
     ["guide", "GuideFind", () => guide.start(), []],
     ["uninstall", "UninstallPlan", () => uninstall.open(), { steps: [] }],
     ["full", "ModCopies", () => full.full("library", "fixture"), { row: null }],
@@ -105,15 +109,37 @@ try {
     assert(document.querySelector('#screen').textContent.includes("new context"), "destination did not load");
     S.board = board; S.shell = shell;
   });
-  await test("build keyboard cannot run a stale preview while remeasuring", async () => {
-    handlers.set("BuildPage", () => buildPreview); await packs.build();
-    const d = deferred(); let builds = 0;
-    handlers.set("BuildPage", () => d.promise); handlers.set("PackBuild", () => { builds++; });
-    packs.packsKey(new KeyboardEvent("keydown", { key: "T", cancelable: true })); await Promise.resolve();
-    packs.packsKey(new KeyboardEvent("keydown", { key: "B", cancelable: true })); await Promise.resolve();
-    assert(builds === 0, "build used a stale preview");
-    screens.openScreen("other"); d.resolve(buildPreview); await settle();
-    assert(S.screen === "other", "option response reopened the build page");
+  await test("build keeps inputs responsive and only the latest texture measurement wins", async () => {
+    handlers.set("BuildPage", () => 1);
+    handlers.set("BuildPageResult", () => buildPreview);
+    await packs.build();
+    const old = deferred(), fresh = deferred(); let builds = 0;
+    handlers.set("BuildPage", (tex) => tex);
+    handlers.set("BuildPageResult", (id) => id === 100 ? old.promise : fresh.promise);
+    handlers.set("PackBuild", () => { builds++; });
+    const name = document.querySelector("#pk-name"), select = document.querySelector("#pk-tex");
+    name.value = "my typed pack"; await name.oninput();
+    select.focus(); select.value = "100"; const first = select.onchange();
+    await settle();
+    assert(select.isConnected && select.value === "100" && document.activeElement === select, "choice was replaced or lost focus");
+    assert(name.isConnected && name.value === "my typed pack", "name was cleared while measuring");
+    assert(document.querySelectorAll(".bd-step .skel").length === 2 && document.querySelector("#pk-size .skel"), "measured facts have no shimmer");
+    assert(document.querySelector(".bd-go").disabled && !document.querySelector(".page-loading"), "measurement replaced the page or enabled build");
+    packs.packsKey(new KeyboardEvent("keydown", { key: "B", cancelable: true }));
+    name.onkeydown(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    await Promise.resolve(); assert(builds === 0, "build used a stale preview");
+    select.value = "50"; const second = select.onchange(); await settle();
+    assert(select.value === "50" && select.isConnected, "second choice was blocked");
+    fresh.resolve({ ...buildPreview, tex: 50, after: "new size" }); await second;
+    assert(document.querySelector("#pk-tex").value === "50" && document.querySelector("#pk-size").textContent.includes("new size"), "latest measurement missing");
+    old.resolve({ ...buildPreview, tex: 100, after: "stale size" }); await first;
+    assert(document.querySelector("#pk-tex").value === "50" && !document.querySelector("#screen").textContent.includes("stale size"), "late measurement overwrote the choice");
+    assert(document.querySelector("#pk-name").value === "my typed pack" && !document.querySelector(".bd-go").disabled, "fresh preview lost name or stayed disabled");
+    assert(!document.querySelector("#screen .skel"), "fresh preview kept shimmer");
+    const late = deferred(); handlers.set("BuildPageResult", () => late.promise);
+    const nextSelect = document.querySelector("#pk-tex"); nextSelect.value = "75"; const pending = nextSelect.onchange();
+    await settle(); screens.openScreen("other"); late.reject(new Error("late build failure")); await pending;
+    assert(S.screen === "other" && !document.querySelector('#screen[aria-busy]'), "late failure reopened the build page");
   });
   await test("environment switch shows progress immediately and rejects repeat clicks", async () => {
     const d = deferred(); let calls = 0;
