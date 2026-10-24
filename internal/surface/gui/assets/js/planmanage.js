@@ -8,6 +8,7 @@ import { openScreen, page, button, act, area, seg, beginPageRead } from "./scree
 import { icon } from "./icons.js";
 import * as pop from "./popups.js";
 import * as plans from "./plans.js";
+import { wireSeparator } from "./separator.js";
 
 let ui = null;
 export function initPlanManage(u) { ui = u; }
@@ -52,7 +53,15 @@ function draw() {
   add.classList.add("primary");
   const w = page("plans pm-page", "", act(T("import"), "import", () => ui.cmd("import"), "i"), add);
   const grid = el("div", "pm");
-  grid.append(listCard(d), M.draft ? newForm() : detailCard(d.sel));
+  const side = listCard(d), gap = el("div", "split pm-split");
+  grid.append(side, gap, M.draft ? newForm() : detailCard(d.sel));
+  const setSide = (v) => { if (v) grid.style.setProperty("--pm-side", v + "px"); else grid.style.removeProperty("--pm-side"); };
+  wireSeparator(gap, {
+    key: "ui.gui.plans.side", range: () => [270, 340],
+    get: () => side.getBoundingClientRect().width,
+    set: setSide, reset: () => setSide(0),
+    restore: (v) => setSide(+v ? Math.max(270, Math.min(340, +v)) : 0),
+  });
   w.append(grid);
   sc.append(w);
   sc.scrollTop = top;

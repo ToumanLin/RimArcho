@@ -17,6 +17,7 @@ import { beginPageRead, pageLoading, openScreen, page, rescanButton, area, full 
 import { createBar } from "./filterbar.js";
 import * as ops from "./ops.js";
 import { createTable, mergeColumns } from "./datatable.js";
+import { wireSeparator } from "./separator.js";
 
 const ROW = 30;      // every row has the same height: the list is drawn by position
 const HEAD = 28;     // the column headers, sticky at the top of the table
@@ -187,24 +188,14 @@ function build() {
 const SIDE_KEY = "ui.gui.library.side";
 let sideW = null;
 function wireSplit(sp, root) {
-  if (sideW == null) api.Setting(SIDE_KEY).then((v) => { sideW = +v || 0; applySide(root); }).catch(() => { sideW = 0; });
-  else applySide(root);
-  sp.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    const x0 = e.clientX, w0 = els.detail.getBoundingClientRect().width;
-    sp.classList.add("drag");
-    const move = (m) => { sideW = Math.max(240, Math.min(root.clientWidth - 360, Math.round(w0 + m.clientX - x0))); applySide(root); };
-    const up = () => {
-      sp.classList.remove("drag");
-      removeEventListener("mousemove", move);
-      removeEventListener("mouseup", up);
-      api.SetSetting(SIDE_KEY, String(sideW)).catch(() => {});
-      drawRows();
-    };
-    addEventListener("mousemove", move);
-    addEventListener("mouseup", up);
+  applySide(root);
+  wireSeparator(sp, {
+    key: SIDE_KEY, range: () => [240, root.clientWidth - 360],
+    get: () => root.querySelector(".lib-side").getBoundingClientRect().width,
+    set: (v) => { sideW = v; applySide(root); },
+    reset: () => { sideW = 0; applySide(root); }, changed: drawRows,
+    restore: sideW == null ? (v) => { sideW = +v || 0; applySide(root); } : null,
   });
-  sp.addEventListener("dblclick", () => { sideW = 0; applySide(root); api.SetSetting(SIDE_KEY, "").catch(() => {}); });
 }
 function applySide(root) {
   if (sideW) root.style.setProperty("--lib-side", sideW + "px");

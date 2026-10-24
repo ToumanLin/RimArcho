@@ -1477,3 +1477,23 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-import fieldset { border: 0; padding: 0; min-width: 0; }
 .pm-import .xc-check .xc-note { flex-basis: 100%; padding-left: 22px; }
 .pm-import .xc-preview[hidden] { display: none; }
+
+/* Adjustable card gaps: 06 §3.1, 06 §7.3. Kept together for every page. */
+.separator { outline: none; touch-action: none; }
+.separator.split::after { width: var(--hairline); margin-left: 0; }
+.separator.hsplit::after, .separator.fbar-gap::after { height: var(--hairline); margin-top: 0; }
+.separator:hover::after, .separator.drag::after, .separator:focus-visible::after { background: var(--accent); }
+#side-split.separator:focus-visible { background: var(--accent-soft); }
+.pm-page > .pm { grid-template-columns: var(--pm-side, 320px) var(--card-gap) minmax(0, 1fr); column-gap: 0; }
+.pm-split { align-self: stretch; margin: 0; }
+#board > .stack { gap: 0; }
+.stack > .stack-split { margin: 0; }
+.stack > .fold.open.stack-sized { flex: 0 1 var(--stack-size); height: var(--stack-size); max-height: none; }
+.stack-split:has(+ [hidden]) { display: none; }
+.stack-split[aria-disabled="true"] { cursor: default; pointer-events: none; }
+.stack-split[aria-disabled="true"]::after { background: transparent; }
+@media (max-width: 760px) {
+  .pm-page > .pm { grid-template-columns: minmax(0, 1fr); }
+  .pm-split { display: none; }
+}
+@media (max-width: 900px) { .logside > .hsplit { display: none; } }
