@@ -11,7 +11,6 @@ import (
 func DependencyGroup(a *app.App) SettingGroup {
 	g := SettingGroup{Title: T("external tools")}
 	labels := map[string]string{deps.Font: T("bundled font"), deps.Todds: "todds", deps.SteamCMD: "SteamCMD", deps.WezTerm: "WezTerm"}
-	sources := map[string]string{"config": T("configured path"), "own": T("RimArcho's own copy"), "path": "PATH", "program-files": T("installed program"), "bundled": T("bundled")}
 	for _, i := range a.Deps().All() {
 		item := SettingItem{Label: labels[i.Name], Value: T("not installed"), Note: i.Path}
 		if i.Version != "" {
@@ -22,9 +21,6 @@ func DependencyGroup(a *app.App) SettingGroup {
 			}
 		} else if i.OK {
 			item.Value = T("installed")
-		}
-		if i.Source != "" {
-			item.Note += "  (" + sources[i.Source] + ")"
 		}
 		if i.Err != "" && i.Path != "" {
 			item.Note += "  " + Humanize(nil, T(i.Err))
@@ -61,10 +57,6 @@ func init() {
 		"bundled font":                "随附字体",
 		"%s font files":               "%s 个字体文件",
 		"the bundled font is missing": "随附字体缺失",
-		"configured path":             "指定路径",
-		"RimArcho's own copy":         "RimArcho 下载的副本",
-		"installed program":           "已安装程序",
-		"bundled":                     "随附",
 		"installed":                   "已安装",
 		"install tool":                "安装工具",
 		"update tool":                 "更新工具",

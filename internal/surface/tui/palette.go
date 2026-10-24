@@ -140,6 +140,9 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			var b strings.Builder
 			for _, g := range append(view.EnvGroups(m.app, m.st), view.SettingsPage(m.app, m.st)...) {
 				b.WriteString(g.Title + "\n")
+				if g.Note != "" {
+					fmt.Fprintf(&b, "  %s\n", g.Note)
+				}
 				for _, it := range g.Items {
 					fmt.Fprintf(&b, "  %s: %s", it.Label, it.Value)
 					if it.ValueNote != "" {

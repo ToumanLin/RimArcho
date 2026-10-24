@@ -90,7 +90,9 @@ func TaskPending(kind string) string {
 
 // SettingGroup is a heading and its rows.
 type SettingGroup struct {
-	Title string        `json:"title"`
+	Title string `json:"title"`
+	// Note is said once under the heading instead of on every row.
+	Note  string        `json:"note,omitempty"`
 	Items []SettingItem `json:"items"`
 }
 

@@ -1317,6 +1317,7 @@ function renderGroups(w, groups, again) {
     w.append(lab);
     const card = el("section", "card settings");
     area(card, lab);
+    if (g.note) card.append(el("div", "group-note", g.note));
     for (const it of g.items || []) {
       const row = el("div", "set");
       row.dataset.settingRow = g.title + "/" + it.label;
