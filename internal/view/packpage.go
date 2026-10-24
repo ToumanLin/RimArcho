@@ -61,6 +61,9 @@ type BuildPage struct {
 	// Tex is the textures choice the page was measured with; TexChoices its values.
 	Tex        int         `json:"tex"`
 	TexChoices []TexChoice `json:"texChoices,omitempty"`
+	// ToolOK: the DDS encoder is ready, whatever Tex is, so the page can let the player
+	// pick another choice and create the pack without measuring it first (06 §2.6).
+	ToolOK bool `json:"toolOk"`
 }
 
 // DefaultPackName is a free pack name for the plan: "<plan> <date>", then " 2", " 3".

@@ -1261,6 +1261,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .textures .set .sub.warn, .tex-rows .warn { color: var(--amber); }
 .tex-foot { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin: 14px 0 18px; }
 .tex-foot .prog { flex: 1; }
+.tex-foot .tex-note { flex: 1; min-width: 0; font-size: 12px; }
+.tex-foot .tex-note:empty { visibility: hidden; }
 /* Data tables share the library's header grid and gestures (06 §3.9). */
 .data-table { overflow: auto; max-height: 65vh; outline: none; }
 .data-table:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

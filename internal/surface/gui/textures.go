@@ -42,6 +42,29 @@ type textureMeasurement struct {
 	err     string
 }
 
+// TexturesInfo is the page without reading a texture: the encoder and the scope's mods.
+// The page opens with it and changing a choice asks only this; Textures reads the textures
+// when the player asks (06 §2.13).
+func (s *API) TexturesInfo(scope string, scale int) (*TexturePage, error) {
+	if scope != app.TexAll {
+		scope = app.TexPlan
+	}
+	s.mu.Lock()
+	targets, err := s.a.TextureTargets(nil, scope)
+	if err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
+	p := view.TexturePageInfo(s.a, scope, scale, s.a.TextureTool(), len(targets))
+	out := &TexturePage{TexturePage: p}
+	if s.busy["textures"] {
+		ev := s.texLast
+		out.Running = &ev
+	}
+	s.mu.Unlock()
+	return out, nil
+}
+
 // Textures returns choices immediately; disk reads run in the background (06 §3.1).
 func (s *API) Textures(scope string, scale int) (*TexturePage, error) {
 	if scope != app.TexAll {

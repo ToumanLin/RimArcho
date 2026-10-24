@@ -82,5 +82,8 @@ func measureBuildPage(r *app.App, tex int) (*view.BuildPage, error) {
 	pl.Measure(dir)
 	p := view.BuildPageOf(pl, plan, chip, dir, tex)
 	p.Name = name
+	if t := r.TextureTool(); t != nil && t.Err == "" {
+		p.ToolOK = true
+	}
 	return p, nil
 }

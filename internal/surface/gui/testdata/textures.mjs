@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Element, loadModules, deferred, flush, event } from "./dom.mjs";
 
+const info = (running) => ({ scope: "plan", scale: 100, scales: [100, 50], labels: ["full size", "50%"], mods: 1, tool: "todds", toolOk: true, running });
 const result = (request, loading, name = "pending") => ({
   request, loading, scope: "plan", scale: 100, scales: [100, 50], labels: ["full size", "50%"],
   mods: 1, tool: "todds", toolOk: true, png: name, estFacts: [name], convert: 1,
@@ -14,8 +15,10 @@ async function setup() {
   let created = 0;
   const el = (tag, cls, text) => { created++; return new Element(tag, cls, text); };
   const $ = (sel) => sel === "#screen" ? screen : screen.querySelector(sel.replace(/^#screen /, ""));
+  const infos = [];
   const api = {
-    Setting: async () => "", SetSetting: async () => {},
+    Setting: async () => "", SetSetting: async () => {}, Leave: async () => { infos.push("leave"); },
+    TexturesInfo: async (...args) => { infos.push(args); return info(); },
     Textures: (...args) => { const d = deferred(); requests.push({ ...d, args }); return d.promise; },
     TextureMeasure: (id) => { const d = deferred(); polls.push({ ...d, id }); return d.promise; },
   };
@@ -33,36 +36,55 @@ async function setup() {
   };
   const document = { activeElement: null, body: new Element("body") };
   const tex = await loadModules("./textures.js", deps, { document, setTimeout: (f) => timers.push(f) });
-  return { screen, timers, requests, polls, messages, S, tex, created: () => created };
+  const click = (label) => {
+    const b = screen.querySelectorAll("button").find((n) => n.textContent === label);
+    assert.ok(b, `no button ${label}`);
+    b.onclick();
+  };
+  // open shows the encoder and the mods; 扫描统计 starts the count.
+  const count = async () => { h.tex.open(); await flush(); click("count the textures"); };
+  const h = { screen, timers, requests, polls, messages, S, tex, infos, click, count, created: () => created };
+  return h;
 
 }
 
-for (const reject of [false, true]) test(`late ${reject ? "error" : "result"} cannot replace newer options`, async () => {
+test("opening reads no texture; changing a choice does not count again", async () => {
   const h = await setup();
-  h.tex.open();
-  h.requests[0].resolve(result(1, true));
-  await flush();
+  h.tex.open(); await flush();
+  assert.equal(h.requests.length, 0, "the page opens without reading textures");
+  assert.ok(h.screen.textContent.includes("not counted yet"));
+  h.click("count the textures");
+  assert.equal(h.screen.querySelector('[data-f="scale"]').disabled, true, "choices wait while counting");
+  h.requests[0].resolve(result(1, false, "first estimate")); await flush();
+  assert.ok(h.screen.textContent.includes("first estimate"));
   const scale = h.screen.querySelector('[data-f="scale"]');
-  assert.equal(scale.disabled, false, "scale remains usable during measurement");
-  assert.ok(h.screen.querySelector(".tex-pending"), "unmeasured values shimmer");
-  h.timers.shift()();
-  await flush();
-  assert.equal(h.polls[0].id, 1);
-  scale.value = "50"; scale.onchange();
-  h.requests[1].resolve(result(2, false, "new estimate"));
-  await flush();
-  if (reject) h.polls[0].reject(new Error("old failure"));
-  else h.polls[0].resolve(result(1, false, "old estimate"));
-  await flush();
-  assert.ok(h.screen.textContent.includes("new estimate"));
-  assert.ok(!h.screen.textContent.includes("old estimate"));
-  assert.equal(h.messages.length, 0, "old errors are discarded too");
+  scale.value = "50"; scale.onchange(); await flush();
+  assert.equal(h.requests.length, 1, "a new scale is not counted by itself");
+  assert.ok(h.screen.textContent.includes("the choices changed since this count"));
+  assert.ok(h.screen.textContent.includes("first estimate"), "the last count stays on screen");
+  h.click("count the textures");
   assert.equal(h.requests[1].args[1], 50);
+});
+
+for (const reject of [false, true]) test(`a stopped count's late ${reject ? "error" : "result"} is dropped`, async () => {
+  const h = await setup();
+  await h.count();
+  h.requests[0].resolve(result(1, false, "kept estimate")); await flush();
+  h.click("count the textures"); await flush();
+  h.click("stop counting"); await flush();
+  assert.ok(h.infos.includes("leave"), "stopping cancels the read");
+  if (reject) h.requests[1].reject(new Error("late failure"));
+  else h.requests[1].resolve(result(2, true, "late estimate"));
+  await flush();
+  assert.ok(h.screen.textContent.includes("kept estimate"), "the finished count comes back");
+  assert.ok(!h.screen.textContent.includes("late estimate"));
+  assert.equal(h.timers.length, 0, "a stopped count polls no more");
+  assert.equal(h.messages.length, 0);
 });
 
 test("row updates preserve selects and conversion progress; leaving discards replies", async () => {
   const h = await setup();
-  h.tex.open(); h.requests[0].resolve(result(1, true));
+  await h.count(); h.requests[0].resolve(result(1, true));
   await flush();
   const scope = h.screen.querySelector('[data-f="scope"]');
   h.tex.event({ text: "conversion progress", frac: 0.25 });
@@ -83,7 +105,7 @@ test("a conversion event arriving before the page reply keeps its progress", asy
   const h = await setup();
   h.tex.open();
   h.tex.event({ text: "new conversion progress", frac: 0.5 });
-  h.requests[0].resolve(result(1, true)); await flush();
+  await flush();
   assert.ok(h.screen.textContent.includes("new conversion progress"));
   assert.equal(h.screen.querySelector('[data-f="scale"]').disabled, true);
 });
@@ -92,7 +114,7 @@ test("unchanged pending rows keep their shimmer while another row completes", as
   const h = await setup();
   const p = result(1, true);
   p.rows.push({ ref: "mod-b", name: "second mod", pending: true });
-  h.tex.open(); h.requests[0].resolve(p); await flush();
+  await h.count(); h.requests[0].resolve(p); await flush();
   const second = h.screen.querySelector('[data-ref="mod-b"]');
   const summary = h.screen.querySelector('[data-tex="estimate"]');
   h.timers.shift()(); await flush();
@@ -105,7 +127,7 @@ test("unchanged pending rows keep their shimmer while another row completes", as
 
 test("measurement can reorder rows without interrupting a header drag or pending shimmer", async () => {
   const h = await setup();
-  h.tex.open();
+  await h.count();
   assert.equal(h.tex.key(event("s")), false, "headers are unavailable before data arrives");
   const p = result(1, true, "Z pending");
   p.rows.push({ ref: "mod-b", name: "A pending", pending: true });
@@ -128,7 +150,7 @@ test("450 rows arrive in batches and unchanged polls create no DOM", async () =>
   const h = await setup();
   const p = result(1, true);
   p.rows = Array.from({ length: 450 }, (_, i) => ({ ref: `mod-${i}`, name: `Mod ${i}`, pending: true }));
-  h.tex.open(); h.requests[0].resolve(p); await flush();
+  await h.count(); h.requests[0].resolve(p); await flush();
   const table = h.screen.querySelector('.tex-rows');
   const unchanged = h.screen.querySelector('[data-ref="mod-449"]');
   h.timers.shift()(); await flush();

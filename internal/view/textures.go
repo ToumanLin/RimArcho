@@ -25,11 +25,14 @@ func TextureScaleLabel(s int) string {
 
 // TexturePage is the 贴图优化 page.
 type TexturePage struct {
-	Loading bool     `json:"loading,omitempty"`
-	Scope   string   `json:"scope"` // app.TexPlan or app.TexAll
-	Scale   int      `json:"scale"`
-	Scales  []int    `json:"scales"`
-	Labels  []string `json:"labels"` // of Scales
+	Loading bool `json:"loading,omitempty"`
+	// Measured: the textures were read (Scope, Scale say with what). The page opens with
+	// only the encoder and the mods; the player starts the read (06 §2.13).
+	Measured bool     `json:"measured,omitempty"`
+	Scope    string   `json:"scope"` // app.TexPlan or app.TexAll
+	Scale    int      `json:"scale"`
+	Scales   []int    `json:"scales"`
+	Labels   []string `json:"labels"` // of Scales
 	// The encoder: ready, or what is wrong and the offer to download it.
 	Tool     string `json:"tool"`
 	ToolPath string `json:"toolPath,omitempty"`
@@ -112,15 +115,15 @@ func TexturePageContext(ctx context.Context, a *app.App, scope string, scale int
 	return TexturePageReport(a, r, scope), nil
 }
 
-// TexturePageReport formats an already measured summary, without loading another index.
-func TexturePageReport(a *app.App, r *app.TextureReport, scope string) *TexturePage {
-	o := r.Options
-	p := TexturePageLoading(scope, o.Scale)
-	p.Loading, p.Mods = false, len(r.Mods)
-	if r.Tool != nil {
-		p.ToolPath = r.Tool.Path
+// TexturePageInfo is the page before any texture is read: the encoder and how many mods
+// the scope holds. Reading the textures is the player's call (06 §2.13).
+func TexturePageInfo(a *app.App, scope string, scale int, tool *app.TextureTool, mods int) *TexturePage {
+	p := TexturePageLoading(scope, scale)
+	p.Loading, p.Mods = false, mods
+	if tool != nil {
+		p.ToolPath = tool.Path
 	}
-	if t := r.Tool; t != nil && t.Err == "" {
+	if t := tool; t != nil && t.Err == "" {
 		p.Tool, p.ToolOK = Tf("todds %s  %s", t.Version, t.Path), true
 	} else {
 		p.Tool = T("the DDS encoder (todds) is not installed")
@@ -131,6 +134,14 @@ func TexturePageReport(a *app.App, r *app.TextureReport, scope string) *TextureP
 		p.Offer = Tf("todds %s  %s  from %s (MPL-2.0)", off.Version, SizeText(off.Bytes), off.URL)
 		p.OfferTo = off.Dir
 	}
+	return p
+}
+
+// TexturePageReport formats an already measured summary, without loading another index.
+func TexturePageReport(a *app.App, r *app.TextureReport, scope string) *TexturePage {
+	o := r.Options
+	p := TexturePageInfo(a, scope, o.Scale, r.Tool, len(r.Mods))
+	p.Measured = true
 	png, pngBytes, ours, oursBytes, stale := r.Totals()
 	p.PNG = Tf("%d PNG  %s", png, SizeText(pngBytes))
 	if ours > 0 {

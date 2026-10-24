@@ -302,11 +302,42 @@ export async function build(again = false) {
   read.finish();
 }
 
-// setTex changes the textures choice: the page is measured again, since the files
-// converted, the size after and the peak all depend on it.
-async function setTex(tex) {
-  if (!B.page || (B.tex === tex && !B.error)) return;
-  return measureBuild(tex);
+// setTex changes the textures choice. Counting what it converts reads every PNG, so it
+// waits for 扫描统计 (measureBuild): until then the step says so, and the pack can be
+// created anyway (the build checks the drive itself).
+function setTex(tex) {
+  if (!B.page || B.tex === tex) return;
+  closeDryRun();
+  B.tex = tex;
+  B.error = "";
+  drawBuild();
+}
+
+// texMeasured: the page's facts are for the choice on screen.
+const texMeasured = () => !!B.page && B.page.tex === B.tex;
+
+// blocker is why 编译 cannot go now. A page measured with another textures choice still
+// tells everything but the encoder, which it knows apart (toolOk).
+function blocker(p) {
+  let why = p.ok ? "" : p.why, toGo = p.toGo || "", toNeeds = !!p.toNeeds;
+  if (!texMeasured()) {
+    if (toGo === "textures") { why = ""; toGo = ""; }
+    if (!why && B.tex > 0 && !p.toolOk) { why = T("install the DDS encoder (todds) first, or create it without converting textures"); toGo = "textures"; }
+  }
+  return { why, toGo, toNeeds };
+}
+
+// texStep is the textures step for a choice not measured yet.
+function texStep(s, p) {
+  const out = { ...s, level: "", more: [], go: "", count: true };
+  out.text = B.tex <= 0
+    ? T("The PNGs are copied as they are. Converted to DDS the game loads faster and uses less video memory: pre-convert keeps their size, slim also shrinks them.")
+    : T("pick a choice, then 扫描统计 to see how many PNG become DDS and the size after");
+  if (B.tex > 0 && !p.toolOk) {
+    out.level = "bad"; out.go = "textures";
+    out.more = [T("the DDS encoder (todds) is not installed: install it in 库 › 贴图优化")];
+  }
+  return out;
 }
 
 async function measureBuild(tex) {
@@ -323,8 +354,7 @@ async function measureBuild(tex) {
     if (!read.current() || seq !== B.seq) return;
     B.loading = false;
     B.error = errText(e);
-    syncMeasure();
-    syncButton();
+    drawBuild();
     read.fail(e);
     return;
   }
@@ -358,7 +388,8 @@ function syncMeasure() {
     step.classList.remove("bad", "warn");
     const text = step.querySelector(".x");
     text.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), key === "textures" ? 3 : 1));
-    step.querySelectorAll("ul, button").forEach((n) => n.remove());
+    // a failed count keeps 扫描统计, to try again
+    step.querySelectorAll(B.loading ? "ul, button" : "ul").forEach((n) => n.remove());
   }
   const size = $("#pk-size");
   if (size) size.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), 1));
@@ -424,7 +455,8 @@ function drawBuild() {
   const NOW = { 0: ["check"], 2: ["trim", "lock"], 3: ["textures"], 4: ["place"], 5: [] };
   const now = S.packBuild ? NOW[S.packBuild.step] || ["check"] : null;
   const first = now ? (now.length ? p.steps.findIndex((s) => now.includes(s.key)) : p.steps.length) : -1;
-  p.steps.forEach((s, i) => {
+  const shown = p.steps.map((s) => s.kind === "textures" && !texMeasured() ? texStep(s, p) : s);
+  shown.forEach((s, i) => {
     let cls = "bd-step" + (s.level ? " " + s.level : "");
     const done = now && !now.includes(s.key) && (i < first || (s.key === "lock" && S.packBuild.step >= 3));
     if (now) cls += done ? " done" : now.includes(s.key) ? " cur" : " wait";
@@ -454,6 +486,7 @@ function drawBuild() {
       body.insertBefore(sel, body.children[1]);
     }
     if (s.go) r.append(button(T("install"), "", () => ui.go(s.go), "primary"));
+    if (s.count && !B.loading && !S.packBuild) r.append(button(T("count the textures"), "", () => measureBuild(B.tex), s.go ? "" : "primary"));
     if (s.needs) r.append(button(T("fix them"), "", () => ui.go("needs"), "primary"));
     sc2.append(r);
   });
@@ -479,7 +512,7 @@ function drawBuild() {
   if (p.before) {
     const v = el("span", "v");
     v.id = "pk-size";
-    v.append(p.before + " → ", el("b", "", p.after));
+    v.append(p.before + " → ", texMeasured() ? el("b", "", p.after) : el("span", "muted", T("not counted for this choice")));
     row(T("size"), v);
   } else {
     const v = el("span", "v muted", T("worked out once the problems are fixed"));
@@ -532,12 +565,13 @@ function syncButton() {
   if (head) head.textContent = B.name.trim() || p.plan;
   err.textContent = B.nameErr || "";
   let reason = "", toNeeds = false, toGo = "";
+  const b = blocker(p);
   if (B.error) reason = B.error;
-  else if (!B.loading && !p.ok) { reason = p.why; toNeeds = p.toNeeds; toGo = p.toGo || ""; }
+  else if (!B.loading && b.why) { reason = b.why; toNeeds = b.toNeeds; toGo = b.toGo; }
   else if (S.packBuild) reason = Tf("creating pack %s", S.packBuild.name);
   else if (building()) reason = T("another pack is being created; wait for it to finish");
   else if (B.nameErr) reason = B.nameErr;
-  go1.disabled = B.loading || !!B.error || B.tex !== p.tex || !!reason;
+  go1.disabled = B.loading || !!B.error || !!reason;
   why.classList.toggle("busy", !!S.packBuild && p.ok);
   why.innerHTML = "";
   why.hidden = !reason;
@@ -553,7 +587,7 @@ function syncButton() {
 
 function go() {
   const p = B.page;
-  if (!p || B.loading || B.error || B.tex !== p.tex || !p.ok || B.nameErr || building()) return;
+  if (!p || B.loading || B.error || blocker(p).why || B.nameErr || building()) return;
   startBuild(B.name.trim());
 }
 

@@ -2,6 +2,8 @@
 // RimArcho converted and what went stale, what converting at a scale would take and save,
 // then the run in the background ("textures" events), stop, and take everything back. The
 // encoder (todds) is downloaded only after the player saw where from and how big.
+// Reading every PNG takes a while, so the page opens with only the encoder and the mods:
+// 扫描统计 reads them, and changing a choice never does (the last count stays, marked old).
 import { pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, pageLoading, page, button } from "./screens.js";
@@ -9,26 +11,56 @@ import * as pop from "./popups.js";
 import { createTable } from "./datatable.js";
 import { textureColumns } from "./tabledefs.js";
 
-const X = { scope: "plan", scale: 100, page: null, prog: null, seq: 0, loading: false, error: "" };
+// info: the encoder and the mods (no texture read); page: the last count, at: what it was
+// counted with; old: the textures changed since (a run, a clean).
+const X = { scope: "plan", scale: 100, info: null, page: null, at: null, old: false, prog: null, seq: 0, infoSeq: 0, loading: false, error: "" };
+
+const context = () => JSON.stringify([S.board?.env, S.shell?.plan?.id]);
+// counted: the count on screen is for the choices on screen.
+const counted = () => !!(X.page && X.at && X.at.scope === X.scope && X.at.scale === X.scale && !X.old);
 
 export async function open() {
-  const read = beginPageRead("textures", { label: "reading textures…", retry: open });
-  return draw(true, false, read);
+  const read = beginPageRead("textures", { label: "loading…", retry: open });
+  // A count of another game or list, or one cut short by leaving, is no count.
+  if (X.at && (X.at.ctx !== context() || X.page?.loading)) { X.page = null; X.at = null; X.old = false; }
+  X.loading = false;
+  return readInfo(read);
+}
+
+// readInfo asks for the encoder and the scope's mods: quick, no texture is read.
+async function readInfo(entryRead = null) {
+  const read = entryRead || beginPageRead("textures", { keep: true, label: "loading…", retry: open });
+  const n = ++X.infoSeq;
+  const progress = X.prog;
+  try {
+    const p = await api.TexturesInfo(X.scope, X.scale);
+    if (!read.current() || n !== X.infoSeq) return;
+    X.info = p;
+    if (X.prog === progress) X.prog = p.running || null;
+    if (!X.loading) X.error = "";
+  } catch (e) {
+    if (!read.current() || n !== X.infoSeq) return;
+    X.error = errText(e); read.fail(e);
+    if (pageLoading()) return;
+  }
+  read.finish();
+  draw();
 }
 
 // event is a "textures" event: the run's progress, then its end.
 export function event(ev) {
   if (ev.done) {
     X.prog = null;
+    if (X.page) X.old = true;
     say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
-    if (S.screen === "textures") draw(true);
+    if (S.screen === "textures") readInfo();
     return;
   }
   X.prog = ev;
   if (S.screen !== "textures") { say("busy", T("converting textures") + "  " + ev.text); return; }
   $("#screen").querySelectorAll("select").forEach((s) => { s.disabled = true; });
   const f = $("#screen .tex-foot");
-  if (f) f.replaceWith(slot(foot(X.page), "foot"));
+  if (f && X.info) f.replaceWith(slot(foot(X.info, X.page), "foot"));
 }
 
 function setRow(card, name, sub, ...right) {
@@ -54,7 +86,7 @@ function select(f, values, labels, value, onchange) {
     s.append(o);
   });
   s.onchange = () => onchange(s.value);
-  s.disabled = !!X.prog;
+  s.disabled = !!X.prog || X.loading;
   return s;
 }
 
@@ -67,48 +99,61 @@ function pending(lines = 1) {
   return s;
 }
 
-async function draw(fetch, measurements = false, entryRead = null) {
-  if (S.screen !== "textures") return;
-  if (fetch) {
-    const read = entryRead || beginPageRead("textures", { label: "reading textures…", retry: open });
-    const n = ++X.seq;
-    const progress = X.prog;
-    X.loading = true; X.error = "";
-    if (X.page) X.page = { ...X.page, loading: true, rows: (X.page.rows || []).map((r) => ({ ...r, pending: true })) };
-    if (!pageLoading() && !entryRead) draw(false);
-    const current = () => n === X.seq && read.current();
-    try {
-      let p = await api.Textures(X.scope, X.scale);
-      if (!current()) return;
-      if (X.prog === progress) X.prog = p.running || null;
-      // Both the request and the page visit must still match after every await (06 §3.1).
-      while (current() && p) {
-        const changed = JSON.stringify(X.page) !== JSON.stringify(p);
-        X.page = p;
-        X.loading = !!p.loading;
-        X.error = p.error || "";
-        if (changed) draw(false, true);
-        if (X.error) say("fail", X.error);
-        if (!p.loading) { read.finish(); return; }
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        if (!current()) return;
-        p = await api.TextureMeasure(p.request);
-        if (!current()) return;
-      }
-    } catch (e) {
-      if (!current()) return;
-      X.loading = false;
-      X.error = errText(e); read.fail(e);
-      if (pageLoading()) return;
-      if (X.page) X.page = { ...X.page, loading: false, rows: (X.page.rows || []).map((r) => ({ ...r, pending: false })) };
-    }
+// count reads every PNG of the scope (扫描统计): rows fill in as mods finish; a later
+// count, a stop or leaving the page drops this one (06 §3.1).
+async function count() {
+  if (S.screen !== "textures" || X.loading) return;
+  const read = X.countRead = beginPageRead("textures", { keep: true, label: "reading textures…", retry: open });
+  const n = ++X.seq;
+  const before = X.before = { page: X.page, at: X.at, old: X.old };
+  const at = { scope: X.scope, scale: X.scale, ctx: context() };
+  X.loading = true; X.error = "";
+  if (X.page) X.page = { ...X.page, loading: true, rows: (X.page.rows || []).map((r) => ({ ...r, pending: true })) };
+  draw();
+  const current = () => n === X.seq && read.current();
+  try {
+    let p = await api.Textures(at.scope, at.scale);
     if (!current()) return;
-    X.loading = false;
-    read.finish();
+    // Both the request and the page visit must still match after every await (06 §3.1).
+    while (current() && p) {
+      const changed = JSON.stringify(X.page) !== JSON.stringify(p);
+      X.page = p; X.at = at; X.old = false;
+      X.loading = !!p.loading;
+      X.error = p.error || "";
+      if (changed) draw(true);
+      if (X.error) { say("fail", X.error); break; }
+      if (!p.loading) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (!current()) return;
+      p = await api.TextureMeasure(p.request);
+      if (!current()) return;
+    }
+  } catch (e) {
+    if (!current()) return;
+    X.error = errText(e); say("fail", X.error);
+    Object.assign(X, before);
   }
-  const p = X.page;
+  if (!current()) return;
+  if (X.error) { const e = X.error; Object.assign(X, before); X.error = e; }
+  X.loading = false;
+  read.finish();
+  draw();
+}
+
+// stopCount drops the count going on; the last finished one comes back.
+function stopCount() {
+  ++X.seq;
+  api.Leave("textures").catch(() => {});
+  Object.assign(X, X.before || {}, { loading: false });
+  X.countRead?.finish();
+  draw();
+}
+
+function draw(measurements = false) {
+  if (S.screen !== "textures") return;
+  const I = X.info, p = X.page;
   const sc = $("#screen");
-  if (!p) {
+  if (!I) {
     sc.innerHTML = "";
     const w = page("textures", X.error);
     w.setAttribute("aria-busy", String(X.loading));
@@ -116,6 +161,7 @@ async function draw(fetch, measurements = false, entryRead = null) {
     sc.append(w);
     return;
   }
+  const busy = X.loading || !!p?.loading;
   const top = sc.scrollTop;
   const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.f;
   const oldPage = sc.querySelector(".textures");
@@ -123,7 +169,7 @@ async function draw(fetch, measurements = false, entryRead = null) {
   if (!previous) sc.innerHTML = "";
   const w = page("textures", "");
   if (!previous) sc.append(w);
-  w.setAttribute("aria-busy", String(X.loading));
+  w.setAttribute("aria-busy", String(busy));
   const error = el("div", "muted", X.error);
   error.hidden = !X.error;
   w.append(slot(error, "error"));
@@ -131,47 +177,43 @@ async function draw(fetch, measurements = false, entryRead = null) {
   // the encoder
   w.append(el("div", "label section", T("encoder")));
   const enc = el("section", "card settings");
-  if (!p.tool) setRow(enc, T("the DDS encoder"), null, X.error ? null : pending());
-  else {
-    setRow(enc, T("the DDS encoder"), p.toolOk ? null : [p.offer, p.offerTo && { text: "→ " + p.offerTo, paths: [p.offerTo] }], p.toolOk ? factText(el("span", "muted"), { text: p.tool, paths: [p.toolPath] }) : null,
-      p.toolOk ? null : button(T("download todds…"), "", () => install(p), "primary"));
-    if (!p.toolOk) enc.querySelector(".name").after(pathContent(el("div", "sub warn"), p.tool, [p.toolPath]));
-  }
+  setRow(enc, T("the DDS encoder"), I.toolOk ? null : [I.offer, I.offerTo && { text: "→ " + I.offerTo, paths: [I.offerTo] }], I.toolOk ? factText(el("span", "muted"), { text: I.tool, paths: [I.toolPath] }) : null,
+    I.toolOk ? null : button(T("download todds…"), "", () => install(I), "primary"));
+  if (!I.toolOk) enc.querySelector(".name").after(pathContent(el("div", "sub warn"), I.tool, [I.toolPath]));
   w.append(slot(enc, "encoder"));
 
   // what is there
   w.append(el("div", "label section", T("what is there")));
   const now = el("section", "card settings");
-  const mods = setRow(now, T("mods"), Tf("%d mods", p.mods),
-    select("scope", ["plan", "all"], [T("the current plan"), T("every installed mod")], X.scope, (v) => { X.scope = v; draw(true); }));
-  const modCount = mods.querySelector(".sub");
-  modCount.dataset.texMods = "";
-  fillModCount(modCount, p);
-  slot(setRow(now, "PNG", p.loading ? null : p.png, p.loading ? pending() : null), "png");
-  const ours = slot(setRow(now, T("RimArcho's DDS"), [p.ours, p.staleText], button(T("remove every converted texture…"), "", () => clean(), "danger", "textures-clean")), "ours");
-  ours.hidden = !p.ours || !!p.loading;
+  setRow(now, T("mods"), Tf("%d mods", I.mods),
+    select("scope", ["plan", "all"], [T("the current plan"), T("every installed mod")], X.scope, (v) => { X.scope = v; readInfo(); }));
+  const png = slot(setRow(now, "PNG", p && !p.loading ? p.png : null, p?.loading ? pending() : null), "png");
+  png.hidden = !p;
+  const ours = slot(setRow(now, T("RimArcho's DDS"), p ? [p.ours, p.staleText] : null, button(T("remove every converted texture…"), "", () => clean(), "danger", "textures-clean")), "ours");
+  ours.hidden = !p || !p.ours || !!p.loading;
   w.append(now);
 
   // what converting does
   w.append(el("div", "label section", T("what converting does")));
   const est = el("section", "card settings");
   setRow(est, T("scale"), T("scaling shrinks them further; never below 128 px, masks stay full size"),
-    select("scale", p.scales, p.labels, X.scale, (v) => { X.scale = Number(v); draw(true); }));
-  const facts = [...(p.estFacts || [])];
-  if (p.upToDate) facts.push(Tf("%d up to date", p.upToDate));
-  if (p.leftAlone) facts.push(Tf("%d left alone (a DDS of the mod's own, or another format of the same name)", p.leftAlone));
-  slot(setRow(est, T("convert"), p.loading ? null : facts, p.loading ? pending() : null), "estimate");
+    select("scale", I.scales, I.labels, X.scale, (v) => { X.scale = Number(v); draw(); }));
+  const facts = [...(p?.estFacts || [])];
+  if (p?.upToDate) facts.push(Tf("%d up to date", p.upToDate));
+  if (p?.leftAlone) facts.push(Tf("%d left alone (a DDS of the mod's own, or another format of the same name)", p.leftAlone));
+  const estimate = slot(setRow(est, T("convert"), p && !p.loading ? facts : null, p?.loading ? pending() : null), "estimate");
+  estimate.hidden = !p;
   setRow(est, "", T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back"));
   w.append(est);
-  w.append(slot(foot(p), "foot"));
+  w.append(slot(foot(I, p), "foot"));
 
-  if (previous) textureRows(p, previous.querySelector('[data-tex="rows"]'));
-  else w.append(slot(textureRows(p), "rows"));
+  const rows = p || { rows: [] };
+  if (previous) textureRows(rows, previous.querySelector('[data-tex="rows"]'));
+  else w.append(slot(textureRows(rows), "rows"));
   if (previous) {
     // Keep live select elements in place while estimates arrive (06 §3.1).
-    previous.setAttribute("aria-busy", String(X.loading));
+    previous.setAttribute("aria-busy", String(busy));
     for (const next of w.querySelectorAll("[data-tex]")) updateMeasurement(previous.querySelector(`[data-tex="${next.dataset.tex}"]`), next);
-    fillModCount(previous.querySelector("[data-tex-mods]"), p);
     return;
   }
   sc.scrollTop = top;
@@ -179,13 +221,13 @@ async function draw(fetch, measurements = false, entryRead = null) {
 }
 
 const textureTable = createTable({ key: "ui.gui.textures.columns", columns: textureColumns,
-  state: { cols: null, sort: "estimate", dir: 1 }, redraw: () => draw(false, true),
+  state: { cols: null, sort: "estimate", dir: 1 }, redraw: () => draw(true),
 });
 let columnsLoaded = false;
 function textureRows(p, old = null) {
   if (!columnsLoaded) {
     columnsLoaded = true;
-    textureTable.load().then(() => { if (S.screen === "textures" && X.page) draw(false, true); });
+    textureTable.load().then(() => { if (S.screen === "textures" && X.info) draw(true); });
   }
   const t = old || el("section", "card data-table tex-rows");
   t.tabIndex = 0;
@@ -235,15 +277,9 @@ function updateMeasurement(old, next) {
   if (!old.isEqualNode(next)) { next.scrollLeft = old.scrollLeft; old.replaceWith(next); }
 }
 
-function fillModCount(node, p) {
-  if (p.loading && p.rows == null && node.querySelector(".tex-pending")) return;
-  const unknown = p.loading && p.rows == null;
-  node.textContent = unknown ? "" : Tf("%d mods", p.mods);
-  if (unknown) node.append(pending());
-}
-
-// foot: the run's progress and stop, or the convert button.
-function foot(p) {
+// foot: the run's progress and stop; else what the count on screen is, 扫描统计 (or its
+// stop) and the convert button.
+function foot(I, p) {
   const f = el("div", "tex-foot");
   if (X.prog) {
     const w = el("div", "prog");
@@ -257,18 +293,30 @@ function foot(p) {
     }));
     return f;
   }
-  const go = button(T("convert"), "", () => convert(p), "primary", "textures-run");
-  go.disabled = X.loading || !!p.loading || !!X.error || !p.toolOk || !p.convert;
-  f.append(go);
+  let note = "";
+  if (!X.loading) {
+    if (!p) note = T("not counted yet: 扫描统计 reads every PNG to show what is there and what converting saves");
+    else if (X.old) note = T("the textures changed since this count; 扫描统计 counts again");
+    else if (!counted()) note = T("the choices changed since this count; 扫描统计 counts again");
+  }
+  f.append(el("div", "muted word-facts tex-note", note));
+  const scan = X.loading
+    ? button(T("stop counting"), "", () => stopCount())
+    : button(T("count the textures"), "", () => count(), counted() ? "" : "primary");
+  const go = button(T("convert"), "", () => convert(), counted() ? "primary" : "", "textures-run");
+  // Without a count the run still converts only what is new or changed.
+  go.disabled = X.loading || !!X.error || !I.toolOk || (counted() && !p.convert);
+  f.append(scan, go);
   return f;
 }
 
-function convert(p) {
-  const lines = [...(p.estFacts || []), T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back")];
+function convert() {
+  const lines = counted() ? [...(X.page.estFacts || [])] : [T("not counted yet: only new or changed PNGs are converted, those already done are skipped")];
+  lines.push(T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back"));
   pop.confirm(T("convert textures to DDS"), lines, T("convert"), async () => {
     try { say("ok", await api.TexturesRun(X.scope, X.scale, [])); } catch (e) { say("fail", errText(e)); return; }
     X.prog = { text: T("converting textures"), frac: 0 };
-    draw(false);
+    draw();
   });
 }
 
@@ -276,13 +324,14 @@ function install(p) {
   pop.confirm(T("download todds…"), [p.offer, "→ " + p.offerTo], T("download todds…"), async () => {
     say("busy", T("download todds…"));
     try { say("ok", await api.TexturesInstall()); } catch (e) { say("fail", errText(e)); }
-    draw(true);
+    readInfo();
   });
 }
 
 function clean() {
   pop.confirm(T("remove every converted texture…"), [T("the DDS RimArcho wrote are deleted; the PNGs stay and the game uses them again")], T("remove every converted texture…"), async () => {
     try { say("ok", await api.TexturesClean(X.scope)); } catch (e) { say("fail", errText(e)); }
-    draw(true);
+    if (X.page) X.old = true;
+    readInfo();
   });
 }

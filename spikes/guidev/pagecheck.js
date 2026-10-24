@@ -108,11 +108,11 @@ try {
     [null, "Workspace", editor, workspace],
     ["library", "Library", () => library.open(), { rows: [], columns: [] }],
     ["tasks", "Tasks", () => tasks.open(), { rows: [] }],
-    ["textures", "Textures", () => textures.open(), texturePage],
+    ["textures", "TexturesInfo", () => textures.open(), texturePage],
     ["log", "LogPage", () => screens.gameLog("fixture", true), { path: "fixture", files: [], rows: [] }],
   ];
   for (const [screen, method, open, payload] of pages) {
-    const remaining = ["Workspace", "Library", "Tasks", "Textures", "LogPage"].includes(method);
+    const remaining = ["Workspace", "Library", "Tasks", "TexturesInfo", "LogPage"].includes(method);
     await test(method + " shows loading immediately; late success/failure cannot navigate" + (remaining ? "; failure can retry" : ""), async () => {
       for (const fail of [false, true]) {
         screens.openScreen("other");
@@ -469,10 +469,10 @@ try {
   });
   await test("texture re-entry ignores old success and failure", async () => {
     const old = deferred(), fresh = deferred();
-    handlers.set("Textures", () => old.promise);
+    handlers.set("TexturesInfo", () => old.promise);
     const p1 = textures.open(); await Promise.resolve();
-    assert(S.screen === "textures" && document.querySelector('#screen [role="status"]')?.getAttribute("aria-label") === "reading textures…", "textures did not show loading immediately");
-    screens.closeScreen(); handlers.set("Textures", () => fresh.promise);
+    assert(S.screen === "textures" && document.querySelector('#screen [role="status"]')?.getAttribute("aria-label") === "loading…", "textures did not show loading immediately");
+    screens.closeScreen(); handlers.set("TexturesInfo", () => fresh.promise);
     const p2 = textures.open(); await Promise.resolve();
     old.resolve({}); await p1;
     assert(document.querySelector("#screen .page-loading .skel"), "old reply replaced new loading state");
