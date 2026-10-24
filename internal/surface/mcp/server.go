@@ -244,12 +244,52 @@ type LogIn struct {
 }
 
 type FilesIn struct {
-	Env       string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Pattern   string `json:"pattern" jsonschema:"text to find (case-insensitive) in the effective XML/TXT of enabled mods"`
-	Mod       string `json:"mod,omitempty" jsonschema:"only this mod"`
-	Regex     bool   `json:"regex,omitempty"`
-	Languages bool   `json:"languages,omitempty" jsonschema:"also search Languages/ (translations)"`
-	All       bool   `json:"all,omitempty"`
+	Env           string   `json:"env,omitempty" jsonschema:"another environment by name (default: current)"`
+	Pattern       string   `json:"pattern" jsonschema:"text, defName, or Go regular expression to find"`
+	Mod           string   `json:"mod,omitempty" jsonschema:"one mod reference; pkg: prefers its enabled copy"`
+	Mods          []string `json:"mods,omitempty" jsonschema:"mod references to search, including inactive copies"`
+	Def           bool     `json:"def,omitempty" jsonschema:"find a case-sensitive whole defName with roles and summary"`
+	Regex         bool     `json:"regex,omitempty" jsonschema:"use a Go regular expression"`
+	Word          bool     `json:"word,omitempty" jsonschema:"require identifier boundaries"`
+	CaseSensitive bool     `json:"case_sensitive,omitempty" jsonschema:"match case (default: insensitive)"`
+	Kind          string   `json:"kind,omitempty" jsonschema:"comma-separated defs,patches,about,languages,textures,sounds,assemblies or all"`
+	Languages     bool     `json:"languages,omitempty" jsonschema:"also search translations in Languages/"`
+	Lang          []string `json:"lang,omitempty" jsonschema:"language folder names to include; implies languages"`
+	AllVersions   bool     `json:"all_versions,omitempty" jsonschema:"search every version and LoadFolders branch without shadowing"`
+	Game          string   `json:"game,omitempty" jsonschema:"official Core/DLC content: with (default), without, or only"`
+	Mode          string   `json:"mode,omitempty" jsonschema:"matches (default), files, or count by mod"`
+	Page          int      `json:"page,omitempty" jsonschema:"1-based page number (default 1)"`
+	Limit         int      `json:"limit,omitempty" jsonschema:"rows per page (default 40)"`
+	PerFile       int      `json:"per_file,omitempty" jsonschema:"matching lines kept per file before paging (default 5)"`
+	All           bool     `json:"all,omitempty" jsonschema:"remove paging; per-file cap and 24 KB output cap still apply"`
+	GameVersion   string   `json:"game_version,omitempty" jsonschema:"game major.minor to resolve, e.g. 1.6 (default: environment)"`
+}
+
+// FilesArgv translates search options into the same flags used by the CLI.
+func FilesArgv(in FilesIn) []string {
+	b := argv("files", "search").str("mod", in.Mod)
+	for _, mod := range in.Mods {
+		b.str("mod", mod)
+	}
+	b.flag("def", in.Def).flag("regex", in.Regex).flag("word", in.Word).flag("case", in.CaseSensitive).
+		str("kind", in.Kind).flag("languages", in.Languages)
+	for _, lang := range in.Lang {
+		b.str("lang", lang)
+	}
+	b.flag("all-versions", in.AllVersions).str("game", in.Game).str("mode", in.Mode)
+	for _, n := range []struct {
+		name  string
+		value int
+	}{{"page", in.Page}, {"limit", in.Limit}, {"per-file", in.PerFile}} {
+		if n.value != 0 {
+			b.a = append(b.a, "--"+n.name, strconv.Itoa(n.value))
+		}
+	}
+	b.flag("all", in.All).str("game-version", in.GameVersion)
+	if strings.HasPrefix(in.Pattern, "--") {
+		b.a = append(b.a, "--")
+	}
+	return append(b.a, in.Pattern)
 }
 
 type SourceIn struct {
@@ -392,7 +432,7 @@ func toolList() []tool {
 			return gv(argv("log").str("cluster", in.Cluster).str("text", in.Text).str("file", in.File).flag("prev", in.Prev).flag("all", in.All).str("since", in.Since), in.GameVersion)
 		}),
 		reg("search_files", true, false, descFiles, func(in FilesIn) []string {
-			return argv("files", "search", in.Pattern).str("mod", in.Mod).flag("regex", in.Regex).flag("languages", in.Languages).flag("all", in.All).a
+			return FilesArgv(in)
 		}),
 		reg("read_source", true, false, descSource, func(in SourceIn) []string { return SourceArgv(in) }),
 		reg("edit_loadout", false, false, descEdit, func(in EditIn) []string { return EditArgv(in) }),

@@ -122,12 +122,18 @@ $ archo why #z3bw #i4uc
     (none)
 
 $ archo files search shared_gun
-files search "shared_gun": 4 matches in 10 files of 5 mods
-  matches:
-    #i4uc  Defs/Shared.xml:3  <defName>Shared_Gun</defName>
-    #hnyg  Patches/Compat.xml:7  <xpath>Defs/ThingDef[defName="Shared_Gun"]/label</xpath>
-    #iqmu  Defs/Weapons/Shared.xml:3  <defName>Shared_Gun</defName>
-    #iqmu  Patches/Label.xml:3  <xpath>Defs/ThingDef[defName="Shared_Gun"]/label</xpath>
+files search "shared_gun" (active list, 1.6, defs,patches,about): 4 matches in 4 files of 3 mods (searched 10 files in 5 mods, <ms> ms)
+  2 #i4uc Over One  pkg:tester.over1  local Over1  load: /
+    Defs/Shared.xml
+      3  in ThingDef/Shared_Gun  <defName>Shared_Gun</defName>
+  3 #hnyg Compat  pkg:tester.compat  local Compat  load: /
+    Patches/Compat.xml
+      7  <xpath>Defs/ThingDef[defName="Shared_Gun"]/label</xpath>
+  4 #iqmu Over Two  pkg:tester.over2  local Over2  load: /
+    Defs/Weapons/Shared.xml
+      3  in ThingDef/Shared_Gun  <defName>Shared_Gun</defName>
+    Patches/Label.xml
+      3  <xpath>Defs/ThingDef[defName="Shared_Gun"]/label</xpath>
 
 $ archo problems ignore p:98551b
 ignored p:98551b incompat.active

@@ -9,6 +9,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -48,6 +49,14 @@ type lfEntry struct {
 // Resolve computes the load folders of the mod at root. loadFoldersXML is the verbatim
 // LoadFolders.xml from the declaration ("" if none); mm is the game's major.minor.
 func Resolve(root, loadFoldersXML, mm string, active Active) Resolved {
+	return ResolveFS(root, loadFoldersXML, mm, active, os.ReadDir)
+}
+
+// ResolveFS is Resolve with directory access supplied by the caller (03 §1).
+func ResolveFS(root, loadFoldersXML, mm string, active Active, readDir func(string) ([]fs.DirEntry, error)) Resolved {
+	if active == nil {
+		active = func(string) bool { return false }
+	}
 	var r Resolved
 	if lf := parseLoadFolders(loadFoldersXML); len(lf) > 0 {
 		tag := pickTag(lf, mm)
@@ -80,7 +89,8 @@ func Resolve(root, loadFoldersXML, mm string, active Active) Resolved {
 			return r
 		}
 	}
-	vs := versionDirs(root)
+	ents, _ := readDir(root)
+	vs := versionDirs(ents)
 	best := ""
 	for _, v := range vs { // ascending
 		if versionLE(trimV(v), mm) {
@@ -98,8 +108,11 @@ func Resolve(root, loadFoldersXML, mm string, active Active) Resolved {
 	if best != "" {
 		r.Folders = append(r.Folders, filepath.Join(root, best))
 	}
-	if st, err := os.Stat(filepath.Join(root, "Common")); err == nil && st.IsDir() {
-		r.Folders = append(r.Folders, filepath.Join(root, "Common"))
+	for _, e := range ents {
+		if e.IsDir() && strings.EqualFold(e.Name(), "Common") {
+			r.Folders = append(r.Folders, filepath.Join(root, e.Name()))
+			break
+		}
 	}
 	r.Folders = append(r.Folders, root)
 	return r
@@ -251,9 +264,8 @@ func versionLE(a, b string) bool {
 
 func versionLess(a, b string) bool { return versionLE(a, b) && !versionLE(b, a) }
 
-// versionDirs lists version-named subdirectories of root in ascending version order.
-func versionDirs(root string) []string {
-	ents, _ := os.ReadDir(root)
+// versionDirs returns version-named directories in ascending version order.
+func versionDirs(ents []fs.DirEntry) []string {
 	var vs []string
 	for _, e := range ents {
 		if e.IsDir() && isVersion(e.Name()) {

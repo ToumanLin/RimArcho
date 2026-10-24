@@ -154,6 +154,9 @@ func TestCLIParity(t *testing.T) {
 		{"analyze_log", map[string]any{"pattern": "pattern:g:xref.def"}, []string{"pattern", "pattern:g:xref.def"}},
 		{"analyze_log", map[string]any{"pattern": "list"}, []string{"pattern", "list"}},
 		{"search_files", map[string]any{"pattern": "Lib_Gun"}, []string{"files", "search", "Lib_Gun"}},
+		{"search_files", map[string]any{"pattern": "Lib_Gun", "def": true, "word": true, "case_sensitive": true, "mods": []string{modA, "pkg:tester.modb"}, "mode": "count", "page": 1, "limit": 2, "per_file": 1, "game_version": "1.6"}, []string{"files", "search", "Lib_Gun", "--def", "--word", "--case", "--mod", modA, "--mod", "pkg:tester.modb", "--mode", "count", "--page", "1", "--limit", "2", "--per-file", "1", "--game-version", "1.6"}},
+		{"search_files", map[string]any{"pattern": "Lib.Gun", "regex": true, "mod": modA, "kind": "defs,patches", "languages": true, "lang": []string{"English", "French"}, "all_versions": true, "game": "without", "all": true}, []string{"files", "search", "Lib.Gun", "--regex", "--mod", modA, "--kind", "defs,patches", "--languages", "--lang", "English", "--lang", "French", "--all-versions", "--game", "without", "--all"}},
+		{"search_files", map[string]any{"pattern": "Lib_Gun", "page": -1}, []string{"files", "search", "Lib_Gun", "--page", "-1"}},
 		{"save_loadout", map[string]any{"dry_run": true}, []string{"save", "--dry-run"}},
 		{"preview_uninstall", map[string]any{"keep_locked": true}, []string{"uninstall", "--dry-run", "--keep-locked"}},
 		{"manage_textures", map[string]any{"action": "optimize", "plan": true, "scale": 50, "dry_run": true}, []string{"textures", "optimize", "--plan", "--scale", "50", "--dry-run"}},
@@ -195,10 +198,11 @@ func TestCLIParity(t *testing.T) {
 		{"list_library", map[string]any{"lineage": modA}, []string{"library", "--lineage", modA}},
 		{"manage_library", map[string]any{"action": "move_to_locked", "refs": []string{modA}, "dry_run": true}, []string{"library", "move-to-locked", modA, "--dry-run"}},
 	}
+	searchMS := regexp.MustCompile(`(files search [^\n]*, )[0-9]+ ms\)`)
 	for _, c := range cases {
 		got, isErr := call(t, cs, c.tool, c.args)
 		want, code := e.Run(c.cli...)
-		if got != want {
+		if searchMS.ReplaceAllString(got, "${1}<ms> ms)") != searchMS.ReplaceAllString(want, "${1}<ms> ms)") {
 			t.Errorf("%s %v: MCP text differs from `archo %s`:\n--- mcp\n%s\n--- cli\n%s", c.tool, c.args, strings.Join(c.cli[:1], " "), got, want)
 		}
 		if isErr != (code == cmds.ExitError || code == cmds.ExitUsage) {

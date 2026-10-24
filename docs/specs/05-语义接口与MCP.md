@@ -214,7 +214,7 @@ next:
 | | `log [--cluster <E#>] [--file <路径>] [--prev] [--text <文本>] [--select] [--all] [--since <游标>]` | 日志归因（03 §6）。`--prev` 读 Player-prev.log；`--text` 分析粘贴的日志或堆栈；`--select` 让 `problems` 纳入这份日志。簇列表带一行 `cursor: log1.…`；`--since <游标>` 只列这之后新出现（`new`）或次数增加（`+N`）的簇，游戏重启过时说明游标已过期并列出新一次运行的全部簇（03 §6.6）；不与 `--cluster`、`--text` 同用 |
 | | `pattern [<pattern:id>] [--mod <packageId>] [--all]` | 错误范式库（03 §6.8）：一个范式的识别规则、常见原因、诊断路线、修法和语料中的出现次数；不带参数列出所有通用范式，`--mod` 列出某 Mod 的已知错误 |
 | | `log --follow [--once] [--json]` | 游戏运行时跟踪 Player.log，新簇出现就输出（03 §6.6）；`--once` 读完现有内容就停；`--json` 每簇一行 JSON |
-| | `files search <模式> [--mod <引用>] [--regex] [--languages] [--all]` | 在已启用 Mod 的生效内容（XML / TXT）里搜索，不区分大小写；默认跳过 `Languages/`（翻译会重复每个键），`--languages` 才搜 |
+| | `files search <模式> [--mod <引用>]… [--regex] [--case] [--word] [--def] [--kind <种类,…>] [--languages] [--lang <语言>]… [--all-versions] [--game with\|without\|only] [--game-version <x.y>] [--mode matches\|files\|count] [--page <n>] [--limit <n>] [--per-file <n>] [--all]` | 按载入范围搜索（03 §5.5）：默认启用的那份副本、当前版本的载入文件夹、`Defs`/`Patches`/`About`，不含翻译；结果按载入顺序分组，带位置、副本、载入文件夹和所在 Def / XPath，分页；`--def` 找一个 defName 的定义、父子、补丁和引用 |
 | | `source <引用> [--type <Namespace.Type>] [--all]` | 按需反编译（ilspycmd，按 DLL 哈希缓存，03 §5.4） |
 | | `source search <模式> (--in <引用>… \| --implicated \| --active --yes) [--regex] [--all] [--budget <秒>]` | 搜索反编译的 C#。必须指定范围：`--in` 点名的 Mod；`--implicated` 最新日志错误簇的候选，没有日志时取 Harmony 警告的主体；`--active` 全部已启用 Mod，先打印估算（程序集数、DLL 大小、缓存约 3 倍 DLL 大小、每个程序集约 1.5 秒），要加 `--yes` 才执行。`--budget` 限定本次反编译时长，未完成的程序集在文本中注明“仍在计算” |
 | | `analyze` | 重建 Def / Patch / Harmony 事实（平时由其他命令按需以子进程调用） |
@@ -306,7 +306,7 @@ next:
 | `list_problems` | `problems`；`ref` 时为 `problems show`。默认加 `--min-severity warning`，给了 `severity`、`min_severity` 或 `all` 时不加 | true | — |
 | `list_changes` | `changes`（`ref`、`since`、`all`） | true | — |
 | `analyze_log` | `log`（`cluster`、`text`、`file`、`prev`、`all`、`since`、`game_version`）；`pattern=<引用>` 对应 `pattern`（`list` 列出全部） | true | — |
-| `search_files` | `files search`（`pattern`、`mod`、`regex`、`languages`、`all`） | true | — |
+| `search_files` | `files search`（`pattern`、`mod`、`mods`、`regex`、`case_sensitive`、`word`、`def`、`kind`、`languages`、`lang`、`all_versions`、`game`、`game_version`、`mode`、`page`、`limit`、`per_file`、`all`） | true | — |
 | `read_source` | 有 `search` 时 `source search`：给了 `in` 用 `--in`，`scope: "active"` 用 `--active --yes`，否则 `--implicated`；`budget` 默认 10。否则 `source`（`ref`、`type`） | true | — |
 | `edit_loadout` | `action`：`enable` / `disable` / `move` / `swap` / `sort`（`dry_run`）/ `undo` / `redo` / `stage`（`stage add`）/ `unstage`（`stage drop`）/ `restore`（`stage restore`）；位置参数 `at`、`before`、`after`、`up`、`down` | false | false |
 | `save_loadout` | `save`（`dry_run`） | false | true |

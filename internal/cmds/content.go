@@ -1,20 +1,13 @@
 package cmds
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"github.com/ToumanLin/RimArcho/internal/app"
-	"github.com/ToumanLin/RimArcho/internal/content"
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/order"
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -29,7 +22,7 @@ func init() {
 		Flags: []Flag{{Name: "mod", Value: "<ref>"}, {Name: "target", Value: "<xpath part | Type/defName>"}, {Name: "failed"}, {Name: "all"}, gameVersionFlag}})
 	register(&Command{Name: "why", Args: "<A> <B>", Summary: "how two mods relate: order, dependencies, conflicts, overrides, shared patches", MinArgs: 2, MaxArgs: 2, Run: whyCmd, Flags: []Flag{gameVersionFlag}})
 	register(&Command{Name: "files search", Args: "<pattern>", Summary: "search the effective content of enabled mods", MinArgs: 1, MaxArgs: 1, Run: filesSearchCmd,
-		Flags: []Flag{{Name: "mod", Value: "<ref>"}, {Name: "regex"}, {Name: "languages", Help: "also search Languages/ (translations; excluded by default)"}, {Name: "all"}}})
+		Flags: filesSearchFlags})
 }
 
 // analysed brings the analysis up to date and returns the run (an error if none exists).
@@ -506,185 +499,6 @@ func depPkgs(l []scan.Dependency) []string {
 	out := make([]string, 0, len(l))
 	for _, d := range l {
 		out = append(out, strings.TrimSuffix(strings.ToLower(strings.TrimSpace(d.PackageID)), "_steam"))
-	}
-	return out
-}
-
-func filesSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	st, err := c.App.Loadout()
-	if err != nil {
-		return nil, err
-	}
-	ix := st.Ix
-	var mods []*store.Mod
-	if r := a.Str("mod"); r != "" {
-		m, err := ix.ResolveOne(r)
-		if err != nil {
-			return nil, err
-		}
-		mods = []*store.Mod{m}
-	} else {
-		for _, e := range st.List {
-			if m := ix.ByID[e.Instance]; m != nil {
-				mods = append(mods, m)
-			}
-		}
-	}
-	if err := c.App.Store.LoadDecls(mods); err != nil {
-		return nil, err
-	}
-	activePkg := map[string]bool{}
-	for _, e := range st.List {
-		if m := ix.ByID[e.Instance]; m != nil {
-			activePkg[strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")] = true
-		}
-	}
-	pat := a.Pos[0]
-	var re *regexp.Regexp
-	if a.Bool("regex") {
-		re, err = regexp.Compile("(?i)" + pat)
-		if err != nil {
-			return nil, &UsageError{Msg: "bad --regex pattern: " + err.Error()}
-		}
-	}
-	lower := strings.ToLower(pat)
-	match := func(line string) bool {
-		if re != nil {
-			return re.MatchString(line)
-		}
-		return strings.Contains(strings.ToLower(line), lower)
-	}
-	limit := boolLimit(a, render.DefaultLimit)
-	langs := a.Bool("languages")
-	var hits []string
-	files, total := 0, 0
-	// Walk the mods in parallel; each keeps its own file list, joined in mod order.
-	perMod := make([][]fileJob, len(mods))
-	var wwg sync.WaitGroup
-	sem := make(chan struct{}, 8)
-	for mi, m := range mods {
-		wwg.Add(1)
-		sem <- struct{}{}
-		go func(mi int, m *store.Mod) {
-			defer func() { <-sem; wwg.Done() }()
-			perMod[mi] = walkMod(ix, st, m, activePkg, langs)
-		}(mi, m)
-	}
-	wwg.Wait()
-	var jobs []fileJob
-	for _, l := range perMod {
-		jobs = append(jobs, l...)
-	}
-	files = len(jobs)
-	// Read and match in parallel (the walk is cheap; reading 4–5k files is not), then
-	// report in walk order.
-	type result struct {
-		n     int
-		lines []string
-	}
-	results := make([]result, len(jobs))
-	var wg sync.WaitGroup
-	next := make(chan int)
-	for w := 0; w < 8; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := range next {
-				j := jobs[i]
-				b, err := os.ReadFile(j.path)
-				if err != nil || (re == nil && !bytes.Contains(bytes.ToLower(b), []byte(lower))) {
-					continue
-				}
-				sc := bufio.NewScanner(bytes.NewReader(b))
-				sc.Buffer(make([]byte, 64<<10), 4<<20)
-				n := 0
-				for sc.Scan() {
-					n++
-					if line := sc.Text(); match(line) {
-						results[i].n++
-						if limit == 0 || len(results[i].lines) < limit {
-							relMod, _ := filepath.Rel(j.dir, j.path)
-							snippet := strings.TrimSpace(line)
-							if len(snippet) > 120 {
-								snippet = snippet[:117] + "..."
-							}
-							results[i].lines = append(results[i].lines, fmt.Sprintf("%s  %s:%d  %s", j.ref, filepath.ToSlash(relMod), n, snippet))
-						}
-					}
-				}
-			}
-		}()
-	}
-	for i := range jobs {
-		next <- i
-	}
-	close(next)
-	wg.Wait()
-	for _, r := range results {
-		total += r.n
-		for _, l := range r.lines {
-			if limit == 0 || len(hits) < limit {
-				hits = append(hits, l)
-			}
-		}
-	}
-	d, root := render.New(fmt.Sprintf("files search %q: %d matches in %d files of %d mods", pat, total, files, len(mods)))
-	lst := root.Section("matches")
-	for _, h := range hits {
-		lst.Add(h)
-	}
-	if len(hits) == 0 {
-		lst.Add("(none)")
-	}
-	if total > len(hits) {
-		lst.Addf("… %d more (add --all)", total-len(hits))
-	}
-	return d, nil
-}
-
-var versionDirRe = regexp.MustCompile(`^[vV]?\d+\.\d+$`)
-
-func isVersionDir(s string) bool { return versionDirRe.MatchString(s) }
-
-type fileJob struct{ ref, dir, path string }
-
-// walkMod lists the effective .xml/.txt files of one mod (higher-priority load folders
-// shadow lower ones; Languages/ only with langs).
-func walkMod(ix *app.Index, st *app.LoadoutState, m *store.Mod, activePkg map[string]bool, langs bool) []fileJob {
-	dir := ix.ModDir(m)
-	r := content.Resolve(dir, m.Decl().LoadFolders, st.GameMM(), func(p string) bool { return activePkg[strings.TrimSuffix(strings.ToLower(p), "_steam")] })
-	seen := map[string]bool{}
-	ref := ix.Ref(m.ID)
-	var out []fileJob
-	for _, folder := range r.Folders {
-		filepath.WalkDir(folder, func(p string, de os.DirEntry, err error) error {
-			if err != nil {
-				return nil
-			}
-			if de.IsDir() {
-				// Translations repeat every key and drown the Defs/Patches evidence.
-				if strings.EqualFold(de.Name(), "Languages") && !langs {
-					return filepath.SkipDir
-				}
-				// The mod root is a load folder too; its version folders are handled by Resolve.
-				if p != folder && folder == dir && (isVersionDir(de.Name()) || strings.EqualFold(de.Name(), "Common")) {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			ext := strings.ToLower(filepath.Ext(p))
-			if ext != ".xml" && ext != ".txt" {
-				return nil
-			}
-			rel, _ := filepath.Rel(folder, p)
-			key := strings.ToLower(rel)
-			if seen[key] {
-				return nil // overridden by a higher-priority load folder
-			}
-			seen[key] = true
-			out = append(out, fileJob{ref: ref, dir: dir, path: p})
-			return nil
-		})
 	}
 	return out
 }

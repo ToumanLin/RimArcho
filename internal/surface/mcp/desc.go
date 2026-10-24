@@ -92,11 +92,27 @@ Example: analyze_log {"cluster": "E3"}
     message: ArgumentOutOfRangeException in List` + "`" + `1.get_Item
     top-frames:`
 
-const descFiles = `Search the effective content (the version folders and LoadFolders branches the game actually loads, Languages excluded) of the enabled mods for text: defNames, XPath targets, uiIconColor, class names in XML. mod=<ref> limits to one mod; regex=true for a regular expression. Use for XML evidence; use read_source for C#.
-Example: search_files {"pattern": "Reload_Standard"}
-  files search "Reload_Standard": 2 matches in 4590 files of 482 mods
-    matches:
-      #mj2v  1.6/Core/Defs/ThingDefs/Apparel/Apparel.xml:463  <soundReload>Reload_Standard</soundReload>`
+const descFiles = `Search the enabled mods' exact copies in load order. By default search only Defs/Patches/About, in the version folder or LoadFolders branch the game loads, with higher-priority files shadowing lower ones; translations are excluded. No analysis or decompilation is needed.
+Widen with languages=true or lang=["English"], all_versions=true (every version/branch, no shadowing), and mod/mods (explicit copies, including inactive mods; pkg: prefers the enabled copy). kind selects content directories or all; textures/sounds/assemblies match asset paths. game="without" excludes official Core/DLC; game="only" searches only them. regex, word, and case_sensitive control matching; game_version overrides version resolution.
+def=true finds a case-sensitive whole defName: who defines, inherits, patches (role patch: the xpath names it; patch-value: used as a value), or references it, with the enclosing def or xpath. Text evidence: whether a patch really applies is get_def / get_patches. Its summary counts all occurrences before paging and per-file caps. Def mode defaults to Defs/Patches; add languages for translations. Use read_source for C#.
+mode="matches" shows lines, "files" lists files, "count" gives mod totals. page starts at 1; limit defaults to 40 rows and per_file to 5 matching lines. Follow next: for the next page; raise per_file for more lines within each file. all=true removes paging; MCP output is still clipped at 24 KB.
+Example: search_files {"pattern":"Gun_Revolver","def":true}
+  files search "Gun_Revolver" (active list, 1.7, defs,patches): 33 matches in 23 files of 15 mods (searched 5753 files in 484 mods, 150 ms)
+    summary:
+      defined: 5 #2337 Core (ThingDef/Gun_Revolver)
+      abstract/parents: 5 #2337 Core (ThingDef/Gun_Revolver)
+      children: 10 #wffj Odyssey (ThingDef/Gun_Revolver_Unique)
+      patched by: 1 operations in 1 mods (#p3sp)
+      referenced by: 14 mods
+    5 #2337 Core  pkg:ludeon.rimworld  official Core  load: /
+      Defs/Scenarios/Scenarios_Classic.xml
+        102  ref  in ScenarioDef/Crashlanded  <thingDef>Gun_Revolver</thingDef>
+      Defs/BackstoryDefs/Solid/Solid_Adult.xml
+        7055  ref  in BackstoryDef/Gunfighter51  <Gun_Revolver>1</Gun_Revolver>
+      Defs/ThingDefs_Misc/Weapons/RangedIndustrial.xml
+        20  abstract  in ThingDef/Gun_Revolver  <ThingDef ParentName="BaseHumanMakeableGun" Name="Gun_Revolver">
+        21  def  in ThingDef/Gun_Revolver  <defName>Gun_Revolver</defName>
+    ...`
 
 const descSource = `Decompiled C# of mod assemblies (ilspycmd, run on demand and cached per DLL hash). ref=<mod> type=<Namespace.Type> shows one type (a Harmony patch class from get_harmony, a frame type from analyze_log); ref alone decompiles the mod's assemblies; search=<text> searches decompiled code: in=[refs] names the mods; without it the search covers the mods the newest log's error clusters and the Harmony warnings implicate; scope="active" searches every enabled mod (hundreds of assemblies, many minutes — only when the user asks). A call spends at most budget seconds decompiling and says how many assemblies are still pending — call again to continue. Prefer short concrete patterns: "AllComps.Remove(", "HarmonyPatch(typeof(Pawn), \"Tick\")", "WorldPawnsTick". If ilspycmd is missing the text says how to install it; nothing is installed automatically.
 Example: read_source {"ref": "#ipv5", "type": "yayoCombat.HarmonyPatches.Pawn_Tick"}
