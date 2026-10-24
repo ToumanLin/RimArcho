@@ -141,7 +141,10 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("menu · shift+F10 · right click", "the row's menu: everything it can do"),
 		)
 	}
-	if page != EditorPage {
+	if page == "home" && !tui {
+		// The launch page has three numbered columns (06 §2.3).
+		out = append(out, r("1–3", "focus the page's areas (the numbers in their headings)"))
+	} else if page != EditorPage {
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}
 	out = append(out,

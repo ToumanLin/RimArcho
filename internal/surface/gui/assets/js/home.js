@@ -67,22 +67,33 @@ function games() {
 }
 const gameOf = (r) => games().find((g) => g.name === r.envName) || { name: r.envName, version: "" };
 
-// homeKey: ↑↓ the applied game's lists and packs, ←→ the games (each applies it), enter
-// opens the applied row, L launches.
+// Numbered columns are focus keys (06 §2.3, 06 §3.5): ↑↓ in 01 changes games;
+// elsewhere it applies lists and packs. Enter on 03 launches, elsewhere it opens the row.
+function focusedStep() { return document.activeElement?.closest(".hm-step")?.dataset.step; }
+
+function focusStep(n) {
+  const s = document.querySelector(`.page.home .hm-s${n}`);
+  if (!s) return;
+  const target = s.querySelector(".hm-pick.on") || s.querySelector(".hm-pick") || (!S.busy.env && s.querySelector(".hm-go:not(:disabled)")) || s;
+  target.focus();
+}
+
 export function homeKey(e) {
   const k = e.key, f = pendingRow || applied();
-  if (k === "Enter" && document.activeElement && document.activeElement.matches(".hm-go")) { e.preventDefault(); document.activeElement.click(); return; }
+  if (/^[1-3]$/.test(k) && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); focusStep(k); return; }
+  if (k === "Enter" && document.activeElement?.matches(".hm-go, .hm-s3")) { e.preventDefault(); document.querySelector(".hm-go")?.click(); return; }
   if (!f) return;
-  if (k === "ArrowDown" || k === "ArrowUp") {
+  const vertical = k === "ArrowDown" || k === "ArrowUp";
+  if (vertical && focusedStep() !== "1") {
     e.preventDefault();
     const list = rowsOf(f.envName), i = list.findIndex((r) => key(r) === key(f));
     if (list.length > 1) apply(list[(i + (k === "ArrowDown" ? 1 : list.length - 1)) % list.length]);
     return;
   }
-  if (k === "ArrowLeft" || k === "ArrowRight") {
+  if (vertical || k === "ArrowLeft" || k === "ArrowRight") {
     e.preventDefault();
     const gs = games(), i = gs.findIndex((g) => g.name === f.envName);
-    if (gs.length > 1) pickGame(gs[(i + (k === "ArrowRight" ? 1 : gs.length - 1)) % gs.length].name);
+    if (gs.length > 1) pickGame(gs[(i + (k === "ArrowRight" || k === "ArrowDown" ? 1 : gs.length - 1)) % gs.length].name);
     return;
   }
   if (k === "Enter") { e.preventDefault(); edit(f); return; }
@@ -93,7 +104,7 @@ export function homeKey(e) {
 }
 
 export function hintList() {
-  return [{ key: "↑↓", label: T("list") }, { key: "←→", label: T("game") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
+  return [{ key: "1–3", label: T("column") }, { key: "↑↓", label: T("list") }, { key: "←→", label: T("game") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
     { key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
 }
 
@@ -107,14 +118,14 @@ export async function focusLaunch() {
     const r = rows().find((x) => x.kind === "plan" && x.current);
     if (r) await apply(r);
   }
-  const b = document.querySelector(".hm-go");
-  if (b) b.focus();
+  focusStep(3);
 }
 
 // liveChanged redraws the launch button when the game starts or stops.
 export function liveChanged() { if (S.screen === "home" && data) { launching = 0; draw(); } }
 
 function draw() {
+  const focus = focusedStep();
   const sc = S.screen === "home" ? document.querySelector("#screen") : openScreen("home");
   sc.innerHTML = "";
   setBackdrop(bg);
@@ -137,6 +148,7 @@ function draw() {
   w.append(gameStep(env), rowStep(f, env, gameMoved), launchStep(f));
   placeMarks(gameMoved);
   if (pendingRow && S.busy.env) showSwitch(pendingRow);
+  if (focus) focusStep(focus);
   shown.game = env; shown.row = f ? key(f) : null; shown.drawn = true;
   shown.note = !!w.querySelector(".hm-note");
 }
@@ -196,6 +208,8 @@ function hero(f, moved) {
 
 function step(n, cls, title) {
   const s = el("section", "hm-step " + cls);
+  s.dataset.step = String(Number(n));
+  s.tabIndex = -1; // Disabled launch controls leave their column reachable (06 §2.3).
   const h = el("h3");
   h.append(el("b", "num", n), title);
   s.append(h);
@@ -357,7 +371,10 @@ async function apply(r) {
       await ui.refreshEnvironment();
       if (current()) say("ok", result.text);
     });
-    if (switched) pendingRow = null;
+    if (switched) {
+      pendingRow = null;
+      if (focusedStep() === "3") focusStep(3);
+    }
   } catch (e) {
     pendingRow = null;
     arrived = false;
@@ -377,6 +394,8 @@ function showSwitch(r) {
   placeMarks(false);
   const b = root.querySelector(".hm-go");
   if (!b) return;
+  // Keep 03 focused while its launch control is disabled (06 §2.3).
+  if (document.activeElement === b) b.closest(".hm-step").focus();
   b.className = "hm-go switching";
   b.disabled = true;
   const top = el("div", "top"), bottom = el("div", "bottom");

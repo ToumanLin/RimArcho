@@ -4,6 +4,7 @@
    The colour tokens and several component rules are taken from magpie's app.css:
    Copyright (c) 2026 yetone, MIT License (https://github.com/yetone/magpie/blob/main/LICENSE). */
 :root {
+  --hairline: 1px; /* 06 §7.3: one physical pixel at 100% and 150% scaling. */
   /* the gap between side-by-side and stacked cards, the same everywhere (06 §7) */
   --card-gap: 4px;
   /* how far a drag handle's invisible hit area reaches over the cards on each side */
@@ -46,6 +47,9 @@
   /* log lines in the game's debug-log colours (view.GameLogColors), darkened for white
      with the hue kept (view.LightLogColors); info is the text colour */
   --log-error: #eb0000; --log-warning: #7e7400; --log-info: var(--fg);
+}
+@media (min-resolution: 2dppx) {
+  :root { --hairline: 0.5px; }
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -752,12 +756,16 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .hm-state.bad { color: var(--amber); }
 .hm-state.bad::before { background: var(--amber); border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 .hm-state.none::before { background: none; box-shadow: inset 0 0 0 1.5px var(--muted); }
-.hm-rule { grid-column: 1 / 13; grid-row: 3; height: 2px; background: var(--fg); transform-origin: left; }
+.hm-rule { grid-column: 1 / 13; grid-row: 3; height: var(--hairline); background: color-mix(in srgb, var(--line) 60%, transparent); transform-origin: left; }
 .hm-rule.in { animation: hm-draw 1s .1s var(--ease) both; }
 .hm-step { grid-row: 4; position: relative; padding-top: 16px; min-width: 0; }
 .hm-s1 { grid-column: 1 / 4; } .hm-s2 { grid-column: 4 / 9; } .hm-s3 { grid-column: 9 / 13; }
 .hm-step h3 { display: flex; gap: 12px; margin: 0 0 14px; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--muted); }
 .hm-step h3 b { color: var(--fg); }
+.hm-step:focus-within h3 b { color: var(--accent); } /* The number is the focus key (06 §7.3). */
+/* Startup hints use 16px gaps (06 §2.3); the shared renderer supplies the separators. */
+#app:has(.page.home) #hints .sep { display: inline-block; font-size: 0; margin: 0 8px; }
+#app:has(.page.home) #hints b { color: var(--fg); }
 .hm-picks { position: relative; display: flex; flex-direction: column; }
 /* the steps' rows: unpicked ones recede, the picked one is the text colour and bold */
 .hm-pick { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 12px; height: 40px; padding: 0; border-bottom: 1px solid var(--line);
