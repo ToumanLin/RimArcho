@@ -56,6 +56,37 @@ raw logs + parsed.jsonl). Only aggregate numbers are recorded here.
 7. Thread route (B): Steam workshop discussion pages can be fetched; they contain HugsLib gist links
    (inside steamcommunity.com/linkfilter redirects) and replies.
 
+== Expansion to 40k logs with a download-time filter (2026-10-22/23, local, branch claude/corpus-expand)
+
+Commands (RimArcho-corpus/scripts/fetch.ps1 -Mode even wraps them; topup.ps1 is the monthly one):
+  hugslogs api -from 2025-07-01 -list-only      listing: 181,373 gists 2025-07-01 .. 2026-10-22
+  hugslogs even -from 2025-07-01 -until 2026-10-23 -per-month 2500 [-max N]
+  hugslogs verdicts -from … -until …            filter rates for a window
+  hugslogs stats                                parsed.jsonl + the summary below
+
+Filter (filter.go judge, applied after download, before anything is written to raw/):
+  keep  1.6 with a "Loaded mods" list and >= 1 problem cluster (any class but other / mod-report);
+        every 1.7 log (tagged mm 1.7).
+  drop  gone (404), duplicate-content (sha256 prefix of the raw upload), version-out-of-scope,
+        no-problems, too-short (< 20 log lines), too-large (> 90 MB), and the parser's drops
+        (empty-log, no-log-section, no-game-version). Dropped logs get no raw file; every
+        candidate gets an index.jsonl line with verdict, mm, hash. Logs collected before the filter
+        are judged in place and tagged legacy (their raw files stay).
+Sampling: per month, whole days in a fixed order (15, 1, 8, 22, 4, …) until 2,500 kept.
+
+Result: 16 months x ~2,500 kept. Judged 43,559: kept 40,160 (92.2%; 1.6 40,050, 1.7 110).
+  Drops: version-out-of-scope 1,559 (3.6%), no-problems 1,532 (3.5%), gone 200, empty-log 55,
+  no-log-section 21, no-game-version 18, too-short 14, duplicate-content 0, too-large 0.
+  Judged at download time only (without the 7,091 legacy logs): 36,468 judged, 33,652 kept (92.3%).
+  1.7 share: none before 2026-10-15; of kept logs per sampled day 3% (10-15), 2% (10-17), 2% (10-18),
+  9% (10-19), 18% (10-22). 1.7 is arriving now, so the monthly top-up matters more than the backfill.
+Storage: 40,743 raw files, 23.3 GB raw, 2.61 GiB packed in git (pushed in 4,000-log batches; largest
+  file < 95 MB; fetch.ps1 -MaxPackGB raised from 2 to 4 deliberately).
+Content of the 40,436 parsed ok logs (stats; this includes 276 legacy no-problems logs):
+  mods per log median 176 (p95 620); clusters per log median 40; Harmony section in all, median
+  1,859 patched methods; 12% truncated; 42,130 distinct packageIds; top 1,000 cover 58% of entries,
+  top 3,000 80% (same curve as the 1k sample). Sessions: 5,607 with 2+ uploads cover 15,853 logs (39%).
+
 == Cleaning problems found (to fix in P1)
 
 - "other" is the largest class (76k clusters in 925 logs). internal/logs' Interesting() keeps any
@@ -133,3 +164,19 @@ distinct packageIds 14290, mod entries 201928
 == sessions (repeat uploads)
 sessions with 2+ uploads: 135, covering 389 logs (40%)
 consecutive pairs 254; with 1-3 package changes 71; of those, some cluster vanished 51
+
+== Library growth and corpusrun v5 on the 40k corpus (2026-10-23/24)
+
+Research library D:\RimWorld16\Mods (+ the Workshop folder): 3,363 -> 4,840 packageIds. kb_plan.py took the
+1,500 most common packages missing from >= 10 logs (that have a Workshop id; 1,903 of the missing
+ones have none) and kb_download.py fetched them with SteamCMD in 30 batches of 50: 1,477 ok,
+19 failed (Access Denied / File Not Found), 4 rejected (About.xml packageId differs).
+Library coverage per log (share of a log's mods the library has), on the 40,326 parsed 1.6 logs:
+  before  p10 0.66  p25 0.75  median 0.83  p75 0.90  p90 0.95   logs >= 0.80: 24,170 (60%)
+  after   p10 0.72  p25 0.80  median 0.88  p75 0.93  p90 0.96   logs >= 0.80: 30,355 (75%)
+  (old 6,734-log corpus on the old library: median 0.82, 58%.) The long tail stays: 17,859
+  packages are missing from >= 10 logs, 1,903 of the planned ones had no Workshop id.
+corpusrun v5: 40,050 kept 1.6 logs, 12 shards (each its own RIMARCHO_HOME, 80-log warm-up first;
+  ~6.9 h of run time after 1h42m warm-up, a stop/resume in between), no errors. Attribution over
+  3,620,151 problem clusters: attributed 56.8%, with a source 34.6% (v4, 6,734 logs: 53.7% / 29.9%
+  on 629,761 clusters; the library is bigger and the sample is not the same). Core/DLC blamed: 0.

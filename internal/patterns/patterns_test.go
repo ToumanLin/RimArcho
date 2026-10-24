@@ -10,7 +10,7 @@ import (
 
 func TestData(t *testing.T) {
 	d := patterns.Load()
-	if len(d.Rules) != 46 || len(d.Mod) < 1000 || d.Logs != 6734 {
+	if len(d.Rules) != 46 || len(d.Mod) < 1000 || d.Logs < 40000 {
 		t.Fatalf("rules %d, mod %d, logs %d", len(d.Rules), len(d.Mod), d.Logs)
 	}
 	sum := 0

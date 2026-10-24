@@ -91,11 +91,11 @@ log:E1 patch-failed x1  first at Player.log:4
     #z3bw Lib  dependency  evidence: the patch targets a def it provides
   confidence: certain
   pattern: pattern:g:patch.op-failed  a mod's patch operation failed (the game's summary line, names the mod and the xpath)
-    evidence: community: seen in 2,501 of 6,734 public 1.6 logs (4.6% of error clusters); what this kind of error usually is, not evidence about this list
+    evidence: community: seen in 15,652 of 40,326 public 1.6 logs (4.8% of error clusters); what this kind of error usually is, not evidence about this list
     causes: as patch.xpath: target inactive, renamed or loading later; a custom operation class whose condition failed
     route (tools): get_patches failed=true → get_def <target>
     fixes: enable-dependency, reorder, update, local-fix
-    repeat-uploads: after 1-3 list changes it went away in 10% of 164 repeat uploads (without any change: 2% of 280)
+    repeat-uploads: after 1-3 list changes it went away in 9% of 1000 repeat uploads (without any change: 2% of 1826)
 next:
   archo enable #z3bw
   archo patches --mod #hnyg --failed
@@ -118,11 +118,11 @@ log:E2 xref-missing x1  first at Player.log:7
     #z3bw Lib  dependency  evidence: defines ThingDef Lib_Gun at Defs/Lib.xml:2 but is not enabled
   confidence: likely
   pattern: pattern:g:xref.def  a def references another def by name that no active mod defines
-    evidence: community: seen in 3,706 of 6,734 public 1.6 logs (15.4% of error clusters); what this kind of error usually is, not evidence about this list
+    evidence: community: seen in 22,998 of 40,326 public 1.6 logs (15.9% of error clusters); what this kind of error usually is, not evidence about this list
     causes: the providing mod or DLC is not active (often an optional patch without MayRequire); the def was renamed or removed in an update; a load-order problem when a patch adds the reference
     route (tools): get_def <name> → get_patches failed=true → list_problems code=dep
     fixes: enable-dependency, update, disable
-    repeat-uploads: after 1-3 list changes it went away in 3% of 249 repeat uploads (without any change: 1% of 488)
+    repeat-uploads: after 1-3 list changes it went away in 5% of 1499 repeat uploads (without any change: 1% of 2939)
 next:
   archo enable #z3bw
   archo def ThingDef/Lib_Gun
@@ -152,11 +152,11 @@ log:E3 harmony-stack x500  first at Player.log:9
     #xamx Mod C  patcher  evidence: log harmony:Verse.Pawn.Tick#transpiler "- TRANSPILER tester.modc" (type ModC.Pawn_Tick_C)
   confidence: possible (no source identified)
   pattern: pattern:g:rt.tick  an exception while ticking a pawn, thing or the world
-    evidence: community: seen in 827 of 6,734 public 1.6 logs (0.8% of error clusters); what this kind of error usually is, not evidence about this list
+    evidence: community: seen in 5,398 of 40,326 public 1.6 logs (0.7% of error clusters); what this kind of error usually is, not evidence about this list
     causes: a comp added or removed during tick; a patch on the tick path
     route (tools): get_harmony target=<each patched frame> → read_source search="AllComps.Remove("
     fixes: disable, update, local-fix
-    repeat-uploads: after 1-3 list changes it went away in 56% of 39 repeat uploads (without any change: 12% of 118)
+    repeat-uploads: after 1-3 list changes it went away in 53% of 255 repeat uploads (without any change: 13% of 834)
   checklist:
     ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: removing or reordering comps during a tick throws ArgumentOutOfRangeException in List`1.get_Item
     red flags: parent.AllComps.Remove(this) inside CompTick(); pawn.AllComps.Add/Remove for runtime comps without deferral; Swap or list surgery on AllComps; runtime ThingComps added without InitializeComps() invariants
@@ -188,11 +188,11 @@ log:E4 harmony-stack x1  first at Player.log:18
     #iqmu Mod A  source  evidence: log frame 1 ModA.CompBroken.CompTick (topmost mod code in the stack); log harmony:Verse.Pawn.Tick#prefix "- PREFIX tester.moda.harmony" (type ModA.Pawn_Tick)
   confidence: likely
   pattern: pattern:g:rt.tick  an exception while ticking a pawn, thing or the world
-    evidence: community: seen in 827 of 6,734 public 1.6 logs (0.8% of error clusters); what this kind of error usually is, not evidence about this list
+    evidence: community: seen in 5,398 of 40,326 public 1.6 logs (0.7% of error clusters); what this kind of error usually is, not evidence about this list
     causes: a comp added or removed during tick; a patch on the tick path
     route (tools): get_harmony target=<each patched frame> → read_source search="AllComps.Remove("
     fixes: disable, update, local-fix
-    repeat-uploads: after 1-3 list changes it went away in 56% of 39 repeat uploads (without any change: 12% of 118)
+    repeat-uploads: after 1-3 list changes it went away in 53% of 255 repeat uploads (without any change: 13% of 834)
   checklist:
     ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: removing or reordering comps during a tick throws ArgumentOutOfRangeException in List`1.get_Item
     red flags: parent.AllComps.Remove(this) inside CompTick(); pawn.AllComps.Add/Remove for runtime comps without deferral; Swap or list surgery on AllComps; runtime ThingComps added without InitializeComps() invariants
@@ -324,39 +324,39 @@ next:
   archo log --cluster E4
 
 $ archo pattern
-patterns v0: 46 kinds of log errors and 1034 mod-specific errors from 6,734 public 1.6 logs
+patterns v0: 46 kinds of log errors and 9305 mod-specific errors from 40,326 public 1.6 logs
   evidence: community: what a kind of error usually is, never which mod causes it in one list
   list:
-    pattern:g:xref.def  load  15.4%  3,706 logs  a def references another def by name that no active mod defines
-    pattern:g:save.defref  save  14.9%  1,010 logs  the save refers to a def that no longer exists
-    pattern:g:asset.texture-missing  load  11.1%  1,821 logs  a texture or sound path names no file in any active mod
-    pattern:g:xml.config-error  load   7.7%  2,004 logs  a def fails the game's config checks
-    pattern:g:xml.type-missing  load   7.4%  2,248 logs  XML names a C# class that no loaded assembly has
-    pattern:g:patch.op-failed  load   4.6%  2,501 logs  a mod's patch operation failed (the game's summary line, names the mod and the xpath)
-    pattern:g:xml.other  load   4.6%  1,543 logs  other XML loading error (fallback: names the class only)
-    pattern:g:rt.nre  runtime   4.6%  2,502 logs  a null reference in mod or game code (fallback: names the class only)
-    pattern:g:xref.sound  load   3.6%  3,532 logs  a def names a SoundDef that no active mod defines; the game uses no sound
-    pattern:g:save.loadid  save   3.4%  1,704 logs  the save refers to an object that was not loaded
-    pattern:g:patch.xpath  load   3.4%  1,790 logs  a patch operation found no node to change
-    pattern:g:xml.no-field  load   3.2%  2,044 logs  XML sets a field the def's class does not have
-    pattern:g:asm.version-mismatch  load   2.9%  1,950 logs  a DLL calls code that does not exist in the loaded game or dependency
-    pattern:g:rt.other  runtime   2.3%  2,148 logs  other exception (fallback: names the class only)
-    pattern:g:xref.getnamed  load   2.0%  1,561 logs  code asked DefDatabase for a def by name that does not exist
-    pattern:g:save.other  save   1.3%  676 logs  other save-loading error (fallback: names the class only)
-    pattern:g:rt.post-load  save   1.2%  1,905 logs  an exception while loading a save or after a long event
-    pattern:g:rt.resolve-references  load   1.0%  398 logs  a def's ResolveReferences threw
-    pattern:g:rt.tick  runtime   0.8%  827 logs  an exception while ticking a pawn, thing or the world
-    pattern:g:asm.harmony-target  load   0.6%  1,867 logs  a Harmony patch could not be applied (target method missing or changed)
-    pattern:g:patch.findmod  load   0.6%  1,548 logs  a FindMod patch (optional-mod patch) failed inside
-    pattern:g:asm.static-ctor  load   0.6%  1,098 logs  a mod's start-up code threw
-    pattern:g:rt.ai-job  runtime   0.5%  547 logs  an exception in pawn AI (think tree, job giver, job driver)
-    pattern:g:save.not-deep-saved  save   0.4%  511 logs  a reference is saved without its object
-    pattern:g:asset.texture-create  load   0.3%  389 logs  Unity rejected a texture (size or format)
-    pattern:g:rt.ui  runtime   0.3%  1,258 logs  an exception in drawing the UI
-    pattern:g:xml.def-exception  load   0.3%  413 logs  a def file could not be loaded
-    pattern:g:patch.other  load   0.2%  513 logs  other patch failure (fallback: names the class only)
-    pattern:g:save.thinknode  save   0.1%  562 logs  the save's AI state refers to think-tree nodes that changed
-    pattern:g:save.abstract-component  save   0.1%  438 logs  the save has a map/game/world component of a mod that is not loaded
+    pattern:g:xref.def  load  15.9%  22,998 logs  a def references another def by name that no active mod defines
+    pattern:g:save.defref  save  13.8%  6,135 logs  the save refers to a def that no longer exists
+    pattern:g:xml.config-error  load   9.3%  12,428 logs  a def fails the game's config checks
+    pattern:g:xml.other  load   6.6%  9,953 logs  other XML loading error (fallback: names the class only)
+    pattern:g:xml.type-missing  load   6.6%  13,911 logs  XML names a C# class that no loaded assembly has
+    pattern:g:patch.op-failed  load   4.8%  15,652 logs  a mod's patch operation failed (the game's summary line, names the mod and the xpath)
+    pattern:g:asset.texture-missing  load   4.7%  11,081 logs  a texture or sound path names no file in any active mod
+    pattern:g:rt.nre  runtime   4.3%  15,792 logs  a null reference in mod or game code (fallback: names the class only)
+    pattern:g:xml.asset-load  load   4.1%  3,111 logs  a texture or sound file could not be read
+    pattern:g:xml.no-field  load   3.5%  12,817 logs  XML sets a field the def's class does not have
+    pattern:g:patch.xpath  load   3.5%  11,372 logs  a patch operation found no node to change
+    pattern:g:save.loadid  save   3.5%  10,296 logs  the save refers to an object that was not loaded
+    pattern:g:xref.sound  load   3.3%  21,530 logs  a def names a SoundDef that no active mod defines; the game uses no sound
+    pattern:g:asm.version-mismatch  load   2.4%  10,886 logs  a DLL calls code that does not exist in the loaded game or dependency
+    pattern:g:rt.other  runtime   2.1%  13,196 logs  other exception (fallback: names the class only)
+    pattern:g:xref.getnamed  load   2.0%  9,407 logs  code asked DefDatabase for a def by name that does not exist
+    pattern:g:save.other  save   1.8%  4,129 logs  other save-loading error (fallback: names the class only)
+    pattern:g:rt.post-load  save   1.4%  11,716 logs  an exception while loading a save or after a long event
+    pattern:g:asm.harmony-target  load   1.0%  10,347 logs  a Harmony patch could not be applied (target method missing or changed)
+    pattern:g:rt.tick  runtime   0.7%  5,398 logs  an exception while ticking a pawn, thing or the world
+    pattern:g:asm.static-ctor  load   0.7%  6,910 logs  a mod's start-up code threw
+    pattern:g:rt.resolve-references  load   0.6%  2,339 logs  a def's ResolveReferences threw
+    pattern:g:patch.findmod  load   0.6%  9,870 logs  a FindMod patch (optional-mod patch) failed inside
+    pattern:g:rt.ai-job  runtime   0.6%  3,668 logs  an exception in pawn AI (think tree, job giver, job driver)
+    pattern:g:save.not-deep-saved  save   0.4%  3,224 logs  a reference is saved without its object
+    pattern:g:rt.ui  runtime   0.3%  8,086 logs  an exception in drawing the UI
+    pattern:g:patch.other  load   0.3%  3,394 logs  other patch failure (fallback: names the class only)
+    pattern:g:xml.def-exception  load   0.2%  2,476 logs  a def file could not be loaded
+    pattern:g:save.thinknode  save   0.1%  3,240 logs  the save's AI state refers to think-tree nodes that changed
+    pattern:g:asm.dependency-missing  load   0.1%  4,915 logs  a mod's DLL references an assembly that is not loaded
     … 16 more (archo pattern --all)
 next:
   archo pattern pattern:g:xref.def
@@ -364,10 +364,10 @@ next:
 
 $ archo pattern pattern:g:xml.type-missing
 pattern:g:xml.type-missing  XML names a C# class that no loaded assembly has
-  evidence: community: patterns v0 from 6,734 public HugsLib logs of RimWorld 1.6 (2026-10-22); what this kind of error usually is, not evidence about one list
+  evidence: community: patterns v0 from 40,326 public HugsLib logs of RimWorld 1.6 (2026-10-24); what this kind of error usually is, not evidence about one list
   recognises: cluster class any, message matches /Could not find (a )?type|Could not find type named|Could not find class/
   stage: load
-  seen: 2,248 of 6,734 public 1.6 logs, 1,733 players' sessions, 45,124 clusters (7.4% of error clusters)
+  seen: 13,911 of 40,326 public 1.6 logs, 10,678 players' sessions, 237,733 clusters (6.6% of error clusters)
   causes:
     the framework mod that defines the class is not active or loads later
     the class was renamed in an update
@@ -376,46 +376,53 @@ pattern:g:xml.type-missing  XML names a C# class that no loaded assembly has
     search_files <class>
     list_problems code=dep
   fixes: enable-dependency, update
-  repeat-uploads: after 1-3 list changes it went away in 19% of 143 repeat uploads (without any change: 6% of 269)
-  changed-when-gone: disable-other 15, enable 14, reorder 12, update-other 3 (co-occurs with the change, not causal)
+  repeat-uploads: after 1-3 list changes it went away in 17% of 916 repeat uploads (without any change: 5% of 1672)
+  changed-when-gone: disable-other 90, enable 77, reorder 71, update-other 12 (co-occurs with the change, not causal)
 
 $ archo pattern rt.nre
 pattern:g:rt.nre  a null reference in mod or game code
-  evidence: community: patterns v0 from 6,734 public HugsLib logs of RimWorld 1.6 (2026-10-22); what this kind of error usually is, not evidence about one list
+  evidence: community: patterns v0 from 40,326 public HugsLib logs of RimWorld 1.6 (2026-10-24); what this kind of error usually is, not evidence about one list
   recognises: cluster class any, message matches /NullReferenceException/ (fallback: names the class only, not shown on clusters)
   stage: runtime
-  seen: 2,502 of 6,734 public 1.6 logs, 1,929 players' sessions, 27,838 clusters (4.6% of error clusters)
+  seen: 15,792 of 40,326 public 1.6 logs, 12,179 players' sessions, 154,373 clusters (4.3% of error clusters)
   route:
     analyze_log cluster=E<n>
     get_harmony target=<patched frame>
     read_source
   fixes: disable, update
-  repeat-uploads: after 1-3 list changes it went away in 26% of 145 repeat uploads (without any change: 6% of 354)
-  changed-when-gone: disable-other 24, reorder 24, enable 15, disable-source 1, update-other 1 (co-occurs with the change, not causal)
-  mod-specific: 52 known errors of single mods are of this kind (archo pattern --mod <packageId>)
+  repeat-uploads: after 1-3 list changes it went away in 26% of 887 repeat uploads (without any change: 7% of 2291)
+  changed-when-gone: disable-other 148, reorder 107, enable 86, update-other 18, disable-source 17 (co-occurs with the change, not causal)
+  mod-specific: 471 known errors of single mods are of this kind (archo pattern --mod <packageId>)
 
 $ archo pattern --mod krkr.rocketman
-patterns of krkr.rocketman: 8 known errors in public 1.6 logs
+patterns of krkr.rocketman: 15 known errors in public 1.6 logs
   list:
-    pattern:m:krkr.rocketman:e84d5a3b  122 logs 2025-07–2026-10  Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been...
-    pattern:m:krkr.rocketman:c107d596  120 logs 2025-07–2026-10  Error in static constructor of RocketMan.RocketPatcher: System.TypeInitializationException: The type … fo...
-    pattern:m:krkr.rocketman:4f102331  74 logs 2025-07–2026-10  Error in static constructor of RocketMan.Main_StaticConstructor: System.TypeInitializationException: The ty...
-    pattern:m:krkr.rocketman:3ff5cbb7  55 logs 2025-07–2026-10  Error in static constructor of RocketMan.Main_StaticConstructor: System.TypeInitializationException: The ty...
-    pattern:m:krkr.rocketman:c3262fb1  46 logs 2025-07–2026-10  ROCKETMAN: Stashing settings failed! System.NullReferenceException: Object reference not set to an instance...
-    pattern:m:krkr.rocketman:eef544a8  45 logs 2025-07–2026-10  Could not instantiate a MapComponent of type … System.Reflection.TargetInvocationException: Exception has...
-    pattern:m:krkr.rocketman:5e972a0e  41 logs 2025-07–2026-10  Could not instantiate a MapComponent of type … System.Reflection.TargetInvocationException: Exception has...
-    pattern:m:krkr.rocketman:56ab145d  41 logs 2025-07–2026-10  ROCKETMAN: Popping settings failed! System.NullReferenceException: Object reference not set to an instance ...
+    pattern:m:krkr.rocketman:c107d596  743 logs 2025-07–2026-10  Error in static constructor of RocketMan.RocketPatcher: System.TypeInitializationException: The type … fo...
+    pattern:m:krkr.rocketman:e84d5a3b  725 logs 2025-07–2026-10  Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been...
+    pattern:m:krkr.rocketman:4f102331  447 logs 2025-07–2026-10  Error in static constructor of RocketMan.Main_StaticConstructor: System.TypeInitializationException: The ty...
+    pattern:m:krkr.rocketman:3ff5cbb7  340 logs 2025-07–2026-10  Error in static constructor of RocketMan.Main_StaticConstructor: System.TypeInitializationException: The ty...
+    pattern:m:krkr.rocketman:c3262fb1  259 logs 2025-07–2026-10  ROCKETMAN: Stashing settings failed! System.NullReferenceException: Object reference not set to an instance...
+    pattern:m:krkr.rocketman:eef544a8  229 logs 2025-07–2026-10  Could not instantiate a MapComponent of type … System.Reflection.TargetInvocationException: Exception has...
+    pattern:m:krkr.rocketman:5e972a0e  215 logs 2025-07–2026-10  Could not instantiate a MapComponent of type … System.Reflection.TargetInvocationException: Exception has...
+    pattern:m:krkr.rocketman:56ab145d  215 logs 2025-07–2026-10  ROCKETMAN: Popping settings failed! System.NullReferenceException: Object reference not set to an instance ...
+    pattern:m:krkr.rocketman:3b3bd538  45 logs 2025-07–2026-09  Root level exception in OnGUI(): System.NullReferenceException: Object reference not set to an instance of ...
+    pattern:m:krkr.rocketman:51b059ed  43 logs 2025-07–2026-09  Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been...
+    pattern:m:krkr.rocketman:12592d3d  41 logs 2025-07–2026-10  Exception processing alert RocketMan.Alert_StatsLearning: System.NullReferenceException: Object reference n...
+    pattern:m:krkr.rocketman:5c91685a  34 logs 2025-09–2026-07  System.IO.Enumeration.FileSystemEnumerable`#[[System.String, mscorlib, Version=#.#.#.#, Culture=neutral, Pu...
+    pattern:m:krkr.rocketman:5a120cd2  33 logs 2025-09–2026-07  System.Collections.Generic.List`#[[System.Reflection.Assembly, mscorlib, Version=#.#.#.#, Culture=neutral, ...
+    pattern:m:krkr.rocketman:a0989b95  21 logs 2025-07–2026-09  Exception filling window for Verse.ImmediateWindow: System.Collections.Generic.KeyNotFoundException: The gi...
+    pattern:m:krkr.rocketman:cf81819d  15 logs 2025-07–2026-04  Exception filling window for Verse.ImmediateWindow: System.MissingMethodException: Method not found: void L...
 next:
-  archo pattern pattern:m:krkr.rocketman:e84d5a3b
+  archo pattern pattern:m:krkr.rocketman:c107d596
 
 $ archo pattern pattern:m:krkr.rocketman:e84d5a3b
 pattern:m:krkr.rocketman:e84d5a3b  a known error of krkr.rocketman
   evidence: community: public logs attributed this error to the mod (RimArcho's attribution, not a confirmed bug); a newer version may have fixed it
   message: Error while instantiating a mod of type … System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.MissingMethodException: Method not found: void Verse.LongEventHandler.QueueLongEvent(System.Action,string,bool,System.Action
   class: exception
-  seen: 122 of 6,734 public 1.6 logs, 103 players' sessions, 2025-07 – 2026-10
-  repeat-uploads: after 1-3 list changes it went away in 50% of 8 repeat uploads (without any change: 0% of 9)
-  changed-when-gone: disable-source 3, disable-other 1, reorder 1 (disable-source: this mod removed)
+  seen: 725 of 40,326 public 1.6 logs, 641 players' sessions, 2025-07 – 2026-10
+  repeat-uploads: after 1-3 list changes it went away in 42% of 26 repeat uploads (without any change: 0% of 42)
+  changed-when-gone: disable-source 10, reorder 2, disable-other 1 (disable-source: this mod removed)
   kind: pattern:g:asm.version-mismatch  a DLL calls code that does not exist in the loaded game or dependency
 next:
   archo pattern pattern:g:asm.version-mismatch

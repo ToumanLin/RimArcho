@@ -5,7 +5,12 @@
 //	go run ./spikes/hugslogs fetch -dir <corpus>   # web listing (newest ~1,000 only), download raw logs
 //	go run ./spikes/hugslogs probe                 # GitHub API: how far back the listing goes
 //	go run ./spikes/hugslogs api -dir <corpus> -from 2025-07-01 [-max N]   # GitHub API listing + download
+//	go run ./spikes/hugslogs even -dir <corpus> -from 2025-07-01 -per-month 2500 [-max N]   # whole days per month until the quota
+//	go run ./spikes/hugslogs verdicts -dir <corpus> [-from D -until D]   # filter rates and version share
 //	go run ./spikes/hugslogs stats -dir <corpus>   # parse, clean, print RESULT numbers
+//
+// Every downloaded log is judged before it is stored (filter.go): only kept logs go to raw/, and
+// every verdict is recorded in index.jsonl.
 //
 // probe and api need a GitHub token (GITHUB_TOKEN, GH_TOKEN or `gh auth login`). They do not work
 // in the cloud session, whose proxy only allows repository-scoped API paths.
@@ -27,6 +32,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -51,7 +57,7 @@ var (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: hugslogs fetch|probe|api|sample|stats [flags]   (hugslogs <command> -h for flags)")
+		fmt.Fprintln(os.Stderr, "usage: hugslogs fetch|probe|api|sample|even|verdicts|stats [flags]   (hugslogs <command> -h for flags)")
 		os.Exit(2)
 	}
 	fs := flag.NewFlagSet(os.Args[1], flag.ExitOnError)
@@ -59,7 +65,9 @@ func main() {
 	pages := fs.Int("pages", 0, "listing pages to read; fetch: 10 gists per page, default 100; api: 100 gists per page, default no limit")
 	workers := fs.Int("workers", 2, "parallel raw downloads")
 	from := fs.String("from", "", "api: only gists created at or after this time (RFC 3339 or YYYY-MM-DD); default: 3 days before the newest indexed gist")
-	maxDL := fs.Int("max", 0, "api, sample: download at most this many raw logs this run, newest first (0 = no limit)")
+	maxDL := fs.Int("max", 0, "api, sample, even: stop once this many logs were kept this run (0 = no limit); newest first except in even")
+	until := fs.String("until", "", "even: only gists created before this date (YYYY-MM-DD)")
+	perMonth := fs.Int("per-month", 2500, "even: kept logs per month to reach (logs kept earlier count)")
 	listOnly := fs.Bool("list-only", false, "api: index the listing, download nothing")
 	day := fs.Int("day", 15, "sample: day of the month (UTC) to download")
 	fs.Parse(os.Args[2:])
@@ -87,6 +95,21 @@ func main() {
 		err = apiFetch(*dir, f, *pages, *workers, limit)
 	case "sample":
 		err = sample(*dir, *from, *day, *workers, *maxDL)
+	case "even":
+		f, u := "", ""
+		if *from != "" {
+			if f, err = resolveFrom(*dir, *from); err != nil {
+				break
+			}
+		}
+		if *until != "" {
+			if u, err = resolveFrom(*dir, *until); err != nil {
+				break
+			}
+		}
+		err = even(*dir, f, u, *perMonth, *workers, *maxDL)
+	case "verdicts":
+		err = verdicts(*dir, *from, *until)
 	case "stats":
 		err = stats(*dir)
 	default:
@@ -136,6 +159,12 @@ type indexEntry struct {
 	File    string `json:"file"`
 	Created string `json:"created"`
 	Listed  string `json:"listed"` // when this run saw it
+	// Set by the cleaning filter (filter.go) once the log was downloaded and judged.
+	Verdict string `json:"verdict,omitempty"` // "kept" or the drop reason
+	MM      string `json:"mm,omitempty"`      // game version major.minor, when known
+	Hash    string `json:"hash,omitempty"`    // content hash (exact duplicates)
+	Fetched string `json:"fetched,omitempty"` // when it was downloaded and judged
+	Legacy  bool   `json:"legacy,omitempty"`  // downloaded before the filter: raw kept whatever the verdict
 }
 
 var listRe = regexp.MustCompile(`href="/` + account + `/([0-9a-f]{20,})"><strong[^>]*>([^<]*)</strong></a>[\s\S]*?datetime="([^"]+)"`)
@@ -245,59 +274,38 @@ func fetch(dir string, pages, workers int) error {
 		time.Sleep(2 * time.Second)
 	}
 	fmt.Printf("listed %d gists (%s .. %s), %d new, index holds %d\n", listed, oldest, newest, added, len(idx))
-	return download(dir, idx, workers, inRange(""), 0)
+	out.Close()
+	return download(dir, workers, inRange(""), 0)
 }
 
-// download fetches the raw logs of index entries that are not on disk yet, newest first: only
-// entries that keep accepts, at most limit of them (0 = no limit).
-func download(dir string, idx map[string]indexEntry, workers int, keep func(indexEntry) bool, limit int) error {
+// download fetches, judges (filter.go) and stores the logs of index entries in range that have no
+// verdict yet, newest first, until limit logs are kept (0 = no limit). The caller must have
+// closed its handle on index.jsonl: the index is rewritten with the verdicts.
+func download(dir string, workers int, keep func(indexEntry) bool, limit int) error {
+	ix, err := loadIndex(dir)
+	if err != nil {
+		return err
+	}
+	seen, err := keptHashes(dir, ix)
+	if err != nil {
+		return err
+	}
 	var todo []indexEntry
-	for _, e := range idx {
-		if !keep(e) {
-			continue
-		}
-		if _, err := os.Stat(rawPath(dir, e.ID)); os.IsNotExist(err) {
+	for _, id := range ix.order {
+		if e := ix.m[id]; keep(e) && !decided(dir, e) {
 			todo = append(todo, e)
 		}
 	}
 	sort.Slice(todo, func(a, b int) bool { return todo[a].Created > todo[b].Created })
-	if limit > 0 && len(todo) > limit {
-		fmt.Printf("%d raw logs to download, capped at -max %d (newest first)\n", len(todo), limit)
-		todo = todo[:limit]
+	fmt.Printf("%d logs to download and judge", len(todo))
+	if limit > 0 {
+		fmt.Printf(", stopping at %d kept", limit)
 	}
-	ch := make(chan indexEntry)
-	var mu sync.Mutex
-	ok, failed := 0, 0
-	var wg sync.WaitGroup
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for e := range ch {
-				b, code, err := get(fmt.Sprintf("%s/%s/%s/raw", rawBase, account, e.ID))
-				mu.Lock()
-				if err != nil || code != 200 {
-					failed++
-					fmt.Fprintf(os.Stderr, "raw %s: HTTP %d %v\n", e.ID, code, err)
-				} else if werr := os.WriteFile(rawPath(dir, e.ID), b, 0o644); werr != nil {
-					failed++
-				} else {
-					ok++
-				}
-				if n := ok + failed; n%200 == 0 {
-					fmt.Printf("  %d / %d downloaded (%d failed)\n", n, len(todo), failed)
-				}
-				mu.Unlock()
-				time.Sleep(rawDelay)
-			}
-		}()
+	fmt.Println()
+	if _, err := fetchJudge(dir, ix, seen, todo, workers, limit); err != nil {
+		return err
 	}
-	for _, e := range todo {
-		ch <- e
-	}
-	close(ch)
-	wg.Wait()
-	fmt.Printf("downloaded %d raw logs, %d failed\n", ok, failed)
+	report(ix, keep)
 	return nil
 }
 
@@ -516,7 +524,8 @@ func apiFetch(dir, from string, maxPages, workers, limit int) error {
 	if limit < 0 {
 		return nil
 	}
-	return download(dir, idx, workers, inRange(from), limit)
+	out.Close()
+	return download(dir, workers, inRange(from), limit)
 }
 
 // sample downloads the indexed gists created on one day of each month (UTC), at or after from.
@@ -560,7 +569,7 @@ func sample(dir, from string, day, workers, limit int) error {
 	for _, d := range ds {
 		fmt.Printf("  %s: %d gists\n", d, days[d])
 	}
-	return download(dir, idx, workers, keep, limit)
+	return download(dir, workers, keep, limit)
 }
 
 // inRange keeps entries created at or after from ("" = all).
@@ -857,30 +866,64 @@ func stats(dir string) error {
 	}
 	defer out.Close()
 	var recs []Record
+	harmonyLen := map[string]int{} // Harmony section size per id, kept after the section is dropped
 	seenHash := map[string]bool{}
 	drops := map[string]int{}
 	missing := 0
 	t0 := time.Now()
-	for _, id := range ids {
-		b, err := os.ReadFile(rawPath(dir, id))
-		if err != nil {
-			missing++
-			continue
+	// Parse in parallel, chunk by chunk, and post-process in created order.
+	const chunk = 1024
+	for start := 0; start < len(ids); start += chunk {
+		part := ids[start:min(start+chunk, len(ids))]
+		got := make([]*Record, len(part))
+		var wg sync.WaitGroup
+		next := make(chan int)
+		for w := 0; w < runtime.NumCPU(); w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := range next {
+					b, err := os.ReadFile(rawPath(dir, part[i]))
+					if err != nil {
+						continue
+					}
+					r := parse(part[i], idx[part[i]].Created, b)
+					got[i] = &r
+				}
+			}()
 		}
-		r := parse(id, idx[id].Created, b)
-		if r.Status == "ok" && seenHash[r.Hash] {
-			r.Status, r.Drop = "dropped", "duplicate-content"
+		for i := range part {
+			next <- i
 		}
-		seenHash[r.Hash] = true
-		if r.Status == "ok" && r.MM != "1.6" && r.MM != "1.7" {
-			r.Status, r.Drop = "dropped", "version-out-of-scope"
+		close(next)
+		wg.Wait()
+		for k := range part {
+			if got[k] == nil {
+				missing++ // not on disk: dropped by the filter, or never downloaded
+				continue
+			}
+			r := *got[k]
+			if r.Status == "ok" && seenHash[r.Hash] {
+				r.Status, r.Drop = "dropped", "duplicate-content"
+			}
+			seenHash[r.Hash] = true
+			if r.Status == "ok" && r.MM != "1.6" && r.MM != "1.7" {
+				r.Status, r.Drop = "dropped", "version-out-of-scope"
+			}
+			if r.Status != "ok" {
+				drops[r.Drop]++
+			}
+			j, _ := json.Marshal(r)
+			out.Write(append(j, '\n'))
+			// The summary below needs neither the Harmony section nor the assemblies; dropping them
+			// keeps 40k records in a few GB instead of tens.
+			harmonyLen[r.ID] = len(r.Harmony)
+			r.Harmony = nil
+			for i := range r.Mods {
+				r.Mods[i].Assemblies = nil
+			}
+			recs = append(recs, r)
 		}
-		if r.Status != "ok" {
-			drops[r.Drop]++
-		}
-		j, _ := json.Marshal(r)
-		out.Write(append(j, '\n'))
-		recs = append(recs, r)
 	}
 	parseTime := time.Since(t0)
 
@@ -923,7 +966,7 @@ func stats(dir string) error {
 	tplLogs := map[string]int{} // logs per cluster template
 	for _, r := range ok {
 		nMods = append(nMods, len(r.Mods))
-		nHar = append(nHar, len(r.Harmony))
+		nHar = append(nHar, harmonyLen[r.ID])
 		nClus = append(nClus, len(r.Clusters))
 		if r.Truncated {
 			tr++
@@ -931,7 +974,7 @@ func stats(dir string) error {
 		if len(r.Clusters) > 0 {
 			withErr = append(withErr, 1)
 		}
-		if len(r.Harmony) > 0 {
+		if harmonyLen[r.ID] > 0 {
 			withHar = append(withHar, 1)
 		}
 		seenC := map[string]bool{}

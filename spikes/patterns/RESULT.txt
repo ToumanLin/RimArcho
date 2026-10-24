@@ -220,3 +220,18 @@ privateRe (here and in spikes/knowndeps) now also drops "[Rimworld_dir]" / "[Rim
 Regenerated from the same inputs: exactly those 2 mod patterns dropped (1,036 -> 1,034), no other
 pattern changed. A scan of patterns.json and internal/known/known.json found no user names,
 Windows user paths, Steam IDs, e-mail addresses, save or colony names.
+
+== Rerun on the 40k corpus (2026-10-24, corpusrun v5, 40,326 logs of 1.6, 40,050 attributed)
+
+Same method and thresholds (mod-specific: >= 10 logs from >= 5 sessions; templates with paths dropped).
+  generic rules matched   84.9% of 3,620,153 problem clusters (87.0% of 610,910 before); 74.6% by
+                          occurrence; MCP workflow covers 32.7% / partly 27.6% / not 39.6% (30.0 / 29.1 / 40.9)
+  sessions                5,585 with 2+ uploads (39% of logs); 10,190 consecutive pairs: 5,548 unchanged,
+                          367 order only, 2,372 with 1-3 changes
+  mod-specific patterns   1,034 -> 9,305 exported (9,351 in patterns-v0.json); 8,567 of them from 10-99 logs.
+                          internal/patterns/patterns.json 476 KB -> 4.2 MB. Checked: none below 10 logs or
+                          5 sessions, no path/e-mail/long-id text in any template.
+  product matcher         `-verify` on results-v5: 3,620,151 clusters, 0 classified differently from the research rules
+The jump is mostly the long tail (more mods reach 10 logs / 5 sessions), not new kinds of error. If the
+4 MB embedded file is too big for the binary, raise -minlogs (e.g. 25 keeps ~1,900) rather than touching the
+session threshold.
