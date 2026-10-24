@@ -11,7 +11,8 @@ const result = (request, loading, name = "pending") => ({
 async function setup() {
   const screen = new Element("div"), timers = [], requests = [], polls = [], messages = [];
   const S = { screen: "textures", screenSeq: 1 };
-  const el = (tag, cls, text) => new Element(tag, cls, text);
+  let created = 0;
+  const el = (tag, cls, text) => { created++; return new Element(tag, cls, text); };
   const $ = (sel) => sel === "#screen" ? screen : screen.querySelector(sel.replace(/^#screen /, ""));
   const api = {
     Setting: async () => "", SetSetting: async () => {},
@@ -32,7 +33,7 @@ async function setup() {
   };
   const document = { activeElement: null, body: new Element("body") };
   const tex = await loadModules("./textures.js", deps, { document, setTimeout: (f) => timers.push(f) });
-  return { screen, timers, requests, polls, messages, S, tex };
+  return { screen, timers, requests, polls, messages, S, tex, created: () => created };
 
 }
 
@@ -121,4 +122,28 @@ test("measurement can reorder rows without interrupting a header drag or pending
   assert.equal(h.screen.querySelector(".lib-th").children[0], header);
   assert.equal(typeof header.onpointerup, "function", "drag retains pointer capture target");
   header.onpointerup();
+});
+
+test("450 rows arrive in batches and unchanged polls create no DOM", async () => {
+  const h = await setup();
+  const p = result(1, true);
+  p.rows = Array.from({ length: 450 }, (_, i) => ({ ref: `mod-${i}`, name: `Mod ${i}`, pending: true }));
+  h.tex.open(); h.requests[0].resolve(p); await flush();
+  const table = h.screen.querySelector('.tex-rows');
+  const unchanged = h.screen.querySelector('[data-ref="mod-449"]');
+  h.timers.shift()(); await flush();
+  let before = h.created();
+  h.polls[0].resolve(p); await flush();
+  assert.equal(h.created(), before, "an unchanged 100ms snapshot draws nothing");
+  h.timers.shift()(); await flush();
+  const next = { ...p, rows: p.rows.map((r, i) => i === 0 ? { ...r, pending: false, estimate: '32 MB' } : r) };
+  before = h.created(); h.polls[1].resolve(next); await flush();
+  assert.ok(h.created() - before < 160, "one completed mod must not rebuild 450 rows");
+  assert.equal(h.screen.querySelector('.tex-rows'), table);
+  assert.equal(h.screen.querySelector('[data-ref="mod-449"]'), unchanged);
+  h.timers.shift()(); await flush();
+  const done = { ...next, loading: false, rows: next.rows.map(r => ({ ...r, pending: false, estimate: '32 MB' })) };
+  h.polls[2].resolve(done); await flush();
+  assert.equal(h.screen.querySelectorAll('.data-row').length, 450, "a single poll applies the whole batch");
+  assert.equal(h.screen.querySelectorAll('.tex-rows .tex-pending').length, 0);
 });

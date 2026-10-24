@@ -41,12 +41,13 @@ func (s *Source) DDS() string { return strings.TrimSuffix(s.Path, filepath.Ext(s
 // Other is a texture file the encoder does not touch: a .dds already there, a .jpg, a
 // .psd, or a .png whose content is not PNG.
 type Other struct {
-	Path string
-	Rel  string
-	Key  string
-	Prio int
-	Ext  string // ".dds", ".jpg", ".jpeg", ".psd", ".png" (not a PNG inside)
-	Size int64
+	Path  string
+	Rel   string
+	Key   string
+	Prio  int
+	Ext   string // ".dds", ".jpg", ".jpeg", ".psd", ".png" (not a PNG inside)
+	Size  int64
+	MTime int64 // unix nanoseconds; page cache fingerprint (08 §5.2)
 }
 
 // Set is every texture file of a mod's load folders.
@@ -114,7 +115,7 @@ func collect(ctx context.Context, root string, folders []string, header func(str
 					return nil
 				}
 			}
-			s.Others = append(s.Others, &Other{Path: p, Rel: rel, Key: key, Prio: prio, Ext: ext, Size: info.Size()})
+			s.Others = append(s.Others, &Other{Path: p, Rel: rel, Key: key, Prio: prio, Ext: ext, Size: info.Size(), MTime: info.ModTime().UnixNano()})
 			return nil
 		})
 		if err != nil {
