@@ -2,6 +2,7 @@ package app
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 	"unicode"
@@ -18,6 +20,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/content"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/fsscan"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -599,8 +602,27 @@ func packFolder(m *store.Mod, used map[string]bool) string {
 }
 
 func dirSize(dir string) int64 {
+	// Unix links have nonzero sizes; retain WalkDir's link accounting there.
+	// Windows links have size zero, so skipping them preserves the total.
+	if runtime.GOOS != "windows" {
+		return dirSizeWithLinks(dir)
+	}
+	fi, err := os.Lstat(dir)
+	if err != nil {
+		return 0
+	}
+	// WalkDir counted a file or link root itself, without following its target.
+	if !fi.IsDir() || source.IsLink(dir) {
+		return fi.Size()
+	}
+	// Pack data contains copies; launch junctions live outside it, in game Mods/.
+	_, n, _ := fsscan.Size(context.Background(), dir, 0)
+	return n
+}
+
+func dirSizeWithLinks(dir string) int64 {
 	var n int64
-	filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
 			if fi, err := d.Info(); err == nil {
 				n += fi.Size()

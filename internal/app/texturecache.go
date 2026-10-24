@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/ToumanLin/RimArcho/internal/fsscan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/textures"
@@ -54,6 +55,10 @@ func (a *App) textureSummaries(ctx context.Context, targets []TextureTarget, o t
 	}
 	jobs := make(chan int)
 	results := make(chan result)
+	if workers <= 0 && len(targets) > 0 {
+		// SSDs benefit through eight workers (07 §6.2); HDDs use two.
+		workers = min(8, fsscan.Workers(targets[0].Dir))
+	}
 	workers = max(1, min(workers, runtime.GOMAXPROCS(0), len(targets)))
 	var wg sync.WaitGroup
 	for range workers {
@@ -177,5 +182,5 @@ func writeTextureSummaries(ctx context.Context, path string, entries map[string]
 	}
 }
 
-// Kept modest for shared disks; first-read concurrency is measured in 07 §6.2.
-const textureSummaryWorkers = 4
+// Zero selects concurrency from the first target's disk in textureSummaries.
+const textureSummaryWorkers = 0

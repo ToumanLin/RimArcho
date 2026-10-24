@@ -1431,6 +1431,12 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-sub .r { margin-left: auto; letter-spacing: 0; font-size: 12px; }
 .card.pad > .pm-sub:first-child { padding: 10px 10px 6px; }
 .pm-note { font-size: 12px; margin: 2px 0 6px; }
+.pm-cost .skel { padding: 4px 0 8px; }
+.pm-cost summary { cursor: pointer; }
+.pm-cost-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
+.pm-cost-table th, .pm-cost-table td { text-align: right; padding: 4px 8px; white-space: nowrap; color: var(--fg-2); }
+.pm-cost-table th { color: var(--muted); font-weight: 500; }
+.pm-cost-table th:first-child, .pm-cost-table td:first-child { text-align: left; white-space: normal; }
 .vrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .vstrip { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 6px; border-radius: var(--r-lg); background: var(--pill); }
 .vstrip .v { height: 24px; min-width: 38px; padding: 0 8px; border-radius: var(--r-sm); display: inline-flex; align-items: center; justify-content: center; gap: 4px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; transition: background var(--t-press), color var(--t-press); }

@@ -52,6 +52,9 @@ func (r *releaser) soon() {
 // Leave cancels abandoned texture reads and drops transient page state. The inventory and
 // dedicated log reader keep their change-keyed caches for the next visit.
 func (s *API) Leave(page string) {
+	if page == "plans" {
+		s.cancelLoadCost(false)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch page {

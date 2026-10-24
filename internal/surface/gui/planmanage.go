@@ -1,10 +1,119 @@
 package gui
 
 import (
+	"context"
 	"strings"
+	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
+
+type PlanCostPage struct {
+	*view.PlanCost
+	Request  uint64 `json:"request"`
+	Loading  bool   `json:"loading"`
+	Progress string `json:"progress"`
+	Error    string `json:"error,omitempty"`
+}
+
+type loadCostMeasurement struct {
+	mu      sync.Mutex
+	disk    sync.Mutex
+	workers sync.WaitGroup
+	cancel  context.CancelFunc
+	closed  bool
+	request uint64
+	page    PlanCostPage
+}
+
+// PlanLoadCost starts a background read; a newer selection cancels the older one.
+func (s *API) PlanLoadCost(id int64) (*PlanCostPage, error) {
+	m := &s.costMeasure
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return nil, context.Canceled
+	}
+	if m.cancel != nil {
+		m.cancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancel = cancel
+	m.request++
+	request := m.request
+	m.page = PlanCostPage{Request: request, Loading: true}
+	m.workers.Add(1)
+	go func() {
+		defer m.workers.Done()
+		defer cancel()
+		defer s.free.soon()
+		// Serialize cancelled reads through cache.Save so they cannot overwrite
+		// another request's cache with an older snapshot.
+		m.disk.Lock()
+		defer m.disk.Unlock()
+		if ctx.Err() != nil {
+			return
+		}
+		r, err := s.detachedReader()
+		if err != nil {
+			s.publishLoadCost(ctx, request, nil, "", err)
+			return
+		}
+		defer r.Close()
+		cost, err := r.PlanLoadCost(ctx, id, func(done, total int) {
+			s.publishLoadCost(ctx, request, nil, view.Tf("read %d / %d mods", done, total), nil)
+		})
+		if err != nil {
+			s.publishLoadCost(ctx, request, nil, "", err)
+			return
+		}
+		s.publishLoadCost(ctx, request, view.PlanLoadCost(cost), "", nil)
+	}()
+	p := m.page
+	return &p, nil
+}
+
+// PlanLoadCostMeasure polls the current request; superseded requests have no result.
+func (s *API) PlanLoadCostMeasure(request uint64) *PlanCostPage {
+	m := &s.costMeasure
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if request != m.request || m.closed {
+		return nil
+	}
+	p := m.page
+	return &p
+}
+
+func (s *API) publishLoadCost(ctx context.Context, request uint64, result *view.PlanCost, progress string, err error) {
+	m := &s.costMeasure
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if ctx.Err() != nil || request != m.request || m.closed {
+		return
+	}
+	if result != nil {
+		m.page.PlanCost, m.page.Loading = result, false
+	}
+	m.page.Progress = progress
+	if err != nil {
+		m.page.Error, m.page.Loading = view.Humanize(nil, err.Error()), false
+	}
+}
+
+func (s *API) cancelLoadCost(close bool) {
+	m := &s.costMeasure
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.cancel != nil {
+		m.cancel()
+		m.cancel = nil
+	}
+	m.request++
+	if close {
+		m.closed = true
+	}
+}
 
 // The list management page and its export sub-page (06 §2.17). Every verb is a view call
 // over the same app functions the CLI's plan versions / follow / sync use.
