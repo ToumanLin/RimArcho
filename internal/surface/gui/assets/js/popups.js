@@ -273,6 +273,7 @@ export function menu(x, y, actions, keys = false) {
   }
   if (m.lastChild && m.lastChild.tagName === "HR") m.lastChild.remove();
   if (!m.childNodes.length) return;
+  m.inert = false;
   m.hidden = false;
   const r = m.getBoundingClientRect();
   m.style.left = Math.max(6, Math.min(x, innerWidth - r.width - 6)) + "px";
@@ -304,4 +305,4 @@ export function menu(x, y, actions, keys = false) {
   setTimeout(() => document.addEventListener("mousedown", hideMenuOutside, { once: true }), 0);
 }
 function hideMenuOutside(e) { if (!$("#menu").contains(e.target)) hideMenu(); else document.addEventListener("mousedown", hideMenuOutside, { once: true }); }
-export function hideMenu() { $("#menu").hidden = true; }
+export function hideMenu() { const m = $("#menu"); m.inert = true; m.hidden = true; }
