@@ -42,7 +42,7 @@ func init() {
 		"does not write game files":                "不写游戏文件",
 		"replace %s":                               "替换选中的列表：%s",
 
-		"manage":                               "管理",
+		"manage":                               "列表管理",
 		"%s has %d lists":                      "%s 里有 %d 个列表",
 		"%s has 1 list":                        "%s 里有 1 个列表",
 		"today %s":                             "今天 %s",

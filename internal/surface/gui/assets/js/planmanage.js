@@ -1,4 +1,4 @@
-// 列表管理 (06 §2.17): the sidebar's 列表 › 管理. On the left every list of the game, on the
+// 列表管理 (06 §2.17): the sidebar's 列表 › 列表管理. On the left every list of the game, on the
 // right the picked one: its game versions (04 §1.6), the Steam Workshop collections it
 // follows (04 §9.6) and how to share it (export, pack). The export is a sub-page of its own
 // (库 / 列表 / <列表> / 导出). Editing what a list holds stays in the editor (§2.5).

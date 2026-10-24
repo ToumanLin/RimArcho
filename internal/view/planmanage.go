@@ -17,7 +17,7 @@ import (
 // game versions (04 §1.6), the Steam collections it follows (04 §9.6) and how to share it.
 // Reading the page never uses the network; CheckPlanFollows does, when the page asks.
 
-// PagePlans is the sidebar's 列表 › 管理.
+// PagePlans is the sidebar's 列表 › 列表管理.
 const PagePlans = "plans"
 
 // PlanManage is the page.
