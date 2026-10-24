@@ -20,6 +20,16 @@ pwsh scripts/vm/vm.ps1 go        # build + push + launch (about 45 s)
 
 The build matches `scripts/release.ps1` (`GUI=1`, fonts and Archo Monitor copied from the newest `dist/archo-*` folder), without `-s -w` and the icon.
 
+## Smoke test (one step)
+
+```powershell
+pwsh scripts/vm/smoke.ps1                 # build, push, CLI checks, launch, window checks
+pwsh scripts/vm/smoke.ps1 -NoBuild        # reuse what is in the guest (about 1 minute)
+pwsh scripts/vm/smoke.ps1 -Shot page.png  # plus one screenshot of the window
+```
+
+It prints only `PASS` / `FAIL` lines and exits with the number of failures; nothing to read when it passes. Window checks: page keys, `alt+←/→`, the real mouse side buttons (sent as mouse input, not as page events), the menu background, no script errors. Add a check to `smoke.mjs` (window) or the guest script in `smoke.ps1` (CLI) instead of testing by hand.
+
 ## Looking and acting
 
 | What | Command |
