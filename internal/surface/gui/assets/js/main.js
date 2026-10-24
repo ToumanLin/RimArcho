@@ -236,7 +236,7 @@ function renderHints() {
   else if (S.screen === "packs" || S.screen === "build") list = packsPage.hintList();
   else if (S.screen === "plan-import") list = importHints();
   else if (S.screen === "plans" || S.screen === "plan-export") list = planManage.hintList();
-  else if (S.screen) list = [{ key: "alt+←/→", label: T("page back / forward") }, { key: "shift+1–8", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
+  else if (S.screen) list = [{ key: "shift+1–8", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);
   const c = S.focus < 3 ? col() : null;
