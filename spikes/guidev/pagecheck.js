@@ -564,6 +564,79 @@ try {
     assert(S.screen === "env", "new navigation did not clear forward");
     await nav.travel(-1); assert(S.screen === "needs", "duplicate visit was pushed");
   });
+  await test("same-page home refresh during back preserves forward history for keys and mouse", async () => {
+    const payload = { rows: [], featured: -1 };
+    for (const mouse of [false, true]) for (const order of ["original", "refresh", "forward"]) {
+      handlers.set("Home", () => payload);
+      await nav.go("home"); await nav.go("needs");
+      const original = deferred(), refresh = deferred();
+      let reads = 0, refreshed;
+      handlers.set("Home", () => ++reads === 1 ? original.promise : refresh.promise);
+      // HomeBackground can announce newly prepared art while Home is still reading.
+      handlers.set("HomeBackground", () => {
+        if (reads === 1) queueMicrotask(() => { refreshed = home.home({ keep: true }); });
+        return { url: "/fixture-background.jpg", dim: 30 };
+      });
+      if (mouse) { side("mousedown", 3); side("mouseup", 3); side("auxclick", 3); }
+      else input("ArrowLeft");
+      for (let i = 0; reads < 2 && i < 30; i++) await Promise.resolve();
+      assert(reads === 2 && S.screen === "home", "back did not receive a same-page refresh");
+      if (order === "original") {
+        original.resolve(payload);
+        for (let i = 0; i < 30; i++) await Promise.resolve();
+        assert(S.screen === "home", "superseded traversal skipped the pending refresh");
+        refresh.resolve(payload); await refreshed; await settle();
+      } else if (order === "refresh") {
+        refresh.resolve(payload); await refreshed;
+        original.resolve(payload); await settle();
+      }
+      if (mouse) { side("mousedown", 4); side("mouseup", 4); side("auxclick", 4); }
+      else input("ArrowRight");
+      assert(S.screen === "needs", "refresh removed the forward destination: " + order);
+      if (order === "forward") {
+        original.resolve(payload); refresh.resolve(payload); await refreshed;
+      }
+      await settle();
+      assert(S.screen === "needs", "late home refresh took over forward navigation");
+      handlers.set("Home", () => payload); handlers.set("HomeBackground", () => ({}));
+      await nav.travel(-1); assert(S.screen === "home", "refresh added a new home visit");
+      await nav.travel(1); assert(S.screen === "needs", "forward history did not survive a second traversal");
+    }
+  });
+  await test("back waits for the latest same-page refresh instead of cancelling its replay", async () => {
+    const payload = { rows: [], featured: -1 };
+    await nav.go("home"); await nav.go("needs");
+    const original = deferred(), latest = deferred();
+    let reads = 0;
+    handlers.set("Home", () => ++reads === 1 ? original.promise : latest.promise);
+    let done = false;
+    const back = nav.travel(-1).then(() => { done = true; });
+    const refresh = home.home({ keep: true });
+    original.resolve(payload);
+    await settle();
+    assert(reads === 2 && !done && S.screen === "home", "same-page refresh cancelled the pending replay");
+    latest.resolve(payload); await refresh; await back;
+    await nav.travel(1); assert(S.screen === "needs", "refresh truncated forward history");
+    handlers.set("Home", () => payload);
+  });
+  await test("back then immediate forward preserves a still-loading destination for keys and mouse", async () => {
+    for (const mouse of [false, true]) {
+      await nav.go("home");
+      const pending = deferred(); handlers.set("Needs", () => pending.promise);
+      const entering = nav.go("needs");
+      if (mouse) { side("mousedown", 3); side("mouseup", 3); side("auxclick", 3); }
+      else input("ArrowLeft");
+      assert(S.screen === "home", "back waited for the pending destination");
+      if (mouse) { side("mousedown", 4); side("mouseup", 4); side("auxclick", 4); }
+      else input("ArrowRight");
+      assert(S.screen === "needs", "pending destination was lost to forward navigation");
+      pending.resolve({ items: [] }); await entering; await settle();
+      assert(S.screen === "needs", "late read took over the pending destination");
+      handlers.set("Needs", () => ({ items: [] }));
+      await nav.travel(-1); assert(S.screen === "home", "pending destination added a duplicate visit");
+      await nav.travel(1); assert(S.screen === "needs", "pending destination was not retained");
+    }
+  });
   await test("side mouseup and auxclick take one step, alt arrows work in inputs, URL stays local", async () => {
     await nav.go("home"); await nav.go("needs"); await nav.go("settings");
     const url = location.href;
@@ -671,7 +744,7 @@ try {
     await nav.go("home"); const pending = nav.go("needs");
     await nav.travel(-1); assert(S.screen === "home", "back skipped the source of an ordinary pending page");
     ordinary.resolve({ items: [] }); await pending;
-    await nav.travel(1); assert(S.screen === "home", "incomplete visit was added to history");
+    await nav.travel(1); assert(S.screen === "needs", "back discarded the explicitly requested pending destination");
     handlers.set("Needs", () => ({ items: [] }));
     await nav.go("needs"); await nav.go("settings");
     const delayed = deferred(); handlers.set("Needs", () => delayed.promise);

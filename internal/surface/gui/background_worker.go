@@ -64,7 +64,6 @@ func (s *API) prepareBackgrounds(fresh bool) {
 			return
 		}
 	}
-	first := job == nil
 	job = &backgroundResult{}
 	s.bgRead.jobs[key] = job
 	ctx, home, game, lang := s.bgRead.ctx, s.a.Home, e.GameRoot, view.Lang()
@@ -86,7 +85,7 @@ func (s *API) prepareBackgrounds(fresh bool) {
 			s.bgs = items
 		}
 		s.mu.Unlock()
-		if publish && (first || changed) {
+		if publish && changed {
 			s.send("backgrounds", nil)
 		} // one refresh after the whole batch (06 §2.14)
 	}()

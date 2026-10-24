@@ -13,6 +13,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/menubg"
+	"github.com/ToumanLin/RimArcho/internal/view"
 	"image"
 	"image/color"
 	"image/png"
@@ -142,12 +143,53 @@ func TestMenuBackgroundSettingsAndVersionRefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	api.HomeBackground()
-	awaitBackgrounds(t, events)
+	api.bgRead.workers.Wait()
 	if got := api.HomeBackground().URL; got != "" {
 		t.Fatalf("previous game's background leaked: %s", got)
 	}
 	if got := api.Backgrounds().Groups[0].Items; len(got) != 1 || got[0].Key != BgPlain {
 		t.Fatalf("missing assets should fall back to plain: %+v", got)
+	}
+}
+
+func TestBackgroundEventsOnlyWhenListChanges(t *testing.T) {
+	e, api, events := fixture(t)
+	noRefresh := func() {
+		t.Helper()
+		api.bgRead.workers.Wait()
+		for {
+			select {
+			case event := <-events:
+				if strings.HasPrefix(event, "backgrounds ") {
+					t.Fatal("unchanged list emitted a background refresh")
+				}
+			default:
+				return
+			}
+		}
+	}
+	// Discovering an empty list for the first time does not change the plain page.
+	api.HomeBackground()
+	noRefresh()
+	// A new worker key alone is not a change to the empty image list.
+	lang := view.Lang()
+	t.Cleanup(func() { view.SetLang(lang) })
+	if lang == "zh" {
+		view.SetLang("en")
+	} else {
+		view.SetLang("zh")
+	}
+	api.HomeBackground()
+	noRefresh()
+	view.SetLang(lang)
+	menuGame(t, e.Game)
+	api.HomeBackground()
+	awaitBackgrounds(t, events)
+	api.bgRead.workers.Wait()
+	for range 3 {
+		api.HomeBackground()
+		api.Backgrounds() // recheck assets without changing their published choices
+		noRefresh()
 	}
 }
 
