@@ -9,9 +9,15 @@ import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
 import { bgSection } from "./bg.js";
 import { virtualRows } from "./virtualrows.js";
+import { on } from "./api.js";
 
 let ui = null;
-export function initScreens(u) { ui = u; }
+export function initScreens(u) {
+  ui = u;
+  on("tasks", (ev) => {
+    if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
+  });
+}
 
 // fresh: the next page built is a new page (not a redraw of the one shown); only a new page
 // fades in, so a redraw after an action or a sub-view switch does not flicker.
@@ -1154,8 +1160,9 @@ export { full, fullKey, fullSection } from "./fulldetail.js";
 
 export async function settings() {
   const read = beginPageRead("settings");
-  let groups, bg;
-  try { [groups, bg] = await Promise.all([api.Settings(), bgSection(read.current)]); } catch (e) { read.fail(e); return; }
+  const taskVersion = settingTaskRead;
+  let groups, bg, tasks;
+  try { [groups, bg, tasks] = await Promise.all([api.Settings(), bgSection(read.current), api.Tasks()]); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   groups = groups || [];
   const sc = S.screen === "settings" ? $("#screen") : openScreen("settings");
@@ -1165,8 +1172,40 @@ export async function settings() {
   sc.append(w);
   w.append(bg);
   renderGroups(w, groups, settings);
+  markSettingTasks(tasks);
   sc.scrollTop = top;
   read.finish();
+  if (taskVersion !== settingTaskRead) refreshSettingTasks(true);
+}
+
+// Task events update the affected values without replacing edits or focus (06 §2.14).
+let settingTaskRead = 0;
+let settingValueRead = 0;
+async function refreshSettingTasks(values = false) {
+  const n = ++settingTaskRead, epoch = S.screenSeq;
+  const v = values ? ++settingValueRead : 0;
+  try {
+    const [tasks, groups] = await Promise.all([api.Tasks(), values ? api.Settings() : null]);
+    if (S.screen !== "settings" || S.screenSeq !== epoch) return;
+    if (n === settingTaskRead) markSettingTasks(tasks);
+    if (!groups || v !== settingValueRead) return;
+    const rows = [...$("#screen").querySelectorAll("[data-setting-row]")];
+    for (const g of groups) for (const it of g.items || []) {
+      const row = rows.find(r => r.dataset.settingRow === g.title + "/" + it.label);
+      if (!row) continue;
+      const note = row.querySelector(".setting-note"), value = row.querySelector(".setting-value");
+      if (note) { note.textContent = it.note || ""; note.hidden = !it.note; }
+      if (value) value.textContent = it.value || "";
+    }
+  } catch (e) { if (S.screen === "settings" && S.screenSeq === epoch) say("fail", errText(e)); }
+}
+
+function markSettingTasks(tasks) {
+  const active = new Set((tasks?.rows || []).filter(t => t.state === "queue" || t.state === "run").map(t => t.kind));
+  for (const b of $("#screen").querySelectorAll("button[data-setting-task]")) {
+    b.disabled = active.has(b.dataset.settingTask);
+    b.textContent = b.disabled ? b.dataset.pending : b.dataset.label;
+  }
 }
 
 // Each startup checks the disk, including environments other than the selected one.
@@ -1221,13 +1260,14 @@ function directoryPrompt(d, moving, after) {
 
 // settingRunner runs a setting's command, then redraws the page with again.
 function settingRunner(again) {
-  return async (argv, value, after) => {
+  return async (argv, value, after, background = false) => {
     const screen = S.screen, epoch = S.screenSeq;
     try {
       const out = await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
     } catch (e) { say("fail", errText(e)); }
     if (S.screen !== screen || S.screenSeq !== epoch) return;
+    if (background) return refreshSettingTasks(true);
     if (after) return after();
     await ui.reload();
     if (S.screen === screen && S.screenSeq === epoch) again();
@@ -1244,9 +1284,12 @@ function renderGroups(w, groups, again) {
     area(card, lab);
     for (const it of g.items || []) {
       const row = el("div", "set");
+      row.dataset.settingRow = g.title + "/" + it.label;
       const left = el("div", "l");
       left.append(el("div", "name", it.label));
-      if (it.note) left.append(el("div", "sub", it.note));
+      const note = el("div", "sub setting-note", it.note || "");
+      note.hidden = !it.note;
+      left.append(note);
       const right = el("div", "r");
       if (it.edit === "choice") {
         const s = el("select");
@@ -1276,13 +1319,23 @@ function renderGroups(w, groups, again) {
         // A folder: the window's folder dialog; the chosen folder is applied at once.
         if (it.edit === "path") right.append(button(T("choose…"), "", () => pickFolder(inp.value, (p) => run(it.argv, p))));
         right.append(ok);
-      } else if (it.value) {
-        right.append(el("span", "muted", it.value));
+      } else {
+        right.append(el("span", "muted setting-value", it.value || ""));
       }
       for (const a of it.actions || []) {
         // 卸载 RimArcho is its own page with the plan; every other action is a command
         if (a.argv[0] === "uninstall") { right.append(button(a.label, "", () => ui.go(a.argv[0]))); continue; }
-        right.append(button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, () => run(a.argv)) : run(a.argv)));
+        const submit = () => {
+          if (a.task) { b.disabled = true; b.textContent = a.pending; }
+          return run(a.argv, "", null, !!a.task);
+        };
+        const b = button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, submit) : submit());
+        if (a.task) {
+          b.dataset.settingTask = a.task;
+          b.dataset.label = a.label;
+          b.dataset.pending = a.pending;
+        }
+        right.append(b);
       }
       row.append(left, right);
       card.append(row);

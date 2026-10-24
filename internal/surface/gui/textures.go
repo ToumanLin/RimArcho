@@ -138,11 +138,9 @@ func (s *API) measureTextures(ctx context.Context, request uint64, scope string,
 
 // TexturesInstall downloads todds; the page asked the player first (source, size, folder).
 func (s *API) TexturesInstall() (string, error) {
-	// not under the lock: a slow download must not hold the other pages
-	if _, err := s.a.InstallTodds(); err != nil {
-		return "", err
-	}
-	return view.T("todds (the DDS encoder) is downloaded"), nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return settingQueued(s.queueSettingTaskLocked(view.TaskTodds, nil, "")), nil
 }
 
 // TexturesRun starts converting: the mods refs (Mod 库存's selection), else scope "plan" or

@@ -47,12 +47,12 @@ func (s *API) startTasks() {
 	}
 	ts.Changed = s.tasksChanged
 	ts.Ended = func(t app.Task) {
-		if t.Lane == app.LaneSelf {
+		if t.Lane == app.LaneSelf && !view.IsSettingTask(t.Kind) {
 			return // its own event says how it ended
 		}
 		r := view.BuildTasks([]app.Task{t}, time.Now()).Rows[0]
 		ok := t.State == app.TaskDone
-		s.send("tasks", map[string]any{"ended": map[string]any{"ok": ok, "kind": t.Kind, "text": r.Title + " · " + r.Obj + "：" + r.Line}})
+		s.send("tasks", map[string]any{"ended": map[string]any{"ok": ok, "id": t.ID, "kind": t.Kind, "text": r.Title + " · " + r.Obj + "：" + r.Line}})
 	}
 	s.tasks = ts
 }
@@ -160,6 +160,15 @@ func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 	case "retry", "resume":
 		t := byID[ids[0]]
 		if t.Lane == app.LaneSelf {
+			if view.IsSettingTask(t.Kind) {
+				if !t.Ended() {
+					return "", errors.New(view.Tf("%s cannot do that now", view.TaskTitle(t.Kind)))
+				}
+				s.mu.Lock()
+				nt := s.queueSettingTaskLocked(t.Kind, t.Args, t.Env)
+				s.mu.Unlock()
+				return settingQueued(nt), nil
+			}
 			switch t.Kind {
 			case view.TaskScan:
 				if s.Scan() {

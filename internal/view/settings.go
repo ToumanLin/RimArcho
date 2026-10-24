@@ -34,6 +34,38 @@ type SettingAction struct {
 	Label   string   `json:"label"`
 	Argv    []string `json:"argv"`
 	Confirm string   `json:"confirm,omitempty"`
+	Task    string   `json:"task,omitempty"`
+	Pending string   `json:"pending,omitempty"`
+}
+
+// SettingTask identifies commands that queue after confirmation (06 §2.14, 06 §2.16).
+func SettingTask(argv []string) string {
+	if len(argv) > 0 && argv[0] == "gc" {
+		return TaskGC
+	}
+	if len(argv) < 2 {
+		return ""
+	}
+	return map[string]string{
+		"data update": TaskData, "cache clear": TaskCache,
+		"db backup": TaskBackup, "db vacuum": TaskVacuum,
+	}[strings.Join(argv[:2], " ")]
+}
+
+// TaskPending is the action's label while this kind runs or waits.
+func TaskPending(kind string) string {
+	switch kind {
+	case TaskSteamCMD, TaskTodds:
+		return T("downloading…")
+	case TaskData:
+		return T("updating…")
+	case TaskBackup:
+		return T("backing up…")
+	case TaskVacuum:
+		return T("compacting…")
+	default:
+		return T("clearing…")
+	}
 }
 
 // SettingGroup is a heading and its rows.
@@ -238,7 +270,28 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		{Label: T("uninstall RimArcho"), Note: T("remove what RimArcho put on this machine and put back what it changed"),
 			Actions: []SettingAction{{Label: T("uninstall RimArcho…"), Argv: []string{"uninstall"}}}},
 	}})
+	for gi := range out {
+		for ii := range out[gi].Items {
+			for ai := range out[gi].Items[ii].Actions {
+				a := &out[gi].Items[ii].Actions[ai]
+				a.Task = SettingTask(a.Argv)
+				if a.Task != "" {
+					a.Pending = TaskPending(a.Task)
+				}
+			}
+		}
+	}
 	return out
+}
+
+func init() {
+	Register(map[string]string{
+		"downloading…": "正在下载…",
+		"updating…":    "正在更新…",
+		"backing up…":  "正在备份…",
+		"compacting…":  "正在压缩…",
+		"clearing…":    "正在清理…",
+	})
 }
 
 // SettingCommand checks that argv is one of the settings page's commands (the interfaces

@@ -106,6 +106,11 @@ func (a *App) OfferSteamCMD() (*SteamCMDOffer, error) {
 // InstallSteamCMD downloads SteamCMD from Valve and unpacks it into SteamCMDDir. It runs
 // only when the player said yes to OfferSteamCMD. SteamCMD updates itself on its first run.
 func (a *App) InstallSteamCMD() (string, error) {
+	return a.InstallSteamCMDProgress(nil)
+}
+
+// InstallSteamCMDProgress also reports bytes received to the guide and task (06 §2.15).
+func (a *App) InstallSteamCMDProgress(progress func(done, total int64)) (string, error) {
 	dir := a.SteamCMDDir()
 	if err := a.checkRoots(dir); err != nil {
 		return "", err
@@ -124,7 +129,7 @@ func (a *App) InstallSteamCMD() (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("downloading SteamCMD: %s", resp.Status)
 	}
-	b, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	b, err := readToolDownload(resp, progress)
 	if err != nil {
 		return "", fmt.Errorf("downloading SteamCMD: %w", err)
 	}

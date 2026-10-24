@@ -85,6 +85,11 @@ type DataUpdate struct {
 // UpdateData downloads the datasets (only those named in keys, or all), validates every
 // one, and replaces the stored files only when all succeeded (04 §6.3 D2).
 func (a *App) UpdateData(keys []string, dryRun bool) ([]*DataUpdate, error) {
+	return a.UpdateDataProgress(keys, dryRun, nil)
+}
+
+// UpdateDataProgress reports each source without changing the all-or-nothing update.
+func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key string, done int)) ([]*DataUpdate, error) {
 	want := func(k string) bool {
 		if len(keys) == 0 {
 			return true
@@ -112,6 +117,9 @@ func (a *App) UpdateData(keys []string, dryRun bool) ([]*DataUpdate, error) {
 	for _, d := range Datasets {
 		if !want(d.Key) {
 			continue
+		}
+		if progress != nil {
+			progress(d.Key, len(res))
 		}
 		u := &DataUpdate{Dataset: d, Info: &DataInfo{Key: d.Key, Source: a.DataSource(d), Fetched: a.Now().UTC()}}
 		res = append(res, u)
@@ -162,6 +170,12 @@ func (a *App) UpdateData(keys []string, dryRun bool) ([]*DataUpdate, error) {
 		a.dataIdx = nil
 	}
 	return res, nil
+}
+
+// DropCommunityData forgets data cached before another connection updated it.
+func (a *App) DropCommunityData() {
+	a.dataIdx, a.prCache, a.planPS = nil, nil, nil
+	a.prKey = ""
 }
 
 // fetchData downloads (or copies a local path) to a temp file and validates it.

@@ -482,6 +482,10 @@ func (s *API) ApplySetting(argv []string, value string) ([]string, error) {
 		}
 		run[i] = x
 	}
+	if kind := view.SettingTask(run); kind != "" {
+		t := s.queueSettingTaskLocked(kind, run, "")
+		return []string{settingQueued(t)}, nil
+	}
 	text, code := cmds.Execute(s.a, run)
 	s.board, s.needs = nil, nil
 	if len(run) == 4 && run[0] == "config" && run[2] == "ui.lang" && code == cmds.ExitOK {
