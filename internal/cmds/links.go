@@ -60,7 +60,7 @@ func linksDoc(p *app.LinkRepairPlan, asJSON bool, title string) (*render.Doc, er
 		n.KV("link", l.Path)
 		n.KV("target", l.Target)
 		n.KV("state", fmt.Sprintf("%s %s (%s)", l.Code, l.State, l.Kind))
-		n.KV("reason", l.Reason)
+		n.KV("reason", l.ShortReason())
 		n.KV("evidence", l.Evidence)
 		n.KV("action", l.Action)
 	}

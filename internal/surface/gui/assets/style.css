@@ -1607,3 +1607,22 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
   .settings .appearance-row .l { flex-basis: 100%; }
   .settings .appearance-row .r, .appearance-control { justify-content: flex-start; }
 }
+
+/* Link health: the same grouped rows in needs and the repair preview. */
+.link-groups { min-width: 0; margin-top: 12px; }
+.link-group + .link-group { margin-top: 16px; }
+.link-game { display: flex; align-items: baseline; gap: 12px; min-width: 0; font-size: 13px; margin-bottom: 8px; }
+.link-game strong { flex-shrink: 0; }
+.link-game > .link-path { color: var(--muted); }
+.link-row { display: grid; grid-template-columns: minmax(100px, 1fr) auto minmax(100px, 2fr) minmax(120px, 1fr) auto; align-items: center; gap: 8px; padding: 8px 0; border-top: var(--hairline) solid var(--line); font-size: 13px; }
+.link-path { display: inline-flex; min-width: 0; max-width: 100%; vertical-align: bottom; }
+.link-path-start { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-path-end { flex-shrink: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.link-arrow, .link-reason { color: var(--muted); }
+.link-tag { border-radius: 999px; background: var(--line); padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+.pop.link-repair { width: min(1000px, 90vw); }
+@media (max-width: 760px) {
+  .link-row { grid-template-columns: minmax(0, 1fr) auto minmax(0, 2fr); }
+  .link-reason { grid-column: 1 / 3; }
+  .link-tag { justify-self: end; }
+}

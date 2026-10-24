@@ -305,3 +305,69 @@ func TestLinkHealthOtherGamesDoNotBlockAndRootsDeduplicate(t *testing.T) {
 		t.Fatal("scan silently dropped broken link")
 	}
 }
+
+func TestStaleIDLinkKnownLiveTarget(t *testing.T) {
+	e, target, id := linkHealthEnv(t)
+	name := "_Archo_env_deleted-instance"
+	path := filepath.Join(e.Game, "Mods", name)
+	// Resolve a physical alias and normalized path rather than relying on the name.
+	alias := filepath.Join(e.Root, "target-alias")
+	e.Junction(alias, filepath.Dir(target))
+	e.Junction(path, filepath.Join(alias, filepath.Base(target)))
+	l := healthByName(t, e)[name]
+	if !l.Owned || l.Code != "" || l.Instance != id || l.Action != "keep" || l.Evidence != "target is known instance "+id {
+		t.Fatalf("known live target: %+v", l)
+	}
+	ps, err := e.App.Problems(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range ps.List {
+		for _, subject := range p.Subjects {
+			if subject == "path:"+path {
+				t.Fatalf("healthy link reported: %+v", p)
+			}
+		}
+	}
+	needs := view.BuildNeeds(e.App, ps.State, ps)
+	for _, n := range needs.Items {
+		if len(n.LinkGroups) > 0 {
+			t.Fatalf("healthy link on needs: %+v", n)
+		}
+	}
+	out, code := e.Run("links", "check", "--all")
+	if code != 0 || !strings.Contains(out, "keep") || strings.Contains(out, app.CodeLinkForeign) {
+		t.Fatalf("check: %d %s", code, out)
+	}
+	// Ownership does not suppress the existing duplicate-entry finding.
+	e.Junction(filepath.Join(e.Game, "Mods", "_Archo_env_another-old-id"), target)
+	ps, err = e.App.Problems(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range ps.List {
+		if p.Code == app.CodeModsDuplicate {
+			return
+		}
+	}
+	t.Fatal("duplicate entry was hidden by ownership fallback")
+}
+
+func TestStaleIDLinkUnknownTarget(t *testing.T) {
+	e, _, _ := linkHealthEnv(t)
+	target := filepath.Join(e.Root, "unknown-target")
+	e.MkdirAll(target)
+	name := "_Archo_env_deleted-instance"
+	path := filepath.Join(e.Game, "Mods", name)
+	e.Junction(path, target)
+	l := healthByName(t, e)[name]
+	if l.Owned || l.Code != app.CodeLinkForeign || l.Action != "keep" {
+		t.Fatalf("unknown target adopted: %+v", l)
+	}
+	if err := os.Remove(target); err != nil {
+		t.Fatal(err)
+	}
+	if l = healthByName(t, e)[name]; l.Code != app.CodeLinkDangling {
+		t.Fatalf("dangling: %+v", l)
+	}
+}

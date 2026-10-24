@@ -81,7 +81,7 @@ func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	for _, l := range r.GameLinks {
 		if l.Code != "" {
-			root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.Reason)
+			root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.ShortReason())
 		}
 	}
 	// Archo Monitor (08 §9): install or update the bundled monitor, apply the default.
