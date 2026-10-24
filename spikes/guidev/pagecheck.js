@@ -15,6 +15,9 @@ import * as full from "/js/fulldetail.js";
 import { setText } from "/js/api.js";
 import * as ops from "/js/ops.js";
 import * as pop from "/js/popups.js";
+import * as nav from "/js/navigation.js";
+import * as planManage from "/js/planmanage.js";
+import { initExchange } from "/js/exchange.js";
 import { withEnvironmentSwitch } from "/js/environment.js";
 
 const output = document.querySelector("#results"), results = [];
@@ -515,6 +518,181 @@ try {
     screens.closeScreen(); await settle();
     assert(document.querySelectorAll("[data-virtual-index]").length === 0, "virtual rows survived page close");
   });
+  // G26: the production router, page completion hooks and window input listeners.
+  Object.assign(ui, { go: nav.go, pageEntering: nav.pageEntering, pageEntered: nav.pageEntered,
+    render() {}, renderHeads() {}, detailFollow() {}, selectedList: () => 1,
+    reload: async (_, read) => { read?.commit(() => { S.shell.plan = { id: 1 }; }); return true; } });
+  nav.initNavigation(ui); nav.wireHistory(); pop.initPopups(ui);
+  planManage.initPlanManage(ui); initExchange(ui);
+  for (const id of ["menu", "popup"]) {
+    const node = document.createElement("div"); node.id = id; node.hidden = true;
+    document.querySelector("#app").append(node);
+  }
+  S.board = { env: "navigation", envs: [{ name: "navigation" }] };
+  S.shell = { plan: { id: 1 }, plans: [{ id: 1 }] };
+  S.start = { ...S.start, text: {} }; setText({});
+  handlers.set("Home", () => ({ rows: [], featured: -1 }));
+  handlers.set("Needs", () => ({ items: [] }));
+  handlers.set("Settings", () => []);
+  handlers.set("Environment", () => ({ envs: [], groups: [] }));
+  handlers.set("Tasks", () => ({ rows: [] }));
+  handlers.set("ExchangeInfo", () => ({}));
+  handlers.set("Packs", () => ({ rows: [] }));
+  handlers.set("Pack", (name) => ({ name, facts: [], mods: [] }));
+  handlers.set("GuideFind", () => []);
+  const input = (name) => {
+    const e = new KeyboardEvent("keydown", { key: name, altKey: name.startsWith("Arrow"), bubbles: true, cancelable: true });
+    (document.activeElement || document).dispatchEvent(e);
+    assert(e.defaultPrevented, name + " was not prevented");
+  };
+  const side = (type, button) => {
+    const e = new MouseEvent(type, { button, bubbles: true, cancelable: true });
+    document.dispatchEvent(e);
+    assert(e.defaultPrevented, type + " side button was not prevented");
+  };
+  let writes = 0;
+  const writeMethods = ["Run", "RunOp", "HistoryGo", "ApplyImport", "PackBuild", "Uninstall", "Undo", "Redo"];
+  for (const method of writeMethods) handlers.set(method, () => { writes++; throw new Error("navigation wrote data: " + method); });
+  await test("page history A→B→C, two back, forward, duplicate and branch truncation", async () => {
+    await nav.go("home"); await nav.go("needs"); await nav.go("settings");
+    await nav.travel(-1); assert(S.screen === "needs", "first back missed B");
+    await nav.travel(-1); assert(S.screen === "home", "second back missed A");
+    await nav.travel(1); assert(S.screen === "needs", "forward missed B");
+    await nav.go("needs"); await nav.travel(1);
+    assert(S.screen === "settings", "same-page navigation cleared forward history");
+    await nav.travel(-1); await nav.go("env"); await nav.travel(1);
+    assert(S.screen === "env", "new navigation did not clear forward");
+    await nav.travel(-1); assert(S.screen === "needs", "duplicate visit was pushed");
+  });
+  await test("side mouseup and auxclick take one step, alt arrows work in inputs, URL stays local", async () => {
+    await nav.go("home"); await nav.go("needs"); await nav.go("settings");
+    const url = location.href;
+    side("mousedown", 3); assert(S.screen === "settings", "mousedown navigated");
+    side("mouseup", 3); await settle(); assert(S.screen === "needs", "mouseup did not go back");
+    side("auxclick", 3); await settle(); assert(S.screen === "needs", "auxclick repeated mouseup");
+    side("mousedown", 4); side("mouseup", 4); side("auxclick", 4); await settle();
+    assert(S.screen === "settings", "forward side button failed");
+    side("auxclick", 3); await settle(); assert(S.screen === "needs", "auxclick-only back failed");
+    const field = document.createElement("input"); document.querySelector("#app").append(field); field.focus();
+    input("ArrowLeft"); await settle(); assert(S.screen === "home", "alt+left in input failed");
+    input("ArrowRight"); await settle(); assert(S.screen === "needs", "alt+right failed");
+    input("BrowserBack"); await settle(); assert(S.screen === "home", "BrowserBack failed");
+    input("BrowserForward"); await settle(); assert(S.screen === "needs", "BrowserForward failed");
+    field.remove();
+    assert(location.href === url && location.origin === new URL(url).origin, "history changed the dev/Wails address");
+  });
+  await test("back closes a menu or popup, then full details use Backspace return", async () => {
+    await nav.go("home"); await nav.go("needs");
+    const menu = document.querySelector("#menu");
+    pop.menu(0, 0, [{ label: "fixture", run() { writes++; } }]);
+    await nav.travel(-1); assert(menu.hidden && S.screen === "needs", "back passed through menu");
+    pop.open("help", "fixture", () => {});
+    await nav.travel(-1); assert(!S.popup && S.screen === "needs", "back passed through popup");
+    handlers.set("Library", () => ({ rows: [], columns: [] }));
+    await nav.go("library");
+    await full.full("library", "fixture");
+    await nav.travel(1); assert(S.screen === "full", "forward at the end left full details");
+    await nav.travel(-1); assert(S.screen === "library", "full detail did not return to library");
+    await nav.travel(-1); assert(S.screen === "needs", "full detail was added to page history");
+  });
+  await test("pack subpages remain distinct; deleted packs and plans are skipped", async () => {
+    await nav.go("home"); await nav.go("pack:first"); await nav.go("pack:second");
+    await nav.travel(-1); assert(S.packFocus === "first", "pack history lost its name");
+    await nav.travel(1); assert(S.packFocus === "second", "pack forward lost its name");
+    handlers.set("Pack", () => { throw new Error("pack removed"); });
+    await nav.travel(-1); assert(S.screen === "home", "unavailable packs were not skipped");
+    handlers.set("Pack", (name) => ({ name, facts: [], mods: [] }));
+    await nav.go("plan:1"); await nav.go("settings");
+    S.shell.plans = [];
+    await nav.travel(-1); assert(S.screen === "home", "deleted plan was not skipped");
+    S.shell.plans = [{ id: 1 }];
+  });
+  await test("direct import and task entry points record completion, expired guide sessions cannot reopen", async () => {
+    await nav.go("home"); await nav.go("plan-import");
+    const field = document.querySelector("#screen input:not([type=file])"); field.value = "unsaved input";
+    await tasks.toggle(); assert(S.screen === "tasks", "tasks did not open");
+    await nav.travel(-1); assert(S.screen === "plan-import" && !S.popup, "import was not restored as normal navigation");
+    await nav.travel(-1); assert(S.screen === "home", "import return missing");
+    await nav.go("guide");
+    const oldSession = guide.historySession();
+    // Reopening the guide also invalidates the old entry without executing any data action.
+    await nav.go("guide");
+    assert(guide.historySession() !== oldSession, "guide session was reused");
+    await nav.go("settings"); await nav.travel(-1);
+    assert(S.screen === "guide", "active guide was not resumable");
+    await nav.travel(-1); assert(S.screen === "home", "expired guide entry was not skipped");
+  });
+  await test("finishing a guide invalidates its page history entry", async () => {
+    await nav.go("home");
+    handlers.set("GuideFind", () => [{ name: "fixture game", game: "fixture", version: "1.6" }]);
+    handlers.set("GuideAdd", (request) => { emit("environment", { request, names: ["fixture game"] }); return true; });
+    handlers.set("GuideScan", () => true);
+    await nav.go("guide");
+    document.querySelector(".guide-foot .primary").click(); await settle();
+    guide.guideEvent({ done: true, ok: true });
+    [...document.querySelectorAll(".guide-foot button")].find(b => b.textContent === "next").click();
+    [...document.querySelectorAll(".guide-foot button")].find(b => b.textContent === "skip").click(); await settle();
+    assert(S.screen === "home" && guide.historySession() === null, "guide did not finish");
+    await nav.travel(-1); assert(S.screen === "home", "completed guide reopened from history");
+    handlers.set("GuideFind", () => []);
+  });
+  await test("export keeps its list id and return context; unavailable visits and other games are skipped", async () => {
+    const seen = [];
+    handlers.set("PlanExport", (id) => { seen.push(id); return { format: "json", formats: [{ id: "json", file: "list.json" }], text: "fixture" }; });
+    await nav.go("home"); await planManage.exportOf(1, "editor"); await nav.go("settings");
+    await nav.travel(-1);
+    assert(S.screen === "plan-export" && S.planExport.id === 1 && S.planExport.from === "editor" && seen.length === 2, "export context was lost");
+    await nav.go("needs");
+    handlers.set("PlanExport", () => { throw new Error("gone"); });
+    await nav.travel(-1); assert(S.screen === "home", "failed export did not skip to home");
+    await nav.go("pack:gone"); await nav.go("settings");
+    handlers.set("Pack", () => { throw new Error("gone"); });
+    // All older visits belong to a different game and cannot be revisited.
+    S.board.env = "different game";
+    await nav.travel(-1); assert(S.screen === "settings", "history switched games");
+    S.board.env = "navigation";
+    handlers.set("Pack", (name) => ({ name, facts: [], mods: [] }));
+  });
+  await test("late success and failure cannot take over a newer history navigation", async () => {
+    await nav.go("home"); await nav.go("needs"); await nav.go("settings");
+    for (const fail of [false, true]) {
+      const delayed = deferred(); handlers.set("Needs", () => delayed.promise);
+      const old = nav.travel(-1);
+      assert(S.screen === "needs", "history did not enter before reading");
+      const newer = nav.travel(-1); await newer;
+      assert(S.screen === "home", "second back waited for old load");
+      if (fail) delayed.reject(new Error("stale failure")); else delayed.resolve({ items: [] });
+      await old; assert(S.screen === "home", "stale load reopened B");
+      handlers.set("Needs", () => ({ items: [] }));
+      await nav.travel(1); await nav.travel(1);
+      assert(S.screen === "settings", "stale completion corrupted forward history");
+    }
+    const ordinary = deferred(); handlers.set("Needs", () => ordinary.promise);
+    await nav.go("home"); const pending = nav.go("needs");
+    await nav.travel(-1); assert(S.screen === "home", "back skipped the source of an ordinary pending page");
+    ordinary.resolve({ items: [] }); await pending;
+    await nav.travel(1); assert(S.screen === "home", "incomplete visit was added to history");
+    handlers.set("Needs", () => ({ items: [] }));
+    await nav.go("needs"); await nav.go("settings");
+    const delayed = deferred(); handlers.set("Needs", () => delayed.promise);
+    const old = nav.travel(-1); await nav.go("env"); delayed.resolve({ items: [] }); await old;
+    await nav.travel(1); assert(S.screen === "env", "new route did not supersede pending back");
+    handlers.set("Needs", () => ({ items: [] }));
+  });
+  await test("history cap stops after 49 back steps and navigation performs no data actions", async () => {
+    for (let i = 0; i < 55; i++) await nav.go(i % 2 ? "needs" : "home");
+    let moved = 0;
+    for (let i = 0; i < 55; i++) { const before = S.screen; await nav.travel(-1); if (before !== S.screen) moved++; }
+    assert(moved === 49, "history did not cap at 50 entries: " + moved);
+    assert(writes === 0, "page navigation performed data actions");
+  });
+  await test("completed uninstall locks both history directions without actions", async () => {
+    uninstall.event({ done: true, page: { ran: true, failed: false } });
+    const before = S.screen;
+    await nav.travel(-1); await nav.travel(1); input("BrowserBack"); await settle();
+    assert(S.screen === before && writes === 0, "history escaped uninstall lock");
+  });
+  for (const method of writeMethods) handlers.delete(method);
   output.dataset.result = "pass";
   const preview = document.createElement("button");
   preview.textContent = "Preview environment switching animation";

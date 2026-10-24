@@ -77,6 +77,7 @@ export const pageLoading = () => !!$("#screen .page-loading, #screen .page-read-
 // keep: a page that is already drawn stays as it is while it reads, even when the game or
 // list changed (the launch page shows that change itself).
 export function beginPageRead(name, { replace = false, keep = false, label = "loading…", retry } = {}) {
+  ui.pageEntering?.();
   const same = S.screen === name;
   const sc = same ? $("#screen") : openScreen(name);
   const n = (pageReads.get(name) || 0) + 1;
@@ -117,6 +118,7 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
       if (!current()) return;
       sc.removeAttribute("aria-busy");
       if (editor && $("#status")?.textContent === T(label)) say("", "");
+      ui.pageEntered?.();
     },
     fail(error) {
       if (!current()) return;

@@ -165,7 +165,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		r("shift+1–8", "go to a page in the sidebar"),
 	)
 	if !tui {
-		out = append(out, r("ctrl+b", "navigation at the side / at the top"), r("ctrl+j", "background tasks; again goes back"))
+		out = append(out, r("alt+← / alt+→", "page back / forward"), r("ctrl+b", "navigation at the side / at the top"), r("ctrl+j", "background tasks; again goes back"))
 	}
 	out = append(out,
 		r(pick("c / l", "c"), pick("mod changes, game log", "mod changes")),
