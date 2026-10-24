@@ -10,6 +10,7 @@ import { createBar } from "./filterbar.js";
 import * as pop from "./popups.js";
 import { icon } from "./icons.js";
 import { still } from "./motion.js";
+import { createTable, mergeColumns } from "./datatable.js";
 
 const COLS_KEY = "ui.gui.tasks.items.columns";
 const SIDE_KEY = "ui.gui.tasks.side";
@@ -109,17 +110,11 @@ async function load() {
   draw();
 }
 
-function mergeCols(saved) {
-  let s = [];
-  try { s = JSON.parse(saved || "[]"); } catch { s = []; }
-  const out = [];
-  for (const c of s) if (COLS.find((d) => d.key === c.key)) out.push({ key: c.key, shown: c.key === "name" || !!c.shown, w: +c.w || 0 });
-  for (const d of COLS) if (!out.find((c) => c.key === d.key)) out.push({ key: d.key, shown: d.def, w: 0 });
-  return out;
-}
-function saveCols() { api.SetSetting(COLS_KEY, JSON.stringify(X.cols)).catch(() => {}); }
+const table = createTable({ key: COLS_KEY, columns: COLS.map((d) => ({ ...d, shown: d.def })), state: X,
+  redraw: () => drawItems(), focus: () => focusItems(),
+});
+function mergeCols(saved) { return mergeColumns(COLS.map((d) => ({ ...d, shown: d.def })), saved); }
 const colDef = (k) => COLS.find((c) => c.key === k);
-const widthOf = (c) => c.w || colDef(c.key).w;
 
 // ---- the filter bar: state, queue, time; the search matches names, results and items ----
 function bar() {
@@ -446,22 +441,7 @@ function drawItems() {
     return;
   }
   const vis = X.cols.filter((c) => c.shown);
-  const tpl = vis.map((c) => (c.key === "name" ? `minmax(${widthOf(c)}px, 1fr)` : widthOf(c) + "px")).join(" ");
-  const minw = vis.reduce((a, c) => a + widthOf(c) + 10, 24);
-  els.items.style.setProperty("--lib-cols", tpl);
-  els.items.style.setProperty("--lib-minw", minw + "px");
-  els.th.innerHTML = "";
-  for (const c of vis) {
-    const d = colDef(c.key);
-    const t = el("div", "th" + (X.sort === c.key ? " on" : "") + (d.num ? " r" : ""));
-    t.dataset.k = c.key;
-    t.append(el("span", "lbl", T(d.title)));
-    if (X.sort === c.key) t.append(el("span", "arrow", X.dir * d.dir > 0 ? "▲" : "▼"));
-    const rz = el("span", "rz");
-    rz.dataset.k = c.key;
-    t.append(rz);
-    els.th.append(t);
-  }
+  table.draw(els.items, els.th);
   const rows = itemRows();
   X.icur = Math.max(0, Math.min(X.icur, rows.length - 1));
   els.ibody.innerHTML = "";
@@ -489,76 +469,7 @@ function itemState(it) {
   s.append(it.stateText);
   return s;
 }
-function sortBy(k) {
-  if (X.sort === k) X.dir = -X.dir;
-  else { X.sort = k; X.dir = 1; }
-  drawItems();
-  say("ok", Tf("sorted by %s", T(colDef(k).title)));
-}
-function size(k, d) {
-  const c = X.cols.find((x) => x.key === k);
-  c.w = d === 0 ? 0 : Math.max(48, Math.min(900, widthOf(c) + d));
-  saveCols();
-  drawItems();
-}
-function headMenu(x, y, k, keys) {
-  k = k || X.sort;
-  const d = colDef(k);
-  const acts = [
-    { label: Tf("sort by %s", T(d.title)), run: () => sortBy(k) },
-    { label: Tf("wider: %s", T(d.title)), key: ">", run: () => size(k, 24) },
-    { label: Tf("narrower: %s", T(d.title)), key: "<", run: () => size(k, -24) },
-    { sep: true },
-  ];
-  for (const c of X.cols) {
-    const cd = colDef(c.key);
-    if (cd.fixed) continue;
-    acts.push({ label: (c.shown ? "✓ " : "   ") + T(cd.title), run: () => { c.shown = !c.shown; saveCols(); drawItems(); } });
-  }
-  acts.push({ sep: true }, { label: T("default columns"), run: () => { X.cols = mergeCols(""); saveCols(); drawItems(); } });
-  pop.menu(x, y, acts, keys);
-}
 function wireItems() {
-  const th = els.th;
-  th.addEventListener("mousedown", (e) => {
-    if (e.button !== 0) return;
-    const t = e.target.closest(".th");
-    if (!t) return;
-    e.preventDefault();
-    const k = t.dataset.k, x0 = e.clientX;
-    if (e.target.closest(".rz")) {
-      const c = X.cols.find((x) => x.key === k), w0 = widthOf(c);
-      document.body.classList.add("col-resizing");
-      const mv = (m) => { c.w = Math.max(48, Math.min(900, w0 + m.clientX - x0)); drawItems(); };
-      const up = () => { document.body.classList.remove("col-resizing"); removeEventListener("mousemove", mv); removeEventListener("mouseup", up); saveCols(); };
-      addEventListener("mousemove", mv); addEventListener("mouseup", up);
-      return;
-    }
-    let moved = false, target = null, after = false;
-    const mv = (m) => {
-      if (!moved && Math.abs(m.clientX - x0) < 5) return;
-      moved = true;
-      th.querySelectorAll(".th").forEach((x) => x.classList.remove("drop-before", "drop-after", "dragging"));
-      th.querySelector(`.th[data-k="${k}"]`).classList.add("dragging");
-      const over = [...th.querySelectorAll(".th")].find((x) => { const r = x.getBoundingClientRect(); return m.clientX >= r.left - 5 && m.clientX <= r.right + 5; });
-      target = over && over.dataset.k !== k ? over.dataset.k : null;
-      if (target) { const r = over.getBoundingClientRect(); after = m.clientX > r.left + r.width / 2; over.classList.add(after ? "drop-after" : "drop-before"); }
-    };
-    const up = () => {
-      removeEventListener("mousemove", mv); removeEventListener("mouseup", up);
-      if (!moved) return sortBy(k);
-      if (target) {
-        const i = X.cols.findIndex((c) => c.key === k);
-        const [c] = X.cols.splice(i, 1);
-        X.cols.splice(X.cols.findIndex((x) => x.key === target) + (after ? 1 : 0), 0, c);
-        saveCols();
-      }
-      drawItems();
-    };
-    addEventListener("mousemove", mv); addEventListener("mouseup", up);
-  });
-  th.addEventListener("dblclick", (e) => { const rz = e.target.closest(".rz"); if (rz) size(rz.dataset.k, 0); });
-  th.addEventListener("contextmenu", (e) => { e.preventDefault(); const t = e.target.closest(".th"); headMenu(e.clientX, e.clientY, t && t.dataset.k); });
   els.ibody.addEventListener("mousedown", (e) => {
     const r = e.target.closest(".tk-irow");
     if (!r) return;
@@ -712,8 +623,7 @@ function itemsKey(e, done, menuKey) {
   if (k === "Home") return go(0);
   if (k === "End") return go(rows.length - 1);
   if (k === "ArrowLeft") { done(); return focusList(); }
-  if (k === "s") { done(); const t = els.th.querySelector(".th.on") || els.th.querySelector(".th"); const b = t.getBoundingClientRect(); return headMenu(b.left, b.bottom + 2, t.dataset.k, true); }
-  if (k === "<" || k === ">" || k === "=") { done(); return size(X.sort, k === "=" ? 0 : k === ">" ? 24 : -24); }
+  if (table.key(e)) return;
   if (menuKey) { done(); const r = els.ibody.querySelector(".tk-irow.cur"); if (r) { const b = r.getBoundingClientRect(); itemMenu(b.left + 30, b.bottom, true); } return; }
   const it = rows[X.icur], t = current();
   if (!it) return;

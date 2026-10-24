@@ -406,6 +406,19 @@ func TestBuildPageG14(t *testing.T) {
 	if err != nil || len(pg.Mods) == 0 {
 		t.Fatalf("pack page: %+v %v", pg, err)
 	}
+	for i, m := range pg.Mods {
+		if m.Order != i+1 || (m.Size != "" && m.Size != view.SizeText(m.Bytes)) {
+			t.Errorf("pack mod has no raw sort values: %+v", m)
+		}
+	}
+	rows, err := api.Packs()
+	if err != nil || len(rows.Rows) != 1 || rows.Rows[0].Size != view.SizeText(rows.Rows[0].Bytes) {
+		t.Fatalf("pack table values: %+v %v", rows, err)
+	}
+	wire, _ := json.Marshal(rows.Rows[0])
+	if !strings.Contains(string(wire), `"playedAt":`) || !strings.Contains(string(wire), `"bytes":`) {
+		t.Fatalf("pack table sort values absent from JSON: %s", wire)
+	}
 	// its list alone, as a RimArcho list (no dialog here: the path is typed); the guide's
 	// 打开 unpacks packs only, a list goes through the import preview
 	list := filepath.Join(e.Root, "one.archolist.json")

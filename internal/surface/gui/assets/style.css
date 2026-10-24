@@ -1211,11 +1211,18 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .textures .set .sub.warn, .tex-rows .warn { color: var(--amber); }
 .tex-foot { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin: 14px 0 18px; }
 .tex-foot .prog { flex: 1; }
-.tex-rows { padding: 6px 0; font-size: 12px; }
-.tex-rows .tr { display: grid; grid-template-columns: minmax(0, 3fr) repeat(6, minmax(0, 1fr)); gap: 8px; padding: 3px 14px; }
-.tex-rows .tr.th { color: var(--muted); border-bottom: 1px solid var(--line-2); padding-bottom: 5px; margin-bottom: 3px; }
-.tex-rows .tr span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tex-rows .tr.stale .n { color: var(--amber); }
+/* Data tables share the library's header grid and gestures (06 §3.9). */
+.data-table { overflow: auto; max-height: 65vh; outline: none; }
+.data-table:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+.data-table .lib-th { padding: 0 12px; }
+.data-table .th.r { justify-content: flex-end; }
+.data-row { display: grid; grid-template-columns: var(--lib-cols); gap: 10px; min-width: var(--lib-minw); align-items: center; padding: 5px 12px; min-height: 30px; font-size: 12px; }
+.data-row .cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.data-row .n { color: var(--fg-2); }
+.data-row .num { text-align: right; }
+.data-row:hover, .data-row.cur { background: var(--pill); }
+.data-row.stale .n { color: var(--amber); }
+.bd-dry-output { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 45vh; overflow: auto; font-size: 12px; margin: 12px 0 0; }
 .textures .tex-pending { width: 100%; min-width: 48px; padding: 0; align-self: center; }
 .textures .tex-pending .bar { width: 100%; min-width: 48px; }
 .packpv .packtex { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }

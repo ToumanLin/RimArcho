@@ -789,6 +789,7 @@ function onKey(e) {
     if (S.screen === "plans" || S.screen === "plan-export") return planManage.key(e);
     if (S.screen === "needs") return scr.needsKey(e);
     if (S.screen === "library") return library.key(e);
+    if (S.screen === "textures") return tex.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     if (S.screen === "full") return scr.fullKey(e);
     return;

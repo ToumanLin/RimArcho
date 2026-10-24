@@ -121,7 +121,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("B · enter in the name", "build"),
 			r("V", "see the list first, write nothing"),
 			r("tab", "the next field or button"),
-			r("esc", "back to the list"),
+			r("esc", "close the preview / back to the list"),
 		)
 	}
 	if page == PageTasks {
@@ -140,6 +140,9 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("shift+↑↓ · ctrl+space · ctrl+a", "select tasks"),
 			r("menu · shift+F10 · right click", "the row's menu: everything it can do"),
 		)
+	}
+	if !tui && (page == LibraryPage || page == "packs" || page == "textures") {
+		out = append(out, r("s · < > =", "the headers: sort and columns; < > = changes or resets the sorted column's width"))
 	}
 	if page != EditorPage {
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))

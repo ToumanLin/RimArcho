@@ -16,6 +16,7 @@ import * as pop from "./popups.js";
 import { openScreen, page, rescanButton, area, full } from "./screens.js";
 import { createBar } from "./filterbar.js";
 import * as ops from "./ops.js";
+import { createTable, mergeColumns } from "./datatable.js";
 
 const ROW = 30;      // every row has the same height: the list is drawn by position
 const HEAD = 28;     // the column headers, sticky at the top of the table
@@ -105,7 +106,7 @@ async function load(fresh, focusRef) {
   if (n !== L.seq || S.screen !== "library" || epoch !== S.screenSeq) return;
   L.page = p;
   ops.setTable(p.opTable);
-  if (!L.cols) L.cols = mergeCols(p.columns || [], saved);
+  if (!L.cols) L.cols = mergeColumns(columnDefs(), saved);
   flatten();
   if (focusRef) {
     const at = L.flat.findIndex((x) => x.t === "inst" && x.i.ref === focusRef);
@@ -243,162 +244,29 @@ function draw() {
 
 // ---- the columns ----
 
-// mergeCols: the page's columns in the saved order with the saved widths; a column the
-// saved list does not know (a new one) keeps its default place at the end.
-function mergeCols(page, saved) {
-  let keep = [];
-  try { keep = JSON.parse(saved || "[]") || []; } catch { keep = []; }
-  const by = new Map(page.map((c) => [c.key, c]));
-  const out = [];
-  for (const k of keep) {
-    const c = by.get(k.k);
-    if (!c) continue;
-    by.delete(k.k);
-    out.push({ key: c.key, title: c.title, shown: c.key === "name" || !k.h, w: +k.w || WIDTH[c.key] || 100 });
-  }
-  for (const c of by.values()) out.push({ key: c.key, title: c.title, shown: c.shown, w: WIDTH[c.key] || 100 });
-  return out;
-}
-
-function saveCols() {
-  const v = JSON.stringify(L.cols.map((c) => (c.shown ? { k: c.key, w: c.w } : { k: c.key, w: c.w, h: 1 })));
-  api.SetSetting(COLS_KEY, v).catch(() => {});
-}
-
-function shownCols() { return L.cols.filter((c) => c.shown); }
-
-// layout sets the grid for the headers and every row; the table scrolls sideways when the
-// columns are wider than the card.
-function layout() {
-  const cs = shownCols();
-  const tpl = cs.map((c) => (c.key === "name" ? `minmax(${c.w}px, 1fr)` : c.w + "px")).join(" ");
-  const min = cs.reduce((n, c) => n + c.w, 0) + 10 * (cs.length - 1) + 24;
-  els.rows.style.setProperty("--lib-cols", tpl);
-  els.rows.style.setProperty("--lib-minw", min + "px");
-}
-
-function sortKey() { return L.sort.replace(/^-/, ""); }
-
+const columnDefs = () => (L.page?.columns || []).map((c) => ({
+  ...c, cls: c.key, w: WIDTH[c.key] || 100, fixed: c.key === "name", dir: ASC.has(c.key) ? 1 : -1,
+}));
+const table = createTable({ key: COLS_KEY, columns: columnDefs,
+  state: {
+    get cols() { return L.cols; }, set cols(v) { L.cols = v; },
+    get sort() { return L.sort.replace(/^-/, ""); },
+    set sort(k) { L.sort = (L.sort.startsWith("-") ? "-" : "") + k; },
+    get dir() { return L.sort.startsWith("-") ? -1 : 1; },
+    set dir(v) { L.sort = (v < 0 ? "-" : "") + L.sort.replace(/^-/, ""); },
+  },
+  redraw: () => { drawHead(); els.rows.dataset.sig = ""; drawRows(); },
+  sort: () => { L.cur = 0; load(); },
+  focus: () => { L.focus = "rows"; els.rows.focus(); markFocus(); },
+});
+function shownCols() { return table.visible(); }
 function drawHead() {
-  const p = L.page;
-  const h = els.head;
+  const p = L.page, h = els.head;
   h.innerHTML = "";
   h.append(el("span", "anum", "2"));
   const n = p.shown === p.total ? Tf("%d mods", p.total) : Tf("%d of %d mods", p.shown, p.total);
   h.append(el("span", "lib-count", n), el("span", "faint", " · " + p.size));
-  layout();
-  const th = els.th;
-  th.innerHTML = "";
-  th.title = T("drag to move · right click: columns");
-  for (const c of shownCols()) {
-    const cell = el("div", "th " + c.key + (sortKey() === c.key ? " on" : ""));
-    cell.append(el("span", "lbl", c.title));
-    if (sortKey() === c.key) {
-      const up = ASC.has(c.key) !== L.sort.startsWith("-");
-      cell.append(el("span", "arrow", up ? "▲" : "▼"));
-    }
-    const rz = el("span", "rz");
-    rz.onpointerdown = (e) => resize(e, c);
-    cell.append(rz);
-    cell.onpointerdown = (e) => { if (e.button === 0 && e.target !== rz) drag(e, c, cell); };
-    th.append(cell);
-  }
-  th.oncontextmenu = (e) => { e.preventDefault(); colMenu(e.clientX, e.clientY); };
-}
-
-// sortBy: a click on a header sorts by it; again reverses.
-function sortBy(key) {
-  L.sort = L.sort === key ? "-" + key : key;
-  L.cur = 0;
-  load();
-}
-
-function resize(e, c) {
-  e.preventDefault();
-  e.stopPropagation();
-  const x0 = e.clientX, w0 = c.w;
-  const t = e.target;
-  t.setPointerCapture(e.pointerId);
-  document.body.classList.add("col-resizing");
-  t.onpointermove = (m) => { c.w = Math.max(c.key === "name" ? 120 : 40, Math.round(w0 + m.clientX - x0)); layout(); };
-  t.onpointerup = () => {
-    t.onpointermove = t.onpointerup = null;
-    document.body.classList.remove("col-resizing");
-    saveCols();
-  };
-}
-
-// drag: a header moved sideways more than a few pixels moves the column; otherwise the
-// press was a click, and sorts.
-function drag(e, c, cell) {
-  const x0 = e.clientX;
-  let moving = false, to = -1;
-  cell.setPointerCapture(e.pointerId);
-  const cells = () => [...els.th.querySelectorAll(".th")];
-  cell.onpointermove = (m) => {
-    if (!moving && Math.abs(m.clientX - x0) < 5) return;
-    moving = true;
-    cell.classList.add("dragging");
-    const cs = cells();
-    to = cs.length;
-    for (let i = 0; i < cs.length; i++) {
-      const r = cs[i].getBoundingClientRect();
-      if (m.clientX < r.left + r.width / 2) { to = i; break; }
-    }
-    for (const x of cs) x.classList.remove("drop-before", "drop-after");
-    if (to < cs.length) cs[to].classList.add("drop-before"); else cs[cs.length - 1].classList.add("drop-after");
-  };
-  cell.onpointerup = () => {
-    cell.onpointermove = cell.onpointerup = null;
-    if (!moving) return sortBy(c.key);
-    const shown = shownCols();
-    const target = to < shown.length ? shown[to] : null;
-    if (target !== c) {
-      L.cols.splice(L.cols.indexOf(c), 1);
-      const at = target ? L.cols.indexOf(target) : L.cols.length;
-      L.cols.splice(at, 0, c);
-      saveCols();
-    }
-    drawHead();
-    els.rows.dataset.sig = "";
-    drawRows();
-  };
-}
-
-// colMenu: right click on the headers shows or hides a column (the name always shows).
-function colMenu(x, y) {
-  const redraw = () => { saveCols(); drawHead(); els.rows.dataset.sig = ""; drawRows(); };
-  const items = L.cols.filter((c) => c.key !== "name").map((c) => ({
-    label: c.title, key: c.shown ? "✓" : "", run: () => { c.shown = !c.shown; redraw(); },
-  }));
-  items.push({ label: T("reset the columns"), cls: "sep", run: () => { L.cols = mergeCols(L.page.columns || [], ""); redraw(); } });
-  pop.menu(x, y, items);
-}
-
-// tableMenu (s): what the headers do with the mouse, from the keyboard (06 §3.1 rule 6):
-// sort by a column (again reverses), move or size the sorted column, show or hide columns.
-function tableMenu() {
-  const redraw = () => { saveCols(); drawHead(); els.rows.dataset.sig = ""; drawRows(); };
-  const sc = L.cols.find((c) => c.key === sortKey());
-  const shift = (d) => {
-    const vis = shownCols(), i = vis.indexOf(sc), to = vis[i + d];
-    if (!sc || !to) return;
-    L.cols.splice(L.cols.indexOf(sc), 1);
-    L.cols.splice(L.cols.indexOf(to) + (d > 0 ? 1 : 0), 0, sc);
-    redraw();
-  };
-  const items = shownCols().map((c) => ({
-    label: Tf("sort by %s", c.title), key: sortKey() === c.key ? (ASC.has(c.key) !== L.sort.startsWith("-") ? "▲" : "▼") : "", run: () => sortBy(c.key),
-  }));
-  if (sc) items.push({ sep: true },
-    { label: Tf("move %s left", sc.title), run: () => shift(-1) }, { label: Tf("move %s right", sc.title), run: () => shift(1) },
-    { label: Tf("widen %s", sc.title), run: () => { sc.w += 24; layout(); saveCols(); } },
-    { label: Tf("narrow %s", sc.title), run: () => { sc.w = Math.max(sc.key === "name" ? 120 : 40, sc.w - 24); layout(); saveCols(); } });
-  items.push({ sep: true });
-  for (const c of L.cols.filter((c) => c.key !== "name")) items.push({ label: c.title, key: c.shown ? "✓" : "", run: () => { c.shown = !c.shown; redraw(); } });
-  items.push({ sep: true }, { label: T("reset the columns"), run: () => { L.cols = mergeCols(L.page.columns || [], ""); redraw(); } });
-  const b = els.th.getBoundingClientRect();
-  pop.menu(b.left + 20, b.bottom, items, true);
+  table.draw(els.rows, els.th);
 }
 
 // ---- the rows ----
@@ -862,7 +730,7 @@ export function key(e) {
   if (ctrl || e.altKey) return;
   const keys = { " ": "space", m: "m", t: "t", x: "x", g: "g", n: "n", Delete: "Del" };
   if (keys[k]) { done(); return byKey(keys[k]); }
-  if (k === "s") { done(); return tableMenu(); }
+  if (table.key(e)) return;
   if (k === "C") { done(); const i = cursorCopy(); if (i && i.id) document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: i.id, name: (L.flat[L.cur] || {}).r ? L.flat[L.cur].r.name : i.label } })); return; }
   if (k === "R") { done(); return ui.cmd("rescan"); }
 }

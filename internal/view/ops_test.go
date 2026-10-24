@@ -2,6 +2,7 @@ package view
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -9,6 +10,17 @@ import (
 // have is in the table with a key or a menu group (the menu key and shift+F10 open the
 // menu), and every menu group's ops come in the menu's order.
 func TestOpsReachable(t *testing.T) {
+	for _, page := range []string{LibraryPage, "packs", "textures", PageTasks} {
+		reached := false
+		for _, row := range KeyHelp(page, false) {
+			if strings.Contains(row.Keys, "s") && strings.Contains(row.Keys, "< > =") {
+				reached = true
+			}
+		}
+		if !reached {
+			t.Errorf("%s: table keyboard actions are absent from help", page)
+		}
+	}
 	seen := map[string]bool{}
 	last := 0
 	for _, o := range OpTable() {

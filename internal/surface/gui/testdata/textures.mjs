@@ -1,44 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { test } from "node:test";
-import { SourceTextModule, SyntheticModule, createContext } from "node:vm";
+import { Element, loadModules, deferred, flush, event } from "./dom.mjs";
 
-// A small DOM stand-in keeps the regression test independent of a browser installation.
-class Element {
-  children = []; dataset = {}; style = {}; attributes = {}; text = ""; disabled = false;
-  constructor(tag, className = "", text = "") { Object.assign(this, { tag, className, text }); }
-  append(...nodes) { for (const n of nodes) { n.parent = this; this.children.push(n); } }
-  set innerHTML(_) { this.children = []; this.text = ""; }
-  set textContent(t) { this.text = t; this.children = []; }
-  get textContent() { return this.text + this.children.map((n) => n.textContent).join(" "); }
-  setAttribute(k, v) { this.attributes[k] = v; }
-  focus() {}
-  after(n) { this.parent.children.splice(this.parent.children.indexOf(this) + 1, 0, n); n.parent = this.parent; }
-  replaceWith(n) { this.parent.children.splice(this.parent.children.indexOf(this), 1, n); n.parent = this.parent; }
-  isEqualNode(n) {
-    return ["tag", "className", "text", "disabled", "hidden"].every((k) => this[k] === n[k]) &&
-      JSON.stringify(this.dataset) === JSON.stringify(n.dataset) && JSON.stringify(this.attributes) === JSON.stringify(n.attributes) &&
-      this.children.length === n.children.length && this.children.every((child, i) => child.isEqualNode(n.children[i]));
-  }
-  matches(s) {
-    if (s.startsWith(".")) return s.slice(1).split(".").every((c) => this.className.split(" ").includes(c));
-    const attr = s.match(/^\[data-([\w-]+)(?:="([^"]*)")?\]$/);
-    if (attr) {
-      const key = attr[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      return key in this.dataset && (attr[2] === undefined || this.dataset[key] === attr[2]);
-    }
-    return this.tag === s;
-  }
-  querySelectorAll(s) {
-    const parts = s.split(" "), last = parts.pop();
-    const all = this.children.flatMap((n) => [n, ...n.querySelectorAll("*")]);
-    return all.filter((n) => (last === "*" || n.matches(last)) && (!parts.length || n.parent.matches(parts.at(-1))));
-  }
-  querySelector(s) { return this.querySelectorAll(s)[0] || null; }
-}
-
-const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
-const flush = () => new Promise(setImmediate);
 const result = (request, loading, name = "pending") => ({
   request, loading, scope: "plan", scale: 100, scales: [100, 50], labels: ["full size", "50%"],
   mods: 1, tool: "todds", toolOk: true, png: name, estFacts: [name], convert: 1,
@@ -51,6 +14,7 @@ async function setup() {
   const el = (tag, cls, text) => new Element(tag, cls, text);
   const $ = (sel) => sel === "#screen" ? screen : screen.querySelector(sel.replace(/^#screen /, ""));
   const api = {
+    Setting: async () => "", SetSetting: async () => {},
     Textures: (...args) => { const d = deferred(); requests.push({ ...d, args }); return d.promise; },
     TextureMeasure: (id) => { const d = deferred(); polls.push({ ...d, id }); return d.promise; },
   };
@@ -59,14 +23,10 @@ async function setup() {
     "./screens.js": { openScreen: () => { screen.innerHTML = ""; }, page: (cls) => el("div", cls), button: (label, _, run, cls) => Object.assign(el("button", cls, label), { onclick: run }) },
     "./popups.js": { confirm: () => {} },
   };
-  const context = createContext({ document: { activeElement: null }, setTimeout: (f) => timers.push(f) });
-  const source = await readFile(new URL("../assets/js/textures.js", import.meta.url), "utf8");
-  const module = new SourceTextModule(source, { context });
-  await module.link((name) => new SyntheticModule(Object.keys(deps[name]), function () {
-    for (const [key, value] of Object.entries(deps[name])) this.setExport(key, value);
-  }, { context }));
-  await module.evaluate();
-  return { screen, timers, requests, polls, messages, S, tex: module.namespace };
+  const document = { activeElement: null, body: new Element("body") };
+  const tex = await loadModules("./textures.js", deps, { document, setTimeout: (f) => timers.push(f) });
+  return { screen, timers, requests, polls, messages, S, tex };
+
 }
 
 for (const reject of [false, true]) test(`late ${reject ? "error" : "result"} cannot replace newer options`, async () => {
@@ -133,4 +93,25 @@ test("unchanged pending rows keep their shimmer while another row completes", as
   h.polls[0].resolve(next); await flush();
   assert.equal(h.screen.querySelector('[data-ref="mod-b"]'), second);
   assert.equal(h.screen.querySelector('[data-tex="estimate"]'), summary);
+});
+
+test("measurement can reorder rows without interrupting a header drag or pending shimmer", async () => {
+  const h = await setup();
+  h.tex.open();
+  assert.equal(h.tex.key(event("s")), false, "headers are unavailable before data arrives");
+  const p = result(1, true, "Z pending");
+  p.rows.push({ ref: "mod-b", name: "A pending", pending: true });
+  h.requests[0].resolve(p); await flush();
+  const shimmer = h.screen.querySelector('[data-ref="mod-a"]');
+  const header = h.screen.querySelector(".lib-th").children[0];
+  header.onpointerdown(event("", { target: header, clientX: 20, button: 0, pointerId: 1 }));
+  header.onpointermove({ clientX: 190 });
+  h.timers.shift()(); await flush();
+  const next = result(1, true, "Z pending");
+  next.rows.push({ ref: "mod-b", name: "B completed", pending: false, savedBytes: 100 });
+  h.polls[0].resolve(next); await flush();
+  assert.equal(h.screen.querySelector('[data-ref="mod-a"]'), shimmer);
+  assert.equal(h.screen.querySelector(".lib-th").children[0], header);
+  assert.equal(typeof header.onpointerup, "function", "drag retains pointer capture target");
+  header.onpointerup();
 });

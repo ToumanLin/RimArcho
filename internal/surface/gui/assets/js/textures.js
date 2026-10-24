@@ -5,6 +5,8 @@
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button } from "./screens.js";
 import * as pop from "./popups.js";
+import { createTable } from "./datatable.js";
+import { textureColumns } from "./tabledefs.js";
 
 const X = { scope: "plan", scale: 100, page: null, prog: null, seq: 0, loading: false, error: "" };
 
@@ -153,24 +155,7 @@ async function draw(fetch, measurements = false) {
   w.append(est);
   w.append(slot(foot(p), "foot"));
 
-  // the mods, the biggest first
-  {
-    const t = el("section", "card tex-rows");
-    t.hidden = !(p.rows || []).length;
-    const head = el("div", "tr th");
-    for (const h of [T("mod"), "PNG", T("to convert"), T("estimated DDS"), T("RimArcho's DDS"), T("stale"), T("own DDS")]) head.append(el("span", "", h));
-    t.append(head);
-    for (const r of (p.rows || []).slice(0, 200)) {
-      const tr = el("div", "tr" + (r.stale ? " stale" : ""));
-      tr.dataset.ref = r.ref;
-      tr.append(el("span", "n", r.name));
-      if (r.pending) for (let i = 0; i < 6; i++) tr.append(pending());
-      else tr.append(el("span", "", r.png), el("span", "", r.convert ? String(r.convert) : ""), el("span", "", r.estimate || ""), el("span", "", r.dds || ""),
-        el("span", r.stale ? "warn" : "", r.stale ? String(r.stale) : ""), el("span", "muted", r.own ? String(r.own) : ""));
-      t.append(tr);
-    }
-    w.append(slot(t, "rows"));
-  }
+  w.append(slot(textureRows(p), "rows"));
   if (previous) {
     // Keep live select elements in place while estimates arrive (06 §3.1).
     previous.setAttribute("aria-busy", String(X.loading));
@@ -182,17 +167,60 @@ async function draw(fetch, measurements = false) {
   if (focused) { const n = sc.querySelector(`[data-f="${focused}"]`); if (n) n.focus(); }
 }
 
+const textureTable = createTable({ key: "ui.gui.textures.columns", columns: textureColumns,
+  state: { cols: null, sort: "estimate", dir: 1 }, redraw: () => draw(false, true),
+});
+let columnsLoaded = false;
+function textureRows(p) {
+  if (!columnsLoaded) {
+    columnsLoaded = true;
+    textureTable.load().then(() => { if (S.screen === "textures" && X.page) draw(false, true); });
+  }
+  const t = el("section", "card data-table tex-rows");
+  t.tabIndex = 0;
+  t.setAttribute("role", "table");
+  t.hidden = !(p.rows || []).length;
+  const head = el("div", "lib-th");
+  t.append(head);
+  textureTable.draw(t, head);
+  for (const r of textureTable.sorted(p.rows || [])) {
+    const tr = el("div", "data-row" + (r.stale ? " stale" : ""));
+    tr.setAttribute("role", "row");
+    tr.dataset.ref = r.ref;
+    for (const c of textureTable.visible()) {
+      if (c.key !== "name" && r.pending) { tr.append(pending()); continue; }
+      const cell = el("span", "cell" + (c.key === "name" ? " n" : "") + (textureTable.column(c.key).num ? " num" : ""));
+      if (c.key === "state") {
+        cell.textContent = [r.stale ? Tf("%d stale", r.stale) : "", r.convert ? Tf("%d to convert", r.convert) : !r.stale ? T(r.dds ? "up to date" : "nothing to convert") : "",
+          r.dds ? T("RimArcho's DDS") + ": " + r.dds : "", r.own ? Tf("%d own DDS", r.own) : ""].filter(Boolean).join(" · ");
+        if (r.stale) cell.classList.add("warn");
+      } else cell.textContent = String(r[c.key] ?? "—");
+      cell.title = cell.textContent;
+      tr.append(cell);
+    }
+    t.append(tr);
+  }
+  return t;
+}
+export function key(e) { return textureTable.key(e); }
+
 function slot(node, key) { node.dataset.tex = key; return node; }
 
 // Preserve unchanged placeholders so their shimmer can finish (06 §7.1).
 function updateMeasurement(old, next) {
-  if (next.dataset.tex === "rows" && old.children.length === next.children.length &&
-      [...old.children].every((row, i) => row.dataset.ref === next.children[i].dataset.ref)) {
-    [...next.children].forEach((row, i) => {
-      if (!old.children[i].isEqualNode(row)) old.children[i].replaceWith(row);
+  if (next.dataset.tex === "rows") {
+    const keep = new Map([...old.children].map((row) => [row.dataset.ref || "header", row]));
+    const nodes = [...next.children].map((row) => {
+      const was = keep.get(row.dataset.ref || "header");
+      const sameHeader = was && !row.dataset.ref && was.dataset.columns === row.dataset.columns;
+      return was && (sameHeader || was.isEqualNode(row)) ? was : row;
     });
+    // Move existing rows in place: another estimate completing must not restart their shimmer (06 §7.1).
+    nodes.forEach((row, i) => { if (old.children[i] !== row) old.insertBefore(row, old.children[i] || null); });
+    while (old.children.length > nodes.length) old.lastChild.remove();
     old.hidden = next.hidden;
-  } else if (!old.isEqualNode(next)) old.replaceWith(next);
+    textureTable.adopt(old, old.children[0]);
+  } else if (!old.isEqualNode(next)) { next.scrollLeft = old.scrollLeft; old.replaceWith(next); }
 }
 
 function fillModCount(node, p) {
