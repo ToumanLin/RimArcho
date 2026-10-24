@@ -62,12 +62,9 @@ func rowBackground(st lipgloss.Style, selected, cursor bool) lipgloss.Style {
 // Styles used by the Problems, Changes and Inspect screens (kept from v1 until V3/V4,
 // restyled: selection is a colour change, not a reversed bar; 06 §7).
 var (
-	stSel    = sSel
-	stHeader = sBold
-	stDim    = sDimS
-	stErr    = sErrS
-	stWarn   = sWarnS
-	stTabOn  = sSel
+	stSel   = sSel
+	stDim   = sDimS
+	stTabOn = sSel
 )
 
 // icons is one icon set (06 §7).

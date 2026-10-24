@@ -824,29 +824,6 @@ func (m *model) detailKey(s string) (tea.Cmd, bool) {
 	return nil, true
 }
 
-func (m *model) openWorkshop() tea.Cmd {
-	it := m.current()
-	if it == nil || m.st == nil {
-		return nil
-	}
-	mod := m.st.Ix.ByID[it.id]
-	if mod == nil || !view.IsNumber(mod.WorkshopID()) {
-		m.say(sayInfo, T("not a workshop mod"))
-		return nil
-	}
-	u := "https://steamcommunity.com/sharedfiles/filedetails/?id=" + mod.WorkshopID()
-	open := m.opts.OpenURL
-	if open == nil {
-		open = openURL
-	}
-	if err := open(u); err != nil {
-		m.say(sayFail, err.Error())
-	} else {
-		m.say(sayOK, T("opened the Workshop page"))
-	}
-	return nil
-}
-
 // fullLines draws the full-screen detail, scrolled.
 func (m *model) fullLines(n int) ([]string, []placement) {
 	w := max(m.w-4, 20)

@@ -127,7 +127,7 @@ func (m *model) gapAt(x int) (colKind, int, bool) {
 		return 0, 0, false
 	}
 	for i, s := range l.slots {
-		end := m.w
+		var end int
 		switch {
 		case i+1 < len(l.slots):
 			end = l.slots[i+1].x

@@ -80,7 +80,7 @@ func refScan(b []byte, want map[string]int, found func(i, line int)) {
 }
 
 // indexable: a def name has no white space (the log's name is \S+).
-func indexable(tok []byte) bool { return bytes.IndexAny(tok, " \t\r\n") < 0 }
+func indexable(tok []byte) bool { return !bytes.ContainsAny(tok, " \t\r\n") }
 
 var castagnoli = crc32.MakeTable(crc32.Castagnoli)
 

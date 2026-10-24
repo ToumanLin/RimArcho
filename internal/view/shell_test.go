@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -104,8 +105,8 @@ func TestBuildHome(t *testing.T) {
 		{Name: "Amber", Played: "never played"},
 	}
 	// The list was launched yesterday (a pack launch later does not count for it).
-	e.App.Store.AddLaunch(b.St.Ix.Env.ID, t0.Add(-24*time.Hour), "steam", "x")
-	e.App.Store.AddLaunch(b.St.Ix.Env.ID, t0.Add(-time.Hour), "pack:Old", "x")
+	e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: b.St.Ix.Env.ID, Started: t0.Add(-24 * time.Hour), Method: "steam", Command: "x", PlanID: e.App.Store.CurrentPlanID(b.St.Ix.Env.ID)})
+	e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: b.St.Ix.Env.ID, Started: t0.Add(-time.Hour), Method: "pack:Old", Command: "x"})
 	plans, _ := view.PlanRows(e.App)
 	h := view.BuildHome(e.App, b, n, plans, packs)
 	var order []string

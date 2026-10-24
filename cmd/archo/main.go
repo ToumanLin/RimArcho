@@ -14,7 +14,7 @@ func main() {
 	code := cli.Run(os.Args[1:], os.Stdout, os.Stderr)
 	if os.Getenv("ARCHO_MEMSTATS") != "" {
 		ws, priv, peak := procmem.MB()
-		fmt.Fprintln(os.Stderr, fmt.Sprintf("memstats: working set %.1f MB, private %.1f MB, peak working set %.1f MB", ws, priv, peak))
+		fmt.Fprintf(os.Stderr, "memstats: working set %.1f MB, private %.1f MB, peak working set %.1f MB\n", ws, priv, peak)
 	}
 	os.Exit(code)
 }

@@ -32,10 +32,6 @@ func (s *Store) FinishScan(scanID int64, finished time.Time, stats any) error {
 	return err
 }
 
-type execer interface {
-	Exec(query string, args ...any) (sql.Result, error)
-}
-
 // insertSnapshot writes a snapshot and its manifest; returns the snapshot ID. A released
 // manifest (unchanged content, new external state) is copied from prevSnap.
 func insertSnapshot(tx *sql.Tx, instanceID string, scanID int64, ob *scan.Observation, prevSnap int64) (int64, error) {

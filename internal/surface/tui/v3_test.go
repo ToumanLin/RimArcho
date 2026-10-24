@@ -248,7 +248,7 @@ func (m *model) tagsDefault(i int) string {
 // T19: every state, popups and the full screen included, shows the focused area and the
 // place in it on the position line, and the open popup's name.
 func TestT19PositionLine(t *testing.T) {
-	e, m := v3Fixture(t)
+	e, _ := v3Fixture(t)
 	// The states share one environment (Staging stages a mod), so the counts are patterns.
 	want := map[string]string{
 		"Disabled":        `Disabled  1 / \d+$`,
@@ -280,7 +280,7 @@ func TestT19PositionLine(t *testing.T) {
 	// The position line in Chinese, and the full screen's sub-section.
 	SetLang("zh")
 	defer SetLang("en")
-	m = direct(t, e, 160, 40)
+	m := direct(t, e, 160, 40)
 	pressAll(m, "down", "shift+down")
 	if top := ansi.Strip(strings.Split(m.View(), "\n")[0]); !regexp.MustCompile(`已启用  3 / \d+  已选 2`).MatchString(top) {
 		t.Fatalf("zh: %q", top)

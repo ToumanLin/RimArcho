@@ -165,15 +165,6 @@ func (m *model) cursorCopy() (*view.LibInstRow, string) {
 	return pick, r.Name
 }
 
-// libCopy is the cursor's copy (shortcuts.go's ctrl+o, ctrl+w, C).
-func (m *model) libCopy() (view.LibInstRow, string, bool) {
-	i, name := m.cursorCopy()
-	if i == nil {
-		return view.LibInstRow{}, name, false
-	}
-	return *i, name, true
-}
-
 // targets are the copies an op acts on: the selected ones, else the cursor's.
 func (m *model) targets() []*view.LibInstRow {
 	l := &m.libr
@@ -764,7 +755,7 @@ func (m *model) libRowLine(i, w, right int) string {
 	x := l.flat[i]
 	r := l.page.Rows[x.row]
 	cells := r.LibCells
-	name := r.Name
+	var name string
 	sel := m.libRowSelected(i)
 	mark := "  "
 	if i == l.cursor && !l.detail {

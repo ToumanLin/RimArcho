@@ -89,7 +89,7 @@ func migrateV14(tx *sql.Tx) error {
 	// Labels: unique among the shared sources. A per-environment lock library folder
 	// (<lock.dir>/<env>) becomes locked-<env>: the global library is lock.dir itself.
 	used := map[string]bool{}
-	sort.SliceStable(kept, func(i, j int) bool { return (kept[i].status == "retired") == false && kept[j].status == "retired" })
+	sort.SliceStable(kept, func(i, j int) bool { return kept[i].status != "retired" && kept[j].status == "retired" })
 	for _, s := range kept {
 		want := s.label
 		if s.kind == "extra" && lockLabelRe.MatchString(s.label) && s.envName != "" {

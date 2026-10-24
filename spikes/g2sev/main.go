@@ -55,7 +55,6 @@ type counts struct {
 	officialLogs, dlcMove, modMove, none int
 	moves                                []int
 	needsDLC                             int // logs where a mod that needs a DLC loads before it
-	cycleWithBefore                      int
 }
 
 func run(home, userData, corpus string, maxN int) error {

@@ -22,8 +22,6 @@ func objIDs(its []*item) []string {
 	return out
 }
 
-func placedText(ps []int) string { return view.PlacedText(ps) }
-
 func (m *model) positions(ids []string) []int { return view.Positions(m.st, ids) }
 
 // object: the shared verb object of the selection (06 §3.5).

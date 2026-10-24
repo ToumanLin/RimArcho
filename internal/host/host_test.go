@@ -183,7 +183,7 @@ func TestT10NoQuestion(t *testing.T) {
 		}
 		return ""
 	}
-	if launched, _ := h.Run(); launched || out.Len() != 0 {
+	if launched, _ := h.Run(); launched || len(*starts) != 0 || out.Len() != 0 {
 		t.Fatal("inside WezTerm: started or asked")
 	}
 	h, _, _, out = testHost(t, gh.URL, "y\n")

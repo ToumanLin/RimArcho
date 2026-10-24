@@ -514,9 +514,7 @@ func canonCSValue(a string) string {
 		}
 		return "[" + strings.Join(es, ",") + "]"
 	}
-	if strings.HasPrefix(a, "HarmonyLib.") {
-		a = strings.TrimPrefix(a, "HarmonyLib.")
-	}
+	a = strings.TrimPrefix(a, "HarmonyLib.")
 	return a
 }
 

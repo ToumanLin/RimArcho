@@ -346,20 +346,20 @@ func AddOtherEnvs(a *app.App, h *Home, current string) {
 }
 
 // FeaturedKey is the GUI setting that remembers a pack applied on the home page:
-// "<environment><pack><the plan current then>". Applying a plan clears it, and it
+// "<environment>\x1f<pack>\x1f<the plan current then>". Applying a plan clears it, and it
 // lapses when the current plan changes some other way.
 const FeaturedKey = "ui.gui.home.pack"
 
 // FeaturedValue is what FeaturedKey holds after applying pack in envName.
 func FeaturedValue(envName, pack string, plan int64) string {
-	return envName + "" + pack + "" + strconv.FormatInt(plan, 10)
+	return envName + "\x1f" + pack + "\x1f" + strconv.FormatInt(plan, 10)
 }
 
 // PickFeatured sets h.Featured: the applied pack when it is still valid, else the
 // current environment's current plan.
 func PickFeatured(h *Home, setting, envName string, plan int64) {
 	h.Featured = -1
-	if f := strings.Split(setting, ""); len(f) == 3 && f[0] == envName && f[2] == strconv.FormatInt(plan, 10) {
+	if f := strings.Split(setting, "\x1f"); len(f) == 3 && f[0] == envName && f[2] == strconv.FormatInt(plan, 10) {
 		for i, r := range h.Rows {
 			if r.Kind == RowPack && !r.OtherEnv && r.Name == f[1] {
 				h.Featured = i

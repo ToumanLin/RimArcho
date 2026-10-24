@@ -10,6 +10,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Launching writes the list (08 §2): no "unsaved changes" block, a version with source
@@ -130,7 +131,7 @@ func TestOneGameAtATime(t *testing.T) {
 	}
 
 	// The command line unreadable: the launch records say it is a pack.
-	if err := e.App.Store.AddLaunch(second.ID, started.Add(-time.Minute), "pack:Raid Night", "x"); err != nil {
+	if err := e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: second.ID, Started: started.Add(-time.Minute), Method: "pack:Raid Night", Command: "x"}); err != nil {
 		t.Fatal(err)
 	}
 	if out, _ := e.Run("launch"); !strings.Contains(out, "environment second is running pack Raid Night (from the launch records)") {

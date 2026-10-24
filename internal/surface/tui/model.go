@@ -304,17 +304,6 @@ func (m *model) act(okText string, argv ...string) bool {
 	return false
 }
 
-// runToStatus runs a command (Problems / Changes screens and the command line); success
-// shows its first line, failure opens a panel with the full text.
-func (m *model) runToStatus(argv ...string) {
-	out, code := m.run(argv...)
-	if code == cmds.ExitOK {
-		m.say(sayOK, m.humanize(firstLine(out)))
-		return
-	}
-	m.openPanel("archo "+strings.Join(argv, " "), out)
-}
-
 // humanize replaces instance references by mod names and drops the "error: " prefix.
 func (m *model) humanize(s string) string { return view.Humanize(m.st, s) }
 
@@ -334,8 +323,6 @@ func (m *model) col() *column { return &m.cols[m.focus] }
 
 // current is the item under the focused column's cursor.
 func (m *model) current() *item { return m.col().cur() }
-
-func (m *model) curID() string { return m.col().curID() }
 
 func (m *model) moveCursor(d int) tea.Cmd {
 	c := m.col()

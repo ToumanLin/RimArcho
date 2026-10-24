@@ -234,14 +234,3 @@ func addShared(c *Ctx, ix *app.Index, root *render.Node, inst string, limit int)
 	}
 	sec.Truncate(limit, "add --all")
 }
-
-// shortMethod: "Verse.Pawn.Tick" → "Tick" (decompiled code rarely spells the full name).
-func shortMethod(t string) string {
-	if i := strings.IndexByte(t, '('); i >= 0 {
-		t = t[:i]
-	}
-	if i := strings.LastIndexByte(t, '.'); i >= 0 {
-		return t[i+1:]
-	}
-	return t
-}

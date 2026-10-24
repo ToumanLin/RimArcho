@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [master, "dev/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # RimArcho is Windows-only: the GUI (wails/WebView2) and several packages build only there.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # The GUI tests drive their page scripts with Node.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: gofmt
+        shell: bash
+        run: |
+          out=$(git ls-files '*.go' | xargs gofmt -l)
+          if [ -n "$out" ]; then
+            echo "These files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: staticcheck
+        # Settings are in staticcheck.conf at the repository root.
+        run: go run honnef.co/go/tools/cmd/staticcheck@2026.2.2 ./...
+
+      - name: go test
+        run: go test -timeout 20m ./...

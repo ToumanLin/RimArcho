@@ -101,10 +101,6 @@ func Skipped(file string, list []string) bool {
 	return false
 }
 
-func isHarmonyAttr(t, name string) bool {
-	return t == "HarmonyLib."+name || t == "Harmony."+name
-}
-
 var methodTypes = []string{"Normal", "Getter", "Setter", "Constructor", "StaticConstructor", "Enumerator", "Async"}
 
 type info struct {

@@ -21,7 +21,7 @@ func fakeGitHub(t *testing.T) (*httptest.Server, *int) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/users/"+account+"/gists", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer test-token" {
-			http.Error(w, `{"message":"Bad credentials"}`, 401)
+			http.Error(w, `{"message":"Bad credentials"}`, http.StatusUnauthorized)
 			return
 		}
 		pages++

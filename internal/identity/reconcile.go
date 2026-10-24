@@ -249,9 +249,7 @@ func Reconcile(in Input) *Result {
 			r.res.Events = append(r.res.Events, ev)
 		}
 	}
-	for _, a := range assigned {
-		r.res.Assignments = append(r.res.Assignments, a)
-	}
+	r.res.Assignments = append(r.res.Assignments, assigned...)
 	return r.res
 }
 

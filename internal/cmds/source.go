@@ -75,14 +75,12 @@ func sourceCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d, root := render.New(fmt.Sprintf("%s  %d assemblies", modLabel(st.Ix, m.ID), len(ds)))
 	sec := root.Section("assemblies")
-	var errs []string
 	for _, x := range ds {
 		was := x.Cached
 		if err := c.App.DecompileDLL(ctx, st, x); err != nil {
 			if errors.Is(err, app.ErrNoILSpy) {
 				return nil, noILSpy(err)
 			}
-			errs = append(errs, x.File+": "+err.Error())
 			sec.Addf("%s  error: %v", x.File, err)
 			continue
 		}

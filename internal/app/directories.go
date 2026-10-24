@@ -405,7 +405,9 @@ func (a *App) MoveDirectory(id, path string) (copied bool, err error) {
 	}
 	same := a.SameVolume
 	if same == nil {
-		same = func(from, to string) bool { return strings.EqualFold(filepath.VolumeName(from), filepath.VolumeName(to)) }
+		same = func(from, to string) bool {
+			return strings.EqualFold(filepath.VolumeName(from), filepath.VolumeName(to))
+		}
 	}
 	copied = !same(d.Path, path)
 	var trashErr error

@@ -91,21 +91,3 @@ func (m *model) selectedIDs() []string {
 	}
 	return out
 }
-
-// focusOn puts the cursor on an instance in whichever list holds it.
-func (m *model) focusOn(id string) {
-	for k := range m.cols {
-		for _, it := range m.cols[k].items {
-			if it.id == id {
-				m.setFocus(colKind(k))
-				m.refilterCol(colKind(k), id)
-				if m.cols[k].curID() != id { // hidden by the list's search
-					m.cols[k].filter = ""
-					m.refilterCol(colKind(k), id)
-				}
-				m.cols[k].scroll(m.rowsShown() - 1)
-				return
-			}
-		}
-	}
-}

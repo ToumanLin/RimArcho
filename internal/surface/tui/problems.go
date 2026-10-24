@@ -134,8 +134,7 @@ func (m *model) startAnalyze() tea.Cmd {
 		})
 		close(ch)
 	}()
-	var wait func() tea.Msg
-	wait = func() tea.Msg {
+	wait := func() tea.Msg {
 		if l, ok := <-ch; ok {
 			return analyzeLineMsg{line: l, ch: ch}
 		}

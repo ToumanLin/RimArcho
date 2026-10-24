@@ -2,7 +2,6 @@ package cmds
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -61,13 +60,6 @@ func addMods(c *Ctx, n *render.Node, ix *app.Index, ms []*store.Mod, limit int, 
 	if len(shown) < len(ms) {
 		n.Addf("… %d more (%s)", len(ms)-len(shown), expand)
 	}
-}
-
-var fullIDRef = regexp.MustCompile(`#([a-z2-7]{26})\b`)
-
-// shortRefs rewrites full instance IDs stored in event details ("#<26 chars>") to short refs.
-func shortRefs(ix *app.Index, s string) string {
-	return fullIDRef.ReplaceAllStringFunc(s, func(m string) string { return ix.Ref(m[1:]) })
 }
 
 // ambiguousDoc lists the candidates of a reference that matched several instances (05 I3).

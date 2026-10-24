@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 func TestSaveDataArg(t *testing.T) {
@@ -47,7 +48,7 @@ func TestWhatRuns(t *testing.T) {
 	if w := a.WhatRuns(en, &app.GameRun{Started: now}); w.Pack != "" {
 		t.Fatalf("no launch: %+v", w)
 	}
-	if err := a.Store.AddLaunch(en.ID, now.Add(-time.Minute), "pack:Big Pack", "x"); err != nil {
+	if err := a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: en.ID, Started: now.Add(-time.Minute), Method: "pack:Big Pack", Command: "x"}); err != nil {
 		t.Fatal(err)
 	}
 	if w := a.WhatRuns(en, &app.GameRun{Started: now}); w.Pack != "Big Pack" || !w.Guess {
@@ -56,7 +57,7 @@ func TestWhatRuns(t *testing.T) {
 	if got := a.RunOfLog(en.ID, now); got != "Big Pack" {
 		t.Fatalf("RunOfLog = %q", got)
 	}
-	if err := a.Store.AddLaunch(en.ID, now.Add(-30*time.Second), "steam", "x"); err != nil {
+	if err := a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: en.ID, Started: now.Add(-30 * time.Second), Method: "steam", Command: "x", PlanID: a.Store.CurrentPlanID(en.ID)}); err != nil {
 		t.Fatal(err)
 	}
 	if w := a.WhatRuns(en, &app.GameRun{Started: now}); w.Pack != "" {

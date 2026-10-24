@@ -65,19 +65,6 @@ func (m *model) areaStep(d int) tea.Cmd {
 	return m.goArea(a)
 }
 
-// areaCycle: tab / shift+tab go round all the areas this screen has.
-func (m *model) areaCycle(d int) tea.Cmd {
-	n := 3
-	if m.hasDetailArea() {
-		n = 4
-	}
-	a := m.area()
-	if m.detailFocus && d > 0 {
-		a = n
-	}
-	return m.goArea((a-1+d+n)%n + 1)
-}
-
 // scrollDetail: PgUp PgDn and the wheel scroll the detail from any area, without moving
 // the focus (06 §3.3). With no detail column they page the list instead.
 func (m *model) scrollDetail(d int) tea.Cmd {
