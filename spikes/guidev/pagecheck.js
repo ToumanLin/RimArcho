@@ -76,6 +76,73 @@ try {
       assert(!screens.pageLoading(), method + " left object shortcuts suspended");
     });
   }
+  // The launch page's numbers are focus keys; applying a row must keep the column (06 §2.3).
+  await test("home 1/2/3 focus columns, arrows apply within their scope, Enter launches", async () => {
+    const original = { ...ui }, live = S.live;
+    const rows = [
+      { kind: "plan", envName: "game-a", plan: 1, name: "list-a1", page: "plan:1", current: true },
+      { kind: "plan", envName: "game-a", plan: 2, name: "list-a2", page: "plan:2" },
+      { kind: "pack", envName: "game-a", name: "pack-a" },
+      { kind: "plan", envName: "game-b", plan: 3, name: "list-b1", page: "plan:3" },
+      { kind: "plan", envName: "game-b", plan: 4, name: "list-b2", page: "plan:4" },
+    ].map((r) => ({ ...r, env: r.envName + " · 1.7", mods: 10, level: "ok", state: "ready" }));
+    const fixture = { rows, featured: 0 }, applied = [], opened = [], launched = [];
+    const press = (key, extra = {}) => home.homeKey(new KeyboardEvent("keydown", { key, cancelable: true, ...extra }));
+    const focused = (n) => document.activeElement?.closest(".hm-step")?.dataset.step === String(n);
+    handlers.set("Home", () => fixture);
+    handlers.set("HomeApply", async (request, kind, env, plan, name) => {
+      fixture.featured = rows.findIndex((r) => r.kind === kind && r.envName === env && (kind === "plan" ? r.plan === plan : r.name === name));
+      applied.push(rows[fixture.featured].name);
+      await new Promise(requestAnimationFrame);
+      emit("environment", { request, text: "applied fixture" });
+      return true;
+    });
+    Object.assign(ui, { reload() {}, refreshEnvironment: () => home.home({ keep: true }), go: (page) => opened.push(page), run: (op) => launched.push(op) });
+    S.live = null;
+    try {
+      await home.home();
+      for (const n of [1, 2, 3]) {
+        press(String(n));
+        const step = document.querySelector(".hm-s" + n), number = step.querySelector("h3 b");
+        assert(focused(n), n + " did not focus its column");
+        assert(number.textContent === "0" + n, "number changed");
+        const probe = document.createElement("span"); probe.style.color = "var(--accent)"; step.append(probe);
+        assert(getComputedStyle(number).color === getComputedStyle(probe).color, "focused number is not accent");
+        probe.remove();
+      }
+      assert(document.activeElement.matches(".hm-go") && !applied.length && !launched.length, "focus key applied or launched a row");
+      for (const modifier of ["ctrlKey", "altKey", "metaKey", "shiftKey"]) {
+        press("1", { [modifier]: true }); assert(focused(3), modifier + "+1 focused a column");
+      }
+      const move = async (key, name, column) => {
+        press(key); await settle();
+        assert(applied.at(-1) === name, key + " applied " + applied.at(-1) + ", expected " + name);
+        assert(focused(column), key + " lost column focus after redraw");
+      };
+      press("1");
+      await move("ArrowDown", "list-b1", 1);
+      await move("ArrowUp", "list-a1", 1);
+      press("2");
+      await move("ArrowDown", "list-a2", 2);
+      await move("ArrowDown", "pack-a", 2);
+      await move("ArrowUp", "list-a2", 2);
+      await move("ArrowRight", "list-b1", 2);
+      await move("ArrowLeft", "list-a2", 2);
+      press("Enter"); assert(opened.at(-1) === "plan:2" && !launched.length, "Enter outside 03 did not edit");
+      press("3"); await move("ArrowUp", "list-a1", 3);
+      assert(document.activeElement.matches(".hm-go"), "03 did not return focus to launch after switching");
+      press("Enter"); await settle();
+      assert(launched.length === 1 && launched[0] === "launch", "Enter on 03 did not launch exactly once");
+      S.live = { running: true }; home.liveChanged(); press("3"); press("Enter");
+      assert(focused(3) && launched.length === 1 && opened.length === 1, "disabled 03 launched or opened the list");
+      const hints = home.hintList();
+      assert(hints.map((h) => h.key).join(" ") === "1–3 ↑↓ ←→ enter L shift+1–8 ?", "startup hint keys differ from 06 §2.3");
+    } finally {
+      Object.assign(ui, original); delete ui.run; S.live = live;
+      handlers.set("Home", () => ({ rows: [], featured: -1 })); handlers.delete("HomeApply");
+      screens.openScreen("other");
+    }
+  });
   await test("same-page replies use only the latest request, including after close/re-entry", async () => {
     screens.openScreen("other");
     const old = deferred(), next = deferred();

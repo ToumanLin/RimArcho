@@ -97,6 +97,13 @@ func TestKeyHelpText(t *testing.T) {
 	}
 }
 
+// The launch page's numbered columns are focus keys (06 §2.3, 06 §3.5).
+func TestHomeFocusKeyHelp(t *testing.T) {
+	if !slices.ContainsFunc(KeyHelp("home", false), func(r KeyRow) bool { return r.Keys == "1–3" }) {
+		t.Fatal("home help does not list its three focus keys")
+	}
+}
+
 func wide(s string) bool {
 	for _, r := range s {
 		if r >= 0x80 {

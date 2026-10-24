@@ -92,6 +92,7 @@ func init() {
 		"scanned %s":                                         "%s 扫描",
 		"see what changed →":                                 "看变了什么 →",
 		"list or pack":                                       "列表 / 整合包",
+		"column":                                             "栏",
 		"versions %s":                                        "版本 %s",
 		"pick again to open it":                              "再点一次打开",
 		"applying %s…":                                       "正在应用 %s…",
