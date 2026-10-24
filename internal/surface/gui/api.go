@@ -39,12 +39,13 @@ type API struct {
 	content view.ContentCache
 	busy    map[string]bool // scan, analyze, pack
 	// building is the pack this window's build child is making ("" none).
-	building string
-	live     view.LiveTracker // the running game's log (03 §6.6)
-	logPath  string           // the log page's Player.log and its clusters' first lines
-	logLinks map[string]string
-	x        exchange // import and export (exchange.go)
-	free     releaser // returns memory to the OS after heavy work (memory.go)
+	building  string
+	buildRead buildPageReader
+	live      view.LiveTracker // the running game's log (03 §6.6)
+	logPath   string           // the log page's Player.log and its clusters' first lines
+	logLinks  map[string]string
+	x         exchange // import and export (exchange.go)
+	free      releaser // returns memory to the OS after heavy work (memory.go)
 	// bgs are the environment bgsEnv's backgrounds; bgPick the image rotation chose for
 	// this window (background.go)
 	bgs    []app.Background
@@ -215,36 +216,6 @@ func (s *API) Packs() (*PackList, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return &PackList{Rows: rows, Others: others, Unfinished: un, Building: s.building}, err
-}
-
-// BuildPage is 编译成整合包 for the current plan (06 §2.6): checked and sorted under the
-// reader's own connection, including texture planning and folder measurement.
-// tex is the textures choice (view.PackTextureOptions): 0 off, 100 预转换, less 精简.
-func (s *API) BuildPage(tex int) (*view.BuildPage, error) {
-	r, err := s.detachedReader()
-	if err != nil {
-		return nil, err
-	}
-	defer r.Close()
-	defer s.free.soon()
-	st, err := r.Loadout()
-	if err != nil {
-		return nil, err
-	}
-	plan, chip := st.Plan.Name, view.EnvChip(st.Ix.Env.Name, st.Ix.Env.GameVersion)
-	name := view.DefaultPackName(r, plan)
-	pl, err := r.PlanPack(name)
-	if err == nil {
-		view.PlanTextures(r, pl, tex)
-	}
-	dir := r.PacksDir()
-	if err != nil {
-		return nil, err
-	}
-	pl.Measure(dir)
-	p := view.BuildPageOf(pl, plan, chip, dir, tex)
-	p.Name = name
-	return p, nil
 }
 
 // PackNameCheck says what is wrong with a new pack's name ("" when it can be used).

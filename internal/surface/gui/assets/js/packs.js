@@ -6,6 +6,7 @@
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { shimmer } from "./motion.js";
 import { openScreen, page, button, act, area, beginPageRead } from "./screens.js";
 import * as pop from "./popups.js";
 
@@ -15,7 +16,7 @@ export function initPacks(u) { ui = u; }
 let packPoll = 0;
 const L = { rows: [], un: [], others: 0, cur: 0, els: [] }; // the list page
 let P = null; // the pack page shown: view.PackPage
-const B = { page: null, tex: 0, name: "", nameErr: "", seq: 0, loading: false }; // the build page
+const B = { page: null, tex: 0, name: "", nameErr: "", seq: 0, loading: false, error: "" }; // the build page
 
 // ---- the list (整合包) ----
 
@@ -233,13 +234,14 @@ export function packEvent(ev) {
 // build opens the page: the check is quick, the sizes need every mod's folder walked, so
 // the page shows at once and the sizes follow. again: a redraw keeps the name typed.
 export async function build(again = false) {
+  if (again && B.loading) return;
   const seq = ++B.seq;
-  if (!again) { B.page = null; B.tex = 0; B.name = ""; B.nameErr = ""; }
+  if (!again) { B.page = null; B.tex = 0; B.name = ""; B.nameErr = ""; B.error = ""; }
   const read = beginPageRead("build", { replace: !again, label: "checking the list…" });
   B.loading = true;
   try {
     const [p] = await Promise.all([
-      B.page || api.BuildPage(B.tex || 0),
+      B.page || readBuild(B.tex || 0, read.current),
       loadList(read.current).catch(() => { if (read.current()) L.un = []; }),
     ]);
     if (!read.current() || seq !== B.seq) return;
@@ -258,22 +260,62 @@ export async function build(again = false) {
 // setTex changes the textures choice: the page is measured again, since the files
 // converted, the size after and the peak all depend on it.
 async function setTex(tex) {
-  if (B.loading || B.tex === tex) return;
+  if (!B.page || (B.tex === tex && !B.error)) return;
   return measureBuild(tex);
 }
 
 async function measureBuild(tex) {
   B.tex = tex;
   const seq = ++B.seq;
-  const read = beginPageRead("build", { replace: true, label: "checking the list…" });
+  const read = beginPageRead("build", { keep: true });
   B.loading = true;
+  B.error = "";
+  syncMeasure();
+  syncButton();
   let p;
-  try { p = await api.BuildPage(tex); } catch (e) { if (read.current()) B.loading = false; read.fail(e); return; }
+  try { p = await readBuild(tex, read.current); } catch (e) {
+    if (!read.current() || seq !== B.seq) return;
+    B.loading = false;
+    B.error = errText(e);
+    syncMeasure();
+    syncButton();
+    read.fail(e);
+    return;
+  }
   if (!read.current() || seq !== B.seq) return;
   B.page = p;
   B.loading = false;
   drawBuild();
   read.finish();
+}
+
+// 06 §3.1: polling never holds navigation; late replies belong to their old ticket.
+async function readBuild(tex, current) {
+  const id = await api.BuildPage(tex);
+  while (current()) {
+    const p = await api.BuildPageResult(id);
+    if (!current()) return null;
+    if (p) return p;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return null;
+}
+
+// 06 §2.6, 06 §7.1: keep the form alive and replace only facts being measured.
+function syncMeasure() {
+  const select = $("#pk-tex");
+  if (select) select.value = String(B.tex);
+  if (!B.loading && !B.error) return;
+  for (const key of ["trim", "textures"]) {
+    const step = document.querySelector(`.bd-step[data-key="${key}"]`);
+    if (!step) continue;
+    step.classList.remove("bad", "warn");
+    const text = step.querySelector(".x");
+    text.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), key === "textures" ? 3 : 1));
+    step.querySelectorAll("ul, button").forEach((n) => n.remove());
+  }
+  const size = $("#pk-size");
+  if (size) size.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), 1));
 }
 
 // nextTex: the D key steps through the choices.
@@ -288,9 +330,10 @@ const building = () => !!(S.packBuild || L.un.some((u) => u.running));
 
 function drawBuild() {
   const p = B.page;
-  if (!p || S.screen !== "build" || B.loading) return;
+  if (!p || S.screen !== "build") return;
   const sc = S.screen === "build" ? $("#screen") : openScreen("build");
   const focusName = document.activeElement && document.activeElement.id === "pk-name";
+  const focusTex = document.activeElement && document.activeElement.id === "pk-tex";
   sc.innerHTML = "";
   const w = page("build", T("a pack locks every mod's version: later Workshop updates do not change it, and it has its own saves and settings; the list stays as it is"),
     button(T("cancel"), "esc", () => ui.go("plan")));
@@ -310,9 +353,9 @@ function drawBuild() {
   name.value = B.name;
   name.oninput = async () => {
     B.name = name.value;
-    const epoch = S.screenSeq, seq = B.seq;
+    const epoch = S.screenSeq;
     const n = B.name, err = await api.PackNameCheck(n);
-    if (n !== B.name || epoch !== S.screenSeq || seq !== B.seq || S.screen !== "build") return;
+    if (n !== B.name || epoch !== S.screenSeq || S.screen !== "build") return;
     B.nameErr = err;
     syncButton();
   };
@@ -340,6 +383,7 @@ function drawBuild() {
     const done = now && !now.includes(s.key) && (i < first || (s.key === "lock" && S.packBuild.step >= 3));
     if (now) cls += done ? " done" : now.includes(s.key) ? " cur" : " wait";
     const r = el("div", cls);
+    r.dataset.key = s.key;
     const n = el("span", "n", done ? "✓" : s.level === "bad" ? "!" : String(i + 1));
     const body = el("div", "b");
     body.append(el("div", "t", s.title), el("div", "x", s.text));
@@ -388,9 +432,14 @@ function drawBuild() {
   row(T("mods"), el("span", "v num", String(p.mods)));
   if (p.before) {
     const v = el("span", "v");
+    v.id = "pk-size";
     v.append(p.before + " → ", el("b", "", p.after));
     row(T("size"), v);
-  } else row(T("size"), el("span", "v muted", T("worked out once the problems are fixed")));
+  } else {
+    const v = el("span", "v muted", T("worked out once the problems are fixed"));
+    v.id = "pk-size";
+    row(T("size"), v);
+  }
   row(T("saves"), p.saves);
   row(T("location"), el("span", "v path", p.dir));
   side.append(kv);
@@ -413,7 +462,9 @@ function drawBuild() {
     w.append(s);
   }
   sc.append(w);
+  syncMeasure();
   syncButton();
+  if (focusTex) $("#pk-tex")?.focus();
   if (focusName) { const n = $("#pk-name"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
 }
 
@@ -426,11 +477,12 @@ function syncButton() {
   if (head) head.textContent = B.name.trim() || p.plan;
   err.textContent = B.nameErr || "";
   let reason = "", toNeeds = false, toGo = "";
-  if (!p.ok) { reason = p.why; toNeeds = p.toNeeds; toGo = p.toGo || ""; }
+  if (B.error) reason = B.error;
+  else if (!B.loading && !p.ok) { reason = p.why; toNeeds = p.toNeeds; toGo = p.toGo || ""; }
   else if (S.packBuild) reason = Tf("creating pack %s", S.packBuild.name);
   else if (building()) reason = T("another pack is being created; wait for it to finish");
   else if (B.nameErr) reason = B.nameErr;
-  go1.disabled = !!reason;
+  go1.disabled = B.loading || !!B.error || B.tex !== p.tex || !!reason;
   why.classList.toggle("busy", !!S.packBuild && p.ok);
   why.innerHTML = "";
   why.hidden = !reason;
@@ -446,7 +498,7 @@ function syncButton() {
 
 function go() {
   const p = B.page;
-  if (!p || B.loading || !p.ok || B.nameErr || building()) return;
+  if (!p || B.loading || B.error || B.tex !== p.tex || !p.ok || B.nameErr || building()) return;
   startBuild(B.name.trim());
 }
 
