@@ -110,8 +110,9 @@ func (a *App) editOther(p *store.Plan, op string, f func(loadout.List) (loadout.
 // library (06 §2.9, 01 §4): a copy made by hand or left by another manager, beside another
 // copy of the same mod. Same volume: renamed; another volume: copied, every file checked,
 // then the original goes to the recycle bin. Its instance stays the same (ID, lineage,
-// history), so every plan keeps it; the game gets it through an _Archo_ link on the next
-// save or launch. .rimarcho/origin.json is written only when it has none.
+// history), so every plan keeps it. Incoming installations and an entry needed by
+// the active plan are reattached after relocation. .rimarcho/origin.json is written
+// only when it has none.
 func (a *App) MoveToLocked(ref string, dryRun bool) (*MoveResult, error) {
 	return a.MoveToLockedFor(ref, dryRun, "")
 }

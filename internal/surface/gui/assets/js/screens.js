@@ -447,7 +447,7 @@ async function runAction(it, act) {
   }
   if (act.confirm) {
     // Not undone with u: ask first (06 §6).
-    return pop.confirm(act.label, [act.warn || act.label], act.label, () => doAction(act, 0));
+    return pop.confirm(act.label, act.kind === "repair-links" ? act.lines : [act.warn || act.label], act.label, () => doAction(act, 0));
   }
   return doAction(act, 0);
 }
@@ -1274,12 +1274,22 @@ function directoryPrompt(d, moving, after) {
     const error = el("div", "err");
     const actions = el("div", "actions");
     let busy = false;
+    let previewedPath = "";
+    const affected = el("pre", "sub");
     const apply = async () => {
       const path = input.value.trim();
       if (!path || busy) return;
       busy = true;
       error.textContent = "";
       try {
+        if (moving && previewedPath !== path) {
+          const links = await api.DirectoryMovePreview(d.id, path);
+          affected.textContent = [d.path + " → " + path, ...(links || [])].join("\n");
+          previewedPath = path;
+          applyButton.textContent = T("confirm move");
+          busy = false;
+          return;
+        }
         const lines = await api.ApplySetting(["folder", moving ? "move" : "set", d.id, "{}"], path);
         pop.close();
         say("ok", lines?.[0] || T("done"));
@@ -1287,11 +1297,17 @@ function directoryPrompt(d, moving, after) {
       } catch (e) { error.textContent = errText(e); busy = false; }
     };
     if (moving) box.append(el("p", "sub", T("move this directory and its files to the new path?")));
+    const applyButton = button(T(moving ? "preview move" : "locate"), "", apply, "primary", "apply-setting");
+    input.addEventListener("input", () => {
+      previewedPath = "";
+      affected.textContent = "";
+      applyButton.textContent = T(moving ? "preview move" : "locate");
+    });
     actions.append(button(T(moving ? "choose parent folder…" : "choose…"), "", () => pickFolder(d.path, path => {
       input.value = moving ? path.replace(/[\\/]$/, "") + "/" + d.path.split(/[\\/]/).pop() : path;
     })),
-      button(T(moving ? "move to…" : "locate"), "", apply, "primary", "apply-setting"), button(T("skip for now"), "", () => pop.close()));
-    box.append(input, error, actions);
+      applyButton, button(T("skip for now"), "", () => pop.close()));
+    box.append(input, affected, error, actions);
     p.keys = e => { if (e.key === "Enter") { e.preventDefault(); apply(); return true; } return false; };
     setTimeout(() => input.focus(), 0);
   });

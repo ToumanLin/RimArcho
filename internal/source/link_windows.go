@@ -118,8 +118,98 @@ func CreateLink(link, target string) error {
 // RemoveLink deletes a junction or symbolic link itself, never its target. It refuses
 // anything that is not a link.
 func RemoveLink(link string) error {
-	if !IsLink(link) {
-		return fmt.Errorf("%s is not a link; refusing to delete it", link)
+	l, err := ReadLink(link)
+	if err != nil {
+		return err
 	}
-	return os.Remove(link) // RemoveDirectory on a junction removes only the reparse point
+	return RemoveLinkChecked(l)
+}
+
+func openLinkHandle(path string, access, share uint32) (windows.Handle, error) {
+	u, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return windows.InvalidHandle, err
+	}
+	return windows.CreateFile(u, access, share, nil, windows.OPEN_EXISTING,
+		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+}
+
+func rawLink(path string) (string, string, error) {
+	h, err := openLinkHandle(path, 0, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE)
+	if err != nil {
+		return "unknown", "", err
+	}
+	defer windows.CloseHandle(h)
+	return rawLinkHandle(h)
+}
+
+func rawLinkHandle(h windows.Handle) (string, string, error) {
+	buf := make([]byte, windows.MAXIMUM_REPARSE_DATA_BUFFER_SIZE)
+	var n uint32
+	err := windows.DeviceIoControl(h, windows.FSCTL_GET_REPARSE_POINT, nil, 0, &buf[0], uint32(len(buf)), &n, nil)
+	if err == windows.ERROR_NOT_A_REPARSE_POINT {
+		return "plain", "", nil
+	}
+	if err != nil {
+		return "unknown", "", err
+	}
+	if n < 16 {
+		return "unknown", "", fmt.Errorf("short reparse data")
+	}
+	kind, base := "", 0
+	switch binary.LittleEndian.Uint32(buf) {
+	case windows.IO_REPARSE_TAG_MOUNT_POINT:
+		kind, base = "junction", 16
+	case windows.IO_REPARSE_TAG_SYMLINK:
+		kind, base = "symlink", 20
+	default:
+		return "unknown", "", fmt.Errorf("unknown reparse tag 0x%x", binary.LittleEndian.Uint32(buf))
+	}
+	off, size := int(binary.LittleEndian.Uint16(buf[8:])), int(binary.LittleEndian.Uint16(buf[10:]))
+	if size%2 != 0 || base+off+size > int(n) {
+		return "unknown", "", fmt.Errorf("invalid reparse target")
+	}
+	chars := make([]uint16, size/2)
+	for i := range chars {
+		chars[i] = binary.LittleEndian.Uint16(buf[base+off+2*i:])
+	}
+	target := string(utf16.Decode(chars))
+	// NT substitute names are the original target; remove only the NT namespace
+	// wrapper so the value remains usable by normal filesystem APIs.
+	if strings.HasPrefix(target, `\??\UNC\`) {
+		target = `\\` + target[8:]
+	} else {
+		target = strings.TrimPrefix(target, `\??\`)
+	}
+	return kind, target, nil
+}
+
+func removeLinkChecked(l *LinkInfo) error {
+	if err := l.verify(); err != nil {
+		return err
+	}
+	// Pin the physical parent and the link without delete/write sharing. Reparse
+	// replacement and renames are denied until disposition is set on this handle.
+	parent, err := openLinkHandle(l.physicalParent, windows.FILE_READ_ATTRIBUTES, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE)
+	if err != nil {
+		return err
+	}
+	defer windows.CloseHandle(parent)
+	h, err := openLinkHandle(l.Path, windows.DELETE|windows.FILE_READ_ATTRIBUTES, windows.FILE_SHARE_READ)
+	if err != nil {
+		return err
+	}
+	defer windows.CloseHandle(h)
+	if err := l.verify(); err != nil {
+		return err
+	}
+	kind, target, err := rawLinkHandle(h)
+	if err != nil {
+		return err
+	}
+	if kind != l.Kind || target != l.RawTarget {
+		return fmt.Errorf("link changed since preview: %s", l.Path)
+	}
+	disposition := byte(1)
+	return windows.SetFileInformationByHandle(h, windows.FileDispositionInfo, &disposition, 1)
 }

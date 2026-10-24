@@ -80,7 +80,7 @@ func ClipOutput(out string) string {
 func (s *Server) run(ctx context.Context, env string, argv []string) (*sdk.CallToolResult, any, error) {
 	out, code := s.executeContext(ctx, env, argv)
 	// Test reports already limit clusters; clipping their JSON would corrupt it.
-	if len(argv) < 2 || argv[0] != "test" || argv[1] != "run" {
+	if len(argv) < 2 || (argv[0] != "test" || argv[1] != "run") && argv[0] != "links" {
 		out = ClipOutput(out)
 	}
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: out}}, IsError: code == cmds.ExitError || code == cmds.ExitUsage}, nil, nil

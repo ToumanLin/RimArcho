@@ -95,6 +95,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     unpin <ref>                               use a locked mod's upstream again in the current plan (a RimCrow-style lock also gets its About.xml back); the copy stays
     trash <ref>                               move a hidden or unsubscribed workshop folder to the recycle bin
     history                                   the workspace's unsaved edits (undo/redo) and the saved versions
+    links check                               check RimArcho links without changing files
+    links repair                              preview or confirm link repair and unfinished-operation recovery
     monitor                                   Archo Monitor, the in-game companion: versions, source, place in the plan
     monitor install                           install or update the bundled Archo Monitor and add it to plans by default (08 §9)
     pack build <name>                         compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load

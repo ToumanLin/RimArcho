@@ -168,6 +168,9 @@ func subscriptionDoc(op *app.SubscribeOp, err error) (*render.Doc, error) {
 	for _, it := range op.Items {
 		n := root.Add(it.Ref + " " + it.Name)
 		n.KV("folder", it.Folder)
+		for _, line := range it.Links.Lines() {
+			n.KV("affected link", line)
+		}
 		if it.To != "" {
 			commit := it.To
 			if it.From != "" {

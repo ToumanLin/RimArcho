@@ -20,14 +20,15 @@ import (
 
 // DuplicateMove is one folder in the way.
 type DuplicateMove struct {
-	Copy ModsCopy
-	For  string // what needs the packageId: "pack X's copy of Name" or "#ref Name"
-	Pack string // for a pack's copy: the pack and the mod's name (to say For in the UI language)
-	Mod  string
-	Link string // the link made in Mods/ once it has moved
-	To   string // where it would go in the lock library
-	Why  string // "" when it can move; else why RimArcho leaves it
-	Ref  string // the folder's instance ref, for archo library move-to-locked
+	Copy  ModsCopy
+	For   string // what needs the packageId: "pack X's copy of Name" or "#ref Name"
+	Pack  string // for a pack's copy: the pack and the mod's name (to say For in the UI language)
+	Mod   string
+	Link  string // the link made in Mods/ once it has moved
+	To    string // where it would go in the lock library
+	Why   string // "" when it can move; else why RimArcho leaves it
+	Ref   string // the folder's instance ref, for archo library move-to-locked
+	Links *LinkLifecyclePlan
 }
 
 // DuplicatesError is a launch or a write refused because Mods/ holds other versions.
@@ -82,6 +83,9 @@ func (e *DuplicatesError) Lines() []string {
 	var out []string
 	for _, m := range e.Moves {
 		out = append(out, fmt.Sprintf("Mods/%s → %s (the lock library); then Mods/%s for %s", m.Copy.Name, m.To, m.Link, m.For))
+		if m.Links != nil {
+			out = append(out, m.Links.Lines()...)
+		}
 	}
 	return out
 }
@@ -99,6 +103,13 @@ func (a *App) planMoves(st *LoadoutState, copies []ModsCopy, moves []DuplicateMo
 		name := freeNameUsed(root, m.Copy.Name, used)
 		used[strings.ToLower(name)] = true
 		m.To = filepath.Join(root, name)
+		if m.Why == "" {
+			var err error
+			m.Links, err = a.PlanIncomingLinks(m.Copy.Mod.RealPath, m.To)
+			if err != nil {
+				m.Why = err.Error()
+			}
+		}
 	}
 	sort.Slice(moves, func(i, j int) bool { return moves[i].Copy.Name < moves[j].Copy.Name })
 	return moves

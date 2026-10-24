@@ -79,6 +79,11 @@ func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	for _, n := range r.Notices {
 		root.KV("loadout", n)
 	}
+	for _, l := range r.GameLinks {
+		if l.Code != "" {
+			root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.Reason)
+		}
+	}
 	// Archo Monitor (08 §9): install or update the bundled monitor, apply the default.
 	if m, err := c.App.EnsureMonitor(false); err != nil {
 		root.KV("monitor", "error: "+err.Error())

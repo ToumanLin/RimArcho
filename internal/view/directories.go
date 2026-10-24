@@ -98,6 +98,8 @@ func init() {
 		"directories are checked each time RimArcho starts; you can skip this and locate them in settings later": "每次启动都会检查目录；可以暂时跳过，稍后到设置中重新定位",
 		"locate":             "重新定位",
 		"move to…":           "移动到…",
+		"preview move":       "预览移动",
+		"confirm move":       "确认移动",
 		"new directory path": "新目录路径",
 		"move this directory and its files to the new path?": "将这个目录及其中的文件移动到新路径？",
 		"skip for now": "稍后处理",

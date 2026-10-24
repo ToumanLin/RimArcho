@@ -80,8 +80,9 @@ type UninstallItem struct {
 	Note  string   // DoLeave: why; otherwise what changes
 	Drop  []string // DoClean: the entries taken out of the list
 	// Set by Uninstall.
-	Done bool
-	Err  string
+	Done  bool
+	Err   string
+	Links *LinkLifecyclePlan
 }
 
 // UninstallStep is one row of the plan.
@@ -257,8 +258,27 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 	gone := map[string]map[string]bool{} // user data key → package IDs only reached through a removed link
 	var links []*UninstallItem
 	seenMods := map[string]bool{}
-	for _, e := range envs {
-		mods := a.modsFolder(e)
+	observations, err := a.InspectGameLinks()
+	if err != nil {
+		return nil, err
+	}
+	owned := map[string]*GameLink{}
+	for _, l := range observations {
+		owned[env.PathKey(l.Path)] = l
+	}
+	roots, err := a.knownGameMods()
+	if err != nil {
+		return nil, err
+	}
+	for _, root := range roots {
+		e := &env.Environment{GameRoot: root.game}
+		for _, candidate := range envs {
+			if env.PathKey(realOrAbs(candidate.GameRoot)) == env.PathKey(root.game) {
+				e = candidate
+				break
+			}
+		}
+		mods := root.mods
 		if mods == "" || seenMods[env.PathKey(mods)] {
 			continue
 		}
@@ -275,6 +295,10 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 				continue
 			}
 			it := &UninstallItem{Path: path, Do: DoUnlink}
+			l := owned[env.PathKey(path)]
+			if l == nil || !l.Owned || l.Code == CodeLinkForeign || l.Code == CodeLinkUnknown || l.Code == CodeLinkRecovery {
+				it.Do, it.Note = DoLeave, "ownership or link health is unproven: left alone"
+			}
 			if tgt, err := source.RealPath(path); err == nil {
 				it.To = tgt
 				if pkg := scan.ReadDecl(tgt, false).PackageID; pkg != "" {
@@ -580,6 +604,16 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 		prog = append(prog, &UninstallItem{Path: dir, Do: DoLater, Bytes: a.sizeOf(dir), Note: "only RimArcho's own files; the folder goes when nothing else is in it"})
 	}
 	add(UnProgram, prog)
+	for _, step := range p.Steps {
+		for _, it := range step.Items {
+			if it.Do == DoTrash || it.Do == DoMove || it.Do == DoDelete {
+				it.Links, err = a.PlanIncomingLinks(it.Path, "")
+				if err != nil && p.Problem == "" {
+					p.Problem = err.Error()
+				}
+			}
+		}
+	}
 	return p, nil
 }
 
@@ -814,7 +848,7 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 	case DoKeep, DoLeave:
 		return nil
 	case DoUnlink:
-		return source.RemoveLink(it.Path)
+		return a.applyLinks(filepath.Dir(it.Path), []LinkChange{{Op: "remove", Name: filepath.Base(it.Path)}})
 	case DoClean:
 		return cleanModsConfig(it.Path, it.Drop)
 	case DoRestore:
@@ -822,11 +856,11 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 	case DoTrash:
 		return a.ToTrash(it.Path)
 	case DoDelete:
-		return removeTree(it.Path)
+		return a.withIncomingLinks(it.Path, "", func() error { return removeTree(it.Path) })
 	case DoDDS:
 		return a.deleteTexturesIn(it.Path)
 	case DoMove:
-		if err := a.moveDir(it.Path, it.To); err != nil {
+		if err := a.withIncomingLinks(it.Path, "", func() error { return a.moveDir(it.Path, it.To) }); err != nil {
 			return err
 		}
 		if step == UnLocked {

@@ -25,9 +25,10 @@ type Problem struct {
 
 // ProblemSet is every current problem of the environment.
 type ProblemSet struct {
-	State   *LoadoutState
-	List    []*Problem // not ignored, sorted by severity then subject
-	Ignored []*Problem
+	GameLinks []*GameLink // refreshed independently of analysis and mod caches
+	State     *LoadoutState
+	List      []*Problem // not ignored, sorted by severity then subject
+	Ignored   []*Problem
 	// Stale holds the problems of stale logs (LogRun.Stale): shown apart, never counted.
 	Stale    []*Problem
 	Logs     []*LogRun // the logs whose clusters joined the problems
@@ -56,6 +57,15 @@ func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	ix := ps.State.Ix
 	dups := ModsDuplicates(a.ModsCopies(ix))
 	var extra []*finding.Finding
+	ps.GameLinks, err = a.InspectGameLinks()
+	if err != nil {
+		return nil, err
+	}
+	for _, l := range ps.GameLinks {
+		if l.Code != "" {
+			extra = append(extra, l.Finding())
+		}
+	}
 	if l := a.LeftPackLinks(ix); l != nil {
 		for _, d := range dups {
 			if d.onlyPacks() {

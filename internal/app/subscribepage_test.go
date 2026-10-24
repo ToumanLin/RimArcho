@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
@@ -155,8 +156,17 @@ func TestSubscribePage(t *testing.T) {
 		t.Fatalf("page not skipped: %+v", bulk)
 	}
 	newZip := pageZip(t, "", "<Defs><ThingDef><defName>Second</defName></ThingDef></Defs>", false)
+	game := secondGame(e, "PageIncoming")
+	e.MustRun("env", "add", "page-incoming", "--game", game)
+	incoming := filepath.Join(game, "Mods", "_Archo_env_"+it.ID)
+	if err := source.CreateLink(incoming, it.Folder); err != nil {
+		t.Fatal(err)
+	}
 	var trashed []string
 	e.App.TrashFunc = func(path string) error {
+		if source.IsLink(incoming) {
+			t.Fatal("page replaced before incoming link detached")
+		}
 		trashed = append(trashed, path)
 		return os.Rename(path, filepath.Join(e.Root, "old-page"))
 	}
@@ -170,6 +180,9 @@ func TestSubscribePage(t *testing.T) {
 	op, err = e.App.UpdateSubscriptionFrom(it.Ref, newZip, false)
 	if err != nil || op.Items[0].ID != it.ID || len(trashed) != 1 {
 		t.Fatalf("update: %+v %v trash %v", op, err, trashed)
+	}
+	if !source.IsLink(incoming) || mustReal(t, incoming) != mustReal(t, it.Folder) {
+		t.Fatal("page update lost incoming installation")
 	}
 	r, _ = subscribe.Read(it.Folder)
 	if r.Installed != "1.1 @ 2026-10-24T15:16:59Z" || r.HasUpdate() {

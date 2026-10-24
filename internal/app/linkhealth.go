@@ -1,0 +1,456 @@
+package app
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
+)
+
+const (
+	CodeLinkDangling = "mods.link-dangling"
+	CodeLinkForeign  = "mods.link-foreign"
+	CodeLinkUnknown  = "mods.link-check-failed"
+	CodeLinkOccupied = "mods.link-occupied"
+	CodeLinkRecovery = "mods.link-recovery"
+)
+
+// GameLink is a fresh first-level filesystem observation, independent of mod caches.
+type GameLink struct {
+	Game     string             `json:"game"`
+	Mods     string             `json:"mods"`
+	Path     string             `json:"path"`
+	Target   string             `json:"target"`
+	Kind     string             `json:"kind"`
+	State    source.TargetState `json:"state"`
+	Code     string             `json:"code,omitempty"`
+	Reason   string             `json:"reason"`
+	Evidence string             `json:"evidence"`
+	Owned    bool               `json:"owned"`
+	Action   string             `json:"action"`
+	snapshot *source.LinkInfo
+	Instance string `json:"instance,omitempty"`
+	Pack     string `json:"pack,omitempty"`
+	recovery *linkRecovery
+}
+
+type gameMods struct{ game, mods string }
+
+// knownGameMods also serves target-lifecycle callers: it never uses scan aliases.
+func (a *App) knownGameMods() ([]gameMods, error) {
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil, err
+	}
+	ss, err := a.Store.AllSources()
+	if err != nil {
+		return nil, err
+	}
+	roots := []gameMods{}
+	for _, e := range es {
+		if e.GameRoot != "" {
+			roots = append(roots, gameMods{e.GameRoot, filepath.Join(e.GameRoot, "Mods")})
+		}
+	}
+	for _, s := range ss {
+		if s.Kind == source.Local && s.Status != source.StatusRetired && s.Root != "" {
+			game := filepath.Dir(s.Root)
+			for _, e := range es {
+				if e.ID == s.EnvID && e.GameRoot != "" {
+					game = e.GameRoot
+					break
+				}
+			}
+			roots = append(roots, gameMods{game, s.Root})
+		}
+	}
+	ledger, err := a.Store.ManagedLinks()
+	if err != nil {
+		return nil, err
+	}
+	for _, l := range ledger {
+		roots = append(roots, gameMods{filepath.Dir(l.Mods), l.Mods})
+		if l.NextPath != "" {
+			roots = append(roots, gameMods{filepath.Dir(filepath.Dir(l.NextPath)), filepath.Dir(l.NextPath)})
+		}
+	}
+	seen := map[string]bool{}
+	out := []gameMods{}
+	for _, r := range roots {
+		r.mods = realOrAbs(r.mods)
+		key := env.PathKey(r.mods)
+		if !seen[key] {
+			seen[key] = true
+			r.game = realOrAbs(r.game)
+			out = append(out, r)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].mods < out[j].mods })
+	return out, nil
+}
+
+// InspectGameLinks reads every known game Mods directory afresh. Healthy links
+// are included so other lifecycle operations can reuse the same observations.
+func (a *App) InspectGameLinks() ([]*GameLink, error) {
+	roots, err := a.knownGameMods()
+	if err != nil {
+		return nil, err
+	}
+	expected := map[string]string{}
+	evidence := map[string]string{}
+	instances, packIDs := map[string]string{}, map[string]string{}
+	ledger, err := a.Store.ManagedLinks()
+	if err != nil {
+		return nil, err
+	}
+	registered := map[string]store.ManagedLink{}
+	for _, l := range ledger {
+		if l.Phase == "complete" && l.NextTarget != "" {
+			delete(registered, env.PathKey(filepath.Join(l.Mods, l.Name)))
+			registered[env.PathKey(l.NextPath)] = l
+		} else if l.Phase == "rolled-back" && l.Target != "" {
+			l.NextTarget = l.Target
+			registered[env.PathKey(filepath.Join(l.Mods, l.Name))] = l
+		} else if store.LinkFinished(l.Phase) {
+			delete(registered, env.PathKey(filepath.Join(l.Mods, l.Name)))
+		}
+	}
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range es {
+		ms, err := a.Store.Mods(e.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range ms {
+			for _, name := range []string{DeployName(m), DeployPrefix + "env_" + m.ID} {
+				key := strings.ToLower(name)
+				expected[key] = m.RealPath
+				instances[key] = m.ID
+				evidence[key] = "known instance " + m.ID + "; expected target: " + m.RealPath
+			}
+		}
+	}
+	packs, err := os.ReadDir(a.PacksDir())
+	packEvidenceError := ""
+	if err != nil && !os.IsNotExist(err) {
+		packEvidenceError = "cannot read pack ownership evidence: " + err.Error()
+	}
+	for _, p := range packs {
+		if !p.IsDir() {
+			continue
+		}
+		pack, err := a.ReadPack(p.Name())
+		if err != nil || pack.Light {
+			continue
+		}
+		for _, e := range pack.Entries {
+			if !e.Official && e.Folder != "" {
+				key := strings.ToLower(packLinkName(p.Name(), e.Folder))
+				expected[key] = filepath.Join(a.packPath(p.Name()), "mods", e.Folder)
+				packIDs[key] = p.Name()
+				evidence[key] = "known pack " + p.Name() + "; expected target: " + expected[key]
+			}
+		}
+	}
+	out := []*GameLink{}
+	for _, root := range roots {
+		entries, err := os.ReadDir(root.mods)
+		if err != nil {
+			if os.IsNotExist(err) {
+				if state, _ := source.ProbeTarget(root.mods); state == source.TargetMissing {
+					continue
+				}
+			}
+			out = append(out, &GameLink{Game: root.game, Mods: root.mods, Path: root.mods, State: source.TargetUnknown, Code: CodeLinkUnknown, Reason: err.Error(), Action: "keep"})
+			continue
+		}
+		for _, de := range entries {
+			name := de.Name()
+			if !managedLink(name) && !packLink(name) {
+				continue
+			}
+			l := &GameLink{Game: root.game, Mods: root.mods, Path: filepath.Join(root.mods, name), Action: "keep", State: source.TargetUnknown, Evidence: "prefix only; ownership is unproven"}
+			if packLink(name) && packEvidenceError != "" {
+				l.Evidence += "; " + packEvidenceError
+			}
+			info, err := source.ReadLink(l.Path)
+			if err != nil {
+				l.Code, l.Reason = CodeLinkUnknown, err.Error()
+				out = append(out, l)
+				continue
+			}
+			l.snapshot, l.Target, l.Kind, l.State = info, info.RawTarget, info.Kind, info.State
+			exp := expected[strings.ToLower(name)]
+			l.Instance, l.Pack = instances[strings.ToLower(name)], packIDs[strings.ToLower(name)]
+			if exp != "" {
+				l.Owned, l.Evidence = true, evidence[strings.ToLower(name)]
+			}
+			if row, ok := registered[env.PathKey(l.Path)]; ok {
+				exp, l.Owned, l.Instance, l.Pack = row.NextTarget, true, row.Instance, row.Pack
+				l.Evidence = "managed link ledger; operation " + row.Operation + "; expected target: " + exp
+				if row.Kind != info.Kind {
+					l.Owned = false
+					l.Evidence += "; reparse type differs from ledger"
+				}
+			}
+			switch {
+			case info.Kind == "plain":
+				l.Code, l.Reason = CodeLinkOccupied, "real directory or file uses a RimArcho prefix; rename it yourself"
+			case info.Kind != "junction" && info.Kind != "symlink" || info.State == source.TargetUnknown:
+				l.Code, l.Reason = CodeLinkUnknown, info.Reason
+			case info.State == source.TargetMissing:
+				l.Code, l.Reason = CodeLinkDangling, info.Reason
+			case !l.Owned:
+				l.Code, l.Reason = CodeLinkForeign, "no matching instance or pack"
+			case env.PathKey(realOrAbs(info.Target)) != env.PathKey(realOrAbs(exp)):
+				l.Code, l.Reason = CodeLinkForeign, "target differs from known instance or pack"
+			default:
+				l.Reason = "target exists"
+			}
+			// Environment links are installed local mods; a present target always stays.
+			if l.Code == CodeLinkDangling || l.Code == CodeLinkForeign && !(envLink(name) && l.State == source.TargetPresent) {
+				if l.Owned {
+					l.Action = "remove link"
+				} else {
+					l.Action = "include explicitly to remove link"
+				}
+			}
+			out = append(out, l)
+		}
+	}
+	recoveries, err := a.linkRecoveries(ledger)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range recoveries {
+		for _, l := range out {
+			if env.PathKey(l.Path) == env.PathKey(r.Path) {
+				l.Action = "keep"
+			}
+		}
+	}
+	return append(out, recoveries...), nil
+}
+
+func (l *GameLink) Finding() *finding.Finding {
+	severity := finding.Warning
+	if l.Code == CodeLinkDangling || l.Code == CodeLinkUnknown || l.Code == CodeLinkRecovery {
+		severity = finding.Error
+	}
+	return &finding.Finding{Code: l.Code, Severity: severity, Key: env.PathKey(l.Path), Layer: "decl", Confidence: finding.Certain,
+		Subjects: []string{"path:" + l.Path, "game:" + l.Game}, Claim: l.Game + ": " + l.Path + ": " + l.Reason,
+		Evidence: []finding.Evidence{{Source: finding.Inferred, Ref: l.Path, Text: "target: " + l.Target + "; " + l.Evidence}}, Suggestions: []string{"archo links check --all", "archo links repair --all --dry-run"}}
+}
+
+func (a *App) CheckGameLinks(mods string) ([]*GameLink, error) {
+	all, err := a.InspectGameLinks()
+	if err != nil {
+		return nil, err
+	}
+	out := []*GameLink{}
+	for _, l := range all {
+		if env.PathKey(l.Mods) == env.PathKey(realOrAbs(mods)) && (l.Code == CodeLinkDangling || l.Code == CodeLinkUnknown || l.Code == CodeLinkRecovery) {
+			out = append(out, l)
+		}
+	}
+	return out, nil
+}
+
+func (a *App) refuseUnhealthyLinks(mods string) error {
+	links, err := a.CheckGameLinks(mods)
+	if err != nil {
+		return err
+	}
+	if len(links) > 0 {
+		return fmt.Errorf("%w: %s: %s; check archo links check and confirm a repair", ErrLaunchBlocked, links[0].Path, links[0].Reason)
+	}
+	return nil
+}
+
+type LinkRepairPlan struct {
+	Links   []*GameLink `json:"links"`
+	Removed []string    `json:"removed"`
+}
+
+func (a *App) PlanLinkRepair(all bool, include []string) (*LinkRepairPlan, error) {
+	links, err := a.InspectGameLinks()
+	if err != nil {
+		return nil, err
+	}
+	selected := map[string]bool{}
+	if !all {
+		e, err := a.Env()
+		if err != nil {
+			return nil, err
+		}
+		selected[env.PathKey(realOrAbs(filepath.Join(e.GameRoot, "Mods")))] = true
+		sources, err := a.Store.Sources(e.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, s := range sources {
+			if s.Kind == source.Local && s.Status != source.StatusRetired {
+				selected[env.PathKey(realOrAbs(s.Root))] = true
+			}
+		}
+	}
+	explicit := map[string]bool{}
+	for _, p := range include {
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			return nil, err
+		}
+		// Resolving the entry itself fails for a dangling link. Normalize its
+		// surviving parent instead, including Windows 8.3 and junction aliases.
+		explicit[env.PathKey(filepath.Join(realOrAbs(filepath.Dir(abs)), filepath.Base(abs)))] = true
+	}
+	matched := map[string]bool{}
+	plan := &LinkRepairPlan{Links: []*GameLink{}, Removed: []string{}}
+	for _, l := range links {
+		if !all && !selected[env.PathKey(l.Mods)] {
+			continue
+		}
+		if explicit[env.PathKey(l.Path)] {
+			matched[env.PathKey(l.Path)] = true
+		}
+		if l.Action == "include explicitly to remove link" && explicit[env.PathKey(l.Path)] {
+			l.Action = "remove link"
+			l.Evidence += "; explicitly included by player"
+		}
+		plan.Links = append(plan.Links, l)
+	}
+	for path := range explicit {
+		if !matched[path] {
+			return nil, fmt.Errorf("included link is not a prefixed entry in the selected game scope: %s", path)
+		}
+	}
+	return plan, nil
+}
+
+// ApplyLinkRepair uses the original preview identities. Preflight the complete
+// batch before removing anything; a changed or newly healthy link cancels it.
+func (a *App) ApplyLinkRepair(plan *LinkRepairPlan) error {
+	if plan == nil {
+		return fmt.Errorf("missing link repair preview")
+	}
+	locked := map[string]bool{}
+	var unlocks []func()
+	defer func() {
+		for i := len(unlocks) - 1; i >= 0; i-- {
+			unlocks[i]()
+		}
+	}()
+	for _, l := range plan.Links {
+		if l.Action == "remove link" && !locked[l.Mods] {
+			unlock, err := lockGameLinks(l.Mods)
+			if err != nil {
+				return err
+			}
+			unlocks = append(unlocks, unlock)
+			locked[l.Mods] = true
+		}
+	}
+	probe := a.probe()
+	for _, l := range plan.Links {
+		if l.Action == "remove link" {
+			if !managedLink(filepath.Base(l.Path)) && !packLink(filepath.Base(l.Path)) || filepath.Dir(l.Path) != l.Mods || l.snapshot == nil {
+				return fmt.Errorf("invalid repair entry: %s", l.Path)
+			}
+			if probe(l.Game) != nil {
+				return fmt.Errorf("game is running: %s; stop it before repairing links", l.Game)
+			}
+			fresh, err := source.ReadLink(l.Path)
+			if err != nil {
+				return err
+			}
+			if fresh.Kind != l.Kind || fresh.RawTarget != l.Target || fresh.State == source.TargetUnknown || l.Code == CodeLinkDangling && fresh.State != source.TargetMissing || envLink(filepath.Base(l.Path)) && fresh.State == source.TargetPresent {
+				return fmt.Errorf("link changed since preview: %s", l.Path)
+			}
+			if err := source.VerifyLink(l.snapshot); err != nil {
+				return err
+			}
+		}
+	}
+	if err := a.applyLinkRecoveries(plan); err != nil {
+		return err
+	}
+	for _, l := range plan.Links {
+		if l.Action == "remove link" {
+			if a.probe()(l.Game) != nil {
+				return fmt.Errorf("game is running: %s", l.Game)
+			}
+			state, _ := source.ProbeTarget(l.snapshot.Target)
+			if state == source.TargetUnknown || l.Code == CodeLinkDangling && state != source.TargetMissing || envLink(filepath.Base(l.Path)) && state == source.TargetPresent {
+				return fmt.Errorf("target changed since preview: %s", l.Path)
+			}
+			var id [16]byte
+			if _, err := rand.Read(id[:]); err != nil {
+				return err
+			}
+			op := hex.EncodeToString(id[:])
+			row := store.ManagedLink{Operation: op, Mods: l.Mods, Name: filepath.Base(l.Path), Kind: l.Kind, Instance: l.Instance, Pack: l.Pack, Target: l.snapshot.Target}
+			if err := a.Store.RecordLinkIntent([]store.ManagedLink{row}); err != nil {
+				return err
+			}
+			if err := source.RemoveLinkChecked(l.snapshot); err != nil {
+				return err
+			}
+			if err := a.Store.LinkPhase(op, "complete"); err != nil {
+				return err
+			}
+			plan.Removed = append(plan.Removed, l.Path)
+		}
+	}
+	a.modsCopies = nil
+	return nil
+}
+
+// RememberLinkRepair keeps filesystem identities on the server, never trusting a
+// round trip through GUI JSON to reconstruct permission to delete an entry.
+func (a *App) RememberLinkRepair(plan *LinkRepairPlan) string {
+	for token, previous := range a.linkRepairPreviews {
+		same := len(plan.Links) == len(previous.Links)
+		if same {
+			for i, l := range plan.Links {
+				p := previous.Links[i]
+				if l.Path != p.Path || l.Action != p.Action || l.Code != p.Code || !source.SameLink(l.snapshot, p.snapshot) {
+					same = false
+					break
+				}
+			}
+		}
+		if same {
+			return token
+		}
+	}
+	if len(a.linkRepairPreviews) >= 512 {
+		a.linkRepairPreviews = nil
+	}
+	if a.linkRepairPreviews == nil {
+		a.linkRepairPreviews = map[string]*LinkRepairPlan{}
+	}
+	a.linkRepairSerial++
+	token := fmt.Sprint(a.linkRepairSerial)
+	a.linkRepairPreviews[token] = plan
+	return token
+}
+
+func (a *App) ConfirmLinkRepair(token string) error {
+	plan := a.linkRepairPreviews[token]
+	delete(a.linkRepairPreviews, token)
+	if plan == nil {
+		return fmt.Errorf("link preview expired; reopen the needs page")
+	}
+	return a.ApplyLinkRepair(plan)
+}

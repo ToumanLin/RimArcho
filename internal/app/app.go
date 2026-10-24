@@ -37,12 +37,13 @@ tombstone_days = 90
 
 // App is one opened RimArcho data directory.
 type App struct {
-	Home   string
-	Store  *store.Store
-	Config Config
-	Now    func() time.Time
-	Rand   io.Reader
-	Loc    *time.Location // time zone for printed times
+	Home                string
+	Store               *store.Store
+	StartupLinkRecovery []*GameLink // read-only startup snapshot; Problems probes afresh
+	Config              Config
+	Now                 func() time.Time
+	Rand                io.Reader
+	Loc                 *time.Location // time zone for printed times
 	// EnvName overrides the current environment for one invocation (--env).
 	EnvName string
 	// Detect configures environment detection (tests point it at fixtures).
@@ -143,14 +144,16 @@ type App struct {
 	ixCache *Index
 	ixKey   string
 	// pngSnaps: the snapshots with PNG textures (贴图优化), until the snapshots change
-	pngSnaps    map[int64]bool
-	pngSnapsKey string
-	stCache     *LoadoutState
-	stKey       string
-	modsCopies  *modsCopiesCache
-	prCache     *ProblemSet
-	prKey       string
-	planPS      map[int64]*planProblems // PlanProblems, by plan
+	pngSnaps           map[int64]bool
+	pngSnapsKey        string
+	stCache            *LoadoutState
+	stKey              string
+	modsCopies         *modsCopiesCache
+	linkRepairPreviews map[string]*LinkRepairPlan
+	linkRepairSerial   uint64
+	prCache            *ProblemSet
+	prKey              string
+	planPS             map[int64]*planProblems // PlanProblems, by plan
 
 	logCache          *logCacheEntry
 	harmonyDir        string
@@ -181,6 +184,14 @@ func Open(home string) (*App, error) {
 	// explicit config path; unlike LockDir this never depends on LockBase.
 	if dirExists(a.PacksDir()) && st.Meta(directoryKey("packs")) == "" {
 		_ = st.SetMeta(directoryKey("packs"), a.PacksDir())
+	}
+	rows, err := st.ManagedLinks()
+	if err == nil {
+		a.StartupLinkRecovery, err = a.linkRecoveries(rows)
+	}
+	if err != nil {
+		st.Close()
+		return nil, err
 	}
 	return a, nil
 }

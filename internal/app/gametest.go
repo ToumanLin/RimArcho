@@ -13,6 +13,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/gametest"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
@@ -42,6 +43,7 @@ type TestRunCluster struct {
 }
 
 type TestRunReport struct {
+	Links         []*GameLink      `json:"links,omitempty"`
 	Env           string           `json:"env"`
 	Plan          string           `json:"plan"`
 	GameVersion   string           `json:"game_version"`
@@ -107,6 +109,13 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, er
 		return nil, fmt.Errorf("test run: no current plan (archo plan list)")
 	}
 	e := st.Ix.Env
+	links, err := a.CheckGameLinks(modsDir(st.Ix))
+	if err != nil {
+		return nil, err
+	}
+	if len(links) > 0 {
+		return &TestRunReport{Env: e.Name, Plan: PlanRef(st.Plan), GameVersion: e.GameVersion, Status: "links-blocked", Links: links, Counts: map[string]int{}, Clusters: []TestRunCluster{}}, nil
+	}
 	base := filepath.Join(a.Home, "tests", e.ID)
 	data := filepath.Join(base, "userdata")
 	runs := filepath.Join(base, "runs")
@@ -179,7 +188,7 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 		}
 		for _, f := range files {
 			if f.IsDir() || !strings.EqualFold(filepath.Ext(f.Name()), ".xml") ||
-				strings.EqualFold(f.Name(), "ModsConfig.xml") || strings.EqualFold(f.Name(), "Knowledge.xml") {
+				strings.EqualFold(f.Name(), "ModsConfig.xml") || strings.EqualFold(f.Name(), "Knowledge.xml") || gametest.PreferenceFile(f.Name()) {
 				continue
 			}
 			dst := filepath.Join(cfg, f.Name())
@@ -286,8 +295,13 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		return err
 	}
 	for _, lc := range rep.Clusters {
-		r.Counts[lc.Class]++
-		if logs.Informational(lc.Class) {
+		class := lc.Class
+		settings := gametest.SettingsError(lc.First)
+		if settings {
+			class = gametest.ClassSettings
+		}
+		r.Counts[class]++
+		if logs.Informational(class) {
 			continue
 		}
 		r.ClustersTotal++
@@ -295,13 +309,18 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 			continue
 		}
 		mods := []string{}
-		for _, at := range lc.Attr {
-			if m := st.Ix.ByID[at.Instance]; m != nil && !slices.Contains(mods, m.DisplayName()) {
-				mods = append(mods, m.DisplayName())
+		confidence := lc.Confidence
+		if settings {
+			confidence = finding.Certain
+		} else {
+			for _, at := range lc.Attr {
+				if m := st.Ix.ByID[at.Instance]; m != nil && !slices.Contains(mods, m.DisplayName()) {
+					mods = append(mods, m.DisplayName())
+				}
 			}
 		}
 		message, _, _ := strings.Cut(lc.First.Message, "\n")
-		r.Clusters = append(r.Clusters, TestRunCluster{Class: lc.Class, Message: strings.TrimSuffix(message, "\r"), Count: lc.Count, Mods: mods, Confidence: lc.Confidence})
+		r.Clusters = append(r.Clusters, TestRunCluster{Class: class, Message: strings.TrimSuffix(message, "\r"), Count: lc.Count, Mods: mods, Confidence: confidence})
 	}
 	return nil
 }

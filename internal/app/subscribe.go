@@ -44,6 +44,7 @@ type SubscribeItem struct {
 	From, To, Result      string
 	Record                *subscribe.Record
 	UsedBy                []string
+	Links                 *LinkLifecyclePlan
 }
 
 type subscriptionCacheEntry struct {
@@ -446,6 +447,10 @@ func (a *App) RemoveSubscriptions(refs []string, dryRun bool) (*SubscribeOp, err
 	op := &SubscribeOp{Action: "remove", DryRun: dryRun}
 	for _, s := range ss {
 		it := subscriptionItem(s)
+		it.Links, err = a.PlanIncomingLinks(s.Folder, "")
+		if err != nil {
+			return nil, err
+		}
 		if it.UsedBy, err = a.usedBy(st, s.Mod.ID); err != nil {
 			return nil, err
 		}
@@ -458,7 +463,13 @@ func (a *App) RemoveSubscriptions(refs []string, dryRun bool) (*SubscribeOp, err
 		return op, nil
 	}
 	for i := range op.Items {
-		if err := a.ToTrash(op.Items[i].Folder); err != nil {
+		if err := a.withIncomingLinks(op.Items[i].Folder, "", func() error {
+			if err := a.recycleTarget(op.Items[i].Folder); err != nil {
+				return err
+			}
+			_, err := a.Scan(false)
+			return err
+		}); err != nil {
 			_, scanErr := a.Scan(false)
 			return op, errors.Join(err, scanErr)
 		}

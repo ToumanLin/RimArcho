@@ -165,7 +165,16 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 			continue
 		}
 		if envLink(name) && source.IsLink(filepath.Join(mods, name)) {
-			continue // another game's local mod stays installed across plan changes
+			l, err := source.ReadLink(filepath.Join(mods, name))
+			if err != nil || l.State != source.TargetPresent || (l.Kind != "junction" && l.Kind != "symlink") {
+				return "", nil, nil, fmt.Errorf("unhealthy environment link: %s; inspect and confirm repair with archo links repair --dry-run", filepath.Join(mods, name))
+			}
+			for key, m := range want {
+				if sameDir(filepath.Join(mods, name), m.RealPath) {
+					have[key] = true
+				}
+			}
+			continue // healthy local mods stay installed across plan changes
 		}
 		p := filepath.Join(mods, name)
 		if !source.IsLink(p) {

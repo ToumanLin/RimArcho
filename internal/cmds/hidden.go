@@ -32,6 +32,9 @@ func fileOpDoc(c *Ctx, a *Args, name string, f func(ref string, dryRun bool) (*a
 		head = "dry run, nothing changed: would be " + head
 	}
 	d, root := render.New(head)
+	for _, line := range op.Links.Lines() {
+		root.KV("affected link", line)
+	}
 	switch op.Op {
 	case "rename":
 		root.KV("from", op.Path)

@@ -3,7 +3,6 @@
 package source
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -34,8 +33,37 @@ func CreateLink(link, target string) error {
 
 // RemoveLink deletes a symbolic link itself, never its target.
 func RemoveLink(link string) error {
-	if !IsLink(link) {
-		return fmt.Errorf("%s is not a link; refusing to delete it", link)
+	l, err := ReadLink(link)
+	if err != nil {
+		return err
 	}
-	return os.Remove(link)
+	return RemoveLinkChecked(l)
+}
+
+func rawLink(path string) (string, string, error) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return "unknown", "", err
+	}
+	if fi.Mode()&os.ModeSymlink == 0 {
+		return "plain", "", nil
+	}
+	target, err := os.Readlink(path)
+	return "symlink", target, err
+}
+
+func removeLinkChecked(l *LinkInfo) error {
+	if err := l.verify(); err != nil {
+		return err
+	}
+	root, err := os.OpenRoot(l.physicalParent)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if err := l.verify(); err != nil {
+		return err
+	}
+	// unlinkat cannot remove a real directory, including one swapped in after verify.
+	return unlinkLink(root, filepath.Base(l.Path))
 }

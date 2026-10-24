@@ -292,6 +292,8 @@ next:
 
 ### 5.2 工具表
 
+链接健康工具：`check_links` 为只读，映射 `archo links check [--all] --json`；`repair_links` 标记 destructive，`dry_run=true` 只预览，执行必须明确 `confirm=true`，无归属凭据的链接另须 `include` 完整路径列表。CLI 对应 `links repair [--all] --dry-run` / `--yes [--include <链接路径>…]`，也支持 `--json`。不带 `--all` 时检查当前游戏及其 local 来源；输出完整路径、目标、原因、凭据和动作。断链/检查失败令 check 返回退出码 1。动作边界见 [08 §3](08-启动与整合包.md#3-链接部署)。
+
 注解遵循 MCP 规范，是否放行由外部 harness 决定；Archo 按 09 §2.2 分档。`openWorldHint` 为 true 的：`get_description`（可能访问 Steam 公开 API）、`exchange_list`（读取 Steam 合集）、`maintenance`（下载社区数据）；其余都是 false。
 
 | 工具 | 对应命令 | readOnlyHint | destructiveHint |

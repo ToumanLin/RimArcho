@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/gametest"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -51,6 +52,9 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	}
 	d, root := render.New("test run: " + r.Plan + "  env:" + r.Env)
 	root.KV("status", r.Status)
+	for _, l := range r.Links {
+		root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.Reason)
+	}
 	root.KV("game", r.GameVersion)
 	root.KV("load", fmt.Sprintf("%.1fs (total %.1fs)", r.LoadSeconds, r.TotalSeconds))
 	root.KV("peak memory", fmt.Sprintf("%d MB", r.PeakMemoryMB))
@@ -62,6 +66,10 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	clusters := root.Section(fmt.Sprintf("error clusters: %d", r.ClustersTotal))
 	for _, cluster := range r.Clusters {
 		n := clusters.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+		if cluster.Class == gametest.ClassSettings {
+			n.KV("source", "game preferences")
+			continue
+		}
 		mods := "no mod identified"
 		if len(cluster.Mods) > 0 {
 			mods = strings.Join(cluster.Mods, ", ")

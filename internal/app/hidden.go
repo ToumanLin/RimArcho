@@ -93,6 +93,7 @@ type FileOp struct {
 	// Op "trash": the plans that use the copy (every environment of this game). The
 	// player's word goes: it still goes, and they show it as missing (06 §2.9).
 	UsedBy []string
+	Links  *LinkLifecyclePlan
 }
 
 func aboutDisabledPath(m *store.Mod) (string, error) {
@@ -246,13 +247,24 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 		return nil, fmt.Errorf("%w: %s is not inside its source folder %s", ErrNotTrashable, real, root)
 	}
 	op := &FileOp{Op: "trash", Path: real, DryRun: dryRun, UsedBy: ps}
+	op.Links, err = a.PlanIncomingLinks(real, "")
+	if err != nil {
+		return nil, err
+	}
 	if dryRun {
 		return op, nil
 	}
-	if err := a.ToTrash(real); err != nil {
-		return nil, err
+	err = a.withIncomingLinks(real, "", func() error {
+		if err := a.recycleTarget(real); err != nil {
+			return err
+		}
+		var err error
+		op.Scan, err = a.Scan(false)
+		return err
+	})
+	if err == nil && op.Scan != nil {
+		op.Scan.GameLinks, err = a.InspectGameLinks()
 	}
-	op.Scan, err = a.Scan(false)
 	return op, err
 }
 

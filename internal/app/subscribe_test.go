@@ -228,8 +228,17 @@ func TestSubscribeRemove(t *testing.T) {
 	}
 	it := op.Items[0]
 	e.MustRun("enable", it.Ref)
+	game := secondGame(e, "SubscriptionIncoming")
+	e.MustRun("env", "add", "subscription-incoming", "--game", game)
+	incoming := filepath.Join(game, "Mods", "_Archo_env_"+it.ID)
+	if err := source.CreateLink(incoming, it.Folder); err != nil {
+		t.Fatal(err)
+	}
 	var trashed []string
 	e.App.TrashFunc = func(path string) error {
+		if source.IsLink(incoming) {
+			t.Fatal("subscription recycled before incoming link detached")
+		}
 		trashed = append(trashed, path)
 		dest := filepath.Join(e.Root, "fake-trash", filepath.Base(path))
 		e.MkdirAll(filepath.Dir(dest))
@@ -249,6 +258,9 @@ func TestSubscribeRemove(t *testing.T) {
 		t.Fatalf("nested folder trash: %v", err)
 	}
 	out := e.MustRun("subscribe", "remove", it.Ref)
+	if source.IsLink(incoming) {
+		t.Fatal("subscription removal left incoming link")
+	}
 	if !strings.Contains(out, "plan:default") || !strings.Contains(out, "recycle bin") || len(trashed) != 1 || filepath.Base(trashed[0]) != filepath.Base(it.Folder) {
 		t.Fatalf("remove: %s %v", out, trashed)
 	}

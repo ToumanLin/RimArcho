@@ -185,10 +185,12 @@ async function exportPack(list) {
   }
 }
 
-function removePack() {
+async function removePack() {
   if (!P) return;
   const name = P.name;
-  pop.confirm(T("move to the recycle bin"), [Tf("pack %s goes to the recycle bin; you can restore it from there", name)], T("move to the recycle bin"), async () => {
+  let links;
+  try { links = await api.PackRemovePreview(name); } catch (e) { return say("fail", errText(e)); }
+  pop.confirm(T("move to the recycle bin"), [Tf("pack %s goes to the recycle bin; you can restore it from there", name), ...(links || [])], T("move to the recycle bin"), async () => {
     try { say("ok", await api.PackRemove(name)); } catch (e) { return say("fail", errText(e)); }
     await ui.reload();
     ui.go("packs");

@@ -68,6 +68,9 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 		return nil, err
 	}
 	e := st.Ix.Env
+	if err := a.refuseUnhealthyLinks(modsDir(st.Ix)); err != nil {
+		return nil, err
+	}
 	if e.UserDataRoot == "" {
 		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
 	}

@@ -831,7 +831,7 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool) (*SaveResul
 		if err := a.checkRoots(mods); err != nil {
 			return nil, err
 		}
-		if err := applyLinks(mods, links); err != nil {
+		if err := a.applyLinks(mods, links); err != nil {
 			return nil, err
 		}
 	}

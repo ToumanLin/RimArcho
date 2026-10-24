@@ -45,6 +45,7 @@ type WorkshopItem struct {
 	// unsubscribe: the plans that use it. The player's word goes: it still goes, and they
 	// show it as missing (06 §2.9).
 	UsedBy []string
+	Links  *LinkLifecyclePlan
 }
 
 // SteamUnavailable is ErrSteamUnavailable with why, and the Workshop pages to open instead.
@@ -61,7 +62,7 @@ func (e *SteamUnavailable) Unwrap() error { return ErrSteamUnavailable }
 // Workshop subscribes to (action "subscribe") or unsubscribes from ("unsubscribe") the
 // Workshop items of refs. Unsubscribing makes Steam delete the item's folder, so it is
 // refused while the game runs; the plans that use it (UsedBy) show it missing afterwards.
-func (a *App) Workshop(action string, refs []string, dryRun bool) (*WorkshopOp, error) {
+func (a *App) Workshop(action string, refs []string, dryRun bool) (result *WorkshopOp, workshopErr error) {
 	if action != steamworks.Subscribe && action != steamworks.Unsubscribe {
 		return nil, fmt.Errorf("unknown action %s: want subscribe or unsubscribe", action)
 	}
@@ -94,6 +95,10 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (*WorkshopOp, 
 			}
 			if m.Status == identity.Live {
 				it.Folder = st.Ix.ModDir(m)
+				it.Links, err = a.PlanIncomingLinks(it.Folder, "")
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 		op.Items = append(op.Items, it)
@@ -107,9 +112,25 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (*WorkshopOp, 
 		return op, nil
 	}
 	ids := make([]string, len(op.Items))
+	var detached []*LinkLifecyclePlan
 	for k, it := range op.Items {
 		ids[k] = it.WorkshopID
+		if it.Links != nil {
+			detached = append(detached, it.Links)
+		}
 	}
+	batch := joinLinkPlans(detached)
+	if len(detached) > 0 {
+		if err := a.beginLinkLifecycle(batch); err != nil {
+			return nil, err
+		}
+	}
+	committed := false
+	defer func() {
+		if !committed && len(detached) > 0 {
+			workshopErr = a.abortLinkLifecycle(batch, workshopErr)
+		}
+	}()
 	rep, err := a.runSteam(action, ids)
 	if err != nil {
 		return nil, a.unavailable(err, op.Items)
@@ -133,6 +154,17 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (*WorkshopOp, 
 	}
 	if len(failed) > 0 {
 		return op, fmt.Errorf("Steam did not confirm: %s", strings.Join(failed, ", "))
+	}
+	if len(detached) > 0 {
+		if _, err := a.Scan(false); err != nil {
+			return op, err
+		}
+	}
+	committed = true
+	if len(detached) > 0 {
+		if err := a.finishLinkLifecycle(batch); err != nil {
+			return op, err
+		}
 	}
 	return op, nil
 }

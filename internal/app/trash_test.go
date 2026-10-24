@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 // H8: the recycle bin's entry refuses any path outside the allow-list of 08 §7, whoever
@@ -47,6 +48,13 @@ func TestTrashAllowList(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(e.Root, "Elsewhere", "Stuff")); err != nil {
 		t.Fatal("a refused folder was touched")
+	}
+	// A foreign incoming link blocks the target too, even on the trash allow-list.
+	if err := e.App.ToTrash(target); err == nil {
+		t.Fatal("trashed a foreign link's target")
+	}
+	if err := source.RemoveLink(link); err != nil {
+		t.Fatal(err)
 	}
 
 	allowed := map[string]string{

@@ -4,6 +4,20 @@ package view
 // item's bold line and its explanation (06 §2.4, §5).
 func init() {
 	Register(map[string]string{
+		"game mod links need attention":                    "游戏的 Mod 链接需要处理",
+		"remove the broken or wrong links":                 "移除断链和错误链接",
+		"repair the previewed links":                       "修复预览中的链接",
+		"press R again to apply the previewed link repair": "再按 R 执行预览中的链接修复",
+		"applied the previewed link repair":                "已执行预览中的链接修复",
+		"recover link":                                     "恢复链接",
+		"complete recovery":                                "完成链接恢复记录",
+		"include unproven link: %s":                        "明确纳入归属未证实的链接：%s",
+		"press R again to remove the previewed links":      "再按 R 移除预览中的链接",
+		"press %s again to remove the previewed links":     "再按 %s 移除预览中的链接",
+		"removed the previewed links":                      "已移除预览中的链接",
+		"keep":                                             "保留",
+		"remove link":                                      "移除链接本身",
+		"include explicitly to remove link":                "归属未证实；须明确纳入后才移除",
 		// sections
 		"breaks the game":          "会让游戏出错",
 		"errors from the last run": "上次运行的报错",

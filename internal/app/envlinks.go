@@ -191,14 +191,14 @@ func (a *App) prepareEnvLinks(e *env.Environment) error {
 	rollback := func(cause error) error {
 		for i := len(added) - 1; i >= 0; i-- {
 			p := filepath.Join(modsDir, added[i].Name)
-			if err := source.RemoveLink(p); err != nil {
+			if err := a.applyLinks(modsDir, []LinkChange{{Op: "remove", Name: filepath.Base(p)}}); err != nil {
 				cause = errors.Join(cause, err)
 			}
 		}
 		return cause
 	}
 	for _, c := range links {
-		if err := applyLinks(modsDir, []LinkChange{c}); err != nil {
+		if err := a.applyLinks(modsDir, []LinkChange{c}); err != nil {
 			return rollback(err)
 		}
 		added = append(added, c)
