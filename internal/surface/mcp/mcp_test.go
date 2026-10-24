@@ -59,6 +59,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
 		"read_source": "ro", "edit_loadout": "write", "copy_local": "write", "save_loadout": "destructive", "add_rule": "write",
 		"get_description": "ro", "set_player_data": "write",
+		"test_run": "write",
 		// 05 §1.2: the player actions that only had CLI commands.
 		"manage_rules": "write", "ignore_problem": "write", "scan": "write", "exchange_list": "write",
 		"manage_packs": "destructive", "resolve_identity": "destructive", "manage_hidden": "destructive", "maintenance": "destructive",

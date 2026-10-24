@@ -41,6 +41,8 @@ func TestCatalogAndArgvFor(t *testing.T) {
 		{"get_patches", `{"failed":true,"mod":"pkg:a.b"}`, []string{"patches", "--mod", "pkg:a.b", "--failed"}},
 		{"read_source", `{"search":"AllComps.Remove(","in":["#a1"]}`, []string{"source", "search", "AllComps.Remove(", "--in", "#a1", "--budget", "10"}},
 		{"status", ``, []string{"status"}},
+		{"test_run", ``, []string{"test", "run", "--json"}},
+		{"test_run", `{"plan":"small","map":true,"timeout_seconds":30}`, []string{"test", "run", "small", "--map", "--timeout", "30s", "--json"}},
 	}
 	for _, c := range cases {
 		got, err := mcp.ArgvFor(c.tool, []byte(c.args))

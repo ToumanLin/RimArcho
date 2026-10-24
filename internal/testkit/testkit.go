@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -105,6 +106,7 @@ func (e *Env) Open() {
 		e.Launched = append(e.Launched, strings.Join(append([]string{exe}, args...), " "))
 		return nil
 	}
+	a.TestGameStart = func(*exec.Cmd) error { return fmt.Errorf("test game starter not configured") }
 	// The Def/Patch analysis runs in-process instead of an `archo analyze` child.
 	a.AnalyzeRunner = app.InProcessAnalyze(a)
 	e.App = a

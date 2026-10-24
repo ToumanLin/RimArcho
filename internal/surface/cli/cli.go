@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -80,8 +81,15 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		}
 		return cmds.ExitOK
 	}
-	out, code := cmds.Execute(ap, rest)
-	if code == cmds.ExitError || code == cmds.ExitUsage {
+	ctx := context.Background()
+	if len(rest) >= 2 && rest[0] == "test" && rest[1] == "run" {
+		var stop context.CancelFunc
+		ctx, stop = signal.NotifyContext(ctx, os.Interrupt)
+		defer stop()
+	}
+	out, code := cmds.ExecuteContext(ctx, ap, rest)
+	// A failed test outcome still prints its report to stdout.
+	if code == cmds.ExitError && strings.HasPrefix(out, "error: ") || code == cmds.ExitUsage {
 		io.WriteString(stderr, out)
 	} else {
 		io.WriteString(stdout, out)
