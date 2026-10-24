@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
@@ -229,7 +230,7 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *
 	}
 	failures := map[string]string{}
 	for _, m := range workshopFailure.FindAllStringSubmatch(out, -1) {
-		failures[m[1]] = m[2]
+		failures[m[1]] = (&DownloadError{Kind: errorKind(strings.ToLower(m[2]))}).Why()
 		delete(okIDs, m[1])
 	}
 	var errs []error
@@ -328,6 +329,8 @@ func (a *App) replaceWorkshopImport(from, target string) error {
 }
 
 func (a *App) runWorkshopSteamCMD(exe string, args []string, console bool) (string, error) {
+	unlock := accounts.Lock(exe)
+	defer unlock()
 	if !console {
 		return a.steamCMD().run(exe, args)
 	}

@@ -27,6 +27,7 @@ import (
 
 // The steps, in the order they run. 01 §4's 卸载 column names them.
 const (
+	UnAccounts   = "accounts"   // forget sessions before removing tools or data
 	UnLinks      = "links"      // _Archo_ and !ArchoPack_ links in each game's Mods/
 	UnModsConfig = "modsconfig" // ModsConfig.xml in each user data folder RimArcho wrote
 	UnTextures   = "textures"   // the DDS RimArcho wrote next to mods' PNGs (贴图优化)
@@ -41,7 +42,7 @@ const (
 )
 
 // UninstallSteps lists every step in order.
-var UninstallSteps = []string{UnLinks, UnModsConfig, UnTextures, UnLocked, UnMonitor, UnPacks, UnSaves, UnGames, UnSteamCMD, UnData, UnProgram}
+var UninstallSteps = []string{UnAccounts, UnLinks, UnModsConfig, UnTextures, UnLocked, UnMonitor, UnPacks, UnSaves, UnGames, UnSteamCMD, UnData, UnProgram}
 
 // What happens to an item.
 const (
@@ -226,6 +227,7 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 			p.Steps = append(p.Steps, &UninstallStep{Key: key, Items: items})
 		}
 	}
+	add(UnAccounts, []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。"}})
 
 	// Where kept lock library copies go: a game that is not itself removed.
 	var lockEnv *env.Environment
@@ -792,6 +794,9 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 			if err := a.uninstallItem(s.Key, it); err != nil {
 				it.Err = err.Error()
 				failed = true
+				if s.Key == UnAccounts {
+					return p, errors.New("忘记账户会话失败；已保留工具和数据，请关闭登录窗口后重试")
+				}
 			} else if it.Do != DoKeep && it.Do != DoLeave {
 				it.Done = true
 			}
@@ -845,6 +850,8 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 // uninstallItem carries out one item.
 func (a *App) uninstallItem(step string, it *UninstallItem) error {
 	switch it.Do {
+	case "forget-accounts":
+		return a.ForgetAccounts()
 	case DoKeep, DoLeave:
 		return nil
 	case DoUnlink:

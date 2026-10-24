@@ -192,7 +192,7 @@ func TestSubscribeWorkshopFallback(t *testing.T) {
 				return nil
 			}), nil
 		}
-		if _, err := e.App.SubscribeWorkshop([]string{"8100"}, true, false); err == nil || !strings.Contains(err.Error(), "No subscription") {
+		if _, err := e.App.SubscribeWorkshop([]string{"8100"}, true, false); err == nil || !strings.Contains(err.Error(), "does not own RimWorld") || strings.Contains(err.Error(), "No subscription") {
 			t.Fatalf("failure: %v", err)
 		}
 		ss, _ := e.App.Folders()
