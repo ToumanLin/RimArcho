@@ -270,7 +270,7 @@ func TestFilesSearch(t *testing.T) {
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.findme")
 	scanNow(t, e)
 	out := e.MustRun("files", "search", "needle_")
-	if !strings.Contains(out, "1.6/Defs/V.xml:1") || strings.Contains(out, "Needle_Old") {
+	if !strings.Contains(out, "1.6/Defs/V.xml") || !strings.Contains(out, "1  in ThingDef/Needle_Current") || strings.Contains(out, "Needle_Old") {
 		t.Fatalf("files search:\n%s", out)
 	}
 }

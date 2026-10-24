@@ -51,7 +51,7 @@ func TestFilesSearchLanguages(t *testing.T) {
 	e.AddEnv(false)
 	e.MustRun("scan")
 	out := e.MustRun("files", "search", "Needle")
-	if !strings.Contains(out, ": 1 matches") || strings.Contains(out, "Languages") || !strings.Contains(out, "Defs/Thing.xml:1") {
+	if !strings.Contains(out, ": 1 matches") || strings.Contains(out, "Languages") || !strings.Contains(out, "Defs/Thing.xml") || !strings.Contains(out, "1  <defName>Needle</defName>") {
 		t.Fatalf("Languages excluded, Defs match kept:\n%s", out)
 	}
 	ix, _ := e.App.Index()

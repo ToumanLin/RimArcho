@@ -67,3 +67,53 @@ func TestClipOutput(t *testing.T) {
 		t.Errorf("clipped to %d bytes, tail %q", len(got), got[len(got)-150:])
 	}
 }
+
+func TestFilesSchemaAndArgv(t *testing.T) {
+	var search *mcp.ToolDoc
+	for _, tool := range mcp.Catalog() {
+		if tool.Name == "search_files" {
+			search = &tool
+			break
+		}
+	}
+	if search == nil || !search.ReadOnly {
+		t.Fatal("search_files must remain read-only")
+	}
+	names := map[string]string{}
+	for _, p := range search.Params {
+		names[p.Name] = p.Type
+	}
+	for _, name := range []string{"pattern", "mod", "kind", "game", "mode", "game_version"} {
+		if names[name] != "string" {
+			t.Errorf("%s: %s", name, names[name])
+		}
+	}
+	for _, name := range []string{"def", "regex", "word", "case_sensitive", "languages", "all_versions", "all"} {
+		if names[name] != "boolean" {
+			t.Errorf("%s: %s", name, names[name])
+		}
+	}
+	for _, name := range []string{"mods", "lang"} {
+		if !strings.Contains(names[name], "string") {
+			t.Errorf("%s: %s", name, names[name])
+		}
+	}
+	for _, name := range []string{"page", "limit", "per_file"} {
+		if names[name] != "integer" {
+			t.Errorf("%s: %s", name, names[name])
+		}
+	}
+	got, err := mcp.ArgvFor("search_files", []byte(`{"pattern":"Target","mod":"#a","mods":["#b","#c"],"def":true,"regex":true,"word":true,"case_sensitive":true,"kind":"all","languages":true,"lang":["English","French"],"all_versions":true,"game":"without","mode":"files","page":2,"limit":7,"per_file":3,"all":true,"game_version":"1.5"}`))
+	want := []string{"files", "search", "--mod", "#a", "--mod", "#b", "--mod", "#c", "--def", "--regex", "--word", "--case", "--kind", "all", "--languages", "--lang", "English", "--lang", "French", "--all-versions", "--game", "without", "--mode", "files", "--page", "2", "--limit", "7", "--per-file", "3", "--all", "--game-version", "1.5", "Target"}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q (%v), want %q", got, err, want)
+	}
+	if got := mcp.FilesArgv(mcp.FilesIn{Pattern: "--def"}); !reflect.DeepEqual(got, []string{"files", "search", "--", "--def"}) {
+		t.Fatal(got)
+	}
+	for _, text := range []string{"exact copies", "load order", "Defs/Patches/About", "translations are excluded", "def=true", "per_file", "24 KB", "Gun_Revolver"} {
+		if !strings.Contains(search.Description, text) {
+			t.Errorf("description missing %q", text)
+		}
+	}
+}
