@@ -119,11 +119,17 @@ func (l *LoversLab) request(ctx context.Context, a siteAction) (*http.Response, 
 	l.next = time.Now().Add(time.Second)
 	if err != nil {
 		if resp != nil {
-			if target, e := resp.Location(); e == nil && strings.Contains(strings.ToLower(target.Path), "login") {
-				_ = l.session.SetStatus("需登录", "")
+			if target, e := resp.Location(); e == nil {
+				if strings.Contains(strings.ToLower(target.Path), "login") && accounts.SiteHost(target.Hostname()) {
+					_ = l.session.SetStatus("需登录", "")
+					return nil, authError("需登录", "站点要求重新登录")
+				}
+				if !fileURL(target) {
+					return nil, authError("需浏览器验证", "站点跳转暂不支持（下载主机尚未确认）")
+				}
 			}
 		}
-		return nil, authError("需登录", "会话请求未完成或转到登录页")
+		return nil, authError("需浏览器验证", "会话请求未完成，请稍后重试")
 	}
 	if resp.StatusCode == 429 {
 		if secs, e := time.ParseDuration(resp.Header.Get("Retry-After") + "s"); e == nil {
@@ -342,6 +348,12 @@ func (l *LoversLab) Verify(ctx context.Context) error {
 	}
 	low := strings.ToLower(string(b))
 	state := "需登录"
+	if resp.StatusCode != 200 {
+		state = "需浏览器验证"
+		if target, e := resp.Location(); e == nil && accounts.SiteHost(target.Hostname()) && strings.Contains(strings.ToLower(target.Path), "login") {
+			state = "需登录"
+		}
+	}
 	if strings.Contains(low, "cf-chl-") || strings.Contains(low, "just a moment") || strings.Contains(low, "captcha") {
 		state = "需浏览器验证"
 	} else if resp.StatusCode == 200 && strings.Contains(low, "do=logout") {

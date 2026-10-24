@@ -149,6 +149,20 @@ func TestLoversLabFileAgreementDownloadAndFallback(t *testing.T) {
 				t.Fatal("Retry-After ignored")
 			}
 		}
+		if value == "403" || value == "login" || value == "challenge" {
+			l.next = time.Time{}
+			before := calls
+			if err = l.Verify(ctx); err == nil || calls != before+1 {
+				t.Fatal("verification must make one GET", value, err)
+			}
+			want := "需浏览器验证"
+			if value == "login" {
+				want = "需登录"
+			}
+			if session.Status().State != want {
+				t.Fatal("verification misclassified access denial", value, session.Status().State)
+			}
+		}
 	}
 	mode = "files"
 	l.next = time.Time{}
