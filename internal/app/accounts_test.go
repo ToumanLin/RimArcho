@@ -197,3 +197,30 @@ func TestUninstallForgetFailurePreservesToolsAndData(t *testing.T) {
 		t.Fatal("database removed after forget failure", err)
 	}
 }
+
+func TestSteamLoginRequiresNameButVerifyAllowsAnonymous(t *testing.T) {
+	e := testkit.New(t)
+	e.App.SteamCMDNoPath = true
+	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "offline fixture")
+	calls := 0
+	e.App.SteamCMDStart = func(_ string, args []string, _ bool) (app.SteamCMDProc, error) {
+		calls++
+		if !reflect.DeepEqual(args, []string{"+login", "anonymous", "+quit"}) {
+			t.Fatal(args)
+		}
+		return accountProc{func() error { return nil }}, nil
+	}
+	for _, name := range []string{"", "anonymous", "ANONYMOUS"} {
+		e.MustRun("config", "set", "steamcmd.account", name)
+		if err := e.App.SteamAccountAction("login"); err == nil || err.Error() != "先填写 Steam 账户名" {
+			t.Fatal(err)
+		}
+	}
+	if calls != 0 {
+		t.Fatal("anonymous login launched")
+	}
+	_ = e.App.SteamAccountAction("verify")
+	if calls != 1 {
+		t.Fatal("anonymous verification was blocked")
+	}
+}

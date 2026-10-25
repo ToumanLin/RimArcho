@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
@@ -26,6 +27,21 @@ import (
 
 // Run executes argv (without the program name) and returns the exit code.
 func Run(argv []string, stdout, stderr io.Writer) int {
+	if len(argv) >= 2 && argv[0] == "account" && argv[1] == "login-check" {
+		if len(argv) != 3 || argv[2] != "loverslab" {
+			fmt.Fprintln(stderr, "usage: archo account login-check loverslab")
+			return cmds.ExitUsage
+		}
+		log, err := accounts.LoginCheck()
+		fmt.Fprintln(stdout, "Login helper log:", log)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return cmds.ExitError
+		}
+		fmt.Fprintln(stdout, "WebView2 window check completed")
+		return cmds.ExitOK
+	}
+
 	if len(argv) >= 1 && argv[0] == "steam-worker" {
 		// The short-lived Steam client call (06 §2.9, 08 §10); no data directory.
 		return steamWorker(argv[1:], stdout)

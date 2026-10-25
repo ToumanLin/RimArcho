@@ -1254,7 +1254,7 @@ async function refreshSettingTasks(values = false) {
       const actions = JSON.stringify(it.actions || []);
       if (row.dataset.settingActions !== actions) {
         row.querySelectorAll("[data-setting-action]").forEach(b => b.remove());
-        renderSettingActions(row.querySelector(".r"), it.actions, settingRunner(settings));
+        renderSettingActions(row.querySelector(".r"), it.actions, settingRunner(settings), it);
         row.dataset.settingActions = actions;
       }
     }
@@ -1343,7 +1343,7 @@ function settingRunner(again) {
     try {
       const out = argv[0] === "account" ? await api.AccountAction(argv[1], argv[2]) : await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
-    } catch (e) { say("fail", errText(e)); }
+    } catch (e) { if (S.screen === screen && S.screenSeq === epoch) say("fail", errText(e)); return; }
     if (S.screen !== screen || S.screenSeq !== epoch) return;
     if (background) return refreshSettingTasks(true);
     if (after) return after();
@@ -1411,7 +1411,7 @@ function renderGroups(w, groups, again) {
       } else {
         right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
       }
-      renderSettingActions(right, it.actions, run);
+      renderSettingActions(right, it.actions, run, it);
       row.append(left, right);
       card.append(row);
     }
@@ -1419,7 +1419,7 @@ function renderGroups(w, groups, again) {
   }
 }
 
-function renderSettingActions(right, actions, run) {
+function renderSettingActions(right, actions, run, item) {
   for (const a of actions || []) {
     // 卸载 RimArcho is its own page with the plan; every other action is a command
     if (a.argv[0] === "uninstall") {
@@ -1435,7 +1435,31 @@ function renderSettingActions(right, actions, run) {
       if (a.task) { b.disabled = true; b.textContent = a.pending; }
       return run(a.argv, "", null, !!a.task);
     };
-    const b = button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, submit) : submit(), "", a.argv.join(" "));
+    const b = button(a.label, "", async () => {
+      if (a.argv.join(" ") === "account steamcmd login") {
+        const input = right.querySelector("input");
+        const account = input?.value.trim() || "";
+        if (!account || /^(anonymous|匿名)$/i.test(account)) {
+          input?.focus(); say("fail", "先填写 Steam 账户名"); return;
+        }
+        // A name entered immediately before login must become the selected account.
+        if (account !== (item?.editValue || "")) {
+          try { await api.ApplySetting(item.argv, account); }
+          catch (e) { say("fail", errText(e)); return; }
+        }
+      }
+      if (a.argv[0] === "deps" && a.argv[1] === "install") {
+        b.disabled = true;
+        try {
+          const offer = await api.ToolInstallOffer(a.argv[2]);
+          pop.confirm(a.label, [a.confirm, "来源：" + offer.url, "目标文件夹：" + offer.dir,
+            offer.bytes > 0 ? "大小：" + offer.bytes + " 字节" : "大小未知"], a.label, submit);
+        } catch (e) { say("fail", errText(e)); }
+        finally { b.disabled = false; }
+        return;
+      }
+      if (a.confirm) pop.confirm(a.label, [a.confirm], a.label, submit); else submit();
+    }, "", a.argv.join(" "));
     b.dataset.settingAction = a.argv.join(" ");
     if (a.task) {
       b.dataset.settingTask = a.task;

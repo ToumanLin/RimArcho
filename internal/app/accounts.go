@@ -93,6 +93,9 @@ func (a *App) SteamAccountAction(action string) error {
 	args := []string{"+login", account}
 	switch action {
 	case "login":
+		if account == "anonymous" {
+			return errors.New("先填写 Steam 账户名")
+		}
 	case "verify":
 		args = append(args, "+quit")
 	case "logout":

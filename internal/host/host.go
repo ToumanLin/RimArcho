@@ -129,12 +129,19 @@ func (h *Host) Download() (string, error) {
 	return h.DownloadProgress(nil)
 }
 
-// DownloadProgress downloads and verifies the portable release, reporting bytes received.
-// It returns the downloaded copy even when another installation takes lookup priority.
-func (h *Host) DownloadProgress(progress func(done, total int64)) (string, error) {
+// Offer describes the latest portable release before the player confirms a download.
+type Offer struct {
+	URL    string
+	SHAURL string
+	Name   string
+	Tag    string
+	Bytes  int64
+}
+
+func (h *Host) Offer() (*Offer, error) {
 	var rel release
 	if err := h.getJSON(strings.TrimRight(h.API, "/")+"/repos/wezterm/wezterm/releases/latest", &rel); err != nil {
-		return "", fmt.Errorf("release lookup: %w", err)
+		return nil, fmt.Errorf("release lookup: %w", err)
 	}
 	var zipURL, shaURL, zipName string
 	var size int64
@@ -149,8 +156,19 @@ func (h *Host) DownloadProgress(progress func(done, total int64)) (string, error
 		}
 	}
 	if zipURL == "" || shaURL == "" {
-		return "", fmt.Errorf("release %s has no portable Windows zip with a .sha256", rel.Tag)
+		return nil, fmt.Errorf("release %s has no portable Windows zip with a .sha256", rel.Tag)
 	}
+	return &Offer{URL: zipURL, SHAURL: shaURL, Name: zipName, Tag: rel.Tag, Bytes: size}, nil
+}
+
+// DownloadProgress downloads and verifies the portable release, reporting bytes received.
+// It returns the downloaded copy even when another installation takes lookup priority.
+func (h *Host) DownloadProgress(progress func(done, total int64)) (string, error) {
+	offer, err := h.Offer()
+	if err != nil {
+		return "", err
+	}
+	zipURL, shaURL, zipName, size := offer.URL, offer.SHAURL, offer.Name, offer.Bytes
 	want, err := h.getSHA(shaURL)
 	if err != nil {
 		return "", fmt.Errorf("checksum: %w", err)
@@ -161,7 +179,7 @@ func (h *Host) DownloadProgress(progress func(done, total int64)) (string, error
 	}
 	tmp := filepath.Join(dest, zipName+".part")
 	defer os.Remove(tmp)
-	fmt.Fprintf(h.Out, "downloading %s (%s, %.0f MB)…\n", zipName, rel.Tag, float64(size)/(1<<20))
+	fmt.Fprintf(h.Out, "downloading %s (%s, %.0f MB)…\n", zipName, offer.Tag, float64(size)/(1<<20))
 	got, err := h.fetch(zipURL, tmp, progress)
 	if err != nil {
 		return "", err

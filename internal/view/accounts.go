@@ -20,9 +20,28 @@ func AccountGroup(a *app.App) SettingGroup {
 	if account == "anonymous" {
 		account = ""
 	}
-	steam := SettingItem{Label: "SteamCMD", Value: name + "；" + s.State, Edit: "text", EditValue: &account, Argv: []string{"config", "set", "steamcmd.account", "{}"},
-		Note: strings.Join([]string{s.Path, "来源：" + s.Source, "最后验证：" + a.FormatTime(s.Verified), "到期：由 Steam 管理，未知"}, "；"), NotePaths: []string{s.Path},
+	source := map[string]string{"own": "RimArcho 自带", "config": "设置", "path": "PATH", "program-files": "已安装程序"}[s.Source]
+	if source == "" {
+		source = s.Source
+	}
+	if source == "" {
+		source = "未找到"
+	}
+	verified := "从未"
+	if !s.Verified.IsZero() {
+		verified = a.FormatTime(s.Verified)
+	}
+	note := []string{s.State, "来源：" + source, "最后验证：" + verified, "到期：由 Steam 管理"}
+	if s.Path != "" {
+		note = append(note, s.Path)
+	}
+	if s.State == "匿名" {
+		name = ""
+	}
+	steam := SettingItem{Label: "SteamCMD", Value: name, Edit: "text", EditValue: &account, Argv: []string{"config", "set", "steamcmd.account", "{}"},
+		Note: strings.Join(note, "；"), NotePaths: []string{s.Path},
 		Actions: []SettingAction{action("steamcmd", "anonymous", "切换匿名", "")}}
+
 	if s.Managed {
 		steam.Actions = append(steam.Actions,
 			action("steamcmd", "login", "登录 / 重新登录", "打开 SteamCMD 自己的控制台。只传账户名；密码和 Guard 由你在窗口输入，完成后输入 quit 关闭。SteamCMD 会自行更新受管认证缓存。"),

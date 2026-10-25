@@ -567,13 +567,12 @@ func runSteamCMD(exe string, args []string) (string, error) {
 }
 
 func startSteamCMD(exe string, args []string, console bool) (SteamCMDProc, error) {
+	if console {
+		return startConsole(exe, args)
+	}
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
-	if console {
-		newConsole(cmd)
-	} else {
-		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	}
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
