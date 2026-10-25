@@ -616,6 +616,7 @@ func (t *logTail) lines() []string {
 
 // steamResult is what the log said: success, a known failure, or the last line.
 type steamResult struct {
+	login             steamLogin
 	success, loggedIn bool
 	err               *DownloadError
 	last              string
@@ -636,23 +637,17 @@ func (r *steamResult) read(line string) (DownloadProgress, bool) {
 	if r.err == nil && !r.success {
 		r.last = l
 	}
-	switch {
-	case strings.Contains(low, "logging in user") || strings.Contains(low, "connecting anonymously"):
-		switch {
-		case strings.Contains(low, "invalid password") || strings.Contains(low, "invalidpassword"):
-			r.err = &DownloadError{Kind: "password", Line: l}
-		case strings.Contains(low, "two-factor") || strings.Contains(low, "logon denied") || strings.Contains(low, "invalidauthcode") || strings.Contains(low, "steam guard"):
-			r.err = &DownloadError{Kind: "guard", Line: l}
-		case strings.Contains(low, "rate limit") || strings.Contains(low, "no connection") || strings.Contains(low, "timeout"):
-			r.err = &DownloadError{Kind: "network", Line: l}
-		case strings.Contains(low, "failed"):
-			r.err = &DownloadError{Kind: "login", Line: l}
-		case strings.HasSuffix(low, "ok"):
-			r.loggedIn = true
-		}
-		return DownloadProgress{State: "login", Line: l}, true
-	case strings.Contains(low, "waiting for user info") && strings.HasSuffix(low, "ok"):
+	loginProgress := r.login.read(l)
+	if loginProgress && r.login.err != nil {
+		r.err = r.login.err
+	}
+	if r.login.ready {
 		r.loggedIn = true
+	}
+	if loginProgress {
+		return DownloadProgress{State: "login", Line: l}, true
+	}
+	switch {
 	case strings.HasPrefix(low, "success!") && strings.Contains(low, "fully installed"):
 		r.success = true
 		return DownloadProgress{State: "done", Percent: 100, Line: l}, true

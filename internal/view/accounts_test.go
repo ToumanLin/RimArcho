@@ -19,7 +19,7 @@ func TestSteamAccountSummaryHasOneStateAndReadableMetadata(t *testing.T) {
 			t.Fatal(text)
 		}
 	}
-	if strings.HasPrefix(item.Note, "；") || strings.Contains(text, "own") || strings.Contains(text, "未知") {
+	if strings.HasPrefix(item.Note, "；") || strings.HasSuffix(strings.Split(item.Note, "\n")[0], "；") || strings.Contains(text, "own") || strings.Contains(text, "未知") {
 		t.Fatal(text)
 	}
 }

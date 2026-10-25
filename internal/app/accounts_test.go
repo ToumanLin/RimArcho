@@ -28,7 +28,7 @@ func TestSteamAccountWindowVerificationAndManagedForget(t *testing.T) {
 	log := filepath.Join(dir, "logs", "console_log.txt")
 	e.MkdirAll(filepath.Dir(log))
 	var args []string
-	line := "Logging in user 'fixture-player' to Steam Public...OK\n"
+	line := "Logging in user 'fixture-player' to Steam Public...OK\nWaiting for user info...OK\n"
 	failed := false
 	e.App.SteamCMDStart = func(got string, argv []string, console bool) (app.SteamCMDProc, error) {
 		if got != exe || !console {
@@ -63,7 +63,7 @@ func TestSteamAccountWindowVerificationAndManagedForget(t *testing.T) {
 	if !reflect.DeepEqual(args, []string{"+login", "fixture-player", "+quit"}) {
 		t.Fatal(args)
 	}
-	line = "Logging in user 'different-player' to Steam Public...OK\n"
+	line = "Logging in user 'different-player' to Steam Public...OK\nWaiting for user info...OK\n"
 	if err := e.App.SteamAccountAction("verify"); err == nil {
 		t.Fatal("wrong identity accepted")
 	}
@@ -118,7 +118,7 @@ func TestFakeSteamCMDScript(t *testing.T) {
 	dir := filepath.Join(e.App.LocalDir(), "steamcmd")
 	e.WriteFile(filepath.Join(dir, "steamcmd.exe"), "stub marker")
 	script := filepath.Join(dir, "fake.cmd")
-	e.WriteFile(script, "@echo off\r\nif not exist logs mkdir logs\r\necho Logging in user 'fixture-player' to Steam Public...OK>>logs\\console_log.txt\r\n")
+	e.WriteFile(script, "@echo off\r\nif not exist logs mkdir logs\r\necho Logging in user 'fixture-player' to Steam Public...OK>>logs\\console_log.txt\r\necho Waiting for user info...OK>>logs\\console_log.txt\r\n")
 	e.MustRun("config", "set", "steamcmd.account", "fixture-player")
 	e.App.SteamCMDStart = func(_ string, args []string, console bool) (app.SteamCMDProc, error) {
 		cmd := exec.Command("cmd.exe", "/c", script)
@@ -222,5 +222,41 @@ func TestSteamLoginRequiresNameButVerifyAllowsAnonymous(t *testing.T) {
 	_ = e.App.SteamAccountAction("verify")
 	if calls != 1 {
 		t.Fatal("anonymous verification was blocked")
+	}
+}
+
+func TestSteamAccountVerificationLogFormats(t *testing.T) {
+	for _, tc := range []struct {
+		sample, account string
+		success         bool
+	}{
+		{"anonymous", "", true}, {"user", "fixture-player", true},
+		{"failed", "fixture-player", false}, {"one-line", "fixture-player", true},
+	} {
+		t.Run(tc.sample, func(t *testing.T) {
+			e := testkit.New(t)
+			e.App.SteamCMDNoPath = true
+			exe := filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe")
+			e.WriteFile(exe, "offline fixture")
+			e.MustRun("config", "set", "steamcmd.account", tc.account)
+			sample, err := os.ReadFile(filepath.Join("testdata", "steam-login", tc.sample+".log"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			e.App.SteamCMDStart = func(_ string, _ []string, _ bool) (app.SteamCMDProc, error) {
+				return accountProc{func() error {
+					log := filepath.Join(filepath.Dir(exe), "logs", "console_log.txt")
+					e.WriteFile(log, string(sample))
+					return nil
+				}}, nil
+			}
+			err = e.App.SteamAccountAction("verify")
+			if (err == nil) != tc.success {
+				t.Fatalf("verify: %v", err)
+			}
+			if verified := !e.App.SteamAccountStatus().Verified.IsZero(); verified != tc.success {
+				t.Fatalf("verified=%v", verified)
+			}
+		})
 	}
 }

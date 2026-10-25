@@ -32,14 +32,15 @@ func AccountGroup(a *app.App) SettingGroup {
 		verified = a.FormatTime(s.Verified)
 	}
 	note := []string{s.State, "来源：" + source, "最后验证：" + verified, "到期：由 Steam 管理"}
+	summary := strings.Join(note, "；")
 	if s.Path != "" {
-		note = append(note, s.Path)
+		summary += "\n" + s.Path
 	}
 	if s.State == "匿名" {
 		name = ""
 	}
 	steam := SettingItem{Label: "SteamCMD", Value: name, Edit: "text", EditValue: &account, Argv: []string{"config", "set", "steamcmd.account", "{}"},
-		Note: strings.Join(note, "；"), NotePaths: []string{s.Path},
+		Note: summary, NotePaths: []string{s.Path},
 		Actions: []SettingAction{action("steamcmd", "anonymous", "切换匿名", "")}}
 
 	if s.Managed {

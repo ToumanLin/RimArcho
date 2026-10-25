@@ -64,7 +64,7 @@ func TestAnonymousConnectionIsNotALicenseFailure(t *testing.T) {
 	if !errors.As(err, &de) || de.Kind != "network" {
 		t.Fatalf("%v", err)
 	}
-	f.lines = []string{"Connecting anonymously to Steam Public...OK"}
+	f.lines = []string{"Connecting anonymously to Steam Public...OK", "Waiting for user info...OK"}
 	_, err = e.App.FetchGame(app.DownloadSpec{Dir: filepath.Join(e.Root, "Game")}, nil)
 	if !errors.As(err, &de) || de.Kind != "other" {
 		t.Fatalf("anonymous connected but no result: %v", err)

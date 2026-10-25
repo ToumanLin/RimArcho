@@ -120,17 +120,13 @@ func (a *App) SteamAccountAction(action string) error {
 	if tail.partial != "" {
 		lines = append(lines, tail.partial)
 	}
-	matched, logout, network := false, false, false
+	login := steamLogin{account: account}
+	logout := false
 	for _, line := range lines {
 		low := strings.ToLower(line)
-		if (strings.Contains(low, "logging in user '"+strings.ToLower(account)+"'") || account == "anonymous" && strings.Contains(low, "connecting anonymously")) && strings.HasSuffix(strings.TrimSpace(low), "ok") {
-			matched = true
-		}
+		login.read(line)
 		if strings.Contains(low, "logged out") || strings.Contains(low, "logging off") {
 			logout = true
-		}
-		if strings.Contains(low, "no connection") || strings.Contains(low, "timeout") {
-			network = true
 		}
 	}
 	if action == "logout" {
@@ -141,12 +137,12 @@ func (a *App) SteamAccountAction(action string) error {
 		a.steamAccountRecord(i.Path, account, "需重新登录", false)
 		return a.Store.SetMeta("cfg:steamcmd.account", "")
 	}
-	if matched && err == nil {
+	if login.ready && login.err == nil && err == nil {
 		a.steamAccountRecord(i.Path, account, "最近登录成功，需时再验证", true)
 		return nil
 	}
 	state := "需重新登录"
-	if network {
+	if login.err != nil && login.err.Kind == "network" {
 		state = "网络错误，登录状态未知"
 	}
 	a.steamAccountRecord(i.Path, account, state, false)
