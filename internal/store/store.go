@@ -396,6 +396,7 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	s.installIndexTriggers() // without them IndexKey is ChangeKey
 	return s, nil
 }
 

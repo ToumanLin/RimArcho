@@ -353,7 +353,7 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 	if err := a.Store.SetMeta(directoryKey(d.ID), path); err != nil {
 		return err
 	}
-	a.ixCache, a.stCache, a.prCache = nil, nil, nil
+	a.ixCache, a.stCache, a.prCache, a.linkInst = nil, nil, nil, nil
 	return a.Store.SetMeta(linkKey, "")
 }
 

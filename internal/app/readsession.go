@@ -44,15 +44,14 @@ func (b *App) ReadOptions(a *App) {
 // avoiding a second large load while holding its page mutex (06 §8.4).
 // Both sessions must use the same database and environment and be idle.
 func (a *App) AdoptReadState(r *App) {
-	stamp := a.Store.ChangeKey()
-	rekey := func(key string) string {
+	rekey := func(stamp, key string) string {
 		if i := strings.IndexByte(key, '|'); i >= 0 {
 			return stamp + key[i:]
 		}
 		return ""
 	}
-	a.ixCache, a.ixKey = r.ixCache, rekey(r.ixKey)
-	a.stCache, a.stKey = r.stCache, rekey(r.stKey)
+	a.ixCache, a.ixKey = r.ixCache, rekey(a.Store.IndexKey(), r.ixKey)
+	a.stCache, a.stKey = r.stCache, rekey(a.Store.ChangeKey(), r.stKey)
 	a.prCache, a.prKey = nil, ""
 	a.Store.MM = r.Store.MM
 }

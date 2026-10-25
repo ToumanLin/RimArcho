@@ -128,6 +128,26 @@ func (s *Store) Mods(envID string) ([]*Mod, error) { return s.mods(envID, modCol
 // ModsFull is Mods with declarations included.
 func (s *Store) ModsFull(envID string) ([]*Mod, error) { return s.mods(envID, modColsFull) }
 
+// LinkMods is Mods with only what the game-link check reads: ID, source label, relative
+// path, real path and status (no snapshot join).
+func (s *Store) LinkMods(envID string) ([]*Mod, error) {
+	rows, err := s.DB.Query(`SELECT i.id, s.label, i.rel_path, i.real_path, i.status FROM instance i
+		JOIN source s ON s.id = i.source_id WHERE i.environment_id IN ('', ?) ORDER BY i.id`, envID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Mod
+	for rows.Next() {
+		m := &Mod{store: s}
+		if err := rows.Scan(&m.ID, &m.SourceLabel, &m.Rel, &m.RealPath, &m.Status); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) mods(envID, cols string) ([]*Mod, error) {
 	rows, err := s.DB.Query(`SELECT `+cols+modFrom+` WHERE i.environment_id IN ('', ?) ORDER BY i.id`, envID)
 	if err != nil {

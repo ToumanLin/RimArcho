@@ -267,6 +267,6 @@ func (a *App) recoverLinkRecords(row store.ManagedLink) error {
 	if err := a.Store.RelocateInstance(row.Instance, destination.ID, rel, next); err != nil {
 		return err
 	}
-	a.ixCache, a.stCache, a.prCache = nil, nil, nil
+	a.ixCache, a.stCache, a.prCache, a.linkInst = nil, nil, nil, nil
 	return nil
 }

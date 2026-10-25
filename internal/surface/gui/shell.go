@@ -33,13 +33,21 @@ type Shell struct {
 func (s *API) Shell() *Shell {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.shellLocked(nil)
+}
+
+// shellLocked builds the sidebar; n is needs just built for the current board, else nil.
+func (s *API) shellLocked(n *view.Needs) *Shell {
 	out := &Shell{Crumbs: map[string][]view.Crumb{}}
 	if envs, err := s.a.Store.Envs(); err == nil {
 		out.Envs = len(envs)
 	}
 	count := 0
 	if st := s.boardState(); st != nil {
-		count = s.needsLocked().Count
+		if n == nil {
+			n = s.needsLocked()
+		}
+		count = n.Count
 		out.Env = view.EnvChip(s.board.EnvName, s.board.GameVersion)
 	} else {
 		out.Env = view.EnvChip("", "")

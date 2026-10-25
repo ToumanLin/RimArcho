@@ -25,15 +25,16 @@ type Index struct {
 	inst, lin *ids.Shortener
 }
 
-// Index loads the environment's instances. The result is cached until the database changes
-// (this connection's total_changes() or another process's commit, PRAGMA data_version), so
-// a TUI issuing many read commands does not reload 1000+ rows each time.
+// Index loads the environment's instances. The result is cached until the tables it is
+// built from may have changed (Store.IndexKey: this connection's writes to them, or any
+// other connection's commit), so neither a TUI issuing many read commands nor a list edit
+// reloads 1000+ rows each time.
 func (a *App) Index() (*Index, error) {
 	e, err := a.Env()
 	if err != nil {
 		return nil, err
 	}
-	key := a.Store.ChangeKey() + "|" + e.ID
+	key := a.Store.IndexKey() + "|" + e.ID
 	if a.ixCache != nil && a.ixKey == key {
 		return a.ixCache, nil
 	}
@@ -43,6 +44,15 @@ func (a *App) Index() (*Index, error) {
 	}
 	a.ixCache, a.ixKey = ix, key
 	return ix, nil
+}
+
+// IndexCached reports whether Index would return its cached index without loading.
+func (a *App) IndexCached() bool {
+	if a.ixCache == nil {
+		return false
+	}
+	e, err := a.Env()
+	return err == nil && a.ixKey == a.Store.IndexKey()+"|"+e.ID
 }
 
 func (a *App) loadIndex(e *env.Environment) (*Index, error) {

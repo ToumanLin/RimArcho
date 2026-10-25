@@ -105,10 +105,29 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 	if err != nil {
 		return nil, err
 	}
-	expected := map[string]string{}
-	liveTargets := map[string]*store.Mod{}
-	evidence := map[string]string{}
-	instances, packIDs := map[string]string{}, map[string]string{}
+	li, err := a.linkInstances()
+	if err != nil {
+		return nil, err
+	}
+	// A link's target is matched against the real path its instance's scan recorded and
+	// confirmed on disk; only a miss resolves every instance's path again (one file-system
+	// call per mod, thousands with a large library).
+	var resolved map[string]*store.Mod
+	liveTarget := func(target string) *store.Mod {
+		key := env.PathKey(realOrAbs(target))
+		if m := li.recorded[key]; m != nil && env.PathKey(realOrAbs(m.RealPath)) == key {
+			return m
+		}
+		if resolved == nil {
+			resolved = make(map[string]*store.Mod, len(li.live))
+			for _, m := range li.live {
+				resolved[env.PathKey(realOrAbs(m.RealPath))] = m
+			}
+		}
+		return resolved[key]
+	}
+	// Packs' expected targets and evidence; a pack wins over an instance of the same name.
+	expected, evidence, packIDs := map[string]string{}, map[string]string{}, map[string]string{}
 	ledger, err := a.Store.ManagedLinks()
 	if err != nil {
 		return nil, err
@@ -123,27 +142,6 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 			registered[env.PathKey(filepath.Join(l.Mods, l.Name))] = l
 		} else if store.LinkFinished(l.Phase) {
 			delete(registered, env.PathKey(filepath.Join(l.Mods, l.Name)))
-		}
-	}
-	es, err := a.Store.Envs()
-	if err != nil {
-		return nil, err
-	}
-	for _, e := range es {
-		ms, err := a.Store.Mods(e.ID)
-		if err != nil {
-			return nil, err
-		}
-		for _, m := range ms {
-			if m.Status == identity.Live && m.RealPath != "" {
-				liveTargets[env.PathKey(realOrAbs(m.RealPath))] = m
-			}
-			for _, name := range []string{DeployName(m), DeployPrefix + "env_" + m.ID} {
-				key := strings.ToLower(name)
-				expected[key] = m.RealPath
-				instances[key] = m.ID
-				evidence[key] = "known instance " + m.ID + "; expected target: " + m.RealPath
-			}
 		}
 	}
 	packs, err := os.ReadDir(a.PacksDir())
@@ -196,10 +194,16 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 				continue
 			}
 			l.snapshot, l.Target, l.Kind, l.State = info, info.RawTarget, info.Kind, info.State
-			exp := expected[strings.ToLower(name)]
-			l.Instance, l.Pack = instances[strings.ToLower(name)], packIDs[strings.ToLower(name)]
+			lname := strings.ToLower(name)
+			exp, ev := "", ""
+			if m := li.byName[lname]; m != nil {
+				l.Instance, exp, ev = m.ID, m.RealPath, "known instance "+m.ID+"; expected target: "+m.RealPath
+			}
+			if p, ok := expected[lname]; ok {
+				l.Pack, exp, ev = packIDs[lname], p, evidence[lname]
+			}
 			if exp != "" {
-				l.Owned, l.Evidence = true, evidence[strings.ToLower(name)]
+				l.Owned, l.Evidence = true, ev
 			}
 			if row, ok := registered[env.PathKey(l.Path)]; ok {
 				exp, l.Owned, l.Instance, l.Pack = row.NextTarget, true, row.Instance, row.Pack
@@ -211,7 +215,7 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 			}
 			// A surviving target proves ownership even after the name's ID was retired.
 			if (info.Kind == "junction" || info.Kind == "symlink") && info.State == source.TargetPresent {
-				if m := liveTargets[env.PathKey(realOrAbs(info.Target))]; m != nil {
+				if m := liveTarget(info.Target); m != nil {
 					exp, l.Owned, l.Instance, l.Pack = m.RealPath, true, m.ID, ""
 					l.Evidence = "target is known instance " + m.ID
 				}
@@ -253,6 +257,43 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 		}
 	}
 	return append(out, recoveries...), nil
+}
+
+// linkInstances is what the game-link check needs from every game's instances, cached
+// like the mod index (Store.IndexKey: instances, sources and environments).
+type linkInstances struct {
+	key      string
+	byName   map[string]*store.Mod // lower-cased link name (DeployName, env link) → instance
+	recorded map[string]*store.Mod // live instances by their recorded real path
+	live     []*store.Mod
+}
+
+func (a *App) linkInstances() (*linkInstances, error) {
+	key := a.Store.IndexKey()
+	if c := a.linkInst; c != nil && c.key == key {
+		return c, nil
+	}
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil, err
+	}
+	li := &linkInstances{key: key, byName: map[string]*store.Mod{}, recorded: map[string]*store.Mod{}}
+	for _, e := range es {
+		ms, err := a.Store.LinkMods(e.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range ms {
+			if m.Status == identity.Live && m.RealPath != "" {
+				li.recorded[env.PathKey(m.RealPath)] = m
+				li.live = append(li.live, m)
+			}
+			li.byName[strings.ToLower(DeployName(m))] = m
+			li.byName[strings.ToLower(DeployPrefix+"env_"+m.ID)] = m
+		}
+	}
+	a.linkInst = li
+	return li, nil
 }
 
 func (l *GameLink) Finding() *finding.Finding {

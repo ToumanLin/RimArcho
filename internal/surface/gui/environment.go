@@ -187,6 +187,9 @@ func (s *API) Workspace(request uint64) bool {
 		defer w.wg.Done()
 		result := &EnvironmentResult{Request: request}
 		defer func() { s.send("environment", result) }()
+		if s.workspaceWarm(result, request, seq) {
+			return
+		}
 		r, err := s.detachedReader()
 		if err != nil {
 			result.Error = err.Error()
@@ -214,5 +217,44 @@ func (s *API) Workspace(request uint64) bool {
 		result.Board.Stamp = s.a.Store.ChangeKey()
 		result.Board.Scanning, result.Board.Analyzing = s.busy["scan"], s.busy["analyze"]
 	}()
+	return true
+}
+
+// workspaceWarm answers a Workspace read on the window's own session when its mod index
+// is current, as after a list edit: the board is then a few milliseconds of work, while a
+// separate session would load every mod again. A cold index (a scan, another game) is left
+// to the separate session so the page mutex is not held during the load. False: not done.
+func (s *API) workspaceWarm(result *EnvironmentResult, request, seq uint64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.a.Uninstalled || !s.a.IndexCached() {
+		return false
+	}
+	w := &s.environment
+	stale := func() bool {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		return w.closed || w.seq != seq || w.readSeq != request
+	}
+	if stale() {
+		result.Stale = true
+		return true
+	}
+	result.Board = s.boardLocked()
+	var n *view.Needs // boardLocked builds the needs unless the board failed
+	if result.Board.Error == "" {
+		n = s.needs
+	}
+	result.Shell = s.shellLocked(n)
+	if s.board != nil && s.board.St != nil {
+		h, err := view.HistoryItems(s.a, s.board.St)
+		if err != nil {
+			result.Error = err.Error()
+			return true
+		}
+		result.History = h
+	}
+	result.Stale = stale()
+	s.free.soon()
 	return true
 }

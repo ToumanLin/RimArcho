@@ -13,9 +13,10 @@ import (
 // it a moment after heavy work. Small, change-keyed inventory/log caches survive navigation
 // so revisiting a page does not repeat the same database queries or log analysis.
 
-// MemoryLimit is the window process's Go soft memory cap. Page summaries discard their
-// per-file objects; releasing after heavy work returns the remaining free memory.
-const MemoryLimit = 32 << 20
+// MemoryLimit is the window process's Go soft memory cap: only a ceiling against runaway
+// growth. Idle memory comes from releasing after heavy work, not from the cap; at 32 MiB a
+// refresh's live heap sat near the cap and one list edit ran hundreds of collections.
+const MemoryLimit = 128 << 20
 
 // tuneProcess applies the window's memory settings: the soft cap, and a 256 KiB SQLite page
 // cache on the main connection, as in the TUI. ReadSession applies the same cache size to

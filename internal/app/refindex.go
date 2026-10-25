@@ -154,7 +154,7 @@ func refFiles(st *LoadoutState, mods []*store.Mod) []refFile {
 func (a *App) refIndexDir() string { return a.cacheDir("refindex") }
 
 // RefIndex returns the reference index of st's enabled set: from disk (about 10 ms for 485
-// mods), or built now and stored. It is not kept in memory (~5 MB; the GUI's limit is 32 MiB).
+// mods), or built now and stored. It is not kept in memory (~5 MB).
 func (a *App) RefIndex(st *LoadoutState) (*refIndex, error) {
 	mods, err := a.refMods(st)
 	if err != nil {
