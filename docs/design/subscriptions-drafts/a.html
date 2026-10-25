@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>订阅与更新 A</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* A: one page that reads top to bottom: add, what waits for you, what Steam already did. */
+.feed { height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: var(--card-gap); padding-bottom: 12px; }
+.feed > * { flex: none; }
+.addzone { display: grid; gap: 6px; padding: 2px 0 10px; }
+.addzone .tip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 0 4px; font-size: 12px; color: var(--muted); }
+.addzone .tip .src { margin-right: 4px; }
+
+.pend { grid-template-columns: minmax(150px, 1.1fr) minmax(130px, auto) minmax(0, 2fr) minmax(90px, .8fr) auto; }
+.pend .nmc { display: flex; flex-direction: column; min-width: 0; }
+.pend .nmc .src { font-size: 11.5px; }
+.chg { grid-template-columns: 76px minmax(150px, 1fr) minmax(0, 2.2fr) auto 14px; }
+.chg .chev, .pend .chev { color: var(--faint); display: inline-flex; transition: transform var(--t-layout) var(--ease); }
+.row.open .chev { transform: rotate(90deg); }
+.more { margin: 0 4px 6px; padding: 4px 14px 10px 14px; border-radius: 0 0 8px 8px; display: grid; gap: 8px; }
+.pend + .more, .row.open + .more { background: var(--card-2); }
+.row.open { background: var(--card-2); border-radius: 8px 8px 0 0; }
+.log { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 3px 10px; font-size: 12px; }
+.log code { color: var(--muted); font-size: 11.5px; }
+.log .d { color: var(--faint); }
+.kv { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 3px 10px; font-size: 12px; }
+.kv > :nth-child(odd) { color: var(--muted); }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.groupline { display: flex; align-items: center; gap: 10px; padding: 7px 14px; margin: 0 4px; border-radius: 8px; color: var(--fg-2); }
+.groupline:hover { background: var(--pill); }
+.older { display: flex; align-items: center; gap: 10px; padding: 7px 14px; margin: 0 4px; border-radius: 8px; }
+.older:hover { background: var(--pill); }
+.older .chev { color: var(--faint); display: inline-flex; margin-left: auto; }
+.allgood { display: flex; align-items: center; gap: 8px; padding: 10px 14px 14px; color: var(--muted); }
+.srcsum { height: 26px; display: inline-flex; align-items: center; gap: 8px; padding: 0 8px; border-radius: 6px; color: var(--muted); font-size: 12px; }
+.srcsum:hover { background: var(--pill); color: var(--fg); }
+.srcsum .warn { display: inline-flex; align-items: center; gap: 3px; }
+@media (max-width: 1100px) { .pend { grid-template-columns: minmax(140px, 1fr) auto minmax(0, 1.4fr) auto; } .pend .used { display: none; } }
+</style>
+</head>
+<body>
+<header class="review"><b>订阅与更新 · 候选 A：一页读到底</b><span>示例数据，不读写文件</span><span class="sp"></span>
+  <span>试一下：</span><button class="rb" data-sample="git">GitHub 链接</button><button class="rb" data-sample="ll">LoversLab 页</button><button class="rb" data-sample="ws">工坊链接</button><button class="rb" data-sample="zip">拖入 zip</button>
+  <a href="a.html" class="on">A</a><a href="b.html">B</a><a href="c.html">C</a><button class="rb" id="theme">深浅色</button></header>
+<div id="app">
+  <aside id="side"><div class="side-head"></div><nav id="nav"></nav></aside>
+  <div id="main">
+    <header id="top"><nav id="crumbs"></nav></header>
+    <div class="page-head" id="head"></div>
+    <div id="page"><div class="feed" id="feed"></div></div>
+    <footer id="bottom"><span id="status"></span><span style="flex:1"></span><span id="hints"></span></footer>
+  </div>
+</div>
+<div id="veil" hidden></div>
+<script src="shared.js"></script>
+<script>
+const S = { text: "", st: {}, open: new Set(["pf"]), scope: 0, done: new Set(), checking: false, drag: false };
+const pending = () => PENDING.filter((p) => !S.done.has(p.id));
+
+function head() {
+  $("#head").innerHTML = `<p class="lead">「主力殖民地」上次游玩是 10月22日，下面是那之后的事</p>
+    <div class="seg">${["当前列表", "整个库"].map((x, i) => `<button class="${S.scope === i ? "on" : ""}" data-scope="${i}">${x}</button>`).join("")}</div>
+    <div class="page-acts">
+      <button class="srcsum" data-do="sources" title="每个来源的状态">${ic("clock")}14:02 检查过 4 个来源<span class="warn">${ic("warn")}2</span>${ic("down")}</button>
+      <button class="btn line" data-do="check">${S.checking ? `<span class="spin" style="display:inline-flex">${ic("refresh")}</span>正在检查…` : `${ic("refresh")}检查更新`}<kbd>R</kbd></button>
+    </div>`;
+}
+
+function addZone() {
+  const k = detect(S.text);
+  if (!k) found.last = null;
+  return `<div class="addzone">
+    <label class="omni ${S.drag ? "drag" : ""}">${ic("plus")}<input id="omni" placeholder="粘贴链接来订阅：GitHub 仓库、LoversLab 文件页、工坊链接或 ID" value="${esc(S.text)}" spellcheck="false"><kbd>ctrl+v</kbd></label>
+    ${k ? found(k, S.st) : `<div class="tip">也可以把下载好的 zip 拖进窗口。本地 Mod 不用在这里添加：复制进 Mods 文件夹，下次扫描就认得<button class="btn link" data-do="mods">${ic("folder")}打开 Mods 文件夹</button></div>`}
+  </div>`;
+}
+
+function pendCard() {
+  const P = pending();
+  if (!P.length) return `<section class="card"><div class="card-head"><h3>等你更新</h3></div><div class="allgood"><span class="ok">${ic("check")}</span>都是最新的。Steam 工坊的 Mod 由 Steam 自己更新，变化在下面</div></section>`;
+  return `<section class="card"><div class="card-head"><h3>等你更新 <span class="n">${P.length}</span></h3>
+      <span class="r">Git、LoversLab、SteamCMD 由 RimArcho 更新<button class="btn primary small" data-do="all">全部更新<kbd style="color:inherit;opacity:.7">U</kbd></button></span></div>
+    <div style="padding-bottom:6px">${P.map((p) => {
+      const open = S.open.has(p.id);
+      const sum = p.kind === "commits" ? `${p.log.length} 个提交：${esc(p.log[0][1])}` : esc(p.note);
+      const btn = p.s === "ll" ? `<button class="btn line small" data-open="${p.id}">选文件…</button>` : `<button class="btn line small" data-upd="${p.id}">更新</button>`;
+      return `<div class="row pend ${open ? "open" : ""}" data-open="${p.id}">
+        <span class="nmc"><span class="nm">${esc(p.n)}</span>${src(p.s)}</span>
+        <span class="ver">${p.from} → <span class="to">${p.to}</span>${p.toD ? `  <span class="faint">${p.toD}</span>` : ""}</span>
+        <span class="say">${sum}</span>
+        <span class="used">${p.used.join("、")}</span>
+        <span style="display:flex;gap:4px;align-items:center">${btn}<span class="chev">${ic("chev")}</span></span></div>
+        ${open ? pendMore(p) : ""}`;
+    }).join("")}</div></section>`;
+}
+function pendMore(p) {
+  if (p.kind === "commits") return `<div class="more">
+    <div class="log">${p.log.map(([h, m, d]) => `<code>${h}</code><span>${esc(m)}</span><span class="d">${d}</span>`).join("")}</div>
+    <div class="kv"><span>跟踪</span><span>${p.track}</span><span>装的是</span><span>${p.from}，${p.fromD}</span><span>大概会改</span><span>${p.impact}</span><span>用在</span><span>${p.used.join("、")}</span></div>
+    <div class="acts"><button class="btn line small">${ic("ext")}在 GitHub 看对比</button><button class="btn small">锁定现在这个版本再更新</button></div></div>`;
+  if (p.kind === "files") return `<div class="more">
+    <div class="muted" style="font-size:12px">${esc(p.note)}</div>
+    <div class="choice">${p.files.map(([n, s, d, on], i) => `<button class="opt ${(S.st[p.id] ?? 0) === i ? "on" : ""}" data-pfile="${p.id}:${i}"><span class="rd"></span><span class="nm">${n}${on ? "<small>和上次下载的同名</small>" : ""}</span><span class="ext">${s}  ${d}</span></button>`).join("")}</div>
+    <div class="acts"><button class="btn primary small" data-upd="${p.id}">下载并更新</button><button class="btn small">或者选下载好的 zip…</button><button class="btn small">${ic("ext")}打开下载页</button></div></div>`;
+  return `<div class="more"><div class="muted" style="font-size:12px">${esc(p.note)}</div>
+    <div class="kv"><span>装的是</span><span>${p.from} 的版本</span><span>用在</span><span>${p.used.join("、")}</span><span>账户</span><span>rim_player（SteamCMD）</span></div>
+    <div class="acts"><button class="btn small">${ic("ext")}看工坊更新说明</button></div></div>`;
+}
+
+function chgCard() {
+  const C = S.scope ? CHANGES : CHANGES.filter((c) => c.used.includes("主力殖民地"));
+  return `<section class="card"><div class="card-head"><h3>Steam 已经更新 <span class="n">${C.length}</span></h3>
+      <span class="r">${["会影响启动", "留意", "只是内容"].map((t, i) => `<span class="pill tier${i + 1}">${C.filter((c) => c.t === i + 1).length} ${t}</span>`).join("")}</span></div>
+    <div style="padding-bottom:6px">${C.map((c) => {
+      const open = S.open.has(c.id);
+      return `<div class="row chg ${open ? "open" : ""}" data-open="${c.id}"><span><span class="pill tier${c.t}">${TIER[c.t]}</span></span>
+        <span class="nm">${esc(c.n)}</span><span class="say">${esc(c.say)}</span><span class="when">${c.when}</span><span class="chev">${ic("chev")}</span></div>
+        ${open ? `<div class="more"><div class="kv">${c.groups.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join("")}<span>用在</span><span>${c.used.join("、")}</span></div>
+          <div class="acts"><button class="btn line small">${ic("ext")}看工坊更新说明</button><button class="btn small">逐个文件</button><button class="btn small">在 Mod 库打开</button>${c.t === 1 ? '<button class="btn small">去能不能跑 →</button>' : ""}</div></div>` : ""}`;
+    }).join("")}
+    <button class="groupline" data-open="arr" style="width:calc(100% - 8px)"><span class="pill">订阅变动</span><span>新订阅 ${ARRIVALS.add.length} 个，不见了 ${ARRIVALS.gone.length} 个</span><span class="muted" style="margin-left:auto;font-size:12px">${S.open.has("arr") ? "" : ARRIVALS.add.concat(ARRIVALS.gone).join("、")}</span></button>
+    ${S.open.has("arr") ? `<div class="more" style="background:var(--card-2)"><div class="kv"><span class="ok">新订阅</span><span>${ARRIVALS.add.join("、")}</span><span class="err">不见了</span><span>${ARRIVALS.gone.join("、")}<span class="muted">（主力殖民地还在用，会影响启动）</span></span></div></div>` : ""}
+    </div></section>
+    <section class="card"><div class="card-head"><h3 class="muted" style="font-weight:500">更早</h3></div><div style="padding-bottom:6px">
+      ${OLDER.map((o) => `<button class="older" style="width:calc(100% - 8px)"><span>${o.day}</span><span class="muted">${o.n} 个 Mod</span><span class="chev">${ic("chev")}</span></button>`).join("")}</div></section>`;
+}
+
+function render() {
+  nav(pending().length || "");
+  head();
+  const f = $("#feed"), top = f.scrollTop, a = document.activeElement?.id;
+  f.innerHTML = addZone() + pendCard() + chgCard();
+  f.scrollTop = top;
+  if (a === "omni") { const i = $("#omni"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+  hints(detect(S.text) ? [["enter", "订阅"], ["esc", "取消"]] : [["ctrl+v", "粘贴链接订阅"], ["U", "全部更新"], ["R", "检查更新"], ["a", "当前列表 / 整个库"], ["?", "全部按键"]]);
+}
+function setText(t) { S.text = t; S.st = {}; render(); }
+
+document.addEventListener("input", (e) => { if (e.target.id === "omni") setText(e.target.value); if (e.target.dataset.from !== undefined) { S.st.from = !!e.target.value; render(); } });
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-do],[data-sample],[data-open],[data-upd],[data-track],[data-file],[data-via],[data-pfile],[data-scope]");
+  if (!b) { if (!e.target.closest(".popover")) $("#veil").hidden = true; return; }
+  const d = b.dataset;
+  if (d.sample) { setText(SAMPLES[d.sample]); $("#feed").scrollTop = 0; return; }
+  if (d.scope) { S.scope = +d.scope; return render(); }
+  if (d.track) { S.st.track = +d.track; return render(); }
+  if (d.file) { S.st.file = +d.file; return render(); }
+  if (d.via) { S.st.via = +d.via; return render(); }
+  if (d.pfile) { const [id, i] = d.pfile.split(":"); S.st[id] = +i; return render(); }
+  if (d.upd) { e.stopPropagation(); const p = PENDING.find((x) => x.id === d.upd); S.done.add(p.id); say(`已排进后台任务：更新 ${p.n}（${p.from} → ${p.to}）`); return render(); }
+  if (d.open) { S.open.has(d.open) ? S.open.delete(d.open) : S.open.add(d.open); return render(); }
+  if (d.do === "clear") return setText("");
+  if (d.do === "add") { const k = detect(S.text);
+  if (!k) found.last = null; say(k === "zip" ? "已添加 Gene Tweaks" : "已排进后台任务：订阅，完成后扫描"); return setText(""); }
+  if (d.do === "all") { pending().filter((p) => p.s !== "ll").forEach((p) => S.done.add(p.id)); S.open.add("bs"); say("已排进后台任务：更新 3 个；Body Shape Patch 要先选文件"); return render(); }
+  if (d.do === "check") { S.checking = true; render(); setTimeout(() => { S.checking = false; say("检查完了：没有新的更新"); render(); }, 1400); return; }
+  if (d.do === "sources") { e.stopPropagation(); return sourcesPopover(b); }
+  if (d.do === "mods") return say("已打开 Mods 文件夹");
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { if (!$("#veil").hidden) $("#veil").hidden = true; else if (S.text) setText(""); }
+  if (e.key === "Enter" && detect(S.text) && detect(S.text) !== "bad") $('[data-do="add"]')?.click();
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "U") $('[data-do="all"]')?.click();
+  if (e.key === "R") $('[data-do="check"]')?.click();
+  if (e.key === "a") { S.scope = 1 - S.scope; render(); }
+});
+document.addEventListener("paste", (e) => { if (e.target.tagName !== "INPUT") { setText(e.clipboardData.getData("text")); } });
+document.addEventListener("dragover", (e) => { e.preventDefault(); if (!S.drag) { S.drag = true; render(); } });
+document.addEventListener("dragleave", (e) => { if (!e.relatedTarget) { S.drag = false; render(); } });
+document.addEventListener("drop", (e) => { e.preventDefault(); S.drag = false; setText(SAMPLES.zip); });
+themeButton();
+render();
+</script>
+</body>
+</html>

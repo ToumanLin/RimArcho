@@ -330,7 +330,7 @@ function renderCrumbs() {
   let chip = (sh && sh.env) || "";
   if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + "  " + chip;
   factText(env, chip);
-  env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "uninstall" || S.screen === "textures" || S.screen === "tasks";
+  env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "subscribe" || S.screen === "uninstall" || S.screen === "textures" || S.screen === "tasks";
   env.title = T("game") + T("; ") + "E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");

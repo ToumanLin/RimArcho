@@ -245,6 +245,7 @@ function renderHints() {
   else if (S.screen === "library") list = library.hintList();
   else if (S.screen === "tasks") list = tasksPage.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
+  else if (S.screen === "subscribe") list = scr.addHints();
   else if (S.screen === "home") list = homePage.hintList();
   else if (S.screen === "packs" || S.screen === "build") list = packsPage.hintList();
   else if (S.screen === "plan-import") list = importHints();
@@ -480,7 +481,7 @@ async function preview(what) {
 async function cmd(id) {
   if (environmentReason() && ["launch", "sort", "save", "undo", "redo", "restore-all", "stage-all", "rescan", "analyze"].includes(id)) return say("busy", environmentReason());
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures", tasks: "tasks" };
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures", tasks: "tasks" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
@@ -797,6 +798,8 @@ function onKey(e) {
     if (S.screen === "library") return library.key(e);
     if (S.screen === "textures") return tex.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
+    // 添加订阅: the form takes its keys; esc outside it goes back to 订阅与更新
+    if (S.screen === "subscribe") { if (k === "Escape") { e.preventDefault(); go("changes"); } return; }
     if (S.screen === "full") return scr.fullKey(e);
     return;
   }

@@ -202,3 +202,22 @@ func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 		}
 	}
 }
+
+// 打开来源页 (06 §2.9): two commits on GitHub / GitLab open their compare view; otherwise the
+// repository or the download page.
+func TestSubscriptionSourceURL(t *testing.T) {
+	for _, c := range []struct {
+		r    subscribe.Record
+		want string
+	}{
+		{subscribe.Record{Kind: "git", URL: "https://github.com/a/b.git", Installed: "aaa", Latest: "bbb"}, "https://github.com/a/b/compare/aaa...bbb"},
+		{subscribe.Record{Kind: "git", URL: "https://gitlab.com/g/s/p", Installed: "aaa", Latest: "bbb"}, "https://gitlab.com/g/s/p/-/compare/aaa...bbb"},
+		{subscribe.Record{Kind: "git", URL: "https://gitgud.io/a/b", Installed: "aaa", Latest: "bbb"}, "https://gitgud.io/a/b"},
+		{subscribe.Record{Kind: "git", URL: "https://github.com/a/b", Installed: "aaa", Latest: "aaa"}, "https://github.com/a/b"},
+		{subscribe.Record{Kind: "page", URL: "https://www.loverslab.com/files/file/1-x/"}, "https://www.loverslab.com/files/file/1-x/"},
+	} {
+		if got := view.SubscriptionSourceURL(&c.r); got != c.want {
+			t.Errorf("%+v: %q, want %q", c.r, got, c.want)
+		}
+	}
+}

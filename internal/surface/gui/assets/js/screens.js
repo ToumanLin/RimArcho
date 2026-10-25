@@ -14,11 +14,12 @@ import { appearanceControl } from "./appearance.js";
 import { virtualRows } from "./virtualrows.js";
 import { on } from "./api.js";
 import { wireSeparator } from "./separator.js";
-import { drawSubscriptions, subscriptionKey, subscriptionHints, resetSubscriptions } from "./subscriptions.js";
+import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 
 let ui = null;
 export function initScreens(u) {
   ui = u;
+  initSubscriptions(u, { beginPageRead, page, area, button, act, seg });
   on("tasks", (ev) => {
     if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
     if (S.screen === "changes" && ev?.ended) changes();
@@ -495,8 +496,6 @@ export function analyzeEvent(ev) {
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
 const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "", list: null };
-// of: only this mod's Lineage ({id, name}), from a detail's history; null every mod.
-const C = { page: null, cur: 0, items: [], els: [], open: new Set(), raw: new Map(), of: null, library: false };
 
 // logPage keeps the page's head and gives a fresh body below it, and its actions.
 function logPage(name, title, ...right) {
@@ -897,37 +896,8 @@ function patternCard(c) {
   return d;
 }
 
-// ---- Mod 库存 › 变化 (06 §2.9): one row per mod, what its changes mean, by tier ----
-// The current plan's mods since that plan was last played (a: the whole library); new and
-// gone mods are one summary row; older changes follow by day. enter opens a row (the
-// grouped summary, then every fact, then its actions), i its raw file list. ctrl+w opens
-// the Workshop change notes, ctrl+o the folder, S sorts, ! goes to 能不能跑, p locks this
-// version. tab / shift+tab go to the other sub-page (全部). Data: API.Changes
-// (view.BuildChanges → modchanges.Build).
-
-// changesFiltered: 变化 shows one mod's Lineage (the hint line offers esc).
-export function changesFiltered() { return S.screen === "changes" && !!C.of; }
-
-// changesPlan: the next 变化 shows the current plan since it was last played (the home
-// page's line opens it so).
-let historyLanding = false;
-export function changesPlan() { C.library = false; C.of = null; C.cur = 0; historyLanding = true; }
-
-// changes shows the page; of: {id, name} narrows it to that mod's Lineage, null shows every
-// mod, undefined keeps what it shows.
-export async function changes(of) {
-  if (S.screen !== "changes") resetSubscriptions();
-  if (of?.id) historyLanding = true;
-  if (of !== undefined && (of && of.id) !== (C.of && C.of.id)) { C.of = of; C.cur = 0; C.open.clear(); }
-  let p;
-  const read = beginPageRead("changes");
-  try { p = await api.SubscriptionsPage(C.library, C.of ? C.of.id : ""); } catch (e) { read.fail(e); return; }
-  if (!read.current()) return;
-  C.subscriptions = p;
-  C.page = p.history;
-  drawChanges();
-  read.finish();
-}
+// ---- Mod 库存 › 订阅与更新 and 添加订阅 (06 §2.9): subscriptions.js ----
+export { changes, changesHints, changesFiltered, changesPlan, openAdd, addHints } from "./subscriptions.js";
 
 export function rescanButton(label) {
   const b = button(S.busy.scan ? T("scanning…") : label || T("rescan the mod folders"), "R", () => ui.cmd("rescan"), "", "rescan");
@@ -948,206 +918,6 @@ export function busyChanged() {
   if (b) b.replaceWith(rescanButton(b.dataset.label));
 }
 
-const rowKey = (r) => r.id + "|" + (r.before || 0) + "|" + (r.after || 0);
-const TIER = { 1: "launch", 2: "watch", 3: "content" };
-
-function drawChanges() {
-  const focus = document.activeElement;
-  const typing = focus?.closest(".subscribe-form") ? focus : null;
-  const wasHistory = !!focus?.closest('[data-section="history"]');
-  const top = ($("#screen .page-scroll") || {}).scrollTop || 0;
-  const w = page("logs fill", "");
-  $("#screen").replaceChildren(w);
-  const scroll = el("div", "scroll page-scroll chg");
-  w.append(scroll);
-  const history = drawSubscriptions(scroll, C.subscriptions || {}, area, { ...ui, rescan: rescanButton,
-    history: r => changes({ id: r.id, name: r.name }) });
-  const p = C.page || {};
-  // the scope and time, or the one condition (removable as on Mod 库存)
-  const bar = el("div", "chg-bar");
-  if (C.of) {
-    const b = el("button", "lib-cond");
-    b.append(el("span", "", Tf("only %s", C.of.name)), el("span", "x", "×"));
-    b.title = T("esc shows every mod");
-    b.onclick = () => changes(null).then(() => ui.renderHints());
-    bar.append(b);
-  } else {
-    const seg = el("div", "chg-scope");
-    for (const [lib, label] of [[false, T("the current plan")], [true, T("the whole library")]]) {
-      const b = el("button", "pill" + (C.library === lib ? " on" : ""), label);
-      b.title = "a";
-      b.onclick = () => { if (C.library !== lib) toggleScope(); };
-      seg.append(b);
-    }
-    bar.append(seg);
-    if (p.since) bar.append(el("span", "muted word-facts", p.since));
-  }
-  history.append(bar);
-  C.items = [];
-  C.els = [];
-  if (p.noScan) { history.append(el("div", "empty-state", T("no scan yet (R scans)"))); return finish(); }
-  if (!C.of) {
-    const card = el("section", "card chg-card");
-    for (const r of p.rows || []) modRow(card, r);
-    if (p.arrivals) group(card, p.arrivals, "now");
-    if (!card.children.length) card.append(el("div", "empty-state", T("nothing changed")));
-    history.append(card);
-  }
-  const older = p.older || [];
-  if (older.length && !C.of) history.append(el("h2", "label chg-older", T("earlier")));
-  for (const d of older) {
-    const k = "day:" + d.day;
-    const open = !!C.of || C.open.has(k);
-    const card = el("section", "card chg-card");
-    const n = (d.rows || []).length + ((d.arrivals && d.arrivals.rows) || []).length;
-    const head = el("div", "chg-row chg-day");
-    head.append(el("span", "mod", d.day), el("span", "muted", Tf("%d mods", n)), el("span", "chev", open ? "▾" : "▸"));
-    item(head, { t: "day", key: k });
-    card.append(head);
-    if (open) {
-      for (const r of d.rows || []) modRow(card, r);
-      if (d.arrivals) group(card, d.arrivals, d.day);
-    }
-    history.append(card);
-  }
-  finish();
-  function finish() {
-    C.cur = Math.min(C.cur, Math.max(C.items.length - 1, 0));
-    C.els.forEach((r, i) => r.classList.toggle("cur", i === C.cur));
-    const sc = $("#screen .page-scroll");
-    if (sc) sc.scrollTop = top;
-    if (historyLanding) { history.scrollIntoView({ block: "start" }); history.focus({ preventScroll: true }); historyLanding = false; }
-    else if (wasHistory) history.focus({ preventScroll: true });
-    if (typing?.isConnected) typing.focus({ preventScroll: true });
-    ui.renderHints();
-  }
-}
-
-// item registers a selectable row: a click selects it and opens or closes it.
-function item(node, it) {
-  const i = C.items.length;
-  C.items.push(it);
-  C.els.push(node);
-  node.onclick = (e) => { if (e.target.closest("button")) return; C.cur = i; node.closest('[data-section="history"]')?.focus({ preventScroll: true }); toggle(it); };
-}
-
-// modRow: [tier] name · sentence ▸, opened: the summary, every fact, the files, the actions.
-function modRow(card, r) {
-  const k = rowKey(r);
-  const open = C.open.has(k);
-  const row = el("div", "chg-row");
-  row.append(el("span", "tier " + (TIER[r.tier] || ""), r.tierText), el("span", "mod", r.mod), el("span", "txt word-facts", r.text));
-  if ((r.details && r.details.length) || r.actions || hasFiles(r)) row.append(el("span", "chev", open ? "▾" : "▸"));
-  item(row, { t: "mod", key: k, r });
-  card.append(row);
-  if (!open) return;
-  const box = el("div", "chg-open");
-  for (const d of r.details || []) box.append(el("div", "line word-facts", d));
-  if (hasFiles(r)) {
-    const f = el("button", "chg-files", (C.raw.has(k) ? "▾ " : "▸ ") + T("files"));
-    f.title = "i";
-    f.onclick = () => rawFiles(r);
-    box.append(f);
-    if (C.raw.has(k)) {
-      const pre = el("pre", "lines files");
-      pathContent(pre, C.raw.get(k).join("\n"));
-      box.append(pre);
-    }
-  }
-  if (r.actions && r.actions.length) {
-    const acts = el("div", "chg-acts");
-    for (const a of r.actions) {
-      const b = el("button", "btn", a.label);
-      b.append(el("kbd", "", a.key));
-      if (!["workshop", "deps"].includes(a.kind)) b.dataset.envWrite = a.kind;
-      b.onclick = () => changeAct(r, a.kind);
-      acts.append(b);
-    }
-    box.append(acts);
-  }
-  card.append(box);
-}
-
-const hasFiles = (r) => r.before && r.after && r.before !== r.after;
-
-// group: the one row of new and gone mods; opened, each of them.
-function group(card, g, where) {
-  const k = "group:" + where;
-  const open = C.open.has(k);
-  const row = el("div", "chg-row chg-group");
-  row.append(el("span", "tier content", T("new and gone")), el("span", "txt word-facts", g.text), el("span", "chev", open ? "▾" : "▸"));
-  item(row, { t: "group", key: k });
-  card.append(row);
-  if (open) for (const r of g.rows || []) modRow(card, r);
-}
-
-function toggle(it) {
-  C.open.has(it.key) ? C.open.delete(it.key) : C.open.add(it.key);
-  drawChanges();
-}
-
-async function rawFiles(r) {
-  const epoch = S.screenSeq;
-  const k = rowKey(r);
-  if (C.raw.has(k)) C.raw.delete(k);
-  else {
-    let lines;
-    try { lines = (await api.ChangeFiles(r.before, r.after)) || []; } catch (e) { if (S.screen === "changes" && S.screenSeq === epoch) say("fail", errText(e)); return; }
-    if (S.screen !== "changes" || S.screenSeq !== epoch) return;
-    C.raw.set(k, lines);
-    C.open.add(k);
-  }
-  drawChanges();
-}
-
-function toggleScope() {
-  if (C.of) return;
-  C.library = !C.library;
-  C.cur = 0;
-  changes();
-}
-
-// changeAct runs a row's action (each also has its key on the page).
-async function changeAct(r, kind) {
-  switch (kind) {
-    case "workshop":
-      try { say("ok", await api.OpenChangeNotes(r.workshopId)); } catch (e) { say("fail", errText(e)); }
-      return;
-    case "deps": return ui.go("needs");
-    case "sort": return ui.run("sort");
-    case "lock": {
-      // a copy in the lock library: the dry run first, as on Mod 库存 (06 §6)
-      let p;
-      try { p = await api.LibraryPreview("pin", [r.ref]); } catch (e) { return say("fail", errText(e)); }
-      pop.confirm(p.title, p.lines, T("lock this one"), p.apply ? async () => {
-        try { say("ok", await api.LibraryDo("pin", [r.ref])); } catch (e) { say("fail", errText(e)); }
-        await ui.reload();
-        changes();
-      } : null);
-    }
-  }
-}
-
-// changesHints: the hint line on 变化 — the moves, then what the row under the cursor offers.
-export function changesHints() {
-  const it = C.items[C.cur];
-  const out = [...subscriptionHints(), { key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }];
-  if (it && it.r) {
-    if (hasFiles(it.r)) out.push({ key: "i", label: T("files") });
-    // ctrl+o first: the hint line folds it with ctrl+w into one place
-    out.push({ key: "ctrl+o", label: T("open the folder") });
-    for (const a of it.r.actions || []) out.push({ key: a.key, label: a.label });
-  }
-  if (!C.of) out.push({ key: "a", label: C.library ? T("the current plan") : T("the whole library") });
-  out.push({ key: "tab", label: T("the next field or button") });
-  return out;
-}
-
-function markRows(X) {
-  X.els.forEach((r, i) => r.classList.toggle("cur", i === X.cur));
-  const on = X.els[X.cur];
-  if (on) on.scrollIntoView({ block: "nearest" });
-}
 
 // logsKey: the arrows move in the game log's errors or in the changes; enter opens a
 // change's files.
@@ -1172,36 +942,6 @@ export function logsKey(e) {
     return;
   }
   return changesKey(e);
-}
-
-// changesKey: the keys of 变化 (every action on the page has one).
-function changesKey(e) {
-  const k = e.key;
-  const ctrl = e.ctrlKey || e.metaKey;
-  const done = () => e.preventDefault();
-  if (subscriptionKey(e)) return;
-  if (k === "Escape" && C.of) { done(); return changes(null).then(() => ui.renderHints()); }
-  if (k === "Tab") return;
-  if (e.target?.closest?.("button, input, select, .subscribe-form") && !["R", "a"].includes(k)) return;
-  if (!document.activeElement?.closest('[data-section="history"]') && !["a", "R"].includes(k)) return;
-  const m = C.items.length ? moveIn(C.cur, C.items.length, k) : null;
-  if (m != null) { done(); C.cur = m; markRows(C); return ui.renderHints(); }
-  const it = C.items[C.cur];
-  const r = it && it.r;
-  const has = (kind) => r && (r.actions || []).some((a) => a.kind === kind);
-  if (ctrl) {
-    const lk = k.toLowerCase();
-    if (lk === "o" && r) { done(); return api.OpenFolder(r.id).then(() => say("ok", T("opened the folder")), (x) => say("fail", errText(x))); }
-    if (lk === "w" && r) { done(); return changeAct(r, "workshop"); }
-    return;
-  }
-  if (k === "Enter" && it) { done(); return toggle(it); }
-  if (k === "i" && r && hasFiles(r)) { done(); return rawFiles(r); }
-  if (k === "a" && !C.of) { done(); return toggleScope(); }
-  if (k === "R") { done(); return ui.cmd("rescan"); }
-  if (k === "S" && has("sort")) { done(); return changeAct(r, "sort"); }
-  if (k === "D" && has("deps")) { done(); return changeAct(r, "deps"); }
-  if (k === "p" && has("lock")) { done(); return changeAct(r, "lock"); }
 }
 
 // ---- the full detail (06 §4.2): one page for the editor and Mod 库存 (fulldetail.js) ----

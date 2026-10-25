@@ -71,6 +71,7 @@ export async function openPage(id, plan = null, entry = null) {
     case "build": return packsPage.build();
     case "env": return scr.environment();
     case "changes": return scr.changes(S.screen === "changes" ? undefined : null);
+    case "subscribe": return scr.openAdd();
     case "library": return library.open();
     case "log": return scr.gameLog(undefined, true);
     case "settings": return scr.settings();

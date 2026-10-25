@@ -1,20 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Element, loadModules, deferred, event } from "./dom.mjs";
+import { Element, loadModules, deferred, event, flush } from "./dom.mjs";
 
-async function setup() {
+// 添加订阅 (06 §2.9): the paste box recognises the source, asks one decision, shows the dry
+// run and only then subscribes; a download-page update needs the player's files.
+async function setup(data = null) {
   const calls = [], confirmations = [], messages = [];
-  let closed = 0;
+  let backs = 0, dones = 0;
   const el = (tag, cls, text) => {
     const e = new Element(tag, cls, text);
-    e.value = ""; e.checked = false; e.listeners = {};
-    e.addEventListener = (name, fn) => (e.listeners[name] ||= []).push(fn);
+    e.value = ""; e.checked = false;
     e.prepend = (n) => e.insertBefore(n, e.firstChild);
-    const append = e.append.bind(e);
-    e.append = (...ns) => {
-      append(...ns);
-      if (tag === "select" && e.children.length && !e.value) e.value = e.children[0].value;
-    };
     return e;
   };
   const api = {
@@ -23,6 +19,8 @@ async function setup() {
     Subscribe: async (r) => { calls.push(["subscribe", JSON.parse(JSON.stringify(r))]); return "queued"; },
     PickFolder: async () => "downloaded-folder", PickSubscriptionZip: async () => "downloaded.zip",
     OpenURL: async (url) => calls.push(["open", url]),
+    OpenModsFolder: async () => calls.push(["mods"]),
+    SubscriptionFilePage: async () => "",
     SubscriptionFromPreview: async (...args) => { calls.push(["from-preview", ...args]); return { title: "update", apply: true, lines: ["old → new"] }; },
     SubscriptionFrom: async (...args) => { calls.push(["from", ...args]); return "queued"; },
   };
@@ -30,117 +28,135 @@ async function setup() {
     "./state.js": { el, api, T: (s) => s, Tf: (s, ...a) => { let i = 0; return s.replace(/%[sd]/g, () => a[i++]); }, errText: (e) => e.message, say: (...a) => messages.push(a) },
     "./popups.js": { confirm: (...args) => confirmations.push(args) },
   };
-  const mod = await loadModules("./subscribe.js", deps);
-  const form = mod.subscribeForm(() => closed++);
+  const mod = await loadModules("./subscribe.js", deps, { URL, setTimeout, clearTimeout });
+  const form = mod.addForm({ data, back: () => backs++, done: () => dones++ });
   const root = form.el;
-  const button = (label, host = root) => host.querySelectorAll("button").find((b) => b.textContent === label);
-  const click = async (label, host = root) => { const b = button(label, host); assert.ok(b, label); if (!b.disabled) await b.onclick(); };
-  const emit = (e, name = "input") => {
-    e["on" + name]?.(event(""));
-    for (let n = e; n; n = n.parent) for (const fn of n.listeners[name] || []) fn(event(""));
-  };
-  const set = (e, value) => { e.value = value; emit(e); };
-  const type = root.querySelector("select"), url = root.querySelector("input");
-  return { mod, root, api, calls, confirmations, messages, button, click, emit, set, type, url, el, closed: () => closed };
+  // a button by its own label (key hints are separate children)
+  const button = (label, host = root) => host.querySelectorAll("button").find((b) => b.text === label);
+  const option = (label, host = root) => host.querySelectorAll(".opt").find((b) => b.querySelector(".nm")?.textContent === label);
+  const click = async (label, host = root) => { const b = button(label, host) || option(label, host); assert.ok(b, label); if (!b.disabled) await b.onclick(); await flush(); };
+  const paste = async (text) => { form.setText(text); await flush(); await flush(); };
+  return { mod, form, root, api, calls, confirmations, messages, button, option, click, paste, el, backs: () => backs, dones: () => dones };
 }
 
-test("inline Git form previews before queuing and invalidates changed input", async () => {
-  const h = await setup();
-  assert.equal(h.root.tag, "section");
-  assert.equal(h.button("subscribe").disabled, true);
-  h.set(h.url, "https://gitgud.io/Example/colony.git");
-  await h.click("preview");
-  assert.equal(h.button("subscribe").disabled, false);
-  assert.ok(h.root.textContent.includes("dry run, nothing changed"));
-  assert.equal(h.confirmations.length, 0, "forms do not open a modal");
-  h.set(h.url, "https://gitgud.io/Example/other");
-  assert.equal(h.button("subscribe").disabled, true);
-  await h.click("subscribe");
-  assert.equal(h.calls.length, 1);
-  await h.click("preview"); await h.click("subscribe");
-  assert.equal(h.calls[2][0], "subscribe");
-  assert.equal(h.calls[2][1].url, "https://gitgud.io/Example/other");
-  assert.equal(h.closed(), 1);
+test("pasted text is recognised by its source", async () => {
+  const { mod } = await setup();
+  const cases = {
+    "https://github.com/bbradson/Performance-Fish": "git",
+    "https://gitgud.io/Example/colony.git": "git",
+    "https://www.loverslab.com/files/file/20511-gene-tweaks/": "loverslab",
+    "https://example.invalid/mods/colony": "page",
+    "https://github.com/Example/colony/releases": "page",
+    "https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077": "workshop",
+    "2009463077 818773962": "workshop",
+    "not an address": "bad",
+    "": "",
+  };
+  for (const [text, kind] of Object.entries(cases)) assert.equal(mod.detect(text), kind, text);
 });
 
-test("a preview for old input cannot enable subscribe", async () => {
+test("Git: the default branch previews at once; another ref needs its name; subscribe sends what was previewed", async () => {
+  const h = await setup();
+  await h.paste("https://github.com/Example/colony");
+  assert.deepEqual(h.calls[0], ["preview", { kind: "git", url: "https://github.com/Example/colony", refType: "branch", ref: "" }]);
+  assert.ok(h.root.textContent.includes("dry run, nothing changed"));
+  assert.equal(h.button("subscribe").disabled, false);
+  await h.click("a tag");
+  assert.equal(h.button("subscribe").disabled, true, "a tag needs its name");
+  assert.equal(h.calls.length, 1, "no preview without the name");
+  const name = h.root.querySelector(".subscribe-choices input");
+  name.value = "v2.2.0"; name.oninput(); await flush(); await flush();
+  assert.deepEqual(h.calls.at(-1)[1], { kind: "git", url: "https://github.com/Example/colony", refType: "tag", ref: "v2.2.0" });
+  await h.click("subscribe");
+  assert.deepEqual(h.calls.at(-1), ["subscribe", { kind: "git", url: "https://github.com/Example/colony", refType: "tag", ref: "v2.2.0" }]);
+  assert.equal(h.dones(), 1);
+  assert.equal(h.form.el.querySelector(".subscribe-card"), null, "the box is empty again");
+});
+
+test("a preview for older text cannot enable subscribe", async () => {
   const h = await setup(), reply = deferred();
-  h.set(h.url, "https://gitgud.io/Example/colony");
   h.api.SubscribePreview = () => reply.promise;
-  const preview = h.click("preview");
-  h.set(h.url, "https://gitgud.io/Example/other");
-  reply.resolve({ apply: true, lines: ["outdated preview"] }); await preview;
+  h.form.setText("https://github.com/Example/old");
+  h.api.SubscribePreview = async (r) => { h.calls.push(["preview", r]); return { apply: false, lines: ["refused"] }; };
+  await h.paste("https://github.com/Example/new");
+  reply.resolve({ apply: true, lines: ["outdated preview"] }); await flush();
   assert.equal(h.button("subscribe").disabled, true);
   assert.ok(!h.root.textContent.includes("outdated preview"));
 });
 
-test("download page defaults to its main Git repository and accepts native zip choice", async () => {
+test("a download page defaults to its repository, or takes downloaded files", async () => {
   const h = await setup();
-  h.set(h.type, "page"); h.set(h.url, "https://example.invalid/download");
-  await h.click("read page");
-  assert.ok(h.button("subscribe with Git: https://gitgud.io/Example/colony"));
-  await h.click("preview");
-  assert.equal(h.calls[0][1].git, true);
-  await h.click("choose zip…");
-  assert.equal(h.button("subscribe").disabled, true);
-  await h.click("preview"); await h.click("subscribe");
-  assert.equal(h.calls.at(-1)[1].git, false);
+  await h.paste("https://example.invalid/mods/colony");
+  assert.ok(h.root.textContent.includes("Example Colony Tweaks"));
+  assert.equal(h.calls.at(-1)[1].git, true);
+  await h.click("use downloaded files");
+  assert.equal(h.button("subscribe").disabled, true, "no files chosen yet");
+  await h.click("choose zip…"); await flush();
   assert.equal(h.calls.at(-1)[1].from, "downloaded.zip");
+  await h.click("subscribe");
+  assert.deepEqual(h.calls.at(-1), ["subscribe", { kind: "page", url: "https://example.invalid/mods/colony", from: "downloaded.zip" }]);
 });
 
-test("ambiguous repos require downloaded files, and late page replies are discarded", async () => {
-  const h = await setup(), reply = deferred();
-  h.set(h.type, "page"); h.set(h.url, "https://example.invalid/old");
-  h.api.SubscriptionPage = () => reply.promise;
-  const read = h.click("read page");
-  h.set(h.url, "https://example.invalid/new");
-  reply.resolve({ Name: "Old result", Main: "https://gitgud.io/Example/old", Repos: [] }); await read;
-  assert.ok(!h.root.textContent.includes("Old result"));
-  h.api.SubscriptionPage = async () => ({ Name: "Example Colony Tweaks", Repos: ["https://gitgud.io/Example/a", "https://github.com/Example/b"] });
-  await h.click("read page"); await h.click("preview");
-  assert.equal(h.button("subscribe").disabled, true);
-  await h.click("choose folder…"); await h.click("preview"); await h.click("subscribe");
-  assert.equal(h.calls.at(-1)[1].from, "downloaded-folder");
+test("Workshop items carry the SteamCMD choice", async () => {
+  const h = await setup();
+  await h.paste("2009463077");
+  assert.equal(h.calls.at(-1)[1].steamcmd, false);
+  await h.click("download with SteamCMD");
+  assert.deepEqual(h.calls.at(-1)[1], { kind: "workshop", url: "2009463077", steamcmd: true });
 });
 
-test("page replacement uses the existing warning confirmation after choosing files", async () => {
+test("LoversLab: a refused session keeps the manual route; consent and install each need the player", async () => {
+  const h = await setup();
+  h.api.SubscriptionPage = async () => { throw new Error("public challenge"); };
+  h.api.LoverFiles = async () => ({ reason: "login required; download a zip in your browser" });
+  await h.paste("https://www.loverslab.com/files/file/123-fixture/");
+  assert.ok(h.option("download from LoversLab").className.includes("on"), "no repository: LoversLab first");
+  assert.ok(h.root.textContent.includes("login required"));
+  assert.ok(h.button("open the page"));
+  assert.ok(h.option("use downloaded files"));
+
+  const g = await setup();
+  g.api.SubscriptionPage = async () => ({ Name: "Fixture" });
+  g.api.LoverFiles = async () => ({ files: [{ id: "opaque-choice", name: "fixture.zip" }], agreement: "I agree to the author rules" });
+  let agreed = 0, installed = 0;
+  g.api.LoverFollow = async (page, id, agree) => { assert.equal(id, "opaque-choice"); assert.equal(agree, true); agreed++; return { ready: "opaque-ready" }; };
+  g.api.LoverInstallPreview = async () => ({ title: "install subscription", lines: ["fixture subscription folder"], apply: true });
+  g.api.LoverInstall = async () => { installed++; return "done"; };
+  await g.paste("https://www.loverslab.com/files/file/123-fixture/");
+  await g.click("fixture.zip");
+  assert.equal(agreed, 0); assert.equal(installed, 0);
+  assert.equal(g.confirmations[0][1][0], "I agree to the author rules");
+  await g.confirmations[0][3](); assert.equal(agreed, 1); assert.equal(installed, 0);
+  await g.confirmations[1][3](); assert.equal(installed, 1);
+  assert.equal(g.dones(), 1);
+});
+
+test("esc clears the box first, then goes back", async () => {
+  const h = await setup();
+  await h.paste("https://github.com/Example/colony");
+  h.root.onkeydown(event("Escape"));
+  assert.equal(h.root.querySelector(".subscribe-card"), null);
+  assert.equal(h.backs(), 0);
+  h.root.onkeydown(event("Escape"));
+  assert.equal(h.backs(), 1);
+});
+
+test("the empty box shows the source cards with account lines and the local route", async () => {
+  const h = await setup({ sources: [{ key: "page", account: "logged in, until Nov 30" }, { key: "steamcmd", account: "rim_player" }], recent: [{ name: "Performance Fish", source: "Git", added: "2026-10-12" }] });
+  assert.ok(h.root.textContent.includes("logged in, until Nov 30"));
+  assert.ok(h.root.textContent.includes("Performance Fish"));
+  await h.click("open the Mods folder");
+  assert.deepEqual(h.calls.at(-1), ["mods"]);
+});
+
+test("a download-page update previews the chosen files and replaces only after confirming", async () => {
   const h = await setup(), host = h.el("section");
   const panel = h.mod.updateFromForm(host, "#example", () => {});
   assert.equal(host.firstChild, panel);
-  await h.click("choose folder…", panel); await h.click("preview", panel);
+  await h.click("choose folder…", panel); await h.click("update from these files", panel);
   assert.equal(h.calls.at(-1)[0], "from-preview");
   assert.equal(h.confirmations.length, 1);
   assert.ok(!h.calls.some(([method]) => method === "from"));
   await h.confirmations[0][3]();
   assert.deepEqual(h.calls.at(-1), ["from", "#example", "downloaded-folder"]);
-});
-
-test("workshop form carries SteamCMD choice and escape collapses the panel", async () => {
-  const h = await setup();
-  h.set(h.type, "workshop"); h.set(h.url, "1234");
-  const checkbox = h.root.querySelectorAll("input").find((e) => e.type === "checkbox");
-  checkbox.checked = true; h.emit(checkbox);
-  await h.click("preview");
-  assert.equal(h.calls[0][1].steamcmd, true);
-  h.root.onkeydown(event("Escape"));
-  assert.equal(h.closed(), 1);
-});
-
-test("LoversLab fallback retains manual zip; consent and install each need the player", async () => {
-  const h = await setup();
-  h.set(h.type, "page"); h.set(h.url, "https://www.loverslab.com/files/file/123-fixture/");
-  h.api.SubscriptionPage = async () => { throw new Error("public challenge"); };
-  h.api.LoverFiles = async () => ({ reason: "login required; download a zip in your browser" });
-  await h.click("read page"); await h.click("read LoversLab files");
-  assert.ok(h.root.textContent.includes("login required")); assert.ok(h.button("choose zip…"));
-  h.api.LoverFiles = async () => ({ files: [{ id: "opaque-choice", name: "fixture.zip" }], agreement: "I agree to the author rules" });
-  let agreed = 0, installed = 0;
-  h.api.LoverFollow = async (page, id, agree) => { assert.equal(id, "opaque-choice"); assert.equal(agree, true); agreed++; return { ready: "opaque-ready" }; };
-  h.api.LoverInstallPreview = async () => ({ title: "install subscription", lines: ["fixture subscription folder"], apply: true });
-  h.api.LoverInstall = async () => { installed++; return "done"; };
-  await h.click("read LoversLab files"); await h.click("fixture.zip");
-  assert.equal(agreed, 0); assert.equal(installed, 0);
-  assert.equal(h.confirmations[0][1][0], "I agree to the author rules");
-  await h.confirmations[0][3](); assert.equal(agreed, 1); assert.equal(installed, 0);
-  await h.confirmations[1][3](); assert.equal(installed, 1);
 });

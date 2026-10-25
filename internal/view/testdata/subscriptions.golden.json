@@ -38,6 +38,9 @@
       "result": "not checked yet"
     }
   ],
+  "summary": {
+    "line": "checked 4 sources, the last at 2026-10-01 11:00"
+  },
   "pending": [
     {
       "id": "id",
@@ -45,11 +48,15 @@
       "name": "Git Mod",
       "source": "Git",
       "kind": "git",
-      "installed": "oldcommit",
-      "available": "newcommit",
+      "installed": "oldcomm",
+      "available": "newcomm",
       "usedIn": [
         "default"
-      ]
+      ],
+      "inPlan": true,
+      "installedAt": "2026-10-01 10:00",
+      "checked": "2026-10-01 10:00",
+      "opens": "page"
     },
     {
       "id": "id",
@@ -61,7 +68,11 @@
       "available": "2.0",
       "usedIn": [
         "default"
-      ]
+      ],
+      "inPlan": true,
+      "installedAt": "2026-10-01 10:00",
+      "checked": "2026-10-01 10:00",
+      "opens": "page"
     },
     {
       "id": "id",
@@ -71,7 +82,9 @@
       "kind": "steamcmd",
       "installed": "2026-10-01 10:00",
       "available": "2026-10-01 11:00",
-      "usedIn": []
+      "usedIn": [],
+      "installedAt": "2026-10-01 10:00",
+      "opens": "notes"
     },
     {
       "id": "id",
@@ -81,7 +94,28 @@
       "kind": "workshop",
       "installed": "2026-10-01 10:00",
       "available": "2026-10-01 11:00",
-      "usedIn": []
+      "usedIn": [],
+      "opens": "notes"
+    }
+  ],
+  "recent": [
+    {
+      "name": "Git Mod",
+      "kind": "git",
+      "source": "Git",
+      "added": "2026-10-01"
+    },
+    {
+      "name": "Page Mod",
+      "kind": "page",
+      "source": "download page / LoversLab",
+      "added": "2026-10-01"
+    },
+    {
+      "name": "SteamCMD Mod",
+      "kind": "steamcmd",
+      "source": "SteamCMD",
+      "added": "2026-10-01"
     }
   ],
   "history": {

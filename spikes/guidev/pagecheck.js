@@ -167,72 +167,80 @@ try {
     pop.close(); popup.remove();
     handlers.set("Needs", () => ({ items: [] }));
   });
-  await test("subscriptions render three sections; inline subscribe esc; update preview, selection and history links", async () => {
+  await test("subscriptions: one list and a detail; scope bar; sources line; update preview; days; one-mod and home landings; add page", async () => {
     const sourceKeys = ["workshop", "steamcmd", "git", "page", "local"];
-    const data = { sources: sourceKeys.map(key => ({ key, name: key, count: 1, checked: "10:00", result: "cached", account: ["steamcmd", "page"].includes(key) ? "offline account" : "" })),
-      pending: [{ id: "git-id", ref: "git-ref", name: "Git fixture", kind: "git", source: "Git", installed: "abc", available: "def", usedIn: ["Colony"] },
-        { id: "page-id", ref: "page-ref", name: "Page fixture", kind: "page", source: "download page", installed: "1", available: "2", usedIn: [] }],
-      history: { rows: [], since: "since last played" } };
-    data.sources[0].failures = [{label: "8 no longer on the Workshop", items: ["Fixture (123): deleted or private", "Other fixture (456): deleted or private"]}];
-    data.sources[4].checked = "";
-    data.sources[4].result = "not checked yet";
-    let reads = [], checks = [], previews = [], updates = [];
+    const change = (id, tier, text) => ({ id, ref: "#" + id, mod: id.toUpperCase(), tier, tierText: ["", "affects launch", "worth a look", "content only"][tier], text, details: [text + " in detail"], before: 1, after: 2, workshopId: "123", actions: [{ kind: "lock", label: "lock this version", key: "p" }] });
+    const data = { sources: sourceKeys.map(key => ({ key, name: key, count: key === "local" ? 3 : 1, checked: "10:00", result: "cached", account: ["steamcmd", "page"].includes(key) ? "offline account" : "" })),
+      summary: { line: "checked 4 sources, the last at 10:00", failures: 2, failed: "2 no longer on the Workshop" },
+      pending: [{ id: "git-id", ref: "git-ref", name: "Git fixture", kind: "git", source: "Git", installed: "abc", available: "def", usedIn: ["Colony"], inPlan: true, tracking: "the default branch", opens: "compare" },
+        { id: "page-id", ref: "page-ref", name: "Page fixture", kind: "page", source: "download page", installed: "1", available: "2", usedIn: ["Other"] }],
+      recent: [],
+      history: { plan: "Colony", since: "since last played", rows: [change("vef", 1, "code changed"), change("tex", 3, "textures +3 MB")],
+        arrivals: { text: "1 new", rows: [{ ...change("new", 3, "new"), text: "new" }] }, older: [{ day: "Oct 21", rows: [change("old", 2, "Defs changed")] }] } };
+    data.sources[0].failures = [{ label: "2 no longer on the Workshop", items: ["Fixture (123): deleted or private", "Other fixture (456): deleted or private"] }];
+    let reads = [], checks = [], previews = [], updates = [], went = [];
     handlers.set("SubscriptionsPage", (library, of) => { reads.push([library, of]); return data; });
     handlers.set("CheckSubscriptionSource", kind => { checks.push(kind); return "queued"; });
     handlers.set("LibraryPreview", (kind, refs) => { previews.push([kind, refs]); return { title: "preview", apply: true, lines: ["abc → def"] }; });
     handlers.set("LibraryDo", (kind, refs) => { updates.push([kind, refs]); return "queued"; });
+    handlers.set("SubscriptionFilePage", () => "");
+    handlers.set("ChangeFiles", () => ["~ Defs/a.xml"]);
     const popup = document.createElement("div"); popup.id = "popup"; popup.hidden = true; document.querySelector("#app").append(popup);
-    await screens.changes(null); await settle();
-    assert([...document.querySelectorAll("[data-section]")].map(n => n.dataset.section).join() === "sources,pending,history", "section order");
-    assert(document.querySelectorAll("[data-source]").length === 5 && checks.length === 0, "sources checked on entry");
-    const failures = document.querySelector('[data-source="workshop"] details');
-    assert(failures && !failures.open && failures.querySelector("summary").textContent === "8 no longer on the Workshop", "failure group is missing or expanded on entry");
-    failures.querySelector("summary").click();
-    assert(failures.open && failures.querySelectorAll("li").length === 2, "failure group cannot expand to its items");
-    const accountRow = document.querySelector('[data-source="steamcmd"]');
-    assert(accountRow.querySelector("button").textContent === T("accounts") + " →", "account link repeats the state");
-    assert(accountRow.textContent.split("offline account").length === 2, "account state is duplicated");
-    assert(document.querySelector('[data-source="local"] .muted').textContent === "not checked yet", "unchecked source has a placeholder or extra spacing");
-    assert([...document.querySelector('[data-source="git"] .muted').children].map(n => n.textContent).join(" ") === "10:00 cached", "checked source lost time/result");
-    assert(document.querySelectorAll(".subscription-pending").length === 2, "missing pending updates");
-    for (const n of [1, 2, 3]) { screens.areaKey(new KeyboardEvent("keydown", { key: String(n), cancelable: true })); assert(document.activeElement.dataset.area === String(n), "section key " + n); }
-    key("+"); await settle();
-    const input = document.querySelector(".subscribe-form input");
-    assert(input && input === document.activeElement && !S.popup, "subscribe not inline/focused");
-    input.value = "draft URL";
-    emit("tasks", { ended: { kind: "source-check" } }); await settle();
-    assert(document.querySelectorAll("[data-section]").length === 3, "refresh duplicated sections");
-    assert(document.querySelector(".subscribe-form input").value === "draft URL", "task refresh discarded draft");
-    document.querySelector(".subscribe-form input").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
-    assert(!document.querySelector(".subscribe-form"), "esc left panel open");
-    document.querySelector('[data-source="git"] button:last-child').click(); await settle();
-    assert(checks.join() === "git", "check did not queue correct source");
-    const first = document.querySelector(".subscription-pending");
-    first.querySelector("input").click();
-    first.querySelector("button").click(); await settle();
-    assert(previews.length === 1 && updates.length === 0 && S.popup?.kind === "confirm", "update skipped preview/confirmation");
-    const confirm = popup.querySelector(".btns .go");
-    assert(confirm, "no confirmation button"); confirm.click(); await settle();
-    assert(updates[0]?.[1]?.[0] === "git-ref", "wrong update target");
-    key("+");
-    document.querySelector(".subscribe-form input").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
-    assert(document.querySelector(".subscription-pending.selected"), "panel esc cleared selection too");
-    key("Escape"); assert(!document.querySelector(".subscription-pending.selected"), "second esc left selection");
-    document.querySelectorAll(".subscription-pending")[1].querySelector("button").click(); await settle();
-    assert(document.querySelector('[data-section="pending"] .subscribe-form'), "download-page update did not open inline file picker");
-    const pathInput = document.querySelector('.subscribe-form input');
-    const typing = new KeyboardEvent("keydown", { key: "U", bubbles: true, cancelable: true });
-    pathInput.dispatchEvent(typing);
-    assert(!typing.defaultPrevented && document.querySelector('.subscribe-form input') === pathInput, "update shortcut intercepted file input");
-    document.querySelector('.subscribe-form input').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
-    assert(!document.querySelector(".subscribe-form") && updates.length === 1, "cancelled file update queued work");
-    document.querySelector(".subscription-pending button:last-child").click(); await settle();
-    assert(reads.at(-1)[1] === "git-id" && document.activeElement.dataset.section === "history", "view changes lost scope/landing");
-    const go = ui.go; ui.go = id => id === "changes" ? screens.changes(null) : undefined;
+    const go = ui.go; ui.go = id => { went.push(id); return id === "changes" ? screens.changes(null) : undefined; };
+    const rows = () => [...document.querySelectorAll(".subs-row")];
+    const sel = () => document.querySelector(".subs-row.sel");
+    const detail = () => document.querySelector(".subs-detail").textContent;
     try {
+      await screens.changes(null); await settle();
+      assert(checks.length === 0, "sources checked on entry");
+      assert(document.querySelector(".subs-scope .seg") && document.querySelector(".subs-scope").textContent.includes("since last played"), "scope bar");
+      assert(rows().filter(r => r.dataset.key.startsWith("p:")).length === 1, "the list scope shows only the current list's updates");
+      assert(document.querySelector(".subs-hidden")?.textContent.includes("1"), "hidden updates are not counted");
+      assert(sel()?.dataset.key === "p:git-ref" && detail().includes("Git fixture") && detail().includes("the default branch"), "first update not selected and detailed");
+      assert(document.querySelector(".subs-foot").textContent.includes("checked 4 sources") && document.querySelector(".subs-failed"), "sources line");
+      for (const n of [1, 2]) { screens.areaKey(new KeyboardEvent("keydown", { key: String(n), cancelable: true })); assert(document.activeElement.closest("[data-area]")?.dataset.area === String(n), "area key " + n); }
+      screens.areaKey(new KeyboardEvent("keydown", { key: "1", cancelable: true }));
+      key("ArrowDown"); await settle();
+      assert(sel()?.dataset.key.startsWith("r:now:vef") && detail().includes("VEF") && detail().includes("affects launch"), "arrow did not move to the change row");
+      assert(document.activeElement === sel(), "focus did not follow the selection");
+      key("i"); await settle();
+      key("ArrowUp"); key("u"); await settle();
+      assert(previews.length === 1 && updates.length === 0 && S.popup?.kind === "confirm", "update skipped preview/confirmation");
+      popup.querySelector(".btns .go").click(); await settle();
+      assert(updates[0]?.[1]?.[0] === "git-ref", "wrong update target");
+      key("a"); await settle();
+      assert(reads.at(-1)[0] === true && rows().filter(r => r.dataset.key.startsWith("p:")).length === 2, "all mods did not show every update");
+      document.querySelector('[data-key="p:page-ref"]').click(); await settle();
+      assert(document.querySelector(".subs-detail .subscribe-update"), "download page update has no file choice");
+      assert(document.querySelector(".subs-detail .subs-dhead .btn.primary").disabled, "download page update can run without files");
+      document.querySelector(".subs-srcsum").click(); await settle();
+      assert(document.querySelectorAll(".subs-src").length === 5, "sources do not open in place");
+      const failures = document.querySelector(".subs-src details");
+      assert(failures && !failures.open, "failure group open on entry");
+      [...document.querySelectorAll(".subs-src")][2].querySelector(".btn.small").click(); await settle();
+      assert(checks.join() === "git", "check did not queue the git source");
+      key("Escape"); await settle();
+      assert(!document.querySelector(".subs-sources"), "esc left the sources open");
+      key("K"); await settle();
+      assert(checks.slice(1).join() === "workshop,steamcmd,git,page", "check for updates did not queue every source");
+      document.querySelector('[data-key="d:Oct 21"]').click(); await settle();
+      assert(rows().some(r => r.classList.contains("indent")), "the day did not open");
+      emit("tasks", { ended: { kind: "source-check" } }); await settle();
+      assert(sel()?.dataset.key === "d:Oct 21", "a task refresh lost the selection");
+      key("+");
+      assert(went.at(-1) === "subscribe", "+ did not go to 添加订阅");
+      await screens.changes({ id: "git-id", name: "Git fixture" }); await settle();
+      assert(reads.at(-1)[1] === "git-id" && document.querySelector(".subs-scope .lib-cond") && screens.changesFiltered(), "one-mod view lost");
+      assert(document.activeElement.closest(".subs-list"), "one-mod view did not land in the list");
+      key("Escape"); await settle();
+      assert(reads.at(-1)[1] === "" && !screens.changesFiltered(), "esc did not show every mod");
       handlers.set("Home", () => ({ rows: [{ kind: "plan", envName: "fixture", env: "fixture", plan: 1, page: "plan:1", name: "Colony", current: true }], featured: 0, changes: { title: "current list", text: "since last played" } }));
       await home.home(); document.querySelector(".hm-actline").click(); await settle();
-      assert(reads.at(-1).join() === "false," && document.activeElement.dataset.section === "history", "home lost current-plan history landing");
+      assert(reads.at(-1).join() === "false," && document.activeElement.closest(".subs-list"), "home lost the current-list landing");
+      await screens.openAdd(); await settle();
+      const box = document.querySelector(".subscribe-omni input");
+      assert(box && box === document.activeElement, "添加订阅 did not focus the paste box");
+      assert(document.querySelectorAll(".subscribe-tile").length === 3, "source cards missing");
     } finally { ui.go = go; }
     pop.close(); popup.remove();
     handlers.set("Home", () => ({ rows: [], featured: -1 }));
