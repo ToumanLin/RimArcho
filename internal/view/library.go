@@ -113,7 +113,7 @@ type LibInstRow struct {
 	ID               string `json:"id"` // the instance ("" for a subscribed item RimArcho never saw)
 	Ref              string `json:"ref"`
 	Label            string `json:"label"` // 工坊  本地  锁定版本  26/10/21 14:27 …
-	// Cells: Name is the copy's folder; Source its Label.
+	// Cells: Name and Source use the abstract copy caption; paths live in fields.
 	LibCells
 	// Note is the copy's own note (the player's or an agent's); Auto what RimArcho knows
 	// about how it made the copy, shown (and offered as a first version) while there is none.
@@ -209,8 +209,10 @@ func LibSourceText(s string) string {
 		return T("lock library")
 	case app.LibSteamCMD:
 		return "SteamCMD"
-	case app.LibExtra:
+	case "other", app.LibExtra:
 		return T("other folder")
+	case "official":
+		return T("official")
 	case app.LibMonitor:
 		return "Archo Monitor"
 	}
@@ -218,7 +220,7 @@ func LibSourceText(s string) string {
 }
 
 func libKeyTitle(k string) string {
-	return map[string]string{"tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
+	return map[string]string{"content": T("content"), "has": T("has"), "name": T("name"), "author": T("author"), "id": T("package"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
 }
 
 func libUseText(v string) string {
@@ -265,18 +267,32 @@ func LibColumnTitle(k string) string {
 		"updated": T("update date"), "version": T("supported versions"), "author": T("author"), "tags": T("tags"), "played": T("last played")}[k]
 }
 
-// libStamp is a locked copy's time: 26/10/21 14:27 (06 §2.9).
-func libStamp(t time.Time) string { return t.Local().Format("06/01/02 15:04") }
+// libStamp is a locked copy's creation time (06 §2.9).
+func libStamp(t time.Time) string { return t.Local().Format("2006/01/02 15:04") }
 
 func libLabel(i *app.LibInstance) string {
-	if i.Source == app.LibLocked {
-		if i.Created.IsZero() {
+	if i.Subscription != nil && (i.Source == app.LibGit || i.Source == app.LibPage) {
+		return LibSourceText(i.Source)
+	}
+	locked, created := false, i.Created
+	if i.Mod != nil {
+		locked, created = copyCreated(i.Mod, created)
+	}
+	if i.Source == app.LibLocked || i.Locked != nil || locked {
+		if created.IsZero() {
 			return T("locked version")
 		}
-		return T("locked version") + "  " + libStamp(i.Created)
+		return T("locked version") + "  " + libStamp(created)
 	}
-	if i.Source == app.LibLocal && i.Locked != nil {
-		return T("locked version") + "  " + T("local") // made in Mods/ before the lock library
+	if i.Mod != nil && i.Mod.GitHead != "" {
+		return "Git"
+	}
+
+	if len(i.DirectoryValues) > 0 && i.DirectoryValues[0] == "other" && i.DirectoryName != "" {
+		return i.DirectoryName
+	}
+	if len(i.DirectoryValues) > 0 {
+		return LibSourceText(i.DirectoryValues[0])
 	}
 	return LibSourceText(i.Source)
 }
@@ -322,6 +338,9 @@ func LibQueryOf(search string, filters []string, sort string) app.LibQuery {
 func LibSplitQuery(text string) (words string, filters []string) {
 	var ws []string
 	for _, w := range queryTokens(text) {
+		if k, v, ok := strings.Cut(strings.TrimPrefix(w, "-"), ":"); ok && v == "" && (slices.Contains(app.LibKeys, k) || k == "tags") {
+			continue
+		}
 		if _, _, err := app.ParseLibFilter(strings.TrimPrefix(w, "-")); err == nil {
 			filters = append(filters, w)
 		} else {
@@ -444,7 +463,20 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 	for _, f := range res.Facets {
 		g := LibGroup{Key: f.Key, Title: libKeyTitle(f.Key)}
 		for _, v := range f.Values {
-			c := LibChoice{Filter: f.Key + ":" + v.Value, Label: libValueText(f.Key, v.Value, lib.GameMM), Count: v.Count, On: v.On}
+			label := libValueText(f.Key, v.Value, lib.GameMM)
+			if f.Key == "content" || f.Key == "has" {
+				label = barValueText(f.Key, v.Value)
+			}
+			if f.Key == "source" {
+				for _, l := range lib.Lineages {
+					for _, i := range l.Instances {
+						if len(i.DirectoryValues) > 1 && i.DirectoryValues[1] == v.Value {
+							label = i.DirectoryName
+						}
+					}
+				}
+			}
+			c := LibChoice{Filter: f.Key + ":" + v.Value, Label: label, Count: v.Count, On: v.On}
 			if f.Key == "version" && v.Value == lib.GameMM {
 				// the game's own version first, marked (06 §2.9)
 				c.Cur = true
@@ -480,7 +512,7 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 	r.Size, r.Source = libSize(i.Bytes, i.Sized), r.Label
 	if i.Mod != nil {
 		r.ID = i.Mod.ID
-		r.LibCells.Name = i.Mod.Rel // the copy's folder: the Lineage row has the name
+		r.LibCells.Name = r.Label // player-facing copy name; raw folder remains in fields
 	}
 	if s := rowState(i.States); s != "" {
 		r.State, r.Code = LibStateText(s, lib.GameMM), s

@@ -258,10 +258,10 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 
 /* ---- the board: three columns (06 §2.5): 未启用 | 已启用 | 详情, with 暂存 and 历史 folded
    under 详情 in the third column ---- */
-#board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 1fr) var(--card-gap) var(--c1, 1.2fr) var(--card-gap) var(--c2, 1.5fr); }
+#board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 38fr) var(--card-gap) var(--c1, 31fr) var(--card-gap) var(--c2, 31fr); }
 #board > .fcol { grid-column: 1; } #board > [data-split="0"] { grid-column: 2; }
 #board > [data-area="1"] { grid-column: 3; } #board > [data-split="1"] { grid-column: 4; }
-#board > .stack { grid-column: 5; } #board > * { grid-row: 1; }
+#board > .editor-right { grid-column: 5; } #board > * { grid-row: 1; }
 .stack { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
 .stack > .detail { flex: 1 1 0; min-height: 140px; }
 /* a fold is its bar until opened; open, it takes a share of the column under 详情 */
@@ -708,7 +708,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 
 /* a narrow window: the third column goes first (enter opens the full detail; 暂存 and 历史
    are reached by their keys and the command palette) */
-@media (max-width: 680px) { #board { grid-template-columns: 1fr var(--card-gap) 1.2fr 0 0; } #board > .stack, #board [data-split="1"] { display: none; } }
+@media (max-width: 680px) { #board { grid-template-columns: minmax(0,1fr) var(--card-gap) minmax(0,1fr); } #board > .editor-left, #board [data-split="0"] { display: none; } #board > [data-area="1"] {grid-column:1} #board > [data-split="1"] {grid-column:2} #board > .editor-right {grid-column:3} }
 
 .kind { flex: none; font-size: 12px; line-height: 16px; padding: 0 5px; border-radius: var(--r-sm); color: var(--muted); border: var(--hairline) solid var(--line); white-space: nowrap; }
 .card.empty-state { padding: 32px 16px; }
@@ -1172,9 +1172,6 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fbar-v.ex .l { text-decoration: line-through; color: var(--faint); }
 .fbar-v.cur .l { color: var(--fg); font-weight: 600; }
 .fbar-v .curv { font-size: 12px; line-height: 15px; padding: 0 4px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
-.fbar-find { flex: 0 0 92px; height: 22px; border-radius: var(--r-sm); background: var(--pill); font-size: 12px; padding: 0 7px; }
-.fbar-find::placeholder { color: var(--faint); }
-.fbar-find:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* open, the bar grows down its column (06 §2.5, §2.9): the groups stacked, each group's
    values wrapping; what was under it (未启用's rows, Mod 库存's details) shrinks to its
    title bar at the bottom, a click on which (or \, esc) closes the bar again */
@@ -1532,7 +1529,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-page > .pm { grid-template-columns: var(--pm-side, 320px) var(--card-gap) minmax(0, 1fr); column-gap: 0; }
 @media (max-width: 760px) { .pm-page > .pm { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .pm-split { display: none; } }
 .pm-split { align-self: stretch; margin: 0; }
-#board > .stack { gap: 0; }
+#board > .stack { gap: var(--card-gap); }
 .stack > .stack-split { margin: 0; }
 .stack > .fold.open.stack-sized { flex: 0 1 var(--stack-size); height: var(--stack-size); max-height: none; }
 .stack-split:has(+ [hidden]) { display: none; }
@@ -1720,3 +1717,43 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .subscribe-recent .r { display: flex; align-items: baseline; gap: 10px; padding: 4px 2px; font-size: 12px; }
 .subscribe-recent .r b { color: var(--fg-2); font-weight: 500; }
 @media (max-width: 900px) { .subscribe-tiles { grid-template-columns: minmax(0, 1fr); } }
+
+/* Approved editor layout: information left, load order centre, available copies right. */
+.editor-right > .area:not(.fold) {flex:1;min-height:0;}
+.editor-left > .histarea {flex:none;}
+.editor-left > .histarea.open:not(.stack-sized) {flex:0 1 25%;height:25%;max-height:25%;}
+.fcol:has(> .fbar.open.fill) > .area {min-height:0;}
+.fbar {overflow:visible;}
+.fbar-suggestions {position:absolute;z-index:20;left:0;right:0;top:calc(100% + 8px);min-width:240px;border:var(--hairline) solid var(--line);background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden;}
+.fbar-suggestion-head {display:flex;justify-content:space-between;gap:8px;padding:8px 10px;color:var(--muted);font-size:12px;}
+.fbar-suggestion-list {max-height:260px;overflow:auto;padding:4px;}
+.fbar-suggestion {display:flex;align-items:center;gap:10px;min-height:30px;width:100%;padding:5px 7px;border-radius:var(--r-sm);text-align:left;}
+.fbar-suggestion code {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px var(--code);color:var(--fg-2);}
+.fbar-suggestion > span {color:var(--muted);font-size:12px;}
+.fbar-suggestion:hover,.fbar-suggestion.on {background:var(--accent-soft);}
+.fbar-suggestion.on code {color:var(--accent-11,var(--accent));}
+.fbar-clear {color:var(--muted);padding:0 4px;}
+.editor-copy-head {position:absolute;top:0;left:15px;right:8px;height:28px;display:flex;align-items:center;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+.row.copy-item {padding-left:22px;color:var(--fg-2);font-size:12px;}
+.row.copy-item .k {display:none;}
+.row.copy-item .t {color:var(--muted);}
+.row .current-copy {position:absolute;left:calc(var(--pw,3ch) + 40px);right:10px;bottom:3px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;}
+.editor-copies {display:grid;gap:4px;margin:14px 0;}
+.editor-copy {text-align:left;padding:7px 8px;border-radius:var(--r-sm);background:var(--pill);color:var(--fg-2);display:flex;justify-content:space-between;gap:8px;}
+.editor-copy.on {background:var(--accent-soft);}
+.editor-copy small {color:var(--muted);}
+.editor-full-link {color:var(--accent-11,var(--accent));white-space:nowrap;margin-left:auto;font-size:12px;}
+
+.row.copy-group-start {padding-top:28px;}
+.row.with-copy {padding-bottom:20px;}
+
+@media (max-width:680px) {
+ #board {grid-template-rows:auto minmax(0,1fr);row-gap:var(--card-gap);}
+ #board > .editor-left {display:contents;}
+ .editor-left > .fbar {grid-column:1 / -1;grid-row:1;}
+ .editor-left > .area,.editor-left > .stack-split {display:none;}
+ #board > [data-area="1"],#board > .editor-right,#board > [data-split="1"] {grid-row:2;}
+ .editor-left > .fbar.open .fbar-panel {max-height:180px;}
+}
+
+.fbar-more { color: var(--muted); }

@@ -19,7 +19,7 @@ type term struct {
 	neg   bool
 }
 
-var queryFields = map[string]bool{"name": true, "author": true, "tag": true, "id": true, "type": true, "has": true, "version": true, "location": true}
+var queryFields = map[string]bool{"name": true, "author": true, "tag": true, "id": true, "type": true, "has": true, "version": true, "location": true, "tags": true, "source": true, "content": true}
 
 // Query is a parsed column search.
 type Query struct{ terms []term }
@@ -34,6 +34,9 @@ func ParseQuery(q string) Query {
 		}
 		if f, v, ok := strings.Cut(t.value, ":"); ok && queryFields[f] {
 			t.field, t.value = f, v
+			if t.field == "tags" {
+				t.field = "tagname"
+			}
 		}
 		if t.value == "" && t.field == "" {
 			continue
@@ -80,7 +83,7 @@ var contentTypes = map[string]bool{"assembly": true, "xml": true, "xml-only": tr
 // lists, made only then).
 func (q Query) NeedsContent() bool {
 	for _, t := range q.terms {
-		if t.field == "type" && contentTypes[t.value] {
+		if (t.field == "type" || t.field == "content") && contentTypes[t.value] {
 			return true
 		}
 	}
@@ -156,6 +159,23 @@ func termMatch(t term, it *Item, f MatchFacts) bool {
 		return v != "" && strings.EqualFold(it.Location, v)
 	case "id":
 		return v != "" && (strings.Contains(it.Package, v) || it.Workshop == v || strings.EqualFold(it.Ref, v) || strings.EqualFold(strings.TrimPrefix(it.Ref, "#"), v))
+	case "source":
+		switch v {
+		case "steamworkshop":
+			v = "workshop"
+		case "localmods":
+			v = "local"
+		case "archolocked", "copy":
+			v = "locked"
+		case "extra":
+			v = "other"
+		}
+		if len(it.Sources) > 0 {
+			return slices.ContainsFunc(it.Sources, func(s string) bool { return strings.EqualFold(s, v) })
+		}
+		return it.Kind == v || v == "steamcmd" && it.SteamCMD
+	case "content":
+		return termMatch(term{field: "type", value: v}, it, f)
 	case "type":
 		switch v { // the long forms are the names in the request (xml-only, language-pack)
 		case "xml-only":

@@ -22,7 +22,7 @@ export function snapshot() {
     const c = S.cols[k];
     for (const d of box.querySelectorAll(":scope > .row")) {
       const it = c.items[c.view[+d.dataset.i]];
-      if (it) out[k].set(key(it), +d.dataset.i * ROW_H - box.scrollTop);
+      if (it) out[k].set(key(it), parseFloat(d.style.top || "0") - box.scrollTop);
     }
   }
   return out;
@@ -44,7 +44,7 @@ export function play(before, ids) {
       const it = c.items[c.view[+d.dataset.i]];
       if (!it) continue;
       const kk = key(it);
-      const now = +d.dataset.i * ROW_H - box.scrollTop;
+      const now = parseFloat(d.style.top || "0") - box.scrollTop;
       const y0 = was.get(kk);
       const dy = y0 == null ? 0 : y0 - now;
       if (dy && Math.abs(dy) < box.clientHeight + ROW_H) moves.push([d, dy]);

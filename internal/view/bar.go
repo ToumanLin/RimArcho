@@ -3,6 +3,7 @@ package view
 import (
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -20,7 +21,7 @@ var BarKeys = []string{"tag", "source", "location", "version", "content", "has"}
 // barValues are the fixed values of a group, in the order shown (tags and versions come
 // from the rows).
 var barValues = map[string][]string{
-	"source":  {"workshop", "local", "official", "copy", "git", "steamcmd"},
+	"source":  {"workshop", "steamcmd", "local", "locked", "official", "other"},
 	"content": {"assembly", "xml", "language"},
 	"has":     {"problem", "error", "note", "alias"},
 }
@@ -37,7 +38,7 @@ type BarFilter struct {
 // barTerm turns a bar filter into the query term it means.
 func barTerm(key, v string) term {
 	switch key {
-	case "source", "content":
+	case "content":
 		return term{field: "type", value: v}
 	case "tag":
 		return term{field: "tagname", value: v}
@@ -92,6 +93,10 @@ func barRowValues(it *Item, key string, f MatchFacts) []string {
 	switch key {
 	case "tag":
 		return it.Tags
+	case "source":
+		if len(it.Sources) > 0 {
+			return it.Sources
+		}
 	case "version":
 		return it.Versions
 	case "location":
@@ -128,7 +133,9 @@ func BarNeedsContent(search string, filters []string, groups bool) bool {
 // and marked.
 func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups bool, game string) *BarFilter {
 	out := &BarFilter{Conds: []LibCond{}}
-	q := ParseQuery(search)
+	words, typed := splitBoardQuery(search)
+	filters = append(append([]string(nil), filters...), typed...)
+	q := ParseQuery(words)
 	c := parseBar(filters)
 	var tags, vers []string
 	for k := range b.Cols {
@@ -202,9 +209,23 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 	for _, k := range BarKeys {
 		g := LibGroup{Key: k, Title: barKeyTitle(k)}
 		for lv, v := range shown[k] {
-			g.Values = append(g.Values, LibChoice{Filter: k + ":" + v, Label: barValueText(k, v), Count: counts[k][lv], On: on[k+":"+lv], Cur: k == "version" && v == game})
+			g.Values = append(g.Values, LibChoice{Filter: k + ":" + v, Label: boardValueText(b, k, v), Count: counts[k][lv], On: on[k+":"+lv], Cur: k == "version" && v == game})
 		}
 		sortBar(k, g.Values)
+		out.Groups = append(out.Groups, g)
+	}
+	for _, key := range []string{"name", "author", "id"} {
+		g := LibGroup{Key: key, Title: libKeyTitle(key)}
+		seen := map[string]bool{}
+		for _, items := range b.Cols {
+			for _, it := range items {
+				value := map[string]string{"name": it.Name, "author": it.Author, "id": it.Package}[key]
+				if value != "" && !seen[value] {
+					seen[value] = true
+					g.Values = append(g.Values, LibChoice{Filter: key + ":" + value, Label: value})
+				}
+			}
+		}
 		out.Groups = append(out.Groups, g)
 	}
 	return out
@@ -239,6 +260,8 @@ func barKeyTitle(k string) string {
 func barValueText(k, v string) string {
 	switch k {
 	case "source":
+		return LibSourceText(v)
+	case "legacy-source":
 		return T(map[string]string{"workshop": "workshop", "local": "local", "official": "official", "copy": "local copy", "git": "git", "steamcmd": "SteamCMD"}[v])
 	case "content":
 		return T(map[string]string{"assembly": "with a DLL", "xml": "XML only", "language": "language pack"}[v])
@@ -306,4 +329,41 @@ func StepAt(visible []int, moving []int, d int) int {
 	}
 	p := ahead[max(len(ahead)+d, 0)]
 	return p - before(p) // just before it
+}
+
+// splitBoardQuery shares the bar's group semantics with typed conditions.
+func splitBoardQuery(text string) (string, []string) {
+	var words, filters []string
+	for _, token := range queryTokens(text) {
+		raw := strings.TrimPrefix(token, "-")
+		k, v, ok := strings.Cut(raw, ":")
+		if k == "tags" {
+			k = "tag"
+		}
+		if ok && slices.Contains(BarKeys, k) && !strings.HasPrefix(raw, "tag:") {
+			if v != "" {
+				prefix := ""
+				if strings.HasPrefix(token, "-") {
+					prefix = "-"
+				}
+				filters = append(filters, prefix+k+":"+v)
+			}
+			continue
+		}
+		words = append(words, strconv.Quote(token))
+	}
+	return strings.Join(words, " "), filters
+}
+func boardValueText(b *Board, k, v string) string {
+	if k == "source" {
+		for _, col := range b.Cols {
+			for _, it := range col {
+				if name := it.SourceNames[v]; name != "" {
+					return name
+				}
+			}
+		}
+		return LibSourceText(v)
+	}
+	return barValueText(k, v)
 }

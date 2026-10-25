@@ -1,19 +1,21 @@
 // The filter bar (06 §2.5, §2.9): one component for the plan editor and Mod 库存 › 全部.
-// One row: the search box (grey completion, tab or → takes it), the filters in force as
-// removable chips, and a "筛选" toggle (also `\`). Open, it shows the groups one line each:
-// the values most used first with their counts, then a box to type in for the rest. A left
+// One row: the query (grey completion, Tab takes it) and a "筛选" toggle (also `\`).
+// Clicked conditions edit the same query. Open, it shows tags, source and content:
+// the values most used first with their counts, then a button to expand the rest. A left
 // click (enter, space) keeps a value, a right click (x) leaves it out, again drops it; the
 // game's own version is marked. The keyboard reaches all of it: `\` opens the bar with the
 // focus on its first value, ↑↓ go between groups, ←→ between values, a letter types into
-// the group's box, esc closes it.
+// the main query with that group key, esc closes it.
 //
 // The page gives: data() → { groups, conds, complete } of its last answer; change(search,
 // filters) when either changed; and the place it lives in. The bar keeps search, filters
 // and open; the page reads them.
 import { el, T, Tf, api } from "./state.js";
 import { wireSeparator } from "./separator.js";
+import { suggestions, queryContext, setQueryFilter } from "./searchsuggest.js";
 
-const LINE = 24; // values of a group before its box (open, the bar has its column's height)
+const LINE = 24; // common values before the expand button
+let nextBar = 0;
 
 export function createBar(opts) {
   const b = { search: "", filters: [], open: false, opts };
@@ -25,105 +27,156 @@ export function createBar(opts) {
   inp.placeholder = opts.placeholder || T("search");
   const ghost = el("span", "fbar-ghost");
   ghost.append(el("span", "typed"), el("span", "sfx"));
+  ghost.setAttribute("aria-hidden","true");
   box.append(inp, ghost);
-  const chips = el("div", "fbar-chips");
+  const popup = el("div", "fbar-suggestions");
+  const listID = "filter-options-" + ++nextBar;
+  popup.hidden = true;
+  box.append(popup);
+  inp.setAttribute("role", "combobox");
+  inp.setAttribute("aria-autocomplete", "both");
+  inp.setAttribute("aria-controls", listID);
+  const clear = el("button", "fbar-clear", "×");
+  clear.title = T("clear");
+  clear.onclick = () => { b.clear(); inp.focus(); };
+  let suggestOpen = false, choice = 0, candidates = [], composing = false;
   const tog = el("button", "fbar-tog");
   tog.title = T("filter") + T("; ") + "\\";
   const panel = el("div", "fbar-panel");
   panel.hidden = true;
-  row.append(box, chips, tog);
-  // the gap under the open bar: drag it to share the column with what is below (the list,
-  // the details); double click, or the bar's first state, gives the bar the whole column
+  row.append(box, clear, tog);
+  // Drag the gap to share the column with the details; double click restores 35%.
   const gap = el("div", "fbar-gap");
-  gap.title = T("drag: share the column, double click: the filter takes it all");
+  gap.title = T("drag to resize, double click: back to the default");
   root.append(row, panel, gap);
   b.el = root;
   b.input = inp;
-  const finds = {}; // group key → typed text in its box
+  const expanded = new Set(); // group keys whose remaining values are visible
   let cur = { g: 0, v: 0 }; // the panel's focused value
   let wantFocus = false;
 
   const data = () => opts.data() || {};
-  const showGhost = () => {
-    const sfx = data().complete && inp.value === b.search ? data().complete : "";
-    const atEnd = document.activeElement === inp && inp.selectionStart === inp.value.length && inp.selectionEnd === inp.value.length;
-    ghost.hidden = !(sfx && atEnd && inp.scrollLeft === 0);
-    if (!ghost.hidden) { ghost.firstChild.textContent = inp.value; ghost.lastChild.textContent = sfx; }
-  };
+  const groups = () => (data().groups || []).filter((g) => g.key !== "location").sort((a,b)=>{const order=["tag","source","content"];return (order.includes(a.key)?order.indexOf(a.key):9)-(order.includes(b.key)?order.indexOf(b.key):9);});
+  function showGhost() {
+    candidates = suggestions(groups(), inp.value, inp.selectionStart ?? inp.value.length);
+    choice = Math.min(choice, Math.max(0,candidates.length-1));
+    const visible = suggestOpen && !composing && document.activeElement === inp;
+    popup.hidden = !visible;
+    inp.setAttribute("aria-expanded", String(visible));
+    popup.replaceChildren();
+    if (visible) {
+      const h = el("div", "fbar-suggestion-head");
+      h.append(el("span", "", T(queryContext(inp.value, inp.selectionStart ?? inp.value.length).text.includes(":") ? "available values" : "available keys")), el("span", "", "↑↓  Tab"));
+      popup.append(h);
+      const list = el("div", "fbar-suggestion-list");
+      list.id = listID;
+      list.setAttribute("role", "listbox");
+      candidates.forEach((c,i) => {
+        const button = el("button", "fbar-suggestion" + (i===choice ? " on" : ""));
+        button.setAttribute("role", "option");
+        button.id = listID + "-" + i;
+        button.setAttribute("aria-selected",String(i===choice));
+        button.tabIndex = -1;
+        button.append(el("code", "", c.token));
+        if (c.label) button.append(el("span", "", c.label));
+        button.onmousedown = (e) => e.preventDefault();
+        button.onclick = () => accept(i);
+        list.append(button);
+      });
+      if (!candidates.length) list.append(el("span", "second", T("no suggestions")));
+      popup.append(list);
+    }
+    if (visible && candidates.length) inp.setAttribute("aria-activedescendant", listID + "-" + choice);
+    else inp.removeAttribute("aria-activedescendant");
+    const ctx = queryContext(inp.value, inp.selectionStart ?? inp.value.length);
+    const token = candidates[choice]?.token || "";
+    const sfx = token.toLowerCase().startsWith(ctx.text.toLowerCase()) ? token.slice(ctx.text.length) : "";
+    const atEnd = inp.selectionStart === inp.value.length && inp.selectionEnd === inp.value.length;
+    ghost.hidden = !(visible && sfx && atEnd);
+    if (!ghost.hidden) { ghost.firstChild.textContent = inp.value; ghost.lastChild.textContent = sfx; ghost.style.transform = `translateX(${-inp.scrollLeft}px)`; }
+    inp.placeholder = !ghost.hidden ? "" : opts.placeholder || T("search");
+    clear.hidden = !inp.value;
+  }
   b.showGhost = showGhost;
   let timer = 0;
-  inp.oninput = () => { ghost.hidden = true; clearTimeout(timer); timer = setTimeout(() => { b.search = inp.value; opts.change(); }, 90); };
-  inp.onblur = inp.onscroll = showGhost;
+  function change(text, show = false) {
+    clearTimeout(timer);
+    inp.value = b.search = text;
+    b.filters = [];
+    suggestOpen = show; choice = 0;
+    opts.change(); showGhost();
+  }
+  function accept(i) {
+    const c = candidates[i]; if (!c) return;
+    const ctx = queryContext(inp.value, inp.selectionStart ?? inp.value.length);
+    const suffix = inp.value.slice(ctx.end), space = !c.key && !suffix.startsWith(" ") ? " " : "";
+    const text = inp.value.slice(0,ctx.start) + c.token + space + suffix;
+    const caret = ctx.start + c.token.length + space.length;
+    inp.value = text; inp.setSelectionRange(caret,caret);
+    change(text,c.key);
+  }
+  inp.oninput = () => { choice=0;suggestOpen=true;showGhost();clearTimeout(timer);if(!composing)timer=setTimeout(()=>change(inp.value,document.activeElement===inp),90); };
+  inp.onfocus = inp.onclick = () => { suggestOpen=true;choice=0;showGhost(); };
+  inp.onblur = () => { suggestOpen=false;showGhost(); };
+  inp.onscroll = showGhost;
+  inp.addEventListener("compositionstart",()=>{composing=true;showGhost();});
+  inp.addEventListener("compositionend",()=>{composing=false;change(inp.value,true);});
   inp.onkeydown = (e) => {
-    e.stopPropagation();
-    const d = data();
-    if ((e.key === "Tab" && !e.shiftKey || e.key === "ArrowRight") && !ghost.hidden && d.complete) {
-      e.preventDefault();
-      inp.value += d.complete;
-      b.search = inp.value;
-      opts.change();
-      return;
+    e.stopPropagation(); if (composing || e.isComposing) return;
+    if (e.key === "Tab" && !e.shiftKey && suggestOpen && candidates.length) {e.preventDefault();accept(choice);return;}
+    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && candidates.length) {
+      e.preventDefault();suggestOpen=true;choice=(choice+(e.key==="ArrowDown"?1:candidates.length-1))%candidates.length;showGhost();popup.querySelector(".fbar-suggestion.on")?.scrollIntoView({block:"nearest"});return;
     }
-    if (e.key === "Tab") return;
     if (e.key === "Escape") {
-      e.preventDefault();
-      if (inp.value) { inp.value = ""; b.search = ""; opts.change(); }
-      inp.blur();
-      opts.leave && opts.leave();
-      return;
+      e.preventDefault();if(suggestOpen){suggestOpen=false;showGhost();return;}
+      if (inp.value) change("");inp.blur();opts.leave?.();return;
     }
-    if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); inp.blur(); opts.leave && opts.leave(); return; }
-    // backspace in an empty box takes the last filter off
-    if (e.key === "Backspace" && !inp.value && b.filters.length) { e.preventDefault(); b.filters.pop(); opts.change(); return; }
-    if (e.key === "\\") { e.preventDefault(); b.toggle(); return; }
-    if (e.key === "ArrowLeft" || e.key === "Home" || e.key === "End") setTimeout(showGhost);
+    if (e.key === "Enter") {e.preventDefault();change(inp.value);inp.blur();opts.leave?.();return;}
+    if (e.key === "\\") {e.preventDefault();b.toggle();return;}
+    if (["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) setTimeout(showGhost);
   };
   tog.onclick = () => b.toggle();
-
-  // set: on 1 keeps the value, -1 leaves it out, 0 drops it
-  b.set = (f, on) => {
-    b.filters = b.filters.filter((x) => x !== f && x !== "-" + f);
-    if (on === 1) b.filters.push(f);
-    if (on === -1) b.filters.push("-" + f);
-    opts.change();
-  };
-  b.clear = () => { b.filters = []; b.search = ""; inp.value = ""; opts.change(); };
+  b.set = (f,on) => change(setQueryFilter(inp.value,f,on));
+  b.clear = () => change("");
   b.active = () => !!(b.search.trim() || b.filters.length);
-  // h: the open bar's height in px; 0 fills the column (what is below shrinks to its title)
-  b.h = 0;
+  // null follows the default 35% share; a number is a saved height, 0 fills the column.
+  b.h = null;
   const KEY = opts.splitKey;
   const colH = () => root.isConnected ? (opts.column ? opts.column() : root.parentElement)?.getBoundingClientRect().height || 0 : 0;
+  const height = () => b.h === null ? Math.max(120, colH() * .35) : b.h || colH() - 34;
+  const savedHeight = () => b.h === null ? "" : String(b.h);
   function place() {
-    root.classList.toggle("fill", b.open && !b.h);
-    if (b.h) root.style.setProperty("--fbar-h", b.h + "px");
+    root.classList.toggle("fill", b.open && b.h === 0);
+    if (b.h === null) root.style.setProperty("--fbar-h", "max(120px, 35%)");
+    else if (b.h) root.style.setProperty("--fbar-h", b.h + "px");
     else root.style.removeProperty("--fbar-h");
   }
   // setH keeps at least the bar and a few values, and leaves what is below its title and a
   // few rows; dragged near the bottom it fills the column again
   b.setH = (h, save = true) => {
     const max = colH() - 34;
-    b.h = !h || h > max - 40 ? 0 : Math.max(120, Math.round(h));
+    b.h = h === null ? null : !h || h > max - 40 ? 0 : Math.max(120, Math.round(h));
     place();
-    if (save && KEY) api.SetSetting(KEY, b.h ? String(b.h) : "").catch(() => {});
+    if (save && KEY) api.SetSetting(KEY, savedHeight()).catch(() => {});
     opts.resized && opts.resized();
     separator.refresh();
   };
-  b.nudge = (d) => b.setH((b.h || colH() - 34) + d);
+  b.nudge = (d) => b.setH(height() + d);
   const separator = wireSeparator(gap, {
     axis: "y", key: KEY, enabled: () => b.open,
     range: () => [120, colH() - 34],
-    get: () => b.h || colH() - 34,
-    set: (h) => b.setH(h, false), reset: () => b.setH(0, false),
-    serialize: () => b.h ? String(b.h) : "",
-    restore: (v) => { b.h = +v || 0; place(); },
+    get: height,
+    set: (h) => b.setH(h, false), reset: () => b.setH(null, false),
+    serialize: savedHeight,
+    restore: (v) => { b.h = v === null || v === undefined || v === "" || !Number.isFinite(+v) || +v < 0 ? null : +v; place(); },
   });
-  b.fills = () => b.open && !b.h;
+  b.fills = () => b.open && b.h === 0;
 
   b.toggle = (v = !b.open) => {
     b.open = v;
     draw();
     opts.change(true);
-    if (v) wantFocus = true; // once the groups are in (draw)
+    if (v) {suggestOpen=false;showGhost();wantFocus = true;} // once the groups are in (draw)
     else if (root.contains(document.activeElement)) { document.activeElement.blur(); opts.leave && opts.leave(); }
   };
   // the open bar folds the moment the focus leaves it: a click elsewhere, tab, a key that
@@ -134,30 +187,16 @@ export function createBar(opts) {
   b.focus = () => { inp.focus(); inp.select(); };
   b.focused = () => root.contains(document.activeElement);
 
+  const available = (g) => (g.values || []).filter((v) => v.count > 0 || v.on);
   const lineOf = (g) => {
-    const q = (finds[g.key] || "").toLowerCase();
-    let vals = (g.values || []).filter((v) => v.count > 0 || v.on);
-    if (q) vals = (g.values || []).filter((v) => v.label.toLowerCase().includes(q) || v.filter.toLowerCase().includes(q));
-    else vals = vals.slice(0, LINE).concat(vals.slice(LINE).filter((v) => v.on));
-    return vals;
+    const vals = available(g);
+    return expanded.has(g.key) ? vals : vals.slice(0, LINE).concat(vals.slice(LINE).filter((v) => v.on));
   };
 
   function draw() {
     const d = data();
-    // the chips: what is in force, each removable
-    chips.innerHTML = "";
-    for (const c of d.conds || []) {
-      const x = el("button", "fbar-chip" + (c.exclude ? " ex" : ""));
-      x.append(el("span", "", c.label), el("span", "x", "×"));
-      x.title = c.label + (c.exclude ? T("; ") + T("left out") : "");
-      x.onclick = () => b.set(c.filter.replace(/^-/, ""), 0);
-      chips.append(x);
-    }
-    const n = (d.conds || []).length;
-    tog.innerHTML = "";
-    tog.append(el("span", "", T("filter")));
-    if (n) tog.append(el("span", "c", String(n)));
-    tog.append(el("kbd", "", "\\"));
+    tog.replaceChildren(el("span", "", T("filter")),el("kbd", "", "\\"));
+    clear.hidden=!inp.value;
     tog.classList.toggle("on", b.open);
     panel.hidden = !b.open;
     place();
@@ -167,8 +206,9 @@ export function createBar(opts) {
     const keep = panel.contains(document.activeElement) ? document.activeElement.dataset.at : null;
     panel.innerHTML = "";
     (d.groups || []).forEach((g, gi) => {
+      if (!["tag","source","content"].includes(g.key)) return;
       const vals = lineOf(g);
-      if (!vals.length && !finds[g.key] && !(g.values || []).length) return;
+      if (!vals.length) return;
       const t = el("span", "fbar-gt", g.title);
       const line = el("span", "fbar-line");
       line.dataset.g = gi;
@@ -185,21 +225,25 @@ export function createBar(opts) {
         x.onkeydown = (e) => valueKey(e, gi, vi, v);
         line.append(x);
       });
-      const more = (g.values || []).filter((v) => v.count > 0 || v.on).length - vals.length;
-      const f = el("input", "fbar-find");
-      f.placeholder = more > 0 && !finds[g.key] ? Tf("%d more…", more) : T("type to find…");
-      f.value = finds[g.key] || "";
-      f.spellcheck = false;
-      f.dataset.at = gi + ":f";
-      f.oninput = () => { finds[g.key] = f.value; draw(); };
-      f.onkeydown = (e) => findKey(e, gi, f, vals);
-      line.append(f);
+      const more = available(g).length - vals.length;
+      if (more > 0 || expanded.has(g.key) && available(g).length > LINE) {
+        const f = el("button", "fbar-v fbar-more", more > 0 ? Tf("%d more…", more) : T("show fewer"));
+        f.dataset.at = gi + ":more";
+        f.setAttribute("aria-expanded", String(expanded.has(g.key)));
+        f.onclick = () => { expanded.has(g.key) ? expanded.delete(g.key) : expanded.add(g.key); draw(); };
+        f.onkeydown = (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); f.onclick(); }
+          else if (!["x", "X", "-", "Delete"].includes(e.key)) valueKey(e, gi, vals.length, null);
+          else e.stopPropagation();
+        };
+        line.append(f);
+      }
       panel.append(t, line);
     });
     if (wantFocus && panel.querySelector(".fbar-v")) { wantFocus = false; cur = { g: 0, v: 0 }; focusValue(); return; }
     if (keep) {
       const n = panel.querySelector(`[data-at="${keep}"]`) || panel.querySelector(`[data-at^="${keep.split(":")[0]}:"]`);
-      if (n) { n.focus(); if (n.tagName === "INPUT") n.setSelectionRange(n.value.length, n.value.length); }
+      if (n) n.focus({ preventScroll: true });
     }
   }
   b.draw = () => { draw(); showGhost(); };
@@ -209,7 +253,7 @@ export function createBar(opts) {
     const ls = lines();
     if (!ls.length) return;
     g = Math.max(0, Math.min(ls.length - 1, g));
-    const items = [...ls[g].querySelectorAll(".fbar-v, .fbar-find")];
+    const items = [...ls[g].querySelectorAll(".fbar-v")];
     v = Math.max(0, Math.min(items.length - 1, v));
     cur = { g, v };
     items[v].focus();
@@ -225,27 +269,16 @@ export function createBar(opts) {
     if (k === "x" || k === "X" || k === "-" || k === "Delete") { e.preventDefault(); e.stopPropagation(); cur = { g: li, v: vi }; return b.set(v.filter, v.on === -1 ? 0 : -1); }
     if (k === "Escape" || k === "\\") { e.preventDefault(); e.stopPropagation(); return b.toggle(false); }
     if (k === "/" ) { e.preventDefault(); e.stopPropagation(); return b.focus(); }
-    // a letter: into the group's box
+    // Typing from a group continues in the one query input.
     if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault(); e.stopPropagation();
       const g = (data().groups || [])[gi];
-      finds[g.key] = (finds[g.key] || "") + k;
-      draw();
-      const f = panel.querySelector(`[data-at="${gi}:f"]`);
-      if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
+      const prefix = inp.value.trimEnd();
+      change((prefix ? prefix + " " : "") + (g.key === "tag" ? "tags" : g.key) + ":" + k, true);
+      inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); showGhost();
       return;
     }
     e.stopPropagation();
-  }
-  function findKey(e, gi, f, vals) {
-    e.stopPropagation();
-    const k = e.key;
-    const li = lines().findIndex((l) => +l.dataset.g === gi);
-    const g = (data().groups || [])[gi];
-    if (k === "Enter" && vals.length) { e.preventDefault(); finds[g.key] = ""; b.set(vals[0].filter, vals[0].on === 1 ? 0 : 1); return; }
-    if (k === "Escape") { e.preventDefault(); if (f.value) { finds[g.key] = ""; draw(); focusValue(li, 0); } else b.toggle(false); return; }
-    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); return focusValue(li + (k === "ArrowDown" ? 1 : -1), 0); }
-    if (k === "ArrowLeft" && f.selectionStart === 0) { e.preventDefault(); return focusValue(li, vals.length - 1); }
   }
   b.cur = () => cur;
   draw();

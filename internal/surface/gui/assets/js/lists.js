@@ -2,6 +2,7 @@
 // board has three columns: 未启用 | 已启用 | 详情, with 暂存 and 历史 folded under 详情.
 import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
+import { listGeometry, rowAt } from "./listgeometry.js";
 import { bump } from "./motion.js";
 import { beginPageRead, pageLoading } from "./screens.js";
 
@@ -45,11 +46,11 @@ export function setItems(k, items) {
 // Both lists ask at once: one call per bar state; only the latest call's answer counts.
 let barCall = null, barSig = "";
 function fetchBar() {
-  const on = S.bar && (S.bar.active() || S.bar.open);
+  const on = !!S.bar;
   const sig = on ? JSON.stringify([S.bar.search, S.bar.filters, S.bar.open, S.board && S.board.stamp]) : "";
   if (!barCall || sig !== barSig) {
     barSig = sig;
-    barCall = (on ? api.BarFilter(S.bar.search, S.bar.filters, S.bar.open) : Promise.resolve(null)).catch(() => null);
+    barCall = (on ? api.BarFilter(S.bar.search, S.bar.filters, true) : Promise.resolve(null)).catch(() => null);
   }
   const p = barCall, gameRequest = S.envSeq;
   return p.then((r) => { if (gameRequest === S.envSeq && p === barCall) S.barData = r; return r; });
@@ -147,6 +148,9 @@ export function renderHeads() {
     const h = $(".head", a);
     if (k === 3) {
       h.innerHTML = `<span class="n">4</span><span class="t">${esc(T(AREAS[3]))}</span>`;
+      const full=el("button","editor-full-link",T("view full details") + "  Enter ↵");
+      full.onmousedown=(e)=>e.stopPropagation();
+      full.onclick=()=>document.dispatchEvent(new CustomEvent("editor-full"));h.append(full);
       continue;
     }
     const c = S.cols[k];
@@ -188,7 +192,8 @@ export function renderRows(k) {
     box.appendChild(pad);
     pools[k].clear();
   }
-  pad.style.height = c.view.length * ROW_H + "px";
+  const layout = listGeometry(c.items,c.view,k,ROW_H);
+  pad.style.height = layout.total + "px";
   // the position column is as wide as the longest number, not a fixed gutter
   if (k === 1) box.style.setProperty("--pw", Math.max(2, String(c.items.length).length) + "ch");
   let empty = $(".empty", box);
@@ -196,27 +201,34 @@ export function renderRows(k) {
     if (!empty) box.appendChild(empty = el("div", "empty"));
     empty.textContent = c.query ? T("nothing matches") : [T("every installed mod is enabled"), T("nothing enabled yet"), T("staging is empty, t puts the selected mods here")][k];
   } else if (empty) empty.remove();
-  const first = Math.max(0, Math.floor(box.scrollTop / ROW_H) - 4);
-  const last = Math.min(c.view.length, first + Math.ceil(box.clientHeight / ROW_H) + 8);
+  const first = Math.max(0, rowAt(layout,box.scrollTop) - 4);
+  const last = Math.min(c.view.length, rowAt(layout,box.scrollTop+box.clientHeight) + 5);
   const pool = pools[k];
   for (const [i, d] of pool) if (i < first || i >= last) { d.remove(); pool.delete(i); }
   for (let i = first; i < last; i++) {
     const it = c.items[c.view[i]];
     let d = pool.get(i);
-    const sig = rowSig(k, i, it);
+    const sig = rowSig(k, i, it) + `:${layout.tops[i]}:${layout.heights[i]}:${layout.heads[i]}`;
     if (d && d.dataset.sig === sig) continue;
     if (!d) { d = el("div", "row"); box.appendChild(d); pool.set(i, d); }
     d.dataset.sig = sig;
     d.dataset.i = i;
     d.style.transform = ""; // a slide (motion.js) belongs to the mod the row showed before
-    d.style.top = i * ROW_H + "px";
+    d.style.top = layout.tops[i] + "px";
+    d.style.height = layout.heights[i] + "px";
     d.draggable = !!it.id || k === 1;
     const st = S.board && S.board.status ? rowStatus(it) : 0;
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
       `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>` +
       (it.unsaved ? `<span class="u" title="${esc(T("not written to the game yet"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
-    d.title = it.name;
+    if (k === 0 && it.copyLabel) {
+      d.classList.add("copy-item");
+      $(".t",d).textContent="└ " + it.copyLabel;
+      if (layout.heads[i]) { d.classList.add("copy-group-start"); d.prepend(el("span","editor-copy-head",it.name)); }
+    }
+    if (k === 1 && it.copyCount > 1) {d.classList.add("with-copy");d.append(el("span","current-copy","└ " + it.copyLabel));}
+    d.title = it.name + (it.copyLabel ? "  " + it.copyLabel : "");
   }
 }
 
@@ -261,7 +273,7 @@ function historyPanel() {
 
 function rowSig(k, i, it) {
   const c = S.cols[k];
-  return [key(it), it.pos, it.unsaved, it.dim, (it.tags || []).join(","), i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name].join("|");
+  return [key(it), it.pos, it.unsaved, it.dim, (it.tags || []).join(","), i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.copyLabel, it.copyCount, it.lineage].join("|");
 }
 
 // rowStatus mirrors view.RowStatus (missing entries are errors, unloadable rows dim).
@@ -283,9 +295,16 @@ export function ensureVisible(k = S.focus) {
   const box = rowsEl(k);
   if (!box) return;
   const c = S.cols[k];
-  const y = c.cursor * ROW_H;
+  const layout=listGeometry(c.items,c.view,k,ROW_H), y=layout.tops[c.cursor] || 0, h=layout.heights[c.cursor] || ROW_H;
   if (y < box.scrollTop) box.scrollTop = y;
-  else if (y + ROW_H > box.scrollTop + box.clientHeight) box.scrollTop = y + ROW_H - box.clientHeight;
+  else if (y + h > box.scrollTop + box.clientHeight) box.scrollTop = y + h - box.clientHeight;
+}
+
+export function pageDelta(k,direction) {
+ const box=rowsEl(k),c=S.cols[k],layout=listGeometry(c.items,c.view,k,ROW_H);
+ const y=(layout.tops[c.cursor] || 0)+direction*Math.max(ROW_H,box.clientHeight-ROW_H);
+ const next=Math.max(0,Math.min(c.view.length-1,rowAt(layout,y)));
+ return next-c.cursor;
 }
 
 // ---- wiring: scrolling, clicks, drags ----
@@ -389,7 +408,9 @@ function dropTarget(k, box, e) {
   if (k !== 1) return { label: drag.from === k ? "" : label };
   const c = S.cols[1];
   const y = e.clientY - box.getBoundingClientRect().top + box.scrollTop;
-  let i = Math.max(0, Math.min(Math.round(y / ROW_H), c.view.length));
+  const layout=listGeometry(c.items,c.view,k,ROW_H);
+  let i=Math.min(rowAt(layout,y),c.view.length);
+  if(i<c.view.length && y>layout.tops[i]+layout.heights[i]/2)i++;
   const moving = new Set(drag.items.map(key));
   // the list position before view row i
   const posAt = (vi) => c.items[c.view[vi]].pos;

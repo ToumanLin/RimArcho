@@ -65,15 +65,27 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
     facts.innerHTML = sourceIcon(d.kind);
     facts.append(factText(el("span"), d.header));
     box.append(facts);
-    // state
-    const st = el("div", "state");
-    st.innerHTML = (d.status ? statusIcon(d.status) : icon.ok) + `<span class="${d.status > 1 ? "" : "second"}">${esc(d.statusText)}</span>`;
-    if (d.status > 1) {
-      const b = el("button", "", T("show what"));
-      b.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "needs" }));
-      st.append(b);
+    const own = S.cols.flatMap((c)=>c.items).find((it)=>it.id===d.id);
+    const lineage=own?.lineage;
+    const copies=lineage ? S.cols.flatMap((c)=>c.items).filter((it)=>it.id && it.lineage===lineage) : [];
+    if(copies.length>1) {
+      const section=el("div","editor-copies");section.append(el("div","sub",T("copies")));
+      const active=new Set(S.cols[1].items.map((it)=>it.id));
+      for(const it of copies) {
+        const b=el("button","editor-copy"+(it.id===d.id?" on":""));
+        b.append(el("span","",it.copyLabel || it.name));
+        if(active.has(it.id))b.append(el("small","",T("in the current list")));
+        b.title=T("view this copy");b.onclick=()=>showDetail(it,S.cols[2].items.some(x=>x.id===it.id));
+        section.append(b);
+      }
+      if(!active.has(d.id)) {
+        const use=el("button","editor-full-link",T("use this copy in the list"));
+        use.disabled=!!own?.dim;use.title=own?.dim ? d.statusText : "";
+        use.onclick=()=>document.dispatchEvent(new CustomEvent("editor-use-copy",{detail:d.id}));
+        section.append(use);
+      }
+      box.append(section);
     }
-    box.append(st);
     if (d.canSeparate) {
       const b = el("button", "btn", T("do not list as a copy"));
       b.dataset.envWrite = "separate";

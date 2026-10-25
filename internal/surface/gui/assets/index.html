@@ -28,14 +28,17 @@
     <div id="body">
       <div id="planhead" class="page-head" hidden><p class="lead"></p><div class="page-acts"></div></div>
       <main id="board">
-        <div class="fcol" data-col="0"><div class="barhost"></div><section class="area list" data-area="0"><div class="head"></div><div class="rows" tabindex="-1"></div></section></div>
+        <div class="fcol stack editor-left" data-col="detail">
+          <div class="barhost"></div>
+          <section class="area detail" data-area="3"><div class="head"></div><div class="scroll" tabindex="-1"><div id="detail"></div></div></section>
+          <section class="area fold histarea"><button class="head hbar"></button><div class="histbody"></div></section>
+        </div>
         <div class="split" data-split="0"></div>
         <section class="area list" data-area="1"><div class="head"></div><div class="rows" tabindex="-1"></div></section>
         <div class="split" data-split="1"></div>
-        <div class="stack">
-          <section class="area detail" data-area="3"><div class="head"></div><div class="scroll" tabindex="-1"><div id="detail"></div></div></section>
+        <div class="stack editor-right">
+          <section class="area list" data-area="0"><div class="head"></div><div class="rows" tabindex="-1"></div></section>
           <section class="area list fold" data-area="2"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
-          <section class="area fold histarea"><button class="head hbar"></button><div class="histbody"></div></section>
         </div>
       </main>
       <div id="screen" aria-busy="true"></div>

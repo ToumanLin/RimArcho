@@ -75,7 +75,7 @@ func TestLibraryPage(t *testing.T) {
 		t.Errorf("the unused workshop copy beside it (enabling it would clash): %v", got)
 	}
 	hid := libRow(t, p, "Hid")
-	if !hid.Single || hid.State != "被其它管理器隐藏" || hid.Source != "工坊" || hid.Insts[0].Name != "5600" {
+	if !hid.Single || hid.State != "被其它管理器隐藏" || hid.Source != "工坊" || hid.Insts[0].Name != "工坊" {
 		t.Errorf("hidden: %+v", hid)
 	}
 	if got := kinds(hid.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "folder", "workshop", "steam", "unhide", "unsubscribe"}) {

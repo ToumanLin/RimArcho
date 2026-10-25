@@ -54,7 +54,7 @@ const (
 var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibGit, LibPage, LibExtra, LibMonitor}
 
 // Library filter keys (LibQuery Include / Exclude are "key:value").
-var LibKeys = []string{"tag", "source", "location", "version", "state", "used", "updated"}
+var LibKeys = []string{"tag", "source", "location", "version", "state", "used", "updated", "content", "has", "name", "author", "id"}
 
 // LibAges are the updated: values (06 §2.9): within a week, a month, half a year, and
 // older. They nest: a copy updated three days ago is in week, month and half-year.
@@ -91,12 +91,15 @@ type LibInstance struct {
 	Subscription *subscribe.Record
 	// Mod is the instance (a tombstone for a missing item RimArcho saw before; nil for one it
 	// never saw).
-	Mod        *store.Mod
-	Ref        string // "#…", or "ws:<id>" for an item never seen
-	Source     string // LibSources
-	WorkshopID string
-	Path       string
-	Location   string // registered source root; retained for subscribed items not on disk
+	Mod             *store.Mod
+	Ref             string // "#…", or "ws:<id>" for an item never seen
+	DirectoryValues []string
+	DirectoryName   string
+	Content         int
+	Source          string // LibSources
+	WorkshopID      string
+	Path            string
+	Location        string // registered source root; retained for subscribed items not on disk
 	// Created: when RimArcho first saw the copy; a lock library copy's copy time when
 	// origin.json has it.
 	Created  time.Time
@@ -258,6 +261,14 @@ func (a *App) Library() (*Library, error) {
 			pinUpdated[h.Copy.ID] = true
 		}
 	}
+	snaps := map[string]int64{}
+	for _, m := range ix.Mods {
+		snaps[m.ID] = m.SnapID
+	}
+	contents, err := a.Store.ContentKinds(snaps)
+	if err != nil {
+		return nil, err
+	}
 	srcKind := map[string]string{}
 	for _, s := range ix.Sources {
 		switch {
@@ -329,6 +340,8 @@ func (a *App) Library() (*Library, error) {
 		}
 		if s := ix.Source(m.SourceID); s != nil {
 			i.Location = s.Root
+			i.DirectoryValues, i.DirectoryName = a.DirectoryValues(s), DirectoryName(s)
+			i.Content = contents[m.ID]
 		}
 		i.PNG = m.SnapID != 0 && png[m.SnapID]
 		if t, ok := texs[m.ID]; ok {
@@ -345,7 +358,7 @@ func (a *App) Library() (*Library, error) {
 			}
 		}
 		i.Created = m.FirstSeen
-		if i.Source == LibLocked {
+		if m.Origin != "" {
 			var og scan.Origin
 			if json.Unmarshal([]byte(m.Origin), &og) == nil && og.CopiedAt != "" {
 				if t, err := time.Parse(time.RFC3339, og.CopiedAt); err == nil {
@@ -754,6 +767,9 @@ type LibResult struct {
 func ParseLibFilter(f string) (key, value string, err error) {
 	k, v, ok := strings.Cut(f, ":")
 	k = strings.ToLower(strings.TrimSpace(k))
+	if k == "tags" {
+		k = "tag"
+	}
 	if !ok || v == "" || !slices.Contains(LibKeys, k) {
 		return "", "", fmt.Errorf("bad filter %q: want key:value with key %s", f, strings.Join(LibKeys, ", "))
 	}
@@ -771,7 +787,48 @@ func libValues(l *LibLineage, i *LibInstance, key string, now time.Time) []strin
 	case "tag":
 		return l.Tags
 	case "source":
+		if len(i.DirectoryValues) > 0 {
+			return i.DirectoryValues
+		}
 		return []string{i.Source}
+	case "content":
+		if i.Mod == nil {
+			return nil
+		}
+		if i.Content&store.HasDLL != 0 {
+			return []string{"assembly"}
+		}
+		if i.Content&store.HasDefsPatch == 0 && i.Content&store.HasLanguages != 0 {
+			return []string{"xml", "language"}
+		}
+		return []string{"xml"}
+	case "has":
+		var vs []string
+		if len(i.States) > 0 {
+			vs = append(vs, "problem")
+		}
+		if i.State() == LibUnloadable || i.Missing() {
+			vs = append(vs, "error")
+		}
+		if l.Note != "" {
+			vs = append(vs, "note")
+		}
+		if len(l.Tags) > 0 {
+			vs = append(vs, "tag")
+		}
+		if l.Alias != "" {
+			vs = append(vs, "alias")
+		}
+		return vs
+	case "name":
+		return []string{l.Name}
+	case "author":
+		return []string{i.Authors}
+	case "id":
+		if i.Mod != nil {
+			return []string{i.Mod.PackageID, i.Ref, i.WorkshopID}
+		}
+		return []string{i.Ref, i.WorkshopID}
 	case "location":
 		if i.Location != "" {
 			return []string{i.Location}
@@ -811,12 +868,13 @@ type libCond struct {
 	words    []string
 	// tags are the library's tag names (lower case): tag:<v> naming one of them is that tag
 	// (a click on the filter column); any other v matches tags by word (TagMatch).
-	tags map[string]bool
-	now  time.Time
+	tags      map[string]bool
+	exactTags map[string]bool
+	now       time.Time
 }
 
 func (q LibQuery) cond() (*libCond, error) {
-	c := &libCond{inc: map[string]map[string]bool{}, exc: map[string]map[string]bool{}, words: strings.Fields(strings.ToLower(q.Search))}
+	c := &libCond{inc: map[string]map[string]bool{}, exc: map[string]map[string]bool{}, exactTags: map[string]bool{}, words: strings.Fields(strings.ToLower(q.Search))}
 	for _, set := range []struct {
 		in []string
 		to map[string]map[string]bool
@@ -830,6 +888,9 @@ func (q LibQuery) cond() (*libCond, error) {
 				set.to[k] = map[string]bool{}
 			}
 			set.to[k][strings.ToLower(v)] = true
+			if strings.HasPrefix(strings.ToLower(f), "tags:") {
+				c.exactTags[strings.ToLower(v)] = true
+			}
 		}
 	}
 	return c, nil
@@ -851,6 +912,34 @@ func (c *libCond) passes(l *LibLineage, i *LibInstance, skip string) bool {
 }
 
 func (c *libCond) has(l *LibLineage, i *LibInstance, k string, want map[string]bool) bool {
+	if k == "source" {
+		for v := range want {
+			switch v {
+			case "steamworkshop":
+				v = LibWorkshop
+			case "localmods":
+				v = LibLocal
+			case "archolocked", "copy":
+				v = LibLocked
+			case "extra":
+				v = "other"
+			}
+			if anyIn(libValues(l, i, k, c.now), map[string]bool{v: true}, true) || v == i.Source {
+				return true
+			}
+		}
+		return false
+	}
+	if k == "name" || k == "author" || k == "id" {
+		for _, value := range libValues(l, i, k, c.now) {
+			for v := range want {
+				if strings.Contains(strings.ToLower(value), v) {
+					return true
+				}
+			}
+		}
+		return false
+	}
 	if anyIn(libValues(l, i, k, c.now), want, true) {
 		return true
 	}
@@ -858,7 +947,7 @@ func (c *libCond) has(l *LibLineage, i *LibInstance, k string, want map[string]b
 		return false
 	}
 	for v := range want {
-		if c.tags[v] {
+		if c.tags[v] || c.exactTags[v] {
 			continue
 		}
 		for _, t := range l.Tags {
@@ -907,6 +996,9 @@ func (lib *Library) Filter(q LibQuery) (*LibResult, error) {
 					all[k] = map[string]string{}
 				}
 				for _, v := range libValues(l, i, k, c.now) {
+					if strings.TrimSpace(v) == "" {
+						continue
+					}
 					if _, ok := all[k][strings.ToLower(v)]; !ok {
 						all[k][strings.ToLower(v)] = v
 					}

@@ -9,7 +9,7 @@ import { api, on, setText } from "./api.js";
 import "./window-theme.js";
 import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
-import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
+import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
 import { showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
@@ -279,6 +279,7 @@ export function foldShortcuts(list) {
 // ---- moving (navigation only: rule 1) ----
 
 function focusArea(k) {
+  if(k===3 && !$('.area[data-area="3"]').getClientRects().length)return verb("full");
   if (k === S.focus) return;
   if (S.focus < 3 && k < 3 && col().sel.size) {
     col().sel.clear(); // switching to another list clears the selection (06 §3.4)
@@ -361,10 +362,21 @@ async function edited(p, undoable = true, ids = null) {
   return r;
 }
 
+// Browsing another copy in the detail must also retarget its keys and menu.
+function actionContext() {
+  if (S.focus === 3 && S.detail?.id) {
+    for (let k = 0; k < 3; k++) {
+      const item = S.cols[k].items.find((it) => it.id === S.detail.id);
+      if (item) return { k, sel: [item] };
+    }
+  }
+  const k = S.focus < 3 ? S.focus : lastList;
+  return { k, sel: S.focus < 3 ? selection() : (cur(k) ? [cur(k)] : []) };
+}
+
 async function verb(name) {
   if (environmentReason() && !["full", "workshop", "folder", "workshop-id", "steam", "needs"].includes(name)) return say("busy", environmentReason());
-  const k = S.focus < 3 ? S.focus : lastList;
-  const sel = S.focus < 3 ? selection() : (cur(lastList) ? [cur(lastList)] : []);
+  const { k, sel } = actionContext();
   const ids = idsOf(sel);
   switch (name) {
     case "toggle":
@@ -389,6 +401,7 @@ async function verb(name) {
     case "tags":
       return pop.tags(sel);
     case "full":
+      if (S.focus===3 && S.detail?.id) return fullPage.full("plan",S.detail.id);
       if (sel.length && sel[0].id) { lastList = k; return scr.full(); }
       return;
     case "workshop":
@@ -396,7 +409,7 @@ async function verb(name) {
       return say("", T("not a workshop mod"));
     // ctrl+o / ctrl+w: the cursor's mod, not the details (they may still be loading)
     case "folder": case "workshop-id": case "steam": {
-      const it = S.focus < 3 ? cur() : cur(lastList);
+      const it = S.focus < 3 ? cur() : sel[0];
       if (!it || !it.id) return say("", name === "folder" ? T("RimArcho has not seen this copy: no folder") : T("no Workshop ID: not a Workshop mod"));
       if (name === "folder") return api.OpenFolder(it.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
       if (name === "steam") return api.OpenSteamWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
@@ -646,7 +659,7 @@ let onHistoryPick = () => {};
 
 // changesOfCursor: the 变化 page with only the cursor's mod (C; the detail's link).
 function changesOfCursor() {
-  const it = cur(S.focus < 3 ? S.focus : lastList);
+  const it = actionContext().sel[0];
   if (it && it.id) document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: it.id, name: it.name } }));
 }
 
@@ -654,15 +667,15 @@ function changesOfCursor() {
 // (the splits' drag and double click, 06 §2.5).
 function widthKey(d) {
   const board = $("#board");
-  const k = S.focus < 2 ? S.focus : 2;
-  if (!d) { [0, 1, 2].forEach((j) => board.style.removeProperty(`--c${j}`)); api.SetSetting("ui.gui.columns:" + ((S.board && S.board.env) || ""), "").catch(() => {}); return; }
+  const k = S.focus === 3 ? 0 : S.focus === 1 ? 1 : 2;
+  if (!d) { [0, 1, 2].forEach((j) => board.style.removeProperty(`--c${j}`)); api.SetSetting("ui.gui.columns.v2:" + ((S.board && S.board.env) || ""), "").catch(() => {}); return; }
   const ws = COLS().map((a) => a.getBoundingClientRect().width);
   const other = k === 2 ? 1 : k + 1;
   const step = 24 * d;
   if (ws[k] + step < 160 || ws[other] - step < 160) return;
   ws[k] += step; ws[other] -= step;
   ws.forEach((v, j) => board.style.setProperty(`--c${j}`, v + "fr"));
-  api.SetSetting("ui.gui.columns:" + ((S.board && S.board.env) || ""), [0, 1, 2].map((j) => board.style.getPropertyValue(`--c${j}`)).join(",")).catch(() => {});
+  api.SetSetting("ui.gui.columns.v2:" + ((S.board && S.board.env) || ""), [0, 1, 2].map((j) => board.style.getPropertyValue(`--c${j}`)).join(",")).catch(() => {});
   for (const j of [0, 1, 2]) renderRows(j);
 }
 
@@ -682,8 +695,8 @@ function subPage(d) {
 // ---- the row menu (06 §8.5): the same groups and order as Mod 库存's, from view.RowOps ----
 
 async function openRowMenu(x, y, keys) {
-  const k = S.focus < 3 ? S.focus : lastList;
-  const it = cur(k);
+  const { k, sel } = actionContext();
+  const it = sel[0];
   if (!it) return;
   let codes = [];
   // a list entry with no mod: only out of the list
@@ -706,7 +719,7 @@ function menuAtCursor() {
 async function rowOp(code) {
   const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", workshop: "workshop-id", steam: "steam" };
   if (verbs[code]) return verb(verbs[code]);
-  const sel = S.focus < 3 ? selection() : (cur(lastList) ? [cur(lastList)] : []);
+  const { sel } = actionContext();
   const ids = idsOf(sel);
   if (!ids.length) return;
   const o = ops.op(code);
@@ -729,8 +742,8 @@ async function rowOp(code) {
 
 // delKey: Del unsubscribes the Workshop copy or deletes one of the player's own (asks first).
 async function delKey() {
-  const k = S.focus < 3 ? S.focus : lastList;
-  const it = cur(k);
+  const { k, sel } = actionContext();
+  const it = sel[0];
   if (!it || !it.id) return;
   const codes = await api.RowOps(k, it.id).catch(() => []);
   const c = ops.keyed(codes, "Del");
@@ -811,14 +824,16 @@ function onKey(e) {
     if (S.focus === 3) return scrollDetail(k === "ArrowDown" ? 1 : -1, false), renderWhere();
     return moveCursor(k === "ArrowDown" ? 1 : -1, e.shiftKey);
   }
-  if (k === "ArrowLeft" || k === "ArrowRight") { handled(); return focusArea(Math.max(0, Math.min(3, S.focus + (k === "ArrowRight" ? 1 : -1)))); }
+  if (k === "ArrowLeft" || k === "ArrowRight") {
+    handled();const areas=[3,1,0],at=areas.indexOf(S.focus===2?0:S.focus);
+    return focusArea(areas[Math.max(0,Math.min(2,at+(k==="ArrowRight"?1:-1)))]);
+  }
   // PgUp / PgDn move the cursor a page (06 §3.3); in the details they scroll them
   if (k === "PageDown" || k === "PageUp") {
     handled();
     if (S.focus === 3) { scrollDetail(k === "PageDown" ? 1 : -1, true); return renderWhere(); }
     const box = $(`.area[data-area="${S.focus}"] .rows`);
-    const page = Math.max(1, Math.floor(box.clientHeight / 28) - 1);
-    return moveCursor(k === "PageDown" ? page : -page, e.shiftKey);
+    return moveCursor(pageDelta(S.focus,k === "PageDown" ? 1 : -1), e.shiftKey);
   }
   if (k === "Home" || k === "End") { handled(); if (S.focus < 3) moveCursor(k === "End" ? 1e9 : -1e9, e.shiftKey); return; }
   if (!ctrl && "1234".includes(k) && k.length === 1) { handled(); return focusArea(+k - 1); }
@@ -871,13 +886,12 @@ function onKey(e) {
 
 // ---- the column widths (06 §7) ----
 
-// Three columns: 未启用, 已启用, and 详情 with 暂存 and 历史 under it. split 0 is between the
-// first two, split 1 before the third. Widths are fr values per environment.
-const COLS = () => [$("#board > .fcol"), $('.area[data-area="1"]'), $("#board .stack")];
+// Three spatial columns: detail/history, enabled, inactive/staging.
+const COLS = () => [$("#board > .fcol"), $('.area[data-area="1"]'), $("#board .editor-right")];
 
 function wireSplits() {
   const board = $("#board");
-  const key = () => "ui.gui.columns:" + ((S.board && S.board.env) || "");
+  const key = () => "ui.gui.columns.v2:" + ((S.board && S.board.env) || "");
   $$("#board > .split").forEach((sp) => {
     const lo = +sp.dataset.split, hi = lo + 1;
     wireSeparator(sp, {
@@ -894,9 +908,9 @@ function wireSplits() {
       changed: () => { for (const k of [0, 1, 2]) renderRows(k); },
     });
   });
-  // Expanded staging/history share the detail column (06 §3.1, 06 §2.5).
-  const stack = board.querySelector(".stack");
-  stack.querySelectorAll(".fold").forEach((card, i) => {
+  // Each fold shares its own parent column (06 §3.1, 06 §2.5).
+  board.querySelectorAll(".stack > .fold").forEach((card) => {
+    const stack = card.parentElement;
     const gap = el("div", "hsplit stack-split");
     stack.insertBefore(gap, card);
     const set = (v) => {
@@ -905,7 +919,7 @@ function wireSplits() {
       else card.style.removeProperty("--stack-size");
     };
     wireSeparator(gap, {
-      axis: "y", direction: -1, key: "ui.gui.plan." + (i ? "history" : "stage"),
+      axis: "y", direction: -1, key: "ui.gui.plan." + (card.dataset.area === "2" ? "stage" : "history"),
       enabled: () => card.classList.contains("open") && !card.hidden,
       range: () => [72, stack.clientHeight - 148 - [...stack.querySelectorAll(".fold")]
         .filter((other) => other !== card).reduce((h, other) => h + other.getBoundingClientRect().height, 0)],
@@ -916,11 +930,9 @@ function wireSplits() {
 }
 
 async function loadWidths() {
-  const v = await api.Setting("ui.gui.columns:" + ((S.board && S.board.env) || ""));
+  const v = await api.Setting("ui.gui.columns.v2:" + ((S.board && S.board.env) || ""));
   const board = $("#board");
   let ws = (v || "").split(",");
-  // saved by the four-column board: 未启用, 已启用, 暂存, 详情 — 详情's is the third column's now
-  if (ws.length === 4) ws = [ws[0], ws[1], ws[3]];
   ws.slice(0, 3).forEach((w, j) => { if (w) board.style.setProperty(`--c${j}`, w); });
 }
 
@@ -960,14 +972,25 @@ async function start() {
   library.initLibrary(ui);
   tasksPage.initTasks(ui);
   S.bar = createBar({ data: () => S.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:plan",
-    column: () => $("#board > .fcol"), resized: () => renderRows(0), leave: () => focusArea(S.focus < 2 ? S.focus : 0),
-    placeholder: T("search: words, tag:, author:, type:, has:, version:, -not") + "  /" });
+    column: () => $("#board > .fcol"), resized: () => renderRows(0), leave: () => focusArea(lastList < 2 ? lastList : 1),
+    placeholder: T("search: words, tags:, source:, content:") + "  /" });
   $("#board .barhost").replaceWith(S.bar.el);
-  $('.area[data-area="0"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
+  $('.area[data-area="3"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
   wireLists(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
+  document.addEventListener("editor-full",()=>fullPage.full("plan",S.detail?.id));
+  document.addEventListener("editor-use-copy", async (e) => {
+    if(environmentReason())return say("busy",environmentReason());
+    const result = await edited(api.RunOp("use",[e.detail]),true,[e.detail]);
+    if (!result) return;
+    const c = S.cols[1], at = c.view.findIndex((i) => c.items[i].id === e.detail);
+    if (at >= 0) { c.cursor = at; lastList = 1; ensureVisible(1); renderLists(); }
+    const item = c.items.find((it) => it.id === e.detail);
+    if (item) await showDetail(item, false);
+    renderWhere(); renderHints();
+  });
   // The detail button always acts on the shown instance, independently of list selection.
   document.addEventListener("separate-mod", async (e) => {
     await edited(api.RunOp("separate", [e.detail]), false, [e.detail]);

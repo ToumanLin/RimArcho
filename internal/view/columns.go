@@ -33,23 +33,28 @@ const (
 
 // Item is one row of a column.
 type Item struct {
-	ID       string   `json:"id"`
-	Ref      string   `json:"ref"`
-	Name     string   `json:"name"` // the alias when there is one
-	Kind     string   `json:"kind"` // official, workshop, local, copy, git (06 §3.7 type:)
-	SteamCMD bool     `json:"steamcmd,omitempty"`
-	Pos      int      `json:"pos,omitempty"`     // 1-based load position (enabled column)
-	Unsaved  bool     `json:"unsaved,omitempty"` // changed since the last save
-	Dim      bool     `json:"dim,omitempty"`     // cannot be loaded
-	Missing  bool     `json:"missing,omitempty"` // a ModsConfig entry with no installed mod
-	Tags     []string `json:"tags,omitempty"`
-	Alias    bool     `json:"alias,omitempty"`
-	Note     string   `json:"-"`
-	Package  string   `json:"-"`
-	Workshop string   `json:"-"`
-	Author   string   `json:"-"`
-	Versions []string `json:"-"` // the game versions it supports ("1.6")
-	Location string   `json:"-"` // the registered source root, including for linked mods
+	Lineage     string            `json:"lineage,omitempty"`
+	CopyLabel   string            `json:"copyLabel,omitempty"`
+	CopyCount   int               `json:"copyCount,omitempty"`
+	Sources     []string          `json:"-"`
+	SourceNames map[string]string `json:"-"`
+	ID          string            `json:"id"`
+	Ref         string            `json:"ref"`
+	Name        string            `json:"name"` // the alias when there is one
+	Kind        string            `json:"kind"` // official, workshop, local, copy, git (06 §3.7 type:)
+	SteamCMD    bool              `json:"steamcmd,omitempty"`
+	Pos         int               `json:"pos,omitempty"`     // 1-based load position (enabled column)
+	Unsaved     bool              `json:"unsaved,omitempty"` // changed since the last save
+	Dim         bool              `json:"dim,omitempty"`     // cannot be loaded
+	Missing     bool              `json:"missing,omitempty"` // a ModsConfig entry with no installed mod
+	Tags        []string          `json:"tags,omitempty"`
+	Alias       bool              `json:"alias,omitempty"`
+	Note        string            `json:"-"`
+	Package     string            `json:"-"`
+	Workshop    string            `json:"-"`
+	Author      string            `json:"-"`
+	Versions    []string          `json:"-"` // the game versions it supports ("1.6")
+	Location    string            `json:"-"` // the registered source root, including for linked mods
 
 	Lower string `json:"-"` // sort key
 	// search fields (06 §3.7), lower case
@@ -109,12 +114,57 @@ func BuildBoard(a *app.App) (*Board, error) {
 		}
 		b.Cols[Inactive] = append(b.Cols[Inactive], ModItem(st, mod))
 	}
+	counts := map[string]int{}
+	for _, m := range st.Ix.Mods {
+		if m.Status == identity.Live {
+			counts[m.LineageID]++
+		}
+	}
+	// Different releases can have different About.xml names. Use one heading per
+	// lineage, preferring the name already used in the enabled list.
+	names := map[string]string{}
+	for _, k := range []Column{Active, Staging, Inactive} {
+		for _, it := range b.Cols[k] {
+			if it.Lineage != "" && names[it.Lineage] == "" {
+				names[it.Lineage] = it.Name
+			}
+		}
+	}
+	for k := range b.Cols {
+		for i := range b.Cols[k] {
+			it := &b.Cols[k][i]
+			m := st.Ix.ByID[it.ID]
+			if m == nil {
+				continue
+			}
+			if k == int(Inactive) {
+				it.Name = names[it.Lineage]
+				it.Lower = strings.ToLower(it.Name)
+				it.names += " " + it.Lower
+				it.text += " " + it.Lower
+			}
+			it.CopyCount = counts[m.LineageID]
+			it.CopyLabel = CopyCaption(a, st, m)
+			s := st.Ix.Source(m.SourceID)
+			it.Sources = a.DirectoryValues(s)
+			it.SourceNames = map[string]string{}
+			if s != nil && a.DirectoryRole(s) == "other" {
+				it.SourceNames[app.DirectoryAlias(s)] = app.DirectoryName(s)
+			}
+		}
+	}
 	ina := b.Cols[Inactive]
 	sort.SliceStable(ina, func(i, j int) bool {
 		if c := order.CompareOfficial(ina[i].Package, ina[j].Package); c != 0 {
 			return c < 0
 		}
-		return ina[i].Lower < ina[j].Lower
+		if ina[i].Lower != ina[j].Lower {
+			return ina[i].Lower < ina[j].Lower
+		}
+		if ina[i].Lineage != ina[j].Lineage {
+			return ina[i].Lineage < ina[j].Lineage
+		}
+		return ina[i].CopyLabel < ina[j].CopyLabel
 	})
 	if qs, err := a.Store.Questions(st.Ix.Env.ID, false); err == nil {
 		b.Questions = len(qs)
@@ -130,7 +180,7 @@ func BuildBoard(a *app.App) (*Board, error) {
 
 // ModItem is the row of one installed mod.
 func ModItem(st *app.LoadoutState, mod *store.Mod) Item {
-	it := Item{ID: mod.ID, Ref: st.Ix.Ref(mod.ID), Name: mod.DisplayName()}
+	it := Item{Lineage: mod.LineageID, ID: mod.ID, Ref: st.Ix.Ref(mod.ID), Name: mod.DisplayName()}
 	it.Lower = strings.ToLower(it.Name)
 	it.names = strings.ToLower(it.Name + " " + mod.Name)
 	it.Author, it.author = mod.Authors, strings.ToLower(mod.Authors)

@@ -16,6 +16,11 @@ library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
     state: missing 1, residue 1
     used: none 5, plan:default 1
     updated: week 2, month 4, half-year 4
+    content: xml 4
+    has: error 1, problem 2, tag 1
+    name: Gone 1, Idle 1, Lockable 1, Oldie 1, Workshop item 5300 1
+    author: Tester 4
+    id: #6olp 1, #hnyg 1, #iqmu 1, #nyh3 1, #z3bw 1, 5100 1, 5200 1, 5300 1, 5400 1, 5500 1, tester.gone 1, tester.idle 1, tester.lock 1, tester.old 1, ws:5300 1
 
 $ archo library --include location:$ROOT/Steam/steamapps/common/RimWorld/Mods
 library: 1 of 5 mods match (location:$ROOT/Steam/steamapps/common/RimWorld/Mods)
@@ -55,6 +60,11 @@ library: 1 of 5 mods match (tag:QoL)
     state: missing 0, residue 0
     used: none 1, plan:default 0
     updated: week 0, month 1, half-year 1
+    content: xml 1
+    has: error 0, problem 0, tag 1
+    name: Gone 0, Idle 1, Lockable 0, Oldie 0, Workshop item 5300 0
+    author: Tester 1
+    id: #6olp 0, #hnyg 1, #iqmu 0, #nyh3 0, #z3bw 0, 5100 0, 5200 1, 5300 0, 5400 0, 5500 0, tester.gone 0, tester.idle 1, tester.lock 0, tester.old 0, ws:5300 0
 
 $ archo library --sort size --include source:workshop
 library: 5 of 5 mods match (source:workshop)
@@ -86,7 +96,7 @@ ws:5300 Workshop item 5300  [1 copy, —]
     states: subscribed, not on disk
 
 $ archo library --include colour:red
-error: bad filter "colour:red": want key:value with key tag, source, location, version, state, used, updated
+error: bad filter "colour:red": want key:value with key tag, source, location, version, state, used, updated, content, has, name, author, id
 [exit 1]
 
 $ archo library --include state:hidden

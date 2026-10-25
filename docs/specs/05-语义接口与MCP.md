@@ -210,7 +210,7 @@ next:
 | | `problems [--subject <引用>] [--code <代码或前缀>] [--severity <级别>] [--min-severity <级别>] [--all] [--detail] [--ignored] [--no-analyze]` | 问题列表（03 §4）。分析过期时先在子进程重建，`--no-analyze` 不重建 |
 | | `problems show\|ignore\|unignore <p:引用>` | 一个问题的证据和修复命令；忽略到它的 Mod 变化为止；取消忽略 |
 | | `changes [<引用>] [--since scan:<n>\|<天数>d\|YYYY-MM-DD] [--all]` | 变化事件，默认最近一次扫描 |
-| | `library [--search <词>] [--include <键:值>]… [--exclude <键:值>]… [--sort name\|size\|changed\|played] [--lineage <引用>] [--facets] [--all]` | Mod 库存（06 §2.9）：一行一个 Lineage（几份、合计大小、最要紧的状态、用在）；`--lineage` 列出每一份的路径、状态、方案、上次游玩和动作命令；`--facets` 列出每个筛选值和个数 |
+| | `library [--search <词>] [--include <键:值>]… [--exclude <键:值>]… [--sort name\|size\|changed\|played] [--lineage <引用>] [--facets] [--all]` | Mod 库存（06 §2.9）：一行一个 Lineage（几份、合计大小、最要紧的状态、用在）；`--lineage` 列出每一份的路径、状态、方案、上次游玩和动作命令；`--facets` 列出每个筛选值和个数；新增 `tags:`（精确标签）、`content:`、`has:`、`name:`、`author:`、`id:`，`source:` 的目录角色与稳定别名见 02 §0.2，旧 `location:` 保留 |
 | | `library remove-from-plans <引用…>` | 从所有方案（同一游戏目录的所有环境）里拿掉，每个方案一步撤销 |
 | | `library move-to-locked <引用> [--dry-run]` | 把 `Mods/` 里的备用副本收进锁定库；Instance 不变，各方案照用（06 §2.9） |
 | | `log [--cluster <E#>] [--file <路径>] [--prev] [--text <文本>] [--select] [--all] [--since <游标>]` | 日志归因（03 §6）。`--prev` 读 Player-prev.log；`--text` 分析粘贴的日志或堆栈；`--select` 让 `problems` 纳入这份日志。簇列表带一行 `cursor: log1.…`；`--since <游标>` 只列这之后新出现（`new`）或次数增加（`+N`）的簇，游戏重启过时说明游标已过期并列出新一次运行的全部簇（03 §6.6）；不与 `--cluster`、`--text` 同用 |

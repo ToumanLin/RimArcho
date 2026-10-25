@@ -92,7 +92,7 @@ function bar() {
       data: () => L.page,
       change: () => { L.cur = 0; load(); },
       leave: () => els && els.rows.focus(),
-      placeholder: T("search: words, tag:, state:, source:, used:, -not") + "  /",
+      placeholder: T("search: words, tags:, source:, content:") + "  /",
     });
   }
   return L.bar;
@@ -330,7 +330,7 @@ function nameCell(x) {
   } else if (x.lone) {
     left.append(el("span", "t", x.r.name));
   } else {
-    left.append(el("span", "tree", "└"), el("span", "t kind", x.i.name || x.i.label));
+    left.append(el("span", "tree", "└"), el("span", "t kind", x.i.label || x.i.name));
   }
   if (x.t === "inst" && x.i.inPlan) left.append(el("span", "here", "●"));
   return left;
@@ -452,6 +452,10 @@ async function drawDetail() {
   els.dhead.append(el("span", "n", "3"), el("span", "t", T("details")));
   if (i) els.dhead.append(el("span", "q word-facts", (row ? row.name : "") + "  " + i.label));
   if (!i) { box.innerHTML = ""; box.dataset.ref = ""; return; }
+  const openFull = el("button", "editor-full-link", T("view full details") + "  Enter ↵");
+  openFull.onmousedown = (e) => e.stopPropagation();
+  openFull.onclick = (e) => { e.stopPropagation(); full("library", i.id || i.ref); };
+  els.dhead.append(openFull);
   const same = box.dataset.ref === i.ref && box.dataset.stamp === stampOf(i);
   if (same) return;
   if (box.dataset.ref === i.ref && box.querySelector(".lib-note.editing")) return; // keep a note being written
