@@ -47,7 +47,7 @@ func TestWorkshopSourceCheckKeepsKnownUpdateOnFailure(t *testing.T) {
 			t.Fatal("failed check discarded known update")
 		}
 	}
-	if !after.At.After(before.At) || !strings.Contains(after.Result, "503") {
+	if !after.At.After(before.At) || len(after.Failures) != 1 || !strings.Contains(after.Failures[0].Reason, "503") {
 		t.Fatalf("failure status: %+v", after)
 	}
 	// The dry run cannot start Steam; execution sends only the requested item.

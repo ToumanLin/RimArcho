@@ -1254,7 +1254,7 @@ async function refreshSettingTasks(values = false) {
       const actions = JSON.stringify(it.actions || []);
       if (row.dataset.settingActions !== actions) {
         row.querySelectorAll("[data-setting-action]").forEach(b => b.remove());
-        renderSettingActions(row.querySelector(".r"), it.actions, settingRunner(settings));
+        renderSettingActions(row.querySelector(".r"), it.actions, settingRunner(settings), it);
         row.dataset.settingActions = actions;
       }
     }
@@ -1341,9 +1341,9 @@ function settingRunner(again) {
   return async (argv, value, after, background = false) => {
     const screen = S.screen, epoch = S.screenSeq;
     try {
-      const out = argv[0] === "account" ? await api.AccountAction(argv[1], argv[2]) : await api.ApplySetting(argv, value || "");
+      const out = argv[0] === "account" ? (argv[1] === "steamcmd" && argv[2] === "login" ? await api.SteamLogin(value) : await api.AccountAction(argv[1], argv[2])) : await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
-    } catch (e) { say("fail", errText(e)); }
+    } catch (e) { if (S.screen === screen && S.screenSeq === epoch) say("fail", errText(e)); return; }
     if (S.screen !== screen || S.screenSeq !== epoch) return;
     if (background) return refreshSettingTasks(true);
     if (after) return after();
@@ -1411,7 +1411,7 @@ function renderGroups(w, groups, again) {
       } else {
         right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
       }
-      renderSettingActions(right, it.actions, run);
+      renderSettingActions(right, it.actions, run, it);
       row.append(left, right);
       card.append(row);
     }
@@ -1419,7 +1419,7 @@ function renderGroups(w, groups, again) {
   }
 }
 
-function renderSettingActions(right, actions, run) {
+function renderSettingActions(right, actions, run, item) {
   for (const a of actions || []) {
     // 卸载 RimArcho is its own page with the plan; every other action is a command
     if (a.argv[0] === "uninstall") {
@@ -1427,15 +1427,45 @@ function renderSettingActions(right, actions, run) {
       b.dataset.settingAction = a.argv.join(" ");
       right.append(b); continue;
     }
-    const submit = () => {
+    const submit = (value = "") => {
       if (a.argv[0] === "account") {
         b.disabled = true; b.textContent = a.label + "…"; say("busy", a.label + "…");
-        return run(a.argv, "").finally(() => { b.disabled = false; b.textContent = a.label; });
+        return run(a.argv, value).finally(() => { b.disabled = false; b.textContent = a.label; });
       }
       if (a.task) { b.disabled = true; b.textContent = a.pending; }
       return run(a.argv, "", null, !!a.task);
     };
-    const b = button(a.label, "", () => a.confirm ? pop.confirm(a.label, [a.confirm], a.label, submit) : submit(), "", a.argv.join(" "));
+    const b = button(a.label, "", async () => {
+      if (a.input !== undefined) {
+        if (right.querySelector(".account-login")) { right.querySelector(".account-login input").focus(); return; }
+        const form = el("form", "account-login subscribe-row"), input = el("input", "field small");
+        input.value = a.input; input.spellcheck = false; input.autocomplete = "username";
+        input.setAttribute("aria-label", T("Steam account name"));
+        input.placeholder = T("Steam account name");
+        const hint = el("span", "muted", T("enter to log in, esc to cancel"));
+        const close = () => { form.remove(); b.hidden = false; b.focus(); };
+        form.append(input, hint); b.hidden = true; right.append(form); input.focus(); input.select();
+        form.onsubmit = e => {
+          e.preventDefault(); e.stopPropagation();
+          const name = input.value.trim();
+          if (!name || /^(anonymous|匿名)$/i.test(name)) { say("fail", T("enter a Steam account name first")); input.focus(); return; }
+          close(); submit(name);
+        };
+        form.onkeydown = e => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); form.requestSubmit(); } };
+        return;
+      }
+      if (a.argv[0] === "deps" && a.argv[1] === "install") {
+        b.disabled = true;
+        try {
+          const offer = await api.ToolInstallOffer(a.argv[2]);
+          pop.confirm(a.label, [a.confirm, Tf("source: %s", offer.url), Tf("target folder: %s", offer.dir),
+            offer.bytes > 0 ? Tf("size: %s bytes", offer.bytes) : T("size unknown")], a.label, () => submit());
+        } catch (e) { say("fail", errText(e)); }
+        finally { b.disabled = false; }
+        return;
+      }
+      if (a.confirm) pop.confirm(a.label, [a.confirm], a.label, () => submit()); else submit();
+    }, "", a.argv.join(" "));
     b.dataset.settingAction = a.argv.join(" ");
     if (a.task) {
       b.dataset.settingTask = a.task;

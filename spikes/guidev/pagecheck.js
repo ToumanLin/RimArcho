@@ -1,7 +1,7 @@
 // Open /dev/pagecheck in guidev. Test real modules/DOM with delayed API replies and
 // synthetic large logs; the mock runtime makes this page independent of user data.
 import { handlers, emit } from "./pagecheck-runtime.js";
-import { S, api, T } from "/js/state.js";
+import { S, api, T, Tf } from "/js/state.js";
 import * as screens from "/js/screens.js";
 import * as library from "/js/library.js";
 import * as lists from "/js/lists.js";
@@ -66,29 +66,78 @@ try {
     before: "100 MB", after: "80 MB", mods: 0, ok: true };
   handlers.set("BuildPageResult", () => buildPreview);
   handlers.set("Backgrounds", () => backgrounds);
-  await test("accounts stay offline on entry, mask secrets, focus actions, and ignore late completion", async () => {
-    const accountGroups = [{ title: "账户", items: [
-      { label: "SteamCMD", value: "匿名；尚未验证", editValue: "", edit: "text", argv: ["config", "set", "steamcmd.account", "{}"],
-        note: "C:\\fixture\\steamcmd.exe；最后验证：-；到期未知", notePaths: ["C:\\fixture\\steamcmd.exe"],
-        actions: [{ label: "验证", argv: ["account", "steamcmd", "verify"] }] },
-      { label: "LoversLab", value: "未连接；默认关闭", note: "站点含成人内容并有自己的规则，请使用你自己的账户。",
-        actions: [{ label: "启用", argv: ["account", "loverslab", "enable"], confirm: "保存加密会话 Cookie，不保存密码。" }] },
+  await test("compact accounts use an inline keyboard login and ignore late completion", async () => {
+    const accountGroups = [{ title: "Accounts", items: [
+      { label: "SteamCMD", note: "mod downloads available, not logged in",
+        actions: [{ label: "log in", argv: ["account", "steamcmd", "login"], input: "known-player" }] },
+      { label: "LoversLab", note: "unavailable, not logged in",
+        actions: [{ label: "log in", argv: ["account", "loverslab", "login"], confirm: "Site consent" }] },
     ] }];
     handlers.set("Settings", () => accountGroups); handlers.set("Tasks", () => ({ rows: [] }));
-    let actions = 0; const pending = deferred();
-    handlers.set("AccountAction", () => { actions++; return pending.promise; });
+    let actions = 0, selected = ""; const pending = deferred();
+    handlers.set("SteamLogin", name => { actions++; selected = name; return pending.promise; });
     await screens.settings(); await settle();
-    const rows = document.querySelectorAll("[data-setting-row]");
-    assert(rows.length === 2 && actions === 0, "settings ran account authentication");
-    assert(!document.querySelector('input[type=password], iframe, webview'), "main settings hosts a login page");
-    assert(document.querySelector(".path-copy"), "tool path is not copyable");
-    const verify = document.querySelector('[data-setting-action="account steamcmd verify"]');
-    verify.focus(); assert(document.activeElement === verify, "account action cannot receive keyboard focus");
-    verify.click(); assert(verify.disabled && verify.textContent.includes("…"), "account action has no immediate feedback");
-    await Promise.resolve(); assert(actions === 1, "verification did not use the player API");
-    screens.openScreen("other"); pending.resolve(["完成"]); await settle();
-    assert(S.screen === "other", "late account completion reopened settings");
-    handlers.set("Settings", () => []); handlers.delete("AccountAction");
+    assert(document.querySelectorAll("[data-setting-row]").length === 2 && actions === 0, "settings ran account authentication");
+    assert(!document.querySelector("#screen input, #screen .apply-setting, iframe, webview"), "account field or login surface is visible on entry");
+    const login = document.querySelector('[data-setting-action="account steamcmd login"]');
+    login.focus(); login.click();
+    let input = document.querySelector(".account-login input");
+    assert(input.value === "known-player" && document.activeElement === input, "known name not prefilled/focused");
+    input.dispatchEvent(new KeyboardEvent("keydown", {key:"Escape", bubbles:true}));
+    assert(!document.querySelector(".account-login") && document.activeElement === login && actions === 0, "escape did not cancel login");
+    login.click(); input = document.querySelector(".account-login input"); input.value = "fixture-player";
+    input.dispatchEvent(new KeyboardEvent("keydown", {key:"Enter", bubbles:true})); await settle();
+    assert(actions === 1 && selected === "fixture-player" && login.disabled, "enter did not start the player login once");
+    screens.openScreen("other"); pending.resolve(["account action completed"]); await settle();
+    assert(S.screen === "other", "late login completion reopened settings");
+    handlers.set("Settings", () => []); handlers.delete("SteamLogin");
+  });
+  await test("inline Steam login rejects anonymous and site helper failures remain visible", async () => {
+    const popup = document.createElement("div"); popup.id = "popup"; popup.hidden = true;
+    document.querySelector("#app").append(popup); pop.initPopups({ renderWhere() {}, renderHeads() {} });
+    const steam = { label: "SteamCMD", actions: [{ label: "log in", argv: ["account", "steamcmd", "login"], input: "" }] };
+    handlers.set("Settings", () => [{ title: "Accounts", items: [steam, { label: "LoversLab", note: "unavailable, not logged in",
+      actions: [{ label: "log in", argv: ["account", "loverslab", "login"], confirm: "Site consent" }] }] }]);
+    let actions = 0;
+    handlers.set("SteamLogin", () => { actions++; });
+    handlers.set("AccountAction", () => { actions++; throw Error("controller create failed 0x80004005"); });
+    await screens.settings(); await settle();
+    document.querySelector('[data-setting-action="account steamcmd login"]').click();
+    const input = document.querySelector(".account-login input");
+    for (const value of ["", "anonymous", "ANONYMOUS", "匿名"]) {
+      input.value = value; input.dispatchEvent(new KeyboardEvent("keydown", {key:"Enter", bubbles:true})); await settle();
+      assert(document.activeElement === input && actions === 0 && popup.hidden, "anonymous login launched or field not focused");
+      assert(document.querySelector("#status").textContent === T("enter a Steam account name first"), "missing name prompt");
+    }
+    input.dispatchEvent(new KeyboardEvent("keydown", {key:"Escape", bubbles:true}));
+    document.querySelector('[data-setting-action="account loverslab login"]').click(); await settle();
+    assert(actions === 0 && !popup.hidden, "site login skipped first-time consent");
+    popup.querySelector(".btns .go").click(); await settle();
+    assert(actions === 1 && popup.hidden, "consent did not call AccountAction");
+    assert(document.querySelector("#status").textContent === "controller create failed 0x80004005", "helper reason disappeared");
+    assert(!document.querySelector('[data-setting-action="account loverslab login"]').disabled, "failed login cannot be retried");
+    handlers.set("Settings", () => []); handlers.delete("AccountAction"); handlers.delete("SteamLogin"); popup.remove();
+  });
+  await test("tool installation confirms source, destination and size before starting", async () => {
+    const popup = document.createElement("div"); popup.id = "popup"; popup.hidden = true;
+    document.querySelector("#app").append(popup); pop.initPopups({ renderWhere() {}, renderHeads() {} });
+    let installs = 0;
+    handlers.set("ApplySetting", () => { installs++; return ["queued"]; });
+    for (const [name, bytes] of [["steamcmd", -1], ["todds", 12345], ["wezterm", 45678]]) {
+      handlers.set("Settings", () => [{ title: "外部工具", items: [{ label: name, actions: [
+        { label: "安装工具", argv: ["deps", "install", name], confirm: "Download tool?" }] }] }]);
+      handlers.set("ToolInstallOffer", () => ({ url: "https://fixture.invalid/" + name + ".zip", dir: "C:/fixture/" + name, bytes }));
+      await screens.settings(); await settle();
+      const before = installs;
+      document.querySelector('[data-setting-action="deps install ' + name + '"]').click(); await settle();
+      assert(installs === before && !popup.hidden, "download began without confirmation");
+      const text = popup.textContent;
+      assert(text.includes("https://fixture.invalid/" + name + ".zip") && text.includes("C:/fixture/" + name), "missing URL or directory");
+      assert(text.includes(bytes > 0 ? Tf("size: %s bytes", bytes) : T("size unknown")), "missing size");
+      popup.querySelector(".btns .go").click(); await settle();
+      assert(installs === before + 1, "confirmed installation did not run");
+    }
+    handlers.set("Settings", () => []); handlers.delete("ApplySetting"); handlers.delete("ToolInstallOffer"); popup.remove();
   });
   handlers.set("HomeBackground", () => ({})); handlers.set("Backgrounds", () => backgrounds);
   handlers.set("Packs", () => ({ rows: [] })); handlers.set("PackNameCheck", () => "");
@@ -124,6 +173,7 @@ try {
       pending: [{ id: "git-id", ref: "git-ref", name: "Git fixture", kind: "git", source: "Git", installed: "abc", available: "def", usedIn: ["Colony"] },
         { id: "page-id", ref: "page-ref", name: "Page fixture", kind: "page", source: "download page", installed: "1", available: "2", usedIn: [] }],
       history: { rows: [], since: "since last played" } };
+    data.sources[0].failures = [{label: "8 no longer on the Workshop", items: ["Fixture (123): deleted or private", "Other fixture (456): deleted or private"]}];
     data.sources[4].checked = "";
     data.sources[4].result = "not checked yet";
     let reads = [], checks = [], previews = [], updates = [];
@@ -135,6 +185,10 @@ try {
     await screens.changes(null); await settle();
     assert([...document.querySelectorAll("[data-section]")].map(n => n.dataset.section).join() === "sources,pending,history", "section order");
     assert(document.querySelectorAll("[data-source]").length === 5 && checks.length === 0, "sources checked on entry");
+    const failures = document.querySelector('[data-source="workshop"] details');
+    assert(failures && !failures.open && failures.querySelector("summary").textContent === "8 no longer on the Workshop", "failure group is missing or expanded on entry");
+    failures.querySelector("summary").click();
+    assert(failures.open && failures.querySelectorAll("li").length === 2, "failure group cannot expand to its items");
     const accountRow = document.querySelector('[data-source="steamcmd"]');
     assert(accountRow.querySelector("button").textContent === T("accounts") + " →", "account link repeats the state");
     assert(accountRow.textContent.split("offline account").length === 2, "account state is duplicated");
@@ -391,36 +445,40 @@ try {
     assert(document.querySelector('#screen').textContent.includes("new context"), "destination did not load");
     S.board = board; S.shell = shell;
   });
-  await test("build keeps inputs responsive and only the latest texture measurement wins", async () => {
+  await test("build counts explicitly, keeps inputs responsive, and rejects stale texture facts", async () => {
     handlers.set("BuildPage", () => 1);
-    handlers.set("BuildPageResult", () => buildPreview);
+    handlers.set("BuildPageResult", () => ({ ...buildPreview, toolOk: true }));
     await packs.build();
-    const old = deferred(), fresh = deferred(); let builds = 0;
-    handlers.set("BuildPage", (tex) => tex);
+    const old = deferred(), fresh = deferred(); let builds = 0, counts = 0;
+    handlers.set("BuildPage", (tex) => { counts++; return tex; });
     handlers.set("BuildPageResult", (id) => id === 100 ? old.promise : fresh.promise);
     handlers.set("PackBuild", () => { builds++; });
-    const name = document.querySelector("#pk-name"), select = document.querySelector("#pk-tex");
-    name.value = "my typed pack"; await name.oninput();
-    select.focus(); select.value = "100"; const first = select.onchange();
-    await settle();
-    assert(select.isConnected && select.value === "100" && document.activeElement === select, "choice was replaced or lost focus");
-    assert(name.isConnected && name.value === "my typed pack", "name was cleared while measuring");
-    assert(document.querySelectorAll(".bd-step .skel").length === 2 && document.querySelector("#pk-size .skel"), "measured facts have no shimmer");
-    assert(document.querySelector(".bd-go").disabled && !document.querySelector(".page-loading"), "measurement replaced the page or enabled build");
+    document.querySelector("#pk-name").value = "my typed pack"; await document.querySelector("#pk-name").oninput();
+    let select = document.querySelector("#pk-tex");
+    select.focus(); select.value = "100"; select.onchange(); await settle();
+    select = document.querySelector("#pk-tex");
+    assert(select.value === "100" && document.activeElement === select && counts === 0, "choice lost focus or counted without a request");
+    const countButton = () => [...document.querySelectorAll('.bd-step[data-key="textures"] button')].find(b => b.textContent === T("count the textures"));
+    countButton().click(); await settle();
+    assert(select.isConnected && select.value === "100" && document.activeElement === select, "count replaced the choice or lost focus");
+    assert(document.querySelector("#pk-name").value === "my typed pack", "name was cleared while counting");
+    assert(document.querySelectorAll(".bd-step .skel").length === 2 && document.querySelector("#pk-size .skel"), "counted facts have no shimmer");
+    assert(document.querySelector(".bd-go").disabled && !document.querySelector(".page-loading"), "count replaced the page or enabled build");
     packs.packsKey(new KeyboardEvent("keydown", { key: "B", cancelable: true }));
-    name.onkeydown(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
-    await Promise.resolve(); assert(builds === 0, "build used a stale preview");
-    select.value = "50"; const second = select.onchange(); await settle();
-    assert(select.value === "50" && select.isConnected, "second choice was blocked");
-    fresh.resolve({ ...buildPreview, tex: 50, after: "new size" }); await second;
-    assert(document.querySelector("#pk-tex").value === "50" && document.querySelector("#pk-size").textContent.includes("new size"), "latest measurement missing");
-    old.resolve({ ...buildPreview, tex: 100, after: "stale size" }); await first;
-    assert(document.querySelector("#pk-tex").value === "50" && !document.querySelector("#screen").textContent.includes("stale size"), "late measurement overwrote the choice");
-    assert(document.querySelector("#pk-name").value === "my typed pack" && !document.querySelector(".bd-go").disabled, "fresh preview lost name or stayed disabled");
-    assert(!document.querySelector("#screen .skel"), "fresh preview kept shimmer");
+    await Promise.resolve(); assert(builds === 0, "build used a pending count");
+    select.value = "50"; select.onchange(); await settle();
+    assert(document.querySelector("#pk-tex").value === "50", "choice was blocked during counting");
+    old.resolve({ ...buildPreview, toolOk: true, tex: 100, after: "stale size" }); await settle();
+    assert(document.querySelector("#pk-tex").value === "50" && !document.querySelector("#pk-size").textContent.includes("stale size"), "old count supplied facts for another choice");
+    countButton().click(); await settle();
+    fresh.resolve({ ...buildPreview, toolOk: true, tex: 50, after: "new size" }); await settle();
+    assert(document.querySelector("#pk-size").textContent.includes("new size"), "explicit fresh count missing");
+    assert(document.querySelector("#pk-name").value === "my typed pack" && !document.querySelector(".bd-go").disabled, "fresh count lost name or stayed disabled");
+    assert(!document.querySelector("#screen .skel"), "fresh count kept shimmer");
     const late = deferred(); handlers.set("BuildPageResult", () => late.promise);
-    const nextSelect = document.querySelector("#pk-tex"); nextSelect.value = "75"; const pending = nextSelect.onchange();
-    await settle(); screens.openScreen("other"); late.reject(new Error("late build failure")); await pending;
+    select = document.querySelector("#pk-tex"); select.value = "75"; select.onchange();
+    countButton().click(); await settle();
+    screens.openScreen("other"); late.reject(new Error("late build failure")); await settle();
     assert(S.screen === "other" && !document.querySelector('#screen[aria-busy]'), "late failure reopened the build page");
   });
   await test("environment switch keeps navigation live and only the latest result applies", async () => {

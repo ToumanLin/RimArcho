@@ -13,7 +13,7 @@
       "count": 1,
       "checked": "2026-10-01 11:00",
       "result": "check complete",
-      "account": "未安装 SteamCMD"
+      "account": "mod downloads available, not logged in"
     },
     {
       "key": "git",
@@ -28,7 +28,7 @@
       "count": 1,
       "checked": "2026-10-01 10:00",
       "result": "check complete",
-      "account": "未启用"
+      "account": "unavailable, not logged in"
     },
     {
       "key": "local",

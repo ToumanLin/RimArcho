@@ -150,3 +150,32 @@ func (a *App) steamCMDContentCheck(dir string) error {
 	}
 	return nil
 }
+
+// OfferDep runs only when the player requests installation, before confirmation.
+func (a *App) OfferDep(name string) (*SteamCMDOffer, error) {
+	dir := a.Deps().Status(name).Dir
+	switch name {
+	case deps.SteamCMD:
+		offer, err := a.OfferSteamCMD()
+		if offer != nil {
+			offer.Dir = dir
+		}
+		return offer, err
+	case deps.Todds:
+		offer := a.OfferTodds()
+		return &SteamCMDOffer{URL: offer.URL, Dir: dir, Bytes: offer.Bytes}, nil
+	case deps.WezTerm:
+		api := a.WezTermAPI
+		if api == "" {
+			api = host.GitHubAPI
+		}
+		h := &host.Host{Home: a.Home, API: api, HTTP: a.HTTP, Out: io.Discard}
+		offer, err := h.Offer()
+		if err != nil {
+			return nil, err
+		}
+		return &SteamCMDOffer{URL: offer.URL, Dir: dir, Bytes: offer.Bytes}, nil
+	default:
+		return nil, fmt.Errorf("unknown installable dependency %q", name)
+	}
+}

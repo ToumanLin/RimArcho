@@ -184,9 +184,9 @@ func TestDownloadGame(t *testing.T) {
 	}
 	// The public branch has no -beta; a second 1.5 gets a free name.
 	f.args = nil
-	f.lines = append([]string{"Connecting anonymously to Steam Public...OK"}, okRun[2:]...)
-	r, err = e.App.DownloadGame(app.DownloadSpec{Branch: "public", Dir: filepath.Join(e.Root, "Games", "Again")}, nil)
-	if err != nil || slices.Contains(f.args, "-beta") || f.args[3] != "anonymous" || r.Env.Name != "1.5-2" {
+	f.lines = okRun
+	r, err = e.App.DownloadGame(app.DownloadSpec{Branch: "public", Dir: filepath.Join(e.Root, "Games", "Again"), Account: "player"}, nil)
+	if err != nil || slices.Contains(f.args, "-beta") || f.args[3] != "player" || r.Env.Name != "1.5-2" {
 		t.Fatalf("public: %v %v %+v", err, f.args, r)
 	}
 }

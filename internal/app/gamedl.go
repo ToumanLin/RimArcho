@@ -313,7 +313,7 @@ func (e *DownloadError) Why() string {
 	var why string
 	switch e.Kind {
 	case "anonymous-license":
-		why = "Steam refused the anonymous download (a license is required); choose an account in settings, or add a game folder you already have"
+		why = "anonymous accounts cannot download RimWorld; log in with an account that owns it, or add a game folder you already have"
 	case "anonymous-login":
 		why = "the anonymous Steam connection did not finish; check the connection and try again"
 	case "ownership":
@@ -413,6 +413,10 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 	if err != nil {
 		return "", err
 	}
+	if account == "anonymous" {
+		return "", &DownloadError{Kind: "anonymous-license"}
+	}
+
 	if spec.Branch == "" {
 		spec.Branch = "public"
 	}
@@ -567,13 +571,12 @@ func runSteamCMD(exe string, args []string) (string, error) {
 }
 
 func startSteamCMD(exe string, args []string, console bool) (SteamCMDProc, error) {
+	if console {
+		return startConsole(exe, args)
+	}
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
-	if console {
-		newConsole(cmd)
-	} else {
-		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	}
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
@@ -617,6 +620,7 @@ func (t *logTail) lines() []string {
 
 // steamResult is what the log said: success, a known failure, or the last line.
 type steamResult struct {
+	login             steamLogin
 	success, loggedIn bool
 	err               *DownloadError
 	last              string
@@ -637,23 +641,17 @@ func (r *steamResult) read(line string) (DownloadProgress, bool) {
 	if r.err == nil && !r.success {
 		r.last = l
 	}
-	switch {
-	case strings.Contains(low, "logging in user") || strings.Contains(low, "connecting anonymously"):
-		switch {
-		case strings.Contains(low, "invalid password") || strings.Contains(low, "invalidpassword"):
-			r.err = &DownloadError{Kind: "password", Line: l}
-		case strings.Contains(low, "two-factor") || strings.Contains(low, "logon denied") || strings.Contains(low, "invalidauthcode") || strings.Contains(low, "steam guard"):
-			r.err = &DownloadError{Kind: "guard", Line: l}
-		case strings.Contains(low, "rate limit") || strings.Contains(low, "no connection") || strings.Contains(low, "timeout"):
-			r.err = &DownloadError{Kind: "network", Line: l}
-		case strings.Contains(low, "failed"):
-			r.err = &DownloadError{Kind: "login", Line: l}
-		case strings.HasSuffix(low, "ok"):
-			r.loggedIn = true
-		}
-		return DownloadProgress{State: "login", Line: l}, true
-	case strings.Contains(low, "waiting for user info") && strings.HasSuffix(low, "ok"):
+	loginProgress := r.login.read(l)
+	if loginProgress && r.login.err != nil {
+		r.err = r.login.err
+	}
+	if r.login.ready {
 		r.loggedIn = true
+	}
+	if loginProgress {
+		return DownloadProgress{State: "login", Line: l}, true
+	}
+	switch {
 	case strings.HasPrefix(low, "success!") && strings.Contains(low, "fully installed"):
 		r.success = true
 		return DownloadProgress{State: "done", Percent: 100, Line: l}, true

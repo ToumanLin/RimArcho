@@ -10,13 +10,15 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
+	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
 // SourceCheck is cached locally: opening the page never contacts a source.
 type SourceCheck struct {
-	At     time.Time
-	Result string
-	Latest map[string]int64
+	At       time.Time
+	Result   string
+	Failures []SourceFailure
+	Latest   map[string]int64
 }
 
 func (a *App) SubscriptionSourceCheck(kind string) SourceCheck {
@@ -33,12 +35,18 @@ func (a *App) subscriptionCheckKey(kind string) string {
 	return "subscriptions:check:" + name + ":" + kind
 }
 
-func (a *App) CheckSubscriptionSource(kind string) error {
+type SourceFailure struct {
+	ID, Name, Reason string
+	Code             int
+}
+
+func (a *App) CheckSubscriptionSource(kind string, pageReader ...func(string) (*subscribe.PageInfo, error)) error {
 	if kind != LibWorkshop && kind != LibSteamCMD && kind != LibGit && kind != LibPage && kind != LibLocal {
 		return fmt.Errorf("unknown subscription source %q", kind)
 	}
 	c := a.SubscriptionSourceCheck(kind)
 	c.At = a.Now()
+	c.Failures = nil
 	var failures []error
 	if kind == LibLocal {
 		_, err := a.Scan(false)
@@ -57,10 +65,14 @@ func (a *App) CheckSubscriptionSource(kind string) error {
 			}
 			d, err := a.fetchWorkshop(m.WorkshopID())
 			if err == nil && d.Result != 1 {
-				err = fmt.Errorf("Workshop %s: result %d", m.WorkshopID(), d.Result)
+				err = errors.New(WorkshopResultText(d.Result))
 			}
 			if err != nil {
-				failures = append(failures, err)
+				code := 0
+				if d != nil {
+					code = d.Result
+				}
+				c.Failures = append(c.Failures, SourceFailure{ID: m.WorkshopID(), Name: m.DisplayName(), Reason: err.Error(), Code: code})
 				continue
 			}
 			c.Latest[m.ID] = d.TimeUpdated
@@ -74,17 +86,23 @@ func (a *App) CheckSubscriptionSource(kind string) error {
 			if s.Record.Kind != kind {
 				continue
 			}
-			op, err := a.CheckSubscriptions([]string{s.Ref})
+			op, err := a.CheckSubscriptions([]string{s.Ref}, pageReader...)
 			failures = append(failures, err)
 			if err == nil && len(op.Items) > 0 && op.Items[0].Record.CheckError != "" {
 				failures = append(failures, errors.New(op.Items[0].Record.CheckError))
 			}
 		}
 	}
+	if len(c.Failures) > 0 {
+		failures = append(failures, fmt.Errorf("%d Workshop items could not be checked", len(c.Failures)))
+	}
 	err := errors.Join(failures...)
 	c.Result = "check complete"
 	if err != nil {
 		c.Result = err.Error()
+		if len(c.Failures) > 0 {
+			c.Result = "some checks failed"
+		}
 	}
 	b, _ := json.Marshal(c)
 	return errors.Join(err, a.Store.SetMeta(a.subscriptionCheckKey(kind), string(b)))

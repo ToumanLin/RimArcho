@@ -121,3 +121,34 @@ func TestWezTermSettingsTask(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestToolInstallOfferUsesManagedDestinationAndServerSize(t *testing.T) {
+	e, api, _ := fixture(t)
+	requests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.Method != http.MethodHead {
+			t.Error("offer downloaded the tool")
+		}
+		w.Header().Set("Content-Length", "12345")
+	}))
+	defer srv.Close()
+	e.App.SteamCMDZip = srv.URL
+	external := filepath.Join(e.Root, "external", "steamcmd.exe")
+	e.WriteFile(external, "offline fixture")
+	e.MustRun("config", "set", "steamcmd.path", external)
+	offer, err := api.ToolInstallOffer(deps.SteamCMD)
+	if err != nil || offer.URL != srv.URL || offer.Bytes != 12345 || offer.Dir != filepath.Join(e.App.LocalDir(), deps.SteamCMD) {
+		t.Fatal(offer, err)
+	}
+	if requests != 1 {
+		t.Fatal(requests)
+	}
+	todds, err := api.ToolInstallOffer(deps.Todds)
+	if err != nil || todds.URL == "" || todds.Bytes <= 0 || todds.Dir != e.App.ToddsDir() {
+		t.Fatal(todds, err)
+	}
+	if _, err := api.ToolInstallOffer("not-a-tool"); err == nil {
+		t.Fatal("unknown offer accepted")
+	}
+}

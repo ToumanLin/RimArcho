@@ -1,12 +1,15 @@
 package gui
 
 import (
+	"context"
 	"errors"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/deps"
+	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -72,7 +75,23 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 	}
 	switch kind {
 	case view.TaskSourceCheck:
-		return view.T("check complete"), a.CheckSubscriptionSource(argv[1])
+		if argv[1] == app.LibPage && a.Store.Meta("account:loverslab:enabled") == "true" {
+			s.accountMu.Lock()
+			defer s.accountMu.Unlock()
+			unlock := accounts.Lock(a.AccountsDir())
+			defer unlock()
+			ll, err := s.loversLab(a)
+			if err != nil {
+				return "", err
+			}
+			return "check complete", a.CheckSubscriptionSource(argv[1], func(page string) (*subscribe.PageInfo, error) {
+				if subscribe.LoversLabPage(page) {
+					return ll.PageInfo(context.Background(), page)
+				}
+				return subscribe.ReadPage(context.Background(), a.HTTP, page)
+			})
+		}
+		return "check complete", a.CheckSubscriptionSource(argv[1])
 	case view.TaskWorkshopUpdate:
 		return view.T("Steam will download this Workshop update"), a.UpdateWorkshopClient(argv[1], false)
 	case view.TaskSubscribe, view.TaskSubscriptionFrom:

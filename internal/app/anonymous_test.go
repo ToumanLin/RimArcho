@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -27,7 +28,7 @@ func TestSteamCMDAnonymousAndAccountPrecedence(t *testing.T) {
 			f := &fakeSteamCMD{lines: []string{"Connecting anonymously to Steam Public...OK", "ERROR! Failed to install app '294100' (No subscription)"}}
 			f.install(t, e)
 			_, err := e.App.FetchGame(app.DownloadSpec{Dir: filepath.Join(e.Root, "Game"), Account: tc.override}, nil)
-			if len(f.args) < 4 || f.args[3] != tc.want {
+			if tc.want != "anonymous" && (len(f.args) < 4 || f.args[3] != tc.want) {
 				t.Fatalf("args %v, error %v", f.args, err)
 			}
 			var de *app.DownloadError
@@ -35,7 +36,7 @@ func TestSteamCMDAnonymousAndAccountPrecedence(t *testing.T) {
 				t.Fatal(err)
 			}
 			if tc.want == "anonymous" {
-				if de.Kind != "anonymous-license" || !strings.Contains(de.Why(), "game folder") {
+				if de.Kind != "anonymous-license" || !strings.Contains(de.Why(), "game folder") || len(f.args) != 0 {
 					t.Fatalf("%+v", de)
 				}
 			} else if de.Kind != "ownership" {
@@ -55,19 +56,18 @@ func TestSteamCMDBadSavedAccountNeverStarts(t *testing.T) {
 	}
 }
 
-func TestAnonymousConnectionIsNotALicenseFailure(t *testing.T) {
+func TestAnonymousGameDownloadDoesNotStartOrCreateFolder(t *testing.T) {
 	e := testkit.New(t)
-	f := &fakeSteamCMD{lines: []string{"Connecting anonymously to Steam Public...FAILED (Timeout)"}}
+	f := &fakeSteamCMD{lines: okRun, game: true}
 	f.install(t, e)
-	_, err := e.App.FetchGame(app.DownloadSpec{Dir: filepath.Join(e.Root, "Game")}, nil)
+	dir := filepath.Join(e.Root, "Game")
+	_, err := e.App.FetchGame(app.DownloadSpec{Dir: dir}, nil)
 	var de *app.DownloadError
-	if !errors.As(err, &de) || de.Kind != "network" {
-		t.Fatalf("%v", err)
+	if !errors.As(err, &de) || de.Kind != "anonymous-license" || len(f.args) != 0 {
+		t.Fatal(err, f.args)
 	}
-	f.lines = []string{"Connecting anonymously to Steam Public...OK"}
-	_, err = e.App.FetchGame(app.DownloadSpec{Dir: filepath.Join(e.Root, "Game")}, nil)
-	if !errors.As(err, &de) || de.Kind != "other" {
-		t.Fatalf("anonymous connected but no result: %v", err)
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatal("anonymous request created game folder")
 	}
 }
 

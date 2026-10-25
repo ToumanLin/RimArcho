@@ -33,7 +33,7 @@ func TestAnonymousConfigAndCLI(t *testing.T) {
 		return anonymousProc{}, nil
 	}
 	out, _ := e.Run("env", "download", "public", "--to", filepath.Join(e.Root, "Games", "New"))
-	if account != "anonymous" || strings.Contains(out, "give the folder") {
+	if account != "" || !strings.Contains(out, "cannot download RimWorld") {
 		t.Fatalf("account %q, %s", account, out)
 	}
 }

@@ -137,7 +137,7 @@ func TestLoversLabFileAgreementDownloadAndFallback(t *testing.T) {
 		mode = value
 		l.next = time.Time{}
 		_, err = l.Files(ctx, page)
-		if err == nil || !strings.Contains(err.Error(), "浏览器下载后选择 zip") {
+		if err == nil || !strings.Contains(err.Error(), "choose a zip downloaded in your browser") {
 			t.Fatal(value, err)
 		}
 		if strings.Contains(err.Error(), "offline-") {
@@ -155,9 +155,9 @@ func TestLoversLabFileAgreementDownloadAndFallback(t *testing.T) {
 			if err = l.Verify(ctx); err == nil || calls != before+1 {
 				t.Fatal("verification must make one GET", value, err)
 			}
-			want := "需浏览器验证"
+			want := "browser verification required"
 			if value == "login" {
-				want = "需登录"
+				want = "login required"
 			}
 			if session.Status().State != want {
 				t.Fatal("verification misclassified access denial", value, session.Status().State)
@@ -177,7 +177,119 @@ func TestLoversLabFileAgreementDownloadAndFallback(t *testing.T) {
 	}
 	empty, _ := accounts.Open(t.TempDir())
 	noSession := NewLoversLab(empty, siteTransport{base, srv.Client().Transport})
-	if _, err = noSession.Files(ctx, page); err == nil || !strings.Contains(err.Error(), "需玩家登录") {
+	if _, err = noSession.Files(ctx, page); err == nil || !strings.Contains(err.Error(), "login required") {
 		t.Fatal("missing session fallback")
+	}
+}
+
+func TestLoversLabRotationsPersistAfterEveryAuthenticatedRequest(t *testing.T) {
+	dir := t.TempDir()
+	session, err := accounts.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, _ := url.Parse(accounts.Site)
+	session.Jar().SetCookies(u, []*http.Cookie{{Name: "ips4_login_key", Value: "offline-old", Domain: "loverslab.com", Path: "/", Secure: true, Expires: time.Now().AddDate(0, 6, 0)}})
+	if err = session.Save(); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		cookie, e := r.Cookie("ips4_login_key")
+		if e != nil || cookie.Value != []string{"offline-old", "offline-verify", "offline-update", "offline-files"}[calls-1] {
+			t.Error("rotated cookie missing", e)
+		}
+		value := []string{"offline-verify", "offline-update", "offline-files", "offline-download"}[calls-1]
+		http.SetCookie(w, &http.Cookie{Name: "ips4_login_key", Value: value, Domain: "loverslab.com", Path: "/", Secure: true, HttpOnly: true, Expires: time.Now().AddDate(0, 7, 0)})
+		switch calls {
+		case 1:
+			io.WriteString(w, `<a href="?do=logout">logout</a>`)
+		case 2:
+			io.WriteString(w, `<script type="application/ld+json">{"@type":"SoftwareApplication","name":"Offline Mod","softwareVersion":"2.0"}</script>`)
+		case 3:
+			io.WriteString(w, `<a href="?do=download&r=1">fixture.zip</a>`)
+		case 4:
+			w.Header().Set("Content-Type", "application/zip")
+			io.WriteString(w, "PKfixture")
+		}
+	}))
+	defer srv.Close()
+	base, _ := url.Parse(srv.URL)
+	l := NewLoversLab(session, siteTransport{base, srv.Client().Transport})
+	page := accounts.Site + "files/file/123-fixture/"
+	check := func(want string) {
+		t.Helper()
+		restored, e := accounts.Open(dir)
+		if e != nil {
+			t.Fatal(e)
+		}
+		found := false
+		for _, cookie := range restored.Jar().Cookies(u) {
+			if cookie.Name == "ips4_login_key" && cookie.Value == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("rotation not stored", want)
+		}
+	}
+	if err = l.Verify(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	check("offline-verify")
+	l.next = time.Time{}
+	if p, e := l.PageInfo(context.Background(), page); e != nil || p.Version != "2.0" {
+		t.Fatal(p, e)
+	}
+	check("offline-update")
+	l.next = time.Time{}
+	files, e := l.Files(context.Background(), page)
+	if e != nil {
+		t.Fatal(e)
+	}
+	check("offline-files")
+	l.next = time.Time{}
+	if _, _, e = l.Follow(context.Background(), page, files.Files[0].ID, false, t.TempDir()); e != nil {
+		t.Fatal(e)
+	}
+	check("offline-download")
+}
+
+func TestLoversLabSelectorFileMetadata(t *testing.T) {
+	calls := 0
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "text/html")
+		if r.URL.Query().Get("do") == "" {
+			io.WriteString(w, `<a href="?do=download">Download this file</a>`)
+			return
+		}
+		io.WriteString(w, `<ul class="ipsDataList">
+  <li class="ipsDataItem"><h4 class="ipsDataItem_title">Fixture Core.zip</h4><span>12.5 MB</span><time datetime="2026-10-23">yesterday</time><a href="?do=download&amp;r=1">Download this file</a></li>
+  <li class="ipsDataItem"><h4 class="ipsDataItem_title">Fixture Addon.7z</h4><span>234 KB</span><time datetime="2026-10-24">today</time><a href="?do=download&amp;r=2">Download this file</a></li>
+  </ul>`)
+	}))
+	defer srv.Close()
+	base, _ := url.Parse(srv.URL)
+	session, e := accounts.Open(t.TempDir())
+	if e != nil {
+		t.Fatal(e)
+	}
+	u, _ := url.Parse(accounts.Site)
+	session.Jar().SetCookies(u, []*http.Cookie{{Name: "fixture", Value: "offline", Path: "/", Secure: true, Expires: time.Now().Add(time.Hour)}})
+	l := NewLoversLab(session, siteTransport{base, srv.Client().Transport})
+	p, e := l.Files(context.Background(), accounts.Site+"files/file/123-fixture/")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if calls != 2 || len(p.Files) != 2 {
+		t.Fatal(calls, p)
+	}
+	if p.Files[0].Name != "Fixture Core.zip" || p.Files[0].Size != "12.5 MB" || p.Files[0].Date != "2026-10-23" {
+		t.Fatal(p.Files[0])
+	}
+	if p.Files[1].Name != "Fixture Addon.7z" || p.Files[1].Date != "2026-10-24" {
+		t.Fatal(p.Files[1])
 	}
 }

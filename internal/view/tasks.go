@@ -104,6 +104,9 @@ type TaskRow struct {
 	Search    string        `json:"search"` // what the search box matches (lower case)
 }
 
+// TaskStatus is the completion sentence shared with the GUI status line.
+func TaskStatus(r TaskRow) string { return r.Title + "  " + Tf("%s: %s", r.Obj, r.Line) }
+
 // TaskStep is a step of a pack build (06 §2.6).
 type TaskStep struct {
 	Label string `json:"label"`
@@ -139,9 +142,9 @@ func TaskTitle(kind string) string {
 	case TaskWorkshopUpdate:
 		return T("update subscription")
 	case TaskAccount:
-		return "账户操作"
+		return T("account operation")
 	case TaskSiteDownload:
-		return "LoversLab 下载 / 安装"
+		return T("LoversLab download / install")
 	case TaskSubscribe:
 		return T("subscribe")
 	case TaskSubscriptionFrom:
@@ -344,7 +347,7 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 		r.Pct = 100
 	}
 	c := t.Counts()
-	result := t.Result
+	result := Text(t.Result)
 	if t.Lane != app.LaneSelf && len(t.Items) > 0 && result == "" {
 		switch {
 		case t.State == app.TaskDone && len(t.Items) == 1:

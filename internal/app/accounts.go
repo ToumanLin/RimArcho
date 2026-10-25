@@ -17,12 +17,15 @@ import (
 func (a *App) AccountsDir() string { return filepath.Join(a.LocalDir(), "accounts") }
 
 type SteamAccountStatus struct {
-	Account  string    `json:"account"`
-	Path     string    `json:"path"`
-	Source   string    `json:"source"`
-	Managed  bool      `json:"managed"`
-	State    string    `json:"state"`
-	Verified time.Time `json:"verified"`
+	Account          string    `json:"account"`
+	Path             string    `json:"path"`
+	Source           string    `json:"source"`
+	Managed          bool      `json:"managed"`
+	State            string    `json:"state"`
+	Verified         time.Time `json:"verified"`
+	LoggedIn         bool      `json:"loggedIn"`
+	OwnsRimWorld     bool      `json:"ownsRimWorld"`
+	OwnershipChecked time.Time `json:"ownershipChecked"`
 }
 
 func steamStateKey(exe, account string) string {
@@ -35,21 +38,26 @@ func (a *App) steamRecordKey(exe, account string) string {
 func (a *App) SteamAccountStatus() SteamAccountStatus {
 	i := a.Deps().Status(deps.SteamCMD)
 	account, _ := a.SteamCMDAccount("")
-	s := SteamAccountStatus{Account: account, Path: i.Path, Source: i.Source, Managed: i.Own, State: "已配置账户，尚未验证"}
+	s := SteamAccountStatus{Account: account, Path: i.Path, Source: i.Source, Managed: i.Own, State: "account not checked yet"}
 	var saved SteamAccountStatus
 	hasRecord := json.Unmarshal([]byte(a.Store.Meta(a.steamRecordKey(i.Path, account))), &saved) == nil
 	if hasRecord {
 		s.State, s.Verified = saved.State, saved.Verified
+		s.LoggedIn, s.OwnsRimWorld, s.OwnershipChecked = saved.LoggedIn, saved.OwnsRimWorld, saved.OwnershipChecked
+		if saved.State == "最近登录成功，需时再验证" {
+			s.LoggedIn = true
+		}
 	}
 	if account == "anonymous" {
-		s.State = "匿名"
+		s.State = "anonymous"
+		s.LoggedIn, s.OwnsRimWorld = false, false
 	} else if !hasRecord && i.Own {
 		if _, err := os.Stat(filepath.Join(i.Dir, "config", "config.vdf")); err == nil {
-			s.State = "检测到可能的缓存，尚未验证"
+			s.State = "possible cached login, not checked yet"
 		}
 	}
 	if i.Path == "" {
-		s.State = "未安装 SteamCMD"
+		s.State = "SteamCMD is not installed"
 	}
 	return s
 }
@@ -58,6 +66,7 @@ func (a *App) steamAccountRecord(exe, account, state string, success bool) {
 	key := a.steamRecordKey(exe, account)
 	_ = json.Unmarshal([]byte(a.Store.Meta(key)), &s)
 	s.State = state
+	s.LoggedIn = success && account != "anonymous"
 	if success {
 		s.Verified = a.Now().UTC()
 	}
@@ -81,73 +90,88 @@ func (a *App) SteamAccountAction(action string) error {
 		return err
 	}
 	if !i.Own {
-		return errors.New("外部缓存，不接管；请在外部 SteamCMD 中管理登录")
+		return errors.New("external SteamCMD manages its own login")
 	}
 	if action == "local-forget" {
 		if err := a.forgetManagedSteam(); err != nil {
 			return err
 		}
-		a.steamAccountRecord(i.Path, account, "需重新登录", false)
+		a.steamAccountRecord(i.Path, account, "login required", false)
 		return a.Store.SetMeta("cfg:steamcmd.account", "")
 	}
-	args := []string{"+login", account}
-	switch action {
-	case "login":
-	case "verify":
-		args = append(args, "+quit")
-	case "logout":
-		args = []string{"+logout", "+quit"}
-	default:
-		return errors.New("未知账户操作")
+	if action != "login" && action != "verify" && action != "logout" {
+		return errors.New("unknown account action")
 	}
-	log := filepath.Join(filepath.Dir(i.Path), "logs", "console_log.txt")
-	var off int64
-	if st, e := os.Stat(log); e == nil {
-		off = st.Size()
+	if action == "login" && account == "anonymous" {
+		return errors.New("enter a Steam account name first")
 	}
-	a.steamAccountRecord(i.Path, account, "等待玩家在 SteamCMD 窗口完成操作", false)
-	p, err := a.steamCMD().start(i.Path, args, true)
-	if err != nil {
-		a.steamAccountRecord(i.Path, account, "SteamCMD 窗口未打开", false)
-		return errors.New("SteamCMD 窗口未打开，请重试")
-	}
-	err = p.Wait()
-	tail := &logTail{path: log, off: off}
-	lines := tail.lines()
-	if tail.partial != "" {
-		lines = append(lines, tail.partial)
-	}
-	matched, logout, network := false, false, false
-	for _, line := range lines {
-		low := strings.ToLower(line)
-		if (strings.Contains(low, "logging in user '"+strings.ToLower(account)+"'") || account == "anonymous" && strings.Contains(low, "connecting anonymously")) && strings.HasSuffix(strings.TrimSpace(low), "ok") {
-			matched = true
+	run := func(args []string, console bool) ([]string, error) {
+		log := filepath.Join(filepath.Dir(i.Path), "logs", "console_log.txt")
+		var off int64
+		if st, e := os.Stat(log); e == nil {
+			off = st.Size()
 		}
-		if strings.Contains(low, "logged out") || strings.Contains(low, "logging off") {
-			logout = true
+		p, e := a.steamCMD().start(i.Path, args, console)
+		if e != nil {
+			return nil, e
 		}
-		if strings.Contains(low, "no connection") || strings.Contains(low, "timeout") {
-			network = true
+		e = p.Wait()
+		tail := &logTail{path: log, off: off}
+		lines := tail.lines()
+		if tail.partial != "" {
+			lines = append(lines, tail.partial)
 		}
+		return lines, e
 	}
 	if action == "logout" {
-		if err != nil || !logout {
-			a.steamAccountRecord(i.Path, account, "退出未确认，可选择本地忘记", false)
-			return errors.New("SteamCMD 未确认退出；可使用“本地忘记受管缓存”，清理此实例所有缓存账户")
+		lines, runErr := run([]string{"+logout", "+quit"}, false)
+		confirmed := false
+		for _, line := range lines {
+			low := strings.ToLower(line)
+			confirmed = confirmed || strings.Contains(low, "logged out") || strings.Contains(low, "logging off")
 		}
-		a.steamAccountRecord(i.Path, account, "需重新登录", false)
+		if runErr != nil || !confirmed {
+			if err := a.forgetManagedSteam(); err != nil {
+				return err
+			}
+		}
+		a.steamAccountRecord(i.Path, account, "signed out", false)
 		return a.Store.SetMeta("cfg:steamcmd.account", "")
 	}
-	if matched && err == nil {
-		a.steamAccountRecord(i.Path, account, "最近登录成功，需时再验证", true)
-		return nil
+	if action == "login" {
+		p, err := a.steamCMD().start(i.Path, []string{"+login", account}, true)
+		if err != nil {
+			a.steamAccountRecord(i.Path, account, "login required", false)
+			return errors.New("SteamCMD window did not complete; try signing in again")
+		}
+		// Closing the console with X can return a nonzero exit code even after
+		// authentication. The cached check below decides whether login succeeded.
+		_ = p.Wait()
 	}
-	state := "需重新登录"
-	if network {
-		state = "网络错误，登录状态未知"
+	// The cached check never receives a password and cannot prompt in the GUI process.
+	lines, runErr := run([]string{"+login", account, "+licenses_print", "+quit"}, false)
+	login := steamLogin{account: account}
+	for _, line := range lines {
+		if !login.ready {
+			login.read(line)
+		}
+	}
+	if login.ready && login.err == nil && runErr == nil {
+		a.steamAccountRecord(i.Path, account, "signed in", true)
+		key := a.steamRecordKey(i.Path, account)
+		var saved SteamAccountStatus
+		_ = json.Unmarshal([]byte(a.Store.Meta(key)), &saved)
+		saved.OwnsRimWorld = account != "anonymous" && steamOwnsRimWorld(strings.Join(lines, "\n"))
+		saved.OwnershipChecked = a.Now().UTC()
+		b, _ := json.Marshal(saved)
+		return a.Store.SetMeta(key, string(b))
+	}
+	state := "login required"
+	if login.err != nil && login.err.Kind == "network" {
+		state = "network error; login status unknown"
 	}
 	a.steamAccountRecord(i.Path, account, state, false)
-	return errors.New(state + "；请在 SteamCMD 窗口自行完成密码与 Guard 验证")
+	return errors.New(state + "; sign in again to complete password and Steam Guard verification")
 }
 
 // Never select config/PATH instances, read token contents or leave auth backups.
@@ -163,29 +187,29 @@ func (a *App) forgetManagedSteam() (result error) {
 	}
 	resolved, err := filepath.EvalSymlinks(dir)
 	if err != nil || !samePath(resolved, dir) {
-		return errors.New("受管 SteamCMD 路径已重定向，未清理；请恢复路径后重试")
+		return errors.New("managed SteamCMD path was redirected; restore it before signing out")
 	}
 	var paths []string
 	for _, pattern := range []string{"config/config.vdf", "ssfn*", "*.sentry", "config/*.sentry", "config/ssfn*"} {
 		ms, e := filepath.Glob(filepath.Join(dir, filepath.FromSlash(pattern)))
 		if e != nil {
-			return errors.New("认证缓存清理失败")
+			return errors.New("authentication cache cleanup failed")
 		}
 		paths = append(paths, ms...)
 	}
 	for _, p := range paths {
 		r, e := filepath.EvalSymlinks(p)
 		if e != nil || !samePath(r, p) {
-			return errors.New("认证缓存路径已重定向，未清理")
+			return errors.New("authentication cache path was redirected; nothing was removed")
 		}
 		fi, e := os.Lstat(p)
 		if e != nil || fi.IsDir() {
-			return errors.New("认证缓存布局未知，请在 SteamCMD 中退出后重试")
+			return errors.New("unknown authentication cache layout; sign out in SteamCMD and retry")
 		}
 	}
 	for _, p := range paths {
 		if os.Remove(p) != nil {
-			return errors.New("认证缓存清理失败，请关闭 SteamCMD 后重试")
+			return errors.New("authentication cache cleanup failed; close SteamCMD and retry")
 		}
 	}
 	return nil

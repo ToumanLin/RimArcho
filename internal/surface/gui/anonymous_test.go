@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -36,28 +37,41 @@ func TestGuideAnonymousAccount(t *testing.T) {
 			}
 		}
 	})
+	t.Cleanup(api.Close)
 	if err := e.App.Store.SetMeta("cfg:steamcmd.account", "player"); err != nil {
 		t.Fatal(err)
 	}
 	if info := api.GuideDownloadInfo(); info.Account != "player" || len(info.Branches) != 1 {
 		t.Fatalf("%+v", info)
 	}
-	for i, tc := range []struct{ override, want string }{{"", "player"}, {"anonymous", "anonymous"}} {
+	for i, tc := range []struct{ override, want string }{{"", "player"}, {"anonymous", ""}} {
 		if ok, err := api.GuideDownload("public", filepath.Join(e.Root, "Games", string(rune('A'+i))), tc.override, ""); !ok || err != nil {
 			t.Fatalf("%v %v", ok, err)
 		}
-		select {
-		case account := <-called:
-			if account != tc.want {
-				t.Fatalf("%q", account)
+		if tc.want != "" {
+			select {
+			case account := <-called:
+				if account != tc.want {
+					t.Fatalf("%q", account)
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("SteamCMD was not started")
 			}
-		case <-time.After(10 * time.Second):
-			t.Fatal("SteamCMD was not started")
 		}
 		select {
 		case <-finished:
 		case <-time.After(10 * time.Second):
 			t.Fatal("no end event")
+		}
+		if tc.want == "" {
+			select {
+			case account := <-called:
+				t.Fatalf("anonymous download started SteamCMD: %q", account)
+			default:
+			}
+			if _, err := os.Stat(filepath.Join(e.Root, "Games", string(rune('A'+i)))); !os.IsNotExist(err) {
+				t.Fatalf("anonymous download created a folder: %v", err)
+			}
 		}
 	}
 	if ok, err := api.GuideDownload("public", filepath.Join(e.Root, "Games", "Bad"), "bad +quit", ""); ok || err == nil {

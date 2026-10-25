@@ -62,7 +62,7 @@ func (s *Server) executeContext(ctx context.Context, env string, argv []string) 
 		lines := strings.Split(out, "\n")
 		for i, line := range lines {
 			if strings.Contains(line, "steamcmd.account") {
-				lines[i] = "steamcmd.account: 需玩家登录"
+				lines[i] = "steamcmd.account: player login required"
 			}
 		}
 		out = strings.Join(lines, "\n")

@@ -20,6 +20,7 @@ async function setup(item) {
   const api = {
     Settings: async () => groups, Tasks: async () => ({ rows: [] }),
     ApplySetting: async (...args) => { calls.push(args); return ["done"]; },
+    ToolInstallOffer: async () => ({url:"https://fixture.invalid/steamcmd.zip",dir:"C:/fixture/steamcmd",bytes:-1}),
     PickProgram: async () => { programPicks++; return "C:/tools/custom.exe"; },
     PickFolder: async () => { assert.fail("program editor opened a folder dialog"); },
   };

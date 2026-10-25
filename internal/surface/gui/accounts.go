@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -16,15 +18,15 @@ import (
 func (s *API) AccountAction(service, action string) ([]string, error) {
 	allowed := map[string]map[string]bool{"steamcmd": {"login": true, "verify": true, "logout": true, "local-forget": true, "anonymous": true}, "loverslab": {"enable": true, "login": true, "verify": true, "forget": true}}
 	if !allowed[service][action] {
-		return nil, errors.New("未知账户操作")
+		return nil, errors.New(view.T("unknown account action"))
 	}
 	s.accountMu.Lock()
 	defer s.accountMu.Unlock()
 	err := s.playerJob(view.TaskAccount, service, func() error { return s.accountAction(service, action) })
 	if err != nil {
-		return nil, err
+		return nil, errors.New(view.Text(err.Error()))
 	}
-	return []string{"账户操作已完成"}, nil
+	return []string{view.T("account action completed")}, nil
 }
 
 // Player jobs retain only a service and a coarse outcome. They cannot be replayed
@@ -34,7 +36,7 @@ func (s *API) playerJob(kind, service string, run func() error) error {
 	s.tasks.EnqueueSelf(app.Task{Kind: kind, Obj: service}, func(string) (result string, err error) {
 		defer func() {
 			if recover() != nil {
-				err = errors.New("账户操作中断，请重新发起")
+				err = errors.New("account action interrupted; try again")
 			}
 			done <- err
 		}()
@@ -42,7 +44,7 @@ func (s *API) playerJob(kind, service string, run func() error) error {
 		if err != nil {
 			return "", err
 		}
-		return "玩家操作已完成", nil
+		return "player action completed", nil
 	})
 	return <-done
 }
@@ -70,25 +72,38 @@ func (s *API) accountAction(service, action string) error {
 			if err == nil {
 				err = a.Store.SetMeta("account:loverslab:enabled", "")
 			}
+		} else if action == "login" {
+			if err = a.Store.SetMeta("account:loverslab:enabled", "true"); err == nil {
+				err = a.Store.SetMeta("account:loverslab:consent", "true")
+			}
+			if err == nil {
+				s.ll = nil
+				err = accounts.Login(a.AccountsDir(), view.T("LoversLab — close this window after login to save the session"))
+				if err == nil {
+					ll, e := s.loversLab(a)
+					if e != nil {
+						err = e
+					} else {
+						ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+						err = ll.Verify(ctx)
+						cancel()
+					}
+				}
+			}
 		} else if a.Store.Meta("account:loverslab:enabled") != "true" {
 			err = accounts.ErrSession
-		} else {
-			switch action {
-			case "login":
-				s.ll = nil
-				err = accounts.Login(a.AccountsDir())
-			case "verify":
-				var ll *subscribe.LoversLab
-				ll, err = s.loversLab(a)
-				if err == nil {
-					err = ll.Verify(context.Background())
-				}
-			default:
-				err = errors.New("未知账户操作")
+		} else if action == "verify" {
+			var ll *subscribe.LoversLab
+			ll, err = s.loversLab(a)
+			if err == nil {
+				err = ll.Verify(context.Background())
 			}
+		} else {
+			err = errors.New("unknown account action")
+
 		}
 	} else {
-		err = errors.New("未知账户服务")
+		err = errors.New("unknown account service")
 	}
 	return err
 }
@@ -121,11 +136,11 @@ func (s *API) LoverFiles(page string) (*subscribe.FilePage, error) {
 	defer unlock()
 	ll, err := s.loversLab(a)
 	if err != nil {
-		return &subscribe.FilePage{Reason: err.Error()}, nil
+		return &subscribe.FilePage{Reason: view.Text(err.Error())}, nil
 	}
 	p, err := ll.Files(context.Background(), page)
 	if err != nil {
-		return &subscribe.FilePage{Reason: err.Error()}, nil
+		return &subscribe.FilePage{Reason: view.Text(err.Error())}, nil
 	}
 	return p, nil
 }
@@ -149,7 +164,7 @@ func (s *API) LoverFollow(page, id string, agreed bool) (*LoverResult, error) {
 	defer unlock()
 	ll, err := s.loversLab(a)
 	if err != nil {
-		return &LoverResult{Page: &subscribe.FilePage{Reason: err.Error()}}, nil
+		return &LoverResult{Page: &subscribe.FilePage{Reason: view.Text(err.Error())}}, nil
 	}
 	var p *subscribe.FilePage
 	var path string
@@ -159,7 +174,7 @@ func (s *API) LoverFollow(page, id string, agreed bool) (*LoverResult, error) {
 		return e
 	})
 	if err != nil {
-		return &LoverResult{Page: &subscribe.FilePage{Reason: err.Error()}}, nil
+		return &LoverResult{Page: &subscribe.FilePage{Reason: view.Text(err.Error())}}, nil
 	}
 	if path != "" {
 		if s.llFiles == nil {
@@ -187,7 +202,7 @@ func (s *API) LoverInstall(page, id, ref string) (string, error) {
 	file := s.llFiles[id]
 	path := file.path
 	if path == "" || file.page != page {
-		return "", errors.New("下载选择已失效，请重新读取")
+		return "", errors.New(view.T("download selection expired; read the page again"))
 	}
 	delete(s.llFiles, id)
 	defer os.Remove(path)
@@ -197,7 +212,7 @@ func (s *API) LoverInstall(page, id, ref string) (string, error) {
 	s.mu.Lock()
 	s.board, s.needs, s.lib = nil, nil, nil
 	s.mu.Unlock()
-	return "订阅已安装", nil
+	return view.T("subscription installed"), nil
 }
 
 func (s *API) LoverInstallPreview(page, id, ref string) (*view.Preview, error) {
@@ -211,13 +226,13 @@ func (s *API) LoverInstallPreview(page, id, ref string) (*view.Preview, error) {
 	file := s.llFiles[id]
 	path := file.path
 	if path == "" || file.page != page {
-		return nil, errors.New("下载选择已失效，请重新读取")
+		return nil, errors.New(view.T("download selection expired; read the page again"))
 	}
 	op, err := a.InstallLoversLabFile(page, path, ref, true)
 	if err != nil {
 		return nil, err
 	}
-	p := &view.Preview{Title: "安装订阅", Apply: true, Lines: []string{"将下载文件安装到订阅目录；更新时替换此订阅的旧文件。"}}
+	p := &view.Preview{Title: view.T("install subscription"), Apply: true, Lines: []string{view.T("Install the download in the subscriptions folder, replacing this subscription when updating.")}}
 	for _, it := range op.Items {
 		p.Lines = append(p.Lines, it.Folder)
 	}
@@ -244,5 +259,66 @@ func (s *API) SubscriptionFilePage(ref string) (string, error) {
 
 // AccountStatus is the only state intended for automation. It reads no secret files.
 func (s *API) AccountStatus() map[string]string {
-	return map[string]string{"steamcmd": "需玩家登录", "loverslab": "需玩家登录"}
+	return map[string]string{"steamcmd": "player login required", "loverslab": "player login required"}
+}
+
+// SteamLogin keeps the account input ephemeral: task records contain only SteamCMD.
+func (s *API) SteamLogin(name string) ([]string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || strings.EqualFold(name, "anonymous") {
+		return nil, errors.New(view.T("enter a Steam account name first"))
+	}
+	s.accountMu.Lock()
+	defer s.accountMu.Unlock()
+	err := s.playerJob(view.TaskAccount, "steamcmd", func() error {
+		a, e := s.detachedReader()
+		if e != nil {
+			return e
+		}
+		defer a.Close()
+		if _, e = a.SteamCMDAccount(name); e != nil {
+			return e
+		}
+		if e = a.Store.SetMeta("cfg:steamcmd.account", name); e != nil {
+			return e
+		}
+		return a.SteamAccountAction("login")
+	})
+	if err != nil {
+		return nil, errors.New(view.Humanize(nil, err.Error()))
+	}
+	return []string{view.T("account action completed")}, nil
+}
+
+// At most one request per four hours, including failures. Opening Settings is
+// the trigger; there is no timer, retry loop, resource load or task/toast.
+func (s *API) refreshLoversLab(a *app.App) {
+	s.accountMu.Lock()
+	defer s.accountMu.Unlock()
+	if a.Store.Meta("account:loverslab:enabled") != "true" {
+		return
+	}
+	unlock := accounts.Lock(a.AccountsDir())
+	defer unlock()
+	last, _ := time.Parse(time.RFC3339Nano, a.Store.Meta("account:loverslab:auto-check"))
+	session, err := accounts.Open(a.AccountsDir())
+	if err != nil || !session.HasCookies() {
+		return
+	}
+	if session.Status().Verified.After(last) {
+		last = session.Status().Verified
+	}
+	if a.Now().Sub(last) < 4*time.Hour {
+		return
+	}
+	if a.Store.SetMeta("account:loverslab:auto-check", a.Now().UTC().Format(time.RFC3339Nano)) != nil {
+		return
+	}
+	ll, err := s.loversLab(a)
+	if err != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = ll.Verify(ctx)
 }

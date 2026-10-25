@@ -25,7 +25,7 @@ func SubscriptionResult(op *app.SubscribeOp) string {
 	}
 	var lines []string
 	for _, it := range op.Items {
-		result := it.Result
+		result := Text(it.Result)
 		switch result {
 		case "up to date":
 			result = T("up to date")
@@ -44,7 +44,7 @@ func SubscriptionResult(op *app.SubscribeOp) string {
 		if note == "Steam downloads it; it appears after the next scan." {
 			note = T("Steam downloads it; it appears after the next scan")
 		}
-		lines = append(lines, note)
+		lines = append(lines, Text(note))
 	}
 	return strings.Join(lines, "  ")
 }
@@ -97,7 +97,7 @@ func SubscriptionFields(r *subscribe.Record) []Field {
 		}
 	}
 	if r.CheckError != "" {
-		check = Tf("failed: %s", r.CheckError)
+		check = Tf("failed: %s", Text(r.CheckError))
 		if !r.CheckedAt.IsZero() {
 			check = checkedAt(r.CheckedAt) + "  " + check
 		}

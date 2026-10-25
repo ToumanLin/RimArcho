@@ -458,6 +458,7 @@ func (s *API) Settings() []view.SettingGroup {
 	}
 	defer r.Close()
 	defer s.free.soon()
+	s.refreshLoversLab(r)
 	return view.SettingsPage(r, nil)
 }
 
@@ -476,6 +477,16 @@ func (s *API) Environment() *view.EnvPage {
 		st = &app.LoadoutState{Ix: &app.Index{Env: e}}
 	}
 	return view.BuildEnvPage(r, st)
+}
+
+// ToolInstallOffer reads download details only after an explicit installation request.
+func (s *API) ToolInstallOffer(name string) (*app.SteamCMDOffer, error) {
+	a, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer a.Close()
+	return a.OfferDep(name)
 }
 
 // ApplySetting runs one of the settings page's commands, with value in place of {}.

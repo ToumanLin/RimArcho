@@ -297,7 +297,7 @@ func subscriptionItem(s Subscription) SubscribeItem {
 	return SubscribeItem{ID: s.Mod.ID, Ref: s.Ref, Name: s.Mod.DisplayName(), Folder: s.Folder, From: s.Record.Installed, To: s.Record.Latest, Record: s.Record}
 }
 
-func (a *App) CheckSubscriptions(refs []string) (*SubscribeOp, error) {
+func (a *App) CheckSubscriptions(refs []string, pageReader ...func(string) (*subscribe.PageInfo, error)) (*SubscribeOp, error) {
 	ss, err := a.selectSubscriptions(refs)
 	if err != nil {
 		return nil, err
@@ -321,7 +321,11 @@ func (a *App) CheckSubscriptions(refs []string) (*SubscribeOp, error) {
 				commit, checkErr = subscribe.RemoteCommit(context.Background(), r.GitURL(), r.RefType, r.Ref)
 			} else {
 				var page *subscribe.PageInfo
-				page, checkErr = a.readSubscriptionPage(r.URL)
+				if len(pageReader) > 0 {
+					page, checkErr = pageReader[0](r.URL)
+				} else {
+					page, checkErr = a.readSubscriptionPage(r.URL)
+				}
 				if checkErr == nil {
 					commit = page.Stamp()
 				}
