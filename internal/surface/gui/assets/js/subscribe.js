@@ -30,9 +30,9 @@ function authenticatedFiles(pageURL, ref, close) {
   const current = () => root.isConnected !== false;
   const info = el("div", "word-facts"), choices = el("div", "subscribe-row");
   const show = p => {
-    info.textContent = p?.reason || p?.agreement || "选择一个文件；若站点需要确认，会先显示原文。";
+    info.textContent = p?.reason || p?.agreement || T("Choose a file. Site agreements are shown before confirmation.");
     choices.replaceChildren();
-    for (const file of p?.files || []) choices.append(button(file.name, async () => {
+    for (const file of p?.files || []) choices.append(button([T(file.name), file.size, file.date].filter(Boolean).join("  "), async () => {
       const follow = async () => {
         const result = await api.LoverFollow(pageURL, file.id, !!p.agreement);
         if (!current()) return;
@@ -44,12 +44,12 @@ function authenticatedFiles(pageURL, ref, close) {
           } : null);
         } else show(result.page);
       };
-      if (p.agreement) pop.confirm("站点下载确认", [p.agreement], "我同意并继续", follow);
+      if (p.agreement) pop.confirm(T("site download agreement"), [p.agreement], T("I agree, continue"), follow);
       else await follow();
     }));
     if (p?.reason) choices.append(button(T("open download page"), () => api.OpenURL(pageURL)));
   };
-  root.append(button("读取 LoversLab 可下载文件", async () => { const p = await api.LoverFiles(pageURL); if (current()) show(p); }), info, choices);
+  root.append(button(T("read LoversLab files"), async () => { const p = await api.LoverFiles(pageURL); if (current()) show(p); }), info, choices);
   return root;
 }
 
@@ -91,7 +91,7 @@ export function subscribeForm(close) {
     const pageURL = url.field.value.trim();
     let p;
     try { p = await api.SubscriptionPage(pageURL); }
-    catch (error) { if (!loversLabPage(pageURL)) throw error; p = { Name: "公开页面无法读取，可尝试会话下载或手动选择 zip。" }; }
+    catch (error) { if (!loversLabPage(pageURL)) throw error; p = { Name: T("Public page unavailable; try the session or choose a downloaded zip.") }; }
     if (type.value !== "page" || url.field.value.trim() !== pageURL) return;
     const date = p.DateModified && !p.DateModified.startsWith("0001-") ? p.DateModified : "";
     info.replaceChildren(el("div", "", p.Name), el("div", "dim", [p.Version, date].filter(Boolean).join(" @ ")));
@@ -145,9 +145,9 @@ export function updateFromForm(host, ref, close, onApplied = () => {}) {
   const files = importPicker();
   const actions = el("div", "subscribe-row");
   const applied = () => { close(); onApplied(); };
-  actions.append(button("从 LoversLab 会话更新", async () => {
+  actions.append(button(T("update using the LoversLab session"), async () => {
     const pageURL = await api.SubscriptionFilePage(ref);
-    if (!pageURL) return say("fail", "此订阅没有可用的 LoversLab 文件页，请选择下载的 zip。");
+    if (!pageURL) return say("fail", T("This subscription has no LoversLab file page; choose a downloaded zip."));
     root.querySelector(".subscribe-page")?.remove();
     root.append(authenticatedFiles(pageURL, ref, applied));
   }));

@@ -3,18 +3,23 @@ package view
 import (
 	"time"
 
-	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 )
 
 type SubscriptionSource struct {
-	Key     string `json:"key"`
-	Name    string `json:"name"`
-	Count   int    `json:"count"`
-	Checked string `json:"checked"`
-	Result  string `json:"result"`
-	Account string `json:"account,omitempty"`
+	Key      string               `json:"key"`
+	Name     string               `json:"name"`
+	Count    int                  `json:"count"`
+	Checked  string               `json:"checked"`
+	Result   string               `json:"result"`
+	Account  string               `json:"account,omitempty"`
+	Failures []SourceFailureGroup `json:"failures,omitempty"`
+}
+
+type SourceFailureGroup struct {
+	Label string   `json:"label"`
+	Items []string `json:"items"`
 }
 
 type PendingUpdate struct {
@@ -48,20 +53,38 @@ func BuildSubscriptions(a *app.App, st *app.LoadoutState, o modchanges.Opts) (*S
 		checks[key] = c
 		r := SubscriptionSource{Key: key, Name: names[i], Result: T("not checked yet")}
 		if !c.At.IsZero() {
-			r.Checked, r.Result = a.FormatTime(c.At), T(c.Result)
-		}
-		if key == app.LibSteamCMD {
-			r.Account = a.SteamAccountStatus().State
-		}
-		if key == app.LibPage {
-			r.Account = "未启用"
-			if a.Store.Meta("account:loverslab:enabled") == "true" {
-				r.Account = "需登录"
-				if session, err := accounts.Open(a.AccountsDir()); err == nil {
-					r.Account = session.Status().State
+			r.Checked, r.Result = a.FormatTime(c.At), Text(c.Result)
+			groups := map[string]int{}
+			for _, failure := range c.Failures {
+				reason := failure.Reason
+				if failure.Code != 0 {
+					reason = app.WorkshopResultText(failure.Code)
+				}
+				groupKey := reason
+				at, ok := groups[groupKey]
+				if !ok {
+					at = len(r.Failures)
+					groups[groupKey] = at
+					r.Failures = append(r.Failures, SourceFailureGroup{})
+				}
+				g := &r.Failures[at]
+				g.Items = append(g.Items, failure.Name+" ("+failure.ID+"): "+Text(reason))
+				g.Label = Tf("%d: %s", len(g.Items), Text(reason))
+				if failure.Code == 9 {
+					g.Label = Tf("%d no longer on the Workshop", len(g.Items))
 				}
 			}
+			if len(c.Failures) > 0 {
+				r.Result = Tf("%d failed", len(c.Failures))
+			}
 		}
+		if key == app.LibSteamCMD {
+			r.Account = SteamAccountLine(a.SteamAccountStatus())
+		}
+		if key == app.LibPage {
+			r.Account, _ = LoversLabLine(a)
+		}
+
 		p.Sources = append(p.Sources, r)
 	}
 	lib, err := a.Library()
@@ -82,7 +105,7 @@ func BuildSubscriptions(a *app.App, st *app.LoadoutState, o modchanges.Opts) (*S
 					checks[s.Key] = check
 					s.Checked, s.Result = a.FormatTime(sub.CheckedAt), T("check complete")
 					if sub.CheckError != "" {
-						s.Result = sub.CheckError
+						s.Result = Text(sub.CheckError)
 					}
 				}
 				if inst.Mod == nil || inst.Missing() || s.Key == app.LibLocal {

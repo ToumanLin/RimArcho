@@ -17,7 +17,7 @@ func (a *App) readSubscriptionPage(url string) (*subscribe.PageInfo, error) {
 // The caller owns the temporary file and must delete it after this call.
 func (a *App) InstallLoversLabFile(page, file, ref string, dryRun bool) (*SubscribeOp, error) {
 	if !subscribe.LoversLabPage(page) {
-		return nil, fmt.Errorf("请选择 LoversLab 文件页")
+		return nil, fmt.Errorf("choose a LoversLab file page")
 	}
 	if ref == "" {
 		return a.SubscribePage(page, false, file, dryRun)
@@ -27,7 +27,7 @@ func (a *App) InstallLoversLabFile(page, file, ref string, dryRun bool) (*Subscr
 		return nil, err
 	}
 	if ss[0].Record.Kind != "page" || ss[0].Record.URL != page {
-		return nil, fmt.Errorf("更新文件页与订阅不一致，请重新读取")
+		return nil, fmt.Errorf("file page does not match the subscription; read it again")
 	}
 	return a.UpdateSubscriptionFrom(ref, file, dryRun)
 }

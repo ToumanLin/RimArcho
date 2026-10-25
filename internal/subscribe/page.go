@@ -72,6 +72,11 @@ func ReadPage(ctx context.Context, client *http.Client, pageURL string) (*PageIn
 	if len(b) > limit {
 		return nil, fmt.Errorf("page exceeds 4 MB: %s", pageURL)
 	}
+	return parsePageInfo(b, pageURL)
+}
+
+func parsePageInfo(b []byte, pageURL string) (*PageInfo, error) {
+	u, _ := url.Parse(pageURL)
 	root, err := html.Parse(strings.NewReader(string(b)))
 	if err != nil {
 		return nil, err

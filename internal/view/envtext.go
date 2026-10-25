@@ -55,7 +55,7 @@ func init() {
 		"empty or anonymous: anonymous login; enter an account name to log in. Password and Steam Guard are entered only in SteamCMD": "留空或填 anonymous：匿名登录；填入账户名可登录。密码和 Steam 令牌只在 SteamCMD 中输入",
 		"empty: %s (from settings)": "留空：%s（来自设置）",
 		"Anonymous by default; you can choose an account in settings or here. Enter anonymous to override a saved account. Password and Steam Guard are entered only in SteamCMD.": "默认匿名；可在设置或这里选择账户。填 anonymous 可覆盖已保存的账户。密码和 Steam 令牌只在 SteamCMD 中输入。",
-		"Steam refused the anonymous download (a license is required); choose an account in settings, or add a game folder you already have":                                       "Steam 拒绝了匿名下载（需要许可）；可在设置中选择账户，或添加已有的游戏目录",
+		"anonymous accounts cannot download RimWorld; log in with an account that owns it, or add a game folder you already have":                                                  "匿名账号不能下载 RimWorld；请登录拥有游戏的账号，或添加已有的游戏目录",
 		"the anonymous Steam connection did not finish; check the connection and try again":                                                                                        "匿名连接 Steam 未完成；请检查网络后重试",
 		"download and add":                                           "下载并加入",
 		"a download is already running":                              "已经有一个下载在进行",

@@ -979,7 +979,7 @@ var idRe = regexp.MustCompile(`#[0-9a-z]{3,8}\b`)
 
 // Humanize replaces instance references by mod names and drops the "error: " prefix.
 func Humanize(st *app.LoadoutState, s string) string {
-	s = strings.TrimPrefix(strings.TrimSpace(s), "error: ")
+	s = Text(strings.TrimPrefix(strings.TrimSpace(s), "error: "))
 	if st == nil {
 		return s
 	}

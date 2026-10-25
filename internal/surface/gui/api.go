@@ -457,6 +457,7 @@ func (s *API) Settings() []view.SettingGroup {
 	}
 	defer r.Close()
 	defer s.free.soon()
+	s.refreshLoversLab(r)
 	return view.SettingsPage(r, nil)
 }
 

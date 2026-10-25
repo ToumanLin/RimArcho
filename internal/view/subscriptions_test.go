@@ -137,17 +137,65 @@ func TestSubscriptionSourceStates(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := "未启用"
-		if enabled {
-			want = "未连接"
-		}
-		if p.Sources[1].Account != "匿名" || p.Sources[3].Account != want {
+		if p.Sources[1].Account != "mod downloads available, not logged in" || p.Sources[3].Account != "unavailable, not logged in" {
 			t.Fatalf("source account states: %+v", p.Sources)
 		}
 		for _, s := range p.Sources {
 			if s.Checked != "" || s.Result != "not checked yet" {
 				t.Fatalf("unchecked source: %+v", s)
 			}
+		}
+	}
+}
+
+func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
+	view.SetLang("zh")
+	defer view.SetLang("en")
+	e := testkit.New(t)
+	e.AddEnv(true)
+	codes := []int{9, 9, 2, 15, 16, 20, 24, 25, 41, 84, 999}
+	for i := range codes {
+		e.AddWorkshop(fmt.Sprint(10000+i), testkit.Sample(fmt.Sprint("tester.failure", i), fmt.Sprint("Fixture ", i)))
+	}
+	e.MustRun("scan")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		id := r.Form.Get("publishedfileids[0]")
+		index := 0
+		fmt.Sscan(id, &index)
+		code := codes[index-10000]
+		fmt.Fprintf(w, `{"response":{"publishedfiledetails":[{"publishedfileid":%q,"result":%d}]}}`, id, code)
+	}))
+	defer server.Close()
+	e.App.SteamAPI = server.URL
+	if err := e.App.CheckSubscriptionSource(app.LibWorkshop); err == nil || strings.Contains(err.Error(), "result 9") {
+		t.Fatal(err)
+	}
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := view.BuildSubscriptions(e.App, st, modchanges.Opts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := page.Sources[0]
+	found := false
+	for _, group := range row.Failures {
+		if group.Label == "2 个已从工坊消失" {
+			found = true
+			if len(group.Items) != 2 || !strings.Contains(group.Items[0], "工坊里已找不到（被删除或设为私有）") {
+				t.Fatal(group)
+			}
+		}
+	}
+	if !found || len(row.Failures) != 10 {
+		t.Fatal(row)
+	}
+	for _, code := range []int{2, 15, 16, 20, 24, 25, 41, 84, 999} {
+		text := view.Text(app.WorkshopResultText(code))
+		if text == "" || strings.Contains(text, "result ") {
+			t.Fatal(code, text)
 		}
 	}
 }

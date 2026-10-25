@@ -203,7 +203,7 @@ func (s *Session) login(check bool) error {
 	if w32.RegisterClassEx(&wc) == 0 {
 		return helperFailure("window class registration failed", 0)
 	}
-	hwnd = w32.CreateWindowEx(0, class, wide("LoversLab — 登录完成后关闭此窗口保存会话"), w32.WS_OVERLAPPEDWINDOW|w32.WS_VISIBLE, 100, 100, 1024, 780, 0, 0, instance, nil)
+	hwnd = w32.CreateWindowEx(0, class, wide(s.title), w32.WS_OVERLAPPEDWINDOW|w32.WS_VISIBLE, 100, 100, 1024, 780, 0, 0, instance, nil)
 	if hwnd == 0 {
 		return helperFailure("window create failed", 0)
 	}

@@ -61,6 +61,12 @@ export function drawSubscriptions(scroll, data, area, controls) {
       heading?.querySelector("button, input")?.focus({ preventScroll: true });
     }));
     row.append(action(T("check for updates"), async () => say("ok", await api.CheckSubscriptionSource(source.key))));
+    for (const group of source.failures || []) {
+      const details = el("details", "source-failures");
+      details.append(el("summary", "", group.label));
+      const list = el("ul"); for (const item of group.items) list.append(el("li", "word-facts", item));
+      details.append(list); row.append(details);
+    }
     host.append(row);
   }
   // A background completion must not discard text the player is entering.

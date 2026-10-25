@@ -22,7 +22,7 @@ import (
 type AuthError struct{ State, Reason string }
 
 func (e *AuthError) Error() string {
-	return e.Reason + "；请打开下载页，在浏览器下载后选择 zip"
+	return e.Reason + "; open the download page and choose a zip downloaded in your browser"
 }
 
 func authError(state, reason string) error { return &AuthError{state, reason} }
@@ -30,6 +30,8 @@ func authError(state, reason string) error { return &AuthError{state, reason} }
 type SiteFile struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	Size string `json:"size,omitempty"`
+	Date string `json:"date,omitempty"`
 }
 type FilePage struct {
 	Files     []SiteFile `json:"files"`
@@ -77,7 +79,7 @@ func LoversLabPage(raw string) bool {
 func (l *LoversLab) request(ctx context.Context, a siteAction) (*http.Response, error) {
 	u, err := url.Parse(a.target)
 	if err != nil || !fileURL(u) {
-		return nil, authError("需浏览器验证", "站点跳转暂不支持")
+		return nil, authError("browser verification required", "site redirect not supported")
 	}
 	if !l.session.HasCookies() {
 		return nil, accounts.ErrSession
@@ -85,13 +87,13 @@ func (l *LoversLab) request(ctx context.Context, a siteAction) (*http.Response, 
 	if time.Now().Before(l.next) {
 		wait := time.Until(l.next)
 		if wait > time.Second {
-			return nil, authError("限额", "站点请求间隔或限额尚未结束，请稍后重试")
+			return nil, authError("rate limited", "site request cooldown is active; try again later")
 		}
 		timer := time.NewTimer(wait)
 		defer timer.Stop()
 		select {
 		case <-ctx.Done():
-			return nil, authError("需登录", "会话请求已取消")
+			return nil, authError("login required", "session request cancelled")
 		case <-timer.C:
 		}
 	}
@@ -117,19 +119,25 @@ func (l *LoversLab) request(ctx context.Context, a siteAction) (*http.Response, 
 	}
 	resp, err := l.client.Do(req)
 	l.next = time.Now().Add(time.Second)
+	if e := l.session.Save(); e != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return nil, e
+	}
 	if err != nil {
 		if resp != nil {
 			if target, e := resp.Location(); e == nil {
 				if strings.Contains(strings.ToLower(target.Path), "login") && accounts.SiteHost(target.Hostname()) {
-					_ = l.session.SetStatus("需登录", "")
-					return nil, authError("需登录", "站点要求重新登录")
+					_ = l.session.SetStatus("login required", "")
+					return nil, authError("login required", "the site requires login again")
 				}
 				if !fileURL(target) {
-					return nil, authError("需浏览器验证", "站点跳转暂不支持（下载主机尚未确认）")
+					return nil, authError("browser verification required", "site redirect not supported (download host not verified)")
 				}
 			}
 		}
-		return nil, authError("需浏览器验证", "会话请求未完成，请稍后重试")
+		return nil, authError("browser verification required", "session request did not complete; try again later")
 	}
 	if resp.StatusCode == 429 {
 		if secs, e := time.ParseDuration(resp.Header.Get("Retry-After") + "s"); e == nil {
@@ -138,7 +146,7 @@ func (l *LoversLab) request(ctx context.Context, a siteAction) (*http.Response, 
 			l.next = t
 		}
 		resp.Body.Close()
-		return nil, authError("限额", "站点达到请求限制，请等待后重试")
+		return nil, authError("rate limited", "site request limit reached; wait before retrying")
 	}
 	return resp, nil
 }
@@ -155,20 +163,20 @@ func (l *LoversLab) page(ctx context.Context, a siteAction) (*FilePage, error) {
 func (l *LoversLab) parsePage(resp *http.Response, a siteAction) (*FilePage, error) {
 	b, err := io.ReadAll(io.LimitReader(resp.Body, (4<<20)+1))
 	if err != nil || len(b) > 4<<20 {
-		return nil, authError("需浏览器验证", "下载页无法读取")
+		return nil, authError("browser verification required", "cannot read the download page")
 	}
 	low := strings.ToLower(string(b))
 	if strings.Contains(low, "cf-chl-") || strings.Contains(low, "just a moment") || strings.Contains(low, "captcha") {
-		_ = l.session.SetStatus("需浏览器验证", "")
-		return nil, authError("需浏览器验证", "站点需要浏览器验证")
+		_ = l.session.SetStatus("browser verification required", "")
+		return nil, authError("browser verification required", "the site requires browser verification")
 	}
 	if resp.StatusCode == 401 || strings.Contains(low, `name="password"`) || strings.Contains(low, `name='password'`) {
-		_ = l.session.SetStatus("需登录", "")
-		return nil, authError("需登录", "会话已失效")
+		_ = l.session.SetStatus("login required", "")
+		return nil, authError("login required", "session expired")
 	}
 	if resp.StatusCode != 200 {
-		_ = l.session.SetStatus("需浏览器验证", "")
-		return nil, authError("需浏览器验证", "站点拒绝访问（权限或浏览器验证）")
+		_ = l.session.SetStatus("browser verification required", "")
+		return nil, authError("browser verification required", "site access denied (permission or browser verification)")
 	}
 	root, _ := html.Parse(strings.NewReader(string(b)))
 	p := &FilePage{}
@@ -181,9 +189,11 @@ func (l *LoversLab) parsePage(resp *http.Response, a siteAction) (*FilePage, err
 			if e == nil && fileURL(u) && u.Query().Get("do") == "download" && (u.Path == base.Path || strings.HasPrefix(u.Path, "/files/")) {
 				name := strings.TrimSpace(nodeText(n))
 				if name == "" {
-					name = "下载文件"
+					name = "download file"
 				}
-				p.Files = append(p.Files, l.add(siteAction{page: a.page, target: u.String(), referer: base.String()}, name))
+				file := l.add(siteAction{page: a.page, target: u.String(), referer: base.String()}, name)
+				file.Name, file.Size, file.Date = fileMetadata(n, name)
+				p.Files = append(p.Files, file)
 			}
 		}
 		if n.Type == html.ElementNode && n.Data == "form" {
@@ -220,7 +230,7 @@ func (l *LoversLab) parsePage(resp *http.Response, a siteAction) (*FilePage, err
 					}
 					u.RawQuery = q.Encode()
 				}
-				p.Files = append(p.Files, l.add(siteAction{page: a.page, target: u.String(), method: method, values: values, agreement: agreement, referer: base.String()}, "确认下载"))
+				p.Files = append(p.Files, l.add(siteAction{page: a.page, target: u.String(), method: method, values: values, agreement: agreement, referer: base.String()}, "confirm download"))
 			}
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
@@ -228,8 +238,21 @@ func (l *LoversLab) parsePage(resp *http.Response, a siteAction) (*FilePage, err
 		}
 	}
 	walk(root)
+	hasNamed := false
+	for _, file := range p.Files {
+		hasNamed = hasNamed || archiveName.MatchString(file.Name) || file.Size != "" || file.Date != ""
+	}
+	if hasNamed {
+		files := p.Files[:0]
+		for _, file := range p.Files {
+			if !genericFileLabel(file.Name) {
+				files = append(files, file)
+			}
+		}
+		p.Files = files
+	}
 	if len(p.Files) == 0 {
-		return nil, authError("需浏览器验证", "未识别到可下载文件，请使用浏览器")
+		return nil, authError("browser verification required", "no downloadable files recognized; use your browser")
 	}
 	return p, nil
 }
@@ -271,10 +294,27 @@ func (l *LoversLab) Files(ctx context.Context, page string) (*FilePage, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !LoversLabPage(page) {
-		return nil, authError("需登录", "请选择 LoversLab 文件页")
+		return nil, authError("login required", "choose a LoversLab file page")
 	}
 	l.actions = map[string]siteAction{}
-	return l.page(ctx, siteAction{page: page, target: page})
+	p, err := l.page(ctx, siteAction{page: page, target: page})
+	if err != nil {
+		return nil, err
+	}
+	// A single generic link often opens Invision's selector rather than a file.
+	// Read that GET page once; agreements and downloads still require a choice.
+	if len(p.Files) == 1 && genericFileLabel(p.Files[0].Name) && p.Agreement == "" {
+		action := l.actions[p.Files[0].ID]
+		resp, e := l.request(ctx, action)
+		if e != nil {
+			return nil, e
+		}
+		defer resp.Body.Close()
+		if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "html") {
+			return l.parsePage(resp, action)
+		}
+	}
+	return p, nil
 }
 
 // Follow returns another selection/agree page or a temporary zip. Opaque IDs are
@@ -284,10 +324,10 @@ func (l *LoversLab) Follow(ctx context.Context, page, id string, agreed bool, di
 	defer l.mu.Unlock()
 	a, ok := l.actions[id]
 	if !ok || a.page != page {
-		return nil, "", authError("需登录", "文件选择已过期，请重新读取")
+		return nil, "", authError("login required", "file selection expired; read the page again")
 	}
 	if a.agreement != "" && !agreed {
-		return &FilePage{Agreement: a.agreement, Files: []SiteFile{{ID: id, Name: "确认下载"}}}, "", nil
+		return &FilePage{Agreement: a.agreement, Files: []SiteFile{{ID: id, Name: "confirm download"}}}, "", nil
 	}
 	resp, err := l.request(ctx, a)
 	if err != nil {
@@ -301,11 +341,11 @@ func (l *LoversLab) Follow(ctx context.Context, page, id string, agreed bool, di
 		return p, "", e
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return nil, "", errors.New("无法创建下载临时目录")
+		return nil, "", errors.New("cannot create the temporary download folder")
 	}
 	f, err := os.CreateTemp(dir, "loverslab-*.zip")
 	if err != nil {
-		return nil, "", errors.New("无法创建下载临时文件")
+		return nil, "", errors.New("cannot create the temporary download file")
 	}
 	name := f.Name()
 	success := false
@@ -318,12 +358,12 @@ func (l *LoversLab) Follow(ctx context.Context, page, id string, agreed bool, di
 	// The archive installer performs the actual zip/folder and About.xml validation.
 	_, err = io.Copy(f, io.LimitReader(resp.Body, 8<<30))
 	if err != nil {
-		return nil, "", errors.New("下载中断，请重试或使用手动下载")
+		return nil, "", errors.New("download interrupted; retry or download manually")
 	}
 	if err = f.Close(); err != nil {
-		return nil, "", errors.New("下载文件写入失败")
+		return nil, "", errors.New("cannot write the downloaded file")
 	}
-	if err := l.session.SetStatus("可用", ""); err != nil {
+	if err := l.session.SetStatus("available", ""); err != nil {
 		return nil, "", err
 	}
 	success = true
@@ -344,20 +384,20 @@ func (l *LoversLab) Verify(ctx context.Context) error {
 	defer resp.Body.Close()
 	b, err := io.ReadAll(io.LimitReader(resp.Body, (4<<20)+1))
 	if err != nil || len(b) > 4<<20 {
-		return authError("需浏览器验证", "验证页无法读取")
+		return authError("browser verification required", "cannot read the verification page")
 	}
 	low := strings.ToLower(string(b))
-	state := "需登录"
+	state := "login required"
 	if resp.StatusCode != 200 {
-		state = "需浏览器验证"
+		state = "browser verification required"
 		if target, e := resp.Location(); e == nil && accounts.SiteHost(target.Hostname()) && strings.Contains(strings.ToLower(target.Path), "login") {
-			state = "需登录"
+			state = "login required"
 		}
 	}
 	if strings.Contains(low, "cf-chl-") || strings.Contains(low, "just a moment") || strings.Contains(low, "captcha") {
-		state = "需浏览器验证"
+		state = "browser verification required"
 	} else if resp.StatusCode == 200 && strings.Contains(low, "do=logout") {
-		state = "可用"
+		state = "available"
 	}
 	name := ""
 	root, _ := html.Parse(strings.NewReader(string(b)))
@@ -377,8 +417,46 @@ func (l *LoversLab) Verify(ctx context.Context) error {
 	if err := l.session.SetStatus(state, name); err != nil {
 		return err
 	}
-	if state != "可用" {
-		return authError(state, "会话需要玩家确认")
+	if state != "available" {
+		return authError(state, "session needs player confirmation")
 	}
 	return nil
+}
+
+// PageInfo checks authenticated metadata with one GET, sharing the same cookie
+// jar and persistence path as verification and downloads.
+func (l *LoversLab) PageInfo(ctx context.Context, page string) (*PageInfo, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if !LoversLabPage(page) {
+		return nil, authError("login required", "choose a LoversLab file page")
+	}
+	old := l.client.CheckRedirect
+	l.client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	defer func() { l.client.CheckRedirect = old }()
+	resp, err := l.request(ctx, siteAction{page: page, target: page})
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(io.LimitReader(resp.Body, (4<<20)+1))
+	if err != nil || len(b) > 4<<20 {
+		return nil, authError("browser verification required", "cannot read the download page")
+	}
+	low := strings.ToLower(string(b))
+	if resp.StatusCode != 200 || strings.Contains(low, "cf-chl-") || strings.Contains(low, "captcha") || strings.Contains(low, "just a moment") {
+		return nil, authError("browser verification required", "the site requires browser verification")
+	}
+	if strings.Contains(low, `name="password"`) || strings.Contains(low, `name='password'`) {
+		_ = l.session.SetStatus("login required", "")
+		return nil, accounts.ErrSession
+	}
+	p, err := parsePageInfo(b, page)
+	if err != nil {
+		return nil, authError("browser verification required", "cannot read the download page")
+	}
+	if err = l.session.SetStatus("available", ""); err != nil {
+		return nil, err
+	}
+	return p, nil
 }

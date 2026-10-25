@@ -10,10 +10,10 @@ import (
 )
 
 // Login starts a dedicated native host process, with no Wails runtime or services.
-// Only the local session-directory path crosses the process boundary.
-func Login(dir string) error { return runLoginHost(dir, false) }
+// The local session-directory path and translated window title cross the process boundary.
+func Login(dir string, title ...string) error { return runLoginHost(dir, false, title...) }
 
-func runLoginHost(dir string, check bool) error {
+func runLoginHost(dir string, check bool, title ...string) error {
 	if err := privateDir(dir); err != nil {
 		return helperFailure("session directory unavailable", 0)
 	}
@@ -29,6 +29,9 @@ func runLoginHost(dir string, check bool) error {
 	args := []string{"account-login-helper", dir}
 	if check {
 		args = append(args, "--check")
+	}
+	if len(title) > 0 {
+		args = append(args, "--title", title[0])
 	}
 	cmd := exec.Command(exe, args...)
 	for _, e := range os.Environ() {
@@ -55,6 +58,11 @@ func Helper(args []string) (handled bool, code int) {
 	if len(args) == 0 || args[0] != "account-login-helper" {
 		return false, 0
 	}
+	title := "LoversLab — close this window after login to save the session"
+	if len(args) == 4 && args[2] == "--title" {
+		title = args[3]
+		args = args[:2]
+	}
 	if len(args) != 2 && !(len(args) == 3 && args[2] == "--check") {
 		return true, 1
 	}
@@ -72,6 +80,7 @@ func Helper(args []string) (handled bool, code int) {
 		writeHelperLog(args[1], helperFailure("session directory unavailable", 0))
 		return true, 1
 	}
+	s.title = title
 	err = s.login(len(args) == 3)
 	writeHelperLog(args[1], err)
 	if err != nil {

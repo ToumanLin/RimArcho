@@ -17,7 +17,7 @@ import (
 
 const Site = "https://www.loverslab.com/"
 
-var ErrSession = errors.New("需玩家登录；请打开站点登录，或在浏览器下载后选择 zip")
+var ErrSession = errors.New("login required; open the login window or download a zip in your browser")
 
 // Status contains derived, non-secret information for the player interface.
 type Status struct {
@@ -29,6 +29,7 @@ type Status struct {
 
 // Session's cookies are intentionally unexported and never JSON-serialized by callers.
 type Session struct {
+	title    string
 	dir      string
 	cookies  []*http.Cookie
 	status   Status
@@ -52,7 +53,7 @@ func Open(dir string) (*Session, error) {
 	if safePath(dir) != nil || safePath(filepath.Join(dir, "loverslab.session")) != nil {
 		return nil, ErrSession
 	}
-	s := &Session{dir: dir, status: Status{State: "未连接"}}
+	s := &Session{dir: dir, status: Status{State: "not connected"}}
 	b, err := os.ReadFile(filepath.Join(dir, "loverslab.session"))
 	if errors.Is(err, os.ErrNotExist) {
 		return s, nil
@@ -72,8 +73,20 @@ func Open(dir string) (*Session, error) {
 	}
 	s.accept(e.Cookies)
 	s.status = e.Status
+	switch s.status.State {
+	case "未连接":
+		s.status.State = "not connected"
+	case "需登录":
+		s.status.State = "login required"
+	case "需浏览器验证":
+		s.status.State = "browser verification required"
+	case "限额":
+		s.status.State = "rate limited"
+	case "可用":
+		s.status.State = "available"
+	}
 	if len(s.cookies) == 0 {
-		s.status.State = "需登录"
+		s.status.State = "login required"
 	}
 	return s, nil
 }
@@ -81,7 +94,7 @@ func Open(dir string) (*Session, error) {
 func (s *Session) accept(cookies []*http.Cookie) {
 	s.cookies = nil
 	for _, c := range cookies {
-		if c != nil && c.MaxAge >= 0 && cookieDomain(c.Domain) && c.Secure && (c.Expires.IsZero() || c.Expires.After(time.Now())) {
+		if c != nil && c.MaxAge >= 0 && cookieDomain(c.Domain) && (c.Expires.IsZero() || c.Expires.After(time.Now())) {
 			copy := *c
 			s.cookies = append(s.cookies, &copy)
 		}
@@ -92,23 +105,19 @@ func (s *Session) Status() Status {
 	r := s.status
 	r.Expiry = time.Time{}
 	if len(s.cookies) == 0 && r.State == "" {
-		r.State = "未连接"
+		r.State = "not connected"
 	}
-	unknown := false
 	for _, c := range s.cookies {
-		unknown = unknown || c.Expires.IsZero()
-		if !c.Expires.IsZero() && (r.Expiry.IsZero() || c.Expires.Before(r.Expiry)) {
+		name := strings.ToLower(c.Name)
+		// Invision's member/login/device keys keep the login alive after the short
+		// session expires. Analytics/preferences must not extend the displayed expiry.
+		auth := strings.Contains(name, "member_id") || strings.Contains(name, "login_key") || strings.Contains(name, "device_key") || strings.Contains(name, "session")
+		if auth && c.MaxAge >= 0 && c.Expires.After(time.Now()) && c.Expires.After(r.Expiry) {
 			r.Expiry = c.Expires
 		}
-		if !c.Expires.IsZero() && c.Expires.Before(time.Now()) {
-			r.State = "需登录"
-		}
 	}
-	if unknown {
-		r.Expiry = time.Time{}
-	}
-	if !s.HasCookies() && r.State != "未连接" {
-		r.State = "需登录"
+	if !s.HasCookies() && r.State != "not connected" {
+		r.State = "login required"
 	}
 	return r
 }
@@ -126,15 +135,18 @@ func (s *Session) SetStatus(state, name string) error {
 	return nil
 }
 
+func (s *Session) Save() error { return s.save() }
+
 func (s *Session) save() error {
 	if !s.current() {
 		return ErrSession
 	}
 	s.status.Expiry = s.Status().Expiry
-	// Session-only cookies may be used for this operation, but never cross a restart.
+	// Keep session cookies too: the native login host exits before the API uses
+	// them. They retain no expiry, and are invalidated by the site or logout.
 	var persistent []*http.Cookie
 	for _, c := range s.cookies {
-		if c.MaxAge >= 0 && !c.Expires.IsZero() && c.Expires.After(time.Now()) {
+		if c.MaxAge >= 0 && (c.Expires.IsZero() || c.Expires.After(time.Now())) {
 			persistent = append(persistent, c)
 		}
 	}
@@ -168,7 +180,7 @@ func (s *Session) save() error {
 // Capture is called only by the native CookieManager completion handler.
 func (s *Session) capture(cookies []*http.Cookie) error {
 	s.accept(cookies)
-	s.status.State = "需登录"
+	s.status.State = "login required"
 	return s.save()
 }
 
@@ -221,9 +233,6 @@ func (j *restrictedJar) SetCookies(u *url.URL, cs []*http.Cookie) {
 				continue
 			}
 		}
-		if !copy.Secure {
-			continue
-		}
 		allowed = append(allowed, c)
 		if copy.Path == "" || copy.Path[0] != '/' {
 			if i := strings.LastIndex(u.Path, "/"); i >= 0 {
@@ -255,12 +264,12 @@ func (j *restrictedJar) SetCookies(u *url.URL, cs []*http.Cookie) {
 
 func (s *Session) Forget() error {
 	s.cookies = nil
-	s.status = Status{State: "未连接"}
+	s.status = Status{State: "not connected"}
 	if err := safeTree(s.dir); err != nil {
 		return ErrSession
 	}
 	if err := os.RemoveAll(s.dir); err != nil {
-		return errors.New("账户会话清理失败，请关闭登录窗口后重试")
+		return errors.New("session cleanup failed; close the login window and retry")
 	}
 	s.exists, s.revision = false, [32]byte{}
 	return nil

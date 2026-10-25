@@ -313,7 +313,7 @@ func (e *DownloadError) Why() string {
 	var why string
 	switch e.Kind {
 	case "anonymous-license":
-		why = "Steam refused the anonymous download (a license is required); choose an account in settings, or add a game folder you already have"
+		why = "anonymous accounts cannot download RimWorld; log in with an account that owns it, or add a game folder you already have"
 	case "anonymous-login":
 		why = "the anonymous Steam connection did not finish; check the connection and try again"
 	case "ownership":
@@ -413,6 +413,10 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 	if err != nil {
 		return "", err
 	}
+	if account == "anonymous" {
+		return "", &DownloadError{Kind: "anonymous-license"}
+	}
+
 	if spec.Branch == "" {
 		spec.Branch = "public"
 	}

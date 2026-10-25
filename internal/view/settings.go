@@ -40,6 +40,7 @@ type SettingItem struct {
 
 // SettingAction is a button: a command, confirmed first when Confirm is set.
 type SettingAction struct {
+	Input   *string  `json:"input,omitempty"`
 	Label   string   `json:"label"`
 	Argv    []string `json:"argv"`
 	Confirm string   `json:"confirm,omitempty"`

@@ -18,7 +18,7 @@ func TestAccountBoundaryNoSecretsInMCP(t *testing.T) {
 	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "config", "config.vdf"), "offline-token-sentinel")
 	cs := connect(t, e)
 	out, bad := call(t, cs, "status", map[string]any{"show": "settings"})
-	if bad || !strings.Contains(out, "需玩家登录") {
+	if bad || !strings.Contains(out, "player login required") {
 		t.Fatal(out)
 	}
 	for _, secret := range []string{"fixture-player", "offline-cookie-sentinel", "offline-token-sentinel"} {
