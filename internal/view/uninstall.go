@@ -70,13 +70,15 @@ type UnItem struct {
 }
 
 var unTitles = map[string]string{
-	app.UnLinks: "RimArcho's links", app.UnModsConfig: "the games' mod lists", app.UnLocked: "lock library copies",
+	app.UnAccounts: "忘记账户会话",
+	app.UnLinks:    "RimArcho's links", app.UnModsConfig: "the games' mod lists", app.UnLocked: "lock library copies",
 	app.UnMonitor: "Archo Monitor", app.UnPacks: "packs", app.UnSaves: "own saves", app.UnGames: "downloaded games",
 	app.UnSteamCMD: "SteamCMD", app.UnData: "RimArcho's data", app.UnProgram: "the program",
 }
 
 var unVerbs = map[string]string{
-	app.DoUnlink: "unlink", app.DoClean: "clean", app.DoRestore: "put the backup back", app.DoTrash: "recycle bin", app.DoMove: "move",
+	"forget-accounts": "忘记会话",
+	app.DoUnlink:      "unlink", app.DoClean: "clean", app.DoRestore: "put the backup back", app.DoTrash: "recycle bin", app.DoMove: "move",
 	app.DoKeep: "keep", app.DoDelete: "delete", app.DoLater: "after closing", app.DoLeave: "left alone",
 }
 
@@ -175,6 +177,8 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		parts = append(parts, Tf(f, a...))
 	}
 	switch s.Key {
+	case app.UnAccounts:
+		return "先忘记账户会话；外部 SteamCMD 缓存不接管，失败时保留工具和数据。"
 	case app.UnLinks:
 		add(app.DoUnlink, "delete %d links in the games' Mods folders; the folders they point to stay")
 		add(app.DoLeave, "%d folders named like them are not links: left alone")

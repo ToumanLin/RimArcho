@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -99,6 +100,8 @@ func (a *App) InstallSteamCMDProgress(progress func(done, total int64)) (string,
 }
 
 func (a *App) installSteamCMDProgress(dir string, progress func(done, total int64)) (string, error) {
+	unlock := accounts.Lock(filepath.Join(dir, "steamcmd.exe"))
+	defer unlock()
 	if err := a.checkRoots(dir); err != nil {
 		return "", err
 	}
@@ -184,6 +187,8 @@ func (a *App) GameBranches() ([]GameBranch, error) {
 	if exe == "" {
 		return nil, ErrNoSteamCMD
 	}
+	unlock := accounts.Lock(exe)
+	defer unlock()
 	out, err := a.steamCMD().run(exe, []string{"+login", "anonymous", "+app_info_update", "1", "+app_info_print", env.WorkshopAppID, "+quit"})
 	bs := ParseBranches(out)
 	if len(bs) == 0 {
@@ -300,9 +305,6 @@ type DownloadError struct {
 }
 
 func (e *DownloadError) Error() string {
-	if e.Line != "" {
-		return e.Why() + " (SteamCMD: " + e.Line + ")"
-	}
 	return e.Why()
 }
 
@@ -405,6 +407,8 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 	if exe == "" {
 		return "", ErrNoSteamCMD
 	}
+	unlock := accounts.Lock(exe)
+	defer unlock()
 	account, err := a.SteamCMDAccount(spec.Account)
 	if err != nil {
 		return "", err
@@ -463,6 +467,7 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 		}
 		for _, l := range t.lines() {
 			if p, ok := res.read(l); ok {
+				p.Line = p.State
 				progress(p)
 			}
 		}

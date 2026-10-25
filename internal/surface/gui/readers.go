@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"time"
 
@@ -20,6 +21,9 @@ type logReader struct {
 func (s *API) detachedReader() (*app.App, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.a.Uninstalled {
+		return nil, errors.New("RimArcho 已卸载，账户操作已停用")
+	}
 	r, err := s.a.ReadSession()
 	if err != nil {
 		return nil, err
@@ -75,6 +79,13 @@ func (s *API) logSession() (*app.App, error) {
 
 // Close releases the page reader's database connection (also used by the dev harness).
 func (s *API) Close() {
+	s.accountMu.Lock()
+	s.ll = nil
+	for _, p := range s.llFiles {
+		_ = os.Remove(p.path)
+	}
+	s.llFiles = nil
+	s.accountMu.Unlock()
 	s.cancelLoadCost(true)
 	s.costMeasure.workers.Wait()
 	s.mu.Lock()

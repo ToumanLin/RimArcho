@@ -234,10 +234,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			Argv:         []string{"config", "set", "ui.accent", "{}"}},
 		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
 			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
-	}}, DirectoryGroup(a), folders, {Title: "SteamCMD", Items: []SettingItem{
-		{Label: T("SteamCMD account (optional)"), Value: cmds.Setting(a, "steamcmd.account"), Edit: "text", Argv: []string{"config", "set", "steamcmd.account", "{}"},
-			Note: T("empty or anonymous: anonymous login; enter an account name to log in. Password and Steam Guard are entered only in SteamCMD")},
-	}}}
+	}}, DirectoryGroup(a), folders, AccountGroup(a)}
 	out = append(out, DependencyGroup(a))
 	lang := cmds.Setting(a, "ui.lang")
 	gpuNote := ""

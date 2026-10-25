@@ -1,5 +1,7 @@
 $ archo uninstall
 uninstall: dry run, nothing changed
+  accounts: forget account sessions before removing tools or data; external SteamCMD caches stay untouched
+    forget      $ROOT/LocalAppData/RimArcho/accounts  — 忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。
   links: delete 2 links in the games' Mods/ (never their targets); 1 folder named like one but not a link: left alone
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
     left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
@@ -29,6 +31,8 @@ next:
 
 $ archo uninstall --keep-locked --remove-packs --remove-saves --remove-games --restore-modsconfig-backup
 uninstall: dry run, nothing changed
+  accounts: forget account sessions before removing tools or data; external SteamCMD caches stay untouched
+    forget      $ROOT/LocalAppData/RimArcho/accounts  — 忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。
   links: delete 2 links in the games' Mods/ (never their targets); 1 folder named like one but not a link: left alone
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
     left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
@@ -58,6 +62,8 @@ next:
 
 $ archo uninstall --keep-locked --locked-to old --remove-games
 uninstall: dry run, nothing changed
+  accounts: forget account sessions before removing tools or data; external SteamCMD caches stay untouched
+    forget      $ROOT/LocalAppData/RimArcho/accounts  — 忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。
   links: delete 2 links in the games' Mods/ (never their targets); 1 folder named like one but not a link: left alone
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
     left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
@@ -91,6 +97,8 @@ usage: archo uninstall [--dry-run] [--yes] [--keep-locked] [--locked-to <env>] [
 
 $ archo uninstall --yes
 uninstalled: RimArcho's folders and program are deleted once this command ends
+  accounts: forget account sessions before removing tools or data; external SteamCMD caches stay untouched
+    done   forget      $ROOT/LocalAppData/RimArcho/accounts  — 忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。
   links: delete 2 links in the games' Mods/ (never their targets); 1 folder named like one but not a link: left alone
     done   unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
            left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone

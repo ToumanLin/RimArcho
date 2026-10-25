@@ -48,7 +48,7 @@ func (s *API) startTasks() {
 	}
 	ts.Changed = s.tasksChanged
 	ts.Ended = func(t app.Task) {
-		if t.Lane == app.LaneSelf && !view.IsSettingTask(t.Kind) {
+		if t.Lane == app.LaneSelf && !view.IsSettingTask(t.Kind) && t.Kind != view.TaskAccount && t.Kind != view.TaskSiteDownload {
 			return // its own event says how it ended
 		}
 		r := view.BuildTasks([]app.Task{t}, time.Now()).Rows[0]

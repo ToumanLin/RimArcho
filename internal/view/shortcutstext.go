@@ -10,7 +10,7 @@ func init() {
 		"opened the folder":                          "已打开文件夹",
 		"RimArcho has not seen this copy: no folder": "RimArcho 没见过这一份：没有文件夹",
 		"folder / Workshop page":                     "文件夹 / 工坊页面",
-		"see all on the changes page":                "在变化页查看全部",
+		"see all in change history":                  "在变化记录查看全部",
 		"this mod's changes":                         "这个 Mod 的变化",
 		"only %s":                                    "只看 %s",
 		"every mod":                                  "所有 Mod",

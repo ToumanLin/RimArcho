@@ -81,8 +81,8 @@ func TestShortcutsFolderWorkshopChanges(t *testing.T) {
 	if beta == 0 {
 		t.Fatalf("no day listed for Beta: %+v", m.chg.rows)
 	}
-	if !strings.Contains(m.chg.rows[0].text, "Beta") {
-		t.Fatalf("no condition line: %q", m.chg.rows[0].text)
+	if !strings.Contains(m.chg.rows[m.chg.off+1].text, "Beta") {
+		t.Fatalf("history link did not land on Beta's history: %+v", m.chg)
 	}
 	press(m, "esc")
 	if m.tab != tabChanges || m.chg.of != "" {

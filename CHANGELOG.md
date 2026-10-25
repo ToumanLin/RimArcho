@@ -273,7 +273,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   (month, half-year, older); `--lineage` lists each copy's `updated:` and `note:`.
 - RimArcho's own copy note is in the normal text colour, like the player's; only the small
   "RimArcho 写的 · 点击修改" line stays muted.
-- A detail's 历史 keeps the newest three changes and links to 在变化页查看全部: 变化 narrowed to
+- A detail's 历史 keeps the newest three changes and links to 在变化记录查看全部: 变化 narrowed to
   that mod's Lineage, every scan that changed one of its copies, with a removable "只看 <名字>"
   (× or `esc` shows every mod again). The TUI opens it with `C`.
 - `ctrl+o` opens the cursor's mod's folder and `ctrl+w` its Workshop page, in the plan editor

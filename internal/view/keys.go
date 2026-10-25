@@ -60,9 +60,6 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("C", "this mod's changes"),
 				r("R", "rescan"),
 			)
-			if !tui {
-				out = append(out, r("+", "subscribe…"))
-			}
 		} else {
 			out = append(out,
 				r(pick("← → / 1–4", "← → / 1–4 / h l"), "go to an area"),
@@ -103,7 +100,11 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		out = append(out, r("↑↓", "format"), r("ctrl+s", "save as a file…"), r("ctrl+c", "copy"), r("esc", "cancel"))
 	}
 	if page == ChangesPage {
+		if !tui {
+			out = append(out, r("+", "subscribe…"), r("U", "update all"), r("u / C", "update / view changes"), r("ctrl+a / ctrl+space / shift+↑↓", "select updates"), r("tab / shift+tab", "the next field or button"))
+		}
 		out = append(out,
+			r("1 / 2 / 3", "sources, updates, history"),
 			r("↑↓ / PgUp PgDn", "move"),
 			r("enter", "open or close a mod's changes"),
 			r("i", "the raw file list"),
@@ -113,7 +114,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("D", "see dependencies (能不能跑)"),
 			r("S", "sort the list"),
 			r("p", "lock this version (dry run first)"),
-			r("esc", "back; with one mod shown, every mod again"),
+			r("esc", "close the panel, clear selection, then show every mod"),
 		)
 	}
 	if page == PackPages {
@@ -163,15 +164,19 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	} else if page != EditorPage {
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}
+	tabText := "next / previous page under the same sidebar entry"
+	if page == ChangesPage && !tui {
+		tabText = "the next field or button"
+	}
 	out = append(out,
-		r("tab / shift+tab", "next / previous page under the same sidebar entry"),
+		r("tab / shift+tab", tabText),
 		r("shift+1–8", "go to a page in the sidebar"),
 	)
 	if !tui {
 		out = append(out, r("alt+← / alt+→", "page back / forward"), r("ctrl+b", "navigation at the side / at the top"), r("ctrl+j", "background tasks; again goes back"))
 	}
 	out = append(out,
-		r(pick("c / l", "c"), pick("mod changes, game log", "mod changes")),
+		r(pick("c / l", "c"), pick("subscriptions and updates, game log", "subscriptions and updates")),
 		r("ctrl+k", "command palette"),
 		r("?", "this help"),
 	)

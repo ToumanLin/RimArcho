@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/host"
@@ -78,6 +79,10 @@ func (a *App) InstallDep(name string, progress func(done, total int64)) (string,
 // RemoveDep removes only the selected managed copy, never a configured external,
 // PATH or Program Files copy. It leaves configuration and other copies unchanged.
 func (a *App) RemoveDep(name string) error {
+	if name == deps.SteamCMD {
+		unlock := accounts.Lock(a.Deps().Status(name).Path)
+		defer unlock()
+	}
 	if err := a.CheckDepRemoval(name); err != nil {
 		return err
 	}

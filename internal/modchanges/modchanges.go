@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Package modchanges builds the changes page (06 §2.9) for every surface: the GUI and the
+// Package modchanges builds the change history (06 §2.9) for every surface: the GUI and the
 // TUI word it through view.T, the CLI and MCP in English.
 //
 // Changes (06 §2.9): one row per mod, merging its change events in the time range, with a

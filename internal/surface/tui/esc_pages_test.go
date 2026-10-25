@@ -61,8 +61,8 @@ var escPages = []escPage{
 	}},
 	{"Mod 库存 › 全部，row menu", tabLibrary, func(m *model) { press(m, "$"); pressKey(m, tea.KeyF10) }},
 	{"Mod 库存 › 全部，help", tabLibrary, func(m *model) { pressAll(m, "$", "?") }},
-	{"Mod 库存 › 变化", tabChanges, func(m *model) { press(m, "c") }},
-	{"Mod 库存 › 变化，one mod's + help", tabChanges, func(m *model) {
+	{"Mod 库存 › 订阅与更新", tabChanges, func(m *model) { press(m, "c") }},
+	{"Mod 库存 › 订阅与更新，one mod's + help", tabChanges, func(m *model) {
 		m.openChangesOf(m.current().id, m.current().name)
 		press(m, "?")
 	}},

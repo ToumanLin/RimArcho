@@ -18,7 +18,11 @@ func TestSteamCMDSettingCanReturnToAnonymous(t *testing.T) {
 					continue
 				}
 				found = true
-				if item.Value != value || item.Edit != "text" || view.SettingCommand(item.Argv) != nil {
+				want := value
+				if want == "anonymous" {
+					want = ""
+				}
+				if item.EditValue == nil || *item.EditValue != want || item.Edit != "text" || view.SettingCommand(item.Argv) != nil {
 					t.Fatalf("%+v", item)
 				}
 			}

@@ -597,7 +597,7 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 	return d, nil
 }
 
-// changesCmd is the changes page (06 §2.9) in text: one row per mod, by tier, for the
+// changesCmd is the change history (06 §2.9) in text: one row per mod, by tier, for the
 // current plan since it was last played (--library: every mod; --since: from then; a ref:
 // that mod's Lineage, every change by day).
 func changesCmd(c *Ctx, a *Args) (*render.Doc, error) {

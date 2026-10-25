@@ -125,3 +125,22 @@ test("workshop form carries SteamCMD choice and escape collapses the panel", asy
   h.root.onkeydown(event("Escape"));
   assert.equal(h.closed(), 1);
 });
+
+test("LoversLab fallback retains manual zip; consent and install each need the player", async () => {
+  const h = await setup();
+  h.set(h.type, "page"); h.set(h.url, "https://www.loverslab.com/files/file/123-fixture/");
+  h.api.SubscriptionPage = async () => { throw new Error("public challenge"); };
+  h.api.LoverFiles = async () => ({ reason: "需玩家登录；请在浏览器下载后选择 zip" });
+  await h.click("read page"); await h.click("读取 LoversLab 可下载文件");
+  assert.ok(h.root.textContent.includes("需玩家登录")); assert.ok(h.button("choose zip…"));
+  h.api.LoverFiles = async () => ({ files: [{ id: "opaque-choice", name: "fixture.zip" }], agreement: "I agree to the author rules" });
+  let agreed = 0, installed = 0;
+  h.api.LoverFollow = async (page, id, agree) => { assert.equal(id, "opaque-choice"); assert.equal(agree, true); agreed++; return { ready: "opaque-ready" }; };
+  h.api.LoverInstallPreview = async () => ({ title: "安装订阅", lines: ["fixture subscription folder"], apply: true });
+  h.api.LoverInstall = async () => { installed++; return "done"; };
+  await h.click("读取 LoversLab 可下载文件"); await h.click("fixture.zip");
+  assert.equal(agreed, 0); assert.equal(installed, 0);
+  assert.equal(h.confirmations[0][1][0], "I agree to the author rules");
+  await h.confirmations[0][3](); assert.equal(agreed, 1); assert.equal(installed, 0);
+  await h.confirmations[1][3](); assert.equal(installed, 1);
+});

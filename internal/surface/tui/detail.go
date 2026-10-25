@@ -152,7 +152,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 			add("  " + sSecond.Render(fit(l, w-2)))
 		}
 		// the whole history of its Lineage is on the 变化 page (06 §2.9)
-		for _, l := range wrap(T("see all on the changes page")+", C", w-2) {
+		for _, l := range wrap(T("see all in change history")+", C", w-2) {
 			add("  " + sDimS.Render(l))
 		}
 		add("")

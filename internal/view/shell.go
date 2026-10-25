@@ -128,7 +128,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	}
 	library := []NavItem{
 		// The entry opens 全部, its first sub-entry (06 §2.9).
-		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all")}, {ID: PageChanges, Label: T("changes")}}},
+		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all")}, {ID: PageChanges, Label: T("subscriptions and updates")}}},
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// what the game loads faster: next to the packs, which convert the same way (08 §5.2)

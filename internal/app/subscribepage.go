@@ -13,13 +13,36 @@ func (a *App) readSubscriptionPage(url string) (*subscribe.PageInfo, error) {
 	return subscribe.ReadPage(context.Background(), a.HTTP, url)
 }
 
+// InstallLoversLabFile reuses the existing archive validation and replacement path.
+// The caller owns the temporary file and must delete it after this call.
+func (a *App) InstallLoversLabFile(page, file, ref string, dryRun bool) (*SubscribeOp, error) {
+	if !subscribe.LoversLabPage(page) {
+		return nil, fmt.Errorf("请选择 LoversLab 文件页")
+	}
+	if ref == "" {
+		return a.SubscribePage(page, false, file, dryRun)
+	}
+	ss, err := a.selectSubscriptions([]string{ref})
+	if err != nil {
+		return nil, err
+	}
+	if ss[0].Record.Kind != "page" || ss[0].Record.URL != page {
+		return nil, fmt.Errorf("更新文件页与订阅不一致，请重新读取")
+	}
+	return a.UpdateSubscriptionFrom(ref, file, dryRun)
+}
+
 func (a *App) SubscribePage(pageURL string, useGit bool, from string, dryRun bool) (*SubscribeOp, error) {
 	if useGit && from != "" {
 		return nil, fmt.Errorf("choose --git or --from, not both")
 	}
 	p, err := a.readSubscriptionPage(pageURL)
 	if err != nil {
-		return nil, err
+		if !useGit && from != "" && subscribe.LoversLabPage(pageURL) {
+			p = &subscribe.PageInfo{Name: strings.Trim(strings.TrimPrefix(pageURL, "https://www.loverslab.com/files/file/"), "/"), Version: "player download"}
+		} else {
+			return nil, err
+		}
 	}
 	if useGit {
 		repo := p.Main
@@ -150,7 +173,11 @@ func (a *App) UpdateSubscriptionFrom(ref, from string, dryRun bool) (*SubscribeO
 	if stamp == "" {
 		p, err := a.readSubscriptionPage(r.URL)
 		if err != nil {
-			return nil, err
+			if subscribe.LoversLabPage(r.URL) {
+				p = &subscribe.PageInfo{Version: "player download"}
+			} else {
+				return nil, err
+			}
 		}
 		stamp = p.Stamp()
 	}

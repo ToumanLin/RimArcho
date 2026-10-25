@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -32,13 +33,14 @@ type chRow struct {
 }
 
 type chState struct {
-	rows        []chRow
-	cursor, off int
-	page        *modchanges.Page
-	open        map[string]bool     // expanded rows, days and groups
-	raw         map[string][]string // raw file lists shown (i)
-	library     bool                // the whole library (a)
-	of, ofName  string              // only this mod's Lineage (C); "" every mod
+	rows          []chRow
+	cursor, off   int
+	page          *modchanges.Page
+	subscriptions *view.SubscriptionsPage
+	open          map[string]bool     // expanded rows, days and groups
+	raw           map[string][]string // raw file lists shown (i)
+	library       bool                // the whole library (a)
+	of, ofName    string              // only this mod's Lineage (C); "" every mod
 }
 
 func rowKey(r *modchanges.Row) string { return fmt.Sprintf("%s|%d|%d", r.ID, r.Before, r.After) }
@@ -56,12 +58,12 @@ func (m *model) loadChanges() {
 	if c.of != "" {
 		o.Of, o.OfName = view.LineageIDs(m.st.Ix, c.of), c.ofName
 	}
-	p, err := view.BuildChanges(m.app, m.st, o)
+	p, err := view.BuildSubscriptions(m.app, m.st, o)
 	if err != nil {
 		c.rows = append(c.rows, chRow{text: err.Error(), kind: chDim})
 		return
 	}
-	c.page = p
+	c.page, c.subscriptions = p.History, p
 	c.relayout()
 }
 
@@ -69,6 +71,20 @@ func (m *model) loadChanges() {
 func (c *chState) build() {
 	p := c.page
 	add := func(text string, kind int) { c.rows = append(c.rows, chRow{text: text, kind: kind}) }
+	if c.subscriptions != nil {
+		add("1 "+T("sources"), chHead)
+		for _, s := range c.subscriptions.Sources {
+			add(fmt.Sprintf("  %s  %d  %s  %s  %s", s.Name, s.Count, s.Checked, s.Result, s.Account), chDim)
+		}
+		add("2 "+T("pending updates"), chHead)
+		for _, r := range c.subscriptions.Pending {
+			add("  "+r.Name+"  "+r.Source+"  "+r.Installed+" → "+r.Available+"  "+strings.Join(r.UsedIn, ", "), chDim)
+		}
+		if len(c.subscriptions.Pending) == 0 {
+			add("  "+T("no known updates; check a source above"), chDim)
+		}
+	}
+	add("3 "+T("change history"), chHead)
 	switch {
 	case c.of != "":
 		add(Tf("only %s", c.ofName)+"  "+T("esc shows every mod"), chHead)
@@ -207,6 +223,13 @@ func (m *model) changesKey(s string) tea.Cmd {
 		mod = r.mod
 	}
 	switch s {
+	case "1", "2", "3":
+		for i, row := range c.rows {
+			if len(row.text) > 1 && row.text[:2] == s+" " {
+				c.cursor, c.off = i, i
+				break
+			}
+		}
 	case "down", "j":
 		c.moveCursor(1)
 	case "up", "k":

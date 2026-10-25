@@ -768,7 +768,7 @@ function onKey(e) {
   // (on the pages with forms, settings and the like, tab keeps moving the focus)
   // Pages with adjustable cards keep native tab order to reach their gaps (06 §3.1).
   if (e.target.closest?.('[role="separator"]') && k === "Tab") return;
-  if (k === "Tab" && !e.ctrlKey && !e.altKey && (S.screen === "changes" || S.screen === "packs")) { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
+  if (k === "Tab" && !e.ctrlKey && !e.altKey && S.screen === "packs") { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
   if (!S.screen && scr.pageLoading()) {
     if ((e.ctrlKey || e.metaKey) && k === "k") { e.preventDefault(); pop.palette(); }
     return;
@@ -969,7 +969,7 @@ async function start() {
     await edited(api.RunOp("separate", [e.detail]), false, [e.detail]);
     detailFollow(true);
   });
-  // a detail's 在变化页查看全部: 变化 with only that mod's Lineage (06 §2.9)
+  // a detail's 在变化记录查看全部: 变化 with only that mod's Lineage (06 §2.9)
   document.addEventListener("changes-of", async (e) => { shell.navigated(); await scr.changes(e.detail); renderWhere(); renderHints(); });
   // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {

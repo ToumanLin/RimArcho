@@ -16,6 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
+	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -72,6 +73,9 @@ type API struct {
 	logRead     logReader
 	texRead     logReader
 	costMeasure loadCostMeasurement
+	accountMu   sync.Mutex
+	ll          *subscribe.LoversLab
+	llFiles     map[string]loverDownload
 	// ScanRunner scans an environment in place of the child process (tests).
 	ScanRunner func(env string) (string, error)
 }

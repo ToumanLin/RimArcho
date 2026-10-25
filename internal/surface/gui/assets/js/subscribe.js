@@ -6,9 +6,9 @@ const button = (label, run, enabled = () => true) => {
   const b = el("button", "btn", label);
   b.type = "button";
   b.onclick = async () => {
-    b.disabled = true;
+    b.disabled = true; b.textContent = label + "…";
     try { await run(); } catch (e) { say("fail", errText(e)); }
-    finally { b.disabled = !enabled(); }
+    finally { b.disabled = !enabled(); b.textContent = label; }
   };
   return b;
 };
@@ -20,6 +20,38 @@ const input = (label, type = "text") => {
   box.append(el("span", "dim", T(label)), field);
   return { box, field };
 };
+
+const loversLabPage = value => /^https:\/\/(www\.)?loverslab\.com\/files\/file\/[^?#]+$/.test(value);
+
+// Site statements remain text. Every selection/agree action is a player click;
+// opaque IDs bind choices without exposing CSRF or signed URLs to the page.
+function authenticatedFiles(pageURL, ref, close) {
+  const root = el("section", "subscribe-page");
+  const current = () => root.isConnected !== false;
+  const info = el("div", "word-facts"), choices = el("div", "subscribe-row");
+  const show = p => {
+    info.textContent = p?.reason || p?.agreement || "选择一个文件；若站点需要确认，会先显示原文。";
+    choices.replaceChildren();
+    for (const file of p?.files || []) choices.append(button(file.name, async () => {
+      const follow = async () => {
+        const result = await api.LoverFollow(pageURL, file.id, !!p.agreement);
+        if (!current()) return;
+        if (result.ready) {
+          const preview = await api.LoverInstallPreview(pageURL, result.ready, ref);
+          if (!current()) return;
+          pop.confirm(preview.title, preview.lines, T("subscribe"), preview.apply ? async () => {
+            try { say("ok", await api.LoverInstall(pageURL, result.ready, ref)); close(); } catch (e) { say("fail", errText(e)); }
+          } : null);
+        } else show(result.page);
+      };
+      if (p.agreement) pop.confirm("站点下载确认", [p.agreement], "我同意并继续", follow);
+      else await follow();
+    }));
+    if (p?.reason) choices.append(button(T("open download page"), () => api.OpenURL(pageURL)));
+  };
+  root.append(button("读取 LoversLab 可下载文件", async () => { const p = await api.LoverFiles(pageURL); if (current()) show(p); }), info, choices);
+  return root;
+}
 
 // File paths remain editable in the development harness, as with the import page.
 export function importPicker(onChange = () => {}) {
@@ -57,7 +89,9 @@ export function subscribeForm(close) {
   let useGit = false, resolved = "";
   const read = button(T("read page"), async () => {
     const pageURL = url.field.value.trim();
-    const p = await api.SubscriptionPage(pageURL);
+    let p;
+    try { p = await api.SubscriptionPage(pageURL); }
+    catch (error) { if (!loversLabPage(pageURL)) throw error; p = { Name: "公开页面无法读取，可尝试会话下载或手动选择 zip。" }; }
     if (type.value !== "page" || url.field.value.trim() !== pageURL) return;
     const date = p.DateModified && !p.DateModified.startsWith("0001-") ? p.DateModified : "";
     info.replaceChildren(el("div", "", p.Name), el("div", "dim", [p.Version, date].filter(Boolean).join(" @ ")));
@@ -67,6 +101,7 @@ export function subscribeForm(close) {
     choices.replaceChildren();
     if (resolved) choices.append(button(Tf("subscribe with Git: %s", resolved), () => { useGit = true; changed(); }));
     choices.append(button(T("open download page"), () => api.OpenURL(url.field.value.trim())));
+    if (!resolved && loversLabPage(pageURL)) choices.append(authenticatedFiles(pageURL, "", close));
     changed();
   });
   page.append(read, info, choices, files.el);
@@ -104,17 +139,24 @@ export function subscribeForm(close) {
   return { el: root, focus: () => url.field.focus() };
 }
 
-export function updateFromForm(host, ref, close) {
+export function updateFromForm(host, ref, close, onApplied = () => {}) {
   host.querySelector(".subscribe-form")?.remove();
   const root = el("section", "subscribe-form");
   const files = importPicker();
   const actions = el("div", "subscribe-row");
+  const applied = () => { close(); onApplied(); };
+  actions.append(button("从 LoversLab 会话更新", async () => {
+    const pageURL = await api.SubscriptionFilePage(ref);
+    if (!pageURL) return say("fail", "此订阅没有可用的 LoversLab 文件页，请选择下载的 zip。");
+    root.querySelector(".subscribe-page")?.remove();
+    root.append(authenticatedFiles(pageURL, ref, applied));
+  }));
   actions.append(button(T("preview"), async () => {
     const from = files.value();
     if (!from) return say("fail", T("choose downloaded files first"));
     const p = await api.SubscriptionFromPreview(ref, from);
     pop.confirm(p.title, p.lines, T("update subscription"), p.apply ? async () => {
-      try { say("ok", await api.SubscriptionFrom(ref, from)); close(); } catch (e) { say("fail", errText(e)); }
+      try { say("ok", await api.SubscriptionFrom(ref, from)); applied(); } catch (e) { say("fail", errText(e)); }
     } : null);
   }), button(T("close"), close));
   root.append(el("div", "", T("choose downloaded files first")), files.el, actions);

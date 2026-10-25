@@ -29,6 +29,7 @@ func (s *API) UninstallPlan(c view.UninstallChoice) (*view.UninstallPage, error)
 // UninstallRun runs it in the background; "uninstall" events carry {i, n, step, item} and at
 // the end {done, page} or {done, error}. Every other call waits until it has finished.
 func (s *API) UninstallRun(c view.UninstallChoice) error {
+	s.accountMu.Lock()
 	s.mu.Lock()
 	p, err := s.a.PlanUninstall(c.Options())
 	if err == nil {
@@ -36,6 +37,7 @@ func (s *API) UninstallRun(c view.UninstallChoice) error {
 	}
 	if err != nil {
 		s.mu.Unlock()
+		s.accountMu.Unlock()
 		var bl = app.ErrUninstallBlocked
 		if errors.Is(err, bl) {
 			return fmt.Errorf("%s", view.UninstallView(p, false).Blocked)
@@ -43,7 +45,10 @@ func (s *API) UninstallRun(c view.UninstallChoice) error {
 		return err
 	}
 	go func() {
+		defer s.accountMu.Unlock()
 		defer s.mu.Unlock()
+		s.ll = nil
+		s.llFiles = nil
 		p, err := s.a.Uninstall(c.Options(), func(pr app.UninstallProgress) {
 			s.send("uninstall", map[string]any{"i": pr.I, "n": pr.N, "step": view.UninstallTitle(pr.Step), "item": pr.Item})
 		})

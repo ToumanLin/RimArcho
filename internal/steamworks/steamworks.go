@@ -28,6 +28,7 @@ const (
 	Subscribe   = "subscribe"
 	Unsubscribe = "unsubscribe"
 	State       = "state"
+	Download    = "download"
 )
 
 // EItemState flags (ISteamUGC::GetItemState).

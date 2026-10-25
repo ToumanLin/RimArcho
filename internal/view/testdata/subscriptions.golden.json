@@ -1,0 +1,135 @@
+{
+  "sources": [
+    {
+      "key": "workshop",
+      "name": "Steam Workshop (client)",
+      "count": 1,
+      "checked": "2026-10-01 11:00",
+      "result": "check complete"
+    },
+    {
+      "key": "steamcmd",
+      "name": "SteamCMD",
+      "count": 1,
+      "checked": "2026-10-01 11:00",
+      "result": "check complete",
+      "account": "未安装 SteamCMD"
+    },
+    {
+      "key": "git",
+      "name": "Git",
+      "count": 1,
+      "checked": "2026-10-01 10:00",
+      "result": "check complete"
+    },
+    {
+      "key": "page",
+      "name": "download page / LoversLab",
+      "count": 1,
+      "checked": "2026-10-01 10:00",
+      "result": "check complete",
+      "account": "未启用"
+    },
+    {
+      "key": "local",
+      "name": "local (no source)",
+      "count": 1,
+      "checked": "",
+      "result": "not checked yet"
+    }
+  ],
+  "pending": [
+    {
+      "id": "id",
+      "ref": "ref",
+      "name": "Git Mod",
+      "source": "Git",
+      "kind": "git",
+      "installed": "oldcommit",
+      "available": "newcommit",
+      "usedIn": [
+        "default"
+      ]
+    },
+    {
+      "id": "id",
+      "ref": "ref",
+      "name": "Page Mod",
+      "source": "download page / LoversLab",
+      "kind": "page",
+      "installed": "1.0",
+      "available": "2.0",
+      "usedIn": [
+        "default"
+      ]
+    },
+    {
+      "id": "id",
+      "ref": "ref",
+      "name": "SteamCMD Mod",
+      "source": "SteamCMD",
+      "kind": "steamcmd",
+      "installed": "2026-10-01 10:00",
+      "available": "2026-10-01 11:00",
+      "usedIn": []
+    },
+    {
+      "id": "id",
+      "ref": "ref",
+      "name": "Workshop Mod",
+      "source": "Steam Workshop (client)",
+      "kind": "workshop",
+      "installed": "2026-10-01 10:00",
+      "available": "2026-10-01 11:00",
+      "usedIn": []
+    }
+  ],
+  "history": {
+    "library": false,
+    "plan": "default",
+    "since": "since you last played  Oct 1",
+    "played": true,
+    "rows": [
+      {
+        "id": "id",
+        "ref": "ref",
+        "mod": "Local Mod",
+        "tier": 2,
+        "tierText": "worth a look",
+        "text": "Defs changed",
+        "details": [
+          "Defs 1 new"
+        ],
+        "before": 4,
+        "after": 7,
+        "inPlan": true
+      }
+    ],
+    "arrivals": {
+      "text": "2 new",
+      "rows": [
+        {
+          "id": "iqmu47fjmbqywa6apifny7vptq",
+          "ref": "#iqmu",
+          "mod": "Git Mod",
+          "tier": 3,
+          "tierText": "content only",
+          "text": "newly added",
+          "after": 5,
+          "inPlan": true
+        },
+        {
+          "id": "gptocty4kohl7lt6o2nlt45rwe",
+          "ref": "#gpto",
+          "mod": "Page Mod",
+          "tier": 3,
+          "tierText": "content only",
+          "text": "newly added",
+          "after": 6,
+          "inPlan": true
+        }
+      ]
+    },
+    "launch": 0
+  }
+}

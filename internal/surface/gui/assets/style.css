@@ -411,6 +411,15 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .empty-state { padding: 36px 20px; text-align: center; color: var(--muted); }
 .group { padding: 12px 14px 4px; color: var(--faint); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
 .page-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--card-gap); padding-bottom: 8px; }
+.subscription-section { flex-shrink: 0; }
+.subscription-source, .subscription-pending { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px; border-bottom: var(--hairline) solid var(--line); }
+.subscription-pending .word-facts { flex: 1; min-width: 180px; }
+.subscription-source > span:first-child { flex: 0 0 220px; }
+.subscription-source > .muted { flex: 1; min-width: 180px; }
+.subscription-pending.cur { background: var(--accent-soft); }
+.subscription-pending.selected { background: var(--sel); }
+.subscription-section .label { margin-bottom: 8px; }
+.subscription-section:not(:focus-within) .cur:not(.selected) { background: transparent; }
 .cols { flex: 1; min-height: 0; display: grid; gap: var(--card-gap); }
 .cols.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .cols.two { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }

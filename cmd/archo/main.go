@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"os"
 
 	"github.com/ToumanLin/RimArcho/internal/procmem"
@@ -11,6 +12,9 @@ import (
 )
 
 func main() {
+	if handled, code := accounts.Helper(os.Args[1:]); handled {
+		os.Exit(code)
+	}
 	code := cli.Run(os.Args[1:], os.Stdout, os.Stderr)
 	if os.Getenv("ARCHO_MEMSTATS") != "" {
 		ws, priv, peak := procmem.MB()
