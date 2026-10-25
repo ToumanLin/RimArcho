@@ -59,7 +59,8 @@ type API struct {
 
 	environment environmentWorker
 	monitorOnce sync.Once
-	quit        func() // closes the window (nil in the harness and in tests)
+	quit        func()     // closes the window (nil in the harness and in tests)
+	windowTheme func(bool) // synchronises the native frame with the resolved page scheme
 	// tasks is the 后台任务 record and its lanes (tasks.go, 06 §2.16)
 	tasks  *app.Tasks
 	taskEv taskEvents

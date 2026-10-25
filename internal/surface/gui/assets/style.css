@@ -12,6 +12,7 @@
   /* how far a drag handle's invisible hit area reaches over the cards on each side */
   --grab: 3px;
   --bg: #f4f4f6;
+  --photo-shade: 255, 255, 255;
   --card: #ffffff;
   --card-2: #f9f9fb;
   --pill: #f1f1f4;
@@ -60,6 +61,7 @@
 }
 :root[data-scheme="dark"] {
   color-scheme: dark;
+  --photo-shade: 0, 0, 0;
   --bg: #1a1a1e; --card: #232327; --card-2: #1f1f23; --pill: #2d2d33; --pill-hover: #36363d;
   --seg-thumb: rgba(255, 255, 255, .15); --seg-edge: inset 0 var(--hairline) 0 rgba(255, 255, 255, .08), 0 1px 2px rgba(0, 0, 0, .3);
   --line: #333339; --line-2: #2c2c32; --fg: #ededf1; --fg-2: #b9b9c1; --muted: #8b8b94; --faint: #56565f; --ctl-fg: #a1a1aa;
@@ -750,27 +752,27 @@ svg.i.fill { fill: currentColor; }
    applied list's problem tucked under it like a tab ---- */
 #main { position: relative; }
 #top, #body { z-index: 1; }
-/* the image behind the top bar and the page; the shade darkens it (--dim, the setting) and
-   more where the text is: down the left, along the bottom (the three steps), under the top bar */
-#backdrop { position: absolute; left: 0; right: 0; top: 0; bottom: 30px; z-index: 0; overflow: hidden; pointer-events: none; background: #0e0e12; }
+/* The shade uses white in light mode and black in dark mode. Its strength is --dim,
+   with extra coverage behind text: down the left, along the bottom and under the top bar. */
+#backdrop { position: absolute; left: 0; right: 0; top: 0; bottom: 30px; z-index: 0; overflow: hidden; pointer-events: none; background: var(--bg); }
 #backdrop .img { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; animation: fade var(--t-enter) ease-out; }
 #backdrop .shade { position: absolute; inset: 0; background:
-  linear-gradient(rgba(0, 0, 0, var(--dim, .3)), rgba(0, 0, 0, var(--dim, .3))),
-  linear-gradient(90deg, rgba(14, 14, 18, .86) 0, rgba(14, 14, 18, .55) 340px, rgba(14, 14, 18, 0) 600px),
-  linear-gradient(0deg, rgba(10, 10, 14, .82) 0, rgba(10, 10, 14, .5) 30%, rgba(10, 10, 14, 0) 55%),
-  linear-gradient(180deg, rgba(10, 10, 14, .5), rgba(10, 10, 14, 0) 72px); }
-/* over the image the text is light whatever the theme */
-#app.photo #top, #app.photo #body { --fg: #f1f1f4; --fg-2: #cfcfd6; --muted: #a2a2ab; --faint: #6c6c75; --line: rgba(255, 255, 255, .2); --pill: rgba(255, 255, 255, .1); --pill-hover: rgba(255, 255, 255, .16);
+  linear-gradient(rgba(var(--photo-shade), var(--dim, .3)), rgba(var(--photo-shade), var(--dim, .3))),
+  linear-gradient(90deg, rgba(var(--photo-shade), .86) 0, rgba(var(--photo-shade), .55) 340px, rgba(var(--photo-shade), 0) 600px),
+  linear-gradient(0deg, rgba(var(--photo-shade), .82) 0, rgba(var(--photo-shade), .5) 30%, rgba(var(--photo-shade), 0) 55%),
+  linear-gradient(180deg, rgba(var(--photo-shade), .5), rgba(var(--photo-shade), 0) 72px); }
+/* Light mode inherits dark text; dark mode uses light text over the shaded image. */
+:root[data-scheme="dark"] #app.photo #top, :root[data-scheme="dark"] #app.photo #body { --fg: #f1f1f4; --fg-2: #cfcfd6; --muted: #a2a2ab; --faint: #6c6c75; --line: rgba(255, 255, 255, .2); --pill: rgba(255, 255, 255, .1); --pill-hover: rgba(255, 255, 255, .16);
   --accent: #a5b4fc; --accent-fg: #14142a; --amber: #f2b544; }
 /* Step 9 is a solid fill; step 11 keeps small accent text legible on cards.
-   A photo backdrop uses the dark scale even in a light page theme. */
-:root[data-accent] #app.photo :is(#top, #body) {
+   A dark photo backdrop uses the dark scale. */
+:root[data-scheme="dark"][data-accent] #app.photo :is(#top, #body) {
   --accent: var(--accent-dark-11); --accent-fg: var(--accent-dark-1);
   --accent-11: var(--accent-dark-11); --accent-soft: var(--accent-dark-3); --sel: var(--accent-dark-5);
 }
 #app.photo #screen { background: transparent; }
 #app.photo #board { visibility: hidden; }
-#app.photo #crumbs .crumb.last { text-shadow: 0 1px 8px rgba(0, 0, 0, .5); }
+:root[data-scheme="dark"] #app.photo #crumbs .crumb.last { text-shadow: 0 1px 8px rgba(0, 0, 0, .5); }
 
 /* 启动 (06 §2.3) on a 12-column grid: the headline carries the page; under a rule the three
    steps read left to right; ▶ 启动游戏 is the one block of colour. */
@@ -836,7 +838,7 @@ svg.i.fill { fill: currentColor; }
 .hm-go.starting::after { animation: hm-fill 1.6s var(--ease) forwards; }
 .hm-go:disabled { cursor: default; }
 .hm-go.running { background: var(--fg); color: var(--bg); }
-#app.photo .hm-go.running { color: #14142a; }
+:root[data-scheme="dark"] #app.photo .hm-go.running { color: #14142a; }
 /* switching (06 §2.3): ▶ says what is loading, a bar sweeps along its foot; the new pick
    comes in when the page is read again */
 .hm-go.switching { cursor: progress; filter: saturate(.85); }
@@ -896,18 +898,18 @@ svg.i.fill { fill: currentColor; }
    images by group below ---- */
 .bg-card { padding: 18px 20px; display: flex; flex-direction: column; }
 .bg-head { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 28px; }
-.bg-pv { position: relative; aspect-ratio: 16 / 9.6; border-radius: var(--r-sm); overflow: hidden; border: var(--hairline) solid var(--line-2); background: #0e0e12; }
+.bg-pv { position: relative; aspect-ratio: 16 / 9.6; border-radius: var(--r-sm); overflow: hidden; border: var(--hairline) solid var(--line-2); background: var(--bg); }
 .bg-pv.plain { background: var(--bg); }
 .bg-pv .img { position: absolute; inset: 0; background-size: cover; }
-.bg-pv .shade { position: absolute; inset: 0; background: linear-gradient(rgba(0, 0, 0, var(--dim, .3)), rgba(0, 0, 0, var(--dim, .3))), linear-gradient(90deg, rgba(14, 14, 18, .86) 0, rgba(14, 14, 18, .5) 32%, rgba(14, 14, 18, 0) 55%), linear-gradient(0deg, rgba(10, 10, 14, .82) 0, rgba(10, 10, 14, .5) 30%, rgba(10, 10, 14, 0) 55%); }
+.bg-pv .shade { position: absolute; inset: 0; background: linear-gradient(rgba(var(--photo-shade), var(--dim, .3)), rgba(var(--photo-shade), var(--dim, .3))), linear-gradient(90deg, rgba(var(--photo-shade), .86) 0, rgba(var(--photo-shade), .5) 32%, rgba(var(--photo-shade), 0) 55%), linear-gradient(0deg, rgba(var(--photo-shade), .82) 0, rgba(var(--photo-shade), .5) 30%, rgba(var(--photo-shade), 0) 55%); }
 .bg-pv.plain .shade { display: none; }
 .bg-pv .ls { position: absolute; left: 14px; top: 20px; width: 30%; display: flex; flex-direction: column; gap: 8px; }
-.bg-pv .ls i { display: block; height: 5px; border-radius: var(--r-sm); background: rgba(255, 255, 255, .5); }
-.bg-pv .ls i.s { width: 60%; height: 3px; margin-top: -4px; background: rgba(255, 255, 255, .2); }
-.bg-pv .ls i.c { background: #fff; }
+.bg-pv .ls i { display: block; height: 5px; border-radius: var(--r-sm); background: var(--muted); }
+.bg-pv .ls i.s { width: 60%; height: 3px; margin-top: -4px; background: var(--faint); }
+.bg-pv .ls i.c { background: var(--fg); }
 .bg-pv.plain .ls i { background: var(--faint); } .bg-pv.plain .ls i.c { background: var(--fg-2); }
-.bg-pv .lb { position: absolute; right: 12px; bottom: 12px; width: 18%; height: 20px; border-radius: var(--r-sm); background: #a5b4fc; }
-.bg-pv .ln { position: absolute; right: 12px; bottom: 40px; width: 22%; height: 4px; border-radius: var(--r-sm); background: rgba(255, 255, 255, .55); }
+.bg-pv .lb { position: absolute; right: 12px; bottom: 12px; width: 18%; height: 20px; border-radius: var(--r-sm); background: var(--accent); }
+.bg-pv .ln { position: absolute; right: 12px; bottom: 40px; width: 22%; height: 4px; border-radius: var(--r-sm); background: var(--muted); }
 .bg-pv.plain .ln { background: var(--faint); }
 .bg-cap { margin-top: 9px; font-size: 13px; color: var(--fg-2); }
 .bg-cap .m { color: var(--muted); }

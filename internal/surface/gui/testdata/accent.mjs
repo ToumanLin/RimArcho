@@ -92,6 +92,26 @@ test("explicit themes override the OS and auto resumes following it", async () =
   assert.equal(root.dataset.scheme, "light");
 });
 
+test("the native title bar follows startup, explicit overrides and automatic OS changes", async () => {
+  const { theme, root, media } = await setup(true);
+  const calls = [];
+  await loadModules("./window-theme.js", {
+    "./api.js": { api: { SetWindowTheme: async dark => calls.push(dark) } },
+  }, { document: { documentElement: root }, archoTheme: theme });
+  assert.deepEqual(calls, [true]);
+  theme.apply("light");
+  assert.equal(calls.at(-1), false);
+  media.change();
+  assert.equal(calls.at(-1), false);
+  theme.apply("dark");
+  assert.equal(calls.at(-1), true);
+  theme.apply("auto");
+  media.matches = false; media.change();
+  assert.equal(calls.at(-1), false);
+  media.matches = true; media.change();
+  assert.equal(calls.at(-1), true);
+});
+
 test("the cached theme is applied before Init, even if storage is unavailable", async () => {
   const source = await readFile(new URL("../assets/js/theme.js", import.meta.url), "utf8");
   for (const unavailable of [false, true]) {
