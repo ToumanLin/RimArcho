@@ -251,17 +251,23 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	st := r.State
-	moved := 0
+	moved, added := 0, 0
 	for _, ch := range r.Changes {
 		if ch.Kind == loadout.Moved {
 			moved++
 		}
+		if ch.Kind == loadout.Added {
+			added++
+		}
 	}
 	head := fmt.Sprintf("sort: %d moved", moved)
+	if added > 0 {
+		head = fmt.Sprintf("sort: %d added, %d moved", added, moved)
+	}
 	switch {
 	case dry:
 		head += " (dry run; the workspace is unchanged)"
-	case moved > 0:
+	case len(r.Changes) > 0:
 		head += " (applied to the workspace; not saved)"
 	}
 	d, root := render.New(head)
@@ -335,7 +341,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		cs += fmt.Sprintf(", %d not used", n)
 	}
 	root.KV("constraints", cs)
-	if dry && moved > 0 {
+	if dry && len(r.Changes) > 0 {
 		d.AddNext("archo sort")
 	} else if !dry && len(st.Changes()) > 0 {
 		d.AddNext("archo save")

@@ -7,6 +7,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/order"
 )
 
@@ -150,6 +151,18 @@ func apply(a *app.App, what string, move bool) (string, error) {
 		}
 		if len(r.Changes) == 0 {
 			return T("the order is already right"), nil
+		}
+		added, moved := 0, 0
+		for _, ch := range r.Changes {
+			if ch.Kind == loadout.Added {
+				added++
+			}
+			if ch.Kind == loadout.Moved {
+				moved++
+			}
+		}
+		if added > 0 {
+			return Tf("sorted: %d added, %d moved", added, moved), nil
 		}
 		strong := 0
 		for _, b := range order.Broken(r.Input, r.Result) {

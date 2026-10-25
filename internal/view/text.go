@@ -101,6 +101,7 @@ var zhText = map[string]string{
 	"no game": "没有游戏",
 	// whole-list actions shared by both interfaces (view/preview.go)
 	"sorted: %d moved":                                   "已排序：移动了 %d 个",
+	"sorted: %d added, %d moved":                         "已排序：新增 %d 个，移动 %d 个",
 	"nothing to write to the game":                       "没有要写入游戏的修改",
 	"written to the game as v%d":                         "已写入游戏（v%d）",
 	"written to the game as v%d; %d Mods/ links updated": "已写入游戏（v%d），更新了 %d 个 Mods/ 链接",

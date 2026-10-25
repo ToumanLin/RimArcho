@@ -599,6 +599,13 @@ func (a *App) SortInput(st *LoadoutState, l loadout.List) (order.Input, error) {
 func (a *App) Sort(dryRun bool) (*SortResult, error) {
 	var out *SortResult
 	compute := func(st *LoadoutState, l loadout.List) (loadout.List, error) {
+		before := l.Clone()
+		// Sorting also restores the installed, loadable base game. DLCs remain
+		// the player's choice; missing Core on disk remains a missing entry.
+		core := st.Reg.Resolve("ludeon.rimworld").Instance
+		if core != "" && st.Reg.Loadable(core) && l.Index(core) < 0 {
+			l = append(l.Clone(), loadout.Entry{Instance: core})
+		}
 		in, err := a.SortInput(st, l)
 		if err != nil {
 			return nil, err
@@ -608,7 +615,7 @@ func (a *App) Sort(dryRun bool) (*SortResult, error) {
 		for _, i := range r.Order {
 			sorted = append(sorted, l[i])
 		}
-		out = &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(l, sorted, st.LineageOf)}
+		out = &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(before, sorted, st.LineageOf)}
 		return sorted, nil
 	}
 	if dryRun {

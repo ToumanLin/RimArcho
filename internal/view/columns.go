@@ -6,6 +6,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/order"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -109,7 +110,12 @@ func BuildBoard(a *app.App) (*Board, error) {
 		b.Cols[Inactive] = append(b.Cols[Inactive], ModItem(st, mod))
 	}
 	ina := b.Cols[Inactive]
-	sort.SliceStable(ina, func(i, j int) bool { return ina[i].Lower < ina[j].Lower })
+	sort.SliceStable(ina, func(i, j int) bool {
+		if c := order.CompareOfficial(ina[i].Package, ina[j].Package); c != 0 {
+			return c < 0
+		}
+		return ina[i].Lower < ina[j].Lower
+	})
 	if qs, err := a.Store.Questions(st.Ix.Env.ID, false); err == nil {
 		b.Questions = len(qs)
 	}

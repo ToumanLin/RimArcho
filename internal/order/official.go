@@ -5,6 +5,19 @@ import "sort"
 // IsOfficial reports Core and the DLCs (also future ludeon.rimworld.* packages).
 func IsOfficial(pkg string) bool { return officialRank(pkg) >= 0 }
 
+// CompareOfficial puts Core and DLCs first, in release order. Non-official
+// packages compare equal so callers can apply their usual name/order fallback.
+func CompareOfficial(a, b string) int {
+	x, y := officialRank(a), officialRank(b)
+	if x < 0 {
+		x = len(Official) + 1
+	}
+	if y < 0 {
+		y = len(Official) + 1
+	}
+	return x - y
+}
+
 // Move puts node Node right after node After.
 type Move struct{ Node, After int }
 

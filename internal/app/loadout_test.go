@@ -299,6 +299,62 @@ func TestSortCycleIgnoreAttach(t *testing.T) {
 	}
 }
 
+func TestSortRestoresCoreWithPreviewAndUndo(t *testing.T) {
+	e := setup(t, false)
+	e.WriteMod(filepath.Join(e.Game, "Data", "Royalty"), testkit.Sample("ludeon.rimworld.royalty", "Royalty"))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "A"), testkit.Sample("tester.a", "A"))
+	e.WriteModsConfig("1.6.4633 rev1261", "tester.a")
+	scanNow(t, e)
+	orig, err := os.ReadFile(e.ModsConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := e.MustRun("sort", "--dry-run")
+	if !strings.Contains(out, "1 added") || joined(active(t, e)) != "A" {
+		t.Fatalf("preview: %s; active %v", out, active(t, e))
+	}
+	out = e.MustRun("sort")
+	if !strings.Contains(out, "1 added") || joined(active(t, e)) != "Core, A" {
+		t.Fatalf("sort: %s; active %v", out, active(t, e))
+	}
+	e.MustRun("undo")
+	if got := joined(active(t, e)); got != "A" {
+		t.Fatalf("undo: %s", got)
+	}
+	e.MustRun("redo")
+	if got := joined(active(t, e)); got != "Core, A" {
+		t.Fatalf("redo: %s", got)
+	}
+	if out := e.MustRun("sort"); !strings.HasPrefix(out, "sort: 0 moved") {
+		t.Fatalf("repeat sort: %s", out)
+	}
+	data, err := os.ReadFile(e.ModsConfig)
+	if err != nil || string(data) != string(orig) {
+		t.Fatalf("sort wrote the game file: %v", err)
+	}
+}
+
+func TestSortEmptyListRestoresOnlyInstalledCore(t *testing.T) {
+	for _, installed := range []bool{true, false} {
+		t.Run(map[bool]string{true: "installed", false: "missing"}[installed], func(t *testing.T) {
+			e := setup(t, false)
+			if !installed {
+				e.Move(filepath.Join(e.Game, "Data", "Core"), filepath.Join(e.Root, "UnusedCore"))
+			}
+			e.WriteModsConfig("1.6.4633 rev1261")
+			scanNow(t, e)
+			e.MustRun("sort")
+			want := ""
+			if installed {
+				want = "Core"
+			}
+			if got := joined(active(t, e)); got != want {
+				t.Fatalf("active: %s, want %s", got, want)
+			}
+		})
+	}
+}
+
 func TestLaunchPlans(t *testing.T) {
 	e := loadoutEnv(t)
 	scanNow(t, e)
