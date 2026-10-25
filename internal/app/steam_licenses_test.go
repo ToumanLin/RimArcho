@@ -1,6 +1,11 @@
 package app
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestSteamLicenseApps(t *testing.T) {
 	for _, tc := range []struct {
@@ -23,5 +28,21 @@ func TestSteamLicenseApps(t *testing.T) {
 				t.Fatalf("owns=%v, want %v", got, tc.owns)
 			}
 		})
+	}
+}
+
+func TestSteamLicenseVMFixtures(t *testing.T) {
+	for _, name := range []string{"real-purchased.log", "borrowed-and-truncated.log"} {
+		b, err := os.ReadFile(filepath.Join("testdata", "steam-licenses", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !steamOwnsRimWorld(string(b)) {
+			t.Fatalf("RimWorld missing in %s", name)
+		}
+		withoutRimWorld := strings.NewReplacer("Apps\t: 294100", "Apps\t: 10", "Apps : 294100", "Apps : 10").Replace(string(b))
+		if steamOwnsRimWorld(withoutRimWorld) {
+			t.Fatal("depot, package or truncated count counted as app")
+		}
 	}
 }

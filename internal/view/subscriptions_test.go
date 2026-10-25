@@ -180,6 +180,9 @@ func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 		t.Fatal(err)
 	}
 	row := page.Sources[0]
+	if row.Result != "11 个失败" {
+		t.Fatal(row.Result)
+	}
 	found := false
 	for _, group := range row.Failures {
 		if group.Label == "2 个已从工坊消失" {

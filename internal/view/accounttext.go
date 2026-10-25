@@ -11,6 +11,9 @@ func init() {
 	enText["environment interface not available"] = "WebView2 interface not available"
 
 	Register(map[string]string{
+		"%d failed": "%d 个失败",
+		"%s: %s":    "%s：%s",
+		"mod downloads available, game downloads: not checked, account: %s": "下载Mod可用，下载游戏：未检查，登录账号：%s",
 		"COM initialize failed":                         "COM 初始化失败",
 		"login window failed or session cleanup failed": "登录窗口或会话清理失败",
 		"runtime load failed":                           "WebView2 加载失败",

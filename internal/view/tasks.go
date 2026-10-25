@@ -104,6 +104,9 @@ type TaskRow struct {
 	Search    string        `json:"search"` // what the search box matches (lower case)
 }
 
+// TaskStatus is the completion sentence shared with the GUI status line.
+func TaskStatus(r TaskRow) string { return r.Title + "  " + Tf("%s: %s", r.Obj, r.Line) }
+
 // TaskStep is a step of a pack build (06 §2.6).
 type TaskStep struct {
 	Label string `json:"label"`

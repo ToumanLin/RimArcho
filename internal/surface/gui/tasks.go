@@ -57,7 +57,7 @@ func (s *API) startTasks() {
 		if ok && (t.Kind == view.TaskSubscribe || t.Kind == view.TaskSubscriptionFrom) {
 			ref = t.Target
 		}
-		s.send("tasks", map[string]any{"ended": map[string]any{"ok": ok, "id": t.ID, "kind": t.Kind, "ref": ref, "text": r.Title + "  " + r.Obj + "：" + r.Line}})
+		s.send("tasks", map[string]any{"ended": map[string]any{"ok": ok, "id": t.ID, "kind": t.Kind, "ref": ref, "text": view.TaskStatus(r)}})
 	}
 	s.tasks = ts
 }

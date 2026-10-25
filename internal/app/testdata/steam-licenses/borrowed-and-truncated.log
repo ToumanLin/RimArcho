@@ -1,0 +1,10 @@
+License packageID 1:
+ - State : Active, Borrowed (flags 0x4200) - Family Group
+ - Original Owner : offline-fixture
+ - Apps : 5, 7, 8, ... (196 in total)
+ - Depots : 294100, (1 in total)
+License packageID 41602:
+ - State : Active, Borrowed (flags 0x4200) - Family Group
+ - Original Owner : offline-fixture
+ - Apps : 294100, (1 in total)
+ - Depots : 294101, (1 in total)

@@ -12,6 +12,9 @@ func SteamAccountLine(s app.SteamAccountStatus) string {
 	if !s.LoggedIn || s.Account == "anonymous" {
 		return T("mod downloads available, not logged in")
 	}
+	if s.OwnershipChecked.IsZero() {
+		return Tf("mod downloads available, game downloads: not checked, account: %s", s.Account)
+	}
 	if s.OwnsRimWorld {
 		return Tf("mod downloads available, game downloads available, account: %s", s.Account)
 	}
