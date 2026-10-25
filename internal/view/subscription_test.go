@@ -15,6 +15,7 @@ import (
 )
 
 func TestSubscriptionLibrary(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	dir := filepath.Join(e.App.SubscribedDir(), "Example")

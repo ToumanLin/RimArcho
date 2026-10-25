@@ -7,6 +7,7 @@ import (
 )
 
 func TestChooseAndImageURL(t *testing.T) {
+	t.Parallel()
 	long := strings.Repeat("A framework for new races. ", 20)
 	if got := choose(long, "[img]https://x/banner.png[/img]\n"+long+"[h1]More[/h1]"); got != "workshop" {
 		t.Errorf("same start after a banner: %s", got)

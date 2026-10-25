@@ -38,6 +38,7 @@ func environmentResult(t *testing.T, events <-chan string, request uint64) *Envi
 // An in-flight switch may finish preparing links, but cannot publish its destination
 // after the player picked another game (06 §3.1).
 func TestEnvironmentLatePreparationCannotSelectOldGame(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	game := e.OtherGame("Other", "1.6.4633 rev1261")
 	e.MustRun("env", "add", "other", "--game", game, "--saves", "own")
@@ -96,6 +97,7 @@ func TestEnvironmentLatePreparationCannotSelectOldGame(t *testing.T) {
 }
 
 func TestEnvironmentOutOfOrderRequestsAndQueuedWork(t *testing.T) {
+	t.Parallel()
 	_, api, events := fixture(t)
 	api.environment.gate.Lock()
 	api.UseEnv(2, "main")
@@ -111,6 +113,7 @@ func TestEnvironmentOutOfOrderRequestsAndQueuedWork(t *testing.T) {
 }
 
 func TestHomeApplyReturnsPreparedWorkspace(t *testing.T) {
+	t.Parallel()
 	_, api, events := fixture(t)
 	board := api.Board()
 	if !api.HomeApply(1, view.RowPlan, "main", board.St.Plan.ID, "") {

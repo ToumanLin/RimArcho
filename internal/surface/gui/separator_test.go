@@ -9,6 +9,7 @@ import (
 
 // Every adjustable card gap uses the keyboard and persistence implementation (06 §3.1).
 func TestSeparators(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"main", "filterbar", "library", "screens", "tasks", "planmanage", "shell"} {
 		b, err := fs.ReadFile(assets, "assets/js/"+name+".js")
 		if err != nil {

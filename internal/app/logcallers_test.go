@@ -31,6 +31,7 @@ XML error: <selectionWeight>2</selectionWeight> doesn't correspond to any field 
 `
 
 func TestLogCallerRules(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	mods := filepath.Join(e.Game, "Mods")
 	mod := func(dir, pkg string, files map[string]string, dlls ...string) {

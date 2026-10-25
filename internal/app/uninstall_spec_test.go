@@ -14,6 +14,7 @@ import (
 // 01 §4.1: every row of the write list (01 §4) says what uninstall does with it — a step in
 // backticks, or "无：" and why not — every step it names exists, and every step is in §4.
 func TestUninstallCoversWriteList(t *testing.T) {
+	t.Parallel()
 	_, file, _, _ := runtime.Caller(0)
 	b, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "docs", "specs", "01-范围与状态.md"))
 	if err != nil {

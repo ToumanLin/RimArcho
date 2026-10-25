@@ -44,6 +44,7 @@ func names(items []view.Item) string {
 
 // G1: the GUI shows view's structures; nothing is rebuilt in the surface.
 func TestSameViewModels(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	b := api.Board()
 	want, err := view.BuildBoard(e.App)
@@ -79,6 +80,7 @@ func TestSameViewModels(t *testing.T) {
 
 // G3: each verb acts at once and u undoes it.
 func TestVerbsAndUndo(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	b := api.Board()
 	id := func(col view.Column, name string) string {
@@ -130,6 +132,7 @@ func TestVerbsAndUndo(t *testing.T) {
 // 06 §6: sort, write and launch act on one click (no confirmation); sort offers 撤销, and
 // a refusal comes back with the commands that resolve it, writing nothing.
 func TestRunAtOnce(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	if _, err := api.Toggle(int(view.Inactive), []string{api.Board().Cols[view.Inactive][0].ID}, nil); err != nil {
 		t.Fatal(err)
@@ -175,6 +178,7 @@ func TestRunAtOnce(t *testing.T) {
 }
 
 func TestPreviewAndInspect(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	p, err := api.Preview(view.ListSort)
 	if err != nil || len(p.Lines) == 0 {
@@ -202,6 +206,7 @@ func TestPreviewAndInspect(t *testing.T) {
 
 // The scan runs in the background and says when it is done (an event, 06 §8.4).
 func TestScanEvent(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	exe := filepath.Join(t.TempDir(), "none.exe")
 	api.Exe = exe // no such program: the scan fails and the failure is reported
@@ -223,6 +228,7 @@ func TestScanEvent(t *testing.T) {
 }
 
 func TestSplitArgs(t *testing.T) {
+	t.Parallel()
 	got := splitArgs(`list --filter "tag:my tag"  -x`)
 	if strings.Join(got, "|") != "list|--filter|tag:my tag|-x" {
 		t.Fatalf("%q", got)
@@ -232,6 +238,7 @@ func TestSplitArgs(t *testing.T) {
 // T: the whole enabled list goes to staging (Core stays), one step; put all back restores
 // the order.
 func TestStageAll(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	b := api.Board()
 	var harmony string
@@ -330,6 +337,7 @@ func TestPackBuildBackground(t *testing.T) {
 
 // A build cut short shows on the packs page and can be removed from there.
 func TestPackUnfinishedRows(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	tmp := filepath.Join(e.App.PacksDir(), "cut"+app.TmpSuffix)
 	os.MkdirAll(tmp, 0o755)
@@ -350,6 +358,7 @@ func TestPackUnfinishedRows(t *testing.T) {
 // G14 (06 §2.6): with an error-level problem the build page disables 编译 and says why,
 // pointing to 能不能跑; 先看清单 writes nothing; once fixed, 编译 is enabled with the sizes.
 func TestBuildPageG14(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	p, err := buildPage(t, api, 0)
 	if err != nil {
@@ -441,6 +450,7 @@ func (fakeEncoder) Encode(context.Context, []string, int, bool) error { return n
 // Another version in the way of a pack copy (08 §5.3): the launch comes back with the moves
 // for one confirmation; with move it goes on.
 func TestPackLaunchMovesConfirm(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	e.MustRun("enable", "pkg:brrainz.harmony")
 	e.MustRun("enable", "pkg:tester.b")

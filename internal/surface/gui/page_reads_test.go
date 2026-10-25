@@ -23,6 +23,7 @@ func stampResponds(t *testing.T, api *API) {
 }
 
 func TestPreviewReadsDoNotHoldSharedLock(t *testing.T) {
+	t.Parallel()
 	for _, page := range []string{"build", "uninstall"} {
 		t.Run(page, func(t *testing.T) {
 			e, api, _ := fixture(t)
@@ -68,6 +69,7 @@ func TestPreviewReadsDoNotHoldSharedLock(t *testing.T) {
 }
 
 func TestHomeAndNeedsReadersLeaveNavigationResponsive(t *testing.T) {
+	t.Parallel()
 	for _, page := range []string{"home", "needs"} {
 		t.Run(page, func(t *testing.T) {
 			e, api, _ := fixture(t)
@@ -92,7 +94,7 @@ func TestHomeAndNeedsReadersLeaveNavigationResponsive(t *testing.T) {
 					api.Needs()
 				}
 			}()
-			deadline := time.Now().Add(3 * time.Second)
+			deadline := time.Now().Add(20 * time.Second)
 			for reader.Stats().WaitCount == before && time.Now().Before(deadline) {
 				time.Sleep(time.Millisecond)
 			}
@@ -117,6 +119,7 @@ func TestHomeAndNeedsReadersLeaveNavigationResponsive(t *testing.T) {
 }
 
 func TestBackgroundLookupUsesOnlyPublishedEnvironment(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	st := api.Board().St
 	api.bgsEnv = st.Ix.Env.ID

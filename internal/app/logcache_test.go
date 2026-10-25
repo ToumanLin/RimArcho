@@ -25,6 +25,7 @@ func logProblems(l []*app.Problem) int {
 // 03 §6.4: a log whose plan changed since its launch, or written by another game version,
 // is stale: its problems are kept apart (ProblemSet.Stale), not counted, and do not escalate.
 func TestStaleLog(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	log := e.HarmonyLogFixture()
 	ps := problems(t, e)
@@ -67,6 +68,7 @@ func TestStaleLog(t *testing.T) {
 // The attributed log is stored in the database: a new process reads it without parsing,
 // and a cache-only problem list (status, mod) never parses the log.
 func TestLogCache(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	p := filepath.Join(e.UserData, "Player.log")

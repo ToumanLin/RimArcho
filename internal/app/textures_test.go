@@ -24,6 +24,7 @@ import (
 )
 
 func TestTextureSummaryMatchesFullReport(t *testing.T) {
+	t.Parallel()
 	e, _, _ := texSetup(t)
 	refs := []string{"pkg:tester.tex"}
 	check := func() {
@@ -76,6 +77,7 @@ func TestTextureSummaryMatchesFullReport(t *testing.T) {
 }
 
 func TestTextureSummaryPublishesRowsBeforeCompletion(t *testing.T) {
+	t.Parallel()
 	e, _, _ := texSetup(t)
 	targets, err := e.App.TextureTargets([]string{"pkg:tester.tex"}, app.TexRefs)
 	if err != nil {
@@ -166,6 +168,7 @@ func texSetup(t *testing.T) (*testkit.Env, *texEnc, string) {
 // folder serves every game version), never touches the author's DDS, is not an update of
 // the mod, does nothing the second time, and clean takes back only its own files.
 func TestTexturesOptimize(t *testing.T) {
+	t.Parallel()
 	e, enc, dir := texSetup(t)
 	ref := "pkg:tester.tex"
 	st, err := e.App.TextureStatus([]string{ref}, app.TexRefs, textures.Options{})
@@ -224,6 +227,7 @@ func TestTexturesOptimize(t *testing.T) {
 // A key that fails in one folder loses its DDS in every folder; a DDS whose PNG is gone is
 // deleted; an update of the mod makes its DDS stale until they are made again.
 func TestTexturesStaleAndFailures(t *testing.T) {
+	t.Parallel()
 	e, enc, dir := texSetup(t)
 	ref := "pkg:tester.tex"
 	enc.fail = "1.6/Textures/Things/A.png"
@@ -274,6 +278,7 @@ func TestTexturesStaleAndFailures(t *testing.T) {
 
 // The commands: status, a dry run, the run, clean (05 §4.2).
 func TestTexturesCLI(t *testing.T) {
+	t.Parallel()
 	e, _, dir := texSetup(t)
 	out := e.MustRun("textures", "status", "pkg:tester.tex")
 	if !strings.Contains(out, "textures of 1 mods: 4 PNGs") || !strings.Contains(out, "1 DDS of its own") || !strings.Contains(out, "3 to convert") {
@@ -305,6 +310,7 @@ func TestTexturesCLI(t *testing.T) {
 
 // A game running, Core, and a DDS that appeared since the plan are refused.
 func TestTexturesRefusals(t *testing.T) {
+	t.Parallel()
 	e, _, _ := texSetup(t)
 	if _, err := e.App.OptimizeTextures(app.TextureRun{Refs: []string{"pkg:ludeon.rimworld"}}); err == nil || !strings.Contains(err.Error(), "part of the game") {
 		t.Fatalf("core: %v", err)
@@ -327,6 +333,7 @@ func realDir(p string) string {
 
 // Uninstall deletes the DDS RimArcho wrote and nothing else of the mod (01 §4.1).
 func TestTexturesUninstall(t *testing.T) {
+	t.Parallel()
 	e, _, dir := texSetup(t)
 	if _, err := e.App.OptimizeTextures(app.TextureRun{Refs: []string{"pkg:tester.tex"}}); err != nil {
 		t.Fatal(err)
@@ -349,6 +356,7 @@ func TestTexturesUninstall(t *testing.T) {
 
 // todds is downloaded from the release (a fake server here) into RimArcho's own folder.
 func TestInstallTodds(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.App.TextureEncoder = &texEnc{}
 	var zb bytes.Buffer

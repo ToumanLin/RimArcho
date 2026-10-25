@@ -95,6 +95,7 @@ func wantKinds(t *testing.T, evs []*store.Event, want map[string]int) {
 
 // A1: first scan of 300+ mods — one Instance per folder, one discovered event each.
 func TestA1FirstScanManyMods(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	for i := 0; i < 300; i++ {
 		id := fmt.Sprint(3000000000 + i)
@@ -140,6 +141,7 @@ func TestA1FirstScanManyMods(t *testing.T) {
 
 // A2: the workshop updates a mod — same Instance, `updated`.
 func TestA2WorkshopUpdate(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	dir := e.AddWorkshop("1001", testkit.Sample("tester.alpha", "Alpha"))
 	scanNow(t, e)
@@ -161,6 +163,7 @@ func TestA2WorkshopUpdate(t *testing.T) {
 // Steam re-downloads an item without content change: a new snapshot records the new
 // manifest, its file list is copied from the previous snapshot, and nothing is reported.
 func TestManifestOnlyChange(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.AddWorkshop("1012", testkit.Sample("tester.same", "Same"))
 	scanNow(t, e)
@@ -181,6 +184,7 @@ func TestManifestOnlyChange(t *testing.T) {
 // A3: the author changes the packageId in an update — same Instance, `package-id-changed`,
 // lineage (where Loadout entries and user rules hang) unchanged.
 func TestA3PackageIDChange(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	m := testkit.Sample("oldauthor.thing", "Thing")
 	dir := e.AddWorkshop("1002", m)
@@ -200,6 +204,7 @@ func TestA3PackageIDChange(t *testing.T) {
 // A4: the whole game folder moves to another drive and the environment path is updated —
 // sources re-bind, every Instance ID stays.
 func TestA4GameFolderMoved(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	for i := 0; i < 6; i++ {
 		e.WriteMod(filepath.Join(e.Game, "Mods", fmt.Sprintf("Local%d", i)), testkit.Sample(fmt.Sprintf("tester.l%d", i), fmt.Sprintf("Local %d", i)))
@@ -234,6 +239,7 @@ func TestA4GameFolderMoved(t *testing.T) {
 
 // A4 (negative): a new root with different mods is not re-bound automatically.
 func TestA4RebindRejected(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	for i := 0; i < 5; i++ {
 		e.WriteMod(filepath.Join(e.Game, "Mods", fmt.Sprintf("Local%d", i)), testkit.Sample(fmt.Sprintf("tester.l%d", i), fmt.Sprintf("Local %d", i)))
@@ -258,6 +264,7 @@ func TestA4RebindRejected(t *testing.T) {
 
 // A5: a workshop mod copied by hand into Mods/ — new Instance in the same lineage, inferred.
 func TestA5ManualCopy(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	src := e.AddWorkshop("1005", testkit.Sample("tester.copyme", "Copy Me"))
 	scanNow(t, e)
@@ -292,6 +299,7 @@ func TestA5ManualCopy(t *testing.T) {
 
 // A6: a copy carrying .rimarcho/origin.json (as copy-local writes it) — confirmed membership.
 func TestA6OriginMarker(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	src := e.AddWorkshop("1006", testkit.Sample("tester.origin", "Origin"))
 	scanNow(t, e)
@@ -323,6 +331,7 @@ func TestA6OriginMarker(t *testing.T) {
 
 // A7: a local mod folder is renamed — same Instance, `moved`.
 func TestA7LocalRename(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	dir := filepath.Join(e.Game, "Mods", "My Mod")
 	e.WriteMod(dir, testkit.Sample("me.mymod", "My Mod"))
@@ -356,6 +365,7 @@ func TestA7LocalRename(t *testing.T) {
 
 // A8: unsubscribe, then re-subscribe within 30 days — same Instance, `reappeared`.
 func TestA8Resubscribe(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	dir := e.AddWorkshop("1008", testkit.Sample("tester.back", "Comes Back"))
 	scanNow(t, e)
@@ -383,6 +393,7 @@ func TestA8Resubscribe(t *testing.T) {
 // A9: the same workshop ID in the Steam client folder and a SteamCMD folder — two Instances,
 // one lineage.
 func TestA9SteamAndSteamCMD(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	m := testkit.Sample("tester.dual", "Dual")
 	e.AddWorkshop("1009", m)
@@ -400,6 +411,7 @@ func TestA9SteamAndSteamCMD(t *testing.T) {
 // A10: two unrelated mods declaring the same packageId — two Instances, two lineages; a
 // pkg: reference lists both instead of picking one.
 func TestA10SamePackageIDUnrelated(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.AddWorkshop("1010", testkit.Sample("common.name", "First Author Mod"))
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Other"), testkit.Sample("common.name", "Second Author Mod"))
@@ -417,6 +429,7 @@ func TestA10SamePackageIDUnrelated(t *testing.T) {
 // A11: one directory reachable from two sources through a junction — one Instance with one
 // alias location.
 func TestA11Junction(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	target := e.AddWorkshop("1011", testkit.Sample("tester.linked", "Linked"))
 	e.Junction(filepath.Join(e.Game, "Mods", "_Link_1011"), target)
@@ -447,6 +460,7 @@ func TestA11Junction(t *testing.T) {
 // Residue: an unsubscribed workshop folder with About.xml is an Instance flagged residue;
 // one without About.xml is only counted.
 func TestResidue(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.AddWorkshop("2001", testkit.Sample("tester.sub", "Subscribed"))
 	e.WriteMod(filepath.Join(e.Workshop, "2002"), testkit.Sample("tester.left", "Left Behind"))
@@ -472,6 +486,7 @@ func TestResidue(t *testing.T) {
 // R6 + identity resolve: a vanished mod reappears elsewhere under a new packageId — RimArcho
 // asks instead of guessing; "same" restores the original identity.
 func TestQuestionResolveSame(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	dir := filepath.Join(e.Game, "Mods", "Gone")
 	e.WriteMod(dir, testkit.Sample("tester.gone", "Gone"))
@@ -521,6 +536,7 @@ func mustPlan(t *testing.T, e *testkit.Env) int64 {
 
 // Lineage split and merge.
 func TestLineageSplitMerge(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	src := e.AddWorkshop("3001", testkit.Sample("tester.fam", "Family"))
 	e.CopyTree(src, filepath.Join(e.Game, "Mods", "Family Copy"))
@@ -557,6 +573,7 @@ func TestLineageSplitMerge(t *testing.T) {
 // Tombstones are kept for the configured retention, then gc removes them unless an open
 // question refers to them.
 func TestTombstoneGC(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	a := filepath.Join(e.Game, "Mods", "A")
 	b := filepath.Join(e.Game, "Mods", "B")
@@ -590,6 +607,7 @@ func TestTombstoneGC(t *testing.T) {
 // 02 §4.4 (revised): files moved into a version folder with unchanged content still count
 // as the same mod (J(hash)); a content-only edit keeps J(path) = 1.
 func TestSimilarityRestructureAndContentOnly(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	dir := filepath.Join(e.Game, "Mods", "Restructure")
 	e.WriteMod(dir, testkit.Sample("tester.re", "Restructure"))
@@ -621,6 +639,7 @@ func TestSimilarityRestructureAndContentOnly(t *testing.T) {
 // a junction outside every source. The disabled folder is an unloadable Instance, and the
 // deployed copy joins its lineage.
 func TestAboutDisabled(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	ws := e.AddWorkshop("4001", testkit.Sample("tester.crow", "Crow Managed"))
 	deployed := filepath.Join(e.Root, "RimCrow", "mods", "4001")
@@ -649,6 +668,7 @@ func TestAboutDisabled(t *testing.T) {
 }
 
 func TestEnvRemoveAndSourceRemove(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	e.WriteMod(filepath.Join(e.SteamCMD, "5001"), testkit.Sample("tester.cmd", "Via SteamCMD"))
 	scanNow(t, e)

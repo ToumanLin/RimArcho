@@ -13,6 +13,7 @@ import (
 // P2, P3 (06 §2.14): caches are measured and cleared; a backup is a database that opens; launch
 // arguments reach the game's command line.
 func TestSettingsCommands(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.WriteFile(filepath.Join(e.Home, "cache", "previews", "a.png"), strings.Repeat("x", 4096))

@@ -14,6 +14,7 @@ import (
 )
 
 func TestTexturePageRequests(t *testing.T) {
+	t.Parallel()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is needed for the texture page regression tests")
@@ -46,6 +47,7 @@ func waitTextureMeasure(t *testing.T, api *API, request uint64) *TexturePage {
 }
 
 func TestTextureMeasureReturnsBeforeDiskAndRejectsLateResults(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	// Hold the disk reader: requesting either option must still return a pending page.
 	api.texRead.mu.Lock()

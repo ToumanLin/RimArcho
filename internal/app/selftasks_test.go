@@ -10,6 +10,7 @@ import (
 
 // Maintenance kinds serialize independently, and keep successes and failures (06 §2.16).
 func TestSelfTasksQueueResultsAndConcurrency(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "tasks.json")
 	ts := OpenTasks(path)
 	started, release := make(chan struct{}), make(chan struct{})
@@ -60,6 +61,7 @@ func TestSelfTasksQueueResultsAndConcurrency(t *testing.T) {
 }
 
 func TestSelfTasksCancelAndClose(t *testing.T) {
+	t.Parallel()
 	ts := OpenTasks("")
 	started, release := make(chan struct{}), make(chan struct{})
 	first := ts.EnqueueSelf(Task{Kind: "data-update", Obj: "community"}, func(string) (string, error) {

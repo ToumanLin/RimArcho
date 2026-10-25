@@ -11,6 +11,7 @@ import (
 // (the characters of the US layout) go to pages; tab / shift+tab go to the next page under
 // the same sidebar entry.
 func TestKeyTable(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	e.MustRun("plan", "new", "second")
 	e.MustRun("plan", "use", "default")

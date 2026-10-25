@@ -14,6 +14,7 @@ import (
 )
 
 func TestWorkshopSourceCheckKeepsKnownUpdateOnFailure(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("1001", testkit.Sample("tester.workshop", "Workshop"))
 	e.SetTimeUpdated("1001", e.Now().Unix())

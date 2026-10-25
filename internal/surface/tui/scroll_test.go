@@ -12,6 +12,7 @@ import (
 // from the top; tab / shift+tab go through the sub-sections; the wheel scrolls; esc goes
 // back with the cursor on the last mod shown.
 func TestT15FullScreenNext(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	e.MustRun("rule", "add", "after", "pkg:tester.a", "pkg:brrainz.harmony")
 	m := direct(t, e, 120, 16)
@@ -67,6 +68,7 @@ func TestT15FullScreenNext(t *testing.T) {
 // on top in the accent colour; ← and esc go back to the list it shows; a click focuses it
 // too. PgDn scrolls it from a list without moving the focus or the cursor.
 func TestDetailFocus(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 10)
 	press(m, "home")

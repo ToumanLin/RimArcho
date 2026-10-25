@@ -6,6 +6,7 @@ import (
 )
 
 func TestDataTables(t *testing.T) {
+	t.Parallel()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is needed for the data table behavior tests")

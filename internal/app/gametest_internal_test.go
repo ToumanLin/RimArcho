@@ -14,6 +14,7 @@ import (
 )
 
 func TestTestRunMissingFolders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	game := filepath.Join(root, "game")
 	workshop := filepath.Join(root, "workshop")

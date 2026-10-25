@@ -3,6 +3,7 @@ package view
 import "testing"
 
 func TestTagMatch(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		tag, v string
 		want   bool
@@ -32,6 +33,7 @@ func TestTagMatch(t *testing.T) {
 }
 
 func TestCompleteQuery(t *testing.T) {
+	t.Parallel()
 	tags := []string{"Facial Hair", "Facial Animation", "Hygiene", "Hair Style"}
 	for q, want := range map[string]string{
 		"au":               "thor:",

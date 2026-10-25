@@ -10,6 +10,7 @@ import (
 // X4: a collection with an installed mod, one that is not installed and a nested
 // collection; sortorder has gaps. --import keeps the installed ones in order.
 func TestCollection(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

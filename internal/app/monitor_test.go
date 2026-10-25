@@ -43,6 +43,7 @@ func monitorDir(e *testkit.Env) string {
 // and added right after Harmony to every plan once, as one undoable edit; then it is a
 // normal mod.
 func TestMonitorInstallAndDefault(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("plan", "new", "other", "--from", "current")
@@ -137,6 +138,7 @@ func contains(l []string, s string) bool {
 // M3: a new bundled version is installed next to the old one, joins its lineage and
 // replaces it in the plans; undo goes back to the old version.
 func TestMonitorUpdate(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.App.MonitorBundle = monitorBundle(t, e, "0.9.0")
@@ -168,6 +170,7 @@ func TestMonitorUpdate(t *testing.T) {
 // 04 §1.5: monitor.default off adds nothing; plans are not marked, so turning it on later
 // still adds it.
 func TestMonitorDefaultOff(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("config", "set", "monitor.default", "off")
@@ -205,6 +208,7 @@ func TestMonitorExFAT(t *testing.T) {
 
 // M7: a development build with the same version replaces its folder, unless a game runs.
 func TestMonitorDevReplace(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	b := monitorBundle(t, e, "0.9.0-dev")
@@ -236,6 +240,7 @@ func TestMonitorDevReplace(t *testing.T) {
 
 // M8: without a bundled monitor nothing is installed and `monitor` says where it looked.
 func TestMonitorNotBundled(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.App.MonitorBundle = filepath.Join(e.Root, "nowhere")
@@ -266,6 +271,7 @@ func TestMonitorDevPath(t *testing.T) {
 
 // M6: a pack carries the monitor like any other mod (a copy, not a link).
 func TestMonitorInPack(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
@@ -286,6 +292,7 @@ func TestMonitorInPack(t *testing.T) {
 // 06 §2.10: the log page's "add Archo Monitor" puts it back after Harmony in the current
 // plan, also after the player removed it; one step that undo takes back.
 func TestAddMonitor(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	if _, err := e.App.AddMonitor(); err == nil || !strings.Contains(err.Error(), "not installed") {

@@ -87,6 +87,7 @@ func atBase(m *model, page int) bool {
 
 // T20 on the pages besides the editor (G5's TUI half): esc reaches the base in at most 3.
 func TestT20EscBackPages(t *testing.T) {
+	t.Parallel()
 	e, _ := v3Fixture(t)
 	e.WriteFile(filepath.Join(e.UserData, "Player.log"), "RimWorld 1.6.4633 rev1261\n") // 游戏日志 has a log to choose
 	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", "steamcmd.exe"), "MZ")
@@ -115,6 +116,7 @@ func TestT20EscBackPages(t *testing.T) {
 
 // The states really are built: each named overlay is there before esc.
 func TestT20PagesBuilt(t *testing.T) {
+	t.Parallel()
 	e, _ := v3Fixture(t)
 	e.WriteFile(filepath.Join(e.UserData, "Player.log"), "RimWorld 1.6.4633 rev1261\n")
 	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", "steamcmd.exe"), "MZ")

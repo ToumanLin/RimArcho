@@ -11,6 +11,7 @@ import (
 )
 
 func TestCopyDigestRejectsLinks(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "content"), []byte("mod"), 0o644); err != nil {
 		t.Fatal(err)
@@ -43,6 +44,7 @@ func TestCopyDigestRejectsLinks(t *testing.T) {
 }
 
 func TestPackEntryProvenance(t *testing.T) {
+	t.Parallel()
 	m := &store.Mod{PackageID: "test.provenance", ACFTimeUpdated: 123456, GitHead: "abcdef"}
 	e := packEntryOf(m)
 	if e.WorkshopUpdated != m.ACFTimeUpdated || e.GitHead != m.GitHead {

@@ -112,6 +112,7 @@ func ruleCluster(t *testing.T, e *testkit.Env, rep *app.LogReport, sub string) (
 }
 
 func TestLogRulesFromCorpus(t *testing.T) {
+	t.Parallel()
 	e, rep := logRulesFixture(t)
 	for _, c := range []struct {
 		name, sub string

@@ -15,6 +15,7 @@ import (
 // 06 §2.1: while the game runs, its log's errors become "this run" items; when it exits the
 // tracker stops.
 func TestLiveTracker(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	text := e.HarmonyLogFixture()
 	running := true
@@ -59,6 +60,7 @@ func TestLiveTracker(t *testing.T) {
 // 08 §1: another environment's game blocks launching; the tracker says so instead of
 // following that game's log.
 func TestLiveBlockedByOtherEnv(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	other := filepath.Join(e.Root, "Other", "RimWorld")

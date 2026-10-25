@@ -35,6 +35,7 @@ func problemCodes(t *testing.T, e *testkit.Env) map[string]string {
 // unloadable; once the workshop copy changes after the copy was made, it is a warning with
 // a file diff.
 func TestHiddenPinned(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	m := testkit.Sample("tester.pin", "Pinned")
 	m.Files = map[string]string{"Defs/a.xml": "<Defs><ThingDef><defName>A</defName></ThingDef></Defs>"}
@@ -78,6 +79,7 @@ func TestHiddenPinned(t *testing.T) {
 
 // H3: an unsubscribed hidden folder goes to the recycle bin (here: a recorder).
 func TestHiddenResidueTrash(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	ws := e.AddWorkshop("4200", testkit.Sample("tester.gone", "Gone"))
 	hide(e, ws)
@@ -105,6 +107,7 @@ func TestHiddenResidueTrash(t *testing.T) {
 // H4, H5, H6: a hidden subscribed mod can be shown again; an existing About.xml is never
 // overwritten; local folders are never trashed.
 func TestHiddenAlone(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	ws := e.AddWorkshop("4300", testkit.Sample("tester.alone", "Alone"))
 	hide(e, ws)

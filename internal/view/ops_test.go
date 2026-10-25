@@ -10,6 +10,7 @@ import (
 // have is in the table with a key or a menu group (the menu key and shift+F10 open the
 // menu), and every menu group's ops come in the menu's order.
 func TestOpsReachable(t *testing.T) {
+	t.Parallel()
 	for _, page := range []string{LibraryPage, "packs", "textures", PageTasks} {
 		reached := false
 		for _, row := range KeyHelp(page, false) {
@@ -75,6 +76,7 @@ func TestOpsReachable(t *testing.T) {
 
 // fixColumn: the editor's row keeps its column's plan ops.
 func TestRowOpsColumns(t *testing.T) {
+	t.Parallel()
 	ops := []string{OpTakeOut, OpMoveTo, OpStage, OpSwap, OpTags, OpFolder}
 	if got := fixColumn(ops, Inactive); !slices.Equal(got, []string{OpEnable, OpEnableAt, OpStage, OpTags, OpFolder}) {
 		t.Errorf("inactive %v", got)
@@ -127,6 +129,7 @@ func TestKeyHelpText(t *testing.T) {
 
 // The launch page's numbered columns are focus keys (06 §2.3, 06 §3.5).
 func TestHomeFocusKeyHelp(t *testing.T) {
+	t.Parallel()
 	if !slices.ContainsFunc(KeyHelp("home", false), func(r KeyRow) bool { return r.Keys == "1–3" }) {
 		t.Fatal("home help does not list its three focus keys")
 	}

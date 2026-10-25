@@ -56,6 +56,7 @@ func stagedNames(t *testing.T, e *testkit.Env) string {
 
 // 06 §11 T9: 20 mods into staging, then all back: every mod returns to its position.
 func TestStageRestoreAllKeepsPositions(t *testing.T) {
+	t.Parallel()
 	e := stageEnv(t)
 	before := names(t, e)
 	// 20 mods, in an order unrelated to their positions, with runs of neighbours.
@@ -87,6 +88,7 @@ func TestStageRestoreAllKeepsPositions(t *testing.T) {
 
 // One mod back at a time follows its anchor, also when the list changed meanwhile.
 func TestStageRestoreOneFollowsAnchor(t *testing.T) {
+	t.Parallel()
 	e := stageEnv(t)
 	e.MustRun("stage", "add", ref(t, e, "M10"), ref(t, e, "M11")) // M11's anchor is M10, also staged
 	e.MustRun("move", ref(t, e, "M09"), "--to", "2")              // M10's anchor moves to the top
@@ -127,6 +129,7 @@ func TestStageRestoreOneFollowsAnchor(t *testing.T) {
 
 // Random batches in random order, then restore all: the list is exactly as before.
 func TestStageRestoreAllRandomBatches(t *testing.T) {
+	t.Parallel()
 	e := stageEnv(t)
 	before := names(t, e)
 	for seed := int64(1); seed <= 12; seed++ {

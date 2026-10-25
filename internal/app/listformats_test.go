@@ -21,6 +21,7 @@ func parse(t *testing.T, s string) *app.ImportedList {
 
 // X1: RimSort's XML export, its JSON, clipboard text and Rentry markdown.
 func TestParseRimSortFormats(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct {
 		in     string
 		format string
@@ -51,6 +52,7 @@ A [tester.a_steam][https://steamcommunity.com/sharedfiles/filedetails/?id=1001]`
 // X3: RimWorld's .rml and RimCrow's ModList.xml, JSON and share code; the writers round-trip;
 // a damaged share code is refused.
 func TestRimCrowAndRMLFormats(t *testing.T) {
+	t.Parallel()
 	tokens := []string{"brrainz.harmony", "ludeon.rimworld", "tester.a"}
 	ws := map[string]string{"brrainz.harmony": "2009463077", "tester.a": "1001"}
 	names := map[string]string{"brrainz.harmony": "Harmony", "ludeon.rimworld": "Core", "tester.a": "A & <B>"}
@@ -88,6 +90,7 @@ func TestRimCrowAndRMLFormats(t *testing.T) {
 // X2: export in every format and import it back: the same list. A list of workshop IDs
 // resolves against installed mods.
 func TestExportImportRoundTrip(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
@@ -119,6 +122,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 // with that content where the packageId alone would pick another, and says which mods it
 // only has in another version.
 func TestArchoListPrefersSameContent(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	local := testkit.Sample("tester.a", "A local")
 	local.Files = map[string]string{"Defs/Local.xml": "<Defs><ThingDef><defName>L</defName></ThingDef></Defs>"}

@@ -45,6 +45,7 @@ const pawn2 = "Exception ticking Pawn2: System.ArgumentOutOfRangeException: Inde
 // that are new or grew after it; a restarted game makes the cursor stale and the old run is
 // then Player-prev.log.
 func TestLogSince(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.MustRun("analyze")

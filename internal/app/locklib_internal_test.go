@@ -9,6 +9,7 @@ import (
 // Moving a locked copy to another volume (04 §7): copy everything (.git and the origin
 // marker included), check it, then send the original to the recycle bin.
 func TestCopyMove(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	from := filepath.Join(root, "Mods", "5100_local")
 	for p, c := range map[string]string{"About/About.xml": "<ModMetaData/>", ".rimarcho/origin.json": "{}", ".git/HEAD": "ref", "Defs/a.xml": "<Defs/>"} {

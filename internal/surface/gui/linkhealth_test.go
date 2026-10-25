@@ -12,6 +12,7 @@ import (
 )
 
 func TestNeedsLinkHealthRefreshAndConfirmedSnapshot(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	target := filepath.Join(e.Root, "temporary-mod")
 	e.MkdirAll(target)

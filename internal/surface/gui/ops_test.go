@@ -14,6 +14,7 @@ import (
 // page runs it: as one of the editor's verbs (main.js rowOp), one of Mod 库存's own cases
 // (library.js run), or through LibDo.
 func TestOpsRunnable(t *testing.T) {
+	t.Parallel()
 	read := func(p string) string {
 		b, err := fs.ReadFile(assets, p)
 		if err != nil {
@@ -62,6 +63,7 @@ func TestOpsRunnable(t *testing.T) {
 
 // Player-invoked forms are pages; irreversible list deletion still confirms (06 §3.1, 06 §6).
 func TestFormRoutesRunnable(t *testing.T) {
+	t.Parallel()
 	read := func(p string) string {
 		b, err := fs.ReadFile(assets, "assets/js/"+p+".js")
 		if err != nil {

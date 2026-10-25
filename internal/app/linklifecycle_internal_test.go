@@ -11,6 +11,7 @@ import (
 )
 
 func TestLinkLifecycleRacePreflight(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	a, err := Open(filepath.Join(root, "data"))
 	if err != nil {

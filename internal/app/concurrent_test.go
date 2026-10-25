@@ -11,6 +11,7 @@ import (
 // sees the other's edit at its next look, and an edit made on a stale view does not
 // overwrite the other's: both edits are in the workspace and in the undo history.
 func TestTwoProcessesShareTheWorkspace(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	other, err := app.Open(e.Home)

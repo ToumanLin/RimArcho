@@ -13,7 +13,7 @@ import (
 
 func endedTask(t *testing.T, api *API, kind string) view.TaskRow {
 	t.Helper()
-	for i := 0; i < 400; i++ {
+	for i := 0; i < 2000; i++ {
 		for _, r := range api.Tasks().Rows {
 			if r.Kind == kind && r.Group != "run" && r.Group != "queue" {
 				return r
@@ -28,6 +28,7 @@ func endedTask(t *testing.T, api *API, kind string) view.TaskRow {
 // Mod 库's actions on folders are background tasks (06 §2.16): queued, one item at a time,
 // one failure does not stop the rest, every item keeps its result.
 func TestLibraryActionIsATask(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	// neither copy is hidden: unhide fails on each, and says why
 	text, err := api.LibraryDo(view.LibUnhide, []string{"pkg:tester.b", "no.such.mod"})
@@ -52,7 +53,7 @@ func TestLibraryActionIsATask(t *testing.T) {
 	if n := len(api.Tasks().Rows); n != 2 {
 		t.Fatalf("%d tasks after a retry of one item", n)
 	}
-	for i := 0; i < 400; i++ {
+	for i := 0; i < 2000; i++ {
 		if p := api.Tasks(); p.Running+p.Queued == 0 {
 			break
 		}
@@ -82,6 +83,7 @@ func TestLibraryActionIsATask(t *testing.T) {
 
 // The window's own jobs are recorded too: a scan that cannot start is a failed task.
 func TestScanIsATask(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	api.Exe = t.TempDir() + "/none.exe"
 	api.Scan()
@@ -103,6 +105,7 @@ func hasAct(r view.TaskRow, id string) bool {
 // 移到回收站 runs as one batch (06 §2.16): every item checked, the folders moved together,
 // one failure kept on its item, and the library rescanned once at the end.
 func TestTrashBatch(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	var mu sync.Mutex
 	var moved []string

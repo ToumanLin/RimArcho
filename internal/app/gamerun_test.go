@@ -11,6 +11,7 @@ import (
 )
 
 func TestSaveDataArg(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ in, want string }{
 		{`"D:\Games\RimWorld\RimWorldWin64.exe"`, ``},
 		{`RimWorldWin64.exe -savedatafolder=D:\packs\a\userdata -popupwindow`, `D:\packs\a\userdata`},
@@ -26,6 +27,7 @@ func TestSaveDataArg(t *testing.T) {
 // A running game is the environment's list or a pack (08 §5.3): by its -savedatafolder,
 // else by the launch records.
 func TestWhatRuns(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	a := e.App

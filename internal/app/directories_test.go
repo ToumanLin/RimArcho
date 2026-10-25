@@ -30,6 +30,7 @@ func directory(t *testing.T, a *app.App, id string) app.ManagedDirectory {
 }
 
 func TestManagedDirectoriesReadOnlyAndStartup(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	for _, id := range []string{"lock", "packs", "monitor", "steamcmd-tool"} {
 		d := directory(t, e.App, id)
@@ -72,6 +73,7 @@ func TestManagedDirectoriesReadOnlyAndStartup(t *testing.T) {
 }
 
 func TestSetDirectoryRetainsIdentityAndPending(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("5100", testkit.Sample("tester.directory", "Directory"))
 	e.AddEnv(false)
@@ -119,6 +121,7 @@ func TestSetDirectoryRetainsIdentityAndPending(t *testing.T) {
 }
 
 func TestSetGameDirectoryRetainsSources(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Local"), testkit.Sample("tester.localdirectory", "Local Directory"))
 	e.AddEnv(false)
@@ -152,6 +155,7 @@ func TestSetGameDirectoryRetainsSources(t *testing.T) {
 }
 
 func TestLockDirectoryRelocationAndLinks(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("5100", testkit.Sample("tester.lockdirectory", "Lock Directory"))
 	e.AddEnv(false)
@@ -215,6 +219,7 @@ func TestLockDirectoryRelocationAndLinks(t *testing.T) {
 // which refuses a whole source folder), RimArcho's links in the game's Mods/ made again at
 // the new place. A link of the player's that points outside stops the copy, untouched.
 func TestMoveDirectoryAcrossDrives(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Local"), testkit.Sample("tester.localacross", "Local Across"))
 	e.AddWorkshop("5100", testkit.Sample("tester.acrossdrives", "Across Drives"))
@@ -298,6 +303,7 @@ func TestMoveDirectoryAcrossDrives(t *testing.T) {
 }
 
 func TestMoveDirectoryAndErrors(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.App.GameProbe = func(string) *app.GameRun { return nil }
@@ -344,6 +350,7 @@ func TestMoveDirectoryAndErrors(t *testing.T) {
 }
 
 func TestMissingMonitorIsNotRecreated(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	scanNow(t, e)
@@ -378,6 +385,7 @@ func TestMissingMonitorIsNotRecreated(t *testing.T) {
 }
 
 func TestManagedPackAndSteamCMDDirectories(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	scanNow(t, e)

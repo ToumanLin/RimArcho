@@ -15,6 +15,7 @@ import (
 // 06 §9.1: while the game runs the status line says so and its errors lead their section; when it
 // exits both go.
 func TestLiveGame(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	running := true
@@ -152,6 +153,7 @@ func TestHistoryArea(t *testing.T) {
 // 08 §1: while another environment's game runs, the top bar shows why launching is off
 // instead of the L key.
 func TestTopBarLaunchBlocked(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	m := direct(t, e, 160, 40)
 	if bar := ansi.Strip(m.topBar()); !strings.Contains(bar, "L "+T("launch")) {
@@ -167,6 +169,7 @@ func TestTopBarLaunchBlocked(t *testing.T) {
 // G17 in the TUI: with no game running the status line says nothing about it, unless a new
 // Player.log waits to be analysed; then it says so and which key opens 能不能跑.
 func TestStatusLineAfterGame(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	m := direct(t, e, 160, 40)
 	m.live = &view.Live{}

@@ -29,6 +29,7 @@ func launches(t *testing.T, e *testkit.Env) []*store.LaunchRecord {
 // J11: a plan's launch records the plan, the list's fingerprint and the version played; a
 // pack's launch has no plan and the pack list's fingerprint (08 §1).
 func TestLaunchRecordCarriesPlan(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("enable", "pkg:tester.b")
@@ -85,6 +86,7 @@ func newPlan(t *testing.T, e *testkit.Env, name string) {
 // written, and is stale when that launch is another plan's (B9), a pack's or another
 // environment's, or when the plan changed since (B10, current again once changed back).
 func TestLogBelongsToLaunch(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture() // plan:default launched 30 minutes before the log
 	r := logRun(t, e)
@@ -163,6 +165,7 @@ func TestLogBelongsToLaunch(t *testing.T) {
 // B11 and "来源不明": without a launch record the log belongs to the plan last written to
 // the game before it; with neither it is of unknown source, stale, and the header says so.
 func TestLogWriteRecordAndUnknown(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.App.Store.DB.Exec(`DELETE FROM launch`)
@@ -205,6 +208,7 @@ func TestLogWriteRecordAndUnknown(t *testing.T) {
 // enabled sets and back does not run the analysis again; the per-plan rows read stored
 // results only.
 func TestAnalysisPerPlan(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	runs := 0
@@ -255,6 +259,7 @@ func TestAnalysisPerPlan(t *testing.T) {
 // 08 §1, §4: the refusal and archo status name the plan running, from the launch records;
 // a game started elsewhere plays the plan last written to the game.
 func TestRunningGameNamesThePlan(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("env", "set", "main", "--launch", "direct")
@@ -282,6 +287,7 @@ func TestRunningGameNamesThePlan(t *testing.T) {
 // J13: after the game exits, a Player.log newer than the last launch and the last log the
 // player looked at shows "analyse this run's log" (08 §2), until the log is looked at.
 func TestNewLogHint(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	st, err := e.App.Loadout()

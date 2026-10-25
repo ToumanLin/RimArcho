@@ -17,6 +17,7 @@ import (
 // deletes only the listed program files, removes the program folder only when empty, copes
 // with non-ASCII and % & in paths, and deletes itself.
 func TestAfterExitScript(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	data := filepath.Join(root, "数据 100% & co")
 	outside := filepath.Join(root, "outside")
@@ -72,6 +73,7 @@ func TestAfterExitScript(t *testing.T) {
 // The script waits while the process runs, even with another find first on PATH (Git's
 // usr/bin): a folder is deleted only after the process has ended.
 func TestAfterExitScriptWaits(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	data := filepath.Join(root, "data")
 	if err := os.MkdirAll(data, 0o755); err != nil {

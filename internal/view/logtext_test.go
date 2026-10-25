@@ -12,6 +12,7 @@ import (
 // 06 §2.10, §7: log lines take the game's log colours; a mod's <color> is kept, adjusted
 // only for contrast; tags that are not rich text stay text.
 func TestLogText(t *testing.T) {
+	t.Parallel()
 	// the game's colours (LudeonTK.EditWindow_Log / Verse.LogMessage.Color)
 	if view.GameLogColors[view.LevelError] != "#ff6666" || view.GameLogColors[view.LevelWarning] != "#ffeb04" || view.GameLogColors[view.LevelInfo] != "#ffffff" {
 		t.Fatalf("game colours %v", view.GameLogColors)

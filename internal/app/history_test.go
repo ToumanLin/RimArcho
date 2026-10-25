@@ -9,6 +9,7 @@ import (
 
 // V2 (06 §2.5): three edits; going back two steps from the history, then forward one.
 func TestHistorySteps(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	start := joined(active(t, e))

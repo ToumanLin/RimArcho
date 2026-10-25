@@ -52,6 +52,7 @@ func compactStrings(s []string) []string {
 // ui.gpu off adds the software-drawing switches; both keep the network service in the
 // browser process and one renderer (07 §8.3).
 func TestBrowserArgs(t *testing.T) {
+	t.Parallel()
 	on, off := strings.Join(BrowserArgs(true), " "), strings.Join(BrowserArgs(false), " ")
 	for _, s := range []string{on, off} {
 		if !strings.Contains(s, "NetworkServiceInProcess2") || !strings.Contains(s, "--renderer-process-limit=1") {
@@ -66,6 +67,7 @@ func TestBrowserArgs(t *testing.T) {
 // The same embedded files used by TestPageTextTranslated also contain untranslated
 // separators and template literals. Inspect the whole source, excluding comments.
 func TestWording(t *testing.T) {
+	t.Parallel()
 	commentsAndStrings := regexp.MustCompile("(?s)//[^\n]*|/\\*.*?\\*/|\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'|`(?:[^`\\\\]|\\\\.)*`")
 	err := fs.WalkDir(assets, "assets/js", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

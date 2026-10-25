@@ -14,6 +14,7 @@ import (
 )
 
 func TestPackDirSizeLinks(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	target := t.TempDir()
 	file := filepath.Join(root, "file")

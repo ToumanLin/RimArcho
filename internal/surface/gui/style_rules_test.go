@@ -16,6 +16,7 @@ var cssBorderWidth = regexp.MustCompile(`^border-(?:(?:top|bottom|left|right|blo
 var cssFontSize = regexp.MustCompile(`^(?:[\d.]+(?:px|em|rem|%|vw|vh)|(?:var|clamp|calc)\()`)
 
 func TestStyleRules(t *testing.T) {
+	t.Parallel()
 	b, err := fs.ReadFile(assets, "assets/style.css")
 	if err != nil {
 		t.Fatal(err)
@@ -173,6 +174,7 @@ func splitStyleShadows(value string) []string {
 
 // These examples guard the lint itself: compact/multiline CSS, shorthands, aliases and comments.
 func TestStyleRulesDetection(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		css  string
 		want int
@@ -200,6 +202,7 @@ func TestStyleRulesDetection(t *testing.T) {
 
 // The exception must stop at its closing marker and must not bypass other rules (06 §7.3).
 func TestStyleRulesHomeException(t *testing.T) {
+	t.Parallel()
 	const start = "/* home: special case, 06 §7.3 */"
 	const end = "/* end home */"
 	const sizes = ".hm-example { font-size: 17px; font: 700 clamp(48px, 7.6vw, 124px)/1 sans-serif; border-top: 2px solid var(--fg); border-radius: 4px; }"

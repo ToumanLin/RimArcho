@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -41,12 +42,20 @@ func fixture(t *testing.T) (*testkit.Env, *int) {
 }
 
 func start(t *testing.T, e *testkit.Env, scans *int, w, h int) *teatest.TestModel {
+	// The stand-ins below run on the TUI's goroutines and can outlive the test's last key;
+	// wait for them before the temp dir is removed (cleanups run last-registered first).
+	var running sync.WaitGroup
+	t.Cleanup(running.Wait)
 	opts := Options{App: e.App, Scan: func(string) (string, error) {
+		running.Add(1)
+		defer running.Done()
 		*scans++
 		// Stand-in for the child process: the same command, run by the test.
 		out, _ := cmds.Execute(e.App, []string{"scan"})
 		return out, nil
 	}, Analyze: func(env string, progress func(string)) error {
+		running.Add(1)
+		defer running.Done()
 		// Stand-in for the `archo analyze` child: its own connection to the same database.
 		a2, err := app.Open(e.Home)
 		if err != nil {
@@ -87,10 +96,14 @@ func keys(tm *teatest.TestModel, s ...string) {
 	}
 }
 
+// waitLimit bounds the screen waits. They return as soon as the screen matches, so the limit only
+// matters when the machine is busy running many tests in parallel.
+const waitLimit = 20 * time.Second
+
 func waitFor(t *testing.T, tm *teatest.TestModel, want string) {
 	t.Helper()
 	teatest.WaitFor(t, tm.Output(), func(b []byte) bool { return bytes.Contains(b, []byte(want)) },
-		teatest.WithDuration(5*time.Second), teatest.WithCheckInterval(20*time.Millisecond))
+		teatest.WithDuration(waitLimit), teatest.WithCheckInterval(20*time.Millisecond))
 }
 
 // waitAll waits for one frame that shows every string.
@@ -103,13 +116,13 @@ func waitAll(t *testing.T, tm *teatest.TestModel, want ...string) {
 			}
 		}
 		return true
-	}, teatest.WithDuration(5*time.Second), teatest.WithCheckInterval(20*time.Millisecond))
+	}, teatest.WithDuration(waitLimit), teatest.WithCheckInterval(20*time.Millisecond))
 }
 
 func finish(t *testing.T, tm *teatest.TestModel) *model {
 	t.Helper()
 	keys(tm, "q")
-	tm.WaitFinished(t, teatest.WithFinalTimeout(5*time.Second))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(waitLimit))
 	return tm.FinalModel(t).(*model)
 }
 
@@ -165,6 +178,7 @@ func press(m *model, k string) {
 }
 
 func TestEnableMoveSortSaveUndo(t *testing.T) {
+	t.Parallel()
 	e, scans := fixture(t)
 	tm := start(t, e, scans, 160, 40)
 	waitFor(t, tm, "Enabled 3")
@@ -205,6 +219,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 }
 
 func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
+	t.Parallel()
 	e, scans := fixture(t)
 	tm := start(t, e, scans, 120, 30)
 	waitFor(t, tm, "Enabled 3")
@@ -213,7 +228,7 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	keys(tm, ":", "scan", "enter") // the command line also routes scans to the child
 	// The second scan prints the same sentence, which the renderer does not send again: wait
 	// for the child-process hook instead.
-	for deadline := time.Now().Add(5 * time.Second); *scans < 2 && time.Now().Before(deadline); {
+	for deadline := time.Now().Add(20 * time.Second); *scans < 2 && time.Now().Before(deadline); {
 		time.Sleep(20 * time.Millisecond)
 	}
 	keys(tm, ":", "list --active", "enter")
@@ -338,6 +353,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 
 // 06 §11 T9: 20 mods into staging (picked with v, one t), then T: all back in place.
 func TestStagingT9(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	active := []string{"ludeon.rimworld"}
 	for i := 1; i <= 26; i++ {
@@ -378,6 +394,7 @@ func TestStagingT9(t *testing.T) {
 // 06 §3.4: a click moves the cursor (and focus), ctrl+click picks one more, shift+click
 // picks a range; there is no drag-to-move; the wheel scrolls.
 func TestMouseClicks(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	for i := 1; i <= 5; i++ {
 		e.WriteMod(filepath.Join(e.Game, "Mods", fmt.Sprintf("N%d", i)), testkit.Sample(fmt.Sprintf("tester.n%d", i), fmt.Sprintf("N%d", i)))
@@ -441,6 +458,7 @@ func pickedNames(m *model) string {
 }
 
 func TestEnvSwitchAndInspect(t *testing.T) {
+	t.Parallel()
 	e, scans := fixture(t)
 	other := filepath.Join(e.Root, "Second", "RimWorld")
 	e.CopyTemplate("core", filepath.Join(other, "Data", "Core"))
@@ -463,6 +481,7 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 // 06 §2.14: E, then d on an environment: the dry run, enter removes it; the other one is
 // then in use.
 func TestEnvRemoveFromChooser(t *testing.T) {
+	t.Parallel()
 	e, scans := fixture(t)
 	other := filepath.Join(e.Root, "Second", "RimWorld")
 	e.CopyTemplate("core", filepath.Join(other, "Data", "Core"))
@@ -532,6 +551,7 @@ func findNeed(m *model, sub string) int {
 // requirements in words and x ignores the suggested one; a dependency that is installed but
 // not enabled is one item in "missing dependencies" that space enables.
 func TestNeedsView(t *testing.T) {
+	// Not parallel: waits a fixed time for background work, which is too short under load.
 	e, scans := fixture(t)
 	for _, p := range [][2]string{{"X", "tester.y"}, {"Y", "tester.x"}} {
 		m := testkit.Sample("tester."+strings.ToLower(p[0]), p[0])
@@ -614,6 +634,7 @@ func countedNeeds(m *model) int {
 // 06 §2.9: changes are a sentence on the status line after a scan and the c view, in
 // words; an outside change of ModsConfig.xml is an item of 需要处理 with load / ignore.
 func TestChangesView(t *testing.T) {
+	t.Parallel()
 	e, scans := fixture(t)
 	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Defs", "ThingDefs", "beta.xml"), "<Defs><ThingDef><defName>beta_Changed</defName></ThingDef></Defs>\n")
 	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Patches", "new.xml"), "<Patch/>\n")
@@ -657,6 +678,7 @@ func TestChangesView(t *testing.T) {
 // 06 §2.4, §7.3: the current log's errors are one item per mod under "last run"; a stale
 // log is one dim row that is not counted.
 func TestNeedsLogs(t *testing.T) {
+	// Not parallel: waits a fixed time for background work, which is too short under load.
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	scans := new(int)
@@ -700,6 +722,7 @@ func TestNeedsLogs(t *testing.T) {
 
 // 06 §7: every icon of both sets is one cell wide for RimArcho's width function.
 func TestIconWidths(t *testing.T) {
+	t.Parallel()
 	for name, set := range map[string]icons{"nerd": nerdIcons, "compat": compatIcons} {
 		for i, s := range []string{set.official, set.workshop, set.local, set.localCopy, set.git, set.err, set.warn, set.logErr,
 			set.unloadable, set.unsaved, set.lock, set.update, set.dep, set.staging, set.play, set.save, set.sort, set.search, set.fail,
@@ -716,6 +739,7 @@ func TestIconWidths(t *testing.T) {
 }
 
 func TestWrap(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		in   string
 		w    int
@@ -741,6 +765,7 @@ func TestWrap(t *testing.T) {
 
 // 06 §3.7 on the fixture: every field, negation, AND, the per-column query, the fallback.
 func TestColumnSearch(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	e.MustRun("tag", "add", "pkg:brrainz.harmony", "core-lib", "--mod", "pkg:tester.b")
 	e.MustRun("note", "pkg:tester.b", "check later")
@@ -817,6 +842,7 @@ func TestColumnSearch(t *testing.T) {
 // 06 §6: L loads an outside change of ModsConfig.xml into the list at once; it is one
 // step, so u brings the player's list back.
 func TestLoadExternalAtOnce(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	e.MustRun("enable", "pkg:tester.b")
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")

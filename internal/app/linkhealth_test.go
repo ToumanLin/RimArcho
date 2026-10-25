@@ -56,6 +56,7 @@ func healthByName(t *testing.T, e *testkit.Env) map[string]*app.GameLink {
 }
 
 func TestLinkHealthClassificationFreshAndRepair(t *testing.T) {
+	t.Parallel()
 	e, target, id := linkHealthEnv(t)
 	mods := filepath.Join(e.Game, "Mods")
 	known := filepath.Join(mods, "_Archo_extra_Known")
@@ -141,6 +142,7 @@ func TestLinkHealthClassificationFreshAndRepair(t *testing.T) {
 }
 
 func TestLinkHealthForeignAndHealthyEnvStay(t *testing.T) {
+	t.Parallel()
 	e, target, id := linkHealthEnv(t)
 	mods := filepath.Join(e.Game, "Mods")
 	wrong := filepath.Join(e.Root, "wrong")
@@ -169,6 +171,7 @@ func TestLinkHealthForeignAndHealthyEnvStay(t *testing.T) {
 }
 
 func TestLinkHealthRepairRaceAndRunning(t *testing.T) {
+	t.Parallel()
 	for _, change := range []string{"retarget", "directory", "parent", "restored", "running"} {
 		t.Run(change, func(t *testing.T) {
 			e, target, id := linkHealthEnv(t)
@@ -223,6 +226,7 @@ func TestLinkHealthRepairRaceAndRunning(t *testing.T) {
 }
 
 func TestLinkHealthLaunchAndTestRunPreflight(t *testing.T) {
+	t.Parallel()
 	e, _, _ := linkHealthEnv(t)
 	e.MustRun("pack", "build", "healthpack")
 	link := filepath.Join(e.Game, "Mods", "_Archo_old_missing")
@@ -283,6 +287,7 @@ func TestLinkHealthLaunchAndTestRunPreflight(t *testing.T) {
 }
 
 func TestLinkHealthOtherGamesDoNotBlockAndRootsDeduplicate(t *testing.T) {
+	t.Parallel()
 	e, _, _ := linkHealthEnv(t)
 	other := secondGame(e, "Other")
 	e.MustRun("env", "add", "other", "--game", other)
@@ -307,6 +312,7 @@ func TestLinkHealthOtherGamesDoNotBlockAndRootsDeduplicate(t *testing.T) {
 }
 
 func TestStaleIDLinkKnownLiveTarget(t *testing.T) {
+	t.Parallel()
 	e, target, id := linkHealthEnv(t)
 	name := "_Archo_env_deleted-instance"
 	path := filepath.Join(e.Game, "Mods", name)
@@ -354,6 +360,7 @@ func TestStaleIDLinkKnownLiveTarget(t *testing.T) {
 }
 
 func TestStaleIDLinkUnknownTarget(t *testing.T) {
+	t.Parallel()
 	e, _, _ := linkHealthEnv(t)
 	target := filepath.Join(e.Root, "unknown-target")
 	e.MkdirAll(target)

@@ -208,6 +208,7 @@ func TestFindAndAddGames(t *testing.T) {
 // The home page's large card is what is applied: a pack applied on the home page while the
 // same plan is current, else the current plan; another environment's rows never are.
 func TestPickFeatured(t *testing.T) {
+	t.Parallel()
 	h := &view.Home{Rows: []view.HomeRow{
 		{Kind: view.RowPlan, Name: "Main", Current: true, EnvName: "main"},
 		{Kind: view.RowPack, Name: "Old", EnvName: "main"},

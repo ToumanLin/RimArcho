@@ -14,6 +14,7 @@ import (
 
 // U10 / 04 §7.2, and the inspector's test_copy_local_creates_clean_independent_git_baseline.
 func TestCopyLocal(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	ws := e.AddWorkshop("123456", testkit.Sample("example.mod", "Example Mod"))
 	e.WriteFile(filepath.Join(ws, ".gitignore"), "ignored.txt\n")
@@ -110,6 +111,7 @@ func rimcrowDB(t *testing.T, path string, stmts ...string) {
 // U11 / 04 §8.2: path first, packageId second, ambiguous and missing reported, conflicts
 // kept, rules mapped, idempotent, and the RimCrow files are never written.
 func TestImportRimCrow(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	alpha := e.AddWorkshop("3000000002", testkit.Sample("tester.alpha", "Alpha"))
 	e.WriteMod(filepath.Join(e.Game, "Mods", "AlphaFork"), testkit.Sample("tester.alpha", "Alpha Fork")) // second lineage, same package
@@ -190,6 +192,7 @@ func TestImportRimCrow(t *testing.T) {
 // 05 §4.2: loadout export / import round-trips through a text list and a ModsConfig.xml,
 // and reads a save's mod list; import is one undoable step and never writes the game file.
 func TestLoadoutExchange(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("3000000002", testkit.Sample("tester.alpha", "Alpha"))
 	e.AddWorkshop("3000000003", testkit.Sample("tester.beta", "Beta"))
@@ -245,6 +248,7 @@ func TestLoadoutExchange(t *testing.T) {
 // 03 §3: the environment's analysis and one for the log's game version coexist;
 // alternating problems and log does not re-run either.
 func TestAnalysisPerGameVersion(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	log := e.HarmonyLogFixture()
 	os.WriteFile(filepath.Join(e.UserData, "Player.log"), []byte(strings.Replace(log, "RimWorld 1.6.4633 rev1261", "RimWorld 1.5.4409 rev1118", 1)), 0o644)

@@ -13,6 +13,7 @@ import (
 
 // The sidebar's badge is the board's needs count, and every page has its breadcrumb (G11).
 func TestShellAndHome(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	b := api.Board()
 	sh := api.Shell()
@@ -114,6 +115,7 @@ func TestGuide(t *testing.T) {
 // Plans in the window (06 §2.1, §2.5): each plan is a sidebar entry with its breadcrumb;
 // opening one switches the board; new, import-as-plan, rename and delete go through view.
 func TestPlansInWindow(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	b := api.Board()
 	enabled := len(b.Cols[view.Active])

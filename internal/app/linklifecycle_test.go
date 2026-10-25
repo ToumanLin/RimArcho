@@ -32,6 +32,7 @@ func incomingFixture(t *testing.T) (*testkit.Env, string, string, []string) {
 }
 
 func TestIncomingLinksLockMove(t *testing.T) {
+	t.Parallel()
 	for _, cross := range []bool{false, true} {
 		name := "rename"
 		if cross {
@@ -119,6 +120,7 @@ func TestIncomingLinksLockMove(t *testing.T) {
 }
 
 func TestIncomingTrashAndForeignRefusal(t *testing.T) {
+	t.Parallel()
 	e, target, id, links := incomingFixture(t)
 	foreign := filepath.Join(filepath.Dir(links[1]), "PlayerManager")
 	e.Junction(foreign, target)
@@ -155,6 +157,7 @@ func TestIncomingTrashAndForeignRefusal(t *testing.T) {
 }
 
 func TestIncomingRunningAndRollback(t *testing.T) {
+	t.Parallel()
 	e, target, id, links := incomingFixture(t)
 	e.App.GameProbe = func(game string) *app.GameRun {
 		if strings.Contains(game, "IncomingTwo") {
@@ -184,6 +187,7 @@ func TestIncomingRunningAndRollback(t *testing.T) {
 }
 
 func TestIncomingPackRemoveAcrossGames(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("pack", "build", "incoming-pack")
@@ -239,6 +243,7 @@ func TestIncomingPackRemoveAcrossGames(t *testing.T) {
 }
 
 func TestLinkLedgerRecoveryConfirmedOnly(t *testing.T) {
+	t.Parallel()
 	for _, phase := range []string{"intent", "detached", "records-updated"} {
 		t.Run(phase, func(t *testing.T) {
 			e, target, id := linkHealthEnv(t)
@@ -313,6 +318,7 @@ func TestLinkLedgerRecoveryConfirmedOnly(t *testing.T) {
 }
 
 func TestLinksCheckOmitsRemoved(t *testing.T) {
+	t.Parallel()
 	e, _, _ := linkHealthEnv(t)
 	out := e.MustRun("links", "check")
 	if strings.Contains(out, "removed:") {
@@ -327,6 +333,7 @@ func TestLinksCheckOmitsRemoved(t *testing.T) {
 // A worker can stop after removing just one item. Recover each journal row in
 // its own direction while requiring confirmation of the whole batch.
 func TestLinkRecoveryMixedBatch(t *testing.T) {
+	t.Parallel()
 	e, target, id := linkHealthEnv(t)
 	mods := filepath.Join(e.Game, "Mods")
 	removed := filepath.Join(mods, "_Archo_env_"+id)
@@ -366,6 +373,7 @@ func TestLinkRecoveryMixedBatch(t *testing.T) {
 }
 
 func TestLinkRecoveryBetweenMoveAndRecords(t *testing.T) {
+	t.Parallel()
 	e, from, id, links := incomingFixture(t)
 	to := filepath.Join(e.App.LockDir(), "Lockable Copy")
 	e.MkdirAll(filepath.Dir(to))
@@ -424,6 +432,7 @@ func TestLinkRecoveryBetweenMoveAndRecords(t *testing.T) {
 }
 
 func TestWorkshopUnsubscribeIncomingLinks(t *testing.T) {
+	t.Parallel()
 	for _, partial := range []bool{false, true} {
 		name := "success"
 		if partial {
@@ -519,6 +528,7 @@ func testWorkshopUnsubscribeIncomingLinks(t *testing.T, partial bool) {
 }
 
 func TestIncomingStaleIDLinkMove(t *testing.T) {
+	t.Parallel()
 	e, from, id, links := incomingFixture(t)
 	old := links[0]
 	if err := source.RemoveLink(old); err != nil {

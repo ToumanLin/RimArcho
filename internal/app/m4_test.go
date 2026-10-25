@@ -17,6 +17,7 @@ import (
 // B5 / test_mod_selector_and_instance_active_state_are_distinct: a packageId selects every
 // instance, and each one reports its own enabled state.
 func TestSelectorVersusActiveState(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.AddWorkshop("4000000001", testkit.Mod{PackageID: "tester.moda", Name: "Mod A (workshop)", Author: "Tester"})
@@ -42,6 +43,7 @@ func TestSelectorVersusActiveState(t *testing.T) {
 
 // B5 / test_active_rg_excludes_languages_and_enriches_matches.
 func TestFilesSearchLanguages(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Needle"), testkit.Mod{PackageID: "example.mod", Name: "Example Mod", Files: map[string]string{
 		"Defs/Thing.xml":             "<defName>Needle</defName>\n",
@@ -84,6 +86,7 @@ func (f *fakeILSpy) run(_ context.Context, dll, outDir, typ string, refs []strin
 // keyed by DLL hash, survives a deleted cache directory (decompiled again) and is
 // invalidated by a changed DLL.
 func TestSourceCache(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	f := &fakeILSpy{}
@@ -127,6 +130,7 @@ func TestSourceCache(t *testing.T) {
 
 // Without ilspycmd the text says how to install it; nothing is installed.
 func TestSourceWithoutILSpy(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.App.Decompile = func(context.Context, string, string, string, []string) error { return app.ErrNoILSpy }
@@ -157,6 +161,7 @@ func ref(t *testing.T, e *testkit.Env, name string) string {
 // 03 §4.5/§7.2: skip-prefix is info until the newest log's stack passes through
 // the method; the newest Player.log joins the problems without --select.
 func TestSkipPrefixEscalation(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	sev := func() (string, string) {
@@ -193,6 +198,7 @@ func TestSkipPrefixEscalation(t *testing.T) {
 
 // 03 §6.4: a log from another game version is attributed against that version.
 func TestLogOwnVersion(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	log := e.HarmonyLogFixture()
 	p := filepath.Join(e.UserData, "Player.log")
@@ -209,6 +215,7 @@ func TestLogOwnVersion(t *testing.T) {
 // 03 §5.4: searching every enabled mod prints an estimate and needs --yes;
 // --implicated covers the newest log's candidates.
 func TestSourceSearchScope(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	f := &fakeILSpy{}

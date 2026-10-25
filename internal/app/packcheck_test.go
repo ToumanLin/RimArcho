@@ -23,6 +23,7 @@ func checkItem(c *app.PackCheck, part, level string) *app.PackCheckItem {
 }
 
 func TestCheckPack(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("pack", "build", "checked")
@@ -125,6 +126,7 @@ func TestCheckPack(t *testing.T) {
 }
 
 func TestCheckPackInstalledDLCAndList(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	e.WriteMod(filepath.Join(e.Game, "Data", "Biotech"), testkit.Sample("ludeon.rimworld.biotech", "Biotech"))
 	scanNow(t, e)

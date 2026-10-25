@@ -13,6 +13,7 @@ import (
 // H8: the recycle bin's entry refuses any path outside the allow-list of 08 §7, whoever
 // calls it; paths on the list reach the recycle bin.
 func TestTrashAllowList(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	scanNow(t, e)
 	var trashed []string

@@ -13,6 +13,7 @@ import (
 )
 
 func TestPlanSourcesIncludesImportedHistoryWithoutSwitching(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	id := api.Shell().Plan.ID
 	before, _ := os.ReadFile(e.ModsConfig)
@@ -48,6 +49,7 @@ func TestPlanSourcesIncludesImportedHistoryWithoutSwitching(t *testing.T) {
 }
 
 func TestNewListImportUsesOnlyItsPreview(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	id := api.Shell().Plan.ID
 	before, _ := os.ReadFile(e.ModsConfig)
@@ -95,6 +97,7 @@ func TestNewListImportUsesOnlyItsPreview(t *testing.T) {
 // Management targets the selected list; preview and cancelled/failed creation do not
 // switch the editor. Versions/saves and copied version constraints survive (06 §2.17).
 func TestPlanForms(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	original := api.Shell().Plan.ID
 	e.MustRun("save")
@@ -167,6 +170,7 @@ func TestPlanForms(t *testing.T) {
 // Checkout is an immediate undoable edit through the same API used by enter and the
 // history's action; it never writes ModsConfig.xml (06 §2.5, 06 §6).
 func TestHistoryCheckoutUndo(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	e.MustRun("save")
 	if _, err := api.ImportPreview(view.ImportText, "tester.b"); err != nil {
@@ -210,6 +214,7 @@ func TestHistoryCheckoutUndo(t *testing.T) {
 }
 
 func TestImportCollectionForm(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()

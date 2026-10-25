@@ -8,6 +8,7 @@ import (
 )
 
 func TestPalScore(t *testing.T) {
+	t.Parallel()
 	it := func(name, alias, desc string) palItem { return palItem{name: name, alias: alias, desc: desc} }
 	for _, c := range []struct {
 		q    string

@@ -15,6 +15,7 @@ type anonymousProc struct{}
 func (anonymousProc) Wait() error { return nil }
 
 func TestGuideAnonymousAccount(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteFile(filepath.Join(e.App.SteamCMDDir(), "steamcmd.exe"), "fake")
 	e.App.SteamCMDNoPath = true

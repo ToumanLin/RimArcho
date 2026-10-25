@@ -18,6 +18,7 @@ import (
 )
 
 func TestSettingCommandsAreTasks(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		argv        []string
 		kind, state string
@@ -76,6 +77,7 @@ func waitSettingEnd(t *testing.T, events <-chan string, id string) {
 // The guide returns while downloading, progress appears in the record, and settings
 // can still be read. SteamCMD and todds share the same queue entry points (06 §2.16).
 func TestToolDownloadsAreTasks(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	var b bytes.Buffer
 	w := zip.NewWriter(&b)
@@ -137,6 +139,7 @@ func TestToolDownloadsAreTasks(t *testing.T) {
 }
 
 func TestSettingsConfirmationsAndRefresh(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	p := filepath.Join(e.App.Home, "cache", "previews", "one.png")
 	e.WriteFile(p, "cached image")
@@ -177,6 +180,7 @@ func TestSettingsConfirmationsAndRefresh(t *testing.T) {
 }
 
 func TestCommunityUpdateTaskRefresh(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	files := []string{
 		`{"timestamp":1789239946,"rules":{"tester.b":{"loadAfter":{"tester.a":{"name":["A"]}}}}}`,
@@ -212,6 +216,7 @@ func TestCommunityUpdateTaskRefresh(t *testing.T) {
 }
 
 func TestSettingTaskRetryAfterReopen(t *testing.T) {
+	t.Parallel()
 	_, api, events := fixture(t)
 	argv := []string{"cache", "clear", "invalid"}
 	if _, err := api.ApplySetting(argv, ""); err != nil {

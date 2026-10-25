@@ -9,6 +9,7 @@ import (
 )
 
 func TestDirectoryAPIRecoversMovedWorkshop(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	dirs, err := api.Directories()
 	if err != nil {

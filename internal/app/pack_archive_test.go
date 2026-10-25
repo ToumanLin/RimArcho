@@ -141,6 +141,7 @@ func assertNoPackTemp(t *testing.T, packsDir, name string) {
 }
 
 func TestPackArchiveRoundTrip(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("enable", "pkg:tester.versions")
@@ -248,6 +249,7 @@ func TestPackArchiveRoundTrip(t *testing.T) {
 }
 
 func TestPackImportFormat1(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	p := app.Pack{Format: 1, Name: "legacy", Entries: []app.PackEntry{{PackageID: "test.legacy", Name: "Legacy Mod", Folder: "legacy"}}}
 	file := filepath.Join(e.Root, "legacy.archopack")
@@ -299,6 +301,7 @@ func TestPackImportFormat1(t *testing.T) {
 }
 
 func TestPackImportRejectsGameFiles(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	for _, zipFormat := range []bool{false, true} {
 		for _, tc := range []struct {
@@ -352,6 +355,7 @@ func TestPackImportRejectsGameFiles(t *testing.T) {
 }
 
 func TestPackImportVerifies(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("pack", "build", "verified")
@@ -453,6 +457,7 @@ func TestPackImportVerifies(t *testing.T) {
 }
 
 func TestPackArchivePreflight(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	p := app.Pack{Format: 1, Name: "preflight", Entries: []app.PackEntry{{PackageID: "test.preflight", Name: "Preflight Mod", Folder: "demo", Bytes: 123}}}
 	file := filepath.Join(e.Root, "preflight.archopack")
@@ -510,6 +515,7 @@ func TestPackArchivePreflight(t *testing.T) {
 }
 
 func TestPackArchiveHeaderLimits(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	p := app.Pack{Format: 2, Name: "limits", Entries: []app.PackEntry{{PackageID: "test.limits", Name: "Limits Mod", Folder: "demo"}}}
 	b, err := json.Marshal(p)

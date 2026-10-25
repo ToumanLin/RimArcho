@@ -28,6 +28,7 @@ func cursorOn(t *testing.T, m *model, name string) {
 // line says when it has no Workshop ID), C the 变化 page narrowed to its Lineage; the
 // same in Mod 库存.
 func TestShortcutsFolderWorkshopChanges(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	var dir, url string

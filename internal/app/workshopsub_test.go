@@ -43,6 +43,7 @@ func steamDLL(e *testkit.Env) {
 // folder outside the game; unsubscribing is refused while the game runs, and only names the
 // plans that use the mod; without Steam the error carries the Workshop pages.
 func TestWorkshopSubscribe(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.AddWorkshop("7100", testkit.Sample("tester.keep", "Keep"))
 	e.AddWorkshop("7200", testkit.Sample("tester.drop", "Drop"))
@@ -122,6 +123,7 @@ func TestWorkshopSubscribe(t *testing.T) {
 }
 
 func TestSteamParse(t *testing.T) {
+	t.Parallel()
 	r := steamworks.Parse("[S_API] SteamAPI_Init(): Loaded\nITEM 1 ok 5\nSTATE 2 1\nDONE state 1\n")
 	if !r.Done || len(r.Items) != 2 || r.Items[0].Result != "ok" || r.Items[0].State != 5 || r.Items[1].State != 1 {
 		t.Fatalf("%+v", r)

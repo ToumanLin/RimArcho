@@ -29,6 +29,7 @@ func packEnv(t *testing.T) *testkit.Env {
 
 // K2: a pack is not built while something needs fixing (here: a list entry not installed).
 func TestPackBuildBlocked(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	out, code := e.Run("pack", "build", "first")
 	if code == 0 || !strings.Contains(out, "not installed: pkg:gone.mod") {
@@ -43,6 +44,7 @@ func TestPackBuildBlocked(t *testing.T) {
 // launch links the copies, writes the pack's own list and leaves the environment's alone; a
 // scan ignores the pack's links; saving the normal list removes them.
 func TestPackBuildAndLaunch(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("enable", "pkg:tester.versions")
@@ -133,6 +135,7 @@ func TestPackBuildAndLaunch(t *testing.T) {
 // K5 and export/import: a pack's list (a RimArcho list) compared with the installed mods; a
 // pack exported, removed and unpacked again.
 func TestPackExportImport(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("pack", "build", "first")

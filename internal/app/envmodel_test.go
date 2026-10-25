@@ -34,6 +34,7 @@ func sourcesOf(t *testing.T, e *testkit.Env) map[string]*source.Source {
 // 02 §0: a second game shares the Workshop folder: the same instances, lineages and player
 // data in both environments; Data/ and Mods/ are each game's own; plans stay per game.
 func TestEnvModelSharedWorkshop(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("5100", testkit.Sample("tester.shared", "Shared"))
 	e.AddEnv(false)
@@ -118,6 +119,7 @@ func TestEnvModelSharedWorkshop(t *testing.T) {
 // 02 §0 item 5: own saves live in <data>/userdata/<env> and the game starts with
 // -savedatafolder; shared saves are the game's default folder.
 func TestEnvModelSaves(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	g2 := secondGame(e, "Game15")
 	e.MustRun("env", "add", "main", "--game", g2, "--saves", "own", "--launch", "direct")
@@ -143,6 +145,7 @@ func TestEnvModelSaves(t *testing.T) {
 // Workshop folder replaces the first (re-bound); RimArcho's own folders stay; folders
 // must not contain each other.
 func TestFolderCommands(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("5100", testkit.Sample("tester.shared", "Shared"))
 	e.AddEnv(false)
@@ -192,6 +195,7 @@ func TestFolderCommands(t *testing.T) {
 // order, the undo stack works, a pack made before still launches and is counted as using
 // the mod, and a locked copy (whose origin.json names IDs merged away) is matched by R5.
 func TestMigrateV14App(t *testing.T) {
+	t.Parallel()
 	e, _ := pinFixture(t)
 	e.MustRun("env", "set", "main", "--launch", "direct")
 	up := refID(t, e, "Lockable", source.Workshop)
@@ -382,6 +386,7 @@ func downgradeWithTwin(t *testing.T, e *testkit.Env) map[string]string {
 // shared SteamCMD folder on env add (and, for an environment added earlier, on a scan); it
 // never moves the Steam client's Workshop folder, and a removed one stays removed.
 func TestGameWorkshopIsSteamCMD(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("5100", testkit.Sample("tester.shared", "Shared"))
 	e.AddEnv(false)
@@ -433,6 +438,7 @@ func TestGameWorkshopIsSteamCMD(t *testing.T) {
 // 06 §2.14: removing an environment is refused while its game runs; removing the current
 // one makes another current, and removing the last leaves none (the guide).
 func TestEnvRemoveCurrent(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	g2 := secondGame(e, "Game15")

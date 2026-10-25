@@ -86,6 +86,7 @@ func TestSteamConsoleHandles(t *testing.T) {
 }
 
 func TestConsoleKillAndWait(t *testing.T) {
+	t.Parallel()
 	exe := filepath.Join(os.Getenv("SystemRoot"), "System32", "cmd.exe")
 	process, err := startConsole(exe, []string{"/d", "/q", "/k"})
 	if err != nil {

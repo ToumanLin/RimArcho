@@ -14,6 +14,7 @@ import (
 
 // 06 §9.4: one new image per frame; the others follow without a new frame.
 func TestImgWriterOneNewPerFrame(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := &imgWriter{Writer: &buf}
 	var ps []placement
@@ -28,7 +29,7 @@ func TestImgWriterOneNewPerFrame(t *testing.T) {
 	if strings.Count(got, "<img") != 1 || !strings.Contains(got, "<img0>") {
 		t.Fatalf("first frame: %q", got)
 	}
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(20 * time.Second)
 	for {
 		w.mu.Lock()
 		got, n := buf.String(), len(w.prev)
@@ -55,6 +56,7 @@ func TestImgWriterOneNewPerFrame(t *testing.T) {
 // 06 §9.4: the thumbnails of ±10 rows around the cursor are made ahead; the cache keeps
 // the 64 most recently used images.
 func TestPrefetchAndLRU(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	for i := 1; i <= 30; i++ {
 		dir := filepath.Join(e.Game, "Mods", fmt.Sprintf("P%02d", i))
@@ -99,6 +101,7 @@ func TestPrefetchAndLRU(t *testing.T) {
 
 // ui.previews off: no images at all.
 func TestPreviewsOff(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	e.MustRun("config", "set", "ui.previews", "off")
 	m := direct(t, e, 160, 40)

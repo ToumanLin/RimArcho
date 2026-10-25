@@ -38,6 +38,7 @@ func (tr accountSiteTransport) RoundTrip(r *http.Request) (*http.Response, error
 }
 
 func TestLoversLabArchiveInstallUpdateWithBlockedPublicPage(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	archive := pageZip(t, "Fixture/", "<Defs><ThingDef><defName>First</defName></ThingDef></Defs>", false)
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -60,6 +60,7 @@ func fakeTestGame(t *testing.T, mode, text string) func(*exec.Cmd) error {
 }
 
 func TestAppGameHelper(t *testing.T) {
+	t.Parallel()
 	mode := os.Getenv("ARCHO_TEST_GAME")
 	if mode == "" {
 		return
@@ -85,6 +86,7 @@ func TestAppGameHelper(t *testing.T) {
 }
 
 func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
+	t.Parallel()
 	e := testRunEnv(t)
 	e.AddWorkshop("1001", testkit.Sample("test.only", "OnlyTest"))
 	e.WriteMod(filepath.Join(e.SteamCMD, "1002"), testkit.Sample("test.cmd", "CmdOnly"))
@@ -243,6 +245,7 @@ func TestTestRunGuardAndRunningGame(t *testing.T) {
 }
 
 func TestTestRunCLIOutcomes(t *testing.T) {
+	t.Parallel()
 	e := testRunEnv(t)
 	for _, tc := range []struct {
 		name, mode, log, status string
@@ -275,6 +278,7 @@ func TestTestRunCLIOutcomes(t *testing.T) {
 }
 
 func TestTestRunSettingsReport(t *testing.T) {
+	t.Parallel()
 	e := testRunEnv(t)
 	e.AddWorkshop("1001", testkit.Sample("test.settingsowner", "SettingsOwner"))
 	e.MustRun("scan")
@@ -310,6 +314,7 @@ func TestTestRunSettingsReport(t *testing.T) {
 }
 
 func TestTestRunCancelSavesReport(t *testing.T) {
+	t.Parallel()
 	e := testRunEnv(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

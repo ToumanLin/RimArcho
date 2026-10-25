@@ -11,6 +11,7 @@ import (
 )
 
 func TestSettingFilesystemPathMarkers(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	groups := append(api.Settings(), api.Environment().Groups...)
 	var values, notes int
@@ -54,6 +55,7 @@ func TestSettingFilesystemPathMarkers(t *testing.T) {
 }
 
 func TestCopyablePaths(t *testing.T) {
+	t.Parallel()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is needed for path interaction tests")
@@ -64,6 +66,7 @@ func TestCopyablePaths(t *testing.T) {
 }
 
 func TestTechnicalFileCopyTargets(t *testing.T) {
+	// Not parallel: expects the background analysis to have finished, which can lag under load.
 	e, api, _ := fixture(t)
 	mod := testkit.Sample("tester.paths", "Paths")
 	mod.Files = map[string]string{"Defs/path test.xml": "<Defs><ThingDef><defName>PathTest</defName></ThingDef></Defs>"}

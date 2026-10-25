@@ -23,6 +23,7 @@ func readyPackEnv(t *testing.T) *app.App {
 // The build reports its steps in order, the copy's bytes add up to what was measured, and
 // nothing of the build folder is left.
 func TestPackBuildProgress(t *testing.T) {
+	t.Parallel()
 	a := readyPackEnv(t)
 	dry, err := a.BuildPack("first", true)
 	if err != nil || dry.Need == 0 || dry.Free == 0 {
@@ -71,6 +72,7 @@ func TestPackBuildProgress(t *testing.T) {
 
 // Asked to stop, a build removes what it copied; with too little space it does not start.
 func TestPackBuildStopAndSpace(t *testing.T) {
+	t.Parallel()
 	a := readyPackEnv(t)
 	tmp := filepath.Join(a.PacksDir(), "first"+app.TmpSuffix)
 	_, err := a.BuildPackWith("first", app.BuildOptions{Progress: func(p app.BuildProgress) {
@@ -113,6 +115,7 @@ func writeBuild(t *testing.T, tmp string, p app.BuildProgress) {
 // A build cut short (its process ended) is reported, can be removed or built again; a
 // running one (fresh heartbeat) blocks another build of the name and its removal.
 func TestPackUnfinished(t *testing.T) {
+	t.Parallel()
 	a := readyPackEnv(t)
 	dir := a.PacksDir()
 	stale := filepath.Join(dir, "old"+app.TmpSuffix)

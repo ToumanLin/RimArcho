@@ -21,6 +21,7 @@ import (
 )
 
 func TestRemoveSteamCMDProtectsContent(t *testing.T) {
+	t.Parallel()
 	for _, kind := range []string{"workshop", "game", "shared-source", "env-source", "lock"} {
 		t.Run(kind, func(t *testing.T) {
 			e := testkit.New(t)
@@ -118,6 +119,7 @@ func TestRemoveDepStaysInsideManagedDirectory(t *testing.T) {
 }
 
 func TestInstallDepSteamCMDOwnDirectoryAndRemove(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
 	external := filepath.Join(e.Root, "external", "steamcmd.exe")
@@ -161,6 +163,7 @@ func TestInstallDepSteamCMDOwnDirectoryAndRemove(t *testing.T) {
 }
 
 func TestRemoveDepRefusesExternalCopies(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{deps.Todds, deps.SteamCMD, deps.WezTerm} {
 		t.Run(name, func(t *testing.T) {
 			e := testkit.New(t)
@@ -263,6 +266,7 @@ func TestInstallDepWezTermAndRemove(t *testing.T) {
 }
 
 func TestDepFontUnknownAndMissingRefusals(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	if _, err := e.App.InstallDep(deps.Font, nil); err == nil || err.Error() != "the font ships with RimArcho; reinstall the release zip" {
 		t.Fatalf("font install: %v", err)
@@ -278,6 +282,7 @@ func TestDepFontUnknownAndMissingRefusals(t *testing.T) {
 }
 
 func TestInstallDepToddsAndRemove(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.App.TextureEncoder = &texEnc{}
 	var buf bytes.Buffer

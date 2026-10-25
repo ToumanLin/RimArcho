@@ -12,6 +12,7 @@ import (
 )
 
 func TestOfficialContentFirstOnlyInInactiveColumn(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	for _, pkg := range order.Official[1:] {
 		folder := strings.TrimPrefix(pkg, "ludeon.rimworld.")

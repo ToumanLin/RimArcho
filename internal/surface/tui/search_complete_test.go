@@ -8,6 +8,7 @@ import (
 
 // 06 §3.7: from the second letter the search shows the rest of a field name; Tab takes it.
 func TestSearchCompletes(t *testing.T) {
+	t.Parallel()
 	e, _ := v3Fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, "1")

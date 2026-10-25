@@ -19,6 +19,7 @@ import (
 )
 
 func TestDependencySettingsRenderer(t *testing.T) {
+	t.Parallel()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is needed for the dependency settings tests")
@@ -29,6 +30,7 @@ func TestDependencySettingsRenderer(t *testing.T) {
 }
 
 func TestDependencySettingTasksInstallRemoveAndRetry(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	e.App.SteamCMDNoPath = true
 	var buf bytes.Buffer
@@ -85,6 +87,7 @@ func TestDependencySettingTasksInstallRemoveAndRetry(t *testing.T) {
 }
 
 func TestWezTermSettingsTask(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	const name = "WezTerm-windows-20990101-a"
 	var buf bytes.Buffer
@@ -123,6 +126,7 @@ func TestWezTermSettingsTask(t *testing.T) {
 }
 
 func TestToolInstallOfferUsesManagedDestinationAndServerSize(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	requests := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

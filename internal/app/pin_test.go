@@ -66,6 +66,7 @@ func archoLinks(t *testing.T, e *testkit.Env) map[string]string {
 // for the enabled original as one undoable edit, and the game gets it only through an
 // _Archo_ link on save. A dry run writes nothing; a mod that is not enabled leaves the plan.
 func TestPinLibrary(t *testing.T) {
+	t.Parallel()
 	e, _ := pinFixture(t)
 	before := e.ReadModsConfig()
 	up := refID(t, e, "Lockable", source.Workshop)
@@ -135,6 +136,7 @@ func TestPinLibrary(t *testing.T) {
 // a warning; pin --update makes a new library folder and swaps it in; both copies coexist
 // and save links only the one the plan uses.
 func TestPinUpdate(t *testing.T) {
+	t.Parallel()
 	e, ws := pinFixture(t)
 	e.MustRun("pin", refOf(t, e, "Lockable", ""))
 	oldID := lockedAt(t, e, "5100_local")
@@ -181,6 +183,7 @@ func TestPinUpdate(t *testing.T) {
 // 04 §7: a copy RimArcho made in Mods/ before the library existed moves into the library on
 // pin --move-to-library (and on the first pin --update); nothing else leaves Mods/.
 func TestPinLegacyMove(t *testing.T) {
+	t.Parallel()
 	e, ws := pinFixture(t)
 	e.MustRun("pin", refOf(t, e, "Lockable", ""))
 	// Make it look like an old copy: the folder sits in Mods/ (origin marker included).
@@ -233,6 +236,7 @@ func TestPinLegacyMove(t *testing.T) {
 
 // 04 §7.5: unpinning a library copy swaps the upstream back; the copy stays.
 func TestUnpinLocked(t *testing.T) {
+	t.Parallel()
 	e, _ := pinFixture(t)
 	e.MustRun("pin", refOf(t, e, "Lockable", ""))
 	cp, up := lockedAt(t, e, "5100_local"), refID(t, e, "Lockable", source.Workshop)

@@ -27,6 +27,7 @@ func ids(t *testing.T, e *testkit.Env, refs ...string) []string {
 
 // 06 §3.4: a pick session's edits become one undo step; a reverted one leaves nothing.
 func TestBatchCommitAndRevert(t *testing.T) {
+	t.Parallel()
 	e := stageEnv(t)
 	before := names(t, e)
 	b, err := e.App.BeginBatch()
@@ -73,6 +74,7 @@ func TestBatchCommitAndRevert(t *testing.T) {
 
 // The suggested position follows loadAfter; nothing declared means the end.
 func TestSuggestAt(t *testing.T) {
+	t.Parallel()
 	e := stageEnv(t)
 	dir := filepath.Join(e.Game, "Mods", "Late")
 	m := testkit.Sample("tester.late", "Late")

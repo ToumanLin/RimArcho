@@ -9,6 +9,7 @@ import (
 
 // 03 §6.7.4: a file the companion log names becomes the 日志 chip of the last run's item.
 func TestCompanionChip(t *testing.T) {
+	t.Parallel()
 	p := &app.Problem{Finding: &finding.Finding{Claim: "log:E1 x9: Config error in a_Thing: has no label",
 		Evidence: []finding.Evidence{{Source: finding.Log, Text: "source: log file (ArchoMonitor.log): Defs/ThingDefs/a.xml (while loading a_Thing)"}}}}
 	ev := logEvidence([]*app.Problem{p}, "10 月 21 日 14:05")

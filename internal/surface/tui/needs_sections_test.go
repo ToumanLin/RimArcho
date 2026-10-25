@@ -48,6 +48,7 @@ func TestG13NeedsSectionsTUI(t *testing.T) {
 // The running game's errors come after 会让游戏出错, under 上次运行的报错 marked "this run";
 // ← → jump between the sections, and the top bar counts them too.
 func TestNeedsSectionsLive(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.App.GameProbe = func(string) *app.GameRun {
@@ -93,6 +94,7 @@ func TestNeedsSectionsLive(t *testing.T) {
 
 // 06 §3.5: Mod 库存's areas are numbered, 1 the filter, 2 the table, 3 the details.
 func TestLibraryAreaKeys(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, "$")

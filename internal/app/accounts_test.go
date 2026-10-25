@@ -18,6 +18,7 @@ type accountProc struct{ wait func() error }
 func (p accountProc) Wait() error { return p.wait() }
 
 func TestSteamAccountWindowVerificationAndManagedForget(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
 	dir := filepath.Join(e.App.LocalDir(), "steamcmd")
@@ -109,6 +110,7 @@ func TestSteamAccountWindowVerificationAndManagedForget(t *testing.T) {
 }
 
 func TestFakeSteamCMDScript(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows console stub")
 	}
@@ -136,6 +138,7 @@ func TestFakeSteamCMDScript(t *testing.T) {
 }
 
 func TestUninstallForgetsSessionsBeforeKeptSteamCMD(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
 	e.App.ArchoProbe = func() []int { return nil }
@@ -175,6 +178,7 @@ func TestUninstallForgetsSessionsBeforeKeptSteamCMD(t *testing.T) {
 }
 
 func TestUninstallForgetFailurePreservesToolsAndData(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
 	e.App.ArchoProbe = func() []int { return nil }
@@ -198,6 +202,7 @@ func TestUninstallForgetFailurePreservesToolsAndData(t *testing.T) {
 }
 
 func TestSteamLoginRequiresNameButVerifyAllowsAnonymous(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
 	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "offline fixture")
@@ -225,6 +230,7 @@ func TestSteamLoginRequiresNameButVerifyAllowsAnonymous(t *testing.T) {
 }
 
 func TestSteamAccountVerificationLogFormats(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		sample, account string
 		success         bool
@@ -261,6 +267,7 @@ func TestSteamAccountVerificationLogFormats(t *testing.T) {
 }
 
 func TestSteamLoginAutomaticallyVerifiesOwnershipAndLogoutFallsBack(t *testing.T) {
+	t.Parallel()
 	for _, owned := range []bool{false, true} {
 		t.Run(map[bool]string{false: "no game", true: "owns game"}[owned], func(t *testing.T) {
 			e := testkit.New(t)

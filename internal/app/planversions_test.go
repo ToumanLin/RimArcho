@@ -45,6 +45,7 @@ func gameVersions(t *testing.T, e *testkit.Env) *app.PlanVersions {
 }
 
 func TestPlanVersionsDefault(t *testing.T) {
+	t.Parallel()
 	e := versionsEnv(t)
 	pv := gameVersions(t, e)
 	// Every mod lists 1.4 and 1.5; the plan was made on 1.6 (Core is not counted).
@@ -71,6 +72,7 @@ func TestPlanVersionsDefault(t *testing.T) {
 }
 
 func TestPlanVersionsChosen(t *testing.T) {
+	t.Parallel()
 	e := versionsEnv(t)
 	mc := e.ReadModsConfig()
 	out := e.MustRun("plan", "versions", "default", "1.5-1.6")
@@ -116,6 +118,7 @@ func TestPlanVersionsChosen(t *testing.T) {
 
 // P4: a RimArcho list carries the versions; importing it as a new plan keeps them.
 func TestPlanVersionsTravelInRimArchoList(t *testing.T) {
+	t.Parallel()
 	e := versionsEnv(t)
 	e.MustRun("plan", "versions", "default", "1.5", "1.6")
 	out := e.MustRun("loadout", "export", "--format", "archo")
@@ -137,6 +140,7 @@ func TestPlanVersionsTravelInRimArchoList(t *testing.T) {
 }
 
 func TestParseAndFormatVersions(t *testing.T) {
+	t.Parallel()
 	for in, want := range map[string]string{"1.6": "1.6", "1.5-1.7": "1.5–1.7", "1.4,1.6–1.7": "1.4, 1.6–1.7", "1.7 1.5 1.6": "1.5–1.7", "1.3 - 1.4": "1.3–1.4"} {
 		vs, err := app.ParseVersions([]string{in})
 		if err != nil || app.FormatVersions(vs) != want {
@@ -148,6 +152,7 @@ func TestParseAndFormatVersions(t *testing.T) {
 // The workshop export (04 §9.3): Markdown links in load order, the rest named in a
 // comment; it reads back as the installed mods with those workshop IDs.
 func TestExportWorkshopLinks(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	out := e.MustRun("loadout", "export", "--format", "workshop")

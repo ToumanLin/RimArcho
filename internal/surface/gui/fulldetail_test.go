@@ -5,6 +5,7 @@ import "testing"
 // 06 §4.2: the full detail's copies part is the mod's Lineage row as Mod 库存 builds it,
 // found by the instance id or a copy ref, with the op table its codes refer to.
 func TestModCopies(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	var alpha string
 	for _, c := range api.Board().Cols {

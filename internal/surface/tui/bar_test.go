@@ -20,6 +20,7 @@ func viewNames(m *model, k colKind) []string {
 // 06 §2.5: `\` opens the bar's groups; ↑↓ a group, typing finds a value, enter keeps it, x
 // leaves it out, esc closes; the filter holds for 未启用 and 已启用 together.
 func TestBarGroups(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, `\`)
@@ -69,6 +70,7 @@ func TestBarGroups(t *testing.T) {
 // 06 §3.5: J / K while the bar filters move past the next shown row; space and m keep the
 // full order's places.
 func TestBarMoves(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, "2")

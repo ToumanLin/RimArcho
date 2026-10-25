@@ -50,6 +50,7 @@ func fakeSteam(t *testing.T, desc string, updated int64) (*httptest.Server, *int
 }
 
 func TestDescribe(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	short := testkit.Sample("tester.short", "Short About")
 	dir := e.AddWorkshop("1001", short)
@@ -133,6 +134,7 @@ func TestDescribe(t *testing.T) {
 }
 
 func TestDescribeChoice(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	long := strings.Repeat("About text that is long enough. ", 15)
 	m := testkit.Sample("tester.long", "Long About")

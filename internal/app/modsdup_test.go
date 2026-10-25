@@ -40,6 +40,7 @@ func packLinksIn(t *testing.T, e *testkit.Env) []string {
 // The replay: launching the pack no longer links its copies next to the same mods in Mods/;
 // the copies already there (the same content) stand in for the pack's.
 func TestPackLaunchNoDuplicates(t *testing.T) {
+	t.Parallel()
 	e := dupEnv(t)
 	out := e.MustRun("pack", "launch", "测试")
 	if !strings.Contains(out, "from Mods/: 2 mods") {
@@ -72,6 +73,7 @@ func TestPackLaunchNoDuplicates(t *testing.T) {
 // What the old pack launch left (local _X_ and !ArchoPack____X_): one item in 会让游戏出错
 // whose one action removes only the pack's links.
 func TestPackLinksDuplicateReported(t *testing.T) {
+	t.Parallel()
 	e := dupEnv(t)
 	mods := filepath.Join(e.Game, "Mods")
 	copyDir := filepath.Join(e.Home, "packs", "测试", "mods")
@@ -105,6 +107,7 @@ func TestPackLinksDuplicateReported(t *testing.T) {
 // packageId in Mods/; a pair that is already there is reported with a fix that does not move
 // the player's folder; a pack drops a plan's link that would duplicate its own copy.
 func TestDeployNoDuplicates(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	cmdDir := filepath.Join(e.SteamCMD, "8888")
 	e.WriteMod(cmdDir, testkit.Sample("tester.cmd", "CmdOnly"))
@@ -138,6 +141,7 @@ func TestDeployNoDuplicates(t *testing.T) {
 
 // Two folders of the player's with one packageId: reported, and the fix says what to do.
 func TestPlayerDuplicatesReported(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	mods := filepath.Join(e.Game, "Mods")
 	e.WriteMod(filepath.Join(mods, "A1"), testkit.Sample("tester.same", "Same"))
@@ -151,6 +155,7 @@ func TestPlayerDuplicatesReported(t *testing.T) {
 
 // A pack whose copy shares a packageId with a plan's _Archo_ link: the link goes for the run.
 func TestPackDropsDuplicateDeploy(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	cmdDir := filepath.Join(e.SteamCMD, "8888")
 	e.WriteMod(cmdDir, testkit.Sample("tester.cmd", "CmdOnly"))
@@ -176,6 +181,7 @@ func TestPackDropsDuplicateDeploy(t *testing.T) {
 // into the lock library (its instance unchanged) and links the pack's copy; the plan that
 // used the folder still launches with exactly that version, now through a link.
 func TestPackLaunchMovesOtherVersion(t *testing.T) {
+	t.Parallel()
 	e := dupEnv(t)
 	mods := filepath.Join(e.Game, "Mods")
 	e.WriteFile(filepath.Join(mods, "_2888837973_", "Defs", "New.xml"), "<Defs><ThingDef><defName>N</defName></ThingDef></Defs>")
@@ -233,6 +239,7 @@ func TestPackLaunchMovesOtherVersion(t *testing.T) {
 // What never moves: another tool's link (RimCrow's _Link_), and a folder such a link points
 // at. The refusal stays, says why, and offers no --move-duplicates.
 func TestPackLaunchNeverMovesLinks(t *testing.T) {
+	t.Parallel()
 	e := dupEnv(t)
 	e.WriteFile(filepath.Join(e.Root, "RimCrow", "Companion", "Defs", "New.xml"), "<Defs><ThingDef><defName>N</defName></ThingDef></Defs>")
 	scanNow(t, e)
@@ -257,6 +264,7 @@ func TestPackLaunchNeverMovesLinks(t *testing.T) {
 // A plan's _Archo_ deploy next to another version: save names --move-duplicates; with it the
 // folder moves into the lock library and the link is made.
 func TestSaveMovesOtherVersion(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	cmdDir := filepath.Join(e.SteamCMD, "8888")
 	e.WriteMod(cmdDir, testkit.Sample("tester.cmd", "CmdOnly"))
@@ -285,6 +293,7 @@ func TestSaveMovesOtherVersion(t *testing.T) {
 
 // 能不能跑's pair of plain folders: the first fix is 收进锁定库 for one of them.
 func TestDuplicateFixMovesToLocked(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	mods := filepath.Join(e.Game, "Mods")
 	e.WriteMod(filepath.Join(mods, "A1"), testkit.Sample("tester.same", "Same"))

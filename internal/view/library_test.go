@@ -105,6 +105,7 @@ func TestLibraryPage(t *testing.T) {
 }
 
 func TestLocationFiltersAcrossPages(t *testing.T) {
+	t.Parallel()
 	e := libEnv(t)
 	local := filepath.Join(e.Game, "Mods")
 	b, err := view.BuildBoard(e.App)
@@ -140,6 +141,7 @@ func mustLibrary(t *testing.T, e *testkit.Env) *app.Library {
 }
 
 func TestLibraryDo(t *testing.T) {
+	t.Parallel()
 	e := libEnv(t)
 	p := libPage(t, e, "Idle")
 	idle := p.Rows[0].Insts[0]
@@ -175,6 +177,7 @@ func TestLibraryDo(t *testing.T) {
 // 06 §3.7 in the library: typed key:value words filter, tag: matches tag words, and the
 // box completes the library's keys and values.
 func TestLibrarySearchBox(t *testing.T) {
+	t.Parallel()
 	e := libEnv(t)
 	e.MustRun("tag", "add", "pkg:tester.idle", "Facial Hair")
 	e.MustRun("tag", "add", "pkg:tester.hid", "Facial Animation")
@@ -218,6 +221,7 @@ func TestLibrarySearchBox(t *testing.T) {
 
 // 06 §4.1, §2.9: one field list, the editor's fields with the library's in between.
 func TestLibFields(t *testing.T) {
+	t.Parallel()
 	e := libEnv(t)
 	lib, err := e.App.Library()
 	if err != nil {
@@ -258,6 +262,7 @@ func TestLibFields(t *testing.T) {
 // 06 §2.9: 退订 is a confirmed action through the Steam client; when Steam is out of reach
 // LibDo answers OpenPages (the window opens the page and says so).
 func TestLibSteam(t *testing.T) {
+	t.Parallel()
 	e := libEnv(t)
 	idle := libRow(t, libPage(t, e, ""), "Idle").Insts[0]
 	unsub := view.OpOf(view.LibUnsub)

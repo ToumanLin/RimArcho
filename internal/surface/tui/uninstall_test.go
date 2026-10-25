@@ -12,6 +12,7 @@ import (
 // 06 §2.14, §9.1: 卸载 RimArcho in the palette shows the plan; enter asks for the word; any
 // other word cancels, "uninstall" runs it, and after it every key quits.
 func TestUninstallPalette(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", "steamcmd.exe"), "MZ")
 	m := direct(t, e, 140, 40)

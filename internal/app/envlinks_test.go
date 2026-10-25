@@ -31,6 +31,7 @@ func envLinksFixture(t *testing.T) (*testkit.Env, string) {
 }
 
 func TestEnvUseLinksLocalAndMonitorBeforeImport(t *testing.T) {
+	t.Parallel()
 	e, g2 := envLinksFixture(t)
 	before := e.ReadModsConfig()
 	main := active(t, e)
@@ -71,6 +72,7 @@ func TestEnvUseLinksLocalAndMonitorBeforeImport(t *testing.T) {
 }
 
 func TestEnvUseKeepsDestinationLocalCopy(t *testing.T) {
+	t.Parallel()
 	e, g2 := envLinksFixture(t)
 	e.WriteMod(filepath.Join(g2, "Mods", "MyB"), testkit.Sample("tester.b", "Destination B"))
 	e.MustRun("env", "use", "other")
@@ -85,6 +87,7 @@ func TestEnvUseKeepsDestinationLocalCopy(t *testing.T) {
 }
 
 func TestEnvUseDoesNotInheritIntoEmptyOwnSaves(t *testing.T) {
+	t.Parallel()
 	e, g2 := envLinksFixture(t)
 	e.MustRun("env", "set", "other", "--saves", "own")
 	e.MustRun("env", "use", "other")
@@ -122,6 +125,7 @@ func TestEnvUseRollsBackFailedLinks(t *testing.T) {
 }
 
 func TestEnvUseDoesNotLinkIntoRunningGame(t *testing.T) {
+	t.Parallel()
 	e, g2 := envLinksFixture(t)
 	e.App.GameProbe = func(root string) *app.GameRun {
 		if root == g2 {
@@ -135,6 +139,7 @@ func TestEnvUseDoesNotLinkIntoRunningGame(t *testing.T) {
 }
 
 func TestEnvUseKeepsSelectedMonitorVersion(t *testing.T) {
+	t.Parallel()
 	e, g2 := envLinksFixture(t)
 	e.App.MonitorBundle = monitorBundle(t, e, "0.10.0")
 	e.MustRun("monitor", "install")
@@ -150,6 +155,7 @@ func TestEnvUseKeepsSelectedMonitorVersion(t *testing.T) {
 }
 
 func TestEnvUsePreservesLocalWorkshopTokens(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("5100", testkit.Sample("tester.same", "Workshop Same"))
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Same"), testkit.Sample("tester.same", "Local Same"))
@@ -165,6 +171,7 @@ func TestEnvUsePreservesLocalWorkshopTokens(t *testing.T) {
 }
 
 func TestEnvUseScansExistingDestinationWithoutNewLinks(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	scanNow(t, e)
@@ -179,6 +186,7 @@ func TestEnvUseScansExistingDestinationWithoutNewLinks(t *testing.T) {
 }
 
 func TestEnvUseMonitorKeepsSharedIdentityAcrossSwitches(t *testing.T) {
+	t.Parallel()
 	e, _ := envLinksFixture(t)
 	monitorID := refID(t, e, monName, source.Extra)
 	for _, name := range []string{"other", "main", "other", "main", "other"} {
@@ -230,6 +238,7 @@ func TestEnvUseMonitorKeepsSharedIdentityAcrossSwitches(t *testing.T) {
 }
 
 func TestGameOnlyScanKeepsLinkedWorkshopMetadata(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	target := e.AddWorkshop("1011", testkit.Sample("tester.linked", "Linked"))
 	e.Junction(filepath.Join(e.Game, "Mods", "_Link_1011"), target)
@@ -251,6 +260,7 @@ func TestGameOnlyScanKeepsLinkedWorkshopMetadata(t *testing.T) {
 }
 
 func TestEnvUseRepairsLegacyLocalMonitorReferences(t *testing.T) {
+	t.Parallel()
 	for _, status := range []string{identity.Live, identity.Tombstone} {
 		t.Run(status, func(t *testing.T) {
 			e, g2 := envLinksFixture(t)

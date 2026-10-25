@@ -25,6 +25,7 @@ func libAt(t *testing.T, m *model, name string) {
 // 06 §2.9, §9.1: Mod 库存 is the window's page in text: the filter bar (the editor's),
 // the Lineage rows, the cursor's copy on the right; esc backs out a level at a time.
 func TestLibraryList(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
 	m.update(tea.KeyMsg{Type: tea.KeyCtrlK})
@@ -83,6 +84,7 @@ func TestLibraryList(t *testing.T) {
 
 // 06 §2.9: n writes a copy's own note; an empty line clears it.
 func TestLibraryCopyNote(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
 	m.openLibrary()
@@ -108,6 +110,7 @@ func TestLibraryCopyNote(t *testing.T) {
 // 06 §3.5: space adds and enables a copy, or takes it out of the current plan; u undoes;
 // t stages; m enables at a place; F10 lists the copy's ops.
 func TestLibraryPlanOps(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
 	m.openLibrary()
@@ -178,6 +181,7 @@ func TestLibraryPlanOps(t *testing.T) {
 
 // 06 §3.1 rule 6: every op of the table has a runner on both pages (no unknown code).
 func TestEveryOpRuns(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
 	for _, o := range view.OpTable() {

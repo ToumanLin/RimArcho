@@ -6,6 +6,7 @@ import (
 )
 
 func TestXMLRefs(t *testing.T) {
+	t.Parallel()
 	src := `<?xml version="1.0"?>
 <Defs>
   <!-- <texPath>Commented/Out</texPath> -->
@@ -41,6 +42,7 @@ func TestXMLRefs(t *testing.T) {
 }
 
 func TestLogMessageNames(t *testing.T) {
+	t.Parallel()
 	if typ, name, ok := xrefName("Failed to find RimWorld.BiomeDef named TropicalRainforest. There are 31 defs of this type loaded."); !ok || typ != "RimWorld.BiomeDef" || name != "TropicalRainforest" {
 		t.Errorf("GetNamed: %q %q %v", typ, name, ok)
 	}

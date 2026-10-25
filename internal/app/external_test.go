@@ -59,6 +59,7 @@ func planVersions(t *testing.T, e *testkit.Env, name string) int {
 // V6: an outside change goes to the plan that wrote the file, not the current one; an
 // untouched writer loads it (undoable).
 func TestV6ExternalGoesToWriter(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
@@ -104,6 +105,7 @@ func TestV6ExternalGoesToWriter(t *testing.T) {
 // V7 and 05 I8: the writer was edited since the write — the change is kept as an external
 // version, the plan is marked, and writes are refused until it is seen, loaded or ignored.
 func TestV7ConflictOnEditedWriter(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
@@ -173,6 +175,7 @@ func TestV7ConflictOnEditedWriter(t *testing.T) {
 
 // Loading the unloaded external version (checkout) clears the mark and unblocks saving.
 func TestIgnoreExternalCheckoutClears(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("save")
@@ -194,6 +197,7 @@ func TestIgnoreExternalCheckoutClears(t *testing.T) {
 // outside change; an outside change after it goes to the writer's plan in its own
 // environment, resolved there.
 func TestV8SharedUserData(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
@@ -251,6 +255,7 @@ func TestV8SharedUserData(t *testing.T) {
 
 // No write record (a new folder, a lost record): the change goes to the current plan.
 func TestExternalNoRecordGoesToCurrent(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e) // imported; seen, but never written
 	e.MustRun("plan", "new", "b", "--from", "current")

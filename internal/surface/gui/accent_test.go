@@ -13,6 +13,7 @@ import (
 )
 
 func TestAccentRuntime(t *testing.T) {
+	t.Parallel()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is needed for accent behavior tests")
@@ -23,6 +24,7 @@ func TestAccentRuntime(t *testing.T) {
 }
 
 func TestAccentScales(t *testing.T) {
+	t.Parallel()
 	b, err := fs.ReadFile(assets, "assets/js/accent.js")
 	if err != nil {
 		t.Fatal(err)
@@ -61,6 +63,7 @@ func TestAccentScales(t *testing.T) {
 }
 
 func TestAccentStartupAndSettings(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	api := NewAPI(e.App, nil)
 	t.Cleanup(api.Close)
@@ -84,6 +87,7 @@ func TestAccentStartupAndSettings(t *testing.T) {
 }
 
 func TestThemeStartupAndSettings(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	api := NewAPI(e.App, nil)
 	t.Cleanup(api.Close)

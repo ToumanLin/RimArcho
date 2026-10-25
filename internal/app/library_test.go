@@ -65,6 +65,7 @@ func filtered(t *testing.T, lib *app.Library, q app.LibQuery) []string {
 }
 
 func TestLibraryStates(t *testing.T) {
+	t.Parallel()
 	e := libFixture(t)
 	lib := mustLib(t, e)
 	lock := libLineage(t, lib, "Lockable")
@@ -112,6 +113,7 @@ func TestLibraryStates(t *testing.T) {
 }
 
 func TestLibraryFilter(t *testing.T) {
+	t.Parallel()
 	e := libFixture(t)
 	e.MustRun("tag", "add", "pkg:tester.idle", "QoL")
 	lib := mustLib(t, e)
@@ -163,6 +165,7 @@ func TestLibraryFilter(t *testing.T) {
 }
 
 func TestLibraryLocations(t *testing.T) {
+	t.Parallel()
 	e := libFixture(t)
 	local := filepath.Join(e.Game, "Mods")
 	// Multiple copies in one folder count as one lineage in that folder's facet.
@@ -217,6 +220,7 @@ func TestLibraryLocations(t *testing.T) {
 
 // 06 §2.9: removing from every plan is one undo step in each plan that had it.
 func TestLibraryRemoveFromPlans(t *testing.T) {
+	t.Parallel()
 	e := libFixture(t)
 	e.MustRun("plan", "new", "other", "--from", "current")
 	ref := refOf(t, e, "Lockable", source.Local)
@@ -247,6 +251,7 @@ func TestLibraryRemoveFromPlans(t *testing.T) {
 
 // 06 §2.9, 01 §4: a spare copy in Mods/ moves into the lock library as the same instance.
 func TestLibraryMoveToLocked(t *testing.T) {
+	t.Parallel()
 	e := libFixture(t)
 	cp := refID(t, e, "Lockable", source.Local)
 	e.MustRun("plan", "new", "other", "--from", "current")
@@ -300,6 +305,7 @@ func TestLibraryMoveToLocked(t *testing.T) {
 
 // 06 §2.9: trash names the plans that still use the folder.
 func TestLibraryTrashNamesPlans(t *testing.T) {
+	t.Parallel()
 	e := libFixture(t)
 	gone := refOf(t, e, "Gone", "")
 	if _, err := e.App.Trash(gone, true); err != nil {
@@ -326,6 +332,7 @@ func TestLibraryTrashNamesPlans(t *testing.T) {
 // A SteamCMD download may go like a copy of the player's own: no subscription brings it
 // back.
 func TestTrashSteamCMDCopy(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	e.WriteMod(filepath.Join(e.SteamCMD, "5001"), testkit.Sample("tester.cmd", "Via SteamCMD"))
 	scanNow(t, e)

@@ -30,6 +30,7 @@ func barBoard() *Board {
 // The bar filters 未启用 and 已启用 together; values of one group are "or", groups "and",
 // a leading "-" leaves out (06 §2.5).
 func TestFilterBoard(t *testing.T) {
+	t.Parallel()
 	b := barBoard()
 	cases := []struct {
 		search  string
@@ -55,6 +56,7 @@ func TestFilterBoard(t *testing.T) {
 
 // A group's counts ignore its own choices; the game's version leads its group, marked.
 func TestFilterBoardGroups(t *testing.T) {
+	t.Parallel()
 	got := FilterBoard(barBoard(), "", []string{"source:workshop"}, MatchFacts{}, true, "1.6")
 	by := map[string]LibGroup{}
 	for _, g := range got.Groups {
@@ -77,6 +79,7 @@ func TestFilterBoardGroups(t *testing.T) {
 }
 
 func TestFilterBoardLocations(t *testing.T) {
+	t.Parallel()
 	b := barBoard()
 	workshop, local := `D:\Steam Library\workshop`, `D:\RimWorld\Mods`
 	for col := 0; col < 2; col++ {
@@ -122,6 +125,7 @@ func TestFilterBoardLocations(t *testing.T) {
 
 // J / K while the bar filters: the rows trade places with the shown rows (06 §3.5).
 func TestStepAt(t *testing.T) {
+	t.Parallel()
 	// 10 enabled mods; the bar shows 2, 5, 8, 9
 	vis := []int{2, 5, 8, 9}
 	cases := []struct {

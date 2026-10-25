@@ -14,6 +14,7 @@ import (
 // 08 §3: a SteamCMD mod can be enabled; save links it into Mods/ and removes the link once
 // it is disabled, never touching the target.
 func TestLinkDeployment(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	cmdDir := filepath.Join(e.SteamCMD, "8888")
 	e.WriteMod(cmdDir, testkit.Sample("tester.cmd", "CmdOnly"))
@@ -71,6 +72,7 @@ func TestLinkDeployment(t *testing.T) {
 
 // RimArcho never deletes or replaces a non-link entry, even with its prefix.
 func TestLinkDeploymentRefusesRealFolder(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	e.WriteMod(filepath.Join(e.SteamCMD, "8888"), testkit.Sample("tester.cmd", "CmdOnly"))
 	e.WriteFile(filepath.Join(e.Game, "Mods", "_Archo_steamcmd_8888", "keep.txt"), "mine")
@@ -88,6 +90,7 @@ func TestLinkDeploymentRefusesRealFolder(t *testing.T) {
 // packageId wins, so enabling the SteamCMD copy is refused; next to an enabled workshop
 // copy it can only be swapped in.
 func TestLinkDeploymentSamePackage(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	e.WriteMod(filepath.Join(e.SteamCMD, "1001"), testkit.Sample("tester.a", "A"))
 	e.WriteMod(filepath.Join(e.SteamCMD, "5555"), testkit.Sample("tester.b", "B"))

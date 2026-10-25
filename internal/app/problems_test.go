@@ -63,6 +63,7 @@ const aboutWithURL = `<?xml version="1.0" encoding="utf-8"?>
 
 // C1: a mod whose dependency is not installed → dep.missing with the workshop link.
 func TestC1DependencyMissing(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.WriteFile(filepath.Join(e.Game, "Mods", "Needy", "About", "About.xml"), aboutWithURL)
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.needy")
@@ -91,6 +92,7 @@ func TestC1DependencyMissing(t *testing.T) {
 
 // C2: the workshop and the local copy of one packageId both enabled → pkg.duplicate-active.
 func TestC2DuplicateActive(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	m := testkit.Sample("tester.dup", "Dup")
 	e.WriteMod(filepath.Join(e.Game, "Mods", "DupLocal"), m)
@@ -109,6 +111,7 @@ func TestC2DuplicateActive(t *testing.T) {
 
 // C3: two mods define the same ThingDef → def.override naming the one that wins.
 func TestC3DefOverride(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	a := testkit.Sample("tester.first", "First")
 	a.Files["Defs/Shared.xml"] = "<Defs>\n  <ThingDef><defName>Shared_Gun</defName></ThingDef>\n</Defs>\n"
@@ -140,6 +143,7 @@ func TestC3DefOverride(t *testing.T) {
 // C4: a patch whose target mod is not enabled and which is not guarded by FindMod →
 // patch.no-match with target-inactive and unguarded-optional.
 func TestC4PatchTargetInactive(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	lib := testkit.Sample("tester.lib", "Lib")
 	lib.Files["Defs/Lib.xml"] = "<Defs><ThingDef><defName>Lib_Gun</defName></ThingDef></Defs>\n"
@@ -191,6 +195,7 @@ func TestC4PatchTargetInactive(t *testing.T) {
 
 // Ignoring a problem hides it until its mod changes (03 §4.2).
 func TestIgnoreExpiresWhenModChanges(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	dir := filepath.Join(e.Game, "Mods", "Needy")
 	e.WriteFile(filepath.Join(dir, "About", "About.xml"), aboutWithURL)
@@ -223,6 +228,7 @@ func TestIgnoreExpiresWhenModChanges(t *testing.T) {
 }
 
 func TestDeclarationLayer(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	lib := testkit.Sample("tester.lib", "Lib")
 	user := testkit.Sample("tester.user", "User")
@@ -262,6 +268,7 @@ func TestDeclarationLayer(t *testing.T) {
 }
 
 func TestFilesSearch(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	m := testkit.Sample("tester.findme", "FindMe")
 	m.Files["1.6/Defs/V.xml"] = "<Defs><ThingDef><defName>Needle_Current</defName></ThingDef></Defs>\n"

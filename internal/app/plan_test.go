@@ -13,6 +13,7 @@ import (
 
 // First use (04 §1.4): the environment's first plan is ModsConfig.xml, imported as v1.
 func TestPlanFirstUseImports(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	p, err := e.App.CurrentPlan()
@@ -32,6 +33,7 @@ func TestPlanFirstUseImports(t *testing.T) {
 }
 
 func TestPlanIsolationAndSwitch(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	b := refOf(t, e, "B", "")
@@ -131,6 +133,7 @@ func TestPlanIsolationAndSwitch(t *testing.T) {
 
 // X5: importing a list as a new plan adds a plan with an import v1; the current plan stays.
 func TestLoadoutImportNewPlan(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	list := filepath.Join(e.Root, "Night.txt")

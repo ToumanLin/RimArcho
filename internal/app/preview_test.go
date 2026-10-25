@@ -25,6 +25,7 @@ func pngBytes(w, h int) string {
 
 // 06 §9.4: Preview.png (any case) scaled to 360 px wide, cached by snapshot hash.
 func TestPreview(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	withP := testkit.Sample("tester.pic", "With Picture")
 	withP.Files = map[string]string{"About/preview.PNG": pngBytes(1600, 900)}

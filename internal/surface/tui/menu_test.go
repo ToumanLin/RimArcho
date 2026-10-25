@@ -14,6 +14,7 @@ import (
 // groups in order with separators, keys on the right, only what applies, 退订 last; ↑↓ and
 // enter run an item.
 func TestRowMenu(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, "2")

@@ -10,6 +10,7 @@ import (
 // The window's import: preview changes nothing, apply is one step that u undoes, and a
 // second apply needs a new preview. Without the window there are no dialogs.
 func TestExchangeAPI(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	if x := api.ExchangeInfo(); x.Dialogs || len(x.Formats) != 8 || x.Formats[0].ID != "archo" {
 		t.Fatalf("info: %+v", x)

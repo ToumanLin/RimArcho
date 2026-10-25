@@ -8,6 +8,7 @@ import (
 )
 
 func TestSteamLicenseApps(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, output string
 		owns         bool
@@ -32,6 +33,7 @@ func TestSteamLicenseApps(t *testing.T) {
 }
 
 func TestSteamLicenseVMFixtures(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"real-purchased.log", "borrowed-and-truncated.log"} {
 		b, err := os.ReadFile(filepath.Join("testdata", "steam-licenses", name))
 		if err != nil {

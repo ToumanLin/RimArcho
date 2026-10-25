@@ -11,6 +11,7 @@ import (
 // The import result says whether the files were checked and what differs from this
 // game; info items stay on the pack's page (06 §2.7, 08 §5.5).
 func TestPackImportTextShowsCheck(t *testing.T) {
+	t.Parallel()
 	check := &app.PackCheck{PackGame: "1.6.4633 rev1261", Game: "1.6.4871 rev590", Items: []app.PackCheckItem{
 		{Part: "game", Level: finding.Warning, Text: "built for 1.6.4633 rev1261, this game is 1.6.4871 rev590"},
 		{Part: "dlc", Level: finding.Info, Text: "installed DLC not used by the pack: Royalty", Names: []string{"Royalty"}},

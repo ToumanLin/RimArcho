@@ -128,6 +128,7 @@ func (f *unFix) run(t *testing.T, o app.UninstallOptions) *app.UninstallPlan {
 // Documents, the downloaded game kept, SteamCMD gone, and the data folders and the program
 // left to the script; the script removes only RimArcho's files from the program folder.
 func TestUninstallDefaults(t *testing.T) {
+	t.Parallel()
 	f := uninstallFixture(t)
 	copyDir := f.lockCopy(t)
 	plan, err := f.App.PlanUninstall(app.UninstallOptions{})
@@ -231,6 +232,7 @@ func hasItem(items []*app.UninstallItem, base, do string) bool {
 // RimArcho's note), packs, saves and the downloaded game to the recycle bin, and the backup
 // of ModsConfig.xml put back.
 func TestUninstallChoices(t *testing.T) {
+	t.Parallel()
 	f := uninstallFixture(t)
 	copyDir := f.lockCopy(t)
 	pack := filepath.Join(f.Home, "packs", "P1")
@@ -279,6 +281,7 @@ func lockFolders(t *testing.T, dir string) []string {
 // 08 §7: with no recycle bin the copy is refused and stays; the data folders and the
 // program are kept so the uninstall can run again.
 func TestUninstallNoRecycleBin(t *testing.T) {
+	t.Parallel()
 	f := uninstallFixture(t)
 	copyDir := f.lockCopy(t)
 	f.App.TrashFunc = func(p string) error { return errors.New("no recycle bin on this volume") }
@@ -312,6 +315,7 @@ func TestUninstallNoRecycleBin(t *testing.T) {
 // Refused while a game or another RimArcho runs, and when kept copies would go into a
 // game that is removed; nothing changes.
 func TestUninstallRefused(t *testing.T) {
+	t.Parallel()
 	f := uninstallFixture(t)
 	before := strings.Join(f.mods(), ",")
 	f.App.GameProbe = func(root string) *app.GameRun {

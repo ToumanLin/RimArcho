@@ -16,6 +16,7 @@ import (
 // Launching writes the list (08 §2): no "unsaved changes" block, a version with source
 // launch (none when nothing changed since the newest version), the launch recorded.
 func TestLaunchWritesTheList(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("env", "set", "main", "--launch", "direct")
@@ -72,6 +73,7 @@ func TestLaunchWritesTheList(t *testing.T) {
 
 // A launch that cannot start (no executable) writes nothing.
 func TestLaunchRefusesBeforeWriting(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("env", "set", "main", "--launch", "direct")
@@ -90,6 +92,7 @@ func TestLaunchRefusesBeforeWriting(t *testing.T) {
 // launch and pack launch, and the refusal names the environment and what it plays. Saving
 // is still allowed and says the game reads it on its next start.
 func TestOneGameAtATime(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("env", "set", "main", "--launch", "direct")

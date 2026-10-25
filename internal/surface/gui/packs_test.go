@@ -6,6 +6,7 @@ import (
 )
 
 func TestPackPageComparison(t *testing.T) {
+	t.Parallel()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is needed for the pack page behavior tests")

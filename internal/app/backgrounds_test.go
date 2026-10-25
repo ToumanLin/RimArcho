@@ -29,6 +29,7 @@ func writePNG(t *testing.T, path string, w, h int) {
 
 // A background mod's Defs name its images; a Def whose image is missing is left out.
 func TestModBackgroundsFromDefs(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "1.6", "Defs"), 0o755)
 	os.WriteFile(filepath.Join(dir, "1.6", "Defs", "Backgrounds.xml"), []byte(`<?xml version="1.0"?>
@@ -47,6 +48,7 @@ func TestModBackgroundsFromDefs(t *testing.T) {
 
 // Without Defs, the large landscape textures count; small or tall ones do not.
 func TestModBackgroundsWithoutDefs(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePNG(t, filepath.Join(dir, "Textures", "UI", "Wide.png"), 1600, 900)
 	writePNG(t, filepath.Join(dir, "Textures", "UI", "Small.png"), 300, 100)
@@ -59,6 +61,7 @@ func TestModBackgroundsWithoutDefs(t *testing.T) {
 
 // One decode makes both cached sizes, never wider than the original.
 func TestBackgroundImageCache(t *testing.T) {
+	t.Parallel()
 	a := &App{Home: t.TempDir()}
 	src := filepath.Join(t.TempDir(), "bg.png")
 	writePNG(t, src, 1000, 500)
@@ -85,6 +88,7 @@ func TestBackgroundImageCache(t *testing.T) {
 
 // Transparent pixels go to black, opaque ones keep their colour.
 func TestScaleDownAlpha(t *testing.T) {
+	t.Parallel()
 	img := image.NewNRGBA(image.Rect(0, 0, 2, 1))
 	img.Set(0, 0, color.NRGBA{255, 0, 0, 255})
 	img.Set(1, 0, color.NRGBA{255, 255, 255, 0})
@@ -98,6 +102,7 @@ func TestScaleDownAlpha(t *testing.T) {
 }
 
 func TestOfficialBackgroundPreviewFallbacks(t *testing.T) {
+	t.Parallel()
 	core, dlc := t.TempDir(), t.TempDir()
 	writePNG(t, filepath.Join(core, "About", "pReViEw.PNG"), 40, 20)
 	writePNG(t, filepath.Join(dlc, "About", "Preview.png"), 40, 20)

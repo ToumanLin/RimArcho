@@ -7,6 +7,7 @@ import (
 
 // A game folder matches its own processes only: "RimWorld2" is not inside "RimWorld".
 func TestProcessIn(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	a := filepath.Join(root, "RimWorld")
 	b := filepath.Join(root, "RimWorld2")

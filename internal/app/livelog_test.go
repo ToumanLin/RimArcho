@@ -37,6 +37,7 @@ func clusterSig(key string, count int, attr []*app.Attribution) string {
 // L1, L2: a log written in two parts, the split inside a stack, gives the same clusters,
 // counts and attribution as the full analysis.
 func TestLiveLogMatchesFullAnalysis(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	text := e.HarmonyLogFixture()
 	path := filepath.Join(e.Root, "live", "Player.log")
@@ -79,6 +80,7 @@ func TestLiveLogMatchesFullAnalysis(t *testing.T) {
 // L3, L4: a restarted log starts over; a flood of one error is one cluster and the
 // follower keeps no text.
 func TestLiveLogResetAndFlood(t *testing.T) {
+	// Not parallel: measures process heap growth, which other tests would add to.
 	e := setup(t, false)
 	scanNow(t, e)
 	path := filepath.Join(e.Root, "Player.log")
@@ -128,6 +130,7 @@ func TestLiveLogResetAndFlood(t *testing.T) {
 
 // L5: the RimCrow companion log supplies timestamps and levels; bad lines are counted.
 func TestLiveLogCompanion(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	scanNow(t, e)
 	path, comp := filepath.Join(e.Root, "Player.log"), filepath.Join(e.Root, "RimCrow_Realtime.log")
@@ -147,6 +150,7 @@ not json
 
 // archo log --follow --once prints the clusters with their first attributed mod.
 func TestLogFollowOnce(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	text := e.HarmonyLogFixture()
 	path := filepath.Join(e.Root, "follow", "Player.log")

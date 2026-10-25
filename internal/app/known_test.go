@@ -14,6 +14,7 @@ import (
 // Findings from the log corpus dataset (internal/known): undeclared prerequisites and
 // known-bad combinations, computed from the enabled list.
 func TestKnownFindings(t *testing.T) {
+	t.Parallel()
 	defer known.SetForTesting(&known.Data{
 		Prereqs: []*known.Prereq{
 			{Mod: "tester.user", Needs: "tester.lib", Logs: 40, Players: 30, Without: 50, Items: []string{"type Lib.Comp"}, Class: "xml-load", Example: "xml-load|Could not find a type named Lib.Comp"},

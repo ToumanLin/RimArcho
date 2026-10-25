@@ -8,6 +8,7 @@ import (
 
 // packNameOK is the rule the pack name regexp used to be.
 func TestPackNameSameAsRegexp(t *testing.T) {
+	t.Parallel()
 	re := regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} ._\-]{0,63}$`)
 	cases := []string{"", "a", "整合包", "1.5 raid", ".x", " x", "-x", "x-", "x/y", "a\x80b", "Ⅻ", "x²",
 		strings.Repeat("a", 64), strings.Repeat("a", 65), strings.Repeat("包", 64), strings.Repeat("包", 65),

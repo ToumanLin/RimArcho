@@ -22,7 +22,7 @@ func buildPage(t *testing.T, api *API, tex int) (*view.BuildPage, error) {
 
 func waitBuildPage(t *testing.T, api *API, id uint64) (*view.BuildPage, error) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		p, err := api.BuildPageResult(id)
 		if p != nil || err != nil {
@@ -35,6 +35,7 @@ func waitBuildPage(t *testing.T, api *API, id uint64) (*view.BuildPage, error) {
 
 // 06 §3.1: a slow old reader cannot block input or replace the latest texture choice.
 func TestBuildPageLatestMeasurementWins(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	e.MustRun("enable", "pkg:brrainz.harmony")
 	started, release := make(chan struct{}), make(chan struct{})

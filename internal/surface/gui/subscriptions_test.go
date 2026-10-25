@@ -9,6 +9,7 @@ import (
 )
 
 func TestSubscriptionSourceTaskAndRunningGuard(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	if _, err := api.CheckSubscriptionSource("invalid"); err == nil || len(api.tasks.List()) != 0 {
 		t.Fatal("invalid source queued")

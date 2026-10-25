@@ -20,6 +20,7 @@ func naiveRef(b []byte, name string) int {
 }
 
 func TestRefScan(t *testing.T) {
+	t.Parallel()
 	b := []byte(`<?xml version="1.0"?>
 <Defs>
   <!-- >Steel< in a comment counts, as it did -->
@@ -54,6 +55,7 @@ func TestRefScan(t *testing.T) {
 }
 
 func TestRefIndexFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	write := func(name, s string) string {
 		p := filepath.Join(dir, name)

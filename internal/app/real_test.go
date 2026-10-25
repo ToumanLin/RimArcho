@@ -16,6 +16,7 @@ import (
 )
 
 func TestRealPlayerLogReplay(t *testing.T) {
+	t.Parallel()
 	home := os.Getenv("RIMARCHO_REAL_HOME")
 	if home == "" {
 		t.Skip("set RIMARCHO_REAL_HOME to replay a real Player.log")

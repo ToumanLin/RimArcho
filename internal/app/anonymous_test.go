@@ -13,6 +13,7 @@ import (
 )
 
 func TestSteamCMDAnonymousAndAccountPrecedence(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct{ name, saved, override, want string }{
 		{"default", "", "", "anonymous"},
 		{"saved", "player", "", "player"},
@@ -47,6 +48,7 @@ func TestSteamCMDAnonymousAndAccountPrecedence(t *testing.T) {
 }
 
 func TestSteamCMDBadSavedAccountNeverStarts(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	f := &fakeSteamCMD{}
 	f.install(t, e)
@@ -57,6 +59,7 @@ func TestSteamCMDBadSavedAccountNeverStarts(t *testing.T) {
 }
 
 func TestAnonymousGameDownloadDoesNotStartOrCreateFolder(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	f := &fakeSteamCMD{lines: okRun, game: true}
 	f.install(t, e)
@@ -72,6 +75,7 @@ func TestAnonymousGameDownloadDoesNotStartOrCreateFolder(t *testing.T) {
 }
 
 func TestWorkshopStateWithoutSteam(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.AddWorkshop("7100", testkit.Sample("tester.local", "Local"))
 	scanNow(t, e)
@@ -90,6 +94,7 @@ func TestWorkshopStateWithoutSteam(t *testing.T) {
 }
 
 func TestManualGameWithWorkshopDefaultsToDirect(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	game := filepath.Join(e.Root, "Standalone")
 	e.WriteFile(filepath.Join(game, "RimWorldWin64.exe"), "")

@@ -21,6 +21,7 @@ import (
 )
 
 func TestSubscriptionForm(t *testing.T) {
+	t.Parallel()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is needed for subscription form behavior tests")
@@ -138,6 +139,7 @@ selected:
 }
 
 func TestPageSubscriptionAPITasks(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	var version atomic.Int32
 	version.Store(1)
@@ -235,6 +237,7 @@ func TestPageSubscriptionAPITasks(t *testing.T) {
 }
 
 func TestWorkshopSubscriptionTaskMessage(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	e.WriteFile(filepath.Join(e.Game, "RimWorldWin64_Data", "Plugins", "x86_64", "steam_api64.dll"), "stand-in")
 	e.App.SteamWorker = func(_ string, args []string) (string, error) {

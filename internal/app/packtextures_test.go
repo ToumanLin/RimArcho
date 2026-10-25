@@ -17,6 +17,7 @@ import (
 // keeps its PNGs and loses its DDS; the author's DDS and its PNG stay; the mod itself is
 // never touched; pack.json and origin.json say what was done.
 func TestPackTextures(t *testing.T) {
+	t.Parallel()
 	e := packEnv(t)
 	e.App.GameProbe = func(string) *app.GameRun { return nil }
 	enc := &texEnc{fail: "Things/Bad.png"}

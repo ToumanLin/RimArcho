@@ -8,6 +8,7 @@ import (
 )
 
 func TestSteamWorkshop(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	b := api.Board()
 	var alpha, beta string
@@ -52,6 +53,7 @@ func TestSteamWorkshop(t *testing.T) {
 }
 
 func TestDetailPageActions(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	lib, err := e.App.Library()
 	if err != nil {

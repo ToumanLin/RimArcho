@@ -22,6 +22,7 @@ type workshopProc func() error
 func (p workshopProc) Wait() error { return p() }
 
 func TestSubscribeWorkshopFallback(t *testing.T) {
+	t.Parallel()
 	t.Run("Steam available", func(t *testing.T) {
 		e := setup(t, false)
 		steamDLL(e)

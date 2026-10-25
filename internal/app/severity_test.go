@@ -13,6 +13,7 @@ import (
 // a warning, order.cycle info; version.unsupported is a warning when the mod stops at the
 // previous minor version and info when it lists only older ones.
 func TestCorpusSeverities(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	prev := testkit.Sample("tester.prev", "Prev")
 	prev.Supported = []string{"1.4", "1.5"}

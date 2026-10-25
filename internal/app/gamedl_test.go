@@ -23,6 +23,7 @@ import (
 // (testdata/steamcmd): public, the public test branch, then the old versions, newest
 // first; nothing guessed.
 func TestParseBranches(t *testing.T) {
+	t.Parallel()
 	_, file, _, _ := runtime.Caller(0)
 	b, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "testdata", "steamcmd", "app_info_print_294100.txt"))
 	if err != nil {
@@ -60,6 +61,7 @@ func steamZip(t *testing.T) []byte {
 // 08 §11: SteamCMD is downloaded from Valve only after the player saw the size, into
 // %LOCALAPPDATA%\RimArcho\steamcmd.
 func TestInstallSteamCMD(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	z := steamZip(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -154,6 +156,7 @@ var okRun = []string{
 // 08 §11: a version downloaded with SteamCMD becomes an environment named after its
 // version; only the account name reaches SteamCMD; progress comes from SteamCMD's log.
 func TestDownloadGame(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	f := &fakeSteamCMD{lines: okRun, game: true}
@@ -193,6 +196,7 @@ func TestDownloadGame(t *testing.T) {
 
 // 08 §11: failures in plain words; the folder must not be RimArcho's or inside a source.
 func TestDownloadGameErrors(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	f := &fakeSteamCMD{}

@@ -8,6 +8,7 @@ import (
 )
 
 func TestPlanCostPageRequests(t *testing.T) {
+	t.Parallel()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is needed for the list measurement regression tests")
@@ -18,6 +19,7 @@ func TestPlanCostPageRequests(t *testing.T) {
 }
 
 func TestPlanCostMeasurementCancelsOlderRequests(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	api.costMeasure.disk.Lock()
 	locked := true

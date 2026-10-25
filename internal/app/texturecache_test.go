@@ -16,6 +16,7 @@ import (
 )
 
 func TestTextureSummaryCacheHitAndInvalidation(t *testing.T) {
+	t.Parallel()
 	e, _, dir := texSetup(t)
 	targets, err := e.App.TextureTargets([]string{"pkg:tester.tex"}, app.TexRefs)
 	if err != nil {

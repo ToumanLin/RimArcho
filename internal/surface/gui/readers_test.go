@@ -9,6 +9,7 @@ import (
 )
 
 func TestInventoryCacheSurvivesNavigationAndSeesExternalWrites(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	if _, err := api.Library("", nil, "name"); err != nil {
 		t.Fatal(err)
@@ -41,6 +42,7 @@ func TestInventoryCacheSurvivesNavigationAndSeesExternalWrites(t *testing.T) {
 }
 
 func TestLogAnalysisDoesNotBlockOtherPagesOrRestartBetweenPolls(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	e.WriteFile(filepath.Join(e.UserData, "Player.log"), "RimWorld 1.5.4104 rev435\nNullReferenceException: fixture\n  at Fixture.Tick ()\n")
 	started, release := make(chan struct{}, 4), make(chan struct{})
@@ -97,6 +99,7 @@ func TestLogAnalysisDoesNotBlockOtherPagesOrRestartBetweenPolls(t *testing.T) {
 }
 
 func TestTextureReadSupersededAndCancelledOnLeave(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	first, cancel := api.beginTextureRead()
 	defer cancel()
@@ -112,6 +115,7 @@ func TestTextureReadSupersededAndCancelledOnLeave(t *testing.T) {
 }
 
 func TestLogPageSwitchesEnvironmentAndRejectsPreviousPath(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	old := filepath.Join(e.UserData, "Player.log")
 	e.WriteFile(old, "RimWorld 1.6.4633 rev1261\n")

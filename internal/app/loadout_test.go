@@ -63,6 +63,7 @@ func loadoutEnv(t *testing.T) *testkit.Env {
 }
 
 func TestLoadoutImportHealAndEdits(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	// Before any scan nothing resolves: entries are kept as missing, not dropped.
 	if got := joined(active(t, e)); got != "?ludeon.rimworld, ?brrainz.harmony, ?tester.a, ?gone.mod" {
@@ -101,6 +102,7 @@ func TestLoadoutImportHealAndEdits(t *testing.T) {
 }
 
 func TestEnableRefusals(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	e.WriteMod(filepath.Join(e.Workshop, "9999"), testkit.Sample("tester.residue", "Residue"))
 	e.WriteMod(filepath.Join(e.SteamCMD, "8888"), testkit.Sample("tester.cmd", "CmdOnly"))
@@ -131,6 +133,7 @@ func TestEnableRefusals(t *testing.T) {
 }
 
 func TestSaveSteamSuffixVersionAndBackup(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	e.WriteMod(filepath.Join(e.Game, "Mods", "A local"), testkit.Sample("tester.a", "A"))
 	e.WriteModsConfig("1.5.4409 rev1118", "ludeon.rimworld", "brrainz.harmony", "tester.a_steam", "gone.mod")
@@ -184,6 +187,7 @@ func TestSaveSteamSuffixVersionAndBackup(t *testing.T) {
 }
 
 func TestExternalChangeAndConflict(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	// Same list, different formatting (the game re-saving it): no new version.
@@ -218,6 +222,7 @@ func TestExternalChangeAndConflict(t *testing.T) {
 }
 
 func TestHistoryCheckoutUndoSource(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
@@ -246,6 +251,7 @@ func TestHistoryCheckoutUndoSource(t *testing.T) {
 // S2–S4 through the CLI: cycle evidence names each About.xml, an ignore rule resolves it,
 // an attach rule keeps a language pack right after its mod.
 func TestSortCycleIgnoreAttach(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	x := testkit.Sample("tester.x", "X")
 	e.WriteMod(filepath.Join(e.Game, "Mods", "X"), x)
@@ -300,6 +306,7 @@ func TestSortCycleIgnoreAttach(t *testing.T) {
 }
 
 func TestSortRestoresCoreWithPreviewAndUndo(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.WriteMod(filepath.Join(e.Game, "Data", "Royalty"), testkit.Sample("ludeon.rimworld.royalty", "Royalty"))
 	e.WriteMod(filepath.Join(e.Game, "Mods", "A"), testkit.Sample("tester.a", "A"))
@@ -335,6 +342,7 @@ func TestSortRestoresCoreWithPreviewAndUndo(t *testing.T) {
 }
 
 func TestSortEmptyListRestoresOnlyInstalledCore(t *testing.T) {
+	t.Parallel()
 	for _, installed := range []bool{true, false} {
 		t.Run(map[bool]string{true: "installed", false: "missing"}[installed], func(t *testing.T) {
 			e := setup(t, false)
@@ -356,6 +364,7 @@ func TestSortEmptyListRestoresOnlyInstalledCore(t *testing.T) {
 }
 
 func TestLaunchPlans(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	e.WriteFile(filepath.Join(e.Steam, "steam.exe"), "")
@@ -387,6 +396,7 @@ func TestLaunchPlans(t *testing.T) {
 // The ignore reference printed by sort must be accepted verbatim by rule add ignore, for
 // every constraint kind (a dependency edge once printed a field name that never matched).
 func TestPrintedIgnoreRefsRoundTrip(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	p := testkit.Sample("tester.p", "P")
 	p.Deps = []string{"tester.q"}

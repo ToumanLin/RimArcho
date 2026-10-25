@@ -8,7 +8,7 @@
 # built by monitor/build.ps1 (needs the .NET SDK 10; game references come from NuGet) and
 # shipped under monitor/ArchoMonitor/.
 #
-#   pwsh scripts/release.ps1 -Version 0.5.0            # tests, then dist/archo-0.5.0-windows-amd64.zip
+#   pwsh scripts/release.ps1 -Version 0.5.0            # tests (-short), then dist/archo-0.5.0-windows-amd64.zip
 #   pwsh scripts/release.ps1 -Version 0.5.0 -SkipTests
 #
 # Nothing outside dist/ is written; the script never pushes or publishes.
@@ -34,8 +34,12 @@ if (git status --porcelain 2>$null) { $commit += "-dirty" }
 $date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
 
 if (-not $SkipTests) {
-    Write-Host "go test ./..."
-    go test ./...
+    # -short skips the long performance checks (the 1354-mod TUI latency run); run them with a
+    # plain `go test ./...` when touching scan or TUI speed. -count=1 turns off the test result
+    # cache: a release reruns the tests anyway, and recording what ~230k file reads and stats
+    # the tests made costs `go test` about a minute on Windows after the tests have finished.
+    Write-Host "go test -short -count=1 ./..."
+    go test -short -count=1 ./...
     if ($LASTEXITCODE -ne 0) { throw "tests failed" }
 }
 

@@ -4,9 +4,12 @@
 package testkit
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/rand/v2"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -109,8 +112,29 @@ func (e *Env) Open() {
 	a.TestGameStart = func(*exec.Cmd) error { return fmt.Errorf("test game starter not configured") }
 	// The Def/Patch analysis runs in-process instead of an `archo analyze` child.
 	a.AnalyzeRunner = app.InProcessAnalyze(a)
+	// Never go online: a test that needs a remote serves it on loopback (httptest) and points
+	// the matching URL or client there. Anything else, such as a Workshop description fetched
+	// when a detail pane opens, fails at once instead of waiting on the network and writing
+	// into the fixture after the test has ended.
+	a.HTTP = &http.Client{Timeout: 15 * time.Second, Transport: offline}
 	e.App = a
 	e.T.Cleanup(func() { a.Close() })
+}
+
+// offline dials loopback only and uses no proxy (a local proxy would forward to the internet).
+var offline = &http.Transport{
+	Proxy: nil,
+	DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+			return nil, fmt.Errorf("test fixture is offline: %s", addr)
+		}
+		var d net.Dialer
+		return d.DialContext(ctx, network, addr)
+	},
 }
 
 // Advance moves the fake clock.

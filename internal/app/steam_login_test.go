@@ -8,6 +8,7 @@ import (
 )
 
 func TestSteamLoginStepsAndDownloadProgress(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, account, text, kind string
 		ready                     bool

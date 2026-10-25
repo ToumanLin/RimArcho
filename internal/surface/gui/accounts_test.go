@@ -17,6 +17,7 @@ import (
 )
 
 func TestPlayerAccountForgetAndDownloadProvenance(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	api := newAPI(e.App)
 	t.Cleanup(api.Close)
@@ -68,6 +69,7 @@ type accountTransport func(*http.Request) (*http.Response, error)
 func (f accountTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestSettingsStaleSessionVerifiesOnceIncludingFailure(t *testing.T) {
+	t.Parallel()
 	for _, fail := range []bool{false, true} {
 		t.Run(map[bool]string{false: "available", true: "challenge"}[fail], func(t *testing.T) {
 			e := testkit.New(t)

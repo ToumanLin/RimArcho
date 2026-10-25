@@ -8,6 +8,7 @@ import (
 
 // Every summary and cause the card can show, and every kind of fix, has its Chinese text.
 func TestPatternTextCovered(t *testing.T) {
+	t.Parallel()
 	for _, p := range patterns.Load().Rules {
 		if p.Fallback {
 			continue

@@ -16,6 +16,7 @@ import (
 // The detail's action separates exactly the shown instance, inherits player data, keeps
 // plan/file identity and refreshes cached details. A later scan must not rejoin it.
 func TestSeparateCopyFromDetail(t *testing.T) {
+	t.Parallel()
 	for _, entry := range []string{"library", "editor"} {
 		t.Run(entry, func(t *testing.T) {
 			e, api, _ := fixture(t)

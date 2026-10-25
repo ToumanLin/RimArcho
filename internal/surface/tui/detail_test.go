@@ -140,6 +140,7 @@ func TestDetailContent(t *testing.T) {
 }
 
 func TestImageWriter(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := &imgWriter{Writer: &buf}
 	w.set([]placement{{row: 5, col: 10, cols: 4, rows: 2, seq: []byte("<IMG>")}})
@@ -162,6 +163,7 @@ func TestImageWriter(t *testing.T) {
 }
 
 func TestImgRows(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ w, h, cols, want int }{
 		{1600, 900, 60, 15}, // 16:9: 60 × 13/30 × 9/16 = 14.6
 		{500, 500, 40, 18},  // square
@@ -179,6 +181,7 @@ func TestImgRows(t *testing.T) {
 // removes it ([✓]); a tag only some have shows as [~] and enter gives it to all; # ←
 // then typing makes a new tag. The list rows show tags faintly.
 func TestT13TagBar(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	e.MustRun("tag", "add", "pkg:ludeon.rimworld", "official-stuff", "core")
 	e.MustRun("tag", "add", "pkg:tester.a", "half")
@@ -265,6 +268,7 @@ func TestT13TagBar(t *testing.T) {
 // Kinsoku: across every width, no wrapped line starts with closing punctuation or ends
 // with opening punctuation, nothing is lost, and every line fits.
 func TestWrapKinsoku(t *testing.T) {
+	t.Parallel()
 	texts := []string{
 		"RimCrow 的核心伴生模组。支持从游戏获取更加详细的日志。必须放在 Harmony 之后加载。最好放在列表最前端以便获取更加完整的加载日志。",
 		"他说：「这是《边缘世界》的模组（测试），好吗？」然后走了！",
@@ -422,6 +426,7 @@ func TestT6Thumbnail(t *testing.T) {
 // 06 §4.2: the full-screen detail has Def, patches, Harmony, rules and the full history
 // as sub-sections, 1–5 jump to them; the column shows a one-line history.
 func TestFullSections(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	e.MustRun("rule", "add", "after", "pkg:tester.a", "pkg:brrainz.harmony")
 	m := direct(t, e, 120, 40)
@@ -467,6 +472,7 @@ func TestFullSections(t *testing.T) {
 // within the column at every width, in the column and the full screen, with or without
 // the thumbnail block; nothing is cut off with "…" except the column's "enter shows all".
 func TestT7Wrapping(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	desc := "[h1]说明 Overview[/h1]\nRimCrow 的核心伴生模组。支持从游戏获取更加详细的日志。必须放在 Harmony 之后加载，最好放在列表最前端以便获取更加完整的加载日志（Player.log）。\n" +
 		"[list][*]Supports [b]CombatExtended[/b] and Vanilla Expanded Framework 的全部补丁[*]见 https://github.com/example/a-very-long-repository-name/blob/main/docs/compatibility.md[/list]" +

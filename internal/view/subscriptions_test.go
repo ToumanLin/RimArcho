@@ -206,6 +206,7 @@ func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 // 打开来源页 (06 §2.9): two commits on GitHub / GitLab open their compare view; otherwise the
 // repository or the download page.
 func TestSubscriptionSourceURL(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		r    subscribe.Record
 		want string

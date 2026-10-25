@@ -36,6 +36,7 @@ func fakeCollection(t *testing.T, e *testkit.Env, items *[]string) {
 }
 
 func TestFollowCollection(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	e.AddWorkshop("1002", testkit.Sample("tester.d", "D"))
 	scanNow(t, e)

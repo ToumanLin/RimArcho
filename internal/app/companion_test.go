@@ -42,6 +42,7 @@ const unityHead = "Mono path[0] = 'x'\nRimWorld 1.6.4633 rev1261\n"
 
 // L9, L6, L12: which companion log belongs to a Player.log.
 func TestCompanionFor(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	root := filepath.Join(e.Root, "userdata")
 	am, amPrev := filepath.Join(root, "ArchoMonitor.log"), filepath.Join(root, "ArchoMonitor-prev.log")
@@ -92,6 +93,7 @@ func TestCompanionFor(t *testing.T) {
 // L8, L10, L13: the full analysis takes files, counts and times from ArchoMonitor.log; an
 // error only the monitor saw becomes a cluster of its own.
 func TestLogAnalysisWithMonitor(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	ix, _ := e.App.Index()
@@ -148,6 +150,7 @@ func TestLogAnalysisWithMonitor(t *testing.T) {
 // L5, L12: live tracking follows RimCrow's log until Player.log names this run's
 // ArchoMonitor.log; an error only the monitor saw shows up after a short wait.
 func TestLiveLogMonitor(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	scanNow(t, e)
 	root := filepath.Join(e.Root, "packs", "p", "userdata")

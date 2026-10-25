@@ -12,6 +12,7 @@ import (
 
 // Load-order findings by constraint strength (04 §5.3), and the DLC-after-mods move.
 func TestOrderSeverityAndDLCMove(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.WriteFile(filepath.Join(e.Game, "Data", "Odyssey", "About", "About.xml"),
 		"<ModMetaData><packageId>Ludeon.RimWorld.Odyssey</packageId><name>Odyssey</name></ModMetaData>")
@@ -80,6 +81,7 @@ func TestOrderSeverityAndDLCMove(t *testing.T) {
 // A loadBefore Core that other constraints make impossible is left out with the reason,
 // not reported as a cycle.
 func TestSortDropsUnsatisfiable(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	lib := testkit.Sample("tester.lib", "Lib")
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Lib"), lib)

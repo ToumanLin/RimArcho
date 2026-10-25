@@ -90,6 +90,7 @@ var v3States = []v3State{
 // T17: in every state, 1000 random arrow keys (PgUp / PgDn and shift / ctrl arrows too)
 // never change the workspace: nothing is moved, enabled, staged or tagged.
 func TestT17ArrowsOnlyNavigate(t *testing.T) {
+	t.Parallel()
 	e, _ := v3Fixture(t)
 	arrows := []tea.KeyType{tea.KeyUp, tea.KeyDown, tea.KeyLeft, tea.KeyRight, tea.KeyPgUp, tea.KeyPgDown,
 		tea.KeyShiftUp, tea.KeyShiftDown, tea.KeyShiftLeft, tea.KeyShiftRight, tea.KeyCtrlUp, tea.KeyCtrlDown}
@@ -116,6 +117,7 @@ func TestT17ArrowsOnlyNavigate(t *testing.T) {
 
 // T18: the tasks of 06 §11, each in no more keys than the v3 column, with the right result.
 func TestT18TaskSteps(t *testing.T) {
+	t.Parallel()
 	e, m := v3Fixture(t)
 	n := 0
 	key := func(ks ...string) {
@@ -290,6 +292,7 @@ func TestT19PositionLine(t *testing.T) {
 // T20: from any state, esc at most three times gets back to a list area with nothing
 // selected and nothing open.
 func TestT20EscBack(t *testing.T) {
+	t.Parallel()
 	e, _ := v3Fixture(t)
 	deep := []v3State{
 		{"selection + search", func(m *model) { pressAll(m, "shift+down", "/"); typeIn(m, "p") }},
@@ -327,6 +330,7 @@ func TestT20EscBack(t *testing.T) {
 // The position input (06 §3.6): a number, a name with tab for before, enter alone is the
 // suggested place; from Disabled it enables there, one undo step.
 func TestPositionInput(t *testing.T) {
+	t.Parallel()
 	e, m := v3Fixture(t)
 	pos := func(name string) int { return m.st.Position(idOf(t, m, name)) }
 	press(m, "2")
@@ -400,6 +404,7 @@ func TestPositionInput(t *testing.T) {
 // 06 §3.7: while searching, the status line counts the other lists' matches; tab takes
 // the search to the next list with matches.
 func TestSearchOtherLists(t *testing.T) {
+	t.Parallel()
 	_, m := v3Fixture(t)
 	press(m, "2")
 	press(m, "/")

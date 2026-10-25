@@ -66,6 +66,7 @@ func awaitBackgrounds(t *testing.T, events <-chan string) {
 }
 
 func TestMenuBackgroundSettingsAndVersionRefresh(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	menuGame(t, e.Game)
 	old := BgSetting{Key: "game:ludeon.rimworld.royalty", Stars: []string{app.BgDefault, "game:ludeon.rimworld.royalty"}, Dim: 37, Focus: "right"}
@@ -194,6 +195,7 @@ func TestBackgroundEventsOnlyWhenListChanges(t *testing.T) {
 }
 
 func TestMenuPreviewMerge(t *testing.T) {
+	t.Parallel()
 	previews := []app.Background{
 		{Key: app.BgDefault, Src: "core-preview.png"},
 		{Key: "game:ludeon.rimworld.royalty", Src: "dlc-preview.png"},
@@ -211,6 +213,7 @@ func TestMenuPreviewMerge(t *testing.T) {
 }
 
 func TestMissingAndBrokenAssetsKeepOfficialPreview(t *testing.T) {
+	t.Parallel()
 	for _, brokenZIP := range []bool{false, true} {
 		t.Run(map[bool]string{false: "no-resources", true: "broken-zip"}[brokenZIP], func(t *testing.T) {
 			e, api, events := fixture(t)

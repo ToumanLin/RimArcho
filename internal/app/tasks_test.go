@@ -10,7 +10,7 @@ import (
 
 func waitEnded(t *testing.T, ts *Tasks, id string) Task {
 	t.Helper()
-	for i := 0; i < 400; i++ {
+	for i := 0; i < 4000; i++ {
 		for _, x := range ts.List() {
 			if x.ID == id && x.Ended() {
 				return x
@@ -32,6 +32,7 @@ func items(refs ...string) []TaskItem {
 
 // One failure does not stop the task; every item keeps its result (06 §2.16).
 func TestTasksItemsGoOnAfterAFailure(t *testing.T) {
+	t.Parallel()
 	ts := OpenTasks(filepath.Join(t.TempDir(), "tasks.json"))
 	ts.Do = func(kind, ref string) error {
 		if ref == "b" {
@@ -58,6 +59,7 @@ func TestTasksItemsGoOnAfterAFailure(t *testing.T) {
 
 // Stop: the item in hand finishes, the rest are left untouched; a queued task never runs.
 func TestTasksStop(t *testing.T) {
+	t.Parallel()
 	ts := OpenTasks(filepath.Join(t.TempDir(), "tasks.json"))
 	hold := make(chan struct{})
 	var once sync.Once
@@ -69,7 +71,7 @@ func TestTasksStop(t *testing.T) {
 	}
 	first := ts.Submit("delete", LaneFiles, "3 mods", items("a", "b", "c"))
 	second := ts.Submit("move", LaneFiles, "1 mod", items("d"))
-	for i := 0; i < 200; i++ {
+	for i := 0; i < 4000; i++ {
 		if ts.List()[1].State == TaskRunning {
 			break
 		}
@@ -93,6 +95,7 @@ func TestTasksStop(t *testing.T) {
 
 // The record survives the window; what ran when it closed is marked stopped.
 func TestTasksRecordAndClose(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "tasks.json")
 	ts := OpenTasks(path)
 	id := ts.Begin("scan", "main", nil)
@@ -117,6 +120,7 @@ func TestTasksRecordAndClose(t *testing.T) {
 
 // Waiting tasks move in their lane's order.
 func TestTasksMove(t *testing.T) {
+	// Not parallel: waits a fixed time for background work, which is too short under load.
 	ts := OpenTasks("")
 	block := make(chan struct{})
 	ts.Do = func(kind, ref string) error { <-block; return nil }

@@ -13,6 +13,7 @@ import (
 )
 
 func TestPlanLoadCostCacheAndSelectedPlan(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	a := e.AddWorkshop("3101", testkit.Sample("tester.cost.a", "Cost A"))
 	b := e.AddWorkshop("3102", testkit.Sample("tester.cost.b", "Cost B"))
@@ -114,6 +115,7 @@ func TestPlanLoadCostCacheAndSelectedPlan(t *testing.T) {
 }
 
 func TestPlanLoadCostMissingLoadFolder(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	dir := e.AddWorkshop("3103", testkit.Sample("tester.cost.missing", "Missing folder"))
 	e.WriteFile(filepath.Join(dir, "LoadFolders.xml"), "<loadFolders><v1.6><li>/</li><li>NotShipped</li></v1.6></loadFolders>")
