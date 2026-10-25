@@ -124,6 +124,8 @@ try {
       pending: [{ id: "git-id", ref: "git-ref", name: "Git fixture", kind: "git", source: "Git", installed: "abc", available: "def", usedIn: ["Colony"] },
         { id: "page-id", ref: "page-ref", name: "Page fixture", kind: "page", source: "download page", installed: "1", available: "2", usedIn: [] }],
       history: { rows: [], since: "since last played" } };
+    data.sources[4].checked = "";
+    data.sources[4].result = "not checked yet";
     let reads = [], checks = [], previews = [], updates = [];
     handlers.set("SubscriptionsPage", (library, of) => { reads.push([library, of]); return data; });
     handlers.set("CheckSubscriptionSource", kind => { checks.push(kind); return "queued"; });
@@ -133,6 +135,11 @@ try {
     await screens.changes(null); await settle();
     assert([...document.querySelectorAll("[data-section]")].map(n => n.dataset.section).join() === "sources,pending,history", "section order");
     assert(document.querySelectorAll("[data-source]").length === 5 && checks.length === 0, "sources checked on entry");
+    const accountRow = document.querySelector('[data-source="steamcmd"]');
+    assert(accountRow.querySelector("button").textContent === T("accounts") + " →", "account link repeats the state");
+    assert(accountRow.textContent.split("offline account").length === 2, "account state is duplicated");
+    assert(document.querySelector('[data-source="local"] .muted').textContent === "not checked yet", "unchecked source has a placeholder or extra spacing");
+    assert([...document.querySelector('[data-source="git"] .muted').children].map(n => n.textContent).join(" ") === "10:00 cached", "checked source lost time/result");
     assert(document.querySelectorAll(".subscription-pending").length === 2, "missing pending updates");
     for (const n of [1, 2, 3]) { screens.areaKey(new KeyboardEvent("keydown", { key: String(n), cancelable: true })); assert(document.activeElement.dataset.area === String(n), "section key " + n); }
     key("+"); await settle();

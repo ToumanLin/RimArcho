@@ -173,7 +173,7 @@ function draw(loading) {
   hs.append(hsHead);
   if (F.d && F.d.history) hs.append(el("div", "history word-facts", F.d.history));
   else hs.append(el("div", "muted", T("no changes recorded")));
-  const all = el("button", "link", T("see all on the changes page"));
+  const all = el("button", "link", T("see all in change history"));
   all.onclick = () => document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: F.id, name: fullName() } }));
   hs.append(all);
   side.append(hs);

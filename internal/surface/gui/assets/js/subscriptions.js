@@ -53,8 +53,8 @@ export function drawSubscriptions(scroll, data, area, controls) {
     const row = el("div", "subscription-source");
     row.dataset.source = source.key;
     row.append(el("span", "word-facts", source.name + "  " + Tf("%d mods", source.count)),
-      el("span", "muted word-facts", source.checked + "  " + source.result));
-    if (source.account) row.append(action(source.account + " → " + T("accounts"), async () => {
+      el("span", "muted word-facts", [source.checked, source.result].filter(Boolean).join("  ")));
+    if (source.account) row.append(el("span", "word-facts", source.account), action(T("accounts") + " →", async () => {
       await ui.go("settings");
       const heading = document.querySelector('[data-setting-action^="account "]')?.closest("[data-area]");
       heading?.scrollIntoView({ block: "start" });

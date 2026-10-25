@@ -3,6 +3,7 @@ package view
 import (
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 )
@@ -39,22 +40,27 @@ func BuildSubscriptions(a *app.App, st *app.LoadoutState, o modchanges.Opts) (*S
 		return nil, err
 	}
 	p := &SubscriptionsPage{History: history, Pending: []PendingUpdate{}}
-	accounts := AccountGroup(a)
 	keys := []string{app.LibWorkshop, app.LibSteamCMD, app.LibGit, app.LibPage, app.LibLocal}
 	names := []string{T("Steam Workshop (client)"), "SteamCMD", "Git", T("download page / LoversLab"), T("local (no source)")}
 	checks := map[string]app.SourceCheck{}
 	for i, key := range keys {
 		c := a.SubscriptionSourceCheck(key)
 		checks[key] = c
-		r := SubscriptionSource{Key: key, Name: names[i], Checked: "—", Result: T("not checked yet")}
+		r := SubscriptionSource{Key: key, Name: names[i], Result: T("not checked yet")}
 		if !c.At.IsZero() {
 			r.Checked, r.Result = a.FormatTime(c.At), T(c.Result)
 		}
 		if key == app.LibSteamCMD {
-			r.Account = accounts.Items[0].Value
+			r.Account = a.SteamAccountStatus().State
 		}
 		if key == app.LibPage {
-			r.Account = accounts.Items[1].Value
+			r.Account = "未启用"
+			if a.Store.Meta("account:loverslab:enabled") == "true" {
+				r.Account = "需登录"
+				if session, err := accounts.Open(a.AccountsDir()); err == nil {
+					r.Account = session.Status().State
+				}
+			}
 		}
 		p.Sources = append(p.Sources, r)
 	}

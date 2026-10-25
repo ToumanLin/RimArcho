@@ -2,7 +2,7 @@ package store
 
 import "strings"
 
-// What the changes page (06 §2.9) reads of stored snapshots: the declaration and Workshop
+// What the change history (06 §2.9) reads of stored snapshots: the declaration and Workshop
 // time of the two ends of a mod's changes, and their file lists.
 
 // SnapInfo is a stored snapshot's declaration and size.

@@ -969,7 +969,7 @@ async function start() {
     await edited(api.RunOp("separate", [e.detail]), false, [e.detail]);
     detailFollow(true);
   });
-  // a detail's 在变化页查看全部: 变化 with only that mod's Lineage (06 §2.9)
+  // a detail's 在变化记录查看全部: 变化 with only that mod's Lineage (06 §2.9)
   document.addEventListener("changes-of", async (e) => { shell.navigated(); await scr.changes(e.detail); renderWhere(); renderHints(); });
   // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {

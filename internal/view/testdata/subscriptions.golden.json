@@ -13,7 +13,7 @@
       "count": 1,
       "checked": "2026-10-01 11:00",
       "result": "check complete",
-      "account": "匿名；未安装 SteamCMD"
+      "account": "未安装 SteamCMD"
     },
     {
       "key": "git",
@@ -28,13 +28,13 @@
       "count": 1,
       "checked": "2026-10-01 10:00",
       "result": "check complete",
-      "account": "未连接；默认关闭"
+      "account": "未启用"
     },
     {
       "key": "local",
       "name": "local (no source)",
       "count": 1,
-      "checked": "—",
+      "checked": "",
       "result": "not checked yet"
     }
   ],

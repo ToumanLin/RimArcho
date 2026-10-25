@@ -117,3 +117,37 @@ func TestSubscriptionsThreeSections(t *testing.T) {
 		t.Fatalf("subscriptions golden differs:\n%s", actual)
 	}
 }
+
+func TestSubscriptionSourceStates(t *testing.T) {
+	view.SetLang("en")
+	e := testkit.New(t)
+	e.App.SteamCMDNoPath = true
+	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "fixture executable")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, enabled := range []bool{false, true} {
+		if err := e.App.Store.SetMeta("account:loverslab:enabled", fmt.Sprint(enabled)); err != nil {
+			t.Fatal(err)
+		}
+		p, err := view.BuildSubscriptions(e.App, st, modchanges.Opts{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := "未启用"
+		if enabled {
+			want = "未连接"
+		}
+		if p.Sources[1].Account != "匿名" || p.Sources[3].Account != want {
+			t.Fatalf("source account states: %+v", p.Sources)
+		}
+		for _, s := range p.Sources {
+			if s.Checked != "" || s.Result != "not checked yet" {
+				t.Fatalf("unchecked source: %+v", s)
+			}
+		}
+	}
+}
