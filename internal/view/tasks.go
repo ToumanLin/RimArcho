@@ -33,6 +33,8 @@ const (
 	TaskVacuum           = "db-vacuum"
 	TaskGC               = "gc"
 	TaskSubscribe        = "subscribe"
+	TaskSourceCheck      = "source-check"
+	TaskWorkshopUpdate   = "workshop-update"
 	TaskSubscriptionFrom = "subscription-from"
 	PageTasks            = "tasks"
 	taskKeyStop          = "x"
@@ -45,7 +47,7 @@ const (
 // IsSettingTask identifies maintenance tasks shared by settings and the guide.
 func IsSettingTask(kind string) bool {
 	switch kind {
-	case TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskWezTerm, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
+	case TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskWezTerm, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
 		return true
 	}
 	return false
@@ -132,6 +134,10 @@ type TaskItemRow struct {
 // TaskTitle names a kind.
 func TaskTitle(kind string) string {
 	switch kind {
+	case TaskSourceCheck:
+		return T("check for updates")
+	case TaskWorkshopUpdate:
+		return T("update subscription")
 	case TaskAccount:
 		return "账户操作"
 	case TaskSiteDownload:
@@ -434,6 +440,8 @@ func joinFacts(parts ...string) string {
 
 func taskTarget(t *app.Task) string {
 	switch t.Kind {
+	case TaskSubscribe, TaskSubscriptionFrom, TaskSourceCheck, TaskWorkshopUpdate, TaskSiteDownload, OpSubCheck, OpSubUpdate, OpSubRemove:
+		return PageChanges
 	case TaskAccount:
 		return PageSettings
 	case TaskSteamCMD, TaskTodds, TaskWezTerm, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
@@ -459,7 +467,7 @@ func taskTarget(t *app.Task) string {
 func TaskTargetName(target string) string {
 	switch {
 	case target == PageChanges:
-		return T("changes")
+		return T("subscriptions and updates")
 	case target == PageNeeds:
 		return T("can it run")
 	case target == PagePacks || strings.HasPrefix(target, "pack:"):

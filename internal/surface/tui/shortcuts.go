@@ -88,6 +88,14 @@ func (m *model) openChangesOf(id, name string) tea.Cmd {
 	m.chg.cursor, m.chg.off = 0, 0
 	m.tab = tabChanges
 	m.loadChanges()
+	if id != "" {
+		for i, r := range m.chg.rows {
+			if r.text == "3 "+T("change history") {
+				m.chg.cursor, m.chg.off = i, i
+				break
+			}
+		}
+	}
 	return nil
 }
 

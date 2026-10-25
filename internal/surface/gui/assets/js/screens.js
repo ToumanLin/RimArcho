@@ -14,12 +14,14 @@ import { appearanceControl } from "./appearance.js";
 import { virtualRows } from "./virtualrows.js";
 import { on } from "./api.js";
 import { wireSeparator } from "./separator.js";
+import { drawSubscriptions, subscriptionKey, subscriptionHints, resetSubscriptions } from "./subscriptions.js";
 
 let ui = null;
 export function initScreens(u) {
   ui = u;
   on("tasks", (ev) => {
     if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
+    if (S.screen === "changes" && ev?.ended) changes();
   });
 }
 
@@ -908,17 +910,21 @@ export function changesFiltered() { return S.screen === "changes" && !!C.of; }
 
 // changesPlan: the next 变化 shows the current plan since it was last played (the home
 // page's line opens it so).
-export function changesPlan() { C.library = false; C.of = null; C.cur = 0; }
+let historyLanding = false;
+export function changesPlan() { C.library = false; C.of = null; C.cur = 0; historyLanding = true; }
 
 // changes shows the page; of: {id, name} narrows it to that mod's Lineage, null shows every
 // mod, undefined keeps what it shows.
 export async function changes(of) {
+  if (S.screen !== "changes") resetSubscriptions();
+  if (of?.id) historyLanding = true;
   if (of !== undefined && (of && of.id) !== (C.of && C.of.id)) { C.of = of; C.cur = 0; C.open.clear(); }
   let p;
   const read = beginPageRead("changes");
-  try { p = await api.Changes(C.library, C.of ? C.of.id : ""); } catch (e) { read.fail(e); return; }
+  try { p = await api.SubscriptionsPage(C.library, C.of ? C.of.id : ""); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
-  C.page = p;
+  C.subscriptions = p;
+  C.page = p.history;
   drawChanges();
   read.finish();
 }
@@ -946,10 +952,16 @@ const rowKey = (r) => r.id + "|" + (r.before || 0) + "|" + (r.after || 0);
 const TIER = { 1: "launch", 2: "watch", 3: "content" };
 
 function drawChanges() {
+  const focus = document.activeElement;
+  const typing = focus?.closest(".subscribe-form") ? focus : null;
+  const wasHistory = !!focus?.closest('[data-section="history"]');
   const top = ($("#screen .page-scroll") || {}).scrollTop || 0;
-  const w = logPage("changes", "", rescanButton());
+  const w = page("logs fill", "");
+  $("#screen").replaceChildren(w);
   const scroll = el("div", "scroll page-scroll chg");
   w.append(scroll);
+  const history = drawSubscriptions(scroll, C.subscriptions || {}, area, { ...ui, rescan: rescanButton,
+    history: r => changes({ id: r.id, name: r.name }) });
   const p = C.page || {};
   // the scope and time, or the one condition (removable as on Mod 库存)
   const bar = el("div", "chg-bar");
@@ -970,19 +982,19 @@ function drawChanges() {
     bar.append(seg);
     if (p.since) bar.append(el("span", "muted word-facts", p.since));
   }
-  scroll.append(bar);
+  history.append(bar);
   C.items = [];
   C.els = [];
-  if (p.noScan) { scroll.append(el("div", "card empty-state", T("no scan yet (R scans)"))); return finish(); }
+  if (p.noScan) { history.append(el("div", "empty-state", T("no scan yet (R scans)"))); return finish(); }
   if (!C.of) {
     const card = el("section", "card chg-card");
     for (const r of p.rows || []) modRow(card, r);
     if (p.arrivals) group(card, p.arrivals, "now");
     if (!card.children.length) card.append(el("div", "empty-state", T("nothing changed")));
-    scroll.append(card);
+    history.append(card);
   }
   const older = p.older || [];
-  if (older.length && !C.of) scroll.append(el("h2", "label chg-older", T("earlier")));
+  if (older.length && !C.of) history.append(el("h2", "label chg-older", T("earlier")));
   for (const d of older) {
     const k = "day:" + d.day;
     const open = !!C.of || C.open.has(k);
@@ -996,14 +1008,17 @@ function drawChanges() {
       for (const r of d.rows || []) modRow(card, r);
       if (d.arrivals) group(card, d.arrivals, d.day);
     }
-    scroll.append(card);
+    history.append(card);
   }
   finish();
   function finish() {
     C.cur = Math.min(C.cur, Math.max(C.items.length - 1, 0));
-    markRows(C);
+    C.els.forEach((r, i) => r.classList.toggle("cur", i === C.cur));
     const sc = $("#screen .page-scroll");
     if (sc) sc.scrollTop = top;
+    if (historyLanding) { history.scrollIntoView({ block: "start" }); history.focus({ preventScroll: true }); historyLanding = false; }
+    else if (wasHistory) history.focus({ preventScroll: true });
+    if (typing?.isConnected) typing.focus({ preventScroll: true });
     ui.renderHints();
   }
 }
@@ -1013,7 +1028,7 @@ function item(node, it) {
   const i = C.items.length;
   C.items.push(it);
   C.els.push(node);
-  node.onclick = (e) => { if (e.target.closest("button")) return; C.cur = i; toggle(it); };
+  node.onclick = (e) => { if (e.target.closest("button")) return; C.cur = i; node.closest('[data-section="history"]')?.focus({ preventScroll: true }); toggle(it); };
 }
 
 // modRow: [tier] name · sentence ▸, opened: the summary, every fact, the files, the actions.
@@ -1116,7 +1131,7 @@ async function changeAct(r, kind) {
 // changesHints: the hint line on 变化 — the moves, then what the row under the cursor offers.
 export function changesHints() {
   const it = C.items[C.cur];
-  const out = [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }];
+  const out = [...subscriptionHints(), { key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }];
   if (it && it.r) {
     if (hasFiles(it.r)) out.push({ key: "i", label: T("files") });
     // ctrl+o first: the hint line folds it with ctrl+w into one place
@@ -1124,7 +1139,7 @@ export function changesHints() {
     for (const a of it.r.actions || []) out.push({ key: a.key, label: a.label });
   }
   if (!C.of) out.push({ key: "a", label: C.library ? T("the current plan") : T("the whole library") });
-  out.push({ key: "tab", label: T("all mods") });
+  out.push({ key: "tab", label: T("the next field or button") });
   return out;
 }
 
@@ -1164,8 +1179,11 @@ function changesKey(e) {
   const k = e.key;
   const ctrl = e.ctrlKey || e.metaKey;
   const done = () => e.preventDefault();
+  if (subscriptionKey(e)) return;
   if (k === "Escape" && C.of) { done(); return changes(null).then(() => ui.renderHints()); }
-  if (k === "Tab") { done(); return ui.go("library"); }
+  if (k === "Tab") return;
+  if (e.target?.closest?.("button, input, select, .subscribe-form") && !["R", "a"].includes(k)) return;
+  if (!document.activeElement?.closest('[data-section="history"]') && !["a", "R"].includes(k)) return;
   const m = C.items.length ? moveIn(C.cur, C.items.length, k) : null;
   if (m != null) { done(); C.cur = m; markRows(C); return ui.renderHints(); }
   const it = C.items[C.cur];

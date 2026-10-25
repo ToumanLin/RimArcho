@@ -139,23 +139,24 @@ export function subscribeForm(close) {
   return { el: root, focus: () => url.field.focus() };
 }
 
-export function updateFromForm(host, ref, close) {
+export function updateFromForm(host, ref, close, onApplied = () => {}) {
   host.querySelector(".subscribe-form")?.remove();
   const root = el("section", "subscribe-form");
   const files = importPicker();
   const actions = el("div", "subscribe-row");
+  const applied = () => { close(); onApplied(); };
   actions.append(button("从 LoversLab 会话更新", async () => {
     const pageURL = await api.SubscriptionFilePage(ref);
     if (!pageURL) return say("fail", "此订阅没有可用的 LoversLab 文件页，请选择下载的 zip。");
     root.querySelector(".subscribe-page")?.remove();
-    root.append(authenticatedFiles(pageURL, ref, close));
+    root.append(authenticatedFiles(pageURL, ref, applied));
   }));
   actions.append(button(T("preview"), async () => {
     const from = files.value();
     if (!from) return say("fail", T("choose downloaded files first"));
     const p = await api.SubscriptionFromPreview(ref, from);
     pop.confirm(p.title, p.lines, T("update subscription"), p.apply ? async () => {
-      try { say("ok", await api.SubscriptionFrom(ref, from)); close(); } catch (e) { say("fail", errText(e)); }
+      try { say("ok", await api.SubscriptionFrom(ref, from)); applied(); } catch (e) { say("fail", errText(e)); }
     } : null);
   }), button(T("close"), close));
   root.append(el("div", "", T("choose downloaded files first")), files.el, actions);

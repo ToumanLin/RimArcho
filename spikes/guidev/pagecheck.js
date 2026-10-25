@@ -118,10 +118,69 @@ try {
     pop.close(); popup.remove();
     handlers.set("Needs", () => ({ items: [] }));
   });
+  await test("subscriptions render three sections; inline subscribe esc; update preview, selection and history links", async () => {
+    const sourceKeys = ["workshop", "steamcmd", "git", "page", "local"];
+    const data = { sources: sourceKeys.map(key => ({ key, name: key, count: 1, checked: "10:00", result: "cached", account: ["steamcmd", "page"].includes(key) ? "offline account" : "" })),
+      pending: [{ id: "git-id", ref: "git-ref", name: "Git fixture", kind: "git", source: "Git", installed: "abc", available: "def", usedIn: ["Colony"] },
+        { id: "page-id", ref: "page-ref", name: "Page fixture", kind: "page", source: "download page", installed: "1", available: "2", usedIn: [] }],
+      history: { rows: [], since: "since last played" } };
+    let reads = [], checks = [], previews = [], updates = [];
+    handlers.set("SubscriptionsPage", (library, of) => { reads.push([library, of]); return data; });
+    handlers.set("CheckSubscriptionSource", kind => { checks.push(kind); return "queued"; });
+    handlers.set("LibraryPreview", (kind, refs) => { previews.push([kind, refs]); return { title: "preview", apply: true, lines: ["abc → def"] }; });
+    handlers.set("LibraryDo", (kind, refs) => { updates.push([kind, refs]); return "queued"; });
+    const popup = document.createElement("div"); popup.id = "popup"; popup.hidden = true; document.querySelector("#app").append(popup);
+    await screens.changes(null); await settle();
+    assert([...document.querySelectorAll("[data-section]")].map(n => n.dataset.section).join() === "sources,pending,history", "section order");
+    assert(document.querySelectorAll("[data-source]").length === 5 && checks.length === 0, "sources checked on entry");
+    assert(document.querySelectorAll(".subscription-pending").length === 2, "missing pending updates");
+    for (const n of [1, 2, 3]) { screens.areaKey(new KeyboardEvent("keydown", { key: String(n), cancelable: true })); assert(document.activeElement.dataset.area === String(n), "section key " + n); }
+    key("+"); await settle();
+    const input = document.querySelector(".subscribe-form input");
+    assert(input && input === document.activeElement && !S.popup, "subscribe not inline/focused");
+    input.value = "draft URL";
+    emit("tasks", { ended: { kind: "source-check" } }); await settle();
+    assert(document.querySelectorAll("[data-section]").length === 3, "refresh duplicated sections");
+    assert(document.querySelector(".subscribe-form input").value === "draft URL", "task refresh discarded draft");
+    document.querySelector(".subscribe-form input").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    assert(!document.querySelector(".subscribe-form"), "esc left panel open");
+    document.querySelector('[data-source="git"] button:last-child').click(); await settle();
+    assert(checks.join() === "git", "check did not queue correct source");
+    const first = document.querySelector(".subscription-pending");
+    first.querySelector("input").click();
+    first.querySelector("button").click(); await settle();
+    assert(previews.length === 1 && updates.length === 0 && S.popup?.kind === "confirm", "update skipped preview/confirmation");
+    const confirm = popup.querySelector(".btns .go");
+    assert(confirm, "no confirmation button"); confirm.click(); await settle();
+    assert(updates[0]?.[1]?.[0] === "git-ref", "wrong update target");
+    key("+");
+    document.querySelector(".subscribe-form input").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    assert(document.querySelector(".subscription-pending.selected"), "panel esc cleared selection too");
+    key("Escape"); assert(!document.querySelector(".subscription-pending.selected"), "second esc left selection");
+    document.querySelectorAll(".subscription-pending")[1].querySelector("button").click(); await settle();
+    assert(document.querySelector('[data-section="pending"] .subscribe-form'), "download-page update did not open inline file picker");
+    const pathInput = document.querySelector('.subscribe-form input');
+    const typing = new KeyboardEvent("keydown", { key: "U", bubbles: true, cancelable: true });
+    pathInput.dispatchEvent(typing);
+    assert(!typing.defaultPrevented && document.querySelector('.subscribe-form input') === pathInput, "update shortcut intercepted file input");
+    document.querySelector('.subscribe-form input').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    assert(!document.querySelector(".subscribe-form") && updates.length === 1, "cancelled file update queued work");
+    document.querySelector(".subscription-pending button:last-child").click(); await settle();
+    assert(reads.at(-1)[1] === "git-id" && document.activeElement.dataset.section === "history", "view changes lost scope/landing");
+    const go = ui.go; ui.go = id => id === "changes" ? screens.changes(null) : undefined;
+    try {
+      handlers.set("Home", () => ({ rows: [{ kind: "plan", envName: "fixture", env: "fixture", plan: 1, page: "plan:1", name: "Colony", current: true }], featured: 0, changes: { title: "current list", text: "since last played" } }));
+      await home.home(); document.querySelector(".hm-actline").click(); await settle();
+      assert(reads.at(-1).join() === "false," && document.activeElement.dataset.section === "history", "home lost current-plan history landing");
+    } finally { ui.go = go; }
+    pop.close(); popup.remove();
+    handlers.set("Home", () => ({ rows: [], featured: -1 }));
+    handlers.set("SubscriptionsPage", () => ({ sources: [], pending: [], history: { rows: [] } }));
+  });
   const pages = [
     ["home", "Home", () => home.home(), { rows: [], featured: -1 }],
     ["needs", "Needs", () => screens.needs(), { items: [] }],
-    ["changes", "Changes", () => screens.changes(null), { rows: [] }],
+    ["changes", "SubscriptionsPage", () => screens.changes(null), { sources: [], pending: [], history: { rows: [] } }],
     ["settings", "Settings", () => screens.settings(), []],
     ["env", "Environment", () => screens.environment(), { envs: [], groups: [] }],
     ["packs", "Packs", () => packs.list(), { rows: [] }],

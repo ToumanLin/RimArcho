@@ -110,7 +110,7 @@ func (m *model) position() string {
 			p += "  " + fmt.Sprintf("%d / %d", min(m.prob.cursor+1, n), n)
 		}
 	case m.tab == tabChanges:
-		p = T("recent changes")
+		p = T("subscriptions and updates")
 	case m.tab == tabLibrary:
 		p = T("mod library")
 		if l := &m.libr; l.page != nil && len(l.flat) > 0 {

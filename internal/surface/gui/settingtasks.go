@@ -71,6 +71,10 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		})
 	}
 	switch kind {
+	case view.TaskSourceCheck:
+		return view.T("check complete"), a.CheckSubscriptionSource(argv[1])
+	case view.TaskWorkshopUpdate:
+		return view.T("Steam will download this Workshop update"), a.UpdateWorkshopClient(argv[1], false)
 	case view.TaskSubscribe, view.TaskSubscriptionFrom:
 		return s.runSubscriptionTask(a, id, kind, argv)
 	case view.TaskSteamCMD, view.TaskTodds, view.TaskWezTerm:

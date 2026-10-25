@@ -768,7 +768,7 @@ function onKey(e) {
   // (on the pages with forms, settings and the like, tab keeps moving the focus)
   // Pages with adjustable cards keep native tab order to reach their gaps (06 §3.1).
   if (e.target.closest?.('[role="separator"]') && k === "Tab") return;
-  if (k === "Tab" && !e.ctrlKey && !e.altKey && (S.screen === "changes" || S.screen === "packs")) { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
+  if (k === "Tab" && !e.ctrlKey && !e.altKey && S.screen === "packs") { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
   if (!S.screen && scr.pageLoading()) {
     if ((e.ctrlKey || e.metaKey) && k === "k") { e.preventDefault(); pop.palette(); }
     return;

@@ -14,7 +14,7 @@ import { renderDetail } from "./detail.js";
 import { fieldList } from "./fields.js";
 import * as pop from "./popups.js";
 import { beginPageRead, pageLoading, openScreen, page, act, rescanButton, area, full } from "./screens.js";
-import { subscribeForm, updateFromForm } from "./subscribe.js";
+import { updateFromForm } from "./subscribe.js";
 import { createBar } from "./filterbar.js";
 import * as ops from "./ops.js";
 import { createTable, mergeColumns } from "./datatable.js";
@@ -146,7 +146,7 @@ function lineageHas(ref) { return (L.page.rows || []).some((r) => r.insts.some((
 
 function build() {
   const sc = openScreen("library");
-  const w = page("fill library", lead(), rescanButton(T("rescan")), act(T("subscribe…"), "", toggleSubscribe, "+", "subscribe"));
+  const w = page("fill library", lead(), rescanButton(T("rescan")));
   const root = el("div", "lib" + (L.full ? " full" : ""));
   const main = el("section", "lib-main card");
   const head = el("div", "lib-head");
@@ -189,14 +189,6 @@ function build() {
   rows.addEventListener("contextmenu", (e) => { if (!e.target.closest(".lib-row")) e.preventDefault(); });
   draw();
   rows.focus();
-}
-
-function toggleSubscribe() {
-  if (subscriptionPanel?.isConnected) { subscriptionPanel.remove(); subscriptionPanel = null; els.rows.focus(); return; }
-  const form = subscribeForm(() => { subscriptionPanel?.remove(); subscriptionPanel = null; els.rows.focus(); });
-  subscriptionPanel = form.el;
-  els.main.prepend(form.el);
-  form.focus();
 }
 
 function updatePage(ref) {
@@ -681,8 +673,7 @@ export function key(e) {
   const x = L.flat[L.cur];
   const done = () => e.preventDefault();
   if (!els) return;
-  if (k === "+" && !ctrl) { done(); return toggleSubscribe(); }
-  if (k === "Escape" && subscriptionPanel?.isConnected) { done(); return toggleSubscribe(); }
+  if (k === "Escape" && subscriptionPanel?.isConnected) { done(); subscriptionPanel.remove(); subscriptionPanel = null; els.rows.focus(); return; }
   if (ops.menuKey(e)) { done(); return menuAtCursor(); }
   // the details hold the focus: the arrows scroll them, ← (or esc) goes back to the rows
   if (L.focus === "detail" && (k === "ArrowDown" || k === "ArrowUp" || k === "PageDown" || k === "PageUp" || k === "j" || k === "k")) {

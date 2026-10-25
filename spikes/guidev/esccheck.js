@@ -32,7 +32,7 @@ async function go(id) {
     b.click();
   }
   else {
-    // a sub-entry (全部 / 变化) shows once its parent is open
+    // a sub-entry (全部 / 订阅与更新) shows once its parent is open
     let b = $(`#nav [data-id="${id}"]`);
     if (!b && id === "changes") { $(`#nav [data-id="library"]`).click(); await wait(600); b = $(`#nav [data-id="changes"]`); }
     b.click();
@@ -56,6 +56,8 @@ function notBase(screen) {
   if (S.screen === "library" && / › /.test(lw)) out.push("details over the page");
   if (S.screen === "library" && $(".lib-detail.focus")) out.push("focus in the details");
   if (S.screen === "library" && /selected|已选/.test(lw)) out.push("library selection");
+  if (S.screen === "changes" && $(".subscribe-form")) out.push("subscription panel");
+  if (S.screen === "changes" && $(".subscription-pending.selected")) out.push("update selection");
   if (!S.screen && S.cols.some((c) => c.sel.size)) out.push("selection");
   if (!S.screen && S.cols.some((c) => c.query)) out.push("staging search");
   const a = document.activeElement;
@@ -93,7 +95,9 @@ const SCENARIOS = [
     key("ArrowDown", { shift: true }); key("\\"); await wait(300); key("Enter"); await wait(300); $(".lib-rows").focus(); key("Enter"); await wait(300);
   }],
   ["Mod 库存 › 全部 · help", "library", "library", async () => { key("?"); }],
-  ["Mod 库存 › 变化 · help", "changes", "changes", async () => { key("?"); }],
+  ["Mod 库存 › 订阅与更新 · help", "changes", "changes", async () => { key("?"); }],
+  ["Mod 库存 › 订阅与更新 · subscribe panel", "changes", "changes", async () => { key("+"); }],
+  ["Mod 库存 › 订阅与更新 · selection + subscribe panel", "changes", "changes", async () => { key("2"); key("a", { ctrl: true }); key("+"); }],
   ["方案 · selection + open filter + palette", "plan", "plan", async () => { key("ArrowDown", { shift: true }); key("\\"); await wait(300); key("k", { ctrl: true }); }],
   ["方案 · filter open, focus on the rows", "plan", "plan", async () => { key("\\"); await wait(300); $('.area[data-area="1"] .rows').focus(); document.activeElement.blur(); }],
   ["方案 · selection + search in staging", "plan", "plan", async () => { key("ArrowDown", { shift: true }); }],

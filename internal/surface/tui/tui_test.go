@@ -219,7 +219,7 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	keys(tm, ":", "list --active", "enter")
 	waitFor(t, tm, "archo list --active")
 	keys(tm, "esc", "c")
-	waitAll(t, tm, "recent changes", "the last scan", "nothing changed")
+	waitAll(t, tm, "subscriptions and updates", "the last scan", "nothing changed")
 	keys(tm, "esc")
 	m := finish(t, tm)
 	if *scans != 2 || m.tab != tabList {

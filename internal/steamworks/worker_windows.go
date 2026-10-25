@@ -32,7 +32,7 @@ type flat struct {
 // the exit code. The current folder must hold steam_api64.dll and steam_appid.txt.
 func Worker(action string, ids []uint64, w io.Writer) int {
 	say := func(s string) { fmt.Fprintln(w, s) }
-	if action != Subscribe && action != Unsubscribe && action != State {
+	if action != Subscribe && action != Unsubscribe && action != State && action != Download {
 		say(ErrorLine("unknown action " + action))
 		return 2
 	}
@@ -43,6 +43,23 @@ func Worker(action string, ids []uint64, w io.Writer) int {
 		return 3
 	}
 	defer f.shutdown.Call()
+	if action == Download {
+		p, err := f.dll.FindProc("SteamAPI_ISteamUGC_DownloadItem")
+		if err != nil {
+			say(ErrorLine(err.Error()))
+			return 3
+		}
+		for _, id := range ids {
+			ok, _, _ := p.Call(f.ugc, uintptr(id), 1)
+			result := "ok"
+			if ok&0xff == 0 {
+				result = "failed:download"
+			}
+			say(ItemLine(id, result, f.state(id)))
+		}
+		say(DoneLine(action, len(ids)))
+		return 0
+	}
 	if action == State {
 		for _, id := range ids {
 			say(StateLine(id, f.state(id)))

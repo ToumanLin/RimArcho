@@ -36,7 +36,7 @@ var Commands = []Command{
 	{"undo", "撤销", "undo", "u"},
 	{"redo", "重做", "redo", "ctrl+r"},
 	{"needs", "需要处理", "needs attention", "! problems"},
-	{"changes", "最近变化", "recent changes", "c history"},
+	{"changes", "订阅与更新", "subscriptions and updates", "c subscriptions updates history"},
 	{"library", "Mod 库", "mod library", "all mods, copies, sizes, filter, clean up"},
 	{"rescan", "重新扫描", "rescan", "R scan"},
 	{"analyze", "重新检查文件", "check the files again", "A analyze"},

@@ -176,7 +176,7 @@ func globalFlags(argv []string) (envName string, here bool, rest []string, err e
 // `archo workshop subscribe|unsubscribe|state`.
 func steamWorker(argv []string, stdout io.Writer) int {
 	if len(argv) < 2 {
-		fmt.Fprintln(stdout, steamworks.ErrorLine("usage: archo steam-worker subscribe|unsubscribe|state <workshop id>…"))
+		fmt.Fprintln(stdout, steamworks.ErrorLine("usage: archo steam-worker subscribe|unsubscribe|state|download <workshop id>…"))
 		return cmds.ExitUsage
 	}
 	var ids []uint64
