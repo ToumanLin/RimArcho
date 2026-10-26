@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -143,6 +144,8 @@ func TestWorkshopResubscribe(t *testing.T) {
 	incoming := filepath.Join(e.Game, "Mods", "_Link_8100")
 	e.Junction(incoming, folder)
 	e.Unsubscribe("8200")
+	e.WriteFile(filepath.Join(folder, "junk.txt"), "untracked junk")
+	e.WriteFile(filepath.Join(folder, ".git", "config"), "author repository")
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.repair")
 	scanNow(t, e)
 	steamDLL(e)
@@ -162,7 +165,7 @@ func TestWorkshopResubscribe(t *testing.T) {
 	fake := fakeSteamWorker(&calls)
 	e.App.SteamWorker = fake
 	op, err := e.App.Workshop(steamworks.Resubscribe, []string{id, left}, true)
-	if err != nil || len(calls) != 0 || op.Items[0].Folder != folder || op.Items[1].Folder != "" {
+	if err != nil || len(calls) != 0 || op.Items[0].Folder != filepath.Join(e.Workshop, "8100") || op.Items[1].Folder != "" {
 		t.Fatalf("dry run: %+v %v %v", op, err, calls)
 	}
 	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 42} }
@@ -170,16 +173,31 @@ func TestWorkshopResubscribe(t *testing.T) {
 		t.Fatalf("running game: %v %v", err, calls)
 	}
 	e.App.GameProbe = func(string) *app.GameRun { return nil }
-	// Simulate Steam deleting, a scan during the gap, then a changed download at the same path.
+	// Steam leaves the old files; RimArcho recycles them before a changed download.
+	recycled := filepath.Join(e.Root, "Recycled8100")
+	e.App.TrashFunc = func(path string) error {
+		if len(calls) != 1 || calls[0][1] != steamworks.Unsubscribe || path != filepath.Join(e.Workshop, "8100") {
+			t.Fatalf("cleanup before confirmed unsubscribe: %s %v", path, calls)
+		}
+		if err := os.Rename(path, recycled); err != nil {
+			return err
+		}
+		scanNow(t, e) // identity and incoming links must survive a scan during the gap
+		return nil
+	}
 	e.App.SteamWorker = func(dir string, args []string) (string, error) {
 		out, err := fake(dir, args)
 		if args[0] == steamworks.Unsubscribe {
-			if err := os.RemoveAll(folder); err != nil {
-				t.Fatal(err)
-			}
 			e.Unsubscribe("8100")
-			scanNow(t, e)
 		} else {
+			if _, err := os.Lstat(folder); !os.IsNotExist(err) {
+				t.Fatalf("Subscribe called before folder was gone: %v", err)
+			}
+			for _, rel := range []string{"junk.txt", filepath.Join(".git", "config")} {
+				if _, err := os.Stat(filepath.Join(recycled, rel)); err != nil {
+					t.Fatalf("old files did not reach recycle bin: %s: %v", rel, err)
+				}
+			}
 			e.AddWorkshop("8100", testkit.Sample("tester.repair", "Repair downloaded"))
 			e.Subscribe("8200")
 		}
@@ -232,6 +250,7 @@ func TestWorkshopResubscribePartialFailure(t *testing.T) {
 			}
 			scanNow(t, e)
 			steamDLL(e)
+			e.App.TrashFunc = os.RemoveAll
 			var calls [][]string
 			e.App.SteamWorker = func(_ string, args []string) (string, error) {
 				calls = append(calls, slices.Clone(args))
@@ -243,6 +262,99 @@ func TestWorkshopResubscribePartialFailure(t *testing.T) {
 			op, err := e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100", "ws:8200", "ws:8300"}, false)
 			if err == nil || op == nil || op.Items[0].Result != result || op.Items[1].Result != "ok" || op.Items[2].Result != "failed:9" || len(calls) != 2 || strings.Join(calls[1], " ") != "subscribe 8200 8300" {
 				t.Fatalf("partial failure: %+v %v %v", op, err, calls)
+			}
+		})
+	}
+}
+
+func TestWorkshopResubscribeCleanup(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []string{"already gone", "gone during recycle", "sharing violation", "still present", "recycle error", "replacement link"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Parallel()
+			e := setup(t, false)
+			folder := e.AddWorkshop("8100", testkit.Sample("tester.repair", "Repair"))
+			residue := e.AddWorkshop("8200", testkit.Sample("tester.residue", "Residue"))
+			e.Unsubscribe("8200")
+			e.WriteFile(filepath.Join(folder, "junk.txt"), "keep until recycled")
+			scanNow(t, e)
+			steamDLL(e)
+			attempts := 0
+			e.App.TrashFunc = func(path string) error {
+				attempts++
+				if filepath.Clean(path) != filepath.Clean(folder) {
+					t.Fatalf("cleanup touched residue or link target: %s", path)
+				}
+				switch mode {
+				case "still present":
+					return nil // a successful shell reply alone is insufficient
+				case "recycle error":
+					return errors.New("recycle bin unavailable")
+				case "sharing violation":
+					if attempts == 1 {
+						return &os.PathError{Op: "recycle", Path: path, Err: syscall.Errno(32)}
+					}
+				}
+				if err := os.RemoveAll(path); err != nil {
+					return err
+				}
+				if mode == "gone during recycle" {
+					return os.ErrNotExist // Steam won the race with the shell
+				}
+				return nil
+			}
+			fail := mode == "still present" || mode == "recycle error" || mode == "replacement link"
+			var calls [][]string
+			fake := fakeSteamWorker(&calls)
+			external := filepath.Join(e.Root, "External")
+			e.App.SteamWorker = func(dir string, args []string) (string, error) {
+				if args[0] == steamworks.Unsubscribe {
+					if mode == "already gone" {
+						if err := os.RemoveAll(folder); err != nil {
+							t.Fatal(err)
+						}
+					}
+					if mode == "replacement link" {
+						e.Move(folder, external)
+						e.Junction(folder, external)
+					}
+				} else {
+					want := []string{steamworks.Subscribe, "8100", "8200"}
+					if fail {
+						want = []string{steamworks.Subscribe, "8200"}
+					} else if _, err := os.Lstat(folder); !os.IsNotExist(err) {
+						t.Fatalf("Subscribe before cleanup: %v", err)
+					}
+					if !slices.Equal(args, want) {
+						t.Fatalf("Subscribe: got %v, want %v", args, want)
+					}
+				}
+				return fake(dir, args)
+			}
+			op, err := e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100", "ws:8200"}, false)
+			if op == nil || (err != nil) != fail || len(calls) != 2 || op.Items[1].Result != "ok" {
+				t.Fatalf("cleanup %s: %+v %v %v", mode, op, err, calls)
+			}
+			if fail {
+				if !strings.HasPrefix(op.Items[0].Result, "failed:folder cleanup:") {
+					t.Fatalf("missing cleanup failure: %+v", op.Items[0])
+				}
+				if mode != "replacement link" && (!strings.Contains(op.Items[0].Result, "still exists") || attempts < 2) {
+					t.Fatalf("did not retry and verify removal: %+v attempts=%d", op.Items[0], attempts)
+				}
+			} else if op.Items[0].Result != "ok" || mode == "sharing violation" && attempts != 2 {
+				t.Fatalf("cleanup: %+v attempts=%d", op.Items[0], attempts)
+			}
+			if mode == "already gone" && attempts != 0 || mode == "replacement link" && attempts != 0 {
+				t.Fatalf("unexpected recycle call: %d", attempts)
+			}
+			if mode == "replacement link" {
+				if _, err := os.Stat(filepath.Join(external, "junk.txt")); err != nil {
+					t.Fatalf("link target was touched: %v", err)
+				}
+			}
+			if _, err := os.Stat(residue); err != nil {
+				t.Fatalf("residue path was changed: %v", err)
 			}
 		})
 	}
@@ -261,6 +373,7 @@ func TestWorkshopResubscribeBatches(t *testing.T) {
 	steamDLL(e)
 	var calls [][]string
 	e.App.SteamWorker = fakeSteamWorker(&calls)
+	e.App.TrashFunc = os.RemoveAll
 	op, err := e.App.Workshop(steamworks.Resubscribe, refs, false)
 	if err != nil || len(op.Items) != 51 || len(calls) != 4 {
 		t.Fatalf("batches: %+v %v %v", op, err, calls)

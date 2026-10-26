@@ -274,7 +274,7 @@ func TestLibSteam(t *testing.T) {
 		t.Fatalf("preview %+v %v", p, err)
 	}
 	p, err = view.LibPreview(e.App, view.LibResub, []string{idle.Ref})
-	if err != nil || !p.Apply || !strings.Contains(strings.Join(p.Lines, "\n"), "local edits") || !strings.Contains(strings.Join(p.Lines, "\n"), "re-download") {
+	if err != nil || !p.Apply || !strings.Contains(strings.Join(p.Lines, "\n"), "local edits") || !strings.Contains(strings.Join(p.Lines, "\n"), "re-download") || !strings.Contains(strings.Join(p.Lines, "\n"), "recycle bin") {
 		t.Fatalf("resubscribe preview %+v %v", p, err)
 	}
 	// no steam_api64.dll in the test game: out of reach

@@ -39,7 +39,7 @@ type WorkshopItem struct {
 	ID         string // the instance
 	Name       string
 	WorkshopID string
-	Folder     string // what Steam deletes; resubscribe downloads it again (empty for residue)
+	Folder     string // folder to remove before resubscribing (empty for residue)
 	Result     string // ok, failed:<EResult>, timeout
 	State      uint32
 	Installed  bool // local fallback: the folder exists now, not a Steam account state
@@ -87,6 +87,10 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (result *Works
 		}
 		if action == steamworks.Resubscribe && !m.Residue {
 			it.Folder = st.Ix.ModDir(m)
+			if src := st.Ix.Source(m.SourceID); src != nil {
+				// Keep the source path so a replacement junction cannot redirect cleanup.
+				it.Folder = filepath.Join(src.Root, m.Rel)
+			}
 		}
 		switch action {
 		case steamworks.Subscribe:
@@ -179,9 +183,9 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (result *Works
 	return op, nil
 }
 
-// resubscribe preserves the recorded copy and incoming links while Steam replaces its
-// folder. Only items with a confirmed unsubscribe proceed to subscribe; residues skip
-// that first phase. Failed items keep their own result for the GUI's batched queue.
+// resubscribe preserves the recorded copy and incoming links while replacing its folder.
+// Only confirmed unsubscribes whose folders are gone proceed to subscribe; residues skip
+// cleanup. Failed items keep their own result for the GUI's batched queue.
 func (a *App) resubscribe(op *WorkshopOp) (*WorkshopOp, error) {
 	var remove []string
 	for _, it := range op.Items {
@@ -210,6 +214,10 @@ func (a *App) resubscribe(op *WorkshopOp) (*WorkshopOp, error) {
 			if it.Result != "ok" {
 				continue
 			}
+			if err := a.recycleWorkshopFolder(it.Folder); err != nil {
+				it.Result = "failed:folder cleanup: " + err.Error()
+				continue
+			}
 		}
 		it.Result = "timeout"
 		add = append(add, it.WorkshopID)
@@ -235,9 +243,42 @@ func (a *App) resubscribe(op *WorkshopOp) (*WorkshopOp, error) {
 		}
 	}
 	if len(failed) > 0 {
-		return op, fmt.Errorf("Steam did not confirm: %s", strings.Join(failed, ", "))
+		return op, fmt.Errorf("could not resubscribe: %s", strings.Join(failed, ", "))
 	}
 	return op, nil
+}
+
+// Steam may leave edited or untracked files behind, or still be deleting the folder.
+// Use the shared recycle-bin allow-list and backend, but keep incoming links in place:
+// the download will return at this path with the same recorded identity.
+func (a *App) recycleWorkshopFolder(path string) error {
+	deadline := time.Now().Add(time.Second)
+	for {
+		if _, err := os.Lstat(path); os.IsNotExist(err) {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("cannot check %s: %w", path, err)
+		}
+		if source.IsLink(path) {
+			return fmt.Errorf("%s is a link; resubscribe to the original Workshop folder", path)
+		}
+		err := a.recycleTarget(path)
+		if _, checkErr := os.Lstat(path); os.IsNotExist(checkErr) {
+			return nil // Steam may have removed it even when recycling failed.
+		} else if checkErr != nil {
+			return fmt.Errorf("cannot verify removal of %s: %w", path, checkErr)
+		}
+		if errors.Is(err, ErrNotInTrashList) {
+			return err
+		}
+		if !time.Now().Before(deadline) {
+			if err != nil {
+				return fmt.Errorf("%s still exists after waiting for the recycle bin; not subscribed: %w", path, err)
+			}
+			return fmt.Errorf("%s still exists after waiting for the recycle bin; not subscribed", path)
+		}
+		time.Sleep(100 * time.Millisecond) // retry transient sharing violations from Steam
+	}
 }
 
 // CanResubscribe checks the source location before resolving links: ModDir points at

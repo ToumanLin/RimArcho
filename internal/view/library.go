@@ -750,7 +750,7 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		}
 		if kind == LibResub {
 			if m, err := st.Ix.ResolveOne(ref); err == nil && !m.Residue {
-				p.Lines = append(p.Lines, T("Steam will delete and re-download the folder; local edits in it are lost"))
+				p.Lines = append(p.Lines, T("RimArcho moves the folder to the recycle bin before Steam re-downloads it; local edits are lost"))
 			}
 		}
 		if w := usedWarning(a, st, kind, ref); w != "" {

@@ -143,6 +143,7 @@ func TestTrashBatch(t *testing.T) {
 func TestLibraryResubscribeSteamQueue(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
+	e.App.TrashFunc = os.RemoveAll
 	refs := []string{"ws:1001"} // already enabled in the current list
 	for n := 0; n < 50; n++ {
 		id := fmt.Sprint(9000 + n)
@@ -159,6 +160,11 @@ func TestLibraryResubscribeSteamQueue(t *testing.T) {
 		mu.Unlock()
 		var lines []string
 		for _, id := range args[1:] {
+			if args[0] == steamworks.Subscribe {
+				if _, err := os.Lstat(filepath.Join(e.Workshop, id)); !os.IsNotExist(err) {
+					return "", fmt.Errorf("Subscribe before folder cleanup: %s: %v", id, err)
+				}
+			}
 			n, _ := strconv.ParseUint(id, 10, 64)
 			lines = append(lines, steamworks.ItemLine(n, "ok", 1))
 		}

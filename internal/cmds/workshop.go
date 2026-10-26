@@ -50,7 +50,10 @@ func workshopCmd(c *Ctx, a *Args, action string) (*render.Doc, error) {
 				what = "Steam would delete"
 			}
 			if action == steamworks.Resubscribe {
-				what += " and re-download; local edits in this folder are lost:"
+				what = "RimArcho moves to the recycle bin before Steam re-downloads; local edits are lost:"
+				if op.DryRun {
+					what = "RimArcho would move to the recycle bin before Steam re-downloads; local edits are lost:"
+				}
 			}
 			n.KV("folder", what+" "+it.Folder)
 		}
