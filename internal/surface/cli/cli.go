@@ -219,7 +219,7 @@ func openPlanFlag(argv []string) (plan string, rest []string, err error) {
 // `archo workshop subscribe|unsubscribe|state`.
 func steamWorker(argv []string, stdout io.Writer) int {
 	if len(argv) < 2 {
-		fmt.Fprintln(stdout, steamworks.ErrorLine("usage: archo steam-worker subscribe|unsubscribe|state|download <workshop id>…"))
+		fmt.Fprintln(stdout, steamworks.ErrorLine("usage: archo steam-worker subscribe|unsubscribe|state|download|watch <workshop id>…"))
 		return cmds.ExitUsage
 	}
 	var ids []uint64

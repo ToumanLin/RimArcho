@@ -124,14 +124,16 @@ type TaskAct struct {
 
 // TaskItemRow is one item of a task.
 type TaskItemRow struct {
-	Ref       string `json:"ref"`
-	Name      string `json:"name"`
-	State     string `json:"state"`
-	StateText string `json:"stateText"`
-	Rank      int    `json:"rank"` // the result column's order: failures first
-	Why       string `json:"why"`
-	Size      string `json:"size"`
-	Bytes     int64  `json:"bytes"`
+	Ref          string `json:"ref"`
+	Name         string `json:"name"`
+	State        string `json:"state"`
+	StateText    string `json:"stateText"`
+	Rank         int    `json:"rank"` // the result column's order: failures first
+	Why          string `json:"why"`
+	Size         string `json:"size"`
+	Bytes        int64  `json:"bytes"`
+	Got          int64  `json:"got"`
+	DownloadSize int64  `json:"downloadSize"` // bytes; size is the existing formatted file-size label
 }
 
 // TaskTitle names a kind.
@@ -343,6 +345,9 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	} else if t.Frac > 0 {
 		r.Pct = int(t.Frac * 100)
 	}
+	if t.Lane == app.LaneSteam && t.Frac > 0 {
+		r.Pct = int(t.Frac * 100)
+	}
 	if t.State == app.TaskDone {
 		r.Pct = 100
 	}
@@ -371,7 +376,11 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	if phase != "" && t.Lane == app.LaneFiles {
 		phase = Tf("on %s", phase)
 	} else if phase != "" && t.Lane == app.LaneSteam {
-		phase = Tf("waiting for Steam: %s", phase)
+		if strings.HasPrefix(phase, "Steam is downloading ") {
+			phase = Tf("Steam is downloading %d of %d", min(t.Done+1, t.Total), t.Total)
+		} else {
+			phase = Tf("waiting for Steam: %s", phase)
+		}
 	}
 	switch t.State {
 	case app.TaskRunning:
@@ -402,7 +411,13 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 		}
 	}
 	for _, it := range t.Items {
-		row := TaskItemRow{Ref: it.Ref, Name: it.Name, State: it.State, StateText: itemStateText(it.State), Rank: itemRank[it.State], Why: Humanize(nil, it.Why), Bytes: it.Bytes}
+		row := TaskItemRow{Ref: it.Ref, Name: it.Name, State: it.State, StateText: itemStateText(it.State), Rank: itemRank[it.State], Why: Humanize(nil, it.Why), Bytes: it.Bytes, Got: it.Got, DownloadSize: it.Size}
+		if it.State == app.ItemRun && t.Lane == app.LaneSteam && t.Kind == LibResub {
+			row.StateText = T("waiting for Steam")
+			if it.Size > 0 && it.Got > 0 {
+				row.StateText = Tf("downloading %d%%", min(int(float64(it.Got)*100/float64(it.Size)), 100))
+			}
+		}
 		if it.Bytes > 0 {
 			row.Size = SizeText(it.Bytes)
 		}
@@ -545,6 +560,9 @@ func init() {
 		"failed":                             "失败",
 		"partly done":                        "部分完成",
 		"stopped":                            "已停止",
+		"waiting for Steam":                  "等 Steam 开始下载",
+		"downloading %d%%":                   "下载中 %d%%",
+		"Steam is downloading %d of %d":      "Steam 正在下载 %d / %d",
 		"working on it":                      "正在做",
 		"not touched":                        "没动",
 		"yesterday":                          "昨天",

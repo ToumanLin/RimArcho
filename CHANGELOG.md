@@ -13,7 +13,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   that RimArcho moves the folder to the recycle bin before Steam downloads it again, losing
   local edits. Only confirmed unsubscribes whose folders are verified gone subscribe again;
   cleanup retries briefly and reports failures per item. Lists keep the same copy identity;
-  a running game blocks the operation. Leftovers can still subscribe again.
+  a running game blocks the operation. Confirmed subscriptions, including leftovers, now
+  request high-priority Steam downloads and wait for installed files, with live byte
+  progress in background tasks and CLI output. A missing folder never counts as installed;
+  stalled downloads fail with a check-Steam hint, and stopping ends the download worker.
 - `ctrl+\` turns reference numbers on and off: every control, text block, image and chart
   gets a thin red frame numbered at its top-left (`lib12`: the page, then the number), so a
   change can be asked for as "change lib12". The frames take no clicks.

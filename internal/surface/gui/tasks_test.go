@@ -1,6 +1,8 @@
 package gui
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
@@ -183,16 +185,61 @@ func TestLibraryResubscribeSteamQueue(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if len(calls) != 4 {
+	if len(calls) != 6 {
 		t.Fatalf("calls: %v", calls)
 	}
-	for n, want := range []string{"unsubscribe", "subscribe", "unsubscribe", "subscribe"} {
+	for n, want := range []string{"unsubscribe", "subscribe", "watch", "unsubscribe", "subscribe", "watch"} {
 		size := 51
-		if n >= 2 {
+		if n >= 3 {
 			size = 2
 		}
 		if calls[n][0] != want || len(calls[n]) != size {
 			t.Fatalf("call %d: %v", n, calls[n])
 		}
+	}
+}
+
+func TestSteamWatchTaskLiveProgressAndStop(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	e.App.TrashFunc = os.RemoveAll
+	e.WriteFile(filepath.Join(e.Game, "steam_api64.dll"), "fake")
+	e.App.SteamWorker = func(_ string, args []string) (string, error) { return "ITEM 1001 ok 1\nDONE " + args[0] + " 1", nil }
+	sampled := make(chan struct{})
+	cancelled := make(chan struct{})
+	e.App.SteamWorkerStream = func(ctx context.Context, _ string, args []string, line func(string)) error {
+		line("PROGRESS 1001 45 100 21")
+		close(sampled)
+		<-ctx.Done()
+		close(cancelled)
+		return ctx.Err()
+	}
+	if _, err := api.LibraryDo(view.LibResub, []string{"no.such.mod", "ws:1001"}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-sampled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no live progress")
+	}
+	row := api.Tasks().Rows[0]
+	if row.Items[1].Got != 45 || row.Items[1].DownloadSize != 100 || row.Items[1].State != app.ItemRun || row.Pct != 72 {
+		t.Fatalf("%+v", row)
+	}
+	data, _ := json.Marshal(row.Items[1])
+	if !strings.Contains(string(data), `"got":45`) || !strings.Contains(string(data), `"downloadSize":100`) {
+		t.Fatalf("%s", data)
+	}
+	if _, err := api.TaskAct("stop", []string{row.ID}, ""); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(3 * time.Second):
+		t.Fatal("stop did not cancel watch")
+	}
+	end := endedTask(t, api, view.LibResub)
+	if end.State != app.TaskStopped || end.Items[1].State != app.ItemSkip || end.Items[0].State != app.ItemFail {
+		t.Fatalf("%+v", end)
 	}
 }

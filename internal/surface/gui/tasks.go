@@ -17,11 +17,11 @@ import (
 // 后台任务 (06 §2.16): Mod 库's file and Steam actions run in app.Tasks' lanes, one item
 // at a time, each item through the same single-item action as before (view.LibDo); the
 // window's own jobs (scan, analysis, packs, textures, downloads) report into the same
-// record. "tasks" events say the record changed (at most every 250 ms); a task of a lane
+// record. "tasks" events say the record changed (at most every 500 ms); a task of a lane
 // that ended also carries its result for the status line.
 
 // taskTick is how often "tasks" events go out while tasks change.
-const taskTick = 250 * time.Millisecond
+const taskTick = 500 * time.Millisecond
 
 type taskEvents struct {
 	mu      sync.Mutex
@@ -454,7 +454,15 @@ func (s *API) batchSteam(kind string, refs []string, b app.BatchCalls) {
 		}
 		ok = append(ok, i)
 	}
+	a, sessionErr := s.a.ReadSession()
 	s.mu.Unlock()
+	if sessionErr != nil {
+		for _, i := range ok {
+			b.Done(i, sessionErr)
+		}
+		return
+	}
+	defer a.Close()
 	opened := false
 	for c := 0; c < len(ok); c += steamChunk {
 		if b.Stopped() {
@@ -466,10 +474,21 @@ func (s *API) batchSteam(kind string, refs []string, b app.BatchCalls) {
 			b.Start(i)
 			chunk = append(chunk, refs[i])
 		}
+		progress := app.BatchCalls{Stopped: b.Stopped,
+			Progress: func(k int, got, total int64) {
+				if b.Progress != nil {
+					b.Progress(part[k], got, total)
+				}
+			},
+			Done: func(k int, err error) { b.Done(part[k], err) },
+		}
+		op, err := a.Workshop(action, chunk, false, progress)
 		s.mu.Lock()
-		op, err := s.a.Workshop(action, chunk, false)
 		s.board, s.needs, s.lib = nil, nil, nil
 		s.mu.Unlock()
+		if b.Stopped() {
+			return
+		}
 		if pages := view.SteamPages(kind, err); pages != nil {
 			// Steam out of reach: the Workshop pages instead, as before (06 §2.9); once
 			if !opened {

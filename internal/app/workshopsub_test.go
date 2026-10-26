@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,8 +9,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -189,7 +192,7 @@ func TestWorkshopResubscribe(t *testing.T) {
 		out, err := fake(dir, args)
 		if args[0] == steamworks.Unsubscribe {
 			e.Unsubscribe("8100")
-		} else {
+		} else if args[0] == steamworks.Subscribe {
 			if _, err := os.Lstat(folder); !os.IsNotExist(err) {
 				t.Fatalf("Subscribe called before folder was gone: %v", err)
 			}
@@ -204,7 +207,7 @@ func TestWorkshopResubscribe(t *testing.T) {
 		return out, err
 	}
 	op, err = e.App.Workshop(steamworks.Resubscribe, []string{id, left}, false)
-	if err != nil || len(calls) != 2 || strings.Join(calls[0][1:], " ") != "unsubscribe 8100" || strings.Join(calls[1][1:], " ") != "subscribe 8100 8200" {
+	if err != nil || len(calls) != 3 || strings.Join(calls[0][1:], " ") != "unsubscribe 8100" || strings.Join(calls[1][1:], " ") != "subscribe 8100 8200" {
 		t.Fatalf("resubscribe: %+v %v %v", op, err, calls)
 	}
 	scanNow(t, e)
@@ -257,10 +260,13 @@ func TestWorkshopResubscribePartialFailure(t *testing.T) {
 				if args[0] == steamworks.Unsubscribe {
 					return steamworks.ItemLine(8100, result, 1) + "\n" + steamworks.ItemLine(8200, "ok", 0) + "\n" + steamworks.ItemLine(8300, "ok", 0) + "\n" + steamworks.DoneLine(args[0], 3), nil
 				}
+				if args[0] == steamworks.Watch {
+					return steamworks.ItemLine(8200, "ok", 5) + "\n" + steamworks.DoneLine(args[0], 1), nil
+				}
 				return steamworks.ItemLine(8200, "ok", 33) + "\n" + steamworks.ItemLine(8300, "failed:9", 0) + "\n" + steamworks.DoneLine(args[0], 2), nil
 			}
 			op, err := e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100", "ws:8200", "ws:8300"}, false)
-			if err == nil || op == nil || op.Items[0].Result != result || op.Items[1].Result != "ok" || op.Items[2].Result != "failed:9" || len(calls) != 2 || strings.Join(calls[1], " ") != "subscribe 8200 8300" {
+			if err == nil || op == nil || op.Items[0].Result != result || op.Items[1].Result != "ok" || op.Items[2].Result != "failed:9" || len(calls) != 3 || strings.Join(calls[1], " ") != "subscribe 8200 8300" {
 				t.Fatalf("partial failure: %+v %v %v", op, err, calls)
 			}
 		})
@@ -318,7 +324,7 @@ func TestWorkshopResubscribeCleanup(t *testing.T) {
 						e.Move(folder, external)
 						e.Junction(folder, external)
 					}
-				} else {
+				} else if args[0] == steamworks.Subscribe {
 					want := []string{steamworks.Subscribe, "8100", "8200"}
 					if fail {
 						want = []string{steamworks.Subscribe, "8200"}
@@ -332,7 +338,7 @@ func TestWorkshopResubscribeCleanup(t *testing.T) {
 				return fake(dir, args)
 			}
 			op, err := e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100", "ws:8200"}, false)
-			if op == nil || (err != nil) != fail || len(calls) != 2 || op.Items[1].Result != "ok" {
+			if op == nil || (err != nil) != fail || len(calls) != 3 || op.Items[1].Result != "ok" {
 				t.Fatalf("cleanup %s: %+v %v %v", mode, op, err, calls)
 			}
 			if fail {
@@ -375,10 +381,10 @@ func TestWorkshopResubscribeBatches(t *testing.T) {
 	e.App.SteamWorker = fakeSteamWorker(&calls)
 	e.App.TrashFunc = os.RemoveAll
 	op, err := e.App.Workshop(steamworks.Resubscribe, refs, false)
-	if err != nil || len(op.Items) != 51 || len(calls) != 4 {
+	if err != nil || len(op.Items) != 51 || len(calls) != 6 {
 		t.Fatalf("batches: %+v %v %v", op, err, calls)
 	}
-	for n, action := range []string{"unsubscribe", "unsubscribe", "subscribe", "subscribe"} {
+	for n, action := range []string{"unsubscribe", "unsubscribe", "subscribe", "subscribe", "watch", "watch"} {
 		want := 52
 		if n%2 == 1 {
 			want = 3
@@ -421,5 +427,89 @@ func TestWorkshopResubscribeRejectsLinkAndLock(t *testing.T) {
 	}
 	if _, err := e.App.Workshop(steamworks.Resubscribe, []string{locks[0].Copy.ID}, true); err == nil {
 		t.Fatal("accepted a locked copy")
+	}
+}
+
+func TestWorkshopWatchStreamsAfterConfirmedSubscribe(t *testing.T) {
+	t.Parallel()
+	for _, stall := range []bool{false, true} {
+		e := setup(t, false)
+		e.AddWorkshop("8100", testkit.Sample("tester.repair", "Repair"))
+		e.AddWorkshop("8200", testkit.Sample("tester.residue", "Residue"))
+		e.Unsubscribe("8200")
+		scanNow(t, e)
+		steamDLL(e)
+		e.App.TrashFunc = os.RemoveAll
+		var calls [][]string
+		e.App.SteamWorker = fakeSteamWorker(&calls)
+		samples := 0
+		completions := 0
+		e.App.SteamWorkerStream = func(ctx context.Context, _ string, args []string, line func(string)) error {
+			if len(calls) != 2 || calls[1][1] != steamworks.Subscribe || strings.Join(args, " ") != "watch 8100 8200" {
+				t.Fatalf("order: %v %v", calls, args)
+			}
+			line("PROGRESS 8100 45 100 21")
+			if samples != 1 {
+				t.Fatal("sample not delivered live")
+			}
+			result := "ok"
+			if stall {
+				result = "failed:download-stalled"
+			}
+			line(steamworks.ItemLine(8100, result, 5))
+			if completions != 1 {
+				t.Fatal("item completion not delivered live")
+			}
+			line(steamworks.ItemLine(8200, "ok", 5))
+			line(steamworks.DoneLine(steamworks.Watch, 2))
+			return nil
+		}
+		op, err := e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100", "ws:8200"}, false, app.BatchCalls{
+			Progress: func(i int, got, total int64) {
+				if i != 0 || got != 45 || total != 100 {
+					t.Fatalf("%d %d/%d", i, got, total)
+				}
+				samples++
+			},
+			Done: func(i int, err error) {
+				if i == 0 && stall && (err == nil || !strings.Contains(err.Error(), "check Steam")) {
+					t.Fatalf("stall: %v", err)
+				}
+				completions++
+			},
+		})
+		if op == nil || (err != nil) != stall || samples != 1 || completions != 2 {
+			t.Fatalf("%+v %v samples=%d done=%d", op, err, samples, completions)
+		}
+		if stall && !strings.Contains(err.Error(), "Steam did not download it") {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestWorkshopStopCancelsWatch(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	e.AddWorkshop("8100", testkit.Sample("tester.repair", "Repair"))
+	scanNow(t, e)
+	steamDLL(e)
+	e.App.TrashFunc = os.RemoveAll
+	var calls [][]string
+	e.App.SteamWorker = fakeSteamWorker(&calls)
+	var stop atomic.Bool
+	e.App.SteamWorkerStream = func(ctx context.Context, _ string, _ []string, line func(string)) error {
+		line("PROGRESS 8100 0 0 5")
+		stop.Store(true)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(3 * time.Second):
+			t.Error("watch not cancelled")
+			return nil
+		}
+	}
+	_, err := e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100"}, false, app.BatchCalls{Stopped: stop.Load})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("%v", err)
 	}
 }

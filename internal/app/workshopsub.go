@@ -63,7 +63,7 @@ func (e *SteamUnavailable) Unwrap() error { return ErrSteamUnavailable }
 // Workshop subscribes to, unsubscribes from, or resubscribes to the
 // Workshop items of refs. Unsubscribing makes Steam delete the item's folder, so it is
 // refused while the game runs; the plans that use it (UsedBy) show it missing afterwards.
-func (a *App) Workshop(action string, refs []string, dryRun bool) (result *WorkshopOp, workshopErr error) {
+func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...BatchCalls) (result *WorkshopOp, workshopErr error) {
 	if action != steamworks.Subscribe && action != steamworks.Unsubscribe && action != steamworks.Resubscribe {
 		return nil, fmt.Errorf("unknown action %s: want subscribe, unsubscribe or resubscribe", action)
 	}
@@ -123,7 +123,11 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (result *Works
 		return op, nil
 	}
 	if action == steamworks.Resubscribe {
-		return a.resubscribe(op)
+		var b BatchCalls
+		if len(callbacks) > 0 {
+			b = callbacks[0]
+		}
+		return a.resubscribe(op, b)
 	}
 	ids := make([]string, len(op.Items))
 	var detached []*LinkLifecyclePlan
@@ -186,7 +190,7 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (result *Works
 // resubscribe preserves the recorded copy and incoming links while replacing its folder.
 // Only confirmed unsubscribes whose folders are gone proceed to subscribe; residues skip
 // cleanup. Failed items keep their own result for the GUI's batched queue.
-func (a *App) resubscribe(op *WorkshopOp) (*WorkshopOp, error) {
+func (a *App) resubscribe(op *WorkshopOp, b BatchCalls) (*WorkshopOp, error) {
 	var remove []string
 	for _, it := range op.Items {
 		if it.Folder != "" {
@@ -206,6 +210,9 @@ func (a *App) resubscribe(op *WorkshopOp) (*WorkshopOp, error) {
 	var add []string
 	for k := range op.Items {
 		it := &op.Items[k]
+		if b.Stopped != nil && b.Stopped() {
+			return op, context.Canceled
+		}
 		it.Result = "timeout"
 		if it.Folder != "" {
 			if r, ok := removed[it.WorkshopID]; ok {
@@ -223,6 +230,9 @@ func (a *App) resubscribe(op *WorkshopOp) (*WorkshopOp, error) {
 		add = append(add, it.WorkshopID)
 	}
 	if len(add) > 0 {
+		if b.Stopped != nil && b.Stopped() {
+			return op, context.Canceled
+		}
 		rep, err := a.runSteam(steamworks.Subscribe, add)
 		if err != nil {
 			return nil, a.unavailable(err, op.Items)
@@ -234,6 +244,20 @@ func (a *App) resubscribe(op *WorkshopOp) (*WorkshopOp, error) {
 					it.Result, it.State = r.Result, r.State
 				}
 			}
+		}
+	}
+
+	var download []string
+	for i, it := range op.Items {
+		if it.Result == "ok" {
+			download = append(download, it.WorkshopID)
+		} else if b.Done != nil {
+			b.Done(i, fmt.Errorf("Steam did not confirm it (%s)", it.Result))
+		}
+	}
+	if len(download) > 0 {
+		if err := a.watchWorkshop(op, download, b); err != nil {
+			return op, a.unavailable(err, op.Items)
 		}
 	}
 	var failed []string

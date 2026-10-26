@@ -5,6 +5,7 @@ package app
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -97,6 +98,8 @@ type App struct {
 	// SteamWorker runs `archo steam-worker <args>` in the Steam runtime folder and returns
 	// its output; nil starts this executable (tests fake Steam with it, 06 §2.9).
 	SteamWorker func(dir string, args []string) (string, error)
+	// SteamWorkerStream replaces the live, cancellable download worker in tests.
+	SteamWorkerStream func(ctx context.Context, dir string, args []string, line func(string)) error
 	// LockBase replaces %LOCALAPPDATA% when finding the default lock library and monitor
 	// folder (tests).
 	LockBase string

@@ -131,7 +131,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     textures tool                             the DDS encoder (todds): where it is, or --install to download it
     workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while the game runs; plans that use it show it missing)
     workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
-    workshop resubscribe <ref…>               unsubscribe then subscribe in Steam to re-download mods; local edits are lost (refused while the game runs)
+    workshop resubscribe <ref…>               resubscribe and wait for Steam to download mods; local edits are lost (refused while the game runs)
     workshop state <ref…>                     ask Steam for item state; without Steam, show local folders with account state unknown
   references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern
   global flags: --env <name> (use another environment for this command)
