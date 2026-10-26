@@ -367,7 +367,7 @@ type RuleIn struct {
 	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
 	Action string `json:"action,omitempty" jsonschema:"add (default), list or remove"`
 	Rule   string `json:"rule,omitempty" jsonschema:"remove: the rule ref r:<n> from action=list"`
-	Kind   string `json:"kind,omitempty" jsonschema:"add: after, before, incompatible, attach (A B) or ignore (target)"`
+	Kind   string `json:"kind,omitempty" jsonschema:"add: after, before, incompatible, attach (A B), top, bottom (A) or ignore (target)"`
 	A      string `json:"a,omitempty" jsonschema:"the mod the rule is about"`
 	B      string `json:"b,omitempty" jsonschema:"the other mod"`
 	Target string `json:"target,omitempty" jsonschema:"for ignore: the constraint ref printed by sort/problems, e.g. decl:#ab12:loadafter:pkg.id"`

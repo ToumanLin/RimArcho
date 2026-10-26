@@ -5,6 +5,7 @@ package app_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -245,6 +246,39 @@ func TestHistoryCheckoutUndoSource(t *testing.T) {
 	}
 	if _, code := e.Run("loadout", "tag", "v2", "base"); code == 0 {
 		t.Fatal("loadout tag is gone: named lists are plans (04 §1.1)")
+	}
+}
+
+// S13 through the CLI (04 §5.5): a community loadBottom and a user top rule move mods to the
+// ends, `sort` explains them under "ends", and the community one can be ignored.
+func TestSortTopBottom(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	for _, m := range []string{"A", "B", "C", "Perf"} {
+		e.WriteMod(filepath.Join(e.Game, "Mods", m), testkit.Sample("tester."+strings.ToLower(m), m))
+	}
+	e.WriteFile(filepath.Join(e.Home, "cache", "communityRules.json"), `{"rules": {"tester.perf": {"loadBottom": {"value": true}}}}`)
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.perf", "tester.a", "tester.b", "tester.c")
+	scanNow(t, e)
+	cr := refOf(t, e, "C", "")
+	if out := e.MustRun("rule", "add", "top", cr); !strings.Contains(out, "top") {
+		t.Fatal(out)
+	}
+	if _, code := e.Run("rule", "add", "top", cr, refOf(t, e, "A", "")); code == 0 {
+		t.Fatal("top takes one reference")
+	}
+	out := e.MustRun("sort")
+	for _, want := range []string{"ends (loadTop / loadBottom", "top    " + cr + "  rule r:1", "bottom " + refOf(t, e, "Perf", "") + "  community  (ignore: community:tester.perf:loadbottom)"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("sort output lacks %q:\n%s", want, out)
+		}
+	}
+	if got := active(t, e); !slices.Equal(got, []string{"Core", "C", "A", "B", "Perf"}) {
+		t.Fatalf("sorted: %v", got)
+	}
+	e.MustRun("rule", "add", "ignore", "community:tester.perf:loadbottom")
+	if out := e.MustRun("sort", "--dry-run"); strings.Contains(out, "community:tester.perf") {
+		t.Fatalf("ignored loadBottom still listed:\n%s", out)
 	}
 }
 

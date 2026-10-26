@@ -1096,12 +1096,19 @@ func (a *App) AddRule(spec RuleSpec) (*store.UserRule, error) {
 		if r.A == r.B {
 			return nil, errors.New("both references are in the same lineage")
 		}
+	case order.RuleTop, order.RuleBottom:
+		if spec.B != "" {
+			return nil, fmt.Errorf("%s takes one reference", spec.Kind)
+		}
+		if r.A, err = ix.ResolveLineage(spec.A); err != nil {
+			return nil, err
+		}
 	case order.RuleIgnore:
 		if r.Target, err = ix.StoredConstraintRef(spec.Target); err != nil {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("unknown rule kind %q (after, before, incompatible, attach, ignore)", spec.Kind)
+		return nil, fmt.Errorf("unknown rule kind %q (after, before, incompatible, attach, top, bottom, ignore)", spec.Kind)
 	}
 	if _, err := a.Store.AddRule(ix.Env.ID, r); err != nil {
 		return nil, err
@@ -1136,6 +1143,9 @@ func (ix *Index) StoredConstraintRef(ref string) (string, error) {
 		}
 		return order.OfficialRef(lin), nil
 	case "community":
+		if len(parts) == 3 && (strings.EqualFold(parts[2], "loadtop") || strings.EqualFold(parts[2], "loadbottom")) {
+			parts = append(parts, "") // community:<pkg>:loadtop (04 §5.5)
+		}
 		if len(parts) != 4 {
 			return "", bad
 		}

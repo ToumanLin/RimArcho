@@ -242,7 +242,7 @@ next:
 | 整合包 | `pack build <名> [--dry-run]` / `pack stop <名>` | 把当前方案编译成整合包；停止进行中的编译并删除已复制的部分（08 §5.2） |
 | | `pack list` / `pack launch <名> [--dry-run]` / `pack unlink [--dry-run]` | 列出整合包；启动整合包；只删掉 `Mods/` 里整合包的 `!ArchoPack_` 链接（08 §5.3；`problems` 报 `pack.links-left` 时的修法） |
 | | `pack export <名> <文件> [--list]` / `pack import <文件> [--as-plan]` / `pack remove <名> [--dry-run] [--unfinished]` | 导出为 `.archopack`（zip），`--list` 只导出它的列表（RimArcho 列表 `.archolist.json`，04 §9.3）；解开包，或对照 RimArcho 列表，`--as-plan` 同时把列表载入当前方案；移到回收站，`--unfinished` 删除被中断的编译（08 §5.4） |
-| 规则 | `rule add after\|before\|incompatible\|attach <A> <B> [--note <文本>]` / `rule add ignore <约束> [--note]` | 用户规则（04 §6）；`ignore` 的目标是 `sort` / `problems` 打印的约束引用 |
+| 规则 | `rule add after\|before\|incompatible\|attach <A> <B> [--note <文本>]` / `rule add top\|bottom <A> [--note]` / `rule add ignore <约束> [--note]` | 用户规则（04 §6）；`ignore` 的目标是 `sort` / `problems` 打印的约束引用 |
 | | `rule list` / `rule remove <r:n>` | |
 | 玩家数据 | `alias <引用> [<名称>] [--clear]` / `note <引用> [<文本>] [--clear]` | 显示名、备注，挂在 Lineage 上 |
 | | `tag add\|remove <引用> <标签…> [--mod <引用>]…` / `tag list` | 标签；重复的 `--mod` 一次给多个 Mod 加减 |

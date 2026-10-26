@@ -37,7 +37,7 @@ func init() {
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: loadoutDiff})
 	register(&Command{Name: "loadout checkout", Args: "<v>", Summary: "load a version into the workspace (save to apply)", MinArgs: 1, MaxArgs: 1, Run: loadoutCheckout})
 	register(&Command{Name: "loadout ignore-external", Summary: "ignore the external ModsConfig.xml version that was not loaded (it stays in the history)", MaxArgs: 0, Run: loadoutIgnoreExternal})
-	register(&Command{Name: "rule add", Args: "after|before|incompatible|attach <A> <B> | ignore <constraint>", Summary: "add a user rule",
+	register(&Command{Name: "rule add", Args: "after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>", Summary: "add a user rule",
 		MinArgs: 2, MaxArgs: 3, Flags: []Flag{{Name: "note", Value: "<text>"}}, Run: ruleAdd})
 	register(&Command{Name: "rule list", Summary: "list user rules", MaxArgs: 0, Run: ruleList})
 	register(&Command{Name: "rule remove", Args: "<r:n>", Summary: "delete a user rule", MinArgs: 1, MaxArgs: 1, Run: ruleRemove})
@@ -287,6 +287,35 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			why.Addf("%-8s %s", b.Strength, ev)
 		}
 		why.Truncate(12, "")
+	}
+	if len(r.Result.Anchors) > 0 {
+		// loadTop / loadBottom (04 §5.5): preferences that only break ties.
+		ends := root.Section("ends (loadTop / loadBottom: preferred, never over a constraint)")
+		for _, an := range r.Result.Anchors {
+			nd := r.Input.Nodes[an.Node]
+			who := "pkg:" + nd.PackageID
+			if nd.Instance != "" {
+				who = st.Ix.Ref(nd.Instance)
+			}
+			line := fmt.Sprintf("%-6s %s", an.Tier, who)
+			if an.Kind == order.KindUser {
+				line += fmt.Sprintf("  rule r:%d  (archo rule remove r:%d)", an.RuleID, an.RuleID)
+			} else {
+				line += "  community  (ignore: " + strings.TrimSuffix(an.Ref, ":") + ")"
+			}
+			if len(an.Pulled) > 0 {
+				what := "what it needs"
+				if an.Tier == order.TierBottom {
+					what = "what needs it"
+				}
+				line += fmt.Sprintf("  +%d mods: %s", len(an.Pulled), what)
+			}
+			if an.Conflict {
+				line += "  [also pulled to the other end]"
+			}
+			ends.Add(line)
+		}
+		ends.Truncate(12, "")
 	}
 	if len(r.Result.Cycles) > 0 {
 		pr := root.Section("problems")
@@ -560,6 +589,9 @@ func ruleLine(c *Ctx, ix *app.Index, r *store.UserRule) []string {
 	if r.Kind == order.RuleIgnore {
 		return []string{fmt.Sprintf("r:%d", r.ID), r.Kind, ix.DisplayConstraintRef(r.Target, primaryRef(ix)), "", r.Note}
 	}
+	if r.B == "" {
+		return []string{fmt.Sprintf("r:%d", r.ID), r.Kind, lin(r.A), "", r.Note}
+	}
 	return []string{fmt.Sprintf("r:%d", r.ID), r.Kind, lin(r.A), lin(r.B), r.Note}
 }
 
@@ -577,10 +609,12 @@ func ruleAdd(c *Ctx, a *Args) (*render.Doc, error) {
 	switch {
 	case spec.Kind == order.RuleIgnore && len(a.Pos) == 2:
 		spec.Target = a.Pos[1]
-	case spec.Kind != order.RuleIgnore && len(a.Pos) == 3:
+	case (spec.Kind == order.RuleTop || spec.Kind == order.RuleBottom) && len(a.Pos) == 2:
+		spec.A = a.Pos[1]
+	case spec.Kind != order.RuleIgnore && spec.Kind != order.RuleTop && spec.Kind != order.RuleBottom && len(a.Pos) == 3:
 		spec.A, spec.B = a.Pos[1], a.Pos[2]
 	default:
-		return nil, &UsageError{Msg: "after|before|incompatible|attach take two references; ignore takes one constraint reference"}
+		return nil, &UsageError{Msg: "after|before|incompatible|attach take two references; top|bottom take one; ignore takes one constraint reference"}
 	}
 	r, err := c.App.AddRule(spec)
 	if err != nil {

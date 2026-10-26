@@ -136,6 +136,74 @@ func TestCycleBreaksWeakestEdge(t *testing.T) {
 	}
 }
 
+type posCommunity map[string]Tier
+
+func (p posCommunity) Rules(string) ([]string, []string) { return nil, nil }
+func (p posCommunity) Position(pkg string) Tier          { return p[pkg] }
+
+// loadTop / loadBottom (04 §5.5): a top mod goes up with what it needs, a bottom mod goes
+// down with what needs it; official content stays first; a user rule wins; the community
+// one can be ignored.
+func TestTiers(t *testing.T) {
+	nodes := []Node{
+		node("ludeon.rimworld", scan.Decl{}),
+		node("perf.mod", scan.Decl{}),
+		node("needs.perf", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "perf.mod"}}}),
+		node("a.mod", scan.Decl{}),
+		node("lib.x", scan.Decl{}),
+		node("z.mod", scan.Decl{}),
+		node("top.mod", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "lib.x"}}}),
+		node("ludeon.rimworld.royalty", scan.Decl{}),
+	}
+	comm := posCommunity{"perf.mod": TierBottom, "top.mod": TierTop}
+	in := Input{Nodes: nodes, GameMM: "1.6", Community: comm}
+	r := Sort(in)
+	want := []string{"ludeon.rimworld", "ludeon.rimworld.royalty", "lib.x", "top.mod", "a.mod", "z.mod", "perf.mod", "needs.perf"}
+	if got := pkgs(in, r); !slices.Equal(got, want) {
+		t.Fatalf("order = %v", got)
+	}
+	if len(r.Anchors) != 2 || r.Anchors[1].Kind != KindCommunity || !slices.Equal(r.Anchors[1].Pulled, []int{4}) {
+		t.Fatalf("anchors = %+v", r.Anchors)
+	}
+	// Sorting the sorted list again changes nothing.
+	var sorted []Node
+	for _, i := range r.Order {
+		sorted = append(sorted, nodes[i])
+	}
+	in2 := Input{Nodes: sorted, GameMM: "1.6", Community: comm}
+	if got := pkgs(in2, Sort(in2)); !slices.Equal(got, want) {
+		t.Fatalf("re-sort = %v", got)
+	}
+	// A user rule wins over the community: top.mod to the bottom.
+	in.Rules = []Rule{{ID: 7, Kind: RuleBottom, A: "L-top.mod"}}
+	r = Sort(in)
+	if got := pkgs(in, r); !slices.Equal(got, []string{"ludeon.rimworld", "ludeon.rimworld.royalty", "a.mod", "lib.x", "z.mod", "perf.mod", "needs.perf", "top.mod"}) {
+		t.Fatalf("user bottom: %v", got)
+	}
+	// Ignoring the community loadBottom puts perf.mod back among the rest.
+	in.Rules = []Rule{{Kind: RuleIgnore, Target: PositionRef("perf.mod", TierBottom)}}
+	r = Sort(in)
+	if got := pkgs(in, r); !slices.Equal(got, []string{"ludeon.rimworld", "ludeon.rimworld.royalty", "lib.x", "top.mod", "perf.mod", "needs.perf", "a.mod", "z.mod"}) {
+		t.Fatalf("ignored bottom: %v", got)
+	}
+	// Pulled both ways: shared depends on a bottom mod and a top mod needs it. It stays
+	// normal; the constraints still hold.
+	nodes = []Node{
+		node("bot.mod", scan.Decl{}),
+		node("shared", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "bot.mod"}}}),
+		node("free", scan.Decl{}),
+		node("up.mod", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "shared"}}}),
+	}
+	in = Input{Nodes: nodes, Community: posCommunity{"bot.mod": TierBottom, "up.mod": TierTop}}
+	r = Sort(in)
+	if got := pkgs(in, r); !slices.Equal(got, []string{"free", "bot.mod", "shared", "up.mod"}) {
+		t.Fatalf("conflict: %v", got)
+	}
+	if !r.Anchors[0].Conflict || !r.Anchors[1].Conflict {
+		t.Fatalf("anchors = %+v", r.Anchors)
+	}
+}
+
 type fakeCommunity map[string][]string
 
 func (f fakeCommunity) Rules(pkg string) ([]string, []string) { return f[pkg], nil }

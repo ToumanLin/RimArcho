@@ -150,9 +150,9 @@ func TestImportRimCrow(t *testing.T) {
 	for _, want := range []string{
 		"mods: 4 with data: 3 mapped (1 by path, 2 by packageId), 1 not mapped",
 		"aliases: 1 new, 0 already set", "notes: 1 new", "tags: 4 new, 0 already present (2 groups, 3 memberships)",
-		"rules: 3: 2 new, 0 already present, 1 skipped", "conflicts: 1", "pkg:tester.gamma  alias: RimArcho has \"My Gamma\", RimCrow \"Gamma Prime\"",
+		"rules: 4: 3 new, 0 already present, 1 skipped", "conflicts: 1", "pkg:tester.gamma  alias: RimArcho has \"My Gamma\", RimCrow \"Gamma Prime\"",
 		"pkg:tester.missing  not installed here", "tester.gamma incompatibleWith tester.nowhere  pkg:tester.nowhere not installed here",
-		"not-mapped: rule loadBottom 1, sign_color 1", "about-disabled: 1 folders", "Switched Off",
+		"not-mapped: sign_color 1", "about-disabled: 1 folders", "Switched Off",
 	} {
 		if !strings.Contains(dry, want) {
 			t.Fatalf("dry run lacks %q:\n%s", want, dry)
@@ -172,11 +172,11 @@ func TestImportRimCrow(t *testing.T) {
 	if out := e.MustRun("list", "--filter", "tag:ui"); !strings.Contains(out, "Beta") || strings.Contains(out, "Alpha") {
 		t.Fatalf("tag filter:\n%s", out)
 	}
-	if out := e.MustRun("rule", "list"); !strings.Contains(out, "attach") || !strings.Contains(out, "after") {
+	if out := e.MustRun("rule", "list"); !strings.Contains(out, "attach") || !strings.Contains(out, "after") || !strings.Contains(out, "bottom") {
 		t.Fatalf("rules:\n%s", out)
 	}
 	again := e.MustRun("import", "rimcrow", "--db", dbPath)
-	for _, want := range []string{"aliases: 0 new, 1 already set", "tags: 0 new, 4 already present", "rules: 3: 0 new, 2 already present"} {
+	for _, want := range []string{"aliases: 0 new, 1 already set", "tags: 0 new, 4 already present", "rules: 4: 0 new, 3 already present"} {
 		if !strings.Contains(again, want) {
 			t.Fatalf("second import is not a no-op (%q):\n%s", want, again)
 		}

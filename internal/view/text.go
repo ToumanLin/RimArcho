@@ -170,7 +170,7 @@ var zhText = map[string]string{
 	// prompts and secondary screens
 	"archo command: ":     "archo 命令：",
 	"move %s to number: ": "把 %s 移到第几个：",
-	"rule for %s (after|before|attach|incompatible <ref>): ": "为 %s 加规则（after|before|attach|incompatible <引用>）：",
+	"rule for %s (after|before|attach|incompatible <ref>, top|bottom): ": "为 %s 加规则（after|before|attach|incompatible <引用>，或 top|bottom）：",
 	"switch game":                  "切换游戏",
 	"no games yet (archo env add)": "还没有游戏（archo env add）",
 	"%d–%d of %d":                  "第 %d–%d 行，共 %d 行",
@@ -446,6 +446,8 @@ var zhText = map[string]string{
 	"%s loads before %s (your rule)":         "%s 排在 %s 之前（你的规则）",
 	"%s is incompatible with %s (your rule)": "%s 与 %s 不兼容（你的规则）",
 	"%s follows %s (your rule)":              "%s 跟随 %s（你的规则）",
+	"%s loads as early as it can (your rule)": "%s 尽量靠前（你的规则）",
+	"%s loads as late as it can (your rule)":  "%s 尽量靠后（你的规则）",
 	"incompatible with %s (About.xml)":       "与 %s 不兼容（About.xml）",
 	"… %d more, tab shows all":               "… 还有 %d 行，tab 查看全部",
 	"first seen":                             "首次发现", "updated": "更新", "moved": "移动了位置",

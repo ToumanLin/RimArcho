@@ -383,6 +383,10 @@ func rulesSection(a *app.App, ix *app.Index, mod *store.Mod) Section {
 			l = Tf("%s is incompatible with %s (your rule)", lin(r.A), lin(r.B))
 		case order.RuleAttach:
 			l = Tf("%s follows %s (your rule)", lin(r.A), lin(r.B))
+		case order.RuleTop:
+			l = Tf("%s loads as early as it can (your rule)", lin(r.A))
+		case order.RuleBottom:
+			l = Tf("%s loads as late as it can (your rule)", lin(r.A))
 		default:
 			continue
 		}

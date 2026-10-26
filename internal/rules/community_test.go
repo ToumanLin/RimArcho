@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/ToumanLin/RimArcho/internal/order"
 )
 
 func TestLoad(t *testing.T) {
@@ -20,5 +22,27 @@ func TestLoad(t *testing.T) {
 	}
 	if c, err := Load(filepath.Join(t.TempDir(), "none.json")); err != nil || c.Count() != 0 {
 		t.Fatal("missing file must be empty")
+	}
+}
+
+func TestLoadPositions(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "communityRules.json")
+	os.WriteFile(p, []byte(`{"rules": {
+		"Krkr.RocketMan": {"loadBottom": {"comment": "last", "value": true}},
+		"imranfish.xmlextensions": {"loadTop": {"value": "true"}},
+		"off.mod": {"loadTop": {"value": false}},
+		"both.mod": {"loadTop": {"value": true}, "loadBottom": {"value": true}}}}`), 0o644)
+	c, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for pkg, want := range map[string]order.Tier{"krkr.rocketman": order.TierBottom, "imranfish.xmlextensions": order.TierTop,
+		"off.mod": order.TierNormal, "both.mod": order.TierNormal, "other.mod": order.TierNormal} {
+		if got := c.Position(pkg); got != want {
+			t.Errorf("%s: %v, want %v", pkg, got, want)
+		}
+	}
+	if c.Count() != 2 {
+		t.Fatalf("count %d", c.Count())
 	}
 }

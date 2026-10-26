@@ -404,8 +404,12 @@ func (m *model) listKey(s string) tea.Cmd {
 			return nil
 		}
 		ref, name := it.ref, it.name
-		m.prompt = &prompt{label: Tf("rule for %s (after|before|attach|incompatible <ref>): ", name), submit: func(m *model, text string) tea.Cmd {
+		m.prompt = &prompt{label: Tf("rule for %s (after|before|attach|incompatible <ref>, top|bottom): ", name), submit: func(m *model, text string) tea.Cmd {
 			f := strings.Fields(text)
+			if len(f) == 1 && (f[0] == "top" || f[0] == "bottom") {
+				m.act(T("rule added"), "rule", "add", f[0], ref)
+				return nil
+			}
 			if len(f) != 2 {
 				m.say(sayFail, T("expected: <kind> <ref>"))
 				return nil

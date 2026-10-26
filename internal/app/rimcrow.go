@@ -337,12 +337,15 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 	addRule := func(kind, pa, pb, label string) error {
 		rep.RulesTotal++
 		la, _, wa := lineageOf(pa)
-		lb, _, wb := lineageOf(pb)
+		lb, wb := "", ""
+		if pb != "" { // top / bottom name one mod
+			lb, _, wb = lineageOf(pb)
+		}
 		switch {
 		case la == "":
 			rep.RulesSkipped = append(rep.RulesSkipped, RCItem{label, "pkg:" + pa + " " + wa})
 			return nil
-		case lb == "":
+		case lb == "" && pb != "":
 			rep.RulesSkipped = append(rep.RulesSkipped, RCItem{label, "pkg:" + pb + " " + wb})
 			return nil
 		}
@@ -403,9 +406,29 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 			}
 			sort.Strings(ks)
 			for _, k := range ks {
+				if pos := map[string]string{"loadTop": order.RuleTop, "loadBottom": order.RuleBottom}[k]; pos != "" {
+					// {"value": true, "comment": "..."} → top / bottom (04 §5.5)
+					var f struct {
+						Value json.RawMessage `json:"value"`
+					}
+					json.Unmarshal(kinds[k], &f)
+					if strings.Trim(strings.ToLower(string(f.Value)), `" `) != "true" {
+						continue
+					}
+					label := fmt.Sprintf("%s %s", strings.ToLower(pa), k)
+					if rep.RulesDisabled && !opt.IncludeDisabledRules {
+						rep.RulesTotal++
+						rep.RulesSkipped = append(rep.RulesSkipped, RCItem{label, "user rules are switched off in RimCrow (--include-disabled-rules)"})
+						continue
+					}
+					if err := addRule(pos, strings.ToLower(pa), "", label); err != nil {
+						return nil, err
+					}
+					continue
+				}
 				kind := map[string]string{"loadAfter": order.RuleAfter, "loadBefore": order.RuleBefore, "incompatibleWith": order.RuleIncompatible}[k]
 				if kind == "" {
-					rep.NotMapped["rule "+k]++ // loadTop / loadBottom: no RimArcho equivalent
+					rep.NotMapped["rule "+k]++
 					continue
 				}
 				var targets map[string]json.RawMessage

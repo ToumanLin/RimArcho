@@ -13,6 +13,13 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   the whole cycle in its current order. A dependency the list had the wrong way round is now
   put right. `archo sort` marks the constraints it gives up `[broken]`; the suggested ignore
   is the weakest of them.
+- Sorting honours loadTop / loadBottom (04 §5.5): from the community rules (RocketMan,
+  RimThreaded, Performance Optimizer and others load last; XML Extensions first), from new
+  user rules `archo rule add top|bottom <mod>`, and from RimCrow's user rules on import. A
+  top mod takes what it needs up with it, a bottom mod takes what needs it down. They are
+  preferences: they never break a constraint and official content stays first. `archo sort`
+  lists them under "ends"; `archo rule add ignore community:<pkg>:loadbottom` drops a
+  community one.
 - `ctrl+\` turns reference numbers on and off: every control, text block, image and chart
   gets a thin red frame numbered at its top-left (`lib12`: the page, then the number), so a
   change can be asked for as "change lib12". The frames take no clicks.

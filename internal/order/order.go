@@ -42,6 +42,8 @@ const (
 	RuleIncompatible = "incompatible"
 	RuleAttach       = "attach"
 	RuleIgnore       = "ignore"
+	RuleTop          = "top"    // A loads as early as its constraints allow (04 §5.5)
+	RuleBottom       = "bottom" // A loads as late as its constraints allow
 )
 
 // Rule is a user rule; A and B are lineage IDs, Target an ignore reference.
@@ -55,6 +57,44 @@ type Rule struct {
 // Community supplies community ordering rules by packageId (04 §6.3).
 type Community interface {
 	Rules(pkg string) (loadAfter, loadBefore []string)
+}
+
+// Positions is implemented by a Community that also has loadTop / loadBottom (04 §5.5).
+type Positions interface {
+	Position(pkg string) Tier
+}
+
+// Tier is a preferred end of the list (04 §5.5). It only breaks ties between mods the
+// constraints leave free: it never overrides a constraint.
+type Tier int
+
+const (
+	TierTop    Tier = -1
+	TierNormal Tier = 0
+	TierBottom Tier = 1
+)
+
+func (t Tier) String() string {
+	switch t {
+	case TierTop:
+		return "top"
+	case TierBottom:
+		return "bottom"
+	}
+	return "normal"
+}
+
+// Anchor is a mod asked to load at one end, with where the request came from.
+type Anchor struct {
+	Node   int
+	Tier   Tier
+	Kind   string // KindCommunity or KindUser
+	Ref    string // community: the ignore reference
+	RuleID int64  // user: the rule
+	// Pulled: mods that go to that end with it (what it needs for top, what needs it for
+	// bottom). Conflict: it is also pulled to the other end.
+	Pulled   []int
+	Conflict bool
 }
 
 // Input to Sort.
@@ -246,6 +286,7 @@ type Result struct {
 	Edges   []Edge
 	Ignored int       // edges removed by ignore rules
 	Dropped []Dropped // constraints not used because they cannot be satisfied (04 §5.1)
+	Anchors []Anchor  // loadTop / loadBottom requests (04 §5.5)
 }
 
 // Reasons a constraint is dropped.
@@ -274,6 +315,15 @@ func DeclRef(lineage, field, target string) string {
 // CommunityRef is the ignore reference of a community rule.
 func CommunityRef(pkg, field, target string) string {
 	return "community:" + pkg + ":" + strings.ToLower(field) + ":" + strings.ToLower(target)
+}
+
+// PositionRef is the ignore reference of a community loadTop / loadBottom.
+func PositionRef(pkg string, t Tier) string {
+	f := "loadTop"
+	if t == TierBottom {
+		f = "loadBottom"
+	}
+	return CommunityRef(pkg, f, "")
 }
 
 // OfficialRef is the ignore reference of the built-in official order for one mod.
@@ -508,8 +558,26 @@ func Sort(in Input) Result {
 	}
 	sort.Slice(res.Cycles, func(a, b int) bool { return slices.Min(res.Cycles[a].Members) < slices.Min(res.Cycles[b].Members) })
 
-	// Kahn over components: pick the ready component whose first member is earliest in the
-	// current list, preferring one attached to what was just emitted.
+	// loadTop / loadBottom (04 §5.5): a top mod pulls what it needs to the top, a bottom mod
+	// pulls what needs it to the bottom. A component's tier breaks ties in the Kahn pick.
+	tier := tiers(in, &res, byLin, ignore, n)
+	ctier := make([]Tier, nComp)
+	for c, ms := range members {
+		top, bottom := false, false
+		for _, m := range ms {
+			top = top || tier[m] == TierTop
+			bottom = bottom || tier[m] == TierBottom
+		}
+		switch {
+		case top && !bottom:
+			ctier[c] = TierTop
+		case bottom && !top:
+			ctier[c] = TierBottom
+		}
+	}
+
+	// Kahn over components: pick the ready component attached to what was just emitted,
+	// then the one in the earlier tier, then the one earliest in the current list.
 	indeg := make([]int, nComp)
 	cadj := make([]map[int]bool, nComp)
 	for i := range cadj {
@@ -540,6 +608,10 @@ func Sort(in Input) Result {
 				if boost[c] {
 					pick = c
 				}
+			case ctier[c] != ctier[pick]:
+				if ctier[c] < ctier[pick] {
+					pick = c
+				}
 			case key(c) < key(pick):
 				pick = c
 			}
@@ -560,6 +632,102 @@ func Sort(in Input) Result {
 		}
 	}
 	return res
+}
+
+// tiers resolves loadTop / loadBottom into a tier per node and records the anchors in res.
+// A user rule wins over the community rule for the same mod; official content keeps its
+// own place.
+func tiers(in Input, res *Result, byLin map[string][]int, ignore map[string]bool, n int) []Tier {
+	own := make([]Tier, n)
+	if p, ok := in.Community.(Positions); ok {
+		for i, nd := range in.Nodes {
+			if nd.PackageID == "" || officialRank(nd.PackageID) >= 0 {
+				continue
+			}
+			if t := p.Position(nd.PackageID); t != TierNormal {
+				ref := PositionRef(nd.PackageID, t)
+				if !ignore[ref] {
+					own[i] = t
+					res.Anchors = append(res.Anchors, Anchor{Node: i, Tier: t, Kind: KindCommunity, Ref: ref})
+				}
+			}
+		}
+	}
+	for _, r := range in.Rules {
+		t := map[string]Tier{RuleTop: TierTop, RuleBottom: TierBottom}[r.Kind]
+		if t == TierNormal {
+			continue
+		}
+		for _, i := range byLin[r.A] {
+			if officialRank(in.Nodes[i].PackageID) >= 0 {
+				continue
+			}
+			own[i] = t
+			res.Anchors = slices.DeleteFunc(res.Anchors, func(a Anchor) bool { return a.Node == i })
+			res.Anchors = append(res.Anchors, Anchor{Node: i, Tier: t, Kind: KindUser, RuleID: r.ID})
+		}
+	}
+	if len(res.Anchors) == 0 {
+		return own
+	}
+	sort.Slice(res.Anchors, func(a, b int) bool { return res.Anchors[a].Node < res.Anchors[b].Node })
+	fwd := make([][]int, n)
+	back := make([][]int, n)
+	for _, e := range res.Edges {
+		fwd[e.From] = append(fwd[e.From], e.To)
+		back[e.To] = append(back[e.To], e.From)
+	}
+	reach := func(start int, adj [][]int) []int {
+		seen := map[int]bool{start: true}
+		stack, out := []int{start}, []int(nil)
+		for len(stack) > 0 {
+			v := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			for _, w := range adj[v] {
+				if !seen[w] {
+					seen[w] = true
+					out = append(out, w)
+					stack = append(stack, w)
+				}
+			}
+		}
+		sort.Ints(out)
+		return out
+	}
+	top, bottom := make([]bool, n), make([]bool, n)
+	for k := range res.Anchors {
+		a := &res.Anchors[k]
+		adj, mark := back, top
+		if a.Tier == TierBottom {
+			adj, mark = fwd, bottom
+		}
+		mark[a.Node] = true
+		for _, m := range reach(a.Node, adj) {
+			if officialRank(in.Nodes[m].PackageID) >= 0 {
+				continue
+			}
+			mark[m] = true
+			if own[m] == TierNormal {
+				a.Pulled = append(a.Pulled, m)
+			}
+		}
+	}
+	out := make([]Tier, n)
+	for i := range out {
+		switch {
+		case own[i] != TierNormal:
+			out[i] = own[i] // an anchor keeps its own end
+		case top[i] && !bottom[i]:
+			out[i] = TierTop
+		case bottom[i] && !top[i]:
+			out[i] = TierBottom
+		}
+	}
+	for k := range res.Anchors {
+		a := &res.Anchors[k]
+		a.Conflict = (a.Tier == TierTop && bottom[a.Node]) || (a.Tier == TierBottom && top[a.Node])
+	}
+	return out
 }
 
 // beforeOfficial reports a non-built-in edge that puts a mod before Core or a DLC.
