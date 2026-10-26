@@ -23,7 +23,7 @@ func TestWorkshopSourceCheckKeepsKnownUpdateOnFailure(t *testing.T) {
 	failed := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if failed {
-			http.Error(w, "offline", 503)
+			http.Error(w, "offline", http.StatusServiceUnavailable)
 			return
 		}
 		fmt.Fprintf(w, `{"response":{"publishedfiledetails":[{"publishedfileid":"1001","result":1,"time_updated":%d}]}}`, e.Now().Add(time.Hour).Unix())

@@ -12,8 +12,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   supported; CLI/MCP library queries accept `location:<source folder path>` too.
 
 ### Breaking
-- Database schema v10 → v16: plans (v11), analysis kept per plan (v12), copy notes (v13),
-  shared mod folders (v14, below), an index for looking defs up by `Name` (v15), the DDS RimArcho wrote (v16). Each environment's workspace, undo stack, versions and
+- Database schema v10 → v18: plans (v11), analysis kept per plan (v12), copy notes (v13),
+  shared mod folders (v14, below), an index for looking defs up by `Name` (v15), the DDS
+  RimArcho wrote (v16), a plan's game versions and followed collections (v17), the link
+  ledger (v18). Each environment's workspace, undo stack, versions and
   staging become its first plan, `default`; each `loadout tag` name becomes a plan of its own
   with one `import` version (04 §1.4).
 - `launch --force` is removed: launching always writes the plan first (08 §2).
@@ -27,6 +29,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - `save` and `launch` refuse while ModsConfig.xml holds an outside change that was not loaded
   (04 §4.1, §4.3).
 - Locked copies made by `pin` live in the lock library, not in `Mods/` (04 §7).
+- Light packs are gone: a pack always carries its mods' files. Sharing a list with each mod's
+  version is the RimArcho list export format (Packs, below); `pack export --light` is now
+  `pack export --list`, and `pack build --light` and the build page's full / light choice are
+  removed. MCP `manage_packs` `list` replaces `light`.
 - One environment is one game folder: `env add` refuses a game folder another environment
   uses, and the Workshop, SteamCMD and other folders are no longer an environment's (below).
 
@@ -193,7 +199,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   (`copy_local` stays as an alias), `unpin_mod`; `status` gains `show` pages (envs,
   settings, data, db, cache); `launch_game`, `manage_plans`, `plan_history`;
   `edit_loadout` gains `checkout` and `ignore_external`; `list_library`, `manage_library`;
-  `preview_uninstall` (read-only; there is no tool that uninstalls). 34 tools in all.
+  `preview_uninstall` (read-only; there is no tool that uninstalls); `search_files`,
+  `test_run`, `check_links`, `repair_links` (below). 38 tools in all.
+- `manage_plans` gains `versions`, `follow`, `unfollow` and `sync`; `manage_packs` gains
+  `check`.
 - `exchange_list` and `maintenance` are open-world; the destructive ones (`save_loadout`,
   `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`, `manage_hidden`,
   `manage_library`, `maintenance`) are listed in the server instructions with "show the dry run and ask first".
@@ -460,7 +469,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   software and saves about 20–35 MB; it takes effect the next time RimArcho opens.
 - The window's Go process returns freed memory to the system 2 seconds after heavy work, and
   forgets a page's caches when the player leaves it (Mod 库存, 需要处理 / 日志, 首页); a 32 MiB
-  soft cap and a 256 KiB SQLite page cache as in the TUI. Idle 85 → 22 MB.
+  soft cap (now 128 MiB, below) and a 256 KiB SQLite page cache as in the TUI. Idle 85 → 22 MB.
+- The soft cap went from 32 MiB to 128 MiB: at 32 MiB a list edit ran garbage collection
+  dozens to hundreds of times and was 2–3× slower. Idle memory still comes from the explicit
+  release after 2 seconds.
 - The window icon is no longer drawn at 256 px: not at all when the exe carries its icon
   (release builds), at the system icon size otherwise. Start-up peak 122 → 67 MB.
 - WebView2 runs its network service inside the browser process (one process fewer), and its
@@ -475,14 +487,13 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   saves (a game's `Saves/`, own save folders, save backups) and a game downloaded with
   SteamCMD. A link, or any other path, is refused whoever asks (`trash`, `pack remove`,
   Mod 库存, moving copies to the lock library, uninstall).
-- 编译成整合包 is the current plan's own page, laid out as drawn: the name and full / light
-  pack, the four things building does (check, leave out, lock, put in place) with their
+- 编译成整合包 is the current plan's own page, laid out as drawn: the name, the four things building does (check, leave out, lock, put in place) with their
   numbers, and a summary (environment, mods, size before → after, own saves, location) with
   编译 and 先看清单，不写磁盘 (the text of `pack build --dry-run`). With error-level problems
   编译 is disabled and says 先修好 N 个问题 →, which opens 能不能跑 (G14); not enough space, an
   unreadable mod, a bad or taken name and a build in progress disable it too. The build's
   progress shows on the four steps with 停止; a finished build opens its pack. Builds cut
-  short are listed below. Keys: `B` build, `V` the dry run, `T` full / light, `n` the name,
+  short are listed below. Keys: `B` build, `V` the dry run, `n` the name,
   `esc` back to the plan. The old build popup is gone.
 - Each pack is a sub-entry under 整合包 with a page of its own: what it is, 启动 (`L`), 导出
   (`e`, a save dialog) and 移到回收站 (`Del`), and its mods in load order with their sizes and
@@ -510,6 +521,17 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   `pack.links-left`: in 能不能跑 › 要你确认 with 移除链接, in the tab under 启动游戏, in
   `archo problems` and MCP `list_problems`. `archo pack unlink [--dry-run]` / MCP
   `manage_packs action=unlink` remove only the links; refused while a game runs.
+- `.archopack` format 2 (08 §5.1, §5.4): tar + zstd with `pack.json` first, a SHA-256 digest
+  per copy and a whitelist that never lets game files in. Import verifies every copy.
+  `archo pack check <name|file>` (MCP `manage_packs action=check`) verifies a pack's copies,
+  or an archive without extracting it.
+- A pack is compared with the game it is imported into or launched on (08 §5.5): game build,
+  DLC and mods. The import result says whether every copy matched and lists the differences;
+  launching refuses only on errors.
+- The RimArcho list (`loadout export --format archo`, `.archolist.json`) shares a list with
+  each mod's version; every list import reads it, takes the installed copy with the listed
+  content and marks mods installed in another version. A pack's page exports its list (`E`).
+- Packs remember the list they were made from.
 
 ### 贴图优化 (08 §5.2)
 - Database schema v15 → v16: the DDS RimArcho wrote, per file and per mod.
@@ -525,8 +547,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - `pack build --textures [--texture-scale N]`: 预转换 (full size) or 精简 (scaled) in the
   pack's copies, which then drop their PNGs. Space is checked against the peak; `pack.json`
   records what was done.
+- Opening 贴图优化 or 创建整合包 no longer reads every texture: 扫描统计 does, and can be
+  stopped. Changing the scope or scale keeps the last numbers and says to count again;
+  converting works without counting (only new or changed PNGs).
 - GUI: a 贴图优化 page (estimate, scale, progress, stop, clean), Mod 库存's 优化贴图 /
-  清除贴图优化, the pack build's textures choice on 编译成整合包 (its own step 贴图 for full packs: off / 预转换 /
+  清除贴图优化, the pack build's textures choice on 编译成整合包 (its own step 贴图: off / 预转换 /
   精简 80–25%, with the PNGs converted, the size after and the peak while converting; `D` steps
   through it; without todds the step says so and 编译 points to 设置 › 贴图优化); TUI palette panel; MCP `manage_textures`.
 
@@ -581,9 +606,152 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   - Mod detail › 技术信息 › Harmony (`archo harmony --mod`): patches from `Harmony.Patch`
     calls are marked, and every unresolved call is listed with its reason.
 
+### Background tasks (06 §2.16)
+- Mod 库's file and Steam actions are queued once confirmed: two queues (files, Steam), one
+  failure does not stop the rest, and each item's result is kept (`<data>/tasks.json`).
+  Scans, checks, pack builds, texture work, game downloads and the long actions of the
+  settings page and the guide are recorded as tasks too.
+- 后台任务 page: a line at the bottom of the sidebar and `ctrl+j`. The CLI and MCP still run
+  in the foreground.
+- The window stays usable during long work (06 §3.1 rule 9): adding a large game, switching
+  games, the first scan, folder sizes, and the settings page's downloads and database actions
+  run in the background, and a page opens before its data is read; stale results are dropped.
+
+### Interface rules (06 §3.1, §3.9, §7.3)
+- Popups are only for warnings: new list, import, the build checklist and loading an older
+  version happen in the page. A filter bar folds away when it loses focus.
+- Packs, a pack's mods and the texture list are data tables. The gaps between cards can be
+  dragged or moved with the keyboard, and their sizes are kept.
+- Two corner radii, four font sizes no smaller than 12 px, hairlines, shared motion timings; no
+  left colour bars (能不能跑, the TUI, selected rows), no `·` in interface text, no purpose
+  lines under page titles. `TestStyleRules` and `TestWording` check this.
+- Every path shown in the window copies on click, by mouse or keyboard (rule 12); text never
+  overlaps the controls next to it.
+- Back and forward between pages (rule 11): the mouse side buttons, `alt+←` / `alt+→` and
+  BrowserBack / BrowserForward share one session history of the last 50 pages; back first
+  closes a menu or popup. Deleted lists, other games' pages and finished guides are skipped.
+  The TUI keeps its own page switching (06 §8.5).
+- 启动 is a grid: the current list or pack as the title, then 01 game → 02 list / pack → 03
+  launch. Choosing applies it, choosing again opens it; a switch shows its progress on the
+  launch block instead of a popup. The launch tab's problems can be folded away until they
+  change. The page shows the game's full version (e.g. 1.6.4871 rev590).
+- RimWorld 1.6's own main-menu background is read from the game's Unity assets in the
+  background and cached, falling back to the official preview image.
+- 设置 › 界面: an accent colour (`ui.accent`, the 15 Radix Colors scales or default), applied at
+  once in light and dark. The native title bar and the launch backdrop follow the theme.
+
+### Lists (04 §1.6, §9.6; 06 §2.17)
+- 列表管理 (the sidebar's 列表 › 管理, `shift+5`): the lists on the left; on the right a list's
+  game versions, the Steam collections it follows and sharing, with an export sub-page
+  (`e` in the editor opens it too). New lists are created in the page, and unfinished drafts
+  are kept.
+- A list's game versions (`archo plan versions [<name> [<versions…>|default]]`): by default the
+  versions every mod supports plus the game it was made on, as one range. Copies of the list
+  and RimArcho list exports carry them. When the current game is not among them, 能不能跑's
+  要你确认 says so (add 1.7, or go to 列表管理).
+- Following a Steam collection (`archo plan follow <name> <link|ID> [--mode add|follow]`,
+  `plan unfollow`, `plan sync`; `collection --import --follow`): RimArcho keeps a snapshot and
+  tells you what changed since; it never changes the list by itself. Catching up is one undo
+  step: `add` enables the new installed mods, `follow` also disables the ones the collection
+  dropped. The network is used only when asked (列表管理 checks at most every 10 minutes).
+- Export format 工坊链接: Markdown Workshop links, read back by Workshop ID on import.
+- Load cost (`archo plan cost [<plan>] [--mods] [--json]`, 列表管理): a RAM and VRAM range for a
+  list from its textures, sounds, XML and assemblies. 1.7 is calibrated on the real game;
+  1.6 follows the loading rules only and says so. Results are cached per mod.
+- Sorting puts the installed base game back when it is missing; the 未启用 area lists Core and
+  the DLCs first.
+
+### Subscriptions (02 §3.4, 06 §2.9)
+- Mods from a Git repository (`archo subscribe git <url> [--branch|--tag|--commit]`), from a
+  download page such as LoversLab (`subscribe page <url> [--git] [--from zip|folder]`: the
+  page's Git repository if it has one, else the files the player downloaded; never downloaded
+  automatically), and Workshop items through Steam with SteamCMD as the fallback when the
+  Steam client is not available (`subscribe workshop <id|url…>`). Where a mod came from is
+  kept in `.rimarcho/source.json`. `subscribe list|check|update|remove`; updates are refused
+  while the game runs; removing warns when lists use the mod.
+- Mod 库 › 订阅与更新 replaces 变化: a scope bar (lists / all mods), one list of 等你更新 then
+  已经更新 (the change records), new and gone, earlier; a source summary line at the bottom;
+  the selected item's details (update, choose files, open the source page, lock). Mod 库 ›
+  添加订阅 takes a pasted link, recognises Git / LoversLab / another page / Workshop, asks one
+  question and shows the dry run.
+- Mod 库 gains a source column, the source-update state, fields and actions; MCP
+  `list_library` knows the new sources and states.
+
+### Accounts (07 §3.1)
+- 设置 › 账户: one status line each for SteamCMD and LoversLab (log in, log in again, log out).
+  SteamCMD's login runs in SteamCMD's own console and is verified, and RimWorld ownership is
+  checked. LoversLab signs in in a separate WebView2 window (its own process, a throwaway
+  profile); only the site's cookies are kept, encrypted for the current Windows user, so
+  downloads that need a login work. Passwords are never asked for or stored. Uninstall
+  forgets the accounts first.
+
+### Searching files (03 §5.5, 05 §4)
+- `archo files search <pattern>` / MCP `search_files` search only what the game loads: the
+  enabled copies in load order, the version or LoadFolders branch for this game version, and
+  the content folders (Defs, Patches, About; Languages, Textures, Sounds, Assemblies when
+  asked). Results are grouped by mod and file, carry the enclosing def or patch XPath, and are
+  paged. `--def` classifies hits (def, abstract, child, patch, patch value, translation,
+  reference). Literal text or `--regex`; no index.
+
+### Game test runs (08 §12)
+- `archo test run [<plan>] [--map] [--timeout]` / MCP `test_run`: starts the game on isolated
+  data with default settings, waits for the main menu (or a quick test map), stops it and
+  reports the startup errors by mod (`report.json`, the last 10 runs kept). Missing mods and
+  broken links stop it before the game starts.
+
+### Game links (08 §3)
+- `archo links check [--all]` / MCP `check_links` find RimArcho's `_Archo_` / `!ArchoPack_`
+  links in every known game's `Mods/` that are dangling, point at the wrong mod, cannot be
+  checked, or whose name a real folder holds (`mods.link-dangling`, `mods.link-foreign`,
+  `mods.link-check-failed`, `mods.link-occupied`). A dangling link or failed check in the
+  selected game blocks writing, launching and test runs; other games are only summarised.
+- `archo links repair --dry-run|--yes [--include <path>]` / MCP `repair_links` (one
+  confirmation in the window) remove only RimArcho's own links, after showing the game, the
+  full path, the target, the reason and the ownership evidence. Links without evidence need
+  `--include`; real folders and unknown entries are never touched; refused while that game
+  runs.
+- Moving, recycling, locking or removing a mod or pack first takes down every known game's
+  links to it, then puts the needed ones back; each step goes into the link ledger (schema
+  v18). An interrupted operation shows as `mods.link-recovery` and finishes through links
+  repair. Links to a known mod count as RimArcho's own, old IDs too.
+
+### Managed directories (06 §2.14)
+- 设置 › RimArcho 管理的目录 lists the game folders, Workshop, SteamCMD, other mod folders, the
+  lock library, packs, Archo Monitor and the SteamCMD program. Each can be relocated (you moved
+  it) or moved by RimArcho (a verified copy across drives, the old folder to the recycle bin).
+  Mods keep their identity, tags and lists, and links follow. Every start checks them and asks
+  where a missing one went; 能不能跑 and the launch check only warn.
+
+### External tools (07 §2.1)
+- `archo deps`, `deps install <todds|steamcmd|wezterm>`, `deps remove <name>`: one place that
+  finds the bundled font, todds, SteamCMD and WezTerm. 设置 › 外部工具 installs and updates them
+  as background tasks (`wezterm.path`, `steamcmd.path`). Only RimArcho's own copy is removed,
+  and SteamCMD not while it holds Workshop content, a game or a mod folder.
+
+### Other
+- Unsubscribing or recycling a mod that lists use only warns: the confirmation names the lists,
+  and their entries then show as missing. Unsubscribing is still refused while the game runs.
+- Mod detail: 不列为副本 separates a copy from its lineage and keeps its player data.
+- Faster on 1,349 mods: a list edit 1.3 s → 16–30 ms, a detail 650 → 6 ms, 需要处理 730 → 11 ms,
+  首页 800 → 125 ms (link checks no longer resolve every mod; a list edit no longer reloads the
+  index). Folder sizes, scan fingerprints and texture summaries walk folders in parallel, with
+  fewer workers on hard disks (the whole Workshop's size 5.05 → 0.75 s).
+
+### Development
+- CI on GitHub Actions (windows-latest; `master`, `dev/**` and pull requests): gofmt, `go vet`,
+  staticcheck (`staticcheck.conf`) and `go test`.
+- Tests that touch no process-wide state run in parallel, and the test App reaches only
+  loopback addresses (no real Steam API). `release.ps1` runs `go test -short -count=1`.
+- `scripts/vm`: build, push and drive the real window in a test VM over DevTools; `smoke.ps1`
+  prints PASS / FAIL. `RIMARCHO_DEVTOOLS_PORT` exists only for this.
+
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
 - `collection <id> --import` replaces the list with only the collection's mods, dropping Core.
+- TUI: no subscribe actions, 后台任务 page or 列表管理 page yet (the CLI and the window have
+  them).
+- MCP has no write tool for subscriptions yet (`archo subscribe` only).
+- Followed collections are checked when 列表管理 opens, not yet on a schedule.
 
 ## 0.8.0 — toward 1.0 (unreleased)
 

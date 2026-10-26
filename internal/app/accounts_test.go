@@ -160,7 +160,7 @@ func TestUninstallForgetsSessionsBeforeKeptSteamCMD(t *testing.T) {
 		t.Fatal("forget is not first")
 	}
 	var steps []string
-	p, err = e.App.Uninstall(app.UninstallOptions{}, func(p app.UninstallProgress) { steps = append(steps, p.Step) })
+	_, err = e.App.Uninstall(app.UninstallOptions{}, func(p app.UninstallProgress) { steps = append(steps, p.Step) })
 	if err != nil {
 		t.Fatal(err)
 	}

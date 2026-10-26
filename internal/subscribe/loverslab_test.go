@@ -46,10 +46,10 @@ func TestLoversLabFileAgreementDownloadAndFallback(t *testing.T) {
 			io.WriteString(w, "denied")
 			return
 		case "login":
-			http.Redirect(w, r, "/login/", 302)
+			http.Redirect(w, r, "/login/", http.StatusFound)
 			return
 		case "foreign":
-			http.Redirect(w, r, "https://unobserved-cdn.test/file.zip?token=offline-secret", 302)
+			http.Redirect(w, r, "https://unobserved-cdn.test/file.zip?token=offline-secret", http.StatusFound)
 			return
 		case "challenge":
 			w.WriteHeader(403)

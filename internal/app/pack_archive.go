@@ -535,16 +535,6 @@ func (a *App) importPackArchive(file string) (*PackMatch, error) {
 	return a.extractPackArchive(ar)
 }
 
-// unpackPack retains the format-1 reader for callers holding an open ZIP reader.
-func (a *App) unpackPack(zr *zip.Reader) (*PackMatch, error) {
-	ar, err := zipPackArchive(zr)
-	if err != nil {
-		return nil, err
-	}
-	defer ar.close()
-	return a.extractPackArchive(ar)
-}
-
 func (a *App) extractPackArchive(ar *packArchive) (*PackMatch, error) {
 	p := ar.p
 	dir := a.packPath(p.Name)

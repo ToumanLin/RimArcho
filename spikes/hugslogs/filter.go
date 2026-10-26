@@ -122,16 +122,6 @@ func loadIndex(dir string) (*index, error) {
 	return ix, sc.Err()
 }
 
-// add appends a newly listed gist; it reports false for a known one.
-func (ix *index) add(e indexEntry) bool {
-	if _, ok := ix.m[e.ID]; ok {
-		return false
-	}
-	ix.order = append(ix.order, e.ID)
-	ix.m[e.ID] = e
-	return true
-}
-
 // save rewrites index.jsonl through a temporary file.
 func (ix *index) save() error {
 	tmp := ix.path + ".tmp"

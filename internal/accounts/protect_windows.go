@@ -37,12 +37,7 @@ func privateDir(dir string) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
-	t, err := windows.OpenCurrentProcessToken()
-	if err != nil {
-		return err
-	}
-	defer t.Close()
-	u, err := t.GetTokenUser()
+	u, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
 		return err
 	}
