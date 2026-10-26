@@ -5,11 +5,12 @@ import "github.com/ToumanLin/RimArcho/internal/view"
 // The page's own text (its hints, labels and help); the shared text is in internal/view.
 func init() {
 	view.Register(map[string]string{
-		"%d mods":                  "%d 个 Mod",
-		"%d not written":           "%d 项未写入",
-		"%d selected":              "已选 %d",
-		"[image, %s]":              "[图片，%s]",
-		"a command, a mod, a game": "命令、Mod 或游戏",
+		"%d mods":                             "%d 个 Mod",
+		"%d not written":                      "%d 项未写入",
+		"changes not written to the game yet": "有修改还没写入游戏",
+		"%d selected":                         "已选 %d",
+		"[image, %s]":                         "[图片，%s]",
+		"a command, a mod, a game":            "命令、Mod 或游戏",
 		"a position, or a mod's name (tab: before / after)": "输入序号或 Mod 名（tab 切换之前 / 之后）",
 		"analyze which log?": "分析哪个日志？",
 		"between areas: enable, disable, stage; within Enabled: reorder": "在各区之间：启用、停用、暂存；在“已启用”内：调整顺序",

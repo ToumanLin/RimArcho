@@ -774,18 +774,11 @@ svg.i.fill { fill: currentColor; }
 .hm-actline .go { color: var(--muted); transition: transform var(--t-layout) var(--ease); }
 .hm-actline:hover .go { transform: translateX(4px); color: var(--fg); }
 .hm-hero { grid-column: 1 / 13; grid-row: 2; align-self: end; padding-bottom: 34px; min-width: 0; }
-.hm-kick { display: flex; gap: 14px; align-items: baseline; font-size: 13px; font-weight: 600; color: var(--accent-11, var(--accent)); margin-bottom: 12px; min-width: 0; }
-.hm-kick span { color: var(--muted); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-headline { overflow: hidden; margin-bottom: -.08em; }
 .hm-headline h1 { margin: 0; padding-bottom: .1em; font: 700 clamp(48px, 7.6vw, 124px)/1 var(--font); letter-spacing: -.03em; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hm-headline h1.in { animation: hm-up var(--t-enter) var(--ease) both; }
 .hm-facts { display: flex; flex-wrap: wrap; gap: 6px 26px; margin-top: 18px; font-size: 14px; color: var(--fg-2); }
 .hm-facts.in { animation: hm-fade var(--t-enter) .12s var(--ease) both; }
-.hm-state { display: inline-flex; align-items: center; gap: 8px; }
-.hm-state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
-.hm-state.bad { color: var(--amber); }
-.hm-state.bad::before { background: var(--amber); border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-.hm-state.none::before { background: none; box-shadow: inset 0 0 0 1.5px var(--muted); }
 .hm-rule { grid-column: 1 / 13; grid-row: 3; height: 2px; background: var(--fg); transform-origin: left; }
 .hm-rule.in { animation: hm-draw var(--t-layout) .1s var(--ease) both; }
 .hm-step { grid-row: 4; position: relative; padding-top: 16px; min-width: 0; }
@@ -796,9 +789,16 @@ svg.i.fill { fill: currentColor; }
 /* Startup hints use 16px gaps (06 §2.3); the shared renderer supplies the separators. */
 #app:has(.page.home) #hints .sep { display: inline-block; width: 0; overflow: hidden; margin: 0 8px; }
 #app:has(.page.home) #hints b { color: var(--fg); }
-.hm-picks { position: relative; display: flex; flex-direction: column; }
+/* A column holds about six rows and scrolls past them; the padding keeps the square on its
+   left inside the scroller. The applied row is first (home.js), so it never starts hidden. */
+.hm-picks { position: relative; display: flex; flex-direction: column; max-height: 241px; overflow-y: auto; overscroll-behavior: contain;
+  margin-left: -16px; padding-left: 16px; scrollbar-gutter: stable; }
+/* Only a column with more rows than it holds scrolls: rows rising in must not flash a bar. */
+.hm-picks:not(.scrolls) { overflow-y: hidden; }
+.hm-picks::-webkit-scrollbar { width: 6px; }
+.hm-picks::-webkit-scrollbar-thumb { border: 0; border-radius: 3px; background: color-mix(in srgb, var(--fg) 28%, transparent); }
 /* the steps' rows: unpicked ones recede, the picked one is the text colour and bold */
-.hm-pick { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 12px; height: 40px; padding: 0; border-bottom: 1px solid var(--line);
+.hm-pick { position: relative; display: grid; overflow: clip; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 12px; height: 40px; padding: 0; border-bottom: 1px solid var(--line);
   font-size: 17px; text-align: left; color: color-mix(in srgb, var(--fg) 42%, var(--bg)); transition: color var(--t-layout); }
 #app.photo .hm-pick { color: color-mix(in srgb, var(--fg) 46%, transparent); }
 #app.photo .hm-pick.on, #app.photo .hm-pick:hover { color: var(--fg); }
@@ -841,6 +841,9 @@ svg.i.fill { fill: currentColor; }
 .hm-go.arrived::before { content: ""; position: absolute; inset: 0; background: var(--accent-fg); opacity: 0; animation: hm-flash 400ms var(--ease); pointer-events: none; }
 .hm-pick.leaving { animation: hm-leave var(--t-exit) var(--ease-in) forwards; }
 .hm-go .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--green); margin-right: 10px; animation: hm-blink 1.4s infinite; }
+/* the current list's edits not written to the game yet, between ▶ and its problem */
+.hm-unsaved { display: block; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); width: 100%; font-size: 12.5px; font-weight: 600; text-align: left; color: var(--fg); }
+.hm-unsaved:hover { text-decoration: underline; }
 /* the applied row's problem under ▶; × hides it until something about the row changes */
 .hm-note { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--t-enter) var(--ease), opacity var(--t-enter) var(--ease); }
 .hm-note > div { min-height: 0; overflow: hidden; }

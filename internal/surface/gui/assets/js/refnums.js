@@ -3,8 +3,11 @@
 // for as "change lib12". The frames sit on their own layer above the page and take no
 // clicks; the page's layout is untouched. The prefix names the page; the numbers follow the
 // page's order and count only what is drawn, so they run without gaps. window.refnum("lib12")
-// gives the element back (for the dev harness's console).
-import { S } from "./state.js";
+// gives the element back (for the dev harness's console). Each time the numbers are drawn
+// they are also written to refnums/<prefix>.txt in the data directory (API.SaveRefNums): a line per
+// number with its place in the page by class and its text, so a number can be looked up
+// in the code without opening the window.
+import { S, api } from "./state.js";
 
 const PREFIX = {
   home: "hom", library: "lib", changes: "chg", subscribe: "sub", log: "log", needs: "run",
@@ -18,7 +21,7 @@ const CONTROL = "button, a[href], input:not([type=hidden]), select, textarea, su
 const MEDIA = "img, canvas, video, picture, svg";
 const TEXT = "p, h1, h2, h3, h4, h5, h6, li, dt, dd, th, td, pre, blockquote, figcaption, legend, label";
 
-let layer = null, observer = null, queued = false, ids = new Map();
+let layer = null, observer = null, queued = false, ids = new Map(), saveTimer = 0, saved = "";
 window.refnum = (id) => ids.get(id);
 
 export function toggleRefNums() { layer ? off() : on(); }
@@ -132,6 +135,34 @@ function draw() {
     frag.append(f);
   }
   layer.replaceChildren(frag);
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(save, 400, prefix);
+}
+
+// where: the element's place by its ancestors' ids and classes, from the page (or the
+// shell part it is in) down, such as "#screen .page.home .hm-hero .hm-facts > span".
+function where(e) {
+  const part = (n) => n.id ? "#" + n.id : n.classList.length ? "." + [...n.classList].join(".") : "";
+  const out = [];
+  for (let n = e; n && n !== document.body; n = n.parentElement) {
+    const p = part(n);
+    if (p) out.unshift(p);
+    if (n.id) break;
+  }
+  if (!part(e)) out.push("> " + e.tagName.toLowerCase());
+  return out.join(" ");
+}
+
+function save(prefix) {
+  if (!layer) return;
+  const lines = [...ids].map(([id, e]) => {
+    const text = (e.getAttribute("aria-label") || e.textContent || e.value || e.title || "").replace(/\s+/g, " ").trim().slice(0, 80);
+    return `${id}\t${e.tagName.toLowerCase()}\t${where(e)}\t${JSON.stringify(text)}`;
+  });
+  const out = `# ${prefix} (${S.screen || "editor"})  ${innerWidth}x${innerHeight}\n` + lines.join("\n") + "\n";
+  if (out === saved) return;
+  saved = out;
+  api.SaveRefNums(prefix, out).catch(() => {});
 }
 
 // Capturing on the window, so fields that keep their own keys still let it through.

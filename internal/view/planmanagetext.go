@@ -37,6 +37,8 @@ func init() {
 		"replace %s":                                                          "替换选中的列表：%s",
 
 		"all lists":                       "全部列表",
+		"all lists (%d)":                  "全部列表（%d）",
+		"all packs (%d)":                  "全部整合包（%d）",
 		"new / import":                    "新建 / 导入",
 		"new / import…":                   "新建 / 导入…",
 		"duplicate":                       "创建副本",

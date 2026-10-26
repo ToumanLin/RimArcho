@@ -12,6 +12,7 @@ import { S, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, changesPlan, beginPageRead } from "./screens.js";
 import { launchPack } from "./packs.js";
 import { withEnvironmentSwitch } from "./environment.js";
+import { places, slideFrom } from "./motion.js";
 
 let ui = null;
 export function initHome(u) {
@@ -55,6 +56,9 @@ const running = () => !!(S.live && (S.live.running || S.live.blocked));
 const key = (r) => [r.kind, r.envName, r.plan || "", r.kind === "pack" ? r.name : ""].join("|");
 // a game's rows: its lists, then its packs, each by the last time played (view.SortHome)
 const rowsOf = (env) => rows().filter((r) => r.envName === env).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "plan" ? -1 : 1));
+// shownFirst puts the applied one at the top of its column; ↑↓ and ←→ still step through
+// the columns' own order, so the keys do not bounce between the top two.
+const shownFirst = (list, on) => { const i = list.findIndex(on); return i > 0 ? [list[i], ...list.slice(0, i), ...list.slice(i + 1)] : list; };
 // the games with something on the page, by name
 function games() {
   const seen = new Map();
@@ -127,6 +131,8 @@ export function liveChanged() { if (S.screen === "home" && data) { launching = 0
 function draw() {
   const focus = focusedStep();
   const sc = S.screen === "home" ? document.querySelector("#screen") : openScreen("home");
+  // where the rows were, so a row that moves to the top slides there
+  const before = places(sc.querySelector(".page.home"), ".hm-pick");
   sc.innerHTML = "";
   setBackdrop(bg);
   // no page actions: rescanning is Mod 库's, a new plan is 方案's
@@ -146,6 +152,8 @@ function draw() {
   w.append(activity(), hero(f, rowMoved));
   w.append(el("div", "hm-rule" + (shown.drawn ? "" : " in")));
   w.append(gameStep(env), rowStep(f, env, gameMoved), launchStep(f));
+  w.querySelectorAll(".hm-picks").forEach((l) => l.classList.toggle("scrolls", l.querySelectorAll(".hm-pick").length > 6));
+  slideFrom(w, ".hm-pick", before);
   placeMarks(gameMoved);
   if (pendingRow && S.busy.env) showSwitch(pendingRow);
   if (focus) focusStep(focus);
@@ -180,7 +188,6 @@ export function setBackdrop(b) {
 }
 
 const kindText = (r) => (r.kind === "plan" ? T("list") : T("pack"));
-const stateClass = (r) => (r.level === "bad" ? "bad" : r.level === "ok" ? "ok" : "none");
 
 // hero: the applied row as the page's one headline.
 function hero(f, moved) {
@@ -191,18 +198,14 @@ function hero(f, moved) {
     box.append(head);
     return box;
   }
-  const kick = el("div", "hm-kick", kindText(f));
-  kick.append(el("span", "num word-facts", [f.env, f.mode].filter(Boolean).join("  ")));
   const head = el("div", "hm-headline");
   const h1 = el("h1", moved ? "in" : "", f.name);
   h1.title = f.name;
   head.append(h1);
   const facts = el("div", "hm-facts num" + (moved ? " in" : ""));
   facts.append(el("span", "word-facts", f.facts || Tf("%d mods", f.mods)));
-  if (f.versions) facts.append(el("span", "", Tf("versions %s", f.versions)));
   if (f.played) facts.append(el("span", "", f.played));
-  facts.append(el("span", "hm-state " + stateClass(f), f.state));
-  box.append(kick, head, facts);
+  box.append(head, facts);
   return box;
 }
 
@@ -216,15 +219,16 @@ function step(n, cls, title) {
   return s;
 }
 
-// 01: the games; picking one applies its last row (this session's pick, else its most
-// recently played).
+// 01: the games, the applied one first; picking one applies its last row (this session's
+// pick, else its most recently played).
 function gameStep(env) {
   const s = step("01", "hm-s1", T("game"));
   const list = el("div", "hm-picks");
   list.append(el("span", "hm-mark"));
-  for (const g of games()) {
+  for (const g of shownFirst(games(), (g) => g.name === env)) {
     const b = el("button", "hm-pick" + (g.name === env ? " on" : ""));
     b.dataset.game = g.name;
+    b.dataset.id = "game|" + g.name;
     const version = el("small", "num", g.version);
     version.title = g.version;
     b.append(el("span", "nm", g.name), version);
@@ -235,15 +239,17 @@ function gameStep(env) {
   return s;
 }
 
-// 02: the game's lists and packs; picking one applies it, picking the applied one opens it.
+// 02: the game's lists and packs, the applied one first; picking one applies it, picking
+// the applied one opens it.
 function rowStep(f, env, moved) {
   const s = step("02", "hm-s2", T("list or pack"));
   const list = el("div", "hm-picks" + (moved ? " enter" : ""));
   list.append(el("span", "hm-mark"));
-  rowsOf(env).forEach((r, i) => {
+  shownFirst(rowsOf(env), (r) => f && key(r) === key(f)).forEach((r, i) => {
     const on = f && key(r) === key(f);
     const b = el("button", "hm-pick" + (on ? " on" : ""));
     b.dataset.key = key(r);
+    b.dataset.id = "row|" + key(r);
     b.style.setProperty("--d", i);
     const nm = el("span", "nm", r.name);
     if (r.level === "bad") nm.append(el("span", "flag bad", "▲"));
@@ -279,6 +285,13 @@ function launchStep(f) {
   if (live) b.title = T("a game is already running");
   b.onclick = () => f && launch(f);
   s.append(b);
+  // the current list's edits not written to the game yet; it opens the list
+  if (f && f.unsaved) {
+    const u = el("button", "hm-unsaved", T("changes not written to the game yet"));
+    u.title = Tf("%d not written", f.unsaved);
+    u.onclick = () => edit(f);
+    s.append(u);
+  }
   const n = f && note(f);
   if (n) s.append(n);
   return s;

@@ -1344,6 +1344,29 @@ func (s *API) OpenURL(raw string) error {
 	return s.open(u.String())
 }
 
+// SaveRefNums writes a page's reference numbers (ctrl+\, refnums.js) to
+// refnums/<prefix>.txt in the data directory, one line per number with where it sits in
+// the page and its text, so "change hom22" can be looked up without opening the window.
+func (s *API) SaveRefNums(prefix, text string) error {
+	for _, c := range prefix {
+		if c < 'a' || c > 'z' {
+			return fmt.Errorf("not a page prefix: %q", prefix)
+		}
+	}
+	if prefix == "" || len(prefix) > 8 {
+		return fmt.Errorf("not a page prefix: %q", prefix)
+	}
+	dir := filepath.Join(s.a.Home, "refnums")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	p := filepath.Join(dir, prefix+".txt")
+	if err := os.WriteFile(p+".tmp", []byte(text), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(p+".tmp", p)
+}
+
 // Setting reads a GUI setting (column widths, 06 §7).
 func (s *API) Setting(key string) string {
 	s.mu.Lock()

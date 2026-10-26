@@ -267,7 +267,34 @@ func TestNavRecentLists(t *testing.T) {
 	for _, k := range kids {
 		got = append(got, k.Label)
 	}
-	if strings.Join(got, ",") != "all lists,0,5,4,3" || kids[0].ID != view.PagePlans {
+	if strings.Join(got, ",") != "all lists (6),0,5,4,3" || kids[0].ID != view.PagePlans {
 		t.Fatalf("sidebar lists %v", got)
+	}
+}
+
+// With more than NavLists lists or packs, the sidebar says how many there are and shows
+// the most recently played packs only.
+func TestNavCapsAndCounts(t *testing.T) {
+	now := time.Now()
+	var rows []view.PlanRow
+	var packs []view.PackRow
+	for i := range 6 {
+		rows = append(rows, view.PlanRow{Page: "plan:" + itoa(i), Name: itoa(i), UsedAt: now})
+		packs = append(packs, view.PackRow{Name: "p" + itoa(i), PlayedAt: now.Add(time.Duration(i) * time.Hour)})
+	}
+	g := view.Nav(0, rows, packs)[1]
+	lists, pk := g.Items[1].Kids, g.Items[2].Kids
+	if lists[0].Label != "all lists (6)" {
+		t.Fatalf("lists head %q", lists[0].Label)
+	}
+	var got []string
+	for _, k := range pk {
+		got = append(got, k.Label)
+	}
+	if strings.Join(got, ",") != "all packs (6),p5,p4,p3,p2" || pk[0].ID != view.PagePacks {
+		t.Fatalf("sidebar packs %v", got)
+	}
+	if few := view.Nav(0, rows[:2], packs[:2])[1]; few.Items[1].Kids[0].Label != "all lists" || len(few.Items[2].Kids) != 2 {
+		t.Fatalf("few: %+v", few.Items[1:3])
 	}
 }

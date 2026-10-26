@@ -198,7 +198,8 @@ function renderSide() {
       nav.append(el("div", "grp", g.title));
       for (const it of g.items || []) {
         const kids = it.kids || [];
-        const kidOn = kids.some((k) => k.id === cur);
+        // a pack left out of the capped sub-entries still keeps 整合包 open
+        const kidOn = kids.some((k) => k.id === cur) || (it.id === "packs" && String(cur).startsWith("pack:"));
         const on = it.id === cur || kidOn;
         // only the open entry shows its sub-entries (06 §2.1)
         if (on && kids.length) openNow = it.id;

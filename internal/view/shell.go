@@ -147,12 +147,25 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	// 全部列表 comes first, where every list is and new lists are made; then at most
 	// NavLists lists: the current one, the one open in the editor, then the most recently
 	// used. 列表 itself opens the current list (06 §2.1, §2.17).
-	planKids := []NavItem{{ID: PagePlans, Label: T("all lists")}}
+	// When some are left out, 全部列表 says how many there are.
+	all := T("all lists")
+	if len(plans) > NavLists {
+		all = Tf("all lists (%d)", len(plans))
+	}
+	planKids := []NavItem{{ID: PagePlans, Label: all}}
 	for _, p := range navPlans(plans) {
 		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, Open: p.Open, InGame: p.InGame})
 	}
+	// Packs the same way: at most NavLists, the most recently played; with more, 全部整合包
+	// with their number comes first.
 	var packKids []NavItem
-	for _, p := range packs {
+	shown := slices.Clone(packs)
+	if len(shown) > NavLists {
+		slices.SortStableFunc(shown, func(a, b PackRow) int { return b.PlayedAt.Compare(a.PlayedAt) })
+		shown = shown[:NavLists]
+		packKids = append(packKids, NavItem{ID: PagePacks, Label: Tf("all packs (%d)", len(packs))})
+	}
+	for _, p := range shown {
 		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name})
 	}
 	// Two groups (06 §2.1): what you play now, and what you have.
@@ -231,10 +244,12 @@ type HomeRow struct {
 	Env         string `json:"env"`   // the environment chip
 	State       string `json:"state"` // "2 problems break the game", "ready to play", "not checked yet"
 	Level       string `json:"level"` // LevelBad, HomeOK, or "" for not checked
-	// Facts: "312 mods" (and what is not written to the game yet); Mode how its mods
-	// change: a plan follows Workshop updates, a pack keeps its versions (08 §5).
-	Facts string `json:"facts"`
-	Mode  string `json:"mode,omitempty"`
+	// Facts: "312 mods"; Mode how its mods change: a plan follows Workshop updates, a pack
+	// keeps its versions (08 §5). Unsaved: the current plan's entries not written to the
+	// game yet (the launch step says so).
+	Facts   string `json:"facts"`
+	Mode    string `json:"mode,omitempty"`
+	Unsaved int    `json:"unsaved,omitempty"`
 	// Played is "played 10 月 20 日" or "never played".
 	Played string `json:"played"`
 	// A plan's row: its ID and page, whether it is the one being edited, its
@@ -300,9 +315,7 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 		if p.Current {
 			r.Mods = len(b.Cols[Active])
 			r.Facts = Tf("%d mods", len(b.Cols[Active]))
-			if b.Unsaved > 0 {
-				r.Facts += "  " + Tf("%d not written", b.Unsaved)
-			}
+			r.Unsaved = b.Unsaved
 			k, checked = BreakCount(n), !n.Never
 			r.Links = PackLinksText(n)
 		} else {
