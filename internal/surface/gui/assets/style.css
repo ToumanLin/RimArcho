@@ -586,6 +586,8 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .prog .bar { height: 6px; border-radius: var(--r-sm); background: var(--pill); overflow: hidden; }
 .prog .bar i { display: block; height: 100%; background: var(--accent); border-radius: var(--r-sm); transition: width var(--t-layout) var(--ease); }
 .prog .bar.bad i { background: var(--red); }
+.stw .tk-dl { display: inline-flex; align-items: center; width: 64px; margin-left: 8px; vertical-align: middle; }
+.stw .tk-dl .bar { flex: 1; height: 4px; }
 .prog .ptext { margin-top: 5px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prog .ptext.bad { color: var(--red); white-space: pre-wrap; }
 
