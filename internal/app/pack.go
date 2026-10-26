@@ -95,7 +95,7 @@ type PackEntry struct {
 	Files           int      `json:"files,omitempty"`
 	SHA256          string   `json:"sha256,omitempty"`
 	WorkshopUpdated int64    `json:"workshop_updated,omitempty"`
-	GitHead         string   `json:"git_head,omitempty"`
+	GitHead         string   `json:"git_head,omitempty"` // observed fingerprint, not Git subscription provenance
 }
 
 // PacksDir is where packs are kept: config pack.dir, else <data>/packs.

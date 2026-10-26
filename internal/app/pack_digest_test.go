@@ -45,9 +45,11 @@ func TestCopyDigestRejectsLinks(t *testing.T) {
 
 func TestPackEntryProvenance(t *testing.T) {
 	t.Parallel()
-	m := &store.Mod{PackageID: "test.provenance", ACFTimeUpdated: 123456, GitHead: "abcdef"}
-	e := packEntryOf(m)
-	if e.WorkshopUpdated != m.ACFTimeUpdated || e.GitHead != m.GitHead {
-		t.Fatalf("missing provenance: %+v", e)
+	for _, kind := range []source.Kind{source.Local, source.Workshop, source.SteamCMD} {
+		m := &store.Mod{Kind: kind, PackageID: "test.provenance", ACFTimeUpdated: 123456, GitHead: "abcdef"}
+		e := packEntryOf(m)
+		if e.WorkshopUpdated != m.ACFTimeUpdated || e.GitHead != m.GitHead {
+			t.Fatalf("%s: missing provenance: %+v", kind, e)
+		}
 	}
 }
