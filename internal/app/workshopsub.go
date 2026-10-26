@@ -14,6 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Subscribing and unsubscribing through the Steam client (06 §2.9, 08 §10). The call runs in
@@ -24,7 +25,7 @@ import (
 // API did not start). The window then opens the item's Workshop page instead.
 var ErrSteamUnavailable = errors.New("Steam is not available")
 
-// WorkshopOp is a subscribe, unsubscribe or state call.
+// WorkshopOp is a subscribe, unsubscribe, resubscribe or state call.
 type WorkshopOp struct {
 	Action string
 	DryRun bool
@@ -38,7 +39,7 @@ type WorkshopItem struct {
 	ID         string // the instance
 	Name       string
 	WorkshopID string
-	Folder     string // unsubscribe: what Steam deletes
+	Folder     string // folder to remove before resubscribing (empty for residue)
 	Result     string // ok, failed:<EResult>, timeout
 	State      uint32
 	Installed  bool // local fallback: the folder exists now, not a Steam account state
@@ -59,12 +60,12 @@ func (e *SteamUnavailable) Error() string {
 }
 func (e *SteamUnavailable) Unwrap() error { return ErrSteamUnavailable }
 
-// Workshop subscribes to (action "subscribe") or unsubscribes from ("unsubscribe") the
+// Workshop subscribes to, unsubscribes from, or resubscribes to the
 // Workshop items of refs. Unsubscribing makes Steam delete the item's folder, so it is
 // refused while the game runs; the plans that use it (UsedBy) show it missing afterwards.
-func (a *App) Workshop(action string, refs []string, dryRun bool) (result *WorkshopOp, workshopErr error) {
-	if action != steamworks.Subscribe && action != steamworks.Unsubscribe {
-		return nil, fmt.Errorf("unknown action %s: want subscribe or unsubscribe", action)
+func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...BatchCalls) (result *WorkshopOp, workshopErr error) {
+	if action != steamworks.Subscribe && action != steamworks.Unsubscribe && action != steamworks.Resubscribe {
+		return nil, fmt.Errorf("unknown action %s: want subscribe, unsubscribe or resubscribe", action)
 	}
 	st, err := a.Loadout()
 	if err != nil {
@@ -77,10 +78,20 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (result *Works
 			return nil, err
 		}
 		ws := m.WorkshopID()
-		if m.Kind != source.Workshop || ws == "" {
+		if m.Kind != source.Workshop || !isDigits(ws) {
 			return nil, fmt.Errorf("%s is not a Workshop item (src:%s)", st.Ix.Ref(m.ID), m.SourceLabel)
 		}
 		it := WorkshopItem{ID: m.ID, Name: m.DisplayName(), WorkshopID: ws}
+		if action == steamworks.Resubscribe && !st.Ix.CanResubscribe(m) {
+			return nil, fmt.Errorf("%s is a link or locked copy: resubscribe to the original Workshop copy", st.Ix.Ref(m.ID))
+		}
+		if action == steamworks.Resubscribe && !m.Residue {
+			it.Folder = st.Ix.ModDir(m)
+			if src := st.Ix.Source(m.SourceID); src != nil {
+				// Keep the source path so a replacement junction cannot redirect cleanup.
+				it.Folder = filepath.Join(src.Root, m.Rel)
+			}
+		}
 		switch action {
 		case steamworks.Subscribe:
 			if !m.Residue {
@@ -103,13 +114,20 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (result *Works
 		}
 		op.Items = append(op.Items, it)
 	}
-	if action == steamworks.Unsubscribe {
+	if action == steamworks.Unsubscribe || action == steamworks.Resubscribe {
 		if run, err := a.GameRunning(); err == nil && run != nil {
 			return nil, fmt.Errorf("the game is running (pid %d): Steam would delete folders it has loaded; close it first", run.PID)
 		}
 	}
 	if dryRun || len(op.Items) == 0 {
 		return op, nil
+	}
+	if action == steamworks.Resubscribe {
+		var b BatchCalls
+		if len(callbacks) > 0 {
+			b = callbacks[0]
+		}
+		return a.resubscribe(op, b)
 	}
 	ids := make([]string, len(op.Items))
 	var detached []*LinkLifecyclePlan
@@ -167,6 +185,137 @@ func (a *App) Workshop(action string, refs []string, dryRun bool) (result *Works
 		}
 	}
 	return op, nil
+}
+
+// resubscribe preserves the recorded copy and incoming links while replacing its folder.
+// Only confirmed unsubscribes whose folders are gone proceed to subscribe; residues skip
+// cleanup. Failed items keep their own result for the GUI's batched queue.
+func (a *App) resubscribe(op *WorkshopOp, b BatchCalls) (*WorkshopOp, error) {
+	var remove []string
+	for _, it := range op.Items {
+		if it.Folder != "" {
+			remove = append(remove, it.WorkshopID)
+		}
+	}
+	removed := map[string]steamworks.Item{}
+	if len(remove) > 0 {
+		rep, err := a.runSteam(steamworks.Unsubscribe, remove)
+		if err != nil {
+			return nil, a.unavailable(err, op.Items)
+		}
+		for _, it := range rep.Items {
+			removed[strconv.FormatUint(it.ID, 10)] = it
+		}
+	}
+	var add []string
+	for k := range op.Items {
+		it := &op.Items[k]
+		if b.Stopped != nil && b.Stopped() {
+			return op, context.Canceled
+		}
+		it.Result = "timeout"
+		if it.Folder != "" {
+			if r, ok := removed[it.WorkshopID]; ok {
+				it.Result, it.State = r.Result, r.State
+			}
+			if it.Result != "ok" {
+				continue
+			}
+			if err := a.recycleWorkshopFolder(it.Folder); err != nil {
+				it.Result = "failed:folder cleanup: " + err.Error()
+				continue
+			}
+		}
+		it.Result = "timeout"
+		add = append(add, it.WorkshopID)
+	}
+	if len(add) > 0 {
+		if b.Stopped != nil && b.Stopped() {
+			return op, context.Canceled
+		}
+		rep, err := a.runSteam(steamworks.Subscribe, add)
+		if err != nil {
+			return nil, a.unavailable(err, op.Items)
+		}
+		for _, r := range rep.Items {
+			for k := range op.Items {
+				it := &op.Items[k]
+				if it.WorkshopID == strconv.FormatUint(r.ID, 10) {
+					it.Result, it.State = r.Result, r.State
+				}
+			}
+		}
+	}
+
+	var download []string
+	for i, it := range op.Items {
+		if it.Result == "ok" {
+			download = append(download, it.WorkshopID)
+		} else if b.Done != nil {
+			b.Done(i, fmt.Errorf("Steam did not confirm it (%s)", it.Result))
+		}
+	}
+	if len(download) > 0 {
+		if err := a.watchWorkshop(op, download, b); err != nil {
+			return op, a.unavailable(err, op.Items)
+		}
+	}
+	var failed []string
+	for _, it := range op.Items {
+		if it.Result != "ok" {
+			failed = append(failed, fmt.Sprintf("%s (%s)", it.Name, it.Result))
+		}
+	}
+	if len(failed) > 0 {
+		return op, fmt.Errorf("could not resubscribe: %s", strings.Join(failed, ", "))
+	}
+	return op, nil
+}
+
+// Steam may leave edited or untracked files behind, or still be deleting the folder.
+// Use the shared recycle-bin allow-list and backend, but keep incoming links in place:
+// the download will return at this path with the same recorded identity.
+func (a *App) recycleWorkshopFolder(path string) error {
+	deadline := time.Now().Add(time.Second)
+	for {
+		if _, err := os.Lstat(path); os.IsNotExist(err) {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("cannot check %s: %w", path, err)
+		}
+		if source.IsLink(path) {
+			return fmt.Errorf("%s is a link; resubscribe to the original Workshop folder", path)
+		}
+		err := a.recycleTarget(path)
+		if _, checkErr := os.Lstat(path); os.IsNotExist(checkErr) {
+			return nil // Steam may have removed it even when recycling failed.
+		} else if checkErr != nil {
+			return fmt.Errorf("cannot verify removal of %s: %w", path, checkErr)
+		}
+		if errors.Is(err, ErrNotInTrashList) {
+			return err
+		}
+		if !time.Now().Before(deadline) {
+			if err != nil {
+				return fmt.Errorf("%s still exists after waiting for the recycle bin; not subscribed: %w", path, err)
+			}
+			return fmt.Errorf("%s still exists after waiting for the recycle bin; not subscribed", path)
+		}
+		time.Sleep(100 * time.Millisecond) // retry transient sharing violations from Steam
+	}
+}
+
+// CanResubscribe checks the source location before resolving links: ModDir points at
+// the target of a junction, which would hide that the Workshop copy itself is a link.
+func (ix *Index) CanResubscribe(m *store.Mod) bool {
+	if m == nil || m.Kind != source.Workshop || !isDigits(m.WorkshopID()) || m.Origin != "" {
+		return false
+	}
+	path := ix.ModDir(m)
+	if src := ix.Source(m.SourceID); src != nil {
+		path = filepath.Join(src.Root, m.Rel)
+	}
+	return !source.IsLink(path)
 }
 
 // WorkshopState asks Steam for live state; when unavailable it reports only local folder

@@ -80,6 +80,10 @@ func (a *App) subscriptionRecord(m *store.Mod, dir string) (*subscribe.Record, e
 	if err != nil {
 		return nil, fmt.Errorf("subscription %s: %w", dir, err)
 	}
+	// Workshop uploads can include the author's Git subscription provenance too.
+	if m.Kind == source.SteamCMD && r.Kind != "steamcmd" {
+		r = &subscribe.Record{Kind: "steamcmd", WorkshopID: filepath.Base(dir)}
+	}
 	if a.subscriptionCache == nil {
 		a.subscriptionCache = map[string]subscriptionCacheEntry{}
 	}

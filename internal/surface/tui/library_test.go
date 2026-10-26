@@ -107,43 +107,22 @@ func TestLibraryCopyNote(t *testing.T) {
 	}
 }
 
-// 06 §3.5: space adds and enables a copy, or takes it out of the current plan; u undoes;
-// t stages; m enables at a place; F10 lists the copy's ops.
+// The library has no plan actions or plan undo keys; the editor keeps those.
 func TestLibraryPlanOps(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
+	// Make an undoable edit first so a stray library undo would be observable.
+	e.MustRun("enable", "pkg:tester.b")
+	m.reload()
 	m.openLibrary()
 	libAt(t, m, "Beta")
-	press(m, "space")
-	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
-		t.Fatalf("space: %s (%q)", got, m.status)
-	}
-	libAt(t, m, "Beta")
-	press(m, "space")
-	if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
-		t.Fatalf("space again: %s (%q)", got, m.status)
-	}
-	press(m, "u")
-	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
-		t.Fatalf("u: %s", got)
-	}
-	libAt(t, m, "Beta")
-	press(m, "t")
-	if got := activeNames(t, e); got != "Core, Alpha, Harmony" || !strings.Contains(m.status, "staged") {
-		t.Fatalf("t: %s %q", got, m.status)
-	}
-	libAt(t, m, "Beta")
-	press(m, "space") // put back from staging
-	libAt(t, m, "Beta")
-	press(m, "m")
-	if m.pos == nil {
-		t.Fatal("m: no position input")
-	}
-	typeIn(m, "1")
-	press(m, "enter")
-	if got := activeNames(t, e); got != "Beta, Core, Alpha, Harmony" {
-		t.Fatalf("m 1: %s (%q)", got, m.status)
+	before := activeNames(t, e)
+	for _, key := range []string{"space", "m", "t", "x", "u", "ctrl+z", "ctrl+y", "ctrl+r"} {
+		press(m, key)
+		if got := activeNames(t, e); got != before || m.pos != nil {
+			t.Fatalf("%s changed the plan: %s", key, got)
+		}
 	}
 	libAt(t, m, "Alpha")
 	press(m, "f10")
@@ -156,7 +135,7 @@ func TestLibraryPlanOps(t *testing.T) {
 			codes = append(codes, it.code)
 		}
 	}
-	if codes[0] != view.OpTakeOut || codes[len(codes)-1] != view.OpUnsub {
+	if codes[0] != view.OpTags || codes[len(codes)-1] != view.OpUnsub {
 		t.Fatalf("menu %v", codes)
 	}
 	press(m, "esc")

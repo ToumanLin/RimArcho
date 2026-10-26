@@ -32,7 +32,7 @@ type flat struct {
 // the exit code. The current folder must hold steam_api64.dll and steam_appid.txt.
 func Worker(action string, ids []uint64, w io.Writer) int {
 	say := func(s string) { fmt.Fprintln(w, s) }
-	if action != Subscribe && action != Unsubscribe && action != State && action != Download {
+	if action != Subscribe && action != Unsubscribe && action != State && action != Download && action != Watch {
 		say(ErrorLine("unknown action " + action))
 		return 2
 	}
@@ -43,6 +43,53 @@ func Worker(action string, ids []uint64, w io.Writer) int {
 		return 3
 	}
 	defer f.shutdown.Call()
+	if action == Watch {
+		download, err := f.dll.FindProc("SteamAPI_ISteamUGC_DownloadItem")
+		if err != nil {
+			say(ErrorLine(err.Error()))
+			return 3
+		}
+		info, err := f.dll.FindProc("SteamAPI_ISteamUGC_GetItemDownloadInfo")
+		if err != nil {
+			say(ErrorLine(err.Error()))
+			return 3
+		}
+		install, err := f.dll.FindProc("SteamAPI_ISteamUGC_GetItemInstallInfo")
+		if err != nil {
+			say(ErrorLine(err.Error()))
+			return 3
+		}
+		// The parent holds stdin open. EOF also stops us if the window crashes or exits.
+		stopped := make(chan struct{})
+		if os.Getenv("RIMARCHO_STEAM_WATCH_PIPE") == "1" {
+			go func() { _, _ = io.Copy(io.Discard, os.Stdin); close(stopped) }()
+		}
+		watchDownloads(ids, w, downloadAPI{
+			stopped: func() bool {
+				select {
+				case <-stopped:
+					return true
+				default:
+					return false
+				}
+			},
+			request:   func(id uint64) bool { ok, _, _ := download.Call(f.ugc, uintptr(id), 1); return ok&0xff != 0 },
+			callbacks: func() { f.runCallbacks.Call() },
+			sample: func(id uint64) (Progress, string) {
+				var got, total, size uint64
+				var stamp uint32
+				var folder [32768]byte
+				info.Call(f.ugc, uintptr(id), uintptr(unsafe.Pointer(&got)), uintptr(unsafe.Pointer(&total)))
+				ok, _, _ := install.Call(f.ugc, uintptr(id), uintptr(unsafe.Pointer(&size)), uintptr(unsafe.Pointer(&folder[0])), uintptr(len(folder)), uintptr(unsafe.Pointer(&stamp)))
+				path := ""
+				if ok&0xff != 0 {
+					path = strings.TrimRight(string(folder[:]), "\x00")
+				}
+				return Progress{ID: id, Got: int64(got), Total: int64(total), State: f.state(id)}, path
+			},
+		}, watchClock{now: time.Now, sleep: time.Sleep})
+		return 0
+	}
 	if action == Download {
 		p, err := f.dll.FindProc("SteamAPI_ISteamUGC_DownloadItem")
 		if err != nil {

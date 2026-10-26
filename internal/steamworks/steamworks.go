@@ -1,15 +1,16 @@
 // Package steamworks subscribes to and unsubscribes from Workshop items, and reads their
-// state, through the Steam client (06 §2.9, 08 §10). The calls run in a short-lived worker
+// state, through the Steam client (06 §2.9, 08 §10). The calls run in a bounded worker
 // process (`archo steam-worker <action> <ids>`) started in a runtime folder that holds
-// steam_api64.dll (copied from the game install) and steam_appid.txt: Steam then sees
-// RimWorld only for the second the call takes, and a crash in the DLL never reaches the
-// window. The worker uses the flat C API through syscall, so there is no cgo.
+// steam_api64.dll (copied from the game install) and steam_appid.txt. Steam sees RimWorld
+// as running while a download is watched; DownloadItem explicitly drives it. A crash
+// in the DLL never reaches the window. The worker uses the flat C API through syscall, so there is no cgo.
 //
 // The worker writes one line per fact on stdout, which Parse reads:
 //
 //	ERROR <message>                  Steam could not be reached (not running, no DLL…)
 //	ITEM <id> <result> <state>       subscribe / unsubscribe: ok, failed:<EResult>, timeout
 //	STATE <id> <state>               state: the item's EItemState flags
+//	PROGRESS <id> <downloaded> <total> <state>  watch: bytes and current flags
 //	DONE <action> <n>
 package steamworks
 
@@ -27,8 +28,10 @@ const AppID = 294100
 const (
 	Subscribe   = "subscribe"
 	Unsubscribe = "unsubscribe"
+	Resubscribe = "resubscribe" // App orchestrates unsubscribe then subscribe with the worker.
 	State       = "state"
 	Download    = "download"
+	Watch       = "watch" // Request high-priority downloads and wait for verified installation.
 )
 
 // EItemState flags (ISteamUGC::GetItemState).
@@ -110,4 +113,28 @@ func StateText(s uint32) string {
 		return "not subscribed"
 	}
 	return strings.Join(parts, ", ")
+}
+
+// Progress is a live download sample, in bytes.
+type Progress struct {
+	ID         uint64
+	Got, Total int64
+	State      uint32
+}
+
+func ProgressLine(p Progress) string {
+	return fmt.Sprintf("PROGRESS %d %d %d %d", p.ID, p.Got, p.Total, p.State)
+}
+
+// ParseProgress ignores malformed samples and unrelated DLL output.
+func ParseProgress(line string) (Progress, bool) {
+	f := strings.Fields(line)
+	if len(f) != 5 || f[0] != "PROGRESS" {
+		return Progress{}, false
+	}
+	id, e1 := strconv.ParseUint(f[1], 10, 64)
+	got, e2 := strconv.ParseInt(f[2], 10, 64)
+	total, e3 := strconv.ParseInt(f[3], 10, 64)
+	state, e4 := strconv.ParseUint(f[4], 10, 32)
+	return Progress{ID: id, Got: got, Total: total, State: uint32(state)}, e1 == nil && e2 == nil && e3 == nil && e4 == nil && id != 0 && got >= 0 && total >= 0
 }

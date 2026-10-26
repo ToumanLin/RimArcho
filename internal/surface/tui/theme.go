@@ -7,8 +7,8 @@ import (
 	"github.com/mattn/go-runewidth"
 	"github.com/muesli/termenv"
 
-	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // Visual system (06 §7, §3).
@@ -135,14 +135,14 @@ func SetColors() {
 
 // sourceIcon is the row's source icon (06 §7).
 func sourceIcon(m *store.Mod) string {
-	switch {
-	case m.Kind == source.Official:
+	switch view.SourceKind(m) {
+	case "official":
 		return ic.official
-	case m.Kind.WorkshopLike():
+	case "workshop":
 		return ic.workshop
-	case m.GitHead != "":
+	case "git":
 		return ic.git
-	case m.Origin != "":
+	case "copy":
 		return ic.localCopy
 	}
 	return ic.local

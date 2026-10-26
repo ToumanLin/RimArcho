@@ -47,6 +47,10 @@ type LiveLog struct {
 	Resets    int // times the file started over (the game restarted)
 	BadLines  int // companion lines that were not JSON
 
+	dataRoot string // automatic pairing for FollowRun
+	session  string
+	marked   string
+
 	off      int64
 	pending  []byte
 	p        *logs.Parser
@@ -78,11 +82,28 @@ func (a *App) FollowLog(path, companion string) *LiveLog {
 	return lv
 }
 
-// FollowRun follows a running game's Player.log (03 §6.6). Its companion is RimCrow's log in
-// the run's save data root until Player.log shows Archo Monitor's marker, which names the
-// ArchoMonitor.log of this run (03 §6.7.4).
+// FollowRun follows a run using the same pairing rules as full analysis (03 §6.7.4).
+// dataRoot may name a pack's save folder; empty uses the Player.log's data root.
 func (a *App) FollowRun(path, dataRoot string) *LiveLog {
-	return a.FollowLog(path, rimCrowLog(dataRoot, 0, time.Time{}))
+	if dataRoot == "" {
+		dataRoot = logDataRoot(path)
+	}
+	lv := a.FollowLog(path, "")
+	lv.dataRoot = dataRoot
+	lv.session, lv.marked = logMarker(path)
+	lv.refreshCompanion()
+	return lv
+}
+
+func (lv *LiveLog) refreshCompanion() {
+	if lv.dataRoot == "" {
+		return
+	}
+	c := findCompanion(lv.Path, lv.dataRoot, lv.session, lv.marked)
+	c = uniqueCompanion(lv.Path, lv.dataRoot, c, lv.session)
+	if c != lv.Companion {
+		lv.follow(c)
+	}
 }
 
 // RunDataRoot is the save data root a run writes into: the pack's when a pack runs.
@@ -110,14 +131,17 @@ func (lv *LiveLog) reset() {
 	lv.memo = map[string]liveKey{}
 }
 
-// marker switches to the ArchoMonitor.log a Player.log line names (03 §6.7.4).
+// marker re-evaluates the session, including a monitor rotated since the marker was written.
 func (lv *LiveLog) marker(line string) {
 	m := logs.SessionRe.FindStringSubmatch(line)
-	if m == nil || m[3] == "" {
+	if m == nil {
 		return
 	}
-	if p := strings.TrimSpace(m[3]); lv.comp == nil || !strings.EqualFold(lv.Companion, p) {
-		lv.follow(p)
+	lv.session, lv.marked = m[2], strings.TrimSpace(m[3])
+	if lv.dataRoot != "" {
+		lv.refreshCompanion()
+	} else if c := CompanionFor(lv.Path); c != lv.Companion {
+		lv.follow(c)
 	}
 }
 
@@ -162,8 +186,10 @@ func (lv *LiveLog) Poll(a *App) ([]*LiveCluster, error) {
 	}
 	if fi.Size() < lv.off {
 		lv.reset()
+		lv.session, lv.marked = logMarker(lv.Path)
 		lv.Resets++
 	}
+	lv.refreshCompanion()
 	// The companion first: its class hints apply to the entries read below.
 	if lv.comp != nil {
 		before := lv.comp.BadLines

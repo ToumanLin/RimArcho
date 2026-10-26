@@ -1,8 +1,10 @@
 package view
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -103,6 +105,34 @@ type NavItem struct {
 	Add bool `json:"add,omitempty"`
 }
 
+// NavLists is how many lists the sidebar shows under 列表; the rest are in 全部列表.
+const NavLists = 4
+
+// navPlans picks the sidebar's lists: the current one first, then the one open in the
+// editor, then the most recently used, NavLists at most, the current one always.
+func navPlans(plans []PlanRow) []PlanRow {
+	rank := func(p PlanRow) int {
+		switch {
+		case p.Current:
+			return 0
+		case p.Open:
+			return 1
+		}
+		return 2
+	}
+	out := slices.Clone(plans)
+	slices.SortStableFunc(out, func(a, b PlanRow) int {
+		if c := cmp.Compare(rank(a), rank(b)); c != 0 {
+			return c
+		}
+		return b.UsedAt.Compare(a.UsedAt)
+	})
+	if len(out) > NavLists {
+		out = out[:NavLists]
+	}
+	return out
+}
+
 // NavGroup is one of the sidebar's three questions. A group with nothing in it yet is
 // left out rather than shown empty.
 type NavGroup struct {
@@ -114,13 +144,13 @@ type NavGroup struct {
 // under 方案, every pack under 整合包. 没玩到 and 值得玩 have no pages yet (10) and are
 // left out.
 func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
-	var planKids []NavItem
-	for _, p := range plans {
+	// 全部列表 comes first, where every list is and new lists are made; then at most
+	// NavLists lists: the current one, the one open in the editor, then the most recently
+	// used. 列表 itself opens the current list (06 §2.1, §2.17).
+	planKids := []NavItem{{ID: PagePlans, Label: T("all lists")}}
+	for _, p := range navPlans(plans) {
 		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, Open: p.Open, InGame: p.InGame})
 	}
-	// The current list comes first (PlanRows) and 列表 opens it, as every entry opens its
-	// first sub-entry; 全部列表 follows the lists, and new lists are made there (06 §2.1, §2.17).
-	planKids = append(planKids, NavItem{ID: PagePlans, Label: T("all lists")})
 	var packKids []NavItem
 	for _, p := range packs {
 		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name})

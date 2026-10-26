@@ -223,7 +223,7 @@ function renderSide() {
         if (badge) b.append(n = el("span", "badge-n num", String(badge)));
         bump("nav:" + it.id, n, badge || 0);
         // 列表 opens its first sub-entry, the current list (06 §2.1)
-        b.onclick = () => ui.go(it.id === "plan" ? (kids[0] && kids[0].id) || "plans" : it.id);
+        b.onclick = () => ui.go(it.id === "plan" ? (kids.find((k) => k.current) || kids.find((k) => k.id !== "plans") || { id: "plans" }).id : it.id);
         nav.append(b);
         if (kids.length) nav.append(kidList(it, kids, cur, hls.get(it.id)));
       }

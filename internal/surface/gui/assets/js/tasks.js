@@ -21,7 +21,7 @@ const SPLIT_KEY = "ui.gui.tasks.split";
 // the natural direction (1: A to Z, -1: biggest first) and how to compare
 const COLS = [
   { key: "name", title: "mod", w: 150, def: true, fixed: true, dir: 1, cmp: (a, b) => a.name.localeCompare(b.name) },
-  { key: "state", title: "result", w: 96, def: true, dir: 1, cmp: (a, b) => a.rank - b.rank },
+  { key: "state", title: "result", w: 160, def: true, dir: 1, cmp: (a, b) => a.rank - b.rank },
   { key: "why", title: "reason", w: 220, def: true, dir: 1, cmp: (a, b) => (b.why ? 1 : 0) - (a.why ? 1 : 0) || a.why.localeCompare(b.why) },
   { key: "size", title: "size", w: 76, def: true, dir: -1, num: true, cmp: (a, b) => a.bytes - b.bytes },
   { key: "ref", title: "location", w: 200, def: false, dir: 1, cmp: (a, b) => a.ref.localeCompare(b.ref) },
@@ -455,7 +455,24 @@ function itemState(it) {
   const mk = { ok: icon.ok, fail: icon.err }[it.state];
   if (mk) { const k = el("span", "mk"); k.innerHTML = mk; s.append(k); }
   s.append(it.stateText);
+  // a Steam download in progress: its bytes as a bar (got / downloadSize)
+  if (it.state === "run" && it.downloadSize > 0) {
+    const pct = Math.max(0, Math.min(100, (100 * (it.got || 0)) / it.downloadSize));
+    const bar = el("span", "prog tk-dl");
+    const b = el("span", "bar"), fill = el("i");
+    fill.style.width = pct.toFixed(1) + "%";
+    b.append(fill);
+    bar.append(b);
+    bar.title = `${fmtBytes(it.got || 0)} / ${fmtBytes(it.downloadSize)}`;
+    s.append(bar);
+  }
   return s;
+}
+function fmtBytes(n) {
+  const u = ["B", "KB", "MB", "GB"];
+  let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return (i ? n.toFixed(1) : String(n)) + " " + u[i];
 }
 function wireItems() {
   els.ibody.addEventListener("mousedown", (e) => {

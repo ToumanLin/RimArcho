@@ -53,6 +53,8 @@ type TaskItem struct {
 	Ref   string `json:"ref"`
 	Name  string `json:"name"`
 	Bytes int64  `json:"bytes,omitempty"`
+	Got   int64  `json:"got,omitempty"`
+	Size  int64  `json:"size,omitempty"`
 	State string `json:"state"`
 	Why   string `json:"why,omitempty"` // a failure's reason
 }
@@ -126,9 +128,10 @@ type Tasks struct {
 
 // BatchCalls are how a Batch reports on its items (by their index in the task).
 type BatchCalls struct {
-	Stopped func() bool // the player asked the task to stop
-	Start   func(i int) // item i is being worked on
-	Done    func(i int, err error)
+	Stopped  func() bool // the player asked the task to stop
+	Start    func(i int) // item i is being worked on
+	Done     func(i int, err error)
+	Progress func(i int, got, total int64)
 }
 
 // OpenTasks reads the record at path (missing: empty). Tasks that were running or queued
@@ -202,6 +205,7 @@ func (ts *Tasks) Submit(kind, lane, obj string, items []TaskItem) *Task {
 	t := &Task{ID: ts.newID(), Kind: kind, Lane: lane, Obj: obj, State: TaskQueued, Queued: ts.stamp(), Total: len(items)}
 	for _, it := range items {
 		it.State, it.Why = ItemWait, ""
+		it.Got, it.Size = 0, 0
 		t.Items = append(t.Items, it)
 	}
 	ts.list = append([]*Task{t}, ts.list...)
@@ -637,7 +641,39 @@ func (ts *Tasks) runBatch(t *Task) bool {
 		refs[i] = t.Items[i].Ref
 	}
 	ts.mu.Unlock()
+	var lastProgress time.Time
+	downloading := false
+	updateDownload := func() {
+		frac := float64(t.Done)
+		for _, it := range t.Items {
+			if it.State == ItemRun && it.Size > 0 {
+				frac += min(float64(it.Got)/float64(it.Size), 0.99)
+			}
+		}
+		if t.Total > 0 {
+			t.Frac = frac / float64(t.Total)
+		}
+		t.Phase = fmt.Sprintf("Steam is downloading %d of %d", min(t.Done+1, t.Total), t.Total)
+	}
 	b := BatchCalls{Stopped: stopped,
+		Progress: func(i int, got, total int64) {
+			ts.mu.Lock()
+			if t.State != TaskRunning || i < 0 || i >= len(t.Items) || t.Items[i].State != ItemRun {
+				ts.mu.Unlock()
+				return
+			}
+			t.Items[i].Got, t.Items[i].Size = max(got, 0), max(total, 0)
+			downloading = true
+			updateDownload()
+			notify := lastProgress.IsZero() || ts.now().Sub(lastProgress) >= 500*time.Millisecond
+			if notify {
+				lastProgress = ts.now()
+			}
+			ts.mu.Unlock()
+			if notify {
+				ts.changed()
+			}
+		},
 		Start: func(i int) {
 			ts.mu.Lock()
 			if i >= 0 && i < len(t.Items) && t.Items[i].State == ItemWait {
@@ -656,6 +692,9 @@ func (ts *Tasks) runBatch(t *Task) bool {
 					t.Items[i].State = ItemOK
 				}
 				t.Done++
+				if downloading {
+					updateDownload()
+				}
 			}
 			ts.mu.Unlock()
 			ts.changed()

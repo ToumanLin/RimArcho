@@ -515,7 +515,7 @@ export function analyzeEvent(ev) {
 // ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
-const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, mcur: 0, open: new Set(), want: "", list: null };
+const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, tabPick: null, mcur: 0, open: new Set(), want: "", list: null };
 
 // logPage keeps the page's head and gives a fresh body below it, and its actions.
 function logPage(name, title, ...right) {
@@ -588,7 +588,13 @@ export async function gameLog(path, open = false) {
     return;
   }
   L.pending = "";
-  if (!L.page || L.page.path !== p.path) L.cur = 0;
+  if (!L.page || L.page.path !== p.path) {
+    // a newly shown run opens on Archo Monitor's log when it has one (its errors say which
+    // file or def was loading); a tab picked in the file menu wins
+    L.cur = 0;
+    L.tab = L.tabPick ?? (isArcho(p.monitor) ? 1 : 0);
+  }
+  L.tabPick = null;
   L.page = p;
   L.path = p.path;
   L.loading = false;
@@ -703,7 +709,7 @@ function logText(r) {
 // filePicker: the log shown, and a menu of the logs — each Player.log with the companion
 // log of its run under it (03 §6.7.4); picking a companion shows its section.
 function filePicker(files) {
-  const shown = files.find((f) => f.path === L.path) || files[0];
+  const shown = (L.tab === 1 && files.find((f) => f.of === L.path)) || files.find((f) => f.path === L.path) || files[0];
   const b = el("button", "btn quiet picker");
   b.append(el("span", "", shown.label), el("span", "muted num", shown.when || ""), el("span", "chev", "⌄"));
   b.onclick = (e) => {
@@ -714,13 +720,15 @@ function filePicker(files) {
       run: () => {
         L.tab = f.of ? 1 : 0;
         if ((f.of || f.path) === L.path) return drawGameLog();
-        L.path = f.of || f.path; L.page = null; L.cur = 0; L.mcur = 0;
+        L.path = f.of || f.path; L.page = null; L.cur = 0; L.mcur = 0; L.tabPick = L.tab;
         gameLog(L.path);
       },
     })));
   };
   return b;
 }
+
+const isArcho = (mon) => !!mon && /^ArchoMonitor/i.test(mon.label || "");
 
 // noMonitor: one line when the current plan has no Archo Monitor, with the default edit.
 function noMonitor(p) {

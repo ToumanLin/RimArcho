@@ -238,7 +238,7 @@ next:
 | 锁定版本 | `pin <实例> [--name <文件夹>] [--git] [--dry-run]` | 创建锁定版本（04 §7）：复制到锁定库（默认 `<文件夹>_local`），写 `.rimarcho/origin.json`，`--git` 建基线提交，并只在当前方案里换成这份副本；`--update` 更新锁定版本，`--move-to-library` 把 `Mods/` 里的旧副本移进锁定库。`copy-local` 是别名 |
 | | `unpin <引用> [--dry-run]` | 解除锁定：恢复工坊那份并改用它（含 RimCrow 风格的锁定） |
 | 隐藏的 Mod | `unhide <引用> [--dry-run]` / `trash <引用> [--dry-run]` | 把 `About.xml.disabled` 改回 `About.xml`；把自己的副本（`Mods/`、锁定库、SteamCMD）或隐藏、已退订的工坊文件夹移到回收站（08 §6、§7） |
-| 工坊订阅 | `workshop unsubscribe <引用…> [--dry-run]` / `workshop subscribe <引用…> [--dry-run]` / `workshop state <引用…>` | 经 Steam 客户端退订（Steam 删掉文件夹）、重新订阅、读状态；连不上 Steam 时报错并给出工坊页面（08 §10） |
+| 工坊订阅 | `workshop unsubscribe <引用…> [--dry-run]` / `workshop subscribe <引用…> [--dry-run]` / `workshop resubscribe <引用…> [--dry-run]` / `workshop state <引用…>` | 经 Steam 客户端退订（Steam 删掉文件夹）、重新订阅、读状态；连不上 Steam 时报错并给出工坊页面（08 §10） |
 | 整合包 | `pack build <名> [--dry-run]` / `pack stop <名>` | 把当前方案编译成整合包；停止进行中的编译并删除已复制的部分（08 §5.2） |
 | | `pack list` / `pack launch <名> [--dry-run]` / `pack unlink [--dry-run]` | 列出整合包；启动整合包；只删掉 `Mods/` 里整合包的 `!ArchoPack_` 链接（08 §5.3；`problems` 报 `pack.links-left` 时的修法） |
 | | `pack export <名> <文件> [--list]` / `pack import <文件> [--as-plan]` / `pack remove <名> [--dry-run] [--unfinished]` | 导出为 `.archopack`（zip），`--list` 只导出它的列表（RimArcho 列表 `.archolist.json`，04 §9.3）；解开包，或对照 RimArcho 列表，`--as-plan` 同时把列表载入当前方案；移到回收站，`--unfinished` 删除被中断的编译（08 §5.4） |

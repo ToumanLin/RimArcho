@@ -586,6 +586,8 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .prog .bar { height: 6px; border-radius: var(--r-sm); background: var(--pill); overflow: hidden; }
 .prog .bar i { display: block; height: 100%; background: var(--accent); border-radius: var(--r-sm); transition: width var(--t-layout) var(--ease); }
 .prog .bar.bad i { background: var(--red); }
+.stw .tk-dl { display: inline-flex; align-items: center; width: 64px; margin-left: 8px; vertical-align: middle; }
+.stw .tk-dl .bar { flex: 1; height: 4px; }
 .prog .ptext { margin-top: 5px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prog .ptext.bad { color: var(--red); white-space: pre-wrap; }
 
@@ -1433,7 +1435,10 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-row.on .n b { color: var(--accent-11, var(--accent)); }
 .pm-row .m { grid-column: 1; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pm-row .ri { grid-row: 1 / 3; grid-column: 2; display: flex; align-items: center; color: var(--faint); }
-.pm-row .ri.changed { color: var(--amber); }
+.pm-row .ri.pill { align-self: center; }
+.pm-row .pm-use { align-self: center; font-size: 12px; color: var(--accent-11, var(--accent)); cursor: pointer; opacity: 0; transition: opacity .12s; }
+.pm-row:hover .pm-use, .pm-row.on .pm-use, .pm-row:focus-visible .pm-use { opacity: 1; }
+.pm-row .pm-use:hover { text-decoration: underline; }
 .pm .pill { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 999px; font-size: 12px; background: var(--pill); color: var(--fg-2); flex: none; }
 .pm .pill.cur { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
 .pm .gdot, .pm .adot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; }
@@ -1541,7 +1546,6 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-rename { display: grid; gap: 4px; min-width: 0; flex: 1; max-width: 360px; }
 .pm-rename .xc-input { height: 28px; font-size: 15px; font-weight: 600; }
 .pm-rename .plan-why:empty { display: none; }
-.pm-head .pm-use { height: 20px; font-size: 12px; }
 .pm-new .acts-row .sp { flex: 1; }
 .pm-drop { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px; border: var(--hairline) dashed var(--line); border-radius: var(--r-sm); background: var(--card-2); }
 .pm-file { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; }
