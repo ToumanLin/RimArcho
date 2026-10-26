@@ -33,7 +33,8 @@ func TestOpsRunnable(t *testing.T) {
 		}
 		q := `"` + o.Code + `"`
 		ed := strings.Contains(verbs[1], q) || strings.Contains(verbs[1], o.Code+":") || view.LibDoes(o.Code)
-		lb := strings.Contains(lib, "case "+q) || view.LibDoes(o.Code)
+		// the list ops are the editor's only: Mod 库存's menu has library ops (06 §8.5)
+		lb := strings.Contains(lib, "case "+q) || view.LibDoes(o.Code) || o.Code == view.OpEnableAt || o.Code == view.OpMoveTo
 		if !ed {
 			t.Errorf("%s: the editor does not run it", o.Code)
 		}

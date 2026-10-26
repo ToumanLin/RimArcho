@@ -619,15 +619,13 @@ function byKey(k) {
   say("", T("nothing to do with this row"));
 }
 
-const PLAN = new Set(["add", "take-out", "put-back", "stage", "use", "swap", "remove"]);
-
 async function run(code, copies) {
   const refs = copies.map((i) => i.ref);
   const i0 = copies[0];
   const o = ops.op(code);
   if (S.busy.env && o.group !== 3) return say("busy", Tf("switching to %s", S.busy.env));
-  const done = async (p, undo) => {
-    try { const t = await p; say("ok", typeof t === "string" ? t : t && t.text, undo); } catch (e) { say("fail", errText(e)); }
+  const done = async (p) => {
+    try { const t = await p; say("ok", typeof t === "string" ? t : t && t.text); } catch (e) { say("fail", errText(e)); }
     L.sel.clear();
     await load(false, code === "separate" ? i0.ref : "");
     ui.reload();
@@ -651,21 +649,11 @@ async function run(code, copies) {
       if (n) n.click();
       return;
     }
-    case "enable-at": case "move-to": {
-      const ids = copies.filter((i) => i.id).map((i) => i.id);
-      const row = (L.page.rows || []).find((r) => r.insts.some((x) => x.ref === i0.ref));
-      const what = ids.length === 1 ? (row ? row.name : i0.label) : Tf("%d mods", ids.length);
-      const from = code === "move-to" ? 1 : i0.ops.includes("put-back") ? 2 : 0;
-      return pop.position({ ids, what }, from, (at) => done(api.Place(from, ids, at), true));
-    }
   }
-  if (PLAN.has(code)) return done(api.LibraryDo(code, refs), true);
-  if (!o.confirm) return done(api.LibraryDo(code, refs), false);
+  if (!o.confirm) return done(api.LibraryDo(code, refs));
   let p;
   try { p = await api.LibraryPreview(code, refs); } catch (e) { return say("fail", errText(e)); }
-  // 优化贴图 takes minutes: it runs in the background ("textures" events), like the page's
-  const run = code === "textures" ? () => done(api.TexturesRun("", 100, refs), false) : () => done(api.LibraryDo(code, refs), false);
-  pop.confirm(p.title, p.lines, o.label, p.apply ? run : null);
+  pop.confirm(p.title, p.lines, o.label, p.apply ? () => done(api.LibraryDo(code, refs)) : null);
 }
 
 // ---- keys (06 §3.5): the plan editor's table; the arrows only move ----
@@ -737,11 +725,8 @@ export function key(e) {
   if (ctrl && !e.shiftKey && !e.altKey && ["o", "w", "s"].includes(k.toLowerCase())) { done(); return byKey("ctrl+" + k.toLowerCase()); }
   if (k === "/" || (ctrl && k.toLowerCase() === "f")) { done(); return L.bar.focus(); }
   if (k === "\\") { done(); return L.bar.toggle(); }
-  // undo / redo: the plan edits (space, m, t, x) are the current plan's steps
-  if ((k === "u" && !ctrl) || (ctrl && k.toLowerCase() === "z")) { done(); return ui.verb("undo").then(() => load()); }
-  if (ctrl && (k.toLowerCase() === "y" || k.toLowerCase() === "r")) { done(); return ui.verb("redo").then(() => load()); }
   if (ctrl || e.altKey) return;
-  const keys = { " ": "space", m: "m", t: "t", x: "x", g: "g", n: "n", Delete: "Del" };
+  const keys = { g: "g", n: "n", Delete: "Del" };
   if (keys[k]) { done(); return byKey(keys[k]); }
   if (table.key(e)) return;
   if (k === "C") { done(); const i = cursorCopy(); if (i && i.id) document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: i.id, name: (L.flat[L.cur] || {}).r ? L.flat[L.cur].r.name : i.label } })); return; }
@@ -771,9 +756,6 @@ export function hintList() {
   const list = [];
   const x = L.flat[L.cur];
   const codes = [...opsOf(selected()).keys()];
-  const sp = ops.keyed(codes, "space");
-  if (sp) list.push({ key: "space", label: ops.op(sp).label });
-  for (const k of ["m", "t"]) { const c = ops.keyed(codes, k); if (c) list.push({ key: k, label: ops.op(c).label }); }
   if (x && x.t === "lin") list.push({ key: "→ ←", label: T("open / close") });
   list.push({ key: "enter", label: L.full ? T("back") : T("details") });
   if (codes.includes("folder") || codes.includes("workshop")) list.push({ key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") });
