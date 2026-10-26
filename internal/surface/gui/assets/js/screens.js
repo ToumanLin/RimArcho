@@ -5,7 +5,7 @@
 import { linkRows } from "./linkrows.js";
 import { copyablePath, pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
-import { icon } from "./icons.js";
+import { icon, bowMark } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
 import * as pop from "./popups.js";
@@ -218,6 +218,14 @@ export function areaKey(e) {
   return true;
 }
 
+// archoMark is the small bow in front of Archo's name where the portrait would be too small
+// to read (06 §7).
+export function archoMark() {
+  const m = el("span", "archo-mark");
+  m.innerHTML = bowMark(16);
+  return m;
+}
+
 export function button(label, keyName, run, cls = "", envWrite = "") {
   const b = el("button", "btn " + cls, label);
   if (envWrite) b.dataset.envWrite = envWrite;
@@ -386,7 +394,11 @@ function needCard(it, i) {
   top.append(body);
   const acts = it.actions || [];
   const right = el("div", "acts");
-  if (archo.ask && it.section === 1) right.append(button(T("ask Archo"), "", () => archo.ask(it), "small"));
+  if (archo.ask && it.section === 1) {
+    const b = button(T("ask Archo"), "", () => archo.ask(it), "small");
+    b.prepend(archoMark());
+    right.append(b);
+  }
   if (acts.length) {
     const a = acts[0];
     right.append(button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, it.dim ? "" : "primary", actionWrite(a)));
@@ -642,7 +654,7 @@ function drawGameLog() {
   const ana = el("section", "card col ana-card");
   ana.hidden = true;
   ana.append(el("div", "col-head", ""), el("div", "scroll"));
-  ana.firstChild.append(el("span", "anum", "3"), T("Archo log analysis"));
+  ana.firstChild.append(el("span", "anum", "3"), archoMark(), T("Archo log analysis"));
   // the analysis above the log text it explains; the gaps between the three cards drag
   const side = el("div", "logside");
   const hs = el("div", "hsplit");

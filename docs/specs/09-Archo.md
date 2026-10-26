@@ -3,7 +3,7 @@
 > 状态：1.1 的设计规格，全部（待实现）。现在能用的 AI 接入只有外部 agent 走 `archo mcp`（05 §5）。
 > 依据：00（§2、§3.2、§4）、00a、05、06。
 
-Archo 是 RimArcho 内置的 AI 助手，形象是项目图标 `internal/icon/portrait.svg`。界面里提到 AI 助手的地方都用这个名字和头像，例如“让 Archo 分析这个报错”。外部 agent（Claude Code、Codex 等）通过 MCP 接入时用它们自己的名字。
+Archo 是 RimArcho 内置的 AI 助手，形象是项目图标 `internal/icon/portrait.svg`，小尺寸用头像上的蝴蝶结作标志（06 §7）。界面里提到 AI 助手的地方都用这个名字和头像，例如“让 Archo 分析这个报错”。外部 agent（Claude Code、Codex 等）通过 MCP 接入时用它们自己的名字。
 
 两条前提贯穿全文：
 

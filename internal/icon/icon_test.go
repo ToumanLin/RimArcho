@@ -27,7 +27,7 @@ func TestRender(t *testing.T) {
 			t.Fatalf("size %d: centre not opaque", s)
 		}
 	}
-	if !strings.Contains(SVG(256), "<path") || !strings.Contains(SVG(16), `viewBox="20 24 44 44"`) {
+	if !strings.Contains(SVG(256), "<path") || !strings.Contains(SVG(16), `viewBox="120 170 790 790"`) {
 		t.Fatal("svg does not carry the portrait")
 	}
 	if len(portrait().ops) < 300 {

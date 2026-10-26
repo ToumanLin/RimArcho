@@ -446,6 +446,14 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   stacked details / 暂存 / 历史, the filter card and what is under it, Mod 库存's two sides, the
   log pages' columns. The draggable gaps keep a 10 px grab area that reaches over the cards'
   edges.
+- New icon artwork: the portrait with the accent rim light (1024×1024). 48 px and up show it
+  whole; 40 px and below show the head (hair and face) instead of the face alone (06 §8.6).
+  The icon renderer now draws groups with inherited fill and stroke, transforms, clip paths,
+  radial and bounding-box gradients, evenodd fills and Gaussian blur, and skips what is only
+  defined (defs, clip paths, gradients, filters).
+- The bow from the portrait is RimArcho's mark (06 §7): in front of Archo's name on the log
+  page's Archo 日志分析 card and the 让 Archo 分析 button. Brand colours: a `#4f46e5`
+  rim in the light theme; a `#a5b4fc` rim and a grey outline in the dark theme.
 
 ### Memory (07 §8.3)
 - 设置 › 界面 has GPU 加速 (`config set ui.gpu on|off`, default on). Off draws the window in

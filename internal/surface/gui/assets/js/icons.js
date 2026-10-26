@@ -43,3 +43,34 @@ export function sourceIcon(kind) { return icon[kind] || icon.local; }
 export function statusIcon(s) {
   return ["", icon.unloadable, icon.warn, icon.log, icon.err][s] || "";
 }
+
+// bowMark is RimArcho's mark, the bow from the portrait (06 §7), drawn simply enough for
+// 16–24 px: three wings and the knot, with the accent rim to the lower left as on the
+// portrait. size picks the drawing: 24 keeps one lighter facet per wing, 16 is flat. The
+// colours are --bow-* (the dark theme has a lighter rim and a grey outline).
+const BOW = {
+  wings: [
+    "M233 264C219 211 216 163 191 117L230-5Q239-13 248 16L282 89L248 209Z",
+    "M219 224C194 211 129 225 94 211C75 185 88 116 91 77Q92 48 85 18C143 55 183 148 219 224Z",
+    "M227 244Q162 237 121 259C87 277 62 301 42 309Q81 325 131 316L209 266Z",
+  ],
+  knot: "M227 243L216 231L222 224L232 235L245 222L248 243L236 258Z",
+  facets: [
+    "M194 116L261 63L271 91L248 199L231 155Z",
+    "M95 209L166 126L186 161L151 183L177 213L144 216Z",
+    "M156 258L199 253L139 310L120 317Z",
+  ],
+};
+
+export function bowMark(size = 16) {
+  const px = 340 / size; // drawing units per pixel at the intended size
+  const paths = (ds) => ds.map((d) => `<path d="${d}"/>`).join("");
+  const all = paths([...BOW.wings, BOW.knot]);
+  const rim = (1.3 * px).toFixed(1);
+  return `<svg class="bow" viewBox="-6 -20 340 340" aria-hidden="true">` +
+    `<g class="bow-halo" fill="none" stroke-width="${(2 * px).toFixed(1)}" stroke-linejoin="round">${all}</g>` +
+    `<g class="bow-rim" transform="translate(-${rim} ${rim})">${paths(BOW.wings)}</g>` +
+    `<g class="bow-body">${all}</g>` +
+    (size >= 24 ? `<g class="bow-facet">${paths(BOW.facets)}</g>` : "") +
+    `</svg>`;
+}

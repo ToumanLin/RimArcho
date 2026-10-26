@@ -16,7 +16,8 @@ import (
 	"sync"
 )
 
-// Portrait is the artwork, an 80×80 SVG (provided by the author, 2026-10-20).
+// Portrait is the artwork, a 1024×1024 SVG (provided by the author; this version with the
+// accent rim light, 2026-10-25).
 //
 //go:embed portrait.svg
 var Portrait []byte
@@ -30,12 +31,12 @@ var Sizes = []int{16, 20, 24, 32, 40, 48, 64, 256}
 const cornerR = 0.22 // rounded base, as a fraction of the size
 
 // crop is the part of the artwork's viewBox shown at a size: the whole portrait from 48 px,
-// the face below that so it stays readable.
+// the head (hair and face) below that so it stays readable.
 func crop(size int) (x, y, w float64) {
 	if size < 48 {
-		return 20, 24, 44
+		return 120, 170, 790
 	}
-	return 0, 0, 80
+	return 0, 0, 1024
 }
 
 var (
@@ -110,7 +111,7 @@ func PNG(size int) []byte {
 
 var svgOpen = regexp.MustCompile(`(?s)^.*?<svg[^>]*>`)
 
-// SVG is the icon as a 256×256 SVG document showing what a size×size image shows (the face
+// SVG is the icon as a 256×256 SVG document showing what a size×size image shows (the head
 // only below 48 px).
 func SVG(size int) string {
 	const k = 256.0
@@ -123,7 +124,7 @@ func SVG(size int) string {
 	fmt.Fprintf(&b, `<clipPath id="rimarcho-base"><rect width="256" height="256" rx="%.1f"/></clipPath>`+"\n", cornerR*k)
 	fmt.Fprintf(&b, `<g clip-path="url(#rimarcho-base)">`+"\n")
 	fmt.Fprintf(&b, `<rect width="256" height="256" fill="#%02X%02X%02X"/>`+"\n", Base.R, Base.G, Base.B)
-	fmt.Fprintf(&b, `<svg width="256" height="256" viewBox="%g %g %g %g" fill="none">`+"\n%s\n</svg>\n", cx, cy, cw, cw, inner)
+	fmt.Fprintf(&b, `<svg width="256" height="256" viewBox="%g %g %g %g">`+"\n%s\n</svg>\n", cx, cy, cw, cw, inner)
 	b.WriteString("</g>\n</svg>\n")
 	return b.String()
 }

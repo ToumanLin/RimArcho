@@ -38,6 +38,8 @@
   --red: #d64545;
   --red-soft: #fbe9e9;
   --amber: #b45309;
+  /* the bow mark (06 §7): fixed brand colours, not the chosen accent */
+  --bow-rim: #4f46e5; --bow-body: #17181a; --bow-facet: #4a4644; --bow-halo: transparent;
   --amber-soft: #fbf0df;
   --log: #c2561d;
   --pop-bg: rgba(255, 255, 255, .94);
@@ -66,6 +68,7 @@
   --seg-thumb: rgba(255, 255, 255, .15); --seg-edge: inset 0 var(--hairline) 0 rgba(255, 255, 255, .08), 0 1px 2px rgba(0, 0, 0, .3);
   --line: #333339; --line-2: #2c2c32; --fg: #ededf1; --fg-2: #b9b9c1; --muted: #8b8b94; --faint: #56565f; --ctl-fg: #a1a1aa;
   --default-accent: #a5b4fc; --default-accent-fg: #14142a;
+  --bow-rim: #a5b4fc; --bow-halo: #4a4d5c;
   --accent: var(--default-accent); --accent-soft: #2b2c47; --accent-fg: #14142a; --sel: #33345a;
   --green: #6fd99b; --green-soft: #1e3a2b; --red: #f28b82; --red-soft: #45272a; --amber: #f2b544; --amber-soft: #3f3220; --log: #f5a97f;
   --log-error: #ff6666; --log-warning: #ffeb04; --log-info: #ffffff;
@@ -118,6 +121,15 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .navtoggle { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); color: var(--muted); transition: background var(--t-press), color var(--t-press); }
 .navtoggle:hover { background: var(--pill); color: var(--fg); }
 .navtoggle svg.i { width: 15px; height: 15px; }
+/* the bow, RimArcho's mark (06 §7) */
+.bow { display: block; width: 100%; height: 100%; overflow: visible; }
+.bow .bow-halo { stroke: var(--bow-halo); }
+.bow .bow-rim { fill: var(--bow-rim); }
+.bow .bow-body { fill: var(--bow-body); }
+.bow .bow-facet { fill: var(--bow-facet); }
+/* the small bow in front of Archo's name */
+.archo-mark { display: inline-flex; width: 14px; height: 14px; margin-right: 5px; vertical-align: -2px; flex: none; }
+.btn .archo-mark { margin-right: 4px; }
 /* a group's title: small, muted, apart from the entries above it (06 §2.1) */
 #nav .grp { padding: 14px 8px 4px; color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: .04em; }
 #nav > .grp:first-of-type { padding-top: 2px; }

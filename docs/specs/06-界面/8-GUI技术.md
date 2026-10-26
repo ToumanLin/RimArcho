@@ -84,7 +84,8 @@
 
 ### 8.6 图标与 Windows 资源
 
-- **图形**：`internal/icon/portrait.svg`（80×80，矢量），放在圆角深色底（`#1B1D23`，圆角半径为边长的 0.22）上。48px 及以上显示整幅；40px 及以下只显示脸部（视框 x 20–64、y 24–68），任务栏上仍能认出。渲染用 `internal/icon/svgr.go` 的小型 SVG 渲染器（路径、圆、椭圆、填充、描边、线性渐变、不透明度），不加依赖。
+- **图形**（2026-10-25 换成带轮廓光的新版）：`internal/icon/portrait.svg`（1024×1024，矢量），放在圆角深色底（`#1B1D23`，圆角半径为边长的 0.22）上。48px 及以上显示整幅；40px 及以下只显示头部（头发和脸，视框 x 120–910、y 170–960），任务栏上仍能认出；只裁脸太紧，小尺寸只剩一块肤色。
+- **渲染**：`internal/icon/svgr.go` 的小型 SVG 渲染器，不加依赖。按元素树绘制：`<g>` 继承 fill / stroke 等属性；transform（matrix、translate、scale、rotate、skewX/Y）；路径、矩形（含圆角）、圆、椭圆、线、折线、多边形；nonzero 与 evenodd 填充；描边（圆角连接）；纯色、线性与径向渐变（用户坐标或图形包围盒，含 gradientTransform）；opacity、fill-opacity、stroke-opacity；clip-path；filter 只认 feGaussianBlur。defs、clipPath、渐变和滤镜里的内容只被引用，不直接画。4 倍超采样；256px 全部尺寸约 1 秒。
 - **不提交二进制**：仓库公开，不放二进制。`icon.PNG(size)` 抗锯齿光栅化（每像素超采样），供窗口图标和资源使用；`icon.SVG(size)` 是同一构图的矢量版，页面的 favicon 用 `/icon.svg`（256）和 `/icon-small.svg`（16），由它生成。
 - **窗口图标**：Wails 先取 exe 的图标组 ID 3，没有时才用传入的 PNG。所以发布版不画；开发版（没有 `.syso`）按系统大图标尺寸（`SM_CXICON`，100% 缩放下 32px）画一张，画完立即 `FreeOSMemory`。以前画 256px，要 43 MB 堆（4 倍超采样的 float64 缓冲 32 MB），只为得到一张 32px 的图标，Go 之后也不把这些内存还给系统。
 - `go run ./scripts/winres`（发布脚本调用）写 `cmd/archo/rsrc_windows_amd64.syso`：一个 COFF 资源对象，含图标组和版本信息。`.syso` 不提交（`.gitignore`）。

@@ -26,7 +26,7 @@ async function setup(item) {
   };
   const screens = await loadModules("./screens.js", {
     "./state.js": { S, $: sel => sel === "#screen" ? screen : screen.querySelector(sel.replace(/^#screen /, "")), el, api, T: s => s, Tf: s => s, errText: e => e.message, say() {}, cur() {}, slideThumb() {} },
-    "./icons.js": { icon: {}, statusIcon() {} },
+    "./icons.js": { icon: {}, statusIcon() {}, bowMark: () => "" },
     "./motion.js": { bump() {}, shimmer: () => el("div") },
     "./popups.js": { confirm: (title, lines, label, submit) => { confirmations.push(lines); submit(); } },
     "./bg.js": { bgSection: async () => el("div") },
