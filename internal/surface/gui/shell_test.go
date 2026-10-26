@@ -166,7 +166,7 @@ func TestPlansInWindow(t *testing.T) {
 	if _, err := api.RemovePlan(def.ID); err != nil {
 		t.Fatal(err)
 	}
-	if sh := api.Shell(); len(sh.Plans) != 2 || sh.Nav[1].Items[1].Kids[1].Label != "Empty" {
+	if sh := api.Shell(); len(sh.Plans) != 2 || sh.Nav[1].Items[1].Kids[0].Label != "Empty" {
 		t.Fatalf("after delete %+v", sh.Plans)
 	}
 	// The palette goes to the other plans.
@@ -192,5 +192,53 @@ func TestScanLineGameOnly(t *testing.T) {
 	}
 	if got := scanLine(strings.Replace(out, "  [game only]", "", 1)); got != "900 mods found" {
 		t.Fatalf("whole scan: %q", got)
+	}
+}
+
+// Opening a list from the sidebar only shows it (04 §1.3, 06 §2.5): the current list — the
+// one the launch page shows and launches — stays until the player makes another current
+// or writes the open one to the game.
+func TestOpenListKeepsCurrent(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	enabled := len(api.Board().Cols[view.Active])
+	d, err := api.NewPlan("Empty", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sh := api.Shell()
+	def := sh.Plans[0]
+	if !def.Current || def.Open || sh.Plan == nil || sh.Plan.Name != "Empty" || sh.Current == nil || sh.Current.ID != def.ID {
+		t.Fatalf("a new list is open, not current: %+v", sh.Plans)
+	}
+	if kids := sh.Nav[1].Items[1].Kids; len(kids) != 3 || kids[0].ID != def.Page || kids[2].ID != view.PagePlans {
+		t.Fatalf("the current list first, then 管理: %+v", kids)
+	}
+	if h := api.Home(); h.Featured < 0 || h.Rows[h.Featured].Name != def.Name {
+		t.Fatalf("the launch page features the open list: %+v", h)
+	}
+	// Going to the current list and back opens without choosing.
+	if _, err := api.OpenPlan(def.ID); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(api.Board().Cols[view.Active]); n != enabled {
+		t.Fatalf("default shows %d enabled, want %d", n, enabled)
+	}
+	if _, err := api.OpenPlan(view.PlanOfPage(d.Page)); err != nil {
+		t.Fatal(err)
+	}
+	if sh := api.Shell(); sh.Plan.Name != "Empty" || !sh.Plans[0].Current || sh.Plans[0].ID != def.ID {
+		t.Fatalf("opening changed the current list: %+v", sh.Plans)
+	}
+	// Writing the open list to the game chooses it.
+	before := e.ReadModsConfig()
+	if o, err := api.Run(view.ListSave); err != nil || len(o.Refused) > 0 {
+		t.Fatalf("save %+v %v", o, err)
+	}
+	if e.ReadModsConfig() == before {
+		t.Fatal("nothing written")
+	}
+	if sh := api.Shell(); sh.Plans[0].Name != "Empty" || !sh.Plans[0].Current || !sh.Plans[0].Open || sh.Current != nil {
+		t.Fatalf("the written list is not current: %+v", sh.Plans)
 	}
 }

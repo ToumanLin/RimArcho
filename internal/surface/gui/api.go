@@ -335,14 +335,14 @@ func (s *API) PackBuild(name string, tex int) (string, error) {
 	tmp := filepath.Join(s.a.PacksDir(), name+app.TmpSuffix)
 	run := s.PackRunner
 	if run == nil {
-		home, env, exe := s.a.Home, s.a.EnvName, s.Exe
+		home, env, exe, plan := s.a.Home, s.a.EnvName, s.Exe, s.a.OpenPlanName()
 		log := filepath.Join(home, "logs", "pack-build.log")
 		extra := app.PackBuildArgs(view.PackTextureOptions(tex))
 		run = func(name string) error {
 			if exe != "" {
-				return app.ChildPackBuildExe(exe, home, env, name, log, extra...)
+				return app.ChildPackBuildExe(exe, home, env, plan, name, log, extra...)
 			}
-			return app.ChildPackBuild(home, env, name, log, extra...)
+			return app.ChildPackBuild(home, env, plan, name, log, extra...)
 		}
 	}
 	task := s.beginSelf(view.TaskPack, name, func() error { _, err := s.PackStop(name); return err })
@@ -1234,7 +1234,7 @@ func (s *API) startAnalyze() bool {
 	}
 	s.busy["analyze"] = true
 	run := s.a.AnalyzeRunner
-	home, env, exe := s.a.Home, s.a.EnvName, s.Exe
+	home, env, exe, plan := s.a.Home, s.a.EnvName, s.Exe, s.a.OpenPlanName()
 	obj := env
 	if s.board != nil && s.board.St != nil && s.board.St.Plan != nil {
 		obj = s.board.St.Plan.Name
@@ -1251,9 +1251,9 @@ func (s *API) startAnalyze() bool {
 		case run != nil:
 			err = run(env, progress)
 		case exe != "":
-			err = app.ChildAnalyzeExe(exe, home, env, "", progress)
+			err = app.ChildAnalyzeExe(exe, home, env, plan, "", progress)
 		default:
-			err = app.ChildAnalyze(home, env, "", progress)
+			err = app.ChildAnalyze(home, env, plan, "", progress)
 		}
 		s.mu.Lock()
 		s.busy["analyze"], s.needs = false, nil

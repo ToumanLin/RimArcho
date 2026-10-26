@@ -20,9 +20,9 @@ import * as tasksPage from "./tasks.js";
 let ui;
 export function initNavigation(u) { ui = u; }
 
-// go opens a sidebar page; "plan" is the current plan's editor, "plan:<id>" a plan (it
-// becomes current: no game file is written), "plan:new" the new-list form, "pack:<name>"
-// a pack on the packs page.
+// go opens a sidebar page; "plan" is the open plan's editor, "plan:<id>" a plan (opened
+// only: the current list, the one launched, stays; 04 §1.3), "plan:new" the new-list form,
+// "pack:<name>" a pack on the packs page.
 export async function go(id, entry = null) {
   if (uninst.locked()) return; // an uninstall runs, or has run (06 §2.14)
   pageEntering();
@@ -52,7 +52,7 @@ export async function openPage(id, plan = null, entry = null) {
     case "plan":
       return openEditor(async (read) => {
         if (plan !== null && plan !== S.shell?.plan?.id && !S.busy.env) {
-          await api.UsePlan(plan);
+          await api.OpenPlan(plan);
           if (!read.current()) return false;
           S.cols.forEach((c, k) => {
             c.query = ""; c.cursor = 0; c.sel.clear(); c.searching = false;

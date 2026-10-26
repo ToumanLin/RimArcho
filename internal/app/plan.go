@@ -15,14 +15,16 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Plans (04 §1): an environment has several named lists; one is current, and every
-// editing, history and staging command acts on it. Switching writes no game file.
+// Plans (04 §1): an environment has several named lists; one is current — the one the
+// game is launched with — and every editing, history and staging command acts on it, or on
+// the list a session opened instead (OpenPlan, --open-plan). Switching writes no game file.
 
 // PlanInfo is a plan with what `plan list` shows (05 §4.3).
 type PlanInfo struct {
 	*store.Plan
-	Current    bool
-	Entries    int // list length, missing entries included
+	Current    bool // the environment's current plan: the one launched
+	Open       bool // the plan this session shows and edits (the current one unless OpenPlan)
+	Entries    int  // list length, missing entries included
 	Versions   int
 	LastPlayed time.Time // zero: never launched
 }
@@ -47,10 +49,11 @@ func (a *App) Plans() ([]*PlanInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	cur := a.Store.CurrentPlanID(st.Ix.Env.ID)
 	var out []*PlanInfo
 	for _, p := range ps {
-		pi := &PlanInfo{Plan: p, Current: p.ID == st.Plan.ID, Versions: a.Store.VersionCount(p.ID), LastPlayed: a.Store.LastPlanLaunch(p.ID)}
-		if pi.Current {
+		pi := &PlanInfo{Plan: p, Current: p.ID == cur, Open: p.ID == st.Plan.ID, Versions: a.Store.VersionCount(p.ID), LastPlayed: a.Store.LastPlanLaunch(p.ID)}
+		if pi.Open {
 			pi.Entries = len(st.List)
 		} else if ws, err := a.Store.Workspace(p.ID); err != nil {
 			return nil, err
@@ -72,7 +75,7 @@ func (a *App) PlansIn(envID string) ([]*PlanInfo, error) {
 	cur := a.Store.CurrentPlanID(envID)
 	var out []*PlanInfo
 	for _, p := range ps {
-		pi := &PlanInfo{Plan: p, Current: p.ID == cur, Versions: a.Store.VersionCount(p.ID), LastPlayed: a.Store.LastPlanLaunch(p.ID)}
+		pi := &PlanInfo{Plan: p, Current: p.ID == cur, Open: p.ID == cur, Versions: a.Store.VersionCount(p.ID), LastPlayed: a.Store.LastPlanLaunch(p.ID)}
 		if ws, err := a.Store.Workspace(p.ID); err != nil {
 			return nil, err
 		} else if ws != nil {
@@ -318,7 +321,8 @@ func (a *App) createPlan(envID, name string, list loadout.List, v *store.Version
 	return p, a.Store.SetWorkspace(ws)
 }
 
-// UsePlan makes a plan current. It writes no game file (04 §1.3).
+// UsePlan makes a plan current: the one launched, and the one this session edits. It
+// writes no game file (04 §1.3).
 func (a *App) UsePlan(name string) (*store.Plan, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -328,7 +332,65 @@ func (a *App) UsePlan(name string) (*store.Plan, error) {
 	if err != nil {
 		return nil, err
 	}
-	return p, a.Store.SetCurrentPlan(st.Ix.Env.ID, p.ID)
+	if err := a.Store.SetCurrentPlan(st.Ix.Env.ID, p.ID); err != nil {
+		return nil, err
+	}
+	a.OpenPlan, a.PlanName = 0, ""
+	return p, nil
+}
+
+// OpenPlanID makes this session show and edit a plan without making it current: the game
+// keeps being launched with the current one until the player chooses this one, writes it
+// to the game or launches it (04 §1.3). Opening the current plan clears the override.
+func (a *App) OpenPlanID(id int64) (*store.Plan, error) {
+	e, err := a.Env()
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, errors.New("no game")
+	}
+	p, err := a.Store.PlanByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil || p.EnvID != e.ID {
+		return nil, errors.New("that list is gone")
+	}
+	a.PlanName = ""
+	if id == a.Store.CurrentPlanID(e.ID) {
+		a.OpenPlan = 0
+	} else {
+		a.OpenPlan = id
+	}
+	return p, nil
+}
+
+// OpenPlanName is the --open-plan value that opens this session's plan in a child process ("":
+// the session edits the current plan).
+func (a *App) OpenPlanName() string {
+	if a.OpenPlan != 0 {
+		if p, err := a.Store.PlanByID(a.OpenPlan); err == nil && p != nil {
+			return p.Name
+		}
+		return ""
+	}
+	return a.PlanName
+}
+
+// planFor is the plan this session works on in an environment: the opened one when it
+// belongs there, else the current one (first falling back to the first plan).
+func (a *App) planFor(envID string) (*store.Plan, error) {
+	if a.OpenPlan != 0 {
+		if p, err := a.Store.PlanByID(a.OpenPlan); err != nil {
+			return nil, err
+		} else if p != nil && p.EnvID == envID {
+			return p, nil
+		}
+	} else if a.PlanName != "" {
+		return a.findPlan(envID, a.PlanName)
+	}
+	return a.Store.CurrentPlan(envID)
 }
 
 // RenamePlan renames a plan; its history is unchanged.
@@ -375,6 +437,9 @@ func (a *App) RemovePlan(name string) (removed, current *store.Plan, err error) 
 	}
 	if err := a.Store.DeletePlan(p.ID); err != nil {
 		return nil, nil, err
+	}
+	if a.OpenPlan == p.ID {
+		a.OpenPlan = 0
 	}
 	current, err = a.Store.CurrentPlan(e.ID)
 	return p, current, err

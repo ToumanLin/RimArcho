@@ -278,7 +278,7 @@ func DiskFree(dir string) int64 {
 // ---- the child process ----
 
 // ChildPackBuild is ChildPackBuildExe with this executable.
-func ChildPackBuild(home, envName, name, logPath string, extra ...string) error {
+func ChildPackBuild(home, envName, plan, name, logPath string, extra ...string) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -286,7 +286,7 @@ func ChildPackBuild(home, envName, name, logPath string, extra ...string) error 
 	if b := strings.ToLower(filepath.Base(exe)); strings.HasSuffix(b, ".test") || strings.HasSuffix(b, ".test.exe") {
 		return errors.New("child pack build from a test binary: set the runner")
 	}
-	return ChildPackBuildExe(exe, home, envName, name, logPath, extra...)
+	return ChildPackBuildExe(exe, home, envName, plan, name, logPath, extra...)
 }
 
 // PackBuildArgs are the `pack build` flags for texture options (nil: none).
@@ -305,11 +305,14 @@ func PackBuildArgs(t *textures.Options) []string {
 // ChildPackBuildExe runs `<exe> pack build <name> [extra flags]` with the same data
 // directory. Its output goes to logPath (not a pipe: the build goes on when this process
 // ends); the progress is in the build folder (ReadBuildProgress). It returns when the
-// child ends.
-func ChildPackBuildExe(exe, home, envName, name, logPath string, extra ...string) error {
+// child ends. plan is the list a session opened ("" the current one, 04 §1.3).
+func ChildPackBuildExe(exe, home, envName, plan, name, logPath string, extra ...string) error {
 	args := append([]string{"pack", "build", name}, extra...)
 	if envName != "" {
 		args = append(args, "--env", envName)
+	}
+	if plan != "" {
+		args = append(args, "--open-plan", plan)
 	}
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return err

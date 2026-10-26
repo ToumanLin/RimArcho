@@ -46,6 +46,12 @@ type App struct {
 	Loc                 *time.Location // time zone for printed times
 	// EnvName overrides the current environment for one invocation (--env).
 	EnvName string
+	// OpenPlan is the list this session shows and edits in place of the environment's
+	// current one (04 §1.3): the GUI opens a list from the sidebar without choosing it to
+	// play. 0, or a plan of another environment, is the current one. PlanName (--open-plan)
+	// names it for one invocation; OpenPlan wins.
+	OpenPlan int64
+	PlanName string
 	// Detect configures environment detection (tests point it at fixtures).
 	Detect env.DetectOptions
 	// Launcher starts the game; nil means ExecLauncher.

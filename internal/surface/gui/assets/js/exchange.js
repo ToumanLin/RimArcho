@@ -4,6 +4,7 @@
 // and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, beginPageRead } from "./screens.js";
+import * as pop from "./popups.js";
 
 let ui = null;
 export function initExchange(u) {
@@ -191,7 +192,7 @@ async function preview(kind, src, fileName) {
       const id = destination === "new" ? +r.page.slice(5) : active.target;
       await ui.manageLists(id);
       say("ok", destination === "new" ? r.text : r, destination !== "new" ? async () => {
-        try { await api.UsePlan(id); const t = await api.Undo(); await ui.reload(); await ui.manageLists(id); say("ok", t); }
+        try { await api.OpenPlan(id); const t = await api.Undo(); await ui.reload(); await ui.manageLists(id); say("ok", t); }
         catch (e) { say("fail", errText(e)); }
       } : false);
     } catch (e) { if (current()) { say("fail", errText(e)); busy = false; checkName(); } }
@@ -232,6 +233,7 @@ export function showImportSummary(body, p, sourceIsPath = !!p.sourcePath) {
 export function showImportContents(body, p) {
   if (p.missing.length) {
     const sec = section(body, Tf("not installed: %d", p.missing.length));
+    subscribeAll(sec, p.missing);
     const list = el("div", "xc-list");
     for (const r of p.missing) {
       const d = el("div", "xc-mod");
@@ -268,6 +270,32 @@ export function showImportContents(body, p) {
     det.append(list);
     body.append(det);
   }
+}
+
+// workshopIDs: the Workshop items of rows that have a Workshop page.
+export const workshopIDs = rows => [...new Set(rows.map(r => /[?&]id=(\d+)/.exec(r.url || "")?.[1]).filter(Boolean))];
+
+// subscribeAll gets every missing mod that has a Workshop page in one go (a background task,
+// 06 §2.16); once downloaded they take their place in the list by themselves.
+function subscribeAll(sec, rows) {
+  const ids = workshopIDs(rows);
+  const bar = el("div", "xc-subscribe");
+  const rest = rows.length - ids.length;
+  bar.append(el("span", "xc-note", ids.length
+    ? T("subscribed mods take their place in the list once downloaded") + (rest ? "  " + Tf("%d have no Workshop page: look for them yourself", rest) : "")
+    : T("none of them has a known Workshop page: look for them yourself")));
+  if (ids.length) {
+    const go = button(Tf("subscribe all %d", ids.length), "", () => {
+      pop.choose(Tf("get %d mods", ids.length), [T("subscribe with Steam"), T("download with SteamCMD")], async (i) => {
+        go.disabled = true;
+        try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1 })); }
+        catch (e) { go.disabled = false; say("fail", errText(e)); }
+      });
+    }, "primary small", "subscribe");
+    go.type = "button";
+    bar.append(go);
+  }
+  sec.append(bar);
 }
 
 function link(text, url, button) {

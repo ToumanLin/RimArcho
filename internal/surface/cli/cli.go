@@ -50,6 +50,10 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		argv = []string{"version"}
 	}
 	envName, here, rest, err := globalFlags(argv)
+	var openPlan string
+	if err == nil {
+		openPlan, rest, err = openPlanFlag(rest)
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, "error:", err)
 		return cmds.ExitUsage
@@ -60,7 +64,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		return cmds.ExitError
 	}
 	defer ap.Close()
-	ap.EnvName = envName
+	ap.EnvName, ap.PlanName = envName, openPlan
 	if (len(rest) == 0 && buildinfo.GUI == "1") || (len(rest) == 1 && rest[0] == "gui") {
 		// RimArcho.exe (a double click) or `archo gui` (06 §8.1).
 		if err := runGUI(ap, len(rest) == 1); err != nil {
@@ -185,6 +189,29 @@ func globalFlags(argv []string) (envName string, here bool, rest []string, err e
 		}
 	}
 	return envName, here, rest, nil
+}
+
+// openPlanFlag removes --open-plan <name> / --open-plan=<name>: the command acts on that
+// list without making it current (04 §1.3; the GUI's analysis and pack build children).
+func openPlanFlag(argv []string) (plan string, rest []string, err error) {
+	for i := 0; i < len(argv); i++ {
+		a := argv[i]
+		switch {
+		case a == "--":
+			return plan, append(rest, argv[i:]...), nil
+		case a == "--open-plan":
+			if i+1 >= len(argv) {
+				return "", nil, fmt.Errorf("--open-plan needs a list name")
+			}
+			plan = argv[i+1]
+			i++
+		case strings.HasPrefix(a, "--open-plan="):
+			plan = strings.TrimPrefix(a, "--open-plan=")
+		default:
+			rest = append(rest, a)
+		}
+	}
+	return plan, rest, nil
 }
 
 // steamWorker runs `archo steam-worker <action> <id>…`, started by app.Workshop in the

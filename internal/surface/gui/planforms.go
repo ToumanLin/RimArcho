@@ -66,20 +66,20 @@ func (s *API) PlanSources(id int64) (*PlanSources, error) {
 	return out, nil
 }
 
-// withPlan selects an explicit management target while the API lock is held. Failed
-// edits restore the previous current list (06 §2.17).
+// withPlan opens an explicit management target while the API lock is held; the current
+// list (what launches) does not change. Failed edits reopen the previous list (06 §2.17).
 func (s *API) withPlan(id int64, keep bool, run func() error) (err error) {
 	previous, err := s.a.CurrentPlan()
 	if err != nil {
 		return err
 	}
 	if id != 0 && id != previous.ID {
-		if _, _, err = view.UsePlan(s.a, id); err != nil {
+		if _, err = view.OpenPlan(s.a, id); err != nil {
 			return err
 		}
 		defer func() {
 			if !keep || err != nil {
-				_, _, restore := view.UsePlan(s.a, previous.ID)
+				_, restore := view.OpenPlan(s.a, previous.ID)
 				if err == nil {
 					err = restore
 				}

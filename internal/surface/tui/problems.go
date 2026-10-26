@@ -121,7 +121,7 @@ func (m *model) startAnalyze() tea.Cmd {
 	run, name := m.opts.Analyze, m.envName
 	if run == nil {
 		home := m.app.Home
-		run = func(env string, progress func(string)) error { return app.ChildAnalyze(home, env, "", progress) }
+		run = func(env string, progress func(string)) error { return app.ChildAnalyze(home, env, "", "", progress) }
 	}
 	ch := make(chan string, 16)
 	done := make(chan error, 1)

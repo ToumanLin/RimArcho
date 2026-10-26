@@ -10,6 +10,7 @@ import { icon } from "./icons.js";
 import * as pop from "./popups.js";
 import * as plans from "./plans.js";
 import { wireSeparator } from "./separator.js";
+import * as motion from "./motion.js";
 import { showImportSummary, showImportContents } from "./exchange.js";
 
 let ui = null;
@@ -64,17 +65,21 @@ export async function open(id) {
 
 function draw(focus = "") {
   const focused = document.activeElement;
-  const fieldClass = ["pm-name", "pm-source", "pm-version", "pm-save"].find(c => focused?.classList.contains(c));
+  const fieldClass = ["pm-name", "pm-source", "pm-version", "pm-save", "pm-title-input"].find(c => focused?.classList.contains(c));
   const caret = fieldClass === "pm-name" ? [focused.selectionStart, focused.selectionEnd] : null;
   if (!focus && fieldClass) focus = "." + fieldClass;
   const d = M.data;
   const sc = S.screen === "plans" ? $("#screen") : openScreen("plans");
   const top = sc.scrollTop;
+  // the rows slide when their order changes (the current list first, 06 §2.17); where they
+  // were is kept from the last drawing, as making a list current reads the page afresh
+  const was = M.places && M.places.seq === S.screenSeq ? M.places.at : null;
   sc.innerHTML = "";
   S.listCreating = M.creating;
-  const add = act(M.draft ? T("continue new list") : T("new list"), "plus", () => newList(), "n");
+  // One entry for new lists: starting empty, copying, a save and importing are one form.
+  const add = act(T("new / import"), "plus", () => newList(), "n");
   if (!M.creating) add.classList.add("primary");
-  const w = page("plans pm-page", "", act(T("import as a new list"), "import", () => newList(null, "import"), "i"), add);
+  const w = page("plans pm-page", "", add);
   const grid = el("div", "pm");
   const side = listCard(d), gap = el("div", "split pm-split");
   grid.append(side, gap, M.creating && M.draft ? newForm() : detailCard(d.sel));
@@ -88,9 +93,15 @@ function draw(focus = "") {
   w.append(grid);
   sc.append(w);
   sc.scrollTop = top;
+  motion.slideFrom(sc, ".pm-list .pm-row", was);
+  M.places = { seq: S.screenSeq, at: motion.places(sc, ".pm-list .pm-row") };
   ui.renderWhere?.();
   ui.renderHints();
-  if (focus) requestAnimationFrame(() => { const field = $(focus); field?.focus(); if (field && caret && focus === ".pm-name") field.setSelectionRange(...caret); });
+  if (focus) requestAnimationFrame(() => {
+    const field = $(focus); field?.focus();
+    if (field && caret && focus === ".pm-name") field.setSelectionRange(...caret);
+    else if (field && focus === ".pm-title-input") field.select?.();
+  });
 }
 
 function listCard(d) {
@@ -107,6 +118,7 @@ function listCard(d) {
   const rows = M.created ? d.rows.filter(r => r.id === M.created).concat(d.rows.filter(r => r.id !== M.created)) : d.rows;
   for (const r of rows) {
     const b = el("button", "pm-row" + (!M.creating && r.id === M.sel ? " on" : ""));
+    b.dataset.id = r.id;
     const n = el("div", "n");
     n.append(el("b", "", r.name));
     if (r.current) n.append(el("span", "pill cur", T("current")));
@@ -130,7 +142,8 @@ function listCard(d) {
 
 function pick(id) {
   if (id === M.sel && !M.creating) return;
-  M.creating = false; S.listCreating = false; M.importSeq++;
+  leaveForm();
+  M.renaming = 0;
   M.sel = id;
   open();
 }
@@ -138,25 +151,37 @@ function pick(id) {
 function detailCard(p) {
   const card = el("section", "card pm-detail");
   if (!p) { card.append(el("div", "empty-state", T("pick a list"))); return card; }
-  // the head: name, marks, facts; edit, make current, ⋯
+  // the head: the name (double-click renames it), marks, facts; then rename, duplicate,
+  // delete and edit, all in sight
   const head = el("div", "pm-head");
   const l = el("div", "l");
   const n = el("div", "n");
-  n.append(el("h2", "", p.name));
+  if (M.renaming === p.id) n.append(renameField(p));
+  else {
+    const h = el("h2", "pm-title", p.name);
+    h.title = T("double-click to rename");
+    h.ondblclick = () => startRename(p.id);
+    n.append(h);
+  }
   if (p.current) n.append(el("span", "pill cur", T("current")));
+  else {
+    const use = el("button", "btn link pm-use", T("make current"));
+    use.dataset.envWrite = "use-plan";
+    use.title = T("launch this list from the start page; no game file is written");
+    use.onclick = () => makeCurrent(p.id);
+    n.append(use);
+  }
   if (p.mark) { const m = el("span", "adot"); m.title = p.mark; n.append(m); }
   const facts = el("div", "facts word-facts", p.facts);
   if (p.inGame) facts.append(el("span", "green", p.inGame));
   l.append(n, facts);
   const r = el("div", "r");
-  r.append(button(T("copy as a new list…"), "", () => newList(p), "", "create-plan"));
+  r.append(button(T("rename"), "", () => startRename(p.id), "", "rename-plan"));
+  r.append(button(T("duplicate"), "", () => duplicate(p.id), "", "create-plan"));
+  const del = button(T("delete"), "", () => plans.deletePlan(p.id, () => open(0)), "danger", "remove-plan");
+  if ((M.data?.rows || []).length < 2) { del.disabled = true; del.title = T("the last list cannot be deleted"); }
+  r.append(del);
   r.append(button(T("edit"), "↵", () => ui.go(p.page), "primary"));
-  if (!p.current) r.append(button(T("make current"), "", () => makeCurrent(p.id), "", "use-plan"));
-  const more = el("button", "btn icon", "");
-  more.append(ic("more"));
-  more.title = T("more");
-  more.onclick = (e) => { e.stopPropagation(); const b = more.getBoundingClientRect(); pop.menu(b.left, b.bottom + 4, menuOf(p)); };
-  r.append(more);
   head.append(l, r);
   card.append(head);
 
@@ -164,46 +189,131 @@ function detailCard(p) {
   return card;
 }
 
-function menuOf(p) {
-  const out = [{ label: T("rename…"), envWrite: "rename-plan", run: () => plans.renamePlan(p.id, stay) }];
-  out.push({ label: T("copy as a new list…"), envWrite: "create-plan", run: () => newList(p) });
-  out.push({ label: T("delete…"), envWrite: "remove-plan", run: () => plans.deletePlan(p.id, () => open(0)) });
-  return out;
+// ---- rename in place: double-click the title, F2 or 改名 ----
+
+export function startRename(id) {
+  if (M.creating || !sel() || sel().id !== id) return;
+  M.renaming = id;
+  draw(".pm-title-input");
 }
 
-// stay: after a dialog the page shows the list it made or renamed.
-const stay = (d) => open(+String(d.page || "").replace(/^plan:/, "") || 0);
+function renameField(p) {
+  const box = el("div", "pm-rename");
+  const inp = el("input", "xc-input pm-title-input");
+  inp.value = p.name; inp.spellcheck = false;
+  inp.setAttribute("aria-label", T("rename the list"));
+  const why = el("div", "plan-why"); why.setAttribute("role", "alert");
+  let seq = 0, done = false;
+  const check = async () => {
+    const n = ++seq;
+    const r = await api.CheckPlanName("", inp.value, p.id).catch(() => null);
+    if (n === seq && r) why.textContent = inp.value.trim() === p.name ? "" : r.problem;
+    return n === seq && !!r && (inp.value.trim() === p.name || !r.problem);
+  };
+  const stop = () => { if (done) return; done = true; M.renaming = 0; draw(); };
+  const commit = async () => {
+    if (done) return;
+    const name = inp.value.trim();
+    if (!name || name === p.name) return stop();
+    if (!(await check())) { inp.focus(); return; }
+    done = true;
+    try {
+      const d = await api.RenamePlan(p.id, name);
+      M.renaming = 0;
+      await ui.reload();
+      await open(p.id);
+      say("ok", d.text);
+    } catch (e) { done = false; why.textContent = errText(e); inp.focus(); }
+  };
+  inp.oninput = () => { void check(); };
+  inp.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); void commit(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); stop(); }
+    else e.stopPropagation(); // typing is not a page key
+  };
+  inp.onblur = () => { if (!done) void commit(); };
+  box.append(inp, why);
+  return box;
+}
 
-// A single session draft per game. Navigation never discards its inputs.
-export async function newList(p = null, from = "current") {
+// duplicate copies a list as it is now (the order and the game versions; the copy has its
+// own history) as "<name> copy" and puts its name up for editing. The undo removes it.
+export async function duplicate(id) {
+  const row = (M.data?.rows || []).find(r => r.id === id) || (S.shell?.plans || []).find(p => p.id === id);
+  if (!row) return;
+  const previous = S.shell?.plan?.id;
+  let d;
+  try {
+    const nm = await api.CheckPlanName(Tf("%s copy", row.name), "", 0);
+    d = await api.CreatePlan(id, nm.free, "current");
+  } catch (e) { return say("fail", errText(e)); }
+  const made = +d.page.slice(5);
+  await ui.reload();
+  if (S.screen !== "plans") await ui.go("plans");
+  leaveForm();
+  M.sel = made; M.created = made; M.renaming = made;
+  await open(made);
+  say("ok", d.text, async () => {
+    try {
+      if (previous && previous !== made) await api.OpenPlan(previous);
+      const t = await api.RemovePlan(made);
+      await ui.reload(); await open(id); say("ok", t.text);
+    } catch (e) { say("fail", errText(e)); }
+  });
+}
+
+// ---- 新建 / 导入: one form in the right column ----
+
+// named: the player gave the draft a name of their own. A draft that still has the name
+// it was given is dropped when the form closes: the player wanted nothing from it.
+const named = d => !!d && !!d.nameTouched && d.name.trim() !== "" && d.name.trim() !== (d.auto || "").trim();
+
+function dropUnnamed() {
+  const d = M.draft;
+  if (!d) return;
+  d.importing = false;
+  if (!d.submitting && !named(d)) M.draft = null;
+}
+
+// leaveForm closes the form (another list picked, another page, back, esc).
+function leaveForm() {
+  if (!M.creating) return;
+  M.creating = false; S.listCreating = false; M.importSeq++;
+  dropUnnamed();
+}
+
+// A single session draft per game. from: "" empty, "current" a copy, "save", "import".
+export async function newList(from = "") {
   if (S.screen !== "plans" || !M.data) await ui.go("plans");
   if (S.screen !== "plans") return;
+  M.renaming = 0;
   if (M.draft) {
-    if (from === "import") M.draft.from = "import";
+    if (from) M.draft.from = from;
     resume();
-    if (p) say("", T("a draft is already open; you can change its source list"));
     return;
   }
-  const source = p?.id || sel()?.id || S.shell?.plan?.id;
-  const draft = M.draft = { env: game(), source, sources: null, name: "", from, version: "current", save: "", import: { text: "", path: "", follow: true }, previous: S.shell?.plan?.id };
+  const source = sel()?.id || S.shell?.plan?.id;
+  const draft = M.draft = { env: game(), source, sources: null, name: "", auto: "", from, version: "current", save: "", import: { text: "", path: "", follow: true }, previous: S.shell?.plan?.id };
   M.creating = true;
   ui.pageEntering?.();
   draw(".pm-name"); ui.pageEntered?.();
   const pending = readSources(draft);
   try {
-    const nm = await api.CheckPlanName(p ? Tf("%s copy", p.name) : "", "", 0);
-    if (M.draft === draft && game() === draft.env && !draft.nameTouched) {
-      draft.name = nm.free;
-      if (S.screen === "plans" && M.creating) {
-        const field = $(".pm-name"); if (field) field.value = draft.name;
-        const row = $(".pm-draft .draft-name"); if (row) row.textContent = draft.name;
-        draft.nameError = "";
-        // The form revalidates on submit; keep its current controls and focus intact.
-        if (!draft.importing) draw();
-      }
-    }
+    const nm = await api.CheckPlanName("", "", 0);
+    if (M.draft === draft && game() === draft.env && !draft.nameTouched) suggestName(draft, nm.free);
   } catch (e) { if (M.draft === draft) draft.error = errText(e); }
   await pending;
+}
+
+// suggestName fills a name the player has not touched, in place: redrawing the form here
+// would swallow a click that is under way.
+function suggestName(draft, name) {
+  if (draft.nameTouched || !name) return;
+  draft.name = draft.auto = name; draft.nameError = "";
+  if (S.screen !== "plans" || !M.creating || M.draft !== draft) return;
+  const field = $(".pm-name"); if (field) field.value = name;
+  const row = $(".pm-draft .draft-name"); if (row) row.textContent = name;
+  M.formChanged?.();
 }
 
 function resume() {
@@ -213,19 +323,23 @@ function resume() {
   if (!M.draft.sources && !M.draft.loading) void readSources(M.draft);
 }
 
-export function backToManagement() {
+// closeForm: esc in the form. A named draft stays in the left column.
+export function closeForm() {
   if (!M.creating) return false;
   ui.pageEntering?.();
-  M.creating = false; S.listCreating = false; M.importSeq++;
-  if (M.draft) M.draft.importing = false;
-  void open(); say("", T("draft kept; continue it from the list"));
+  const kept = named(M.draft);
+  leaveForm();
+  void open();
+  if (kept) say("", T("draft kept; continue it from the list"));
   return true;
 }
 
 export const historyState = () => ({ creating: M.creating, selected: M.sel });
 export function restoreHistory(state) {
   syncGame();
-  M.creating = !!state?.creating && !!M.draft;
+  const creating = !!state?.creating && !!M.draft;
+  if (M.creating && !creating) leaveForm();
+  M.creating = creating && !!M.draft;
   if (state?.selected) M.sel = state.selected;
 }
 
@@ -242,15 +356,18 @@ async function readSources(draft) {
     if (M.draft !== draft || n !== M.sourceSeq || env !== S.envSeq) return;
     draft.loading = false; draft.sourceError = errText(e);
   }
-  if (S.screen === "plans" && M.creating && (draft.from === "current" || draft.from === "save")) draw();
+  if (S.screen === "plans" && M.creating && M.draft === draft && (draft.from === "current" || draft.from === "save")) draw();
+  else M.formChanged?.();
 }
+
+const MODES = [["", "an empty list"], ["current", "copy a list"], ["save", "from a save"], ["import", "import"]];
 
 function newForm() {
   const draft = M.draft;
   const card = el("section", "card pad pm-new");
   const head = el("div", "pm-head");
-  const title = el("div"); title.append(el("h2", "", T("new list")), el("div", "pm-note", T("draft kept")));
-  head.append(title, button(T("back to management"), "esc", backToManagement)); card.append(head);
+  head.append(el("h2", "", T("new list")));
+  card.append(head);
   const form = el("form");
   M.form = form;
   const fields = el("fieldset", "pm-fields"); fields.disabled = !!draft.submitting;
@@ -258,17 +375,25 @@ function newForm() {
   const name = el("input", "xc-input pm-name"); name.value = draft.name; name.spellcheck = false;
   label.append(name);
   const why = el("div", "plan-why", draft.error || ""); why.setAttribute("role", "alert");
-  const create = button(T("create and edit"), "enter", () => submit(true), "primary", "create-plan");
-  const only = button(T("create only"), "", () => submit(false), "", "create-plan");
+  // One main button: in an import it reads the content first (预览), then it creates.
+  const main = button(T("create and edit"), "enter", () => go(), "primary", "create-plan");
   const active = () => M.draft === draft && M.form === form && M.creating && S.screen === "plans" && draft.env === game();
+  const previewing = () => draft.from === "import" && !draft.import.preview;
   const updateButtons = () => {
-    const sourceOK = draft.from === "import" ? !!draft.import.preview && !draft.importing : draft.from === "" || !!draft.sources && !draft.loading && (draft.from !== "save" || !!draft.save);
-    create.disabled = only.disabled = !!draft.submitting || !name.value.trim() || !!draft.nameError || !sourceOK;
+    const hasInput = !!(draft.import.text.trim() || draft.import.path);
+    const label = previewing() ? T("preview") : T("create and edit");
+    if (main.firstChild?.textContent !== label) main.replaceChildren(label, el("kbd", "", "enter"));
+    if (previewing()) { delete main.dataset.envWrite; main.disabled = !!draft.submitting || !!draft.importing || !hasInput; ui.renderHints?.(); return; }
+    main.dataset.envWrite = "create-plan";
+    const sourceOK = draft.from === "import" ? !draft.importing : draft.from === "" || !!draft.sources && !draft.loading && (draft.from !== "save" || !!draft.save);
+    main.disabled = !!draft.submitting || !name.value.trim() || !!draft.nameError || !sourceOK;
+    ui.renderHints?.();
   };
+  M.formChanged = () => { if (active()) updateButtons(); };
   let seq = 0;
   async function check() {
     const n = ++seq, value = name.value;
-    create.disabled = only.disabled = true;
+    main.disabled = true;
     try {
       const r = await api.CheckPlanName("", value, 0);
       if (n !== seq || !active()) return false;
@@ -283,8 +408,8 @@ function newForm() {
   };
   fields.append(label, why, el("div", "pm-sub", T("start from")));
   const modes = el("div", "pm-modes"); modes.setAttribute("role", "group"); modes.setAttribute("aria-label", T("start from"));
-  for (const [value, text] of [["current", T("copy a list")], ["", T("an empty list")], ["save", T("from a save")], ["import", T("import")]]) {
-    const b = button(text, "", () => { M.importSeq++; draft.importing = false; draft.from = value; draft.error = ""; draw(); $(".pm-modes .on")?.focus(); });
+  for (const [value, text] of MODES) {
+    const b = button(T(text), "", () => { M.importSeq++; draft.importing = false; draft.from = value; draft.error = ""; draw(); $(".pm-modes .on")?.focus(); });
     b.type = "button"; b.dataset.mode = value;
     b.classList.toggle("on", draft.from === value); b.setAttribute("aria-pressed", String(draft.from === value)); modes.append(b);
   }
@@ -294,7 +419,9 @@ function newForm() {
     for (const o of options) { const op = el("option", "", o.label); op.value = o.from; select.append(op); }
     select.value = value; select.onchange = () => change(select.value); field.append(select); fields.append(field); return select;
   }
-  if (draft.from === "current") {
+  if (draft.from === "") {
+    fields.append(el("div", "pm-note", T("the list starts with no mods; add them in the editor, or pick another start above")));
+  } else if (draft.from === "current") {
     choice(T("source list"), "pm-source", M.data.rows.map(r => ({ from: String(r.id), label: r.name })), String(draft.source), id => {
       draft.source = +id; draft.version = "current"; draft.sources = null; draft.sourceError = "";
       void readSources(draft); draw(".pm-source");
@@ -313,22 +440,42 @@ function newForm() {
   } else if (draft.from === "import") {
     fields.append(inlineImport(draft, active, updateButtons));
   }
-  if (draft.from !== "import" && draft.from !== "") {
+  if (draft.from === "current" || draft.from === "save") {
     if (draft.loading) fields.append(el("div", "pm-note", T("reading source list…")));
     if (draft.sourceError) { fields.append(el("div", "plan-why", draft.sourceError), button(T("retry"), "", () => { void readSources(draft); draw(); })); }
   }
   const bottom = el("div", "pm-create-bottom");
-  bottom.append(el("div", "pm-note", T("the new list becomes current; game files change only when writing or launching")));
   const actions = el("div", "acts-row");
-  const discard = button(T("discard draft"), "", () => { const kept = draft; M.draft = null; backToManagement(); say("", T("draft discarded"), () => { if (game() !== kept.env || M.draft) return; M.draft = kept; return ui.go("plans").then(resume); }); });
-  actions.append(discard, button(T("continue later"), "", backToManagement), only, create);
+  if (named(draft)) {
+    const discard = button(T("discard draft"), "", () => {
+      const kept = draft; M.draft = null; closeForm();
+      say("", T("draft discarded"), () => { if (game() !== kept.env || M.draft) return; M.draft = kept; return ui.go("plans").then(resume); });
+    }, "link");
+    actions.append(discard);
+  }
+  main.title = T("does not write game files");
+  actions.append(el("span", "sp"), main);
   bottom.append(actions); fields.append(bottom); form.append(fields);
   for (const b of form.querySelectorAll("button")) b.type = "button";
   form.onkeydown = e => {
-    if (e.key === "Enter" && e.target === name) { e.preventDefault(); e.stopPropagation(); void submit(true); }
+    if (e.key === "Enter" && e.target === name) { e.preventDefault(); e.stopPropagation(); void go(); }
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && e.target.tagName === "TEXTAREA") { e.preventDefault(); e.stopPropagation(); void go(); }
   };
-  form.onsubmit = e => { e.preventDefault(); void submit(true); };
-  async function submit(edit) {
+  form.onsubmit = e => { e.preventDefault(); void go(); };
+  // A file dropped anywhere on the form is an import.
+  card.addEventListener("dragover", e => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); });
+  card.addEventListener("drop", e => {
+    const f = e.dataTransfer?.files?.[0];
+    if (!f) return;
+    e.preventDefault(); e.stopPropagation();
+    if (draft.from !== "import") { draft.from = "import"; draw(); }
+    void M.importFile?.(f);
+  });
+  function go() {
+    if (previewing()) return M.importPreview?.();
+    return submit();
+  }
+  async function submit() {
     if (draft.submitting) return;
     draft.submitting = true; fields.disabled = true;
     const env = S.envSeq, epoch = S.screenSeq;
@@ -346,14 +493,8 @@ function newForm() {
       }
       if (env !== S.envSeq || game() !== draft.env) return;
       await ui.reload();
-      if (stillHere && S.screen === "plans" && epoch === S.screenSeq) { if (edit) await ui.go(r.page); else await open(M.created); }
-      say("ok", r.text, !edit ? async () => {
-        try {
-          if (draft.previous) await api.UsePlan(draft.previous);
-          const t = await api.RemovePlan(+r.page.slice(5));
-          await ui.reload(); await open(draft.previous || 0); say("ok", t.text);
-        } catch (e) { say("fail", errText(e)); }
-      } : false);
+      if (stillHere && S.screen === "plans" && epoch === S.screenSeq) await ui.go(r.page);
+      say("ok", r.text);
     } catch (e) { if (visible()) { draft.error = errText(e); why.textContent = draft.error; } }
     finally { draft.submitting = false; if (active()) { fields.disabled = false; updateButtons(); } }
   }
@@ -362,26 +503,41 @@ function newForm() {
   return card;
 }
 
+// The import source: a file (the window's open dialog or a drop) or pasted text. Choosing
+// a file reads it at once; pasted text is read with 预览 (links go to Steam or Rentry).
 function inlineImport(draft, active, updateButtons) {
   const box = el("div", "pm-inline-import"), imp = draft.import;
-  const input = el("label", "pm-field", T("file, share code or collection"));
+  box.append(el("div", "pm-note", T("bring in a list from RimSort, RimCrow, RimWorld or another RimArcho, a save, a share code or a Steam collection; you see which mods you have before anything is created")));
+  // the file: one button, then its name; the path is never typed
+  const drop = el("div", "pm-drop");
+  const file = el("input"); file.type = "file"; file.hidden = true; file.accept = ".xml,.rml,.json,.txt,.rws";
+  const pickBtn = button(T("choose a file…"), "", () => void choose());
+  const chosen = el("span", "pm-file");
+  const showFile = () => {
+    chosen.replaceChildren();
+    if (!imp.path) { chosen.append(el("span", "muted", T("or drop it here: .xml .rml .json .txt, a save (.rws)"))); return; }
+    chosen.append(el("b", "word-facts", imp.path.replace(/^.*[\\/]/, "")));
+    chosen.title = imp.path;
+    const clear = el("button", "btn link", T("clear")); clear.type = "button";
+    clear.onclick = () => { imp.path = ""; invalidate(); showFile(); };
+    chosen.append(clear);
+  };
+  drop.append(pickBtn, chosen, file);
+  box.append(drop);
+  box.append(el("div", "pm-or", T("or paste")));
   const text = el("textarea", "xc-text"); text.value = imp.text; text.spellcheck = false;
-  text.placeholder = T("a list from RimSort or RimCrow, a share code (RC-…), a Rentry link, or a Steam Workshop collection link");
-  input.append(text); box.append(input);
+  text.placeholder = T("a share code (RC-…), a Steam Workshop collection link, a Rentry link, or a list copied from RimSort or RimCrow");
+  text.setAttribute("aria-label", T("paste"));
+  box.append(text);
   const status = el("div", "pm-note", draft.importing ? T("reading the list…") : ""); status.setAttribute("role", "status");
   const error = el("div", "plan-why", imp.error || ""); error.setAttribute("role", "alert");
   const preview = el("div", "pm-inline-preview");
+  box.append(status, error, preview);
   function invalidate() {
     M.importSeq++; draft.importing = false; imp.preview = null; imp.error = "";
     preview.replaceChildren(); status.textContent = ""; error.textContent = ""; updateButtons();
   }
-  text.oninput = () => { imp.text = text.value; invalidate(); };
-  const actions = el("div", "acts-row");
-  const file = el("input"); file.type = "file"; file.hidden = true; file.accept = ".xml,.rml,.json,.txt,.rws";
-  const path = el("input", "xc-input pm-import-path"); path.value = imp.path; path.spellcheck = false;
-  path.placeholder = T("a file path: .xml .rml .json .txt, a save (.rws)");
-  path.setAttribute("aria-label", T("from a file"));
-  path.oninput = () => { imp.path = path.value; invalidate(); };
+  text.oninput = () => { imp.text = text.value; if (text.value && imp.path) { imp.path = ""; showFile(); } invalidate(); };
   async function read(kind, value, fileName) {
     if (!value.trim() || !active()) return;
     const n = ++M.importSeq, env = S.envSeq;
@@ -394,6 +550,12 @@ function inlineImport(draft, active, updateButtons) {
       if (fileName) p.source = fileName;
       imp.preview = p; imp.kind = kind; imp.value = value; draft.importing = false;
       status.textContent = ""; renderPreview(); updateButtons();
+      // the list's own title names the new list, unless the player named it
+      const base = p.name || (fileName || (kind === "file" ? value : "")).replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
+      if (base && !draft.nameTouched) {
+        const nm = await api.CheckPlanName(base, "", 0).catch(() => null);
+        if (nm && current()) suggestName(draft, nm.free);
+      }
     } catch (e) {
       if (!current()) return;
       draft.importing = false; imp.error = errText(e); error.textContent = imp.error; status.textContent = ""; updateButtons();
@@ -406,26 +568,26 @@ function inlineImport(draft, active, updateButtons) {
     try {
       const value = await (/\.rws$/i.test(f.name) ? f.slice(0, 4 << 20) : f).text();
       if (!active() || n !== M.importSeq) return;
-      imp.text = value; text.value = value; imp.path = ""; path.value = "";
+      imp.text = ""; text.value = ""; imp.path = f.name; showFile();
       await read("text", value, f.name);
     } catch (e) { if (active() && n === M.importSeq) { draft.importing = false; error.textContent = errText(e); updateButtons(); } }
   }
-  file.onchange = () => { if (file.files[0]) void readFile(file.files[0]); };
-  actions.append(button(T("choose a file…"), "", async () => {
+  async function choose() {
     const epoch = S.envSeq;
     try {
       const info = await api.ExchangeInfo();
       if (!active() || epoch !== S.envSeq) return;
       if (!info.dialogs) { file.click(); return; }
       const picked = await api.PickImportFile();
-      if (picked && active() && epoch === S.envSeq) { imp.path = picked; path.value = picked; await read("file", picked); }
+      if (picked && active() && epoch === S.envSeq) {
+        imp.path = picked; imp.text = ""; text.value = ""; showFile();
+        await read("file", picked);
+      }
     } catch (e) { if (active()) error.textContent = errText(e); }
-  }), button(T("preview"), "", () => read("text", text.value)), file);
-  const pathRow = el("div", "xc-row");
-  pathRow.append(path, button(T("read"), "", () => read("file", path.value)));
-  box.append(actions, pathRow, status, error, preview);
-  box.addEventListener("dragover", e => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); });
-  box.addEventListener("drop", e => { const f = e.dataTransfer?.files?.[0]; if (f) { e.preventDefault(); e.stopPropagation(); void readFile(f); } });
+  }
+  file.onchange = () => { if (file.files[0]) void readFile(file.files[0]); };
+  M.importFile = readFile;
+  M.importPreview = () => imp.path && !imp.text.trim() ? read("file", imp.path) : read("text", text.value);
   function renderPreview() {
     preview.replaceChildren();
     const p = imp.preview; if (!p) return;
@@ -437,16 +599,20 @@ function inlineImport(draft, active, updateButtons) {
     }
     showImportContents(preview, p);
   }
+  showFile();
   renderPreview();
   return box;
 }
 
-// Leave only transient reads behind; the session draft survives ordinary navigation.
-export function abandon() { M.importSeq++; if (M.draft) M.draft.importing = false; C.seq++; C.slot = null; M.form = null; }
+// Leaving the page: transient reads stop; a draft the player never named goes (06 §2.17).
+export function abandon() {
+  M.importSeq++; if (M.draft) M.draft.importing = false; C.seq++; C.slot = null; M.form = null; M.renaming = 0;
+  if (M.creating && !named(M.draft)) { M.creating = false; S.listCreating = false; M.draft = null; }
+}
 export const selected = () => { syncGame(); return M.sel || S.shell?.plan?.id || 0; };
 
 async function makeCurrent(id) {
-  if (await plans.openPlan(id)) open(id);
+  if (await plans.usePlan(id)) open(id);
 }
 
 function section(title, right) {
@@ -699,10 +865,10 @@ function share(p) {
   return s;
 }
 
-// buildOf opens 编译成整合包 (§2.6) for the list: it becomes current first (no game file is
-// written), and esc comes back here.
+// buildOf opens 编译成整合包 (§2.6) for the list: it is opened first (the current list
+// stays), and esc comes back here.
 async function buildOf(p) {
-  if (!p.current && !(await plans.openPlan(p.id))) return;
+  if (!(await plans.openPlan(p.id))) return;
   S.buildFrom = "plans";
   ui.go("build");
 }
@@ -727,7 +893,7 @@ export function key(e) {
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
   if (S.screen === "plan-export") return exportKey(e);
   if (M.creating) {
-    if (k === "Escape") { e.preventDefault(); backToManagement(); }
+    if (k === "Escape") { e.preventDefault(); closeForm(); }
     return;
   }
   const p = sel();
@@ -735,20 +901,24 @@ export function key(e) {
   if (["ArrowDown", "ArrowUp", "j", "k", "Home", "End"].includes(k)) { e.preventDefault(); return step(k); }
   if (!p) return;
   const map = {
-    Enter: () => ui.go(p.page), n: () => newList(), i: () => newList(null, "import"), e: () => exportOf(p.id, "plans"),
-    B: () => buildOf(p), F2: () => plans.renamePlan(p.id, stay), Delete: () => plans.deletePlan(p.id, () => open(0)),
+    Enter: () => ui.go(p.page), n: () => newList(), i: () => newList("import"), e: () => exportOf(p.id, "plans"),
+    B: () => buildOf(p), F2: () => startRename(p.id), D: () => duplicate(p.id),
+    Delete: () => { if ((M.data?.rows || []).length > 1) plans.deletePlan(p.id, () => open(0)); },
   };
   if (map[kk]) { e.preventDefault(); map[kk](); }
 }
 
 export function hintList() {
-  if (M.creating && S.screen === "plans") return [{ key: "enter", label: T("create and edit") }, { key: "esc", label: T("back to management") }];
+  if (M.creating && S.screen === "plans") {
+    const label = M.draft?.from === "import" && !M.draft.import.preview ? T("preview") : T("create and edit");
+    return [{ key: "enter", label }, { key: "esc", label: T("close") }];
+  }
   if (S.screen === "plan-export") {
     return [{ key: "↑↓", label: T("format") }, { key: "ctrl+s", label: T("save as a file…") }, { key: "ctrl+c", label: T("copy") },
       { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
   }
-  return [{ key: "↑↓", label: T("pick a list") }, { key: "enter", label: T("edit") }, { key: "n", label: T("new list") }, { key: "i", label: T("import") },
-    { key: "e", label: T("export") }, { key: "B", label: T("create a pack") }, { key: "?", label: T("all keys") }];
+  return [{ key: "↑↓", label: T("pick a list") }, { key: "enter", label: T("edit") }, { key: "n", label: T("new / import") }, { key: "F2", label: T("rename") },
+    { key: "D", label: T("duplicate") }, { key: "e", label: T("export") }, { key: "?", label: T("all keys") }];
 }
 
 // ---- the export sub-page (库 / 列表 / <列表> / 导出) ----

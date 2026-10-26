@@ -162,7 +162,7 @@ func (a *App) analysisOf(st *LoadoutState, newest bool) (*AnalysisState, error) 
 }
 
 // ChildAnalyze runs `<this executable> analyze --env <name>` and streams its output lines.
-func ChildAnalyze(home, envName, mm string, progress func(string)) error {
+func ChildAnalyze(home, envName, plan, mm string, progress func(string)) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -172,14 +172,18 @@ func ChildAnalyze(home, envName, mm string, progress func(string)) error {
 		// start it again: tests set App.AnalyzeRunner (testkit uses InProcessAnalyze).
 		return errors.New("child analysis from a test binary: set App.AnalyzeRunner")
 	}
-	return ChildAnalyzeExe(exe, home, envName, mm, progress)
+	return ChildAnalyzeExe(exe, home, envName, plan, mm, progress)
 }
 
-// ChildAnalyzeExe is ChildAnalyze with an explicit archo executable.
-func ChildAnalyzeExe(exe, home, envName, mm string, progress func(string)) error {
+// ChildAnalyzeExe is ChildAnalyze with an explicit archo executable. plan is the list a
+// session opened ("" the current one, 04 §1.3).
+func ChildAnalyzeExe(exe, home, envName, plan, mm string, progress func(string)) error {
 	args := []string{"analyze"}
 	if envName != "" {
 		args = append(args, "--env", envName)
+	}
+	if plan != "" {
+		args = append(args, "--open-plan", plan)
 	}
 	if mm != "" {
 		args = append(args, "--game-version", mm)
@@ -241,12 +245,12 @@ func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
 	if run == nil {
 		// the version and the executable are read now: with AnalyzeWait the child starts
 		// in a goroutine, after EnsureLogAnalysis may have put GameVersion back
-		mm, exe := a.GameVersion, a.AnalyzeExe
+		mm, exe, plan := a.GameVersion, a.AnalyzeExe, a.OpenPlanName()
 		run = func(envName string, p func(string)) error {
 			if exe != "" {
-				return ChildAnalyzeExe(exe, a.Home, envName, mm, p)
+				return ChildAnalyzeExe(exe, a.Home, envName, plan, mm, p)
 			}
-			return ChildAnalyze(a.Home, envName, mm, p)
+			return ChildAnalyze(a.Home, envName, plan, mm, p)
 		}
 	}
 	if a.AnalyzeWait <= 0 {

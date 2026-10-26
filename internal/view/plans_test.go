@@ -60,8 +60,12 @@ func TestPlanVerbs(t *testing.T) {
 	if err != nil || !strings.Contains(text, "new list Copy: 2 mods") {
 		t.Fatalf("new: %v %q", err, text)
 	}
+	// The new plan is open; the current one (launched) stays (04 §1.3).
 	if cur, _ := a.CurrentPlan(); cur.ID != p.ID {
-		t.Fatalf("the new plan is not current: %+v", cur)
+		t.Fatalf("the new plan is not open: %+v", cur)
+	}
+	if rows := mustPlans(t, a); planNames(t, rows) != "default*,Copy" || !rows[1].Open {
+		t.Fatalf("the new plan became current: %+v", rows)
 	}
 	if _, _, err := view.NewPlan(a, "copy", ""); err == nil || err.Error() != "Copy already exists" {
 		t.Fatalf("a taken name (any case): %v", err)
@@ -82,15 +86,20 @@ func TestPlanVerbs(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows = mustPlans(t, a)
-	if planNames(t, rows) != "default,Copy,Empty,Old*" || rows[1].Entries != 2 || rows[2].Entries != 0 {
+	if planNames(t, rows) != "default*,Copy,Empty,Old" || !rows[3].Open || rows[1].Entries != 2 || rows[2].Entries != 0 {
 		t.Fatalf("rows %+v", rows)
 	}
 
 	// Switching writes no game file.
 	before := e.ReadModsConfig()
-	if _, text, err := view.UsePlan(a, rows[2].ID); err != nil || !strings.HasPrefix(text, "now editing Empty") {
+	if _, text, err := view.UsePlan(a, rows[2].ID); err != nil || !strings.HasPrefix(text, "Empty is the current list") {
 		t.Fatalf("use: %v %q", err, text)
 	}
+	if rows := mustPlans(t, a); planNames(t, rows) != "Empty*,default,Copy,Old" || !rows[0].Open {
+		t.Fatalf("the current list comes first: %+v", rows)
+	}
+	rows = mustPlans(t, a)
+	rows[0], rows[1], rows[2] = rows[1], rows[2], rows[0] // back to creation order for the steps below
 	if e.ReadModsConfig() != before {
 		t.Fatal("switching wrote ModsConfig.xml")
 	}
@@ -179,13 +188,14 @@ func TestInGameAndMarks(t *testing.T) {
 	}
 	nav := view.Nav(0, rows, nil)
 	kids := nav[1].Items[1].Kids
-	if len(kids) != 3 || kids[0].ID != view.PagePlans || kids[2].Mark == "" || !kids[2].Current {
+	// the current list first (列表 opens it), 管理 after the lists (06 §2.1)
+	if len(kids) != 3 || kids[2].ID != view.PagePlans || kids[1].Mark == "" || !kids[1].Open || !kids[0].Current {
 		t.Fatalf("plan kids %+v", kids)
 	}
 	// the plan the game has is marked on its entry, not on the status line
 	for i, r := range rows {
-		if kids[i+1].InGame != r.InGame {
-			t.Fatalf("in-game mark %d: %+v vs %+v", i, kids[i+1], r)
+		if kids[i].InGame != r.InGame {
+			t.Fatalf("in-game mark %d: %+v vs %+v", i, kids[i], r)
 		}
 	}
 }
@@ -203,6 +213,9 @@ func TestHomePerPlan(t *testing.T) {
 		}
 	}
 	beta, _ := a.FindPlan("Beta")
+	if _, err := a.UsePlan("Alpha"); err != nil {
+		t.Fatal(err)
+	}
 	t0 := e.Now()
 	a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: def.EnvID, PlanID: def.ID, Started: t0.Add(-48 * time.Hour), Method: "steam"})
 	a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: def.EnvID, PlanID: beta.ID, Started: t0.Add(-time.Hour), Method: "steam"})

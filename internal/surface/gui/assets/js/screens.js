@@ -461,6 +461,11 @@ async function runAction(it, act) {
       return drawNeeds();
     case "choose-disable":
       return pop.choose(act.title, act.options.map((o) => o.label), (i) => doAction(act, i));
+    case "subscribe":
+      // a background task (06 §2.16): the mods take their place in the list once downloaded
+      return pop.choose(act.label, [T("subscribe with Steam"), T("download with SteamCMD")], async (i) => {
+        try { say("ok", await api.Subscribe({ kind: "workshop", url: act.refs.join(" "), steamcmd: i === 1 })); } catch (e) { say("fail", errText(e)); }
+      });
   }
   if (act.confirm) {
     // Not undone with u: ask first (06 §6).

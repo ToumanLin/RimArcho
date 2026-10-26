@@ -26,6 +26,7 @@ func (b *App) ReadOptions(a *App) {
 	b.Home, b.Config, b.Now, b.Rand, b.Loc = a.Home, a.Config, a.Now, a.Rand, a.Loc
 	b.Detect, b.FreeSpace, b.Decompile = a.Detect, a.FreeSpace, a.Decompile
 	b.EnvName, b.GameVersion = a.EnvName, a.GameVersion
+	b.OpenPlan, b.PlanName = a.OpenPlan, a.PlanName
 	b.AnalyzeRunner, b.AnalyzeExe, b.AnalyzeWait = a.AnalyzeRunner, a.AnalyzeExe, a.AnalyzeWait
 	b.LazyLog, b.LogCacheOnly = a.LazyLog, a.LogCacheOnly
 	b.GameProbe, b.LockBase, b.MonitorBundle = a.GameProbe, a.LockBase, a.MonitorBundle
@@ -54,4 +55,6 @@ func (a *App) AdoptReadState(r *App) {
 	a.stCache, a.stKey = r.stCache, rekey(a.Store.ChangeKey(), r.stKey)
 	a.prCache, a.prKey = nil, ""
 	a.Store.MM = r.Store.MM
+	// the worker may have chosen a list (HomeApply): its state is for that list
+	a.OpenPlan, a.PlanName = r.OpenPlan, r.PlanName
 }

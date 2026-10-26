@@ -1,7 +1,9 @@
 // Plans in the window (04 §1.3, 06 §2.1, §2.5): each plan is a sidebar entry whose page is
-// its editor. Opening one switches the current plan (no game file is written); new (empty,
-// a copy, a version, an import) opens management; delete asks for confirmation. Every verb is a view
-// call through the API (view.NewPlan, UsePlan, RenamePlan, RemovePlan, ImportAsPlan).
+// its editor. Opening one only shows it: the current list (the one launched) changes when
+// the player makes another current, writes it to the game or launches it from its editor.
+// New (empty, a copy, a version, an import) opens management; delete asks for confirmation.
+// Every verb is a view call through the API (view.NewPlan, UsePlan, OpenPlan, RenamePlan,
+// RemovePlan, ImportAsPlan).
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import * as pop from "./popups.js";
 
@@ -11,13 +13,24 @@ export function initPlans(u) { ui = u; }
 const current = () => (S.shell && S.shell.plan) || null;
 const planOf = (id) => ((S.shell && S.shell.plans) || []).find((p) => p.id === id) || null;
 
-// openPlan makes a plan current when it is not; true once its list is the board's.
+// openPlan opens a plan when it is not open (the current list stays); true once its list
+// is the board's.
 export async function openPlan(id) {
   const cur = current();
   if (cur && cur.id === id) return true;
+  try { await api.OpenPlan(id); } catch (e) { say("fail", errText(e)); return false; }
+  forget();
+  await ui.reload();
+  return true;
+}
+
+// usePlan makes a plan current — the one launched — and opens it; no game file is written.
+export async function usePlan(id) {
+  const p = planOf(id), was = current();
+  if (p && p.current && was && was.id === id) return true;
   let d;
   try { d = await api.UsePlan(id); } catch (e) { say("fail", errText(e)); return false; }
-  forget();
+  if (!was || was.id !== id) forget();
   await ui.reload();
   say("ok", d.text);
   return true;
@@ -69,7 +82,7 @@ function nameField(box, value, self) {
 }
 
 // New lists live in the management page's right column (06 §2.17).
-export function newPlan(from = "current") { pop.close(); return ui.newList(from); }
+export function newPlan(from = "") { pop.close(); return ui.newList(from); }
 
 // renamePlan: the rename dialog; the history stays.
 export function renamePlan(id, after = null) {
@@ -105,10 +118,11 @@ export function actions(id) {
   const p = planOf(id);
   if (!p) return [];
   const out = [];
-  if (!p.current) out.push({ label: T("open"), run: () => ui.go(p.page) });
+  if (!p.open) out.push({ label: T("open"), run: () => ui.go(p.page) });
+  if (!p.current) out.push({ label: T("make current"), envWrite: "use-plan", run: () => usePlan(id) });
   out.push({ label: T("rename…"), envWrite: "rename-plan", run: () => renamePlan(id) });
-  if (p.current) out.push({ label: T("copy as a new list…"), envWrite: "new-plan", run: () => newPlan("current") });
-  out.push({ label: T("new list…"), envWrite: "new-plan", run: () => newPlan() });
+  out.push({ label: T("duplicate"), envWrite: "create-plan", run: () => ui.duplicateList(id) });
+  out.push({ label: T("new / import…"), envWrite: "new-plan", run: () => newPlan() });
   out.push({ label: T("delete…"), envWrite: "remove-plan", run: () => deletePlan(id) });
   return out;
 }
@@ -117,12 +131,12 @@ export function actions(id) {
 export function chooser() {
   const ps = (S.shell && S.shell.plans) || [];
   const cur = current();
-  const labels = ps.map((p) => p.name + (p.current ? "  " + T("editing") : "") + (p.conflict ? "  " + p.conflictText : ""));
+  const labels = ps.map((p) => p.name + (p.current ? "  " + T("current") : "") + (p.open ? "  " + T("editing") : "") + (p.conflict ? "  " + p.conflictText : ""));
   const runs = ps.map((p) => () => ui.go(p.page));
-  const extra = [[T("new list…"), () => newPlan()]];
+  const extra = [[T("new / import…"), () => newPlan()]];
   if (cur) extra.push([Tf("rename %s…", cur.name), () => renamePlan(cur.id)], [Tf("delete %s…", cur.name), () => deletePlan(cur.id)]);
   for (const [l, r] of extra) { labels.push(l); runs.push(r); }
-  pop.choose(T("lists"), labels, (i) => runs[i](), Math.max(0, ps.findIndex((p) => p.current)));
+  pop.choose(T("lists"), labels, (i) => runs[i](), Math.max(0, ps.findIndex((p) => p.open)));
 }
 
 // menuAt opens a plan's actions as a context menu.

@@ -715,7 +715,7 @@ var zhText = map[string]string{
 	"that mod is not known":                  "没有这个 Mod",
 	"i shows the files":                      "i 显示改了哪些文件",
 	"files":                                  "文件",
-	"all mods":                               "全部",
+	"all mods":                               "全部 Mod",
 	"last game":                              "上次游戏",
 	"new and gone":                           "新增和不见了的",
 }

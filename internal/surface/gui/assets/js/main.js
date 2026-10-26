@@ -120,7 +120,8 @@ function renderTop() {
 }
 
 // goLaunch is the editor's 启动游戏 (and its L): the game starts from 启动, so it opens that
-// page with the current plan applied and the focus on its launch button (06 §2.5).
+// page with this list applied — launching it from its editor makes it current — and the
+// focus on its launch button (06 §2.5).
 // exportCurrent is the editor's e: the current list's export sub-page (06 §2.5, §2.17).
 function exportCurrent() {
   const p = S.shell && S.shell.plan;
@@ -130,6 +131,8 @@ function exportCurrent() {
 
 async function goLaunch() {
   if (environmentReason()) return say("busy", environmentReason());
+  const open = S.shell && S.shell.plan;
+  if (open && !open.current && !(await plans.usePlan(open.id))) return;
   await go("home");
   await homePage.focusLaunch();
 }
@@ -155,6 +158,19 @@ function planActions() {
     m.onclick = (e) => { e.stopPropagation(); go("needs"); };
     out.push(m);
   }
+  // another list is the current one, the one launched (04 §1.3): say so, and offer this one
+  const other = S.shell && S.shell.current;
+  if (plan && other) {
+    const note = el("span", "play-note");
+    const t = el("span", "t", Tf("launching plays %s", other.name));
+    const use = el("button", "lnk", T("make current"));
+    use.title = T("launch this list from now on; no game file is written");
+    use.dataset.envWrite = "use-plan";
+    use.onclick = (e) => { e.stopPropagation(); plans.usePlan(plan.id); };
+    note.title = Tf("the game is launched with %s; this list is only open here", other.name);
+    note.append(t, use);
+    out.push(note);
+  }
   if (u) {
     const n = el("span", "unwritten", Tf("%d not written", u));
     n.title = T("different from the list last written to the game; launching or writing to the game writes them");
@@ -178,13 +194,15 @@ function planActions() {
 let lastList = 1;
 
 // The sidebar's entries in shift+1–8 order, 在玩 then 库 (06 §3.5; view.Nav).
-const NAV = ["home", "needs", "log", "library", "plans", "packs", "textures", "env"];
+// "plan" is 列表: like a click on it, the current list (06 §2.1).
+const NAV = ["home", "needs", "log", "library", "plan", "packs", "textures", "env"];
+const navTarget = (id) => id !== "plan" ? id : ((S.shell && S.shell.plans) || []).find((p) => p.current)?.page || "plans";
 
 // renderWhere: the position line (06 §3.2), the sidebar and the breadcrumb.
 function renderWhere() {
   shell.sync();
   $("#planhead").hidden = !!S.screen;
-  if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + T("undo") + "|" + JSON.stringify(S.shell && S.shell.plan), ...planActions());
+  if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + T("undo") + "|" + JSON.stringify(S.shell && S.shell.plan) + "|" + JSON.stringify(S.shell && S.shell.current), ...planActions());
   // A page's place is its breadcrumb; the position line says more only on the plan (where
   // the cursor is in which list) and in the full detail.
   let s = "";
@@ -518,7 +536,7 @@ async function cmd(id) {
     case "tech": return verb("full");
     case "tags": return verb("tags");
     case "cli": return commandLine();
-    case "import": return S.screen === "plans" ? planManage.newList(null, "import") : exchange(0);
+    case "import": return S.screen === "plans" ? planManage.newList("import") : exchange(0);
     case "export": return exportCurrent();
     case "help": return pop.help(S.screen || "plan");
     case "quit": return window.close();
@@ -775,7 +793,7 @@ function onKey(e) {
   const dig = /^Digit([1-9])$/.exec(e.code || "");
   if (dig && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
     e.preventDefault();
-    if (NAV[+dig[1] - 1]) go(NAV[+dig[1] - 1]);
+    if (NAV[+dig[1] - 1]) go(navTarget(NAV[+dig[1] - 1]));
     return;
   }
   // tab / shift+tab: the next / previous page under the same sidebar entry (Mod 库存's 全部 and
@@ -943,7 +961,8 @@ const ui = {
   palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
-  newList: (from) => planManage.newList(null, from),
+  newList: (from) => planManage.newList(from),
+  duplicateList: (id) => planManage.duplicate(id),
   selectedList: () => planManage.selected(),
   resumeGuide: () => guide.resume(),
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },

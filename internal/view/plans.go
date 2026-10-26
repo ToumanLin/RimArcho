@@ -3,6 +3,7 @@ package view
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -34,12 +35,15 @@ func PlanOfPage(page string) int64 {
 
 // PlanRow is one plan of the environment.
 type PlanRow struct {
-	ID       int64  `json:"id"`
-	Page     string `json:"page"`
-	Name     string `json:"name"`
-	Current  bool   `json:"current,omitempty"`
-	Entries  int    `json:"entries"`
-	Versions int    `json:"versions"`
+	ID   int64  `json:"id"`
+	Page string `json:"page"`
+	Name string `json:"name"`
+	// Current: the environment's current list, the one launched; Open: the one this window
+	// shows and edits (the current one unless another was opened, 04 §1.3).
+	Current  bool `json:"current,omitempty"`
+	Open     bool `json:"open,omitempty"`
+	Entries  int  `json:"entries"`
+	Versions int  `json:"versions"`
 	// Played is "played 10 月 20 日" or "never played".
 	Played string `json:"played"`
 	// Conflict: an external version was not loaded (04 §4.3); ConflictText says so.
@@ -50,7 +54,8 @@ type PlanRow struct {
 	PlayedAt time.Time `json:"-"`
 }
 
-// PlanRows lists the current environment's plans in creation order.
+// PlanRows lists the current environment's plans: the current one first, then the others
+// in creation order (06 §2.1, §2.17).
 func PlanRows(a *app.App) ([]PlanRow, error) {
 	ps, err := a.Plans()
 	if err != nil {
@@ -59,7 +64,7 @@ func PlanRows(a *app.App) ([]PlanRow, error) {
 	g := InGame(a)
 	var out []PlanRow
 	for _, p := range ps {
-		r := PlanRow{ID: p.ID, Page: PlanPage(p.ID), Name: p.Name, Current: p.Current, Entries: p.Entries, Versions: p.Versions,
+		r := PlanRow{ID: p.ID, Page: PlanPage(p.ID), Name: p.Name, Current: p.Current, Open: p.Open, Entries: p.Entries, Versions: p.Versions,
 			Played: T("never played"), PlayedAt: p.LastPlayed, InGame: g != nil && g.PlanID == p.ID}
 		if !p.LastPlayed.IsZero() {
 			r.Played = Tf("played %s", ShortDate(p.LastPlayed))
@@ -69,6 +74,7 @@ func PlanRows(a *app.App) ([]PlanRow, error) {
 		}
 		out = append(out, r)
 	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Current && !out[j].Current })
 	return out, nil
 }
 
@@ -229,8 +235,9 @@ func ImportAsPlan(a *app.App, imp *Import, name string) (*store.Plan, string, er
 	return switchToNew(a, r)
 }
 
+// switchToNew opens the new plan; the current one (what launches) stays (04 §1.3).
 func switchToNew(a *app.App, r *app.NewPlanResult) (*store.Plan, string, error) {
-	if _, err := a.UsePlan(r.Plan.Name); err != nil {
+	if _, err := a.OpenPlanID(r.Plan.ID); err != nil {
 		return r.Plan, "", err
 	}
 	t := Tf("new list %s: %d mods; the game's list is unchanged until you write or launch", r.Plan.Name, len(r.List))
@@ -243,7 +250,8 @@ func switchToNew(a *app.App, r *app.NewPlanResult) (*store.Plan, string, error) 
 	return r.Plan, t, nil
 }
 
-// UsePlan makes a plan current; it writes no game file (04 §1.3).
+// UsePlan makes a plan current: the one launched, and the one edited. It writes no game
+// file (04 §1.3).
 func UsePlan(a *app.App, id int64) (*store.Plan, string, error) {
 	p, err := planByID(a, id)
 	if err != nil {
@@ -252,7 +260,17 @@ func UsePlan(a *app.App, id int64) (*store.Plan, string, error) {
 	if _, err := a.UsePlan(p.Name); err != nil {
 		return nil, "", planErr(err)
 	}
-	return p, Tf("now editing %s; the game's list is unchanged until you write or launch", p.Name), nil
+	return p, Tf("%s is the current list: launching plays it; no game file was written", p.Name), nil
+}
+
+// OpenPlan shows and edits a plan without making it current: launching still plays the
+// current one (04 §1.3, 06 §2.5). Going somewhere says nothing, so there is no text.
+func OpenPlan(a *app.App, id int64) (*store.Plan, error) {
+	p, err := a.OpenPlanID(id)
+	if err != nil {
+		return nil, errors.New(T("that list is gone"))
+	}
+	return p, nil
 }
 
 // RenamePlan renames a plan; its history stays.

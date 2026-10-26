@@ -92,10 +92,12 @@ type NavItem struct {
 	Badge int       `json:"badge,omitempty"` // 能不能跑: the actionable items (06 §5)
 	Key   string    `json:"key,omitempty"`   // shift+1–8
 	Kids  []NavItem `json:"kids,omitempty"`
-	// Mark is a plan's "有未载入的外部版本" (04 §4.3); Current the plan being edited;
-	// InGame the plan the game's ModsConfig.xml holds (a small mark when there are several).
+	// Mark is a plan's "有未载入的外部版本" (04 §4.3); Current the current plan (the one
+	// launched, listed first); Open the plan being edited; InGame the plan the game's
+	// ModsConfig.xml holds (a small mark when there are several).
 	Mark    string `json:"mark,omitempty"`
 	Current bool   `json:"current,omitempty"`
+	Open    bool   `json:"open,omitempty"`
 	InGame  bool   `json:"inGame,omitempty"`
 	// Add: the entry opens a dialog ("+ 新方案"), not a page.
 	Add bool `json:"add,omitempty"`
@@ -114,10 +116,11 @@ type NavGroup struct {
 func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	var planKids []NavItem
 	for _, p := range plans {
-		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, InGame: p.InGame})
+		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, Open: p.Open, InGame: p.InGame})
 	}
-	// 管理 heads the lists (06 §2.17); new lists are made there.
-	planKids = append([]NavItem{{ID: PagePlans, Label: T("manage")}}, planKids...)
+	// The current list comes first (PlanRows) and 列表 opens it, as every entry opens its
+	// first sub-entry; 全部列表 follows the lists, and new lists are made there (06 §2.1, §2.17).
+	planKids = append(planKids, NavItem{ID: PagePlans, Label: T("all lists")})
 	var packKids []NavItem
 	for _, p := range packs {
 		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name})
@@ -130,7 +133,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	}
 	library := []NavItem{
 		// The entry opens 全部, its first sub-entry (06 §2.9).
-		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all")}, {ID: PageChanges, Label: T("subscriptions and updates")}, {ID: PageSubscribe, Label: T("add a subscription")}}},
+		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("subscriptions and updates")}, {ID: PageSubscribe, Label: T("add a subscription")}}},
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// what the game loads faster: next to the packs, which convert the same way (08 §5.2)

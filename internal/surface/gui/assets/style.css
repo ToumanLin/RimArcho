@@ -1048,9 +1048,13 @@ details.xc-sec > summary { cursor: pointer; }
 .chip.mark { color: var(--amber); background: var(--amber-soft); }
 .page-acts .chip.mark { margin: 0; white-space: nowrap; flex: none; cursor: pointer; border: 0; display: inline-flex; align-items: center; gap: 6px; }
 .page-acts .chip.mark .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+/* the editor shows a list that is not the current one (04 §1.3) */
+.page-acts .play-note { display: inline-flex; align-items: center; gap: 8px; flex: none; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.page-acts .play-note .lnk { color: var(--accent-11, var(--accent)); font-size: 12px; padding: 0; background: none; border: 0; cursor: pointer; }
+.page-acts .play-note .lnk:hover { text-decoration: underline; }
 #crumbs { min-width: 0; }
 #top #env { margin-left: 2px; }
-@media (max-width: 1280px) { .page-acts .chip.mark .t { display: none; } .page-acts .chip.mark { padding: 0 7px; line-height: 22px; } }
+@media (max-width: 1280px) { .page-acts .chip.mark .t, .page-acts .play-note .t { display: none; } .page-acts .chip.mark { padding: 0 7px; line-height: 22px; } }
 .page-acts .icon-btn { padding: 0 8px; letter-spacing: 1px; }
 /* the plan the game has, when there are several plans: a small green dot by its name */
 .ingame-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
@@ -1501,6 +1505,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 
 /* New-list and import forms stay in the page (06 §2.17). */
 .pm-new form { display: flex; flex-direction: column; gap: 8px; }
+.card.pm-new { overflow: visible; }
 .pm-new .pm-head { margin-bottom: 16px; }
 .pm-new .pm-head > .btn { margin-left: auto; }
 .pm-new .plan-why:empty { display: none; }
@@ -1513,7 +1518,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-modes .on { color: var(--accent); background: var(--accent-soft); }
 .pm-source-summary { background: var(--card-2); border-radius: var(--r-sm); padding: 12px; display: grid; gap: 5px; }
 .pm-new .pm-note, .pm-draft .m { color: var(--fg-2); font-size: 12px; }
-.pm-create-bottom { display: grid; gap: 12px; margin-top: 12px; padding-top: 16px; border-top: var(--hairline) solid var(--line-2); }
+.pm-create-bottom { display: grid; gap: 12px; margin-top: 12px; padding: 12px 0; border-top: var(--hairline) solid var(--line-2); position: sticky; bottom: 0; z-index: 1; background: var(--card); }
 .pm-create-bottom .acts-row { justify-content: flex-end; }
 .pm-draft { border: var(--hairline) dashed var(--line); }
 .pm-draft .pill { color: var(--fg-2); }
@@ -1525,6 +1530,20 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-new label.xc-sec { display: grid; gap: 8px; }
 .pm-new .xc-check .xc-input { flex: 1; min-width: 140px; }
 .pm-new .xc-check input[type=radio], .pm-import input[type=radio], .pm-import input[type=checkbox] { flex: none; width: auto; }
+/* The title renames in place (double-click, F2, 改名); 设为当前 sits beside it (06 §2.17). */
+.pm-head h2.pm-title { cursor: text; border-radius: var(--r-sm); padding: 1px 4px; margin-left: -4px; }
+.pm-head h2.pm-title:hover { background: var(--pill); }
+.pm-rename { display: grid; gap: 4px; min-width: 0; flex: 1; max-width: 360px; }
+.pm-rename .xc-input { height: 28px; font-size: 15px; font-weight: 600; }
+.pm-rename .plan-why:empty { display: none; }
+.pm-head .pm-use { height: 20px; font-size: 12px; }
+.pm-new .acts-row .sp { flex: 1; }
+.pm-drop { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px; border: var(--hairline) dashed var(--line); border-radius: var(--r-sm); background: var(--card-2); }
+.pm-file { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; }
+.pm-file b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-or { color: var(--muted); font-size: 12px; }
+.xc-subscribe { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
+.xc-subscribe .xc-note { flex: 1; min-width: 200px; }
 .pm-import { display: flex; flex-direction: column; gap: var(--card-gap); }
 .pm-import .xc-body, .pm-import .xc-preview { padding: 16px; }
 .pm-import .xc-text { width: 100%; min-height: 100px; }

@@ -88,6 +88,41 @@ export function bump(name, e, value) {
   e.classList.add("bump");
 }
 
+// ---- reordered entries slide to their new place (the sidebar's lists, 列表管理's rows) ----
+
+// places remembers where each element matching sel under root is on screen, by its data-id:
+// a redraw replaces the elements, and slideFrom moves the new ones from there.
+export function places(root, sel) {
+  if (!root || still()) return null;
+  const m = new Map();
+  for (const e of root.querySelectorAll(sel)) if (e.dataset.id && e.offsetParent) m.set(e.dataset.id, e.getBoundingClientRect().top);
+  return m;
+}
+
+// slideFrom moves each element that was in places() from where it was to where it is now,
+// like the lists' rows (one style recalculation for the batch).
+export function slideFrom(root, sel, before) {
+  if (!root || !before || !before.size || still()) return;
+  const moves = [];
+  for (const e of root.querySelectorAll(sel)) {
+    const y0 = before.get(e.dataset.id);
+    if (y0 == null || !e.offsetParent) continue;
+    const dy = y0 - e.getBoundingClientRect().top;
+    if (Math.abs(dy) >= 1 && Math.abs(dy) < 800) moves.push([e, dy]);
+  }
+  if (!moves.length) return;
+  for (const [e, dy] of moves) {
+    e.style.transition = "none";
+    e.style.transform = `translateY(${dy}px)`;
+  }
+  void document.body.offsetHeight;
+  for (const [e] of moves) {
+    e.style.transition = `transform ${LAYOUT_MS}ms var(--ease)`;
+    e.style.transform = "";
+  }
+  setTimeout(() => { for (const [e] of moves) if (!e.style.transform) e.style.transition = ""; }, LAYOUT_MS + 40);
+}
+
 // ---- the sidebar: one highlight that slides to the open entry ----
 
 // slideNav moves the sidebar's highlights (like the view switch's thumb): one under the

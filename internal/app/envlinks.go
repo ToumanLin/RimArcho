@@ -41,7 +41,7 @@ func (a *App) prepareEnvLinks(e *env.Environment) error {
 			tokens = append(tokens, cfg.Active...)
 		}
 	}
-	if p, err := a.Store.CurrentPlan(e.ID); err != nil {
+	if p, err := a.planFor(e.ID); err != nil {
 		return err
 	} else if p != nil {
 		ws, err := a.Store.Workspace(p.ID)

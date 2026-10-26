@@ -53,6 +53,9 @@ func (m *model) choosePlan() tea.Cmd {
 		r := rows[i]
 		label := r.Name
 		if r.Current {
+			label += "  " + T("current")
+		}
+		if r.Open {
 			label += "  " + T("editing")
 			cur = &rows[i]
 			p.choice = i
@@ -65,7 +68,7 @@ func (m *model) choosePlan() tea.Cmd {
 		}
 		id := r.ID
 		add(label, func(m *model) tea.Cmd {
-			if r.Current {
+			if r.Current && r.Open {
 				m.tab, m.full, m.insp = tabList, false, nil
 				return nil
 			}

@@ -124,7 +124,7 @@ func (a *App) Loadout() (*LoadoutState, error) {
 	if err != nil {
 		return nil, err
 	}
-	key := a.Store.ChangeKey() + "|" + ix.Env.ID
+	key := a.Store.ChangeKey() + "|" + ix.Env.ID + fmt.Sprintf("|open=%d|%s", a.OpenPlan, a.PlanName)
 	if ix.Env.UserDataRoot != "" {
 		if fi, err := os.Stat(env.ModsConfigPath(ix.Env.UserDataRoot)); err == nil {
 			key += fmt.Sprintf("|%d|%d", fi.Size(), fi.ModTime().UnixNano())
@@ -208,7 +208,7 @@ func (a *App) sync(st *LoadoutState) error {
 	if err != nil {
 		return err
 	}
-	plan, err := a.Store.CurrentPlan(e.ID)
+	plan, err := a.planFor(e.ID)
 	if err != nil {
 		return err
 	}
@@ -869,12 +869,19 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool) (*SaveResul
 	if err := a.Store.SetWorkspace(st.WS); err != nil {
 		return nil, err
 	}
+	// Writing an opened list to the game chooses it: it becomes the current one (04 §1.3).
+	if a.Store.CurrentPlanID(e.ID) != st.Plan.ID {
+		if err := a.Store.SetCurrentPlan(e.ID, st.Plan.ID); err != nil {
+			return nil, err
+		}
+	}
+	a.OpenPlan, a.PlanName = 0, ""
 	return r, nil
 }
 
 // ParseVersionRef resolves "v3", "3" or "workspace" (0) in the environment's current plan.
 func (a *App) ParseVersionRef(envID, ref string) (int, error) {
-	p, err := a.Store.CurrentPlan(envID)
+	p, err := a.planFor(envID)
 	if err != nil {
 		return 0, err
 	}

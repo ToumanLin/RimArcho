@@ -95,6 +95,11 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 		k.run = func(m *model) tea.Cmd { return m.openInspect(a.Argv) }
 	case view.ActList:
 		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n")); return nil }
+	case view.ActSubscribe: // a background task in the window; here, the command to run
+		k.run = func(m *model) tea.Cmd {
+			m.openPanel(T("subscribe them from a terminal"), "archo "+strings.Join(a.Argv, " "))
+			return nil
+		}
 	case view.ActFold:
 		k.run = func(m *model) tea.Cmd {
 			p := &m.prob

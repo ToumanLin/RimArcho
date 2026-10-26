@@ -225,7 +225,7 @@ func (m *model) subPage(d int) tea.Cmd {
 		}
 		at := 0
 		for i, r := range rows {
-			if r.Current {
+			if r.Open {
 				at = i
 			}
 		}

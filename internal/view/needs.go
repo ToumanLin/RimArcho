@@ -58,6 +58,7 @@ const (
 	ActUnlinkPacks     = "unlink-packs"     // remove the packs' links from Mods/ (08 §5.3)
 	ActRepairLinks     = "repair-links"
 	ActSwap            = "swap"           // Refs[0] → Refs[1] in the plan (one undoable step)
+	ActSubscribe       = "subscribe"      // Refs: Workshop IDs to subscribe to (a background task)
 	ActMoveLocked      = "move-to-locked" // Refs[0]: a Mods/ folder into the lock library (confirm first)
 	ActTextures        = "textures"       // Refs: convert their textures to DDS again (confirm first)
 	ActTexClean        = "textures-clean" // Refs: delete the DDS RimArcho wrote (confirm first)
@@ -216,6 +217,19 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	}
 	var mergeKeys []string
 	merges := map[string]*merged{}
+	// Entries the list has but nothing installed matches (an imported list, say) are one
+	// item with one action for all of them; a mod needing one of them is covered by it.
+	type missingEntry struct {
+		pkg, ws, name string
+		n             Need
+	}
+	var missing []missingEntry
+	inList := map[string]bool{}
+	for _, e := range st.List {
+		if e.Missing != "" {
+			inList[strings.TrimSuffix(e.Missing, "_steam")] = true
+		}
+	}
 	merge := func(key, x, y string, n Need) {
 		m := merges[key]
 		if m == nil {
@@ -293,9 +307,18 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 					look.Label, look.URL = T("open it in the Workshop"), u
 				}
 			}
-			add(Need{rank: 4, Group: GroupList, Text: Tf("the list has %s, but it is not installed", pkg),
+			me := missingEntry{pkg: pkg, name: pkg, n: Need{rank: 4, Group: GroupList, Text: Tf("the list has %s, but it is not installed", pkg),
 				Actions: []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s,
-				Title: Tf("not installed: %s", pkg), Why: T("the list has it, but no mod folder does"), Evidence: ev})
+				Title: Tf("not installed: %s", pkg), Why: T("the list has it, but no mod folder does"), Evidence: ev}}
+			if w, ok := a.WorkshopFor(pkg); ok {
+				me.ws = w.WorkshopID
+				if w.Name != "" {
+					me.name = w.Name
+					me.n.Text = Tf("the list has %s, but it is not installed", w.Name)
+					me.n.Title = Tf("not installed: %s", w.Name)
+				}
+			}
+			missing = append(missing, me)
 		case "mod.replaced":
 			name := y
 			if mt := replacedRe.FindStringSubmatch(p.Claim); mt != nil {
@@ -313,6 +336,9 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			add(Need{rank: 4, Group: GroupList, Text: Tf("%s is enabled, but the game cannot load it", nm(x)), Actions: []Action{disable(st, x, T("disable it"))}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("the game cannot load %s", nm(x)), Why: T("it is enabled, but the game skips it; disabling it changes nothing in play"), Evidence: ev})
 		case "dep.missing":
+			if inList[strings.TrimSuffix(strings.TrimPrefix(y, "pkg:"), "_steam")] {
+				continue // the list has it, not installed: the missing entries' item covers it
+			}
 			dep := depName(p.Claim, strings.TrimPrefix(y, "pkg:"))
 			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not installed", nm(x), dep, dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("missing dependency: %s", dep), Why: Tf("%s needs it, but it is not installed.", nm(x)), Evidence: ev})
@@ -391,6 +417,39 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			// Harmony warnings without log evidence, overlapping Defs and patches whose target
 			// is simply absent stay in the technical information (06 §5).
 		}
+	}
+	switch len(missing) {
+	case 0:
+	case 1:
+		n := missing[0].n
+		if ws := missing[0].ws; ws != "" {
+			n.Actions = append([]Action{subscribeAction([]string{ws}, T("subscribe to it"))}, n.Actions...)
+		}
+		add(n)
+	default:
+		f := Need{rank: 4, Group: GroupList, Counted: true, Status: missing[0].n.Status, Fold: true, code: "entry.missing",
+			Text:     Tf("%d mods in the list are not installed", len(missing)),
+			Why:      T("the list has them, but no mod folder does; once subscribed and downloaded they take their place in the list"),
+			Evidence: missing[0].n.Evidence}
+		var ws, refs []string
+		for _, m := range missing {
+			f.Parts = append(f.Parts, m.name)
+			refs = append(refs, TokRef(st, "pkg:"+m.pkg))
+			if m.ws != "" {
+				ws = append(ws, m.ws)
+			}
+		}
+		if len(ws) > 0 {
+			label := Tf("subscribe to all %d", len(ws))
+			if len(ws) < len(missing) {
+				label = Tf("subscribe to the %d on the Workshop", len(ws))
+			}
+			f.Actions = append(f.Actions, subscribeAction(ws, label))
+		}
+		f.Actions = append(f.Actions,
+			Action{Kind: ActDisable, Key: "x", Label: T("remove them from the list"), Refs: refs, Done: Tf("removed %d mods from the list", len(refs))},
+			Action{Kind: ActFold, Key: "f", Label: T("show which")})
+		add(f)
 	}
 	for _, k := range mergeKeys {
 		m := merges[k]
@@ -718,6 +777,12 @@ func trash(st *app.LoadoutState, tok string) Action {
 
 func keepHidden(p *app.Problem) Action {
 	return Action{Kind: ActIgnore, Key: "I", Label: T("keep it hidden"), Problem: p.Ref, Done: T("kept hidden; asked again if the mod changes")}
+}
+
+// subscribeAction subscribes to Workshop items (the interface asks Steam or SteamCMD).
+func subscribeAction(ws []string, label string) Action {
+	return Action{Kind: ActSubscribe, Key: "s", Label: label, Refs: ws, Argv: append([]string{"subscribe", "workshop"}, ws...),
+		Done: Tf("subscribing to %d mods in the background", len(ws))}
 }
 
 func viewAction(label string, argv ...string) Action {

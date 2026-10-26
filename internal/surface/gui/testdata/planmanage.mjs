@@ -25,6 +25,7 @@ async function setup(overrides = {}) {
     "./popups.js": {},
     "./plans.js": {},
     "./separator.js": { wireSeparator() {} },
+    "./motion.js": { places: () => null, slideFrom() {} },
     "./exchange.js": { showImportSummary() {}, showImportContents() {} },
   };
   const pm = await loadModules("./planmanage.js", deps, { document: { activeElement: null }, setTimeout: f => timers.push(f), requestAnimationFrame: f => f() });
@@ -91,13 +92,28 @@ test("cancelling a new-list form resumes the selected list measurement", async (
   assert.equal(h.screen.querySelector(".skel"), null);
 });
 
-const buttonNamed = (screen, text) => screen.querySelectorAll("button").find(b => b.textContent === text);
+const label = b => b.text || b.children[0]?.textContent || "";
+const buttonNamed = (screen, text) => screen.querySelectorAll("button").find(b => label(b) === text);
 const inputName = async (h, value) => { const input = h.screen.querySelector(".pm-name"); input.value = value; input.oninput(); await flush(); };
-const mode = (h, value) => h.screen.querySelectorAll(".pm-modes button").find(b => b.dataset.mode === value).onclick();
+const mode = async (h, value) => { h.screen.querySelectorAll(".pm-modes button").find(b => b.dataset.mode === value).onclick(); await flush(); };
+const escape = async h => { h.pm.key({ key: "Escape", preventDefault() {} }); await flush(); };
+
+test("the form starts empty and creates an empty list", async () => {
+  const copies = [], h = await setup({ CreatePlan: async (...a) => { copies.push(a); return { page: "plan:3", text: "created" }; } });
+  await h.pm.open(1); await h.pm.newList();
+  assert.ok(h.screen.querySelector(".pm-modes .on").dataset.mode === "", "empty is the default start");
+  assert.equal(h.screen.querySelector(".pm-name").value, "New list");
+  assert.equal(buttonNamed(h.screen, "back to management"), undefined);
+  assert.equal(buttonNamed(h.screen, "create only"), undefined);
+  assert.equal(buttonNamed(h.screen, "continue later"), undefined);
+  await buttonNamed(h.screen, "create and edit").onclick(); await flush();
+  assert.deepEqual(copies, [[1, "New list", ""]]);
+  assert.equal(h.routes.at(-1), "plan:3");
+});
 
 test("copy chooses another list and its own version without changing the current list", async () => {
   const copies = [], h = await setup({ CreatePlan: async (...a) => { copies.push(a); return { page: "plan:3", text: "created" }; } });
-  await h.pm.open(1); await h.pm.newList(); await inputName(h, "My copy");
+  await h.pm.open(1); await h.pm.newList(); await inputName(h, "My copy"); await mode(h, "current");
   const source = h.screen.querySelector(".pm-source"); source.value = "2"; source.onchange(); await flush();
   assert.equal(h.S.shell.plan.id, 1, "source browsing does not switch current list");
   assert.ok(h.screen.querySelector(".pm-version").textContent.includes("History 2"));
@@ -108,10 +124,26 @@ test("copy chooses another list and its own version without changing the current
   assert.equal(h.routes.at(-1), "plan:3");
 });
 
+test("a draft with its given name is dropped on leaving; a named one is kept", async () => {
+  const h = await setup(); await h.pm.open(1);
+  await h.pm.newList(); await escape(h);
+  assert.equal(h.screen.querySelector(".pm-draft"), null, "esc drops an unnamed draft");
+  await h.pm.newList(); h.pm.abandon();
+  h.S.screen = "plans"; await h.pm.open();
+  assert.equal(h.screen.querySelector(".pm-draft"), null, "leaving the page drops an unnamed draft");
+  assert.equal(h.screen.querySelector(".pm-new"), null);
+  await h.pm.newList(); await inputName(h, "New list");
+  await escape(h);
+  assert.equal(h.screen.querySelector(".pm-draft"), null, "typing the given name back is no name of one's own");
+  await h.pm.newList(); await inputName(h, "Mine");
+  h.screen.querySelectorAll(".pm-row").find(r => r.dataset.id === 2).onclick(); await flush();
+  assert.ok(h.screen.querySelector(".pm-draft").textContent.includes("Mine"), "picking another list keeps a named draft");
+});
+
 test("draft name, source and version survive browsing, leaving, and switching games", async () => {
-  const h = await setup(); await h.pm.open(1); await h.pm.newList(); await inputName(h, "Draft A");
+  const h = await setup(); await h.pm.open(1); await h.pm.newList(); await inputName(h, "Draft A"); await mode(h, "current");
   const version = h.screen.querySelector(".pm-version"); version.value = "v1"; version.onchange();
-  h.pm.key({ key: "Escape", preventDefault() {} }); await flush();
+  await escape(h);
   assert.equal(h.screen.querySelector(".pm-new"), null);
   assert.ok(h.screen.querySelector(".pm-draft").textContent.includes("Draft A"));
   await h.pm.newList();
@@ -129,7 +161,7 @@ test("draft name, source and version survive browsing, leaving, and switching ga
 test("late source replies never replace a newer selection", async () => {
   const pending = [], h = await setup({ PlanSources: id => { const d = deferred(); pending.push({ id, ...d }); return d.promise; } });
   await h.pm.open(1); const initial = h.pm.newList(); await flush();
-  await inputName(h, "Keep input");
+  await inputName(h, "Keep input"); await mode(h, "current");
   const source = h.screen.querySelector(".pm-source"); source.value = "2"; source.onchange();
   pending[1].resolve({ count: 20, versions: [{ from: "v2", label: "Latest source" }], saves: [] }); await flush();
   pending[0].resolve({ count: 10, versions: [{ from: "v1", label: "Stale source" }], saves: [] }); await initial;
@@ -139,36 +171,52 @@ test("late source replies never replace a newer selection", async () => {
   assert.ok(!h.screen.textContent.includes("Stale source"));
 });
 
-test("inline import preserves the chosen name and invalidates changed preview content", async () => {
+test("import: the main button previews first, then creates; changed content previews again", async () => {
   const previews = [], creates = [], h = await setup({
     ImportPreviewFor: async (...args) => { previews.push(args); return { request: 42, summary: "2 mods", installed: [], missing: [] }; },
     ImportAsPlanPreview: async (...args) => { creates.push(args); return { page: "plan:3", text: "created" }; },
   });
-  await h.pm.open(1); await h.pm.newList(); await inputName(h, "My own name"); mode(h, "import");
+  await h.pm.open(1); await h.pm.newList(); await inputName(h, "My own name"); await mode(h, "import");
+  assert.equal(h.screen.querySelector(".pm-import-path"), null, "no typed path");
+  assert.equal(buttonNamed(h.screen, "preview").disabled, true, "nothing to preview yet");
   let text = h.screen.querySelector("textarea"); text.value = "mod.a\nmod.b"; text.oninput();
-  await buttonNamed(h.screen, "preview").onclick();
+  assert.equal(buttonNamed(h.screen, "create and edit"), undefined);
+  await buttonNamed(h.screen, "preview").onclick(); await flush();
   assert.equal(h.screen.querySelector(".pm-name").value, "My own name");
-  assert.equal(buttonNamed(h.screen, "create only").disabled, false);
-  h.pm.key({ key: "Escape", preventDefault() {} }); await flush(); await h.pm.newList();
+  assert.equal(buttonNamed(h.screen, "create and edit").disabled, false, "the same button now creates");
+  await escape(h); await h.pm.newList();
   assert.equal(h.screen.querySelector("textarea").value, "mod.a\nmod.b");
   text = h.screen.querySelector("textarea"); text.value = "mod.c"; text.oninput();
-  assert.equal(buttonNamed(h.screen, "create only").disabled, true);
-  await buttonNamed(h.screen, "preview").onclick();
-  await buttonNamed(h.screen, "create only").onclick();
+  assert.equal(buttonNamed(h.screen, "create and edit"), undefined, "changed content is previewed again");
+  await buttonNamed(h.screen, "preview").onclick(); await flush();
+  await buttonNamed(h.screen, "create and edit").onclick(); await flush();
   assert.deepEqual(creates, [["My own name", 42, true]]);
   assert.deepEqual(previews.at(-1), [1, "text", "mod.c"]);
-  assert.equal(h.S.screen, "plans", "create only stays in management");
+  assert.equal(h.routes.at(-1), "plan:3");
+});
+
+test("import names an unnamed list after the imported one", async () => {
+  const h = await setup({
+    ImportPreviewFor: async () => ({ request: 1, name: "Shared colony", summary: "", installed: [], missing: [] }),
+    CheckPlanName: async (base, name) => ({ free: base || "New list", problem: "" }),
+  });
+  await h.pm.open(1); await h.pm.newList(); await mode(h, "import");
+  const text = h.screen.querySelector("textarea"); text.value = "RC-1"; text.oninput();
+  await buttonNamed(h.screen, "preview").onclick(); await flush();
+  assert.equal(h.screen.querySelector(".pm-name").value, "Shared colony");
+  await escape(h);
+  assert.equal(h.screen.querySelector(".pm-draft"), null, "the suggested name is not the player's");
 });
 
 test("leaving during import preview ignores the late result and permits retry", async () => {
   const d = deferred(), h = await setup({ ImportPreviewFor: () => d.promise });
-  await h.pm.open(1); await h.pm.newList(); await inputName(h, "Keep me"); mode(h, "import");
+  await h.pm.open(1); await h.pm.newList(); await inputName(h, "Keep me"); await mode(h, "import");
   const text = h.screen.querySelector("textarea"); text.value = "mod.a"; text.oninput();
   const read = buttonNamed(h.screen, "preview").onclick();
-  h.pm.backToManagement(); await flush(); d.resolve({ request: 7 }); await read;
+  h.pm.closeForm(); await flush(); d.resolve({ request: 7 }); await read;
   await h.pm.newList();
   assert.equal(h.screen.querySelector(".pm-name").value, "Keep me");
-  assert.equal(buttonNamed(h.screen, "create only").disabled, true);
+  assert.equal(buttonNamed(h.screen, "preview").disabled, false, "the preview can run again");
   assert.ok(!h.screen.textContent.includes("reading the list…"));
 });
 
@@ -179,6 +227,40 @@ test("name validation and a double submission preserve the draft and create at m
   await buttonNamed(h.screen, "create and edit").onclick(); assert.equal(copies.length, 0);
   await inputName(h, "Good name");
   const first = buttonNamed(h.screen, "create and edit").onclick();
-  const second = buttonNamed(h.screen, "create only").onclick(); await flush();
+  const second = buttonNamed(h.screen, "create and edit").onclick(); await flush();
   assert.equal(copies.length, 1); d.resolve({ page: "plan:3", text: "created" }); await Promise.all([first, second]);
+});
+
+test("the detail shows rename, duplicate, delete and edit; double-clicking the title renames", async () => {
+  const renames = [], h = await setup({ RenamePlan: async (...a) => { renames.push(a); return { page: "plan:1", text: "renamed" }; } });
+  await h.pm.open(1);
+  const names = h.screen.querySelectorAll(".pm-detail .pm-head .r button").map(label);
+  assert.deepEqual(names, ["rename", "duplicate", "delete", "edit"]);
+  h.screen.querySelector(".pm-title").ondblclick(); await flush();
+  const input = h.screen.querySelector(".pm-title-input");
+  assert.equal(input.value, "List 1");
+  input.value = "Colony"; input.oninput();
+  input.onkeydown({ key: "Enter", preventDefault() {}, stopPropagation() {} }); await flush();
+  assert.deepEqual(renames, [[1, "Colony"]]);
+  assert.equal(h.screen.querySelector(".pm-title-input"), null);
+});
+
+test("esc in the title puts the name back", async () => {
+  const renames = [], h = await setup({ RenamePlan: async (...a) => { renames.push(a); return { page: "plan:1", text: "" }; } });
+  await h.pm.open(1); h.pm.startRename(1); await flush();
+  const input = h.screen.querySelector(".pm-title-input"); input.value = "Other";
+  input.onkeydown({ key: "Escape", preventDefault() {}, stopPropagation() {} }); await flush();
+  assert.deepEqual(renames, []);
+  assert.equal(h.screen.querySelector(".pm-title").textContent, "List 1");
+});
+
+test("duplicate copies the list as it is now and offers its name for editing", async () => {
+  const copies = [], h = await setup({
+    CreatePlan: async (...a) => { copies.push(a); return { page: "plan:3", text: "created" }; },
+    CheckPlanName: async (base) => ({ free: base, problem: "" }),
+  });
+  await h.pm.open(1);
+  await buttonNamed(h.screen, "duplicate").onclick(); await flush();
+  assert.deepEqual(copies, [[1, "%s copy", "current"]]);
+  assert.ok(h.screen.querySelector(".pm-title-input"), "the copy's name is up for editing");
 });

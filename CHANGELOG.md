@@ -10,6 +10,25 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - The plan editor and mod library filter bars now include Location, with one value per
   registered source folder. Multiple locations, exclusions and quoted paths in search are
   supported; CLI/MCP library queries accept `location:<source folder path>` too.
+- Opening a list no longer switches the list you play (04 §1.3). A list opened from the
+  sidebar, the palette or list management is only shown and edited; the current list — the
+  one the launch page shows and launches — changes when you make another current, write it
+  to the game or launch it from its editor. New lists open without becoming current. The
+  editor says which list launches and offers "make current". 列表 opens the current list,
+  which comes first in the sidebar and in list management (管理 moves last), and reordered
+  entries slide to their new place. `--open-plan <name>` runs one command on another list.
+- List management is simpler (06 §2.17). The sidebar entry is now "all lists" (and the mod
+  library's first entry "all mods"). One "new / import" button opens one form that starts
+  empty; importing has a short guide, a file button that reads the file at once (no typed
+  path) and drag-and-drop, and its one main button says "preview" until the content is read,
+  then "create and edit". "back to management", "continue later" and "create only" are gone;
+  leaving the form drops a draft whose name was never changed. The picked list shows rename,
+  duplicate, delete and edit side by side; double-click the name (or F2) to rename in place,
+  and "duplicate" copies the list at once and lets you name the copy.
+- Mods an imported list has but you don't: the preview offers "subscribe all" (Steam or
+  SteamCMD, one background task), and "can it run" folds them into one item with the same
+  action instead of one error per mod (and none for the mods that need them). Once
+  downloaded they take their place in the list.
 
 ### Breaking
 - Database schema v10 → v18: plans (v11), analysis kept per plan (v12), copy notes (v13),

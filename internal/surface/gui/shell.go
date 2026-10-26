@@ -22,11 +22,13 @@ type Shell struct {
 	Crumbs map[string][]view.Crumb `json:"crumbs"`
 	Env    string                  `json:"env"` // the environment chip
 	Envs   int                     `json:"envs"`
-	// Plans are the environment's plans; Plan is the current one (the editor's), InGame
-	// what the game's ModsConfig.xml holds (the status line, 04 §1.3).
-	Plans  []view.PlanRow    `json:"plans"`
-	Plan   *view.PlanRow     `json:"plan,omitempty"`
-	InGame *view.InGameState `json:"inGame,omitempty"`
+	// Plans are the environment's plans, the current one (launched) first; Plan is the open
+	// one (the editor's); Current the current one when another is open; InGame what the
+	// game's ModsConfig.xml holds (04 §1.3).
+	Plans   []view.PlanRow    `json:"plans"`
+	Plan    *view.PlanRow     `json:"plan,omitempty"`
+	Current *view.PlanRow     `json:"current,omitempty"`
+	InGame  *view.InGameState `json:"inGame,omitempty"`
 }
 
 // Shell builds the sidebar from the needs count and the packs.
@@ -58,8 +60,10 @@ func (s *API) shellLocked(n *view.Needs) *Shell {
 		out.InGame = view.InGame(s.a)
 	}
 	for i := range out.Plans {
-		if out.Plans[i].Current {
+		if out.Plans[i].Open {
 			out.Plan = &out.Plans[i]
+		} else if out.Plans[i].Current {
+			out.Current = &out.Plans[i]
 		}
 	}
 	out.Nav = view.Nav(count, out.Plans, packs)
@@ -87,6 +91,9 @@ func (s *API) Home() *view.Home {
 	if err != nil {
 		return &view.Home{Featured: -1}
 	}
+	// The launch page is about the current list, the one launched, whichever list the
+	// editor has open (04 §1.3); the reader takes the window's options again next time.
+	r.OpenPlan, r.PlanName = 0, ""
 	b, err := view.BuildBoard(r)
 	if err != nil || b.St == nil {
 		return &view.Home{}
@@ -184,12 +191,21 @@ func (s *API) importAsPlan(name string) (*PlanDone, error) {
 	return s.planDone(p.ID, t, err)
 }
 
-// UsePlan switches the current plan; no game file is written.
+// UsePlan makes a plan current (the one launched) and opens it; no game file is written.
 func (s *API) UsePlan(id int64) (*PlanDone, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, t, err := view.UsePlan(s.a, id)
 	return s.planDone(id, t, err)
+}
+
+// OpenPlan shows a plan in the editor without making it current (06 §2.5): the sidebar's
+// lists are places to go, not a choice of what to play.
+func (s *API) OpenPlan(id int64) (*PlanDone, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := view.OpenPlan(s.a, id)
+	return s.planDone(id, "", err)
 }
 
 // RenamePlan renames a plan.

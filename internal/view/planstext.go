@@ -16,7 +16,6 @@ func init() {
 		"delete the list":                "删除列表",
 		"delete":                         "删除",
 		"rename…":                        "改名…",
-		"copy as a new list…":            "复制成新列表…",
 		"new list…":                      "新列表…",
 		"delete…":                        "删除…",
 		"editing":                        "正在编辑",

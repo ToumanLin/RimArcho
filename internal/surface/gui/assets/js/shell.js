@@ -5,7 +5,7 @@
 import { factText, S, $, el, api, T, Tf } from "./state.js";
 import { icon } from "./icons.js";
 import { liveCount, seg, setSeg } from "./screens.js";
-import { bump, slideNav } from "./motion.js";
+import { bump, slideNav, places, slideFrom } from "./motion.js";
 import * as pop from "./popups.js";
 import { wireSeparator } from "./separator.js";
 
@@ -133,8 +133,8 @@ export async function loadShell() {
   sync();
 }
 
-// current is the sidebar ID of what is shown: a page, the current plan (the editor and
-// its full detail), or one pack.
+// current is the sidebar ID of what is shown: a page, the open plan (the editor and its
+// full detail), or one pack.
 export function current() {
   // 编译成整合包 is the current plan's sub-page (06 §2.1)
   // the full detail belongs to the list it was opened from (06 §4.2)
@@ -189,6 +189,8 @@ function renderSide() {
     // the highlights are kept, so they slide from where they were
     const thumb = nav.querySelector(":scope > .nav-thumb");
     const hls = new Map([...nav.querySelectorAll(".kid-hl")].map((h) => [h.dataset.for, h]));
+    // the open entry's sub-entries slide when their order changes (the current list first)
+    const was = settled ? places(nav, ".kids-wrap.open .nav-kid") : null;
     nav.innerHTML = "";
     if (thumb) nav.append(thumb);
     let openNow = "";
@@ -220,8 +222,8 @@ function renderSide() {
         let n = null;
         if (badge) b.append(n = el("span", "badge-n num", String(badge)));
         bump("nav:" + it.id, n, badge || 0);
-        // 列表 opens its first sub-entry, 列表管理 (06 §2.17)
-        b.onclick = () => ui.go(it.id === "plan" ? "plans" : it.id);
+        // 列表 opens its first sub-entry, the current list (06 §2.1)
+        b.onclick = () => ui.go(it.id === "plan" ? (kids[0] && kids[0].id) || "plans" : it.id);
         nav.append(b);
         if (kids.length) nav.append(kidList(it, kids, cur, hls.get(it.id)));
       }
@@ -234,6 +236,7 @@ function renderSide() {
     void nav.offsetHeight;
     for (const w of nav.querySelectorAll(".kids-wrap")) w.classList.toggle("open", w.dataset.for === openNow);
     openWas = openNow;
+    slideFrom(nav, ".kids-wrap.open .nav-kid", was);
   }
   slideNav(nav, !settled);
   const set = $("#nav-settings");

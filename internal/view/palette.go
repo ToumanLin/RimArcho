@@ -108,11 +108,11 @@ func PalScore(q string, e PalEntry) int {
 	return best
 }
 
-// PlanEntries are the palette's "go to plan X" entries: every plan but the current one.
+// PlanEntries are the palette's "go to plan X" entries: every plan but the open one.
 func PlanEntries(rows []PlanRow) []PalEntry {
 	var out []PalEntry
 	for _, r := range rows {
-		if !r.Current {
+		if !r.Open {
 			out = append(out, PalEntry{Kind: PalPlan, ID: r.Page, Name: Tf("list %s", r.Name), Alias: r.Name, Desc: "list"})
 		}
 	}

@@ -179,6 +179,7 @@ next:
 | `archo mcp` | stdio MCP server（§5） |
 | `archo <命令> [参数]` | 执行一条命令后退出 |
 | `--env <名称>` / `--env=<名称>` | 只对这一条命令换用另一个环境 |
+| `--open-plan <名称>` / `--open-plan=<名称>` | 只对这一条命令换用另一个方案，不改当前方案（04 §1.3；GUI 的分析、编译整合包子进程用它）；写入游戏或启动会让它成为当前方案 |
 | `--version` / `-v` / `archo version` | 打印版本 |
 | `archo help`、`archo <命令> --help` | 命令表；单个命令的用法和每个参数 |
 

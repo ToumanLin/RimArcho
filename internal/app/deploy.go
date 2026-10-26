@@ -82,7 +82,7 @@ func deployCandidate(m *store.Mod) loadout.Candidate {
 // disk now (the game sees them until the next save removes the link).
 func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string]bool, error) {
 	var ws *store.Workspace
-	plan, err := a.Store.CurrentPlan(ix.Env.ID)
+	plan, err := a.planFor(ix.Env.ID)
 	if err != nil {
 		return nil, err
 	}
