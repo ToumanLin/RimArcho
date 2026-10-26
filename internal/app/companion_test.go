@@ -79,6 +79,12 @@ func TestCompanionFor(t *testing.T) {
 	e.WriteFile(crow, `{"timestamp":"2026-10-21 14:05:03.120","level":"ERROR","message":"x","count":1,"context":{}}`+"\n")
 	pl := filepath.Join(other, "Player.log")
 	e.WriteFile(pl, unityHead)
+	at := time.Now().Add(time.Second)
+	for _, p := range []string{pl, crow} {
+		if err := os.Chtimes(p, at, at); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if got := app.CompanionFor(pl); got != crow {
 		t.Fatalf("RMM_Realtime.log: %q", got)
 	}
@@ -147,7 +153,7 @@ func TestLogAnalysisWithMonitor(t *testing.T) {
 	}
 }
 
-// L5, L12: live tracking follows RimCrow's log until Player.log names this run's
+// L5, L12: live tracking rejects an empty RimCrow log, then follows this run's
 // ArchoMonitor.log; an error only the monitor saw shows up after a short wait.
 func TestLiveLogMonitor(t *testing.T) {
 	t.Parallel()
@@ -158,8 +164,8 @@ func TestLiveLogMonitor(t *testing.T) {
 	path := filepath.Join(e.Root, "default", "Player.log")
 	e.MkdirAll(filepath.Dir(path))
 	lv := e.App.FollowRun(path, root)
-	if !strings.HasSuffix(lv.Companion, "RimCrow_Realtime.log") {
-		t.Fatalf("before the marker: %q", lv.Companion)
+	if lv.Companion != "" {
+		t.Fatalf("before Player.log exists: %q", lv.Companion)
 	}
 	am := filepath.Join(root, "ArchoMonitor.log")
 	e.WriteFile(am, sessionLine(t, "aaaaaaaaaaaa"))
@@ -187,5 +193,183 @@ func TestLiveLogMonitor(t *testing.T) {
 	cs = lv.Clusters()
 	if len(cs) != 2 || !cs[1].OnlyCompanion || cs[1].Count != 50 || cs[1].Report == nil {
 		t.Fatalf("monitor-only cluster: %d clusters", len(cs))
+	}
+}
+
+// Files from another run must never become the companion merely because their names fit.
+func TestCompanionRunWindow(t *testing.T) {
+	t.Parallel()
+	const crowLine = `{"timestamp":"2026-10-21 14:01:00.000","message":"ready","level":"INFO"}` + "\n"
+	start := time.Date(2026, 10, 21, 14, 0, 0, 0, time.Local)
+	for _, tc := range []struct {
+		name, crowName, crow, monitor, playerMarker, want string
+		crowAt                                            time.Time
+	}{
+		{name: "stale empty", crowAt: start.Add(-72 * time.Hour)},
+		{name: "fresh empty", crowAt: start.Add(time.Minute)},
+		{name: "stale nonempty", crow: crowLine, crowAt: start.Add(-72 * time.Hour)},
+		{name: "before start", crow: crowLine, crowAt: start.Add(-time.Second)},
+		{name: "after run", crow: crowLine, crowAt: start.Add(3 * time.Minute)},
+		{name: "same run", crow: crowLine, crowAt: start.Add(time.Minute), want: "RimCrow_Realtime.log"},
+		{name: "legacy same run", crowName: "RMM_Realtime.log", crow: crowLine, crowAt: start.Add(time.Minute), want: "RMM_Realtime.log"},
+		{name: "monitor priority", crow: crowLine, crowAt: start.Add(time.Minute), monitor: "aaaaaaaaaaaa", playerMarker: "aaaaaaaaaaaa", want: "ArchoMonitor.log"},
+		{name: "monitor before marker", crow: crowLine, crowAt: start.Add(time.Minute), monitor: "aaaaaaaaaaaa", want: "ArchoMonitor.log"},
+		{name: "mismatched monitor", crow: crowLine, crowAt: start.Add(time.Minute), monitor: "bbbbbbbbbbbb", playerMarker: "aaaaaaaaaaaa", want: "RimCrow_Realtime.log"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			player := filepath.Join(root, "Logs", "Player.log")
+			if err := os.MkdirAll(filepath.Dir(player), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			write := func(path, content string, at time.Time) {
+				t.Helper()
+				if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Chtimes(path, at, at); err != nil {
+					t.Fatal(err)
+				}
+			}
+			monitor := filepath.Join(root, "ArchoMonitor.log")
+			head := "=== Waylith log ===\nStarted:   " + start.Format("2006-01-02 15:04:05.000 -07:00") + "\n"
+			if tc.playerMarker != "" {
+				head += marker(tc.playerMarker, monitor)
+			}
+			write(player, head, start.Add(time.Minute))
+			name := tc.crowName
+			if name == "" {
+				name = "RimCrow_Realtime.log"
+			}
+			write(filepath.Join(root, name), tc.crow, tc.crowAt)
+			if tc.monitor != "" {
+				write(monitor, sessionLine(t, tc.monitor), start.Add(time.Minute))
+			}
+			want := ""
+			if tc.want != "" {
+				want = filepath.Join(root, tc.want)
+			}
+			if got := app.CompanionFor(player); got != want {
+				t.Fatalf("got %q, want %q", got, want)
+			}
+			lv := (&app.App{}).FollowRun(player, root)
+			if lv.Companion != want {
+				t.Fatalf("live got %q, want %q", lv.Companion, want)
+			}
+		})
+	}
+}
+
+func TestCompanionUniqueSession(t *testing.T) {
+	t.Parallel()
+	for _, currentMarked := range []bool{false, true} {
+		t.Run(map[bool]string{false: "previous marker wins", true: "duplicate marker prefers current"}[currentMarked], func(t *testing.T) {
+			e := testkit.New(t)
+			cur, prev := filepath.Join(e.Root, "Player.log"), filepath.Join(e.Root, "Player-prev.log")
+			monitor := filepath.Join(e.Root, "ArchoMonitor.log")
+			e.WriteFile(monitor, sessionLine(t, "aaaaaaaaaaaa"))
+			head := unityHead
+			if currentMarked {
+				head += marker("aaaaaaaaaaaa", monitor)
+			}
+			e.WriteFile(cur, head)
+			alias := filepath.Join(e.Root, "monitor-alias.log")
+			if err := os.Link(monitor, alias); err != nil {
+				t.Fatal(err)
+			}
+			e.WriteFile(prev, unityHead+marker("aaaaaaaaaaaa", alias))
+			at := time.Now().Add(time.Second)
+			for _, p := range []string{cur, monitor} {
+				if err := os.Chtimes(p, at, at); err != nil {
+					t.Fatal(err)
+				}
+			}
+			gotCur, gotPrev := app.CompanionFor(cur), app.CompanionFor(prev)
+			if currentMarked {
+				if gotCur != monitor || gotPrev != "" {
+					t.Fatalf("current %q previous %q", gotCur, gotPrev)
+				}
+			} else if gotCur != "" || gotPrev != alias {
+				t.Fatalf("current %q previous %q", gotCur, gotPrev)
+			}
+		})
+	}
+}
+
+func TestFollowRunDiscoversMonitor(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	player := filepath.Join(e.Root, "Player.log")
+	monitor := filepath.Join(e.Root, "ArchoMonitor.log")
+	e.WriteFile(player, unityHead)
+	at := time.Now().Add(time.Second)
+	if err := os.Chtimes(player, at, at); err != nil {
+		t.Fatal(err)
+	}
+	lv := e.App.FollowRun(player, e.Root)
+	if lv.Companion != "" {
+		t.Fatalf("before companion: %q", lv.Companion)
+	}
+	crow := filepath.Join(e.Root, "RimCrow_Realtime.log")
+	e.WriteFile(crow, `{"message":"ready","level":"INFO"}`+"\n")
+	if err := os.Chtimes(crow, at, at); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lv.Poll(e.App); err != nil {
+		t.Fatal(err)
+	}
+	if lv.Companion != crow {
+		t.Fatalf("RimCrow appeared: %q", lv.Companion)
+	}
+	e.WriteFile(monitor, sessionLine(t, "aaaaaaaaaaaa"))
+	if err := os.Chtimes(monitor, at, at); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lv.Poll(e.App); err != nil {
+		t.Fatal(err)
+	}
+	if lv.Companion != monitor || lv.CompanionLog().Session != "aaaaaaaaaaaa" {
+		t.Fatalf("monitor appeared: %q", lv.Companion)
+	}
+}
+
+// An unknown start is conservative, and the previous run bounds reused creation times.
+func TestCompanionConservativeStart(t *testing.T) {
+	t.Parallel()
+	for _, hasPrev := range []bool{false, true} {
+		t.Run(map[bool]string{false: "no start evidence", true: "previous run boundary"}[hasPrev], func(t *testing.T) {
+			e := testkit.New(t)
+			end := time.Date(2026, 10, 21, 14, 5, 0, 0, time.Local)
+			player, crow := filepath.Join(e.Root, "Player.log"), filepath.Join(e.Root, "RimCrow_Realtime.log")
+			head := unityHead
+			if hasPrev {
+				head += "Started:   " + end.Add(-time.Hour).Format("2006-01-02 15:04:05.000 -07:00") + "\n"
+			}
+			e.WriteFile(player, head)
+			e.WriteFile(crow, `{"timestamp":"2026-10-21 14:05:00.000","message":"ready"}`+"\n")
+			if err := os.Chtimes(player, end, end); err != nil {
+				t.Fatal(err)
+			}
+			if hasPrev {
+				prev := filepath.Join(e.Root, "Player-prev.log")
+				e.WriteFile(prev, unityHead)
+				at := end.Add(-time.Second)
+				if err := os.Chtimes(prev, at, at); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, at := range []time.Time{end.Add(-time.Minute), end} {
+				if err := os.Chtimes(crow, at, at); err != nil {
+					t.Fatal(err)
+				}
+				want := ""
+				if at.Equal(end) {
+					want = crow
+				}
+				if got := app.CompanionFor(player); got != want {
+					t.Fatalf("mtime %v: got %q, want %q", at, got, want)
+				}
+			}
+		})
 	}
 }

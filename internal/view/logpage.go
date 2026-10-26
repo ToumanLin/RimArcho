@@ -2,12 +2,10 @@ package view
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/logs"
@@ -83,31 +81,8 @@ func LogFiles(a *app.App, st *app.LoadoutState) []LogFile {
 	return out
 }
 
-// companionOf is app.CompanionFor, remembered per version of the Player.log (it reads up
-// to 4 MiB of it).
-func companionOf(path string) string {
-	fi, err := os.Stat(path)
-	if err != nil {
-		return ""
-	}
-	key := fmt.Sprintf("%s|%d|%d", path, fi.Size(), fi.ModTime().UnixNano())
-	companionFor.Lock()
-	defer companionFor.Unlock()
-	if c, ok := companionFor.by[key]; ok {
-		return c
-	}
-	c := app.CompanionFor(path)
-	if len(companionFor.by) > 16 {
-		companionFor.by = map[string]string{}
-	}
-	companionFor.by[key] = c
-	return c
-}
-
-var companionFor = struct {
-	sync.Mutex
-	by map[string]string
-}{by: map[string]string{}}
+// Companion files can appear or rotate while Player.log stays unchanged.
+func companionOf(path string) string { return app.CompanionFor(path) }
 
 // BuildLogPage analyses path (the newest log when empty; a companion log means its
 // Player.log); the analysis is cached by the app, so a second look at the same file is
