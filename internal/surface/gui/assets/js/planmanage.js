@@ -121,14 +121,19 @@ function listCard(d) {
     b.dataset.id = r.id;
     const n = el("div", "n");
     n.append(el("b", "", r.name));
-    if (r.current) n.append(el("span", "pill cur", T("current")));
     if (r.inGame) { const g = el("span", "gdot"); g.title = T("in the game"); n.append(g); }
     if (r.mark) { const m = el("span", "adot"); m.title = r.mark; n.append(m); }
     b.append(n, el("div", "m word-facts", r.meta));
-    if (r.follows) {
-      const f = ic("workshop", "ri" + (r.changed ? " changed" : ""));
-      f.title = r.changed ? T("the collection changed") : T("follows Steam collections");
-      b.append(f);
+    // the right side says which list is current; any other row makes itself current
+    // (a span, since the row is itself a button)
+    if (r.current) b.append(el("span", "ri pill cur", T("current")));
+    else {
+      const use = el("span", "ri pm-use", T("make current"));
+      use.setAttribute("role", "button");
+      use.dataset.envWrite = "use-plan";
+      use.title = T("launch this list from the start page; no game file is written");
+      use.onclick = (e) => { e.stopPropagation(); if (!use.disabled) makeCurrent(r.id); };
+      b.append(use);
     }
     b.onclick = () => pick(r.id);
     b.ondblclick = () => ui.go(r.page);
@@ -162,14 +167,6 @@ function detailCard(p) {
     h.title = T("double-click to rename");
     h.ondblclick = () => startRename(p.id);
     n.append(h);
-  }
-  if (p.current) n.append(el("span", "pill cur", T("current")));
-  else {
-    const use = el("button", "btn link pm-use", T("make current"));
-    use.dataset.envWrite = "use-plan";
-    use.title = T("launch this list from the start page; no game file is written");
-    use.onclick = () => makeCurrent(p.id);
-    n.append(use);
   }
   if (p.mark) { const m = el("span", "adot"); m.title = p.mark; n.append(m); }
   const facts = el("div", "facts word-facts", p.facts);

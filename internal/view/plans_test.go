@@ -188,13 +188,13 @@ func TestInGameAndMarks(t *testing.T) {
 	}
 	nav := view.Nav(0, rows, nil)
 	kids := nav[1].Items[1].Kids
-	// the current list first (列表 opens it), 管理 after the lists (06 §2.1)
-	if len(kids) != 3 || kids[2].ID != view.PagePlans || kids[1].Mark == "" || !kids[1].Open || !kids[0].Current {
+	// 全部列表 first, then the current list (列表 opens it), then the open one (06 §2.1)
+	if len(kids) != 3 || kids[0].ID != view.PagePlans || kids[2].Mark == "" || !kids[2].Open || !kids[1].Current {
 		t.Fatalf("plan kids %+v", kids)
 	}
 	// the plan the game has is marked on its entry, not on the status line
 	for i, r := range rows {
-		if kids[i].InGame != r.InGame {
+		if kids[i+1].InGame != r.InGame {
 			t.Fatalf("in-game mark %d: %+v vs %+v", i, kids[i], r)
 		}
 	}
@@ -250,5 +250,24 @@ func TestHomePerPlan(t *testing.T) {
 	h = view.BuildHome(a, b, n, plans, packs)
 	if h.Rows[0].State != "2 problems break the game" || h.Rows[2].State != "ready to play" {
 		t.Fatalf("hooked %+v", h.Rows)
+	}
+}
+
+// The sidebar keeps 全部列表 first and shows NavLists lists at most: the current one,
+// then the most recently used (06 §2.1).
+func TestNavRecentLists(t *testing.T) {
+	now := time.Now()
+	var rows []view.PlanRow
+	for i := range 6 {
+		rows = append(rows, view.PlanRow{Page: "plan:" + itoa(i), Name: itoa(i), UsedAt: now.Add(time.Duration(i) * time.Hour)})
+	}
+	rows[0].Current = true // the oldest, still shown
+	kids := view.Nav(0, rows, nil)[1].Items[1].Kids
+	var got []string
+	for _, k := range kids {
+		got = append(got, k.Label)
+	}
+	if strings.Join(got, ",") != "all lists,0,5,4,3" || kids[0].ID != view.PagePlans {
+		t.Fatalf("sidebar lists %v", got)
 	}
 }

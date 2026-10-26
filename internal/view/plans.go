@@ -52,6 +52,9 @@ type PlanRow struct {
 	// InGame: this plan is what the game's ModsConfig.xml holds now (the write record).
 	InGame   bool      `json:"inGame,omitempty"`
 	PlayedAt time.Time `json:"-"`
+	// UsedAt is the list's last use: its last change or launch, whichever is later. The
+	// sidebar shows the most recently used lists (06 §2.1).
+	UsedAt time.Time `json:"-"`
 }
 
 // PlanRows lists the current environment's plans: the current one first, then the others
@@ -66,6 +69,10 @@ func PlanRows(a *app.App) ([]PlanRow, error) {
 	for _, p := range ps {
 		r := PlanRow{ID: p.ID, Page: PlanPage(p.ID), Name: p.Name, Current: p.Current, Open: p.Open, Entries: p.Entries, Versions: p.Versions,
 			Played: T("never played"), PlayedAt: p.LastPlayed, InGame: g != nil && g.PlanID == p.ID}
+		r.UsedAt = p.Updated
+		if p.LastPlayed.After(r.UsedAt) {
+			r.UsedAt = p.LastPlayed
+		}
 		if !p.LastPlayed.IsZero() {
 			r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 		}

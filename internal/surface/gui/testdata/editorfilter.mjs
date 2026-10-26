@@ -23,8 +23,9 @@ test("virtual row boundaries account for group headings and current-copy subtitl
   const q = await loadModules("./listgeometry.js", {});
   const items=[{id:"a",lineage:"ce",copyCount:3},{id:"b",lineage:"ce",copyCount:3},{id:"c",lineage:"hud",copyCount:1}];
   const inactive=q.listGeometry(items,[0,1,2],0);
-  assert.equal(JSON.stringify(inactive.tops),"[0,56,84]");assert.equal(inactive.total,140);
-  assert.equal(q.rowAt(inactive,55),0);assert.equal(q.rowAt(inactive,56),1);assert.equal(q.rowAt(inactive,140),3);
+  assert.equal(JSON.stringify(inactive.tops),"[0,56,84]");assert.equal(inactive.total,112); // a lone copy has no heading
+  assert.equal(inactive.heads[2],false);
+  assert.equal(q.rowAt(inactive,55),0);assert.equal(q.rowAt(inactive,56),1);assert.equal(q.rowAt(inactive,112),3);
   const active=q.listGeometry(items,[0,2],1);assert.equal(JSON.stringify(active.tops),"[0,48]");assert.equal(active.total,76);
   const filtered=q.listGeometry(items,[1,2],0);assert.equal(filtered.heads[0],true);assert.equal(filtered.heights[0],56);
 });

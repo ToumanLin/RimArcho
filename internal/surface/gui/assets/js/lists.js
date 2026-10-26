@@ -223,13 +223,13 @@ export function renderRows(k) {
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
       `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>` +
       (it.unsaved ? `<span class="u" title="${esc(T("not written to the game yet"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
-    if (k === 0 && it.copyLabel) {
+    if (k === 0 && it.copyCount > 1 && it.copyLabel) {
       d.classList.add("copy-item");
       $(".t",d).textContent="└ " + it.copyLabel;
       if (layout.heads[i]) { d.classList.add("copy-group-start"); d.prepend(el("span","editor-copy-head",it.name)); }
     }
     if (k === 1 && it.copyCount > 1) {d.classList.add("with-copy");d.append(el("span","current-copy","└ " + it.copyLabel));}
-    d.title = it.name + (it.copyLabel ? "  " + it.copyLabel : "");
+    d.title = it.name + (it.copyCount > 1 && it.copyLabel ? "  " + it.copyLabel : "");
   }
 }
 
