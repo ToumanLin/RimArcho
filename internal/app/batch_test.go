@@ -89,4 +89,20 @@ func TestSuggestAt(t *testing.T) {
 	if at, _ := e.App.SuggestAt(ids(t, e, "pkg:tester.m31")); at != 32 {
 		t.Fatalf("unconstrained: %d", at)
 	}
+	// Needing only a mod that loads before Core (Harmony) never suggests a place ahead of
+	// the official content.
+	h := testkit.Sample("brrainz.harmony", "Harmony")
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Harmony"), h)
+	e.WriteFile(filepath.Join(e.Game, "Mods", "Harmony", "About", "About.xml"), strings.Replace(h.AboutXML(), "</ModMetaData>",
+		"<loadBefore><li>Ludeon.RimWorld</li></loadBefore></ModMetaData>", 1))
+	dir = filepath.Join(e.Game, "Mods", "NeedsH")
+	m = testkit.Sample("tester.needsh", "NeedsH")
+	e.WriteMod(dir, m)
+	e.WriteFile(filepath.Join(dir, "About", "About.xml"), strings.Replace(m.AboutXML(), "</ModMetaData>",
+		"<loadAfter><li>brrainz.harmony</li></loadAfter></ModMetaData>", 1))
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:brrainz.harmony", "--at", "1")
+	if at, _ := e.App.SuggestAt(ids(t, e, "pkg:tester.needsh")); at < 3 {
+		t.Fatalf("ahead of Core: %d", at)
+	}
 }

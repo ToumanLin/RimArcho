@@ -522,6 +522,7 @@ func (a *App) Enable(refs []string, p Placement) (*EditResult, error) {
 	return a.edit("enable", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		var notes []string
 		at := -1
+		placed := 0 // without a position: appended here, then placed by the constraints
 		for _, ref := range refs {
 			m, err := st.Ix.ResolveOne(ref)
 			if err != nil {
@@ -551,6 +552,11 @@ func (a *App) Enable(refs []string, p Placement) (*EditResult, error) {
 				l[idx] = loadout.Entry{Instance: m.ID}
 				continue
 			}
+			if !p.set() {
+				l = append(l, loadout.Entry{Instance: m.ID})
+				placed++
+				continue
+			}
 			if at < 0 {
 				if at, err = p.target(st, l, len(l)); err != nil {
 					return nil, nil, err
@@ -558,6 +564,18 @@ func (a *App) Enable(refs []string, p Placement) (*EditResult, error) {
 			}
 			l = insert(l, at, loadout.Entry{Instance: m.ID})
 			at++
+		}
+		if placed > 0 {
+			// The latest position the sort constraints allow (04 §2.1, order.Place).
+			in, err := a.SortInput(st, l)
+			if err != nil {
+				return nil, nil, err
+			}
+			out := make(loadout.List, 0, len(l))
+			for _, i := range order.Place(in, len(l)-placed) {
+				out = append(out, l[i])
+			}
+			l = out
 		}
 		return l, notes, nil
 	})

@@ -249,6 +249,32 @@ func TestHistoryCheckoutUndoSource(t *testing.T) {
 	}
 }
 
+// V16 (04 §2.1): enable without a position puts a mod at the latest place its constraints
+// allow — a library before the enabled mod that needs it, anything else at the end.
+func TestEnablePlacesByConstraints(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	needs := testkit.Sample("tester.needs", "Needs")
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Needs"), needs)
+	e.WriteFile(filepath.Join(e.Game, "Mods", "Needs", "About", "About.xml"), strings.Replace(needs.AboutXML(), "</ModMetaData>",
+		"<modDependencies><li><packageId>tester.lib</packageId><displayName>Lib</displayName></li></modDependencies></ModMetaData>", 1))
+	for _, m := range []string{"Lib", "Other", "Late"} {
+		e.WriteMod(filepath.Join(e.Game, "Mods", m), testkit.Sample("tester."+strings.ToLower(m), m))
+	}
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.needs", "tester.other")
+	scanNow(t, e)
+	e.MustRun("enable", refOf(t, e, "Late", ""), refOf(t, e, "Lib", ""))
+	if got := active(t, e); !slices.Equal(got, []string{"Core", "Lib", "Needs", "Other", "Late"}) {
+		t.Fatalf("enabled: %v", got)
+	}
+	// An explicit position still wins.
+	e.MustRun("disable", refOf(t, e, "Lib", ""))
+	e.MustRun("enable", refOf(t, e, "Lib", ""), "--at", "4")
+	if got := active(t, e); !slices.Equal(got, []string{"Core", "Needs", "Other", "Lib", "Late"}) {
+		t.Fatalf("--at: %v", got)
+	}
+}
+
 // S13 through the CLI (04 §5.5): a community loadBottom and a user top rule move mods to the
 // ends, `sort` explains them under "ends", and the community one can be ignored.
 func TestSortTopBottom(t *testing.T) {

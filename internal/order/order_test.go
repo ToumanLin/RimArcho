@@ -204,6 +204,58 @@ func TestTiers(t *testing.T) {
 	}
 }
 
+// Enabling without a position (04 §2.1): the latest position the constraints allow.
+func TestPlace(t *testing.T) {
+	cur := []Node{
+		node("brrainz.harmony", scan.Decl{LoadBefore: []string{"Ludeon.RimWorld"}}),
+		node("ludeon.rimworld", scan.Decl{}),
+		node("ludeon.rimworld.anomaly", scan.Decl{}),
+		node("needs.lib", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "the.lib"}}}),
+		node("other.mod", scan.Decl{}),
+		node("orig.mod", scan.Decl{}),
+	}
+	place := func(rules []Rule, comm Community, add ...Node) []string {
+		in := Input{Nodes: append(slices.Clone(cur), add...), GameMM: "1.6", Rules: rules, Community: comm}
+		var out []string
+		for _, i := range Place(in, len(cur)) {
+			out = append(out, in.Nodes[i].PackageID)
+		}
+		return out
+	}
+	base := []string{"brrainz.harmony", "ludeon.rimworld", "ludeon.rimworld.anomaly", "needs.lib", "other.mod", "orig.mod"}
+	with := func(at int, pkg ...string) []string { return slices.Insert(slices.Clone(base), at, pkg...) }
+	cases := []struct {
+		name  string
+		rules []Rule
+		comm  Community
+		add   []Node
+		want  []string
+	}{
+		{"unconstrained: end", nil, nil, []Node{node("new.mod", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "brrainz.harmony"}}})}, with(6, "new.mod")},
+		{"a DLC: after the official content", nil, nil, []Node{node("ludeon.rimworld.odyssey", scan.Decl{})}, with(3, "ludeon.rimworld.odyssey")},
+		{"a library an enabled mod needs: just before it", nil, nil, []Node{node("the.lib", scan.Decl{})}, with(3, "the.lib")},
+		{"top: as early as it can", nil, posCommunity{"xml.ext": TierTop}, []Node{node("xml.ext", scan.Decl{})}, with(3, "xml.ext")},
+		{"attach: right after its target", []Rule{{Kind: RuleAttach, A: "L-orig.mod.zh", B: "L-other.mod"}}, nil, []Node{node("orig.mod.zh", scan.Decl{})}, with(5, "orig.mod.zh")},
+		{"two new, the second needed by the first", nil, nil, []Node{
+			node("new.a", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "new.b"}}}), node("new.b", scan.Decl{})}, with(6, "new.b", "new.a")},
+	}
+	for _, c := range cases {
+		if got := place(c.rules, c.comm, c.add...); !slices.Equal(got, c.want) {
+			t.Errorf("%s: %v", c.name, got)
+		}
+	}
+	// The list already has a dependent before its dependency: the new mod sits between
+	// them in neither order, so it goes after what it needs.
+	cur = []Node{
+		node("ludeon.rimworld", scan.Decl{}),
+		node("wants.mid", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "mid.mod"}}}),
+		node("base.mod", scan.Decl{}),
+	}
+	if got := place(nil, nil, node("mid.mod", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "base.mod"}}})); !slices.Equal(got, []string{"ludeon.rimworld", "wants.mid", "base.mod", "mid.mod"}) {
+		t.Errorf("inconsistent list: %v", got)
+	}
+}
+
 type fakeCommunity map[string][]string
 
 func (f fakeCommunity) Rules(pkg string) ([]string, []string) { return f[pkg], nil }

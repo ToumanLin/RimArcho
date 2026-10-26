@@ -128,9 +128,15 @@ func (a *App) SuggestAt(ids []string) (int, error) {
 	}
 	r := order.Sort(in)
 	lo, hi, constrained := 0, n, false
+	official := 0 // after the official content the new ones must follow
 	for _, e := range r.Edges {
 		if e.C.Kind == order.KindOfficial && e.C.Field == "official-first" {
-			continue // every mod comes after the official content anyway
+			// Every mod comes after the official content anyway: it does not constrain on
+			// its own, but no suggestion goes ahead of it.
+			if e.From < n && e.To >= n {
+				official = max(official, e.From+1)
+			}
+			continue
 		}
 		switch {
 		case e.From < n && e.To >= n: // a new one loads after an enabled one
@@ -145,6 +151,7 @@ func (a *App) SuggestAt(ids []string) (int, error) {
 	if lo == 0 && hi < n {
 		return hi + 1, nil // only "before" constraints: just before the first of them
 	}
+	lo = max(lo, official)
 	if hi < lo {
 		return lo + 1, nil // cannot satisfy both: after what they need
 	}

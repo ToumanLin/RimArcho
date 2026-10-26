@@ -634,6 +634,70 @@ func Sort(in Input) Result {
 	return res
 }
 
+// Place finds where newly enabled mods go (04 §2.1): in.Nodes[:n] is the current list,
+// in order, and in.Nodes[n:] the new mods in the order given. The current list keeps its
+// order; each new mod goes to the latest position its constraints allow — the end, unless
+// an enabled mod has to load after it (a library, a DLC), then just before the first of
+// them. A top mod (§5.5) goes to the earliest position instead, an `attach` mod right
+// after its target. When the list already breaks its constraints so that no position
+// satisfies both sides, the new mod goes after what it needs. It returns node indices.
+func Place(in Input, n int) []int {
+	r := Sort(in)
+	own := map[int]Tier{}
+	for _, a := range r.Anchors {
+		own[a.Node] = a.Tier
+	}
+	byLin := map[string][]int{}
+	for i, nd := range in.Nodes {
+		if nd.Lineage != "" {
+			byLin[nd.Lineage] = append(byLin[nd.Lineage], i)
+		}
+	}
+	follows := map[int][]int{} // attach: node → targets
+	for _, rl := range in.Rules {
+		if rl.Kind != RuleAttach {
+			continue
+		}
+		for _, a := range byLin[rl.A] {
+			follows[a] = append(follows[a], byLin[rl.B]...)
+		}
+	}
+	seq := make([]int, n)
+	for i := range seq {
+		seq[i] = i
+	}
+	for a := n; a < len(in.Nodes); a++ {
+		pos := make(map[int]int, len(seq))
+		for p, v := range seq {
+			pos[v] = p
+		}
+		lo, hi := 0, len(seq)
+		for _, e := range r.Edges {
+			if p, ok := pos[e.From]; ok && e.To == a {
+				lo = max(lo, p+1)
+			}
+			if p, ok := pos[e.To]; ok && e.From == a {
+				hi = min(hi, p)
+			}
+		}
+		at := hi
+		switch {
+		case lo > hi:
+			at = lo
+		case own[a] == TierTop:
+			at = lo
+		}
+		for _, b := range follows[a] {
+			if p, ok := pos[b]; ok && p+1 >= lo && p+1 <= hi {
+				at = p + 1
+				break
+			}
+		}
+		seq = slices.Insert(seq, at, a)
+	}
+	return seq
+}
+
 // tiers resolves loadTop / loadBottom into a tier per node and records the anchors in res.
 // A user rule wins over the community rule for the same mod; official content keeps its
 // own place.
