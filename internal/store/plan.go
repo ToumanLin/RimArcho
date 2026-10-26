@@ -7,10 +7,12 @@ import (
 	"time"
 )
 
-// Plan is one named, ordered enabled list of an environment (04 §1): it owns a workspace,
-// an undo stack, versions and a staging list. Names are unique within an environment.
+// Plan is one named, ordered enabled list (04 §1): it owns a workspace, an undo stack,
+// versions and a staging list. Lists are shared by every game (2026-10-25); names are
+// unique across them.
 type Plan struct {
-	ID      int64
+	ID int64
+	// EnvID is the game the list was made in. It does not limit where the list is used.
 	EnvID   string
 	Name    string
 	Created time.Time
@@ -42,9 +44,9 @@ func scanPlan(row interface{ Scan(...any) error }) (*Plan, error) {
 	return &p, nil
 }
 
-// Plans lists an environment's plans in creation order.
-func (s *Store) Plans(envID string) ([]*Plan, error) {
-	rows, err := s.DB.Query(`SELECT `+planCols+` FROM plan WHERE environment_id=? ORDER BY id`, envID)
+// Plans lists every plan in creation order.
+func (s *Store) Plans() ([]*Plan, error) {
+	rows, err := s.DB.Query(`SELECT ` + planCols + ` FROM plan ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -69,10 +71,10 @@ func (s *Store) PlanByID(id int64) (*Plan, error) {
 	return p, err
 }
 
-// PlanByName returns an environment's plan by exact name, else by a unique
-// case-insensitive match; nil if none.
-func (s *Store) PlanByName(envID, name string) (*Plan, error) {
-	ps, err := s.Plans(envID)
+// PlanByName returns a plan by exact name, else by a unique case-insensitive match; nil
+// if none.
+func (s *Store) PlanByName(name string) (*Plan, error) {
+	ps, err := s.Plans()
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +122,8 @@ func (s *Store) DeletePlan(id int64) error {
 			`DELETE FROM workspace WHERE plan_id=?`,
 			`DELETE FROM workspace_undo WHERE plan_id=?`,
 			`DELETE FROM loadout_version WHERE plan_id=?`,
-			`UPDATE environment SET current_plan=0 WHERE current_plan=?`,
+			// Games using it fall back to the oldest other list.
+			`UPDATE environment SET current_plan=coalesce((SELECT min(p.id) FROM plan p WHERE p.id<>?1), 0) WHERE current_plan=?1`,
 			`DELETE FROM plan_collection WHERE plan_id=?`,
 			`DELETE FROM plan WHERE id=?`,
 		} {
@@ -146,19 +149,20 @@ func (s *Store) SetCurrentPlan(envID string, planID int64) error {
 	return err
 }
 
-// CurrentPlan returns the environment's current plan; when the stored one is gone it falls
-// back to the first plan (and records that). nil when the environment has no plan yet.
+// CurrentPlan returns the environment's current plan — any list, lists being shared by
+// every game; when the stored one is gone it falls back to the first plan (and records
+// that). nil when the game has never had a current list: its first use imports its
+// ModsConfig.xml (04 §1.4).
 func (s *Store) CurrentPlan(envID string) (*Plan, error) {
-	if id := s.CurrentPlanID(envID); id != 0 {
-		p, err := s.PlanByID(id)
-		if err != nil {
-			return nil, err
-		}
-		if p != nil && p.EnvID == envID {
-			return p, nil
-		}
+	id := s.CurrentPlanID(envID)
+	if id == 0 {
+		return nil, nil
 	}
-	ps, err := s.Plans(envID)
+	p, err := s.PlanByID(id)
+	if err != nil || p != nil {
+		return p, err
+	}
+	ps, err := s.Plans()
 	if err != nil || len(ps) == 0 {
 		return nil, err
 	}

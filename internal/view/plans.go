@@ -86,7 +86,7 @@ type InGameState struct {
 	Version int    `json:"version"`
 	// Text is the status line's "游戏里现在是：<方案> v<n>".
 	Text string `json:"text"`
-	// Other: the plan belongs to another environment that shares the folder.
+	// Other: another game sharing the folder wrote it.
 	Other bool `json:"other,omitempty"`
 }
 
@@ -105,10 +105,10 @@ func InGame(a *app.App) *InGameState {
 	if err != nil || p == nil {
 		return nil
 	}
-	g := &InGameState{PlanID: p.ID, Plan: p.Name, Version: ms.WriterVersion, Other: p.EnvID != e.ID}
+	g := &InGameState{PlanID: p.ID, Plan: p.Name, Version: ms.WriterVersion, Other: ms.WriterEnv != "" && ms.WriterEnv != e.ID}
 	name := p.Name
 	if g.Other {
-		if pe, err := a.Store.EnvByID(p.EnvID); err == nil && pe != nil {
+		if pe, err := a.Store.EnvByID(ms.WriterEnv); err == nil && pe != nil {
 			name = pe.Name + "  " + p.Name
 		}
 	}

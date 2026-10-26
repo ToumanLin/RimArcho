@@ -20,7 +20,7 @@ func planList(t *testing.T, e *testkit.Env, name string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := e.App.Store.PlanByName(ix.Env.ID, name)
+	p, err := e.App.Store.PlanByName(name)
 	if err != nil || p == nil {
 		t.Fatalf("no plan %q: %v", name, err)
 	}
@@ -41,11 +41,7 @@ func planList(t *testing.T, e *testkit.Env, name string) string {
 
 func planVersions(t *testing.T, e *testkit.Env, name string) int {
 	t.Helper()
-	ix, err := e.App.Index()
-	if err != nil {
-		t.Fatal(err)
-	}
-	p, _ := e.App.Store.PlanByName(ix.Env.ID, name)
+	p, _ := e.App.Store.PlanByName(name)
 	if p == nil {
 		t.Fatalf("no plan %q", name)
 	}
@@ -193,9 +189,10 @@ func TestIgnoreExternalCheckoutClears(t *testing.T) {
 	e.MustRun("save")
 }
 
-// V8: two environments share a user data folder. The other environment's write is not an
-// outside change; an outside change after it goes to the writer's plan in its own
-// environment, resolved there.
+// V8: two environments share a user data folder. The second game takes the list that
+// wrote the file as its current one (lists are shared); the other environment's write is
+// not an outside change; an outside change after it goes to the writer's plan, resolved by
+// the game that wrote it.
 func TestV8SharedUserData(t *testing.T) {
 	t.Parallel()
 	e := loadoutEnv(t)
@@ -220,7 +217,10 @@ func TestV8SharedUserData(t *testing.T) {
 	if out := e.MustRun("status"); strings.Contains(out, "changed outside") || strings.Contains(out, "pending:") {
 		t.Fatalf("V8 status:\n%s", out)
 	}
-	secondVersions := planVersions(t, e, "default")
+	if ps, _ := e.App.Store.Plans(); len(ps) != 1 {
+		t.Fatalf("second made its own list instead of using main's: %d lists", len(ps))
+	}
+	versions := planVersions(t, e, "default")
 
 	// B exists only in main's Mods/: the change is resolved by main.
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony", "tester.a", "tester.b")
@@ -228,8 +228,8 @@ func TestV8SharedUserData(t *testing.T) {
 	if !strings.Contains(out, "ModsConfig.xml changed outside RimArcho: loaded as env:main plan:default v3") {
 		t.Fatalf("status in second:\n%s", out)
 	}
-	if planVersions(t, e, "default") != secondVersions {
-		t.Fatal("second's plan got the change")
+	if planVersions(t, e, "default") != versions+1 {
+		t.Fatal("the writer's plan got no version")
 	}
 	e.MustRun("env", "use", "main")
 	if got := planList(t, e, "default"); got != "Core, Harmony, A, B" {
@@ -239,16 +239,15 @@ func TestV8SharedUserData(t *testing.T) {
 		t.Fatalf("seen again in main:\n%s", out)
 	}
 
-	// A conflict in main's plan shows from second with --env in the commands, and second
+	// A conflict in the shared plan, written by main, shows from second, and second
 	// cannot overwrite it.
 	e.MustRun("disable", refOf(t, e, "B", ""))
 	e.MustRun("env", "use", "second")
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld")
-	if out := e.MustRun("status"); !strings.Contains(out, "kept as env:main plan:default v4, not loaded") ||
-		!strings.Contains(out, "archo --env main plan use default") {
+	if out := e.MustRun("status"); !strings.Contains(out, "kept as env:main plan:default v4, not loaded") {
 		t.Fatalf("conflict from second:\n%s", out)
 	}
-	if out, code := e.Run("save"); code == 0 || !strings.Contains(out, "first archo --env main plan use default, then see the difference: archo --env main loadout diff v4 workspace") {
+	if out, code := e.Run("save"); code == 0 || !strings.Contains(out, "see the difference: archo loadout diff v4 workspace") {
 		t.Fatalf("save in second: exit %d\n%s", code, out)
 	}
 }

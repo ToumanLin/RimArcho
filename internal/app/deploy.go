@@ -24,6 +24,9 @@ const DeployPrefix = "_Archo_"
 
 // DeployName is the Mods/ link name of a deployed instance.
 func DeployName(m *store.Mod) string {
+	if m.Kind == source.Elsewhere { // another game's Mods/ (04 §1.7), named as on switching games
+		return envLinkPrefix + m.ID
+	}
 	r := strings.NewReplacer("/", "_", `\`, "_", ":", "_")
 	return DeployPrefix + r.Replace(m.SourceLabel) + "_" + r.Replace(m.Rel)
 }
@@ -36,11 +39,11 @@ func gameVisible(k source.Kind) bool {
 	return k == source.Official || k == source.Local || k == source.Workshop
 }
 
-// deployable reports whether m lives where the game does not look (SteamCMD or an extra
-// folder) and could be linked into Mods/ (08 §3). An instance the game already sees
+// deployable reports whether m lives where the game does not look (SteamCMD, an extra
+// folder or another game's Mods/) and could be linked into Mods/ (08 §3). An instance the game already sees
 // through someone else's link is not deployable: it is an ordinary candidate.
 func deployable(ix *Index, aliases map[string][]store.Alias, m *store.Mod) bool {
-	if m.Status != identity.Live || m.Residue || m.Unloadable != "" || (m.Kind != source.SteamCMD && m.Kind != source.Extra) {
+	if m.Status != identity.Live || m.Residue || m.Unloadable != "" || (m.Kind != source.SteamCMD && m.Kind != source.Extra && m.Kind != source.Elsewhere) {
 		return false
 	}
 	kinds := map[string]source.Kind{}
@@ -94,7 +97,7 @@ func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string
 	set := map[string]bool{}
 	if ws != nil {
 		for _, e := range loadout.Decode(ws.Entries) {
-			if m := ix.ByID[e.Instance]; m != nil && deployable(ix, aliases, m) {
+			if m := ix.Elsewhere(ix.ByID[e.Instance]); m != nil && deployable(ix, aliases, m) {
 				set[m.ID] = true
 			}
 		}

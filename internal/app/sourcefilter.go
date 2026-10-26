@@ -21,7 +21,7 @@ func (a *App) DirectoryRole(s *source.Source) string {
 		return "official"
 	case source.Workshop:
 		return LibWorkshop
-	case source.Local:
+	case source.Local, source.Elsewhere: // a game's own Mods/, this one's or another's
 		return LibLocal
 	case source.SteamCMD:
 		return LibSteamCMD
@@ -63,5 +63,24 @@ func (a *App) DirectoryValues(s *source.Source) []string {
 	if role == "" {
 		return nil
 	}
+	if role == LibLocal {
+		return []string{a.LocalValue(s.EnvID)}
+	}
 	return []string{role}
+}
+
+// LocalValue is the source: value of a game's own Mods/ folder, "local-<game>" (local-main,
+// local-1.6; 2026-10-25): every game's Mods/ is in the library and the editor (04 §1.7), so
+// the value says which. source:local still matches all of them (LocalMatches).
+func (a *App) LocalValue(envID string) string {
+	if e, err := a.Store.EnvByID(envID); err == nil && e != nil && e.Name != "" {
+		return LibLocal + "-" + e.Name
+	}
+	return LibLocal
+}
+
+// LocalMatches reports whether a source: filter value want takes the value have: equal
+// (case-insensitive), or "local" for any game's "local-<game>".
+func LocalMatches(want, have string) bool {
+	return strings.EqualFold(want, have) || strings.EqualFold(want, LibLocal) && len(have) > len(LibLocal) && strings.EqualFold(have[:len(LibLocal)+1], LibLocal+"-")
 }

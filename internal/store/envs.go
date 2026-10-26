@@ -179,6 +179,9 @@ func (s *Store) SourceSemantics(sourceID string) (map[string]map[string][16]byte
 // left without instances goes. Only RimArcho's own database is touched; no game or mod file is.
 func (s *Store) DeleteEnv(envID string) error {
 	return s.inTx(func(tx *sql.Tx) error {
+		if err := keepLists(tx, envID); err != nil {
+			return err
+		}
 		inst := `(SELECT id FROM instance WHERE environment_id=?)`
 		for _, q := range []string{
 			`DELETE FROM snapshot_file WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id IN ` + inst + `)`,
@@ -204,12 +207,8 @@ func (s *Store) DeleteEnv(envID string) error {
 			`DELETE FROM source WHERE environment_id=?`,
 			// The ModsConfig.xml write record belongs to the user data folder, which other
 			// environments may share; it stays.
-			`DELETE FROM meta WHERE key IN (SELECT 'stage:' || id FROM plan WHERE environment_id=?)`,
-			`DELETE FROM workspace WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
-			`DELETE FROM workspace_undo WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
-			`DELETE FROM loadout_version WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
-			`DELETE FROM plan_collection WHERE plan_id IN (SELECT id FROM plan WHERE environment_id=?)`,
-			`DELETE FROM plan WHERE environment_id=?`,
+			// Lists are shared by every game and stay (04 §1.1); keepLists already named
+			// this game's own mods in them by packageId.
 			`DELETE FROM launch WHERE environment_id=?`,
 			`DELETE FROM environment WHERE id=?`,
 		} {

@@ -32,7 +32,7 @@ func sourcesOf(t *testing.T, e *testkit.Env) map[string]*source.Source {
 }
 
 // 02 §0: a second game shares the Workshop folder: the same instances, lineages and player
-// data in both environments; Data/ and Mods/ are each game's own; plans stay per game.
+// data in both environments; Data/ and Mods/ are each game's own; plans are shared by every game.
 func TestEnvModelSharedWorkshop(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -83,13 +83,13 @@ func TestEnvModelSharedWorkshop(t *testing.T) {
 			t.Fatal("the other game's Data/ is not this one's")
 		}
 	}
-	// Plans: per game; the first game's plan still uses the shared mod.
+	// Lists are shared by every game; the first game's list still uses the shared mod.
 	e.MustRun("env", "use", "main")
 	st, _ := e.App.Loadout()
 	if st.List.Index(ws) < 0 {
 		t.Fatal("main's plan lost the shared mod")
 	}
-	// Mod 库存: "用在" names the other game's plans too.
+	// Mod 库存: "用在" names each list once, whichever game uses it.
 	e.MustRun("env", "use", "old")
 	e.MustRun("enable", "#"+ws[:6])
 	e.MustRun("env", "use", "main")
@@ -105,7 +105,7 @@ func TestEnvModelSharedWorkshop(t *testing.T) {
 	for _, u := range l.UsedIn() {
 		uses = append(uses, u.Name)
 	}
-	if !slices.Contains(uses, "default") || !slices.Contains(uses, "old/default") {
+	if !slices.Contains(uses, "default") {
 		t.Fatalf("used in: %v", uses)
 	}
 	// Removing a game keeps the shared mod and what was said about it.
@@ -374,8 +374,9 @@ func downgradeWithTwin(t *testing.T, e *testkit.Env) map[string]string {
 	exec(`DROP TABLE id_alias`)
 	exec(`DROP TABLE texture_file`) // v16
 	exec(`DROP TABLE texture_mod`)
-	exec(`DROP TABLE plan_collection`) // v17
-	exec(`DROP TABLE managed_link`)    // v18
+	exec(`DROP TABLE plan_collection`)                          // v17
+	exec(`DROP TABLE managed_link`)                             // v18
+	exec(`ALTER TABLE modsconfig_state DROP COLUMN writer_env`) // v19
 	exec(`ALTER TABLE plan DROP COLUMN created_game`)
 	exec(`ALTER TABLE plan DROP COLUMN versions`)
 	exec(`UPDATE meta SET value='13' WHERE key='schema_version'`)
@@ -432,6 +433,30 @@ func TestGameWorkshopIsSteamCMD(t *testing.T) {
 		if s.Root == own3 && s.Status != source.StatusRetired {
 			t.Fatalf("a removed folder stays removed: %+v", s)
 		}
+	}
+
+	// Removing the game and adding it again brings its own folder back as itself: the
+	// same source, the same mod ID (2026-10-25).
+	later := refID(t, e, "Later", "")
+	e.MustRun("env", "use", "main")
+	e.MustRun("env", "remove", "third", "--yes")
+	out = e.MustRun("env", "add", "third", "--game", g3)
+	if !strings.Contains(out, "src:steamcmd") {
+		t.Fatalf("env add again: the game's own folder comes back:\n%s", out)
+	}
+	var back *source.Source
+	for _, s := range sourcesOf(t, e) {
+		if s.Root == own3 {
+			back = s
+		}
+	}
+	if back == nil || back.Status != source.StatusOK || back.Kind != source.SteamCMD {
+		t.Fatalf("the re-added game's folder: %+v", back)
+	}
+	e.MustRun("env", "use", "third")
+	scanNow(t, e)
+	if got := refID(t, e, "Later", ""); got != later {
+		t.Fatalf("the folder's mod came back as a new instance: %s, was %s", got, later)
 	}
 }
 

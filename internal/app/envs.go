@@ -319,7 +319,7 @@ func (a *App) foldersFromSpec(e *env.Environment, spec EnvSpec, adding, moved bo
 		}
 	}
 	if adding || moved {
-		ch, err := a.adoptGameWorkshop(e)
+		ch, err := a.adoptGameWorkshop(e, true)
 		if err != nil {
 			return out, err
 		}
@@ -443,10 +443,9 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 
 // EnvRemoval is what removing an environment forgets (06 §2.14), for the dry run and the
 // result. Only RimArcho's records go: game files, mods and saves stay, and so do the shared
-// mod folders with their mods and what the player noted on them.
+// mod folders with their mods, what the player noted on them, and the lists (shared by every game).
 type EnvRemoval struct {
 	Env      *env.Environment
-	Plans    int    // its plans (lists, versions, undo steps)
 	Launches int    // its launch records
 	Mods     int    // instances RimArcho read from its Data/ and Mods/
 	Current  bool   // it is the current environment
@@ -464,8 +463,8 @@ func (a *App) EnvRemovePreview(name string) (*EnvRemoval, error) {
 	}
 	r := &EnvRemoval{Env: e}
 	db := a.Store.DB
-	if err := db.QueryRow(`SELECT (SELECT count(*) FROM plan WHERE environment_id=?), (SELECT count(*) FROM launch WHERE environment_id=?),
-		(SELECT count(*) FROM instance WHERE environment_id=? AND status='live')`, e.ID, e.ID, e.ID).Scan(&r.Plans, &r.Launches, &r.Mods); err != nil {
+	if err := db.QueryRow(`SELECT (SELECT count(*) FROM launch WHERE environment_id=?),
+		(SELECT count(*) FROM instance WHERE environment_id=? AND status='live')`, e.ID, e.ID).Scan(&r.Launches, &r.Mods); err != nil {
 		return nil, err
 	}
 	if cur, _ := a.Store.CurrentEnv(); cur != nil && cur.ID == e.ID {

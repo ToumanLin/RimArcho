@@ -15,9 +15,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Plans (04 §1): an environment has several named lists; one is current — the one the
-// game is launched with — and every editing, history and staging command acts on it, or on
-// the list a session opened instead (OpenPlan, --open-plan). Switching writes no game file.
+// Plans (04 §1): named lists shared by every game; each game has one current list — the
+// one it is launched with — and every editing, history and staging command acts on it, or
+// on the list a session opened instead (OpenPlan, --open-plan). Switching writes no game
+// file.
 
 // PlanInfo is a plan with what `plan list` shows (05 §4.3).
 type PlanInfo struct {
@@ -39,13 +40,13 @@ func (a *App) CurrentPlan() (*store.Plan, error) {
 	return st.Plan, nil
 }
 
-// Plans lists the current environment's plans in creation order.
+// Plans lists every plan in creation order, marked against the current game.
 func (a *App) Plans() ([]*PlanInfo, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
 	}
-	ps, err := a.Store.Plans(st.Ix.Env.ID)
+	ps, err := a.Store.Plans()
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +66,11 @@ func (a *App) Plans() ([]*PlanInfo, error) {
 	return out, nil
 }
 
-// PlansIn lists another environment's plans without loading it: each list's length comes
-// from its workspace (the home page lists every environment, 06 §2.3).
+// PlansIn lists every plan with another game's current one marked, without loading that
+// game: each list's length comes from its workspace (the home page lists every game, and
+// lists are shared by all of them, 06 §2.3).
 func (a *App) PlansIn(envID string) ([]*PlanInfo, error) {
-	ps, err := a.Store.Plans(envID)
+	ps, err := a.Store.Plans()
 	if err != nil {
 		return nil, err
 	}
@@ -89,21 +91,20 @@ func (a *App) PlansIn(envID string) ([]*PlanInfo, error) {
 // PlanRef is how output names a plan.
 func PlanRef(p *store.Plan) string { return "plan:" + p.Name }
 
-// FindPlan resolves a plan name (with or without "plan:") in the current environment.
+// FindPlan resolves a plan name (with or without "plan:").
 func (a *App) FindPlan(name string) (*store.Plan, error) {
-	st, err := a.Loadout()
-	if err != nil {
+	if _, err := a.Loadout(); err != nil {
 		return nil, err
 	}
-	return a.findPlan(st.Ix.Env.ID, name)
+	return a.findPlan(name)
 }
 
-func (a *App) findPlan(envID, name string) (*store.Plan, error) {
+func (a *App) findPlan(name string) (*store.Plan, error) {
 	n := strings.TrimSpace(name)
 	if len(n) > 5 && strings.EqualFold(n[:5], "plan:") {
 		n = n[5:]
 	}
-	p, err := a.Store.PlanByName(envID, n)
+	p, err := a.Store.PlanByName(n)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +115,7 @@ func (a *App) findPlan(envID, name string) (*store.Plan, error) {
 }
 
 // checkPlanName validates a new plan name and refuses one the environment already has.
-func (a *App) checkPlanName(envID, name string, self int64) (string, error) {
+func (a *App) checkPlanName(name string, self int64) (string, error) {
 	n := strings.TrimSpace(name)
 	if len(n) > 5 && strings.EqualFold(n[:5], "plan:") {
 		n = strings.TrimSpace(n[5:])
@@ -129,7 +130,7 @@ func (a *App) checkPlanName(envID, name string, self int64) (string, error) {
 	case strings.IndexFunc(n, unicode.IsControl) >= 0:
 		return "", errors.New("plan names cannot contain control characters")
 	}
-	ps, err := a.Store.Plans(envID)
+	ps, err := a.Store.Plans()
 	if err != nil {
 		return "", err
 	}
@@ -167,7 +168,7 @@ func (a *App) NewPlan(name, from string) (*NewPlanResult, error) {
 		return nil, err
 	}
 	e := st.Ix.Env
-	if name, err = a.checkPlanName(e.ID, name, 0); err != nil {
+	if name, err = a.checkPlanName(name, 0); err != nil {
 		return nil, err
 	}
 	v := &store.Version{Source: "import"}
@@ -231,10 +232,6 @@ func (a *App) ImportLoadoutAsPlan(path, name string) (*NewPlanResult, error) {
 	if strings.TrimSpace(name) != "" {
 		return a.NewPlan(name, path)
 	}
-	st, err := a.Loadout()
-	if err != nil {
-		return nil, err
-	}
 	il, err := readListFile(path)
 	if err != nil {
 		return nil, err
@@ -248,7 +245,7 @@ func (a *App) ImportLoadoutAsPlan(path, name string) (*NewPlanResult, error) {
 	}
 	name = base
 	for i := 2; ; i++ {
-		if p, _ := a.Store.PlanByName(st.Ix.Env.ID, name); p == nil {
+		if p, _ := a.Store.PlanByName(name); p == nil {
 			break
 		}
 		name = fmt.Sprintf("%s (%d)", base, i)
@@ -265,7 +262,7 @@ func (a *App) NewPlanFromImport(name string, il *ImportedList, source string) (*
 		return nil, err
 	}
 	e := st.Ix.Env
-	if name, err = a.checkPlanName(e.ID, name, 0); err != nil {
+	if name, err = a.checkPlanName(name, 0); err != nil {
 		return nil, err
 	}
 	list, unresolved := ImportedEntries(st, il)
@@ -328,7 +325,7 @@ func (a *App) UsePlan(name string) (*store.Plan, error) {
 	if err != nil {
 		return nil, err
 	}
-	p, err := a.findPlan(st.Ix.Env.ID, name)
+	p, err := a.findPlan(name)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +351,7 @@ func (a *App) OpenPlanID(id int64) (*store.Plan, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p == nil || p.EnvID != e.ID {
+	if p == nil {
 		return nil, errors.New("that list is gone")
 	}
 	a.PlanName = ""
@@ -384,26 +381,25 @@ func (a *App) planFor(envID string) (*store.Plan, error) {
 	if a.OpenPlan != 0 {
 		if p, err := a.Store.PlanByID(a.OpenPlan); err != nil {
 			return nil, err
-		} else if p != nil && p.EnvID == envID {
+		} else if p != nil {
 			return p, nil
 		}
 	} else if a.PlanName != "" {
-		return a.findPlan(envID, a.PlanName)
+		return a.findPlan(a.PlanName)
 	}
 	return a.Store.CurrentPlan(envID)
 }
 
 // RenamePlan renames a plan; its history is unchanged.
 func (a *App) RenamePlan(oldName, newName string) (*store.Plan, string, error) {
-	st, err := a.Loadout()
+	if _, err := a.Loadout(); err != nil {
+		return nil, "", err
+	}
+	p, err := a.findPlan(oldName)
 	if err != nil {
 		return nil, "", err
 	}
-	p, err := a.findPlan(st.Ix.Env.ID, oldName)
-	if err != nil {
-		return nil, "", err
-	}
-	n, err := a.checkPlanName(st.Ix.Env.ID, newName, p.ID)
+	n, err := a.checkPlanName(newName, p.ID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -424,16 +420,16 @@ func (a *App) RemovePlan(name string) (removed, current *store.Plan, err error) 
 		return nil, nil, err
 	}
 	e := st.Ix.Env
-	p, err := a.findPlan(e.ID, name)
+	p, err := a.findPlan(name)
 	if err != nil {
 		return nil, nil, err
 	}
-	ps, err := a.Store.Plans(e.ID)
+	ps, err := a.Store.Plans()
 	if err != nil {
 		return nil, nil, err
 	}
 	if len(ps) <= 1 {
-		return nil, nil, fmt.Errorf("plan:%s is the environment's only plan; it cannot be removed", p.Name)
+		return nil, nil, fmt.Errorf("plan:%s is the only plan; it cannot be removed", p.Name)
 	}
 	if err := a.Store.DeletePlan(p.ID); err != nil {
 		return nil, nil, err

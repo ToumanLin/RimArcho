@@ -11,7 +11,7 @@ func EnvRemovalTitle(r *app.EnvRemoval) string { return Tf("remove game %s", r.E
 // EnvRemovalLines says what removing the environment forgets and what stays.
 func EnvRemovalLines(r *app.EnvRemoval) []string {
 	out := []string{
-		Tf("RimArcho forgets: %d lists, %d launch records, %d mods read from its Data/ and Mods/, its history", r.Plans, r.Launches, r.Mods),
+		Tf("RimArcho forgets: %d launch records, %d mods read from its Data/ and Mods/, its history; lists are shared by every game and stay", r.Launches, r.Mods),
 		T("stays: the game folder, every mod and save; the shared mod folders and what you noted on mods"),
 	}
 	if r.Current {
@@ -28,8 +28,8 @@ func init() {
 	Register(map[string]string{
 		"remove game %s":  "移除游戏 %s",
 		"remove the game": "移除游戏",
-		"RimArcho forgets: %d lists, %d launch records, %d mods read from its Data/ and Mods/, its history": "RimArcho 忘掉：%d 个列表、%d 条启动记录、从它的 Data/ 和 Mods/ 读到的 %d 个 Mod，以及它的历史",
-		"stays: the game folder, every mod and save; the shared mod folders and what you noted on mods":     "保留：游戏文件夹、所有 mod 和存档；共享的 Mod 文件夹和你给 mod 记下的内容",
+		"RimArcho forgets: %d launch records, %d mods read from its Data/ and Mods/, its history; lists are shared by every game and stay": "RimArcho 忘掉：%d 条启动记录、从它的 Data/ 和 Mods/ 读到的 %d 个 Mod，以及它的历史；列表是所有游戏共用的，会保留",
+		"stays: the game folder, every mod and save; the shared mod folders and what you noted on mods":                                    "保留：游戏文件夹、所有 mod 和存档；共享的 Mod 文件夹和你给 mod 记下的内容",
 		"then %s is in use": "之后使用 %s",
 		"no game is left":   "之后不再有游戏",
 		"removed game %s":   "已移除游戏 %s",

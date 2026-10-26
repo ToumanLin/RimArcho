@@ -60,6 +60,9 @@ func libKind(c *Ctx, i *app.LibInstance) string {
 	if i.Source == app.LibLocked && !i.Created.IsZero() {
 		return "locked " + c.App.FormatTime(i.Created)
 	}
+	if i.Source == app.LibLocal && len(i.DirectoryValues) > 0 { // local-<game>: which game's Mods/
+		return i.DirectoryValues[0]
+	}
 	return i.Source
 }
 

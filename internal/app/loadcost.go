@@ -69,8 +69,8 @@ func (a *App) PlanLoadCost(ctx context.Context, planID int64, progress func(done
 		if err != nil {
 			return nil, err
 		}
-		if p == nil || p.EnvID != st.Ix.Env.ID {
-			return nil, fmt.Errorf("no plan %d in this environment", planID)
+		if p == nil {
+			return nil, fmt.Errorf("no plan %d", planID)
 		}
 	}
 	ps, err := a.PlanState(st, p)

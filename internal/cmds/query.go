@@ -830,7 +830,7 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 		line += fmt.Sprintf(", same as v%d (%s)", st.Latest.N, st.Latest.Source)
 	}
 	plan := app.PlanRef(st.Plan)
-	if ps, err := c.App.Store.Plans(st.Ix.Env.ID); err == nil && len(ps) > 1 {
+	if ps, err := c.App.Store.Plans(); err == nil && len(ps) > 1 {
 		plan += fmt.Sprintf(" (%d plans: archo plan list)", len(ps))
 	}
 	root.KV("plan", plan)

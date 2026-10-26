@@ -10,7 +10,7 @@ $ archo library --facets
 library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
   filters:
     tag: QoL 1
-    source: workshop 5, local 1
+    source: workshop 5, local-main 1
     location: $ROOT/Steam/steamapps/common/RimWorld/Mods 1, $ROOT/Steam/steamapps/workshop/content/294100 5
     version: 1.6 3, 1.4 1
     state: missing 1, residue 1
@@ -54,7 +54,7 @@ $ archo library --include tag:QoL --facets
 library: 1 of 5 mods match (tag:QoL)
   filters:
     tag: +QoL 1
-    source: workshop 1, local 0
+    source: workshop 1, local-main 0
     location: $ROOT/Steam/steamapps/common/RimWorld/Mods 0, $ROOT/Steam/steamapps/workshop/content/294100 1
     version: 1.6 1, 1.4 0
     state: missing 0, residue 0
@@ -81,7 +81,7 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5100
     supports: 1.6
     updated: 2026-09-21 14:13
-  #iqmu local  549 B  (current plan)
+  #iqmu local-main  549 B  (current plan)
     path: $ROOT/Steam/steamapps/common/RimWorld/Mods/Lockable Copy
     supports: 1.6
     updated: 2026-10-01 10:00

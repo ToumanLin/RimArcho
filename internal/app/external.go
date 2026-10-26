@@ -15,7 +15,7 @@ import (
 // attributeExternal handles a ModsConfig.xml whose hash is neither the one RimArcho last
 // saw nor the one it last wrote (04 §4.3). The change belongs to the plan that last wrote
 // the file — possibly another plan of this environment, or a plan of another environment
-// sharing the user data folder — with entries resolved by that plan's environment (§4.2).
+// sharing the user data folder — with entries resolved by the game that wrote it (§4.2).
 // Without a usable record it belongs to the current plan. A file that only differs in
 // format from the version the file is known to hold is no change.
 //
@@ -27,6 +27,9 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 		return err
 	}
 	list, _ := reg.FromTokens(st.File.Active)
+	read := func(entries string) loadout.List {
+		return reg.Heal(a.localizer(tenv.ID, reg, nil)(loadout.Decode(entries)))
+	}
 	// The version the file was known to hold: the writer's, else (no record) the newest.
 	var ref *store.Version
 	if target.ID == mcs.WriterPlan && mcs.WriterVersion > 0 {
@@ -40,7 +43,7 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 		}
 	}
 	mcs.Seen = h
-	if ref != nil && ref.GameVersion == st.File.Version && reg.Heal(loadout.Decode(ref.Entries)).Equal(list) {
+	if ref != nil && ref.GameVersion == st.File.Version && read(ref.Entries).Equal(list) {
 		// Rewritten by the game or another tool without a real change (formatting).
 		return nil
 	}
@@ -48,8 +51,8 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 	if err != nil {
 		return err
 	}
-	cur := reg.Heal(loadout.Decode(ws.Entries))
-	clean := ref == nil || cur.Equal(reg.Heal(loadout.Decode(ref.Entries)))
+	cur := read(ws.Entries)
+	clean := ref == nil || cur.Equal(read(ref.Entries))
 	n, err := a.Store.AddVersion(target.ID, &store.Version{Created: now, Source: "external", Entries: list.Encode(),
 		GameVersion: st.File.Version, Note: "ModsConfig.xml changed outside RimArcho"})
 	if err != nil {
@@ -77,7 +80,7 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 	if err := a.Store.SetWorkspace(ws); err != nil {
 		return err
 	}
-	mcs.WriterPlan, mcs.WriterVersion = target.ID, n
+	mcs.WriterPlan, mcs.WriterVersion, mcs.WriterEnv = target.ID, n, tenv.ID
 	return nil
 }
 
@@ -85,7 +88,7 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 // environment and that environment's registry: the record's writer when it still exists,
 // else the current plan.
 func (a *App) writerPlan(st *LoadoutState, mcs *store.ModsConfigState) (*store.Plan, *env.Environment, *loadout.Registry, error) {
-	if mcs.WriterPlan == 0 || mcs.WriterPlan == st.Plan.ID {
+	if mcs.WriterPlan == 0 || mcs.WriterPlan == st.Plan.ID && (mcs.WriterEnv == "" || mcs.WriterEnv == st.Ix.Env.ID) {
 		return st.Plan, st.Ix.Env, st.Reg, nil
 	}
 	p, err := a.Store.PlanByID(mcs.WriterPlan)
@@ -95,15 +98,16 @@ func (a *App) writerPlan(st *LoadoutState, mcs *store.ModsConfigState) (*store.P
 	if p == nil { // the writer was deleted
 		return st.Plan, st.Ix.Env, st.Reg, nil
 	}
-	if p.EnvID == st.Ix.Env.ID {
+	// Lists are shared by every game: the entries are read as the game that wrote them.
+	if mcs.WriterEnv == "" || mcs.WriterEnv == st.Ix.Env.ID {
 		return p, st.Ix.Env, st.Reg, nil
 	}
-	e, err := a.Store.EnvByID(p.EnvID)
+	e, err := a.Store.EnvByID(mcs.WriterEnv)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	if e == nil {
-		return st.Plan, st.Ix.Env, st.Reg, nil
+		return p, st.Ix.Env, st.Reg, nil
 	}
 	ix, err := a.loadIndex(e)
 	if err != nil {
@@ -152,14 +156,13 @@ func (c *ExternalConflict) Commands(from *env.Environment) []string {
 		pre+"loadout ignore-external")
 }
 
-// Conflicts lists the plans of the environment with an unloaded external version, the
-// current plan first.
+// Conflicts lists the plans with an unloaded external version, the current plan first.
 func (a *App) Conflicts(st *LoadoutState) ([]*ExternalConflict, error) {
 	var out []*ExternalConflict
 	if st.WS.Conflict != 0 {
 		out = append(out, &ExternalConflict{Plan: st.Plan, Env: st.Ix.Env, Version: st.WS.Conflict, Current: true})
 	}
-	ps, err := a.Store.Plans(st.Ix.Env.ID)
+	ps, err := a.Store.Plans()
 	if err != nil {
 		return nil, err
 	}
@@ -203,9 +206,11 @@ func (a *App) writeBlocker(st *LoadoutState) (*ExternalConflict, error) {
 		return nil, err
 	}
 	e := st.Ix.Env
-	if p.EnvID != e.ID {
-		if e, err = a.Store.EnvByID(p.EnvID); err != nil || e == nil {
+	if mcs.WriterEnv != "" && mcs.WriterEnv != e.ID {
+		if o, err := a.Store.EnvByID(mcs.WriterEnv); err != nil {
 			return nil, err
+		} else if o != nil {
+			e = o
 		}
 	}
 	return &ExternalConflict{Plan: p, Env: e, Version: ws.Conflict}, nil

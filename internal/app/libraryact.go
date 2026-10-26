@@ -21,14 +21,14 @@ import (
 
 // PlanRemoval is one plan a removal changed: one undo step in that plan.
 type PlanRemoval struct {
-	Plan    string // "<env>/<plan>" for another environment of the same game
+	Plan    string
 	Current bool
 	Removed int
 }
 
-// RemoveFromPlans takes the instances out of every plan that has them, in this environment
-// and every other one of the same game (the plans Mod 库存 lists under "used in"). Each
-// plan gets one undo step; nothing is written to the game.
+// RemoveFromPlans takes the instances out of every plan that has them (the plans Mod 库存
+// lists under "used in"; lists are shared by every game). Each plan gets one undo step;
+// nothing is written to the game.
 func (a *App) RemoveFromPlans(refs []string) ([]PlanRemoval, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -59,33 +59,28 @@ func (a *App) RemoveFromPlans(refs []string) ([]PlanRemoval, error) {
 		}
 	}
 	var res []PlanRemoval
-	for _, le := range envs {
-		ps, err := a.Store.Plans(le.e.ID)
+	ps, err := a.Store.Plans()
+	if err != nil {
+		return nil, err
+	}
+	f := keep(libHere(envs))
+	for _, p := range ps {
+		r := PlanRemoval{Plan: p.Name}
+		if st.Plan != nil && p.ID == st.Plan.ID {
+			r.Current = true
+			_, err = a.edit("disable", func(_ *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+				out, n := f(l)
+				r.Removed = n
+				return out, nil, nil
+			})
+		} else {
+			r.Removed, err = a.editOther(p, "disable", f)
+		}
 		if err != nil {
 			return res, err
 		}
-		f := keep(le.here)
-		for _, p := range ps {
-			r := PlanRemoval{Plan: p.Name}
-			if !le.cur {
-				r.Plan = le.e.Name + "/" + p.Name
-			}
-			if le.cur && st.Plan != nil && p.ID == st.Plan.ID {
-				r.Current = true
-				_, err = a.edit("disable", func(_ *LoadoutState, l loadout.List) (loadout.List, []string, error) {
-					out, n := f(l)
-					r.Removed = n
-					return out, nil, nil
-				})
-			} else {
-				r.Removed, err = a.editOther(p, "disable", f)
-			}
-			if err != nil {
-				return res, err
-			}
-			if r.Removed > 0 {
-				res = append(res, r)
-			}
+		if r.Removed > 0 {
+			res = append(res, r)
 		}
 	}
 	return res, nil

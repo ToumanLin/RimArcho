@@ -311,8 +311,9 @@ func packHomeRow(p PackRow, chip, envName, gameVersion string) HomeRow {
 }
 
 // AddOtherEnvs puts the other environments' plans and packs on the home page (06 §2.3):
-// it lists what you play everywhere, not only in the current environment. Their state
-// comes from PlanProblems like any plan that is not current; nothing is loaded or scanned.
+// it lists what you play everywhere, not only in the current environment. Lists are
+// shared by every game, so each game lists all of them. Their state comes from
+// PlanProblems like any plan that is not current; nothing is loaded or scanned.
 func AddOtherEnvs(a *app.App, h *Home, current string) {
 	envs, err := a.Store.Envs()
 	if err != nil {

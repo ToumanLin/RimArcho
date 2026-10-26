@@ -181,6 +181,7 @@ var zhText = map[string]string{
 	"no problems found":                                  "没有发现问题",
 	"needs attention, ! shows what":                      "需要处理，按 ! 查看",
 	"the game cannot load it":                            "游戏无法加载它",
+	"click to keep it open":                              "点击固定",
 	"About.xml is renamed: the game cannot load it":      "About.xml 被改了名，游戏无法加载它",
 	"no longer subscribed: the game ignores this folder": "已取消订阅，游戏会忽略这个文件夹",
 	"listed in ModsConfig.xml, but not installed":        "ModsConfig.xml 里有它，但没有安装",

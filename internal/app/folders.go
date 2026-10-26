@@ -119,6 +119,24 @@ func (a *App) FolderAdd(kind source.Kind, root string) (SourceChange, error) {
 			return SourceChange{Source: s, Action: "unchanged"}, nil
 		}
 	}
+	// A folder removed before comes back as itself: its mods keep their IDs, so lists,
+	// tags and notes find them again once it is read.
+	for _, s := range shared {
+		if s.Status == source.StatusRetired && s.Kind == kind && kind != source.Workshop && env.PathKey(s.Root) == env.PathKey(root) {
+			all, err := a.Store.AllSources()
+			if err != nil {
+				return SourceChange{}, err
+			}
+			s.Label, s.Status = nextLabel(all, kind), source.StatusOK
+			if !dirExists(root) {
+				s.Status = source.StatusMissing
+			}
+			if err := a.Store.UpdateSource(s); err != nil {
+				return SourceChange{}, err
+			}
+			return SourceChange{Source: s, Action: "added"}, nil
+		}
+	}
 	var ws *source.Source
 	if kind == source.Workshop {
 		if ws, err = a.workshopFolder(); err != nil {
@@ -235,8 +253,10 @@ func (a *App) SharedUnread() bool {
 // folder (steamapps\workshop\content\294100) as a shared SteamCMD folder (02 §0). It is
 // never the Workshop folder: that one is the Steam client's, and a game's own folder must
 // not move it. Nothing happens when the folder is missing, is the Steam client's, or is
-// known already, retired included: a folder the player removed stays removed.
-func (a *App) adoptGameWorkshop(e *env.Environment) (*SourceChange, error) {
+// known already, retired included: a folder the player removed stays removed — except when
+// the player adds the game (again) or points it at this folder (explicit), which brings
+// the game's own folder back (a game removed and added again, 2026-10-25).
+func (a *App) adoptGameWorkshop(e *env.Environment, explicit bool) (*SourceChange, error) {
 	w := env.GameWorkshopFor(e.GameRoot)
 	if !dirExists(w) {
 		return nil, nil
@@ -252,6 +272,9 @@ func (a *App) adoptGameWorkshop(e *env.Environment) (*SourceChange, error) {
 	}
 	for _, s := range all {
 		if env.PathKey(s.Root) == env.PathKey(w) {
+			if explicit && s.Status == source.StatusRetired && s.EnvID == store.Shared && s.Kind == source.SteamCMD {
+				continue // FolderAdd revives it
+			}
 			return nil, nil
 		}
 	}
@@ -276,7 +299,7 @@ func (a *App) adoptGameWorkshops() error {
 		return err
 	}
 	for _, e := range envs {
-		if _, err := a.adoptGameWorkshop(e); err != nil {
+		if _, err := a.adoptGameWorkshop(e, false); err != nil {
 			return err
 		}
 	}

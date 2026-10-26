@@ -15,6 +15,7 @@ import { virtualRows } from "./virtualrows.js";
 import { on } from "./api.js";
 import { wireSeparator } from "./separator.js";
 import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
+import { setNeedRunner } from "./badgepop.js";
 
 let ui = null;
 export function initScreens(u) {
@@ -439,6 +440,8 @@ function markNeeds() {
 
 // Read-only needs actions stay available during a game switch (06 §3.1).
 const actionWrite = (a) => ["open-url", "view", "list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
+// The pinned badge popover in the editor offers the same actions (06 §4.2).
+setNeedRunner((it, a) => runAction(it, a), actionWrite);
 
 async function runAction(it, act) {
   switch (act.kind) {

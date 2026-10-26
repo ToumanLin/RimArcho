@@ -21,13 +21,20 @@ export function copyablePath(node, path) {
   node.setAttribute("role", "button");
   node.title = path + "\n" + T("click to copy");
   node.addEventListener("mousedown", e => e.stopPropagation());
-  node.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); copy(path, node); });
+  // a drag that selected part of the text keeps that selection for ctrl+c (06 §3.1 rule 13)
+  node.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); if (!selectedIn(node)) copy(path, node); });
   node.addEventListener("keydown", e => {
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault(); e.stopPropagation();
     if (!e.repeat) copy(path, node);
   });
   return node;
+}
+
+// selectedIn: the player has selected text inside node (a drag, not a click).
+function selectedIn(node) {
+  const sel = globalThis.getSelection ? globalThis.getSelection() : null;
+  return !!sel && !sel.isCollapsed && sel.toString().trim() !== "" && node.contains(sel.anchorNode);
 }
 
 // Render known paths before splitting facts, preserving spaces (even double spaces)

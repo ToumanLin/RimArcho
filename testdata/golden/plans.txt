@@ -184,7 +184,7 @@ plan:night 2  removed
   current: plan:default
 
 $ archo plan remove default --yes
-error: plan:default is the environment's only plan; it cannot be removed
+error: plan:default is the only plan; it cannot be removed
 [exit 1]
 
 $ archo plan list

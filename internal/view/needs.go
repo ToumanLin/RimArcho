@@ -129,9 +129,12 @@ type Need struct {
 type Needs struct {
 	Items  []Need         `json:"items"`
 	Status map[string]int `json:"status"` // each mod's row icon
-	Count  int            `json:"count"`  // the top bar's number
-	Never  bool           `json:"never"`  // the mods' files were never checked
-	Stale  bool           `json:"stale"`  // the files changed since the last check
+	// Reasons say why a row has its icon: the items behind it, worst first (06 §4.2: the
+	// badge's hover / pinned popover).
+	Reasons map[string][]Reason `json:"reasons,omitempty"`
+	Count   int                 `json:"count"` // the top bar's number
+	Never   bool                `json:"never"` // the mods' files were never checked
+	Stale   bool                `json:"stale"` // the files changed since the last check
 	// Launch is the most likely trouble of a launch (app.LaunchChecks among the counted
 	// items), for the launch page's tab and the TUI's launch line (06 §2.3); nil when none.
 	Launch *LaunchHint `json:"launch,omitempty"`
@@ -141,10 +144,20 @@ type Needs struct {
 	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "10 月 21 日"
 }
 
+// Reason is one item behind a row's status icon: its status, its one-line text and the
+// same actions 能不能跑 offers for it (the pinned popover's buttons, 06 §4.2).
+type Reason struct {
+	Status  int      `json:"status"`
+	Text    string   `json:"text"`
+	Why     string   `json:"why,omitempty"`
+	Section int      `json:"section"`
+	Actions []Action `json:"actions,omitempty"`
+}
+
 // BuildNeeds turns the problem set and the environment's open questions into items, and
 // counts them (06 §7, §4.2, §7).
 func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
-	n := &Needs{Status: map[string]int{}}
+	n := &Needs{Status: map[string]int{}, Reasons: map[string][]Reason{}}
 	n.Never = ps.Analysis == nil || ps.Analysis.Run == nil
 	n.Stale = !n.Never && !ps.Analysis.Fresh
 	if st == nil {
@@ -184,11 +197,19 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		if !it.Fold && len(icons) > 1 {
 			icons = icons[:1] // the subject; the others are what it needs or conflicts with
 		}
+		text := it.Title
+		if text == "" {
+			text = it.Text
+		}
 		for _, id := range icons {
 			if it.Status > n.Status[id] {
 				n.Status[id] = it.Status
 			}
+			n.Reasons[id] = append(n.Reasons[id], Reason{Status: it.Status, Text: text, Why: it.Why, Section: it.Section, Actions: popActions(it.Actions)})
 		}
+	}
+	for _, rs := range n.Reasons {
+		sort.SliceStable(rs, func(i, j int) bool { return rs[i].Status > rs[j].Status })
 	}
 	return n
 }
@@ -1063,4 +1084,16 @@ func ShortDate(t time.Time) string {
 		return fmt.Sprintf("%d 月 %d 日", int(t.Month()), t.Day())
 	}
 	return t.Format("Jan 2")
+}
+
+// popActions are an item's actions as the badge popover offers them: all but "fold" (the
+// popover has no parts to unfold).
+func popActions(as []Action) []Action {
+	var out []Action
+	for _, a := range as {
+		if a.Kind != "fold" {
+			out = append(out, a)
+		}
+	}
+	return out
 }

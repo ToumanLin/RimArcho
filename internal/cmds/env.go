@@ -170,7 +170,7 @@ func envRemove(c *Ctx, a *Args) (*render.Doc, error) {
 
 // envRemovalLines says what removing an environment forgets and what stays (06 §2.14).
 func envRemovalLines(n *render.Node, r *app.EnvRemoval) {
-	n.KV("forgets", fmt.Sprintf("%d plans, %d launch records, %d mods read from its Data/ and Mods/, its history", r.Plans, r.Launches, r.Mods))
+	n.KV("forgets", fmt.Sprintf("%d launch records, %d mods read from its Data/ and Mods/, its history; plans are shared by every game and stay", r.Launches, r.Mods))
 	n.KV("keeps", "game files, mods and saves; the shared mod folders and what you noted on mods")
 	if r.Current {
 		if r.Next != "" {

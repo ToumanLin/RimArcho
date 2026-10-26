@@ -23,6 +23,23 @@ type Index struct {
 	Lineages  map[string]*store.Lineage
 	Sources   []*source.Source
 	inst, lin *ids.Shortener
+	own       map[string]*store.Mod // packageId → this game's own Mods/ copy (OwnCopy)
+}
+
+// OwnCopy is this game's own Mods/ copy of a packageId (not a RimArcho link), or nil. A list
+// naming another game's Mods/ copy uses it instead (02 §0 item 14, 04 §1.7).
+func (ix *Index) OwnCopy(pkg string) *store.Mod { return ix.own[strings.ToLower(pkg)] }
+
+// Elsewhere is m when it is another game's Mods/ copy that this game has no copy of its
+// own for — the one a list links in — else the copy to use instead.
+func (ix *Index) Elsewhere(m *store.Mod) *store.Mod {
+	if m == nil || m.Kind != source.Elsewhere {
+		return m
+	}
+	if o := ix.OwnCopy(m.PackageID); o != nil {
+		return o
+	}
+	return m
 }
 
 // Index loads the environment's instances. The result is cached until the tables it is
@@ -84,12 +101,21 @@ func (a *App) loadIndex(e *env.Environment) (*Index, error) {
 			m.Alias, m.Note, m.Tags = p.Alias, p.Note, p.Tags
 		}
 	}
+	if mods, srcs, err = a.withElsewhere(e, mods, srcs); err != nil {
+		return nil, err
+	}
 	ix := &Index{Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs}
 	var iids, lids []string
+	ix.own = map[string]*store.Mod{}
 	for _, m := range mods {
 		ix.ByID[m.ID] = m
 		ix.ByLineage[m.LineageID] = append(ix.ByLineage[m.LineageID], m)
 		iids = append(iids, m.ID)
+		if m.Kind == source.Local && m.Status == identity.Live && !m.Residue && m.Unloadable == "" && !managedLink(m.Rel) && m.PackageID != "" {
+			if _, dup := ix.own[strings.ToLower(m.PackageID)]; !dup {
+				ix.own[strings.ToLower(m.PackageID)] = m
+			}
+		}
 	}
 	for id := range lins {
 		lids = append(lids, id)

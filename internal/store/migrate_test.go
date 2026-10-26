@@ -64,7 +64,7 @@ func TestMigrateV10Plans(t *testing.T) {
 		t.Fatalf("schema_version %s", v)
 	}
 
-	ps, _ := s.Plans("e1")
+	ps := envPlans(s, "e1")
 	var names []string
 	for _, p := range ps {
 		names = append(names, p.Name)
@@ -76,7 +76,7 @@ func TestMigrateV10Plans(t *testing.T) {
 	if s.CurrentPlanID("e1") != def.ID {
 		t.Fatal("the first plan is current")
 	}
-	if p, _ := s.Plans("e3"); len(p) != 0 || s.CurrentPlanID("e3") != 0 {
+	if p := envPlans(s, "e3"); len(p) != 0 || s.CurrentPlanID("e3") != 0 {
 		t.Fatal("an environment without loadout data gets no plan (first use imports ModsConfig.xml)")
 	}
 
@@ -110,9 +110,13 @@ func TestMigrateV10Plans(t *testing.T) {
 		t.Fatal("a tag plan starts without undo steps")
 	}
 
-	e2, _ := s.Plans("e2")
+	e2 := envPlans(s, "e2")
 	if len(e2) != 1 {
 		t.Fatalf("e2 plans: %d", len(e2))
+	}
+	// v19: lists are shared by every game; a clashing name gets the game's name.
+	if e2[0].Name != "default (two)" {
+		t.Fatalf("e2's default is renamed: %q", e2[0].Name)
 	}
 	if v, _ := s.Version(e2[0].ID, 2); v == nil || v.Entries != "Y2" {
 		t.Fatal("versions are numbered per plan")
@@ -127,7 +131,7 @@ func TestMigrateV10Plans(t *testing.T) {
 
 	// Both environments share the folder: the newest write wins, attributed to e2's first plan.
 	st, _ := s.ModsConfigStateAt("C:/Users/x/RimWorld")
-	if !bytes.Equal(st.Written, []byte{2}) || !bytes.Equal(st.Seen, []byte{3}) || st.WriterPlan != e2[0].ID || st.WriterVersion != 2 || st.WrittenAt.Unix() != 260 {
+	if !bytes.Equal(st.Written, []byte{2}) || !bytes.Equal(st.Seen, []byte{3}) || st.WriterPlan != e2[0].ID || st.WriterVersion != 2 || st.WrittenAt.Unix() != 260 || st.WriterEnv != "e2" {
 		t.Fatalf("write record: %+v", st)
 	}
 	if old, _ := s.ModsConfigState("e1"); !bytes.Equal(old.Written, []byte{2}) {
@@ -150,7 +154,7 @@ func TestMigrateV10Plans(t *testing.T) {
 		t.Fatal("loadout_tag is dropped")
 	}
 
-	// Removing an environment removes its plans and their data.
+	// Removing an environment keeps the lists: they are shared by every game.
 	if err := s.DeleteEnv("e1"); err != nil {
 		t.Fatal(err)
 	}
@@ -160,10 +164,21 @@ func TestMigrateV10Plans(t *testing.T) {
 		`SELECT count(*) FROM workspace_undo WHERE plan_id IN (` + ids(def.ID, tagDef.ID, raid.ID) + `)`,
 		`SELECT count(*) FROM meta WHERE key LIKE 'stage:%'`} {
 		s.DB.QueryRow(q).Scan(&n)
-		if n != 0 {
-			t.Fatalf("%s: %d left", q, n)
+		if n == 0 {
+			t.Fatalf("%s: nothing left", q)
 		}
 	}
+}
+
+func envPlans(s *Store, envID string) []*Plan {
+	ps, _ := s.Plans()
+	var out []*Plan
+	for _, p := range ps {
+		if p.EnvID == envID {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func ids(xs ...int64) string {
@@ -195,8 +210,8 @@ func TestPlanStore(t *testing.T) {
 	if _, err := s.CreatePlan("e", "a", fixed); err == nil {
 		t.Fatal("names are unique per environment")
 	}
-	if p, _ := s.CurrentPlan("e"); p == nil || p.ID != a.ID {
-		t.Fatal("without a current plan the first one is used")
+	if p, _ := s.CurrentPlan("e"); p != nil {
+		t.Fatal("a game that never chose a list has none: its first use imports ModsConfig.xml")
 	}
 	s.SetCurrentPlan("e", b.ID)
 	s.SetWorkspace(&Workspace{PlanID: b.ID, Entries: "x", Updated: fixed.Add(time.Hour)})
@@ -206,7 +221,7 @@ func TestPlanStore(t *testing.T) {
 	if p, _ := s.PlanByID(b.ID); !p.Updated.Equal(fixed.Add(time.Hour)) {
 		t.Fatal("updated_at follows the workspace")
 	}
-	if p, _ := s.PlanByName("e", "B"); p == nil || p.ID != b.ID {
+	if p, _ := s.PlanByName("B"); p == nil || p.ID != b.ID {
 		t.Fatal("case-insensitive lookup")
 	}
 	if err := s.DeletePlan(b.ID); err != nil {

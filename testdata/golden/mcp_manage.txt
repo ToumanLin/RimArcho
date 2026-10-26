@@ -485,8 +485,8 @@ versions: 1 (plan:raid night, env:main)
 library: 4 of 5 mods match (used:none)
   L#l4xt  A         [1 of 2 copies, 1.3 KB, plan:raid night +3]
   L#a6o7  Alone     [workshop, 538 B]
-  L#gpto  Bee       [local, 518 B]
-  L#xamx  Leftover  [local, 554 B]
+  L#gpto  Bee       [local-main, 518 B]
+  L#xamx  Leftover  [local-main, 554 B]
 
 > manage_library {"action":"move_to_locked","dry_run":true,"refs":["#iqmu"]}
 #iqmu A dry run, nothing changed: would move to the lock library

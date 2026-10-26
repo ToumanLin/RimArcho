@@ -63,7 +63,7 @@ func (a *App) PlanState(st *LoadoutState, p *store.Plan) (*LoadoutState, error) 
 		}
 	}
 	c.WS = ws
-	c.List = st.Reg.Heal(loadout.Decode(ws.Entries))
+	c.List = c.readList(ws.Entries)
 	return &c, nil
 }
 
@@ -71,7 +71,7 @@ func (a *App) PlanState(st *LoadoutState, p *store.Plan) (*LoadoutState, error) 
 // analysis slots worth keeping.
 func (a *App) planSetKeys(st *LoadoutState) []string {
 	keys := []string{SetFingerprint(st.List)}
-	ps, err := a.Store.Plans(st.Ix.Env.ID)
+	ps, err := a.Store.Plans()
 	if err != nil {
 		return keys
 	}

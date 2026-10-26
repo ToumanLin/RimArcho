@@ -70,8 +70,8 @@ func (a *App) sourceAt(e *env.Environment, reg *loadout.Registry, t time.Time, p
 		!w.WrittenAt.IsZero() && !w.WrittenAt.After(t) {
 		src.ByWrite, src.At, src.PlanID = true, w.WrittenAt, w.WriterPlan
 		if p, _ := a.Store.PlanByID(w.WriterPlan); p != nil {
-			src.EnvID = p.EnvID
-			if reg != nil && p.EnvID == e.ID && w.WriterVersion > 0 {
+			src.EnvID = w.WriterEnv
+			if reg != nil && (w.WriterEnv == "" || w.WriterEnv == e.ID) && w.WriterVersion > 0 {
 				// The written version's list, read as this environment reads it.
 				if v, _ := a.Store.Version(p.ID, w.WriterVersion); v != nil {
 					src.Fingerprint = ListFingerprint(reg.Heal(loadout.Decode(v.Entries)))

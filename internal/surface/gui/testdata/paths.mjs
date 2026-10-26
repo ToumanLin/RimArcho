@@ -64,3 +64,24 @@ test("click, enter and space copy the full value locally and show feedback", asy
   await h.copy(path, node);
   assert.deepEqual(h.browser, [path]);
 });
+
+test("a click that ends a text selection inside the path keeps the selection instead of copying", async () => {
+  const copied = [];
+  let sel = null;
+  const el = (tag, cls, text) => new Element(tag, cls, text);
+  const fields = await loadModules("./fields.js", {
+    "./state.js": { el, esc: s => s, api: {}, T: s => s, errText: e => e.message, say() {} },
+    "/wails/runtime.js": { Clipboard: { SetText: async text => { copied.push(text); } } },
+  }, { document: { activeElement: null }, getSelection: () => sel, setTimeout() {} });
+  const root = el("div");
+  const node = fields.copyablePath(el("span", "", "D:\mods\A"), "D:\mods\A");
+  root.append(node);
+  sel = { isCollapsed: false, toString: () => "mods", anchorNode: node };
+  node.dispatchEvent(event("", { type: "click", preventDefault() {}, stopPropagation() {} }));
+  await flush();
+  assert.deepEqual(copied, []);
+  sel = { isCollapsed: true, toString: () => "", anchorNode: null };
+  node.dispatchEvent(event("", { type: "click", preventDefault() {}, stopPropagation() {} }));
+  await flush();
+  assert.deepEqual(copied, ["D:\mods\A"]);
+});

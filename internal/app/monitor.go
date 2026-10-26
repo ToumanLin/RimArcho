@@ -344,7 +344,7 @@ func (a *App) EnsureMonitor(dryRun bool) (*MonitorResult, error) {
 		ms = monitorInstances(ix)
 		newest = ms[0]
 	}
-	plans, err := a.Store.Plans(ix.Env.ID)
+	plans, err := a.Store.Plans()
 	if err != nil {
 		return r, err
 	}

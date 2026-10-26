@@ -171,7 +171,7 @@ func termMatch(t term, it *Item, f MatchFacts) bool {
 			v = "other"
 		}
 		if len(it.Sources) > 0 {
-			return slices.ContainsFunc(it.Sources, func(s string) bool { return strings.EqualFold(s, v) })
+			return slices.ContainsFunc(it.Sources, func(s string) bool { return app.LocalMatches(v, s) })
 		}
 		return it.Kind == v || v == "steamcmd" && it.SteamCMD
 	case "content":

@@ -193,7 +193,7 @@ func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error)
 		if e != nil {
 			return nil, e
 		}
-		if plan == nil || plan.EnvID != st.Ix.Env.ID {
+		if plan == nil {
 			return nil, errors.New(T("that list is gone"))
 		}
 		st, err = a.PlanState(st, plan)

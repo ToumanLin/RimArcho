@@ -276,7 +276,7 @@ func (a *App) Library() (*Library, error) {
 			srcKind[s.ID] = LibWorkshop
 		case s.Kind == source.SteamCMD:
 			srcKind[s.ID] = LibSteamCMD
-		case s.Kind == source.Local:
+		case s.Kind == source.Local, s.Kind == source.Elsewhere: // every game's Mods/ (04 §1.7)
 			srcKind[s.ID] = LibLocal
 		case a.IsLockSource(s):
 			srcKind[s.ID] = LibLocked
@@ -569,8 +569,22 @@ func (a *App) planList(p *store.Plan) (loadout.List, error) {
 	return loadout.Decode(v.Entries), nil
 }
 
-// libUses maps each instance to the plans (every environment of this game) and packs that
-// use it.
+// libHere maps an instance ID of any list to the instance it is in this game: itself when
+// visible here, else the copy at the same path seen by another game sharing this game
+// folder ("" when none).
+func libHere(envs []libEnv) func(id string) string {
+	return func(id string) string {
+		for _, le := range envs {
+			if h := le.here(id); h != "" {
+				return h
+			}
+		}
+		return ""
+	}
+}
+
+// libUses maps each instance to the plans (lists are shared by every game) and packs
+// that use it.
 func (a *App) libUses(st *LoadoutState) (map[string][]LibUse, error) {
 	out := map[string][]LibUse{}
 	envs, err := a.libEnvs(st)
@@ -580,27 +594,23 @@ func (a *App) libUses(st *LoadoutState) (map[string][]LibUse, error) {
 	names := map[string]libEnv{}
 	for _, le := range envs {
 		names[le.e.Name] = le
-		ps, err := a.Store.Plans(le.e.ID)
-		if err != nil {
-			return nil, err
+	}
+	here := libHere(envs)
+	ps, err := a.Store.Plans()
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range ps {
+		l := st.List
+		if st.Plan == nil || p.ID != st.Plan.ID {
+			if l, err = a.planList(p); err != nil {
+				return nil, err
+			}
 		}
-		for _, p := range ps {
-			l := st.List
-			if !le.cur || st.Plan == nil || p.ID != st.Plan.ID {
-				if l, err = a.planList(p); err != nil {
-					return nil, err
-				}
-			}
-			u := LibUse{Kind: "plan", Name: p.Name}
-			if le.cur {
-				u.PlanID, u.Current = p.ID, st.Plan != nil && p.ID == st.Plan.ID
-			} else {
-				u.Name = le.e.Name + "/" + p.Name
-			}
-			for _, e := range l {
-				if id := le.here(e.Instance); id != "" && !slices.ContainsFunc(out[id], func(x LibUse) bool { return x.Value() == u.Value() }) {
-					out[id] = append(out[id], u)
-				}
+		u := LibUse{Kind: "plan", Name: p.Name, PlanID: p.ID, Current: st.Plan != nil && p.ID == st.Plan.ID}
+		for _, e := range l {
+			if id := here(e.Instance); id != "" && !slices.ContainsFunc(out[id], func(x LibUse) bool { return x.Value() == u.Value() }) {
+				out[id] = append(out[id], u)
 			}
 		}
 	}
@@ -1065,6 +1075,9 @@ func sortFacet(k string, vs []LibFacetValue, lib *Library) {
 	rank := func(v string) int {
 		switch k {
 		case "source":
+			if strings.HasPrefix(v, LibLocal+"-") { // a game's Mods/ (local-main) sorts as local
+				v = LibLocal
+			}
 			return slices.Index(LibSources, v)
 		case "state":
 			return slices.Index(LibStates, v)

@@ -21,6 +21,10 @@ const (
 	Workshop Kind = "workshop"
 	SteamCMD Kind = "steamcmd"
 	Extra    Kind = "extra"
+	// Elsewhere is another game's own Mods/ folder as this game's index shows it (04 §1.7,
+	// 06 §2.9). Never stored: the source is "local" of that game. Its mods are linked into
+	// this game's Mods/ (_Archo_env_<ID>) when a list enables them.
+	Elsewhere Kind = "elsewhere"
 )
 
 // WorkshopLike reports whether sub-directory names of this kind are workshop IDs.

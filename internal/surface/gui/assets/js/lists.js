@@ -2,6 +2,7 @@
 // board has three columns: 未启用 | 已启用 | 详情, with 暂存 and 历史 folded under 详情.
 import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
+import { wireBadges } from "./badgepop.js";
 import { listGeometry, rowAt } from "./listgeometry.js";
 import { bump } from "./motion.js";
 import { beginPageRead, pageLoading } from "./screens.js";
@@ -340,6 +341,7 @@ export function wireLists(ui) {
       ui.menu(e.clientX, e.clientY);
     });
     wireDrag(ui, k, box);
+    wireBadges(k, box, (i) => { const c = S.cols[k]; return c.items[c.view[i]]; }, (it) => (S.board && S.board.status ? rowStatus(it) : 0));
     const input = $(`.area[data-area="${k}"] .search input`);
     if (!input) continue; // 未启用 and 已启用 share the filter bar
     input.placeholder = T("search: words, tag:, author:, type:, has:, -not");

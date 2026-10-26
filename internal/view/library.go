@@ -196,6 +196,9 @@ func LibStateText(s, mm string) string {
 
 // LibSourceText names a source value.
 func LibSourceText(s string) string {
+	if game, ok := strings.CutPrefix(s, app.LibLocal+"-"); ok && game != "" { // a game's Mods/
+		return T("local") + "-" + game
+	}
 	switch s {
 	case app.LibGit:
 		return "Git"

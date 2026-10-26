@@ -30,7 +30,7 @@ func (a *App) prepareEnvLinks(e *env.Environment) error {
 	if err != nil {
 		return err
 	}
-	var tokens []string
+	var tokens, other []string
 	var selected []*store.Mod
 	if e.UserDataRoot != "" {
 		cfg, err := loadout.ReadModsConfig(env.ModsConfigPath(e.UserDataRoot))
@@ -54,11 +54,14 @@ func (a *App) prepareEnvLinks(e *env.Environment) error {
 					tokens = append(tokens, entry.Missing)
 				} else if m := ix.ByID[entry.Instance]; m != nil {
 					selected = append(selected, m)
+				} else {
+					// Lists are shared: this may be the previous game's own Mods/ folder.
+					other = append(other, entry.Instance)
 				}
 			}
 		}
 	}
-	if len(tokens) == 0 && len(selected) == 0 {
+	if len(tokens) == 0 && len(selected) == 0 && len(other) == 0 {
 		return nil
 	}
 
@@ -132,6 +135,11 @@ func (a *App) prepareEnvLinks(e *env.Environment) error {
 			selected = append(selected, m)
 		}
 	}
+	for _, id := range other {
+		if m := byID[id]; m != nil {
+			selected = append(selected, m)
+		}
+	}
 	for _, m := range selected {
 		if m == nil || m.Status != identity.Live || m.Residue || m.Unloadable != "" || present[m.PackageID] {
 			continue
@@ -139,7 +147,7 @@ func (a *App) prepareEnvLinks(e *env.Environment) error {
 		name := ""
 		switch {
 		case m.Kind == source.Local:
-			if s := ix.Source(m.SourceID); s != nil {
+			if s := ix.Source(m.SourceID); s != nil && s.Kind == source.Local {
 				if !envLink(m.Rel) {
 					continue // ordinary local mods belong to the destination
 				}

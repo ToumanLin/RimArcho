@@ -62,7 +62,7 @@ func TestLibraryPage(t *testing.T) {
 		t.Fatalf("total %d shown %d", p.Total, p.Shown)
 	}
 	lock := libRow(t, p, "Lockable")
-	if lock.Single || len(lock.Insts) != 2 || lock.Insts[0].Label != "工坊" || lock.Insts[1].Label != "本地" {
+	if lock.Single || len(lock.Insts) != 2 || lock.Insts[0].Label != "工坊" || lock.Insts[1].Label != "本地-main" {
 		t.Fatalf("Lockable rows: %+v", lock.Insts)
 	}
 	if lock.State != "" || lock.Used != "default" {
@@ -117,7 +117,7 @@ func TestLocationFiltersAcrossPages(t *testing.T) {
 		t.Fatalf("board's local copy: %+v", r.Rows)
 	}
 	p := libPage(t, e, "", "location:"+local)
-	if p.Shown != 1 || len(p.Rows[0].Insts) != 1 || p.Rows[0].Insts[0].Label != "local" {
+	if p.Shown != 1 || len(p.Rows[0].Insts) != 1 || p.Rows[0].Insts[0].Label != "local-main" {
 		t.Fatalf("library's local copy: %+v", p.Rows)
 	}
 	// The same quoted path syntax works in both search boxes, including spaces and colons.

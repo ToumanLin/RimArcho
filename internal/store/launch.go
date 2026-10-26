@@ -19,6 +19,9 @@ type ModsConfigState struct {
 	// file (0 when unknown).
 	WriterPlan    int64
 	WriterVersion int
+	// WriterEnv is the game that wrote it ("" when unknown): lists are shared by every
+	// game, so the plan alone does not say which game's mods its entries were.
+	WriterEnv string
 }
 
 // UserDataKey normalises a user data folder for the write record (case-insensitive on
@@ -38,8 +41,8 @@ func UserDataKey(root string) string {
 func (s *Store) ModsConfigStateAt(userDataRoot string) (*ModsConfigState, error) {
 	var st ModsConfigState
 	var at, plan sql.NullInt64
-	err := s.DB.QueryRow(`SELECT written_hash, seen_hash, written_at, writer_plan, writer_version FROM modsconfig_state WHERE user_data_root=?`,
-		UserDataKey(userDataRoot)).Scan(&st.Written, &st.Seen, &at, &plan, &st.WriterVersion)
+	err := s.DB.QueryRow(`SELECT written_hash, seen_hash, written_at, writer_plan, writer_version, writer_env FROM modsconfig_state WHERE user_data_root=?`,
+		UserDataKey(userDataRoot)).Scan(&st.Written, &st.Seen, &at, &plan, &st.WriterVersion, &st.WriterEnv)
 	if err == sql.ErrNoRows {
 		return &st, nil
 	}
@@ -64,10 +67,10 @@ func (s *Store) SetModsConfigStateAt(userDataRoot string, st *ModsConfigState) e
 	if st.WriterPlan != 0 {
 		plan = st.WriterPlan
 	}
-	_, err := s.DB.Exec(`INSERT INTO modsconfig_state(user_data_root, written_hash, seen_hash, written_at, writer_plan, writer_version) VALUES(?,?,?,?,?,?)
+	_, err := s.DB.Exec(`INSERT INTO modsconfig_state(user_data_root, written_hash, seen_hash, written_at, writer_plan, writer_version, writer_env) VALUES(?,?,?,?,?,?,?)
 		ON CONFLICT(user_data_root) DO UPDATE SET written_hash=excluded.written_hash, seen_hash=excluded.seen_hash, written_at=excluded.written_at,
-		writer_plan=excluded.writer_plan, writer_version=excluded.writer_version`,
-		key, st.Written, st.Seen, at, plan, st.WriterVersion)
+		writer_plan=excluded.writer_plan, writer_version=excluded.writer_version, writer_env=excluded.writer_env`,
+		key, st.Written, st.Seen, at, plan, st.WriterVersion, st.WriterEnv)
 	return err
 }
 
@@ -88,6 +91,9 @@ func (s *Store) ModsConfigState(envID string) (*ModsConfigState, error) {
 //
 // Deprecated: use SetModsConfigStateAt and set the writer.
 func (s *Store) SetModsConfigState(envID string, st *ModsConfigState) error {
+	if st.WriterPlan != 0 && st.WriterEnv == "" {
+		st.WriterEnv = envID
+	}
 	return s.SetModsConfigStateAt(s.envUserData(envID), st)
 }
 

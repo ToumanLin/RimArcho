@@ -11,7 +11,7 @@ func TestMigrateV18LinkLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.DB.Exec(`DROP TABLE managed_link; UPDATE meta SET value='17' WHERE key='schema_version'`); err != nil {
+	if _, err = s.DB.Exec(`DROP TABLE managed_link; ALTER TABLE modsconfig_state DROP COLUMN writer_env; UPDATE meta SET value='17' WHERE key='schema_version'`); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.SetMeta("migration-keeper", "preserved"); err != nil {
@@ -23,7 +23,7 @@ func TestMigrateV18LinkLedger(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	if s.Meta("schema_version") != "18" || s.Meta("migration-keeper") != "preserved" {
+	if s.Meta("schema_version") != "19" || s.Meta("migration-keeper") != "preserved" {
 		t.Fatal("migration lost facts")
 	}
 	row := ManagedLink{Operation: "test", Mods: filepath.Join(t.TempDir(), "Mods"), Name: "_Archo_env_test", Kind: "junction", Instance: "test", Target: "original", NextPath: "entry", NextTarget: "destination"}

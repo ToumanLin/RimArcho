@@ -43,7 +43,7 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 	return a.exportList(st, format)
 }
 
-// ExportPlan renders one of the environment's plans (current or not) in a format.
+// ExportPlan renders a plan (current or not) in a format, as this game reads it.
 func (a *App) ExportPlan(planID int64, format string) ([]byte, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -53,8 +53,8 @@ func (a *App) ExportPlan(planID int64, format string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p == nil || p.EnvID != st.Ix.Env.ID {
-		return nil, fmt.Errorf("no plan %d in env:%s", planID, st.Ix.Env.Name)
+	if p == nil {
+		return nil, fmt.Errorf("no plan %d", planID)
 	}
 	ps, err := a.PlanState(st, p)
 	if err != nil {

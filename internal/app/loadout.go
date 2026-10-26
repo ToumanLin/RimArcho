@@ -36,6 +36,82 @@ type LoadoutState struct {
 
 	cands  []loadout.Candidate // what Reg was built from, deployed instances included
 	deploy map[string]bool     // instances linked into Mods/ by RimArcho (08 §3)
+	// localize reads another game's own entries by packageId (nil: as stored).
+	localize func(loadout.List) loadout.List
+}
+
+// readList is a stored list as this game reads it: another game's Core, DLCs and Mods/
+// folders become their packageIds (lists are shared by every game, 04 §1.1), then every
+// packageId this game has resolves to its instance.
+func (st *LoadoutState) readList(entries string) loadout.List {
+	l := loadout.Decode(entries)
+	if st.localize != nil {
+		l = st.localize(l)
+	}
+	return st.Reg.Heal(l)
+}
+
+// localizer reads the entries of a list that are another game's own instances as this
+// game sees them: this game's own Mods/ copy of the package when it has one; else the
+// instance at the same folder (a link it made, or the other game's Mods/ copy in ix,
+// linked in on save); else a missing entry naming the packageId, so Heal can find this
+// game's copy (Core and DLCs always go this way). ix may be nil.
+func (a *App) localizer(envID string, reg *loadout.Registry, ix *Index) func(loadout.List) loadout.List {
+	return func(l loadout.List) loadout.List {
+		var ids []string
+		own := false
+		for _, e := range l {
+			if e.Instance != "" && !reg.Known(e.Instance) && (ix == nil || ix.ByID[e.Instance] == nil) {
+				ids = append(ids, e.Instance)
+			}
+			if ix != nil && e.Instance != "" {
+				if m := ix.ByID[e.Instance]; m != nil && ix.Elsewhere(m) != m {
+					own = true
+				}
+			}
+		}
+		if own { // another game's Mods/ copy of a mod this game has in its own Mods/
+			l = l.Clone()
+			for i, e := range l {
+				if m := ix.ByID[e.Instance]; m != nil {
+					if o := ix.Elsewhere(m); o != m && l.Index(o.ID) < 0 {
+						l[i] = loadout.Entry{Instance: o.ID}
+					}
+				}
+			}
+		}
+		if len(ids) == 0 {
+			return l
+		}
+		fs, err := a.Store.ForeignInstances(envID, ids)
+		if err != nil || len(fs) == 0 {
+			return l
+		}
+		var byReal map[string]string
+		if ix != nil {
+			byReal = map[string]string{}
+			for _, m := range ix.Mods {
+				if m.Status == identity.Live && m.RealPath != "" && m.Kind != source.Official {
+					byReal[env.PathKey(m.RealPath)] = m.ID
+				}
+			}
+		}
+		out := l.Clone()
+		for i, e := range out {
+			f, ok := fs[e.Instance]
+			if !ok {
+				continue
+			}
+			if id := byReal[env.PathKey(f.RealPath)]; id != "" && !f.Official && f.RealPath != "" {
+				if o := ix.Elsewhere(ix.ByID[id]); o != nil && out.Index(o.ID) < 0 {
+					out[i] = loadout.Entry{Instance: o.ID}
+				}
+			} else if f.PackageID != "" {
+				out[i] = loadout.Entry{Missing: f.PackageID}
+			}
+		}
+		return out
+	}
 }
 
 // GameMM is the environment's game major.minor version.
@@ -51,7 +127,7 @@ func (st *LoadoutState) Baseline() loadout.List {
 	if st.Latest == nil {
 		return nil
 	}
-	return st.Reg.Heal(loadout.Decode(st.Latest.Entries))
+	return st.readList(st.Latest.Entries)
 }
 
 // Changes is the diff from the newest version to the workspace.
@@ -161,7 +237,7 @@ func (a *App) loadLoadout(ix *Index) (*LoadoutState, error) {
 	if err != nil {
 		return nil, err
 	}
-	st := &LoadoutState{Ix: ix, Reg: reg, Aliases: aliases, cands: all, deploy: deploy}
+	st := &LoadoutState{Ix: ix, Reg: reg, Aliases: aliases, cands: all, deploy: deploy, localize: a.localizer(ix.Env.ID, reg, ix)}
 	if err := a.sync(st); err != nil {
 		return nil, err
 	}
@@ -213,11 +289,17 @@ func (a *App) sync(st *LoadoutState) error {
 		return err
 	}
 	if plan == nil {
-		// First use (04 §1.4): ModsConfig.xml becomes the environment's first plan.
-		p, err := a.Store.CreatePlan(e.ID, store.DefaultPlanName, now)
+		if plan, err = a.adoptPlan(st, mcs, h); err != nil {
+			return err
+		}
+	}
+	if plan == nil {
+		// First use (04 §1.4): ModsConfig.xml becomes a new list, current in this game.
+		name := a.firstPlanName(e)
+		p, err := a.Store.CreatePlan(e.ID, name, now)
 		if err != nil {
 			// Another process may have just made it.
-			if p, _ = a.Store.PlanByName(e.ID, store.DefaultPlanName); p == nil {
+			if p, _ = a.Store.PlanByName(name); p == nil {
 				return err
 			}
 			plan = p
@@ -263,9 +345,52 @@ func (a *App) sync(st *LoadoutState) error {
 		return err
 	}
 	st.WS = ws
-	st.List = st.Reg.Heal(loadout.Decode(ws.Entries))
+	st.List = st.readList(ws.Entries)
 	st.Latest, err = a.Store.LatestVersion(plan.ID)
 	return err
+}
+
+// adoptPlan picks the current list of a game that has none yet, from the lists other
+// games already have (they are shared, 04 §1.4): the list that last wrote this game's
+// ModsConfig.xml when the file is still what it wrote, else — with no ModsConfig.xml —
+// the most recently changed list. nil: import the file as a new list.
+func (a *App) adoptPlan(st *LoadoutState, mcs *store.ModsConfigState, h []byte) (*store.Plan, error) {
+	e := st.Ix.Env
+	var p *store.Plan
+	switch {
+	case st.File != nil:
+		if mcs.WriterPlan == 0 || !bytes.Equal(h, mcs.Written) {
+			return nil, nil
+		}
+		var err error
+		if p, err = a.Store.PlanByID(mcs.WriterPlan); err != nil || p == nil {
+			return nil, err
+		}
+	default:
+		ps, err := a.Store.Plans()
+		if err != nil {
+			return nil, err
+		}
+		for _, q := range ps {
+			if p == nil || q.Updated.After(p.Updated) {
+				p = q
+			}
+		}
+		if p == nil {
+			return nil, nil
+		}
+	}
+	return p, a.Store.SetCurrentPlan(e.ID, p.ID)
+}
+
+// firstPlanName names the list imported on a game's first use: "default", else the
+// game's name, else that name numbered.
+func (a *App) firstPlanName(e *env.Environment) string {
+	taken := func(n string) bool { p, _ := a.Store.PlanByName(n); return p != nil && strings.EqualFold(p.Name, n) }
+	if !taken(store.DefaultPlanName) {
+		return store.DefaultPlanName
+	}
+	return store.UniquePlanName(e.Name, taken)
 }
 
 // planWorkspace returns a plan's workspace; a plan without one (only versions) starts
@@ -862,7 +987,7 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool) (*SaveResul
 	// The write record is per user data folder and names the writer (04 §4.3).
 	h := loadout.Hash(data)
 	if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, &store.ModsConfigState{Written: h, Seen: h, WrittenAt: now,
-		WriterPlan: st.Plan.ID, WriterVersion: n}); err != nil {
+		WriterPlan: st.Plan.ID, WriterVersion: n, WriterEnv: e.ID}); err != nil {
 		return nil, err
 	}
 	st.WS.OriginVersion, st.WS.OriginKind, st.WS.Conflict, st.WS.Updated = n, "save", 0, now
@@ -914,7 +1039,7 @@ func (a *App) ListAt(st *LoadoutState, n int) (loadout.List, error) {
 	if err != nil || v == nil {
 		return nil, fmt.Errorf("no version v%d", n)
 	}
-	return st.Reg.Heal(loadout.Decode(v.Entries)), nil
+	return st.readList(v.Entries), nil
 }
 
 // Checkout loads a version into the workspace (it still has to be saved).

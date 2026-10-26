@@ -7,6 +7,24 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Lists are shared by every game (04 §1.7). Switching games no longer hides the lists made
+  in another one; each game keeps its own current list. A list's Core, DLC and game-folder
+  `Mods/` entries are read as the open game's own copy by packageId. Removing a game keeps
+  the lists. The database moves to schema v19: lists with the same name in two games get the
+  game's name added ("default (1.6)").
+- The mod library also lists every other game's own `Mods/` folder, and a list can enable
+  those mods in any game: writing to the game links them in as `_Archo_env_<ID>`. When the
+  open game has its own copy of the same package in `Mods/`, that copy is used. A game's
+  `Mods/` shows as `local-<game>` (`local-main`, `local-1.6`); `source:local` still matches
+  them all.
+- Removing a game and adding it back restores the SteamCMD folder inside it, with its mods'
+  IDs unchanged; it used to stay "removed". `folder add` on a removed folder also restores it
+  instead of registering a new one.
+- In the plan editor, hovering a row's warning or error icon says what the problem is;
+  clicking it pins the popover so its text can be read and selected, with the same quick
+  actions as "can it run" (Esc or a click elsewhere closes it).
+- Most text in the window can now be selected and copied: mod names, paths, details, logs
+  and popovers. Only controls and draggable rows keep selection off.
 - The plan editor and mod library filter bars now include Location, with one value per
   registered source folder. Multiple locations, exclusions and quoted paths in search are
   supported; CLI/MCP library queries accept `location:<source folder path>` too.

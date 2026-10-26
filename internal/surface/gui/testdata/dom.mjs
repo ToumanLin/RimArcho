@@ -33,6 +33,7 @@ export class Element {
   addEventListener(type, fn) { (this.listeners ||= {})[type] ||= []; this.listeners[type].push(fn); }
   dispatchEvent(e) { for (const fn of this.listeners?.[e.type] || []) fn(e); }
   closest(s) { for (let n = this; n; n = n.parent) if (n.matches(s)) return n; return null; }
+  contains(o) { for (let n = o; n; n = n.parent) if (n === this) return true; return false; }
   get firstChild() { return this.children[0]; }
   get lastChild() { return this.children.at(-1); }
   set innerHTML(_) { for (const c of [...this.children]) c.remove(); this.text = ""; }

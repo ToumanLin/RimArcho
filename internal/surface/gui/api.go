@@ -162,14 +162,16 @@ func (s *API) Init() *Start {
 // Board is the three columns with what surrounds them.
 type Board struct {
 	*view.Board
-	Status    map[string]int `json:"status"` // row icons (06 §7)
-	Needs     int            `json:"needs"`  // the top bar's number
-	Stamp     string         `json:"stamp"`  // the database state: the page reloads when it changes
-	Envs      []string       `json:"envs"`
-	Error     string         `json:"error,omitempty"`
-	Scanning  bool           `json:"scanning"`
-	Analyzing bool           `json:"analyzing"`
-	Never     bool           `json:"neverScanned"`
+	Status map[string]int `json:"status"` // row icons (06 §7)
+	// Reasons are the items behind each row icon, for its hover / pinned popover (06 §4.2).
+	Reasons   map[string][]view.Reason `json:"reasons,omitempty"`
+	Needs     int                      `json:"needs"` // the top bar's number
+	Stamp     string                   `json:"stamp"` // the database state: the page reloads when it changes
+	Envs      []string                 `json:"envs"`
+	Error     string                   `json:"error,omitempty"`
+	Scanning  bool                     `json:"scanning"`
+	Analyzing bool                     `json:"analyzing"`
+	Never     bool                     `json:"neverScanned"`
 }
 
 // Board builds the columns (06 §2.5) and the counts from the workspace.
@@ -198,7 +200,7 @@ func (s *API) boardLocked() *Board {
 		out.Never = sc == nil
 	}
 	n := s.needsLocked()
-	out.Status, out.Needs = n.Status, n.Count
+	out.Status, out.Reasons, out.Needs = n.Status, n.Reasons, n.Count
 	return out
 }
 

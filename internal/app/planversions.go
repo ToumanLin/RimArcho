@@ -243,7 +243,7 @@ func (a *App) SetPlanVersions(name string, args []string) (*PlanVersionsResult, 
 	if err != nil {
 		return nil, err
 	}
-	p, err := a.findPlan(st.Ix.Env.ID, name)
+	p, err := a.findPlan(name)
 	if err != nil {
 		return nil, err
 	}

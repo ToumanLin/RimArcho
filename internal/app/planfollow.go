@@ -151,7 +151,7 @@ func (a *App) FollowCollection(planName, ref, mode string) (*Followed, error) {
 	if err != nil {
 		return nil, err
 	}
-	p, err := a.findPlan(st.Ix.Env.ID, planName)
+	p, err := a.findPlan(planName)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func (a *App) UnfollowCollection(planName, ref string) (*store.PlanCollection, e
 	if err != nil {
 		return nil, err
 	}
-	p, err := a.findPlan(st.Ix.Env.ID, planName)
+	p, err := a.findPlan(planName)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (a *App) CheckFollowed(planName, ref string, force bool) ([]*Followed, erro
 	if err != nil {
 		return nil, err
 	}
-	p, err := a.findPlan(st.Ix.Env.ID, planName)
+	p, err := a.findPlan(planName)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (a *App) SyncCollection(planName, ref string, dryRun bool) (*SyncResult, er
 	if err != nil {
 		return nil, err
 	}
-	p, err := a.findPlan(st.Ix.Env.ID, planName)
+	p, err := a.findPlan(planName)
 	if err != nil {
 		return nil, err
 	}
