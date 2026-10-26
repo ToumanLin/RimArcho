@@ -1804,3 +1804,8 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .badge-pop .bp-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; user-select: none; }
 .badge-pop.pinned { border-color: var(--line); }
 .row .s:has(svg) { cursor: pointer; }
+
+/* reference numbers (ctrl+\, refnums.js): a layer above everything that takes no clicks */
+.refnums { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; }
+.refnum { position: fixed; box-sizing: border-box; border: var(--hairline) solid #e5262a; }
+.refnum > span { position: absolute; left: -1px; top: -1px; padding: 0 3px; background: #e5262a; color: #fff; font: 600 12px/15px ui-monospace, Consolas, monospace; white-space: nowrap; user-select: none; }

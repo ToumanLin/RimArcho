@@ -79,6 +79,7 @@ func init() {
 		"sort, write to the game, launch (the palette previews them)":             "排序，写入游戏，启动（命令面板里可预览）",
 		"sort, write to the game, to the launch page (the palette previews them)": "排序，写入游戏，去启动页（命令面板里可预览）",
 		"focus the page's areas (the numbers in their headings)":                  "聚焦页面的各个区（标题前的数字）",
+		"reference numbers on every control, text and image":                      "给每个控件、文字和图片标上引用编号",
 		"navigation at the side / at the top":                                     "导航在侧边 / 在顶部",
 		"rescan, check the files again":                                           "重新扫描，重新检查文件",
 		"lists, games":                                                            "列表，游戏",

@@ -7,6 +7,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- `ctrl+\` turns reference numbers on and off: every control, text block, image and chart
+  gets a thin red frame numbered at its top-left (`lib12`: the page, then the number), so a
+  change can be asked for as "change lib12". The frames take no clicks.
 - Lists are shared by every game (04 §1.7). Switching games no longer hides the lists made
   in another one; each game keeps its own current list. A list's Core, DLC and game-folder
   `Mods/` entries are read as the open game's own copy by packageId. Removing a game keeps
