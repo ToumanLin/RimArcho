@@ -69,8 +69,15 @@ func (s *API) bgListLocked() []app.Background {
 }
 
 func (s *API) bgFind(key string) *app.Background {
-	for _, b := range s.bgListLocked() {
+	list := s.bgListLocked()
+	for _, b := range list {
 		if b.Key == key {
+			return &b
+		}
+	}
+	// a mod's copies changed since the key was saved: its first copy with that image
+	for _, b := range list {
+		if app.SameBackground(key, b.Key) {
 			return &b
 		}
 	}
@@ -155,6 +162,15 @@ func (s *API) Backgrounds() *BgPage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := &BgPage{Setting: s.bgSettingLocked(), Dialogs: s.x.native != nil}
+	// a key saved before a mod's copies changed shows on the image it now names
+	if b := s.bgFind(out.Setting.Key); b != nil {
+		out.Setting.Key = b.Key
+	}
+	for i, k := range out.Setting.Stars {
+		if b := s.bgFind(k); b != nil {
+			out.Setting.Stars[i] = b.Key
+		}
+	}
 	game := BgGroup{Name: view.T("the game's own"), Items: []BgItem{}}
 	files := BgGroup{Name: view.T("your images"), Files: true, Items: []BgItem{}}
 	var mods []BgGroup

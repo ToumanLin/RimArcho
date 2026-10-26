@@ -115,3 +115,30 @@ func TestOfficialBackgroundPreviewFallbacks(t *testing.T) {
 		t.Fatalf("official previews: %+v", got)
 	}
 }
+
+// Every copy of a background mod with images is listed, each saying where it is; a copy
+// without its textures (another game's local copy) is left out and hides nothing.
+func TestBackgroundsEveryCopyListed(t *testing.T) {
+	t.Parallel()
+	empty, ws, local := t.TempDir(), t.TempDir(), t.TempDir()
+	os.MkdirAll(filepath.Join(empty, "About"), 0o755)
+	writePNG(t, filepath.Join(ws, "Textures", "UI", "Wide.png"), 1600, 900)
+	writePNG(t, filepath.Join(local, "Textures", "UI", "Wide.png"), 1600, 900)
+	got := CollectBackgrounds([]BackgroundTarget{
+		{Dir: empty, Name: "Shella", LineageID: "L", ID: "a", Source: "local-1.6"},
+		{Dir: ws, Name: "Shella", LineageID: "L", ID: "b", Source: "workshop"},
+	})
+	if len(got) != 1 || got[0].Key != "mod:L/ui/wide" || got[0].Group != "Shella" {
+		t.Fatalf("one copy with images: %+v", got)
+	}
+	got = CollectBackgrounds([]BackgroundTarget{
+		{Dir: local, Name: "Shella", LineageID: "L", ID: "a", Source: "local-1.6"},
+		{Dir: ws, Name: "Shella", LineageID: "L", ID: "b", Source: "workshop"},
+	})
+	if len(got) != 2 || got[0].Key != "mod:L@a/ui/wide" || got[0].Group != "Shella  local-1.6" || got[1].Key != "mod:L@b/ui/wide" || got[1].Group != "Shella  workshop" {
+		t.Fatalf("two copies: %+v", got)
+	}
+	if !SameBackground("mod:L/ui/wide", "mod:L@b/ui/wide") || !SameBackground("mod:L@a/ui/wide", "mod:L/ui/wide") || SameBackground("mod:L/ui/x", "mod:L@a/ui/wide") || SameBackground("mod:M/ui/wide", "mod:L/ui/wide") {
+		t.Fatal("saved keys across copies")
+	}
+}

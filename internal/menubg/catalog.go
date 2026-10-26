@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,37 +33,33 @@ type entry struct {
 	file *zip.File
 }
 
-func catalog(game, lang string, files []*zip.File) ([]entry, error) {
-	defs, err := expansions(game, lang)
-	if err != nil {
-		return nil, err
-	}
+func catalogDefs(game string, defs []expansion, files []*zip.File) []entry {
 	var out []entry
 	for _, d := range defs {
 		prefix := "resources/textures/" + strings.ToLower(strings.Trim(d.Path, "/")) + "."
 		var matches []*zip.File
+		var candidates []string
 		for _, f := range files {
 			name := strings.ToLower(f.Name)
-			if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, ".dds") {
-				matches = append(matches, f)
+			if strings.HasPrefix(name, prefix) {
+				candidates = append(candidates, f.Name)
+				if strings.HasSuffix(name, ".dds") || strings.HasSuffix(name, ".dds.split") {
+					matches = append(matches, f)
+				}
 			}
 		}
-		st, dirErr := os.Stat(filepath.Join(game, "Data", d.Name))
-		installed := d.Name == "Core" || (dirErr == nil && st.IsDir()) || len(matches) > 0
-		if !installed {
-			continue
-		}
 		if len(matches) != 1 {
-			// Missing/ambiguous entries leave room for the official preview fallback.
+			// Do not guess between raw and split entries for one resource.
+			log.Printf("menu backgrounds: %s in %s: expected one .dds or BC7 .dds.split entry for %s, found %d supported candidates (%s); using About/Preview.png if available", d.Name, game, d.Path, len(matches), strings.Join(candidates, ", "))
 			continue
 		}
 		out = append(out, entry{d, matches[0]})
 	}
-	return out, nil
+	return out
 }
 
 func expansions(game, lang string) ([]expansion, error) {
-	b, err := os.ReadFile(filepath.Join(game, "Data", "Core", "Defs", "Misc", "ExpansionDefs", "ExpansionDefs.xml"))
+	b, err := os.ReadFile(defsPath(game))
 	if err != nil {
 		return nil, err
 	}
@@ -170,8 +167,8 @@ func readLabels(r io.Reader, labels map[string]string) {
 	}
 }
 
-// Stamp identifies the ZIP or Unity source files independently of the environment.
-// Stat is the only game filesystem work needed by the UI thread (06 §3.1).
+// Stamp guards extraction against source changes. It is never part of a shared
+// cache key and is only checked while filling missing pairs.
 func Stamp(game string) string {
 	path, _ := filepath.Abs(filepath.Join(game, "Assets.zip"))
 	stamp := fileStamp(path)

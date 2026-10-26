@@ -22,6 +22,38 @@ func gz(s string) []byte {
 	return b.Bytes()
 }
 
+func TestCommunityDataEncoding(t *testing.T) {
+	t.Parallel()
+	const payload = `{"version":"test","rules":[{"oldPackageId":"tester.a","newPackageId":"tester.a2","newName":"A Continued"}]}`
+	for _, tc := range []struct {
+		name string
+		data []byte
+	}{
+		{"plain", []byte(payload)},
+		{"plain_bom", []byte("\xef\xbb\xbf" + payload)},
+		{"gzip", gz(payload)},
+		{"gzip_bom", gz("\xef\xbb\xbf" + payload)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			e := loadoutEnv(t)
+			path := filepath.Join(t.TempDir(), "replacements.json.gz")
+			if err := os.WriteFile(path, tc.data, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			e.MustRun("config", "set", "data.replacements.url", path)
+			e.MustRun("data", "update", "replacements")
+			info := e.App.DataStatus()["replacements"]
+			if info == nil || info.Entries != 1 || info.Version != "test" {
+				t.Fatalf("unexpected replacements status: %+v", info)
+			}
+			if r := e.App.ReplacementFor("", "tester.a"); r == nil || r.NewPackageID != "tester.a2" {
+				t.Fatalf("replacement not loaded: %+v", r)
+			}
+		})
+	}
+}
+
 // D1–D3 (04 §6.3): download, all-or-nothing replacement, and what the data adds to 需要处理.
 func TestCommunityData(t *testing.T) {
 	t.Parallel()

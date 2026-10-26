@@ -3,7 +3,6 @@ package menubg
 import (
 	"archive/zip"
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"image"
@@ -11,35 +10,25 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime/debug"
 	"strings"
 	"sync"
 
 	"github.com/klauspost/compress/zstd"
 )
 
-// One decode lane across environments: only the small outputs and four source
-// rows are live. Completed JPEG pairs survive restarts and language changes.
+// One decode lane across environments: small outputs and four source rows,
+// plus a bounded payload buffer for split BC7 entries. Completed JPEG pairs
+// survive restarts and language changes.
 var decodeMu sync.Mutex
 
-// Prepare performs the slow, cancellable work in the caller's background goroutine.
-// Errors leave the affected image out; the GUI retains its official preview fallback.
-// It must not be called while holding the GUI mutex (06 §3.1, 06 §2.14).
-func Prepare(ctx context.Context, game, cache, lang string) ([]Item, error) {
+// prepareZIP opens an archive only for expansions whose shared pairs are missing.
+func prepareZIP(ctx context.Context, game, cache string, defs []expansion) ([]Item, error) {
 	stamp := Stamp(game)
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if _, err := os.Stat(filepath.Join(game, "Assets.zip")); os.IsNotExist(err) {
-		return prepareUnity(ctx, game, cache, lang, stamp)
-	}
 	archive, err := zip.OpenReader(filepath.Join(game, "Assets.zip"))
 	if err != nil {
 		return nil, err
 	}
 	defer archive.Close()
-	// archive/zip reads the local header (including variable name/extra fields) to
-	// locate the compressed bytes, and verifies size and CRC-32 at EOF for all methods.
 	archive.RegisterDecompressor(93, func(r io.Reader) io.ReadCloser {
 		d, err := zstd.NewReader(r, zstd.WithDecoderConcurrency(1), zstd.WithDecoderMaxMemory(64<<20))
 		if err != nil {
@@ -47,31 +36,20 @@ func Prepare(ctx context.Context, game, cache, lang string) ([]Item, error) {
 		}
 		return d.IOReadCloser()
 	})
-	entries, err := catalog(game, lang, archive.File)
-	if err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(cache, 0o755); err != nil {
-		return nil, err
-	}
 	var out []Item
 	var failures []error
-	for _, e := range entries {
+	for _, e := range catalogDefs(game, defs, archive.File) {
 		if err := ctx.Err(); err != nil {
 			return out, err
 		}
-		hash := sha256.Sum256([]byte("menu-v1|" + stamp + "|" + e.file.Name))
-		base := filepath.Join(cache, fmt.Sprintf("menu-%x", hash[:12]))
-		it := Item{Key: "game:" + strings.ToLower(e.def.Mod), Label: e.def.Label, Full: base + "-1920.jpg", Thumb: base + "-480.jpg"}
-		if err := preparePair(ctx, e.file, it); err != nil {
-			failures = append(failures, fmt.Errorf("%s: %w", e.def.Name, err))
+		it := cacheItem(cache, e.def)
+		if err := prepareSharedPair(ctx, game, stamp, it, func(staged Item) error {
+			return extractPair(ctx, e.file, staged)
+		}); err != nil {
+			failures = append(failures, fmt.Errorf("%s (%s): %w; using About/Preview.png if available", e.def.Name, e.file.Name, err))
 			continue
 		}
 		out = append(out, it)
-	}
-	// Do not publish a pair under a signature that changed during extraction.
-	if stamp != Stamp(game) {
-		return nil, errors.New("Assets.zip changed while reading menu backgrounds")
 	}
 	return out, errors.Join(failures...)
 }
@@ -81,23 +59,8 @@ type failedReader struct{ err error }
 func (r failedReader) Read([]byte) (int, error) { return 0, r.err }
 func (r failedReader) Close() error             { return nil }
 
-func preparePair(ctx context.Context, f *zip.File, it Item) error {
-	decodeMu.Lock()
-	defer decodeMu.Unlock()
-	if regular(it.Full) && regular(it.Thumb) {
-		return nil
-	}
-	defer debug.FreeOSMemory() // return each image's scratch/output memory (06 §2.14)
-	return extractPair(ctx, f, it)
-}
-
-func regular(path string) bool {
-	st, err := os.Stat(path)
-	return err == nil && st.Mode().IsRegular() && st.Size() > 0
-}
-
 func extractPair(ctx context.Context, f *zip.File, it Item) error {
-	if f.Flags&1 != 0 || f.UncompressedSize64 > 128<<20 {
+	if f.Flags&1 != 0 || f.UncompressedSize64 > maxMenuTexture {
 		return errors.New("encrypted or oversized menu texture")
 	}
 	r, err := f.Open()
@@ -105,7 +68,13 @@ func extractPair(ctx context.Context, f *zip.File, it Item) error {
 		return err
 	}
 	defer r.Close()
-	d, err := ReadDDS(r)
+	checked := &textureReader{r: contextReader{ctx, r}}
+	var d *DDS
+	if strings.HasSuffix(strings.ToLower(f.Name), ".dds.split") {
+		d, err = readSplitDDS(ctx, checked, f.UncompressedSize64)
+	} else {
+		d, err = ReadDDS(checked)
+	}
 	if err != nil {
 		return err
 	}
@@ -114,15 +83,36 @@ func extractPair(ctx context.Context, f *zip.File, it Item) error {
 		return err
 	}
 	// Consume unused mipmaps too: Open's checksum reader reports a bad CRC at EOF.
-	if _, err := io.Copy(io.Discard, contextReader{ctx, r}); err != nil {
+	if _, err := io.Copy(io.Discard, contextReader{ctx, d.r}); err != nil {
 		return err
 	}
+	if checked.err != nil {
+		return checked.err
+	}
 	for i, path := range []string{it.Full, it.Thumb} {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if err := writeJPEG(images[i], path); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// Preserve terminal checksum errors even when an exact-length DDS read consumes
+// the accompanying bytes and io.ReadFull suppresses that error.
+type textureReader struct {
+	r   io.Reader
+	err error
+}
+
+func (r *textureReader) Read(p []byte) (int, error) {
+	n, err := r.r.Read(p)
+	if err != nil && err != io.EOF && r.err == nil {
+		r.err = err
+	}
+	return n, err
 }
 
 type contextReader struct {

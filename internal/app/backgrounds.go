@@ -37,7 +37,7 @@ import (
 
 // Background is one image the launch page can show.
 type Background struct {
-	Key   string `json:"key"`   // "game:<packageId>", "mod:<lineage>/<defName>", "file:<path>"
+	Key   string `json:"key"`   // "game:<packageId>", "mod:<lineage>/<defName>" ("mod:<lineage>@<copy>/<defName>" when several copies have images), "file:<path>"
 	Label string `json:"label"` // its name
 	Group string `json:"group"` // "" the game; else the mod's name
 	Src   string `json:"-"`     // the file on disk
@@ -66,6 +66,7 @@ func (a *App) Backgrounds(ix *Index) []Background {
 // capture these from the existing index, without retaining or reloading every Mod.
 type BackgroundTarget struct {
 	Dir, Name, PackageID, LineageID string
+	ID, Source                      string // the copy (instance) and its source label, such as "workshop" or "local-1.6"
 	Official                        bool
 }
 
@@ -75,7 +76,7 @@ func (a *App) BackgroundTargets(ix *Index) []BackgroundTarget {
 		if !m.TombstoneAt.IsZero() || m.Residue || (m.Kind != source.Official && !strings.Contains(strings.ToLower(m.Name), "background")) {
 			continue
 		}
-		out = append(out, BackgroundTarget{Dir: a.ModPath(ix, m), Name: m.Name, PackageID: m.PackageID, LineageID: m.LineageID, Official: m.Kind == source.Official})
+		out = append(out, BackgroundTarget{Dir: a.ModPath(ix, m), Name: m.Name, PackageID: m.PackageID, LineageID: m.LineageID, ID: m.ID, Source: m.SourceLabel, Official: m.Kind == source.Official})
 	}
 	return out
 }
@@ -83,7 +84,12 @@ func (a *App) BackgroundTargets(ix *Index) []BackgroundTarget {
 // CollectBackgrounds does the slow file reads without an App or database connection.
 func CollectBackgrounds(targets []BackgroundTarget) []Background {
 	var game, mods []Background
-	seen := map[string]bool{}
+	type modCopy struct {
+		t  BackgroundTarget
+		bs []Background
+	}
+	var copies []modCopy
+	n := map[string]int{} // copies with images per lineage
 	for _, m := range targets {
 		dir := m.Dir
 		if m.Official {
@@ -96,13 +102,24 @@ func CollectBackgrounds(targets []BackgroundTarget) []Background {
 			}
 			continue
 		}
-		if seen[m.LineageID] {
-			continue
+		if bs := modBackgrounds(dir); len(bs) > 0 {
+			copies = append(copies, modCopy{m, bs})
+			n[m.LineageID]++
 		}
-		seen[m.LineageID] = true
-		for _, b := range modBackgrounds(dir) {
-			b.Key = "mod:" + m.LineageID + "/" + b.Key
-			b.Group = m.Name
+	}
+	// Every copy with images is listed (a Workshop copy and another game's local one can
+	// differ); when a mod has several, each says where it is and its keys name the copy.
+	for _, c := range copies {
+		lin, group := c.t.LineageID, c.t.Name
+		if n[c.t.LineageID] > 1 {
+			lin += "@" + c.t.ID
+			if c.t.Source != "" {
+				group += "  " + c.t.Source
+			}
+		}
+		for _, b := range c.bs {
+			b.Key = "mod:" + lin + "/" + b.Key
+			b.Group = group
 			mods = append(mods, b)
 		}
 	}
@@ -358,4 +375,27 @@ func pixelReader(src image.Image) func(x, y int) (uint32, uint32, uint32) {
 		r, g, b, _ := src.At(x, y).RGBA()
 		return r >> 8, g >> 8, b >> 8
 	}
+}
+
+// SameBackground: a saved key still names b when the mod's copies changed since, with or
+// without the copy in it ("mod:L@x/k" and "mod:L/k").
+func SameBackground(saved, key string) bool {
+	if saved == key {
+		return true
+	}
+	if !strings.HasPrefix(saved, "mod:") || !strings.HasPrefix(key, "mod:") {
+		return false
+	}
+	return bgWithoutCopy(saved) == bgWithoutCopy(key)
+}
+
+func bgWithoutCopy(k string) string {
+	slash := strings.IndexByte(k, '/')
+	if slash < 0 {
+		return k
+	}
+	if at := strings.IndexByte(k[:slash], '@'); at >= 0 {
+		return k[:at] + k[slash:]
+	}
+	return k
 }

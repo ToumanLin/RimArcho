@@ -6,6 +6,7 @@ import (
 	"log"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -38,7 +39,7 @@ func (s *API) prepareBackgrounds(fresh bool) {
 	if err != nil || s.bgRead.closed {
 		return
 	}
-	base := e.ID + "|" + menubg.Stamp(e.GameRoot) + "|" + view.Lang()
+	base := e.ID + "|" + menubg.InventoryStamp(e.GameRoot) + "|" + view.Lang()
 	if !fresh && s.bgRead.key == base {
 		return
 	}
@@ -55,6 +56,7 @@ func (s *API) prepareBackgrounds(fresh bool) {
 	if s.bgRead.key != base || s.bgsEnv != e.ID {
 		s.bgs = []app.Background{} // plain until the current game's cache is ready
 	}
+	previous := slices.Clone(s.bgs)
 	s.bgRead.key, s.bgRead.active, s.bgsEnv = base, key, e.ID
 	if job != nil {
 		if job.done {
@@ -70,24 +72,49 @@ func (s *API) prepareBackgrounds(fresh bool) {
 	s.bgRead.workers.Add(1)
 	go func() {
 		defer s.bgRead.workers.Done()
-		fallbacks := app.CollectBackgrounds(targets)
-		menu, err := menubg.Prepare(ctx, game, filepath.Join(home, "cache", "backgrounds"), lang)
+		publish := func(items []app.Background, done bool) {
+			s.mu.Lock()
+			job.items, job.done = items, done
+			current, envErr := s.a.Env()
+			active := !s.bgRead.closed && ctx.Err() == nil && envErr == nil && current.ID == e.ID && current.GameRoot == game && s.bgRead.active == key
+			changed := !slices.Equal(s.bgs, items)
+			if active {
+				s.bgs = items
+			}
+			s.mu.Unlock()
+			if active && changed {
+				s.send("backgrounds", nil)
+			}
+		}
+		cache := filepath.Join(home, "cache", "backgrounds")
+		cached, _ := menubg.Cached(ctx, game, cache, lang)
+		if len(cached) > 0 {
+			// Show shared art before inspecting another installation or reading mods.
+			publish(mergeMenuBackgrounds(cached, previous), false)
+		}
+		var games []string
+		if environments, err := s.a.Store.Envs(); err == nil {
+			for _, other := range environments {
+				games = append(games, other.GameRoot)
+			}
+		}
+		menu, err := menubg.PrepareFrom(ctx, game, cache, lang, games)
 		if err != nil && ctx.Err() == nil {
 			log.Printf("menu backgrounds: %v", err)
 		}
-		items := mergeMenuBackgrounds(menu, fallbacks)
-		s.mu.Lock()
-		job.items, job.done = items, true
-		current, envErr := s.a.Env()
-		publish := !s.bgRead.closed && ctx.Err() == nil && envErr == nil && current.ID == e.ID && current.GameRoot == game && s.bgRead.active == key
-		changed := !slices.Equal(s.bgs, items)
-		if publish {
-			s.bgs = items
-		}
-		s.mu.Unlock()
-		if publish && changed {
-			s.send("backgrounds", nil)
-		} // one refresh after the whole batch (06 §2.14)
+		// Cached/extracted official art needs no Preview.png filesystem discovery.
+		fallbackTargets := slices.DeleteFunc(slices.Clone(targets), func(t app.BackgroundTarget) bool {
+			if !t.Official {
+				return false
+			}
+			for _, it := range menu {
+				if strings.EqualFold(it.Key, "game:"+t.PackageID) {
+					return true
+				}
+			}
+			return false
+		})
+		publish(mergeMenuBackgrounds(menu, app.CollectBackgrounds(fallbackTargets)), true)
 	}()
 }
 

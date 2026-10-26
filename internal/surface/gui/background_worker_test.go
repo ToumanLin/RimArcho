@@ -3,15 +3,18 @@ package gui
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"image/jpeg"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/menubg"
 	"github.com/ToumanLin/RimArcho/internal/view"
 	"image"
@@ -23,6 +26,9 @@ func menuGame(t *testing.T, game string) {
 	t.Helper()
 	dir := filepath.Join(game, "Data/Core/Defs/Misc/ExpansionDefs")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(game, "Data", "Royalty"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	defs := `<Defs><ExpansionDef><defName>Core</defName><label>Core</label><backgroundPath>UI/Core</backgroundPath></ExpansionDef><ExpansionDef><defName>Royalty</defName><label>Royalty</label><linkedMod>Ludeon.RimWorld.Royalty</linkedMod><backgroundPath>UI/Royalty</backgroundPath></ExpansionDef></Defs>`
@@ -65,7 +71,7 @@ func awaitBackgrounds(t *testing.T, events <-chan string) {
 	}
 }
 
-func TestMenuBackgroundSettingsAndVersionRefresh(t *testing.T) {
+func TestMenuBackgroundSettingsAndSharedCache(t *testing.T) {
 	t.Parallel()
 	e, api, events := fixture(t)
 	menuGame(t, e.Game)
@@ -123,17 +129,18 @@ func TestMenuBackgroundSettingsAndVersionRefresh(t *testing.T) {
 		}
 	default:
 	}
+	// Game updates leave the shared images and browser URLs alone. Even a broken
+	// source cannot affect a complete valid pair on a fresh settings read.
 	os.Chtimes(filepath.Join(e.Game, "Assets.zip"), time.Unix(100, 0), time.Unix(100, 0))
-	api.HomeBackground()
-	awaitBackgrounds(t, events)
-	if next := api.Backgrounds().Groups[0].Items[1].Full; next == items[1].Full {
-		t.Fatal("updated game kept the previous browser image URL")
+	if err := os.WriteFile(filepath.Join(e.Game, "Assets.zip"), []byte("must not open"), 0644); err != nil {
+		t.Fatal(err)
 	}
-	res := httptest.NewRecorder()
-	api.serveBg(res, httptest.NewRequest("GET", items[1].Full, nil))
-	if res.Code != 404 {
-		t.Fatal("stale image URL served a different game's pixels")
+	api.Backgrounds()
+	api.bgRead.workers.Wait()
+	if next := api.Backgrounds().Groups[0].Items[1].Full; next != items[1].Full {
+		t.Fatal("game update replaced the shared URL")
 	}
+	api.bgRead.workers.Wait()
 	// Rebind this environment to an old game without Assets.zip: no previous game's art.
 	env, err := e.App.Env()
 	if err != nil {
@@ -253,5 +260,84 @@ func TestMissingAndBrokenAssetsKeepOfficialPreview(t *testing.T) {
 				t.Fatalf("preview: %+v %v", cfg, err)
 			}
 		})
+	}
+}
+
+func TestMenuCachedArtPublishedBeforeMissingExtraction(t *testing.T) {
+	e, api, _ := fixture(t)
+	menuGame(t, e.Game)
+	cache := filepath.Join(e.App.Home, "cache", "backgrounds")
+	items, err := menubg.Prepare(context.Background(), e.Game, cache, view.Lang())
+	if err != nil || len(items) != 2 {
+		t.Fatal(items, err)
+	}
+	for _, path := range []string{items[1].Full, items[1].Thumb} {
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	shown, resume := make(chan struct{}), make(chan struct{})
+	var first, release sync.Once
+	t.Cleanup(func() { release.Do(func() { close(resume) }) })
+	api.emit = func(name string, _ any) {
+		if name == "backgrounds" {
+			first.Do(func() { close(shown); <-resume })
+		}
+	}
+	api.HomeBackground()
+	select {
+	case <-shown:
+	case <-time.After(5 * time.Second):
+		t.Fatal("cached art wasn't published")
+	}
+	api.mu.Lock()
+	if len(api.bgs) != 1 || api.bgs[0].Key != app.BgDefault {
+		t.Errorf("cached stage: %+v", api.bgs)
+	}
+	if job := api.bgRead.jobs[api.bgRead.active]; job == nil || job.done {
+		t.Error("missing extraction completed before cached stage")
+	}
+	api.mu.Unlock()
+	if _, err := os.Stat(items[1].Full); !os.IsNotExist(err) {
+		t.Fatal("missing pair extracted before cached art was shown", err)
+	}
+	stampResponds(t, api)
+	release.Do(func() { close(resume) })
+	api.bgRead.workers.Wait()
+	if got := api.Backgrounds().Groups[0].Items; len(got) != 3 {
+		t.Fatalf("missing DLC wasn't filled: %+v", got)
+	}
+	api.bgRead.workers.Wait()
+}
+
+func TestMenuWorkerUsesOtherRegisteredGame(t *testing.T) {
+	e, api, events := fixture(t)
+	menuGame(t, e.Game)
+	if err := os.WriteFile(filepath.Join(e.Game, "Assets.zip"), []byte("selected source is broken"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	other := e.OtherGame("newest", "1.10.100 rev1")
+	menuGame(t, other)
+	if err := e.App.Store.InsertEnv(&env.Environment{ID: "menu-provider", Name: "menu-provider", GameRoot: other, GameVersion: "1.10.100 rev1"}); err != nil {
+		t.Fatal(err)
+	}
+	api.HomeBackground()
+	awaitBackgrounds(t, events)
+	api.bgRead.workers.Wait()
+	for _, it := range api.Backgrounds().Groups[0].Items {
+		if it.Key == BgPlain {
+			continue
+		}
+		res := httptest.NewRecorder()
+		api.serveBg(res, httptest.NewRequest("GET", it.Full, nil))
+		if res.Code != 200 {
+			t.Fatalf("other install didn't provide %s: %d", it.Key, res.Code)
+		}
+	}
+	api.bgRead.workers.Wait()
+	api.mu.Lock()
+	defer api.mu.Unlock()
+	if len(api.bgs) != 2 || !strings.Contains(api.bgs[0].Src, "menu-shared-v1-") {
+		t.Fatalf("not shared extracted art: %+v", api.bgs)
 	}
 }

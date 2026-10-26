@@ -244,7 +244,11 @@ func readDataFile(path string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return io.ReadAll(io.LimitReader(zr, 512<<20))
+		defer zr.Close()
+		b, err = io.ReadAll(io.LimitReader(zr, 512<<20))
+		if err != nil {
+			return nil, err
+		}
 	}
 	return bytes.TrimPrefix(b, []byte{0xEF, 0xBB, 0xBF}), nil
 }

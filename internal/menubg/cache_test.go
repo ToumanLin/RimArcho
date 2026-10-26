@@ -40,6 +40,7 @@ func gameFixture(t *testing.T) string {
 	game := t.TempDir()
 	put(t, filepath.Join(game, "Data/Core/Defs/Misc/ExpansionDefs/ExpansionDefs.xml"), []byte(testDefs))
 	put(t, filepath.Join(game, "Data/Ambiguous/About/About.xml"), []byte("<ModMetaData/>"))
+	put(t, filepath.Join(game, "Data/Royalty/About/About.xml"), []byte("<ModMetaData/>"))
 	return game
 }
 
@@ -117,21 +118,21 @@ func TestPrepareCacheAndVersions(t *testing.T) {
 			if !st.ModTime().Equal(old) {
 				t.Fatal("cache hit rewrote the image")
 			}
-			// A missing member repairs the pair, while another archive gets another cache.
+			// A missing member repairs the pair; source changes and other installs reuse it.
 			os.Remove(items[0].Thumb)
-			if _, err := Prepare(context.Background(), game, cache, "en"); err != nil || !regular(items[0].Thumb) {
+			if _, err := Prepare(context.Background(), game, cache, "en"); err != nil || !validPair(items[0]) {
 				t.Fatal("did not repair incomplete pair", err)
 			}
 			os.Chtimes(filepath.Join(game, "Assets.zip"), old, old)
 			changed, err := Prepare(context.Background(), game, cache, "en")
-			if err != nil || changed[0].Full == items[0].Full {
-				t.Fatal("archive version reused old cache", err)
+			if err != nil || changed[0].Full != items[0].Full {
+				t.Fatal("archive change replaced shared cache", err)
 			}
 			other := gameFixture(t)
 			fixtureZIP(t, other, method, false)
 			different, err := Prepare(context.Background(), other, cache, "en")
-			if err != nil || different[0].Full == items[0].Full {
-				t.Fatal("another game reused old cache", err)
+			if err != nil || different[0].Full != items[0].Full {
+				t.Fatal("another game did not reuse shared cache", err)
 			}
 		})
 	}

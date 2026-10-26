@@ -394,7 +394,7 @@ func TestPrepareUnityExactResourcesAndCache(t *testing.T) {
 		t.Fatal("cache hit rewrote image")
 	}
 	os.Remove(items[0].Thumb)
-	if _, err := Prepare(context.Background(), game, cache, "en"); err != nil || !regular(items[0].Thumb) {
+	if _, err := Prepare(context.Background(), game, cache, "en"); err != nil || !validPair(items[0]) {
 		t.Fatal("pair repair", err)
 	}
 	for _, name := range []string{"resources.assets", "globalgamemanagers", "resources.assets.resS"} {
@@ -407,8 +407,8 @@ func TestPrepareUnityExactResourcesAndCache(t *testing.T) {
 			}
 		}
 		changed, err := Prepare(context.Background(), game, cache, "en")
-		if err != nil || len(changed) != 2 || changed[0].Full == items[0].Full {
-			t.Fatalf("%s did not invalidate: %v", name, err)
+		if err != nil || len(changed) != 2 || changed[0].Full != items[0].Full {
+			t.Fatalf("%s replaced shared cache: %v", name, err)
 		}
 		items = changed
 	}
