@@ -20,11 +20,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   preferences: they never break a constraint and official content stays first. `archo sort`
   lists them under "ends"; `archo rule add ignore community:<pkg>:loadbottom` drops a
   community one.
-- `archo enable` without a position puts each mod at the latest place its constraints
-  allow instead of always at the end: still the end when nothing needs it earlier, but a
-  library goes before the enabled mod that depends on it and a DLC enabled later goes
-  straight back behind the official content. A top mod goes as early as it can, an
-  `attach` mod right after its target.
+- `archo enable` without a position places each mod by the sort constraints instead of
+  always at the end, with the same rule as the editor's suggested position: right after
+  the last enabled mod it must load after (never ahead of Core and the DLCs); before the
+  first enabled mod that needs it when that is all there is (a library, a DLC enabled
+  later); at the end when nothing constrains it; an `attach` mod right after its target.
 - The editor's suggested position (`m`) no longer puts a mod that only needs Harmony
   between Harmony and Core.
 - `ctrl+\` turns reference numbers on and off: every control, text block, image and chart

@@ -204,7 +204,8 @@ func TestTiers(t *testing.T) {
 	}
 }
 
-// Enabling without a position (04 §2.1): the latest position the constraints allow.
+// Enabling without a position (04 §2.1): after what it needs, else before what needs it,
+// else the end.
 func TestPlace(t *testing.T) {
 	cur := []Node{
 		node("brrainz.harmony", scan.Decl{LoadBefore: []string{"Ludeon.RimWorld"}}),
@@ -231,10 +232,11 @@ func TestPlace(t *testing.T) {
 		add   []Node
 		want  []string
 	}{
-		{"unconstrained: end", nil, nil, []Node{node("new.mod", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "brrainz.harmony"}}})}, with(6, "new.mod")},
+		{"unconstrained: end", nil, nil, []Node{node("new.mod", scan.Decl{})}, with(6, "new.mod")},
+		{"needs Harmony: after the official content, not before Core", nil, nil, []Node{node("new.mod", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "brrainz.harmony"}}})}, with(3, "new.mod")},
+		{"needs other.mod: right after it", nil, nil, []Node{node("new.mod", scan.Decl{LoadAfter: []string{"other.mod"}})}, with(5, "new.mod")},
 		{"a DLC: after the official content", nil, nil, []Node{node("ludeon.rimworld.odyssey", scan.Decl{})}, with(3, "ludeon.rimworld.odyssey")},
 		{"a library an enabled mod needs: just before it", nil, nil, []Node{node("the.lib", scan.Decl{})}, with(3, "the.lib")},
-		{"top: as early as it can", nil, posCommunity{"xml.ext": TierTop}, []Node{node("xml.ext", scan.Decl{})}, with(3, "xml.ext")},
 		{"attach: right after its target", []Rule{{Kind: RuleAttach, A: "L-orig.mod.zh", B: "L-other.mod"}}, nil, []Node{node("orig.mod.zh", scan.Decl{})}, with(5, "orig.mod.zh")},
 		{"two new, the second needed by the first", nil, nil, []Node{
 			node("new.a", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "new.b"}}}), node("new.b", scan.Decl{})}, with(6, "new.b", "new.a")},

@@ -636,17 +636,14 @@ func Sort(in Input) Result {
 
 // Place finds where newly enabled mods go (04 §2.1): in.Nodes[:n] is the current list,
 // in order, and in.Nodes[n:] the new mods in the order given. The current list keeps its
-// order; each new mod goes to the latest position its constraints allow — the end, unless
-// an enabled mod has to load after it (a library, a DLC), then just before the first of
-// them. A top mod (§5.5) goes to the earliest position instead, an `attach` mod right
-// after its target. When the list already breaks its constraints so that no position
-// satisfies both sides, the new mod goes after what it needs. It returns node indices.
+// order; each new mod goes right after the last enabled mod it must load after (never
+// ahead of the official content); with only mods that must load after it (a library, a
+// DLC), just before the first of them; with no constraint, at the end. An `attach` mod
+// goes right after its target. The same rule as the editor's suggested position
+// (app.SuggestAt); in the log-corpus replay it lands closer to where players had a mod
+// than the latest legal position. It returns node indices.
 func Place(in Input, n int) []int {
 	r := Sort(in)
-	own := map[int]Tier{}
-	for _, a := range r.Anchors {
-		own[a.Node] = a.Tier
-	}
 	byLin := map[string][]int{}
 	for i, nd := range in.Nodes {
 		if nd.Lineage != "" {
@@ -671,21 +668,26 @@ func Place(in Input, n int) []int {
 		for p, v := range seq {
 			pos[v] = p
 		}
-		lo, hi := 0, len(seq)
+		lo, hi, official := 0, len(seq), 0
+		after, before := false, false
 		for _, e := range r.Edges {
 			if p, ok := pos[e.From]; ok && e.To == a {
-				lo = max(lo, p+1)
+				if e.C.Kind == KindOfficial && e.C.Field == "official-first" {
+					official = max(official, p+1) // a bound, not a reason to move up
+					continue
+				}
+				lo, after = max(lo, p+1), true
 			}
 			if p, ok := pos[e.To]; ok && e.From == a {
-				hi = min(hi, p)
+				hi, before = min(hi, p), true
 			}
 		}
-		at := hi
+		at := len(seq)
 		switch {
-		case lo > hi:
-			at = lo
-		case own[a] == TierTop:
-			at = lo
+		case after:
+			at = max(lo, official)
+		case before:
+			at = hi
 		}
 		for _, b := range follows[a] {
 			if p, ok := pos[b]; ok && p+1 >= lo && p+1 <= hi {
