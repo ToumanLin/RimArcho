@@ -151,6 +151,15 @@ func TestLiveMonitor(t *testing.T) {
 	if view.LiveMonitor(e.App, st, &tr, filepath.Join(e.UserData, "Logs", "Player-prev.log"), nil) != nil {
 		t.Fatal("a section for a log the game does not write")
 	}
+	// The files rotated at the same paths, but the tracker has not polled the new session.
+	monitor := tr.Companion(player).Path
+	e.WriteFile(player, "[Archo Monitor] 0.9.0 session abcdefabcdef: "+monitor+"\n")
+	e.WriteFile(monitor, `{"kind":"session","message":"session","context":{"session":"abcdefabcdef"},"source":"archo-monitor"}`+"\n"+
+		`{"message":"new session error","level":"ERROR","source":"archo-monitor","count":1}`+"\n")
+	m = view.LiveMonitor(e.App, st, &tr, player, nil)
+	if m == nil || m.Title != "Archo Monitor" || len(m.Entries) != 1 || m.Entries[0].Text != "new session error" {
+		t.Fatalf("rotated monitor: %+v", m)
+	}
 }
 
 // A run without the monitor's log, and no monitor installed: one line says so, no action.
@@ -169,5 +178,104 @@ func TestLogPageNoMonitor(t *testing.T) {
 	}
 	if p.Monitor != nil || !strings.Contains(p.NoMonitor, "not installed") || p.AddMonitor {
 		t.Fatalf("monitor %v, note %q %v", p.Monitor != nil, p.NoMonitor, p.AddMonitor)
+	}
+}
+
+// A new monitor must replace the tracker's old RimCrow section even before its next poll.
+func TestLogPagePrefersNewMonitor(t *testing.T) {
+	e, player, monitor := realRun(t)
+	content, err := os.ReadFile(monitor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(monitor); err != nil {
+		t.Fatal(err)
+	}
+	crow := filepath.Join(e.UserData, "RimCrow_Realtime.log")
+	e.WriteFile(crow, `{"message":"ready","level":"INFO"}`+"\n")
+	fi, err := os.Stat(player)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(crow, fi.ModTime(), fi.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	e.App.GameProbe = func(root string) *app.GameRun {
+		if root == e.Game {
+			return &app.GameRun{PID: 7, Started: e.Now()}
+		}
+		return nil
+	}
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tr view.LiveTracker
+	if _, err := tr.Update(e.App, st); err != nil {
+		t.Fatal(err)
+	}
+	if c := tr.Companion(player); c == nil || c.Path != crow {
+		t.Fatalf("initial companion: %+v", c)
+	}
+	files := view.LogFiles(e.App, st)
+	if len(files) < 2 || files[1].Path != crow {
+		t.Fatalf("initial files: %+v", files)
+	}
+	if err := os.WriteFile(monitor, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files = view.LogFiles(e.App, st)
+	if len(files) < 2 || files[1].Path != monitor {
+		t.Fatalf("monitor appeared: %+v", files)
+	}
+	m := view.LiveMonitor(e.App, st, &tr, player, nil)
+	if m == nil || m.Path != monitor || m.Title != "Archo Monitor" {
+		t.Fatalf("live monitor: %+v", m)
+	}
+	p, err := view.BuildLogPage(e.App, st, player, &tr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Monitor == nil || p.Monitor.Path != monitor {
+		t.Fatalf("page monitor: %+v", p.Monitor)
+	}
+}
+
+func TestLogPageRejectsStaleCrow(t *testing.T) {
+	e, player, monitor := realRun(t)
+	prev := filepath.Join(filepath.Dir(player), "Player-prev.log")
+	if err := os.Rename(player, prev); err != nil {
+		t.Fatal(err)
+	}
+	monitorPrev := filepath.Join(e.UserData, "ArchoMonitor-prev.log")
+	if err := os.Rename(monitor, monitorPrev); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Date(2026, 10, 21, 17, 55, 0, 0, time.Local)
+	for _, p := range []string{prev, monitorPrev} {
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	crow := filepath.Join(e.UserData, "RimCrow_Realtime.log")
+	e.WriteFile(crow, "")
+	if err := os.Chtimes(crow, old, old); err != nil {
+		t.Fatal(err)
+	}
+	e.WriteFile(player, "=== Waylith log ===\nStarted:   2026-10-24 03:30:00.000 -07:00\nVersion:   1.7.4985.1269\n")
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := view.LogFiles(e.App, st)
+	if len(files) != 3 || files[0].Path != player || files[1].Path != prev || files[2].Path != monitorPrev || files[2].Of != prev {
+		t.Fatalf("files: %+v", files)
+	}
+	p, err := view.BuildLogPage(e.App, st, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Path != player || p.Monitor != nil {
+		t.Fatalf("current path %q monitor %+v", p.Path, p.Monitor)
 	}
 }

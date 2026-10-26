@@ -46,12 +46,21 @@ func logMarker(logPath string) (session, path string) {
 	return "", ""
 }
 
-// CompanionFor is the companion log of a Player.log ("" for none): the ArchoMonitor.log of
-// the same session, else RimCrow's log of the same generation, unless it was written after
-// the Player.log (it then belongs to a later run).
+// CompanionFor returns the companion of this run, preferring Archo Monitor. A marker
+// proves the session; without one, only a non-empty file within the run is eligible.
 func CompanionFor(logPath string) string {
-	root := logDataRoot(logPath)
-	if session, marked := logMarker(logPath); session != "" {
+	return CompanionForRun(logPath, logDataRoot(logPath))
+}
+
+// CompanionForRun applies the pairing rules in a run's save data root, including packs.
+func CompanionForRun(logPath, root string) string {
+	session, marked := logMarker(logPath)
+	c := findCompanion(logPath, root, session, marked)
+	return uniqueCompanion(logPath, root, c, session)
+}
+
+func findCompanion(logPath, root, session, marked string) string {
+	if session != "" {
 		var cands []string
 		if marked != "" {
 			cands = append(cands, marked, filepath.Join(filepath.Dir(marked), logs.MonitorPrevLog))
@@ -64,34 +73,89 @@ func CompanionFor(logPath string) string {
 		}
 	}
 	fi, err := os.Stat(logPath)
-	if err != nil {
+	if err != nil || root == "" {
 		return ""
 	}
+	start := logStart(logPath, fi)
 	gen := 0
+	monitor := logs.MonitorLog
 	if strings.Contains(strings.ToLower(filepath.Base(logPath)), "-prev") {
-		gen = 1
+		gen, monitor = 1, logs.MonitorPrevLog
+	} else if prev, err := os.Stat(filepath.Join(filepath.Dir(logPath), "Player-prev.log")); err == nil && !prev.ModTime().After(fi.ModTime()) {
+		// Unity can truncate an existing Player.log, keeping its old creation time.
+		if boundary := prev.ModTime().Add(time.Nanosecond); boundary.After(start) {
+			start = boundary
+		}
 	}
-	return rimCrowLog(root, gen, fi.ModTime())
-}
-
-// rimCrowLog is RimCrow's companion log of a generation (0 current, 1 previous) in a save
-// data root; notAfter (unless zero) rejects one written more than a minute later.
-func rimCrowLog(root string, gen int, notAfter time.Time) string {
-	if root == "" {
-		return ""
+	names := logs.RimCrowLogs[gen]
+	if session == "" {
+		names = append([]string{monitor}, names...)
 	}
-	for _, name := range logs.RimCrowLogs[gen] {
+	for _, name := range names {
 		p := filepath.Join(root, name)
-		fi, err := os.Stat(p)
-		if err != nil {
+		ci, err := os.Stat(p)
+		if err != nil || !ci.Mode().IsRegular() || ci.Size() == 0 || ci.ModTime().Before(start) || ci.ModTime().After(fi.ModTime().Add(time.Minute)) {
 			continue
 		}
-		if !notAfter.IsZero() && fi.ModTime().After(notAfter.Add(time.Minute)) {
+		if name == monitor && logs.FirstSession(p) == "" {
 			continue
 		}
 		return p
 	}
 	return ""
+}
+
+// logStart uses Waylith's explicit start (also valid for copied logs), then the native
+// creation time. With neither, mtime is a conservative bound: ambiguous files stay unpaired.
+func logStart(path string, fi os.FileInfo) time.Time {
+	if f, err := os.Open(path); err == nil {
+		defer f.Close()
+		sc := bufio.NewScanner(io.LimitReader(f, 4096))
+		for sc.Scan() {
+			if value, ok := strings.CutPrefix(sc.Text(), "Started:"); ok {
+				if at, err := time.Parse("2006-01-02 15:04:05.000 -07:00", strings.TrimSpace(value)); err == nil && !at.After(fi.ModTime()) {
+					return at
+				}
+			}
+		}
+	}
+	if at := logCreationTime(fi); !at.IsZero() && !at.After(fi.ModTime()) {
+		return at
+	}
+	return fi.ModTime()
+}
+
+// uniqueCompanion resolves conflicting claims by the current and previous Player.log,
+// including aliases/hard links: a session marker wins, then the current generation.
+func uniqueCompanion(path, root, candidate, candidateSession string) string {
+	if candidate == "" {
+		return ""
+	}
+	var sibling string
+	previous := false
+	switch {
+	case strings.EqualFold(filepath.Base(path), "Player.log"):
+		sibling = "Player-prev.log"
+	case strings.EqualFold(filepath.Base(path), "Player-prev.log"):
+		sibling, previous = "Player.log", true
+	default:
+		return candidate
+	}
+	sibling = filepath.Join(filepath.Dir(path), sibling)
+	session, markedPath := logMarker(sibling)
+	other := findCompanion(sibling, root, session, markedPath)
+	ci, err := os.Stat(candidate)
+	if err != nil {
+		return ""
+	}
+	if oi, err := os.Stat(other); err == nil && os.SameFile(ci, oi) {
+		marked := candidateSession != "" && logs.FirstSession(candidate) == candidateSession
+		otherMarked := session != "" && logs.FirstSession(other) == session
+		if !marked && otherMarked || marked == otherMarked && previous {
+			return ""
+		}
+	}
+	return candidate
 }
 
 // companionKey fingerprints the companion log for the log cache (03 §6.5).

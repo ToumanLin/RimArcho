@@ -211,6 +211,13 @@ func LiveMonitor(a *app.App, st *app.LoadoutState, t *LiveTracker, path string, 
 	if c == nil {
 		return nil
 	}
+	paired := app.CompanionForRun(path, a.RunDataRoot(st, t.what))
+	if paired == "" {
+		return nil
+	}
+	if !strings.EqualFold(filepath.Clean(c.Path), filepath.Clean(paired)) || c.Session != logs.FirstSession(paired) {
+		c = readCompanion(paired)
+	}
 	return MonitorOf(a, st, c, links, true)
 }
 

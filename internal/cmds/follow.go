@@ -31,7 +31,7 @@ func logFollow(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		lv = c.App.FollowRun(path, c.App.RunDataRoot(st, w))
 	} else {
-		lv = c.App.FollowLog(path, app.CompanionFor(path))
+		lv = c.App.FollowRun(path, "")
 	}
 	d, root := render.New("following " + path)
 	emit := func(s string) {
