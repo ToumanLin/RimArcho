@@ -255,7 +255,7 @@ func libraryLineageDoc(c *Ctx, lib *app.Library, l *app.LibLineage) *render.Doc 
 		if !i.Played.IsZero() {
 			x.KV("played", c.App.FormatTime(i.Played))
 		}
-		for _, cmd := range libNext(i, l.InPlan()) {
+		for _, cmd := range libNext(lib.St.Ix, i) {
 			d.AddNext(cmd)
 		}
 	}
@@ -297,15 +297,13 @@ func copyNoteText(c *Ctx, i *app.LibInstance) string {
 }
 
 // libNext is what each state's action is as a command (06 §2.9's table).
-// inPlan: another copy is in the current plan already (enabling this one would clash).
-func libNext(i *app.LibInstance, inPlan bool) []string {
+func libNext(ix *app.Index, i *app.LibInstance) []string {
 	if i.Mod == nil {
 		return nil
 	}
 	var out []string
-	// a healthy copy no plan uses: add it to the current plan
-	if len(i.States) == 0 && len(i.UsedIn) == 0 && !inPlan {
-		out = append(out, "archo enable "+i.Ref)
+	if i.Source == app.LibWorkshop && i.Locked == nil && ix.CanResubscribe(i.Mod) && !i.Mod.Residue {
+		out = append(out, "archo workshop resubscribe "+i.Ref+" --dry-run")
 	}
 	for _, s := range i.States {
 		switch s {

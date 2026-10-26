@@ -26,10 +26,6 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	switch page {
 	case EditorPage, LibraryPage:
 		lib := page == LibraryPage
-		space := "enable / disable; in staging, put back in the list"
-		if lib {
-			space = "enable / disable (the current list)"
-		}
 		out = append(out,
 			r("↑↓ / j k", "move the cursor (in the details: scroll)"),
 			r("PgUp PgDn / Home End", "move the cursor a page / to the top or the bottom"),
@@ -40,16 +36,10 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("esc", "back one level: the details, the selection, the search and filters"),
 			r("/  ctrl+f", "search"),
 			r(`\`, "open / close the filter bar (in it, ctrl+↑↓ moves its lower edge)"),
-			r("space", space),
-			r("m", "enable at… / move to…"),
-			r("t", "stage / put back"),
-			r("x", "switch version…"),
 			r("g", "tags"),
 			r("n", "note"),
 			r("ctrl+o / ctrl+w", "open the folder, the Workshop page"),
 			r("ctrl+s", "steam page"),
-			r("u / ctrl+z", pick("undo", "undo")),
-			r("ctrl+y / ctrl+r", "redo"),
 			r("Del", "unsubscribe / move to the recycle bin (asks first)"),
 			r(pick("menu / shift+F10 / right click", "menu / shift+F10"), "the row's menu: everything it can do"),
 		)
@@ -62,6 +52,12 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			)
 		} else {
 			out = append(out,
+				r("space", "enable / disable; in staging, put back in the list"),
+				r("m", "enable at… / move to…"),
+				r("t", "stage / put back"),
+				r("x", "switch version…"),
+				r("u / ctrl+z", "undo"),
+				r("ctrl+y / ctrl+r", "redo"),
 				r(pick("← → / 1–4", "← → / 1–4 / h l"), "go to an area"),
 				r("J K / alt+J K", "move down / up 1 (10); with a filter, past the rows shown"),
 				r("T", "put everything back from staging; elsewhere, stage everything enabled"),
@@ -84,9 +80,6 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			} else {
 				out = append(out, r(T("drag"), "between areas: enable, disable, stage; within Enabled: reorder"))
 			}
-		}
-		if lib {
-			out = append(out, r("u", "undo applies to list edits (space, m, t, x)"))
 		}
 	}
 	// Management and its forms use native tab focus; esc closes the form (06 §2.17).

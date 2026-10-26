@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// What the player can do with a row, the same on the plan editor and Mod 库存 › 全部
+// What the player can do with a row in the plan editor or Mod 库存 › 全部
 // (06 §3.5, §8.5): one table of operations with their label, key and menu group, and per
 // row only the codes that apply. The right-click menu, the hint line, a copy's detail
 // buttons, the selection bar and the keys all come from it, and the label table goes to the
@@ -93,7 +93,7 @@ var opTable = []Op{
 	{Code: OpUnhide, Group: 5, Confirm: true, Detail: true},
 	{Code: OpTextures, Group: 5, Confirm: true, Detail: true},
 	{Code: OpTexClean, Group: 5, Confirm: true, Detail: true},
-	{Code: OpResub, Group: 5, Detail: true},
+	{Code: OpResub, Group: 5, Confirm: true, Detail: true},
 	{Code: OpSubCheck, Group: 5, Detail: true},
 	{Code: OpSubUpdate, Group: 5, Confirm: true, Detail: true},
 	{Code: OpSubRemove, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
@@ -175,8 +175,7 @@ func WhereOf(lib *app.Library, i *app.LibInstance) Where {
 	return Nowhere
 }
 
-// EditorPage and LibraryPage name the page asking: the plan ops read the same on both but
-// for space, which is 启用 / 停用 in the editor and 加入 / 拿掉 in Mod 库存.
+// EditorPage and LibraryPage name the page asking; only the editor offers plan ops.
 const (
 	EditorPage  = "plan"
 	LibraryPage = "library"
@@ -204,31 +203,33 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		}
 	}
 	var ks []string
-	switch WhereOf(lib, i) {
-	case Disabled:
-		inPlan := l != nil && l.InPlan()
-		switch {
-		case page == EditorPage:
-			ks = append(ks, OpEnable, OpEnableAt, OpStage)
-		case inPlan && loadable:
-			ks = append(ks, OpUse) // the plan uses another copy of it
-		case loadable && !has(app.LibIgnored):
-			ks = append(ks, OpAdd, OpEnableAt, OpStage)
+	if page != LibraryPage {
+		switch WhereOf(lib, i) {
+		case Disabled:
+			inPlan := l != nil && l.InPlan()
+			switch {
+			case page == EditorPage:
+				ks = append(ks, OpEnable, OpEnableAt, OpStage)
+			case inPlan && loadable:
+				ks = append(ks, OpUse) // the plan uses another copy of it
+			case loadable && !has(app.LibIgnored):
+				ks = append(ks, OpAdd, OpEnableAt, OpStage)
+			}
+		case Enabled:
+			off := OpTakeOut
+			if page == EditorPage {
+				off = OpDisable
+			}
+			ks = append(ks, off, OpMoveTo, OpStage)
+			if others > 0 {
+				ks = append(ks, OpSwap)
+			}
+		case Staged:
+			ks = append(ks, OpPutBack, OpEnableAt)
 		}
-	case Enabled:
-		off := OpTakeOut
-		if page == EditorPage {
-			off = OpDisable
+		if plans && m != nil {
+			ks = append(ks, OpRemove)
 		}
-		ks = append(ks, off, OpMoveTo, OpStage)
-		if others > 0 {
-			ks = append(ks, OpSwap)
-		}
-	case Staged:
-		ks = append(ks, OpPutBack, OpEnableAt)
-	}
-	if plans && m != nil {
-		ks = append(ks, OpRemove)
 	}
 	if m != nil {
 		ks = append(ks, OpTags, OpNote) // the editor: the mod's note; Mod 库存: this copy's
@@ -259,13 +260,17 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		ks = append(ks, OpUnhide)
 	}
 	// 贴图优化: a copy with PNG textures (not RimArcho's own mod)
-	if live && i.PNG && i.Path != "" && i.Source != app.LibMonitor && !has(app.LibHidden) && !has(app.LibResidue) {
+	if page != LibraryPage && live && i.PNG && i.Path != "" && i.Source != app.LibMonitor && !has(app.LibHidden) && !has(app.LibResidue) {
 		ks = append(ks, OpTextures)
 	}
 	if i.Textures != nil && i.Textures.Files > 0 {
 		ks = append(ks, OpTexClean)
 	}
-	if live && has(app.LibResidue) && url {
+	resub := m != nil && i.Source == app.LibWorkshop && url && i.Locked == nil && m.Origin == "" && !source.IsLink(i.Path)
+	if resub && lib != nil && lib.St != nil {
+		resub = lib.St.Ix.CanResubscribe(m)
+	}
+	if resub {
 		ks = append(ks, OpResub)
 	}
 	if live && i.Source == app.LibWorkshop && !has(app.LibResidue) && url {

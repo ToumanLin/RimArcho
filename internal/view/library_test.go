@@ -68,17 +68,17 @@ func TestLibraryPage(t *testing.T) {
 	if lock.State != "" || lock.Used != "default" {
 		t.Errorf("a lineage with a used copy is not \"in no plan\": %q %q", lock.State, lock.Used)
 	}
-	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"take-out", "move-to", "stage", "swap", "remove", "tags", "note", "separate", "folder", "move", "textures", "delete"}) {
+	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"tags", "note", "separate", "folder", "move", "delete"}) {
 		t.Errorf("the Mods/ copy: %v", got)
 	}
-	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"use", "tags", "note", "separate", "folder", "workshop", "steam", "pin", "textures", "unsubscribe"}) {
+	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "separate", "folder", "workshop", "steam", "pin", "resubscribe", "unsubscribe"}) {
 		t.Errorf("the unused workshop copy beside it (enabling it would clash): %v", got)
 	}
 	hid := libRow(t, p, "Hid")
 	if !hid.Single || hid.State != "被其它管理器隐藏" || hid.Source != "工坊" || hid.Insts[0].Name != "工坊" {
 		t.Errorf("hidden: %+v", hid)
 	}
-	if got := kinds(hid.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "folder", "workshop", "steam", "unhide", "unsubscribe"}) {
+	if got := kinds(hid.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "folder", "workshop", "steam", "unhide", "resubscribe", "unsubscribe"}) {
 		t.Errorf("hidden actions: %v", got)
 	}
 	ghost := libRow(t, p, "工坊条目 5300")
@@ -86,7 +86,7 @@ func TestLibraryPage(t *testing.T) {
 		t.Errorf("ghost: %+v", ghost)
 	}
 	idle := libRow(t, p, "Idle")
-	if got := kinds(idle.Insts[0].Ops); !slices.Contains(got, "add") {
+	if got := kinds(idle.Insts[0].Ops); slices.Contains(got, "add") || !slices.Contains(got, "resubscribe") {
 		t.Errorf("idle: %v", got)
 	}
 	// filters and conditions
@@ -273,6 +273,10 @@ func TestLibSteam(t *testing.T) {
 	if err != nil || !p.Apply || !strings.Contains(strings.Join(p.Lines, "\n"), "would unsubscribe") {
 		t.Fatalf("preview %+v %v", p, err)
 	}
+	p, err = view.LibPreview(e.App, view.LibResub, []string{idle.Ref})
+	if err != nil || !p.Apply || !strings.Contains(strings.Join(p.Lines, "\n"), "local edits") || !strings.Contains(strings.Join(p.Lines, "\n"), "re-download") {
+		t.Fatalf("resubscribe preview %+v %v", p, err)
+	}
 	// no steam_api64.dll in the test game: out of reach
 	_, err = view.LibDo(e.App, view.LibUnsub, []string{idle.Ref})
 	var pages *view.OpenPages
@@ -308,5 +312,23 @@ func TestLibraryPayload(t *testing.T) {
 	}
 	if len(p.Ops) != len(view.OpTable()) || p.Ops[0].Label == "" {
 		t.Errorf("op table %+v", p.Ops)
+	}
+}
+
+func TestLibraryLinkedWorkshopCannotResubscribe(t *testing.T) {
+	t.Parallel()
+	e := libEnv(t)
+	path := filepath.Join(e.Workshop, "5200")
+	target := filepath.Join(e.Root, "Moved Workshop")
+	e.Move(path, target)
+	e.Junction(path, target)
+	e.MustRun("scan")
+	i := libRow(t, libPage(t, e, ""), "Idle").Insts[0]
+	if slices.Contains(i.Ops, view.LibResub) {
+		t.Fatalf("linked copy offers resubscribe: %v", i.Ops)
+	}
+	p, err := view.LibPreview(e.App, view.LibResub, []string{i.Ref})
+	if err != nil || p.Apply {
+		t.Fatalf("linked copy preview: %+v %v", p, err)
 	}
 }

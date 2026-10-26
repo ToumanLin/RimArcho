@@ -2,8 +2,10 @@ package app_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -130,5 +132,181 @@ func TestSteamParse(t *testing.T) {
 	}
 	if steamworks.StateText(5) != "subscribed, installed" || steamworks.StateText(0) != "not subscribed" {
 		t.Fatal(steamworks.StateText(5))
+	}
+}
+
+func TestWorkshopResubscribe(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	folder := e.AddWorkshop("8100", testkit.Sample("tester.repair", "Repair"))
+	e.AddWorkshop("8200", testkit.Sample("tester.residue", "Residue"))
+	incoming := filepath.Join(e.Game, "Mods", "_Link_8100")
+	e.Junction(incoming, folder)
+	e.Unsubscribe("8200")
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.repair")
+	scanNow(t, e)
+	steamDLL(e)
+	id := refID(t, e, "Repair", source.Workshop)
+	left := refID(t, e, "Residue", source.Workshop)
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	folder, err = source.RealPath(folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := *st.Ix.ByID[id]
+	before := slices.Clone(st.List)
+	var calls [][]string
+	fake := fakeSteamWorker(&calls)
+	e.App.SteamWorker = fake
+	op, err := e.App.Workshop(steamworks.Resubscribe, []string{id, left}, true)
+	if err != nil || len(calls) != 0 || op.Items[0].Folder != folder || op.Items[1].Folder != "" {
+		t.Fatalf("dry run: %+v %v %v", op, err, calls)
+	}
+	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 42} }
+	if _, err := e.App.Workshop(steamworks.Resubscribe, []string{id}, false); err == nil || len(calls) != 0 {
+		t.Fatalf("running game: %v %v", err, calls)
+	}
+	e.App.GameProbe = func(string) *app.GameRun { return nil }
+	// Simulate Steam deleting, a scan during the gap, then a changed download at the same path.
+	e.App.SteamWorker = func(dir string, args []string) (string, error) {
+		out, err := fake(dir, args)
+		if args[0] == steamworks.Unsubscribe {
+			if err := os.RemoveAll(folder); err != nil {
+				t.Fatal(err)
+			}
+			e.Unsubscribe("8100")
+			scanNow(t, e)
+		} else {
+			e.AddWorkshop("8100", testkit.Sample("tester.repair", "Repair downloaded"))
+			e.Subscribe("8200")
+		}
+		return out, err
+	}
+	op, err = e.App.Workshop(steamworks.Resubscribe, []string{id, left}, false)
+	if err != nil || len(calls) != 2 || strings.Join(calls[0][1:], " ") != "unsubscribe 8100" || strings.Join(calls[1][1:], " ") != "subscribe 8100 8200" {
+		t.Fatalf("resubscribe: %+v %v %v", op, err, calls)
+	}
+	scanNow(t, e)
+	st, err = e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := st.Ix.ByID[id]
+	if m == nil || m.LineageID != original.LineageID || m.WorkshopID() != "8100" || st.Ix.ModDir(m) != folder || m.Name != "Repair downloaded" || m.Status != "live" {
+		t.Fatalf("identity after redownload: %+v", m)
+	}
+	if !source.IsLink(incoming) {
+		t.Fatal("incoming link was removed")
+	}
+	if target, err := source.RealPath(incoming); err != nil || target != folder {
+		t.Fatalf("incoming link: %s %v", target, err)
+	}
+	if !slices.Equal(st.List, before) {
+		t.Fatalf("plan changed: %v -> %v", before, st.List)
+	}
+	// A plain subscription remains supported for leftovers.
+	e.Unsubscribe("8200")
+	scanNow(t, e)
+	e.App.SteamWorker = fake
+	if _, err := e.App.Workshop(steamworks.Subscribe, []string{left}, false); err != nil {
+		t.Fatal(err)
+	}
+	// Local/locked copies cannot be passed through the direct API.
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Local"), testkit.Sample("tester.local", "Local"))
+	scanNow(t, e)
+	if _, err := e.App.Workshop(steamworks.Resubscribe, []string{"pkg:tester.local"}, true); err == nil {
+		t.Fatal("accepted a local copy")
+	}
+}
+
+func TestWorkshopResubscribePartialFailure(t *testing.T) {
+	t.Parallel()
+	for _, result := range []string{"failed:15", "timeout"} {
+		t.Run(result, func(t *testing.T) {
+			e := setup(t, false)
+			for _, id := range []string{"8100", "8200", "8300"} {
+				e.AddWorkshop(id, testkit.Sample("tester.m"+id, "Mod "+id))
+			}
+			scanNow(t, e)
+			steamDLL(e)
+			var calls [][]string
+			e.App.SteamWorker = func(_ string, args []string) (string, error) {
+				calls = append(calls, slices.Clone(args))
+				if args[0] == steamworks.Unsubscribe {
+					return steamworks.ItemLine(8100, result, 1) + "\n" + steamworks.ItemLine(8200, "ok", 0) + "\n" + steamworks.ItemLine(8300, "ok", 0) + "\n" + steamworks.DoneLine(args[0], 3), nil
+				}
+				return steamworks.ItemLine(8200, "ok", 33) + "\n" + steamworks.ItemLine(8300, "failed:9", 0) + "\n" + steamworks.DoneLine(args[0], 2), nil
+			}
+			op, err := e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100", "ws:8200", "ws:8300"}, false)
+			if err == nil || op == nil || op.Items[0].Result != result || op.Items[1].Result != "ok" || op.Items[2].Result != "failed:9" || len(calls) != 2 || strings.Join(calls[1], " ") != "subscribe 8200 8300" {
+				t.Fatalf("partial failure: %+v %v %v", op, err, calls)
+			}
+		})
+	}
+}
+
+func TestWorkshopResubscribeBatches(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	var refs []string
+	for n := 0; n < 51; n++ {
+		id := fmt.Sprint(9000 + n)
+		e.AddWorkshop(id, testkit.Sample("tester.m"+id, "Mod "+id))
+		refs = append(refs, "ws:"+id)
+	}
+	scanNow(t, e)
+	steamDLL(e)
+	var calls [][]string
+	e.App.SteamWorker = fakeSteamWorker(&calls)
+	op, err := e.App.Workshop(steamworks.Resubscribe, refs, false)
+	if err != nil || len(op.Items) != 51 || len(calls) != 4 {
+		t.Fatalf("batches: %+v %v %v", op, err, calls)
+	}
+	for n, action := range []string{"unsubscribe", "unsubscribe", "subscribe", "subscribe"} {
+		want := 52
+		if n%2 == 1 {
+			want = 3
+		}
+		if calls[n][1] != action || len(calls[n]) != want {
+			t.Fatalf("call %d: %v", n, calls[n])
+		}
+	}
+}
+
+func TestWorkshopResubscribeRejectsLinkAndLock(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	folder := e.AddWorkshop("8100", testkit.Sample("tester.repair", "Repair"))
+	scanNow(t, e)
+	id := refID(t, e, "Repair", source.Workshop)
+	moved := filepath.Join(e.Root, "External")
+	e.Move(folder, moved)
+	e.Junction(folder, moved)
+	scanNow(t, e)
+	if _, err := e.App.Workshop(steamworks.Resubscribe, []string{id}, true); err == nil {
+		t.Fatal("accepted a linked Workshop copy")
+	}
+	lib, err := e.App.Library()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lib.St.Ix.CanResubscribe(lib.St.Ix.ByID[id]) {
+		t.Fatal("eligibility resolved away the link")
+	}
+	// A locked copy keeps its Workshop ID but must never drive Steam subscriptions.
+	e.MustRun("pin", id)
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	locks := st.Locked()
+	if len(locks) != 1 {
+		t.Fatalf("locks: %v", locks)
+	}
+	if _, err := e.App.Workshop(steamworks.Resubscribe, []string{locks[0].Copy.ID}, true); err == nil {
+		t.Fatal("accepted a locked copy")
 	}
 }

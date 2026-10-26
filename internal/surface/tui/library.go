@@ -14,9 +14,8 @@ import (
 // editor's, view.BuildLibrary's groups), the table of Lineages that open to their copies
 // (→ ←), and the detail of the cursor's copy on the right when the terminal is wide enough
 // (enter shows it full screen). Every op of a copy is a key or in the row menu (view.CopyOps,
-// the same table as the editor's): space adds and enables or takes out of the current plan,
-// m enables at a place, t stages, x uses this copy, g tags, n the copy's note, ctrl+o
-// ctrl+w, Del, F10 the menu; u undoes the plan edits.
+// the labels share the editor's op table): g tags, n the copy's note, ctrl+o and
+// ctrl+w open the folder and Workshop page, Del previews deletion, F10 opens the menu.
 
 type libState struct {
 	page        *view.LibPage
@@ -229,12 +228,8 @@ func (m *model) runLibOp(code string) tea.Cmd {
 	}
 	i0 := ts[0]
 	refs := make([]string, len(ts))
-	ids := []string{}
 	for k, i := range ts {
 		refs[k] = i.Ref
-		if i.ID != "" {
-			ids = append(ids, i.ID)
-		}
 	}
 	switch code {
 	case view.OpFolder:
@@ -249,36 +244,8 @@ func (m *model) runLibOp(code string) tea.Cmd {
 		return m.editCopyNote(name, *i0)
 	case view.OpTags:
 		return m.libTagKey(refs, what)
-	case view.OpEnableAt, view.OpMoveTo:
-		if len(ids) == 0 || m.st == nil {
-			return nil
-		}
-		p := &posInput{ids: ids, what: what, from: cInactive}
-		if code == view.OpMoveTo {
-			p.from = cActive
-		}
-		for _, i := range ts {
-			if i.ID != "" {
-				p.refs = append(p.refs, m.st.Ix.Ref(i.ID))
-			}
-		}
-		m.pos = p
-		m.posOptions()
-		return nil
 	}
 	return m.libOp(code, refs, what)
-}
-
-// libSpace is space: the copy takes effect in the current plan, or stops (06 §3.5).
-func (m *model) libSpace() tea.Cmd {
-	ops := targetOps(m.targets())
-	for _, c := range []string{view.OpAdd, view.OpTakeOut, view.OpPutBack, view.OpUse} {
-		if slices.Contains(ops, c) {
-			return m.runLibOp(c)
-		}
-	}
-	m.say(sayInfo, T("this copy cannot be used in the current list"))
-	return nil
 }
 
 // libFirst runs the first of codes the targets have.
@@ -570,14 +537,6 @@ func (m *model) libraryKey(s string) tea.Cmd {
 			l.full = true // no room beside the table: the details over the page
 		}
 		return nil
-	case " ":
-		return m.libSpace()
-	case "m":
-		return m.libFirst(view.OpEnableAt, view.OpMoveTo)
-	case "t":
-		return m.libFirst(view.OpStage, view.OpPutBack)
-	case "x":
-		return m.libFirst(view.OpUse, view.OpSwap)
 	case "g":
 		return m.libFirst(view.OpTags)
 	case "n":
@@ -598,14 +557,6 @@ func (m *model) libraryKey(s string) tea.Cmd {
 		return m.libFirst(view.OpSteam)
 	case "delete":
 		return m.delKey(targetOps(m.targets()), m.runLibOp)
-	case "u", "ctrl+z":
-		m.act(T("undid the last change"), "undo")
-		m.loadLibrary()
-		return nil
-	case "ctrl+r", "ctrl+y":
-		m.act(T("redid the change"), "redo")
-		m.loadLibrary()
-		return nil
 	case "s":
 		return m.libSortChooser()
 	case "C":
@@ -866,15 +817,6 @@ func (m *model) libPairs() [][2]string {
 	pairs := [][2]string{}
 	if x, ok := l.cur(); ok && x.inst < 0 {
 		pairs = append(pairs, [2]string{"→ ←", T("open / close")})
-	}
-	ops := targetOps(m.targets())
-	for _, o := range view.OpTable() {
-		if slices.Contains(ops, o.Code) && o.Key != "" && o.Group == 1 {
-			pairs = append(pairs, [2]string{o.Key, o.Label})
-			if len(pairs) >= 3 {
-				break
-			}
-		}
 	}
 	pairs = append(pairs, [2]string{"enter", T("details")}, [2]string{"F10", T("menu")}, [2]string{"/", T("search")}, [2]string{"?", T("all keys")})
 	return pairs

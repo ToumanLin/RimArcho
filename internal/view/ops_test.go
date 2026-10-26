@@ -1,6 +1,9 @@
 package view
 
 import (
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"slices"
 	"strings"
 	"testing"
@@ -142,4 +145,55 @@ func wide(s string) bool {
 		}
 	}
 	return false
+}
+
+func TestLibraryHasOnlyLibraryOps(t *testing.T) {
+	t.Parallel()
+	for _, where := range []Where{Disabled, Enabled, Staged, Nowhere} {
+		m := &store.Mod{ID: "copy", Kind: source.Workshop, Rel: "123"}
+		i := &app.LibInstance{Mod: m, Source: app.LibWorkshop, WorkshopID: "123", Path: t.TempDir(), PNG: true, Textures: &app.TextureSummary{Files: 1}, InPlan: where == Enabled, Staged: where == Staged, UsedIn: []app.LibUse{{Kind: "plan"}}}
+		l := &app.LibLineage{Instances: []*app.LibInstance{i, {Mod: &store.Mod{ID: "other"}}}}
+		lib := &app.Library{St: &app.LoadoutState{Ix: &app.Index{ByID: map[string]*store.Mod{"copy": m}}}, Lineages: []*app.LibLineage{l}}
+		if where == Nowhere {
+			i.States = []string{app.LibMissing}
+		}
+		if got := WhereOf(lib, i); got != where {
+			t.Fatalf("fixture where %v != %v", got, where)
+		}
+		codes := CopyOps(lib, l, i, LibraryPage)
+		for _, code := range codes {
+			if OpOf(code).Group == 1 || code == OpTextures {
+				t.Errorf("where %d: unwanted library op %s", where, code)
+			}
+		}
+		for _, code := range []string{OpTags, OpNote, OpWorkshop, OpResub, OpTexClean} {
+			if !slices.Contains(codes, code) {
+				t.Errorf("missing %s: %v", code, codes)
+			}
+		}
+		for _, col := range []Column{Inactive, Active, Staging} {
+			if got := RowOps(lib, "copy", col); !slices.Contains(got, map[Column]string{Inactive: OpEnable, Active: OpDisable, Staging: OpPutBack}[col]) || where != Nowhere && !slices.Contains(got, OpTextures) {
+				t.Errorf("editor column %v: %v", col, got)
+			}
+		}
+		i.Locked = &app.Locked{}
+		if slices.Contains(CopyOps(lib, l, i, LibraryPage), OpResub) {
+			t.Error("resubscribe on locked copy")
+		}
+		i.Locked = nil
+		i.Source = app.LibSteamCMD
+		if slices.Contains(CopyOps(lib, l, i, LibraryPage), OpResub) {
+			t.Error("resubscribe on SteamCMD copy")
+		}
+	}
+	for _, tui := range []bool{false, true} {
+		for _, row := range KeyHelp(LibraryPage, tui) {
+			if slices.Contains([]string{"space", "m", "t", "x", "u", "u / ctrl+z", "ctrl+y / ctrl+r"}, row.Keys) {
+				t.Errorf("library help: %v", row)
+			}
+		}
+	}
+	if !OpOf(OpResub).Confirm {
+		t.Fatal("resubscribe requires confirmation")
+	}
 }

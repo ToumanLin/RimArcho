@@ -526,6 +526,8 @@ L#l4xt A  [2 copies, 1.3 KB]
     upstream: #6olp A
     used in: plan:raid night, plan:default, plan:first, plan:from file
     played: 2026-10-01 12:00
+next:
+  archo workshop resubscribe #6olp --dry-run
 
 > manage_library {"action":"remove_from_plans","refs":["#hnyg"]}
 removed #hnyg Harmony from 4 plans
@@ -562,4 +564,6 @@ L#l4xt A  [2 copies, 1.3 KB]
     upstream: #6olp A
     used in: plan:raid night, plan:default, plan:first, plan:from file
     played: 2026-10-01 12:00
+next:
+  archo workshop resubscribe #6olp --dry-run
 

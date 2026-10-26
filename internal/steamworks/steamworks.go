@@ -27,6 +27,7 @@ const AppID = 294100
 const (
 	Subscribe   = "subscribe"
 	Unsubscribe = "unsubscribe"
+	Resubscribe = "resubscribe" // App orchestrates unsubscribe then subscribe with the worker.
 	State       = "state"
 	Download    = "download"
 )
