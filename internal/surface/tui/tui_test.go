@@ -206,7 +206,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 		t.Fatalf("after sort: %s", got)
 	}
 	keys(tm, "w")
-	waitFor(t, tm, "written to the game as v")
+	waitFor(t, tm, "saved as v")
 	if !strings.Contains(e.ReadModsConfig(), "<li>tester.b</li>") {
 		t.Fatal("save did not write the list")
 	}

@@ -858,7 +858,7 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	}
 	addConflicts(c, root, st)
 	if v := st.FileVersionMismatch(); v != "" {
-		root.KV("warning", fmt.Sprintf("ModsConfig.xml was saved for %s; the game (%s) resets it on start. Launching from RimArcho or writing to the game once (archo save) writes it for %s",
+		root.KV("warning", fmt.Sprintf("ModsConfig.xml was saved for %s; the game (%s) resets it on start. Launching from RimArcho or saving once (archo save) saves it for %s",
 			env.MajorMinor(v), st.GameMM(), st.GameMM()))
 	}
 	if st.FileErr != nil {

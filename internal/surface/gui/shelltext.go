@@ -32,8 +32,8 @@ func init() {
 		"the games page":               "游戏页",
 		"create a pack":                "创建整合包",
 		"start the game with the list": "用这个列表启动游戏",
-		"different from the list last written to the game; launching or writing to the game writes them": "与上次写入游戏的列表不同；启动或写入游戏时写进去",
-		"sort, write to the game, launch (at once; the palette previews them)":                           "排序，写入游戏，启动（立即执行；命令面板里可以预览）",
+		"different from the last saved list; launching or saving saves these changes to the game": "与上次保存的列表不同；启动或保存时会把修改保存到游戏",
+		"sort, save, launch (at once; the palette previews them)":                                 "排序，保存，启动（立即执行；命令面板里可以预览）",
 		// the launch page and its background (06 §2.3, §2.14)
 		"apply / edit":           "应用 / 编辑",
 		"launch page background": "启动页背景",

@@ -38,7 +38,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | --- | --- | --- |
 | 启动方案（08 §2） | 已完成 | 工具 `launch_game`，`destructiveHint: true` |
 | 方案管理：列出、新建、切换、改名、删除（04 §1） | 已完成 | 工具 `manage_plans`，`destructiveHint: true`（删除方案连同历史，不能撤回） |
-| 写入游戏但不启动 | `save_loadout` 的描述已改为“写入游戏但不启动” | 已完成 |
+| 写入游戏但不启动 | `save_loadout` 的描述已改为“保存但不启动” | 已完成 |
 | 看历史、对比、回到某个版本（04 §3） | 已完成 | 工具 `plan_history`（只读：log / diff / steps）；回到版本走 `edit_loadout` 的 `checkout` 动作 |
 | 处理外部修改的冲突：看差异 / 载入 / 忽略（04 §4.3） | 已完成 | 看差异 `loadout diff v<n> workspace`、载入 `loadout checkout v<n>`、忽略 `loadout ignore-external`；工具：`plan_history action=diff`、`edit_loadout action=checkout` / `ignore_external` |
 | 锁定版本、解除、更新锁定版本（04 §7） | 已完成 | 工具 `pin_mod`（对应 `pin`，创建锁定版本并在当前方案里换上；`copy_local` 保留为别名）；新增工具 `unpin_mod`；更新锁定版本是 `pin --update <实例>`，并入 `pin_mod` |
@@ -228,7 +228,7 @@ next:
 | | `stage list` / `stage add <引用…>` / `stage drop <引用…>` / `stage restore [<引用…>] [--at\|--before\|--after]` | 暂存（04 §2.2）。从已启用中暂存的 Mod 记住原位置；`restore` 不带引用时全部放回；`add` 和 `restore` 各是一步可撤销的编辑；重新启用的 Mod 自动离开暂存 |
 | 历史 | `history [--all]` | 当前方案的编辑步骤（撤销栈）和版本，默认最近 10 个版本 |
 | | `loadout log [--all]` / `loadout diff [<v>] [<v>]` / `loadout checkout <v>` | 版本列表；版本之间的差异（默认最新版本 → 当前状态）；把一个版本载入当前方案（一步可撤销的编辑） |
-| 写入与启动 | `save [--dry-run]` | **写入游戏但不启动**（界面上叫“写入游戏”），给从 Steam 等其他途径开游戏的玩家：渲染当前方案的 ModsConfig.xml（备份、原子替换、写当前游戏版本）、同步 `_Archo_` 链接、移除整合包链接（04 §4.1、08 §3）。`--dry-run` 显示会写什么 |
+| 写入与启动 | `save [--dry-run]` | **写入游戏但不启动**（界面上叫“保存”），给从 Steam 等其他途径开游戏的玩家：渲染当前方案的 ModsConfig.xml（备份、原子替换、写当前游戏版本）、同步 `_Archo_` 链接、移除整合包链接（04 §4.1、08 §3）。`--dry-run` 显示会写什么 |
 | | `launch [--dry-run]` | 启动当前方案（08 §2）。`--dry-run` 只显示启动命令。先写入再启动、已有游戏运行就拒绝、记启动记录和 `launch` 版本；`--dry-run` 显示与 `save --dry-run` 同一份预览加启动命令行 |
 | | `test run [<方案>] [--env <环境>] [--map] [--timeout <时长>] [--settle <时长>] [--json]` | 隔离数据测试运行（08 §12）：默认当前方案，直接启动、收集加载日志后停止；超时默认 `10m`，主菜单后等 `5s`。到达目标且没有错误簇返回 0，否则 1；报告始终写 stdout，进度写 stderr |
 | 方案管理 | 见 §4.3 | |
@@ -343,7 +343,7 @@ next:
 
 | 工具 | 原来的描述 | 原来的实际行为 | 现在的描述 |
 | --- | --- | --- | --- |
-| `save_loadout` | “Refuses when ModsConfig.xml changed outside RimArcho.” | **不拒绝**：直接备份并覆盖；外部修改的检测只发生在读取时（载入为 external 版本并标冲突） | “写入游戏但不启动：把当前方案写进 ModsConfig.xml（备份、原子替换、写当前游戏版本），同步 `_Archo_` 链接、移除整合包链接。会改变游戏下次读到的列表：先问玩家，并先用 `dry_run=true` 给玩家看差异。ModsConfig.xml 有尚未处理的外部修改冲突（04 §4.3）时拒绝，文本给出看差异 / 载入 / 忽略三个选项的命令。游戏正在运行时照常写入，并提示游戏下次启动才会读到。” |
+| `save_loadout` | “Refuses when ModsConfig.xml changed outside RimArcho.” | **不拒绝**：直接备份并覆盖；外部修改的检测只发生在读取时（载入为 external 版本并标冲突） | “保存但不启动：把当前方案写进 ModsConfig.xml（备份、原子替换、写当前游戏版本），同步 `_Archo_` 链接、移除整合包链接。会改变游戏下次读到的列表：先问玩家，并先用 `dry_run=true` 给玩家看差异。ModsConfig.xml 有尚未处理的外部修改冲突（04 §4.3）时拒绝，文本给出看差异 / 载入 / 忽略三个选项的命令。游戏正在运行时照常写入，并提示游戏下次启动才会读到。” |
 | `edit_loadout` | “Change RimArcho's workspace Loadout … nothing reaches the game until save_loadout” | 改的是环境唯一的工作区 | “改当前方案（即时保存，每步可撤销）；不写游戏文件，直到 save_loadout 或启动方案。” 加了 `checkout` 动作；`plan` 参数暂不加（§4.3） |
 | `status` | 示例里有 “unsaved edits” | 显示工作区与最新版本的差异 | 改说“与游戏里的列表的差异”，并列出方案 |
 | `copy_local` | “The Loadout is not changed: call edit_loadout action=swap …” | 不改方案 | “创建锁定版本：复制成独立副本并在当前方案里换上，其他方案不动；工坊更新不影响它。” |

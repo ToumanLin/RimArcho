@@ -31,9 +31,10 @@ var retired = []struct{ Old, New string }{
 	{"固定的副本", "锁定的那份"},
 	{"换成另一份", "切换版本…"},
 	{"替换实例", "切换版本…"},
-	{"保存到游戏", "写入游戏"},
-	{"已保存的版本", "写入过的版本"},
-	{"未保存", "还没写入游戏"},
+	{"写入游戏", "保存"},
+	{"未写入", "未保存"},
+	{"还没写入游戏", "未保存"},
+	{"写入过的版本", "保存过的版本"},
 	{"载入版本", "回到旧版"},
 	{"载入列表", "回到这一版 / 采用外部修改"},
 	{"载入到列表", "采用外部修改"},
@@ -44,9 +45,9 @@ var retired = []struct{ Old, New string }{
 }
 
 // retiredEn are the English words the interface no longer uses: list, game, a newer
-// version, switch version, locked, not written to the game, go back to a version, and the
+// version, switch version, locked, go back to a version, and the
 // light / full pack (a pack is always full; its list alone is a RimArcho list).
-var retiredEn = regexp.MustCompile(`(?i)\b(plans?|environments?|upstream|workspace|swap(s|ped)?|pinned|unsaved|checkout|light packs?|full packs?)\b`)
+var retiredEn = regexp.MustCompile(`(?i)\b(plans?|environments?|upstream|workspace|swap(s|ped)?|pinned|not written|checkout|light packs?|full packs?)\b`)
 
 // wordingExempt are texts whose Chinese is right although it holds a retired word.
 var wordingExempt = map[string]bool{

@@ -540,7 +540,7 @@ func (s *API) HistoryGo(steps, version int) (string, error) {
 		if _, _, err := s.a.Checkout(fmt.Sprintf("v%d", version)); err != nil {
 			return "", err
 		}
-		return view.Tf("back at v%d (not written to the game yet)", version), nil
+		return view.Tf("back at v%d (unsaved)", version), nil
 	}
 	r, err := s.a.StepTo(steps)
 	if err != nil {

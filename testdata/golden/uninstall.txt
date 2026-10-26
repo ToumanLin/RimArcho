@@ -38,7 +38,7 @@ uninstall: dry run, nothing changed
     left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_steamcmd_8888 → $ROOT/steamcmd/steamapps/workshop/content/294100/8888
   modsconfig: put the ModsConfig.xml backup back in 1 user data folder
-    restore     $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml  (main)  — the list from before RimArcho's last write
+    restore     $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml  (main)  — the list from before RimArcho's last save
   locked: 1 lock library copy into env:main's Mods/ as ordinary mods, <size>
     move        $ROOT/LocalAppData/RimArcho/locked/1001_local → $ROOT/Steam/steamapps/common/RimWorld/Mods/1001_local  (A)  <size>
     affected link: $ROOT/Steam/steamapps/common/RimWorld: $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local -> $ROOT/LocalAppData/RimArcho/locked/1001_local; detach link

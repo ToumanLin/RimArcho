@@ -36,7 +36,7 @@ Archo 用的工具就是 05 §1 定义的那一套命令与工具层，和 MCP �
 | --- | --- | --- |
 | 只读 | `readOnlyHint: true` 的全部工具：`status`、`find_mods`、`get_mod`、`get_description`、`get_def`、`get_patches`、`get_harmony`、`explain_relation`、`list_problems`、`list_changes`、`analyze_log`、`search_files`、`read_source`，以及 10 的存档读取工具（10 §1.6） | 直接调用，不问玩家 |
 | 改动，可撤销 | 编辑方案（`edit_loadout`：启用、停用、移动、换实例、排序、暂存）、玩家数据（`set_player_data`：标签、别名、备注）、用户规则（`add_rule`）、创建锁定版本（`copy_local`） | 直接调用。每一步都走现有动作，进**当前方案**的撤销历史（04 §3），历史里的操作名以“Archo：”开头。面板里每次改动显示一行“Archo 做了 … · 撤销” |
-| 要玩家确认 | 05 §5.2 里标 `destructiveHint: true` 的全部工具：写入游戏（`save_loadout`，写 ModsConfig.xml）、启动游戏（`launch_game`）、移到回收站（08 §7）、备份存档（10 §4.4）、回答身份问题（`resolve_identity`）、从 RimCrow 导入、清理（`maintenance`）等 | Archo 只能**发起**：面板里出现一张确认卡，写清会改哪些文件（同 06 §6 的确认规则），由玩家点“确认”。玩家不点，什么都不发生 |
+| 要玩家确认 | 05 §5.2 里标 `destructiveHint: true` 的全部工具：保存（`save_loadout`，写 ModsConfig.xml）、启动游戏（`launch_game`）、移到回收站（08 §7）、备份存档（10 §4.4）、回答身份问题（`resolve_identity`）、从 RimCrow 导入、清理（`maintenance`）等 | Archo 只能**发起**：面板里出现一张确认卡，写清会改哪些文件（同 06 §6 的确认规则），由玩家点“确认”。玩家不点，什么都不发生 |
 
 修改环境和设置只能由玩家自己做，没有对应工具（05 §1.2）。Archo 判断需要做这些事时，在回答里放一个按钮，按钮打开对应的页面。
 
@@ -151,7 +151,7 @@ Vanilla Expanded 这类 Mod 的工坊简介大量用图片，图片里是章节�
 | AR1 | 设置里关闭 Archo | 侧栏底部入口和所有“让 Archo …”按钮消失，其他功能不受影响 |
 | AR2 | 没配置模型来源时点 Archo | 面板显示说明和“去设置”，不报错 |
 | AR3 | Archo 在聊天里停用一个 Mod | 方案的撤销历史多一步“Archo：…”，`undo` 能撤回 |
-| AR4 | Archo 要写入游戏 | 只出现确认卡；玩家不点“确认”，ModsConfig.xml 不变 |
+| AR4 | Archo 要保存列表 | 只出现确认卡；玩家不点“确认”，ModsConfig.xml 不变 |
 | AR5 | 工具层直接收到 Archo 的 `save_loadout`、移到回收站、备份调用 | 都返回待确认，不写磁盘 |
 | AR6 | 第一次用“翻译” | 先弹同意说明；选“不同意”则不发送任何内容 |
 | AR7 | 设置页把“翻译”改回未同意 | 下次翻译重新问 |

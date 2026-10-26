@@ -55,7 +55,7 @@ func (m *model) histLines(w, n int) []string {
 	for i, h := range m.hist {
 		if h.Kind == "version" && !versions {
 			versions = true
-			rows, at = append(rows, head("versions written to the game")), append(at, -1)
+			rows, at = append(rows, head("saved versions")), append(at, -1)
 		}
 		st := sText
 		switch h.Kind {
@@ -136,7 +136,7 @@ func (m *model) histGo() tea.Cmd {
 		if err != nil {
 			m.say(sayFail, m.humanize(err.Error()))
 		} else {
-			m.say(sayOK, Tf("back at v%d (not written to the game yet)", h.Version)+Tf(", %s", T("u undoes")))
+			m.say(sayOK, Tf("back at v%d (unsaved)", h.Version)+Tf(", %s", T("u undoes")))
 		}
 		return m.requestDetail()
 	}

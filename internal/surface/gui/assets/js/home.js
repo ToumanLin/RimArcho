@@ -285,10 +285,10 @@ function launchStep(f) {
   if (live) b.title = T("a game is already running");
   b.onclick = () => f && launch(f);
   s.append(b);
-  // the current list's edits not written to the game yet; it opens the list
+  // the current list's edits unsaved; it opens the list
   if (f && f.unsaved) {
-    const u = el("button", "hm-unsaved", T("changes not written to the game yet"));
-    u.title = Tf("%d not written", f.unsaved);
+    const u = el("button", "hm-unsaved", T("unsaved changes"));
+    u.title = Tf("%d unsaved", f.unsaved);
     u.onclick = () => edit(f);
     s.append(u);
   }

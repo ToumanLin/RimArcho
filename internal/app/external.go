@@ -73,7 +73,7 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 		st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: loaded as %s", c.Name(st.Ix.Env)))
 	} else {
 		ws.Conflict = n
-		st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: kept as %s, not loaded because the plan changed since it was written (%s)",
+		st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: kept as %s, not loaded because the plan changed since it was saved (%s)",
 			c.Name(st.Ix.Env), strings.Join(c.Commands(st.Ix.Env), "; ")))
 	}
 	ws.Updated = now

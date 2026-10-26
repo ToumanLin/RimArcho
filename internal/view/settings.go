@@ -212,7 +212,7 @@ func FolderGroup(a *app.App) SettingGroup {
 	g.Items = append(g.Items, others...)
 	g.Items = append(g.Items,
 		SettingItem{Label: T("add a SteamCMD folder"), Edit: "path", Argv: []string{"folder", "add", "steamcmd", "{}"},
-			Note: T("mods there can be enabled; writing to the game links them into Mods/")},
+			Note: T("mods there can be enabled; saving links them into Mods/")},
 		SettingItem{Label: T("add another mod folder"), Edit: "path", Argv: []string{"folder", "add", "extra", "{}"}})
 	return g
 }

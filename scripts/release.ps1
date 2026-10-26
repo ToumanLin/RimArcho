@@ -34,12 +34,13 @@ if (git status --porcelain 2>$null) { $commit += "-dirty" }
 $date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
 
 if (-not $SkipTests) {
-    # -short skips the long performance checks (the 1354-mod TUI latency run); run them with a
-    # plain `go test ./...` when touching scan or TUI speed. -count=1 turns off the test result
-    # cache: a release reruns the tests anyway, and recording what ~230k file reads and stats
-    # the tests made costs `go test` about a minute on Windows after the tests have finished.
-    Write-Host "go test -short -count=1 ./..."
-    go test -short -count=1 ./...
+    # Test product code and build helpers, plus the maintained corpus-tool suites.
+    # tmp/ is disposable diagnostics; other spikes are development/measurement programs.
+    # Keep tested spikes explicit so local experiments cannot enter the release gate.
+    # -short skips long performance checks; omit it for scan or TUI speed changes.
+    # -count=1 reruns tests without recording the costly Windows file-access test cache.
+    Write-Host "go test -short -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel"
+    go test -short -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel
     if ($LASTEXITCODE -ne 0) { throw "tests failed" }
 }
 

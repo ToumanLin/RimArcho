@@ -195,10 +195,10 @@ func (m *model) listAction(what string) tea.Cmd {
 	return m.requestDetail()
 }
 
-// listPreview is the palette's 预览排序 / 预览写入 / 预览启动: the dry run, to read.
+// listPreview is the palette's 预览排序 / 预览保存 / 预览启动: the dry run, to read.
 func (m *model) listPreview(what string) tea.Cmd {
 	out, _ := m.run(what, "--dry-run")
-	title := map[string]string{view.ListSort: "preview the sort", view.ListSave: "preview writing to the game", view.ListLaunch: "preview the launch"}[what]
+	title := map[string]string{view.ListSort: "preview the sort", view.ListSave: "preview saving", view.ListLaunch: "preview the launch"}[what]
 	m.openPanel(T(title), out)
 	return nil
 }
@@ -209,7 +209,7 @@ func listTitle(what string) string {
 	case view.ListSort:
 		return T("sort")
 	case view.ListSave:
-		return T("write to the game")
+		return T("save")
 	}
 	return T("launch")
 }

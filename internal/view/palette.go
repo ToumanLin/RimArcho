@@ -28,10 +28,10 @@ func (c Command) Name() string {
 // Commands of the main screen.
 var Commands = []Command{
 	{"sort", "自动排序", "sort", "S"},
-	{"save", "写入游戏", "write to the game", "w save ModsConfig.xml"},
+	{"save", "保存", "save", "w save ModsConfig.xml"},
 	{"launch", "启动游戏", "launch", "L RimWorld"},
 	{"preview-sort", "预览排序", "preview the sort", "S dry run"},
-	{"preview-save", "预览写入", "preview writing to the game", "w dry run ModsConfig.xml"},
+	{"preview-save", "预览保存", "preview saving", "w dry run ModsConfig.xml"},
 	{"preview-launch", "预览启动", "preview the launch", "L dry run"},
 	{"undo", "撤销", "undo", "u"},
 	{"redo", "重做", "redo", "ctrl+r"},

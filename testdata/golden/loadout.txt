@@ -7,7 +7,7 @@ env:main  RimWorld 1.6.4633 rev1261
   changes: 11 discovered (archo changes)
   plan: plan:default
   loadout: 7 active (1 missing entries), same as v1 (import)
-  warning: ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start. Launching from RimArcho or writing to the game once (archo save) writes it for 1.6
+  warning: ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start. Launching from RimArcho or saving once (archo save) saves it for 1.6
   problems: 0 error, 3 warning, 4 info in declarations; Defs and Patches not analysed yet (archo problems)
 
 $ archo list --active
@@ -200,7 +200,7 @@ versions: 2 (plan:default, env:main)
 
 $ archo loadout checkout v1
 workspace: 7 active, 5 changes unsaved (plan:default, env:main)
-  checked out v1 into the workspace (archo save writes it to the game)
+  checked out v1 into the workspace (archo save saves it to the game)
   removed  #gpto         Gamma      was 2
   moved    #iqmu         Core       3 → 2
   moved    #6olp         Harmony    1 → 4

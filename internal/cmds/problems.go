@@ -486,7 +486,7 @@ func logRunText(c *Ctx, r *app.LogRun) string {
 	}
 	run := func() string { // the run the log maps to
 		if src.ByWrite {
-			return fmt.Sprintf("%s as written to the game at %s", plan(), c.App.FormatTime(src.At))
+			return fmt.Sprintf("%s as saved at %s", plan(), c.App.FormatTime(src.At))
 		}
 		if src.Pack != "" {
 			return fmt.Sprintf("the launch of pack %s at %s", src.Pack, c.App.FormatTime(src.At))

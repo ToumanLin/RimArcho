@@ -188,7 +188,7 @@ func TestLogWriteRecordAndUnknown(t *testing.T) {
 	if r.Stale() || !r.Source.ByWrite || r.Source.Plan != "default" {
 		t.Fatalf("by the write record: %+v %+v", r, r.Source)
 	}
-	if out := e.MustRun("problems"); !strings.Contains(out, "current (from plan:default as written to the game at ") {
+	if out := e.MustRun("problems"); !strings.Contains(out, "current (from plan:default as saved at ") {
 		t.Fatal(out)
 	}
 	newPlan(t, e, "other")
@@ -275,7 +275,7 @@ func TestRunningGameNamesThePlan(t *testing.T) {
 	}
 
 	e.App.Store.DB.Exec(`DELETE FROM launch`)
-	if out, _ := e.Run("launch"); !strings.Contains(out, "environment main is running plan:default (last written to the game) (pid 7") {
+	if out, _ := e.Run("launch"); !strings.Contains(out, "environment main is running plan:default (last saved) (pid 7") {
 		t.Fatal(out)
 	}
 	e.App.Store.DB.Exec(`DELETE FROM modsconfig_state`)

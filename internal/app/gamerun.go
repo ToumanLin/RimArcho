@@ -192,7 +192,7 @@ func (w RunWhat) PlanText() string {
 	case w.Plan == "":
 		return "its list"
 	case w.PlanWritten:
-		return "plan:" + w.Plan + " (last written to the game)"
+		return "plan:" + w.Plan + " (last saved)"
 	}
 	return "plan:" + w.Plan
 }

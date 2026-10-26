@@ -164,7 +164,7 @@ function inGameMark(isInGame) {
   const sh = S.shell;
   if (!isInGame || !sh || !sh.inGame || !sh.plans || sh.plans.length < 2) return null;
   const m = el("span", "ingame-dot");
-  m.title = sh.inGame.text + T("; ") + T("switching lists writes no game file; writing to the game or launching does");
+  m.title = sh.inGame.text + T("; ") + T("switching lists does not save to the game; saving or launching does");
   return m;
 }
 
@@ -334,7 +334,7 @@ function renderCrumbs() {
   let chip = (sh && sh.env) || "";
   if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + "  " + chip;
   factText(env, chip);
-  env.hidden = !chip || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "subscribe" || S.screen === "uninstall" || S.screen === "textures" || S.screen === "tasks";
+  env.hidden = !chip || !S.screen || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "subscribe" || S.screen === "uninstall" || S.screen === "textures" || S.screen === "tasks";
   env.title = T("game") + T("; ") + "E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");

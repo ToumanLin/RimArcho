@@ -372,7 +372,7 @@ diff v1 → workspace: 1 change
 
 > edit_loadout {"action":"checkout","version":"v1"}
 workspace: 3 active, saved (plan:default, env:main)
-  checked out v1 into the workspace (archo save writes it to the game)
+  checked out v1 into the workspace (archo save saves it to the game)
   added  #hnyg  Harmony  at 2
 
 > plan_history {"action":"steps"}
@@ -416,7 +416,7 @@ next:
 > manage_plans {"action":"use","name":"copy"}
 current plan: plan:copy (env:main)
   workspace: 3 active, saved (plan:copy, env:main)
-  game: ModsConfig.xml unchanged (archo save or archo launch writes this plan)
+  game: ModsConfig.xml unchanged (archo save or archo launch saves this plan)
 
 > manage_plans {"action":"rename","name":"copy","new_name":"raid night"}
 plan:copy renamed to plan:raid night
@@ -445,7 +445,7 @@ next:
 > manage_plans {"action":"use","name":"raid night"}
 current plan: plan:raid night (env:main)
   workspace: 3 active, saved (plan:raid night, env:main)
-  game: ModsConfig.xml unchanged (archo save or archo launch writes this plan)
+  game: ModsConfig.xml unchanged (archo save or archo launch saves this plan)
 
 > launch_game {"dry_run":true}
 launch: dry run (direct), nothing written

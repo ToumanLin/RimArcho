@@ -138,9 +138,10 @@ async function goLaunch() {
   await homePage.focusLaunch();
 }
 
-// planActions: the plan's actions in the top bar (06 §2.5): undo, sort, build a pack, write
-// to the game, and how many entries are not written to the game yet (06 §2.2); the plan's
-// own menu (rename, copy, delete) and its "有未载入的外部版本" mark (04 §4.3).
+// planActions: the list's actions in the top bar (06 §2.5): its "有未载入的外部版本" mark,
+// how many entries are not saved to the game yet, rename and delete, import / export (the
+// list's page in 全部列表), save, and set current or launch. Undo sits beside sort in the
+// enabled list's head.
 function planActions() {
   const u = (S.board && S.board.unsaved) || 0;
   const btn = (label, k, run, cls = "", envWrite = "") => {
@@ -159,37 +160,40 @@ function planActions() {
     m.onclick = (e) => { e.stopPropagation(); go("needs"); };
     out.push(m);
   }
-  // another list is the current one, the one launched (04 §1.3): say so, and offer this one
-  const other = S.shell && S.shell.current;
-  if (plan && other) {
-    const note = el("span", "play-note");
-    const t = el("span", "t", Tf("launching plays %s", other.name));
-    const use = el("button", "lnk", T("make current"));
-    use.title = T("launch this list from now on; no game file is written");
-    use.dataset.envWrite = "use-plan";
-    use.onclick = (e) => { e.stopPropagation(); plans.usePlan(plan.id); };
-    note.title = Tf("the game is launched with %s; this list is only open here", other.name);
-    note.append(t, use);
-    out.push(note);
-  }
   if (u) {
-    const n = el("span", "unwritten", Tf("%d not written", u));
-    n.title = T("different from the list last written to the game; launching or writing to the game writes them");
+    const n = el("span", "unwritten", Tf("%d unsaved", u));
+    n.title = T("different from the last saved list; launching or saving saves these changes to the game");
     motion.bump("unwritten", n, u);
     out.push(n);
   } else motion.bump("unwritten", null, 0);
-  out.push(btn(T("undo"), "u", () => verb("undo"), "wide-only", "undo"), btn(T("import"), "i", () => exchange()), btn(T("export"), "e", exportCurrent),
-    btn(T("create a pack"), "", () => go("build"), "wide-only"), btn(T("write to the game"), "w", () => run("save"), u ? "hot" : "", "save"));
   if (plan) {
-    const more = btn("⋯", "", () => { const r = more.getBoundingClientRect(); plans.menuAt(plan.id, r.left, r.bottom + 4); }, "icon-btn");
-    more.title = T("the list: rename, copy, delete") + T("; ") + "P";
-    out.push(more);
+    out.push(btn(T("rename"), "", () => plans.renamePlan(plan.id), "", "rename-plan"),
+      btn(T("delete"), "", () => plans.deletePlan(plan.id), "", "remove-plan"));
   }
-  // 启动游戏 opens 启动, where the game starts (06 §2.5)
-  const l = btn(T("launch the game"), "L", goLaunch, "primary", "launch");
-  l.title = T("opens the launch page, where the game starts") + T("; ") + "L";
-  out.push(l);
+  const io = btn(T("import/export"), "", manageCurrent);
+  io.title = T("the list's page in all lists: import, export, share");
+  const save = btn(u ? T("save changes") : T("no changes"), "w", () => run("save"), u ? "hot" : "", "save");
+  save.disabled = !u;
+  out.push(io, save);
+  // another list is the one launched (04 §1.3): this one can be made current first
+  if (plan && S.shell.current) {
+    const c = btn(T("set current"), "", () => plans.usePlan(plan.id), "primary", "use-plan");
+    c.title = Tf("the game is launched with %s; this list is only open here", S.shell.current.name) + T("; ") + T("no game file is written");
+    out.push(c);
+  } else {
+    // 启动 opens 启动, where the game starts (06 §2.5)
+    const l = btn(T("launch"), "L", goLaunch, "primary", "launch");
+    l.title = T("opens the launch page, where the game starts") + T("; ") + "L";
+    out.push(l);
+  }
   return out;
+}
+
+// manageCurrent opens 全部列表 with the open list selected: its import, export and sharing.
+function manageCurrent() {
+  const p = S.shell && S.shell.plan;
+  if (p) planManage.select(p.id);
+  return go("plans");
 }
 
 let lastList = 1;
@@ -476,7 +480,7 @@ async function drop(from, to, items, at) {
   if (to === 0 && from === 2) return edited(api.Unstage(ids), true, ids);
 }
 
-// run: sort, write to the game and launch act at once and say what they did (06 §6); sort
+// run: sort, save and launch act at once and say what they did (06 §6); sort
 // offers 撤销. A refusal says why in the status line and shows the commands that resolve it.
 async function run(what) {
   const before = motion.snapshot();
@@ -486,7 +490,7 @@ async function run(what) {
   if (o.moves) return confirmMoves(o, () => api.RunMoving(what), async (o2) => { say(o2.refused ? "fail" : "ok", o2.text); await reload(); motion.play(before, null); });
   if (o.refused) {
     say("fail", o.text);
-    if (o.refused.length > 1) pop.text({ sort: T("sort"), save: T("write to the game"), launch: T("launch") }[what], o.refused);
+    if (o.refused.length > 1) pop.text({ sort: T("sort"), save: T("save"), launch: T("launch") }[what], o.refused);
   } else say("ok", o.text, !!o.undo);
   await reload();
   motion.play(before, null);

@@ -38,7 +38,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     sort                                      sort the workspace by load-order constraints
     undo [<n>]                                undo the last workspace edit (or the last n: archo history)
     redo [<n>]                                redo an undone workspace edit (or n of them)
-    save                                      write the list to the game without starting it: Mods/ links, ModsConfig.xml (backup + atomic replace)
+    save                                      save the list without starting the game: Mods/ links, ModsConfig.xml (backup + atomic replace)
     loadout log                               saved and imported Loadout versions
     loadout diff [<v>] [<v>]                  differences between versions (default: newest version → workspace)
     loadout checkout <v>                      load a version into the workspace (save to apply)
@@ -64,7 +64,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     rule add after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>  add a user rule
     rule list                                 list user rules
     rule remove <r:n>                         delete a user rule
-    launch                                    write the list to the game and start it (one game at a time)
+    launch                                    save the list and start the game (one game at a time)
     test run [<plan>]                         run the game with isolated data, capture startup errors, then stop it
     identity list                             open identity questions ("is this #xxxx back?")
     identity resolve <q:n> same|copy|unrelated  answer an identity question

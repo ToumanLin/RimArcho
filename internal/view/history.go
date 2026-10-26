@@ -32,7 +32,7 @@ func HistoryItems(a *app.App, st *app.LoadoutState) ([]HistItem, error) {
 	}
 	now := T("now  same as the game")
 	if n := len(st.Changes()); n > 0 {
-		now = Tf("now  %d not written", n)
+		now = Tf("now  %d unsaved", n)
 	}
 	out = append(out, HistItem{Kind: "now", Text: now})
 	for _, s := range h.Undo {
@@ -42,7 +42,7 @@ func HistoryItems(a *app.App, st *app.LoadoutState) ([]HistItem, error) {
 		if i == 20 {
 			break
 		}
-		src := map[string]string{"user": T("written to the game"), "external": T("changed outside RimArcho"), "import": T("first seen"), "undo": T("went back")}[v.Source]
+		src := map[string]string{"user": T("saved"), "external": T("changed outside RimArcho"), "import": T("first seen"), "undo": T("went back")}[v.Source]
 		if src == "" {
 			src = v.Source
 		}

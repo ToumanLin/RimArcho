@@ -197,7 +197,7 @@ func sourceWord(s string) string {
 	case "launch":
 		return "launched"
 	case "save", "user":
-		return "written to the game"
+		return "saved"
 	}
 	return s
 }
@@ -247,7 +247,7 @@ func switchToNew(a *app.App, r *app.NewPlanResult) (*store.Plan, string, error) 
 	if _, err := a.OpenPlanID(r.Plan.ID); err != nil {
 		return r.Plan, "", err
 	}
-	t := Tf("new list %s: %d mods; the game's list is unchanged until you write or launch", r.Plan.Name, len(r.List))
+	t := Tf("new list %s: %d mods; the game's list is unchanged until you save or launch", r.Plan.Name, len(r.List))
 	if len(r.Unresolved) > 0 {
 		t += "  " + Tf("%d not installed", len(r.Unresolved))
 	}

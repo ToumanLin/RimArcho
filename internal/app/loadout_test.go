@@ -210,7 +210,7 @@ func TestExternalChangeAndConflict(t *testing.T) {
 	e.MustRun("enable", refOf(t, e, "B", ""))
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
 	out := e.MustRun("status")
-	if !strings.Contains(out, "not loaded because the plan changed since it was written") || joined(active(t, e)) != "Core, A, B" {
+	if !strings.Contains(out, "not loaded because the plan changed since it was saved") || joined(active(t, e)) != "Core, A, B" {
 		t.Fatalf("conflict:\n%s", out)
 	}
 	e.MustRun("loadout", "checkout", "v3")

@@ -104,7 +104,7 @@ func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 		case app.UnModsConfig:
 			for _, it := range s.Items {
 				if _, err := os.Stat(it.Path + loadout.BackupSuffix); err == nil {
-					st.Toggle, st.Label, st.On = "restoreBackup", T("put back the list from before RimArcho's last write instead"), o.RestoreBackup
+					st.Toggle, st.Label, st.On = "restoreBackup", T("put back the list from before RimArcho's last save instead"), o.RestoreBackup
 				}
 			}
 		case app.UnLocked:
@@ -184,7 +184,7 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		add(app.DoLeave, "%d folders named like them are not links: left alone")
 	case app.UnModsConfig:
 		add(app.DoClean, "keep each game's current list (%d), without Archo Monitor and the mods only there through a link; RimArcho's backup is deleted")
-		add(app.DoRestore, "put back the list from before RimArcho's last write (%d)")
+		add(app.DoRestore, "put back the list from before RimArcho's last save (%d)")
 	case app.UnLocked:
 		add(app.DoTrash, "%d copies to the recycle bin")
 		add(app.DoMove, "%d copies into %s's Mods folder, as ordinary mods", p.LockedTo)

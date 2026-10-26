@@ -30,7 +30,7 @@ func init() {
 		Flags: []Flag{{Name: "dry-run", Help: "show the result without changing the workspace"}}, Run: sortCmd})
 	register(&Command{Name: "undo", Args: "[<n>]", Summary: "undo the last workspace edit (or the last n: archo history)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, false) }})
 	register(&Command{Name: "redo", Args: "[<n>]", Summary: "redo an undone workspace edit (or n of them)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, true) }})
-	register(&Command{Name: "save", Summary: "write the list to the game without starting it: Mods/ links, ModsConfig.xml (backup + atomic replace)", MaxArgs: 0,
+	register(&Command{Name: "save", Summary: "save the list without starting the game: Mods/ links, ModsConfig.xml (backup + atomic replace)", MaxArgs: 0,
 		Flags: []Flag{{Name: "dry-run", Help: "show what would be written"}, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a mod to link into the lock library"}}, Run: saveCmd})
 	register(&Command{Name: "loadout log", Summary: "saved and imported Loadout versions", MaxArgs: 0, Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: loadoutLog})
 	register(&Command{Name: "loadout diff", Args: "[<v>] [<v>]", Summary: "differences between versions (default: newest version → workspace)", MaxArgs: 2,
@@ -41,7 +41,7 @@ func init() {
 		MinArgs: 2, MaxArgs: 3, Flags: []Flag{{Name: "note", Value: "<text>"}}, Run: ruleAdd})
 	register(&Command{Name: "rule list", Summary: "list user rules", MaxArgs: 0, Run: ruleList})
 	register(&Command{Name: "rule remove", Args: "<r:n>", Summary: "delete a user rule", MinArgs: 1, MaxArgs: 1, Run: ruleRemove})
-	register(&Command{Name: "launch", Summary: "write the list to the game and start it (one game at a time)", MaxArgs: 0,
+	register(&Command{Name: "launch", Summary: "save the list and start the game (one game at a time)", MaxArgs: 0,
 		Flags: []Flag{{Name: "dry-run", Help: "show what would be written and the command; write nothing"}, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a mod to link into the lock library"}}, Run: launchCmd})
 }
 
@@ -543,7 +543,7 @@ func loadoutCheckout(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	d := editDoc(c, r)
-	d.Nodes[0].Children = append([]*render.Node{{Line: fmt.Sprintf("checked out v%d into the workspace (archo save writes it to the game)", n)}}, d.Nodes[0].Children...)
+	d.Nodes[0].Children = append([]*render.Node{{Line: fmt.Sprintf("checked out v%d into the workspace (archo save saves it to the game)", n)}}, d.Nodes[0].Children...)
 	return d, nil
 }
 
@@ -570,7 +570,7 @@ func addConflicts(c *Ctx, root *render.Node, st *app.LoadoutState) {
 		return
 	}
 	for _, x := range cs {
-		root.KV("pending", fmt.Sprintf("ModsConfig.xml changed outside RimArcho; %s was not loaded because the plan changed since it was written: %s",
+		root.KV("pending", fmt.Sprintf("ModsConfig.xml changed outside RimArcho; %s was not loaded because the plan changed since it was saved: %s",
 			x.Name(st.Ix.Env), strings.Join(x.Commands(st.Ix.Env), ", ")))
 	}
 }

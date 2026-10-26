@@ -103,7 +103,7 @@ func planUse(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d, root := render.New(fmt.Sprintf("current plan: %s (%s)", app.PlanRef(p), envRef(st.Ix.Env)))
 	root.Add(workspaceLine(st))
-	root.KV("game", "ModsConfig.xml unchanged (archo save or archo launch writes this plan)")
+	root.KV("game", "ModsConfig.xml unchanged (archo save or archo launch saves this plan)")
 	return d, nil
 }
 

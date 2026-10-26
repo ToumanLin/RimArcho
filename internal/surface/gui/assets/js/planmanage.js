@@ -424,7 +424,7 @@ function newForm() {
       void readSources(draft); draw(".pm-source");
     });
     if (draft.sources) {
-      choice(T("based on which version"), "pm-version", [{ from: "current", label: T("current editing content (including changes not written to the game)") }, ...draft.sources.versions], draft.version, v => { draft.version = v; draw(".pm-version"); });
+      choice(T("based on which version"), "pm-version", [{ from: "current", label: T("current editing content (including unsaved changes)") }, ...draft.sources.versions], draft.version, v => { draft.version = v; draw(".pm-version"); });
       const summary = el("div", "pm-source-summary");
       summary.append(el("div", "", draft.version === "current" ? Tf("%d enabled mods; loading order is kept", draft.sources.count) : draft.sources.versions.find(v => v.from === draft.version)?.label));
       summary.append(el("div", "pm-note", T("a separate list with its own history; game versions are copied")));

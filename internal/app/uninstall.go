@@ -356,7 +356,7 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 		}
 		it := &UninstallItem{Path: path, Name: e.Name}
 		if o.RestoreBackup && bakErr == nil {
-			it.Do, it.Note = DoRestore, "the list from before RimArcho's last write"
+			it.Do, it.Note = DoRestore, "the list from before RimArcho's last save"
 			mcs = append(mcs, it)
 			continue
 		}

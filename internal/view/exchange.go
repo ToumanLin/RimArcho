@@ -386,9 +386,9 @@ func ApplyImport(a *app.App, imp *Import, merge bool) (string, error) {
 		}
 	}
 	if merge {
-		return Tf("added %s from %s, not written to the game yet, u undoes", Plural(e.Added, "mod"), imp.Source), nil
+		return Tf("added %s from %s, unsaved, u undoes", Plural(e.Added, "mod"), imp.Source), nil
 	}
-	return Tf("imported %s: %d added, %d removed, %d moved, not written to the game yet, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved), nil
+	return Tf("imported %s: %d added, %d removed, %d moved, unsaved, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved), nil
 }
 
 // FollowImported makes a list follow the collection an import read (no network: the
@@ -476,7 +476,7 @@ func ExportTo(a *app.App, format, path string, overwrite bool) (string, error) {
 	}
 	if st, err := a.Loadout(); err == nil && st.FilePath != "" {
 		if game, err := filepath.Abs(st.FilePath); err == nil && strings.EqualFold(game, abs) {
-			return "", errors.New(T("that is the game's own ModsConfig.xml: write to the game instead (with a preview and a version)"))
+			return "", errors.New(T("that is the game's own ModsConfig.xml: save instead (with a preview and a version)"))
 		}
 	}
 	if fi, err := os.Stat(abs); err == nil {

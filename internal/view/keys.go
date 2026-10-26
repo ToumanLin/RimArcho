@@ -61,7 +61,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r(pick("← → / 1–4", "← → / 1–4 / h l"), "go to an area"),
 				r("J K / alt+J K", "move down / up 1 (10); with a filter, past the rows shown"),
 				r("T", "put everything back from staging; elsewhere, stage everything enabled"),
-				r("S / w / L", pick("sort, write to the game, to the launch page (the palette previews them)", "sort, write to the game, launch (the palette previews them)")),
+				r("S / w / L", pick("sort, save, to the launch page (the palette previews them)", "sort, save, launch (the palette previews them)")),
 				r(pick("i / e", "e"), pick("import, export the mod list", "export the mod list")),
 				r("R / A", "rescan, check the files again"),
 				r("P / E", "lists, games"),

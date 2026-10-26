@@ -172,10 +172,11 @@ export function renderHeads() {
   }
 }
 
-// listActions: sort sits in the enabled list's head, since it orders that list; import /
-// export and the plan's other actions are in the top bar. main.js runs it by data-cmd.
+// listActions: undo and sort sit in the enabled list's head, since they change that list;
+// the list's other actions are in the top bar. main.js runs them by data-cmd.
 function listActions() {
-  return `<span class="acts"><button class="btn small" data-cmd="sort" data-env-write="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
+  return `<span class="acts"><button class="btn small" data-cmd="undo" data-env-write="undo" title="u">${esc(T("undo"))}<kbd>u</kbd></button>` +
+    `<button class="btn small" data-cmd="sort" data-env-write="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
 }
 
 const pools = [new Map(), new Map(), new Map()];
@@ -222,7 +223,7 @@ export function renderRows(k) {
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
       `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>` +
-      (it.unsaved ? `<span class="u" title="${esc(T("not written to the game yet"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
+      (it.unsaved ? `<span class="u" title="${esc(T("unsaved"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
     if (k === 0 && it.copyCount > 1 && it.copyLabel) {
       d.classList.add("copy-item");
       $(".t",d).textContent="└ " + it.copyLabel;
@@ -260,7 +261,7 @@ function historyPanel() {
   for (const h of S.history) {
     if (h.kind === "version" && !versions) {
       versions = true;
-      p.append(el("div", "hh", T("versions written to the game")));
+      p.append(el("div", "hh", T("saved versions")));
     }
     const r = el("div", "h " + h.kind, h.text);
     if (h.kind !== "now") {

@@ -26,7 +26,7 @@ func launchHintNow(a *app.App) *LaunchHint {
 
 // Whole-list actions (06 §6): sort, save and launch act on one key or click and say what
 // they did (sort: u undoes it). The preview is the CLI's dry run (read-only), reached from
-// the palette (预览排序 / 预览写入 / 预览启动) or `archo … --dry-run`; it never asks to go on.
+// the palette (预览排序 / 预览保存 / 预览启动) or `archo … --dry-run`; it never asks to go on.
 
 // Whole-list actions.
 const (
@@ -124,7 +124,7 @@ func DryRun(a *app.App, what string) (*Preview, error) {
 	case ListSort:
 		p.Title = T("preview the sort")
 	case ListSave:
-		p.Title = T("preview writing to the game")
+		p.Title = T("preview saving")
 	case ListLaunch:
 		p.Title = T("preview the launch")
 	default:
@@ -181,11 +181,11 @@ func apply(a *app.App, what string, move bool) (string, error) {
 			return "", err
 		}
 		if r.Unchanged {
-			return T("nothing to write to the game"), nil
+			return T("no changes to save"), nil
 		}
-		msg := Tf("written to the game as v%d", r.Version)
+		msg := Tf("saved as v%d", r.Version)
 		if len(r.Links) > 0 {
-			msg = Tf("written to the game as v%d; %d Mods/ links updated", r.Version, len(r.Links))
+			msg = Tf("saved as v%d; %d Mods/ links updated", r.Version, len(r.Links))
 		}
 		if r.Running != nil {
 			msg += "  " + T("the game reads it on its next start")

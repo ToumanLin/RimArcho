@@ -550,9 +550,9 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		}
 	}
 	if v := env.MajorMinor(st.FileVersionMismatch()); v != "" {
-		add(Need{rank: 6, Group: GroupList, Text: Tf("the list was written for %s; the game resets it when it starts — launching from RimArcho or writing to the game once writes it for the current version", v),
-			Actions: []Action{{Kind: ActSave, Key: "w", Label: T("write to the game")}}, Counted: true, Status: StatusWarn,
-			Title: Tf("the list was written for %s", v), Why: T("the game resets it when it starts; writing it to the game once fixes that"), Evidence: evidence(EvInferred, Tf("ModsConfig.xml says %s", v))})
+		add(Need{rank: 6, Group: GroupList, Text: Tf("the list was saved for %s; the game resets it when it starts — launching from RimArcho or saving once saves it for the current version", v),
+			Actions: []Action{{Kind: ActSave, Key: "w", Label: T("save")}}, Counted: true, Status: StatusWarn,
+			Title: Tf("the list was saved for %s", v), Why: T("the game resets it when it starts; saving once fixes that"), Evidence: evidence(EvInferred, Tf("ModsConfig.xml says %s", v))})
 	}
 	// Last run: the current log's errors, one item per mod (06 §2.4).
 	logWhen := ""
@@ -736,9 +736,9 @@ func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need 
 	switch {
 	case len(f) == 4 && f[1] == "swap":
 		from, to := f[2], f[3]
-		n.Why = Tf("RimArcho links %s for this list, and Mods/ already has the same mod; use the copy in Mods/ (the link goes the next time the list is written to the game)", TokName(st, from))
+		n.Why = Tf("RimArcho links %s for this list, and Mods/ already has the same mod; use the copy in Mods/ (the link goes the next time the list is saved)", TokName(st, from))
 		n.Actions = []Action{{Kind: ActSwap, Key: "x", Label: T("use the copy in Mods/"), Refs: []string{TokRef(st, from), TokRef(st, to)}, Undo: true,
-			Done: Tf("the list uses the copy of %s in Mods/ (not written yet)", TokName(st, to))}}
+			Done: Tf("the list uses the copy of %s in Mods/ (unsaved)", TokName(st, to))}}
 	case len(f) == 3 && f[1] == "disable":
 		n.Why = Tf("RimArcho links %s for this list, and Mods/ has another mod with the same packageId; disable it, or move the folder out of Mods/", TokName(st, f[2]))
 		n.Actions = []Action{disable(st, f[2], T("disable it"))}
@@ -786,7 +786,7 @@ func unpin(st *app.LoadoutState, tok string) Action {
 	name := TokName(st, tok)
 	return Action{Kind: ActUnpin, Key: "P", Label: T("use the workshop version"), Refs: []string{TokRef(st, tok)},
 		Confirm: T("press P again to unhide the workshop copy and use it"), Warn: Tf("RimArcho unhides the workshop copy of %s and uses it instead of the locked one; that one stays on disk", name),
-		Done: Tf("the list now uses the workshop version of %s (not written to the game yet)", name)}
+		Done: Tf("the list now uses the workshop version of %s (unsaved)", name)}
 }
 
 func trash(st *app.LoadoutState, tok string) Action {

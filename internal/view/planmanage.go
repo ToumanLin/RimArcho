@@ -420,7 +420,7 @@ func ExportPlanTo(a *app.App, id int64, format, path string, overwrite bool) (st
 	}
 	if st, err := a.Loadout(); err == nil && st.FilePath != "" {
 		if game, err := filepath.Abs(st.FilePath); err == nil && strings.EqualFold(game, abs) {
-			return "", errors.New(T("that is the game's own ModsConfig.xml: write to the game instead (with a preview and a version)"))
+			return "", errors.New(T("that is the game's own ModsConfig.xml: save instead (with a preview and a version)"))
 		}
 	}
 	if fi, err := os.Stat(abs); err == nil {
