@@ -287,7 +287,7 @@ func libLabel(i *app.LibInstance) string {
 		}
 		return T("locked version") + "  " + libStamp(created)
 	}
-	if i.Mod != nil && i.Mod.GitHead != "" {
+	if i.Mod != nil && SourceKind(i.Mod) == "git" {
 		return "Git"
 	}
 

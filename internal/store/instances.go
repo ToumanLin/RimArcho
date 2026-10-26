@@ -45,7 +45,7 @@ type Mod struct {
 	ACFManifest       string
 	ACFTimeUpdated    int64
 	ACFSize           int64
-	GitHead           string
+	GitHead           string // observed HEAD fingerprint, including Workshop uploads; not a source kind
 	Origin            string
 	FileCount         int
 	TotalSize         int64
