@@ -63,7 +63,7 @@ func init() {
 		"unhide":                                               "取消隐藏",
 		"unsubscribe":                                          "退订",
 		"delete":                                               "删除",
-		"subscribe again":                                      "重新订阅",
+		"resubscribe":                                          "重新订阅",
 		"open the web page":                                    "打开网页",
 		"Steam could not be reached (%s): the Workshop page is open, unsubscribe there":                   "连不上 Steam（%s）：已打开工坊页面，请在页面上退订",
 		"Steam could not be reached (%s): the Workshop page is open, resubscribe there":                   "连不上 Steam（%s）：已打开工坊页面，请在页面上重新订阅",

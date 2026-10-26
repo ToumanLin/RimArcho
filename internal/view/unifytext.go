@@ -9,7 +9,7 @@ func init() {
 		"use this one in the current list":      "在当前列表里用这一份",
 		"disable":                               "停用",
 		"lock this version":                     "锁定这个版本",
-		"subscribe again":                       "重新订阅",
+		"resubscribe":                           "重新订阅",
 		"unsubscribe":                           "退订",
 		"delete":                                "删除",
 		"the current list now uses %s":          "当前列表现在用 %s",

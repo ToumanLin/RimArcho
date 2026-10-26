@@ -112,7 +112,7 @@ func opLabel(code string) string {
 		OpFolder:   T("open the folder"), OpWorkshop: T("open the Workshop page"),
 		OpSteam: T("steam page"),
 		OpPin:   T("lock this version"), OpPinUpdate: T("update the locked version"), OpUnpin: T("unlock"),
-		OpMove: T("move into the lock library"), OpUnhide: T("unhide"), OpResub: T("subscribe again"),
+		OpMove: T("move into the lock library"), OpUnhide: T("unhide"), OpResub: T("resubscribe"),
 		OpUnsub: T("unsubscribe"), OpDelete: T("move to the recycle bin"),
 		OpTextures: T("convert textures to DDS"), OpTexClean: T("remove the converted textures"),
 	}[code]
