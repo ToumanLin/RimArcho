@@ -152,7 +152,7 @@ type BrokenEdge struct {
 
 // Broken lists what the current order breaks and a sort puts right, strongest first (04 §5.3):
 // the edges whose source comes after their target, left out when both ends are in one cycle
-// (a cycle keeps its order). Official content first is strong.
+// (the cycle reports those). Official content first is strong.
 func Broken(in Input, r Result) []BrokenEdge {
 	inCycle := map[int]int{}
 	for i, cy := range r.Cycles {

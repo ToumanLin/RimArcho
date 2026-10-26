@@ -712,10 +712,10 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		for _, mi := range cy.Members {
 			refs = append(refs, nodeTok(mi))
 		}
-		// Info (G8): the list keeps its current order, and mods on a cycle were error sources
-		// no more often than chance (6.8% vs 6.1% in 804 logs).
+		// Info (G8): mods on a cycle were error sources no more often than chance (6.8% vs
+		// 6.1% in 804 logs). Sorting gives up the weakest constraints (04 §5.2).
 		f := &finding.Finding{Code: "order.cycle", Severity: finding.Info, Key: strings.Join(refs, " "), Subjects: refs,
-			Claim: fmt.Sprintf("load-order constraints form a cycle among %s (kept in the current order)", strings.Join(refs, " "))}
+			Claim: fmt.Sprintf("load-order constraints form a cycle among %s (sorting gives up the weakest)", strings.Join(refs, " "))}
 		for i, e := range cy.Edges {
 			ev, ig := edgeText(st, in, e)
 			t := ev

@@ -70,7 +70,7 @@ func init() {
 		"they change things %s adds, and %s is not enabled.":                                       "它们改的是 %s 加入的东西，而 %s 没有启用。",
 		"Core and the DLCs are out of place":                                                       "Core 和 DLC 的位置不对",
 		"out of order, part of it may not take effect; sorting puts it right":                      "顺序不对时，它的部分内容可能不生效；自动排序会排好。",
-		"they stay in the current order; ignoring the suggested requirement lets sorting work":     "现在保持原来的顺序；忽略建议的那一条，就能自动排序。",
+		"sorting keeps the strongest of them and gives up the weakest (the suggested one); ignoring it settles that for good": "自动排序保留其中最强的，放弃最弱的那一条（就是建议忽略的那条）；忽略它就彻底定下来。",
 		"the game loads only one of them; you pick which":                                          "游戏只会加载其中一份，由你选留哪一份。",
 		"not installed: %s":                                                                      "没有安装：%s",
 		"the list has it, but no mod folder does":                                                "列表里有它，但 Mod 文件夹里找不到。",

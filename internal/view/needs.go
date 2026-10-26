@@ -316,7 +316,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		case "order.cycle":
 			add(Need{rank: 2, Group: GroupList, Text: Tf("the order requirements of %d mods contradict each other", len(subj)),
 				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: p.Severity != finding.Info, Dim: p.Severity == finding.Info, Mods: ids, Status: s,
-				Why: T("they stay in the current order; ignoring the suggested requirement lets sorting work"), Evidence: ev})
+				Why: T("sorting keeps the strongest of them and gives up the weakest (the suggested one); ignoring it settles that for good"), Evidence: ev})
 		case "pkg.duplicate-active":
 			add(Need{rank: 3, Group: GroupList, Text: Tf("%s is enabled twice", nm(x)), Actions: []Action{keepOne(st, ids)}, Counted: true, Mods: ids, Status: s,
 				Why: T("the game loads only one of them; you pick which"), Evidence: ev})

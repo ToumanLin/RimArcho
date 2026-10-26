@@ -4,6 +4,7 @@
 package order
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -94,46 +95,148 @@ type Edge struct {
 
 // Cycle is a strongly connected set of nodes with the edges that bind it.
 type Cycle struct {
-	Members []int
+	Members []int // in the sorted order
 	Edges   []Edge
-	Suggest int // index into Edges of the edge suggested for an ignore rule; -1: none
+	Broken  []int // indices into Edges that the sorted order breaks (the weakest that had to give)
+	Suggest int   // index into Edges of the edge suggested for an ignore rule; -1: none
 }
 
-// suggestRank orders constraint kinds by how readily an ignore rule should drop them
-// (04 §5.2): community rules, then About.xml load rules, then dependencies. User rules
-// are never suggested — the user removes them instead.
-func suggestRank(k string) int {
+// kindRank orders constraint kinds by how readily a cycle gives them up (04 §5.2): community
+// rules, loadAfter, the other About.xml load rules, dependencies, the official order, user
+// rules.
+func kindRank(k string) int {
 	switch k {
 	case KindCommunity:
 		return 0
-	case KindLoadAfter, KindLoadBefore, KindForceAft, KindForceBef:
+	case KindLoadAfter:
 		return 1
-	case KindDependency:
+	case KindLoadBefore, KindForceAft, KindForceBef:
 		return 2
-	case KindOfficial:
+	case KindDependency:
 		return 3
+	case KindOfficial:
+		return 4
 	}
-	return -1
+	return 5 // user
 }
 
-// suggest picks the edge to ignore: the best-ranked kind, and among equals the edge that
-// conflicts with the current order (From currently after To), then the first.
-func suggest(edges []Edge) int {
-	best, bestKey := -1, 0
+// giveKey ranks an edge for giving up inside a cycle: lower gives first. Corpus strength
+// (Assess) first, then the kind, then an edge the current order already breaks.
+func giveKey(in Input, e Edge) int {
+	k := int(Assess(in, e).Strength)*20 + kindRank(e.C.Kind)*2
+	if e.From < e.To {
+		k++ // the current order keeps it
+	}
+	return k
+}
+
+// suggestable: an ignore rule can drop it. User rules are never suggested — the user
+// removes them instead.
+func suggestable(e Edge) bool { return e.C.Kind != KindUser && e.C.Ref != "" }
+
+// suggest picks the edge to ignore: the weakest broken edge, else the weakest edge.
+func suggest(in Input, edges []Edge, broken []int) int {
+	pick := func(idx []int) int {
+		best, bestKey := -1, 0
+		for _, i := range idx {
+			if !suggestable(edges[i]) {
+				continue
+			}
+			if k := giveKey(in, edges[i]); best < 0 || k < bestKey {
+				best, bestKey = i, k
+			}
+		}
+		return best
+	}
+	if b := pick(broken); b >= 0 {
+		return b
+	}
+	all := make([]int, len(edges))
+	for i := range all {
+		all[i] = i
+	}
+	return pick(all)
+}
+
+// orderCycle orders the members of one cycle (ms ascending = current order): it keeps the
+// strongest constraints that can hold together — pairs by their strongest constraint,
+// strongest first, each kept unless it closes a loop with those already kept — and sorts by
+// them, keeping the current order where they allow. It returns the order and the indices
+// of the edges it breaks.
+func orderCycle(in Input, ms []int, edges []Edge) (order []int, broken []int) {
+	type pair struct {
+		from, to, key int
+		edges         []int
+	}
+	byPair := map[[2]int]*pair{}
+	var pairs []*pair
 	for i, e := range edges {
-		r := suggestRank(e.C.Kind)
-		if r < 0 || e.C.Ref == "" {
+		k := [2]int{e.From, e.To}
+		p := byPair[k]
+		if p == nil {
+			p = &pair{from: e.From, to: e.To, key: -1}
+			byPair[k] = p
+			pairs = append(pairs, p)
+		}
+		p.key = max(p.key, giveKey(in, e))
+		p.edges = append(p.edges, i)
+	}
+	sort.SliceStable(pairs, func(a, b int) bool {
+		if pairs[a].key != pairs[b].key {
+			return pairs[a].key > pairs[b].key
+		}
+		if pairs[a].from != pairs[b].from {
+			return pairs[a].from < pairs[b].from
+		}
+		return pairs[a].to < pairs[b].to
+	})
+	adj := map[int][]int{}
+	reaches := func(from, to int) bool {
+		seen := map[int]bool{from: true}
+		stack := []int{from}
+		for len(stack) > 0 {
+			v := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if v == to {
+				return true
+			}
+			for _, w := range adj[v] {
+				if !seen[w] {
+					seen[w] = true
+					stack = append(stack, w)
+				}
+			}
+		}
+		return false
+	}
+	for _, p := range pairs {
+		if reaches(p.to, p.from) {
+			broken = append(broken, p.edges...)
 			continue
 		}
-		key := r * 2
-		if e.From < e.To {
-			key++ // agrees with the current order
-		}
-		if best < 0 || key < bestKey {
-			best, bestKey = i, key
+		adj[p.from] = append(adj[p.from], p.to)
+	}
+	sort.Ints(broken)
+	indeg := map[int]int{}
+	for _, ws := range adj {
+		for _, w := range ws {
+			indeg[w]++
 		}
 	}
-	return best
+	done := map[int]bool{}
+	for len(order) < len(ms) {
+		for _, m := range ms { // earliest ready member in the current order
+			if !done[m] && indeg[m] == 0 {
+				done[m] = true
+				order = append(order, m)
+				for _, w := range adj[m] {
+					indeg[w]--
+				}
+				break
+			}
+		}
+	}
+	return order, broken
 }
 
 // Result of Sort.
@@ -388,16 +491,22 @@ func Sort(in Input) Result {
 		if len(ms) < 2 {
 			continue
 		}
-		cy := Cycle{Members: ms}
+		cy := Cycle{}
 		for _, e := range res.Edges {
 			if comp[e.From] == c && comp[e.To] == c {
 				cy.Edges = append(cy.Edges, e)
 			}
 		}
-		cy.Suggest = suggest(cy.Edges)
+		cy.Members, cy.Broken = orderCycle(in, ms, cy.Edges)
+		members[c] = cy.Members
+		cy.Suggest = suggest(in, cy.Edges, cy.Broken)
 		res.Cycles = append(res.Cycles, cy)
 	}
-	sort.Slice(res.Cycles, func(a, b int) bool { return res.Cycles[a].Members[0] < res.Cycles[b].Members[0] })
+	first := make([]int, nComp) // earliest current position of each component
+	for c, ms := range members {
+		first[c] = slices.Min(ms)
+	}
+	sort.Slice(res.Cycles, func(a, b int) bool { return slices.Min(res.Cycles[a].Members) < slices.Min(res.Cycles[b].Members) })
 
 	// Kahn over components: pick the ready component whose first member is earliest in the
 	// current list, preferring one attached to what was just emitted.
@@ -413,7 +522,7 @@ func Sort(in Input) Result {
 			indeg[b]++
 		}
 	}
-	key := func(c int) int { return members[c][0] }
+	key := func(c int) int { return first[c] }
 	ready := map[int]bool{}
 	for c := 0; c < nComp; c++ {
 		if indeg[c] == 0 {

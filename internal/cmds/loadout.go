@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -297,7 +298,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 					refs = append(refs, st.Ix.Ref(nd.Instance))
 				}
 			}
-			p := pr.Addf("info order.cycle  %s  (kept in current order)", strings.Join(refs, " "))
+			p := pr.Addf("info order.cycle  %s  (gives up the weakest)", strings.Join(refs, " "))
 			seen := map[string]bool{}
 			for i, e := range cy.Edges {
 				ev, ig := constraintText(st, r.Input, e)
@@ -310,6 +311,9 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 					line += "  (" + ig + ")"
 				} else {
 					line += "  (ignore: " + ig + ")"
+				}
+				if slices.Contains(cy.Broken, i) {
+					line += "  [broken]"
 				}
 				if i == cy.Suggest {
 					line += "  [suggested]"

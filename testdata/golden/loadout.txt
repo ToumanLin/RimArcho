@@ -30,8 +30,8 @@ sort: 2 moved (dry run; the workspace is unchanged)
     weak     decl #hnyg About.xml loadAfter pkg:brrainz.harmony
     harmless decl #6olp About.xml loadBefore pkg:ludeon.rimworld
   problems:
-    info order.cycle  #qfph #tmxx  (kept in current order)
-      evidence: decl #qfph About.xml loadAfter pkg:tester.y  (ignore: decl:#qfph:loadafter:tester.y)  [suggested]
+    info order.cycle  #qfph #tmxx  (gives up the weakest)
+      evidence: decl #qfph About.xml loadAfter pkg:tester.y  (ignore: decl:#qfph:loadafter:tester.y)  [broken]  [suggested]
       evidence: decl #tmxx About.xml loadAfter pkg:tester.x  (ignore: decl:#tmxx:loadafter:tester.x)
   constraints: 10 edges, 0 ignored by rules
 next:

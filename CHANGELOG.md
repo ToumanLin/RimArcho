@@ -7,6 +7,12 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Sorting a list with a constraint cycle now gives up the weakest constraint on the cycle
+  (by the log corpus's strength: harmless, weak, then strong; then community rules,
+  loadAfter, loadBefore, dependencies) and orders the rest by what holds, instead of keeping
+  the whole cycle in its current order. A dependency the list had the wrong way round is now
+  put right. `archo sort` marks the constraints it gives up `[broken]`; the suggested ignore
+  is the weakest of them.
 - `ctrl+\` turns reference numbers on and off: every control, text block, image and chart
   gets a thin red frame numbered at its top-left (`lib12`: the page, then the number), so a
   change can be asked for as "change lib12". The frames take no clicks.

@@ -85,7 +85,8 @@ func TestS2CycleAndS3Ignore(t *testing.T) {
 	if sg := r.Cycles[0].Suggest; sg < 0 || in.Nodes[r.Cycles[0].Edges[sg].C.Owner].PackageID != "x.one" {
 		t.Fatalf("suggest = %d", sg)
 	}
-	// Cycle members keep their relative order; the rest still sorts.
+	// Both edges are equally strong: the one the current order keeps stays, so the cycle
+	// keeps its order; the rest still sorts.
 	if got := pkgs(in, r); !slices.Equal(got, []string{"ludeon.rimworld", "x.one", "y.two", "z.free"}) && !slices.Equal(got, []string{"ludeon.rimworld", "x.one", "z.free", "y.two"}) {
 		t.Fatalf("order = %v", got)
 	}
@@ -95,6 +96,43 @@ func TestS2CycleAndS3Ignore(t *testing.T) {
 	got := pkgs(in, r)
 	if len(r.Cycles) != 0 || r.Ignored != 1 || slices.Index(got, "y.two") > slices.Index(got, "x.one") {
 		t.Fatalf("with ignore: %v cycles %d ignored %d", got, len(r.Cycles), r.Ignored)
+	}
+}
+
+// A cycle gives up its weakest constraint, not whatever the current order happens to break
+// (04 §5.2): a dependency outranks a loadAfter even when the list has it the wrong way round.
+func TestCycleBreaksWeakestEdge(t *testing.T) {
+	nodes := []Node{
+		node("ludeon.rimworld", scan.Decl{}),
+		node("a.mod", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "b.mod"}}}),
+		node("c.free", scan.Decl{}),
+		node("b.mod", scan.Decl{LoadAfter: []string{"a.mod"}}),
+	}
+	in := Input{Nodes: nodes, GameMM: "1.6"}
+	r := Sort(in)
+	if len(r.Cycles) != 1 {
+		t.Fatalf("cycles = %+v", r.Cycles)
+	}
+	cy := r.Cycles[0]
+	if got := pkgs(in, r); !slices.Equal(got, []string{"ludeon.rimworld", "b.mod", "a.mod", "c.free"}) {
+		t.Fatalf("order = %v", got)
+	}
+	if len(cy.Broken) != 1 || cy.Edges[cy.Broken[0]].C.Kind != KindLoadAfter {
+		t.Fatalf("broken = %+v", cy.Broken)
+	}
+	if cy.Suggest != cy.Broken[0] {
+		t.Fatalf("suggest %d, broken %v", cy.Suggest, cy.Broken)
+	}
+	// A three-mod loop with one weak edge: only that edge breaks, the rest hold.
+	nodes = []Node{
+		node("p.mod", scan.Decl{LoadAfter: []string{"r.mod"}}),
+		node("q.mod", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "p.mod"}}}),
+		node("r.mod", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "q.mod"}}}),
+	}
+	in = Input{Nodes: nodes}
+	r = Sort(in)
+	if got := pkgs(in, r); !slices.Equal(got, []string{"p.mod", "q.mod", "r.mod"}) || len(r.Cycles[0].Broken) != 1 {
+		t.Fatalf("order = %v, broken %v", got, r.Cycles[0].Broken)
 	}
 }
 
