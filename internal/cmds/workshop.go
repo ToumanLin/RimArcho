@@ -17,6 +17,8 @@ func init() {
 		MinArgs: 1, MaxArgs: -1, Flags: dry, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return workshopCmd(c, a, steamworks.Unsubscribe) }})
 	register(&Command{Name: "workshop subscribe", Args: "<ref…>", Summary: "subscribe again in Steam to an unsubscribed leftover",
 		MinArgs: 1, MaxArgs: -1, Flags: dry, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return workshopCmd(c, a, steamworks.Subscribe) }})
+	register(&Command{Name: "workshop resubscribe", Args: "<ref…>", Summary: "unsubscribe then subscribe in Steam to re-download mods; local edits are lost (refused while the game runs)",
+		MinArgs: 1, MaxArgs: -1, Flags: dry, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return workshopCmd(c, a, steamworks.Resubscribe) }})
 	register(&Command{Name: "workshop state", Args: "<ref…>", Summary: "ask Steam for item state; without Steam, show local folders with account state unknown",
 		MinArgs: 1, MaxArgs: -1, Run: workshopStateCmd})
 }
@@ -30,7 +32,7 @@ func workshopCmd(c *Ctx, a *Args, action string) (*render.Doc, error) {
 	if ierr != nil {
 		return nil, ierr
 	}
-	verb := map[string]string{steamworks.Subscribe: "subscribed", steamworks.Unsubscribe: "unsubscribed"}[action]
+	verb := map[string]string{steamworks.Subscribe: "subscribed", steamworks.Unsubscribe: "unsubscribed", steamworks.Resubscribe: "resubscribed"}[action]
 	items := fmt.Sprintf("%d Workshop items", len(op.Items))
 	if len(op.Items) == 1 {
 		items = "1 Workshop item"
@@ -47,6 +49,9 @@ func workshopCmd(c *Ctx, a *Args, action string) (*render.Doc, error) {
 			if op.DryRun {
 				what = "Steam would delete"
 			}
+			if action == steamworks.Resubscribe {
+				what += " and re-download; local edits in this folder are lost:"
+			}
 			n.KV("folder", what+" "+it.Folder)
 		}
 		if len(it.UsedBy) > 0 {
@@ -62,7 +67,7 @@ func workshopCmd(c *Ctx, a *Args, action string) (*render.Doc, error) {
 	switch {
 	case op.DryRun:
 		d.AddNext("archo workshop " + action + " " + strings.Join(a.Pos, " "))
-	case action == steamworks.Subscribe:
+	case action == steamworks.Subscribe || action == steamworks.Resubscribe:
 		root.KV("note", "Steam downloads it in the background; the next scan sees it subscribed")
 	default:
 		root.KV("note", "the next scan sees the folders gone")

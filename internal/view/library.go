@@ -660,7 +660,7 @@ func CopyNoteAuto(i *app.LibInstance) string {
 }
 
 // libConfirm: the actions that change files (a dry run first); the plan edits are undone with u.
-var libConfirm = map[string]bool{LibPin: true, LibPinUpdate: true, LibUnpin: true, LibUnhide: true, LibMove: true, LibDelete: true, LibUnsub: true,
+var libConfirm = map[string]bool{LibPin: true, LibPinUpdate: true, LibUnpin: true, LibUnhide: true, LibMove: true, LibDelete: true, LibUnsub: true, LibResub: true,
 	OpTextures: true, OpTexClean: true, OpSubRemove: true, OpSubUpdate: true}
 
 // texArgv is the textures command for copies (all of them in one run).
@@ -690,6 +690,8 @@ func libArgv(kind string, refs []string) []string {
 		return []string{"library", "move-to-locked", refs[0]}
 	case LibTrash:
 		return []string{"trash", refs[0]}
+	case LibResub:
+		return []string{"workshop", "resubscribe", refs[0]}
 	case LibUnsub:
 		return []string{"workshop", "unsubscribe", refs[0]}
 	}
@@ -745,6 +747,11 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		}
 		if code != 0 {
 			p.Apply = false
+		}
+		if kind == LibResub {
+			if m, err := st.Ix.ResolveOne(ref); err == nil && !m.Residue {
+				p.Lines = append(p.Lines, T("Steam will delete and re-download the folder; local edits in it are lost"))
+			}
 		}
 		if w := usedWarning(a, st, kind, ref); w != "" {
 			p.Lines = append(p.Lines, w)
@@ -932,10 +939,7 @@ func libCopyName(st *app.LoadoutState, m *store.Mod) string {
 // libSteam unsubscribes or subscribes again through the Steam client (06 §2.9); when Steam
 // is out of reach the answer is OpenPages.
 func libSteam(a *app.App, kind string, refs []string, what string) (string, error) {
-	action := steamworks.Unsubscribe
-	if kind == LibResub {
-		action = steamworks.Subscribe
-	}
+	action := SteamAction(kind)
 	_, err := a.Workshop(action, refs, false)
 	switch {
 	case SteamPages(kind, err) != nil:
@@ -957,7 +961,7 @@ func SteamPages(kind string, err error) *OpenPages {
 	}
 	msg := Tf("Steam could not be reached (%s): the Workshop page is open, unsubscribe there", u.Why)
 	if kind == LibResub {
-		msg = Tf("Steam could not be reached (%s): the Workshop page is open, subscribe there", u.Why)
+		msg = Tf("Steam could not be reached (%s): the Workshop page is open, resubscribe there", u.Why)
 	}
 	return &OpenPages{Msg: msg, URLs: u.URLs}
 }
@@ -965,7 +969,7 @@ func SteamPages(kind string, err error) *OpenPages {
 // SteamAction is the Steam client's action for a Mod 库 op.
 func SteamAction(kind string) string {
 	if kind == LibResub {
-		return steamworks.Subscribe
+		return steamworks.Resubscribe
 	}
 	return steamworks.Unsubscribe
 }

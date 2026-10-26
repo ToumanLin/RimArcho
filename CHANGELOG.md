@@ -7,6 +7,11 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- The mod library now offers only library actions: list edits and single-mod DDS conversion
+  stay off its row menu. Subscribed Workshop originals can be resubscribed through the
+  Steam task queue, CLI `workshop resubscribe`, or MCP `manage_library`: confirmation warns
+  that Steam deletes and re-downloads the folder and local edits are lost. Lists keep the
+  same copy identity; a running game blocks the operation. Leftovers can still subscribe again.
 - `ctrl+\` turns reference numbers on and off: every control, text block, image and chart
   gets a thin red frame numbered at its top-left (`lib12`: the page, then the number), so a
   change can be asked for as "change lib12". The frames take no clicks.

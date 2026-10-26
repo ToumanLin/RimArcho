@@ -1,7 +1,12 @@
 package gui
 
 import (
+	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/steamworks"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -132,5 +137,56 @@ func TestTrashBatch(t *testing.T) {
 	}
 	if m, err := st.Ix.ResolveOne("pkg:tester.b"); err == nil && m.Status == "live" {
 		t.Fatal("the library was not rescanned")
+	}
+}
+
+func TestLibraryResubscribeSteamQueue(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	refs := []string{"ws:1001"} // already enabled in the current list
+	for n := 0; n < 50; n++ {
+		id := fmt.Sprint(9000 + n)
+		e.AddWorkshop(id, testkit.Sample("tester.m"+id, "Mod "+id))
+		refs = append(refs, "ws:"+id)
+	}
+	e.MustRun("scan")
+	e.WriteFile(filepath.Join(e.Game, "steam_api64.dll"), "fake")
+	var calls [][]string
+	var mu sync.Mutex
+	e.App.SteamWorker = func(_ string, args []string) (string, error) {
+		mu.Lock()
+		calls = append(calls, append([]string{}, args...))
+		mu.Unlock()
+		var lines []string
+		for _, id := range args[1:] {
+			n, _ := strconv.ParseUint(id, 10, 64)
+			lines = append(lines, steamworks.ItemLine(n, "ok", 1))
+		}
+		return strings.Join(append(lines, steamworks.DoneLine(args[0], len(args)-1)), "\n"), nil
+	}
+	p, err := api.LibraryPreview(view.LibResub, refs[:1])
+	if err != nil || !p.Apply || !strings.Contains(strings.Join(p.Lines, " "), "local edits") {
+		t.Fatalf("preview: %+v %v", p, err)
+	}
+	if text, err := api.LibraryDo(view.LibResub, refs); err != nil || !strings.Contains(text, "queue") {
+		t.Fatalf("queue: %s %v", text, err)
+	}
+	r := endedTask(t, api, view.LibResub)
+	if r.State != app.TaskDone || len(r.Items) != 51 {
+		t.Fatalf("task: %+v", r)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(calls) != 4 {
+		t.Fatalf("calls: %v", calls)
+	}
+	for n, want := range []string{"unsubscribe", "subscribe", "unsubscribe", "subscribe"} {
+		size := 51
+		if n >= 2 {
+			size = 2
+		}
+		if calls[n][0] != want || len(calls[n]) != size {
+			t.Fatalf("call %d: %v", n, calls[n])
+		}
 	}
 }

@@ -87,6 +87,7 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     updated: 2026-10-01 10:00
     used in: plan:default
 next:
+  archo workshop resubscribe #6olp --dry-run
   archo library move-to-locked #iqmu --dry-run
 
 $ archo library --lineage ws:5300
@@ -148,6 +149,8 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     note: (by RimArcho) moved into the lock library 2026-10-01 for plan:default, plan:other
     upstream: #6olp Lockable
     used in: plan:default, plan:other
+next:
+  archo workshop resubscribe #6olp --dry-run
 
 $ archo note #iqmu kept for the old save --copy
 copy note set for #iqmu Lockable
@@ -168,6 +171,8 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     note: kept for the old save
     upstream: #6olp Lockable
     used in: plan:default, plan:other
+next:
+  archo workshop resubscribe #6olp --dry-run
 
 $ archo note #iqmu --copy --clear
 copy note cleared for #iqmu Lockable
