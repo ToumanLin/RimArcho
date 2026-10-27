@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"os"
@@ -64,5 +65,35 @@ func TestFixtureCanonicalAndReadOnly(t *testing.T) {
 	}
 	if string(before) != string(after) {
 		t.Fatal("observer wrote database")
+	}
+}
+
+func TestSnapshotLegacyHistoryReadOnly(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "fixture")
+	fixture(root)
+	home := filepath.Join(root, "home")
+	path := filepath.Join(home, "archo.db")
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`ALTER TABLE workspace_undo DROP COLUMN staging; UPDATE meta SET value='20' WHERE key='schema_version'`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observed := snapshot(home).(map[string]any)
+	if len(observed["plans"].([]map[string]any)) != 3 {
+		t.Fatal("legacy observation lost plans")
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("legacy observer migrated or wrote DB")
 	}
 }
