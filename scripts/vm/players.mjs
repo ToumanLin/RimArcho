@@ -49,21 +49,31 @@ export async function drive(ctx) {
     }
     return s;
   }
-  function identity(control,state) {
+  function identity(control,state,s) {
     // The DOM is virtualized. Rows are representative action classes, with their
     // concrete target retained for replay; ordinary descendants remain separate.
     const label=control.label.replaceAll(out,'<run>').replaceAll(out.replaceAll('\\','/'),'<run>');
     const stable=control.row?['row',control.area,control.rowKind,control.identity?.['data-kind']||'',/missing|absent/i.test(control.label)?'missing':'present']:[control.tag,control.role,control.identity,control.locator,label];
-    return hash(JSON.stringify([state,...stable]));
+    // A sidebar button does not become a new control in every popup/focus state.
+    // Keep popup/menu context for their controls, and page/list/view context for
+    // page controls. Retain all graph occurrences separately in the ledger.
+    const context=control.owner==='nav'?[s.page||'plan','nav']:['popup','menu'].includes(control.owner)?state:[s.page||'plan',s.plan,s.modes||[]];
+    return hash(JSON.stringify([context,...stable]));
   }
   function record(found,s,key,recipe) {
     const added=[];
     for(const control of found){
       // A container and its pointer-styled text child are one target; nested real
       // buttons are still independently discovered by discover().
-      const id=identity(control,key);if(ledger.has(id))continue;
+      const id=identity(control,key,s);
+      if(ledger.has(id)){
+        const old=ledger.get(id);if(!old.states.includes(key))old.states.push(key);
+        const policy=classify(control,s),eligible=allowed(policy.tier,options.allow)&&control.visible&&control.enabled&&!control.blockedByLayer;
+        if(!old.eligible&&eligible&&!old.attemptedAt)Object.assign(old,control,{state:key,recipe,eligible:true,outcome:'unreachable',reason:'not attempted'});
+        continue;
+      }
       const policy=classify(control,s), permitted=allowed(policy.tier,options.allow),eligible=permitted&&control.visible&&control.enabled&&!control.blockedByLayer;
-      const row={...control,key:id,state:key,page:s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
+      const row={...control,key:id,state:key,states:[key],page:s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
       if(!permitted){row.outcome='skipped';row.reason=policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`;}
       else if(!eligible){row.reason=!control.visible?'not visible in this state':!control.enabled?'disabled; requires application precondition':'covered by popup/menu; not an eligible edge in this state';}
       ledger.set(id,row);added.push(row);
@@ -373,7 +383,7 @@ export async function drive(ctx) {
         const found=await controls(),state=hash(stateKey(s,found));record(found,s,state,[]);
         const candidates=found.filter(x=>x.visible&&x.enabled&&x.hittable&&allowed(classify(x,s).tier,options.allow)&&(!previousLedger||previousLedger.controls.some(old=>old.page===(s.page||'plan')&&old.locator===x.locator&&allowed(old.tier,options.allow))));
         const target=candidates.length?pick(candidates):null;
-        chosenRow=target?ledger.get(identity(target,state)):null;
+        chosenRow=target?ledger.get(identity(target,state,s)):null;
         if(target&&classify(target,s).tier!=='safe'){
           await isolatedEdge(chosenRow,trace.filter(t=>t.action.kind!=='branch').map(t=>t.action));
           result.executedSteps=i+1;if(result.failures.length>beforeFailures)break;continue;

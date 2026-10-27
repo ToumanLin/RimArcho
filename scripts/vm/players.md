@@ -44,6 +44,11 @@ still undergo undo comparison; F2 staging differences remain failures. External
 mode is intended for the disposable test VM and can open a native dialog that needs
 desktop interaction; a blocked native workflow is never counted as coverage.
 
+A control records every graph state in which it was discovered. Sidebar controls
+are deduplicated across focus/popups on their page; page controls use list/view
+context; popup and menu controls retain their full opening context. This avoids
+requiring the same sidebar button to pass again under every unrelated overlay.
+
 The crawler uses page + current list + popup/title + menu options + focus + navigation
 layout + view modes as a state key. It deduplicates states, saves input recipes and
 checks each return. Discovery combines CONTROL-style selectors, delegated semantic
