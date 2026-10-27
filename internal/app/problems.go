@@ -262,9 +262,21 @@ func (a *App) collectProblems(ps *ProblemSet) error {
 			ps.List = append(ps.List, p)
 		}
 	}
+	positions := make(map[string]int, len(st.List))
+	for i, e := range st.List {
+		if _, exists := positions[e.Instance]; !exists {
+			positions[e.Instance] = i + 1
+		}
+	}
+	orders := make(map[string]string)
 	order := func(f *finding.Finding) string {
 		if m := st.Ix.ByID[f.SubjectInstance()]; m != nil {
-			return fmt.Sprintf("%06d %s", st.Position(m.ID), strings.ToLower(m.DisplayName()))
+			if key, ok := orders[m.ID]; ok {
+				return key
+			}
+			key := fmt.Sprintf("%06d %s", positions[m.ID], strings.ToLower(m.DisplayName()))
+			orders[m.ID] = key
+			return key
 		}
 		return "~" + f.Key
 	}

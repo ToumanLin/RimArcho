@@ -42,7 +42,30 @@ func TestIndexKey(t *testing.T) {
 	if err := other.SetMeta("from-another-connection", "x"); err != nil {
 		t.Fatal(err)
 	}
-	if k := s.IndexKey(); k == k1 {
-		t.Fatal("another connection's commit kept the index key")
+	if k := s.IndexKey(); k != k1 {
+		t.Fatal("another connection's unrelated commit invalidated the index")
+	}
+	if err := other.SetAlias("", "L1", "renamed"); err != nil {
+		t.Fatal(err)
+	}
+	if k := s.IndexKey(); k == k1 || k != other.IndexKey() {
+		t.Fatal("index table write did not publish the same generation to both sessions")
+	}
+	key := s.IndexKey()
+	tx, err := other.DB.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE lineage_data SET alias='uncommitted'`); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := OpenSession(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	if k := reader.IndexKey(); k != key {
+		t.Fatal("new WAL reader wrote or observed an uncommitted generation")
 	}
 }

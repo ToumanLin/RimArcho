@@ -122,9 +122,16 @@ func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string
 		}
 	}
 	if mods := modsDir(ix); mods != "" {
+		// Enumerate the directory once. Probing a missing link for every library
+		// instance otherwise makes a cold workspace perform thousands of syscalls.
+		entries, _ := os.ReadDir(mods)
+		present := make(map[string]bool, len(entries))
+		for _, entry := range entries {
+			present[env.PathKey(filepath.Join(mods, entry.Name()))] = true
+		}
 		for _, m := range ix.Mods {
 			if !set[m.ID] && deployable(ix, aliases, m) {
-				if _, err := os.Lstat(filepath.Join(mods, DeployName(m))); err == nil {
+				if present[env.PathKey(filepath.Join(mods, DeployName(m)))] {
 					set[m.ID] = true
 				}
 			}

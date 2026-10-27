@@ -410,7 +410,12 @@ func open(path string, initialise bool) (*Store, error) {
 			return nil, err
 		}
 	}
-	s.installIndexTriggers() // without them IndexKey is ChangeKey
+	if initialise {
+		if err := s.installIndexTriggers(); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("store: index generation: %w", err)
+		}
+	}
 	return s, nil
 }
 

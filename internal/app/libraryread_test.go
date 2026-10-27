@@ -86,3 +86,37 @@ func TestReadIndexOwnsLazyDeclarationsAndAdoption(t *testing.T) {
 		t.Fatal("adopted mod still reads the closed worker DB")
 	}
 }
+
+func TestReadIndexDoesNotStampOldSnapshotAsCurrent(t *testing.T) {
+	t.Parallel()
+	e := libFixture(t)
+	r, err := e.App.ReadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	release, err := r.Store.ReadSnapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	ix, err := r.Index()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := ix.Mods[0]
+	if err := e.App.Store.SetAlias("", m.LineageID, "Newer committed name"); err != nil {
+		t.Fatal(err)
+	}
+	next, err := e.App.ReadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer next.Close()
+	// r still sees the pinned, older generation; next sees the new commit.
+	next.ReadIndex(r)
+	got, err := next.Index()
+	if err != nil || got.ByID[m.ID].DisplayName() != "Newer committed name" {
+		t.Fatalf("copied snapshot hid a newer commit: %v", err)
+	}
+}

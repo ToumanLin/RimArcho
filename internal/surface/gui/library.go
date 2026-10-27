@@ -25,6 +25,8 @@ func (s *API) inventoryKey() string {
 func (s *API) library() (*app.Library, error) {
 	s.libGate.Lock()
 	defer s.libGate.Unlock()
+	s.libRead.mu.Lock()
+	defer s.libRead.mu.Unlock()
 	s.mu.Lock()
 	key := s.inventoryKey()
 	if s.lib != nil && s.libAt == key {
@@ -32,16 +34,24 @@ func (s *API) library() (*app.Library, error) {
 		s.mu.Unlock()
 		return lib, nil
 	}
-	r, err := s.readInventorySession()
+	r, err := s.inventorySession(&s.libRead)
 	s.mu.Unlock()
+	if err == nil {
+		err = s.refreshPageIndex(r)
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
+	release, err := pinPageRead(r)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	lib, err := r.Library()
 	if err != nil {
 		return nil, err
 	}
+	release()
 	s.mu.Lock()
 	if s.inventoryKey() == key {
 		s.lib, s.libAt = lib, key

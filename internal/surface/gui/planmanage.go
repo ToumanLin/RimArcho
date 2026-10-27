@@ -120,12 +120,22 @@ func (s *API) cancelLoadCost(close bool) {
 
 // PlanManage is the page with the list sel picked (0: the current one). No network.
 func (s *API) PlanManage(sel int64) (*view.PlanManage, error) {
-	r, err := s.detachedReader()
+	s.plansRead.mu.Lock()
+	defer s.plansRead.mu.Unlock()
+	s.mu.Lock()
+	r, err := s.inventorySession(&s.plansRead)
+	s.mu.Unlock()
+	if err == nil {
+		err = s.refreshPageIndex(r)
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
-	r.WorkspaceSnapshot()
+	release, err := pinPageRead(r)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return view.BuildPlanManage(r, sel)
 }
 

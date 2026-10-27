@@ -28,23 +28,28 @@ import (
 // method locks its App. Slow texture/log reads use separate sessions; descriptions use
 // a snapshot of the index. Only snapshotting settings/results needs the shared mu.
 type API struct {
-	mu         sync.Mutex
-	filesMu    sync.RWMutex // scans and file jobs; never acquired by page reads/edits
-	a          *app.App
-	emit       func(name string, data any) // Wails events; nil in tests
-	open       func(url string) error      // the system browser
-	openDir    func(dir string) error      // the file manager (nil: the system's)
-	lib        *app.Library                // Mod 库存, as of libAt
-	libAt      string
-	libGate    sync.Mutex // coalesces full inventory builds, never acquired by edits
-	subRead    subscriptionReader
-	copyRead   inventoryReader
-	detailRead logReader
-	board      *view.Board
-	needs      *view.Needs
-	needsAt    string // the database state the needs were built at
-	content    view.ContentCache
-	busy       map[string]bool // scan, analyze, pack
+	mu            sync.Mutex
+	filesMu       sync.RWMutex // scans and file jobs; never acquired by page reads/edits
+	a             *app.App
+	emit          func(name string, data any) // Wails events; nil in tests
+	open          func(url string) error      // the system browser
+	openDir       func(dir string) error      // the file manager (nil: the system's)
+	lib           *app.Library                // Mod 库存, as of libAt
+	libAt         string
+	libGate       sync.Mutex // coalesces full inventory builds, never acquired by edits
+	subRead       subscriptionReader
+	copyRead      inventoryReader
+	libRead       logReader
+	plansRead     logReader
+	workspaceRead logReader
+	indexRead     logReader
+	detailRead    logReader
+	board         *view.Board
+	boardAt       string
+	needs         *view.Needs
+	needsAt       string // the database state the needs were built at
+	content       view.ContentCache
+	busy          map[string]bool // scan, analyze, pack
 	// building is the pack this window's build child is making ("" none).
 	building  string
 	buildRead buildPageReader
@@ -206,7 +211,14 @@ func (s *API) Board() *Board {
 }
 
 func (s *API) boardLocked() *Board {
-	b, err := view.BuildBoard(s.a)
+	key, err := s.a.LoadoutKey()
+	b := s.board
+	if err != nil || b == nil || key != s.boardAt {
+		b, err = view.BuildBoard(s.a)
+		if err == nil {
+			s.boardAt, _ = s.a.LoadoutKey()
+		}
+	}
 	s.board = b
 	out := &Board{Board: b, Stamp: s.a.Store.ChangeKey(), Scanning: s.busy["scan"], Analyzing: s.busy["analyze"]}
 	if err != nil {

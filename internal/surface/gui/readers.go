@@ -9,11 +9,14 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 type logReader struct {
-	mu sync.Mutex
-	a  *app.App
+	mu      sync.Mutex
+	a       *app.App
+	board   *view.Board
+	boardAt string
 }
 
 const subscriptionIdle = 5 * time.Minute
@@ -126,6 +129,56 @@ func (s *API) pageReader() (*app.App, error) {
 	return r, nil
 }
 
+// inventorySession retains a page's connection and detached index. Caller holds
+// both the page reader mutex and API.mu; view construction runs after API.mu is freed.
+func (s *API) inventorySession(w *logReader) (*app.App, error) {
+	if w.a == nil {
+		var err error
+		w.a, err = s.pageReader()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		s.refreshInventorySession(w.a)
+	}
+	return w.a, nil
+}
+
+// Coalesce a scan/removal's index reload across pages. The shared index is never
+// published: every page owns a detached copy and its lazy declarations. Neither
+// this gate nor the full index query is taken by editor writes or API.mu.
+func (s *API) refreshPageIndex(a *app.App) error {
+	w := &s.indexRead
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.a == nil {
+		var err error
+		w.a, err = a.ReadSession()
+		if err != nil {
+			return err
+		}
+	}
+	w.a.ReadOptions(a)
+	release, err := w.a.Store.ReadSnapshot()
+	if err != nil {
+		return err
+	}
+	defer release()
+	if _, err := w.a.Index(); err != nil {
+		return err
+	}
+	a.ReadIndex(w.a)
+	return nil
+}
+
+func pinPageRead(a *app.App) (func(), error) {
+	// First use or an external ModsConfig change may require guarded writes.
+	if _, err := a.Loadout(); err != nil {
+		return nil, err
+	}
+	return a.Store.ReadSnapshot()
+}
+
 // logSession is called with logRead.mu held; only snapshotting options needs s.mu.
 func (s *API) logSession() (*app.App, error) {
 	s.mu.Lock()
@@ -204,6 +257,14 @@ func (s *API) Close() {
 	s.mu.Unlock()
 	s.libGate.Lock()
 	s.libGate.Unlock()
+	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceRead, &s.indexRead} {
+		w.mu.Lock()
+		if w.a != nil {
+			w.a.Close()
+			w.a = nil
+		}
+		w.mu.Unlock()
+	}
 	s.detailRead.mu.Lock()
 	if s.detailRead.a != nil {
 		s.detailRead.a.Close()

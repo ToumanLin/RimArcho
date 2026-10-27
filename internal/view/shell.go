@@ -297,26 +297,39 @@ type Home struct {
 // Rows go by the last time they were played (launch records, 08 §2); never played ones
 // follow by name.
 func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow) *Home {
-	h := &Home{Featured: -1}
 	if b == nil || b.St == nil {
-		return h
+		return &Home{Featured: -1}
 	}
-	chip, ver := EnvChip(b.EnvName, b.GameVersion), env.MajorMinor(b.GameVersion)
+	return BuildHomeFromState(a, b.St, n, plans, packs)
+}
+
+// BuildHomeFromState needs counts and list state, not the editor's thousands of
+// inactive rows, copy captions and search fields.
+func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, packs []PackRow) *Home {
+	h := &Home{Featured: -1}
+	name, version := st.Ix.Env.Name, st.Ix.Env.GameVersion
+	chip, ver := EnvChip(name, version), env.MajorMinor(version)
+	active := 0
+	for _, e := range st.List {
+		if e.Instance == "" || st.Ix.ByID[e.Instance] != nil {
+			active++ // the editor shows missing packages but omits unknown instances
+		}
+	}
 	for _, p := range plans {
 		r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: p.Played, at: p.PlayedAt, Plan: p.ID, Page: p.Page,
 			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"),
-			EnvName: b.EnvName, GameVersion: b.GameVersion, Versions: ver, Mods: p.Entries}
+			EnvName: name, GameVersion: version, Versions: ver, Mods: p.Entries}
 		// a list says the game versions it allows (04 §1.6, 06 §2.3)
 		if sp, err := a.Store.PlanByID(p.ID); err == nil && sp != nil {
-			if vs := app.FormatVersions(a.PlanAllowedVersions(b.St, sp)); vs != "" {
+			if vs := app.FormatVersions(a.PlanAllowedVersions(st, sp)); vs != "" {
 				r.Versions = vs
 			}
 		}
 		k, checked := 0, false
 		if p.Current {
-			r.Mods = len(b.Cols[Active])
-			r.Facts = Tf("%d mods", len(b.Cols[Active]))
-			r.Unsaved = b.Unsaved
+			r.Mods = active
+			r.Facts = Tf("%d mods", active)
+			r.Unsaved = len(st.Changes())
 			k, checked = BreakCount(n), !n.Never
 			r.Links = PackLinksText(n)
 		} else {
@@ -333,12 +346,12 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 		h.Rows = append(h.Rows, r)
 	}
 	for _, p := range packs {
-		h.Rows = append(h.Rows, packHomeRow(p, chip, b.EnvName, b.GameVersion))
+		h.Rows = append(h.Rows, packHomeRow(p, chip, name, version))
 	}
 	SortHome(h.Rows)
 	h.LastRun, h.LastRunDay, h.LastRunErrors = n.LastRun, n.LastRunDay, LastRunErrors(n)
 	h.Launch = n.Launch
-	h.Changes = ChangeHome(a, b.St)
+	h.Changes = ChangeHome(a, st)
 	return h
 }
 

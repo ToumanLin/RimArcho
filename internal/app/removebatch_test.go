@@ -4,12 +4,62 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
+
+func TestRemovalCommitWaitsForConcurrentWriter(t *testing.T) {
+	e := setup(t, true)
+	e.WriteMod(filepath.Join(e.SteamCMD, "7709"), testkit.Sample("remove.writer", "Writer"))
+	scanNow(t, e)
+	ix, err := e.App.Index()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := ix.ResolveOne("pkg:remove.writer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := e.App.ReadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	tx, err := e.App.Store.DB.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`INSERT INTO meta(key,value) VALUES('test:removal-writer','held')`); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- r.Store.RecordRemoved(m.ID, m.RealPath, e.Now()) }()
+	select {
+	case err := <-done:
+		t.Fatalf("removal did not wait for writer: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("removal did not resume after writer")
+	}
+	m, err = r.Store.Mod(m.ID)
+	if err != nil || m.Status != identity.Tombstone {
+		t.Fatalf("removal: %+v %v", m, err)
+	}
+}
 
 func TestSubscriptionRemovalCommitsBeforeCancellation(t *testing.T) {
 	e := setup(t, true)

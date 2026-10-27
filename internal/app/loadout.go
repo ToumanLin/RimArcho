@@ -237,6 +237,15 @@ func (a *App) Loadout() (*LoadoutState, error) {
 	return st, nil
 }
 
+// LoadoutKey validates the cached state, including ModsConfig.xml changes. Views
+// can retain derived rows without hiding an external edit to the game file.
+func (a *App) LoadoutKey() (string, error) {
+	if _, err := a.Loadout(); err != nil {
+		return "", err
+	}
+	return a.stKey + "|" + a.GameVersion, nil
+}
+
 func (a *App) loadLoadout() (*LoadoutState, error) {
 	if a.workspaceSnapshot {
 		st, err := a.storedLoadout()

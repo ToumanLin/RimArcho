@@ -73,15 +73,24 @@ func (a *App) AdoptReadState(r *App) {
 	a.OpenPlan, a.PlanName = r.OpenPlan, r.PlanName
 }
 
+// AdoptReadSnapshot keeps the reader usable by subsequent page requests. Only a
+// detached index crosses sessions; a writer retains its own guarded loadout cache.
+func (a *App) AdoptReadSnapshot(r *App) {
+	a.ReadIndex(r)
+	a.OpenPlan, a.PlanName = r.OpenPlan, r.PlanName
+}
+
 // ReadIndex copies a warm index into an idle reader. Call with the source App locked.
 // Only the immutable shorteners are shared; lazy Mod declarations use the reader's DB.
 // List edits on the source connection do not invalidate this detached index.
 func (b *App) ReadIndex(a *App) {
 	if !a.IndexCached() {
-		b.readIndexFrom = ""
 		return
 	}
-	if b.readIndexFrom != a.ixKey || b.ixCache == nil {
+	if b.ixCache != nil && b.ixKey == a.ixKey {
+		return
+	}
+	if b.ixKey != a.ixKey || b.ixCache == nil {
 		x := *a.ixCache
 		x.store = b.Store
 		e := *x.Env
@@ -110,7 +119,8 @@ func (b *App) ReadIndex(a *App) {
 			x.Sources = append(x.Sources, &c)
 		}
 		b.ixCache, b.stCache = &x, nil
-		b.readIndexFrom = a.ixKey
 	}
-	b.ixKey = b.Store.IndexKey() + "|" + b.ixCache.Env.ID
+	// Keep the generation we actually copied. A concurrent writer may have
+	// committed since then; stamping the copy with its newer key would hide it.
+	b.ixKey = a.ixKey
 }

@@ -53,6 +53,7 @@ func TestGuide(t *testing.T) {
 		json.Unmarshal(b, &m)
 		events <- m
 	})
+	t.Cleanup(api.Close)
 	api.ScanRunner = func(env string) (string, error) {
 		e.App.EnvName = env // the child gets it as --env
 		out, code := cmds.Execute(e.App, []string{"scan"})

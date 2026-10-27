@@ -163,18 +163,24 @@ func (s *Store) UninstallMods(envID string) ([]*Mod, error) {
 // ModsFull is Mods with declarations included.
 func (s *Store) ModsFull(envID string) ([]*Mod, error) { return s.mods(envID, modColsFull) }
 
-// LinkMods is Mods with only what the game-link check reads: ID, source label, relative
-// path, real path and status (no snapshot join).
-func (s *Store) LinkMods(envID string) ([]*Mod, error) {
+// LinkMod contains only ownership evidence; a full Mod retains hundreds of unused
+// bytes per row in every page's link cache.
+type LinkMod struct {
+	ID, SourceLabel, Rel, RealPath, Status string
+}
+
+// LinkMods reads all known games once, including shared instances once (no snapshot join).
+func (s *Store) LinkMods() ([]*LinkMod, error) {
 	rows, err := s.DB.Query(`SELECT i.id, s.label, i.rel_path, i.real_path, i.status FROM instance i
-		JOIN source s ON s.id = i.source_id WHERE i.environment_id IN ('', ?) ORDER BY i.id`, envID)
+		JOIN source s ON s.id = i.source_id
+		WHERE i.environment_id='' OR i.environment_id IN (SELECT id FROM environment) ORDER BY i.id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []*Mod
+	var out []*LinkMod
 	for rows.Next() {
-		m := &Mod{store: s}
+		m := &LinkMod{}
 		if err := rows.Scan(&m.ID, &m.SourceLabel, &m.Rel, &m.RealPath, &m.Status); err != nil {
 			return nil, err
 		}

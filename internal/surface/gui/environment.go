@@ -120,7 +120,7 @@ func (s *API) queueEnvironment(request uint64, name, kind string, plan int64, pa
 				result.Error = result.Board.Error
 				return
 			}
-			result.Shell = reader.Shell()
+			result.Shell = reader.shellLocked(reader.needs)
 			if result.Shell.Error != "" {
 				result.Error = result.Shell.Error
 				return
@@ -194,22 +194,33 @@ func (s *API) Workspace(request uint64) bool {
 		defer func() { s.send("environment", result) }()
 		// Even a warm board can be expensive (all copies, needs and sidebar).
 		// Capture a detached index under mu; render on its own session.
+		s.workspaceRead.mu.Lock()
+		defer s.workspaceRead.mu.Unlock()
 		s.mu.Lock()
 		key := s.inventoryKey()
-		r, err := s.readInventorySession()
+		r, err := s.inventorySession(&s.workspaceRead)
 		s.mu.Unlock()
+		if err == nil {
+			err = s.refreshPageIndex(r)
+		}
 		if err != nil {
 			result.Error = err.Error()
 			return
 		}
-		defer r.Close()
-		reader := &API{a: r, busy: map[string]bool{}}
+		reader := &API{a: r, busy: map[string]bool{}, board: s.workspaceRead.board, boardAt: s.workspaceRead.boardAt}
+		release, err := pinPageRead(r)
+		if err != nil {
+			result.Error = err.Error()
+			return
+		}
+		defer release()
 		result.Board = reader.boardLocked()
+		s.workspaceRead.board, s.workspaceRead.boardAt = reader.board, reader.boardAt
 		if result.Board.Error != "" {
 			result.Error = result.Board.Error
 			return
 		}
-		result.Shell = reader.Shell()
+		result.Shell = reader.shellLocked(reader.needs)
 		if result.Shell.Error != "" {
 			result.Error = result.Shell.Error
 			return
@@ -219,6 +230,7 @@ func (s *API) Workspace(request uint64) bool {
 			result.Error = err.Error()
 			return
 		}
+		release()
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		w.mu.Lock()
@@ -228,7 +240,7 @@ func (s *API) Workspace(request uint64) bool {
 			return
 		}
 		// Adopt only if no edit or option change overtook this read.
-		s.a.AdoptReadState(r)
+		s.a.AdoptReadSnapshot(r)
 		s.board, s.needs, s.needsAt = reader.board, reader.needs, s.a.Store.ChangeKey()
 		result.Board.Stamp = s.a.Store.ChangeKey()
 		result.Board.Scanning, result.Board.Analyzing = s.busy["scan"], s.busy["analyze"]

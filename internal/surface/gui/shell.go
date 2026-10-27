@@ -34,13 +34,29 @@ type Shell struct {
 
 // Shell builds the sidebar from the needs count and the packs.
 func (s *API) Shell() *Shell {
+	// The sidebar and editor read the same loadout/problems. Reuse their reader
+	// rather than retaining two full indices and sets of declarations/findings.
+	s.workspaceRead.mu.Lock()
+	defer s.workspaceRead.mu.Unlock()
 	s.mu.Lock()
-	r, err := s.readInventorySession()
+	r, err := s.inventorySession(&s.workspaceRead)
 	s.mu.Unlock()
+	if err == nil {
+		err = s.refreshPageIndex(r)
+		if errors.Is(err, app.ErrNoEnv) {
+			err = nil // first-run sidebar has no inventory yet
+		}
+	}
 	if err != nil {
 		return &Shell{Error: err.Error()}
 	}
-	defer r.Close()
+	if _, err := r.Env(); err == nil {
+		release, err := pinPageRead(r)
+		if err != nil {
+			return &Shell{Error: err.Error()}
+		}
+		defer release()
+	}
 	reader := &API{a: r, busy: map[string]bool{}}
 	return reader.shellLocked(nil)
 }
@@ -115,6 +131,9 @@ func (s *API) Home() *view.Home {
 	defer s.logRead.mu.Unlock()
 	defer s.free.soon()
 	r, err := s.logSession()
+	if err == nil {
+		err = s.refreshPageIndex(r)
+	}
 	if err != nil {
 		if errors.Is(err, app.ErrNoEnv) {
 			return &view.Home{Featured: -1}
@@ -124,17 +143,27 @@ func (s *API) Home() *view.Home {
 	// The launch page is about the current list, the one launched, whichever list the
 	// editor has open (04 §1.3); the reader takes the window's options again next time.
 	r.OpenPlan, r.PlanName = 0, ""
-	b, err := view.BuildBoard(r)
+	st, err := r.Loadout()
 	if err != nil {
 		return &view.Home{Featured: -1, Error: err.Error()}
 	}
-	if b.St == nil {
+	if st == nil {
 		return &view.Home{Featured: -1, Error: "could not read the current list"}
 	}
-	st := b.St
 	// The last run's line reads Player.log when it is newer than the one read last (06
 	// §2.3): the page loads, or the window comes back into focus, after a game.
 	_, newer := r.NewLog(st)
+	if !newer {
+		release, err := r.Store.ReadSnapshot()
+		if err != nil {
+			return &view.Home{Featured: -1, Error: err.Error()}
+		}
+		defer release()
+		st, err = r.Loadout()
+		if err != nil {
+			return &view.Home{Featured: -1, Error: err.Error()}
+		}
+	}
 	n, _, err := readNeedsChecked(r, newer)
 	if err != nil {
 		return &view.Home{Featured: -1, Error: err.Error()}
@@ -147,7 +176,7 @@ func (s *API) Home() *view.Home {
 	if err != nil {
 		return &view.Home{Featured: -1, Error: err.Error()}
 	}
-	h := view.BuildHome(r, b, n, plans, packs)
+	h := view.BuildHomeFromState(r, st, n, plans, packs)
 	view.AddOtherEnvs(r, h, st.Ix.Env.ID)
 	view.PickFeatured(h, r.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
 	return h

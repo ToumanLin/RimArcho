@@ -12,11 +12,9 @@ import (
 // Filesystem work must finish before this short transaction begins.
 func (s *Store) RecordRemoved(id, path string, now time.Time) error {
 	return s.inTx(func(tx *sql.Tx) error {
-		var envID, lineage string
-		var snapshot int64
-		if err := tx.QueryRow(`SELECT environment_id,lineage_id,coalesce(current_snapshot_id,0) FROM instance WHERE id=? AND real_path=?`, id, path).Scan(&envID, &lineage, &snapshot); err != nil {
-			return err
-		}
+		// Acquire the writer before reading. A deferred read transaction cannot
+		// upgrade its WAL snapshot after a concurrent editor/worker commits;
+		// SQLite returns BUSY immediately despite busy_timeout in that case.
 		r, err := tx.Exec(`UPDATE instance SET status=?,tombstone_at=? WHERE id=? AND real_path=? AND status=?`, identity.Tombstone, now.Unix(), id, path, identity.Live)
 		if err != nil {
 			return err
@@ -27,6 +25,11 @@ func (s *Store) RecordRemoved(id, path string, now time.Time) error {
 		}
 		if n == 0 {
 			return fmt.Errorf("instance changed during removal: %s", id)
+		}
+		var envID, lineage string
+		var snapshot int64
+		if err := tx.QueryRow(`SELECT environment_id,lineage_id,coalesce(current_snapshot_id,0) FROM instance WHERE id=?`, id).Scan(&envID, &lineage, &snapshot); err != nil {
+			return err
 		}
 		if _, err := tx.Exec(`DELETE FROM instance_alias WHERE instance_id=?`, id); err != nil {
 			return err
