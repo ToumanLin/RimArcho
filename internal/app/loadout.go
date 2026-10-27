@@ -873,7 +873,7 @@ func (a *App) SaveWith(dryRun, move bool) (*SaveResult, error) {
 // version — source "launch" when launch is set (none when the list equals the newest
 // version), else "user" or "undo". dryRun computes the same result and writes nothing.
 // move: plain Mods/ folders in the way move into the lock library first (08 §3).
-func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool) (*SaveResult, error) {
+func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom ...*store.Mod) (*SaveResult, error) {
 	e := st.Ix.Env
 	if st.FilePath == "" {
 		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
@@ -934,6 +934,31 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool) (*SaveResul
 		if mods, links, _, err = planLinks(st, rest); err != nil {
 			return nil, err
 		}
+	}
+	// A credit handoff projects the file already in the game, keeping unrelated
+	// pending edits, links and the selected plan intact. Only the old copy's managed
+	// deployment is detached. Registry tokens must describe the links that will remain.
+	if len(creditFrom) > 0 {
+		old := creditFrom[0]
+		filtered := []LinkChange{}
+		for _, c := range links {
+			if c.Op == "remove" && c.Target != "" && samePath(c.Target, old.RealPath) {
+				filtered = append(filtered, c)
+			}
+		}
+		links = filtered
+		base := Candidates(st.Ix, st.Aliases)
+		seen := map[string]bool{}
+		for _, c := range base {
+			seen[c.ID] = true
+		}
+		for _, c := range st.cands {
+			if c.ID != old.ID && !seen[c.ID] {
+				base = append(base, c)
+				seen[c.ID] = true
+			}
+		}
+		st.Reg = loadout.NewRegistry(base)
 	}
 	r := &SaveResult{State: st, Path: st.FilePath, DryRun: dryRun, Changes: st.Changes(), Moved: moved}
 	r.Links = links
@@ -1011,6 +1036,9 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool) (*SaveResul
 	if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, &store.ModsConfigState{Written: h, Seen: h, WrittenAt: now,
 		WriterPlan: st.Plan.ID, WriterVersion: n, WriterEnv: e.ID}); err != nil {
 		return nil, err
+	}
+	if len(creditFrom) > 0 {
+		return r, nil
 	}
 	st.WS.OriginVersion, st.WS.OriginKind, st.WS.Conflict, st.WS.Updated = n, "save", 0, now
 	if err := a.Store.SetWorkspace(st.WS); err != nil {

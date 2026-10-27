@@ -96,8 +96,16 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 	if r.Unchanged && st.Latest != nil {
 		vn = st.Latest.N
 	}
-	return r, a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: e.ID, PlanID: st.Plan.ID, Started: a.Now().UTC(),
-		Method: p.Method, Command: p.Command(), Fingerprint: ListFingerprint(st.List), VersionN: vn})
+	record := &store.LaunchRecord{EnvID: e.ID, PlanID: st.Plan.ID, Started: a.Now().UTC(),
+		Method: p.Method, Command: p.Command(), Fingerprint: ListFingerprint(st.List), VersionN: vn}
+	if err := a.Store.AddLaunchRecord(record); err != nil {
+		return r, err
+	}
+	var enabled []string
+	for _, en := range st.List {
+		enabled = append(enabled, en.Instance)
+	}
+	return r, a.Store.CountCreditSession(record.ID, enabled)
 }
 
 func (a *App) startGame(p *LaunchPlan) error {

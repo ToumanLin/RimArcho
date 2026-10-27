@@ -20,6 +20,7 @@ type SubscriptionRequest struct {
 	Git      bool   `json:"git"`
 	From     string `json:"from"`
 	SteamCMD bool   `json:"steamcmd"`
+	Batch    bool   `json:"batch"`
 }
 
 func subscriptionArgs(r SubscriptionRequest) ([]string, error) {
@@ -85,6 +86,9 @@ func (s *API) Subscribe(r SubscriptionRequest) (string, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if r.Kind == "workshop" && r.SteamCMD && r.Batch {
+		args = append(args, "--credit-batch")
+	}
 	return settingQueued(s.queueSettingTaskLocked(view.TaskSubscribe, args, "")), nil
 }
 
@@ -123,6 +127,25 @@ func (s *API) SubscriptionFrom(ref, from string) (string, error) {
 }
 
 func (s *API) runSubscriptionTask(a *app.App, id, kind string, args []string) (string, error) {
+	if len(args) > 0 && args[len(args)-1] == "--credit-batch" {
+		// This is a persisted GUI task argument, not a public CLI flag.
+		op, err := a.SubscribeWorkshopBatch(args[2:len(args)-2], true, true, false)
+		if op != nil {
+			items := make([]app.TaskItem, 0, len(op.Items))
+			for _, it := range op.Items {
+				state := app.ItemOK
+				if it.Result != "downloaded with SteamCMD" {
+					state = app.ItemFail
+				}
+				items = append(items, app.TaskItem{Ref: it.ID, Name: it.Name, State: state, Why: it.Result})
+			}
+			s.tasks.Update(id, func(t *app.Task) { t.Items = items; t.Total = len(items) })
+		}
+		if err != nil {
+			return "", err
+		}
+		return view.T("subscription finished"), nil
+	}
 	before, err := a.Subscriptions()
 	if err != nil {
 		return "", err
