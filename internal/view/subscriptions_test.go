@@ -7,12 +7,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -94,6 +96,20 @@ func TestSubscriptionsThreeSections(t *testing.T) {
 			t.Fatalf("list usage: %+v", row)
 		}
 	}
+	info, err := view.BuildAddSubscriptionInfo(e.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(info.Recent, p.Recent) {
+		t.Fatalf("light recent differs: %+v / %+v", info.Recent, p.Recent)
+	}
+	for _, src := range info.Sources {
+		for _, full := range p.Sources {
+			if src.Key == full.Key && src.Account != full.Account {
+				t.Fatalf("light account differs: %+v / %+v", src, full)
+			}
+		}
+	}
 	// Instance IDs are incidental to the section contents.
 	for i := range p.Pending {
 		p.Pending[i].ID, p.Pending[i].Ref = "id", "ref"
@@ -115,6 +131,31 @@ func TestSubscriptionsThreeSections(t *testing.T) {
 	}
 	if strings.ReplaceAll(string(want), "\r\n", "\n") != actual {
 		t.Fatalf("subscriptions golden differs:\n%s", actual)
+	}
+
+	// Recent installs have the same five-row limit and stable ties on both pages.
+	for i := 0; i < 7; i++ {
+		dir := filepath.Join(e.App.SubscribedDir(), fmt.Sprintf("Recent%d", i))
+		e.WriteMod(dir, testkit.Sample(fmt.Sprintf("tester.recent%d", i), fmt.Sprintf("Recent %d", i)))
+		if err := subscribe.Write(dir, &subscribe.Record{Kind: "page", URL: "https://example.invalid/file", InstalledAt: e.Now().Add(time.Duration(i/2) * time.Hour)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.MustRun("scan")
+	st, err = e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	full, err := view.BuildSubscriptions(e.App, st, modchanges.Opts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err = view.BuildAddSubscriptionInfo(e.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(info.Recent) != 5 || !reflect.DeepEqual(info.Recent, full.Recent) {
+		t.Fatalf("recent limit/ties differ: %+v / %+v", info.Recent, full.Recent)
 	}
 }
 
@@ -220,5 +261,67 @@ func TestSubscriptionSourceURL(t *testing.T) {
 		if got := view.SubscriptionSourceURL(&c.r); got != c.want {
 			t.Errorf("%+v: %q, want %q", c.r, got, c.want)
 		}
+	}
+}
+
+func TestAddSubscriptionRecentMatchesLibrarySourceRules(t *testing.T) {
+	e := testkit.New(t)
+	e.AddEnv(false)
+	g := testkit.NewGitRepo(t, "")
+	op, err := e.App.SubscribeGit(g.Bare, "branch", "main", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := op.Items[0]
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := st.Ix.ByID[item.ID]
+	if m == nil {
+		t.Fatal("missing subscribed mod")
+	}
+	src := st.Ix.Source(m.SourceID)
+	original := src.Kind
+	defer func() { src.Kind = original }()
+	for n, tc := range []struct {
+		name, record, want string
+		source             source.Kind
+	}{
+		{"git overrides extra", app.LibGit, app.LibGit, original},
+		{"page overrides extra", app.LibPage, app.LibPage, original},
+		{"steamcmd record preserves extra", app.LibSteamCMD, "", original},
+		{"unknown record preserves extra", "future", "", original},
+		{"unknown source is skipped", app.LibGit, "", source.Kind("future")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src.Kind = tc.source
+			r := &subscribe.Record{Kind: tc.record, URL: g.Bare, Installed: "old", InstalledAt: e.Now()}
+			if err := subscribe.Write(item.Folder, r); err != nil {
+				t.Fatal(err)
+			}
+			stamp := e.Now().Add(time.Duration(n+1) * time.Hour)
+			if err := os.Chtimes(filepath.Join(item.Folder, subscribe.File), stamp, stamp); err != nil {
+				t.Fatal(err)
+			}
+			full, err := view.BuildSubscriptions(e.App, st, modchanges.Opts{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			light, err := view.BuildAddSubscriptionInfo(e.App)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(light.Recent, full.Recent) {
+				t.Fatalf("recent differs: light=%+v full=%+v", light.Recent, full.Recent)
+			}
+			if tc.want == "" {
+				if len(light.Recent) != 0 {
+					t.Fatalf("unexpected recent: %+v", light.Recent)
+				}
+			} else if len(light.Recent) != 1 || light.Recent[0].Kind != tc.want {
+				t.Fatalf("recent: %+v, want %s", light.Recent, tc.want)
+			}
+		})
 	}
 }

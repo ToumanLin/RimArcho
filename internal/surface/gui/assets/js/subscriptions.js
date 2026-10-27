@@ -593,7 +593,7 @@ export function changesKey(e) {
 export async function openAdd() {
   const read = beginPageRead("subscribe");
   let data = null;
-  try { data = await api.SubscriptionsPage(false, ""); } catch { /* the page works without the account lines */ }
+  try { data = await api.AddSubscriptionInfo(); } catch { /* the page works without the account lines */ }
   if (!read.current()) return;
   const sc = $("#screen");
   sc.innerHTML = "";

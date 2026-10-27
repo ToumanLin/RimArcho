@@ -127,6 +127,7 @@ func (s *API) queueEnvironment(request uint64, name, kind string, plan int64, pa
 				return
 			}
 		}
+		defer s.releaseSubscriptionsForEnvironment()
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		w.mu.Lock()

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
@@ -486,4 +487,83 @@ func (a *App) RemoveSubscriptions(refs []string, dryRun bool) (*SubscribeOp, err
 	}
 	_, err = a.Scan(false)
 	return op, err
+}
+
+// SubscriptionLineages reads just the live subscription rows needed by the add page.
+// Names and tie ordering match Library, including non-subscribed primary copies.
+func (a *App) SubscriptionLineages() ([]*LibLineage, error) {
+	ix, err := a.Index()
+	if err != nil {
+		return nil, err
+	}
+	srcKind := a.libSourceKinds(ix)
+	byLin := map[string]*LibLineage{}
+	for _, m := range ix.Mods {
+		r := a.SubscriptionOf(m)
+		if srcKind[m.SourceID] == "" || r == nil || r.InstalledAt.IsZero() {
+			continue
+		}
+		l := byLin[m.LineageID]
+		if l == nil {
+			l = &LibLineage{ID: m.LineageID}
+			for _, other := range ix.ByLineage[m.LineageID] {
+				if other.Status == identity.Live && other.Kind != source.Official && srcKind[other.SourceID] != "" {
+					l.Instances = append(l.Instances, &LibInstance{Mod: other})
+					break
+				}
+			}
+			l.Name = libName(ix, m.LineageID, l)
+			l.Instances = nil
+			byLin[m.LineageID] = l
+		}
+		kind := srcKind[m.SourceID]
+		if r.Kind == LibGit || r.Kind == LibPage {
+			kind = r.Kind
+		}
+		l.Instances = append(l.Instances, &LibInstance{Mod: m, Ref: ix.Ref(m.ID), Source: kind, Subscription: r, Created: libCreated(m)})
+	}
+	ls := make([]*LibLineage, 0, len(byLin))
+	for _, l := range byLin {
+		sortLibInstances(l.Instances)
+		ls = append(ls, l)
+	}
+	sortLineages(ls, "name")
+	return ls, nil
+}
+
+// SubscriptionInventoryKey watches the disk state Library reads in addition to the
+// scanned inventory: provenance, Steam subscriptions and packs that use the mods.
+func (a *App) SubscriptionInventoryKey(ix *Index) string {
+	var key strings.Builder
+	stamp := func(path string) {
+		fi, err := os.Stat(path)
+		if err != nil {
+			fmt.Fprintf(&key, "%s:%v;", path, err)
+			return
+		}
+		fmt.Fprintf(&key, "%s:%d:%d;", path, fi.ModTime().UnixNano(), fi.Size())
+	}
+	for _, m := range ix.Mods {
+		if subscriptionSource(m) {
+			stamp(filepath.Join(m.RealPath, subscribe.File))
+		}
+	}
+	for _, src := range ix.Sources {
+		if src.Kind == source.Workshop {
+			stamp(scan.ACFPathFor(src.Root))
+		}
+	}
+	// The root catches additions/removals; manifests catch edits inside existing packs.
+	packs := a.PacksDir()
+	stamp(packs)
+	entries, err := os.ReadDir(packs)
+	if err != nil {
+		fmt.Fprintf(&key, "packs:%v;", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() && !strings.HasSuffix(entry.Name(), TmpSuffix) {
+			stamp(filepath.Join(packs, entry.Name(), "pack.json"))
+		}
+	}
+	return key.String()
 }

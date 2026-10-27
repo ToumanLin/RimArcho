@@ -352,6 +352,7 @@ func (s *API) PackImport(path string) (string, error) {
 	if !app.IsPackZip(path) {
 		return "", errors.New(view.Tf("%s is not a pack (.archopack)", path))
 	}
+	defer s.subRevision.Add(1)
 	m, err := s.a.ImportPack(path, false)
 	s.board, s.needs = nil, nil
 	if err != nil {

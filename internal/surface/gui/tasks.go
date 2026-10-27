@@ -48,6 +48,7 @@ func (s *API) startTasks() {
 	}
 	ts.Changed = s.tasksChanged
 	ts.Ended = func(t app.Task) {
+		s.subRevision.Add(1)
 		if t.Lane == app.LaneSelf && !view.IsSettingTask(t.Kind) && t.Kind != view.TaskAccount && t.Kind != view.TaskSiteDownload {
 			return // its own event says how it ended
 		}

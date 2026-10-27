@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -13,6 +14,60 @@ import (
 type logReader struct {
 	mu sync.Mutex
 	a  *app.App
+}
+
+const subscriptionIdle = 5 * time.Minute
+
+type subscriptionReader struct {
+	inventoryReader
+	idle *time.Timer
+	used time.Time
+}
+
+// Called with the subscription reader locked, including by the expiry callback.
+func (w *subscriptionReader) release() {
+	if w.idle != nil {
+		w.idle.Stop()
+		w.idle = nil
+	}
+	if w.a != nil {
+		w.a.Close()
+		w.a = nil
+	}
+	w.lib, w.key = nil, ""
+}
+
+func (s *API) expireSubscriptions() {
+	w := &s.subRead
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if time.Since(w.used) >= subscriptionIdle {
+		w.release()
+	}
+}
+
+// Called after each read while subRead.mu is held. A callback already waiting for
+// that lock checks used again, so it cannot discard a newly refreshed cache.
+func (s *API) retainSubscriptions() {
+	w := &s.subRead
+	w.used = time.Now()
+	if w.idle == nil {
+		w.idle = time.AfterFunc(subscriptionIdle, s.expireSubscriptions)
+	} else {
+		w.idle.Reset(subscriptionIdle)
+	}
+}
+
+// Environment publication calls this after releasing API.mu (reader lock order).
+func (s *API) releaseSubscriptionsForEnvironment() {
+	w := &s.subRead
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if e, err := s.a.Env(); w.a != nil && (err != nil || w.a.EnvName != e.Name) {
+		w.release()
+	}
 }
 
 // detachedReader snapshots invocation options without building the board. It also works
@@ -33,6 +88,31 @@ func (s *API) detachedReader() (*app.App, error) {
 	}
 	r.AnalyzeExe, r.AnalyzeWait = s.Exe, 200*time.Millisecond
 	return r, nil
+}
+
+// subscriptionSession is called with subRead.mu held. The reader owns its connection
+// and lazy declarations; only invocation options and a detached index cross API.mu.
+func (s *API) subscriptionSession() (*app.App, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.a.Uninstalled {
+		return nil, "", errors.New("RimArcho 已卸载，账户操作已停用")
+	}
+	w := &s.subRead
+	if e, err := s.a.Env(); w.a != nil && (err != nil || w.a.EnvName != e.Name) {
+		w.release()
+	}
+	var err error
+	if w.a == nil {
+		w.a, err = s.readInventorySession()
+	} else {
+		s.refreshInventorySession(w.a)
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	w.a.AnalyzeExe, w.a.AnalyzeWait = s.Exe, 200*time.Millisecond
+	return w.a, fmt.Sprintf("%s|%d", s.inventoryKey(), s.subRevision.Load()), nil
 }
 
 // pageReader is called with s.mu held, only to snapshot the invocation settings.
@@ -116,6 +196,9 @@ func (s *API) Close() {
 		s.detailRead.a = nil
 	}
 	s.detailRead.mu.Unlock()
+	s.subRead.mu.Lock()
+	s.subRead.release()
+	s.subRead.mu.Unlock()
 	s.copyRead.mu.Lock()
 	if s.copyRead.a != nil {
 		s.copyRead.a.Close()

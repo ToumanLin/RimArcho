@@ -11,11 +11,14 @@ import (
 )
 
 func (s *API) SubscriptionsPage(library bool, of string) (*view.SubscriptionsPage, error) {
-	a, err := s.detachedReader()
+	w := &s.subRead
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	defer s.retainSubscriptions()
+	a, key, err := s.subscriptionSession()
 	if err != nil {
 		return nil, err
 	}
-	defer a.Close()
 	defer s.free.soon()
 	st, err := a.Loadout()
 	if err != nil {
@@ -29,7 +32,31 @@ func (s *API) SubscriptionsPage(library bool, of string) (*view.SubscriptionsPag
 		}
 		o.OfName = st.Ix.ByID[of].DisplayName()
 	}
-	return view.BuildSubscriptions(a, st, o)
+	// The full inventory is scope independent; only history is narrowed by o.
+	// Loadout may import an external ModsConfig.xml on this reader connection.
+	key += "|" + a.Store.ChangeKey() + "|" + a.SubscriptionInventoryKey(st.Ix)
+	if w.lib == nil || w.key != key {
+		lib, err := a.Library()
+		if err != nil {
+			return nil, err
+		}
+		w.lib, w.key = lib, key
+	}
+	return view.BuildSubscriptionsFromLibrary(a, st, o, w.lib)
+}
+
+// AddSubscriptionInfo reads the account lines and newest installs without a loadout,
+// change history or full inventory.
+func (s *API) AddSubscriptionInfo() (*view.AddSubscriptionInfo, error) {
+	w := &s.subRead
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	defer s.retainSubscriptions()
+	a, _, err := s.subscriptionSession()
+	if err != nil {
+		return nil, err
+	}
+	return view.BuildAddSubscriptionInfo(a)
 }
 
 func (s *API) CheckSubscriptionSource(kind string) (string, error) {
