@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -28,22 +29,30 @@ import (
 // method locks its App. Slow texture/log reads use separate sessions; descriptions use
 // a snapshot of the index. Only snapshotting settings/results needs the shared mu.
 type API struct {
-	mu         sync.Mutex
-	a          *app.App
-	emit       func(name string, data any) // Wails events; nil in tests
-	open       func(url string) error      // the system browser
-	openDir    func(dir string) error      // the file manager (nil: the system's)
-	lib        *app.Library                // Mod 库存, as of libAt
-	libAt      string
-	libGate    sync.Mutex // coalesces full inventory builds, never acquired by edits
-	subRead    subscriptionReader
-	copyRead   inventoryReader
-	detailRead logReader
-	board      *view.Board
-	needs      *view.Needs
-	needsAt    string // the database state the needs were built at
-	content    view.ContentCache
-	busy       map[string]bool // scan, analyze, pack
+	workspace       *workspaceSnapshot
+	mu              sync.Mutex
+	a               *app.App
+	emit            func(name string, data any) // Wails events; nil in tests
+	open            func(url string) error      // the system browser
+	openDir         func(dir string) error      // the file manager (nil: the system's)
+	lib             *app.Library                // Mod 库存, as of libAt
+	libAt           string
+	libGate         sync.Mutex // coalesces full inventory builds, never acquired by edits
+	subRead         subscriptionReader
+	copyRead        inventoryReader
+	detailRead      logReader
+	board           *view.Board
+	needs           *view.Needs
+	needsCache      map[string]*needsSnapshot
+	needsJobs       sync.WaitGroup
+	needsRefreshing bool
+	needsClosed     bool
+	needsWanted     bool
+	needsSequence   uint64
+	listEdits       uint64
+	needsAt         string // the database state the needs were built at
+	content         view.ContentCache
+	busy            map[string]bool // scan, analyze, pack
 	// building is the pack this window's build child is making ("" none).
 	building  string
 	buildRead buildPageReader
@@ -181,6 +190,7 @@ func (s *API) Init() *Start {
 
 // Board is the three columns with what surrounds them.
 type Board struct {
+	Problems *view.ListProblems `json:"problems,omitempty"`
 	*view.Board
 	Status map[string]int `json:"status"` // row icons (06 §7)
 	// Reasons are the items behind each row icon, for its hover / pinned popover (06 §4.2).
@@ -220,6 +230,7 @@ func (s *API) boardLocked() *Board {
 		out.Never = sc == nil
 	}
 	n := s.needsLocked()
+	out.Problems = view.ProblemsOf(n)
 	out.Status, out.Reasons, out.Needs = n.Status, n.Reasons, n.Count
 	return out
 }
@@ -772,6 +783,10 @@ func (s *API) after(r *view.Result, err error) (*view.Result, error) {
 	if err != nil {
 		return nil, errors.New(view.Humanize(s.boardState(), err.Error()))
 	}
+	s.listEdits++
+	if r != nil {
+		r.Problems = s.editProblemsLocked()
+	}
 	return r, nil
 }
 
@@ -825,6 +840,11 @@ func (s *API) text(t string, err error) (string, error) {
 	s.board = nil
 	if err != nil {
 		return "", errors.New(view.Humanize(s.boardState(), err.Error()))
+	}
+	s.listEdits++
+	if s.needsCache != nil {
+		p := s.editProblemsLocked()
+		go s.send("list-problems", p)
 	}
 	return t, nil
 }
@@ -945,19 +965,53 @@ func (s *API) SetTag(ids []string, tag string, remove bool) (string, error) {
 // Needs builds the screen. Opening it includes the newest log (parsing it if needed) and
 // starts the files' check when it is stale, as the TUI does.
 func (s *API) Needs() *view.Needs {
+	s.mu.Lock()
+	s.needsWanted = true
+	if c, key := s.cachedNeedsLocked(); c != nil {
+		if c.key == key {
+			s.refreshNeedsLocked(c)
+			n := c.n
+			if c.eager && n.Error == "" && (n.Stale || n.Never) && !s.busy["analyze"] {
+				s.startAnalyze()
+			}
+			s.mu.Unlock()
+			return n
+		}
+		n := *c.n
+		dirs, _ := s.a.ManagedDirectories()
+		db, _ := json.Marshal(dirs)
+		if string(db) != c.directories {
+			n = *view.RefreshDirectories(s.a, &n)
+		}
+		n.Updating = true
+		s.refreshNeedsLocked(c)
+		s.mu.Unlock()
+		return &n
+	}
+	s.mu.Unlock()
 	s.logRead.mu.Lock()
 	defer s.logRead.mu.Unlock()
 	defer s.free.soon()
 	r, err := s.logSession()
 	if err != nil {
-		return &view.Needs{Status: map[string]int{}}
+		return &view.Needs{Status: map[string]int{}, Error: err.Error()}
 	}
+	ps, err := r.Problems(false, nil)
+	if err != nil || ps == nil || ps.State == nil {
+		return &view.Needs{Status: map[string]int{}, Error: fmt.Sprint(err)}
+	}
+	r.LazyLog, r.LogCacheOnly = false, false
 	n, st := readNeeds(r, true)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	current, _ := s.a.Loadout()
-	if st != nil && current != nil && st.Ix.Env.ID == current.Ix.Env.ID && st.Plan.ID == current.Plan.ID && app.ListFingerprint(st.List) == app.ListFingerprint(current.List) && (n.Stale || n.Never) && !s.busy["analyze"] {
-		s.startAnalyze()
+	if sameNeedsList(st, current) {
+		// The eager pass may have saved a parsed log report. Read its ProblemSet again.
+		ps, _ = r.Problems(false, nil)
+		s.saveNeedsLocked(ps, n, true)
+		if (n.Stale || n.Never) && !s.busy["analyze"] {
+			s.startAnalyze()
+		}
 	}
 	return n
 }
@@ -982,21 +1036,33 @@ func readNeeds(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState) {
 }
 
 func (s *API) needsLocked() *view.Needs {
-	st := s.boardState()
+	if c, key := s.cachedNeedsLocked(); c != nil && c.key == key {
+		s.needs = c.n
+		return c.n
+	}
 	ps, err := s.a.Problems(false, nil)
-	if err != nil || st == nil {
+	if err != nil || ps == nil || ps.State == nil {
 		return &view.Needs{Status: map[string]int{}}
 	}
-	s.needs, s.needsAt = view.BuildNeeds(s.a, st, ps), s.a.Store.ChangeKey()
-	return s.needs
+	n := view.BuildNeeds(s.a, ps.State, ps)
+	s.saveNeedsLocked(ps, n, false)
+	return n
 }
 
 // DoAction runs an item's data action (view.Do); option picks a choose-disable choice.
 func (s *API) DoAction(act view.Action, option int) (string, error) {
+	if act.Kind == view.ActSubscribe {
+		return s.Subscribe(SubscriptionRequest{Kind: "workshop", URL: strings.Join(act.Refs, " "), Batch: true})
+	}
+	if act.Kind == view.ActOpenURL {
+		if err := s.open(act.URL); err != nil {
+			return "", err
+		}
+		return act.Done, nil
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	done, err := view.Do(s.a, act, option)
-	s.needs = nil
 	if errors.Is(err, view.ErrNothing) {
 		return done, nil
 	}
@@ -1272,18 +1338,22 @@ func (s *API) Analyze() bool {
 }
 
 func (s *API) startAnalyze() bool {
-	if s.busy["analyze"] {
+	if s.needsClosed || s.busy["analyze"] {
 		return false
 	}
 	s.busy["analyze"] = true
 	run := s.a.AnalyzeRunner
 	home, env, exe, plan := s.a.Home, s.a.EnvName, s.Exe, s.a.OpenPlanName()
+	mm := s.a.GameVersion
+	scope, _, _, _ := s.needsKeyLocked()
 	obj := env
 	if s.board != nil && s.board.St != nil && s.board.St.Plan != nil {
 		obj = s.board.St.Plan.Name
 	}
 	task := s.beginSelf(view.TaskAnalyze, obj, nil)
+	s.needsJobs.Add(1)
 	go func() {
+		defer s.needsJobs.Done()
 		progress := func(l string) {
 			l = strings.TrimPrefix(l, "progress: ")
 			s.tasks.Update(task, func(t *app.Task) { t.Phase = l })
@@ -1294,12 +1364,28 @@ func (s *API) startAnalyze() bool {
 		case run != nil:
 			err = run(env, progress)
 		case exe != "":
-			err = app.ChildAnalyzeExe(exe, home, env, plan, "", progress)
+			err = app.ChildAnalyzeExe(exe, home, env, plan, mm, progress)
 		default:
-			err = app.ChildAnalyze(home, env, plan, "", progress)
+			err = app.ChildAnalyze(home, env, plan, mm, progress)
 		}
 		s.mu.Lock()
 		s.busy["analyze"], s.needs = false, nil
+		if err != nil {
+			if c, _ := s.cachedNeedsLocked(); c != nil && c.scope == scope {
+				n := *c.n
+				s.needsSequence++
+				n.Sequence = s.needsSequence
+				n.Updating = false
+				n.Error = err.Error()
+				c.n = &n
+				go s.send("list-problems", view.ProblemsOf(&n))
+			}
+		}
+		if err == nil {
+			if c, _ := s.cachedNeedsLocked(); c != nil {
+				s.refreshNeedsLocked(c)
+			}
+		}
 		s.mu.Unlock()
 		s.endSelf(task, err, view.T("analysis done"))
 		ev := map[string]any{"done": true, "ok": err == nil}

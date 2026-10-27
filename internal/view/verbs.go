@@ -16,8 +16,9 @@ import (
 // Result is what a verb did, for the status line; Placed are the mods it put into the list
 // (the next "m changes it" applies to them).
 type Result struct {
-	Text   string   `json:"text"`
-	Placed []string `json:"placed,omitempty"`
+	Problems *ListProblems `json:"problems,omitempty"`
+	Text     string        `json:"text"`
+	Placed   []string      `json:"placed,omitempty"`
 }
 
 // Positions: the 1-based load positions of the mods that are in the list.

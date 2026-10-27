@@ -227,6 +227,11 @@ func (a *App) collectProblems(ps *ProblemSet) error {
 		fromLog[f] = true
 	}
 	all = append(all, lfs...)
+	return a.finishProblems(ps, all, fromLog, run)
+}
+
+func (a *App) finishProblems(ps *ProblemSet, all []*finding.Finding, fromLog map[*finding.Finding]bool, run *LogRun) error {
+	st := ps.State
 	ignores, err := a.Store.Ignores(st.Ix.Env.ID)
 	if err != nil {
 		return err
