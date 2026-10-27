@@ -85,7 +85,14 @@ func (s *API) Close() {
 		s.creditCancel()
 	}
 	s.mu.Unlock()
-	s.creditWG.Wait()
+	creditDone := make(chan struct{})
+	go func() { s.creditWG.Wait(); close(creditDone) }()
+	select {
+	case <-creditDone:
+	case <-time.After(3 * time.Second):
+		// A buffered runner may ignore cancellation. It owns its detached App until
+		// return and cannot mutate GUI state after creditClosed.
+	}
 	s.accountMu.Lock()
 	s.ll = nil
 	for _, p := range s.llFiles {

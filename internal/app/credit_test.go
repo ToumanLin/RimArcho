@@ -93,6 +93,13 @@ func creditClient(t *testing.T, e *testkit.Env, items []store.CreditItem) {
 	var calls [][]string
 	e.App.SteamWorker = fakeSteamWorker(&calls)
 }
+func creditRecycle(e *testkit.Env, path string) error {
+	dir := filepath.Join(e.Root, "recycled")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	return os.Rename(path, filepath.Join(dir, filepath.Base(path)))
+}
 func creditItem(t *testing.T, e *testkit.Env, batch int64) store.CreditItem {
 	t.Helper()
 	items, err := e.App.Store.CreditItems(batch)
@@ -247,7 +254,7 @@ func TestCreditReplacementResumeAndFailures(t *testing.T) {
 		return fmt.Sprintf("STATE %s %d\nDONE state 1", id, state), nil
 	}
 	trashed := []string{}
-	e.App.TrashFunc = func(path string) error { trashed = append(trashed, path); return os.Rename(path, path+"-recycled") }
+	e.App.TrashFunc = func(path string) error { trashed = append(trashed, path); return creditRecycle(e, path) }
 	if err := e.App.CreditStep(nil); err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +339,7 @@ func TestCreditRetryPauseAndCancelBoundary(t *testing.T) {
 	}
 }
 
-func TestCreditReplacePlansKeepsHistoryAndForeignLinks(t *testing.T) {
+func TestCreditReplacePlansRemapsHistoryAndPreservesUnrelatedLinks(t *testing.T) {
 	t.Parallel()
 	e, batch, items := creditEnv(t, "8100")
 	otherDir := filepath.Join(e.App.SteamCMDModsDir(), "steamapps", "workshop", "content", "294100", "8200")
@@ -356,13 +363,13 @@ func TestCreditReplacePlansKeepsHistoryAndForeignLinks(t *testing.T) {
 	if err := e.App.Store.SetWorkspace(ws); err != nil {
 		t.Fatal(err)
 	}
-	e.App.TrashFunc = func(string) error { t.Fatal("referenced copy recycled"); return nil }
+	e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
 	if err := e.App.CreditStep(nil); err != nil {
 		t.Fatal(err)
 	}
 	it := creditItem(t, e, batch)
-	if it.State != "retained" {
-		t.Fatalf("history must retain copy %+v", it)
+	if it.State != "done" {
+		t.Fatalf("history must follow client copy %+v", it)
 	}
 	for _, plan := range mustCreditPlans(t, e) {
 		ws, err := e.App.Store.Workspace(plan.ID)
@@ -464,7 +471,7 @@ func TestCreditInterruptedRecycleResumes(t *testing.T) {
 		t.Fatalf("lost switch checkpoint %+v %d", it, calls)
 	}
 	e.Advance(time.Hour)
-	e.App.TrashFunc = func(path string) error { calls++; return os.Rename(path, path+"-recycled") }
+	e.App.TrashFunc = func(path string) error { calls++; return creditRecycle(e, path) }
 	r, err := e.App.ReadSession()
 	if err != nil {
 		t.Fatal(err)
@@ -482,6 +489,7 @@ func TestCreditInterruptedRecycleResumes(t *testing.T) {
 func TestCreditDeploymentsAcrossGamesResume(t *testing.T) {
 	t.Parallel()
 	e, batch, items := creditEnv(t, "8100")
+	e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
 	creditStart(t, e, batch, items)
 	creditClient(t, e, items)
 	e.MustRun("enable", items[0].InstanceID)
@@ -521,7 +529,7 @@ func TestCreditDeploymentsAcrossGamesResume(t *testing.T) {
 		t.Fatal(err)
 	}
 	it = creditItem(t, e, batch)
-	if it.State != "retained" {
+	if it.State != "done" {
 		t.Fatalf("did not finish deployment resume %+v", it)
 	}
 	if ds, err := r.Store.CreditDeployments(it); err != nil || len(ds) != 0 {
@@ -571,6 +579,7 @@ func TestCreditDoesNotSwitchWhenGameStartsDuringSteamCall(t *testing.T) {
 func TestCreditStageAndSteamSuffix(t *testing.T) {
 	t.Parallel()
 	e, batch, items := creditEnv(t, "8100")
+	e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
 	creditStart(t, e, batch, items)
 	creditClient(t, e, items)
 	// A separate local copy is not in the batch and remains installed. The client
@@ -592,7 +601,7 @@ func TestCreditStageAndSteamSuffix(t *testing.T) {
 		t.Fatal(err)
 	}
 	it := creditItem(t, e, batch)
-	if it.State != "retained" || it.TargetID == "" {
+	if it.State != "done" || it.TargetID == "" {
 		t.Fatalf("switch %+v", it)
 	}
 	var staged []app.StageItem
@@ -661,5 +670,312 @@ func TestCreditSessionsSurviveRemovingGame(t *testing.T) {
 	bs, err := e.App.Store.CreditBatches("")
 	if err != nil || len(bs) != 1 || bs[0].Sessions != 2 {
 		t.Fatalf("lost or conflated sessions %+v %v", bs, err)
+	}
+}
+
+func TestCreditRealLaunchRemapsRestorableStatesAndRecycles(t *testing.T) {
+	t.Parallel()
+	e, batch, items := creditEnv(t, "8100")
+	old := items[0].InstanceID
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	e.MustRun("enable", old)
+	for range 3 {
+		e.MustRun("launch")
+	}
+	bs, err := e.App.Store.CreditBatches("prompt")
+	if err != nil || len(bs) != 1 || bs[0].Sessions != 3 {
+		t.Fatalf("real launches: %+v %v", bs, err)
+	}
+	plan := mustPlan(t, e)
+	versions, _ := e.App.Store.Versions(plan)
+	hasOld := false
+	for _, v := range versions {
+		hasOld = hasOld || loadout.Decode(v.Entries).Index(old) >= 0
+	}
+	if !hasOld {
+		t.Fatal("launch did not write the old identity into history")
+	}
+	// An ordinary edit leaves an undo entry that contains the SteamCMD instance.
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Unrelated"), testkit.Sample("credit.unrelated", "Unrelated"))
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:credit.unrelated")
+	e.MustRun("disable", "pkg:credit.unrelated")
+	if err := e.App.Store.PushStep(plan, "redo", loadout.List{{Instance: old}}.Encode(), "fixture"); err != nil {
+		t.Fatal(err)
+	}
+	creditClient(t, e, items)
+	if err := e.App.CreditAnswer([]int64{batch}, true); err != nil {
+		t.Fatal(err)
+	}
+	original := mustCreditMod(t, e, old).RealPath
+	recycled := ""
+	e.App.TrashFunc = func(path string) error { recycled = path; return creditRecycle(e, path) }
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it := creditItem(t, e, batch)
+	if it.State != "done" || recycled != original {
+		t.Fatalf("real used copy retained: %+v trash=%q", it, recycled)
+	}
+	if _, err := os.Stat(original); !os.IsNotExist(err) {
+		t.Fatalf("old folder still exists: %v", err)
+	}
+	for _, table := range []string{"workspace", "workspace_undo", "loadout_version"} {
+		rows, err := e.App.Store.DB.Query(`SELECT entries FROM `+table+` WHERE plan_id=?`, plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			var raw string
+			if err := rows.Scan(&raw); err != nil {
+				t.Fatal(err)
+			}
+			if loadout.Decode(raw).Index(old) >= 0 {
+				t.Fatalf("old identity in %s: %s", table, raw)
+			}
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		rows.Close()
+	}
+	// Undo after the physical copy is gone still resolves to the client copy.
+	e.MustRun("undo")
+	st, err := e.App.Loadout()
+	if err != nil || st.List.Index(it.TargetID) < 0 || st.List.Index(old) >= 0 || !st.Reg.Loadable(it.TargetID) {
+		t.Fatalf("undo restored unavailable copy: %+v %v", st, err)
+	}
+}
+
+func TestCreditCrossEnvironmentCandidateRequired(t *testing.T) {
+	t.Parallel()
+	e, batch, items := creditEnv(t, "8100")
+	old := items[0].InstanceID
+	e.MustRun("enable", old)
+	game := secondGame(e, "CreditBlocked")
+	e.MustRun("env", "add", "blocked", "--game", game, "--saves", "own")
+	e.MustRun("env", "use", "blocked")
+	p, err := e.App.NewPlan("blocked-list", "current")
+	if err != nil {
+		t.Fatal(err)
+	}
+	en, err := e.App.Env()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.Store.SetCurrentPlan(en.ID, p.Plan.ID); err != nil {
+		t.Fatal(err)
+	}
+	e.MustRun("enable", old)
+	e.MustRun("save")
+	blockedPlan := mustPlan(t, e)
+	// A local token and its _steam token occupy both legal names in this game.
+	e.WriteMod(filepath.Join(game, "Mods", "A"), testkit.Sample("credit.mod8100", "Local collision"))
+	e.WriteMod(filepath.Join(game, "Mods", "B"), testkit.Sample("credit.mod8100_steam", "Steam token collision"))
+	e.MustRun("scan")
+	e.MustRun("env", "use", "main")
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	e.App.TrashFunc = func(string) error { t.Fatal("copy in blocked game recycled"); return nil }
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it := creditItem(t, e, batch)
+	if it.State != "retained" || !strings.Contains(it.Result, "blocked") {
+		t.Fatalf("missing environment reason: %+v", it)
+	}
+	ws, err := e.App.Store.Workspace(blockedPlan)
+	if err != nil || loadout.Decode(ws.Entries).Index(old) < 0 || loadout.Decode(ws.Entries).Index(it.TargetID) >= 0 {
+		t.Fatalf("unloadable plan switched: %+v %v", ws, err)
+	}
+	main, err := e.App.Store.Workspace(mustPlan(t, e))
+	if err != nil || loadout.Decode(main.Entries).Index(it.TargetID) < 0 {
+		t.Fatalf("eligible game not switched: %+v %v", main, err)
+	}
+	if ds, err := e.App.Store.CreditDeployments(it); err != nil || len(ds) != 1 {
+		t.Fatalf("blocked deployment lost: %+v %v", ds, err)
+	}
+}
+
+func TestCreditOverlappingBatchesSubscribeOnce(t *testing.T) {
+	for _, installed := range []bool{false, true} {
+		t.Run(fmt.Sprint(installed), func(t *testing.T) {
+			t.Parallel()
+			e, first, items := creditEnv(t, "8100")
+			second, err := e.App.Store.CreateCreditBatch(e.Now(), items)
+			if err != nil {
+				t.Fatal(err)
+			}
+			creditDue(t, e, items)
+			if err := e.App.CreditAnswer([]int64{first, second}, true); err != nil {
+				t.Fatal(err)
+			}
+			creditClient(t, e, items)
+			calls := 0
+			e.App.SteamWorker = func(_ string, args []string) (string, error) {
+				if args[0] == steamworks.Subscribe {
+					calls++
+					return "ITEM 8100 ok 1\nDONE subscribe 1", nil
+				}
+				state := steamworks.ItemSubscribed
+				if installed {
+					state |= steamworks.ItemInstalled
+				}
+				return fmt.Sprintf("STATE 8100 %d\nDONE state 1", state), nil
+			}
+			e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
+			if err := e.App.CreditStep(nil); err != nil {
+				t.Fatal(err)
+			}
+			if calls != 1 {
+				t.Fatalf("repeated subscription: %d", calls)
+			}
+			a, b := creditItem(t, e, first), creditItem(t, e, second)
+			if !installed {
+				if a.State != "subscribed" || b.State != "subscribed" {
+					t.Fatalf("confirmation not shared: %+v %+v", a, b)
+				}
+				installed = true
+				e.Advance(time.Minute)
+				// Durable confirmation must survive a new connection and both pending batches.
+				r, err := e.App.ReadSession()
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer r.Close()
+				if err := r.CreditStep(nil); err != nil {
+					t.Fatal(err)
+				}
+				b = creditItem(t, e, second)
+			}
+			if b.State != "done" || b.Result != "already replaced with Workshop" || calls != 1 {
+				t.Fatalf("overlap: %+v calls=%d", b, calls)
+			}
+		})
+	}
+}
+
+func TestCreditReadinessWaitKeepsAttempts(t *testing.T) {
+	t.Parallel()
+	e, batch, items := creditEnv(t, "8100")
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	for _, reason := range []string{"waiting for scan", "waiting for file task"} {
+		for range 12 {
+			if err := e.App.CreditStep(func(store.CreditItem) (string, error) { return "", app.CreditWait(reason) }); err != nil {
+				t.Fatal(err)
+			}
+			it := creditItem(t, e, batch)
+			if it.Attempts != 0 || it.NextAttempt-e.Now().Unix() != 5 || it.Result != reason {
+				t.Fatalf("wait became failure: %+v", it)
+			}
+			e.Advance(5 * time.Second)
+		}
+	}
+}
+
+func TestCreditLaunchCountFailureIsNonfatal(t *testing.T) {
+	t.Parallel()
+	e, _, items := creditEnv(t, "8100")
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	e.MustRun("enable", items[0].InstanceID)
+	if _, err := e.App.Store.DB.Exec(`CREATE TRIGGER reject_credit_session BEFORE INSERT ON credit_session BEGIN SELECT RAISE(FAIL,'test count failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	started := false
+	e.App.Launcher = func(string, []string, string) error { started = true; return nil }
+	if _, err := e.App.LaunchWith(false, false); err != nil || !started {
+		t.Fatalf("successful launch reported failure: started=%t err=%v", started, err)
+	}
+}
+
+func TestCreditRemapRollsBackAllListStates(t *testing.T) {
+	t.Parallel()
+	e, _, items := creditEnv(t, "8100")
+	creditClient(t, e, items)
+	e.MustRun("enable", items[0].InstanceID)
+	e.MustRun("save")
+	e.MustRun("scan")
+	p := mustPlan(t, e)
+	target := refID(t, e, "Credit 8100", source.Workshop)
+	before, _ := e.App.Store.Workspace(p)
+	// Failure in staging comes after writes to workspace/history/undo in the transaction.
+	if err := e.App.Store.SetMeta(store.StageKey(p), "broken JSON"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.Store.RemapCreditPlans([]int64{p}, items[0].InstanceID, target, e.Now()); err == nil {
+		t.Fatal("malformed stage accepted")
+	}
+	after, _ := e.App.Store.Workspace(p)
+	if after.Entries != before.Entries {
+		t.Fatal("partial workspace remap committed")
+	}
+	versions, _ := e.App.Store.Versions(p)
+	if loadout.Decode(versions[0].Entries).Index(items[0].InstanceID) < 0 {
+		t.Fatal("partial version remap committed")
+	}
+}
+
+func TestCreditOverlappingBatchesSharePermanentFailure(t *testing.T) {
+	t.Parallel()
+	e, first, items := creditEnv(t, "8100")
+	second, err := e.App.Store.CreateCreditBatch(e.Now(), items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	creditDue(t, e, items)
+	if err := e.App.CreditAnswer([]int64{first, second}, true); err != nil {
+		t.Fatal(err)
+	}
+	creditClient(t, e, items)
+	calls := 0
+	e.App.SteamWorker = func(string, []string) (string, error) { calls++; return "ITEM 8100 failed:15 0\nDONE subscribe 1", nil }
+	e.App.TrashFunc = func(string) error { t.Fatal("failed subscription recycled"); return nil }
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	a, b := creditItem(t, e, first), creditItem(t, e, second)
+	if calls != 1 || a.State != "failed" || b.State != "failed" || a.Result != b.Result {
+		t.Fatalf("failure not shared: %+v %+v calls=%d", a, b, calls)
+	}
+	if _, err := os.Stat(mustCreditMod(t, e, items[0].InstanceID).RealPath); err != nil {
+		t.Fatal("lost retained copy", err)
+	}
+}
+
+func TestCreditResumeAfterRecycleBeforeScan(t *testing.T) {
+	t.Parallel()
+	e, batch, items := creditEnv(t, "8100")
+	e.MustRun("enable", items[0].InstanceID)
+	e.MustRun("save")
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	calls := 0
+	e.App.TrashFunc = func(path string) error {
+		calls++
+		if err := creditRecycle(e, path); err != nil {
+			return err
+		}
+		return errors.New("exit after OS recycle, before scan/checkpoint")
+	}
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it := creditItem(t, e, batch)
+	if it.State != "switching" {
+		t.Fatal(it)
+	}
+	e.Advance(time.Hour)
+	r, err := e.App.ReadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	if err := r.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it = creditItem(t, e, batch)
+	if it.State != "done" || calls != 1 {
+		t.Fatalf("recycled folder retried: %+v calls=%d", it, calls)
 	}
 }

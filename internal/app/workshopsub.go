@@ -381,13 +381,17 @@ func (a *App) unavailable(err error, items []WorkshopItem) error {
 // runSteam prepares the runtime folder and runs the worker (SteamWorker in tests), 50 items
 // a call.
 func (a *App) runSteam(action string, ids []string) (*steamworks.Report, error) {
+	return a.runSteamContext(context.Background(), action, ids)
+}
+
+func (a *App) runSteamContext(ctx context.Context, action string, ids []string) (*steamworks.Report, error) {
 	dir, err := a.SteamRuntime()
 	if err != nil {
 		return nil, &SteamUnavailable{Why: err.Error()}
 	}
 	run := a.SteamWorker
 	if run == nil {
-		run = steamWorkerProcess
+		run = func(dir string, args []string) (string, error) { return steamWorkerProcessContext(ctx, dir, args) }
 	}
 	all := &steamworks.Report{}
 	for i := 0; i < len(ids); i += 50 {
@@ -457,19 +461,24 @@ func statOf(p string) os.FileInfo {
 
 // steamWorkerProcess starts `<this executable> steam-worker …` in dir, with a time limit.
 func steamWorkerProcess(dir string, args []string) (string, error) {
+	return steamWorkerProcessContext(context.Background(), dir, args)
+}
+
+func steamWorkerProcessContext(parent context.Context, dir string, args []string) (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 40*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, exe, append([]string{"steam-worker"}, args...)...)
 	cmd.Dir = dir
+	cmd.WaitDelay = time.Second
 	cmd.Env = append(os.Environ(), "SteamAppId="+strconv.Itoa(steamworks.AppID), "SteamGameId="+strconv.Itoa(steamworks.AppID))
 	hideWindow(cmd)
 	out, err := cmd.Output()
 	if ctx.Err() != nil {
-		return string(out), fmt.Errorf("the Steam call took longer than 40 s")
+		return string(out), fmt.Errorf("Steam call interrupted: %w", ctx.Err())
 	}
 	return string(out), err
 }

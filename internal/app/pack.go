@@ -758,6 +758,15 @@ func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 // LaunchPackWith is LaunchPack that, with move, first moves plain Mods/ folders holding
 // another version of a pack copy into the lock library (08 §5.3; --move-duplicates).
 func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	return a.launchPackWith(name, dryRun, move)
+}
+
+func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error) {
 	if err := a.checkNoGame(); err != nil { // one game at a time (08 §1)
 		return nil, err
 	}
@@ -847,7 +856,7 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 			if _, err := a.doMoves(de.Moves); err != nil {
 				return nil, err
 			}
-			r2, err := a.LaunchPackWith(name, false, false)
+			r2, err := a.launchPackWith(name, false, false)
 			if r2 != nil {
 				r2.Moved = de.Moves
 			}

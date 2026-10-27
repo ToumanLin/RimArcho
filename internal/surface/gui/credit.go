@@ -94,7 +94,21 @@ func (s *API) runCredit(ctx context.Context, a *app.App, id string) {
 		s.mu.Unlock()
 	}()
 	batches := map[int64]bool{}
-	finish := func(state, text string) { s.tasks.Finish(id, state, text) }
+	finish := func(state, text string) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if !s.creditClosed {
+			s.tasks.Finish(id, state, text)
+		}
+	}
+	progress := func(active *store.CreditItem) ([]app.TaskItem, int, int, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.creditClosed {
+			return nil, 0, 0, context.Canceled
+		}
+		return s.creditProgress(a, id, batches, active)
+	}
 	for {
 		if ctx.Err() != nil || s.tasks.StopAsked(id) {
 			finish(app.TaskStopped, view.T("replacement paused; Steam subscriptions kept"))
@@ -108,7 +122,7 @@ func (s *API) runCredit(ctx context.Context, a *app.App, id string) {
 		for _, it := range pending {
 			batches[it.BatchID] = true
 		}
-		if _, _, _, err := s.creditProgress(a, id, batches, nil); err != nil {
+		if _, _, _, err := progress(nil); err != nil {
 			finish(app.TaskFailed, err.Error())
 			return
 		}
@@ -119,24 +133,25 @@ func (s *API) runCredit(ctx context.Context, a *app.App, id string) {
 				return "", ctx.Err()
 			}
 			if s.busy["scan"] {
-				return "", fmt.Errorf("waiting for scan")
+				return "", app.CreditWait("waiting for scan")
 			}
 			for _, t := range s.tasks.List() {
 				if t.Lane == app.LaneFiles && t.State == app.TaskRunning {
-					return "", fmt.Errorf("waiting for file task")
+					return "", app.CreditWait("waiting for file task")
 				}
 			}
 			result, err := a.ReplaceCreditItem(it)
 			s.board, s.needs, s.lib = nil, nil, nil
 			return result, err
 		}, app.CreditCallbacks{
+			Context:  ctx,
 			Stopped:  func() bool { return ctx.Err() != nil || s.tasks.StopAsked(id) },
-			Progress: func(it store.CreditItem) { s.creditProgress(a, id, batches, &it) },
+			Progress: func(it store.CreditItem) { progress(&it) },
 		}); err != nil {
 			finish(app.TaskFailed, err.Error())
 			return
 		}
-		rows, done, failed, err := s.creditProgress(a, id, batches, nil)
+		rows, done, failed, err := progress(nil)
 		if err != nil {
 			finish(app.TaskFailed, err.Error())
 			return
@@ -197,15 +212,18 @@ func init() {
 		"waiting to retry: ":             "等待重试：",
 		"waiting for Steam installation": "等待 Steam 完成安装",
 		"SteamCMD copy already removed":  "SteamCMD 副本已移走",
-		"switched to Workshop; SteamCMD copy moved to recycle bin":                          "已切换到工坊里的这一份，SteamCMD 副本已移入回收站",
-		"recorded SteamCMD instance is unavailable or has changed":                          "原来这份 SteamCMD Mod 已不可用或发生变化",
-		"SteamCMD copy is no longer live":                                                   "SteamCMD 副本已不在磁盘上",
-		"Workshop instance identity needs review":                                           "工坊里这份 Mod 的身份需要检查",
-		"lists, staging, undo history, versions or packs still reference the SteamCMD copy": "列表、暂存、撤销记录、历史版本或整合包仍引用 SteamCMD 副本",
-		"links still reference the SteamCMD copy":                                           "链接仍指向 SteamCMD 副本",
-		"replacement paused; Steam subscriptions kept":                                      "替换已暂停，已完成的 Steam 订阅保留",
-		"waiting for Steam or a safe time to replace":                                       "等待 Steam 安装完成或游戏退出后替换",
-		"replacement finished; see item results":                                            "替换已处理完，请查看逐项结果",
+		"already replaced with Workshop": "已由另一批替换为工坊里的这一份",
+		"waiting for scan":               "等待扫描完成",
+		"waiting for file task":          "等待文件任务完成",
+		"switched to Workshop; SteamCMD copy moved to recycle bin":                  "已切换到工坊里的这一份，SteamCMD 副本已移入回收站",
+		"recorded SteamCMD instance is unavailable or has changed":                  "原来这份 SteamCMD Mod 已不可用或发生变化",
+		"SteamCMD copy is no longer live":                                           "SteamCMD 副本已不在磁盘上",
+		"Workshop instance identity needs review":                                   "工坊里这份 Mod 的身份需要检查",
+		"an unavailable game list or fixed pack still references the SteamCMD copy": "不可切换的游戏列表或固定整合包仍引用 SteamCMD 副本",
+		"links still reference the SteamCMD copy":                                   "链接仍指向 SteamCMD 副本",
+		"replacement paused; Steam subscriptions kept":                              "替换已暂停，已完成的 Steam 订阅保留",
+		"waiting for Steam or a safe time to replace":                               "等待 Steam 安装完成或游戏退出后替换",
+		"replacement finished; see item results":                                    "替换已处理完，请查看逐项结果",
 	})
 }
 

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -115,6 +116,7 @@ func (a *App) CreditPending() ([]store.CreditItem, error) {
 
 // CreditCallbacks report checkpoint progress and stop at each safe item boundary.
 type CreditCallbacks struct {
+	Context  context.Context
 	Stopped  func() bool
 	Progress func(store.CreditItem)
 }
@@ -140,6 +142,10 @@ func (a *App) CreditStep(replace func(store.CreditItem) (string, error), callbac
 			hooks.Progress(it)
 		}
 	}
+	ctx := hooks.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	processed := 0
 	for _, it := range items {
 		if stop() {
@@ -159,8 +165,41 @@ func (a *App) CreditStep(replace func(store.CreditItem) (string, error), callbac
 			return nil
 		}
 		progress(it)
+		// Refresh shared confirmation even after this item's subscribed checkpoint:
+		// another batch may have completed the same physical handoff since the last pass.
+		peer, err := a.Store.CreditPeer(it)
+		if err != nil {
+			return err
+		}
+		if peer != nil {
+			changed := false
+			if it.State == "pending" {
+				it.State, it.Result, changed = "subscribed", "waiting for Steam installation", true
+				if peer.State == "failed" {
+					it.State, it.Result = "failed", peer.Result
+				}
+			}
+			if peer.InstanceID == it.InstanceID && peer.State == "done" && peer.TargetID != "" {
+				old, err := a.Store.Mod(it.InstanceID)
+				if err != nil {
+					return err
+				}
+				if old == nil || old.Status != identity.Live {
+					it.State, it.Result, it.TargetID, it.NextAttempt, changed = "done", "already replaced with Workshop", peer.TargetID, 0, true
+				}
+			}
+			if changed {
+				if err := a.Store.SaveCreditItem(it); err != nil {
+					return err
+				}
+				progress(it)
+				if it.Terminal() {
+					continue
+				}
+			}
+		}
 		if it.State == "pending" {
-			rep, callErr := a.runSteam(steamworks.Subscribe, []string{it.WorkshopID})
+			rep, callErr := a.runSteamContext(ctx, steamworks.Subscribe, []string{it.WorkshopID})
 			result := "unconfirmed"
 			if callErr == nil {
 				for _, r := range rep.Items {
@@ -191,7 +230,7 @@ func (a *App) CreditStep(replace func(store.CreditItem) (string, error), callbac
 			}
 		}
 		if it.State == "subscribed" || it.State == "switching" {
-			rep, callErr := a.runSteam(steamworks.State, []string{it.WorkshopID})
+			rep, callErr := a.runSteamContext(ctx, steamworks.State, []string{it.WorkshopID})
 			ready := false
 			if callErr == nil {
 				for _, r := range rep.Items {
@@ -220,7 +259,12 @@ func (a *App) CreditStep(replace func(store.CreditItem) (string, error), callbac
 					}
 				}
 				if e != nil {
-					creditRetry(&it, a.Now(), e.Error())
+					var wait CreditWait
+					if errors.As(e, &wait) {
+						it.NextAttempt, it.Result = a.Now().Add(5*time.Second).Unix(), e.Error()
+					} else {
+						creditRetry(&it, a.Now(), e.Error())
+					}
 				} else {
 					it.State, it.Result, it.NextAttempt = "done", result, 0
 					if strings.HasPrefix(result, "retained:") {
@@ -259,3 +303,9 @@ func creditRetry(i *store.CreditItem, now time.Time, why string) {
 	i.NextAttempt = now.Add(delay).Unix()
 	i.Result = fmt.Sprintf("waiting to retry: %s", why)
 }
+
+// CreditWait is a scheduler/readiness wait, not a failed subscription attempt.
+// Recheck soon without growing the durable exponential retry counter.
+type CreditWait string
+
+func (w CreditWait) Error() string { return string(w) }

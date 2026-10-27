@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -60,6 +61,11 @@ func (a *App) Launch(dryRun bool) (*SaveResult, error) { return a.LaunchWith(dry
 // LaunchWith is Launch that, with move, first moves plain Mods/ folders in the way of a
 // deployed copy into the lock library (08 §3; --move-duplicates).
 func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	if err := a.checkNoGame(); err != nil {
 		return nil, err
 	}
@@ -105,7 +111,10 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 	for _, en := range st.List {
 		enabled = append(enabled, en.Instance)
 	}
-	return r, a.Store.CountCreditSession(record.ID, enabled)
+	if err := a.Store.CountCreditSession(record.ID, enabled); err != nil {
+		log.Printf("game started; cannot count credit session for launch %d: %v", record.ID, err)
+	}
+	return r, nil
 }
 
 func (a *App) startGame(p *LaunchPlan) error {

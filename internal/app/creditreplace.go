@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
@@ -13,10 +14,15 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// ReplaceCreditItem switches only the recorded SteamCMD instance. Current lists and
-// staging follow the client copy; immutable history stays intact. Every side effect
+// ReplaceCreditItem switches only the recorded SteamCMD instance. Current lists,
+// staging and restorable history follow the client copy. Every side effect
 // is idempotent or journalled so a crash between plans, deployments or recycling resumes.
 func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return "", CreditWait(err.Error())
+	}
+	defer unlock()
 	if err := a.checkNoGame(); err != nil {
 		return "", err
 	}
@@ -28,8 +34,8 @@ func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
 		return "retained: recorded SteamCMD instance is unavailable or has changed", nil
 	}
 	if old.Status != identity.Live {
-		if it.State == "switching" {
-			return "SteamCMD copy already removed", nil
+		if it.TargetID != "" {
+			return "already replaced with Workshop", nil
 		}
 		return "retained: SteamCMD copy is no longer live", nil
 	}
@@ -50,7 +56,7 @@ func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
 		}
 	}
 	if target == nil {
-		return "", fmt.Errorf("waiting for scanned Workshop instance %s with readable About.xml", it.WorkshopID)
+		return "", CreditWait(fmt.Sprintf("waiting for scanned Workshop instance %s with readable About.xml", it.WorkshopID))
 	}
 	if target.LineageID != old.LineageID || target.PackageID == "" {
 		return "retained: Workshop instance identity needs review", nil
@@ -117,37 +123,40 @@ func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Build each owner's registry without syncing or editing its lists. A shared
+	// source can be absent from another game's candidate set (e.g. another Steam library).
+	eligible := []int64{}
+	blocked := []string{}
 	for _, p := range plans {
-		if err := a.checkNoGame(); err != nil {
-			return "", err
-		}
-		_, err := a.editOther(p, "credit-replace", func(l loadout.List) (loadout.List, int) { return creditSwap(l, old.ID, target.ID) })
+		referenced, err := a.creditReferenced(old.ID, p.ID)
 		if err != nil {
 			return "", err
 		}
-		var staged []StageItem
-		raw := a.Store.Meta(store.StageKey(p.ID))
-		if raw != "" {
-			if err := json.Unmarshal([]byte(raw), &staged); err != nil {
-				return "", err
-			}
-			changed := false
-			for i := range staged {
-				if staged[i].Instance == old.ID {
-					staged[i].Instance = target.ID
-					changed = true
-				}
-				if staged[i].After == old.ID {
-					staged[i].After = target.ID
-					changed = true
-				}
-			}
-			if changed {
-				if err := a.setStaged(p.ID, staged); err != nil {
-					return "", err
-				}
-			}
+		if !referenced {
+			continue
 		}
+		e, err := a.Store.EnvByID(p.EnvID)
+		if err != nil {
+			return "", err
+		}
+		if e == nil {
+			blocked = append(blocked, fmt.Sprintf("list %s has no owning game", p.Name))
+			continue
+		}
+		a.EnvName, a.OpenPlan, a.PlanName = e.Name, p.ID, ""
+		ix, err := a.Index()
+		if err != nil {
+			return "", err
+		}
+		reg, _, _, _, err := a.registry(ix)
+		if err != nil {
+			return "", err
+		}
+		if !reg.Loadable(target.ID) {
+			blocked = append(blocked, fmt.Sprintf("Workshop copy cannot be loaded in %s (list %s)", e.Name, p.Name))
+			continue
+		}
+		eligible = append(eligible, p.ID)
 	}
 	deployments, err := a.Store.CreditDeployments(it)
 	if err != nil {
@@ -175,7 +184,8 @@ func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
 			return "", err
 		}
 		if !st.Reg.Loadable(target.ID) {
-			return "", fmt.Errorf("Workshop instance cannot be loaded in %s", e.Name)
+			blocked = append(blocked, fmt.Sprintf("Workshop copy cannot be loaded in deployed game %s", e.Name))
+			continue
 		}
 		// Save owns registry tokens, _steam, link journal, external-edit checks and backups.
 		if st.File == nil {
@@ -190,6 +200,9 @@ func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
 			return "", err
 		}
 		st.List, _ = creditSwap(projection, old.ID, target.ID)
+		if err := a.checkNoGame(); err != nil {
+			return "", err
+		}
 		if _, err := a.writeGame(st, false, false, false, old); err != nil {
 			return "", err
 		}
@@ -200,12 +213,30 @@ func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
 	if err := a.checkNoGame(); err != nil {
 		return "", err
 	}
+	// Deployment snapshots above still need the old identity to disambiguate
+	// _steam tokens. Only after handoff, atomically remap every restorable list state.
+	if err := a.Store.RemapCreditPlans(eligible, old.ID, target.ID, a.Now()); err != nil {
+		return "", err
+	}
+	if len(blocked) > 0 {
+		// Report only when an unremapped reference really remains below.
+		if held, err := a.creditReferenced(old.ID); err != nil {
+			return "", err
+		} else if held {
+			return "retained: " + strings.Join(blocked, "; "), nil
+		}
+		if pending, err := a.Store.CreditDeployments(it); err != nil {
+			return "", err
+		} else if len(pending) > 0 {
+			return "retained: " + strings.Join(blocked, "; "), nil
+		}
+	}
 	held, err := a.creditReferenced(old.ID)
 	if err != nil {
 		return "", err
 	}
 	if held {
-		return "retained: lists, staging, undo history, versions or packs still reference the SteamCMD copy", nil
+		return "retained: an unavailable game list or fixed pack still references the SteamCMD copy", nil
 	}
 	links, err := a.IncomingLinks(old.RealPath)
 	if err != nil {
@@ -225,6 +256,15 @@ func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
 		}
 		if held {
 			return fmt.Errorf("SteamCMD copy acquired a reference; keeping it")
+		}
+		if err := a.checkNoGame(); err != nil {
+			return err
+		}
+		if _, err := os.Lstat(old.RealPath); os.IsNotExist(err) {
+			_, err = a.Scan(false)
+			return err
+		} else if err != nil {
+			return err
 		}
 		if err := a.recycleTarget(old.RealPath); err != nil {
 			return err
@@ -256,11 +296,16 @@ func creditSwap(l loadout.List, old, target string) (loadout.List, int) {
 	return out, 1
 }
 
-// History is a real reference too: never silently invalidate undo or old versions to
-// obtain disk savings. Packs own their copies and are never rewritten by this feature.
-func (a *App) creditReferenced(id string) (bool, error) {
+// Eligible list/history references have already moved atomically. Remaining ones
+// belong to unavailable environments or fixed packs and must keep the original copy.
+func (a *App) creditReferenced(id string, planIDs ...int64) (bool, error) {
 	for _, q := range []string{`SELECT entries FROM workspace`, `SELECT entries FROM workspace_undo`, `SELECT entries FROM loadout_version`} {
-		rows, err := a.Store.DB.Query(q)
+		var args []any
+		if len(planIDs) > 0 {
+			q += ` WHERE plan_id=?`
+			args = append(args, planIDs[0])
+		}
+		rows, err := a.Store.DB.Query(q, args...)
 		if err != nil {
 			return false, err
 		}
@@ -291,6 +336,9 @@ func (a *App) creditReferenced(id string) (bool, error) {
 		return false, err
 	}
 	for _, p := range plans {
+		if len(planIDs) > 0 && p.ID != planIDs[0] {
+			continue
+		}
 		var staged []StageItem
 		raw := a.Store.Meta(store.StageKey(p.ID))
 		if raw == "" {
@@ -304,6 +352,9 @@ func (a *App) creditReferenced(id string) (bool, error) {
 				return true, nil
 			}
 		}
+	}
+	if len(planIDs) > 0 {
+		return false, nil
 	}
 	packs, err := a.Packs()
 	if err != nil {

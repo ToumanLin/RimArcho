@@ -241,3 +241,45 @@ func TestCreditQuestionRenderer(t *testing.T) {
 		t.Fatalf("credit question: %v\n%s", err, out)
 	}
 }
+
+func TestCreditCloseBoundsSlowWorkerAndKeepsCheckpoint(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	batch, _ := guiCreditBatch(t, e)
+	e.WriteFile(filepath.Join(e.Game, "steam_api64.dll"), "fake DLL")
+	started, release := make(chan struct{}), make(chan struct{})
+	e.App.SteamWorker = func(string, []string) (string, error) {
+		close(started)
+		<-release
+		return "ITEM 8100 ok 1\nDONE subscribe 1", nil
+	}
+	if _, err := api.CreditAnswer([]int64{batch}, true); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("worker not started")
+	}
+	closed := make(chan struct{})
+	go func() { api.Close(); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(4 * time.Second):
+		close(release)
+		t.Fatal("window close waited for the Steam worker")
+	}
+	// The runner still owns its separate connection. Late confirmation is checkpointed,
+	// while the closed GUI task remains stopped and no handoff can start.
+	close(release)
+	api.creditWG.Wait()
+	items, err := e.App.Store.CreditItems(batch)
+	if err != nil || items[0].State != "subscribed" {
+		t.Fatalf("shutdown lost subscription confirmation: %+v %v", items, err)
+	}
+	for _, task := range api.tasks.List() {
+		if task.Kind == view.TaskCreditReplace && task.State != app.TaskStopped {
+			t.Fatalf("late completion changed closed task: %+v", task)
+		}
+	}
+}
