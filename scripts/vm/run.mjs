@@ -104,6 +104,9 @@ async function editor() {
   await until(async()=>(await uiState()).plan===currentPlan);
   await settled(null,15000);
 }
+async function popupFeedback(name, action, opened) {
+  await timed(name,async()=>{await action();await until(async()=>!!(await uiState()).popup===opened,15000)},200);
+}
 async function enabledSecond() {
   await press('Digit2');await press('Home');await press('ArrowDown');
 }
@@ -117,6 +120,67 @@ async function clickText(selector,text) {
     const p=await c.evaluate('(()=>{const b=document.querySelector("#screen").getBoundingClientRect();return {x:b.x+b.width/2,y:b.y+b.height/2}})()');
     await c.call('Input.dispatchMouseEvent',{type:'mouseWheel',...p,deltaX:0,deltaY:400});await sleep(50);
   }
+}
+async function cancelUnsubscribe() {
+  const observed=JSON.parse(command(exe('vmstate'),['--home',home,'--plan',currentPlan])).observation;
+  const target=await c.evaluate(`(()=>{const kinds=${JSON.stringify(observed.kinds)};return window.__vm.read().columns.slice(0,2).flatMap((c,k)=>c.entries.map((e,i)=>({...e,k,i}))).find(e=>kinds[e.id]==='workshop')})()`);
+  if(!target){result.coverage.push({action:'unsubscribe cancellation',status:'unsupported: no Workshop row'});return;}
+  for(const close of ['cancel','esc','backdrop']) {
+    await press(target.k===0?'Digit1':'Digit2');await press('Home');
+    if(target.i)await c.key('ArrowDown',{repeats:target.i-1});
+    const b=await snapshot(`before-unsubscribe-${close}`);
+    await press('Delete');await until(async()=>!!(await uiState()).popup);
+    check('unsubscribe confirmation is for Workshop',await c.evaluate('document.querySelector("#popup").innerText.toLowerCase().includes("unsubscribe")'));
+    if(close==='cancel')await c.click('#popup .btns button:not(.go)');
+    else if(close==='esc')await press('Escape');
+    else {const p=await c.evaluate('(()=>{const b=document.querySelector("#popup").getBoundingClientRect();return {x:b.x+4,y:b.y+4}})()');await c.mouse('left',p.x,p.y);}
+    await settled();check(`unsubscribe ${close} preserves domain`,JSON.stringify(domain(await snapshot(`unsubscribe-${close}`)))===JSON.stringify(domain(b)));
+  }
+}
+async function repeatedSubscription() {
+  // A loopback peer closes the TLS handshake. This exercises real submit/queue/failure
+  // handling without remote accounts, certificates, fixture hooks or product changes.
+  const server=createServer(socket=>socket.destroy());
+  await new Promise((ok,fail)=>{server.once('error',fail);server.listen(0,'127.0.0.1',ok)});
+  const url=`https://127.0.0.1:${server.address().port}/phase1a.git`;
+  const tasks=()=>c.evaluate('(async()=>{const {api}=await import("/js/state.js");return api.Tasks()})()');
+  try {
+    for(const clicks of [2,3]) {
+      const before=await snapshot(`before-subscription-${clicks}`),known=new Set((await tasks()).rows.map(r=>r.id));
+      await press('Shift+Digit4');await settled('library');
+      await c.click('#nav [data-id="subscribe"]');await settled('subscribe');
+      await c.click('.subscribe-omni input');await c.call('Input.insertText',{text:url});
+      await until(()=>c.evaluate('!!document.querySelector(".subscribe-foot button.primary:not(:disabled)")'));
+      const point=await c.click('.subscribe-foot button.primary');
+      for(let i=2;i<=clicks;i++)await c.mouse('left',point.x,point.y,i);
+      await until(async()=>{const rows=(await tasks()).rows.filter(r=>!known.has(r.id));return rows.length&&rows.every(r=>!['queue','run'].includes(r.state))},15000);
+      const added=(await tasks()).rows.filter(r=>!known.has(r.id));save(`subscription-${clicks}-tasks`,added);
+      check(`subscription ${clicks}-click queues one request`,added.length===1,{tasks:added.map(r=>({kind:r.kind,state:r.state,line:r.line}))});
+      check(`subscription ${clicks}-click reports local transport failure`,added.length===1&&added[0].state==='fail');
+      await editor();const after=await snapshot(`after-subscription-${clicks}`);
+      check(`subscription ${clicks}-click failure preserves plans and instances`,JSON.stringify(payload(before))===JSON.stringify(payload(after))&&JSON.stringify(before.instances)===JSON.stringify(after.instances));
+    }
+    result.coverage.push({action:'subscription submit double/triple click',status:'asserted: loopback TLS failure; successful download fixture remains Phase 1b'});
+  } finally {server.close();}
+}
+async function cancelExportOverwrite() {
+  if(platform()!=='win32') {result.coverage.push({action:'export overwrite cancellation',status:'unsupported: Windows native helper'});return;}
+  const path=join(out,'existing.archolist.json'),marker='existing export must survive cancellation\n';
+  writeFileSync(path,marker);
+  await press('KeyE');await settled('plan-export');
+  await c.click('#screen .fmt');await settled('plan-export');
+  const evidence=join(out,'native-save.json');
+  const helper=spawn('powershell.exe',['-NoProfile','-File',join(repo,'scripts/vm/native-save-cancel.ps1'),'-AppProcessId',String(child.pid),'-ExistingFile',path,'-Evidence',evidence],{windowsHide:true,stdio:['ignore','pipe','pipe']});
+  let logs='';helper.stdout.on('data',b=>logs+=b);helper.stderr.on('data',b=>logs+=b);
+  const completion=new Promise((ok,fail)=>{helper.on('error',fail);helper.on('exit',code=>code===0?ok():fail(Error(`native save cancellation: ${logs}`)));});
+  // Observe helper failure immediately even if the click itself fails.
+  completion.catch(()=>{});
+  try {await clickText('#screen button','save as a file…');await completion;}
+  finally {if(helper.exitCode===null)helper.kill();}
+  await settled('plan-export');
+  check('export overwrite cancellation preserves existing bytes',readFileSync(path,'utf8')===marker);
+  result.coverage.push({action:'export overwrite cancellation',status:'asserted: native Windows control No then Cancel',evidence:'native-save.json'});
+  await editor();
 }
 async function importPreview() {
   await editor();await press('KeyI');await settled('plan-import');
@@ -179,6 +243,7 @@ async function setup() {
   result.workingTree=command('git',['-C',repo,'status','--short']).trim();
   result.node=process.version;result.toolHashes=Object.fromEntries(['archo','vmstate',driver==='W'?'RimArcho':driver==='A'?'guidev':null].filter(Boolean).map(n=>[n,createHash('sha256').update(readFileSync(exe(n))).digest('hex')]));
   result.preparationMs=performance.now()-preparing;
+  if(driver==='W'&&scenario===3)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
   if(driver==='C') return;
   const launching=performance.now();
   const freePort = () => new Promise((ok,fail) => { const server=createServer();server.on('error',fail);server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>ok(port))}); });
@@ -218,13 +283,13 @@ async function setup() {
 
 async function sortUndo() {
   const before=await snapshot('before-sort');
-  if(c){await press('Shift+KeyS');await settled();await dismiss();}else await act('Sort');
+  await timed('sort-to-settled',async()=>{if(c){await press('Shift+KeyS');await settled();await dismiss();}else await act('Sort');},result.content.instances>1000?5000:2000);
   const sorted=await snapshot('sorted');
   if(entries(before)!==entries(sorted)) {
     check('sort is one undo step',undoDepth(sorted)===Math.min(100,undoDepth(before)+1));
-    if(c){await press('KeyU');await settled();}else await act('Undo');
+    await timed('sort-undo-to-settled',async()=>{if(c){await press('KeyU');await settled();}else await act('Undo');},5000);
     const undone=await snapshot('sort-undone');check('undo restores entries',entries(undone)===entries(before));
-    if(c){await press('Control+KeyR');await settled();}else await act('Redo');
+    await timed('sort-redo-to-settled',async()=>{if(c){await press('Control+KeyR');await settled();}else await act('Redo');},5000);
     const redone=await snapshot('sort-redone');check('redo restores sorted entries',entries(redone)===entries(sorted));
   } else check('idempotent sort adds no history',undoDepth(sorted)===undoDepth(before));
   return sorted;
@@ -343,7 +408,7 @@ async function scenario3() {
       check(`import ${clicks}-click is one undo step`,undoDepth(a)===Math.min(100,undoDepth(b)+1));
       await press('KeyU');await settled();check(`import ${clicks}-click undo restores entries`,entries(await snapshot(`import-${clicks}-undone`))===entries(b));
     }
-    result.coverage.push({action:'subscription submit double/triple click',status:'blocked: requires online subscription fixture; Phase 1b'});
+    await repeatedSubscription();
   }
 }
 async function scenario4() {
@@ -369,21 +434,26 @@ async function scenario4() {
     // Plan deletion is destructive only after confirmation. Test cancel, Esc and backdrop.
     for(const close of ['cancel','esc','backdrop']) {
       const selector='#top [data-env-write="remove-plan"], #topbar [data-env-write="remove-plan"], [data-env-write="remove-plan"]';
-      await c.click(selector);await until(async()=>!!(await uiState()).popup);
-      if(close==='cancel')await c.click('#popup .btns button:not(.go)');
-      else if(close==='esc')await press('Escape');
-      else {const p=await c.evaluate('(()=>{const b=document.querySelector("#popup").getBoundingClientRect();return {x:b.x+4,y:b.y+4}})()');await c.mouse('left',p.x,p.y);}
+      await popupFeedback('plan-delete-confirm-ready',()=>c.click(selector),true);
+      await popupFeedback(`dialog-close-${close}`,async()=>{
+        if(close==='cancel')await c.click('#popup .btns button:not(.go)');
+        else if(close==='esc')await press('Escape');
+        else {const p=await c.evaluate('(()=>{const b=document.querySelector("#popup").getBoundingClientRect();return {x:b.x+4,y:b.y+4}})()');await c.mouse('left',p.x,p.y);}
+      },false);
       await settled();check(`delete ${close} closes only dialog`,!(await uiState()).popup);
       const after=await snapshot('cancel-'+close);check(`delete ${close} does not write`,JSON.stringify(domain(before))===JSON.stringify(domain(after)));
     }
     for(const close of ['cancel','esc','backdrop']){
       await c.click('.area[data-area="0"] .row');const b=await snapshot(`before-mod-delete-${close}`);
       await press('Delete');await until(async()=>!!(await uiState()).popup);
-      if(close==='cancel')await c.click('#popup .btns button:not(.go)');
-      else if(close==='esc')await press('Escape');
-      else {const p=await c.evaluate('(()=>{const b=document.querySelector("#popup").getBoundingClientRect();return {x:b.x+4,y:b.y+4}})()');await c.mouse('left',p.x,p.y);}
+      await popupFeedback(`dialog-close-${close}`,async()=>{
+        if(close==='cancel')await c.click('#popup .btns button:not(.go)');
+        else if(close==='esc')await press('Escape');
+        else {const p=await c.evaluate('(()=>{const b=document.querySelector("#popup").getBoundingClientRect();return {x:b.x+4,y:b.y+4}})()');await c.mouse('left',p.x,p.y);}
+      },false);
       await settled();check(`mod deletion ${close} preserves payload and files`,JSON.stringify(domain(await snapshot(`mod-delete-${close}`)))===JSON.stringify(domain(b)));
     }
+    await cancelUnsubscribe();
     await c.click('#nav-settings');await settled('settings');
     const directoryBefore=await snapshot('before-directory-cancel');
     for(const close of ['skip','esc']){
@@ -395,7 +465,9 @@ async function scenario4() {
       await settled('settings');check(`directory ${close} preserves payload and files`,JSON.stringify(domain(await snapshot(`directory-${close}`)))===JSON.stringify(domain(directoryBefore)));
     }
     await editor();
-    result.coverage.push({action:'export overwrite cancellation',status:'blocked/external: native Windows save dialog requires UIA; CDP has no access'});
+    const exportBefore=await snapshot('before-export-cancel');
+    await cancelExportOverwrite();
+    check('export cancellation preserves domain',JSON.stringify(domain(await snapshot('export-cancelled')))===JSON.stringify(domain(exportBefore)));
     const cancelBefore=await snapshot('before-import-cancel');
     await importPreview();await press('Escape');await settled();await editor();
     check('import preview Esc does not write',JSON.stringify(domain(await snapshot('import-cancelled')))===JSON.stringify(domain(cancelBefore)));

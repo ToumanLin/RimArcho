@@ -1,6 +1,6 @@
 # Running Phase 1a scenarios
 
-Run commands from the repository root. Node 22+, Go, PowerShell 7 and `sqlite3` must be on PATH. W requires a signed-in Windows desktop and WebView2. C and A use the same generated library without a desktop.
+Run commands from the repository root. Node 22+, Go, PowerShell 7 and `sqlite3` must be on PATH. Native export cancellation also uses Windows PowerShell 5.1 (`powershell.exe`). W requires a signed-in Windows desktop and WebView2. C and A use the same generated library without a desktop.
 
 ## Build outside the checkout
 
@@ -13,7 +13,7 @@ go build -o "$tools/guidev.exe" ./spikes/guidev
 go build -o "$tools/vmstate.exe" ./spikes/vmstate
 ```
 
-The runner records the checkout commit; rebuild the tools after app changes. Fixtures include two game versions, several dozen synthetic mods, installed/missing dependencies, an unresolved installed copy and a recommended replacement. They cannot launch RimWorld. `vmstate --mode fixture --root <new-directory>` also creates a persistent seed for inspection.
+The runner records the checkout commit; rebuild the tools after app changes. Fixtures include two game versions, several dozen synthetic mods (including a Workshop copy for unsubscribe cancellation), installed/missing dependencies, an unresolved installed copy and a recommended replacement. They cannot launch RimWorld. `vmstate --mode fixture --root <new-directory>` also creates a persistent seed for inspection.
 
 ## Run the fixture
 
@@ -26,7 +26,7 @@ foreach ($driver in 'C','A','W') {
 }
 ```
 
-Each invocation creates a new case and prints its external result directory, even on failure. Use `--out <external-directory>` to retain evidence, `--plan <name>` to select a list, and `--port <port>` to choose the W DevTools port (also accepts `RIMARCHO_DEVTOOLS_PORT`). An existing listener is rejected. The runner launches and terminates only its own application process tree. W scenarios send CDP keyboard, pointer, wheel and text input; evaluation reads geometry/state and installs observers.
+Each invocation creates a new case and prints its external result directory, even on failure. Use `--out <external-directory>` to retain evidence, `--plan <name>` to select a list, and `--port <port>` to choose the W DevTools port (also accepts `RIMARCHO_DEVTOOLS_PORT`). An existing listener is rejected. The runner launches and terminates only its own application process tree. W scenarios send CDP keyboard, pointer, wheel and text input; evaluation reads geometry/state and installs observers. Export cancellation crosses into a native dialog: the PowerShell helper scopes Win32 controls to the runner child PID, enters an external existing filename, chooses No at the overwrite prompt, then Cancel. It records the native control trace and verifies the sentinel bytes survived.
 
 Scenarios contain fast input deadlines, rather than waiting for each app operation. `window-trace.json` preserves trusted input arrival, selection/cursor, modifiers, repeat, focus, edit queue, page/plan context, DOM samples, feedback and backend events. Settled means no loading/error/environment switch, an empty editing queue, intact navigation, and repeated matching samples. API jobs await their matching `environment` event; an acknowledgement alone does not complete a step.
 
@@ -50,23 +50,24 @@ Scenarios 1/3/4 take a fresh DB backup and cache copy; their list edits and conf
 
 `result.json` separates checks, functional failures, performance failures, timings and unsupported/external coverage. `functionalStatus` can pass while the overall `status` fails a budget. Checkpoint JSON contains canonical domain data and surface observations. The `observation` field has raw runtime handles for validating the visible enabled order; it is excluded from cross-run comparisons.
 
-Canonical identity includes source/environment, relative path, package ID and content fingerprint. Snapshots retain all plans, entry order, enabled membership, workspace origin/conflicts, staging positions/anchors, complete ordered undo/redo payloads, saved versions, tags/notes/rules, instances, source state, problem counts, ModsConfig bytes/hash/XML and game links. SQLite observation is read only and does not call startup recovery. Cache/log/profile bytes are not equivalence criteria.
+Canonical identity includes source/environment, relative path, package ID and content fingerprint. Snapshots retain all plans, entry order, enabled membership, workspace origin/conflicts, staging positions/anchors, complete ordered undo/redo payloads, saved versions, tags/notes/rules, instances, source state, problem counts and canonical per-instance ownership, ModsConfig bytes/hash/XML and game links. SQLite observation is read only and does not call startup recovery. Cache/log/profile bytes are not equivalence criteria.
 
 ```powershell
 node scripts/vm/compare.mjs <C-result-directory> <A-result-directory>
 node scripts/vm/compare.mjs <A-result-directory> <W-result-directory>
 ```
 
-Compare the same fixture, plan and scenario. The comparator reports the earliest difference at shared checkpoints and its JSON path. Scenario 3 has exact common sort/undo/redo checkpoints. A matching domain result does not imply matching window input semantics. An invocation with no common checkpoints returns unsupported, not success.
+Compare the same fixture, plan and scenario. The comparator reports the earliest difference at shared checkpoints and its JSON path. It compares independently observed problem counts and per-instance severity, excluding surface-specific publication sequence/revision and transient updating state. Scenario 3 has exact common sort/undo/redo checkpoints. A matching domain result does not imply matching window input semantics. An invocation with no common checkpoints returns unsupported, not success.
 
 The budgets come from the [automation plan §6](../../docs/research/2026-10-27_VM自动化测试方案.md#6-通过判据与时间预算). Navigation mutation feedback uses the 200ms soft threshold; timer sampling gaps over 500ms fail separately. Burst settling has a 10s limit, individual page waits 15s and problem publication 120s. Cold local readiness is recorded against 2s/5s by content scale. First DOM mutation is a feedback proxy, not proof that the action finished. Observer/host overhead is included; these host measurements are not VM results. Repeat at least five independent runs for a timing baseline; retain all samples and do not report P95 from fewer than twenty.
 
 ## Coverage boundaries
 
-- W: rapid Space/held/Shift input, navigation during reads, twenty alternating plan clicks, both game versions, repeated sorting, double/triple row activation and import apply, delete-plan/Mod confirmation cancellation, directory-move preview cancellation, import/menu/position/tag Esc, enable/move/stage/sort undo and fresh problem counts.
+- W: rapid Space/held/Shift input, navigation during reads, twenty alternating plan clicks, both game versions, repeated sorting, double/triple row activation and import apply, delete-plan/Mod/unsubscribe confirmation cancellation, native export overwrite cancellation, directory-move preview cancellation, import/menu/position/tag Esc, enable/move/stage/sort undo and fresh problem counts.
 - A/C: matching sort history and dry-run semantics; A also tests queued workspace completion events and toggle. Both retain the independent stage/undo-payload oracle, which currently exposes a core defect.
 - D2 suggested multi-selection placement has no exact CLI equivalent; the ledger marks it unsupported. C/A do not claim input or popup coverage.
-- Subscription submission needs an online subscription fixture and remains blocked for Phase 1b. Export overwrite cancellation is a native Windows save dialog, outside CDP; it requires UIA/manual coverage. Neither is counted as passed.
+- Subscription submit double/triple clicks use an owned loopback peer that closes the TLS handshake. The driver asserts exactly one terminal failed task per submit sequence and unchanged lists/instances; successful clone/download deduplication still needs a Phase 1b online fixture. No external subscription or Steam account is used. The subscription output folder is isolated per run.
+- Native export cancellation uses standard English/Chinese Windows No labels. Unsupported OS/dialog variants fail explicitly; there is no browser mock or automatic overwrite confirmation.
 - `--discover true` saves visible controls and their semantic keys, bounds, enabled/hit state. This is discovery on the final page, not an action crawler or a coverage denominator.
 - Filesystem manifests for full destructive/download workflows and task/credit replay belong to the later scenarios. Current cancellation checks compare domain/links/config and never confirm deletion or a move.
 

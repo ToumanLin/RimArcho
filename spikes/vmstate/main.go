@@ -61,6 +61,7 @@ func fixture(root string) {
 		check(os.MkdirAll(filepath.Join(base, "Mods"), 0755))
 		write(filepath.Join(root, g+"-userdata", "Config", "ModsConfig.xml"), `<ModsConfigData><version>1.6.4633</version><activeMods><li>ludeon.rimworld</li><li>vm.dependent</li><li>vm.old</li><li>vm.absent</li><li>vm.installed</li></activeMods></ModsConfigData>`)
 	}
+	mod(filepath.Join(root, "workshop", "2710270001"), "vm.workshop", "000-workshop", "")
 	for i := 0; i < 28; i++ {
 		name := fmt.Sprintf("mod-%02d", i)
 		mod(filepath.Join(root, "library", name), "vm."+name, name, "")
@@ -82,6 +83,7 @@ func fixture(root string) {
 		run(a, "env", "add", g, "--game", filepath.Join(root, g), "--user-data", filepath.Join(root, g+"-userdata"))
 	}
 	run(a, "folder", "add", "extra", filepath.Join(root, "library"))
+	run(a, "folder", "add", "workshop", filepath.Join(root, "workshop"))
 	run(a, "env", "use", "game-a")
 	run(a, "scan")
 	// Read first: extra-folder copies stay unresolved until explicitly bound with UseInstalled.
@@ -311,12 +313,14 @@ func snapshot(home string, openPlan ...string) any {
 		out["problems"] = norm(value)
 		handles := map[string]string{}
 		eligible := map[string]bool{}
+		kinds := map[string]string{}
 		for _, m := range ps.State.Ix.Mods {
 			handles[m.ID] = m.PackageID
+			kinds[m.ID] = string(m.Kind)
 			winner := ps.State.Reg.Resolve(m.PackageID).Instance
 			eligible[m.ID] = !view.ModItem(ps.State, m).Dim && (winner == "" || winner == m.ID)
 		}
-		out["observation"] = map[string]any{"entries": ps.State.List, "environment": ps.State.Ix.Env.ID, "plan": ps.State.Plan.ID, "packages": handles, "eligible": eligible}
+		out["observation"] = map[string]any{"entries": ps.State.List, "environment": ps.State.Ix.Env.ID, "plan": ps.State.Plan.ID, "packages": handles, "eligible": eligible, "kinds": kinds}
 	}
 	return out
 }

@@ -10,7 +10,11 @@ const read=(root,file)=>JSON.parse(readFileSync(join(root,file),'utf8'));
 const [left,right]=args.map(p=>resolve(p));
 const l=read(left,'result.json'),r=read(right,'result.json');
 assert(l.scenario===r.scenario&&l.fixture===r.fixture&&l.plan===r.plan,'compare the same scenario, fixture and plan');
-const projection=d=>Object.fromEntries(['environments','plans','sources','instances','lineage_data','lineage_tag','instance_note','user_rule','modsConfigHashes','links'].map(k=>[k,d[k]]));
+const projection=d=>({
+  ...Object.fromEntries(['environments','plans','sources','instances','lineage_data','lineage_tag','instance_note','plan_collection','user_rule','modsConfigHashes','links'].map(k=>[k,d[k]])),
+  problems:{count:d.problems?.count,severity:d.problems?.severity,error:d.problems?.error,
+    mods:Object.fromEntries(Object.entries(d.problems?.mods||{}).map(([id,p])=>[id,{count:p.count,severity:p.severity}]))}
+});
 function difference(a,b,path='') {
   if(Object.is(a,b))return null;
   if(typeof a!==typeof b || a===null || b===null || typeof a!=='object')return {path,left:a,right:b};
