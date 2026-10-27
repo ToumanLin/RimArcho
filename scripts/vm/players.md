@@ -24,7 +24,10 @@ Allow enough time and disk space for copying a large library. Before launching t
 window, crawler/walker setup clears only the copied DB undo/redo history and records
 the removed step count. The content start is retained. This prevents random Undo
 from crossing into pre-run history and a later edit destroying the redo path back
-to the experiment start; the baseline DB is never changed.
+to the experiment start; the baseline DB is never changed. Unless `--allow external` is enabled, copied
+collection refresh timestamps are deferred through the run budget to prevent the
+plans page from automatically contacting Workshop on opening. Follow source/content
+remain retained and compared; the setup is listed in `deferredExternalEffects`.
 
 ## Safety and coverage
 

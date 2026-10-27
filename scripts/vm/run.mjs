@@ -267,6 +267,14 @@ async function setup() {
     // Establish the same boundary as the fixture, on this case's DB only.
     const removed=Number(command('sqlite3',[join(home,'archo.db'),'SELECT count(*) FROM workspace_undo; DELETE FROM workspace_undo;']).trim());
     result.setupUndoBoundary={removedSteps:removed,reason:'isolated case starts with empty undo/redo history; workspace/staging/content retained'};
+    if(options.allow!=='external'){
+      // Opening plan management otherwise refreshes stale followed collections
+      // through Go networking, outside CDP request interception. Defer only the
+      // copied refresh timestamps through this case budget; retain follow data.
+      const until=Math.ceil(Date.now()/1000+Number(options.minutes||60)*60+600);
+      command('sqlite3',[join(home,'archo.db'),`UPDATE plan_collection SET checked_at=${until};`]);
+      result.deferredExternalEffects=[{operation:'automatic followed-collection network refresh',until,scope:'copied DB checked_at only'}];
+    }
   }
   env={RIMARCHO_HOME:home, APPDATA:join(out,'appdata'), LOCALAPPDATA:join(out,'localappdata')};
   const initial=JSON.parse(command(exe('vmstate'),['--home',home]));
