@@ -356,7 +356,7 @@ export async function drive(ctx) {
       const args=replayArgs(join(out,'trace.json'));
       result.replay={command:replayCommand(args),seed,trace:join(out,'trace.json')};
       save('replay',result.replay);
-      if(options.mode==='walk'&&options.shrink!=='false'&&!options.replay)await shrink();
+      if(options.mode==='walk'&&options.shrink!=='false')await shrink();
     }
   }
 
