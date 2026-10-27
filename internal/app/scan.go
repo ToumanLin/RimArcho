@@ -68,11 +68,15 @@ func (a *App) Scan(full bool) (*ScanReport, error) { return a.ScanWith(ScanOptio
 
 // ScanWith is Scan with options: enumerate → observe → reconcile → persist.
 func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
-	full := o.Full
 	e, err := a.Env()
 	if err != nil {
 		return nil, err
 	}
+	return a.scanEnvironment(e, o)
+}
+
+func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, error) {
+	full := o.Full
 	started := a.Now()
 	if err := a.adoptGameWorkshops(); err != nil {
 		return nil, err

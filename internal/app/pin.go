@@ -40,7 +40,7 @@ func (st *LoadoutState) Locked() []*Locked {
 
 // lockedCopy returns the lock m is the copy of (nil if m is not one).
 func (st *LoadoutState) lockedCopy(m *store.Mod) *Locked {
-	if m.Origin == "" || m.Status != identity.Live || m.Unloadable != "" || m.Kind != source.Local && m.Kind != source.Extra {
+	if m.Origin == "" || m.Status != identity.Live || m.Unloadable != "" || !m.Kind.Managed() {
 		return nil
 	}
 	var og scan.Origin
@@ -167,7 +167,7 @@ func (a *App) PinUpdateFor(ref, name string, git, dryRun bool, reason string) (*
 	if res.Diff, err = a.DiffInstances(l.Copy, l.Upstream); err != nil {
 		return nil, err
 	}
-	if l.Copy.Kind == source.Local {
+	if l.Copy.Kind.GameMods() {
 		if res.Moved, err = a.moveToLibrary(st, l.Copy, dryRun); err != nil {
 			return nil, err
 		}

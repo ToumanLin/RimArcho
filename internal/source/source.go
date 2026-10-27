@@ -27,6 +27,18 @@ const (
 	Elsewhere Kind = "elsewhere"
 )
 
+// Managed reports whether RimArcho manages the player's mod folders in this kind.
+// Extra includes user-added folders, subscriptions, Monitor and lock libraries.
+// Official content and Steam-client Workshop subscriptions have separate rules.
+// This is ownership only; callers still check paths, links and operation-specific rules.
+func (k Kind) Managed() bool {
+	return k.GameMods() || k == SteamCMD || k == Extra
+}
+
+// GameMods includes every registered game's Mods/, regardless of the selected game.
+// Elsewhere is only an index projection of a stored Local source.
+func (k Kind) GameMods() bool { return k == Local || k == Elsewhere }
+
 // WorkshopLike reports whether sub-directory names of this kind are workshop IDs.
 func (k Kind) WorkshopLike() bool { return k == Workshop || k == SteamCMD }
 

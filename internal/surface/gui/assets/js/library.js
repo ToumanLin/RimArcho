@@ -10,8 +10,7 @@
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { on } from "./api.js";
 import { icon } from "./icons.js";
-import { renderDetail } from "./detail.js";
-import { fieldList } from "./fields.js";
+import { detailFrame } from "./detail.js";
 import * as pop from "./popups.js";
 import { beginPageRead, pageLoading, openScreen, page, act, rescanButton, area, full } from "./screens.js";
 import { updateFromForm } from "./subscribe.js";
@@ -116,6 +115,7 @@ async function load(fresh, focusRef, read = null) {
     const at = L.flat.findIndex((x) => x.t === "inst" && x.i.ref === focusRef);
     if (at >= 0) L.cur = at;
   }
+  land(1);
   if (fresh || !els || S.screen !== "library" || !document.body.contains(els.root)) build();
   else draw();
   if (focusRef) { ensureVisible(); drawRows(); }
@@ -198,7 +198,7 @@ function updatePage(ref) {
 
 // The left column's width: drag the split (kept in ui.gui.library.side), double click for
 // the default.
-const SIDE_KEY = "ui.gui.library.side";
+const SIDE_KEY = "ui.gui.library.side.v2"; // v2: the default became the editor's 38%
 let sideW = null;
 function wireSplit(sp, root) {
   applySide(root);
@@ -332,16 +332,47 @@ function nameCell(x) {
   } else {
     left.append(el("span", "tree", "└"), el("span", "t kind", x.i.label || x.i.name));
   }
-  if (x.t === "inst" && x.i.inPlan) left.append(el("span", "here", "●"));
   return left;
 }
 
+const isOpen = (r) => L.open.has(r.id) || r.insts.length < r.copies;
+
+// toggle opens or closes a Lineage. The cursor never rests on a Lineage's own row: closing
+// the one it is in moves it on to the next row (06 §2.9).
 function toggle(r) {
+  const x = L.flat[L.cur];
+  const inside = x && x.r === r;
   if (L.open.has(r.id)) L.open.delete(r.id); else L.open.add(r.id);
   flatten();
+  if (inside && !isOpen(r)) {
+    const h = L.flat.findIndex((y) => y.t === "lin" && y.r.id === r.id);
+    if (h >= 0) { L.cur = h + 1 < L.flat.length ? h + 1 : Math.max(0, h - 1); land(L.cur > h ? 1 : -1); }
+  }
+  resize();
+  ensureVisible();
+  follow();
+  hints();
+}
+
+function resize() {
   els.sizer.style.height = HEAD + L.flat.length * ROW + "px";
   els.rows.dataset.sig = "";
   drawRows();
+}
+
+// land: the cursor came onto a Lineage's row going dir (1 down, -1 up). A closed Lineage
+// opens and the cursor takes its first copy (going up: its last); going up onto the row of
+// an open one, the cursor passes it.
+function land(dir) {
+  for (let guard = 0; guard < 4; guard++) {
+    const x = L.flat[L.cur];
+    if (!x || x.t !== "lin") return;
+    const was = isOpen(x.r);
+    if (!was) { L.open.add(x.r.id); flatten(); if (els) resize(); }
+    if (dir >= 0 || !was) { L.cur = Math.min(L.flat.length - 1, L.cur + (dir >= 0 ? 1 : x.r.insts.length)); return; }
+    if (L.cur === 0) { L.cur = 1; return; }
+    L.cur -= 1;
+  }
 }
 
 function click(k, e) {
@@ -355,12 +386,10 @@ function click(k, e) {
   } else if (e.ctrlKey || e.metaKey) {
     toggleSel(x);
     L.anchor = k;
-  } else {
-    L.anchor = k;
-    // a click on a Lineage's row again opens or closes it; the details follow the cursor
-    if (x.t === "lin" && L.cur === k) toggle(x.r);
-  }
+  } else L.anchor = k;
   L.cur = k;
+  // a click on a Lineage's row opens it and takes its first copy
+  if (x.t === "lin") { const was = isOpen(x.r); land(1); if (!was) ensureVisible(); }
   els.rows.dataset.sig = "";
   drawRows();
   drawBar();
@@ -387,6 +416,7 @@ function move(d, extend) {
   if (!L.flat.length) return;
   const from = L.cur;
   L.cur = Math.max(0, Math.min(L.flat.length - 1, L.cur + d));
+  land(L.cur === 0 && d < 0 ? 1 : Math.sign(d) || 1);
   if (extend) {
     if (L.anchor < 0) L.anchor = from;
     L.sel.clear();
@@ -422,14 +452,9 @@ function cursorCopy() {
 }
 const shownCopy = () => cursorCopy();
 
-let followTimer = 0;
-// follow draws the cursor's copy in the details, at once when asked, else once the cursor
-// rests a moment (the arrows held down do not load every copy on the way).
-function follow(now) {
-  clearTimeout(followTimer);
-  if (now) return drawDetail();
-  followTimer = setTimeout(drawDetail, 90);
-}
+// follow draws the cursor's copy in the details at once (each step asks Go straight away;
+// an answer for a row the cursor has left is dropped).
+function follow() { return drawDetail(); }
 
 function setFull(v) {
   L.full = v;
@@ -440,9 +465,11 @@ function setFull(v) {
   hints();
 }
 
-let detailSeq = 0;
-// drawDetail: the copy's note at the top, then its buttons (the detail's ops, only those
-// that apply), then one field list, then the mod's picture, name and description (06 §2.9).
+let detailSeq = 0, frame = null;
+// drawDetail: the cursor's copy in the details, laid out as the editor's (detail.js
+// detailFrame): its note, picture and name, where it comes from, Mod 库存's field list, its
+// actions, the description and history (06 §2.9). A Workshop page not read yet is fetched
+// straight away.
 async function drawDetail() {
   if (!els) return;
   const i = cursorCopy() && findCopy(cursorCopy().ref);
@@ -451,98 +478,49 @@ async function drawDetail() {
   els.dhead.innerHTML = "";
   els.dhead.append(el("span", "n", "3"), el("span", "t", T("details")));
   if (i) els.dhead.append(el("span", "q word-facts", (row ? row.name : "") + "  " + i.label));
-  if (!i) { box.innerHTML = ""; box.dataset.ref = ""; return; }
+  if (!i) { box.innerHTML = ""; box.dataset.ref = ""; frame = null; return; }
   const openFull = el("button", "editor-full-link", T("view full details") + "  Enter ↵");
   openFull.onmousedown = (e) => e.stopPropagation();
   openFull.onclick = (e) => { e.stopPropagation(); full("library", i.id || i.ref); };
   els.dhead.append(openFull);
-  const same = box.dataset.ref === i.ref && box.dataset.stamp === stampOf(i);
-  if (same) return;
-  if (box.dataset.ref === i.ref && box.querySelector(".lib-note.editing")) return; // keep a note being written
+  const same = frame && box.dataset.ref === i.ref && box.contains(frame.box);
+  if (same && box.dataset.stamp === stampOf(i)) return;
   const n = ++detailSeq;
-  const keep = box.dataset.ref === i.ref ? box.scrollTop : 0;
-  box.innerHTML = "";
-  box.dataset.ref = i.ref;
+  const current = () => n === detailSeq && box.dataset.ref === i.ref;
   box.dataset.stamp = stampOf(i);
-  box.append(noteEl(i));
-  const acts = el("div", "lib-acts");
-  for (const c of ops.sorted((i.ops || []).filter((c) => ops.op(c).detail))) {
-    const o = ops.op(c);
-    const b = el("button", "btn" + (o.danger ? " danger" : ""), o.label);
-    if (o.group !== 3) b.dataset.envWrite = c;
-    if (o.key) b.append(el("kbd", "", o.key));
-    b.onclick = () => run(c, [i]);
-    acts.append(b);
+  if (!same) {
+    box.dataset.ref = i.ref;
+    const inner = el("div", "mod-detail");
+    box.replaceChildren(inner);
+    box.scrollTop = 0;
+    frame = detailFrame(inner, null, {
+      ownFields: true,
+      fieldActs: () => ({ folder: () => run("folder", [findCopy(i.ref) || i]), tags: () => run("tags", [findCopy(i.ref) || i]) }),
+      run: (c, r) => run(c, [findCopy(r.ref) || r]),
+      noteSaved: () => load(),
+      noteLeave: () => els.rows.focus(),
+    });
+    frame.head(row ? row.name : i.label, "", i.id);
   }
-  if (acts.childNodes.length) box.append(acts);
-  const fields = el("div", "lib-fields");
-  box.append(fields);
-  const d = el("div", "lib-desc");
-  box.append(d);
-  try {
-    const fs = await api.LibraryFields(i.ref);
-    if (n !== detailSeq) return;
-    fields.append(fieldList(fs, {
-      folder: () => run("folder", [i]),
-      tags: () => run("tags", [i]),
-    }));
-  } catch (e) { if (n === detailSeq) fields.append(el("p", "err", errText(e))); }
-  box.scrollTop = keep;
+  const f = frame;
+  f.inst(i);
+  api.LibraryFields(i.ref).then((fs) => { if (current()) f.fields(fs); }, (e) => { if (current()) f.error(errText(e)); });
   if (!i.id) return;
   try {
-    const det = await api.Detail(i.id, false, false, false);
-    if (n !== detailSeq) return;
-    renderDetail(det, d, box, true, { page: true });
-  } catch (e) { if (n === detailSeq) d.append(el("p", "err", errText(e))); }
+    const d = await api.Detail(i.id, false, false, false);
+    if (!current()) return;
+    f.detail(d);
+    if (d.state === "not cached") {
+      f.fetching();
+      const d2 = await api.Detail(i.id, false, true, false).catch(() => null);
+      if (d2 && current()) f.detail(d2);
+    }
+  } catch (e) {
+    // a copy of another game's has no detail here: its fields say what there is
+    if (current() && !/^no (mod|list)\b/.test(errText(e))) f.error(errText(e));
+  }
 }
 const stampOf = (i) => [i.note, i.auto, (i.ops || []).join(","), i.state, i.inPlan].join("|");
-
-// noteEl: the copy's own note (06 §2.9). The player's text, else what RimArcho wrote (grey),
-// else a place to write one; a click (or n) edits it, enter saves, shift+enter breaks the
-// line, esc leaves it as it was.
-function noteEl(i) {
-  const box = el("div", "lib-note" + (i.note ? "" : i.auto ? " auto" : " empty"));
-  const show = () => {
-    box.innerHTML = "";
-    box.classList.remove("editing");
-    box.append(el("div", "txt", i.note || i.auto || T("write a note")));
-    if (!i.note && i.auto) box.append(el("div", "by", T("by RimArcho, click to edit")));
-  };
-  show();
-  if (!i.id) return box;
-  box.title = T("click to edit") + T("; ") + "n";
-  box.onclick = () => {
-    if (box.classList.contains("editing")) return;
-    box.classList.add("editing");
-    box.innerHTML = "";
-    const start = i.note || i.auto || "";
-    const ta = el("textarea", "lib-note-in");
-    ta.value = start;
-    ta.placeholder = T("a note on this copy…");
-    ta.rows = Math.min(6, Math.max(2, start.split("\n").length + 1));
-    box.append(ta, el("div", "by", T("enter saves, esc cancels")));
-    ta.focus();
-    ta.setSelectionRange(ta.value.length, ta.value.length);
-    let done = false;
-    const save = async () => {
-      if (done) return;
-      done = true;
-      const text = ta.value.trim();
-      if (text === start.trim()) { show(); els.rows.focus(); return; }
-      try { say("ok", await api.LibrarySetNote(i.ref, text)); } catch (e) { say("fail", errText(e)); }
-      box.classList.remove("editing");
-      els.rows.focus();
-      await load();
-    };
-    ta.onkeydown = (e) => {
-      e.stopPropagation();
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
-      else if (e.key === "Escape") { e.preventDefault(); done = true; show(); els.rows.focus(); }
-    };
-    ta.onblur = save;
-  };
-  return box;
-}
 
 function findCopy(ref) {
   for (const r of L.page.rows || []) for (const i of r.insts) if (i.ref === ref) return i;
@@ -685,15 +663,14 @@ export function key(e) {
   if (k === "ArrowRight" || k === "l") {
     done();
     if (!x) return;
-    if (x.t === "lin" && !(L.open.has(x.r.id) || x.r.insts.length < x.r.copies)) return toggle(x.r);
-    if (x.t === "lin") return move(1);
+    if (x.t === "lin") { land(1); ensureVisible(); els.rows.dataset.sig = ""; drawRows(); return follow(); }
     L.focus = "detail"; els.scroll.focus(); markFocus(); return hints();
   }
   if (k === "ArrowLeft" || k === "h") {
     done();
     if (!x) return;
-    if (x.t === "inst" && !x.lone) { L.cur = L.flat.findIndex((y) => y.t === "lin" && y.r.id === x.r.id); ensureVisible(); els.rows.dataset.sig = ""; drawRows(); return follow(); }
-    if (x.t === "lin" && L.open.has(x.r.id)) return toggle(x.r);
+    // ← on a copy closes its Lineage (when it can close: the filters may show only some)
+    if (x.t === "inst" && !x.lone && L.open.has(x.r.id)) return toggle(x.r);
     return;
   }
   // enter: the full detail, the same page the editor opens (06 §4.2); in a narrow window
@@ -738,6 +715,7 @@ export function key(e) {
 export function stepCopy(d) {
   if (!L.page || !L.flat.length) return "";
   L.cur = Math.max(0, Math.min(L.flat.length - 1, L.cur + d));
+  land(d < 0 && L.cur > 0 ? -1 : 1);
   const i = cursorCopy();
   return i ? i.id || i.ref : "";
 }
@@ -756,7 +734,7 @@ export function hintList() {
   const list = [];
   const x = L.flat[L.cur];
   const codes = [...opsOf(selected()).keys()];
-  if (x && x.t === "lin") list.push({ key: "→ ←", label: T("open / close") });
+  if (x && x.t === "inst" && !x.lone) list.push({ key: "←", label: T("open / close") });
   list.push({ key: "enter", label: L.full ? T("back") : T("details") });
   if (codes.includes("folder") || codes.includes("workshop")) list.push({ key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") });
   if (codes.includes("steam")) list.push({ key: "ctrl+s", label: T("steam page") });

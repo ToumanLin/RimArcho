@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/analyze"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -29,6 +30,15 @@ func (ix *Index) ModDir(m *store.Mod) string {
 		return filepath.Join(s.Root, m.Rel)
 	}
 	return m.Rel
+}
+
+// ModIsLink checks the registered entry before resolving it to its target.
+// ModDir normally returns RealPath, which no longer identifies a junction itself.
+func (ix *Index) ModIsLink(m *store.Mod) bool {
+	if s := ix.Source(m.SourceID); s != nil && source.IsLink(filepath.Join(s.Root, m.Rel)) {
+		return true
+	}
+	return source.IsLink(ix.ModDir(m))
 }
 
 // analysisMods: the enabled list in order, plus every other live, loadable instance

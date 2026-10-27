@@ -942,7 +942,7 @@ export function rescanButton(label) {
 export function busyChanged() {
   if (S.screen === "env") return environment();
   if (S.screen === "changes") return changes();
-  const b = document.querySelector(".page .rescan");
+  const b = document.querySelector(".page .rescan, #planhead .rescan");
   if (b) b.replaceWith(rescanButton(b.dataset.label));
 }
 
@@ -1284,7 +1284,7 @@ export async function environment() {
     } else {
       row.append(button(T("use this one"), "", () => ui.useEnv(e.name)));
     }
-    row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet", "remove-env"));
+    row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet danger", "remove-env"));
     card.append(row);
   }
   w.append(card);

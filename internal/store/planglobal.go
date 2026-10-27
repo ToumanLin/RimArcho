@@ -148,12 +148,12 @@ func keepLists(tx *sql.Tx, envID string) error {
 	return nil
 }
 
-// ElsewhereMods lists the live mods in the other games' own Mods/ folders, leaving out the
-// links RimArcho made there (_Archo_*): the library and every list can use them in any game
-// (06 §2.9, 04 §1.7).
+// ElsewhereMods lists the other games' own Mods/ instances, leaving out links
+// RimArcho made there (_Archo_*). Tombstones keep a plan's deleted copy missing
+// instead of healing its packageId to another installed copy (06 §2.9, 04 §1.7).
 func (s *Store) ElsewhereMods(envID string) ([]*Mod, error) {
 	rows, err := s.DB.Query(`SELECT `+modColsLite+modFrom+` WHERE i.environment_id NOT IN ('', ?) AND s.kind = 'local'
-		AND i.status = 'live' AND substr(lower(i.rel_path), 1, 7) <> '_archo_' ORDER BY i.id`, envID)
+		AND substr(lower(i.rel_path), 1, 7) <> '_archo_' ORDER BY i.id`, envID)
 	if err != nil {
 		return nil, err
 	}

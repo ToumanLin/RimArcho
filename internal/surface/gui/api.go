@@ -27,18 +27,21 @@ import (
 // method locks its App. Slow texture/log reads use separate sessions; descriptions use
 // a snapshot of the index. Only snapshotting settings/results needs the shared mu.
 type API struct {
-	mu      sync.Mutex
-	a       *app.App
-	emit    func(name string, data any) // Wails events; nil in tests
-	open    func(url string) error      // the system browser
-	openDir func(dir string) error      // the file manager (nil: the system's)
-	lib     *app.Library                // Mod 库存, as of libAt
-	libAt   string
-	board   *view.Board
-	needs   *view.Needs
-	needsAt string // the database state the needs were built at
-	content view.ContentCache
-	busy    map[string]bool // scan, analyze, pack
+	mu         sync.Mutex
+	a          *app.App
+	emit       func(name string, data any) // Wails events; nil in tests
+	open       func(url string) error      // the system browser
+	openDir    func(dir string) error      // the file manager (nil: the system's)
+	lib        *app.Library                // Mod 库存, as of libAt
+	libAt      string
+	libGate    sync.Mutex // coalesces full inventory builds, never acquired by edits
+	copyRead   inventoryReader
+	detailRead logReader
+	board      *view.Board
+	needs      *view.Needs
+	needsAt    string // the database state the needs were built at
+	content    view.ContentCache
+	busy       map[string]bool // scan, analyze, pack
 	// building is the pack this window's build child is making ("" none).
 	building  string
 	buildRead buildPageReader
@@ -641,25 +644,48 @@ type Detail struct {
 // page (the page asks again after the cursor rested, 06 §4.3 item 3), refresh ignores the
 // cache.
 func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
-	s.mu.Lock()
-	st := s.boardState()
-	if st == nil {
+	// Cursor reads retain their own caches. Network fetches get a short-lived
+	// session so an earlier fetch cannot delay the next cursor's cached detail.
+	var r *app.App
+	var err error
+	if fetch || refresh {
+		s.mu.Lock()
+		r, err = s.readInventorySession()
 		s.mu.Unlock()
+		if err == nil {
+			defer r.Close()
+		}
+	} else {
+		w := &s.detailRead
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		s.mu.Lock()
+		if w.a == nil {
+			w.a, err = s.readInventorySession()
+		} else {
+			s.refreshInventorySession(w.a)
+		}
+		r = w.a
+		s.mu.Unlock()
+	}
+	if err != nil {
+		return nil, err
+	}
+	st, _ := r.Loadout()
+	if st == nil {
 		return nil, errors.New("no list")
 	}
 	mod := st.Ix.ByID[id]
 	if mod == nil {
-		s.mu.Unlock()
 		return nil, fmt.Errorf("no mod %s", id)
 	}
-	n := s.needsLocked()
+	n, _ := readNeeds(r, false)
 	pos := st.Position(id)
 	item := view.ModItem(st, mod)
-	s.mu.Unlock()
 
-	data := view.LoadDetail(s.a, st.Ix, mod, fetch, refresh) // off the lock: may use the network
+	data := view.LoadDetail(r, st.Ix, mod, fetch, refresh) // off the lock: may use the network
 	d := &Detail{ID: id, Name: mod.DisplayName(), Authors: strings.TrimSpace(mod.Authors), Kind: view.SourceKind(mod), Pos: pos,
-		Header: view.HeaderFacts(mod, pos, staged), Facts: view.Facts(mod, data), Deps: view.Deps(st, data), Fields: view.ModFields(s.a, st, mod, data),
+		Header: view.HeaderFacts(mod, pos, staged), Facts: view.Facts(mod, data), Deps: view.Deps(st, data), Fields: view.ModFields(r, st, mod, data),
 		Show: data.Desc.Show, Note: view.DescNote(data), State: data.Desc.WorkshopState,
 		About: data.About, Workshop: data.Workshop, History: view.HistoryLine(data.Events), CanSeparate: st.Ix.CanSeparate(mod)}
 	d.Status = view.RowStatus(&item, n.Status)
@@ -698,14 +724,10 @@ func (s *API) Sections(id string) ([]view.Section, error) {
 	return secs, nil
 }
 
+// Commands need the loadout, not thousands of rendered rows and problem summaries.
 func (s *API) boardState() *app.LoadoutState {
-	if s.board == nil || s.board.St == nil {
-		s.boardLocked()
-	}
-	if s.board == nil {
-		return nil
-	}
-	return s.board.St
+	st, _ := s.a.Loadout()
+	return st
 }
 
 // ---- verbs (06 §3.5) ----

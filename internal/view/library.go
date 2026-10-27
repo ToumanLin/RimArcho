@@ -1013,3 +1013,18 @@ func LibDoes(kind string) bool {
 	}
 	return libConfirm[kind]
 }
+
+// LibCopy is one copy's row (its note and ops, as Mod 库存 shows them), found by instance
+// id or ref: the plan editor's details draw it like Mod 库存's (06 §2.9, §4.1). nil when
+// the library does not have it.
+func LibCopy(lib *app.Library, ref string) *LibInstRow {
+	for _, l := range lib.Lineages {
+		for _, i := range l.Instances {
+			if i.Ref == ref || i.Mod != nil && i.Mod.ID == ref {
+				r := libInst(lib, l, i)
+				return &r
+			}
+		}
+	}
+	return nil
+}

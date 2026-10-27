@@ -150,15 +150,16 @@ type App struct {
 
 	dataIdx *dataIndex // community data indexes (04 §6.3), loaded on first use
 
-	ixCache  *Index
-	linkInst *linkInstances // InspectGameLinks, keyed like ixCache
-	ixKey    string
+	readIndexFrom string // source index generation of a detached read session
+	ixCache       *Index
+	linkInst      *linkInstances // InspectGameLinks, keyed like ixCache
+	ixKey         string
 	// pngSnaps: the snapshots with PNG textures (贴图优化), until the snapshots change
 	pngSnaps           map[int64]bool
 	pngSnapsKey        string
 	stCache            *LoadoutState
 	stKey              string
-	modsCopies         *modsCopiesCache
+	modsCopies         map[string]*modsCopiesCache
 	linkRepairPreviews map[string]*LinkRepairPlan
 	linkRepairSerial   uint64
 	prCache            *ProblemSet

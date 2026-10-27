@@ -50,7 +50,7 @@ func (s *API) shellLocked(n *view.Needs) *Shell {
 			n = s.needsLocked()
 		}
 		count = n.Count
-		out.Env = view.EnvChip(s.board.EnvName, s.board.GameVersion)
+		out.Env = view.EnvChip(st.Ix.Env.Name, st.Ix.Env.GameVersion)
 	} else {
 		out.Env = view.EnvChip("", "")
 	}

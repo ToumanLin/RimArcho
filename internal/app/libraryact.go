@@ -125,8 +125,8 @@ func (a *App) MoveToLockedFor(ref string, dryRun bool, reason string) (*MoveResu
 	switch {
 	case m.Status != identity.Live:
 		return nil, fmt.Errorf("%s is no longer on disk", st.Ix.Ref(m.ID))
-	case m.Kind != source.Local:
-		return nil, fmt.Errorf("%s is in src:%s; only copies in the game's Mods/ move to the lock library", st.Ix.Ref(m.ID), m.SourceLabel)
+	case !m.Kind.GameMods():
+		return nil, fmt.Errorf("%s is in src:%s; only copies in a registered game's Mods/ move to the lock library", st.Ix.Ref(m.ID), m.SourceLabel)
 	}
 	other := false
 	for _, o := range st.Ix.ByLineage[m.LineageID] {

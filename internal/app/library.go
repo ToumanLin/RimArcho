@@ -231,7 +231,32 @@ func (a *App) Library() (*Library, error) {
 	if err != nil {
 		return nil, err
 	}
+	return a.library(st, "")
+}
+
+// LibraryFor builds only the lineage containing an exact copy ID/ref (or a Workshop
+// ghost). It retains the full loadout so copy actions use the same rules as Library.
+func (a *App) LibraryFor(ref string) (*Library, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	lineage := "\x00" + ref
+	if strings.HasPrefix(ref, "ws:") {
+		lineage = ref
+	}
+	for _, m := range st.Ix.Mods {
+		if m.ID == ref || st.Ix.Ref(m.ID) == ref {
+			lineage = m.LineageID
+			break
+		}
+	}
+	return a.library(st, lineage)
+}
+
+func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 	ix := st.Ix
+	selected := func(m *store.Mod) bool { return only == "" || m.LineageID == only }
 	lib := &Library{Env: ix.Env, GameMM: st.GameMM(), St: st}
 	used, err := a.libUses(st)
 	if err != nil {
@@ -241,11 +266,20 @@ func (a *App) Library() (*Library, error) {
 	if err != nil {
 		return nil, err
 	}
-	changed, err := a.Store.LastChanged(ix.Env.ID)
+	var instances []string
+	if only != "" {
+		for _, m := range ix.ByLineage[only] {
+			instances = append(instances, m.ID)
+		}
+		if len(instances) == 0 { // an unseen ghost has no history or note
+			instances = []string{""}
+		}
+	}
+	changed, err := a.Store.LastChanged(ix.Env.ID, instances...)
 	if err != nil {
 		return nil, err
 	}
-	notes, err := a.Store.CopyNotes(ix.Env.ID)
+	notes, err := a.Store.CopyNotes(ix.Env.ID, instances...)
 	texs := a.TextureSummaries() // 贴图优化: the DDS RimArcho wrote into each copy
 	if err != nil {
 		return nil, err
@@ -263,7 +297,9 @@ func (a *App) Library() (*Library, error) {
 	}
 	snaps := map[string]int64{}
 	for _, m := range ix.Mods {
-		snaps[m.ID] = m.SnapID
+		if selected(m) {
+			snaps[m.ID] = m.SnapID
+		}
 	}
 	contents, err := a.Store.ContentKinds(snaps)
 	if err != nil {
@@ -320,9 +356,17 @@ func (a *App) Library() (*Library, error) {
 			staged[it.Instance] = true
 		}
 	}
-	png := a.pngSnapshots()
+	var png map[int64]bool
+	if only == "" {
+		png = a.pngSnapshots()
+	} else {
+		png, err = a.Store.SnapshotsWithPNGFor(snaps)
+		if err != nil {
+			return nil, err
+		}
+	}
 	for _, m := range ix.Mods {
-		if m.Status != identity.Live || m.Kind == source.Official || srcKind[m.SourceID] == "" {
+		if !selected(m) || m.Status != identity.Live || m.Kind == source.Official || srcKind[m.SourceID] == "" {
 			continue
 		}
 		i := &LibInstance{Mod: m, Ref: ix.Ref(m.ID), Source: srcKind[m.SourceID], WorkshopID: m.WorkshopID(), Path: ix.ModDir(m),
@@ -366,7 +410,7 @@ func (a *App) Library() (*Library, error) {
 				}
 			}
 		}
-		i.Spare = m.Kind == source.Local && live[m.LineageID] > 1 && !source.IsLink(i.Path)
+		i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || a.inModsDuplicate(st, m.ID)) && !ix.ModIsLink(m)
 		if i.Locked != nil {
 			since := i.Created
 			if i.Note != nil && i.Note.Made != nil {
@@ -408,7 +452,13 @@ func (a *App) Library() (*Library, error) {
 			}
 			i := &LibInstance{Source: LibWorkshop, Location: s.Root, WorkshopID: id, Ref: "ws:" + id, States: []string{LibMissing}}
 			if ghost == nil {
+				if only != "" && only != "ws:"+id {
+					continue
+				}
 				byLin["ws:"+id] = &LibLineage{ID: "ws:" + id, Ref: "ws:" + id, Name: "Workshop item " + id, Instances: []*LibInstance{i}, search: " " + id}
+				continue
+			}
+			if !selected(ghost) {
 				continue
 			}
 			i.Mod, i.Ref, i.UsedIn, i.InPlan, i.Note = ghost, ix.Ref(ghost.ID), used[ghost.ID], st.List.Index(ghost.ID) >= 0, notes[ghost.ID]

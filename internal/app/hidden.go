@@ -147,7 +147,7 @@ func (a *App) unhide(st *LoadoutState, m *store.Mod, dryRun bool) (*FileOp, erro
 	if err := os.Rename(op.Path, op.To); err != nil {
 		return nil, err
 	}
-	op.Scan, err = a.Scan(false)
+	op.Scan, err = a.scanAfterFileOp(st.Ix, m)
 	return op, err
 }
 
@@ -195,8 +195,7 @@ func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 	return op, err
 }
 
-// ErrNotTrashable: Trash only removes the player's own copies (Mods/, the lock library,
-// SteamCMD) and hidden or unsubscribed workshop folders.
+// ErrNotTrashable: Trash only removes managed copies and hidden or unsubscribed Workshop folders.
 var ErrNotTrashable = errors.New("not trashable")
 
 // Trash moves a copy of the player's own, or a hidden or unsubscribed workshop folder, to the recycle bin
@@ -210,18 +209,16 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if err != nil {
 		return nil, err
 	}
-	// A copy of the player's own (in Mods/, the lock library, or a SteamCMD download: no
-	// subscription brings it back) may go; a Workshop folder only when it is hidden or no
-	// longer subscribed: Steam would download a subscribed one again (06 §2.9, 01 §4).
-	own := m.Kind == source.Local || m.Kind == source.SteamCMD || m.Kind == source.Extra && st.Ix.isLockSource(a, m.SourceID)
+	// Steam would download a subscribed, loadable Workshop folder again.
+	own := m.Kind.Managed()
 	switch {
 	case m.Status != identity.Live:
 		return nil, fmt.Errorf("%s is no longer on disk", st.Ix.Ref(m.ID))
-	case !own && m.Kind != source.Workshop && m.Kind != source.SteamCMD:
-		return nil, fmt.Errorf("%w: %s is in src:%s; RimArcho only moves copies in Mods/, the lock library or SteamCMD, and hidden or unsubscribed workshop folders, to the recycle bin", ErrNotTrashable, st.Ix.Ref(m.ID), m.SourceLabel)
+	case !own && m.Kind != source.Workshop:
+		return nil, fmt.Errorf("%w: %s is in src:%s; RimArcho only moves copies in registered Mods/, SteamCMD or extra folders, and hidden or unsubscribed workshop folders, to the recycle bin", ErrNotTrashable, st.Ix.Ref(m.ID), m.SourceLabel)
 	case !own && m.Unloadable != scan.UnloadableAboutDisabled && !m.Residue:
 		return nil, fmt.Errorf("%w: %s is a subscribed, loadable mod; unsubscribe it in Steam instead", ErrNotTrashable, st.Ix.Ref(m.ID))
-	case own && source.IsLink(st.Ix.ModDir(m)):
+	case st.Ix.ModIsLink(m):
 		return nil, fmt.Errorf("%w: %s is a link, not a folder; RimArcho does not move it", ErrNotTrashable, st.Ix.ModDir(m))
 	}
 	// The plans that use it (the current one when it is enabled, any environment of this
@@ -259,7 +256,7 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 			return err
 		}
 		var err error
-		op.Scan, err = a.Scan(false)
+		op.Scan, err = a.scanAfterFileOp(st.Ix, m)
 		return err
 	})
 	if err == nil && op.Scan != nil {
@@ -268,10 +265,22 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	return op, err
 }
 
-// isLockSource: the source is the environment's lock library (04 §7).
-func (ix *Index) isLockSource(a *App, id string) bool {
-	s := ix.Source(id)
-	return a.IsLockSource(s)
+// scanAfterFileOp also reconciles another game's Mods/ after changing its files.
+// The selected environment and its current plan stay unchanged.
+func (a *App) scanAfterFileOp(ix *Index, m *store.Mod) (*ScanReport, error) {
+	if s := ix.Source(m.SourceID); s != nil && s.Kind == source.Elsewhere {
+		e, err := a.Store.EnvByID(s.EnvID)
+		if err != nil {
+			return nil, err
+		}
+		if e == nil {
+			return nil, fmt.Errorf("environment %s no longer exists", s.EnvID)
+		}
+		if _, err := a.scanEnvironment(e, ScanOptions{GameOnly: true}); err != nil {
+			return nil, err
+		}
+	}
+	return a.Scan(false)
 }
 
 // env0 reports whether p is the source root itself (never trashed).

@@ -108,6 +108,21 @@ func (s *API) Close() {
 		s.texCancel = nil
 	}
 	s.mu.Unlock()
+	s.libGate.Lock()
+	s.libGate.Unlock()
+	s.detailRead.mu.Lock()
+	if s.detailRead.a != nil {
+		s.detailRead.a.Close()
+		s.detailRead.a = nil
+	}
+	s.detailRead.mu.Unlock()
+	s.copyRead.mu.Lock()
+	if s.copyRead.a != nil {
+		s.copyRead.a.Close()
+		s.copyRead.a = nil
+	}
+	s.copyRead.lib = nil
+	s.copyRead.mu.Unlock()
 	s.logRead.mu.Lock()
 	defer s.logRead.mu.Unlock()
 	if s.logRead.a != nil {

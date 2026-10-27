@@ -8,6 +8,7 @@
 import { api, on, setText } from "./api.js";
 import "./window-theme.js";
 import "./refnums.js";
+import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
 import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
@@ -41,9 +42,12 @@ import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } 
 let reloadSeq = 0;
 async function reload(snapshot = null, read = null) {
   if (S.busy.env && !snapshot && !read) return;
+  // edits on their way to Go: the lists here are ahead of Go's; the last edit reads them
+  if (editsPending && !snapshot && !read) { reloadWanted = true; return; }
   if (!read && !S.screen) return openEditor((ticket) => reload(snapshot, ticket), false, () => { render(); detailFollow(true); });
-  const seq = ++reloadSeq, gameRequest = S.envSeq;
-  const current = () => seq === reloadSeq && gameRequest === S.envSeq && (!read || read.current());
+  const seq = ++reloadSeq, gameRequest = S.envSeq, epoch = editEpoch;
+  // an edit made while this read was on its way is newer than what it brings
+  const current = () => seq === reloadSeq && gameRequest === S.envSeq && (read ? read.current() : epoch === editEpoch);
   let b, sh, history;
   try {
     const result = snapshot || await api.Workspace();
@@ -166,9 +170,10 @@ function planActions() {
     motion.bump("unwritten", n, u);
     out.push(n);
   } else motion.bump("unwritten", null, 0);
+  out.push(scr.rescanButton(T("rescan")));
   if (plan) {
     out.push(btn(T("rename"), "", () => plans.renamePlan(plan.id), "", "rename-plan"),
-      btn(T("delete"), "", () => plans.deletePlan(plan.id), "", "remove-plan"));
+      btn(T("delete"), "", () => plans.deletePlan(plan.id), "danger", "remove-plan"));
   }
   const io = btn(T("import/export"), "", manageCurrent);
   io.title = T("the list's page in all lists: import, export, share");
@@ -207,7 +212,7 @@ const navTarget = (id) => id !== "plan" ? id : ((S.shell && S.shell.plans) || []
 function renderWhere() {
   shell.sync();
   $("#planhead").hidden = !!S.screen;
-  if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + T("undo") + "|" + JSON.stringify(S.shell && S.shell.plan) + "|" + JSON.stringify(S.shell && S.shell.current), ...planActions());
+  if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + !!S.busy.scan + "|" + T("undo") + "|" + JSON.stringify(S.shell && S.shell.plan) + "|" + JSON.stringify(S.shell && S.shell.current), ...planActions());
   // A page's place is its breadcrumb; the position line says more only on the plan (where
   // the cursor is in which list) and in the full detail.
   let s = "";
@@ -370,19 +375,139 @@ function click(k, i, e) {
 
 // ---- verbs (rule 2): each acts at once and is one undo step ----
 
-// edited waits for a verb, says what it did and redraws; the visible rows slide to their
-// new places and the ones it changed (ids; else what moved) flash (06 §7.1).
-async function edited(p, undoable = true, ids = null) {
+// edited runs a verb, says what it did and redraws; the visible rows slide to their new
+// places and the ones it changed (ids; else what moved) flash (06 §7.1). call is a function
+// that starts the verb: the verbs go to Go one after another, in the order given, and the
+// page reads the lists again once, after the last (a key held down does not wait on each
+// step). local, when given, changes the lists here at once, before Go answers.
+let editChain = Promise.resolve(), editsPending = 0, reloadWanted = false, editEpoch = 0;
+async function edited(call, undoable = true, ids = null, local = null) {
   const before = motion.snapshot();
-  let r;
-  try { r = await p; } catch (e) { say("fail", errText(e)); await reload(); return null; }
-  const text = typeof r === "string" ? r : r && r.text;
-  say("ok", text, undoable);
-  S.placed = r && r.placed && r.placed.length ? r.placed : null;
-  for (const c of S.cols) c.sel.clear();
+  editEpoch++;
+  editsPending++;
+  S.editing = editsPending;
+  if (local) {
+    for (const c of S.cols) c.sel.clear();
+    if (local() !== false) { render(); motion.play(before, ids); detailFollow(); }
+  }
+  const mine = editChain.then(async () => {
+    try { return { r: await (typeof call === "function" ? call() : call) }; } catch (e) { return { e }; }
+  });
+  editChain = mine;
+  const { r, e } = await mine;
+  editsPending--;
+  S.editing = editsPending;
+  if (e) say("fail", errText(e));
+  else {
+    const text = typeof r === "string" ? r : r && r.text;
+    say("ok", text, undoable);
+    S.placed = r && r.placed && r.placed.length ? r.placed : null;
+  }
+  if (editsPending) { reloadWanted = true; return e ? null : r; }
+  reloadWanted = false;
+  if (!local) for (const c of S.cols) c.sel.clear();
+  const again = motion.snapshot();
   await reload();
-  motion.play(before, S.placed || ids);
-  return r;
+  motion.play(local ? again : before, S.placed || ids);
+  return e ? null : r;
+}
+
+// ---- the lists changed here at once (edited's local) ----
+
+// take removes the rows with these keys from column k, in the column's order.
+function take(k, keys) {
+  const c = S.cols[k], want = new Set(keys), out = [], rest = [];
+  for (const it of c.items) (want.has(key(it)) ? out : rest).push(it);
+  if (!out.length) return out;
+  const curKey = cur(k) && key(cur(k));
+  const shown = new Set(c.view.map((i) => key(c.items[i])));
+  c.items = rest;
+  relist(k, shown, curKey && !want.has(curKey) ? curKey : null, c.cursor);
+  return out;
+}
+
+// put adds rows to column k: 已启用 at a 1-based place (0: the end), 未启用 in its order
+// (official first, then by name), 暂存 at the end. The cursor goes to the first.
+function put(k, its, at = 0) {
+  if (!its.length) return;
+  const c = S.cols[k];
+  const shown = new Set(c.view.map((i) => key(c.items[i])));
+  for (const it of its) shown.add(key(it));
+  if (k === 1) {
+    const i = at > 0 ? Math.min(at - 1, c.items.length) : c.items.length;
+    c.items = [...c.items.slice(0, i), ...its.map((it) => ({ ...it, unsaved: true })), ...c.items.slice(i)];
+  } else if (k === 0) {
+    const rank = (it) => [it.kind === "official" ? 0 : 1, (it.name || "").toLowerCase()];
+    const less = (a, b) => { const x = rank(a), y = rank(b); return x[0] - y[0] || (x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0); };
+    const out = [...c.items];
+    for (const it of its) {
+      const v = { ...it, pos: 0 };
+      const i = out.findIndex((o) => less(v, o) < 0);
+      i < 0 ? out.push(v) : out.splice(i, 0, v);
+    }
+    c.items = out;
+  } else c.items = [...c.items, ...its.map((it) => ({ ...it, pos: 0 }))];
+  relist(k, shown, key(its[0]));
+}
+
+// relist renumbers 已启用 and rebuilds a column's view: every row, or while it is filtered
+// the rows it showed and the ones that came in (Go filters again after the reload).
+function relist(k, shown, keepKey, keepAt = 0) {
+  const c = S.cols[k];
+  if (k === 1) c.items = c.items.map((it, i) => (it.pos === i + 1 ? it : { ...it, pos: i + 1 }));
+  const filtered = k < 2 ? barOn() : !!c.query.trim();
+  c.view = [];
+  c.items.forEach((it, i) => { if (!filtered || shown.has(key(it))) c.view.push(i); });
+  let at = keepKey ? c.view.findIndex((i) => key(c.items[i]) === keepKey) : -1;
+  if (at < 0) at = keepAt;
+  c.cursor = Math.max(0, Math.min(at, c.view.length - 1));
+}
+
+// moveLocal: the selection leaves column from for column to (at: 已启用's place). The focus
+// follows the rows only within 已启用.
+function moveLocal(from, to, keys, at = 0) {
+  if (!S.cols[from] || !keys.length) return false;
+  const its = take(from, keys);
+  if (!its.length) return false;
+  put(to, its, at);
+  return true;
+}
+
+// toggleLocal is space: 已启用 → 未启用 (an entry with no mod only leaves), else into
+// 已启用 at its end (Go then puts it where the rules say; the reload slides it there).
+function toggleLocal(k, its) {
+  const mods = its.filter((it) => it.id).map(key);
+  if (k !== 1) return moveLocal(k, 1, mods);
+  const gone = take(1, its.filter((it) => !it.id).map(key)).length > 0;
+  return moveLocal(1, 0, mods) || gone;
+}
+
+// blockAt: where MoveBy puts the block (view.MoveBy): its first row d places on, in the
+// list without it.
+function blockAt(keys, d) {
+  const c = S.cols[1], want = new Set(keys);
+  const first = c.items.findIndex((it) => want.has(key(it)));
+  if (first < 0) return 0;
+  const rest = c.items.length - want.size;
+  return Math.max(1, Math.min(first + 1 + d, rest + 1));
+}
+
+// stepAt is view.StepAt: J / K while the bar shows only some rows.
+function stepAt(visible, moving, d) {
+  if (!moving.length || !d) return 0;
+  const mv = new Set(moving), first = Math.min(...moving), last = Math.max(...moving);
+  const others = visible.filter((p) => !mv.has(p));
+  const before = (p) => moving.filter((q) => q < p).length;
+  if (d > 0) {
+    const after = others.filter((p) => p > last);
+    if (!after.length) return 0;
+    const p = after[Math.min(d, after.length) - 1];
+    return p - before(p) + 1;
+  }
+  const ahead = others.filter((p) => p < first);
+  if (!ahead.length) return 0;
+  const p = ahead[Math.max(ahead.length + d, 0)];
+  return p - before(p);
 }
 
 // Browsing another copy in the detail must also retarget its keys and menu.
@@ -404,10 +529,10 @@ async function verb(name) {
   switch (name) {
     case "toggle":
       if (!sel.length) return;
-      return edited(api.Toggle(k, ids, refsOf(sel)), true, ids);
+      return edited(() => api.Toggle(k, ids, refsOf(sel)), true, ids, () => toggleLocal(k, sel));
     case "stage":
       if (!ids.length) return;
-      return edited(api.Stage(k, ids), true, ids);
+      return edited(() => api.Stage(k, ids), true, ids, () => moveLocal(k, k === 2 ? 1 : 2, sel.filter((it) => it.id).map(key)));
     case "move": {
       const placed = S.placed;
       if (placed) return pop.position({ ids: placed, what: placed.length === 1 ? nameOf(placed[0]) : named(placed.map((id) => ({ name: nameOf(id) }))) }, 1);
@@ -418,8 +543,15 @@ async function verb(name) {
       if (k !== 1 || !ids.length) return say("", T("only enabled mods can be moved"));
       const d = { down: 1, up: -1, down10: 10, up10: -10 }[name];
       // the bar shows only some rows: past the next row shown (view.StepAt, 06 §3.5)
-      if (barOn()) { const c = col(1); return edited(api.MoveShown(ids, d, c.view.map((i) => c.items[i].pos)), true, ids); }
-      return edited(api.MoveBy(ids, d), true, ids);
+      const keys = sel.map(key);
+      if (barOn()) {
+        const c = col(1), shown = c.view.map((i) => c.items[i].pos);
+        const at = stepAt(shown, sel.map((it) => it.pos).filter(Boolean), d);
+        if (!at) return say("", T("already at the edge of the rows shown"));
+        return edited(() => api.MoveShown(ids, d, shown), true, ids, () => moveLocal(1, 1, keys, at));
+      }
+      const at = blockAt(keys, d);
+      return edited(() => api.MoveBy(ids, d), true, ids, () => moveLocal(1, 1, keys, at));
     }
     case "tags":
       return pop.tags(sel);
@@ -439,7 +571,7 @@ async function verb(name) {
       return api.OpenWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
     }
     case "swap":
-      if (sel.length === 1 && sel[0].id) return edited(api.Swap(sel[0].id), true, ids);
+      if (sel.length === 1 && sel[0].id) return edited(() => api.Swap(sel[0].id), true, ids);
       return;
     case "note": {
       // the mod's own note (06 §3.5): one line, from what is there; empty clears it
@@ -451,12 +583,12 @@ async function verb(name) {
         await reload();
       }, now);
     }
-    case "undo": return edited(api.Undo(), false);
-    case "redo": return edited(api.Redo(), false);
+    case "undo": return edited(() => api.Undo(), false);
+    case "redo": return edited(() => api.Redo(), false);
     case "restore-all":
       if (!S.cols[2].items.length) return say("", T("staging is empty"));
-      return edited(api.RestoreAll());
-    case "stage-all": return edited(api.StageAll());
+      return edited(() => api.RestoreAll());
+    case "stage-all": return edited(() => api.StageAll());
     case "needs": return scr.needs();
   }
 }
@@ -467,17 +599,19 @@ function nameOf(id) {
 }
 
 async function place(from, obj, at) {
-  await edited(api.Place(from, obj.ids, at), true, obj.ids);
+  const keys = S.cols[from] ? S.cols[from].items.filter((it) => obj.ids.includes(it.id)).map(key) : [];
+  await edited(() => api.Place(from, obj.ids, at), true, obj.ids, () => moveLocal(from, 1, keys, at));
 }
 
 // drop: dragging is another way to run a verb (06 §8.5).
 async function drop(from, to, items, at) {
   const ids = idsOf(items);
-  if (to === 1) return edited(api.Place(from, ids, at), true, ids);
+  const keys = items.map(key), withID = items.filter((it) => it.id).map(key);
+  if (to === 1) return edited(() => api.Place(from, ids, at), true, ids, () => moveLocal(from, 1, from === 1 ? keys : withID, at));
   if (from === to) return;
-  if (to === 2) return edited(api.Stage(from, ids), true, ids);
-  if (to === 0 && from === 1) return edited(api.Toggle(1, ids, refsOf(items)), true, ids);
-  if (to === 0 && from === 2) return edited(api.Unstage(ids), true, ids);
+  if (to === 2) return edited(() => api.Stage(from, ids), true, ids, () => moveLocal(from, 2, withID));
+  if (to === 0 && from === 1) return edited(() => api.Toggle(1, ids, refsOf(items)), true, ids, () => toggleLocal(1, items));
+  if (to === 0 && from === 2) return edited(() => api.Unstage(ids), true, ids, () => moveLocal(2, 0, withID));
 }
 
 // run: sort, save and launch act at once and say what they did (06 §6); sort
@@ -739,11 +873,10 @@ function menuAtCursor() {
 
 // rowOp runs an op of the menu on the object: the plan's own as their verbs, the version
 // and disk ops as Mod 库存 runs them (a dry run first when they change files).
-async function rowOp(code) {
+async function rowOp(code, only = null) {
   const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", workshop: "workshop-id", steam: "steam" };
-  if (verbs[code]) return verb(verbs[code]);
-  const { sel } = actionContext();
-  const ids = idsOf(sel);
+  if (verbs[code] && !only) return verb(verbs[code]);
+  const ids = only || idsOf(actionContext().sel);
   if (!ids.length) return;
   const o = ops.op(code);
   if (code === "subscription-update" && ids.length === 1) {
@@ -756,7 +889,7 @@ async function rowOp(code) {
       return;
     }
   }
-  const run = () => edited(api.RunOp(code, ids), code === "remove", ids);
+  const run = () => edited(() => api.RunOp(code, ids), code === "remove", ids);
   if (!o.confirm) return run();
   let p;
   try { p = await api.OpPreview(code, ids); } catch (e) { return say("fail", errText(e)); }
@@ -1007,7 +1140,7 @@ async function start() {
   document.addEventListener("editor-full",()=>fullPage.full("plan",S.detail?.id));
   document.addEventListener("editor-use-copy", async (e) => {
     if(environmentReason())return say("busy",environmentReason());
-    const result = await edited(api.RunOp("use",[e.detail]),true,[e.detail]);
+    const result = await edited(() => api.RunOp("use",[e.detail]),true,[e.detail]);
     if (!result) return;
     const c = S.cols[1], at = c.view.findIndex((i) => c.items[i].id === e.detail);
     if (at >= 0) { c.cursor = at; lastList = 1; ensureVisible(1); renderLists(); }
@@ -1015,9 +1148,14 @@ async function start() {
     if (item) await showDetail(item, false);
     renderWhere(); renderHints();
   });
+  // the details' buttons act on the copy shown, whatever the lists' selection
+  document.addEventListener("detail-op", (e) => {
+    if (environmentReason() && ops.op(e.detail.code).group !== 3) return say("busy", environmentReason());
+    rowOp(e.detail.code, [e.detail.id]);
+  });
   // The detail button always acts on the shown instance, independently of list selection.
   document.addEventListener("separate-mod", async (e) => {
-    await edited(api.RunOp("separate", [e.detail]), false, [e.detail]);
+    await edited(() => api.RunOp("separate", [e.detail]), false, [e.detail]);
     detailFollow(true);
   });
   // a detail's 在变化记录查看全部: 变化 with only that mod's Lineage (06 §2.9)

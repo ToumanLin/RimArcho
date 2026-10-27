@@ -212,6 +212,6 @@ workspace: 2 active, saved (plan:default, env:main)
   added  #iqmu  Lockable  at 2
 
 $ archo library move-to-locked #hnyg
-error: #hnyg is in src:workshop; only copies in the game's Mods/ move to the lock library
+error: #hnyg is in src:workshop; only copies in a registered game's Mods/ move to the lock library
 [exit 1]
 

@@ -192,7 +192,11 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	m := i.Mod
 	live := m != nil && !i.Missing()
 	workshop := i.Source == app.LibWorkshop || i.Source == app.LibSteamCMD
-	own := i.Source == app.LibLocal || i.Source == app.LibLocked || i.Source == app.LibSteamCMD // no subscription brings these back
+	own := m != nil && m.Kind.Managed()
+	linked := source.IsLink(i.Path)
+	if m != nil && lib != nil && lib.St != nil && lib.St.Ix != nil {
+		linked = lib.St.Ix.ModIsLink(m)
+	}
 	loadable := live && !has(app.LibUnloadable) && !has(app.LibHidden) && !has(app.LibResidue)
 	others := 0
 	if l != nil {
@@ -244,7 +248,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	if url {
 		ks = append(ks, OpWorkshop, OpSteam)
 	}
-	if loadable && workshop {
+	if loadable && (workshop || own) {
 		ks = append(ks, OpPin)
 	}
 	if i.Locked != nil && i.Locked.Updated {
@@ -253,7 +257,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	if i.Locked != nil {
 		ks = append(ks, OpUnpin)
 	}
-	if live && i.Spare && i.Source == app.LibLocal {
+	if live && i.Spare {
 		ks = append(ks, OpMove)
 	}
 	if live && has(app.LibHidden) {
@@ -266,7 +270,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	if i.Textures != nil && i.Textures.Files > 0 {
 		ks = append(ks, OpTexClean)
 	}
-	resub := m != nil && i.Source == app.LibWorkshop && url && i.Locked == nil && m.Origin == "" && !source.IsLink(i.Path)
+	resub := m != nil && i.Source == app.LibWorkshop && url && i.Locked == nil && m.Origin == "" && !linked
 	if resub && lib != nil && lib.St != nil {
 		resub = lib.St.Ix.CanResubscribe(m)
 	}
@@ -278,7 +282,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	}
 	// a copy the lists use may go too: the confirm warns, and the lists show it missing
 	if live && i.Subscription != nil {
-		if !source.IsLink(i.Path) {
+		if !linked {
 			ks = append(ks, OpSubRemove)
 		}
 		if i.Subscription.Kind != "steamcmd" {
@@ -290,7 +294,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		if i.Subscription.Kind == "page" {
 			ks = append(ks, OpSubPage)
 		}
-	} else if live && (own || workshop && has(app.LibResidue)) && !source.IsLink(i.Path) {
+	} else if live && (own || workshop && (has(app.LibResidue) || has(app.LibHidden))) && !linked {
 		ks = append(ks, OpDelete)
 	}
 	return sortOps(ks)

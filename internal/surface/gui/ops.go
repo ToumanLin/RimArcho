@@ -3,6 +3,7 @@ package gui
 import (
 	"errors"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -13,22 +14,26 @@ import (
 // groups while the bar is open.
 func (s *API) BarFilter(search string, filters []string, groups bool) (*view.BarFilter, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.board == nil || s.board.St == nil {
-		s.boardLocked()
+	r, err := s.readInventorySession()
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
 	}
-	if s.board == nil || s.board.St == nil {
+	defer r.Close()
+	reader := &API{a: r, busy: map[string]bool{}}
+	b := reader.boardLocked()
+	if b.Board == nil || b.St == nil {
 		return &view.BarFilter{}, nil
 	}
-	f := view.MatchFacts{Status: s.needsLocked().Status}
+	f := view.MatchFacts{Status: b.Status}
 	if view.BarNeedsContent(search, filters, groups) {
-		c, err := s.content.Get(s.a, s.board.St)
+		c, err := reader.content.Get(r, b.St)
 		if err != nil {
 			return nil, err
 		}
 		f.Content = c
 	}
-	return view.FilterBoard(s.board, search, filters, f, groups, s.board.St.GameMM()), nil
+	return view.FilterBoard(b.Board, search, filters, f, groups, b.St.GameMM()), nil
 }
 
 // MoveShown is J / K while the bar filters 已启用: past the next shown row (view.StepAt).
@@ -53,10 +58,12 @@ func (s *API) MoveShown(ids []string, d int, shown []int) (*view.Result, error) 
 
 // RowOps are the op codes of an editor row (its copy's, with the column's plan ops).
 func (s *API) RowOps(col int, id string) []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	lib, _ := s.library()
-	return view.RowOps(lib, id, view.Column(col))
+	out := view.RowOps(nil, id, view.Column(col))
+	_ = s.withCopyLibrary(id, func(_ *app.App, lib *app.Library) error {
+		out = view.RowOps(lib, id, view.Column(col))
+		return nil
+	})
+	return out
 }
 
 // RunOp runs an op of the version and disk groups (and 从所有方案里拿掉) on editor rows; the

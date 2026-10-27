@@ -104,7 +104,7 @@ func (a *App) MoveToLibrary(ref string, dryRun bool) (*MoveResult, error) {
 	if l == nil {
 		return nil, fmt.Errorf("%s is not a locked version RimArcho made (only folders with .rimarcho/origin.json are moved)", st.Ix.Ref(m.ID))
 	}
-	if l.Copy.Kind != source.Local {
+	if !l.Copy.Kind.GameMods() {
 		return nil, fmt.Errorf("%s is already in the lock library (%s)", st.Ix.Ref(l.Copy.ID), l.Copy.RealPath)
 	}
 	return a.moveToLibrary(st, l.Copy, dryRun)
@@ -113,11 +113,11 @@ func (a *App) MoveToLibrary(ref string, dryRun bool) (*MoveResult, error) {
 // moveToLibrary moves a folder of Mods/ into the lock library and points its instance at
 // the new place, so the instance (and every plan's entry) stays the same (06 §2.9, 04 §7.4).
 func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (result *MoveResult, moveErr error) {
-	if m.Kind != source.Local {
+	if !m.Kind.GameMods() {
 		return nil, fmt.Errorf("%s is not in Mods/; RimArcho moves nothing else into the lock library", st.Ix.Ref(m.ID))
 	}
 	from := st.Ix.ModDir(m)
-	if source.IsLink(from) {
+	if st.Ix.ModIsLink(m) {
 		return nil, fmt.Errorf("%s is a link, not a folder; RimArcho does not move it", from)
 	}
 	if real, err := source.RealPath(from); err == nil {

@@ -174,7 +174,13 @@ func (a *App) doMoves(moves []DuplicateMove) ([]*MoveResult, error) {
 // inModsDuplicate: the instance's folder in Mods/ shares its packageId with another entry
 // of Mods/ (pkg.duplicate-mods).
 func (a *App) inModsDuplicate(st *LoadoutState, id string) bool {
-	for _, d := range ModsDuplicates(a.ModsCopies(st.Ix)) {
+	root := modsDir(st.Ix)
+	if m := st.Ix.ByID[id]; m != nil && m.Kind.GameMods() {
+		if s := st.Ix.Source(m.SourceID); s != nil {
+			root = s.Root
+		}
+	}
+	for _, d := range ModsDuplicates(a.modsCopiesIn(st.Ix, root)) {
 		for _, c := range d.Copies {
 			if c.Mod != nil && c.Mod.ID == id && c.By == CopyPlayer && !c.Link {
 				return true

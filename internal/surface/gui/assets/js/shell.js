@@ -268,10 +268,11 @@ function kidList(it, kids, cur, hl) {
     const kb = el("button", "nav-kid" + (k.id === cur ? " on" : "") + (k.add ? " add" : ""));
     kb.dataset.id = k.id;
     kb.append(el("span", "lbl", k.label));
+    kb.title = k.label;
     const g = inGameMark(k.inGame);
     if (g) kb.append(g);
     // a plan's "有未载入的外部版本" (04 §4.3)
-    if (k.mark) { const m = el("span", "mark"); m.title = k.mark; kb.append(m); kb.title = k.mark; }
+    if (k.mark) { const m = el("span", "mark"); m.title = k.mark; kb.append(m); kb.title = k.label + T("; ") + k.mark; }
     kb.onclick = () => ui.go(k.id);
     if (it.id === "plan" && !k.add) {
       kb.oncontextmenu = (e) => { e.preventDefault(); ui.planMenu(+k.id.slice(5), e.clientX, e.clientY); };

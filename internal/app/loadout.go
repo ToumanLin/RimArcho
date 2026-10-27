@@ -83,7 +83,11 @@ func (a *App) localizer(envID string, reg *loadout.Registry, ix *Index) func(loa
 		if len(ids) == 0 {
 			return l
 		}
-		fs, err := a.Store.ForeignInstances(envID, ids)
+		db := a.Store
+		if ix != nil && ix.store != nil {
+			db = ix.store
+		}
+		fs, err := db.ForeignInstances(envID, ids)
 		if err != nil || len(fs) == 0 {
 			return l
 		}

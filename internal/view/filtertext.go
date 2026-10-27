@@ -10,6 +10,7 @@ func init() {
 		"no suggestions":            "没有匹配的候选",
 		"view this copy":            "查看此副本",
 		"use this copy in the list": "在列表中使用此副本",
+		"use this copy":             "使用此副本",
 		"view full details":         "查看完整详情",
 	})
 }

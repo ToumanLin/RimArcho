@@ -117,7 +117,7 @@ export async function pack(name) {
   play.disabled = P.blocked;
   if (P.blocked) play.title = P.why;
   const w = page("packs pack-page", P.facts.join("  "), button(T("export"), "e", () => exportPack(false)),
-    button(T("export the list"), "E", () => exportPack(true)), button(T("move to the recycle bin"), "Del", () => removePack(), "", "pack-remove"), play);
+    button(T("export the list"), "E", () => exportPack(true)), button(T("move to the recycle bin"), "Del", () => removePack(), "danger", "pack-remove"), play);
   sc.append(w);
   const items = P.check?.items || [];
   const tooltip = items.map((item) => item.text).join("\n");

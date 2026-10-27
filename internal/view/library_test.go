@@ -68,7 +68,7 @@ func TestLibraryPage(t *testing.T) {
 	if lock.State != "" || lock.Used != "default" {
 		t.Errorf("a lineage with a used copy is not \"in no plan\": %q %q", lock.State, lock.Used)
 	}
-	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"tags", "note", "separate", "folder", "move", "delete"}) {
+	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"tags", "note", "separate", "folder", "pin", "move", "delete"}) {
 		t.Errorf("the Mods/ copy: %v", got)
 	}
 	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "separate", "folder", "workshop", "steam", "pin", "resubscribe", "unsubscribe"}) {
@@ -78,7 +78,7 @@ func TestLibraryPage(t *testing.T) {
 	if !hid.Single || hid.State != "被其它管理器隐藏" || hid.Source != "工坊" || hid.Insts[0].Name != "工坊" {
 		t.Errorf("hidden: %+v", hid)
 	}
-	if got := kinds(hid.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "folder", "workshop", "steam", "unhide", "resubscribe", "unsubscribe"}) {
+	if got := kinds(hid.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "folder", "workshop", "steam", "unhide", "resubscribe", "unsubscribe", "delete"}) {
 		t.Errorf("hidden actions: %v", got)
 	}
 	ghost := libRow(t, p, "工坊条目 5300")

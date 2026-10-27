@@ -54,6 +54,22 @@ type Mod struct {
 	store *Store // for loading DeclBlob on demand (lite queries)
 }
 
+// BindMods transfers lazy declaration reads when an idle reader's index is adopted.
+func (s *Store) BindMods(mods []*Mod) {
+	for _, m := range mods {
+		m.store = s
+	}
+}
+
+// ReadCopy detaches a mod's lazy declarations and slices from another session.
+func (s *Store) ReadCopy(m *Mod) *Mod {
+	c := *m
+	c.Tags = append([]string(nil), m.Tags...)
+	c.SnapHash = append([]byte(nil), m.SnapHash...)
+	c.store = s
+	return &c
+}
+
 // WorkshopID is the folder name under workshop-like sources, else the declared ID.
 func (m *Mod) WorkshopID() string {
 	if m.Kind.WorkshopLike() {

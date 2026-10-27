@@ -53,7 +53,10 @@ type modsCopiesCache struct {
 // folder and link with an About.xml, with its packageId. The list is kept until Mods/ or the
 // index changes (a folder added or removed changes the folder's time).
 func (a *App) ModsCopies(ix *Index) []ModsCopy {
-	mods := modsDir(ix)
+	return a.modsCopiesIn(ix, modsDir(ix))
+}
+
+func (a *App) modsCopiesIn(ix *Index, mods string) []ModsCopy {
 	if mods == "" {
 		return nil
 	}
@@ -62,7 +65,7 @@ func (a *App) ModsCopies(ix *Index) []ModsCopy {
 		return nil
 	}
 	key := fmt.Sprintf("%s|%d|%p", env.PathKey(mods), fi.ModTime().UnixNano(), ix)
-	if c := a.modsCopies; c != nil && c.key == key {
+	if c := a.modsCopies[env.PathKey(mods)]; c != nil && c.key == key {
 		return c.copies
 	}
 	ents, err := os.ReadDir(mods)
@@ -75,7 +78,7 @@ func (a *App) ModsCopies(ix *Index) []ModsCopy {
 		if m.Status != identity.Live {
 			continue
 		}
-		if m.Kind == source.Local && !strings.ContainsAny(m.Rel, `/\`) {
+		if s := ix.Source(m.SourceID); s != nil && m.Kind.GameMods() && env.PathKey(s.Root) == env.PathKey(mods) && !strings.ContainsAny(m.Rel, `/\`) {
 			local[strings.ToLower(m.Rel)] = m
 		}
 		if m.RealPath != "" {
@@ -123,7 +126,10 @@ func (a *App) ModsCopies(ix *Index) []ModsCopy {
 		}
 		out = append(out, c)
 	}
-	a.modsCopies = &modsCopiesCache{key: key, copies: out}
+	if a.modsCopies == nil {
+		a.modsCopies = map[string]*modsCopiesCache{}
+	}
+	a.modsCopies[env.PathKey(mods)] = &modsCopiesCache{key: key, copies: out}
 	return out
 }
 

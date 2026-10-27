@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -55,7 +56,53 @@ func (a *App) AdoptReadState(r *App) {
 	a.ixCache, a.ixKey = r.ixCache, rekey(a.Store.IndexKey(), r.ixKey)
 	a.stCache, a.stKey = r.stCache, rekey(a.Store.ChangeKey(), r.stKey)
 	a.prCache, a.prKey = nil, ""
+	if a.ixCache != nil {
+		a.Store.BindMods(a.ixCache.Mods)
+		a.ixCache.store = a.Store
+	}
 	a.Store.MM = r.Store.MM
 	// the worker may have chosen a list (HomeApply): its state is for that list
 	a.OpenPlan, a.PlanName = r.OpenPlan, r.PlanName
+}
+
+// ReadIndex copies a warm index into an idle reader. Call with the source App locked.
+// Only the immutable shorteners are shared; lazy Mod declarations use the reader's DB.
+// List edits on the source connection do not invalidate this detached index.
+func (b *App) ReadIndex(a *App) {
+	if !a.IndexCached() {
+		b.readIndexFrom = ""
+		return
+	}
+	if b.readIndexFrom != a.ixKey || b.ixCache == nil {
+		x := *a.ixCache
+		x.store = b.Store
+		e := *x.Env
+		x.Env = &e
+		x.Mods = make([]*store.Mod, 0, len(x.Mods))
+		x.ByID = make(map[string]*store.Mod, len(a.ixCache.ByID))
+		x.ByLineage = make(map[string][]*store.Mod, len(a.ixCache.ByLineage))
+		for _, m := range a.ixCache.Mods {
+			c := b.Store.ReadCopy(m)
+			x.Mods = append(x.Mods, c)
+			x.ByID[c.ID] = c
+			x.ByLineage[c.LineageID] = append(x.ByLineage[c.LineageID], c)
+		}
+		x.own = make(map[string]*store.Mod, len(a.ixCache.own))
+		for pkg, m := range a.ixCache.own {
+			x.own[pkg] = x.ByID[m.ID]
+		}
+		x.Lineages = make(map[string]*store.Lineage, len(a.ixCache.Lineages))
+		for id, l := range a.ixCache.Lineages {
+			c := *l
+			x.Lineages[id] = &c
+		}
+		x.Sources = make([]*source.Source, 0, len(a.ixCache.Sources))
+		for _, src := range a.ixCache.Sources {
+			c := *src
+			x.Sources = append(x.Sources, &c)
+		}
+		b.ixCache, b.stCache = &x, nil
+		b.readIndexFrom = a.ixKey
+	}
+	b.ixKey = b.Store.IndexKey() + "|" + b.ixCache.Env.ID
 }

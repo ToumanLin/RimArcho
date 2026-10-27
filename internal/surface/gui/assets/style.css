@@ -258,7 +258,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .page .btn:hover, .pop .btns button:hover { border-color: var(--muted); background: var(--card-2); color: var(--fg); }
 .btn.primary, .page .btn.primary, .pop .btns button.go { color: var(--accent-fg); background: var(--accent); border-color: transparent; font-weight: 500; }
 .btn.primary:hover, .page .btn.primary:hover, .pop .btns button.go:hover { filter: brightness(1.08); background: var(--accent); color: var(--accent-fg); }
-.page .btn.danger:hover { color: var(--red); background: var(--red-soft); border-color: transparent; }
+.page .btn.danger:hover, .page-acts .btn.danger:hover, .btn.danger:hover { color: var(--red); background: var(--red-soft); border-color: transparent; }
 .btn.small { height: 22px; padding: 0 8px; font-size: 12px; }
 .btn kbd { margin-left: 6px; }
 .btn.primary kbd { color: inherit; opacity: .6; }
@@ -356,13 +356,13 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 
 /* detail (06 §4) */
 .detail .scroll { flex: 1; overflow-y: auto; outline: 0; }
-:is(#detail, .lib-desc) { padding: 10px 18px 40px 16px; user-select: text; }
-:is(#detail, .lib-desc) .thumb { display: block; max-width: min(100%, 480px); max-height: 260px; border-radius: var(--r-sm); margin: 4px 0 12px; border: var(--hairline) solid var(--line-2); }
-:is(#detail, .lib-desc) h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: -.01em; }
-:is(#detail, .lib-desc) .who { color: var(--muted); margin-top: 2px; }
-:is(#detail, .lib-desc) .facts { color: var(--faint); margin-top: 4px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; }
-:is(#detail, .lib-desc) .state { margin: 12px 0; display: flex; gap: 8px; align-items: flex-start; }
-:is(#detail, .lib-desc) .state button { color: var(--accent-11, var(--accent)); }
+:is(#detail, .lib-desc, .mod-detail) { padding: 10px 18px 40px 16px; user-select: text; }
+:is(#detail, .lib-desc, .mod-detail) .thumb { display: block; max-width: min(100%, 480px); max-height: 260px; border-radius: var(--r-sm); margin: 4px 0 12px; border: var(--hairline) solid var(--line-2); }
+:is(#detail, .lib-desc, .mod-detail) h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: -.01em; }
+:is(#detail, .lib-desc, .mod-detail) .who { color: var(--muted); margin-top: 2px; }
+:is(#detail, .lib-desc, .mod-detail) .facts { color: var(--faint); margin-top: 4px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+:is(#detail, .lib-desc, .mod-detail) .state { margin: 12px 0; display: flex; gap: 8px; align-items: flex-start; }
+:is(#detail, .lib-desc, .mod-detail) .state button { color: var(--accent-11, var(--accent)); }
 /* the detail's one field list (fields.js, 06 §4.1): a click on a value copies it */
 .fields { margin: 8px 0 14px; font-size: 13px; }
 .frow { position: relative; display: flex; gap: 12px; align-items: baseline; padding: 2px 0; }
@@ -377,21 +377,21 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .frow .fact { flex: none; color: var(--accent-11, var(--accent)); font-size: 12px; padding: 0 2px; }
 .frow .fact:hover { text-decoration: underline; }
 .copied { display: inline-block; max-width: 100%; white-space: normal; vertical-align: baseline; font-size: 12px; line-height: 17px; padding: 0 7px; border-radius: var(--r-sm); background: var(--accent); color: var(--accent-fg); pointer-events: none; }
-:is(#detail, .lib-desc) .link { color: var(--accent-11, var(--accent)); cursor: pointer; }
-:is(#detail, .lib-desc) .link:hover { text-decoration: underline; }
-:is(#detail, .lib-desc) .chip, .chip { display: inline-block; background: var(--pill); color: var(--fg-2); border-radius: 999px; padding: 0 8px; margin: 0 4px 2px 0; font-size: 12px; line-height: 19px; }
-:is(#detail, .lib-desc) .sub { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin: 18px 0 6px; }
-:is(#detail, .lib-desc) .desc p { margin: 0 0 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
-:is(#detail, .lib-desc) .desc p.gap { height: 8px; }
-:is(#detail, .lib-desc) .desc h3 { font-size: 13px; margin: 10px 0 4px; }
-:is(#detail, .lib-desc) .desc .item { display: flex; gap: 6px; }
-:is(#detail, .lib-desc) .desc .quote { color: var(--muted); padding-left: 14px; }
-:is(#detail, .lib-desc) .desc s { color: var(--faint); }
-:is(#detail, .lib-desc) .desc img { display: block; max-width: min(100%, 560px); border-radius: var(--r-sm); margin: 8px 0; }
-:is(#detail, .lib-desc) .desc table { border-collapse: collapse; margin: 6px 0; }
-:is(#detail, .lib-desc) .desc td { padding: 1px 10px 1px 0; vertical-align: top; }
-:is(#detail, .lib-desc) .history { color: var(--muted); }
-:is(#detail, .lib-desc) .more { color: var(--faint); }
+:is(#detail, .lib-desc, .mod-detail) .link { color: var(--accent-11, var(--accent)); cursor: pointer; }
+:is(#detail, .lib-desc, .mod-detail) .link:hover { text-decoration: underline; }
+:is(#detail, .lib-desc, .mod-detail) .chip, .chip { display: inline-block; background: var(--pill); color: var(--fg-2); border-radius: 999px; padding: 0 8px; margin: 0 4px 2px 0; font-size: 12px; line-height: 19px; }
+:is(#detail, .lib-desc, .mod-detail) .sub { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin: 18px 0 6px; }
+:is(#detail, .lib-desc, .mod-detail) .desc p { margin: 0 0 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+:is(#detail, .lib-desc, .mod-detail) .desc p.gap { height: 8px; }
+:is(#detail, .lib-desc, .mod-detail) .desc h3 { font-size: 13px; margin: 10px 0 4px; }
+:is(#detail, .lib-desc, .mod-detail) .desc .item { display: flex; gap: 6px; }
+:is(#detail, .lib-desc, .mod-detail) .desc .quote { color: var(--muted); padding-left: 14px; }
+:is(#detail, .lib-desc, .mod-detail) .desc s { color: var(--faint); }
+:is(#detail, .lib-desc, .mod-detail) .desc img { display: block; max-width: min(100%, 560px); border-radius: var(--r-sm); margin: 8px 0; }
+:is(#detail, .lib-desc, .mod-detail) .desc table { border-collapse: collapse; margin: 6px 0; }
+:is(#detail, .lib-desc, .mod-detail) .desc td { padding: 1px 10px 1px 0; vertical-align: top; }
+:is(#detail, .lib-desc, .mod-detail) .history { color: var(--muted); }
+:is(#detail, .lib-desc, .mod-detail) .more { color: var(--faint); }
 
 /* ---- pages (the sidebar's entries): a head, then cards; centred within 1200px like magpie's ---- */
 #screen { position: absolute; inset: 0; background: var(--bg); overflow-y: auto; z-index: 10; }
@@ -1083,7 +1083,7 @@ details.xc-sec > summary { cursor: pointer; }
 /* the left column (the filter bar, then the details) as wide as the editor's 未启用; the
    table takes the rest of the page, which is as wide as the window (no centred cap) */
 .page.library { padding-left: 12px; padding-right: 12px; }
-.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--lib-side, clamp(280px, 26%, 440px)) var(--card-gap) minmax(0, 1fr); position: relative; }
+.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--lib-side, calc((100% - 2 * var(--card-gap)) * .38)) var(--card-gap) minmax(0, 1fr); position: relative; }
 .lib-split { cursor: col-resize; }
 /* the grey completion over the input (the plan's .search .ghost, in this box) */
 
@@ -1159,6 +1159,11 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-note-in { display: block; width: 100%; resize: vertical; font: inherit; line-height: 1.5; padding: 6px 8px; border-radius: var(--r-sm); border: var(--hairline) solid var(--line-2); background: var(--card); color: var(--fg); outline: 0; }
 .lib-note-in:focus { border-color: var(--accent); }
 .lib-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+/* the details, the same on both pages (detail.js detailFrame) */
+.lib-detail .mod-detail { padding: 0; }
+.md-copies .editor-copies { margin-top: 0; }
+.md-acts .lib-acts { margin: 12px 0 4px; }
+.md-acts:empty, .md-note:empty, .md-copies:empty, .md-hist:empty, .md-more:empty { display: none; }
 .lib-fields .fields { margin-top: 4px; }
 .lib-bar { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 10px; border-radius: var(--r-lg); background: var(--card); border: var(--hairline) solid var(--line-2); box-shadow: 0 1px 2px rgba(0, 0, 0, .05); animation: view-in var(--t-enter) var(--ease); }
 .lib-bar > .accent { font-weight: 600; margin-right: 4px; font-size: 12px; }
@@ -1227,6 +1232,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 /* the row menu (06 §8.5): groups split by a hairline, keys on the right, 退订 / 删除 in red */
 #menu hr { border: 0; border-top: var(--hairline) solid var(--line-2); margin: 3px 4px; }
 #menu button.danger { color: var(--red); }
+#menu button.danger:hover, #menu button.danger:focus { background: var(--red-soft); }
 #menu button:focus { outline: 0; background: var(--pill); }
 
 /* 设置 › 卸载 RimArcho (06 §2.14): one row per step, the answer inline, the items folded */
@@ -1782,7 +1788,13 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .row.copy-item .t {color:var(--muted);}
 .row .current-copy {position:absolute;left:calc(var(--pw,3ch) + 40px);right:10px;bottom:3px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;}
 .editor-copies {display:grid;gap:4px;margin:14px 0;}
-.editor-copy {text-align:left;padding:7px 8px;border-radius:var(--r-sm);background:var(--pill);color:var(--fg-2);display:flex;justify-content:space-between;gap:8px;}
+.editor-copy {text-align:left;padding:5px 6px 5px 8px;min-height:30px;border-radius:var(--r-sm);background:var(--pill);color:var(--fg-2);display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;}
+.editor-copy:hover:not(.on) {background:color-mix(in srgb,var(--pill) 60%,var(--line-2));}
+.editor-copy .lbl {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.editor-copy small {flex:none;}
+.editor-use {flex:none;font-size:12px;color:var(--accent-11,var(--accent));padding:2px 8px;border-radius:var(--r-sm);}
+.editor-use:hover:not(:disabled) {background:var(--accent-soft);}
+.editor-use:disabled {color:var(--faint);cursor:default;}
 .editor-copy.on {background:var(--accent-soft);}
 .editor-copy small {color:var(--muted);}
 .editor-full-link {color:var(--accent-11,var(--accent));white-space:nowrap;margin-left:auto;font-size:12px;}

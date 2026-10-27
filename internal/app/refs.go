@@ -16,6 +16,7 @@ import (
 
 // Index is an environment's instances with reference helpers (05 §2).
 type Index struct {
+	store     *store.Store // lazy foreign-list lookups follow the owning session on adoption
 	Env       *env.Environment
 	Mods      []*store.Mod // sorted by display name, then ID
 	ByID      map[string]*store.Mod
@@ -104,7 +105,7 @@ func (a *App) loadIndex(e *env.Environment) (*Index, error) {
 	if mods, srcs, err = a.withElsewhere(e, mods, srcs); err != nil {
 		return nil, err
 	}
-	ix := &Index{Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs}
+	ix := &Index{store: a.Store, Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs}
 	var iids, lids []string
 	ix.own = map[string]*store.Mod{}
 	for _, m := range mods {

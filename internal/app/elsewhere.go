@@ -48,10 +48,12 @@ func (a *App) withElsewhere(e *env.Environment, mods []*store.Mod, srcs []*sourc
 	used := map[string]bool{}
 	for _, m := range other {
 		s := bySource[m.SourceID]
-		if s == nil || m.RealPath == "" || seen[env.PathKey(m.RealPath)] {
+		if s == nil || m.RealPath == "" || m.Status == identity.Live && seen[env.PathKey(m.RealPath)] {
 			continue
 		}
-		seen[env.PathKey(m.RealPath)] = true
+		if m.Status == identity.Live {
+			seen[env.PathKey(m.RealPath)] = true
+		}
 		m.Kind, m.SourceLabel = source.Elsewhere, s.Label
 		out = append(out[:len(out):len(out)], m)
 		used[s.ID] = true

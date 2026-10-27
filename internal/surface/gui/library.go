@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -15,23 +16,95 @@ import (
 // Mod 库存 › 全部 (06 §2.9). The library is built once per database state; each filter
 // click only filters it again.
 
+// inventoryKey includes invocation options as well as database changes (opening a
+// different list need not write to SQLite).
+func (s *API) inventoryKey() string {
+	return fmt.Sprintf("%s|%s|%d|%s|%s", s.a.Store.ChangeKey(), s.a.EnvName, s.a.OpenPlan, s.a.PlanName, s.a.GameVersion)
+}
+
 func (s *API) library() (*app.Library, error) {
-	key := s.a.Store.ChangeKey()
+	s.libGate.Lock()
+	defer s.libGate.Unlock()
+	s.mu.Lock()
+	key := s.inventoryKey()
 	if s.lib != nil && s.libAt == key {
-		return s.lib, nil
+		lib := s.lib
+		s.mu.Unlock()
+		return lib, nil
 	}
-	lib, err := s.a.Library()
+	r, err := s.readInventorySession()
+	s.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
-	s.lib, s.libAt = lib, s.a.Store.ChangeKey()
+	defer r.Close()
+	lib, err := r.Library()
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	if s.inventoryKey() == key {
+		s.lib, s.libAt = lib, key
+	}
+	s.mu.Unlock()
 	return lib, nil
+}
+
+// readInventorySession captures settings and a detached warm index; caller holds mu.
+func (s *API) readInventorySession() (*app.App, error) {
+	r, err := s.a.ReadSession()
+	if err != nil {
+		return nil, err
+	}
+	s.refreshInventorySession(r)
+	return r, nil
+}
+
+func (s *API) refreshInventorySession(r *app.App) {
+	r.ReadOptions(s.a)
+	if e, err := s.a.Env(); err == nil {
+		r.EnvName = e.Name
+	}
+	r.ReadIndex(s.a)
+}
+
+type inventoryReader struct {
+	mu       sync.Mutex
+	a        *app.App
+	lib      *app.Library
+	key, ref string
+}
+
+// withCopyLibrary serializes only detail readers. A full inventory build and editor
+// verbs proceed independently. Keep just the last lineage, bounding retained memory.
+func (s *API) withCopyLibrary(ref string, read func(*app.App, *app.Library) error) error {
+	w := &s.copyRead
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	s.mu.Lock()
+	key := s.inventoryKey()
+	var err error
+	if w.a == nil {
+		w.a, err = s.readInventorySession()
+	} else {
+		s.refreshInventorySession(w.a)
+	}
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	if w.lib == nil || w.key != key || (w.ref != ref && w.lib.Instance(ref) == nil) {
+		lib, err := w.a.LibraryFor(ref)
+		if err != nil {
+			return err
+		}
+		w.lib, w.key, w.ref = lib, key, ref
+	}
+	return read(w.a, w.lib)
 }
 
 // Library is the page for a search, filters ("key:value", "-key:value" excludes) and a sort.
 func (s *API) Library(search string, filters []string, sort string) (*view.LibPage, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	defer s.free.soon()
 	lib, err := s.library()
 	if err != nil {
@@ -167,47 +240,52 @@ type ModCopies struct {
 }
 
 func (s *API) ModCopies(id string) (*ModCopies, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	lib, err := s.library()
-	if err != nil {
-		return nil, err
-	}
-	p, err := view.BuildLibrary(lib, "", nil, "")
-	if err != nil {
-		return nil, err
-	}
-	for i := range p.Rows {
-		for _, c := range p.Rows[i].Insts {
-			if (id != "" && c.ID == id) || c.Ref == id {
-				return &ModCopies{Row: &p.Rows[i], Ops: p.Ops}, nil
+	var out *ModCopies
+	err := s.withCopyLibrary(id, func(_ *app.App, lib *app.Library) error {
+		p, err := view.BuildLibrary(lib, "", nil, "")
+		if err != nil {
+			return err
+		}
+		out = &ModCopies{Ops: p.Ops}
+		for i := range p.Rows {
+			for _, c := range p.Rows[i].Insts {
+				if (id != "" && c.ID == id) || c.Ref == id {
+					out.Row = &p.Rows[i]
+					return nil
+				}
 			}
 		}
-	}
-	return &ModCopies{Ops: p.Ops}, nil
+		return nil
+	})
+	return out, err
 }
 
-// LibraryFields is a copy's field list (06 §2.9): one list, the editor's fields with the
-// library's (state, used in, size, versions, update date, last played) among them.
+// LibraryCopy is one copy's row (note, ops) by instance id or ref; nil when absent.
+func (s *API) LibraryCopy(id string) (*view.LibInstRow, error) {
+	var out *view.LibInstRow
+	err := s.withCopyLibrary(id, func(_ *app.App, lib *app.Library) error {
+		out = view.LibCopy(lib, id)
+		return nil
+	})
+	return out, err
+}
+
+// LibraryFields is a copy's field list, read on the same detached session as its lineage.
 func (s *API) LibraryFields(ref string) ([]view.Field, error) {
-	s.mu.Lock()
-	lib, err := s.library()
-	if err != nil {
-		s.mu.Unlock()
-		return nil, err
-	}
-	i := lib.Instance(ref)
-	s.mu.Unlock()
-	if i == nil {
-		return nil, fmt.Errorf("no copy %s", ref)
-	}
-	var data *view.DetailData
-	if i.Mod != nil {
-		data = view.LoadDetail(s.a, lib.St.Ix, i.Mod, false, false) // the cache only: no network here
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.LibFields(s.a, lib, i, data), nil
+	var out []view.Field
+	err := s.withCopyLibrary(ref, func(r *app.App, lib *app.Library) error {
+		i := lib.Instance(ref)
+		if i == nil {
+			return fmt.Errorf("no copy %s", ref)
+		}
+		var data *view.DetailData
+		if i.Mod != nil {
+			data = view.LoadDetail(r, lib.St.Ix, i.Mod, false, false)
+		}
+		out = view.LibFields(r, lib, i, data)
+		return nil
+	})
+	return out, err
 }
 
 // LibrarySetNote sets a copy's own note ("" clears it).
