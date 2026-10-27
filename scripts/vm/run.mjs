@@ -104,6 +104,9 @@ async function editor() {
   await until(async()=>(await uiState()).plan===currentPlan);
   await settled(null,15000);
 }
+async function enabledSecond() {
+  await press('Digit2');await press('Home');await press('ArrowDown');
+}
 async function dismiss() { await press('Escape');await settled(); }
 async function uiState() { return c.evaluate('window.__vm.read()'); }
 async function clickText(selector,text) {
@@ -262,7 +265,7 @@ async function scenario1() {
   }
   // Exercise held Space and the enabled/staging columns with real repeat keydown events.
   await c.click('.area[data-area="0"] .row');await c.key('Space',{repeats:4});await settled();await snapshot('held-space');
-  await c.click('.area[data-area="1"] .row[data-i="1"]');
+  await enabledSecond();
   await c.key('Shift+KeyJ');await settled();await snapshot('shift-lowercase-j');
   await c.key('Shift+KeyK',{uppercase:true});await settled();await snapshot('shift-uppercase-k');
   result.timings.push({name:'enabled-space-burst',trace:await c.burst(Array(20).fill('Space'),50)});await settled();await snapshot('enabled-space-burst');
@@ -401,10 +404,10 @@ async function scenario4() {
     await c.click('.area[data-area="0"] .row');const initial=await snapshot('before-enable');
     await press('Space');await settled();await snapshot('after-enable');await press('KeyU');await settled();
     check('enable undo restores list',entries(await snapshot('enable-undone'))===entries(initial));
-    await c.click('.area[data-area="1"] .row[data-i="1"]');const moveBefore=await snapshot('before-move');
+    await enabledSecond();const moveBefore=await snapshot('before-move');
     await press('Shift+KeyJ');await settled();const moved=await snapshot('after-move');
     if(entries(moved)!==entries(moveBefore)){await press('KeyU');await settled();check('move undo restores list',entries(await snapshot('move-undone'))===entries(moveBefore));}
-    await c.click('.area[data-area="1"] .row[data-i="1"]');const stageBefore=await snapshot('before-stage');
+    await enabledSecond();const stageBefore=await snapshot('before-stage');
     await press('KeyT');await settled();const staged=await snapshot('after-stage');
     if(entries(staged)!==entries(stageBefore)){await press('KeyU');await settled();const undone=await snapshot('stage-undone');check('stage undo restores entries and staging payload',JSON.stringify(payload(undone))===JSON.stringify(payload(stageBefore)),{finding:'Stage metadata is outside workspace undo (plan §6.1 / P0-2)',before:stageBefore.plans.find(p=>p.name===currentPlan).staging,after:undone.plans.find(p=>p.name===currentPlan).staging});}
   }
