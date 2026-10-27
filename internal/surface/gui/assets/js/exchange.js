@@ -275,6 +275,17 @@ export function showImportContents(body, p) {
 // workshopIDs: the Workshop items of rows that have a Workshop page.
 export const workshopIDs = rows => [...new Set(rows.map(r => /[?&]id=(\d+)/.exec(r.url || "")?.[1]).filter(Boolean))];
 
+// getAll asks how to get the Workshop items ids (Steam or SteamCMD), then gets them all as one
+// background task (06 §2.16); btn stays disabled once it started. The import page's "subscribe
+// all" and a followed collection's mods that are not installed share it.
+export function getAll(ids, btn) {
+  pop.choose(Tf("get %d mods", ids.length), [T("subscribe with Steam"), T("download with SteamCMD")], async (i) => {
+    if (btn) btn.disabled = true;
+    try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1 })); }
+    catch (e) { if (btn) btn.disabled = false; say("fail", errText(e)); }
+  });
+}
+
 // subscribeAll gets every missing mod that has a Workshop page in one go (a background task,
 // 06 §2.16); once downloaded they take their place in the list by themselves.
 function subscribeAll(sec, rows) {
@@ -285,13 +296,7 @@ function subscribeAll(sec, rows) {
     ? T("subscribed mods take their place in the list once downloaded") + (rest ? "  " + Tf("%d have no Workshop page: look for them yourself", rest) : "")
     : T("none of them has a known Workshop page: look for them yourself")));
   if (ids.length) {
-    const go = button(Tf("subscribe all %d", ids.length), "", () => {
-      pop.choose(Tf("get %d mods", ids.length), [T("subscribe with Steam"), T("download with SteamCMD")], async (i) => {
-        go.disabled = true;
-        try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1 })); }
-        catch (e) { go.disabled = false; say("fail", errText(e)); }
-      });
-    }, "primary small", "subscribe");
+    const go = button(Tf("subscribe all %d", ids.length), "", () => getAll(ids, go), "primary small", "subscribe");
     go.type = "button";
     bar.append(go);
   }

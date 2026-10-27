@@ -26,7 +26,7 @@ async function setup(overrides = {}) {
     "./plans.js": {},
     "./separator.js": { wireSeparator() {} },
     "./motion.js": { places: () => null, slideFrom() {} },
-    "./exchange.js": { showImportSummary() {}, showImportContents() {} },
+    "./exchange.js": { showImportSummary() {}, showImportContents() {}, getAll() {}, workshopIDs: () => [] },
   };
   const pm = await loadModules("./planmanage.js", deps, { document: { activeElement: null }, setTimeout: f => timers.push(f), requestAnimationFrame: f => f() });
   const routes = [];

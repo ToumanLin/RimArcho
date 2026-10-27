@@ -11,7 +11,7 @@ import * as pop from "./popups.js";
 import * as plans from "./plans.js";
 import { wireSeparator } from "./separator.js";
 import * as motion from "./motion.js";
-import { showImportSummary, showImportContents } from "./exchange.js";
+import { showImportSummary, showImportContents, getAll, workshopIDs } from "./exchange.js";
 
 let ui = null;
 export function initPlanManage(u) { ui = u; }
@@ -794,10 +794,18 @@ function collection(p, f) {
   const meta = el("div", "meta word-facts", f.meta);
   if (f.notInstalled) {
     meta.append(el("span", "", Tf("%d not installed", f.notInstalled)));
-    const sub = el("a", "xc-link", T("subscribe in the Workshop"));
-    sub.title = f.link;
-    sub.onclick = (e) => { e.preventDefault(); api.OpenURL(f.link).catch((x) => say("fail", errText(x))); };
-    meta.append(sub);
+    // the ones not installed, got as the import page gets them: Steam or SteamCMD, all at once
+    const ids = workshopIDs((f.missing || []).map((url) => ({ url })));
+    if (ids.length) {
+      const sub = button(Tf("subscribe all %d", ids.length), "", () => getAll(ids, sub), "small", "subscribe");
+      sub.type = "button";
+      meta.append(sub);
+    } else {
+      const sub = el("a", "xc-link", T("subscribe in the Workshop"));
+      sub.title = f.link;
+      sub.onclick = (e) => { e.preventDefault(); api.OpenURL(f.link).catch((x) => say("fail", errText(x))); };
+      meta.append(sub);
+    }
   }
   c.append(meta);
 
