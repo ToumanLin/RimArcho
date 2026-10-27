@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runChild } from './subprocess.mjs';
 import { createHash } from 'node:crypto';
 import { discover } from './observe.mjs';
 import { sleep } from './cdp.mjs';
@@ -124,11 +124,12 @@ export async function drive(ctx) {
         action.actions ||= JSON.parse(readFileSync(action.traceFile,'utf8')).actions;
         const branchFile=join(out,'replay-branch-'+entry.index+'.json');
         writeFileSync(branchFile,JSON.stringify({actions:action.actions}));
-        const child=spawnSync(process.execPath,[...replayArgs(branchFile),'--branch','true'],{encoding:'utf8',windowsHide:true,timeout:Math.floor(Math.min(600000,Math.max(1000,deadline-performance.now()))),maxBuffer:8*1024*1024});
+        const child=await runChild([...replayArgs(branchFile),'--branch','true'],Math.floor(Math.min(600000,Math.max(1000,deadline-performance.now()))));
         entry.exitCode=child.status;entry.branchOutput=child.stdout.slice(-4000);entry.error=child.error?.message;
         try{
           const summary=JSON.parse(child.stdout),report=JSON.parse(readFileSync(join(summary.output,'result.json'),'utf8'));
           entry.functionalStatus=report.functionalStatus;entry.branchResult=join(summary.output,'result.json');
+          entry.nonUndoableChanges=report.nonUndoableChanges||null;entry.failures=report.failures;entry.storage=report.storage;
           result.performanceFailures.push(...report.performanceFailures.map(f=>({...f,branchControl:action.control})));
         }catch{}
         if(entry.functionalStatus!=='passed')fail('isolated branch',{control:action.control,error:entry.error,output:entry.branchOutput});
@@ -372,7 +373,7 @@ export async function drive(ctx) {
     const parentAfter=await snapshot('branch-'+row.key+'-parent-return');
     row.returnVerified=!difference(canonical(parentBefore),canonical(parentAfter));
     if(!row.returnVerified)fail('branch parent canonical equality',{control:row.key});
-    row.outcome=entry.functionalStatus==='passed'&&row.returnVerified?'pressed-ok':'failed';row.asserted=row.outcome==='pressed-ok';row.branchReplay=file;row.reason=entry.error||entry.branchOutput;saveLedger();
+    row.outcome=entry.functionalStatus==='passed'&&row.returnVerified?'pressed-ok':'failed';row.asserted=row.outcome==='pressed-ok';row.branchReplay=file;row.nonUndoable=entry.nonUndoableChanges;row.oracles=entry.failures||[];row.reason=entry.error||entry.branchOutput;saveLedger();
   }
   async function walk() {
     await root();await enqueue([]);
@@ -433,7 +434,7 @@ export async function drive(ctx) {
     const max=Number(options['shrink-runs']||6);
     async function retry(actions){
       const file=join(out,'shrink-candidate.json');writeFileSync(file,JSON.stringify({actions}));
-      const r=spawnSync(process.execPath,replayArgs(file),{encoding:'utf8',windowsHide:true,timeout:180000,maxBuffer:4*1024*1024});
+      const r=await runChild(replayArgs(file),180000);
       let reproduced=false,output=null;
       try{const j=JSON.parse(r.stdout);output=j.output;const report=JSON.parse(readFileSync(join(output,'result.json'),'utf8'));reproduced=report.failures.some(f=>signature(f)===signature(target));}catch{}
       attempts.push({length:actions.length,reproduced,output,error:r.error?.message});return reproduced;
