@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { connect, sleep } from './cdp.mjs';
 import { observe, discover } from './observe.mjs';
+import { fingerprints } from './checkpoints.mjs';
 import { treeBytes, cleanupRun, hostOutput } from './storage.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -65,7 +66,7 @@ async function snapshot(label) {
   }
   const artifact = `${String(++checkpointSeq).padStart(2,'0')}-${label}`;
   const digest=createHash('sha256').update(JSON.stringify(data)).digest('hex');
-  result.checkpoints.push({label,sha256:digest,counts:{instances:data.instances.length,plans:data.plans.length},surface:ui?{page:ui.page,plan:ui.plan,popup:ui.popup}:null});
+  result.checkpoints.push({label,sha256:digest,domainHashes:fingerprints(data),counts:{instances:data.instances.length,plans:data.plans.length},surface:ui?{page:ui.page,plan:ui.plan,popup:ui.popup}:null});
   if(ui) {
     if(ui.page===null && data.observation && (!mode || ui.plan===currentPlan)){
       const expected=data.observation.entries.map(e=>e.i||'pkg:'+e.m);
