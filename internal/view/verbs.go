@@ -20,6 +20,7 @@ type Result struct {
 	Enabled             []string                `json:"enabled,omitempty"`
 	WorkshopIDs         []string                `json:"workshopIds,omitempty"`
 	Undo                bool                    `json:"undo,omitempty"`
+	Problems            *ListProblems           `json:"problems,omitempty"`
 	Text                string                  `json:"text"`
 	Placed              []string                `json:"placed,omitempty"`
 }

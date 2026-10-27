@@ -164,10 +164,12 @@ func (s *API) Close() {
 	}
 	s.mu.Lock()
 	s.creditClosed = true
+	s.needsClosed = true
 	if s.creditCancel != nil {
 		s.creditCancel()
 	}
 	s.mu.Unlock()
+	s.needsJobs.Wait()
 	creditDone := make(chan struct{})
 	go func() { s.creditWG.Wait(); close(creditDone) }()
 	select {

@@ -4,6 +4,9 @@ package view
 // item's bold line and its explanation (06 §2.4, §5).
 func init() {
 	Register(map[string]string{
+		"required by: %s":                                   "%s 需要",
+		"move %s after %s":                                  "将 %s 移到 %s 之后",
+		"subscribe to %s":                                   "订阅 %s",
 		"game mod links need attention":                     "游戏的 Mod 链接需要处理",
 		"remove the broken or wrong links":                  "移除断链和错误链接",
 		"repair the previewed links":                        "修复预览中的链接",

@@ -57,8 +57,13 @@ export function openScreen(name) {
   sc.hidden = false;
   sc.removeAttribute("aria-busy");
   sc.replaceChildren();
-  const cached = S.busy.env && pageCache.get(name);
-  if (cached) { sc.append(...cached.nodes); sc.scrollTop = cached.top; }
+  // While the game switches, or when coming back to a page kept warm (06 §2.4: 能不能跑,
+  // the editor's other half) for the same game and list, the last drawing shows at once
+  // and the page reads again behind it.
+  const sameContext = WARM.has(name) && pageContexts.get(name) === JSON.stringify([S.board?.env, S.shell?.plan?.id]);
+  const cached = (S.busy.env || sameContext) && pageCache.get(name);
+  if (cached) { sc.append(...cached.nodes); sc.scrollTop = cached.top; sc.dataset.warm = sameContext ? "1" : ""; }
+  else delete sc.dataset.warm;
   ui.renderWhere();
   ui.renderHints();
   return sc;
@@ -79,6 +84,8 @@ export function closeScreen() {
 }
 
 const pageReads = new Map();
+// pages kept warm: shown at once from their last drawing when the game and list are the same
+const WARM = new Set(["needs"]);
 const pageContexts = new Map();
 let activeRead = null;
 export const pendingPageRead = () => activeRead?.done;
@@ -108,7 +115,16 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
   // Old object controls cannot remain usable across a game/list switch (06 §8.2).
   const objectPage = editor || name === "library";
   const hasContent = sc.children.length || (editor && same && sc.hidden && S.board);
-  if ((!same || (changed && (!S.busy.env || objectPage)) || replace || !hasContent || sc.querySelector(".page-read-error")) && !((keep && same || S.busy.env && !objectPage) && hasContent && !pageLoading())) {
+  // Coming back to the editor of the same list: its columns are still in #board, so show
+  // them at once and read again behind them (no placeholder, no wait).
+  const warmEditor = editor && !same && !changed && !replace && S.board && !S.board.error && board && board.querySelector(".row");
+  const warmPage = !editor && !same && !changed && !replace && sc.dataset.warm === "1" && sc.children.length;
+  if (warmEditor) {
+    sc.replaceChildren();
+    sc.hidden = true;
+  } else if (warmPage) {
+    // the kept drawing stays; the read below replaces it
+  } else if ((!same || (changed && (!S.busy.env || objectPage)) || replace || !hasContent || sc.querySelector(".page-read-error")) && !((keep && same || S.busy.env && !objectPage) && hasContent && !pageLoading())) {
     sc.hidden = false;
     sc.innerHTML = "";
     const w = page(name || "plan", "");
@@ -119,7 +135,7 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
   sc.setAttribute("aria-busy", "true");
   if (board) board.inert = !sc.hidden;
   if (editor && $("#planhead")) $("#planhead").inert = !sc.hidden;
-  if (editor && sc.hidden) say("busy", T(label));
+  if (editor && sc.hidden && !warmEditor) say("busy", T(label));
   return {
     current,
     // A workspace reply can itself change the current game/list (06 §8.2).
@@ -314,7 +330,8 @@ export async function needs(keepCursor) {
   try { data = await api.Needs(); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   N.data = data;
-  if (!keepCursor) N.cur = 0;
+  // back on a kept page: the cursor stays where it was
+  if (!keepCursor && $("#screen").dataset.warm !== "1") N.cur = 0;
   orderNeeds();
   drawNeeds();
   read.finish();

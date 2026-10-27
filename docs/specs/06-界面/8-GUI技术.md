@@ -92,3 +92,36 @@
 - **图标组 ID 3**：Wails 窗口按 ID 3 取应用图标；资源管理器取第一个图标组，两者是同一个。尺寸 16、20、24、32、40、48、64、256，每个尺寸一张 PNG。
 - **版本信息**：`FileVersion`、`ProductVersion` 取发布版本号，`ProductName` RimArcho，`FileDescription` 区分 `archo.exe`（RimArcho command line）和 `RimArcho.exe`（RimArcho）。两个 exe 由同一个包构建，发布脚本在两次构建之间各写一次 `.syso`。
 - **没有资源时**（开发构建、`spikes/guidev`），窗口用 `application.Options.Icon` 的 PNG（256 px）作后备。
+
+
+### 8.7 列表问题与 needs 缓存 API
+
+编辑器和能不能跑读取同一个后端快照。入口是 `API.Needs`、`API.ListProblems` 和 `Board.problems`；结构定义在 [`view.Needs`](../../../internal/view/needs.go) 和 [`view.ListProblems`](../../../internal/view/listproblems.go)，缓存实现是 [`gui/needscache.go`](../../../internal/surface/gui/needscache.go)。
+
+**调用时机**：
+
+- Workspace 的 `environment` 事件里，`board.problems` 已包含列表问题，首屏直接使用。
+- 打开能不能跑调用 `Needs()`；只需要编辑器问题时调用 `ListProblems()`。两者命中同一个缓存。
+- `Toggle`、`Stage`、`Unstage`、`MoveBy`、`Place`、`StageAll` 等返回 `view.Result` 的编辑，在 `result.problems` 中带回更新摘要。返回字符串的 `Undo`、`Redo`、`DoAction` 等通过 `list-problems` 事件带回同一结构。
+- 后台日志／内容分析补齐也发 `list-problems`；`analyze` 的进度与完成事件继续保留。无需为了刷新标记再请求一次问题列表。
+
+`ListProblems` JSON 的主要字段：
+
+| 字段 | 用途 |
+| --- | --- |
+| `environment`, `plan` | 环境 ID 和打开列表 ID，用于过滤导航前的迟到事件；启动页仍按当前列表读取 |
+| `listVersion` | 这份结果对应的列表内容指纹 |
+| `revision` | 缓存输入指纹；相同输入复用，不应按字典序比较 |
+| `sequence` | 当前 API 会话内递增的发布序号；同环境、同列表只接收不小于已显示序号的结果 |
+| `updating`, `error?` | 后台仍在补齐时保留上一份内容结果并标 `updating=true`；失败时保留问题，返回错误说明 |
+| `count`, `severity` | 与 needs 共用的计数、最高级别（`error` / `warning` / `info`）；隐藏维护项及淡色信息项沿用 needs 的计数规则 |
+| `mods` | 以 Instance ID 索引；值含 `count`、`severity`、`summary`、`problemIds`。未出现的 Mod 没有可展示的问题 |
+| `items` | 列表级完整 `Need` 数组；每个问题只传一份，按 `problemIds` 取对应项 |
+
+`Need` 在原字段之外含 `id`、可选的 `target` 和 `requiredBy`。依赖的 `target` 是去空白、大小写归一、去 `_steam` 且按注册表解析目录别名后的 packageId；`requiredBy` 是 `{id, name}` 数组。声明依赖、语料中的缺依赖、目标未启用的补丁可以按目标合并；需要它的 Mod 都获得问题归属。已有未安装列表条目覆盖依赖时，归属附在该条目的汇总项上。强顺序问题继续合成一个自动排序项；单条强约束另有 `move` 动作。
+
+**执行动作**：把 `item.actions` 中的完整 Action 对象传给 `DoAction(action, option)`。`id` 是动作标识，执行参数仍由 `kind`、`refs`、`after`、`options` 等原字段承载，不是只传 ID。`choose-disable` 的 `option` 为从零开始的选项索引，其他数据动作传 `0`。`enable` 自动按约束放置依赖；`move` 使用一个 `refs` 和 `after`；`sort` 直接排序；`subscribe` 进入既有订阅任务队列。DLC 的商店链接通过 `open-url` 打开。`view`、`list`、`fold`、`save` 等界面动作仍由界面分派，确认规则仍按 `confirm` / `warn` 执行。
+
+**缓存边界**：每个 API 会话最多保留八个环境／列表／游戏版本／语言槽位。输入还包含列表内容、数据库变化键、扫描快照与分析器版本（`AnalysisKey`）、日志路径及大小／mtime，以及每次现查的目录和游戏链接状态。Workspace 复用完整 Board／Shell／History；需要重新组合时用独立连接，避免持有主锁。
+
+列表编辑走 `App.IncrementalProblems`，同步重算声明层，保留可复用的上一份内容层问题；已启用目标对应的旧 `patch.no-match` 提示立即移除。后续日志读取与完整分析在独立会话／原分析子进程中进行，发布前重新核对输入，过期工作不能覆盖新编辑。内容分析继续使用按启用集合保存的分析槽和按 Mod 内容键保存的 Def／程序集事实；补丁模拟依赖顺序及整个文档，仍在后台重算。
