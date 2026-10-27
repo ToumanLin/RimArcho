@@ -1200,6 +1200,8 @@ async function start() {
   tasksPage.refreshFoot();
   on("guide", (ev) => guide.guideEvent(ev));
   on("download", (ev) => guide.downloadEvent(ev));
+  // launching waits (up to ten seconds) for a background Steam credit switch to finish
+  on("launch-wait", (ev) => say("busy", ev.text));
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again
   // when the window gets the focus (G8).
   addEventListener("focus", async () => {
