@@ -68,7 +68,7 @@ func TestLibraryPage(t *testing.T) {
 	if lock.State != "" || lock.Used != "default" {
 		t.Errorf("a lineage with a used copy is not \"in no plan\": %q %q", lock.State, lock.Used)
 	}
-	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"tags", "note", "separate", "folder", "pin", "move", "delete"}) {
+	if got := kinds(lock.Insts[1].Ops); !slices.Equal(got, []string{"tags", "note", "separate", "folder", "pin", "pin-update", "move", "delete"}) {
 		t.Errorf("the Mods/ copy: %v", got)
 	}
 	if got := kinds(lock.Insts[0].Ops); !slices.Equal(got, []string{"tags", "note", "separate", "folder", "workshop", "steam", "pin", "resubscribe", "unsubscribe"}) {

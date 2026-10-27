@@ -332,6 +332,15 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		return l
 	}
 	live := map[string]int{} // live instances per lineage
+	// the packageId duplicates of each game's Mods/, read once per folder (inModsDuplicate)
+	dups := map[string]map[string]bool{}
+	dupIn := func(id string) bool {
+		root := modsRootOf(ix, id)
+		if dups[root] == nil {
+			dups[root] = a.modsDuplicateIDs(ix, root)
+		}
+		return dups[root][id]
+	}
 	onDisk := map[string]bool{}
 	for _, m := range ix.Mods {
 		if m.Status == identity.Live && m.Kind != source.Official {
@@ -410,7 +419,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 				}
 			}
 		}
-		i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || a.inModsDuplicate(st, m.ID)) && !ix.ModIsLink(m)
+		i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || dupIn(m.ID)) && !ix.ModIsLink(m)
 		if i.Locked != nil {
 			since := i.Created
 			if i.Note != nil && i.Note.Made != nil {

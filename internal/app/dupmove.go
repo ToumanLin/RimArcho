@@ -174,18 +174,30 @@ func (a *App) doMoves(moves []DuplicateMove) ([]*MoveResult, error) {
 // inModsDuplicate: the instance's folder in Mods/ shares its packageId with another entry
 // of Mods/ (pkg.duplicate-mods).
 func (a *App) inModsDuplicate(st *LoadoutState, id string) bool {
-	root := modsDir(st.Ix)
-	if m := st.Ix.ByID[id]; m != nil && m.Kind.GameMods() {
-		if s := st.Ix.Source(m.SourceID); s != nil {
-			root = s.Root
+	return a.modsDuplicateIDs(st.Ix, modsRootOf(st.Ix, id))[id]
+}
+
+// modsRootOf is the Mods/ folder an instance sits in (the current game's when it is not in
+// a game's Mods/).
+func modsRootOf(ix *Index, id string) string {
+	if m := ix.ByID[id]; m != nil && m.Kind.GameMods() {
+		if s := ix.Source(m.SourceID); s != nil {
+			return s.Root
 		}
 	}
-	for _, d := range ModsDuplicates(a.modsCopiesIn(st.Ix, root)) {
+	return modsDir(ix)
+}
+
+// modsDuplicateIDs: the player's own folders (not links) in the Mods/ folder root that share
+// their packageId with another entry there; one pass over the folder.
+func (a *App) modsDuplicateIDs(ix *Index, root string) map[string]bool {
+	out := map[string]bool{}
+	for _, d := range ModsDuplicates(a.modsCopiesIn(ix, root)) {
 		for _, c := range d.Copies {
-			if c.Mod != nil && c.Mod.ID == id && c.By == CopyPlayer && !c.Link {
-				return true
+			if c.Mod != nil && c.By == CopyPlayer && !c.Link {
+				out[c.Mod.ID] = true
 			}
 		}
 	}
-	return false
+	return out
 }

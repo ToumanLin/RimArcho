@@ -46,3 +46,45 @@ func TestContentKindsScopedSnapshots(t *testing.T) {
 		t.Fatalf("empty scope: %v, %v", empty, err)
 	}
 }
+
+// A snapshot's flags are kept, but an ID that gc freed and a later scan reused is read again.
+func TestContentKindsCacheFollowsReusedIDs(t *testing.T) {
+	t.Parallel()
+	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	put := func(scan int, file string) {
+		t.Helper()
+		for _, q := range []struct {
+			sql  string
+			args []any
+		}{
+			{`DELETE FROM snapshot_file WHERE snapshot_id=7`, nil},
+			{`DELETE FROM snapshot WHERE id=7`, nil},
+			{`INSERT INTO snapshot(id, instance_id, scan_id, snapshot_hash) VALUES(7, 'i', ?, x'00')`, []any{scan}},
+			{`INSERT INTO snapshot_file(snapshot_id, rel_path, size, mtime) VALUES(7, ?, 1, 1)`, []any{file}},
+		} {
+			if _, err := s.DB.Exec(q.sql, q.args...); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	kinds := func() int {
+		t.Helper()
+		got, err := s.ContentKinds(map[string]int64{"i": 7})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got["i"]
+	}
+	put(1, "Assemblies/a.dll")
+	if kinds() != HasDLL || kinds() != HasDLL {
+		t.Fatal("first read")
+	}
+	put(2, "Languages/English/k.xml")
+	if got := kinds(); got != HasLanguages {
+		t.Fatalf("reused ID kept the old flags: %d", got)
+	}
+}

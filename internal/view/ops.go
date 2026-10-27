@@ -50,7 +50,7 @@ const (
 	OpWorkshop  = "workshop"   // 打开工坊页面
 	OpSteam     = "steam"      // Steam 客户端页面
 	OpPin       = "pin"        // 锁定这个版本
-	OpPinUpdate = "pin-update" // 更新锁定版本
+	OpPinUpdate = "pin-update" // 更新至工坊版本
 	OpUnpin     = "unpin"      // 解除锁定
 	OpMove      = "move"       // 移入锁定库
 	OpUnhide    = "unhide"     // 取消隐藏
@@ -111,7 +111,7 @@ func opLabel(code string) string {
 		OpSeparate: T("do not list as a copy"),
 		OpFolder:   T("open the folder"), OpWorkshop: T("open the Workshop page"),
 		OpSteam: T("steam page"),
-		OpPin:   T("lock this version"), OpPinUpdate: T("update the locked version"), OpUnpin: T("unlock"),
+		OpPin:   T("lock this version"), OpPinUpdate: T("update to the Workshop version"), OpUnpin: T("unlock"),
 		OpMove: T("move into the lock library"), OpUnhide: T("unhide"), OpResub: T("resubscribe"),
 		OpUnsub: T("unsubscribe"), OpDelete: T("move to the recycle bin"),
 		OpTextures: T("convert textures to DDS"), OpTexClean: T("remove the converted textures"),
@@ -251,7 +251,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	if loadable && (workshop || own) {
 		ks = append(ks, OpPin)
 	}
-	if i.Locked != nil && i.Locked.Updated {
+	if live && own && !workshop && !linked && lib != nil && lib.St != nil && lib.St.Ix != nil && lib.St.Ix.WorkshopUpdateSource(m) != nil {
 		ks = append(ks, OpPinUpdate)
 	}
 	if i.Locked != nil {

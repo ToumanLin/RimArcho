@@ -197,3 +197,43 @@ func TestLibraryHasOnlyLibraryOps(t *testing.T) {
 		t.Fatal("resubscribe requires confirmation")
 	}
 }
+
+func TestWorkshopUpdateCopyOps(t *testing.T) {
+	SetLang("zh")
+	defer SetLang("en")
+	for _, kind := range []source.Kind{source.Local, source.Elsewhere, source.Extra, source.Official, source.Workshop, source.SteamCMD} {
+		for _, locked := range []bool{false, true} {
+			for _, upstreamLive := range []bool{false, true} {
+				m := &store.Mod{ID: "local", LineageID: "family", Kind: kind, Status: "live"}
+				up := &store.Mod{ID: "workshop", LineageID: "family", Kind: source.Workshop, Status: "live"}
+				if !upstreamLive {
+					up.Status = "tombstone"
+				}
+				i := &app.LibInstance{Mod: m, Path: t.TempDir()}
+				if locked {
+					i.Locked = &app.Locked{Copy: m, Upstream: up, Updated: false}
+				}
+				ix := &app.Index{ByID: map[string]*store.Mod{m.ID: m, up.ID: up}, ByLineage: map[string][]*store.Mod{"family": {m, up}}}
+				l := &app.LibLineage{Instances: []*app.LibInstance{i, {Mod: up}}}
+				lib := &app.Library{St: &app.LoadoutState{Ix: ix}, Lineages: []*app.LibLineage{l}}
+				want := kind.Managed() && !kind.WorkshopLike() && upstreamLive
+				for _, page := range []string{EditorPage, LibraryPage} {
+					if got := slices.Contains(CopyOps(lib, l, i, page), OpPinUpdate); got != want {
+						t.Fatalf("kind=%s locked=%v upstream=%v page=%s: update=%v", kind, locked, upstreamLive, page, got)
+					}
+				}
+				i.States = []string{app.LibMissing}
+				if slices.Contains(CopyOps(lib, l, i, LibraryPage), OpPinUpdate) {
+					t.Fatal("missing target offers update")
+				}
+			}
+		}
+	}
+	op := OpOf(OpPinUpdate)
+	if op.Code != "pin-update" || op.Group != 4 || !op.Confirm || TaskLane(op.Code) != app.LaneFiles {
+		t.Fatalf("operation contract: %+v", op)
+	}
+	if Table()["update to the Workshop version"] != "更新至工坊版本" {
+		t.Fatal("missing action translation")
+	}
+}

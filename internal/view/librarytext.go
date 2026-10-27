@@ -3,9 +3,14 @@ package view
 // Mod 库存 › 全部 (06 §2.9), in both interfaces.
 func init() {
 	Register(map[string]string{
-		"enable":                        "启用",
-		"disable in every list":         "在所有列表里停用",
-		"update the locked version":     "更新锁定版本",
+		"enable":                         "启用",
+		"disable in every list":          "在所有列表里停用",
+		"update to the Workshop version": "更新至工坊版本",
+		"Changes made in this copy will be overwritten and lost. The old folder goes to the recycle bin.": "此副本中的修改将被覆盖、丢失。原文件夹会移到回收站。",
+		"copy from: %s":                 "复制来源：%s",
+		"replace at: %s (%d files, %s)": "覆盖位置：%s（%d 个文件，%s）",
+		"The copy keeps its location and identity in every list.": "此副本的位置和各列表中的身份保持不变。",
+		"skip link: %s":                 "跳过链接：%s",
 		"unlock":                        "解除锁定",
 		"move into the lock library":    "移入锁定库",
 		"open the folder":               "打开文件夹",

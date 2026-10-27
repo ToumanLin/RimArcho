@@ -150,7 +150,7 @@ const (
 	LibEnable    = OpAdd       // 加入当前方案
 	LibRemove    = OpRemove    // 从所有方案里拿掉
 	LibPin       = OpPin       // 锁定版本
-	LibPinUpdate = OpPinUpdate // 更新锁定版本
+	LibPinUpdate = OpPinUpdate // 更新至工坊版本
 	LibUnpin     = OpUnpin     // 解除锁定
 	LibUnhide    = OpUnhide    // 恢复
 	LibUnsub     = OpUnsub     // 退订, through the Steam client
@@ -680,8 +680,6 @@ func libArgv(kind string, refs []string) []string {
 		return append([]string{"subscribe", "update"}, refs...)
 	case LibPin:
 		return []string{"pin", refs[0]}
-	case LibPinUpdate:
-		return []string{"pin", "--update", refs[0]}
 	case LibUnpin:
 		return []string{"unpin", refs[0]}
 	case LibUnhide:
@@ -721,6 +719,24 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		return p, nil
 	}
 	for _, ref := range refs {
+		if kind == LibPinUpdate {
+			r, err := a.UpdateToWorkshop(ref, true)
+			if err != nil {
+				p.Apply = false
+				p.Lines = append(p.Lines, Humanize(st, err.Error()))
+				continue
+			}
+			p.Lines = append(p.Lines,
+				T("Changes made in this copy will be overwritten and lost. The old folder goes to the recycle bin."),
+				Tf("copy from: %s", r.From),
+				Tf("replace at: %s (%d files, %s)", r.Target, r.Copy.Files, SizeText(r.Copy.Bytes)),
+				T("The copy keeps its location and identity in every list."))
+			for _, skipped := range r.Copy.Skipped {
+				p.Lines = append(p.Lines, Tf("skip link: %s", skipped))
+			}
+			p.Lines = append(p.Lines, r.Links.Lines()...)
+			continue
+		}
 		if kind == OpSubUpdate {
 			if m, err := st.Ix.ResolveOne(ref); err == nil {
 				if r := a.SubscriptionOf(m); r != nil && r.Kind == "page" {
@@ -869,7 +885,7 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 		case LibPin:
 			_, err = a.Pin(ref, "", false, false)
 		case LibPinUpdate:
-			_, err = a.PinUpdate(ref, "", false, false)
+			_, err = a.UpdateToWorkshop(ref, false)
 		case LibUnpin:
 			_, err = a.Unpin(ref, false)
 		case LibUnhide:
