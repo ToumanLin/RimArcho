@@ -1,0 +1,1 @@
+{"schema":1,"seed":3,"actions":[{"action":{"kind":"click","locator":".histarea .hbar","delayMs":400}},{"action":{"kind":"click","locator":".histarea .h.version","delayMs":400,"mustUndo":true}}]}

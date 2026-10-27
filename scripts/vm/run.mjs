@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { connect, sleep } from './cdp.mjs';
 import { observe, discover } from './observe.mjs';
+import { fingerprints } from './checkpoints.mjs';
+import { treeBytes, cleanupRun, hostOutput } from './storage.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 // A VM guest gets an exported copy of the scripts with no Git; RIMARCHO_VM_BUILD names its commit.
@@ -22,12 +24,20 @@ for (let i = 2; i < process.argv.length; i += 2) {
   options[key.slice(2)] = process.argv[i+1];
 }
 const driver = options.driver || 'W', scenario = Number(options.scenario || 1);
+const mode = options.mode;
+assert(!mode || ['crawl','walk'].includes(mode), 'use --mode crawl|walk');
+assert(!mode || driver === 'W', 'crawl/walk require real window driver W');
 assert(['W','A','C'].includes(driver) && scenario >= 1 && scenario <= 4, 'use --driver W|A|C --scenario 1|2|3|4');
 const outside = path => { for(const root of [repo,repositoryRoot]) { const r=relative(root,resolve(path));assert(r.startsWith('..')||isAbsolute(r),`results and test homes must be outside the repository: ${path}`); } return resolve(path); };
-const outputBase = outside(options.out || join(tmpdir(), 'RimArcho-vm-results'));
+const guest=process.env.RIMARCHO_VM_GUEST==='1';
+assert(options.allow!=='external'||guest,'external actions are enabled only in the test VM');
+assert(!options.baseline || guest,'host runs support only the generated fixture; real baselines are VM-only');
+assert(!options.baseline || options['reuse-content']==='true','VM baselines require --reuse-content true (no full content copy)');
+assert(!options.baseline || mode || scenario!==2,'scenario 2 deployment switching needs private content; skipped on a shared baseline');
+const outputBase = outside(guest ? options.out : hostOutput(options.out));
 mkdirSync(outputBase, { recursive: true });
-const out = mkdtempSync(join(outputBase, `s${scenario}-${driver}-`));
-const tools = resolve(options.tools || join(tmpdir(), 'RimArcho-vm-tools'));
+const out = mkdtempSync(join(outputBase, `${mode || 's'+scenario}-${driver}-`));
+const tools = resolve(options.tools || 'D:/RimArcho-test/tools');
 const exe = name => join(tools, name + (platform() === 'win32' ? '.exe' : ''));
 const result = { schema: 1, scenario, driver, seed: 271027, fixture: options.baseline ? 'real-copy' : 'small', output: out, started: new Date().toISOString(), host: { cpu: cpus()[0]?.model, cores: cpus().length, memory: totalmem(), platform: platform() }, timings: [], checks: [], coverage: [], checkpoints: [], failures: [], performanceFailures: [] };
 const save = (name, data) => writeFileSync(join(out, name + '.json'), JSON.stringify(data,null,2));
@@ -46,12 +56,20 @@ const payload = snap => snap.plans.map(p => ({ name:p.name, entries:p.workspace,
 const entries = (snap,name=currentPlan) => snap.plans.find(p=>p.name===name)?.workspace?.[0]?.entries;
 const undoDepth = (snap,name=currentPlan) => snap.plans.find(p=>p.name===name)?.undoDepth;
 async function snapshot(label) {
-  const data = JSON.parse(command(exe('vmstate'), ['--home',home,'--plan',currentPlan]));
-  const ui = c ? await c.evaluate('window.__vm.read()') : null;
+  let data,ui;
+  for(let attempt=0;attempt<3;attempt++){
+    data=JSON.parse(command(exe('vmstate'), ['--home',home,'--plan',currentPlan]));
+    ui=c ? await c.evaluate('window.__vm.read()') : null;
+    // A background publication can begin a new page read while vmstate runs.
+    // Capture a settled checkpoint instead of diagnosing its loading view as blank.
+    if(!mode||!ui||!(ui.loading||ui.editing||ui.busy.env))break;
+    await settled();
+  }
   const artifact = `${String(++checkpointSeq).padStart(2,'0')}-${label}`;
-  save(artifact,{ domain:data, surface:ui });result.checkpoints.push({ label, artifact:artifact+'.json' });
+  const digest=createHash('sha256').update(JSON.stringify(data)).digest('hex');
+  result.checkpoints.push({label,sha256:digest,domainHashes:fingerprints(data),counts:{instances:data.instances.length,plans:data.plans.length},surface:ui?{page:ui.page,plan:ui.plan,popup:ui.popup}:null});
   if(ui) {
-    if(ui.page===null && data.observation){
+    if(ui.page===null && data.observation && (!mode || ui.plan===currentPlan)){
       const expected=data.observation.entries.map(e=>e.i||'pkg:'+e.m);
       const shown=ui.columns[1].entries.map(e=>e.id||e.ref);
       check(label+': window enabled list matches domain',JSON.stringify(shown)===JSON.stringify(expected),{expected:expected.length,shown:shown.length});
@@ -61,22 +79,25 @@ async function snapshot(label) {
     check(label+': page has content',!ui.blank && ui.content,ui.page);
     check(label+': sidebar lists intact',ui.plans?.length===data.plans.length,{ui:ui.plans?.length,db:data.plans.length});
     check(label+': no console/script errors',ui.errors.length===0,ui.errors);
-    check(label+': open plan matches',ui.plan===currentPlan,{expected:currentPlan,actual:ui.plan});
+    if(!mode)check(label+': open plan matches',ui.plan===currentPlan,{expected:currentPlan,actual:ui.plan});
   }
   return data;
 }
 async function until(fn, ms=15000) {
   const end=performance.now()+ms;
   while(performance.now()<end) { const r=await fn(); if(r) return r;await sleep(50); }
-  throw Error(`condition timed out after ${ms}ms`);
+  throw Error(`condition timed out after ${ms}ms; state=${c?JSON.stringify(await c.evaluate('(()=>{const s=__vm.read(false);return {page:s.page,plan:s.plan,popup:s.popup,loading:s.loading,editing:s.editing,busy:s.busy,content:s.content,status:s.status,navLayout:s.navLayout,activeElement:s.activeElement,errors:s.errors}})()')):'no window'}`);
 }
-async function settled(page, ms=10000) {
+async function settled(page, ms=10000, plan) {
   let last='', stable=0;
   return until(async()=>{
-    const s=await c.evaluate('window.__vm.read()');
+    const s=await c.evaluate(mode?'window.__vm.read(false)':'window.__vm.read()');
     if(s.blank || s.readError) throw Error(`DOM oracle: ${s.readError || 'blank page'}`);
-    const signature=JSON.stringify([s.page,s.plan,s.columns,s.status,s.popup,s.problems?.listVersion]);
-    const ready=!s.loading && !s.editing && !s.busy.env && s.content && s.sidebar.includes('plan') && (page===undefined || s.page===page);
+    // Background analysis status can change continuously on a large library.
+    // Page loading/editing and list publication gate readiness; focus/rows gate
+    // visual stability without repeatedly serializing all problem/instance data.
+    const signature=JSON.stringify([s.page,s.plan,mode?s.columnState:s.columns,mode&&s.busy.analyze?null:s.status,s.popup,s.problems?.listVersion]);
+    const ready=!s.loading && !s.editing && !s.busy.env && s.content && s.sidebar.includes('plan') && (page===undefined || s.page===page) && (plan===undefined || s.plan===plan);
     stable=ready && signature===last ? stable+1 : 0;last=signature;
     return stable>=5 && s;
   },ms);
@@ -114,6 +135,17 @@ async function enabledSecond() {
 }
 async function dismiss() { await press('Escape');await settled(); }
 async function uiState() { return c.evaluate('window.__vm.read()'); }
+async function windowEvidence() {
+  await c.evaluate('__vm.stop()');
+  const evidence=await c.evaluate('(()=>{const {read,stop,timer,inputs,events,errors,samples,feedback,statuses,...meta}=__vm;return meta})()');
+  // Long real-content crawls can accumulate tens of MB. Bound each CDP response
+  // instead of serializing the entire observer through a single 15s request.
+  for(const name of ['inputs','events','errors','samples','feedback','statuses']) {
+    const length=await c.evaluate(`__vm.${name}.length`);evidence[name]=[];
+    for(let at=0;at<length;at+=100)evidence[name].push(...await c.evaluate(`__vm.${name}.slice(${at},${at+100})`));
+  }
+  return evidence;
+}
 async function clickText(selector,text) {
   for(let i=0;i<24;i++){
     const point=await c.evaluate(`(()=>{for(const e of document.querySelectorAll(${JSON.stringify(selector)})){if(e.disabled || e.textContent.trim()!==${JSON.stringify(text)})continue;const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,h=document.elementFromPoint(x,y);if(b.width&&b.height&&(h===e||e.contains(h)))return {x,y};}return null})()`);
@@ -150,7 +182,8 @@ async function repeatedSubscription() {
     for(const clicks of [2,3]) {
       const before=await snapshot(`before-subscription-${clicks}`),known=new Set((await tasks()).rows.map(r=>r.id));
       await press('Shift+Digit4');await settled('library');
-      await c.click('#nav [data-id="subscribe"]');await settled('subscribe');
+      await press('Shift+Digit4');await settled('library');
+  await c.click('#nav [data-id="subscribe"]');await settled('subscribe');
       await c.click('.subscribe-omni input');await c.call('Input.insertText',{text:url});
       await until(()=>c.evaluate('!!document.querySelector(".subscribe-foot button.primary:not(:disabled)")'));
       const point=await c.click('.subscribe-foot button.primary');
@@ -228,15 +261,26 @@ async function setup() {
   if(options.baseline) {
     const baseline=outside(options.baseline);assert(existsSync(join(baseline,'isolated.json')),'baseline needs isolated.json from prepare-real.ps1');
     command(exe('vmstate'),['--mode','audit','--home',join(baseline,'home'),'--root',baseline],{},30000);
-    if(scenario===2 && driver==='W' && options['owned-files']!=='true') {
-      // UseEnv can create/remove deployment links: this scenario owns a full filesystem copy.
-      command('pwsh',['-NoProfile','-File',join(repo,'scripts/vm/prepare-real.ps1'),'-SourceHome',join(baseline,'home'),'-Root',dirname(home),'-Tools',tools],{},1800000);
-    } else {
     mkdirSync(home,{recursive:true});
     command('sqlite3',['-readonly',join(baseline,'home','archo.db'),`.backup '${join(home,'archo.db').replaceAll("'","''")}'`]);
-    for(const name of ['config.toml','cache']) if(existsSync(join(baseline,'home',name))) cpSync(join(baseline,'home',name),join(home,name),{recursive:true});
-    }
+    if(existsSync(join(baseline,'home','config.toml')))cpSync(join(baseline,'home','config.toml'),join(home,'config.toml'));
+    result.sharedContent={baseline,policy:'private DB only; baseline content reused; filesystem writes skipped'};
   } else command(exe('vmstate'),['--mode','fixture','--root',dirname(home)],{},30000);
+  if(mode){
+    // A copied player's old undo history predates this experiment. Random Undo
+    // followed by an edit could otherwise destroy the redo path back to start.
+    // Establish the same boundary as the fixture, on this case's DB only.
+    const removed=Number(command('sqlite3',[join(home,'archo.db'),'SELECT count(*) FROM workspace_undo; DELETE FROM workspace_undo;']).trim());
+    result.setupUndoBoundary={removedSteps:removed,reason:'isolated case starts with empty undo/redo history; workspace/staging/content retained'};
+    if(options.allow!=='external'){
+      // Opening plan management otherwise refreshes stale followed collections
+      // through Go networking, outside CDP request interception. Defer only the
+      // copied refresh timestamps through this case budget; retain follow data.
+      const until=Math.ceil(Date.now()/1000+Number(options.minutes||60)*60+600);
+      command('sqlite3',[join(home,'archo.db'),`UPDATE plan_collection SET checked_at=${until};`]);
+      result.deferredExternalEffects=[{operation:'automatic followed-collection network refresh',until,scope:'copied DB checked_at only'}];
+    }
+  }
   env={RIMARCHO_HOME:home, APPDATA:join(out,'appdata'), LOCALAPPDATA:join(out,'localappdata')};
   const initial=JSON.parse(command(exe('vmstate'),['--home',home]));
   currentPlan=options.plan || initial.plans.find(p=>p.name==='default')?.name || initial.plans[0].name;
@@ -245,7 +289,7 @@ async function setup() {
   result.workingTree=hasGit?command('git',['-C',repo,'status','--short']).trim():'exported copy';
   result.node=process.version;result.toolHashes=Object.fromEntries(['archo','vmstate',driver==='W'?'RimArcho':driver==='A'?'guidev':null].filter(Boolean).map(n=>[n,createHash('sha256').update(readFileSync(exe(n))).digest('hex')]));
   result.preparationMs=performance.now()-preparing;
-  if(driver==='W'&&scenario===3)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
+  if(driver==='W'&&!mode&&scenario===3&&!options.baseline)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
   if(driver==='C') return;
   const launching=performance.now();
   const freePort = () => new Promise((ok,fail) => { const server=createServer();server.on('error',fail);server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>ok(port))}); });
@@ -254,9 +298,10 @@ async function setup() {
   // Refuse an existing listener rather than driving another window's user data.
   try {await fetch(`http://${addr}/${driver==='W'?'json/list':''}`,{signal:AbortSignal.timeout(300)});throw Error(`port ${port} already in use`);}catch(e){if(e.message.includes('already in use'))throw e;}
   child=spawn(exe(driver==='W'?'RimArcho':'guidev'),driver==='W'?[]:['-home',home,'-addr',addr,'-exe',exe('archo')],{env:{...process.env,...env,RIMARCHO_DEVTOOLS_PORT:String(port)},cwd:tools,windowsHide:true,stdio:['ignore','pipe','pipe']});
-  let logs='';child.stdout.on('data',b=>logs+=b);child.stderr.on('data',b=>logs+=b);child.on('exit',()=>writeFileSync(join(out,'process.log'),logs));
+  let logs='';child.stdout.on('data',b=>logs=(logs+b).slice(-256*1024));child.stderr.on('data',b=>logs=(logs+b).slice(-256*1024));child.on('exit',()=>writeFileSync(join(out,'process.log'),logs));
   await until(async()=>{try{return (await fetch(`http://${addr}/${driver==='W'?'json/list':''}`,{signal:AbortSignal.timeout(500)})).ok}catch{return false}},15000);
   if(driver==='W') {
+    await until(async()=>{try{return (await (await fetch(`http://${addr}/json/list`)).json()).some(t=>t.type==='page'&&!t.url.startsWith('devtools:'));}catch{return false}},15000);
     c=await connect(addr);await until(async()=>{try{return await c.evaluate("location.host === 'wails.localhost'")}catch{return false}},15000);await until(async()=>c.evaluate("(async()=>{const {S}=await import('/js/state.js');return !!S.shell?.plan;})()"),15000);
     await c.evaluate(`(${observe.toString()})()`);
     await settled(undefined,15000);
@@ -413,7 +458,44 @@ async function scenario3() {
     await repeatedSubscription();
   }
 }
+async function deletionPrerequisite() {
+  if(!c||(await uiState()).plans.length!==1)return;
+  await c.click('[data-env-write="remove-plan"]');await sleep(350);await settled();
+  result.lastPlanRefusal={popup:(await uiState()).popup,status:await c.evaluate('document.querySelector("#status")?.textContent'),message:await c.evaluate('document.querySelector("#say")?.textContent||document.querySelector(".toast")?.textContent||""')};
+  check('last plan deletion refuses without confirmation',!(await uiState()).popup&&/only list|cannot be deleted|唯一|不能删除/.test(result.lastPlanRefusal.status));
+  await c.click('#nav [data-id="plans"]');await settled('plans');await press('KeyN');await settled('plans');
+  await c.click('.pm-name');await press('Control+KeyA');await c.call('Input.insertText',{text:'VM cancellation companion'});
+  await until(()=>c.evaluate('!!document.querySelector("[data-env-write=create-plan]:not(:disabled)")'));
+  await c.click('[data-env-write="create-plan"]');await settled();await editor();
+  result.setupAdditionalPlans=(await uiState()).plans.length-1;
+  check('delete cancellation prerequisite creates second plan',result.setupAdditionalPlans===1);
+}
+async function guestProbes() {
+  await deletionPrerequisite();
+  await c.click('[data-env-write="remove-plan"]');await until(async()=>!!(await uiState()).popup);
+  result.deletePlanPreview=await c.evaluate('document.querySelector("#popup")?.innerText');
+  await dismiss();
+  await press('Shift+Digit4');await settled('library');
+  await c.click('#nav [data-id="subscribe"]');await settled('subscribe');
+  await c.click('.subscribe-omni input');await c.call('Input.insertText',{text:'https://127.0.0.1:9/phase1a.git'});
+  await until(()=>c.evaluate('!!document.querySelector(".subscribe-preview")?.textContent.trim()'));
+  result.subscriptionPrerequisite={gitAvailable:spawnSync('git',['--version'],{windowsHide:true}).status===0,preview:await c.evaluate('document.querySelector(".subscribe-preview")?.textContent'),subscribeDisabled:await c.evaluate('document.querySelector(".subscribe-foot button.primary")?.disabled')};
+  if(result.subscriptionPrerequisite.subscribeDisabled&&/unresolved location change/.test(result.subscriptionPrerequisite.preview)){
+    // Diagnosis on the case DB only: a preparer used cfg:subscribed.dir that did
+    // not match its relocated indexed source. Do not move or create content.
+    const rows=JSON.parse(command('sqlite3',['-json',join(home,'archo.db'),"SELECT root FROM source WHERE label='subscribed' AND status='ok' LIMIT 1;"])||'[]');
+    result.subscriptionPrerequisite.indexedSourceFound=rows.length>0;
+    if(rows.length){
+      command('sqlite3',[join(home,'archo.db'),`UPDATE meta SET value='${rows[0].root.replaceAll("'","''")}' WHERE key='cfg:subscribed.dir';`]);
+      await c.click('.subscribe-omni input');await press('Control+KeyA');await c.call('Input.insertText',{text:'https://127.0.0.1:9/phase1a.git'});await sleep(400);
+      await until(()=>c.evaluate('!!document.querySelector(".subscribe-preview")?.textContent.trim()'));
+      result.subscriptionPrerequisite.afterDirectoryAlignment={preview:await c.evaluate('document.querySelector(".subscribe-preview")?.textContent'),subscribeDisabled:await c.evaluate('document.querySelector(".subscribe-foot button.primary")?.disabled'),scope:'copied DB config aligned to existing baseline source; no content changes or submit'};
+    }
+  }
+  await press('Escape');await editor();
+}
 async function scenario4() {
+  await deletionPrerequisite();
   const before=await snapshot('before-cancel');
   const staging = snap => snap.plans.map(p=>({name:p.name,staging:p.staging}));
   const stageHistory = async (b,a,disable) => {
@@ -509,13 +591,21 @@ async function scenario4() {
 try {
   await timed('prepare-and-start',setup,null);
   if(c)await editor();
-  await timed('scenario',()=>[scenario1,scenario2,scenario3,scenario4][scenario-1](),300000);
-  await freshProblems();
+  if(options.probe==='true')await guestProbes();
+  else if(mode) {
+    const { drive } = await import('./players.mjs');
+    await drive({ c, options, result, out, repo, home, tools, currentPlan, snapshot, settled, check, editor, command, exe, save });
+  } else {
+    await timed('scenario',()=>[scenario1,scenario2,scenario3,scenario4][scenario-1](),300000);
+    await freshProblems();
+  }
   if(c){
     await settled();
-    const evidence=await c.evaluate('(()=>{__vm.stop();const {read,stop,timer,...v}=__vm;return v})()');save('window-trace',evidence);
-    check('all observed input is trusted',evidence.inputs.every(i=>i.trusted));check('no transient blank page',evidence.samples.filter(s=>s.armed).every(s=>!s.blank && (s.content || s.loading)));
-    check('sidebar never loses lists',evidence.samples.filter(s=>s.armed).every(s=>s.sidebar.includes('plan') && s.plansCount===result.content.plans));
+    const evidence=await windowEvidence();result.observationCounts=Object.fromEntries(Object.entries(evidence).filter(([,v])=>Array.isArray(v)).map(([k,v])=>[k,v.length]));
+    // App keyboard handlers may invoke .click() internally (e.g. Tab to a list).
+    // Physical key/pointer arrival must be trusted; derived synthetic clicks are evidence.
+    check('all observed key/pointer input is trusted',evidence.inputs.filter(i=>/^(key|pointer|mouse)/.test(i.type)).every(i=>i.trusted));check('no transient blank page',evidence.samples.filter(s=>s.armed).every(s=>!s.blank && (s.content || s.loading)));
+    check('sidebar never loses lists',evidence.samples.filter(s=>s.armed).every(s=>s.sidebar.includes('plan') && (mode || s.plansCount>=result.content.plans&&s.plansCount<=result.content.plans+(result.setupAdditionalPlans||0))));
     check('never falsely displays no game',evidence.samples.filter(s=>s.armed).every(s=>!s.noGame));
     check('no console errors',evidence.errors.length===0,evidence.errors);
     const sequences=new Map();
@@ -529,15 +619,16 @@ try {
     result.performanceFailures.push(...result.feedback.over200ms.map(f=>({name:'first feedback',...f,budgetMs:200})));
     const stalls=evidence.samples.filter(s=>s.gapMs>500);result.performanceFailures.push(...stalls.map(s=>({name:'main-thread stall',...s,budgetMs:500})));
     if(options.discover==='true')save('controls',await c.evaluate(`(${discover.toString()})()`));
-    await c.shot(join(out,'final.png'));
+
   }
 } catch(e) {
   result.failures.push({name:'runner',detail:e.stack});
-  if(c){try{await c.shot(join(out,'failure.png'));save('failure-window',await c.evaluate('window.__vm?.read()'));save('window-trace',await c.evaluate('(()=>{const {read,stop,timer,...v}=__vm;return v})()'));}catch{}}
+  if(c){try{result.failureSurface=await c.evaluate('(()=>{const s=__vm.read(false);return {page:s.page,status:s.status,popup:s.popup,errors:s.errors}})()');}catch{}}
 } finally {
   eventStream?.abort();c?.close();
   if(child?.pid){if(platform()==='win32')spawnSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true});else child.kill();}
-  save('events',events);result.finished=new Date().toISOString();result.functionalStatus=result.failures.length?'failed':'passed';result.status=result.failures.length||result.performanceFailures.length?'failed':'passed';save('result',result);
-  console.log(JSON.stringify({status:result.status,driver,scenario,output:out,failures:result.failures,performanceFailures:result.performanceFailures},null,2));
+  try{result.storage=cleanupRun(out);}catch(e){result.failures.push({name:'cleanup',detail:e.message});}
+  result.finished=new Date().toISOString();result.functionalStatus=result.failures.length?'failed':'passed';result.status=result.failures.length||result.performanceFailures.length?'failed':'passed';save('result',result);
+  console.log(JSON.stringify({status:result.status,driver,scenario,...(mode?{mode,seed:result.seed,steps:result.executedSteps}:{}),output:out,failures:result.failures,performanceFailures:result.performanceFailures},null,2));
   process.exitCode=result.failures.length||result.performanceFailures.length?1:0;
 }
