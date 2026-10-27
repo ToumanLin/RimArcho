@@ -7,9 +7,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -363,7 +365,7 @@ func (a *App) CheckSubscriptions(refs []string, pageReader ...func(string) (*sub
 	return op, errors.Join(failures...)
 }
 
-func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (*SubscribeOp, error) {
+func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *SubscribeOp, updateErr error) {
 	ss, err := a.selectSubscriptions(refs)
 	if err != nil {
 		return nil, err
@@ -398,47 +400,95 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (*SubscribeOp, err
 	if dryRun {
 		return op, nil
 	}
-	// Rescan successful updates even if a later repository fails.
+	// Git failures still prevent later work. Skipped download-page subscriptions
+	// do not split SteamCMD groups; only Git updates are ordering barriers.
 	changed := false
-	for i, s := range ss {
-		if s.Record.Kind != "git" && s.Record.Kind != "steamcmd" {
-			continue
+	var failures []error
+	defer func() {
+		if changed {
+			updateErr = errors.Join(updateErr, a.refreshWorkshop(op))
 		}
+	}()
+	for i := 0; i < len(ss); {
+		s := ss[i]
 		if s.Record.Kind == "steamcmd" {
-			result, downloadErr := a.downloadWorkshop([]string{s.Record.WorkshopID}, filepath.Dir(s.Folder), false)
-			if result != nil && len(result.Items) > 0 {
-				op.Items[i].To, op.Items[i].Result = result.Items[0].To, result.Items[0].Result
-				op.Items[i].Record = result.Items[0].Record
+			end := i + 1
+			for end < len(ss) && ss[end].Record.Kind != "git" {
+				end++
 			}
-			if downloadErr != nil {
-				if changed {
-					_, err = a.Scan(false)
+			account, accountErr := a.SteamCMDAccount("")
+			if accountErr != nil {
+				return op, errors.Join(append(failures, accountErr)...)
+			}
+			type groupKey struct{ root, account string }
+			type group struct {
+				key     groupKey
+				ids     []string
+				indices []int
+			}
+			var groups []*group
+			byKey := map[groupKey]*group{}
+			for j := i; j < end; j++ {
+				if ss[j].Record.Kind != "steamcmd" {
+					continue
 				}
-				return op, errors.Join(downloadErr, err)
+				root := realOrAbs(filepath.Dir(ss[j].Folder))
+				key := groupKey{env.PathKey(root), account}
+				g := byKey[key]
+				if g == nil {
+					g = &group{key: groupKey{root, account}}
+					groups = append(groups, g)
+					byKey[key] = g
+				}
+				if !slices.Contains(g.ids, ss[j].Record.WorkshopID) {
+					g.ids = append(g.ids, ss[j].Record.WorkshopID)
+				}
+				g.indices = append(g.indices, j)
 			}
+			for _, g := range groups {
+				download, err := a.downloadWorkshopGroup(g.ids, g.key.root, g.key.account, false, false)
+				if err != nil {
+					failures = append(failures, err)
+				}
+				for _, j := range g.indices {
+					if download == nil {
+						op.Items[j].To = ""
+						op.Items[j].Result = "failed: " + err.Error()
+						continue
+					}
+					for _, item := range download.Items {
+						if item.Record.WorkshopID == ss[j].Record.WorkshopID {
+							op.Items[j].To, op.Items[j].Result = item.To, item.Result
+							op.Items[j].Record, op.Items[j].Links = item.Record, item.Links
+							delete(a.subscriptionCache, ss[j].Folder)
+							delete(a.subscriptionCache, realOrAbs(ss[j].Folder))
+							changed = changed || item.To != ""
+						}
+					}
+				}
+			}
+			i = end
 			continue
 		}
-		commit, updateErr := subscribe.Update(context.Background(), s.Folder, s.Record)
-		if updateErr != nil {
-			if changed {
-				_, err = a.Scan(false)
-			}
-			return op, errors.Join(updateErr, err)
+		if s.Record.Kind != "git" {
+			i++
+			continue
+		}
+		commit, err := subscribe.Update(context.Background(), s.Folder, s.Record)
+		if err != nil {
+			return op, errors.Join(append(failures, err)...)
 		}
 		changed = true
 		r := s.Record
 		r.Installed, r.Latest, r.InstalledAt, r.CheckedAt, r.CheckError = commit, commit, a.Now(), a.Now(), ""
 		op.Items[i].To, op.Items[i].Result = commit, "updated"
 		if err := subscribe.Write(s.Folder, r); err != nil {
-			_, scanErr := a.Scan(false)
-			return op, errors.Join(err, scanErr)
+			return op, errors.Join(append(failures, err)...)
 		}
 		delete(a.subscriptionCache, s.Folder)
+		i++
 	}
-	if changed {
-		_, err = a.Scan(false)
-	}
-	return op, err
+	return op, errors.Join(failures...)
 }
 
 func (a *App) RemoveSubscriptions(refs []string, dryRun bool) (*SubscribeOp, error) {

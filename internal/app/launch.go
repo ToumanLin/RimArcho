@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -60,6 +61,11 @@ func (a *App) Launch(dryRun bool) (*SaveResult, error) { return a.LaunchWith(dry
 // LaunchWith is Launch that, with move, first moves plain Mods/ folders in the way of a
 // deployed copy into the lock library (08 §3; --move-duplicates).
 func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
+	unlock, err := a.waitLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	if err := a.checkNoGame(); err != nil {
 		return nil, err
 	}
@@ -96,8 +102,19 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 	if r.Unchanged && st.Latest != nil {
 		vn = st.Latest.N
 	}
-	return r, a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: e.ID, PlanID: st.Plan.ID, Started: a.Now().UTC(),
-		Method: p.Method, Command: p.Command(), Fingerprint: ListFingerprint(st.List), VersionN: vn})
+	record := &store.LaunchRecord{EnvID: e.ID, PlanID: st.Plan.ID, Started: a.Now().UTC(),
+		Method: p.Method, Command: p.Command(), Fingerprint: ListFingerprint(st.List), VersionN: vn}
+	if err := a.Store.AddLaunchRecord(record); err != nil {
+		return r, err
+	}
+	var enabled []string
+	for _, en := range st.List {
+		enabled = append(enabled, en.Instance)
+	}
+	if err := a.Store.CountCreditSession(record.ID, enabled); err != nil {
+		log.Printf("game started; cannot count credit session for launch %d: %v", record.ID, err)
+	}
+	return r, nil
 }
 
 func (a *App) startGame(p *LaunchPlan) error {

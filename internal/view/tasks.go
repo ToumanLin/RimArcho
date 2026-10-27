@@ -15,6 +15,7 @@ import (
 // Task kinds of RimArcho's own jobs (the lane "self"); the files and Steam lanes' kinds
 // are Mod 库's ops (LibDelete, LibUnsub, …).
 const (
+	TaskCreditReplace    = "steam-credit-replace"
 	TaskScan             = "scan"
 	TaskAccount          = "account-operation"
 	TaskSiteDownload     = "site-download"
@@ -139,6 +140,8 @@ type TaskItemRow struct {
 // TaskTitle names a kind.
 func TaskTitle(kind string) string {
 	switch kind {
+	case TaskCreditReplace:
+		return T("replace SteamCMD mods with Steam subscriptions")
 	case TaskSourceCheck:
 		return T("check for updates")
 	case TaskWorkshopUpdate:
@@ -502,7 +505,7 @@ func TaskTargetName(target string) string {
 
 // TaskCanStop says which self tasks stop part way (a pack build, a texture run).
 func TaskCanStop(kind string) bool {
-	return kind == TaskPack || kind == TaskTextures || kind == TaskTexClean
+	return kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean
 }
 
 func taskActs(t *app.Task, c map[string]int) []TaskAct {
@@ -519,12 +522,15 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 		}
 	case app.TaskFailed, app.TaskPartial:
 		switch {
-		case c[app.ItemFail] > 0:
+		case c[app.ItemFail] > 0 && t.Kind != TaskCreditReplace:
 			a = append(a, TaskAct{ID: "retry", Label: Tf("try the %d failed again", c[app.ItemFail]), Key: taskKeyRetry, Primary: true})
-		case t.Lane == app.LaneSelf && (t.Kind == TaskScan || t.Kind == TaskAnalyze || IsSettingTask(t.Kind)):
+		case t.Lane == app.LaneSelf && (t.Kind == TaskScan || t.Kind == TaskAnalyze || (t.Kind == TaskCreditReplace && c[app.ItemFail] == 0) || IsSettingTask(t.Kind)):
 			a = append(a, TaskAct{ID: "retry", Label: T("try again"), Key: taskKeyRetry, Primary: true})
 		}
 	case app.TaskStopped:
+		if t.Kind == TaskCreditReplace {
+			a = append(a, TaskAct{ID: "resume", Label: T("continue replacement"), Key: taskKeyRetry, Primary: true})
+		}
 		if IsSettingTask(t.Kind) {
 			a = append(a, TaskAct{ID: "retry", Label: T("try again"), Key: taskKeyRetry, Primary: true})
 		}
@@ -544,6 +550,7 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 
 func init() {
 	Register(map[string]string{
+		"continue replacement":    "继续替换",
 		"clear cache":             "清除缓存",
 		"back up the database":    "备份数据库",
 		"compact the database":    "压缩数据库",

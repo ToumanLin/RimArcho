@@ -67,8 +67,12 @@ type API struct {
 	quit        func()     // closes the window (nil in the harness and in tests)
 	windowTheme func(bool) // synchronises the native frame with the resolved page scheme
 	// tasks is the 后台任务 record and its lanes (tasks.go, 06 §2.16)
-	tasks  *app.Tasks
-	taskEv taskEvents
+	tasks        *app.Tasks
+	taskEv       taskEvents
+	creditID     string
+	creditCancel context.CancelFunc
+	creditWG     sync.WaitGroup
+	creditClosed bool
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
 	// TexRunner runs `archo textures optimize` in place of the child process (tests).
@@ -97,7 +101,9 @@ type API struct {
 func newAPI(a *app.App) *API {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &API{a: a, open: openURL, busy: map[string]bool{}, branchCtx: ctx, branchCancel: cancel}
+	a.LaunchWait = func(text string) { s.send("launch-wait", map[string]any{"text": view.T(text)}) }
 	s.startTasks()
+	s.startCreditLocked()
 	return s
 }
 

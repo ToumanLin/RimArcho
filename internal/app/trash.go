@@ -134,5 +134,6 @@ func realOrAbs(p string) string {
 }
 
 func samePath(p, q string) bool {
+	p = realOrAbs(p)
 	return source.Within(p, realOrAbs(q)) && source.Within(realOrAbs(q), p)
 }

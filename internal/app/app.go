@@ -38,6 +38,12 @@ tombstone_days = 90
 
 // App is one opened RimArcho data directory.
 type App struct {
+	// LaunchWait reports a launch waiting for the cross-process handoff lock.
+	LaunchWait      func(string)
+	launchDepth     int
+	launchUnlock    func()
+	launchWaitLimit time.Duration // tests may shorten the production ten-second limit
+
 	Home                string
 	Store               *store.Store
 	StartupLinkRecovery []*GameLink // read-only startup snapshot; Problems probes afresh
@@ -112,10 +118,12 @@ type App struct {
 	// SteamCMDStart and SteamCMDRun replace starting SteamCMD (tests fake it, 08 §11);
 	// SteamCMDZip replaces Valve's download URL, SteamCMDPoll how often its log is read,
 	// SteamCMDNoPath leaves PATH out when looking for it.
-	SteamCMDStart  func(exe string, args []string, console bool) (SteamCMDProc, error)
-	SteamCMDRun    func(exe string, args []string) (string, error)
-	SteamCMDZip    string
-	SteamCMDPoll   time.Duration
+	SteamCMDStart func(exe string, args []string, console bool) (SteamCMDProc, error)
+	SteamCMDRun   func(exe string, args []string) (string, error)
+	SteamCMDZip   string
+	SteamCMDPoll  time.Duration
+	// SteamCMDWait replaces the Workshop retry backoff in tests; nil uses time.Sleep.
+	SteamCMDWait   func(time.Duration)
 	SteamCMDNoPath bool
 	HTTP           *http.Client
 	// FindTool delegates dependency lookup; subscriptions never install tools.

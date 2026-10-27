@@ -163,6 +163,12 @@ var versionArgRe = regexp.MustCompile(`^[vV]?\d+$`)
 // the current plan ("current"), one of its versions ("v<n>"), or a list file. Its first
 // version has source import and a note saying where it came from. The current plan stays.
 func (a *App) NewPlan(name, from string) (*NewPlanResult, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
@@ -257,6 +263,12 @@ func (a *App) ImportLoadoutAsPlan(path, name string) (*NewPlanResult, error) {
 // (a file, pasted text, a share code, a Workshop collection; 04 §9.1 "import as a new
 // plan"). source is its v1's note. The current plan stays.
 func (a *App) NewPlanFromImport(name string, il *ImportedList, source string) (*NewPlanResult, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err

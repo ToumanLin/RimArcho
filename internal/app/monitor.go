@@ -432,6 +432,11 @@ func monitorAddedKey(planID int64) string { return fmt.Sprintf("monitor.added:%d
 // Harmony once (04 §1.5). Each change is one undoable edit of that plan.
 func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (MonitorPlanChange, error) {
 	c := MonitorPlanChange{Plan: p.Name}
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return c, err
+	}
+	defer unlock()
 	ws, err := a.planWorkspace(p)
 	if err != nil {
 		return c, err
@@ -535,6 +540,20 @@ func (a *App) AddMonitor() (*store.Mod, error) {
 
 // editPlan replaces a plan's list as one undoable edit of that plan (current or not).
 func (a *App) editPlan(p *store.Plan, ws *store.Workspace, before, after loadout.List, op string) error {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	fresh, err := a.Store.Workspace(p.ID)
+	if err != nil {
+		return err
+	}
+	if fresh == nil || fresh.Entries != ws.Entries {
+		return fmt.Errorf("list changed while editing; reload and try again")
+	}
+
 	if after.Equal(before) {
 		return nil
 	}

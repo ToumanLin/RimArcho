@@ -49,7 +49,7 @@ func (s *API) startTasks() {
 	ts.Changed = s.tasksChanged
 	ts.Ended = func(t app.Task) {
 		s.subRevision.Add(1)
-		if t.Lane == app.LaneSelf && !view.IsSettingTask(t.Kind) && t.Kind != view.TaskAccount && t.Kind != view.TaskSiteDownload {
+		if t.Lane == app.LaneSelf && !view.IsSettingTask(t.Kind) && t.Kind != view.TaskAccount && t.Kind != view.TaskSiteDownload && t.Kind != view.TaskCreditReplace {
 			return // its own event says how it ended
 		}
 		r := view.BuildTasks([]app.Task{t}, time.Now()).Rows[0]
@@ -204,6 +204,11 @@ func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 				return settingQueued(nt), nil
 			}
 			switch t.Kind {
+			case view.TaskCreditReplace:
+				s.mu.Lock()
+				id, err := s.startCreditLocked()
+				s.mu.Unlock()
+				return id, err
 			case view.TaskScan:
 				if s.Scan() {
 					return view.T("scanning…"), nil

@@ -374,7 +374,11 @@ func downgradeWithTwin(t *testing.T, e *testkit.Env) map[string]string {
 	exec(`DROP TABLE id_alias`)
 	exec(`DROP TABLE texture_file`) // v16
 	exec(`DROP TABLE texture_mod`)
-	exec(`DROP TABLE plan_collection`)                          // v17
+	exec(`DROP TABLE plan_collection`)   // v17
+	exec(`DROP TABLE credit_deployment`) // v20
+	exec(`DROP TABLE credit_session`)
+	exec(`DROP TABLE credit_item`)
+	exec(`DROP TABLE credit_batch`)
 	exec(`DROP TABLE managed_link`)                             // v18
 	exec(`ALTER TABLE modsconfig_state DROP COLUMN writer_env`) // v19
 	exec(`ALTER TABLE plan DROP COLUMN created_game`)

@@ -16,6 +16,7 @@ import { on } from "./api.js";
 import { wireSeparator } from "./separator.js";
 import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
+import { getChoices } from "./credit.js";
 
 let ui = null;
 export function initScreens(u) {
@@ -466,8 +467,8 @@ async function runAction(it, act) {
       return pop.choose(act.title, act.options.map((o) => o.label), (i) => doAction(act, i));
     case "subscribe":
       // a background task (06 §2.16): the mods take their place in the list once downloaded
-      return pop.choose(act.label, [T("subscribe with Steam"), T("download with SteamCMD")], async (i) => {
-        try { say("ok", await api.Subscribe({ kind: "workshop", url: act.refs.join(" "), steamcmd: i === 1 })); } catch (e) { say("fail", errText(e)); }
+      return pop.choose(act.label, getChoices(), async (i) => {
+        try { say("ok", await api.Subscribe({ kind: "workshop", url: act.refs.join(" "), steamcmd: i === 1, batch: true })); } catch (e) { say("fail", errText(e)); }
       });
   }
   if (act.confirm) {
