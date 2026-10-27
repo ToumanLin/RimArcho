@@ -9,6 +9,8 @@ param(
  [double]$Minutes = 60,
  [ValidateSet('safe','local','external')][string]$Allow = 'safe',
  [string]$GuestBaseline,
+ [string]$ReplayTrace,
+ [string]$PreviousLedger,
  [string]$PowerShellZip,
  [string]$NodeExe = (Get-Command node).Source,
  [string]$SQLiteExe = (Get-Command sqlite3).Source,
@@ -50,12 +52,16 @@ $sqliteDll = Join-Path (Split-Path $SQLiteExe) 'sqlite3.dll'
 if (Test-Path -LiteralPath $sqliteDll) { Copy-Item -LiteralPath $sqliteDll -Destination (Join-Path $bundle 'tools/sqlite3.dll') }
 Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object Extension -in '.mjs','.ps1','.md' | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $bundle 'scripts/vm') }
 if ($PowerShellZip) { Expand-Archive -LiteralPath $PowerShellZip -DestinationPath (Join-Path $bundle 'pwsh') }
+if ($ReplayTrace) { Copy-Item -LiteralPath $ReplayTrace -Destination (Join-Path $bundle 'replay-input.json') }
+if ($PreviousLedger) { Copy-Item -LiteralPath $PreviousLedger -Destination (Join-Path $bundle 'crawler-ledger.json') }
 $manifest = @(Get-ChildItem -LiteralPath $bundle -Recurse -File | ForEach-Object { @{path=[IO.Path]::GetRelativePath($bundle,$_.FullName);sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash} })
 @{build=$build;files=$manifest} | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $bundle 'manifest.json')
 $zip = Join-Path $transfer 'player-bundle.zip'
 Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath $zip
 $zipHash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
 $runnerArgs = @('scripts/vm/run.mjs','--mode',$Mode,'--shrink',$Shrink,'--driver','W','--seed',[string]$Seed,'--steps',[string]$Steps,'--minutes',[string]$Minutes,'--tools',(Join-Path $guestBundle 'tools'),'--out',(Join-Path $guestRun 'results'))
+if ($ReplayTrace) { $runnerArgs += @('--replay',(Join-Path $guestBundle 'replay-input.json')) }
+if ($PreviousLedger) { $runnerArgs += @('--ledger',(Join-Path $guestBundle 'crawler-ledger.json')) }
 if ($Probe) { $runnerArgs += @('--probe','true') }
 if ($Allow -ne 'safe') { $runnerArgs += @('--allow',$Allow) }
 if ($GuestBaseline) { $runnerArgs += @('--baseline',$GuestBaseline,'--reuse-content','true') }
@@ -136,6 +142,19 @@ if ($completion.status -ne 'completed') { throw ('Guest run failed: ' + $complet
 & $vm get "$guestRun\evidence.zip" (Join-Path $transfer 'evidence.zip') @vmArgs
 Expand-Archive -LiteralPath (Join-Path $transfer 'evidence.zip') -DestinationPath (Join-Path $transfer 'evidence')
 & $vm get "$guestRun\disk.json" (Join-Path $transfer 'evidence/disk.json') @vmArgs
+Get-ChildItem -LiteralPath (Join-Path $transfer 'evidence') -Recurse -Filter replay.json | ForEach-Object {
+ $evidenceFolder=$_.Directory.FullName
+ $replay=Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json
+ $traceFile=Join-Path $evidenceFolder 'minimal-trace.json'
+ if(-not(Test-Path -LiteralPath $traceFile)){$traceFile=Join-Path $evidenceFolder 'trace.json'}
+ $replayArgs=@('-Mode','walk','-Seed',[string]$replay.seed,'-Steps',[string]$Steps,'-Minutes',[string]$Minutes,'-ReplayTrace',$traceFile)
+ if($GuestBaseline){$replayArgs+=@('-GuestBaseline',$GuestBaseline)}
+ if($Allow -ne 'safe'){$replayArgs+=@('-Allow',$Allow)}
+ if($StandardUser){$replayArgs+='-StandardUser'}
+ $command='pwsh '+(Literal $PSCommandPath)+' '+(($replayArgs|ForEach-Object {Literal $_})-join ' ')
+ @{command=$command;seed=$replay.seed;trace=$traceFile;requires='same baseline content and matching signed-in guest account'}|ConvertTo-Json|Set-Content -Encoding utf8 (Join-Path $evidenceFolder 'host-replay.json')
+}
+
 } finally {
 foreach ($owned in @($bundle,$zip)) {
  $resolved=[IO.Path]::GetFullPath($owned)

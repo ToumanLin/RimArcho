@@ -107,3 +107,8 @@ Saved-version checkout claims “u undoes” but can change workspace origin met
 without an undo entry (F3). Those checks run on disposable DB branches and retain
 the canonical failure while the parent stays usable. An unrestorable parent stops
 its crawl branch instead of attributing later failures to unrelated controls.
+
+Use `-ReplayTrace <host-trace.json>` to bundle a returned trace into a fresh guest
+run, and `-PreviousLedger <ledger.json>` for ledger diffs / walker control choices.
+Provisioned failure evidence includes `host-replay.json`: its command rebuilds the
+portable tools, since the old guest bundle was intentionally removed by cleanup.
