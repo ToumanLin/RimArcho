@@ -185,6 +185,9 @@ func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 		}
 		if len(ids) == 1 {
 			t := byID[ids[0]]
+			if t.State == app.TaskRunning && t.WorkshopSubscription() {
+				return view.T("cancelling the download; completed items are kept"), nil
+			}
 			if t.State == app.TaskQueued {
 				return view.Tf("cancelled %s, %s: nothing was touched", view.TaskTitle(t.Kind), t.Obj), nil
 			}
@@ -198,8 +201,33 @@ func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 				if !t.Ended() {
 					return "", errors.New(view.Tf("%s cannot do that now", view.TaskTitle(t.Kind)))
 				}
+				args := t.Args
+				if t.Kind == view.TaskSubscribe && len(args) > 2 && args[1] == "workshop" && len(t.Items) > 0 {
+					state := app.ItemFail
+					if act == "resume" {
+						state = app.ItemSkip
+					}
+					args = append([]string(nil), args[:2]...)
+					for _, it := range t.Items {
+						if it.State == state && !it.Permanent && (ref == "" || ref == it.Ref) {
+							args = append(args, strings.TrimPrefix(it.Ref, "ws:"))
+						}
+					}
+					if len(args) == 2 {
+						return "", errors.New(view.T("nothing to retry"))
+					}
+					for _, flag := range t.Args[2:] {
+						if strings.HasPrefix(flag, "--") {
+							args = append(args, flag)
+						}
+					}
+				}
 				s.mu.Lock()
-				nt := s.queueSettingTaskLocked(t.Kind, t.Args, t.Env)
+				var resume []app.Task
+				if act == "resume" && t.WorkshopSubscription() {
+					resume = append(resume, t)
+				}
+				nt := s.queueSettingTaskLocked(t.Kind, args, t.Env, resume...)
 				s.mu.Unlock()
 				return settingQueued(nt), nil
 			}

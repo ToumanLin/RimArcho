@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -50,13 +51,15 @@ const (
 
 // TaskItem is one thing a task works on (a copy of a mod).
 type TaskItem struct {
-	Ref   string `json:"ref"`
-	Name  string `json:"name"`
-	Bytes int64  `json:"bytes,omitempty"`
-	Got   int64  `json:"got,omitempty"`
-	Size  int64  `json:"size,omitempty"`
-	State string `json:"state"`
-	Why   string `json:"why,omitempty"` // a failure's reason
+	Ref         string `json:"ref"`
+	Name        string `json:"name"`
+	Bytes       int64  `json:"bytes,omitempty"`
+	Got         int64  `json:"got,omitempty"`
+	Size        int64  `json:"size,omitempty"`
+	State       string `json:"state"`
+	Why         string `json:"why,omitempty"` // a failure's reason
+	FailureKind string `json:"failureKind,omitempty"`
+	Permanent   bool   `json:"permanent,omitempty"`
 }
 
 // Task is one background task.
@@ -86,6 +89,21 @@ type Task struct {
 // Ended reports whether the task has finished one way or another.
 func (t *Task) Ended() bool {
 	return t.State != TaskQueued && t.State != TaskRunning
+}
+
+func (t *Task) WorkshopSubscription() bool {
+	if t.Kind != "subscribe" {
+		return false
+	}
+	if len(t.Args) > 1 && t.Args[1] == "workshop" {
+		return true
+	}
+	for _, it := range t.Items {
+		if strings.HasPrefix(it.Ref, "ws:") {
+			return true
+		}
+	}
+	return false
 }
 
 // Counts are the items by state.
@@ -242,7 +260,23 @@ func (ts *Tasks) EnqueueSelf(request Task, run func(string) (string, error)) Tas
 		ts.selfRuns = map[string]func(string) (string, error){}
 	}
 	t := &Task{ID: ts.newID(), Kind: request.Kind, Lane: LaneSelf, Obj: request.Obj, Args: slices.Clone(request.Args), Env: request.Env, State: TaskQueued, Queued: ts.stamp()}
-	ts.list = append([]*Task{t}, ts.list...)
+	if prior := ts.find(request.ID); prior != nil && prior.WorkshopSubscription() {
+		if prior.State != TaskStopped {
+			cp := *prior
+			ts.mu.Unlock()
+			return cp
+		}
+		// Continuing a cancelled download keeps its original items and progress.
+		t = prior
+		t.State, t.End, t.Result, t.Closed, t.Phase = TaskQueued, 0, "", false, ""
+		for i := range t.Items {
+			if t.Items[i].State == ItemSkip {
+				t.Items[i].State, t.Items[i].Why = ItemWait, ""
+			}
+		}
+	} else {
+		ts.list = append([]*Task{t}, ts.list...)
+	}
 	ts.selfRuns[t.ID] = run
 	key := LaneSelf + ":" + t.Kind
 	start := !ts.working[key]
@@ -289,6 +323,23 @@ func (ts *Tasks) runSelf(kind, key string) {
 		state := TaskDone
 		if err != nil {
 			state, result = TaskFailed, err.Error()
+		}
+		if next.Kind == "subscribe" {
+			ts.mu.Lock()
+			c := next.Counts()
+			next.Done = c[ItemOK] + c[ItemFail]
+			if len(next.Items) > 0 && next.Done == len(next.Items) {
+				next.Frac = 1
+			}
+			switch {
+			case ts.stopping[id] && c[ItemSkip] > 0:
+				state = TaskStopped
+			case ts.stopping[id] && len(next.Items) > 0 && c[ItemFail] == 0:
+				state = TaskDone
+			case c[ItemFail] > 0 && c[ItemOK] > 0:
+				state = TaskPartial
+			}
+			ts.mu.Unlock()
 		}
 		ts.Finish(id, state, result)
 	}
@@ -348,19 +399,25 @@ func (ts *Tasks) Stop(id string) error {
 		t.State, t.End = TaskStopped, ts.ms()
 		delete(ts.selfRuns, id)
 		for i := range t.Items {
-			t.Items[i].State = ItemSkip
+			if t.Items[i].State == ItemWait || t.Items[i].State == ItemRun || t.Items[i].State == "" {
+				t.Items[i].State = ItemSkip
+			}
 		}
 		ts.saveLocked()
 	case t.State == TaskRunning && t.Lane != LaneSelf:
 		ts.stopping[id] = true
 	case t.State == TaskRunning:
 		stop := ts.stops[id]
-		if stop != nil {
+		canStop := stop != nil || t.WorkshopSubscription()
+		if canStop {
 			ts.stopping[id] = true
 		}
 		ts.mu.Unlock()
-		if stop == nil {
+		if !canStop {
 			return ErrCannotStop
+		}
+		if stop == nil {
+			return nil
 		}
 		return stop()
 	default:
@@ -370,6 +427,20 @@ func (ts *Tasks) Stop(id string) error {
 	ts.mu.Unlock()
 	ts.changed()
 	return nil
+}
+
+// SetStop attaches a self runner's cancellation once it starts.
+func (ts *Tasks) SetStop(id string, stop func() error) {
+	ts.mu.Lock()
+	t := ts.find(id)
+	stopped := t == nil || t.Ended() || ts.stopping[id]
+	if !stopped {
+		ts.stops[id] = stop
+	}
+	ts.mu.Unlock()
+	if stopped {
+		stop()
+	}
 }
 
 // StopAsked reports whether the player asked a self task to stop (its runner then ends
@@ -391,7 +462,7 @@ func (ts *Tasks) Again(id, state, ref, obj string) (*Task, error) {
 	}
 	var items []TaskItem
 	for _, it := range t.Items {
-		if it.State == state && (ref == "" || it.Ref == ref) {
+		if it.State == state && !it.Permanent && (ref == "" || it.Ref == ref) {
 			items = append(items, it)
 		}
 	}
@@ -523,15 +594,22 @@ func (ts *Tasks) MarkSeen() {
 // Close marks what still runs or waits as stopped by the window closing, and saves.
 func (ts *Tasks) Close() {
 	ts.mu.Lock()
-	defer ts.mu.Unlock()
+	var stops []func() error
 	for _, t := range ts.list {
 		if !t.Ended() {
+			if stop := ts.stops[t.ID]; stop != nil {
+				stops = append(stops, stop)
+			}
 			ts.stopping[t.ID] = true
 			ts.closeLocked(t)
 		}
 	}
 	clear(ts.selfRuns)
 	ts.saveLocked()
+	ts.mu.Unlock()
+	for _, stop := range stops {
+		stop()
+	}
 }
 
 func (ts *Tasks) closeLocked(t *Task) {

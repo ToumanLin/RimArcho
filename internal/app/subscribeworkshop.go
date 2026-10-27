@@ -70,7 +70,7 @@ func workshopURL(id string) string {
 	return "https://steamcommunity.com/sharedfiles/filedetails/?id=" + id
 }
 
-func (a *App) SubscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool) (*SubscribeOp, error) {
+func (a *App) subscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool, w *workshopTransfer) (*SubscribeOp, error) {
 	ids, err := workshopIDs(inputs)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,36 @@ func (a *App) SubscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool) (*S
 		return op, nil
 	}
 	if !forceSteamCMD {
-		report, err := a.runSteam(steamworks.Subscribe, ids)
+		if w != nil && w.ctx.Err() != nil {
+			return op, w.ctx.Err()
+		}
+		report := &steamworks.Report{}
+		var err error
+		for start := 0; start < len(ids); start += 50 {
+			if w != nil && w.ctx.Err() != nil {
+				break
+			}
+			part := ids[start:min(start+50, len(ids))]
+			if w != nil {
+				w.line("Downloading item " + part[0])
+			}
+			var got *steamworks.Report
+			got, err = a.runSteam(steamworks.Subscribe, part)
+			if err != nil {
+				break
+			}
+			report.Items = append(report.Items, got.Items...)
+			if w != nil {
+				for _, it := range got.Items {
+					if it.Result == "ok" {
+						w.line("Success. Downloaded item " + strconv.FormatUint(it.ID, 10))
+					}
+				}
+			}
+		}
+		if len(report.Items) > 0 {
+			err = nil
+		}
 		if err == nil {
 			byID := map[string]string{}
 			for _, item := range report.Items {
@@ -103,6 +132,16 @@ func (a *App) SubscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool) (*S
 					failures = append(failures, fmt.Errorf("Workshop %s: Steam did not confirm subscription (%s); %s", id, result, workshopURL(id)))
 				}
 				op.Items[i].Result = result
+				if strings.HasPrefix(result, "failed:") {
+					code, _ := strconv.Atoi(strings.TrimPrefix(result, "failed:"))
+					op.Items[i].Result = "failed: " + WorkshopResultText(code)
+					if code == 9 {
+						op.Items[i].FailureKind = "missing"
+					} else if code == 15 || code == 24 || code == 26 || code == 41 {
+						op.Items[i].FailureKind = "permission"
+					}
+					op.Items[i].Permanent = workshopPermanent(op.Items[i].FailureKind)
+				}
 			}
 			op.Notes = append(op.Notes, "Steam downloads it; it appears after the next scan.")
 			return op, errors.Join(failures...)
@@ -110,8 +149,15 @@ func (a *App) SubscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool) (*S
 		if !errors.Is(err, ErrSteamUnavailable) {
 			return nil, err
 		}
+		if w != nil && w.ctx.Err() != nil {
+			return op, w.ctx.Err()
+		}
 	}
-	return a.downloadWorkshop(ids, "", false)
+	account, err := a.SteamCMDAccount("")
+	if err != nil {
+		return nil, err
+	}
+	return a.downloadWorkshopGroup(ids, "", account, false, true, w)
 }
 
 // downloadWorkshop uses the same runner/account policy as game downloads. root is
@@ -124,7 +170,7 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *
 	return a.downloadWorkshopGroup(ids, root, account, dryRun, true)
 }
 
-func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, refresh bool) (result *SubscribeOp, downloadErr error) {
+func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, refresh bool, transfer ...*workshopTransfer) (result *SubscribeOp, downloadErr error) {
 	if err := a.refuseSubscriptionGameRunning(); err != nil {
 		return nil, err
 	}
@@ -225,7 +271,7 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 			downloadErr = a.abortLinkLifecycle(incoming, downloadErr)
 		}
 	}()
-	outcomes, runErr := a.runWorkshopBatches(exe, base, account, ids)
+	outcomes, runErr := a.runWorkshopBatches(exe, base, account, ids, transfer...)
 	var errs []error
 	if runErr != nil {
 		errs = append(errs, runErr)
@@ -236,6 +282,7 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 		if outcome := outcomes[id]; !outcome.confirmed {
 			why := outcome.why()
 			it.Result = "failed: " + why
+			it.FailureKind, it.Permanent = outcome.kind, workshopPermanent(outcome.kind)
 			errs = append(errs, fmt.Errorf("SteamCMD item %s: %s; %s", id, why, workshopURL(id)))
 			continue
 		}
@@ -334,26 +381,74 @@ func (a *App) replaceWorkshopImport(from, target string) error {
 	})
 }
 
-func (a *App) runWorkshopSteamCMD(exe string, args []string, console bool) (string, error) {
+func (a *App) runWorkshopSteamCMD(exe string, args []string, console bool, transfer ...*workshopTransfer) (string, error) {
 	unlock := accounts.Lock(exe)
 	defer unlock()
-	if !console {
-		return a.steamCMD().run(exe, args)
+	w := workshopObserver(transfer)
+	if w.ctx.Err() != nil {
+		return "", w.ctx.Err()
 	}
 	log := filepath.Join(filepath.Dir(exe), "logs", "console_log.txt")
 	var off int64
 	if st, err := os.Stat(log); err == nil {
 		off = st.Size()
 	}
-	p, err := a.steamCMD().start(exe, args, true)
+	// Tests may supply a synchronous runner. Production always tails its own log
+	// offset under the same account lock, for hidden and interactive processes alike.
+	if !console && a.SteamCMDRun != nil {
+		out, err := a.SteamCMDRun(exe, args)
+		for _, line := range strings.Split(out, "\n") {
+			w.line(line)
+		}
+		return out, err
+	}
+	start := startWorkshopCMD
+	if a.SteamCMDStart != nil {
+		start = a.SteamCMDStart
+	}
+	p, err := start(exe, args, console)
 	if err != nil {
 		return "", err
 	}
-	err = p.Wait()
 	tail := &logTail{path: log, off: off}
-	lines := tail.lines()
+	var lines []string
+	read := func() {
+		for _, line := range tail.lines() {
+			lines = append(lines, line)
+			w.line(line)
+		}
+	}
+	wait := make(chan error, 1)
+	go func() { wait <- p.Wait() }()
+	poll := a.SteamCMDPoll
+	if poll <= 0 {
+		poll = 200 * time.Millisecond
+	}
+	tick := time.NewTicker(poll)
+	defer tick.Stop()
+	for {
+		select {
+		case err = <-wait:
+			read()
+			goto finished
+		case <-tick.C:
+			read()
+		case <-w.ctx.Done():
+			if killer, ok := p.(interface{ KillTree() error }); ok {
+				killer.KillTree()
+			} else if killer, ok := p.(interface{ Kill() error }); ok {
+				killer.Kill()
+			}
+			<-wait
+			err = w.ctx.Err()
+			read()
+			goto finished
+		}
+	}
+finished:
 	if tail.partial != "" {
 		lines = append(lines, tail.partial)
+		w.line(tail.partial)
 	}
 	return strings.Join(lines, "\n"), err
 }

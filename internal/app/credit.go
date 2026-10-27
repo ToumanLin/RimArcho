@@ -16,8 +16,8 @@ import (
 
 // SubscribeWorkshopBatch changes no existing subscription policy. Only explicitly
 // forced, non-preview SteamCMD bulk downloads create a credit batch.
-func (a *App) SubscribeWorkshopBatch(inputs []string, steamcmd, batch, dryRun bool) (*SubscribeOp, error) {
-	op, err := a.SubscribeWorkshop(inputs, steamcmd, dryRun)
+func (a *App) SubscribeWorkshopBatch(inputs []string, steamcmd, batch, dryRun bool, calls ...WorkshopCalls) (*SubscribeOp, error) {
+	op, err := a.SubscribeWorkshop(inputs, steamcmd, dryRun, calls...)
 	if !steamcmd || !batch || dryRun || op == nil {
 		return op, err
 	}

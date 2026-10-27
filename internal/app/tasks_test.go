@@ -139,3 +139,20 @@ func TestTasksMove(t *testing.T) {
 	}
 	close(block)
 }
+
+func TestStopQueuedWorkshopContinuationKeepsEarlierResults(t *testing.T) {
+	ts := OpenTasks("")
+	ts.mu.Lock()
+	ts.list = []*Task{{ID: "continued", Kind: "subscribe", Lane: LaneSelf, State: TaskQueued, Frac: .5, Done: 2, Total: 3,
+		Args:  []string{"subscribe", "workshop", "1", "2", "3"},
+		Items: []TaskItem{{Ref: "ws:1", State: ItemOK}, {Ref: "ws:2", State: ItemFail, Permanent: true}, {Ref: "ws:3", State: ItemWait}},
+	}}
+	ts.mu.Unlock()
+	if err := ts.Stop("continued"); err != nil {
+		t.Fatal(err)
+	}
+	got := ts.List()[0]
+	if got.State != TaskStopped || got.Items[0].State != ItemOK || got.Items[1].State != ItemFail || got.Items[2].State != ItemSkip || got.Frac != .5 {
+		t.Fatalf("cancel discarded earlier results: %+v", got)
+	}
+}

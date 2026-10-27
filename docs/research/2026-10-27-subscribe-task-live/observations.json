@@ -1,0 +1,794 @@
+{
+  "date": "2026-10-27",
+  "route": "real guidev + headless Chrome CDP; import text -> subscribe all -> SteamCMD",
+  "account": "anonymous",
+  "sampleCount": 104,
+  "taskIDs": [
+    "t1793088101148-1"
+  ],
+  "maxTaskRows": 1,
+  "steps": 0,
+  "monotonic": true,
+  "publicAPI": [
+    {
+      "id": "3328573858",
+      "title": "Phase Weaponry - Revert Man in Black Change",
+      "size": "1159",
+      "result": 1
+    },
+    {
+      "id": "3544122256",
+      "title": "Omnivore Animals",
+      "size": "3795",
+      "result": 1
+    },
+    {
+      "id": "3553042543",
+      "title": "MiliraNamePlus",
+      "size": "16012",
+      "result": 1
+    },
+    {
+      "id": "1591142767",
+      "title": "FrameRateControl",
+      "size": "14904",
+      "result": 1
+    },
+    {
+      "id": "3784455797",
+      "title": "No Ambient Ducking",
+      "size": "15241",
+      "result": 1
+    },
+    {
+      "id": "3000564841",
+      "title": "More Fire Resistance Genes",
+      "size": "17082",
+      "result": 1
+    },
+    {
+      "id": "3310058867",
+      "title": "Time As a Slave",
+      "size": "19396",
+      "result": 1
+    },
+    {
+      "id": "3727646270",
+      "title": "Cellcycle Acceleration",
+      "size": "19571",
+      "result": 1
+    },
+    {
+      "id": "3544594291",
+      "title": "Prisoner Jumpsuits - No Quality",
+      "size": "19734",
+      "result": 1
+    },
+    {
+      "id": "3238650014",
+      "title": "Organ Decay Variety",
+      "size": "20447",
+      "result": 1
+    },
+    {
+      "id": "3579237751",
+      "title": "Better Scroll Bars",
+      "size": "23615",
+      "result": 1
+    },
+    {
+      "id": "2240524945",
+      "title": "Settlement Descriptions",
+      "size": "25065",
+      "result": 1
+    },
+    {
+      "id": "2893659870",
+      "title": "Better money",
+      "size": "26557",
+      "result": 1
+    },
+    {
+      "id": "3183941628",
+      "title": "High Life Drug Cooking Speed",
+      "size": "27760",
+      "result": 1
+    },
+    {
+      "id": "3794903743",
+      "title": "Artisan Experience",
+      "size": "30826",
+      "result": 1
+    },
+    {
+      "id": "3757435365",
+      "title": "Trader Will Buy Search",
+      "size": "31014",
+      "result": 1
+    },
+    {
+      "id": "3530589531",
+      "title": "Dignified Empire Names",
+      "size": "32010",
+      "result": 1
+    },
+    {
+      "id": "1716086112",
+      "title": "Electric Igniter",
+      "size": "32086",
+      "result": 1
+    },
+    {
+      "id": "3666446844",
+      "title": "Better Animal Info",
+      "size": "32358",
+      "result": 1
+    },
+    {
+      "id": "3296130663",
+      "title": "BodyMastery Mastered DBH",
+      "size": "33971",
+      "result": 1
+    },
+    {
+      "id": "3738362387",
+      "title": "VFE Tribals Cornerstone Search",
+      "size": "35391",
+      "result": 1
+    },
+    {
+      "id": "3781285156",
+      "title": "Cherry picker scroll bars",
+      "size": "35546",
+      "result": 1
+    },
+    {
+      "id": "3053650876",
+      "title": "Proselytizing Never",
+      "size": "36337",
+      "result": 1
+    },
+    {
+      "id": "2157495459",
+      "title": "Undraft After Tucking",
+      "size": "36652",
+      "result": 1
+    },
+    {
+      "id": "2572368517",
+      "title": "No Time Change Sounds",
+      "size": "36838",
+      "result": 1
+    },
+    {
+      "id": "3693258313",
+      "title": "Drug Policy Search",
+      "size": "36960",
+      "result": 1
+    },
+    {
+      "id": "3746091680",
+      "title": "Can I Reinstall This?",
+      "size": "37350",
+      "result": 1
+    },
+    {
+      "id": "3718719179",
+      "title": "Pawn Perspective",
+      "size": "37814",
+      "result": 1
+    },
+    {
+      "id": "3386472432",
+      "title": "PocketMap Architect Fix",
+      "size": "38056",
+      "result": 1
+    },
+    {
+      "id": "2583377522",
+      "title": "No Random Relations",
+      "size": "38220",
+      "result": 1
+    },
+    {
+      "id": "3226502149",
+      "title": null,
+      "size": null,
+      "result": 9
+    },
+    {
+      "id": "3309016770",
+      "title": null,
+      "size": null,
+      "result": 9
+    },
+    {
+      "id": "3778487830",
+      "title": null,
+      "size": null,
+      "result": 9
+    },
+    {
+      "id": "3809376831",
+      "title": null,
+      "size": null,
+      "result": 9
+    }
+  ],
+  "timeline": [
+    {
+      "state": "run",
+      "pct": 0,
+      "count": "",
+      "line": "订阅",
+      "ok": 0,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:41.165000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 11,
+      "count": "4 / 34",
+      "line": "正在下载 Phase Weaponry - Revert Man in Black Change",
+      "ok": 0,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:42.212000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 11,
+      "count": "5 / 34",
+      "line": "正在下载 Omnivore Animals",
+      "ok": 1,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:47.192000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 12,
+      "count": "6 / 34",
+      "line": "正在下载 FrameRateControl",
+      "ok": 2,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:48.764000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 13,
+      "count": "7 / 34",
+      "line": "正在下载 No Ambient Ducking",
+      "ok": 3,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:50.334000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 15,
+      "count": "8 / 34",
+      "line": "正在下载 MiliraNamePlus",
+      "ok": 4,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:51.383000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 17,
+      "count": "9 / 34",
+      "line": "正在下载 More Fire Resistance Genes",
+      "ok": 5,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:52.173000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 19,
+      "count": "10 / 34",
+      "line": "正在下载 Time As a Slave",
+      "ok": 6,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:53.224000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 21,
+      "count": "11 / 34",
+      "line": "正在下载 Cellcycle Acceleration",
+      "ok": 7,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:54.006000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 23,
+      "count": "12 / 34",
+      "line": "正在下载 Prisoner Jumpsuits - No Quality",
+      "ok": 8,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:54.790000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 25,
+      "count": "13 / 34",
+      "line": "正在下载 Organ Decay Variety",
+      "ok": 9,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:55.836000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 27,
+      "count": "14 / 34",
+      "line": "正在下载 Better Scroll Bars",
+      "ok": 10,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:56.878000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 30,
+      "count": "15 / 34",
+      "line": "正在下载 Settlement Descriptions",
+      "ok": 11,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:57.664000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 33,
+      "count": "16 / 34",
+      "line": "正在下载 Better money",
+      "ok": 12,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:58.452000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 35,
+      "count": "17 / 34",
+      "line": "正在下载 High Life Drug Cooking Speed",
+      "ok": 13,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:01:59.493000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 38,
+      "count": "18 / 34",
+      "line": "正在下载 Artisan Experience",
+      "ok": 14,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:00.544000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 42,
+      "count": "19 / 34",
+      "line": "正在下载 Trader Will Buy Search",
+      "ok": 15,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:02.384000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 45,
+      "count": "20 / 34",
+      "line": "正在下载 Dignified Empire Names",
+      "ok": 16,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:03.738000+00:00"
+    },
+    {
+      "state": "stop",
+      "pct": 45,
+      "count": "20 / 34",
+      "line": "完成 16，已取消 14",
+      "ok": 16,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:11.908000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 45,
+      "count": "20 / 34",
+      "line": "正在完成订阅",
+      "ok": 16,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:13.483000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 45,
+      "count": "20 / 34",
+      "line": "正在下载 Dignified Empire Names",
+      "ok": 16,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:13.743000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 49,
+      "count": "21 / 34",
+      "line": "正在下载 Electric Igniter",
+      "ok": 17,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:18.211000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 52,
+      "count": "22 / 34",
+      "line": "正在下载 Better Animal Info",
+      "ok": 18,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:19.774000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 56,
+      "count": "23 / 34",
+      "line": "正在下载 BodyMastery Mastered DBH",
+      "ok": 19,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:21.333000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 59,
+      "count": "24 / 34",
+      "line": "正在下载 VFE Tribals Cornerstone Search",
+      "ok": 20,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:22.377000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 59,
+      "count": "24 / 34",
+      "line": "正在完成订阅",
+      "ok": 20,
+      "temporaryFailures": 10,
+      "time": "2026-10-27T08:02:22.636000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 59,
+      "count": "24 / 34",
+      "line": "正在下载 VFE Tribals Cornerstone Search",
+      "ok": 20,
+      "temporaryFailures": 9,
+      "time": "2026-10-27T08:02:27.568000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 63,
+      "count": "25 / 34",
+      "line": "正在完成订阅",
+      "ok": 21,
+      "temporaryFailures": 9,
+      "time": "2026-10-27T08:02:31.731000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 63,
+      "count": "25 / 34",
+      "line": "正在下载 Cherry picker scroll bars",
+      "ok": 21,
+      "temporaryFailures": 8,
+      "time": "2026-10-27T08:02:31.993000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 67,
+      "count": "26 / 34",
+      "line": "正在完成订阅",
+      "ok": 22,
+      "temporaryFailures": 8,
+      "time": "2026-10-27T08:02:33.031000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 67,
+      "count": "26 / 34",
+      "line": "正在下载 Proselytizing Never",
+      "ok": 22,
+      "temporaryFailures": 7,
+      "time": "2026-10-27T08:02:33.288000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 71,
+      "count": "27 / 34",
+      "line": "正在完成订阅",
+      "ok": 23,
+      "temporaryFailures": 7,
+      "time": "2026-10-27T08:02:34.583000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 71,
+      "count": "27 / 34",
+      "line": "正在下载 Undraft After Tucking",
+      "ok": 23,
+      "temporaryFailures": 6,
+      "time": "2026-10-27T08:02:34.839000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 75,
+      "count": "28 / 34",
+      "line": "正在完成订阅",
+      "ok": 24,
+      "temporaryFailures": 6,
+      "time": "2026-10-27T08:02:35.354000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 75,
+      "count": "28 / 34",
+      "line": "正在下载 No Time Change Sounds",
+      "ok": 24,
+      "temporaryFailures": 5,
+      "time": "2026-10-27T08:02:35.614000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 79,
+      "count": "29 / 34",
+      "line": "正在完成订阅",
+      "ok": 25,
+      "temporaryFailures": 5,
+      "time": "2026-10-27T08:02:36.134000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 79,
+      "count": "29 / 34",
+      "line": "正在下载 Drug Policy Search",
+      "ok": 25,
+      "temporaryFailures": 4,
+      "time": "2026-10-27T08:02:36.392000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 83,
+      "count": "30 / 34",
+      "line": "正在完成订阅",
+      "ok": 26,
+      "temporaryFailures": 4,
+      "time": "2026-10-27T08:02:36.912000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 83,
+      "count": "30 / 34",
+      "line": "正在下载 Can I Reinstall This?",
+      "ok": 26,
+      "temporaryFailures": 3,
+      "time": "2026-10-27T08:02:37.171000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 87,
+      "count": "31 / 34",
+      "line": "正在完成订阅",
+      "ok": 27,
+      "temporaryFailures": 3,
+      "time": "2026-10-27T08:02:37.687000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 87,
+      "count": "31 / 34",
+      "line": "正在下载 Pawn Perspective",
+      "ok": 27,
+      "temporaryFailures": 2,
+      "time": "2026-10-27T08:02:37.945000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 91,
+      "count": "32 / 34",
+      "line": "正在下载 PocketMap Architect Fix",
+      "ok": 28,
+      "temporaryFailures": 1,
+      "time": "2026-10-27T08:02:38.725000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 95,
+      "count": "33 / 34",
+      "line": "正在完成订阅",
+      "ok": 29,
+      "temporaryFailures": 1,
+      "time": "2026-10-27T08:02:39.502000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 95,
+      "count": "33 / 34",
+      "line": "正在下载 No Random Relations",
+      "ok": 29,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:39.760000+00:00"
+    },
+    {
+      "state": "run",
+      "pct": 99,
+      "count": "34 / 34",
+      "line": "正在完成订阅",
+      "ok": 30,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:40.279000+00:00"
+    },
+    {
+      "state": "part",
+      "pct": 100,
+      "count": "34 / 34",
+      "line": "完成 30，失败 4：已不在创意工坊",
+      "ok": 30,
+      "temporaryFailures": 0,
+      "time": "2026-10-27T08:02:53.494000+00:00"
+    }
+  ],
+  "cancel": {
+    "id": "t1793088101148-1",
+    "pct": 45,
+    "count": "20 / 34",
+    "line": "完成 16，已取消 14",
+    "remaining": [
+      "3530589531",
+      "1716086112",
+      "3666446844",
+      "3296130663",
+      "3738362387",
+      "3781285156",
+      "3053650876",
+      "2157495459",
+      "2572368517",
+      "3693258313",
+      "3746091680",
+      "3718719179",
+      "3386472432",
+      "2583377522"
+    ],
+    "confirmedRegistered": 16,
+    "ownedPID": 99540,
+    "parentPID": 75692,
+    "afterCancelSteamCMDProcesses": []
+  },
+  "resume": {
+    "pct": 45,
+    "count": "20 / 34"
+  },
+  "crash": {
+    "time": 1793088142094,
+    "pid": 44624,
+    "parent": 75692,
+    "pct": 52,
+    "count": "22 / 34",
+    "ok": 18,
+    "task": "t1793088101148-1"
+  },
+  "scripts": [
+    {
+      "file": "RimArcho-workshop-169081423.txt",
+      "time": 1793088102.1055357,
+      "ids": [
+        "3328573858",
+        "3544122256",
+        "1591142767",
+        "3784455797",
+        "3553042543",
+        "3000564841",
+        "3310058867",
+        "3727646270",
+        "3544594291",
+        "3238650014",
+        "3579237751",
+        "2240524945",
+        "2893659870",
+        "3183941628",
+        "3794903743",
+        "3757435365",
+        "3530589531",
+        "1716086112",
+        "3666446844",
+        "3296130663",
+        "3738362387",
+        "3781285156",
+        "3053650876",
+        "2157495459",
+        "2572368517"
+      ]
+    },
+    {
+      "file": "RimArcho-workshop-1809742474.txt",
+      "time": 1793088133.7248914,
+      "ids": [
+        "3530589531",
+        "1716086112",
+        "3666446844",
+        "3296130663",
+        "3738362387",
+        "3781285156",
+        "3053650876",
+        "2157495459",
+        "2572368517",
+        "3693258313",
+        "3746091680",
+        "3718719179",
+        "3386472432",
+        "2583377522"
+      ]
+    },
+    {
+      "file": "RimArcho-workshop-897450565.txt",
+      "time": 1793088147.460019,
+      "ids": [
+        "3738362387",
+        "3781285156",
+        "3053650876",
+        "2157495459",
+        "2572368517",
+        "3693258313",
+        "3746091680",
+        "3718719179",
+        "3386472432",
+        "2583377522"
+      ]
+    }
+  ],
+  "final": {
+    "id": "t1793088101148-1",
+    "pct": 100,
+    "count": "34 / 34",
+    "line": "完成 30，失败 4：已不在创意工坊",
+    "say": "4 个 Mod 已不在创意工坊（作者删除或设为私有）",
+    "acts": [
+      {
+        "id": "goto",
+        "label": "前往订阅与更新",
+        "key": "o",
+        "primary": true
+      },
+      {
+        "id": "forget",
+        "label": "从记录里去掉",
+        "key": "Del",
+        "danger": true
+      }
+    ],
+    "registered": 30,
+    "sourceRecords": 30,
+    "creditItems": 30,
+    "deletedCreditItems": 0
+  },
+  "finalDOM": {
+    "left": "今天\n1\n订阅 34 个 Mod\n01:02\n部分完成\n完成 30，失败 4：已不在创意工坊",
+    "summary": "订阅 34 个 Mod\n\n4 个 Mod 已不在创意工坊（作者删除或设为私有）\n\n前往订阅与更新\no\n从记录里去掉\nDel\n队列\nRimArcho\n同一种一次一个，不同种可以同时\n开始\n01:02\n用时\n40 秒",
+    "items": "3\n每一项\n34\n完成 30\n失败 4\nMod\n结果\n▲\n原因\n大小\nWorkshop 3226502149\n失败\n已不在创意工坊\n—\nWorkshop 3309016770\n失败\n已不在创意工坊\n—\nWorkshop 3778487830\n失败\n已不在创意工坊\n—\nWorkshop 3809376831\n失败\n已不在创意工坊\n—\nArtisan Experience\n完成\n—\n—\nBetter Animal Info\n完成\n—\n—\nBetter money\n完成\n—\n—\nBetter Scroll Bars\n完成\n—\n—\nBodyMastery Mastered DBH\n完成\n—\n—\nCan I Reinstall This?\n完成\n—\n—\nCellcycle Acceleration\n完成\n—\n—\nCherry picker scroll bars\n完成\n—\n—\nDignified Empire Names\n完成\n—\n—\nDrug Policy Search\n完成\n—\n—\nElectric Igniter\n完成\n—\n—\nFrameRateControl\n完成\n—\n—\nHigh Life Drug Cooking Speed\n完成\n—\n—\nMiliraNamePlus\n完成\n—\n—\nMore Fire Resistance Genes\n完成\n—\n—\nNo Ambient Ducking\n完成\n—\n—\nNo Random Relations\n完成\n—\n—\nNo Time Change Sounds\n完成\n—\n—\nOmnivore Animals\n完成\n—\n—\nOrgan Decay Variety\n完成\n—\n—\nPawn Perspective\n完成\n—\n—\nPhase Weaponry - Revert Man in Black Change\n完成\n—\n—\nPocketMap Architect Fix\n完成\n—\n—\nPrisoner Jumpsuits - No Quality\n完成\n—\n—\nProselytizing Never\n完成\n—\n—\nSettlement Descriptions\n完成\n—\n—\nTime As a Slave\n完成\n—\n—\nTrader Will Buy Search\n完成\n—\n—\nUndraft After Tucking\n完成\n—\n—\nVFE Tribals Cornerstone Search\n完成\n—\n—",
+    "buttons": [
+      {
+        "text": "前往订阅与更新\no",
+        "act": "goto",
+        "primary": true
+      },
+      {
+        "text": "从记录里去掉\nDel",
+        "act": "forget",
+        "primary": false
+      }
+    ],
+    "rows": 1,
+    "steps": 0
+  },
+  "permanentItemMenu": "在 Mod 库里看\no\n打开文件夹\nctrl+o\n打开工坊页面\n复制名字\nctrl+c",
+  "cleanup": {
+    "systemTemporaryDataAndDownloads": "sent to Recycle Bin",
+    "temporaryBrowserProfilesAndPrograms": "sent to Recycle Bin",
+    "worktreeRawTestArtifacts": "sent to Recycle Bin",
+    "ownedProcesses": "stopped",
+    "managedRunscriptsRemaining": 0
+  }
+}
