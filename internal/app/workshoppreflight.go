@@ -256,6 +256,20 @@ func (a *App) SubscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool, cal
 
 // SetWorkshopProgress keeps one monotonic progress bar across batches and retries.
 func (t *Task) SetWorkshopProgress(items []TaskItem) {
+	// A continuation reports only its remaining IDs; retain earlier outcomes and
+	// weights so it is still the same operation in the task page.
+	if len(t.Items) > len(items) {
+		merged := slices.Clone(t.Items)
+		for _, next := range items {
+			for i := range merged {
+				if merged[i].Ref == next.Ref {
+					merged[i] = next
+					break
+				}
+			}
+		}
+		items = merged
+	}
 	previousDone := t.Done
 	t.Items, t.Total, t.Done, t.Phase = slices.Clone(items), len(items), 0, ""
 	var known, count float64
@@ -276,7 +290,9 @@ func (t *Task) SetWorkshopProgress(items []TaskItem) {
 			weight = float64(it.Size)
 		}
 		total += weight
-		if it.State == ItemOK || it.State == ItemFail {
+		// A transient failure may still be retried. Counting it as complete here
+		// would jump the entire bar to 99% before the retry has downloaded it.
+		if it.State == ItemOK || it.State == ItemFail && it.Permanent {
 			t.Done++
 			done += weight
 		}

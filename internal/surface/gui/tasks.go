@@ -223,7 +223,11 @@ func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 					}
 				}
 				s.mu.Lock()
-				nt := s.queueSettingTaskLocked(t.Kind, args, t.Env)
+				var resume []app.Task
+				if act == "resume" && t.WorkshopSubscription() {
+					resume = append(resume, t)
+				}
+				nt := s.queueSettingTaskLocked(t.Kind, args, t.Env, resume...)
 				s.mu.Unlock()
 				return settingQueued(nt), nil
 			}

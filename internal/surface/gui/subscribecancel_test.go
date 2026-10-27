@@ -94,6 +94,10 @@ func TestSubscribeCancelPreservesSuccessAndResumesRemaining(t *testing.T) {
 		t.Fatalf("runscript not cleaned: %v %v", files, err)
 	}
 	var resumed []string
+	resumeStarted, resumeRelease := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(resumeRelease) }) }
+	t.Cleanup(release)
 	e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
 		data, err := os.ReadFile(filepath.Join(filepath.Dir(exe), args[5]))
 		if err != nil {
@@ -106,16 +110,28 @@ func TestSubscribeCancelPreservesSuccessAndResumesRemaining(t *testing.T) {
 			}
 		}
 		e.WriteMod(filepath.Join(args[1], "steamapps", "workshop", "content", "294100", "8200"), testkit.Sample("cancel.second", "Second Mod"))
+		close(resumeStarted)
+		<-resumeRelease
 		return "Success. Downloaded item 8200", nil
 	}
 	if _, err := api.TaskAct("resume", []string{ended.ID}, ""); err != nil {
 		t.Fatal(err)
 	}
+	select {
+	case <-resumeStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("continuation did not start")
+	}
+	continued := api.Tasks().Rows
+	if len(continued) != 1 || continued[0].ID != ended.ID || continued[0].Pct < ended.Pct || continued[0].Count != "1 / 2" || len(continued[0].Items) != 2 {
+		t.Fatalf("continuation lost original task or progress: %+v", continued)
+	}
+	release()
 	deadline = time.Now().Add(5 * time.Second)
 	var next view.TaskRow
 	for time.Now().Before(deadline) {
 		for _, r := range api.Tasks().Rows {
-			if r.ID != ended.ID && r.State == app.TaskDone {
+			if r.ID == ended.ID && r.State == app.TaskDone {
 				next = r
 			}
 		}
@@ -124,7 +140,7 @@ func TestSubscribeCancelPreservesSuccessAndResumesRemaining(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if next.ID == "" || fmt.Sprint(resumed) != "[8200]" || len(api.Tasks().Rows) != 2 {
+	if next.ID == "" || fmt.Sprint(resumed) != "[8200]" || len(api.Tasks().Rows) != 1 || len(next.Items) != 2 || next.Count != "2 / 2" {
 		t.Fatalf("resumed=%v next=%+v", resumed, next)
 	}
 	if _, err := api.TaskAct("retry", []string{ended.ID}, ended.Items[0].Ref); err == nil {

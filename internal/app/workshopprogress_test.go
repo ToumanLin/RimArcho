@@ -97,6 +97,15 @@ func TestWorkshopRetryRoundsAndMonotonicProgress(t *testing.T) {
 	var previous float64
 	w.changed = func(items []TaskItem) {
 		progress.SetWorkshopProgress(items)
+		settled := 0
+		for _, it := range items {
+			if it.State == ItemOK || it.State == ItemFail && it.Permanent {
+				settled++
+			}
+		}
+		if progress.Done != settled {
+			t.Fatalf("retrying items counted as complete: done=%d settled=%d", progress.Done, settled)
+		}
 		if progress.Frac < previous {
 			t.Fatalf("progress reversed %f -> %f", previous, progress.Frac)
 		}
@@ -116,6 +125,8 @@ func TestWorkshopRetryRoundsAndMonotonicProgress(t *testing.T) {
 				out = append(out, "ERROR! Download item "+id+" failed (Not enough disk space).")
 			case id == "8102" && len(calls) <= 2:
 				out = append(out, "ERROR! Timeout downloading item "+id)
+			case id == "8103" && len(calls) <= 2:
+				out = append(out, "ERROR! Download item "+id+" failed (Failure).")
 			case id == "8125" && len(calls) <= 2: // unconfirmed crash in the second internal batch
 			case id == "8126" && len(calls) <= 2:
 				out = append(out, "ERROR! Download item "+id+" failed (Failure).")
@@ -129,7 +140,7 @@ func TestWorkshopRetryRoundsAndMonotonicProgress(t *testing.T) {
 		return strings.Join(out, "\n"), nil
 	}
 	results, err := a.runWorkshopBatches(exe, base, "anonymous", ids, w)
-	if err != nil || len(calls) != 3 || !slices.Equal(calls[0], ids[:25]) || !slices.Equal(calls[1], ids[25:]) || !slices.Equal(calls[2], []string{"8102", "8125", "8126"}) {
+	if err != nil || len(calls) != 3 || !slices.Equal(calls[0], ids[:25]) || !slices.Equal(calls[1], ids[25:]) || !slices.Equal(calls[2], []string{"8102", "8103", "8125", "8126"}) {
 		t.Fatalf("calls=%v err=%v", calls, err)
 	}
 	if !results["8102"].confirmed || !results["8125"].confirmed || !results["8126"].confirmed || !workshopPermanent(results["8100"].kind) || !workshopPermanent(results["8101"].kind) {

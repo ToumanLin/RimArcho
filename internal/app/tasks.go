@@ -260,7 +260,23 @@ func (ts *Tasks) EnqueueSelf(request Task, run func(string) (string, error)) Tas
 		ts.selfRuns = map[string]func(string) (string, error){}
 	}
 	t := &Task{ID: ts.newID(), Kind: request.Kind, Lane: LaneSelf, Obj: request.Obj, Args: slices.Clone(request.Args), Env: request.Env, State: TaskQueued, Queued: ts.stamp()}
-	ts.list = append([]*Task{t}, ts.list...)
+	if prior := ts.find(request.ID); prior != nil && prior.WorkshopSubscription() {
+		if prior.State != TaskStopped {
+			cp := *prior
+			ts.mu.Unlock()
+			return cp
+		}
+		// Continuing a cancelled download keeps its original items and progress.
+		t = prior
+		t.State, t.End, t.Result, t.Closed, t.Phase = TaskQueued, 0, "", false, ""
+		for i := range t.Items {
+			if t.Items[i].State == ItemSkip {
+				t.Items[i].State, t.Items[i].Why = ItemWait, ""
+			}
+		}
+	} else {
+		ts.list = append([]*Task{t}, ts.list...)
+	}
 	ts.selfRuns[t.ID] = run
 	key := LaneSelf + ":" + t.Kind
 	start := !ts.working[key]
@@ -312,6 +328,9 @@ func (ts *Tasks) runSelf(kind, key string) {
 			ts.mu.Lock()
 			c := next.Counts()
 			next.Done = c[ItemOK] + c[ItemFail]
+			if len(next.Items) > 0 && next.Done == len(next.Items) {
+				next.Frac = 1
+			}
 			switch {
 			case ts.stopping[id] && c[ItemSkip] > 0:
 				state = TaskStopped
@@ -380,7 +399,9 @@ func (ts *Tasks) Stop(id string) error {
 		t.State, t.End = TaskStopped, ts.ms()
 		delete(ts.selfRuns, id)
 		for i := range t.Items {
-			t.Items[i].State = ItemSkip
+			if t.Items[i].State == ItemWait || t.Items[i].State == ItemRun || t.Items[i].State == "" {
+				t.Items[i].State = ItemSkip
+			}
 		}
 		ts.saveLocked()
 	case t.State == TaskRunning && t.Lane != LaneSelf:

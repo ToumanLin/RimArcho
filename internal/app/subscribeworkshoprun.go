@@ -253,6 +253,11 @@ func workshopErrorKind(low string) string {
 	if strings.Contains(low, "file not found") || strings.Contains(low, "filenotfound") || strings.Contains(low, "private") || strings.Contains(low, "not visible") {
 		return "missing"
 	}
+	// SteamCMD can report bare Failure for the item interrupted by a crashed
+	// process. It supplies no permanent cause; retry it as unconfirmed.
+	if strings.Contains(low, "failed (failure)") && workshopFailure.MatchString(low) {
+		return ""
+	}
 	if kind := errorKind(low); kind != "other" {
 		return kind
 	}
