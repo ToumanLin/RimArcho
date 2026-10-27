@@ -96,3 +96,29 @@ func TestCheckedRemoveRefusesReplacement(t *testing.T) {
 		})
 	}
 }
+
+func TestReadPlainEntryCannotAuthorizeRemoval(t *testing.T) {
+	for _, dir := range []bool{false, true} {
+		root := t.TempDir()
+		path := filepath.Join(root, "plain")
+		var err error
+		if dir {
+			err = os.Mkdir(path, 0755)
+		} else {
+			err = os.WriteFile(path, []byte("keep"), 0644)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		l, err := source.ReadLink(path)
+		if err != nil || l.Kind != "plain" {
+			t.Fatalf("plain: %+v %v", l, err)
+		}
+		if err := source.RemoveLinkChecked(l); err == nil {
+			t.Fatal("plain entry accepted for removal")
+		}
+		if _, err := os.Stat(path); err != nil {
+			t.Fatal("plain entry was touched")
+		}
+	}
+}

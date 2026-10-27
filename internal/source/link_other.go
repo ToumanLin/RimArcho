@@ -10,7 +10,11 @@ import (
 // IsLink reports whether p is a symbolic link.
 func IsLink(p string) bool {
 	fi, err := os.Lstat(p)
-	return err == nil && fi.Mode()&os.ModeSymlink != 0
+	return err == nil && isLinkInfo(fi)
+}
+
+func isLinkInfo(fi os.FileInfo) bool {
+	return fi.Mode()&os.ModeSymlink != 0
 }
 
 // RealPath resolves symbolic links.

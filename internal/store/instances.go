@@ -141,6 +141,25 @@ var (
 // loaded on demand by Mod.Decl (see LoadDecls for a batch).
 func (s *Store) Mods(envID string) ([]*Mod, error) { return s.mods(envID, modColsLite) }
 
+// UninstallMods reads only the inputs needed to clean ModsConfig.xml. It always queries
+// the current database; full snapshot metadata and declarations are not needed here.
+func (s *Store) UninstallMods(envID string) ([]*Mod, error) {
+	rows, err := s.DB.Query(`SELECT i.status, s.kind, i.rel_path, coalesce(n.package_id, '')`+modFrom+` WHERE i.environment_id IN ('', ?)`, envID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Mod
+	for rows.Next() {
+		m := &Mod{}
+		if err := rows.Scan(&m.Status, &m.Kind, &m.Rel, &m.PackageID); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
 // ModsFull is Mods with declarations included.
 func (s *Store) ModsFull(envID string) ([]*Mod, error) { return s.mods(envID, modColsFull) }
 

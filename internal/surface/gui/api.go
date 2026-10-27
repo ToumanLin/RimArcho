@@ -80,6 +80,10 @@ type API struct {
 	accountMu   sync.Mutex
 	ll          *subscribe.LoversLab
 	llFiles     map[string]loverDownload
+
+	uninstallSizes app.UninstallSizeCache
+	uninstallRead  logReader
+
 	// ScanRunner scans an environment in place of the child process (tests).
 	ScanRunner func(env string) (string, error)
 }

@@ -3,6 +3,7 @@ package gui
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -13,13 +14,14 @@ import (
 
 // UninstallPlan is the plan for these answers (nothing changes).
 func (s *API) UninstallPlan(c view.UninstallChoice) (*view.UninstallPage, error) {
-	r, err := s.detachedReader()
+	s.uninstallRead.mu.Lock()
+	defer s.uninstallRead.mu.Unlock()
+	r, err := s.uninstallSession()
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
 	defer s.free.soon()
-	p, err := r.PlanUninstall(c.Options())
+	p, err := r.PlanUninstallPreview(c.Options(), &s.uninstallSizes)
 	if err != nil {
 		return nil, err
 	}
@@ -71,4 +73,28 @@ func (s *API) Quit() bool {
 	}
 	go s.quit()
 	return true
+}
+
+// Called with uninstallRead.mu held. Only invocation options are copied under mu;
+// the reader's database-keyed input caches survive, but no plan is retained.
+func (s *API) uninstallSession() (*app.App, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.a.Uninstalled {
+		return nil, errors.New("RimArcho 已卸载，预览已停用")
+	}
+	if s.uninstallRead.a == nil {
+		r, err := s.a.ReadSession()
+		if err != nil {
+			return nil, err
+		}
+		s.uninstallRead.a = r
+	}
+	r := s.uninstallRead.a
+	r.ReadOptions(s.a)
+	if e, err := s.a.Env(); err == nil {
+		r.EnvName = e.Name
+	}
+	r.AnalyzeExe, r.AnalyzeWait = s.Exe, 200*time.Millisecond
+	return r, nil
 }

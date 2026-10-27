@@ -120,6 +120,8 @@ type UninstallPlan struct {
 	AfterExit AfterExit
 	// Log is where the script lists anything it could not delete.
 	Log string
+
+	EstimatedSizes bool // preview bytes may come from a short-lived cache
 }
 
 // AfterExit is the last step: folders deleted whole, files, and folders removed only when
@@ -203,6 +205,20 @@ func downloadedGame(root string) bool {
 
 // PlanUninstall works out what Uninstall would do with these answers.
 func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
+	return a.planUninstall(o, dirSize)
+}
+
+// PlanUninstallPreview reuses only byte estimates. Every path, process and ownership
+// check is recomputed; execution uses PlanUninstall, without this cache.
+func (a *App) PlanUninstallPreview(o UninstallOptions, sizes *UninstallSizeCache) (*UninstallPlan, error) {
+	p, err := a.planUninstall(o, sizes.sizeOf)
+	if p != nil {
+		p.EstimatedSizes = true
+	}
+	return p, err
+}
+
+func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*UninstallPlan, error) {
 	envs, err := a.Store.Envs()
 	if err != nil {
 		return nil, err
@@ -323,7 +339,7 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 	used := map[string]bool{}
 	for _, dir := range lockCopies(lockRoot) {
 		d := scan.ReadDecl(dir, false)
-		it := &UninstallItem{Path: dir, Name: d.Name, Bytes: a.sizeOf(dir), Do: DoTrash}
+		it := &UninstallItem{Path: dir, Name: d.Name, Bytes: sizeOf(dir), Do: DoTrash}
 		if o.KeepLocked && lockEnv != nil {
 			mods := a.modsFolder(lockEnv)
 			name := freeNameUsed(mods, filepath.Base(dir), used)
@@ -404,7 +420,7 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 		for _, d := range ents {
 			path := filepath.Join(monRoot, d.Name())
 			if strings.HasPrefix(d.Name(), monitorFolder) || strings.HasSuffix(d.Name(), TmpSuffix) {
-				mon = append(mon, &UninstallItem{Path: path, Do: DoDelete, Bytes: a.sizeOf(path)})
+				mon = append(mon, &UninstallItem{Path: path, Do: DoDelete, Bytes: sizeOf(path)})
 			}
 		}
 	}
@@ -426,14 +442,14 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 			}
 			path := filepath.Join(packsDir, d.Name())
 			if strings.HasSuffix(d.Name(), TmpSuffix) {
-				packs = append(packs, &UninstallItem{Path: path, Do: DoDelete, Bytes: a.sizeOf(path), Note: "an unfinished build"})
+				packs = append(packs, &UninstallItem{Path: path, Do: DoDelete, Bytes: sizeOf(path), Note: "an unfinished build"})
 				continue
 			}
 			pk, err := a.ReadPack(d.Name())
 			if err != nil {
 				continue // not a pack: inside the data folder it goes with it, elsewhere it stays
 			}
-			it := &UninstallItem{Path: path, Name: pk.Name, Bytes: a.sizeOf(path), Do: DoKeep}
+			it := &UninstallItem{Path: path, Name: pk.Name, Bytes: sizeOf(path), Do: DoKeep}
 			switch {
 			case o.RemovePacks:
 				it.Do = DoTrash
@@ -453,7 +469,7 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 	}
 	usedS := map[string]bool{}
 	saveItem := func(path, name string) {
-		it := &UninstallItem{Path: path, Name: name, Bytes: a.sizeOf(path), Do: DoTrash}
+		it := &UninstallItem{Path: path, Name: name, Bytes: sizeOf(path), Do: DoTrash}
 		if !o.RemoveSaves {
 			it.Do, it.To = DoMove, filepath.Join(p.SavesTo, freeNameUsed(p.SavesTo, name, usedS))
 		}
@@ -475,7 +491,7 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 	var games []*UninstallItem
 	for _, e := range envs {
 		if downloadedGame(e.GameRoot) {
-			it := &UninstallItem{Path: e.GameRoot, Name: e.Name, Bytes: a.sizeOf(e.GameRoot), Do: DoKeep}
+			it := &UninstallItem{Path: e.GameRoot, Name: e.Name, Bytes: sizeOf(e.GameRoot), Do: DoKeep}
 			if o.RemoveGames {
 				it.Do = DoTrash
 			}
@@ -498,7 +514,7 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 	// 8. RimArcho's SteamCMD
 	var scmd []*UninstallItem
 	if dir := a.SteamCMDDir(); dirExists(dir) {
-		it := &UninstallItem{Path: dir, Do: DoDelete, Bytes: a.sizeOf(dir)}
+		it := &UninstallItem{Path: dir, Do: DoDelete, Bytes: sizeOf(dir)}
 		switch {
 		case a.Store.Meta("cfg:steamcmd.path") != "" && !source.Within(dir, a.LocalDir()):
 			it.Do, it.Note = DoLeave, "SteamCMD is in a custom directory: left alone"
@@ -523,7 +539,7 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 	// 9. the data folders
 	var data []*UninstallItem
 	if isArchoHome(a.Home) {
-		data = append(data, &UninstallItem{Path: a.Home, Do: DoLater, Bytes: a.sizeOf(a.Home)})
+		data = append(data, &UninstallItem{Path: a.Home, Do: DoLater, Bytes: sizeOf(a.Home)})
 		p.AfterExit.Dirs = append(p.AfterExit.Dirs, a.Home)
 	} else {
 		data = append(data, &UninstallItem{Path: a.Home, Do: DoLeave, Note: "not a RimArcho data folder (no archo.db): left alone"})
@@ -535,7 +551,7 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 				kept = append(kept, k)
 			}
 		}
-		it := &UninstallItem{Path: p.Local, Do: DoLater, Bytes: a.sizeOf(p.Local)}
+		it := &UninstallItem{Path: p.Local, Do: DoLater, Bytes: sizeOf(p.Local)}
 		if len(kept) == 0 {
 			p.AfterExit.Dirs = append(p.AfterExit.Dirs, p.Local)
 		} else {
@@ -603,13 +619,24 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 			}
 		}
 		p.AfterExit.Empty = append(p.AfterExit.Empty, dir)
-		prog = append(prog, &UninstallItem{Path: dir, Do: DoLater, Bytes: a.sizeOf(dir), Note: "only RimArcho's own files; the folder goes when nothing else is in it"})
+		prog = append(prog, &UninstallItem{Path: dir, Do: DoLater, Bytes: sizeOf(dir), Note: "only RimArcho's own files; the folder goes when nothing else is in it"})
 	}
 	add(UnProgram, prog)
+	var incoming *incomingLinkCheck
 	for _, step := range p.Steps {
 		for _, it := range step.Items {
 			if it.Do == DoTrash || it.Do == DoMove || it.Do == DoDelete {
-				it.Links, err = a.PlanIncomingLinks(it.Path, "")
+				// All targets in this plan use one fresh incoming-link observation.
+				if incoming == nil {
+					incoming, err = a.readIncomingLinks()
+					if err != nil {
+						if p.Problem == "" {
+							p.Problem = err.Error()
+						}
+						return p, nil
+					}
+				}
+				it.Links, err = a.planIncomingLinks(it.Path, "", incoming)
 				if err != nil && p.Problem == "" {
 					p.Problem = err.Error()
 				}
@@ -643,7 +670,7 @@ func (a *App) presentPackages(envs []*env.Environment, udKey string) (map[string
 		if store.UserDataKey(e.UserDataRoot) != udKey {
 			continue
 		}
-		mods, err := a.Store.Mods(e.ID)
+		mods, err := a.Store.UninstallMods(e.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -720,20 +747,6 @@ func holdsAny(dir string, paths []string) bool {
 func isArchoHome(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, "archo.db"))
 	return err == nil
-}
-
-// sizeOf measures a folder once per App (a dry run is drawn again on every answer).
-func (a *App) sizeOf(dir string) int64 {
-	if a.sizes == nil {
-		a.sizes = map[string]int64{}
-	}
-	k := env.PathKey(dir)
-	if n, ok := a.sizes[k]; ok {
-		return n
-	}
-	n := dirSize(dir)
-	a.sizes[k] = n
-	return n
 }
 
 // otherArcho lists the other RimArcho processes started from this program's folder: they

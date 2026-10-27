@@ -32,8 +32,23 @@ func (a *App) IncomingInstanceLinks(id string) ([]*GameLink, error) {
 	return a.IncomingLinks(m.RealPath)
 }
 
+// incomingLinkCheck is a fresh observation for one operation, never retained across requests.
+type incomingLinkCheck struct {
+	roots   []gameMods
+	links   []*GameLink
+	targets map[*GameLink]string
+	probe   func(string) *GameRun
+}
+
 func (a *App) affectedGameLinks(target string, locations bool) ([]*GameLink, error) {
-	target = physicalLinkPath(target)
+	check, err := a.readIncomingLinks()
+	if err != nil {
+		return nil, err
+	}
+	return check.affected(target, locations), nil
+}
+
+func (a *App) readIncomingLinks() (*incomingLinkCheck, error) {
 	managed, err := a.InspectGameLinks()
 	if err != nil {
 		return nil, err
@@ -77,12 +92,25 @@ func (a *App) affectedGameLinks(target string, locations bool) ([]*GameLink, err
 			if l.snapshot == nil || l.Kind != "junction" && l.Kind != "symlink" || l.State == source.TargetUnknown {
 				return nil, fmt.Errorf("cannot rule out an incoming link at %s: %s; leave it alone and resolve the check failure first", l.Path, l.Reason)
 			}
-			if source.Within(physicalLinkPath(l.snapshot.Target), target) || locations && source.Within(l.Path, target) {
-				out = append(out, l)
-			}
+			out = append(out, l)
 		}
 	}
-	return out, nil
+	targets := make(map[*GameLink]string, len(out))
+	for _, l := range out {
+		targets[l] = physicalLinkPath(l.snapshot.Target)
+	}
+	return &incomingLinkCheck{roots: roots, links: out, targets: targets, probe: a.probe()}, nil
+}
+
+func (c *incomingLinkCheck) affected(target string, locations bool) []*GameLink {
+	target = physicalLinkPath(target)
+	var out []*GameLink
+	for _, l := range c.links {
+		if source.Within(c.targets[l], target) || locations && source.Within(l.Path, target) {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 func missingTarget(path string) bool {
@@ -139,34 +167,36 @@ func rebaseLinkPath(path, from, to string) string {
 // PlanIncomingLinks is read-only. An empty destination means detach permanently.
 // Directory moves also capture managed links located inside the moved tree.
 func (a *App) PlanIncomingLinks(from, to string) (*LinkLifecyclePlan, error) {
+	check, err := a.readIncomingLinks()
+	if err != nil {
+		return nil, err
+	}
+	return a.planIncomingLinks(from, to, check)
+}
+
+func (a *App) planIncomingLinks(from, to string, check *incomingLinkCheck) (*LinkLifecyclePlan, error) {
 	from = physicalLinkPath(from)
 	if to != "" {
 		to = physicalLinkPath(to)
 	}
-	roots, err := a.knownGameMods()
-	if err != nil {
-		return nil, err
-	}
+	roots := check.roots
 	var games []string
 	for _, root := range roots {
 		if source.Within(from, root.mods) || source.Within(root.mods, from) {
 			games = append(games, root.game)
 		}
-		if (source.Within(from, root.mods) || source.Within(root.mods, from)) && a.probe()(root.game) != nil {
+		if (source.Within(from, root.mods) || source.Within(root.mods, from)) && check.probe(root.game) != nil {
 			return nil, fmt.Errorf("affected game is running: %s", root.game)
 		}
 	}
-	links, err := a.affectedGameLinks(from, to != "")
-	if err != nil {
-		return nil, err
-	}
+	links := check.affected(from, to != "")
 	p := &LinkLifecyclePlan{From: from, To: to, Games: games}
 	unique := map[string]*LinkTransition{}
 	for _, l := range links {
 		if !l.Owned || l.Code == CodeLinkForeign || !managedLink(filepath.Base(l.Path)) && !packLink(filepath.Base(l.Path)) {
 			return nil, fmt.Errorf("moving or removing %s would break foreign link %s -> %s (%s); detach it yourself first", from, l.Path, l.Target, l.Evidence)
 		}
-		if a.probe()(l.Game) != nil {
+		if check.probe(l.Game) != nil {
 			return nil, fmt.Errorf("affected game is running: %s", l.Game)
 		}
 		p.Games = append(p.Games, l.Game)

@@ -144,7 +144,6 @@ type App struct {
 	AfterExitFunc     func(AfterExit) error
 	// Uninstalled is set once an uninstall has run: every command is refused after it.
 	Uninstalled bool
-	sizes       map[string]int64
 
 	analyzing *pendingAnalysis
 
