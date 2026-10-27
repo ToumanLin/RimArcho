@@ -36,7 +36,7 @@ import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
 import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } from "./navigation.js";
-import { checkCredit } from "./credit.js";
+import { checkCredit, getChoices } from "./credit.js";
 
 // ---- loading ----
 
@@ -647,6 +647,35 @@ async function run(what) {
   } else say("ok", o.text, !!o.undo);
   await reload();
   motion.play(before, null);
+  if (what === "sort" && o.missingDependencies?.length) offerDependencies(o.missingDependencies);
+}
+
+// offerDependencies: a sort found enabled mods whose required mods are not enabled (04).
+// Installed ones are enabled in one undo step and the list sorted again; Workshop ones are
+// subscribed after the usual Steam / SteamCMD choice; the rest can only be named.
+function offerDependencies(missing) {
+  const by = (k) => missing.filter((m) => m.kind === k);
+  const installed = by("installed"), workshop = by("workshop"), unknown = by("unknown");
+  const line = (m) => Tf("%s, needed by %s", m.name || m.packageId, (m.requiredBy || []).slice(0, 3).join(T(", ")) + ((m.requiredBy || []).length > 3 ? " …" : ""));
+  const lines = [];
+  if (installed.length) lines.push(Tf("installed, not enabled (%d):", installed.length), ...installed.map(line));
+  if (workshop.length) lines.push(Tf("not installed, on the Workshop (%d):", workshop.length), ...workshop.map(line));
+  if (unknown.length) lines.push(Tf("not installed, no known source (%d):", unknown.length), ...unknown.map(line));
+  const subscribe = (ids) => pop.choose(Tf("get %d mods", ids.length), getChoices(), async (i) => {
+    try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1, batch: true })); } catch (e) { say("fail", errText(e)); }
+  });
+  if (!installed.length && !workshop.length) return pop.text(T("some required mods are missing"), lines);
+  const go = installed.length
+    ? (workshop.length ? Tf("enable %d and subscribe %d", installed.length, workshop.length) : Tf("enable %d and sort again", installed.length))
+    : Tf("subscribe %d", workshop.length);
+  pop.confirm(T("some required mods are missing"), lines, go, async () => {
+    let ids = workshop.map((m) => m.workshopId);
+    if (installed.length) {
+      const r = await edited(() => api.CompleteDependencies(), true);
+      if (r?.workshopIds?.length) ids = r.workshopIds;
+    }
+    if (ids.length) subscribe([...new Set(ids)]);
+  });
 }
 
 // confirmMoves asks once about moving folders into the lock library (08 §3), then runs again.
