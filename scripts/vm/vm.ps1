@@ -52,6 +52,14 @@ function PS1InGuest([string]$file, [switch]$Interactive, [switch]$NoWait) {
 function GuestIP { (VM getGuestIPAddress @('-wait')) | Select-Object -Last 1 }
 
 switch ($Command) {
+    'put' {
+        if ($Rest.Count -ne 2) { throw 'put requires host source and guest destination' }
+        ToGuest $Rest[0] $Rest[1]
+    }
+    'get' {
+        if ($Rest.Count -ne 2) { throw 'get requires guest source and host destination' }
+        FromGuest $Rest[0] $Rest[1]
+    }
     'status' {
         & 'C:\Program Files\VMware\VMware Workstation\vmrun.exe' list
         Write-Host "tools: $(VM checkToolsState)"

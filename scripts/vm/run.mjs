@@ -22,11 +22,14 @@ for (let i = 2; i < process.argv.length; i += 2) {
   options[key.slice(2)] = process.argv[i+1];
 }
 const driver = options.driver || 'W', scenario = Number(options.scenario || 1);
+const mode = options.mode;
+assert(!mode || ['crawl','walk'].includes(mode), 'use --mode crawl|walk');
+assert(!mode || driver === 'W', 'crawl/walk require real window driver W');
 assert(['W','A','C'].includes(driver) && scenario >= 1 && scenario <= 4, 'use --driver W|A|C --scenario 1|2|3|4');
 const outside = path => { for(const root of [repo,repositoryRoot]) { const r=relative(root,resolve(path));assert(r.startsWith('..')||isAbsolute(r),`results and test homes must be outside the repository: ${path}`); } return resolve(path); };
 const outputBase = outside(options.out || join(tmpdir(), 'RimArcho-vm-results'));
 mkdirSync(outputBase, { recursive: true });
-const out = mkdtempSync(join(outputBase, `s${scenario}-${driver}-`));
+const out = mkdtempSync(join(outputBase, `${mode || 's'+scenario}-${driver}-`));
 const tools = resolve(options.tools || join(tmpdir(), 'RimArcho-vm-tools'));
 const exe = name => join(tools, name + (platform() === 'win32' ? '.exe' : ''));
 const result = { schema: 1, scenario, driver, seed: 271027, fixture: options.baseline ? 'real-copy' : 'small', output: out, started: new Date().toISOString(), host: { cpu: cpus()[0]?.model, cores: cpus().length, memory: totalmem(), platform: platform() }, timings: [], checks: [], coverage: [], checkpoints: [], failures: [], performanceFailures: [] };
@@ -51,7 +54,7 @@ async function snapshot(label) {
   const artifact = `${String(++checkpointSeq).padStart(2,'0')}-${label}`;
   save(artifact,{ domain:data, surface:ui });result.checkpoints.push({ label, artifact:artifact+'.json' });
   if(ui) {
-    if(ui.page===null && data.observation){
+    if(ui.page===null && data.observation && (!mode || ui.plan===currentPlan)){
       const expected=data.observation.entries.map(e=>e.i||'pkg:'+e.m);
       const shown=ui.columns[1].entries.map(e=>e.id||e.ref);
       check(label+': window enabled list matches domain',JSON.stringify(shown)===JSON.stringify(expected),{expected:expected.length,shown:shown.length});
@@ -61,7 +64,7 @@ async function snapshot(label) {
     check(label+': page has content',!ui.blank && ui.content,ui.page);
     check(label+': sidebar lists intact',ui.plans?.length===data.plans.length,{ui:ui.plans?.length,db:data.plans.length});
     check(label+': no console/script errors',ui.errors.length===0,ui.errors);
-    check(label+': open plan matches',ui.plan===currentPlan,{expected:currentPlan,actual:ui.plan});
+    if(!mode)check(label+': open plan matches',ui.plan===currentPlan,{expected:currentPlan,actual:ui.plan});
   }
   return data;
 }
@@ -228,7 +231,7 @@ async function setup() {
   if(options.baseline) {
     const baseline=outside(options.baseline);assert(existsSync(join(baseline,'isolated.json')),'baseline needs isolated.json from prepare-real.ps1');
     command(exe('vmstate'),['--mode','audit','--home',join(baseline,'home'),'--root',baseline],{},30000);
-    if(scenario===2 && driver==='W' && options['owned-files']!=='true') {
+    if(driver==='W' && ((mode && options.allow) || (!mode && scenario===2 && options['owned-files']!=='true'))) {
       // UseEnv can create/remove deployment links: this scenario owns a full filesystem copy.
       command('pwsh',['-NoProfile','-File',join(repo,'scripts/vm/prepare-real.ps1'),'-SourceHome',join(baseline,'home'),'-Root',dirname(home),'-Tools',tools],{},1800000);
     } else {
@@ -491,13 +494,20 @@ async function scenario4() {
 try {
   await timed('prepare-and-start',setup,null);
   if(c)await editor();
-  await timed('scenario',()=>[scenario1,scenario2,scenario3,scenario4][scenario-1](),300000);
-  await freshProblems();
+  if(mode) {
+    const { drive } = await import('./players.mjs');
+    await drive({ c, options, result, out, repo, home, tools, currentPlan, snapshot, settled, check, editor, command, exe, save });
+  } else {
+    await timed('scenario',()=>[scenario1,scenario2,scenario3,scenario4][scenario-1](),300000);
+    await freshProblems();
+  }
   if(c){
     await settled();
     const evidence=await c.evaluate('(()=>{__vm.stop();const {read,stop,timer,...v}=__vm;return v})()');save('window-trace',evidence);
-    check('all observed input is trusted',evidence.inputs.every(i=>i.trusted));check('no transient blank page',evidence.samples.filter(s=>s.armed).every(s=>!s.blank && (s.content || s.loading)));
-    check('sidebar never loses lists',evidence.samples.filter(s=>s.armed).every(s=>s.sidebar.includes('plan') && s.plansCount===result.content.plans));
+    // App keyboard handlers may invoke .click() internally (e.g. Tab to a list).
+    // Physical key/pointer arrival must be trusted; derived synthetic clicks are evidence.
+    check('all observed key/pointer input is trusted',evidence.inputs.filter(i=>/^(key|pointer|mouse)/.test(i.type)).every(i=>i.trusted));check('no transient blank page',evidence.samples.filter(s=>s.armed).every(s=>!s.blank && (s.content || s.loading)));
+    check('sidebar never loses lists',evidence.samples.filter(s=>s.armed).every(s=>s.sidebar.includes('plan') && (mode || s.plansCount===result.content.plans)));
     check('never falsely displays no game',evidence.samples.filter(s=>s.armed).every(s=>!s.noGame));
     check('no console errors',evidence.errors.length===0,evidence.errors);
     const sequences=new Map();

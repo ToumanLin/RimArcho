@@ -29,13 +29,14 @@ export async function observe() {
     const screen = document.querySelector('#screen'), status = document.querySelector('#status')?.textContent || '';
     const renderedColumns=S.screen===null ? S.cols.slice(0,2).map((col,k)=>({expected:col.view.length,rendered:document.querySelectorAll(`.area[data-area="${k}"] .rows .row`).length})) : [];
     const cols = detailed && (S.cols || []).map(c => ({ entries: c.items.map(i => ({ id: i.id, ref: i.ref, packageId: i.packageId, missing: i.missing })), selected: [...c.sel], cursor: c.cursor }));
-    return { ...context(), status, popup: S.popup?.kind || null, busy: S.busy, editing: S.editing || 0, problems: S.board?.problems, plans: S.shell?.plans, columns: cols, renderedColumns, focus: S.focus,
+    return { ...context(), status, popup: S.popup?.kind || null, popupTitle:S.popup?.title || '', menu:!!document.querySelector('#menu:not([hidden])'), modes:[...document.querySelectorAll('.tabs .on,[role="tab"][aria-selected="true"],details[open],.fold.closed,.fold.collapsed')].map(e=>[e.id,{...e.dataset},e.className,e.tagName]), busy: S.busy, editing: S.editing || 0, problems: S.board?.problems, plans: S.shell?.plans, columns: cols, renderedColumns, focus: S.focus,
       loading: !!document.querySelector('.page-loading, [aria-busy="true"]'),
       readError: document.querySelector('.page-read-error')?.innerText,
       blank: !document.querySelector('#app')?.firstElementChild,
       noGame: !!S.board?.envs?.length && /no games? yet|还没有游戏/.test(screen?.textContent||''),
       sidebar: [...document.querySelectorAll('#nav [data-id]')].map(e => e.dataset.id),
       content: S.screen === null ? !!document.querySelector('#board .rows') && renderedColumns.every(col=>!col.expected || col.rendered>0) : !!screen?.innerText.trim(),
+      navLayout:document.querySelector('#app')?.classList.contains('nav-top')?'top':'side',
       errors: vm.errors, activeElement: document.activeElement?.outerHTML.slice(0, 300) };
   };
   let lastStatus = '', last = performance.now();
@@ -49,11 +50,30 @@ export async function observe() {
   return context();
 }
 export function discover() {
-  const selector = 'button,a,input,select,textarea,summary,[role="button"],[role="tab"],[role="menuitem"],[tabindex],[data-cmd],[data-env-write],.row';
-  return [...document.querySelectorAll(selector)].map(e => {
+  const selector = 'button,a[href],input:not([type="hidden"]),select,textarea,summary,label:has(> input),[role="button"],[role="tab"],[role="menuitem"],[role="option"],[role="checkbox"],[role="switch"],[role="slider"],[tabindex],[data-cmd],[data-env-write],[onclick],[contenteditable="true"],.row,.lrow,.opt,.fold > .head';
+  const candidates = new Set(document.querySelectorAll(selector));
+  // Delegated handlers and row descendants need more than the CONTROL selector.
+  for(const e of document.querySelectorAll('#app *')) if(e.onclick || e.oncontextmenu || getComputedStyle(e).cursor==='pointer') {
+    if(!e.closest('.refnums') && (!e.parentElement || getComputedStyle(e.parentElement).cursor!=='pointer' || e.onclick || e.oncontextmenu)) candidates.add(e);
+  }
+  const path = e => {
+    const parts=[];
+    for(let n=e;n && n!==document.body;n=n.parentElement) {
+      if(n.id){parts.unshift('#'+CSS.escape(n.id));break;}
+      const semantic=['data-cmd','data-env-write','data-id','data-key','data-area','name'].find(k=>n.hasAttribute(k));
+      if(semantic)parts.unshift(n.tagName.toLowerCase()+'['+semantic+'='+JSON.stringify(n.getAttribute(semantic))+']');
+      else {const siblings=[...n.parentElement.children].filter(s=>s.tagName===n.tagName);parts.unshift(n.tagName.toLowerCase()+':nth-of-type('+(siblings.indexOf(n)+1)+')');}
+    }
+    return parts.join(' > ');
+  };
+  return [...candidates].map(e => {
     const b = e.getBoundingClientRect(), x = b.x+b.width/2, y = b.y+b.height/2, hit = document.elementFromPoint(x,y);
     const label = (e.getAttribute('aria-label') || e.title || e.innerText || e.name || '').trim().replace(/\s+/g,' ').slice(0,200);
     const identity = Object.fromEntries([...e.attributes].filter(a => /^(data-|name|id)/.test(a.name)).map(a => [a.name,a.value]));
-    return { tag: e.tagName, role: e.getAttribute('role'), label, identity, bounds: {x:b.x,y:b.y,width:b.width,height:b.height}, visible: !!(b.width && b.height), enabled: !e.disabled && !e.closest('[inert]'), hittable: hit === e || e.contains(hit), key: [document.querySelector('#nav .on')?.dataset.id, document.querySelector('#popup:not([hidden])')?.innerText.slice(0,80), e.tagName, e.getAttribute('role'), JSON.stringify(identity),label].join('|') };
+    const row=e.matches('.row,.lrow'), area=e.closest('[data-area]')?.dataset.area;
+    const owner=e.closest('#popup:not([hidden])')?'popup':e.closest('#menu:not([hidden])')?'menu':e.closest('#nav,#nav-settings,#tasks-line,#env,#live')?'nav':'page';
+    const locator=path(e);
+    const blockedByLayer=!!(hit?.closest('#popup:not([hidden]),#menu:not([hidden])')&&!e.closest('#popup:not([hidden]),#menu:not([hidden])'));
+    return { tag: e.tagName, role: e.getAttribute('role'), label, identity, locator, owner, area, row, inputType:e.type, href:e.getAttribute('href'), context:!!e.oncontextmenu || row, blockedByLayer, bounds: {x:b.x,y:b.y,width:b.width,height:b.height}, visible: !!(b.width && b.height), enabled: !e.matches(':disabled') && !e.closest('[inert]'), hittable: hit === e || e.contains(hit), key: [e.tagName, e.getAttribute('role'),JSON.stringify(identity),locator,label].join('|') };
   });
 }

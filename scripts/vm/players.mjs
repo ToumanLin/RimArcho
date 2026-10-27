@@ -1,0 +1,320 @@
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { discover } from './observe.mjs';
+import { sleep } from './cdp.mjs';
+import { allowed, canonical, classify, coverage, difference, exclusions, random, stateKey } from './player-policy.mjs';
+
+const hash=s=>createHash('sha256').update(s).digest('hex').slice(0,20);
+const quoted=s=>JSON.stringify(s);
+export async function drive(ctx) {
+  const {c,options,result,out,currentPlan,snapshot,settled,editor,check,save}=ctx;
+  const seed=Number(options.seed||271027), steps=Number(options.steps||200), minutes=Number(options.minutes||60);
+  if(!Number.isSafeInteger(seed)||!Number.isInteger(steps)||steps<1||!Number.isFinite(minutes)||minutes<=0)throw Error('seed must be an integer, steps positive integer, minutes positive');
+  if(options.allow&&!['local','external'].includes(options.allow))throw Error('--allow local|external');
+  const rng=random(seed), pick=a=>a[Math.floor(rng()*a.length)], started=performance.now(), deadline=started+minutes*60000;
+  Object.assign(result,{mode:options.mode,seed,steps,minutes,allow:options.allow||'safe',canonicalExclusions:exclusions,knownFailures:[{id:'F2',oracle:'undo canonical equality',description:'stage metadata outside undo; fix belongs to stage-undo branch'}]});
+  const ledger=new Map(),states=new Map(),queue=[],trace=[],edges=[],sequences=new Map();
+  const maxStates=Number(options['max-states']||200);
+  const previousLedger=options.ledger?JSON.parse(readFileSync(options.ledger,'utf8')):null;
+  let sampleAt=0,statusAt=0,continuousFailure=null,expectedEnd,nonUndoableBranch=false,needsReset=false;
+  const read=()=>c.evaluate('__vm.read()');
+  const controls=()=>c.evaluate(`(${discover.toString()})()`);
+  const fail=(name,detail)=>{check(name,false,detail);continuousFailure ||= {name,detail};};
+  async function oracles(label,ready=true) {
+    const s=await read();
+    if(s.blank||s.readError||(!s.content&&!s.loading))fail('no blank/error page',{label,page:s.page,error:s.readError});
+    if(!s.sidebar.includes('plan'))fail('sidebar intact',{label,sidebar:s.sidebar});
+    if(s.errors.length)fail('no console/script errors',{label,errors:s.errors});
+    if(s.noGame)fail('no false no-game state',{label});
+    if(ready&&(s.loading||s.editing||s.busy.env))fail('no stuck loading',{label,loading:s.loading,editing:s.editing});
+    const batch=await c.evaluate(`({samples:__vm.samples.slice(${sampleAt}),statuses:__vm.statuses.slice(${statusAt}),sampleAt:__vm.samples.length,statusAt:__vm.statuses.length})`);
+    sampleAt=batch.sampleAt;statusAt=Math.max(0,batch.statusAt-1);
+    for(const p of batch.samples.filter(p=>p.armed)){
+      if(p.blank||(!p.content&&!p.loading))fail('continuous no blank page',{label,sample:p});
+      if(!p.sidebar.includes('plan'))fail('continuous sidebar intact',{label,sample:p});
+      if(p.gapMs>1500)fail('responsive main thread',{label,gapMs:p.gapMs});
+      const k=JSON.stringify([p.env,p.problemPlan,p.listVersion]);
+      if(sequences.has(k)&&p.sequence<sequences.get(k))fail('problems sequence monotonic',{label,key:k,before:sequences.get(k),after:p.sequence});
+      sequences.set(k,p.sequence);
+    }
+    for(let i=1;i<batch.statuses.length;i++){
+      const a=batch.statuses[i-1],b=batch.statuses[i];
+      if(a.text&&!/loading|checking|正在|加载/i.test(a.text)&&/loading|加载/i.test(b.text)&&a.inputCount===b.inputCount)fail('results not overwritten by loading',{label,a,b});
+    }
+    return s;
+  }
+  function identity(control,state) {
+    // The DOM is virtualized. Rows are representative action classes, with their
+    // concrete target retained for replay; ordinary descendants remain separate.
+    const label=control.label.replaceAll(out,'<run>').replaceAll(out.replaceAll('\\','/'),'<run>');
+    const stable=control.row?['row',control.area,control.identity?.['data-kind']||'',/missing|absent/i.test(control.label)?'missing':'present']:[control.tag,control.role,control.identity,control.locator,label];
+    return hash(JSON.stringify([state,...stable]));
+  }
+  function record(found,s,key,recipe) {
+    const added=[];
+    for(const control of found){
+      // A container and its pointer-styled text child are one target; nested real
+      // buttons are still independently discovered by discover().
+      const id=identity(control,key);if(ledger.has(id))continue;
+      const policy=classify(control,s), permitted=allowed(policy.tier,options.allow),eligible=permitted&&control.visible&&control.enabled&&!control.blockedByLayer;
+      const row={...control,key:id,state:key,page:s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
+      if(!permitted){row.outcome='skipped';row.reason=policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`;}
+      else if(!eligible){row.reason=!control.visible?'not visible in this state':!control.enabled?'disabled; requires application precondition':'covered by popup/menu; not an eligible edge in this state';}
+      ledger.set(id,row);added.push(row);
+      if(control.context&&control.visible){const right={...row,key:hash(id+'context'),label:control.label+' [context menu]',action:{kind:'click',locator:control.locator,button:'right'}};if(!ledger.has(right.key)){ledger.set(right.key,right);added.push(right);}}
+    }
+    return added;
+  }
+  async function enqueue(recipe) {
+    const s=await read(),found=await controls(),key=stateKey(s,found),id=hash(key);
+    record(found,s,id,recipe);
+    if(!states.has(id)){const node={key:id,signature:key,page:s.page||'plan',popup:s.popup,menu:s.menu,recipe};states.set(id,node);if(states.size<=maxStates)queue.push(node);}
+    return id;
+  }
+  async function point(action) {
+    return c.evaluate(`(()=>{const e=document.querySelector(${quoted(action.locator)});if(!e||e.disabled||e.closest('[inert]'))return null;const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,h=document.elementFromPoint(x,y);return b.width&&b.height&&(h===e||e.contains(h))?{x,y}:null})()`);
+  }
+  const targetControl=action=>c.evaluate(`(()=>{const target=document.querySelector(${quoted(action.locator)});return (${discover.toString()})().find(c=>document.querySelector(c.locator)===target)||null})()`);
+  async function locate(action) {
+    for(let tries=0;tries<12;tries++){
+      const p=await point(action);if(p)return p;
+      const scroll=await c.evaluate(`(()=>{const e=document.querySelector(${quoted(action.locator)});if(!e||e.closest('[hidden],[inert]'))return null;const b=e.getBoundingClientRect();for(let a=e.parentElement;a;a=a.parentElement){const r=a.getBoundingClientRect();if(a.scrollHeight>a.clientHeight+4&&/(auto|scroll)/.test(getComputedStyle(a).overflowY)&&(b.bottom>r.bottom||b.top<r.top))return {x:Math.max(4,Math.min(innerWidth-4,r.x+r.width/2)),y:Math.max(4,Math.min(innerHeight-4,r.y+r.height/2)),delta:b.bottom>r.bottom?360:-360};}return null})()`);
+      if(!scroll){if(await c.evaluate('document.getAnimations().some(a=>a.playState==="running")')){await sleep(60);continue;}return null;}
+      await input({kind:'wheel',...scroll});await sleep(60);
+    }
+    return null;
+  }
+  async function input(action,logged=true) {
+    const pointer=action.kind==='click'?await locate(action):null;
+    if(action.kind==='click'){
+      if(!pointer)throw Error('unreachable control: '+action.locator);
+      const actual=await targetControl(action),policy=actual&&classify(actual,await read());
+      if(!policy||!allowed(policy.tier,options.allow))throw Error('policy blocked replay target: '+action.locator);
+    }
+    const entry={index:trace.length,atMs:performance.now()-started,action,started:new Date().toISOString()};
+    if(logged){trace.push(entry);save('trace',{schema:1,seed,actions:trace});}
+    try {
+      if(action.kind==='key')await c.key(action.combo,{repeats:action.repeats||0});
+      else if(action.kind==='text')await c.call('Input.insertText',{text:action.text});
+      else if(action.kind==='wheel')await c.call('Input.dispatchMouseEvent',{type:'mouseWheel',x:action.x||700,y:action.y||420,deltaX:0,deltaY:action.delta||420});
+      else {
+        for(let n=1;n<=(action.count||1);n++)await c.mouse(action.button||'left',pointer.x,pointer.y,n);
+      }
+      if(action.delayMs)await sleep(action.delayMs);
+      entry.finishedMs=performance.now()-started;
+    }catch(e){entry.error=e.message;throw e;}
+  }
+  const key=combo=>({kind:'key',combo});
+  async function root() {
+    await input(key('Escape'));await input(key('Escape'));
+    let s=await read();
+    if(s.navLayout==='top'){await input(key('Control+KeyB'));await sleep(400);s=await read();}
+    if(s.page!==null){await input({kind:'click',locator:'#nav .nav-item[data-id="plan"]'});await settled();s=await read();}
+    if(s.plan!==currentPlan){const plan=s.plans.find(p=>p.name===currentPlan);if(!plan)throw Error('original list was removed');await input({kind:'click',locator:`#nav [data-id="plan:${plan.id}"]`});await settled();}
+    await input(key('Digit2'));await input(key('Home'));await settled();
+  }
+  async function restore(recipe) {
+    if(needsReset){if(!await undoTo(startSnapshot,'reset'))throw Error('canonical root cannot be restored');needsReset=false;}
+    await root();for(const action of recipe){await input(action);await settled();}return oracles('return/replay');
+  }
+  async function undoTo(before,label) {
+    await root();
+    // Undo applies to the open list. Visit all lists by real sidebar input.
+    const after=await snapshot(label+'-before-undo');
+    for(const p of after.plans){
+      const original=before.plans.find(b=>b.name===p.name);if(!original)continue;
+      const ui=(await read()).plans.find(b=>b.name===p.name);if(!ui)continue;
+      if((await read()).plan!==p.name){await input({kind:'click',locator:`#nav [data-id="plan:${ui.id}"]`});await settled();}
+      const wanted=original.workspace?.[0]?.entries,actual=p.workspace?.[0]?.entries;
+      let n=Math.max(0,p.undoDepth-original.undoDepth),combo='KeyU';
+      if(wanted!==actual){
+        const u=p.undo.findIndex(step=>step.entries===wanted),r=p.redo.findIndex(step=>step.entries===wanted);
+        if(u>=0)n=u+1;else if(r>=0){n=r+1;combo='Control+KeyR';}
+      }
+      for(let i=0;i<n;i++){await input(key(combo));await settled();}
+    }
+    await root();
+    const restored=await snapshot(label+'-undone'),d=difference(canonical(before),canonical(restored));
+    needsReset=!!difference(canonical(startSnapshot),canonical(restored));
+    if(d){const known=d.path.includes('staging');fail('undo canonical equality',{label,knownFailure:known?'F2':null,firstDifference:d});}
+    return !d;
+  }
+  async function attempt(row,recipe,{branch=false}={}) {
+    const start=performance.now();
+    const action=row.action||{kind:'click',locator:row.locator};
+    row.action=action;row.attemptedAt=new Date().toISOString();
+    try {
+      await restore(recipe);
+      if(action.kind==='click'&&!await locate(action)){row.outcome='unreachable';row.reason='not hittable after real scroll/replay';return;}
+      // Re-check the actual target immediately before input. A stale selector must
+      // never silently turn a safe button into a newly rendered destructive one.
+      if(action.kind==='click'){
+        const actual=await targetControl(action),s=await read();
+        if(!actual){row.outcome='unreachable';row.reason='target disappeared';return;}
+        const policy=classify(actual,s);
+        if(policy.tier!==row.tier||!allowed(policy.tier,options.allow)){row.outcome='skipped';row.reason='target classification changed during replay';return;}
+      }
+      const before=await snapshot('edge-'+row.key+'-before');
+      const failures=result.failures.length;
+      await input(action);await settled();await oracles('edge '+row.key);
+      const after=await snapshot('edge-'+row.key+'-after');
+      needsReset=!!difference(canonical(startSnapshot),canonical(after));
+      const child=await enqueue([...recipe,action]);edges.push({from:row.state,to:child,control:row.key});
+      await input(key('Escape'));await input(key('Escape'));
+      const changed=difference(canonical(before),canonical(after));
+      if(changed){
+        row.change=changed;
+        const undoable=after.plans.some(p=>p.undoDepth>(before.plans.find(b=>b.name===p.name)?.undoDepth||0));
+        if(undoable)await undoTo(before,'edge-'+row.key);
+        else if(row.tier==='safe')fail('safe action preserves canonical domain',{key:row.key,firstDifference:changed});
+        else row.nonUndoable={reason:'persistent write; branch discarded',firstDifference:changed};
+      }
+      await restore(recipe);
+      const returned=await read();
+      row.returnVerified=hash(stateKey(returned,await controls()))===row.state;
+      if(!row.returnVerified)fail('return state equality',{control:row.key,expected:row.state,actual:hash(stateKey(returned,await controls()))});
+      const returnedSnapshot=await snapshot('edge-'+row.key+'-return');
+      needsReset=!!difference(canonical(startSnapshot),canonical(returnedSnapshot));
+      if(!changed){const d=difference(canonical(before),canonical(returnedSnapshot));if(d)fail('cancel/return canonical equality',{control:row.key,firstDifference:d});}
+      row.outcome=result.failures.length===failures?'pressed-ok':'failed';
+      row.asserted=row.outcome==='pressed-ok';row.oracles=result.failures.slice(failures);row.reason=undefined;
+    }catch(e){row.outcome=/unreachable|not hittable/.test(e.message)?'unreachable':'failed';row.reason=e.message;if(row.outcome==='failed')fail('crawler edge',{key:row.key,error:e.stack});}
+    finally {row.elapsedMs=performance.now()-start;saveLedger();}
+  }
+  function saveLedger() {
+    const all=[...ledger.values()],pages=coverage(all),previous=previousLedger;
+    const old=new Set((previous?.controls||[]).map(c=>c.key)),now=new Set(all.map(c=>c.key));
+      const report={schema:1,seed,mode:options.mode,scope:'discovered controls within reachable fixture states; repeated virtual rows grouped by action/area/missing class',complete:queue.length===0&&states.size<=maxStates&&performance.now()<deadline,states:[...states.values()],edges,controls:all,pages,skippedByTier:Object.fromEntries(['safe','local-destructive','external','unknown'].map(t=>[t,all.filter(c=>c.tier===t&&c.outcome==='skipped').length])),diff:previous?{new:[...now].filter(k=>!old.has(k)),removed:[...old].filter(k=>!now.has(k))}:null};
+    save('ledger',report);result.playerCoverage={pages,skippedByTier:report.skippedByTier,states:states.size,controls:all.length,complete:report.complete};
+    writeFileSync(join(out,'ledger.md'),`# ${options.mode} coverage\n\nSeed: ${seed}. ${states.size} states, ${all.length} controls.\n\nCoverage = asserted / permitted, visible, enabled edges without an overlay. Offscreen eligible controls stay in the denominator; hidden/disabled controls remain recorded as unreachable.\n\n| Page | Discovered | Eligible | Asserted | Coverage | Failed | Skipped | Unreachable |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n${Object.entries(pages).map(([name,p])=>`| ${name} | ${p.discovered} | ${p.eligible} | ${p.asserted} | ${p.coveragePercent??'—'}% | ${p.failed} | ${p.skipped} | ${p.unreachable} |`).join('\n')}\n\nSkipped by tier: ${JSON.stringify(report.skippedByTier)}\n\n${previous?`Ledger diff: ${report.diff.new.length} new, ${report.diff.removed.length} removed.`:'No previous ledger supplied.'}\n`);
+  }
+  // Keyboard recipes supplement DOM discovery, including all editor columns and
+  // popups that have no permanently visible button. OpTable/palette are observed.
+  const recipes=[['Control+KeyK'],['Shift+F10'],['KeyG'],['KeyM'],['KeyN'],['KeyX'],['Shift+KeyP'],['Shift+KeyH'],['KeyI'],['KeyE'],['Shift+Slash'],['Digit1'],['Digit2'],['Digit3'],['Digit4'],['Backslash']];
+  const startSnapshot=await snapshot('player-start');
+  expectedEnd=startSnapshot;
+  await c.key('Control+Backslash'); // real documented refnums switch, isolated home only
+  await settled();
+  save('operation-seeds',await c.evaluate(`(async()=>{const {S}=await import('/js/state.js');return {ops:S.start?.ops,commands:S.start?.commands,nav:S.shell?.nav}})()`));
+  let originalFailure=null;
+  try {
+    if(options.mode==='crawl') {
+      await root();await enqueue([]);
+      // All sidebar pages are explicit roots; popup branching cannot starve them.
+      const nav=(await controls()).filter(x=>x.owner==='nav'&&(x.identity['data-id']||x.identity.id));
+      for(const n of nav){if(!n.enabled||!n.visible||!n.hittable)continue;try{await restore([{kind:'click',locator:n.locator}]);await enqueue([{kind:'click',locator:n.locator}]);}catch(e){fail('sidebar root',{label:n.label,error:e.message});}}
+      for(const r of recipes){
+        await root();const s=await read(),from=hash(stateKey(s,await controls()));
+        const recipe=r.map(key),id=hash(from+'key:'+r.join(','));
+        const row={key:id,state:from,page:'plan',tier:'safe',eligible:true,visible:true,enabled:true,owner:'keyboard',label:r.join(', '),action:recipe[0],recipe:[],outcome:'unreachable',reason:'not attempted',classification:'documented local key'};
+        ledger.set(id,row);await attempt(row,[]);
+      }
+      while(queue.length&&performance.now()<deadline){
+        const node=queue.shift();
+        const rows=[...ledger.values()].filter(r=>r.state===node.key&&r.eligible&&r.visible&&r.enabled&&!r.attemptedAt).sort((a,b)=>(a.owner==='nav')-(b.owner==='nav'));
+        const row=rows[0];
+        if(row){
+          // Confirming persistent operations runs in another fresh runner case.
+          if(row.tier!=='safe')await isolatedEdge(row,node.recipe);
+          else await attempt(row,node.recipe);
+          if(rows.length>1)queue.push(node);
+        }
+        saveLedger();
+        if(continuousFailure?.name==='undo canonical equality')break;
+      }
+      result.crawlLimit=performance.now()>=deadline?'minutes':states.size>maxStates?'max-states':queue.length?'failure':null;
+      if(result.crawlLimit)for(const r of ledger.values())if(r.reason==='not attempted')r.reason='crawl stopped: '+result.crawlLimit;
+    } else await walk();
+  }catch(e){fail('player driver',{error:e.stack});}
+  finally {
+    try{
+      await input(key('Escape'));
+      if(nonUndoableBranch){const final=await snapshot('player-end-nonundoable');const d=difference(canonical(expectedEnd),canonical(final));if(d)fail('nonundoable branch stable after cancel',{firstDifference:d});}
+      else await undoTo(expectedEnd,'player-end');
+      await oracles('end');
+    }catch(e){fail('end restoration',{error:e.message});}
+    save('trace',{schema:1,seed,actions:trace});saveLedger();
+    result.playerElapsedMs=performance.now()-started;
+    if(result.failures.length){
+      const args=replayArgs(join(out,'trace.json'));
+      result.replay={command:['node',...args].map(s=>/\s/.test(s)?quoted(s):s).join(' '),seed,trace:join(out,'trace.json')};
+      save('replay',result.replay);
+      if(options.mode==='walk'&&options.shrink!=='false'&&!options.replay)await shrink();
+    }
+  }
+
+  function replayArgs(file) {
+    return [join(ctx.repo,'scripts/vm/run.mjs'),'--mode','walk','--driver','W','--seed',String(seed),'--steps',String(steps),'--minutes',String(minutes),'--tools',ctx.tools,'--out',join(out,'retries'),'--replay',file,'--shrink','false',...(options.baseline?['--baseline',options.baseline]:[]),...(options.allow?['--allow',options.allow]:[])];
+  }
+  async function isolatedEdge(row,recipe) {
+    row.attemptedAt=new Date().toISOString();
+    const file=join(out,'branch-'+row.key+'.json');save('branch-'+row.key,{actions:[...recipe,row.action||{kind:'click',locator:row.locator}].map(action=>({action}))});
+    // Child runs have a fresh fixture/full filesystem copy; never reuse a dirty root.
+    const child=spawnSync(process.execPath,[...replayArgs(file),'--branch','true'],{encoding:'utf8',windowsHide:true,timeout:Math.min(600000,Math.max(1000,deadline-performance.now())),maxBuffer:8*1024*1024});
+    row.outcome=child.status===0?'pressed-ok':'failed';row.asserted=child.status===0;row.branchReplay=file;row.reason=child.error?.message||child.stdout.slice(-4000);saveLedger();
+    if(child.status!==0)fail('isolated branch',{control:row.key,reason:row.reason});
+  }
+  async function walk() {
+    await root();await enqueue([]);
+    const replay=options.replay?JSON.parse(readFileSync(options.replay,'utf8')):null;
+    if(replay){
+      const replayStart=performance.now(),firstAt=replay.actions[0]?.atMs||0;
+      for(const entry of replay.actions){if(performance.now()>=deadline)throw Error('replay exceeded minute budget');const wait=(entry.atMs||firstAt)-firstAt-(performance.now()-replayStart);if(wait>0)await sleep(wait);await input(entry.action||entry);await oracles('replay',false);}
+      await settled();await oracles('replay settled');
+      if(options.branch==='true'){
+        const after=await snapshot('branch-after'),d=difference(canonical(startSnapshot),canonical(after));
+        const undoable=after.plans.some(p=>p.undoDepth>(startSnapshot.plans.find(b=>b.name===p.name)?.undoDepth||0));
+        if(d&&!undoable&&!d.path.includes('/staging')){nonUndoableBranch=true;expectedEnd=after;result.nonUndoableChanges={reason:'explicitly permitted persistent operation in a disposable branch; no workspace undo exists',beforeCanonicalHash:hash(JSON.stringify(canonical(startSnapshot))),afterCanonicalHash:hash(JSON.stringify(canonical(after))),firstDifference:d,beforeArtifact:'01-player-start.json',afterArtifact:result.checkpoints.at(-1).artifact};}
+      }
+      return;
+    }
+    const pageKeys=['Shift+Digit1','Shift+Digit2','Shift+Digit3','Shift+Digit4','Shift+Digit5','Shift+Digit6','Shift+Digit7','Shift+Digit8'];
+    for(let i=0;i<steps&&performance.now()<deadline;i++){
+      const beforeFailures=result.failures.length,s=await read(),fast=rng()<.68,delayMs=fast?20+Math.floor(rng()*81):180+Math.floor(rng()*421),group=Math.floor(rng()*10);
+      let actions=[],chosenRow=null;
+      if(group<3)actions=Array.from({length:2+Math.floor(rng()*4)},()=>({...key(pick(pageKeys)),delayMs}));
+      else if(group===3)actions=[key(pick(['Control+KeyK','KeyI','KeyE','Shift+F10'])),{...key('Escape'),delayMs},key('Escape')];
+      else if(group===4)actions=[key('Escape'),{...key('Alt+ArrowLeft'),delayMs},key('Escape')];
+      else if(group<8){
+        // Real editor operations; deliberately interleave queued writes and navigation.
+        await root();
+        const col=pick(['Digit1','Digit2','Digit3']);
+        actions=[key(col),key(pick(['Home','ArrowDown','End'])),{...key(pick(['Space','Space','Space','Shift+KeyJ','Shift+KeyK','Shift+KeyS','KeyT','KeyU'])),repeats:rng()<.3?2:0,delayMs}];
+      } else {
+        const found=await controls(),state=hash(stateKey(s,found));record(found,s,state,[]);
+        const candidates=found.filter(x=>x.visible&&x.enabled&&x.hittable&&allowed(classify(x,s).tier,options.allow)&&(!previousLedger||previousLedger.controls.some(old=>old.page===(s.page||'plan')&&old.locator===x.locator&&allowed(old.tier,options.allow))));
+        const target=candidates.length?pick(candidates):null;
+        chosenRow=target?ledger.get(identity(target,state)):null;
+        actions=target?[{kind:'click',locator:target.locator,count:pick([1,1,2,3]),delayMs},...(rng()<.5?[key('Escape')]:[])]:[key('Escape')];
+      }
+      for(const action of actions){try{await input(action);await oracles('walk '+i,false);}catch(e){if(/unreachable control|policy blocked/.test(e.message)){(result.skippedActions||=[]).push({step:i,action,reason:e.message});}else fail('walk action',{step:i,error:e.message});break;}}
+      if(chosenRow){
+        try{await settled();await oracles('random control '+i);await snapshot('random-control-'+i);chosenRow.outcome=result.failures.length===beforeFailures?'pressed-ok':'failed';chosenRow.asserted=chosenRow.outcome==='pressed-ok';chosenRow.attemptedAt=new Date().toISOString();}catch(e){chosenRow.outcome='failed';chosenRow.reason=e.message;fail('random control',{step:i,error:e.message});}
+      }
+      if(i%10===9){try{await settled();await oracles('checkpoint '+i);await snapshot('walk-'+i);}catch(e){fail('checkpoint',{step:i,error:e.message});}}
+      result.executedSteps=i+1;save('trace',{schema:1,seed,actions:trace});
+      if(result.failures.length>beforeFailures){originalFailure=result.failures[beforeFailures];break;}
+    }
+    await settled();await oracles('walk complete');
+  }
+  async function shrink() {
+    // Replays always use a fresh runner copy. Keep a candidate only if the same
+    // oracle fails; unrelated setup/selector failures cannot shrink an app bug.
+    const signature=(originalFailure||result.failures[0])?.name;
+    let best=trace.map(t=>({action:t.action})),attempts=[];
+    const max=Number(options['shrink-runs']||6);
+    async function retry(actions){
+      const file=join(out,'shrink-candidate.json');writeFileSync(file,JSON.stringify({actions}));
+      const r=spawnSync(process.execPath,replayArgs(file),{encoding:'utf8',windowsHide:true,timeout:180000,maxBuffer:4*1024*1024});
+      let reproduced=false,output=null;
+      try{const j=JSON.parse(r.stdout);output=j.output;const report=JSON.parse(readFileSync(join(output,'result.json'),'utf8'));reproduced=report.failures.some(f=>f.name===signature);}catch{}
+      attempts.push({length:actions.length,reproduced,output,error:r.error?.message});return reproduced;
+    }
+    // Shorter prefixes, then removal chunks (including middle actions).
+    for(let n=Math.floor(best.length/2);n>0&&attempts.length<Math.ceil(max/2);n=Math.floor(n/2))if(await retry(best.slice(0,n)))best=best.slice(0,n);
+    for(let chunk=Math.ceil(best.length/2);chunk>=1&&attempts.length<max;chunk=Math.floor(chunk/2))for(let at=0;at<best.length&&attempts.length<max;at+=chunk){const candidate=best.slice(0,at).concat(best.slice(at+chunk));if(candidate.length&&await retry(candidate)){best=candidate;break;}}
+    save('minimal-trace',{schema:1,seed,actions:best});save('shrink',{oracle:signature,originalLength:trace.length,minimalLength:best.length,attempts,command:['node',...replayArgs(join(out,'minimal-trace.json'))].map(quoted).join(' '),minimality:'bounded prefix/chunk reduction, not proof of global minimum'});
+  }
+}

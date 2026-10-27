@@ -1,5 +1,7 @@
 # Running Phase 1a scenarios
 
+For the real-window state crawler and seeded player modes, see [players.md](players.md).
+
 Run commands from the repository root. Node 22+, Go, PowerShell 7 and `sqlite3` must be on PATH. Native export cancellation also uses Windows PowerShell 5.1 (`powershell.exe`). W requires a signed-in Windows desktop and WebView2. C and A use the same generated library without a desktop.
 
 ## Build outside the checkout
