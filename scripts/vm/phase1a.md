@@ -84,6 +84,6 @@ pwsh scripts/vm/vm.ps1 exec guest-phase1a.ps1 -Interactive
 ## Regression checks
 
 ```powershell
-node --test scripts/vm/cdp.test.mjs scripts/vm/navigation.test.mjs
+node --test scripts/vm/cdp.test.mjs scripts/vm/navigation.test.mjs scripts/vm/lists.test.mjs
 go test ./...
 ```
