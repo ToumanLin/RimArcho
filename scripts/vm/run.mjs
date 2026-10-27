@@ -461,12 +461,13 @@ async function deletionPrerequisite() {
   if(!c||(await uiState()).plans.length!==1)return;
   await c.click('[data-env-write="remove-plan"]');await sleep(350);await settled();
   result.lastPlanRefusal={popup:(await uiState()).popup,status:await c.evaluate('document.querySelector("#status")?.textContent'),message:await c.evaluate('document.querySelector("#say")?.textContent||document.querySelector(".toast")?.textContent||""')};
-  check('last plan deletion refuses without confirmation',!(await uiState()).popup);
+  check('last plan deletion refuses without confirmation',!(await uiState()).popup&&/only list|cannot be deleted|唯一|不能删除/.test(result.lastPlanRefusal.status));
   await c.click('#nav [data-id="plans"]');await settled('plans');await press('KeyN');await settled('plans');
   await c.click('.pm-name');await press('Control+KeyA');await c.call('Input.insertText',{text:'VM cancellation companion'});
   await until(()=>c.evaluate('!!document.querySelector("[data-env-write=create-plan]:not(:disabled)")'));
   await c.click('[data-env-write="create-plan"]');await settled();await editor();
-  check('delete cancellation prerequisite creates second plan',(await uiState()).plans.length===2);
+  result.setupAdditionalPlans=(await uiState()).plans.length-1;
+  check('delete cancellation prerequisite creates second plan',result.setupAdditionalPlans===1);
 }
 async function guestProbes() {
   await deletionPrerequisite();
@@ -585,7 +586,7 @@ try {
     // App keyboard handlers may invoke .click() internally (e.g. Tab to a list).
     // Physical key/pointer arrival must be trusted; derived synthetic clicks are evidence.
     check('all observed key/pointer input is trusted',evidence.inputs.filter(i=>/^(key|pointer|mouse)/.test(i.type)).every(i=>i.trusted));check('no transient blank page',evidence.samples.filter(s=>s.armed).every(s=>!s.blank && (s.content || s.loading)));
-    check('sidebar never loses lists',evidence.samples.filter(s=>s.armed).every(s=>s.sidebar.includes('plan') && (mode || s.plansCount===result.content.plans)));
+    check('sidebar never loses lists',evidence.samples.filter(s=>s.armed).every(s=>s.sidebar.includes('plan') && (mode || s.plansCount>=result.content.plans&&s.plansCount<=result.content.plans+(result.setupAdditionalPlans||0))));
     check('never falsely displays no game',evidence.samples.filter(s=>s.armed).every(s=>!s.noGame));
     check('no console errors',evidence.errors.length===0,evidence.errors);
     const sequences=new Map();
