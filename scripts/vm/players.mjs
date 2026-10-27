@@ -159,7 +159,7 @@ export async function drive(ctx) {
     await input(key('Escape'));await input(key('Escape'));
     let s=await read();
     if(s.navLayout==='top'){await input(key('Control+KeyB'));await sleep(400);s=await read();}
-    if(s.page!==null){await input({kind:'click',locator:'#nav .nav-item[data-id="plan"]'});await settled(null,15000);s=await read();}
+    if(s.page!==null){await input(key('Shift+Digit5'));await settled(null,15000);s=await read();}
     if(s.plan!==currentPlan){const plan=s.plans.find(p=>p.name===currentPlan);if(!plan)throw Error('original list was removed');await openPlan(plan);}
     // A native input can retain focus after a dismissed view. Real row input
     // returns keyboard ownership to the editor before focus/undo shortcuts.
@@ -379,7 +379,7 @@ export async function drive(ctx) {
       if(options.branch==='true'){
         const after=await snapshot('branch-after'),d=difference(canonical(startSnapshot),canonical(after));
         const undoable=hasRestoration(startSnapshot,after);
-        if(d&&!undoable&&!d.path.includes('/staging')){nonUndoableBranch=true;expectedEnd=after;result.nonUndoableChanges={reason:'explicitly permitted persistent operation in a disposable branch; no workspace undo exists',beforeCanonicalHash:hash(JSON.stringify(canonical(startSnapshot))),afterCanonicalHash:hash(JSON.stringify(canonical(after))),firstDifference:d,beforeArtifact:'01-player-start.json',afterArtifact:result.checkpoints.at(-1).artifact};}
+        if(d&&!undoable&&!d.path.includes('/staging')){nonUndoableBranch=true;expectedEnd=after;result.nonUndoableChanges={reason:'explicitly permitted persistent operation in a disposable branch; no workspace undo exists',beforeCanonicalHash:hash(JSON.stringify(canonical(startSnapshot))),afterCanonicalHash:hash(JSON.stringify(canonical(after))),firstDifference:d,beforeCheckpoint:'player-start',afterCheckpoint:result.checkpoints.at(-1).label};}
       }
       return;
     }

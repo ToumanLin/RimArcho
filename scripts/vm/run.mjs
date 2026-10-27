@@ -84,7 +84,7 @@ async function snapshot(label) {
 async function until(fn, ms=15000) {
   const end=performance.now()+ms;
   while(performance.now()<end) { const r=await fn(); if(r) return r;await sleep(50); }
-  throw Error(`condition timed out after ${ms}ms`);
+  throw Error(`condition timed out after ${ms}ms; state=${c?JSON.stringify(await c.evaluate('(()=>{const s=__vm.read(false);return {page:s.page,plan:s.plan,popup:s.popup,loading:s.loading,editing:s.editing,busy:s.busy,content:s.content,status:s.status,navLayout:s.navLayout}})()')):'no window'}`);
 }
 async function settled(page, ms=10000, plan) {
   let last='', stable=0;
@@ -180,7 +180,8 @@ async function repeatedSubscription() {
     for(const clicks of [2,3]) {
       const before=await snapshot(`before-subscription-${clicks}`),known=new Set((await tasks()).rows.map(r=>r.id));
       await press('Shift+Digit4');await settled('library');
-      await c.click('#nav [data-id="subscribe"]');await settled('subscribe');
+      await press('Shift+Digit4');await settled('library');
+  await c.click('#nav [data-id="subscribe"]');await settled('subscribe');
       await c.click('.subscribe-omni input');await c.call('Input.insertText',{text:url});
       await until(()=>c.evaluate('!!document.querySelector(".subscribe-foot button.primary:not(:disabled)")'));
       const point=await c.click('.subscribe-foot button.primary');
@@ -470,6 +471,7 @@ async function guestProbes() {
   await c.click('[data-env-write="remove-plan"]');await until(async()=>!!(await uiState()).popup);
   result.deletePlanPreview=await c.evaluate('document.querySelector("#popup")?.innerText');
   await dismiss();
+  await press('Shift+Digit4');await settled('library');
   await c.click('#nav [data-id="subscribe"]');await settled('subscribe');
   await c.click('.subscribe-omni input');await c.call('Input.insertText',{text:'https://127.0.0.1:9/phase1a.git'});
   await until(()=>c.evaluate('!!document.querySelector(".subscribe-preview")?.textContent.trim()'));
@@ -556,7 +558,7 @@ try {
   await timed('prepare-and-start',setup,null);
   if(c)await editor();
   if(options.probe==='true')await guestProbes();
-  else if(mode) {
+  if(mode) {
     const { drive } = await import('./players.mjs');
     await drive({ c, options, result, out, repo, home, tools, currentPlan, snapshot, settled, check, editor, command, exe, save });
   } else {
@@ -587,7 +589,7 @@ try {
   }
 } catch(e) {
   result.failures.push({name:'runner',detail:e.stack});
-  if(c){try{save('window-trace',await windowEvidence());}catch{}}
+  if(c){try{result.failureSurface=await c.evaluate('(()=>{const s=__vm.read(false);return {page:s.page,status:s.status,popup:s.popup,errors:s.errors}})()');}catch{}}
 } finally {
   eventStream?.abort();c?.close();
   if(child?.pid){if(platform()==='win32')spawnSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true});else child.kill();}

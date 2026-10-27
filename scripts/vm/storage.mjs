@@ -4,7 +4,7 @@ export const HOST_ROOT='D:/RimArcho-test';
 export function treeBytes(root){
   let bytes=0;
   for(const e of readdirSync(root,{withFileTypes:true})){
-    const p=join(root,e.name),s=lstatSync(p);
+    const p=join(root,e.name);let s;try{s=lstatSync(p);}catch(err){if(err.code==='ENOENT')continue;throw err;}
     if(s.isSymbolicLink())continue;
     bytes+=s.isDirectory()?treeBytes(p):s.size;
   }
@@ -24,7 +24,7 @@ export function cleanupRun(run){
   for(const entry of readdirSync(root,{withFileTypes:true})){
     const p=resolve(root,entry.name),r=relative(root,p);
     if(!r||r.startsWith('..')||isAbsolute(r))throw Error('cleanup escaped run root');
-    if(entry.isDirectory()&&entry.name==='retries')continue;
+    if(entry.isDirectory()&&entry.name==='retries'){for(const child of readdirSync(p,{withFileTypes:true})){if(child.isDirectory())cleanupRun(join(p,child.name));}continue;}
     if(entry.isFile()&&keep.test(entry.name)){
       if(entry.name.endsWith('.log')&&lstatSync(p).size>256*1024){const b=readFileSync(p);writeFileSync(p,b.subarray(-256*1024));}
       continue;
