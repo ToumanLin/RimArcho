@@ -64,7 +64,11 @@ func (st *LoadoutState) Deployable(m *store.Mod) bool { return deployable(st.Ix,
 // Deployed reports whether m is enabled through a RimArcho link (existing or due on save).
 func (st *LoadoutState) Deployed(m *store.Mod) bool { return st.deploy[m.ID] }
 
-// regWith is the registry as it would be with id deployed as well.
+// regWith is the registry as it would be with id deployed as well, for asking about id
+// (Loadable, SamePackage). It holds only the candidates whose packageId can share a token
+// with id's: tokens differ only by an added "_steam", so those are the packageIds with the
+// same base. Building it from every installed mod made the list page take seconds, as the
+// followed-collection check asks this for every mod installed more than once.
 func (st *LoadoutState) regWith(id string) *loadout.Registry {
 	if st.Reg.Known(id) {
 		return st.Reg
@@ -73,7 +77,22 @@ func (st *LoadoutState) regWith(id string) *loadout.Registry {
 	if m == nil || !st.Deployable(m) {
 		return st.Reg
 	}
-	return loadout.NewRegistry(append(st.cands[:len(st.cands):len(st.cands)], deployCandidate(m)))
+	base := packageBase(m.PackageID)
+	var group []loadout.Candidate
+	for _, c := range st.cands {
+		if packageBase(c.PackageID) == base {
+			group = append(group, c)
+		}
+	}
+	return loadout.NewRegistry(append(group, deployCandidate(m)))
+}
+
+// packageBase is a packageId without any "_steam" suffixes.
+func packageBase(p string) string {
+	for strings.HasSuffix(p, "_steam") {
+		p = strings.TrimSuffix(p, "_steam")
+	}
+	return p
 }
 
 func deployCandidate(m *store.Mod) loadout.Candidate {
