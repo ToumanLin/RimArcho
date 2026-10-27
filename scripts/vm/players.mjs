@@ -75,7 +75,7 @@ export async function drive(ctx) {
       }
       const policy=classify(control,s), permitted=allowed(policy,options.allow),eligible=permitted&&control.visible&&control.enabled&&!control.blockedByLayer;
       const row={...control,key:id,state:key,states:[key],page:control.owner==='nav'?'sidebar':s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,blocked:policy.blocked,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
-      if(!permitted){row.outcome='skipped';row.reason=policy.blocked||policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`;}
+      if(!permitted){row.outcome='skipped';row.reason=policy.blocked||(policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`);}
       else if(!eligible){row.reason=!control.visible?'not visible in this state':!control.enabled?'disabled; requires application precondition':'covered by page/popup/menu; not an eligible edge in this state';}
       ledger.set(id,row);added.push(row);
       if(control.context&&control.visible){const right={...row,key:hash(id+'context'),label:control.label+' [context menu]',sourceLabel:control.label,action:{kind:'click',locator:control.locator,button:'right'}};if(!ledger.has(right.key)){ledger.set(right.key,right);added.push(right);}}
