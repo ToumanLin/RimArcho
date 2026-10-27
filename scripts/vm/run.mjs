@@ -261,6 +261,13 @@ async function setup() {
     for(const name of ['config.toml','cache']) if(existsSync(join(baseline,'home',name))) cpSync(join(baseline,'home',name),join(home,name),{recursive:true});
     }
   } else command(exe('vmstate'),['--mode','fixture','--root',dirname(home)],{},30000);
+  if(mode){
+    // A copied player's old undo history predates this experiment. Random Undo
+    // followed by an edit could otherwise destroy the redo path back to start.
+    // Establish the same boundary as the fixture, on this case's DB only.
+    const removed=Number(command('sqlite3',[join(home,'archo.db'),'SELECT count(*) FROM workspace_undo; DELETE FROM workspace_undo;']).trim());
+    result.setupUndoBoundary={removedSteps:removed,reason:'isolated case starts with empty undo/redo history; workspace/staging/content retained'};
+  }
   env={RIMARCHO_HOME:home, APPDATA:join(out,'appdata'), LOCALAPPDATA:join(out,'localappdata')};
   const initial=JSON.parse(command(exe('vmstate'),['--home',home]));
   currentPlan=options.plan || initial.plans.find(p=>p.name==='default')?.name || initial.plans[0].name;

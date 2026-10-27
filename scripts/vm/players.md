@@ -20,7 +20,11 @@ SQLite `.backup` path and the audited, already isolated content baseline. They n
 open the player's AppData home. `--allow local` or `--allow external` makes a full
 relocated filesystem copy through `prepare-real.ps1` before starting the window.
 The legacy `--owned-files` shortcut cannot disable this protection for these modes.
-Allow enough time and disk space for copying a large library.
+Allow enough time and disk space for copying a large library. Before launching the
+window, crawler/walker setup clears only the copied DB undo/redo history and records
+the removed step count. The content start is retained. This prevents random Undo
+from crossing into pre-run history and a later edit destroying the redo path back
+to the experiment start; the baseline DB is never changed.
 
 ## Safety and coverage
 
@@ -73,7 +77,8 @@ same page. Native disclosure sections are restored with real clicks before recip
 replay; distinct disclosure/tab paths participate in state identity. Undo restoration uses the explicit workspace palette command, including
 redo restoration after testing Undo itself; it does not assume undo depth increases.
 Background analysis remains observable while lightweight polling waits for page
-loads and workspace edits. Event evidence retains scalar metadata; independent
+loads and workspace edits. A nested memory-estimate shimmer is recorded as a pending
+region while the page remains usable; it is not a whole-page loading failure. Event evidence retains scalar metadata; independent
 canonical checkpoints retain the complete domain.
 
 The default crawl budget is 60 minutes / 200 queued states (`--max-states N` changes

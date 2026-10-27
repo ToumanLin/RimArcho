@@ -33,7 +33,8 @@ export async function observe() {
     const renderedColumns=S.screen===null ? S.cols.slice(0,2).map((col,k)=>({expected:col.view.length,rendered:document.querySelectorAll(`.area[data-area="${k}"] .rows .row`).length})) : [];
     const cols = detailed && (S.cols || []).map(c => ({ entries: c.items.map(i => ({ id: i.id, ref: i.ref, packageId: i.packageId, missing: i.missing })), selected: [...c.sel], cursor: c.cursor }));
     return { ...context(), status, popup: S.popup?.kind || null, popupTitle:S.popup?.title || '', menu:!!document.querySelector('#menu:not([hidden])'), modes:[...document.querySelectorAll('.tabs .on,[role="tab"][aria-selected="true"],details[open],.fold.closed,.fold.collapsed')].map(e=>[modePath(e),{...e.dataset},e.className,e.tagName]), busy: S.busy, editing: S.editing || 0, problems: detailed ? S.board?.problems : Object.fromEntries(['environment','plan','sequence','listVersion','revision','count','updating'].map(k=>[k,S.board?.problems?.[k]])), columnState:(S.cols||[]).map(c=>[c.items.length,c.view.length,c.cursor,[...c.sel]]), plans: S.shell?.plans, columns: cols, renderedColumns, focus: S.focus,
-      loading: !!document.querySelector('.page-loading, [aria-busy="true"]'),
+      loading: !!document.querySelector('#screen .page-loading, #screen[aria-busy="true"]'),
+      pendingRegions:[...document.querySelectorAll('#screen [aria-busy="true"]')].map(e=>e.getAttribute('aria-label')||e.className),
       readError: document.querySelector('.page-read-error')?.innerText,
       blank: !document.querySelector('#app')?.firstElementChild,
       noGame: !!S.board?.envs?.length && /no games? yet|还没有游戏/.test(screen?.textContent||''),
