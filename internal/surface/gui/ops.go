@@ -122,3 +122,12 @@ func (s *API) SetModNote(id, text string) (string, error) {
 	s.board, s.lib = nil, nil
 	return s.text(view.SetModNote(s.a, st.Ix.Ref(id), text))
 }
+
+// CompleteDependencies enables installed prerequisites and sorts the open plan.
+// Subscription remains a separate Subscribe call after choosing Steam or SteamCMD.
+func (s *API) CompleteDependencies() (*view.Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	return s.after(view.CompleteDependencies(s.a))
+}

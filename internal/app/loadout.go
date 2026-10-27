@@ -548,65 +548,69 @@ func whyNotLoadable(st *LoadoutState, m *store.Mod) string {
 // Enable adds instances to the workspace (04 §2.1).
 func (a *App) Enable(refs []string, p Placement) (*EditResult, error) {
 	return a.edit("enable", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
-		var notes []string
-		at := -1
-		placed := 0 // without a position: appended here, then placed by the constraints
-		for _, ref := range refs {
-			m, err := st.Ix.ResolveOne(ref)
-			if err != nil {
-				return nil, nil, err
-			}
-			if why := whyNotLoadable(st, m); why != "" {
-				return nil, nil, fmt.Errorf("cannot enable %s: %s", st.Ix.Ref(m.ID), why)
-			}
-			if l.Index(m.ID) >= 0 {
-				notes = append(notes, st.Ix.Ref(m.ID)+" is already enabled")
-				continue
-			}
-			for _, o := range st.regWith(m.ID).SamePackage(m.ID) {
-				if l.Index(o.ID) >= 0 {
-					return nil, nil, fmt.Errorf("cannot enable %s: %s with the same packageId %s is enabled; the game keeps only one (archo swap %s %s)",
-						st.Ix.Ref(m.ID), st.Ix.Ref(o.ID), m.PackageID, st.Ix.Ref(o.ID), st.Ix.Ref(m.ID))
-				}
-			}
-			// A missing entry for this package is replaced in place.
-			idx := -1
-			for i, e := range l {
-				if e.Missing != "" && st.Reg.Resolve(e.Missing).Instance == "" && strings.TrimSuffix(e.Missing, "_steam") == m.PackageID {
-					idx = i
-				}
-			}
-			if idx >= 0 && !p.set() {
-				l[idx] = loadout.Entry{Instance: m.ID}
-				continue
-			}
-			if !p.set() {
-				l = append(l, loadout.Entry{Instance: m.ID})
-				placed++
-				continue
-			}
-			if at < 0 {
-				if at, err = p.target(st, l, len(l)); err != nil {
-					return nil, nil, err
-				}
-			}
-			l = insert(l, at, loadout.Entry{Instance: m.ID})
-			at++
-		}
-		if placed > 0 {
-			// The latest position the sort constraints allow (04 §2.1, order.Place).
-			in, err := a.SortInput(st, l)
-			if err != nil {
-				return nil, nil, err
-			}
-			out := make(loadout.List, 0, len(l))
-			for _, i := range order.Place(in, len(l)-placed) {
-				out = append(out, l[i])
-			}
-			l = out
-		}
-		return l, notes, nil
+		return a.enableList(st, l, refs, p)
 	})
+}
+
+func (a *App) enableList(st *LoadoutState, l loadout.List, refs []string, p Placement) (loadout.List, []string, error) {
+	var notes []string
+	at := -1
+	placed := 0 // without a position: appended here, then placed by the constraints
+	for _, ref := range refs {
+		m, err := st.Ix.ResolveOne(ref)
+		if err != nil {
+			return nil, nil, err
+		}
+		if why := whyNotLoadable(st, m); why != "" {
+			return nil, nil, fmt.Errorf("cannot enable %s: %s", st.Ix.Ref(m.ID), why)
+		}
+		if l.Index(m.ID) >= 0 {
+			notes = append(notes, st.Ix.Ref(m.ID)+" is already enabled")
+			continue
+		}
+		for _, o := range st.regWith(m.ID).SamePackage(m.ID) {
+			if l.Index(o.ID) >= 0 {
+				return nil, nil, fmt.Errorf("cannot enable %s: %s with the same packageId %s is enabled; the game keeps only one (archo swap %s %s)",
+					st.Ix.Ref(m.ID), st.Ix.Ref(o.ID), m.PackageID, st.Ix.Ref(o.ID), st.Ix.Ref(m.ID))
+			}
+		}
+		// A missing entry for this package is replaced in place.
+		idx := -1
+		for i, e := range l {
+			if e.Missing != "" && st.Reg.Resolve(e.Missing).Instance == "" && strings.TrimSuffix(e.Missing, "_steam") == m.PackageID {
+				idx = i
+			}
+		}
+		if idx >= 0 && !p.set() {
+			l[idx] = loadout.Entry{Instance: m.ID}
+			continue
+		}
+		if !p.set() {
+			l = append(l, loadout.Entry{Instance: m.ID})
+			placed++
+			continue
+		}
+		if at < 0 {
+			if at, err = p.target(st, l, len(l)); err != nil {
+				return nil, nil, err
+			}
+		}
+		l = insert(l, at, loadout.Entry{Instance: m.ID})
+		at++
+	}
+	if placed > 0 {
+		// The latest position the sort constraints allow (04 §2.1, order.Place).
+		in, err := a.SortInput(st, l)
+		if err != nil {
+			return nil, nil, err
+		}
+		out := make(loadout.List, 0, len(l))
+		for _, i := range order.Place(in, len(l)-placed) {
+			out = append(out, l[i])
+		}
+		l = out
+	}
+	return l, notes, nil
 }
 
 // Disable removes instances (or missing entries named by pkg:) from the workspace.
@@ -714,12 +718,13 @@ func (a *App) Swap(ref, with string) (*EditResult, error) {
 
 // SortResult is the outcome of Sort.
 type SortResult struct {
-	State   *LoadoutState
-	Input   order.Input
-	Result  order.Result
-	Sorted  loadout.List
-	Changes []loadout.Change
-	Applied bool
+	MissingDependencies []MissingDependency
+	State               *LoadoutState
+	Input               order.Input
+	Result              order.Result
+	Sorted              loadout.List
+	Changes             []loadout.Change
+	Applied             bool
 }
 
 // Community loads community rules from <home>/cache/communityRules.json (04 §6.3).
@@ -769,46 +774,56 @@ func (a *App) SortInput(st *LoadoutState, l loadout.List) (order.Input, error) {
 // Sort orders the workspace (04 §5); dryRun only computes.
 func (a *App) Sort(dryRun bool) (*SortResult, error) {
 	var out *SortResult
-	compute := func(st *LoadoutState, l loadout.List) (loadout.List, error) {
-		before := l.Clone()
-		// Sorting also restores the installed, loadable base game. DLCs remain
-		// the player's choice; missing Core on disk remains a missing entry.
-		core := st.Reg.Resolve("ludeon.rimworld").Instance
-		if core != "" && st.Reg.Loadable(core) && l.Index(core) < 0 {
-			l = append(l.Clone(), loadout.Entry{Instance: core})
-		}
-		in, err := a.SortInput(st, l)
-		if err != nil {
-			return nil, err
-		}
-		r := order.Sort(in)
-		sorted := make(loadout.List, 0, len(l))
-		for _, i := range r.Order {
-			sorted = append(sorted, l[i])
-		}
-		out = &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(before, sorted, st.LineageOf)}
-		return sorted, nil
-	}
+
 	if dryRun {
 		st, err := a.Loadout()
 		if err != nil {
 			return nil, err
 		}
-		if _, err := compute(st, st.List); err != nil {
+		out, err = a.sortList(st, st.List)
+		if err != nil {
 			return nil, err
 		}
 		out.State = st
 		return out, nil
 	}
 	r, err := a.edit("sort", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
-		sorted, err := compute(st, l)
-		return sorted, nil, err
+		var err error
+		out, err = a.sortList(st, l)
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Sorted, nil, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 	out.State, out.Applied = r.State, true
 	return out, nil
+}
+
+func (a *App) sortList(st *LoadoutState, l loadout.List) (*SortResult, error) {
+	before := l.Clone()
+	// Sorting also restores the installed, loadable base game. DLCs remain
+	// the player's choice; missing Core on disk remains a missing entry.
+	core := st.Reg.Resolve("ludeon.rimworld").Instance
+	if core != "" && st.Reg.Loadable(core) && l.Index(core) < 0 {
+		l = append(l.Clone(), loadout.Entry{Instance: core})
+	}
+	in, err := a.SortInput(st, l)
+	if err != nil {
+		return nil, err
+	}
+	r := order.Sort(in)
+	sorted := make(loadout.List, 0, len(l))
+	for _, i := range r.Order {
+		sorted = append(sorted, l[i])
+	}
+	out := &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(before, sorted, st.LineageOf)}
+	state := *st
+	state.List = sorted
+	out.MissingDependencies, err = a.MissingDependencies(&state)
+	return out, err
 }
 
 // UndoRedo steps the workspace back (undo) or forward (redo).

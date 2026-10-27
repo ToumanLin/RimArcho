@@ -364,13 +364,8 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	for _, l := range locked {
 		lockedCopy[l.Copy.ID] = l.Upstream.ID
 	}
-	installed := map[string][]*store.Mod{} // live, loadable instances by packageId
-	for _, m := range st.Ix.Mods {
-		if m.TombstoneAt.IsZero() && !m.Residue && m.Unloadable == "" && (st.Reg.Known(m.ID) || st.Deployable(m)) {
-			p := strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")
-			installed[p] = append(installed[p], m)
-		}
-	}
+	installed := installedDependencies(st)
+	depsIndex := dependencyIndex{st: st, activeByPkg: activeByPkg, installed: installed}
 
 	for _, m := range active {
 		d := m.Decl()
@@ -393,20 +388,10 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				Suggestions: []string{"archo disable " + inst(m.ID)}})
 		}
 		// Dependencies.
-		deps := append([]scanDep{}, toDeps(d.Dependencies)...)
-		deps = append(deps, toDeps(d.DependenciesByVersion["v"+mm])...)
-		seen := map[string]bool{}
-		for _, dep := range deps {
-			p := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(dep.pkg)), "_steam")
-			if p == "" || seen[p] {
-				continue
-			}
-			seen[p] = true
-			if len(activeByPkg[p]) > 0 {
-				continue
-			}
+		for _, dep := range depsIndex.missing(m) {
+			p := dep.pkg
 			ev := finding.Evidence{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml modDependencies: " + p}
-			if cands := installed[p]; len(cands) > 0 {
+			if cands := depsIndex.candidates(p); len(cands) > 0 {
 				f := &finding.Finding{Code: "dep.inactive", Severity: finding.Error, Key: p, Subjects: []string{inst(m.ID), inst(cands[0].ID)},
 					Claim:    fmt.Sprintf("%s requires pkg:%s; %s is installed but not enabled", inst(m.ID), p, inst(cands[0].ID)),
 					Evidence: []finding.Evidence{ev}}
@@ -422,18 +407,18 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			}
 			f := &finding.Finding{Code: "dep.missing", Severity: finding.Error, Key: p, Subjects: []string{inst(m.ID), "pkg:" + p},
 				Claim: fmt.Sprintf("%s requires %s (pkg:%s), which is not installed", inst(m.ID), name, p), Evidence: []finding.Evidence{ev}}
-			switch {
-			case strings.HasPrefix(p, "ludeon.rimworld."):
+			if p == "ludeon.rimworld" || strings.HasPrefix(p, "ludeon.rimworld.") {
 				f.Claim = fmt.Sprintf("%s requires the %s DLC (pkg:%s), which is not installed", inst(m.ID), name, p)
-			case dep.url != "":
-				f.Suggestions = append(f.Suggestions, "subscribe: "+dep.url)
-			default:
-				if w, ok := a.WorkshopFor(p); ok { // steamDB (04 §6.3): a direct link
-					f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+w.WorkshopID)
+			} else {
+				ws, _ := a.dependencyWorkshop(dep)
+				if dep.url != "" {
+					f.Suggestions = append(f.Suggestions, "subscribe: "+dep.url)
+				} else if ws != "" {
+					f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+ws)
 				}
-			}
-			if ws := workshopID(dep.url); ws != "" {
-				f.Suggestions = append(f.Suggestions, "steam://url/CommunityFilePage/"+ws)
+				if ws != "" {
+					f.Suggestions = append(f.Suggestions, "steam://url/CommunityFilePage/"+ws)
+				}
 			}
 			add(f)
 		}
@@ -742,11 +727,13 @@ func toDeps(l []scan.Dependency) []scanDep {
 
 // workshopID extracts the item ID from a Steam workshop URL.
 func workshopID(u string) string {
-	i := strings.Index(u, "id=")
-	if i < 0 {
-		return ""
+	u = strings.TrimSpace(u)
+	id := ""
+	if rest, ok := strings.CutPrefix(u, "steam://url/CommunityFilePage/"); ok {
+		id = rest
+	} else if i := strings.Index(u, "id="); i >= 0 {
+		id = u[i+3:]
 	}
-	id := u[i+3:]
 	for j, c := range id {
 		if c < '0' || c > '9' {
 			id = id[:j]

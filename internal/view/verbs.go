@@ -16,8 +16,12 @@ import (
 // Result is what a verb did, for the status line; Placed are the mods it put into the list
 // (the next "m changes it" applies to them).
 type Result struct {
-	Text   string   `json:"text"`
-	Placed []string `json:"placed,omitempty"`
+	MissingDependencies []app.MissingDependency `json:"missingDependencies,omitempty"`
+	Enabled             []string                `json:"enabled,omitempty"`
+	WorkshopIDs         []string                `json:"workshopIds,omitempty"`
+	Undo                bool                    `json:"undo,omitempty"`
+	Text                string                  `json:"text"`
+	Placed              []string                `json:"placed,omitempty"`
 }
 
 // Positions: the 1-based load positions of the mods that are in the list.
@@ -287,4 +291,17 @@ func StageAll(a *app.App) (*Result, error) {
 		return nil, err
 	}
 	return &Result{Text: Tf("staged %s; Core and the DLCs stay enabled", Plural(len(refs), "mod"))}, nil
+}
+
+// CompleteDependencies enables installed prerequisites and sorts as one undo step.
+func CompleteDependencies(a *app.App) (*Result, error) {
+	r, err := a.CompleteDependencies()
+	if err != nil {
+		return nil, err
+	}
+	return &Result{
+		Text:                Tf("enabled %s", Plural(len(r.Enabled), "mod")),
+		MissingDependencies: r.MissingDependencies, Enabled: r.Enabled,
+		WorkshopIDs: r.WorkshopIDs, Undo: len(r.Edit.Changes) > 0,
+	}, nil
 }

@@ -45,10 +45,11 @@ type Preview struct {
 
 // Outcome is what a whole-list action did, for the status line.
 type Outcome struct {
-	What    string   `json:"what"`
-	Text    string   `json:"text"`
-	Undo    bool     `json:"undo,omitempty"`    // u takes it back (sort)
-	Refused []string `json:"refused,omitempty"` // refused: why, then the commands that resolve it
+	MissingDependencies []app.MissingDependency `json:"missingDependencies,omitempty"`
+	What                string                  `json:"what"`
+	Text                string                  `json:"text"`
+	Undo                bool                    `json:"undo,omitempty"`    // u takes it back (sort)
+	Refused             []string                `json:"refused,omitempty"` // refused: why, then the commands that resolve it
 	// Moves: refused because Mods/ holds another version that can move into the lock
 	// library (08 §3): what moving them does, for the one confirmation; RunMoving goes on.
 	Moves []string `json:"moves,omitempty"`
@@ -65,7 +66,18 @@ func RunMoving(a *app.App, what string) *Outcome { return run(a, what, true) }
 
 func run(a *app.App, what string, move bool) *Outcome {
 	o := &Outcome{What: what}
-	text, err := apply(a, what, move)
+	var text string
+	var err error
+	if what == ListSort {
+		var r *app.SortResult
+		r, err = a.Sort(false)
+		if err == nil {
+			text = sortResultText(r)
+			o.MissingDependencies = r.MissingDependencies
+		}
+	} else {
+		text, err = apply(a, what, move)
+	}
 	if err != nil {
 		return refused(a, o, err)
 	}
@@ -149,32 +161,7 @@ func apply(a *app.App, what string, move bool) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if len(r.Changes) == 0 {
-			return T("the order is already right"), nil
-		}
-		added, moved := 0, 0
-		for _, ch := range r.Changes {
-			if ch.Kind == loadout.Added {
-				added++
-			}
-			if ch.Kind == loadout.Moved {
-				moved++
-			}
-		}
-		if added > 0 {
-			return Tf("sorted: %d added, %d moved", added, moved), nil
-		}
-		strong := 0
-		for _, b := range order.Broken(r.Input, r.Result) {
-			if b.Strength == order.Strong {
-				strong++
-			}
-		}
-		if strong > 0 {
-			// Strong ones first (04 §5.3): they are what the sort mattered for.
-			return Tf("sorted: %d moved, strong requirements put right: %d", len(r.Changes), strong), nil
-		}
-		return Tf("sorted: %d moved, only weaker preferences were out of order", len(r.Changes)), nil
+		return sortResultText(r), nil
 	case ListSave:
 		r, err := a.SaveWith(false, move)
 		if err != nil {
@@ -256,4 +243,33 @@ func LaunchPack(a *app.App, name string, move bool) *Outcome {
 		o.Text += "  " + Tf("%d folders moved into the lock library", len(r.Moved))
 	}
 	return o
+}
+
+func sortResultText(r *app.SortResult) string {
+	if len(r.Changes) == 0 {
+		return T("the order is already right")
+	}
+	added, moved := 0, 0
+	for _, ch := range r.Changes {
+		if ch.Kind == loadout.Added {
+			added++
+		}
+		if ch.Kind == loadout.Moved {
+			moved++
+		}
+	}
+	if added > 0 {
+		return Tf("sorted: %d added, %d moved", added, moved)
+	}
+	strong := 0
+	for _, b := range order.Broken(r.Input, r.Result) {
+		if b.Strength == order.Strong {
+			strong++
+		}
+	}
+	if strong > 0 {
+		// Strong ones first (04 §5.3): they are what the sort mattered for.
+		return Tf("sorted: %d moved, strong requirements put right: %d", len(r.Changes), strong)
+	}
+	return Tf("sorted: %d moved, only weaker preferences were out of order", len(r.Changes))
 }
