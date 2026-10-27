@@ -14,7 +14,7 @@ import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
 import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
-import { showDetail, scrollDetail } from "./detail.js";
+import { followDetail, showDetail, scrollDetail } from "./detail.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
 import * as shell from "./shell.js";
@@ -97,7 +97,7 @@ function detailFollow(force) {
   const id = it ? key(it) + "|" + (it.pos || 0) + "|" + S.board.stamp : "";
   if (!force && id === detailKey) return;
   detailKey = id;
-  showDetail(it, k === 2);
+  followDetail(it, k === 2);
 }
 
 // relang: the language changed (06 §2.14). The text comes again from Go (the page data and
