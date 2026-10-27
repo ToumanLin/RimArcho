@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -227,5 +228,16 @@ func TestCreditGUIProgressDuringSlowSteamCall(t *testing.T) {
 	it, _ := e.App.Store.CreditItems(batch)
 	if it[0].State != "subscribed" {
 		t.Fatalf("stopping lost confirmed subscription %+v", it)
+	}
+}
+
+func TestCreditQuestionRenderer(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is needed for the credit question tests")
+	}
+	if out, err := exec.Command(node, "--experimental-vm-modules", "--test", "testdata/credit.mjs").CombinedOutput(); err != nil {
+		t.Fatalf("credit question: %v\n%s", err, out)
 	}
 }

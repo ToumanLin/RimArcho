@@ -5,6 +5,7 @@
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, beginPageRead } from "./screens.js";
 import * as pop from "./popups.js";
+import { getChoices } from "./credit.js";
 
 let ui = null;
 export function initExchange(u) {
@@ -279,9 +280,9 @@ export const workshopIDs = rows => [...new Set(rows.map(r => /[?&]id=(\d+)/.exec
 // background task (06 §2.16); btn stays disabled once it started. The import page's "subscribe
 // all" and a followed collection's mods that are not installed share it.
 export function getAll(ids, btn) {
-  pop.choose(Tf("get %d mods", ids.length), [T("subscribe with Steam"), T("download with SteamCMD")], async (i) => {
+  pop.choose(Tf("get %d mods", ids.length), getChoices(), async (i) => {
     if (btn) btn.disabled = true;
-    try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1 })); }
+    try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1, batch: true })); }
     catch (e) { if (btn) btn.disabled = false; say("fail", errText(e)); }
   });
 }

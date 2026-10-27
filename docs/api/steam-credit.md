@@ -115,16 +115,16 @@ Wails 调用顺序是 `CreditAnswer(prompt.batchIDs, true)` 或 `CreditAnswer(pr
 
 ## 前端文案
 
-下列是前端需定义的 i18n key，未改前端词典。后端任务页沿用 Go `view.T` 的英文句子 key，已注册中文。
+前端沿用英文句子作 key（`T()` / `Tf()`），中文登记在 `internal/view/subscriptionstext.go`；实现见 `assets/js/credit.js`。
 
-| 前端 key | 中文 | English |
-| --- | --- | --- |
-| credit.download.steam | 从 Steam 订阅（慢，但用订阅给作者 credit，由 Steam 管理） | Subscribe through Steam (slower; gives authors subscription credit; managed by Steam) |
-| credit.download.steamcmd | 从 SteamCMD 下载（快，但不给作者 credit，由 RimArcho 管理） | Download through SteamCMD (faster; no subscription credit; managed by RimArcho) |
-| credit.prompt.title | 要通过 Steam 订阅来给作者 credit 吗？ | Give authors credit by subscribing through Steam? |
-| credit.prompt.replace | 逐步用 Steam 订阅替换这批 SteamCMD Mod | Gradually replace these SteamCMD mods with Steam subscriptions |
-| credit.prompt.dismiss | 不用了 | No thanks |
-| credit.prompt.scope | 这几批共 {count} 个 Mod，例如 {examples} | {count} mods in these batches, including {examples} |
+| 英文 key | 中文 |
+| --- | --- |
+| from Steam (slow, but credits the modder with a subscription; Steam manages it) | 从 Steam 订阅（慢，但订阅能给作者带来订阅数，由 Steam 管理） |
+| from SteamCMD (fast, but does not credit the modder; RimArcho manages it) | 从 SteamCMD 下载（快，但不计入作者的订阅数，由 RimArcho 管理） |
+| Do you want to credit the modders by subscribing from Steam? | 要在 Steam 上订阅，给作者带来订阅数吗？ |
+| %d mods, such as %s | 共 %d 个 Mod，例如 %s |
+| replace these SteamCMD mods with Steam subscriptions, little by little | 在后台逐步把这批 SteamCMD Mod 换成 Steam 订阅 |
+| dismiss | 不用了 |
 
 ## 限制与验证
 

@@ -36,6 +36,7 @@ import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
 import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } from "./navigation.js";
+import { checkCredit } from "./credit.js";
 
 // ---- loading ----
 
@@ -1203,6 +1204,7 @@ async function start() {
   // when the window gets the focus (G8).
   addEventListener("focus", async () => {
     try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
+    checkCredit();
   });
   await reload();
   // No environment yet: the first-run guide (06 §2.15); else the home page (06 §2.3).
@@ -1216,6 +1218,7 @@ async function start() {
   if (first) return;
   await scr.checkDirectories();
   if (S.board && S.board.neverScanned) cmd("rescan");
+  checkCredit();
 }
 
 // A history row (06 §2.5): a click goes there at once. Loading a version is one step: the
@@ -1239,6 +1242,8 @@ async function pollLive() {
     if (JSON.stringify(l.items) !== before) { scr.liveChanged(); shell.sync(); }
     if (l.running) scr.logLive();
     if (was !== !!l.running) homePage.liveChanged();
+    // the game exited: a session that used SteamCMD mods may make a credit question due
+    if (was && !l.running) checkCredit();
   } catch { /* the next poll tries again */ }
   setTimeout(pollLive, 2000);
 }
