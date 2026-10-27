@@ -8,9 +8,15 @@ param(
 $ErrorActionPreference = 'Stop'
 $Root = [IO.Path]::GetFullPath($Root)
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-$common = (& git -C $repo rev-parse --path-format=absolute --git-common-dir)
-if ($LASTEXITCODE) { throw 'Cannot resolve repository root' }
-$mainRepo = Split-Path -Parent $common
+$git = Get-Command git -ErrorAction SilentlyContinue
+if ($git) {
+    $common = (& $git.Source -C $repo rev-parse --path-format=absolute --git-common-dir)
+    if ($LASTEXITCODE) { throw 'Cannot resolve repository root' }
+    $mainRepo = Split-Path -Parent $common
+} else {
+    # A VM guest gets an exported copy of the scripts with no Git.
+    $mainRepo = $repo
+}
 if ($Root.StartsWith($mainRepo, [StringComparison]::OrdinalIgnoreCase) -or $Root.StartsWith($repo, [StringComparison]::OrdinalIgnoreCase) -or $Root.StartsWith($SourceHome, [StringComparison]::OrdinalIgnoreCase)) { throw 'Root must be outside the repo and source home' }
 if ((Test-Path $Root) -and -not $ResumeCopy) { throw 'Root already exists; choose a new directory' }
 if ($ResumeCopy -and ((Test-Path (Join-Path $Root 'relocation.sql')) -or -not (Test-Path (Join-Path $Root 'copy-source.json')))) { throw 'ResumeCopy requires an interrupted copy before relocation' }
