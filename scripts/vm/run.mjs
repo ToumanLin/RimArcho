@@ -297,7 +297,7 @@ async function setup() {
   // Refuse an existing listener rather than driving another window's user data.
   try {await fetch(`http://${addr}/${driver==='W'?'json/list':''}`,{signal:AbortSignal.timeout(300)});throw Error(`port ${port} already in use`);}catch(e){if(e.message.includes('already in use'))throw e;}
   child=spawn(exe(driver==='W'?'RimArcho':'guidev'),driver==='W'?[]:['-home',home,'-addr',addr,'-exe',exe('archo')],{env:{...process.env,...env,RIMARCHO_DEVTOOLS_PORT:String(port)},cwd:tools,windowsHide:true,stdio:['ignore','pipe','pipe']});
-  let logs='';child.stdout.on('data',b=>logs+=b);child.stderr.on('data',b=>logs+=b);child.on('exit',()=>writeFileSync(join(out,'process.log'),logs));
+  let logs='';child.stdout.on('data',b=>logs=(logs+b).slice(-256*1024));child.stderr.on('data',b=>logs=(logs+b).slice(-256*1024));child.on('exit',()=>writeFileSync(join(out,'process.log'),logs));
   await until(async()=>{try{return (await fetch(`http://${addr}/${driver==='W'?'json/list':''}`,{signal:AbortSignal.timeout(500)})).ok}catch{return false}},15000);
   if(driver==='W') {
     await until(async()=>{try{return (await (await fetch(`http://${addr}/json/list`)).json()).some(t=>t.type==='page'&&!t.url.startsWith('devtools:'));}catch{return false}},15000);

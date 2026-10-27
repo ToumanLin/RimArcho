@@ -3,7 +3,8 @@ import { resolve, relative, join, isAbsolute } from 'node:path';
 export const HOST_ROOT='D:/RimArcho-test';
 export function treeBytes(root){
   let bytes=0;
-  for(const e of readdirSync(root,{withFileTypes:true})){
+  let entries;try{entries=readdirSync(root,{withFileTypes:true});}catch(err){if(err.code==='ENOENT')return 0;throw err;}
+  for(const e of entries){
     const p=join(root,e.name);let s;try{s=lstatSync(p);}catch(err){if(err.code==='ENOENT')continue;throw err;}
     if(s.isSymbolicLink())continue;
     bytes+=s.isDirectory()?treeBytes(p):s.size;
