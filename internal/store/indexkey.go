@@ -27,10 +27,6 @@ func (s *Store) IndexKey() string {
 // Only Open installs the shared counter. OpenSession and IndexKey never write,
 // including when a different connection is holding a WAL write transaction.
 func (s *Store) installIndexTriggers() error {
-	var token string
-	if s.DB.QueryRow(`SELECT token FROM archo_index_gen`).Scan(&token) == nil {
-		return nil
-	}
 	b := make([]byte, 6)
 	rand.Read(b)
 	var sql strings.Builder

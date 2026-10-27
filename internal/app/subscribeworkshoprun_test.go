@@ -84,7 +84,7 @@ func TestWorkshopBatchSessionFailureStopsQueue(t *testing.T) {
 		{"guard", "ERROR! InvalidAuthCode", "player", "guard", 1},
 		{"login", "Logging in user 'player'...\nFAILED (Failure)", "player", "login", 1},
 		{"anonymous login", "Connecting anonymously to Steam Public...\nFAILED (Failure)", "anonymous", "anonymous-login", 1},
-		{"network", "ERROR! Failed to connect to Steam servers", "anonymous", "network", 3},
+		{"network", "ERROR! Failed to connect to Steam servers", "anonymous", "network", 12},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			base := t.TempDir()
@@ -126,8 +126,12 @@ func TestWorkshopBatchSessionFailureStopsQueue(t *testing.T) {
 			if err != nil || len(calls) != tc.calls {
 				t.Fatalf("starts=%d, error=%v", len(calls), err)
 			}
-			for _, batch := range calls {
-				if !slices.Equal(batch, ids[:25]) {
+			for call, batch := range calls {
+				start := 0
+				if tc.kind == "network" {
+					start = call % 4 * 25
+				}
+				if !slices.Equal(batch, ids[start:start+25]) {
 					t.Fatalf("started later batch: %v", batch)
 				}
 			}

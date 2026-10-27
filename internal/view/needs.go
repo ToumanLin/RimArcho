@@ -40,7 +40,9 @@ const (
 	ActLocateDirectory = "locate-directory" // Refs[0]: managed directory ID; Lines[0]: old path
 	ActSort            = "sort"             // open the sort preview (S)
 	ActSave            = "save"             // open the save preview (w)
+	ActMove            = "move"
 	ActEnable          = "enable"           // Refs
+	ActUseInstalled    = "use-installed"    // Refs: package IDs, bound in place as one undo step
 	ActDisable         = "disable"          // Refs
 	ActChooseDisable   = "choose-disable"   // pick one of Options, then disable its Refs
 	ActOpenURL         = "open-url"         // URL in the browser
@@ -75,6 +77,8 @@ type Option struct {
 
 // Action is one way to handle an item.
 type Action struct {
+	ID    string `json:"id,omitempty"`
+	After string `json:"after,omitempty"`
 	Kind  string `json:"kind"`
 	Key   string `json:"key"` // the TUI's key for it (06 §5)
 	Label string `json:"label"`
@@ -101,9 +105,12 @@ type Action struct {
 
 // Need is one item of 需要处理.
 type Need struct {
-	Group   int    `json:"group"`
-	Section int    `json:"section"` // the section it is shown in (SectionOf, 06 §2.4)
-	Text    string `json:"text"`    // one sentence (the TUI's line)
+	ID         string     `json:"id"`
+	Target     string     `json:"target,omitempty"`
+	RequiredBy []ModOwner `json:"requiredBy,omitempty"`
+	Group      int        `json:"group"`
+	Section    int        `json:"section"` // the section it is shown in (SectionOf, 06 §2.4)
+	Text       string     `json:"text"`    // one sentence (the TUI's line)
 	// Title and Why are the GUI card's bold line and its plain explanation (Title empty:
 	// the card shows Text); Evidence is where the claim comes from.
 	Title    string    `json:"title,omitempty"`
@@ -127,8 +134,15 @@ type Need struct {
 
 // Needs is the screen's content and what it means for the rest of the interface.
 type Needs struct {
-	Items  []Need         `json:"items"`
-	Status map[string]int `json:"status"` // each mod's row icon
+	Environment string         `json:"environment,omitempty"`
+	Plan        int64          `json:"plan,omitempty"`
+	ListVersion string         `json:"listVersion,omitempty"`
+	Sequence    uint64         `json:"sequence"`
+	Revision    string         `json:"revision,omitempty"`
+	Updating    bool           `json:"updating"`
+	Error       string         `json:"error,omitempty"`
+	Items       []Need         `json:"items"`
+	Status      map[string]int `json:"status"` // each mod's row icon
 	// Reasons say why a row has its icon: the items behind it, worst first (06 §4.2: the
 	// badge's hover / pinned popover).
 	Reasons map[string][]Reason `json:"reasons,omitempty"`
@@ -163,10 +177,11 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	if st == nil {
 		return n
 	}
-	n.Items = append(buildItems(a, st, ps), directoryNeeds(a)...)
+	n.Items = append(mergeDependencies(st, buildItems(a, st, ps)), directoryNeeds(a)...)
 	n.Items = append(n.Items, linkNeeds(a, ps.GameLinks)...)
 	for i := range n.Items {
 		n.Items[i].Section = SectionOf(n.Items[i].Group)
+		identifyNeed(&n.Items[i])
 	}
 	n.Launch = launchHint(n.Items)
 	for _, r := range ps.Logs {
@@ -182,6 +197,15 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		}
 		break
 	}
+	indexNeeds(n)
+	return n
+}
+
+func indexNeeds(n *Needs) {
+	n.Status = map[string]int{}
+	n.Reasons = map[string][]Reason{}
+	n.Count = 0
+	n.Launch = launchHint(n.Items)
 	// The number in the top bar is the number of items the player can act on, and a row
 	// carries an icon exactly when its mod is in one of them (06 §7, §4.2).
 	for _, it := range n.Items {
@@ -211,7 +235,6 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	for _, rs := range n.Reasons {
 		sort.SliceStable(rs, func(i, j int) bool { return rs[i].Status > rs[j].Status })
 	}
-	return n
 }
 
 func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
@@ -238,17 +261,22 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	}
 	var mergeKeys []string
 	merges := map[string]*merged{}
-	// Entries the list has but nothing installed matches (an imported list, say) are one
-	// item with one action for all of them; a mod needing one of them is covered by it.
+	// Unresolved entries are grouped by whether an installed copy can be used;
+	// a mod needing one of them is covered by the same item.
 	type missingEntry struct {
 		pkg, ws, name string
 		n             Need
 	}
-	var missing []missingEntry
+	missingInfo := map[string]app.MissingMod{}
+	for _, m := range a.MissingMods(st) {
+		missingInfo[strings.ToLower(m.PackageID)] = m
+	}
+	var missing, installed []missingEntry
+	missingOwners := map[string][]ModOwner{}
 	inList := map[string]bool{}
 	for _, e := range st.List {
 		if e.Missing != "" {
-			inList[strings.TrimSuffix(e.Missing, "_steam")] = true
+			inList[dependencyTarget(st, "pkg:"+e.Missing)] = true
 		}
 	}
 	merge := func(key, x, y string, n Need) {
@@ -306,7 +334,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				weak = append(weak, Need{Text: Tf("%s should load after %s", nm(x), nm(y)), Mods: ids})
 				continue
 			}
-			order = append(order, Need{rank: 1, Group: GroupList, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{sortAction()}, Counted: true, Mods: ids, Status: s,
+			order = append(order, Need{rank: 1, Group: GroupList, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{{Kind: ActMove, Key: "m", Label: Tf("move %s after %s", nm(x), nm(y)), Refs: []string{TokRef(st, x)}, After: TokRef(st, y), Undo: true}, sortAction()}, Counted: true, Mods: ids, Status: s,
 				Why: T("a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right"), Evidence: ev})
 		case "mod.known-error":
 			// The mod's own problem (03 §4.3): whatever else is enabled, shared logs show it.
@@ -314,9 +342,9 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				Actions: []Action{viewAction(T("see the error"), "problems", "show", p.Ref)}, Mods: ids, Status: StatusWarn, Dim: true,
 				Title: Tf("%s has a known error: this is the mod's own problem", nm(x)), Why: T("not your list's: shared logs show it whatever else is enabled; an update may fix it"), Evidence: ev})
 		case "order.cycle":
-			add(Need{rank: 2, Group: GroupList, Text: Tf("the order requirements of %d mods contradict each other", len(subj)),
-				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: p.Severity != finding.Info, Dim: p.Severity == finding.Info, Mods: ids, Status: s,
-				Why: T("sorting keeps the strongest of them and gives up the weakest (the suggested one); ignoring it settles that for good"), Evidence: ev})
+			add(Need{rank: 2, Group: GroupList, Text: Tf("sorting keeps the strongest constraints in a cycle of %d mods", len(subj)),
+				Actions: []Action{cycleView(st, p)}, Counted: false, Dim: true, Mods: ids,
+				Why: cycleResolution(st, p), Evidence: ev})
 		case "pkg.duplicate-active":
 			add(Need{rank: 3, Group: GroupList, Text: Tf("%s is enabled twice", nm(x)), Actions: []Action{keepOne(st, ids)}, Counted: true, Mods: ids, Status: s,
 				Why: T("the game loads only one of them; you pick which"), Evidence: ev})
@@ -331,12 +359,17 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			me := missingEntry{pkg: pkg, name: pkg, n: Need{rank: 4, Group: GroupList, Text: Tf("the list has %s, but it is not installed", pkg),
 				Actions: []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s,
 				Title: Tf("not installed: %s", pkg), Why: T("the list has it, but no mod folder does"), Evidence: ev}}
-			if w, ok := a.WorkshopFor(pkg); ok {
+			if w, ok := missingInfo[strings.TrimSuffix(strings.ToLower(pkg), "_steam")]; ok {
 				me.ws = w.WorkshopID
 				if w.Name != "" {
 					me.name = w.Name
 					me.n.Text = Tf("the list has %s, but it is not installed", w.Name)
 					me.n.Title = Tf("not installed: %s", w.Name)
+				}
+				if w.CanEnable {
+					me.pkg = w.PackageID
+					installed = append(installed, me)
+					continue
 				}
 			}
 			missing = append(missing, me)
@@ -357,22 +390,23 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			add(Need{rank: 4, Group: GroupList, Text: Tf("%s is enabled, but the game cannot load it", nm(x)), Actions: []Action{disable(st, x, T("disable it"))}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("the game cannot load %s", nm(x)), Why: T("it is enabled, but the game skips it; disabling it changes nothing in play"), Evidence: ev})
 		case "dep.missing":
-			if inList[strings.TrimSuffix(strings.TrimPrefix(y, "pkg:"), "_steam")] {
-				continue // the list has it, not installed: the missing entries' item covers it
+			if inList[dependencyTarget(st, y)] {
+				missingOwners[dependencyTarget(st, y)] = append(missingOwners[dependencyTarget(st, y)], owners(st, x)...)
+				continue // the missing-entry card covers the dependency as well
 			}
 			dep := depName(p.Claim, strings.TrimPrefix(y, "pkg:"))
-			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not installed", nm(x), dep, dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
+			add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s needs %s, but %s is not installed", nm(x), dep, dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("missing dependency: %s", dep), Why: Tf("%s needs it, but it is not installed.", nm(x)), Evidence: ev})
 		case "dep.inactive":
-			add(Need{Group: GroupDeps, Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
+			add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("missing dependency: %s", nm(y)), Why: Tf("%s needs it, but it is not enabled.", nm(x)), Evidence: ev})
 		case "dep.observed-missing": // undeclared, seen in shared logs (internal/known)
 			if strings.HasPrefix(y, "pkg:") {
 				dep := strings.TrimPrefix(y, "pkg:")
-				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not installed", nm(x), dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
+				add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s seems to need %s (seen in shared logs), which is not installed", nm(x), dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
 					Title: Tf("probably missing: %s", dep), Why: Tf("%s does not declare it, but in shared logs it fails without it. It is not installed.", nm(x)), Evidence: ev})
 			} else {
-				add(Need{Group: GroupDeps, Text: Tf("%s seems to need %s (seen in shared logs), which is not enabled", nm(x), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
+				add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s seems to need %s (seen in shared logs), which is not enabled", nm(x), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
 					Title: Tf("probably missing: %s", nm(y)), Why: Tf("%s does not declare it, but in shared logs it fails without it. It is not enabled.", nm(x)), Evidence: ev})
 			}
 		case "combo.known-bad":
@@ -384,10 +418,13 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 					Title: Tf("this version of %s often fails", nm(x)), Why: T("in shared logs this version produces errors; other versions did not. Updating it usually helps."), Evidence: ev})
 			}
 		case "patch.no-match":
+			if id := finding.InstID(y); id != "" && st.Position(id) > 0 {
+				continue
+			}
 			if y == "" {
 				continue // no inactive target: nothing the player can do (technical information)
 			}
-			merge("patch|"+x+"|"+y, nm(x), nm(y), Need{Group: GroupDeps, Text: Tf("part of %s does not take effect: %s, which it targets, is not enabled", nm(x), nm(y)),
+			merge("patch|"+x+"|"+y, nm(x), nm(y), Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("part of %s does not take effect: %s, which it targets, is not enabled", nm(x), nm(y)),
 				Actions: []Action{enable(st, y), viewAction(T("see what"), "patches", "--mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("part of %s does not take effect", nm(x)), Why: Tf("it changes things %s adds, and %s is not enabled.", nm(y), nm(y)), Evidence: ev})
 		case "incompat.active":
@@ -439,6 +476,34 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			// is simply absent stay in the technical information (06 §5).
 		}
 	}
+	for _, entries := range [][]missingEntry{missing, installed} {
+		for i := range entries {
+			m := &entries[i]
+			m.n.RequiredBy = missingOwners[dependencyTarget(st, "pkg:"+m.pkg)]
+			for _, o := range m.n.RequiredBy {
+				m.n.Mods = append(m.n.Mods, o.ID)
+			}
+			m.n.Fold = len(m.n.Mods) > 1
+		}
+	}
+	if len(installed) > 0 {
+		f := Need{rank: 4, Group: GroupList, Counted: true, Status: installed[0].n.Status, Fold: true, code: "entry.missing",
+			Text:     Tf("%d mods in the list can use copies already installed", len(installed)),
+			Why:      T("use the installed copies in the same positions; any needed links are created when you save or launch"),
+			Evidence: installed[0].n.Evidence}
+		var packages []string
+		for _, m := range installed {
+			f.RequiredBy = append(f.RequiredBy, m.n.RequiredBy...)
+			f.Mods = append(f.Mods, m.n.Mods...)
+			f.Parts = append(f.Parts, m.name)
+			packages = append(packages, m.pkg)
+		}
+		f.Actions = []Action{
+			{Kind: ActUseInstalled, Key: "space", Label: T("use installed copies"), Refs: packages, Undo: true, Done: T("using installed copies")},
+			{Kind: ActFold, Key: "f", Label: T("show which")},
+		}
+		add(f)
+	}
 	switch len(missing) {
 	case 0:
 	case 1:
@@ -454,6 +519,8 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			Evidence: missing[0].n.Evidence}
 		var ws, refs []string
 		for _, m := range missing {
+			f.RequiredBy = append(f.RequiredBy, m.n.RequiredBy...)
+			f.Mods = append(f.Mods, m.n.Mods...)
 			f.Parts = append(f.Parts, m.name)
 			refs = append(refs, TokRef(st, "pkg:"+m.pkg))
 			if m.ws != "" {
@@ -501,6 +568,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			Why:      T("loadAfter and community rules: breaking them showed no more errors in shared logs; sorting puts them right"),
 			Evidence: evidence(EvCorpus, T("load-order constraint strength"))}
 		for _, w := range weak {
+			f.Mods = append(f.Mods, w.Mods...)
 			f.Parts = append(f.Parts, w.Text)
 		}
 		f.Actions = []Action{sortAction(), {Kind: ActFold, Key: "f", Label: T("show which")}}
@@ -540,11 +608,13 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				text = Tf("%d mods do not list %s as supported (%d of them list %s)", n, mm, warn, prev)
 			}
 			names := make([]string, 0, n)
+			var versionMods []string
 			for _, v := range versions {
+				versionMods = append(versionMods, v.SubjectInstance())
 				names = append(names, nm(v.Subjects[0]))
 			}
 			sort.Strings(names)
-			add(Need{rank: 5, Group: GroupList, Text: text, Counted: true, Status: StatusWarn,
+			add(Need{rank: 5, Group: GroupList, Text: text, Counted: true, Status: StatusWarn, Mods: versionMods, Fold: true,
 				Why: T("they may still work, but their authors have not said they do on this version"), Evidence: evidence(EvDeclared, T("About.xml supportedVersions")),
 				Actions: []Action{{Kind: ActList, Key: "enter", Label: T("see the list"), Title: text, Lines: names}}})
 		}
@@ -859,6 +929,15 @@ func workshop(p *app.Problem, name string) Action {
 	if u == "" {
 		u = WorkshopSearch(name)
 	}
+	if strings.Contains(u, "sharedfiles/filedetails/") {
+		if parsed, err := url.Parse(u); err == nil {
+			if ws := parsed.Query().Get("id"); IsNumber(ws) {
+				act := subscribeAction([]string{ws}, Tf("subscribe to %s", name))
+				act.URL = u
+				return act
+			}
+		}
+	}
 	return Action{Kind: ActOpenURL, Key: "o", Label: Tf("open %s in the Workshop", name), URL: u, Done: T("opened the Workshop page")}
 }
 
@@ -876,18 +955,6 @@ func cycleView(st *app.LoadoutState, p *app.Problem) Action {
 	return Action{Kind: ActList, Key: "enter", Label: T("see which"), Title: T("order requirements that contradict each other"), Lines: lines}
 }
 
-// cycleIgnore: ignore the requirement the sort suggests dropping (its first suggestion).
-func cycleIgnore(st *app.LoadoutState, p *app.Problem) Action {
-	act := Action{Kind: ActIgnoreRule, Key: "x", Label: T("ignore the suggested one"), Done: T("that requirement is ignored from now on")}
-	for _, s := range p.Suggestions {
-		if rest, ok := strings.CutPrefix(s, "archo rule add ignore "); ok {
-			act.Rule = finding.Expand(rest, st.Ix.Ref)
-			break
-		}
-	}
-	return act
-}
-
 // ErrNothing: the action has nothing to do (an ignore with no suggestion).
 var ErrNothing = errors.New("nothing to do")
 
@@ -897,8 +964,17 @@ var ErrNothing = errors.New("nothing to do")
 // Navigation kinds (sort, save, view, list, fold, open-url) are the interface's own.
 func Do(a *app.App, act Action, option int) (done string, err error) {
 	switch act.Kind {
+	case ActMove:
+		if len(act.Refs) != 1 || act.After == "" {
+			return "", fmt.Errorf("move requires one mod and an after reference")
+		}
+		_, err = a.Move(act.Refs[0], app.Placement{After: act.After})
+	case ActSort:
+		_, err = a.Sort(false)
 	case ActEnable:
 		_, err = a.Enable(act.Refs, app.Placement{})
+	case ActUseInstalled:
+		_, err = a.UseInstalled(act.Refs)
 	case ActDisable:
 		_, err = a.Disable(act.Refs)
 	case ActChooseDisable:
@@ -1043,6 +1119,7 @@ var edgeRe = regexp.MustCompile(`^(?:decl|community|rule r:\d+|builtin) (\S+)(?:
 // after B · suggested to ignore".
 func EdgeWords(st *app.LoadoutState, t string) string {
 	sug := strings.Contains(t, "[suggested to ignore]")
+	broken := strings.Contains(t, "[not used by sorting]")
 	mt := edgeRe.FindStringSubmatch(t)
 	if mt == nil {
 		return Humanize(st, finding.Expand(t, st.Ix.Ref))
@@ -1055,7 +1132,9 @@ func EdgeWords(st *app.LoadoutState, t string) string {
 	default:
 		s = Tf("%s wants to load after %s", x, y)
 	}
-	if sug {
+	if broken {
+		s += "  " + T("set aside by sorting")
+	} else if sug {
 		s += "  " + T("suggested to ignore (x)")
 	}
 	return s
@@ -1096,4 +1175,14 @@ func popActions(as []Action) []Action {
 		}
 	}
 	return out
+}
+
+func cycleResolution(st *app.LoadoutState, p *app.Problem) string {
+	var broken []string
+	for _, ev := range p.Evidence {
+		if strings.Contains(ev.Text, "[not used by sorting]") {
+			broken = append(broken, EdgeWords(st, ev.Text))
+		}
+	}
+	return Tf("requirements set aside by sorting: %s", strings.Join(broken, "; "))
 }

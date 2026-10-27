@@ -227,6 +227,11 @@ func (a *App) collectProblems(ps *ProblemSet) error {
 		fromLog[f] = true
 	}
 	all = append(all, lfs...)
+	return a.finishProblems(ps, all, fromLog, run)
+}
+
+func (a *App) finishProblems(ps *ProblemSet, all []*finding.Finding, fromLog map[*finding.Finding]bool, run *LogRun) error {
+	st := ps.State
 	ignores, err := a.Store.Ignores(st.Ix.Env.ID)
 	if err != nil {
 		return err
@@ -342,6 +347,10 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		out = append(out, f)
 	}
 	inst := finding.Inst
+	missingInfo := map[string]SortMod{}
+	for _, m := range a.MissingMods(st) {
+		missingInfo[m.PackageID] = m.SortMod
+	}
 	activePos := map[string]int{}
 	activeByPkg := map[string][]*store.Mod{}
 	var active []*store.Mod
@@ -351,7 +360,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				Subjects:    []string{"pkg:" + e.Missing},
 				Claim:       fmt.Sprintf("pkg:%s in the Loadout matches no installed mod (kept in ModsConfig.xml)", e.Missing),
 				Suggestions: []string{"archo find " + e.Missing, "archo disable pkg:" + e.Missing}})
-			if w, ok := a.WorkshopFor(e.Missing); ok {
+			if w := missingInfo[dependencyPackage(e.Missing)]; w.WorkshopID != "" {
 				f := out[len(out)-1]
 				f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+w.WorkshopID)
 			}
@@ -376,24 +385,19 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	for _, l := range locked {
 		lockedCopy[l.Copy.ID] = l.Upstream.ID
 	}
-	installed := map[string][]*store.Mod{} // live, loadable instances by packageId
-	for _, m := range st.Ix.Mods {
-		if m.TombstoneAt.IsZero() && !m.Residue && m.Unloadable == "" && (st.Reg.Known(m.ID) || st.Deployable(m)) {
-			p := strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")
-			installed[p] = append(installed[p], m)
-		}
-	}
+	installed := installedDependencies(st)
+	depsIndex := dependencyIndex{st: st, activeByPkg: activeByPkg, installed: installed}
 
 	for _, m := range active {
 		d := m.Decl()
 		// Use This Instead (04 §6.3): the community knows a maintained replacement for this game version.
-		if r := a.ReplacementFor(m.WorkshopID(), m.PackageID); r != nil && r.NewPackageID != m.PackageID && (len(r.NewVersions) == 0 || slices.Contains(r.NewVersions, mm)) {
+		if r := a.replacementFor(st, m); r != nil {
 			f := &finding.Finding{Code: "mod.replaced", Severity: finding.Warning, Key: r.NewWorkshopID, Subjects: []string{inst(m.ID)},
 				Claim:    fmt.Sprintf("%s has a replacement for %s: %s by %s", inst(m.ID), mm, r.NewName, r.NewAuthor),
 				Evidence: []finding.Evidence{{Source: finding.Inferred, Ref: "replacements.json", Text: fmt.Sprintf("Use This Instead: ws:%s → ws:%s", r.OldWorkshopID, r.NewWorkshopID)}}}
-			if ins := installed[r.NewPackageID]; len(ins) > 0 {
-				f.Subjects = append(f.Subjects, inst(ins[0].ID))
-				f.Suggestions = []string{"archo disable " + inst(m.ID), "archo enable " + inst(ins[0].ID)}
+			if c := replacementCandidate(st, m, r); c != nil && swapBlocker(st, c, m) == "" {
+				f.Subjects = append(f.Subjects, inst(c.ID))
+				f.Suggestions = []string{"archo disable " + inst(m.ID), "archo enable " + inst(c.ID)}
 			} else if r.NewWorkshopID != "" {
 				f.Suggestions = []string{"subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=" + r.NewWorkshopID}
 			}
@@ -405,20 +409,10 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				Suggestions: []string{"archo disable " + inst(m.ID)}})
 		}
 		// Dependencies.
-		deps := append([]scanDep{}, toDeps(d.Dependencies)...)
-		deps = append(deps, toDeps(d.DependenciesByVersion["v"+mm])...)
-		seen := map[string]bool{}
-		for _, dep := range deps {
-			p := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(dep.pkg)), "_steam")
-			if p == "" || seen[p] {
-				continue
-			}
-			seen[p] = true
-			if len(activeByPkg[p]) > 0 {
-				continue
-			}
+		for _, dep := range depsIndex.missing(m) {
+			p := dep.pkg
 			ev := finding.Evidence{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml modDependencies: " + p}
-			if cands := installed[p]; len(cands) > 0 {
+			if cands := depsIndex.candidates(p); len(cands) > 0 {
 				f := &finding.Finding{Code: "dep.inactive", Severity: finding.Error, Key: p, Subjects: []string{inst(m.ID), inst(cands[0].ID)},
 					Claim:    fmt.Sprintf("%s requires pkg:%s; %s is installed but not enabled", inst(m.ID), p, inst(cands[0].ID)),
 					Evidence: []finding.Evidence{ev}}
@@ -434,18 +428,18 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			}
 			f := &finding.Finding{Code: "dep.missing", Severity: finding.Error, Key: p, Subjects: []string{inst(m.ID), "pkg:" + p},
 				Claim: fmt.Sprintf("%s requires %s (pkg:%s), which is not installed", inst(m.ID), name, p), Evidence: []finding.Evidence{ev}}
-			switch {
-			case strings.HasPrefix(p, "ludeon.rimworld."):
+			if p == "ludeon.rimworld" || strings.HasPrefix(p, "ludeon.rimworld.") {
 				f.Claim = fmt.Sprintf("%s requires the %s DLC (pkg:%s), which is not installed", inst(m.ID), name, p)
-			case dep.url != "":
-				f.Suggestions = append(f.Suggestions, "subscribe: "+dep.url)
-			default:
-				if w, ok := a.WorkshopFor(p); ok { // steamDB (04 §6.3): a direct link
-					f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+w.WorkshopID)
+			} else {
+				ws, _ := a.dependencyWorkshop(dep)
+				if dep.url != "" {
+					f.Suggestions = append(f.Suggestions, "subscribe: "+dep.url)
+				} else if ws != "" {
+					f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+ws)
 				}
-			}
-			if ws := workshopID(dep.url); ws != "" {
-				f.Suggestions = append(f.Suggestions, "steam://url/CommunityFilePage/"+ws)
+				if ws != "" {
+					f.Suggestions = append(f.Suggestions, "steam://url/CommunityFilePage/"+ws)
+				}
 			}
 			add(f)
 		}
@@ -731,6 +725,9 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		for i, e := range cy.Edges {
 			ev, ig := edgeText(st, in, e)
 			t := ev
+			if slices.Contains(cy.Broken, i) {
+				t += "  [not used by sorting]"
+			}
 			if i == cy.Suggest {
 				t += "  [suggested to ignore]"
 				f.Suggestions = append([]string{"archo rule add ignore " + ig}, f.Suggestions...)
@@ -738,6 +735,20 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Declared, Text: t})
 		}
 		add(f)
+	}
+	for _, d := range r.Dropped {
+		if d.Reason != order.ReasonOfficialFirst {
+			continue
+		}
+		ev, _ := edgeText(st, in, d.Edge)
+		var refs []string
+		for _, i := range d.Members {
+			refs = append(refs, nodeTok(i))
+		}
+		add(&finding.Finding{Code: "order.cycle", Severity: finding.Info, Key: "official:" + ev,
+			Subjects: refs,
+			Claim:    "sorting keeps the official order and sets aside a contradictory rule",
+			Evidence: []finding.Evidence{{Source: finding.Declared, Text: ev + "  [not used by sorting]"}}})
 	}
 	return out, nil
 }
@@ -754,11 +765,13 @@ func toDeps(l []scan.Dependency) []scanDep {
 
 // workshopID extracts the item ID from a Steam workshop URL.
 func workshopID(u string) string {
-	i := strings.Index(u, "id=")
-	if i < 0 {
-		return ""
+	u = strings.TrimSpace(u)
+	id := ""
+	if rest, ok := strings.CutPrefix(u, "steam://url/CommunityFilePage/"); ok {
+		id = rest
+	} else if i := strings.Index(u, "id="); i >= 0 {
+		id = u[i+3:]
 	}
-	id := u[i+3:]
 	for j, c := range id {
 		if c < '0' || c > '9' {
 			id = id[:j]

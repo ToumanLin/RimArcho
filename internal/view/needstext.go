@@ -1,9 +1,24 @@
 package view
 
+import "regexp"
+
 // 能不能跑's card text (needs.go, evidence.go): the sections, the evidence chips, each
 // item's bold line and its explanation (06 §2.4, §5).
 func init() {
+	interfaceFormats = append(interfaceFormats,
+		interfaceFormat{"no usable installed copy for missing package %s", regexp.MustCompile(`^no usable installed copy for missing package (.+)$`)},
+		interfaceFormat{"installed copy for %s is no longer available", regexp.MustCompile(`^installed copy for (.+) is no longer available$`)},
+	)
 	Register(map[string]string{
+		"no usable installed copy for missing package %s":                                                      "列表缺失的 %s 没有可用的已安装副本",
+		"installed copy for %s is no longer available":                                                         "%s 的已安装副本已不可用",
+		"%d mods in the list can use copies already installed":                                                 "%d 个列表中的 Mod 可以使用已安装的副本",
+		"use the installed copies in the same positions; any needed links are created when you save or launch": "使用已安装的副本并保留列表顺序；保存或启动时会创建所需链接",
+		"use installed copies":                              "使用已安装的副本",
+		"using installed copies":                            "已使用安装好的副本",
+		"required by: %s":                                   "%s 需要",
+		"move %s after %s":                                  "将 %s 移到 %s 之后",
+		"subscribe to %s":                                   "订阅 %s",
 		"game mod links need attention":                     "游戏的 Mod 链接需要处理",
 		"remove the broken or wrong links":                  "移除断链和错误链接",
 		"repair the previewed links":                        "修复预览中的链接",

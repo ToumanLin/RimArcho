@@ -2,6 +2,7 @@ package gui
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -31,7 +32,7 @@ func TestPageReadersRetainIndexAcrossEditorCommits(t *testing.T) {
 		}
 	}
 	read(1)
-	readers := []*logReader{&api.logRead, &api.plansRead, &api.libRead, &api.workspaceRead}
+	readers := []*logReader{&api.logRead, &api.plansRead, &api.libRead, &api.workspaceReader}
 	apps := make([]*app.App, len(readers))
 	indexes := make([]*app.Index, len(readers))
 	for i, r := range readers {
@@ -67,5 +68,34 @@ func TestPageReadersRetainIndexAcrossEditorCommits(t *testing.T) {
 		if err != nil || ix == indexes[i] || ix.ByID[id].DisplayName() != "Renamed" {
 			t.Fatalf("reader %d kept stale metadata: %v", i, err)
 		}
+	}
+}
+
+func TestWorkspaceInvalidatedIndexLoadsOutsidePageMutex(t *testing.T) {
+	e, api, events := fixture(t)
+	board := api.Board()
+	api.Workspace(1)
+	first := environmentResult(t, events, 1)
+	if first.Error != "" || first.Stale {
+		t.Fatalf("workspace: %+v", first)
+	}
+	id := board.Cols[view.Active][1].ID
+	if err := e.App.Store.SetAlias("", board.St.Ix.ByID[id].LineageID, "Invalidated"); err != nil {
+		t.Fatal(err)
+	}
+	started, release := pauseInventory(t, api)
+	api.Workspace(2)
+	awaitInventory(t, started)
+	done := make(chan struct{})
+	go func() { api.Init(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		release()
+		t.Fatal("invalidated workspace loaded the index while holding the page mutex")
+	}
+	release()
+	if result := environmentResult(t, events, 2); result.Error != "" || result.Stale {
+		t.Fatalf("workspace: %+v", result)
 	}
 }

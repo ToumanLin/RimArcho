@@ -14,8 +14,11 @@ import (
 // Entry is one position of a Loadout: an Instance, or an entry that matched nothing
 // (kept, never silently dropped — 04 §4.2).
 type Entry struct {
-	Instance string `json:"i,omitempty"`
-	Missing  string `json:"m,omitempty"` // the token as found in ModsConfig.xml
+	Instance   string `json:"i,omitempty"`
+	Missing    string `json:"m,omitempty"`    // the token as found in ModsConfig.xml
+	Name       string `json:"name,omitempty"` // source metadata retained for unresolved imports
+	WorkshopID string `json:"ws,omitempty"`
+	Lineage    string `json:"l,omitempty"`
 }
 
 // Key identifies an entry within a list.

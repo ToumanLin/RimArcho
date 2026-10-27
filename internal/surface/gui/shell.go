@@ -36,10 +36,10 @@ type Shell struct {
 func (s *API) Shell() *Shell {
 	// The sidebar and editor read the same loadout/problems. Reuse their reader
 	// rather than retaining two full indices and sets of declarations/findings.
-	s.workspaceRead.mu.Lock()
-	defer s.workspaceRead.mu.Unlock()
+	s.workspaceReader.mu.Lock()
+	defer s.workspaceReader.mu.Unlock()
 	s.mu.Lock()
-	r, err := s.inventorySession(&s.workspaceRead)
+	r, err := s.inventorySession(&s.workspaceReader)
 	s.mu.Unlock()
 	if err == nil {
 		err = s.refreshPageIndex(r)

@@ -48,7 +48,7 @@ async function port() {
     await call('Page.navigate', {url: origin});
     await sleep(15000);
     const evaluated = await call('Runtime.evaluate', {awaitPromise: true, returnByValue: true, expression: `(async () => {
-      const {api} = await import('/js/api.js'), {S} = await import('/js/state.js');
+      const {api, on} = await import('/js/api.js'), {S} = await import('/js/state.js');
       const {go} = await import('/js/navigation.js'), pop = await import('/js/popups.js');
       const mods = ${JSON.stringify(mods)}, refs = mods.map(m => m.id);
       const out = window.__readerCheck = {measures: [], errors: [], spaces: []};
@@ -106,6 +106,7 @@ async function port() {
           }
           return response;
         };
+        const previousTasks = new Set(((await api.Tasks()).rows || []).map(t => t.id));
         const t = performance.now();
         await api.LibraryDo('subscription-remove', refs);
         for (let i = 0; i < 100; i++) { if ((await api.Tasks()).running) break; await sleep(5); }
@@ -118,7 +119,7 @@ async function port() {
         for (let i = 0; i < 2400; i++) {
           const tasks = await api.Tasks();
           if (!tasks.running && !tasks.queued) {
-            out.tasks = tasks.rows.filter(r => r.kind === 'subscription-remove').map(r => ({state:r.state, items:r.items?.map(i => ({state:i.state, why:i.why}))}));
+            out.tasks = tasks.rows.filter(r => r.kind === 'subscription-remove' && !previousTasks.has(r.id)).map(r => ({state:r.state, items:r.items?.map(i => ({state:i.state, why:i.why}))}));
             break;
           }
           await sleep(50);
@@ -128,6 +129,36 @@ async function port() {
         out.sidebarLists = S.shell?.plans?.length;
         window.fetch = original;
         await reads('after'); await pages('after');
+      }
+      // Compare warm editor/can-it-run navigation without adding an artificial frame.
+      await go('needs'); await sleep(500); await go('plan');
+      out.switches = [];
+      for (let i = 0; i < 6; i++) {
+        for (const id of ['needs', 'plan']) {
+          const t = performance.now(); await go(id);
+          out.switches.push({page: id, ms: Math.round(performance.now() - t)});
+        }
+      }
+      if (${execute}) {
+        out.problemEvents = [];
+        on('list-problems', p => out.problemEvents.push({count: p.count, environment: p.environment, plan: p.plan, sequence: p.sequence}));
+        const before = S.board.problems;
+        const action = before.items.flatMap(it => it.actions || []).find(a => a.kind === 'enable');
+        if (!action) throw Error('A dependency enable action is required for the edit check');
+        const summary = p => ({count: p.count, environment: p.environment, plan: p.plan, sequence: p.sequence, listVersion: p.listVersion});
+        try {
+          await api.DoAction(action, 0); await go('plan');
+          out.problemEdit = {before: summary(before), after: summary(S.board.problems)};
+        } finally {
+          await api.Undo(); await go('plan');
+          if (out.problemEdit) out.problemEdit.restored = summary(S.board.problems);
+        }
+        if (out.problemEdit.before.count === out.problemEdit.after.count ||
+            out.problemEdit.after.sequence <= out.problemEdit.before.sequence ||
+            out.problemEdit.before.listVersion !== out.problemEdit.restored.listVersion ||
+            !out.problemEvents.length || out.problemEvents.some(p => !p.environment || !p.plan || !p.sequence)) {
+          throw Error('Problem count, event identity, sequence or undo verification failed');
+        }
       }
       return out;
     })()`});

@@ -57,8 +57,13 @@ export function openScreen(name) {
   sc.hidden = false;
   sc.removeAttribute("aria-busy");
   sc.replaceChildren();
-  const cached = S.busy.env && pageCache.get(name);
-  if (cached) { sc.append(...cached.nodes); sc.scrollTop = cached.top; }
+  // While the game switches, or when coming back to a page kept warm (06 §2.4: 能不能跑,
+  // the editor's other half) for the same game and list, the last drawing shows at once
+  // and the page reads again behind it.
+  const sameContext = WARM.has(name) && pageContexts.get(name) === JSON.stringify([S.board?.env, S.shell?.plan?.id]);
+  const cached = (S.busy.env || sameContext) && pageCache.get(name);
+  if (cached) { sc.append(...cached.nodes); sc.scrollTop = cached.top; sc.dataset.warm = sameContext ? "1" : ""; }
+  else delete sc.dataset.warm;
   ui.renderWhere();
   ui.renderHints();
   return sc;
@@ -79,6 +84,8 @@ export function closeScreen() {
 }
 
 const pageReads = new Map();
+// pages kept warm: shown at once from their last drawing when the game and list are the same
+const WARM = new Set(["needs"]);
 const pageContexts = new Map();
 let activeRead = null;
 export const pendingPageRead = () => activeRead?.done;
@@ -108,7 +115,16 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
   // Old object controls cannot remain usable across a game/list switch (06 §8.2).
   const objectPage = editor || name === "library";
   const hasContent = sc.children.length || (editor && same && sc.hidden && S.board);
-  if ((!same || (changed && (!S.busy.env || objectPage)) || replace || !hasContent || sc.querySelector(".page-read-error")) && !((keep && same || S.busy.env && !objectPage) && hasContent && !pageLoading())) {
+  // Coming back to the editor of the same list: its columns are still in #board, so show
+  // them at once and read again behind them (no placeholder, no wait).
+  const warmEditor = editor && !same && !changed && !replace && S.board && !S.board.error && board && board.querySelector(".row");
+  const warmPage = !editor && !same && !changed && !replace && sc.dataset.warm === "1" && sc.children.length;
+  if (warmEditor) {
+    sc.replaceChildren();
+    sc.hidden = true;
+  } else if (warmPage) {
+    // the kept drawing stays; the read below replaces it
+  } else if ((!same || (changed && (!S.busy.env || objectPage)) || replace || !hasContent || sc.querySelector(".page-read-error")) && !((keep && same || S.busy.env && !objectPage) && hasContent && !pageLoading())) {
     sc.hidden = false;
     sc.innerHTML = "";
     const w = page(name || "plan", "");
@@ -119,7 +135,9 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
   sc.setAttribute("aria-busy", "true");
   if (board) board.inert = !sc.hidden;
   if (editor && $("#planhead")) $("#planhead").inert = !sc.hidden;
-  if (editor && sc.hidden) say("busy", T(label));
+  // A read behind the editor already on screen (after sort, an edit, undo) keeps the status
+  // line: it says what the action did, which "loading…" would wipe.
+  if (editor && sc.hidden && !warmEditor && !same) say("busy", T(label));
   return {
     current,
     // A workspace reply can itself change the current game/list (06 §8.2).
@@ -314,7 +332,8 @@ export async function needs(keepCursor) {
   try { data = await api.Needs(); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   N.data = data;
-  if (!keepCursor) N.cur = 0;
+  // back on a kept page: the cursor stays where it was
+  if (!keepCursor && $("#screen").dataset.warm !== "1") N.cur = 0;
   orderNeeds();
   drawNeeds();
   read.finish();
@@ -342,6 +361,7 @@ function drawNeeds() {
   else if (d.stale) state = T("the files changed since the last check");
   const w = page("needs", needsLead(d),
     state ? el("span", "state-note", state) : null,
+    autoFix(),
     act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A", "analyze"),
     act(T("game log"), "log", () => ui.go("log"), "l"));
   N.els = [];
@@ -380,6 +400,20 @@ function drawNeeds() {
   sc.append(w);
   sc.scrollTop = top;
   markNeeds();
+}
+
+// autoFix: one click for what needs no question: the required mods that are installed
+// but not enabled are enabled and the list sorted again (one undo step).
+function autoFix() {
+  const n = N.items.filter((it) => it.counted && it.target && (it.actions || []).some((a) => a.kind === "enable")).length;
+  if (!n) return null;
+  const b = act(Tf("fix %d automatically", n), "ok", async () => {
+    await ui.edited(() => api.CompleteDependencies(), true);
+    if (S.screen === "needs") needs(true);
+  }, "F", "enable");
+  b.classList.add("primary");
+  b.title = T("enables the required mods that are installed and sorts the list; u undoes it");
+  return b;
 }
 
 function needCard(it, i) {
@@ -443,6 +477,9 @@ function markNeeds() {
 const actionWrite = (a) => ["open-url", "view", "list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
 // The pinned badge popover in the editor offers the same actions (06 §4.2).
 setNeedRunner((it, a) => runAction(it, a), actionWrite);
+// The editor's problems panel (problems.js) runs them too.
+export const runNeedAction = (it, a) => runAction(it, a);
+export const needActionWrite = actionWrite;
 
 async function runAction(it, act) {
   switch (act.kind) {
@@ -490,7 +527,8 @@ async function doAction(act, option) {
 // needsKey: ↑↓ (j k, PageUp/PageDown, Home/End) move through the items, ← → jump to the
 // previous / next section; an item's action keys run its actions.
 export function needsKey(e) {
-  const k = e.key;
+  // shift+letter is the capital letter even where the key reports it in lower case
+  const k = e.shiftKey && /^[a-z]$/.test(e.key) ? e.key.toUpperCase() : e.key;
   const n = N.items.length;
   if ((k === "ArrowLeft" || k === "ArrowRight") && n) {
     e.preventDefault();
@@ -502,6 +540,7 @@ export function needsKey(e) {
   const m = n ? moveIn(N.cur, n, k) : null;
   if (m != null) { e.preventDefault(); N.cur = m; return markNeeds(); }
   if (k === "A") return ui.cmd("analyze");
+  if (k === "F") { const b = $("#screen .page-acts .primary"); if (b) { e.preventDefault(); b.click(); } return; }
   if (k === "l") return ui.go("log");
   const it = N.items[N.cur];
   const name = k === " " ? "space" : k === "Enter" ? "enter" : k;

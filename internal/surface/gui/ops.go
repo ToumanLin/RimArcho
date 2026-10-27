@@ -122,3 +122,29 @@ func (s *API) SetModNote(id, text string) (string, error) {
 	s.board, s.lib = nil, nil
 	return s.text(view.SetModNote(s.a, st.Ix.Ref(id), text))
 }
+
+// CompleteDependencies enables installed prerequisites and sorts the open plan.
+// Subscription remains a separate Subscribe call after choosing Steam or SteamCMD.
+func (s *API) CompleteDependencies() (*view.Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	return s.after(view.CompleteDependencies(s.a))
+}
+
+// ReplaceRecommended replaces the named enabled originals with their installed
+// recommendations, validated again at application time, as one undoable list edit.
+func (s *API) ReplaceRecommended(refs []string) (*view.Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	return s.after(view.ReplaceRecommended(s.a, refs))
+}
+
+// UseInstalled binds missing package IDs to usable installed copies in one undo step.
+func (s *API) UseInstalled(packageIDs []string) (*view.Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	return s.after(view.UseInstalled(s.a, packageIDs))
+}

@@ -45,7 +45,7 @@
 - 扫描和分析在子进程中运行（`archo scan`、`archo analyze`，`app.ChildScan` / `ChildAnalyze`，子进程带 `CREATE_NO_WINDOW`）。进度通过事件推到状态行，界面不阻塞。TUI 同样如此（`:` 里输入 `scan` 也交给子进程）。
 - 启动时：有索引就立即显示列表，然后在后台增量扫描；从没扫描过时自动开始扫描。
 - 加入新游戏（§2.15、§2.8）：扫描和第一次分析在子进程里，引导页和其他页面都能操作；新游戏的数据读完前它的页面显示骨架。Go 端的 GUI 方法不在调用里做可能超过约 100ms 的事，长的一律交给协程或子进程，结果用事件推回（§3.1 规则 9）。
-- 列表、侧栏和历史一起由 `Workspace` 读取，结果用事件推回。主 App 的 Mod 索引仍有效时（改列表之后就是这样）直接在主 App 上构建，几十毫秒；索引要重载时（扫描之后、换游戏）改用独立连接，不在持页面锁时加载全库。
+- 列表、侧栏和历史一起由 `Workspace` 读取，结果用事件推回。needs 键未变时复用完整工作区快照；需要重建时复用独立读取会话、分离的索引和编辑器行缓存，在短期 WAL 只读快照中构建，不在持页面锁时加载全库。侧栏复用同一份 needs，发布时校验环境、请求序号、列表编辑代次及输入键。
 - 整合包编译在后台进行，进度推到编译页，可以停止（§2.6）。
 - 所有这些和 Mod 库的文件、Steam 动作都记成后台任务（§2.16，`app.Tasks`）：一处看到进行中的、排着的和做过的，结果写进 `<数据目录>/tasks.json`。
 
@@ -92,3 +92,38 @@
 - **图标组 ID 3**：Wails 窗口按 ID 3 取应用图标；资源管理器取第一个图标组，两者是同一个。尺寸 16、20、24、32、40、48、64、256，每个尺寸一张 PNG。
 - **版本信息**：`FileVersion`、`ProductVersion` 取发布版本号，`ProductName` RimArcho，`FileDescription` 区分 `archo.exe`（RimArcho command line）和 `RimArcho.exe`（RimArcho）。两个 exe 由同一个包构建，发布脚本在两次构建之间各写一次 `.syso`。
 - **没有资源时**（开发构建、`spikes/guidev`），窗口用 `application.Options.Icon` 的 PNG（256 px）作后备。
+
+
+### 8.7 列表问题与 needs 缓存 API
+
+编辑器和能不能跑读取同一个后端快照。入口是 `API.Needs`、`API.ListProblems` 和 `Board.problems`；结构定义在 [`view.Needs`](../../../internal/view/needs.go) 和 [`view.ListProblems`](../../../internal/view/listproblems.go)，缓存实现是 [`gui/needscache.go`](../../../internal/surface/gui/needscache.go)。
+
+**调用时机**：
+
+- Workspace 的 `environment` 事件里，`board.problems` 已包含列表问题，首屏直接使用。
+- 打开能不能跑调用 `Needs()`；只需要编辑器问题时调用 `ListProblems()`。两者命中同一个缓存。
+- `Toggle`、`Stage`、`Unstage`、`MoveBy`、`Place`、`StageAll` 等返回 `view.Result` 的编辑，在 `result.problems` 中带回更新摘要。返回字符串的 `Undo`、`Redo`、`DoAction` 等通过 `list-problems` 事件带回同一结构。
+- 后台日志／内容分析补齐也发 `list-problems`；`analyze` 的进度与完成事件继续保留。无需为了刷新标记再请求一次问题列表。
+
+`ListProblems` JSON 的主要字段：
+
+| 字段 | 用途 |
+| --- | --- |
+| `environment`, `plan` | 环境 ID 和打开列表 ID，用于过滤导航前的迟到事件；启动页仍按当前列表读取 |
+| `listVersion` | 这份结果对应的列表内容指纹 |
+| `revision` | 缓存输入指纹；相同输入复用，不应按字典序比较 |
+| `sequence` | 当前 API 会话内递增的发布序号；同环境、同列表只接收不小于已显示序号的结果 |
+| `updating`, `error?` | 后台仍在补齐时保留上一份内容结果并标 `updating=true`；失败时保留问题，返回错误说明 |
+| `count`, `severity` | 与 needs 共用的计数、最高级别（`error` / `warning` / `info`）；隐藏维护项及淡色信息项沿用 needs 的计数规则 |
+| `mods` | 以 Instance ID 索引；值含 `count`、`severity`、`summary`、`problemIds`。未出现的 Mod 没有可展示的问题 |
+| `items` | 列表级完整 `Need` 数组；每个问题只传一份，按 `problemIds` 取对应项 |
+
+`Need` 在原字段之外含 `id`、可选的 `target` 和 `requiredBy`。依赖的 `target` 是去空白、大小写归一、去 `_steam` 且按注册表解析目录别名后的 packageId；`requiredBy` 是 `{id, name}` 数组。声明依赖、语料中的缺依赖、目标未启用的补丁可以按目标合并；需要它的 Mod 都获得问题归属。已有未安装列表条目覆盖依赖时，归属附在该条目的汇总项上。强顺序问题继续合成一个自动排序项；单条强约束另有 `move` 动作。
+
+**执行动作**：把 `item.actions` 中的完整 Action 对象传给 `DoAction(action, option)`。`id` 是动作标识，执行参数仍由 `kind`、`refs`、`after`、`options` 等原字段承载，不是只传 ID。`choose-disable` 的 `option` 为从零开始的选项索引，其他数据动作传 `0`。`enable` 自动按约束放置依赖；`move` 使用一个 `refs` 和 `after`；`sort` 直接排序；`subscribe` 进入既有订阅任务队列。DLC 的商店链接通过 `open-url` 打开。`view`、`list`、`fold`、`save` 等界面动作仍由界面分派，确认规则仍按 `confirm` / `warn` 执行。
+
+**使用已安装副本**：`API.UseInstalled(packageIDs []string) (*view.Result, error)` 绑定打开列表中的缺失条目，保留位置，一批可撤销；语义与拒绝规则见 04 §4.2。参数为 packageId 数组（接受大小写、首尾空白及 `_steam` 后缀），不是 Instance 引用；空数组无修改。结果的 `text`、`undo` 和 `problems` 沿用上面的编辑合同。能不能跑把 `MissingMods.CanEnable` 的条目单列为“可以使用已安装的副本”，主动作 `kind: "use-installed"`，`refs` 为 packageId 数组，`undo: true`，`key: "space"`，带 `label`、`done` 和动作 `id`，不带 `confirm`／`warn`。完整动作可交给 `DoAction(action, 0)`（返回字符串并发布问题事件），或将 `refs` 传给 `UseInstalled` 取得编辑结果。只有没有可用副本的条目保留订阅／移除动作；排序 Outcome 的 `missingMods` 保持原合同，前端按 `canEnable` 提供修复入口。
+
+**缓存边界**：每个 API 会话最多保留八个环境／列表／游戏版本／语言槽位。输入还包含列表内容、数据库变化键、扫描快照与分析器版本（`AnalysisKey`）、日志路径及大小／mtime，以及每次现查的目录和游戏链接状态。Workspace 复用完整 Board／Shell／History；需要重新组合时用独立连接，避免持有主锁。
+
+列表编辑走 `App.IncrementalProblems`，同步重算声明层，保留可复用的上一份内容层问题；已启用目标对应的旧 `patch.no-match` 提示立即移除。后续日志读取与完整分析在独立会话／原分析子进程中进行，发布前重新核对输入，过期工作不能覆盖新编辑。内容分析继续使用按启用集合保存的分析槽和按 Mod 内容键保存的 Def／程序集事实；补丁模拟依赖顺序及整个文档，仍在后台重算。

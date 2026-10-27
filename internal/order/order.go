@@ -303,7 +303,8 @@ const (
 // Dropped is a constraint the sorter does not use, with the reason.
 type Dropped struct {
 	Edge
-	Reason string
+	Reason  string
+	Members []int // full component for a cycle with the built-in official order
 }
 
 // DeclRef is the ignore reference of an About.xml constraint, keyed by lineage so it
@@ -369,7 +370,7 @@ func Sort(in Input) Result {
 		if c.Kind != KindOfficial && c.Kind != KindUser {
 			rf, rt := officialRank(in.Nodes[from].PackageID), officialRank(in.Nodes[to].PackageID)
 			if rf >= 0 && rt >= 0 && rf > rt {
-				res.Dropped = append(res.Dropped, Dropped{e, ReasonOfficialOrder})
+				res.Dropped = append(res.Dropped, Dropped{Edge: e, Reason: ReasonOfficialOrder})
 				return
 			}
 		}
@@ -529,7 +530,7 @@ func Sort(in Input) Result {
 		kept := res.Edges[:0:0]
 		for k, e := range res.Edges {
 			if drop[k] {
-				res.Dropped = append(res.Dropped, Dropped{e, ReasonOfficialFirst})
+				res.Dropped = append(res.Dropped, Dropped{Edge: e, Reason: ReasonOfficialFirst, Members: append([]int(nil), members[comp[e.From]]...)})
 			} else {
 				kept = append(kept, e)
 			}

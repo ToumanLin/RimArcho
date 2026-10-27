@@ -548,7 +548,7 @@ func findNeed(m *model, sub string) int {
 }
 
 // 06 §5: a cycle of order requirements is one item in "this list"; enter shows the
-// requirements in words and x ignores the suggested one; a dependency that is installed but
+// requirements and the automatic resolution in words; a dependency that is installed but
 // not enabled is one item in "missing dependencies" that space enables.
 func TestNeedsView(t *testing.T) {
 	// Not parallel: waits a fixed time for background work, which is too short under load.
@@ -566,39 +566,41 @@ func TestNeedsView(t *testing.T) {
 	tm := start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
 	keys(tm, "@")
-	waitFor(t, tm, "contradict each other")
+	waitFor(t, tm, "sorting keeps the strongest constraints")
 	time.Sleep(300 * time.Millisecond)
 	fm := finish(t, tm)
 	if fm.prob.never || fm.prob.stale {
 		t.Fatal("analysis did not complete")
 	}
-	ci, di := findNeed(fm, "the order requirements of 2 mods"), findNeed(fm, "Alpha needs Harmony, but Harmony is not enabled")
+	ci, di := findNeed(fm, "sorting keeps the strongest constraints in a cycle of 2 mods"), findNeed(fm, "Alpha needs Harmony, but Harmony is not enabled")
 	if ci < 0 || di < 0 {
 		t.Fatalf("items: %q", needItems(fm))
+	}
+	if fm.prob.items[ci].counted {
+		t.Fatal("cycle note must not count as a problem")
 	}
 	if fm.needCount() != countedNeeds(fm) || fm.needCount() == 0 {
 		t.Fatalf("top bar %d, counted items %d", fm.needCount(), countedNeeds(fm))
 	}
-	// Second session: x on the cycle, space on the dependency.
+	// Second session: view the automatic resolution; x must not create an ignore rule.
 	tm = start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
 	keys(tm, "@")
-	waitFor(t, tm, "contradict each other")
+	waitFor(t, tm, "sorting keeps the strongest constraints")
 	for i := 0; i < ci; i++ {
 		keys(tm, "down")
 	}
 	keys(tm, "enter")
-	waitFor(t, tm, "wants to load after")
+	waitFor(t, tm, "set aside by sorting")
 	keys(tm, "esc", "x")
-	waitFor(t, tm, "ignored from now on")
 	keys(tm, "g")
 	time.Sleep(100 * time.Millisecond)
 	fm2 := finish(t, tm)
-	if findNeed(fm2, "contradict") >= 0 {
-		t.Fatalf("cycle still listed: %q", needItems(fm2))
+	if findNeed(fm2, "sorting keeps the strongest constraints") < 0 {
+		t.Fatalf("automatic cycle note absent: %q", needItems(fm2))
 	}
-	if out := e.MustRun("rule", "list"); !strings.Contains(out, "ignore") {
-		t.Fatalf("rule not added: %s", out)
+	if out := e.MustRun("rule", "list"); strings.Contains(out, "ignore") {
+		t.Fatalf("automatic resolution wrote an ignore rule: %s", out)
 	}
 	tm = start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")

@@ -251,7 +251,7 @@ func TestWorkshopSubscriptionTaskMessage(t *testing.T) {
 	}
 	task := endedTask(t, api, view.TaskSubscribe)
 	waitSettingEnd(t, events, task.ID)
-	if task.State != app.TaskDone || !strings.Contains(task.Line, "next scan") {
+	if task.State != app.TaskDone || !strings.Contains(task.Say, "next scan") || len(task.Items) != 1 || task.Items[0].State != app.ItemOK {
 		t.Fatalf("Steam result: %+v", task)
 	}
 }

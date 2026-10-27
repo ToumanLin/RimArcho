@@ -106,7 +106,12 @@ type TaskRow struct {
 }
 
 // TaskStatus is the completion sentence shared with the GUI status line.
-func TaskStatus(r TaskRow) string { return r.Title + "  " + Tf("%s: %s", r.Obj, r.Line) }
+func TaskStatus(r TaskRow) string {
+	if r.Obj == "" {
+		return joinFacts(r.Title, r.Line)
+	}
+	return r.Title + "  " + Tf("%s: %s", r.Obj, r.Line)
+}
 
 // TaskStep is a step of a pack build (06 §2.6).
 type TaskStep struct {
@@ -135,6 +140,8 @@ type TaskItemRow struct {
 	Bytes        int64  `json:"bytes"`
 	Got          int64  `json:"got"`
 	DownloadSize int64  `json:"downloadSize"` // bytes; size is the existing formatted file-size label
+	Permanent    bool   `json:"permanent,omitempty"`
+	WorkshopURL  string `json:"workshopURL,omitempty"`
 }
 
 // TaskTitle names a kind.
@@ -350,11 +357,14 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	} else if t.Frac > 0 {
 		r.Pct = int(t.Frac * 100)
 	}
-	if t.Lane == app.LaneSteam && t.Frac > 0 {
+	if (t.Lane == app.LaneSteam || t.Kind == TaskSubscribe) && t.Frac > 0 {
 		r.Pct = int(t.Frac * 100)
 	}
 	if t.State == app.TaskDone {
 		r.Pct = 100
+	}
+	if t.Kind == TaskSubscribe && t.State == app.TaskRunning {
+		r.Pct = min(r.Pct, 99)
 	}
 	c := t.Counts()
 	result := Text(t.Result)
@@ -417,6 +427,17 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	}
 	for _, it := range t.Items {
 		row := TaskItemRow{Ref: it.Ref, Name: it.Name, State: it.State, StateText: itemStateText(it.State), Rank: itemRank[it.State], Why: Humanize(nil, it.Why), Bytes: it.Bytes, Got: it.Got, DownloadSize: it.Size}
+		row.Permanent = it.Permanent
+		if t.Kind == TaskSubscribe && strings.HasPrefix(it.Ref, "ws:") {
+			row.WorkshopURL = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + strings.TrimPrefix(it.Ref, "ws:")
+			row.Why = ""
+			if it.State == app.ItemFail {
+				row.Why = subscriptionReason(it, false)
+			}
+			if it.State == app.ItemSkip {
+				row.StateText = T("cancelled")
+			}
+		}
 		if it.State == app.ItemRun && t.Lane == app.LaneSteam && t.Kind == LibResub {
 			row.StateText = T("waiting for Steam")
 			if it.Size > 0 && it.Got > 0 {
@@ -436,6 +457,18 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 			}
 		}
 		r.Counts = strings.Join(parts, "  ")
+	}
+	if t.Kind == TaskSubscribe && len(t.Items) == 0 && t.WorkshopSubscription() {
+		var names []string
+		for _, arg := range t.Args[2:] {
+			if !strings.HasPrefix(arg, "--") {
+				names = append(names, "Workshop "+arg)
+			}
+		}
+		r.Title, r.Obj = Tf("subscribe %s", TaskObj(names)), ""
+	}
+	if t.Kind == TaskSubscribe && len(t.Items) > 0 {
+		subscriptionTaskText(t, &r, c)
 	}
 	r.Target = taskTarget(t)
 	if len(t.Items) == 0 {
@@ -512,10 +545,19 @@ func TaskCanStop(kind string) bool {
 
 func taskActs(t *app.Task, c map[string]int) []TaskAct {
 	var a []TaskAct
+	retry := 0
+	for _, it := range t.Items {
+		if it.State == app.ItemFail && !it.Permanent {
+			retry++
+		}
+	}
 	switch t.State {
 	case app.TaskRunning:
-		if t.Lane != app.LaneSelf || TaskCanStop(t.Kind) {
+		if t.Lane != app.LaneSelf || TaskCanStop(t.Kind) || t.WorkshopSubscription() {
 			a = append(a, TaskAct{ID: "stop", Label: T("stop the rest"), Key: taskKeyStop})
+			if t.Kind == TaskSubscribe {
+				a[len(a)-1].Label = T("cancel")
+			}
 		}
 	case app.TaskQueued:
 		if t.Kind != TaskAccount && t.Kind != TaskSiteDownload {
@@ -524,23 +566,30 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 		}
 	case app.TaskFailed, app.TaskPartial:
 		switch {
-		case c[app.ItemFail] > 0 && t.Kind != TaskCreditReplace:
-			a = append(a, TaskAct{ID: "retry", Label: Tf("try the %d failed again", c[app.ItemFail]), Key: taskKeyRetry, Primary: true})
-		case t.Lane == app.LaneSelf && (t.Kind == TaskScan || t.Kind == TaskAnalyze || (t.Kind == TaskCreditReplace && c[app.ItemFail] == 0) || IsSettingTask(t.Kind)):
+		case retry > 0 && t.Kind != TaskCreditReplace:
+			a = append(a, TaskAct{ID: "retry", Label: Tf("retry %d items", retry), Key: taskKeyRetry, Primary: true})
+		case len(t.Items) == 0 && t.Lane == app.LaneSelf && (t.Kind == TaskScan || t.Kind == TaskAnalyze || t.Kind == TaskCreditReplace || IsSettingTask(t.Kind)):
 			a = append(a, TaskAct{ID: "retry", Label: T("try again"), Key: taskKeyRetry, Primary: true})
 		}
 	case app.TaskStopped:
 		if t.Kind == TaskCreditReplace {
 			a = append(a, TaskAct{ID: "resume", Label: T("continue replacement"), Key: taskKeyRetry, Primary: true})
 		}
-		if IsSettingTask(t.Kind) {
+		if IsSettingTask(t.Kind) && len(t.Items) == 0 {
 			a = append(a, TaskAct{ID: "retry", Label: T("try again"), Key: taskKeyRetry, Primary: true})
 		}
 		if c[app.ItemSkip] > 0 {
 			a = append(a, TaskAct{ID: "resume", Label: Tf("do the %d left", c[app.ItemSkip]), Key: taskKeyRetry, Primary: true})
+			if t.Kind == TaskSubscribe {
+				a[len(a)-1].Label = Tf("continue %d items", c[app.ItemSkip])
+			}
 		}
 	}
 	a = append(a, TaskAct{ID: "goto", Label: Tf("go to %s", TaskTargetName(taskTarget(t))), Key: taskKeyGoto})
+	if t.Kind == TaskSubscribe && t.Ended() && len(a) == 1 {
+		a[0].Primary = true
+		a[0].Label = T("go to subscriptions and updates")
+	}
 	if t.Lane == app.LaneFiles && len(t.Items) == 1 {
 		a = append(a, TaskAct{ID: "folder", Label: T("open the folder"), Key: taskKeyFolder})
 	}

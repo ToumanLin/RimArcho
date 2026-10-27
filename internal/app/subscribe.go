@@ -48,6 +48,8 @@ type SubscribeItem struct {
 	Record                *subscribe.Record
 	UsedBy                []string
 	Links                 *LinkLifecyclePlan
+	FailureKind           string
+	Permanent             bool
 }
 
 type subscriptionCacheEntry struct {

@@ -310,10 +310,10 @@ func TestWorkshopRetryClassification(t *testing.T) {
 		{"password", "Logging in user 'player'...FAILED (Invalid Password)", "password", 1},
 		{"guard", "ERROR! InvalidAuthCode", "Steam Guard", 1},
 		{"permission", "ERROR! Download item 8100 failed (AccessDenied).", "access was denied", 1},
-		{"invisible", "ERROR! Download item 8100 failed (FileNotFound).", "unavailable", 1},
+		{"invisible", "ERROR! Download item 8100 failed (FileNotFound).", "no longer on the Workshop", 1},
 		{"disk", "ERROR! Download item 8100 failed (Not enough disk space).", "disk is full", 1},
-		{"unknown", "ERROR! Download item 8100 failed (Failure).", "did not finish", 1},
-		{"unconfirmed", "", "not confirmed", 1},
+		{"unconfirmed failure", "ERROR! Download item 8100 failed (Failure).", "not confirmed", 3},
+		{"unconfirmed", "", "not confirmed", 3},
 		{"rate limit", "ERROR! Rate limit exceeded", "did not finish", 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

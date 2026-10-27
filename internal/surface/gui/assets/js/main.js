@@ -36,11 +36,21 @@ import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
 import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } from "./navigation.js";
-import { checkCredit } from "./credit.js";
+import { checkCredit, getChoices } from "./credit.js";
+import * as problems from "./problems.js";
 
 // ---- loading ----
 
 let reloadSeq = 0;
+// retryRead reads the workspace again after a failed read: 1, 2, 4, 8 s, then every 10 s
+// for a minute; a successful read resets it.
+let readRetries = 0, readRetryTimer = null;
+function retryRead() {
+  if (readRetryTimer || readRetries >= 10) return;
+  const wait = Math.min(1000 * 2 ** readRetries, 10000);
+  readRetries++;
+  readRetryTimer = setTimeout(() => { readRetryTimer = null; reload(); }, wait);
+}
 async function reload(snapshot = null, read = null) {
   if (S.busy.env && !snapshot && !read) return;
   // edits on their way to Go: the lists here are ahead of Go's; the last edit reads them
@@ -54,8 +64,17 @@ async function reload(snapshot = null, read = null) {
     const result = snapshot || await api.Workspace();
     if (!current() || result.stale) return;
     b = result.board; sh = result.shell; history = result.history;
-  } catch (e) { if (read) throw e; if (current()) say("fail", errText(e)); return; }
+  } catch (e) { if (read) throw e; if (current()) { say("fail", errText(e)); retryRead(); } return; }
   if (!current()) return;
+  // A board that could not be read (a background job holding the data) has an error and no
+  // columns: it must not replace the lists on screen, the sidebar's lists or the games.
+  if (b && b.error && S.board && !S.board.error) {
+    say("fail", b.error + "  " + T("trying again…"));
+    retryRead();
+    if (read) read.finish();
+    return;
+  }
+  readRetries = 0;
   const apply = () => { S.board = b; S.shell = sh; S.history = history; };
   if (read) read.commit(apply); else apply();
   S.busy.scan = b.scanning;
@@ -156,7 +175,7 @@ function planActions() {
     b.onclick = (e) => { e.stopPropagation(); run(); };
     return b;
   };
-  const out = [];
+  const out = [problems.chip()];
   const plan = S.shell && S.shell.plan;
   if (plan && plan.conflict) {
     const m = el("button", "chip mark");
@@ -213,7 +232,11 @@ const navTarget = (id) => id !== "plan" ? id : ((S.shell && S.shell.plans) || []
 function renderWhere() {
   shell.sync();
   $("#planhead").hidden = !!S.screen;
-  if (!S.screen) shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + !!S.busy.scan + "|" + T("undo") + "|" + JSON.stringify(S.shell && S.shell.plan) + "|" + JSON.stringify(S.shell && S.shell.current), ...planActions());
+  if (!S.screen) {
+    const p = S.board && S.board.problems;
+    shell.setActs("plan|" + ((S.board && S.board.unsaved) || 0) + "|" + !!S.busy.scan + "|" + T("undo") + "|" + JSON.stringify(S.shell && S.shell.plan) + "|" + JSON.stringify(S.shell && S.shell.current) + "|" + (p ? p.sequence + ":" + p.count + ":" + p.updating + ":" + p.revision : ""), ...planActions());
+    problems.refresh();
+  } else problems.close();
   // A page's place is its breadcrumb; the position line says more only on the plan (where
   // the cursor is in which list) and in the full detail.
   let s = "";
@@ -629,6 +652,54 @@ async function run(what) {
   } else say("ok", o.text, !!o.undo);
   await reload();
   motion.play(before, null);
+  if (what === "sort") offerAfterSort(o);
+}
+
+// offerAfterSort: what a sort found that the list cannot fix by ordering (04): required
+// mods that are not enabled, list entries with no mod folder, and mods with a recommended
+// replacement. One window says it all and one button fixes all it can: installed mods are
+// enabled or put in place (one undo step each), the rest are subscribed after the usual
+// Steam / SteamCMD choice. A broken cycle is settled by the sort itself and only noted on
+// 能不能跑, so it asks nothing here.
+function offerAfterSort(o) {
+  const deps = o.missingDependencies || [], absent = o.missingMods || [], repl = o.replacements || [];
+  const enable = deps.filter((m) => m.kind === "installed");
+  const useCopies = absent.filter((m) => m.canEnable);
+  const replace = repl.filter((r) => r.canReplace && r.installed && !r.enabled);
+  const ws = [...deps.filter((m) => m.kind === "workshop").map((m) => m.workshopId),
+    ...absent.filter((m) => !m.canEnable && m.workshopId).map((m) => m.workshopId),
+    ...repl.filter((r) => !r.installed && r.replacement && r.replacement.workshopId).map((r) => r.replacement.workshopId)];
+  const subscribe = [...new Set(ws.filter(Boolean))];
+  const unknown = [...deps.filter((m) => m.kind === "unknown"), ...absent.filter((m) => !m.canEnable && !m.workshopId)];
+  if (!enable.length && !useCopies.length && !replace.length && !subscribe.length && !unknown.length) return;
+  const some = (names) => names.slice(0, 6).join(T(", ")) + (names.length > 6 ? " " + Tf("and %d more", names.length - 6) : "");
+  const lines = [];
+  const group = (head, names) => { if (names.length) lines.push(head, "  " + some(names), ""); };
+  group(Tf("required but not enabled, installed (%d):", enable.length), enable.map((m) => m.name || m.packageId));
+  group(Tf("in the list with no folder, a copy is installed (%d):", useCopies.length), useCopies.map((m) => m.name || m.packageId));
+  group(Tf("a recommended replacement is installed (%d):", replace.length), replace.map((r) => Tf("%s → %s", r.original.name, r.replacement.name)));
+  group(Tf("to get from the Workshop (%d):", subscribe.length), [
+    ...deps.filter((m) => m.kind === "workshop").map((m) => m.name || m.packageId),
+    ...absent.filter((m) => !m.canEnable && m.workshopId).map((m) => m.name || m.packageId),
+    ...repl.filter((r) => !r.installed && r.replacement && r.replacement.workshopId).map((r) => r.replacement.name)]);
+  group(Tf("missing, no known source (%d):", unknown.length), unknown.map((m) => m.name || m.packageId));
+  while (lines.length && !lines[lines.length - 1]) lines.pop();
+  const local = enable.length + useCopies.length + replace.length;
+  if (!local && !subscribe.length) return pop.text(T("the sort found mods the list is missing"), lines);
+  const go = local && subscribe.length ? Tf("fix %d and get %d", local, subscribe.length)
+    : local ? Tf("fix %d", local) : Tf("get %d mods", subscribe.length);
+  pop.confirm(T("the sort found mods the list is missing"), lines, go, async () => {
+    let ids = subscribe;
+    if (useCopies.length && api.UseInstalled) await edited(() => api.UseInstalled(useCopies.map((m) => m.packageId)), true);
+    if (replace.length) await edited(() => api.ReplaceRecommended(replace.map((r) => r.original.ref || r.original.instance)), true);
+    if (enable.length) {
+      const r = await edited(() => api.CompleteDependencies(), true);
+      if (r?.workshopIds?.length) ids = [...new Set([...ids, ...r.workshopIds])];
+    }
+    if (ids.length) pop.choose(Tf("get %d mods", ids.length), getChoices(), async (i) => {
+      try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1, batch: true })); } catch (e) { say("fail", errText(e)); }
+    });
+  }, "enable");
 }
 
 // confirmMoves asks once about moving folders into the lock library (08 §3), then runs again.
@@ -1030,7 +1101,7 @@ function onKey(e) {
   if (e.altKey && (k === "J" || k === "j" || k === "K" || k === "k")) { handled(); return verb(k.toLowerCase() === "j" ? "down10" : "up10"); }
   const map = {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
-    g: () => verb("tags"), n: () => verb("note"), Enter: () => verb("full"), x: () => verb("swap"),
+    g: () => verb("tags"), n: () => verb("note"), p: () => problems.toggle(), Enter: () => verb("full"), x: () => verb("swap"),
     S: () => run("sort"), w: () => run("save"), L: () => goLaunch(), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
@@ -1105,6 +1176,7 @@ const ui = {
   selectedList: () => planManage.selected(),
   resumeGuide: () => guide.resume(),
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
+  edited: (call, undoable = true) => edited(call, undoable),
   afterImport: null, // the first-run guide's next step once an import is applied
 };
 
@@ -1119,6 +1191,7 @@ async function start() {
   wireHistory();
   pop.initPopups(ui);
   scr.initScreens(ui);
+  problems.initProblems(ui);
   shell.initShell(ui);
   homePage.initHome(ui);
   fullPage.initFull(ui);
@@ -1202,6 +1275,9 @@ async function start() {
   on("download", (ev) => guide.downloadEvent(ev));
   // launching waits (up to ten seconds) for a background Steam credit switch to finish
   on("launch-wait", (ev) => say("busy", ev.text));
+  // the background check of the open list finished: the problems button, the panel and the
+  // row icons follow without reading the lists again
+  on("list-problems", (ev) => { if (problems.event(ev) && !S.screen) { renderLists(); renderWhere(); } });
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again
   // when the window gets the focus (G8).
   addEventListener("focus", async () => {
