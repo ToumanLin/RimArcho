@@ -270,6 +270,7 @@ async function runOp(code) {
   }
   if (PLAN.has(code)) return done(api.LibraryDo(code, [c.ref]), true);
   if (!o.confirm) return done(api.LibraryDo(code, [c.ref]), false);
+  if (code === "subscription-remove") return pop.libraryConfirm(code, [c.ref], o.label, (p) => done(p, false));
   let p;
   try { p = await api.LibraryPreview(code, [c.ref]); } catch (e) { return say("fail", errText(e)); }
   const go = code === "textures" ? () => done(api.TexturesRun("", 100, [c.ref]), false) : () => done(api.LibraryDo(code, [c.ref]), false);

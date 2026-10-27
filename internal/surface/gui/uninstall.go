@@ -29,17 +29,24 @@ func (s *API) UninstallPlan(c view.UninstallChoice) (*view.UninstallPage, error)
 }
 
 // UninstallRun runs it in the background; "uninstall" events carry {i, n, step, item} and at
-// the end {done, page} or {done, error}. Every other call waits until it has finished.
+// the end {done, page} or {done, error}. Work owns a detached application session.
 func (s *API) UninstallRun(c view.UninstallChoice) error {
-	s.accountMu.Lock()
-	s.mu.Lock()
-	p, err := s.a.CheckUninstall(c.Options())
+	release, err := s.beginAccount()
+	if err != nil {
+		return err
+	}
+	a, err := s.detachedReader()
+	if err != nil {
+		release()
+		return err
+	}
+	p, err := a.CheckUninstall(c.Options())
 	if err == nil {
 		err = p.Blocked()
 	}
 	if err != nil {
-		s.mu.Unlock()
-		s.accountMu.Unlock()
+		a.Close()
+		release()
 		var bl = app.ErrUninstallBlocked
 		if errors.Is(err, bl) {
 			return fmt.Errorf("%s", view.UninstallView(p, false).Blocked)
@@ -47,11 +54,11 @@ func (s *API) UninstallRun(c view.UninstallChoice) error {
 		return err
 	}
 	go func() {
-		defer s.accountMu.Unlock()
-		defer s.mu.Unlock()
+		defer release()
+		defer a.Close()
 		s.ll = nil
 		s.llFiles = nil
-		p, err := s.a.Uninstall(c.Options(), func(pr app.UninstallProgress) {
+		p, err := a.Uninstall(c.Options(), func(pr app.UninstallProgress) {
 			s.send("uninstall", map[string]any{"i": pr.I, "n": pr.N, "step": view.UninstallTitle(pr.Step), "item": pr.Item})
 		})
 		ev := map[string]any{"done": true}
@@ -60,7 +67,10 @@ func (s *API) UninstallRun(c view.UninstallChoice) error {
 		} else {
 			ev["page"] = view.UninstallView(p, true)
 		}
-		s.board, s.needs = nil, nil
+		s.mu.Lock()
+		s.a.Uninstalled = a.Uninstalled
+		s.board, s.needs, s.lib = nil, nil, nil
+		s.mu.Unlock()
 		s.send("uninstall", ev)
 	}()
 	return nil

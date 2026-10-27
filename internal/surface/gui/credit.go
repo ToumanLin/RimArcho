@@ -103,8 +103,9 @@ func (s *API) runCredit(ctx context.Context, a *app.App, id string) {
 	}
 	progress := func(active *store.CreditItem) ([]app.TaskItem, int, int, error) {
 		s.mu.Lock()
-		defer s.mu.Unlock()
-		if s.creditClosed {
+		closed := s.creditClosed
+		s.mu.Unlock()
+		if closed {
 			return nil, 0, 0, context.Canceled
 		}
 		return s.creditProgress(a, id, batches, active)
@@ -128,11 +129,12 @@ func (s *API) runCredit(ctx context.Context, a *app.App, id string) {
 		}
 		if err := a.CreditStep(func(it store.CreditItem) (string, error) {
 			s.mu.Lock()
-			defer s.mu.Unlock()
+			scanning := s.busy["scan"]
+			s.mu.Unlock()
 			if ctx.Err() != nil {
 				return "", ctx.Err()
 			}
-			if s.busy["scan"] {
+			if scanning {
 				return "", app.CreditWait("waiting for scan")
 			}
 			for _, t := range s.tasks.List() {
@@ -141,7 +143,7 @@ func (s *API) runCredit(ctx context.Context, a *app.App, id string) {
 				}
 			}
 			result, err := a.ReplaceCreditItem(it)
-			s.board, s.needs, s.lib = nil, nil, nil
+			s.invalidateInventory()
 			return result, err
 		}, app.CreditCallbacks{
 			Context:  ctx,

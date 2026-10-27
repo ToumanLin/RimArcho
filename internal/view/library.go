@@ -160,7 +160,8 @@ const (
 	LibFolder    = OpFolder    // 打开文件夹
 	LibWorkshop  = OpWorkshop  // 打开网页
 	// LibTrash is the old name of LibDelete.
-	LibTrash = LibDelete
+	LibTrash        = LibDelete
+	OpSubRemoveFast = "subscription-remove-fast"
 )
 
 func libActionLabel(k string) string { return opLabel(k) }
@@ -808,12 +809,12 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 	}
 	what := Named(st, idsOfRefs(st, refs))
 	switch kind {
-	case OpSubRemove, OpSubCheck, OpSubUpdate:
+	case OpSubRemove, OpSubRemoveFast, OpSubCheck, OpSubUpdate:
 		var op *app.SubscribeOp
 		var err error
 		switch kind {
-		case OpSubRemove:
-			op, err = a.RemoveSubscriptions(refs, false)
+		case OpSubRemove, OpSubRemoveFast:
+			op, err = a.RemoveSubscriptionsWith(refs, app.RemoveSubscriptionOptions{Permanent: kind == OpSubRemoveFast}, app.BatchCalls{})
 		case OpSubCheck:
 			op, err = a.CheckSubscriptions(refs)
 		case OpSubUpdate:

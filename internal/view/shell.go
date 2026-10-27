@@ -274,7 +274,8 @@ type HomeRow struct {
 
 // Home is the home page: the rows, then the activity card.
 type Home struct {
-	Rows []HomeRow `json:"rows"`
+	Error string    `json:"error,omitempty"`
+	Rows  []HomeRow `json:"rows"`
 	// LastRun: "the list · 10 月 20 日 19:41" ("" when no run was read: the line is
 	// hidden); LastRunDay its day; LastRunErrors its errors in 能不能跑.
 	LastRun       string `json:"lastRun,omitempty"`

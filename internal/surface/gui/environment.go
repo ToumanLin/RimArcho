@@ -121,6 +121,10 @@ func (s *API) queueEnvironment(request uint64, name, kind string, plan int64, pa
 				return
 			}
 			result.Shell = reader.Shell()
+			if result.Shell.Error != "" {
+				result.Error = result.Shell.Error
+				return
+			}
 			result.History, err = reader.History()
 			if err != nil {
 				result.Error = err.Error()
@@ -201,7 +205,15 @@ func (s *API) Workspace(request uint64) bool {
 		defer r.Close()
 		reader := &API{a: r, busy: map[string]bool{}}
 		result.Board = reader.boardLocked()
+		if result.Board.Error != "" {
+			result.Error = result.Board.Error
+			return
+		}
 		result.Shell = reader.Shell()
+		if result.Shell.Error != "" {
+			result.Error = result.Shell.Error
+			return
+		}
 		result.History, err = reader.History()
 		if err != nil {
 			result.Error = err.Error()

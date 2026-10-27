@@ -163,7 +163,6 @@ next:
 > manage_hidden {"action":"trash","ref":"ws:4200"}
 moved to the recycle bin
   folder: $ROOT/Steam/steamapps/workshop/content/294100/4200
-  rescanned: scan:5
 
 > manage_packs {"action":"list"}
 packs: 0 ($ROOT/ArchoHome/packs)

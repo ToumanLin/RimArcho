@@ -38,6 +38,7 @@ tombstone_days = 90
 
 // App is one opened RimArcho data directory.
 type App struct {
+	workspaceSnapshot bool
 	// LaunchWait reports a launch waiting for the cross-process handoff lock.
 	LaunchWait      func(string)
 	launchDepth     int

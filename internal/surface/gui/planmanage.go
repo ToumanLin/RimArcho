@@ -120,17 +120,24 @@ func (s *API) cancelLoadCost(close bool) {
 
 // PlanManage is the page with the list sel picked (0: the current one). No network.
 func (s *API) PlanManage(sel int64) (*view.PlanManage, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.BuildPlanManage(s.a, sel)
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	r.WorkspaceSnapshot()
+	return view.BuildPlanManage(r, sel)
 }
 
 // PlanCheck reads a list's followed collections when they are older than ten minutes
 // (the network); true when something was read and the page should be read again.
 func (s *API) PlanCheck(id int64) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.CheckPlanFollows(s.a, id)
+	r, err := s.detachedReader()
+	if err != nil {
+		return false, err
+	}
+	defer r.Close()
+	return view.CheckPlanFollows(r, id)
 }
 
 // PlanVersionsSet sets a list's game versions; none goes back to the default.

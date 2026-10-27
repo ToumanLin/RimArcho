@@ -11,7 +11,7 @@ import (
 // Call while the original App is locked; the returned App is used by one reader at a
 // time and must be closed. No Index, Loadout or analysis cache is shared between them.
 func (a *App) ReadSession() (*App, error) {
-	s, err := store.Open(a.Store.Path)
+	s, err := store.OpenSession(a.Store.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -20,6 +20,10 @@ func (a *App) ReadSession() (*App, error) {
 	s.DB.Exec("PRAGMA cache_size=-256")
 	return b, nil
 }
+
+// WorkspaceSnapshot makes page reads use persisted lists without importing game
+// files or taking the launch/edit lock. Commands still use normal ReadSession.
+func (a *App) WorkspaceSnapshot() { a.workspaceSnapshot = true }
 
 // ReadOptions refreshes the invocation settings without discarding a reader's caches.
 // Neither App may be in use while its options are copied.
@@ -56,6 +60,9 @@ func (a *App) AdoptReadState(r *App) {
 	}
 	a.ixCache, a.ixKey = r.ixCache, rekey(a.Store.IndexKey(), r.ixKey)
 	a.stCache, a.stKey = r.stCache, rekey(a.Store.ChangeKey(), r.stKey)
+	if r.workspaceSnapshot {
+		a.stCache, a.stKey = nil, ""
+	}
 	a.prCache, a.prKey = nil, ""
 	if a.ixCache != nil {
 		a.Store.BindMods(a.ixCache.Mods)

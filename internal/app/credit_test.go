@@ -471,7 +471,28 @@ func TestCreditInterruptedRecycleResumes(t *testing.T) {
 		t.Fatalf("lost switch checkpoint %+v %d", it, calls)
 	}
 	e.Advance(time.Hour)
-	e.App.TrashFunc = func(path string) error { calls++; return creditRecycle(e, path) }
+	e.App.TrashFunc = func(path string) error {
+		calls++
+		// Recycling can be slow. A separate edit session must already be able
+		// to acquire the launch guard, including when resuming a checkpoint.
+		r, err := e.App.ReadSession()
+		if err != nil {
+			return err
+		}
+		defer r.Close()
+		guard := make(chan error, 1)
+		go func() {
+			b, err := r.BeginBatch()
+			if err == nil {
+				err = b.Commit("test")
+			}
+			guard <- err
+		}()
+		if err := <-guard; err != nil {
+			return err
+		}
+		return creditRecycle(e, path)
+	}
 	r, err := e.App.ReadSession()
 	if err != nil {
 		t.Fatal(err)
@@ -709,12 +730,31 @@ func TestCreditRealLaunchRemapsRestorableStatesAndRecycles(t *testing.T) {
 	}
 	original := mustCreditMod(t, e, old).RealPath
 	recycled := ""
-	e.App.TrashFunc = func(path string) error { recycled = path; return creditRecycle(e, path) }
+	e.App.TrashFunc = func(path string) error {
+		recycled = path
+		r, err := e.App.ReadSession()
+		if err != nil {
+			return err
+		}
+		defer r.Close()
+		guard := make(chan error, 1)
+		go func() {
+			b, err := r.BeginBatch()
+			if err == nil {
+				err = b.Commit("test")
+			}
+			guard <- err
+		}()
+		if err := <-guard; err != nil {
+			return err
+		}
+		return creditRecycle(e, path)
+	}
 	if err := e.App.CreditStep(nil); err != nil {
 		t.Fatal(err)
 	}
 	it := creditItem(t, e, batch)
-	if it.State != "done" || recycled != original {
+	if it.State != "done" || recycled != filepath.Join(filepath.Dir(original), ".archo-credit-"+it.WorkshopID+"-"+it.InstanceID) {
 		t.Fatalf("real used copy retained: %+v trash=%q", it, recycled)
 	}
 	if _, err := os.Stat(original); !os.IsNotExist(err) {

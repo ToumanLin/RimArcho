@@ -375,6 +375,16 @@ type Store struct {
 
 // Open opens (creating if needed) the database at path and applies migrations.
 func Open(path string) (*Store, error) {
+	return open(path, true)
+}
+
+// OpenSession connects to a database already initialised by Open. Page/worker
+// sessions do not run migrations or negotiate the journal mode while a writer runs.
+func OpenSession(path string) (*Store, error) {
+	return open(path, false)
+}
+
+func open(path string, initialise bool) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
@@ -385,16 +395,20 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	for _, p := range []string{"PRAGMA journal_mode=WAL"} {
-		if _, err := db.Exec(p); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("store: %s: %w", p, err)
+	if initialise {
+		for _, p := range []string{"PRAGMA journal_mode=WAL"} {
+			if _, err := db.Exec(p); err != nil {
+				db.Close()
+				return nil, fmt.Errorf("store: %s: %w", p, err)
+			}
 		}
 	}
 	s := &Store{DB: db, Path: path}
-	if err := s.migrate(); err != nil {
-		db.Close()
-		return nil, err
+	if initialise {
+		if err := s.migrate(); err != nil {
+			db.Close()
+			return nil, err
+		}
 	}
 	s.installIndexTriggers() // without them IndexKey is ChangeKey
 	return s, nil

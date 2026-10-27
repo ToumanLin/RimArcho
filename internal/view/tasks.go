@@ -60,7 +60,7 @@ func TaskLane(kind string) string {
 	switch kind {
 	case LibUnsub, LibResub:
 		return app.LaneSteam
-	case OpSubRemove, OpSubCheck, OpSubUpdate, LibDelete, LibMove, LibUnhide, LibPin, LibPinUpdate, LibUnpin:
+	case OpSubRemove, OpSubRemoveFast, OpSubCheck, OpSubUpdate, LibDelete, LibMove, LibUnhide, LibPin, LibPinUpdate, LibUnpin:
 		return app.LaneFiles
 	}
 	return ""
@@ -140,6 +140,8 @@ type TaskItemRow struct {
 // TaskTitle names a kind.
 func TaskTitle(kind string) string {
 	switch kind {
+	case OpSubRemoveFast:
+		return T("quick delete (cannot be undone)")
 	case TaskCreditReplace:
 		return T("replace SteamCMD mods with Steam subscriptions")
 	case TaskSourceCheck:
@@ -461,7 +463,7 @@ func joinFacts(parts ...string) string {
 
 func taskTarget(t *app.Task) string {
 	switch t.Kind {
-	case TaskSubscribe, TaskSubscriptionFrom, TaskSourceCheck, TaskWorkshopUpdate, TaskSiteDownload, OpSubCheck, OpSubUpdate, OpSubRemove:
+	case TaskSubscribe, TaskSubscriptionFrom, TaskSourceCheck, TaskWorkshopUpdate, TaskSiteDownload, OpSubCheck, OpSubUpdate, OpSubRemove, OpSubRemoveFast:
 		return PageChanges
 	case TaskAccount:
 		return PageSettings

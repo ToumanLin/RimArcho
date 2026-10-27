@@ -111,7 +111,13 @@ func checkedAt(t time.Time) string { return ShortDate(t) + " " + t.Local().Forma
 
 func init() {
 	Register(map[string]string{
-		"up to date": "已是最新", "update available": "有更新", "not checked": "未检查",
+		"an account operation is running; try again when it finishes":           "账户操作正在进行，完成后请重试",
+		"checking the selected mods…":                                           "正在检查所选 Mod…",
+		"quick delete (cannot be undone)":                                       "快速删除（无法恢复）",
+		"Quick delete skips the recycle bin. Deleted files cannot be restored.": "快速删除会跳过回收站，删除的文件无法恢复。",
+		"permanently delete these mods?":                                        "永久删除这些 Mod？",
+		"permanently delete":                                                    "永久删除",
+		"up to date":                                                            "已是最新", "update available": "有更新", "not checked": "未检查",
 		"subscription type": "类型", "Git repository": "Git 仓库", "Workshop item": "工坊条目", "URL or Workshop ID": "地址或工坊 ID",
 		"tracking name (blank: default branch)": "跟踪名称（留空为默认分支）", "use SteamCMD (only without the Steam client)": "用 SteamCMD（只在没有 Steam 客户端时用）",
 		"downloaded zip or folder": "下载好的 zip 或文件夹", "choose zip…": "选择 zip…", "choose folder…": "选择文件夹…", "read page": "读取页面",

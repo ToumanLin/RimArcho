@@ -49,14 +49,18 @@ func (s *API) TexturesInfo(scope string, scale int) (*TexturePage, error) {
 	if scope != app.TexAll {
 		scope = app.TexPlan
 	}
-	s.mu.Lock()
-	targets, err := s.a.TextureTargets(nil, scope)
+	a, err := s.detachedReader()
 	if err != nil {
-		s.mu.Unlock()
 		return nil, err
 	}
-	p := view.TexturePageInfo(s.a, scope, scale, s.a.TextureTool(), len(targets))
+	defer a.Close()
+	targets, err := a.TextureTargets(nil, scope)
+	if err != nil {
+		return nil, err
+	}
+	p := view.TexturePageInfo(a, scope, scale, a.TextureTool(), len(targets))
 	out := &TexturePage{TexturePage: p}
+	s.mu.Lock()
 	if s.busy["textures"] {
 		ev := s.texLast
 		out.Running = &ev
@@ -289,6 +293,10 @@ func (s *API) TexturesStop() (string, error) {
 
 // TexturesClean deletes the DDS RimArcho wrote: scope "plan" or "all".
 func (s *API) TexturesClean(scope string) (string, error) {
+	return s.cleanTextures(scope, nil)
+}
+
+func (s *API) cleanTextures(scope string, refs []string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.busy["textures"] {
@@ -298,17 +306,38 @@ func (s *API) TexturesClean(scope string) (string, error) {
 	if scope == "all" {
 		sc = app.TexAll
 	}
+	if len(refs) > 0 {
+		sc = app.TexRefs
+		refs = append([]string(nil), refs...)
+	}
 	obj := view.T("the current plan")
 	if scope == "all" {
 		obj = view.T("every installed mod")
 	}
+	if len(refs) > 0 {
+		obj = view.Tf("%d mods", len(refs))
+	}
 	task := s.beginSelf(view.TaskTexClean, obj, nil)
-	c, err := s.a.CleanTextures(nil, sc, false)
-	s.lib, s.needs, s.board = nil, nil, nil
+	a, err := s.a.ReadSession()
 	if err != nil {
 		s.endSelf(task, err, "")
 		return "", err
 	}
-	s.endSelf(task, nil, view.Tf("deleted %d DDS RimArcho wrote (%s); the game uses the PNGs again", c.Files, view.SizeText(c.Bytes)))
-	return view.Tf("deleted %d DDS RimArcho wrote (%s); the game uses the PNGs again", c.Files, view.SizeText(c.Bytes)), nil
+	a.WorkspaceSnapshot()
+	s.busy["textures"] = true
+	s.texLast = TextureEvent{Text: view.TaskTitle(view.TaskTexClean)}
+	go func() {
+		defer a.Close()
+		c, err := a.CleanTextures(refs, sc, false)
+		s.mu.Lock()
+		s.busy["textures"] = false
+		s.mu.Unlock()
+		s.invalidateInventory()
+		text := ""
+		if err == nil {
+			text = view.Tf("deleted %d DDS RimArcho wrote (%s); the game uses the PNGs again", c.Files, view.SizeText(c.Bytes))
+		}
+		s.endSelf(task, err, text)
+	}()
+	return view.T("it goes on in the background"), nil
 }

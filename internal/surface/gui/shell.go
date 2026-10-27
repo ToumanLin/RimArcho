@@ -18,6 +18,7 @@ import (
 
 // Shell is the sidebar and the breadcrumb of every page in it.
 type Shell struct {
+	Error  string                  `json:"error,omitempty"`
 	Nav    []view.NavGroup         `json:"nav"`
 	Crumbs map[string][]view.Crumb `json:"crumbs"`
 	Env    string                  `json:"env"` // the environment chip
@@ -34,29 +35,55 @@ type Shell struct {
 // Shell builds the sidebar from the needs count and the packs.
 func (s *API) Shell() *Shell {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.shellLocked(nil)
+	r, err := s.readInventorySession()
+	s.mu.Unlock()
+	if err != nil {
+		return &Shell{Error: err.Error()}
+	}
+	defer r.Close()
+	reader := &API{a: r, busy: map[string]bool{}}
+	return reader.shellLocked(nil)
 }
 
 // shellLocked builds the sidebar; n is needs just built for the current board, else nil.
 func (s *API) shellLocked(n *view.Needs) *Shell {
 	out := &Shell{Crumbs: map[string][]view.Crumb{}}
-	if envs, err := s.a.Store.Envs(); err == nil {
-		out.Envs = len(envs)
+	envs, err := s.a.Store.Envs()
+	if err != nil {
+		out.Error = err.Error()
+		return out
 	}
+	out.Envs = len(envs)
 	count := 0
-	if st := s.boardState(); st != nil {
+	if out.Envs > 0 {
+		st, err := s.a.Loadout()
+		if err != nil {
+			out.Error = err.Error()
+			return out
+		}
 		if n == nil {
-			n = s.needsLocked()
+			n, _, err = readNeedsChecked(s.a, false)
+			if err != nil {
+				out.Error = err.Error()
+				return out
+			}
 		}
 		count = n.Count
 		out.Env = view.EnvChip(st.Ix.Env.Name, st.Ix.Env.GameVersion)
 	} else {
 		out.Env = view.EnvChip("", "")
 	}
-	packs, _, _ := view.PackRows(s.a)
+	packs, _, err := view.PackRows(s.a)
+	if err != nil {
+		out.Error = err.Error()
+		return out
+	}
 	if out.Envs > 0 {
-		out.Plans, _ = view.PlanRows(s.a)
+		out.Plans, err = view.PlanRows(s.a)
+		if err != nil {
+			out.Error = err.Error()
+			return out
+		}
 		out.InGame = view.InGame(s.a)
 	}
 	for i := range out.Plans {
@@ -89,22 +116,37 @@ func (s *API) Home() *view.Home {
 	defer s.free.soon()
 	r, err := s.logSession()
 	if err != nil {
-		return &view.Home{Featured: -1}
+		if errors.Is(err, app.ErrNoEnv) {
+			return &view.Home{Featured: -1}
+		}
+		return &view.Home{Featured: -1, Error: err.Error()}
 	}
 	// The launch page is about the current list, the one launched, whichever list the
 	// editor has open (04 §1.3); the reader takes the window's options again next time.
 	r.OpenPlan, r.PlanName = 0, ""
 	b, err := view.BuildBoard(r)
-	if err != nil || b.St == nil {
-		return &view.Home{}
+	if err != nil {
+		return &view.Home{Featured: -1, Error: err.Error()}
+	}
+	if b.St == nil {
+		return &view.Home{Featured: -1, Error: "could not read the current list"}
 	}
 	st := b.St
 	// The last run's line reads Player.log when it is newer than the one read last (06
 	// §2.3): the page loads, or the window comes back into focus, after a game.
 	_, newer := r.NewLog(st)
-	n, _ := readNeeds(r, newer)
-	packs, _, _ := view.PackRows(r)
-	plans, _ := view.PlanRows(r)
+	n, _, err := readNeedsChecked(r, newer)
+	if err != nil {
+		return &view.Home{Featured: -1, Error: err.Error()}
+	}
+	packs, _, err := view.PackRows(r)
+	if err != nil {
+		return &view.Home{Featured: -1, Error: err.Error()}
+	}
+	plans, err := view.PlanRows(r)
+	if err != nil {
+		return &view.Home{Featured: -1, Error: err.Error()}
+	}
 	h := view.BuildHome(r, b, n, plans, packs)
 	view.AddOtherEnvs(r, h, st.Ix.Env.ID)
 	view.PickFeatured(h, r.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
@@ -346,15 +388,18 @@ func scanLine(out string) string {
 // PackImport unpacks a pack file (.archopack) into the packs folder (pack import, 08
 // §5.4). A RimArcho list goes through the import preview like any other list.
 func (s *API) PackImport(path string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	r, err := s.detachedReader()
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
 	path = strings.Trim(strings.TrimSpace(path), `"'`)
 	if !app.IsPackZip(path) {
 		return "", errors.New(view.Tf("%s is not a pack (.archopack)", path))
 	}
 	defer s.subRevision.Add(1)
-	m, err := s.a.ImportPack(path, false)
-	s.board, s.needs = nil, nil
+	m, err := r.ImportPack(path, false)
+	s.invalidateInventory()
 	if err != nil {
 		return "", errors.New(view.Humanize(nil, err.Error()))
 	}
@@ -444,16 +489,17 @@ func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
 	task := s.beginSelf(view.TaskDownload, branch, nil)
 	go func() {
 		var r *app.SourceChangeEnv
-		got, err := s.a.FetchGame(spec, func(p app.DownloadProgress) { s.send("download", p) })
+		reader, err := s.detachedReader()
+		if reader != nil {
+			defer reader.Close()
+		}
+		var got string
+		if err == nil {
+			got, err = reader.FetchGame(spec, func(p app.DownloadProgress) { s.send("download", p) })
+		}
 		end := map[string]any{"end": true}
 		if err == nil {
-			reader, openErr := s.detachedReader()
-			if openErr != nil {
-				err = openErr
-			} else {
-				r, err = reader.AddDownloaded(spec, got)
-				reader.Close()
-			}
+			r, err = reader.AddDownloaded(spec, got)
 		}
 		s.mu.Lock()
 		if err == nil {

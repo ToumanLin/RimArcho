@@ -138,6 +138,10 @@ func (a *App) unhide(st *LoadoutState, m *store.Mod, dryRun bool) (*FileOp, erro
 		return nil, err
 	}
 	op := &FileOp{Op: "rename", Path: from, To: filepath.Join(filepath.Dir(from), "About.xml"), DryRun: dryRun}
+	links, err := a.IncomingLinks(m.RealPath)
+	if err != nil {
+		return nil, err
+	}
 	if dryRun {
 		return op, nil
 	}
@@ -147,7 +151,10 @@ func (a *App) unhide(st *LoadoutState, m *store.Mod, dryRun bool) (*FileOp, erro
 	if err := os.Rename(op.Path, op.To); err != nil {
 		return nil, err
 	}
-	op.Scan, err = a.scanAfterFileOp(st.Ix, m)
+	if _, err := a.scanLinkedEnvironments(st.Ix, m, links); err != nil {
+		return op, err
+	}
+	op.Scan, err = a.Scan(false)
 	return op, err
 }
 
@@ -251,17 +258,7 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if dryRun {
 		return op, nil
 	}
-	err = a.withIncomingLinks(real, "", func() error {
-		if err := a.recycleTarget(real); err != nil {
-			return err
-		}
-		var err error
-		op.Scan, err = a.scanAfterFileOp(st.Ix, m)
-		return err
-	})
-	if err == nil && op.Scan != nil {
-		op.Scan.GameLinks, err = a.InspectGameLinks()
-	}
+	op.Scan, err = a.removeMod(st.Ix, m, real, false)
 	return op, err
 }
 

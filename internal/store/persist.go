@@ -218,8 +218,18 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 func recomputePrimaries(tx *sql.Tx, envID string) error { return recomputeAllPrimaries(tx) }
 
 func recomputeAllPrimaries(tx *sql.Tx) error {
-	rows, err := tx.Query(`SELECT i.id, i.lineage_id, i.status, s.kind, i.first_seen, coalesce(l.primary_instance_id, '')
-		FROM instance i JOIN source s ON s.id=i.source_id JOIN lineage l ON l.id=i.lineage_id`)
+	return recomputePrimary(tx, "")
+}
+
+func recomputePrimary(tx *sql.Tx, lineage string) error {
+	q := `SELECT i.id, i.lineage_id, i.status, s.kind, i.first_seen, coalesce(l.primary_instance_id, '')
+		FROM instance i JOIN source s ON s.id=i.source_id JOIN lineage l ON l.id=i.lineage_id`
+	var args []any
+	if lineage != "" {
+		q += ` WHERE i.lineage_id=?`
+		args = append(args, lineage)
+	}
+	rows, err := tx.Query(q, args...)
 	if err != nil {
 		return err
 	}
@@ -263,7 +273,9 @@ func recomputeAllPrimaries(tx *sql.Tx) error {
 			return err
 		}
 	}
-	_, err = tx.Exec(`DELETE FROM lineage WHERE id NOT IN (SELECT lineage_id FROM instance)`)
+	if lineage == "" {
+		_, err = tx.Exec(`DELETE FROM lineage WHERE id NOT IN (SELECT lineage_id FROM instance)`)
+	}
 	return err
 }
 

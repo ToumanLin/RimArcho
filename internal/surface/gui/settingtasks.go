@@ -76,8 +76,11 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 	switch kind {
 	case view.TaskSourceCheck:
 		if argv[1] == app.LibPage && a.Store.Meta("account:loverslab:enabled") == "true" {
-			s.accountMu.Lock()
-			defer s.accountMu.Unlock()
+			release, err := s.beginAccount()
+			if err != nil {
+				return "", err
+			}
+			defer release()
 			unlock := accounts.Lock(a.AccountsDir())
 			defer unlock()
 			ll, err := s.loversLab(a)
