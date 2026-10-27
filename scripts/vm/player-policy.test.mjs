@@ -37,3 +37,10 @@ test('seeded sequences repeat and coverage retains unreachable eligible edges',(
   const pages=coverage([{page:'plan',eligible:true,asserted:true,outcome:'pressed-ok',tier:'safe'},{page:'plan',eligible:true,outcome:'unreachable',tier:'safe'},{page:'plan',eligible:false,outcome:'skipped',tier:'unknown'}]);
   assert.equal(pages.plan.coveragePercent,50);assert.equal(pages.plan.discovered,3);
 });
+
+test('shared baseline blocks file/deployment writes while permitting private plan records',()=>{
+  const state={sharedContent:true};
+  for(const identity of [{'data-cmd':'pin'},{'data-env-write':'move-directory'},{'data-env-write':'import-apply'}])assert.equal(classify({identity,label:'apply'},state).tier,'unknown');
+  assert.equal(classify({identity:{'data-env-write':'create-plan'},label:'create and edit'},state).tier,'local-destructive');
+  assert.equal(classify({identity:{'data-env-write':'toggle'},label:'enable'},state).tier,'safe');
+});

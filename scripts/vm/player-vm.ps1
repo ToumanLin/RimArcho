@@ -22,6 +22,8 @@ $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Run this host script with PowerShell 7' }
 if ($Steps -lt 1 -or $Minutes -le 0) { throw 'Steps and Minutes must be positive' }
 if (-not [IO.Path]::GetFullPath($TransferRoot).StartsWith('D:\RimArcho-test\',[StringComparison]::OrdinalIgnoreCase)) { throw 'TransferRoot must be under D:\RimArcho-test' }
+$existingBytes=(Get-ChildItem -LiteralPath 'D:\RimArcho-test' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+if ($existingBytes -gt 1400MB) { throw 'Host output is above 1400 MiB; no room for a new bounded bundle' }
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $build = (& git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE) { throw 'Cannot identify build' }
@@ -89,20 +91,22 @@ try {
   if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination $evidence }
  }
  Set-Location -LiteralPath '__RUN__'
- # All paths below were created by this run; never touch the shared baseline.
- foreach ($owned in @('__RUN__\bundle','__RUN__\results','__ZIP__')) {
-  $resolved=[IO.Path]::GetFullPath($owned)
-  if (-not ($resolved.StartsWith('__RUN__\',[StringComparison]::OrdinalIgnoreCase) -or $resolved -eq '__ZIP__')) { throw 'cleanup path escaped run' }
-  Remove-Item -LiteralPath $resolved -Recurse -Force
- }
- $retained = (Get-ChildItem -LiteralPath '__RUN__' -Recurse -File | Measure-Object Length -Sum).Sum
- $disk=@{freeBefore=$freeBefore;freeAfter=(Get-PSDrive C).Free;runRetainedBytes=$retained;baseline='__BASELINE__';gitAvailable=[bool](Get-Command git -ErrorAction SilentlyContinue)}
- $disk | ConvertTo-Json | Set-Content -Encoding UTF8 "$evidence\disk.json"
  Compress-Archive -Path "$evidence\*" -DestinationPath '__RUN__\evidence.zip'
  @{status='completed';runnerExit=$runnerExit;result=$latest.FullName;user=[Environment]::UserName;build=$manifest.build} | ConvertTo-Json | Set-Content -Encoding UTF8 '__RUN__\completion.json'
 } catch {
  @{status='failed';error=$_.Exception.Message} | ConvertTo-Json | Set-Content -Encoding UTF8 '__RUN__\completion.json'
  throw
+} finally {
+ Set-Location -LiteralPath '__RUN__'
+ $cleanupErrors=@()
+ foreach ($owned in @('__RUN__\bundle','__RUN__\results','__ZIP__')) {
+  $resolved=[IO.Path]::GetFullPath($owned)
+  if (-not ($resolved.StartsWith('__RUN__\',[StringComparison]::OrdinalIgnoreCase) -or $resolved -eq '__ZIP__')) { throw 'cleanup path escaped run' }
+  if (Test-Path -LiteralPath $resolved) { try { Remove-Item -LiteralPath $resolved -Recurse -Force } catch { $cleanupErrors += $_.Exception.Message } }
+ }
+ $retained = (Get-ChildItem -LiteralPath '__RUN__' -Recurse -File | Measure-Object Length -Sum).Sum
+ $disk=@{freeBefore=$freeBefore;freeAfter=(Get-PSDrive C).Free;runRetainedBytes=$retained;baseline='__BASELINE__';gitAvailable=[bool](Get-Command git -ErrorAction SilentlyContinue);cleanupErrors=$cleanupErrors}
+ $disk | ConvertTo-Json | Set-Content -Encoding UTF8 '__RUN__\disk.json'
 }
 '@
 foreach ($pair in @(@('__ZIP__',"$GuestRoot\$runName.zip"),@('__HASH__',$zipHash),@('__BUNDLE__',$guestBundle),@('__RUN__',$guestRun),@('__ARGS__',$argsPS),@('__BASELINE__',$GuestBaseline))) { $guestScript = $guestScript.Replace($pair[0],$pair[1]) }
@@ -115,6 +119,7 @@ if ($BundleOnly) { Write-Output "Bundle prepared without contacting the VM: $tra
 # Deliberately no snapshot revert, VM start, app-wide process kill or credential read.
 $vm = Join-Path $PSScriptRoot 'vm.ps1'
 $vmArgs = @{Transfer=$transfer;StandardUser=$StandardUser}
+try {
 & $vm put $zip "$GuestRoot\$runName.zip" @vmArgs
 & $vm exec $scriptFile -Interactive @vmArgs
 & $vm get "$guestRun\completion.json" (Join-Path $transfer 'completion.json') @vmArgs
@@ -122,10 +127,13 @@ $completion = Get-Content -Raw -LiteralPath (Join-Path $transfer 'completion.jso
 if ($completion.status -ne 'completed') { throw ('Guest run failed: ' + $completion.error) }
 & $vm get "$guestRun\evidence.zip" (Join-Path $transfer 'evidence.zip') @vmArgs
 Expand-Archive -LiteralPath (Join-Path $transfer 'evidence.zip') -DestinationPath (Join-Path $transfer 'evidence')
+& $vm get "$guestRun\disk.json" (Join-Path $transfer 'evidence/disk.json') @vmArgs
+} finally {
 foreach ($owned in @($bundle,$zip)) {
  $resolved=[IO.Path]::GetFullPath($owned)
  if (-not $resolved.StartsWith([IO.Path]::GetFullPath($transfer)+[IO.Path]::DirectorySeparatorChar)) { throw 'host cleanup escaped transfer' }
  Remove-Item -LiteralPath $resolved -Recurse -Force
+}
 }
 Write-Output "Guest exit $($completion.runnerExit); evidence: $transfer\evidence"
 if ($completion.runnerExit) { exit $completion.runnerExit }

@@ -482,9 +482,10 @@ async function guestProbes() {
     // Diagnosis on the case DB only: a preparer used cfg:subscribed.dir that did
     // not match its relocated indexed source. Do not move or create content.
     const rows=JSON.parse(command('sqlite3',['-json',join(home,'archo.db'),"SELECT root FROM source WHERE label='subscribed' AND status='ok' LIMIT 1;"])||'[]');
+    result.subscriptionPrerequisite.indexedSourceFound=rows.length>0;
     if(rows.length){
       command('sqlite3',[join(home,'archo.db'),`UPDATE meta SET value='${rows[0].root.replaceAll("'","''")}' WHERE key='cfg:subscribed.dir';`]);
-      await c.click('.subscribe-omni input');await press('Control+KeyA');await c.call('Input.insertText',{text:'https://127.0.0.1:9/phase1a.git'});
+      await c.click('.subscribe-omni input');await press('Control+KeyA');await c.call('Input.insertText',{text:'https://127.0.0.1:9/phase1a.git'});await sleep(400);
       await until(()=>c.evaluate('!!document.querySelector(".subscribe-preview")?.textContent.trim()'));
       result.subscriptionPrerequisite.afterDirectoryAlignment={preview:await c.evaluate('document.querySelector(".subscribe-preview")?.textContent'),subscribeDisabled:await c.evaluate('document.querySelector(".subscribe-foot button.primary")?.disabled'),scope:'copied DB config aligned to existing baseline source; no content changes or submit'};
     }

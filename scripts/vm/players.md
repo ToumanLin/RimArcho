@@ -6,28 +6,15 @@ actions through evaluation. `Runtime.evaluate` observes state/geometry and insta
 the existing observer. All results, profiles, DB backups and images stay outside Git.
 
 ```powershell
-$tools='D:/vm-crawler-tools'
+$tools='D:/RimArcho-test/tools'
 go build -o "$tools/archo.exe" ./cmd/archo
 go build -ldflags '-H windowsgui -X github.com/ToumanLin/RimArcho/internal/buildinfo.GUI=1' -o "$tools/RimArcho.exe" ./cmd/archo
 go build -o "$tools/vmstate.exe" ./spikes/vmstate
-node scripts/vm/run.mjs --mode crawl --driver W --tools $tools --minutes 60 --out D:/vm-player-results
-node scripts/vm/run.mjs --mode walk --driver W --tools $tools --seed 42 --steps 200 --minutes 10 --out D:/vm-player-results
-node scripts/vm/run.mjs --mode crawl --driver W --tools $tools --baseline D:/vm-phase1a-real-baseline --minutes 60 --out D:/vm-player-real
 ```
 
-Every invocation owns a fresh test home. Safe real-content runs use the normal
-SQLite `.backup` path and the audited, already isolated content baseline. They never
-open the player's AppData home. `--allow local` or `--allow external` makes a full
-relocated filesystem copy through `prepare-real.ps1` before starting the window.
-The legacy `--owned-files` shortcut cannot disable this protection for these modes.
-Allow enough time and disk space for copying a large library. Before launching the
-window, crawler/walker setup clears only the copied DB undo/redo history and records
-the removed step count. The content start is retained. This prevents random Undo
-from crossing into pre-run history and a later edit destroying the redo path back
-to the experiment start; the baseline DB is never changed. Unless `--allow external` is enabled, copied
-collection refresh timestamps are deferred through the run budget to prevent the
-plans page from automatically contacting Workshop on opening. Follow source/content
-remain retained and compared; the setup is listed in `deferredExternalEffects`.
+Each run owns a fresh home and clears only that DB's old undo/redo history before
+its start checkpoint. Automatic collection network refresh is deferred in that DB
+while external actions are disabled. No real AppData home is opened by a test.
 
 ## Disk policy (required)
 
