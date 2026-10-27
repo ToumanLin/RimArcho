@@ -29,7 +29,8 @@ APPDATA and WebView profiles. Retained evidence consists of result, coverage led
 trace/replay/shrink, operation seeds and bounded logs. Canonical snapshots are read
 in full and compared in memory; checkpoint hashes/counts and first differences are
 retained in result.json. Screenshots, databases and complete observer samples are
-not retained. A killed process may require cleanup of its exact owned run directory.
+not retained. A replay timeout terminates its owned process tree; cleanup does not
+follow junctions into shared content. A killed process may require cleanup of its exact owned run directory.
 
 ```powershell
 $tools = 'D:/RimArcho-test/tools'
@@ -95,3 +96,17 @@ state. Staging remains compared; F2 remains a known app failure owned by stage-u
 inputs, seed and replay command. Shrinking retries shorter prefixes and chunk
 removals in fresh small cases. `--shrink false` disables retries for seed sweeps.
 The bounded shrinker does not claim a globally minimal sequence.
+
+If Player authentication in the protected wrapper fails while another user can
+transfer files, `-StandardUser -DesktopLaunch` uses that account only for transfer
+and waiting. It launches the guest script through the **already signed-in**
+Win11-Player-Test desktop's Run dialog with balanced host key input. It verifies
+the VMware window title and foreground handle before typing; it never logs in,
+changes credentials, or touches other VMs. Default execution still uses `-Interactive`.
+A foreground failure aborts before typing. `-SeedCount 5 -Seed 1` runs seeds 1–5
+sequentially in one bundle and returns `evidence/seed-<N>`.
+
+Saved-version checkout claims “u undoes” but can change workspace origin metadata
+without an undo entry (F3). Those checks run on disposable DB branches and retain
+the canonical failure while the parent stays usable. An unrestorable parent stops
+its crawl branch instead of attributing later failures to unrelated controls.

@@ -5,6 +5,7 @@ param(
  [ValidateSet('crawl','walk')][string]$Mode = 'crawl',
  [int]$Seed = 271027,
  [int]$Steps = 200,
+ [ValidateRange(1,20)][int]$SeedCount = 1,
  [double]$Minutes = 60,
  [ValidateSet('safe','local','external')][string]$Allow = 'safe',
  [string]$GuestBaseline,
@@ -15,6 +16,7 @@ param(
  [string]$GuestRoot = 'C:\Users\Public\Documents\VM-Test',
  [ValidateSet('true','false')][string]$Shrink = 'false',
  [switch]$Probe,
+ [switch]$DesktopLaunch,
  [switch]$StandardUser,
  [switch]$BundleOnly
 )
@@ -80,16 +82,23 @@ try {
  & '__BUNDLE__\tools\sqlite3.exe' -version
  if ($LASTEXITCODE) { throw 'bundled SQLite cannot start; supply a standalone SQLite distribution' }
  $runnerArgs = @(__ARGS__)
+ $seedAt=[Array]::IndexOf($runnerArgs,'--seed')+1
+ $runnerExit=0
+ for($round=0;$round -lt __SEEDCOUNT__;$round++) {
+ $runnerArgs[$seedAt]=[string](__SEED__+$round)
  & '__BUNDLE__\tools\node.exe' @runnerArgs *> '__RUN__\runner.log'
- $runnerExit = $LASTEXITCODE
+ $runnerExit = [Math]::Max($runnerExit,$LASTEXITCODE)
  $latest = Get-ChildItem -LiteralPath '__RUN__\results' -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
  if (-not $latest -or -not (Test-Path -LiteralPath (Join-Path $latest.FullName 'result.json'))) { throw 'runner produced no result.json' }
  $evidence = '__RUN__\evidence'
+ if(__SEEDCOUNT__ -gt 1){$evidence=Join-Path $evidence ('seed-'+$runnerArgs[$seedAt])}
  New-Item -ItemType Directory -Force $evidence | Out-Null
  foreach ($name in @('result.json','ledger.json','ledger.md','trace.json','minimal-trace.json','replay.json','shrink.json')) {
   $source = Join-Path $latest.FullName $name
   if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination $evidence }
  }
+ }
+ $evidence='__RUN__\evidence'
  Set-Location -LiteralPath '__RUN__'
  Compress-Archive -Path "$evidence\*" -DestinationPath '__RUN__\evidence.zip'
  @{status='completed';runnerExit=$runnerExit;result=$latest.FullName;user=[Environment]::UserName;build=$manifest.build} | ConvertTo-Json | Set-Content -Encoding UTF8 '__RUN__\completion.json'
@@ -109,19 +118,28 @@ try {
  $disk | ConvertTo-Json | Set-Content -Encoding UTF8 '__RUN__\disk.json'
 }
 '@
-foreach ($pair in @(@('__ZIP__',"$GuestRoot\$runName.zip"),@('__HASH__',$zipHash),@('__BUNDLE__',$guestBundle),@('__RUN__',$guestRun),@('__ARGS__',$argsPS),@('__BASELINE__',$GuestBaseline))) { $guestScript = $guestScript.Replace($pair[0],$pair[1]) }
+foreach ($pair in @(@('__ZIP__',"$GuestRoot\$runName.zip"),@('__HASH__',$zipHash),@('__BUNDLE__',$guestBundle),@('__RUN__',$guestRun),@('__ARGS__',$argsPS),@('__BASELINE__',$GuestBaseline),@('__SEEDCOUNT__',[string]$SeedCount),@('__SEED__',[string]$Seed))) { $guestScript = $guestScript.Replace($pair[0],$pair[1]) }
 $scriptFile = Join-Path $transfer 'run-player.ps1'
 # Create the run directory before guest execution; the script itself is BOM encoded.
 $guestScript = "New-Item -ItemType Directory -Force $(Literal $guestRun) | Out-Null`r`n" + $guestScript
 [IO.File]::WriteAllText($scriptFile,$guestScript,[Text.UTF8Encoding]::new($true))
-@{run=$runName;build=$build;zipHash=$zipHash;mode=$Mode;seed=$Seed;steps=$Steps;minutes=$Minutes;allow=$Allow;guestBaseline=$GuestBaseline;bundleOnly=[bool]$BundleOnly} | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $transfer 'host.json')
+@{run=$runName;build=$build;zipHash=$zipHash;mode=$Mode;seed=$Seed;steps=$Steps;minutes=$Minutes;allow=$Allow;guestBaseline=$GuestBaseline;bundleOnly=[bool]$BundleOnly;seedCount=$SeedCount;desktopLaunch=[bool]$DesktopLaunch} | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $transfer 'host.json')
 if ($BundleOnly) { Write-Output "Bundle prepared without contacting the VM: $transfer"; return }
 # Deliberately no snapshot revert, VM start, app-wide process kill or credential read.
 $vm = Join-Path $PSScriptRoot 'vm.ps1'
 $vmArgs = @{Transfer=$transfer;StandardUser=$StandardUser}
 try {
 & $vm put $zip "$GuestRoot\$runName.zip" @vmArgs
-& $vm exec $scriptFile -Interactive @vmArgs
+if($DesktopLaunch){
+ $guestScriptFile="$GuestRoot\$runName-run.ps1"
+ & $vm put $scriptFile $guestScriptFile @vmArgs
+ & (Join-Path $PSScriptRoot 'desktop-launch.ps1') -GuestScript $guestScriptFile
+ $waitScript=Join-Path $transfer 'wait-player.ps1'
+ $waitText="`$until=(Get-Date).AddMinutes($([Math]::Ceiling($Minutes*$SeedCount+10))); while(-not(Test-Path -LiteralPath '$guestRun\completion.json')){if((Get-Date)-gt`$until){throw 'guest completion timeout'};Start-Sleep -Seconds 5};Get-Content -Raw -LiteralPath '$guestRun\completion.json'"
+ [IO.File]::WriteAllText($waitScript,$waitText,[Text.UTF8Encoding]::new($true))
+ & $vm exec $waitScript @vmArgs
+} else { & $vm exec $scriptFile -Interactive @vmArgs }
+
 & $vm get "$guestRun\completion.json" (Join-Path $transfer 'completion.json') @vmArgs
 $completion = Get-Content -Raw -LiteralPath (Join-Path $transfer 'completion.json') | ConvertFrom-Json
 if ($completion.status -ne 'completed') { throw ('Guest run failed: ' + $completion.error) }
