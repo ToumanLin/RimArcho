@@ -212,8 +212,14 @@ func snapshot(home string, openPlan ...string) any {
 				norm(m)
 			}
 		case map[string]any:
+			// Problem ownership maps use instance IDs as keys, not only values.
+			next := make(map[string]any, len(x))
 			for k, v := range x {
-				x[k] = norm(v)
+				next[replace(k)] = norm(v)
+			}
+			clear(x)
+			for k, v := range next {
+				x[k] = v
 			}
 		}
 		return v

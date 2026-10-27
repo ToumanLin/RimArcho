@@ -33,7 +33,21 @@ func TestFixtureCanonicalAndReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	l, err := json.Marshal(snapshot(filepath.Join(left, "home")))
+	observed := snapshot(filepath.Join(left, "home")).(map[string]any)
+	instances := map[string]bool{}
+	for _, m := range observed["instances"].([]map[string]any) {
+		instances[m["id"].(string)] = true
+	}
+	owners := observed["problems"].(map[string]any)["mods"].(map[string]any)
+	if len(owners) == 0 {
+		t.Fatal("fixture must contain per-instance problems")
+	}
+	for id := range owners {
+		if !instances[id] {
+			t.Fatalf("problem ownership key was not canonicalized: %s", id)
+		}
+	}
+	l, err := json.Marshal(observed)
 	if err != nil {
 		t.Fatal(err)
 	}
