@@ -159,6 +159,9 @@ func (s *API) logSession() (*app.App, error) {
 
 // Close releases the page reader's database connection (also used by the dev harness).
 func (s *API) Close() {
+	if s.branchCancel != nil {
+		s.branchCancel()
+	}
 	s.accountMu.Lock()
 	s.ll = nil
 	for _, p := range s.llFiles {

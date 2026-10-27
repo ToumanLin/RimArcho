@@ -86,6 +86,8 @@ type API struct {
 	uninstallSizes app.UninstallSizeCache
 	uninstallRead  logReader
 
+	branchCtx    context.Context
+	branchCancel context.CancelFunc
 	// ScanRunner scans an environment in place of the child process (tests).
 	ScanRunner func(env string) (string, error)
 
@@ -93,7 +95,8 @@ type API struct {
 }
 
 func newAPI(a *app.App) *API {
-	s := &API{a: a, open: openURL, busy: map[string]bool{}}
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &API{a: a, open: openURL, busy: map[string]bool{}, branchCtx: ctx, branchCancel: cancel}
 	s.startTasks()
 	return s
 }
