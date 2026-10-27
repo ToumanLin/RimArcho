@@ -20,6 +20,7 @@ const workshopBatchSize = 25
 var (
 	workshopSuccess = regexp.MustCompile(`(?i)Success[.!]\s+Downloaded (?:workshop )?item\s+(\d+)\b`)
 	workshopFailure = regexp.MustCompile(`(?i)ERROR!\s+(?:Download(?:ing)? (?:workshop )?item|Timeout downloading (?:workshop )?item)\s+(\d+)\b[^\r\n]*`)
+	workshopCurrent = regexp.MustCompile(`(?i)Downloading (?:workshop )?item\s+(\d+)\b`)
 )
 
 type workshopOutcome struct {
@@ -33,7 +34,13 @@ func (o workshopOutcome) why() string {
 		return o.err.Error()
 	}
 	if o.kind == "permission" {
-		return "this content is private, unavailable, or access was denied; check account access"
+		return "access was denied; check account access"
+	}
+	if o.kind == "missing" {
+		return workshopMissing
+	}
+	if o.kind == "crash" {
+		return "SteamCMD exited before confirming the download"
 	}
 	if o.kind == "" {
 		return "download was not confirmed"
@@ -90,7 +97,7 @@ func parseWorkshopOutput(ids []string, out string, runErr error) map[string]work
 		}
 		globalKind, loginPending = kind, false
 	}
-	if globalKind == "" && runErr != nil {
+	if (globalKind == "" || globalKind == "other") && runErr != nil {
 		var download *DownloadError
 		var network net.Error
 		switch {
@@ -99,7 +106,7 @@ func parseWorkshopOutput(ids []string, out string, runErr error) map[string]work
 		case errors.As(runErr, &network):
 			globalKind = "network"
 		default:
-			globalKind = "other"
+			globalKind = "crash"
 		}
 	}
 	var localErr error
@@ -113,6 +120,9 @@ func parseWorkshopOutput(ids []string, out string, runErr error) map[string]work
 	requested := make(map[string]workshopOutcome, len(ids))
 	for _, id := range ids {
 		if result, ok := results[id]; ok {
+			if !result.confirmed && result.kind == "other" && globalKind == "crash" {
+				result.kind = "crash"
+			}
 			requested[id] = result
 		} else {
 			requested[id] = workshopOutcome{kind: globalKind, err: localErr}
@@ -121,7 +131,8 @@ func parseWorkshopOutput(ids []string, out string, runErr error) map[string]work
 	return requested
 }
 
-func (a *App) runWorkshopBatches(exe, base, account string, ids []string) (map[string]workshopOutcome, error) {
+func (a *App) runWorkshopBatches(exe, base, account string, ids []string, transfer ...*workshopTransfer) (map[string]workshopOutcome, error) {
+	w := workshopObserver(transfer)
 	var processErrors []error
 	results := map[string]workshopOutcome{}
 	var validIDs []string
@@ -137,32 +148,45 @@ func (a *App) runWorkshopBatches(exe, base, account string, ids []string) (map[s
 		results[id] = workshopOutcome{}
 		validIDs = append(validIDs, id)
 	}
-	for start := 0; start < len(validIDs); start += workshopBatchSize {
-		end := min(start+workshopBatchSize, len(validIDs))
-		pending := validIDs[start:end]
-		for attempt := 0; len(pending) > 0; attempt++ {
-			if attempt > 0 {
-				wait := time.Sleep
-				if a.SteamCMDWait != nil {
-					wait = a.SteamCMDWait
+	queue := validIDs
+	for attempt := 0; attempt < 3 && len(queue) > 0; attempt++ {
+		if attempt > 0 {
+			delay := []time.Duration{5 * time.Second, 15 * time.Second}[attempt-1]
+			if a.SteamCMDWait != nil {
+				a.SteamCMDWait(delay)
+			} else {
+				timer := time.NewTimer(delay)
+				select {
+				case <-timer.C:
+				case <-w.ctx.Done():
 				}
-				wait([]time.Duration{5 * time.Second, 15 * time.Second}[attempt-1])
+				timer.Stop()
 			}
-			out, ran, err := a.runWorkshopScript(exe, base, account, pending)
+		}
+		var retry []string
+		for start := 0; start < len(queue); start += workshopBatchSize {
+			if w.ctx.Err() != nil {
+				return results, w.ctx.Err()
+			}
+			end := min(start+workshopBatchSize, len(queue))
+			pending := queue[start:end]
+			w.line("Downloading item " + pending[0])
+			out, ran, err := a.runWorkshopScript(exe, base, account, pending, w)
 			if !ran {
-				for _, id := range append(append([]string(nil), pending...), validIDs[end:]...) {
+				for _, id := range queue[start:] {
 					results[id] = workshopOutcome{err: err}
 				}
 				return results, errors.Join(processErrors...)
 			}
 			parsed := parseWorkshopOutput(pending, out, err)
 			confirmed := 0
-			var retry []string
 			stopKind := ""
-			allNetwork := true
 			for _, id := range pending {
 				r := parsed[id]
 				results[id] = r
+				if w.ctx.Err() == nil || r.confirmed || workshopPermanent(r.kind) {
+					w.outcome(id, r)
+				}
 				if r.confirmed {
 					confirmed++
 				}
@@ -170,30 +194,32 @@ func (a *App) runWorkshopBatches(exe, base, account string, ids []string) (map[s
 				case "password", "guard", "login", "anonymous-login":
 					stopKind = r.kind
 				}
-				allNetwork = allNetwork && r.kind == "network"
-				if !r.confirmed && r.kind == "network" && attempt < 2 {
+				if !r.confirmed && r.err == nil && (r.kind == "network" || r.kind == "crash" || r.kind == "") && attempt < 2 {
 					retry = append(retry, id)
 				}
 			}
 			if err != nil && confirmed == len(pending) {
 				processErrors = append(processErrors, errors.New("SteamCMD did not exit successfully; confirmed items were retained"))
 			}
-			if confirmed == 0 && (stopKind != "" || allNetwork && attempt == 2) {
-				if stopKind == "" {
-					stopKind = "network"
-				}
-				for _, id := range validIDs[end:] {
+			if w.ctx.Err() != nil {
+				return results, w.ctx.Err()
+			}
+			if confirmed == 0 && stopKind != "" {
+				for _, id := range validIDs {
+					if results[id].confirmed || workshopPermanent(results[id].kind) {
+						continue
+					}
 					results[id] = workshopOutcome{kind: stopKind}
 				}
 				return results, errors.Join(processErrors...)
 			}
-			pending = retry
 		}
+		queue = retry
 	}
 	return results, errors.Join(processErrors...)
 }
 
-func (a *App) runWorkshopScript(exe, base, account string, ids []string) (string, bool, error) {
+func (a *App) runWorkshopScript(exe, base, account string, ids []string, transfer ...*workshopTransfer) (string, bool, error) {
 	f, err := os.CreateTemp(filepath.Dir(exe), "RimArcho-workshop-*.txt")
 	if err != nil {
 		return "", false, err
@@ -214,17 +240,23 @@ func (a *App) runWorkshopScript(exe, base, account string, ids []string) (string
 	// Pass only an ASCII filename: SteamCMD resolves it against its working
 	// directory, so non-ASCII profile/base paths never enter the script argument.
 	args := []string{"+force_install_dir", base, "+login", account, "+runscript", filepath.Base(f.Name())}
-	out, err := a.runWorkshopSteamCMD(exe, args, account != "anonymous")
+	out, err := a.runWorkshopSteamCMD(exe, args, account != "anonymous", transfer...)
 	return out, true, err
 }
 
 // Workshop access errors need item context; game download diagnostics keep their
 // existing wording. Local write errors must never be described as private content.
 func workshopErrorKind(low string) string {
+	if errorKind(low) == "disk" {
+		return "disk"
+	}
+	if strings.Contains(low, "file not found") || strings.Contains(low, "filenotfound") || strings.Contains(low, "private") || strings.Contains(low, "not visible") {
+		return "missing"
+	}
 	if kind := errorKind(low); kind != "other" {
 		return kind
 	}
-	if strings.Contains(low, "access denied") || strings.Contains(low, "accessdenied") || strings.Contains(low, "permission") || strings.Contains(low, "private") || strings.Contains(low, "not visible") || strings.Contains(low, "file not found") || strings.Contains(low, "filenotfound") {
+	if strings.Contains(low, "access denied") || strings.Contains(low, "accessdenied") || strings.Contains(low, "permission") {
 		return "permission"
 	}
 	return errorKind(low)

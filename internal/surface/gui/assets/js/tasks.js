@@ -369,7 +369,9 @@ function drawSum() {
   const h = el("h3", "", r.title);
   h.append(el("span", "o", r.obj));
   top.append(h);
-  box.append(top, el("p", "say word-facts s-" + r.state, r.say));
+  const summary = el("p", "say" + (r.kind === "subscribe" ? "" : " word-facts") + " s-" + r.state, r.say);
+  if (r.kind === "subscribe") summary.style.whiteSpace = "pre-line";
+  box.append(top, summary);
   if (r.bar) {
     const p = el("div", "prog");
     const b = el("div", "bar" + (r.state === "fail" ? " bad" : "") + (r.state === "run" ? " busy" : ""));
@@ -498,7 +500,8 @@ function itemMenu(x, y, keys) {
     { label: T("see it in the mod library"), key: "o", run: () => toLibrary(it.name) },
     { label: T("open the folder"), key: "ctrl+o", run: () => run("folder", [t], it.ref) },
   ];
-  if (it.state === "fail") acts.push({ sep: true }, { label: T("try only this one again"), key: "r", run: () => run("retry", [t], it.ref) });
+  if (it.workshopURL) acts.push({ label: T("open the Workshop page"), run: () => api.OpenURL(it.workshopURL).catch((e) => say("fail", errText(e))) });
+  if (it.state === "fail" && !it.permanent) acts.push({ sep: true }, { label: T("try only this one again"), key: "r", run: () => run("retry", [t], it.ref) });
   acts.push({ label: T("copy the name"), key: "ctrl+c", run: () => copy(it.name) });
   pop.menu(x, y, acts, keys);
 }
@@ -635,7 +638,7 @@ function itemsKey(e, done, menuKey) {
   if (k === "o") { done(); return toLibrary(it.name); }
   if (ctrl && k.toLowerCase() === "o") { done(); return run("folder", [t], it.ref); }
   if (ctrl && k.toLowerCase() === "c") { done(); return copy(it.name); }
-  if (k === "r" && it.state === "fail") { done(); return run("retry", [t], it.ref); }
+  if (k === "r" && it.state === "fail" && !it.permanent) { done(); return run("retry", [t], it.ref); }
 }
 
 // ---- the shell's lines ----

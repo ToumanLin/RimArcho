@@ -127,24 +127,48 @@ func (s *API) SubscriptionFrom(ref, from string) (string, error) {
 }
 
 func (s *API) runSubscriptionTask(a *app.App, id, kind string, args []string) (string, error) {
-	if len(args) > 0 && args[len(args)-1] == "--credit-batch" {
-		// This is a persisted GUI task argument, not a public CLI flag.
-		op, err := a.SubscribeWorkshopBatch(args[2:len(args)-2], true, true, false)
-		if op != nil {
-			items := make([]app.TaskItem, 0, len(op.Items))
-			for _, it := range op.Items {
-				state := app.ItemOK
-				if it.Result != "downloaded with SteamCMD" {
-					state = app.ItemFail
-				}
-				items = append(items, app.TaskItem{Ref: it.ID, Name: it.Name, State: state, Why: it.Result})
+	if kind == view.TaskSubscribe && len(args) > 2 && args[1] == "workshop" {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		s.tasks.SetStop(id, func() error { cancel(); return nil })
+		var inputs []string
+		steamcmd, batch := false, false
+		for _, arg := range args[2:] {
+			switch arg {
+			case "--steamcmd":
+				steamcmd = true
+			case "--credit-batch":
+				batch = true
+			default:
+				inputs = append(inputs, arg)
 			}
-			s.tasks.Update(id, func(t *app.Task) { t.Items = items; t.Total = len(items) })
 		}
-		if err != nil {
-			return "", err
+		op, err := a.SubscribeWorkshopBatch(inputs, steamcmd, batch, false, app.WorkshopCalls{Context: ctx,
+			Changed: func(items []app.TaskItem) { s.tasks.Update(id, func(t *app.Task) { t.SetWorkshopProgress(items) }) },
+		})
+		if op != nil {
+			for _, it := range op.Items {
+				if it.Ref != "" {
+					s.tasks.Update(id, func(t *app.Task) {
+						if t.Target == "" {
+							t.Target = it.Ref
+						}
+					})
+					break
+				}
+			}
 		}
-		return view.T("subscription finished"), nil
+		if ctx.Err() != nil {
+			return "cancelled", ctx.Err()
+		}
+		if op != nil {
+			for _, note := range op.Notes {
+				if strings.HasPrefix(note, "Steam downloads it;") {
+					return view.T("Steam downloads it; it appears after the next scan"), err
+				}
+			}
+		}
+		return view.T("subscription finished"), err
 	}
 	before, err := a.Subscriptions()
 	if err != nil {
