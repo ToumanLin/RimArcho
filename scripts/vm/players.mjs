@@ -77,7 +77,7 @@ export async function drive(ctx) {
       if(!permitted){row.outcome='skipped';row.reason=policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`;}
       else if(!eligible){row.reason=!control.visible?'not visible in this state':!control.enabled?'disabled; requires application precondition':'covered by page/popup/menu; not an eligible edge in this state';}
       ledger.set(id,row);added.push(row);
-      if(control.context&&control.visible){const right={...row,key:hash(id+'context'),label:control.label+' [context menu]',action:{kind:'click',locator:control.locator,button:'right'}};if(!ledger.has(right.key)){ledger.set(right.key,right);added.push(right);}}
+      if(control.context&&control.visible){const right={...row,key:hash(id+'context'),label:control.label+' [context menu]',sourceLabel:control.label,action:{kind:'click',locator:control.locator,button:'right'}};if(!ledger.has(right.key)){ledger.set(right.key,right);added.push(right);}}
     }
     return added;
   }
@@ -229,7 +229,7 @@ export async function drive(ctx) {
       if(action.kind==='click'){
         const actual=await targetControl(action),s=await read();
         if(!actual){row.outcome='unreachable';row.reason='target disappeared';return;}
-        if(!row.row&&(actual.label!==row.label||JSON.stringify(actual.identity)!==JSON.stringify(row.identity))){row.outcome='unreachable';row.reason='semantic target changed during replay';return;}
+        if(!row.row&&(actual.label!==(row.sourceLabel??row.label)||JSON.stringify(actual.identity)!==JSON.stringify(row.identity))){row.outcome='unreachable';row.reason='semantic target changed during replay';return;}
         const policy=classify(actual,s);
         if(policy.tier!==row.tier||!allowed(policy.tier,options.allow)){row.outcome='skipped';row.reason='target classification changed during replay';return;}
       }
@@ -292,8 +292,8 @@ export async function drive(ctx) {
       const nav=(await controls()).filter(x=>x.owner==='nav'&&(x.identity['data-id']||x.identity.id));
       for(const n of nav){
         if(!n.enabled||!n.visible||!n.hittable)continue;
-        const row=[...ledger.values()].find(r=>r.owner==='nav'&&r.locator===n.locator&&r.eligible&&!r.attemptedAt);
-        if(row)await attempt(row,[]);
+        const rows=[...ledger.values()].filter(r=>r.owner==='nav'&&r.locator===n.locator&&r.eligible&&!r.attemptedAt);
+        for(const row of rows)await attempt(row,[]);
       }
       for(const r of recipes){
         await root();const s=await read(),from=hash(stateKey(s,await controls()));
