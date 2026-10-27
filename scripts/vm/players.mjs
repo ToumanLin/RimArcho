@@ -373,15 +373,16 @@ export async function drive(ctx) {
     return [join(ctx.repo,'scripts/vm/run.mjs'),'--mode','walk','--driver','W','--seed',String(seed),'--steps',String(steps),'--minutes',String(minutes),'--tools',ctx.tools,'--out',join(out,'retries'),'--replay',file,'--shrink','false',...(options.baseline?['--baseline',options.baseline,'--reuse-content','true']:[]),...(options.allow?['--allow',options.allow]:[])];
   }
   async function isolatedEdge(row,recipe) {
+    const edgeStarted=performance.now();
     row.attemptedAt=new Date().toISOString();
     const parentBefore=await snapshot('branch-'+row.key+'-parent-before');
     const file=join(out,'branch-'+row.key+'.json');save('branch-'+row.key,{actions:[...recipe,{...(row.action||{kind:'click',locator:row.locator}),expectedTarget:{label:row.sourceLabel??row.label,identity:row.identity},mustUndo:row.mustUndo}].map(action=>({action}))});
-    // Child runs have a fresh fixture/full filesystem copy; never reuse a dirty root.
+    // Each child owns a fresh fixture or private DB backup over shared guest content.
     const entry=await input({kind:'branch',traceFile:file,control:row.key});
     const parentAfter=await snapshot('branch-'+row.key+'-parent-return');
     row.returnVerified=!difference(canonical(parentBefore),canonical(parentAfter));
     if(!row.returnVerified)fail('branch parent canonical equality',{control:row.key});
-    row.outcome=entry.unreachableReason?'unreachable':entry.functionalStatus==='passed'&&row.returnVerified?'pressed-ok':'failed';row.asserted=row.outcome==='pressed-ok';row.branchReplay=file;row.nonUndoable=entry.nonUndoableChanges;row.oracles=entry.failures||[];row.reason=entry.unreachableReason||entry.error||entry.branchOutput;saveLedger();
+    row.outcome=entry.unreachableReason?'unreachable':entry.functionalStatus==='passed'&&row.returnVerified?'pressed-ok':'failed';row.asserted=row.outcome==='pressed-ok';row.branchReplay=file;row.nonUndoable=entry.nonUndoableChanges;row.oracles=entry.failures||[];row.reason=entry.unreachableReason||entry.error||entry.branchOutput;row.elapsedMs=performance.now()-edgeStarted;saveLedger();
   }
   async function walk() {
     await root();await enqueue([]);
