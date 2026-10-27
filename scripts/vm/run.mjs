@@ -10,9 +10,11 @@ import { connect, sleep } from './cdp.mjs';
 import { observe, discover } from './observe.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+// A VM guest gets an exported copy of the scripts with no Git; RIMARCHO_VM_BUILD names its commit.
 const common=spawnSync('git',['-C',repo,'rev-parse','--path-format=absolute','--git-common-dir'],{encoding:'utf8',windowsHide:true});
-assert(common.status===0,'run from a Git checkout');
-const repositoryRoot=resolve(common.stdout.trim(),'..');
+const hasGit=common.status===0;
+assert(hasGit||process.env.RIMARCHO_VM_BUILD,'run from a Git checkout, or set RIMARCHO_VM_BUILD in an exported copy');
+const repositoryRoot=hasGit?resolve(common.stdout.trim(),'..'):repo;
 const options = {};
 for (let i = 2; i < process.argv.length; i += 2) {
   const key = process.argv[i];
@@ -239,8 +241,8 @@ async function setup() {
   const initial=JSON.parse(command(exe('vmstate'),['--home',home]));
   currentPlan=options.plan || initial.plans.find(p=>p.name==='default')?.name || initial.plans[0].name;
   result.plan=currentPlan;result.content={instances:initial.instances.length,plans:initial.plans.length};
-  result.build=command('git',['-C',repo,'rev-parse','HEAD']).trim();
-  result.workingTree=command('git',['-C',repo,'status','--short']).trim();
+  result.build=hasGit?command('git',['-C',repo,'rev-parse','HEAD']).trim():process.env.RIMARCHO_VM_BUILD;
+  result.workingTree=hasGit?command('git',['-C',repo,'status','--short']).trim():'exported copy';
   result.node=process.version;result.toolHashes=Object.fromEntries(['archo','vmstate',driver==='W'?'RimArcho':driver==='A'?'guidev':null].filter(Boolean).map(n=>[n,createHash('sha256').update(readFileSync(exe(n))).digest('hex')]));
   result.preparationMs=performance.now()-preparing;
   if(driver==='W'&&scenario===3)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
