@@ -86,7 +86,7 @@ async function snapshot(label) {
 async function until(fn, ms=15000) {
   const end=performance.now()+ms;
   while(performance.now()<end) { const r=await fn(); if(r) return r;await sleep(50); }
-  throw Error(`condition timed out after ${ms}ms; state=${c?JSON.stringify(await c.evaluate('(()=>{const s=__vm.read(false);return {page:s.page,plan:s.plan,popup:s.popup,loading:s.loading,editing:s.editing,busy:s.busy,content:s.content,status:s.status,navLayout:s.navLayout,activeElement:s.activeElement}})()')):'no window'}`);
+  throw Error(`condition timed out after ${ms}ms; state=${c?JSON.stringify(await c.evaluate('(()=>{const s=__vm.read(false);return {page:s.page,plan:s.plan,popup:s.popup,loading:s.loading,editing:s.editing,busy:s.busy,content:s.content,status:s.status,navLayout:s.navLayout,activeElement:s.activeElement,errors:s.errors}})()')):'no window'}`);
 }
 async function settled(page, ms=10000, plan) {
   let last='', stable=0;

@@ -1,0 +1,24 @@
+{
+  "seed": 271027,
+  "actions": [
+    {
+      "action": {
+        "kind": "click",
+        "locator": "#nav > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(1) > button[data-id=\"plan:3\"]"
+      }
+    },
+    {
+      "action": {
+        "kind": "click",
+        "locator": "#board > section[data-area=\"1\"] > div:nth-of-type(1) > span:nth-of-type(4) > button[data-cmd=\"sort\"]"
+      }
+    },
+    {
+      "action": {
+        "kind": "click",
+        "locator": "#popup > div:nth-of-type(1) > div:nth-of-type(3) > button[data-env-write=\"enable\"]",
+        "mustUndo": true
+      }
+    }
+  ]
+}
