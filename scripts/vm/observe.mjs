@@ -77,7 +77,7 @@ export function discover() {
     const row=e.matches('.row,.lrow,.lib-row,.log-row,.chg-row,.needs-row'), area=e.closest('[data-area]')?.dataset.area;
     const owner=e.closest('#popup:not([hidden])')?'popup':e.closest('#menu:not([hidden])')?'menu':e.closest('#nav,#nav-settings,#tasks-line,#env,#live')?'nav':'page';
     const locator=path(e);
-    const blockedByLayer=!!(hit?.closest('#popup:not([hidden]),#menu:not([hidden])')&&!e.closest('#popup:not([hidden]),#menu:not([hidden])'));
+    const blockedByLayer=!!(hit?.closest('#popup:not([hidden]),#menu:not([hidden])')&&!e.closest('#popup:not([hidden]),#menu:not([hidden])'))||!!(e.closest('#board,#planhead')&&!document.querySelector('#screen')?.hidden);
     return { tag: e.tagName, role: e.getAttribute('role'), label, identity, locator, owner, area, row, rowKind:row?[...e.classList].filter(c=>!['cur','on','sel','selected'].includes(c)).join(' '):null, inputType:e.type, href:e.getAttribute('href'), context:!!e.oncontextmenu || row, blockedByLayer, bounds: {x:b.x,y:b.y,width:b.width,height:b.height}, visible: !!(b.width && b.height), enabled: !e.matches(':disabled') && !e.closest('[inert]'), hittable: hit === e || e.contains(hit), key: [e.tagName, e.getAttribute('role'),JSON.stringify(identity),locator,label].join('|') };
   });
 }
