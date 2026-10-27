@@ -159,7 +159,12 @@ export async function drive(ctx) {
     await input(key('Escape'));await input(key('Escape'));
     let s=await read();
     if(s.navLayout==='top'){await input(key('Control+KeyB'));await sleep(400);s=await read();}
-    if(s.page!==null){await input(key('Shift+Digit5'));await settled(null,15000);s=await read();}
+    if(s.page!==null){
+      // Sidebar reflow animates after page races. Wait before targeting geometry;
+      // page shortcuts can be ignored while a native form input owns focus.
+      await settled();await sleep(350);
+      await input({kind:'click',locator:'#nav .nav-item[data-id="plan"]'});await settled(null,15000);s=await read();
+    }
     if(s.plan!==currentPlan){const plan=s.plans.find(p=>p.name===currentPlan);if(!plan)throw Error('original list was removed');await openPlan(plan);}
     // A native input can retain focus after a dismissed view. Real row input
     // returns keyboard ownership to the editor before focus/undo shortcuts.
