@@ -44,8 +44,12 @@ export async function connect(addr, { timeoutMs = 15000 } = {}) {
     let k = punctuation[code]?.[modifiers&8?1:0] || (code.startsWith('Key') ? code.slice(3).toLowerCase() : code.startsWith('Digit') ? code.slice(5) : code === 'Space' ? ' ' : code === 'Backslash' ? '\\' : code);
     if (options.uppercase && modifiers & 8) k = k.toUpperCase();
     const params = { code, key: k, modifiers, windowsVirtualKeyCode: VK[code] || (k.length === 1 ? k.toUpperCase().charCodeAt(0) : 0) };
-    for (let i = 0; i <= (options.repeats || 0); i++) await call('Input.dispatchKeyEvent', { ...params, type: 'rawKeyDown', autoRepeat: i > 0 });
-    await call('Input.dispatchKeyEvent', { ...params, type: 'keyUp' });
+    try {
+      for (let i = 0; i <= (options.repeats || 0); i++) {
+        if(i>0&&options.beforeRepeat)await options.beforeRepeat(i);
+        await call('Input.dispatchKeyEvent', { ...params, type: 'rawKeyDown', autoRepeat: i > 0 });
+      }
+    } finally { await call('Input.dispatchKeyEvent', { ...params, type: 'keyUp' }); }
   };
   const mouse = async (button = 'left', x = 400, y = 300, clickCount = 1) => {
     const buttons = { left: 1, right: 2, middle: 4, back: 8, forward: 16 }[button];

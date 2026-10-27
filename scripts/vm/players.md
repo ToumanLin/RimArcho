@@ -39,6 +39,9 @@ Unknown controls are always skipped, even with `--allow external`. The live targ
 is classified again immediately before clicking, including during replay. Sidebar
 route classification never overrides an external or destructive toolbar operation;
 reviewed selection rows are classified independently of the mod title they display.
+Held-key repeats recheck popup policy; every double/triple click rechecks the live
+target and stops if it moves, disappears or becomes disallowed. Keyup is guaranteed
+when a held repeat is denied. Partial/cancelled clicks are listed in the trace.
 
 Local/external crawler edges run in fresh child cases: the parent state remains
 available for other controls. A child records nonundoable writes explicitly and

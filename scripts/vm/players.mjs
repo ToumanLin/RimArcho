@@ -114,7 +114,7 @@ export async function drive(ctx) {
     const entry={index:trace.length,atMs:performance.now()-started,action,started:new Date().toISOString()};
     if(logged){trace.push(entry);save('trace',{schema:1,seed,actions:trace});}
     try {
-      if(action.kind==='key')await c.key(action.combo,{repeats:action.repeats||0});
+      if(action.kind==='key')await c.key(action.combo,{repeats:action.repeats||0,beforeRepeat:async()=>{const policy=classifyKey(action.combo,await read());if(!allowed(policy.tier,options.allow))throw Error('policy blocked held key repeat: '+policy.reason);}});
       else if(action.kind==='text')await c.call('Input.insertText',{text:action.text});
       else if(action.kind==='wheel')await c.call('Input.dispatchMouseEvent',{type:'mouseWheel',x:action.x||700,y:action.y||420,deltaX:0,deltaY:action.delta||420});
       else if(action.kind==='branch'){
@@ -133,7 +133,16 @@ export async function drive(ctx) {
         if(entry.functionalStatus!=='passed')fail('isolated branch',{control:action.control,error:entry.error,output:entry.branchOutput});
       }
       else {
-        for(let n=1;n<=(action.count||1);n++)await c.mouse(action.button||'left',pointer.x,pointer.y,n);
+        for(let n=1;n<=(action.count||1);n++){
+          if(n>1){
+            const p=await point(action),actual=p&&await targetControl(action),policy=actual&&classify(actual,await read());
+            if(!p||Math.abs(p.x-pointer.x)>2||Math.abs(p.y-pointer.y)>2||!policy||!allowed(policy.tier,options.allow)){
+              entry.cancelledRepeats={from:n,reason:'target moved, disappeared or changed to a disallowed tier'};break;
+            }
+            (entry.repeatTargets||=[]).push({click:n,tier:policy.tier,label:actual.label,locator:actual.locator});
+          }
+          await c.mouse(action.button||'left',pointer.x,pointer.y,n);entry.issuedClicks=n;
+        }
       }
       if(action.delayMs)await sleep(action.delayMs);
       entry.finishedMs=performance.now()-started;

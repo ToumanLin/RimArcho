@@ -35,3 +35,11 @@ test('Space, Backslash, Shift, held keys and left/right clicks produce real prot
 });
 test('protocol errors and timeouts reject, never silently succeed',async t=>{const {c}=await mock(t);await assert.rejects(c.call('test.error'),/fixture protocol error/);await assert.rejects(c.call('test.hang',{},25),/timed out/);});
 test('disconnect rejects every pending call',async t=>{const {c}=await mock(t);const waiting=assert.rejects(c.call('test.hang'),/disconnect/);await assert.rejects(c.call('test.disconnect'),/disconnect/);await waiting;});
+
+test('a denied held repeat releases the physical key and sends no extra keydown',async t=>{
+  const {c,received}=await mock(t);
+  await assert.rejects(c.key('Space',{repeats:3,beforeRepeat:()=>{throw Error('dialog changed to unknown');}}),/dialog changed/);
+  const keys=received.filter(d=>d.method==='Input.dispatchKeyEvent').map(d=>d.params);
+  assert.deepEqual(keys.map(k=>k.type),['rawKeyDown','keyUp']);
+  assert.equal(keys[0].autoRepeat,false);
+});
