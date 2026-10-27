@@ -399,8 +399,8 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 	if dryRun {
 		return op, nil
 	}
-	// Other subscription kinds are ordering barriers: a Git failure must still
-	// prevent later work. Within each SteamCMD run, group by physical root/account.
+	// Git failures still prevent later work. Skipped download-page subscriptions
+	// do not split SteamCMD groups; only Git updates are ordering barriers.
 	changed := false
 	var failures []error
 	defer func() {
@@ -412,7 +412,7 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 		s := ss[i]
 		if s.Record.Kind == "steamcmd" {
 			end := i + 1
-			for end < len(ss) && ss[end].Record.Kind == "steamcmd" {
+			for end < len(ss) && ss[end].Record.Kind != "git" {
 				end++
 			}
 			account, accountErr := a.SteamCMDAccount("")
@@ -428,6 +428,9 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 			var groups []*group
 			byKey := map[groupKey]*group{}
 			for j := i; j < end; j++ {
+				if ss[j].Record.Kind != "steamcmd" {
+					continue
+				}
 				root := realOrAbs(filepath.Dir(ss[j].Folder))
 				key := groupKey{env.PathKey(root), account}
 				g := byKey[key]
@@ -456,6 +459,8 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 						if item.Record.WorkshopID == ss[j].Record.WorkshopID {
 							op.Items[j].To, op.Items[j].Result = item.To, item.Result
 							op.Items[j].Record, op.Items[j].Links = item.Record, item.Links
+							delete(a.subscriptionCache, ss[j].Folder)
+							delete(a.subscriptionCache, realOrAbs(ss[j].Folder))
 							changed = changed || item.To != ""
 						}
 					}

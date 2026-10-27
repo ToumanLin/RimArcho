@@ -164,11 +164,14 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 	if err != nil {
 		return nil, err
 	}
+	registrationRoot, activeSource := root, false
 	for _, s := range ss {
-		if s.Status == source.StatusRetired {
+		if s.Kind == source.SteamCMD && samePath(root, s.Root) {
+			registrationRoot = s.Root
+			activeSource = activeSource || s.Status != source.StatusRetired
 			continue
 		}
-		if s.Kind == source.SteamCMD && samePath(root, s.Root) {
+		if s.Status == source.StatusRetired {
 			continue
 		}
 		if directoriesOverlap(checkDir, s.Root) {
@@ -257,12 +260,14 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 			continue
 		}
 		delete(a.subscriptionCache, it.Folder)
+		delete(a.subscriptionCache, realOrAbs(it.Folder))
+		delete(a.subscriptionCache, filepath.Join(registrationRoot, id))
 		it.To, it.Result = it.Record.Installed, "downloaded with SteamCMD"
 		changed = true
 	}
 	if changed {
-		if !existing {
-			if _, err := a.FolderAdd(source.SteamCMD, root); err != nil {
+		if !activeSource {
+			if _, err := a.FolderAdd(source.SteamCMD, registrationRoot); err != nil {
 				return op, errors.Join(append(errs, err)...)
 			}
 		}

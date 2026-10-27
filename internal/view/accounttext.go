@@ -103,6 +103,7 @@ func init() {
 		"access denied":                                  "没有访问权限",
 		"Steam request timed out":                        "Steam 请求超时",
 		"Steam service unavailable":                      "Steam 服务暂不可用",
+		"Steam account has insufficient privileges":      "Steam 账号权限不足",
 		"Steam request limit exceeded":                   "Steam 请求已达限额",
 		"Steam access revoked":                           "Steam 访问权已撤销",
 		"Steam account restricted":                       "Steam 账号受限",

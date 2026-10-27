@@ -15,8 +15,10 @@ func WorkshopResultText(code int) string {
 	case 20:
 		return "Steam service unavailable"
 	case 24:
-		return "Steam request limit exceeded"
+		return "Steam account has insufficient privileges"
 	case 25:
+		return "Steam request limit exceeded"
+	case 26:
 		return "Steam access revoked"
 	case 41:
 		return "Steam account restricted"

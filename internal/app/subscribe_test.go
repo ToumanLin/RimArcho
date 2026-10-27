@@ -373,8 +373,8 @@ func TestUpdateWorkshopGroups(t *testing.T) {
 	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
 	var calls [][]string
 	var bases []string
-	e.App.SteamCMDRun = func(_ string, args []string) (string, error) {
-		ids := workshopScriptIDs(t, args)
+	e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
+		ids := workshopScriptIDs(t, exe, args)
 		calls = append(calls, ids)
 		bases = append(bases, args[1])
 		if args[3] != "anonymous" {
@@ -433,8 +433,9 @@ func TestUpdateWorkshopGroups(t *testing.T) {
 }
 
 func TestUpdateWorkshopGitOrdering(t *testing.T) {
-	for _, failingGit := range []bool{false, true} {
-		t.Run(fmt.Sprint(failingGit), func(t *testing.T) {
+	for _, tc := range []struct{ failingGit, failingSteam bool }{{}, {true, false}, {false, true}, {true, true}} {
+		t.Run(fmt.Sprintf("git=%v/steam=%v", tc.failingGit, tc.failingSteam), func(t *testing.T) {
+			failingGit := tc.failingGit
 			e := setup(t, true)
 			g := testkit.NewGitRepo(t, "")
 			gitOp, err := e.App.SubscribeGit(g.Bare, "branch", "main", false)
@@ -464,8 +465,8 @@ func TestUpdateWorkshopGitOrdering(t *testing.T) {
 			}
 			e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
 			var calls [][]string
-			e.App.SteamCMDRun = func(_ string, args []string) (string, error) {
-				ids := workshopScriptIDs(t, args)
+			e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
+				ids := workshopScriptIDs(t, exe, args)
 				calls = append(calls, ids)
 				if len(calls) == 1 {
 					if gitHead(t, gitOp.Items[0].Folder) != g.First {
@@ -473,6 +474,9 @@ func TestUpdateWorkshopGitOrdering(t *testing.T) {
 					}
 				} else if gitHead(t, gitOp.Items[0].Folder) != next {
 					t.Fatal("later SteamCMD group ran before Git")
+				}
+				if tc.failingSteam && len(calls) == 1 {
+					return "ERROR! Download item 8100 failed (AccessDenied)", nil
 				}
 				p := filepath.Join(args[1], "steamapps", "workshop", "content", "294100", ids[0])
 				e.WriteFile(filepath.Join(p, "updated.xml"), "<Defs/>")
@@ -483,14 +487,134 @@ func TestUpdateWorkshopGitOrdering(t *testing.T) {
 				if err == nil || !strings.Contains(err.Error(), "dirty") || len(calls) != 1 {
 					t.Fatalf("Git error boundary: %v calls %v", err, calls)
 				}
-			} else if err != nil || len(calls) != 2 {
+			} else if len(calls) != 2 || (err != nil) != tc.failingSteam {
 				t.Fatalf("Git ordering: %v calls %v", err, calls)
 			}
-			if !slices.Equal(calls[0], []string{"8100"}) || op.Items[0].To == "" {
-				t.Fatalf("preceding success lost: %+v", op)
+			if !slices.Equal(calls[0], []string{"8100"}) {
+				t.Fatalf("preceding group: %+v", op)
 			}
-			if _, err := subscribe.Read(op.Items[0].Folder); err != nil {
+			if tc.failingSteam {
+				if !strings.HasPrefix(op.Items[0].Result, "failed:") || op.Items[0].To != "" {
+					t.Fatalf("preceding failure lost: %+v", op)
+				}
+				if !failingGit && (op.Items[1].To != next || op.Items[2].To == "" || gitHead(t, gitOp.Items[0].Folder) != next) {
+					t.Fatalf("SteamCMD failure prevented later Git/workshop success: %+v", op)
+				}
+			} else if op.Items[0].To == "" {
+				t.Fatalf("preceding success lost: %+v", op)
+			} else if _, err := subscribe.Read(op.Items[0].Folder); err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestUpdateWorkshopGroupsAcrossSkippedPages(t *testing.T) {
+	e := setup(t, true)
+	e.WriteMod(filepath.Join(e.SteamCMD, "8100"), testkit.Sample("group.first", "A Workshop"))
+	e.WriteMod(filepath.Join(e.SteamCMD, "8200"), testkit.Sample("group.last", "C Workshop"))
+	pageDir := filepath.Join(e.App.SubscribedDir(), "page")
+	e.WriteMod(pageDir, testkit.Sample("group.page", "B Page"))
+	if err := subscribe.Write(pageDir, &subscribe.Record{Kind: "page", URL: "https://www.loverslab.com/files/file/123-fixture/"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.Store.InsertSource(&source.Source{ID: e.App.NewID(), EnvID: store.Shared, Kind: source.Extra, Label: app.SubscribedLabel, Root: e.App.SubscribedDir(), Status: source.StatusOK}); err != nil {
+		t.Fatal(err)
+	}
+	scanNow(t, e)
+	ss, err := e.App.Subscriptions()
+	if err != nil || len(ss) != 3 || ss[0].Record.Kind != "steamcmd" || ss[1].Record.Kind != "page" || ss[2].Record.Kind != "steamcmd" {
+		t.Fatalf("ordering fixture: %+v %v", ss, err)
+	}
+	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+	var calls [][]string
+	e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
+		ids := workshopScriptIDs(t, exe, args)
+		calls = append(calls, ids)
+		var out []string
+		for _, id := range ids {
+			out = append(out, "Success. Downloaded item "+id)
+		}
+		return strings.Join(out, "\n"), nil
+	}
+	op, err := e.App.UpdateSubscriptions(nil, false)
+	if err != nil || len(calls) != 1 || !slices.Equal(calls[0], []string{"8100", "8200"}) || len(op.Items) != 3 || !strings.HasPrefix(op.Items[1].Result, "skipped:") {
+		t.Fatalf("groups %v, result %+v, error %v", calls, op, err)
+	}
+}
+
+func TestUpdateWorkshopJunctionCacheAndRetiredSource(t *testing.T) {
+	for _, retired := range []bool{false, true} {
+		t.Run(fmt.Sprint(retired), func(t *testing.T) {
+			e := setup(t, false)
+			root := filepath.Join(e.Root, "cache-library", "steamapps", "workshop", "content", "294100")
+			target := filepath.Join(root, "8100")
+			e.WriteMod(target, testkit.Sample("cache.mod", "Cache Mod"))
+			if err := subscribe.Write(target, &subscribe.Record{Kind: "steamcmd", WorkshopID: "8100", Installed: e.Now().Format(time.RFC3339), InstalledAt: e.Now()}); err != nil {
+				t.Fatal(err)
+			}
+			alias := filepath.Join(e.Root, "library-alias")
+			if err := source.CreateLink(alias, root); err != nil {
+				t.Fatal(err)
+			}
+			added, err := e.App.FolderAdd(source.SteamCMD, alias)
+			if err != nil {
+				t.Fatal(err)
+			}
+			scanNow(t, e)
+			ss, err := e.App.Subscriptions()
+			if err != nil || len(ss) != 1 {
+				t.Fatalf("subscription: %+v %v", ss, err)
+			}
+			mod := *ss[0].Mod
+			mod.RealPath = filepath.Join(alias, "8100")
+			cached := e.App.SubscriptionOf(&mod)
+			if cached == nil {
+				t.Fatal("no alias provenance cached")
+			}
+			stamp, err := os.Stat(filepath.Join(target, subscribe.File))
+			if err != nil {
+				t.Fatal(err)
+			}
+			e.Advance(time.Hour)
+			e.App.FindTool = func(string) (string, bool) {
+				if retired {
+					added.Source.Status = source.StatusRetired
+					if err := e.App.Store.UpdateSource(added.Source); err != nil {
+						t.Fatal(err)
+					}
+				}
+				return filepath.Join(e.Root, "steamcmd.exe"), true
+			}
+			e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
+				workshopScriptIDs(t, exe, args)
+				return "Success. Downloaded item 8100", nil
+			}
+			if _, err := e.App.UpdateSubscriptions([]string{ss[0].Ref}, false); err != nil {
+				t.Fatal(err)
+			}
+			newStamp, err := os.Stat(filepath.Join(target, subscribe.File))
+			if err != nil || newStamp.Size() != stamp.Size() {
+				t.Fatalf("cache fixture must keep record size: %v %v", newStamp, err)
+			}
+			if err := os.Chtimes(filepath.Join(target, subscribe.File), stamp.ModTime(), stamp.ModTime()); err != nil {
+				t.Fatal(err)
+			}
+			if got := e.App.SubscriptionOf(&mod); got == nil || got.Installed != e.Now().Format(time.RFC3339) || got.Installed == cached.Installed {
+				t.Fatalf("stale alias cache: %+v", got)
+			}
+			folders, err := e.App.Folders()
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, folder := range folders {
+				if folder.ID == added.Source.ID {
+					found = folder.Status != source.StatusRetired
+				}
+			}
+			if !found {
+				t.Fatal("existing source was not reactivated")
 			}
 		})
 	}

@@ -195,7 +195,7 @@ func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 	if !found || len(row.Failures) != 10 {
 		t.Fatal(row)
 	}
-	for _, code := range []int{2, 15, 16, 20, 24, 25, 41, 84, 999} {
+	for _, code := range []int{2, 15, 16, 20, 24, 25, 26, 41, 84, 999} {
 		text := view.Text(app.WorkshopResultText(code))
 		if text == "" || strings.Contains(text, "result ") {
 			t.Fatal(code, text)
