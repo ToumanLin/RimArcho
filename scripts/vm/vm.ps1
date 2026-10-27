@@ -17,7 +17,7 @@ param(
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Rest = @(),
     [string]$VMX = 'D:\VMs\Player-Test\Win11-Player-Test.vmx',
     [string]$Wrapper = 'D:\VMs\Setup\Invoke-VMRun.ps1',
-    [string]$Transfer = 'D:\VMs\Transfer\rimarcho',
+    [string]$Transfer = 'D:\RimArcho-test\transfer\rimarcho',
     [string]$GuestDir = 'C:\Users\Public\Documents\VM-Test\RimArcho',
     [int]$DevToolsPort = 9222,   # inside the guest, on 127.0.0.1
     [int]$ForwardPort = 9223,    # what the host connects to

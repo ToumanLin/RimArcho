@@ -34,13 +34,17 @@ function classifyBase(control, state={}) {
   if(control.action?.kind==='key') return classifyKey(control.action.combo,state);
   if(control.action?.kind==='wheel') return {tier:'safe',reason:'real scrolling'};
   const id=control.identity||{}, cmd=id['data-cmd'] || id['data-op'] || '', write=id['data-env-write'], text=control.label?.trim().toLowerCase()||'';
+  if(control.semantics?.some(x=>['breadcrumb','table-header','plan-choice','export-format','appearance','filter-choice'].includes(x)))return {tier:'safe',reason:'reviewed UI navigation/view control: '+control.semantics.join(', ')};
+  if(control.owner==='nav'&&id['data-id']==='subscribe')return {tier:'safe',reason:'open subscription form without submitting or previewing a URL'};
+  if(id['data-act']==='goto')return {tier:'safe',reason:'task result navigation'};
+  if(id['data-act']==='forget')return {tier:'local-destructive',reason:'remove task record in isolated DB'};
   if(control.owner==='popup'&&state.popupTitle==='lists'&&state.plans?.some(p=>text===p.name.toLowerCase()||text.startsWith(p.name.toLowerCase()+' ')))return {tier:'safe',reason:'known list choice from the observed shell'};
   if(id['data-game']||id['data-id']?.startsWith('game|')||id['data-id']?.startsWith('row|')||/use this (?:one|;)|switch to .* and use/.test(text))return {tier:'local-destructive',reason:'apply list/game selection may change active environment or deployment links'};
   if(control.href && !control.href.startsWith('#')) return {tier:'external',reason:'link opens a browser or network target'};
   // Mod titles may contain 'Steam', 'download' or 'RimWorld'. A reviewed
   // selection row is distinct from an operation nested inside that row.
   if(control.row&&!cmd&&!write)return {tier:'safe',reason:'reviewed row selection/context'};
-  if(control.inputType==='file' || /(?:save as|choose|browse|select) (?:a |the )?(?:file|folder|directory)|open.*(?:browser|steam|folder)|launch|rimworld|steamcmd|download|subscribe|unsubscribe|resubscribe|check for updates|refresh.*(?:workshop|steam)|工坊|启动游戏|下载|退订|订阅/.test(text)) return {tier:'external',reason:'native picker, external app or network operation'};
+  if(control.inputType==='file' || /(?:save as|choose|browse|select) (?:a |the )?(?:file|folder|directory)|open.*(?:browser|steam|folder)|launch|rimworld|steamcmd|download|subscribe|unsubscribe|resubscribe|check for updates|refresh.*(?:workshop|steam)|workshop|steam page|web page|ctrl\+s|工坊|启动游戏|下载|退订|订阅/.test(text)) return {tier:'external',reason:'native picker, external app or network operation'};
   if(externalCommands.has(cmd)||externalCommands.has(write)||/subscribe|steam|download|launch|network|browse|file-picker/.test(write||''))return {tier:'external',reason:'external operation '+(cmd||write)};
   // A cancel remains safe even inside a destructive confirmation.
   if(/^(?:cancel|close|back|skip for now|no|取消|关闭|返回|否|×|✕|←)(?:\s|$)/.test(text))return {tier:'safe',reason:'dismissal'};

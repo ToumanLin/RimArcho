@@ -46,3 +46,10 @@ test('shared baseline blocks file/deployment writes while permitting private pla
   assert.equal(allowed(classify({identity:{'data-env-write':'plan-unfollow'},label:'stop following'},state),'local'),true);
   const steam=classify({identity:{'data-env-write':'subscription-update'},label:'download'},state);assert.equal(steam.tier,'external');assert.equal(allowed(steam,'external'),false);
 });
+
+test('opening subscription UI and choosing export formats do not submit external operations',()=>{
+ assert.equal(classify({owner:'nav',identity:{'data-id':'subscribe'},label:'add a subscription'}).tier,'safe');
+ assert.equal(classify({semantics:['export-format'],label:'Workshop links',identity:{}}).tier,'safe');
+ assert.equal(classify({label:'look for it in the Workshop',identity:{}}).tier,'external');
+ assert.equal(classify({identity:{'data-env-write':'subscribe'},label:'subscribe'}).tier,'external');
+});
