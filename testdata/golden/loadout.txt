@@ -22,6 +22,7 @@ workspace: 7 active, saved (plan:default, env:main)
 
 $ archo sort --dry-run
 sort: 2 moved (dry run; the workspace is unchanged)
+  missing mod: pkg:gone.mod gone.mod (installed: false; can enable: false; workshop: )
   moved  #6olp  Harmony             4 → 1
   moved  #hnyg  Versioned Mod 版本  1 → 3
   why (order constraints the list broke; strong ones go with more errors):
@@ -50,6 +51,7 @@ rules: 1 (env:main)
 
 $ archo sort
 sort: 3 moved (applied to the workspace; not saved)
+  missing mod: pkg:gone.mod gone.mod (installed: false; can enable: false; workshop: )
   moved  #6olp  Harmony             4 → 1
   moved  #hnyg  Versioned Mod 版本  1 → 3
   moved  #qfph  X                   5 → 6

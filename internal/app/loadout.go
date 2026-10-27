@@ -785,16 +785,13 @@ func (a *App) Swap(ref, with string) (*EditResult, error) {
 
 // SortResult is the outcome of Sort.
 type SortResult struct {
-	MissingDependencies []MissingDependency
-	MissingMods         []MissingMod
-	Replacements        []ReplacementSuggestion
-	Cycles              []SortCycle
-	State               *LoadoutState
-	Input               order.Input
-	Result              order.Result
-	Sorted              loadout.List
-	Changes             []loadout.Change
-	Applied             bool
+	SortNotices
+	State   *LoadoutState
+	Input   order.Input
+	Result  order.Result
+	Sorted  loadout.List
+	Changes []loadout.Change
+	Applied bool
 }
 
 // Community loads community rules from <home>/cache/communityRules.json (04 §6.3).

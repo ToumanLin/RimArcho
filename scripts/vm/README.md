@@ -36,7 +36,8 @@ It prints only `PASS` / `FAIL` lines and exits with the number of failures; noth
 | --- | --- |
 | The page, as the player sees it | `node scripts/vm/cdp.mjs <ip>:9223 shot page.png` |
 | The whole guest screen | `pwsh scripts/vm/vm.ps1 shot screen.png` |
-| Run JS in the page, read state, click | `node scripts/vm/cdp.mjs <ip>:9223 eval "document.querySelector('.x').click(), 1"` |
+| Click a visible control with real input | `node scripts/vm/cdp.mjs <ip>:9223 click "#nav [data-id=home]"` |
+| Observe page state | `node scripts/vm/cdp.mjs <ip>:9223 eval "document.title"` |
 | A key press | `node scripts/vm/cdp.mjs <ip>:9223 key "Shift+Digit2"` |
 | A CLI command in the guest | `pwsh scripts/vm/vm.ps1 cli "env detect"` |
 | Any PowerShell script in the guest | `pwsh scripts/vm/vm.ps1 exec check.ps1` |
@@ -52,3 +53,8 @@ DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players neve
 - Files copied in by VMware Tools have no download mark, so SmartScreen warnings aren't tested.
 - The guest has no GPU driver; game performance is checked on a real machine.
 - Leftovers in the guest: `C:\Users\Public\Documents\VM-Test`, `%APPDATA%\RimArcho` and `%LOCALAPPDATA%\RimArcho` of the user who ran it. Delete the last two for a first run again.
+
+
+## Phase 1a local and CI scenarios
+
+The [Phase 1a runbook](phase1a.md) covers the build, deterministic fixture, private real-data backup, scenarios 1–4, canonical comparisons, budget interpretation and VM hook. Results and test homes default to the OS temporary directory. A nonzero exit includes functional **or** performance failures; inspect both arrays in `result.json`.

@@ -21,6 +21,7 @@ param(
     [string]$GuestDir = 'C:\Users\Public\Documents\VM-Test\RimArcho',
     [int]$DevToolsPort = 9222,   # inside the guest, on 127.0.0.1
     [int]$ForwardPort = 9223,    # what the host connects to
+    [switch]$Interactive,       # exec: run a window runner in the signed-in desktop session
     [switch]$StandardUser        # run guest programs as 新玩家 instead of the logged-in Player
 )
 $ErrorActionPreference = 'Stop'
@@ -148,7 +149,7 @@ Start-Process -FilePath '$GuestDir\RimArcho.exe' -WorkingDirectory '$GuestDir'
         ToGuest (Join-Path $Transfer $inner) "$work\$inner"
         # Native programs write UTF-8 (archo) or the console code page; read them as UTF-8.
         "[Console]::OutputEncoding = [Text.Encoding]::UTF8; `$OutputEncoding = [Text.Encoding]::UTF8; & '$work\$inner' *>&1 | Out-File -Encoding UTF8 '$res'" | Set-Content -Encoding UTF8 $s
-        PS1InGuest $s
+        PS1InGuest $s -Interactive:$Interactive
         FromGuest $res (Join-Path $Transfer 'exec-out.txt')
         Get-Content -Encoding UTF8 (Join-Path $Transfer 'exec-out.txt')
     }
