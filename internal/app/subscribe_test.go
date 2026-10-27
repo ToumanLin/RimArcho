@@ -2,9 +2,11 @@ package app_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -321,5 +323,175 @@ func TestSubscribedDirectoryMove(t *testing.T) {
 	scanNow(t, e)
 	if r := e.App.SubscriptionOf(one(t, e, "Git Mod")); r == nil || r.Installed != g.First {
 		t.Fatalf("moved record: %+v", r)
+	}
+}
+
+func TestUpdateWorkshopGroups(t *testing.T) {
+	e := setup(t, true)
+	roots := []string{
+		filepath.Join(e.Root, "batch library A", "steamapps", "workshop", "content", "294100"),
+		filepath.Join(e.Root, "batch library B", "steamapps", "workshop", "content", "294100"),
+	}
+	for _, root := range roots {
+		for i := 1; i <= 27; i++ {
+			id := fmt.Sprint(8000 + i)
+			e.WriteMod(filepath.Join(root, id), testkit.Sample("group.mod"+id, "Group "+id))
+		}
+		if _, err := e.App.FolderAdd(source.SteamCMD, root); err != nil {
+			t.Fatal(err)
+		}
+	}
+	scanNow(t, e)
+	ss, err := e.App.Subscriptions()
+	if err != nil || len(ss) != 54 {
+		t.Fatalf("initial subscriptions: %d %v", len(ss), err)
+	}
+	var refs []string
+	// Interleave roots: each root must remain its own queue, in first-seen order.
+	for i := 1; i <= 27; i++ {
+		for _, root := range roots {
+			for _, sub := range ss {
+				realRoot, err := source.RealPath(root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if strings.EqualFold(filepath.Base(sub.Folder), fmt.Sprint(8000+i)) && strings.EqualFold(filepath.Dir(sub.Folder), realRoot) {
+					refs = append(refs, sub.Ref)
+				}
+			}
+		}
+	}
+	if len(refs) != 54 {
+		t.Fatalf("references: %v", refs)
+	}
+	// Managed incoming links survive a partial failure in the same source.
+	incoming := filepath.Join(e.Game, "Mods", "_Archo_group-test")
+	target := filepath.Join(roots[0], "8001")
+	if err := source.CreateLink(incoming, target); err != nil {
+		t.Fatal(err)
+	}
+	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+	var calls [][]string
+	var bases []string
+	e.App.SteamCMDRun = func(_ string, args []string) (string, error) {
+		ids := workshopScriptIDs(t, args)
+		calls = append(calls, ids)
+		bases = append(bases, args[1])
+		if args[3] != "anonymous" {
+			t.Fatalf("effective account: %v", args)
+		}
+		if source.IsLink(incoming) && len(calls) <= 2 {
+			t.Fatal("incoming link not detached during group")
+		}
+		var out []string
+		for _, id := range ids {
+			if id == "8002" && len(calls) == 1 {
+				out = append(out, "ERROR! Download item "+id+" failed (AccessDenied).")
+				continue
+			}
+			p := filepath.Join(args[1], "steamapps", "workshop", "content", "294100", id)
+			e.WriteFile(filepath.Join(p, "updated.xml"), "<Defs/>")
+			out = append(out, "Success. Downloaded item "+id)
+		}
+		return strings.Join(out, "\n"), nil
+	}
+	var before int
+	if err := e.App.Store.DB.QueryRow("SELECT count(*) FROM scan").Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.UpdateSubscriptions(refs, true); err != nil || len(calls) != 0 {
+		t.Fatalf("dry run: %v", err)
+	}
+	op, err := e.App.UpdateSubscriptions(refs, false)
+	if err == nil || !strings.Contains(err.Error(), "8002") {
+		t.Fatalf("partial failure: %v", err)
+	}
+	if len(calls) != 4 || len(calls[0]) != 25 || len(calls[1]) != 2 || len(calls[2]) != 25 || len(calls[3]) != 2 || bases[0] != bases[1] || bases[2] != bases[3] || bases[0] == bases[2] {
+		t.Fatalf("groups: %v, bases %v", calls, bases)
+	}
+	var after int
+	if err := e.App.Store.DB.QueryRow("SELECT count(*) FROM scan").Scan(&after); err != nil || after-before != 1 {
+		t.Fatalf("scan delta %d: %v", after-before, err)
+	}
+	for i, item := range op.Items {
+		if item.Ref != refs[i] || item.ID == "" {
+			t.Fatalf("result order: %+v", item)
+		}
+		if i == 2 {
+			if !strings.HasPrefix(item.Result, "failed:") || item.To != "" {
+				t.Fatalf("failure: %+v", item)
+			}
+		} else if item.To == "" || item.Result != "downloaded with SteamCMD" {
+			t.Fatalf("lost success: %+v", item)
+		}
+	}
+	resolved, err := source.RealPath(incoming)
+	want, _ := source.RealPath(target)
+	if err != nil || !strings.EqualFold(resolved, want) {
+		t.Fatalf("incoming link not restored: %s %v", resolved, err)
+	}
+}
+
+func TestUpdateWorkshopGitOrdering(t *testing.T) {
+	for _, failingGit := range []bool{false, true} {
+		t.Run(fmt.Sprint(failingGit), func(t *testing.T) {
+			e := setup(t, true)
+			g := testkit.NewGitRepo(t, "")
+			gitOp, err := e.App.SubscribeGit(g.Bare, "branch", "main", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			next := g.Commit(t, "Defs/Updated.xml", "<Defs/>")
+			for _, id := range []string{"8100", "8200"} {
+				e.WriteMod(filepath.Join(e.SteamCMD, id), testkit.Sample("ordering.mod"+id, id))
+			}
+			scanNow(t, e)
+			ss, err := e.App.Subscriptions()
+			if err != nil {
+				t.Fatal(err)
+			}
+			refs := []string{"", gitOp.Items[0].Ref, ""}
+			for _, sub := range ss {
+				if sub.Record.WorkshopID == "8100" {
+					refs[0] = sub.Ref
+				}
+				if sub.Record.WorkshopID == "8200" {
+					refs[2] = sub.Ref
+				}
+			}
+			if failingGit {
+				e.WriteFile(filepath.Join(gitOp.Items[0].Folder, "About", "About.xml"), "player changes")
+			}
+			e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+			var calls [][]string
+			e.App.SteamCMDRun = func(_ string, args []string) (string, error) {
+				ids := workshopScriptIDs(t, args)
+				calls = append(calls, ids)
+				if len(calls) == 1 {
+					if gitHead(t, gitOp.Items[0].Folder) != g.First {
+						t.Fatal("Git ran before preceding SteamCMD group")
+					}
+				} else if gitHead(t, gitOp.Items[0].Folder) != next {
+					t.Fatal("later SteamCMD group ran before Git")
+				}
+				p := filepath.Join(args[1], "steamapps", "workshop", "content", "294100", ids[0])
+				e.WriteFile(filepath.Join(p, "updated.xml"), "<Defs/>")
+				return "Success. Downloaded item " + ids[0], nil
+			}
+			op, err := e.App.UpdateSubscriptions(refs, false)
+			if failingGit {
+				if err == nil || !strings.Contains(err.Error(), "dirty") || len(calls) != 1 {
+					t.Fatalf("Git error boundary: %v calls %v", err, calls)
+				}
+			} else if err != nil || len(calls) != 2 {
+				t.Fatalf("Git ordering: %v calls %v", err, calls)
+			}
+			if !slices.Equal(calls[0], []string{"8100"}) || op.Items[0].To == "" {
+				t.Fatalf("preceding success lost: %+v", op)
+			}
+			if _, err := subscribe.Read(op.Items[0].Folder); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

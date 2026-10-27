@@ -300,7 +300,7 @@ type DownloadProgress struct {
 
 // DownloadError is a failed download in plain words.
 type DownloadError struct {
-	Kind string // ownership | anonymous-license | anonymous-login | password | guard | disk | branch | network | login | other
+	Kind string // ownership | anonymous-license | anonymous-login | password | guard | permission | disk | branch | network | login | other
 	Line string // SteamCMD's line
 }
 
@@ -322,6 +322,8 @@ func (e *DownloadError) Why() string {
 		why = "Steam did not accept the password"
 	case "guard":
 		why = "Steam did not accept the Steam Guard code"
+	case "permission":
+		why = "this content is private, unavailable, or access was denied; check account access"
 	case "disk":
 		why = "the disk is full (or the folder cannot be written)"
 	case "branch":
@@ -674,13 +676,21 @@ func (r *steamResult) read(line string) (DownloadProgress, bool) {
 
 func errorKind(low string) string {
 	switch {
-	case strings.Contains(low, "no subscription") || strings.Contains(low, "not own") || strings.Contains(low, "no license"):
+	case strings.Contains(low, "invalid password") || strings.Contains(low, "invalidpassword"):
+		return "password"
+	case strings.Contains(low, "two-factor") || strings.Contains(low, "logon denied") || strings.Contains(low, "invalidauthcode") || strings.Contains(low, "invalidloginauthcode") || strings.Contains(low, "steam guard"):
+		return "guard"
+	case strings.Contains(low, "failed to log in") || strings.Contains(low, "failed to login") || strings.Contains(low, "login failure") || strings.Contains(low, "account disabled"):
+		return "login"
+	case strings.Contains(low, "access denied") || strings.Contains(low, "accessdenied") || strings.Contains(low, "permission") || strings.Contains(low, "private") || strings.Contains(low, "not visible") || strings.Contains(low, "file not found") || strings.Contains(low, "filenotfound"):
+		return "permission"
+	case strings.Contains(low, "no subscription") || strings.Contains(low, "not own") || strings.Contains(low, "no license") || strings.Contains(low, "nosubscription"):
 		return "ownership"
 	case strings.Contains(low, "disk") || strings.Contains(low, "space") || strings.Contains(low, "write failure"):
 		return "disk"
 	case strings.Contains(low, "beta") || strings.Contains(low, "branch"):
 		return "branch"
-	case strings.Contains(low, "timeout") || strings.Contains(low, "no connection") || strings.Contains(low, "network"):
+	case strings.Contains(low, "timeout") || strings.Contains(low, "timed out") || strings.Contains(low, "no connection") || strings.Contains(low, "noconnection") || strings.Contains(low, "network") || strings.Contains(low, "connect failed") || strings.Contains(low, "connection failed") || strings.Contains(low, "connection failure") || strings.Contains(low, "connection reset") || strings.Contains(low, "not connected") || strings.Contains(low, "failed to connect") || strings.Contains(low, "could not connect") || strings.Contains(low, "connection lost"):
 		return "network"
 	}
 	return "other"

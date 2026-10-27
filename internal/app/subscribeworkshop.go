@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -115,12 +114,17 @@ func (a *App) SubscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool) (*S
 	return a.downloadWorkshop(ids, "", false)
 }
 
-var workshopSuccess = regexp.MustCompile(`Success\. Downloaded item (\d+)`)
-var workshopFailure = regexp.MustCompile(`ERROR! Download item (\d+) failed(?: \(([^\r\n]*)\))?`)
-
 // downloadWorkshop uses the same runner/account policy as game downloads. root is
 // the existing source during updates; new subscriptions use the configured root.
 func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *SubscribeOp, downloadErr error) {
+	account, err := a.SteamCMDAccount("")
+	if err != nil {
+		return nil, err
+	}
+	return a.downloadWorkshopGroup(ids, root, account, dryRun, true)
+}
+
+func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, refresh bool) (result *SubscribeOp, downloadErr error) {
 	if err := a.refuseSubscriptionGameRunning(); err != nil {
 		return nil, err
 	}
@@ -132,10 +136,7 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *
 		}
 		return nil, fmt.Errorf("install SteamCMD in Settings; Workshop pages: %s", strings.Join(urls, " "))
 	}
-	account, err := a.SteamCMDAccount("")
-	if err != nil {
-		return nil, err
-	}
+	var err error
 	base := a.SteamCMDModsDir()
 	relocate := false
 	existing := root != ""
@@ -207,13 +208,11 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return nil, err
 	}
-	args := []string{"+force_install_dir", base, "+login", account}
-	for _, id := range ids {
-		args = append(args, "+workshop_download_item", env.WorkshopAppID, id)
-	}
-	args = append(args, "+quit")
 	if incoming != nil && !relocate {
 		if err := a.beginLinkLifecycle(incoming); err != nil {
+			for i := range op.Items {
+				op.Items[i].Result = "failed: " + err.Error()
+			}
 			return op, err
 		}
 	}
@@ -223,16 +222,7 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *
 			downloadErr = a.abortLinkLifecycle(incoming, downloadErr)
 		}
 	}()
-	out, runErr := a.runWorkshopSteamCMD(exe, args, account != "anonymous")
-	okIDs := map[string]bool{}
-	for _, m := range workshopSuccess.FindAllStringSubmatch(out, -1) {
-		okIDs[m[1]] = true
-	}
-	failures := map[string]string{}
-	for _, m := range workshopFailure.FindAllStringSubmatch(out, -1) {
-		failures[m[1]] = (&DownloadError{Kind: errorKind(strings.ToLower(m[2]))}).Why()
-		delete(okIDs, m[1])
-	}
+	outcomes, runErr := a.runWorkshopBatches(exe, base, account, ids)
 	var errs []error
 	if runErr != nil {
 		errs = append(errs, runErr)
@@ -240,11 +230,8 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *
 	changed := false
 	for i, id := range ids {
 		it := &op.Items[i]
-		if !okIDs[id] {
-			why := failures[id]
-			if why == "" {
-				why = "download was not confirmed"
-			}
+		if outcome := outcomes[id]; !outcome.confirmed {
+			why := outcome.why()
 			it.Result = "failed: " + why
 			errs = append(errs, fmt.Errorf("SteamCMD item %s: %s; %s", id, why, workshopURL(id)))
 			continue
@@ -252,17 +239,20 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *
 		if relocate {
 			downloaded := filepath.Join(base, "steamapps", "workshop", "content", env.WorkshopAppID, id)
 			if err := a.replaceWorkshopImport(downloaded, it.Folder); err != nil {
+				it.Result = "failed: " + err.Error()
 				errs = append(errs, err)
 				continue
 			}
 		}
 		if source.AboutState(it.Folder) != source.AboutPresent {
+			it.Result = "failed: no About/About.xml"
 			errs = append(errs, fmt.Errorf("SteamCMD item %s has no About/About.xml at %s", id, it.Folder))
 			continue
 		}
 		now := a.Now()
 		it.Record.Installed, it.Record.InstalledAt = now.Format(time.RFC3339), now
 		if err := subscribe.Write(it.Folder, it.Record); err != nil {
+			it.Result = "failed: " + err.Error()
 			errs = append(errs, err)
 			continue
 		}
@@ -271,21 +261,14 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *
 		changed = true
 	}
 	if changed {
-		if _, err := a.FolderAdd(source.SteamCMD, root); err != nil {
-			return op, errors.Join(append(errs, err)...)
+		if !existing {
+			if _, err := a.FolderAdd(source.SteamCMD, root); err != nil {
+				return op, errors.Join(append(errs, err)...)
+			}
 		}
-		if _, err := a.Scan(false); err != nil {
-			return op, errors.Join(append(errs, err)...)
-		}
-		ix, err := a.Index()
-		if err != nil {
-			return op, err
-		}
-		for i := range op.Items {
-			for _, m := range ix.Mods {
-				if subscriptionSource(m) && samePath(ix.ModDir(m), op.Items[i].Folder) {
-					op.Items[i].ID, op.Items[i].Ref = m.ID, ix.Ref(m.ID)
-				}
+		if refresh {
+			if err := a.refreshWorkshop(op); err != nil {
+				return op, errors.Join(append(errs, err)...)
 			}
 		}
 	}
@@ -299,6 +282,24 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *
 		}
 	}
 	return op, nil
+}
+
+func (a *App) refreshWorkshop(op *SubscribeOp) error {
+	if _, err := a.Scan(false); err != nil {
+		return err
+	}
+	ix, err := a.Index()
+	if err != nil {
+		return err
+	}
+	for i := range op.Items {
+		for _, m := range ix.Mods {
+			if subscriptionSource(m) && samePath(ix.ModDir(m), op.Items[i].Folder) {
+				op.Items[i].ID, op.Items[i].Ref = m.ID, ix.Ref(m.ID)
+			}
+		}
+	}
+	return nil
 }
 
 func (a *App) replaceWorkshopImport(from, target string) error {

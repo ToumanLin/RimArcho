@@ -112,10 +112,12 @@ type App struct {
 	// SteamCMDStart and SteamCMDRun replace starting SteamCMD (tests fake it, 08 §11);
 	// SteamCMDZip replaces Valve's download URL, SteamCMDPoll how often its log is read,
 	// SteamCMDNoPath leaves PATH out when looking for it.
-	SteamCMDStart  func(exe string, args []string, console bool) (SteamCMDProc, error)
-	SteamCMDRun    func(exe string, args []string) (string, error)
-	SteamCMDZip    string
-	SteamCMDPoll   time.Duration
+	SteamCMDStart func(exe string, args []string, console bool) (SteamCMDProc, error)
+	SteamCMDRun   func(exe string, args []string) (string, error)
+	SteamCMDZip   string
+	SteamCMDPoll  time.Duration
+	// SteamCMDWait replaces the Workshop retry backoff in tests; nil uses time.Sleep.
+	SteamCMDWait   func(time.Duration)
 	SteamCMDNoPath bool
 	HTTP           *http.Client
 	// FindTool delegates dependency lookup; subscriptions never install tools.
