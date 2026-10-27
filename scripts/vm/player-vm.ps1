@@ -16,7 +16,6 @@ param(
  [string]$GuestRoot = 'C:\Users\Public\Documents\VM-Test',
  [ValidateSet('true','false')][string]$Shrink = 'false',
  [switch]$Probe,
- [switch]$DesktopLaunch,
  [switch]$StandardUser,
  [switch]$BundleOnly
 )
@@ -123,23 +122,14 @@ $scriptFile = Join-Path $transfer 'run-player.ps1'
 # Create the run directory before guest execution; the script itself is BOM encoded.
 $guestScript = "New-Item -ItemType Directory -Force $(Literal $guestRun) | Out-Null`r`n" + $guestScript
 [IO.File]::WriteAllText($scriptFile,$guestScript,[Text.UTF8Encoding]::new($true))
-@{run=$runName;build=$build;zipHash=$zipHash;mode=$Mode;seed=$Seed;steps=$Steps;minutes=$Minutes;allow=$Allow;guestBaseline=$GuestBaseline;bundleOnly=[bool]$BundleOnly;seedCount=$SeedCount;desktopLaunch=[bool]$DesktopLaunch} | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $transfer 'host.json')
+@{run=$runName;build=$build;zipHash=$zipHash;mode=$Mode;seed=$Seed;steps=$Steps;minutes=$Minutes;allow=$Allow;guestBaseline=$GuestBaseline;bundleOnly=[bool]$BundleOnly;seedCount=$SeedCount} | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $transfer 'host.json')
 if ($BundleOnly) { Write-Output "Bundle prepared without contacting the VM: $transfer"; return }
 # Deliberately no snapshot revert, VM start, app-wide process kill or credential read.
 $vm = Join-Path $PSScriptRoot 'vm.ps1'
 $vmArgs = @{Transfer=$transfer;StandardUser=$StandardUser}
 try {
 & $vm put $zip "$GuestRoot\$runName.zip" @vmArgs
-if($DesktopLaunch){
- $guestScriptFile="$GuestRoot\$runName-run.ps1"
- & $vm put $scriptFile $guestScriptFile @vmArgs
- & (Join-Path $PSScriptRoot 'desktop-launch.ps1') -GuestScript $guestScriptFile
- $waitScript=Join-Path $transfer 'wait-player.ps1'
- $waitText="`$until=(Get-Date).AddMinutes($([Math]::Ceiling($Minutes*$SeedCount+10))); while(-not(Test-Path -LiteralPath '$guestRun\completion.json')){if((Get-Date)-gt`$until){throw 'guest completion timeout'};Start-Sleep -Seconds 5};Get-Content -Raw -LiteralPath '$guestRun\completion.json'"
- [IO.File]::WriteAllText($waitScript,$waitText,[Text.UTF8Encoding]::new($true))
- & $vm exec $waitScript @vmArgs
-} else { & $vm exec $scriptFile -Interactive @vmArgs }
-
+& $vm exec $scriptFile -Interactive @vmArgs
 & $vm get "$guestRun\completion.json" (Join-Path $transfer 'completion.json') @vmArgs
 $completion = Get-Content -Raw -LiteralPath (Join-Path $transfer 'completion.json') | ConvertFrom-Json
 if ($completion.status -ne 'completed') { throw ('Guest run failed: ' + $completion.error) }

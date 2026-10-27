@@ -97,14 +97,11 @@ inputs, seed and replay command. Shrinking retries shorter prefixes and chunk
 removals in fresh small cases. `--shrink false` disables retries for seed sweeps.
 The bounded shrinker does not claim a globally minimal sequence.
 
-If Player authentication in the protected wrapper fails while another user can
-transfer files, `-StandardUser -DesktopLaunch` uses that account only for transfer
-and waiting. It launches the guest script through the **already signed-in**
-Win11-Player-Test desktop's Run dialog with balanced host key input. It verifies
-the VMware window title and foreground handle before typing; it never logs in,
-changes credentials, or touches other VMs. Default execution still uses `-Interactive`.
-A foreground failure aborts before typing. `-SeedCount 5 -Seed 1` runs seeds 1–5
-sequentially in one bundle and returns `evidence/seed-<N>`.
+`-SeedCount 5 -Seed 1` runs seeds 1–5 sequentially in one bundle and returns
+`evidence/seed-<N>`. Interactive execution requires the wrapper's account to match
+the user signed in to the guest desktop. If authentication fails, restore that
+existing wrapper access or sign the test VM into the working standard account;
+the runner never changes guest credentials or login state.
 
 Saved-version checkout claims “u undoes” but can change workspace origin metadata
 without an undo entry (F3). Those checks run on disposable DB branches and retain
