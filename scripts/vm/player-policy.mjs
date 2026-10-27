@@ -30,14 +30,10 @@ export function classifyKey(combo,state={}) {
   if(/^(?:Escape|Space|Tab|Shift\+Tab|Home|End|PageUp|PageDown|(?:(?:Shift|Alt)\+)?Arrow(?:Up|Down|Left|Right)|(?:Shift\+)?Digit[1-8]|Control\+(?:Key[ABKRYZ]|Space)|Shift\+F10|Shift\+Key[HP]|Key[EGIMNTUX]|(?:Shift\+)?Key[JKST]|Backslash|Slash|Shift\+Slash)$/.test(combo))return {tier:'safe',reason:'reviewed navigation/view/workspace shortcut'};
   return {tier:'unknown',reason:'unclassified keyboard shortcut '+combo};
 }
-export function classify(control, state={}) {
+function classifyBase(control, state={}) {
   if(control.action?.kind==='key') return classifyKey(control.action.combo,state);
   if(control.action?.kind==='wheel') return {tier:'safe',reason:'real scrolling'};
   const id=control.identity||{}, cmd=id['data-cmd'] || id['data-op'] || '', write=id['data-env-write'], text=control.label?.trim().toLowerCase()||'';
-  if(state.sharedContent){
-    const dbOnly=new Set(['create-plan','new-plan','rename-plan','remove-plan','tags','note']);
-    if((write&&!dbOnly.has(write)&&!['toggle','enable','disable','add','take-out','sort','undo','redo','move-to','enable-at','up','down'].includes(write))||localCommands.has(cmd)||id['data-game']||/use this (?:one|;)|switch to .* and use/.test(text)||/delete|trash|recycle|move to…|clean|uninstall|permanent|apply/.test(text)&&!dbOnly.has(write))return {tier:'unknown',reason:'shared baseline: operation may change content or deployment files; requires a private full copy'};
-  }
   if(control.owner==='popup'&&state.popupTitle==='lists'&&state.plans?.some(p=>text===p.name.toLowerCase()||text.startsWith(p.name.toLowerCase()+' ')))return {tier:'safe',reason:'known list choice from the observed shell'};
   if(id['data-game']||id['data-id']?.startsWith('game|')||id['data-id']?.startsWith('row|')||/use this (?:one|;)|switch to .* and use/.test(text))return {tier:'local-destructive',reason:'apply list/game selection may change active environment or deployment links'};
   if(control.href && !control.href.startsWith('#')) return {tier:'external',reason:'link opens a browser or network target'};
@@ -60,7 +56,20 @@ export function classify(control, state={}) {
   if(control.owner==='popup' && state.popup==='palette')return {tier:'unknown',reason:'palette option requires command classification'};
   return {tier:'unknown',reason:'no reviewed semantic classification'};
 }
-export function allowed(tier,allow) { return tier==='safe'||tier==='local-destructive'&&['local','external'].includes(allow)||tier==='external'&&allow==='external'; }
+export function classify(control,state={}) {
+  const policy=classifyBase(control,state);
+  if(!state.sharedContent)return policy;
+  const id=control.identity||{},cmd=id['data-cmd']||id['data-op']||'',write=id['data-env-write'],text=control.label?.trim().toLowerCase()||'';
+  const dbOnly=new Set(['create-plan','new-plan','rename-plan','remove-plan','use-plan','plan-unfollow','tags','note']);
+  if(state.popupTitle==='delete the list'&&/^delete(?:\s|$)/.test(text))return {tier:'local-destructive',reason:'reviewed plan deletion confirmation; private DB only'};
+  const workspace=['toggle','enable','disable','add','take-out','sort','undo','redo','move-to','enable-at','up','down'];
+  if((write&&!dbOnly.has(write)&&!workspace.includes(write))||localCommands.has(cmd)||id['data-game']||/use this (?:one|;)|switch to .* and use/.test(text)||/delete|trash|recycle|move to…|clean|uninstall|permanent|apply/.test(text)&&!dbOnly.has(write))return {...policy,blocked:'shared baseline: operation may change content or deployment files; requires a private full copy'};
+  return policy;
+}
+export function allowed(policy,allow) {
+  if(typeof policy==='object'){if(policy.blocked)return false;policy=policy.tier;}
+  return policy==='safe'||policy==='local-destructive'&&['local','external'].includes(allow)||policy==='external'&&allow==='external';
+}
 export function stateKey(s,controls=[]) {
   const menu=s.menu?controls.filter(c=>c.owner==='menu'&&c.visible).map(c=>c.label):[];
   return JSON.stringify([s.page||'plan',s.plan,s.popup,s.popupTitle,s.menu,s.page===null?s.focus:null,s.navLayout,s.modes||[],menu]);

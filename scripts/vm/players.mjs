@@ -69,13 +69,13 @@ export async function drive(ctx) {
       const id=identity(control,key,s);
       if(ledger.has(id)){
         const old=ledger.get(id);if(!old.states.includes(key))old.states.push(key);
-        const policy=classify(control,s),eligible=allowed(policy.tier,options.allow)&&control.visible&&control.enabled&&!control.blockedByLayer;
+        const policy=classify(control,s),eligible=allowed(policy,options.allow)&&control.visible&&control.enabled&&!control.blockedByLayer;
         if(!old.eligible&&eligible&&!old.attemptedAt)Object.assign(old,control,{key:id,state:key,recipe,eligible:true,outcome:'unreachable',reason:'not attempted'});
         continue;
       }
-      const policy=classify(control,s), permitted=allowed(policy.tier,options.allow),eligible=permitted&&control.visible&&control.enabled&&!control.blockedByLayer;
-      const row={...control,key:id,state:key,states:[key],page:control.owner==='nav'?'sidebar':s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
-      if(!permitted){row.outcome='skipped';row.reason=policy.reason.startsWith('shared baseline')?policy.reason:policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`;}
+      const policy=classify(control,s), permitted=allowed(policy,options.allow),eligible=permitted&&control.visible&&control.enabled&&!control.blockedByLayer;
+      const row={...control,key:id,state:key,states:[key],page:control.owner==='nav'?'sidebar':s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,blocked:policy.blocked,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
+      if(!permitted){row.outcome='skipped';row.reason=policy.blocked||policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`;}
       else if(!eligible){row.reason=!control.visible?'not visible in this state':!control.enabled?'disabled; requires application precondition':'covered by page/popup/menu; not an eligible edge in this state';}
       ledger.set(id,row);added.push(row);
       if(control.context&&control.visible){const right={...row,key:hash(id+'context'),label:control.label+' [context menu]',sourceLabel:control.label,action:{kind:'click',locator:control.locator,button:'right'}};if(!ledger.has(right.key)){ledger.set(right.key,right);added.push(right);}}
@@ -104,18 +104,18 @@ export async function drive(ctx) {
   async function input(action,logged=true) {
     if(action.kind==='key'){
       const policy=classifyKey(action.combo,await read());
-      if(!allowed(policy.tier,options.allow))throw Error('policy blocked keyboard input: '+policy.reason);
+      if(!allowed(policy,options.allow))throw Error('policy blocked keyboard input: '+policy.reason);
     }
     const pointer=action.kind==='click'?await locate(action):null;
     if(action.kind==='click'){
       if(!pointer)throw Error('unreachable control: '+action.locator);
       const actual=await targetControl(action),policy=actual&&classify(actual,await read());
-      if(!policy||!allowed(policy.tier,options.allow))throw Error('policy blocked replay target: '+action.locator);
+      if(!policy||!allowed(policy,options.allow))throw Error('policy blocked replay target: '+action.locator);
     }
     const entry={index:trace.length,atMs:performance.now()-started,action,started:new Date().toISOString()};
     if(logged){trace.push(entry);save('trace',{schema:1,seed,actions:trace});}
     try {
-      if(action.kind==='key')await c.key(action.combo,{repeats:action.repeats||0,beforeRepeat:async()=>{const policy=classifyKey(action.combo,await read());if(!allowed(policy.tier,options.allow))throw Error('policy blocked held key repeat: '+policy.reason);}});
+      if(action.kind==='key')await c.key(action.combo,{repeats:action.repeats||0,beforeRepeat:async()=>{const policy=classifyKey(action.combo,await read());if(!allowed(policy,options.allow))throw Error('policy blocked held key repeat: '+policy.reason);}});
       else if(action.kind==='text')await c.call('Input.insertText',{text:action.text});
       else if(action.kind==='wheel')await c.call('Input.dispatchMouseEvent',{type:'mouseWheel',x:action.x||700,y:action.y||420,deltaX:0,deltaY:action.delta||420});
       else if(action.kind==='branch'){
@@ -138,7 +138,7 @@ export async function drive(ctx) {
         for(let n=1;n<=(action.count||1);n++){
           if(n>1){
             const p=await point(action),actual=p&&await targetControl(action),policy=actual&&classify(actual,await read());
-            if(!p||Math.abs(p.x-pointer.x)>2||Math.abs(p.y-pointer.y)>2||!policy||!allowed(policy.tier,options.allow)){
+            if(!p||Math.abs(p.x-pointer.x)>2||Math.abs(p.y-pointer.y)>2||!policy||!allowed(policy,options.allow)){
               entry.cancelledRepeats={from:n,reason:'target moved, disappeared or changed to a disallowed tier'};break;
             }
             (entry.repeatTargets||=[]).push({click:n,tier:policy.tier,label:actual.label,locator:actual.locator});
@@ -249,7 +249,7 @@ export async function drive(ctx) {
         if(!actual){row.outcome='unreachable';row.reason='target disappeared';return;}
         if(!row.row&&(actual.label!==(row.sourceLabel??row.label)||JSON.stringify(actual.identity)!==JSON.stringify(row.identity))){row.outcome='unreachable';row.reason='semantic target changed during replay';return;}
         const policy=classify(actual,s);
-        if(policy.tier!==row.tier||!allowed(policy.tier,options.allow)){row.outcome='skipped';row.reason='target classification changed during replay';return;}
+        if(policy.tier!==row.tier||!allowed(policy,options.allow)){row.outcome='skipped';row.reason='target classification changed during replay';return;}
       }
       const before=await snapshot('edge-'+row.key+'-before');
       const failures=result.failures.length;
@@ -403,7 +403,7 @@ export async function drive(ctx) {
         actions=[key(col),key(pick(['Home','ArrowDown','End'])),{...key(pick(['Space','Space','Space','Shift+KeyJ','Shift+KeyK','Shift+KeyS','KeyT','KeyU'])),repeats:rng()<.3?2:0,delayMs}];
       } else {
         const found=await controls(),state=hash(stateKey(s,found));record(found,s,state,[]);
-        const candidates=found.filter(x=>x.visible&&x.enabled&&x.hittable&&allowed(classify(x,s).tier,options.allow)&&(!previousLedger||previousLedger.controls.some(old=>(old.page===(s.page||'plan')||old.page==='sidebar'&&x.owner==='nav')&&old.locator===x.locator&&allowed(old.tier,options.allow))));
+        const candidates=found.filter(x=>x.visible&&x.enabled&&x.hittable&&allowed(classify(x,s),options.allow)&&(!previousLedger||previousLedger.controls.some(old=>(old.page===(s.page||'plan')||old.page==='sidebar'&&x.owner==='nav')&&old.locator===x.locator&&allowed(old,options.allow))));
         const target=candidates.length?pick(candidates):null;
         chosenRow=target?ledger.get(identity(target,state,s)):null;
         if(target&&classify(target,s).tier!=='safe'){

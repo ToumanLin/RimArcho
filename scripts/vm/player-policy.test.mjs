@@ -40,7 +40,9 @@ test('seeded sequences repeat and coverage retains unreachable eligible edges',(
 
 test('shared baseline blocks file/deployment writes while permitting private plan records',()=>{
   const state={sharedContent:true};
-  for(const identity of [{'data-cmd':'pin'},{'data-env-write':'move-directory'},{'data-env-write':'import-apply'}])assert.equal(classify({identity,label:'apply'},state).tier,'unknown');
+  for(const identity of [{'data-cmd':'pin'},{'data-env-write':'move-directory'},{'data-env-write':'import-apply'}]){const p=classify({identity,label:'apply'},state);assert.equal(p.tier,'local-destructive');assert.match(p.blocked,/shared baseline/);assert.equal(allowed(p,'external'),false);}
   assert.equal(classify({identity:{'data-env-write':'create-plan'},label:'create and edit'},state).tier,'local-destructive');
   assert.equal(classify({identity:{'data-env-write':'toggle'},label:'enable'},state).tier,'safe');
+  assert.equal(allowed(classify({identity:{'data-env-write':'plan-unfollow'},label:'stop following'},state),'local'),true);
+  const steam=classify({identity:{'data-env-write':'subscription-update'},label:'download'},state);assert.equal(steam.tier,'external');assert.equal(allowed(steam,'external'),false);
 });
