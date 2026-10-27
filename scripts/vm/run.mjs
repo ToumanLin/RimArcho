@@ -415,22 +415,39 @@ async function scenario3() {
 }
 async function scenario4() {
   const before=await snapshot('before-cancel');
+  const staging = snap => snap.plans.map(p=>({name:p.name,staging:p.staging}));
+  const stageHistory = async (b,a,disable) => {
+    const step=async redo=>{if(c){await press(redo?'Control+KeyR':'KeyU');await settled();}else await act(redo?'Redo':'Undo');};
+    await step(false);const u=await snapshot('stage-undone');
+    check('stage undo restores entries and staging payload',JSON.stringify(payload(u))===JSON.stringify(payload(b)),{finding:'Staging/history payload mismatch (spec 04 §2.2)'});
+    await step(true);const r=await snapshot('stage-redone');
+    check('stage redo restores entries and staging payload',JSON.stringify(payload(r))===JSON.stringify(payload(a)));
+    await step(false);await snapshot('stage-undone-again');
+    await disable();const d=await snapshot('stage-undone-then-disabled');
+    check('ordinary disable changes enabled entries',entries(d)!==entries(b));
+    check('stage undo then disable never resurrects staging',JSON.stringify(staging(d))===JSON.stringify(staging(b)));
+    await step(false);const restored=await snapshot('stage-disable-undone');
+    check('disable undo preserves original stage payload',JSON.stringify(payload(restored))===JSON.stringify(payload(b)));
+  };
   if(!c){
     await act('Preview');result.coverage.push({action:'cancel/Esc/focus',status:'unsupported: W-only; preview/dry-run tested'});
     const b=await snapshot('before-stage');
+    let disable;
     if(driver==='A'){
       const row=(await api('Board')).cols[1].find((r,i)=>i>0&&r.id);
-      if(row)await api('Stage',1,[row.id]);
+      assert(row,'stage needs an enabled mod');
+      await api('Stage',1,[row.id]);
+      disable=()=>api('Toggle',1,[row.id],[]);
     }else{
       const list=JSON.parse(entries(b));
       const m=list.slice(1).map(e=>b.instances.find(m=>m.id===e.i)).find(m=>m&&b.instances.filter(i=>i.package_id===m.package_id).length===1);
       assert(m,'stage needs a uniquely resolvable enabled package');
       command(exe('archo'),['--open-plan',currentPlan,'stage','add','pkg:'+m.package_id],env);
+      disable=()=>command(exe('archo'),['--open-plan',currentPlan,'disable','pkg:'+m.package_id],env);
     }
     const a=await snapshot('after-stage');
     check('stage changes enabled entries',entries(a)!==entries(b));
-    await act('Undo');const u=await snapshot('stage-undone');
-    check('stage undo restores entries and staging payload',JSON.stringify(payload(u))===JSON.stringify(payload(b)),{finding:'Stage metadata is outside workspace undo (plan §6.1 / P0-2)'});
+    await stageHistory(b,a,disable);
   }
   else {
     // Plan deletion is destructive only after confirmation. Test cancel, Esc and backdrop.
@@ -483,7 +500,8 @@ async function scenario4() {
     if(entries(moved)!==entries(moveBefore)){await press('KeyU');await settled();check('move undo restores list',entries(await snapshot('move-undone'))===entries(moveBefore));}
     await enabledSecond();const stageBefore=await snapshot('before-stage');
     await press('KeyT');await settled();const staged=await snapshot('after-stage');
-    if(entries(staged)!==entries(stageBefore)){await press('KeyU');await settled();const undone=await snapshot('stage-undone');check('stage undo restores entries and staging payload',JSON.stringify(payload(undone))===JSON.stringify(payload(stageBefore)),{finding:'Stage metadata is outside workspace undo (plan §6.1 / P0-2)',before:stageBefore.plans.find(p=>p.name===currentPlan).staging,after:undone.plans.find(p=>p.name===currentPlan).staging});}
+    check('stage changes enabled entries',entries(staged)!==entries(stageBefore));
+    await stageHistory(stageBefore,staged,async()=>{await enabledSecond();await press('Space');await settled();});
   }
   const after=await snapshot('after-cancel');check('previews and cancelled actions preserve game config',JSON.stringify(after.modsConfigHashes)===JSON.stringify(before.modsConfigHashes));
   await sortUndo();

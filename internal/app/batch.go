@@ -53,17 +53,11 @@ func (b *Batch) Commit(op string) error {
 	if b.a.Store.LastStepID(b.planID, "undo") == b.lastID {
 		return nil // nothing was edited
 	}
-	if err := b.a.Store.DeleteStepsAfter(b.planID, "undo", b.lastID); err != nil {
-		return err
-	}
 	st, err := b.a.Loadout()
 	if err != nil {
 		return err
 	}
-	if st.List.Encode() == b.entries {
-		return nil // the edits cancelled out
-	}
-	return b.a.Store.PushStep(b.planID, "undo", b.entries, op)
+	return b.a.Store.FinishBatch(st.WS, b.lastID, b.entries, b.staged, op, false)
 }
 
 // Revert ends the session and undoes everything it did, staging included.
@@ -81,16 +75,9 @@ func (b *Batch) Revert() error {
 	if err != nil {
 		return err
 	}
-	if err := b.a.Store.DeleteStepsAfter(b.planID, "undo", b.lastID); err != nil {
-		return err
-	}
-	if st.List.Encode() != b.entries {
-		st.WS.Entries, st.WS.Updated = b.entries, b.a.Now().UTC()
-		if err := b.a.Store.SetWorkspace(st.WS); err != nil {
-			return err
-		}
-	}
-	return b.a.Store.SetMeta(store.StageKey(b.planID), b.staged)
+	ws := *st.WS
+	ws.Updated = b.a.Now().UTC()
+	return b.a.Store.FinishBatch(&ws, b.lastID, b.entries, b.staged, "", true)
 }
 
 // MoveBlock moves enabled instances to a 1-based position as one block, keeping their

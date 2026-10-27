@@ -40,15 +40,30 @@ func (s *Store) SetWorkspace(w *Workspace) error {
 		return fmt.Errorf("store: workspace without a plan")
 	}
 	return s.inTx(func(tx *sql.Tx) error {
-		if _, err := tx.Exec(`INSERT INTO workspace(plan_id, entries, origin_version, origin_kind, conflict_version, updated_at) VALUES(?,?,?,?,?,?)
-		ON CONFLICT(plan_id) DO UPDATE SET entries=excluded.entries, origin_version=excluded.origin_version,
-		origin_kind=excluded.origin_kind, conflict_version=excluded.conflict_version, updated_at=excluded.updated_at`,
-			w.PlanID, w.Entries, w.OriginVersion, w.OriginKind, w.Conflict, w.Updated.Unix()); err != nil {
+		if err := setWorkspace(tx, w); err != nil {
 			return err
 		}
-		_, err := tx.Exec(`UPDATE plan SET updated_at=max(updated_at, ?) WHERE id=?`, w.Updated.Unix(), w.PlanID)
-		return err
+		raw, err := stageMeta(tx, w.PlanID)
+		if err != nil {
+			return err
+		}
+		raw, err = pruneStage(raw, w.Entries)
+		if err != nil {
+			return err
+		}
+		return setStage(tx, w.PlanID, raw)
 	})
+}
+
+func setWorkspace(tx *sql.Tx, w *Workspace) error {
+	if _, err := tx.Exec(`INSERT INTO workspace(plan_id, entries, origin_version, origin_kind, conflict_version, updated_at) VALUES(?,?,?,?,?,?)
+	ON CONFLICT(plan_id) DO UPDATE SET entries=excluded.entries, origin_version=excluded.origin_version,
+	origin_kind=excluded.origin_kind, conflict_version=excluded.conflict_version, updated_at=excluded.updated_at`,
+		w.PlanID, w.Entries, w.OriginVersion, w.OriginKind, w.Conflict, w.Updated.Unix()); err != nil {
+		return err
+	}
+	_, err := tx.Exec(`UPDATE plan SET updated_at=max(updated_at, ?) WHERE id=?`, w.Updated.Unix(), w.PlanID)
+	return err
 }
 
 // UndoLimit bounds each undo/redo stack.
@@ -56,10 +71,27 @@ const UndoLimit = 100
 
 // PushStep pushes a workspace state onto a plan's "undo" or "redo" stack.
 func (s *Store) PushStep(planID int64, stack, entries, op string) error {
-	if _, err := s.DB.Exec(`INSERT INTO workspace_undo(plan_id, stack, entries, op) VALUES(?,?,?,?)`, planID, stack, entries, op); err != nil {
+	return s.inTx(func(tx *sql.Tx) error {
+		if err := lockHistory(tx); err != nil {
+			return err
+		}
+		stage, err := stageMeta(tx, planID)
+		if err != nil {
+			return err
+		}
+		stage, err = pruneStage(stage, entries)
+		if err != nil {
+			return err
+		}
+		return pushStep(tx, planID, stack, entries, op, stage)
+	})
+}
+
+func pushStep(tx *sql.Tx, planID int64, stack, entries, op, stage string) error {
+	if _, err := tx.Exec(`INSERT INTO workspace_undo(plan_id, stack, entries, op, staging) VALUES(?,?,?,?,?)`, planID, stack, entries, op, stage); err != nil {
 		return err
 	}
-	_, err := s.DB.Exec(`DELETE FROM workspace_undo WHERE plan_id=? AND stack=? AND id NOT IN
+	_, err := tx.Exec(`DELETE FROM workspace_undo WHERE plan_id=? AND stack=? AND id NOT IN
 		(SELECT id FROM workspace_undo WHERE plan_id=? AND stack=? ORDER BY id DESC LIMIT ?)`, planID, stack, planID, stack, UndoLimit)
 	return err
 }
@@ -83,11 +115,22 @@ type Step struct {
 	ID      int64
 	Entries string
 	Op      string
+	Staging *string // nil: legacy entries-only step; empty string: no stage meta row
+}
+
+// PeekStep reads the newest complete state without moving either stack.
+func (s *Store) PeekStep(planID int64, stack string) (*Step, error) {
+	var x Step
+	err := s.DB.QueryRow(`SELECT id,entries,op,staging FROM workspace_undo WHERE plan_id=? AND stack=? ORDER BY id DESC LIMIT 1`, planID, stack).Scan(&x.ID, &x.Entries, &x.Op, &x.Staging)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &x, err
 }
 
 // Steps lists a stack, newest first.
 func (s *Store) Steps(planID int64, stack string) ([]Step, error) {
-	rows, err := s.DB.Query(`SELECT id, entries, op FROM workspace_undo WHERE plan_id=? AND stack=? ORDER BY id DESC`, planID, stack)
+	rows, err := s.DB.Query(`SELECT id, entries, op, staging FROM workspace_undo WHERE plan_id=? AND stack=? ORDER BY id DESC`, planID, stack)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +138,7 @@ func (s *Store) Steps(planID int64, stack string) ([]Step, error) {
 	var out []Step
 	for rows.Next() {
 		var x Step
-		if err := rows.Scan(&x.ID, &x.Entries, &x.Op); err != nil {
+		if err := rows.Scan(&x.ID, &x.Entries, &x.Op, &x.Staging); err != nil {
 			return nil, err
 		}
 		out = append(out, x)

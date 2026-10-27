@@ -432,6 +432,41 @@ func (a *App) creditReferenced(id string, planIDs ...int64) (bool, error) {
 			return true, nil
 		}
 	}
+	// Staging-only undo steps can refer to copies absent from every entries list.
+	query := `SELECT staging FROM workspace_undo WHERE staging IS NOT NULL AND staging<>''`
+	var stageArgs []any
+	if len(planIDs) > 0 {
+		query += ` AND plan_id=?`
+		stageArgs = append(stageArgs, planIDs[0])
+	}
+	rows, err := a.Store.DB.Query(query, stageArgs...)
+	if err != nil {
+		return false, err
+	}
+	found := false
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			rows.Close()
+			return false, err
+		}
+		var items []StageItem
+		if err := json.Unmarshal([]byte(raw), &items); err != nil {
+			rows.Close()
+			return false, err
+		}
+		for _, it := range items {
+			found = found || it.Instance == id || it.After == id
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return false, err
+	}
+	if found {
+		return true, nil
+	}
 	plans, err := a.Store.Plans()
 	if err != nil {
 		return false, err

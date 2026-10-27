@@ -27,6 +27,9 @@ func (s *Store) RemapCreditPlans(plans []int64, old, target string, now time.Tim
 			return fmt.Errorf("credit replacement identity changed")
 		}
 		for _, plan := range plans {
+			if err := remapHistoryStages(tx, map[string]string{old: target}, &plan); err != nil {
+				return err
+			}
 			changed := false
 			for _, table := range []string{"workspace", "workspace_undo", "loadout_version"} {
 				type row struct {

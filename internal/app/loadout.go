@@ -512,6 +512,10 @@ type EditResult struct {
 
 // edit applies f to the workspace, recording an undo step.
 func (a *App) edit(op string, f func(st *LoadoutState, l loadout.List) (loadout.List, []string, error)) (*EditResult, error) {
+	return a.editStaged(op, nil, f)
+}
+
+func (a *App) editStaged(op string, staged *string, f func(st *LoadoutState, l loadout.List) (loadout.List, []string, error)) (*EditResult, error) {
 	unlock, err := a.lockLaunch()
 	if err != nil {
 		return nil, err
@@ -528,22 +532,18 @@ func (a *App) edit(op string, f func(st *LoadoutState, l loadout.List) (loadout.
 		return nil, err
 	}
 	r := &EditResult{Before: before, Notes: notes}
-	if !after.Equal(before) {
-		if err := a.Store.PushStep(st.Plan.ID, "undo", before.Encode(), op); err != nil {
+	if !after.Equal(before) || staged != nil {
+		ws := *st.WS
+		ws.Entries, ws.Updated = after.Encode(), a.Now().UTC()
+		if ws.OriginKind == "checkout" {
+			ws.OriginKind = "edited"
+		}
+		if err := a.Store.EditWorkspace(&ws, before.Encode(), op, staged); err != nil {
 			return nil, err
 		}
-		if err := a.Store.ClearSteps(st.Plan.ID, "redo"); err != nil {
-			return nil, err
-		}
-		st.WS.Entries, st.WS.Updated = after.Encode(), a.Now().UTC()
-		if st.WS.OriginKind == "checkout" {
-			st.WS.OriginKind = "edited"
-		}
-		if err := a.Store.SetWorkspace(st.WS); err != nil {
-			return nil, err
-		}
-		st.List = after
+		st.WS, st.List = &ws, after
 	}
+
 	r.State = st
 	r.Changes = loadout.Diff(before, st.List, st.LineageOf)
 	return r, nil
@@ -915,23 +915,21 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 	if redo {
 		from, to = "redo", "undo"
 	}
-	entries, op, ok, err := a.Store.PopStep(st.Plan.ID, from)
+	step, err := a.Store.PeekStep(st.Plan.ID, from)
 	if err != nil {
 		return nil, "", err
 	}
-	if !ok {
+	if step == nil {
 		return nil, "", fmt.Errorf("nothing to %s", from)
 	}
-	if err := a.Store.PushStep(st.Plan.ID, to, st.List.Encode(), op); err != nil {
-		return nil, "", err
-	}
 	before := st.List
-	st.WS.Entries, st.WS.Updated = entries, a.Now().UTC()
-	if err := a.Store.SetWorkspace(st.WS); err != nil {
+	ws := *st.WS
+	ws.Entries, ws.Updated = step.Entries, a.Now().UTC()
+	if err := a.Store.RestoreStep(&ws, before.Encode(), from, to, *step); err != nil {
 		return nil, "", err
 	}
-	st.List = loadout.Decode(entries)
-	return &EditResult{State: st, Before: before, Changes: loadout.Diff(before, st.List, st.LineageOf)}, op, nil
+	st.WS, st.List = &ws, loadout.Decode(step.Entries)
+	return &EditResult{State: st, Before: before, Changes: loadout.Diff(before, st.List, st.LineageOf)}, step.Op, nil
 }
 
 // SaveResult describes a write to the game: archo save, or the writing part of a launch

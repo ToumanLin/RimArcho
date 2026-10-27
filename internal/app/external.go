@@ -60,15 +60,6 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 	}
 	c := &ExternalConflict{Plan: target, Env: tenv, Version: n, Current: target.ID == st.Plan.ID}
 	if clean {
-		// Loaded as a workspace edit that u takes back.
-		if !cur.Equal(list) {
-			if err := a.Store.PushStep(target.ID, "undo", ws.Entries, "external"); err != nil {
-				return err
-			}
-			if err := a.Store.ClearSteps(target.ID, "redo"); err != nil {
-				return err
-			}
-		}
 		ws.Entries, ws.OriginVersion, ws.OriginKind, ws.Conflict = list.Encode(), n, "external", 0
 		st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: loaded as %s", c.Name(st.Ix.Env)))
 	} else {
@@ -77,7 +68,12 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 			c.Name(st.Ix.Env), strings.Join(c.Commands(st.Ix.Env), "; ")))
 	}
 	ws.Updated = now
-	if err := a.Store.SetWorkspace(ws); err != nil {
+	if clean {
+		err = a.Store.EditWorkspace(ws, cur.Encode(), "external", nil)
+	} else {
+		err = a.Store.SetWorkspace(ws)
+	}
+	if err != nil {
 		return err
 	}
 	mcs.WriterPlan, mcs.WriterVersion, mcs.WriterEnv = target.ID, n, tenv.ID

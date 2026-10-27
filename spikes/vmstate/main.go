@@ -139,6 +139,14 @@ func snapshot(home string, openPlan ...string) any {
 	_, err = db.Exec("BEGIN")
 	check(err)
 	defer db.Exec("ROLLBACK")
+	// Real baselines may predate staging history; observation must not migrate them.
+	stageColumn := "NULL AS staging"
+	for _, col := range rows(db, "PRAGMA table_info(workspace_undo)") {
+		if col["name"] == "staging" {
+			stageColumn = "staging"
+			break
+		}
+	}
 	envs := rows(db, "SELECT id,name,game_root,user_data_root,game_version,current_plan FROM environment ORDER BY name")
 	sources := rows(db, "SELECT id,environment_id,kind,label,root,status,pending_root FROM source ORDER BY kind,label")
 	plans := rows(db, "SELECT id,name,created_game,versions FROM plan ORDER BY name")
@@ -245,7 +253,7 @@ func snapshot(home string, openPlan ...string) any {
 			p["enabled"] = enabled
 		}
 		for _, stack := range []string{"undo", "redo"} {
-			r := rows(db, "SELECT entries,op FROM workspace_undo WHERE plan_id=? AND stack=? ORDER BY id DESC", id, stack)
+			r := rows(db, "SELECT entries,op,"+stageColumn+" FROM workspace_undo WHERE plan_id=? AND stack=? ORDER BY id DESC", id, stack)
 			p[stack] = norm(r)
 			p[stack+"Depth"] = len(r)
 		}
