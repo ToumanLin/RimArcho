@@ -18,9 +18,10 @@ import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
 
 let ui;
-// The displayed shell can still name the previous plan while OpenPlan is in flight.
-// Preserve click order even when the player returns to that displayed plan immediately.
-let openingPlan = Promise.resolve();
+// The displayed shell can still name the previous plan while OpenPlan is in flight:
+// clicks open in order, and a click on the displayed plan is a no-op only when no other
+// plan is on its way (then returning to it must open it again).
+let openingPlan = Promise.resolve(), requestedPlan = null;
 export function initNavigation(u) { ui = u; }
 
 // go opens a sidebar page; "plan" is the open plan's editor, "plan:<id>" a plan (opened
@@ -54,8 +55,10 @@ export async function openPage(id, plan = null, entry = null) {
   switch (id) {
     case "plan":
       return openEditor(async (read) => {
-        if (plan !== null && !S.busy.env) {
-          await (openingPlan = openingPlan.catch(() => {}).then(() => api.OpenPlan(plan)));
+        if (plan !== null && !S.busy.env && plan !== (requestedPlan ?? S.shell?.plan?.id)) {
+          requestedPlan = plan;
+          const p = openingPlan = openingPlan.catch(() => {}).then(() => api.OpenPlan(plan));
+          try { await p; } finally { if (openingPlan === p) requestedPlan = null; }
           if (!read.current()) return false;
           S.cols.forEach((c, k) => {
             c.query = ""; c.cursor = 0; c.sel.clear(); c.searching = false;

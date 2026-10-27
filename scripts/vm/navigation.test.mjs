@@ -23,3 +23,6 @@ test('a rejected plan request does not strand the next click',async()=>{
   const h=harness();const first=h.open(2).catch(()=>{});await flush();const last=h.open(1);h.resolvers[0].reject(Error('test failure'));await flush();
   assert.deepEqual(h.calls,[2,1]);h.resolvers[1].resolve();await Promise.all([first,last]);assert.equal(h.state.shell.plan.id,1);
 });
+test('clicking the displayed plan with nothing opening keeps its search and asks nothing',async()=>{
+  const h=harness();await h.open(1);assert.deepEqual(h.calls,[]);
+});
