@@ -80,7 +80,7 @@ async function until(fn, ms=15000) {
   while(performance.now()<end) { const r=await fn(); if(r) return r;await sleep(50); }
   throw Error(`condition timed out after ${ms}ms`);
 }
-async function settled(page, ms=10000) {
+async function settled(page, ms=10000, plan) {
   let last='', stable=0;
   return until(async()=>{
     const s=await c.evaluate(mode?'window.__vm.read(false)':'window.__vm.read()');
@@ -89,7 +89,7 @@ async function settled(page, ms=10000) {
     // Page loading/editing and list publication gate readiness; focus/rows gate
     // visual stability without repeatedly serializing all problem/instance data.
     const signature=JSON.stringify([s.page,s.plan,mode?s.columnState:s.columns,mode&&s.busy.analyze?null:s.status,s.popup,s.problems?.listVersion]);
-    const ready=!s.loading && !s.editing && !s.busy.env && s.content && s.sidebar.includes('plan') && (page===undefined || s.page===page);
+    const ready=!s.loading && !s.editing && !s.busy.env && s.content && s.sidebar.includes('plan') && (page===undefined || s.page===page) && (plan===undefined || s.plan===plan);
     stable=ready && signature===last ? stable+1 : 0;last=signature;
     return stable>=5 && s;
   },ms);

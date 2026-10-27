@@ -158,7 +158,7 @@ export async function drive(ctx) {
     await input(key('Escape'));await input(key('Escape'));
     let s=await read();
     if(s.navLayout==='top'){await input(key('Control+KeyB'));await sleep(400);s=await read();}
-    if(s.page!==null){await input({kind:'click',locator:'#nav .nav-item[data-id="plan"]'});await settled();s=await read();}
+    if(s.page!==null){await input({kind:'click',locator:'#nav .nav-item[data-id="plan"]'});await settled(null,15000);s=await read();}
     if(s.plan!==currentPlan){const plan=s.plans.find(p=>p.name===currentPlan);if(!plan)throw Error('original list was removed');await openPlan(plan);}
     // A native input can retain focus after a dismissed view. Real row input
     // returns keyboard ownership to the editor before focus/undo shortcuts.
@@ -170,12 +170,14 @@ export async function drive(ctx) {
     const locator=`#nav [data-id="plan:${plan.id}"]`;
     if(await locate({locator}))await input({kind:'click',locator});
     else {
+      const s=await read(),row=(await controls()).find(x=>x.row&&x.area==='1'&&x.hittable&&classify(x,s).tier==='safe');
+      if(row)await input({kind:'click',locator:row.locator});
       await input(key('Shift+KeyP'));await settled();
       const state=await read(),index=state.plans.findIndex(p=>p.id===plan.id);
       if(index<0)throw Error('list no longer available: '+plan.name);
       await input({kind:'click',locator:`#popup .opts > .opt:nth-child(${index+1})`});
     }
-    await settled();
+    await settled(null,15000,plan.name);
     if((await read()).plan!==plan.name)throw Error('list cannot be edited in the current game: '+plan.name);
   }
   async function normalizeDetails(page) {
