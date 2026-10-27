@@ -10,6 +10,14 @@ import (
 
 const schemaV21 = `ALTER TABLE workspace_undo ADD COLUMN staging TEXT;`
 
+// lockHistory reserves the SQLite writer before reading history/staging. In WAL
+// mode a deferred read transaction cannot upgrade after a background analysis
+// commits; busy_timeout only helps when the write reservation is acquired first.
+func lockHistory(tx *sql.Tx) error {
+	_, err := tx.Exec(`UPDATE meta SET value=value WHERE key='schema_version'`)
+	return err
+}
+
 func stageMeta(tx *sql.Tx, plan int64) (string, error) {
 	var raw string
 	err := tx.QueryRow(`SELECT value FROM meta WHERE key=?`, StageKey(plan)).Scan(&raw)
@@ -60,6 +68,9 @@ func pruneStage(raw, entries string) (string, error) {
 // together. staged=nil retains staging except for items enabled by this edit.
 func (s *Store) EditWorkspace(w *Workspace, before, op string, staged *string) error {
 	return s.inTx(func(tx *sql.Tx) error {
+		if err := lockHistory(tx); err != nil {
+			return err
+		}
 		raw, err := stageMeta(tx, w.PlanID)
 		if err != nil {
 			return err
@@ -96,6 +107,9 @@ func (s *Store) EditWorkspace(w *Workspace, before, op string, staged *string) e
 // the current and target states so undo cannot preserve a hidden ghost item.
 func (s *Store) RestoreStep(w *Workspace, before, from, to string, step Step) error {
 	return s.inTx(func(tx *sql.Tx) error {
+		if err := lockHistory(tx); err != nil {
+			return err
+		}
 		var newest int64
 		if err := tx.QueryRow(`SELECT id FROM workspace_undo WHERE plan_id=? AND stack=? ORDER BY id DESC LIMIT 1`, w.PlanID, from).Scan(&newest); err != nil {
 			return err

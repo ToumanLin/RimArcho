@@ -72,6 +72,9 @@ const UndoLimit = 100
 // PushStep pushes a workspace state onto a plan's "undo" or "redo" stack.
 func (s *Store) PushStep(planID int64, stack, entries, op string) error {
 	return s.inTx(func(tx *sql.Tx) error {
+		if err := lockHistory(tx); err != nil {
+			return err
+		}
 		stage, err := stageMeta(tx, planID)
 		if err != nil {
 			return err

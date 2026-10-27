@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestMigrateV20StageHistory(t *testing.T) {
@@ -77,4 +78,66 @@ func TestStageHistoryRemapItemsAndAnchors(t *testing.T) {
 	if *steps[0].Staging != want {
 		t.Fatalf("remap staging: %s", *steps[0].Staging)
 	}
+}
+
+// A background analyzer owns a separate SQLite connection and can commit while
+// an editor transaction is reading. Writer reservation must precede those reads.
+func TestStageHistoryWaitsForBackgroundWriter(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "archo.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, err := s.DB.Exec(`INSERT INTO environment(id,name,game_root,user_data_root,created_at) VALUES('e','e','g','u',0)`); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.CreatePlan("e", "test", fixed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := &Workspace{PlanID: p.ID, Entries: `[]`, Updated: fixed}
+	if err := s.SetWorkspace(w); err != nil {
+		t.Fatal(err)
+	}
+	bg, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bg.Close()
+	wait := func(edit func() error) {
+		t.Helper()
+		tx, err := bg.DB.Begin()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback()
+		if _, err := tx.Exec(`UPDATE meta SET value=value WHERE key='schema_version'`); err != nil {
+			t.Fatal(err)
+		}
+		done := make(chan error, 1)
+		go func() { done <- edit() }()
+		select {
+		case err := <-done:
+			t.Fatalf("history edit should wait for background writer, got %v", err)
+		case <-time.After(100 * time.Millisecond):
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		if err := <-done; err != nil {
+			t.Fatalf("history edit failed after background commit: %v", err)
+		}
+	}
+	staged := `[{"i":"mod","p":2,"a":"anchor"}]`
+	wait(func() error { return s.EditWorkspace(w, `[]`, "stage", &staged) })
+	step, err := s.PeekStep(p.ID, "undo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wait(func() error { return s.RestoreStep(w, `[]`, "undo", "redo", *step) })
+	if s.Meta(StageKey(p.ID)) != "" {
+		t.Fatal("undo failed to restore staging")
+	}
+	wait(func() error { return s.PushStep(p.ID, "undo", `[]`, "fixture") })
 }
