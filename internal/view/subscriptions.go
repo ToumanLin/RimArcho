@@ -74,6 +74,16 @@ type SubscriptionsPage struct {
 }
 
 func BuildSubscriptions(a *app.App, st *app.LoadoutState, o modchanges.Opts) (*SubscriptionsPage, error) {
+	lib, err := a.Library()
+	if err != nil {
+		return nil, err
+	}
+	return BuildSubscriptionsFromLibrary(a, st, o, lib)
+}
+
+// BuildSubscriptionsFromLibrary reuses a read-only inventory; history still follows
+// the requested scope. The caller invalidates the inventory when provenance changes.
+func BuildSubscriptionsFromLibrary(a *app.App, st *app.LoadoutState, o modchanges.Opts, lib *app.Library) (*SubscriptionsPage, error) {
 	history, err := BuildChanges(a, st, o)
 	if err != nil {
 		return nil, err
@@ -121,15 +131,6 @@ func BuildSubscriptions(a *app.App, st *app.LoadoutState, o modchanges.Opts) (*S
 
 		p.Sources = append(p.Sources, r)
 	}
-	lib, err := a.Library()
-	if err != nil {
-		return nil, err
-	}
-	type added struct {
-		r  RecentSubscription
-		at time.Time
-	}
-	var recent []added
 	for _, l := range lib.Lineages {
 		for _, inst := range l.Instances {
 			for i := range p.Sources {
@@ -138,9 +139,6 @@ func BuildSubscriptions(a *app.App, st *app.LoadoutState, o modchanges.Opts) (*S
 					continue
 				}
 				s.Count++
-				if sub := inst.Subscription; sub != nil && !sub.InstalledAt.IsZero() && inst.Mod != nil && !inst.Missing() {
-					recent = append(recent, added{RecentSubscription{Name: l.Name, Kind: s.Key, Source: s.Name, Added: a.FormatDate(sub.InstalledAt)}, sub.InstalledAt})
-				}
 				if sub := inst.Subscription; sub != nil && sub.CheckedAt.After(checks[s.Key].At) {
 					check := checks[s.Key]
 					check.At = sub.CheckedAt
@@ -190,11 +188,7 @@ func BuildSubscriptions(a *app.App, st *app.LoadoutState, o modchanges.Opts) (*S
 			}
 		}
 	}
-	sort.SliceStable(recent, func(i, j int) bool { return recent[i].at.After(recent[j].at) })
-	p.Recent = []RecentSubscription{}
-	for i := 0; i < len(recent) && i < 5; i++ {
-		p.Recent = append(p.Recent, recent[i].r)
-	}
+	p.Recent = recentSubscriptions(a, lib.Lineages)
 	p.Summary = sourceSummary(a, p.Sources, checks)
 	return p, nil
 }
@@ -307,4 +301,51 @@ func subscriptionValue(a *app.App, kind, v string) string {
 		return date
 	}
 	return version + "  " + date
+}
+
+// AddSubscriptionInfo is the account and recent-install data used by the add form.
+type AddSubscriptionInfo struct {
+	Sources []SubscriptionSource `json:"sources"`
+	Recent  []RecentSubscription `json:"recent"`
+}
+
+func BuildAddSubscriptionInfo(a *app.App) (*AddSubscriptionInfo, error) {
+	ls, err := a.SubscriptionLineages()
+	if err != nil {
+		return nil, err
+	}
+	ll, _ := LoversLabLine(a)
+	return &AddSubscriptionInfo{
+		Sources: []SubscriptionSource{
+			{Key: app.LibSteamCMD, Account: SteamAccountLine(a.SteamAccountStatus())},
+			{Key: app.LibPage, Account: ll},
+		},
+		Recent: recentSubscriptions(a, ls),
+	}, nil
+}
+
+func recentSubscriptions(a *app.App, ls []*app.LibLineage) []RecentSubscription {
+	type added struct {
+		r  RecentSubscription
+		at time.Time
+	}
+	names := map[string]string{app.LibSteamCMD: "SteamCMD", app.LibGit: "Git", app.LibPage: T("download page / LoversLab")}
+	var recent []added
+	for _, l := range ls {
+		for _, inst := range l.Instances {
+			name, ok := names[inst.Source]
+			if !ok || inst.Mod == nil || inst.Missing() {
+				continue
+			}
+			if sub := inst.Subscription; sub != nil && !sub.InstalledAt.IsZero() {
+				recent = append(recent, added{RecentSubscription{Name: l.Name, Kind: inst.Source, Source: name, Added: a.FormatDate(sub.InstalledAt)}, sub.InstalledAt})
+			}
+		}
+	}
+	sort.SliceStable(recent, func(i, j int) bool { return recent[i].at.After(recent[j].at) })
+	out := []RecentSubscription{}
+	for i := 0; i < len(recent) && i < 5; i++ {
+		out = append(out, recent[i].r)
+	}
+	return out
 }

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -35,6 +36,7 @@ type API struct {
 	lib        *app.Library                // Mod 库存, as of libAt
 	libAt      string
 	libGate    sync.Mutex // coalesces full inventory builds, never acquired by edits
+	subRead    inventoryReader
 	copyRead   inventoryReader
 	detailRead logReader
 	board      *view.Board
@@ -82,6 +84,8 @@ type API struct {
 	llFiles     map[string]loverDownload
 	// ScanRunner scans an environment in place of the child process (tests).
 	ScanRunner func(env string) (string, error)
+
+	subRevision atomic.Uint64 // completed tasks may change files without a DB write
 }
 
 func newAPI(a *app.App) *API {

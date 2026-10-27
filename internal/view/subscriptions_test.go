@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -94,6 +95,20 @@ func TestSubscriptionsThreeSections(t *testing.T) {
 			t.Fatalf("list usage: %+v", row)
 		}
 	}
+	info, err := view.BuildAddSubscriptionInfo(e.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(info.Recent, p.Recent) {
+		t.Fatalf("light recent differs: %+v / %+v", info.Recent, p.Recent)
+	}
+	for _, src := range info.Sources {
+		for _, full := range p.Sources {
+			if src.Key == full.Key && src.Account != full.Account {
+				t.Fatalf("light account differs: %+v / %+v", src, full)
+			}
+		}
+	}
 	// Instance IDs are incidental to the section contents.
 	for i := range p.Pending {
 		p.Pending[i].ID, p.Pending[i].Ref = "id", "ref"
@@ -115,6 +130,31 @@ func TestSubscriptionsThreeSections(t *testing.T) {
 	}
 	if strings.ReplaceAll(string(want), "\r\n", "\n") != actual {
 		t.Fatalf("subscriptions golden differs:\n%s", actual)
+	}
+
+	// Recent installs have the same five-row limit and stable ties on both pages.
+	for i := 0; i < 7; i++ {
+		dir := filepath.Join(e.App.SubscribedDir(), fmt.Sprintf("Recent%d", i))
+		e.WriteMod(dir, testkit.Sample(fmt.Sprintf("tester.recent%d", i), fmt.Sprintf("Recent %d", i)))
+		if err := subscribe.Write(dir, &subscribe.Record{Kind: "page", URL: "https://example.invalid/file", InstalledAt: e.Now().Add(time.Duration(i/2) * time.Hour)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.MustRun("scan")
+	st, err = e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	full, err := view.BuildSubscriptions(e.App, st, modchanges.Opts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err = view.BuildAddSubscriptionInfo(e.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(info.Recent) != 5 || !reflect.DeepEqual(info.Recent, full.Recent) {
+		t.Fatalf("recent limit/ties differ: %+v / %+v", info.Recent, full.Recent)
 	}
 }
 

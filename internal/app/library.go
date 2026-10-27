@@ -410,15 +410,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 				i.Versions = append(i.Versions, v)
 			}
 		}
-		i.Created = m.FirstSeen
-		if m.Origin != "" {
-			var og scan.Origin
-			if json.Unmarshal([]byte(m.Origin), &og) == nil && og.CopiedAt != "" {
-				if t, err := time.Parse(time.RFC3339, og.CopiedAt); err == nil {
-					i.Created = t
-				}
-			}
-		}
+		i.Created = libCreated(m)
 		i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || dupIn(m.ID)) && !ix.ModIsLink(m)
 		if i.Locked != nil {
 			since := i.Created
@@ -492,16 +484,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 			}
 			i.UpstreamUpdates, i.UpstreamWorkshop = a.Store.UpdatesSince(ws.Mod.ID, i.Created), true
 		}
-		sort.SliceStable(l.Instances, func(x, y int) bool {
-			a, b := l.Instances[x], l.Instances[y]
-			if ra, rb := slices.Index(LibSources, a.Source), slices.Index(LibSources, b.Source); ra != rb {
-				return ra < rb
-			}
-			if !a.Created.Equal(b.Created) {
-				return a.Created.After(b.Created) // the newest locked version first
-			}
-			return a.Ref < b.Ref
-		})
+		sortLibInstances(l.Instances)
 		lib.Lineages = append(lib.Lineages, l)
 	}
 	sortLineages(lib.Lineages, "name")
@@ -1380,4 +1363,30 @@ func (lib *Library) Instance(ref string) *LibInstance {
 		}
 	}
 	return nil
+}
+
+func sortLibInstances(instances []*LibInstance) {
+	sort.SliceStable(instances, func(x, y int) bool {
+		a, b := instances[x], instances[y]
+		if ra, rb := slices.Index(LibSources, a.Source), slices.Index(LibSources, b.Source); ra != rb {
+			return ra < rb
+		}
+		if !a.Created.Equal(b.Created) {
+			return a.Created.After(b.Created) // the newest locked version first
+		}
+		return a.Ref < b.Ref
+	})
+}
+
+func libCreated(m *store.Mod) time.Time {
+	created := m.FirstSeen
+	if m.Origin != "" {
+		var og scan.Origin
+		if json.Unmarshal([]byte(m.Origin), &og) == nil && og.CopiedAt != "" {
+			if t, err := time.Parse(time.RFC3339, og.CopiedAt); err == nil {
+				created = t
+			}
+		}
+	}
+	return created
 }

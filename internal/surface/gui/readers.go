@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -33,6 +34,28 @@ func (s *API) detachedReader() (*app.App, error) {
 	}
 	r.AnalyzeExe, r.AnalyzeWait = s.Exe, 200*time.Millisecond
 	return r, nil
+}
+
+// subscriptionSession is called with subRead.mu held. The reader owns its connection
+// and lazy declarations; only invocation options and a detached index cross API.mu.
+func (s *API) subscriptionSession() (*app.App, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.a.Uninstalled {
+		return nil, "", errors.New("RimArcho 已卸载，账户操作已停用")
+	}
+	w := &s.subRead
+	var err error
+	if w.a == nil {
+		w.a, err = s.readInventorySession()
+	} else {
+		s.refreshInventorySession(w.a)
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	w.a.AnalyzeExe, w.a.AnalyzeWait = s.Exe, 200*time.Millisecond
+	return w.a, fmt.Sprintf("%s|%d", s.inventoryKey(), s.subRevision.Load()), nil
 }
 
 // pageReader is called with s.mu held, only to snapshot the invocation settings.
@@ -116,6 +139,13 @@ func (s *API) Close() {
 		s.detailRead.a = nil
 	}
 	s.detailRead.mu.Unlock()
+	s.subRead.mu.Lock()
+	if s.subRead.a != nil {
+		s.subRead.a.Close()
+		s.subRead.a = nil
+	}
+	s.subRead.lib = nil
+	s.subRead.mu.Unlock()
 	s.copyRead.mu.Lock()
 	if s.copyRead.a != nil {
 		s.copyRead.a.Close()
