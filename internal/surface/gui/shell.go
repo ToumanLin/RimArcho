@@ -365,12 +365,13 @@ func (s *API) PackImport(path string) (string, error) {
 // DownloadInfo is what the download step shows: SteamCMD (or the offer to download it from
 // Valve, with its size), RimWorld's branches, and a folder for the game.
 type DownloadInfo struct {
-	Account  string             `json:"account"`  // effective default; no password
-	SteamCMD string             `json:"steamcmd"` // "" when it is not installed
-	Offer    *app.SteamCMDOffer `json:"offer,omitempty"`
-	Branches []app.GameBranch   `json:"branches,omitempty"`
-	Games    string             `json:"games"` // a folder to put the new game in
-	Error    string             `json:"error,omitempty"`
+	Refreshing bool               `json:"refreshing,omitempty"`
+	Account    string             `json:"account"`  // effective default; no password
+	SteamCMD   string             `json:"steamcmd"` // "" when it is not installed
+	Offer      *app.SteamCMDOffer `json:"offer,omitempty"`
+	Branches   []app.GameBranch   `json:"branches,omitempty"`
+	Games      string             `json:"games"` // a folder to put the new game in
+	Error      string             `json:"error,omitempty"`
 }
 
 // GuideDownloadInfo asks SteamCMD (anonymously) which branches RimWorld has. SteamCMD
@@ -379,14 +380,15 @@ func (s *API) GuideDownloadInfo() *DownloadInfo {
 	s.mu.Lock()
 	a := s.a
 	games := gamesFolder(a)
-	s.mu.Unlock()
 	account, _ := a.SteamCMDAccount("")
 	d := &DownloadInfo{SteamCMD: a.SteamCMDPath(), Games: games, Account: account}
+	s.mu.Unlock()
 	if d.SteamCMD == "" {
 		d.Offer, _ = a.OfferSteamCMD()
 		return d
 	}
-	bs, err := a.GameBranches()
+	bs, refreshing, err := a.GameBranchesCached(d.SteamCMD)
+	d.Refreshing = refreshing
 	if err != nil {
 		d.Error = view.Humanize(nil, err.Error())
 	}
