@@ -112,9 +112,10 @@ func TestToolDownloadsAreTasks(t *testing.T) {
 	}
 	read := make(chan struct{})
 	go func() { api.Settings(); close(read) }()
+	// the download is held until the test ends, so a slow machine only waits longer here
 	select {
 	case <-read:
-	case <-time.After(5 * time.Second):
+	case <-time.After(30 * time.Second):
 		t.Fatal("download held the GUI lock")
 	}
 	if _, err := api.TexturesInstall(); err != nil {

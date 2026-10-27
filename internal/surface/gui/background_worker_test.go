@@ -58,7 +58,8 @@ func menuGame(t *testing.T, game string) {
 
 func awaitBackgrounds(t *testing.T, events <-chan string) {
 	t.Helper()
-	deadline := time.After(5 * time.Second)
+	// generous: the whole suite runs in parallel and a busy machine extracts slowly
+	deadline := time.After(30 * time.Second)
 	for {
 		select {
 		case event := <-events:

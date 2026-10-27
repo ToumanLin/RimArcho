@@ -135,7 +135,9 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
   sc.setAttribute("aria-busy", "true");
   if (board) board.inert = !sc.hidden;
   if (editor && $("#planhead")) $("#planhead").inert = !sc.hidden;
-  if (editor && sc.hidden && !warmEditor) say("busy", T(label));
+  // A read behind the editor already on screen (after sort, an edit, undo) keeps the status
+  // line: it says what the action did, which "loading…" would wipe.
+  if (editor && sc.hidden && !warmEditor && !same) say("busy", T(label));
   return {
     current,
     // A workspace reply can itself change the current game/list (06 §8.2).
