@@ -16,10 +16,11 @@ export async function drive(ctx) {
   if(options.allow&&!['local','external'].includes(options.allow))throw Error('--allow local|external');
   const classify=(control,state)=>baseClassify(control,{...state,sharedContent:!!options.baseline});
   const rng=random(seed), pick=a=>a[Math.floor(rng()*a.length)], started=performance.now(), deadline=started+minutes*60000;
-  Object.assign(result,{mode:options.mode,seed,steps,minutes,allow:options.allow||'safe',canonicalExclusions:exclusions,knownFailures:[{id:'F2',oracle:'undo canonical equality',description:'stage metadata outside undo; fix belongs to stage-undo branch'}]});
+  Object.assign(result,{mode:options.mode,seed,steps,minutes,allow:options.allow||'safe',canonicalExclusions:exclusions,knownFailures:[{id:'F2',oracle:'undo canonical equality',description:'stage metadata outside undo; fix belongs to stage-undo branch'},{id:'F3',oracle:'undo canonical equality',description:'saved-version checkout changes workspace origin metadata outside undo'}]});
   const ledger=new Map(),states=new Map(),queue=[],trace=[],edges=[],sequences=new Map(),pageDetails=new Map();
   const maxStates=Number(options['max-states']||200);
   const previousLedger=options.ledger?JSON.parse(readFileSync(options.ledger,'utf8')):null;
+  let restorationBroken=false;
   let sampleAt=0,statusAt=0,continuousFailure=null,expectedEnd,nonUndoableBranch=false,needsReset=false;
   const read=()=>c.evaluate('__vm.read(false)');
   const controls=()=>c.evaluate(`(${discover.toString()})()`);
@@ -74,7 +75,7 @@ export async function drive(ctx) {
         continue;
       }
       const policy=classify(control,s), permitted=allowed(policy,options.allow),eligible=permitted&&control.visible&&control.enabled&&!control.blockedByLayer;
-      const row={...control,key:id,state:key,states:[key],page:control.owner==='nav'?'sidebar':s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,blocked:policy.blocked,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
+      const row={...control,key:id,state:key,states:[key],page:control.owner==='nav'?'sidebar':s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,blocked:policy.blocked,isolate:policy.isolate,mustUndo:policy.mustUndo,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
       if(!permitted){row.outcome='skipped';row.reason=policy.blocked||(policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`);}
       else if(!eligible){row.reason=!control.visible?'not visible in this state':!control.enabled?'disabled; requires application precondition':'covered by page/popup/menu; not an eligible edge in this state';}
       ledger.set(id,row);added.push(row);
@@ -233,7 +234,7 @@ export async function drive(ctx) {
     await root();
     const restored=await snapshot(label+'-undone'),d=difference(canonical(before),canonical(restored));
     needsReset=!!difference(canonical(startSnapshot),canonical(restored));
-    if(d){const known=d.path.includes('staging');fail('undo canonical equality',{label,knownFailure:known?'F2':null,firstDifference:d});}
+    if(d){restorationBroken=true;const known=d.path.includes('staging')?'F2':/origin_kind|origin_version|conflict/.test(d.path)?'F3':null;fail('undo canonical equality',{label,knownFailure:known,firstDifference:d});}
     return !d;
   }
   async function attempt(row,recipe) {
@@ -265,7 +266,7 @@ export async function drive(ctx) {
         row.change=changed;
         const undoable=hasRestoration(before,after);
         if(undoable)await undoTo(before,'edge-'+row.key);
-        else if(row.tier==='safe')fail('safe action preserves canonical domain',{key:row.key,firstDifference:changed});
+        else if(row.tier==='safe'){restorationBroken=true;fail('safe action preserves canonical domain',{key:row.key,firstDifference:changed});}
         else row.nonUndoable={reason:'persistent write; branch discarded',firstDifference:changed};
       }
       await restore(recipe);
@@ -335,14 +336,14 @@ export async function drive(ctx) {
         const row=rows[0];
         if(row){
           // Confirming persistent operations runs in another fresh runner case.
-          if(row.tier!=='safe')await isolatedEdge(row,node.recipe);
+          if(row.tier!=='safe'||row.isolate)await isolatedEdge(row,node.recipe);
           else await attempt(row,node.recipe);
           if(rows.length>1)queue.push(node);
         }
         saveLedger();
-        if(continuousFailure?.name==='undo canonical equality')break;
+        if(restorationBroken)break;
       }
-      result.crawlLimit=performance.now()>=deadline?'minutes':states.size>maxStates?'max-states':queue.length?'failure':null;
+      result.crawlLimit=performance.now()>=deadline?'minutes':states.size>maxStates?'max-states':restorationBroken?'canonical-restoration':queue.length?'failure':null;
       if(result.crawlLimit)for(const r of ledger.values())if(r.reason==='not attempted')r.reason='crawl stopped: '+result.crawlLimit;
     } else await walk();
   }catch(e){fail('player driver',{error:e.stack});}
@@ -369,7 +370,7 @@ export async function drive(ctx) {
   async function isolatedEdge(row,recipe) {
     row.attemptedAt=new Date().toISOString();
     const parentBefore=await snapshot('branch-'+row.key+'-parent-before');
-    const file=join(out,'branch-'+row.key+'.json');save('branch-'+row.key,{actions:[...recipe,{...(row.action||{kind:'click',locator:row.locator}),expectedTarget:{label:row.sourceLabel??row.label,identity:row.identity}}].map(action=>({action}))});
+    const file=join(out,'branch-'+row.key+'.json');save('branch-'+row.key,{actions:[...recipe,{...(row.action||{kind:'click',locator:row.locator}),expectedTarget:{label:row.sourceLabel??row.label,identity:row.identity},mustUndo:row.mustUndo}].map(action=>({action}))});
     // Child runs have a fresh fixture/full filesystem copy; never reuse a dirty root.
     const entry=await input({kind:'branch',traceFile:file,control:row.key});
     const parentAfter=await snapshot('branch-'+row.key+'-parent-return');
@@ -387,7 +388,7 @@ export async function drive(ctx) {
       if(options.branch==='true'){
         const after=await snapshot('branch-after'),d=difference(canonical(startSnapshot),canonical(after));
         const undoable=hasRestoration(startSnapshot,after);
-        if(d&&!undoable&&!d.path.includes('/staging')){nonUndoableBranch=true;expectedEnd=after;result.nonUndoableChanges={reason:'explicitly permitted persistent operation in a disposable branch; no workspace undo exists',beforeCanonicalHash:hash(JSON.stringify(canonical(startSnapshot))),afterCanonicalHash:hash(JSON.stringify(canonical(after))),firstDifference:d,beforeCheckpoint:'player-start',afterCheckpoint:result.checkpoints.at(-1).label};}
+        if(d&&!undoable&&!d.path.includes('/staging')&&!replay.actions.some(x=>(x.action||x).mustUndo)){nonUndoableBranch=true;expectedEnd=after;result.nonUndoableChanges={reason:'explicitly permitted persistent operation in a disposable branch; no workspace undo exists',beforeCanonicalHash:hash(JSON.stringify(canonical(startSnapshot))),afterCanonicalHash:hash(JSON.stringify(canonical(after))),firstDifference:d,beforeCheckpoint:'player-start',afterCheckpoint:result.checkpoints.at(-1).label};}
       }
       return;
     }

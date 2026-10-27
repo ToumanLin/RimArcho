@@ -34,6 +34,7 @@ function classifyBase(control, state={}) {
   if(control.action?.kind==='key') return classifyKey(control.action.combo,state);
   if(control.action?.kind==='wheel') return {tier:'safe',reason:'real scrolling'};
   const id=control.identity||{}, cmd=id['data-cmd'] || id['data-op'] || '', write=id['data-env-write'], text=control.label?.trim().toLowerCase()||'';
+  if(/^go back to this version/.test(text))return {tier:'safe',reason:'saved-version checkout advertises undo; verify on a disposable DB branch',isolate:true,mustUndo:true};
   if(control.semantics?.some(x=>['breadcrumb','table-header','plan-choice','export-format','appearance','filter-choice'].includes(x)))return {tier:'safe',reason:'reviewed UI navigation/view control: '+control.semantics.join(', ')};
   if(control.owner==='nav'&&id['data-id']==='subscribe')return {tier:'safe',reason:'open subscription form without submitting or previewing a URL'};
   if(id['data-act']==='goto')return {tier:'safe',reason:'task result navigation'};
