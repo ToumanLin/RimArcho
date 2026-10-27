@@ -359,6 +359,7 @@ function drawNeeds() {
   else if (d.stale) state = T("the files changed since the last check");
   const w = page("needs", needsLead(d),
     state ? el("span", "state-note", state) : null,
+    autoFix(),
     act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A", "analyze"),
     act(T("game log"), "log", () => ui.go("log"), "l"));
   N.els = [];
@@ -397,6 +398,20 @@ function drawNeeds() {
   sc.append(w);
   sc.scrollTop = top;
   markNeeds();
+}
+
+// autoFix: one click for what needs no question: the required mods that are installed
+// but not enabled are enabled and the list sorted again (one undo step).
+function autoFix() {
+  const n = N.items.filter((it) => it.counted && it.target && (it.actions || []).some((a) => a.kind === "enable")).length;
+  if (!n) return null;
+  const b = act(Tf("fix %d automatically", n), "ok", async () => {
+    await ui.edited(() => api.CompleteDependencies(), true);
+    if (S.screen === "needs") needs(true);
+  }, "F", "enable");
+  b.classList.add("primary");
+  b.title = T("enables the required mods that are installed and sorts the list; u undoes it");
+  return b;
 }
 
 function needCard(it, i) {
@@ -460,6 +475,9 @@ function markNeeds() {
 const actionWrite = (a) => ["open-url", "view", "list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
 // The pinned badge popover in the editor offers the same actions (06 §4.2).
 setNeedRunner((it, a) => runAction(it, a), actionWrite);
+// The editor's problems panel (problems.js) runs them too.
+export const runNeedAction = (it, a) => runAction(it, a);
+export const needActionWrite = actionWrite;
 
 async function runAction(it, act) {
   switch (act.kind) {
@@ -507,7 +525,8 @@ async function doAction(act, option) {
 // needsKey: ↑↓ (j k, PageUp/PageDown, Home/End) move through the items, ← → jump to the
 // previous / next section; an item's action keys run its actions.
 export function needsKey(e) {
-  const k = e.key;
+  // shift+letter is the capital letter even where the key reports it in lower case
+  const k = e.shiftKey && /^[a-z]$/.test(e.key) ? e.key.toUpperCase() : e.key;
   const n = N.items.length;
   if ((k === "ArrowLeft" || k === "ArrowRight") && n) {
     e.preventDefault();
@@ -519,6 +538,7 @@ export function needsKey(e) {
   const m = n ? moveIn(N.cur, n, k) : null;
   if (m != null) { e.preventDefault(); N.cur = m; return markNeeds(); }
   if (k === "A") return ui.cmd("analyze");
+  if (k === "F") { const b = $("#screen .page-acts .primary"); if (b) { e.preventDefault(); b.click(); } return; }
   if (k === "l") return ui.go("log");
   const it = N.items[N.cur];
   const name = k === " " ? "space" : k === "Enter" ? "enter" : k;

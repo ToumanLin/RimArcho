@@ -15,7 +15,7 @@ const writesGame = new Set([
   "CreatePlan", "ImportApplyTo", "UsePlan", "OpenPlan", "NewPlan", "RenamePlan", "RemovePlan", "ImportApply", "ImportAsPlan", "ImportAsPlanPreview", "ImportFollow",
   "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetTag",
   "LibraryDo", "LibrarySetNote", "Subscribe", "SubscriptionFrom", "CheckSubscriptionSource", "WorkshopUpdate", "Scan", "Analyze", "RemoveEnv", "ApplySetting", "AddMonitor",
-  "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer",
+  "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer", "CompleteDependencies", "ReplaceRecommended", "UseInstalled",
 ]);
 on("environment", (result) => {
   const p = pending.get(result.request);
