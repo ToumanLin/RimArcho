@@ -30,6 +30,7 @@ assert(!mode || driver === 'W', 'crawl/walk require real window driver W');
 assert(['W','A','C'].includes(driver) && scenario >= 1 && scenario <= 4, 'use --driver W|A|C --scenario 1|2|3|4');
 const outside = path => { for(const root of [repo,repositoryRoot]) { const r=relative(root,resolve(path));assert(r.startsWith('..')||isAbsolute(r),`results and test homes must be outside the repository: ${path}`); } return resolve(path); };
 const guest=process.env.RIMARCHO_VM_GUEST==='1';
+assert(options.allow!=='external'||guest,'external actions are enabled only in the test VM');
 assert(!options.baseline || guest,'host runs support only the generated fixture; real baselines are VM-only');
 assert(!options.baseline || options['reuse-content']==='true','VM baselines require --reuse-content true (no full content copy)');
 assert(!options.baseline || mode || scenario!==2,'scenario 2 deployment switching needs private content; skipped on a shared baseline');
