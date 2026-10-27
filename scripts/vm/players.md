@@ -69,7 +69,8 @@ driver action, including resets and final undo. Continuous DOM sampling and chec
 oracles check responsiveness, loading, sidebar integrity, scripts and problem sequences.
 
 Page scheduling rotates across sidebar pages before taking another edge on the
-same page. Undo restoration uses the explicit workspace palette command, including
+same page. Native disclosure sections are restored with real clicks before recipe
+replay; distinct disclosure/tab paths participate in state identity. Undo restoration uses the explicit workspace palette command, including
 redo restoration after testing Undo itself; it does not assume undo depth increases.
 Background analysis remains observable while lightweight polling waits for page
 loads and workspace edits. Event evidence retains scalar metadata; independent
@@ -98,7 +99,7 @@ stage-undo branch is merged.
 command. Replay preserves recorded input spacing. Disposable branch actions are
 embedded in the trace so copied evidence does not depend on guest-only branch files. Failed walks automatically retry
 shorter prefixes and remove chunks on fresh copies, accepting only a repeat of the
-same oracle. `minimal-trace.json` and `shrink.json` report the best bounded reduction;
+same oracle, known-failure ID and canonical difference path. `minimal-trace.json` and `shrink.json` report the best bounded reduction;
 this is not a proof of global minimality. Use `--shrink-runs N` (default 6) or disable
 retries with `--shrink false` for seed sweeps.
 

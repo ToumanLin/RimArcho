@@ -49,8 +49,15 @@ const payload = snap => snap.plans.map(p => ({ name:p.name, entries:p.workspace,
 const entries = (snap,name=currentPlan) => snap.plans.find(p=>p.name===name)?.workspace?.[0]?.entries;
 const undoDepth = (snap,name=currentPlan) => snap.plans.find(p=>p.name===name)?.undoDepth;
 async function snapshot(label) {
-  const data = JSON.parse(command(exe('vmstate'), ['--home',home,'--plan',currentPlan]));
-  const ui = c ? await c.evaluate('window.__vm.read()') : null;
+  let data,ui;
+  for(let attempt=0;attempt<3;attempt++){
+    data=JSON.parse(command(exe('vmstate'), ['--home',home,'--plan',currentPlan]));
+    ui=c ? await c.evaluate('window.__vm.read()') : null;
+    // A background publication can begin a new page read while vmstate runs.
+    // Capture a settled checkpoint instead of diagnosing its loading view as blank.
+    if(!mode||!ui||!(ui.loading||ui.editing||ui.busy.env))break;
+    await settled();
+  }
   const artifact = `${String(++checkpointSeq).padStart(2,'0')}-${label}`;
   save(artifact,{ domain:data, surface:ui });result.checkpoints.push({ label, artifact:artifact+'.json' });
   if(ui) {

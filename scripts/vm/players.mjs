@@ -16,7 +16,7 @@ export async function drive(ctx) {
   if(options.allow&&!['local','external'].includes(options.allow))throw Error('--allow local|external');
   const rng=random(seed), pick=a=>a[Math.floor(rng()*a.length)], started=performance.now(), deadline=started+minutes*60000;
   Object.assign(result,{mode:options.mode,seed,steps,minutes,allow:options.allow||'safe',canonicalExclusions:exclusions,knownFailures:[{id:'F2',oracle:'undo canonical equality',description:'stage metadata outside undo; fix belongs to stage-undo branch'}]});
-  const ledger=new Map(),states=new Map(),queue=[],trace=[],edges=[],sequences=new Map();
+  const ledger=new Map(),states=new Map(),queue=[],trace=[],edges=[],sequences=new Map(),pageDetails=new Map();
   const maxStates=Number(options['max-states']||200);
   const previousLedger=options.ledger?JSON.parse(readFileSync(options.ledger,'utf8')):null;
   let sampleAt=0,statusAt=0,continuousFailure=null,expectedEnd,nonUndoableBranch=false,needsReset=false;
@@ -159,9 +159,19 @@ export async function drive(ctx) {
     await settled();
     if((await read()).plan!==plan.name)throw Error('list cannot be edited in the current game: '+plan.name);
   }
+  async function normalizeDetails(page) {
+    const details=await c.evaluate(`(${discover.toString()})().filter(x=>x.tag==='SUMMARY').map(x=>({locator:x.locator,open:document.querySelector(x.locator).parentElement.open}))`);
+    if(!pageDetails.has(page)){pageDetails.set(page,details);return;}
+    for(const wanted of pageDetails.get(page)){
+      const actual=details.find(x=>x.locator===wanted.locator);
+      if(actual&&actual.open!==wanted.open){await input({kind:'click',locator:wanted.locator});await settled();}
+    }
+  }
   async function restore(recipe) {
     if(needsReset){if(!await undoTo(startSnapshot,'reset'))throw Error('canonical root cannot be restored');needsReset=false;}
-    await root();for(const action of recipe){await input(action);await settled();}return oracles('return/replay');
+    await root();await normalizeDetails(null);
+    for(const action of recipe){const page=(await read()).page;await input(action);await settled();const next=(await read()).page;if(next!==page)await normalizeDetails(next);}
+    return oracles('return/replay');
   }
   async function undoTo(before,label) {
     await root();
@@ -202,6 +212,7 @@ export async function drive(ctx) {
     row.action=action;row.attemptedAt=new Date().toISOString();
     try {
       await restore(recipe);
+      if(hash(stateKey(await read(),await controls()))!==row.state){row.outcome='unreachable';row.reason='state changed during real-input recipe replay';return;}
       if(action.kind==='click'&&!await locate(action)){row.outcome='unreachable';row.reason='not hittable after real scroll/replay';return;}
       // Re-check the actual target immediately before input. A stale selector must
       // never silently turn a safe button into a newly rendered destructive one.
@@ -385,19 +396,20 @@ export async function drive(ctx) {
   async function shrink() {
     // Replays always use a fresh runner copy. Keep a candidate only if the same
     // oracle fails; unrelated setup/selector failures cannot shrink an app bug.
-    const signature=(originalFailure||result.failures[0])?.name;
+    const target=originalFailure||result.failures[0];
+    const signature=f=>JSON.stringify([f?.name,f?.detail?.knownFailure||null,f?.detail?.firstDifference?.path||null]);
     let best=trace.map(t=>({action:t.action})),attempts=[];
     const max=Number(options['shrink-runs']||6);
     async function retry(actions){
       const file=join(out,'shrink-candidate.json');writeFileSync(file,JSON.stringify({actions}));
       const r=spawnSync(process.execPath,replayArgs(file),{encoding:'utf8',windowsHide:true,timeout:180000,maxBuffer:4*1024*1024});
       let reproduced=false,output=null;
-      try{const j=JSON.parse(r.stdout);output=j.output;const report=JSON.parse(readFileSync(join(output,'result.json'),'utf8'));reproduced=report.failures.some(f=>f.name===signature);}catch{}
+      try{const j=JSON.parse(r.stdout);output=j.output;const report=JSON.parse(readFileSync(join(output,'result.json'),'utf8'));reproduced=report.failures.some(f=>signature(f)===signature(target));}catch{}
       attempts.push({length:actions.length,reproduced,output,error:r.error?.message});return reproduced;
     }
     // Shorter prefixes, then removal chunks (including middle actions).
     for(let n=Math.floor(best.length/2);n>0&&attempts.length<Math.ceil(max/2);n=Math.floor(n/2))if(await retry(best.slice(0,n)))best=best.slice(0,n);
     for(let chunk=Math.ceil(best.length/2);chunk>=1&&attempts.length<max;chunk=Math.floor(chunk/2))for(let at=0;at<best.length&&attempts.length<max;at+=chunk){const candidate=best.slice(0,at).concat(best.slice(at+chunk));if(candidate.length&&await retry(candidate)){best=candidate;break;}}
-    save('minimal-trace',{schema:1,seed,actions:best});save('shrink',{oracle:signature,originalLength:trace.length,minimalLength:best.length,attempts,command:replayCommand(replayArgs(join(out,'minimal-trace.json'))),minimality:'bounded prefix/chunk reduction, not proof of global minimum'});
+    save('minimal-trace',{schema:1,seed,actions:best});save('shrink',{oracle:target?.name,signature:signature(target),originalLength:trace.length,minimalLength:best.length,attempts,command:replayCommand(replayArgs(join(out,'minimal-trace.json'))),minimality:'bounded prefix/chunk reduction, not proof of global minimum'});
   }
 }
