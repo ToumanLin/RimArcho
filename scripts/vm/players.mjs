@@ -57,7 +57,7 @@ export async function drive(ctx) {
     // A sidebar button does not become a new control in every popup/focus state.
     // Keep popup/menu context for their controls, and page/list/view context for
     // page controls. Retain all graph occurrences separately in the ledger.
-    const context=control.owner==='nav'?[s.page||'plan','nav']:['popup','menu'].includes(control.owner)?state:[s.page||'plan',s.plan,s.modes||[]];
+    const context=control.owner==='nav'?['sidebar']:['popup','menu'].includes(control.owner)?state:[s.page||'plan',s.plan,s.modes||[]];
     return hash(JSON.stringify([context,...stable]));
   }
   function record(found,s,key,recipe) {
@@ -73,7 +73,7 @@ export async function drive(ctx) {
         continue;
       }
       const policy=classify(control,s), permitted=allowed(policy.tier,options.allow),eligible=permitted&&control.visible&&control.enabled&&!control.blockedByLayer;
-      const row={...control,key:id,state:key,states:[key],page:s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
+      const row={...control,key:id,state:key,states:[key],page:control.owner==='nav'?'sidebar':s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
       if(!permitted){row.outcome='skipped';row.reason=policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`;}
       else if(!eligible){row.reason=!control.visible?'not visible in this state':!control.enabled?'disabled; requires application precondition':'covered by page/popup/menu; not an eligible edge in this state';}
       ledger.set(id,row);added.push(row);
@@ -290,7 +290,11 @@ export async function drive(ctx) {
       await root();await enqueue([]);
       // All sidebar pages are explicit roots; popup branching cannot starve them.
       const nav=(await controls()).filter(x=>x.owner==='nav'&&(x.identity['data-id']||x.identity.id));
-      for(const n of nav){if(!n.enabled||!n.visible||!n.hittable)continue;try{await restore([{kind:'click',locator:n.locator}]);await enqueue([{kind:'click',locator:n.locator}]);}catch(e){fail('sidebar root',{label:n.label,error:e.message});}}
+      for(const n of nav){
+        if(!n.enabled||!n.visible||!n.hittable)continue;
+        const row=[...ledger.values()].find(r=>r.owner==='nav'&&r.locator===n.locator&&r.eligible&&!r.attemptedAt);
+        if(row)await attempt(row,[]);
+      }
       for(const r of recipes){
         await root();const s=await read(),from=hash(stateKey(s,await controls()));
         const recipe=r.map(key),id=hash(from+'key:'+r.join(','));
@@ -381,7 +385,7 @@ export async function drive(ctx) {
         actions=[key(col),key(pick(['Home','ArrowDown','End'])),{...key(pick(['Space','Space','Space','Shift+KeyJ','Shift+KeyK','Shift+KeyS','KeyT','KeyU'])),repeats:rng()<.3?2:0,delayMs}];
       } else {
         const found=await controls(),state=hash(stateKey(s,found));record(found,s,state,[]);
-        const candidates=found.filter(x=>x.visible&&x.enabled&&x.hittable&&allowed(classify(x,s).tier,options.allow)&&(!previousLedger||previousLedger.controls.some(old=>old.page===(s.page||'plan')&&old.locator===x.locator&&allowed(old.tier,options.allow))));
+        const candidates=found.filter(x=>x.visible&&x.enabled&&x.hittable&&allowed(classify(x,s).tier,options.allow)&&(!previousLedger||previousLedger.controls.some(old=>(old.page===(s.page||'plan')||old.page==='sidebar'&&x.owner==='nav')&&old.locator===x.locator&&allowed(old.tier,options.allow))));
         const target=candidates.length?pick(candidates):null;
         chosenRow=target?ledger.get(identity(target,state,s)):null;
         if(target&&classify(target,s).tier!=='safe'){

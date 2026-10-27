@@ -48,9 +48,11 @@ mode is intended for the disposable test VM and can open a native dialog that ne
 desktop interaction; a blocked native workflow is never counted as coverage.
 
 A control records every graph state in which it was discovered. Sidebar controls
-are deduplicated across focus/popups on their page; page controls use list/view
+are deduplicated globally and reported under `sidebar`, with every discovered page
+occurrence retained; page controls use list/view
 context; popup and menu controls retain their full opening context. This avoids
-requiring the same sidebar button to pass again under every unrelated overlay.
+requiring the same sidebar button to pass again under every unrelated overlay. Initial sidebar
+routes undergo the full control assertion/canonical/return path, not just a visit.
 
 The crawler uses page + current list + popup/title + menu options + focus + navigation
 layout + view modes as a state key. It deduplicates states, saves input recipes and
