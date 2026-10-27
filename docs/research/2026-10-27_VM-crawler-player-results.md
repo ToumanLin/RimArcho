@@ -81,8 +81,10 @@ created by this task in guest VM-Test were deleted after evidence retrieval;
 Node count is zero. Guest C: free after cleanup: **23,732,092,928 bytes**. The
 existing baseline measured **22,580,416,214 bytes** and was left unchanged.
 
-Host output under `D:/RimArcho-test` is **537,912,079 bytes** before these final small
-report files. The final evidence folder is approximately **70 MB**, below 1 GB.
+At the final inventory (2026-10-27 23:31 UTC), `D:/RimArcho-test` measured
+**1,396,928,233 bytes**, below 2 GB, including a separate `f4` directory measured
+at **1,009,955,753 bytes** that was left untouched. The final evidence measured
+**69,761,904 bytes**, below 1 GB, before this small report correction.
 Old `D:/vm-*` and `D:/stage-undo-*` folders were not deleted.
 
 Coverage is incomplete. The real crawler predates the final driver fixes and its
