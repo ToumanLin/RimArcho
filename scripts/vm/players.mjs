@@ -136,7 +136,10 @@ export async function drive(ctx) {
           if(replayFailures.length&&replayFailures.every(f=>/^(?:Error: )?(?:unreachable control|policy blocked|control not hittable)/.test(f.detail?.error||f.detail||'')))entry.unreachableReason=replayFailures.map(f=>f.detail?.error||f.detail).join('\n');
           result.performanceFailures.push(...report.performanceFailures.map(f=>({...f,branchControl:action.control})));
         }catch{}
-        if(entry.functionalStatus!=='passed'&&!entry.unreachableReason)fail('isolated branch',{control:action.control,error:entry.error,output:entry.branchOutput});
+        if(entry.functionalStatus!=='passed'&&!entry.unreachableReason){
+          const known=entry.failures?.length&&entry.failures.every(f=>f.detail?.knownFailure)?[...new Set(entry.failures.map(f=>f.detail.knownFailure))].join(','):undefined;
+          fail('isolated branch',{control:action.control,knownFailure:known,error:entry.error,output:entry.branchOutput});
+        }
       }
       else {
         for(let n=1;n<=(action.count||1);n++){
@@ -418,7 +421,7 @@ export async function drive(ctx) {
         chosenRow=target?ledger.get(identity(target,state,s)):null;
         if(target&&classify(target,s).tier!=='safe'){
           await isolatedEdge(chosenRow,trace.filter(t=>t.action.kind!=='branch').map(replayAction));
-          result.executedSteps=i+1;if(result.failures.length>beforeFailures)break;continue;
+          result.executedSteps=i+1;if(result.failures.slice(beforeFailures).some(f=>!f.detail?.knownFailure))break;continue;
         }
         actions=target?[{kind:'click',locator:target.locator,count:pick([1,1,2,3]),delayMs},...(rng()<.5?[key('Escape')]:[])]:[key('Escape')];
       }
@@ -431,7 +434,7 @@ export async function drive(ctx) {
       }
       if(i%10===9){try{await settled();await oracles('checkpoint '+i);await snapshot('walk-'+i);}catch(e){fail('checkpoint',{step:i,error:e.message});}}
       result.executedSteps=i+1;save('trace',{schema:1,seed,actions:trace});
-      if(result.failures.length>beforeFailures){originalFailure=result.failures[beforeFailures];break;}
+      if(result.failures.slice(beforeFailures).some(f=>!f.detail?.knownFailure)){originalFailure=result.failures[beforeFailures];break;}
     }
     await settled();await oracles('walk complete');
   }
