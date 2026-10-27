@@ -223,16 +223,27 @@ async function scenario1() {
   }
 
   const initial=await snapshot('before-bursts');
+  const inventory=(await uiState()).columns.flatMap(col=>col.entries.map(e=>e.id).filter(Boolean)).sort();
   for(const count of [1,10,100]) for(const cadence of [20,50,100]) {
     await dismiss();
     const available=await c.evaluate('(async()=>{const {S}=await import("/js/state.js");return S.cols[0].view.length})()');
     if(available<count){result.coverage.push({action:'selection-'+count,cadence,status:'insufficient fixture rows',available});continue;}
+    const observed=JSON.parse(command(exe('vmstate'),['--home',home,'--plan',currentPlan])).observation;
+    const activePackages=observed.entries.map(e=>observed.packages[e.i]||e.m);
+    const chosen=await c.evaluate(`(()=>{const packages=${JSON.stringify(observed.packages)},eligible=${JSON.stringify(observed.eligible)},seen=new Set(${JSON.stringify(activePackages)}),out=[];const col=window.__vm.read().columns[0];return col.entries.map((e,i)=>({id:e.id,i})).filter(e=>{const p=packages[e.id];if(!p||!eligible[e.id]||seen.has(p))return false;seen.add(p);return true}).slice(0,${count})})()`);
+    if(chosen.length<count){result.coverage.push({action:'legal-selection-'+count,status:'insufficient distinct loadable packages',available:chosen.length});continue;}
     await c.click('.area[data-area="0"] .row');await press('Home');
-    if(count>1)await c.key('Shift+ArrowDown',{repeats:count-2});
+    let position=0;
+    for(const item of chosen){
+      if(item.i>position)await c.key('ArrowDown',{repeats:item.i-position-1});
+      await press('Control+Space');position=item.i;
+    }
+    check(`selection ${count}-${cadence} contains legal unique packages`,(await uiState()).columns[0].selected.length===count);
     const before=await snapshot(`selection-${count}-${cadence}`);
     result.timings.push({name:`space-${count}-${cadence}`,trace:await c.burst(Array(20).fill('Space'),cadence)});
     await timed(`space-${count}-${cadence}-settled`,()=>settled(),10000);
     const after=await snapshot(`space-${count}-${cadence}`);
+    check(`space-${count}-${cadence} conserves instances across columns`,JSON.stringify((await uiState()).columns.flatMap(col=>col.entries.map(e=>e.id).filter(Boolean)).sort())===JSON.stringify(inventory));
     const stack=after.plans.find(p=>p.name===currentPlan).undo;
     const n=stack.findIndex(step=>step.entries===entries(before))+1;
     if(n>0){await c.burst(Array(n).fill('KeyU'),20);await settled();check(`space-${count}-${cadence} undo restores entries`,entries(await snapshot(`undo-${count}-${cadence}`))===entries(before));}
@@ -303,7 +314,7 @@ async function scenario3() {
     for(const clicks of [2,3]){
       const point=await c.click('.area[data-area="0"] .row');
       const b=await snapshot(`before-enable-${clicks}`);
-      await c.mouse('left',point.x,point.y,clicks);await settled();
+      for(let click=2;click<=clicks;click++)await c.mouse('left',point.x,point.y,click);await settled();
       const a=await snapshot(`after-enable-${clicks}`);
       check(`enable ${clicks}-click has no duplicate entries`,new Set(JSON.parse(entries(a)).map(e=>e.i||"missing:"+e.m)).size===JSON.parse(entries(a)).length);
       if(entries(a)!==entries(b)){await press('KeyU');await settled();check(`enable ${clicks}-click undo restores entries`,entries(await snapshot(`enable-${clicks}-undone`))===entries(b));}
@@ -312,7 +323,7 @@ async function scenario3() {
       const b=await snapshot(`before-import-${clicks}`);
       await importPreview();await c.click('.xc-preview fieldset .xc-check:nth-of-type(2) input');
       const point=await c.click('[data-env-write="import-apply"]');
-      await c.mouse('left',point.x,point.y,clicks);await settled('plans');await editor();
+      for(let click=2;click<=clicks;click++)await c.mouse('left',point.x,point.y,click);await settled('plans');await editor();
       const a=await snapshot(`after-import-${clicks}`);
       check(`import ${clicks}-click creates no plans`,a.plans.length===b.plans.length);
       check(`import ${clicks}-click is one undo step`,undoDepth(a)===Math.min(100,undoDepth(b)+1));

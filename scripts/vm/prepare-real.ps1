@@ -35,7 +35,13 @@ foreach ($e in $envRows) {
  if (-not $copies.Contains($e.game_root)) { $copies[$e.game_root] = Join-Path $Root ('game-' + $e.id) }
  if ($e.user_data_root -and -not $copies.Contains($e.user_data_root)) { $copies[$e.user_data_root] = Join-Path $Root ('userdata-' + $e.id) }
 }
-foreach ($s in $srcRows) { if (-not $copies.Contains($s.root)) { $copies[$s.root] = Join-Path $Root ('source-' + $s.id) } }
+foreach ($s in $srcRows) {
+ if ($copies.Contains($s.root)) { continue }
+ # Preserve nesting: moving a game's embedded SteamCMD directory elsewhere would
+ # let product discovery index the remaining embedded copy as a second source.
+ $parent = $copies.Keys | Where-Object { $s.root.StartsWith($_.TrimEnd('\','/')+'\',[StringComparison]::OrdinalIgnoreCase) } | Sort-Object Length -Descending | Select-Object -First 1
+ $copies[$s.root] = if ($parent) { Join-Path $copies[$parent] ([IO.Path]::GetRelativePath($parent,$s.root)) } else { Join-Path $Root ('source-' + $s.id) }
+}
 function CopyTree([string]$from,[string]$to) {
  Write-Output "copy $from -> $to"
  robocopy $from $to /E /XJ /NFL /NDL /NJH /NJS /NP /R:1 /W:1 /MT:16 | Out-Null
@@ -102,6 +108,8 @@ $sqlFile = Join-Path $Root 'relocation.sql'
 [IO.File]::WriteAllText($sqlFile, ".bail on`nbegin immediate;`n" + ($updates -join "`n") + "`ncommit;`n", [Text.UTF8Encoding]::new($false))
 Get-Content -Raw $sqlFile | & sqlite3 $db
 if ($LASTEXITCODE) { throw 'typed relocation failed' }
+& (Join-Path $Tools 'vmstate.exe') --mode audit --home (Join-Path $Root 'home') --root $Root
+if ($LASTEXITCODE) { throw 'pre-open isolation audit failed' }
 $env:RIMARCHO_HOME = Join-Path $Root 'home'
 $env:APPDATA = Join-Path $Root 'appdata'
 $env:LOCALAPPDATA = Join-Path $Root 'localappdata'
@@ -110,16 +118,9 @@ $archo = Join-Path $Tools 'archo.exe'
 & $archo config set ui.lang en
 # Only now use product services against the fully isolated copy.
 foreach ($e in $envRows) { & $archo env set $e.name --game (Mapped $e.game_root) --user-data (Mapped $e.user_data_root); if ($LASTEXITCODE) { throw 'isolated env validation failed' } }
-foreach ($s in $srcRows) {
- $id = switch ($s.label) { 'locked' {'lock'} 'monitor' {'monitor'} default {"source:$($s.id)"} }
- & $archo folder set $id (Mapped $s.root)
- if ($LASTEXITCODE) { throw 'isolated source validation failed' }
-}
 & $archo scan
 if ($LASTEXITCODE) { throw 'isolated scan failed' }
 & (Join-Path $Tools 'vmstate.exe') --mode audit --home $env:RIMARCHO_HOME --root $Root
 if ($LASTEXITCODE) { throw 'isolation audit failed' }
 @{schema=1;root=$Root;home=$env:RIMARCHO_HOME;created=(Get-Date).ToUniversalTime().ToString('o');sourceDatabaseHash=(Get-FileHash (Join-Path $SourceHome 'archo.db')).Hash;copies=$copies} | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $Root 'isolated.json')
 Write-Output "isolated baseline: $Root"
-
-

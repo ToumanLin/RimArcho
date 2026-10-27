@@ -303,7 +303,14 @@ func snapshot(home string, openPlan ...string) any {
 		var value any
 		check(json.Unmarshal(b, &value))
 		out["problems"] = norm(value)
-		out["observation"] = map[string]any{"entries": ps.State.List, "environment": ps.State.Ix.Env.ID, "plan": ps.State.Plan.ID}
+		handles := map[string]string{}
+		eligible := map[string]bool{}
+		for _, m := range ps.State.Ix.Mods {
+			handles[m.ID] = m.PackageID
+			winner := ps.State.Reg.Resolve(m.PackageID).Instance
+			eligible[m.ID] = !view.ModItem(ps.State, m).Dim && (winner == "" || winner == m.ID)
+		}
+		out["observation"] = map[string]any{"entries": ps.State.List, "environment": ps.State.Ix.Env.ID, "plan": ps.State.Plan.ID, "packages": handles, "eligible": eligible}
 	}
 	return out
 }
