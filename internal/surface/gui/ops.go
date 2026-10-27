@@ -140,3 +140,11 @@ func (s *API) ReplaceRecommended(refs []string) (*view.Result, error) {
 	s.needs, s.board = nil, nil
 	return s.after(view.ReplaceRecommended(s.a, refs))
 }
+
+// UseInstalled binds missing package IDs to usable installed copies in one undo step.
+func (s *API) UseInstalled(packageIDs []string) (*view.Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	return s.after(view.UseInstalled(s.a, packageIDs))
+}

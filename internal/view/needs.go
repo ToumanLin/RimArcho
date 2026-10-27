@@ -42,6 +42,7 @@ const (
 	ActSave            = "save"             // open the save preview (w)
 	ActMove            = "move"
 	ActEnable          = "enable"           // Refs
+	ActUseInstalled    = "use-installed"    // Refs: package IDs, bound in place as one undo step
 	ActDisable         = "disable"          // Refs
 	ActChooseDisable   = "choose-disable"   // pick one of Options, then disable its Refs
 	ActOpenURL         = "open-url"         // URL in the browser
@@ -260,17 +261,17 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 	}
 	var mergeKeys []string
 	merges := map[string]*merged{}
-	// Entries the list has but nothing installed matches (an imported list, say) are one
-	// item with one action for all of them; a mod needing one of them is covered by it.
+	// Unresolved entries are grouped by whether an installed copy can be used;
+	// a mod needing one of them is covered by the same item.
 	type missingEntry struct {
 		pkg, ws, name string
 		n             Need
 	}
-	missingInfo := map[string]app.SortMod{}
+	missingInfo := map[string]app.MissingMod{}
 	for _, m := range a.MissingMods(st) {
-		missingInfo[strings.ToLower(m.PackageID)] = m.SortMod
+		missingInfo[strings.ToLower(m.PackageID)] = m
 	}
-	var missing []missingEntry
+	var missing, installed []missingEntry
 	missingOwners := map[string][]ModOwner{}
 	inList := map[string]bool{}
 	for _, e := range st.List {
@@ -364,6 +365,11 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 					me.name = w.Name
 					me.n.Text = Tf("the list has %s, but it is not installed", w.Name)
 					me.n.Title = Tf("not installed: %s", w.Name)
+				}
+				if w.CanEnable {
+					me.pkg = w.PackageID
+					installed = append(installed, me)
+					continue
 				}
 			}
 			missing = append(missing, me)
@@ -470,13 +476,33 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			// is simply absent stay in the technical information (06 §5).
 		}
 	}
-	for i := range missing {
-		m := &missing[i]
-		m.n.RequiredBy = missingOwners[dependencyTarget(st, "pkg:"+m.pkg)]
-		for _, o := range m.n.RequiredBy {
-			m.n.Mods = append(m.n.Mods, o.ID)
+	for _, entries := range [][]missingEntry{missing, installed} {
+		for i := range entries {
+			m := &entries[i]
+			m.n.RequiredBy = missingOwners[dependencyTarget(st, "pkg:"+m.pkg)]
+			for _, o := range m.n.RequiredBy {
+				m.n.Mods = append(m.n.Mods, o.ID)
+			}
+			m.n.Fold = len(m.n.Mods) > 1
 		}
-		m.n.Fold = len(m.n.Mods) > 1
+	}
+	if len(installed) > 0 {
+		f := Need{rank: 4, Group: GroupList, Counted: true, Status: installed[0].n.Status, Fold: true, code: "entry.missing",
+			Text:     Tf("%d mods in the list can use copies already installed", len(installed)),
+			Why:      T("use the installed copies in the same positions; any needed links are created when you save or launch"),
+			Evidence: installed[0].n.Evidence}
+		var packages []string
+		for _, m := range installed {
+			f.RequiredBy = append(f.RequiredBy, m.n.RequiredBy...)
+			f.Mods = append(f.Mods, m.n.Mods...)
+			f.Parts = append(f.Parts, m.name)
+			packages = append(packages, m.pkg)
+		}
+		f.Actions = []Action{
+			{Kind: ActUseInstalled, Key: "space", Label: T("use installed copies"), Refs: packages, Undo: true, Done: T("using installed copies")},
+			{Kind: ActFold, Key: "f", Label: T("show which")},
+		}
+		add(f)
 	}
 	switch len(missing) {
 	case 0:
@@ -947,6 +973,8 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		_, err = a.Sort(false)
 	case ActEnable:
 		_, err = a.Enable(act.Refs, app.Placement{})
+	case ActUseInstalled:
+		_, err = a.UseInstalled(act.Refs)
 	case ActDisable:
 		_, err = a.Disable(act.Refs)
 	case ActChooseDisable:

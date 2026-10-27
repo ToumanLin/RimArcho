@@ -122,6 +122,8 @@
 
 **执行动作**：把 `item.actions` 中的完整 Action 对象传给 `DoAction(action, option)`。`id` 是动作标识，执行参数仍由 `kind`、`refs`、`after`、`options` 等原字段承载，不是只传 ID。`choose-disable` 的 `option` 为从零开始的选项索引，其他数据动作传 `0`。`enable` 自动按约束放置依赖；`move` 使用一个 `refs` 和 `after`；`sort` 直接排序；`subscribe` 进入既有订阅任务队列。DLC 的商店链接通过 `open-url` 打开。`view`、`list`、`fold`、`save` 等界面动作仍由界面分派，确认规则仍按 `confirm` / `warn` 执行。
 
+**使用已安装副本**：`API.UseInstalled(packageIDs []string) (*view.Result, error)` 绑定打开列表中的缺失条目，保留位置，一批可撤销；语义与拒绝规则见 04 §4.2。参数为 packageId 数组（接受大小写、首尾空白及 `_steam` 后缀），不是 Instance 引用；空数组无修改。结果的 `text`、`undo` 和 `problems` 沿用上面的编辑合同。能不能跑把 `MissingMods.CanEnable` 的条目单列为“可以使用已安装的副本”，主动作 `kind: "use-installed"`，`refs` 为 packageId 数组，`undo: true`，`key: "space"`，带 `label`、`done` 和动作 `id`，不带 `confirm`／`warn`。完整动作可交给 `DoAction(action, 0)`（返回字符串并发布问题事件），或将 `refs` 传给 `UseInstalled` 取得编辑结果。只有没有可用副本的条目保留订阅／移除动作；排序 Outcome 的 `missingMods` 保持原合同，前端按 `canEnable` 提供修复入口。
+
 **缓存边界**：每个 API 会话最多保留八个环境／列表／游戏版本／语言槽位。输入还包含列表内容、数据库变化键、扫描快照与分析器版本（`AnalysisKey`）、日志路径及大小／mtime，以及每次现查的目录和游戏链接状态。Workspace 复用完整 Board／Shell／History；需要重新组合时用独立连接，避免持有主锁。
 
 列表编辑走 `App.IncrementalProblems`，同步重算声明层，保留可复用的上一份内容层问题；已启用目标对应的旧 `patch.no-match` 提示立即移除。后续日志读取与完整分析在独立会话／原分析子进程中进行，发布前重新核对输入，过期工作不能覆盖新编辑。内容分析继续使用按启用集合保存的分析槽和按 Mod 内容键保存的 Def／程序集事实；补丁模拟依赖顺序及整个文档，仍在后台重算。
