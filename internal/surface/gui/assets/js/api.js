@@ -1,5 +1,6 @@
 // The Go service (internal/surface/gui.API) through the Wails runtime (06 §8.2): no
 // generated bindings, no build step.
+import { call as perfCall } from "./perf.js";
 import { Call, Events } from "/wails/runtime.js";
 
 const SVC = "github.com/ToumanLin/RimArcho/internal/surface/gui.API.";
@@ -27,7 +28,7 @@ on("environment", (result) => {
 });
 
 export const api = new Proxy({}, {
-  get: (_, method) => (...args) => {
+  get: (_, method) => (...args) => perfCall(method, () => {
     const reason = writesGame.has(method) && actionGuard();
     if (reason) return Promise.reject(new Error(reason));
     if (!["UseEnv", "HomeApply", "GuideAdd", "Workspace"].includes(method)) return Call.ByName(SVC + method, ...args);
@@ -38,7 +39,7 @@ export const api = new Proxy({}, {
         if (!ok) { pending.delete(id); reject(new Error(T("the window is closing"))); }
       }, (error) => { pending.delete(id); reject(error); });
     });
-  },
+  }),
 });
 
 // on subscribes to a Go event; the handler gets its data.

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -157,6 +158,7 @@ func (s *API) submitTask(kind string, refs []string) (string, error) {
 
 // Tasks is the 后台任务 page (and the sidebar's line).
 func (s *API) Tasks() *view.TaskPage {
+	defer perftrace.Span("Tasks")()
 	return view.BuildTasks(s.tasks.List(), time.Now())
 }
 

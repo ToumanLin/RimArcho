@@ -21,6 +21,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/ids"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
@@ -180,6 +181,7 @@ type App struct {
 
 // Open opens (creating if needed) the data directory home.
 func Open(home string) (*App, error) {
+	defer perftrace.Span("app-open")()
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		return nil, err
 	}
@@ -191,7 +193,9 @@ func Open(home string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	dbDone := perftrace.Span("db-open-migrate")
 	st, err := store.Open(filepath.Join(home, "archo.db"))
+	dbDone()
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +207,8 @@ func Open(home string) (*App, error) {
 	if dirExists(a.PacksDir()) && st.Meta(directoryKey("packs")) == "" {
 		_ = st.SetMeta(directoryKey("packs"), a.PacksDir())
 	}
+	recoveryDone := perftrace.Span("startup-recovery")
+	defer recoveryDone()
 	rows, err := st.ManagedLinks()
 	if err == nil {
 		a.StartupLinkRecovery, err = a.linkRecoveries(rows)

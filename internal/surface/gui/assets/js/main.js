@@ -5,6 +5,7 @@
 //   3. the position line always says where you are;
 //   4. the hint line lists what you can do with the object now;
 //   5. few popups, each closed with esc, never nested.
+import { phase as perfPhase } from "./perf.js";
 import { api, on, setText } from "./api.js";
 import "./window-theme.js";
 import "./refnums.js";
@@ -131,10 +132,12 @@ async function reaccent() {
 // ---- drawing ----
 
 function render() {
+  const done = perfPhase("editor-render");
   renderTop();
   renderLists();
   renderWhere();
   renderHints();
+  done();
 }
 
 // renderTop: the plan editor's description line, like every page's (06 §2.2, §2.5): how many

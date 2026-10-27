@@ -1,7 +1,8 @@
+import { gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir, cpus, totalmem, platform } from 'node:os';
 import { resolve, join, dirname, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,7 +31,12 @@ const out = mkdtempSync(join(outputBase, `s${scenario}-${driver}-`));
 const tools = resolve(options.tools || join(tmpdir(), 'RimArcho-vm-tools'));
 const exe = name => join(tools, name + (platform() === 'win32' ? '.exe' : ''));
 const result = { schema: 1, scenario, driver, seed: 271027, fixture: options.baseline ? 'real-copy' : 'small', output: out, started: new Date().toISOString(), host: { cpu: cpus()[0]?.model, cores: cpus().length, memory: totalmem(), platform: platform() }, timings: [], checks: [], coverage: [], checkpoints: [], failures: [], performanceFailures: [] };
-const save = (name, data) => writeFileSync(join(out, name + '.json'), JSON.stringify(data,null,2));
+const save = (name, data) => {
+ const json=JSON.stringify(data,null,2);
+ if(options.archive==='true' && (name==='window-trace'||/^\d{2}-/.test(name)))writeFileSync(join(out,name+'.json.gz'),gzipSync(json));
+ else writeFileSync(join(out,name+'.json'),json);
+ if(options.archive==='true' && ['perf','browser-cpu','window-trace','result'].includes(name))writeFileSync(join(dirname(outputBase),out.split(/[\\/]/).pop()+'-'+name+'.json'+(name==='window-trace'?'.gz':'')),name==='window-trace'?gzipSync(json):json);
+};
 const command = (file, args, env, timeout = 15000) => {
   const r = spawnSync(file, args, { encoding: 'utf8', timeout, env: { ...process.env, ...env }, windowsHide: true, maxBuffer: 128 * 1024 * 1024 });
   if (r.error || r.status !== 0) throw Error(`${file} ${args.join(' ')}: ${r.error?.message || r.stderr || r.stdout}`);
@@ -38,7 +44,7 @@ const command = (file, args, env, timeout = 15000) => {
 };
 const home = join(out, 'case', 'home');
 let c, child, api, env, currentPlan, checkpointSeq = 0, eventStream;
-const events = [], requestWaiters = new Map();
+const events = [], requestWaiters = new Map(), browserTimeline=[];let traceComplete;
 const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); if (!ok) result.failures.push({name,detail}); };
 const timed = async (name, fn, budgetMs = 2000) => { const start=performance.now(); try { return await fn(); } finally { const ms=performance.now()-start;result.timings.push({name,ms,budgetMs});if(budgetMs!==null&&ms>budgetMs)result.performanceFailures.push({name,ms,budgetMs}); } };
 const domain = snap => ({ sources:snap.sources, instances:snap.instances, links:snap.links, environments: snap.environments, plans: snap.plans, lineage_data: snap.lineage_data, lineage_tag:snap.lineage_tag, instance_note:snap.instance_note, user_rule:snap.user_rule, modsConfigHashes:snap.modsConfigHashes });
@@ -49,7 +55,7 @@ async function snapshot(label) {
   const data = JSON.parse(command(exe('vmstate'), ['--home',home,'--plan',currentPlan]));
   const ui = c ? await c.evaluate('window.__vm.read()') : null;
   const artifact = `${String(++checkpointSeq).padStart(2,'0')}-${label}`;
-  save(artifact,{ domain:data, surface:ui });result.checkpoints.push({ label, artifact:artifact+'.json' });
+  save(artifact,{ domain:data, surface:ui });result.checkpoints.push({ label, artifact:artifact+'.json'+(options.archive==='true'?'.gz':'') });
   if(ui) {
     if(ui.page===null && data.observation){
       const expected=data.observation.entries.map(e=>e.i||'pkg:'+e.m);
@@ -227,6 +233,7 @@ async function setup() {
   for(const name of ['vmstate','archo',...(driver==='W'?['RimArcho']:driver==='A'?['guidev']:[])]) assert(existsSync(exe(name)),`build ${exe(name)} first (scripts/vm/README.md)`);
   if(options.baseline) {
     const baseline=outside(options.baseline);assert(existsSync(join(baseline,'isolated.json')),'baseline needs isolated.json from prepare-real.ps1');
+    if(JSON.parse(readFileSync(join(baseline,'isolated.json'),'utf8').replace(/^\uFEFF/,'' )).synthetic)result.fixture='synthetic-scale';
     command(exe('vmstate'),['--mode','audit','--home',join(baseline,'home'),'--root',baseline],{},30000);
     if(scenario===2 && driver==='W' && options['owned-files']!=='true') {
       // UseEnv can create/remove deployment links: this scenario owns a full filesystem copy.
@@ -248,20 +255,31 @@ async function setup() {
   if(driver==='W'&&scenario===3)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
   if(driver==='C') return;
   const launching=performance.now();
+ result.milestones=[];const milestone=name=>result.milestones.push({name,ms:performance.now()-launching,epochMs:Date.now()});
   const freePort = () => new Promise((ok,fail) => { const server=createServer();server.on('error',fail);server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>ok(port))}); });
   const port=Number(options.port || (driver==='W' && process.env.RIMARCHO_DEVTOOLS_PORT) || await freePort());
   const addr=`127.0.0.1:${port}`;
   // Refuse an existing listener rather than driving another window's user data.
   try {await fetch(`http://${addr}/${driver==='W'?'json/list':''}`,{signal:AbortSignal.timeout(300)});throw Error(`port ${port} already in use`);}catch(e){if(e.message.includes('already in use'))throw e;}
-  child=spawn(exe(driver==='W'?'RimArcho':'guidev'),driver==='W'?[]:['-home',home,'-addr',addr,'-exe',exe('archo')],{env:{...process.env,...env,RIMARCHO_DEVTOOLS_PORT:String(port)},cwd:tools,windowsHide:true,stdio:['ignore','pipe','pipe']});
+  milestone("process-spawn");
+  result.processStartEpochMs=Date.now();
+  child=spawn(exe(driver==='W'?'RimArcho':'guidev'),driver==='W'?[]:['-home',home,'-addr',addr,'-exe',exe('archo')],{env:{...process.env,...env,RIMARCHO_PERF:options.perf==='true'?'1':'',RIMARCHO_DEVTOOLS_PORT:String(port)},cwd:tools,windowsHide:true,stdio:['ignore','pipe','pipe']});
   let logs='';child.stdout.on('data',b=>logs+=b);child.stderr.on('data',b=>logs+=b);child.on('exit',()=>writeFileSync(join(out,'process.log'),logs));
   await until(async()=>{try{return (await fetch(`http://${addr}/${driver==='W'?'json/list':''}`,{signal:AbortSignal.timeout(500)})).ok}catch{return false}},15000);
+  milestone('devtools-listening');
   if(driver==='W') {
     c=await connect(addr);await until(async()=>{try{return await c.evaluate("location.host === 'wails.localhost'")}catch{return false}},15000);await until(async()=>c.evaluate("(async()=>{const {S}=await import('/js/state.js');return !!S.shell?.plan;})()"),15000);
+    milestone('shell-plan-visible');
+    if(options.profile==='true'){result.profileBrowserStart=await c.evaluate('performance.now()');await c.call('Profiler.enable');await c.call('Profiler.start');}
+    if(options.timeline==='true') {
+      c.on(e=>{if(e.method==='Tracing.dataCollected')browserTimeline.push(...e.params.value);if(e.method==='Tracing.tracingComplete')traceComplete?.()});
+      await c.call('Tracing.start',{categories:'devtools.timeline,disabled-by-default-devtools.timeline.stack',options:'record-as-much-as-possible'});
+    }
+    result.windowConnectedEpochMs=Date.now();
     await c.evaluate(`(${observe.toString()})()`);
-    await settled(undefined,15000);
-    if((await uiState()).popup){result.coverage.push({action:'startup-dialog',status:'dismissed with real Esc',text:await c.evaluate("document.querySelector('#popup')?.innerText")});await press('Escape');await settled();}
-    await editor();
+    await settled(undefined,15000);milestone('home-stable');
+    if((await uiState()).popup){result.coverage.push({action:'startup-dialog',status:'dismissed with real Esc',text:await c.evaluate("document.querySelector('#popup')?.innerText")});await press('Escape');milestone('startup-esc');await settled();milestone('prompt-dismissed-stable');}
+    await editor();milestone('editor-stable');
     await c.evaluate('window.__vm.armed=true');
   } else {
     const base='http://'+addr;await listen(base);
@@ -509,8 +527,10 @@ async function scenario4() {
 try {
   await timed('prepare-and-start',setup,null);
   if(c)await editor();
+  if(options["cold-only"]!=="true") {
   await timed('scenario',()=>[scenario1,scenario2,scenario3,scenario4][scenario-1](),300000);
   await freshProblems();
+  }
   if(c){
     await settled();
     const evidence=await c.evaluate('(()=>{__vm.stop();const {read,stop,timer,...v}=__vm;return v})()');save('window-trace',evidence);
@@ -529,6 +549,9 @@ try {
     result.performanceFailures.push(...result.feedback.over200ms.map(f=>({name:'first feedback',...f,budgetMs:200})));
     const stalls=evidence.samples.filter(s=>s.gapMs>500);result.performanceFailures.push(...stalls.map(s=>({name:'main-thread stall',...s,budgetMs:500})));
     if(options.discover==='true')save('controls',await c.evaluate(`(${discover.toString()})()`));
+    if(options.timeline==='true'){const done=new Promise(ok=>traceComplete=ok);await c.call('Tracing.end');await done;writeFileSync(join(dirname(outputBase),out.split(/[\\/]/).pop()+'-timeline.json.gz'),gzipSync(JSON.stringify({traceEvents:browserTimeline})));}
+    if(options.profile==='true'){const p=await c.call('Profiler.stop');save('browser-cpu',p.result.profile);}
+    if(options.perf==='true')save('perf',await c.evaluate('window.__f4'));
     await c.shot(join(out,'final.png'));
   }
 } catch(e) {
@@ -537,6 +560,11 @@ try {
 } finally {
   eventStream?.abort();c?.close();
   if(child?.pid){if(platform()==='win32')spawnSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true});else child.kill();}
+  if(options.cleanup==='true')for(const name of ['case','appdata','localappdata']){
+    const target=join(out,name),rel=relative(out,target);assert(rel && !rel.startsWith('..') && !isAbsolute(rel));
+    try{rmSync(target,{recursive:true,force:true,maxRetries:10,retryDelay:200});}
+    catch(e){(result.cleanupErrors??=[]).push({path:target,code:e.code,message:e.message});}
+  }
   save('events',events);result.finished=new Date().toISOString();result.functionalStatus=result.failures.length?'failed':'passed';result.status=result.failures.length||result.performanceFailures.length?'failed':'passed';save('result',result);
   console.log(JSON.stringify({status:result.status,driver,scenario,output:out,failures:result.failures,performanceFailures:result.performanceFailures},null,2));
   process.exitCode=result.failures.length||result.performanceFailures.length?1:0;
