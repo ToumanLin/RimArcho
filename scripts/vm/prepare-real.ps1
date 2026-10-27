@@ -1,4 +1,4 @@
-# Private local baseline for Phase 1a. Requires PowerShell 7 and sqlite3; no app opens until paths are isolated.
+﻿# Private local baseline for Phase 1a. Requires PowerShell 7 and sqlite3; no app opens until paths are isolated.
 param(
  [Parameter(Mandatory)][string]$Root,
  [string]$SourceHome = (Join-Path $env:APPDATA 'RimArcho'),
@@ -103,7 +103,7 @@ foreach ($row in @(Query 'select key,value from meta;')) {
 foreach ($key in @('lock.dir','pack.dir','monitor.dir','subscribed.dir')) {
  $dir = Join-Path $Root ($key -replace '\.dir$','')
  # Existing source directories take precedence (lock and monitor normally have an indexed source).
- $kind = switch ($key) { 'lock.dir' {'locked'} 'monitor.dir' {'monitor'} default {''} }
+ $kind = switch ($key) { 'lock.dir' {'locked'} 'monitor.dir' {'monitor'} 'subscribed.dir' {'subscribed'} default {''} }
  $s = $srcRows | Where-Object label -eq $kind | Select-Object -First 1
  if ($s) { $dir = Mapped $s.root }
  New-Item -ItemType Directory -Force $dir | Out-Null

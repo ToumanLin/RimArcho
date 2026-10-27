@@ -288,7 +288,7 @@ async function setup() {
   result.workingTree=hasGit?command('git',['-C',repo,'status','--short']).trim():'exported copy';
   result.node=process.version;result.toolHashes=Object.fromEntries(['archo','vmstate',driver==='W'?'RimArcho':driver==='A'?'guidev':null].filter(Boolean).map(n=>[n,createHash('sha256').update(readFileSync(exe(n))).digest('hex')]));
   result.preparationMs=performance.now()-preparing;
-  if(driver==='W'&&!mode&&scenario===3)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
+  if(driver==='W'&&!mode&&scenario===3&&!options.baseline)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
   if(driver==='C') return;
   const launching=performance.now();
   const freePort = () => new Promise((ok,fail) => { const server=createServer();server.on('error',fail);server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>ok(port))}); });
@@ -478,6 +478,17 @@ async function guestProbes() {
   await c.click('.subscribe-omni input');await c.call('Input.insertText',{text:'https://127.0.0.1:9/phase1a.git'});
   await until(()=>c.evaluate('!!document.querySelector(".subscribe-preview")?.textContent.trim()'));
   result.subscriptionPrerequisite={gitAvailable:spawnSync('git',['--version'],{windowsHide:true}).status===0,preview:await c.evaluate('document.querySelector(".subscribe-preview")?.textContent'),subscribeDisabled:await c.evaluate('document.querySelector(".subscribe-foot button.primary")?.disabled')};
+  if(result.subscriptionPrerequisite.subscribeDisabled&&/unresolved location change/.test(result.subscriptionPrerequisite.preview)){
+    // Diagnosis on the case DB only: a preparer used cfg:subscribed.dir that did
+    // not match its relocated indexed source. Do not move or create content.
+    const rows=JSON.parse(command('sqlite3',['-json',join(home,'archo.db'),"SELECT root FROM source WHERE label='subscribed' AND status='ok' LIMIT 1;"])||'[]');
+    if(rows.length){
+      command('sqlite3',[join(home,'archo.db'),`UPDATE meta SET value='${rows[0].root.replaceAll("'","''")}' WHERE key='cfg:subscribed.dir';`]);
+      await c.click('.subscribe-omni input');await press('Control+KeyA');await c.call('Input.insertText',{text:'https://127.0.0.1:9/phase1a.git'});
+      await until(()=>c.evaluate('!!document.querySelector(".subscribe-preview")?.textContent.trim()'));
+      result.subscriptionPrerequisite.afterDirectoryAlignment={preview:await c.evaluate('document.querySelector(".subscribe-preview")?.textContent'),subscribeDisabled:await c.evaluate('document.querySelector(".subscribe-foot button.primary")?.disabled'),scope:'copied DB config aligned to existing baseline source; no content changes or submit'};
+    }
+  }
   await press('Escape');await editor();
 }
 async function scenario4() {
