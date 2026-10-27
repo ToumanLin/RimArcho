@@ -44,8 +44,8 @@ func (ix *Index) Elsewhere(m *store.Mod) *store.Mod {
 }
 
 // Index loads the environment's instances. The result is cached until the tables it is
-// built from may have changed (Store.IndexKey: this connection's writes to them, or any
-// other connection's commit), so neither a TUI issuing many read commands nor a list edit
+// built from may have changed (Store.IndexKey: writes to index tables on any
+// connection), so neither a TUI issuing many read commands nor a list edit
 // reloads 1000+ rows each time.
 func (a *App) Index() (*Index, error) {
 	e, err := a.Env()

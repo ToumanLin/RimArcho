@@ -2,12 +2,9 @@ package gui
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -82,25 +79,19 @@ func (s *API) tasksChanged() {
 
 // taskItem runs one item of a lane's task: Mod 库's action on one copy.
 func (s *API) taskItem(kind, ref string) error {
-	if kind == view.OpSubCheck || kind == view.OpSubUpdate || kind == view.OpSubRemove {
-		s.mu.Lock()
-		a, err := s.a.ReadSession()
-		s.mu.Unlock()
-		if err != nil {
-			return err
-		}
-		defer a.Close()
-		_, err = view.LibDo(a, kind, []string{ref})
-		s.mu.Lock()
-		s.board, s.needs, s.lib = nil, nil, nil
-		s.mu.Unlock()
+	if view.TaskLane(kind) == app.LaneFiles {
+		s.filesMu.RLock()
+		defer s.filesMu.RUnlock()
+	}
+	a, err := s.detachedReader()
+	if err != nil {
 		return err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st, _ := s.a.Loadout() // for the reasons: a copy's reference becomes its name
-	s.board, s.needs, s.lib = nil, nil, nil
-	_, err := view.LibDo(s.a, kind, []string{ref})
+	defer a.Close()
+	a.WorkspaceSnapshot()
+	st, _ := a.Loadout()
+	_, err = view.LibDo(a, kind, []string{ref})
+	s.invalidateInventory()
 	// Steam out of reach: the Workshop page instead, as the action did before (06 §2.9)
 	var pages *view.OpenPages
 	if errors.As(err, &pages) {
@@ -115,9 +106,22 @@ func (s *API) taskItem(kind, ref string) error {
 	return nil
 }
 
-// submitTask queues Mod 库's action kind on refs (the caller holds s.mu).
+func (s *API) invalidateInventory() {
+	s.mu.Lock()
+	s.board, s.needs, s.lib = nil, nil, nil
+	s.mu.Unlock()
+	s.subRevision.Add(1)
+}
+
+// submitTask resolves item names on a detached session before queuing.
 func (s *API) submitTask(kind string, refs []string) (string, error) {
-	st, err := s.a.Loadout()
+	a, err := s.detachedReader()
+	if err != nil {
+		return "", err
+	}
+	defer a.Close()
+	a.WorkspaceSnapshot()
+	st, err := a.Loadout()
 	if err != nil {
 		return "", err
 	}
@@ -128,7 +132,7 @@ func (s *API) submitTask(kind string, refs []string) (string, error) {
 		it := app.TaskItem{Ref: ref, Name: ref}
 		if m, err := st.Ix.ResolveOne(ref); err == nil {
 			if kind == view.OpSubUpdate {
-				if r := s.a.SubscriptionOf(m); r != nil && r.Kind == "page" {
+				if r := a.SubscriptionOf(m); r != nil && r.Kind == "page" {
 					skipped = true
 					continue
 				}
@@ -384,24 +388,24 @@ func init() {
 	})
 }
 
-// fileWorkers is how many folders go to the recycle bin at once. The shell spends most of
-// its time per folder (it walks it), not per byte, so several in parallel go much faster;
-// memory is not the concern here.
-const fileWorkers = 8
-
-// steamChunk is how many items go to the Steam client per call (its worker takes 50).
 const steamChunk = 50
 
 // taskBatch runs a whole lane task at once when its kind allows (app.Tasks.Batch): 移到回收站
-// and 取消隐藏 check every item, move the folders several at a time and rescan once;
+// and 取消隐藏 use the CLI app actions, including link lifecycle and affected game scans;
 // 退订 and 重新订阅 check every item and hand Steam 50 at a time. The rest (锁定, 移入锁定库…)
 // need a scan after each item to know the new copy, and go one by one.
 func (s *API) taskBatch(kind string, refs []string, b app.BatchCalls) bool {
+	if kind == view.OpSubRemove || kind == view.OpSubRemoveFast {
+		s.filesMu.RLock()
+		defer s.filesMu.RUnlock()
+	}
 	switch kind {
 	case view.LibDelete, view.LibUnhide:
 		s.batchFiles(kind, refs, b)
 	case view.LibUnsub, view.LibResub:
 		s.batchSteam(kind, refs, b)
+	case view.OpSubRemove, view.OpSubRemoveFast:
+		s.batchRemoveSubscriptions(kind, refs, b)
 	default:
 		return false
 	}
@@ -409,94 +413,59 @@ func (s *API) taskBatch(kind string, refs []string, b app.BatchCalls) bool {
 }
 
 func (s *API) batchFiles(kind string, refs []string, b app.BatchCalls) {
-	type job struct {
-		i        int
-		from, to string
+	a, err := s.detachedReader()
+	if err != nil {
+		for i := range refs {
+			b.Done(i, err)
+		}
+		return
 	}
-	var jobs []job
-	s.mu.Lock()
-	st, _ := s.a.Loadout()
+	defer a.Close()
+	a.WorkspaceSnapshot()
+	st, _ := a.Loadout()
 	for i, ref := range refs {
 		if b.Stopped() {
 			break
 		}
-		j := job{i: i}
+		b.Start(i)
+		s.filesMu.RLock()
 		var err error
 		if kind == view.LibDelete {
-			j.from, err = s.a.TrashPlan(ref)
+			_, err = a.Trash(ref, false)
 		} else {
-			j.from, j.to, err = s.a.UnhidePlan(ref)
+			_, err = a.Unhide(ref, false)
 		}
+		s.filesMu.RUnlock()
 		if err != nil {
-			b.Done(i, errors.New(view.Humanize(st, err.Error())))
-			continue
+			err = errors.New(view.Humanize(st, err.Error()))
 		}
-		jobs = append(jobs, j)
+		b.Done(i, err)
 	}
-	s.mu.Unlock()
-	ch := make(chan job)
-	var wg sync.WaitGroup
-	var moved atomic.Int32
-	for w := 0; w < fileWorkers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			runtime.LockOSThread() // the shell's file operation stays on one thread
-			defer runtime.UnlockOSThread()
-			for j := range ch {
-				b.Start(j.i)
-				var err error
-				if kind == view.LibDelete {
-					err = s.a.TrashPath(j.from)
-				} else {
-					err = os.Rename(j.from, j.to)
-				}
-				if err == nil {
-					moved.Add(1)
-				}
-				b.Done(j.i, err)
-			}
-		}()
-	}
-	for _, j := range jobs {
-		if b.Stopped() {
-			break // the rest are not touched
-		}
-		ch <- j
-	}
-	close(ch)
-	wg.Wait()
-	if moved.Load() == 0 {
-		return
-	}
-	// one scan for the whole batch, so the library sees what moved
-	s.mu.Lock()
-	s.a.Scan(false)
-	s.board, s.needs, s.lib = nil, nil, nil
-	s.mu.Unlock()
+	s.invalidateInventory()
 }
 
 func (s *API) batchSteam(kind string, refs []string, b app.BatchCalls) {
-	action := view.SteamAction(kind)
-	var ok []int
-	s.mu.Lock()
-	st, _ := s.a.Loadout()
-	for i, ref := range refs {
-		if _, err := s.a.Workshop(action, []string{ref}, true); err != nil {
-			b.Done(i, errors.New(view.Humanize(st, err.Error())))
-			continue
-		}
-		ok = append(ok, i)
-	}
-	a, sessionErr := s.a.ReadSession()
-	s.mu.Unlock()
+	a, sessionErr := s.detachedReader()
 	if sessionErr != nil {
-		for _, i := range ok {
+		for i := range refs {
 			b.Done(i, sessionErr)
 		}
 		return
 	}
 	defer a.Close()
+	action := view.SteamAction(kind)
+	var ok []int
+	st, _ := a.Loadout()
+	for i, ref := range refs {
+		if b.Stopped() {
+			return
+		}
+		if _, err := a.Workshop(action, []string{ref}, true); err != nil {
+			b.Done(i, errors.New(view.Humanize(st, err.Error())))
+			continue
+		}
+		ok = append(ok, i)
+	}
 	opened := false
 	for c := 0; c < len(ok); c += steamChunk {
 		if b.Stopped() {
@@ -550,4 +519,22 @@ func (s *API) batchSteam(kind string, refs []string, b app.BatchCalls) {
 			}
 		}
 	}
+}
+
+func (s *API) batchRemoveSubscriptions(kind string, refs []string, b app.BatchCalls) {
+	a, err := s.detachedReader()
+	if err != nil {
+		for i := range refs {
+			b.Done(i, err)
+		}
+		return
+	}
+	defer a.Close()
+	op, err := a.RemoveSubscriptionsWith(refs, app.RemoveSubscriptionOptions{Permanent: kind == view.OpSubRemoveFast, Workers: 4}, b)
+	if op == nil && err != nil {
+		for i := range refs {
+			b.Done(i, err)
+		}
+	}
+	s.invalidateInventory()
 }

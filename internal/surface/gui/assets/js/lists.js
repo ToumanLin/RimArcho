@@ -36,7 +36,12 @@ export async function openEditor(load, replace = false, ready = () => {}) {
 export function setItems(k, items) {
   const c = S.cols[k];
   const keep = cur(k);
+  // Resize/scroll can draw before the asynchronous filter answers. Retain
+  // visible identities, never indices into the previous items array.
+  const shown = new Set(c.view.map((i) => c.items[i]).filter(Boolean).map(key));
   c.items = items;
+  c.view = items.flatMap((it, i) => shown.has(key(it)) ? [i] : []);
+  c.cursor = Math.max(0, Math.min(c.cursor, c.view.length - 1));
   const alive = new Set(items.map(key));
   for (const x of [...c.sel]) if (!alive.has(x)) c.sel.delete(x);
   return keep ? key(keep) : "";

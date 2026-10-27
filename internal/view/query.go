@@ -248,7 +248,10 @@ type ContentCache struct {
 // Get returns the content kinds of the state's instances, loading them once per database
 // state.
 func (c *ContentCache) Get(a *app.App, st *app.LoadoutState) (map[string]int, error) {
-	key := a.Store.ChangeKey()
+	key := a.Store.IndexKey()
+	if st != nil {
+		key += "|" + st.Ix.Env.ID
+	}
 	if c.kinds != nil && c.key == key {
 		return c.kinds, nil
 	}

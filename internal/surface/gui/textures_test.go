@@ -135,6 +135,9 @@ func TestTexturesBackground(t *testing.T) {
 	if _, err := api.TexturesClean("plan"); err == nil {
 		t.Fatal("clean while a run goes on")
 	}
+	if _, err := api.LibraryDo(view.OpTexClean, []string{"#abc"}); err == nil {
+		t.Fatal("library clean bypassed the active conversion")
+	}
 	wait := func(want string) string {
 		deadline := time.After(10 * time.Second)
 		for {
@@ -163,7 +166,7 @@ func TestTexturesBackground(t *testing.T) {
 	// Mod 库存's selection
 	release = make(chan struct{})
 	close(release)
-	api.TexturesRun("", 100, []string{"#abc"})
+	api.LibraryDo(view.OpTextures, []string{"#abc"})
 	wait(`"done":true`)
 	if strings.Join(got, " ") != "textures optimize #abc" {
 		t.Fatalf("refs: %v", got)

@@ -112,14 +112,14 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 	// A link's target is matched against the real path its instance's scan recorded and
 	// confirmed on disk; only a miss resolves every instance's path again (one file-system
 	// call per mod, thousands with a large library).
-	var resolved map[string]*store.Mod
-	liveTarget := func(target string) *store.Mod {
+	var resolved map[string]*store.LinkMod
+	liveTarget := func(target string) *store.LinkMod {
 		key := env.PathKey(realOrAbs(target))
 		if m := li.recorded[key]; m != nil && env.PathKey(realOrAbs(m.RealPath)) == key {
 			return m
 		}
 		if resolved == nil {
-			resolved = make(map[string]*store.Mod, len(li.live))
+			resolved = make(map[string]*store.LinkMod, len(li.live))
 			for _, m := range li.live {
 				resolved[env.PathKey(realOrAbs(m.RealPath))] = m
 			}
@@ -263,9 +263,9 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 // like the mod index (Store.IndexKey: instances, sources and environments).
 type linkInstances struct {
 	key      string
-	byName   map[string]*store.Mod // lower-cased link name (DeployName, env link) → instance
-	recorded map[string]*store.Mod // live instances by their recorded real path
-	live     []*store.Mod
+	byName   map[string]*store.LinkMod // lower-cased link name (DeployName, env link) → instance
+	recorded map[string]*store.LinkMod // live instances by their recorded real path
+	live     []*store.LinkMod
 }
 
 func (a *App) linkInstances() (*linkInstances, error) {
@@ -273,24 +273,18 @@ func (a *App) linkInstances() (*linkInstances, error) {
 	if c := a.linkInst; c != nil && c.key == key {
 		return c, nil
 	}
-	es, err := a.Store.Envs()
+	ms, err := a.Store.LinkMods()
 	if err != nil {
 		return nil, err
 	}
-	li := &linkInstances{key: key, byName: map[string]*store.Mod{}, recorded: map[string]*store.Mod{}}
-	for _, e := range es {
-		ms, err := a.Store.LinkMods(e.ID)
-		if err != nil {
-			return nil, err
+	li := &linkInstances{key: key, byName: map[string]*store.LinkMod{}, recorded: map[string]*store.LinkMod{}}
+	for _, m := range ms {
+		if m.Status == identity.Live && m.RealPath != "" {
+			li.recorded[env.PathKey(m.RealPath)] = m
+			li.live = append(li.live, m)
 		}
-		for _, m := range ms {
-			if m.Status == identity.Live && m.RealPath != "" {
-				li.recorded[env.PathKey(m.RealPath)] = m
-				li.live = append(li.live, m)
-			}
-			li.byName[strings.ToLower(DeployName(m))] = m
-			li.byName[strings.ToLower(DeployPrefix+"env_"+m.ID)] = m
-		}
+		li.byName[strings.ToLower(DeployName(&store.Mod{ID: m.ID, SourceLabel: m.SourceLabel, Rel: m.Rel}))] = m
+		li.byName[strings.ToLower(DeployPrefix+"env_"+m.ID)] = m
 	}
 	a.linkInst = li
 	return li, nil

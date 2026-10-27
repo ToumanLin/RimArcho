@@ -12,41 +12,30 @@ import (
 // List tables (workspace, undo, versions, plans) are not among them.
 var indexTables = []string{"environment", "source", "lineage", "instance", "snapshot", "lineage_data", "lineage_tag"}
 
-// IndexKey changes whenever the index tables may have changed: a commit by another
-// connection or process (data_version), or a write by this connection to one of them,
-// counted by temporary triggers. This connection's list edits leave it unchanged, so a
-// list edit does not reload every mod. Without the triggers it is ChangeKey.
+// IndexKey changes only when an index table changes, including writes by another
+// connection/process. data_version cannot distinguish a list edit from a scan.
+// The durable triggers let WAL readers retain their index across editor commits.
 func (s *Store) IndexKey() string {
-	var dv int64
 	var token string
 	var n int64
-	if err := s.DB.QueryRow(`PRAGMA data_version`).Scan(&dv); err != nil {
-		return s.ChangeKey()
-	}
-	if err := s.DB.QueryRow(`SELECT token, n FROM temp.archo_index_gen`).Scan(&token, &n); err != nil {
-		// First call, or the pool opened a new connection (temporary objects are per
-		// connection): install the triggers; this answer never matches an older key.
-		if s.installIndexTriggers() != nil {
-			return s.ChangeKey()
-		}
+	if err := s.DB.QueryRow(`SELECT token, n FROM archo_index_gen`).Scan(&token, &n); err != nil {
 		return "c" + s.ChangeKey()
 	}
-	return fmt.Sprintf("i%d.%s.%d", dv, token, n)
+	return fmt.Sprintf("i%s.%d", token, n)
 }
 
-// installIndexTriggers creates the counter and its triggers on this connection. A fresh
-// token keeps keys from a previous connection from matching.
+// Only Open installs the shared counter. OpenSession and IndexKey never write,
+// including when a different connection is holding a WAL write transaction.
 func (s *Store) installIndexTriggers() error {
 	b := make([]byte, 6)
 	rand.Read(b)
 	var sql strings.Builder
-	sql.WriteString(`DROP TABLE IF EXISTS temp.archo_index_gen;
-CREATE TEMP TABLE archo_index_gen(token TEXT NOT NULL, n INTEGER NOT NULL);
-INSERT INTO temp.archo_index_gen VALUES('` + hex.EncodeToString(b) + `', 0);
+	sql.WriteString(`CREATE TABLE IF NOT EXISTS archo_index_gen(token TEXT NOT NULL, n INTEGER NOT NULL);
+INSERT INTO archo_index_gen SELECT '` + hex.EncodeToString(b) + `', 0 WHERE NOT EXISTS(SELECT 1 FROM archo_index_gen);
 `)
 	for _, t := range indexTables {
 		for _, op := range []string{"INSERT", "UPDATE", "DELETE"} {
-			fmt.Fprintf(&sql, "CREATE TEMP TRIGGER IF NOT EXISTS archo_ix_%s_%s AFTER %s ON main.%s BEGIN UPDATE archo_index_gen SET n = n + 1; END;\n",
+			fmt.Fprintf(&sql, "CREATE TRIGGER IF NOT EXISTS archo_ix_%s_%s AFTER %s ON %s BEGIN UPDATE archo_index_gen SET n = n + 1; END;\n",
 				t, strings.ToLower(op), op, t)
 		}
 	}

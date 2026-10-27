@@ -1098,6 +1098,12 @@ func (lib *Library) Filter(q LibQuery) (*LibResult, error) {
 }
 
 func sortFacet(k string, vs []LibFacetValue, lib *Library) {
+	// Names/authors/IDs may contribute thousands of facet values. Fold once,
+	// rather than allocating Unicode strings on every sort comparison.
+	folded := make(map[string]string, len(vs))
+	for _, v := range vs {
+		folded[v.Value] = strings.ToLower(v.Value)
+	}
 	rank := func(v string) int {
 		switch k {
 		case "source":
@@ -1139,7 +1145,7 @@ func sortFacet(k string, vs []LibFacetValue, lib *Library) {
 				return a.Count > b.Count
 			}
 		}
-		return strings.ToLower(a.Value) < strings.ToLower(b.Value)
+		return folded[a.Value] < folded[b.Value]
 	})
 }
 
@@ -1163,7 +1169,11 @@ func versionLess(a, b string) bool {
 }
 
 func sortLineages(ls []*LibLineage, by string) {
-	name := func(l *LibLineage) string { return strings.ToLower(l.Name) }
+	names := make(map[*LibLineage]string, len(ls))
+	for _, l := range ls {
+		names[l] = strings.ToLower(l.Name)
+	}
+	name := func(l *LibLineage) string { return names[l] }
 	rev := strings.HasPrefix(by, "-")
 	by = strings.TrimPrefix(by, "-")
 	// cmp: <0 a first, >0 b first, 0 tie (then by name, A to Z, either way)

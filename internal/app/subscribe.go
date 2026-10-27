@@ -271,17 +271,12 @@ func subscriptionTarget(dir, name string) (string, error) {
 }
 
 func (a *App) selectSubscriptions(refs []string) ([]Subscription, error) {
-	all, err := a.Subscriptions()
-	if err != nil || len(refs) == 0 {
-		return all, err
+	if len(refs) == 0 {
+		return a.Subscriptions()
 	}
 	ix, err := a.Index()
 	if err != nil {
 		return nil, err
-	}
-	byID := map[string]Subscription{}
-	for _, s := range all {
-		byID[s.Mod.ID] = s
 	}
 	var out []Subscription
 	seen := map[string]bool{}
@@ -290,12 +285,15 @@ func (a *App) selectSubscriptions(refs []string) ([]Subscription, error) {
 		if err != nil {
 			return nil, err
 		}
-		s, ok := byID[m.ID]
-		if !ok {
+		r, err := a.subscriptionRecord(m, ix.ModDir(m))
+		if err != nil {
+			return nil, err
+		}
+		if r == nil {
 			return nil, fmt.Errorf("%s is not a subscription", ref)
 		}
 		if !seen[m.ID] {
-			out = append(out, s)
+			out = append(out, Subscription{m, ix.Ref(m.ID), ix.ModDir(m), r})
 			seen[m.ID] = true
 		}
 	}
@@ -494,6 +492,19 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 }
 
 func (a *App) RemoveSubscriptions(refs []string, dryRun bool) (*SubscribeOp, error) {
+	return a.RemoveSubscriptionsWith(refs, RemoveSubscriptionOptions{DryRun: dryRun}, BatchCalls{})
+}
+
+type RemoveSubscriptionOptions struct {
+	DryRun    bool
+	Permanent bool
+	Workers   int
+}
+
+func (a *App) RemoveSubscriptionsWith(refs []string, opts RemoveSubscriptionOptions, calls BatchCalls) (*SubscribeOp, error) {
+	if opts.Workers > 1 {
+		return a.removeSubscriptionsParallel(refs, opts, calls)
+	}
 	if len(refs) == 0 {
 		return nil, fmt.Errorf("give at least one subscription reference")
 	}
@@ -505,7 +516,7 @@ func (a *App) RemoveSubscriptions(refs []string, dryRun bool) (*SubscribeOp, err
 	if err != nil {
 		return nil, err
 	}
-	op := &SubscribeOp{Action: "remove", DryRun: dryRun}
+	op := &SubscribeOp{Action: "remove", DryRun: opts.DryRun}
 	for _, s := range ss {
 		it := subscriptionItem(s)
 		it.Links, err = a.PlanIncomingLinks(s.Folder, "")
@@ -520,25 +531,39 @@ func (a *App) RemoveSubscriptions(refs []string, dryRun bool) (*SubscribeOp, err
 		}
 		op.Items = append(op.Items, it)
 	}
-	if dryRun {
+	if opts.DryRun {
 		return op, nil
 	}
-	for i := range op.Items {
-		if err := a.withIncomingLinks(op.Items[i].Folder, "", func() error {
-			if err := a.recycleTarget(op.Items[i].Folder); err != nil {
-				return err
-			}
-			_, err := a.Scan(false)
-			return err
-		}); err != nil {
-			_, scanErr := a.Scan(false)
-			return op, errors.Join(err, scanErr)
+	var failures []error
+	remove := func(worker *App, i int) {
+		if calls.Start != nil {
+			calls.Start(i)
 		}
-		op.Items[i].Result = "moved to recycle bin"
-		delete(a.subscriptionCache, op.Items[i].Folder)
+		it := &op.Items[i]
+		_, err := worker.removeMod(st.Ix, ss[i].Mod, it.Folder, opts.Permanent)
+		if err == nil {
+			it.Result = "moved to recycle bin"
+			if opts.Permanent {
+				it.Result = "permanently deleted"
+			}
+		}
+		if err != nil {
+			failures = append(failures, err)
+		}
+		if calls.Done != nil {
+			calls.Done(i, err)
+		}
 	}
-	_, err = a.Scan(false)
-	return op, err
+	for i := range op.Items {
+		if calls.Stopped != nil && calls.Stopped() {
+			break
+		}
+		remove(a, i)
+	}
+	for _, it := range op.Items {
+		delete(a.subscriptionCache, it.Folder)
+	}
+	return op, errors.Join(failures...)
 }
 
 // SubscriptionLineages reads just the live subscription rows needed by the add page.

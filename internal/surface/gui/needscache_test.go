@@ -258,3 +258,55 @@ func TestNeedsDetachedLinkActionsUseReceivingSession(t *testing.T) {
 		t.Fatal("detached token did not execute its own confirmed preview")
 	}
 }
+
+func TestWorkspaceAdoptsOneNeedsSnapshotAndRefreshesAfterEdit(t *testing.T) {
+	_, s, events := fixture(t)
+	s.needsClosed = true
+	read := func(request uint64) *EnvironmentResult {
+		t.Helper()
+		if !s.Workspace(request) {
+			t.Fatal("workspace rejected")
+		}
+		r := environmentResult(t, events, request)
+		if r.Error != "" || r.Stale || r.Board == nil || r.Board.Problems == nil {
+			t.Fatalf("workspace: %+v", r)
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		c, _ := s.cachedNeedsLocked()
+		if c == nil || c.n != s.needs || c.n.Sequence != r.Board.Problems.Sequence || c.n.Count != r.Board.Problems.Count {
+			t.Fatal("workspace and API did not adopt the same needs snapshot")
+		}
+		return r
+	}
+	first := read(1)
+	s.mu.Lock()
+	cached := s.workspace
+	s.mu.Unlock()
+	warm := read(2)
+	s.mu.Lock()
+	reused := s.workspace == cached
+	s.mu.Unlock()
+	if !reused || warm.Board.Problems.Sequence != first.Board.Problems.Sequence {
+		t.Fatal("unchanged needs key rebuilt workspace")
+	}
+	a, err := s.a.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := a.Ix.ResolveOne("pkg:tester.a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	edit, err := s.Toggle(int(view.Active), []string{m.ID}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := read(3)
+	if next.Board.Problems.Count == first.Board.Problems.Count {
+		t.Fatal("edit kept obsolete problems count")
+	}
+	if next.Board.Problems.Count != edit.Problems.Count || next.Board.Problems.Sequence <= first.Board.Problems.Sequence {
+		t.Fatal("workspace lost edit problems or sequence")
+	}
+}

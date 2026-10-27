@@ -9,11 +9,14 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 type logReader struct {
-	mu sync.Mutex
-	a  *app.App
+	mu      sync.Mutex
+	a       *app.App
+	board   *view.Board
+	boardAt string
 }
 
 const subscriptionIdle = 5 * time.Minute
@@ -118,17 +121,62 @@ func (s *API) subscriptionSession() (*app.App, string, error) {
 // pageReader is called with s.mu held, only to snapshot the invocation settings.
 // All slow work then uses this separate connection without the shared API mutex.
 func (s *API) pageReader() (*app.App, error) {
-	st := s.boardState()
-	if st == nil {
-		return nil, errors.New("no list")
-	}
-	r, err := s.a.ReadSession()
+	r, err := s.readInventorySession()
 	if err != nil {
 		return nil, err
 	}
-	r.EnvName = st.Ix.Env.Name
 	r.AnalyzeExe, r.AnalyzeWait = s.Exe, 200*time.Millisecond
 	return r, nil
+}
+
+// inventorySession retains a page's connection and detached index. Caller holds
+// both the page reader mutex and API.mu; view construction runs after API.mu is freed.
+func (s *API) inventorySession(w *logReader) (*app.App, error) {
+	if w.a == nil {
+		var err error
+		w.a, err = s.pageReader()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		s.refreshInventorySession(w.a)
+	}
+	return w.a, nil
+}
+
+// Coalesce a scan/removal's index reload across pages. The shared index is never
+// published: every page owns a detached copy and its lazy declarations. Neither
+// this gate nor the full index query is taken by editor writes or API.mu.
+func (s *API) refreshPageIndex(a *app.App) error {
+	w := &s.indexRead
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.a == nil {
+		var err error
+		w.a, err = a.ReadSession()
+		if err != nil {
+			return err
+		}
+	}
+	w.a.ReadOptions(a)
+	release, err := w.a.Store.ReadSnapshot()
+	if err != nil {
+		return err
+	}
+	defer release()
+	if _, err := w.a.Index(); err != nil {
+		return err
+	}
+	a.ReadIndex(w.a)
+	return nil
+}
+
+func pinPageRead(a *app.App) (func(), error) {
+	// First use or an external ModsConfig change may require guarded writes.
+	if _, err := a.Loadout(); err != nil {
+		return nil, err
+	}
+	return a.Store.ReadSnapshot()
 }
 
 // logSession is called with logRead.mu held; only snapshotting options needs s.mu.
@@ -140,10 +188,6 @@ func (s *API) logSession() (*app.App, error) {
 	} else if s.board != nil && s.board.St != nil && s.board.St.Ix.Env.ID != e.ID {
 		s.board, s.logLinks, s.logPath = nil, nil, ""
 	}
-	st := s.boardState()
-	if st == nil {
-		return nil, errors.New("no list")
-	}
 	if s.logRead.a == nil {
 		var err error
 		s.logRead.a, err = s.pageReader()
@@ -153,7 +197,10 @@ func (s *API) logSession() (*app.App, error) {
 	}
 	r := s.logRead.a
 	r.ReadOptions(s.a)
-	r.EnvName, r.AnalyzeExe, r.AnalyzeWait = st.Ix.Env.Name, s.Exe, 200*time.Millisecond
+	if e, err := s.a.Env(); err == nil {
+		r.EnvName = e.Name
+	}
+	r.AnalyzeExe, r.AnalyzeWait = s.Exe, 200*time.Millisecond
 	return r, nil
 }
 
@@ -179,12 +226,15 @@ func (s *API) Close() {
 		// return and cannot mutate GUI state after creditClosed.
 	}
 	s.accountMu.Lock()
-	s.ll = nil
-	for _, p := range s.llFiles {
+	s.accountClosed = true
+	var accountFiles map[string]loverDownload
+	if !s.accountActive {
+		accountFiles, s.llFiles, s.ll = s.llFiles, nil, nil
+	}
+	s.accountMu.Unlock()
+	for _, p := range accountFiles {
 		_ = os.Remove(p.path)
 	}
-	s.llFiles = nil
-	s.accountMu.Unlock()
 	s.cancelLoadCost(true)
 	s.costMeasure.workers.Wait()
 	s.mu.Lock()
@@ -209,6 +259,14 @@ func (s *API) Close() {
 	s.mu.Unlock()
 	s.libGate.Lock()
 	s.libGate.Unlock()
+	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead} {
+		w.mu.Lock()
+		if w.a != nil {
+			w.a.Close()
+			w.a = nil
+		}
+		w.mu.Unlock()
+	}
 	s.detailRead.mu.Lock()
 	if s.detailRead.a != nil {
 		s.detailRead.a.Close()
@@ -261,21 +319,20 @@ func (s *API) beginTextureRead() (context.Context, context.CancelFunc) {
 // the current index; the reader keeps its own connection but never loads a second index.
 func (s *API) textureSession(scope string) (*app.App, []app.TextureTarget, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.texRead.a == nil {
 		var err error
 		s.texRead.a, err = s.pageReader()
 		if err != nil {
+			s.mu.Unlock()
 			return nil, nil, err
 		}
 	}
 	r := s.texRead.a
 	r.ReadOptions(s.a)
-	st := s.boardState()
-	if st == nil {
-		return nil, nil, errors.New("no list")
+	if e, err := s.a.Env(); err == nil {
+		r.EnvName = e.Name
 	}
-	r.EnvName = st.Ix.Env.Name
-	targets, err := s.a.TextureTargets(nil, scope)
+	s.mu.Unlock()
+	targets, err := r.TextureTargets(nil, scope)
 	return r, targets, err
 }

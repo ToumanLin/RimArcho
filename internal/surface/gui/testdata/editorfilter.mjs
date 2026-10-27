@@ -1,6 +1,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { loadModules } from "./dom.mjs";
+import { loadModules, Element } from "./dom.mjs";
+
+test("replacing rows keeps visible identities valid before the filter answers", async () => {
+  const key=it=>it.id||it.ref;
+  const c={items:[{id:"a"},{id:"b"},{id:"c"}],view:[2,1],cursor:0,sel:new Set(["b","c"])};
+  const S={cols:[c]};
+  const lists=await loadModules("./lists.js", {
+    "./state.js":{S,key,cur:k=>S.cols[k].items[S.cols[k].view[S.cols[k].cursor]],col:k=>S.cols[k],$:()=>null,$$:()=>[],el:tag=>new Element(tag),factText:()=>{},esc:String,api:{},T:s=>s,Tf:s=>s,AREAS:[],ROW_H:28},
+    "./icons.js":{icon:{},sourceIcon:()=>"",statusIcon:()=>""},
+    "./badgepop.js":{wireBadges:()=>{}},"./motion.js":{bump:()=>{}},
+    "./screens.js":{beginPageRead:()=>{},pageLoading:()=>false},
+  });
+  const keep=lists.setItems(0,[{id:"b"},{id:"a"}]);
+  assert.equal(keep,"c");
+  assert.deepEqual([...c.view],[0]);
+  assert.deepEqual([...c.sel],["b"]);
+  const geometry=await loadModules("./listgeometry.js",{});
+  assert.doesNotThrow(()=>geometry.listGeometry(c.items,c.view,0));
+});
 
 test("typed conditions preserve quoted paths, replace one condition and share the tag alias", async () => {
   const q = await loadModules("./searchsuggest.js", {});

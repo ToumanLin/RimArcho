@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
@@ -20,6 +21,9 @@ import (
 func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
 	if err := a.checkNoGame(); err != nil {
 		return "", err
+	}
+	if pending := a.Store.Meta("credit.recycle:" + it.InstanceID); pending != "" {
+		return a.finishCreditRecycle(it, pending)
 	}
 	old, err := a.Store.Mod(it.InstanceID)
 	if err != nil {
@@ -61,7 +65,9 @@ func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
 	if err != nil {
 		return "", CreditWait(err.Error())
 	}
-	result, err := a.replaceCreditLocked(it, old, target)
+	unlock = sync.OnceFunc(unlock)
+	defer unlock()
+	result, err := a.replaceCreditLocked(it, old, target, unlock)
 	unlock()
 	if err == nil && strings.HasPrefix(result, "switched to Workshop;") {
 		if _, scanErr := a.Scan(false); scanErr != nil {
@@ -71,7 +77,7 @@ func (a *App) ReplaceCreditItem(it store.CreditItem) (string, error) {
 	return result, err
 }
 
-func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod) (string, error) {
+func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, unlock func()) (string, error) {
 	if err := a.checkNoGame(); err != nil {
 		return "", err
 	}
@@ -273,7 +279,18 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod) (
 	if len(links) > 0 {
 		return "retained: links still reference the SteamCMD copy", nil
 	}
-	// Recheck inside the shared lifecycle immediately before moving the folder.
+	// Reserve a non-loadable sibling under the handoff lock. Persist the obligation
+	// before rename so a crash can resume recycling without exposing the old copy.
+	if err := a.trashAllowed(old.RealPath); err != nil {
+		return "", err
+	}
+	staged := filepath.Join(filepath.Dir(old.RealPath), ".archo-credit-"+it.WorkshopID+"-"+old.ID)
+	if _, err := os.Lstat(staged); !os.IsNotExist(err) {
+		return "", fmt.Errorf("credit recycle destination already exists: %s", staged)
+	}
+	if err := a.Store.SetMeta("credit.recycle:"+it.InstanceID, staged); err != nil {
+		return "", err
+	}
 	err = a.withIncomingLinks(old.RealPath, "", func() error {
 		if err := a.checkNoGame(); err != nil {
 			return err
@@ -293,12 +310,62 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod) (
 		} else if err != nil {
 			return err
 		}
-		if err := a.recycleTarget(old.RealPath); err != nil {
+		if err := os.Rename(old.RealPath, staged); err != nil {
 			return err
 		}
-		return nil
+		return a.Store.RecordRemoved(old.ID, old.RealPath, a.Now())
 	})
 	if err != nil {
+		return "", err
+	}
+	unlock()
+	return a.finishCreditRecycle(it, staged)
+}
+
+func (a *App) finishCreditRecycle(it store.CreditItem, staged string) (string, error) {
+	old, err := a.Store.Mod(it.InstanceID)
+	if err != nil {
+		return "", err
+	}
+	if old == nil || old.Kind != source.SteamCMD || old.WorkshopID() != it.WorkshopID || staged != filepath.Join(filepath.Dir(old.RealPath), ".archo-credit-"+it.WorkshopID+"-"+old.ID) || source.IsLink(staged) {
+		return "", fmt.Errorf("invalid credit recycle checkpoint for %s", it.InstanceID)
+	}
+	sources, err := a.Store.AllSources()
+	if err != nil {
+		return "", err
+	}
+	registered := false
+	for _, s := range sources {
+		registered = registered || s.ID == old.SourceID && s.Kind == source.SteamCMD && s.Status != source.StatusRetired && samePath(s.Root, filepath.Dir(staged))
+	}
+	if !registered {
+		return "", fmt.Errorf("credit recycle source is no longer registered: %s", staged)
+	}
+	if _, err := os.Lstat(old.RealPath); err == nil {
+		if _, stagedErr := os.Lstat(staged); !os.IsNotExist(stagedErr) {
+			return "", fmt.Errorf("credit source reappeared while recycling is pending: %s", old.RealPath)
+		}
+		// A crash before rename left the source intact. Revalidate the full handoff.
+		if err := a.Store.SetMeta("credit.recycle:"+it.InstanceID, ""); err != nil {
+			return "", err
+		}
+		return "", CreditWait("retrying credit handoff before recycling")
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	if old.Status == identity.Live {
+		if err := a.Store.RecordRemoved(old.ID, old.RealPath, a.Now()); err != nil {
+			return "", err
+		}
+	}
+	if _, err := os.Lstat(staged); err == nil {
+		if err := a.trash(staged); err != nil {
+			return "", err
+		}
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	if err := a.Store.SetMeta("credit.recycle:"+it.InstanceID, ""); err != nil {
 		return "", err
 	}
 	result := "switched to Workshop; SteamCMD copy moved to recycle bin"

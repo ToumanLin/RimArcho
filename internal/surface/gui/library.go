@@ -25,6 +25,8 @@ func (s *API) inventoryKey() string {
 func (s *API) library() (*app.Library, error) {
 	s.libGate.Lock()
 	defer s.libGate.Unlock()
+	s.libRead.mu.Lock()
+	defer s.libRead.mu.Unlock()
 	s.mu.Lock()
 	key := s.inventoryKey()
 	if s.lib != nil && s.libAt == key {
@@ -32,16 +34,24 @@ func (s *API) library() (*app.Library, error) {
 		s.mu.Unlock()
 		return lib, nil
 	}
-	r, err := s.readInventorySession()
+	r, err := s.inventorySession(&s.libRead)
 	s.mu.Unlock()
+	if err == nil {
+		err = s.refreshPageIndex(r)
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
+	release, err := pinPageRead(r)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	lib, err := r.Library()
 	if err != nil {
 		return nil, err
 	}
+	release()
 	s.mu.Lock()
 	if s.inventoryKey() == key {
 		s.lib, s.libAt = lib, key
@@ -57,6 +67,7 @@ func (s *API) readInventorySession() (*app.App, error) {
 		return nil, err
 	}
 	s.refreshInventorySession(r)
+	r.WorkspaceSnapshot()
 	return r, nil
 }
 
@@ -115,30 +126,30 @@ func (s *API) Library(search string, filters []string, sort string) (*view.LibPa
 
 // LibraryPreview is the dry run of an action that changes files, for the confirmation.
 func (s *API) LibraryPreview(kind string, refs []string) (*view.Preview, error) {
-	s.mu.Lock()
-	if kind == view.OpSubUpdate || kind == view.OpSubRemove {
-		a, err := s.a.ReadSession()
-		s.mu.Unlock()
-		if err != nil {
-			return nil, err
-		}
-		defer a.Close()
-		return view.LibPreview(a, kind, refs)
+	a, err := s.detachedReader()
+	if err != nil {
+		return nil, err
 	}
-	defer s.mu.Unlock()
-	return view.LibPreview(s.a, kind, refs)
+	defer a.Close()
+	return view.LibPreview(a, kind, refs)
 }
 
 // LibraryDo runs an action on copies.
 func (s *API) LibraryDo(kind string, refs []string) (string, error) {
+	if kind == view.OpTextures {
+		return s.TexturesRun("", 100, refs)
+	}
+	if kind == view.OpTexClean {
+		return s.cleanTextures("", refs)
+	}
+	if view.TaskLane(kind) != "" && len(refs) > 0 {
+		return s.submitTask(kind, refs)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.board, s.needs, s.lib = nil, nil, nil
 	// the actions on folders and through Steam are background tasks (06 §2.16): queued
 	// here, one item at a time, one failure does not stop the rest
-	if view.TaskLane(kind) != "" && len(refs) > 0 {
-		return s.submitTask(kind, refs)
-	}
 	t, err := view.LibDo(s.a, kind, refs)
 	// Steam out of reach (not running, no DLL): the Workshop pages instead, said so (06 §2.9)
 	var pages *view.OpenPages

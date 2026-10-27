@@ -38,6 +38,7 @@ tombstone_days = 90
 
 // App is one opened RimArcho data directory.
 type App struct {
+	workspaceSnapshot bool
 	// LaunchWait reports a launch waiting for the cross-process handoff lock.
 	LaunchWait      func(string)
 	launchDepth     int
@@ -157,10 +158,9 @@ type App struct {
 
 	dataIdx *dataIndex // community data indexes (04 §6.3), loaded on first use
 
-	readIndexFrom string // source index generation of a detached read session
-	ixCache       *Index
-	linkInst      *linkInstances // InspectGameLinks, keyed like ixCache
-	ixKey         string
+	ixCache  *Index
+	linkInst *linkInstances // InspectGameLinks, keyed like ixCache
+	ixKey    string
 	// pngSnaps: the snapshots with PNG textures (贴图优化), until the snapshots change
 	pngSnaps           map[int64]bool
 	pngSnapsKey        string

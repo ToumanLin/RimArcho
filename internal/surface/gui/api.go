@@ -29,8 +29,8 @@ import (
 // method locks its App. Slow texture/log reads use separate sessions; descriptions use
 // a snapshot of the index. Only snapshotting settings/results needs the shared mu.
 type API struct {
-	workspace       *workspaceSnapshot
 	mu              sync.Mutex
+	filesMu         sync.RWMutex // scans and file jobs; never acquired by page reads/edits
 	a               *app.App
 	emit            func(name string, data any) // Wails events; nil in tests
 	open            func(url string) error      // the system browser
@@ -40,9 +40,18 @@ type API struct {
 	libGate         sync.Mutex // coalesces full inventory builds, never acquired by edits
 	subRead         subscriptionReader
 	copyRead        inventoryReader
+	libRead         logReader
+	plansRead       logReader
+	workspaceReader logReader
+	indexRead       logReader
 	detailRead      logReader
 	board           *view.Board
+	boardAt         string
 	needs           *view.Needs
+	needsAt         string // the database state the needs were built at
+	content         view.ContentCache
+	busy            map[string]bool // scan, analyze, pack
+	workspace       *workspaceSnapshot
 	needsCache      map[string]*needsSnapshot
 	needsJobs       sync.WaitGroup
 	needsRefreshing bool
@@ -50,9 +59,6 @@ type API struct {
 	needsWanted     bool
 	needsSequence   uint64
 	listEdits       uint64
-	needsAt         string // the database state the needs were built at
-	content         view.ContentCache
-	busy            map[string]bool // scan, analyze, pack
 	// building is the pack this window's build child is making ("" none).
 	building  string
 	buildRead buildPageReader
@@ -85,16 +91,18 @@ type API struct {
 	// PackRunner builds a pack in place of the child process (tests).
 	PackRunner func(name string) error
 	// TexRunner runs `archo textures optimize` in place of the child process (tests).
-	TexRunner   func(args []string, progress func(string)) ([]string, error)
-	texLast     TextureEvent // the running conversion's last progress
-	texCancel   context.CancelFunc
-	texMeasure  textureMeasurement
-	logRead     logReader
-	texRead     logReader
-	costMeasure loadCostMeasurement
-	accountMu   sync.Mutex
-	ll          *subscribe.LoversLab
-	llFiles     map[string]loverDownload
+	TexRunner     func(args []string, progress func(string)) ([]string, error)
+	texLast       TextureEvent // the running conversion's last progress
+	texCancel     context.CancelFunc
+	texMeasure    textureMeasurement
+	logRead       logReader
+	texRead       logReader
+	costMeasure   loadCostMeasurement
+	accountMu     sync.Mutex
+	accountActive bool
+	accountClosed bool
+	ll            *subscribe.LoversLab
+	llFiles       map[string]loverDownload
 
 	uninstallSizes app.UninstallSizeCache
 	uninstallRead  logReader
@@ -213,23 +221,37 @@ func (s *API) Board() *Board {
 }
 
 func (s *API) boardLocked() *Board {
-	b, err := view.BuildBoard(s.a)
-	s.board = b
-	out := &Board{Board: b, Stamp: s.a.Store.ChangeKey(), Scanning: s.busy["scan"], Analyzing: s.busy["analyze"]}
-	if envs, err := s.a.Store.Envs(); err == nil {
-		for _, e := range envs {
-			out.Envs = append(out.Envs, e.Name)
+	key, err := s.a.LoadoutKey()
+	b := s.board
+	if err != nil || b == nil || key != s.boardAt {
+		b, err = view.BuildBoard(s.a)
+		if err == nil {
+			s.boardAt, _ = s.a.LoadoutKey()
 		}
 	}
+	s.board = b
+	out := &Board{Board: b, Stamp: s.a.Store.ChangeKey(), Scanning: s.busy["scan"], Analyzing: s.busy["analyze"]}
 	if err != nil {
 		out.Error = view.Humanize(nil, err.Error())
 		return out
+	}
+	envs, err := s.a.Store.Envs()
+	if err != nil {
+		out.Error = err.Error()
+		return out
+	}
+	for _, e := range envs {
+		out.Envs = append(out.Envs, e.Name)
 	}
 	if e, err := s.a.Env(); err == nil {
 		sc, _, _ := s.a.LastScan(e.ID)
 		out.Never = sc == nil
 	}
 	n := s.needsLocked()
+	if n.Error != "" {
+		out.Error = n.Error
+		return out
+	}
 	out.Problems = view.ProblemsOf(n)
 	out.Status, out.Reasons, out.Needs = n.Status, n.Reasons, n.Count
 	return out
@@ -282,11 +304,14 @@ func (s *API) PackNameCheck(name string) string {
 
 // PackDryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run (nothing is written).
 func (s *API) PackDryRun(name string, tex int) []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	r, err := s.detachedReader()
+	if err != nil {
+		return []string{err.Error()}
+	}
+	defer r.Close()
 	argv := append([]string{"pack", "build", strings.TrimSpace(name), "--dry-run"}, app.PackBuildArgs(view.PackTextureOptions(tex))...)
-	text, _ := cmds.Execute(s.a, argv)
-	st := s.boardState()
+	text, _ := cmds.Execute(r, argv)
+	st, _ := r.Loadout()
 	var out []string
 	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
 		if strings.HasPrefix(l, "usage:") {
@@ -329,9 +354,12 @@ func (s *API) PackExport(name, file string, list bool) (string, error) {
 		}
 		file = f
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	n, err := s.a.ExportPack(name, file, list)
+	r, err := s.detachedReader()
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+	n, err := r.ExportPack(name, file, list)
 	if err != nil {
 		return "", err
 	}
@@ -1019,12 +1047,20 @@ func (s *API) Needs() *view.Needs {
 // readNeeds is shared by slow page readers. The board and sidebar keep their cheap,
 // cache-only path and never inherit a page's eager log parsing options.
 func readNeeds(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState) {
+	n, st, _ := readNeedsChecked(a, withLog)
+	return n, st
+}
+
+func readNeedsChecked(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState, error) {
 	if withLog {
 		a.LazyLog, a.LogCacheOnly = false, false
 	}
 	ps, err := a.Problems(false, nil)
-	if err != nil || ps.State == nil {
-		return &view.Needs{Status: map[string]int{}}, nil
+	if err != nil {
+		return &view.Needs{Status: map[string]int{}}, nil, err
+	}
+	if ps.State == nil {
+		return &view.Needs{Status: map[string]int{}}, nil, errors.New("could not read list problems")
 	}
 	st := ps.State
 	if withLog {
@@ -1032,7 +1068,7 @@ func readNeeds(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState) {
 			a.SelectLog(st, cur)
 		}
 	}
-	return view.BuildNeeds(a, st, ps), st
+	return view.BuildNeeds(a, st, ps), st, nil
 }
 
 func (s *API) needsLocked() *view.Needs {
@@ -1041,8 +1077,11 @@ func (s *API) needsLocked() *view.Needs {
 		return c.n
 	}
 	ps, err := s.a.Problems(false, nil)
-	if err != nil || ps == nil || ps.State == nil {
-		return &view.Needs{Status: map[string]int{}}
+	if err != nil {
+		return &view.Needs{Status: map[string]int{}, Error: err.Error()}
+	}
+	if ps == nil || ps.State == nil {
+		return &view.Needs{Status: map[string]int{}, Error: "could not read list problems"}
 	}
 	n := view.BuildNeeds(s.a, ps.State, ps)
 	s.saveNeedsLocked(ps, n, false)
@@ -1300,6 +1339,7 @@ func (s *API) Scan() bool {
 	home, env := s.a.Home, s.a.EnvName
 	task := s.beginSelf(view.TaskScan, env, nil)
 	go func() {
+		s.filesMu.Lock()
 		var out string
 		var err error
 		if s.Exe != "" {
@@ -1307,17 +1347,16 @@ func (s *API) Scan() bool {
 		} else {
 			out, err = app.ChildScan(home, env)
 		}
+		s.filesMu.Unlock()
 		s.mu.Lock()
 		s.busy["scan"], s.board, s.needs = false, nil, nil
+		s.mu.Unlock()
 		ev := map[string]any{"ok": err == nil}
 		if err != nil {
 			ev["error"] = view.Humanize(nil, firstLine(out)+" "+err.Error())
-		} else if b := s.boardLocked(); b.Board != nil && b.Changes > 0 {
-			ev["text"] = view.T("scan complete") + "  " + view.ChangeSummary(b.LastEvents)
 		} else {
-			ev["text"] = view.T("scan complete, nothing changed")
+			ev["text"] = view.T("scan complete")
 		}
-		s.mu.Unlock()
 		if err != nil {
 			s.endSelf(task, errors.New(ev["error"].(string)), "")
 		} else {

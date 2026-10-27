@@ -75,7 +75,13 @@ func (s *Store) EnvByID(id string) (*env.Environment, error) {
 
 // CurrentEnv returns the environment selected with `env use`, or nil.
 func (s *Store) CurrentEnv() (*env.Environment, error) {
-	id := s.Meta(metaCurrentEnv)
+	var id string
+	if err := s.DB.QueryRow(`SELECT value FROM meta WHERE key=?`, metaCurrentEnv).Scan(&id); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
 	if id == "" {
 		return nil, nil
 	}

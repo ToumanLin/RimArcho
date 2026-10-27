@@ -42,7 +42,61 @@ func TestIndexKey(t *testing.T) {
 	if err := other.SetMeta("from-another-connection", "x"); err != nil {
 		t.Fatal(err)
 	}
-	if k := s.IndexKey(); k == k1 {
-		t.Fatal("another connection's commit kept the index key")
+	if k := s.IndexKey(); k != k1 {
+		t.Fatal("another connection's unrelated commit invalidated the index")
+	}
+	if err := other.SetAlias("", "L1", "renamed"); err != nil {
+		t.Fatal(err)
+	}
+	if k := s.IndexKey(); k == k1 || k != other.IndexKey() {
+		t.Fatal("index table write did not publish the same generation to both sessions")
+	}
+	key := s.IndexKey()
+	tx, err := other.DB.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE lineage_data SET alias='uncommitted'`); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := OpenSession(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	if k := reader.IndexKey(); k != key {
+		t.Fatal("new WAL reader wrote or observed an uncommitted generation")
+	}
+}
+
+// Rebuilding an indexed table drops its triggers; Open must repair them without
+// replacing the durable token or resetting its generation.
+func TestOpenRestoresIndexTriggers(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "archo.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := s.IndexKey()
+	if _, err := s.DB.Exec(`DROP TRIGGER archo_ix_lineage_data_insert`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if got := s.IndexKey(); got != key {
+		t.Fatalf("Open reset generation: %q -> %q", key, got)
+	}
+	if _, err := s.DB.Exec(`INSERT INTO lineage_data(environment_id, lineage_id, alias) VALUES('', 'L1', 'restored')`); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.IndexKey(); got == key {
+		t.Fatal("Open did not restore the dropped trigger")
 	}
 }

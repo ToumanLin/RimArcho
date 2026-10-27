@@ -11,7 +11,7 @@ import (
 // Call while the original App is locked; the returned App is used by one reader at a
 // time and must be closed. No Index, Loadout or analysis cache is shared between them.
 func (a *App) ReadSession() (*App, error) {
-	s, err := store.Open(a.Store.Path)
+	s, err := store.OpenSession(a.Store.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -20,6 +20,10 @@ func (a *App) ReadSession() (*App, error) {
 	s.DB.Exec("PRAGMA cache_size=-256")
 	return b, nil
 }
+
+// WorkspaceSnapshot makes page reads use persisted lists without importing game
+// files or taking the launch/edit lock. Commands still use normal ReadSession.
+func (a *App) WorkspaceSnapshot() { a.workspaceSnapshot = true }
 
 // ReadOptions refreshes the invocation settings without discarding a reader's caches.
 // Neither App may be in use while its options are copied.
@@ -57,6 +61,9 @@ func (a *App) AdoptReadState(r *App) {
 	}
 	a.ixCache, a.ixKey = r.ixCache, rekey(a.Store.IndexKey(), r.ixKey)
 	a.stCache, a.stKey = r.stCache, rekey(a.Store.ChangeKey(), r.stKey)
+	if r.workspaceSnapshot {
+		a.stCache, a.stKey = nil, ""
+	}
 	a.prCache, a.prKey = nil, ""
 	if a.ixCache != nil {
 		a.Store.BindMods(a.ixCache.Mods)
@@ -67,15 +74,24 @@ func (a *App) AdoptReadState(r *App) {
 	a.OpenPlan, a.PlanName = r.OpenPlan, r.PlanName
 }
 
+// AdoptReadSnapshot keeps the reader usable by subsequent page requests. Only a
+// detached index crosses sessions; a writer retains its own guarded loadout cache.
+func (a *App) AdoptReadSnapshot(r *App) {
+	a.ReadIndex(r)
+	a.OpenPlan, a.PlanName = r.OpenPlan, r.PlanName
+}
+
 // ReadIndex copies a warm index into an idle reader. Call with the source App locked.
 // Only the immutable shorteners are shared; lazy Mod declarations use the reader's DB.
 // List edits on the source connection do not invalidate this detached index.
 func (b *App) ReadIndex(a *App) {
 	if !a.IndexCached() {
-		b.readIndexFrom = ""
 		return
 	}
-	if b.readIndexFrom != a.ixKey || b.ixCache == nil {
+	if b.ixCache != nil && b.ixKey == a.ixKey {
+		return
+	}
+	if b.ixKey != a.ixKey || b.ixCache == nil {
 		x := *a.ixCache
 		x.store = b.Store
 		e := *x.Env
@@ -104,7 +120,8 @@ func (b *App) ReadIndex(a *App) {
 			x.Sources = append(x.Sources, &c)
 		}
 		b.ixCache, b.stCache = &x, nil
-		b.readIndexFrom = a.ixKey
 	}
-	b.ixKey = b.Store.IndexKey() + "|" + b.ixCache.Env.ID
+	// Keep the generation we actually copied. A concurrent writer may have
+	// committed since then; stamping the copy with its newer key would hide it.
+	b.ixKey = a.ixKey
 }

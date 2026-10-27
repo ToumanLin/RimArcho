@@ -237,10 +237,77 @@ func (a *App) Loadout() (*LoadoutState, error) {
 	return st, nil
 }
 
+// LoadoutKey validates the cached state, including ModsConfig.xml changes. Views
+// can retain derived rows without hiding an external edit to the game file.
+func (a *App) LoadoutKey() (string, error) {
+	if _, err := a.Loadout(); err != nil {
+		return "", err
+	}
+	return a.stKey + "|" + a.GameVersion, nil
+}
+
 func (a *App) loadLoadout() (*LoadoutState, error) {
+	if a.workspaceSnapshot {
+		st, err := a.storedLoadout()
+		if err != nil {
+			return nil, err
+		}
+		if st != nil {
+			mcs, err := a.Store.ModsConfigStateAt(st.Ix.Env.UserDataRoot)
+			if err != nil {
+				return nil, err
+			}
+			if st.File == nil || bytes.Equal(loadout.Hash(st.File.Raw), mcs.Seen) {
+				return st, nil
+			}
+			// External changes still import through guarded sync. Ordinary page
+			// reads of persisted state never take a writer or launch lock.
+		}
+		// First use has no persisted list yet; initialise it through normal sync.
+	}
 	st := &LoadoutState{}
 	if err := a.sync(st); err != nil {
 		return nil, err
+	}
+	return st, nil
+}
+
+func (a *App) storedLoadout() (*LoadoutState, error) {
+	now := a.Now().UTC()
+	ix, err := a.Index()
+	if err != nil {
+		return nil, err
+	}
+	plan, err := a.planFor(ix.Env.ID)
+	if err != nil || plan == nil {
+		return nil, err
+	}
+	reg, aliases, all, deploy, err := a.registry(ix)
+	if err != nil {
+		return nil, err
+	}
+	ws, err := a.Store.Workspace(plan.ID)
+	if err != nil {
+		return nil, err
+	}
+	latest, err := a.Store.LatestVersion(plan.ID)
+	if err != nil {
+		return nil, err
+	}
+	if ws == nil {
+		ws = &store.Workspace{PlanID: plan.ID, Entries: loadout.List(nil).Encode(), Updated: now}
+		if latest != nil {
+			ws.Entries, ws.OriginVersion, ws.OriginKind = latest.Entries, latest.N, latest.Source
+		}
+	}
+	st := &LoadoutState{Ix: ix, Plan: plan, Reg: reg, Aliases: aliases, cands: all, deploy: deploy, WS: ws, Latest: latest, localize: a.localizer(ix.Env.ID, reg, ix)}
+	st.List = st.readList(ws.Entries)
+	if ix.Env.UserDataRoot != "" {
+		st.FilePath = env.ModsConfigPath(ix.Env.UserDataRoot)
+		st.File, st.FileErr = loadout.ReadModsConfig(st.FilePath)
+		if errors.Is(st.FileErr, os.ErrNotExist) {
+			st.FileErr = nil
+		}
 	}
 	return st, nil
 }

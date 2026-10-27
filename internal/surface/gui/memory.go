@@ -10,13 +10,16 @@ import (
 
 // The window process's memory (07 §8.3). Go does not collect on its own while the window
 // sits idle, so what a page built stays resident after the page is gone; the window returns
-// it a moment after heavy work. Small, change-keyed inventory/log caches survive navigation
+// it a moment after heavy work. Change-keyed inventory/log caches survive navigation
 // so revisiting a page does not repeat the same database queries or log analysis.
 
 // MemoryLimit is the window process's Go soft memory cap: only a ceiling against runaway
 // growth. Idle memory comes from releasing after heavy work, not from the cap; at 32 MiB a
 // refresh's live heap sat near the cap and one list edit ran hundreds of collections.
-const MemoryLimit = 128 << 20
+// Retained WAL readers for a 5,000-mod library need about 100 MiB live; 128 MiB
+// leaves too little space for concurrent page construction and causes the same GC
+// thrashing. The cap leaves allocation headroom; idle release still returns it.
+const MemoryLimit = 256 << 20
 
 // tuneProcess applies the window's memory settings: the soft cap, and a 256 KiB SQLite page
 // cache on the main connection, as in the TUI. ReadSession applies the same cache size to
@@ -50,8 +53,8 @@ func (r *releaser) soon() {
 	r.timer = time.AfterFunc(releaseAfter, debug.FreeOSMemory)
 }
 
-// Leave cancels abandoned texture reads and drops transient page state. The inventory and
-// dedicated log reader keep their change-keyed caches for the next visit.
+// Leave cancels abandoned texture reads and drops transient page state. Dedicated
+// page readers keep their change-keyed caches for the next visit.
 func (s *API) Leave(page string) {
 	if page == "plans" {
 		s.cancelLoadCost(false)

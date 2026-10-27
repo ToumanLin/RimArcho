@@ -174,6 +174,41 @@ export function confirm(title, lines, goLabel, go, envWrite = "apply") {
   panel(title, pre, goLabel, go, "", envWrite);
 }
 
+// Show the confirmation before starting disk/network checks. A closed or superseded
+// dialog never receives a late preview, and Enter cannot bypass a pending check.
+export async function libraryConfirm(kind, refs, label, done) {
+  const body = el("div");
+  const lines = el("pre", "lines", T("checking the selected mods…"));
+  body.append(lines);
+  const fast = el("input");
+  fast.type = "checkbox";
+  if (kind === "subscription-remove") {
+    const choice = el("label");
+    choice.append(fast, document.createTextNode(" " + T("quick delete (cannot be undone)")));
+    body.append(choice, el("p", "muted", T("Quick delete skips the recycle bin. Deleted files cannot be restored.")));
+  }
+  let ready = false;
+  const apply = () => {
+    if (!ready) return;
+    if (fast.checked) {
+      confirm(T("permanently delete these mods?"), [T("Quick delete skips the recycle bin. Deleted files cannot be restored."), ...refs], T("permanently delete"), () => done(api.LibraryDo("subscription-remove-fast", refs)));
+    } else done(api.LibraryDo(kind, refs));
+  };
+  panel(label, body, label, apply, "", "library");
+  const dialog = S.popup;
+  const yes = $("#popup .btns .go");
+  yes.disabled = true;
+  try {
+    const preview = await api.LibraryPreview(kind, refs);
+    if (S.popup !== dialog) return;
+    pathContent(lines, (preview.lines || []).join("\n"));
+    ready = !!preview.apply;
+    yes.disabled = !ready;
+  } catch (e) {
+    if (S.popup === dialog) lines.textContent = errText(e);
+  }
+}
+
 // panel is a confirmation whose body is an element (the pack build's steps); cls widens it.
 export function panel(title, content, goLabel, go, cls = "", envWrite = "") {
   open("confirm", title, (pop, p) => {

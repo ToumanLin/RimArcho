@@ -14,15 +14,44 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
+// Account operations own their session while doing I/O. Contending requests get
+// an explicit busy error instead of waiting behind a download or login window.
+func (s *API) beginAccount() (func(), error) {
+	s.accountMu.Lock()
+	defer s.accountMu.Unlock()
+	if s.accountClosed {
+		return nil, errors.New("account operations are closed")
+	}
+	if s.accountActive {
+		return nil, errors.New(view.T("an account operation is running; try again when it finishes"))
+	}
+	s.accountActive = true
+	return func() {
+		s.accountMu.Lock()
+		s.accountActive = false
+		var files map[string]loverDownload
+		if s.accountClosed {
+			files, s.llFiles, s.ll = s.llFiles, nil, nil
+		}
+		s.accountMu.Unlock()
+		for _, file := range files {
+			_ = os.Remove(file.path)
+		}
+	}, nil
+}
+
 // AccountAction is deliberately absent from cmds, MCP and agent tool registries.
 func (s *API) AccountAction(service, action string) ([]string, error) {
 	allowed := map[string]map[string]bool{"steamcmd": {"login": true, "verify": true, "logout": true, "local-forget": true, "anonymous": true}, "loverslab": {"enable": true, "login": true, "verify": true, "forget": true}}
 	if !allowed[service][action] {
 		return nil, errors.New(view.T("unknown account action"))
 	}
-	s.accountMu.Lock()
-	defer s.accountMu.Unlock()
-	err := s.playerJob(view.TaskAccount, service, func() error { return s.accountAction(service, action) })
+	release, err := s.beginAccount()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	err = s.playerJob(view.TaskAccount, service, func() error { return s.accountAction(service, action) })
 	if err != nil {
 		return nil, errors.New(view.Text(err.Error()))
 	}
@@ -125,8 +154,11 @@ func (s *API) loversLab(a *app.App) (*subscribe.LoversLab, error) {
 // LoverFiles and LoverFollow accept only canonical file pages and opaque selections.
 // No method accepts credentials, arbitrary headers, cookies or an HTTP method/body.
 func (s *API) LoverFiles(page string) (*subscribe.FilePage, error) {
-	s.accountMu.Lock()
-	defer s.accountMu.Unlock()
+	release, err := s.beginAccount()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	a, err := s.detachedReader()
 	if err != nil {
 		return nil, err
@@ -153,8 +185,11 @@ type LoverResult struct {
 type loverDownload struct{ page, path string }
 
 func (s *API) LoverFollow(page, id string, agreed bool) (*LoverResult, error) {
-	s.accountMu.Lock()
-	defer s.accountMu.Unlock()
+	release, err := s.beginAccount()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	a, err := s.detachedReader()
 	if err != nil {
 		return nil, err
@@ -190,8 +225,11 @@ func (s *API) LoverFollow(page, id string, agreed bool) (*LoverResult, error) {
 }
 
 func (s *API) LoverInstall(page, id, ref string) (string, error) {
-	s.accountMu.Lock()
-	defer s.accountMu.Unlock()
+	release, err := s.beginAccount()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	a, err := s.detachedReader()
 	if err != nil {
 		return "", err
@@ -216,8 +254,11 @@ func (s *API) LoverInstall(page, id, ref string) (string, error) {
 }
 
 func (s *API) LoverInstallPreview(page, id, ref string) (*view.Preview, error) {
-	s.accountMu.Lock()
-	defer s.accountMu.Unlock()
+	release, err := s.beginAccount()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	a, err := s.detachedReader()
 	if err != nil {
 		return nil, err
@@ -268,9 +309,12 @@ func (s *API) SteamLogin(name string) ([]string, error) {
 	if name == "" || strings.EqualFold(name, "anonymous") {
 		return nil, errors.New(view.T("enter a Steam account name first"))
 	}
-	s.accountMu.Lock()
-	defer s.accountMu.Unlock()
-	err := s.playerJob(view.TaskAccount, "steamcmd", func() error {
+	release, err := s.beginAccount()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	err = s.playerJob(view.TaskAccount, "steamcmd", func() error {
 		a, e := s.detachedReader()
 		if e != nil {
 			return e
@@ -293,8 +337,11 @@ func (s *API) SteamLogin(name string) ([]string, error) {
 // At most one request per four hours, including failures. Opening Settings is
 // the trigger; there is no timer, retry loop, resource load or task/toast.
 func (s *API) refreshLoversLab(a *app.App) {
-	s.accountMu.Lock()
-	defer s.accountMu.Unlock()
+	release, err := s.beginAccount()
+	if err != nil {
+		return
+	}
+	defer release()
 	if a.Store.Meta("account:loverslab:enabled") != "true" {
 		return
 	}

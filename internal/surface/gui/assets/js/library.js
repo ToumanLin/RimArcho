@@ -629,6 +629,7 @@ async function run(code, copies) {
     }
   }
   if (!o.confirm) return done(api.LibraryDo(code, refs));
+  if (code === "subscription-remove") return pop.libraryConfirm(code, refs, o.label, done);
   let p;
   try { p = await api.LibraryPreview(code, refs); } catch (e) { return say("fail", errText(e)); }
   pop.confirm(p.title, p.lines, o.label, p.apply ? () => done(api.LibraryDo(code, refs)) : null);
