@@ -14,6 +14,7 @@ test('external and unknown targets fail closed, including deceptive button label
   assert.equal(classify({identity:{'data-env-write':'new-operation'},label:'go'}).tier,'local-destructive');
   assert.equal(classify({identity:{'data-env-write':'subscribe'},label:'add'}).tier,'external');
   assert.equal(classify({identity:{'data-id':'game|1.6'},label:'1.6'}).tier,'local-destructive');
+  assert.equal(classifyKey('Control+Backslash').tier,'safe');
   assert.equal(classifyKey('Shift+KeyL').tier,'external');assert.equal(classifyKey('Enter',{popup:'confirm'}).tier,'unknown');
   assert.equal(classifyKey('Space',{popup:'palette'}).tier,'unknown');assert.equal(classifyKey('KeyT').tier,'safe');
   assert.equal(classifyKey('Space',{page:'home'}).tier,'unknown');assert.equal(classifyKey('Space',{page:null}).tier,'safe');

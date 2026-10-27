@@ -290,7 +290,7 @@ export async function drive(ctx) {
   await root();
   const startSnapshot=await snapshot('player-start');
   expectedEnd=startSnapshot;
-  await c.key('Control+Backslash'); // real documented refnums switch, isolated home only
+  await input(key('Control+Backslash')); // real documented refnums switch, isolated home only
   await settled();
   save('operation-seeds',await c.evaluate(`(async()=>{const {S}=await import('/js/state.js');return {ops:S.start?.ops,commands:S.start?.commands,nav:S.shell?.nav}})()`));
   let originalFailure=null;

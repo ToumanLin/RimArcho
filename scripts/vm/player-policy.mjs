@@ -22,6 +22,7 @@ const safeCommands = new Set(['full','detail','search','menu','filter','fold','e
 const externalCommands = new Set(['folder','workshop','workshop-id','steam','subscription-page','subscription-check','subscription-update','resubscribe','unsubscribe','launch','download','open','browse','save-file','open-file']);
 const localCommands = new Set(['delete','remove','separate','pin','pin-update','unpin','move','unhide','textures-clean','subscription-remove','subscription-remove-fast','save','apply']);
 export function classifyKey(combo,state={}) {
+  if(combo==='Control+Backslash')return {tier:'safe',reason:'reference-number UI toggle in the isolated home'};
   if(['Shift+KeyL','Control+KeyO','Control+KeyW','Control+KeyS'].includes(combo))return {tier:'external',reason:'documented game/external shortcut'};
   if(combo==='Enter')return state.popup==='tags'?{tier:'local-destructive',reason:'commit persistent tag'}:state.popup==='position'?{tier:'safe',reason:'undoable position choice'}:{tier:'unknown',reason:'Enter could confirm an unclassified menu/dialog action'};
   if(combo==='Space'&&(state.popup||state.menu))return {tier:'unknown',reason:'Space could activate an unclassified dialog choice'};
