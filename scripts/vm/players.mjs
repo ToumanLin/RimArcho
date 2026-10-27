@@ -128,6 +128,7 @@ export async function drive(ctx) {
         writeFileSync(branchFile,JSON.stringify({actions:action.actions}));
         const child=await runChild([...replayArgs(branchFile),'--branch','true'],Math.floor(Math.min(600000,Math.max(1000,deadline-performance.now()))));
         entry.exitCode=child.status;entry.branchOutput=child.stdout.slice(-4000);entry.error=child.error?.message;
+        if(child.error&&performance.now()>=deadline){entry.budgetLimited=true;entry.unreachableReason='run minute budget exhausted during isolated replay; not asserted';}
         try{
           const summary=JSON.parse(child.stdout),report=JSON.parse(readFileSync(join(summary.output,'result.json'),'utf8'));
           entry.functionalStatus=report.functionalStatus;entry.branchResult=join(summary.output,'result.json');
