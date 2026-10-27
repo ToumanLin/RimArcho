@@ -219,6 +219,11 @@ export async function drive(ctx) {
         const u=p.undo.findIndex(step=>step.entries===wanted),r=p.redo.findIndex(step=>step.entries===wanted);
         if(u>=0)n=u+1;else if(r>=0){n=r+1;combo='Control+KeyR';}
       }
+      if(n===0&&wanted===actual&&p.undoDepth===0&&JSON.stringify(p.workspace)!==JSON.stringify(original.workspace)){
+        // Checkout can claim “u undoes” while adding no history for identical
+        // entries. Exercise that real key before reporting metadata mismatch.
+        await input(key('KeyU'));await settled();
+      }
       for(let i=0;i<n;i++){
         // The global U key can be consumed by a page-level status undo. Choose
         // the explicit workspace command through the real palette instead.
