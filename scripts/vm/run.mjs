@@ -79,6 +79,17 @@ async function settled(page, ms=10000) {
     return stable>=5 && s;
   },ms);
 }
+async function environmentReady(page) {
+  const start=performance.now();
+  try { return await timed('environment-switch-ready',()=>settled(page,15000),5000); }
+  catch(e){
+    check('environment switch meets 15s hard deadline',false,e.message);
+    // Keep the failure, then collect eventual completion/restoration for diagnosis.
+    const state=await settled(page,120000);
+    result.timings.push({name:'environment-switch-eventual',ms:performance.now()-start,budgetMs:15000});
+    return state;
+  }
+}
 async function press(combo, opts) { await c.key(combo,opts); }
 async function editor() {
   await press('Escape');
@@ -287,12 +298,12 @@ async function scenario2() {
       const destination=alternatives[0];
       await clickText('.envrow:not(.on) button','use this one');
       // Navigate while UseEnv is still in flight. Names are deliberately distinct from IDs.
-      await press('Shift+Digit4');await settled('library',15000);
+      await press('Shift+Digit4');await environmentReady('library');
       check('environment switch adopts destination',await c.evaluate(`(async()=>{const {S}=await import('/js/state.js');return S.board.env===${JSON.stringify(destination)}})()`));
       await press('Shift+Digit8');await settled('env');
       // Raw environment IDs are intentionally absent in canonical snapshots; read displayed names.
       const row=await c.evaluate(`(()=>{const rows=[...document.querySelectorAll('.envrow')];return rows.findIndex(r=>r.querySelector('.name')?.textContent!==${JSON.stringify(destination)})})()`);
-      await c.click(`.envrow:nth-child(${row+1}) button`);await press('Shift+Digit1');await settled('home',15000);
+      await c.click(`.envrow:nth-child(${row+1}) button`);await press('Shift+Digit1');await environmentReady('home');
       check('environment switch returns to original ID',(await uiState()).env===original);
       await editor();
     }else result.coverage.push({action:'environment switch',status:'unsupported: only one environment'});
