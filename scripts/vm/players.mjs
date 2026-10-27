@@ -111,6 +111,7 @@ export async function drive(ctx) {
       if(!pointer)throw Error('unreachable control: '+action.locator);
       const actual=await targetControl(action),policy=actual&&classify(actual,await read());
       if(!policy||!allowed(policy,options.allow))throw Error('policy blocked replay target: '+action.locator);
+      if(action.expectedTarget&&(actual.label!==action.expectedTarget.label||JSON.stringify(actual.identity)!==JSON.stringify(action.expectedTarget.identity)))throw Error('unreachable control: semantic target changed: '+action.locator);
     }
     const entry={index:trace.length,atMs:performance.now()-started,action,started:new Date().toISOString()};
     if(logged){trace.push(entry);save('trace',{schema:1,seed,actions:trace});}
@@ -130,9 +131,10 @@ export async function drive(ctx) {
           const summary=JSON.parse(child.stdout),report=JSON.parse(readFileSync(join(summary.output,'result.json'),'utf8'));
           entry.functionalStatus=report.functionalStatus;entry.branchResult=join(summary.output,'result.json');
           entry.nonUndoableChanges=report.nonUndoableChanges||null;entry.failures=report.failures;entry.storage=report.storage;
+          if(report.failures.length&&report.failures.every(f=>/^(?:Error: )?(?:unreachable control|policy blocked|control not hittable)/.test(f.detail?.error||f.detail||'')))entry.unreachableReason=report.failures.map(f=>f.detail?.error||f.detail).join('\n');
           result.performanceFailures.push(...report.performanceFailures.map(f=>({...f,branchControl:action.control})));
         }catch{}
-        if(entry.functionalStatus!=='passed')fail('isolated branch',{control:action.control,error:entry.error,output:entry.branchOutput});
+        if(entry.functionalStatus!=='passed'&&!entry.unreachableReason)fail('isolated branch',{control:action.control,error:entry.error,output:entry.branchOutput});
       }
       else {
         for(let n=1;n<=(action.count||1);n++){
@@ -367,20 +369,20 @@ export async function drive(ctx) {
   async function isolatedEdge(row,recipe) {
     row.attemptedAt=new Date().toISOString();
     const parentBefore=await snapshot('branch-'+row.key+'-parent-before');
-    const file=join(out,'branch-'+row.key+'.json');save('branch-'+row.key,{actions:[...recipe,row.action||{kind:'click',locator:row.locator}].map(action=>({action}))});
+    const file=join(out,'branch-'+row.key+'.json');save('branch-'+row.key,{actions:[...recipe,{...(row.action||{kind:'click',locator:row.locator}),expectedTarget:{label:row.sourceLabel??row.label,identity:row.identity}}].map(action=>({action}))});
     // Child runs have a fresh fixture/full filesystem copy; never reuse a dirty root.
     const entry=await input({kind:'branch',traceFile:file,control:row.key});
     const parentAfter=await snapshot('branch-'+row.key+'-parent-return');
     row.returnVerified=!difference(canonical(parentBefore),canonical(parentAfter));
     if(!row.returnVerified)fail('branch parent canonical equality',{control:row.key});
-    row.outcome=entry.functionalStatus==='passed'&&row.returnVerified?'pressed-ok':'failed';row.asserted=row.outcome==='pressed-ok';row.branchReplay=file;row.nonUndoable=entry.nonUndoableChanges;row.oracles=entry.failures||[];row.reason=entry.error||entry.branchOutput;saveLedger();
+    row.outcome=entry.unreachableReason?'unreachable':entry.functionalStatus==='passed'&&row.returnVerified?'pressed-ok':'failed';row.asserted=row.outcome==='pressed-ok';row.branchReplay=file;row.nonUndoable=entry.nonUndoableChanges;row.oracles=entry.failures||[];row.reason=entry.unreachableReason||entry.error||entry.branchOutput;saveLedger();
   }
   async function walk() {
     await root();await enqueue([]);
     const replay=options.replay?JSON.parse(readFileSync(options.replay,'utf8')):null;
     if(replay){
       const replayStart=performance.now(),firstAt=replay.actions[0]?.atMs||0;
-      for(let i=0;i<replay.actions.length;i++){const entry=replay.actions[i];if(performance.now()>=deadline)throw Error('replay exceeded minute budget');const wait=(entry.atMs||firstAt)-firstAt-(performance.now()-replayStart);if(wait>0)await sleep(wait);await input(entry.action||entry);if(i%10===9)await oracles('replay',false);}
+      for(let i=0;i<replay.actions.length;i++){const entry=replay.actions[i];if(performance.now()>=deadline)throw Error('replay exceeded minute budget');const wait=(entry.atMs||firstAt)-firstAt-(performance.now()-replayStart);if(wait>0)await sleep(wait);await input(entry.action||entry);if(options.branch==='true')await settled();if(i%10===9)await oracles('replay',false);}
       await settled();await oracles('replay settled');
       if(options.branch==='true'){
         const after=await snapshot('branch-after'),d=difference(canonical(startSnapshot),canonical(after));
