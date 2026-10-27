@@ -34,6 +34,7 @@ func (b *App) ReadOptions(a *App) {
 	b.HTTP, b.SteamAPI = a.HTTP, a.SteamAPI
 	b.FindTool, b.SteamWorker, b.TrashFunc = a.FindTool, a.SteamWorker, a.TrashFunc
 	b.SteamWorkerStream = a.SteamWorkerStream
+	b.LaunchWait = a.LaunchWait
 	b.pageRepo = a.pageRepo
 	b.SteamCMDZip, b.SteamCMDNoPath = a.SteamCMDZip, a.SteamCMDNoPath
 	b.SteamCMDStart, b.SteamCMDRun, b.SteamCMDPoll = a.SteamCMDStart, a.SteamCMDRun, a.SteamCMDPoll

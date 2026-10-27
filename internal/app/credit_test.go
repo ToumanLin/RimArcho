@@ -752,31 +752,48 @@ func TestCreditCrossEnvironmentCandidateRequired(t *testing.T) {
 	e, batch, items := creditEnv(t, "8100")
 	old := items[0].InstanceID
 	e.MustRun("enable", old)
+	shared := mustPlan(t, e)
+	mainEnv, err := e.App.Env()
+	if err != nil {
+		t.Fatal(err)
+	}
 	game := secondGame(e, "CreditBlocked")
 	e.MustRun("env", "add", "blocked", "--game", game, "--saves", "own")
 	e.MustRun("env", "use", "blocked")
-	p, err := e.App.NewPlan("blocked-list", "current")
+	blockedEnv, err := e.App.Env()
 	if err != nil {
 		t.Fatal(err)
 	}
-	en, err := e.App.Env()
-	if err != nil {
+	// B uses the same list but has never saved or launched it. Its ModsConfig
+	// contains no old copy and the list's EnvID still names A.
+	if err := e.App.Store.SetCurrentPlan(blockedEnv.ID, shared); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.App.Store.SetCurrentPlan(en.ID, p.Plan.ID); err != nil {
-		t.Fatal(err)
-	}
-	e.MustRun("enable", old)
-	e.MustRun("save")
-	blockedPlan := mustPlan(t, e)
-	// A local token and its _steam token occupy both legal names in this game.
-	e.WriteMod(filepath.Join(game, "Mods", "A"), testkit.Sample("credit.mod8100", "Local collision"))
-	e.WriteMod(filepath.Join(game, "Mods", "B"), testkit.Sample("credit.mod8100_steam", "Steam token collision"))
-	e.MustRun("scan")
 	e.MustRun("env", "use", "main")
 	creditStart(t, e, batch, items)
 	creditClient(t, e, items)
-	e.App.TrashFunc = func(string) error { t.Fatal("copy in blocked game recycled"); return nil }
+	e.MustRun("scan")
+	ix, err := e.App.Index()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var target *store.Mod
+	for _, m := range ix.Mods {
+		if m.Kind == source.Workshop && m.WorkshopID() == "8100" {
+			target = m
+		}
+	}
+	if target == nil {
+		t.Fatal("missing client copy")
+	}
+	// A sees the client copy, B does not. Scan preserves source ownership.
+	if _, err := e.App.Store.DB.Exec(`UPDATE source SET environment_id=? WHERE id=?`, mainEnv.ID, target.SourceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.Store.DB.Exec(`UPDATE instance SET environment_id=? WHERE id=?`, mainEnv.ID, target.ID); err != nil {
+		t.Fatal(err)
+	}
+	e.App.TrashFunc = func(string) error { t.Fatal("copy needed by blocked game recycled"); return nil }
 	if err := e.App.CreditStep(nil); err != nil {
 		t.Fatal(err)
 	}
@@ -784,16 +801,12 @@ func TestCreditCrossEnvironmentCandidateRequired(t *testing.T) {
 	if it.State != "retained" || !strings.Contains(it.Result, "blocked") {
 		t.Fatalf("missing environment reason: %+v", it)
 	}
-	ws, err := e.App.Store.Workspace(blockedPlan)
-	if err != nil || loadout.Decode(ws.Entries).Index(old) < 0 || loadout.Decode(ws.Entries).Index(it.TargetID) >= 0 {
-		t.Fatalf("unloadable plan switched: %+v %v", ws, err)
+	ws, err := e.App.Store.Workspace(shared)
+	if err != nil || loadout.Decode(ws.Entries).Index(old) < 0 || loadout.Decode(ws.Entries).Index(target.ID) >= 0 {
+		t.Fatalf("shared list switched: %+v %v", ws, err)
 	}
-	main, err := e.App.Store.Workspace(mustPlan(t, e))
-	if err != nil || loadout.Decode(main.Entries).Index(it.TargetID) < 0 {
-		t.Fatalf("eligible game not switched: %+v %v", main, err)
-	}
-	if ds, err := e.App.Store.CreditDeployments(it); err != nil || len(ds) != 1 {
-		t.Fatalf("blocked deployment lost: %+v %v", ds, err)
+	if ds, err := e.App.Store.CreditDeployments(it); err != nil || len(ds) != 0 {
+		t.Fatalf("handoff started before eligibility: %+v %v", ds, err)
 	}
 }
 
@@ -977,5 +990,182 @@ func TestCreditResumeAfterRecycleBeforeScan(t *testing.T) {
 	it = creditItem(t, e, batch)
 	if it.State != "done" || calls != 1 {
 		t.Fatalf("recycled folder retried: %+v calls=%d", it, calls)
+	}
+}
+
+func TestCreditNotesTexturesAndStaleBatch(t *testing.T) {
+	t.Parallel()
+	e, batch, items := creditEnv(t, "8100")
+	old := items[0].InstanceID
+	e.MustRun("enable", old)
+	pick, err := e.App.BeginBatch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.MustRun("disable", old)
+	e.MustRun("enable", old)
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	e.MustRun("scan")
+	ix, err := e.App.Index()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var target string
+	for _, m := range ix.Mods {
+		if m.Kind == source.Workshop && m.WorkshopID() == "8100" {
+			target = m.ID
+		}
+	}
+	if target == "" {
+		t.Fatal("missing Workshop")
+	}
+	for id, text := range map[string]string{old: "old note", target: "client note"} {
+		if err := e.App.Store.SetCopyNote(id, text, e.Now()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := e.App.Store.SetMade(old, &store.Made{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.Store.PutTextureMod(store.TextureMod{InstanceID: old, SnapHash: []byte("old-content"), Scale: 50, MadeAt: e.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	folder := mustCreditMod(t, e, old).RealPath
+	dds := filepath.Join(folder, "Textures", "test.dds")
+	if err := e.App.Store.PutTextureFiles([]store.TextureFile{{Path: dds, InstanceID: old, ModDir: folder, Rel: "Textures/test.dds", Scale: 50, MadeAt: e.Now()}}); err != nil {
+		t.Fatal(err)
+	}
+	e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it := creditItem(t, e, batch)
+	if it.State != "done" || !strings.Contains(it.Result, "optimise Workshop textures again") {
+		t.Fatalf("texture warning lost: %+v", it)
+	}
+	var text, made string
+	if err := e.App.Store.DB.QueryRow(`SELECT text,made FROM instance_note WHERE instance_id=?`, target).Scan(&text, &made); err != nil {
+		t.Fatal(err)
+	}
+	if text != "client note\n\nold note" || made == "" {
+		t.Fatalf("note merge: %q %q", text, made)
+	}
+	var n int
+	if err := e.App.Store.DB.QueryRow(`SELECT count(*) FROM instance_note WHERE instance_id=?`, old).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("old note: %d %v", n, err)
+	}
+	if err := e.App.Store.DB.QueryRow(`SELECT count(*) FROM texture_file WHERE instance_id=? AND path=?`, old, dds).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("physical ledger relabelled: %d %v", n, err)
+	}
+	if err := e.App.Store.DB.QueryRow(`SELECT count(*) FROM texture_mod WHERE instance_id=?`, target).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("false optimisation state: %d %v", n, err)
+	}
+	if err := pick.Commit("pick"); err == nil || !strings.Contains(err.Error(), "reload") {
+		t.Fatalf("stale undo accepted: %v", err)
+	}
+	if err := pick.Revert(); err == nil || !strings.Contains(err.Error(), "reload") {
+		t.Fatalf("stale workspace accepted: %v", err)
+	}
+	ws, err := e.App.Store.Workspace(mustPlan(t, e))
+	if err != nil || loadout.Decode(ws.Entries).Index(old) >= 0 || loadout.Decode(ws.Entries).Index(target) < 0 {
+		t.Fatalf("old copy resurrected: %+v %v", ws, err)
+	}
+}
+
+func TestCreditMalformedStagingRetained(t *testing.T) {
+	t.Parallel()
+	e, batch, items := creditEnv(t, "8100")
+	old := items[0].InstanceID
+	e.MustRun("enable", old)
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	if err := e.App.Store.SetMeta(store.StageKey(mustPlan(t, e)), `[{broken`); err != nil {
+		t.Fatal(err)
+	}
+	e.App.TrashFunc = func(string) error { t.Fatal("corrupt staging recycled"); return nil }
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it := creditItem(t, e, batch)
+	if it.State != "retained" || !strings.Contains(it.Result, "staging list") || it.Attempts != 0 {
+		t.Fatalf("corruption retried: %+v", it)
+	}
+	ws, err := e.App.Store.Workspace(mustPlan(t, e))
+	if err != nil || loadout.Decode(ws.Entries).Index(old) < 0 {
+		t.Fatalf("list mutated: %+v %v", ws, err)
+	}
+	e.Advance(time.Hour)
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	if again := creditItem(t, e, batch); again != it {
+		t.Fatalf("terminal item retried: %+v", again)
+	}
+}
+
+func TestCreditManagedLinkOutsideEnvironmentRetained(t *testing.T) {
+	t.Parallel()
+	e, batch, items := creditEnv(t, "8100")
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	old := mustCreditMod(t, e, items[0].InstanceID)
+	mods := filepath.Join(e.Root, "removed-game", "Mods")
+	e.MkdirAll(mods)
+	name := app.DeployPrefix + "credit"
+	link := filepath.Join(mods, name)
+	if err := source.CreateLink(link, old.RealPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.Store.RecordLinkIntent([]store.ManagedLink{{Operation: "credit-test", Mods: mods, Name: name, Kind: "deploy", Instance: old.ID, Target: old.RealPath}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.Store.LinkPhase("credit-test", "complete"); err != nil {
+		t.Fatal(err)
+	}
+	e.App.TrashFunc = func(string) error { t.Fatal("managed link target recycled"); return nil }
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it := creditItem(t, e, batch)
+	if it.State != "retained" || !strings.Contains(it.Result, "links") {
+		t.Fatalf("managed link ignored: %+v", it)
+	}
+	if !source.IsLink(link) {
+		t.Fatal("managed link changed")
+	}
+}
+
+func TestCreditRemovedStageSnapshotCannotResurrectCopy(t *testing.T) {
+	t.Parallel()
+	e, batch, items := creditEnv(t, "8100")
+	old := items[0].InstanceID
+	if _, err := e.App.Stage([]string{old}); err != nil {
+		t.Fatal(err)
+	}
+	pick, err := e.App.BeginBatch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.Unstage([]string{old}); err != nil {
+		t.Fatal(err)
+	}
+	// No current/history SQL row refers to the old item; only the open pick
+	// snapshot does. A remap must still invalidate it before the copy is recycled.
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	if it := creditItem(t, e, batch); it.State != "done" {
+		t.Fatal(it)
+	}
+	if err := pick.Revert(); err == nil {
+		t.Fatal("removed staged item restored from stale snapshot")
+	}
+	staged, _, err := e.App.Staged()
+	if err != nil || len(staged) != 0 {
+		t.Fatalf("stale staging restored: %+v %v", staged, err)
 	}
 }

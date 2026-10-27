@@ -89,6 +89,12 @@ func (a *App) RemoveFromPlans(refs []string) ([]PlanRemoval, error) {
 // editOther changes a plan that is not the current one, with an undo step in its own
 // history (the step is undone once the plan is current, 04 §3).
 func (a *App) editOther(p *store.Plan, op string, f func(loadout.List) (loadout.List, int)) (int, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return 0, err
+	}
+	defer unlock()
+
 	ws, err := a.planWorkspace(p)
 	if err != nil {
 		return 0, err

@@ -232,6 +232,12 @@ func conflictError(st *LoadoutState, c *ExternalConflict) error {
 // `loadout ignore-external`); the version stays in the history. It returns the version
 // that was ignored, 0 when there was none.
 func (a *App) IgnoreExternal() (int, *LoadoutState, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return 0, nil, err
+	}
+	defer unlock()
+
 	st, err := a.Loadout()
 	if err != nil {
 		return 0, nil, err

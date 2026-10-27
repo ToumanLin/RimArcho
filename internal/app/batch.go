@@ -14,6 +14,7 @@ import (
 
 // Batch is an open pick session.
 type Batch struct {
+	remap   string
 	a       *App
 	planID  int64
 	entries string // the workspace list when it began
@@ -23,17 +24,32 @@ type Batch struct {
 
 // BeginBatch starts a session on the current plan.
 func (a *App) BeginBatch() (*Batch, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
 	}
 	p := st.Plan.ID
-	return &Batch{a: a, planID: p, entries: st.List.Encode(), staged: a.Store.Meta(store.StageKey(p)), lastID: a.Store.LastStepID(p, "undo")}, nil
+	return &Batch{a: a, planID: p, entries: st.List.Encode(), staged: a.Store.Meta(store.StageKey(p)), lastID: a.Store.LastStepID(p, "undo"), remap: a.Store.Meta(store.CreditRemapKey)}, nil
 }
 
 // Commit ends the session: its undo steps become one, which restores the list as it was
 // when the session began.
 func (b *Batch) Commit(op string) error {
+	unlock, err := b.a.lockLaunch()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if b.remap != b.a.Store.Meta(store.CreditRemapKey) {
+		return fmt.Errorf("list changed during credit replacement; reload the pick session")
+	}
+
 	if b.a.Store.LastStepID(b.planID, "undo") == b.lastID {
 		return nil // nothing was edited
 	}
@@ -52,6 +68,15 @@ func (b *Batch) Commit(op string) error {
 
 // Revert ends the session and undoes everything it did, staging included.
 func (b *Batch) Revert() error {
+	unlock, err := b.a.lockLaunch()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if b.remap != b.a.Store.Meta(store.CreditRemapKey) {
+		return fmt.Errorf("list changed during credit replacement; reload the pick session")
+	}
+
 	st, err := b.a.Loadout()
 	if err != nil {
 		return err

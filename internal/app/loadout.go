@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
@@ -220,7 +221,7 @@ func (a *App) Loadout() (*LoadoutState, error) {
 		a.Store.MM = c.GameMM()
 		return &c, nil
 	}
-	st, err := a.loadLoadout(ix)
+	st, err := a.loadLoadout()
 	if err != nil {
 		return nil, err
 	}
@@ -236,12 +237,8 @@ func (a *App) Loadout() (*LoadoutState, error) {
 	return st, nil
 }
 
-func (a *App) loadLoadout(ix *Index) (*LoadoutState, error) {
-	reg, aliases, all, deploy, err := a.registry(ix)
-	if err != nil {
-		return nil, err
-	}
-	st := &LoadoutState{Ix: ix, Reg: reg, Aliases: aliases, cands: all, deploy: deploy, localize: a.localizer(ix.Env.ID, reg, ix)}
+func (a *App) loadLoadout() (*LoadoutState, error) {
+	st := &LoadoutState{}
 	if err := a.sync(st); err != nil {
 		return nil, err
 	}
@@ -269,6 +266,28 @@ func (a *App) registry(ix *Index) (*loadout.Registry, map[string][]store.Alias, 
 }
 
 func (a *App) sync(st *LoadoutState) error {
+	// Readers may spend time measuring before they need a write. Do not hold the
+	// handoff lock across that work. Rebuild the registry and reread ModsConfig
+	// under the guard, so a read overtaken by replacement cannot sync old IDs back.
+	now := a.Now().UTC()
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	ix, err := a.Index()
+	if err != nil {
+		return err
+	}
+	reg, aliases, all, deploy, err := a.registry(ix)
+	if err != nil {
+		return err
+	}
+	*st = LoadoutState{Ix: ix, Reg: reg, Aliases: aliases, cands: all, deploy: deploy, localize: a.localizer(ix.Env.ID, reg, ix)}
+	return a.syncLocked(st, now)
+}
+
+func (a *App) syncLocked(st *LoadoutState, now time.Time) error {
 	e := st.Ix.Env
 	if e.UserDataRoot != "" {
 		st.FilePath = env.ModsConfigPath(e.UserDataRoot)
@@ -283,7 +302,6 @@ func (a *App) sync(st *LoadoutState) error {
 		h = loadout.Hash(st.File.Raw)
 		fileList, _ = st.Reg.FromTokens(st.File.Active)
 	}
-	now := a.Now().UTC()
 	mcs, err := a.Store.ModsConfigStateAt(e.UserDataRoot)
 	if err != nil {
 		return err
@@ -427,6 +445,12 @@ type EditResult struct {
 
 // edit applies f to the workspace, recording an undo step.
 func (a *App) edit(op string, f func(st *LoadoutState, l loadout.List) (loadout.List, []string, error)) (*EditResult, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
@@ -789,6 +813,12 @@ func (a *App) Sort(dryRun bool) (*SortResult, error) {
 
 // UndoRedo steps the workspace back (undo) or forward (redo).
 func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlock()
+
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, "", err
@@ -853,6 +883,12 @@ func (a *App) Save(dryRun bool) (*SaveResult, error) { return a.SaveWith(dryRun,
 // SaveWith is Save that, with move, first moves plain Mods/ folders in the way of a deployed
 // copy into the lock library (08 §3; --move-duplicates). The dry run lists those moves.
 func (a *App) SaveWith(dryRun, move bool) (*SaveResult, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
@@ -1094,6 +1130,12 @@ func (a *App) ListAt(st *LoadoutState, n int) (loadout.List, error) {
 
 // Checkout loads a version into the workspace (it still has to be saved).
 func (a *App) Checkout(ref string) (*EditResult, int, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, 0, err
+	}
+	defer unlock()
+
 	var n int
 	r, err := a.edit("checkout", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		var err error

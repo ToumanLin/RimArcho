@@ -758,7 +758,7 @@ func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 // LaunchPackWith is LaunchPack that, with move, first moves plain Mods/ folders holding
 // another version of a pack copy into the lock library (08 §5.3; --move-duplicates).
 func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error) {
-	unlock, err := a.lockLaunch()
+	unlock, err := a.waitLaunch()
 	if err != nil {
 		return nil, err
 	}

@@ -61,7 +61,7 @@ func (a *App) Launch(dryRun bool) (*SaveResult, error) { return a.LaunchWith(dry
 // LaunchWith is Launch that, with move, first moves plain Mods/ folders in the way of a
 // deployed copy into the lock library (08 §3; --move-duplicates).
 func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
-	unlock, err := a.lockLaunch()
+	unlock, err := a.waitLaunch()
 	if err != nil {
 		return nil, err
 	}

@@ -90,6 +90,7 @@ type API struct {
 
 func newAPI(a *app.App) *API {
 	s := &API{a: a, open: openURL, busy: map[string]bool{}}
+	a.LaunchWait = func(text string) { s.send("launch-wait", map[string]any{"text": view.T(text)}) }
 	s.startTasks()
 	s.startCreditLocked()
 	return s

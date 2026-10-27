@@ -283,3 +283,18 @@ func TestCreditCloseBoundsSlowWorkerAndKeepsCheckpoint(t *testing.T) {
 		}
 	}
 }
+
+func TestCreditReplacementDiagnostics(t *testing.T) {
+	lang := view.Lang()
+	view.SetLang("zh")
+	t.Cleanup(func() { view.SetLang(lang) })
+	for _, tc := range []struct{ raw, want string }{
+		{"retained: Workshop copy cannot be loaded in game B; shared lists unchanged", "游戏 game B 无法加载工坊副本"},
+		{"retained: staging list list B is unreadable; repair it before replacing", "列表 list B 的暂存数据无法读取"},
+		{"switched to Workshop; SteamCMD copy moved to recycle bin; texture records are bound to the old folder and content snapshot; optimise Workshop textures again", "请重新优化工坊副本的贴图"},
+	} {
+		if got := creditResultText(tc.raw); !strings.Contains(got, tc.want) {
+			t.Fatalf("diagnostic %q: %q", tc.raw, got)
+		}
+	}
+}

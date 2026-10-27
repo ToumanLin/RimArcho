@@ -55,6 +55,12 @@ func (a *App) setStaged(planID int64, items []StageItem) error {
 // Stage puts mods into staging; enabled ones leave the Loadout (one undo step) and
 // remember their place.
 func (a *App) Stage(refs []string) (*EditResult, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	items, st, err := a.Staged()
 	if err != nil {
 		return nil, err
@@ -118,6 +124,12 @@ func (a *App) Stage(refs []string) (*EditResult, error) {
 
 // Unstage takes mods out of staging without enabling them.
 func (a *App) Unstage(refs []string) ([]string, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	items, st, err := a.Staged()
 	if err != nil {
 		return nil, err
@@ -146,6 +158,12 @@ func (a *App) Unstage(refs []string) ([]string, error) {
 // its anchor, following anchors through mods that are still staged, else to the position
 // it had. With a placement (one mod only) it goes there instead. One undo step.
 func (a *App) Restore(refs []string, p Placement) (*EditResult, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	items, st, err := a.Staged()
 	if err != nil {
 		return nil, err

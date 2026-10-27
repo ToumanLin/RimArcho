@@ -38,6 +38,12 @@ tombstone_days = 90
 
 // App is one opened RimArcho data directory.
 type App struct {
+	// LaunchWait reports a launch waiting for the cross-process handoff lock.
+	LaunchWait      func(string)
+	launchDepth     int
+	launchUnlock    func()
+	launchWaitLimit time.Duration // tests may shorten the production ten-second limit
+
 	Home                string
 	Store               *store.Store
 	StartupLinkRecovery []*GameLink // read-only startup snapshot; Problems probes afresh

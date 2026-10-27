@@ -213,8 +213,13 @@ func init() {
 		"waiting for Steam installation": "等待 Steam 完成安装",
 		"SteamCMD copy already removed":  "SteamCMD 副本已移走",
 		"already replaced with Workshop": "已由另一批替换为工坊里的这一份",
-		"waiting for scan":               "等待扫描完成",
-		"waiting for file task":          "等待文件任务完成",
+		"Workshop copy cannot be loaded in %s; shared lists unchanged":                                       "游戏 %s 无法加载工坊副本；共享列表保持原副本",
+		"staging list %s is unreadable; repair it before replacing":                                          "列表 %s 的暂存数据无法读取；修复后再替换",
+		"waiting for background replacement to finish":                                                       "等待后台替换完成",
+		"waiting for background replacement timed out; try launching again":                                  "等待后台替换超时，请稍后重新启动游戏",
+		"texture records are bound to the old folder and content snapshot; optimise Workshop textures again": "贴图记录绑定原目录和内容快照，请重新优化工坊副本的贴图",
+		"waiting for scan":      "等待扫描完成",
+		"waiting for file task": "等待文件任务完成",
 		"switched to Workshop; SteamCMD copy moved to recycle bin":                  "已切换到工坊里的这一份，SteamCMD 副本已移入回收站",
 		"recorded SteamCMD instance is unavailable or has changed":                  "原来这份 SteamCMD Mod 已不可用或发生变化",
 		"SteamCMD copy is no longer live":                                           "SteamCMD 副本已不在磁盘上",
@@ -228,6 +233,18 @@ func init() {
 }
 
 func creditResultText(result string) string {
+	for _, pattern := range []string{
+		"Workshop copy cannot be loaded in %s; shared lists unchanged",
+		"staging list %s is unreadable; repair it before replacing",
+	} {
+		parts := strings.SplitN(pattern, "%s", 2)
+		reason := strings.TrimPrefix(result, "retained: ")
+		if strings.HasPrefix(reason, parts[0]) && strings.HasSuffix(reason, parts[1]) {
+			name := strings.TrimSuffix(strings.TrimPrefix(reason, parts[0]), parts[1])
+			return view.T("retained: ") + view.Tf(pattern, name)
+		}
+	}
+
 	if strings.HasPrefix(result, "failed:") {
 		parts := strings.SplitN(result, "; ", 3)
 		code, err := strconv.Atoi(strings.TrimPrefix(parts[0], "failed:"))
@@ -243,6 +260,9 @@ func creditResultText(result string) string {
 		if strings.HasPrefix(result, prefix) {
 			return view.T(prefix) + view.T(strings.TrimPrefix(result, prefix))
 		}
+	}
+	if parts := strings.SplitN(result, "; texture records", 2); len(parts) == 2 {
+		return view.T(parts[0]) + "; " + view.T("texture records"+parts[1])
 	}
 	return view.T(result)
 }

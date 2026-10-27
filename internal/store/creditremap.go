@@ -10,7 +10,8 @@ import (
 )
 
 // RemapCreditPlans moves the logical item in all editable/restorable list states
-// together. Physical copies, fixed packs and deployment journals retain their IDs.
+// together, merging copy notes and invalidating long-lived editor snapshots.
+// Physical texture ledgers, fixed packs and deployment journals retain their IDs.
 // No undo step is added: undo must never resurrect the retired physical copy.
 func (s *Store) RemapCreditPlans(plans []int64, old, target string, now time.Time) error {
 	return s.inTx(func(tx *sql.Tx) error {
@@ -112,9 +113,15 @@ func (s *Store) RemapCreditPlans(plans []int64, old, target string, now time.Tim
 				}
 			}
 		}
-		return nil
+		if _, err := tx.Exec(`INSERT INTO meta(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1`, CreditRemapKey); err != nil {
+			return err
+		}
+		return mergeCopyNote14(tx, old, target)
 	})
 }
+
+// CreditRemapKey invalidates long-lived TUI batch snapshots after a physical handoff.
+const CreditRemapKey = "credit.remap"
 
 // CreditPeer finds durable subscription confirmation or permanent failure shared
 // by overlapping batches.
