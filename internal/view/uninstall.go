@@ -88,6 +88,10 @@ func UninstallTitle(key string) string { return T(unTitles[key]) }
 // UninstallView builds the page from a plan (or a report: ran).
 func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 	o := p.Options
+	sizePrefix := ""
+	if p.EstimatedSizes {
+		sizePrefix = "≈ "
+	}
 	pg := &UninstallPage{Envs: p.Envs, LockedTo: p.LockedTo, SavesTo: p.SavesTo, PacksTo: p.PacksTo, Ran: ran}
 	if pg.LockedTo == "" && len(p.Envs) > 0 {
 		pg.LockedTo = p.Envs[0]
@@ -98,7 +102,7 @@ func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 	for _, s := range p.Steps {
 		st := UnStep{Key: s.Key, Title: T(unTitles[s.Key]), Text: uninstallText(p, s)}
 		if b := s.Bytes(); b > 0 {
-			st.Size = render.Size(b)
+			st.Size = sizePrefix + render.Size(b)
 		}
 		switch s.Key {
 		case app.UnModsConfig:
@@ -122,7 +126,7 @@ func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 				u.Note += "\n" + strings.Join(lines, "\n")
 			}
 			if it.Bytes > 0 {
-				u.Size = render.Size(it.Bytes)
+				u.Size = sizePrefix + render.Size(it.Bytes)
 			}
 			if len(it.Drop) > 0 {
 				u.Note = Tf("takes out %s", strings.Join(it.Drop, ", "))

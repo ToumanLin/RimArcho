@@ -206,6 +206,12 @@ func (s *API) Close() {
 	}
 	s.copyRead.lib = nil
 	s.copyRead.mu.Unlock()
+	s.uninstallRead.mu.Lock()
+	if s.uninstallRead.a != nil {
+		s.uninstallRead.a.Close()
+		s.uninstallRead.a = nil
+	}
+	s.uninstallRead.mu.Unlock()
 	s.logRead.mu.Lock()
 	defer s.logRead.mu.Unlock()
 	if s.logRead.a != nil {

@@ -39,15 +39,21 @@ func ReadLink(path string) (*LinkInfo, error) {
 		l.Reason = err.Error()
 		return l, nil
 	}
+	l.entry, err = os.Lstat(p)
+	if err != nil {
+		return unknown(err)
+	}
+	// Plain entries cannot be incoming links and need no checked-removal identity.
+	// Windows checks the reparse attribute too, including unknown reparse tags.
+	if !isLinkInfo(l.entry) {
+		l.Kind = "plain"
+		return l, nil
+	}
 	l.physicalParent, err = RealPath(filepath.Dir(p))
 	if err != nil {
 		return unknown(err)
 	}
 	l.parent, err = os.Stat(l.physicalParent)
-	if err != nil {
-		return unknown(err)
-	}
-	l.entry, err = os.Lstat(p)
 	if err != nil {
 		return unknown(err)
 	}

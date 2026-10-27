@@ -477,7 +477,10 @@ func (a *App) RememberLinkRepair(plan *LinkRepairPlan) string {
 		if same {
 			for i, l := range plan.Links {
 				p := previous.Links[i]
-				if l.Path != p.Path || l.Action != p.Action || l.Code != p.Code || !source.SameLink(l.snapshot, p.snapshot) {
+				// Occupied plain entries are informational: this token permits no
+				// operation on them. Removable links still require full identities.
+				occupied := l.Code == CodeLinkOccupied && l.Action == "keep" && l.Kind == "plain" && p.Kind == "plain"
+				if l.Path != p.Path || l.Action != p.Action || l.Code != p.Code || !occupied && !source.SameLink(l.snapshot, p.snapshot) {
 					same = false
 					break
 				}

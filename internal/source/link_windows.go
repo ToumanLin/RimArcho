@@ -15,9 +15,10 @@ import (
 // IsLink reports whether p is a reparse point (junction or symbolic link).
 func IsLink(p string) bool {
 	fi, err := os.Lstat(p)
-	if err != nil {
-		return false
-	}
+	return err == nil && isLinkInfo(fi)
+}
+
+func isLinkInfo(fi os.FileInfo) bool {
 	if fi.Mode()&os.ModeSymlink != 0 {
 		return true
 	}
