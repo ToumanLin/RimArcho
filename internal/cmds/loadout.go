@@ -1,6 +1,7 @@
 package cmds
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
@@ -27,7 +28,11 @@ func init() {
 		Flags: []Flag{{Name: "to", Value: "<n>"}, {Name: "before", Value: "<ref>"}, {Name: "after", Value: "<ref>"}, {Name: "up", Value: "", Help: "one up"}, {Name: "down", Help: "one down"}}, Run: moveCmd})
 	register(&Command{Name: "swap", Args: "<ref> [<ref>]", Summary: "replace an enabled mod by another instance of its lineage", MinArgs: 1, MaxArgs: 2, Run: swapCmd})
 	register(&Command{Name: "sort", Summary: "sort the workspace by load-order constraints", MaxArgs: 0,
-		Flags: []Flag{{Name: "dry-run", Help: "show the result without changing the workspace"}}, Run: sortCmd})
+		Flags: []Flag{{Name: "dry-run", Help: "show the result without changing the workspace"}, {Name: "json", Help: "print changes and sort notices as JSON"}}, Run: sortCmd})
+	register(&Command{Name: "loadout complete-dependencies", Summary: "enable installed dependencies and sort in one undo step; report downloads separately", MaxArgs: 0, Run: completeDependenciesCmd})
+	register(&Command{Name: "loadout replace-recommended", Args: "<ref…>", Summary: "replace enabled mods with installed recommendations in one undo step", MinArgs: 1, MaxArgs: -1, Run: replaceRecommendedCmd})
+	register(&Command{Name: "loadout use-installed", Args: "<packageId…>", Summary: "restore missing entries using installed copies in one undo step", MinArgs: 1, MaxArgs: -1, Run: useInstalledCmd})
+
 	register(&Command{Name: "undo", Args: "[<n>]", Summary: "undo the last workspace edit (or the last n: archo history)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, false) }})
 	register(&Command{Name: "redo", Args: "[<n>]", Summary: "redo an undone workspace edit (or n of them)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, true) }})
 	register(&Command{Name: "save", Summary: "save the list without starting the game: Mods/ links, ModsConfig.xml (backup + atomic replace)", MaxArgs: 0,
@@ -251,6 +256,15 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
+	if a.Bool("json") {
+		b, err := json.MarshalIndent(struct {
+			app.SortNotices
+			Changes []loadout.Change `json:"changes"`
+			Sorted  loadout.List     `json:"sorted"`
+			Applied bool             `json:"applied"`
+		}{r.SortNotices, r.Changes, r.Sorted, r.Applied}, "", "  ")
+		return &render.Doc{Raw: string(b) + "\n"}, err
+	}
 	st := r.State
 	moved, added := 0, 0
 	for _, ch := range r.Changes {
@@ -272,6 +286,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		head += " (applied to the workspace; not saved)"
 	}
 	d, root := render.New(head)
+	addSortNotices(root, r.SortNotices)
 	addChanges(c, root, st, r.Changes, render.DefaultLimit, "archo loadout diff --all")
 	if moved > 0 {
 		// Why: what the order broke, strong constraints first (04 §5.3): breaking a strong one
@@ -716,4 +731,39 @@ func movedKV(root *render.Node, moved []app.DuplicateMove, dry bool) {
 		n.Add(l)
 	}
 	n.Truncate(10, "")
+}
+
+func completeDependenciesCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	r, err := c.App.CompleteDependencies()
+	if err != nil {
+		return nil, err
+	}
+	d := editDoc(c, r.Edit)
+	addSortNotices(d.Nodes[0], app.SortNotices{MissingDependencies: r.MissingDependencies})
+	return d, nil
+}
+func replaceRecommendedCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	r, err := c.App.ReplaceRecommended(a.Pos)
+	if err != nil {
+		return nil, err
+	}
+	return editDoc(c, r), nil
+}
+func useInstalledCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	r, err := c.App.UseInstalled(a.Pos)
+	if err != nil {
+		return nil, err
+	}
+	return editDoc(c, r), nil
+}
+func addSortNotices(root *render.Node, n app.SortNotices) {
+	for _, d := range n.MissingDependencies {
+		root.Addf("dependency %s: pkg:%s %s (workshop: %s; required by: %s)", d.Kind, d.PackageID, d.Name, d.WorkshopID, strings.Join(d.RequiredBy, ", "))
+	}
+	for _, m := range n.MissingMods {
+		root.Addf("missing mod: pkg:%s %s (installed: %t; can enable: %t; workshop: %s)", m.PackageID, m.Name, m.Installed, m.CanEnable, m.WorkshopID)
+	}
+	for _, r := range n.Replacements {
+		root.Addf("recommended replacement: %s → pkg:%s %s (installed: %t; can replace: %t; workshop: %s) %s", r.Original.Ref, r.Replacement.PackageID, r.Replacement.Name, r.Installed, r.CanReplace, r.Replacement.WorkshopID, r.BlockedReason)
+	}
 }

@@ -45,14 +45,11 @@ type Preview struct {
 
 // Outcome is what a whole-list action did, for the status line.
 type Outcome struct {
-	MissingMods         []app.MissingMod            `json:"missingMods,omitempty"`
-	Replacements        []app.ReplacementSuggestion `json:"replacements,omitempty"`
-	Cycles              []app.SortCycle             `json:"cycles,omitempty"`
-	MissingDependencies []app.MissingDependency     `json:"missingDependencies,omitempty"`
-	What                string                      `json:"what"`
-	Text                string                      `json:"text"`
-	Undo                bool                        `json:"undo,omitempty"`    // u takes it back (sort)
-	Refused             []string                    `json:"refused,omitempty"` // refused: why, then the commands that resolve it
+	app.SortNotices
+	What    string   `json:"what"`
+	Text    string   `json:"text"`
+	Undo    bool     `json:"undo,omitempty"`    // u takes it back (sort)
+	Refused []string `json:"refused,omitempty"` // refused: why, then the commands that resolve it
 	// Moves: refused because Mods/ holds another version that can move into the lock
 	// library (08 §3): what moving them does, for the one confirmation; RunMoving goes on.
 	Moves []string `json:"moves,omitempty"`
@@ -76,8 +73,7 @@ func run(a *app.App, what string, move bool) *Outcome {
 		r, err = a.Sort(false)
 		if err == nil {
 			text = sortResultText(r)
-			o.MissingDependencies = r.MissingDependencies
-			o.MissingMods, o.Replacements, o.Cycles = r.MissingMods, r.Replacements, r.Cycles
+			o.SortNotices = r.SortNotices
 		}
 	} else {
 		text, err = apply(a, what, move)
