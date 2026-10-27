@@ -29,7 +29,9 @@ Safe includes navigation, views, cancelable panels and reviewed undoable workspa
 edits. Local-destructive includes persistent local writes and confirmations.
 External includes native pickers, browser/application launches, Steam and downloads.
 Unknown controls are always skipped, even with `--allow external`. The live target
-is classified again immediately before clicking, including during replay.
+is classified again immediately before clicking, including during replay. Sidebar
+route classification never overrides an external or destructive toolbar operation;
+reviewed selection rows are classified independently of the mod title they display.
 
 Local/external crawler edges run in fresh child cases: the parent state remains
 available for other controls. A child records nonundoable writes explicitly and
@@ -66,6 +68,13 @@ selection, sort, enable/disable, move, stage, double/triple clicks and popup can
 driver action, including resets and final undo. Continuous DOM sampling and checkpoint
 oracles check responsiveness, loading, sidebar integrity, scripts and problem sequences.
 
+Page scheduling rotates across sidebar pages before taking another edge on the
+same page. Undo restoration uses the explicit workspace palette command, including
+redo restoration after testing Undo itself; it does not assume undo depth increases.
+Background analysis remains observable while lightweight polling waits for page
+loads and workspace edits. Event evidence retains scalar metadata; independent
+canonical checkpoints retain the complete domain.
+
 The default crawl budget is 60 minutes / 200 queued states (`--max-states N` changes
 the latter). A bounded crawl reports `crawlLimit` and `playerCoverage.complete=false`;
 passing observed controls does not imply complete discovery. Unvisited edges remain
@@ -78,12 +87,16 @@ compares the canonical domain, including workspace, saved versions, staging, tag
 notes, sources, instances, links and ModsConfig bytes. Explicit exclusions are undo/
 redo stacks/depths (undo creates redo history), open-list navigation, computed problem
 publication/cache state, UI settings/focus/selection/scroll, clipboard and log/task
-history. Exclusions are recorded in every result; staging is never excluded.
+history and `plan_collection.checked_at` refresh timestamps. Collection source/hash/
+content fields remain compared. Reachable lists are opened during setup to materialize
+saved workspaces before the start checkpoint. Exclusions are recorded in every result;
+staging is never excluded.
 The existing F2 stage/undo defect is recorded as a known app failure until the separate
 stage-undo branch is merged.
 
 `result.json`, `trace.json` and `replay.json` contain the seed, failures and replay
-command. Replay preserves recorded input spacing. Failed walks automatically retry
+command. Replay preserves recorded input spacing. Disposable branch actions are
+embedded in the trace so copied evidence does not depend on guest-only branch files. Failed walks automatically retry
 shorter prefixes and remove chunks on fresh copies, accepting only a repeat of the
 same oracle. `minimal-trace.json` and `shrink.json` report the best bounded reduction;
 this is not a proof of global minimality. Use `--shrink-runs N` (default 6) or disable

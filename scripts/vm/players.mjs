@@ -1,15 +1,16 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { discover } from './observe.mjs';
 import { sleep } from './cdp.mjs';
-import { allowed, canonical, classify, coverage, difference, exclusions, random, stateKey } from './player-policy.mjs';
+import { allowed, canonical, classify, classifyKey, coverage, difference, exclusions, random, stateKey } from './player-policy.mjs';
 
 const hash=s=>createHash('sha256').update(s).digest('hex').slice(0,20);
 const quoted=s=>JSON.stringify(s);
+const replayCommand=args=>'node '+args.map(s=>"'"+s.replaceAll("'","''")+"'").join(' ');
 export async function drive(ctx) {
-  const {c,options,result,out,currentPlan,snapshot,settled,editor,check,save}=ctx;
+  const {c,options,result,out,currentPlan,snapshot,settled,check,save}=ctx;
   const seed=Number(options.seed||271027), steps=Number(options.steps||200), minutes=Number(options.minutes||60);
   if(!Number.isSafeInteger(seed)||!Number.isInteger(steps)||steps<1||!Number.isFinite(minutes)||minutes<=0)throw Error('seed must be an integer, steps positive integer, minutes positive');
   if(options.allow&&!['local','external'].includes(options.allow))throw Error('--allow local|external');
@@ -19,11 +20,14 @@ export async function drive(ctx) {
   const maxStates=Number(options['max-states']||200);
   const previousLedger=options.ledger?JSON.parse(readFileSync(options.ledger,'utf8')):null;
   let sampleAt=0,statusAt=0,continuousFailure=null,expectedEnd,nonUndoableBranch=false,needsReset=false;
-  const read=()=>c.evaluate('__vm.read()');
+  const read=()=>c.evaluate('__vm.read(false)');
   const controls=()=>c.evaluate(`(${discover.toString()})()`);
   const fail=(name,detail)=>{check(name,false,detail);continuousFailure ||= {name,detail};};
   async function oracles(label,ready=true) {
-    const s=await read();
+    let s=await read();
+    if(ready&&(s.loading||s.editing||s.busy.env)){
+      try{s=await settled();}catch(e){fail('no stuck loading',{label,error:e.message});}
+    }
     if(s.blank||s.readError||(!s.content&&!s.loading))fail('no blank/error page',{label,page:s.page,error:s.readError});
     if(!s.sidebar.includes('plan'))fail('sidebar intact',{label,sidebar:s.sidebar});
     if(s.errors.length)fail('no console/script errors',{label,errors:s.errors});
@@ -49,7 +53,7 @@ export async function drive(ctx) {
     // The DOM is virtualized. Rows are representative action classes, with their
     // concrete target retained for replay; ordinary descendants remain separate.
     const label=control.label.replaceAll(out,'<run>').replaceAll(out.replaceAll('\\','/'),'<run>');
-    const stable=control.row?['row',control.area,control.identity?.['data-kind']||'',/missing|absent/i.test(control.label)?'missing':'present']:[control.tag,control.role,control.identity,control.locator,label];
+    const stable=control.row?['row',control.area,control.rowKind,control.identity?.['data-kind']||'',/missing|absent/i.test(control.label)?'missing':'present']:[control.tag,control.role,control.identity,control.locator,label];
     return hash(JSON.stringify([state,...stable]));
   }
   function record(found,s,key,recipe) {
@@ -87,6 +91,10 @@ export async function drive(ctx) {
     return null;
   }
   async function input(action,logged=true) {
+    if(action.kind==='key'){
+      const policy=classifyKey(action.combo,await read());
+      if(!allowed(policy.tier,options.allow))throw Error('policy blocked keyboard input: '+policy.reason);
+    }
     const pointer=action.kind==='click'?await locate(action):null;
     if(action.kind==='click'){
       if(!pointer)throw Error('unreachable control: '+action.locator);
@@ -99,21 +107,57 @@ export async function drive(ctx) {
       if(action.kind==='key')await c.key(action.combo,{repeats:action.repeats||0});
       else if(action.kind==='text')await c.call('Input.insertText',{text:action.text});
       else if(action.kind==='wheel')await c.call('Input.dispatchMouseEvent',{type:'mouseWheel',x:action.x||700,y:action.y||420,deltaX:0,deltaY:action.delta||420});
+      else if(action.kind==='branch'){
+        // Embed branch inputs so copied VM evidence has no dependency on an
+        // unreturned guest branch file or on the original result directory.
+        action.actions ||= JSON.parse(readFileSync(action.traceFile,'utf8')).actions;
+        const branchFile=join(out,'replay-branch-'+entry.index+'.json');
+        writeFileSync(branchFile,JSON.stringify({actions:action.actions}));
+        const child=spawnSync(process.execPath,[...replayArgs(branchFile),'--branch','true'],{encoding:'utf8',windowsHide:true,timeout:Math.floor(Math.min(600000,Math.max(1000,deadline-performance.now()))),maxBuffer:8*1024*1024});
+        entry.exitCode=child.status;entry.branchOutput=child.stdout.slice(-4000);entry.error=child.error?.message;
+        try{
+          const summary=JSON.parse(child.stdout),report=JSON.parse(readFileSync(join(summary.output,'result.json'),'utf8'));
+          entry.functionalStatus=report.functionalStatus;entry.branchResult=join(summary.output,'result.json');
+          result.performanceFailures.push(...report.performanceFailures.map(f=>({...f,branchControl:action.control})));
+        }catch{}
+        if(entry.functionalStatus!=='passed')fail('isolated branch',{control:action.control,error:entry.error,output:entry.branchOutput});
+      }
       else {
         for(let n=1;n<=(action.count||1);n++)await c.mouse(action.button||'left',pointer.x,pointer.y,n);
       }
       if(action.delayMs)await sleep(action.delayMs);
       entry.finishedMs=performance.now()-started;
     }catch(e){entry.error=e.message;throw e;}
+    return entry;
   }
   const key=combo=>({kind:'key',combo});
+  const hasRestoration=(before,after)=>after.plans.some(p=>{
+    const old=before.plans.find(b=>b.name===p.name),wanted=old?.workspace?.[0]?.entries;
+    return old&&(p.undoDepth>old.undoDepth||(p.workspace?.[0]?.entries!==wanted&&(p.undo?.some(x=>x.entries===wanted)||p.redo?.some(x=>x.entries===wanted))));
+  });
   async function root() {
     await input(key('Escape'));await input(key('Escape'));
     let s=await read();
     if(s.navLayout==='top'){await input(key('Control+KeyB'));await sleep(400);s=await read();}
     if(s.page!==null){await input({kind:'click',locator:'#nav .nav-item[data-id="plan"]'});await settled();s=await read();}
-    if(s.plan!==currentPlan){const plan=s.plans.find(p=>p.name===currentPlan);if(!plan)throw Error('original list was removed');await input({kind:'click',locator:`#nav [data-id="plan:${plan.id}"]`});await settled();}
+    if(s.plan!==currentPlan){const plan=s.plans.find(p=>p.name===currentPlan);if(!plan)throw Error('original list was removed');await openPlan(plan);}
+    // A native input can retain focus after a dismissed view. Real row input
+    // returns keyboard ownership to the editor before focus/undo shortcuts.
+    const focusRow=(await controls()).find(x=>x.row&&x.area==='1'&&x.hittable&&x.visible&&classify(x,s).tier==='safe');
+    if(focusRow)await input({kind:'click',locator:focusRow.locator});
     await input(key('Digit2'));await input(key('Home'));await settled();
+  }
+  async function openPlan(plan) {
+    const locator=`#nav [data-id="plan:${plan.id}"]`;
+    if(await locate({locator}))await input({kind:'click',locator});
+    else {
+      await input(key('Shift+KeyP'));await settled();
+      const state=await read(),index=state.plans.findIndex(p=>p.id===plan.id);
+      if(index<0)throw Error('list no longer available: '+plan.name);
+      await input({kind:'click',locator:`#popup .opts > .opt:nth-child(${index+1})`});
+    }
+    await settled();
+    if((await read()).plan!==plan.name)throw Error('list cannot be edited in the current game: '+plan.name);
   }
   async function restore(recipe) {
     if(needsReset){if(!await undoTo(startSnapshot,'reset'))throw Error('canonical root cannot be restored');needsReset=false;}
@@ -125,15 +169,26 @@ export async function drive(ctx) {
     const after=await snapshot(label+'-before-undo');
     for(const p of after.plans){
       const original=before.plans.find(b=>b.name===p.name);if(!original)continue;
+      if(JSON.stringify(p.workspace)===JSON.stringify(original.workspace)&&p.undoDepth<=original.undoDepth)continue;
       const ui=(await read()).plans.find(b=>b.name===p.name);if(!ui)continue;
-      if((await read()).plan!==p.name){await input({kind:'click',locator:`#nav [data-id="plan:${ui.id}"]`});await settled();}
+      if((await read()).plan!==p.name)await openPlan(ui);
       const wanted=original.workspace?.[0]?.entries,actual=p.workspace?.[0]?.entries;
       let n=Math.max(0,p.undoDepth-original.undoDepth),combo='KeyU';
       if(wanted!==actual){
         const u=p.undo.findIndex(step=>step.entries===wanted),r=p.redo.findIndex(step=>step.entries===wanted);
         if(u>=0)n=u+1;else if(r>=0){n=r+1;combo='Control+KeyR';}
       }
-      for(let i=0;i<n;i++){await input(key(combo));await settled();}
+      for(let i=0;i<n;i++){
+        // The global U key can be consumed by a page-level status undo. Choose
+        // the explicit workspace command through the real palette instead.
+        if(combo==='KeyU'){
+          await input(key('Control+KeyK'));await settled();
+          const choice=(await controls()).find(x=>x.owner==='popup'&&x.visible&&/^undo(?:\s|$)/i.test(x.label));
+          if(!choice)throw Error('workspace undo command is unavailable');
+          await input({kind:'click',locator:choice.locator});
+        }else await input(key(combo));
+        await settled();
+      }
     }
     await root();
     const restored=await snapshot(label+'-undone'),d=difference(canonical(before),canonical(restored));
@@ -141,7 +196,7 @@ export async function drive(ctx) {
     if(d){const known=d.path.includes('staging');fail('undo canonical equality',{label,knownFailure:known?'F2':null,firstDifference:d});}
     return !d;
   }
-  async function attempt(row,recipe,{branch=false}={}) {
+  async function attempt(row,recipe) {
     const start=performance.now();
     const action=row.action||{kind:'click',locator:row.locator};
     row.action=action;row.attemptedAt=new Date().toISOString();
@@ -153,6 +208,7 @@ export async function drive(ctx) {
       if(action.kind==='click'){
         const actual=await targetControl(action),s=await read();
         if(!actual){row.outcome='unreachable';row.reason='target disappeared';return;}
+        if(!row.row&&(actual.label!==row.label||JSON.stringify(actual.identity)!==JSON.stringify(row.identity))){row.outcome='unreachable';row.reason='semantic target changed during replay';return;}
         const policy=classify(actual,s);
         if(policy.tier!==row.tier||!allowed(policy.tier,options.allow)){row.outcome='skipped';row.reason='target classification changed during replay';return;}
       }
@@ -166,7 +222,7 @@ export async function drive(ctx) {
       const changed=difference(canonical(before),canonical(after));
       if(changed){
         row.change=changed;
-        const undoable=after.plans.some(p=>p.undoDepth>(before.plans.find(b=>b.name===p.name)?.undoDepth||0));
+        const undoable=hasRestoration(before,after);
         if(undoable)await undoTo(before,'edge-'+row.key);
         else if(row.tier==='safe')fail('safe action preserves canonical domain',{key:row.key,firstDifference:changed});
         else row.nonUndoable={reason:'persistent write; branch discarded',firstDifference:changed};
@@ -193,6 +249,15 @@ export async function drive(ctx) {
   // Keyboard recipes supplement DOM discovery, including all editor columns and
   // popups that have no permanently visible button. OpTable/palette are observed.
   const recipes=[['Control+KeyK'],['Shift+F10'],['KeyG'],['KeyM'],['KeyN'],['KeyX'],['Shift+KeyP'],['Shift+KeyH'],['KeyI'],['KeyE'],['Shift+Slash'],['Digit1'],['Digit2'],['Digit3'],['Digit4'],['Backslash']];
+  // Opening an imported/saved plan can materialize its workspace for the first
+  // time. Do this as explicit setup, before the canonical start checkpoint.
+  const initialUI=await read();
+  for(const plan of initialUI.plans){
+    if(!initialUI.sidebar.includes('plan:'+plan.id))continue;
+    try{await input({kind:'click',locator:`#nav [data-id="plan:${plan.id}"]`});await settled();}
+    catch(e){(result.setupUnreachablePlans||=[]).push({name:plan.name,reason:e.message});}
+  }
+  await root();
   const startSnapshot=await snapshot('player-start');
   expectedEnd=startSnapshot;
   await c.key('Control+Backslash'); // real documented refnums switch, isolated home only
@@ -211,9 +276,17 @@ export async function drive(ctx) {
         const row={key:id,state:from,page:'plan',tier:'safe',eligible:true,visible:true,enabled:true,owner:'keyboard',label:r.join(', '),action:recipe[0],recipe:[],outcome:'unreachable',reason:'not attempted',classification:'documented local key'};
         ledger.set(id,row);await attempt(row,[]);
       }
+      let pageCursor=0;
+      const pageOrder=[...new Set(queue.map(n=>n.page))];
+      const rank=r=>r.owner==='nav'?4:/^#(?:side-split|navtoggle|status|where)/.test(r.locator||'')?3:r.row?2:1;
       while(queue.length&&performance.now()<deadline){
-        const node=queue.shift();
-        const rows=[...ledger.values()].filter(r=>r.state===node.key&&r.eligible&&r.visible&&r.enabled&&!r.attemptedAt).sort((a,b)=>(a.owner==='nav')-(b.owner==='nav'));
+        for(const n of queue)if(!pageOrder.includes(n.page))pageOrder.push(n.page);
+        let at=-1;
+        for(let tries=0;tries<pageOrder.length&&at<0;tries++){
+          const page=pageOrder[pageCursor++%pageOrder.length];at=queue.findIndex(n=>n.page===page);
+        }
+        const node=queue.splice(at,1)[0];
+        const rows=[...ledger.values()].filter(r=>r.state===node.key&&r.eligible&&r.visible&&r.enabled&&!r.attemptedAt).sort((a,b)=>rank(a)-rank(b));
         const row=rows[0];
         if(row){
           // Confirming persistent operations runs in another fresh runner case.
@@ -239,7 +312,7 @@ export async function drive(ctx) {
     result.playerElapsedMs=performance.now()-started;
     if(result.failures.length){
       const args=replayArgs(join(out,'trace.json'));
-      result.replay={command:['node',...args].map(s=>/\s/.test(s)?quoted(s):s).join(' '),seed,trace:join(out,'trace.json')};
+      result.replay={command:replayCommand(args),seed,trace:join(out,'trace.json')};
       save('replay',result.replay);
       if(options.mode==='walk'&&options.shrink!=='false'&&!options.replay)await shrink();
     }
@@ -250,22 +323,25 @@ export async function drive(ctx) {
   }
   async function isolatedEdge(row,recipe) {
     row.attemptedAt=new Date().toISOString();
+    const parentBefore=await snapshot('branch-'+row.key+'-parent-before');
     const file=join(out,'branch-'+row.key+'.json');save('branch-'+row.key,{actions:[...recipe,row.action||{kind:'click',locator:row.locator}].map(action=>({action}))});
     // Child runs have a fresh fixture/full filesystem copy; never reuse a dirty root.
-    const child=spawnSync(process.execPath,[...replayArgs(file),'--branch','true'],{encoding:'utf8',windowsHide:true,timeout:Math.min(600000,Math.max(1000,deadline-performance.now())),maxBuffer:8*1024*1024});
-    row.outcome=child.status===0?'pressed-ok':'failed';row.asserted=child.status===0;row.branchReplay=file;row.reason=child.error?.message||child.stdout.slice(-4000);saveLedger();
-    if(child.status!==0)fail('isolated branch',{control:row.key,reason:row.reason});
+    const entry=await input({kind:'branch',traceFile:file,control:row.key});
+    const parentAfter=await snapshot('branch-'+row.key+'-parent-return');
+    row.returnVerified=!difference(canonical(parentBefore),canonical(parentAfter));
+    if(!row.returnVerified)fail('branch parent canonical equality',{control:row.key});
+    row.outcome=entry.functionalStatus==='passed'&&row.returnVerified?'pressed-ok':'failed';row.asserted=row.outcome==='pressed-ok';row.branchReplay=file;row.reason=entry.error||entry.branchOutput;saveLedger();
   }
   async function walk() {
     await root();await enqueue([]);
     const replay=options.replay?JSON.parse(readFileSync(options.replay,'utf8')):null;
     if(replay){
       const replayStart=performance.now(),firstAt=replay.actions[0]?.atMs||0;
-      for(const entry of replay.actions){if(performance.now()>=deadline)throw Error('replay exceeded minute budget');const wait=(entry.atMs||firstAt)-firstAt-(performance.now()-replayStart);if(wait>0)await sleep(wait);await input(entry.action||entry);await oracles('replay',false);}
+      for(let i=0;i<replay.actions.length;i++){const entry=replay.actions[i];if(performance.now()>=deadline)throw Error('replay exceeded minute budget');const wait=(entry.atMs||firstAt)-firstAt-(performance.now()-replayStart);if(wait>0)await sleep(wait);await input(entry.action||entry);if(i%10===9)await oracles('replay',false);}
       await settled();await oracles('replay settled');
       if(options.branch==='true'){
         const after=await snapshot('branch-after'),d=difference(canonical(startSnapshot),canonical(after));
-        const undoable=after.plans.some(p=>p.undoDepth>(startSnapshot.plans.find(b=>b.name===p.name)?.undoDepth||0));
+        const undoable=hasRestoration(startSnapshot,after);
         if(d&&!undoable&&!d.path.includes('/staging')){nonUndoableBranch=true;expectedEnd=after;result.nonUndoableChanges={reason:'explicitly permitted persistent operation in a disposable branch; no workspace undo exists',beforeCanonicalHash:hash(JSON.stringify(canonical(startSnapshot))),afterCanonicalHash:hash(JSON.stringify(canonical(after))),firstDifference:d,beforeArtifact:'01-player-start.json',afterArtifact:result.checkpoints.at(-1).artifact};}
       }
       return;
@@ -287,9 +363,16 @@ export async function drive(ctx) {
         const candidates=found.filter(x=>x.visible&&x.enabled&&x.hittable&&allowed(classify(x,s).tier,options.allow)&&(!previousLedger||previousLedger.controls.some(old=>old.page===(s.page||'plan')&&old.locator===x.locator&&allowed(old.tier,options.allow))));
         const target=candidates.length?pick(candidates):null;
         chosenRow=target?ledger.get(identity(target,state)):null;
+        if(target&&classify(target,s).tier!=='safe'){
+          await isolatedEdge(chosenRow,trace.filter(t=>t.action.kind!=='branch').map(t=>t.action));
+          result.executedSteps=i+1;if(result.failures.length>beforeFailures)break;continue;
+        }
         actions=target?[{kind:'click',locator:target.locator,count:pick([1,1,2,3]),delayMs},...(rng()<.5?[key('Escape')]:[])]:[key('Escape')];
       }
-      for(const action of actions){try{await input(action);await oracles('walk '+i,false);}catch(e){if(/unreachable control|policy blocked/.test(e.message)){(result.skippedActions||=[]).push({step:i,action,reason:e.message});}else fail('walk action',{step:i,error:e.message});break;}}
+      for(const action of actions){try{await input(action);}catch(e){if(/unreachable control|policy blocked/.test(e.message)){(result.skippedActions||=[]).push({step:i,action,reason:e.message});}else fail('walk action',{step:i,error:e.message});break;}}
+      // The observer samples throughout a burst. Drain it after the group so that
+      // querying thousands of domain rows cannot turn 20ms spam into slow input.
+      await oracles('walk '+i,false);
       if(chosenRow){
         try{await settled();await oracles('random control '+i);await snapshot('random-control-'+i);chosenRow.outcome=result.failures.length===beforeFailures?'pressed-ok':'failed';chosenRow.asserted=chosenRow.outcome==='pressed-ok';chosenRow.attemptedAt=new Date().toISOString();}catch(e){chosenRow.outcome='failed';chosenRow.reason=e.message;fail('random control',{step:i,error:e.message});}
       }
@@ -315,6 +398,6 @@ export async function drive(ctx) {
     // Shorter prefixes, then removal chunks (including middle actions).
     for(let n=Math.floor(best.length/2);n>0&&attempts.length<Math.ceil(max/2);n=Math.floor(n/2))if(await retry(best.slice(0,n)))best=best.slice(0,n);
     for(let chunk=Math.ceil(best.length/2);chunk>=1&&attempts.length<max;chunk=Math.floor(chunk/2))for(let at=0;at<best.length&&attempts.length<max;at+=chunk){const candidate=best.slice(0,at).concat(best.slice(at+chunk));if(candidate.length&&await retry(candidate)){best=candidate;break;}}
-    save('minimal-trace',{schema:1,seed,actions:best});save('shrink',{oracle:signature,originalLength:trace.length,minimalLength:best.length,attempts,command:['node',...replayArgs(join(out,'minimal-trace.json'))].map(quoted).join(' '),minimality:'bounded prefix/chunk reduction, not proof of global minimum'});
+    save('minimal-trace',{schema:1,seed,actions:best});save('shrink',{oracle:signature,originalLength:trace.length,minimalLength:best.length,attempts,command:replayCommand(replayArgs(join(out,'minimal-trace.json'))),minimality:'bounded prefix/chunk reduction, not proof of global minimum'});
   }
 }

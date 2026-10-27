@@ -3,12 +3,13 @@ export const exclusions = [
   'undo/redo stack payloads and depths: undo adds redo history; original snapshots retain both',
   'environment current_plan: opening a different list is navigation, not an undoable edit',
   'problem publication/analysis caches, revision, sequence and computed observations',
+  'plan_collection.checked_at: source refresh timestamp; source/hash/content fields remain compared',
   'UI settings, reference numbers, focus, selection, scroll, page visits, clipboard, logs and task history',
 ];
 export function canonical(s) {
   return Object.fromEntries(['sources','instances','links','environments','plans','lineage_data','lineage_tag','instance_note','plan_collection','user_rule','modsConfigHashes','modsConfig'].map(k=>[k,
     k==='plans' ? s.plans.map(({undo,redo,undoDepth,redoDepth,...p})=>p) :
-    k==='environments' ? s.environments.map(({current_plan,...e})=>e) : s[k]]));
+    k==='environments' ? s.environments.map(({current_plan,...e})=>e) : k==='plan_collection'?s[k]?.map(({checked_at,...row})=>row):s[k]]));
 }
 export function difference(a,b,path='') {
   if(Object.is(a,b))return null;
@@ -20,18 +21,31 @@ export function random(seed) { let n=Number(seed)>>>0;return ()=>{n+=0x6D2B79F5;
 const safeCommands = new Set(['full','detail','search','menu','filter','fold','expand','collapse','history','palette','help','keys','import','export','position','tags','note','swap','move-to','enable-at','plan','plans','home','needs','library','changes','log','settings','env','packs','tasks','textures','guide','undo','redo','sort','preview','toggle','enable','disable','add','take-out','put-back','stage','stage-all','restore-all','up','down','up10','down10']);
 const externalCommands = new Set(['folder','workshop','workshop-id','steam','subscription-page','subscription-check','subscription-update','resubscribe','unsubscribe','launch','download','open','browse','save-file','open-file']);
 const localCommands = new Set(['delete','remove','separate','pin','pin-update','unpin','move','unhide','textures-clean','subscription-remove','subscription-remove-fast','save','apply']);
+export function classifyKey(combo,state={}) {
+  if(['Shift+KeyL','Control+KeyO','Control+KeyW','Control+KeyS'].includes(combo))return {tier:'external',reason:'documented game/external shortcut'};
+  if(combo==='Enter')return state.popup==='tags'?{tier:'local-destructive',reason:'commit persistent tag'}:state.popup==='position'?{tier:'safe',reason:'undoable position choice'}:{tier:'unknown',reason:'Enter could confirm an unclassified menu/dialog action'};
+  if(combo==='Space'&&(state.popup||state.menu))return {tier:'unknown',reason:'Space could activate an unclassified dialog choice'};
+  if(combo==='Space'&&state.page!==undefined&&state.page!==null&&state.page!=='library')return {tier:'unknown',reason:'Space is only reviewed for editor/library workspace actions'};
+  if(/^(?:Escape|Space|Tab|Shift\+Tab|Home|End|PageUp|PageDown|(?:(?:Shift|Alt)\+)?Arrow(?:Up|Down|Left|Right)|(?:Shift\+)?Digit[1-8]|Control\+(?:Key[ABKRYZ]|Space)|Shift\+F10|Shift\+Key[HP]|Key[EGIMNTUX]|(?:Shift\+)?Key[JKST]|Backslash|Slash|Shift\+Slash)$/.test(combo))return {tier:'safe',reason:'reviewed navigation/view/workspace shortcut'};
+  return {tier:'unknown',reason:'unclassified keyboard shortcut '+combo};
+}
 export function classify(control, state={}) {
-  if(control.action?.kind==='key') return {tier:'safe',reason:'documented, reviewed local keyboard action'};
+  if(control.action?.kind==='key') return classifyKey(control.action.combo,state);
   if(control.action?.kind==='wheel') return {tier:'safe',reason:'real scrolling'};
   const id=control.identity||{}, cmd=id['data-cmd'] || id['data-op'] || '', write=id['data-env-write'], text=control.label?.trim().toLowerCase()||'';
-  if(control.owner==='nav') return {tier:'safe',reason:'sidebar navigation'};
+  if(control.owner==='popup'&&state.popupTitle==='lists'&&state.plans?.some(p=>text===p.name.toLowerCase()||text.startsWith(p.name.toLowerCase()+' ')))return {tier:'safe',reason:'known list choice from the observed shell'};
+  if(id['data-game']||id['data-id']?.startsWith('game|')||id['data-id']?.startsWith('row|')||/use this (?:one|;)|switch to .* and use/.test(text))return {tier:'local-destructive',reason:'apply list/game selection may change active environment or deployment links'};
   if(control.href && !control.href.startsWith('#')) return {tier:'external',reason:'link opens a browser or network target'};
+  // Mod titles may contain 'Steam', 'download' or 'RimWorld'. A reviewed
+  // selection row is distinct from an operation nested inside that row.
+  if(control.row&&!cmd&&!write)return {tier:'safe',reason:'reviewed row selection/context'};
   if(control.inputType==='file' || /(?:save as|choose|browse|select) (?:a |the )?(?:file|folder|directory)|open.*(?:browser|steam|folder)|launch|rimworld|steamcmd|download|subscribe|unsubscribe|resubscribe|check for updates|refresh.*(?:workshop|steam)|工坊|启动游戏|下载|退订|订阅/.test(text)) return {tier:'external',reason:'native picker, external app or network operation'};
   if(externalCommands.has(cmd)||externalCommands.has(write)||/subscribe|steam|download|launch|network|browse|file-picker/.test(write||''))return {tier:'external',reason:'external operation '+(cmd||write)};
   // A cancel remains safe even inside a destructive confirmation.
   if(/^(?:cancel|close|back|skip for now|no|取消|关闭|返回|否|×|✕|←)(?:\s|$)/.test(text))return {tier:'safe',reason:'dismissal'};
   if(['toggle','enable','disable','add','take-out','sort','undo','redo','move-to','enable-at','up','down'].includes(write))return {tier:'safe',reason:'reviewed undoable workspace edit '+write};
   if(localCommands.has(cmd) || /delete|trash|recycle|remove|uninstall|permanent|confirm move|apply|save changes|save list|create list|new list|rename|清空|删除|回收|卸载|确认|保存|重命名/.test(text) || id['data-env-write'])return {tier:'local-destructive',reason:'persistent local write / confirmation; disposable branch required'};
+  if(control.owner==='nav'&&(/^(?:plan(?::\d+)?|home|needs|library|changes|log|settings|env|packs|tasks|textures|guide|plans)$/.test(id['data-id']||'')||['navtoggle','nav-settings','tasks-line','env'].includes(id.id)))return {tier:'safe',reason:'reviewed sidebar route/toggle'};
   if(safeCommands.has(cmd))return {tier:'safe',reason:'reviewed local command '+cmd};
   if(control.row)return {tier:'safe',reason:'representative row selection/context'};
   if(/click to copy|left click: only these|view full details|technical information|see all in change history|what is wrong with this list|go back to this version|drag to move, right click: columns|the list.s page in all lists|^clear$|^sidebar$|^location$|^\d+ staging \d+$/i.test(text))return {tier:'safe',reason:'reviewed view, filter, clipboard or undoable history control'};

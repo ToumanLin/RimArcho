@@ -1,12 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { allowed, canonical, classify, coverage, difference, random } from './player-policy.mjs';
+import { allowed, canonical, classify, classifyKey, coverage, difference, random } from './player-policy.mjs';
 test('external and unknown targets fail closed, including deceptive button labels',()=>{
   for(const label of ['unsubscribe','launch RimWorld','choose a folder','save as a file…','open Steam browser'])assert.equal(classify({label}).tier,'external',label);
   assert.equal(classify({tag:'BUTTON',label:'do something new'}).tier,'unknown');
+  assert.equal(classify({owner:'nav',label:'launch',identity:{'data-env-write':'launch'}}).tier,'external');
+  assert.equal(classify({owner:'nav',label:'delete',identity:{'data-env-write':'remove-plan'}}).tier,'local-destructive');
+  assert.equal(classify({owner:'nav',label:'my list',identity:{'data-id':'plan:1'}}).tier,'safe');
+  assert.equal(classify({owner:'nav',label:'new operation'}).tier,'unknown');
+  assert.equal(classify({row:true,label:'RimWorld Workshop downloads'}).tier,'safe');
+  assert.equal(classify({row:true,label:'RimWorld',identity:{'data-env-write':'launch'}}).tier,'external');
   assert.equal(classify({tag:'BUTTON',label:'cancel'},{popup:'confirm'}).tier,'safe');
   assert.equal(classify({identity:{'data-env-write':'new-operation'},label:'go'}).tier,'local-destructive');
   assert.equal(classify({identity:{'data-env-write':'subscribe'},label:'add'}).tier,'external');
+  assert.equal(classify({identity:{'data-id':'game|1.6'},label:'1.6'}).tier,'local-destructive');
+  assert.equal(classifyKey('Shift+KeyL').tier,'external');assert.equal(classifyKey('Enter',{popup:'confirm'}).tier,'unknown');
+  assert.equal(classifyKey('Space',{popup:'palette'}).tier,'unknown');assert.equal(classifyKey('KeyT').tier,'safe');
+  assert.equal(classifyKey('Space',{page:'home'}).tier,'unknown');assert.equal(classifyKey('Space',{page:null}).tier,'safe');
   for(const tier of ['unknown','local-destructive','external'])assert.equal(allowed(tier),false);
   assert.equal(allowed('external','local'),false);assert.equal(allowed('local-destructive','local'),true);assert.equal(allowed('unknown','external'),false);
 });
@@ -15,6 +25,11 @@ test('canonical equality detects staging corruption despite identical enabled en
   const undone=structuredClone(start);undone.plans[0].redo=[{entries:'b'}];undone.plans[0].redoDepth=1;
   assert.equal(difference(canonical(start),canonical(undone)),null);
   undone.plans[0].staging=[{value:'leftover'}];assert.match(difference(canonical(start),canonical(undone)).path,/staging/);
+});
+test('refresh timestamps do not mask collection source changes',()=>{
+  const a={plans:[],environments:[],plan_collection:[{source:'https://example.invalid/list',checked_at:1}]};
+  const b=structuredClone(a);b.plan_collection[0].checked_at=2;assert.equal(difference(canonical(a),canonical(b)),null);
+  b.plan_collection[0].source='https://example.invalid/other';assert.match(difference(canonical(a),canonical(b)).path,/source/);
 });
 test('seeded sequences repeat and coverage retains unreachable eligible edges',()=>{
   const a=random(12),b=random(12);assert.deepEqual(Array.from({length:100},a),Array.from({length:100},b));

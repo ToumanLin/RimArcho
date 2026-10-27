@@ -31,7 +31,9 @@ export async function connect(addr, { timeoutMs = 15000 } = {}) {
     try { ws.send(JSON.stringify({ id, method, params })); } catch (e) { clearTimeout(timer); pending.delete(id); fail(e); }
   });
   const evaluate = async expression => {
-    const r = await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    let r;
+    try { r = await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }); }
+    catch(e) { e.message += ' evaluating ' + expression.slice(0,120);throw e; }
     if (r.result?.exceptionDetails) throw Error(r.result.exceptionDetails.exception?.description || r.result.exceptionDetails.text);
     return r.result?.result?.value;
   };

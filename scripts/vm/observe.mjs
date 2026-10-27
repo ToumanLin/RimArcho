@@ -17,7 +17,9 @@ export async function observe() {
   addEventListener('unhandledrejection', e => vm.errors.push({ at: now(), message: String(e.reason?.stack || e.reason) }));
   const originalError = console.error.bind(console);
   console.error = (...args) => { vm.errors.push({ at: now(), message: args.map(String).join(' ') }); originalError(...args); };
-  for (const name of ['environment', 'list-problems', 'scan', 'analyze', 'tasks']) on(name, data => vm.events.push({ at: now(), name, data }));
+  // Domain payloads are independently captured by vmstate. Keep scalar event
+  // metadata here: analysis events may contain the entire real mod library.
+  for (const name of ['environment', 'list-problems', 'scan', 'analyze', 'tasks']) on(name, data => vm.events.push({ at: now(), name, data: data&&typeof data==='object'?Object.fromEntries(Object.entries(data).filter(([,v])=>v===null||['string','number','boolean'].includes(typeof v))):data, payload:'scalar metadata; full domain in checkpoints' }));
   let lastFeedback=-1;
   const mutation=new MutationObserver(()=>{
     const action=vm.lastAction;if(!action||action.index===lastFeedback)return;
@@ -29,7 +31,7 @@ export async function observe() {
     const screen = document.querySelector('#screen'), status = document.querySelector('#status')?.textContent || '';
     const renderedColumns=S.screen===null ? S.cols.slice(0,2).map((col,k)=>({expected:col.view.length,rendered:document.querySelectorAll(`.area[data-area="${k}"] .rows .row`).length})) : [];
     const cols = detailed && (S.cols || []).map(c => ({ entries: c.items.map(i => ({ id: i.id, ref: i.ref, packageId: i.packageId, missing: i.missing })), selected: [...c.sel], cursor: c.cursor }));
-    return { ...context(), status, popup: S.popup?.kind || null, popupTitle:S.popup?.title || '', menu:!!document.querySelector('#menu:not([hidden])'), modes:[...document.querySelectorAll('.tabs .on,[role="tab"][aria-selected="true"],details[open],.fold.closed,.fold.collapsed')].map(e=>[e.id,{...e.dataset},e.className,e.tagName]), busy: S.busy, editing: S.editing || 0, problems: S.board?.problems, plans: S.shell?.plans, columns: cols, renderedColumns, focus: S.focus,
+    return { ...context(), status, popup: S.popup?.kind || null, popupTitle:S.popup?.title || '', menu:!!document.querySelector('#menu:not([hidden])'), modes:[...document.querySelectorAll('.tabs .on,[role="tab"][aria-selected="true"],details[open],.fold.closed,.fold.collapsed')].map(e=>[e.id,{...e.dataset},e.className,e.tagName]), busy: S.busy, editing: S.editing || 0, problems: detailed ? S.board?.problems : Object.fromEntries(['environment','plan','sequence','listVersion','revision','count','updating'].map(k=>[k,S.board?.problems?.[k]])), columnState:(S.cols||[]).map(c=>[c.items.length,c.view.length,c.cursor,[...c.sel]]), plans: S.shell?.plans, columns: cols, renderedColumns, focus: S.focus,
       loading: !!document.querySelector('.page-loading, [aria-busy="true"]'),
       readError: document.querySelector('.page-read-error')?.innerText,
       blank: !document.querySelector('#app')?.firstElementChild,
@@ -70,10 +72,10 @@ export function discover() {
     const b = e.getBoundingClientRect(), x = b.x+b.width/2, y = b.y+b.height/2, hit = document.elementFromPoint(x,y);
     const label = (e.getAttribute('aria-label') || e.title || e.innerText || e.name || '').trim().replace(/\s+/g,' ').slice(0,200);
     const identity = Object.fromEntries([...e.attributes].filter(a => /^(data-|name|id)/.test(a.name)).map(a => [a.name,a.value]));
-    const row=e.matches('.row,.lrow'), area=e.closest('[data-area]')?.dataset.area;
+    const row=e.matches('.row,.lrow,.lib-row,.log-row,.chg-row,.needs-row'), area=e.closest('[data-area]')?.dataset.area;
     const owner=e.closest('#popup:not([hidden])')?'popup':e.closest('#menu:not([hidden])')?'menu':e.closest('#nav,#nav-settings,#tasks-line,#env,#live')?'nav':'page';
     const locator=path(e);
     const blockedByLayer=!!(hit?.closest('#popup:not([hidden]),#menu:not([hidden])')&&!e.closest('#popup:not([hidden]),#menu:not([hidden])'));
-    return { tag: e.tagName, role: e.getAttribute('role'), label, identity, locator, owner, area, row, inputType:e.type, href:e.getAttribute('href'), context:!!e.oncontextmenu || row, blockedByLayer, bounds: {x:b.x,y:b.y,width:b.width,height:b.height}, visible: !!(b.width && b.height), enabled: !e.matches(':disabled') && !e.closest('[inert]'), hittable: hit === e || e.contains(hit), key: [e.tagName, e.getAttribute('role'),JSON.stringify(identity),locator,label].join('|') };
+    return { tag: e.tagName, role: e.getAttribute('role'), label, identity, locator, owner, area, row, rowKind:row?[...e.classList].filter(c=>!['cur','on','sel','selected'].includes(c)).join(' '):null, inputType:e.type, href:e.getAttribute('href'), context:!!e.oncontextmenu || row, blockedByLayer, bounds: {x:b.x,y:b.y,width:b.width,height:b.height}, visible: !!(b.width && b.height), enabled: !e.matches(':disabled') && !e.closest('[inert]'), hittable: hit === e || e.contains(hit), key: [e.tagName, e.getAttribute('role'),JSON.stringify(identity),locator,label].join('|') };
   });
 }

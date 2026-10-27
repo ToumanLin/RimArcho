@@ -76,9 +76,12 @@ async function until(fn, ms=15000) {
 async function settled(page, ms=10000) {
   let last='', stable=0;
   return until(async()=>{
-    const s=await c.evaluate('window.__vm.read()');
+    const s=await c.evaluate(mode?'window.__vm.read(false)':'window.__vm.read()');
     if(s.blank || s.readError) throw Error(`DOM oracle: ${s.readError || 'blank page'}`);
-    const signature=JSON.stringify([s.page,s.plan,s.columns,s.status,s.popup,s.problems?.listVersion]);
+    // Background analysis status can change continuously on a large library.
+    // Page loading/editing and list publication gate readiness; focus/rows gate
+    // visual stability without repeatedly serializing all problem/instance data.
+    const signature=JSON.stringify([s.page,s.plan,mode?s.columnState:s.columns,mode&&s.busy.analyze?null:s.status,s.popup,s.problems?.listVersion]);
     const ready=!s.loading && !s.editing && !s.busy.env && s.content && s.sidebar.includes('plan') && (page===undefined || s.page===page);
     stable=ready && signature===last ? stable+1 : 0;last=signature;
     return stable>=5 && s;
@@ -117,6 +120,17 @@ async function enabledSecond() {
 }
 async function dismiss() { await press('Escape');await settled(); }
 async function uiState() { return c.evaluate('window.__vm.read()'); }
+async function windowEvidence() {
+  await c.evaluate('__vm.stop()');
+  const evidence=await c.evaluate('(()=>{const {read,stop,timer,inputs,events,errors,samples,feedback,statuses,...meta}=__vm;return meta})()');
+  // Long real-content crawls can accumulate tens of MB. Bound each CDP response
+  // instead of serializing the entire observer through a single 15s request.
+  for(const name of ['inputs','events','errors','samples','feedback','statuses']) {
+    const length=await c.evaluate(`__vm.${name}.length`);evidence[name]=[];
+    for(let at=0;at<length;at+=100)evidence[name].push(...await c.evaluate(`__vm.${name}.slice(${at},${at+100})`));
+  }
+  return evidence;
+}
 async function clickText(selector,text) {
   for(let i=0;i<24;i++){
     const point=await c.evaluate(`(()=>{for(const e of document.querySelectorAll(${JSON.stringify(selector)})){if(e.disabled || e.textContent.trim()!==${JSON.stringify(text)})continue;const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,h=document.elementFromPoint(x,y);if(b.width&&b.height&&(h===e||e.contains(h)))return {x,y};}return null})()`);
@@ -503,7 +517,7 @@ try {
   }
   if(c){
     await settled();
-    const evidence=await c.evaluate('(()=>{__vm.stop();const {read,stop,timer,...v}=__vm;return v})()');save('window-trace',evidence);
+    const evidence=await windowEvidence();save('window-trace',evidence);
     // App keyboard handlers may invoke .click() internally (e.g. Tab to a list).
     // Physical key/pointer arrival must be trusted; derived synthetic clicks are evidence.
     check('all observed key/pointer input is trusted',evidence.inputs.filter(i=>/^(key|pointer|mouse)/.test(i.type)).every(i=>i.trusted));check('no transient blank page',evidence.samples.filter(s=>s.armed).every(s=>!s.blank && (s.content || s.loading)));
@@ -525,11 +539,11 @@ try {
   }
 } catch(e) {
   result.failures.push({name:'runner',detail:e.stack});
-  if(c){try{await c.shot(join(out,'failure.png'));save('failure-window',await c.evaluate('window.__vm?.read()'));save('window-trace',await c.evaluate('(()=>{const {read,stop,timer,...v}=__vm;return v})()'));}catch{}}
+  if(c){try{await c.shot(join(out,'failure.png'));save('failure-window',await c.evaluate('window.__vm?.read()'));save('window-trace',await windowEvidence());}catch{}}
 } finally {
   eventStream?.abort();c?.close();
   if(child?.pid){if(platform()==='win32')spawnSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true});else child.kill();}
   save('events',events);result.finished=new Date().toISOString();result.functionalStatus=result.failures.length?'failed':'passed';result.status=result.failures.length||result.performanceFailures.length?'failed':'passed';save('result',result);
-  console.log(JSON.stringify({status:result.status,driver,scenario,output:out,failures:result.failures,performanceFailures:result.performanceFailures},null,2));
+  console.log(JSON.stringify({status:result.status,driver,scenario,...(mode?{mode,seed:result.seed,steps:result.executedSteps}:{}),output:out,failures:result.failures,performanceFailures:result.performanceFailures},null,2));
   process.exitCode=result.failures.length||result.performanceFailures.length?1:0;
 }
