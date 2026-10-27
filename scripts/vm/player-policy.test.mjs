@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { allowed, canonical, classify, classifyKey, coverage, difference, random } from './player-policy.mjs';
+import { allowed, canonical, classify, classifyKey, coverage, difference, random, replayAction } from './player-policy.mjs';
 test('external and unknown targets fail closed, including deceptive button labels',()=>{
   for(const label of ['unsubscribe','launch RimWorld','choose a folder','save as a file…','open Steam browser'])assert.equal(classify({label}).tier,'external',label);
   assert.equal(classify({tag:'BUTTON',label:'do something new'}).tier,'unknown');
@@ -52,4 +52,11 @@ test('opening subscription UI and choosing export formats do not submit external
  assert.equal(classify({semantics:['export-format'],label:'Workshop links',identity:{}}).tier,'safe');
  assert.equal(classify({label:'look for it in the Workshop',identity:{}}).tier,'external');
  assert.equal(classify({identity:{'data-env-write':'subscribe'},label:'subscribe'}).tier,'external');
+});
+
+test('replay sends the actual click count after a moving target cancels repeats',()=>{
+ const entry={action:{kind:'click',locator:'#navtoggle',count:3},issuedClicks:1,cancelledRepeats:{from:2}};
+ assert.equal(replayAction(entry).count,1);
+ assert.equal(entry.action.count,3);
+ assert.equal(replayAction({action:{kind:'key',combo:'Escape'}}).combo,'Escape');
 });

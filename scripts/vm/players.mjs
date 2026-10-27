@@ -4,7 +4,7 @@ import { runChild } from './subprocess.mjs';
 import { createHash } from 'node:crypto';
 import { discover } from './observe.mjs';
 import { sleep } from './cdp.mjs';
-import { allowed, canonical, classify as baseClassify, classifyKey, coverage, difference, exclusions, random, stateKey } from './player-policy.mjs';
+import { allowed, canonical, classify as baseClassify, classifyKey, coverage, difference, exclusions, random, replayAction, stateKey } from './player-policy.mjs';
 
 const hash=s=>createHash('sha256').update(s).digest('hex').slice(0,20);
 const quoted=s=>JSON.stringify(s);
@@ -132,7 +132,8 @@ export async function drive(ctx) {
           const summary=JSON.parse(child.stdout),report=JSON.parse(readFileSync(join(summary.output,'result.json'),'utf8'));
           entry.functionalStatus=report.functionalStatus;entry.branchResult=join(summary.output,'result.json');
           entry.nonUndoableChanges=report.nonUndoableChanges||null;entry.failures=report.failures;entry.storage=report.storage;
-          if(report.failures.length&&report.failures.every(f=>/^(?:Error: )?(?:unreachable control|policy blocked|control not hittable)/.test(f.detail?.error||f.detail||'')))entry.unreachableReason=report.failures.map(f=>f.detail?.error||f.detail).join('\n');
+          const replayFailures=report.failures.filter(f=>!f.detail?.knownFailure);
+          if(replayFailures.length&&replayFailures.every(f=>/^(?:Error: )?(?:unreachable control|policy blocked|control not hittable)/.test(f.detail?.error||f.detail||'')))entry.unreachableReason=replayFailures.map(f=>f.detail?.error||f.detail).join('\n');
           result.performanceFailures.push(...report.performanceFailures.map(f=>({...f,branchControl:action.control})));
         }catch{}
         if(entry.functionalStatus!=='passed'&&!entry.unreachableReason)fail('isolated branch',{control:action.control,error:entry.error,output:entry.branchOutput});
@@ -389,7 +390,7 @@ export async function drive(ctx) {
     const replay=options.replay?JSON.parse(readFileSync(options.replay,'utf8')):null;
     if(replay){
       const replayStart=performance.now(),firstAt=replay.actions[0]?.atMs||0;
-      for(let i=0;i<replay.actions.length;i++){const entry=replay.actions[i];if(performance.now()>=deadline)throw Error('replay exceeded minute budget');const wait=(entry.atMs||firstAt)-firstAt-(performance.now()-replayStart);if(wait>0)await sleep(wait);await input(entry.action||entry);if(options.branch==='true')await settled();if(i%10===9)await oracles('replay',false);}
+      for(let i=0;i<replay.actions.length;i++){const entry=replay.actions[i];if(performance.now()>=deadline)throw Error('replay exceeded minute budget');const wait=(entry.atMs||firstAt)-firstAt-(performance.now()-replayStart);if(wait>0)await sleep(wait);await input(replayAction(entry));if(options.branch==='true')await settled();if(i%10===9)await oracles('replay',false);}
       await settled();await oracles('replay settled');
       if(options.branch==='true'){
         const after=await snapshot('branch-after'),d=difference(canonical(startSnapshot),canonical(after));
@@ -416,7 +417,7 @@ export async function drive(ctx) {
         const target=candidates.length?pick(candidates):null;
         chosenRow=target?ledger.get(identity(target,state,s)):null;
         if(target&&classify(target,s).tier!=='safe'){
-          await isolatedEdge(chosenRow,trace.filter(t=>t.action.kind!=='branch').map(t=>t.action));
+          await isolatedEdge(chosenRow,trace.filter(t=>t.action.kind!=='branch').map(replayAction));
           result.executedSteps=i+1;if(result.failures.length>beforeFailures)break;continue;
         }
         actions=target?[{kind:'click',locator:target.locator,count:pick([1,1,2,3]),delayMs},...(rng()<.5?[key('Escape')]:[])]:[key('Escape')];
@@ -439,7 +440,7 @@ export async function drive(ctx) {
     // oracle fails; unrelated setup/selector failures cannot shrink an app bug.
     const target=originalFailure||result.failures[0];
     const signature=f=>JSON.stringify([f?.name,f?.detail?.knownFailure||null,f?.detail?.firstDifference?.path||null]);
-    let best=trace.map(t=>({action:t.action})),attempts=[];
+    let best=trace.map(t=>({action:replayAction(t)})),attempts=[];
     const max=Number(options['shrink-runs']||6);
     async function retry(actions){
       const file=join(out,'shrink-candidate.json');writeFileSync(file,JSON.stringify({actions}));

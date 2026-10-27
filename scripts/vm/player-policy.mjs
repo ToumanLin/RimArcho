@@ -85,3 +85,9 @@ export function coverage(controls) {
   for(const p of Object.values(pages)){p.coveragePercent=p.eligible?Math.round(p.asserted/p.eligible*10000)/100:null;p.discoveredPassPercent=Math.round(p.passed/p.discovered*10000)/100;}
   return pages;
 }
+
+// A cancelled repeated click is evidence of the clicks actually sent.
+export function replayAction(entry) {
+  const action=entry.action||entry;
+  return action.kind==='click'&&Number.isInteger(entry.issuedClicks)?{...action,count:entry.issuedClicks}:action;
+}
