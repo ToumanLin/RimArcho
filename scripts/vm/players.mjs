@@ -69,7 +69,7 @@ export async function drive(ctx) {
       if(ledger.has(id)){
         const old=ledger.get(id);if(!old.states.includes(key))old.states.push(key);
         const policy=classify(control,s),eligible=allowed(policy.tier,options.allow)&&control.visible&&control.enabled&&!control.blockedByLayer;
-        if(!old.eligible&&eligible&&!old.attemptedAt)Object.assign(old,control,{state:key,recipe,eligible:true,outcome:'unreachable',reason:'not attempted'});
+        if(!old.eligible&&eligible&&!old.attemptedAt)Object.assign(old,control,{key:id,state:key,recipe,eligible:true,outcome:'unreachable',reason:'not attempted'});
         continue;
       }
       const policy=classify(control,s), permitted=allowed(policy.tier,options.allow),eligible=permitted&&control.visible&&control.enabled&&!control.blockedByLayer;
