@@ -315,8 +315,8 @@ func sortCycles(st *LoadoutState, in order.Input, r order.Result) []SortCycle {
 
 // SortNotices is the shared after-sort payload for GUI and CLI, including dry runs.
 type SortNotices struct {
-	MissingDependencies []MissingDependency     `json:"missingDependencies"`
-	MissingMods         []MissingMod            `json:"missingMods"`
-	Replacements        []ReplacementSuggestion `json:"replacements"`
-	Cycles              []SortCycle             `json:"cycles"`
+	MissingDependencies []MissingDependency     `json:"missingDependencies,omitempty"`
+	MissingMods         []MissingMod            `json:"missingMods,omitempty"`
+	Replacements        []ReplacementSuggestion `json:"replacements,omitempty"`
+	Cycles              []SortCycle             `json:"cycles,omitempty"`
 }
