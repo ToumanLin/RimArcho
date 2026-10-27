@@ -327,7 +327,11 @@ export function wireLists(ui) {
   for (const k of [0, 1, 2]) {
     const box = rowsEl(k);
     box.addEventListener("scroll", () => renderRows(k), { passive: true });
-    new ResizeObserver(() => renderRows(k)).observe(box);
+    // Rendering changes the scroll layout; defer writes beyond this resize delivery.
+    let resizeFrame = 0;
+    new ResizeObserver(() => {
+      if (!resizeFrame) resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; renderRows(k); });
+    }).observe(box);
     box.addEventListener("mousedown", (e) => {
       const r = e.target.closest(".row");
       if (!r || e.button !== 0) return;
