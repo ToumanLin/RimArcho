@@ -27,14 +27,15 @@ export async function observe() {
   mutation.observe(document.querySelector('#app'),{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','hidden','disabled','aria-busy']});
   vm.read = (detailed=true) => {
     const screen = document.querySelector('#screen'), status = document.querySelector('#status')?.textContent || '';
+    const renderedColumns=S.screen===null ? S.cols.slice(0,2).map((col,k)=>({expected:col.view.length,rendered:document.querySelectorAll(`.area[data-area="${k}"] .rows .row`).length})) : [];
     const cols = detailed && (S.cols || []).map(c => ({ entries: c.items.map(i => ({ id: i.id, ref: i.ref, packageId: i.packageId, missing: i.missing })), selected: [...c.sel], cursor: c.cursor }));
-    return { ...context(), status, popup: S.popup?.kind || null, busy: S.busy, editing: S.editing || 0, problems: S.board?.problems, plans: S.shell?.plans, columns: cols, focus: S.focus,
+    return { ...context(), status, popup: S.popup?.kind || null, busy: S.busy, editing: S.editing || 0, problems: S.board?.problems, plans: S.shell?.plans, columns: cols, renderedColumns, focus: S.focus,
       loading: !!document.querySelector('.page-loading, [aria-busy="true"]'),
       readError: document.querySelector('.page-read-error')?.innerText,
       blank: !document.querySelector('#app')?.firstElementChild,
       noGame: !!S.board?.envs?.length && /no games? yet|还没有游戏/.test(screen?.textContent||''),
       sidebar: [...document.querySelectorAll('#nav [data-id]')].map(e => e.dataset.id),
-      content: S.screen === null ? !!document.querySelector('#board .rows') : !!screen?.innerText.trim(),
+      content: S.screen === null ? !!document.querySelector('#board .rows') && renderedColumns.every(col=>!col.expected || col.rendered>0) : !!screen?.innerText.trim(),
       errors: vm.errors, activeElement: document.activeElement?.outerHTML.slice(0, 300) };
   };
   let lastStatus = '', last = performance.now();
