@@ -61,7 +61,7 @@ func linkNeeds(a *app.App, links []*app.GameLink) []Need {
 			actions = append(actions, act)
 		}
 	}
-	return []Need{{Group: GroupList, Counted: true, Status: StatusErr, Title: T("game mod links need attention"), Text: T("game mod links need attention"), Why: strings.Join(lines, "\n\n"), Actions: actions, Parts: lines, LinkGroups: groups}}
+	return []Need{{code: "mods.link-health", Group: GroupList, Counted: true, Status: StatusErr, Title: T("game mod links need attention"), Text: T("game mod links need attention"), Why: strings.Join(lines, "\n\n"), Actions: actions, Parts: lines, LinkGroups: groups}}
 }
 
 // LinkGroup is shared by the needs panel and its repair confirmation.

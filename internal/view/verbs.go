@@ -16,8 +16,13 @@ import (
 // Result is what a verb did, for the status line; Placed are the mods it put into the list
 // (the next "m changes it" applies to them).
 type Result struct {
-	Text   string   `json:"text"`
-	Placed []string `json:"placed,omitempty"`
+	MissingDependencies []app.MissingDependency `json:"missingDependencies,omitempty"`
+	Enabled             []string                `json:"enabled,omitempty"`
+	WorkshopIDs         []string                `json:"workshopIds,omitempty"`
+	Undo                bool                    `json:"undo,omitempty"`
+	Problems            *ListProblems           `json:"problems,omitempty"`
+	Text                string                  `json:"text"`
+	Placed              []string                `json:"placed,omitempty"`
 }
 
 // Positions: the 1-based load positions of the mods that are in the list.
@@ -287,4 +292,35 @@ func StageAll(a *app.App) (*Result, error) {
 		return nil, err
 	}
 	return &Result{Text: Tf("staged %s; Core and the DLCs stay enabled", Plural(len(refs), "mod"))}, nil
+}
+
+// CompleteDependencies enables installed prerequisites and sorts as one undo step.
+func CompleteDependencies(a *app.App) (*Result, error) {
+	r, err := a.CompleteDependencies()
+	if err != nil {
+		return nil, err
+	}
+	return &Result{
+		Text:                Tf("enabled %s", Plural(len(r.Enabled), "mod")),
+		MissingDependencies: r.MissingDependencies, Enabled: r.Enabled,
+		WorkshopIDs: r.WorkshopIDs, Undo: len(r.Edit.Changes) > 0,
+	}, nil
+}
+
+// ReplaceRecommended applies the current game's installed recommendations in one step.
+func ReplaceRecommended(a *app.App, refs []string) (*Result, error) {
+	r, err := a.ReplaceRecommended(refs)
+	if err != nil {
+		return nil, err
+	}
+	return &Result{Text: T("replaced with recommended mods"), Undo: len(r.Changes) > 0}, nil
+}
+
+// UseInstalled keeps unresolved entries in place while binding installed copies.
+func UseInstalled(a *app.App, packageIDs []string) (*Result, error) {
+	r, err := a.UseInstalled(packageIDs)
+	if err != nil {
+		return nil, err
+	}
+	return &Result{Text: T("using installed copies"), Undo: len(r.Changes) > 0}, nil
 }
