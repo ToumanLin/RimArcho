@@ -36,7 +36,7 @@ type API struct {
 	lib        *app.Library                // Mod 库存, as of libAt
 	libAt      string
 	libGate    sync.Mutex // coalesces full inventory builds, never acquired by edits
-	subRead    inventoryReader
+	subRead    subscriptionReader
 	copyRead   inventoryReader
 	detailRead logReader
 	board      *view.Board
@@ -424,6 +424,7 @@ func (s *API) PackRemoveUnfinished(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer s.subRevision.Add(1)
 	if err := os.RemoveAll(dir); err != nil { // off the lock: gigabytes take a while
 		return "", err
 	}
@@ -440,6 +441,7 @@ func (s *API) PackLaunch(name string, move bool) (*view.Outcome, error) {
 
 // PackRemove moves a pack to the recycle bin.
 func (s *API) PackRemove(name string) (string, error) {
+	defer s.subRevision.Add(1)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, err := s.a.RemovePack(name, false); err != nil {

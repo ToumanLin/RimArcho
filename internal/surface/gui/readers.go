@@ -16,6 +16,60 @@ type logReader struct {
 	a  *app.App
 }
 
+const subscriptionIdle = 5 * time.Minute
+
+type subscriptionReader struct {
+	inventoryReader
+	idle *time.Timer
+	used time.Time
+}
+
+// Called with the subscription reader locked, including by the expiry callback.
+func (w *subscriptionReader) release() {
+	if w.idle != nil {
+		w.idle.Stop()
+		w.idle = nil
+	}
+	if w.a != nil {
+		w.a.Close()
+		w.a = nil
+	}
+	w.lib, w.key = nil, ""
+}
+
+func (s *API) expireSubscriptions() {
+	w := &s.subRead
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if time.Since(w.used) >= subscriptionIdle {
+		w.release()
+	}
+}
+
+// Called after each read while subRead.mu is held. A callback already waiting for
+// that lock checks used again, so it cannot discard a newly refreshed cache.
+func (s *API) retainSubscriptions() {
+	w := &s.subRead
+	w.used = time.Now()
+	if w.idle == nil {
+		w.idle = time.AfterFunc(subscriptionIdle, s.expireSubscriptions)
+	} else {
+		w.idle.Reset(subscriptionIdle)
+	}
+}
+
+// Environment publication calls this after releasing API.mu (reader lock order).
+func (s *API) releaseSubscriptionsForEnvironment() {
+	w := &s.subRead
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if e, err := s.a.Env(); w.a != nil && (err != nil || w.a.EnvName != e.Name) {
+		w.release()
+	}
+}
+
 // detachedReader snapshots invocation options without building the board. It also works
 // before the first environment exists (settings, detection and uninstall previews).
 // The caller owns the connection and closes it after constructing the view model.
@@ -45,6 +99,9 @@ func (s *API) subscriptionSession() (*app.App, string, error) {
 		return nil, "", errors.New("RimArcho 已卸载，账户操作已停用")
 	}
 	w := &s.subRead
+	if e, err := s.a.Env(); w.a != nil && (err != nil || w.a.EnvName != e.Name) {
+		w.release()
+	}
 	var err error
 	if w.a == nil {
 		w.a, err = s.readInventorySession()
@@ -140,11 +197,7 @@ func (s *API) Close() {
 	}
 	s.detailRead.mu.Unlock()
 	s.subRead.mu.Lock()
-	if s.subRead.a != nil {
-		s.subRead.a.Close()
-		s.subRead.a = nil
-	}
-	s.subRead.lib = nil
+	s.subRead.release()
 	s.subRead.mu.Unlock()
 	s.copyRead.mu.Lock()
 	if s.copyRead.a != nil {

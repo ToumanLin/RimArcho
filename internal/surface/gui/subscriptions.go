@@ -14,6 +14,7 @@ func (s *API) SubscriptionsPage(library bool, of string) (*view.SubscriptionsPag
 	w := &s.subRead
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	defer s.retainSubscriptions()
 	a, key, err := s.subscriptionSession()
 	if err != nil {
 		return nil, err
@@ -50,6 +51,7 @@ func (s *API) AddSubscriptionInfo() (*view.AddSubscriptionInfo, error) {
 	w := &s.subRead
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	defer s.retainSubscriptions()
 	a, _, err := s.subscriptionSession()
 	if err != nil {
 		return nil, err

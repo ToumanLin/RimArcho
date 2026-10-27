@@ -14,6 +14,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -260,5 +261,67 @@ func TestSubscriptionSourceURL(t *testing.T) {
 		if got := view.SubscriptionSourceURL(&c.r); got != c.want {
 			t.Errorf("%+v: %q, want %q", c.r, got, c.want)
 		}
+	}
+}
+
+func TestAddSubscriptionRecentMatchesLibrarySourceRules(t *testing.T) {
+	e := testkit.New(t)
+	e.AddEnv(false)
+	g := testkit.NewGitRepo(t, "")
+	op, err := e.App.SubscribeGit(g.Bare, "branch", "main", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := op.Items[0]
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := st.Ix.ByID[item.ID]
+	if m == nil {
+		t.Fatal("missing subscribed mod")
+	}
+	src := st.Ix.Source(m.SourceID)
+	original := src.Kind
+	defer func() { src.Kind = original }()
+	for n, tc := range []struct {
+		name, record, want string
+		source             source.Kind
+	}{
+		{"git overrides extra", app.LibGit, app.LibGit, original},
+		{"page overrides extra", app.LibPage, app.LibPage, original},
+		{"steamcmd record preserves extra", app.LibSteamCMD, "", original},
+		{"unknown record preserves extra", "future", "", original},
+		{"unknown source is skipped", app.LibGit, "", source.Kind("future")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src.Kind = tc.source
+			r := &subscribe.Record{Kind: tc.record, URL: g.Bare, Installed: "old", InstalledAt: e.Now()}
+			if err := subscribe.Write(item.Folder, r); err != nil {
+				t.Fatal(err)
+			}
+			stamp := e.Now().Add(time.Duration(n+1) * time.Hour)
+			if err := os.Chtimes(filepath.Join(item.Folder, subscribe.File), stamp, stamp); err != nil {
+				t.Fatal(err)
+			}
+			full, err := view.BuildSubscriptions(e.App, st, modchanges.Opts{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			light, err := view.BuildAddSubscriptionInfo(e.App)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(light.Recent, full.Recent) {
+				t.Fatalf("recent differs: light=%+v full=%+v", light.Recent, full.Recent)
+			}
+			if tc.want == "" {
+				if len(light.Recent) != 0 {
+					t.Fatalf("unexpected recent: %+v", light.Recent)
+				}
+			} else if len(light.Recent) != 1 || light.Recent[0].Kind != tc.want {
+				t.Fatalf("recent: %+v, want %s", light.Recent, tc.want)
+			}
+		})
 	}
 }

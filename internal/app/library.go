@@ -305,23 +305,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 	if err != nil {
 		return nil, err
 	}
-	srcKind := map[string]string{}
-	for _, s := range ix.Sources {
-		switch {
-		case s.Kind == source.Workshop:
-			srcKind[s.ID] = LibWorkshop
-		case s.Kind == source.SteamCMD:
-			srcKind[s.ID] = LibSteamCMD
-		case s.Kind == source.Local, s.Kind == source.Elsewhere: // every game's Mods/ (04 §1.7)
-			srcKind[s.ID] = LibLocal
-		case a.IsLockSource(s):
-			srcKind[s.ID] = LibLocked
-		case s.Kind == source.Extra && s.Label == MonitorLabel:
-			srcKind[s.ID] = LibMonitor
-		case s.Kind == source.Extra:
-			srcKind[s.ID] = LibExtra
-		}
-	}
+	srcKind := a.libSourceKinds(ix)
 	byLin := map[string]*LibLineage{}
 	lineage := func(id string) *LibLineage {
 		l := byLin[id]
@@ -1389,4 +1373,25 @@ func libCreated(m *store.Mod) time.Time {
 		}
 	}
 	return created
+}
+
+func (a *App) libSourceKinds(ix *Index) map[string]string {
+	srcKind := map[string]string{}
+	for _, s := range ix.Sources {
+		switch {
+		case s.Kind == source.Workshop:
+			srcKind[s.ID] = LibWorkshop
+		case s.Kind == source.SteamCMD:
+			srcKind[s.ID] = LibSteamCMD
+		case s.Kind == source.Local, s.Kind == source.Elsewhere: // every game's Mods/ (04 §1.7)
+			srcKind[s.ID] = LibLocal
+		case a.IsLockSource(s):
+			srcKind[s.ID] = LibLocked
+		case s.Kind == source.Extra && s.Label == MonitorLabel:
+			srcKind[s.ID] = LibMonitor
+		case s.Kind == source.Extra:
+			srcKind[s.ID] = LibExtra
+		}
+	}
+	return srcKind
 }

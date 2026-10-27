@@ -496,17 +496,18 @@ func (a *App) SubscriptionLineages() ([]*LibLineage, error) {
 	if err != nil {
 		return nil, err
 	}
+	srcKind := a.libSourceKinds(ix)
 	byLin := map[string]*LibLineage{}
 	for _, m := range ix.Mods {
 		r := a.SubscriptionOf(m)
-		if r == nil || r.InstalledAt.IsZero() {
+		if srcKind[m.SourceID] == "" || r == nil || r.InstalledAt.IsZero() {
 			continue
 		}
 		l := byLin[m.LineageID]
 		if l == nil {
 			l = &LibLineage{ID: m.LineageID}
 			for _, other := range ix.ByLineage[m.LineageID] {
-				if other.Status == identity.Live && other.Kind != source.Official && ix.Source(other.SourceID) != nil {
+				if other.Status == identity.Live && other.Kind != source.Official && srcKind[other.SourceID] != "" {
 					l.Instances = append(l.Instances, &LibInstance{Mod: other})
 					break
 				}
@@ -515,7 +516,11 @@ func (a *App) SubscriptionLineages() ([]*LibLineage, error) {
 			l.Instances = nil
 			byLin[m.LineageID] = l
 		}
-		l.Instances = append(l.Instances, &LibInstance{Mod: m, Ref: ix.Ref(m.ID), Source: r.Kind, Subscription: r, Created: libCreated(m)})
+		kind := srcKind[m.SourceID]
+		if r.Kind == LibGit || r.Kind == LibPage {
+			kind = r.Kind
+		}
+		l.Instances = append(l.Instances, &LibInstance{Mod: m, Ref: ix.Ref(m.ID), Source: kind, Subscription: r, Created: libCreated(m)})
 	}
 	ls := make([]*LibLineage, 0, len(byLin))
 	for _, l := range byLin {
@@ -527,7 +532,7 @@ func (a *App) SubscriptionLineages() ([]*LibLineage, error) {
 }
 
 // SubscriptionInventoryKey watches the disk state Library reads in addition to the
-// scanned inventory: subscription provenance and Steam's subscribed/missing items.
+// scanned inventory: provenance, Steam subscriptions and packs that use the mods.
 func (a *App) SubscriptionInventoryKey(ix *Index) string {
 	var key strings.Builder
 	stamp := func(path string) {
@@ -546,6 +551,18 @@ func (a *App) SubscriptionInventoryKey(ix *Index) string {
 	for _, src := range ix.Sources {
 		if src.Kind == source.Workshop {
 			stamp(scan.ACFPathFor(src.Root))
+		}
+	}
+	// The root catches additions/removals; manifests catch edits inside existing packs.
+	packs := a.PacksDir()
+	stamp(packs)
+	entries, err := os.ReadDir(packs)
+	if err != nil {
+		fmt.Fprintf(&key, "packs:%v;", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() && !strings.HasSuffix(entry.Name(), TmpSuffix) {
+			stamp(filepath.Join(packs, entry.Name(), "pack.json"))
 		}
 	}
 	return key.String()
