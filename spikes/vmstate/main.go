@@ -245,7 +245,7 @@ func snapshot(home string, openPlan ...string) any {
 			p["enabled"] = enabled
 		}
 		for _, stack := range []string{"undo", "redo"} {
-			r := rows(db, "SELECT entries,op FROM workspace_undo WHERE plan_id=? AND stack=? ORDER BY id DESC", id, stack)
+			r := rows(db, "SELECT entries,op,staging FROM workspace_undo WHERE plan_id=? AND stack=? ORDER BY id DESC", id, stack)
 			p[stack] = norm(r)
 			p[stack+"Depth"] = len(r)
 		}

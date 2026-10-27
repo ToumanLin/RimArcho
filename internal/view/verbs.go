@@ -179,9 +179,6 @@ func Place(a *app.App, from Column, o Object, at int) (*Result, error) {
 		_, err = a.MoveBlock(o.IDs, at)
 	} else {
 		_, err = a.Enable(o.Refs, app.Placement{At: at})
-		if err == nil && from == Staging {
-			_, err = a.Unstage(o.Refs)
-		}
 	}
 	if err != nil {
 		return nil, err

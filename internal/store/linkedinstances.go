@@ -63,6 +63,9 @@ func (s *Store) MergeLinkedInstances(replace map[string]string) error {
 		}
 		// Use the same reference rewriting as the shared-source migration, so history
 		// and provenance cannot resurrect the obsolete local IDs.
+		if err := remapHistoryStages(tx, pending, nil); err != nil {
+			return err
+		}
 		if err := rewriteInstances14(tx, pending); err != nil {
 			return err
 		}
