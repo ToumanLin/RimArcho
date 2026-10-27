@@ -315,3 +315,12 @@ func ReplaceRecommended(a *app.App, refs []string) (*Result, error) {
 	}
 	return &Result{Text: T("replaced with recommended mods"), Undo: len(r.Changes) > 0}, nil
 }
+
+// UseInstalled keeps unresolved entries in place while binding installed copies.
+func UseInstalled(a *app.App, packageIDs []string) (*Result, error) {
+	r, err := a.UseInstalled(packageIDs)
+	if err != nil {
+		return nil, err
+	}
+	return &Result{Text: T("using installed copies"), Undo: len(r.Changes) > 0}, nil
+}
