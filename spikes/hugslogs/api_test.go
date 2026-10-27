@@ -8,23 +8,24 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
 // A fake GitHub: 250 gists, one per hour going back from 2026-10-20 00:00, newest first,
 // 100 per page; raw content is a 1.6 log with one problem that the filter keeps.
-func fakeGitHub(t *testing.T) (*httptest.Server, *int) {
+func fakeGitHub(t *testing.T) (*httptest.Server, *atomic.Int64) {
 	t.Helper()
 	newest := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
-	pages := 0
+	var pages atomic.Int64
 	mux := http.NewServeMux()
 	mux.HandleFunc("/users/"+account+"/gists", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer test-token" {
 			http.Error(w, `{"message":"Bad credentials"}`, http.StatusUnauthorized)
 			return
 		}
-		pages++
+		pages.Add(1)
 		p, _ := strconv.Atoi(r.URL.Query().Get("page"))
 		var out []map[string]any
 		for i := (p - 1) * 100; i < p*100 && i < 250; i++ {
@@ -59,8 +60,8 @@ func TestAPIFetch(t *testing.T) {
 		t.Fatal(err)
 	}
 	idx, _ := readIndex(filepath.Join(dir, "index.jsonl"))
-	if len(idx) != 97 || *pages != 2 {
-		t.Fatalf("index %d entries after %d pages, want 97 after 2 (one batch of -workers 2)", len(idx), *pages)
+	if len(idx) != 97 || pages.Load() != 2 {
+		t.Fatalf("index %d entries after %d pages, want 97 after 2 (one batch of -workers 2)", len(idx), pages.Load())
 	}
 	raws, _ := os.ReadDir(filepath.Join(dir, "raw"))
 	if len(raws) != 10 {
@@ -72,7 +73,7 @@ func TestAPIFetch(t *testing.T) {
 	}
 
 	// A second run with no limit downloads the rest and adds nothing to the index.
-	*pages = 0
+	pages.Store(0)
 	if err := apiFetch(dir, "2026-10-16T00:00:00Z", 0, 2, 0); err != nil {
 		t.Fatal(err)
 	}
@@ -92,13 +93,13 @@ func TestAPIFetch(t *testing.T) {
 	}
 
 	// The whole listing: 3 pages of gists, then an empty page.
-	*pages = 0
+	pages.Store(0)
 	if err := apiFetch(dir, "2000-01-01T00:00:00Z", 0, 2, 0); err != nil {
 		t.Fatal(err)
 	}
 	idx, _ = readIndex(filepath.Join(dir, "index.jsonl"))
-	if len(idx) != 250 || *pages != 4 {
-		t.Fatalf("index %d after %d pages, want 250 after 4", len(idx), *pages)
+	if len(idx) != 250 || pages.Load() != 4 {
+		t.Fatalf("index %d after %d pages, want 250 after 4", len(idx), pages.Load())
 	}
 }
 
