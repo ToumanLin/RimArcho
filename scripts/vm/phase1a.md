@@ -63,8 +63,8 @@ The budgets come from the [automation plan §6](../../docs/research/2026-10-27_V
 
 ## Coverage boundaries
 
-- W: rapid Space/held/Shift input, navigation during reads, twenty alternating plan clicks, both game versions, repeated sorting, double/triple row activation and import apply, delete-plan/Mod/unsubscribe confirmation cancellation, native export overwrite cancellation, directory-move preview cancellation, import/menu/position/tag Esc, enable/move/stage/sort undo and fresh problem counts.
-- A/C: matching sort history and dry-run semantics; A also tests queued workspace completion events and toggle. Both retain the independent stage/undo-payload oracle, which currently exposes a core defect.
+- W: rapid Space/held/Shift input, navigation during reads, twenty alternating plan clicks, both game versions, repeated sorting, double/triple row activation and import apply, delete-plan/Mod/unsubscribe confirmation cancellation, native export overwrite cancellation, directory-move preview cancellation, import/menu/position/tag Esc, enable/move/stage/sort undo and fresh problem counts. Scenario 4 also checks staging redo and stage → undo → plain disable without stale staging membership.
+- A/C: matching sort history and dry-run semantics; A also tests queued workspace completion events and toggle. Both retain the independent stage/undo-payload oracle. History snapshots include staging payloads, with null identifying legacy steps.
 - D2 suggested multi-selection placement has no exact CLI equivalent; the ledger marks it unsupported. C/A do not claim input or popup coverage.
 - Subscription submit double/triple clicks use an owned loopback peer that closes the TLS handshake. The driver asserts exactly one terminal failed task per submit sequence and unchanged lists/instances; successful clone/download deduplication still needs a Phase 1b online fixture. No external subscription or Steam account is used. The subscription output folder is isolated per run.
 - Native export cancellation uses standard English/Chinese Windows No labels. Unsupported OS/dialog variants fail explicitly; there is no browser mock or automatic overwrite confirmation.
