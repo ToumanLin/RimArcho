@@ -1,7 +1,10 @@
 package gui
 
 import (
+	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -92,5 +95,27 @@ func TestGuideDownloadInfoSingleflight(t *testing.T) {
 	}
 	if d := s.GuideDownloadInfo(); d.Error != "" || len(d.Branches) == 0 || calls.Load() != 1 {
 		t.Fatalf("hot info: %+v calls=%d", d, calls.Load())
+	}
+}
+
+func TestGuideCloseCancelsBranchQueries(t *testing.T) {
+	e := testkit.New(t)
+	s := newAPI(e.App)
+	s.Close()
+	if !errors.Is(s.branchCtx.Err(), context.Canceled) {
+		t.Fatal("Close did not cancel branch context")
+	}
+	if _, _, err := e.App.GameBranchesCachedContext(s.branchCtx, "unused.exe"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("closed window query: %v", err)
+	}
+}
+
+func TestGuideBranchRefreshFrontend(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is needed for guide tests")
+	}
+	if out, err := exec.Command(node, "--experimental-vm-modules", "--test", "testdata/guide.mjs").CombinedOutput(); err != nil {
+		t.Fatalf("guide refresh: %v\n%s", err, out)
 	}
 }

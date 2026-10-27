@@ -223,12 +223,15 @@ function applyDownloadInfo() {
 }
 
 async function refreshDownload(info) {
-  while (D.info === info && info.refreshing && S.screen === "guide" && G.step === 0 && G.way === 1 && !D.run) {
-    await new Promise(resolve => setTimeout(resolve, 250));
-    if (D.info !== info || S.screen !== "guide" || G.step !== 0 || G.way !== 1 || D.run) return;
+  const deadline = Date.now() + 120000;
+  let delay = 250;
+  while (D.info === info && info.refreshing && S.screen === "guide" && G.step === 0 && G.way === 1 && !D.run && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, Math.min(delay, deadline - Date.now())));
+    delay = Math.min(delay * 2, 5000);
+    if (D.info !== info || S.screen !== "guide" || G.step !== 0 || G.way !== 1 || D.run || Date.now() >= deadline) return;
     let next;
     try { next = await api.GuideDownloadInfo(); } catch { return; }
-    if (D.info !== info || S.screen !== "guide" || G.step !== 0 || G.way !== 1 || D.run) return;
+    if (D.info !== info || S.screen !== "guide" || G.step !== 0 || G.way !== 1 || D.run || Date.now() >= deadline) return;
     D.info = info = next;
     if (!info.refreshing) applyDownloadInfo();
   }
@@ -294,6 +297,7 @@ function download(card) {
     card.append(el("div", "dl-note err", info.error));
     return footer(card, button(T("ask again"), "", () => { D.info = null; loadDownload(); }));
   }
+  if (info.refreshing) card.append(el("div", "dl-note muted", T("refreshing branch list…")));
   if (info.error) card.append(el("div", "dl-note err", info.error));
   const list = el("div", "branches");
   for (const b of info.branches || []) {

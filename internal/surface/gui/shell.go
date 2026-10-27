@@ -387,7 +387,7 @@ func (s *API) GuideDownloadInfo() *DownloadInfo {
 		d.Offer, _ = a.OfferSteamCMD()
 		return d
 	}
-	bs, refreshing, err := a.GameBranchesCached(d.SteamCMD)
+	bs, refreshing, err := a.GameBranchesCachedContext(s.branchCtx, d.SteamCMD)
 	d.Refreshing = refreshing
 	if err != nil {
 		d.Error = view.Humanize(nil, err.Error())

@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -181,10 +182,7 @@ var branchVersionRe = regexp.MustCompile(`^version-(\d+\.\d+)`)
 
 // GameBranches returns public RimWorld branches, reusing the process cache.
 func (a *App) GameBranches() ([]GameBranch, error) {
-	// App's dependency finder is mutable, including during a read-only lookup.
-	gameBranchesCache.mu.Lock()
 	exe := a.SteamCMDPath()
-	gameBranchesCache.mu.Unlock()
 	bs, _, err := a.GameBranchesCached(exe)
 	if len(bs) > 0 {
 		return bs, nil
@@ -196,6 +194,15 @@ func (a *App) GameBranches() ([]GameBranch, error) {
 // while stale branches are being refreshed; callers can read again on completion.
 // A failed refresh returns the old branches with the error.
 func (a *App) GameBranchesCached(exe string) ([]GameBranch, bool, error) {
+	return a.GameBranchesCachedContext(context.Background(), exe)
+}
+
+// GameBranchesCachedContext ties branch queries and stale refreshes to the caller's
+// lifetime. Downloads keep their own runner and process lifecycle.
+func (a *App) GameBranchesCachedContext(ctx context.Context, exe string) ([]GameBranch, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
 	if exe == "" {
 		return nil, false, ErrNoSteamCMD
 	}
@@ -203,11 +210,24 @@ func (a *App) GameBranchesCached(exe string) ([]GameBranch, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	run := a.steamCMD().run
+	run := a.SteamCMDRun
 	return gameBranchesCache.get(key, time.Now, func() ([]GameBranch, error) {
 		unlock := accounts.Lock(exe)
 		defer unlock()
-		out, err := run(exe, []string{"+login", "anonymous", "+app_info_update", "1", "+app_info_print", env.WorkshopAppID, "+quit"})
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		args := []string{"+login", "anonymous", "+app_info_update", "1", "+app_info_print", env.WorkshopAppID, "+quit"}
+		var out string
+		var err error
+		if run != nil {
+			out, err = run(exe, args)
+		} else {
+			out, err = runBranchSteamCMD(ctx, exe, args)
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		if err != nil {
 			return nil, fmt.Errorf("SteamCMD could not read RimWorld's branches: %v", err)
 		}
@@ -216,7 +236,7 @@ func (a *App) GameBranchesCached(exe string) ([]GameBranch, bool, error) {
 			return nil, errors.New("SteamCMD did not list RimWorld's branches (is Steam reachable?)")
 		}
 		return bs, nil
-	})
+	}, func() (branchKey, error) { return branchToolKey(exe, env.WorkshopAppID) })
 }
 
 // ParseBranches reads the branches from app_info_print's output: public first, the public
