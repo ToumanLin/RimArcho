@@ -79,7 +79,7 @@ func TestOrderSeverityAndDLCMove(t *testing.T) {
 }
 
 // A loadBefore Core that other constraints make impossible is left out with the reason,
-// not reported as a cycle.
+// reported as an informational, automatically resolved cycle.
 func TestSortDropsUnsatisfiable(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)
@@ -94,7 +94,7 @@ func TestSortDropsUnsatisfiable(t *testing.T) {
 	if strings.Contains(out, "order.cycle") || !strings.Contains(out, "not used:") || !strings.Contains(out, "loadBefore pkg:ludeon.rimworld  (would put the mod before official content") {
 		t.Fatalf("sort:\n%s", out)
 	}
-	if cy := byCode(problems(t, e).List, "order.cycle"); len(cy) != 0 {
+	if cy := byCode(problems(t, e).List, "order.cycle"); len(cy) != 1 || cy[0].Severity != finding.Info || len(cy[0].Subjects) != 3 {
 		t.Fatalf("cycle: %+v", cy)
 	}
 }

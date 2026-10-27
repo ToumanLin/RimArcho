@@ -330,6 +330,10 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		out = append(out, f)
 	}
 	inst := finding.Inst
+	missingInfo := map[string]SortMod{}
+	for _, m := range a.MissingMods(st) {
+		missingInfo[m.PackageID] = m.SortMod
+	}
 	activePos := map[string]int{}
 	activeByPkg := map[string][]*store.Mod{}
 	var active []*store.Mod
@@ -339,7 +343,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				Subjects:    []string{"pkg:" + e.Missing},
 				Claim:       fmt.Sprintf("pkg:%s in the Loadout matches no installed mod (kept in ModsConfig.xml)", e.Missing),
 				Suggestions: []string{"archo find " + e.Missing, "archo disable pkg:" + e.Missing}})
-			if w, ok := a.WorkshopFor(e.Missing); ok {
+			if w := missingInfo[dependencyPackage(e.Missing)]; w.WorkshopID != "" {
 				f := out[len(out)-1]
 				f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+w.WorkshopID)
 			}
@@ -370,13 +374,13 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	for _, m := range active {
 		d := m.Decl()
 		// Use This Instead (04 §6.3): the community knows a maintained replacement for this game version.
-		if r := a.ReplacementFor(m.WorkshopID(), m.PackageID); r != nil && r.NewPackageID != m.PackageID && (len(r.NewVersions) == 0 || slices.Contains(r.NewVersions, mm)) {
+		if r := a.replacementFor(st, m); r != nil {
 			f := &finding.Finding{Code: "mod.replaced", Severity: finding.Warning, Key: r.NewWorkshopID, Subjects: []string{inst(m.ID)},
 				Claim:    fmt.Sprintf("%s has a replacement for %s: %s by %s", inst(m.ID), mm, r.NewName, r.NewAuthor),
 				Evidence: []finding.Evidence{{Source: finding.Inferred, Ref: "replacements.json", Text: fmt.Sprintf("Use This Instead: ws:%s → ws:%s", r.OldWorkshopID, r.NewWorkshopID)}}}
-			if ins := installed[r.NewPackageID]; len(ins) > 0 {
-				f.Subjects = append(f.Subjects, inst(ins[0].ID))
-				f.Suggestions = []string{"archo disable " + inst(m.ID), "archo enable " + inst(ins[0].ID)}
+			if c := replacementCandidate(st, m, r); c != nil && swapBlocker(st, c, m) == "" {
+				f.Subjects = append(f.Subjects, inst(c.ID))
+				f.Suggestions = []string{"archo disable " + inst(m.ID), "archo enable " + inst(c.ID)}
 			} else if r.NewWorkshopID != "" {
 				f.Suggestions = []string{"subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=" + r.NewWorkshopID}
 			}
@@ -704,6 +708,9 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		for i, e := range cy.Edges {
 			ev, ig := edgeText(st, in, e)
 			t := ev
+			if slices.Contains(cy.Broken, i) {
+				t += "  [not used by sorting]"
+			}
 			if i == cy.Suggest {
 				t += "  [suggested to ignore]"
 				f.Suggestions = append([]string{"archo rule add ignore " + ig}, f.Suggestions...)
@@ -711,6 +718,20 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Declared, Text: t})
 		}
 		add(f)
+	}
+	for _, d := range r.Dropped {
+		if d.Reason != order.ReasonOfficialFirst {
+			continue
+		}
+		ev, _ := edgeText(st, in, d.Edge)
+		var refs []string
+		for _, i := range d.Members {
+			refs = append(refs, nodeTok(i))
+		}
+		add(&finding.Finding{Code: "order.cycle", Severity: finding.Info, Key: "official:" + ev,
+			Subjects: refs,
+			Claim:    "sorting keeps the official order and sets aside a contradictory rule",
+			Evidence: []finding.Evidence{{Source: finding.Declared, Text: ev + "  [not used by sorting]"}}})
 	}
 	return out, nil
 }

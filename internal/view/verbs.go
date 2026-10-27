@@ -305,3 +305,12 @@ func CompleteDependencies(a *app.App) (*Result, error) {
 		WorkshopIDs: r.WorkshopIDs, Undo: len(r.Edit.Changes) > 0,
 	}, nil
 }
+
+// ReplaceRecommended applies the current game's installed recommendations in one step.
+func ReplaceRecommended(a *app.App, refs []string) (*Result, error) {
+	r, err := a.ReplaceRecommended(refs)
+	if err != nil {
+		return nil, err
+	}
+	return &Result{Text: T("replaced with recommended mods"), Undo: len(r.Changes) > 0}, nil
+}

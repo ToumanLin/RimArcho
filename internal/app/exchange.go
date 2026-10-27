@@ -93,7 +93,7 @@ func (a *App) exportList(st *LoadoutState, format string) ([]byte, error) {
 			if m := st.Ix.ByID[e.Instance]; m != nil {
 				p.Entries = append(p.Entries, packEntryOf(m))
 			} else {
-				p.Entries = append(p.Entries, PackEntry{PackageID: strings.TrimSuffix(e.Missing, "_steam")})
+				p.Entries = append(p.Entries, PackEntry{PackageID: strings.TrimSuffix(e.Missing, "_steam"), Name: e.Name, WorkshopID: e.WorkshopID, Lineage: e.Lineage})
 			}
 		}
 		b, _ := json.MarshalIndent(p, "", "  ")
@@ -180,6 +180,7 @@ type ImportedList struct {
 	Title  string            // the list's own name (share codes)
 	// Workshop maps packageIds to workshop IDs when the list has them; WorkshopOnly are
 	// entries known only by workshop ID (resolved against installed mods on import).
+	Lineages     map[string]string // packageId → source lineage (RimArcho lists)
 	Workshop     map[string]string
 	WorkshopOnly []string
 	// Unresolved are WorkshopOnly IDs no installed mod has (import notes them, 04 §9).
@@ -363,6 +364,11 @@ func ImportedEntries(st *LoadoutState, il *ImportedList) (list loadout.List, unr
 	}
 	list, _ = st.Reg.FromTokens(tokens)
 	for i, e := range list {
+		if e.Missing != "" {
+			list[i].Name = il.Names[e.Missing]
+			list[i].WorkshopID = il.Workshop[e.Missing]
+			list[i].Lineage = il.Lineages[e.Missing]
+		}
 		if m := st.Ix.ByID[e.Instance]; m != nil && il.Hash(m.PackageID) != "" && !SameContent(m, il.Hash(m.PackageID)) {
 			if c := sameContentCopy(st, m.PackageID, il.Hash(m.PackageID)); c != "" && list.Index(c) < 0 {
 				list[i].Instance = c

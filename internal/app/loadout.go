@@ -719,6 +719,9 @@ func (a *App) Swap(ref, with string) (*EditResult, error) {
 // SortResult is the outcome of Sort.
 type SortResult struct {
 	MissingDependencies []MissingDependency
+	MissingMods         []MissingMod
+	Replacements        []ReplacementSuggestion
+	Cycles              []SortCycle
 	State               *LoadoutState
 	Input               order.Input
 	Result              order.Result
@@ -823,7 +826,13 @@ func (a *App) sortList(st *LoadoutState, l loadout.List) (*SortResult, error) {
 	state := *st
 	state.List = sorted
 	out.MissingDependencies, err = a.MissingDependencies(&state)
-	return out, err
+	if err != nil {
+		return nil, err
+	}
+	out.MissingMods = a.MissingMods(&state)
+	out.Replacements = a.ReplacementSuggestions(&state)
+	out.Cycles = sortCycles(&state, in, r)
+	return out, nil
 }
 
 // UndoRedo steps the workspace back (undo) or forward (redo).

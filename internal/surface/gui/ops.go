@@ -131,3 +131,12 @@ func (s *API) CompleteDependencies() (*view.Result, error) {
 	s.needs, s.board = nil, nil
 	return s.after(view.CompleteDependencies(s.a))
 }
+
+// ReplaceRecommended replaces the named enabled originals with their installed
+// recommendations, validated again at application time, as one undoable list edit.
+func (s *API) ReplaceRecommended(refs []string) (*view.Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	return s.after(view.ReplaceRecommended(s.a, refs))
+}

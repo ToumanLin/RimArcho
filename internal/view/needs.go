@@ -244,6 +244,10 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		pkg, ws, name string
 		n             Need
 	}
+	missingInfo := map[string]app.SortMod{}
+	for _, m := range a.MissingMods(st) {
+		missingInfo[strings.ToLower(m.PackageID)] = m.SortMod
+	}
 	var missing []missingEntry
 	inList := map[string]bool{}
 	for _, e := range st.List {
@@ -314,9 +318,9 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				Actions: []Action{viewAction(T("see the error"), "problems", "show", p.Ref)}, Mods: ids, Status: StatusWarn, Dim: true,
 				Title: Tf("%s has a known error: this is the mod's own problem", nm(x)), Why: T("not your list's: shared logs show it whatever else is enabled; an update may fix it"), Evidence: ev})
 		case "order.cycle":
-			add(Need{rank: 2, Group: GroupList, Text: Tf("the order requirements of %d mods contradict each other", len(subj)),
-				Actions: []Action{cycleView(st, p), cycleIgnore(st, p)}, Counted: p.Severity != finding.Info, Dim: p.Severity == finding.Info, Mods: ids, Status: s,
-				Why: T("sorting keeps the strongest of them and gives up the weakest (the suggested one); ignoring it settles that for good"), Evidence: ev})
+			add(Need{rank: 2, Group: GroupList, Text: Tf("sorting keeps the strongest constraints in a cycle of %d mods", len(subj)),
+				Actions: []Action{cycleView(st, p)}, Counted: false, Dim: true, Mods: ids,
+				Why: cycleResolution(st, p), Evidence: ev})
 		case "pkg.duplicate-active":
 			add(Need{rank: 3, Group: GroupList, Text: Tf("%s is enabled twice", nm(x)), Actions: []Action{keepOne(st, ids)}, Counted: true, Mods: ids, Status: s,
 				Why: T("the game loads only one of them; you pick which"), Evidence: ev})
@@ -331,7 +335,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			me := missingEntry{pkg: pkg, name: pkg, n: Need{rank: 4, Group: GroupList, Text: Tf("the list has %s, but it is not installed", pkg),
 				Actions: []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s,
 				Title: Tf("not installed: %s", pkg), Why: T("the list has it, but no mod folder does"), Evidence: ev}}
-			if w, ok := a.WorkshopFor(pkg); ok {
+			if w, ok := missingInfo[strings.TrimSuffix(strings.ToLower(pkg), "_steam")]; ok {
 				me.ws = w.WorkshopID
 				if w.Name != "" {
 					me.name = w.Name
@@ -876,18 +880,6 @@ func cycleView(st *app.LoadoutState, p *app.Problem) Action {
 	return Action{Kind: ActList, Key: "enter", Label: T("see which"), Title: T("order requirements that contradict each other"), Lines: lines}
 }
 
-// cycleIgnore: ignore the requirement the sort suggests dropping (its first suggestion).
-func cycleIgnore(st *app.LoadoutState, p *app.Problem) Action {
-	act := Action{Kind: ActIgnoreRule, Key: "x", Label: T("ignore the suggested one"), Done: T("that requirement is ignored from now on")}
-	for _, s := range p.Suggestions {
-		if rest, ok := strings.CutPrefix(s, "archo rule add ignore "); ok {
-			act.Rule = finding.Expand(rest, st.Ix.Ref)
-			break
-		}
-	}
-	return act
-}
-
 // ErrNothing: the action has nothing to do (an ignore with no suggestion).
 var ErrNothing = errors.New("nothing to do")
 
@@ -1043,6 +1035,7 @@ var edgeRe = regexp.MustCompile(`^(?:decl|community|rule r:\d+|builtin) (\S+)(?:
 // after B · suggested to ignore".
 func EdgeWords(st *app.LoadoutState, t string) string {
 	sug := strings.Contains(t, "[suggested to ignore]")
+	broken := strings.Contains(t, "[not used by sorting]")
 	mt := edgeRe.FindStringSubmatch(t)
 	if mt == nil {
 		return Humanize(st, finding.Expand(t, st.Ix.Ref))
@@ -1055,7 +1048,9 @@ func EdgeWords(st *app.LoadoutState, t string) string {
 	default:
 		s = Tf("%s wants to load after %s", x, y)
 	}
-	if sug {
+	if broken {
+		s += "  " + T("set aside by sorting")
+	} else if sug {
 		s += "  " + T("suggested to ignore (x)")
 	}
 	return s
@@ -1096,4 +1091,14 @@ func popActions(as []Action) []Action {
 		}
 	}
 	return out
+}
+
+func cycleResolution(st *app.LoadoutState, p *app.Problem) string {
+	var broken []string
+	for _, ev := range p.Evidence {
+		if strings.Contains(ev.Text, "[not used by sorting]") {
+			broken = append(broken, EdgeWords(st, ev.Text))
+		}
+	}
+	return Tf("requirements set aside by sorting: %s", strings.Join(broken, "; "))
 }
