@@ -13,6 +13,7 @@ param(
  [string]$SQLiteExe = (Get-Command sqlite3).Source,
  [string]$TransferRoot = 'D:\RimArcho-test\transfer',
  [string]$GuestRoot = 'C:\Users\Public\Documents\VM-Test',
+ [ValidateSet('true','false')][string]$Shrink = 'false',
  [switch]$Probe,
  [switch]$StandardUser,
  [switch]$BundleOnly
@@ -51,7 +52,7 @@ $manifest = @(Get-ChildItem -LiteralPath $bundle -Recurse -File | ForEach-Object
 $zip = Join-Path $transfer 'player-bundle.zip'
 Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath $zip
 $zipHash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
-$runnerArgs = @('scripts/vm/run.mjs','--mode',$Mode,'--driver','W','--seed',[string]$Seed,'--steps',[string]$Steps,'--minutes',[string]$Minutes,'--tools',(Join-Path $guestBundle 'tools'),'--out',(Join-Path $guestRun 'results'))
+$runnerArgs = @('scripts/vm/run.mjs','--mode',$Mode,'--shrink',$Shrink,'--driver','W','--seed',[string]$Seed,'--steps',[string]$Steps,'--minutes',[string]$Minutes,'--tools',(Join-Path $guestBundle 'tools'),'--out',(Join-Path $guestRun 'results'))
 if ($Probe) { $runnerArgs += @('--probe','true') }
 if ($Allow -ne 'safe') { $runnerArgs += @('--allow',$Allow) }
 if ($GuestBaseline) { $runnerArgs += @('--baseline',$GuestBaseline,'--reuse-content','true') }

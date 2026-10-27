@@ -300,6 +300,7 @@ async function setup() {
   let logs='';child.stdout.on('data',b=>logs+=b);child.stderr.on('data',b=>logs+=b);child.on('exit',()=>writeFileSync(join(out,'process.log'),logs));
   await until(async()=>{try{return (await fetch(`http://${addr}/${driver==='W'?'json/list':''}`,{signal:AbortSignal.timeout(500)})).ok}catch{return false}},15000);
   if(driver==='W') {
+    await until(async()=>{try{return (await (await fetch(`http://${addr}/json/list`)).json()).some(t=>t.type==='page'&&!t.url.startsWith('devtools:'));}catch{return false}},15000);
     c=await connect(addr);await until(async()=>{try{return await c.evaluate("location.host === 'wails.localhost'")}catch{return false}},15000);await until(async()=>c.evaluate("(async()=>{const {S}=await import('/js/state.js');return !!S.shell?.plan;})()"),15000);
     await c.evaluate(`(${observe.toString()})()`);
     await settled(undefined,15000);
@@ -559,7 +560,7 @@ try {
   await timed('prepare-and-start',setup,null);
   if(c)await editor();
   if(options.probe==='true')await guestProbes();
-  if(mode) {
+  else if(mode) {
     const { drive } = await import('./players.mjs');
     await drive({ c, options, result, out, repo, home, tools, currentPlan, snapshot, settled, check, editor, command, exe, save });
   } else {
