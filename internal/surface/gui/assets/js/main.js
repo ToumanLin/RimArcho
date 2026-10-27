@@ -41,6 +41,15 @@ import { checkCredit } from "./credit.js";
 // ---- loading ----
 
 let reloadSeq = 0;
+// retryRead reads the workspace again after a failed read: 1, 2, 4, 8 s, then every 10 s
+// for a minute; a successful read resets it.
+let readRetries = 0, readRetryTimer = null;
+function retryRead() {
+  if (readRetryTimer || readRetries >= 10) return;
+  const wait = Math.min(1000 * 2 ** readRetries, 10000);
+  readRetries++;
+  readRetryTimer = setTimeout(() => { readRetryTimer = null; reload(); }, wait);
+}
 async function reload(snapshot = null, read = null) {
   if (S.busy.env && !snapshot && !read) return;
   // edits on their way to Go: the lists here are ahead of Go's; the last edit reads them
@@ -54,8 +63,17 @@ async function reload(snapshot = null, read = null) {
     const result = snapshot || await api.Workspace();
     if (!current() || result.stale) return;
     b = result.board; sh = result.shell; history = result.history;
-  } catch (e) { if (read) throw e; if (current()) say("fail", errText(e)); return; }
+  } catch (e) { if (read) throw e; if (current()) { say("fail", errText(e)); retryRead(); } return; }
   if (!current()) return;
+  // A board that could not be read (a background job holding the data) has an error and no
+  // columns: it must not replace the lists on screen, the sidebar's lists or the games.
+  if (b && b.error && S.board && !S.board.error) {
+    say("fail", b.error + "  " + T("trying again…"));
+    retryRead();
+    if (read) read.finish();
+    return;
+  }
+  readRetries = 0;
   const apply = () => { S.board = b; S.shell = sh; S.history = history; };
   if (read) read.commit(apply); else apply();
   S.busy.scan = b.scanning;

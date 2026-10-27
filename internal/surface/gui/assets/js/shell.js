@@ -129,7 +129,13 @@ function wireSideSplit() {
 }
 
 export async function loadShell() {
-  try { S.shell = await api.Shell(); } catch { /* keep the last one */ }
+  try {
+    const next = await api.Shell();
+    // no games after there were some is a read that failed (a background job holding the
+    // data), not the games gone: keep the sidebar and look again in a moment
+    if (!next.envs && S.shell?.envs) { setTimeout(loadShell, 2000); return; }
+    S.shell = next;
+  } catch { /* keep the last one */ }
   sync();
 }
 

@@ -36,18 +36,38 @@ const picks = new Map(); // game → the row last applied in it this session
 const shown = { game: null, row: null, note: false, drawn: false };
 const markY = new Map();
 
+let homeRetries = 0, homeRetryTimer = null;
 export async function home({ keep = false } = {}) {
-  const read = beginPageRead("home", { keep });
+  clearTimeout(homeRetryTimer);
+  const read = beginPageRead("home", { keep, retry: () => home() });
   let next, backdrop, h;
   try {
     [next, backdrop, h] = await Promise.all([api.Home(), api.HomeBackground(), hidden == null ? api.Setting(HIDDEN_KEY).catch(() => "") : hidden]);
-  } catch (e) { read.fail(e); return; }
+  } catch (e) { read.fail(e); retryHome(); return; }
   if (!read.current()) return;
+  // An empty page while games exist is a read that failed (a background job holding the
+  // data), not "no game yet": keep what was shown, say so, and read again.
+  const games = (S.shell?.envs || 0) > 0 || (S.board?.envs?.length || 0) > 0;
+  if (next?.error || (games && !(next?.rows?.length))) {
+    const why = next?.error || T("could not read the games right now (a background task may be busy); trying again…");
+    if (rows().length) { draw(); read.finish(); say("busy", why); } else read.fail(new Error(why));
+    retryHome();
+    return;
+  }
+  homeRetries = 0;
   data = next; bg = backdrop; hidden = h || "";
   const f = applied();
   if (f) picks.set(f.envName, key(f));
   draw();
   read.finish();
+}
+
+// retryHome reads the page again after 1, 2, 4, 8 s, then every 10 s, for about a minute
+function retryHome() {
+  if (homeRetries >= 10) return;
+  const wait = Math.min(1000 * 2 ** homeRetries, 10000);
+  homeRetries++;
+  homeRetryTimer = setTimeout(() => { if (S.screen === "home") home({ keep: true }); }, wait);
 }
 
 const rows = () => (data && data.rows) || [];
