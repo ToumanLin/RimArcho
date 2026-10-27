@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -341,5 +342,58 @@ func TestUninstallRefused(t *testing.T) {
 	}
 	if strings.Join(f.mods(), ",") != before || f.App.Uninstalled || len(f.trashed) > 0 {
 		t.Fatal("a refused uninstall changed something")
+	}
+}
+
+func TestUninstallExecutionSkipsDirectorySizes(t *testing.T) {
+	f := uninstallFixture(t)
+	o := app.UninstallOptions{KeepLocked: true}
+	preview, err := f.App.PlanUninstall(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	measured := 0
+	for _, step := range preview.Steps {
+		for _, it := range step.Items {
+			if it.Bytes > 0 {
+				measured++
+			}
+			it.Bytes = 0
+		}
+	}
+	if measured == 0 {
+		t.Fatal("fixture has no directory sizes")
+	}
+	checked, err := f.App.CheckUninstall(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := json.Marshal(preview)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := json.Marshal(checked)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("checks changed beyond sizes:\n%s\n%s", want, got)
+	}
+	// Exercise the actual execution entry point, with a blocker so nothing is removed.
+	f.App.ArchoProbe = func() []int { return []int{77} }
+	ran := false
+	blocked, err := f.App.Uninstall(o, func(app.UninstallProgress) { ran = true })
+	if !errors.Is(err, app.ErrUninstallBlocked) {
+		t.Fatalf("uninstall: %v", err)
+	}
+	for _, step := range blocked.Steps {
+		for _, it := range step.Items {
+			if it.Bytes != 0 {
+				t.Fatalf("execution measured %s: %d bytes", it.Path, it.Bytes)
+			}
+		}
+	}
+	if ran || f.App.Uninstalled || len(f.trashed) > 0 {
+		t.Fatal("blocked execution changed files")
 	}
 }

@@ -33,7 +33,7 @@ func (s *API) UninstallPlan(c view.UninstallChoice) (*view.UninstallPage, error)
 func (s *API) UninstallRun(c view.UninstallChoice) error {
 	s.accountMu.Lock()
 	s.mu.Lock()
-	p, err := s.a.PlanUninstall(c.Options())
+	p, err := s.a.CheckUninstall(c.Options())
 	if err == nil {
 		err = p.Blocked()
 	}

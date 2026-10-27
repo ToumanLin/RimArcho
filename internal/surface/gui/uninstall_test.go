@@ -56,7 +56,7 @@ func TestUninstallPreviewCachesOnlySizes(t *testing.T) {
 	if got := item(next, foreign).Verb; got != view.T("left alone") {
 		t.Fatalf("real directory deletion permitted: %s", got)
 	}
-	// The execution planning entry point uses fresh sizes and fresh safety checks.
+	// The uncached preview entry point still measures current sizes.
 	fresh, err := e.App.PlanUninstall(choice.Options())
 	if err != nil {
 		t.Fatal(err)
@@ -110,11 +110,30 @@ func TestUninstallPreviewRechecksForeignLinks(t *testing.T) {
 	if err != nil || p.Blocked == "" {
 		t.Fatalf("new foreign incoming link not refused: %+v %v", p, err)
 	}
-	fresh, err := e.App.PlanUninstall(c.Options())
+	fresh, err := e.App.CheckUninstall(c.Options())
 	if err != nil || fresh.Blocked() == nil {
 		t.Fatalf("execution planning accepted foreign link: %+v %v", fresh, err)
 	}
 	if !source.IsLink(link) {
 		t.Fatal("preview detached foreign link")
+	}
+}
+
+func TestUninstallRunBlockedReleasesLocks(t *testing.T) {
+	e, s, _ := fixture(t)
+	e.App.ArchoProbe = func() []int { return []int{77} }
+	if err := s.UninstallRun(view.UninstallChoice{}); err == nil {
+		t.Fatal("running process did not block execution")
+	}
+	if !s.mu.TryLock() {
+		t.Fatal("blocked execution retained the GUI lock")
+	}
+	s.mu.Unlock()
+	if !s.accountMu.TryLock() {
+		t.Fatal("blocked execution retained the account lock")
+	}
+	s.accountMu.Unlock()
+	if e.App.Uninstalled {
+		t.Fatal("blocked execution uninstalled the fixture")
 	}
 }

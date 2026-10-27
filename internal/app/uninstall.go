@@ -208,8 +208,14 @@ func (a *App) PlanUninstall(o UninstallOptions) (*UninstallPlan, error) {
 	return a.planUninstall(o, dirSize)
 }
 
+// CheckUninstall rebuilds all execution checks without recursively measuring folders.
+// Sizes are display-only; the execution report omits these directory totals.
+func (a *App) CheckUninstall(o UninstallOptions) (*UninstallPlan, error) {
+	return a.planUninstall(o, func(string) int64 { return 0 })
+}
+
 // PlanUninstallPreview reuses only byte estimates. Every path, process and ownership
-// check is recomputed; execution uses PlanUninstall, without this cache.
+// check is recomputed; execution uses CheckUninstall, without this cache.
 func (a *App) PlanUninstallPreview(o UninstallOptions, sizes *UninstallSizeCache) (*UninstallPlan, error) {
 	p, err := a.planUninstall(o, sizes.sizeOf)
 	if p != nil {
@@ -780,7 +786,7 @@ type UninstallProgress struct {
 // because they hold what is needed to finish. Otherwise the script that deletes them once
 // RimArcho has closed is started.
 func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*UninstallPlan, error) {
-	p, err := a.PlanUninstall(o)
+	p, err := a.CheckUninstall(o)
 	if err != nil {
 		return nil, err
 	}
