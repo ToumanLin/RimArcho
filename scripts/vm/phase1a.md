@@ -7,7 +7,7 @@ Run commands from the repository root. Node 22+, Go, PowerShell 7 and `sqlite3` 
 ## Build outside the checkout
 
 ```powershell
-$tools = Join-Path $env:TEMP 'RimArcho-vm-tools'
+$tools = 'D:/RimArcho-test/tools'
 New-Item -ItemType Directory -Force $tools | Out-Null
 go build -o "$tools/archo.exe" ./cmd/archo
 go build -ldflags '-H windowsgui -X github.com/ToumanLin/RimArcho/internal/buildinfo.GUI=1' -o "$tools/RimArcho.exe" ./cmd/archo
@@ -32,25 +32,18 @@ Each invocation creates a new case and prints its external result directory, eve
 
 Scenarios contain fast input deadlines, rather than waiting for each app operation. `window-trace.json` preserves trusted input arrival, selection/cursor, modifiers, repeat, focus, edit queue, page/plan context, DOM samples, feedback and backend events. Settled means no loading/error/environment switch, an empty editing queue, intact navigation, and repeated matching samples. API jobs await their matching `environment` event; an acknowledgement alone does not complete a step.
 
-## Copy real content
+## Real content: VM only
 
-Choose a new external root with enough free disk space for the game directories, libraries and user data. This reads the source DB with SQLite `.backup`, copies files without following junctions, copies external junction targets separately, relocates typed paths in the copied DB, and audits resolved paths **before** opening the application.
-
-```powershell
-$baseline = 'D:/RimArcho-private-baseline'
-pwsh scripts/vm/prepare-real.ps1 -Root $baseline -Tools "$tools"
-foreach ($scenario in 1..4) {
-  node scripts/vm/run.mjs --scenario $scenario --driver W --tools "$tools" --baseline $baseline
-}
-```
-
-The default source is the real APPDATA home, read only. `-SourceHome <home>` selects another source. `RIMARCHO_HOME`, APPDATA and LOCALAPPDATA are isolated for application processes. Do not pass a real home as a baseline: it must have the preparation manifest and pass the path audit.
-
-Scenarios 1/3/4 take a fresh DB backup and cache copy; their list edits and confirmation previews share the private baseline's content. Scenario 2 can change deployment links during environment switching and therefore makes a complete additional private filesystem copy. Corpus preparation is measured separately from interactive readiness. An already prepared, disposable filesystem clone can be assigned to scenario 2 with `--owned-files true`; that clone is then writable test content and must have no other consumers. Never run another test against shared private content while a filesystem scenario owns it. If an initial copy is interrupted, `-ResumeCopy` resumes only before `relocation.sql` exists, with a matching `copy-source.json`; after relocation starts, use a new root.
+Host runs are fixture-only and all output is under `D:/RimArcho-test` (total <2 GiB).
+Use the already-prepared VM baseline with `--reuse-content true`; no second full
+content copy is permitted. See [players.md](players.md) for provisioning and cleanup.
+Scenario 2 deployment switching is refused on reused shared content. Scenario 4
+records the single-plan refusal and creates a companion plan before testing cancel.
+`--probe true` checks that refusal and the subscription preview without submitting.
 
 ## Read and compare evidence
 
-`result.json` separates checks, functional failures, performance failures, timings and unsupported/external coverage. `functionalStatus` can pass while the overall `status` fails a budget. Checkpoint JSON contains canonical domain data and surface observations. The `observation` field has raw runtime handles for validating the visible enabled order; it is excluded from cross-run comparisons.
+`result.json` separates checks, functional failures, performance failures, timings and unsupported/external coverage. `functionalStatus` can pass while the overall `status` fails a budget. Full checkpoint data is compared in memory; result.json retains hashes/counts and failures. The `observation` field has raw runtime handles for validating the visible enabled order; it is excluded from cross-run comparisons.
 
 Canonical identity includes source/environment, relative path, package ID and content fingerprint. Snapshots retain all plans, entry order, enabled membership, workspace origin/conflicts, staging positions/anchors, complete ordered undo/redo payloads, saved versions, tags/notes/rules, instances, source state, problem counts and canonical per-instance ownership, ModsConfig bytes/hash/XML and game links. SQLite observation is read only and does not call startup recovery. Cache/log/profile bytes are not equivalence criteria.
 

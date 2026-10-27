@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { discover } from './observe.mjs';
 import { sleep } from './cdp.mjs';
-import { allowed, canonical, classify, classifyKey, coverage, difference, exclusions, random, stateKey } from './player-policy.mjs';
+import { allowed, canonical, classify as baseClassify, classifyKey, coverage, difference, exclusions, random, stateKey } from './player-policy.mjs';
 
 const hash=s=>createHash('sha256').update(s).digest('hex').slice(0,20);
 const quoted=s=>JSON.stringify(s);
@@ -14,6 +14,7 @@ export async function drive(ctx) {
   const seed=Number(options.seed||271027), steps=Number(options.steps||200), minutes=Number(options.minutes||60);
   if(!Number.isSafeInteger(seed)||!Number.isInteger(steps)||steps<1||!Number.isFinite(minutes)||minutes<=0)throw Error('seed must be an integer, steps positive integer, minutes positive');
   if(options.allow&&!['local','external'].includes(options.allow))throw Error('--allow local|external');
+  const classify=(control,state)=>baseClassify(control,{...state,sharedContent:!!options.baseline});
   const rng=random(seed), pick=a=>a[Math.floor(rng()*a.length)], started=performance.now(), deadline=started+minutes*60000;
   Object.assign(result,{mode:options.mode,seed,steps,minutes,allow:options.allow||'safe',canonicalExclusions:exclusions,knownFailures:[{id:'F2',oracle:'undo canonical equality',description:'stage metadata outside undo; fix belongs to stage-undo branch'}]});
   const ledger=new Map(),states=new Map(),queue=[],trace=[],edges=[],sequences=new Map(),pageDetails=new Map();
@@ -74,7 +75,7 @@ export async function drive(ctx) {
       }
       const policy=classify(control,s), permitted=allowed(policy.tier,options.allow),eligible=permitted&&control.visible&&control.enabled&&!control.blockedByLayer;
       const row={...control,key:id,state:key,states:[key],page:control.owner==='nav'?'sidebar':s.page||'plan',plan:s.plan,tier:policy.tier,classification:policy.reason,eligible,recipe,outcome:'unreachable',reason:'not attempted',discoveredAt:new Date().toISOString()};
-      if(!permitted){row.outcome='skipped';row.reason=policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`;}
+      if(!permitted){row.outcome='skipped';row.reason=policy.reason.startsWith('shared baseline')?policy.reason:policy.tier==='unknown'?policy.reason:`${policy.tier} tier disabled (use --allow ${policy.tier==='external'?'external':'local'})`;}
       else if(!eligible){row.reason=!control.visible?'not visible in this state':!control.enabled?'disabled; requires application precondition':'covered by page/popup/menu; not an eligible edge in this state';}
       ledger.set(id,row);added.push(row);
       if(control.context&&control.visible){const right={...row,key:hash(id+'context'),label:control.label+' [context menu]',sourceLabel:control.label,action:{kind:'click',locator:control.locator,button:'right'}};if(!ledger.has(right.key)){ledger.set(right.key,right);added.push(right);}}
@@ -355,7 +356,7 @@ export async function drive(ctx) {
   }
 
   function replayArgs(file) {
-    return [join(ctx.repo,'scripts/vm/run.mjs'),'--mode','walk','--driver','W','--seed',String(seed),'--steps',String(steps),'--minutes',String(minutes),'--tools',ctx.tools,'--out',join(out,'retries'),'--replay',file,'--shrink','false',...(options.baseline?['--baseline',options.baseline]:[]),...(options.allow?['--allow',options.allow]:[])];
+    return [join(ctx.repo,'scripts/vm/run.mjs'),'--mode','walk','--driver','W','--seed',String(seed),'--steps',String(steps),'--minutes',String(minutes),'--tools',ctx.tools,'--out',join(out,'retries'),'--replay',file,'--shrink','false',...(options.baseline?['--baseline',options.baseline,'--reuse-content','true']:[]),...(options.allow?['--allow',options.allow]:[])];
   }
   async function isolatedEdge(row,recipe) {
     row.attemptedAt=new Date().toISOString();

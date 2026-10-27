@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { connect, sleep } from './cdp.mjs';
 import { observe, discover } from './observe.mjs';
+import { treeBytes, cleanupRun, hostOutput } from './storage.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 // A VM guest gets an exported copy of the scripts with no Git; RIMARCHO_VM_BUILD names its commit.
@@ -27,10 +28,14 @@ assert(!mode || ['crawl','walk'].includes(mode), 'use --mode crawl|walk');
 assert(!mode || driver === 'W', 'crawl/walk require real window driver W');
 assert(['W','A','C'].includes(driver) && scenario >= 1 && scenario <= 4, 'use --driver W|A|C --scenario 1|2|3|4');
 const outside = path => { for(const root of [repo,repositoryRoot]) { const r=relative(root,resolve(path));assert(r.startsWith('..')||isAbsolute(r),`results and test homes must be outside the repository: ${path}`); } return resolve(path); };
-const outputBase = outside(options.out || join(tmpdir(), 'RimArcho-vm-results'));
+const guest=process.env.RIMARCHO_VM_GUEST==='1';
+assert(!options.baseline || guest,'host runs support only the generated fixture; real baselines are VM-only');
+assert(!options.baseline || options['reuse-content']==='true','VM baselines require --reuse-content true (no full content copy)');
+assert(!options.baseline || mode || scenario!==2,'scenario 2 deployment switching needs private content; skipped on a shared baseline');
+const outputBase = outside(guest ? options.out : hostOutput(options.out));
 mkdirSync(outputBase, { recursive: true });
 const out = mkdtempSync(join(outputBase, `${mode || 's'+scenario}-${driver}-`));
-const tools = resolve(options.tools || join(tmpdir(), 'RimArcho-vm-tools'));
+const tools = resolve(options.tools || 'D:/RimArcho-test/tools');
 const exe = name => join(tools, name + (platform() === 'win32' ? '.exe' : ''));
 const result = { schema: 1, scenario, driver, seed: 271027, fixture: options.baseline ? 'real-copy' : 'small', output: out, started: new Date().toISOString(), host: { cpu: cpus()[0]?.model, cores: cpus().length, memory: totalmem(), platform: platform() }, timings: [], checks: [], coverage: [], checkpoints: [], failures: [], performanceFailures: [] };
 const save = (name, data) => writeFileSync(join(out, name + '.json'), JSON.stringify(data,null,2));
@@ -59,7 +64,8 @@ async function snapshot(label) {
     await settled();
   }
   const artifact = `${String(++checkpointSeq).padStart(2,'0')}-${label}`;
-  save(artifact,{ domain:data, surface:ui });result.checkpoints.push({ label, artifact:artifact+'.json' });
+  const digest=createHash('sha256').update(JSON.stringify(data)).digest('hex');
+  result.checkpoints.push({label,sha256:digest,counts:{instances:data.instances.length,plans:data.plans.length},surface:ui?{page:ui.page,plan:ui.plan,popup:ui.popup}:null});
   if(ui) {
     if(ui.page===null && data.observation && (!mode || ui.plan===currentPlan)){
       const expected=data.observation.entries.map(e=>e.i||'pkg:'+e.m);
@@ -252,14 +258,10 @@ async function setup() {
   if(options.baseline) {
     const baseline=outside(options.baseline);assert(existsSync(join(baseline,'isolated.json')),'baseline needs isolated.json from prepare-real.ps1');
     command(exe('vmstate'),['--mode','audit','--home',join(baseline,'home'),'--root',baseline],{},30000);
-    if(driver==='W' && ((mode && options.allow) || (!mode && scenario===2 && options['owned-files']!=='true'))) {
-      // UseEnv can create/remove deployment links: this scenario owns a full filesystem copy.
-      command('pwsh',['-NoProfile','-File',join(repo,'scripts/vm/prepare-real.ps1'),'-SourceHome',join(baseline,'home'),'-Root',dirname(home),'-Tools',tools],{},1800000);
-    } else {
     mkdirSync(home,{recursive:true});
     command('sqlite3',['-readonly',join(baseline,'home','archo.db'),`.backup '${join(home,'archo.db').replaceAll("'","''")}'`]);
-    for(const name of ['config.toml','cache']) if(existsSync(join(baseline,'home',name))) cpSync(join(baseline,'home',name),join(home,name),{recursive:true});
-    }
+    if(existsSync(join(baseline,'home','config.toml')))cpSync(join(baseline,'home','config.toml'),join(home,'config.toml'));
+    result.sharedContent={baseline,policy:'private DB only; baseline content reused; filesystem writes skipped'};
   } else command(exe('vmstate'),['--mode','fixture','--root',dirname(home)],{},30000);
   if(mode){
     // A copied player's old undo history predates this experiment. Random Undo
@@ -284,7 +286,7 @@ async function setup() {
   result.workingTree=hasGit?command('git',['-C',repo,'status','--short']).trim():'exported copy';
   result.node=process.version;result.toolHashes=Object.fromEntries(['archo','vmstate',driver==='W'?'RimArcho':driver==='A'?'guidev':null].filter(Boolean).map(n=>[n,createHash('sha256').update(readFileSync(exe(n))).digest('hex')]));
   result.preparationMs=performance.now()-preparing;
-  if(driver==='W'&&scenario===3)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
+  if(driver==='W'&&!mode&&scenario===3)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
   if(driver==='C') return;
   const launching=performance.now();
   const freePort = () => new Promise((ok,fail) => { const server=createServer();server.on('error',fail);server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>ok(port))}); });
@@ -452,7 +454,30 @@ async function scenario3() {
     await repeatedSubscription();
   }
 }
+async function deletionPrerequisite() {
+  if(!c||(await uiState()).plans.length!==1)return;
+  await c.click('[data-env-write="remove-plan"]');await sleep(350);await settled();
+  result.lastPlanRefusal={popup:(await uiState()).popup,status:await c.evaluate('document.querySelector("#status")?.textContent'),message:await c.evaluate('document.querySelector("#say")?.textContent||document.querySelector(".toast")?.textContent||""')};
+  check('last plan deletion refuses without confirmation',!(await uiState()).popup);
+  await c.click('#nav [data-id="plans"]');await settled('plans');await press('KeyN');await settled('plans');
+  await c.click('.pm-name');await press('Control+KeyA');await c.call('Input.insertText',{text:'VM cancellation companion'});
+  await until(()=>c.evaluate('!!document.querySelector("[data-env-write=create-plan]:not(:disabled)")'));
+  await c.click('[data-env-write="create-plan"]');await settled();await editor();
+  check('delete cancellation prerequisite creates second plan',(await uiState()).plans.length===2);
+}
+async function guestProbes() {
+  await deletionPrerequisite();
+  await c.click('[data-env-write="remove-plan"]');await until(async()=>!!(await uiState()).popup);
+  result.deletePlanPreview=await c.evaluate('document.querySelector("#popup")?.innerText');
+  await dismiss();
+  await c.click('#nav [data-id="subscribe"]');await settled('subscribe');
+  await c.click('.subscribe-omni input');await c.call('Input.insertText',{text:'https://127.0.0.1:9/phase1a.git'});
+  await until(()=>c.evaluate('!!document.querySelector(".subscribe-preview")?.textContent.trim()'));
+  result.subscriptionPrerequisite={gitAvailable:spawnSync('git',['--version'],{windowsHide:true}).status===0,preview:await c.evaluate('document.querySelector(".subscribe-preview")?.textContent'),subscribeDisabled:await c.evaluate('document.querySelector(".subscribe-foot button.primary")?.disabled')};
+  await press('Escape');await editor();
+}
 async function scenario4() {
+  await deletionPrerequisite();
   const before=await snapshot('before-cancel');
   if(!c){
     await act('Preview');result.coverage.push({action:'cancel/Esc/focus',status:'unsupported: W-only; preview/dry-run tested'});
@@ -530,7 +555,8 @@ async function scenario4() {
 try {
   await timed('prepare-and-start',setup,null);
   if(c)await editor();
-  if(mode) {
+  if(options.probe==='true')await guestProbes();
+  else if(mode) {
     const { drive } = await import('./players.mjs');
     await drive({ c, options, result, out, repo, home, tools, currentPlan, snapshot, settled, check, editor, command, exe, save });
   } else {
@@ -539,7 +565,7 @@ try {
   }
   if(c){
     await settled();
-    const evidence=await windowEvidence();save('window-trace',evidence);
+    const evidence=await windowEvidence();result.observationCounts=Object.fromEntries(Object.entries(evidence).filter(([,v])=>Array.isArray(v)).map(([k,v])=>[k,v.length]));
     // App keyboard handlers may invoke .click() internally (e.g. Tab to a list).
     // Physical key/pointer arrival must be trusted; derived synthetic clicks are evidence.
     check('all observed key/pointer input is trusted',evidence.inputs.filter(i=>/^(key|pointer|mouse)/.test(i.type)).every(i=>i.trusted));check('no transient blank page',evidence.samples.filter(s=>s.armed).every(s=>!s.blank && (s.content || s.loading)));
@@ -557,15 +583,16 @@ try {
     result.performanceFailures.push(...result.feedback.over200ms.map(f=>({name:'first feedback',...f,budgetMs:200})));
     const stalls=evidence.samples.filter(s=>s.gapMs>500);result.performanceFailures.push(...stalls.map(s=>({name:'main-thread stall',...s,budgetMs:500})));
     if(options.discover==='true')save('controls',await c.evaluate(`(${discover.toString()})()`));
-    await c.shot(join(out,'final.png'));
+
   }
 } catch(e) {
   result.failures.push({name:'runner',detail:e.stack});
-  if(c){try{await c.shot(join(out,'failure.png'));save('failure-window',await c.evaluate('window.__vm?.read()'));save('window-trace',await windowEvidence());}catch{}}
+  if(c){try{save('window-trace',await windowEvidence());}catch{}}
 } finally {
   eventStream?.abort();c?.close();
   if(child?.pid){if(platform()==='win32')spawnSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true});else child.kill();}
-  save('events',events);result.finished=new Date().toISOString();result.functionalStatus=result.failures.length?'failed':'passed';result.status=result.failures.length||result.performanceFailures.length?'failed':'passed';save('result',result);
+  try{result.storage=cleanupRun(out);}catch(e){result.failures.push({name:'cleanup',detail:e.message});}
+  result.finished=new Date().toISOString();result.functionalStatus=result.failures.length?'failed':'passed';result.status=result.failures.length||result.performanceFailures.length?'failed':'passed';save('result',result);
   console.log(JSON.stringify({status:result.status,driver,scenario,...(mode?{mode,seed:result.seed,steps:result.executedSteps}:{}),output:out,failures:result.failures,performanceFailures:result.performanceFailures},null,2));
   process.exitCode=result.failures.length||result.performanceFailures.length?1:0;
 }

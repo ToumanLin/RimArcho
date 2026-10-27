@@ -1,4 +1,4 @@
-# Host-only packaging and optional execution. -BundleOnly never contacts VMware.
+﻿# Host-only packaging and optional execution. -BundleOnly never contacts VMware.
 # Test VM only; no power/snapshot/revert operations and no credential access here.
 [CmdletBinding()]
 param(
@@ -11,15 +11,16 @@ param(
  [string]$PowerShellZip,
  [string]$NodeExe = (Get-Command node).Source,
  [string]$SQLiteExe = (Get-Command sqlite3).Source,
- [string]$TransferRoot = 'D:\VMs\Transfer',
+ [string]$TransferRoot = 'D:\RimArcho-test\transfer',
  [string]$GuestRoot = 'C:\Users\Public\Documents\VM-Test',
+ [switch]$Probe,
  [switch]$StandardUser,
  [switch]$BundleOnly
 )
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Run this host script with PowerShell 7' }
 if ($Steps -lt 1 -or $Minutes -le 0) { throw 'Steps and Minutes must be positive' }
-if ($GuestBaseline -and -not $PowerShellZip) { throw 'Guest real-copy preparation needs a portable PowerShell 7 zip (-PowerShellZip)' }
+if (-not [IO.Path]::GetFullPath($TransferRoot).StartsWith('D:\RimArcho-test\',[StringComparison]::OrdinalIgnoreCase)) { throw 'TransferRoot must be under D:\RimArcho-test' }
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $build = (& git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE) { throw 'Cannot identify build' }
@@ -51,8 +52,9 @@ $zip = Join-Path $transfer 'player-bundle.zip'
 Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath $zip
 $zipHash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
 $runnerArgs = @('scripts/vm/run.mjs','--mode',$Mode,'--driver','W','--seed',[string]$Seed,'--steps',[string]$Steps,'--minutes',[string]$Minutes,'--tools',(Join-Path $guestBundle 'tools'),'--out',(Join-Path $guestRun 'results'))
+if ($Probe) { $runnerArgs += @('--probe','true') }
 if ($Allow -ne 'safe') { $runnerArgs += @('--allow',$Allow) }
-if ($GuestBaseline) { $runnerArgs += @('--baseline',$GuestBaseline) }
+if ($GuestBaseline) { $runnerArgs += @('--baseline',$GuestBaseline,'--reuse-content','true') }
 function Literal([string]$s) { "'" + $s.Replace("'","''") + "'" }
 $argsPS = ($runnerArgs | ForEach-Object { Literal $_ }) -join ','
 # Runs under inbox Windows PowerShell 5.1; portable pwsh is only needed for prepare-real.
@@ -65,6 +67,9 @@ try {
  $manifest = Get-Content -Raw -LiteralPath '__BUNDLE__\manifest.json' | ConvertFrom-Json
  foreach ($file in $manifest.files) { if ((Get-FileHash -LiteralPath (Join-Path '__BUNDLE__' $file.path) -Algorithm SHA256).Hash -ne $file.sha256) { throw ('file hash mismatch: ' + $file.path) } }
  $env:RIMARCHO_VM_BUILD = $manifest.build
+ $env:RIMARCHO_VM_GUEST = '1'
+ $freeBefore = (Get-PSDrive C).Free
+ if ($freeBefore -lt 4GB) { throw 'guest needs 4 GB free; no content copies are made' }
  $env:PATH = '__BUNDLE__\tools;__BUNDLE__\pwsh;' + $env:PATH
  Set-Location -LiteralPath '__BUNDLE__'
  & '__BUNDLE__\tools\node.exe' --version
@@ -82,6 +87,16 @@ try {
   $source = Join-Path $latest.FullName $name
   if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination $evidence }
  }
+ Set-Location -LiteralPath '__RUN__'
+ # All paths below were created by this run; never touch the shared baseline.
+ foreach ($owned in @('__RUN__\bundle','__RUN__\results','__ZIP__')) {
+  $resolved=[IO.Path]::GetFullPath($owned)
+  if (-not ($resolved.StartsWith('__RUN__\',[StringComparison]::OrdinalIgnoreCase) -or $resolved -eq '__ZIP__')) { throw 'cleanup path escaped run' }
+  Remove-Item -LiteralPath $resolved -Recurse -Force
+ }
+ $retained = (Get-ChildItem -LiteralPath '__RUN__' -Recurse -File | Measure-Object Length -Sum).Sum
+ $disk=@{freeBefore=$freeBefore;freeAfter=(Get-PSDrive C).Free;runRetainedBytes=$retained;baseline='__BASELINE__';gitAvailable=[bool](Get-Command git -ErrorAction SilentlyContinue)}
+ $disk | ConvertTo-Json | Set-Content -Encoding UTF8 "$evidence\disk.json"
  Compress-Archive -Path "$evidence\*" -DestinationPath '__RUN__\evidence.zip'
  @{status='completed';runnerExit=$runnerExit;result=$latest.FullName;user=[Environment]::UserName;build=$manifest.build} | ConvertTo-Json | Set-Content -Encoding UTF8 '__RUN__\completion.json'
 } catch {
@@ -89,7 +104,7 @@ try {
  throw
 }
 '@
-foreach ($pair in @(@('__ZIP__',"$GuestRoot\$runName.zip"),@('__HASH__',$zipHash),@('__BUNDLE__',$guestBundle),@('__RUN__',$guestRun),@('__ARGS__',$argsPS))) { $guestScript = $guestScript.Replace($pair[0],$pair[1]) }
+foreach ($pair in @(@('__ZIP__',"$GuestRoot\$runName.zip"),@('__HASH__',$zipHash),@('__BUNDLE__',$guestBundle),@('__RUN__',$guestRun),@('__ARGS__',$argsPS),@('__BASELINE__',$GuestBaseline))) { $guestScript = $guestScript.Replace($pair[0],$pair[1]) }
 $scriptFile = Join-Path $transfer 'run-player.ps1'
 # Create the run directory before guest execution; the script itself is BOM encoded.
 $guestScript = "New-Item -ItemType Directory -Force $(Literal $guestRun) | Out-Null`r`n" + $guestScript
@@ -106,5 +121,10 @@ $completion = Get-Content -Raw -LiteralPath (Join-Path $transfer 'completion.jso
 if ($completion.status -ne 'completed') { throw ('Guest run failed: ' + $completion.error) }
 & $vm get "$guestRun\evidence.zip" (Join-Path $transfer 'evidence.zip') @vmArgs
 Expand-Archive -LiteralPath (Join-Path $transfer 'evidence.zip') -DestinationPath (Join-Path $transfer 'evidence')
+foreach ($owned in @($bundle,$zip)) {
+ $resolved=[IO.Path]::GetFullPath($owned)
+ if (-not $resolved.StartsWith([IO.Path]::GetFullPath($transfer)+[IO.Path]::DirectorySeparatorChar)) { throw 'host cleanup escaped transfer' }
+ Remove-Item -LiteralPath $resolved -Recurse -Force
+}
 Write-Output "Guest exit $($completion.runnerExit); evidence: $transfer\evidence"
 if ($completion.runnerExit) { exit $completion.runnerExit }

@@ -34,6 +34,10 @@ export function classify(control, state={}) {
   if(control.action?.kind==='key') return classifyKey(control.action.combo,state);
   if(control.action?.kind==='wheel') return {tier:'safe',reason:'real scrolling'};
   const id=control.identity||{}, cmd=id['data-cmd'] || id['data-op'] || '', write=id['data-env-write'], text=control.label?.trim().toLowerCase()||'';
+  if(state.sharedContent){
+    const dbOnly=new Set(['create-plan','new-plan','rename-plan','remove-plan','tags','note']);
+    if((write&&!dbOnly.has(write)&&!['toggle','enable','disable','add','take-out','sort','undo','redo','move-to','enable-at','up','down'].includes(write))||localCommands.has(cmd)||id['data-game']||/use this (?:one|;)|switch to .* and use/.test(text)||/delete|trash|recycle|move to…|clean|uninstall|permanent|apply/.test(text)&&!dbOnly.has(write))return {tier:'unknown',reason:'shared baseline: operation may change content or deployment files; requires a private full copy'};
+  }
   if(control.owner==='popup'&&state.popupTitle==='lists'&&state.plans?.some(p=>text===p.name.toLowerCase()||text.startsWith(p.name.toLowerCase()+' ')))return {tier:'safe',reason:'known list choice from the observed shell'};
   if(id['data-game']||id['data-id']?.startsWith('game|')||id['data-id']?.startsWith('row|')||/use this (?:one|;)|switch to .* and use/.test(text))return {tier:'local-destructive',reason:'apply list/game selection may change active environment or deployment links'};
   if(control.href && !control.href.startsWith('#')) return {tier:'external',reason:'link opens a browser or network target'};
