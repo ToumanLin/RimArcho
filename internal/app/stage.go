@@ -14,7 +14,7 @@ import (
 // its 1-based position then and the instance just before it (the anchor).
 //
 // Staging holds only mods that are not enabled: a staged mod that is enabled again (by
-// undo, enable, a checkout) leaves staging when the list is next read.
+// undo, enable, a checkout) leaves staging in the same persisted edit.
 
 // StageItem is one staged mod.
 type StageItem struct {
@@ -44,12 +44,10 @@ func (a *App) Staged() ([]StageItem, *LoadoutState, error) {
 	return out, st, nil
 }
 
-func (a *App) setStaged(planID int64, items []StageItem) error {
-	b, err := json.Marshal(items)
-	if err != nil {
-		return err
-	}
-	return a.Store.SetMeta(store.StageKey(planID), string(b))
+func encodeStaged(items []StageItem) *string {
+	b, _ := json.Marshal(items)
+	raw := string(b)
+	return &raw
 }
 
 // Stage puts mods into staging; enabled ones leave the Loadout (one undo step) and
@@ -108,7 +106,11 @@ func (a *App) Stage(refs []string) (*EditResult, error) {
 		}
 		add = append(add, it)
 	}
-	r, err := a.edit("stage", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+	var staged *string
+	if len(add) > 0 {
+		staged = encodeStaged(append(items, add...))
+	}
+	return a.editStaged("stage", staged, func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		for _, it := range add {
 			if i := l.Index(it.Instance); i >= 0 {
 				l = remove(l, i)
@@ -116,10 +118,6 @@ func (a *App) Stage(refs []string) (*EditResult, error) {
 		}
 		return l, notes, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return r, a.setStaged(st.Plan.ID, append(items, add...))
 }
 
 // Unstage takes mods out of staging without enabling them.
@@ -151,7 +149,11 @@ func (a *App) Unstage(refs []string) ([]string, error) {
 		}
 		keep = append(keep, it)
 	}
-	return gone, a.setStaged(st.Plan.ID, keep)
+	if len(gone) == 0 {
+		return gone, nil
+	}
+	_, err = a.editStaged("unstage", encodeStaged(keep), func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) { return l, nil, nil })
+	return gone, err
 }
 
 // Restore enables staged mods again (all of them when refs is empty): each goes back after
@@ -226,7 +228,11 @@ func (a *App) Restore(refs []string, p Placement) (*EditResult, error) {
 		visit(it)
 	}
 	todo = ordered
-	r, err := a.edit("restore", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+	var staged *string
+	if len(todo) > 0 {
+		staged = encodeStaged(keep)
+	}
+	return a.editStaged("restore", staged, func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		for _, it := range todo {
 			m := st.Ix.ByID[it.Instance]
 			if why := whyNotLoadable(st, m); why != "" {
@@ -253,8 +259,4 @@ func (a *App) Restore(refs []string, p Placement) (*EditResult, error) {
 		}
 		return l, nil, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return r, a.setStaged(st.Plan.ID, keep)
 }

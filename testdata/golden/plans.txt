@@ -96,10 +96,11 @@ next:
   archo save
 
 $ archo history
-history: 1 unsaved edits, 0 redoable, 1 versions
+history: 2 unsaved edits, 0 redoable, 1 versions
   now: workspace: 5 active, 1 change unsaved (plan:copy, env:main)
   undo: archo undo <n> returns to before step n
-    1    enable     added #gpto Gamma at 5
+    1    stage      0 changes
+    2    enable     added #gpto Gamma at 5
   versions: archo loadout checkout v<n>
     v1   2026-10-01  import   4 mods  copied from default v1
 

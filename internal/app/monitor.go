@@ -557,17 +557,11 @@ func (a *App) editPlan(p *store.Plan, ws *store.Workspace, before, after loadout
 	if after.Equal(before) {
 		return nil
 	}
-	if err := a.Store.PushStep(p.ID, "undo", before.Encode(), op); err != nil {
-		return err
-	}
-	if err := a.Store.ClearSteps(p.ID, "redo"); err != nil {
-		return err
-	}
 	ws.Entries, ws.Updated = after.Encode(), a.Now().UTC()
 	if ws.OriginKind == "checkout" {
 		ws.OriginKind = "edited"
 	}
-	return a.Store.SetWorkspace(ws)
+	return a.Store.EditWorkspace(ws, before.Encode(), op, nil)
 }
 
 // MonitorForNewPlan applies the default to a plan just created (04 §1.5): no install, no
