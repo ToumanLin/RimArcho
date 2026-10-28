@@ -8,7 +8,7 @@ param(
  [ValidateRange(1,20)][int]$SeedCount = 1,
  [double]$Minutes = 60,
  [ValidateSet('safe','local','external')][string]$Allow = 'safe',
- [string]$GuestBaseline,
+ [switch]$RealHome,
  [string]$ReplayTrace,
  [string]$PreviousLedger,
  [string]$PowerShellZip,
@@ -64,7 +64,9 @@ if ($ReplayTrace) { $runnerArgs += @('--replay',(Join-Path $guestBundle 'replay-
 if ($PreviousLedger) { $runnerArgs += @('--ledger',(Join-Path $guestBundle 'crawler-ledger.json')) }
 if ($Probe) { $runnerArgs += @('--probe','true') }
 if ($Allow -ne 'safe') { $runnerArgs += @('--allow',$Allow) }
-if ($GuestBaseline) { $runnerArgs += @('--baseline',$GuestBaseline,'--reuse-content','true') }
+# The guest player's own home and Steam content; revert snapshot RimArcho-Real after the round.
+if ($RealHome) { $runnerArgs += @('--real-home','true') }
+$baselineLabel = if ($RealHome) { 'real-home' } else { '' }
 function Literal([string]$s) { "'" + $s.Replace("'","''") + "'" }
 $argsPS = ($runnerArgs | ForEach-Object { Literal $_ }) -join ','
 # Runs under inbox Windows PowerShell 5.1; portable pwsh is only needed for prepare-real.
@@ -88,6 +90,7 @@ try {
  if ($LASTEXITCODE) { throw 'bundled SQLite cannot start; supply a standalone SQLite distribution' }
  $runnerArgs = @(__ARGS__)
  $seedAt=[Array]::IndexOf($runnerArgs,'--seed')+1
+ if ('__BASELINE__' -eq 'real-home' -and (Get-Process RimArcho -ErrorAction SilentlyContinue)) { throw 'RimArcho is already open in the guest; close it before a real-home run' }
  $runnerExit=0
  for($round=0;$round -lt __SEEDCOUNT__;$round++) {
  $runnerArgs[$seedAt]=[string](__SEED__+$round)
@@ -123,12 +126,12 @@ try {
  $disk | ConvertTo-Json | Set-Content -Encoding UTF8 '__RUN__\disk.json'
 }
 '@
-foreach ($pair in @(@('__ZIP__',"$GuestRoot\$runName.zip"),@('__HASH__',$zipHash),@('__BUNDLE__',$guestBundle),@('__RUN__',$guestRun),@('__ARGS__',$argsPS),@('__BASELINE__',$GuestBaseline),@('__SEEDCOUNT__',[string]$SeedCount),@('__SEED__',[string]$Seed))) { $guestScript = $guestScript.Replace($pair[0],$pair[1]) }
+foreach ($pair in @(@('__ZIP__',"$GuestRoot\$runName.zip"),@('__HASH__',$zipHash),@('__BUNDLE__',$guestBundle),@('__RUN__',$guestRun),@('__ARGS__',$argsPS),@('__BASELINE__',$baselineLabel),@('__SEEDCOUNT__',[string]$SeedCount),@('__SEED__',[string]$Seed))) { $guestScript = $guestScript.Replace($pair[0],$pair[1]) }
 $scriptFile = Join-Path $transfer 'run-player.ps1'
 # Create the run directory before guest execution; the script itself is BOM encoded.
 $guestScript = "New-Item -ItemType Directory -Force $(Literal $guestRun) | Out-Null`r`n" + $guestScript
 [IO.File]::WriteAllText($scriptFile,$guestScript,[Text.UTF8Encoding]::new($true))
-@{run=$runName;build=$build;zipHash=$zipHash;mode=$Mode;seed=$Seed;steps=$Steps;minutes=$Minutes;allow=$Allow;guestBaseline=$GuestBaseline;bundleOnly=[bool]$BundleOnly;seedCount=$SeedCount} | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $transfer 'host.json')
+@{run=$runName;build=$build;zipHash=$zipHash;mode=$Mode;seed=$Seed;steps=$Steps;minutes=$Minutes;allow=$Allow;realHome=[bool]$RealHome;bundleOnly=[bool]$BundleOnly;seedCount=$SeedCount} | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $transfer 'host.json')
 if ($BundleOnly) { Write-Output "Bundle prepared without contacting the VM: $transfer"; return }
 # Deliberately no snapshot revert, VM start, app-wide process kill or credential read.
 $vm = Join-Path $PSScriptRoot 'vm.ps1'
@@ -148,11 +151,11 @@ Get-ChildItem -LiteralPath (Join-Path $transfer 'evidence') -Recurse -Filter rep
  $traceFile=Join-Path $evidenceFolder 'minimal-trace.json'
  if(-not(Test-Path -LiteralPath $traceFile)){$traceFile=Join-Path $evidenceFolder 'trace.json'}
  $replayArgs=@('-Mode','walk','-Seed',[string]$replay.seed,'-Steps',[string]$Steps,'-Minutes',[string]$Minutes,'-ReplayTrace',$traceFile)
- if($GuestBaseline){$replayArgs+=@('-GuestBaseline',$GuestBaseline)}
+ if($RealHome){$replayArgs+='-RealHome'}
  if($Allow -ne 'safe'){$replayArgs+=@('-Allow',$Allow)}
  if($StandardUser){$replayArgs+='-StandardUser'}
  $command='pwsh '+(Literal $PSCommandPath)+' '+(($replayArgs|ForEach-Object {Literal $_})-join ' ')
- @{command=$command;seed=$replay.seed;trace=$traceFile;requires='same baseline content and matching signed-in guest account'}|ConvertTo-Json|Set-Content -Encoding utf8 (Join-Path $evidenceFolder 'host-replay.json')
+ @{command=$command;seed=$replay.seed;trace=$traceFile;requires=$(if($RealHome){'snapshot RimArcho-Real reverted first; Player signed in'}else{'same baseline content and matching signed-in guest account'})}|ConvertTo-Json|Set-Content -Encoding utf8 (Join-Path $evidenceFolder 'host-replay.json')
 }
 
 } finally {

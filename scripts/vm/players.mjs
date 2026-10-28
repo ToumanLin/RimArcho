@@ -14,7 +14,7 @@ export async function drive(ctx) {
   const seed=Number(options.seed||271027), steps=Number(options.steps||200), minutes=Number(options.minutes||60);
   if(!Number.isSafeInteger(seed)||!Number.isInteger(steps)||steps<1||!Number.isFinite(minutes)||minutes<=0)throw Error('seed must be an integer, steps positive integer, minutes positive');
   if(options.allow&&!['local','external'].includes(options.allow))throw Error('--allow local|external');
-  const classify=(control,state)=>baseClassify(control,{...state,sharedContent:!!options.baseline});
+  const classify=(control,state)=>baseClassify(control,{...state,sharedContent:!!(options.baseline||options['real-home'])});
   const rng=random(seed), pick=a=>a[Math.floor(rng()*a.length)], started=performance.now(), deadline=started+minutes*60000;
   Object.assign(result,{mode:options.mode,seed,steps,minutes,allow:options.allow||'safe',canonicalExclusions:exclusions,knownFailures:[{id:'F2',oracle:'undo canonical equality',description:'stage metadata outside undo; fix belongs to stage-undo branch'},{id:'F3',oracle:'undo canonical equality',description:'saved-version checkout changes workspace origin metadata outside undo'}]});
   const ledger=new Map(),states=new Map(),queue=[],trace=[],edges=[],sequences=new Map(),pageDetails=new Map();
@@ -375,7 +375,7 @@ export async function drive(ctx) {
   }
 
   function replayArgs(file) {
-    return [join(ctx.repo,'scripts/vm/run.mjs'),'--mode','walk','--driver','W','--seed',String(seed),'--steps',String(steps),'--minutes',String(minutes),'--tools',ctx.tools,'--out',join(out,'retries'),'--replay',file,'--shrink','false',...(options.baseline?['--baseline',options.baseline,'--reuse-content','true']:[]),...(options.allow?['--allow',options.allow]:[])];
+    return [join(ctx.repo,'scripts/vm/run.mjs'),'--mode','walk','--driver','W','--seed',String(seed),'--steps',String(steps),'--minutes',String(minutes),'--tools',ctx.tools,'--out',join(out,'retries'),'--replay',file,'--shrink','false',...(options.baseline?['--baseline',options.baseline,'--reuse-content','true']:[]),...(options['real-home']?['--real-home',options['real-home'],'--start-db',options['start-db']||join(out,'real-start.db')]:[]),...(options.allow?['--allow',options.allow]:[])];
   }
   async function isolatedEdge(row,recipe) {
     const edgeStarted=performance.now();

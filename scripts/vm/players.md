@@ -44,22 +44,28 @@ go test ./...
 
 ## VM real content
 
-Read `D:/VMs/PLAYER-TEST-AI-HANDOFF.md`. Use only the released test VM; no snapshot
-reverts, credential printing or baseline replacement. The existing guest baseline
-is `C:/Users/Public/Documents/VM-Test/real-baseline` (about 22 GB). Reuse its content:
-a run takes only a SQLite backup and config file, never another game/workshop/cache
-copy. `--baseline` requires `RIMARCHO_VM_GUEST=1 --reuse-content true`.
+Read `D:/VMs/PLAYER-TEST-AI-HANDOFF.md`. Use only the released test VM and no
+credential printing. Real-data rounds start from snapshot `RimArcho-Real` and revert
+to it afterwards (evidence exported first). The old copied baseline
+(`VM-Test/real-baseline`, `prepare-real.ps1`, `--baseline`) is gone.
 
-With shared content, filesystem/deployment writes are skipped with a reason even
-with `--allow local`. Reviewed DB-only plan/tag operations remain available in
-private disposable DB branches. External operations stay disabled unless explicitly
-authorized. Scenario 2 deployment switching requires private content and is refused.
+`-RealHome` (runner `--real-home true`, guest only) uses Player's own
+`%APPDATA%\RimArcho`, APPDATA/LOCALAPPDATA and Steam content directly. Each run first
+takes a SQLite backup of `archo.db` (plus `config.toml`, `tasks.json`) and restores
+them after the app exits, so every seed starts from the same state. Crawler branches
+and shrink replays get a private DB made from that backup (`--start-db`). Close any
+RimArcho the player has open first; the guest script refuses to start otherwise.
+
+Content stays shared: filesystem/deployment writes are skipped with a reason even
+with `--allow local`. Reviewed DB-only plan/tag operations remain available.
+External operations stay disabled unless explicitly authorized. Scenario 2
+deployment switching changes content and is refused.
 
 ```powershell
-pwsh scripts/vm/player-vm.ps1 -Mode crawl -Minutes 60 -Allow local -GuestBaseline 'C:\Users\Public\Documents\VM-Test\real-baseline'
-pwsh scripts/vm/player-vm.ps1 -Mode walk -Seed 1 -Steps 200 -Allow local -GuestBaseline 'C:\Users\Public\Documents\VM-Test\real-baseline'
+pwsh scripts/vm/player-vm.ps1 -Mode crawl -Minutes 60 -Allow local -RealHome
+pwsh scripts/vm/player-vm.ps1 -Mode walk -Seed 1 -SeedCount 5 -Steps 200 -Allow local -RealHome
 # Player-visible last-plan refusal, second-plan cancellation and subscription preview only:
-pwsh scripts/vm/player-vm.ps1 -Mode walk -Probe -GuestBaseline 'C:\Users\Public\Documents\VM-Test\real-baseline'
+pwsh scripts/vm/player-vm.ps1 -Mode walk -Probe -RealHome
 ```
 
 The host script builds and bundles tools, Node, SQLite and scripts, verifies hashes,

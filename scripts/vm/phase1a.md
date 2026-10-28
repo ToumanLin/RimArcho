@@ -35,9 +35,9 @@ Scenarios contain fast input deadlines, rather than waiting for each app operati
 ## Real content: VM only
 
 Host runs are fixture-only and all output is under `D:/RimArcho-test` (total <2 GiB).
-Use the already-prepared VM baseline with `--reuse-content true`; no second full
-content copy is permitted. See [players.md](players.md) for provisioning and cleanup.
-Scenario 2 deployment switching is refused on reused shared content. Scenario 4
+In the VM, `--real-home true` uses the guest player's own home and content; no
+content copy is made. See [players.md](players.md) for the snapshot round and cleanup.
+Scenario 2 deployment switching is refused on the real home. Scenario 4
 records the single-plan refusal and creates a companion plan before testing cancel.
 `--probe true` checks that refusal and the subscription preview without submitting.
 

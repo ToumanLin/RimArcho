@@ -35,12 +35,19 @@ assert(options.allow!=='external'||guest,'external actions are enabled only in t
 assert(!options.baseline || guest,'host runs support only the generated fixture; real baselines are VM-only');
 assert(!options.baseline || options['reuse-content']==='true','VM baselines require --reuse-content true (no full content copy)');
 assert(!options.baseline || mode || scenario!==2,'scenario 2 deployment switching needs private content; skipped on a shared baseline');
+// --real-home true|<dir>: the guest player's own home, used directly. The run backs up its DB
+// first and restores it afterwards; child replays (--start-db) get a private DB from that backup.
+const realHome=options['real-home']?resolve(options['real-home']==='true'?join(process.env.APPDATA||'','RimArcho'):options['real-home']):null;
+const childOfReal=!!(realHome&&options['start-db']);
+assert(!realHome || guest,'the real home is used only in the test VM; revert snapshot RimArcho-Real after the round');
+assert(!realHome || !options.baseline,'--real-home replaces --baseline');
+assert(!realHome || mode || scenario!==2,'scenario 2 deployment switching changes content; refused on the real home');
 const outputBase = outside(guest ? options.out : hostOutput(options.out));
 mkdirSync(outputBase, { recursive: true });
 const out = mkdtempSync(join(outputBase, `${mode || 's'+scenario}-${driver}-`));
 const tools = resolve(options.tools || 'D:/RimArcho-test/tools');
 const exe = name => join(tools, name + (platform() === 'win32' ? '.exe' : ''));
-const result = { schema: 1, scenario, driver, seed: 271027, fixture: options.baseline ? 'real-copy' : 'small', output: out, started: new Date().toISOString(), host: { cpu: cpus()[0]?.model, cores: cpus().length, memory: totalmem(), platform: platform() }, timings: [], checks: [], coverage: [], checkpoints: [], failures: [], performanceFailures: [] };
+const result = { schema: 1, scenario, driver, seed: 271027, fixture: realHome ? 'real-home' : options.baseline ? 'real-copy' : 'small', output: out, started: new Date().toISOString(), host: { cpu: cpus()[0]?.model, cores: cpus().length, memory: totalmem(), platform: platform() }, timings: [], checks: [], coverage: [], checkpoints: [], failures: [], performanceFailures: [] };
 const save = (name, data) => {
  const json=JSON.stringify(data,null,2);
  if(options.archive==='true' && (name==='window-trace'||/^\d{2}-/.test(name)))writeFileSync(join(out,name+'.json.gz'),gzipSync(json));
@@ -52,7 +59,8 @@ const command = (file, args, env, timeout = 15000) => {
   if (r.error || r.status !== 0) throw Error(`${file} ${args.join(' ')}: ${r.error?.message || r.stderr || r.stdout}`);
   return r.stdout;
 };
-const home = join(out, 'case', 'home');
+const home = realHome && !childOfReal ? realHome : join(out, 'case', 'home');
+const realStart = join(out, 'real-start.db');
 let c, child, api, env, currentPlan, checkpointSeq = 0, eventStream;
 const events = [], requestWaiters = new Map(), browserTimeline=[];let traceComplete;
 const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); if (!ok) result.failures.push({name,detail}); };
@@ -264,7 +272,21 @@ async function listen(base) {
 async function setup() {
   const preparing=performance.now();
   for(const name of ['vmstate','archo',...(driver==='W'?['RimArcho']:driver==='A'?['guidev']:[])]) assert(existsSync(exe(name)),`build ${exe(name)} first (scripts/vm/README.md)`);
-  if(options.baseline) {
+  const sq=p=>`'${p.replaceAll("'","''")}'`;
+  if(realHome) {
+    assert(existsSync(join(realHome,'archo.db')),'real home has no archo.db: '+realHome);
+    if(childOfReal) {
+      mkdirSync(home,{recursive:true});cpSync(options['start-db'],join(home,'archo.db'));
+      if(existsSync(join(realHome,'config.toml')))cpSync(join(realHome,'config.toml'),join(home,'config.toml'));
+      // Packs default to <home>/packs; point the private DB at the real folder.
+      command('sqlite3',[join(home,'archo.db'),`INSERT INTO meta(key,value) VALUES('cfg:pack.dir',${sq(join(realHome,'packs'))}) ON CONFLICT(key) DO NOTHING;`]);
+      result.sharedContent={home:realHome,policy:'private DB from the parent start state; real content reused; content writes skipped'};
+    } else {
+      command('sqlite3',['-readonly',join(realHome,'archo.db'),`.backup ${sq(realStart)}`],{},120000);
+      for(const f of ['config.toml','tasks.json'])if(existsSync(join(realHome,f)))cpSync(join(realHome,f),join(out,'real-start-'+f));
+      result.sharedContent={home:realHome,policy:'guest real home used directly; DB, config and tasks restored after the run; content writes skipped'};
+    }
+  } else if(options.baseline) {
     const baseline=outside(options.baseline);assert(existsSync(join(baseline,'isolated.json')),'baseline needs isolated.json from prepare-real.ps1');
     if(JSON.parse(readFileSync(join(baseline,'isolated.json'),'utf8').replace(/^\uFEFF/,'' )).synthetic)result.fixture='synthetic-scale';
     command(exe('vmstate'),['--mode','audit','--home',join(baseline,'home'),'--root',baseline],{},30000);
@@ -288,7 +310,8 @@ async function setup() {
       result.deferredExternalEffects=[{operation:'automatic followed-collection network refresh',until,scope:'copied DB checked_at only'}];
     }
   }
-  env={RIMARCHO_HOME:home, APPDATA:join(out,'appdata'), LOCALAPPDATA:join(out,'localappdata')};
+  // The real home keeps the player's own APPDATA/LOCALAPPDATA (lock library, monitor, subscriptions).
+  env=realHome?{RIMARCHO_HOME:home}:{RIMARCHO_HOME:home, APPDATA:join(out,'appdata'), LOCALAPPDATA:join(out,'localappdata')};
   const initial=JSON.parse(command(exe('vmstate'),['--home',home]));
   currentPlan=options.plan || initial.plans.find(p=>p.name==='default')?.name || initial.plans[0].name;
   result.plan=currentPlan;result.content={instances:initial.instances.length,plans:initial.plans.length};
@@ -296,7 +319,7 @@ async function setup() {
   result.workingTree=hasGit?command('git',['-C',repo,'status','--short']).trim():'exported copy';
   result.node=process.version;result.toolHashes=Object.fromEntries(['archo','vmstate',driver==='W'?'RimArcho':driver==='A'?'guidev':null].filter(Boolean).map(n=>[n,createHash('sha256').update(readFileSync(exe(n))).digest('hex')]));
   result.preparationMs=performance.now()-preparing;
-  if(driver==='W'&&!mode&&scenario===3&&!options.baseline)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
+  if(driver==='W'&&!mode&&scenario===3&&!options.baseline&&!realHome)command(exe('archo'),['config','set','subscribed.dir',join(out,'subscriptions')],env);
   if(driver==='C') return;
   const launching=performance.now();
  result.milestones=[];const milestone=name=>result.milestones.push({name,ms:performance.now()-launching,epochMs:Date.now()});
@@ -648,6 +671,14 @@ try {
 } finally {
   eventStream?.abort();c?.close();
   if(child?.pid){if(platform()==='win32')spawnSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true});else child.kill();}
+  if(realHome&&!childOfReal&&existsSync(realStart)){
+    // Each seed starts from the same real state; the snapshot revert is the final reset.
+    try{
+      command('sqlite3',[join(realHome,'archo.db'),'.timeout 20000',`.restore '${realStart.replaceAll("'","''")}'`],{},120000);
+      for(const f of ['config.toml','tasks.json'])if(existsSync(join(out,'real-start-'+f)))cpSync(join(out,'real-start-'+f),join(realHome,f));
+      result.realHomeRestored=true;
+    }catch(e){result.realHomeRestored=false;result.failures.push({name:'real home restore',detail:e.message});}
+  }
   try{result.storage=cleanupRun(out);}catch(e){result.failures.push({name:'cleanup',detail:e.message});}
   result.finished=new Date().toISOString();result.functionalStatus=result.failures.length?'failed':'passed';result.status=result.failures.length||result.performanceFailures.length?'failed':'passed';save('result',result);
   console.log(JSON.stringify({status:result.status,driver,scenario,...(mode?{mode,seed:result.seed,steps:result.executedSteps}:{}),output:out,failures:result.failures,performanceFailures:result.performanceFailures},null,2));
