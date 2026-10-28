@@ -409,3 +409,126 @@ func TestParentSubscribeIsPrimaryWithoutProvider(t *testing.T) {
 		t.Fatal("missing candidate caveat", panel.Notes)
 	}
 }
+
+// A fresh analysis indexed every installed mod's Names, so the on-demand search only
+// reads mods whose facts may differ once enabled (here: a folder conditional on the
+// mod itself). Unconfirmed candidates disappear once every missing Name has a provider.
+func TestParentSearchTrustsFreshIndex(t *testing.T) {
+	for _, selfFolder := range []bool{false, true} {
+		t.Run(fmt.Sprint(selfFolder), func(t *testing.T) {
+			e := testkit.New(t)
+			child := testkit.Mod{PackageID: "test.child", Name: "Child", Files: map[string]string{
+				"Defs/Child.xml": `<Defs><HediffDef ParentName="Base"><defName>Illness</defName></HediffDef></Defs>`}}
+			child.Files["About/About.xml"] = strings.Replace(child.AboutXML(), "</ModMetaData>", `<loadAfter><li>test.order</li></loadAfter></ModMetaData>`, 1)
+			e.AddWorkshop("1001", child)
+			indexed := e.AddWorkshop("1002", testkit.Mod{PackageID: "test.indexed", Name: "Indexed", Files: map[string]string{
+				"Defs/Other.xml": `<Defs><HediffDef Name="Other" Abstract="True" /></Defs>`}})
+			if selfFolder {
+				e.AddWorkshop("1003", testkit.Mod{PackageID: "test.self", Name: "Self", Files: map[string]string{
+					"LoadFolders.xml":     `<loadFolders><v1.6><li>/</li><li IfModActive="test.self">Extra</li></v1.6></loadFolders>`,
+					"Extra/Defs/Base.xml": `<Defs><HediffDef Name="Base" Abstract="True" /></Defs>`}})
+			}
+			e.WriteFile(filepath.Join(e.Home, "cache", "steamDB.index.json"), `{"test.order":["2002","Ordering friend"]}`)
+			e.WriteModsConfig("1.6", "ludeon.rimworld", "test.child")
+			e.AddEnv(false)
+			e.MustRun("scan")
+			e.MustRun("analyze")
+			ps, err := e.App.Problems(false, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var p *app.Problem
+			for _, q := range ps.List {
+				if q.Code == "def.parent-missing" {
+					p = q
+				}
+			}
+			if p == nil || ps.Analysis == nil || !ps.Analysis.Fresh {
+				t.Fatalf("fixture: %v", p)
+			}
+			if !selfFolder {
+				out := e.MustRun("problems", "--ref", p.Ref)
+				if !strings.Contains(out, "providers: no installed mod defines it") || strings.Contains(out, "not every installed mod") {
+					t.Fatalf("cli:\n%s", out)
+				}
+			}
+			// Without a rescan, the index still vouches for the old content of Indexed:
+			// a search that read it anyway would offer it.
+			e.WriteFile(filepath.Join(indexed, "Defs", "Other.xml"), `<Defs><HediffDef Name="Base" Abstract="True" /></Defs>`)
+			h, err := e.App.FindParentHelp(context.Background(), ps, p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if h.SearchIncomplete || h.CacheIncomplete {
+				t.Fatalf("incomplete: %+v", h)
+			}
+			kinds := map[string]string{}
+			for _, f := range h.Fixes {
+				kinds[f.Kind] += f.Name + ";"
+			}
+			if strings.Contains(kinds["enable"], "Indexed") {
+				t.Fatalf("searched a mod the index covers: %+v", h.Fixes)
+			}
+			if selfFolder {
+				if kinds["enable"] != "Self;" || kinds["subscribe"] != "" || kinds["search"] != "" {
+					t.Fatalf("fixes %+v", h.Fixes)
+				}
+			} else if kinds["enable"] != "" || kinds["subscribe"] != "Ordering friend;" {
+				t.Fatalf("fixes %+v", h.Fixes)
+			}
+			view.SetLang("zh")
+			defer view.SetLang("en")
+			panel, err := view.BuildProblemPanelContext(context.Background(), e.App, ps, p.Ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			notes := strings.Join(panel.Notes, "|")
+			if strings.Contains(notes, "再试") || strings.Contains(notes, "找到提供这些内容的 Mod 后启用它") != false {
+				t.Fatalf("notes %q", notes)
+			}
+			if got := strings.Contains(notes, "都没有定义这些基础内容"); got == selfFolder {
+				t.Fatalf("none-installed note=%v notes %q", got, notes)
+			}
+			for _, act := range panel.Actions {
+				if selfFolder && act.Kind == view.ActSubscribe {
+					t.Fatalf("candidate offered next to a provider: %+v", panel.Actions)
+				}
+			}
+		})
+	}
+}
+
+// A disabled SteamCMD-folder mod is enabled through a link on save, so the analysis
+// indexes it like a Workshop mod: the provider comes from the index, and the panel's
+// file search has nothing left to read.
+func TestParentProviderInSteamCMDFolder(t *testing.T) {
+	e := testkit.New(t)
+	e.AddWorkshop("1001", testkit.Mod{PackageID: "test.child", Name: "Child", Files: map[string]string{
+		"Defs/Child.xml": `<Defs><HediffDef ParentName="Base"><defName>Illness</defName></HediffDef></Defs>`}})
+	e.WriteMod(filepath.Join(e.SteamCMD, "1002"), testkit.Mod{PackageID: "test.provider", Name: "Provider", Files: map[string]string{
+		"Defs/Base.xml": `<Defs><HediffDef Name="Base" Abstract="True" /></Defs>`}})
+	e.WriteModsConfig("1.6", "ludeon.rimworld", "test.child")
+	e.AddEnv(true)
+	e.MustRun("scan")
+	e.MustRun("analyze")
+	ps, err := e.App.Problems(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p *app.Problem
+	for _, q := range ps.List {
+		if q.Code == "def.parent-missing" {
+			p = q
+		}
+	}
+	if p == nil {
+		t.Fatal("no missing parent")
+	}
+	h, err := e.App.ParentHelp(ps, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h.Fixes) == 0 || h.Fixes[0].Kind != "enable" || h.Fixes[0].Name != "Provider" || h.Fixes[0].Basis != "provider" || h.CacheIncomplete {
+		t.Fatalf("cached provider: %+v", h)
+	}
+}

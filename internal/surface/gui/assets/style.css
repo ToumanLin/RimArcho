@@ -694,6 +694,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 #status.ok::before { content: "✓ "; color: var(--green); }
 #status.fail::before { content: "✗ "; color: var(--red); }
 #status.busy::before { content: "… "; color: var(--muted); }
+#status.warn::before { content: "⚠ "; color: var(--amber); }
 #status a { color: var(--accent-11, var(--accent)); cursor: pointer; margin-left: 8px; }
 #hints { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 #hints b { color: var(--fg-2); font-weight: 500; }

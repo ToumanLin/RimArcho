@@ -77,6 +77,7 @@ const (
 	sayFail
 	sayBusy
 	sayInfo
+	sayWarn // needs the player (a lapsed login), not a failure of what they did
 )
 
 type model struct {

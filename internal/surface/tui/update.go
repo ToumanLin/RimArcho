@@ -56,7 +56,11 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.app.DropCommunityData()
 		}
 		if notice := view.AutomaticNotice(msg.before, msg.after); notice != "" {
-			m.say(sayOK, notice)
+			kind := sayOK
+			if msg.kind == "session" {
+				kind = sayWarn
+			}
+			m.say(kind, notice)
 		}
 		return m, nil
 	case tea.WindowSizeMsg:

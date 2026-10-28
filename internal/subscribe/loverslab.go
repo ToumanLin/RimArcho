@@ -377,7 +377,10 @@ func (l *LoversLab) Verify(ctx context.Context) error {
 	old := l.client.CheckRedirect
 	l.client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	defer func() { l.client.CheckRedirect = old }()
-	resp, err := l.request(ctx, siteAction{target: accounts.Site + "?app=core&module=system&controller=settings"})
+	// The canonical page: the query form (?app=core&module=system&controller=settings)
+	// answers 301 → /settings/, and this single GET does not follow redirects, so a
+	// signed-in session read as needing verification (2026-10-28 VM).
+	resp, err := l.request(ctx, siteAction{target: accounts.Site + "settings/"})
 	if err != nil {
 		return err
 	}
@@ -396,7 +399,7 @@ func (l *LoversLab) Verify(ctx context.Context) error {
 	}
 	if strings.Contains(low, "cf-chl-") || strings.Contains(low, "just a moment") || strings.Contains(low, "captcha") {
 		state = "browser verification required"
-	} else if resp.StatusCode == 200 && strings.Contains(low, "do=logout") {
+	} else if resp.StatusCode == 200 && signedIn(low) {
 		state = "available"
 	}
 	name := ""
@@ -455,8 +458,15 @@ func (l *LoversLab) PageInfo(ctx context.Context, page string) (*PageInfo, error
 	if err != nil {
 		return nil, authError("browser verification required", "cannot read the download page")
 	}
-	if err = l.session.SetStatus("available", ""); err != nil {
-		return nil, err
+	// File pages are public: a readable page proves the login only when it carries the
+	// signed-in menu, as in Verify. A guest view leaves the state to the session check.
+	if signedIn(low) {
+		if err = l.session.SetStatus("available", ""); err != nil {
+			return nil, err
+		}
 	}
 	return p, nil
 }
+
+// signedIn reports the site's sign-out link, present only in a member's page header.
+func signedIn(lowerHTML string) bool { return strings.Contains(lowerHTML, "do=logout") }

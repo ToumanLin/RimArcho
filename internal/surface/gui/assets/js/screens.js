@@ -27,7 +27,8 @@ export function initScreens(u) {
   initNeedText(u);
   initSubscriptions(u, { beginPageRead, page, area, button, act, seg });
   on("automatic-update", ev => {
-    if (ev?.notice) say("ok", ev.notice);
+    // A lapsed LoversLab login needs the player; update counts are plain news.
+    if (ev?.notice) say(ev.kind === "session" ? "warn" : "ok", ev.notice);
     if (S.screen === "settings") refreshSettingTasks(true);
     if (S.screen === "changes" && ev?.kind === "mods") changes();
   });

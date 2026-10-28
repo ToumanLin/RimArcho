@@ -26,6 +26,7 @@ type Op struct {
 	mayReq    string // MayRequire / MayRequireAnyOf: honoured only on list items, like the game
 	mayReqAny string
 	Line      int
+	node      int32 // the operation element in valDoc
 
 	// filled by the simulation
 	lastFailed *Op
@@ -48,7 +49,7 @@ func parseOp(d *xdoc.Doc, n int32) *Op {
 	short := strings.TrimPrefix(cls, "Verse.")
 	mr, _ := d.Attr(n, "MayRequire")
 	mra, _ := d.Attr(n, "MayRequireAnyOf")
-	op := &Op{Class: short, Known: knownOps[short], mayReq: mr, mayReqAny: mra, valDoc: d, value: xdoc.None, Line: d.Line(n)}
+	op := &Op{Class: short, Known: knownOps[short], mayReq: mr, mayReqAny: mra, valDoc: d, value: xdoc.None, Line: d.Line(n), node: n}
 	if cls == "" {
 		op.Class, op.Known = "PatchOperation", true
 	}

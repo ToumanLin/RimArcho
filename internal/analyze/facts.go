@@ -529,13 +529,24 @@ func (s *sim) parentFindings(origin map[int32]defLoc, tops []*topOp, isActive fu
 			}
 		}
 	}
+	// A mod-defined operation is counted as successful (patch.unknown-op). When one that
+	// ran names the missing parent in its own XML, it most likely adds that Name
+	// (Chimera Creation's PatchOperationAddNameOrReplaceAllUses does): no error.
+	custom := map[string]bool{}
+	for _, top := range tops {
+		top.op.walk(func(o *Op) {
+			if !o.Known && o.ran && o.valDoc != nil {
+				texts(o.valDoc, o.node, custom)
+			}
+		})
+	}
 	var out []*Finding
 	for t := d.FirstChild(s.root); t != xdoc.None; t = d.Next(t) {
 		if d.Kind(t) != xdoc.KindElement || !loaded(t) {
 			continue
 		}
 		parent, ok := d.Attr(t, "ParentName")
-		if !ok || names[parent] {
+		if !ok || names[parent] || custom[parent] {
 			continue
 		}
 		id := ""
@@ -567,6 +578,20 @@ func (s *sim) parentFindings(origin map[int32]defLoc, tops []*topOp, isActive fu
 		out = append(out, f)
 	}
 	return out
+}
+
+// texts adds the trimmed text of every text node under n.
+func texts(d *xdoc.Doc, n int32, out map[string]bool) {
+	for c := d.FirstChild(n); c != xdoc.None; c = d.Next(c) {
+		switch d.Kind(c) {
+		case xdoc.KindText:
+			if v := strings.TrimSpace(d.Text(c)); v != "" {
+				out[v] = true
+			}
+		case xdoc.KindElement:
+			texts(d, c, out)
+		}
+	}
 }
 
 func (s *sim) findings(tops []*topOp, facts []*PatchFact) []*Finding {

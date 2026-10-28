@@ -81,6 +81,11 @@ func TestLoversLabFileAgreementDownloadAndFallback(t *testing.T) {
 			return
 		}
 		if r.URL.Query().Get("controller") == "settings" {
+			// Like the site: the query form redirects to the canonical page.
+			http.Redirect(w, r, "/settings/", http.StatusMovedPermanently)
+			return
+		}
+		if r.URL.Path == "/settings/" {
 			io.WriteString(w, `<a id="elUserLink">Fixture Player</a><a href="?do=logout">Sign out</a>`)
 			return
 		}
@@ -291,5 +296,46 @@ func TestLoversLabSelectorFileMetadata(t *testing.T) {
 	}
 	if p.Files[1].Name != "Fixture Addon.7z" || p.Files[1].Date != "2026-10-24" {
 		t.Fatal(p.Files[1])
+	}
+}
+
+// File pages are public. An update check that reads one as a guest must not overturn
+// the session check's "login required"; the member header still confirms a login.
+func TestLoversLabGuestPageKeepsLoginState(t *testing.T) {
+	dir := t.TempDir()
+	session, err := accounts.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, _ := url.Parse(accounts.Site)
+	session.Jar().SetCookies(u, []*http.Cookie{{Name: "ips4_device_key", Value: "guest", Domain: "loverslab.com", Path: "/", Secure: true, Expires: time.Now().AddDate(1, 0, 0)}})
+	if err = session.SetStatus("login required", ""); err != nil {
+		t.Fatal(err)
+	}
+	member := false
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header := `<a href="/login/">Sign In</a>`
+		if member {
+			header = `<a href="?app=core&module=system&controller=login&do=logout&csrfKey=x">Sign Out</a>`
+		}
+		io.WriteString(w, header+`<script type="application/ld+json">{"@type":"SoftwareApplication","name":"Fixture","softwareVersion":"1.1"}</script>`)
+	}))
+	defer srv.Close()
+	base, _ := url.Parse(srv.URL)
+	l := NewLoversLab(session, siteTransport{base, srv.Client().Transport})
+	page := accounts.Site + "files/file/123-fixture/"
+	if p, e := l.PageInfo(context.Background(), page); e != nil || p.Version != "1.1" {
+		t.Fatal(p, e)
+	}
+	if got := session.Status().State; got != "login required" {
+		t.Fatalf("guest page changed the state to %q", got)
+	}
+	member = true
+	l.next = time.Time{}
+	if _, e := l.PageInfo(context.Background(), page); e != nil {
+		t.Fatal(e)
+	}
+	if got := session.Status().State; got != "available" {
+		t.Fatalf("member page state %q", got)
 	}
 }

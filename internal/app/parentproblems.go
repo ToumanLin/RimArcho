@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/modsearch"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // ParentPart identifies content that cannot inherit its missing template. The claim
@@ -137,20 +139,12 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 			if !fresh || mod == nil || mod.Status != identity.Live || mod.Residue || st.Position(mod.ID) > 0 || whyNotLoadable(st, mod) != "" {
 				continue
 			}
-			// Compare conditional-content keys without enumerating any directory.
-			resolved := content.ResolveFS("", mod.Decl().LoadFolders, st.GameMM(), isActive, func(string) ([]fs.DirEntry, error) { return nil, nil })
-			if a.Store.ContentKey(mod.ID) != resolved.Key(mod.SnapHash, st.GameMM())+fmt.Sprintf("|a%d", analyze.Version) {
+			current, sameWhenEnabled, afterEnable := parentIndex(st, mod, a.Store.ContentKey(mod.ID), isActive)
+			if !current {
 				h.CacheIncomplete = true
 				continue
 			}
-			afterEnable := func(pkg string) bool {
-				return dependencyPackage(pkg) == dependencyPackage(mod.PackageID) || isActive(pkg)
-			}
-			enabledContent := content.ResolveFS("", mod.Decl().LoadFolders, st.GameMM(), afterEnable, func(string) ([]fs.DirEntry, error) { return nil, nil })
-			if enabledContent.Conds != resolved.Conds {
-				continue
-			}
-			if !d.Loaded(afterEnable) {
+			if !sameWhenEnabled || !d.Loaded(afterEnable) {
 				continue
 			}
 			add(ParentFix{Kind: "enable", Ref: st.Ix.Ref(mod.ID), Name: mod.DisplayName(), Parent: part.Parent, Basis: "provider"})
@@ -220,8 +214,35 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 		u = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + ws
 	}
 	add(ParentFix{Kind: "requirements", Name: m.DisplayName(), URL: u})
+	h.dropCandidates()
 	h.sortFixes()
 	return h, nil
+}
+
+// parentIndex compares a mod's stored Name facts with what it would load: current means
+// the analysis indexed its present content; sameWhenEnabled means enabling it changes no
+// load-folder condition. Both hold for a mod whose facts already answer "who defines this
+// Name", so a file search cannot find more there. No directory is enumerated.
+func parentIndex(st *LoadoutState, mod *store.Mod, key string, isActive func(string) bool) (current, sameWhenEnabled bool, afterEnable func(string) bool) {
+	noDirs := func(string) ([]fs.DirEntry, error) { return nil, nil }
+	resolved := content.ResolveFS("", mod.Decl().LoadFolders, st.GameMM(), isActive, noDirs)
+	afterEnable = func(pkg string) bool {
+		return dependencyPackage(pkg) == dependencyPackage(mod.PackageID) || isActive(pkg)
+	}
+	if key != resolved.Key(mod.SnapHash, st.GameMM())+fmt.Sprintf("|a%d", analyze.Version) {
+		return false, false, afterEnable
+	}
+	enabled := content.ResolveFS("", mod.Decl().LoadFolders, st.GameMM(), afterEnable, noDirs)
+	return true, enabled.Conds == resolved.Conds, afterEnable
+}
+
+// dropCandidates removes unconfirmed candidates once installed providers cover every
+// missing Name: a loadAfter or MayRequire mention is not a reason to subscribe then.
+func (h *ParentHelp) dropCandidates() {
+	if len(h.Parts) == 0 || len(h.UnresolvedNames()) > 0 {
+		return
+	}
+	h.Fixes = slices.DeleteFunc(h.Fixes, func(f ParentFix) bool { return f.Kind == "subscribe" || f.Kind == "search" })
 }
 
 func (h *ParentHelp) Meaning(name string) string {
@@ -267,17 +288,39 @@ func (a *App) FindParentHelp(ctx context.Context, ps *ProblemSet, p *Problem) (*
 			active[dependencyPackage(m.PackageID)] = true
 		}
 	}
+	// A fresh analysis indexed every installed mod's Names; search only the mods whose
+	// facts may differ from what they would load once enabled (03 §4.3).
+	var keys map[string]string
+	if ps.Analysis != nil && ps.Analysis.Fresh {
+		prevMM := a.Store.MM
+		a.Store.MM = st.GameMM()
+		keys, err = a.Store.ContentKeys()
+		a.Store.MM = prevMM
+		if err != nil {
+			return nil, err
+		}
+	}
+	isActive := func(pkg string) bool { return active[dependencyPackage(pkg)] }
 	var mods []modsearch.Mod
 	for _, m := range st.Ix.Mods {
 		if m.Status != identity.Live || m.Residue || st.Position(m.ID) > 0 || whyNotLoadable(st, m) != "" {
 			continue
+		}
+		if keys != nil {
+			if current, same, _ := parentIndex(st, m, keys[m.ID], isActive); current && same {
+				continue
+			}
 		}
 		mods = append(mods, modsearch.Mod{Ref: st.Ix.Ref(m.ID), PackageID: m.PackageID, Name: m.DisplayName(), Root: m.RealPath, LoadFoldersXML: m.Decl().LoadFolders})
 		if len(mods) > 1000 {
 			break
 		}
 	}
-	matches, incomplete, err := modsearch.FindNames(ctx, mods, modsearch.Options{MM: st.GameMM(), Active: func(pkg string) bool { return active[dependencyPackage(pkg)] }}, names)
+	if len(mods) == 0 {
+		h.CacheIncomplete, h.SearchIncomplete = false, false
+		return h, nil
+	}
+	matches, incomplete, err := modsearch.FindNames(ctx, mods, modsearch.Options{MM: st.GameMM(), Active: isActive}, names)
 	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 		return nil, err
 	}
@@ -286,6 +329,7 @@ func (a *App) FindParentHelp(ctx context.Context, ps *ProblemSet, p *Problem) (*
 	for _, match := range matches {
 		h.Fixes = append(h.Fixes, ParentFix{Kind: "enable", Ref: match.Mod.Ref, Name: match.Mod.Name, Parent: match.Name, Basis: "scan"})
 	}
+	h.dropCandidates()
 	h.sortFixes()
 	return h, nil
 }

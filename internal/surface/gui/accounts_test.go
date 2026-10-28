@@ -92,7 +92,7 @@ func TestAutomaticSessionVerifiesWithoutOpeningSettings(t *testing.T) {
 			t.Cleanup(api.Close)
 			e.App.HTTP.Transport = accountTransport(func(r *http.Request) (*http.Response, error) {
 				calls++
-				if r.Method != "GET" || r.URL.Query().Get("controller") != "settings" {
+				if r.Method != "GET" || r.URL.Path != "/settings/" {
 					t.Error("not a single verification GET", r.URL)
 				}
 				body := `<a href="?do=logout">logout</a>`

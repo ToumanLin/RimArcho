@@ -260,3 +260,34 @@ func TestParentAfterPatchesMayRequireAndFolderGuard(t *testing.T) {
 		}
 	}
 }
+
+// Chimera Creation (Continued) adds Names to Anomaly defs with its own operation class.
+// Unknown operations count as successful, so a parent they name is not reported missing;
+// one they do not name still is, and so is one named only in a branch that did not run.
+func TestParentNamedByCustomOperation(t *testing.T) {
+	f := newFixture(t)
+	c := f.mods["modc"]
+	write(t, filepath.Join(c.Dir, "Defs", "Kids.xml"), defs(`
+  <ThingDef ParentName="ChimeraThing"><defName>Kid_1</defName></ThingDef>
+  <ThingDef ParentName="Unnamed_Base"><defName>Kid_2</defName></ThingDef>
+  <ThingDef ParentName="Branch_Base"><defName>Kid_3</defName></ThingDef>`))
+	write(t, filepath.Join(c.Dir, "Patches", "Names.xml"), patch(
+		`<Operation Class="AnomalyAllies.Misc.PatchOperationAddNameOrReplaceAllUses"><xpath>Defs/ThingDef[defName="Gun_A"]</xpath><value>ChimeraThing</value></Operation>
+  <Operation Class="PatchOperationFindMod"><mods><li>No Such Mod</li></mods>
+    <match Class="Custom.AddName"><xpath>Defs/ThingDef[defName="Gun_A"]</xpath><value>Branch_Base</value></match></Operation>`))
+	out, err := Run(f.in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, x := range findingsOf(out, "def.parent-missing") {
+		got = append(got, x.Key)
+	}
+	slices.Sort(got)
+	if !slices.Equal(got, []string{"ThingDef/Gun_C<NoSuchBase", "ThingDef/Kid_2<Unnamed_Base", "ThingDef/Kid_3<Branch_Base"}) {
+		t.Fatalf("parent-missing keys = %v", got)
+	}
+	if len(findingsOf(out, "patch.unknown-op")) == 0 {
+		t.Fatal("the custom operation is no longer reported as not simulated")
+	}
+}

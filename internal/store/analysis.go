@@ -17,6 +17,24 @@ func (s *Store) ContentKey(instanceID string) string {
 	return k
 }
 
+// ContentKeys returns every instance's stored effective-content key for s.MM.
+func (s *Store) ContentKeys() (map[string]string, error) {
+	rows, err := s.DB.Query(`SELECT instance_id, content_key FROM content_state WHERE game_mm=?`, s.MM)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var id, key string
+		if err := rows.Scan(&id, &key); err != nil {
+			return nil, err
+		}
+		out[id] = key
+	}
+	return out, rows.Err()
+}
+
 // CachedDefs returns an instance's Def facts if they were built for key.
 func (s *Store) CachedDefs(instanceID, key string) ([]analyze.DefFact, bool) {
 	if s.ContentKey(instanceID) != key {

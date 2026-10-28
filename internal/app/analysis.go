@@ -41,8 +41,10 @@ func (ix *Index) ModIsLink(m *store.Mod) bool {
 	return source.IsLink(ix.ModDir(m))
 }
 
-// analysisMods: the enabled list in order, plus every other live, loadable instance
-// (inactive definers, for no-match reasons). pos is 1-based; 0 = inactive.
+// analysisMods: the enabled list in order, plus every other live instance the list could
+// load: registered, or deployable through a link on save (SteamCMD and extra folders).
+// Inactive ones are definers for no-match reasons and the missing-parent provider index
+// (03 §4.3). pos is 1-based; 0 = inactive.
 func analysisMods(st *LoadoutState) ([]*store.Mod, map[string]int) {
 	pos := map[string]int{}
 	for i, e := range st.List {
@@ -57,7 +59,7 @@ func analysisMods(st *LoadoutState) ([]*store.Mod, map[string]int) {
 		if !m.TombstoneAt.IsZero() || m.SnapID == 0 {
 			continue
 		}
-		if pos[m.ID] == 0 && (m.Residue || m.Unloadable != "" || !st.Reg.Loadable(m.ID)) {
+		if pos[m.ID] == 0 && (m.Residue || m.Unloadable != "" || !st.Reg.Loadable(m.ID) && !st.Deployable(m)) {
 			continue
 		}
 		all = append(all, m)

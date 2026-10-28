@@ -16,6 +16,24 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   mods only when a problem is opened (bounded and cancellable). It suggests absent companions through
   the cached Steam DB, and links the mod's Workshop requirements. A matching last log
   with no errors attributed to the mod allows ignoring the group until the mod changes.
+- A missing base template that a mod's own custom patch operation adds is no longer an
+  error. RimArcho cannot simulate such operations and already counts them as successful;
+  a Name written in one of them now counts as added (Chimera Creation (Continued) names
+  Anomaly's chimera this way). The analysis cache is rebuilt once.
+- The missing-content panel trusts a fresh analysis: it searches only the installed mods
+  whose indexed content may change when enabled, so large libraries no longer end with
+  "search incomplete, try again". Disabled SteamCMD and extra-folder mods are now indexed
+  too, so their templates are found without reading files. When nothing installed defines
+  the template it says so;
+  it no longer suggests trying again. Once installed providers cover every missing
+  template, the panel and `problems --ref` drop unconfirmed candidates (such as a
+  loadAfter mod), and the CLI no longer prints an empty `fixes:` heading.
+- The LoversLab session check asked for an old settings address that the site now
+  redirects, so a signed-in session was reported as needing login while the settings row
+  still said it worked. It now reads the current settings page. Automatic mod checks
+  count a file page as proof of login only when it shows the signed-in header, since
+  file pages are public. The "needs login" notice uses a warning mark (⚠ in the window,
+  `!` in the TUI) instead of ✓.
 - Missing-content rows now keep one short explanation. The panel places enable/subscribe
   first as the primary action, shows source locations beside affected content, and only
   explains optional candidates when it lists them.

@@ -20,15 +20,21 @@ func parentProblemDoc(c *Ctx, ps *app.ProblemSet, p *app.Problem, all bool) (*re
 		name += " " + m.DisplayName()
 	}
 	d, root := render.New(h.Meaning(name) + " (" + p.Ref + ")")
-	fixes := root.Add("fixes:")
+	var fixes *render.Node
+	fix := func(line string) {
+		if fixes == nil {
+			fixes = root.Add("fixes:")
+		}
+		fixes.Add(line)
+	}
 	for _, f := range h.Fixes {
 		switch f.Kind {
 		case "enable":
-			fixes.Add("fix: archo enable " + f.Ref + "  (" + f.Name + " defines " + f.Parent + ")")
+			fix("fix: archo enable " + f.Ref + "  (" + f.Name + " defines " + f.Parent + ")")
 		case "subscribe":
-			fixes.Add("candidate (" + f.Basis + ", provider unconfirmed): " + f.Name + "; archo subscribe workshop " + f.Ref + "; " + f.URL)
+			fix("candidate (" + f.Basis + ", provider unconfirmed): " + f.Name + "; archo subscribe workshop " + f.Ref + "; " + f.URL)
 		case "search":
-			fixes.Add("candidate (" + f.Basis + ", provider unconfirmed): " + f.Name + "; https://steamcommunity.com/workshop/browse/?appid=294100&searchtext=" + url.QueryEscape(f.Name))
+			fix("candidate (" + f.Basis + ", provider unconfirmed): " + f.Name + "; https://steamcommunity.com/workshop/browse/?appid=294100&searchtext=" + url.QueryEscape(f.Name))
 		case "requirements":
 			u := f.URL
 			if u == "" {
@@ -37,7 +43,7 @@ func parentProblemDoc(c *Ctx, ps *app.ProblemSet, p *app.Problem, all bool) (*re
 			root.Add("check this mod's Workshop requirements: " + u)
 		}
 	}
-	if !all {
+	if fixes != nil && !all {
 		fixes.Truncate(6, "archo problems --ref "+p.Ref+" --all")
 	}
 	root.Add("risk: mods with missing base content were error sources in 16% of shared logs (4.1% by chance); this is not a prediction for this list")
@@ -53,8 +59,12 @@ func parentProblemDoc(c *Ctx, ps *app.ProblemSet, p *app.Problem, all bool) (*re
 			ignores.Truncate(3, "archo problems --ref "+p.Ref+" --all")
 		}
 	}
-	if h.SearchIncomplete {
-		root.Add("providers: installed mod search incomplete; check Workshop requirements or try again")
+	if len(h.UnresolvedNames()) > 0 {
+		if h.SearchIncomplete {
+			root.Add("providers: not every installed mod could be checked")
+		} else if !h.CacheIncomplete {
+			root.Add("providers: no installed mod defines it, enabled or not")
+		}
 	}
 	affected := root.Add("affected:")
 	for _, q := range h.Problems {

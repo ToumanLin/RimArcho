@@ -212,6 +212,8 @@ func (m *model) statusText(w int) string {
 		mark, ms = markOK, sOK
 	case sayFail:
 		mark, ms = ic.fail, sErrS
+	case sayWarn:
+		mark, ms = ic.warn, sWarnS
 	case sayBusy:
 		mark = markBusy
 	}

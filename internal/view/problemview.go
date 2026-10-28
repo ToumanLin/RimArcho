@@ -129,8 +129,18 @@ func buildProblemPanel(ctx context.Context, a *app.App, ps *app.ProblemSet, ref 
 		n := parentNeed(st, h.Problems, p)
 		panel.Title = n.Title
 		panel.Meaning = parentSummary(h.Parts)
-		panel.Notes = []string{T(parentRisk), T(parentNext)}
-		panel.Searching = ctx == nil && len(h.UnresolvedNames()) > 0
+		panel.Notes = []string{T(parentRisk)}
+		unresolved := len(h.UnresolvedNames()) > 0
+		switch {
+		case !unresolved: // the enable buttons say what to do
+		case h.SearchIncomplete:
+			panel.Notes = append(panel.Notes, T("not every installed mod could be checked"))
+		case ctx != nil && !h.CacheIncomplete:
+			panel.Notes = append(panel.Notes, T("no installed mod defines this base content, enabled or not"))
+		default:
+			panel.Notes = append(panel.Notes, T(parentNext))
+		}
+		panel.Searching = ctx == nil && unresolved
 		for _, q := range h.Problems {
 			if part, ok := app.MissingParent(q); ok {
 				panel.Affected = append(panel.Affected, parentPart(part))
@@ -140,9 +150,6 @@ func buildProblemPanel(ctx context.Context, a *app.App, ps *app.ProblemSet, ref 
 					panel.Evidence = appendUnique(panel.Evidence, Humanize(st, finding.Expand(ev, st.Ix.Ref)))
 				}
 			}
-		}
-		if h.SearchIncomplete {
-			panel.Notes = append(panel.Notes, T("the installed mod search was incomplete; check the Workshop requirements or try again"))
 		}
 		hasCandidates := false
 		enabled := map[string]bool{}
