@@ -286,6 +286,8 @@ async function setup() {
       for(const f of ['config.toml','tasks.json'])if(existsSync(join(realHome,f)))cpSync(join(realHome,f),join(out,'real-start-'+f));
       result.sharedContent={home:realHome,policy:'guest real home used directly; DB, config and tasks restored after the run; content writes skipped'};
     }
+    // The player policy and walker read English labels (the copied baseline set this too).
+    command(exe('archo'),['config','set','ui.lang','en'],{RIMARCHO_HOME:home});
   } else if(options.baseline) {
     const baseline=outside(options.baseline);assert(existsSync(join(baseline,'isolated.json')),'baseline needs isolated.json from prepare-real.ps1');
     if(JSON.parse(readFileSync(join(baseline,'isolated.json'),'utf8').replace(/^\uFEFF/,'' )).synthetic)result.fixture='synthetic-scale';
