@@ -303,6 +303,7 @@ function renderHints() {
   else if (S.screen === "library") list = library.hintList();
   else if (S.screen === "tasks") list = tasksPage.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
+  else if (S.screen === "log") list = scr.logHints();
   else if (S.screen === "subscribe") list = scr.addHints();
   else if (S.screen === "home") list = homePage.hintList();
   else if (S.screen === "packs" || S.screen === "build") list = packsPage.hintList();

@@ -548,7 +548,6 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .lrow .top .chip { white-space: nowrap; flex: none; }
 .lrow .files { margin-top: 3px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .mrow { cursor: pointer; }
-.loghint { margin-left: auto; font-size: 12px; white-space: nowrap; }
 .mrow .log-disclosure { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 20px; margin: 0 -4px; border-radius: var(--r-sm); }
 .mrow .log-disclosure .fold-chev { margin: 0; }
 .mrow button.log-disclosure:hover { background: var(--pill); color: var(--fg); }

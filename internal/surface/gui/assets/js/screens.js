@@ -707,11 +707,6 @@ function drawGameLog() {
   const mon = p.monitor;
   if (!mon) L.tab = 0;
   L.view = L.tab;
-  if (L.tab === 1) {
-    const hint = el("span", "muted loghint");
-    hint.append(el("kbd", "", "enter"), " " + T("expand") + " / " + T("close"));
-    bar.append(hint);
-  }
   const grid = el("div", "cols two logcols");
   const list = el("section", "card col focus");
   if (mon) {
@@ -770,6 +765,16 @@ function drawGameLog() {
   det.prepend(el("div", "col-head", "")); det.firstChild.append(el("span", "anum", "2"), T("the log text"));
   scroll.scrollTop = L.views[L.tab]?.scrollTop || 0;
   markLog(true);
+  ui.renderHints();
+}
+
+// logHints: the game log's keys for the hint line (the tab decides what enter does).
+export function logHints() {
+  const out = [{ key: "↑↓", label: T("move") }];
+  if (L.page?.monitor) out.push({ key: "←→", label: T("section") });
+  if (L.tab === 1 && L.page?.monitor) out.push({ key: "enter", label: T("expand / close") });
+  out.push({ key: "2", label: T("the log text") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") });
+  return out;
 }
 
 // logText draws a log line in the game's colours: the level colours the line, a mod's
@@ -864,7 +869,7 @@ function monitorRows(scroll, mon) {
       const chev = el("span", "fold-chev");
       chev.innerHTML = icon.chev;
       disclosure.append(chev);
-      disclosure.title = T(open ? "close" : "expand") + " " + T("details");
+      disclosure.title = T(open ? "hide details" : "show details");
       disclosure.setAttribute("aria-label", disclosure.title);
       disclosure.setAttribute("aria-expanded", String(open));
       disclosure.onclick = (e) => { e.stopPropagation(); toggleMonitor(i); };
@@ -886,7 +891,7 @@ function toggleMonitor(i) {
     row.classList.toggle("open", open);
     row.querySelector(".monitor-details").hidden = !open;
     const b = row.querySelector(".log-disclosure");
-    b.title = T(open ? "close" : "expand") + " " + T("details");
+    b.title = T(open ? "hide details" : "show details");
     b.setAttribute("aria-label", b.title);
     b.setAttribute("aria-expanded", String(open));
   });
