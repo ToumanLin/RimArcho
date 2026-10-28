@@ -56,11 +56,35 @@ func (a *App) Deps() *deps.Finder {
 
 // InstallDep downloads a dependency into RimArcho's managed directory. Selection
 // settings are preserved, so a configured external copy remains selected.
-func (a *App) InstallDep(name string, progress func(done, total int64)) (string, error) {
+func (a *App) InstallDep(name string, progress func(done, total int64)) (path string, installErr error) {
+	defer func() {
+		if installErr == nil {
+			a.recordToolInstalled(name)
+		}
+	}()
+	if name == deps.WezTerm {
+		unlock := accounts.Lock(a.Deps().Status(name).Dir)
+		defer unlock()
+		if err := toolIdle(name); err != nil {
+			return "", err
+		}
+	}
 	switch name {
 	case deps.Todds:
 		return a.InstallToddsProgress(progress)
 	case deps.SteamCMD:
+		if info := a.Deps().Status(name); info.Own {
+			unlock := accounts.Lock(info.Path)
+			defer unlock()
+			if err := toolIdle(name); err != nil {
+				return "", err
+			}
+			p, err := a.steamCMD().start(info.Path, []string{"+quit"}, false)
+			if err != nil {
+				return "", err
+			}
+			return info.Path, p.Wait()
+		}
 		return a.installSteamCMDProgress(a.Deps().Status(name).Dir, progress)
 	case deps.WezTerm:
 		api := a.WezTermAPI
@@ -79,10 +103,13 @@ func (a *App) InstallDep(name string, progress func(done, total int64)) (string,
 // RemoveDep removes only the selected managed copy, never a configured external,
 // PATH or Program Files copy. It leaves configuration and other copies unchanged.
 func (a *App) RemoveDep(name string) error {
+	i := a.Deps().Status(name)
+	key := i.Dir
 	if name == deps.SteamCMD {
-		unlock := accounts.Lock(a.Deps().Status(name).Path)
-		defer unlock()
+		key = i.Path
 	}
+	unlock := accounts.Lock(key)
+	defer unlock()
 	if err := a.CheckDepRemoval(name); err != nil {
 		return err
 	}
@@ -92,6 +119,9 @@ func (a *App) RemoveDep(name string) error {
 // CheckDepRemoval checks ownership and protected content without changing files.
 // Settings use the same check as RemoveDep, which repeats it when the action runs.
 func (a *App) CheckDepRemoval(name string) error {
+	if err := toolIdle(name); err != nil {
+		return err
+	}
 	i := a.Deps().Status(name)
 	if !i.Installable || !i.Own {
 		return fmt.Errorf("%s is not RimArcho's own copy; nothing removed", name)

@@ -145,15 +145,18 @@ func (a *App) scanSubscriptionItem(it *SubscribeItem) error {
 }
 
 func (a *App) refuseSubscriptionGameRunning() error {
-	if run, err := a.GameRunning(); err != nil {
+	if run, err := a.RunningGame(); err != nil {
 		return err
 	} else if run != nil {
-		return fmt.Errorf("the game is running (pid %d); close it before updating subscriptions", run.PID)
+		return fmt.Errorf("the game is running (pid %d); close it before updating subscriptions", run.Run.PID)
 	}
 	return nil
 }
 
 func (a *App) UpdateSubscriptionFrom(ref, from string, dryRun bool) (*SubscribeOp, error) {
+	if !dryRun {
+		defer a.recordModUpdatesPending()
+	}
 	ss, err := a.selectSubscriptions([]string{ref})
 	if err != nil {
 		return nil, err

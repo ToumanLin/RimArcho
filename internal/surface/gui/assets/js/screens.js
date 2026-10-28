@@ -22,6 +22,11 @@ let ui = null;
 export function initScreens(u) {
   ui = u;
   initSubscriptions(u, { beginPageRead, page, area, button, act, seg });
+  on("automatic-update", ev => {
+    if (ev?.notice) say("ok", ev.notice);
+    if (S.screen === "settings") refreshSettingTasks(true);
+    if (S.screen === "changes" && ev?.kind === "mods") changes();
+  });
   on("tasks", (ev) => {
     if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
     if (S.screen === "changes" && ev?.ended) changes();

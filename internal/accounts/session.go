@@ -122,6 +122,26 @@ func (s *Session) Status() Status {
 	return r
 }
 
+// RenewalExpiry excludes the short session cookie: remembered authentication can
+// recreate it. Use the earliest durable login key, not the latest preference or
+// device cookie, when deciding when to try renewal.
+func (s *Session) RenewalExpiry() time.Time {
+	var expiry time.Time
+	for _, c := range s.cookies {
+		name := strings.ToLower(c.Name)
+		if c.MaxAge < 0 || c.Expires.IsZero() || !(strings.Contains(name, "member_id") || strings.Contains(name, "login_key") || strings.Contains(name, "device_key")) {
+			continue
+		}
+		if expiry.IsZero() || c.Expires.Before(expiry) {
+			expiry = c.Expires
+		}
+	}
+	if expiry.IsZero() {
+		expiry = s.Status().Expiry
+	}
+	return expiry
+}
+
 func (s *Session) SetStatus(state, name string) error {
 	old := s.status
 	s.status.State, s.status.Verified = state, time.Now().UTC()

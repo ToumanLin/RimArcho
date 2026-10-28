@@ -249,7 +249,7 @@ next:
 | | `import rimcrow --db <路径> [--rules <路径>] [--dry-run] [--include-disabled-rules] [--all]` | 一次性导入 RimCrow 的别名、备注、分组（成为标签）和用户规则，可重复执行（04 §8） |
 | 身份 | `identity list [--all]` / `identity resolve <q:n> same\|copy\|unrelated` | 待确认项（02 §5.4） |
 | | `lineage split <引用>` / `lineage merge <引用> <引用>` / `gc [--dry-run]` | 拆分、合并 Lineage；清理过期墓碑和无用快照（02 §5.5） |
-| 社区数据 | `data update [<数据集>…] [--dry-run]` / `data status` | 下载社区数据（`rules`、`steamdb`、`replacements`），唯一联网获取它们的命令（04 §6） |
+| 社区数据 | `data update [<数据集>…] [--dry-run]` / `data status` | 手动下载社区数据（`rules`、`steamdb`、`replacements`），或读取来源、下载与检查时间（04 §6）；交互界面另有自动更新（06 §2.16） |
 | 维护 | `db status` / `db backup` / `db vacuum` | 数据库路径、大小、备份；写一份一致的副本到 `<数据目录>/backups`；压缩 |
 | | `cache status` / `cache clear <类别>` | 缓存大小；清空一类缓存（`previews`、`workshop`、`images`、`source`、`logs`），用到时重建 |
 | 设置 | `config get [<键>]` / `config set <键> <值>` | 见下 |
@@ -260,7 +260,9 @@ next:
 
 **分析参数**：`--game-version X.Y` 用于 `analyze`、`problems`、`def`、`patches`、`harmony`、`why`、`log`，按另一个游戏主次版本分析（格式必须像 `1.6`，命令结束后恢复）。MCP 对应工具有同名参数 `game_version`。
 
-**设置键**（`config set`）：`ui.lang auto|en|zh`；`ui.icons auto|nerd|compat`；`ui.mouse on|off`（关掉终端的鼠标上报，方便选中文字）；`workshop.fetch on|off`（是否联网获取工坊简介）；`workshop.images on|off`（是否下载简介里的图片）；`terminal.host auto|wezterm|none`；`ui.previews on|off`；`ui.gpu on|off`（窗口的 GPU 加速，下次打开窗口生效，06 §2.14）；`ui.preview_dwell_ms 0–5000`；`tags.pinned <逗号分隔的标签>`；`monitor.default on|off`（是否把 Archo Monitor 自动加进方案，04 §1.5）；`monitor.dir <绝对路径>`（Monitor 目录，08 §9）。设置存在数据库的 meta 表（键 `cfg:<键>`）；`config.toml` 只有 `tombstone_days`（07 §3）。
+**自动检查状态**：`status`、`data status`（包括 MCP `status` 对应输出）读取四项的上次尝试、结果、待处理数，不联网，也不暴露 Cookie；`deps` 另列受管工具的新版本。开关和间隔见 06 §2.16。
+
+**设置键**（`config set`）：`ui.lang auto|en|zh`；`ui.icons auto|nerd|compat`；`ui.mouse on|off`（关掉终端的鼠标上报，方便选中文字）；`workshop.fetch on|off`（是否联网获取工坊简介）；`workshop.images on|off`（是否下载简介里的图片）；`updates.auto on|off`、`updates.interval normal|frequent|relaxed`（06 §2.16）；`terminal.host auto|wezterm|none`；`ui.previews on|off`；`ui.gpu on|off`（窗口的 GPU 加速，下次打开窗口生效，06 §2.14）；`ui.preview_dwell_ms 0–5000`；`tags.pinned <逗号分隔的标签>`；`monitor.default on|off`（是否把 Archo Monitor 自动加进方案，04 §1.5）；`monitor.dir <绝对路径>`（Monitor 目录，08 §9）。设置存在数据库的 meta 表（键 `cfg:<键>`）；`config.toml` 只有 `tombstone_days`（07 §3）。
 
 ### 4.3 方案管理
 

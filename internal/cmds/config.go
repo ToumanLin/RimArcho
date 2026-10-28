@@ -15,11 +15,13 @@ import (
 // configKeys are the user settings stored in the database (meta "cfg:<key>"), with their
 // allowed values; the first is the default.
 var configKeys = map[string][]string{
-	"ui.accent": {"default", "indigo", "blue", "cyan", "teal", "green", "grass", "orange", "amber", "red", "crimson", "pink", "plum", "purple", "violet", "iris"},
-	"ui.lang":   {"auto", "en", "zh"},
-	"ui.theme":  {"auto", "light", "dark"},
-	"ui.icons":  {"auto", "nerd", "compat"}, // auto: Nerd Font icons in the WezTerm host (06 §9.3)
-	"ui.mouse":  {"on", "off"},
+	"updates.auto":     {"on", "off"},
+	"updates.interval": {"normal", "frequent", "relaxed"},
+	"ui.accent":        {"default", "indigo", "blue", "cyan", "teal", "green", "grass", "orange", "amber", "red", "crimson", "pink", "plum", "purple", "violet", "iris"},
+	"ui.lang":          {"auto", "en", "zh"},
+	"ui.theme":         {"auto", "light", "dark"},
+	"ui.icons":         {"auto", "nerd", "compat"}, // auto: Nerd Font icons in the WezTerm host (06 §9.3)
+	"ui.mouse":         {"on", "off"},
 	// 06 §4.3: whether descriptions and their images may be fetched from the Steam Workshop
 	"workshop.fetch":  {"on", "off"},
 	"workshop.images": {"on", "off"},
@@ -117,7 +119,7 @@ func SettingChoices(key string) []string { return slices.Clone(configKeys[key]) 
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (ui.lang: auto|en|zh; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.gpu: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; wezterm.path: an existing WezTerm program, or empty for discovery)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto|en|zh; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.gpu: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; wezterm.path: an existing WezTerm program, or empty for discovery)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.

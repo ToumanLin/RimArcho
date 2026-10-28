@@ -29,6 +29,13 @@ func DependencyGroup(a *app.App) SettingGroup {
 			item.Note += "  " + T("only needed for the terminal interface (archo tui)")
 		}
 		item.Note = strings.TrimSpace(item.Note)
+		update := a.ToolUpdate(i.Name)
+		if update.Pending && i.Own {
+			item.ValueNote = Tf("new version available: %s", update.Latest)
+			if !update.Compatible {
+				item.Note += "  " + Tf("RimArcho supports todds %s; the new version has not been verified.", i.Version)
+			}
+		}
 		if i.ConfigKey != "" {
 			item.Edit, item.Argv = "path", []string{"config", "set", i.ConfigKey, "{}"}
 			value := a.Store.Meta("cfg:" + i.ConfigKey)
@@ -41,6 +48,9 @@ func DependencyGroup(a *app.App) SettingGroup {
 			}
 			item.Actions = append(item.Actions, SettingAction{Label: label, Argv: []string{"deps", "install", i.Name},
 				Confirm: Tf("download %s into RimArcho's own folder?", labels[i.Name])})
+			if update.Pending && !update.Compatible && i.Own {
+				item.Actions = nil
+			}
 			if i.Own && a.CheckDepRemoval(i.Name) == nil {
 				item.Actions = append(item.Actions, SettingAction{Label: T("remove"), Argv: []string{"deps", "remove", i.Name},
 					Confirm: Tf("remove RimArcho's own copy of %s?", labels[i.Name])})

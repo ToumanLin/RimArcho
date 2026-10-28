@@ -209,6 +209,12 @@ func (s *API) Close() {
 	if s.branchCancel != nil {
 		s.branchCancel()
 	}
+	autoDone := make(chan struct{})
+	go func() { s.autoWG.Wait(); close(autoDone) }()
+	select {
+	case <-autoDone:
+	case <-time.After(3 * time.Second):
+	}
 	s.mu.Lock()
 	s.creditClosed = true
 	s.needsClosed = true

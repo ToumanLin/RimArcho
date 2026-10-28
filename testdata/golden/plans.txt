@@ -75,6 +75,11 @@ env:main  RimWorld 1.6.4633 rev1261
   changes: 9 discovered (archo changes)
   plan: plan:default (6 plans: archo plan list)
   loadout: 4 active (1 missing entries), same as v1 (import)
+  automatic-checks: on, interval normal
+    session: last checked never; not checked yet; 0 pending
+    mods: last checked never; not checked yet; 0 pending
+    tools: last checked never; not checked yet; 0 pending
+    data: last checked never; not checked yet; 0 pending
   problems: 0 error, 1 warning, 2 info in declarations; Defs and Patches not analysed yet (archo problems)
 
 $ archo plan use copy

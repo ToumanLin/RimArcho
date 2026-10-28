@@ -15,7 +15,7 @@ func init() {
 	for _, d := range app.Datasets {
 		keys = append(keys, d.Key)
 	}
-	register(&Command{Name: "data update", Args: "[<dataset>…]", Summary: "download the community data (" + strings.Join(keys, ", ") + "); the only command that fetches it", MaxArgs: len(keys), Run: dataUpdateCmd,
+	register(&Command{Name: "data update", Args: "[<dataset>…]", Summary: "download the community data (" + strings.Join(keys, ", ") + "); automatic checks can also refresh it while the window is open", MaxArgs: len(keys), Run: dataUpdateCmd,
 		Flags: []Flag{{Name: "dry-run", Help: "show the sources, download nothing"}}})
 	register(&Command{Name: "data status", Summary: "the community data: source, version, when it was fetched, entries", MaxArgs: 0, Run: dataStatusCmd})
 	for _, d := range app.Datasets {
@@ -85,9 +85,15 @@ func dataStatusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		n := root.KV(ds.Key, line)
 		n.Add("source: " + di.Source)
+		checked := di.Checked
+		if checked.IsZero() {
+			checked = di.Fetched
+		}
+		n.Add("last checked: " + c.App.FormatTime(checked))
 	}
 	if stale {
 		d.AddNext("archo data update")
 	}
+	automaticStatus(c, root)
 	return d, nil
 }

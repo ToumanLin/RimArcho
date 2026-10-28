@@ -27,6 +27,8 @@ settings
   ui.preview_dwell_ms: 0
   ui.previews: on
   ui.theme: auto
+  updates.auto: on
+  updates.interval: normal
   workshop.fetch: on
   workshop.images: on
 
@@ -35,6 +37,11 @@ community data
   rules: not downloaded (RimSort community sorting rules)
   steamdb: not downloaded (RimSort Steam Workshop database (packageIds, dependencies, versions))
   replacements: not downloaded (Use This Instead replacements)
+  automatic-checks: on, interval normal
+    session: last checked never; not checked yet; 0 pending
+    mods: last checked never; not checked yet; 0 pending
+    tools: last checked never; not checked yet; 0 pending
+    data: last checked never; not checked yet; 0 pending
 next:
   archo data update
 

@@ -25,6 +25,9 @@ func LoversLabLine(a *app.App) (string, bool) {
 	if a.Store.Meta("account:loverslab:enabled") == "true" {
 		if session, err := accounts.Open(a.AccountsDir()); err == nil {
 			st := session.Status()
+			if s := a.AutomaticStatus("session"); s.Pending > 0 && !st.Verified.After(s.Completed) {
+				return T("session needs confirmation; log in again"), true
+			}
 			if session.HasCookies() && st.State == "available" {
 				expiry := "N/A"
 				if !st.Expiry.IsZero() {

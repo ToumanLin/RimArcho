@@ -4,6 +4,7 @@
 package tui
 
 import (
+	"context"
 	"os"
 	"runtime/debug"
 	"strconv"
@@ -206,6 +207,12 @@ func TuneProcess(a *app.App) {
 
 // Run starts the TUI on the terminal.
 func Run(o Options) error {
+	// Snapshot options before the model starts editing its App. Each maintenance
+	// pass owns a separate connection and releases its inventory afterwards.
+	maintenance := &app.App{Store: o.App.Store}
+	maintenance.ReadOptions(o.App)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	TuneProcess(o.App)
 	SetLang(o.App.Store.Meta("cfg:ui.lang"))
 	SetIcons(o.App.Store.Meta("cfg:ui.icons"))
@@ -219,7 +226,24 @@ func Run(o Options) error {
 		mdl.images = &imgWriter{Writer: os.Stdout}
 		opts = append(opts, tea.WithOutput(mdl.images))
 	}
-	_, err := tea.NewProgram(mdl, opts...).Run()
+	program := tea.NewProgram(mdl, opts...)
+	go app.AutomaticLoop(ctx, func(parent context.Context) {
+		r, err := maintenance.ReadSession()
+		if err != nil {
+			return
+		}
+		defer r.Close()
+		checkCtx, stop := context.WithTimeout(parent, 15*time.Minute)
+		defer stop()
+		r.RunAutomaticCycle(checkCtx, func(kind string, run func() error) {
+			before := r.AutomaticStatus(kind)
+			_ = run()
+			if parent.Err() == nil {
+				program.Send(automaticDoneMsg{kind: kind, before: before, after: r.AutomaticStatus(kind)})
+			}
+		})
+	})
+	_, err := program.Run()
 	return err
 }
 
@@ -230,6 +254,10 @@ type scanDoneMsg struct {
 	err error
 }
 type detailTick struct{ seq int }
+type automaticDoneMsg struct {
+	kind          string
+	before, after app.AutomaticStatus
+}
 type idleTick struct{ seq int }
 type detailMsg struct {
 	ref   string

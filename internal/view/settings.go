@@ -237,6 +237,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
 	}}, DirectoryGroup(a), folders, AccountGroup(a)}
 	out = append(out, DependencyGroup(a))
+	out = append(out, AutomaticGroup(a))
 	lang := cmds.Setting(a, "ui.lang")
 	gpuNote := ""
 	if cmds.Setting(a, "ui.gpu") == "off" {

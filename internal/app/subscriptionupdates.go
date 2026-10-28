@@ -23,11 +23,22 @@ type SourceCheck struct {
 
 func (a *App) SubscriptionSourceCheck(kind string) SourceCheck {
 	var c SourceCheck
-	_ = json.Unmarshal([]byte(a.Store.Meta(a.subscriptionCheckKey(kind))), &c)
+	value := a.Store.Meta(a.subscriptionCheckKey(kind))
+	if value == "" && (kind == LibSteamCMD || kind == LibGit || kind == LibPage) {
+		if e, err := a.Env(); err == nil {
+			value = a.Store.Meta("subscriptions:check:" + e.Name + ":" + kind)
+		}
+	}
+	_ = json.Unmarshal([]byte(value), &c)
 	return c
 }
 
 func (a *App) subscriptionCheckKey(kind string) string {
+	// Subscription folders are shared by every game (02 §0), so automatic
+	// results must survive switching games too. Workshop-client state stays scoped.
+	if kind == LibSteamCMD || kind == LibGit || kind == LibPage {
+		return "subscriptions:check:shared:" + kind
+	}
 	name := a.EnvName
 	if env, err := a.Env(); err == nil {
 		name = env.Name
@@ -110,10 +121,8 @@ func (a *App) CheckSubscriptionSource(kind string, pageReader ...func(string) (*
 
 // UpdateWorkshopClient asks the running client to download; Steam owns completion.
 func (a *App) UpdateWorkshopClient(ref string, dryRun bool) error {
-	if running, err := a.GameRunning(); err != nil {
+	if err := a.refuseSubscriptionGameRunning(); err != nil {
 		return err
-	} else if running != nil {
-		return fmt.Errorf("the game is running (pid %d); close it before updating subscriptions", running.PID)
 	}
 	ix, err := a.Index()
 	if err != nil {
