@@ -8,6 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // NeedPart is literal text, or one named mod's navigation target. Strings stay available
@@ -25,8 +26,8 @@ type NeedContent struct {
 	Parts [][]NeedPart `json:"parts,omitempty"`
 }
 
-// One transient name trie per snapshot: no per-item walk of the mod library, and longest
-// names win ("Vanilla Expanded" must not swallow "Vanilla Expanded Framework").
+// Each item gets a small trie of its own subjects and targets. Longest names win
+// ("Vanilla Expanded" must not swallow "Vanilla Expanded Framework").
 type needNames struct {
 	next map[byte]*needNames
 	mods []namedMod
@@ -54,75 +55,106 @@ func (r *needNames) addFor(p NeedPart, owner string) {
 		}
 		r = r.next[p.Text[i]]
 	}
-	for _, m := range r.mods {
-		if m.part == p && m.owner == owner {
+	for i, m := range r.mods {
+		if m.owner == owner {
+			if m.part.ID == "" && m.part.URL == "" {
+				r.mods[i].part = p
+			}
 			return
 		}
 	}
 	r.mods = append(r.mods, namedMod{part: p, owner: owner})
 }
 
-func newNeedNames(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missing []app.MissingMod) *needNames {
-	r := &needNames{}
-	installed := map[string]bool{}
+// The package lookup is built once per snapshot; unrelated library names never enter
+// an item's trie. Instance references use the existing ByID index directly.
+type needNameIndex struct {
+	a        *app.App
+	st       *app.LoadoutState
+	packages map[string]*store.Mod
+	missing  map[string]app.MissingMod
+}
+
+func newNeedNames(a *app.App, st *app.LoadoutState, missing []app.MissingMod) *needNameIndex {
+	r := &needNameIndex{a: a, st: st, packages: map[string]*store.Mod{}, missing: map[string]app.MissingMod{}}
 	for _, m := range st.Ix.Mods {
-		if m.Status != identity.Live {
-			p := NeedPart{Text: m.DisplayName()}
-			if ws := m.WorkshopID(); ws != "" {
-				p.URL = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + ws
-			}
-			r.addFor(p, m.ID)
-			continue
+		pkg := strings.ToLower(m.PackageID)
+		if m.Status == identity.Live && r.packages[pkg] == nil {
+			r.packages[pkg] = m
 		}
-		r.add(NeedPart{Text: m.DisplayName(), ID: m.ID})
-		installed[strings.ToLower(m.PackageID)] = true
 	}
 	for _, m := range missing {
-		if m.CanEnable && m.Instance != "" {
-			r.add(NeedPart{Text: m.Name, ID: m.Instance})
-		} else if m.WorkshopID != "" && !installed[strings.ToLower(m.PackageID)] {
-			url := "https://steamcommunity.com/sharedfiles/filedetails/?id=" + m.WorkshopID
-			r.add(NeedPart{Text: m.Name, URL: url})
-			r.add(NeedPart{Text: m.PackageID, URL: url})
-		}
-	}
-	for _, p := range ps.List {
-		var url string
-		for _, s := range p.Suggestions {
-			if u, ok := strings.CutPrefix(s, "subscribe: "); ok {
-				url = u
-				break
-			}
-		}
-		for _, s := range subjects(p) {
-			if pkg, ok := strings.CutPrefix(s, "pkg:"); ok && !installed[strings.ToLower(pkg)] {
-				u := url
-				if a != nil {
-					if w, ok := a.WorkshopFor(pkg); ok {
-						if u == "" && w.WorkshopID != "" {
-							u = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + w.WorkshopID
-						}
-						if u != "" {
-							r.add(NeedPart{Text: w.Name, URL: u})
-						}
-					}
-				}
-				if u == "" {
-					continue
-				}
-				r.add(NeedPart{Text: pkg, URL: u})
-				if p.Code == "dep.missing" {
-					r.add(NeedPart{Text: depName(p.Claim, pkg), URL: u})
-				}
-			}
-		}
-		if p.Code == "mod.replaced" && url != "" {
-			if m := replacedRe.FindStringSubmatch(p.Claim); m != nil {
-				r.add(NeedPart{Text: m[1], URL: url})
-			}
-		}
+		r.missing[strings.ToLower(m.PackageID)] = m
 	}
 	return r
+}
+
+func namedInstance(m *store.Mod) NeedPart {
+	p := NeedPart{Text: m.DisplayName()}
+	if m.Status == identity.Live {
+		p.ID = m.ID
+	} else if ws := m.WorkshopID(); ws != "" {
+		p.URL = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + ws
+	}
+	return p
+}
+
+// addRef accepts subject tokens, action references, and the dependency target. The
+// returned part also supplies the target for a name alias in a declared dependency.
+func (r *needNameIndex) addRef(names *needNames, ref, url string, prefer func(string)) NeedPart {
+	id := finding.InstID(ref)
+	if r.st.Ix.ByID[ref] != nil {
+		id = ref
+	}
+	if id != "" {
+		if m := r.st.Ix.ByID[id]; m != nil {
+			p := namedInstance(m)
+			names.addFor(p, m.ID)
+			prefer(m.ID)
+			return p
+		}
+		return NeedPart{}
+	}
+	if strings.HasPrefix(ref, "#") || strings.HasPrefix(ref, "L#") {
+		if m, err := r.st.Ix.ResolveOne(ref); err == nil {
+			return r.addRef(names, m.ID, url, prefer)
+		}
+		return NeedPart{}
+	}
+	pkg := strings.ToLower(strings.TrimPrefix(ref, "pkg:"))
+	if m := r.packages[pkg]; m != nil {
+		return r.addRef(names, m.ID, url, prefer)
+	}
+	if !strings.HasPrefix(ref, "pkg:") && url == "" && r.missing[pkg].PackageID == "" {
+		return NeedPart{}
+	}
+	if m, ok := r.missing[pkg]; ok {
+		if m.CanEnable && m.Instance != "" {
+			p := r.addRef(names, m.Instance, url, prefer)
+			p.Text = m.Name
+			names.addFor(p, m.Instance)
+			return p
+		}
+		if url == "" && m.WorkshopID != "" {
+			url = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + m.WorkshopID
+		}
+		names.addFor(NeedPart{Text: m.Name, URL: url}, "pkg:"+pkg)
+	}
+	if r.a != nil {
+		if w, ok := r.a.WorkshopFor(pkg); ok {
+			if url == "" && w.WorkshopID != "" {
+				url = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + w.WorkshopID
+			}
+			names.addFor(NeedPart{Text: w.Name, URL: url}, "pkg:"+pkg)
+		}
+	}
+	p := NeedPart{Text: pkg, URL: url}
+	// Unknown non-mod action arguments (versions, Workshop numbers, etc.) are not names.
+	if strings.HasPrefix(ref, "pkg:") || url != "" || r.missing[pkg].PackageID != "" {
+		names.addFor(p, "pkg:"+pkg)
+		prefer("pkg:" + pkg)
+	}
+	return p
 }
 
 func nameWord(r rune) bool {
@@ -182,7 +214,8 @@ func (r *needNames) parts(text string, preferred map[string]int) []NeedPart {
 	return out
 }
 
-func (r *needNames) fill(n *Need) {
+func (r *needNameIndex) fill(n *Need) {
+	names := &needNames{}
 	preferred := map[string]int{}
 	prefer := func(id string) {
 		if id != "" && preferred[id] == 0 {
@@ -190,24 +223,59 @@ func (r *needNames) fill(n *Need) {
 		}
 	}
 	for _, id := range n.Mods {
-		prefer(id)
+		r.addRef(names, id, "", prefer)
 	}
 	for _, o := range n.RequiredBy {
-		prefer(o.ID)
+		r.addRef(names, o.ID, "", prefer)
 	}
-	// Names in a dependency's title can refer to a different installed mod than its owners.
-	for _, a := range n.Actions {
-		for _, ref := range a.Refs {
-			prefer(finding.InstID(ref))
+	if n.Target != "" {
+		r.addRef(names, "pkg:"+n.Target, "", prefer)
+	}
+	for _, p := range n.linkProblems {
+		if p == nil {
+			continue
+		}
+		url := ""
+		for _, s := range p.Suggestions {
+			if u, ok := strings.CutPrefix(s, "subscribe: "); ok {
+				url = u
+				break
+			}
+		}
+		for _, ref := range subjects(p) {
+			target := r.addRef(names, ref, url, prefer)
+			if pkg, ok := strings.CutPrefix(ref, "pkg:"); ok && p.Code == "dep.missing" {
+				target.Text = depName(p.Claim, pkg)
+				names.addFor(target, ref)
+			}
+		}
+		if p.Code == "mod.replaced" {
+			if m := replacedRe.FindStringSubmatch(p.Claim); m != nil {
+				names.addFor(NeedPart{Text: m[1], URL: url}, "replacement")
+			}
 		}
 	}
-	c := &NeedContent{Title: r.parts(n.Title, preferred), Text: r.parts(n.Text, preferred), Why: r.parts(n.Why, preferred)}
+	for _, a := range n.Actions {
+		for _, ref := range a.Refs {
+			r.addRef(names, ref, "", prefer)
+		}
+		if a.After != "" {
+			r.addRef(names, a.After, "", prefer)
+		}
+		for _, o := range a.Options {
+			for _, ref := range o.Refs {
+				r.addRef(names, ref, "", prefer)
+			}
+		}
+	}
+	c := &NeedContent{Title: names.parts(n.Title, preferred), Text: names.parts(n.Text, preferred), Why: names.parts(n.Why, preferred)}
 	for _, p := range n.Parts {
-		c.Parts = append(c.Parts, r.parts(p, preferred))
+		c.Parts = append(c.Parts, names.parts(p, preferred))
 	}
 	if len(c.Title)+len(c.Text)+len(c.Why)+len(c.Parts) > 0 {
 		n.Content = c
 	}
+	n.linkProblems = nil
 }
 
 func reasonContent(n Need) *NeedContent {

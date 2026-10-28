@@ -7,7 +7,7 @@ function harness() {
   function el(tag, cls = '', text = '') {
     return { tag, className: cls, textContent: text, children: [], dataset: {},
       append(...nodes) { this.children.push(...nodes); }, setAttribute() {},
-      classList: { add() {}, remove() {} },
+      classList: { add() {}, remove() {}, toggle() {} },
       click() { return this.onclick({ preventDefault() {}, stopPropagation() {} }); } };
   }
   const calls = [], state = { screen: 'needs', busy: {} };
@@ -52,6 +52,47 @@ test('known missing mods open the Workshop, unknown ones stay text, and markup s
   await row.children[0].click();
   assert.deepEqual(h.calls, [['url', url]]);
   assert.equal(row.children[1].onclick, undefined);
+});
+
+test('sentences keep inline text flow on every problem surface', () => {
+  const h = harness();
+  const parts = [{ text: 'TakeCover', id: 'one' }, { text: ' 与 ' }, { text: 'Achtung!', id: 'two' }, { text: ' 不兼容' }];
+  for (const cls of ['title word-facts', 'why word-facts', 'why sub', 'pp-t', 'pp-why', 'bp-t', 'bp-why']) {
+    const node = h.context.needText('div', cls, '', parts);
+    assert.equal(node.className.split(/\s+/).includes('word-facts'), false, cls);
+    assert.equal(node.children.map(x => x.textContent).join(''), 'TakeCover 与 Achtung! 不兼容');
+  }
+  const plain = h.context.needText('div', 'title word-facts', 'plain', null);
+  assert.equal(plain.className, 'title');
+  const list = h.context.needParts({ parts: ['TakeCover 与 Achtung! 不兼容'], content: { parts: [parts] } });
+  assert.equal(list.children[0].tag, 'li');
+  assert.equal(list.children[0].children.map(x => x.textContent).join(''), 'TakeCover 与 Achtung! 不兼容');
+});
+
+test('badge popover keeps its own mod plain and links the other mod in title and why', () => {
+  const h = harness();
+  h.load('badgepop.js', ['draw', 'box']);
+  const parts = [{ text: 'Fortress Citadel', id: 'one' }, { text: ' + ' }, { text: 'Framework', id: 'two' }];
+  h.state.board = { reasons: { one: [{ status: -1, text: 'pair', why: 'pair', content: { text: parts, why: parts } }] } };
+  h.context.draw({ id: 'one' }, -1);
+  const body = h.context.box.children[0].children[1];
+  for (const line of body.children) {
+    assert.equal(line.children[0].tag, undefined);
+    assert.equal(line.children[0].textContent, 'Fortress Citadel');
+    assert.equal(line.children[2].tag, 'a');
+    assert.equal(line.children[2].textContent, 'Framework');
+  }
+  assert.equal(parts[0].id, 'one', 'shared view data must keep the link for other surfaces');
+});
+
+test('editor panel shows evidence only on hints', () => {
+  const h = harness();
+  h.load('problems.js', ['card']);
+  for (const status of [-1, 2, 4]) {
+    const card = h.context.card({ text: 'item', status, evidence: { kind: status === -1 ? 'corpus' : 'declared', label: 'source' } });
+    const body = card.children[1];
+    assert.equal(body.children.some(x => x.className === 'ev-line'), status === -1);
+  }
 });
 
 test('folds are semantic lists and evidence includes the supplied cutoff', () => {

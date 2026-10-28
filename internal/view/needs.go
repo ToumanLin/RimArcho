@@ -134,6 +134,8 @@ type Need struct {
 
 	rank int    // order within the group (06 §5's order)
 	code string // the problem code it stands for (LaunchHint)
+
+	linkProblems []*app.Problem // original subjects and targets, retained through folding for name links
 }
 
 // Needs is the screen's content and what it means for the rest of the interface.
@@ -187,9 +189,9 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	missing := a.MissingMods(st)
 	n.Items = append(mergeDependencies(st, buildItems(a, st, ps, missing)), directoryNeeds(a)...)
 	n.Items = append(n.Items, linkNeeds(a, ps.GameLinks)...)
-	var names *needNames
+	var names *needNameIndex
 	if len(n.Items) > 0 {
-		names = newNeedNames(a, st, ps, missing)
+		names = newNeedNames(a, st, missing)
 	}
 	for i := range n.Items {
 		n.Items[i].Section = SectionOf(n.Items[i].Group)
@@ -272,9 +274,13 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	}
 	var out []Need
 	cur := "" // the code of the problem being turned into an item
+	var linkProblem *app.Problem
 	add := func(n Need) {
 		if n.code == "" {
 			n.code = cur
+		}
+		if linkProblem != nil {
+			n.linkProblems = append(n.linkProblems, linkProblem)
 		}
 		out = append(out, n)
 	}
@@ -320,6 +326,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		if n.Evidence != nil {
 			m.srcs = append(m.srcs, n.Evidence.Source)
 		}
+		m.n.linkProblems = append(m.n.linkProblems, linkProblem)
 	}
 	for _, p := range ps.List {
 		if p.Log != nil {
@@ -342,6 +349,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			continue // info: technical information only (06 §5)
 		}
 		cur = p.Code
+		linkProblem = p
 		subj := subjects(p)
 		x, y := "", ""
 		if len(subj) > 0 {
@@ -363,10 +371,12 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		case "order.violated":
 			if p.Severity == finding.Info {
 				weak = append(weak, Need{Text: Tf("%s should load after %s", nm(x), nm(y)), Mods: ids})
+				weak[len(weak)-1].linkProblems = []*app.Problem{p}
 				continue
 			}
 			order = append(order, Need{rank: 1, Group: GroupList, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{{Kind: ActMove, Key: "m", Label: Tf("move %s after %s", nm(x), nm(y)), Refs: []string{TokRef(st, x)}, After: TokRef(st, y), Undo: true}, sortAction()}, Counted: true, Mods: ids, Status: s,
 				Why: T("a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right"), Evidence: ev})
+			order[len(order)-1].linkProblems = []*app.Problem{p}
 		case "mod.known-error":
 			// The mod's own problem (03 §4.3): whatever else is enabled, shared logs show it.
 			add(Need{rank: 9, Group: GroupConflict, Text: Tf("%s has a known error: this is the mod's own problem", nm(x)),
@@ -390,6 +400,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			me := missingEntry{pkg: pkg, name: pkg, n: Need{rank: 4, Group: GroupList, Text: Tf("the list has %s, but it is not installed", pkg),
 				Actions: []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s,
 				Title: Tf("not installed: %s", pkg), Why: T("the list has it, but no mod folder does"), Evidence: ev}}
+			me.n.linkProblems = []*app.Problem{p}
 			if w, ok := missingInfo[strings.TrimSuffix(strings.ToLower(pkg), "_steam")]; ok {
 				me.ws = w.WorkshopID
 				if w.Name != "" {
@@ -510,6 +521,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			// is simply absent stay in the technical information (06 §5).
 		}
 	}
+	linkProblem = nil
 	for _, entries := range [][]missingEntry{missing, installed} {
 		for i := range entries {
 			m := &entries[i]
@@ -527,6 +539,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			Evidence: installed[0].n.Evidence}
 		var packages []string
 		for _, m := range installed {
+			f.linkProblems = append(f.linkProblems, m.n.linkProblems...)
 			f.RequiredBy = append(f.RequiredBy, m.n.RequiredBy...)
 			f.Mods = append(f.Mods, m.n.Mods...)
 			f.Parts = append(f.Parts, m.name)
@@ -553,6 +566,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			Evidence: missing[0].n.Evidence}
 		var ws, refs []string
 		for _, m := range missing {
+			f.linkProblems = append(f.linkProblems, m.n.linkProblems...)
 			f.RequiredBy = append(f.RequiredBy, m.n.RequiredBy...)
 			f.Mods = append(f.Mods, m.n.Mods...)
 			f.Parts = append(f.Parts, m.name)
@@ -602,6 +616,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			Why:      T("loadAfter and community rules: breaking them showed no more errors in shared logs; sorting puts them right"),
 			Evidence: evidence(EvCorpus, T("load-order constraint strength"))}
 		for _, w := range weak {
+			f.linkProblems = append(f.linkProblems, w.linkProblems...)
 			f.Mods = append(f.Mods, w.Mods...)
 			f.Parts = append(f.Parts, w.Text)
 		}
@@ -616,6 +631,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		f := Need{rank: 1, Group: GroupList, Counted: true, Status: StatusWarn, Fold: true, code: "order.violated"}
 		seen := map[string]bool{}
 		for _, o := range order {
+			f.linkProblems = append(f.linkProblems, o.linkProblems...)
 			f.Parts = append(f.Parts, o.Text)
 			if len(o.Mods) > 0 && !seen[o.Mods[0]] {
 				seen[o.Mods[0]] = true

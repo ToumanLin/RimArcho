@@ -120,7 +120,7 @@ function card(it) {
   const t = needText("div", "pp-t", it.title || it.text, it.title ? it.content?.title : it.content?.text, close);
   body.append(t);
   if (it.why) body.append(needText("div", "pp-why", it.why, it.content?.why, close));
-  if (it.evidence) body.append(needEvidence(it.evidence));
+  if (it.status === -1 && it.evidence) body.append(needEvidence(it.evidence));
   if (it.fold && it.parts?.length) {
     const fold = el("details", "pp-parts");
     fold.append(el("summary", "", T("show which")), needParts(it, close));

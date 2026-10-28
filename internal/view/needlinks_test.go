@@ -17,7 +17,7 @@ func linkFixture(t testing.TB) (*testkit.Env, *app.LoadoutState) {
 	t.Helper()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
-	for i, name := range []string{"TakeCover", "Achtung!", "同名", "同名", "Framework"} {
+	for i, name := range []string{"TakeCover", "Achtung!", "同名", "同名", "Framework", "Mods", "Load"} {
 		e.AddWorkshop(fmt.Sprint(1001+i), testkit.Sample(fmt.Sprintf("tester.m%d", i), name))
 	}
 	e.WriteModsConfig("1.6", "ludeon.rimworld", "brrainz.harmony", "tester.m0", "tester.m1")
@@ -72,7 +72,7 @@ func TestNeedLinksAcrossSurfaces(t *testing.T) {
 	x, _ := st.Ix.ResolveOne("pkg:tester.m2")
 	y, _ := st.Ix.ResolveOne("pkg:tester.m3")
 	q := questionNeed(st, &store.Question{InstanceID: y.ID, CandidateID: x.ID})
-	names := newNeedNames(e.App, st, ps, nil)
+	names := newNeedNames(e.App, st, nil)
 	names.fill(&q)
 	if q.Content.Text[0].ID != y.ID || q.Content.Text[2].ID != x.ID || flatParts(q.Content.Text) != q.Text {
 		t.Fatalf("identity question links: %+v", q.Content.Text)
@@ -85,9 +85,12 @@ func TestMissingAndFoldedNameLinks(t *testing.T) {
 	ps := &app.ProblemSet{List: []*app.Problem{{Finding: &finding.Finding{Code: "dep.missing",
 		Subjects: []string{"pkg:tester.absent"}, Claim: "requires Absent Framework (pkg:tester.absent)",
 		Suggestions: []string{"subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456"}}}}}
-	r := newNeedNames(e.App, st, ps, nil)
+	r := newNeedNames(e.App, st, nil)
+	a, _ := st.Ix.ResolveOne("pkg:tester.m0")
+	b, _ := st.Ix.ResolveOne("pkg:tester.m1")
 	n := Need{Title: "missing: Absent Framework", Why: "TakeCover needs Absent Framework",
-		Parts: []string{"TakeCover should load after Achtung!", "tester.unknown"}, Fold: true}
+		Parts: []string{"TakeCover should load after Achtung!", "tester.unknown"}, Fold: true,
+		Mods: []string{a.ID, b.ID}, linkProblems: ps.List}
 	r.fill(&n)
 	last := n.Content.Title[len(n.Content.Title)-1]
 	if last.Text != "Absent Framework" || last.ID != "" || !strings.HasSuffix(last.URL, "=123456") {
@@ -97,27 +100,115 @@ func TestMissingAndFoldedNameLinks(t *testing.T) {
 		t.Fatalf("folded or unknown links: %+v", n.Content.Parts)
 	}
 	// Never match a name inside another English word or interpret markup as HTML.
-	r.add(NeedPart{Text: "<b>Mod</b>", ID: "markup"})
-	if r.parts("Frameworks", nil) != nil || flatParts(r.parts("<b>Mod</b>", nil)) != "<b>Mod</b>" {
+	trie := &needNames{}
+	trie.add(NeedPart{Text: "Framework", ID: "short"})
+	trie.add(NeedPart{Text: "<b>Mod</b>", ID: "markup"})
+	if trie.parts("Frameworks", nil) != nil || flatParts(trie.parts("<b>Mod</b>", nil)) != "<b>Mod</b>" {
 		t.Fatal("name boundaries or literal text lost")
 	}
-	r.add(NeedPart{Text: "Framework Extended", ID: "longer"})
-	if p := r.parts("Framework Extended", nil); len(p) != 1 || p[0].ID != "longer" {
+	trie.add(NeedPart{Text: "Framework Extended", ID: "longer"})
+	if p := trie.parts("Framework Extended", nil); len(p) != 1 || p[0].ID != "longer" {
 		t.Fatalf("short name swallowed longer name: %+v", p)
 	}
-	r.addFor(NeedPart{Text: "TakeCover", URL: "https://steamcommunity.com/sharedfiles/filedetails/?id=9999"}, "removed")
-	if p := r.parts("TakeCover", map[string]int{"removed": 1}); len(p) != 1 || p[0].ID != "" || p[0].URL == "" {
+	trie.add(NeedPart{Text: "TakeCover", ID: a.ID})
+	trie.addFor(NeedPart{Text: "TakeCover", URL: "https://steamcommunity.com/sharedfiles/filedetails/?id=9999"}, "removed")
+	if p := trie.parts("TakeCover", map[string]int{"removed": 1}); len(p) != 1 || p[0].ID != "" || p[0].URL == "" {
 		t.Fatalf("removed copy linked to another installed copy: %+v", p)
 	}
-	r.addFor(NeedPart{Text: "TakeCover"}, "unknown-removed")
-	if p := r.parts("TakeCover", map[string]int{"unknown-removed": 1}); len(p) != 1 || p[0].ID != "" || p[0].URL != "" {
+	trie.addFor(NeedPart{Text: "TakeCover"}, "unknown-removed")
+	if p := trie.parts("TakeCover", map[string]int{"unknown-removed": 1}); len(p) != 1 || p[0].ID != "" || p[0].URL != "" {
 		t.Fatalf("unknown removed copy must stay plain text: %+v", p)
 	}
 	// A title with no names keeps its title even when the full sentence contains names.
-	n = Need{Title: "missing dependency", Text: "TakeCover needs Achtung!"}
+	n = Need{Title: "missing dependency", Text: "TakeCover needs Achtung!", Mods: []string{a.ID, b.ID}}
 	r.fill(&n)
 	if reasonContent(n).Text != nil {
 		t.Fatal("badge replaced title with full sentence")
+	}
+}
+
+func TestNeedLinksLimitedToItem(t *testing.T) {
+	e, st := linkFixture(t)
+	a, _ := st.Ix.ResolveOne("pkg:tester.m0")
+	b, _ := st.Ix.ResolveOne("pkg:tester.m1")
+	index := newNeedNames(e.App, st, nil)
+	for label, n := range map[string]Need{
+		"row owner":   {Mods: []string{a.ID}},
+		"required by": {RequiredBy: []ModOwner{{ID: a.ID}}},
+		"action ref":  {Actions: []Action{{Refs: []string{st.Ix.Ref(a.ID)}}}},
+		"subject":     {linkProblems: []*app.Problem{{Finding: &finding.Finding{Subjects: []string{finding.Inst(a.ID)}}}}},
+	} {
+		t.Run(label, func(t *testing.T) {
+			n.Title = "Load Mods: TakeCover, Achtung!, Harmony, Framework"
+			n.Text, n.Why = n.Title, n.Title
+			n.Parts = []string{n.Title}
+			index.fill(&n)
+			for _, parts := range [][]NeedPart{n.Content.Title, n.Content.Text, n.Content.Why, n.Content.Parts[0]} {
+				if flatParts(parts) != n.Title {
+					t.Fatalf("text changed: %+v", parts)
+				}
+				links := 0
+				for _, p := range parts {
+					if p.ID != "" || p.URL != "" {
+						links++
+						if p.ID != a.ID || p.Text != "TakeCover" {
+							t.Fatalf("unrelated library mod linked: %+v", p)
+						}
+					}
+				}
+				if links != 1 {
+					t.Fatalf("wanted only the item's own mod: %+v", parts)
+				}
+			}
+		})
+	}
+	// Order folds keep the target even though only the mod to move gets a row badge.
+	n := Need{Mods: []string{a.ID}, Text: "TakeCover after Achtung!", Actions: []Action{{After: st.Ix.Ref(b.ID)}}}
+	index.fill(&n)
+	if len(n.Content.Text) != 3 || n.Content.Text[2].ID != b.ID {
+		t.Fatalf("action target lost: %+v", n.Content)
+	}
+	// A package target is enough; no owner or action has to repeat the target instance.
+	n = Need{Target: "tester.m1", Text: "Achtung!"}
+	index.fill(&n)
+	if n.Content.Text[0].ID != b.ID {
+		t.Fatalf("dependency target lost: %+v", n.Content)
+	}
+}
+
+func TestNeedLinksKeepEachProblemsMissingTarget(t *testing.T) {
+	SetLang("en")
+	e, st := linkFixture(t)
+	a, _ := st.Ix.ResolveOne("pkg:tester.m0")
+	ps := &app.ProblemSet{}
+	for i, name := range []string{"Missing Framework", "Other Library"} {
+		pkg := fmt.Sprintf("tester.absent%d", i)
+		ps.List = append(ps.List, &app.Problem{Finding: &finding.Finding{Code: "dep.missing", Severity: finding.Warning,
+			Subjects:    []string{finding.Inst(a.ID), "pkg:" + pkg},
+			Claim:       fmt.Sprintf("requires %s (pkg:%s)", name, pkg),
+			Suggestions: []string{fmt.Sprintf("subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=%d", 123456+i)}}})
+	}
+	n := BuildNeeds(e.App, st, ps)
+	if len(n.Items) != 2 {
+		t.Fatalf("expected two dependencies: %+v", n.Items)
+	}
+	for _, it := range n.Items {
+		want := "https://steamcommunity.com/sharedfiles/filedetails/?id=123456"
+		if strings.HasSuffix(it.Target, "1") {
+			want = "https://steamcommunity.com/sharedfiles/filedetails/?id=123457"
+		}
+		links := 0
+		for _, p := range it.Content.Title {
+			if p.URL != "" {
+				links++
+				if p.ID != "" || p.URL != want {
+					t.Fatalf("another item's target leaked into %s: %+v", it.Title, p)
+				}
+			}
+		}
+		if links != 1 {
+			t.Fatalf("Workshop target lost behind plain package alias: %+v", it.Content.Title)
+		}
 	}
 }
 

@@ -7,6 +7,11 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Problem text flows naturally around linked mod names, without the spacing between
+  separate facts. Links are limited to mods involved in each item; row popovers keep
+  their own mod name as plain text. The editor panel shows evidence only for shared-log
+  hints, keeping the cutoff date without repeating author-declaration lines.
+
 - Can it run, the editor's problems panel and mod-row popovers now link each named mod
   separately, including identity questions and folded lists. Installed names reveal their
   editor row; known missing mods open the Workshop. Folded entries display as proper lists.

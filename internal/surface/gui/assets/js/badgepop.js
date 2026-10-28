@@ -33,8 +33,8 @@ function draw(it, st) {
     const ic = el("span", "bp-ic s" + r.status);
     ic.innerHTML = statusIcon(r.status);
     const body = el("div", "bp-body");
-    body.append(needText("div", "bp-t", r.text, r.content?.text, () => hide(true)));
-    if (r.why) body.append(needText("div", "bp-why", r.why, r.content?.why, () => hide(true)));
+    body.append(needText("div", "bp-t", r.text, r.content?.text, () => hide(true), it.id));
+    if (r.why) body.append(needText("div", "bp-why", r.why, r.content?.why, () => hide(true), it.id));
     if (r.evidence) body.append(needEvidence(r.evidence));
     if (pinned && runNeed && r.actions && r.actions.length) {
       const acts = el("div", "bp-acts");

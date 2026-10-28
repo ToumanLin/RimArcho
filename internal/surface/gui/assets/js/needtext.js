@@ -5,11 +5,12 @@ import { S, el, T, say, errText, api } from "./state.js";
 let ui;
 export function initNeedText(u) { ui = u; }
 
-export function needText(tag, cls, text, parts, activated) {
-  const node = el(tag, cls);
+export function needText(tag, cls, text, parts, activated, ownID) {
+  // A sentence flows as text; word-facts lays out separate facts with flex gaps.
+  const node = el(tag, cls.split(/\s+/).filter((c) => c !== "word-facts").join(" "));
   if (!parts?.length) { node.textContent = text || ""; return node; }
   for (const p of parts) {
-    if (!p.id && !p.url) { node.append(document.createTextNode(p.text)); continue; }
+    if ((!p.id && !p.url) || (ownID && p.id === ownID)) { node.append(document.createTextNode(p.text)); continue; }
     const link = el("a", "need-name", p.text);
     link.href = p.url || "#";
     link.title = T(p.id ? "show it in the list" : "open it in the Workshop");

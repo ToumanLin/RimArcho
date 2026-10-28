@@ -123,7 +123,7 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 	if len(out) == 0 {
 		return out
 	}
-	names := newNeedNames(nil, st, &app.ProblemSet{}, nil)
+	names := newNeedNames(nil, st, nil)
 	for i := range out {
 		names.fill(&out[i])
 	}

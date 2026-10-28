@@ -128,6 +128,7 @@ func mergeDependencies(st *app.LoadoutState, items []Need) []Need {
 		}
 		if i, ok := by[key]; ok {
 			n := &out[i]
+			n.linkProblems = append(n.linkProblems, it.linkProblems...)
 			for _, o := range it.RequiredBy {
 				if !slices.ContainsFunc(n.RequiredBy, func(x ModOwner) bool { return x.ID == o.ID }) {
 					n.RequiredBy = append(n.RequiredBy, o)
