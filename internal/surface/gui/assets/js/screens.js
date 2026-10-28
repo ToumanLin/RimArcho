@@ -477,7 +477,7 @@ function markNeeds() {
 }
 
 // Read-only needs actions stay available during a game switch (06 §3.1).
-const actionWrite = (a) => ["open-url", "view", "list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
+const actionWrite = (a) => ["open-url", "problem", "view", "list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
 // The pinned badge popover in the editor offers the same actions (06 §4.2).
 setNeedRunner((it, a) => runAction(it, a), actionWrite);
 // The editor's problems panel (problems.js) runs them too.
@@ -493,6 +493,8 @@ async function runAction(it, act) {
       return;
     case "locate-directory":
       return directoryPrompt({ id: act.refs[0], label: it.title || act.label, path: act.lines?.[0] || "" }, false, async () => { await ui.reload(); needs(true); });
+    case "problem":
+      return pop.problem(act.problem, (fix) => runAction(it, fix), actionWrite);
     case "view":
       try { pop.text(act.label, await api.Inspect(act.argv)); } catch (e) { say("fail", errText(e)); }
       return;

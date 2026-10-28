@@ -102,6 +102,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 ### 3.2 详略
 
 - 默认输出摘要。`--all` 取消截断（问题列表里还取消折叠、显示默认隐藏的类别）；`--detail` 展开证据原文，例如 XML 片段或日志原文。
+- `problems --ref <p:引用>` 与 `problems show <p:引用>` 是同一个聚焦详情入口，MCP `list_problems ref=` 返回同一文本。缺失父模板先列影响、修复命令及候选，再列受影响内容和文件证据；同一 Mod 的未忽略项一起列，已忽略项单独检查。默认限制各段行数，`--ref … --all` 展开修复与忽略命令；提供方及日志条件见 03 §4.3。补丁目标未启用、Mod 的已知错误也先讲影响和处理入口。详情不附 Mod 卡的身份、文件清单、工坊清单和历史；`mod` 保持完整卡片。
 - 问题列表的默认显示（哪些折叠、哪些隐藏、过期日志不计数）以 03 §4.5 为准；默认被隐藏时会有一行 `hidden: N def.override, M patch.contested` 说明。
 
 ### 3.3 退出码与错误
@@ -208,7 +209,7 @@ next:
 | | `patches [--mod <引用>] [--target <Type/defName \| XPath 片段>] [--failed] [--all]` | Patch 操作及模拟结果；`--failed` 只列落空的及原因（03 §4.4） |
 | | `harmony [--mod <引用>] [--target <Type.Method \| 片段>] [--shared] [--all]` | Harmony 补丁：某 Mod 的、某方法上的、多个 Mod 共同补丁的 |
 | | `why <A> <B>` | 两个 Mod 的关系：位置、双向的声明、排序约束及是否被违反、共同定义的 Def、一方对另一方的 Patch、共同的 Harmony 目标（含各自的补丁类型）、共同的问题 |
-| | `problems [--subject <引用>] [--code <代码或前缀>] [--severity <级别>] [--min-severity <级别>] [--all] [--detail] [--ignored] [--no-analyze]` | 问题列表（03 §4）。分析过期时先在子进程重建，`--no-analyze` 不重建 |
+| | `problems [--ref <p:引用>] [--subject <引用>] [--code <代码或前缀>] [--severity <级别>] [--min-severity <级别>] [--all] [--detail] [--ignored] [--no-analyze]` | 问题列表（03 §4）。分析过期时先在子进程重建，`--no-analyze` 不重建 |
 | | `problems show\|ignore\|unignore <p:引用>` | 一个问题的证据和修复命令；忽略到它的 Mod 变化为止；取消忽略 |
 | | `changes [<引用>] [--since scan:<n>\|<天数>d\|YYYY-MM-DD] [--all]` | 变化事件，默认最近一次扫描 |
 | | `library [--search <词>] [--include <键:值>]… [--exclude <键:值>]… [--sort name\|size\|changed\|played] [--lineage <引用>] [--facets] [--all]` | Mod 库存（06 §2.9）：一行一个 Lineage（几份、合计大小、最要紧的状态、用在）；`--lineage` 列出每一份的路径、状态、方案、上次游玩和动作命令；`--facets` 列出每个筛选值和个数；新增 `tags:`（精确标签）、`content:`、`has:`、`name:`、`author:`、`id:`，`source:` 的目录角色与稳定别名见 02 §0.2，旧 `location:` 保留 |
@@ -309,7 +310,7 @@ next:
 | `get_patches` | `patches`（`mod`、`target`、`failed`、`all`、`game_version`） | true | — |
 | `get_harmony` | `harmony`（`mod`、`target`、`shared`、`all`、`game_version`） | true | — |
 | `explain_relation` | `why`（`a`、`b`、`game_version`） | true | — |
-| `list_problems` | `problems`；`ref` 时为 `problems show`。默认加 `--min-severity warning`，给了 `severity`、`min_severity` 或 `all` 时不加 | true | — |
+| `list_problems` | `problems`；`ref` 时为 `problems --ref`（保留 `all`、`game_version`）。默认加 `--min-severity warning`，给了 `severity`、`min_severity` 或 `all` 时不加 | true | — |
 | `list_changes` | `changes`（`ref`、`since`、`all`） | true | — |
 | `analyze_log` | `log`（`cluster`、`text`、`file`、`prev`、`all`、`since`、`game_version`）；`pattern=<引用>` 对应 `pattern`（`list` 列出全部） | true | — |
 | `search_files` | `files search`（`pattern`、`mod`、`mods`、`regex`、`case_sensitive`、`word`、`def`、`kind`、`languages`、`lang`、`all_versions`、`game`、`game_version`、`mode`、`page`、`limit`、`per_file`、`all`） | true | — |

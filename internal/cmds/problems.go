@@ -19,7 +19,7 @@ func init() {
 	register(&Command{Name: "analyze", Summary: "rebuild the Def and Patch facts (normally run on demand as a child process)", MaxArgs: 0, Run: analyzeCmd,
 		Flags: []Flag{gameVersionFlag}})
 	register(&Command{Name: "problems", Summary: "problems: declarations, Defs, Patches, Harmony and the newest log", MaxArgs: 0, Run: problemsCmd,
-		Flags: []Flag{{Name: "subject", Value: "<ref>", Help: "only problems involving this mod"}, {Name: "code", Value: "<code>", Help: "code or prefix, e.g. dep or patch.no-match"},
+		Flags: []Flag{{Name: "ref", Value: "<p:ref>", Help: "one problem: meaning, fixes and evidence"}, {Name: "subject", Value: "<ref>", Help: "only problems involving this mod"}, {Name: "code", Value: "<code>", Help: "code or prefix, e.g. dep or patch.no-match"},
 			{Name: "severity", Value: "<error|warning|info>"}, {Name: "all"}, {Name: "detail"}, {Name: "ignored"}, {Name: "no-analyze", Help: "do not rebuild a stale analysis"}, {Name: "min-severity", Value: "<error|warning|info>"}, gameVersionFlag}})
 	register(&Command{Name: "problems show", Args: "<p:ref>", Summary: "one problem with its evidence", MinArgs: 1, MaxArgs: 1, Run: problemShowCmd})
 	register(&Command{Name: "problems ignore", Args: "<p:ref>", Summary: "ignore a problem until its mod changes", MinArgs: 1, MaxArgs: 1, Run: problemIgnoreCmd})
@@ -114,6 +114,11 @@ func analysisText(c *Ctx, s *app.AnalysisState, err error) string {
 }
 
 func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if ref := a.Str("ref"); ref != "" {
+		detail := *a
+		detail.Pos = []string{ref}
+		return problemShowCmd(c, &detail)
+	}
 	if !a.Bool("no-analyze") {
 		// The newest log is attributed against its own version (03 §6.4, §7.3).
 		if st, err := c.App.Loadout(); err == nil {
@@ -314,6 +319,12 @@ func problemShowCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	ps, p, err := findProblem(c, a.Pos[0])
 	if err != nil {
 		return nil, err
+	}
+	if p.Code == "def.parent-missing" {
+		return parentProblemDoc(c, ps, p, a.Bool("all"))
+	}
+	if doc := problemDecisionDoc(c, ps, p); doc != nil {
+		return doc, nil
 	}
 	ix := ps.State.Ix
 	d, root := render.New(problemLine(ix, p))

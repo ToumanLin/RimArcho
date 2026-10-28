@@ -1861,3 +1861,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .prob-pop .pp-body .pp-acts { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .prob-pop .pp-more { margin: 2px 12px 4px 36px; color: var(--accent); font-size: 12px; }
 .prob-pop .pp-more:hover { text-decoration: underline; }
+
+.problem-panel .btns { flex-wrap: wrap; }
+.problem-panel .body { user-select: text; }
+.problem-panel li { overflow-wrap: anywhere; }
