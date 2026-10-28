@@ -239,7 +239,7 @@ type ProblemsIn struct {
 	Ignored     bool   `json:"ignored,omitempty" jsonschema:"list the problems the player ignored"`
 	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
 
-	IncludeMuted bool `json:"include_muted,omitempty" jsonschema:"also show muted version warnings, marked muted"`
+	IncludeMuted bool `json:"include_muted,omitempty" jsonschema:"also show ignored version warnings, marked ignored"`
 }
 
 type ChangesIn struct {

@@ -8,9 +8,12 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 `1.0.0-rc1` first.
 
 - A mod row's version warning now names that mod's declared versions. Version reminders
-  can be muted per mod and game minor version across all lists and games, survive updates,
-  and can be restored from the muted list or mod detail. The merged warning offers a
-  confirmed batch mute; muted mods leave problem counts and pack-build version warnings.
+  can be ignored per mod and game minor version across all lists and games, survive updates,
+  and can be restored from the ignored list or mod detail. The version list opens as a
+  scrollable panel with clickable mod names, declared versions, compact ignore/restore
+  controls, and groups by declared versions. Group/all ignore asks first; all restore is
+  available. Panel rows load only when opened. Ignored warnings leave problem counts and
+  pack-build version warnings; CLI/MCP help and output use ignore/restore consistently.
   CLI: `problems --include-muted`, `problems mute-version|unmute-version <mod>…
   [--game-version X.Y]`; MCP: `list_problems include_muted`, `mute_version_warnings`.
 

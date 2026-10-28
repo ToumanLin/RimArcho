@@ -182,7 +182,7 @@ func planVersions(c *Ctx, a *Args) (*render.Doc, error) {
 			line = v + "  every mod lists it"
 		}
 		if pv.Muted[v] > 0 {
-			line += fmt.Sprintf("; %d muted", pv.Muted[v])
+			line += fmt.Sprintf("; %d version warnings ignored", pv.Muted[v])
 		}
 		var tags []string
 		if slices.Contains(pv.Allowed, v) {

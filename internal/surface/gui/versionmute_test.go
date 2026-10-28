@@ -33,12 +33,24 @@ func TestVersionMuteRefreshesBoardAndDetail(t *testing.T) {
 	if err != nil || d.Version == nil || d.Version.Actions[0].Kind != view.ActVersionMute {
 		t.Fatalf("detail: %+v %v", d, err)
 	}
+	panel, err := a.VersionWarnings("1.7", false)
+	if err != nil || len(panel.Groups) != 1 || panel.Groups[0].Rows[0].ID != id {
+		t.Fatalf("panel: %+v %v", panel, err)
+	}
 	if _, err := a.DoAction(b.Reasons[id][0].Actions[0], 0); err != nil {
 		t.Fatal(err)
 	}
 	p := a.ListProblems()
 	if p.Count != 0 || p.Status[id] != 0 || len(p.Reasons[id]) != 0 {
 		t.Fatalf("stale event: %+v", p)
+	}
+	panel, err = a.VersionWarnings("1.7", false)
+	if err != nil || panel.Groups == nil || len(panel.Groups) != 0 {
+		t.Fatalf("empty panel: %+v %v", panel, err)
+	}
+	panel, err = a.VersionWarnings("1.7", true)
+	if err != nil || len(panel.Groups) != 1 || len(panel.All.Refs) != 1 || panel.All.Kind != view.ActVersionUnmute {
+		t.Fatalf("ignored panel: %+v %v", panel, err)
 	}
 	d, err = a.Detail(id, false, false, false)
 	if err != nil || d.Version == nil || d.Version.Actions[0].Kind != view.ActVersionUnmute {

@@ -26,7 +26,7 @@ func TestVersionMuteDetailRefresh(t *testing.T) {
 	for _, step := range []struct {
 		key, kind, text string
 	}{
-		{"M", view.ActVersionUnmute, "warnings about 1.7 are muted for this mod"},
+		{"M", view.ActVersionUnmute, "the 1.7 warning for this mod is ignored"},
 		{"U", view.ActVersionMute, "does not list 1.7 as supported (lists 1.6)"},
 	} {
 		cmd, handled := m.versionDetailKey(step.key)

@@ -2,6 +2,7 @@ package view_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -42,8 +43,12 @@ func TestVersionReasonsAndMuteActions(t *testing.T) {
 	if batch.Kind != view.ActVersionMute || batch.Confirm == "" || batch.Warn == "" || len(batch.Refs) != 2 {
 		t.Fatalf("batch: %+v", batch)
 	}
-	if merged.Actions[0].Kind != view.ActVersionList || len(merged.Actions[0].Entries) != 2 {
+	if merged.Actions[0].Kind != view.ActVersionList || merged.Actions[0].GameVersion != "1.7" {
 		t.Fatalf("list: %+v", merged.Actions)
+	}
+	panel, err := view.ReadVersionWarnings(e.App, "1.7", false)
+	if err != nil || len(panel.Groups) != 1 || len(panel.Groups[0].Rows) != 2 {
+		t.Fatalf("lazy list: %+v %v", panel, err)
 	}
 	var alpha string
 	for id, rs := range n.Reasons {
@@ -99,14 +104,18 @@ func TestVersionReasonsAndMuteActions(t *testing.T) {
 	}
 	var muted *view.Need
 	for i := range n.Items {
-		if n.Items[i].Text == "2 mods muted" {
+		if n.Items[i].Text == "2 mods' 1.7 warnings are ignored" {
 			muted = &n.Items[i]
 		}
 	}
-	if muted == nil || !muted.Dim || muted.Counted || len(muted.Actions[0].Entries) != 2 {
+	if muted == nil || !muted.Dim || muted.Counted || !muted.Actions[0].VersionMuted {
 		t.Fatalf("muted line: %+v", muted)
 	}
-	if _, err := view.Do(e.App, muted.Actions[0].Entries[0].Action, 0); err != nil {
+	panel, err = view.ReadVersionWarnings(e.App, "1.7", true)
+	if err != nil || len(panel.Groups) != 1 || len(panel.Groups[0].Rows) != 2 {
+		t.Fatalf("ignored list: %+v %v", panel, err)
+	}
+	if _, err := view.Do(e.App, panel.Groups[0].Rows[0].Action, 0); err != nil {
 		t.Fatal(err)
 	}
 	n, ps = build()
@@ -134,5 +143,85 @@ func TestVersionReasonChinese(t *testing.T) {
 	t.Cleanup(func() { view.SetLang("en") })
 	if got := view.Tf("does not list %s as supported (lists %s)", "1.7", "1.6"); got != "没有标明支持 1.7（标明了 1.6）" {
 		t.Fatal(got)
+	}
+	for _, c := range []struct {
+		key  string
+		args []any
+		want string
+	}{
+		{"ignore the %s warning for this mod", []any{"1.7"}, "忽略此 Mod 的 1.7 提醒"},
+		{"the %s warning for this mod is ignored", []any{"1.7"}, "已忽略此 Mod 的 1.7 提醒"},
+		{"restore the %s warning", []any{"1.7"}, "恢复 1.7 提醒"},
+		{"the %s warning for this mod is restored", []any{"1.7"}, "已恢复此 Mod 的 1.7 提醒"},
+		{"ignore these %d mods' %s warnings", []any{365, "1.7"}, "忽略这 365 个 Mod 的 1.7 提醒"},
+		{"%d mods' %s warnings are ignored", []any{1, "1.7"}, "1 个 Mod 的 1.7 提醒已忽略"},
+	} {
+		if got := view.Tf(c.key, c.args...); got != c.want {
+			t.Errorf("%s: %s", c.key, got)
+		}
+	}
+}
+
+func TestVersionPanelGroupsAndActions(t *testing.T) {
+	view.SetLang("en")
+	e := testkit.New(t)
+	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.7.5000 rev1")
+	packages := []string{"ludeon.rimworld"}
+	for i, versions := range [][]string{{"1.6"}, {"1.5", "1.6"}, {"1.4", "1.5"}, {"1.4"}, {"1.8"}} {
+		pkg := fmt.Sprintf("tester.mod%d", i)
+		e.AddWorkshop(fmt.Sprint(1001+i), testkit.Mod{PackageID: pkg, Name: fmt.Sprintf("Mod %d", i), Supported: versions})
+		packages = append(packages, pkg)
+	}
+	e.WriteModsConfig("1.7.5000 rev1", packages...)
+	e.AddEnv(false)
+	e.MustRun("scan")
+	panel, err := view.ReadVersionWarnings(e.App, "1.7", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if panel.Title != "does not list 1.7 as supported" || len(panel.Groups) != 3 || panel.All.Confirm == "" || len(panel.All.Refs) != 5 {
+		t.Fatalf("panel: %+v", panel)
+	}
+	if panel.Groups[0].Title != "lists 1.6  2" || panel.Groups[1].Title != "only lists 1.5 or earlier  2" {
+		t.Fatalf("groups: %+v", panel.Groups)
+	}
+	for _, group := range panel.Groups {
+		if group.Action.Confirm == "" || len(group.Action.Refs) != len(group.Rows) {
+			t.Fatalf("group action: %+v", group)
+		}
+		for _, row := range group.Rows {
+			if row.ID == "" || strings.Contains(row.Supported, "does not list") || row.Action.Label != "ignore" || len(row.Action.Refs) != 1 || row.Action.Confirm != "" {
+				t.Fatalf("row: %+v", row)
+			}
+		}
+	}
+	if _, err := view.Do(e.App, panel.Groups[0].Action, 0); err != nil {
+		t.Fatal(err)
+	}
+	panel, err = view.ReadVersionWarnings(e.App, "1.7", false)
+	if err != nil || len(panel.All.Refs) != 3 || len(panel.Groups) != 2 {
+		t.Fatalf("after group: %+v %v", panel, err)
+	}
+	ignored, err := view.ReadVersionWarnings(e.App, "1.7", true)
+	if err != nil || len(ignored.All.Refs) != 2 || ignored.All.Kind != view.ActVersionUnmute || ignored.All.Confirm != "" {
+		t.Fatalf("restore all: %+v %v", ignored, err)
+	}
+	if _, err := view.Do(e.App, ignored.All, 0); err != nil {
+		t.Fatal(err)
+	}
+	panel, err = view.ReadVersionWarnings(e.App, "1.7", false)
+	if err != nil || len(panel.All.Refs) != 5 {
+		t.Fatalf("restored: %+v %v", panel, err)
+	}
+	if _, err := view.ReadVersionWarnings(e.App, "1.8", false); err == nil {
+		t.Fatal("stale version accepted")
+	}
+	ps, err := e.App.Problems(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(view.BuildNeeds(e.App, ps.State, ps))
+	if err != nil || strings.Contains(string(data), `"entries":`) || strings.Contains(string(data), `"rows":`) {
+		t.Fatalf("eager panel payload: %s %v", data, err)
 	}
 }

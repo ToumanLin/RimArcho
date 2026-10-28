@@ -7,7 +7,6 @@ import { api } from "./api.js";
 import { statusIcon } from "./icons.js";
 import * as pop from "./popups.js";
 import { runNeedAction, needActionWrite } from "./screens.js";
-import { versionList, onVersionList } from "./versionwarnings.js";
 
 let ui = null;
 export function initProblems(u) { ui = u; listen(); }
@@ -124,8 +123,6 @@ function card(it) {
   }
   body.append(t);
   if (it.why) body.append(el("div", "pp-why", it.why));
-  const versions = versionList(it, runNeedAction);
-  if (versions) body.append(versions);
   const acts = (it.actions || []).filter((a) => a.kind !== "fold");
   if (acts.length) {
     const right = el("div", "pp-acts");
@@ -185,7 +182,6 @@ let listening = false;
 function listen() {
   if (listening) return;
   listening = true;
-  onVersionList("problems", () => { if (isOpen()) draw(); });
   // a click outside the panel (and outside its menu and any dialog) closes it
   document.addEventListener("mousedown", (e) => {
     if (!isOpen() || box.contains(e.target)) return;

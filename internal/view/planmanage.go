@@ -191,7 +191,7 @@ func planDetail(a *app.App, st *app.LoadoutState, r *PlanRow) (*PlanDetail, erro
 			c.Tip = Tf("every mod lists %s", v)
 		}
 		if n := pv.Muted[v]; n > 0 {
-			c.Tip += "  " + Tf("%d mods muted", n)
+			c.Tip += "  " + Tf("%d mods' %s warnings are ignored", n, v)
 		}
 		if c.Game {
 			c.Tip = T("the game now") + "  " + c.Tip

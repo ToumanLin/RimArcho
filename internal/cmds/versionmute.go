@@ -21,7 +21,7 @@ func versionMuteCmd(c *Ctx, a *Args, muted bool) (*render.Doc, error) {
 	if err := c.App.SetVersionMute(a.Pos, mm, muted); err != nil {
 		return nil, err
 	}
-	verb := "muted"
+	verb := "ignored"
 	if !muted {
 		verb = "restored"
 	}

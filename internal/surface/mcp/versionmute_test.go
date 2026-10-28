@@ -19,15 +19,15 @@ func TestVersionMuteTool(t *testing.T) {
 	e.MustRun("scan")
 	cs := connect(t, e)
 	got, isErr := call(t, cs, "mute_version_warnings", map[string]any{"refs": []string{"pkg:tester.a"}, "game_version": "1.7"})
-	if isErr || !strings.Contains(got, "muted for 1.7") {
+	if isErr || !strings.Contains(got, "ignored for 1.7") {
 		t.Fatalf("mute: %s %v", got, isErr)
 	}
 	got, isErr = call(t, cs, "list_problems", nil)
-	if isErr || !strings.Contains(got, "muted: 1 version warnings") || strings.Contains(got, "Alpha") {
+	if isErr || !strings.Contains(got, "ignored-version-warnings: 1 version warnings") || strings.Contains(got, "Alpha") {
 		t.Fatalf("list: %s %v", got, isErr)
 	}
 	got, isErr = call(t, cs, "list_problems", map[string]any{"include_muted": true})
-	if isErr || !strings.Contains(got, "Alpha") || !strings.Contains(got, "[version warning muted]") {
+	if isErr || !strings.Contains(got, "Alpha") || !strings.Contains(got, "[version warning ignored]") {
 		t.Fatalf("include: %s %v", got, isErr)
 	}
 	got, isErr = call(t, cs, "mute_version_warnings", map[string]any{"refs": []string{"pkg:tester.a"}, "undo": true})
@@ -35,7 +35,7 @@ func TestVersionMuteTool(t *testing.T) {
 		t.Fatalf("unmute: %s %v", got, isErr)
 	}
 	got, isErr = call(t, cs, "list_problems", nil)
-	if isErr || strings.Contains(got, "muted: ") || !strings.Contains(got, "version.unsupported") {
+	if isErr || strings.Contains(got, "ignored-version-warnings: ") || !strings.Contains(got, "version.unsupported") {
 		t.Fatalf("restored list: %s %v", got, isErr)
 	}
 }
@@ -61,7 +61,7 @@ func TestIncludeMutedOlderVersionTool(t *testing.T) {
 	e.MustRun("problems", "mute-version", "pkg:tester.old")
 	cs := connect(t, e)
 	got, isErr := call(t, cs, "list_problems", map[string]any{"include_muted": true})
-	if isErr || !strings.Contains(got, "Old mod") || !strings.Contains(got, "[version warning muted]") {
+	if isErr || !strings.Contains(got, "Old mod") || !strings.Contains(got, "[version warning ignored]") {
 		t.Fatalf("info mute missing: %s %v", got, isErr)
 	}
 }

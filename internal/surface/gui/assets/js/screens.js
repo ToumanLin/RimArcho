@@ -17,12 +17,12 @@ import { wireSeparator } from "./separator.js";
 import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
 import { getChoices } from "./credit.js";
-import { toggleVersionList, versionList, onVersionList, setVersionRunner } from "./versionwarnings.js";
+import { setVersionRunner } from "./versionwarnings.js";
+import { openVersionList } from "./versionpanel.js";
 
 let ui = null;
 export function initScreens(u) {
   ui = u;
-  onVersionList("needs", () => { if (S.screen === "needs") drawNeeds(); });
   initSubscriptions(u, { beginPageRead, page, area, button, act, seg });
   on("tasks", (ev) => {
     if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
@@ -455,8 +455,6 @@ function needCard(it, i) {
   }
   top.append(right);
   row.append(top);
-  const versions = versionList(it, runAction);
-  if (versions) row.append(versions);
   if (it.linkGroups?.length) row.append(linkRows(it.linkGroups));
   if (it.fold && N.open.has(it.text)) {
     const parts = el("div", "parts");
@@ -504,7 +502,7 @@ async function runAction(it, act) {
     case "list":
       return pop.text(act.title, act.lines);
     case "version-list":
-      return toggleVersionList(it);
+      return openVersionList(act, runAction, async (id) => { await ui.go("plan"); await ui.palette({ kind: 1, id }); });
     case "manage-lists":
       return ui.manageLists(0);
     case "fold":

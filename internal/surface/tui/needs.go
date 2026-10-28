@@ -96,23 +96,7 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 	case view.ActList:
 		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n")); return nil }
 	case view.ActVersionList:
-		k.run = func(m *model) tea.Cmd {
-			p := &panel{title: a.Title}
-			for _, e := range a.Entries {
-				p.choices = append(p.choices, e.Text+"  "+e.Action.Label)
-			}
-			p.onPick = func(m *model, v string) tea.Cmd {
-				for i, label := range p.choices {
-					if label == v {
-						m.doAction(a.Entries[i].Action, 0)
-						break
-					}
-				}
-				return nil
-			}
-			m.panel = p
-			return nil
-		}
+		k.run = func(m *model) tea.Cmd { return m.openVersionWarnings(a) }
 	case view.ActSubscribe: // a background task in the window; here, the command to run
 		k.run = func(m *model) tea.Cmd {
 			m.openPanel(T("subscribe them from a terminal"), "archo "+strings.Join(a.Argv, " "))

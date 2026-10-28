@@ -165,7 +165,7 @@ func TestVersionMuteCountsAndAtomicValidation(t *testing.T) {
 	if len(p.Mismatch) != 0 {
 		t.Fatalf("pack warnings: %v", p.Mismatch)
 	}
-	if got := e.MustRun("plan", "versions"); !strings.Contains(got, "2 muted") || strings.Contains(got, "1.7  every mod lists it") {
+	if got := e.MustRun("plan", "versions"); !strings.Contains(got, "2 version warnings ignored") || strings.Contains(got, "1.7  every mod lists it") {
 		t.Fatalf("plan output: %s", got)
 	}
 }

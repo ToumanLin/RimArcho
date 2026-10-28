@@ -101,8 +101,8 @@ type Action struct {
 	Answer  string   `json:"answer,omitempty"`
 	Problem string   `json:"problem,omitempty"` // p:<ref> for ignore
 
-	GameVersion string         `json:"gameVersion,omitempty"`
-	Entries     []VersionEntry `json:"entries,omitempty"`
+	GameVersion  string `json:"gameVersion,omitempty"`
+	VersionMuted bool   `json:"versionMuted,omitempty"`
 
 	LinkGroups []LinkGroup `json:"linkGroups,omitempty"`
 }
@@ -231,11 +231,15 @@ func indexNeeds(n *Needs) {
 		if text == "" {
 			text = it.Text
 		}
+		var common Reason
+		if len(it.rowReasons) == 0 {
+			common = Reason{Status: it.Status, Text: text, Why: it.Why, Section: it.Section, Actions: popActions(it.Actions)}
+		}
 		for _, id := range icons {
 			if it.Status > n.Status[id] {
 				n.Status[id] = it.Status
 			}
-			r := Reason{Status: it.Status, Text: text, Why: it.Why, Section: it.Section, Actions: popActions(it.Actions)}
+			r := common
 			if own, ok := it.rowReasons[id]; ok {
 				r = own
 				r.Section = it.Section
@@ -618,21 +622,18 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			if prev := app.PrevMinor(mm); prev != "" {
 				text = Tf("%d mods do not list %s as supported (%d of them list %s)", n, mm, warn, prev)
 			}
-			var versionMods []string
-			rows := make([]VersionEntry, 0, n)
-			reasons := map[string]Reason{}
+			versionMods := make([]string, 0, n)
+			reasons := make(map[string]Reason, n)
+			reasonOf := versionReasonBuilder(mm, false)
 			for _, v := range versions {
 				id := v.SubjectInstance()
 				versionMods = append(versionMods, id)
-				r := versionReason(st, ix.ByID[id], false)
-				reasons[id] = r
-				rows = append(rows, VersionEntry{Text: nm(v.Subjects[0]) + "  " + r.Text, Action: r.Actions[0]})
+				reasons[id] = reasonOf(ix.ByID[id])
 			}
-			sort.SliceStable(rows, func(i, j int) bool { return rows[i].Text < rows[j].Text })
 			add(Need{rank: 5, Group: GroupList, Text: text, Counted: true, Status: StatusWarn, Mods: versionMods, Fold: true,
 				code: "version.unsupported", rowReasons: reasons,
 				Why: T("they may still work, but their authors have not said they do on this version"), Evidence: evidence(EvDeclared, T("About.xml supportedVersions")),
-				Actions: []Action{{Kind: ActVersionList, Key: "enter", Label: T("see the list"), Title: text, Entries: rows}, versionBatch(st, versions)}})
+				Actions: []Action{{Kind: ActVersionList, Key: "enter", Label: T("see the list"), Title: Tf("does not list %s as supported", mm), GameVersion: mm}, versionBatch(st, versions, false)}})
 		}
 	}
 	if len(ps.Muted) > 0 {
