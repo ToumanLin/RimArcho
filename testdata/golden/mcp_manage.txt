@@ -57,11 +57,38 @@ questions: 1 open
   q:1  score 1.00  scan:3
     new:     #np4v  Leftover  [local Leftover Again]
     was it:  #xzwf  Leftover  [local Leftover, tombstone since 2026-10-01]
+    3 content files are identical; differences: package ID
+    name matches: Leftover
+    package ID: tester.leftover2 / tester.leftover
+    author matches: Tester
+    comparison folder: Leftover Again / Leftover
+    matching file: defs/recipedefs/leftover.xml
+    matching file: defs/thingdefs/leftover.xml
+    matching file: patches/leftover.xml
 next:
   archo identity resolve q:1 same|copy|unrelated
 
+> resolve_identity {"action":"why","question":"q:1"}
+q:1 comparison
+  3 content files are identical; differences: package ID
+  name matches: Leftover
+  package ID: tester.leftover2 / tester.leftover
+  author matches: Tester
+  comparison folder: Leftover Again / Leftover
+  matching file: defs/recipedefs/leftover.xml
+  matching file: defs/thingdefs/leftover.xml
+  matching file: patches/leftover.xml
+
 > resolve_identity {"action":"resolve","answer":"same","question":"q:1"}
 q:1  resolved: same
+  3 content files are identical; differences: package ID
+  name matches: Leftover
+  package ID: tester.leftover2 / tester.leftover
+  author matches: Tester
+  comparison folder: Leftover Again / Leftover
+  matching file: defs/recipedefs/leftover.xml
+  matching file: defs/thingdefs/leftover.xml
+  matching file: patches/leftover.xml
   #np4v merged into #xzwf; it keeps its ID, lineage and history
   #xzwf  Leftover  [local Leftover Again]
 next:

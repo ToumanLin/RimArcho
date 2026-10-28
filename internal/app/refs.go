@@ -261,8 +261,8 @@ func ParseQuestionRef(ref string) (int64, error) {
 	return n, nil
 }
 
-// ResolveQuestion answers an identity question: same | copy | unrelated (02 §5.4).
-func (a *App) ResolveQuestion(qid int64, answer string) (*store.Question, error) {
+// IdentityQuestion looks up a question visible to the current environment.
+func (a *App) IdentityQuestion(qid int64) (*store.Question, error) {
 	e, err := a.Env()
 	if err != nil {
 		return nil, err
@@ -273,6 +273,15 @@ func (a *App) ResolveQuestion(qid int64, answer string) (*store.Question, error)
 	}
 	if q == nil || (q.EnvID != e.ID && q.EnvID != store.Shared) {
 		return nil, fmt.Errorf("no question q:%d in env:%s (archo identity list)", qid, e.Name)
+	}
+	return q, nil
+}
+
+// ResolveQuestion answers an identity question: same | copy | unrelated (02 §5.4).
+func (a *App) ResolveQuestion(qid int64, answer string) (*store.Question, error) {
+	q, err := a.IdentityQuestion(qid)
+	if err != nil {
+		return nil, err
 	}
 	if q.Status != "open" {
 		return nil, fmt.Errorf("q:%d is already resolved (%s)", qid, q.Resolution)

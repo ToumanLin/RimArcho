@@ -35,6 +35,15 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   suggestions, the editor button reads "suggestions". Diagnostic wording explains what to
   try, avoids XML field names and internal log references, and treats corpus rates as hints.
 
+- Identity questions now require matching mod contents, exclude shared About/preview/routing
+  files and empty or repeated contents, and stop asking when either mod has several
+  candidates. A scan removes obsolete unanswered questions; player answers are preserved.
+- Answering “same” now keeps references in every plan, older list versions, undo/redo and
+  staged positions valid in the same transaction. Fixed packs follow the merged identity.
+- All three identity answers remain equally visible with effects and confirmation.
+  A quiet “Why this question?” link opens a small comparison with a conclusion, two columns,
+  up to five matching files and the three answers. The main reason also appears on the row.
+  CLI/MCP comparisons omit empty rows and method details; bare `identity` lists questions.
 - Launching from the window with a required mod missing or disabled now asks once ("launch
   anyway" / cancel) and lists what is missing: the game would not load the mods that need
   them and may reset its list to the base game. The CLI and TUI still launch without asking.

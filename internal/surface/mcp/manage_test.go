@@ -152,6 +152,7 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("status", map[string]any{"show": "data"}, "data", "status"),
 		s("scan", nil, "scan"),
 		s("resolve_identity", map[string]any{"action": "list"}, "identity", "list"),
+		s("resolve_identity", map[string]any{"action": "why", "question": "q:1"}, "identity", "why", "q:1"),
 		s("resolve_identity", map[string]any{"action": "resolve", "question": "q:1", "answer": "same"}, "identity", "resolve", "q:1", "same"),
 		func() manageStep {
 			a := pick("A", "local")

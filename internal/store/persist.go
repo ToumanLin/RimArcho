@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -199,12 +200,26 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 			return err
 		}
 	}
+	questionIDs := map[*identity.Question]int64{}
 	for _, q := range res.Questions {
-		if _, err = tx.Exec(`INSERT INTO identity_question(environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score)
+		var inserted sql.Result
+		if inserted, err = tx.Exec(`INSERT INTO identity_question(environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score)
 			VALUES(?,?,?,?,?,?)`, instEnv[q.New.InstanceID], scanID, q.New.InstanceID, snapOf[q.New], q.Candidate.ID, q.Score); err != nil {
 			return err
 		}
+		questionIDs[q], err = inserted.LastInsertId()
+		if err != nil {
+			return err
+		}
+		if err := saveQuestionSummary(tx, &Question{ID: questionIDs[q], ScanID: scanID, InstanceID: q.New.InstanceID, SnapshotID: snapOf[q.New], CandidateID: q.Candidate.ID}); err != nil {
+			return err
+		}
 	}
+	removed, checkErr := recheckQuestions(tx, envID, scanned)
+	if checkErr != nil {
+		return checkErr
+	}
+	res.Questions = slices.DeleteFunc(res.Questions, func(q *identity.Question) bool { return removed[questionIDs[q]] })
 	if err = recomputePrimaries(tx, envID); err != nil {
 		return err
 	}

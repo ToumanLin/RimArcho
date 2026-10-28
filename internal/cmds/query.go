@@ -587,6 +587,11 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		case q.CandidateID:
 			root.KV("question", fmt.Sprintf("q:%d %s may be this mod back (archo identity list)", q.ID, ix.Ref(q.InstanceID)))
 		}
+		if m.ID == q.InstanceID || m.ID == q.CandidateID {
+			if err := addIdentityReasons(c.App.Store, q, func(line string) { root.Add(line) }); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if decl.ParseError != "" {
 		root.KV("warning", "About.xml: "+decl.ParseError)

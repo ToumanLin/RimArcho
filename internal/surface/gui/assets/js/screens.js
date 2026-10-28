@@ -445,7 +445,15 @@ function needCard(it, i) {
     b.prepend(archoMark());
     right.append(b);
   }
-  if (acts.length) {
+  if (acts.some((a) => a.kind === "answer")) {
+    right.classList.add("identity-answers");
+    for (const a of acts) {
+      const answer = a.kind === "answer";
+      const b = button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, answer ? "" : "identity-why", actionWrite(a));
+      if (a.title) b.title = a.title;
+      (answer ? right : body).append(b);
+    }
+  } else if (acts.length) {
     const a = acts[0];
     right.append(button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, it.dim ? "" : "primary", actionWrite(a)));
     if (acts.length > 1) {
@@ -498,6 +506,9 @@ async function runAction(it, act) {
     case "problem":
       return pop.problem(act.problem, (fix) => runAction(it, fix), actionWrite);
     case "view":
+      if (act.argv?.[0] === "identity" && act.argv?.[1] === "why") {
+        return pop.identity(act.question, (answer) => runAction(it, answer));
+      }
       try { pop.text(act.label, await api.Inspect(act.argv)); } catch (e) { say("fail", errText(e)); }
       return;
     case "list":

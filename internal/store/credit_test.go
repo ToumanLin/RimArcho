@@ -13,7 +13,7 @@ func TestMigrateV19Credit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.DB.Exec(`ALTER TABLE workspace_undo DROP COLUMN staging; DROP TABLE credit_deployment; DROP TABLE credit_session; DROP TABLE credit_item; DROP TABLE credit_batch; UPDATE meta SET value='19' WHERE key='schema_version'`); err != nil {
+	if _, err := s.DB.Exec(`ALTER TABLE identity_question DROP COLUMN summary; ALTER TABLE workspace_undo DROP COLUMN staging; DROP TABLE credit_deployment; DROP TABLE credit_session; DROP TABLE credit_item; DROP TABLE credit_batch; UPDATE meta SET value='19' WHERE key='schema_version'`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetMeta("keeper", "preserved"); err != nil {

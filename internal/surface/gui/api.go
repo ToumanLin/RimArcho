@@ -1155,11 +1155,25 @@ func (s *API) ProblemDetail(ref string) (*view.ProblemPanel, error) {
 // inspectable are the read-only commands an item's "see what" may run.
 var inspectable = map[string]bool{"problems": true, "patches": true, "mod": true, "def": true, "harmony": true}
 
+// IdentityWhy is a read-only comparison requested by the player.
+func (s *API) IdentityWhy(qid int64) (*view.IdentityPanel, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.IdentityQuestionPanel(s.a, qid)
+}
+
 // Inspect runs a read-only command an action names (view, 06 §5) and returns its text
 // with names for #refs.
 func (s *API) Inspect(argv []string) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if len(argv) == 3 && argv[0] == "identity" && argv[1] == "why" {
+		qid, err := app.ParseQuestionRef(argv[2])
+		if err != nil {
+			return nil, err
+		}
+		return view.IdentityReasons(s.a, qid)
+	}
 	// an outside change's "see the difference" (loadout diff [<v>] [<v>]), in the window's words
 	if len(argv) >= 2 && len(argv) <= 4 && argv[0] == "loadout" && argv[1] == "diff" {
 		from, to := "", ""

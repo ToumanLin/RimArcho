@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -58,6 +59,16 @@ func (m *model) fillInspect(v *inspectView) {
 	argv := v.argv
 	if v.modRef != "" {
 		argv = modTabArgv(v.modRef, v.sub)
+	}
+	if len(argv) == 3 && argv[0] == "identity" && argv[1] == "why" {
+		qid, err := app.ParseQuestionRef(argv[2])
+		if err == nil {
+			if lines, err := view.IdentityReasons(m.app, qid); err == nil {
+				v.lines = lines
+				v.cursor, v.off = 0, 0
+				return
+			}
+		}
 	}
 	out, _ := cmds.Execute(m.app, argv)
 	v.lines = strings.Split(strings.TrimRight(out, "\n"), "\n")

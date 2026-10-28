@@ -84,11 +84,29 @@ questions: 1 open
   q:1  score 1.00  scan:3
     new:     #2ihw  Leftover  [local Leftover Again]
     was it:  #ekgo  Leftover  [workshop ws:3000000009, tombstone since 2026-10-02, residue]
+    3 content files are identical; differences: package ID, Workshop ID
+    name matches: Leftover
+    package ID: tester.leftover2 / tester.leftover
+    author matches: Tester
+    Workshop ID: not recorded / 3000000009
+    comparison folder: Leftover Again / 3000000009
+    matching file: defs/recipedefs/leftover.xml
+    matching file: defs/thingdefs/leftover.xml
+    matching file: patches/leftover.xml
 next:
   archo identity resolve q:1 same|copy|unrelated
 
 $ archo identity resolve q:1 same
 q:1  resolved: same
+  3 content files are identical; differences: package ID, Workshop ID
+  name matches: Leftover
+  package ID: tester.leftover2 / tester.leftover
+  author matches: Tester
+  Workshop ID: not recorded / 3000000009
+  comparison folder: Leftover Again / 3000000009
+  matching file: defs/recipedefs/leftover.xml
+  matching file: defs/thingdefs/leftover.xml
+  matching file: patches/leftover.xml
   #2ihw merged into #ekgo; it keeps its ID, lineage and history
   #ekgo  Leftover  [local Leftover Again]
 next:
@@ -99,6 +117,14 @@ questions: 0 open, 1 resolved
   q:1  score 1.00  scan:3  [resolved: same]
     new:     #2ihwr2ol  (gone)
     was it:  #ekgo      Leftover  [local Leftover Again]
+    3 content files are identical; differences: package ID
+    name matches: Leftover
+    package ID: tester.leftover2 / tester.leftover
+    author matches: Tester
+    comparison folder: not recorded / Leftover Again
+    matching file: defs/recipedefs/leftover.xml
+    matching file: defs/thingdefs/leftover.xml
+    matching file: patches/leftover.xml
 
 $ archo changes #ekgo
 changes: 3 mods (#ekgo)

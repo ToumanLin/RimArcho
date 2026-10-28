@@ -143,6 +143,7 @@ type Question struct {
 	InstanceID  string
 	SnapshotID  int64
 	CandidateID string
+	Summary     string // compact comparison recorded at question creation
 	Score       float64
 	Status      string // open | resolved
 	Resolution  string // same | copy | unrelated
@@ -152,7 +153,7 @@ type Question struct {
 // Questions lists an environment's identity questions (open first unless all is false).
 func (s *Store) Questions(envID string, all bool) ([]*Question, error) {
 	q := `SELECT id, environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score, status, resolution,
-		coalesce(resolved_at, 0) FROM identity_question WHERE environment_id IN ('', ?)`
+		coalesce(resolved_at, 0), summary FROM identity_question WHERE environment_id IN ('', ?)`
 	if !all {
 		q += ` AND status='open'`
 	}
@@ -166,7 +167,7 @@ func (s *Store) Questions(envID string, all bool) ([]*Question, error) {
 	for rows.Next() {
 		var x Question
 		var ra int64
-		if err := rows.Scan(&x.ID, &x.EnvID, &x.ScanID, &x.InstanceID, &x.SnapshotID, &x.CandidateID, &x.Score, &x.Status, &x.Resolution, &ra); err != nil {
+		if err := rows.Scan(&x.ID, &x.EnvID, &x.ScanID, &x.InstanceID, &x.SnapshotID, &x.CandidateID, &x.Score, &x.Status, &x.Resolution, &ra, &x.Summary); err != nil {
 			return nil, err
 		}
 		if ra != 0 {
@@ -182,8 +183,8 @@ func (s *Store) QuestionByID(id int64) (*Question, error) {
 	var x Question
 	var ra int64
 	err := s.DB.QueryRow(`SELECT id, environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score, status, resolution,
-		coalesce(resolved_at, 0) FROM identity_question WHERE id=?`, id).
-		Scan(&x.ID, &x.EnvID, &x.ScanID, &x.InstanceID, &x.SnapshotID, &x.CandidateID, &x.Score, &x.Status, &x.Resolution, &ra)
+		coalesce(resolved_at, 0), summary FROM identity_question WHERE id=?`, id).
+		Scan(&x.ID, &x.EnvID, &x.ScanID, &x.InstanceID, &x.SnapshotID, &x.CandidateID, &x.Score, &x.Status, &x.Resolution, &ra, &x.Summary)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

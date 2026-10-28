@@ -38,12 +38,15 @@ function draw(it, st) {
     if (r.evidence) body.append(needEvidence(r.evidence));
     if (pinned && runNeed && r.actions && r.actions.length) {
       const acts = el("div", "bp-acts");
+      const answers = r.actions.some((a) => a.kind === "answer");
       r.actions.forEach((a, i) => {
-        const b = el("button", "btn small" + (i === 0 ? " primary" : ""), a.label);
+        const why = answers && a.kind !== "answer";
+        const b = el("button", why ? "btn identity-why" : "btn small" + (i === 0 && !answers ? " primary" : ""), a.label);
+        if (a.title) b.title = a.title;
         const w = needWrite(a);
         if (w) b.dataset.envWrite = w;
         b.onclick = (e) => { e.stopPropagation(); hide(true); runNeed(r, a); };
-        acts.append(b);
+        (why ? body : acts).append(b);
       });
       body.append(acts);
     }

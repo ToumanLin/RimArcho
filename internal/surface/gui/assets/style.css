@@ -474,6 +474,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need .acts { flex: none; display: flex; gap: 6px; align-items: center; }
 .need .acts .btn { height: 28px; padding: 0 12px; border-radius: var(--r-sm); font-size: 13px; }
 .need .acts .btn.primary { font-weight: 600; }
+.need .acts.identity-answers { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
 .need .acts .btn.more { padding: 0 8px; letter-spacing: 1px; background: transparent; }
 .need .ev-line { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; min-width: 0; font-size: 12px; color: var(--muted); }
 /* where a claim comes from is for the item being read: the others stay quiet */
@@ -1873,3 +1874,18 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .problem-panel .btns { flex-wrap: wrap; }
 .problem-panel .body { user-select: text; }
 .problem-panel li { overflow-wrap: anywhere; }
+/* Identity answers stay equal; their explanation is a quiet control under the text. */
+.btn.identity-why, .page .btn.identity-why { display: block; height: auto; padding: 3px 0; margin-top: 3px; border: 0; box-shadow: none; background: none; color: var(--muted); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.btn.identity-why:hover, .page .btn.identity-why:hover { color: var(--fg); background: none; }
+.identity-comparison .identity-headline { margin: 0 0 16px; font-size: 15px; font-weight: 600; }
+.identity-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
+.identity-table th, .identity-table td { padding: 7px 8px; text-align: left; overflow-wrap: anywhere; border-bottom: var(--hairline) solid var(--line); vertical-align: top; }
+.identity-table th { color: var(--muted); font-weight: 400; }
+.identity-table th:first-child { width: 90px; }
+.identity-table tr.different { background: var(--pill); }
+.identity-table tr.match td { color: var(--muted); }
+.identity-mark { display: inline-block; width: 18px; }
+.identity-files-label { margin-top: 16px; color: var(--muted); font-size: 12px; }
+.identity-files { padding-left: 20px; margin: 6px 0 0; overflow-wrap: anywhere; font-size: 13px; }
+.identity-answer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.identity-comparison .btns { flex-wrap: wrap; justify-content: space-between; }

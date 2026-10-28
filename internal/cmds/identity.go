@@ -15,8 +15,11 @@ import (
 const pathSep = os.PathSeparator
 
 func init() {
+	register(&Command{Name: "identity", Summary: "list open identity questions", MaxArgs: 0,
+		Flags: []Flag{{Name: "all", Help: "include resolved questions"}}, Run: identityList})
 	register(&Command{Name: "identity list", Summary: "open identity questions (\"is this #xxxx back?\")", MaxArgs: 0,
 		Flags: []Flag{{Name: "all", Help: "include resolved questions"}}, Run: identityList})
+	register(&Command{Name: "identity why", Args: "<q:n>", Summary: "show what matched and differed in an identity question", MinArgs: 1, MaxArgs: 1, Run: identityWhy})
 	register(&Command{Name: "identity resolve", Args: "<q:n> same|copy|unrelated", Summary: "answer an identity question", MinArgs: 2, MaxArgs: 2, Run: identityResolve})
 	register(&Command{Name: "lineage split", Args: "<ref>", Summary: "move an instance into a lineage of its own", MinArgs: 1, MaxArgs: 1, Run: lineageSplit})
 	register(&Command{Name: "lineage merge", Args: "<ref> <ref>", Summary: "merge the second lineage into the first", MinArgs: 2, MaxArgs: 2, Run: lineageMerge})
@@ -91,6 +94,9 @@ func identityList(c *Ctx, a *Args) (*render.Doc, error) {
 			}
 		}
 		n.AddColumns(rows)
+		if err := addIdentityReasons(c.App.Store, q, func(line string) { n.Add(line) }); err != nil {
+			return nil, err
+		}
 	}
 	root.Truncate(render.DefaultLimit/2, "archo identity list --all")
 	for _, q := range qs {
@@ -111,6 +117,14 @@ func identityResolve(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
+	question, err := c.App.IdentityQuestion(qid)
+	if err != nil {
+		return nil, err
+	}
+	reasons, err := IdentityReasonLines(c.App.Store, question, fmt.Sprintf)
+	if err != nil {
+		return nil, err
+	}
 	q, err := c.App.ResolveQuestion(qid, strings.ToLower(a.Pos[1]))
 	if err != nil {
 		return nil, err
@@ -120,6 +134,9 @@ func identityResolve(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	d, root := render.New(fmt.Sprintf("q:%d  resolved: %s", q.ID, q.Resolution))
+	for _, line := range reasons {
+		root.Add(line)
+	}
 	cand := ix.ByID[q.CandidateID]
 	switch q.Resolution {
 	case "same":
@@ -214,5 +231,21 @@ func gcCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("kept", fmt.Sprintf("%d expired tombstones referenced by open questions (archo identity list)", r.Kept))
 	}
 	root.KV("snapshots", fmt.Sprintf("%d superseded (%d file rows)", r.Snapshots, r.Files))
+	return d, nil
+}
+
+func identityWhy(c *Ctx, a *Args) (*render.Doc, error) {
+	id, err := app.ParseQuestionRef(a.Pos[0])
+	if err != nil {
+		return nil, err
+	}
+	q, err := c.App.IdentityQuestion(id)
+	if err != nil {
+		return nil, err
+	}
+	d, root := render.New(fmt.Sprintf("q:%d comparison", q.ID))
+	if err := addIdentityReasons(c.App.Store, q, func(line string) { root.Add(line) }); err != nil {
+		return nil, err
+	}
 	return d, nil
 }
