@@ -1,11 +1,12 @@
 // Variable-height log rows: keep only the viewport and a small margin in the DOM.
 // The spacer can follow a header in the same scroll container.
-export function virtualRows(scroll, count, renderRow) {
+export function virtualRows(scroll, count, renderRow, saved) {
   const spacer = document.createElement("div");
   spacer.style.position = "relative";
   spacer.style.overflowAnchor = "none";
   scroll.append(spacer);
   const heights = new Float64Array(count).fill(80);
+  if (saved) heights.set(saved.heights.subarray(0, count));
   const offsets = new Float64Array(count + 1);
   const nodes = new Map();
   let selected = -1, frame = 0, dead = false, layoutPending = false, correctionPending = 0;
@@ -97,6 +98,15 @@ export function virtualRows(scroll, count, renderRow) {
   // Construction can precede attachment to the page; measure on the next frame.
   schedule();
   return {
+    // Capture before destroy removes the spacer and the browser clamps scrollTop.
+    // Pending measurements already changed heights, but not the scroll coordinates.
+    snapshot() {
+      return { heights: heights.slice(), scrollTop: scroll.scrollTop + correctionPending };
+    },
+    update(index, paint) {
+      const row = nodes.get(index);
+      if (!dead && row) paint(row); // ResizeObserver measures the new inline details.
+    },
     select(index, reveal = true) {
       if (dead || !count) return;
       selected = Math.max(0, Math.min(count - 1, index));

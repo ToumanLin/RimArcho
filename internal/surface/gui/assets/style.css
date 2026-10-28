@@ -288,10 +288,10 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .fold > :not(.head) { opacity: 1; transition: opacity var(--t-exit) var(--ease-in), display var(--t-exit) allow-discrete; }
 .fold:not(.open) > :not(.head) { display: none; opacity: 0; }
 .fold:not(.open) > .head { border-bottom-color: transparent; }
-.fold .head .fold-chev { margin-left: auto; align-self: center; display: inline-flex; color: var(--faint); transition: transform var(--t-layout) var(--ease); }
+.fold .head .fold-chev, .log-disclosure .fold-chev { margin-left: auto; align-self: center; display: inline-flex; color: var(--faint); transition: transform var(--t-layout) var(--ease); }
 .fold .head .acts + .fold-chev { margin-left: 6px; }
-.fold .head .fold-chev svg.i { width: 10px; height: 10px; stroke-width: 1.8; }
-.fold.open .head .fold-chev { transform: rotate(90deg); }
+.fold .head .fold-chev svg.i, .log-disclosure .fold-chev svg.i { width: 10px; height: 10px; stroke-width: 1.8; }
+.fold.open .head .fold-chev, .mrow.open .fold-chev { transform: rotate(90deg); }
 .histarea .hbar { width: 100%; text-align: left; }
 .histbody { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 6px; }
 .histbody .hist { margin-top: 4px; }
@@ -548,6 +548,11 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .lrow .top .chip { white-space: nowrap; flex: none; }
 .lrow .files { margin-top: 3px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .mrow { cursor: pointer; }
+.loghint { margin-left: auto; font-size: 12px; white-space: nowrap; }
+.mrow .log-disclosure { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 20px; margin: 0 -4px; border-radius: var(--r-sm); }
+.mrow .log-disclosure .fold-chev { margin: 0; }
+.mrow button.log-disclosure:hover { background: var(--pill); color: var(--fg); }
+.mrow button.log-disclosure:hover .fold-chev { color: inherit; }
 /* a log line's level colour and a mod's own <color> (--c dark, --l light; 06 §7) */
 .lrow .text.lv-error { color: var(--log-error); }
 .lrow .text.lv-warning { color: var(--log-warning); }

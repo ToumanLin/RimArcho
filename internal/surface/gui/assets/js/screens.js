@@ -585,7 +585,7 @@ export function analyzeEvent(ev) {
 // ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
-const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, tabPick: null, mcur: 0, open: new Set(), want: "", list: null };
+const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, tabPick: null, mcur: 0, open: new Set(), want: "", list: null, views: [], view: null, viewPath: "" };
 
 // logPage keeps the page's head and gives a fresh body below it, and its actions.
 function logPage(name, title, ...right) {
@@ -622,6 +622,7 @@ function syncLogEnvironment() {
   L.path = ""; L.page = null; L.loading = false; L.pending = ""; L.error = "";
   L.cur = 0; L.mcur = 0; L.tab = 0; L.want = ""; L.els = [];
   L.detail.clear(); L.open.clear();
+  L.views = []; L.view = null; L.viewPath = "";
   return true;
 }
 
@@ -672,7 +673,15 @@ export async function gameLog(path, open = false) {
 }
 
 function drawGameLog() {
-  L.list?.destroy(); L.list = null;
+  if (L.list) {
+    L.views[L.view] = L.list.snapshot();
+    L.list.destroy(); L.list = null;
+  }
+  if (L.viewPath !== L.page?.path) {
+    L.views = []; L.open.clear(); L.mcur = 0;
+    L.viewPath = L.page?.path || "";
+  }
+  L.view = L.tab;
   clearTimeout(detailTimer); L.want = "";
   const p = L.page;
   const right = [];
@@ -684,8 +693,6 @@ function drawGameLog() {
       gameLog(p.path);
     }));
   }
-  const keep = $("#screen .page.logs .col.focus .scroll");
-  const was = keep ? keep.scrollTop : 0;
   const w = logPage("log", "", ...right);
   const files = (p && p.files) || [];
   const bar = el("div", "subbar");
@@ -699,6 +706,12 @@ function drawGameLog() {
   if (!p || !p.path) { w.append(el("div", "card empty-state", T("no Player.log found"))); return; }
   const mon = p.monitor;
   if (!mon) L.tab = 0;
+  L.view = L.tab;
+  if (L.tab === 1) {
+    const hint = el("span", "muted loghint");
+    hint.append(el("kbd", "", "enter"), " " + T("expand") + " / " + T("close"));
+    bar.append(hint);
+  }
   const grid = el("div", "cols two logcols");
   const list = el("section", "card col focus");
   if (mon) {
@@ -724,9 +737,9 @@ function drawGameLog() {
       if (r.mods) top.append(el("span", "mods", r.mods));
       body.append(top, logText(r));
       row.append(ic, body);
-      row.onclick = () => { L.cur = i; markLog(); };
+      row.onclick = () => { L.cur = i; markLog(true); };
       return row;
-    });
+    }, L.views[0]);
   }
   list.append(scroll);
   const det = el("section", "card col detail-card");
@@ -755,7 +768,7 @@ function drawGameLog() {
   area(ana, null, () => { if (!ana.hidden) ana.querySelector(".scroll").focus(); });
   if (!list.querySelector(".ltabs")) { list.prepend(el("div", "col-head", "")); list.firstChild.append(el("span", "anum", "1"), T("the errors")); }
   det.prepend(el("div", "col-head", "")); det.firstChild.append(el("span", "anum", "2"), T("the log text"));
-  scroll.scrollTop = was;
+  scroll.scrollTop = L.views[L.tab]?.scrollTop || 0;
   markLog(true);
 }
 
@@ -813,7 +826,7 @@ function noMonitor(p) {
 }
 
 // monitorRows: the companion log of the run — time, level, kind, ×count, related mods and
-// files; a click opens its details and the Player.log cluster it matches.
+// files; selection shows its evidence, disclosure opens inline details.
 function monitorRows(scroll, mon) {
   const head = el("div", "mhead");
   if (mon.running) head.append(el("span", "live-dot"));
@@ -835,22 +848,49 @@ function monitorRows(scroll, mon) {
     if (m.mods && m.mods.length) { const s = el("span", "mods word-facts", m.mods.join("  ")); s.title = m.mods.join("\n"); top.append(s); }
     body.append(top, logText(m));
     if (m.files && m.files.length) body.append(factText(el("div", "files"), m.files.map((text, i) => ({ text, paths: [{ text, path: m.filePaths?.[i] || text }] }))));
-    if (open) {
-      if (m.details) { const pre = el("pre", "details"); pathContent(pre, m.details); pre.onclick = (e) => e.stopPropagation(); body.append(pre); }
+    const extra = el("div", "monitor-details");
+    extra.hidden = !open;
+    if (canOpenMonitor(m)) {
+      if (m.details) { const pre = el("pre", "details"); pathContent(pre, m.details); extra.append(pre); }
       if (m.cluster) {
         const go = el("button", "go", Tf("%s in Player.log", m.cluster) + " →");
         go.onclick = (e) => { e.stopPropagation(); toCluster(m.cluster); };
-        body.append(go);
-      } else if (m.only) body.append(el("div", "files", Tf("only in %s: the game had stopped writing Player.log", mon.label)));
+        extra.append(go);
+      } else if (m.only) extra.append(el("div", "files", Tf("only in %s: the game had stopped writing Player.log", mon.label)));
     }
-    row.append(ic, body);
-    row.onclick = () => {
-      L.mcur = i;
-      L.open.has(m.key) ? L.open.delete(m.key) : L.open.add(m.key);
-      drawGameLog();
-    };
+    body.append(extra);
+    const disclosure = el(canOpenMonitor(m) ? "button" : "span", "log-disclosure");
+    if (canOpenMonitor(m)) {
+      const chev = el("span", "fold-chev");
+      chev.innerHTML = icon.chev;
+      disclosure.append(chev);
+      disclosure.title = T(open ? "close" : "expand") + " " + T("details");
+      disclosure.setAttribute("aria-label", disclosure.title);
+      disclosure.setAttribute("aria-expanded", String(open));
+      disclosure.onclick = (e) => { e.stopPropagation(); toggleMonitor(i); };
+    }
+    row.append(disclosure, ic, body);
+    row.onclick = () => { L.mcur = i; markLog(true); };
     return row;
+  }, L.views[1]);
+}
+
+const canOpenMonitor = (m) => !!(m.details || m.cluster || m.only);
+function toggleMonitor(i) {
+  const m = L.page?.monitor?.entries[i];
+  if (!m || !canOpenMonitor(m)) return;
+  L.mcur = i;
+  const open = !L.open.has(m.key);
+  if (open) L.open.add(m.key); else L.open.delete(m.key);
+  L.list?.update(i, (row) => {
+    row.classList.toggle("open", open);
+    row.querySelector(".monitor-details").hidden = !open;
+    const b = row.querySelector(".log-disclosure");
+    b.title = T(open ? "close" : "expand") + " " + T("details");
+    b.setAttribute("aria-label", b.title);
+    b.setAttribute("aria-expanded", String(open));
   });
+  markLog(true);
 }
 
 // toCluster shows a Player.log cluster in the errors tab.
@@ -1031,7 +1071,7 @@ export function logsKey(e) {
       const m = n ? moveIn(L.mcur, n, k) : null;
       if (m != null) { e.preventDefault(); L.mcur = m; return markLog(); }
       const it = mon.entries[L.mcur];
-      if (k === "Enter" && it) { e.preventDefault(); L.open.has(it.key) ? L.open.delete(it.key) : L.open.add(it.key); return drawGameLog(); }
+      if (k === "Enter" && it && (!e.target.closest?.("button, .path-copy") || e.target.closest?.(".log-disclosure"))) { e.preventDefault(); return toggleMonitor(L.mcur); }
       return;
     }
     const n = (L.page && L.page.rows && L.page.rows.length) || 0;

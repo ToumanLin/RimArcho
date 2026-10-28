@@ -7,6 +7,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Game log rows select without expanding or jumping to the top. Use the Archo Monitor
+  row’s disclosure arrow or Enter for inline details; tab switches and live refresh keep
+  the scroll position, and live refresh keeps expanded rows open.
 - The launch page has more room again. The headline is no longer cut off: it shrinks to
   fit its line, takes two lines when it must, and a Workshop tag at the end of the name
   (`[UPDATED 1.7]`) moves to the line under it. Under ▶ the problem is one line, with its
