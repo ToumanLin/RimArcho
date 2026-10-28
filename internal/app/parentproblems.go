@@ -1,16 +1,20 @@
 package app
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"github.com/ToumanLin/RimArcho/internal/content"
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/modsearch"
 )
 
 // ParentPart identifies content that cannot inherit its missing template. The claim
@@ -31,11 +35,12 @@ func MissingParent(p *Problem) (ParentPart, bool) {
 // affected mod's requirements page. Candidates are never claimed to define a Name.
 type ParentFix struct{ Kind, Ref, Name, URL, Basis, Parent string }
 type ParentHelp struct {
-	Problems        []*Problem
-	Parts           []ParentPart
-	Fixes           []ParentFix
-	Quiet           bool
-	CacheIncomplete bool
+	Problems         []*Problem
+	Parts            []ParentPart
+	Fixes            []ParentFix
+	Quiet            bool
+	CacheIncomplete  bool
+	SearchIncomplete bool
 }
 
 // ParentProblems groups the visible missing-parent findings of one mod. An ignored
@@ -107,6 +112,9 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 	seen := map[string]bool{}
 	add := func(f ParentFix) {
 		key := f.Kind + "|" + f.Ref + "|" + f.URL
+		if f.Kind == "enable" {
+			key += "|" + f.Parent
+		}
 		if !seen[key] {
 			seen[key] = true
 			h.Fixes = append(h.Fixes, f)
@@ -212,9 +220,101 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 		u = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + ws
 	}
 	add(ParentFix{Kind: "requirements", Name: m.DisplayName(), URL: u})
+	h.sortFixes()
 	return h, nil
 }
 
 func (h *ParentHelp) Meaning(name string) string {
 	return fmt.Sprintf("%s: %d added things cannot load because their base content is missing", name, len(h.Parts))
+}
+
+// UnresolvedNames excludes names with an already verified installed provider.
+func (h *ParentHelp) UnresolvedNames() map[string]bool {
+	names := map[string]bool{}
+	for _, part := range h.Parts {
+		names[part.Parent] = true
+	}
+	for _, fix := range h.Fixes {
+		if fix.Kind == "enable" {
+			delete(names, fix.Parent)
+		}
+	}
+	return names
+}
+
+// FindParentHelp supplements the cache only on an explicit detail request.
+func (a *App) FindParentHelp(ctx context.Context, ps *ProblemSet, p *Problem) (*ParentHelp, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	h, err := a.ParentHelp(ps, p)
+	if err != nil {
+		return nil, err
+	}
+	names := h.UnresolvedNames()
+	if len(names) == 0 {
+		return h, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	st := ps.State
+	active := map[string]bool{}
+	for _, m := range st.Ix.Mods {
+		if st.Position(m.ID) > 0 {
+			active[dependencyPackage(m.PackageID)] = true
+		}
+	}
+	var mods []modsearch.Mod
+	for _, m := range st.Ix.Mods {
+		if m.Status != identity.Live || m.Residue || st.Position(m.ID) > 0 || whyNotLoadable(st, m) != "" {
+			continue
+		}
+		mods = append(mods, modsearch.Mod{Ref: st.Ix.Ref(m.ID), PackageID: m.PackageID, Name: m.DisplayName(), Root: m.RealPath, LoadFoldersXML: m.Decl().LoadFolders})
+		if len(mods) > 1000 {
+			break
+		}
+	}
+	matches, incomplete, err := modsearch.FindNames(ctx, mods, modsearch.Options{MM: st.GameMM(), Active: func(pkg string) bool { return active[dependencyPackage(pkg)] }}, names)
+	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		return nil, err
+	}
+	h.CacheIncomplete = false
+	h.SearchIncomplete = incomplete || err != nil
+	for _, match := range matches {
+		h.Fixes = append(h.Fixes, ParentFix{Kind: "enable", Ref: match.Mod.Ref, Name: match.Mod.Name, Parent: match.Name, Basis: "scan"})
+	}
+	h.sortFixes()
+	return h, nil
+}
+
+var parentFileLine = regexp.MustCompile(`(?i)^.+\.xml:[0-9]+$`)
+
+// ParentLocations separates bare source locations from explanatory evidence.
+func ParentLocations(p *Problem) (locations, other []string) {
+	for _, e := range p.Evidence {
+		if parentFileLine.MatchString(e.Text) {
+			locations = append(locations, e.Text)
+		} else {
+			other = append(other, e.Text)
+		}
+	}
+	return
+}
+
+func (h *ParentHelp) sortFixes() {
+	priority := func(kind string) int {
+		switch kind {
+		case "enable":
+			return 0
+		case "subscribe":
+			return 1
+		case "search":
+			return 2
+		}
+		return 3
+	}
+	sort.SliceStable(h.Fixes, func(i, j int) bool { return priority(h.Fixes[i].Kind) < priority(h.Fixes[j].Kind) })
 }

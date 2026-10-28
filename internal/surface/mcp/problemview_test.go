@@ -12,11 +12,12 @@ import (
 func TestParentProblemRefParity(t *testing.T) {
 	e := testkit.New(t)
 	e.AddWorkshop("1001", testkit.Mod{PackageID: "test.child", Name: "Child", Files: map[string]string{"Defs/Child.xml": `<Defs><HediffDef ParentName="Base"><defName>Illness</defName></HediffDef></Defs>`}})
-	e.AddWorkshop("1002", testkit.Mod{PackageID: "test.provider", Name: "Provider", Files: map[string]string{"Defs/Base.xml": `<Defs><HediffDef Name="Base" Abstract="True" /></Defs>`}})
 	e.WriteModsConfig("1.6", "ludeon.rimworld", "test.child")
 	e.AddEnv(false)
 	e.MustRun("scan")
 	e.MustRun("analyze")
+	e.AddWorkshop("1002", testkit.Mod{PackageID: "test.provider", Name: "Provider", Files: map[string]string{"Defs/Base.xml": `<Defs><HediffDef Name="Base" Abstract="True" /></Defs>`}})
+	e.MustRun("scan")
 	ps, err := e.App.Problems(false, nil)
 	if err != nil {
 		t.Fatal(err)

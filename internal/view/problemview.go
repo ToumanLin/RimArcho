@@ -1,6 +1,7 @@
 package view
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -10,12 +11,15 @@ import (
 
 // ProblemPanel is the small decision view; the full Mod card remains archo mod.
 type ProblemPanel struct {
-	Title    string   `json:"title"`
-	Meaning  string   `json:"meaning"`
-	Notes    []string `json:"notes,omitempty"`
-	Affected []string `json:"affected,omitempty"`
-	Evidence []string `json:"evidence,omitempty"`
-	Actions  []Action `json:"actions"`
+	Title     string   `json:"title"`
+	Meaning   string   `json:"meaning"`
+	Notes     []string `json:"notes,omitempty"`
+	Affected  []string `json:"affected,omitempty"`
+	Evidence  []string `json:"evidence,omitempty"`
+	Actions   []Action `json:"actions"`
+	Locations []string `json:"locations,omitempty"`
+	Searching bool     `json:"searching,omitempty"`
+	Primary   bool     `json:"primary,omitempty"`
 }
 
 func problemAction(ref string) Action {
@@ -66,7 +70,9 @@ func parentSummary(parts []app.ParentPart) string {
 }
 
 const parentRisk = "in shared logs, mods with missing base content were error sources in 16% of logs (4.1% by chance)"
-const parentNext = "enable a provider if one is found, or check the mod's Workshop requirements; declared candidates may only be optional companions"
+const parentNext = "enable a provider if one is found, or check the mod's Workshop requirements"
+const parentCandidates = "declared candidates may only be optional companions"
+const parentRowWhy = "their base content is missing; in shared logs these mods caused errors in 16% of logs (4.1% by chance)"
 
 func parentNeed(st *app.LoadoutState, qs []*app.Problem, p *app.Problem) Need {
 	var parts []app.ParentPart
@@ -78,18 +84,25 @@ func parentNeed(st *app.LoadoutState, qs []*app.Problem, p *app.Problem) Need {
 		}
 	}
 	title := Tf("%s: %d added things cannot load", TokName(st, finding.Inst(p.SubjectInstance())), len(parts))
-	n := Need{Group: GroupDeps, Text: title + ": " + parentSummary(parts), Title: title, Why: parentSummary(parts) + ". " + T(parentRisk) + ". " + T(parentNext),
-		Actions: []Action{problemAction(p.Ref)}, Counted: true, Mods: []string{p.SubjectInstance()}, Status: StatusErr, Evidence: evidenceFor(p)}
+	n := Need{Group: GroupDeps, Text: title, Title: title, Why: T(parentRowWhy),
+		Actions: []Action{problemAction(p.Ref)}, Counted: true, Mods: []string{p.SubjectInstance()}, Status: StatusErr}
 	if len(lines) > 1 {
 		n.Parts = lines
 		n.Fold = true
 		n.Actions = append(n.Actions, Action{Kind: ActFold, Key: "f", Label: T("show which")})
-		n.Evidence = evidence(EvInferred, Tf("%s and %d more", lines[0], len(lines)-1))
 	}
 	return n
 }
 
 func BuildProblemPanel(a *app.App, ps *app.ProblemSet, ref string) (*ProblemPanel, error) {
+	return buildProblemPanel(nil, a, ps, ref)
+}
+
+// BuildProblemPanelContext also searches installed providers on the caller's request.
+func BuildProblemPanelContext(ctx context.Context, a *app.App, ps *app.ProblemSet, ref string) (*ProblemPanel, error) {
+	return buildProblemPanel(ctx, a, ps, ref)
+}
+func buildProblemPanel(ctx context.Context, a *app.App, ps *app.ProblemSet, ref string) (*ProblemPanel, error) {
 	var p *app.Problem
 	for _, q := range ps.All() {
 		if q.Ref == ref {
@@ -103,7 +116,13 @@ func BuildProblemPanel(a *app.App, ps *app.ProblemSet, ref string) (*ProblemPane
 	st := ps.State
 	panel := &ProblemPanel{Title: Humanize(st, finding.Expand(p.Claim, st.Ix.Ref))}
 	if p.Code == "def.parent-missing" {
-		h, err := a.ParentHelp(ps, p)
+		var h *app.ParentHelp
+		var err error
+		if ctx == nil {
+			h, err = a.ParentHelp(ps, p)
+		} else {
+			h, err = a.FindParentHelp(ctx, ps, p)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -111,25 +130,34 @@ func BuildProblemPanel(a *app.App, ps *app.ProblemSet, ref string) (*ProblemPane
 		panel.Title = n.Title
 		panel.Meaning = parentSummary(h.Parts)
 		panel.Notes = []string{T(parentRisk), T(parentNext)}
-		for _, part := range h.Parts {
-			panel.Affected = append(panel.Affected, parentPart(part))
-		}
+		panel.Searching = ctx == nil && len(h.UnresolvedNames()) > 0
 		for _, q := range h.Problems {
-			for _, ev := range q.Evidence {
-				panel.Evidence = appendUnique(panel.Evidence, Humanize(st, finding.Expand(ev.Text, st.Ix.Ref)))
+			if part, ok := app.MissingParent(q); ok {
+				panel.Affected = append(panel.Affected, parentPart(part))
+				locations, other := app.ParentLocations(q)
+				panel.Locations = append(panel.Locations, strings.Join(locations, ", "))
+				for _, ev := range other {
+					panel.Evidence = appendUnique(panel.Evidence, Humanize(st, finding.Expand(ev, st.Ix.Ref)))
+				}
 			}
 		}
-		if h.CacheIncomplete {
-			panel.Notes = append(panel.Notes, T("the file check is out of date; check files again before looking for installed providers"))
+		if h.SearchIncomplete {
+			panel.Notes = append(panel.Notes, T("the installed mod search was incomplete; check the Workshop requirements or try again"))
 		}
+		hasCandidates := false
+		enabled := map[string]bool{}
 		for _, fix := range h.Fixes {
 			switch fix.Kind {
 			case "enable":
 				act := Action{Kind: ActEnable, Label: Tf("enable %s", fix.Name), Refs: []string{fix.Ref}, Done: Tf("enabled %s", fix.Name), Undo: true}
 				act.Key = fmt.Sprint(len(panel.Actions) + 1)
-				panel.Actions = append(panel.Actions, act)
-				panel.Evidence = append(panel.Evidence, Tf("%s supplies the missing base content %s (stored file check)", fix.Name, fix.Parent))
+				if !enabled[fix.Ref] {
+					panel.Actions = append(panel.Actions, act)
+					enabled[fix.Ref] = true
+				}
+				panel.Evidence = appendUnique(panel.Evidence, Tf("%s supplies the missing base content %s (file check)", fix.Name, fix.Parent))
 			case "subscribe", "search":
+				hasCandidates = true
 				label := Tf("check candidate %s", fix.Name)
 				var act Action
 				if fix.Kind == "subscribe" {
@@ -148,6 +176,12 @@ func BuildProblemPanel(a *app.App, ps *app.ProblemSet, ref string) (*ProblemPane
 				}
 				panel.Actions = append(panel.Actions, Action{Kind: ActOpenURL, Key: "o", Label: T("check this mod's Workshop requirements"), URL: u, Done: T("opened the Workshop page")})
 			}
+		}
+		if hasCandidates {
+			panel.Notes = append(panel.Notes, T(parentCandidates))
+		}
+		if len(panel.Actions) > 0 && (panel.Actions[0].Kind == ActEnable || panel.Actions[0].Kind == ActSubscribe) {
+			panel.Primary = true
 		}
 		if h.Quiet {
 			panel.Notes = append(panel.Notes, T("the last run of this list had no errors attributed to this mod; this is probably harmless content meant for an optional mod"))
@@ -210,6 +244,7 @@ func BuildProblemPanel(a *app.App, ps *app.ProblemSet, ref string) (*ProblemPane
 		}
 		panel.Actions = append(panel.Actions, Action{Kind: ActOpenURL, Key: "o", Label: T("open this mod's Workshop page"), URL: u, Done: T("opened the Workshop page")})
 	}
+	panel.Primary = len(panel.Actions) > 0 && (panel.Actions[0].Kind == ActEnable || panel.Actions[0].Kind == ActSubscribe)
 	return panel, nil
 }
 

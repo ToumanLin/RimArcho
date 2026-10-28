@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,9 +13,10 @@ import (
 func TestFocusedProblemAPIAndEnable(t *testing.T) {
 	e, s, _ := fixture(t)
 	e.WriteFile(filepath.Join(e.Workshop, "1001", "Defs", "Missing.xml"), `<Defs><HediffDef ParentName="BaseIllness"><defName>Illness</defName></HediffDef></Defs>`)
-	e.AddWorkshop("1002", testkit.Mod{PackageID: "test.provider", Name: "Provider", Files: map[string]string{"Defs/Base.xml": `<Defs><HediffDef Name="BaseIllness" Abstract="True" /></Defs>`}})
 	e.MustRun("scan")
 	e.MustRun("analyze")
+	e.AddWorkshop("1002", testkit.Mod{PackageID: "test.provider", Name: "Provider", Files: map[string]string{"Defs/Base.xml": `<Defs><HediffDef Name="BaseIllness" Abstract="True" /></Defs>`}})
+	e.MustRun("scan")
 	ps, err := e.App.Problems(false, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -35,6 +37,16 @@ func TestFocusedProblemAPIAndEnable(t *testing.T) {
 	}
 	if !strings.Contains(panel.Title, "1 added things cannot load") || len(panel.Affected) != 1 {
 		t.Fatalf("panel %+v", panel)
+	}
+	if !panel.Searching {
+		t.Fatal("missing pending search", panel)
+	}
+	panel, err = s.ProblemProviders(ref, s.BeginProblemProviders())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !panel.Primary || panel.Searching {
+		t.Fatalf("completed panel %+v", panel)
 	}
 	var enable *view.Action
 	for i, act := range panel.Actions {
@@ -64,5 +76,29 @@ func TestFocusedProblemAPIAndEnable(t *testing.T) {
 	}
 	if _, err := s.ProblemDetail("p:000000"); err == nil {
 		t.Fatal("stale reference accepted")
+	}
+}
+
+func TestProblemProviderCancellation(t *testing.T) {
+	_, s, _ := fixture(t)
+	old := s.BeginProblemProviders()
+	current := s.BeginProblemProviders()
+	if _, err := s.ProblemProviders("p:000000", old); err != context.Canceled {
+		t.Fatalf("superseded: %v", err)
+	}
+	s.CancelProblemProviders(old)
+	s.problemLookup.mu.Lock()
+	err := s.problemLookup.ctx.Err()
+	s.problemLookup.mu.Unlock()
+	if err != nil {
+		t.Fatal("old close cancelled current search")
+	}
+	s.CancelProblemProviders(current)
+	if _, err := s.ProblemProviders("p:000000", current); err != context.Canceled {
+		t.Fatalf("closed: %v", err)
+	}
+	s.closeProblemProviders()
+	if _, err := s.ProblemProviders("p:000000", s.BeginProblemProviders()); err != context.Canceled {
+		t.Fatalf("shutdown: %v", err)
 	}
 }

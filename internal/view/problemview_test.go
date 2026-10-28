@@ -39,7 +39,7 @@ func TestPatchInspectionFocusesAffectedChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(panel.Affected) != 2 || len(panel.Actions) != 2 || panel.Actions[0].Kind != view.ActEnable || panel.Actions[1].Kind != view.ActOpenURL {
+	if !panel.Primary || len(panel.Affected) != 2 || len(panel.Actions) != 2 || panel.Actions[0].Kind != view.ActEnable || panel.Actions[1].Kind != view.ActOpenURL {
 		t.Fatalf("panel %+v", panel)
 	}
 	if strings.Contains(panel.Title, "PatchOperation") || !strings.Contains(panel.Meaning, "Target Mod") {

@@ -22,6 +22,7 @@ export function open(kind, title, build) {
 
 export function close() {
   if (!S.popup) return;
+  S.popup.onclose?.();
   S.popup = null;
   const box = $("#popup");
   box.hidden = true;
@@ -359,27 +360,32 @@ export async function problem(ref, run, actionWrite) {
   open("problem", T("see the problem and fixes"), (box) => {
     box.append(el("div", "ttl", T("checking the problem…")));
   });
-  const request = S.popup, env = S.envSeq;
-  try {
-    const detail = await api.ProblemDetail(ref);
-    if (S.popup !== request || S.envSeq !== env) return;
+  let request = S.popup;
+  const env = S.envSeq;
+  const current = () => S.popup === request && S.envSeq === env;
+  const draw = (detail) => {
     open("problem", detail.title, (box, p) => {
       box.classList.add("problem-panel");
       box.append(el("div", "ttl", detail.title));
       const body = el("div", "body");
       if (detail.meaning) body.append(el("p", "", detail.meaning));
       for (const note of detail.notes || []) body.append(el("p", "", note));
+      if (detail.searching) body.append(el("p", "muted", T("searching installed mods…")));
       for (const [label, lines] of [[T("affected content"), detail.affected], [T("problem evidence"), detail.evidence]]) {
         if (!lines?.length) continue;
         body.append(el("h3", "", label));
         const list = el("ul");
-        for (const line of lines) list.append(el("li", "", line));
+        lines.forEach((line, i) => {
+          const li = el("li", "", line);
+          if (lines === detail.affected && detail.locations?.[i]) li.append(el("span", "muted", "  " + detail.locations[i]));
+          list.append(li);
+        });
         body.append(list);
       }
       box.append(body);
       const btns = el("div", "btns");
-      for (const act of detail.actions || []) {
-        const b = el("button", "", act.label);
+      for (const [i, act] of (detail.actions || []).entries()) {
+        const b = el("button", detail.primary && i === 0 ? "go" : "", act.label);
         const write = actionWrite(act);
         if (write) b.dataset.envWrite = write;
         b.onclick = () => { close(); run(act); };
@@ -406,7 +412,23 @@ export async function problem(ref, run, actionWrite) {
         return true;
       };
     });
+    request = S.popup;
+  };
+  try {
+    const detail = await api.ProblemDetail(ref);
+    if (!current()) return;
+    draw(detail);
+    if (!detail.searching) return;
+    const lookup = await api.BeginProblemProviders();
+    const cancel = () => { api.CancelProblemProviders(lookup).catch(() => {}); };
+    if (!current()) { cancel(); return; }
+    request.onclose = cancel;
+    const updated = await api.ProblemProviders(ref, lookup);
+    if (!current()) { cancel(); return; }
+    request.onclose = null;
+    cancel();
+    draw(updated);
   } catch (e) {
-    if (S.popup === request && S.envSeq === env) { close(); say("fail", errText(e)); }
+    if (current()) { close(); say("fail", errText(e)); }
   }
 }

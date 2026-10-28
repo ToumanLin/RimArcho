@@ -9,9 +9,13 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 
 - Missing base content on can it run now says which added things cannot load, explains
   the observed risk, and opens a focused problem panel with fixes. It finds disabled
-  providers in the existing analysis cache, suggests absent declared companions through
+  providers in the existing analysis cache and, when needed, searches installed inactive
+  mods only when a problem is opened (bounded and cancellable). It suggests absent companions through
   the cached Steam DB, and links the mod's Workshop requirements. A matching last log
   with no errors attributed to the mod allows ignoring the group until the mod changes.
+- Missing-content rows now keep one short explanation. The panel places enable/subscribe
+  first as the primary action, shows source locations beside affected content, and only
+  explains optional candidates when it lists them.
 - `problems --ref p:…` (also `problems show` and MCP `list_problems ref=`) leads with
   meaning and fixes. Problem inspections show relevant evidence and affected content
   instead of opening a full mod card or all of a mod's patches; `mod` keeps its full card.

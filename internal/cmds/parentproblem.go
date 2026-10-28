@@ -3,13 +3,14 @@ package cmds
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
 func parentProblemDoc(c *Ctx, ps *app.ProblemSet, p *app.Problem, all bool) (*render.Doc, error) {
-	h, err := c.App.ParentHelp(ps, p)
+	h, err := c.App.FindParentHelp(c.Context, ps, p)
 	if err != nil {
 		return nil, err
 	}
@@ -52,30 +53,45 @@ func parentProblemDoc(c *Ctx, ps *app.ProblemSet, p *app.Problem, all bool) (*re
 			ignores.Truncate(3, "archo problems --ref "+p.Ref+" --all")
 		}
 	}
-	if h.CacheIncomplete {
-		root.Add("providers: file check is out of date; archo analyze, then inspect this problem again")
+	if h.SearchIncomplete {
+		root.Add("providers: installed mod search incomplete; check Workshop requirements or try again")
 	}
 	affected := root.Add("affected:")
-	for _, part := range h.Parts {
-		affected.Add(fmt.Sprintf("%s %s cannot load: missing base content %s", part.Type, part.Name, part.Parent))
+	for _, q := range h.Problems {
+		part, ok := app.MissingParent(q)
+		if !ok {
+			continue
+		}
+		line := fmt.Sprintf("%s %s cannot load: missing base content %s", part.Type, part.Name, part.Parent)
+		locations, _ := app.ParentLocations(q)
+		if len(locations) > 0 {
+			line += "  (" + strings.Join(locations, ", ") + ")"
+		}
+		affected.Add(line)
 	}
 	if !all {
-		affected.Truncate(8, "archo problems --subject "+ps.State.Ix.Ref(p.SubjectInstance())+" --code def.parent-missing --detail --all")
+		affected.Truncate(8, "archo problems --ref "+p.Ref+" --all")
 	}
-	ev := root.Add("evidence:")
+	var evidence []string
 	seen := map[string]bool{}
 	for _, q := range h.Problems {
-		for _, e := range q.Evidence {
-			line := expand(ps.State.Ix, e.Text, "")
-			if seen[line] {
-				continue
+		_, other := app.ParentLocations(q)
+		for _, text := range other {
+			line := expand(ps.State.Ix, text, "")
+			if !seen[line] {
+				seen[line] = true
+				evidence = append(evidence, line)
 			}
-			seen[line] = true
-			ev.Add(line)
 		}
 	}
-	if !all {
-		ev.Truncate(5, "archo problems --subject "+ps.State.Ix.Ref(p.SubjectInstance())+" --code def.parent-missing --detail --all")
+	if len(evidence) > 0 {
+		ev := root.Add("evidence:")
+		for _, line := range evidence {
+			ev.Add(line)
+		}
+		if !all {
+			ev.Truncate(5, "archo problems --ref "+p.Ref+" --all")
+		}
 	}
 	if p.Ignored {
 		root.Add("ignored: yes; archo problems unignore " + p.Ref)
