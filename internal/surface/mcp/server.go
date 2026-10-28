@@ -238,6 +238,8 @@ type ProblemsIn struct {
 	Detail      bool   `json:"detail,omitempty" jsonschema:"evidence and fix commands for every problem"`
 	Ignored     bool   `json:"ignored,omitempty" jsonschema:"list the problems the player ignored"`
 	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
+
+	IncludeMuted bool `json:"include_muted,omitempty" jsonschema:"also show ignored version warnings, marked ignored"`
 }
 
 type ChangesIn struct {
@@ -533,11 +535,11 @@ func ProblemsArgv(in ProblemsIn) []string {
 		return gv(argv("problems").str("ref", in.Ref).flag("all", in.All), in.GameVersion)
 	}
 	min := in.MinSeverity
-	if min == "" && in.Severity == "" && !in.All {
+	if min == "" && in.Severity == "" && !in.All && !in.IncludeMuted {
 		min = "warning"
 	}
 	return gv(argv("problems").str("subject", in.Subject).str("code", in.Code).str("severity", in.Severity).str("min-severity", min).
-		flag("all", in.All).flag("detail", in.Detail).flag("ignored", in.Ignored), in.GameVersion)
+		flag("all", in.All).flag("detail", in.Detail).flag("ignored", in.Ignored).flag("include-muted", in.IncludeMuted), in.GameVersion)
 }
 
 // SourceArgv maps read_source: a search gets a 10 s decompile budget by default (05 §5.1).

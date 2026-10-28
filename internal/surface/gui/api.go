@@ -707,6 +707,7 @@ type Detail struct {
 	CanSeparate bool           `json:"canSeparate,omitempty"`
 	URL         string         `json:"url,omitempty"` // the Workshop page
 	Pos         int            `json:"pos,omitempty"`
+	Version     *view.Reason   `json:"version,omitempty"`
 }
 
 // Detail returns the detail of an instance; fetch allows the network for the Workshop
@@ -758,6 +759,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 		Header: view.HeaderFacts(mod, pos, staged), Facts: view.Facts(mod, data), Deps: view.Deps(st, data), Fields: view.ModFields(r, st, mod, data),
 		Show: data.Desc.Show, Note: view.DescNote(data), State: data.Desc.WorkshopState,
 		About: data.About, Workshop: data.Workshop, History: view.HistoryLine(data.Events), CanSeparate: st.Ix.CanSeparate(mod)}
+	d.Version = data.Version
 	d.Status = view.RowStatus(&item, n.Status)
 	switch d.Status {
 	case view.StatusNone:

@@ -29,12 +29,16 @@ type DetailData struct {
 	Workshop []bbcode.Block
 	Events   []*store.Event // the mod's change events, oldest first
 	Fetching bool           // the Workshop page is being fetched
+	Version  *Reason
 }
 
 // LoadDetail reads the declaration, About.xml and the cached Workshop text; fetch allows
 // the network (06 §4.3 item 3), refresh ignores the cache.
 func LoadDetail(a *app.App, ix *app.Index, mod *store.Mod, fetch, refresh bool) *DetailData {
 	d := &DetailData{ID: mod.ID, Decl: mod.Decl()}
+	if st, err := a.Loadout(); err == nil {
+		d.Version, _ = VersionReason(a, st, mod)
+	}
 	d.Desc = a.Describe(ix, mod, fetch, refresh)
 	d.About, d.Workshop = bbcode.Parse(d.Desc.About), bbcode.Parse(d.Desc.Workshop)
 	d.Events, _ = a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, InstanceIDs: []string{mod.ID}})

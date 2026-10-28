@@ -496,6 +496,11 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 	root.KV("authors", strings.Join(decl.Authors, ", "))
 	root.KV("version", decl.ModVersion)
 	root.KV("supports", strings.Join(decl.SupportedVersions, " "))
+	if st, err := c.App.Loadout(); err == nil {
+		if mutes, err := c.App.Store.VersionMutes(st.GameMM()); err == nil && mutes[store.VersionMuteKey(m.PackageID)] {
+			root.KV("version-warning", "ignored for "+st.GameMM()+" (archo problems unmute-version "+ref+" --game-version "+st.GameMM()+")")
+		}
+	}
 	mm := env.MajorMinor(ix.Env.GameVersion)
 	var deps []string
 	for _, x := range decl.Dependencies {

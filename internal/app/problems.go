@@ -19,6 +19,7 @@ type Problem struct {
 	*finding.Finding
 	Ref           string // p:<hex>
 	Ignored       bool
+	VersionMuted  bool    // global package + game minor preference; survives updates
 	IgnoreExpired bool    // ignored once, but the subject changed since (03 §4.2)
 	Log           *LogRun // the log of a log.* problem
 }
@@ -27,8 +28,9 @@ type Problem struct {
 type ProblemSet struct {
 	GameLinks []*GameLink // refreshed independently of analysis and mod caches
 	State     *LoadoutState
-	List      []*Problem // not ignored, sorted by severity then subject
+	List      []*Problem // neither ignored nor version-muted, sorted by severity then subject
 	Ignored   []*Problem
+	Muted     []*Problem // version warnings muted by the player, never counted
 	// Stale holds the problems of stale logs (LogRun.Stale): shown apart, never counted.
 	Stale    []*Problem
 	Logs     []*LogRun // the logs whose clusters joined the problems
@@ -232,6 +234,10 @@ func (a *App) collectProblems(ps *ProblemSet) error {
 
 func (a *App) finishProblems(ps *ProblemSet, all []*finding.Finding, fromLog map[*finding.Finding]bool, run *LogRun) error {
 	st := ps.State
+	mutes, err := a.Store.VersionMutes(st.GameMM())
+	if err != nil {
+		return err
+	}
 	ignores, err := a.Store.Ignores(st.Ix.Env.ID)
 	if err != nil {
 		return err
@@ -251,6 +257,11 @@ func (a *App) finishProblems(ps *ProblemSet, all []*finding.Finding, fromLog map
 			lin, snap = m.LineageID, m.SnapID
 		}
 		p.Ref = ProblemRef(f, lin)
+		if f.Code == "version.unsupported" {
+			if m := st.Ix.ByID[f.SubjectInstance()]; m != nil {
+				p.VersionMuted = mutes[store.VersionMuteKey(m.PackageID)]
+			}
+		}
 		if g := ig[igKey{lin, f.Code, f.Key}]; g != nil {
 			if g.SnapshotID == snap {
 				p.Ignored = true
@@ -259,6 +270,8 @@ func (a *App) finishProblems(ps *ProblemSet, all []*finding.Finding, fromLog map
 			}
 		}
 		switch {
+		case p.VersionMuted:
+			ps.Muted = append(ps.Muted, p)
 		case p.Ignored:
 			ps.Ignored = append(ps.Ignored, p)
 		case p.Log != nil && p.Log.Stale():
@@ -287,6 +300,7 @@ func (a *App) finishProblems(ps *ProblemSet, all []*finding.Finding, fromLog map
 	}
 	sortProblems(ps.List, order)
 	sortProblems(ps.Ignored, order)
+	sortProblems(ps.Muted, order)
 	sortProblems(ps.Stale, order)
 	return nil
 }
@@ -304,9 +318,9 @@ func sortProblems(ps []*Problem, order func(*finding.Finding) string) {
 	}
 }
 
-// All is every problem: current, ignored and from stale logs.
+// All is every problem: current, ignored, version-muted and from stale logs.
 func (ps *ProblemSet) All() []*Problem {
-	return append(append(append([]*Problem{}, ps.List...), ps.Ignored...), ps.Stale...)
+	return append(append(append(append([]*Problem{}, ps.List...), ps.Ignored...), ps.Stale...), ps.Muted...)
 }
 
 // IgnoreProblem records an ignore on the subject's lineage at its current snapshot.

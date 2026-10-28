@@ -19,7 +19,7 @@ const opened = new Set(); // sections shown in full
 const SECTIONS = ["breaks the game", "errors from the last run", "for you to confirm", "hidden mods"];
 const FOLD_AT = 4; // a long section shows this many, then "show all"
 
-const items = () => ((S.board && S.board.problems && S.board.problems.items) || []).filter((it) => it.counted || it.status === -1);
+const items = () => ((S.board && S.board.problems && S.board.problems.items) || []).filter((it) => it.counted || it.status === -1 || (it.actions || []).some((a) => a.kind === "version-list"));
 const problemCount = (its) => its.filter((it) => it.counted && it.section !== 3).length;
 export const isOpen = () => box.isConnected;
 
@@ -113,7 +113,7 @@ function draw() {
 }
 
 function card(it) {
-  const row = el("div", "pp-item");
+  const row = el("div", "pp-item" + (it.dim ? " muted" : ""));
   const ic = el("span", "pp-ic s" + it.status);
   ic.innerHTML = statusIcon(it.status);
   const body = el("div", "pp-body");
@@ -212,19 +212,8 @@ export function event(p) {
   if (plan && p.plan && p.plan !== plan) return false;
   if (b.problems && b.problems.sequence > p.sequence) return false;
   b.problems = p;
-  const status = {}, reasons = {};
-  for (const it of p.items || []) {
-    if (!it.counted && it.status !== -1) continue;
-    let icons = it.mods || [];
-    if (!it.fold && icons.length > 1) icons = icons.slice(0, 1);
-    for (const id of icons) {
-      if (!status[id] || it.status > status[id]) status[id] = it.status;
-      (reasons[id] = reasons[id] || []).push({ status: it.status, text: it.title || it.text, why: it.why, content: { text: it.title ? it.content?.title : it.content?.text, why: it.content?.why }, evidence: it.evidence, section: it.section, actions: (it.actions || []).filter((a) => a.kind !== "fold") });
-    }
-  }
-  for (const id in reasons) reasons[id].sort((x, y) => y.status - x.status);
-  b.status = status;
-  b.reasons = reasons;
+  b.status = p.status || {};
+  b.reasons = p.reasons || {};
   b.needs = p.count;
   return true;
 }

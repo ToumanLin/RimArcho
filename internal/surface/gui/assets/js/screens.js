@@ -18,6 +18,8 @@ import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
 import { initNeedText, needText, needParts, needEvidence } from "./needtext.js";
 import { getChoices } from "./credit.js";
+import { setVersionRunner } from "./versionwarnings.js";
+import { openVersionList } from "./versionpanel.js";
 
 let ui = null;
 export function initScreens(u) {
@@ -487,9 +489,10 @@ function markNeeds() {
 }
 
 // Read-only needs actions stay available during a game switch (06 §3.1).
-const actionWrite = (a) => ["open-url", "problem", "view", "list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
+const actionWrite = (a) => ["open-url", "problem", "view", "list", "version-list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
 // The pinned badge popover in the editor offers the same actions (06 §4.2).
 setNeedRunner((it, a) => runAction(it, a), actionWrite);
+setVersionRunner((it, a) => runAction(it, a));
 // The editor's problems panel (problems.js) runs them too.
 export const runNeedAction = (it, a) => runAction(it, a);
 export const needActionWrite = actionWrite;
@@ -513,6 +516,8 @@ async function runAction(it, act) {
       return;
     case "list":
       return pop.text(act.title, act.lines);
+    case "version-list":
+      return openVersionList(act, runAction, async (id) => { await ui.go("plan"); await ui.palette({ kind: 1, id }); });
     case "manage-lists":
       return ui.manageLists(0);
     case "fold":
@@ -539,6 +544,7 @@ async function runAction(it, act) {
 async function doAction(act, option) {
   try { say("ok", await api.DoAction(act, option), act.undo || act.kind === "enable" || act.kind === "disable" || act.kind === "choose-disable"); } catch (e) { say("fail", errText(e)); }
   await ui.reload();
+  if (act.kind === "version-mute" || act.kind === "version-unmute") document.dispatchEvent(new CustomEvent("version-mutes-changed"));
   if (S.screen === "needs") needs(true);
 }
 

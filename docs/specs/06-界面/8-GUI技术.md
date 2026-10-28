@@ -117,6 +117,9 @@
 | `count`, `severity` | 与 needs 共用的计数、最高级别（`error` / `warning` / `info`）；隐藏维护项及淡色信息项沿用 needs 的计数规则 |
 | `mods` | 以 Instance ID 索引；值含 `count`、`severity`、`summary`、`problemIds`。未出现的 Mod 没有可展示的问题 |
 | `items` | 列表级完整 `Need` 数组；每个问题只传一份，按 `problemIds` 取对应项 |
+| `status`, `reasons` | 同一快照的行图标和单个 Mod 说明，按 Instance ID；事件接收后直接替换，不从 `items` 的汇总标题和动作重建（版本提醒见 §5） |
+
+版本动作 `version-mute` / `version-unmute` 的 `refs` 为包名引用，`gameVersion` 为目标主次版本。`version-list` 只带 `gameVersion` 和 `versionMuted`，打开时读 `API.VersionWarnings` → `view.ReadVersionWarnings`，返回标题、全部动作、分组及组内 `{id, name, supported, action}` 行；行清单不进入 Board / Needs 的常规响应。逐个 / 分组 / 全部操作仍交给 `DoAction(action, 0)`，批量忽略走 `confirm` / `warn`；具体交互见 §5。
 
 `Need` 在原字段之外含 `id`、可选的 `target` 和 `requiredBy`。依赖的 `target` 是去空白、大小写归一、去 `_steam` 且按注册表解析目录别名后的 packageId；`requiredBy` 是 `{id, name}` 数组。声明依赖、语料中的缺依赖、目标未启用的补丁可以按目标合并；需要它的 Mod 都获得问题归属。已有未安装列表条目覆盖依赖时，归属附在该条目的汇总项上。强顺序问题继续合成一个自动排序项；单条强约束另有 `move` 动作。
 

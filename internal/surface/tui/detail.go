@@ -136,6 +136,14 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	if m.dd != nil && m.dd.ID == it.id {
 		d = m.dd
 	}
+	if d != nil && d.Version != nil {
+		r := d.Version
+		addWrapped(r.Text, sSecond, 0)
+		for _, a := range r.Actions {
+			addWrapped(a.Key+"  "+a.Label, sSecond, 0)
+		}
+		add("")
+	}
 	// the field list (06 §4.1), the GUI's one
 	for _, l := range fieldLines(view.ModFields(m.app, m.st, mod, d), w) {
 		add(l)
@@ -677,6 +685,9 @@ var openURL = func(u string) error {
 // ---- full-screen detail (06 §4.2) ----
 
 func (m *model) fullKey(s string) tea.Cmd {
+	if cmd, ok := m.versionDetailKey(s); ok {
+		return cmd
+	}
 	page := max(m.h-6, 1)
 	switch s {
 	case "esc", "q", "backspace", "enter":
@@ -801,6 +812,9 @@ func (m *model) syncFullSec() {
 // go back to the list whose mod it shows. Verbs and the other keys work as in that list
 // (they act on the mod shown, or on the list's selection) and keep the focus here.
 func (m *model) detailKey(s string) (tea.Cmd, bool) {
+	if cmd, ok := m.versionDetailKey(s); ok {
+		return cmd, true
+	}
 	m.syncDetailOff()
 	switch s {
 	case "down", "j":
@@ -822,6 +836,20 @@ func (m *model) detailKey(s string) (tea.Cmd, bool) {
 		return nil, false
 	}
 	return nil, true
+}
+
+func (m *model) versionDetailKey(s string) (tea.Cmd, bool) {
+	it := m.current()
+	if it == nil || m.dd == nil || m.dd.ID != it.id || m.dd.Version == nil {
+		return nil, false
+	}
+	for _, a := range m.dd.Version.Actions {
+		if a.Key == s {
+			m.doAction(a, 0)
+			return m.requestDetail(), true
+		}
+	}
+	return nil, false
 }
 
 // fullLines draws the full-screen detail, scrolled.

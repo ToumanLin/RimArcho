@@ -113,7 +113,21 @@ test('background updates preserve hint links and evidence without counting them 
   const hint = { status: -1, counted: false, mods: ['one'], text: 'One and Two',
     content: { text: [{ text: 'One', id: 'one' }, { text: ' and ' }, { text: 'Two', id: 'two' }] },
     evidence: { kind: 'corpus', label: 'shared logs (up to 2040-03)' }, actions: [{ kind: 'fold' }] };
-  const update = items => ({ environment: 'fixture', sequence: 2, count: items.filter(x => x.counted).length, items });
+  // The event carries the row icons and reasons as view.indexNeeds builds them; the
+  // window adopts them as sent (codex/version-mute moved this to the server).
+  const update = items => {
+    const status = {}, reasons = {};
+    for (const it of items) {
+      if (!it.counted && it.status !== -1) continue;
+      for (const id of it.fold ? it.mods : it.mods.slice(0, 1)) {
+        if (!status[id] || it.status > status[id]) status[id] = it.status;
+        (reasons[id] ||= []).push({ status: it.status, text: it.title || it.text, content: it.content, evidence: it.evidence,
+          section: it.section, actions: (it.actions || []).filter(a => a.kind !== 'fold') });
+      }
+    }
+    for (const id in reasons) reasons[id].sort((x, y) => y.status - x.status);
+    return { environment: 'fixture', sequence: 2, count: items.filter(x => x.counted && x.section !== 3).length, items, status, reasons };
+  };
   h.context.event(update([hint]));
   assert.equal(h.state.board.needs, 0);
   assert.equal(h.state.board.status.one, -1);

@@ -6,6 +6,7 @@ import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { fieldList } from "./fields.js";
 
 import * as ops from "./ops.js";
+import { versionNotice } from "./versionwarnings.js";
 
 let seq = 0, detailTimer;
 
@@ -109,7 +110,7 @@ export function detailFrame(box, sc, o = {}) {
   const part = (cls) => { const e = el("div", "md-" + cls); box.append(e); return e; };
   const P = {
     copies: part("copies"), note: part("note"), head: part("head"), facts: part("facts"),
-    fields: part("fields"), acts: part("acts"), desc: part("desc"), hist: part("hist"), more: part("more"),
+    version: part("version"), fields: part("fields"), acts: part("acts"), desc: part("desc"), hist: part("hist"), more: part("more"),
   };
   let shownID = "", row = null, d0 = null;
   const f = {
@@ -180,6 +181,8 @@ export function detailFrame(box, sc, o = {}) {
       facts.innerHTML = sourceIcon(d.kind);
       facts.append(factText(el("span"), d.header));
       P.facts.append(facts);
+      P.version.replaceChildren();
+      if (d.version) P.version.append(versionNotice(d.version));
       if (!o.ownFields) f.fields(d.fields);
       P.desc.innerHTML = "";
       P.desc.append(description(d));
@@ -291,6 +294,7 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   img.src = "/preview/" + encodeURIComponent(d.id);
   box.append(img, el("h1", "", d.name));
   if (d.authors) box.append(el("div", "who", d.authors));
+  if (d.version) box.append(versionNotice(d.version));
   // a copy's details on Mod 库存 draw their own note, actions and field list (06 §2.9)
   if (!opts.page) {
     const facts = el("div", "facts");

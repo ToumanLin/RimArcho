@@ -20,10 +20,12 @@ func init() {
 		Flags: []Flag{gameVersionFlag}})
 	register(&Command{Name: "problems", Summary: "problems: declarations, Defs, Patches, Harmony and the newest log", MaxArgs: 0, Run: problemsCmd,
 		Flags: []Flag{{Name: "ref", Value: "<p:ref>", Help: "one problem: meaning, fixes and evidence"}, {Name: "subject", Value: "<ref>", Help: "only problems involving this mod"}, {Name: "code", Value: "<code>", Help: "code or prefix, e.g. dep or patch.no-match"},
-			{Name: "severity", Value: "<error|warning|info>"}, {Name: "all"}, {Name: "detail"}, {Name: "ignored"}, {Name: "no-analyze", Help: "do not rebuild a stale analysis"}, {Name: "min-severity", Value: "<error|warning|info>"}, gameVersionFlag}})
+			{Name: "severity", Value: "<error|warning|info>"}, {Name: "all"}, {Name: "detail"}, {Name: "ignored"}, {Name: "include-muted", Help: "also list ignored version warnings, marked ignored"}, {Name: "no-analyze", Help: "do not rebuild a stale analysis"}, {Name: "min-severity", Value: "<error|warning|info>"}, gameVersionFlag}})
 	register(&Command{Name: "problems show", Args: "<p:ref>", Summary: "one problem with its evidence", MinArgs: 1, MaxArgs: 1, Run: problemShowCmd})
 	register(&Command{Name: "problems ignore", Args: "<p:ref>", Summary: "ignore a problem until its mod changes", MinArgs: 1, MaxArgs: 1, Run: problemIgnoreCmd})
 	register(&Command{Name: "problems unignore", Args: "<p:ref>", Summary: "stop ignoring a problem", MinArgs: 1, MaxArgs: 1, Run: problemUnignoreCmd})
+	register(&Command{Name: "problems mute-version", Args: "<mod>…", Summary: "ignore version warnings for these packages in every list and game; survives updates", MinArgs: 1, MaxArgs: -1, Run: problemMuteVersionCmd, Flags: []Flag{gameVersionFlag}})
+	register(&Command{Name: "problems unmute-version", Args: "<mod>…", Summary: "restore version warnings for these packages", MinArgs: 1, MaxArgs: -1, Run: problemUnmuteVersionCmd, Flags: []Flag{gameVersionFlag}})
 }
 
 func progress() func(string) { return Progress }
@@ -70,6 +72,9 @@ func problemLine(ix *app.Index, p *app.Problem) string {
 	l := fmt.Sprintf("%s %s  %s  (%s)", p.Severity, p.Code, expand(ix, p.Claim, p.SubjectInstance()), p.Ref)
 	if p.IgnoreExpired {
 		l += "  [ignore expired: the mod changed]"
+	}
+	if p.VersionMuted {
+		l += "  [version warning ignored]"
 	}
 	return l
 }
@@ -135,6 +140,8 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	list := append(append([]*app.Problem{}, ps.List...), ps.Stale...)
 	if a.Bool("ignored") {
 		list = ps.Ignored
+	} else if a.Bool("include-muted") {
+		list = append(list, ps.Muted...)
 	}
 	var subj string
 	if r := a.Str("subject"); r != "" {
@@ -145,7 +152,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		subj = finding.Inst(m.ID)
 	}
 	code, sev, minSev := a.Str("code"), a.Str("severity"), a.Str("min-severity")
-	full := a.Bool("all") || code != "" || subj != "" || sev == finding.Info
+	full := a.Bool("all") || a.Bool("include-muted") || code != "" || subj != "" || sev == finding.Info
 	var sel []*app.Problem
 	hidden := map[string]int{}
 	var versions, skips []*app.Problem
@@ -192,6 +199,9 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		head = "ignored problems: " + severityCounts(counted)
 	}
 	d, root := render.New(head)
+	if len(ps.Muted) > 0 {
+		root.KV("ignored-version-warnings", fmt.Sprintf("%d version warnings (archo problems --include-muted --code version.unsupported)", len(ps.Muted)))
+	}
 	root.KV("analysis", analysisText(c, ps.Analysis, ps.AnalysisErr))
 	shown := len(sel)
 	for _, r := range ps.Logs {
@@ -337,6 +347,9 @@ func problemShowCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	root.KV("subjects", strings.Join(subs, " "))
 	if p.Ignored {
 		root.KV("ignored", "yes (archo problems unignore "+p.Ref+")")
+	}
+	if p.VersionMuted {
+		root.KV("ignored-version-warnings", "yes (archo problems unmute-version "+ix.Ref(p.SubjectInstance())+" --game-version "+p.Key+")")
 	}
 	if p.Log != nil {
 		root.KV("log", logRunText(c, p.Log))

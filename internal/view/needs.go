@@ -103,6 +103,9 @@ type Action struct {
 	Answer  string   `json:"answer,omitempty"`
 	Problem string   `json:"problem,omitempty"` // p:<ref> for ignore
 
+	GameVersion  string `json:"gameVersion,omitempty"`
+	VersionMuted bool   `json:"versionMuted,omitempty"`
+
 	LinkGroups []LinkGroup `json:"linkGroups,omitempty"`
 }
 
@@ -138,6 +141,7 @@ type Need struct {
 	code string // the problem code it stands for (LaunchHint)
 
 	linkProblems []*app.Problem // original subjects and targets, retained through folding for name links
+	rowReasons   map[string]Reason
 }
 
 // Needs is the screen's content and what it means for the rest of the interface.
@@ -251,11 +255,20 @@ func indexNeeds(n *Needs) {
 		if text == "" {
 			text = it.Text
 		}
+		var common Reason
+		if len(it.rowReasons) == 0 {
+			common = Reason{Status: it.Status, Text: text, Why: it.Why, Content: reasonContent(it), Evidence: it.Evidence, Section: it.Section, Actions: popActions(it.Actions)}
+		}
 		for _, id := range icons {
 			if n.Status[id] == StatusNone || it.Status > n.Status[id] {
 				n.Status[id] = it.Status
 			}
-			n.Reasons[id] = append(n.Reasons[id], Reason{Status: it.Status, Text: text, Why: it.Why, Content: reasonContent(it), Evidence: it.Evidence, Section: it.Section, Actions: popActions(it.Actions)})
+			r := common
+			if own, ok := it.rowReasons[id]; ok {
+				r = own
+				r.Section = it.Section
+			}
+			n.Reasons[id] = append(n.Reasons[id], r)
 		}
 	}
 	for _, rs := range n.Reasons {
@@ -667,17 +680,22 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			if prev := app.PrevMinor(mm); prev != "" {
 				text = Tf("%d mods do not list %s as supported (%d of them list %s)", n, mm, warn, prev)
 			}
-			names := make([]string, 0, n)
-			var versionMods []string
+			versionMods := make([]string, 0, n)
+			reasons := make(map[string]Reason, n)
+			reasonOf := versionReasonBuilder(mm, false)
 			for _, v := range versions {
-				versionMods = append(versionMods, v.SubjectInstance())
-				names = append(names, nm(v.Subjects[0]))
+				id := v.SubjectInstance()
+				versionMods = append(versionMods, id)
+				reasons[id] = reasonOf(ix.ByID[id])
 			}
-			sort.Strings(names)
 			add(Need{rank: 5, Group: GroupList, Text: text, Counted: true, Status: StatusWarn, Mods: versionMods, Fold: true,
+				code: "version.unsupported", rowReasons: reasons,
 				Why: T("they may still work, but their authors have not said they do on this version"), Evidence: evidence(EvDeclared, T("About.xml supportedVersions")),
-				Actions: []Action{{Kind: ActList, Key: "enter", Label: T("see the list"), Title: text, Lines: names}}})
+				Actions: []Action{{Kind: ActVersionList, Key: "enter", Label: T("see the list"), Title: Tf("does not list %s as supported", mm), GameVersion: mm}, versionBatch(st, versions, false)}})
 		}
+	}
+	if len(ps.Muted) > 0 {
+		add(mutedVersionsNeed(st, ps.Muted))
 	}
 	if v := env.MajorMinor(st.FileVersionMismatch()); v != "" {
 		add(Need{rank: 6, Group: GroupList, Text: Tf("the list was saved for %s; the game resets it when it starts — launching from RimArcho or saving once saves it for the current version", v),
@@ -1078,6 +1096,8 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 				return "", err
 			}
 		}
+	case ActVersionMute, ActVersionUnmute:
+		err = a.SetVersionMute(act.Refs, act.GameVersion, act.Kind == ActVersionMute)
 	case ActUnlinkPacks:
 		_, err = a.UnlinkPacks(false)
 	case ActRepairLinks:

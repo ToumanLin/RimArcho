@@ -95,6 +95,8 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 		k.run = func(m *model) tea.Cmd { return m.openInspect(a.Argv) }
 	case view.ActList:
 		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n")); return nil }
+	case view.ActVersionList:
+		k.run = func(m *model) tea.Cmd { return m.openVersionWarnings(a) }
 	case view.ActSubscribe: // a background task in the window; here, the command to run
 		k.run = func(m *model) tea.Cmd {
 			m.openPanel(T("subscribe them from a terminal"), "archo "+strings.Join(a.Argv, " "))
@@ -149,6 +151,11 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 func (m *model) doAction(a view.Action, option int) {
 	done, err := view.Do(m.app, a, option)
 	m.reload()
+	if (a.Kind == view.ActVersionMute || a.Kind == view.ActVersionUnmute) && m.dd != nil && m.st != nil {
+		if mod := m.st.Ix.ByID[m.dd.ID]; mod != nil {
+			m.dd.Version, _ = view.VersionReason(m.app, m.st, mod)
+		}
+	}
 	switch {
 	case errors.Is(err, view.ErrNothing):
 		m.say(sayInfo, done)
