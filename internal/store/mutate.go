@@ -24,6 +24,9 @@ func (s *Store) inTx(fn func(tx *sql.Tx) error) error {
 // candidate takes over the location, snapshots and events, and comes back to life.
 func (s *Store) ResolveSame(q *Question, now time.Time) error {
 	return s.inTx(func(tx *sql.Tx) error {
+		if err := lockHistory(tx); err != nil {
+			return err
+		}
 		var candStatus string
 		var candSnap sql.NullInt64
 		if err := tx.QueryRow(`SELECT status, current_snapshot_id FROM instance WHERE id=?`, q.CandidateID).Scan(&candStatus, &candSnap); err != nil {
@@ -39,6 +42,44 @@ func (s *Store) ResolveSame(q *Question, now time.Time) error {
 		if err := tx.QueryRow(`SELECT source_id, rel_path, real_path, residue, last_seen, current_snapshot_id, status FROM instance WHERE id=?`, q.InstanceID).
 			Scan(&src, &rel, &real, &residue, &lastSeen, &newSnap, new(string)); err != nil {
 			return fmt.Errorf("instance #%s: %w", q.InstanceID, err)
+		}
+		mapping := map[string]string{q.InstanceID: q.CandidateID}
+		if err := rewriteInstanceLists(tx, mapping); err != nil {
+			return err
+		}
+		if err := remapHistoryStages(tx, mapping, nil); err != nil {
+			return err
+		}
+		// Durable aliases also cover fixed pack manifests and on-disk origin markers.
+		var oldLineage, keptLineage string
+		var remaining int
+		if err := tx.QueryRow(`SELECT lineage_id FROM instance WHERE id=?`, q.InstanceID).Scan(&oldLineage); err != nil {
+			return err
+		}
+		if err := tx.QueryRow(`SELECT lineage_id FROM instance WHERE id=?`, q.CandidateID).Scan(&keptLineage); err != nil {
+			return err
+		}
+		if err := tx.QueryRow(`SELECT count(*) FROM instance WHERE lineage_id=? AND id<>?`, oldLineage, q.InstanceID).Scan(&remaining); err != nil {
+			return err
+		}
+		aliases := map[string]string{q.InstanceID: q.CandidateID}
+		if remaining == 0 && oldLineage != keptLineage {
+			aliases[oldLineage] = keptLineage
+		}
+		for old, kept := range aliases {
+			kind := "instance"
+			if old == oldLineage {
+				kind = "lineage"
+			}
+			if _, err := tx.Exec(`UPDATE id_alias SET new_id=? WHERE new_id=? AND kind=?`, kept, old, kind); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`INSERT OR REPLACE INTO id_alias(old_id,new_id,kind) VALUES(?,?,?)`, old, kept, kind); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(`INSERT INTO meta(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1`, CreditRemapKey); err != nil {
+			return err
 		}
 		stmts := []struct {
 			q    string

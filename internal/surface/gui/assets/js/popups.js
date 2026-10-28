@@ -1,7 +1,7 @@
 // Popups (06 §3.1 rule 5): the command palette, the tag bar, the position input, a
 // confirmation, a text or choice panel, help. Each has a title, shows in the position
 // line, closes with esc, and never nests: opening one closes the other.
-import { pathContent } from "./fields.js";
+import { pathContent, copyablePath } from "./fields.js";
 import { S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
 
 let ui = null;
@@ -248,6 +248,76 @@ export function panel(title, content, goLabel, go, cls = "", envWrite = "") {
 
 // text shows lines (an inspection, a list, help).
 export function text(title, lines) { confirm(title, lines, "", null); }
+
+// The player opens this comparison and can answer here; an answer replaces it
+// with the existing confirmation, rather than nesting another popup.
+export async function identity(question, run) {
+  let pop, state;
+  open("identity", T("why this question?"), (node, p) => {
+    pop = node; state = p;
+    pop.append(el("div", "body", T("loading…")));
+  });
+  try {
+    const data = await api.IdentityWhy(question);
+    if (S.popup !== state) return;
+    pop.classList.add("identity-comparison");
+    pop.innerHTML = "";
+    const body = el("div", "body");
+    body.append(el("p", "identity-headline", data.headline));
+    const table = el("table", "identity-table");
+    const head = el("thead"), headings = el("tr");
+    for (const text of ["", T("newly found"), T("previously recorded")]) headings.append(el("th", "", text));
+    head.append(headings); table.append(head);
+    const rows = el("tbody");
+    for (const row of data.rows || []) {
+      const tr = el("tr", row.match ? "match" : "different");
+      const label = el("th", "", row.label);
+      const mark = el("span", "identity-mark", row.match ? "✓" : "≠");
+      mark.title = T(row.match ? "matching values" : "different values");
+      label.prepend(mark); tr.append(label);
+      for (const [value, path] of [[row.new, row.newPath], [row.previous, row.previousPath]]) {
+        const td = el("td"), text = el("span", "", value);
+        if (path) copyablePath(text, path);
+        td.append(text); tr.append(td);
+      }
+      rows.append(tr);
+    }
+    table.append(rows); body.append(table);
+    if (data.files?.length) {
+      body.append(el("div", "identity-files-label", T("matching files")));
+      const files = el("ul", "identity-files");
+      for (const file of data.files) files.append(el("li", "", file));
+      if (data.more) files.append(el("li", "muted", Tf("and %d more files", data.more)));
+      body.append(files);
+    }
+    pop.append(body);
+    const btns = el("div", "btns");
+    const leave = el("button", "identity-close", T("close") + "  esc");
+    leave.onclick = close; btns.append(leave);
+    const answers = el("div", "identity-answer-buttons");
+    const pick = (action) => { close(); run(action); };
+    for (const action of data.answers || []) {
+      const b = el("button", "", action.label);
+      b.title = action.title;
+      b.dataset.envWrite = action.kind;
+      b.onclick = () => pick(action);
+      answers.append(b);
+    }
+    btns.append(answers); pop.append(btns);
+    state.keys = (e) => {
+      if (!e.ctrlKey && !e.altKey && !e.metaKey) {
+        const action = (data.answers || []).find((a) => a.key === e.key);
+        if (action) { e.preventDefault(); pick(action); return true; }
+      }
+      if (e.key === "PageDown") body.scrollTop += body.clientHeight * 0.9;
+      if (e.key === "PageUp") body.scrollTop -= body.clientHeight * 0.9;
+      return true;
+    };
+    leave.focus();
+  } catch (e) {
+    if (S.popup === state) { close(); say("fail", errText(e)); }
+  }
+}
 
 // choose offers a few choices; pick gets the chosen index. other is a second action on
 // the highlighted choice ({key, label, run}), shown under the list (the environment

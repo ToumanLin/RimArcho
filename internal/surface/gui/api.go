@@ -1136,6 +1136,13 @@ func (s *API) DoAction(act view.Action, option int) (string, error) {
 // inspectable are the read-only commands an item's "see what" may run.
 var inspectable = map[string]bool{"problems": true, "patches": true, "mod": true, "def": true, "harmony": true}
 
+// IdentityWhy is a read-only comparison requested by the player.
+func (s *API) IdentityWhy(qid int64) (*view.IdentityPanel, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.IdentityQuestionPanel(s.a, qid)
+}
+
 // Inspect runs a read-only command an action names (view, 06 §5) and returns its text
 // with names for #refs.
 func (s *API) Inspect(argv []string) ([]string, error) {

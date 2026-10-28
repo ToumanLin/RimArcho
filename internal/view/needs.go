@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/identity"
@@ -836,13 +837,13 @@ func questionNeed(st *app.LoadoutState, q *store.Question) Need {
 		return Action{Kind: ActAnswer, Key: key, Label: label, QID: q.ID, Answer: ans, Done: done, Confirm: Tf("press %s again: %s", key, done), Warn: done + "\n" + hint + "\n" + T("this answer cannot be undone with u"), Title: hint}
 	}
 	return Need{Group: GroupConfirm, Text: Tf("is %s the same mod as %s?", x, y), Counted: true, Status: StatusWarn,
-		Why: T("they look alike; your answer decides whether lists and history treat them as one"), Evidence: evidence(EvInferred, T("RimArcho compared their folders")),
+		Why: cmds.IdentityHeadline(q.ComparisonSummary(), Tf),
 		Mods: []string{q.InstanceID, q.CandidateID},
 		Actions: []Action{
 			answer("s", T("same"), "same", Tf("%s and %s are one mod", x, y), T("treat as one mod in lists and combine their change history")),
 			answer("c", T("a copy"), "copy", Tf("%s is a copy of %s", x, y), T("keep two copies in lists with separate change histories; share mod notes and tags")),
 			answer("u", T("unrelated"), "unrelated", Tf("%s and %s are unrelated", x, y), T("keep lists and histories separate; close this question")),
-			{Kind: ActView, Key: "v", Label: T("why this question?"), Argv: []string{"identity", "why", fmt.Sprintf("q:%d", q.ID)}},
+			{Kind: ActView, Key: "v", QID: q.ID, Label: T("why this question?"), Argv: []string{"identity", "why", fmt.Sprintf("q:%d", q.ID)}},
 		}}
 }
 

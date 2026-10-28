@@ -441,9 +441,10 @@ function needCard(it, i) {
   if (acts.some((a) => a.kind === "answer")) {
     right.classList.add("identity-answers");
     for (const a of acts) {
-      const b = button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, "", actionWrite(a));
+      const answer = a.kind === "answer";
+      const b = button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, answer ? "" : "identity-why", actionWrite(a));
       if (a.title) b.title = a.title;
-      right.append(b);
+      (answer ? right : body).append(b);
     }
   } else if (acts.length) {
     const a = acts[0];
@@ -501,6 +502,9 @@ async function runAction(it, act) {
     case "locate-directory":
       return directoryPrompt({ id: act.refs[0], label: it.title || act.label, path: act.lines?.[0] || "" }, false, async () => { await ui.reload(); needs(true); });
     case "view":
+      if (act.argv?.[0] === "identity" && act.argv?.[1] === "why") {
+        return pop.identity(act.question, (answer) => runAction(it, answer));
+      }
       try { pop.text(act.label, await api.Inspect(act.argv)); } catch (e) { say("fail", errText(e)); }
       return;
     case "list":

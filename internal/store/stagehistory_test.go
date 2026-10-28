@@ -24,7 +24,7 @@ func TestMigrateV20StageHistory(t *testing.T) {
 	if err := s.PushStep(p.ID, "undo", `[]`, "legacy"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.DB.Exec(`ALTER TABLE workspace_undo DROP COLUMN staging; UPDATE meta SET value='20' WHERE key='schema_version'`); err != nil {
+	if _, err := s.DB.Exec(`ALTER TABLE identity_question DROP COLUMN summary; ALTER TABLE workspace_undo DROP COLUMN staging; UPDATE meta SET value='20' WHERE key='schema_version'`); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()

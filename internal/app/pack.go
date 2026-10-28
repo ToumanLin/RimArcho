@@ -155,7 +155,7 @@ func (a *App) ReadPack(name string) (*Pack, error) {
 	return &p, nil
 }
 
-// aliasPack maps the IDs of a pack made before migration v14 to the IDs kept (02 §0.1): the
+// aliasPack follows IDs merged by migration or an identity answer (02 §5.4): the
 // file on disk is not rewritten.
 func (a *App) aliasPack(p *Pack) {
 	al, err := a.Store.IDAliases()
@@ -1058,6 +1058,7 @@ func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.aliasPack(&p)
 	r := &PackMatch{Pack: &p}
 	for _, pe := range p.Entries {
 		if pe.Official {

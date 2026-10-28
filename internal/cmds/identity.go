@@ -15,6 +15,8 @@ import (
 const pathSep = os.PathSeparator
 
 func init() {
+	register(&Command{Name: "identity", Summary: "list open identity questions", MaxArgs: 0,
+		Flags: []Flag{{Name: "all", Help: "include resolved questions"}}, Run: identityList})
 	register(&Command{Name: "identity list", Summary: "open identity questions (\"is this #xxxx back?\")", MaxArgs: 0,
 		Flags: []Flag{{Name: "all", Help: "include resolved questions"}}, Run: identityList})
 	register(&Command{Name: "identity why", Args: "<q:n>", Summary: "show what matched and differed in an identity question", MinArgs: 1, MaxArgs: 1, Run: identityWhy})

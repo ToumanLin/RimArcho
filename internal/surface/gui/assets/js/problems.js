@@ -127,7 +127,10 @@ function card(it) {
   if (acts.length) {
     const right = el("div", "pp-acts");
     const answers = acts.some((a) => a.kind === "answer");
-    const shown = answers ? acts : acts.slice(0, 1);
+    if (answers) {
+      for (const a of acts.filter((a) => a.kind !== "answer")) body.append(actButton(it, a, "btn identity-why"));
+    }
+    const shown = answers ? acts.filter((a) => a.kind === "answer") : acts.slice(0, 1);
     for (const a of shown) right.append(actButton(it, a, answers ? "btn small" : "btn small primary"));
     if (!answers && acts.length > 1) {
       const more = el("button", "btn small more", "⋯");

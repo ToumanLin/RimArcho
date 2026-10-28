@@ -35,7 +35,7 @@ func BenchmarkIdentityQuestionPage1354(b *testing.B) {
 		if m.ID == candidate || count == 67 {
 			continue
 		}
-		if _, err := e.App.Store.DB.Exec(`INSERT INTO identity_question(environment_id,scan_id,instance_id,observation_snapshot_id,candidate_instance_id,score) VALUES(?,1,?,?,?,1)`, st.Ix.Env.ID, m.ID, m.SnapID, candidate); err != nil {
+		if _, err := e.App.Store.DB.Exec(`INSERT INTO identity_question(environment_id,scan_id,instance_id,observation_snapshot_id,candidate_instance_id,score,summary) VALUES(?,1,?,?,?,1,'{"Available":true,"Common":4,"NewFiles":4,"PreviousFiles":4,"Differences":7}')`, st.Ix.Env.ID, m.ID, m.SnapID, candidate); err != nil {
 			b.Fatal(err)
 		}
 		count++

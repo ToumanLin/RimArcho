@@ -211,6 +211,9 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 		if err != nil {
 			return err
 		}
+		if err := saveQuestionSummary(tx, &Question{ID: questionIDs[q], ScanID: scanID, InstanceID: q.New.InstanceID, SnapshotID: snapOf[q.New], CandidateID: q.Candidate.ID}); err != nil {
+			return err
+		}
 	}
 	removed, checkErr := recheckQuestions(tx, envID, scanned)
 	if checkErr != nil {
