@@ -7,7 +7,7 @@ export function listGeometry(items, view, column, rowHeight = 28) {
     const item = items[index];
     const lineage = item.lineage || item.id;
     const heading = column === 0 && item.copyCount > 1 && lineage !== previous;
-    const height = rowHeight + (heading ? rowHeight : column === 1 && item.copyCount > 1 ? 20 : 0);
+    const height = rowHeight + (heading ? rowHeight : 0);
     tops.push(total); heights.push(height); heads.push(heading); total += height; previous = lineage;
   }
   return { tops, heights, heads, total };

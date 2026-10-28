@@ -79,7 +79,7 @@ export function hide(force = false) {
   box.remove();
 }
 
-const rowKey = (it) => it.id || "pkg:" + (it.missing || it.name);
+const rowKey = (it) => it.id || it.ref;
 
 // wireBadges hooks one list's rows: item(i) is the row's item, status(it) its icon.
 export function wireBadges(k, rows, item, status) {

@@ -128,15 +128,22 @@ function wireSideSplit() {
   });
 }
 
+let shellRetries = 0;
 export async function loadShell() {
   try {
     const next = await api.Shell();
-    // no games after there were some is a read that failed (a background job holding the
-    // data), not the games gone: keep the sidebar and look again in a moment
-    if (!next.envs && S.shell?.envs) { setTimeout(loadShell, 2000); return; }
+    // an error, or no games after there were some, is a read that failed (a background
+    // job holding the data), not the lists or games gone: keep the sidebar, look again
+    if (shellFailed(next)) { if (shellRetries++ < 10) setTimeout(loadShell, 2000); return; }
+    shellRetries = 0;
     S.shell = next;
   } catch { /* keep the last one */ }
   sync();
+}
+
+// shellFailed: next must not replace the sidebar on screen.
+export function shellFailed(next) {
+  return !!S.shell && !S.shell.error && (!next || !!next.error || (!next.envs && S.shell.envs > 0));
 }
 
 // current is the sidebar ID of what is shown: a page, the open plan (the editor and its

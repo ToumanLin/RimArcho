@@ -107,6 +107,21 @@ func (a *App) MissingMods(st *LoadoutState) []MissingMod {
 	return out
 }
 
+// MissingByToken is MissingMods keyed by each unresolved entry's token as the list has it.
+func (a *App) MissingByToken(st *LoadoutState) map[string]MissingMod {
+	byPkg := map[string]MissingMod{}
+	for _, m := range a.MissingMods(st) {
+		byPkg[m.PackageID] = m
+	}
+	out := map[string]MissingMod{}
+	for _, e := range st.List {
+		if e.Missing != "" {
+			out[e.Missing] = byPkg[dependencyPackage(e.Missing)]
+		}
+	}
+	return out
+}
+
 // ReplacementSuggestion reuses Use This Instead and the current game's version filter.
 type ReplacementSuggestion struct {
 	Original      SortMod `json:"original"`

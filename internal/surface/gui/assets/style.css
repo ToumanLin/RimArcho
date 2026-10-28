@@ -1788,7 +1788,8 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .row.copy-item {padding-left:22px;color:var(--fg-2);font-size:12px;}
 .row.copy-item .k {display:none;}
 .row.copy-item .t {color:var(--muted);}
-.row .current-copy {position:absolute;left:calc(var(--pw,3ch) + 40px);right:10px;bottom:3px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;}
+.row .src {flex:0 1 auto;max-width:45%;margin-right:auto;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--muted);}
+.row:has(.src) .t {flex:0 1 auto;}
 .editor-copies {display:grid;gap:4px;margin:14px 0;}
 .editor-copy {text-align:left;padding:5px 6px 5px 8px;min-height:30px;border-radius:var(--r-sm);background:var(--pill);color:var(--fg-2);display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;}
 .editor-copy:hover:not(.on) {background:color-mix(in srgb,var(--pill) 60%,var(--line-2));}
@@ -1802,7 +1803,6 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .editor-full-link {color:var(--accent-11,var(--accent));white-space:nowrap;margin-left:auto;font-size:12px;}
 
 .row.copy-group-start {padding-top:28px;}
-.row.with-copy {padding-bottom:20px;}
 
 @media (max-width:680px) {
  #board {grid-template-rows:auto minmax(0,1fr);row-gap:var(--card-gap);}

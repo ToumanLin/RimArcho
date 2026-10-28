@@ -37,13 +37,30 @@ test("suggestions omit locations and result counts, and quote the full value", a
   assert.equal(candidate.token,'tags:"Facial Hair"'); assert.equal(candidate.label,""); assert.equal("count" in candidate,false);
   assert.equal(q.suggestions(groups,"source:l",8)[0].label,"本地");
 });
-test("virtual row boundaries account for group headings and current-copy subtitles", async () => {
+test("virtual row boundaries account for group headings; an enabled copy keeps one line", async () => {
   const q = await loadModules("./listgeometry.js", {});
   const items=[{id:"a",lineage:"ce",copyCount:3},{id:"b",lineage:"ce",copyCount:3},{id:"c",lineage:"hud",copyCount:1}];
   const inactive=q.listGeometry(items,[0,1,2],0);
   assert.equal(JSON.stringify(inactive.tops),"[0,56,84]");assert.equal(inactive.total,112); // a lone copy has no heading
   assert.equal(inactive.heads[2],false);
   assert.equal(q.rowAt(inactive,55),0);assert.equal(q.rowAt(inactive,56),1);assert.equal(q.rowAt(inactive,112),3);
-  const active=q.listGeometry(items,[0,2],1);assert.equal(JSON.stringify(active.tops),"[0,48]");assert.equal(active.total,76);
+  const active=q.listGeometry(items,[0,2],1);assert.equal(JSON.stringify(active.tops),"[0,28]");assert.equal(active.total,56);
   const filtered=q.listGeometry(items,[1,2],0);assert.equal(filtered.heads[0],true);assert.equal(filtered.heights[0],56);
+});
+test("a shell read that failed never replaces the sidebar's lists", async () => {
+  const S={shell:null};
+  const shell=await loadModules("./shell.js", {
+    "./state.js":{S,factText:()=>{},$:()=>null,el:tag=>new Element(tag),api:{},T:s=>s,Tf:s=>s},
+    "./icons.js":{icon:{}},"./screens.js":{liveCount:()=>0,seg:()=>{},setSeg:()=>{}},
+    "./motion.js":{bump:()=>{},slideNav:()=>{},places:()=>{},slideFrom:()=>{}},
+    "./popups.js":{},"./separator.js":{wireSeparator:()=>{}},
+  });
+  assert.equal(shell.shellFailed({error:"busy"}),false); // nothing shown yet: take it
+  S.shell={envs:2,plans:[{id:1}]};
+  assert.equal(shell.shellFailed({error:"database is locked",envs:2}),true);
+  assert.equal(shell.shellFailed({envs:0}),true);
+  assert.equal(shell.shellFailed(undefined),true);
+  assert.equal(shell.shellFailed({envs:2,plans:[]}),false);
+  S.shell={error:"busy"};
+  assert.equal(shell.shellFailed({error:"still busy"}),false); // a failed shell is replaced
 });

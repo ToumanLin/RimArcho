@@ -47,6 +47,8 @@ type Item struct {
 	Unsaved     bool              `json:"unsaved,omitempty"` // changed since the last save
 	Dim         bool              `json:"dim,omitempty"`     // cannot be loaded
 	Missing     bool              `json:"missing,omitempty"` // a ModsConfig entry with no installed mod
+	Gone        bool              `json:"gone,omitempty"`    // its folder is no longer on disk (a tombstone)
+	CanUse      bool              `json:"canUse,omitempty"`  // missing, but an installed copy can take its place
 	Tags        []string          `json:"tags,omitempty"`
 	Alias       bool              `json:"alias,omitempty"`
 	Note        string            `json:"-"`
@@ -90,10 +92,20 @@ func BuildBoard(a *app.App) (*Board, error) {
 		unsaved[c.Entry.Key()] = true
 	}
 	inList := map[string]bool{}
+	var missingRows map[string]app.MissingMod
 	for i, e := range st.List {
 		if e.Instance == "" {
 			b.Missing++
-			b.Cols[Active] = append(b.Cols[Active], Item{Pos: i + 1, Ref: "pkg:" + e.Missing, Name: e.Missing, Lower: e.Missing, Missing: true, Unsaved: unsaved[e.Key()]})
+			// Show the mod's name (import, earlier copy, steamDB), not only its packageId.
+			if missingRows == nil {
+				missingRows = a.MissingByToken(st)
+			}
+			m := missingRows[e.Missing]
+			name := m.Name
+			if name == "" {
+				name = e.Missing
+			}
+			b.Cols[Active] = append(b.Cols[Active], Item{Pos: i + 1, Ref: "pkg:" + e.Missing, Name: name, Lower: strings.ToLower(name + " " + e.Missing), Missing: true, CanUse: m.CanEnable, Unsaved: unsaved[e.Key()]})
 			continue
 		}
 		inList[e.Instance] = true
@@ -192,6 +204,7 @@ func ModItem(st *app.LoadoutState, mod *store.Mod) Item {
 	if s := st.Ix.Source(mod.SourceID); s != nil {
 		it.Location = s.Root
 	}
+	it.Gone = mod.Status != identity.Live
 	it.Dim = mod.Unloadable != "" || mod.Residue || (!st.Reg.Known(mod.ID) && !st.Deployable(mod)) || (st.Reg.Known(mod.ID) && !st.Reg.Loadable(mod.ID))
 	return it
 }

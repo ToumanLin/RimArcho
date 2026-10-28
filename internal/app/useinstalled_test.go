@@ -112,6 +112,10 @@ func TestUseInstalledOtherGamesMods(t *testing.T) {
 	if len(missing) != 1 || !missing[0].CanEnable {
 		t.Fatal(missing)
 	}
+	// The editor's row for the entry shows the other game's copy's name.
+	if m := e.App.MissingByToken(st)["tester.foreign"]; m.Name != "Foreign" || !m.CanEnable {
+		t.Fatalf("missing row: %+v", m)
+	}
 	m := st.Ix.ByID[missing[0].Instance]
 	if m.Kind != source.Elsewhere || st.Reg.Loadable(m.ID) || !st.Deployable(m) {
 		t.Fatalf("expected undeployed foreign copy: %+v", m)

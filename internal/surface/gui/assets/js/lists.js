@@ -228,14 +228,15 @@ export function renderRows(k) {
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
       `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>` +
+      // what the row is short of, or which copy it is, sits on the name's line
+      (it.missing || it.gone ? `<span class="src">${esc(T(it.canUse ? "installed copy available" : "not installed"))}</span>` : k === 1 && it.copyCount > 1 && it.copyLabel ? `<span class="src">${esc(it.copyLabel)}</span>` : "") +
       (it.unsaved ? `<span class="u" title="${esc(T("unsaved"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
     if (k === 0 && it.copyCount > 1 && it.copyLabel) {
       d.classList.add("copy-item");
       $(".t",d).textContent="└ " + it.copyLabel;
       if (layout.heads[i]) { d.classList.add("copy-group-start"); d.prepend(el("span","editor-copy-head",it.name)); }
     }
-    if (k === 1 && it.copyCount > 1) {d.classList.add("with-copy");d.append(el("span","current-copy","└ " + it.copyLabel));}
-    d.title = it.name + (it.copyCount > 1 && it.copyLabel ? "  " + it.copyLabel : "");
+    d.title = it.name + (it.missing ? "  " + it.ref.replace(/^pkg:/, "") + "  " + T(it.canUse ? "installed copy available" : "not installed") : it.gone ? "  " + T("not installed") : it.copyCount > 1 && it.copyLabel ? "  " + it.copyLabel : "");
   }
 }
 
@@ -280,7 +281,7 @@ function historyPanel() {
 
 function rowSig(k, i, it) {
   const c = S.cols[k];
-  return [key(it), it.pos, it.unsaved, it.dim, (it.tags || []).join(","), i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.copyLabel, it.copyCount, it.lineage].join("|");
+  return [key(it), it.pos, it.unsaved, it.dim, it.gone, it.canUse, (it.tags || []).join(","), i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.copyLabel, it.copyCount, it.lineage].join("|");
 }
 
 // rowStatus mirrors view.RowStatus (missing entries are errors, unloadable rows dim).

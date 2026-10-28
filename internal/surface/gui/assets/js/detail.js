@@ -41,7 +41,8 @@ export async function showDetail(it, staged) {
     box.innerHTML = "";
     delete box.dataset.ref;
     editorFrame = null;
-    box.append(el("h1", "", it.name), el("p", "second", T("listed in ModsConfig.xml, but not installed")));
+    const pkg = (it.ref || "").replace(/^pkg:/, "");
+    box.append(el("h1", "", it.name), ...(pkg && pkg !== it.name ? [el("p", "second", pkg)] : []), el("p", "second", T(it.canUse ? "an installed copy can take its place: use it from the list's problems" : "listed in ModsConfig.xml, but not installed")));
     return;
   }
   const same = box.dataset.ref === it.id && editorFrame && editorFrame.box === box && box.firstChild;

@@ -76,8 +76,11 @@ async function reload(snapshot = null, read = null) {
     return;
   }
   readRetries = 0;
-  const apply = () => { S.board = b; S.shell = sh; S.history = history; };
+  // a shell that could not be read keeps the sidebar's lists; the sidebar reads again
+  const shellOK = !shell.shellFailed(sh);
+  const apply = () => { S.board = b; if (shellOK) S.shell = sh; S.history = history; };
   if (read) read.commit(apply); else apply();
+  if (!shellOK) setTimeout(shell.loadShell, 2000);
   S.busy.scan = b.scanning;
   S.busy.analyze = b.analyzing;
   if (b.error && b.envs && b.envs.length) say("fail", b.error);
