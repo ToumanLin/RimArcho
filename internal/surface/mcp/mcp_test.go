@@ -63,7 +63,8 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"check_links": "ro", "repair_links": "destructive",
 		// 05 §1.2: the player actions that only had CLI commands.
 		"manage_rules": "write", "ignore_problem": "write", "scan": "write", "exchange_list": "write",
-		"manage_packs": "destructive", "resolve_identity": "destructive", "manage_hidden": "destructive", "maintenance": "destructive",
+		"mute_version_warnings": "write",
+		"manage_packs":          "destructive", "resolve_identity": "destructive", "manage_hidden": "destructive", "maintenance": "destructive",
 		"pin_mod": "write", "unpin_mod": "write",
 		// 0.9: launching, plans and their history.
 		"launch_game": "destructive", "manage_plans": "destructive", "plan_history": "ro",

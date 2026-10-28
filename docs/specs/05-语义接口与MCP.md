@@ -44,6 +44,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 锁定版本、解除、更新锁定版本（04 §7） | 已完成 | 工具 `pin_mod`（对应 `pin`，创建锁定版本并在当前方案里换上；`copy_local` 保留为别名）；新增工具 `unpin_mod`；更新锁定版本是 `pin --update <实例>`，并入 `pin_mod` |
 | 整合包：编译、列表、启动、导出、导入、删除、停止编译、移除留下的链接（08 §5） | 已完成 | 工具 `manage_packs`，`destructiveHint: true` |
 | 忽略 / 取消忽略问题（03 §4.2） | 已完成 | 工具 `ignore_problem` |
+| 关闭 / 恢复某个游戏版本的 Mod 提醒（03 §4.2） | 已完成 | 工具 `mute_version_warnings`（`undo=true` 恢复），批量关闭先问玩家 |
 | 回答身份待确认项、拆分 / 合并 Lineage（02 §5.4、§6） | 已完成 | 工具 `resolve_identity`，`destructiveHint: true` |
 | 扫描 | 已完成 | 工具 `scan` |
 | Mod 库存：列出、筛选、排序；收进锁定库、从所有方案里拿掉（06 §2.9） | 已完成 | CLI `library`、`library move-to-locked`、`library remove-from-plans`；只读工具 `list_library`，写工具 `manage_library`（`destructiveHint: true`：会移动 `Mods/` 里的文件夹）。其他动作已有工具：加入当前方案 `edit_loadout`，锁定 / 更新 / 解除 `pin_mod`、`unpin_mod`，恢复给游戏和回收站 `manage_hidden` |
@@ -208,8 +209,9 @@ next:
 | | `patches [--mod <引用>] [--target <Type/defName \| XPath 片段>] [--failed] [--all]` | Patch 操作及模拟结果；`--failed` 只列落空的及原因（03 §4.4） |
 | | `harmony [--mod <引用>] [--target <Type.Method \| 片段>] [--shared] [--all]` | Harmony 补丁：某 Mod 的、某方法上的、多个 Mod 共同补丁的 |
 | | `why <A> <B>` | 两个 Mod 的关系：位置、双向的声明、排序约束及是否被违反、共同定义的 Def、一方对另一方的 Patch、共同的 Harmony 目标（含各自的补丁类型）、共同的问题 |
-| | `problems [--subject <引用>] [--code <代码或前缀>] [--severity <级别>] [--min-severity <级别>] [--all] [--detail] [--ignored] [--no-analyze]` | 问题列表（03 §4）。分析过期时先在子进程重建，`--no-analyze` 不重建 |
+| | `problems [--subject <引用>] [--code <代码或前缀>] [--severity <级别>] [--min-severity <级别>] [--all] [--detail] [--ignored] [--include-muted] [--no-analyze]` | 问题列表（03 §4）。分析过期时先在子进程重建，`--no-analyze` 不重建；`--include-muted` 也列出已关闭的版本提醒，并标记，默认只报告已关闭数 |
 | | `problems show\|ignore\|unignore <p:引用>` | 一个问题的证据和修复命令；忽略到它的 Mod 变化为止；取消忽略 |
+| | `problems mute-version\|unmute-version <Mod 引用…> [--game-version X.Y]` | 关闭 / 恢复版本提醒（03 §4.2），默认当前游戏的主次版本；支持 `pkg:`，移除 Mod 后仍能恢复。`mod` 的详情显示偏好和恢复命令 |
 | | `changes [<引用>] [--since scan:<n>\|<天数>d\|YYYY-MM-DD] [--all]` | 变化事件，默认最近一次扫描 |
 | | `library [--search <词>] [--include <键:值>]… [--exclude <键:值>]… [--sort name\|size\|changed\|played] [--lineage <引用>] [--facets] [--all]` | Mod 库存（06 §2.9）：一行一个 Lineage（几份、合计大小、最要紧的状态、用在）；`--lineage` 列出每一份的路径、状态、方案、上次游玩和动作命令；`--facets` 列出每个筛选值和个数；新增 `tags:`（精确标签）、`content:`、`has:`、`name:`、`author:`、`id:`，`source:` 的目录角色与稳定别名见 02 §0.2，旧 `location:` 保留 |
 | | `library remove-from-plans <引用…>` | 从所有方案（同一游戏目录的所有环境）里拿掉，每个方案一步撤销 |
@@ -309,7 +311,7 @@ next:
 | `get_patches` | `patches`（`mod`、`target`、`failed`、`all`、`game_version`） | true | — |
 | `get_harmony` | `harmony`（`mod`、`target`、`shared`、`all`、`game_version`） | true | — |
 | `explain_relation` | `why`（`a`、`b`、`game_version`） | true | — |
-| `list_problems` | `problems`；`ref` 时为 `problems show`。默认加 `--min-severity warning`，给了 `severity`、`min_severity` 或 `all` 时不加 | true | — |
+| `list_problems` | `problems`；`ref` 时为 `problems show`。默认加 `--min-severity warning`，给了 `severity`、`min_severity`、`all` 或 `include_muted` 时不加；`include_muted` 映射 `--include-muted` | true | — |
 | `list_changes` | `changes`（`ref`、`since`、`all`） | true | — |
 | `analyze_log` | `log`（`cluster`、`text`、`file`、`prev`、`all`、`since`、`game_version`）；`pattern=<引用>` 对应 `pattern`（`list` 列出全部） | true | — |
 | `search_files` | `files search`（`pattern`、`mod`、`mods`、`regex`、`case_sensitive`、`word`、`def`、`kind`、`languages`、`lang`、`all_versions`、`game`、`game_version`、`mode`、`page`、`limit`、`per_file`、`all`） | true | — |
@@ -327,6 +329,7 @@ next:
 | `manage_rules` | `rule add/list/remove`（`action`、`kind`、`a`、`b`、`target`、`note`、`rule`） | false | false |
 | `add_rule` | `manage_rules` 的旧名（`action` 默认 add） | false | false |
 | `ignore_problem` | `problems ignore` / `unignore`（`undo`） | false | false |
+| `mute_version_warnings` | `problems mute-version` / `unmute-version`（`refs`、`game_version`、`undo`），范围见 03 §4.2 | false | false |
 | `scan` | `scan`（`full`） | false | false |
 | `exchange_list` | `loadout export/import`、`collection [--import]` | false | false |
 | `manage_packs` | `pack list/build/launch/export/import/remove/stop/unlink` | false | true |

@@ -74,6 +74,7 @@ Example: explain_relation {"a": "#i4uc", "b": "#iqmu"}
     declared:`
 
 const descProblems = `Current problems: declarations (dep.missing, dep.inactive, incompat.active, order.violated, order.cycle, official.order, pkg.duplicate-*, version.unsupported, mod.unloadable), the log corpus (dep.observed-missing: an undeclared prerequisite seen in shared logs; combo.known-bad; mod.known-error), Defs (def.parent-missing, def.abstract-collision, def.override), Patches (patch.no-match, patch.unknown-op, patch.contested), Harmony (harmony.multi-transpiler, harmony.skip-prefix, harmony.shared-target, harmony.manual) and the selected log (log.*). Default: warning and above, version.unsupported folded into one row, def.override/patch.contested hidden; min_severity=info or all=true shows them. Each problem has a p:<hex> ref: ref=<p:…> shows its evidence and fix commands. code takes a prefix (dep, patch, harmony). The Def/Patch/Harmony layers are rebuilt automatically when the Loadout changed (a few seconds).
+Muted version warnings are skipped even with all=true; the muted count is reported. include_muted=true shows them with a muted marker, including info unless severity or min_severity is specified. mute_version_warnings changes this preference per package and game minor version across all plans and games.
 Example: list_problems {"code": "dep"}
   problems: 1 error, 0 warning, 0 info
     analysis: a:1 2026-10-19 07:21

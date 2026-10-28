@@ -24,6 +24,7 @@ import { updateFromForm } from "./subscribe.js";
 let ui = null;
 export function initFull(u) {
   ui = u;
+  document.addEventListener("version-mutes-changed", () => { if (S.screen === "full" && F.id) full(F.from, F.id); });
   document.addEventListener("task-ended", () => { if (S.screen === "full" && F.id) full(F.from, F.id); });
 }
 

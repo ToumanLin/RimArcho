@@ -17,6 +17,7 @@ func manageTools() []tool {
 		reg("test_run", false, false, descTestRun, TestRunArgv),
 		reg("manage_rules", false, false, descRules, func(in RuleIn) []string { return RulesArgv(in) }),
 		reg("ignore_problem", false, false, descIgnore, func(in IgnoreIn) []string { return IgnoreArgv(in) }),
+		reg("mute_version_warnings", false, false, descVersionMute, VersionMuteArgv),
 		reg("scan", false, false, descScan, func(in ScanIn) []string { return argv("scan").flag("full", in.Full).a }),
 		reg("exchange_list", false, false, descExchange, func(in ExchangeIn) []string { return ExchangeArgv(in) }),
 		reg("manage_packs", false, true, descPacks, func(in PackIn) []string { return PackArgv(in) }),

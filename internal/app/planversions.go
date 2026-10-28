@@ -33,6 +33,7 @@ type PlanVersions struct {
 	// mods were counted (official content, missing entries and mods without
 	// supportedVersions are not).
 	Missing map[string]int
+	Muted   map[string]int // missing declarations the player chose not to warn about
 	Counted int
 }
 
@@ -42,8 +43,13 @@ func (a *App) PlanVersionsOf(st *LoadoutState, p *store.Plan) (*PlanVersions, er
 	if err != nil {
 		return nil, err
 	}
-	pv := &PlanVersions{Plan: p, Created: env.MajorMinor(p.CreatedGame), Game: st.GameMM(), Missing: map[string]int{}}
+	pv := &PlanVersions{Plan: p, Created: env.MajorMinor(p.CreatedGame), Game: st.GameMM(), Missing: map[string]int{}, Muted: map[string]int{}}
+	mutes, err := a.Store.AllVersionMutes()
+	if err != nil {
+		return nil, err
+	}
 	var sets []map[string]bool
+	var packages []string
 	for _, e := range ps.List {
 		m := st.Ix.ByID[e.Instance]
 		if m == nil || m.Kind == source.Official || strings.TrimSpace(m.SupportedVersions) == "" {
@@ -57,6 +63,7 @@ func (a *App) PlanVersionsOf(st *LoadoutState, p *store.Plan) (*PlanVersions, er
 		}
 		if len(vs) > 0 {
 			sets = append(sets, vs)
+			packages = append(packages, store.VersionMuteKey(m.PackageID))
 		}
 	}
 	pv.Counted = len(sets)
@@ -91,9 +98,13 @@ func (a *App) PlanVersionsOf(st *LoadoutState, p *store.Plan) (*PlanVersions, er
 	}
 	for _, v := range pv.Shown {
 		n := 0
-		for _, s := range sets {
+		for i, s := range sets {
 			if !s[v] {
-				n++
+				if mutes[v][packages[i]] {
+					pv.Muted[v]++
+				} else {
+					n++
+				}
 			}
 		}
 		pv.Missing[v] = n

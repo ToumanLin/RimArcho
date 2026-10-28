@@ -17,10 +17,12 @@ import { wireSeparator } from "./separator.js";
 import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
 import { getChoices } from "./credit.js";
+import { toggleVersionList, versionList, onVersionList, setVersionRunner } from "./versionwarnings.js";
 
 let ui = null;
 export function initScreens(u) {
   ui = u;
+  onVersionList("needs", () => { if (S.screen === "needs") drawNeeds(); });
   initSubscriptions(u, { beginPageRead, page, area, button, act, seg });
   on("tasks", (ev) => {
     if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
@@ -453,6 +455,8 @@ function needCard(it, i) {
   }
   top.append(right);
   row.append(top);
+  const versions = versionList(it, runAction);
+  if (versions) row.append(versions);
   if (it.linkGroups?.length) row.append(linkRows(it.linkGroups));
   if (it.fold && N.open.has(it.text)) {
     const parts = el("div", "parts");
@@ -477,9 +481,10 @@ function markNeeds() {
 }
 
 // Read-only needs actions stay available during a game switch (06 §3.1).
-const actionWrite = (a) => ["open-url", "view", "list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
+const actionWrite = (a) => ["open-url", "view", "list", "version-list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
 // The pinned badge popover in the editor offers the same actions (06 §4.2).
 setNeedRunner((it, a) => runAction(it, a), actionWrite);
+setVersionRunner((it, a) => runAction(it, a));
 // The editor's problems panel (problems.js) runs them too.
 export const runNeedAction = (it, a) => runAction(it, a);
 export const needActionWrite = actionWrite;
@@ -498,6 +503,8 @@ async function runAction(it, act) {
       return;
     case "list":
       return pop.text(act.title, act.lines);
+    case "version-list":
+      return toggleVersionList(it);
     case "manage-lists":
       return ui.manageLists(0);
     case "fold":
@@ -524,6 +531,7 @@ async function runAction(it, act) {
 async function doAction(act, option) {
   try { say("ok", await api.DoAction(act, option), act.undo || act.kind === "enable" || act.kind === "disable" || act.kind === "choose-disable"); } catch (e) { say("fail", errText(e)); }
   await ui.reload();
+  if (act.kind === "version-mute" || act.kind === "version-unmute") document.dispatchEvent(new CustomEvent("version-mutes-changed"));
   if (S.screen === "needs") needs(true);
 }
 

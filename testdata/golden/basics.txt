@@ -116,6 +116,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     plan follow <name> <collection link|ID>   make a plan follow a Steam Workshop collection: RimArcho tells you when it changes (uses the network)
     plan unfollow <name> <collection link|ID>  stop following a collection; the plan stays as it is
     plan sync <name> [<collection>]           catch a plan up with a collection it follows (one undoable edit; uses the network)
+    problems mute-version <mod>…              mute version warnings for these packages in every list and game; survives updates
+    problems unmute-version <mod>…            restore version warnings for these packages
     db status                                 the database: path, size, backups
     db backup                                 write a consistent copy of the database to <data>/backups
     db vacuum                                 compact the database

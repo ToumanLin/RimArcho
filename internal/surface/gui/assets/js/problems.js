@@ -7,6 +7,7 @@ import { api } from "./api.js";
 import { statusIcon } from "./icons.js";
 import * as pop from "./popups.js";
 import { runNeedAction, needActionWrite } from "./screens.js";
+import { versionList, onVersionList } from "./versionwarnings.js";
 
 let ui = null;
 export function initProblems(u) { ui = u; listen(); }
@@ -18,7 +19,7 @@ const opened = new Set(); // sections shown in full
 const SECTIONS = ["breaks the game", "errors from the last run", "for you to confirm", "hidden mods"];
 const FOLD_AT = 4; // a long section shows this many, then "show all"
 
-const items = () => ((S.board && S.board.problems && S.board.problems.items) || []).filter((it) => it.counted);
+const items = () => ((S.board && S.board.problems && S.board.problems.items) || []).filter((it) => it.counted || (it.actions || []).some((a) => a.kind === "version-list"));
 export const isOpen = () => box.isConnected;
 
 // autoFixable: the items one click can fix with no question (required mods that are
@@ -28,9 +29,9 @@ const autoFixable = () => items().filter((it) => (it.actions || []).some((a) => 
 // chip: the top bar's button, or null when the list has nothing to fix.
 export function chip() {
   const p = S.board && S.board.problems;
-  const n = items().filter((it) => it.section !== 3).length;
-  if (!p || !n) { if (isOpen()) close(); return null; }
-  const b = el("button", "chip prob " + (p.severity === "error" ? "err" : "warn") + (p.updating ? " updating" : "") + (isOpen() ? " on" : ""));
+  const n = items().filter((it) => it.counted && it.section !== 3).length;
+  if (!p || !items().length) { if (isOpen()) close(); return null; }
+  const b = el("button", "chip prob " + (n ? (p.severity === "error" ? "err" : "warn") : "muted") + (p.updating ? " updating" : "") + (isOpen() ? " on" : ""));
   b.append(el("span", "dot"), el("span", "t", Tf("%d problems", n)), el("kbd", "", "p"));
   b.title = T("what is wrong with this list, and the fixes") + T("; ") + "p";
   b.onclick = (e) => { e.stopPropagation(); toggle(b); };
@@ -70,7 +71,7 @@ function draw() {
   const p = S.board.problems;
   const head = el("div", "pp-head");
   const lead = el("div", "pp-lead");
-  lead.append(el("b", "", Tf("%d problems in this list", its.filter((it) => it.section !== 3).length)));
+  lead.append(el("b", "", Tf("%d problems in this list", its.filter((it) => it.counted && it.section !== 3).length)));
   if (p.updating) lead.append(el("span", "muted", T("updating…")));
   head.append(lead);
   const acts = el("div", "pp-acts");
@@ -93,7 +94,7 @@ function draw() {
     const sec = its.filter((it) => it.section === si);
     if (!sec.length) return;
     const h = el("div", "pp-sec", T(title));
-    h.append(el("span", "num", String(sec.length)));
+    h.append(el("span", "num", String(sec.filter((it) => it.counted).length)));
     list.append(h);
     const shown = opened.has(si) || sec.length <= FOLD_AT + 1 ? sec : sec.slice(0, FOLD_AT);
     for (const it of shown) list.append(card(it));
@@ -110,7 +111,7 @@ function draw() {
 }
 
 function card(it) {
-  const row = el("div", "pp-item");
+  const row = el("div", "pp-item" + (it.dim ? " muted" : ""));
   const ic = el("span", "pp-ic s" + it.status);
   ic.innerHTML = statusIcon(it.status);
   const body = el("div", "pp-body");
@@ -123,6 +124,8 @@ function card(it) {
   }
   body.append(t);
   if (it.why) body.append(el("div", "pp-why", it.why));
+  const versions = versionList(it, runNeedAction);
+  if (versions) body.append(versions);
   const acts = (it.actions || []).filter((a) => a.kind !== "fold");
   if (acts.length) {
     const right = el("div", "pp-acts");
@@ -182,6 +185,7 @@ let listening = false;
 function listen() {
   if (listening) return;
   listening = true;
+  onVersionList("problems", () => { if (isOpen()) draw(); });
   // a click outside the panel (and outside its menu and any dialog) closes it
   document.addEventListener("mousedown", (e) => {
     if (!isOpen() || box.contains(e.target)) return;
@@ -209,19 +213,8 @@ export function event(p) {
   if (plan && p.plan && p.plan !== plan) return false;
   if (b.problems && b.problems.sequence > p.sequence) return false;
   b.problems = p;
-  const status = {}, reasons = {};
-  for (const it of p.items || []) {
-    if (!it.counted) continue;
-    let icons = it.mods || [];
-    if (!it.fold && icons.length > 1) icons = icons.slice(0, 1);
-    for (const id of icons) {
-      if (it.status > (status[id] || 0)) status[id] = it.status;
-      (reasons[id] = reasons[id] || []).push({ status: it.status, text: it.title || it.text, why: it.why, section: it.section, actions: it.actions });
-    }
-  }
-  for (const id in reasons) reasons[id].sort((x, y) => y.status - x.status);
-  b.status = status;
-  b.reasons = reasons;
+  b.status = p.status || {};
+  b.reasons = p.reasons || {};
   b.needs = p.count;
   return true;
 }

@@ -36,10 +36,13 @@ type ListProblems struct {
 	Severity    string                  `json:"severity"`
 	Mods        map[string]*ModProblems `json:"mods"`
 	Items       []Need                  `json:"items"`
+	Status      map[string]int          `json:"status"`
+	Reasons     map[string][]Reason     `json:"reasons"`
 }
 
 func ProblemsOf(n *Needs) *ListProblems {
 	p := &ListProblems{Environment: n.Environment, Plan: n.Plan, ListVersion: n.ListVersion, Sequence: n.Sequence, Revision: n.Revision, Updating: n.Updating, Error: n.Error, Count: n.Count, Severity: "info", Mods: map[string]*ModProblems{}, Items: n.Items}
+	p.Status, p.Reasons = n.Status, n.Reasons
 	for _, it := range n.Items {
 		if it.Counted && it.Status == StatusErr {
 			p.Severity = "error"
@@ -62,6 +65,9 @@ func ProblemsOf(n *Needs) *ListProblems {
 			title := it.Title
 			if title == "" {
 				title = it.Text
+			}
+			if r, ok := it.rowReasons[id]; ok {
+				title = r.Text
 			}
 			sev := problemSeverity(it.Status)
 			if it.Dim && !it.Counted {
