@@ -7,6 +7,15 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Sorting adds Archo Monitor right after Harmony when the setting "add Archo Monitor to
+  lists" is on and the list has none, also after you took it out; it is part of the same
+  undo step as the sort. Before, the setting only covered new lists, so a sort never put
+  it back. When it cannot go in (no Harmony in the list, `Mods/` on FAT/exFAT) the sort
+  says why. The sort message names what it added ("sorted: added Archo Monitor, 3
+  moved"). Turn the setting off to keep it out.
+- Game log: the error list takes 62% of the width by default and the log text 38%; the
+  Archo log analysis card takes 40% of the right side's height. Double-click a gap to go
+  back to these.
 - The launch page has more room again. The headline is no longer cut off: it shrinks to
   fit its line, takes two lines when it must, and a Workshop tag at the end of the name
   (`[UPDATED 1.7]`) moves to the line under it. Under ▶ the problem is one line, with its

@@ -100,8 +100,11 @@ var zhText = map[string]string{
 	// top bar, columns, status and hint lines (06 §7: short, verb first)
 	"no game": "没有游戏",
 	// whole-list actions shared by both interfaces (view/preview.go)
-	"sorted: %d moved":                       "已排序：移动了 %d 个",
-	"sorted: %d added, %d moved":             "已排序：新增 %d 个，移动 %d 个",
+	"sorted: %d moved":                        "已排序：移动了 %d 个",
+	"sorted: added %s, %d moved":              "已排序：加入了 %s，移动 %d 个",
+	"Archo Monitor not added: %s":             "没有加入 Archo Monitor：%s",
+	"the list has no Harmony, which it needs": "列表里没有它需要的 Harmony",
+	"Mods/ is on a FAT or exFAT drive, which cannot hold the link it needs": "Mods/ 在 FAT 或 exFAT 盘上，放不了它需要的链接",
 	"no changes to save":                     "没有要保存的修改",
 	"saved as v%d":                           "已保存（v%d）",
 	"saved as v%d; %d Mods/ links updated":   "已保存（v%d），更新了 %d 个 Mods/ 链接",

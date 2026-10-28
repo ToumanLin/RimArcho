@@ -42,7 +42,7 @@ func monitorCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if !s.Default {
 		def = "off"
 	}
-	root.KV("default", def+" (archo config set monitor.default on|off: add it to new plans)")
+	root.KV("default", def+" (archo config set monitor.default on|off: add it to new plans and on every sort)")
 	if s.Bundled != nil && (len(s.Installed) == 0 || s.Installed[0] != s.Bundled.Version || s.Source == nil) {
 		d.AddNext("archo monitor install")
 	}

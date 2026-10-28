@@ -55,7 +55,7 @@ func TestSettingsWording(t *testing.T) {
 					}
 				case "monitor.default":
 					found++
-					if it.Note != "" || it.Hover != view.T("only new lists and lists not handled yet") {
+					if it.Note != "" || it.Hover != view.T("new lists, and every sort") {
 						t.Errorf("Monitor help: %+v", it)
 					}
 				}

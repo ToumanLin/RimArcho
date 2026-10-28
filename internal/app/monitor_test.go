@@ -316,3 +316,47 @@ func TestAddMonitor(t *testing.T) {
 		t.Fatalf("undo: %v %v", err, active(t, e))
 	}
 }
+
+// 04 §1.5, §5.1: with monitor.default on, every sort puts Archo Monitor back after Harmony,
+// also after the player took it out; off, a sort leaves it out; a list without Harmony
+// says why it was not added.
+func TestSortAddsMonitor(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.App.MonitorBundle = monitorBundle(t, e, "0.9.0")
+	e.MustRun("monitor", "install")
+	e.MustRun("undo") // the player took it out; install alone does not add it again
+	if contains(active(t, e), monName) {
+		t.Fatal("undo did not remove the monitor")
+	}
+
+	r, err := e.App.Sort(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := active(t, e)
+	if !contains(got, monName) || strings.Join(got, ",") != strings.Join(insertAfter(got, "Harmony"), ",") {
+		t.Fatalf("sort did not put the monitor after Harmony: %v", got)
+	}
+	if r.MonitorSkipped != "" {
+		t.Fatalf("skipped: %q", r.MonitorSkipped)
+	}
+	e.MustRun("undo") // one step with the sort
+	if contains(active(t, e), monName) {
+		t.Fatal("the sort's insertion is not undone with it")
+	}
+
+	e.MustRun("config", "set", "monitor.default", "off")
+	e.MustRun("sort")
+	if contains(active(t, e), monName) {
+		t.Fatal("sort added the monitor with monitor.default off")
+	}
+
+	e.MustRun("config", "set", "monitor.default", "on")
+	e.MustRun("plan", "new", "bare")
+	e.MustRun("plan", "use", "bare")
+	if out := e.MustRun("sort"); !strings.Contains(out, "Archo Monitor not added: "+app.MonitorNoHarmony) {
+		t.Fatalf("no Harmony:\n%s", out)
+	}
+}

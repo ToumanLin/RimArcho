@@ -4,7 +4,7 @@ package view
 func init() {
 	Register(map[string]string{
 		"add Archo Monitor to lists":                          "自动把 Archo Monitor 加进列表",
-		"only new lists and lists not handled yet":            "只管新列表和还没处理过的列表",
+		"new lists, and every sort":                           "新建的列表，以及每次排序",
 		"Archo Monitor installed":                             "已安装的 Archo Monitor",
 		"Archo Monitor added after Harmony (undo removes it)": "已在 Harmony 后面加入 Archo Monitor（撤销即可去掉）",
 		"not installed":                                       "未安装",

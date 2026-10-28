@@ -258,20 +258,36 @@ func LaunchPack(a *app.App, name string, move bool) *Outcome {
 }
 
 func sortResultText(r *app.SortResult) string {
+	text := sortChangeText(r)
+	if r.MonitorSkipped != "" {
+		text += "  " + Tf("Archo Monitor not added: %s", T(r.MonitorSkipped))
+	}
+	return text
+}
+
+func sortChangeText(r *app.SortResult) string {
 	if len(r.Changes) == 0 {
 		return T("the order is already right")
 	}
-	added, moved := 0, 0
+	var added []string
+	moved := 0
 	for _, ch := range r.Changes {
 		if ch.Kind == loadout.Added {
-			added++
+			name := ch.Entry.Instance
+			if r.State != nil {
+				if m := r.State.Ix.ByID[ch.Entry.Instance]; m != nil {
+					name = m.DisplayName()
+				}
+			}
+			added = append(added, name)
 		}
 		if ch.Kind == loadout.Moved {
 			moved++
 		}
 	}
-	if added > 0 {
-		return Tf("sorted: %d added, %d moved", added, moved)
+	if len(added) > 0 {
+		// what the sort put in (Core, Archo Monitor: 04 §5.1) by name
+		return Tf("sorted: added %s, %d moved", strings.Join(added, T(", ")), moved)
 	}
 	strong := 0
 	for _, b := range order.Broken(r.Input, r.Result) {

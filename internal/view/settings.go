@@ -290,7 +290,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}
 	out = append(out, caches)
 	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
-		ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("only new lists and lists not handled yet")}
+		ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("new lists, and every sort")}
 	if s, err := a.MonitorState(); err == nil {
 		v := T("not installed")
 		if len(s.Installed) > 0 {

@@ -437,11 +437,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .cols .col.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .cols .col .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 6px; }
 /* the log page's right side: the log text, and under it the Archo 日志分析 card */
-.cols.logcols { grid-template-columns: minmax(260px, var(--log-left, 1.1fr)) var(--card-gap) minmax(320px, 1fr); gap: 0; }
+.cols.logcols { grid-template-columns: minmax(260px, var(--log-left, 62fr)) var(--card-gap) minmax(320px, 38fr); gap: 0; }
 .logsplit { margin: 0; }
 .logside { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .logside > .detail-card { flex: 1 1 auto; min-height: 120px; }
-.logside > .ana-card { flex: 0 1 auto; max-height: 50%; }
+.logside > .ana-card { flex: 0 0 40%; min-height: 80px; }
 .logcols.ana-sized .logside > .ana-card { flex: none; height: var(--log-ana); max-height: none; }
 .logside > .ana-card[hidden], .logside > .hsplit[hidden] { display: none; }
 /* the gap under the analysis: drags its height (like .split, across) */

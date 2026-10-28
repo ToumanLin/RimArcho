@@ -793,7 +793,43 @@ type SortResult struct {
 	Sorted  loadout.List
 	Changes []loadout.Change
 	Applied bool
+	// MonitorSkipped says why the sort did not add Archo Monitor although monitor.default
+	// is on and it is installed (no Harmony, Mods/ cannot hold links); "" otherwise.
+	MonitorSkipped string `json:"monitorSkipped,omitempty"`
 }
+
+// sortMonitor puts the newest installed Archo Monitor right after Harmony when
+// monitor.default is on and the list has none (04 §1.5, §5.1): a sort applies the setting
+// every time, also after the player took the monitor out. why says why it could not go in.
+func (a *App) sortMonitor(st *LoadoutState, l loadout.List) (loadout.List, string) {
+	if !a.MonitorDefault() {
+		return l, ""
+	}
+	for _, e := range l {
+		if IsMonitor(st.Ix.ByID[e.Instance]) {
+			return l, ""
+		}
+	}
+	ms := monitorInstances(st.Ix)
+	if len(ms) == 0 {
+		return l, ""
+	}
+	at, why := a.monitorSlot(st.Ix, l)
+	switch {
+	case why == "":
+		return insert(l.Clone(), at, loadout.Entry{Instance: ms[0].Mod.ID}), ""
+	case at < 0 && strings.HasPrefix(why, "no Harmony"):
+		return l, MonitorNoHarmony
+	default:
+		return l, MonitorNoLinks
+	}
+}
+
+// Why a sort could not add Archo Monitor (SortResult.MonitorSkipped; view translates them).
+const (
+	MonitorNoHarmony = "the list has no Harmony, which it needs"
+	MonitorNoLinks   = "Mods/ is on a FAT or exFAT drive, which cannot hold the link it needs"
+)
 
 // Community loads community rules from <home>/cache/communityRules.json (04 §6.3).
 func (a *App) Community() order.Community {
@@ -878,6 +914,7 @@ func (a *App) sortList(st *LoadoutState, l loadout.List) (*SortResult, error) {
 	if core != "" && st.Reg.Loadable(core) && l.Index(core) < 0 {
 		l = append(l.Clone(), loadout.Entry{Instance: core})
 	}
+	l, monitorSkipped := a.sortMonitor(st, l)
 	in, err := a.SortInput(st, l)
 	if err != nil {
 		return nil, err
@@ -887,7 +924,7 @@ func (a *App) sortList(st *LoadoutState, l loadout.List) (*SortResult, error) {
 	for _, i := range r.Order {
 		sorted = append(sorted, l[i])
 	}
-	out := &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(before, sorted, st.LineageOf)}
+	out := &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(before, sorted, st.LineageOf), MonitorSkipped: monitorSkipped}
 	state := *st
 	state.List = sorted
 	out.MissingDependencies, err = a.MissingDependencies(&state)

@@ -69,7 +69,7 @@ func TestSortPreviewCanAddCoreWithoutMovingAnything(t *testing.T) {
 		t.Fatalf("preview changed workspace: %v", err)
 	}
 	msg, err := view.Apply(e.App, view.ListSort)
-	if err != nil || msg != "sorted: 1 added, 0 moved" {
+	if err != nil || msg != "sorted: added Core, 0 moved" {
 		t.Fatalf("apply: %q, %v", msg, err)
 	}
 	st, err = e.App.Loadout()

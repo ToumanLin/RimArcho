@@ -286,6 +286,9 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		head += " (applied to the workspace; not saved)"
 	}
 	d, root := render.New(head)
+	if r.MonitorSkipped != "" {
+		root.Addf("Archo Monitor not added: %s (monitor.default is on)", r.MonitorSkipped)
+	}
 	addSortNotices(root, r.SortNotices)
 	addChanges(c, root, st, r.Changes, render.DefaultLimit, "archo loadout diff --all")
 	if moved > 0 {
