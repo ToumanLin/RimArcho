@@ -1240,6 +1240,14 @@ func (a *App) Checkout(ref string) (*EditResult, int, error) {
 	}
 	st := r.State
 	if r.Before.Equal(st.List) {
+		// Nothing to undo; the origin stays. A conflict about this version is resolved,
+		// though: the list already is that version.
+		if st.WS.Conflict == n {
+			st.WS.Conflict = 0
+			if err := a.Store.SetWorkspace(st.WS); err != nil {
+				return nil, 0, err
+			}
+		}
 		return r, n, nil
 	}
 	st.WS.OriginVersion, st.WS.OriginKind = n, "checkout"

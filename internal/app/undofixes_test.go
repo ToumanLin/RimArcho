@@ -23,7 +23,7 @@ func TestIdenticalCheckoutIsNoOp(t *testing.T) {
 				t.Fatal(err)
 			}
 			ws := *st.WS
-			ws.OriginVersion, ws.OriginKind, ws.Conflict = 2, kind, 1
+			ws.OriginVersion, ws.OriginKind, ws.Conflict = 2, kind, 7 // a conflict about another version
 			if err := e.App.Store.SetWorkspace(&ws); err != nil {
 				t.Fatal(err)
 			}
@@ -72,6 +72,38 @@ func TestIdenticalCheckoutIsNoOp(t *testing.T) {
 				t.Error("no-op changed staging or game config")
 			}
 		})
+	}
+}
+
+// The list already is the external version it was kept from, so checking that version
+// out resolves the conflict; nothing else changes and there is still nothing to undo.
+func TestIdenticalCheckoutClearsItsConflict(t *testing.T) {
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.Store.AddVersion(st.Plan.ID, &store.Version{Created: e.Now(), Source: "external", Entries: st.WS.Entries}); err != nil {
+		t.Fatal(err)
+	}
+	ws := *st.WS
+	ws.OriginVersion, ws.OriginKind, ws.Conflict = 2, "edited", 1
+	if err := e.App.Store.SetWorkspace(&ws); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.App.Checkout("v1"); err != nil {
+		t.Fatal(err)
+	}
+	after, err := e.App.Store.Workspace(st.Plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Conflict != 0 || after.OriginVersion != 2 || after.OriginKind != "edited" || after.Entries != ws.Entries {
+		t.Errorf("want only the conflict cleared: %+v", after)
+	}
+	if e.App.Store.StepCount(st.Plan.ID, "undo") != 0 {
+		t.Error("no-op created an undo step")
 	}
 }
 
