@@ -107,6 +107,9 @@ func Worker(action string, ids []uint64, w io.Writer) int {
 		say(DoneLine(action, len(ids)))
 		return 0
 	}
+	clock := watchClock{now: time.Now, sleep: time.Sleep}
+	// the subscription refresh that starting the API set off lands first (hold.go)
+	settle(func() { f.runCallbacks.Call() }, clock, settleTime)
 	if action == State {
 		for _, id := range ids {
 			say(StateLine(id, f.state(id)))
@@ -140,9 +143,17 @@ func Worker(action string, ids []uint64, w io.Writer) int {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	// Steam finishes its side of the call before the process goes (RimCrow waits the same).
-	time.Sleep(500 * time.Millisecond)
-	f.runCallbacks.Call()
+	// Steam finishes its side of the call before the process goes (RimCrow waits the same),
+	// and a late subscription refresh may turn an accepted change back: ask once more.
+	accepted := make([]bool, len(ids))
+	for k, r := range results {
+		accepted[k] = r == "ok"
+	}
+	holdChanges(ids, accepted, action == Subscribe, holdAPI{
+		state:     f.state,
+		again:     func(id uint64) { call.Call(f.ugc, uintptr(id)) },
+		callbacks: func() { f.runCallbacks.Call() },
+	}, clock, holdTime)
 	for k, id := range ids {
 		st := f.state(id)
 		r := results[k]
