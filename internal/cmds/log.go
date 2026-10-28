@@ -125,6 +125,19 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	analysedAs(root, r)
 	root.KV("classes", strings.Join(classes, ", "))
+	if len(r.Phases) > 0 {
+		phases := root.Section("phases")
+		for _, p := range r.Phases {
+			line := p.Name
+			if p.Save != "" {
+				line += " " + p.Save
+			}
+			if !p.At.IsZero() {
+				line += "  " + p.At.In(c.App.Loc).Format("15:04:05")
+			}
+			phases.Add(line)
+		}
+	}
 	lst := root.Section("list")
 	for _, lc := range r.Clusters {
 		if logs.Informational(lc.Class) && !a.Bool("all") {
@@ -164,7 +177,7 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 		}
 		who += ")"
 	}
-	return fmt.Sprintf("log:%s %s x%d  %s%s%s", lc.ID, lc.Class, lc.Count, msg, who, patternTag(ix, lc))
+	return fmt.Sprintf("log:%s %s x%d%s  %s%s%s", lc.ID, lc.Class, lc.Count, logs.PhaseSummary(lc.Phases), msg, who, patternTag(ix, lc))
 }
 
 func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc {
@@ -173,6 +186,9 @@ func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc
 		at = fmt.Sprintf("  first at %s:%d", r.Label, lc.Lines[0])
 	}
 	d, root := render.New(fmt.Sprintf("log:%s %s x%d%s", lc.ID, lc.Class, lc.Count, at))
+	if phase := logs.PhaseSummary(lc.Phases); phase != "" {
+		root.KV("phases", strings.TrimSpace(phase))
+	}
 	// The whole message up to 1200 bytes: the inner exception at its end is often the cause
 	// (G7 agents re-read the raw log for what a 300-byte cut hid).
 	msg := lc.First.Message

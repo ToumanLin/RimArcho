@@ -45,6 +45,27 @@ func TestG13NeedsSectionsTUI(t *testing.T) {
 	}
 }
 
+func TestNeedsPhaseHeadingsAreNotCursorItems(t *testing.T) {
+	e, _ := fixture(t)
+	m := direct(t, e, 160, 40)
+	press(m, "@")
+	m.prob.items = m.toNeeds([]view.Need{
+		{Group: view.GroupLastRun, Section: view.SectionRun, Text: "Alpha — 3 warnings", PhaseHeading: "while loading the game", Counted: true},
+		{Group: view.GroupLastRun, Section: view.SectionRun, Text: "Alpha — 2 warnings", PhaseHeading: "while loading a save", Counted: true},
+	})
+	m.prob.cursor = 0
+	s := ansi.Strip(strings.Join(m.needLines(30), "\n"))
+	for _, heading := range []string{"while loading the game", "while loading a save"} {
+		if !strings.Contains(s, heading) {
+			t.Fatal(s)
+		}
+	}
+	press(m, "down")
+	if m.prob.cursor != 1 || len(m.prob.items) != 2 {
+		t.Fatalf("cursor %d items %d", m.prob.cursor, len(m.prob.items))
+	}
+}
+
 // The running game's errors come after 会让游戏出错, under 上次运行的报错 marked "this run";
 // ← → jump between the sections, and the top bar counts them too.
 func TestNeedsSectionsLive(t *testing.T) {

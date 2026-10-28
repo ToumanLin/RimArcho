@@ -59,9 +59,14 @@ static class Tests
         Check(Writer.Seen(Level.Error, text), "seen twice");
         var c2 = new Context { Message = "Config error in Foo: \"quoted\" \\ path", Inferred = "DefConfigError" };
         Writer.Add(Level.Error, "other text, same fingerprint", c2);
+        Check(Writer.WritePhase("save", "Colony1.rws"), "save phase");
+        Check(!Writer.WritePhase("save", "Colony1.rws"), "same phase is not repeated");
+        Check(Writer.Seen(Level.Error, text), "same entry in save phase");
+        Check(Writer.WritePhase("play"), "play phase flushes save counts");
+        Check(Writer.Seen(Level.Error, text), "same entry while playing");
         Writer.Close();
         var lines = File.ReadAllLines(Path.Combine(dir, "ArchoMonitor.log"));
-        Check(lines.Length == 3, "3 lines, got " + lines.Length);
+        Check(lines.Length == 7, "7 lines, got " + lines.Length);
         var first = JsonDocument.Parse(lines[0]).RootElement;
         Check(first.GetProperty("message").GetString() == c.Message, "message round trip");
         Check(first.GetProperty("count").GetInt32() == 1 && first.GetProperty("total").GetInt32() == 1, "first count");
@@ -76,7 +81,15 @@ static class Tests
         Check(second.GetProperty("count").GetInt32() == 3 && second.GetProperty("total").GetInt32() == 4, "count line: " + lines[1]);
         Check(second.GetProperty("id").GetString() == first.GetProperty("id").GetString(), "same id");
         Check(second.GetProperty("details").GetString() == "", "no details on count lines");
-        var exit = JsonDocument.Parse(lines[2]).RootElement;
+        var save = JsonDocument.Parse(lines[2]).RootElement;
+        Check(save.GetProperty("kind").GetString() == "phase" && save.GetProperty("context").GetProperty("phase").GetString() == "save", "save boundary follows loading count");
+        Check(save.GetProperty("context").GetProperty("save").GetString() == "Colony1.rws", "save file");
+        var saveCount = JsonDocument.Parse(lines[3]).RootElement;
+        Check(saveCount.GetProperty("count").GetInt32() == 1 && saveCount.GetProperty("total").GetInt32() == 5, "save count before play boundary");
+        Check(JsonDocument.Parse(lines[4]).RootElement.GetProperty("context").GetProperty("phase").GetString() == "play", "play boundary");
+        var playCount = JsonDocument.Parse(lines[5]).RootElement;
+        Check(playCount.GetProperty("count").GetInt32() == 1 && playCount.GetProperty("total").GetInt32() == 6, "play count");
+        var exit = JsonDocument.Parse(lines[6]).RootElement;
         Check(exit.GetProperty("kind").GetString() == "exit", "exit line");
         Directory.Delete(dir, true);
 

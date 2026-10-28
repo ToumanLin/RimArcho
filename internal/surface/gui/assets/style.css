@@ -462,6 +462,8 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need-sec.run > h2.label { color: var(--log); }
 .need-sec > h2.label .muted { font-weight: 400; }
 .need-list { display: flex; flex-direction: column; }
+.need-phase { padding: 14px 18px 4px; color: var(--muted); font-size: 12px; }
+.log-phase { padding: 14px 10px 5px; color: var(--muted); font-size: 12px; border-top: var(--hairline) solid var(--line); }
 .need { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; }
 .need + .need { border-top: var(--hairline) solid var(--line-2); }
 .need:hover { background: var(--card-2); }

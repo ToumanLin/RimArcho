@@ -264,6 +264,8 @@ next:
 | 存档（1.1，待实现） | `saves list [--colony <名>]` / `saves show <存档>` / `unplayed [--group never\|partial\|functional] [--mod <引用>]` | 只读（10 §1.6） |
 | | `saves backup <存档…>` / `saves trash <存档…>` | 要玩家确认（10 §4.4） |
 
+**日志阶段输出**：有明确标记时（03 §6.7.3–4），`log` 的簇行、`problems --code log` 的 finding、MCP `analyze_log` / `list_problems` 都附短阶段名及次数，如 `[loading x3, save x2, play x4]`；不能恢复阶段的次数写 `unknown`。`log` 的 `phases` 段按文件顺序列出边界，带已记录的存档名和时间；`log --cluster` 也列本簇各阶段次数。`log --follow` 的文本沿用同样标注，`--json` 增加可选 `phases` 数组（阶段及其次数）。无标记时不增加阶段段落、标签或 JSON 字段。
+
 **分析参数**：`--game-version X.Y` 用于 `analyze`、`problems`、`def`、`patches`、`harmony`、`why`、`log`，按另一个游戏主次版本分析（格式必须像 `1.6`，命令结束后恢复）。MCP 对应工具有同名参数 `game_version`。
 
 **自动检查状态**：`status`、`data status`（包括 MCP `status` 对应输出）只用一行 `automatic checks`：开关状态，以及等待玩家处理的 Mod / 工具更新数、已设置的 LoversLab 账户登录提醒。没有待处理项时写 `nothing waiting (last MM-DD HH:MM)`；尚未检查时注明 `not checked yet`。省略不适用的账户及零计数，不联网，也不暴露 Cookie；`deps` 另列受管工具的新版本和检查时间，`data status` 列各份数据的检查时间。开关和间隔见 06 §2.16。

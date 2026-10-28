@@ -90,6 +90,8 @@ export function virtualRows(scroll, count, renderRow, saved) {
         observer.observe(row);
       }
       row.classList.toggle("cur", i === selected);
+      const inner = row.querySelector?.(":scope > .lrow");
+      if (inner) inner.classList.toggle("cur", i === selected);
     }
   }
   layout();

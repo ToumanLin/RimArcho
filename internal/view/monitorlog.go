@@ -16,20 +16,21 @@ import (
 
 // MonitorEntry is one entry of the companion log.
 type MonitorEntry struct {
-	Key       string     `json:"key"`
-	Time      string     `json:"time"` // 17:51:45
-	Status    int        `json:"status"`
-	Kind      string     `json:"kind,omitempty"` // inferredType in a few words: 补丁错误
-	Text      string     `json:"text"`           // the message's first line, rich-text tags removed
-	Spans     []TextSpan `json:"spans"`          // with the mod's rich text (logtext.go)
-	Level     string     `json:"level"`
-	Count     int        `json:"count"`
-	Mods      []string   `json:"mods,omitempty"`      // related mods by name
-	FilePaths []string   `json:"filePaths,omitempty"` // full paths, aligned with shortened Files
-	Files     []string   `json:"files,omitempty"`     // related files: inside a mod relative to it
-	Details   string     `json:"details,omitempty"`
-	Cluster   string     `json:"cluster,omitempty"` // the Player.log cluster it matches (E3)
-	Only      bool       `json:"only,omitempty"`    // the game had stopped writing Player.log
+	PhaseStart string     `json:"phaseStart,omitempty"`
+	Key        string     `json:"key"`
+	Time       string     `json:"time"` // 17:51:45
+	Status     int        `json:"status"`
+	Kind       string     `json:"kind,omitempty"` // inferredType in a few words: 补丁错误
+	Text       string     `json:"text"`           // the message's first line, rich-text tags removed
+	Spans      []TextSpan `json:"spans"`          // with the mod's rich text (logtext.go)
+	Level      string     `json:"level"`
+	Count      int        `json:"count"`
+	Mods       []string   `json:"mods,omitempty"`      // related mods by name
+	FilePaths  []string   `json:"filePaths,omitempty"` // full paths, aligned with shortened Files
+	Files      []string   `json:"files,omitempty"`     // related files: inside a mod relative to it
+	Details    string     `json:"details,omitempty"`
+	Cluster    string     `json:"cluster,omitempty"` // the Player.log cluster it matches (E3)
+	Only       bool       `json:"only,omitempty"`    // the game had stopped writing Player.log
 }
 
 // MonitorLog is the companion section of the log page.
@@ -86,11 +87,21 @@ func MonitorOf(a *app.App, st *app.LoadoutState, c *logs.Companion, links map[st
 		facts = append(facts, T("full: no new entries after 32 MiB"))
 	}
 	m.Facts = strings.Join(facts, "  ")
-	for _, e := range c.Entries {
+	entries := c.Entries
+	if c.HasPhases {
+		entries = c.Segments
+	}
+	var prev *logs.Phase
+	first := true
+	for _, e := range entries {
 		if e.Level == "INFO" && e.Inferred == "" {
 			continue
 		}
 		me := MonitorEntry{Key: e.Key, Kind: MonitorKind(e.Inferred), Spans: LogSpans(e.Message, 240), Count: e.Count, Details: strings.TrimSpace(e.Details)}
+		if c.HasPhases && (first || !samePhase(prev, e.Phase)) {
+			me.PhaseStart = phaseLabel(e.Phase, a.Loc)
+		}
+		prev, first = e.Phase, false
 		me.Text = SpanText(me.Spans)
 		if !e.At.IsZero() {
 			me.Time = e.At.In(a.Loc).Format("15:04:05")

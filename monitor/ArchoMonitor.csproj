@@ -22,7 +22,7 @@
     <GenerateDependencyFile>false</GenerateDependencyFile>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <MonitorVersion Condition="'$(MonitorVersion)' == ''">0.0.0-dev</MonitorVersion>
+    <MonitorVersion Condition="'$(MonitorVersion)' == ''">$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/VERSION').Trim())</MonitorVersion>
     <InformationalVersion>$(MonitorVersion)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Version>$([System.Text.RegularExpressions.Regex]::Match($(MonitorVersion), '^\d+\.\d+\.\d+'))</Version>

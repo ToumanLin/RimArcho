@@ -38,10 +38,12 @@ var SessionRe = regexp.MustCompile(`\[Archo Monitor\] (\S+) session ([0-9a-f]{12
 
 // CompanionEntry is one distinct entry of a companion log, its lines merged.
 type CompanionEntry struct {
-	Key      string // Archo Monitor's id, else level|normalised message
-	Match    string // Normalize(first message line): how clusters find it
-	Level    string // ERROR, WARNING, INFO
-	Message  string // as written, RimCrow's "[Mod, …] " prefix removed
+	Phase    *Phase       `json:",omitempty"`
+	Phases   []PhaseCount `json:",omitempty"`
+	Key      string       // Archo Monitor's id, else level|normalised message
+	Match    string       // Normalize(first message line): how clusters find it
+	Level    string       // ERROR, WARNING, INFO
+	Message  string       // as written, RimCrow's "[Mod, …] " prefix removed
 	Details  string
 	At       time.Time // the first line's time
 	Count    int       // occurrences: the sum of count, or the highest total
@@ -56,16 +58,21 @@ type CompanionEntry struct {
 
 // Companion is a companion log read so far.
 type Companion struct {
-	Path     string
-	Monitor  bool   // the file is Archo Monitor's (its first line is a session line)
-	Session  string // Archo Monitor's session id
-	Version  string // Archo Monitor's version
-	Game     string // the game version the session line names
-	Started  time.Time
-	Ended    time.Time // the exit line's time: the game closed normally
-	Full     bool      // the monitor stopped adding entries (32 MiB, 03 §6.7.3)
-	BadLines int
-	Entries  []*CompanionEntry
+	HasPhases bool
+	Phases    []*Phase
+	Segments  []*CompanionEntry // distinct entries within each phase, in file order
+	phase     *Phase
+	segments  map[string]*CompanionEntry
+	Path      string
+	Monitor   bool   // the file is Archo Monitor's (its first line is a session line)
+	Session   string // Archo Monitor's session id
+	Version   string // Archo Monitor's version
+	Game      string // the game version the session line names
+	Started   time.Time
+	Ended     time.Time // the exit line's time: the game closed normally
+	Full      bool      // the monitor stopped adding entries (32 MiB, 03 §6.7.3)
+	BadLines  int
+	Entries   []*CompanionEntry
 
 	by      map[string]*CompanionEntry
 	byMatch map[string]*CompanionEntry
@@ -76,7 +83,7 @@ type Companion struct {
 
 // NewCompanion starts reading path from its beginning.
 func NewCompanion(path string) *Companion {
-	return &Companion{Path: path, by: map[string]*CompanionEntry{}, byMatch: map[string]*CompanionEntry{}}
+	return &Companion{Path: path, by: map[string]*CompanionEntry{}, byMatch: map[string]*CompanionEntry{}, segments: map[string]*CompanionEntry{}}
 }
 
 // ReadCompanion reads a whole companion log.
@@ -111,6 +118,8 @@ type companionLine struct {
 		Session       string            `json:"session"`
 		Version       string            `json:"version"`
 		Game          string            `json:"game"`
+		Phase         string            `json:"phase"`
+		Save          string            `json:"save"`
 	} `json:"context"`
 	Source string `json:"source"`
 	Schema int    `json:"schema"`
@@ -172,6 +181,13 @@ func (c *Companion) line(b []byte) *CompanionEntry {
 	case "full":
 		c.Full = true
 		return nil
+	case "phase":
+		if j.Source == "archo-monitor" && ValidPhase(j.Context.Phase) {
+			c.HasPhases = true
+			c.phase = &Phase{Name: j.Context.Phase, Save: j.Context.Save, At: at, Index: len(c.Phases) + 1, Line: c.lines}
+			c.Phases = append(c.Phases, c.phase)
+		}
+		return nil
 	}
 	if j.Source == "archo-monitor" {
 		c.Monitor = true
@@ -197,13 +213,19 @@ func (c *Companion) line(b []byte) *CompanionEntry {
 	if j.Count != nil {
 		n = *j.Count
 	}
+	// count belongs to this phase. total is session-wide and can recover missing
+	// occurrences, whose phase is unknown; it must never be assigned to this phase.
+	if n < 0 {
+		n = 0
+	}
 	e := c.by[key]
 	if e == nil {
 		if len(c.Entries) >= companionMax {
 			return nil
 		}
 		e = &CompanionEntry{Key: key, Match: match, Level: level, Message: msg, Details: j.Details, At: at,
-			Mods: lower(j.Context.RelatedModIDs), Roles: j.Context.Roles, Inferred: j.Context.InferredType, Def: j.Context.Def,
+			Phase: c.phase,
+			Mods:  lower(j.Context.RelatedModIDs), Roles: j.Context.Roles, Inferred: j.Context.InferredType, Def: j.Context.Def,
 			Monitor: j.Source == "archo-monitor"}
 		e.Files, e.Refs = splitFiles(j.Context.RelatedFiles)
 		e.Refs = appendNew(e.Refs, j.Context.Refs...)
@@ -216,12 +238,14 @@ func (c *Companion) line(b []byte) *CompanionEntry {
 		if j.Total > e.Count {
 			e.Count = j.Total
 		}
+		c.addSegment(e, n, at)
 		return e
 	}
 	e.Count += n
 	if j.Total > e.Count {
 		e.Count = j.Total
 	}
+	c.addSegment(e, n, at)
 	if e.Details == "" {
 		e.Details = j.Details
 	}
@@ -232,6 +256,27 @@ func (c *Companion) line(b []byte) *CompanionEntry {
 		e.Mods = appendNew(e.Mods, m)
 	}
 	return nil
+}
+
+func (c *Companion) addSegment(e *CompanionEntry, n int, at time.Time) {
+	e.Phases = AddPhaseCount(e.Phases, c.phase, n)
+	index := 0
+	if c.phase != nil {
+		index = c.phase.Index
+	}
+	key := e.Key + "@" + itoa(index)
+	s := c.segments[key]
+	if s == nil {
+		if len(c.Segments) >= companionMax {
+			return
+		}
+		copy := *e
+		copy.Key, copy.Phase, copy.At, copy.Count, copy.Phases = key, c.phase, at, 0, nil
+		s = &copy
+		c.segments[key] = s
+		c.Segments = append(c.Segments, s)
+	}
+	s.Count += n
 }
 
 // Lookup finds the entry of a log message (its first line, normalised).
@@ -428,11 +473,20 @@ func ClustersHint(f *File, hint Hint) []*Cluster {
 		c := by[key]
 		if c == nil {
 			c = &Cluster{Key: key, Template: tmpl, Class: cls, First: e}
+			if f.HasPhases {
+				c.Phase = e.Phase
+				if c.Phase == nil {
+					c.Phase = LoadingPhase
+				}
+			}
 			by[key] = c
 			out = append(out, c)
 			c.ID = "E" + itoa(len(out))
 		}
 		c.Count++
+		if f.HasPhases {
+			c.Phases = AddPhaseCount(c.Phases, e.Phase, 1)
+		}
 		if len(c.Lines) < 5 {
 			c.Lines = append(c.Lines, e.Line)
 		}
@@ -487,6 +541,7 @@ func EntryOf(e *CompanionEntry) *Entry {
 	}
 	en := f.Entries[0]
 	en.Line = 0
+	en.Phase = e.Phase
 	return en
 }
 

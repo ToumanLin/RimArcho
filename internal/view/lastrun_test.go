@@ -6,10 +6,42 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
 func runProblem(code, severity, claim, confidence string) *app.Problem {
 	return &app.Problem{Finding: &finding.Finding{Code: "log." + code, Severity: severity, Claim: claim, Confidence: confidence}, Log: &app.LogRun{Path: "synthetic/Player-prev.log"}}
+}
+
+func TestLastRunPhaseSummary(t *testing.T) {
+	defer SetLang("en")
+	p := runProblem("texture-missing", finding.Warning, "log:E1 x8: Could not load Texture2D at 'Things/Empty'", finding.Certain)
+	p.Key = "texture"
+	p.Log.Phases = map[string][]logs.PhaseCount{"texture": {{Phase: logs.LoadingPhase, Count: 3}, {Phase: &logs.Phase{Name: "save"}, Count: 2}, {Phase: &logs.Phase{Name: "play"}, Count: 3}}}
+	for _, lang := range []string{"en", "zh"} {
+		SetLang(lang)
+		ns := lastRunNeeds("Alpha Props", []*app.Problem{p}, "09:50", true)
+		if len(ns) != 3 || ns[0].Phase != "loading" || ns[1].Phase != "save" || ns[2].Phase != "play" {
+			t.Fatalf("%+v", ns)
+		}
+		for _, n := range ns {
+			if strings.Contains(n.Text, n.PhaseHeading) {
+				t.Fatal("phase repeated in item")
+			}
+			if n.Actions[0].Cluster != "E1" {
+				t.Fatal("cluster link lost")
+			}
+		}
+		if lang == "en" && (ns[0].Title != "Alpha Props — 3 warnings" || ns[1].PhaseHeading != "while loading a save") {
+			t.Fatalf("%+v", ns)
+		}
+		if lang == "zh" && (ns[0].Title != "Alpha Props — 3 个警告" || ns[1].PhaseHeading != "读取存档时") {
+			t.Fatalf("%+v", ns)
+		}
+	}
+	if logCount(p) != 8 {
+		t.Fatal("phase summary mutated the original finding")
+	}
 }
 
 func TestLastRunSummary(t *testing.T) {

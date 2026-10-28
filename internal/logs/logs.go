@@ -13,6 +13,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Classes (03 §6.1).
@@ -54,7 +55,8 @@ type Patch struct {
 
 // Entry is one log message with its stack.
 type Entry struct {
-	Line    int // 1-based line of the message
+	Phase   *Phase `json:",omitempty"`
+	Line    int    // 1-based line of the message
 	Message string
 	Extra   []string // continuation lines that are not frames (file:, Subnode:, inner messages)
 	Frames  []Frame
@@ -65,10 +67,12 @@ type Entry struct {
 
 // File is a parsed log.
 type File struct {
-	Entries []*Entry
-	Lines   int
-	Version string // "1.6.4871 rev…" from the header, if found
-	Waylith bool   // the 1.7 log format
+	HasPhases bool     `json:",omitempty"`
+	Phases    []*Phase `json:",omitempty"`
+	Entries   []*Entry
+	Lines     int
+	Version   string // "1.6.4871 rev…" from the header, if found
+	Waylith   bool   // the 1.7 log format
 }
 
 var (
@@ -131,6 +135,7 @@ func Parse(r io.Reader) (*File, error) {
 // Parser reads a log line by line (Parse, and the live follower of a running game: 03 §6.6).
 // Entries are appended to F.Entries; the last one may still grow until Open reports false.
 type Parser struct {
+	phase        *Phase
 	F            *File
 	cur          *Entry
 	afterSubnode bool
@@ -206,11 +211,21 @@ func (p *Parser) Line(l string) {
 		return
 	}
 	if f.Waylith {
+		// INFO phase markers must be seen before the usual level filtering.
+		if m := waylithLineRe.FindStringSubmatch(l); m != nil && p.marker(m[2], l, n) {
+			return
+		}
 		next := waylithLine(f, p.cur, n, l)
 		if next != p.cur {
 			p.finish()
 		}
 		p.cur = next
+		if next != nil && next.Line == n {
+			next.Phase = p.phase
+		}
+		return
+	}
+	if p.marker(l, "", n) {
 		return
 	}
 	if f.Version == "" && n < 50 {
@@ -239,7 +254,7 @@ func (p *Parser) Line(l string) {
 	}
 	if m := xmlExtStartRe.FindStringSubmatch(l); m != nil {
 		p.finish()
-		p.cur = &Entry{Line: n, Message: "[" + m[1] + "]"}
+		p.cur = &Entry{Line: n, Message: "[" + m[1] + "]", Phase: p.phase}
 		f.Entries = append(f.Entries, p.cur)
 		p.xname = m[1]
 		return
@@ -258,8 +273,24 @@ func (p *Parser) Line(l string) {
 		return
 	}
 	p.finish()
-	p.cur = &Entry{Line: n, Message: l}
+	p.cur = &Entry{Line: n, Message: l, Phase: p.phase}
 	f.Entries = append(f.Entries, p.cur)
+}
+
+func (p *Parser) marker(msg, line string, n int) bool {
+	name, ok := strings.CutPrefix(msg, "[Archo Monitor] phase ")
+	if !ok || !ValidPhase(name) {
+		return false
+	}
+	p.finish()
+	p.cur, p.afterSubnode = nil, false
+	p.F.HasPhases = true
+	p.phase = &Phase{Name: name, Index: len(p.F.Phases) + 1, Line: n}
+	if len(line) >= 23 {
+		p.phase.At, _ = time.ParseInLocation("2006-01-02 15:04:05.000", line[:23], time.Local)
+	}
+	p.F.Phases = append(p.F.Phases, p.phase)
+	return true
 }
 
 // waylithLine handles one line of a 1.7 log: a new message, or a continuation of cur (any line
@@ -563,7 +594,9 @@ func Template(m string) string {
 
 // Cluster groups entries with the same class, normalised message and top frame.
 type Cluster struct {
-	ID       string // E1, E2 … in order of first occurrence
+	Phase    *Phase       `json:",omitempty"` // first occurrence, when the run has markers
+	Phases   []PhaseCount `json:",omitempty"`
+	ID       string       // E1, E2 … in order of first occurrence
 	Key      string
 	Template string // class|Template(message): the kind of problem, across defs, types and mods
 	Class    string

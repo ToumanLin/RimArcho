@@ -206,6 +206,20 @@ func (cx *attrCtx) companion(lc *LogCluster) {
 	if e.Count > lc.Count {
 		lc.Count = e.Count
 	}
+	if cx.comp.HasPhases {
+		lc.Phases = logs.MergePhaseCounts(lc.Phases, e.Phases)
+		if lc.Phase == nil {
+			lc.Phase = e.Phase
+			if lc.Phase == nil {
+				lc.Phase = logs.LoadingPhase
+			}
+		}
+		n := 0
+		for _, pc := range lc.Phases {
+			n += pc.Count
+		}
+		lc.Count = max(lc.Count, n)
+	}
 	while := ""
 	if e.Def != "" {
 		while = " (while loading " + e.Def + ")"

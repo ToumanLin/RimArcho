@@ -4,6 +4,12 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Archo Monitor records game loading, save loading, new colony generation, playing and
+  returns to the main menu. Can it run groups recorded errors by phase; the game log
+  adds quiet phase separators. CLI and MCP include phase counts. Older logs keep their
+  existing display. The bundled Monitor version now comes from `monitor/VERSION` and
+  is updated independently of the launcher.
+
 - Last-run errors in Can it run now name the kinds of errors (with a sample resource
   path for missing textures), include both error and warning counts, and open that run's
   game log with a related cluster selected. Unattributed errors open the complete log;

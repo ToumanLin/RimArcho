@@ -21,23 +21,24 @@ type needKey struct {
 
 // need is one item of the screen: the shared item and its keys.
 type need struct {
-	group    int
-	section  int            // the section it is shown in (view.SectionOf, 06 §2.4)
-	evidence *view.Evidence // where the claim comes from: the chip under the item
-	text     string
-	keys     []needKey
-	counted  bool     // in the top bar's number; false for the folded stale log
-	mods     []string // instance ids: the first carries the row icon
-	status   int      // statusErr, statusWarn or statusLog for the row icon
-	dim      bool
-	parts    []string
-	fold     bool
+	phaseHeading string
+	group        int
+	section      int            // the section it is shown in (view.SectionOf, 06 §2.4)
+	evidence     *view.Evidence // where the claim comes from: the chip under the item
+	text         string
+	keys         []needKey
+	counted      bool     // in the top bar's number; false for the folded stale log
+	mods         []string // instance ids: the first carries the row icon
+	status       int      // statusErr, statusWarn or statusLog for the row icon
+	dim          bool
+	parts        []string
+	fold         bool
 }
 
 func (m *model) toNeeds(items []view.Need) []need {
 	out := make([]need, 0, len(items))
 	for _, it := range items {
-		n := need{group: it.Group, section: it.Section, evidence: it.Evidence, text: it.Text, counted: it.Counted, mods: it.Mods, status: it.Status, dim: it.Dim, parts: it.Parts, fold: it.Fold}
+		n := need{group: it.Group, section: it.Section, phaseHeading: it.PhaseHeading, evidence: it.Evidence, text: it.Text, counted: it.Counted, mods: it.Mods, status: it.Status, dim: it.Dim, parts: it.Parts, fold: it.Fold}
 		for _, a := range it.Actions {
 			n.keys = append(n.keys, m.actionKey(a, it.Text))
 		}
@@ -253,6 +254,7 @@ func (m *model) needLines(n int) []string {
 	}
 	var rows []row
 	sec := -1
+	phase, group := "", -1
 	for i, it := range items {
 		if it.section != sec {
 			if sec >= 0 {
@@ -261,6 +263,10 @@ func (m *model) needLines(n int) []string {
 			sec = it.section
 			rows = append(rows, row{"  " + m.sectionHead(sec, w-2), -1})
 		}
+		if it.phaseHeading != "" && (phase != it.phaseHeading || group != it.group) {
+			rows = append(rows, row{"    " + sDimS.Render(it.phaseHeading), -1})
+		}
+		phase, group = it.phaseHeading, it.group
 		icon := statusIcon(it.status)
 		if it.dim && it.status != statusHint || it.status == statusNone {
 			icon = " "

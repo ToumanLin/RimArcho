@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/logs"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -52,7 +53,7 @@ func logFollow(c *Ctx, a *Args) (*render.Doc, error) {
 				emit(string(b))
 				continue
 			}
-			line := fmt.Sprintf("%s  %s x%d  %s", lc.At.In(c.App.Loc).Format("15:04:05"), lc.Class, lc.Count, firstMessage(lc))
+			line := fmt.Sprintf("%s  %s x%d%s  %s", lc.At.In(c.App.Loc).Format("15:04:05"), lc.Class, lc.Count, logs.PhaseSummary(lc.Phases), firstMessage(lc))
 			if r := lc.Report; r != nil && len(r.Attr) > 0 {
 				line += "  → " + modLabel(st.Ix, r.Attr[0].Instance) + " (" + r.Attr[0].Role + ")"
 			}
@@ -112,17 +113,19 @@ func firstMessage(lc *app.LiveCluster) string {
 }
 
 type liveOut struct {
-	At       string   `json:"at"`
-	Class    string   `json:"class"`
-	Count    int      `json:"count"`
-	Level    string   `json:"level,omitempty"`
-	Message  string   `json:"message"`
-	Mods     []string `json:"mods,omitempty"` // "#ref role"
-	Template string   `json:"template"`
+	Phases   []logs.PhaseCount `json:"phases,omitempty"`
+	At       string            `json:"at"`
+	Class    string            `json:"class"`
+	Count    int               `json:"count"`
+	Level    string            `json:"level,omitempty"`
+	Message  string            `json:"message"`
+	Mods     []string          `json:"mods,omitempty"` // "#ref role"
+	Template string            `json:"template"`
 }
 
 func liveJSON(ix *app.Index, lc *app.LiveCluster) liveOut {
 	o := liveOut{At: lc.At.Format(time.RFC3339), Class: lc.Class, Count: lc.Count, Level: lc.Level, Message: firstMessage(lc), Template: lc.Template}
+	o.Phases = lc.Phases
 	if lc.Report != nil {
 		for _, at := range lc.Report.Attr {
 			o.Mods = append(o.Mods, ix.Ref(at.Instance)+" "+at.Role)

@@ -62,11 +62,13 @@ type LogCluster struct {
 
 // LogReport is an analysed log.
 type LogReport struct {
-	Path    string
-	Label   string // "Player.log", "Player-prev.log" or "<text>"
-	ModTime time.Time
-	Lines   int
-	Version string
+	HasPhases bool          `json:",omitempty"`
+	Phases    []*logs.Phase `json:",omitempty"`
+	Path      string
+	Label     string // "Player.log", "Player-prev.log" or "<text>"
+	ModTime   time.Time
+	Lines     int
+	Version   string
 	// AnalysedAs is the major.minor the log was attributed against when it differs from
 	// the environment's (EnvMM): the log's own version (03 §6.4).
 	AnalysedAs, EnvMM string
@@ -122,8 +124,9 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 
 // logCacheVersion invalidates stored reports when attribution changes.
 // 7: both the companion log (dev, 4) and the G1/G7 attribution rules (master, 6); 8: no
-// nearby messages for entries only the companion log has.
-const logCacheVersion = 8
+// nearby messages for entries only the companion log has; 9: observed phase boundaries
+// and counts from both logs.
+const logCacheVersion = 9
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -345,6 +348,19 @@ type dirOwner struct {
 }
 
 func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure, comp *logs.Companion) error {
+	rep.HasPhases = lf.HasPhases || comp != nil && comp.HasPhases
+	rep.Phases = lf.Phases
+	if comp != nil && comp.HasPhases {
+		rep.Phases = comp.Phases
+		for _, p := range lf.Phases {
+			if p.Index <= len(comp.Phases) {
+				cp := comp.Phases[p.Index-1]
+				if cp.Name == p.Name {
+					p.At, p.Save = cp.At, cp.Save
+				}
+			}
+		}
+	}
 	cx := &attrCtx{a: a, st: st, byName: map[string][]*store.Mod{}, byPkg: map[string][]*store.Mod{}, typeMemo: map[string][]string{}, idMemo: map[string][]string{}, defMemo: map[string][]analyze.DefFact{}, libMemo: map[string]string{}, lf: lf, comp: comp}
 	for _, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
@@ -406,6 +422,12 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 	}
 	for _, lc := range rep.Clusters {
 		// Source searches cover the cluster's candidates, not every enabled mod (03 §5.4).
+		if rep.HasPhases {
+			lc.Phases = logs.CompletePhaseCounts(lc.Phases, lc.Count)
+			if lc.Phase == nil {
+				lc.Phase = logs.UnknownPhase
+			}
+		}
 		in := ""
 		for i, at := range lc.Attr {
 			if i == 4 {
@@ -1054,7 +1076,7 @@ func (cx *attrCtx) toFinding(lc *LogCluster) *finding.Finding {
 		msg = msg[:157] + "..."
 	}
 	f := &finding.Finding{Code: "log." + lc.Class, Severity: logSeverity[lc.Class], Layer: "log", Key: findingKey(lc.Key), Confidence: lc.Confidence,
-		Claim: fmt.Sprintf("log:%s x%d: %s", lc.ID, lc.Count, msg)}
+		Claim: fmt.Sprintf("log:%s x%d: %s%s", lc.ID, lc.Count, msg, logs.PhaseSummary(lc.Phases))}
 	for _, at := range lc.Attr {
 		f.Subjects = append(f.Subjects, finding.Inst(at.Instance))
 		for _, ev := range at.Evidence {
@@ -1154,6 +1176,7 @@ type hotMethod struct {
 // still describes the analysed plan (03 §6.4). A stale log's problems are listed apart and
 // not counted.
 type LogRun struct {
+	Phases      map[string][]logs.PhaseCount `json:",omitempty"` // finding key → observed counts
 	Path, Label string
 	Version     string
 	ModTime     time.Time
@@ -1215,6 +1238,9 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 		return nil, nil, r
 	}
 	run := a.logRun(st, path, rep.Version, rep.ModTime)
+	if rep.HasPhases {
+		run.Phases = map[string][]logs.PhaseCount{}
+	}
 	var out []*finding.Finding
 	hot := map[string]hotMethod{}
 	for _, lc := range rep.Clusters {
@@ -1222,6 +1248,9 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 			continue
 		}
 		if lc.Finding != nil {
+			if rep.HasPhases {
+				run.Phases[lc.Finding.Key] = lc.Phases
+			}
 			out = append(out, lc.Finding)
 		}
 		for _, fr := range lc.First.Frames {
