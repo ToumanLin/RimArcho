@@ -84,7 +84,9 @@ func fixtureSized(root string, scale bool) {
 	for _, name := range []string{"old", "new", "installed", "dependency"} {
 		mod(filepath.Join(root, "library", name), "vm."+name, name, "")
 	}
-	mod(filepath.Join(root, "library", "dependent"), "vm.dependent", "dependent", `<modDependencies><li><packageId>vm.old</packageId></li><li><packageId>vm.dependency</packageId></li><li><packageId>vm.remote</packageId><steamWorkshopUrl>steam://url/CommunityFilePage/123456</steamWorkshopUrl></li><li><packageId>vm.unknown</packageId></li></modDependencies>`)
+	// dependent loads after old without requiring it, so old → new stays replaceable (a
+	// required original is never offered for replacement; app tests cover that case).
+	mod(filepath.Join(root, "library", "dependent"), "vm.dependent", "dependent", `<loadAfter><li>vm.old</li></loadAfter><modDependencies><li><packageId>vm.dependency</packageId></li><li><packageId>vm.remote</packageId><steamWorkshopUrl>steam://url/CommunityFilePage/123456</steamWorkshopUrl></li><li><packageId>vm.unknown</packageId></li></modDependencies>`)
 	write(filepath.Join(home, "cache", "replacements.json.gz"), `{"rules":[{"oldPackageId":"vm.old","newPackageId":"vm.new","newName":"new","newVersions":["1.6"]}]}`)
 	a, err := app.Open(home)
 	check(err)
