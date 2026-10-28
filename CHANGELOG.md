@@ -37,7 +37,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - The missing-content panel trusts a fresh analysis: it searches only the installed mods
   whose indexed content may change when enabled, so large libraries no longer end with
   "search incomplete, try again". Disabled SteamCMD and extra-folder mods are now indexed
-  too, so their templates are found without reading files. When nothing installed defines
+  too, so their templates are found without reading files. When nothing installed supplies
   the template it says so;
   it no longer suggests trying again. Once installed providers cover every missing
   template, the panel and `problems --ref` drop unconfirmed candidates (such as a

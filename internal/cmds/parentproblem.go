@@ -63,7 +63,7 @@ func parentProblemDoc(c *Ctx, ps *app.ProblemSet, p *app.Problem, all bool) (*re
 		if h.SearchIncomplete {
 			root.Add("providers: not every installed mod could be checked")
 		} else if !h.CacheIncomplete {
-			root.Add("providers: no installed mod defines it, enabled or not")
+			root.Add("providers: no installed mod supplies it, enabled or not")
 		}
 	}
 	affected := root.Add("affected:")

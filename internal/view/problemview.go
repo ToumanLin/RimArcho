@@ -136,7 +136,7 @@ func buildProblemPanel(ctx context.Context, a *app.App, ps *app.ProblemSet, ref 
 		case h.SearchIncomplete:
 			panel.Notes = append(panel.Notes, T("not every installed mod could be checked"))
 		case ctx != nil && !h.CacheIncomplete:
-			panel.Notes = append(panel.Notes, T("no installed mod defines this base content, enabled or not"))
+			panel.Notes = append(panel.Notes, T("no installed mod supplies this base content, enabled or not"))
 		default:
 			panel.Notes = append(panel.Notes, T(parentNext))
 		}

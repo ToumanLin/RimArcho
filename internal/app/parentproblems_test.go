@@ -448,7 +448,7 @@ func TestParentSearchTrustsFreshIndex(t *testing.T) {
 			}
 			if !selfFolder {
 				out := e.MustRun("problems", "--ref", p.Ref)
-				if !strings.Contains(out, "providers: no installed mod defines it") || strings.Contains(out, "not every installed mod") {
+				if !strings.Contains(out, "providers: no installed mod supplies it") || strings.Contains(out, "not every installed mod") {
 					t.Fatalf("cli:\n%s", out)
 				}
 			}
@@ -486,7 +486,7 @@ func TestParentSearchTrustsFreshIndex(t *testing.T) {
 			if strings.Contains(notes, "再试") || strings.Contains(notes, "找到提供这些内容的 Mod 后启用它") != false {
 				t.Fatalf("notes %q", notes)
 			}
-			if got := strings.Contains(notes, "都没有定义这些基础内容"); got == selfFolder {
+			if got := strings.Contains(notes, "都提供不了这些基础内容"); got == selfFolder {
 				t.Fatalf("none-installed note=%v notes %q", got, notes)
 			}
 			for _, act := range panel.Actions {
