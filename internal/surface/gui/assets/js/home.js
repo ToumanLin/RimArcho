@@ -479,7 +479,7 @@ async function launch(r) {
   draw();
   setTimeout(() => { if (S.screen === "home" && launching && launching <= Date.now()) { launching = 0; draw(); } }, 4100);
   try {
-    if (r.kind === "plan") await ui.run("launch");
-    else await launchPack(r.name);
+    if (r.kind !== "plan") await launchPack(r.name);
+    else if (await ui.run("launch") === "asked") { launching = 0; draw(); }
   } catch (e) { launching = 0; draw(); say("fail", errText(e)); }
 }

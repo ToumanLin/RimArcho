@@ -934,9 +934,19 @@ func (s *API) Preview(what string) (*view.Preview, error) {
 	return view.DryRun(s.a, what)
 }
 
-// Run does sort, save or launch at once (S, w, L; 06 §6): no confirmation. A refusal comes
-// back in Outcome.Refused with the commands that resolve it.
+// Run does sort, save or launch at once (S, w, L; 06 §6). A refusal comes back in
+// Outcome.Refused with the commands that resolve it. A launch with required mods missing
+// asks first (Outcome.Confirm, VM run B8); RunAnyway goes on.
 func (s *API) Run(what string) (*view.Outcome, error) {
+	return s.run(what, true)
+}
+
+// RunAnyway is Run after the player chose to launch with required mods missing.
+func (s *API) RunAnyway(what string) (*view.Outcome, error) {
+	return s.run(what, false)
+}
+
+func (s *API) run(what string, ask bool) (*view.Outcome, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.needs = nil
@@ -945,6 +955,9 @@ func (s *API) Run(what string) (*view.Outcome, error) {
 	case view.ListSort, view.ListSave, view.ListLaunch:
 	default:
 		return nil, fmt.Errorf("no action %s", what)
+	}
+	if ask {
+		return view.RunAsking(s.a, what), nil
 	}
 	return view.Run(s.a, what), nil
 }
@@ -1128,6 +1141,17 @@ var inspectable = map[string]bool{"problems": true, "patches": true, "mod": true
 func (s *API) Inspect(argv []string) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// an outside change's "see the difference" (loadout diff [<v>] [<v>]), in the window's words
+	if len(argv) >= 2 && len(argv) <= 4 && argv[0] == "loadout" && argv[1] == "diff" {
+		from, to := "", ""
+		if len(argv) > 2 {
+			from = argv[2]
+		}
+		if len(argv) > 3 {
+			to = argv[3]
+		}
+		return view.VersionDiff(s.a, from, to)
+	}
 	directoryCheck := len(argv) == 2 && argv[0] == "folder" && argv[1] == "check"
 	if len(argv) == 0 || (!directoryCheck && !inspectable[argv[0]]) {
 		return nil, fmt.Errorf("not a read-only command: %v", argv)

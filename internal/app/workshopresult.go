@@ -6,6 +6,10 @@ func WorkshopResultText(code int) string {
 	switch code {
 	case 2:
 		return "Steam could not complete the request"
+	case 3:
+		// k_EResultNoConnection: the client is offline, often signed out by a SteamCMD
+		// sign-in with the same account (VM run B11)
+		return "the Steam client is offline"
 	case 9:
 		return "no longer on the Workshop (deleted or private)"
 	case 15:

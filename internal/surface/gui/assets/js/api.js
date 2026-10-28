@@ -12,7 +12,7 @@ let actionGuard = () => "";
 export function setEnvironmentGuard(fn) { actionGuard = fn; }
 const writesGame = new Set([
   "CompleteDependencies", "ReplaceRecommended", "UseInstalled",
-  "Run", "RunMoving", "RunCLI", "Toggle", "Stage", "Unstage", "StageAll", "RestoreAll",
+  "Run", "RunAnyway", "RunMoving", "RunCLI", "Toggle", "Stage", "Unstage", "StageAll", "RestoreAll",
   "MoveBy", "MoveShown", "Place", "Swap", "Undo", "Redo", "HistoryGo", "RunOp", "DoAction",
   "CreatePlan", "ImportApplyTo", "UsePlan", "OpenPlan", "NewPlan", "RenamePlan", "RemovePlan", "ImportApply", "ImportAsPlan", "ImportAsPlanPreview", "ImportFollow",
   "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetTag",

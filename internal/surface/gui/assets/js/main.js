@@ -646,10 +646,15 @@ async function drop(from, to, items, at) {
 
 // run: sort, save and launch act at once and say what they did (06 §6); sort
 // offers 撤销. A refusal says why in the status line and shows the commands that resolve it.
-async function run(what) {
+// A launch with required mods missing asks once (VM run B8); run says "asked" then.
+async function run(what, anyway = false) {
   const before = motion.snapshot();
   let o;
-  try { o = await api.Run(what); } catch (e) { return say("fail", errText(e)); }
+  try { o = await (anyway ? api.RunAnyway(what) : api.Run(what)); } catch (e) { return say("fail", errText(e)); }
+  if (o.confirm) {
+    pop.confirm(o.text, o.confirm, T("launch anyway"), () => run(what, true), "launch");
+    return "asked";
+  }
   // another version in the way that can move into the lock library: one confirmation, then on
   if (o.moves) return confirmMoves(o, () => api.RunMoving(what), async (o2) => { say(o2.refused ? "fail" : "ok", o2.text); await reload(); motion.play(before, null); });
   if (o.refused) {

@@ -401,6 +401,24 @@ func (a *App) SteamCMDAccount(override string) (string, error) {
 	return account, nil
 }
 
+// SteamCMDSignsOutSteam: SteamCMD signing in as account signs the running Steam client out.
+// The client is signed in with that same account and Steam keeps one session per account;
+// the client stays offline until it is restarted (VM run B11).
+func (a *App) SteamCMDSignsOutSteam(account string) bool {
+	if account == "" || strings.EqualFold(account, "anonymous") {
+		return false
+	}
+	signedIn := a.SteamSignedIn
+	if signedIn == nil {
+		signedIn = env.SteamSignedIn
+	}
+	name, ok := signedIn()
+	return ok && strings.EqualFold(name, account)
+}
+
+// SteamSignOutNote is the note a SteamCMD download carries when SteamCMDSignsOutSteam.
+const SteamSignOutNote = "SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it"
+
 // CheckDownloadDir: the new game folder may not be inside RimArcho's data directory, nor
 // inside or around any source (another game, a mod folder).
 func (a *App) CheckDownloadDir(dir string) (string, error) {

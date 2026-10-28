@@ -52,6 +52,7 @@ const (
 	ActIgnoreRule      = "ignore-rule"      // Rule (empty: nothing to ignore)
 	ActLoadExternal    = "load-external"    // check out Version (confirm first)
 	ActDismissConflict = "dismiss-conflict" // keep the workspace, ignore the outside change
+	ActKeepOutside     = "keep-outside"     // keep the outside change that left mods out (droppedNeed)
 	ActAnswer          = "answer"           // Question, Answer (confirm first)
 	ActUnhide          = "unhide"           // Refs[0]: rename About.xml back (confirm first)
 	ActUnpin           = "unpin"            // Refs[0]: restore the workshop copy (confirm first)
@@ -694,6 +695,9 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				{Kind: ActDismissConflict, Key: "I", Label: T("ignore it"), Done: T("the outside change is ignored (it stays in the history)")},
 			}})
 	}
+	if n := droppedNeed(a, st); n != nil {
+		add(*n)
+	}
 	// The game now is not among the versions the list allows (04 §1.6): something to
 	// confirm, not a block; version.unsupported still checks each mod against the game.
 	if pv, err := a.PlanVersionsOf(st, st.Plan); err == nil && pv.Game != "" && len(pv.Allowed) > 0 && !slices.Contains(pv.Allowed, pv.Game) {
@@ -993,6 +997,8 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		_, _, err = a.Checkout(fmt.Sprintf("v%d", act.Version))
 	case ActDismissConflict:
 		err = a.DismissConflict()
+	case ActKeepOutside:
+		err = a.KeepOutsideChange()
 	case ActAnswer:
 		_, err = a.ResolveQuestion(act.QID, act.Answer)
 	case ActUnhide:

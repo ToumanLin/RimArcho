@@ -403,6 +403,8 @@ var zhText = map[string]string{
 	"see the difference":                                                                                     "看改了什么",
 	"ModsConfig.xml was changed outside RimArcho; list %s keeps it as v%d, not used yet":                     "ModsConfig.xml 在 RimArcho 之外被修改了；已为列表 %s 记为 v%d，还没采用",
 	"ModsConfig.xml was changed outside RimArcho":                                                            "ModsConfig.xml 在 RimArcho 之外被修改了",
+	"ModsConfig.xml was changed outside RimArcho, and this list has edits of its own: nothing was written":   "ModsConfig.xml 在 RimArcho 之外被修改了，而这个列表也有自己的修改：什么都没写",
+	"choose which to keep on the can it run page: see the difference, use the outside change, or ignore it":  "到「能不能跑」页选留哪一份：看改了什么、采用外部修改，或忽略",
 	"is %s the same mod as %s?":                                                                              "%s 和 %s 是同一个 Mod 吗？",
 	"same":                                                                                                   "是同一个",
 	"a copy":                                                                                                 "是副本",

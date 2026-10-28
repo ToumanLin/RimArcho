@@ -17,6 +17,15 @@ func subscriptionReason(it app.TaskItem, full bool) string {
 		}
 		return T("no longer on the Workshop")
 	}
+	if kind == "" && (it.Why == "the Steam client is offline" || strings.Contains(it.Why, "(code 3)")) {
+		kind = "offline"
+	}
+	if kind == "offline" {
+		if full {
+			return T("the Steam client is offline: restart Steam, then retry (SteamCMD signing in with the same account signs Steam out)")
+		}
+		return T("the Steam client is offline")
+	}
 	key := map[string]string{
 		"permission": "access denied", "ownership": "account does not own this content",
 		"disk": "not enough disk space or unable to write", "network": "connection failed or timed out",
@@ -27,6 +36,10 @@ func subscriptionReason(it app.TaskItem, full bool) string {
 		return T(key)
 	}
 	if strings.HasPrefix(it.Ref, "ws:") {
+		// Steam's own reason (workshopresult.go) says more than "not confirmed"
+		if why := strings.TrimPrefix(it.Why, "failed: "); strings.HasPrefix(why, "Steam ") {
+			return Text(why)
+		}
 		return T("download was not confirmed")
 	}
 	return Humanize(nil, strings.TrimPrefix(it.Why, "failed: "))

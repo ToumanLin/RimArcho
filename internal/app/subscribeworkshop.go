@@ -129,7 +129,11 @@ func (a *App) subscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool, w *
 			for i, id := range ids {
 				result := byID[id]
 				if result != "ok" {
-					failures = append(failures, fmt.Errorf("Workshop %s: Steam did not confirm subscription (%s); %s", id, result, workshopURL(id)))
+					why := result
+					if code, err := strconv.Atoi(strings.TrimPrefix(result, "failed:")); err == nil {
+						why = WorkshopResultText(code)
+					}
+					failures = append(failures, fmt.Errorf("Workshop %s: Steam did not confirm subscription (%s); %s", id, why, workshopURL(id)))
 				}
 				op.Items[i].Result = result
 				if strings.HasPrefix(result, "failed:") {
@@ -137,6 +141,8 @@ func (a *App) subscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool, w *
 					op.Items[i].Result = "failed: " + WorkshopResultText(code)
 					if code == 9 {
 						op.Items[i].FailureKind = "missing"
+					} else if code == 3 {
+						op.Items[i].FailureKind = "offline"
 					} else if code == 15 || code == 24 || code == 26 || code == 41 {
 						op.Items[i].FailureKind = "permission"
 					}
@@ -230,6 +236,9 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 	op := &SubscribeOp{Action: "workshop", DryRun: dryRun}
 	for _, id := range ids {
 		op.Items = append(op.Items, SubscribeItem{Name: "Workshop " + id, Folder: filepath.Join(root, id), Record: &subscribe.Record{Kind: "steamcmd", WorkshopID: id}, Result: "would download with SteamCMD"})
+	}
+	if a.SteamCMDSignsOutSteam(account) {
+		op.Notes = append(op.Notes, fmt.Sprintf(SteamSignOutNote, account))
 	}
 	var incoming *LinkLifecyclePlan
 	if existing {

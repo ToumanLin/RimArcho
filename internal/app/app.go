@@ -127,7 +127,10 @@ type App struct {
 	// SteamCMDWait replaces the Workshop retry backoff in tests; nil uses time.Sleep.
 	SteamCMDWait   func(time.Duration)
 	SteamCMDNoPath bool
-	HTTP           *http.Client
+	// SteamSignedIn replaces asking which account the running Steam client is signed in
+	// with (env.SteamSignedIn); tests fake it.
+	SteamSignedIn func() (account string, ok bool)
+	HTTP          *http.Client
 	// FindTool delegates dependency lookup; subscriptions never install tools.
 	FindTool func(name string) (path string, ok bool)
 	pageRepo func(string) string // resolved-repository override in local tests

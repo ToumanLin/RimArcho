@@ -104,6 +104,8 @@ func (e *Env) Open() {
 	a.MonitorBundle = app.MonitorNone
 	// The DDS encoder is only what a test brings (贴图优化), never one on PATH.
 	a.ToddsNoPath = true
+	// The host's own Steam client is never asked who is signed in.
+	a.SteamSignedIn = func() (string, bool) { return "", false }
 	// Never start a process from a test: launches are only recorded.
 	a.Launcher = func(exe string, args []string, dir string) error {
 		e.Launched = append(e.Launched, strings.Join(append([]string{exe}, args...), " "))

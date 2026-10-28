@@ -56,6 +56,9 @@ type Outcome struct {
 	// Moves: refused because Mods/ holds another version that can move into the lock
 	// library (08 §3): what moving them does, for the one confirmation; RunMoving goes on.
 	Moves []string `json:"moves,omitempty"`
+	// Confirm: nothing was done; a launch with required mods missing asks first (RunAsking):
+	// what will go wrong, then the missing ones.
+	Confirm []string `json:"confirm,omitempty"`
 }
 
 // Run carries out sort, save or launch at once (06 §6). A refusal (a game is running, an
@@ -97,6 +100,12 @@ func refused(a *app.App, o *Outcome, err error) *Outcome {
 		o.Text = T("Mods/ holds another version of mods RimArcho must link")
 		o.Refused = []string{o.Text}
 		o.Moves = MoveLines(de)
+		return o
+	}
+	// an unloaded outside change: the window's words and its page, not CLI commands (VM run B9)
+	if errors.Is(err, app.ErrExternalConflict) {
+		o.Text = T("ModsConfig.xml was changed outside RimArcho, and this list has edits of its own: nothing was written")
+		o.Refused = []string{o.Text, T("choose which to keep on the can it run page: see the difference, use the outside change, or ignore it")}
 		return o
 	}
 	o.Refused = RefusalLines(Humanize(st, err.Error()))

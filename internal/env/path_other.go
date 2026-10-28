@@ -8,3 +8,5 @@ import "path/filepath"
 func PathKey(p string) string { return filepath.Clean(p) }
 
 func registrySteamPath() string { return "" }
+
+func steamActiveUser() (uint32, string) { return 0, "" }

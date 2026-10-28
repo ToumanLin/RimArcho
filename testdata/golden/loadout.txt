@@ -267,7 +267,7 @@ scan:2  env:main  0s
   instances: 11 live, 0 tombstones
   files: 55 (5.4 KB), semantic hashed 0, reused 40
   changes: none
-  loadout: ModsConfig.xml changed outside RimArcho: loaded as plan:default v3
+  loadout: ModsConfig.xml changed outside RimArcho: loaded as plan:default v3; 6 mods left the list (v2 has them)
 
 $ archo loadout log
 versions: 3 (plan:default, env:main)

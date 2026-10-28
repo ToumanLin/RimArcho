@@ -61,7 +61,17 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 	c := &ExternalConflict{Plan: target, Env: tenv, Version: n, Current: target.ID == st.Plan.ID}
 	if clean {
 		ws.Entries, ws.OriginVersion, ws.OriginKind, ws.Conflict = list.Encode(), n, "external", 0
-		st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: loaded as %s", c.Name(st.Ix.Env)))
+		note := fmt.Sprintf("ModsConfig.xml changed outside RimArcho: loaded as %s", c.Name(st.Ix.Env))
+		// Mods the change left out are said, here and on the can it run page, until the
+		// player keeps the change or puts the list back (VM run B8: the game resets its
+		// list when mods fail to load).
+		if dropped := removedEntries(cur, list, st.LineageOf); ref != nil && dropped > 0 {
+			if err := a.Store.SetMeta(droppedKey(target.ID), fmt.Sprintf("%d %d", ref.N, n)); err != nil {
+				return err
+			}
+			note += fmt.Sprintf("; %d mods left the list (v%d has them)", dropped, ref.N)
+		}
+		st.Notices = append(st.Notices, note)
 	} else {
 		ws.Conflict = n
 		st.Notices = append(st.Notices, fmt.Sprintf("ModsConfig.xml changed outside RimArcho: kept as %s, not loaded because the plan changed since it was saved (%s)",
@@ -250,4 +260,43 @@ func (a *App) IgnoreExternal() (int, *LoadoutState, error) {
 func (a *App) DismissConflict() error {
 	_, _, err := a.IgnoreExternal()
 	return err
+}
+
+// removedEntries counts the entries of before that after does not have.
+func removedEntries(before, after loadout.List, lineage func(string) string) int {
+	n := 0
+	for _, c := range loadout.Diff(before, after, lineage) {
+		if c.Kind == loadout.Removed {
+			n++
+		}
+	}
+	return n
+}
+
+func droppedKey(plan int64) string { return fmt.Sprintf("external-dropped:%d", plan) }
+
+// DroppedByOutsideChange: the list was loaded from an outside change (to) that left out mods
+// of the version before it (from), and the player has not answered yet. 0, 0 otherwise: no
+// such change, or the list was edited, checked out or loaded again since.
+func (a *App) DroppedByOutsideChange(st *LoadoutState) (from, to int) {
+	if st.WS == nil || st.WS.OriginKind != "external" || st.WS.Conflict != 0 {
+		return 0, 0
+	}
+	if _, err := fmt.Sscanf(a.Store.Meta(droppedKey(st.Plan.ID)), "%d %d", &from, &to); err != nil || to != st.WS.OriginVersion {
+		return 0, 0
+	}
+	if v, err := a.Store.Version(st.Plan.ID, to); err != nil || v == nil || v.Entries != st.WS.Entries {
+		return 0, 0
+	}
+	return from, to
+}
+
+// KeepOutsideChange: the player keeps the list an outside change left mods out of; the
+// question is not asked again.
+func (a *App) KeepOutsideChange() error {
+	st, err := a.Loadout()
+	if err != nil {
+		return err
+	}
+	return a.Store.SetMeta(droppedKey(st.Plan.ID), "")
 }
