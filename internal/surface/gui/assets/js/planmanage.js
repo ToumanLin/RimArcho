@@ -85,10 +85,10 @@ function draw(focus = "") {
   grid.append(side, gap, M.creating && M.draft ? newForm() : detailCard(d.sel));
   const setSide = (v) => { if (v) grid.style.setProperty("--pm-side", v + "px"); else grid.style.removeProperty("--pm-side"); };
   wireSeparator(gap, {
-    key: "ui.gui.plans.side", range: () => [270, 340],
+    key: "ui.gui.plans.side", range: () => [270, Math.max(270, grid.clientWidth - 420)],
     get: () => side.getBoundingClientRect().width,
     set: setSide, reset: () => setSide(0),
-    restore: (v) => setSide(+v ? Math.max(270, Math.min(340, +v)) : 0),
+    restore: (v) => setSide(+v ? Math.max(270, +v) : 0),
   });
   w.append(grid);
   sc.append(w);

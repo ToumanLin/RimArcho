@@ -28,6 +28,7 @@ func init() {
 		"%d other messages":          "其他消息 ×%d",
 		"%s ×%d":                     "%s ×%d",
 		"; source not confirmed":     "；尚未确定来源",
+		": ":                         "：",
 		"%s can run; suggestions below may help if you see errors.":                      "%s 可以运行；若遇到报错，可以参考下面的提示。",
 		"the game finds %d copies of %s in Mods/: it reports an error and uses only one": "游戏在 Mods/ 中找到了 %d 份 %s：会报错，并且只加载其中一份",
 		"Player.log, %d error groups":                                                    "Player.log 中的 %d 组报错",

@@ -332,7 +332,7 @@ function texStep(s, p) {
   const out = { ...s, level: "", more: [], go: "", count: true };
   out.text = B.tex <= 0
     ? T("The PNGs are copied as they are. Converted to DDS the game loads faster and uses less video memory: pre-convert keeps their size, slim also shrinks them.")
-    : T("pick a choice, then 扫描统计 to see how many PNG become DDS and the size after");
+    : T("pick a choice, then “count the textures” to see how many PNG become DDS and the size after");
   if (B.tex > 0 && !p.toolOk) {
     out.level = "bad"; out.go = "textures";
     out.more = [T("the DDS encoder (todds) is not installed: install it in 库 › 贴图优化")];

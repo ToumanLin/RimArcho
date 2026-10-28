@@ -295,7 +295,7 @@ function foot(I, p) {
   }
   let note = "";
   if (!X.loading) {
-    if (!p) note = T("not counted yet: 扫描统计 reads every PNG to show what is there and what converting saves");
+    if (!p) note = T("not counted yet: “count the textures” reads every PNG to show what is there and what converting saves");
     else if (X.old) note = T("the textures changed since this count; 扫描统计 counts again");
     else if (!counted()) note = T("the choices changed since this count; 扫描统计 counts again");
   }

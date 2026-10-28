@@ -12,6 +12,12 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Page widths follow the page's shape. Pages split into columns fill the window like the
+  editor and the mod library: game log, all lists (list 38%, details 62%, draggable),
+  packs, subscriptions and updates. One-column pages share one narrower width (960px) so
+  labels and values sit closer: can it run, game, texture optimisation, settings. Before,
+  all of them were centred in 1200px.
+- The texture page's English hint no longer names its button in Chinese ("扫描统计").
 - Sorting adds Archo Monitor right after Harmony when the setting "add Archo Monitor to
   lists" is on and the list has none, also after you took it out; it is part of the same
   undo step as the sort. Before, the setting only covered new lists, so a sort never put

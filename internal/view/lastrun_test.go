@@ -20,7 +20,7 @@ func TestLastRunSummary(t *testing.T) {
 		n := lastRunNeed("Alpha Props", []*app.Problem{p}, "10:00", true)
 		title, why := "Alpha Props — 8 warnings", "missing textures (Things/Building/ModCompat/Empty)"
 		if lang == "zh" {
-			title, why = "Alpha Props — 8 个警告", "贴图缺失 (Things/Building/ModCompat/Empty)"
+			title, why = "Alpha Props — 8 个警告", "贴图缺失（Things/Building/ModCompat/Empty）"
 		}
 		if n.Title != title || n.Why != why {
 			t.Fatalf("%s: %+v", lang, n)

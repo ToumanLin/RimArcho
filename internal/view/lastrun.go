@@ -99,7 +99,7 @@ func lastRunNeed(name string, ps []*app.Problem, when string, attributed bool) N
 			part = Tf("%s ×%d", part, k.n)
 		}
 		if k.example != "" {
-			part += " (" + k.example + ")"
+			part = Tf("%s (%s)", part, k.example)
 		}
 		parts = append(parts, part)
 	}

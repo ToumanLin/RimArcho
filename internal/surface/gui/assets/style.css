@@ -399,6 +399,10 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 /* a new page fades in and rises 4px; a redraw of the page shown does not */
 .page.enter { animation: view-in var(--t-enter) var(--ease); }
 .page.fill { height: 100%; min-height: 0; padding-bottom: 8px; }
+/* page width by shape (06 §7.3 rule 12): list-and-detail pages fill the window like the
+   editor and the library; one-column pages share one reading width */
+.page:is(.logs, .pm-page, .packs, .subs-page) { padding-left: 12px; padding-right: 12px; }
+.page:is(.needs, .env, .textures, .settings) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
 @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
 .head-right { display: flex; align-items: center; gap: 8px; }
 .note { padding: 0 4px; font-size: 12px; }
@@ -549,7 +553,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .lrow .files { margin-top: 3px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .mrow { cursor: pointer; }
 .mrow .log-disclosure { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 20px; margin: 0 -4px; border-radius: var(--r-sm); }
-.mrow .log-disclosure .fold-chev { margin: 0; }
+.mrow .log-disclosure .fold-chev { margin: 0; color: var(--muted); }
 .mrow button.log-disclosure:hover { background: var(--pill); color: var(--fg); }
 .mrow button.log-disclosure:hover .fold-chev { color: inherit; }
 /* a log line's level colour and a mod's own <color> (--c dark, --l light; 06 §7) */
@@ -1617,7 +1621,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .separator.hsplit::after, .separator.fbar-gap::after { height: var(--hairline); margin-top: 0; }
 .separator:hover::after, .separator.drag::after, .separator:focus-visible::after { background: var(--accent); }
 #side-split.separator:focus-visible { background: var(--accent-soft); }
-.pm-page > .pm { grid-template-columns: var(--pm-side, 320px) var(--card-gap) minmax(0, 1fr); column-gap: 0; }
+.pm-page > .pm { grid-template-columns: minmax(270px, var(--pm-side, 38fr)) var(--card-gap) minmax(0, 62fr); column-gap: 0; }
 @media (max-width: 760px) { .pm-page > .pm { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .pm-split { display: none; } }
 .pm-split { align-self: stretch; margin: 0; }
 #board > .stack { gap: var(--card-gap); }
