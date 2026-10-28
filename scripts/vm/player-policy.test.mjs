@@ -60,3 +60,15 @@ test('replay sends the actual click count after a moving target cancels repeats'
  assert.equal(entry.action.count,3);
  assert.equal(replayAction({action:{kind:'key',combo:'Escape'}}).combo,'Escape');
 });
+test('restoration stops at the step whose entries and staging both match the start',async()=>{
+  const {restoreSteps}=await import('./player-policy.mjs');
+  const E0='[{"i":"a"}]',E1='[{"i":"a"},{"i":"b"}]',X='[{"i":"x"}]';
+  // start E0/no staging; stage x (staging only), enable b: newest first
+  const p={workspace:[{entries:E1}],undoDepth:2,undo:[{op:'enable',entries:E0,staging:X},{op:'stage',entries:E0,staging:''}],redo:[]};
+  const original={workspace:[{entries:E0}],staging:[],undoDepth:0};
+  assert.deepEqual(restoreSteps(p,original),{n:2,combo:'KeyU'});
+  // old history without staging falls back to entries
+  assert.deepEqual(restoreSteps({...p,undo:[{entries:E0,staging:null}]},original),{n:1,combo:'KeyU'});
+  // entries already equal: undo every new step
+  assert.deepEqual(restoreSteps({workspace:[{entries:E0}],undoDepth:3,undo:[],redo:[]},original),{n:3,combo:'KeyU'});
+});

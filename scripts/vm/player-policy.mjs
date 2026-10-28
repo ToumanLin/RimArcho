@@ -17,6 +17,21 @@ export function difference(a,b,path='') {
   for(const k of [...new Set([...Object.keys(a),...Object.keys(b)])].sort()) { const d=difference(a[k],b[k],path+'/'+k);if(d)return d; }
   return null;
 }
+// restoreSteps: how many presses of which key take a plan back to its start snapshot.
+// Steps are newest first and hold the entries and staging from before them. Entries alone
+// do not name a state: staging a disabled mod changes only staging.
+export function restoreSteps(p,original) {
+  const wanted=original.workspace?.[0]?.entries,staging=original.staging?.[0]?.value??'';
+  let n=Math.max(0,p.undoDepth-original.undoDepth),combo='KeyU';
+  if(wanted!==p.workspace?.[0]?.entries){
+    for(const match of [s=>s.entries===wanted&&(s.staging??staging)===staging,s=>s.entries===wanted]){
+      const u=p.undo.findIndex(match),r=p.redo.findIndex(match);
+      if(u>=0){n=u+1;break;}
+      if(r>=0){n=r+1;combo='Control+KeyR';break;}
+    }
+  }
+  return {n,combo};
+}
 export function random(seed) { let n=Number(seed)>>>0;return ()=>{n+=0x6D2B79F5;let t=n;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;}; }
 const safeCommands = new Set(['full','detail','search','menu','filter','fold','expand','collapse','history','palette','help','keys','import','export','position','tags','note','swap','move-to','enable-at','plan','plans','home','needs','library','changes','log','settings','env','packs','tasks','textures','guide','undo','redo','sort','preview','toggle','enable','disable','add','take-out','put-back','stage','stage-all','restore-all','up','down','up10','down10']);
 const externalCommands = new Set(['folder','workshop','workshop-id','steam','subscription-page','subscription-check','subscription-update','resubscribe','unsubscribe','launch','download','open','browse','save-file','open-file']);

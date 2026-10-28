@@ -4,7 +4,7 @@ import { runChild } from './subprocess.mjs';
 import { createHash } from 'node:crypto';
 import { discover } from './observe.mjs';
 import { sleep } from './cdp.mjs';
-import { allowed, canonical, classify as baseClassify, classifyKey, coverage, difference, exclusions, random, replayAction, stateKey } from './player-policy.mjs';
+import { allowed, canonical, classify as baseClassify, classifyKey, coverage, difference, exclusions, random, replayAction, restoreSteps, stateKey } from './player-policy.mjs';
 
 const hash=s=>createHash('sha256').update(s).digest('hex').slice(0,20);
 const quoted=s=>JSON.stringify(s);
@@ -219,11 +219,7 @@ export async function drive(ctx) {
       const ui=(await read()).plans.find(b=>b.name===p.name);if(!ui)continue;
       if((await read()).plan!==p.name)await openPlan(ui);
       const wanted=original.workspace?.[0]?.entries,actual=p.workspace?.[0]?.entries;
-      let n=Math.max(0,p.undoDepth-original.undoDepth),combo='KeyU';
-      if(wanted!==actual){
-        const u=p.undo.findIndex(step=>step.entries===wanted),r=p.redo.findIndex(step=>step.entries===wanted);
-        if(u>=0)n=u+1;else if(r>=0){n=r+1;combo='Control+KeyR';}
-      }
+      let {n,combo}=restoreSteps(p,original);
       if(n===0&&wanted===actual&&p.undoDepth===0&&JSON.stringify(p.workspace)!==JSON.stringify(original.workspace)){
         // Checkout can claim “u undoes” while adding no history for identical
         // entries. Exercise that real key before reporting metadata mismatch.
