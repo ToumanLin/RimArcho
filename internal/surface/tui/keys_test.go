@@ -58,14 +58,14 @@ func TestKeyTable(t *testing.T) {
 	if m.st.Plan.Name != "default" {
 		t.Fatalf("shift+tab: plan %s", m.st.Plan.Name)
 	}
-	// shift+2 能不能跑, shift+4 Mod 库存, tab 变化, tab back, shift+5 方案
+	// shift+2 能不能跑, shift+6 Mod 库存, tab 变化, tab back, shift+4 列表
 	press(m, "@")
 	if m.tab != tabProblems {
 		t.Fatalf("@: tab %d", m.tab)
 	}
-	press(m, "$")
+	press(m, "^")
 	if m.tab != tabLibrary {
-		t.Fatalf("$: tab %d", m.tab)
+		t.Fatalf("^: tab %d", m.tab)
 	}
 	if h := help(); !strings.Contains(h, "a mod's copies") || strings.Contains(h, "J K") {
 		t.Fatalf("library help:\n%s", h)
@@ -78,9 +78,9 @@ func TestKeyTable(t *testing.T) {
 	if m.tab != tabLibrary {
 		t.Fatalf("tab in changes: %d", m.tab)
 	}
-	press(m, "%")
+	press(m, "$")
 	if m.tab != tabList {
-		t.Fatalf("%%: tab %d", m.tab)
+		t.Fatalf("$: tab %d", m.tab)
 	}
 	press(m, "!")
 	if !strings.Contains(m.status, "window") {

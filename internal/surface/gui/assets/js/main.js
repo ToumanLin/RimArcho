@@ -231,7 +231,7 @@ let lastList = 1;
 
 // The sidebar's entries in shift+1–8 order, 在玩 then 库 (06 §3.5; view.Nav).
 // "plan" is 列表: like a click on it, the current list (06 §2.1).
-const NAV = ["home", "needs", "log", "library", "plan", "packs", "textures", "env"];
+const NAV = ["home", "needs", "log", "plan", "packs", "library", "textures", "env"];
 const navTarget = (id) => id !== "plan" ? id : ((S.shell && S.shell.plans) || []).find((p) => p.current)?.page || "plans";
 
 // renderWhere: the position line (06 §3.2), the sidebar and the breadcrumb.

@@ -97,7 +97,7 @@ func TestLibraryAreaKeys(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
-	press(m, "$")
+	press(m, "^")
 	s := ansi.Strip(strings.Join(m.libraryLines(30), "\n"))
 	for _, want := range []string{"1 ", "2 " + Tf("%d mods", m.libr.page.Total), "3 " + T("details")} {
 		if !strings.Contains(s, want) {

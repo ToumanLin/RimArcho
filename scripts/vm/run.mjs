@@ -195,8 +195,8 @@ async function repeatedSubscription() {
   try {
     for(const clicks of [2,3]) {
       const before=await snapshot(`before-subscription-${clicks}`),known=new Set((await tasks()).rows.map(r=>r.id));
-      await press('Shift+Digit4');await settled('library');
-      await press('Shift+Digit4');await settled('library');
+      await press('Shift+Digit6');await settled('library');
+      await press('Shift+Digit6');await settled('library');
   await c.click('#nav [data-id="subscribe"]');await settled('subscribe');
       await c.click('.subscribe-omni input');await c.call('Input.insertText',{text:url});
       await until(()=>c.evaluate('!!document.querySelector(".subscribe-foot button.primary:not(:disabled)")'));
@@ -438,7 +438,7 @@ async function scenario2() {
     result.coverage.push({action:'page/selection/loading interleaving',status:'unsupported: W-only; A covers asynchronous workspace events, C read-only projection'});
   }else{
     for(let round=0;round<5;round++){
-      result.timings.push({name:'navigation-burst',trace:await c.burst(['Shift+Digit4','Shift+Digit2','Shift+Digit1','Shift+Digit5'],20)});
+      result.timings.push({name:'navigation-burst',trace:await c.burst(['Shift+Digit6','Shift+Digit2','Shift+Digit1','Shift+Digit4'],20)});
       await timed('navigation-final-editor',()=>settled(null),5000);
       check('last requested page wins',(await uiState()).page===null);
     }
@@ -457,7 +457,7 @@ async function scenario2() {
       const destination=alternatives[0];
       await clickText('.envrow:not(.on) button','use this one');
       // Navigate while UseEnv is still in flight. Names are deliberately distinct from IDs.
-      await press('Shift+Digit4');await environmentReady('library');
+      await press('Shift+Digit6');await environmentReady('library');
       check('environment switch adopts destination',await c.evaluate(`(async()=>{const {S}=await import('/js/state.js');return S.board.env===${JSON.stringify(destination)}})()`));
       await press('Shift+Digit8');await settled('env');
       // Raw environment IDs are intentionally absent in canonical snapshots; read displayed names.
@@ -519,7 +519,7 @@ async function guestProbes() {
   await c.click('[data-env-write="remove-plan"]');await until(async()=>!!(await uiState()).popup);
   result.deletePlanPreview=await c.evaluate('document.querySelector("#popup")?.innerText');
   await dismiss();
-  await press('Shift+Digit4');await settled('library');
+  await press('Shift+Digit6');await settled('library');
   await c.click('#nav [data-id="subscribe"]');await settled('subscribe');
   await c.click('.subscribe-omni input');await c.call('Input.insertText',{text:'https://127.0.0.1:9/phase1a.git'});
   await until(()=>c.evaluate('!!document.querySelector(".subscribe-preview")?.textContent.trim()'));

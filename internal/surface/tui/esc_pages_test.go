@@ -35,23 +35,23 @@ var escPages = []escPage{
 		m.arm("x", "press x again", func(*model) tea.Cmd { return nil })
 	}},
 	{"游戏日志，choose a log", tabList, func(m *model) { press(m, "#") }},
-	{"Mod 库存 › 全部", tabLibrary, func(m *model) { press(m, "$") }},
-	{"Mod 库存 › 全部，filter open", tabLibrary, func(m *model) { pressAll(m, "$", `\`) }},
-	{"Mod 库存 › 全部，search typed", tabLibrary, func(m *model) { pressAll(m, "$", "/"); typeIn(m, "a") }},
-	{"Mod 库存 › 全部，filters set, filter open", tabLibrary, func(m *model) { pressAll(m, "$", "/"); typeIn(m, "a"); pressAll(m, "enter", `\`) }},
-	{"Mod 库存 › 全部，selection + details over the page", tabLibrary, func(m *model) { pressAll(m, "$", "shift+down", "shift+down", "enter") }},
+	{"Mod 库存 › 全部", tabLibrary, func(m *model) { press(m, "^") }},
+	{"Mod 库存 › 全部，filter open", tabLibrary, func(m *model) { pressAll(m, "^", `\`) }},
+	{"Mod 库存 › 全部，search typed", tabLibrary, func(m *model) { pressAll(m, "^", "/"); typeIn(m, "a") }},
+	{"Mod 库存 › 全部，filters set, filter open", tabLibrary, func(m *model) { pressAll(m, "^", "/"); typeIn(m, "a"); pressAll(m, "enter", `\`) }},
+	{"Mod 库存 › 全部，selection + details over the page", tabLibrary, func(m *model) { pressAll(m, "^", "shift+down", "shift+down", "enter") }},
 	{"Mod 库存 › 全部，selection + filters + details", tabLibrary, func(m *model) {
-		pressAll(m, "$", "/")
+		pressAll(m, "^", "/")
 		typeIn(m, "a")
 		pressAll(m, "enter", "shift+down", "enter")
 	}},
 	{"Mod 库存 › 全部，filters set + selection + details + filter open", tabLibrary, func(m *model) {
-		pressAll(m, "$", "/")
+		pressAll(m, "^", "/")
 		typeIn(m, "a")
 		pressAll(m, "enter", "shift+down", "enter", `\`)
 	}},
 	{"Mod 库存 › 全部，focus in a copy's details", tabLibrary, func(m *model) {
-		press(m, "$")
+		press(m, "^")
 		for i := 0; i < 4 && !m.libr.detail; i++ {
 			pressAll(m, "right", "right")
 			if !m.libr.detail {
@@ -59,14 +59,14 @@ var escPages = []escPage{
 			}
 		}
 	}},
-	{"Mod 库存 › 全部，row menu", tabLibrary, func(m *model) { press(m, "$"); pressKey(m, tea.KeyF10) }},
-	{"Mod 库存 › 全部，help", tabLibrary, func(m *model) { pressAll(m, "$", "?") }},
+	{"Mod 库存 › 全部，row menu", tabLibrary, func(m *model) { press(m, "^"); pressKey(m, tea.KeyF10) }},
+	{"Mod 库存 › 全部，help", tabLibrary, func(m *model) { pressAll(m, "^", "?") }},
 	{"Mod 库存 › 订阅与更新", tabChanges, func(m *model) { press(m, "c") }},
 	{"Mod 库存 › 订阅与更新，one mod's + help", tabChanges, func(m *model) {
 		m.openChangesOf(m.current().id, m.current().name)
 		press(m, "?")
 	}},
-	{"整合包", tabList, func(m *model) { press(m, "^") }},
+	{"整合包", tabList, func(m *model) { press(m, "%") }},
 	{"环境", tabList, func(m *model) { press(m, "&") }},
 	{"设置", tabList, func(m *model) { runAlias(m, "settings") }},
 	{"卸载，the typed confirmation", tabList, func(m *model) { runAlias(m, "uninstall"); press(m, "enter") }},

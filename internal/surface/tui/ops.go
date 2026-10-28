@@ -182,7 +182,7 @@ func (m *model) selectAll() tea.Cmd {
 // characters of the US layout.
 var navKeys = map[string]int{"!": 1, "@": 2, "#": 3, "$": 4, "%": 5, "^": 6, "&": 7, "*": 8}
 
-// goPage opens the n-th sidebar entry: 启动 能不能跑 游戏日志 Mod 库存 方案 整合包 贴图优化 环境.
+// goPage opens the n-th sidebar entry: 启动 能不能跑 游戏日志 方案 整合包 Mod 库存 贴图优化 环境.
 func (m *model) goPage(n int) tea.Cmd {
 	m.full, m.insp, m.panel = false, nil, nil
 	switch n {
@@ -195,12 +195,12 @@ func (m *model) goPage(n int) tea.Cmd {
 	case 3:
 		return m.palRun("log")(m)
 	case 4:
-		return m.openLibrary()
-	case 5:
 		m.tab = tabList
 		return m.requestDetail()
-	case 6:
+	case 5:
 		return m.palRun("packs")(m)
+	case 6:
+		return m.openLibrary()
 	case 7:
 		return m.texturesPanel()
 	case 8:

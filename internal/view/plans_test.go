@@ -187,7 +187,7 @@ func TestInGameAndMarks(t *testing.T) {
 		t.Fatalf("marks %+v", rows)
 	}
 	nav := view.Nav(0, rows, nil)
-	kids := nav[1].Items[1].Kids
+	kids := nav[1].Items[0].Kids
 	// 全部列表 first, then the current list (列表 opens it), then the open one (06 §2.1)
 	if len(kids) != 3 || kids[0].ID != view.PagePlans || kids[2].Mark == "" || !kids[2].Open || !kids[1].Current {
 		t.Fatalf("plan kids %+v", kids)
@@ -262,7 +262,7 @@ func TestNavRecentLists(t *testing.T) {
 		rows = append(rows, view.PlanRow{Page: "plan:" + itoa(i), Name: itoa(i), UsedAt: now.Add(time.Duration(i) * time.Hour)})
 	}
 	rows[0].Current = true // the oldest, still shown
-	kids := view.Nav(0, rows, nil)[1].Items[1].Kids
+	kids := view.Nav(0, rows, nil)[1].Items[0].Kids
 	var got []string
 	for _, k := range kids {
 		got = append(got, k.Label)
@@ -283,7 +283,7 @@ func TestNavCapsAndCounts(t *testing.T) {
 		packs = append(packs, view.PackRow{Name: "p" + itoa(i), PlayedAt: now.Add(time.Duration(i) * time.Hour)})
 	}
 	g := view.Nav(0, rows, packs)[1]
-	lists, pk := g.Items[1].Kids, g.Items[2].Kids
+	lists, pk := g.Items[0].Kids, g.Items[1].Kids
 	if lists[0].Label != "all lists (6)" {
 		t.Fatalf("lists head %q", lists[0].Label)
 	}
@@ -294,7 +294,7 @@ func TestNavCapsAndCounts(t *testing.T) {
 	if strings.Join(got, ",") != "all packs (6),p5,p4,p3,p2" || pk[0].ID != view.PagePacks {
 		t.Fatalf("sidebar packs %v", got)
 	}
-	if few := view.Nav(0, rows[:2], packs[:2])[1]; few.Items[1].Kids[0].Label != "all lists" || len(few.Items[2].Kids) != 2 {
+	if few := view.Nav(0, rows[:2], packs[:2])[1]; few.Items[0].Kids[0].Label != "all lists" || len(few.Items[1].Kids) != 2 {
 		t.Fatalf("few: %+v", few.Items[1:3])
 	}
 }

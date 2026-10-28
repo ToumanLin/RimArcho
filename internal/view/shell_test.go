@@ -51,7 +51,7 @@ func TestNavAndPath(t *testing.T) {
 			ids, keys = append(ids, it.ID), append(keys, it.Key)
 		}
 	}
-	if strings.Join(ids, ",") != "home,needs,log,library,plan,packs,textures,env" {
+	if strings.Join(ids, ",") != "home,needs,log,plan,packs,library,textures,env" {
 		t.Fatalf("order %v", ids)
 	}
 	if keys[0] != "shift+1" || keys[7] != "shift+8" {
@@ -76,14 +76,14 @@ func TestNavAndPath(t *testing.T) {
 		return strings.Join(out, " / ")
 	}
 	for id, want := range map[string]string{
-		"plan":        "library=library / lists=plan",
-		plans[0].Page: "library=library / lists=plan / default=" + plans[0].Page,
-		"plans":       "library=library / lists=plan / all lists=plans",
+		"plan":        "library=plan / lists=plan",
+		plans[0].Page: "library=plan / lists=plan / default=" + plans[0].Page,
+		"plans":       "library=plan / lists=plan / all lists=plans",
 		"needs":       "playing=home / can it run=needs",
 		"log":         "playing=home / game log=log",
-		"changes":     "library=library / mod library=library / subscriptions and updates=changes",
-		"library":     "library=library / mod library=library / all mods=library",
-		"pack:Main":   "library=library / packs=packs / Main=pack:Main",
+		"changes":     "library=plan / mod library=library / subscriptions and updates=changes",
+		"library":     "library=plan / mod library=library / all mods=library",
+		"pack:Main":   "library=plan / packs=packs / Main=pack:Main",
 		"settings":    "settings=settings",
 		"nowhere":     "",
 	} {
