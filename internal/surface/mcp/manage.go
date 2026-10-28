@@ -146,6 +146,8 @@ func IdentityArgv(in IdentityIn) []string {
 	switch in.Action {
 	case "list":
 		return argv("identity", "list").flag("all", in.All).a
+	case "why":
+		return argv("identity", "why").pos(in.Question).a
 	case "resolve":
 		return argv("identity", "resolve").pos(in.Question).pos(in.Answer).a
 	case "split":
@@ -224,8 +226,8 @@ type PackIn struct {
 
 type IdentityIn struct {
 	Env      string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action   string   `json:"action" jsonschema:"list, resolve, split or merge"`
-	Question string   `json:"question,omitempty" jsonschema:"resolve: the question ref q:<n> from action=list"`
+	Action   string   `json:"action" jsonschema:"list, why, resolve, split or merge"`
+	Question string   `json:"question,omitempty" jsonschema:"why / resolve: the question ref q:<n> from action=list"`
 	Answer   string   `json:"answer,omitempty" jsonschema:"resolve: same (the same mod came back), copy (a copy of it) or unrelated"`
 	Refs     []string `json:"refs,omitempty" jsonschema:"split: the instance to move into a lineage of its own; merge: two refs, the second lineage joins the first"`
 	All      bool     `json:"all,omitempty" jsonschema:"list: include answered questions"`

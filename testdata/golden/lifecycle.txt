@@ -84,11 +84,41 @@ questions: 1 open
   q:1  score 1.00  scan:3
     new:     #2ihw  Leftover  [local Leftover Again]
     was it:  #ekgo  Leftover  [workshop ws:3000000009, tombstone since 2026-10-02, residue]
+    recorded files and declarations; folders and their Workshop IDs are current; values are new / previous
+    package ID differs: tester.leftover2 / tester.leftover
+    mod name matches: Leftover
+    Workshop ID: incomplete (not recorded / 3000000009)
+    mod authors matches: Tester
+    checked files: 4 / 4; 4 shared paths, 3 identical contents
+    file differences: 1 shared paths have different contents; 0 / 0 paths occur on only one side
+    mod content in common: 3 of 3 / 3 distinct nonempty files (100% overlap)
+    previews, About files, load-folder rules and repeated or empty contents do not count as mod content
+    content in common: defs/recipedefs/leftover.xml
+    content in common: defs/thingdefs/leftover.xml
+    content in common: patches/leftover.xml
+    asked because at least three distinct mod contents match and overlap is at least 60%
+    current folders differs: $ROOT/Steam/steamapps/common/RimWorld/Mods/Leftover Again / $ROOT/Steam/steamapps/workshop/content/294100/3000000009
+    folder names and authors alone do not establish a match; textures and audio are not compared by content
 next:
   archo identity resolve q:1 same|copy|unrelated
 
 $ archo identity resolve q:1 same
 q:1  resolved: same
+  recorded files and declarations; folders and their Workshop IDs are current; values are new / previous
+  package ID differs: tester.leftover2 / tester.leftover
+  mod name matches: Leftover
+  Workshop ID: incomplete (not recorded / 3000000009)
+  mod authors matches: Tester
+  checked files: 4 / 4; 4 shared paths, 3 identical contents
+  file differences: 1 shared paths have different contents; 0 / 0 paths occur on only one side
+  mod content in common: 3 of 3 / 3 distinct nonempty files (100% overlap)
+  previews, About files, load-folder rules and repeated or empty contents do not count as mod content
+  content in common: defs/recipedefs/leftover.xml
+  content in common: defs/thingdefs/leftover.xml
+  content in common: patches/leftover.xml
+  asked because at least three distinct mod contents match and overlap is at least 60%
+  current folders differs: $ROOT/Steam/steamapps/common/RimWorld/Mods/Leftover Again / $ROOT/Steam/steamapps/workshop/content/294100/3000000009
+  folder names and authors alone do not establish a match; textures and audio are not compared by content
   #2ihw merged into #ekgo; it keeps its ID, lineage and history
   #ekgo  Leftover  [local Leftover Again]
 next:
@@ -99,6 +129,21 @@ questions: 0 open, 1 resolved
   q:1  score 1.00  scan:3  [resolved: same]
     new:     #2ihwr2ol  (gone)
     was it:  #ekgo      Leftover  [local Leftover Again]
+    recorded files and declarations; folders and their Workshop IDs are current; values are new / previous
+    package ID differs: tester.leftover2 / tester.leftover
+    mod name matches: Leftover
+    Workshop ID: incomplete (not recorded / not recorded)
+    mod authors matches: Tester
+    checked files: 4 / 4; 4 shared paths, 3 identical contents
+    file differences: 1 shared paths have different contents; 0 / 0 paths occur on only one side
+    mod content in common: 3 of 3 / 3 distinct nonempty files (100% overlap)
+    previews, About files, load-folder rules and repeated or empty contents do not count as mod content
+    content in common: defs/recipedefs/leftover.xml
+    content in common: defs/thingdefs/leftover.xml
+    content in common: patches/leftover.xml
+    asked because at least three distinct mod contents match and overlap is at least 60%
+    current folders: incomplete (not recorded / $ROOT/Steam/steamapps/common/RimWorld/Mods/Leftover Again)
+    folder names and authors alone do not establish a match; textures and audio are not compared by content
 
 $ archo changes #ekgo
 changes: 3 mods (#ekgo)

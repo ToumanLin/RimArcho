@@ -474,6 +474,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need .acts { flex: none; display: flex; gap: 6px; align-items: center; }
 .need .acts .btn { height: 28px; padding: 0 12px; border-radius: var(--r-sm); font-size: 13px; }
 .need .acts .btn.primary { font-weight: 600; }
+.need .acts.identity-answers { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
 .need .acts .btn.more { padding: 0 8px; letter-spacing: 1px; background: transparent; }
 .need .ev-line { display: flex; gap: 8px; align-items: baseline; min-width: 0; font-size: 12px; color: var(--muted); }
 /* where a claim comes from is for the item being read: the others stay quiet */

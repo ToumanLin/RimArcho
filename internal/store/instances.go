@@ -322,7 +322,11 @@ func (s *Store) LineageIDs(envID string) (map[string]bool, error) {
 
 // SemanticSet loads the semantic layer of a snapshot.
 func (s *Store) SemanticSet(snapshotID int64) (scan.SemanticSet, error) {
-	rows, err := s.DB.Query(`SELECT lower(rel_path), hash FROM snapshot_file WHERE snapshot_id=? AND hash IS NOT NULL`, snapshotID)
+	return semanticSet(s.DB, snapshotID)
+}
+
+func semanticSet(db questionReader, snapshotID int64) (scan.SemanticSet, error) {
+	rows, err := db.Query(`SELECT lower(rel_path), hash FROM snapshot_file WHERE snapshot_id=? AND hash IS NOT NULL`, snapshotID)
 	if err != nil {
 		return nil, err
 	}

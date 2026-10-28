@@ -7,6 +7,13 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Identity questions now require matching mod contents, exclude shared About/preview/routing
+  files and empty or repeated contents, and stop asking when either mod has several
+  candidates. A scan removes obsolete unanswered questions; player answers are preserved.
+- All three identity answers are visible with equal styling and tooltips explaining lists
+  and history; confirmation remains. “Why this question?” shows matching and differing
+  metadata and files on demand. CLI/MCP lists and answers include that comparison;
+  `identity why q:<n>` / `resolve_identity action=why` shows it separately.
 - Launching from the window with a required mod missing or disabled now asks once ("launch
   anyway" / cancel) and lists what is missing: the game would not load the mods that need
   them and may reset its list to the base game. The CLI and TUI still launch without asking.

@@ -831,17 +831,18 @@ func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need 
 func questionNeed(st *app.LoadoutState, q *store.Question) Need {
 	nm := func(id string) string { return TokName(st, finding.Inst(id)) }
 	x, y := nm(q.InstanceID), nm(q.CandidateID)
-	answer := func(key, label, ans, done string) Action {
+	answer := func(key, label, ans, done, hint string) Action {
 		// Merging or splitting lineages is not undone with u: confirm first (06 §6).
-		return Action{Kind: ActAnswer, Key: key, Label: label, QID: q.ID, Answer: ans, Done: done, Confirm: Tf("press %s again: %s", key, done), Warn: done}
+		return Action{Kind: ActAnswer, Key: key, Label: label, QID: q.ID, Answer: ans, Done: done, Confirm: Tf("press %s again: %s", key, done), Warn: done + "\n" + hint + "\n" + T("this answer cannot be undone with u"), Title: hint}
 	}
 	return Need{Group: GroupConfirm, Text: Tf("is %s the same mod as %s?", x, y), Counted: true, Status: StatusWarn,
 		Why: T("they look alike; your answer decides whether lists and history treat them as one"), Evidence: evidence(EvInferred, T("RimArcho compared their folders")),
 		Mods: []string{q.InstanceID, q.CandidateID},
 		Actions: []Action{
-			answer("s", T("same"), "same", Tf("%s and %s are one mod", x, y)),
-			answer("c", T("a copy"), "copy", Tf("%s is a copy of %s", x, y)),
-			answer("u", T("unrelated"), "unrelated", Tf("%s and %s are unrelated", x, y)),
+			answer("s", T("same"), "same", Tf("%s and %s are one mod", x, y), T("treat as one mod in lists and combine their change history")),
+			answer("c", T("a copy"), "copy", Tf("%s is a copy of %s", x, y), T("keep two copies in lists with separate change histories; share mod notes and tags")),
+			answer("u", T("unrelated"), "unrelated", Tf("%s and %s are unrelated", x, y), T("keep lists and histories separate; close this question")),
+			{Kind: ActView, Key: "v", Label: T("why this question?"), Argv: []string{"identity", "why", fmt.Sprintf("q:%d", q.ID)}},
 		}}
 }
 

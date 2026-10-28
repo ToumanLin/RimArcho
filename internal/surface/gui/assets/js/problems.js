@@ -126,9 +126,10 @@ function card(it) {
   const acts = (it.actions || []).filter((a) => a.kind !== "fold");
   if (acts.length) {
     const right = el("div", "pp-acts");
-    const a = acts[0];
-    right.append(actButton(it, a, "btn small primary"));
-    if (acts.length > 1) {
+    const answers = acts.some((a) => a.kind === "answer");
+    const shown = answers ? acts : acts.slice(0, 1);
+    for (const a of shown) right.append(actButton(it, a, answers ? "btn small" : "btn small primary"));
+    if (!answers && acts.length > 1) {
       const more = el("button", "btn small more", "⋯");
       more.title = acts.slice(1).map((x) => x.label).join(T("; "));
       more.onclick = (e) => {
@@ -146,6 +147,7 @@ function card(it) {
 
 function actButton(it, a, cls) {
   const b = el("button", cls, a.label);
+  if (a.title) b.title = a.title;
   const w = needActionWrite(a);
   if (w) b.dataset.envWrite = w;
   b.onclick = (e) => { e.stopPropagation(); runNeedAction(it, a); };

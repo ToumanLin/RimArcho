@@ -70,6 +70,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     launch                                    save the list and start the game (one game at a time)
     test run [<plan>]                         run the game with isolated data, capture startup errors, then stop it
     identity list                             open identity questions ("is this #xxxx back?")
+    identity why <q:n>                        show what matched and differed in an identity question
     identity resolve <q:n> same|copy|unrelated  answer an identity question
     lineage split <ref>                       move an instance into a lineage of its own
     lineage merge <ref> <ref>                 merge the second lineage into the first

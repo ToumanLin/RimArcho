@@ -131,9 +131,11 @@ type Result struct {
 }
 
 type reconciler struct {
-	in       Input
-	res      *Result
-	semCache map[*Known]scan.SemanticSet
+	in                 Input
+	res                *Result
+	semCache           map[*Known]scan.SemanticSet
+	questionCandidates map[string]int
+	payloadCache       map[*Known]map[scan.Hash]string
 	// instances present in this scan: matched known ones and newly created ones
 	present []*Assignment
 }
@@ -143,7 +145,7 @@ type reconciler struct {
 // created earlier in the same scan can be the original of a later copy (first scan of a
 // workshop item and its Mods/ copy, or Steam + SteamCMD).
 func Reconcile(in Input) *Result {
-	r := &reconciler{in: in, res: &Result{}, semCache: map[*Known]scan.SemanticSet{}}
+	r := &reconciler{in: in, res: &Result{}, semCache: map[*Known]scan.SemanticSet{}, questionCandidates: map[string]int{}, payloadCache: map[*Known]map[scan.Hash]string{}}
 	assigned := make([]*Assignment, len(in.Obs))
 
 	byLoc := map[string]*Known{}
@@ -159,7 +161,7 @@ func Reconcile(in Input) *Result {
 	// R2: workshop-like folder name (= workshop ID) seen before under a workshop-like
 	// source, and that Instance did not appear this scan.
 	for i, ob := range in.Obs {
-		if assigned[i] != nil || !ob.Loc.Kind.WorkshopLike() {
+		if assigned[i] != nil || !ob.Loc.Kind.WorkshopLike() || !ValidWorkshopID(ob.Loc.Rel) {
 			continue
 		}
 		var best *Known
@@ -227,7 +229,7 @@ func Reconcile(in Input) *Result {
 				gone = append(gone, k)
 			}
 		}
-		k, score := r.best(ob, gone, QuestionSimilarity, nil)
+		k, score := r.question(ob, gone)
 		rule := "R7"
 		if k != nil {
 			rule = "R6"
@@ -249,6 +251,15 @@ func Reconcile(in Input) *Result {
 			r.res.Events = append(r.res.Events, ev)
 		}
 	}
+	// A missing mod that fits several new folders is ambiguous even when each new
+	// folder has only that one candidate. Never turn that fan-out into repeated asks.
+	r.res.Questions = slices.DeleteFunc(r.res.Questions, func(q *Question) bool {
+		if r.questionCandidates[q.Candidate.ID] == 1 {
+			return false
+		}
+		q.New.Rule = "R7"
+		return true
+	})
 	r.res.Assignments = append(r.res.Assignments, assigned...)
 	return r.res
 }
@@ -287,7 +298,7 @@ func declMatch(ob *scan.Observation) func(k *Known) bool {
 
 // SameDecl reports whether two mods declare the same packageId or the same workshop ID.
 func SameDecl(pkgA, wsA, pkgB, wsB string) bool {
-	return pkgA != "" && strings.EqualFold(pkgA, pkgB) || wsA != "" && wsA == wsB
+	return strings.TrimSpace(pkgA) != "" && strings.EqualFold(pkgA, pkgB) || ValidWorkshopID(wsA) && wsA == wsB
 }
 
 // best returns the candidate with the highest similarity ≥ min that passes ok.
@@ -422,4 +433,34 @@ func sameOrigin(a, b *scan.Origin) bool {
 		return a == b
 	}
 	return *a == *b
+}
+
+// question accepts only an unambiguous candidate with actual content evidence.
+func (r *reconciler) question(ob *scan.Observation, cands []*Known) (*Known, float64) {
+	var candidate *Known
+	var score float64
+	count := 0
+	observedPayload := payload(ob.FP.Semantic)
+	for _, k := range cands {
+		if k.Snap == nil {
+			continue
+		}
+		knownPayload, ok := r.payloadCache[k]
+		if !ok {
+			knownPayload = payload(r.sem(k))
+			r.payloadCache[k] = knownPayload
+		}
+		s := questionScore(SameDecl(ob.Decl.PackageID, ob.WorkshopID,
+			k.Snap.Decl.PackageID, k.Snap.WorkshopID), observedPayload, knownPayload)
+		if s < QuestionSimilarity {
+			continue
+		}
+		count++
+		r.questionCandidates[k.ID]++
+		candidate, score = k, s
+	}
+	if count != 1 {
+		return nil, 0
+	}
+	return candidate, score
 }

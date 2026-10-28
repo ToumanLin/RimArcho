@@ -247,7 +247,7 @@ next:
 | 玩家数据 | `alias <引用> [<名称>] [--clear]` / `note <引用> [<文本>] [--clear]` | 显示名、备注，挂在 Lineage 上 |
 | | `tag add\|remove <引用> <标签…> [--mod <引用>]…` / `tag list` | 标签；重复的 `--mod` 一次给多个 Mod 加减 |
 | | `import rimcrow --db <路径> [--rules <路径>] [--dry-run] [--include-disabled-rules] [--all]` | 一次性导入 RimCrow 的别名、备注、分组（成为标签）和用户规则，可重复执行（04 §8） |
-| 身份 | `identity list [--all]` / `identity resolve <q:n> same\|copy\|unrelated` | 待确认项（02 §5.4） |
+| 身份 | `identity list [--all]` / `identity why <q:n>` / `identity resolve <q:n> same\|copy\|unrelated` | 待确认项与按需比较；列出、查看、回答都给出匹配与差异凭据（02 §5.4） |
 | | `lineage split <引用>` / `lineage merge <引用> <引用>` / `gc [--dry-run]` | 拆分、合并 Lineage；清理过期墓碑和无用快照（02 §5.5） |
 | 社区数据 | `data update [<数据集>…] [--dry-run]` / `data status` | 下载社区数据（`rules`、`steamdb`、`replacements`），唯一联网获取它们的命令（04 §6） |
 | 维护 | `db status` / `db backup` / `db vacuum` | 数据库路径、大小、备份；写一份一致的副本到 `<数据目录>/backups`；压缩 |
@@ -330,7 +330,7 @@ next:
 | `scan` | `scan`（`full`） | false | false |
 | `exchange_list` | `loadout export/import`、`collection [--import]` | false | false |
 | `manage_packs` | `pack list/build/launch/export/import/remove/stop/unlink` | false | true |
-| `resolve_identity` | `identity list/resolve`、`lineage split/merge` | false | true |
+| `resolve_identity` | `identity list/why/resolve`（`resolve_identity action=why question=q:<n>` 只读）、`lineage split/merge` | false | true |
 | `manage_hidden` | `unhide`、`trash` | false | true |
 | `maintenance` | `data update`、`import rimcrow`、`gc` | false | true |
 | `list_library` | `library`（`search`、`include`、`exclude`、`sort`、`lineage`、`facets`、`all`） | true | — |
