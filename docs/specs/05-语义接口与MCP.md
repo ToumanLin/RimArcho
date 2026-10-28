@@ -116,7 +116,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 2 | 用法错误（未知命令、未知参数、参数个数不对，附 `usage:` 行） | stderr |
 | 3 | 引用有歧义：输出候选列表 | stdout |
 
-玩家在 PowerShell 或 bash 里照着列表手打 `archo enable #nyh3`，shell 把 `#nyh3` 当注释吃掉，程序只收到 `archo enable`（§2）。所以缺的参数是 Mod 引用时（参数不够且用法里有 `<ref>`、`<ref…>`、`<A>`、`<mod>`；`<ref>` 参数的值缺失；`textures` 没给 Mod），用法错误后面加一句 `(in PowerShell and bash a word starting with # is a comment: write a mod reference as nyh3, not #nyh3)`（`cmds.commentHint`）。引用可选的命令照没给引用执行，没有提示：`changes`、`subscribe check` 只读；`stage restore` 恢复全部暂存（可撤销），`subscribe update` 更新全部订阅。
+玩家在 PowerShell 或 bash 里照着列表手打 `archo enable #nyh3`，shell 把 `#nyh3` 当注释吃掉，程序只收到 `archo enable`（§2）。所以缺的参数是 Mod 引用时（参数不够且用法里有 `<ref>`、`<ref…>`、`<A>`、`<mod>`；`<ref>` 参数的值缺失；`textures` 没给 Mod），用法错误后面加一句 `(in PowerShell and bash a word starting with # is a comment: write a mod reference as nyh3, not #nyh3)`（`cmds.commentHint`）。会对全部生效的命令要写引用或 `--all`，两样都没写时拒绝并附同一句（`refsOrAll`）：`stage restore`、`subscribe update`，和要求 `--plan` / `--all` 的 `textures`。MCP 的 `edit_loadout restore` 不给 `refs` 仍是全部放回（参数照旧，转成 `--all`）。引用可选的只读命令照没给引用执行：`changes` 看当前方案，`subscribe check` 查全部订阅。
 
 ### 3.4 示例
 
@@ -231,7 +231,7 @@ next:
 | | `move <引用> [--to <n>] [--before <引用>] [--after <引用>] [--up] [--down]` / `swap <引用> [<引用>]` | 移动；换成同一 Lineage 的另一个 Instance |
 | | `sort [--dry-run]` | 按约束排序（04 §5）；`--dry-run` 只显示结果 |
 | | `undo [<n>]` / `redo [<n>]` | 撤销 / 重做最近的一步或 n 步（04 §3） |
-| | `stage list` / `stage add <引用…>` / `stage drop <引用…>` / `stage restore [<引用…>] [--at\|--before\|--after]` | 暂存（04 §2.2）。从已启用中暂存的 Mod 记住原位置；`restore` 不带引用时全部放回；`add` 和 `restore` 各是一步可撤销的编辑；重新启用的 Mod 自动离开暂存 |
+| | `stage list` / `stage add <引用…>` / `stage drop <引用…>` / `stage restore <引用…> \| --all [--at\|--before\|--after]` | 暂存（04 §2.2）。从已启用中暂存的 Mod 记住原位置；`restore --all` 全部放回；`add` 和 `restore` 各是一步可撤销的编辑；重新启用的 Mod 自动离开暂存 |
 | 历史 | `history [--all]` | 当前方案的编辑步骤（撤销栈）和版本，默认最近 10 个版本 |
 | | `loadout log [--all]` / `loadout diff [<v>] [<v>]` / `loadout checkout <v>` | 版本列表；版本之间的差异（默认最新版本 → 当前状态）；把一个版本载入当前方案（一步可撤销的编辑） |
 | 写入与启动 | `save [--dry-run]` | **写入游戏但不启动**（界面上叫“保存”），给从 Steam 等其他途径开游戏的玩家：渲染当前方案的 ModsConfig.xml（备份、原子替换、写当前游戏版本）、同步 `_Archo_` 链接、移除整合包链接（04 §4.1、08 §3）。`--dry-run` 显示会写什么 |

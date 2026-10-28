@@ -77,7 +77,7 @@ func TestStageRestoreAllKeepsPositions(t *testing.T) {
 	if !strings.Contains(out, "staging: 20 mods") || !strings.Contains(out, "was 31") {
 		t.Fatalf("stage list:\n%s", out)
 	}
-	e.MustRun("stage", "restore")
+	e.MustRun("stage", "restore", "--all")
 	if got := names(t, e); got != before {
 		t.Fatalf("restore all:\n got %s\nwant %s", got, before)
 	}
@@ -105,7 +105,7 @@ func TestStageRestoreOneFollowsAnchor(t *testing.T) {
 	// A mod staged from outside the Loadout goes to the end; drop leaves it disabled.
 	e.MustRun("stage", "add", ref(t, e, "M31"), ref(t, e, "M32"))
 	e.MustRun("stage", "drop", ref(t, e, "M32"))
-	e.MustRun("stage", "restore")
+	e.MustRun("stage", "restore", "--all")
 	got = strings.Fields(names(t, e))
 	if got[len(got)-1] != "M31" || strings.Contains(names(t, e), "M32") || stagedNames(t, e) != "" {
 		t.Fatalf("prep-area mods: %v / staged %q", got[len(got)-3:], stagedNames(t, e))
@@ -144,7 +144,7 @@ func TestStageRestoreAllRandomBatches(t *testing.T) {
 			}
 			e.MustRun(append([]string{"stage", "add"}, refs...)...)
 		}
-		e.MustRun("stage", "restore")
+		e.MustRun("stage", "restore", "--all")
 		if got := names(t, e); got != before {
 			t.Fatalf("seed %d (%d mods):\n got %s\nwant %s", seed, n, got, before)
 		}

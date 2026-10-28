@@ -346,7 +346,7 @@ func (m *model) listKey(s string) tea.Cmd {
 			m.say(sayInfo, T("staging is empty"))
 			return nil
 		}
-		m.act(Tf("put %s back in place", plural(n, "mod")), "stage", "restore")
+		m.act(Tf("put %s back in place", plural(n, "mod")), "stage", "restore", "--all")
 		m.clearSel()
 		return m.requestDetail()
 	case "K":

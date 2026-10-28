@@ -217,6 +217,18 @@ func parse(c *Command, rest []string) (*Args, error) {
 // writes "archo … #ref", which ShellSafe would rewrite.
 const commentHint = "in PowerShell and bash a word starting with # is a comment: write a mod reference as nyh3, not #nyh3"
 
+// refsOrAll is for commands that can act on every item: with no mod named they need --all,
+// so a shell that ate `#nyh3` cannot turn `stage restore #nyh3` into "restore all" (05 §3.3).
+func refsOrAll(a *Args) error {
+	switch {
+	case len(a.Pos) > 0 && a.Bool("all"):
+		return &UsageError{Msg: "name the mods or use --all, not both"}
+	case len(a.Pos) == 0 && !a.Bool("all"):
+		return &UsageError{Msg: "name the mods, or use --all (" + commentHint + ")"}
+	}
+	return nil
+}
+
 // takesRef: a usage placeholder for a mod reference (<ref>, <ref…>, <A>, <mod>…), the
 // argument a shell can drop as a comment; <p:ref>, <q:n> and the like start with a letter.
 func takesRef(usage string) bool {

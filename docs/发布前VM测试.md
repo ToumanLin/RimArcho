@@ -8,6 +8,7 @@
 
 | 加入 | 功能 / 按键 | 规格 | 在 VM 里怎么测 | 已经做过的检查 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | `stage restore`、`subscribe update` 不写引用时要 `--all`，否则拒绝 | 04 §2.2、02 §3.4、05 §3.3 | PowerShell 里手打 `archo stage restore #<引用>`、`archo subscribe update #<引用> --dry-run`：exit 2、报错带 `#` 注释的提示，暂存和订阅都没动；`archo stage restore --all` 全部放回后 `archo undo`。TUI 暂存栏按 `T` 仍全部放回 | 合成用法测试、暂存测试改用 `--all`、MCP `restore` 参数测试 |
 | 2026-10-28 | 手打 `archo enable #nyh3` 被 shell 吃掉引用时，用法错误说明 `#` 是注释、应写 `nyh3` | 05 §3.3 | 在 Windows PowerShell 5.1 和 Git Bash 里手打 `archo enable #<引用>`、`archo why <引用> #<引用>`、`archo problems --subject #<引用> --all`、`archo textures clean #<引用>`：都是 exit 2，报错带这句提示；`archo plan use`、`archo problems show` 缺参数不带。cmd 里同样的命令直接能跑 | 合成用法测试；宿主上用临时 `RIMARCHO_HOME` 在 PowerShell 5.1 / 7 里跑过前三条 |
 | 2026-10-28 | 打印的命令里 Mod 引用不带 `#`（`fix: archo enable nyh3`），原样粘进 shell 能跑；TUI 技术页在这种行上按 `enter` 仍打开 Mod | 05 §2、§3.1 规则 11、06 §9 | 在 Windows PowerShell 5.1、cmd、Git Bash 里各跑 `archo problems --all --detail` 和 `archo mod <引用>`，把 `fix:` / `next:` / `… N more (…)` 和报错括号里的命令原样复制粘贴：只读的（mod、why、changes、patches、problems）直接跑，不出现 usage 或 “matches nothing”；会改列表的跑完 `archo undo`。TUI 技术页选中 `fix: archo enable …` 行按 `enter` | 合成夹具：PowerShell 5.1 / 7 解析器逐条读打印的命令再执行；规则单元测试；更新 CLI / MCP golden |
 | 2026-10-28 | 侧栏顺序：列表、整合包、Mod 库；`shift+4` 列表、`shift+5` 整合包、`shift+6` Mod 库（GUI 和 TUI） | 06 §2.1、§3.5 | 侧栏看顺序；GUI 和 TUI 各按一遍 `shift+1`–`shift+8`，确认去的页和侧栏顺序一致；顶部导航模式下也看一次 | 单元测试 |

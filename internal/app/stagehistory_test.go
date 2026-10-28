@@ -46,7 +46,7 @@ func TestStageHistoryRoundTrip(t *testing.T) {
 		{"stage", "add", "pkg:tester.m31"}, // staging-only add must create a step
 		{"stage", "drop", "pkg:tester.m11"},
 		{"stage", "restore", "pkg:tester.m12"},
-		{"stage", "restore"},
+		{"stage", "restore", "--all"},
 	}
 	st, _ := e.App.Loadout()
 	depth := e.App.Store.StepCount(st.Plan.ID, "undo")
@@ -243,7 +243,7 @@ func TestStageEmptyRepresentationsAndNoops(t *testing.T) {
 		before := stageState(t, e)
 		depth := e.App.Store.StepCount(st.Plan.ID, "undo")
 		e.MustRun("stage", "drop", "pkg:tester.m31")
-		e.MustRun("stage", "restore")
+		e.MustRun("stage", "restore", "--all")
 		if e.App.Store.StepCount(st.Plan.ID, "undo") != depth {
 			t.Fatal("no-op recorded an undo step")
 		}

@@ -131,14 +131,18 @@ func TestMissingRefNamesTheComment(t *testing.T) {
 		argv []string
 		hint bool
 	}{
-		{[]string{"enable"}, true},                    // archo enable #nyh3
-		{[]string{"why", "nyh3"}, true},               // archo why nyh3 #i4uc
-		{[]string{"problems", "--subject"}, true},     // archo problems --subject #5sed --all
-		{[]string{"textures", "clean"}, true},         // archo textures clean #nyh3
-		{[]string{"problems", "show"}, false},         // p:ref has no leading #
-		{[]string{"problems", "--code"}, false},       // not a reference
-		{[]string{"plan", "use"}, false},              // a name
-		{[]string{"enable", "a", "b", "--at"}, false}, // a number
+		{[]string{"enable"}, true},                // archo enable #nyh3
+		{[]string{"why", "nyh3"}, true},           // archo why nyh3 #i4uc
+		{[]string{"problems", "--subject"}, true}, // archo problems --subject #5sed --all
+		{[]string{"textures", "clean"}, true},     // archo textures clean #nyh3
+		// "all" needs --all, so a lost reference never means every mod
+		{[]string{"stage", "restore"}, true},                   // archo stage restore #nyh3
+		{[]string{"subscribe", "update", "--dry-run"}, true},   // archo subscribe update #nyh3 --dry-run
+		{[]string{"stage", "restore", "nyh3", "--all"}, false}, // one or the other
+		{[]string{"problems", "show"}, false},                  // p:ref has no leading #
+		{[]string{"problems", "--code"}, false},                // not a reference
+		{[]string{"plan", "use"}, false},                       // a name
+		{[]string{"enable", "a", "b", "--at"}, false},          // a number
 	} {
 		out, code := e.Run(c.argv...)
 		if code != cmds.ExitUsage || strings.Contains(out, hint) != c.hint {

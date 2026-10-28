@@ -17,6 +17,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - A player who types `archo enable #nyh3` in PowerShell or bash runs `archo enable`
   without its argument. When the missing argument is a mod reference, the usage error now
   says why: a word starting with `#` is a comment there, so write `nyh3`.
+- `stage restore` and `subscribe update` need mod references or `--all`: with neither
+  they refuse instead of restoring every staged mod or updating every subscription, so a
+  reference the shell dropped cannot widen the command. The TUI's `T` and MCP
+  `edit_loadout restore` without refs still restore everything.
 - The sidebar lists Mod library below Packs (lists, packs, Mod library). Page keys follow
   the sidebar: `shift+4` lists, `shift+5` packs, `shift+6` Mod library, in the window and
   the TUI.
