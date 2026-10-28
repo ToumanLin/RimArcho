@@ -387,6 +387,9 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	if t.Closed {
 		result = joinFacts(T("stopped when the window closed"), result)
 	}
+	if n := handedOver(t); n > 0 {
+		result = joinFacts(result, Tf("%d handed to a new task", n))
+	}
 	phase := t.Phase
 	if phase != "" && t.Lane == app.LaneFiles {
 		phase = Tf("on %s", phase)
@@ -428,6 +431,9 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	for _, it := range t.Items {
 		row := TaskItemRow{Ref: it.Ref, Name: it.Name, State: it.State, StateText: itemStateText(it.State), Rank: itemRank[it.State], Why: Humanize(nil, it.Why), Bytes: it.Bytes, Got: it.Got, DownloadSize: it.Size}
 		row.Permanent = it.Permanent
+		if it.Again != "" {
+			row.Why = joinFacts(row.Why, T("handed to a new task"))
+		}
 		if t.Kind == TaskSubscribe && strings.HasPrefix(it.Ref, "ws:") {
 			row.WorkshopURL = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + strings.TrimPrefix(it.Ref, "ws:")
 			row.Why = ""
@@ -543,12 +549,28 @@ func TaskCanStop(kind string) bool {
 	return kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean
 }
 
+// handedOver counts the items a new task took over.
+func handedOver(t *app.Task) int {
+	n := 0
+	for _, it := range t.Items {
+		if it.Again != "" {
+			n++
+		}
+	}
+	return n
+}
+
 func taskActs(t *app.Task, c map[string]int) []TaskAct {
 	var a []TaskAct
-	retry := 0
+	// items a new task took over (重试, 继续剩下的) are not offered again
+	retry, left := 0, 0
 	for _, it := range t.Items {
-		if it.State == app.ItemFail && !it.Permanent {
+		switch {
+		case it.Again != "":
+		case it.State == app.ItemFail && !it.Permanent:
 			retry++
+		case it.State == app.ItemSkip:
+			left++
 		}
 	}
 	switch t.State {
@@ -578,10 +600,10 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 		if IsSettingTask(t.Kind) && len(t.Items) == 0 {
 			a = append(a, TaskAct{ID: "retry", Label: T("try again"), Key: taskKeyRetry, Primary: true})
 		}
-		if c[app.ItemSkip] > 0 {
-			a = append(a, TaskAct{ID: "resume", Label: Tf("do the %d left", c[app.ItemSkip]), Key: taskKeyRetry, Primary: true})
+		if left > 0 {
+			a = append(a, TaskAct{ID: "resume", Label: Tf("do the %d left", left), Key: taskKeyRetry, Primary: true})
 			if t.Kind == TaskSubscribe {
-				a[len(a)-1].Label = Tf("continue %d items", c[app.ItemSkip])
+				a[len(a)-1].Label = Tf("continue %d items", left)
 			}
 		}
 	}
@@ -602,6 +624,8 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 func init() {
 	Register(map[string]string{
 		"continue replacement":    "继续替换",
+		"handed to a new task":    "已交给新的任务",
+		"%d handed to a new task": "%d 项已交给新的任务",
 		"clear cache":             "清除缓存",
 		"back up the database":    "备份数据库",
 		"compact the database":    "压缩数据库",

@@ -55,6 +55,16 @@ func TestTasksItemsGoOnAfterAFailure(t *testing.T) {
 	if g := waitEnded(t, ts, again.ID); g.State != TaskFailed {
 		t.Fatalf("retry state %s", g.State)
 	}
+	// The failed item belongs to the retry now: a second press finds nothing (VM run B1,
+	// where 继续剩下的 pressed twice ran ten deletions twice).
+	if _, err := ts.Again(sub.ID, ItemFail, "", "1 mod"); err == nil {
+		t.Fatal("the same items were taken again")
+	}
+	for _, x := range ts.List() {
+		if x.ID == sub.ID && x.Items[1].Again != again.ID {
+			t.Fatalf("handed-over item %+v", x.Items[1])
+		}
+	}
 }
 
 // Stop: the item in hand finishes, the rest are left untouched; a queued task never runs.

@@ -60,6 +60,7 @@ type TaskItem struct {
 	Why         string `json:"why,omitempty"` // a failure's reason
 	FailureKind string `json:"failureKind,omitempty"`
 	Permanent   bool   `json:"permanent,omitempty"`
+	Again       string `json:"again,omitempty"` // the task that took this item over (重试, 继续剩下的)
 }
 
 // Task is one background task.
@@ -222,7 +223,7 @@ func (ts *Tasks) Submit(kind, lane, obj string, items []TaskItem) *Task {
 	ts.mu.Lock()
 	t := &Task{ID: ts.newID(), Kind: kind, Lane: lane, Obj: obj, State: TaskQueued, Queued: ts.stamp(), Total: len(items)}
 	for _, it := range items {
-		it.State, it.Why = ItemWait, ""
+		it.State, it.Why, it.Again = ItemWait, "", ""
 		it.Got, it.Size = 0, 0
 		t.Items = append(t.Items, it)
 	}
@@ -461,18 +462,34 @@ func (ts *Tasks) Again(id, state, ref, obj string) (*Task, error) {
 		return nil, errors.New("no such task")
 	}
 	var items []TaskItem
-	for _, it := range t.Items {
-		if it.State == state && !it.Permanent && (ref == "" || it.Ref == ref) {
+	var took []int
+	for i, it := range t.Items {
+		if it.State == state && !it.Permanent && it.Again == "" && (ref == "" || it.Ref == ref) {
 			items = append(items, it)
+			took = append(took, i)
 		}
+	}
+	if len(items) == 0 {
+		ts.mu.Unlock()
+		return nil, errors.New("nothing to do again")
+	}
+	// The items belong to the new task from now on: a second press finds nothing to do.
+	for _, i := range took {
+		t.Items[i].Again = "pending"
 	}
 	kind, lane := t.Kind, t.Lane
 	t.Seen = true
 	ts.mu.Unlock()
-	if len(items) == 0 {
-		return nil, errors.New("nothing to do again")
+	nt := ts.Submit(kind, lane, obj, items)
+	ts.mu.Lock()
+	for _, i := range took {
+		if i < len(t.Items) {
+			t.Items[i].Again = nt.ID
+		}
 	}
-	return ts.Submit(kind, lane, obj, items), nil
+	ts.mu.Unlock()
+	ts.changed()
+	return nt, nil
 }
 
 // Move moves a queued task by d places in its lane's order (-1: sooner).
