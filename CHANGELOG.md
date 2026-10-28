@@ -7,6 +7,17 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- The launch page has more room again. The headline is no longer cut off: it shrinks to
+  fit its line, takes two lines when it must, and a Workshop tag at the end of the name
+  (`[UPDATED 1.7]`) moves to the line under it. Under ▶ the problem is one line, with its
+  reason on hover, and × shows on hover. Unsaved edits are written inside the launch
+  block ("2 unsaved") instead of a line of their own; the block no longer repeats the game
+  and list. Only the applied list carries ▲ / ○; another list's state is on hover. Lists
+  show just their mod count; packs still say "pack". Games show their short version
+  ("1.7"), none when the name already says it, with the full build on hover. Over a
+  background picture the three columns stand on a flat dark (or light) ground. The
+  top-right lines line up with the launch column, and "nothing changed" is no longer
+  shown. The launch page has no breadcrumb. Text on the page uses four sizes.
 - Checking Workshop and SteamCMD mods for updates asks Steam about 100 items per request,
   four requests at a time, instead of one request per mod: a 5182-mod library took about
   two minutes and a few items failed every run. A failed request is sent once more after

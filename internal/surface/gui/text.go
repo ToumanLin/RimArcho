@@ -5,10 +5,9 @@ import "github.com/ToumanLin/RimArcho/internal/view"
 // The page's own text (its hints, labels and help); the shared text is in internal/view.
 func init() {
 	view.Register(map[string]string{
-		"%d mods":         "%d 个 Mod",
-		"unsaved changes": "有修改未保存",
-		"%d unsaved":      "%d 项未保存",
-		"import/export":   "导入/导出",
+		"%d mods":       "%d 个 Mod",
+		"%d unsaved":    "%d 项未保存",
+		"import/export": "导入/导出",
 		"the list's page in all lists: import, export, share": "全部列表里这个列表的页面：导入、导出、分享",
 		"save changes":            "保存修改",
 		"set current":             "设为当前",

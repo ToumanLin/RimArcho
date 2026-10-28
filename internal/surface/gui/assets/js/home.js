@@ -1,8 +1,8 @@
-// 启动 (06 §2.3), on a Swiss grid: what is applied is one large headline (its kind, game
-// and how its mods change above; its mods, versions, last play and state below), the last
-// game and the changes since it was last played in the top right, and under a rule three
-// steps read left to right — 01 the game, 02 that game's lists and packs, 03 ▶ 启动游戏
-// with the applied list's problem under it. Picking a game or a row applies it at once
+// 启动 (06 §2.3), on a Swiss grid: what is applied is one large headline that fits its
+// width (its mods and last play below), the last game and the changes since it was last
+// played in the top right, and under a rule three steps read left to right — 01 the game,
+// 02 that game's lists and packs, 03 ▶ 启动游戏 with the applied list's problem under it
+// in one line. Picking a game or a row applies it at once
 // (its environment and plan become current; a pack becomes the featured item); it writes
 // no game file. Picking the applied row again opens it. The problem can be hidden; it
 // comes back when the row, its game, its mods or its problem change.
@@ -20,7 +20,7 @@ export function initHome(u) {
   // Back from a game: the page reads the new Player.log (API.Home reads it when it is newer
   // than the last one read).
   addEventListener("focus", () => { if (S.screen === "home") home(); });
-  addEventListener("resize", () => { if (S.screen === "home") { markY.clear(); placeMarks(); } });
+  addEventListener("resize", () => { if (S.screen === "home") { markY.clear(); placeMarks(); fitHeadline(); } });
 }
 
 // the hidden problem's fingerprint (a GUI setting, so it stays hidden across restarts)
@@ -79,13 +79,16 @@ const rowsOf = (env) => rows().filter((r) => r.envName === env).sort((a, b) => (
 // shownFirst puts the applied one at the top of its column; ↑↓ and ←→ still step through
 // the columns' own order, so the keys do not bounce between the top two.
 const shownFirst = (list, on) => { const i = list.findIndex(on); return i > 0 ? [list[i], ...list.slice(0, i), ...list.slice(i + 1)] : list; };
-// the games with something on the page, by name
+// the games with something on the page, by name; short is the chip's version ("1.7"),
+// full the build ("1.7.4990 rev1069")
 function games() {
   const seen = new Map();
   for (const r of rows()) {
     if (seen.has(r.envName)) continue;
     const p = r.envName + "  ";
-    seen.set(r.envName, { name: r.envName, version: r.gameVersion || (r.env && r.env.startsWith(p) ? r.env.slice(p.length) : "") });
+    const chip = r.env && r.env.startsWith(p) ? r.env.slice(p.length) : "";
+    const full = r.gameVersion || chip;
+    seen.set(r.envName, { name: r.envName, version: full, short: chip || (/^\d+\.\d+/.exec(full) || [""])[0] });
   }
   return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
@@ -169,11 +172,14 @@ function draw() {
   }
   const env = f ? f.envName : games()[0].name;
   const rowMoved = !f || shown.row !== key(f), gameMoved = shown.game !== env;
-  w.append(activity(), hero(f, rowMoved));
+  // the floor goes first so everything paints over it: over a picture it gives the three
+  // steps a flat ground (06 §2.3)
+  w.append(el("div", "hm-floor"), activity(), hero(f, rowMoved));
   w.append(el("div", "hm-rule" + (shown.drawn ? "" : " in")));
   w.append(gameStep(env), rowStep(f, env, gameMoved), launchStep(f));
   w.querySelectorAll(".hm-picks").forEach((l) => l.classList.toggle("scrolls", l.querySelectorAll(".hm-pick").length > 6));
   slideFrom(w, ".hm-pick", before);
+  fitHeadline();
   placeMarks(gameMoved);
   if (pendingRow && S.busy.env) showSwitch(pendingRow);
   if (focus) focusStep(focus);
@@ -207,7 +213,15 @@ export function setBackdrop(b) {
   app.classList.add("photo");
 }
 
-const kindText = (r) => (r.kind === "plan" ? T("list") : T("pack"));
+// splitTags takes the trailing "[…]" groups off a name ("The Progression Modpack [UPDATED
+// 1.7]"): Workshop tags, which go on the line under the headline. A name that is only
+// tags stays whole.
+function splitTags(name) {
+  const tags = [];
+  let stem = name, m;
+  while ((m = /^(.*\S)\s*\[([^[\]]+)\]\s*$/.exec(stem))) { tags.unshift(m[2].trim()); stem = m[1]; }
+  return [stem, tags];
+}
 
 // hero: the applied row as the page's one headline.
 function hero(f, moved) {
@@ -218,15 +232,40 @@ function hero(f, moved) {
     box.append(head);
     return box;
   }
+  const [stem, tags] = splitTags(f.name);
   const head = el("div", "hm-headline");
-  const h1 = el("h1", moved ? "in" : "", f.name);
+  const h1 = el("h1", moved ? "in" : "", stem);
   h1.title = f.name;
   head.append(h1);
   const facts = el("div", "hm-facts num" + (moved ? " in" : ""));
+  for (const t of tags) facts.append(el("span", "", t));
   facts.append(el("span", "word-facts", f.facts || Tf("%d mods", f.mods)));
   if (f.played) facts.append(el("span", "", f.played));
   box.append(head, facts);
   return box;
+}
+
+// fitHeadline sets the headline as large as its width allows (06 §2.3): one line, from the
+// largest size down to 64px; still too long, two lines, from 64px down to 48px. Only a
+// name longer than that ends in an ellipsis (the whole name is on hover).
+function fitHeadline() {
+  const h1 = document.querySelector(".page.home .hm-headline h1");
+  if (!h1) return;
+  h1.classList.remove("two");
+  h1.style.fontSize = "";
+  const max = parseFloat(getComputedStyle(h1).fontSize), min = Math.min(max, 64);
+  let size = max;
+  for (let i = 0; i < 4 && h1.scrollWidth > h1.clientWidth + 1 && size > min; i++) {
+    size = Math.max(min, Math.floor(size * h1.clientWidth / h1.scrollWidth));
+    h1.style.fontSize = size + "px";
+  }
+  if (h1.scrollWidth <= h1.clientWidth + 1) return;
+  h1.classList.add("two");
+  // a third line adds about a line's height; glyphs below the tight line height add less
+  for (let i = 0; i < 4 && h1.scrollHeight > h1.clientHeight + size * .4 && size > 48; i++) {
+    size = Math.max(48, size - 4);
+    h1.style.fontSize = size + "px";
+  }
 }
 
 function step(n, cls, title) {
@@ -240,7 +279,8 @@ function step(n, cls, title) {
 }
 
 // 01: the games, the applied one first; picking one applies its last row (this session's
-// pick, else its most recently played).
+// pick, else its most recently played). Each says its short version unless its name
+// already does ("1.6"); the full build is on hover.
 function gameStep(env) {
   const s = step("01", "hm-s1", T("game"));
   const list = el("div", "hm-picks");
@@ -249,9 +289,8 @@ function gameStep(env) {
     const b = el("button", "hm-pick" + (g.name === env ? " on" : ""));
     b.dataset.game = g.name;
     b.dataset.id = "game|" + g.name;
-    const version = el("small", "num", g.version);
-    version.title = g.version;
-    b.append(el("span", "nm", g.name), version);
+    b.title = g.version;
+    b.append(el("span", "nm", g.name), el("small", "num", g.short && !g.name.includes(g.short) ? g.short : ""));
     b.onclick = () => pickGame(g.name);
     list.append(b);
   }
@@ -272,10 +311,14 @@ function rowStep(f, env, moved) {
     b.dataset.id = "row|" + key(r);
     b.style.setProperty("--d", i);
     const nm = el("span", "nm", r.name);
-    if (r.level === "bad") nm.append(el("span", "flag bad", "▲"));
-    else if (r.level !== "ok") nm.append(el("span", "flag", "○"));
-    b.append(nm, el("small", "num word-facts", kindText(r) + "  " + r.mods));
-    b.title = on ? T("pick again to open it") : r.otherEnv ? Tf("switch to %s and use this; no game file is written", r.envName) : T("use this; no game file is written");
+    // Only the applied row is marked, and 03 says what is wrong; another row's state is
+    // on hover (06 §2.3).
+    if (on && r.level === "bad") nm.append(el("span", "flag bad", "▲"));
+    else if (on && r.level !== "ok") nm.append(el("span", "flag", "○"));
+    // the count alone for a list; a pack says it is one
+    b.append(nm, el("small", "num word-facts", r.kind === "pack" ? T("pack") + "  " + r.mods : String(r.mods)));
+    const use = on ? T("pick again to open it") : r.otherEnv ? Tf("switch to %s and use this; no game file is written", r.envName) : T("use this; no game file is written");
+    b.title = !on && r.level !== "ok" && r.state ? r.state + "\n" + use : use;
     b.onclick = () => (on ? edit(r) : apply(r));
     list.append(b);
   });
@@ -295,7 +338,8 @@ function launchStep(f) {
   if (live) title.prepend(el("span", "dot"));
   top.append(title);
   if (!live) top.append(el("kbd", "", "L"));
-  const sub = live ? (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")) : f ? `${f.env} — ${f.name}` : "";
+  // 01 and 02 already say what starts; the block adds only the edits that launching saves
+  const sub = live ? (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")) : f && f.unsaved ? Tf("%d unsaved", f.unsaved) : "";
   const bottom = el("div", "bottom");
   bottom.append(el("span", "sub num", sub));
   if (!live) bottom.append(el("span", "arrow", "→"));
@@ -303,15 +347,9 @@ function launchStep(f) {
   // one game at a time (08 §4)
   b.disabled = live || !f;
   if (live) b.title = T("a game is already running");
+  else if (f && f.unsaved) b.title = T("different from the last saved list; launching or saving saves these changes to the game");
   b.onclick = () => f && launch(f);
   s.append(b);
-  // the current list's edits unsaved; it opens the list
-  if (f && f.unsaved) {
-    const u = el("button", "hm-unsaved", T("unsaved changes"));
-    u.title = Tf("%d unsaved", f.unsaved);
-    u.onclick = () => edit(f);
-    s.append(u);
-  }
   const n = f && note(f);
   if (n) s.append(n);
   return s;
@@ -339,10 +377,11 @@ function note(r) {
   if (hidden === fp) return null;
   const wrap = el("div", "hm-note" + (p.bad ? " bad" : "") + (shown.note ? "" : " enter"));
   const inner = el("div"), box = el("div", "box");
+  // one line; the reason and its log numbers are on hover and on 能不能跑
   const what = el(p.go ? "button" : "div", "what", (p.bad ? "▲  " : "") + p.what);
-  if (p.go) { what.title = T("can it run"); what.onclick = () => ui.go("needs"); }
+  what.title = [p.what, p.why].filter(Boolean).join("\n");
+  if (p.go) what.onclick = () => ui.go("needs");
   box.append(what);
-  if (p.why) box.append(el("div", "why", p.why));
   const x = el("button", "x", "×");
   x.title = T("hide until the list, the game or a mod changes");
   x.setAttribute("aria-label", T("hide"));
@@ -436,7 +475,7 @@ function showSwitch(r) {
   b.disabled = true;
   const top = el("div", "top"), bottom = el("div", "bottom");
   top.append(el("span", "title", gameMoved ? Tf("switching to %s…", r.envName) : Tf("applying %s…", r.name)));
-  bottom.append(el("span", "sub num", gameMoved ? T("loading the game, please wait…") : `${r.env} — ${r.name}`));
+  bottom.append(el("span", "sub num", gameMoved ? T("loading the game, please wait…") : ""));
   const bar = el("span", "bar");
   bar.setAttribute("role", "progressbar");
   bar.setAttribute("aria-label", top.textContent);
@@ -455,8 +494,9 @@ function activity() {
     const runGo = live || data.lastRunErrors ? "needs" : "log";
     box.append(actLine(T("last game"), runText, () => ui.go(runGo)));
   }
+  // "nothing changed" tells nothing: the line shows only with changes or before a scan
   const c = data.changes;
-  if (c) {
+  if (c && (c.count || c.noScan)) {
     const go = c.noScan ? () => ui.cmd("rescan") : () => { changesPlan(); ui.go("changes"); };
     box.append(actLine(c.title, c.text, go));
   }

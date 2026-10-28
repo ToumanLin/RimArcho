@@ -234,7 +234,7 @@ try {
       assert(document.activeElement.closest(".subs-list"), "one-mod view did not land in the list");
       key("Escape"); await settle();
       assert(reads.at(-1)[1] === "" && !screens.changesFiltered(), "esc did not show every mod");
-      handlers.set("Home", () => ({ rows: [{ kind: "plan", envName: "fixture", env: "fixture", plan: 1, page: "plan:1", name: "Colony", current: true }], featured: 0, changes: { title: "current list", text: "since last played" } }));
+      handlers.set("Home", () => ({ rows: [{ kind: "plan", envName: "fixture", env: "fixture", plan: 1, page: "plan:1", name: "Colony", current: true }], featured: 0, changes: { title: "current list", text: "since last played", count: 1 } }));
       await home.home(); document.querySelector(".hm-actline").click(); await settle();
       assert(reads.at(-1).join() === "false," && document.activeElement.closest(".subs-list"), "home lost the current-list landing");
       await screens.openAdd(); await settle();
