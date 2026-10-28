@@ -16,6 +16,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - Game log: the error list takes 62% of the width by default and the log text 38%; the
   Archo log analysis card takes 40% of the right side's height. Double-click a gap to go
   back to these.
+- Game log rows select without expanding or jumping to the top. Use the Archo Monitor
+  row’s disclosure arrow or Enter for inline details; tab switches and live refresh keep
+  the scroll position, and live refresh keeps expanded rows open.
 - The launch page has more room again. The headline is no longer cut off: it shrinks to
   fit its line, takes two lines when it must, and a Workshop tag at the end of the name
   (`[UPDATED 1.7]`) moves to the line under it. Under ▶ the problem is one line, with its
