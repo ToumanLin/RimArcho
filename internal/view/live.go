@@ -2,7 +2,6 @@ package view
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/finding"
@@ -100,10 +99,8 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 		}
 		var ids []string
 		text := Tf("this run, %d× %s", c.Count, msg)
-		lines := []string{c.Report.First.Message}
 		for _, at := range c.Report.Attr {
 			ids = append(ids, at.Instance)
-			lines = append(lines, ", "+TokName(st, finding.Inst(at.Instance))+" — "+T(at.Role)+": "+strings.Join(at.Evidence, "; "))
 		}
 		if len(c.Report.Attr) > 0 {
 			text = Tf("this run, %s: %d× %s", TokName(st, finding.Inst(c.Report.Attr[0].Instance)), c.Count, msg)
@@ -120,7 +117,8 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 		}
 		n := Need{Group: GroupThisRun, Section: SectionRun, Text: text, Counted: true, Mods: ids, Status: StatusLog,
 			Evidence: ev,
-			Actions:  []Action{{Kind: ActList, Key: "enter", Label: T("see the log and evidence"), Title: T("this run"), Lines: lines}}}
+			// like the last run's items: the game log at this cluster (the TUI: `archo log`)
+			Actions: []Action{{Kind: ActGameLog, Key: "enter", Label: T("open game log"), Cluster: c.Report.ID, Argv: []string{"log"}}}}
 		if len(c.Phases) > 0 {
 			n.Phase = logs.PhaseName(c.Phases[0].Phase)
 			n.PhaseHeading = phaseHeading(n.Phase)

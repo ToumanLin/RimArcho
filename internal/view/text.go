@@ -434,7 +434,6 @@ var zhText = map[string]string{
 	"see which":                                               "查看是哪些",
 	"see it":                                                  "查看",
 	"see the list":                                            "查看列表",
-	"see the log and evidence":                                "查看日志与证据",
 	"ignore the suggested one":                                "忽略建议的那一条",
 	"that requirement is ignored from now on":                 "这条顺序要求以后会被忽略",
 	"nothing to ignore here":                                  "这里没有可忽略的",

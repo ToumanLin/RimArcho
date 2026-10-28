@@ -17,6 +17,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   The evidence line labels the mod's file and puts gaps between it, the log name and the
   time ("file Defs/…/Apparel.xml   ArchoMonitor.log   Oct 28 15:45"); before, the window
   ran them together so they read as one path.
+  While the game runs, its "this run" items open the game log at that error group too
+  ("open game log"), instead of "see the log and evidence" showing a block of text.
 
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
