@@ -1307,7 +1307,10 @@ async function start() {
 onHistoryPick = (h) => goHistory(h);
 setOnHistory((h) => goHistory(h));
 async function goHistory(h) {
-  try { say("ok", await api.HistoryGo(h.steps || 0, h.version || 0), h.kind === "version"); } catch (e) { say("fail", errText(e)); }
+  try {
+    const r = await api.HistoryGo(h.steps || 0, h.version || 0);
+    say("ok", r.text, !!r.undo);
+  } catch (e) { say("fail", errText(e)); }
   await reload();
 }
 

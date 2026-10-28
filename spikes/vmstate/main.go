@@ -366,9 +366,20 @@ func snapshot(home string, openPlan ...string) any {
 func audit(home, root string) {
 	root, err := filepath.Abs(root)
 	check(err)
+	// A resolved link names the root in its long form; the root as given may be an
+	// 8.3 short path (C:\Users\TOUMAN~1\...), so accept either spelling of it.
+	roots := []string{root}
+	if long, err := filepath.EvalSymlinks(root); err == nil && long != root {
+		roots = append(roots, long)
+	}
 	within := func(path string) bool {
-		rel, err := filepath.Rel(root, path)
-		return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
+		for _, root := range roots {
+			rel, err := filepath.Rel(root, path)
+			if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel) {
+				return true
+			}
+		}
+		return false
 	}
 	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(filepath.Join(home, "archo.db"))+"?mode=ro")
 	check(err)

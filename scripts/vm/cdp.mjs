@@ -31,18 +31,25 @@ export async function connect(addr, { timeoutMs = 15000 } = {}) {
     try { ws.send(JSON.stringify({ id, method, params })); } catch (e) { clearTimeout(timer); pending.delete(id); fail(e); }
   });
   const evaluate = async expression => {
-    const r = await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    let r;
+    try { r = await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }); }
+    catch(e) { e.message += ' evaluating ' + expression.slice(0,120);throw e; }
     if (r.result?.exceptionDetails) throw Error(r.result.exceptionDetails.exception?.description || r.result.exceptionDetails.text);
     return r.result?.result?.value;
   };
   const key = async (combo, options = {}) => {
     const parts = combo.split('+'), code = parts.pop();
     const modifiers = parts.reduce((m, p) => m | ({ Alt: 1, Control: 2, Meta: 4, Shift: 8 }[p] || 0), 0);
-    let k = code.startsWith('Key') ? code.slice(3).toLowerCase() : code.startsWith('Digit') ? code.slice(5) : code === 'Space' ? ' ' : code === 'Backslash' ? '\\' : code;
+    const punctuation={Slash:['/','?'],Semicolon:[';',':']};
+    let k = punctuation[code]?.[modifiers&8?1:0] || (code.startsWith('Key') ? code.slice(3).toLowerCase() : code.startsWith('Digit') ? code.slice(5) : code === 'Space' ? ' ' : code === 'Backslash' ? '\\' : code);
     if (options.uppercase && modifiers & 8) k = k.toUpperCase();
     const params = { code, key: k, modifiers, windowsVirtualKeyCode: VK[code] || (k.length === 1 ? k.toUpperCase().charCodeAt(0) : 0) };
-    for (let i = 0; i <= (options.repeats || 0); i++) await call('Input.dispatchKeyEvent', { ...params, type: 'rawKeyDown', autoRepeat: i > 0 });
-    await call('Input.dispatchKeyEvent', { ...params, type: 'keyUp' });
+    try {
+      for (let i = 0; i <= (options.repeats || 0); i++) {
+        if(i>0&&options.beforeRepeat)await options.beforeRepeat(i);
+        await call('Input.dispatchKeyEvent', { ...params, type: 'rawKeyDown', autoRepeat: i > 0 });
+      }
+    } finally { await call('Input.dispatchKeyEvent', { ...params, type: 'keyUp' }); }
   };
   const mouse = async (button = 'left', x = 400, y = 300, clickCount = 1) => {
     const buttons = { left: 1, right: 2, middle: 4, back: 8, forward: 16 }[button];

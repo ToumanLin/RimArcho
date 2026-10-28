@@ -599,20 +599,24 @@ func (s *API) History() ([]view.HistItem, error) {
 
 // HistoryGo moves through the unsaved steps (n > 0 undoes n, n < 0 redoes -n) or, with
 // version > 0, loads that version into the list (loadout checkout).
-func (s *API) HistoryGo(steps, version int) (string, error) {
+func (s *API) HistoryGo(steps, version int) (*view.Result, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if version > 0 {
-		if _, _, err := s.a.Checkout(fmt.Sprintf("v%d", version)); err != nil {
-			return "", err
+		r, _, err := s.a.Checkout(fmt.Sprintf("v%d", version))
+		if err != nil {
+			return nil, err
 		}
-		return view.Tf("back at v%d (unsaved)", version), nil
+		if r.Before.Equal(r.State.List) {
+			return &view.Result{Text: view.T("no changes")}, nil
+		}
+		return &view.Result{Text: view.Tf("back at v%d (unsaved)", version), Undo: true}, nil
 	}
 	r, err := s.a.StepTo(steps)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return view.Tf("%d changes", len(r.Changes)), nil
+	return &view.Result{Text: view.Tf("%d changes", len(r.Changes))}, nil
 }
 
 // Live reports the running game and the errors its log gained (06 §2.1); the page asks

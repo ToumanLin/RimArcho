@@ -106,6 +106,7 @@ async function load(read = null) {
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   foot(p);
+  p.rows ||= [];
   X.page = p;
   if (!X.cols) X.cols = mergeCols(saved);
   if (!els || !document.body.contains(els.root)) build();

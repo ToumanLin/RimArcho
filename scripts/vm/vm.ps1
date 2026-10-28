@@ -1,4 +1,4 @@
-# Test RimArcho in the Player-Test VM (VMware Workstation) from the host, with no clicks.
+﻿# Test RimArcho in the Player-Test VM (VMware Workstation) from the host, with no clicks.
 # Wraps D:\VMs\Setup\Invoke-VMRun.ps1, which holds the VM and guest credentials (never printed).
 # See scripts/vm/README.md.
 #
@@ -17,7 +17,7 @@ param(
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Rest = @(),
     [string]$VMX = 'D:\VMs\Player-Test\Win11-Player-Test.vmx',
     [string]$Wrapper = 'D:\VMs\Setup\Invoke-VMRun.ps1',
-    [string]$Transfer = 'D:\VMs\Transfer\rimarcho',
+    [string]$Transfer = 'D:\RimArcho-test\transfer\rimarcho',
     [string]$GuestDir = 'C:\Users\Public\Documents\VM-Test\RimArcho',
     [int]$DevToolsPort = 9222,   # inside the guest, on 127.0.0.1
     [int]$ForwardPort = 9223,    # what the host connects to
@@ -52,6 +52,14 @@ function PS1InGuest([string]$file, [switch]$Interactive, [switch]$NoWait) {
 function GuestIP { (VM getGuestIPAddress @('-wait')) | Select-Object -Last 1 }
 
 switch ($Command) {
+    'put' {
+        if ($Rest.Count -ne 2) { throw 'put requires host source and guest destination' }
+        ToGuest $Rest[0] $Rest[1]
+    }
+    'get' {
+        if ($Rest.Count -ne 2) { throw 'get requires guest source and host destination' }
+        FromGuest $Rest[0] $Rest[1]
+    }
     'status' {
         & 'C:\Program Files\VMware\VMware Workstation\vmrun.exe' list
         Write-Host "tools: $(VM checkToolsState)"
@@ -142,16 +150,17 @@ Start-Process -FilePath '$GuestDir\RimArcho.exe' -WorkingDirectory '$GuestDir'
     }
     'exec' {
         $file = $Rest[0]
-        $res = "$work\exec-out.txt"
-        $s = Join-Path $Transfer 'exec-wrap.ps1'
+        $token=[guid]::NewGuid().ToString('N').Substring(0,10)
+        $res = "$work\exec-out-$token.txt"
+        $s = Join-Path $Transfer "exec-wrap-$token.ps1"
         $inner = Split-Path -Leaf $file
         [IO.File]::WriteAllText((Join-Path $Transfer $inner), [IO.File]::ReadAllText($file), [Text.UTF8Encoding]::new($true))
         ToGuest (Join-Path $Transfer $inner) "$work\$inner"
         # Native programs write UTF-8 (archo) or the console code page; read them as UTF-8.
         "[Console]::OutputEncoding = [Text.Encoding]::UTF8; `$OutputEncoding = [Text.Encoding]::UTF8; & '$work\$inner' *>&1 | Out-File -Encoding UTF8 '$res'" | Set-Content -Encoding UTF8 $s
         PS1InGuest $s -Interactive:$Interactive
-        FromGuest $res (Join-Path $Transfer 'exec-out.txt')
-        Get-Content -Encoding UTF8 (Join-Path $Transfer 'exec-out.txt')
+        FromGuest $res (Join-Path $Transfer "exec-out-$token.txt")
+        Get-Content -Encoding UTF8 (Join-Path $Transfer "exec-out-$token.txt")
     }
     'cli' {
         $s = Join-Path $Transfer 'cli.ps1'

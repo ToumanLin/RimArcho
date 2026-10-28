@@ -8,7 +8,7 @@ export function virtualRows(scroll, count, renderRow) {
   const heights = new Float64Array(count).fill(80);
   const offsets = new Float64Array(count + 1);
   const nodes = new Map();
-  let selected = -1, frame = 0, dead = false;
+  let selected = -1, frame = 0, dead = false, layoutPending = false, correctionPending = 0;
 
   function layout() {
     for (let i = 0; i < count; i++) offsets[i + 1] = offsets[i] + heights[i];
@@ -28,7 +28,20 @@ export function virtualRows(scroll, count, renderRow) {
     return lo;
   }
   function schedule() {
-    if (!dead && !frame) frame = requestAnimationFrame(() => { frame = 0; draw(); });
+    if (!dead && !frame) frame = requestAnimationFrame(() => {
+      frame = 0;
+      if (dead) return;
+      if (layoutPending) {
+        const top = scroll.scrollTop;
+        layoutPending = false;
+        layout();
+        // Layout can clamp scrollTop when the spacer shrinks. Preserve the value
+        // before layout, including any player scroll since the resize notification.
+        scroll.scrollTop = top + correctionPending;
+        correctionPending = 0;
+      }
+      draw();
+    });
   }
   const observer = new ResizeObserver((entries) => {
     let changed = false;
@@ -46,11 +59,10 @@ export function virtualRows(scroll, count, renderRow) {
       }
     }
     if (changed) {
-      const top = scroll.scrollTop;
-      layout();
-      // Shrinking the spacer can clamp scrollTop; apply the correction to the value
-      // from before layout, so End does not get moved upwards a second time.
-      scroll.scrollTop = top + correction;
+      // Resize delivery only measures. Writing the spacer/row layout here can
+      // resize the observed scroll box again and trigger a ResizeObserver loop.
+      layoutPending = true;
+      correctionPending += correction;
       schedule();
     }
   });
