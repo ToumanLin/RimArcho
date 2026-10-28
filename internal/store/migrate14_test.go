@@ -83,6 +83,10 @@ func TestMigrateV14SharedFolders(t *testing.T) {
 			(1, 'i1a', 1, x'01', ''), (2, 'i1b', 1, x'02', ''), (3, 'i1c', 1, x'03', '{"origin_instance":"i1a","origin_lineage":"la1"}'),
 			(4, 'i2a', 2, x'01', ''), (5, 'i2b', 2, x'02', ''), (6, 'i2c', 2, x'03', '{"origin_instance":"i2a","origin_lineage":"la2","workshop_id":"111"}'),
 			(7, 'i2m', 2, x'07', '')`,
+		// The copy shares three Defs with i1a, so the open question survives the v24 recheck.
+		`INSERT INTO snapshot_file(snapshot_id, rel_path, size, mtime, hash) VALUES
+			(1, 'Defs/A.xml', 1, 1, x'0a'), (1, 'Defs/B.xml', 1, 1, x'0b'), (1, 'Defs/C.xml', 1, 1, x'0c'),
+			(6, 'Defs/A.xml', 1, 1, x'0a'), (6, 'Defs/B.xml', 1, 1, x'0b'), (6, 'Defs/C.xml', 1, 1, x'0c')`,
 		`INSERT INTO instance_alias(instance_id, source_id, rel_path, real_path) VALUES ('i2a', 's2l', '_Link_111', 'W/111')`,
 		`INSERT INTO scan(id, environment_id, started_at) VALUES (1, 'e1', 100), (2, 'e2', 200)`,
 		`INSERT INTO change_event(scan_id, instance_id, kind, detail) VALUES

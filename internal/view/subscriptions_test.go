@@ -205,11 +205,14 @@ func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 	e.MustRun("scan")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
-		id := r.Form.Get("publishedfileids[0]")
-		index := 0
-		fmt.Sscan(id, &index)
-		code := codes[index-10000]
-		fmt.Fprintf(w, `{"response":{"publishedfiledetails":[{"publishedfileid":%q,"result":%d}]}}`, id, code)
+		var out []string
+		for i := 0; r.Form.Has(fmt.Sprintf("publishedfileids[%d]", i)); i++ {
+			id := r.Form.Get(fmt.Sprintf("publishedfileids[%d]", i))
+			index := 0
+			fmt.Sscan(id, &index)
+			out = append(out, fmt.Sprintf(`{"publishedfileid":%q,"result":%d}`, id, codes[index-10000]))
+		}
+		fmt.Fprintf(w, `{"response":{"publishedfiledetails":[%s]}}`, strings.Join(out, ","))
 	}))
 	defer server.Close()
 	e.App.SteamAPI = server.URL
@@ -225,7 +228,8 @@ func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 		t.Fatal(err)
 	}
 	row := page.Sources[0]
-	if row.Result != "11 个失败" {
+	// The two gone items are listed but are not failures.
+	if row.Result != "9 个失败" {
 		t.Fatal(row.Result)
 	}
 	found := false
@@ -239,6 +243,9 @@ func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 	}
 	if !found || len(row.Failures) != 10 {
 		t.Fatal(row)
+	}
+	if page.Summary.Failed != "9 个检查失败" {
+		t.Fatal(page.Summary)
 	}
 	for _, code := range []int{2, 15, 16, 20, 24, 25, 26, 41, 84, 999} {
 		text := view.Text(app.WorkshopResultText(code))

@@ -24,6 +24,8 @@ type SubscriptionSource struct {
 type SourceFailureGroup struct {
 	Label string   `json:"label"`
 	Items []string `json:"items"`
+	// Gone: items no longer on the Workshop. Steam answered, so they are not failed checks.
+	Gone bool `json:"gone,omitempty"`
 }
 
 // PendingUpdate is one row of 等你更新 (06 §2.9) and its detail.
@@ -53,7 +55,7 @@ type PendingUpdate struct {
 // SourceSummary is the one line under the list that replaces the sources section.
 type SourceSummary struct {
 	Line     string `json:"line"`               // "checked 4 sources, the last at …"
-	Failures int    `json:"failures,omitempty"` // failed checks of the last runs
+	Failures int    `json:"failures,omitempty"` // items listed by the last runs, gone ones included
 	Failed   string `json:"failed,omitempty"`   // "2 no longer on the Workshop"
 }
 
@@ -114,12 +116,13 @@ func BuildSubscriptionsFromLibrary(a *app.App, st *app.LoadoutState, o modchange
 				g := &r.Failures[at]
 				g.Items = append(g.Items, failure.Name+" ("+failure.ID+"): "+Text(reason))
 				g.Label = Tf("%d: %s", len(g.Items), Text(reason))
-				if failure.Code == 9 {
+				if failure.Gone() {
+					g.Gone = true
 					g.Label = Tf("%d no longer on the Workshop", len(g.Items))
 				}
 			}
-			if len(c.Failures) > 0 {
-				r.Result = Tf("%d failed", len(c.Failures))
+			if n := app.CheckFailures(c.Failures); n > 0 {
+				r.Result = Tf("%d failed", n)
 			}
 		}
 		if key == app.LibSteamCMD {
@@ -212,6 +215,7 @@ func sourceSummary(a *app.App, sources []SubscriptionSource, checks map[string]a
 	var last time.Time
 	n := 0
 	var groups []SourceFailureGroup
+	gone := 0
 	for _, s := range sources {
 		if s.Key == app.LibLocal {
 			continue
@@ -224,6 +228,9 @@ func sourceSummary(a *app.App, sources []SubscriptionSource, checks map[string]a
 		}
 		for _, g := range s.Failures {
 			sum.Failures += len(g.Items)
+			if g.Gone {
+				gone += len(g.Items)
+			}
 			groups = append(groups, g)
 		}
 	}
@@ -231,10 +238,13 @@ func sourceSummary(a *app.App, sources []SubscriptionSource, checks map[string]a
 	if n > 0 {
 		sum.Line = Tf("checked %d sources, the last at %s", n, a.FormatTime(last))
 	}
-	if len(groups) == 1 {
+	switch {
+	case len(groups) == 1:
 		sum.Failed = groups[0].Label
-	} else if sum.Failures > 0 {
-		sum.Failed = Tf("%d checks failed", sum.Failures)
+	case sum.Failures > gone:
+		sum.Failed = Tf("%d checks failed", sum.Failures-gone)
+	case gone > 0:
+		sum.Failed = Tf("%d no longer on the Workshop", gone)
 	}
 	return sum
 }

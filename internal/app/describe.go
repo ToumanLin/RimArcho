@@ -221,44 +221,15 @@ func isDigits(s string) bool {
 }
 
 func (a *App) fetchWorkshop(id string) (*workshopCache, error) {
-	api := a.SteamAPI
-	if api == "" {
-		api = SteamAPI
-	}
-	form := url.Values{"itemcount": {"1"}, "publishedfileids[0]": {id}}
-	req, err := http.NewRequestWithContext(a.subscriptionContext(), "POST", api, strings.NewReader(form.Encode()))
+	got, err := a.postWorkshopDetails(a.subscriptionContext(), []string{id})
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", UserAgent)
-	resp, err := a.httpClient().Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("Steam unreachable: %v", shortErr(err))
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Steam answered %s", resp.Status)
-	}
-	var r struct {
-		Response struct {
-			Details []struct {
-				ID          string `json:"publishedfileid"`
-				Result      int    `json:"result"`
-				Title       string `json:"title"`
-				Description string `json:"description"`
-				TimeUpdated int64  `json:"time_updated"`
-			} `json:"publishedfiledetails"`
-		} `json:"response"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&r); err != nil {
-		return nil, fmt.Errorf("unexpected answer from Steam: %v", err)
-	}
-	if len(r.Response.Details) == 0 {
+	d, ok := got[id]
+	if !ok {
 		return nil, errors.New("Steam returned no details")
 	}
-	x := r.Response.Details[0]
-	return &workshopCache{ID: id, Title: x.Title, Description: x.Description, TimeUpdated: x.TimeUpdated, Fetched: a.Now().Unix(), Result: x.Result}, nil
+	return d, nil
 }
 
 func shortErr(err error) string {

@@ -1,12 +1,14 @@
 package app_test
 
 import (
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -45,7 +47,7 @@ func TestVersionMuteMigrationAndStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.Open()
-	if e.App.Store.Meta("schema_version") != "23" || e.App.Store.Meta("keeper") != "preserved" {
+	if e.App.Store.Meta("schema_version") != fmt.Sprint(store.SchemaVersion) || e.App.Store.Meta("keeper") != "preserved" {
 		t.Fatal("migration lost state")
 	}
 	if err := e.App.Store.SetVersionMutes([]string{" TESTER.A_Steam ", "tester.a"}, "1.7", true); err != nil {

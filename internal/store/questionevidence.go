@@ -71,17 +71,19 @@ func questionEvidence(db questionReader, q *Question) (*QuestionEvidence, error)
 }
 
 // recheckQuestions removes obsolete open guesses in the scan transaction. Player
-// decisions are never selected. Partial scans leave questions about skipped sources alone.
-func recheckQuestions(tx *sql.Tx, envID string, scanned []string) (map[int64]bool, error) {
+// decisions are never selected. Every open question of the environment is judged, from the
+// stored snapshots, whether or not this scan read its folders: before 24 a question about a
+// folder the scan skipped (another game's Mods/, a partial scan) stayed however wrong it was.
+func recheckQuestions(tx *sql.Tx, envID string) (map[int64]bool, error) {
 	rows, err := tx.Query(`SELECT id, instance_id, candidate_instance_id FROM identity_question
 		WHERE status='open' AND environment_id IN ('', ?) ORDER BY id`, envID)
 	if err != nil {
 		return nil, err
 	}
 	type pending struct {
-		id           int64
-		a, b         string
-		check, valid bool
+		id    int64
+		a, b  string
+		valid bool
 	}
 	var qs []*pending
 	for rows.Next() {
@@ -96,10 +98,6 @@ func recheckQuestions(tx *sql.Tx, envID string, scanned []string) (map[int64]boo
 	rows.Close()
 	if err != nil {
 		return nil, err
-	}
-	active := map[string]bool{}
-	for _, id := range scanned {
-		active[id] = true
 	}
 	cache := map[string]*QuestionSide{}
 	load := func(id string) (*QuestionSide, error) {
@@ -127,10 +125,6 @@ func recheckQuestions(tx *sql.Tx, envID string, scanned []string) (map[int64]boo
 		if err != nil {
 			return nil, err
 		}
-		q.check = a == nil || b == nil || (active[a.SourceID] && active[b.SourceID])
-		if !q.check {
-			continue
-		}
 		q.valid = a != nil && b != nil && q.a != q.b && identity.QuestionScore(a.PackageID, a.WorkshopID, a.Files,
 			b.PackageID, b.WorkshopID, b.Files) >= identity.QuestionSimilarity
 		if q.valid {
@@ -140,7 +134,7 @@ func recheckQuestions(tx *sql.Tx, envID string, scanned []string) (map[int64]boo
 	}
 	removed := map[int64]bool{}
 	for _, q := range qs {
-		if q.check && (!q.valid || degree[q.a] > 1 || degree[q.b] > 1) {
+		if !q.valid || degree[q.a] > 1 || degree[q.b] > 1 {
 			if _, err := tx.Exec(`DELETE FROM identity_question WHERE id=? AND status='open'`, q.id); err != nil {
 				return nil, fmt.Errorf("recheck q:%d: %w", q.id, err)
 			}
@@ -198,6 +192,31 @@ func saveQuestionSummary(tx *sql.Tx, q *Question) error {
 }
 
 const schemaV22 = `ALTER TABLE identity_question ADD COLUMN summary TEXT NOT NULL DEFAULT '';`
+
+// schemaV24 indexes the open questions every scan now rechecks; migrateV24 rechecks
+// the ones older scans left alone.
+const schemaV24 = `CREATE INDEX IF NOT EXISTS identity_question_open ON identity_question(status, environment_id);`
+
+// migrateV24 judges every open question once, environment by environment, as a scan does.
+func migrateV24(tx *sql.Tx) error {
+	var envs []string
+	if err := eachRow(tx, `SELECT DISTINCT environment_id FROM identity_question WHERE status='open'`, func(rows *sql.Rows) error {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		envs = append(envs, id)
+		return nil
+	}); err != nil {
+		return err
+	}
+	for _, id := range envs {
+		if _, err := recheckQuestions(tx, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func migrateV22(tx *sql.Tx) error {
 	var qs []*Question

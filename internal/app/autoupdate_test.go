@@ -218,7 +218,8 @@ func TestAutomaticSteamCMDModsCheckOnlyAndKeepsPendingOffline(t *testing.T) {
 	if _, err := e.App.RunAutomatic(context.Background(), "mods", nil); err == nil {
 		t.Fatal("offline check succeeded")
 	}
-	if s := e.App.AutomaticStatus("mods"); s.Pending != 1 || calls != 2 || downloads != 0 {
+	// The failed request is sent once more.
+	if s := e.App.AutomaticStatus("mods"); s.Pending != 1 || calls != 3 || downloads != 0 {
 		t.Fatal(s, calls, downloads)
 	}
 	if _, err := e.App.UpdateSubscriptions(nil, false); err == nil || !strings.Contains(err.Error(), "game is running") {

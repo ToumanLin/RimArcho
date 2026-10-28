@@ -215,7 +215,7 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 			return err
 		}
 	}
-	removed, checkErr := recheckQuestions(tx, envID, scanned)
+	removed, checkErr := recheckQuestions(tx, envID)
 	if checkErr != nil {
 		return checkErr
 	}

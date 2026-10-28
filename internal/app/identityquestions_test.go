@@ -138,8 +138,9 @@ func TestIdentityQuestionsRecheckStored(t *testing.T) {
 			if err := e.App.Store.ApplyScan(mustEnv(t, e), sid, e.Now(), &identity.Result{}, nil); err != nil {
 				t.Fatal(err)
 			}
-			if pending, err := e.App.Store.Questions(mustEnv(t, e), false); err != nil || len(pending) != 66 {
-				t.Fatalf("partial scan removed unanswered questions: %d err=%v", len(pending), err)
+			// A scan that read no folder still judges every open question from the stored snapshots.
+			if pending, err := e.App.Store.Questions(mustEnv(t, e), false); err != nil || len(pending) != 0 {
+				t.Fatalf("partial scan kept unsupported questions: %d err=%v", len(pending), err)
 			}
 			scanNow(t, e)
 			all, err := e.App.Store.Questions(mustEnv(t, e), true)
@@ -150,6 +151,50 @@ func TestIdentityQuestionsRecheckStored(t *testing.T) {
 				t.Fatal("cleanup changed a mod")
 			}
 		})
+	}
+}
+
+// Opening a database from before 24 judges the questions older scans never rechecked
+// (the host had 67 about one VRE patch), and keeps the player's answers.
+func TestIdentityQuestionsMigrationRechecksOld(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	oldDir := filepath.Join(e.Game, "Mods", "Old")
+	e.WriteMod(oldDir, testkit.Mod{PackageID: "tester.old", Name: "Old"})
+	scanNow(t, e)
+	old := one(t, e, "Old")
+	for n := 0; n < 67; n++ {
+		name := fmt.Sprintf("New %02d", n)
+		e.WriteMod(filepath.Join(e.Game, "Mods", name), testkit.Mod{PackageID: fmt.Sprintf("tester.new%d", n), Name: name})
+	}
+	sid := scanNow(t, e)
+	var answered int64
+	for n := 0; n < 67; n++ {
+		m := one(t, e, fmt.Sprintf("New %02d", n))
+		r, err := e.App.Store.DB.Exec(`INSERT INTO identity_question(environment_id,scan_id,instance_id,observation_snapshot_id,candidate_instance_id,score)
+			VALUES(?,?,?,?,?,1)`, mustEnv(t, e), sid, m.ID, m.SnapID, old.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n == 0 {
+			answered, _ = r.LastInsertId()
+		}
+	}
+	if _, err := e.App.ResolveQuestion(answered, "unrelated"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.Store.DB.Exec(`DROP INDEX identity_question_open; UPDATE meta SET value='23' WHERE key='schema_version'`); err != nil {
+		t.Fatal(err)
+	}
+	e.Open()
+	if v := e.App.Store.Meta("schema_version"); v != fmt.Sprint(store.SchemaVersion) {
+		t.Fatal("schema", v)
+	}
+	if pending, err := e.App.Store.Questions(mustEnv(t, e), false); err != nil || len(pending) != 0 {
+		t.Fatalf("migration kept unsupported questions: %d err=%v", len(pending), err)
+	}
+	if all, err := e.App.Store.Questions(mustEnv(t, e), true); err != nil || len(all) != 1 || all[0].ID != answered {
+		t.Fatalf("answer lost: %+v err=%v", all, err)
 	}
 }
 

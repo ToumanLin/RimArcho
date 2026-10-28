@@ -7,6 +7,18 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Checking Workshop and SteamCMD mods for updates asks Steam about 100 items per request,
+  four requests at a time, instead of one request per mod: a 5182-mod library took about
+  two minutes and a few items failed every run. A failed request is sent once more after
+  a second, and so is an item Steam answered as busy, timed out or rate limited.
+- Mods that are no longer on the Workshop (deleted or private) are still listed under the
+  check ("N no longer on the Workshop"), but they no longer make the check or the
+  automatic mods check fail.
+- Same-mod questions are rechecked on every scan even when the scan did not read one of
+  the two folders (another game's `Mods/`, a partial scan). Before, such questions stayed
+  however little content the two mods shared. Opening the database once (schema 24)
+  clears the ones older scans left, such as 67 questions about one VRE patch; answered
+  questions are kept.
 - Commands that RimArcho prints (`fix:`, `next:`, `… N more (…)`, hints in errors) write
   mod references without `#`: `fix: archo enable nyh3`, not `archo enable #nyh3`. In
   PowerShell and bash a word starting with `#` is a comment, so a pasted suggestion ran

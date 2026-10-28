@@ -10,6 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
@@ -51,6 +52,20 @@ type SourceFailure struct {
 	Code             int
 }
 
+// Gone: Steam answered that the item is no longer on the Workshop (deleted or private).
+func (f SourceFailure) Gone() bool { return f.Code == 9 }
+
+// CheckFailures counts the items that could not be checked, leaving out the gone ones.
+func CheckFailures(fs []SourceFailure) int {
+	n := 0
+	for _, f := range fs {
+		if !f.Gone() {
+			n++
+		}
+	}
+	return n
+}
+
 func (a *App) CheckSubscriptionSource(kind string, pageReader ...func(string) (*subscribe.PageInfo, error)) error {
 	if kind != LibWorkshop && kind != LibSteamCMD && kind != LibGit && kind != LibPage && kind != LibLocal {
 		return fmt.Errorf("unknown subscription source %q", kind)
@@ -70,23 +85,29 @@ func (a *App) CheckSubscriptionSource(kind string, pageReader ...func(string) (*
 		if c.Latest == nil {
 			c.Latest = map[string]int64{}
 		}
+		var want []*store.Mod
+		var ids []string
 		for _, m := range ix.Mods {
 			if m.Status != identity.Live || (kind == LibWorkshop && m.Kind != source.Workshop) || (kind == LibSteamCMD && m.Kind != source.SteamCMD) {
 				continue
 			}
-			d, err := a.fetchWorkshop(m.WorkshopID())
-			if err == nil && d.Result != 1 {
-				err = errors.New(WorkshopResultText(d.Result))
-			}
-			if err != nil {
-				code := 0
-				if d != nil {
-					code = d.Result
+			want = append(want, m)
+			ids = append(ids, m.WorkshopID())
+		}
+		answers := a.workshopDetails(a.subscriptionContext(), ids)
+		for _, m := range want {
+			ans := answers[m.WorkshopID()]
+			switch {
+			case ans.err != nil:
+				c.Failures = append(c.Failures, SourceFailure{ID: m.WorkshopID(), Name: m.DisplayName(), Reason: ans.err.Error()})
+			case ans.d.Result != 1:
+				c.Failures = append(c.Failures, SourceFailure{ID: m.WorkshopID(), Name: m.DisplayName(), Reason: WorkshopResultText(ans.d.Result), Code: ans.d.Result})
+				if ans.d.Result == 9 {
+					delete(c.Latest, m.ID) // nothing left to update to
 				}
-				c.Failures = append(c.Failures, SourceFailure{ID: m.WorkshopID(), Name: m.DisplayName(), Reason: err.Error(), Code: code})
-				continue
+			default:
+				c.Latest[m.ID] = ans.d.TimeUpdated
 			}
-			c.Latest[m.ID] = d.TimeUpdated
 		}
 	} else {
 		ss, err := a.Subscriptions()
@@ -104,14 +125,16 @@ func (a *App) CheckSubscriptionSource(kind string, pageReader ...func(string) (*
 			}
 		}
 	}
-	if len(c.Failures) > 0 {
-		failures = append(failures, fmt.Errorf("%d Workshop items could not be checked", len(c.Failures)))
+	// Items gone from the Workshop were checked: Steam said so. They are listed, not failures.
+	broken := CheckFailures(c.Failures)
+	if broken > 0 {
+		failures = append(failures, fmt.Errorf("%d Workshop items could not be checked", broken))
 	}
 	err := errors.Join(failures...)
 	c.Result = "check complete"
 	if err != nil {
 		c.Result = err.Error()
-		if len(c.Failures) > 0 {
+		if broken > 0 {
 			c.Result = "some checks failed"
 		}
 	}
