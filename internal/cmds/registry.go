@@ -258,9 +258,10 @@ func ExecuteContext(ctx context.Context, ap *app.App, argv []string) (string, in
 			if ue.Cmd == nil {
 				ue.Cmd = c
 			}
-			return "error: " + ue.Error() + "\n", ExitUsage
+			return render.ShellSafe("error: " + ue.Error() + "\n"), ExitUsage
 		}
-		return "error: " + err.Error() + "\n", ExitError
+		// Errors suggest commands too ("x is not enabled (archo enable #x)").
+		return render.ShellSafe("error: " + err.Error() + "\n"), ExitError
 	}
 	return doc.String(), cctx.ExitCode
 }

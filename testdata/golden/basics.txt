@@ -236,7 +236,7 @@ $ archo find harmony
 found: 1 for "harmony"
   #6olp  Harmony  [workshop ws:2009463077]
 next:
-  archo mod #6olp
+  archo mod 6olp
 
 $ archo find nothing-like-this
 found: 0 for "nothing-like-this"
@@ -254,9 +254,9 @@ $ archo mod pkg:brrainz.harmony
   workshop: ws:2009463077, manifest 9000, updated 2026-09-21
   files: 4 (353 B), 4 semantic
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
-  changes: 1, latest discovered 2026-10-01 (archo changes #6olp)
+  changes: 1, latest discovered 2026-10-01 (archo changes 6olp)
 next:
-  archo changes #6olp
+  archo changes 6olp
 
 $ archo mod ws:3000000001
 #hnyg Versioned Mod 版本  [workshop ws:3000000001]
@@ -274,9 +274,9 @@ $ archo mod ws:3000000001
   workshop: ws:3000000001, manifest 9001, updated 2026-09-21
   files: 5 (779 B), 4 semantic
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
-  changes: 1, latest discovered 2026-10-01 (archo changes #hnyg)
+  changes: 1, latest discovered 2026-10-01 (archo changes hnyg)
 next:
-  archo changes #hnyg
+  archo changes hnyg
 
 $ archo mod #xamx
 #xamx Old Mod  [local OldMod]
@@ -289,17 +289,17 @@ $ archo mod #xamx
     path: $ROOT/Steam/steamapps/common/RimWorld/Mods/OldMod
   files: 2 (300 B), 2 semantic
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
-  changes: 1, latest discovered 2026-10-01 (archo changes #xamx)
+  changes: 1, latest discovered 2026-10-01 (archo changes xamx)
 next:
-  archo changes #xamx
+  archo changes xamx
 
 $ archo mod pkg:tester.alpha
 pkg:tester.alpha matches 2 instances; pick one
   #nyh3  Alpha       [workshop ws:3000000002]
   #lqj2  Alpha Fork  [local Twin]
 next:
-  archo mod #nyh3
-  archo mod #lqj2
+  archo mod nyh3
+  archo mod lqj2
 [exit 3]
 
 $ archo mod pkg:nope

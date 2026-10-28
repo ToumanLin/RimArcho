@@ -87,8 +87,8 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     updated: 2026-10-01 10:00
     used in: plan:default
 next:
-  archo workshop resubscribe #6olp --dry-run
-  archo library move-to-locked #iqmu --dry-run
+  archo workshop resubscribe 6olp --dry-run
+  archo library move-to-locked iqmu --dry-run
 
 $ archo library --lineage ws:5300
 ws:5300 Workshop item 5300  [1 copy, —]
@@ -121,7 +121,7 @@ $ archo library move-to-locked #iqmu --dry-run
   marker: .rimarcho/origin.json would be written (the folder has none)
   plans: plan:default, plan:other keep it: the same instance; affected game links are restored during the move
 next:
-  archo library move-to-locked #iqmu
+  archo library move-to-locked iqmu
 
 $ archo library move-to-locked #iqmu
 #iqmu Lockable moved to the lock library
@@ -150,12 +150,12 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     upstream: #6olp Lockable
     used in: plan:default, plan:other
 next:
-  archo workshop resubscribe #6olp --dry-run
+  archo workshop resubscribe 6olp --dry-run
 
 $ archo note #iqmu kept for the old save --copy
 copy note set for #iqmu Lockable
   note: kept for the old save
-  copy: this instance only (src:locked Lockable Copy); the mod's note is archo note #iqmu
+  copy: this instance only (src:locked Lockable Copy); the mod's note is archo note iqmu
 
 $ archo library --lineage #iqmu
 L#l4xt Lockable  [2 copies, 1.1 KB]
@@ -172,7 +172,7 @@ L#l4xt Lockable  [2 copies, 1.1 KB]
     upstream: #6olp Lockable
     used in: plan:default, plan:other
 next:
-  archo workshop resubscribe #6olp --dry-run
+  archo workshop resubscribe 6olp --dry-run
 
 $ archo note #iqmu --copy --clear
 copy note cleared for #iqmu Lockable

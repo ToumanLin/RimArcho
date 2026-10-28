@@ -24,9 +24,9 @@ harmony:Verse.Pawn.Tick  4 patches from 3 mods
     #gpto Mod B  ModB.Pawn_Tick_B.Transpiler
     #xamx Mod C  ModC.Pawn_Tick_C.Rewrite
 next:
-  archo source #iqmu --type ModA.Pawn_Tick
-  archo source #gpto --type ModB.Pawn_Tick_B
-  archo source #xamx --type ModC.Pawn_Tick_C
+  archo source iqmu --type ModA.Pawn_Tick
+  archo source gpto --type ModB.Pawn_Tick_B
+  archo source xamx --type ModC.Pawn_Tick_C
 
 $ archo harmony --mod #i4uc
 #i4uc Manual Patcher  harmony: 1 patches
@@ -34,7 +34,7 @@ $ archo harmony --mod #i4uc
     Assemblies/ModManual.dll  types 1, patches 1  (calls Harmony.Patch from code)
   patches:
     postfix    Verse.ThingWithComps.Tick  ← ModManual.Boot.After  (Harmony.Patch call in code)
-  manual: 1 patch targets found in Harmony.Patch calls, 0 not resolved (archo source search ".Patch(" --in #i4uc)
+  manual: 1 patch targets found in Harmony.Patch calls, 0 not resolved (archo source search ".Patch(" --in i4uc)
 
 $ archo problems --code harmony
 problems: 0 error, 2 warning, 2 info
@@ -97,9 +97,9 @@ log:E1 patch-failed x1  first at Player.log:4
     fixes: enable-dependency, reorder, update, local-fix
     repeat-uploads: after 1-3 list changes it went away in 9% of 1000 repeat uploads (without any change: 2% of 1826)
 next:
-  archo enable #z3bw
-  archo patches --mod #hnyg --failed
-  archo files search "Lib_Gun" --mod #hnyg
+  archo enable z3bw
+  archo patches --mod hnyg --failed
+  archo files search "Lib_Gun" --mod hnyg
 
 $ archo log --cluster E2
 log:E2 xref-missing x1  first at Player.log:7
@@ -124,7 +124,7 @@ log:E2 xref-missing x1  first at Player.log:7
     fixes: enable-dependency, update, disable
     repeat-uploads: after 1-3 list changes it went away in 5% of 1499 repeat uploads (without any change: 1% of 2939)
 next:
-  archo enable #z3bw
+  archo enable z3bw
   archo def ThingDef/Lib_Gun
   archo files search "Lib_Gun"
 
@@ -164,8 +164,8 @@ log:E3 harmony-stack x500  first at Player.log:9
     also check ExposeData/PostExposeData, SpawnSetup, DeSpawn and Destroy of the mods that patch the method
 next:
   archo harmony --target Verse.Pawn.Tick
-  archo source search "AllComps.Remove(" --in #iqmu --in #gpto --in #xamx
-  archo source search "AllComps.Add(" --in #iqmu --in #gpto --in #xamx
+  archo source search "AllComps.Remove(" --in iqmu --in gpto --in xamx
+  archo source search "AllComps.Add(" --in iqmu --in gpto --in xamx
 
 $ archo log --cluster E4
 log:E4 harmony-stack x1  first at Player.log:18
@@ -199,10 +199,10 @@ log:E4 harmony-stack x1  first at Player.log:18
     a PREFIX/POSTFIX line only shows who touched the method last; it is not the cause without other evidence
     also check ExposeData/PostExposeData, SpawnSetup, DeSpawn and Destroy of the mods that patch the method
 next:
-  archo source #iqmu --type ModA.CompBroken
+  archo source iqmu --type ModA.CompBroken
   archo harmony --target Verse.Pawn.Tick
-  archo source search "AllComps.Remove(" --in #iqmu
-  archo source search "AllComps.Add(" --in #iqmu
+  archo source search "AllComps.Remove(" --in iqmu
+  archo source search "AllComps.Add(" --in iqmu
 
 $ archo log --select
 log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
@@ -318,10 +318,10 @@ error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutO
   evidence: log #iqmu source: log frame 1 ModA.CompBroken.CompTick (topmost mod code in the stack)
   evidence: log #iqmu source: log harmony:Verse.Pawn.Tick#prefix "- PREFIX tester.moda.harmony" (type ModA.Pawn_Tick)
   fix: archo log --cluster E4
-  fix: archo source #iqmu --type ModA.CompBroken
+  fix: archo source iqmu --type ModA.CompBroken
   fix: archo harmony --target Verse.Pawn.Tick
-  fix: archo source search "AllComps.Remove(" --in #iqmu
-  fix: archo source search "AllComps.Add(" --in #iqmu
+  fix: archo source search "AllComps.Remove(" --in iqmu
+  fix: archo source search "AllComps.Add(" --in iqmu
 next:
   archo log --cluster E4
 

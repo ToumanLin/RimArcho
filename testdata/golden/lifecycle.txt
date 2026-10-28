@@ -60,9 +60,9 @@ pkg:tester.alpha matches 3 instances; pick one
   #mdx4  Alpha       [workshop ws:3000000002]
   #qfph  Alpha Fork  [local Twin]
 next:
-  archo mod #tmxx
-  archo mod #mdx4
-  archo mod #qfph
+  archo mod tmxx
+  archo mod mdx4
+  archo mod qfph
 [exit 3]
 
 $ archo scan
@@ -111,7 +111,7 @@ q:1  resolved: same
   #2ihw merged into #ekgo; it keeps its ID, lineage and history
   #ekgo  Leftover  [local Leftover Again]
 next:
-  archo mod #ekgo
+  archo mod ekgo
 
 $ archo identity list --all
 questions: 0 open, 1 resolved
@@ -144,7 +144,7 @@ $ archo lineage split #tmxx
 #tmxx Alpha  split
   lineage: L#vgoh (was L#z3bw)
 next:
-  archo mod #tmxx
+  archo mod tmxx
 
 $ archo lineage merge L#z3bw #tmxx
 L#z3bw  merged L#vgoh into it
@@ -157,8 +157,8 @@ pkg:brrainz.harmony matches 2 instances; pick one
   #76gh  Harmony  [steamcmd ws:2009463077, copy inferred]
   #l4xt  Harmony  [workshop ws:2009463077]
 next:
-  archo mod #76gh
-  archo mod #l4xt
+  archo mod 76gh
+  archo mod l4xt
 [exit 3]
 
 $ archo changes --since scan:2 --all

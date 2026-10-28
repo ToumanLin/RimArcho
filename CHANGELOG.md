@@ -7,6 +7,13 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Commands that RimArcho prints (`fix:`, `next:`, `… N more (…)`, hints in errors) write
+  mod references without `#`: `fix: archo enable nyh3`, not `archo enable #nyh3`. In
+  PowerShell and bash a word starting with `#` is a comment, so a pasted suggestion ran
+  without its argument. The bare form needs no quotes in cmd, PowerShell or bash, and
+  every command already accepted it. Lists and other text keep `#nyh3`; `L#…` and MCP tool
+  arguments are unchanged. In the TUI's technical pages, `enter` on such a line still
+  opens the mod.
 - The sidebar lists Mod library below Packs (lists, packs, Mod library). Page keys follow
   the sidebar: `shift+4` lists, `shift+5` packs, `shift+6` Mod library, in the window and
   the TUI.

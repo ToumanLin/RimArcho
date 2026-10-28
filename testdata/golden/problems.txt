@@ -19,15 +19,15 @@ problems: 2 error, 1 warning, 0 info
       fix: steam://url/CommunityFilePage/123456
     error incompat.active  #z3bw Needy is incompatible with #i4uc, and both are enabled  (p:98551b)
       evidence: declared #z3bw About.xml incompatibleWith: tester.over1
-      fix: archo disable #i4uc
-      fix: archo disable #z3bw
-      fix: archo why #z3bw #i4uc
+      fix: archo disable i4uc
+      fix: archo disable z3bw
+      fix: archo why z3bw i4uc
     warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
       evidence: inferred reason target-inactive
       evidence: inferred reason unguarded-optional
       evidence: inferred ThingDef/Lib_Gun is defined by #nyh3, which is not active; the patch is not wrapped in PatchOperationFindMod, a Conditional or a MayRequire list item
-      fix: archo enable #nyh3
-      fix: archo patches --mod #hnyg
+      fix: archo enable nyh3
+      fix: archo patches --mod hnyg
   hidden: 1 def.override, 1 patch.contested (archo problems --all)
 next:
   subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
@@ -43,10 +43,10 @@ launch: dry run (steam), nothing written
   before you play: 3 problems that often cause errors in the game (they do not block the launch)
     warning patch.no-match  #hnyg Compat: Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)
       why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
-      fix: archo enable #nyh3
+      fix: archo enable nyh3
     error incompat.active  #z3bw Needy is incompatible with #i4uc, and both are enabled
       why: their authors say these mods do not work together: they were error sources in 26% of logs (7.3% by chance)
-      fix: archo disable #i4uc
+      fix: archo disable i4uc
     error dep.missing  #z3bw Needy requires Absent Library (pkg:tester.absent), which is not installed
       why: a mod without its dependency fails in parts: such mods were error sources in 10% of logs (4.4% by chance)
       fix: subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
@@ -61,13 +61,13 @@ problems: 0 error, 1 warning, 1 info
       evidence: inferred reason target-inactive
       evidence: inferred reason unguarded-optional
       evidence: inferred ThingDef/Lib_Gun is defined by #nyh3, which is not active; the patch is not wrapped in PatchOperationFindMod, a Conditional or a MayRequire list item
-      fix: archo enable #nyh3
-      fix: archo patches --mod #hnyg
+      fix: archo enable nyh3
+      fix: archo patches --mod hnyg
     info patch.contested  2 mods replace or remove ThingDef/Shared_Gun/label; #iqmu Over Two runs last  (p:9789a9)
       evidence: declared #hnyg Patches/Compat.xml:6 PatchOperationReplace
       evidence: declared #iqmu Patches/Label.xml:2 PatchOperationReplace
 next:
-  archo enable #nyh3
+  archo enable nyh3
 
 $ archo problems show p:c2a532
 error dep.missing  #z3bw Needy requires Absent Library (pkg:tester.absent), which is not installed  (p:c2a532)
@@ -149,11 +149,11 @@ ignored problems: 1 error, 0 warning, 0 info
   list:
     error incompat.active  #z3bw Needy is incompatible with #i4uc, and both are enabled  (p:98551b)
       evidence: declared #z3bw About.xml incompatibleWith: tester.over1
-      fix: archo disable #i4uc
-      fix: archo disable #z3bw
-      fix: archo why #z3bw #i4uc
+      fix: archo disable i4uc
+      fix: archo disable z3bw
+      fix: archo why z3bw i4uc
 next:
-  archo disable #i4uc
+  archo disable i4uc
 
 $ archo launch --dry-run
 launch: dry run (steam), nothing written
@@ -166,7 +166,7 @@ launch: dry run (steam), nothing written
   before you play: 2 problems that often cause errors in the game (they do not block the launch)
     warning patch.no-match  #hnyg Compat: Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)
       why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
-      fix: archo enable #nyh3
+      fix: archo enable nyh3
     error dep.missing  #z3bw Needy requires Absent Library (pkg:tester.absent), which is not installed
       why: a mod without its dependency fails in parts: such mods were error sources in 10% of logs (4.4% by chance)
       fix: subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=123456
@@ -188,9 +188,9 @@ $ archo mod #hnyg
     path: $ROOT/Steam/steamapps/common/RimWorld/Mods/Compat
   files: 2 (550 B), 2 semantic
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
-  changes: 1, latest discovered 2026-10-01 (archo changes #hnyg)
+  changes: 1, latest discovered 2026-10-01 (archo changes hnyg)
 next:
-  archo changes #hnyg
+  archo changes hnyg
 
 $ archo enable #nyh3 --before #hnyg
 workspace: 6 active, 1 change unsaved (plan:default, env:main)

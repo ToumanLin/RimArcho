@@ -80,7 +80,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | `v<n>` | 方案的一个版本 | `v3` | `loadout diff/checkout` 使用；也接受 `workspace`（当前编辑状态） |
 | `pattern:<id>` | 一个错误范式（03 §6.8） | `pattern:g:xml.type-missing` | 不属于某个环境；`pattern:m:<packageId>:<hash>` 是某个 Mod 的已知错误 |
 
-- 不带 `#` 的 ID 前缀也被接受，因为 `#` 在 bash 和 PowerShell 里是注释符，命令行里带 `#` 的引用要加引号（`'#a3f9'`）。TUI、GUI 和 MCP 没有这个问题。
+- 不带 `#` 的 ID 前缀也被接受（`archo mod a3f9`）：PowerShell 和 bash 里以 `#` 开头的词是注释，`archo mod #a3f9` 会丢掉参数。要带 `#` 就加双引号（`"#a3f9"`）；单引号在 cmd 里会连引号一起传进来。词中间的 `#`（`L#7c2e`、`decl:#iqmu:…`）不是注释。RimArcho 打印的命令一律用不带 `#` 的形式（§3.1 规则 11）。TUI 的 `:`、GUI 和 MCP 的参数不经过 shell，带不带 `#` 都行。
 - `harmony:<Type.Method>`（如 `harmony:Verse.Pawn.Tick`）只出现在 `harmony --target` 输出的标题里；作为参数时直接写方法名（`harmony --target Verse.Pawn.Tick`），带 `harmony:` 前缀的输入（待实现）。
 - `patch:#<id>/<文件>#<序号>` 这种单个 Patch 操作的引用没有实现（待实现）；现在用 `patches --mod <引用>` 加文件:行号定位。
 - 方案：`plan` 命令按名称指定方案，名称在本环境内唯一，不区分大小写。
@@ -99,6 +99,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 8. 不输出 ANSI 颜色（终端里也不加），MCP 与重定向的输出因此和终端一致。
 9. 列宽最多填充到 40 个字符，避免一个超长名字把整列推开；东亚“模糊宽度”字符（`–`、`…`、`·`）按 1 格计算（07 §8）。
 10. 时间按本地时区输出（测试中为 UTC）。
+11. 输出里的 `archo` 命令把实例引用写成不带 `#` 的 ID 前缀：`fix: archo enable nyh3`、`… 3 more (archo problems --subject 5sed)`、`error: #z3bw is not enabled (archo enable z3bw)`。这样原样粘进 cmd、PowerShell、bash 都能运行，不用加引号（§2）。命令从 `archo` 起，到行尾，或到它所在括号的 `)`、`;`、两个空格为止；命令以外的引用（主体行、列表项、说明）仍写 `#nyh3`，词中间的 `#` 和双引号里的文字不变。由 `render.ShellSafe` 在 `Doc.String` 和错误输出处统一处理，写命令的代码照常用 `Index.Ref`。只改打印的文字：MCP 工具的参数照旧接受 `#nyh3`。
 
 ### 3.2 详略
 
@@ -132,11 +133,11 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
   problems: 2 error, 3 warning
     error incompat.active  #51aa Yayo's Combat 3 is active
     error log.exception    log:E3 attributed (role: patcher)
-    … 3 more (archo problems --subject #a3f9)
-  changes: updated 2026-10-17 (archo changes #a3f9)
+    … 3 more (archo problems --subject a3f9)
+  changes: updated 2026-10-17 (archo changes a3f9)
 next:
-  archo why #a3f9 #51aa
-  archo harmony --mod #a3f9 --shared
+  archo why a3f9 51aa
+  archo harmony --mod a3f9 --shared
 ```
 
 `archo def ThingDef/Gun_Revolver`
@@ -165,7 +166,7 @@ log:E3 exception x512  first at Player.log:4021
   confidence: possible (no source identified)
 next:
   archo harmony --target Verse.Pawn.Tick
-  archo source search "AllComps.Remove(" --in #a3f9 --in #77b0
+  archo source search "AllComps.Remove(" --in a3f9 --in 77b0
 ```
 
 ## 4. CLI 命令
@@ -421,3 +422,4 @@ next:
 | I8 | ModsConfig.xml 有未处理的外部修改冲突时调用 `save_loadout` | 拒绝，文本给出看差异 / 载入 / 忽略三条命令；ModsConfig.xml 不变 | 通过 |
 | I9 | 游戏正在运行时调用启动工具；调用 `save_loadout` | 启动工具拒绝并说明哪个环境的游戏在运行；`save_loadout` 照常写入，提示游戏下次启动才会读到 | 通过 |
 | I10 | `plan new` / `use` / `rename` / `remove` 与 `loadout import --new` 经 CLI 和 MCP 各执行一次 | 输出逐字相同；`plan use` 不写游戏文件；不能删除最后一个方案 | 通过 |
+| I11 | 把输出里的命令（`fix:`、`next:`、`… N more (…)`、错误里的提示）原样粘进 cmd、PowerShell、bash | 参数一个不少，引用能解析（`TestPrintedCommandsSurviveShells`：PowerShell 5.1 / 7 的解析器逐条读，没有注释、词与预期相同，再逐条执行；规则见 `TestShellSafe`） | 通过（合成夹具）；真实 VM 待验证 |

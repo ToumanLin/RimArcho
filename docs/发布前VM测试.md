@@ -8,6 +8,7 @@
 
 | 加入 | 功能 / 按键 | 规格 | 在 VM 里怎么测 | 已经做过的检查 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | 打印的命令里 Mod 引用不带 `#`（`fix: archo enable nyh3`），原样粘进 shell 能跑；TUI 技术页在这种行上按 `enter` 仍打开 Mod | 05 §2、§3.1 规则 11、06 §9 | 在 Windows PowerShell 5.1、cmd、Git Bash 里各跑 `archo problems --all --detail` 和 `archo mod <引用>`，把 `fix:` / `next:` / `… N more (…)` 和报错括号里的命令原样复制粘贴：只读的（mod、why、changes、patches、problems）直接跑，不出现 usage 或 “matches nothing”；会改列表的跑完 `archo undo`。TUI 技术页选中 `fix: archo enable …` 行按 `enter` | 合成夹具：PowerShell 5.1 / 7 解析器逐条读打印的命令再执行；规则单元测试；更新 CLI / MCP golden |
 | 2026-10-28 | 侧栏顺序：列表、整合包、Mod 库；`shift+4` 列表、`shift+5` 整合包、`shift+6` Mod 库（GUI 和 TUI） | 06 §2.1、§3.5 | 侧栏看顺序；GUI 和 TUI 各按一遍 `shift+1`–`shift+8`，确认去的页和侧栏顺序一致；顶部导航模式下也看一次 | 单元测试 |
 | 2026-10-28 | 缺失基础内容的按需查找 | 03 §4.3、05 §3.2、06 §5 | 启用 Chimera Creation，3 个内容缺父模板；分析后才安装未启用的 Chimera Base：页面不扫，打开面板先出说明和“正在查找已安装的 Mod…”，找到后“启用 Chimera Base”为首个主按钮且可撤销；关闭、换层、换环境取消且不重开。行上只有一句说明、不重复清单，文件:行号淡色跟随各内容；没有候选时不提示可选候选。CLI / MCP 单问题同样找到提供方 | 合成 Go / JS 回归与 400 Mod 基准；真实 VM 待测 |
 | 2026-10-28 | 能不能跑的问题与处理办法：缺失基础内容、补丁目标未启用、已知错误；`problems --ref` / MCP `list_problems ref=` | 03 §4.3、05 §3.2、06 §5 | 缺父模板的 Mod：看受影响内容和比例；有停用提供方时启用并撤销；缺声明候选时核对工坊并订阅；匹配且无此 Mod 报错的日志才显示整组“不再提醒”，更新 Mod 后重新提醒；`tab` / 方向键 / `enter`、`esc`，关闭后迟到结果不重开；详情不显示整张 Mod 卡 | 合成数据 Go 测试、MCP/CLI 一致性、弹层键盘和异步脚本测试；真实 VM 待测 |

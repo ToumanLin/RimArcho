@@ -95,13 +95,13 @@ q:1  resolved: same
   #np4v merged into #xzwf; it keeps its ID, lineage and history
   #xzwf  Leftover  [local Leftover Again]
 next:
-  archo mod #xzwf
+  archo mod xzwf
 
 > resolve_identity {"action":"split","refs":["#iqmu"]}
 #iqmu A  split
   lineage: L#bakj (was L#l4xt)
 next:
-  archo mod #iqmu
+  archo mod iqmu
 
 > resolve_identity {"action":"merge","refs":["L#l4xt","#iqmu"]}
 L#l4xt  merged L#bakj into it
@@ -487,7 +487,7 @@ launch: dry run (direct), nothing written
   before you play: 1 problems that often cause errors in the game (they do not block the launch)
     warning patch.no-match  #iqmu A: Patches/a.xml:1 Verse.PatchOperationAdd(Defs/ThingDef[defName="a"]) matched nothing (exception)
       why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
-      fix: archo patches --mod #iqmu
+      fix: archo patches --mod iqmu
 next:
   archo launch
 
@@ -503,7 +503,7 @@ launched RimWorld via direct
   before you play: 1 problems that often cause errors in the game (they do not block the launch)
     warning patch.no-match  #iqmu A: Patches/a.xml:1 Verse.PatchOperationAdd(Defs/ThingDef[defName="a"]) matched nothing (exception)
       why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
-      fix: archo patches --mod #iqmu
+      fix: archo patches --mod iqmu
 
 > plan_history {}
 versions: 1 (plan:raid night, env:main)
@@ -526,7 +526,7 @@ library: 4 of 5 mods match (used:none)
   marker: .rimarcho/origin.json would be written (the folder has none)
   plans: plan:raid night, plan:default, plan:first, plan:from file keep it: the same instance; affected game links are restored during the move
 next:
-  archo library move-to-locked #iqmu
+  archo library move-to-locked iqmu
 
 > manage_library {"action":"move_to_locked","refs":["#iqmu"]}
 #iqmu A moved to the lock library
@@ -556,7 +556,7 @@ L#l4xt A  [2 copies, 1.3 KB]
     used in: plan:raid night, plan:default, plan:first, plan:from file
     played: 2026-10-01 12:00
 next:
-  archo workshop resubscribe #6olp --dry-run
+  archo workshop resubscribe 6olp --dry-run
 
 > manage_library {"action":"remove_from_plans","refs":["#hnyg"]}
 removed #hnyg Harmony from 4 plans
@@ -571,12 +571,12 @@ next:
 dry run, nothing changed: would subscribe 1 Workshop item
   #nyh3 Gone  ws:4200
 next:
-  archo workshop subscribe #nyh3
+  archo workshop subscribe nyh3
 
 > set_player_data {"action":"copy_note","refs":["#iqmu"],"text":"kept for the 1.5 save"}
 copy note set for #iqmu A
   note: kept for the 1.5 save
-  copy: this instance only (src:locked A Local); the mod's note is archo note #iqmu
+  copy: this instance only (src:locked A Local); the mod's note is archo note iqmu
 
 > list_library {"lineage":"L#l4xt","sort":"-size"}
 L#l4xt A  [2 copies, 1.3 KB]
@@ -594,5 +594,5 @@ L#l4xt A  [2 copies, 1.3 KB]
     used in: plan:raid night, plan:default, plan:first, plan:from file
     played: 2026-10-01 12:00
 next:
-  archo workshop resubscribe #6olp --dry-run
+  archo workshop resubscribe 6olp --dry-run
 

@@ -86,7 +86,7 @@ next:
   archo save
 
 $ archo move #z3bw --to 3
-error: #z3bw is not enabled (archo enable #z3bw)
+error: #z3bw is not enabled (archo enable z3bw)
 [exit 1]
 
 $ archo enable #z3bw
