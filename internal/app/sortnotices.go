@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
@@ -184,6 +185,7 @@ func replacementCandidate(st *LoadoutState, old *store.Mod, r *Replacement) *sto
 
 func (a *App) ReplacementSuggestions(st *LoadoutState) []ReplacementSuggestion {
 	var out []ReplacementSuggestion
+	var required map[string][]string // read only when a replacement could be offered
 	seen := map[string]bool{}
 	for _, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
@@ -205,6 +207,16 @@ func (a *App) ReplacementSuggestions(st *LoadoutState) []ReplacementSuggestion {
 			}
 			installed, enabled = true, st.List.Index(c.ID) >= 0
 			blockedReason = swapBlocker(st, c, m)
+			// A mod that requires the original by packageId would be left without it, and
+			// completing dependencies would enable the original again next to its replacement.
+			if p := dependencyPackage(m.PackageID); blockedReason == "" && dependencyPackage(c.PackageID) != p {
+				if required == nil {
+					required = a.requiredBy(st)
+				}
+				if by := slices.DeleteFunc(slices.Clone(required[p]), func(n string) bool { return n == m.DisplayName() }); len(by) > 0 {
+					blockedReason = fmt.Sprintf("%s requires %s, so it stays", strings.Join(by, ", "), m.DisplayName())
+				}
+			}
 			canReplace = blockedReason == ""
 		}
 		if target.Name == "" {
@@ -212,6 +224,30 @@ func (a *App) ReplacementSuggestions(st *LoadoutState) []ReplacementSuggestion {
 		}
 		out = append(out, ReplacementSuggestion{Original: sortMod(st, m), Replacement: target, Installed: installed, Enabled: enabled, CanReplace: canReplace, BlockedReason: blockedReason,
 			Reason: fmt.Sprintf("Use This Instead recommends %s for %s", target.Name, st.GameMM()), Source: "Use This Instead"})
+	}
+	return out
+}
+
+// requiredBy maps a packageId to the enabled mods that require it (modDependencies,
+// including this game version's).
+func (a *App) requiredBy(st *LoadoutState) map[string][]string {
+	var active []*store.Mod
+	seen := map[string]bool{}
+	for _, e := range st.List {
+		if m := st.Ix.ByID[e.Instance]; m != nil && !seen[m.ID] {
+			seen[m.ID] = true
+			active = append(active, m)
+		}
+	}
+	_ = a.Store.LoadDecls(active) // on failure each Decl reads its own row
+	out := map[string][]string{}
+	for _, m := range active {
+		d := m.Decl()
+		for _, dep := range append(toDeps(d.Dependencies), toDeps(d.DependenciesByVersion["v"+st.GameMM()])...) {
+			if p := dependencyPackage(dep.pkg); p != "" && !slices.Contains(out[p], m.DisplayName()) {
+				out[p] = append(out[p], m.DisplayName())
+			}
+		}
 	}
 	return out
 }

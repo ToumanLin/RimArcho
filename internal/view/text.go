@@ -333,6 +333,8 @@ var zhText = map[string]string{
 	"open it in the Workshop":                "在工坊打开它",
 	"%s has a maintained replacement: %s":    "%s 有仍在维护的替代：%s",
 	"back to an older version":               "回到旧版",
+	"complete dependencies and sort":         "补齐依赖并排序",
+	"replace recommended mods":               "换成推荐的替代版本",
 	"import %s":                              "导入 %s",
 	"go back to here":                        "回到这里",
 	"go back to this version":                "回到这一版",

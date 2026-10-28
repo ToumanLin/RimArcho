@@ -171,3 +171,29 @@ func TestReplacementMustMatchRecommendedWorkshop(t *testing.T) {
 		t.Fatal("wrong Workshop fork accepted")
 	}
 }
+
+// A replacement with another packageId is not offered while an enabled mod requires the
+// original: completing dependencies would enable the original again next to it.
+func TestReplacementKeptWhenRequired(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Old"), testkit.Sample("tester.old", "Old"))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "New"), testkit.Sample("tester.new", "New"))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "User"), testkit.Mod{PackageID: "tester.user", Name: "User", Deps: []string{"tester.old"}})
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.old", "tester.user")
+	e.WriteFile(filepath.Join(e.Home, "cache", "replacements.json.gz"), `{"rules":[{"oldPackageId":"tester.old","newPackageId":"tester.new"}]}`)
+	scanNow(t, e)
+	r, err := e.App.Sort(false)
+	if err != nil || len(r.Replacements) != 1 {
+		t.Fatal(r, err)
+	}
+	if s := r.Replacements[0]; s.CanReplace || !s.Installed || s.BlockedReason != "User requires Old, so it stays" {
+		t.Fatalf("%+v", s)
+	}
+	// Without the requirement it is offered.
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.old")
+	scanNow(t, e)
+	if r, err = e.App.Sort(false); err != nil || len(r.Replacements) != 1 || !r.Replacements[0].CanReplace {
+		t.Fatal(r, err)
+	}
+}
