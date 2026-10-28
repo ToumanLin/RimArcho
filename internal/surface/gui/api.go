@@ -81,6 +81,8 @@ type API struct {
 
 	environment environmentWorker
 	monitorOnce sync.Once
+	autoOnce    sync.Once
+	autoWG      sync.WaitGroup
 	quit        func()     // closes the window (nil in the harness and in tests)
 	windowTheme func(bool) // synchronises the native frame with the resolved page scheme
 	// tasks is the 后台任务 record and its lanes (tasks.go, 06 §2.16)
@@ -141,6 +143,7 @@ var processStart = time.Now()
 // start-up time to <data>/logs/gui.log.
 func (s *API) Ready() {
 	defer perftrace.Span("Ready")()
+	s.startAutomatic()
 	s.prepareBackgrounds(false) // menu extraction starts after the first draw (06 §3.1)
 	s.monitorOnce.Do(s.checkMonitor)
 	ms := time.Since(processStart).Milliseconds()
@@ -527,7 +530,6 @@ func (s *API) Settings() []view.SettingGroup {
 	}
 	defer r.Close()
 	defer s.free.soon()
-	s.refreshLoversLab(r)
 	return view.SettingsPage(r, nil)
 }
 

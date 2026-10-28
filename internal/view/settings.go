@@ -237,6 +237,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
 	}}, DirectoryGroup(a), folders, AccountGroup(a)}
 	out = append(out, DependencyGroup(a))
+	out = append(out, AutomaticGroup(a))
 	lang := cmds.Setting(a, "ui.lang")
 	gpuNote := ""
 	if cmds.Setting(a, "ui.gpu") == "off" {
@@ -244,13 +245,25 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}
 	out = append(out, SettingGroup{Title: T("interface"), Items: []SettingItem{
 		{Label: T("language"), Value: lang, Edit: "choice", Choices: []string{"auto", "zh", "en"}, Argv: []string{"config", "set", "ui.lang", "{}"}},
-		{Label: T("Workshop descriptions"), Value: cmds.Setting(a, "workshop.fetch"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "workshop.fetch", "{}"}},
-		{Label: T("images in descriptions"), Value: cmds.Setting(a, "workshop.images"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "workshop.images", "{}"}},
-		{Label: T("GPU acceleration"), Value: cmds.Setting(a, "ui.gpu"), Edit: "choice", Choices: []string{"on", "off"}, Argv: []string{"config", "set", "ui.gpu", "{}"},
+		{Label: T("Workshop descriptions"), Value: cmds.Setting(a, "workshop.fetch"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "workshop.fetch", "{}"}},
+		{Label: T("images in descriptions"), Value: cmds.Setting(a, "workshop.images"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "workshop.images", "{}"}},
+		{Label: T("GPU acceleration"), Value: cmds.Setting(a, "ui.gpu"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "ui.gpu", "{}"},
 			Hover: T("uses about 20–35 MB less memory and draws in software"), ValueNote: gpuNote},
 	}})
 	data := SettingGroup{Title: T("community data")}
 	status := a.DataStatus()
+	checked := a.AutomaticStatus("data").Checked
+	for _, info := range status {
+		if info != nil {
+			if info.Checked.After(checked) {
+				checked = info.Checked
+			}
+			if info.Fetched.After(checked) {
+				checked = info.Fetched
+			}
+		}
+	}
+	data.Note = lastChecked(a, checked)
 	for _, d := range app.Datasets {
 		v := T("not downloaded")
 		if di := status[d.Key]; di != nil {
@@ -277,7 +290,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}
 	out = append(out, caches)
 	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
-		Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("only new lists and lists not handled yet")}
+		ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("only new lists and lists not handled yet")}
 	if s, err := a.MonitorState(); err == nil {
 		v := T("not installed")
 		if len(s.Installed) > 0 {

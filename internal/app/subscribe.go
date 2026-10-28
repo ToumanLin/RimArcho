@@ -325,7 +325,9 @@ func (a *App) CheckSubscriptions(refs []string, pageReader ...func(string) (*sub
 			var commit string
 			var checkErr error
 			if r.Kind == "git" {
-				commit, checkErr = subscribe.RemoteCommit(context.Background(), r.GitURL(), r.RefType, r.Ref)
+				ctx, cancel := context.WithTimeout(a.subscriptionContext(), 30*time.Second)
+				commit, checkErr = subscribe.RemoteCommit(ctx, r.GitURL(), r.RefType, r.Ref)
+				cancel()
 			} else {
 				var page *subscribe.PageInfo
 				if len(pageReader) > 0 {
@@ -366,14 +368,15 @@ func (a *App) CheckSubscriptions(refs []string, pageReader ...func(string) (*sub
 }
 
 func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *SubscribeOp, updateErr error) {
+	if !dryRun {
+		defer a.recordModUpdatesPending()
+	}
 	ss, err := a.selectSubscriptions(refs)
 	if err != nil {
 		return nil, err
 	}
-	if run, err := a.GameRunning(); err != nil {
+	if err := a.refuseSubscriptionGameRunning(); err != nil {
 		return nil, err
-	} else if run != nil {
-		return nil, fmt.Errorf("the game is running (pid %d); close it before updating subscriptions", run.PID)
 	}
 	op := &SubscribeOp{Action: "update", DryRun: dryRun}
 	for _, s := range ss {

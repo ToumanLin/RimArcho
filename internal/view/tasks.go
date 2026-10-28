@@ -15,6 +15,7 @@ import (
 // Task kinds of RimArcho's own jobs (the lane "self"); the files and Steam lanes' kinds
 // are Mod 库's ops (LibDelete, LibUnsub, …).
 const (
+	TaskAutomatic        = "automatic-check"
 	TaskCreditReplace    = "steam-credit-replace"
 	TaskScan             = "scan"
 	TaskAccount          = "account-operation"
@@ -147,6 +148,8 @@ type TaskItemRow struct {
 // TaskTitle names a kind.
 func TaskTitle(kind string) string {
 	switch kind {
+	case TaskAutomatic:
+		return T("automatic checks")
 	case OpSubRemoveFast:
 		return T("quick delete (cannot be undone)")
 	case TaskCreditReplace:
@@ -502,6 +505,11 @@ func joinFacts(parts ...string) string {
 
 func taskTarget(t *app.Task) string {
 	switch t.Kind {
+	case TaskAutomatic:
+		if t.Target == "mods" {
+			return PageChanges
+		}
+		return PageSettings
 	case TaskSubscribe, TaskSubscriptionFrom, TaskSourceCheck, TaskWorkshopUpdate, TaskSiteDownload, OpSubCheck, OpSubUpdate, OpSubRemove, OpSubRemoveFast:
 		return PageChanges
 	case TaskAccount:

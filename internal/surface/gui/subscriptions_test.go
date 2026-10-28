@@ -33,6 +33,9 @@ func TestSubscriptionSourceTaskAndRunningGuard(t *testing.T) {
 	if task.State != app.TaskDone {
 		t.Fatalf("check: %+v", task)
 	}
+	if task.Line != view.T("everything is up to date") {
+		t.Fatalf("check did not show its result: %+v", task)
+	}
 	if e.App.SubscriptionSourceCheck("git").At.IsZero() {
 		t.Fatal("check did not persist its result")
 	}

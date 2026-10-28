@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -84,6 +85,18 @@ func (s *API) accountAction(service, action string) error {
 		return err
 	}
 	defer a.Close()
+	defer func() {
+		if err == nil && service == "loverslab" && (action == "login" || action == "verify" || action == "forget") {
+			status := a.AutomaticStatus("session")
+			status.Pending = 0
+			status.State = "available"
+			if action == "forget" {
+				status.State = "not connected"
+			}
+			b, _ := json.Marshal(status)
+			_ = a.Store.SetMeta("automatic:session", string(b))
+		}
+	}()
 	if service == "steamcmd" {
 		err = a.SteamAccountAction(action)
 	} else if service == "loverslab" {
@@ -332,40 +345,4 @@ func (s *API) SteamLogin(name string) ([]string, error) {
 		return nil, errors.New(view.Humanize(nil, err.Error()))
 	}
 	return []string{view.T("account action completed")}, nil
-}
-
-// At most one request per four hours, including failures. Opening Settings is
-// the trigger; there is no timer, retry loop, resource load or task/toast.
-func (s *API) refreshLoversLab(a *app.App) {
-	release, err := s.beginAccount()
-	if err != nil {
-		return
-	}
-	defer release()
-	if a.Store.Meta("account:loverslab:enabled") != "true" {
-		return
-	}
-	unlock := accounts.Lock(a.AccountsDir())
-	defer unlock()
-	last, _ := time.Parse(time.RFC3339Nano, a.Store.Meta("account:loverslab:auto-check"))
-	session, err := accounts.Open(a.AccountsDir())
-	if err != nil || !session.HasCookies() {
-		return
-	}
-	if session.Status().Verified.After(last) {
-		last = session.Status().Verified
-	}
-	if a.Now().Sub(last) < 4*time.Hour {
-		return
-	}
-	if a.Store.SetMeta("account:loverslab:auto-check", a.Now().UTC().Format(time.RFC3339Nano)) != nil {
-		return
-	}
-	ll, err := s.loversLab(a)
-	if err != nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	_ = ll.Verify(ctx)
 }

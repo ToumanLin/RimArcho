@@ -26,6 +26,11 @@ export function initScreens(u) {
   ui = u;
   initNeedText(u);
   initSubscriptions(u, { beginPageRead, page, area, button, act, seg });
+  on("automatic-update", ev => {
+    if (ev?.notice) say("ok", ev.notice);
+    if (S.screen === "settings") refreshSettingTasks(true);
+    if (S.screen === "changes" && ev?.kind === "mods") changes();
+  });
   on("tasks", (ev) => {
     if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
     if (S.screen === "changes" && ev?.ended) changes();
@@ -1219,7 +1224,6 @@ function renderGroups(w, groups, again) {
         s.onchange = () => run(it.argv, s.value,
           it.argv[2] === "ui.lang" ? () => ui.relang() : it.argv[2] === "ui.accent" ? () => ui.reaccent() : null);
         right.append(s);
-        if (it.valueNote) right.append(el("span", "muted word-facts", it.valueNote));
       } else if (it.edit === "directory") {
         const value = factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] });
         const d = { id: it.directory, label: it.label, path: it.value };
@@ -1243,6 +1247,7 @@ function renderGroups(w, groups, again) {
       } else {
         right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
       }
+      if (it.valueNote) right.append(el("span", "muted word-facts", it.valueNote));
       renderSettingActions(right, it.actions, run, it);
       row.append(left, right);
       card.append(row);

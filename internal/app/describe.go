@@ -226,7 +226,7 @@ func (a *App) fetchWorkshop(id string) (*workshopCache, error) {
 		api = SteamAPI
 	}
 	form := url.Values{"itemcount": {"1"}, "publishedfileids[0]": {id}}
-	req, err := http.NewRequest("POST", api, strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(a.subscriptionContext(), "POST", api, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
 	}

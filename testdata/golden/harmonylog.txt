@@ -259,6 +259,7 @@ env:main  RimWorld 1.6.4633 rev1261
   changes: 9 discovered (archo changes)
   plan: plan:default
   loadout: 8 active, same as v1 (import)
+  automatic checks: on; nothing waiting (not checked yet)
   problems: 2 error, 6 warning, 2 info (archo problems)
   log: Player.log 1.6.4633 2026-10-01 10:00, current (from the launch of plan:default at 2026-10-01 09:30)
 
@@ -290,6 +291,7 @@ env:main  RimWorld 1.6.4633 rev1261
   changes: 9 discovered (archo changes)
   plan: plan:default
   loadout: 7 active, 1 change unsaved (archo loadout diff)
+  automatic checks: on; nothing waiting (not checked yet)
   problems: 0 error, 2 warning, 3 info (archo problems)
   log: Player.log 1.6.4633 2026-10-01 10:00, stale log (the plan changed since the launch of plan:default at 2026-10-01 09:30): 2 error, 2 warning, not counted (archo problems --code log --all)
 next:

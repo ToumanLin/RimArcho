@@ -144,7 +144,14 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 					fmt.Fprintf(&b, "  %s\n", g.Note)
 				}
 				for _, it := range g.Items {
-					fmt.Fprintf(&b, "  %s: %s", it.Label, it.Value)
+					value := it.Value
+					for i, choice := range it.Choices {
+						if choice == value && i < len(it.ChoiceLabels) {
+							value = it.ChoiceLabels[i]
+							break
+						}
+					}
+					fmt.Fprintf(&b, "  %s: %s", it.Label, value)
 					if it.ValueNote != "" {
 						fmt.Fprintf(&b, "  %s", it.ValueNote)
 					}

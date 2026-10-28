@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"io"
 	"net/http"
 	"os"
@@ -15,7 +16,7 @@ import (
 )
 
 // Community data (04 §6.3): RimSort's sorting rules and Steam Workshop database and
-// the "Use This Instead" replacements. Downloaded only by archo data update; stored in
+// the "Use This Instead" replacements. Downloaded manually or by automatic maintenance; stored in
 // <home>/cache with a sidecar recording where and when each came from.
 
 // Dataset is one community data file.
@@ -46,13 +47,15 @@ func (a *App) DataSource(d Dataset) string {
 
 // DataInfo is a dataset's sidecar (<file>.source.json).
 type DataInfo struct {
-	Key     string    `json:"key"`
-	Source  string    `json:"source"`
-	ETag    string    `json:"etag,omitempty"`
-	Version string    `json:"version,omitempty"` // the dataset's own timestamp or version
-	Fetched time.Time `json:"fetched"`
-	Entries int       `json:"entries"`
-	Bytes   int64     `json:"bytes"`
+	Key      string    `json:"key"`
+	Source   string    `json:"source"`
+	ETag     string    `json:"etag,omitempty"`
+	Modified string    `json:"modified,omitempty"`
+	Checked  time.Time `json:"checked"`
+	Version  string    `json:"version,omitempty"` // the dataset's own timestamp or version
+	Fetched  time.Time `json:"fetched"`
+	Entries  int       `json:"entries"`
+	Bytes    int64     `json:"bytes"`
 }
 
 func (a *App) dataPath(d Dataset) string { return filepath.Join(a.Home, "cache", d.File) }
@@ -90,6 +93,11 @@ func (a *App) UpdateData(keys []string, dryRun bool) ([]*DataUpdate, error) {
 
 // UpdateDataProgress reports each source without changing the all-or-nothing update.
 func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key string, done int)) ([]*DataUpdate, error) {
+	unlock := accounts.Lock(filepath.Join(a.Home, "cache", "community-data"))
+	defer unlock()
+	if err := a.subscriptionContext().Err(); err != nil {
+		return nil, err
+	}
 	want := func(k string) bool {
 		if len(keys) == 0 {
 			return true
@@ -106,13 +114,13 @@ func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key s
 	}
 	status := a.DataStatus()
 	var res []*DataUpdate
-	type staged struct{ tmp, dst string }
-	var ready []staged
+	var ready []stagedDataFile
 	cleanup := func() {
 		for _, s := range ready {
 			os.Remove(s.tmp)
 		}
 	}
+	defer cleanup()
 	failed := false
 	for _, d := range Datasets {
 		if !want(d.Key) {
@@ -121,7 +129,7 @@ func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key s
 		if progress != nil {
 			progress(d.Key, len(res))
 		}
-		u := &DataUpdate{Dataset: d, Info: &DataInfo{Key: d.Key, Source: a.DataSource(d), Fetched: a.Now().UTC()}}
+		u := &DataUpdate{Dataset: d, Info: &DataInfo{Key: d.Key, Source: a.DataSource(d), Fetched: a.Now().UTC(), Checked: a.Now().UTC()}}
 		res = append(res, u)
 		if dryRun {
 			continue
@@ -133,42 +141,83 @@ func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key s
 				etag = prev.ETag
 			}
 		}
-		tmp, err := a.fetchData(d, u, etag)
+		modified := ""
+		if prev != nil && prev.Source == u.Info.Source && etag != "" {
+			modified = prev.Modified
+		}
+		if prev != nil && prev.Source == u.Info.Source && etag == "" {
+			if _, err := os.Stat(a.dataPath(d)); err == nil {
+				modified = prev.Modified
+			}
+		}
+		tmp, err := a.fetchData(d, u, etag, modified)
 		if err != nil {
 			u.Err, failed = err, true
 			continue
 		}
 		if u.Same {
-			u.Info = prev
+			if prev == nil || (etag == "" && modified == "") {
+				u.Err, failed = errors.New("unexpected not-modified response"), true
+				continue
+			}
+			copy := *prev
+			copy.Checked = a.Now().UTC()
+			u.Info = &copy
 			continue
 		}
-		ready = append(ready, staged{tmp, a.dataPath(d)})
+		ready = append(ready, stagedDataFile{tmp, a.dataPath(d)})
 	}
 	if failed {
-		cleanup()
 		return res, errors.New("community data not updated: a download failed or was invalid; the stored files are unchanged")
 	}
-	for i, s := range ready {
-		if err := os.Rename(s.tmp, s.dst); err != nil {
-			cleanup()
-			return res, err
+	if err := a.subscriptionContext().Err(); err != nil {
+		return res, err
+	}
+	if dryRun {
+		return res, nil
+	}
+	stage := func(dst string, b []byte) error {
+		file, err := stageDataFile(dst, b)
+		if err == nil {
+			ready = append(ready, file)
 		}
-		ready[i].tmp = ""
+		return err
 	}
 	for _, u := range res {
-		if u.Err == nil && !u.Same && !dryRun {
-			b, _ := json.MarshalIndent(u.Info, "", "  ")
-			os.WriteFile(a.dataPath(u.Dataset)+".source.json", b, 0o644)
-			if u.Dataset.Key == "steamdb" {
-				if err := a.buildSteamIndex(); err != nil {
+		b, err := json.MarshalIndent(u.Info, "", "  ")
+		if err != nil {
+			return res, err
+		}
+		if err := stage(a.dataPath(u.Dataset)+".source.json", b); err != nil {
+			return res, err
+		}
+		if u.Dataset.Key == "steamdb" && !u.Same {
+			for _, file := range ready {
+				if file.dst != a.dataPath(u.Dataset) {
+					continue
+				}
+				index, err := steamIndexData(file.tmp)
+				if err != nil {
 					return res, fmt.Errorf("steamDB index: %v", err)
 				}
+				if err := stage(a.steamIndexPath(), index); err != nil {
+					return res, err
+				}
+				break
 			}
 		}
 	}
-	if !dryRun {
-		a.dataIdx = nil
+	if err := a.subscriptionContext().Err(); err != nil {
+		return res, err
 	}
+	err := replaceDataFiles(ready, os.Rename, func() error {
+		_, err := a.Store.DB.Exec(`INSERT INTO meta(key,value) VALUES('community:generation','1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1`)
+		return err
+	})
+	if err != nil {
+		return res, err
+	}
+	a.dataIdx = nil
 	return res, nil
 }
 
@@ -179,17 +228,20 @@ func (a *App) DropCommunityData() {
 }
 
 // fetchData downloads (or copies a local path) to a temp file and validates it.
-func (a *App) fetchData(d Dataset, u *DataUpdate, etag string) (string, error) {
+func (a *App) fetchData(d Dataset, u *DataUpdate, etag string, modified ...string) (string, error) {
 	src := u.Info.Source
 	var body io.ReadCloser
 	if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
-		req, err := http.NewRequest("GET", src, nil)
+		req, err := http.NewRequestWithContext(a.subscriptionContext(), "GET", src, nil)
 		if err != nil {
 			return "", err
 		}
 		req.Header.Set("User-Agent", UserAgent)
 		if etag != "" {
 			req.Header.Set("If-None-Match", etag)
+		}
+		if len(modified) > 0 && modified[0] != "" {
+			req.Header.Set("If-Modified-Since", modified[0])
 		}
 		client := *a.httpClient()
 		client.Timeout = 10 * time.Minute // steamDB is ~50 MB
@@ -207,6 +259,7 @@ func (a *App) fetchData(d Dataset, u *DataUpdate, etag string) (string, error) {
 			return "", fmt.Errorf("%s answered %s", src, resp.Status)
 		}
 		u.Info.ETag = resp.Header.Get("ETag")
+		u.Info.Modified = resp.Header.Get("Last-Modified")
 		body = resp.Body
 	} else {
 		f, err := os.Open(src)
@@ -220,8 +273,8 @@ func (a *App) fetchData(d Dataset, u *DataUpdate, etag string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	n, err := io.Copy(tmp, io.LimitReader(body, 512<<20))
-	tmp.Close()
+	n, copyErr := io.Copy(tmp, io.LimitReader(body, 512<<20))
+	err = errors.Join(copyErr, tmp.Close())
 	if err != nil {
 		os.Remove(tmp.Name())
 		return "", err
@@ -313,9 +366,11 @@ type dataIndex struct {
 
 // dataIndex loads the replacements and a packageId index of steamDB once per process.
 func (a *App) dataIndexes() *dataIndex {
-	if a.dataIdx != nil {
+	key := a.Store.Meta("community:generation")
+	if a.dataIdx != nil && a.dataKey == key {
 		return a.dataIdx
 	}
+	a.dataKey = key
 	ix := &dataIndex{byOldWS: map[string]*Replacement{}, byOldPkg: map[string]*Replacement{}, byPkg: map[string]WorkshopEntry{}}
 	if b, err := readDataFile(a.dataPath(Datasets[2])); err == nil {
 		var v struct {
@@ -359,10 +414,10 @@ func (a *App) dataIndexes() *dataIndex {
 // when it is downloaded so nothing parses the 50 MB file afterwards.
 func (a *App) steamIndexPath() string { return filepath.Join(a.Home, "cache", "steamDB.index.json") }
 
-func (a *App) buildSteamIndex() error {
-	b, err := readDataFile(a.dataPath(Datasets[1]))
+func steamIndexData(path string) ([]byte, error) {
+	b, err := readDataFile(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var v struct {
 		Database map[string]struct {
@@ -372,7 +427,7 @@ func (a *App) buildSteamIndex() error {
 		} `json:"database"`
 	}
 	if err := json.Unmarshal(b, &v); err != nil {
-		return err
+		return nil, err
 	}
 	m := map[string][2]string{}
 	for id, e := range v.Database {
@@ -384,15 +439,7 @@ func (a *App) buildSteamIndex() error {
 			m[p] = [2]string{id, e.Name}
 		}
 	}
-	out, err := json.Marshal(m)
-	if err != nil {
-		return err
-	}
-	tmp := a.steamIndexPath() + ".tmp"
-	if err := os.WriteFile(tmp, out, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, a.steamIndexPath())
+	return json.Marshal(m)
 }
 
 // ReplacementFor returns the "use this instead" suggestion for an installed mod.

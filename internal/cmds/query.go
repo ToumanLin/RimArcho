@@ -208,6 +208,7 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	loadoutStatus(c, root, d)
+	automaticStatus(c, root)
 	// Status never parses the log: it uses the stored report (logs are a problems command).
 	c.App.LogCacheOnly = true
 	ps, err := c.App.Problems(false, nil)

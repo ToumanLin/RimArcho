@@ -51,6 +51,14 @@ func (m *model) visibleDetail() []dline {
 
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case automaticDoneMsg:
+		if msg.kind == "data" {
+			m.app.DropCommunityData()
+		}
+		if notice := view.AutomaticNotice(msg.before, msg.after); notice != "" {
+			m.say(sayOK, notice)
+		}
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		for k := range m.cols {

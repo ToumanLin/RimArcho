@@ -28,6 +28,14 @@ func depsCmd(c *Ctx, _ *Args) (*render.Doc, error) {
 		s.KV("version", i.Version)
 		s.KV("path", i.Path)
 		s.KV("source", i.Source)
+		if u := c.App.ToolUpdate(i.Name); !u.Checked.IsZero() {
+			s.KV("last-checked", c.App.FormatTime(u.Checked))
+			s.KV("latest", u.Latest)
+			s.KV("update-available", fmt.Sprint(u.Pending))
+			if !u.Compatible && u.Pending {
+				s.KV("update", "new version not yet supported by RimArcho")
+			}
+		}
 		if i.Err != "" {
 			s.KV("error", i.Err)
 		}

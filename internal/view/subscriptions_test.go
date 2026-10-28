@@ -178,7 +178,11 @@ func TestSubscriptionSourceStates(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if p.Sources[1].Account != "mod downloads available, not logged in" || p.Sources[3].Account != "unavailable, not logged in" {
+		ll := ""
+		if enabled {
+			ll = "unavailable, not logged in"
+		}
+		if p.Sources[1].Account != "mod downloads available, not logged in" || p.Sources[3].Account != ll {
 			t.Fatalf("source account states: %+v", p.Sources)
 		}
 		for _, s := range p.Sources {

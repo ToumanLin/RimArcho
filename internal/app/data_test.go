@@ -22,6 +22,57 @@ func gz(s string) []byte {
 	return b.Bytes()
 }
 
+func TestCommunityDataIndexFailureKeepsWholeSet(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	payloads := map[string]string{
+		"rules":        `{"timestamp":1,"rules":{}}`,
+		"steamdb":      `{"version":1,"database":{"42":{"packageId":"tester.old","name":"Old"}}}`,
+		"replacements": `{"version":"one","rules":[]}`,
+	}
+	for _, d := range app.Datasets {
+		path := filepath.Join(e.Root, "sources", d.File)
+		e.WriteFile(path, payloads[d.Key])
+		e.MustRun("config", "set", "data."+d.Key+".url", path)
+	}
+	e.MustRun("data", "update")
+	cache := filepath.Join(e.Home, "cache")
+	previous := map[string]string{}
+	files, err := os.ReadDir(cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if !f.IsDir() {
+			b, err := os.ReadFile(filepath.Join(cache, f.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			previous[f.Name()] = string(b)
+		}
+	}
+	generation := e.App.Store.Meta("community:generation")
+	// The outer shape passes validation, but building the compact index fails.
+	e.WriteFile(filepath.Join(e.Root, "sources", app.Datasets[0].File), `{"timestamp":2,"rules":{"tester.new":{}}}`)
+	e.WriteFile(filepath.Join(e.Root, "sources", app.Datasets[1].File), `{"version":2,"database":{"42":"invalid entry"}}`)
+	if _, err := e.App.UpdateData(nil, false); err == nil || !strings.Contains(err.Error(), "steamDB index") {
+		t.Fatal(err)
+	}
+	for name, want := range previous {
+		b, err := os.ReadFile(filepath.Join(cache, name))
+		if err != nil || string(b) != want {
+			t.Fatalf("%s changed on index failure: %s %v", name, b, err)
+		}
+	}
+	if e.App.Store.Meta("community:generation") != generation {
+		t.Fatal("failed update published a new generation")
+	}
+	files, err = os.ReadDir(cache)
+	if err != nil || len(files) != len(previous) {
+		t.Fatal("staging files left", files, err)
+	}
+}
+
 func TestCommunityDataEncoding(t *testing.T) {
 	t.Parallel()
 	const payload = `{"version":"test","rules":[{"oldPackageId":"tester.a","newPackageId":"tester.a2","newName":"A Continued"}]}`

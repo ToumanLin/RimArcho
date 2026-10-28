@@ -53,6 +53,25 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   pack-build version warnings; CLI/MCP help and output use ignore/restore consistently.
   CLI: `problems --include-muted`, `problems mute-version|unmute-version <mod>…
   [--game-version X.Y]`; MCP: `list_problems include_muted`, `mute_version_warnings`.
+- While the window or TUI is open, one background scheduler checks SteamCMD, Git and
+  download-page mods, managed tools, LoversLab sessions and community data. Checks remember
+  their last attempt across restarts. Settings has one switch and interval control; mods
+  and data default to daily, tools weekly. Mod updates remain the player's choice, and
+  any registered game running blocks installation. New updates appear in subscriptions
+  and Settings with quiet notices; CLI/MCP status and data output use one compact summary
+  of pending updates or the latest check time. Settings keeps only the switch, interval
+  and a note under automatic checks; dates appear with their subjects. Results say what
+  has updates, intervals use daily/weekly wording, and Chinese switches show 开/关.
+  Unconfigured LoversLab accounts have no status text. Tool rows display new versions.
+- LoversLab sessions refresh through a signed-in request, saving renewed cookies in the
+  existing encrypted session. Settings no longer waits for verification. If the site
+  requires login or the session will expire soon, Settings and a notice say so ahead of
+  downloads. Managed tool updates refuse tools in use; unsupported todds releases are
+  shown without offering an incompatible install. Bundled fonts have no separate update.
+- Community data refreshes automatically using ETag and Last-Modified. Unchanged responses
+  advance the check time; failed downloads retain the previous data without a notice.
+  Data, source records and the compact index are staged together; replacement or database
+  failures restore the previous set. This does not cover process crashes or power loss.
 
 - Launching from the window with a required mod missing or disabled now asks once ("launch
   anyway" / cancel) and lists what is missing: the game would not load the mods that need

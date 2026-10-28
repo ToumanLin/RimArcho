@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -105,6 +106,11 @@ func (a *App) InstallTodds() (string, error) {
 
 // InstallToddsProgress reports the download to the task record (06 §2.16).
 func (a *App) InstallToddsProgress(progress func(done, total int64)) (string, error) {
+	unlock := accounts.Lock(a.ToddsDir())
+	defer unlock()
+	if err := toolIdle("todds"); err != nil {
+		return "", err
+	}
 	dir := a.ToddsDir()
 	c := a.httpClient()
 	if c.Timeout != 0 && c.Timeout < 2*time.Minute {
@@ -489,6 +495,10 @@ var ErrGameRuns = errors.New("a game is running")
 // (a lone DDS would shadow a newer PNG elsewhere), and RimArcho's DDS whose PNG is gone are
 // deleted. The mod's snapshot is kept to tell when an update makes its DDS stale.
 func (a *App) OptimizeTextures(run TextureRun) (*TextureReport, error) {
+	if !run.DryRun {
+		unlock := accounts.Lock(a.ToddsDir())
+		defer unlock()
+	}
 	if g, _ := a.RunningGame(); g != nil && !run.DryRun {
 		return nil, fmt.Errorf("%w: %s; close it first (it may be reading the textures)", ErrGameRuns, g.Describe(nil))
 	}
