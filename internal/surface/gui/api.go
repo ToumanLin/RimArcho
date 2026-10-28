@@ -1406,7 +1406,7 @@ func (s *API) startAnalyze() bool {
 	go func() {
 		defer s.needsJobs.Done()
 		progress := func(l string) {
-			l = strings.TrimPrefix(l, "progress: ")
+			l = view.AnalyzeProgress(strings.TrimPrefix(l, "progress: "))
 			s.tasks.Update(task, func(t *app.Task) { t.Phase = l })
 			s.send("analyze", map[string]any{"line": l})
 		}
