@@ -10,6 +10,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/logs"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -182,7 +183,18 @@ func TestLiveLogMonitor(t *testing.T) {
 	if _, err := lv.Poll(e.App); err != nil {
 		t.Fatal(err)
 	}
-	cs := lv.Clusters()
+	// The Monitor pairing message can also be an informational cluster when a parent
+	// directory contains "errors". This test counts actual errors, independent of TMP.
+	problemClusters := func() []*app.LiveCluster {
+		var out []*app.LiveCluster
+		for _, c := range lv.Clusters() {
+			if !logs.Informational(c.Class) {
+				out = append(out, c)
+			}
+		}
+		return out
+	}
+	cs := problemClusters()
 	if len(cs) != 1 || cs[0].Level != "ERROR" || cs[0].At.Format("15:04:05") != "14:05:03" {
 		t.Fatalf("clusters %d", len(cs))
 	}
@@ -190,7 +202,7 @@ func TestLiveLogMonitor(t *testing.T) {
 	if _, err := lv.Poll(e.App); err != nil {
 		t.Fatal(err)
 	}
-	cs = lv.Clusters()
+	cs = problemClusters()
 	if len(cs) != 2 || !cs[1].OnlyCompanion || cs[1].Count != 50 || cs[1].Report == nil {
 		t.Fatalf("monitor-only cluster: %d clusters", len(cs))
 	}

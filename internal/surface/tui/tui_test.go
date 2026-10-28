@@ -693,7 +693,7 @@ func TestNeedsLogs(t *testing.T) {
 	for _, it := range fm.prob.items {
 		if it.group == view.GroupLastRun {
 			last++
-			if !it.counted || !strings.HasPrefix(it.text, "last run, ") {
+			if !it.counted || !strings.Contains(it.text, " — ") || len(it.keys) == 0 || it.keys[0].label != "open game log" {
 				t.Fatalf("log item %+v", it)
 			}
 		}

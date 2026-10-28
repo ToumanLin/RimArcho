@@ -49,6 +49,7 @@ const (
 	ActOpenURL         = "open-url"         // URL in the browser
 	ActProblem         = "problem"          // focused problem, Problem: p:ref
 	ActView            = "view"             // read-only command text: Argv
+	ActGameLog         = "game-log"         // GUI: Player.log and cluster; TUI: Argv
 	ActList            = "list"             // show Title and Lines
 	ActFold            = "fold"             // show / hide the item's Parts
 	ActIgnoreRule      = "ignore-rule"      // Rule (empty: nothing to ignore)
@@ -102,6 +103,8 @@ type Action struct {
 	QID     int64    `json:"question,omitempty"`
 	Answer  string   `json:"answer,omitempty"`
 	Problem string   `json:"problem,omitempty"` // p:<ref> for ignore
+	LogPath string   `json:"logPath,omitempty"`
+	Cluster string   `json:"cluster,omitempty"`
 
 	GameVersion  string `json:"gameVersion,omitempty"`
 	VersionMuted bool   `json:"versionMuted,omitempty"`
@@ -716,44 +719,23 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	}
 	sort.Slice(subjectsOrder, func(i, j int) bool { return nm(finding.Inst(subjectsOrder[i])) < nm(finding.Inst(subjectsOrder[j])) })
 	for _, id := range subjectsOrder {
-		errs, warns := 0, 0
-		for _, p := range logs[id] {
-			if p.Severity == finding.Error {
-				errs += logCount(p)
-			} else {
-				warns += logCount(p)
-			}
-		}
-		var text, why string
-		switch {
-		case id == "":
-			why = T("the log does not say which mod they come from")
-		default:
-			why = T("they most likely come from this mod; see the log and evidence before changing anything")
-		}
-		switch {
-		case id == "" && errs > 0:
-			text = Tf("last run, %d errors could not be tied to a mod", errs)
-		case id == "":
-			text = Tf("last run, %d warnings could not be tied to a mod", warns)
-		case errs > 0:
-			text = Tf("last run, %s reported %d errors", nm(finding.Inst(id)), errs)
-		default:
-			text = Tf("last run, %s reported %d warnings", nm(finding.Inst(id)), warns)
-		}
 		argv := []string{"problems", "--code", "log"}
 		var ids []string
+		name := T("unknown source")
 		if id != "" {
 			argv = append(argv, "--subject", ix.Ref(id))
 			ids = []string{id}
+			name = nm(finding.Inst(id))
 		}
-		add(Need{Group: GroupLastRun, Text: text, Actions: []Action{viewAction(T("see the log and evidence"), argv...)}, Counted: true, Mods: ids, Status: StatusLog,
-			Why: why, Evidence: logEvidence(logs[id], logWhen)})
+		n := lastRunNeed(name, logs[id], logWhen, id != "")
+		n.Mods = ids
+		n.Actions[0].Argv = argv
+		add(n)
 	}
 	for _, r := range ps.Logs {
 		if r.Stale() {
 			add(Need{Group: GroupLastRun, Text: Tf("earlier log  %s  %s", ShortDate(r.ModTime), r.MM), Dim: true,
-				Actions: []Action{viewAction(T("see it"), "problems", "--code", "log", "--all")}})
+				Actions: []Action{{Kind: ActGameLog, Key: "enter", Label: T("open game log"), LogPath: r.Path, Argv: []string{"log", "--file", r.Path}}}})
 		}
 	}
 	// Needs your answer: identity questions and an external change of the list.
