@@ -538,7 +538,8 @@ func (a *App) editStaged(op string, staged *string, f func(st *LoadoutState, l l
 		if ws.OriginKind == "checkout" {
 			ws.OriginKind = "edited"
 		}
-		if err := a.Store.EditWorkspace(&ws, before.Encode(), op, staged); err != nil {
+		// History keeps stored identities; before is localized to the current game.
+		if err := a.Store.EditWorkspace(&ws, st.WS.Entries, op, staged); err != nil {
 			return nil, err
 		}
 		st.WS, st.List = &ws, after
@@ -925,10 +926,10 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 	before := st.List
 	ws := *st.WS
 	ws.Entries, ws.Updated = step.Entries, a.Now().UTC()
-	if err := a.Store.RestoreStep(&ws, before.Encode(), from, to, *step); err != nil {
+	if err := a.Store.RestoreStep(&ws, st.WS.Entries, from, to, *step); err != nil {
 		return nil, "", err
 	}
-	st.WS, st.List = &ws, loadout.Decode(step.Entries)
+	st.WS, st.List = &ws, st.readList(step.Entries)
 	return &EditResult{State: st, Before: before, Changes: loadout.Diff(before, st.List, st.LineageOf)}, step.Op, nil
 }
 
@@ -1238,6 +1239,9 @@ func (a *App) Checkout(ref string) (*EditResult, int, error) {
 		return nil, 0, err
 	}
 	st := r.State
+	if r.Before.Equal(st.List) {
+		return r, n, nil
+	}
 	st.WS.OriginVersion, st.WS.OriginKind = n, "checkout"
 	if st.WS.Conflict == n {
 		st.WS.Conflict = 0

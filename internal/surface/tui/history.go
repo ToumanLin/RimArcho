@@ -115,7 +115,7 @@ func (m *model) histLabel() string {
 	case "now":
 		return ""
 	case "version":
-		return T("go back to this version (u undoes)")
+		return T("go back to this version")
 	}
 	return T("go back to here")
 }
@@ -131,10 +131,12 @@ func (m *model) histGo() tea.Cmd {
 		return nil
 	case "version":
 		// One step: the list it replaces stays in the history, u brings it back (06 §6).
-		_, _, err := m.app.Checkout(fmt.Sprintf("v%d", h.Version))
+		r, _, err := m.app.Checkout(fmt.Sprintf("v%d", h.Version))
 		m.reload()
 		if err != nil {
 			m.say(sayFail, m.humanize(err.Error()))
+		} else if r.Before.Equal(r.State.List) {
+			m.say(sayOK, T("no changes"))
 		} else {
 			m.say(sayOK, Tf("back at v%d (unsaved)", h.Version)+Tf(", %s", T("u undoes")))
 		}

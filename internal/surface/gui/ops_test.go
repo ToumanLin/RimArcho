@@ -91,7 +91,7 @@ func TestFormRoutesRunnable(t *testing.T) {
 	}
 	history := main[strings.Index(main, "async function goHistory"):]
 	history = history[:strings.Index(history, "// pollLive")]
-	if strings.Contains(history, "confirm") || !strings.Contains(history, "api.HistoryGo") || !strings.Contains(history, `h.kind === "version"`) {
+	if strings.Contains(history, "confirm") || !strings.Contains(history, "api.HistoryGo") || !strings.Contains(history, `r.undo`) {
 		t.Fatal("history checkout must run directly with undo")
 	}
 }

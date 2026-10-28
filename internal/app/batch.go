@@ -35,7 +35,7 @@ func (a *App) BeginBatch() (*Batch, error) {
 		return nil, err
 	}
 	p := st.Plan.ID
-	return &Batch{a: a, planID: p, entries: st.List.Encode(), staged: a.Store.Meta(store.StageKey(p)), lastID: a.Store.LastStepID(p, "undo"), remap: a.Store.Meta(store.CreditRemapKey)}, nil
+	return &Batch{a: a, planID: p, entries: st.WS.Entries, staged: a.Store.Meta(store.StageKey(p)), lastID: a.Store.LastStepID(p, "undo"), remap: a.Store.Meta(store.CreditRemapKey)}, nil
 }
 
 // Commit ends the session: its undo steps become one, which restores the list as it was

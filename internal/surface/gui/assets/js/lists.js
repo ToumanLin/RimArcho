@@ -270,7 +270,7 @@ function historyPanel() {
     }
     const r = el("div", "h " + h.kind, h.text);
     if (h.kind !== "now") {
-      r.title = h.kind === "version" ? T("go back to this version (u undoes)") : T("go back to here");
+      r.title = h.kind === "version" ? T("go back to this version") : T("go back to here");
       r.onclick = (e) => { e.stopPropagation(); onHistory(h); };
     }
     p.append(r);

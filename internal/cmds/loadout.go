@@ -558,6 +558,10 @@ func loadoutCheckout(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	d := editDoc(c, r)
+	if r.Before.Equal(r.State.List) {
+		d.Nodes[0].Children = append([]*render.Node{{Line: fmt.Sprintf("workspace already matches v%d; no changes", n)}}, d.Nodes[0].Children...)
+		return d, nil
+	}
 	d.Nodes[0].Children = append([]*render.Node{{Line: fmt.Sprintf("checked out v%d into the workspace (archo save saves it to the game)", n)}}, d.Nodes[0].Children...)
 	return d, nil
 }

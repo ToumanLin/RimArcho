@@ -333,7 +333,7 @@ var zhText = map[string]string{
 	"back to an older version":               "回到旧版",
 	"import %s":                              "导入 %s",
 	"go back to here":                        "回到这里",
-	"go back to this version (u undoes)":     "回到这一版（可撤销）",
+	"go back to this version":                "回到这一版",
 	"switch version":                         "切换版本",
 	"this run, %d× %s":                       "本次运行：%d× %s",
 	"this run, %s: %d× %s":                   "本次运行，%s：%d× %s",

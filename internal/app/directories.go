@@ -483,12 +483,12 @@ func (a *App) managedRootReady(id, path string) error {
 		if id == "lock" && (s.Label == LockLabel || a.IsLockSource(s)) || id == "monitor" && s.Label == MonitorLabel || id == SubscribedLabel && s.Label == SubscribedLabel {
 			used = true
 			if s.Status == source.StatusRebindPending || ((s.Label == LockLabel || s.Label == MonitorLabel || s.Label == SubscribedLabel) && env.PathKey(s.Root) != env.PathKey(path)) {
-				return fmt.Errorf("the %s directory has an unresolved location change; use SetDirectory before writing to it", id)
+				return fmt.Errorf("the %s directory has an unresolved location change; locate it in settings before writing to it", id)
 			}
 		}
 	}
 	if used && !dirExists(path) {
-		return fmt.Errorf("the %s directory %s is unavailable; choose its current location with SetDirectory before writing to it", id, path)
+		return fmt.Errorf("the %s directory %s is unavailable; enter its new location in settings, or reconnect the drive before writing to it", id, path)
 	}
 	return nil
 }

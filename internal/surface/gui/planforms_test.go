@@ -195,8 +195,12 @@ func TestHistoryCheckoutUndo(t *testing.T) {
 	if version == 0 {
 		t.Fatal("no version")
 	}
-	if _, err := api.HistoryGo(0, version); err != nil {
+	result, err := api.HistoryGo(0, version)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if !result.Undo {
+		t.Fatal("changed checkout must advertise undo")
 	}
 	if names(api.Board().Cols[view.Active]) == before {
 		t.Fatal("checkout did not load version")
@@ -238,5 +242,30 @@ func TestImportCollectionForm(t *testing.T) {
 	managed, err := api.PlanManage(view.PlanOfPage(d.Page))
 	if err != nil || len(managed.Sel.Follows) != 1 {
 		t.Fatalf("default follow: %+v %v", managed, err)
+	}
+}
+
+func TestHistoryIdenticalCheckoutIsNoOp(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := *st.WS
+	depth := e.App.Store.StepCount(st.Plan.ID, "undo")
+	r, err := api.HistoryGo(0, st.Latest.N)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Undo || r.Text != view.T("no changes") {
+		t.Fatalf("no-op feedback: %+v", r)
+	}
+	after, err := e.App.Store.Workspace(st.Plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *after != before || e.App.Store.StepCount(st.Plan.ID, "undo") != depth {
+		t.Fatal("identical checkout mutated workspace/history")
 	}
 }
