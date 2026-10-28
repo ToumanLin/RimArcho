@@ -1,10 +1,14 @@
 package gui
 
-import "github.com/wailsapp/wails/v3/pkg/application"
+import (
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
+	"github.com/wailsapp/wails/v3/pkg/application"
+)
 
 // SetWindowTheme receives the resolved scheme, including changes to the OS theme
 // while the appearance setting is auto. It does not change the saved preference.
 func (s *API) SetWindowTheme(dark bool) {
+	defer perftrace.Span("SetWindowTheme")()
 	if s.windowTheme != nil {
 		s.windowTheme(dark)
 	}

@@ -273,7 +273,8 @@ async function setup() {
     if(options.profile==='true'){result.profileBrowserStart=await c.evaluate('performance.now()');await c.call('Profiler.enable');await c.call('Profiler.start');}
     if(options.timeline==='true') {
       c.on(e=>{if(e.method==='Tracing.dataCollected')browserTimeline.push(...e.params.value);if(e.method==='Tracing.tracingComplete')traceComplete?.()});
-      await c.call('Tracing.start',{categories:'devtools.timeline,disabled-by-default-devtools.timeline.stack',options:'record-as-much-as-possible'});
+      await c.call('Tracing.start',{categories:'toplevel,blink.user_timing,devtools.timeline,disabled-by-default-devtools.timeline.stack',options:'record-as-much-as-possible'});
+      result.timelineBrowserStart=await c.evaluate("performance.mark('f4-trace-sync');performance.getEntriesByName('f4-trace-sync').at(-1).startTime");
     }
     result.windowConnectedEpochMs=Date.now();
     await c.evaluate(`(${observe.toString()})()`);
