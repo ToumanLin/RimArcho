@@ -189,7 +189,11 @@ func parse(c *Command, rest []string) (*Args, error) {
 		}
 		if !hasVal {
 			if i+1 >= len(rest) {
-				return nil, &UsageError{Msg: fmt.Sprintf("--%s needs a value", name), Cmd: c}
+				msg := fmt.Sprintf("--%s needs a value", name)
+				if takesRef(f.Value) {
+					msg += " (" + commentHint + ")"
+				}
+				return nil, &UsageError{Msg: msg, Cmd: c}
 			}
 			i++
 			val = rest[i]
@@ -199,10 +203,29 @@ func parse(c *Command, rest []string) (*Args, error) {
 		}
 		a.flags[name] = append(a.flags[name], val)
 	}
+	if len(a.Pos) < c.MinArgs && takesRef(c.Args) {
+		return nil, &UsageError{Msg: "wrong number of arguments (" + commentHint + ")", Cmd: c}
+	}
 	if len(a.Pos) < c.MinArgs || (c.MaxArgs >= 0 && len(a.Pos) > c.MaxArgs) {
 		return nil, &UsageError{Msg: "wrong number of arguments", Cmd: c}
 	}
 	return a, nil
+}
+
+// commentHint explains a mod reference the shell dropped: a player who types
+// `archo enable #nyh3` in PowerShell or bash runs `archo enable` (05 §3.3). It never
+// writes "archo … #ref", which ShellSafe would rewrite.
+const commentHint = "in PowerShell and bash a word starting with # is a comment: write a mod reference as nyh3, not #nyh3"
+
+// takesRef: a usage placeholder for a mod reference (<ref>, <ref…>, <A>, <mod>…), the
+// argument a shell can drop as a comment; <p:ref>, <q:n> and the like start with a letter.
+func takesRef(usage string) bool {
+	for _, p := range []string{"<ref>", "<ref…>", "ref…]", "<A>", "<B>", "<mod>"} {
+		if strings.Contains(usage, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // Exit codes.

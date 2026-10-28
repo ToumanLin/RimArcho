@@ -116,6 +116,8 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 2 | 用法错误（未知命令、未知参数、参数个数不对，附 `usage:` 行） | stderr |
 | 3 | 引用有歧义：输出候选列表 | stdout |
 
+玩家在 PowerShell 或 bash 里照着列表手打 `archo enable #nyh3`，shell 把 `#nyh3` 当注释吃掉，程序只收到 `archo enable`（§2）。所以缺的参数是 Mod 引用时（参数不够且用法里有 `<ref>`、`<ref…>`、`<A>`、`<mod>`；`<ref>` 参数的值缺失；`textures` 没给 Mod），用法错误后面加一句 `(in PowerShell and bash a word starting with # is a comment: write a mod reference as nyh3, not #nyh3)`（`cmds.commentHint`）。引用可选的命令照没给引用执行，没有提示：`changes`、`subscribe check` 只读；`stage restore` 恢复全部暂存（可撤销），`subscribe update` 更新全部订阅。
+
 ### 3.4 示例
 
 `archo mod pkg:ceteam.combatextended`
@@ -423,3 +425,4 @@ next:
 | I9 | 游戏正在运行时调用启动工具；调用 `save_loadout` | 启动工具拒绝并说明哪个环境的游戏在运行；`save_loadout` 照常写入，提示游戏下次启动才会读到 | 通过 |
 | I10 | `plan new` / `use` / `rename` / `remove` 与 `loadout import --new` 经 CLI 和 MCP 各执行一次 | 输出逐字相同；`plan use` 不写游戏文件；不能删除最后一个方案 | 通过 |
 | I11 | 把输出里的命令（`fix:`、`next:`、`… N more (…)`、错误里的提示）原样粘进 cmd、PowerShell、bash | 参数一个不少，引用能解析（`TestPrintedCommandsSurviveShells`：PowerShell 5.1 / 7 的解析器逐条读，没有注释、词与预期相同，再逐条执行；规则见 `TestShellSafe`） | 通过（合成夹具）；真实 VM 待验证 |
+| I12 | 在 PowerShell 或 bash 手打带 `#` 的引用，引用被当成注释 | 缺的是 Mod 引用时用法错误说明原因（`TestMissingRefNamesTheComment`；宿主上 PowerShell 5.1 / 7 跑过） | 通过（合成夹具）；真实 VM 待验证 |

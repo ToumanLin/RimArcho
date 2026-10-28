@@ -14,6 +14,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   every command already accepted it. Lists and other text keep `#nyh3`; `L#…` and MCP tool
   arguments are unchanged. In the TUI's technical pages, `enter` on such a line still
   opens the mod.
+- A player who types `archo enable #nyh3` in PowerShell or bash runs `archo enable`
+  without its argument. When the missing argument is a mod reference, the usage error now
+  says why: a word starting with `#` is a comment there, so write `nyh3`.
 - The sidebar lists Mod library below Packs (lists, packs, Mod library). Page keys follow
   the sidebar: `shift+4` lists, `shift+5` packs, `shift+6` Mod library, in the window and
   the TUI.

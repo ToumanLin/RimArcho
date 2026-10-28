@@ -14,6 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/ids"
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 // Printed commands survive a paste into a shell (05 §3.1 rule 11). Every archo command
@@ -118,6 +119,32 @@ func TestPrintedCommandsSurviveShells(t *testing.T) {
 		}
 		t.Logf("%d printed commands, %d with references, %d run", len(all), len(withRefs), ran)
 	})
+}
+
+// A player who types `archo enable #nyh3` in PowerShell or bash runs `archo enable`: the
+// usage error says why when the missing argument is a mod reference (05 §3.3).
+func TestMissingRefNamesTheComment(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	const hint = "a word starting with # is a comment: write a mod reference as nyh3, not #nyh3"
+	for _, c := range []struct {
+		argv []string
+		hint bool
+	}{
+		{[]string{"enable"}, true},                    // archo enable #nyh3
+		{[]string{"why", "nyh3"}, true},               // archo why nyh3 #i4uc
+		{[]string{"problems", "--subject"}, true},     // archo problems --subject #5sed --all
+		{[]string{"textures", "clean"}, true},         // archo textures clean #nyh3
+		{[]string{"problems", "show"}, false},         // p:ref has no leading #
+		{[]string{"problems", "--code"}, false},       // not a reference
+		{[]string{"plan", "use"}, false},              // a name
+		{[]string{"enable", "a", "b", "--at"}, false}, // a number
+	} {
+		out, code := e.Run(c.argv...)
+		if code != cmds.ExitUsage || strings.Contains(out, hint) != c.hint {
+			t.Errorf("archo %s: exit %d, hint %v:\n%s", strings.Join(c.argv, " "), code, c.hint, out)
+		}
+	}
 }
 
 // shellWords splits a command as cmd, PowerShell and bash do for these commands: at
