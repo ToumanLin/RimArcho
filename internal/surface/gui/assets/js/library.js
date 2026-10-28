@@ -632,7 +632,7 @@ async function run(code, copies) {
   if (code === "subscription-remove") return pop.libraryConfirm(code, refs, o.label, done);
   let p;
   try { p = await api.LibraryPreview(code, refs); } catch (e) { return say("fail", errText(e)); }
-  pop.confirm(p.title, p.lines, o.label, p.apply ? () => done(api.LibraryDo(code, refs)) : null);
+  pop.confirm(p.title, p.lines, o.label, p.apply ? () => done(api.LibraryDo(code, pop.previewOk(p, refs))) : null);
 }
 
 // ---- keys (06 §3.5): the plan editor's table; the arrows only move ----

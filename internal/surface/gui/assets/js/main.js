@@ -967,10 +967,12 @@ async function rowOp(code, only = null) {
       return;
     }
   }
-  const run = () => edited(() => api.RunOp(code, ids), code === "remove", ids);
+  let go = ids;
+  const run = () => edited(() => api.RunOp(code, go), code === "remove", go);
   if (!o.confirm) return run();
   let p;
   try { p = await api.OpPreview(code, ids); } catch (e) { return say("fail", errText(e)); }
+  go = pop.previewOk(p, ids);
   pop.confirm(p.title, p.lines, o.label, p.apply ? run : null);
 }
 

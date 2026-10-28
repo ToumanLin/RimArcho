@@ -719,14 +719,15 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		p.Apply = code == 0 && !strings.Contains(out, "convert: 0 PNGs") && !strings.Contains(out, "would delete 0 DDS")
 		return p, nil
 	}
-	for _, ref := range refs {
+	var ok []int
+	for k, ref := range refs {
 		if kind == LibPinUpdate {
 			r, err := a.UpdateToWorkshop(ref, true)
 			if err != nil {
-				p.Apply = false
-				p.Lines = append(p.Lines, Humanize(st, err.Error()))
+				p.Lines = append(p.Lines, previewFailure(st, ref, err.Error()))
 				continue
 			}
+			ok = append(ok, k)
 			p.Lines = append(p.Lines,
 				T("Changes made in this copy will be overwritten and lost. The old folder goes to the recycle bin."),
 				Tf("copy from: %s", r.From),
@@ -742,11 +743,17 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			if m, err := st.Ix.ResolveOne(ref); err == nil {
 				if r := a.SubscriptionOf(m); r != nil && r.Kind == "page" {
 					p.Lines = append(p.Lines, m.DisplayName()+": "+T("page items skipped; choose downloaded files to update them"))
+					ok = append(ok, k)
 					continue
 				}
 			}
 		}
 		out, code := cmds.Execute(a, append(libArgv(kind, []string{ref}), "--dry-run"))
+		if code != 0 {
+			p.Lines = append(p.Lines, previewFailure(st, ref, out))
+			continue
+		}
+		ok = append(ok, k)
 		for _, l := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
 			if strings.HasPrefix(l, "next:") {
 				break
@@ -762,9 +769,6 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			}
 			p.Lines = append(p.Lines, l)
 		}
-		if code != 0 {
-			p.Apply = false
-		}
 		if kind == LibResub {
 			if m, err := st.Ix.ResolveOne(ref); err == nil && !m.Residue {
 				p.Lines = append(p.Lines, T("RimArcho moves the folder to the recycle bin before Steam re-downloads it; local edits are lost"))
@@ -774,7 +778,36 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			p.Lines = append(p.Lines, w)
 		}
 	}
+	// One copy that cannot go does not hold back the others (VM run B2: a moved folder
+	// blocked eleven deletions); the confirm says which are left out.
+	switch {
+	case len(ok) == 0:
+		p.Apply = false
+	case len(ok) < len(refs):
+		p.Ok = ok
+		p.Lines = append(p.Lines, Tf("%d of %d cannot be done now and are left out", len(refs)-len(ok), len(refs)))
+	}
 	return p, nil
+}
+
+// previewFailure is a copy's dry run that failed, as one line with its name; a folder that
+// is not there any more says so instead of the system's message.
+func previewFailure(st *app.LoadoutState, ref, out string) string {
+	name := ref
+	if m, err := st.Ix.ResolveOne(ref); err == nil {
+		name = m.DisplayName()
+	}
+	var why []string
+	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+		if l = strings.TrimSpace(l); l != "" && !strings.HasPrefix(l, "next:") {
+			why = append(why, Humanize(st, l))
+		}
+	}
+	msg := strings.Join(why, " ")
+	if low := strings.ToLower(msg); strings.Contains(low, "cannot find the") || strings.Contains(low, "no such file") || strings.Contains(low, "no longer on disk") {
+		msg = T("its folder is not there any more; rescan")
+	}
+	return Tf("✗ %s: cannot be done now: %s", name, msg)
 }
 
 // usedWarning: deleting or unsubscribing a copy the lists use only warns; the player's word

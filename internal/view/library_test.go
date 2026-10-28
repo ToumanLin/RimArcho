@@ -172,6 +172,13 @@ func TestLibraryDo(t *testing.T) {
 	if err != nil || pv.Apply {
 		t.Fatalf("trash of a subscribed mod: %+v %v", pv, err)
 	}
+	// with others it is left out, by name, and the others go ahead (VM run B2)
+	idleRef := libRow(t, libPage(t, e, ""), "Idle").Insts[0].Ref
+	pv, err = view.LibPreview(e.App, view.LibTrash, []string{idleRef, cp.Ref})
+	text := strings.Join(pv.Lines, "\n")
+	if err != nil || !pv.Apply || !slices.Equal(pv.Ok, []int{1}) || !strings.Contains(text, "✗ Idle: cannot be done now: ") || !strings.Contains(text, "1 of 2 cannot be done now and are left out") {
+		t.Fatalf("one refused of two: %+v %v", pv, err)
+	}
 }
 
 // 06 §3.7 in the library: typed key:value words filter, tag: matches tag words, and the

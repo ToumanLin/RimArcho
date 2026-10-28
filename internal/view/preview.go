@@ -41,6 +41,9 @@ type Preview struct {
 	Title string   `json:"title"`
 	Lines []string `json:"lines"` // the dry run's text, #refs replaced by names
 	Apply bool     `json:"apply"` // there is something to do and nothing blocks it
+	// Ok, when set, are the positions (in the refs asked about) of the items that can go
+	// ahead; the others cannot now and are left out. Unset: all of them.
+	Ok []int `json:"ok,omitempty"`
 }
 
 // Outcome is what a whole-list action did, for the status line.

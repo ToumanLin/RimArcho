@@ -168,6 +168,12 @@ export function position(obj, from, done = null) {
 }
 
 // ---- a confirmation, for what u cannot undo (06 §6); text() shows lines with none ----
+// previewOk: the items of list (refs or ids, in the order the preview was asked for) that
+// can go ahead; a preview leaves out the ones that cannot now (p.ok unset: all of them).
+export function previewOk(p, list) {
+  return Array.isArray(p && p.ok) ? list.filter((_, i) => p.ok.includes(i)) : list;
+}
+
 export function confirm(title, lines, goLabel, go, envWrite = "apply") {
   const pre = el("pre", "lines");
   pathContent(pre, (lines || []).join("\n"));
@@ -187,12 +193,12 @@ export async function libraryConfirm(kind, refs, label, done) {
     choice.append(fast, document.createTextNode(" " + T("quick delete (cannot be undone)")));
     body.append(choice, el("p", "muted", T("Quick delete skips the recycle bin. Deleted files cannot be restored.")));
   }
-  let ready = false;
+  let ready = false, go = refs;
   const apply = () => {
     if (!ready) return;
     if (fast.checked) {
-      confirm(T("permanently delete these mods?"), [T("Quick delete skips the recycle bin. Deleted files cannot be restored."), ...refs], T("permanently delete"), () => done(api.LibraryDo("subscription-remove-fast", refs)));
-    } else done(api.LibraryDo(kind, refs));
+      confirm(T("permanently delete these mods?"), [T("Quick delete skips the recycle bin. Deleted files cannot be restored."), ...go], T("permanently delete"), () => done(api.LibraryDo("subscription-remove-fast", go)));
+    } else done(api.LibraryDo(kind, go));
   };
   panel(label, body, label, apply, "", "library");
   const dialog = S.popup;
@@ -203,6 +209,7 @@ export async function libraryConfirm(kind, refs, label, done) {
     if (S.popup !== dialog) return;
     pathContent(lines, (preview.lines || []).join("\n"));
     ready = !!preview.apply;
+    go = previewOk(preview, refs);
     yes.disabled = !ready;
   } catch (e) {
     if (S.popup === dialog) lines.textContent = errText(e);
