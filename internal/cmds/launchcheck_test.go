@@ -39,7 +39,7 @@ func TestLaunchChecksGrouped(t *testing.T) {
 		"before you play: 2 problems that often cause errors",
 		"error dep.inactive  2 dependencies of 2 mods are installed but not enabled: " + ref(e, "Alpha") + " Alpha, " + ref(e, "Beta") + " Beta",
 		"why: a mod without its dependency fails in parts",
-		"fix: archo enable " + lib,
+		"fix: archo enable " + strings.TrimPrefix(lib, "#"), // commands write refs without "#" (05 §3.1 rule 11)
 		"checks: declarations only",
 	} {
 		if !strings.Contains(out, want) {

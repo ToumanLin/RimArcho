@@ -599,7 +599,8 @@ func EditArgv(in EditIn) []string {
 	case "unstage":
 		return append([]string{"stage", "drop"}, in.Refs...)
 	case "restore":
-		b := argv(append([]string{"stage", "restore"}, in.Refs...)...)
+		// no refs: every staged mod, as the tool says (the CLI needs --all for that)
+		b := argv(append([]string{"stage", "restore"}, in.Refs...)...).flag("all", len(in.Refs) == 0)
 		if in.At > 0 {
 			b.str("at", strconv.Itoa(in.At))
 		}

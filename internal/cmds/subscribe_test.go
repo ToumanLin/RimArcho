@@ -55,7 +55,7 @@ func TestSubscribeCommands(t *testing.T) {
 	if out := e.MustRun("subscribe", "check"); !strings.Contains(out, "up to date") {
 		t.Fatal(out)
 	}
-	if out := e.MustRun("subscribe", "update", "--dry-run"); !strings.Contains(out, "dry run, nothing changed") || !strings.Contains(out, g.First) {
+	if out := e.MustRun("subscribe", "update", "--all", "--dry-run"); !strings.Contains(out, "dry run, nothing changed") || !strings.Contains(out, g.First) {
 		t.Fatal(out)
 	}
 	if out := e.MustRun("subscribe", "remove", ref, "--dry-run"); !strings.Contains(out, "dry run, nothing changed") {

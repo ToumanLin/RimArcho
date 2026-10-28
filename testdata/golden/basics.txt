@@ -57,7 +57,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     stage list                                staged mods, with the place each one came from
     stage add <ref…>                          stage mods (enabled ones leave the Loadout and remember their place)
     stage drop <ref…>                         take mods out of staging without enabling them
-    stage restore [<ref…>]                    enable staged mods again at their old place (all when no ref)
+    stage restore [<ref…>]                    enable staged mods again at their old place (--all: every staged mod)
     pin <ref>                                 lock a mod: copy it into the lock library (origin marker) and use the copy in the current plan
     copy-local <ref>                          alias of pin
     import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
@@ -130,7 +130,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     subscribe page <url>                      inspect a download page or install its Git repository or a downloaded archive
     subscribe workshop <id|url…>              subscribe through Steam, with SteamCMD fallback when Steam is unavailable
     subscribe check [ref…]                    check upstream references for updates (default: all subscriptions)
-    subscribe update [ref…]                   update subscriptions; page subscriptions require --from (refused while the game runs)
+    subscribe update [ref…]                   update subscriptions (--all: every one); page subscriptions require --from (refused while the game runs)
     subscribe remove <ref…>                   move subscription folders to the recycle bin; warn when plans use them
     textures status [<mod>...]                PNG textures, the DDS RimArcho made (and stale ones), and what converting them would take and save
     textures optimize [<mod>...]              write the DDS of mods' PNG textures next to them (the game loads them instead; the PNGs stay)
@@ -236,7 +236,7 @@ $ archo find harmony
 found: 1 for "harmony"
   #6olp  Harmony  [workshop ws:2009463077]
 next:
-  archo mod #6olp
+  archo mod 6olp
 
 $ archo find nothing-like-this
 found: 0 for "nothing-like-this"
@@ -254,9 +254,9 @@ $ archo mod pkg:brrainz.harmony
   workshop: ws:2009463077, manifest 9000, updated 2026-09-21
   files: 4 (353 B), 4 semantic
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
-  changes: 1, latest discovered 2026-10-01 (archo changes #6olp)
+  changes: 1, latest discovered 2026-10-01 (archo changes 6olp)
 next:
-  archo changes #6olp
+  archo changes 6olp
 
 $ archo mod ws:3000000001
 #hnyg Versioned Mod 版本  [workshop ws:3000000001]
@@ -274,9 +274,9 @@ $ archo mod ws:3000000001
   workshop: ws:3000000001, manifest 9001, updated 2026-09-21
   files: 5 (779 B), 4 semantic
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
-  changes: 1, latest discovered 2026-10-01 (archo changes #hnyg)
+  changes: 1, latest discovered 2026-10-01 (archo changes hnyg)
 next:
-  archo changes #hnyg
+  archo changes hnyg
 
 $ archo mod #xamx
 #xamx Old Mod  [local OldMod]
@@ -289,17 +289,17 @@ $ archo mod #xamx
     path: $ROOT/Steam/steamapps/common/RimWorld/Mods/OldMod
   files: 2 (300 B), 2 semantic
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
-  changes: 1, latest discovered 2026-10-01 (archo changes #xamx)
+  changes: 1, latest discovered 2026-10-01 (archo changes xamx)
 next:
-  archo changes #xamx
+  archo changes xamx
 
 $ archo mod pkg:tester.alpha
 pkg:tester.alpha matches 2 instances; pick one
   #nyh3  Alpha       [workshop ws:3000000002]
   #lqj2  Alpha Fork  [local Twin]
 next:
-  archo mod #nyh3
-  archo mod #lqj2
+  archo mod nyh3
+  archo mod lqj2
 [exit 3]
 
 $ archo mod pkg:nope

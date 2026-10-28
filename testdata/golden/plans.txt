@@ -132,7 +132,7 @@ $ archo stage list
 staging: 1 mod (plan:copy, env:main)
   #nyh3  Alpha  was not enabled
 next:
-  archo stage restore
+  archo stage restore --all
 
 $ archo loadout log
 versions: 1 (plan:copy, env:main)

@@ -13,8 +13,8 @@ func init() {
 	register(&Command{Name: "stage list", Summary: "staged mods, with the place each one came from", MaxArgs: 0, Run: stageList})
 	register(&Command{Name: "stage add", Args: "<ref…>", Summary: "stage mods (enabled ones leave the Loadout and remember their place)", MinArgs: 1, MaxArgs: -1, Run: stageAdd})
 	register(&Command{Name: "stage drop", Args: "<ref…>", Summary: "take mods out of staging without enabling them", MinArgs: 1, MaxArgs: -1, Run: stageDrop})
-	register(&Command{Name: "stage restore", Args: "[<ref…>]", Summary: "enable staged mods again at their old place (all when no ref)", MaxArgs: -1,
-		Flags: placeFlags, Run: stageRestore})
+	register(&Command{Name: "stage restore", Args: "[<ref…>]", Summary: "enable staged mods again at their old place (--all: every staged mod)", MaxArgs: -1,
+		Flags: append([]Flag{{Name: "all", Help: "every staged mod"}}, placeFlags...), Run: stageRestore})
 }
 
 func stageList(c *Ctx, a *Args) (*render.Doc, error) {
@@ -37,7 +37,7 @@ func stageList(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	root.AddColumns(rows)
 	if len(items) > 0 {
-		d.AddNext("archo stage restore")
+		d.AddNext("archo stage restore --all")
 	}
 	return d, nil
 }
@@ -65,6 +65,9 @@ func stageDrop(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func stageRestore(c *Ctx, a *Args) (*render.Doc, error) {
+	if err := refsOrAll(a); err != nil {
+		return nil, err
+	}
 	p, err := placement(a, "at")
 	if err != nil {
 		return nil, err

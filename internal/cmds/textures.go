@@ -83,7 +83,7 @@ func texScope(a *Args) (string, error) {
 	case a.Bool("plan"):
 		return app.TexPlan, nil
 	case len(a.Pos) == 0:
-		return "", &UsageError{Msg: "name the mods, or use --plan or --all"}
+		return "", &UsageError{Msg: "name the mods, or use --plan or --all (" + commentHint + ")"}
 	}
 	return app.TexRefs, nil
 }

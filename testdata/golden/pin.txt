@@ -3,7 +3,7 @@ dry run, nothing changed: would copy #6olp Lockable to $ROOT/LocalAppData/RimArc
   files: 2 (0.0 MB)
   plan: the copy would replace #6olp in the current plan
 next:
-  archo pin #6olp
+  archo pin 6olp
 
 $ archo pin #6olp
 #6olp Lockable locked: copied to $ROOT/LocalAppData/RimArcho/locked/5100_local
@@ -19,9 +19,9 @@ problems: 0 error, 0 warning, 1 info
   list:
     info mod.pinned  #6olp Lockable is locked: #mdx4 is a copy of it made by archo pin (.rimarcho/origin.json)  (p:06e583)
       evidence: inferred #mdx4 origin_snapshot 98fbacb19f50
-      fix: archo unpin #mdx4
+      fix: archo unpin mdx4
 next:
-  archo unpin #mdx4
+  archo unpin mdx4
 
 $ archo pin #mdx4 --update
 error: #6olp has not changed since #mdx4 was copied from it; nothing to update
@@ -47,11 +47,11 @@ problems: 0 error, 1 warning, 0 info
     warning mod.pinned  #6olp Lockable is locked to #mdx4, and #6olp has been updated since the copy was made  (p:41b77e)
       evidence: inferred #mdx4 origin_snapshot 98fbacb19f50
       evidence: inferred #6olp current snapshot 3dbe8e3b9c4b
-      fix: archo mod #mdx4 --diff #6olp
-      fix: archo pin --update #mdx4
-      fix: archo unpin #mdx4
+      fix: archo mod mdx4 --diff 6olp
+      fix: archo pin --update mdx4
+      fix: archo unpin mdx4
 next:
-  archo mod #mdx4 --diff #6olp
+  archo mod mdx4 --diff 6olp
 
 $ archo pin #6olp --update --dry-run
 dry run, nothing changed: would copy #6olp Lockable to $ROOT/LocalAppData/RimArcho/locked/5100_local2
@@ -61,7 +61,7 @@ dry run, nothing changed: would copy #6olp Lockable to $ROOT/LocalAppData/RimArc
   old copy: #mdx4 stays in the lock library
   plan: the copy would replace #mdx4 in the current plan
 next:
-  archo pin --update #6olp
+  archo pin --update 6olp
 
 $ archo pin #mdx4 --update
 #6olp Lockable: new locked version copied to $ROOT/LocalAppData/RimArcho/locked/5100_local2
@@ -91,7 +91,7 @@ dry run, nothing changed: would use #6olp instead of #z3bw Lockable in the curre
   copy: stays at $ROOT/LocalAppData/RimArcho/locked/5100_local2 (no files change)
   upstream: #6olp at $ROOT/Steam/steamapps/workshop/content/294100/5100
 next:
-  archo unpin #z3bw
+  archo unpin z3bw
 
 $ archo unpin #z3bw
 unpinned: the current plan uses #6olp instead of #z3bw Lockable

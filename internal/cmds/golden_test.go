@@ -374,35 +374,7 @@ func TestGoldenPlans(t *testing.T) {
 }
 
 func TestGoldenProblems(t *testing.T) {
-	e := testkit.New(t)
-	plain := func(pkg, name string, files map[string]string) testkit.Mod {
-		return testkit.Mod{PackageID: pkg, Name: name, Author: "Tester", Files: files}
-	}
-	e.WriteMod(filepath.Join(e.Game, "Mods", "Lib"), plain("tester.lib", "Lib", map[string]string{
-		"Defs/Lib.xml": "<Defs>\n  <ThingDef><defName>Lib_Gun</defName></ThingDef>\n</Defs>\n"}))
-	e.WriteMod(filepath.Join(e.Game, "Mods", "Compat"), plain("tester.compat", "Compat", map[string]string{
-		"Patches/Compat.xml": "<Patch>\n  <Operation Class=\"PatchOperationAdd\">\n    <xpath>Defs/ThingDef[defName=\"Lib_Gun\"]</xpath>\n    <value><description>x</description></value>\n  </Operation>\n" +
-			"  <Operation Class=\"PatchOperationReplace\">\n    <xpath>Defs/ThingDef[defName=\"Shared_Gun\"]/label</xpath>\n    <value><label>compat</label></value>\n  </Operation>\n</Patch>\n"}))
-	shared := "<Defs>\n  <ThingDef>\n    <defName>Shared_Gun</defName>\n    <label>shared</label>\n  </ThingDef>\n</Defs>\n"
-	e.WriteMod(filepath.Join(e.Game, "Mods", "Over1"), plain("tester.over1", "Over One", map[string]string{"Defs/Shared.xml": shared}))
-	e.WriteMod(filepath.Join(e.Game, "Mods", "Over2"), plain("tester.over2", "Over Two", map[string]string{"Defs/Weapons/Shared.xml": shared,
-		"Patches/Label.xml": "<Patch>\n  <Operation Class=\"PatchOperationReplace\">\n    <xpath>Defs/ThingDef[defName=\"Shared_Gun\"]/label</xpath>\n    <value><label>two</label></value>\n  </Operation>\n</Patch>\n"}))
-	e.WriteFile(filepath.Join(e.Game, "Mods", "Needy", "About", "About.xml"), `<?xml version="1.0" encoding="utf-8"?>
-<ModMetaData>
-  <packageId>tester.needy</packageId>
-  <name>Needy</name>
-  <supportedVersions><li>1.6</li></supportedVersions>
-  <modDependencies>
-    <li><packageId>tester.absent</packageId><displayName>Absent Library</displayName>
-      <steamWorkshopUrl>https://steamcommunity.com/sharedfiles/filedetails/?id=123456</steamWorkshopUrl></li>
-  </modDependencies>
-  <incompatibleWith><li>tester.over1</li></incompatibleWith>
-</ModMetaData>
-`)
-	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.over1", "tester.compat", "tester.over2", "tester.needy")
-	e.WriteFile(filepath.Join(e.Steam, "steam.exe"), "") // for launch --dry-run
-	e.AddEnv(false)
-	e.MustRun("scan")
+	e := problemsFixture(t)
 	firstRef := func(code string) step {
 		return func(e *testkit.Env) []string {
 			ps, err := e.App.Problems(false, nil)
@@ -441,4 +413,39 @@ func TestGoldenProblems(t *testing.T) {
 		cmd("status"),
 		cmd("patches", "--failed"),
 	})
+}
+
+// problemsFixture: an inactive library, a missing dependency, an active incompatibility,
+// two mods defining one Def and patches that fail, scanned.
+func problemsFixture(t *testing.T) *testkit.Env {
+	e := testkit.New(t)
+	plain := func(pkg, name string, files map[string]string) testkit.Mod {
+		return testkit.Mod{PackageID: pkg, Name: name, Author: "Tester", Files: files}
+	}
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Lib"), plain("tester.lib", "Lib", map[string]string{
+		"Defs/Lib.xml": "<Defs>\n  <ThingDef><defName>Lib_Gun</defName></ThingDef>\n</Defs>\n"}))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Compat"), plain("tester.compat", "Compat", map[string]string{
+		"Patches/Compat.xml": "<Patch>\n  <Operation Class=\"PatchOperationAdd\">\n    <xpath>Defs/ThingDef[defName=\"Lib_Gun\"]</xpath>\n    <value><description>x</description></value>\n  </Operation>\n" +
+			"  <Operation Class=\"PatchOperationReplace\">\n    <xpath>Defs/ThingDef[defName=\"Shared_Gun\"]/label</xpath>\n    <value><label>compat</label></value>\n  </Operation>\n</Patch>\n"}))
+	shared := "<Defs>\n  <ThingDef>\n    <defName>Shared_Gun</defName>\n    <label>shared</label>\n  </ThingDef>\n</Defs>\n"
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Over1"), plain("tester.over1", "Over One", map[string]string{"Defs/Shared.xml": shared}))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Over2"), plain("tester.over2", "Over Two", map[string]string{"Defs/Weapons/Shared.xml": shared,
+		"Patches/Label.xml": "<Patch>\n  <Operation Class=\"PatchOperationReplace\">\n    <xpath>Defs/ThingDef[defName=\"Shared_Gun\"]/label</xpath>\n    <value><label>two</label></value>\n  </Operation>\n</Patch>\n"}))
+	e.WriteFile(filepath.Join(e.Game, "Mods", "Needy", "About", "About.xml"), `<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <packageId>tester.needy</packageId>
+  <name>Needy</name>
+  <supportedVersions><li>1.6</li></supportedVersions>
+  <modDependencies>
+    <li><packageId>tester.absent</packageId><displayName>Absent Library</displayName>
+      <steamWorkshopUrl>https://steamcommunity.com/sharedfiles/filedetails/?id=123456</steamWorkshopUrl></li>
+  </modDependencies>
+  <incompatibleWith><li>tester.over1</li></incompatibleWith>
+</ModMetaData>
+`)
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.over1", "tester.compat", "tester.over2", "tester.needy")
+	e.WriteFile(filepath.Join(e.Steam, "steam.exe"), "") // for launch --dry-run
+	e.AddEnv(false)
+	e.MustRun("scan")
+	return e
 }

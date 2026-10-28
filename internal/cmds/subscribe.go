@@ -73,13 +73,16 @@ func init() {
 		op, err := c.App.CheckSubscriptions(a.Pos)
 		return subscriptionDoc(op, err)
 	}})
-	register(&Command{Name: "subscribe update", Args: "[ref…]", Summary: "update subscriptions; page subscriptions require --from (refused while the game runs)", MaxArgs: -1, Flags: append([]Flag{{Name: "from", Value: "zip|folder", Help: "replace one page subscription with downloaded files"}}, dry...), Run: func(c *Ctx, a *Args) (*render.Doc, error) {
+	register(&Command{Name: "subscribe update", Args: "[ref…]", Summary: "update subscriptions (--all: every one); page subscriptions require --from (refused while the game runs)", MaxArgs: -1, Flags: append([]Flag{{Name: "all", Help: "every subscription"}, {Name: "from", Value: "zip|folder", Help: "replace one page subscription with downloaded files"}}, dry...), Run: func(c *Ctx, a *Args) (*render.Doc, error) {
 		if a.Bool("from") {
 			if len(a.Pos) != 1 || a.Str("from") == "" {
 				return nil, fmt.Errorf("--from requires one subscription reference and a zip or folder")
 			}
 			op, err := c.App.UpdateSubscriptionFrom(a.Pos[0], a.Str("from"), a.Bool("dry-run"))
 			return subscriptionDoc(op, err)
+		}
+		if err := refsOrAll(a); err != nil {
+			return nil, err
 		}
 		op, err := c.App.UpdateSubscriptions(a.Pos, a.Bool("dry-run"))
 		return subscriptionDoc(op, err)

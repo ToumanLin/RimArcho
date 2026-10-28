@@ -8,6 +8,8 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/ids"
+	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -82,23 +84,45 @@ func (m *model) fillInspect(v *inspectView) {
 var refRe = regexp.MustCompile(`(?:^|[\s(,\[])((?:L?#[a-z0-9]{4,})|(?:def:[A-Za-z0-9_.]+[/@][^\s,)]+)|(?:p:[0-9a-f]{6})|(?:log:E[0-9]+))`)
 
 // lineRef returns the first followable reference in a line and the command that shows it.
-func lineRef(line string) []string {
-	for _, mt := range refRe.FindAllStringSubmatch(line, -1) {
-		r := mt[1]
-		switch {
-		case strings.HasPrefix(r, "def:"):
-			return []string{"def", r}
-		case strings.HasPrefix(r, "p:"):
-			return []string{"problems", "show", r}
-		case strings.HasPrefix(r, "log:"):
-			return []string{"log", "--cluster", strings.TrimPrefix(r, "log:")}
-		case strings.HasPrefix(r, "L#"):
-			return []string{"list", "--filter", "lineage:" + r[2:]}
-		default:
-			return []string{"mod", r}
+// Printed commands write instance references without "#" (05 §3.1 rule 11), so a word of
+// an archo command is followed too when ix knows it as one mod.
+func lineRef(line string, ix *app.Index) []string {
+	at, argv := len(line), []string(nil)
+	if mt := refRe.FindStringSubmatchIndex(line); mt != nil {
+		at, argv = mt[2], refArgv(line[mt[2]:mt[3]])
+	}
+	if ix == nil {
+		return argv
+	}
+	for _, sp := range render.CommandSpans(line[:at]) {
+		for i := sp[0]; i < sp[1]; {
+			j := strings.IndexByte(line[i:sp[1]], ' ')
+			if j < 0 {
+				j = sp[1] - i
+			}
+			if w := line[i : i+j]; ids.Valid(w) {
+				if _, err := ix.ResolveOne(w); err == nil {
+					return []string{"mod", w}
+				}
+			}
+			i += j + 1
 		}
 	}
-	return nil
+	return argv
+}
+
+func refArgv(r string) []string {
+	switch {
+	case strings.HasPrefix(r, "def:"):
+		return []string{"def", r}
+	case strings.HasPrefix(r, "p:"):
+		return []string{"problems", "show", r}
+	case strings.HasPrefix(r, "log:"):
+		return []string{"log", "--cluster", strings.TrimPrefix(r, "log:")}
+	case strings.HasPrefix(r, "L#"):
+		return []string{"list", "--filter", "lineage:" + r[2:]}
+	}
+	return []string{"mod", r}
 }
 
 func (m *model) inspectKey(s string) tea.Cmd {
@@ -147,7 +171,11 @@ func (m *model) inspectKey(s string) tea.Cmd {
 		}
 	case "enter":
 		if v.cursor < len(v.lines) {
-			if argv := lineRef(v.lines[v.cursor]); argv != nil {
+			var ix *app.Index
+			if m.st != nil {
+				ix = m.st.Ix
+			}
+			if argv := lineRef(v.lines[v.cursor], ix); argv != nil {
 				same := len(argv) == len(v.argv) && strings.Join(argv, " ") == strings.Join(v.argv, " ")
 				if !same {
 					return m.openInspect(argv)

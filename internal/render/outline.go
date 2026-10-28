@@ -76,7 +76,8 @@ func (n *Node) Truncate(limit int, expand string) {
 // AddNext appends suggested next commands.
 func (d *Doc) AddNext(cmds ...string) { d.Next = append(d.Next, cmds...) }
 
-// String renders the document; every line ends with "\n".
+// String renders the document; every line ends with "\n". Commands in it write instance
+// references without "#" (ShellSafe).
 func (d *Doc) String() string {
 	if d.Raw != "" {
 		return d.Raw
@@ -100,7 +101,7 @@ func (d *Doc) String() string {
 			sb.WriteString("  " + c + "\n")
 		}
 	}
-	return sb.String()
+	return ShellSafe(sb.String())
 }
 
 // MaxColumn caps column padding so one very long name does not push every row apart.
