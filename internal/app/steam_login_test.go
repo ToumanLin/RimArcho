@@ -74,3 +74,43 @@ func TestSteamLoginStepsAndDownloadProgress(t *testing.T) {
 		})
 	}
 }
+
+// A connection SteamCMD drops and retries mid-download is not a failure once it says the
+// app is fully installed; one it never recovers from still is (VM run 2026-10-28).
+func TestSteamDownloadRecoversFromDisconnect(t *testing.T) {
+	t.Parallel()
+	head := `[2026-10-28 15:47:59] Logging in user 'fixture-player' [U:1:1] to Steam Public...
+[2026-10-28 15:48:00] OK
+[2026-10-28 15:48:00] Waiting for client config...
+[2026-10-28 15:48:00] OK
+[2026-10-28 15:48:00] Waiting for user info...
+[2026-10-28 15:48:00] OK
+ Update state (0x61) downloading, progress: 62.01 (10152347554 / 16372745944)
+[2026-10-28 16:07:02] 
+steamcmd has been disconnected from steam with result 3 (No Connection)
+[2026-10-28 16:07:02] Retrying... `
+	for _, tc := range []struct {
+		name, tail string
+		ok         bool
+	}{
+		{"recovered", `
+ Update state (0x61) downloading, progress: 99.00 (1 / 1)
+[2026-10-28 16:24:55] Success! App '294100' fully installed.
+[2026-10-28 16:24:55] Unloading Steam API...
+[2026-10-28 16:24:55] OK`, true},
+		{"never recovered", `
+[2026-10-28 16:24:55] Unloading Steam API...
+[2026-10-28 16:24:55] OK`, false},
+	} {
+		var r steamResult
+		for _, line := range strings.Split(head+tc.tail, "\n") {
+			r.read(line)
+		}
+		if tc.ok && (!r.success || r.err != nil) {
+			t.Fatalf("%s: success=%v err=%v", tc.name, r.success, r.err)
+		}
+		if !tc.ok && (r.success || r.err == nil || r.err.Kind != "network") {
+			t.Fatalf("%s: success=%v err=%v", tc.name, r.success, r.err)
+		}
+	}
+}

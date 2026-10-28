@@ -23,6 +23,10 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Downloading a game version no longer fails when SteamCMD drops its connection and
+  reconnects on its own partway through: once SteamCMD says the game is fully installed,
+  the version is added. Before, a finished 16 GB download was reported as "Steam could not
+  be reached" and no game was added.
 - Page widths follow the page's shape. Pages split into columns fill the window like the
   editor and the mod library: game log, all lists (list 38%, details 62%, draggable),
   packs, subscriptions and updates. One-column pages share one narrower width (960px) so

@@ -713,7 +713,11 @@ func (r *steamResult) read(line string) (DownloadProgress, bool) {
 	}
 	switch {
 	case strings.HasPrefix(low, "success!") && strings.Contains(low, "fully installed"):
-		r.success = true
+		// SteamCMD retries a dropped connection by itself ("disconnected from steam with
+		// result 3 (No Connection)", "Retrying..."): an error before the app is fully
+		// installed was recovered from (VM run 2026-10-28: a 16 GB download that succeeded
+		// was reported as "Steam could not be reached").
+		r.success, r.err = true, nil
 		return DownloadProgress{State: "done", Percent: 100, Line: l}, true
 	case strings.HasPrefix(low, "error!") || strings.Contains(low, "failed to install app"):
 		r.err = &DownloadError{Kind: errorKind(low), Line: l}
