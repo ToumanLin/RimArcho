@@ -727,7 +727,7 @@ func TestIconWidths(t *testing.T) {
 	t.Parallel()
 	for name, set := range map[string]icons{"nerd": nerdIcons, "compat": compatIcons} {
 		for i, s := range []string{set.official, set.workshop, set.local, set.localCopy, set.git, set.err, set.warn, set.logErr,
-			set.unloadable, set.unsaved, set.lock, set.update, set.dep, set.staging, set.play, set.save, set.sort, set.search, set.fail,
+			set.unloadable, set.hint, set.unsaved, set.lock, set.update, set.dep, set.staging, set.play, set.save, set.sort, set.search, set.fail,
 			set.evDeclared, set.evInferred, set.evLog, set.evCommunity, set.evRule,
 			markSel, markOK, markPrompt, markBusy} {
 			if s == "" {

@@ -5,7 +5,7 @@ package view
 func init() {
 	Register(map[string]string{
 		// the 社区日志 chip
-		"shared logs":         "社区日志",
+		"shared logs":         "分享的日志",
 		"%d of %d (%d%%)":     "%d/%d（%d%%）",
 		"seen in shared logs": "分享的日志里见过",
 		"errors with both in %s of shared logs, alone in %s":           "一起启用时 %s 出错，单独时 %s",
@@ -15,20 +15,20 @@ func init() {
 		"load-order constraint strength":                               "排序要求的强弱",
 		// the corpus's items
 		"probably missing: %s": "可能缺少前置：%s",
-		"%s does not declare it, but in shared logs it fails without it. It is not installed.": "%s 没有声明它，但分享的日志里缺了它就会出错。它没有安装。",
-		"%s does not declare it, but in shared logs it fails without it. It is not enabled.":   "%s 没有声明它，但分享的日志里缺了它就会出错。它没有启用。",
+		"%s does not declare it, but in shared logs it fails without it. It is not installed.": "%s 没有注明这个前置，但分享的日志里有缺少它的报错。它尚未安装；如果遇到报错，可以安装后再试。",
+		"%s does not declare it, but in shared logs it fails without it. It is not enabled.":   "%s 没有注明这个前置，但分享的日志里有缺少它的报错。它尚未启用；如果遇到报错，可以启用后再试。",
 		"%s and %s often fail together": "%s 和 %s 一起时常出错",
-		"in shared logs this pair produces errors far more often than either one alone. Disable one if you see errors.": "分享的日志里，这两个一起启用时出错远比单独时多。看到报错就停用其中一个。",
+		"in shared logs this pair produces errors far more often than either one alone. Disable one if you see errors.": "若遇到报错，可以尝试停用其中一个；这项提示不代表你的列表已经出错。",
 		"this version of %s often fails": "这个版本的 %s 常出错",
-		"in shared logs this version produces errors; other versions did not. Updating it usually helps.": "分享的日志里这个版本会出错，其他版本不会。更新它通常就好了。",
-		"this version of %s often produces errors (seen in shared logs); other versions did not":          "这个版本的 %s 经常报错（玩家分享的日志中常见），其他版本没有",
-		"%s has a known error: this is the mod's own problem":                                             "%s 有一个已知错误：这是 Mod 自己的问题",
+		"in shared logs this version produces errors; other versions did not. Updating it usually helps.": "若遇到报错，可以先检查更新，再试试其他版本。",
+		"this version of %s often produces errors (seen in shared logs); other versions did not":          "分享的日志中，这个版本的 %s 比其他版本更常报错；若遇到报错，可以检查更新",
+		"%s has a known error: this is the mod's own problem":                                             "分享的日志中，%s 经常报错",
 		"see the error": "看这个错误",
-		"not your list's: shared logs show it whatever else is enabled; an update may fix it": "不是你的列表的问题：不管还启用了什么，分享的日志里都会出现；更新它可能就好了",
+		"not your list's: shared logs show it whatever else is enabled; an update may fix it": "这些报错出现在不同的 Mod 组合里。如果你也遇到了，可以先检查更新。",
 		// order strength (04 §5.3)
-		"a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right": "强要求（依赖或 loadBefore）：分享的日志里违反它时出错更多；自动排序能排好",
+		"a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right": "顺序不对可能让前置或部分内容无法生效；自动排序能排好。",
 		"%d weaker order preferences are not met": "%d 条较弱的顺序要求没满足",
-		"loadAfter and community rules: breaking them showed no more errors in shared logs; sorting puts them right": "loadAfter 和社区规则：分享的日志里违反它们并没有多出错；自动排序会顺带排好",
+		"loadAfter and community rules: breaking them showed no more errors in shared logs; sorting puts them right": "这些是作者或社区建议的顺序，分享的日志里违反它们并没有更常出错；自动排序会顺带排好。",
 		"sorted: %d moved, strong requirements put right: %d":                                                        "已排序：移动了 %d 个，排好的强要求：%d 条",
 		"sorted: %d moved, only weaker preferences were out of order":                                                "已排序：移动了 %d 个，只有较弱的顺序要求没满足",
 		// the launch hint (06 §2.3)

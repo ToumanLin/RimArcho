@@ -31,6 +31,9 @@ const (
 	StatusErr
 )
 
+// StatusHint is informational and sorts below warnings without changing existing wire values.
+const StatusHint = -1
+
 // Item is one row of a column.
 type Item struct {
 	Lineage     string            `json:"lineage,omitempty"`

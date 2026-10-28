@@ -97,7 +97,7 @@ func TestModsDuplicateNeed(t *testing.T) {
 		}
 	}
 	// 收进锁定库 first, for the player's folders and beside RimArcho's link alike (08 §3)
-	if kinds["Mods/ holds tester.same twice"] != view.ActMoveLocked || kinds["Mods/ holds tester.cmd twice"] != view.ActMoveLocked {
+	if kinds["Mods/ holds Same twice"] != view.ActMoveLocked || kinds["Mods/ holds CmdOnly twice"] != view.ActMoveLocked {
 		t.Fatalf("first actions: %v", kinds)
 	}
 }

@@ -114,6 +114,7 @@ func (g *G5) Text() string {
 
 // Data is the embedded dataset.
 type Data struct {
+	Cutoff  string    `json:"cutoff"` // last month covered by the shared logs, YYYY-MM
 	Source  string    `json:"source"`
 	Game    string    `json:"game"`
 	Logs    int       `json:"logs"`

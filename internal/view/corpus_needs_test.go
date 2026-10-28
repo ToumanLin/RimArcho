@@ -18,6 +18,7 @@ import (
 func TestCorpusNeeds(t *testing.T) {
 	view.SetLang("en")
 	defer known.SetForTesting(&known.Data{
+		Cutoff:  "2040-03",
 		Prereqs: []*known.Prereq{{Mod: "tester.user", Needs: "tester.lib", Logs: 40, Players: 30, Without: 50, Items: []string{"type Lib.Comp"}, Class: "xml-load"}},
 		Combos: []*known.Combo{
 			{Mods: []string{"tester.user", "tester.other"}, Class: "patch-failed", Templates: []string{"patch-failed|[User] Patch operation failed"}, Logs: 30, Players: 20, With: 40, Without: 100, WithoutErr: 2},
@@ -55,12 +56,12 @@ func TestCorpusNeeds(t *testing.T) {
 		return nil
 	}
 	dep := find("seems to need Lib")
-	if dep.Group != view.GroupDeps || !dep.Counted || dep.Evidence == nil || dep.Evidence.Kind != view.EvCorpus ||
+	if dep.Group != view.GroupDeps || dep.Counted || dep.Evidence == nil || dep.Evidence.Kind != view.EvCorpus ||
 		!strings.Contains(dep.Evidence.Source, "40 of 50 (80%)") {
 		t.Errorf("observed prerequisite: %+v %+v", dep, dep.Evidence)
 	}
 	pair := find("often produce errors together")
-	if pair.Group != view.GroupConflict || !pair.Counted || pair.Evidence == nil || pair.Evidence.Kind != view.EvCorpus ||
+	if pair.Group != view.GroupConflict || pair.Counted || pair.Evidence == nil || pair.Evidence.Kind != view.EvCorpus ||
 		!strings.Contains(pair.Evidence.Source, "30 of 40 (75%)") || !strings.Contains(pair.Evidence.Source, "2 of 100 (2%)") {
 		t.Errorf("known-bad pair: %+v %+v", pair, pair.Evidence)
 	}
@@ -72,12 +73,27 @@ func TestCorpusNeeds(t *testing.T) {
 	if weak.Counted || !weak.Dim || len(weak.Parts) != 1 || !strings.Contains(weak.Parts[0], "Other should load after User") {
 		t.Errorf("weak order: %+v", weak)
 	}
-	if n.Launch == nil || n.Launch.Code != "dep.observed-missing" || !strings.Contains(n.Launch.Text, "Lib") || n.Launch.Why == "" {
+	if n.Launch != nil {
 		t.Errorf("launch hint: %+v", n.Launch)
 	}
-	// The count is the counted items only: the prerequisite and the pair.
-	if n.Count != 2 {
-		t.Errorf("count %d, want 2: %+v", n.Count, n.Items)
+	// Corpus suggestions stay visible, including on rows, without becoming problems.
+	if n.Count != 0 {
+		t.Errorf("count %d, want 0: %+v", n.Count, n.Items)
+	}
+	for _, it := range []*view.Need{dep, pair, own, weak} {
+		if it.Status != view.StatusHint || it.Evidence.Cutoff != "2040-03" || !strings.Contains(it.Evidence.Label, "2040-03") {
+			t.Errorf("hint or cutoff: %+v", it)
+		}
+		for _, id := range it.Mods[:1] {
+			if n.Status[id] != view.StatusHint || len(n.Reasons[id]) == 0 || n.Reasons[id][0].Evidence.Cutoff != "2040-03" {
+				t.Errorf("missing hint badge: %s %+v", id, n.Reasons[id])
+			}
+		}
+	}
+	for _, m := range view.ProblemsOf(n).Mods {
+		if m.Count != 0 || m.Severity != "info" {
+			t.Errorf("hint counted as a problem: %+v", m)
+		}
 	}
 }
 

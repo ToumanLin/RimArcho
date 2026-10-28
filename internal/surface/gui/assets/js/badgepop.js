@@ -4,6 +4,7 @@
 // it. The same information is in the details (enter), so the keyboard reaches it there.
 import { S, el, T } from "./state.js";
 import { statusIcon } from "./icons.js";
+import { needText, needEvidence } from "./needtext.js";
 
 const box = el("div", "badge-pop");
 box.setAttribute("role", "tooltip");
@@ -32,8 +33,9 @@ function draw(it, st) {
     const ic = el("span", "bp-ic s" + r.status);
     ic.innerHTML = statusIcon(r.status);
     const body = el("div", "bp-body");
-    body.append(el("div", "bp-t", r.text));
-    if (r.why) body.append(el("div", "bp-why", r.why));
+    body.append(needText("div", "bp-t", r.text, r.content?.text, () => hide(true)));
+    if (r.why) body.append(needText("div", "bp-why", r.why, r.content?.why, () => hide(true)));
+    if (r.evidence) body.append(needEvidence(r.evidence));
     if (pinned && runNeed && r.actions && r.actions.length) {
       const acts = el("div", "bp-acts");
       r.actions.forEach((a, i) => {
@@ -120,6 +122,9 @@ let listening = false;
 function listen() {
   if (listening) return;
   listening = true;
+  box.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+  });
   box.addEventListener("mouseleave", () => { if (!pinned) hideTimer = setTimeout(() => hide(), 120); });
   box.addEventListener("mouseenter", () => clearTimeout(hideTimer));
   // a click outside the popover and outside any badge closes a pinned one

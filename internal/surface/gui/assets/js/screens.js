@@ -16,11 +16,13 @@ import { on } from "./api.js";
 import { wireSeparator } from "./separator.js";
 import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
+import { initNeedText, needText, needParts, needEvidence } from "./needtext.js";
 import { getChoices } from "./credit.js";
 
 let ui = null;
 export function initScreens(u) {
   ui = u;
+  initNeedText(u);
   initSubscriptions(u, { beginPageRead, page, area, button, act, seg });
   on("tasks", (ev) => {
     if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
@@ -350,6 +352,7 @@ function needsLead(d) {
   if (breaks) return Tf("%s is not safe to play yet: fix the %d problems below.", plan, breaks);
   if (count) return Tf("%s can run; %d things below are worth a look.", plan, count);
   if (d.never) return Tf("%s: the mods' files are not checked yet.", plan);
+  if (N.items.some((x) => x.status === -1)) return Tf("%s can run; suggestions below may help if you see errors.", plan);
   return Tf("%s can run: nothing to handle.", plan);
 }
 
@@ -375,9 +378,10 @@ function drawNeeds() {
   SECTIONS.forEach((title, si) => {
     const its = N.items.filter((x) => x.section === si);
     if (!its.length) return;
-    const sec = el("section", "sec need-sec " + SECTION_CLS[si]);
+    const hintsOnly = its.every((x) => x.status === -1);
+    const sec = el("section", "sec need-sec " + (hintsOnly ? "hint" : SECTION_CLS[si]));
     const n = its.filter((x) => x.counted).length;
-    const h = el("h2", "label", T(title));
+    const h = el("h2", "label", T(hintsOnly ? "suggestions" : title));
     const first = i;
     area(sec, h, () => { N.cur = first; markNeeds(); });
     if (n) {
@@ -423,12 +427,15 @@ function needCard(it, i) {
   const row = el("div", "need" + (it.dim ? " dimmed" : ""));
   const top = el("div", "top");
   const body = el("div", "body");
+  const ic = el("span", "need-ic");
+  ic.innerHTML = statusIcon(it.status);
+  top.append(ic);
   if (it.dim) {
-    body.append(el("div", "why word-facts", it.text));
-    if (it.why) body.append(el("div", "why sub", it.why));
+    body.append(needText("div", "why word-facts", it.text, it.content?.text));
+    if (it.why) body.append(needText("div", "why sub", it.why, it.content?.why));
   } else {
-    body.append(el("div", "title word-facts", it.title || it.text));
-    if (it.why && !it.linkGroups?.length) body.append(el("div", "why", it.why));
+    body.append(needText("div", "title word-facts", it.title || it.text, it.title ? it.content?.title : it.content?.text));
+    if (it.why && !it.linkGroups?.length) body.append(needText("div", "why", it.why, it.content?.why));
   }
   top.append(body);
   const acts = it.actions || [];
@@ -455,15 +462,10 @@ function needCard(it, i) {
   row.append(top);
   if (it.linkGroups?.length) row.append(linkRows(it.linkGroups));
   if (it.fold && N.open.has(it.text)) {
-    const parts = el("div", "parts");
-    for (const p of it.parts || []) parts.append(el("div", "", ", " + p));
-    row.append(parts);
+    row.append(needParts(it));
   }
   if (it.evidence) {
-    const ev = el("div", "ev-line");
-    ev.append(el("span", "ev-chip " + it.evidence.kind, it.evidence.label));
-    if (it.evidence.source) ev.append(el("span", "src", it.evidence.source));
-    row.append(ev);
+    row.append(needEvidence(it.evidence));
   }
   row.onclick = () => { N.cur = i; markNeeds(); };
   return row;

@@ -70,7 +70,7 @@ var (
 // icons is one icon set (06 §7).
 type icons struct {
 	official, workshop, local, localCopy, git string
-	err, warn, logErr, unloadable             string
+	err, warn, logErr, unloadable, hint       string
 	unsaved, lock, update, dep, staging       string
 	play, save, sort, search, fail            string
 	// the evidence chips of 能不能跑 (06 §2.4): declared, inferred, log, community, your rule,
@@ -81,7 +81,7 @@ type icons struct {
 // Nerd Font: the Font Awesome 4 range, in every Nerd Font and WezTerm's built-in symbols.
 var nerdIcons = icons{
 	official: "", workshop: "", local: "", localCopy: "", git: "",
-	err: "", warn: "", logErr: "", unloadable: "",
+	err: "", warn: "", logErr: "", unloadable: "", hint: "",
 	unsaved: "", lock: "", update: "", dep: "", staging: "",
 	play: "", save: "", sort: "", search: "", fail: "",
 	evDeclared: "", evInferred: "", evLog: "", evCommunity: "", evRule: "", evCorpus: "",
@@ -90,7 +90,7 @@ var nerdIcons = icons{
 // Compatibility: East Asian width "neutral", present in Cascadia Mono, 1 cell (V0).
 var compatIcons = icons{
 	official: "⬥", workshop: "◉", local: "▢", localCopy: "⬦", git: "∆",
-	err: "⨯", warn: "!", logErr: "◍", unloadable: "◌",
+	err: "⨯", warn: "!", logErr: "◍", unloadable: "◌", hint: "ⓘ",
 	unsaved: "⬤", lock: "", update: "⇣", dep: "›", staging: "◫",
 	play: "►", save: "↲", sort: "↨", search: "/", fail: "⨯",
 	evDeclared: "≣", evInferred: "◊", evLog: "◍", evCommunity: "⬡", evRule: "⌂", evCorpus: "◔",

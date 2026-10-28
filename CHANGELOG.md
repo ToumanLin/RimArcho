@@ -7,6 +7,14 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Can it run, the editor's problems panel and mod-row popovers now link each named mod
+  separately, including identity questions and folded lists. Installed names reveal their
+  editor row; known missing mods open the Workshop. Folded entries display as proper lists.
+- Shared-log suggestions use a neutral information symbol in the window and terminal,
+  show the corpus cutoff from embedded data, and no longer count as problems. With only
+  suggestions, the editor button reads "suggestions". Diagnostic wording explains what to
+  try, avoids XML field names and internal log references, and treats corpus rates as hints.
+
 - Launching from the window with a required mod missing or disabled now asks once ("launch
   anyway" / cancel) and lists what is missing: the game would not load the mods that need
   them and may reset its list to the base game. The CLI and TUI still launch without asking.

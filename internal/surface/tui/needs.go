@@ -255,7 +255,7 @@ func (m *model) needLines(n int) []string {
 			rows = append(rows, row{"  " + m.sectionHead(sec, w-2), -1})
 		}
 		icon := statusIcon(it.status)
-		if it.dim || it.status == statusNone {
+		if it.dim && it.status != statusHint || it.status == statusNone {
 			icon = " "
 		}
 		st := sText
@@ -332,16 +332,25 @@ func (m *model) needLines(n int) []string {
 // run they are from (06 §2.4).
 func (m *model) sectionHead(sec, w int) string {
 	n := 0
+	hintsOnly := true
 	for _, it := range m.prob.items {
-		if it.section == sec && it.counted {
-			n++
+		if it.section == sec {
+			if it.counted {
+				n++
+			}
+			if it.status != statusHint {
+				hintsOnly = false
+			}
 		}
 	}
 	title := T(view.SectionTitles[sec])
+	if hintsOnly {
+		title = T("suggestions")
+	}
 	// its number among the sections shown: 1–4 jump to it (06 §3.5)
 	num := itoa(m.sectionNumber(sec)) + " "
 	head := sDimS.Render(num) + sDimS.Render(title)
-	if sec == view.SectionBreak {
+	if sec == view.SectionBreak && !hintsOnly {
 		head = sDimS.Render(num) + sErrS.Render(title)
 	}
 	used := width.StringWidth(num + title)
