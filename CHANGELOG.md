@@ -4,6 +4,11 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Last-run errors in Can it run now name the kinds of errors (with a sample resource
+  path for missing textures), include both error and warning counts, and open that run's
+  game log with a related cluster selected. Unattributed errors open the complete log;
+  earlier logs open their own file. The TUI keeps its existing log inspection view.
+
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 

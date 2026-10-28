@@ -1,0 +1,13 @@
+RimWorld 1.6.4633 rev1
+
+Loading game from file SyntheticSave with mods Synthetic Alpha
+
+Could not resolve cross-reference: No Verse.ThingDef named SyntheticMissingDef found to give to Verse.RecipeDef SyntheticRecipe
+
+Could not find class Synthetic.MissingComp while resolving node li
+
+Could not resolve reference to object with loadID Thing_Synthetic42 of type Verse.Thing. Was not deep-saved.
+
+Exception loading SyntheticPawn from save: System.InvalidOperationException: synthetic save failure
+  at Verse.Scribe_Deep.Look () [0x00000] in <00000000000000000000000000000000>:0
+
