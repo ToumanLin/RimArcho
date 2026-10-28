@@ -54,7 +54,7 @@ func (s *API) automaticCycle(parent context.Context) {
 		id := s.tasks.Begin(view.TaskAutomatic, view.AutomaticName(kind), nil)
 		checkErr := run()
 		after := r.AutomaticStatus(kind)
-		state, result := app.TaskDone, view.Text(after.State)
+		state, result := app.TaskDone, view.AutomaticResult(after)
 		if checkErr != nil {
 			state = app.TaskFailed
 		}

@@ -114,13 +114,13 @@ func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key s
 	}
 	status := a.DataStatus()
 	var res []*DataUpdate
-	type staged struct{ tmp, dst string }
-	var ready []staged
+	var ready []stagedDataFile
 	cleanup := func() {
 		for _, s := range ready {
 			os.Remove(s.tmp)
 		}
 	}
+	defer cleanup()
 	failed := false
 	for _, d := range Datasets {
 		if !want(d.Key) {
@@ -165,46 +165,59 @@ func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key s
 			u.Info = &copy
 			continue
 		}
-		ready = append(ready, staged{tmp, a.dataPath(d)})
+		ready = append(ready, stagedDataFile{tmp, a.dataPath(d)})
 	}
 	if failed {
-		cleanup()
 		return res, errors.New("community data not updated: a download failed or was invalid; the stored files are unchanged")
 	}
 	if err := a.subscriptionContext().Err(); err != nil {
-		cleanup()
 		return res, err
 	}
-	for i, s := range ready {
-		if err := os.Rename(s.tmp, s.dst); err != nil {
-			cleanup()
-			return res, err
+	if dryRun {
+		return res, nil
+	}
+	stage := func(dst string, b []byte) error {
+		file, err := stageDataFile(dst, b)
+		if err == nil {
+			ready = append(ready, file)
 		}
-		ready[i].tmp = ""
+		return err
 	}
 	for _, u := range res {
-		if u.Err == nil && !dryRun {
-			b, _ := json.MarshalIndent(u.Info, "", "  ")
-			path := a.dataPath(u.Dataset) + ".source.json"
-			if err := os.WriteFile(path+".tmp", b, 0o644); err != nil {
-				return res, err
-			}
-			if err := os.Rename(path+".tmp", path); err != nil {
-				return res, err
-			}
-			if u.Dataset.Key == "steamdb" && !u.Same {
-				if err := a.buildSteamIndex(); err != nil {
-					return res, fmt.Errorf("steamDB index: %v", err)
-				}
-			}
-		}
-	}
-	if !dryRun {
-		a.dataIdx = nil
-		if _, err := a.Store.DB.Exec(`INSERT INTO meta(key,value) VALUES('community:generation','1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1`); err != nil {
+		b, err := json.MarshalIndent(u.Info, "", "  ")
+		if err != nil {
 			return res, err
 		}
+		if err := stage(a.dataPath(u.Dataset)+".source.json", b); err != nil {
+			return res, err
+		}
+		if u.Dataset.Key == "steamdb" && !u.Same {
+			for _, file := range ready {
+				if file.dst != a.dataPath(u.Dataset) {
+					continue
+				}
+				index, err := steamIndexData(file.tmp)
+				if err != nil {
+					return res, fmt.Errorf("steamDB index: %v", err)
+				}
+				if err := stage(a.steamIndexPath(), index); err != nil {
+					return res, err
+				}
+				break
+			}
+		}
 	}
+	if err := a.subscriptionContext().Err(); err != nil {
+		return res, err
+	}
+	err := replaceDataFiles(ready, os.Rename, func() error {
+		_, err := a.Store.DB.Exec(`INSERT INTO meta(key,value) VALUES('community:generation','1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1`)
+		return err
+	})
+	if err != nil {
+		return res, err
+	}
+	a.dataIdx = nil
 	return res, nil
 }
 
@@ -260,8 +273,8 @@ func (a *App) fetchData(d Dataset, u *DataUpdate, etag string, modified ...strin
 	if err != nil {
 		return "", err
 	}
-	n, err := io.Copy(tmp, io.LimitReader(body, 512<<20))
-	tmp.Close()
+	n, copyErr := io.Copy(tmp, io.LimitReader(body, 512<<20))
+	err = errors.Join(copyErr, tmp.Close())
 	if err != nil {
 		os.Remove(tmp.Name())
 		return "", err
@@ -401,10 +414,10 @@ func (a *App) dataIndexes() *dataIndex {
 // when it is downloaded so nothing parses the 50 MB file afterwards.
 func (a *App) steamIndexPath() string { return filepath.Join(a.Home, "cache", "steamDB.index.json") }
 
-func (a *App) buildSteamIndex() error {
-	b, err := readDataFile(a.dataPath(Datasets[1]))
+func steamIndexData(path string) ([]byte, error) {
+	b, err := readDataFile(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var v struct {
 		Database map[string]struct {
@@ -414,7 +427,7 @@ func (a *App) buildSteamIndex() error {
 		} `json:"database"`
 	}
 	if err := json.Unmarshal(b, &v); err != nil {
-		return err
+		return nil, err
 	}
 	m := map[string][2]string{}
 	for id, e := range v.Database {
@@ -426,15 +439,7 @@ func (a *App) buildSteamIndex() error {
 			m[p] = [2]string{id, e.Name}
 		}
 	}
-	out, err := json.Marshal(m)
-	if err != nil {
-		return err
-	}
-	tmp := a.steamIndexPath() + ".tmp"
-	if err := os.WriteFile(tmp, out, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, a.steamIndexPath())
+	return json.Marshal(m)
 }
 
 // ReplacementFor returns the "use this instead" suggestion for an installed mod.

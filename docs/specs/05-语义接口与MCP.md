@@ -260,7 +260,7 @@ next:
 
 **分析参数**：`--game-version X.Y` 用于 `analyze`、`problems`、`def`、`patches`、`harmony`、`why`、`log`，按另一个游戏主次版本分析（格式必须像 `1.6`，命令结束后恢复）。MCP 对应工具有同名参数 `game_version`。
 
-**自动检查状态**：`status`、`data status`（包括 MCP `status` 对应输出）读取四项的上次尝试、结果、待处理数，不联网，也不暴露 Cookie；`deps` 另列受管工具的新版本。开关和间隔见 06 §2.16。
+**自动检查状态**：`status`、`data status`（包括 MCP `status` 对应输出）只用一行 `automatic checks`：开关状态，以及等待玩家处理的 Mod / 工具更新数、已设置的 LoversLab 账户登录提醒。没有待处理项时写 `nothing waiting (last MM-DD HH:MM)`；尚未检查时注明 `not checked yet`。省略不适用的账户及零计数，不联网，也不暴露 Cookie；`deps` 另列受管工具的新版本和检查时间，`data status` 列各份数据的检查时间。开关和间隔见 06 §2.16。
 
 **设置键**（`config set`）：`ui.lang auto|en|zh`；`ui.icons auto|nerd|compat`；`ui.mouse on|off`（关掉终端的鼠标上报，方便选中文字）；`workshop.fetch on|off`（是否联网获取工坊简介）；`workshop.images on|off`（是否下载简介里的图片）；`updates.auto on|off`、`updates.interval normal|frequent|relaxed`（06 §2.16）；`terminal.host auto|wezterm|none`；`ui.previews on|off`；`ui.gpu on|off`（窗口的 GPU 加速，下次打开窗口生效，06 §2.14）；`ui.preview_dwell_ms 0–5000`；`tags.pinned <逗号分隔的标签>`；`monitor.default on|off`（是否把 Archo Monitor 自动加进方案，04 §1.5）；`monitor.dir <绝对路径>`（Monitor 目录，08 §9）。设置存在数据库的 meta 表（键 `cfg:<键>`）；`config.toml` 只有 `tombstone_days`（07 §3）。
 

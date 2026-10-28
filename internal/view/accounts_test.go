@@ -24,7 +24,7 @@ func TestCompactAccountRows(t *testing.T) {
 	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "offline fixture")
 	group := view.AccountGroup(e.App)
 	steam, ll := group.Items[0], group.Items[1]
-	if steam.Note != "下载Mod可用，未登录" || ll.Note != "不可用，未登录" {
+	if steam.Note != "下载Mod可用，未登录" || ll.Note != "" {
 		t.Fatal(group)
 	}
 	for _, item := range group.Items {

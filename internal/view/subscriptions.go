@@ -188,6 +188,18 @@ func BuildSubscriptionsFromLibrary(a *app.App, st *app.LoadoutState, o modchange
 			}
 		}
 	}
+	for i := range p.Sources {
+		s := &p.Sources[i]
+		if s.Result == T("check complete") {
+			n := 0
+			for _, update := range p.Pending {
+				if update.Kind == s.Key {
+					n++
+				}
+			}
+			s.Result = UpdateCheckResult(n, "check complete")
+		}
+	}
 	p.Recent = recentSubscriptions(a, lib.Lineages)
 	p.Summary = sourceSummary(a, p.Sources, checks)
 	return p, nil

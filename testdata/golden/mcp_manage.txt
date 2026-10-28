@@ -37,11 +37,7 @@ community data
   rules: not downloaded (RimSort community sorting rules)
   steamdb: not downloaded (RimSort Steam Workshop database (packageIds, dependencies, versions))
   replacements: not downloaded (Use This Instead replacements)
-  automatic-checks: on, interval normal
-    session: last checked never; not checked yet; 0 pending
-    mods: last checked never; not checked yet; 0 pending
-    tools: last checked never; not checked yet; 0 pending
-    data: last checked never; not checked yet; 0 pending
+  automatic checks: on; nothing waiting (not checked yet)
 next:
   archo data update
 

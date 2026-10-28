@@ -9,7 +9,7 @@ import (
 
 // DependencyGroup shows the selected copies and commands for managing downloaded tools.
 func DependencyGroup(a *app.App) SettingGroup {
-	g := SettingGroup{Title: T("external tools")}
+	g := SettingGroup{Title: T("external tools"), Note: lastChecked(a, a.AutomaticStatus("tools").Checked)}
 	labels := map[string]string{deps.Font: T("bundled font"), deps.Todds: "todds", deps.SteamCMD: "SteamCMD", deps.WezTerm: "WezTerm"}
 	for _, i := range a.Deps().All() {
 		item := SettingItem{Label: labels[i.Name], Value: T("not installed"), Note: i.Path, NotePaths: []string{i.Path}}

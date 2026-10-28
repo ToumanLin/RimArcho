@@ -9,6 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/deps"
+	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -78,6 +79,25 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 	}
 	switch kind {
 	case view.TaskSourceCheck:
+		result := func(err error) (string, error) {
+			if err != nil {
+				return "", err
+			}
+			st, err := a.Loadout()
+			if err != nil {
+				return "", err
+			}
+			page, err := view.BuildSubscriptions(a, st, modchanges.Opts{})
+			if err != nil {
+				return "", err
+			}
+			for _, source := range page.Sources {
+				if source.Key == argv[1] {
+					return source.Result, nil
+				}
+			}
+			return "", nil
+		}
 		if argv[1] == app.LibPage && a.Store.Meta("account:loverslab:enabled") == "true" {
 			release, err := s.beginAccount()
 			if err != nil {
@@ -90,14 +110,14 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 			if err != nil {
 				return "", err
 			}
-			return "check complete", a.CheckSubscriptionSource(argv[1], func(page string) (*subscribe.PageInfo, error) {
+			return result(a.CheckSubscriptionSource(argv[1], func(page string) (*subscribe.PageInfo, error) {
 				if subscribe.LoversLabPage(page) {
 					return ll.PageInfo(context.Background(), page)
 				}
 				return subscribe.ReadPage(context.Background(), a.HTTP, page)
-			})
+			}))
 		}
-		return "check complete", a.CheckSubscriptionSource(argv[1])
+		return result(a.CheckSubscriptionSource(argv[1]))
 	case view.TaskWorkshopUpdate:
 		return view.T("Steam will download this Workshop update"), a.UpdateWorkshopClient(argv[1], false)
 	case view.TaskSubscribe, view.TaskSubscriptionFrom:

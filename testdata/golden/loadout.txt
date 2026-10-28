@@ -8,11 +8,7 @@ env:main  RimWorld 1.6.4633 rev1261
   plan: plan:default
   loadout: 7 active (1 missing entries), same as v1 (import)
   warning: ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start. Launching from RimArcho or saving once (archo save) saves it for 1.6
-  automatic-checks: on, interval normal
-    session: last checked never; not checked yet; 0 pending
-    mods: last checked never; not checked yet; 0 pending
-    tools: last checked never; not checked yet; 0 pending
-    data: last checked never; not checked yet; 0 pending
+  automatic checks: on; nothing waiting (not checked yet)
   problems: 0 error, 3 warning, 4 info in declarations; Defs and Patches not analysed yet (archo problems)
 
 $ archo list --active

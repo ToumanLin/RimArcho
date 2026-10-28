@@ -5,14 +5,14 @@
       "name": "Steam Workshop (client)",
       "count": 1,
       "checked": "2026-10-01 11:00",
-      "result": "check complete"
+      "result": "1 update available"
     },
     {
       "key": "steamcmd",
       "name": "SteamCMD",
       "count": 1,
       "checked": "2026-10-01 11:00",
-      "result": "check complete",
+      "result": "1 update available",
       "account": "mod downloads available, not logged in"
     },
     {
@@ -20,15 +20,14 @@
       "name": "Git",
       "count": 1,
       "checked": "2026-10-01 10:00",
-      "result": "check complete"
+      "result": "1 update available"
     },
     {
       "key": "page",
       "name": "download page / LoversLab",
       "count": 1,
       "checked": "2026-10-01 10:00",
-      "result": "check complete",
-      "account": "unavailable, not logged in"
+      "result": "1 update available"
     },
     {
       "key": "local",
