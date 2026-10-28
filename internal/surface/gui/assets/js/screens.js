@@ -403,7 +403,10 @@ function drawNeeds() {
     else if (si === 1 && d.lastRun) h.append(el("span", "muted word-facts", d.lastRun));
     sec.append(h);
     const card = el("div", "card need-list");
+    let phase = "", group = -1;
     for (const it of its) {
+      if (it.phaseHeading && (it.phaseHeading !== phase || it.group !== group)) card.append(el("div", "need-phase", it.phaseHeading));
+      phase = it.phaseHeading || ""; group = it.group;
       const row = needCard(it, i);
       N.els[i] = row;
       card.append(row);
@@ -749,7 +752,7 @@ function drawGameLog() {
       body.append(top, logText(r));
       row.append(ic, body);
       row.onclick = () => { L.cur = i; markLog(true); };
-      return row;
+      return phaseRow(row, r.phaseStart);
     }, L.views[0]);
   }
   list.append(scroll);
@@ -892,8 +895,17 @@ function monitorRows(scroll, mon) {
     }
     row.append(disclosure, ic, body);
     row.onclick = () => { L.mcur = i; markLog(true); };
-    return row;
+    return phaseRow(row, m.phaseStart);
   }, L.views[1]);
+}
+
+// The separator shares its data row's measured wrapper, so it has no cursor index
+// or count of its own and participates in the existing scroll anchoring.
+function phaseRow(row, label) {
+  if (!label) return row;
+  const wrap = el("div", "log-phase-row");
+  wrap.append(el("div", "log-phase", label), row);
+  return wrap;
 }
 
 const canOpenMonitor = (m) => !!(m.details || m.cluster || m.only);
@@ -904,6 +916,7 @@ function toggleMonitor(i) {
   const open = !L.open.has(m.key);
   if (open) L.open.add(m.key); else L.open.delete(m.key);
   L.list?.update(i, (row) => {
+    if (row.classList.contains("log-phase-row")) row = row.querySelector(".lrow");
     row.classList.toggle("open", open);
     row.querySelector(".monitor-details").hidden = !open;
     const b = row.querySelector(".log-disclosure");

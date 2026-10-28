@@ -41,6 +41,7 @@ namespace ArchoMonitor
         static Timer timer;
         static long bytes;
         static bool full, closed;
+        static string phase = "loading";
         static int failures, distinct;
         static readonly Dictionary<string, Entry>[] exact = { new Dictionary<string, Entry>(), new Dictionary<string, Entry>(), new Dictionary<string, Entry>() };
         static readonly Dictionary<string, Entry> byPrint = new Dictionary<string, Entry>();
@@ -244,6 +245,26 @@ namespace ArchoMonitor
             {
                 WriteLine(j.End());
                 Flush();
+            }
+        }
+
+        // The lock covers both pending counts and the boundary: a count line cannot span
+        // two phases, even when the timer or a background logging thread is active.
+        internal static bool WritePhase(string next, string save = null)
+        {
+            lock (sync)
+            {
+                if (closed || w == null || phase == next) return false;
+                FlushDirty(true);
+                var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] phase " + next);
+                j.Str("details", "").Num("count", 1);
+                j.Raw("context").Open().Str("phase", next);
+                if (!string.IsNullOrEmpty(save)) j.Str("save", save);
+                j.Close().Kind("phase");
+                WriteLine(j.End(), force: true);
+                phase = next;
+                Flush();
+                return true;
             }
         }
 

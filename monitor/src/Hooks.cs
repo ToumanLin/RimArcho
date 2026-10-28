@@ -31,6 +31,19 @@ namespace ArchoMonitor
             Patch(h, "PatchOperation.Apply", AccessTools.Method(typeof(PatchOperation), "Apply", new[] { typeof(XmlDocument) }), typeof(XmlTracker), prefix: "OpPrefix", finalizer: "OpFinalizer");
             Patch(h, "PatchOperation.Complete", AccessTools.Method(typeof(PatchOperation), "Complete", new[] { typeof(string) }), typeof(XmlTracker), prefix: "OpPrefix", finalizer: "OpFinalizer");
             Patch(h, "DirectXmlToObject.ValidateListNode", AccessTools.Method(typeof(DirectXmlToObject), "ValidateListNode"), typeof(XmlTracker), postfix: "ListPostfix");
+            // UIRoot_Entry.Init finishes MainMenuDrawer.Init without patching its static
+            // texture-owning type during the earlier mod-constructor stage.
+            PhasePatch(h, "Verse.UIRoot_Entry", "Init", postfix: "Menu");
+            PhasePatch(h, "Verse.SavedGameLoaderNow", "LoadGameFromSaveFileNow", prefix: "Save", args: new[] { typeof(string) });
+            PhasePatch(h, "RimWorld.Planet.WorldGenerator", "GenerateWorld", prefix: "New", args: null, anyArgs: true);
+            PhasePatch(h, "Verse.Game", "InitNewGame", prefix: "New");
+            PhasePatch(h, "Verse.Game", "FinalizeInit", postfix: "Play");
+        }
+
+        static void PhasePatch(Harmony h, string type, string method, string prefix = null, string postfix = null, Type[] args = null, bool anyArgs = false)
+        {
+            var t = AccessTools.TypeByName(type);
+            Patch(h, type + "." + method, t == null ? null : AccessTools.Method(t, method, anyArgs ? null : args ?? Type.EmptyTypes), typeof(Phases), prefix: prefix, postfix: postfix);
         }
 
         static void Patch(Harmony h, string name, MethodBase target, Type host, string prefix = null, string postfix = null, string finalizer = null, bool first = false)

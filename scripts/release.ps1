@@ -82,10 +82,10 @@ try {
 
 Copy-Item README.md, CHANGELOG.md, LICENSE $out
 
-# Archo Monitor (08 §9): the in-game companion, built for 1.5, 1.6 and 1.7 with the release's
-# version and shipped as monitor/ArchoMonitor/, where RimArcho finds it next to the exe.
-Write-Host "building Archo Monitor $Version"
-& (Join-Path $PSScriptRoot "..\monitor\build.ps1") -Version $Version -Out (Join-Path $out "monitor\ArchoMonitor")
+# Archo Monitor (08 §9): built for 1.5, 1.6 and 1.7 with monitor/VERSION and shipped as
+# monitor/ArchoMonitor/, where RimArcho finds it next to the exe.
+Write-Host "building Archo Monitor"
+& (Join-Path $PSScriptRoot "..\monitor\build.ps1") -Out (Join-Path $out "monitor\ArchoMonitor")
 if (-not (Test-Path (Join-Path $out "monitor\ArchoMonitor\About\About.xml"))) { throw "Archo Monitor build produced no About.xml" }
 
 # The bundled font (06 §9.2): Maple Mono NF CN, Regular and Bold, and the OFL.

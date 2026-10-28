@@ -114,12 +114,14 @@ type Action struct {
 
 // Need is one item of 需要处理.
 type Need struct {
-	ID         string     `json:"id"`
-	Target     string     `json:"target,omitempty"`
-	RequiredBy []ModOwner `json:"requiredBy,omitempty"`
-	Group      int        `json:"group"`
-	Section    int        `json:"section"` // the section it is shown in (SectionOf, 06 §2.4)
-	Text       string     `json:"text"`    // one sentence (the TUI's line)
+	ID           string     `json:"id"`
+	Target       string     `json:"target,omitempty"`
+	RequiredBy   []ModOwner `json:"requiredBy,omitempty"`
+	Group        int        `json:"group"`
+	Section      int        `json:"section"` // the section it is shown in (SectionOf, 06 §2.4)
+	Phase        string     `json:"phase,omitempty"`
+	PhaseHeading string     `json:"phaseHeading,omitempty"`
+	Text         string     `json:"text"` // one sentence (the TUI's line)
 	// Title and Why are the GUI card's bold line and its plain explanation (Title empty:
 	// the card shows Text); Evidence is where the claim comes from.
 	Title    string    `json:"title,omitempty"`
@@ -727,10 +729,11 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			ids = []string{id}
 			name = nm(finding.Inst(id))
 		}
-		n := lastRunNeed(name, logs[id], logWhen, id != "")
-		n.Mods = ids
-		n.Actions[0].Argv = argv
-		add(n)
+		for _, n := range lastRunNeeds(name, logs[id], logWhen, id != "") {
+			n.Mods = ids
+			n.Actions[0].Argv = argv
+			add(n)
+		}
 	}
 	for _, r := range ps.Logs {
 		if r.Stale() {

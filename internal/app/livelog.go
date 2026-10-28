@@ -23,6 +23,8 @@ const (
 
 // LiveCluster is one error cluster of a running game.
 type LiveCluster struct {
+	Phases               []logs.PhaseCount
+	playerPhases         []logs.PhaseCount
 	Key, Template, Class string
 	Count                int
 	FirstLine            int
@@ -274,6 +276,7 @@ func (lv *LiveLog) take(all bool) []*LiveCluster {
 			lv.byMatch[firstLineKey(e.Message)] = true
 		}
 		c.Count++
+		c.playerPhases = logs.AddPhaseCount(c.playerPhases, e.Phase, 1)
 		if len(c.samples) < liveSamples {
 			c.samples = append(c.samples, e)
 		}
@@ -366,7 +369,7 @@ func (lv *LiveLog) finish(a *App, fresh []*LiveCluster) error {
 	}
 	fresh = todo
 	if len(fresh) > 0 {
-		lf := &logs.File{Version: lv.Version, Waylith: lv.p.F.Waylith}
+		lf := &logs.File{Version: lv.Version, Waylith: lv.p.F.Waylith, HasPhases: lv.p.F.HasPhases}
 		for _, c := range fresh {
 			lf.Entries = append(lf.Entries, c.samples[0])
 		}
@@ -401,6 +404,19 @@ func (lv *LiveLog) finish(a *App, fresh []*LiveCluster) error {
 		if len(c.samples) == 0 {
 			continue
 		}
+		c.Phases = nil
+		if lv.p.F.HasPhases || lv.comp != nil && lv.comp.HasPhases {
+			// Rebuild from the independent sources. Player.log can arrive after its
+			// companion count; incrementing the previously merged total would count
+			// that occurrence twice and invent an unknown-phase remainder.
+			c.Count = 0
+			for _, pc := range c.playerPhases {
+				c.Count += pc.Count
+			}
+		}
+		if lv.p.F.HasPhases {
+			c.Phases = append([]logs.PhaseCount(nil), c.playerPhases...)
+		}
 		if e := lv.comp.Lookup(c.samples[0].Message); e != nil {
 			if c.Level == "" {
 				c.At, c.Level = e.At, e.Level
@@ -408,9 +424,32 @@ func (lv *LiveLog) finish(a *App, fresh []*LiveCluster) error {
 			if e.Count > c.Count {
 				c.Count = e.Count
 			}
+			if lv.comp.HasPhases {
+				c.Phases = logs.MergePhaseCounts(c.Phases, e.Phases)
+			}
+		}
+		if lv.p.F.HasPhases || lv.comp != nil && lv.comp.HasPhases {
+			n := 0
+			for _, pc := range c.Phases {
+				n += pc.Count
+			}
+			c.Count = max(c.Count, n)
+			c.Phases = logs.CompletePhaseCounts(c.Phases, c.Count)
 		}
 		if c.Report != nil && c.Report.Cluster != nil {
 			c.Report.Count = c.Count
+			c.Report.Phases = c.Phases
+			if lv.p.F.HasPhases && !c.OnlyCompanion {
+				c.Report.Phase = c.samples[0].Phase
+				if c.Report.Phase == nil {
+					c.Report.Phase = logs.LoadingPhase
+				}
+			} else if e := lv.comp.Lookup(c.samples[0].Message); e != nil && lv.comp.HasPhases {
+				c.Report.Phase = e.Phase
+				if c.Report.Phase == nil {
+					c.Report.Phase = logs.LoadingPhase
+				}
+			}
 		}
 	}
 	return nil

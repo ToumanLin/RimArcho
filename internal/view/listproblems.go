@@ -180,7 +180,7 @@ func mergeDependencies(st *app.LoadoutState, items []Need) []Need {
 func identifyNeed(n *Need) {
 	mods := slices.Clone(n.Mods)
 	sort.Strings(mods)
-	key := n.code + "|" + n.Target + "|" + strings.Join(mods, ",")
+	key := n.code + "|" + n.Phase + "|" + n.Target + "|" + strings.Join(mods, ",")
 	if n.Target != "" {
 		key = "dependency|" + n.Target
 		if n.Evidence != nil && n.Evidence.Kind == EvCorpus {

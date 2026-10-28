@@ -1,6 +1,7 @@
 package view
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -86,6 +87,7 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 
 // LiveNeeds turns the running game's clusters into 需要处理 items, newest first.
 func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
+	cs = splitLivePhases(cs)
 	var out []Need
 	for i := len(cs) - 1; i >= 0; i-- {
 		c := cs[i]
@@ -116,9 +118,14 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 		} else if c.OnlyCompanion && c.Report.Companion != "" {
 			ev = evidence(EvLog, Tf("%s, this run, %d times", c.Report.Companion, c.Count))
 		}
-		out = append(out, Need{Group: GroupThisRun, Section: SectionRun, Text: text, Counted: true, Mods: ids, Status: StatusLog,
+		n := Need{Group: GroupThisRun, Section: SectionRun, Text: text, Counted: true, Mods: ids, Status: StatusLog,
 			Evidence: ev,
-			Actions:  []Action{{Kind: ActList, Key: "enter", Label: T("see the log and evidence"), Title: T("this run"), Lines: lines}}})
+			Actions:  []Action{{Kind: ActList, Key: "enter", Label: T("see the log and evidence"), Title: T("this run"), Lines: lines}}}
+		if len(c.Phases) > 0 {
+			n.Phase = logs.PhaseName(c.Phases[0].Phase)
+			n.PhaseHeading = phaseHeading(n.Phase)
+		}
+		out = append(out, n)
 	}
 	if len(out) == 0 {
 		return out
@@ -127,6 +134,7 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 	for i := range out {
 		names.fill(&out[i])
 	}
+	sort.SliceStable(out, func(i, j int) bool { return phaseRank(out[i].Phase) < phaseRank(out[j].Phase) })
 	return out
 }
 

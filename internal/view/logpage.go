@@ -26,10 +26,11 @@ type LogFile struct {
 
 // LogRow is one cluster.
 type LogRow struct {
-	ID    string `json:"id"` // E3
-	Class string `json:"class"`
-	Count int    `json:"count"`
-	Text  string `json:"text"` // the first line, rich-text tags removed
+	PhaseStart string `json:"phaseStart,omitempty"` // quiet boundary above this row
+	ID         string `json:"id"`                   // E3
+	Class      string `json:"class"`
+	Count      int    `json:"count"`
+	Text       string `json:"text"` // the first line, rich-text tags removed
 	// Spans is Text with the mods' rich text; Level the line's colour (logtext.go).
 	Spans   []TextSpan `json:"spans"`
 	Level   string     `json:"level"`
@@ -147,8 +148,14 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		// this run had the monitor: its tab is the answer, not a line saying it is missing
 		p.NoMonitor, p.AddMonitor = "", false
 	}
+	var prev *logs.Phase
+	first := true
 	for _, lc := range r.Clusters {
 		row := LogRow{ID: lc.ID, Class: T(lc.Class), Count: lc.Count, Spans: LogSpans(lc.First.Message, 240), Cluster: lc.ID, Info: logs.Informational(lc.Class)}
+		if r.HasPhases && (first || !samePhase(prev, lc.Phase)) {
+			row.PhaseStart = phaseLabel(lc.Phase, a.Loc)
+		}
+		prev, first = lc.Phase, false
 		row.Text = SpanText(row.Spans)
 		switch {
 		case row.Info:
@@ -176,22 +183,24 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		}
 		p.Rows = append(p.Rows, row)
 	}
-	// errors first, then warnings, then what is only informational; each by count
-	order := func(r LogRow) int {
-		if r.Info {
-			return 2
+	if !r.HasPhases {
+		// Keep the existing ordering for logs from older monitors.
+		order := func(row LogRow) int {
+			if row.Info {
+				return 2
+			}
+			if row.Status == StatusWarn {
+				return 1
+			}
+			return 0
 		}
-		if r.Status == StatusWarn {
-			return 1
-		}
-		return 0
+		sort.SliceStable(p.Rows, func(i, j int) bool {
+			x, y := p.Rows[i], p.Rows[j]
+			if order(x) != order(y) {
+				return order(x) < order(y)
+			}
+			return x.Count > y.Count
+		})
 	}
-	sort.SliceStable(p.Rows, func(i, j int) bool {
-		x, y := p.Rows[i], p.Rows[j]
-		if order(x) != order(y) {
-			return order(x) < order(y)
-		}
-		return x.Count > y.Count
-	})
 	return p, nil
 }
