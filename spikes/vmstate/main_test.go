@@ -121,6 +121,10 @@ func TestScaleFixture(t *testing.T) {
 	if err != nil || !strings.Contains(string(marker), `"synthetic":true`) {
 		t.Fatalf("synthetic marker: %s: %v", marker, err)
 	}
+	var fetch string
+	if err := db.QueryRow("SELECT value FROM meta WHERE key='cfg:workshop.fetch'").Scan(&fetch); err != nil || fetch != "off" {
+		t.Fatalf("Workshop fetch must be off: %q: %v", fetch, err)
+	}
 	var entries string
 	if err := db.QueryRow("SELECT w.entries FROM workspace w JOIN plan p ON p.id=w.plan_id WHERE p.name='default'").Scan(&entries); err != nil {
 		t.Fatal(err)

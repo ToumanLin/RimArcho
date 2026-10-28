@@ -95,6 +95,7 @@ func fixtureSized(root string, scale bool) {
 	run(a, "config", "set", "monitor.default", "off")
 	run(a, "config", "set", "ui.lang", "en")
 	if scale {
+		run(a, "config", "set", "workshop.fetch", "off")
 		run(a, "config", "set", "pack.dir", filepath.Join(root, "missing-packs"))
 	}
 	for _, g := range []string{"game-a", "game-b"} {
