@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -13,15 +14,32 @@ import (
 // BarFilter is the editor's filter bar over 未启用 and 已启用: the rows that match, and the
 // groups while the bar is open.
 func (s *API) BarFilter(search string, filters []string, groups bool) (*view.BarFilter, error) {
+	defer perftrace.Span("BarFilter")()
+	// Filtering follows Workspace and uses exactly its row order. Keep that
+	// reader's immutable rows; revalidate the index and list on every request.
+	w := &s.workspaceReader
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	s.mu.Lock()
-	r, err := s.readInventorySession()
+	r, err := s.inventorySession(w)
 	s.mu.Unlock()
+	if err == nil {
+		err = s.refreshPageIndex(r)
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
-	reader := &API{a: r, busy: map[string]bool{}}
+	release, err := pinPageRead(r)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	reader := &API{a: r, busy: map[string]bool{}, board: w.board, boardAt: w.boardAt}
 	b := reader.boardLocked()
+	w.board, w.boardAt = reader.board, reader.boardAt
+	if b.Error != "" {
+		return nil, errors.New(b.Error)
+	}
 	if b.Board == nil || b.St == nil {
 		return &view.BarFilter{}, nil
 	}

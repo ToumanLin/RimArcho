@@ -7,12 +7,31 @@ import { fieldList } from "./fields.js";
 
 import * as ops from "./ops.js";
 
-let seq = 0;
+let seq = 0, detailTimer;
+
+// Cursor bursts keep only the last detail read. Invalidate the previous response
+// immediately so an abandoned row cannot refill the pane while this one waits.
+export function followDetail(it, staged) {
+ clearTimeout(detailTimer);
+ ++seq;
+ S.detail = null;
+ const box = $("#detail");
+ if (box) { box.replaceChildren(); delete box.dataset.ref; }
+ editorFrame = null;
+ if (it) box?.append(el("h1", "", it.name));
+ if (!it || it.missing || !it.id) return showDetail(it, staged);
+ const game = S.envSeq;
+ detailTimer = setTimeout(() => {
+  if (game === S.envSeq && !S.screen) showDetail(it, staged);
+ }, 75);
+}
+
 
 // showDetail draws the plan editor's details of a row (06 §4.1): at once what the row knows
 // (its copies, name, picture), then the detail and the copy's note and actions as Go
 // answers. A Workshop page not read yet is fetched straight away.
 export async function showDetail(it, staged) {
+ clearTimeout(detailTimer);
   const n = ++seq, gameRequest = S.envSeq;
   const current = () => n === seq && S.envSeq === gameRequest;
   const box = $("#detail"), sc = $(".detail .scroll");

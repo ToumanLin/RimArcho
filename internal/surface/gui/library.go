@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -273,6 +274,7 @@ func (s *API) ModCopies(id string) (*ModCopies, error) {
 
 // LibraryCopy is one copy's row (note, ops) by instance id or ref; nil when absent.
 func (s *API) LibraryCopy(id string) (*view.LibInstRow, error) {
+	defer perftrace.Span("LibraryCopy")()
 	var out *view.LibInstRow
 	err := s.withCopyLibrary(id, func(_ *app.App, lib *app.Library) error {
 		out = view.LibCopy(lib, id)

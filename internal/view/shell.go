@@ -14,6 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 )
 
 // The window's shell (06 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
@@ -306,6 +307,7 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 // BuildHomeFromState needs counts and list state, not the editor's thousands of
 // inactive rows, copy captions and search fields.
 func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, packs []PackRow) *Home {
+	defer perftrace.Span("Home-rows")()
 	h := &Home{Featured: -1}
 	name, version := st.Ix.Env.Name, st.Ix.Env.GameVersion
 	chip, ver := EnvChip(name, version), env.MajorMinor(version)
@@ -372,6 +374,7 @@ func packHomeRow(p PackRow, chip, envName, gameVersion string) HomeRow {
 // shared by every game, so each game lists all of them. Their state comes from
 // PlanProblems like any plan that is not current; nothing is loaded or scanned.
 func AddOtherEnvs(a *app.App, h *Home, current string) {
+	defer perftrace.Span("Home-other-envs")()
 	envs, err := a.Store.Envs()
 	if err != nil {
 		return

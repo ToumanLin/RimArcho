@@ -159,11 +159,19 @@ function place(h, on, box, outer, jump) {
 
 // ---- the status line slides in from below ----
 
+const statusAnimations = new WeakMap();
 export function statusIn(s) {
+  statusAnimations.get(s)?.cancel();
+  statusAnimations.delete(s);
   if (still() || !s.textContent) return;
-  s.classList.remove("in");
-  void s.offsetWidth;
-  s.classList.add("in");
+  // Read only animation tokens: restarting through offsetWidth lays out the lists
+  // just changed by an edit. Web Animations restarts the same fade/slide directly.
+  const style = getComputedStyle(s), time = style.getPropertyValue("--t-enter").trim();
+  const duration = parseFloat(time) * (time.endsWith("ms") ? 1 : 1000);
+  statusAnimations.set(s, s.animate([
+    { opacity: 0, transform: "translateY(6px)" },
+    { opacity: 1, transform: "none" },
+  ], { duration, easing: style.getPropertyValue("--ease").trim() }));
 }
 
 // ---- a page that loads lazily shows a shimmer, not a "loading" line ----

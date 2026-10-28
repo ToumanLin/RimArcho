@@ -40,7 +40,8 @@ func run(a *app.App, args ...string) {
 		panic(out)
 	}
 }
-func fixture(root string) {
+func fixture(root string) { fixtureSized(root, false) }
+func fixtureSized(root string, scale bool) {
 	if _, err := os.Stat(root); !os.IsNotExist(err) {
 		panic("fixture destination must not exist")
 	}
@@ -61,8 +62,22 @@ func fixture(root string) {
 		check(os.MkdirAll(filepath.Join(base, "Mods"), 0755))
 		write(filepath.Join(root, g+"-userdata", "Config", "ModsConfig.xml"), `<ModsConfigData><version>1.6.4633</version><activeMods><li>ludeon.rimworld</li><li>vm.dependent</li><li>vm.old</li><li>vm.absent</li><li>vm.installed</li></activeMods></ModsConfigData>`)
 	}
+	if scale {
+		var active strings.Builder
+		active.WriteString("<li>ludeon.rimworld</li>")
+		for i := 0; i < 480; i++ {
+			fmt.Fprintf(&active, "<li>vm.mod-%02d</li>", i)
+		}
+		for _, g := range []string{"game-a", "game-b"} {
+			write(filepath.Join(root, g+"-userdata", "Config", "ModsConfig.xml"), "<ModsConfigData><version>1.6.4633</version><activeMods>"+active.String()+"</activeMods></ModsConfigData>")
+		}
+	}
 	mod(filepath.Join(root, "workshop", "2710270001"), "vm.workshop", "000-workshop", "")
-	for i := 0; i < 28; i++ {
+	count := 28
+	if scale {
+		count = 3992
+	}
+	for i := 0; i < count; i++ {
 		name := fmt.Sprintf("mod-%02d", i)
 		mod(filepath.Join(root, "library", name), "vm."+name, name, "")
 	}
@@ -79,6 +94,10 @@ func fixture(root string) {
 	a.MonitorBundle = app.MonitorNone
 	run(a, "config", "set", "monitor.default", "off")
 	run(a, "config", "set", "ui.lang", "en")
+	if scale {
+		run(a, "config", "set", "workshop.fetch", "off")
+		run(a, "config", "set", "pack.dir", filepath.Join(root, "missing-packs"))
+	}
 	for _, g := range []string{"game-a", "game-b"} {
 		run(a, "env", "add", g, "--game", filepath.Join(root, g), "--user-data", filepath.Join(root, g+"-userdata"))
 	}
@@ -89,7 +108,15 @@ func fixture(root string) {
 	// Read first: extra-folder copies stay unresolved until explicitly bound with UseInstalled.
 	_, err = a.Loadout()
 	check(err)
-	run(a, "loadout", "use-installed", "vm.old", "vm.dependent")
+	if scale {
+		args := []string{"loadout", "use-installed"}
+		for i := 0; i < 480; i++ {
+			args = append(args, fmt.Sprintf("vm.mod-%02d", i))
+		}
+		run(a, args...)
+	} else {
+		run(a, "loadout", "use-installed", "vm.old", "vm.dependent")
+	}
 	st, err := a.Loadout()
 	check(err)
 	check(a.Store.ClearSteps(st.Plan.ID, "undo"))
@@ -102,6 +129,9 @@ func fixture(root string) {
 	_, err = a.Loadout()
 	check(err)
 	a.EnvName = ""
+	if scale {
+		write(filepath.Join(root, "isolated.json"), `{"schema":1,"synthetic":true,"instances":4000,"enabled":481}`)
+	}
 	write(filepath.Join(root, "fixture.json"), `{"schema":1,"seed":271027,"env":"game-a","plan":"default","alternate":"alternate","toggle":"vm.mod-00"}`)
 }
 func rows(db *sql.DB, q string, args ...any) []map[string]any {
@@ -336,9 +366,20 @@ func snapshot(home string, openPlan ...string) any {
 func audit(home, root string) {
 	root, err := filepath.Abs(root)
 	check(err)
+	// A resolved link names the root in its long form; the root as given may be an
+	// 8.3 short path (C:\Users\TOUMAN~1\...), so accept either spelling of it.
+	roots := []string{root}
+	if long, err := filepath.EvalSymlinks(root); err == nil && long != root {
+		roots = append(roots, long)
+	}
 	within := func(path string) bool {
-		rel, err := filepath.Rel(root, path)
-		return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
+		for _, root := range roots {
+			rel, err := filepath.Rel(root, path)
+			if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel) {
+				return true
+			}
+		}
+		return false
 	}
 	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(filepath.Join(home, "archo.db"))+"?mode=ro")
 	check(err)
@@ -365,6 +406,7 @@ func main() {
 	home := flag.String("home", "", "isolated home")
 	root := flag.String("root", "", "new fixture root")
 	plan := flag.String("plan", "", "open plan for problem snapshot")
+	scale := flag.Bool("scale", false, "generate 4,000 instances and a 481-entry default list")
 	flag.Parse()
 	if *mode == "audit" {
 		audit(*home, *root)
@@ -373,7 +415,7 @@ func main() {
 	if *mode == "fixture" {
 		p, err := filepath.Abs(*root)
 		check(err)
-		fixture(p)
+		fixtureSized(p, *scale)
 		fmt.Println(p)
 		return
 	}

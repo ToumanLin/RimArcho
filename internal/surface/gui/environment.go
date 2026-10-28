@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -216,6 +217,7 @@ func (s *API) Workspace(request uint64) bool {
 // Analysis/log commits may change the database while rows are read. Re-read those
 // inputs on a fresh snapshot; an edit or navigation still rejects the original request.
 func (s *API) workspaceRead(request, seq uint64) (*EnvironmentResult, bool) {
+	defer perftrace.Span("Workspace-read")()
 	w := &s.environment
 	result := &EnvironmentResult{Request: request}
 	s.workspaceReader.mu.Lock()

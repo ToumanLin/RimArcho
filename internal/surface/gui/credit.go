@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -16,6 +17,7 @@ import (
 // CreditPrompt is safe to poll at game exit or window focus. null means defer;
 // repeated reads return the same prompt until CreditAnswer commits the answer.
 func (s *API) CreditPrompt() (*app.CreditPromptData, error) {
+	defer perftrace.Span("CreditPrompt")()
 	s.mu.Lock()
 	a, err := s.a.ReadSession()
 	s.mu.Unlock()

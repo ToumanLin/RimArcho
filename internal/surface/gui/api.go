@@ -18,6 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -138,6 +139,7 @@ var processStart = time.Now()
 // Ready is called once the launch page or first-run guide has drawn; it logs the
 // start-up time to <data>/logs/gui.log.
 func (s *API) Ready() {
+	defer perftrace.Span("Ready")()
 	s.prepareBackgrounds(false) // menu extraction starts after the first draw (06 §3.1)
 	s.monitorOnce.Do(s.checkMonitor)
 	ms := time.Since(processStart).Milliseconds()
@@ -189,6 +191,7 @@ type Start struct {
 
 // Init returns the page's start data.
 func (s *API) Init() *Start {
+	defer perftrace.Span("Init")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
@@ -221,6 +224,7 @@ func (s *API) Board() *Board {
 }
 
 func (s *API) boardLocked() *Board {
+	defer perftrace.Span("Board-build")()
 	key, err := s.a.LoadoutKey()
 	b := s.board
 	if err != nil || b == nil || key != s.boardAt {
@@ -504,6 +508,7 @@ func (s *API) PackRemove(name string) (string, error) {
 
 // Directories checks paths on disk even when no database row changed.
 func (s *API) Directories() ([]app.ManagedDirectory, error) {
+	defer perftrace.Span("Directories")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	dirs, err := s.a.ManagedDirectories()
@@ -617,6 +622,7 @@ func (s *API) HistoryGo(steps, version int) (*view.Result, error) {
 // Live reports the running game and the errors its log gained (06 §2.1); the page asks
 // every two seconds.
 func (s *API) Live() (*view.Live, error) {
+	defer perftrace.Span("Live")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.board == nil || s.board.St == nil {
@@ -706,6 +712,7 @@ type Detail struct {
 // page (the page asks again after the cursor rested, 06 §4.3 item 3), refresh ignores the
 // cache.
 func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
+	defer perftrace.Span("Detail")()
 	// Cursor reads retain their own caches. Network fetches get a short-lived
 	// session so an earlier fetch cannot delay the next cursor's cached detail.
 	var r *app.App
@@ -1056,6 +1063,7 @@ func readNeeds(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState) {
 }
 
 func readNeedsChecked(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState, error) {
+	defer perftrace.Span("Needs-read")()
 	if withLog {
 		a.LazyLog, a.LogCacheOnly = false, false
 	}
@@ -1539,6 +1547,7 @@ func (s *API) SaveRefNums(prefix, text string) error {
 
 // Setting reads a GUI setting (column widths, 06 §7).
 func (s *API) Setting(key string) string {
+	defer perftrace.Span("Setting")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !strings.HasPrefix(key, "ui.gui.") {

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -109,6 +110,7 @@ type HomeBg struct {
 // HomeBackground is the launch page's background. With rotation on, one starred image is
 // picked the first time the window asks and kept until it closes.
 func (s *API) HomeBackground() *HomeBg {
+	defer perftrace.Span("HomeBackground")()
 	s.prepareBackgrounds(false)
 	s.mu.Lock()
 	defer s.mu.Unlock()

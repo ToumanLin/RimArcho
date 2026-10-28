@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 )
 
 // The window process's memory (07 §8.3). Go does not collect on its own while the window
@@ -56,6 +57,7 @@ func (r *releaser) soon() {
 // Leave cancels abandoned texture reads and drops transient page state. Dedicated
 // page readers keep their change-keyed caches for the next visit.
 func (s *API) Leave(page string) {
+	defer perftrace.Span("Leave")()
 	if page == "plans" {
 		s.cancelLoadCost(false)
 	}

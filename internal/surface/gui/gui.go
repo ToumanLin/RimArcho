@@ -14,10 +14,12 @@ import (
 	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/icon"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -31,6 +33,7 @@ type Options struct {
 
 // Run opens the window and returns when it is closed.
 func Run(o Options) error {
+	perftrace.Mark("gui-enter")
 	a := o.App
 	view.SetLang(cmds.Setting(a, "ui.lang"))
 	a.LazyLog = true // the newest log is parsed when 需要处理 opens (as in the TUI)
@@ -43,7 +46,9 @@ func Run(o Options) error {
 	if err != nil {
 		return err
 	}
+	iconDone := perftrace.Span("window-icon")
 	ico := windowIcon()
+	iconDone()
 	debug.FreeOSMemory() // the drawing's buffers
 	w := application.New(application.Options{
 		Name:     "RimArcho",
@@ -61,13 +66,16 @@ func Run(o Options) error {
 	api.quit = w.Quit
 	frame := newWindowTheme(cmds.Setting(a, "ui.theme"))
 	win := w.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: "/",
+		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: perfURL(),
 		BackgroundColour:           frame.background,
 		Windows:                    frame.options,
 		DefaultContextMenuDisabled: true, // the page draws its own (06 §8.5)
 	})
+	win.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) { perftrace.Mark("window-show") })
+	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { perftrace.Mark("webview-runtime-ready") })
 	api.windowTheme = frame.bind(win)
 	lowMemoryWhenMinimised(win)
+	perftrace.Mark("window-run")
 	return w.Run()
 }
 
@@ -165,4 +173,11 @@ var openURL = func(u string) error {
 		return exec.Command("open", u).Start()
 	}
 	return exec.Command("xdg-open", u).Start()
+}
+
+func perfURL() string {
+	if os.Getenv("RIMARCHO_PERF") != "" {
+		return "/?perf=1"
+	}
+	return "/"
 }

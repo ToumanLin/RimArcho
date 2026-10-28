@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -34,6 +35,7 @@ type Shell struct {
 
 // Shell builds the sidebar from the needs count and the packs.
 func (s *API) Shell() *Shell {
+	defer perftrace.Span("Shell")()
 	// The sidebar and editor read the same loadout/problems. Reuse their reader
 	// rather than retaining two full indices and sets of declarations/findings.
 	s.workspaceReader.mu.Lock()
@@ -63,6 +65,7 @@ func (s *API) Shell() *Shell {
 
 // shellLocked builds the sidebar; n is needs just built for the current board, else nil.
 func (s *API) shellLocked(n *view.Needs) *Shell {
+	defer perftrace.Span("Shell-build")()
 	out := &Shell{Crumbs: map[string][]view.Crumb{}}
 	envs, err := s.a.Store.Envs()
 	if err != nil {
@@ -127,6 +130,7 @@ func (s *API) shellLocked(n *view.Needs) *Shell {
 
 // Home is the home page (06 §2.3).
 func (s *API) Home() *view.Home {
+	defer perftrace.Span("Home")()
 	s.logRead.mu.Lock()
 	defer s.logRead.mu.Unlock()
 	defer s.free.soon()
