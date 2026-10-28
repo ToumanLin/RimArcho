@@ -39,6 +39,7 @@ type API struct {
 	lib             *app.Library                // Mod 库存, as of libAt
 	libAt           string
 	libGate         sync.Mutex // coalesces full inventory builds, never acquired by edits
+	problemLookup   problemLookup
 	subRead         subscriptionReader
 	copyRead        inventoryReader
 	libRead         logReader
@@ -1131,6 +1132,24 @@ func (s *API) DoAction(act view.Action, option int) (string, error) {
 		return done, nil
 	}
 	return s.text(done, err)
+}
+
+// ProblemDetail opens the cached decision view before an optional provider search.
+func (s *API) ProblemDetail(ref string) (*view.ProblemPanel, error) {
+	// The log reader is independent of editing/navigation and reuses attributed logs.
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err != nil {
+		return nil, err
+	}
+	r.LazyLog, r.LogCacheOnly = false, false
+	ps, err := r.Problems(false, nil)
+	if err != nil {
+		return nil, err
+	}
+	return view.BuildProblemPanel(r, ps, ref)
 }
 
 // inspectable are the read-only commands an item's "see what" may run.

@@ -22,6 +22,7 @@ export function open(kind, title, build) {
 
 export function close() {
   if (!S.popup) return;
+  S.popup.onclose?.();
   S.popup = null;
   const box = $("#popup");
   box.hidden = true;
@@ -353,3 +354,81 @@ export function menu(x, y, actions, keys = false) {
 }
 function hideMenuOutside(e) { if (!$("#menu").contains(e.target)) hideMenu(); else document.addEventListener("mousedown", hideMenuOutside, { once: true }); }
 export function hideMenu() { const m = $("#menu"); m.inert = true; m.hidden = true; }
+
+// A player-requested temporary decision panel (06 §3.1 rule 7).
+export async function problem(ref, run, actionWrite) {
+  open("problem", T("see the problem and fixes"), (box) => {
+    box.append(el("div", "ttl", T("checking the problem…")));
+  });
+  let request = S.popup;
+  const env = S.envSeq;
+  const current = () => S.popup === request && S.envSeq === env;
+  const draw = (detail) => {
+    open("problem", detail.title, (box, p) => {
+      box.classList.add("problem-panel");
+      box.append(el("div", "ttl", detail.title));
+      const body = el("div", "body");
+      if (detail.meaning) body.append(el("p", "", detail.meaning));
+      for (const note of detail.notes || []) body.append(el("p", "", note));
+      if (detail.searching) body.append(el("p", "muted", T("searching installed mods…")));
+      for (const [label, lines] of [[T("affected content"), detail.affected], [T("problem evidence"), detail.evidence]]) {
+        if (!lines?.length) continue;
+        body.append(el("h3", "", label));
+        const list = el("ul");
+        lines.forEach((line, i) => {
+          const li = el("li", "", line);
+          if (lines === detail.affected && detail.locations?.[i]) li.append(el("span", "muted", "  " + detail.locations[i]));
+          list.append(li);
+        });
+        body.append(list);
+      }
+      box.append(body);
+      const btns = el("div", "btns");
+      for (const [i, act] of (detail.actions || []).entries()) {
+        const b = el("button", detail.primary && i === 0 ? "go" : "", act.label);
+        const write = actionWrite(act);
+        if (write) b.dataset.envWrite = write;
+        b.onclick = () => { close(); run(act); };
+        btns.append(b);
+      }
+      const back = el("button", "", T("close") + "  esc");
+      back.onclick = close;
+      btns.append(back);
+      box.append(btns);
+      const buttons = [...btns.querySelectorAll("button")];
+      buttons[0]?.focus();
+      p.keys = (e) => {
+        if (["Tab", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+          e.preventDefault();
+          const i = buttons.indexOf(document.activeElement);
+          const step = e.shiftKey || e.key === "ArrowLeft" ? -1 : 1;
+          buttons[(i + step + buttons.length) % buttons.length].focus();
+        } else if (e.key === "Enter" || e.key === " ") {
+          if (buttons.includes(document.activeElement)) { e.preventDefault(); document.activeElement.click(); }
+        } else if (e.key === "ArrowDown") body.scrollTop += 40;
+        else if (e.key === "ArrowUp") body.scrollTop -= 40;
+        else if (e.key === "PageDown") body.scrollTop += body.clientHeight;
+        else if (e.key === "PageUp") body.scrollTop -= body.clientHeight;
+        return true;
+      };
+    });
+    request = S.popup;
+  };
+  try {
+    const detail = await api.ProblemDetail(ref);
+    if (!current()) return;
+    draw(detail);
+    if (!detail.searching) return;
+    const lookup = await api.BeginProblemProviders();
+    const cancel = () => { api.CancelProblemProviders(lookup).catch(() => {}); };
+    if (!current()) { cancel(); return; }
+    request.onclose = cancel;
+    const updated = await api.ProblemProviders(ref, lookup);
+    if (!current()) { cancel(); return; }
+    request.onclose = null;
+    cancel();
+    draw(updated);
+  } catch (e) {
+    if (current()) { close(); say("fail", errText(e)); }
+  }
+}

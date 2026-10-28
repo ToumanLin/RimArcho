@@ -135,7 +135,7 @@ func evidenceFor(p *app.Problem) *Evidence {
 	case "def.parent-missing":
 		src := T("an inherited definition is missing")
 		if m := parentRe.FindStringSubmatch(p.Claim); m != nil {
-			src = Tf("%s inherits %s, which no enabled mod defines", m[1], m[2])
+			src = Tf("%s cannot load: its base content %s is missing", m[1], m[2])
 		}
 		return evidence(EvInferred, src)
 	case "mod.pinned":

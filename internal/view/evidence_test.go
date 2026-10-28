@@ -70,7 +70,7 @@ func TestNeedsMergePerMod(t *testing.T) {
 			Evidence: []finding.Evidence{{Source: finding.Inferred, Text: "x"}}}}
 	}
 	one := view.BuildNeeds(e.App, b.St, &app.ProblemSet{List: []*app.Problem{parent("A_Def")}})
-	if len(one.Items) != 1 || one.Items[0].Fold || one.Items[0].Evidence.Source != "A_Def inherits BaseThing, which no enabled mod defines" {
+	if len(one.Items) != 1 || one.Items[0].Fold || one.Items[0].Evidence != nil {
 		t.Fatalf("one %+v", one.Items)
 	}
 	three := view.BuildNeeds(e.App, b.St, &app.ProblemSet{List: []*app.Problem{parent("A_Def"), parent("B_Def"), parent("C_Def")}})
@@ -78,7 +78,7 @@ func TestNeedsMergePerMod(t *testing.T) {
 		t.Fatalf("merged into %d items, count %d", len(three.Items), three.Count)
 	}
 	it := three.Items[0]
-	if !it.Fold || len(it.Parts) != 3 || it.Title != "3 parts of Alpha may be missing a dependency" || !strings.HasSuffix(it.Evidence.Source, "and 2 more") {
+	if !it.Fold || len(it.Parts) != 3 || it.Title != "Alpha: 3 added things cannot load" || it.Evidence != nil || strings.Contains(it.Why, ". ") || !strings.Contains(it.Why, "16%") {
 		t.Fatalf("merged %+v %+v", it, it.Evidence)
 	}
 	if last := it.Actions[len(it.Actions)-1]; last.Kind != view.ActFold {

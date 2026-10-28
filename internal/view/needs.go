@@ -46,6 +46,7 @@ const (
 	ActDisable         = "disable"          // Refs
 	ActChooseDisable   = "choose-disable"   // pick one of Options, then disable its Refs
 	ActOpenURL         = "open-url"         // URL in the browser
+	ActProblem         = "problem"          // focused problem, Problem: p:ref
 	ActView            = "view"             // read-only command text: Argv
 	ActList            = "list"             // show Title and Lines
 	ActFold            = "fold"             // show / hide the item's Parts
@@ -249,6 +250,13 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		}
 		out = append(out, n)
 	}
+	parentSeen := map[string]bool{}
+	parentGroups := map[string][]*app.Problem{}
+	for _, p := range ps.List {
+		if p.Code == "def.parent-missing" {
+			parentGroups[p.SubjectInstance()] = append(parentGroups[p.SubjectInstance()], p)
+		}
+	}
 	var versions []*app.Problem
 	var order []Need                    // order.violated: folded into one item when there are several
 	var weak []Need                     // order.violated of weak or harmless constraints: one dimmed item (04 §5.3)
@@ -340,7 +348,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 		case "mod.known-error":
 			// The mod's own problem (03 §4.3): whatever else is enabled, shared logs show it.
 			add(Need{rank: 9, Group: GroupConflict, Text: Tf("%s has a known error: this is the mod's own problem", nm(x)),
-				Actions: []Action{viewAction(T("see the error"), "problems", "show", p.Ref)}, Mods: ids, Status: StatusWarn, Dim: true,
+				Actions: []Action{problemAction(p.Ref)}, Mods: ids, Status: StatusWarn, Dim: true,
 				Title: Tf("%s has a known error: this is the mod's own problem", nm(x)), Why: T("not your list's: shared logs show it whatever else is enabled; an update may fix it"), Evidence: ev})
 		case "order.cycle":
 			add(Need{rank: 2, Group: GroupList, Text: Tf("sorting keeps the strongest constraints in a cycle of %d mods", len(subj)),
@@ -426,7 +434,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 				continue // no inactive target: nothing the player can do (technical information)
 			}
 			merge("patch|"+x+"|"+y, nm(x), nm(y), Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("part of %s does not take effect: %s, which it targets, is not enabled", nm(x), nm(y)),
-				Actions: []Action{enable(st, y), viewAction(T("see what"), "patches", "--mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s,
+				Actions: []Action{enable(st, y), problemAction(p.Ref)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("part of %s does not take effect", nm(x)), Why: Tf("it changes things %s adds, and %s is not enabled.", nm(y), nm(y)), Evidence: ev})
 		case "incompat.active":
 			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s,
@@ -469,9 +477,10 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) []Need {
 			}
 			add(n)
 		case "def.parent-missing":
-			merge("def|"+x, nm(x), "", Need{Group: GroupDeps, Text: Tf("part of %s builds on a definition no enabled mod provides; a dependency may be missing", nm(x)),
-				Actions: []Action{viewAction(T("see what"), "mod", TokRef(st, x))}, Counted: true, Mods: ids, Status: s,
-				Title: Tf("part of %s may be missing a dependency", nm(x)), Why: T("it builds on a definition no enabled mod provides."), Evidence: ev})
+			if !parentSeen[x] {
+				parentSeen[x] = true
+				add(parentNeed(st, parentGroups[p.SubjectInstance()], p))
+			}
 		default:
 			// Harmony warnings without log evidence, overlapping Defs and patches whose target
 			// is simply absent stay in the technical information (06 §5).
@@ -1008,7 +1017,15 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 	case ActTrash:
 		_, err = a.Trash(act.Refs[0], false)
 	case ActIgnore:
-		_, err = a.IgnoreProblem(act.Problem, false)
+		refs := act.Refs
+		if len(refs) == 0 {
+			refs = []string{act.Problem}
+		}
+		for _, ref := range refs {
+			if _, err = a.IgnoreProblem(ref, false); err != nil {
+				return "", err
+			}
+		}
 	case ActUnlinkPacks:
 		_, err = a.UnlinkPacks(false)
 	case ActRepairLinks:

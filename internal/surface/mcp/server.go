@@ -530,7 +530,7 @@ func ArgvFor(name string, args []byte) ([]string, error) {
 // ProblemsArgv maps list_problems: warning and above by default (03 §4.5).
 func ProblemsArgv(in ProblemsIn) []string {
 	if in.Ref != "" {
-		return []string{"problems", "show", in.Ref}
+		return gv(argv("problems").str("ref", in.Ref).flag("all", in.All), in.GameVersion)
 	}
 	min := in.MinSeverity
 	if min == "" && in.Severity == "" && !in.All {

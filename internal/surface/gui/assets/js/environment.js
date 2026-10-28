@@ -29,6 +29,7 @@ function updateActions(root = document.body) {
 
 export async function withEnvironmentSwitch(name, action) {
   const seq = ++S.envSeq;
+  S.popup?.onclose?.();
   const current = () => S.envSeq === seq;
   S.busy.env = name;
   // Invalidate reads already in flight, even if the destination has the same name.
