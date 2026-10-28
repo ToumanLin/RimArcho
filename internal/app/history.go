@@ -39,7 +39,7 @@ func (a *App) History() (*History, error) {
 	}
 	after := st.List
 	for i, s := range undo {
-		before := loadout.Decode(s.Entries)
+		before := st.readList(s.Entries)
 		h.Undo = append(h.Undo, HistoryStep{Op: s.Op, Changes: loadout.Diff(before, after, st.LineageOf), Steps: i + 1})
 		after = before
 	}
@@ -49,7 +49,7 @@ func (a *App) History() (*History, error) {
 	}
 	before := st.List
 	for i, s := range redo {
-		next := loadout.Decode(s.Entries)
+		next := st.readList(s.Entries)
 		h.Redo = append(h.Redo, HistoryStep{Op: s.Op, Changes: loadout.Diff(before, next, st.LineageOf), Steps: -(i + 1)})
 		before = next
 	}
