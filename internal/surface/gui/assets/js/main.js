@@ -1287,7 +1287,20 @@ async function start() {
     try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
     checkCredit();
   });
-  await reload();
+  // The start page needs only Workspace's shell and board. The editor behind it gets its
+  // filter answer (the bar's first one reads every mod's content) and its rows afterwards,
+  // so the first page does not wait for them.
+  let shellIn;
+  const shellRead = new Promise((r) => { shellIn = r; });
+  reload(null, { current: () => true, commit(apply) { apply(); shellIn(); return true; } })
+    .then((ok) => {
+      if (!ok) return; // a newer read (the editor opened, the game changed) has these rows
+      renderTop();
+      renderLists();
+      scr.notePageContext(null); // opening the editor shows these rows and reads behind them
+    }, () => retryRead())
+    .finally(() => shellIn());
+  await shellRead;
   // No environment yet: the first-run guide (06 §2.15); else the home page (06 §2.3).
   const first = !S.shell || !S.shell.envs;
   if (first) await guide.start("first");

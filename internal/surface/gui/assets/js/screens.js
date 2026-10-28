@@ -87,6 +87,9 @@ const pageReads = new Map();
 // pages kept warm: shown at once from their last drawing when the game and list are the same
 const WARM = new Set(["needs"]);
 const pageContexts = new Map();
+// notePageContext records that a page's content was drawn for the current game and list
+// without a page read (the editor behind the start page), so opening it is warm.
+export function notePageContext(name) { pageContexts.set(name, JSON.stringify([S.board?.env, S.shell?.plan?.id])); }
 let activeRead = null;
 export const pendingPageRead = () => activeRead?.done;
 function settlePageRead() { activeRead?.resolve(); activeRead = null; }
