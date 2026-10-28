@@ -1,4 +1,5 @@
 {
+ "cutoff": "2026-10",
  "source": "RimArcho log corpus: 40326 shared HugsLib logs of RimWorld 1.6 (2025-07..2026-10, evenly sampled per month, cleaned by the collector filter), attribution by RimArcho (final run v5). Aggregate counts only; every entry from the logs of at least 5 different players. Logs are shared because something went wrong: rates are of shared logs, not of all players.",
  "game": "1.6",
  "logs": 40326,

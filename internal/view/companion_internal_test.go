@@ -20,7 +20,7 @@ func TestCompanionChip(t *testing.T) {
 	if ev := logEvidence([]*app.Problem{p, q}, ""); ev.Source != "ArchoMonitor.log  Defs/ThingDefs/a.xml and 1 more" {
 		t.Fatalf("two files: %+v", ev)
 	}
-	if ev := logEvidence([]*app.Problem{{Finding: &finding.Finding{Claim: "log:E3 x1: x"}}}, ""); ev.Source != "log:E3" {
+	if ev := logEvidence([]*app.Problem{{Finding: &finding.Finding{Claim: "log:E3 x1: x"}}}, ""); ev.Source != "Player.log, 1 error groups" {
 		t.Fatalf("no file: %+v", ev)
 	}
 }

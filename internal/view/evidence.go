@@ -5,6 +5,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/known"
 )
 
 // 能不能跑's sections and evidence (06 §2.4): the items are shown in four sections by
@@ -58,13 +59,21 @@ var evidenceLabels = map[string]string{
 // Evidence is the chip on an item: its kind in words and the concrete source
 // ("About.xml modDependencies", "log:E3 · 10 月 19 日 21:04").
 type Evidence struct {
+	Cutoff string `json:"cutoff,omitempty"`
 	Kind   string `json:"kind"`
 	Label  string `json:"label"`
 	Source string `json:"source,omitempty"`
 }
 
 func evidence(kind, source string) *Evidence {
-	return &Evidence{Kind: kind, Label: T(evidenceLabels[kind]), Source: source}
+	e := &Evidence{Kind: kind, Label: T(evidenceLabels[kind]), Source: source}
+	if kind == EvCorpus {
+		e.Cutoff = known.Get().Cutoff
+		if e.Cutoff != "" {
+			e.Label = Tf("%s (up to %s)", e.Label, e.Cutoff)
+		}
+	}
+	return e
 }
 
 // evidenceKind is the kind of a finding's first evidence, else def.
@@ -113,7 +122,14 @@ func evidenceFor(p *app.Problem) *Evidence {
 				field = m[1]
 			}
 		}
-		return evidence(kind, Tf("About.xml %s", field))
+		switch field {
+		case "modDependencies", "modDependenciesByVersion":
+			return evidence(kind, T("About.xml modDependencies"))
+		case "loadBefore", "forceLoadBefore":
+			return evidence(kind, T("the author's requirement to load before another mod"))
+		default:
+			return evidence(kind, T("the author's requirement to load after another mod"))
+		}
 	case "order.cycle":
 		return evidence(EvDeclared, T("the mods' load-order requirements"))
 	case "official.order":
@@ -235,11 +251,8 @@ func logEvidence(ps []*app.Problem, when string) *Evidence {
 		}
 	}
 	src := "Player.log"
-	switch {
-	case len(ids) == 1:
-		src = ids[0]
-	case len(ids) > 1:
-		src = Tf("%s and %d more", ids[0], len(ids)-1)
+	if len(ids) > 0 {
+		src = Tf("Player.log, %d error groups", len(ids))
 	}
 	switch files := companionChips(texts); {
 	case len(files) == 1:

@@ -71,7 +71,9 @@ func ProblemsOf(n *Needs) *ListProblems {
 				m.Summary = title
 				m.Severity = sev
 			}
-			m.Count++
+			if it.Counted {
+				m.Count++
+			}
 			m.ProblemIDs = append(m.ProblemIDs, it.ID)
 		}
 	}
@@ -120,8 +122,13 @@ func mergeDependencies(st *app.LoadoutState, items []Need) []Need {
 			out = append(out, it)
 			continue
 		}
-		if i, ok := by[it.Target]; ok {
+		key := it.Target
+		if it.Evidence != nil && it.Evidence.Kind == EvCorpus {
+			key = "corpus|" + key
+		}
+		if i, ok := by[key]; ok {
 			n := &out[i]
+			n.linkProblems = append(n.linkProblems, it.linkProblems...)
 			for _, o := range it.RequiredBy {
 				if !slices.ContainsFunc(n.RequiredBy, func(x ModOwner) bool { return x.ID == o.ID }) {
 					n.RequiredBy = append(n.RequiredBy, o)
@@ -150,10 +157,13 @@ func mergeDependencies(st *app.LoadoutState, items []Need) []Need {
 				names = append(names, o.Name)
 			}
 			n.Why = Tf("required by: %s", strings.Join(names, ", "))
+			if n.Evidence != nil && n.Evidence.Kind == EvCorpus {
+				n.Why = Tf("may be needed by: %s; try adding it if errors mention a missing dependency.", strings.Join(names, ", "))
+			}
 			n.Text = n.Title + "  " + n.Why
 			continue
 		}
-		by[it.Target] = len(out)
+		by[key] = len(out)
 		if len(it.Parts) == 0 {
 			it.Parts = []string{it.Text}
 		}
@@ -167,6 +177,9 @@ func identifyNeed(n *Need) {
 	key := n.code + "|" + n.Target + "|" + strings.Join(mods, ",")
 	if n.Target != "" {
 		key = "dependency|" + n.Target
+		if n.Evidence != nil && n.Evidence.Kind == EvCorpus {
+			key = "corpus|" + key
+		}
 	} else {
 		key += "|" + n.Text
 	}

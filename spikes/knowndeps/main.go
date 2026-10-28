@@ -631,6 +631,7 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 	p("thresholds: players >= %d, candidate cover >= %.0f%%, prerequisite rate >= %.0f%%", *minPlayers, 100**cover, 100**minRate)
 
 	data := &known.Data{
+		Cutoff: "2026-10",
 		Source: fmt.Sprintf("RimArcho log corpus: %d shared HugsLib logs of RimWorld %s (2025-07..2026-10, evenly sampled per month, cleaned by the collector filter), attribution by RimArcho (final run v5). Aggregate counts only; every entry from the logs of at least 5 different players. Logs are shared because something went wrong: rates are of shared logs, not of all players.", len(ls), mm),
 		Game:   mm, Logs: len(ls),
 	}

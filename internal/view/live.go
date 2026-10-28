@@ -120,6 +120,13 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 			Evidence: ev,
 			Actions:  []Action{{Kind: ActList, Key: "enter", Label: T("see the log and evidence"), Title: T("this run"), Lines: lines}}})
 	}
+	if len(out) == 0 {
+		return out
+	}
+	names := newNeedNames(nil, st, nil)
+	for i := range out {
+		names.fill(&out[i])
+	}
 	return out
 }
 

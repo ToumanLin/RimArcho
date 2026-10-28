@@ -11,6 +11,7 @@ export const icon = {
   git: svg('<circle cx="4.5" cy="4" r="1.6"/><circle cx="4.5" cy="12" r="1.6"/><circle cx="11.5" cy="6" r="1.6"/><path d="M4.5 5.6v4.8M11.5 7.6c0 2-2 2.6-5.4 3.2"/>'),
   err: svg('<circle cx="8" cy="8" r="6"/><path d="M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4"/>', "err"),
   warn: svg('<path d="M8 2.2l6.2 11H1.8z"/><path d="M8 6.6v3M8 11.4v.2"/>', "warn"),
+  hint: svg('<circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 4.6v.2"/>', "hint"),
   log: svg('<rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 8.5h6M5 11h3.5"/>', "log"),
   unloadable: svg('<circle cx="8" cy="8" r="5.6" stroke-dasharray="2.2 2"/>', "dim"),
   rescan: svg('<path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.8"/><path d="M13.4 2.6v2.8h-2.8"/>'),
@@ -41,6 +42,7 @@ export function sourceIcon(kind) { return icon[kind] || icon.local; }
 
 // statusIcon: view.Status* (none, unloadable, warn, log, err).
 export function statusIcon(s) {
+  if (s === -1) return icon.hint;
   return ["", icon.unloadable, icon.warn, icon.log, icon.err][s] || "";
 }
 

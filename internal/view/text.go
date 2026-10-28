@@ -390,7 +390,6 @@ var zhText = map[string]string{
 	"%s seems to need %s (seen in shared logs), which is not installed":                                      "%s 似乎需要 %s（玩家分享的日志中常见），但没有安装它",
 	"%s seems to need %s (seen in shared logs), which is not enabled":                                        "%s 似乎需要 %s（玩家分享的日志中常见），但它没有启用",
 	"%s and %s often produce errors together (seen in shared logs)":                                          "%s 和 %s 同时启用时经常报错（玩家分享的日志中常见）",
-	"this version of %s often produces errors (seen in shared logs); other versions did not":                 "这个版本的 %s 经常报错（玩家分享的日志中常见），其他版本没有",
 	"%s is incompatible with %s":                                                                             "%s 与 %s 不兼容",
 	"part of %s builds on a definition no enabled mod provides; a dependency may be missing":                 "%s 的部分内容继承的定义不存在，可能缺少前置 Mod",
 	"%d mods do not list %s as supported":                                                                    "%d 个 Mod 没有标明支持 %s",
