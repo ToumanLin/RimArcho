@@ -7,6 +7,29 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 
+- Launching from the window with a required mod missing or disabled now asks once ("launch
+  anyway" / cancel) and lists what is missing: the game would not load the mods that need
+  them and may reset its list to the base game. The CLI and TUI still launch without asking.
+- When an outside change that RimArcho loads by itself drops mods from the list (the game
+  resets its list after mods fail to load), `scan` says how many and which version still
+  has them, and the can it run page shows a card: see the difference, put the version
+  before back (one undoable step), or keep the change.
+- The outside-change card's "see the difference" shows the two lists in the window, one
+  mod a line; it used to run a CLI command the window does not allow. A save or launch
+  refused over an outside change points to that card instead of listing `archo` commands.
+- Downloading with SteamCMD as the account the running Steam client is signed in with signs
+  the client out; the preview now says so. Steam's "no connection" (code 3) reads "the
+  Steam client is offline" with a hint to restart Steam, and Workshop tasks show Steam's
+  own reason instead of always "download was not confirmed".
+- Steam subscribe and unsubscribe no longer get undone by Steam's own subscription refresh:
+  the worker waits for the refresh to land and asks again if an item flips back.
+- Background tasks: items handed to a new task by "continue" or "retry" are marked so, and
+  the old task no longer offers the same action for them.
+- A batch preview in the mod library goes ahead without the copies that cannot be done
+  now and names them, instead of refusing the whole batch.
+- Mod library cells stay on one line (long text is cut short), and analysis progress is
+  shown in the window's language.
+
 - Sorting a list with a constraint cycle now gives up the weakest constraint on the cycle
   (by the log corpus's strength: harmless, weak, then strong; then community rules,
   loadAfter, loadBefore, dependencies) and orders the rest by what holds, instead of keeping
