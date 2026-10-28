@@ -14,6 +14,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   path for missing textures), include both error and warning counts, and open that run's
   game log with a related cluster selected. Unattributed errors open the complete log;
   earlier logs open their own file. The TUI keeps its existing log inspection view.
+  The evidence line labels the mod's file and puts gaps between it, the log name and the
+  time ("file Defs/…/Apparel.xml   ArchoMonitor.log   Oct 28 15:45"); before, the window
+  ran them together so they read as one path.
 
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.

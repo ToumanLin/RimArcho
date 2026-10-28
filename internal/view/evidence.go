@@ -2,6 +2,7 @@ package view
 
 import (
 	"regexp"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/finding"
@@ -220,12 +221,13 @@ var (
 )
 
 // companionChips are the files the companion log names in evidence texts, as
-// "ArchoMonitor.log · Defs/X.xml".
+// "file Defs/X.xml  ArchoMonitor.log": the mod's file labelled as one, then the log that
+// named it; two spaces part facts (06 §7.3, the GUI shows them as a gap).
 func companionChips(texts []string) []string {
 	var out []string
 	for _, t := range texts {
 		if m := companionFileRe.FindStringSubmatch(t); m != nil {
-			c := m[1] + "  " + m[2]
+			c := Tf("file %s", m[2]) + "  " + m[1]
 			dup := false
 			for _, o := range out {
 				dup = dup || o == c
@@ -258,7 +260,9 @@ func logEvidence(ps []*app.Problem, when string) *Evidence {
 	case len(files) == 1:
 		src = files[0]
 	case len(files) > 1:
-		src = Tf("%s and %d more", files[0], len(files)-1)
+		// "file a.xml, and 1 more  ArchoMonitor.log"
+		f, log, _ := strings.Cut(files[0], "  ")
+		src = Tf("%s and %d more", f, len(files)-1) + "  " + log
 	}
 	if when != "" {
 		src += "  " + when

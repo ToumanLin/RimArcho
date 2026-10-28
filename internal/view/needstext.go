@@ -110,6 +110,7 @@ func init() {
 		"About.xml.disabled, and no longer subscribed":    "说明文件已被改名隐藏，Steam 也已退订",
 		"About.xml is renamed to About.xml.disabled":      "说明文件被改名，游戏不会识别它",
 		"%s and %d more":                                  "%s，另有 %d 处",
+		"file %s":                                         "文件 %s",
 		"Player.log, this run, %d times":                  "Player.log，本次运行，%d 次",
 		"ModsConfig.xml says %s":                          "ModsConfig.xml 写的是 %s",
 		"ModsConfig.xml differs from what RimArcho wrote": "ModsConfig.xml 和 RimArcho 写入的不一样",
