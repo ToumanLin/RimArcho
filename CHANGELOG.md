@@ -4,6 +4,15 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- The database (`archo.db`) takes less space. Upgrading to schema 25 drops analysis
+  indexes no query uses (about 40 MB on a library of 4,000 mods analysed for two game
+  versions) and compresses stored log reports (a 9 MB report becomes about 0.4 MB).
+  After an analysis or a scan that recorded mod updates, the `archo.db-wal` file is cut
+  back instead of staying at its largest size (often 100 MB or more) while RimArcho is
+  open. Databases that missed the index for finding a Def by `Name` (two updates both
+  used schema 15) get it back, so a log with many missing parent templates is
+  attributed quickly again.
+
 - Archo Monitor records game loading, save loading, new colony generation, playing and
   returns to the main menu. Can it run groups recorded errors by phase; the game log
   adds quiet phase separators. CLI and MCP include phase counts. Older logs keep their

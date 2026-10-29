@@ -260,6 +260,9 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if err := a.Store.FinishScan(scanID, a.Now(), st); err != nil {
 		return nil, err
 	}
+	if st.Snapshots > 0 {
+		a.Store.TruncateWAL() // new snapshots wrote their file lists through the WAL (02 §7)
+	}
 	rep := &ScanReport{Env: e, ScanID: scanID, Full: full, GameOnly: o.GameOnly, Stats: st}
 	// 04 §4.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
 	if ls, err := a.Loadout(); err == nil {

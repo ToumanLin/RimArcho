@@ -1,5 +1,5 @@
 // Package store is RimArcho's SQLite fact store (02 §7), using modernc.org/sqlite in WAL mode
-// with synchronous=NORMAL (07 §7 item 4).
+// with synchronous=NORMAL and a WAL size limit.
 package store
 
 import (
@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 24
+const SchemaVersion = 25
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -389,7 +389,9 @@ func open(path string, initialise bool) (*Store, error) {
 		return nil, err
 	}
 	// Per-connection settings go in the DSN so every connection the pool opens gets them.
-	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)"
+	// journal_size_limit: after a large write the WAL file is cut back to 16 MB when it is
+	// next reset, instead of keeping its largest size while any connection is open (02 §7).
+	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_pragma=journal_size_limit(16777216)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
@@ -426,9 +428,9 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13, schemaV14, schemaV15, schemaV16, schemaV17, schemaV18, schemaV19, schemaV20, schemaV21, schemaV22, schemaV23, schemaV24}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13, schemaV14, schemaV15, schemaV16, schemaV17, schemaV18, schemaV19, schemaV20, schemaV21, schemaV22, schemaV23, schemaV24, schemaV25}
 	// post runs after a step's SQL, in the same transaction.
-	post := map[int]func(*sql.Tx) error{11: migrateV11, 14: migrateV14, 19: migrateV19, 22: migrateV22, 24: migrateV24}
+	post := map[int]func(*sql.Tx) error{11: migrateV11, 14: migrateV14, 19: migrateV19, 22: migrateV22, 24: migrateV24, 25: migrateV25}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {
