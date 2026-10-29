@@ -209,6 +209,8 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("maintenance", map[string]any{"action": "import_rimcrow", "db": crowDB}, "import", "rimcrow", "--db", crowDB),
 		s("maintenance", map[string]any{"action": "gc", "dry_run": true}, "gc", "--dry-run"),
 		s("maintenance", map[string]any{"action": "gc"}, "gc"),
+		s("maintenance", map[string]any{"action": "vacuum", "dry_run": true}, "db", "vacuum", "--dry-run"),
+		s("maintenance", map[string]any{"action": "vacuum"}, "db", "vacuum"),
 		// 0.9: history, going back to a version, plans (I10) and launching.
 		func() manageStep {
 			h := r("Harmony")

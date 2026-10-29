@@ -122,7 +122,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     problems unmute-version <mod>…            restore version warnings for these packages
     db status                                 the database: path, size, backups
     db backup                                 write a consistent copy of the database to <data>/backups
-    db vacuum                                 compact the database
+    db vacuum                                 clean old file lists and compact the database
     cache status                              the caches and their sizes
     cache clear <kind>                        empty one cache (previews, workshop, images, source, logs); rebuilt on demand
     subscribe git <url>                       install a Git mod and track its branch, tag or commit

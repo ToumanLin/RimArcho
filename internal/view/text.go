@@ -533,7 +533,7 @@ var zhText = map[string]string{
 	"external ModsConfig.xml version ignored (it stays in loadout log)": "已忽略外部修改的 ModsConfig.xml（仍保留在列表历史里）",
 	"… %d more": "… 另有 %d 项",
 	"(semantic files unchanged: only other files changed)": "（语义文件未变，只有其他文件变化）",
-	"(snapshot no longer stored)":                          "（快照已不在库中）",
+	"(file lists no longer stored)":                        "（文件清单已清理）",
 	"(no file-level difference recorded for this event)":   "（此事件没有文件级差异记录）",
 	"no changes":            "没有变化",
 	"no scan yet (R scans)": "尚未扫描（R 扫描）",

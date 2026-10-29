@@ -370,6 +370,12 @@ gc: would remove 0 tombstones (tombstones older than 90 days, before 2026-07-03)
 gc: removed 0 tombstones (tombstones older than 90 days, before 2026-07-03)
   snapshots: 0 superseded (0 file rows)
 
+> maintenance {"action":"vacuum","dry_run":true}
+database maintenance: would remove 6 old file records and compact the database
+
+> maintenance {"action":"vacuum"}
+database compacted: 1.1 MB → 444.0 KB; freed 698.7 KB
+
 > edit_loadout {"action":"disable","refs":["#hnyg"]}
 workspace: 2 active, 1 change unsaved (plan:default, env:main)
   removed  #hnyg  Harmony  was 2

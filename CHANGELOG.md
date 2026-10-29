@@ -4,6 +4,14 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- The GUI now cleans old snapshot file lists and reclaims database space weekly
+  while idle. Current snapshots, unanswered identity evidence and each mod copy's
+  last three updates keep their complete file lists; older history keeps its
+  events and declarations and explains when file lists have been cleaned.
+  Settings' existing Compact button, `db vacuum` and MCP maintenance's `vacuum`
+  action use the same cleanup and report freed space. Running games block it;
+  tombstone collection remains manual.
+
 - Archo Monitor records game loading, save loading, new colony generation, playing and
   returns to the main menu. Can it run groups recorded errors by phase; the game log
   adds quiet phase separators. CLI and MCP include phase counts. Older logs keep their
