@@ -40,7 +40,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   to Player.log is listed once. Before, when the game's next log line came more than 5
   seconds later, "this run" listed it twice, once from Player.log and once from
   ArchoMonitor.log. The counts of "this run" items no longer grow past the larger of the
-  two logs' counts. `archo log --follow` prints it once too.
+  two logs' counts. `archo log --follow` prints it once too. A line the game logs as
+  noise, such as "Translation data for language English has 9 errors", is no longer listed
+  under "this run" from ArchoMonitor.log; the analysis after the game exits never listed it.
 - An open Can it run updates itself when the background check finishes and when the game
   exits. Before, it kept the run's old time and items until you left the page and came
   back.

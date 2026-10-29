@@ -3,6 +3,7 @@ package app
 import (
 	"bufio"
 	"bytes"
+	"hash/maphash"
 	"io"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ const (
 	liveMaxClusters = 2000
 	liveSamples     = 3
 	liveMaxRead     = 8 << 20 // bytes per poll; the rest comes on the next one
+	liveMaxQuiet    = 50000   // remembered Player.log lines that are not errors (~1 MB)
 )
 
 // LiveCluster is one error cluster of a running game.
@@ -62,6 +64,10 @@ type LiveLog struct {
 	by       map[string]*LiveCluster
 	byMatch  map[string]bool         // normalised first lines of the clusters' entries
 	compOnly map[string]*LiveCluster // companion-only clusters by their entry's first line
+	// quiet holds hashes of the normalised first lines of Player.log entries that are not
+	// errors (noise, information): a monitor entry with the same line is in Player.log, as
+	// the full analysis decides, and does not become a cluster of its own.
+	quiet    map[uint64]struct{}
 	order    []*LiveCluster
 	behind   bool // Player.log has more left than one poll reads
 	comp     *logs.Companion
@@ -78,7 +84,12 @@ const liveCompanionWait = 5 * time.Second
 type liveKey struct {
 	interesting          bool
 	key, template, class string
+	quiet                uint64 // quietHash of the first line, for entries that are not errors
 }
+
+var quietSeed = maphash.MakeSeed()
+
+func quietHash(match string) uint64 { return maphash.String(quietSeed, match) }
 
 // FollowLog starts following path from its beginning (a running game's log is short),
 // with an explicit companion log ("" for none).
@@ -135,6 +146,7 @@ func (lv *LiveLog) reset() {
 	lv.by = map[string]*LiveCluster{}
 	lv.byMatch = map[string]bool{}
 	lv.compOnly = map[string]*LiveCluster{}
+	lv.quiet = map[uint64]struct{}{}
 	lv.order = nil
 	lv.memo = map[string]liveKey{}
 }
@@ -169,6 +181,8 @@ func (lv *LiveLog) classify(e *logs.Entry) liveKey {
 	k := liveKey{interesting: logs.Interesting(e)}
 	if k.interesting {
 		k.key, k.template, k.class = logs.ClusterKeyHint(e, logs.HintFrom(lv.comp))
+	} else {
+		k.quiet = quietHash(firstLineKey(e.Message))
 	}
 	if len(lv.memo) >= 10000 {
 		clear(lv.memo)
@@ -271,6 +285,12 @@ func (lv *LiveLog) take(all bool) []*LiveCluster {
 	for _, e := range es[:k] {
 		ck := lv.classify(e)
 		if !ck.interesting {
+			if lv.comp != nil {
+				if len(lv.quiet) >= liveMaxQuiet {
+					clear(lv.quiet) // the monitor's entries meet their lines within seconds
+				}
+				lv.quiet[ck.quiet] = struct{}{}
+			}
 			continue
 		}
 		key, tmpl, cls := ck.key, ck.template, ck.class
@@ -357,7 +377,7 @@ func (lv *LiveLog) companionOnly(all bool) []*LiveCluster {
 		if lv.compDone[e] || !e.Monitor || (e.Level != "ERROR" && e.Level != "WARNING") {
 			continue
 		}
-		if lv.byMatch[e.Match] {
+		if _, quiet := lv.quiet[quietHash(e.Match)]; quiet || lv.byMatch[e.Match] {
 			lv.compDone[e] = true
 			continue
 		}

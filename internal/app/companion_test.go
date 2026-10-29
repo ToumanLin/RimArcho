@@ -278,6 +278,41 @@ func TestLiveLogMonitorFirst(t *testing.T) {
 	}
 }
 
+// A line Player.log has as noise is in Player.log: the monitor's entry for it (with a stack,
+// so it passes the noise filter) is not an error of its own, as in the full analysis (VM run
+// 2026-10-28 listed "Translation data … 9 errors" under ArchoMonitor.log while the game ran).
+func TestLiveLogMonitorNoise(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	scanNow(t, e)
+	root := filepath.Join(e.Root, "userdata")
+	path := filepath.Join(root, "Player.log")
+	am := filepath.Join(root, "ArchoMonitor.log")
+	e.WriteFile(am, sessionLine(t, "aaaaaaaaaaaa"))
+	e.WriteFile(path, unityHead+marker("aaaaaaaaaaaa", am))
+	lv := e.App.FollowRun(path, root)
+	if _, err := lv.Poll(e.App); err != nil {
+		t.Fatal(err)
+	}
+	noise := "Translation data for language English has 9 errors. Generate translation report for more info."
+	appendFile(t, am, monitorLine(t, "", "ERROR", noise, "  at Verse.Log.Error ()\n  at Verse.LanguageDatabase.InitAllMetadata ()", 1, 1, "77777777", map[string]any{}))
+	appendFile(t, path, noise+"\nUnloading 5 Unused Serialized files (Serialized files now loaded: 5)\n")
+	for _, d := range []time.Duration{0, 6 * time.Second} {
+		e.Advance(d)
+		if _, err := lv.Poll(e.App); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := lv.Close(e.App); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range lv.Clusters() {
+		if strings.HasPrefix(c.Template, "Translation data") || c.Report != nil && strings.HasPrefix(c.Report.First.Message, "Translation data") {
+			t.Fatalf("noise listed: only %v class %s", c.OnlyCompanion, c.Class)
+		}
+	}
+}
+
 // Files from another run must never become the companion merely because their names fit.
 func TestCompanionRunWindow(t *testing.T) {
 	t.Parallel()
