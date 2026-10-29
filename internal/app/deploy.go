@@ -101,7 +101,10 @@ func deployCandidate(m *store.Mod) loadout.Candidate {
 
 // deploySet picks the deployable instances the registry should treat as present in Mods/:
 // those in the workspace (they will be linked on save) and those whose RimArcho link is on
-// disk now (the game sees them until the next save removes the link).
+// disk now (the game sees them until the next save removes the link). A link on disk whose
+// packageId the workspace already holds through another instance is left out: the save that
+// writes the list removes it, so it never competes with the list's copy (an Archo Monitor
+// update while the old version's link is still in Mods/, 08 §9).
 func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string]bool, error) {
 	var ws *store.Workspace
 	plan, err := a.planFor(ix.Env.ID)
@@ -114,9 +117,15 @@ func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string
 		}
 	}
 	set := map[string]bool{}
+	listed := map[string]bool{} // package bases of the workspace's instances
 	if ws != nil {
 		for _, e := range loadout.Decode(ws.Entries) {
-			if m := ix.Elsewhere(ix.ByID[e.Instance]); m != nil && deployable(ix, aliases, m) {
+			m := ix.Elsewhere(ix.ByID[e.Instance])
+			if m == nil {
+				continue
+			}
+			listed[packageBase(strings.ToLower(m.PackageID))] = true
+			if deployable(ix, aliases, m) {
 				set[m.ID] = true
 			}
 		}
@@ -130,7 +139,7 @@ func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string
 			present[env.PathKey(filepath.Join(mods, entry.Name()))] = true
 		}
 		for _, m := range ix.Mods {
-			if !set[m.ID] && deployable(ix, aliases, m) {
+			if !set[m.ID] && !listed[packageBase(strings.ToLower(m.PackageID))] && deployable(ix, aliases, m) {
 				if present[env.PathKey(filepath.Join(mods, DeployName(m)))] {
 					set[m.ID] = true
 				}

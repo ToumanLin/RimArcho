@@ -22,7 +22,9 @@ type RunSource struct {
 	Pack    string              // the pack played
 	// Fingerprint is the played list's ListFingerprint ("" when not known).
 	Fingerprint string
-	Unknown     bool // neither a launch nor a write matches
+	// VersionN is the plan version played or written (0: not known).
+	VersionN int
+	Unknown  bool // neither a launch nor a write matches
 }
 
 // sharedEnvs are the environments whose game writes into e's user data folder: e and
@@ -66,12 +68,14 @@ func (a *App) sourceAt(e *env.Environment, reg *loadout.Registry, t time.Time, p
 	}
 	if l != nil {
 		src.Launch, src.At, src.EnvID, src.PlanID, src.Pack, src.Fingerprint = l, l.Started, l.EnvID, l.PlanID, l.Pack(), l.Fingerprint
+		src.VersionN = l.VersionN
 	} else if w, err := a.Store.ModsConfigStateAt(e.UserDataRoot); err == nil && w.WriterPlan != 0 &&
 		!w.WrittenAt.IsZero() && !w.WrittenAt.After(t) {
 		src.ByWrite, src.At, src.PlanID = true, w.WrittenAt, w.WriterPlan
 		if p, _ := a.Store.PlanByID(w.WriterPlan); p != nil {
 			src.EnvID = w.WriterEnv
 			if reg != nil && (w.WriterEnv == "" || w.WriterEnv == e.ID) && w.WriterVersion > 0 {
+				src.VersionN = w.WriterVersion
 				// The written version's list, read as this environment reads it.
 				if v, _ := a.Store.Version(p.ID, w.WriterVersion); v != nil {
 					src.Fingerprint = ListFingerprint(reg.Heal(loadout.Decode(v.Entries)))
@@ -122,8 +126,42 @@ func (a *App) judge(st *LoadoutState, r *LogRun) {
 		}
 	case st.Plan == nil || src.PlanID != st.Plan.ID:
 		r.OtherRun = true
-	case src.Fingerprint == "" || src.Fingerprint != ListFingerprint(st.List):
+	case src.Fingerprint == "" || src.Fingerprint != ListFingerprint(st.List) && !a.monitorSwapOnly(st, src):
 		// A launch from before plans had fingerprints cannot be compared: changed.
 		r.Changed = true
 	}
+}
+
+// monitorSwapOnly reports whether the plan's list differs from the played one only in which
+// Archo Monitor version sits at the same place (08 §9 "更新"): the monitor update does not
+// change what the run's errors describe, so the log stays counted (03 §6.4). The played
+// list is the version the launch or write names, checked against its fingerprint.
+func (a *App) monitorSwapOnly(st *LoadoutState, src *RunSource) bool {
+	if src.PlanID == 0 || src.VersionN <= 0 {
+		return false
+	}
+	v, err := a.Store.Version(src.PlanID, src.VersionN)
+	if err != nil || v == nil {
+		return false
+	}
+	played := loadout.Decode(v.Entries)
+	if ListFingerprint(played) != src.Fingerprint {
+		if played = st.Reg.Heal(played); ListFingerprint(played) != src.Fingerprint {
+			return false
+		}
+	}
+	return monitorBlind(st.Ix, played) == monitorBlind(st.Ix, st.List)
+}
+
+// monitorBlind is ListFingerprint with every Archo Monitor entry counted as one key.
+func monitorBlind(ix *Index, l loadout.List) string {
+	keys := make([]string, 0, len(l))
+	for _, e := range l {
+		if IsMonitor(ix.ByID[e.Instance]) || e.Instance == "" && packageBase(e.Missing) == MonitorPackage {
+			keys = append(keys, "monitor:"+MonitorPackage)
+		} else {
+			keys = append(keys, e.Key())
+		}
+	}
+	return fingerprintOf(keys)
 }

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -358,5 +359,74 @@ func TestSortAddsMonitor(t *testing.T) {
 	e.MustRun("plan", "use", "bare")
 	if out := e.MustRun("sort"); !strings.Contains(out, "Archo Monitor not added: "+app.MonitorNoHarmony) {
 		t.Fatalf("no Harmony:\n%s", out)
+	}
+}
+
+// M9 (VM 2026-10-28): the game was launched before the monitor check finished (the first
+// scan took 27 s), and the check then put the newer Archo Monitor into the plan while the
+// game ran. A monitor version swap is not a list change: the run's log is still counted
+// (03 §6.4). The old copy's _Archo_ link, left in Mods/ until the next save removes it, does
+// not make the plan's new copy look unloadable; the next launch links the new one.
+func TestMonitorUpdateAfterLaunch(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.HarmonyLogFixture()
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	mods := filepath.Join(e.Game, "Mods")
+	e.App.MonitorBundle = monitorBundle(t, e, "0.9.0-dev")
+	e.MustRun("monitor", "install")
+	e.Advance(time.Minute)
+	e.MustRun("launch")
+	oldLink := filepath.Join(mods, "_Archo_monitor_ArchoMonitor-0.9.0-dev")
+	if !source.IsLink(oldLink) {
+		t.Fatal("the launch did not link Archo Monitor 0.9.0-dev")
+	}
+	launched := launches(t, e)[0]
+
+	// The check finishes while the game runs and swaps in 0.9.1.
+	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 42, Started: launched.Started} }
+	e.App.MonitorBundle = monitorBundle(t, e, "0.9.1")
+	if out := e.MustRun("monitor", "install"); !strings.Contains(out, "plan:default: updated 0.9.0-dev → 0.9.1") {
+		t.Fatalf("update while the game runs:\n%s", out)
+	}
+
+	// The game writes its log, then exits.
+	e.Advance(time.Minute)
+	p := filepath.Join(e.UserData, "Player.log")
+	e.WriteFile(p, testkit.FixtureLog(filepath.Join(mods, "Compat", "Patches", "Compat.xml")))
+	os.Chtimes(p, e.Now(), e.Now())
+	e.App.GameProbe = func(string) *app.GameRun { return nil }
+
+	r := logRun(t, e)
+	if r.Stale() || r.Source == nil || r.Source.Launch == nil || r.Source.Launch.ID != launched.ID {
+		t.Fatalf("the run's log after the monitor update: %+v %+v", r, r.Source)
+	}
+	out := e.MustRun("problems")
+	if strings.Contains(out, "stale log") || !strings.Contains(out, "current (from the launch of plan:default at ") {
+		t.Fatalf("problems after the monitor update:\n%s", out)
+	}
+	for _, f := range problems(t, e).List {
+		if f.Code == "mod.unloadable" {
+			t.Fatalf("the old monitor's link counts against the new one: %s %s", f.Code, f.Claim)
+		}
+	}
+
+	// The next launch links 0.9.1 and removes the old link.
+	e.Advance(time.Minute)
+	e.MustRun("launch")
+	if source.IsLink(oldLink) || !source.IsLink(filepath.Join(mods, "_Archo_monitor_ArchoMonitor-0.9.1")) {
+		t.Fatal("the next launch did not swap the monitor links")
+	}
+
+	// Any other change since the launch still makes its log stale.
+	e.Advance(time.Minute)
+	e.WriteFile(p, testkit.FixtureLog(filepath.Join(mods, "Compat", "Patches", "Compat.xml")))
+	os.Chtimes(p, e.Now(), e.Now())
+	if r := logRun(t, e); r.Stale() {
+		t.Fatalf("the new launch's log: %+v", r)
+	}
+	e.MustRun("disable", "pkg:tester.manual")
+	if r := logRun(t, e); !r.Changed {
+		t.Fatalf("a real change since the launch: %+v", r)
 	}
 }

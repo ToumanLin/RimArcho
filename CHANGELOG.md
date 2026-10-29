@@ -46,6 +46,15 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - An open Can it run updates itself when the background check finishes and when the game
   exits. Before, it kept the run's old time and items until you left the page and came
   back.
+- When RimArcho updates Archo Monitor in your list after the game has already started
+  (for example when you launch before the first scan finishes), the run's errors still
+  count once the game exits. Before, Can it run treated the list as changed since the
+  launch: the run that had just ended was missing and `archo problems` said "stale log
+  (the plan changed since the launch …) not counted". Only a Monitor version swap at the
+  same place is ignored; any other change still makes the log stale. Until the next
+  launch, the new Monitor is no longer reported as "enabled but the game will not load
+  it" because the old version's link is still in Mods/; the next launch replaces that
+  link.
 
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
