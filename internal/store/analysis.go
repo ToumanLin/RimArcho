@@ -77,11 +77,14 @@ func (s *Store) DefsOf(instanceID string) ([]analyze.DefFact, error) {
 	return scanDefs(rows)
 }
 
-// DefsNamed returns the Def facts with a defName (or, with byName, a Name attribute).
+// DefsNamed returns the Def facts with a defName (or, with byName, a Name attribute), by
+// instance ID and then file order. The order must not follow the table layout: rebuilt or
+// migrated facts get new rowids, and the first provider of a missing parent (and so a log
+// problem's ID) would change with them (03 §3).
 func (s *Store) DefsNamed(name string, byName bool) ([]analyze.DefFact, error) {
-	q := `SELECT ` + defCols + defView + ` WHERE f.def_name=? AND c.game_mm=? ORDER BY f.rowid`
+	q := `SELECT ` + defCols + defView + ` WHERE f.def_name=? AND c.game_mm=? ORDER BY c.instance_id, f.rowid`
 	if byName {
-		q = `SELECT ` + defCols + defView + ` WHERE f.name=? AND f.name<>'' AND c.game_mm=? ORDER BY f.rowid`
+		q = `SELECT ` + defCols + defView + ` WHERE f.name=? AND f.name<>'' AND c.game_mm=? ORDER BY c.instance_id, f.rowid`
 	}
 	rows, err := s.DB.Query(q, name, s.MM)
 	if err != nil {

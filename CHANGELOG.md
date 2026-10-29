@@ -28,6 +28,10 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   action use the same cleanup and report freed space. Running games block it;
   tombstone collection remains manual.
 
+- When several installed mods provide a missing parent template, Can it run and
+  `archo log` name them in the same order every time. Before, the first provider and
+  the log problem's `p:` reference could change after the analysis cache was rebuilt.
+
 - Environments sharing a user data folder now exclude logs written by another game
   before attribution or analysis. Can it run, the game log, sidebar counts, new-log
   hints, CLI and MCP use only eligible logs, falling back to an eligible previous log.

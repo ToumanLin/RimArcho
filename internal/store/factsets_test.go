@@ -317,3 +317,49 @@ func TestMaintainPrunesFacts(t *testing.T) {
 		t.Fatal("current-version slot removed", n)
 	}
 }
+
+// 03 §3: Def lookups by name come back by instance ID, then file order, whatever order the
+// facts were written in, so a rebuilt or migrated cache names the same first provider.
+func TestDefsNamedOrderIndependentOfWrites(t *testing.T) {
+	e := testkit.New(t)
+	e.AddEnv(false)
+	s := e.App.Store
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := []string{"zz-provider", "aa-provider", "mm-provider"}
+	for _, id := range ids {
+		if _, err := s.DB.Exec(`INSERT INTO instance(id,environment_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES(?,?,'l','x',?,'live',1,1)`, id, st.Ix.Env.ID, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.MM = "1.6"
+	for round, key := range []string{"k1", "k2", "k3"} {
+		o := &analyze.Output{Content: map[string]*analyze.ContentState{}, NewDefs: map[string][]analyze.DefFact{}}
+		// Rotate which mod is written first; map iteration adds its own shuffle.
+		for i := range ids {
+			id := ids[(i+round)%len(ids)]
+			o.Content[id] = &analyze.ContentState{Key: id + key}
+			o.NewDefs[id] = []analyze.DefFact{
+				{Type: "ThingDef", Name: "Bomb", Abstract: true, File: "Defs/A.xml", Line: 1},
+				{Type: "ThingDef", Name: "Bomb", Abstract: true, File: "Defs/B.xml", Line: 2},
+			}
+		}
+		if _, err := s.SaveAnalysis(st.Ix.Env.ID, "set", key, "1.6", []string{"set"}, o, e.App.Now(), e.App.Now()); err != nil {
+			t.Fatal(err)
+		}
+		ds, err := s.DefsNamed("Bomb", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, d := range ds {
+			got = append(got, d.Instance+":"+d.File)
+		}
+		want := []string{"aa-provider:Defs/A.xml", "aa-provider:Defs/B.xml", "mm-provider:Defs/A.xml", "mm-provider:Defs/B.xml", "zz-provider:Defs/A.xml", "zz-provider:Defs/B.xml"}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("round %d: %v, want %v", round, got, want)
+		}
+	}
+}
