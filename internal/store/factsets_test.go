@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -264,5 +265,55 @@ func TestFactSetsEmptyAssemblyViewReplacesOld(t *testing.T) {
 	}
 	if n := factCount(t, s, `SELECT count(*) FROM assembly_fact f JOIN fact_set x ON x.id=f.set_id WHERE x.instance_id=?`, inst); n != 0 {
 		t.Fatal("orphan assembly set kept", n)
+	}
+}
+
+// 02 §7.2 step 2: maintenance (automatic or the Compact button) runs the same fact
+// cleanup as a saved analysis, so an expired slot for another game version goes even
+// when nothing is analysed again.
+func TestMaintainPrunesFacts(t *testing.T) {
+	e := testkit.New(t)
+	e.AddEnv(false)
+	s := e.App.Store
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec(`INSERT INTO instance(id,environment_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES('own',?,'l','x','own','live',1,1)`, st.Ix.Env.ID); err != nil {
+		t.Fatal(err)
+	}
+	now := e.App.Now()
+	for _, mm := range []string{"1.6", "1.5"} {
+		o := &analyze.Output{
+			Content: map[string]*analyze.ContentState{"own": {Key: "own-" + mm}},
+			NewDefs: map[string][]analyze.DefFact{"own": {{Type: "ThingDef", DefName: "D" + mm, File: "A.xml", Line: 1}}},
+		}
+		if _, err := s.SaveAnalysis(st.Ix.Env.ID, "set", "run", mm, []string{"set"}, o, now, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := factCount(t, s, `SELECT count(*) FROM content_state WHERE game_mm='1.5'`); n != 1 {
+		t.Fatal("1.5 view not saved", n)
+	}
+	r, err := s.Maintain(context.Background(), store.MaintenanceOptions{
+		Now: now.Add(store.ForeignAnalysisRetention + time.Hour), FreeSpace: func(string) int64 { return 1 << 40 },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Vacuumed {
+		t.Fatal("compact did not vacuum")
+	}
+	if n := factCount(t, s, `SELECT count(*) FROM analysis WHERE game_mm='1.5'`); n != 0 {
+		t.Fatal("expired 1.5 slot kept", n)
+	}
+	if n := factCount(t, s, `SELECT count(*) FROM content_state WHERE game_mm='1.5'`); n != 0 {
+		t.Fatal("1.5 view kept", n)
+	}
+	if n := factCount(t, s, `SELECT count(*) FROM def_fact`); n != 1 {
+		t.Fatal("want only the 1.6 Def left, have", n)
+	}
+	if n := factCount(t, s, `SELECT count(*) FROM analysis WHERE game_mm='1.6'`); n != 1 {
+		t.Fatal("current-version slot removed", n)
 	}
 }

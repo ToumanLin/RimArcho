@@ -123,7 +123,10 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 	if err != nil {
 		return r, err
 	}
-	// 2. Analysis-fact cleanup belongs here, in the same pruning transaction.
+	// 2. Version views no game needs and the fact sets nothing references (03 §3).
+	if err = pruneFactsOn(ctx, c, o.Now); err != nil {
+		return r, err
+	}
 	if _, err = c.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, maintenanceLeaseKey, o.Now.UTC().Format(time.RFC3339)); err != nil {
 		return r, err
 	}

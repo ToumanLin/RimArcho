@@ -19,8 +19,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   used schema 15) get it back, so a log with many missing parent templates is
   attributed quickly again.
 
-- The GUI now cleans old snapshot file lists and reclaims database space weekly
-  while idle. Current snapshots, unanswered identity evidence and each mod copy's
+- The GUI now cleans old snapshot file lists and analysis facts no game needs, and
+  reclaims database space, weekly while idle. Current snapshots, unanswered identity evidence and each mod copy's
   last three updates keep their complete file lists; older history keeps its
   events and declarations and explains when file lists have been cleaned.
   Settings' existing Compact button, `db vacuum` and MCP maintenance's `vacuum`

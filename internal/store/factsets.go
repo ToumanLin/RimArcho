@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -17,9 +18,19 @@ func (s *Store) PruneFacts(now time.Time) error {
 }
 
 func pruneFacts(tx *sql.Tx, now time.Time) error {
+	return pruneFactsOn(context.Background(), tx, now)
+}
+
+// factDB is a transaction, or a connection inside an explicit BEGIN (Store.Maintain).
+type factDB interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+func pruneFactsOn(ctx context.Context, tx factDB, now time.Time) error {
 	type game struct{ id, mm string }
 	var games []game
-	rows, err := tx.Query(`SELECT id, game_version FROM environment`)
+	rows, err := tx.QueryContext(ctx, `SELECT id, game_version FROM environment`)
 	if err != nil {
 		return err
 	}
@@ -44,39 +55,41 @@ func pruneFacts(tx *sql.Tx, now time.Time) error {
 			continue
 		}
 		for _, table := range []string{"patch_fact", "finding"} {
-			if _, err := tx.Exec(`DELETE FROM `+table+` WHERE analysis_id IN (SELECT id FROM analysis WHERE environment_id=? AND game_mm<>? AND finished_at<?)`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE analysis_id IN (SELECT id FROM analysis WHERE environment_id=? AND game_mm<>? AND finished_at<?)`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
 				return err
 			}
 		}
-		if _, err := tx.Exec(`DELETE FROM analysis WHERE environment_id=? AND game_mm<>? AND finished_at<?`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM analysis WHERE environment_id=? AND game_mm<>? AND finished_at<?`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
 			return err
 		}
 	}
 	// Materialize the small set of needed (visibility owner, mm) pairs once. Shared
 	// instances can use any environment; private instances only their owning one.
-	if _, err := tx.Exec(`CREATE TEMP TABLE IF NOT EXISTS needed_fact_version(environment_id TEXT NOT NULL, game_mm TEXT NOT NULL, PRIMARY KEY(environment_id,game_mm)) WITHOUT ROWID; DELETE FROM needed_fact_version`); err != nil {
+	if _, err := tx.ExecContext(ctx, `CREATE TEMP TABLE IF NOT EXISTS needed_fact_version(environment_id TEXT NOT NULL, game_mm TEXT NOT NULL, PRIMARY KEY(environment_id,game_mm)) WITHOUT ROWID; DELETE FROM needed_fact_version`); err != nil {
 		return err
 	}
 	for _, g := range games {
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO needed_fact_version VALUES(?,?)`, g.id, g.mm); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO needed_fact_version VALUES(?,?)`, g.id, g.mm); err != nil {
 			return err
 		}
 	}
-	if _, err := tx.Exec(`INSERT OR IGNORE INTO needed_fact_version SELECT environment_id,game_mm FROM analysis`); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO needed_fact_version SELECT environment_id,game_mm FROM analysis`); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM content_state WHERE NOT EXISTS (
+	if _, err := tx.ExecContext(ctx, `DELETE FROM content_state WHERE NOT EXISTS (
  SELECT 1 FROM instance i WHERE i.id=content_state.instance_id AND EXISTS (
  SELECT 1 FROM needed_fact_version n WHERE (i.environment_id='' OR n.environment_id=i.environment_id)
  AND (n.game_mm=content_state.game_mm OR n.game_mm='')))`); err != nil {
 		return err
 	}
-	return pruneFactSets(tx)
+	return pruneFactSetsOn(ctx, tx)
 }
 
-func pruneFactSets(tx *sql.Tx) error {
+func pruneFactSets(tx *sql.Tx) error { return pruneFactSetsOn(context.Background(), tx) }
+
+func pruneFactSetsOn(ctx context.Context, tx factDB) error {
 	// The child tables have set_id indexes for these cascading deletes.
-	_, err := tx.Exec(`DELETE FROM fact_set WHERE NOT EXISTS(SELECT 1 FROM content_state c WHERE c.def_set_id=fact_set.id)
+	_, err := tx.ExecContext(ctx, `DELETE FROM fact_set WHERE NOT EXISTS(SELECT 1 FROM content_state c WHERE c.def_set_id=fact_set.id)
  AND NOT EXISTS(SELECT 1 FROM content_state c WHERE c.dll_set_id=fact_set.id)`)
 	return err
 }
