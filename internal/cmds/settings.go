@@ -65,7 +65,7 @@ func dbVacuumCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	d, _ := render.New(fmt.Sprintf("database compacted: %s → %s; freed %s", mb(before), mb(after), mb(max(0, before-after))))
+	d, _ := render.New(fmt.Sprintf("database compacted: freed %s (now %s)", mb(max(0, before-after)), mb(after)))
 	return d, nil
 }
 

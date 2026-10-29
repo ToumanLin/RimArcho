@@ -374,7 +374,7 @@ gc: removed 0 tombstones (tombstones older than 90 days, before 2026-07-03)
 database maintenance: would remove 6 old file records and compact the database
 
 > maintenance {"action":"vacuum"}
-database compacted: 1.1 MB → 444.0 KB; freed 698.7 KB
+database compacted: freed 698.7 KB (now 444.0 KB)
 
 > edit_loadout {"action":"disable","refs":["#hnyg"]}
 workspace: 2 active, 1 change unsaved (plan:default, env:main)

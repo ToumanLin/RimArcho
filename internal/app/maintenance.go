@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -23,10 +25,15 @@ func (a *App) Maintain(ctx context.Context, automatic, dryRun bool) (store.Maint
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-	return a.Store.Maintain(ctx, store.MaintenanceOptions{
+	r, err := a.Store.Maintain(ctx, store.MaintenanceOptions{
 		Now: a.Now(), Automatic: automatic, DryRun: dryRun,
 		FreeSpace: func(path string) int64 { return free(filepath.Dir(path)) },
 	})
+	var space *store.NeedSpaceError
+	if errors.As(err, &space) {
+		err = fmt.Errorf("cannot compact database: it needs %s of free disk space", render.Size(space.Need))
+	}
+	return r, err
 }
 
 // MaintenanceGamesIdle probes captured roots without accessing the database.

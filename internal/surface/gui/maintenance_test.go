@@ -96,7 +96,7 @@ func TestManualCompactUsesMaintenanceAndIgnoresPeriodAndTasks(t *testing.T) {
 	id := api.tasks.Begin("test", "other work", nil)
 	defer api.tasks.Finish(id, app.TaskDone, "")
 	text, err := api.runSettingTask(e.App, "", view.TaskVacuum, []string{"db", "vacuum"})
-	if err != nil || !strings.Contains(text, "freed") || !strings.Contains(text, "→") {
+	if err != nil || !strings.Contains(text, "freed") || !strings.Contains(text, "(now ") {
 		t.Fatalf("manual: %s %v", text, err)
 	}
 	if f, _ := e.App.Store.SnapshotFiles(ids[0]); f != nil {

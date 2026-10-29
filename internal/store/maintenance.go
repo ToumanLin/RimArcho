@@ -18,6 +18,13 @@ const (
 
 var ErrMaintenanceBusy = errors.New("database is busy; try compacting again later")
 
+// NeedSpaceError: the volume has less free space than a VACUUM may need (Need bytes).
+type NeedSpaceError struct{ Need int64 }
+
+func (e *NeedSpaceError) Error() string {
+	return fmt.Sprintf("cannot compact database: it needs %d bytes of free disk space", e.Need)
+}
+
 type MaintenanceOptions struct {
 	Now       time.Time
 	Automatic bool
@@ -157,7 +164,7 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 		// SQLite may need a temporary database AND a full WAL concurrently.
 		need := 2*pages*pageSize + 64<<20
 		if o.FreeSpace == nil || o.FreeSpace(s.Path) < need {
-			return r, fmt.Errorf("cannot compact database: need %d bytes of free disk space; free space is insufficient or unknown", need)
+			return r, &NeedSpaceError{Need: need}
 		}
 		if err = maintenanceCheckpoint(ctx, c); err != nil {
 			return r, err

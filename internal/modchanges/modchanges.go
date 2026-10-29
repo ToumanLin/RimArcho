@@ -552,8 +552,12 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 	var filesMissing bool
 	if r.HasFiles() && !b.noFiles {
 		groups, delta, filesMissing = b.files(r.Before, r.After)
-	} else if x, y := info[r.Before], info[r.After]; x != nil && y != nil && r.HasFiles() {
-		delta = y.TotalSize - x.TotalSize
+	}
+	if (b.noFiles || filesMissing) && r.HasFiles() {
+		// The snapshot rows keep their total size after maintenance cleans the file lists.
+		if x, y := info[r.Before], info[r.After]; x != nil && y != nil {
+			delta = y.TotalSize - x.TotalSize
+		}
 	}
 	code, defs := false, false
 	var media []string
