@@ -170,6 +170,9 @@ func (m *model) chooseLog() tea.Cmd {
 	}
 	cur, prev := m.app.LogPaths(m.st)
 	if cur == "" {
+		cur, prev = prev, ""
+	}
+	if cur == "" {
 		m.status = T("no Player.log found")
 		return nil
 	}

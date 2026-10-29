@@ -20,12 +20,21 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   attributed quickly again.
 
 - The GUI now cleans old snapshot file lists and analysis facts no game needs, and
-  reclaims database space, weekly while idle. Current snapshots, unanswered identity evidence and each mod copy's
-  last three updates keep their complete file lists; older history keeps its
-  events and declarations and explains when file lists have been cleaned.
+  reclaims database space, weekly while idle. Current snapshots, unanswered identity
+  evidence and each mod copy's last three updates keep their complete file lists;
+  older history keeps its events and declarations and explains when file lists have
+  been cleaned.
   Settings' existing Compact button, `db vacuum` and MCP maintenance's `vacuum`
   action use the same cleanup and report freed space. Running games block it;
   tombstone collection remains manual.
+
+- Environments sharing a user data folder now exclude logs written by another game
+  before attribution or analysis. Can it run, the game log, sidebar counts, new-log
+  hints, CLI and MCP use only eligible logs, falling back to an eligible previous log.
+  Explicit log paths and game-version overrides cannot bypass ownership checks: a log
+  another environment's game wrote is refused.
+  A game's own logs from before an upgrade still use their recorded game version.
+  Logs with unknown owners remain uncounted and do not trigger another version's analysis.
 
 - Archo Monitor records game loading, save loading, new colony generation, playing and
   returns to the main menu. Can it run groups recorded errors by phase; the game log

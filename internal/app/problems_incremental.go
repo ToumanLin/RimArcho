@@ -1,7 +1,8 @@
 package app
 
 // IncrementalProblems recomputes declarations after an edit, retaining previous content
-// findings until background analysis completes. It reads neither Def/Patch facts nor logs.
+// findings until background analysis completes. It reads no Def/Patch facts or log
+// entries; log ownership is rechecked from startup headers.
 // The caller must match the environment, plan, scan snapshot and game version.
 func (a *App) IncrementalProblems(previous *ProblemSet) (*ProblemSet, error) {
 	st, err := a.Loadout()
@@ -22,6 +23,9 @@ func (a *App) IncrementalProblems(previous *ProblemSet) (*ProblemSet, error) {
 	}
 	runs := map[*LogRun]*LogRun{}
 	judge := func(old *LogRun) *LogRun {
+		if a.CheckLogOwner(st, old.Path) != nil {
+			return nil
+		}
 		if r := runs[old]; r != nil {
 			return r
 		}
@@ -44,6 +48,9 @@ func (a *App) IncrementalProblems(previous *ProblemSet) (*ProblemSet, error) {
 		p := *old
 		if old.Log != nil {
 			run := judge(old.Log)
+			if run == nil {
+				continue
+			}
 			p.Log = run
 			if run.Stale() {
 				ps.Stale = append(ps.Stale, &p)
@@ -57,7 +64,9 @@ func (a *App) IncrementalProblems(previous *ProblemSet) (*ProblemSet, error) {
 		}
 	}
 	for _, old := range previous.Logs {
-		ps.Logs = append(ps.Logs, judge(old))
+		if run := judge(old); run != nil {
+			ps.Logs = append(ps.Logs, run)
+		}
 	}
 	return ps, nil
 }

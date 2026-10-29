@@ -84,25 +84,28 @@ type LogReport struct {
 	Cursor string `json:",omitempty"`
 }
 
-// LogPaths returns the current and previous Player.log for the environment's (or the
-// overridden) game version: 1.7+ under Logs/, older in the user data root (02 §2.3). When
-// the expected file is missing, the other location is used.
+// LogPaths returns usable current and previous logs (03 §6.4). Check both locations,
+// preferring this game's layout, independently: a foreign Player.log must not hide an
+// owned Player-prev.log. --game-version changes analysis, never game ownership.
 func (a *App) LogPaths(st *LoadoutState) (cur, prev string) {
 	root := st.Ix.Env.UserDataRoot
 	if root == "" {
 		return "", ""
 	}
-	cur = env.PlayerLog(root, st.GameMM())
-	if cur == "" {
-		cur = env.PlayerLog(root, "")
+	dirs := []string{root, filepath.Join(root, "Logs")}
+	if mm := env.MajorMinor(st.Ix.Env.GameVersion); mm != "" && !env.VersionLess(mm, "1.7") {
+		dirs[0], dirs[1] = dirs[1], dirs[0]
 	}
-	if cur == "" {
-		return "", ""
+	pick := func(name string) string {
+		for _, dir := range dirs {
+			p := filepath.Join(dir, name)
+			if fi, err := os.Stat(p); err == nil && !fi.IsDir() && a.CheckLogOwner(st, p) == nil {
+				return p
+			}
+		}
+		return ""
 	}
-	prev = filepath.Join(filepath.Dir(cur), "Player-prev.log")
-	if _, err := os.Stat(prev); err != nil {
-		prev = ""
-	}
+	cur, prev = pick("Player.log"), pick("Player-prev.log")
 	return cur, prev
 }
 
@@ -147,6 +150,9 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 	}
 	st, err := a.Loadout()
 	if err != nil {
+		return nil, err
+	}
+	if err := a.CheckLogOwner(st, path); err != nil {
 		return nil, err
 	}
 	compPath := CompanionFor(path)
@@ -1138,6 +1144,9 @@ func (a *App) SelectedLog(st *LoadoutState) string {
 
 // SelectLog makes problems include a log's clusters and records its mtime as seen.
 func (a *App) SelectLog(st *LoadoutState, path string) error {
+	if err := a.CheckLogOwner(st, path); err != nil {
+		return err
+	}
 	if err := a.Store.SetMeta("log.selected:"+st.Ix.Env.ID, path); err != nil {
 		return err
 	}
@@ -1191,11 +1200,22 @@ func sameLog(a, b string) bool { return a != "" && b != "" && env.PathKey(a) == 
 // listed as this run, not again as the last (VM run 2026-10-28).
 func (a *App) ProblemLog(st *LoadoutState) string {
 	sel := a.SelectedLog(st)
+	foreign := sel != "" && a.CheckLogOwner(st, sel) != nil
+	if foreign {
+		sel = ""
+	}
 	live := ""
-	if !a.LazyLog || sel != "" {
+	if !a.LazyLog || sel != "" || foreign {
 		live = a.LiveLog(st)
 	}
 	if a.LazyLog {
+		if foreign {
+			cur, prev := a.LogPaths(st)
+			if cur != "" && !sameLog(cur, live) {
+				return cur
+			}
+			return prev
+		}
 		if !sameLog(sel, live) {
 			return sel
 		}
@@ -1209,6 +1229,9 @@ func (a *App) ProblemLog(st *LoadoutState) string {
 	}
 	cur, prev := a.LogPaths(st)
 	if sameLog(cur, live) {
+		cur = prev
+	}
+	if cur == "" {
 		cur = prev
 	}
 	switch {

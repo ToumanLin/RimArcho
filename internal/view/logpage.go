@@ -122,7 +122,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 			p.NoMonitor = T("Archo Monitor is not installed: errors will not say which file or def was loading (archo monitor install)")
 		}
 	}
-	if err := a.EnsureLogAnalysis(st, app.LogVersionOf(path), nil); errors.Is(err, app.ErrStillComputing) {
+	if err := a.EnsureLogFileAnalysis(st, path, nil); errors.Is(err, app.ErrStillComputing) {
 		p.Path, p.Pending = path, app.LogMM(app.LogVersionOf(path))
 		return p, nil
 	} else if err != nil {

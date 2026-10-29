@@ -37,6 +37,9 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 	if path == "" {
 		cur, prev := c.App.LogPaths(st)
 		path = cur
+		if path == "" {
+			path = prev
+		}
 		if a.Bool("prev") {
 			path = prev
 		}
@@ -44,7 +47,7 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 			return nil, nil, fmt.Errorf("no Player.log found for %s under %s (archo log --file <path>)", st.GameMM(), st.Ix.Env.UserDataRoot)
 		}
 	}
-	if err := c.App.EnsureLogAnalysis(st, app.LogVersionOf(path), progress()); err != nil && !errors.Is(err, app.ErrStillComputing) {
+	if err := c.App.EnsureLogFileAnalysis(st, path, progress()); err != nil && !errors.Is(err, app.ErrStillComputing) {
 		return nil, nil, err
 	}
 	r, err := c.App.AnalyzeLog(path)
