@@ -1,6 +1,7 @@
 package cmds
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -21,7 +22,7 @@ func init() {
 	}}
 	register(&Command{Name: "db status", Summary: "the database: path, size, backups", MaxArgs: 0, Run: dbStatusCmd})
 	register(&Command{Name: "db backup", Summary: "write a consistent copy of the database to <data>/backups", MaxArgs: 0, Run: dbBackupCmd})
-	register(&Command{Name: "db vacuum", Summary: "compact the database", MaxArgs: 0, Run: dbVacuumCmd})
+	register(&Command{Name: "db vacuum", Summary: "clean old file lists and compact the database", Flags: []Flag{{Name: "dry-run", Help: "preview old file cleanup without changing the database"}}, MaxArgs: 0, Run: dbVacuumCmd})
 	register(&Command{Name: "cache status", Summary: "the caches and their sizes", MaxArgs: 0, Run: cacheStatusCmd})
 	register(&Command{Name: "cache clear", Args: "<kind>", Summary: "empty one cache (previews, workshop, images, source, logs); rebuilt on demand", MinArgs: 1, MaxArgs: 1, Run: cacheClearCmd})
 }
@@ -52,11 +53,19 @@ func dbBackupCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func dbVacuumCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Bool("dry-run") {
+		r, err := c.App.Maintain(context.Background(), false, true)
+		if err != nil {
+			return nil, err
+		}
+		d, _ := render.New(fmt.Sprintf("database maintenance: would remove %d old file records and compact the database", r.Files))
+		return d, nil
+	}
 	before, after, err := c.App.DBVacuum()
 	if err != nil {
 		return nil, err
 	}
-	d, _ := render.New(fmt.Sprintf("database compacted: %s → %s", mb(before), mb(after)))
+	d, _ := render.New(fmt.Sprintf("database compacted: freed %s (now %s)", mb(max(0, before-after)), mb(after)))
 	return d, nil
 }
 

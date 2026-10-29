@@ -549,10 +549,15 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 	// Files: grouped by kind.
 	var groups []fileGroup
 	var delta int64
+	var filesMissing bool
 	if r.HasFiles() && !b.noFiles {
-		groups, delta = b.files(r.Before, r.After)
-	} else if x, y := info[r.Before], info[r.After]; x != nil && y != nil && r.HasFiles() {
-		delta = y.TotalSize - x.TotalSize
+		groups, delta, filesMissing = b.files(r.Before, r.After)
+	}
+	if (b.noFiles || filesMissing) && r.HasFiles() {
+		// The snapshot rows keep their total size after maintenance cleans the file lists.
+		if x, y := info[r.Before], info[r.After]; x != nil && y != nil {
+			delta = y.TotalSize - x.TotalSize
+		}
 	}
 	code, defs := false, false
 	var media []string
@@ -628,6 +633,9 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 		say = append(say, f.text)
 	}
 	r.Text = strings.Join(say, tx.T("; "))
+	if filesMissing {
+		r.Details = append(r.Details, tx.T("(file lists no longer stored)"))
+	}
 	if s := groupText(tx, groups, delta); s != "" {
 		r.Details = append(r.Details, s)
 	} else if delta != 0 && r.HasFiles() {
@@ -808,11 +816,11 @@ func diffFiles(x, y map[string]store.SnapFile) []fileChange {
 }
 
 // files groups what differs between two snapshots by kind, with the total size change.
-func (b *changeBuilder) files(before, after int64) ([]fileGroup, int64) {
+func (b *changeBuilder) files(before, after int64) ([]fileGroup, int64, bool) {
 	x, err1 := b.a.Store.SnapshotFiles(before)
 	y, err2 := b.a.Store.SnapshotFiles(after)
 	if err1 != nil || err2 != nil || x == nil || y == nil {
-		return nil, 0
+		return nil, 0, true
 	}
 	by := map[string]*fileGroup{}
 	var delta int64
@@ -843,7 +851,7 @@ func (b *changeBuilder) files(before, after int64) ([]fileGroup, int64) {
 			out = append(out, *g)
 		}
 	}
-	return out, delta
+	return out, delta, false
 }
 
 // groupText: "Defs 改了 4 个、新增 1 个，贴图 +3.2 MB · 共 +3.4 MB".
@@ -894,7 +902,7 @@ func Files(a *app.App, tx Text, before, after int64) []string {
 	x, err1 := a.Store.SnapshotFiles(before)
 	y, err2 := a.Store.SnapshotFiles(after)
 	if err1 != nil || err2 != nil || x == nil || y == nil {
-		return []string{tx.T("(snapshot no longer stored)")}
+		return []string{tx.T("(file lists no longer stored)")}
 	}
 	var out []string
 	for _, c := range diffFiles(x, y) {

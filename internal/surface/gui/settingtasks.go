@@ -78,6 +78,16 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		})
 	}
 	switch kind {
+	case view.TaskVacuum:
+		defer s.free.soon()
+		if len(argv) != 2 {
+			return executeSettingTask(a, argv)
+		}
+		before, after, err := a.DBVacuum()
+		if err != nil {
+			return "", err
+		}
+		return view.Tf("database compacted: freed %s (now %s)", view.SizeText(max(0, before-after)), view.SizeText(after)), nil
 	case view.TaskSourceCheck:
 		result := func(err error) (string, error) {
 			if err != nil {

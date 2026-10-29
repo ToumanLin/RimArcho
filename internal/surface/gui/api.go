@@ -79,12 +79,13 @@ type API struct {
 	// development harness points it at archo.exe).
 	Exe string
 
-	environment environmentWorker
-	monitorOnce sync.Once
-	autoOnce    sync.Once
-	autoWG      sync.WaitGroup
-	quit        func()     // closes the window (nil in the harness and in tests)
-	windowTheme func(bool) // synchronises the native frame with the resolved page scheme
+	environment     environmentWorker
+	monitorOnce     sync.Once
+	autoOnce        sync.Once
+	maintenanceOnce sync.Once
+	autoWG          sync.WaitGroup
+	quit            func()     // closes the window (nil in the harness and in tests)
+	windowTheme     func(bool) // synchronises the native frame with the resolved page scheme
 	// tasks is the 后台任务 record and its lanes (tasks.go, 06 §2.16)
 	tasks        *app.Tasks
 	taskEv       taskEvents
@@ -144,6 +145,7 @@ var processStart = time.Now()
 func (s *API) Ready() {
 	defer perftrace.Span("Ready")()
 	s.startAutomatic()
+	s.startMaintenance()
 	s.prepareBackgrounds(false) // menu extraction starts after the first draw (06 §3.1)
 	s.monitorOnce.Do(s.checkMonitor)
 	ms := time.Since(processStart).Milliseconds()

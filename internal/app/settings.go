@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -54,19 +55,10 @@ func (a *App) DBBackup() (string, error) {
 	return p, nil
 }
 
-// DBVacuum compacts the database; it returns the size before and after.
+// DBVacuum runs the shared maintenance pipeline and returns the size before and after.
 func (a *App) DBVacuum() (before, after int64, err error) {
-	s, _ := a.DBInfo()
-	before = s.Bytes
-	if _, err = a.Store.DB.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
-		return
-	}
-	if _, err = a.Store.DB.Exec(`VACUUM`); err != nil {
-		return
-	}
-	a.Store.DB.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
-	s, _ = a.DBInfo()
-	return before, s.Bytes, nil
+	r, err := a.Maintain(context.Background(), false, false)
+	return r.Before, r.After, err
 }
 
 // Cache is one kind of cached data.

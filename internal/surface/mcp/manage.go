@@ -168,7 +168,7 @@ func HiddenArgv(in HiddenIn) []string {
 	return unknown("manage_hidden", in.Action)
 }
 
-// MaintenanceArgv maps maintenance to data update, import rimcrow and gc.
+// MaintenanceArgv maps maintenance to the data management commands.
 func MaintenanceArgv(in MaintenanceIn) []string {
 	switch in.Action {
 	case "data_update":
@@ -178,6 +178,8 @@ func MaintenanceArgv(in MaintenanceIn) []string {
 			flag("include-disabled-rules", in.IncludeDisabledRules).flag("all", in.All).a
 	case "gc":
 		return argv("gc").flag("dry-run", in.DryRun).a
+	case "vacuum":
+		return argv("db", "vacuum").flag("dry-run", in.DryRun).a
 	}
 	return unknown("maintenance", in.Action)
 }
@@ -243,7 +245,7 @@ type HiddenIn struct {
 
 type MaintenanceIn struct {
 	Env                  string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
-	Action               string   `json:"action" jsonschema:"data_update, import_rimcrow or gc"`
+	Action               string   `json:"action" jsonschema:"data_update, import_rimcrow, vacuum or gc"`
 	Datasets             []string `json:"datasets,omitempty" jsonschema:"data_update: rules, steamdb, replacements (default: all)"`
 	DB                   string   `json:"db,omitempty" jsonschema:"import_rimcrow: RimCrow's data\\mod_manager.db"`
 	Rules                string   `json:"rules,omitempty" jsonschema:"import_rimcrow: RimCrow's user_rules.json (default: next to the database)"`

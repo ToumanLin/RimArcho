@@ -52,7 +52,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 用户规则列出 / 删除 | 已完成 | `manage_rules`（`add_rule` 保留为别名） |
 | 隐藏的 Mod：恢复显示、移到回收站（08 §6、§7） | 已完成 | 工具 `manage_hidden`，`destructiveHint: true` |
 | 环境管理、设置 | 已完成（`status` 的 `show`：envs / settings / data / db / cache） | 只读部分并入 `status`；修改留给玩家（这些改的是 RimArcho 自己的配置，影响面大） |
-| 社区数据更新、RimCrow 导入、`gc` | 已完成 | 工具 `maintenance`，`destructiveHint: true` |
+| 社区数据更新、RimCrow 导入、数据库整理与压缩、`gc` | 已完成 | 工具 `maintenance`，`destructiveHint: true` |
 | 卸载 RimArcho（01 §4.1） | 已完成 | 只有预览：只读工具 `preview_uninstall`（`uninstall --dry-run`，参数同 CLI）。没有执行卸载的工具，理由见 01 §4.1 |
 | 存档：列出、看一份、没碰过的内容；备份、移到回收站（10 §1.6、§4） | 都没有（1.1） | CLI `saves list/show/backup/trash`、`unplayed`；只读工具 `list_saves`、`get_save`、`list_unplayed`；写工具 `manage_saves`，`destructiveHint: true` |
 
@@ -256,7 +256,7 @@ next:
 | 身份 | `identity [list] [--all]` / `identity why <q:n>` / `identity resolve <q:n> same\|copy\|unrelated` | 不带子命令列出待确认项；列出、查看、回答都给出裁剪后的比较（02 §5.4） |
 | | `lineage split <引用>` / `lineage merge <引用> <引用>` / `gc [--dry-run]` | 拆分、合并 Lineage；清理过期墓碑和无用快照（02 §5.5） |
 | 社区数据 | `data update [<数据集>…] [--dry-run]` / `data status` | 手动下载社区数据（`rules`、`steamdb`、`replacements`），或读取来源、下载与检查时间（04 §6）；交互界面另有自动更新（06 §2.16） |
-| 维护 | `db status` / `db backup` / `db vacuum` | 数据库路径、大小、备份；写一份一致的副本到 `<数据目录>/backups`；压缩 |
+| 维护 | `db status` / `db backup` / `db vacuum [--dry-run]` | 数据库路径、大小、备份；写一份一致的副本到 `<数据目录>/backups`；整理与压缩（02 §7.2） |
 | | `cache status` / `cache clear <类别>` | 缓存大小；清空一类缓存（`previews`、`workshop`、`images`、`source`、`logs`），用到时重建 |
 | 设置 | `config get [<键>]` / `config set <键> <值>` | 见下 |
 | Archo Monitor | `monitor` / `monitor install [--dry-run]` | 随附与已安装的版本、来源、当前方案里的位置；安装、更新、默认加入方案（08 §9、04 §1.5） |
@@ -343,7 +343,7 @@ next:
 | `manage_packs` | `pack list/build/launch/export/import/remove/stop/unlink` | false | true |
 | `resolve_identity` | `identity list/why/resolve`（`resolve_identity action=why question=q:<n>` 只读）、`lineage split/merge` | false | true |
 | `manage_hidden` | `unhide`、`trash` | false | true |
-| `maintenance` | `data update`、`import rimcrow`、`gc` | false | true |
+| `maintenance` | `data update`、`import rimcrow`、`db vacuum`（`action=vacuum`）、`gc` | false | true |
 | `list_library` | `library`（`search`、`include`、`exclude`、`sort`、`lineage`、`facets`、`all`） | true | — |
 | `manage_library` | `action`：`move_to_locked`（`library move-to-locked`，`dry_run`、`reason`）/ `remove_from_plans`（`library remove-from-plans`）/ `unsubscribe`、`subscribe`（`workshop unsubscribe|subscribe`，`dry_run`）/ `steam_state`（`workshop state`）；`refs` | false | true |
 | `preview_uninstall` | `uninstall --dry-run`（`keep_locked`、`locked_to`、`remove_packs`、`packs_to`、`remove_saves`、`saves_to`、`remove_games`、`restore_modsconfig_backup`、`all`）；从不带 `--yes` | true | — |

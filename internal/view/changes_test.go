@@ -1,6 +1,7 @@
 package view_test
 
 import (
+	"context"
 	"encoding/json"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,50 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
+
+func TestChangesAfterMaintenance(t *testing.T) {
+	e := testkit.New(t)
+	e.AddWorkshop("1001", testkit.Sample("tester.alpha", "Alpha"))
+	e.AddEnv(false)
+	e.MustRun("scan")
+	var id string
+	if err := e.App.Store.DB.QueryRow(`SELECT id FROM instance WHERE rel_path='1001'`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	// Real synthetic scans exercise the same snapshots the history page reads.
+	for v := 0; v < 6; v++ {
+		e.Advance(time.Hour)
+		m := testkit.Sample("tester.alpha", "Alpha")
+		m.Files["Defs/updated.xml"] = strings.Repeat("x", v+1)
+		e.WriteMod(filepath.Join(e.Workshop, "1001"), m)
+		e.MustRun("scan")
+	}
+	if _, err := e.App.Maintain(context.Background(), false, false); err != nil {
+		t.Fatal(err)
+	}
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := modchanges.Build(e.App, st, modchanges.Opts{Of: []string{id}}, modchanges.English(time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, day := range p.Older {
+		for _, row := range day.Rows {
+			if slices.Contains(row.Details, "(file lists no longer stored)") {
+				found = true
+				if strings.Contains(row.Text, "only") {
+					t.Fatalf("invented partial file comparison: %+v", row)
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatal("history missing cleanup explanation")
+	}
+}
 
 // 06 §2.9: one row per mod since the plan was last played, tiered by what the change means
 // and worded from the recorded data only; the whole library adds the other mods and new
