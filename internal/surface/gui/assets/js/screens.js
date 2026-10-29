@@ -714,6 +714,8 @@ function drawGameLog() {
   const right = [];
   if (p && p.path && !L.loading) {
     if (p.selected) right.push(el("span", "muted", T("its errors are in needs attention")));
+    // the game still writes it: listed as this run, as the last run once the game exits
+    else if (p.live) right.push(el("span", "muted", T("the game is writing it: its errors join needs attention when it exits")));
     else right.push(button(T("add its errors to needs attention"), "", async () => {
       try { say("ok", await api.SelectLog(p.path)); } catch (e) { say("fail", errText(e)); }
       await ui.reload();

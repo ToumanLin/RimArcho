@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -71,7 +73,11 @@ func TestNeedsPhaseHeadingsAreNotCursorItems(t *testing.T) {
 func TestNeedsSectionsLive(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
-	e.HarmonyLogFixture()
+	text := e.HarmonyLogFixture()
+	// the run before this one: the game moved its log aside when it started
+	prev := filepath.Join(e.UserData, "Player-prev.log")
+	e.WriteFile(prev, text)
+	os.Chtimes(prev, e.Now().Add(-20*time.Minute), e.Now().Add(-20*time.Minute))
 	e.App.GameProbe = func(string) *app.GameRun {
 		return &app.GameRun{PID: 42, Started: e.Now().Add(-10 * time.Minute)}
 	}
@@ -90,7 +96,11 @@ func TestNeedsSectionsLive(t *testing.T) {
 		}
 		both = both || m.prob.items[i].group == view.GroupLastRun && m.prob.items[i-1].group == view.GroupThisRun
 	}
-	// the last run's items after this run's say which run they are (VM run 2026-10-28)
+	// the last run's items after this run's say which run they are, and come from the run
+	// before, not again from the log the game writes (VM run 2026-10-28)
+	if ps, err := e.App.Problems(false, nil); err != nil || len(ps.Logs) != 1 || ps.Logs[0].Path != prev {
+		t.Fatalf("problem log while running: %+v %v", ps.Logs, err)
+	}
 	label := false
 	for _, line := range strings.Split(s[run:], "\n") {
 		line = strings.TrimSpace(line)

@@ -1169,14 +1169,48 @@ func (a *App) NewLog(st *LoadoutState) (string, bool) {
 	return cur, true
 }
 
+// LiveLog is the log the current environment's running game writes ("" when none runs):
+// this run, which is not a last run until the game exits (03 §6.4).
+func (a *App) LiveLog(st *LoadoutState) string {
+	if st == nil || st.Ix == nil || st.Ix.Env == nil {
+		return ""
+	}
+	r := a.probe()(st.Ix.Env.GameRoot)
+	if r == nil {
+		return ""
+	}
+	return a.RunLog(st, a.WhatRuns(st.Ix.Env, r))
+}
+
+// sameLog: two log paths name one file ("" names none).
+func sameLog(a, b string) bool { return a != "" && b != "" && env.PathKey(a) == env.PathKey(b) }
+
 // ProblemLog is the log whose clusters join the problems (03 §6.4): the
-// selected one, or the current Player.log when that is newer.
+// selected one, or the current Player.log when that is newer. While the game writes
+// Player.log, the last run is the one it moved to Player-prev.log: the run in progress is
+// listed as this run, not again as the last (VM run 2026-10-28).
 func (a *App) ProblemLog(st *LoadoutState) string {
 	sel := a.SelectedLog(st)
-	if a.LazyLog {
-		return sel
+	live := ""
+	if !a.LazyLog || sel != "" {
+		live = a.LiveLog(st)
 	}
-	cur, _ := a.LogPaths(st)
+	if a.LazyLog {
+		if !sameLog(sel, live) {
+			return sel
+		}
+		// the game writes the selected log: the last run is the one it moved aside, whose
+		// report the refresh during this run stored (the sidebar's count reads it)
+		_, prev := a.LogPaths(st)
+		return prev
+	}
+	if sameLog(sel, live) {
+		sel = ""
+	}
+	cur, prev := a.LogPaths(st)
+	if sameLog(cur, live) {
+		cur = prev
+	}
 	switch {
 	case cur == "":
 		return sel

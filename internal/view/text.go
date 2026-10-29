@@ -559,7 +559,7 @@ var zhText = map[string]string{
 	"logs": "日志", "game log": "游戏日志", "manager actions": "操作记录",
 	"reading the log…": "正在读取日志…",
 	"the mods are analysed for %s first (once per game version)…": "先按 %s 分析一遍 Mod 的文件（每个游戏版本只需一次）…",
-	"its errors are in needs attention":                           "它的错误已列入需要处理", "add its errors to needs attention": "把它的错误列入需要处理",
+	"its errors are in needs attention":                           "它的错误已列入需要处理", "the game is writing it: its errors join needs attention when it exits": "游戏还在写它：退出后列入需要处理", "add its errors to needs attention": "把它的错误列入需要处理",
 	"pick an error on the left":                               "在左边选一条错误",
 	"no errors in this log":                                   "这份日志里没有错误",
 	"unsaved steps and saved versions; click one to go there": "未保存的步骤和保存过的版本；点一下回到那里",

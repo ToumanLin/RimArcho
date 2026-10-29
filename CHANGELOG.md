@@ -30,6 +30,12 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   heading says it) and their evidence shows only the log file, not the count again. When
   the previous run's errors follow them, a "last run" heading with that run's time
   separates the two, in the window and the TUI.
+- While the game runs, the last run in Can it run is the run before it (Player-prev.log).
+  Before, a check during the run read the log the game was still writing as the last run,
+  so the run in progress was listed twice and its errors counted twice. The sidebar's
+  count now includes that last run while the game runs (it used to leave it out). The game log
+  page says "the game is writing it: its errors join needs attention when it exits"
+  instead of offering to add them. `archo log` still reads the log being written.
 - An open Can it run updates itself when the background check finishes and when the game
   exits. Before, it kept the run's old time and items until you left the page and came
   back.

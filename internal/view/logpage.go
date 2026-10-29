@@ -50,6 +50,8 @@ type LogPage struct {
 	Facts    string    `json:"facts"` // "1.6.4633  12 840 lines"
 	Rows     []LogRow  `json:"rows"`
 	Selected bool      `json:"selected"` // its errors are in 需要处理
+	// Live: the running game still writes it; its errors join 需要处理 when the game exits.
+	Live bool `json:"live,omitempty"`
 	// Pending is the game version whose analysis is still running: no rows yet, ask again.
 	Pending string `json:"pending,omitempty"`
 	// Monitor is the companion log of this run (Archo Monitor's, else RimCrow's).
@@ -131,6 +133,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		return nil, err
 	}
 	p.Path, p.Selected = path, a.ProblemLog(st) == path
+	p.Live = !p.Selected && path == a.LiveLog(st)
 	var facts []string
 	if r.Version != "" {
 		facts = append(facts, r.Version)
