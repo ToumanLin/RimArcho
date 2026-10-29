@@ -36,6 +36,11 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   count now includes that last run while the game runs (it used to leave it out). The game log
   page says "the game is writing it: its errors join needs attention when it exits"
   instead of offering to add them. `archo log` still reads the log being written.
+- While the game runs, an error Archo Monitor records before the game finishes writing it
+  to Player.log is listed once. Before, when the game's next log line came more than 5
+  seconds later, "this run" listed it twice, once from Player.log and once from
+  ArchoMonitor.log. The counts of "this run" items no longer grow past the larger of the
+  two logs' counts. `archo log --follow` prints it once too.
 - An open Can it run updates itself when the background check finishes and when the game
   exits. Before, it kept the run's old time and items until you left the page and came
   back.

@@ -33,7 +33,10 @@ type LiveCluster struct {
 	// OnlyCompanion: the entry is in the companion log only (the game had stopped writing
 	// Player.log, 03 §6.7.4).
 	OnlyCompanion bool
-	withComp      bool // attributed with its companion entry
+	withComp      bool   // attributed with its companion entry
+	redo          bool   // attribute again: Player.log showed a companion-only entry after all
+	match         string // the companion entry a companion-only cluster started from
+	alias         string // the Player.log key that joined a companion-only cluster
 	// Report is the attribution of the first sample (roles, evidence, next steps); nil
 	// until attributed.
 	Report  *LogCluster
@@ -57,8 +60,10 @@ type LiveLog struct {
 	pending  []byte
 	p        *logs.Parser
 	by       map[string]*LiveCluster
-	byMatch  map[string]bool // normalised first lines of the clusters' entries
+	byMatch  map[string]bool         // normalised first lines of the clusters' entries
+	compOnly map[string]*LiveCluster // companion-only clusters by their entry's first line
 	order    []*LiveCluster
+	behind   bool // Player.log has more left than one poll reads
 	comp     *logs.Companion
 	compRead map[*logs.CompanionEntry]time.Time // when each companion entry was first read
 	compDone map[*logs.CompanionEntry]bool      // matched, or made a cluster of its own
@@ -129,6 +134,7 @@ func (lv *LiveLog) reset() {
 	lv.p = logs.NewParser()
 	lv.by = map[string]*LiveCluster{}
 	lv.byMatch = map[string]bool{}
+	lv.compOnly = map[string]*LiveCluster{}
 	lv.order = nil
 	lv.memo = map[string]liveKey{}
 }
@@ -233,6 +239,7 @@ func (lv *LiveLog) Poll(a *App) ([]*LiveCluster, error) {
 		}
 		fresh = lv.take(false)
 	}
+	lv.behind = fi.Size() > lv.off
 	lv.Lines, lv.Version = lv.p.F.Lines, lv.p.F.Version
 	fresh = append(fresh, lv.companionOnly(false)...)
 	return fresh, lv.finish(a, fresh)
@@ -268,18 +275,38 @@ func (lv *LiveLog) take(all bool) []*LiveCluster {
 		}
 		key, tmpl, cls := ck.key, ck.template, ck.class
 		c := lv.by[key]
+		fk := "" // normalising costs; repeats of a known cluster skip it
+		if c == nil || c.OnlyCompanion {
+			fk = firstLineKey(e.Message)
+		}
+		if c == nil {
+			// The monitor's entry came first and waited out liveCompanionWait: Player.log
+			// joins its cluster (the monitor's text can cluster under another key).
+			if oc := lv.compOnly[fk]; oc != nil {
+				c, oc.alias = oc, key
+				lv.by[key] = oc
+			}
+		}
 		if c == nil {
 			c = &LiveCluster{Key: key, Template: tmpl, Class: cls, FirstLine: e.Line, At: lv.now()}
 			lv.by[key] = c
 			lv.order = append(lv.order, c)
 			fresh = append(fresh, c)
-			lv.byMatch[firstLineKey(e.Message)] = true
+			lv.byMatch[fk] = true
+		}
+		if c.OnlyCompanion {
+			// One cluster, as if Player.log had come first: its entry leads, the counts start
+			// over from Player.log (finish takes the monitor's count when it is larger).
+			delete(lv.compOnly, c.match)
+			c.OnlyCompanion, c.match, c.redo = false, "", true
+			c.Count, c.FirstLine = 0, e.Line
+			c.samples = append([]*logs.Entry{e}, c.samples[:min(len(c.samples), liveSamples-1)]...)
+			lv.byMatch[fk] = true
+		} else if len(c.samples) < liveSamples {
+			c.samples = append(c.samples, e)
 		}
 		c.Count++
 		c.playerPhases = logs.AddPhaseCount(c.playerPhases, e.Phase, 1)
-		if len(c.samples) < liveSamples {
-			c.samples = append(c.samples, e)
-		}
 	}
 	lv.p.F.Entries = append([]*logs.Entry(nil), es[k:]...)
 	lv.trim()
@@ -299,7 +326,14 @@ func (lv *LiveLog) trim() {
 		if drop < 0 {
 			drop = 0
 		}
-		delete(lv.by, lv.order[drop].Key)
+		d := lv.order[drop]
+		delete(lv.by, d.Key)
+		if d.alias != "" {
+			delete(lv.by, d.alias)
+		}
+		if d.match != "" {
+			delete(lv.compOnly, d.match)
+		}
 		lv.order = append(lv.order[:drop], lv.order[drop+1:]...)
 	}
 }
@@ -311,6 +345,13 @@ func (lv *LiveLog) companionOnly(all bool) []*LiveCluster {
 	if lv.comp == nil {
 		return nil
 	}
+	// Player.log is still writing an entry, or has more to read than one poll takes: an
+	// entry it may yet show keeps waiting (a slow next line left an open entry past the
+	// wait, and its monitor entry became a second cluster; VM run 2026-10-28).
+	open := ""
+	if es := lv.p.F.Entries; !all && lv.p.Open() && len(es) > 0 {
+		open = firstLineKey(es[len(es)-1].Message)
+	}
 	var fresh []*LiveCluster
 	for _, e := range lv.comp.Entries {
 		if lv.compDone[e] || !e.Monitor || (e.Level != "ERROR" && e.Level != "WARNING") {
@@ -320,7 +361,7 @@ func (lv *LiveLog) companionOnly(all bool) []*LiveCluster {
 			lv.compDone[e] = true
 			continue
 		}
-		if !all && lv.now().Sub(lv.compRead[e]) < liveCompanionWait {
+		if !all && (lv.behind || e.Match == open || lv.now().Sub(lv.compRead[e]) < liveCompanionWait) {
 			continue
 		}
 		lv.compDone[e] = true
@@ -331,11 +372,12 @@ func (lv *LiveLog) companionOnly(all bool) []*LiveCluster {
 		}
 		c := lv.by[ck.key]
 		if c == nil {
-			c = &LiveCluster{Key: ck.key, Template: ck.template, Class: ck.class, At: e.At, Level: e.Level, OnlyCompanion: true}
+			c = &LiveCluster{Key: ck.key, Template: ck.template, Class: ck.class, At: e.At, Level: e.Level, OnlyCompanion: true, match: e.Match}
 			lv.by[ck.key] = c
 			lv.order = append(lv.order, c)
 			fresh = append(fresh, c)
 			lv.byMatch[e.Match] = true
+			lv.compOnly[e.Match] = c
 		}
 		c.Count += max(e.Count, 1)
 		if len(c.samples) < liveSamples {
@@ -358,14 +400,16 @@ func firstLineKey(m string) string {
 func (lv *LiveLog) finish(a *App, fresh []*LiveCluster) error {
 	// A cluster attributed before its companion line was read is attributed again once the
 	// line is there (the files and mods it names are evidence, 03 §6.7.4).
+	// So is a companion-only cluster Player.log joined.
 	todo := fresh
 	for _, c := range lv.order {
-		if c.Report != nil && !c.withComp && len(c.samples) > 0 && lv.comp.Lookup(c.samples[0].Message) != nil {
+		if c.Report != nil && len(c.samples) > 0 && (c.redo || !c.withComp && lv.comp.Lookup(c.samples[0].Message) != nil) {
 			todo = append(todo[:len(todo):len(todo)], c)
 		}
 	}
 	for _, c := range todo {
 		c.withComp = len(c.samples) > 0 && lv.comp.Lookup(c.samples[0].Message) != nil
+		c.redo = false
 	}
 	fresh = todo
 	if len(fresh) > 0 {
@@ -405,7 +449,7 @@ func (lv *LiveLog) finish(a *App, fresh []*LiveCluster) error {
 			continue
 		}
 		c.Phases = nil
-		if lv.p.F.HasPhases || lv.comp != nil && lv.comp.HasPhases {
+		if len(c.playerPhases) > 0 || lv.p.F.HasPhases || lv.comp != nil && lv.comp.HasPhases {
 			// Rebuild from the independent sources. Player.log can arrive after its
 			// companion count; incrementing the previously merged total would count
 			// that occurrence twice and invent an unknown-phase remainder.

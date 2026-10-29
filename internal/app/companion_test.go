@@ -208,6 +208,76 @@ func TestLiveLogMonitor(t *testing.T) {
 	}
 }
 
+// The monitor writes an error before Player.log finishes it: one cluster, not one per log.
+// Player.log's entry can stay open past the wait (its next line comes late), or arrive after
+// the monitor's entry has become a cluster of its own (VM run 2026-10-28 listed it twice).
+func TestLiveLogMonitorFirst(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	scanNow(t, e)
+	root := filepath.Join(e.Root, "userdata")
+	path := filepath.Join(root, "Player.log")
+	am := filepath.Join(root, "ArchoMonitor.log")
+	e.WriteFile(am, sessionLine(t, "aaaaaaaaaaaa"))
+	e.WriteFile(path, unityHead+marker("aaaaaaaaaaaa", am))
+	lv := e.App.FollowRun(path, root)
+	poll := func() []*app.LiveCluster {
+		t.Helper()
+		if _, err := lv.Poll(e.App); err != nil {
+			t.Fatal(err)
+		}
+		var out []*app.LiveCluster
+		for _, c := range lv.Clusters() {
+			if !logs.Informational(c.Class) {
+				out = append(out, c)
+			}
+		}
+		return out
+	}
+	poll()
+	xref := "Could not resolve cross-reference to Verse.SoundDef named Reload_Standard (wanter=soundInteract)"
+	appendFile(t, am, monitorLine(t, "", "ERROR", xref, "  at Verse.Log.Error ()\n  at Verse.DirectXmlCrossRefLoader.ResolveAllWantedCrossReferences ()", 1, 1, "55555555", map[string]any{}))
+	appendFile(t, path, xref+"\n")
+	if cs := poll(); len(cs) != 0 {
+		t.Fatalf("the entry is still open: %d clusters", len(cs))
+	}
+	e.Advance(6 * time.Second)
+	if cs := poll(); len(cs) != 0 {
+		t.Fatalf("Player.log is still writing it, past the wait: %d clusters", len(cs))
+	}
+	appendFile(t, path, "Some later message\n")
+	cs := poll()
+	if len(cs) != 1 || cs[0].OnlyCompanion || cs[0].Count != 1 || cs[0].Report == nil {
+		t.Fatalf("open entry: %d clusters", len(cs))
+	}
+	// Player.log shows it only after the monitor's entry became a cluster of its own.
+	tick := "Exception ticking Pawn7: System.NullReferenceException: Object reference not set to an instance of an object"
+	appendFile(t, am, monitorLine(t, "", "ERROR", tick, "", 3, 3, "66666666", map[string]any{}))
+	poll()
+	e.Advance(6 * time.Second)
+	cs = poll()
+	if len(cs) != 2 || !cs[1].OnlyCompanion || cs[1].Count != 3 {
+		t.Fatalf("monitor-only: %d clusters", len(cs))
+	}
+	appendFile(t, path, tick+"\n  at Foo.Bar.Tick () [0x0] in <0>:0\n\n")
+	cs = poll()
+	if len(cs) != 2 || cs[1].OnlyCompanion || cs[1].Count != 3 || cs[1].Report == nil || cs[1].Report.First.Top() == nil {
+		t.Fatalf("late Player.log entry: %d clusters", len(cs))
+	}
+	// later occurrences in Player.log join it too
+	appendFile(t, path, strings.Repeat(tick+"\n  at Foo.Bar.Tick () [0x0] in <0>:0\n\n", 4))
+	cs = poll()
+	if len(cs) != 2 || cs[1].Count != 5 {
+		t.Fatalf("more occurrences: %d clusters, count %d", len(cs), cs[len(cs)-1].Count)
+	}
+	if _, err := lv.Close(e.App); err != nil {
+		t.Fatal(err)
+	}
+	if cs := poll(); len(cs) != 2 {
+		t.Fatalf("after exit: %d clusters", len(cs))
+	}
+}
+
 // Files from another run must never become the companion merely because their names fit.
 func TestCompanionRunWindow(t *testing.T) {
 	t.Parallel()
