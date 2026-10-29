@@ -207,6 +207,7 @@ func TestMigrateIdentityQuestionSummary(t *testing.T) {
 	}
 	// Simulate the prior released shape; migration must reconstruct the same summary
 	// from stored snapshots while leaving the question and player decisions alone.
+	e.DowngradeFacts()
 	if _, err := e.App.Store.DB.Exec(`DROP TABLE version_mute; ALTER TABLE identity_question DROP COLUMN summary; UPDATE meta SET value='21' WHERE key='schema_version'`); err != nil {
 		t.Fatal(err)
 	}

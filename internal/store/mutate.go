@@ -208,11 +208,6 @@ func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, erro
 				`DELETE FROM snapshot_file WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id=?)`,
 				`DELETE FROM snapshot WHERE instance_id=?`,
 				`DELETE FROM instance_alias WHERE instance_id=?`,
-				`DELETE FROM def_fact WHERE instance_id=?`,
-				`DELETE FROM assembly_fact WHERE instance_id=?`,
-				`DELETE FROM type_fact WHERE instance_id=?`,
-				`DELETE FROM harmony_fact WHERE instance_id=?`,
-				`DELETE FROM harmony_id WHERE instance_id=?`,
 				`DELETE FROM content_state WHERE instance_id=?`,
 				`DELETE FROM change_event WHERE instance_id=?`,
 				`DELETE FROM identity_question WHERE instance_id=? OR candidate_instance_id=?`,
@@ -255,6 +250,9 @@ func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, erro
 			}
 		}
 		if err := recomputePrimaries(tx, envID); err != nil {
+			return err
+		}
+		if err := pruneFacts(tx, time.Now()); err != nil {
 			return err
 		}
 		if dryRun {

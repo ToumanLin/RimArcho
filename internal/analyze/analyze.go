@@ -90,6 +90,7 @@ type Input struct {
 // ContentState is the effective content of one instance.
 type ContentState struct {
 	Key         string
+	AssemblyKey string // snapshot, effective DLL files, analyzer and skip policy
 	Folders     []string
 	DefFiles    int
 	PatchFiles  int
@@ -160,6 +161,9 @@ func Run(in Input) (*Output, error) {
 		folders[m.Instance] = r.Folders
 		requires[m.Instance] = r.Requires
 		out.Content[m.Instance] = &ContentState{Key: r.Key(m.SnapHash, in.MM) + fmt.Sprintf("|a%d", Version), Folders: r.Folders}
+		if m.Pos > 0 {
+			out.Content[m.Instance].AssemblyKey = AssemblyKey(m, r.Folders, in.HarmonySkip)
+		}
 	}
 
 	// Def layer: active mods into the merged document, in load order.

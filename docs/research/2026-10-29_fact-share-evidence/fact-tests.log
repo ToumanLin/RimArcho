@@ -1,0 +1,21 @@
+=== RUN   TestFactQueriesUseIndexes
+--- PASS: TestFactQueriesUseIndexes (0.03s)
+=== RUN   TestMigrateV26FactViews
+--- PASS: TestMigrateV26FactViews (0.36s)
+=== RUN   TestFactSetsShareVersionsAndUpdates
+--- PASS: TestFactSetsShareVersionsAndUpdates (0.09s)
+=== RUN   TestFactSetsDifferentFoldersAndPriority
+--- PASS: TestFactSetsDifferentFoldersAndPriority (0.06s)
+=== RUN   TestFactSetsHarmonyViews
+--- PASS: TestFactSetsHarmonyViews (0.08s)
+=== RUN   TestFactPruneVisibilitySlotsAndEnvRemoval
+--- PASS: TestFactPruneVisibilitySlotsAndEnvRemoval (0.03s)
+=== RUN   TestFactSetsDifferentAssemblyInputs
+--- PASS: TestFactSetsDifferentAssemblyInputs (0.07s)
+=== RUN   TestFactSetsEmptyAssemblyViewReplacesOld
+--- PASS: TestFactSetsEmptyAssemblyViewReplacesOld (0.06s)
+=== RUN   TestFactShareScale
+    factshare_bench_test.go:19: set RIMARCHO_FACT_BENCH=1 for the 760,000-row synthetic benchmark
+--- SKIP: TestFactShareScale (0.00s)
+PASS
+ok  	github.com/ToumanLin/RimArcho/internal/store	3.164s

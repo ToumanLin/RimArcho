@@ -6,6 +6,8 @@ package content
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -35,9 +37,20 @@ type Resolved struct {
 	Requires map[string][]string
 }
 
-// Key is the effective-content cache key: snapshot hash + game version + condition results.
-func (r *Resolved) Key(snapHash []byte, mm string) string {
-	return fmt.Sprintf("%x|%s|%s", snapHash, mm, r.Conds)
+// Key identifies the ordered effective folders of this snapshot. mm has already been
+// resolved into Folders; it must not prevent sharing identical content across versions.
+func (r *Resolved) Key(snapHash []byte, _ string) string {
+	return FolderKey(snapHash, r.Folders)
+}
+
+// FolderKey preserves priority and duplicate entries: both affect resource enumeration.
+func FolderKey(snapHash []byte, folders []string) string {
+	normalized := make([]string, len(folders))
+	for i, f := range folders {
+		normalized[i] = filepath.ToSlash(filepath.Clean(f))
+	}
+	data, _ := json.Marshal(normalized)
+	return fmt.Sprintf("%x|f%x", snapHash, sha256.Sum256(data))
 }
 
 type lfEntry struct {

@@ -68,12 +68,12 @@ func TestMigrateV25(t *testing.T) {
 			t.Fatal(err)
 		}
 		ix := indexes(t, s)
-		for _, gone := range []string{"def_fact_name", "type_fact_name", "type_fact_instance", "harmony_fact_instance", "harmony_fact_target"} {
+		for _, gone := range []string{"def_fact_name", "type_fact_name", "type_fact_instance", "harmony_fact_instance", "harmony_fact_target", "def_fact_instance", "def_fact_mm", "def_fact_mm_name", "def_fact_mm_named"} {
 			if ix[gone] {
 				t.Errorf("noNamed=%v: index %s kept", noNamed, gone)
 			}
 		}
-		for _, kept := range []string{"def_fact_mm_named", "def_fact_mm", "def_fact_mm_name", "def_fact_instance", "type_fact_mm", "type_fact_inst_mm", "harmony_fact_mm", "harmony_fact_inst_mm", "harmony_id_id"} {
+		for _, kept := range []string{"def_fact_named", "def_fact_lookup", "def_fact_set", "content_state_def", "content_state_dll", "type_fact_lookup", "type_fact_set", "harmony_fact_set", "harmony_id_lookup"} {
 			if !ix[kept] {
 				t.Errorf("noNamed=%v: index %s missing", noNamed, kept)
 			}
@@ -132,9 +132,16 @@ func bigWrite(t *testing.T, s *Store, n int) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ins, _ := tx.Prepare(`INSERT INTO def_fact(instance_id, def_type, def_name, file, line, game_mm) VALUES(?,?,?,?,?,?)`)
+	id, _, err := ensureFactSet(tx, "wal", "def", fmt.Sprint(time.Now().UnixNano()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ins, err := tx.Prepare(`INSERT INTO def_fact(set_id,def_type,def_name,file,line) VALUES(?,?,?,?,?)`)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < n; i++ {
-		if _, err := ins.Exec(fmt.Sprintf("inst%05d", i/100), "ThingDef", fmt.Sprintf("Def_%d", i), "1.6/Defs/ThingDefs/Things.xml", i, "1.7"); err != nil {
+		if _, err := ins.Exec(id, "ThingDef", fmt.Sprintf("Def_%d", i), "1.6/Defs/ThingDefs/Things.xml", i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -154,7 +161,7 @@ func TestTruncateWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	bigWrite(t, s, 150000)
+	bigWrite(t, s, 250000)
 	if n := fileSize(path + "-wal"); n < 20<<20 {
 		t.Fatalf("WAL after the write is %d bytes; the test needs it above the 16 MB limit", n)
 	}
@@ -169,7 +176,7 @@ func TestTruncateWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	bigWrite(t, s, 150000)
+	bigWrite(t, s, 250000)
 	tx, err := r.DB.Begin()
 	if err != nil {
 		t.Fatal(err)
@@ -198,17 +205,18 @@ func TestFactQueriesUseIndexes(t *testing.T) {
 	}
 	defer s.Close()
 	for _, q := range []string{
-		`SELECT * FROM def_fact WHERE instance_id='a' AND game_mm='1.7' ORDER BY rowid`,
-		`SELECT * FROM def_fact WHERE def_name='a' AND game_mm='1.7' ORDER BY rowid`,
-		`SELECT * FROM def_fact WHERE name='a' AND name<>'' AND game_mm='1.7' ORDER BY rowid`,
-		`SELECT instance_id, count(*) FROM def_fact WHERE game_mm='1.7' GROUP BY instance_id`,
-		`DELETE FROM def_fact WHERE instance_id='a'`,
-		`SELECT DISTINCT instance_id, file FROM type_fact WHERE type_name IN ('a', 'b') AND game_mm='1.7'`,
-		`DELETE FROM type_fact WHERE instance_id='a'`,
-		`SELECT * FROM harmony_fact WHERE game_mm='1.7' AND target='a'`,
-		`SELECT * FROM harmony_fact WHERE game_mm='1.7' AND instance_id='a'`,
-		`DELETE FROM harmony_fact WHERE instance_id='a'`,
-		`SELECT DISTINCT instance_id FROM harmony_id WHERE id='a' AND game_mm='1.7'`,
+		`SELECT ` + defCols + defView + `WHERE c.instance_id='a' AND c.game_mm='1.7' ORDER BY f.rowid`,
+		`SELECT ` + defCols + defView + `WHERE f.def_name='a' AND c.game_mm='1.7' ORDER BY f.rowid`,
+		`SELECT ` + defCols + defView + `WHERE f.name='a' AND f.name<>'' AND c.game_mm='1.7' ORDER BY f.rowid`,
+		`SELECT c.instance_id,count(*)` + defView + `WHERE c.game_mm='1.7' GROUP BY c.instance_id`,
+		`DELETE FROM fact_set WHERE instance_id='a'`,
+		`DELETE FROM def_fact WHERE set_id=1`,
+		`SELECT DISTINCT c.instance_id,f.file FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id WHERE f.type_name IN ('a','b') AND c.game_mm='1.7'`,
+		`DELETE FROM type_fact WHERE set_id=1`,
+		`SELECT * FROM harmony_fact f JOIN content_state c ON c.dll_set_id=f.set_id WHERE c.game_mm='1.7' AND f.target='a'`,
+		`SELECT * FROM harmony_fact f JOIN content_state c ON c.dll_set_id=f.set_id WHERE c.game_mm='1.7' AND c.instance_id='a'`,
+		`DELETE FROM harmony_fact WHERE set_id=1`,
+		`SELECT DISTINCT c.instance_id FROM harmony_id f CROSS JOIN content_state c ON c.dll_set_id=f.set_id WHERE f.id='a' AND c.game_mm='1.7'`,
 	} {
 		rows, err := s.DB.Query(`EXPLAIN QUERY PLAN ` + q)
 		if err != nil {

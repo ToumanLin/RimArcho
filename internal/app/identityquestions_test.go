@@ -183,6 +183,7 @@ func TestIdentityQuestionsMigrationRechecksOld(t *testing.T) {
 	if _, err := e.App.ResolveQuestion(answered, "unrelated"); err != nil {
 		t.Fatal(err)
 	}
+	e.DowngradeFacts()
 	if _, err := e.App.Store.DB.Exec(`DROP INDEX identity_question_open; UPDATE meta SET value='23' WHERE key='schema_version'`); err != nil {
 		t.Fatal(err)
 	}

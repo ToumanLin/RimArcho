@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 25
+const SchemaVersion = 26
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -428,9 +428,9 @@ func (s *Store) migrate() error {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13, schemaV14, schemaV15, schemaV16, schemaV17, schemaV18, schemaV19, schemaV20, schemaV21, schemaV22, schemaV23, schemaV24, schemaV25}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13, schemaV14, schemaV15, schemaV16, schemaV17, schemaV18, schemaV19, schemaV20, schemaV21, schemaV22, schemaV23, schemaV24, schemaV25, schemaV26}
 	// post runs after a step's SQL, in the same transaction.
-	post := map[int]func(*sql.Tx) error{11: migrateV11, 14: migrateV14, 19: migrateV19, 22: migrateV22, 24: migrateV24, 25: migrateV25}
+	post := map[int]func(*sql.Tx) error{11: migrateV11, 14: migrateV14, 19: migrateV19, 22: migrateV22, 24: migrateV24, 25: migrateV25, 26: migrateV26}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {
@@ -439,6 +439,10 @@ func (s *Store) migrate() error {
 		if _, err := tx.Exec(strings.Join(steps, "")); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("store: create schema: %w", err)
+		}
+		if err := migrateV26(tx); err != nil {
+			tx.Rollback()
+			return err
 		}
 		if _, err := tx.Exec(`INSERT INTO meta(key, value) VALUES('schema_version', ?)`, fmt.Sprint(SchemaVersion)); err != nil {
 			tx.Rollback()

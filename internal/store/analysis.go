@@ -37,14 +37,21 @@ func (s *Store) ContentKeys() (map[string]string, error) {
 
 // CachedDefs returns an instance's Def facts if they were built for key.
 func (s *Store) CachedDefs(instanceID, key string) ([]analyze.DefFact, bool) {
-	if s.ContentKey(instanceID) != key {
+	var id int64
+	if err := s.DB.QueryRow(`SELECT id FROM fact_set WHERE instance_id=? AND kind='def' AND content_key=?`, instanceID, key).Scan(&id); err != nil {
 		return nil, false
 	}
-	fs, err := s.DefsOf(instanceID)
+	rows, err := s.DB.Query(`SELECT ? AS instance_id,`+defFields+` FROM def_fact f WHERE f.set_id=? ORDER BY f.rowid`, instanceID, id)
+	if err != nil {
+		return nil, false
+	}
+	fs, err := scanDefs(rows)
 	return fs, err == nil
 }
 
-const defCols = `instance_id, def_type, def_name, name, parent, abstract, file, line, may_require, may_require_any`
+const defFields = `f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file, f.line, f.may_require, f.may_require_any`
+const defCols = `c.instance_id, ` + defFields
+const defView = ` FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id `
 
 func scanDefs(rows *sql.Rows) ([]analyze.DefFact, error) {
 	defer rows.Close()
@@ -63,7 +70,7 @@ func scanDefs(rows *sql.Rows) ([]analyze.DefFact, error) {
 
 // DefsOf returns the Def facts of one instance, in file order.
 func (s *Store) DefsOf(instanceID string) ([]analyze.DefFact, error) {
-	rows, err := s.DB.Query(`SELECT `+defCols+` FROM def_fact WHERE instance_id=? AND game_mm=? ORDER BY rowid`, instanceID, s.MM)
+	rows, err := s.DB.Query(`SELECT `+defCols+defView+` WHERE c.instance_id=? AND c.game_mm=? ORDER BY f.rowid`, instanceID, s.MM)
 	if err != nil {
 		return nil, err
 	}
@@ -72,9 +79,9 @@ func (s *Store) DefsOf(instanceID string) ([]analyze.DefFact, error) {
 
 // DefsNamed returns the Def facts with a defName (or, with byName, a Name attribute).
 func (s *Store) DefsNamed(name string, byName bool) ([]analyze.DefFact, error) {
-	q := `SELECT ` + defCols + ` FROM def_fact WHERE def_name=? AND game_mm=? ORDER BY rowid`
+	q := `SELECT ` + defCols + defView + ` WHERE f.def_name=? AND c.game_mm=? ORDER BY f.rowid`
 	if byName {
-		q = `SELECT ` + defCols + ` FROM def_fact WHERE name=? AND name<>'' AND game_mm=? ORDER BY rowid`
+		q = `SELECT ` + defCols + defView + ` WHERE f.name=? AND f.name<>'' AND c.game_mm=? ORDER BY f.rowid`
 	}
 	rows, err := s.DB.Query(q, name, s.MM)
 	if err != nil {
@@ -85,7 +92,7 @@ func (s *Store) DefsNamed(name string, byName bool) ([]analyze.DefFact, error) {
 
 // DefCounts returns the number of Def facts per instance.
 func (s *Store) DefCounts() (map[string]int, error) {
-	rows, err := s.DB.Query(`SELECT instance_id, count(*) FROM def_fact WHERE game_mm=? GROUP BY instance_id`, s.MM)
+	rows, err := s.DB.Query(`SELECT c.instance_id, count(*)`+defView+` WHERE c.game_mm=? GROUP BY c.instance_id`, s.MM)
 	if err != nil {
 		return nil, err
 	}
@@ -126,58 +133,32 @@ type Analysis struct {
 
 // SaveAnalysis persists a run: content states and rebuilt Def facts, the Patch facts and
 // findings. The run fills the slot (environment, mm, setKey) (03 §3): the slot's older run
-// is deleted, and so is every run of the environment and mm whose set key is not in keep
+// is deleted, and so is every run of the environment whose set key is not in keep
 // (the enabled sets the environment's plans have now), so slots do not pile up as plans
 // are edited.
 func (s *Store) SaveAnalysis(envID, setKey, runKey, mm string, keep []string, out *analyze.Output, started, finished time.Time) (int64, error) {
 	var id int64
 	err := s.inTx(func(tx *sql.Tx) error {
-		for inst, cs := range out.Content {
-			if _, err := tx.Exec(`INSERT INTO content_state(instance_id, game_mm, content_key, folders, def_files, patch_files, parse_errors) VALUES(?,?,?,?,?,?,?)
-				ON CONFLICT(instance_id, game_mm) DO UPDATE SET content_key=excluded.content_key, folders=excluded.folders,
-				def_files=excluded.def_files, patch_files=excluded.patch_files, parse_errors=excluded.parse_errors`,
-				inst, mm, cs.Key, strings.Join(cs.Folders, "\n"), cs.DefFiles, cs.PatchFiles, strings.Join(cs.ParseErrors, "\n")); err != nil {
-				return err
-			}
-		}
-		del, err := tx.Prepare(`DELETE FROM def_fact WHERE instance_id=? AND game_mm=?`)
-		if err != nil {
+		if err := saveContent(tx, out, mm); err != nil {
 			return err
-		}
-		defer del.Close()
-		ins, err := tx.Prepare(`INSERT INTO def_fact(` + defCols + `, game_mm) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
-		if err != nil {
-			return err
-		}
-		defer ins.Close()
-		for inst, fs := range out.NewDefs {
-			if _, err := del.Exec(inst, mm); err != nil {
-				return err
-			}
-			for _, f := range fs {
-				abs := 0
-				if f.Abstract {
-					abs = 1
-				}
-				if _, err := ins.Exec(inst, f.Type, f.DefName, f.Name, f.Parent, abs, f.File, f.Line, f.MayRequire, f.MayRequireAny, mm); err != nil {
-					return err
-				}
-			}
 		}
 		kept := map[string]bool{}
 		for _, k := range keep {
 			kept[k] = true
 		}
 		var old []int64
-		rows, err := tx.Query(`SELECT id, set_key FROM analysis WHERE environment_id=? AND game_mm=?`, envID, mm)
+		rows, err := tx.Query(`SELECT id, set_key, game_mm FROM analysis WHERE environment_id=?`, envID)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var x int64
-			var k string
-			rows.Scan(&x, &k)
-			if k == setKey || !kept[k] {
+			var k, oldMM string
+			if err := rows.Scan(&x, &k, &oldMM); err != nil {
+				rows.Close()
+				return err
+			}
+			if oldMM == mm && k == setKey || !kept[k] {
 				old = append(old, x)
 			}
 		}
@@ -208,9 +189,6 @@ func (s *Store) SaveAnalysis(envID, setKey, runKey, mm string, keep []string, ou
 				return err
 			}
 		}
-		if err := saveHarmony(tx, out.Assemblies, mm); err != nil {
-			return err
-		}
 		fins, err := tx.Prepare(`INSERT INTO finding(analysis_id, layer, code, severity, key, subject_instance, data) VALUES(?,?,?,?,?,?,?)`)
 		if err != nil {
 			return err
@@ -222,7 +200,7 @@ func (s *Store) SaveAnalysis(envID, setKey, runKey, mm string, keep []string, ou
 				return err
 			}
 		}
-		return nil
+		return pruneFacts(tx, finished)
 	})
 	return id, err
 }
@@ -396,7 +374,7 @@ func (s *Store) RemoveIgnore(envID, lineageID, code, key string) (bool, error) {
 // DefCount is the number of Def facts of an instance.
 func (s *Store) DefCount(instanceID string) int {
 	var n int
-	s.DB.QueryRow(`SELECT count(*) FROM def_fact WHERE instance_id=? AND game_mm=?`, instanceID, s.MM).Scan(&n)
+	s.DB.QueryRow(`SELECT count(*)`+defView+` WHERE c.instance_id=? AND c.game_mm=?`, instanceID, s.MM).Scan(&n)
 	return n
 }
 
@@ -406,35 +384,23 @@ func (s *Store) PatchCount(analysisID int64, instanceID string) (ops, failed int
 	return
 }
 
-func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, mm string) error {
-	seen := map[string]bool{}
-	for _, a := range asms {
-		if seen[a.Instance] {
-			continue
-		}
-		seen[a.Instance] = true
-		for _, t := range []string{"assembly_fact", "type_fact", "harmony_fact", "harmony_id"} {
-			if _, err := tx.Exec(`DELETE FROM `+t+` WHERE instance_id=? AND game_mm=?`, a.Instance, mm); err != nil {
-				return err
-			}
-		}
-	}
-	insA, err := tx.Prepare(`INSERT INTO assembly_fact(instance_id, file, skipped, manual, uses_harmony, types, patches, error, game_mm) VALUES(?,?,?,?,?,?,?,?,?)`)
+func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, sets map[string]int64) error {
+	insA, err := tx.Prepare(`INSERT INTO assembly_fact(set_id, file, skipped, manual, uses_harmony, types, patches, error) VALUES(?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer insA.Close()
-	insT, err := tx.Prepare(`INSERT INTO type_fact(instance_id, file, type_name, game_mm) VALUES(?,?,?,?)`)
+	insT, err := tx.Prepare(`INSERT INTO type_fact(set_id, file, type_name) VALUES(?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer insT.Close()
-	insH, err := tx.Prepare(`INSERT INTO harmony_fact(instance_id, file, patch_type, patch_method, kind, target, target_type, target_method, args, skips, dynamic, game_mm) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
+	insH, err := tx.Prepare(`INSERT INTO harmony_fact(set_id, file, patch_type, patch_method, kind, target, target_type, target_method, args, skips, dynamic) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer insH.Close()
-	insI, err := tx.Prepare(`INSERT INTO harmony_id(instance_id, file, id, game_mm) VALUES(?,?,?,?)`)
+	insI, err := tx.Prepare(`INSERT INTO harmony_id(set_id, file, id) VALUES(?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -446,23 +412,26 @@ func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, mm string) error {
 		return 0
 	}
 	for _, a := range asms {
-		if _, err := insA.Exec(a.Instance, a.File, b(a.Skipped), b(a.Manual), b(a.UsesHarm), len(a.Types), len(a.Patches), a.Err, mm); err != nil {
+		if sets[a.Instance] == 0 {
+			continue
+		}
+		if _, err := insA.Exec(sets[a.Instance], a.File, b(a.Skipped), b(a.Manual), b(a.UsesHarm), len(a.Types), len(a.Patches), a.Err); err != nil {
 			return err
 		}
 		for _, t := range a.Types {
-			if _, err := insT.Exec(a.Instance, a.File, t, mm); err != nil {
+			if _, err := insT.Exec(sets[a.Instance], a.File, t); err != nil {
 				return err
 			}
 		}
 		for _, p := range a.Patches {
 			// dynamic holds two bits: 1 the target is chosen at run time, 2 the patch was
 			// found at a Harmony.Patch call in code (G9, 03 §5.3).
-			if _, err := insH.Exec(a.Instance, a.File, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual), mm); err != nil {
+			if _, err := insH.Exec(sets[a.Instance], a.File, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)); err != nil {
 				return err
 			}
 		}
 		for _, id := range a.IDs {
-			if _, err := insI.Exec(a.Instance, a.File, id, mm); err != nil {
+			if _, err := insI.Exec(sets[a.Instance], a.File, id); err != nil {
 				return err
 			}
 		}
@@ -488,10 +457,10 @@ type HarmonyFilter struct {
 
 // HarmonyPatches returns stored patches ordered by target.
 func (s *Store) HarmonyPatches(f HarmonyFilter) ([]*HarmonyRow, error) {
-	q := `SELECT instance_id, file, patch_type, patch_method, kind, target, skips, dynamic FROM harmony_fact WHERE game_mm=?`
+	q := `SELECT c.instance_id, f.file, f.patch_type, f.patch_method, f.kind, f.target, f.skips, f.dynamic FROM harmony_fact f JOIN content_state c ON c.dll_set_id=f.set_id WHERE c.game_mm=?`
 	args := []any{s.MM}
 	if f.Instance != "" {
-		q += ` AND instance_id=?`
+		q += ` AND c.instance_id=?`
 		args = append(args, f.Instance)
 	}
 	if f.Target != "" {
@@ -503,7 +472,7 @@ func (s *Store) HarmonyPatches(f HarmonyFilter) ([]*HarmonyRow, error) {
 			args = append(args, f.Target, f.Target, f.Target)
 		}
 	}
-	rows, err := s.DB.Query(q+` ORDER BY target, rowid`, args...)
+	rows, err := s.DB.Query(q+` ORDER BY target, f.rowid`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -531,7 +500,7 @@ type AssemblyRow struct {
 
 // Assemblies returns the stored assemblies of an instance.
 func (s *Store) Assemblies(instanceID string) ([]*AssemblyRow, error) {
-	rows, err := s.DB.Query(`SELECT instance_id, file, skipped, manual, uses_harmony, types, patches, error FROM assembly_fact WHERE instance_id=? AND game_mm=? ORDER BY rowid`, instanceID, s.MM)
+	rows, err := s.DB.Query(`SELECT c.instance_id, f.file, f.skipped, f.manual, f.uses_harmony, f.types, f.patches, f.error FROM assembly_fact f JOIN content_state c ON c.dll_set_id=f.set_id WHERE c.instance_id=? AND c.game_mm=? ORDER BY f.rowid`, instanceID, s.MM)
 	if err != nil {
 		return nil, err
 	}
@@ -553,7 +522,7 @@ func (s *Store) Assemblies(instanceID string) ([]*AssemblyRow, error) {
 // stored with '+'; stack frames may print either.
 func (s *Store) TypeOwners(name string) ([][2]string, error) {
 	alt := strings.ReplaceAll(name, ".", "+")
-	rows, err := s.DB.Query(`SELECT DISTINCT instance_id, file FROM type_fact WHERE type_name IN (?, ?) AND game_mm=?`, name, alt, s.MM)
+	rows, err := s.DB.Query(`SELECT DISTINCT c.instance_id, f.file FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id WHERE f.type_name IN (?, ?) AND c.game_mm=?`, name, alt, s.MM)
 	if err != nil {
 		return nil, err
 	}
@@ -581,7 +550,7 @@ func (s *Store) TypeOwners(name string) ([][2]string, error) {
 
 // TypeOwners0 is TypeOwners for an exact stored name.
 func (s *Store) TypeOwners0(name string) ([][2]string, error) {
-	rows, err := s.DB.Query(`SELECT DISTINCT instance_id, file FROM type_fact WHERE type_name=? AND game_mm=?`, name, s.MM)
+	rows, err := s.DB.Query(`SELECT DISTINCT c.instance_id, f.file FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id WHERE f.type_name=? AND c.game_mm=?`, name, s.MM)
 	if err != nil {
 		return nil, err
 	}
@@ -597,7 +566,7 @@ func (s *Store) TypeOwners0(name string) ([][2]string, error) {
 
 // HarmonyIDOwners returns the instances whose assemblies contain the Harmony ID string.
 func (s *Store) HarmonyIDOwners(id string) ([]string, error) {
-	rows, err := s.DB.Query(`SELECT DISTINCT instance_id FROM harmony_id WHERE id=? AND game_mm=?`, id, s.MM)
+	rows, err := s.DB.Query(`SELECT DISTINCT c.instance_id FROM harmony_id f CROSS JOIN content_state c ON c.dll_set_id=f.set_id WHERE f.id=? AND c.game_mm=?`, id, s.MM)
 	if err != nil {
 		return nil, err
 	}

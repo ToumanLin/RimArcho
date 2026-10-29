@@ -12,6 +12,7 @@ func TestMigrateV18LinkLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	downgradeFacts(t, s)
 	if _, err = s.DB.Exec(`ALTER TABLE identity_question DROP COLUMN summary; ALTER TABLE workspace_undo DROP COLUMN staging; DROP TABLE credit_deployment; DROP TABLE credit_session; DROP TABLE credit_item; DROP TABLE credit_batch; DROP TABLE managed_link; ALTER TABLE modsconfig_state DROP COLUMN writer_env; UPDATE meta SET value='17' WHERE key='schema_version'`); err != nil {
 		t.Fatal(err)
 	}
