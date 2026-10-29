@@ -205,6 +205,9 @@ func PatternCardArgv(a *app.App, st *app.LoadoutState, argv []string) *PatternCa
 	if path == "" {
 		cur, p := a.LogPaths(st)
 		path = cur
+		if path == "" {
+			path = p
+		}
 		if prev {
 			path = p
 		}

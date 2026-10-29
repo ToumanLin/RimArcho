@@ -99,7 +99,19 @@ func (a *App) sourceAt(e *env.Environment, reg *loadout.Registry, t time.Time, p
 func (a *App) logSource(st *LoadoutState, path string, mod time.Time) *RunSource {
 	root := st.Ix.Env.UserDataRoot
 	plansOnly := root != "" && path != "" && env.PathKey(filepath.Dir(path)) == env.PathKey(filepath.Join(root, "Logs"))
-	return a.sourceAt(st.Ix.Env, st.Reg, mod, plansOnly)
+	src := a.sourceAt(st.Ix.Env, st.Reg, mod, plansOnly)
+	// An explicit startup path can contradict a time-matched launch (Steam/external
+	// launches have no record). Do not assign that run to the recorded plan.
+	if root := logGameRoot(path); root != "" && src.EnvID != "" {
+		if es, err := a.Store.Envs(); err == nil {
+			for _, e := range es {
+				if e.ID == src.EnvID && env.PathKey(root) != env.PathKey(e.GameRoot) {
+					return &RunSource{Unknown: true}
+				}
+			}
+		}
+	}
+	return src
 }
 
 // judge sets r's attribution and staleness against st's plan (03 §6.4 new rule): the log

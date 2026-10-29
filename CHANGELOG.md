@@ -4,6 +4,13 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Environments sharing a user data folder now exclude logs written by another game
+  before attribution or analysis. Can it run, the game log, sidebar counts, new-log
+  hints, CLI and MCP use only eligible logs, falling back to an eligible previous log.
+  Explicit log paths and game-version overrides cannot bypass ownership checks.
+  A game's own logs from before an upgrade still use their recorded game version.
+  Logs with unknown owners remain uncounted and do not trigger another version's analysis.
+
 - Archo Monitor records game loading, save loading, new colony generation, playing and
   returns to the main menu. Can it run groups recorded errors by phase; the game log
   adds quiet phase separators. CLI and MCP include phase counts. Older logs keep their

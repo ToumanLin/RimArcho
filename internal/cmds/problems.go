@@ -128,7 +128,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		// The newest log is attributed against its own version (03 §6.4, §7.3).
 		if st, err := c.App.Loadout(); err == nil {
 			if p := c.App.ProblemLog(st); p != "" {
-				c.App.EnsureLogAnalysis(st, app.LogVersionOf(p), progress())
+				c.App.EnsureLogFileAnalysis(st, p, progress())
 			}
 		}
 	}

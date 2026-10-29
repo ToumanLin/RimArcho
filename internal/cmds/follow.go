@@ -32,6 +32,9 @@ func logFollow(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		lv = c.App.FollowRun(path, c.App.RunDataRoot(st, w))
 	} else {
+		if err := c.App.CheckLogOwner(st, path); err != nil {
+			return nil, err
+		}
 		lv = c.App.FollowRun(path, "")
 	}
 	d, root := render.New("following " + path)

@@ -273,7 +273,7 @@ func (a *App) packOfDir(dir string) string {
 // the one Unity keeps (the environment's).
 func (a *App) RunLog(st *LoadoutState, w RunWhat) string {
 	if w.UserData != "" && env.PathKey(w.UserData) != env.PathKey(st.Ix.Env.UserDataRoot) {
-		if p := env.PlayerLog(w.UserData, st.GameMM()); p != "" {
+		if p := env.PlayerLog(w.UserData, st.GameMM()); p != "" && a.CheckLogOwner(st, p) == nil {
 			return p
 		}
 	}

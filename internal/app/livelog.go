@@ -199,6 +199,9 @@ func (lv *LiveLog) CompanionLog() *logs.Companion { return lv.comp }
 
 // Poll reads what was appended since the last poll and returns the clusters that appeared.
 func (lv *LiveLog) Poll(a *App) ([]*LiveCluster, error) {
+	if lv.foreign(a) {
+		return nil, nil
+	}
 	fi, err := os.Stat(lv.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -261,6 +264,9 @@ func (lv *LiveLog) Poll(a *App) ([]*LiveCluster, error) {
 
 // Close ends the log (the game exited): the last entry is complete.
 func (lv *LiveLog) Close(a *App) ([]*LiveCluster, error) {
+	if lv.foreign(a) {
+		return nil, nil
+	}
 	if len(lv.pending) > 0 {
 		lv.p.Line(string(lv.pending))
 		lv.pending = nil
@@ -269,6 +275,24 @@ func (lv *LiveLog) Close(a *App) ([]*LiveCluster, error) {
 	fresh := lv.take(true)
 	fresh = append(fresh, lv.companionOnly(true)...)
 	return fresh, lv.finish(a, fresh)
+}
+
+// Recheck on every read: a shared file can be replaced by another game's log while
+// being followed. Discard earlier clusters too, so they cannot remain in live counts.
+func (lv *LiveLog) foreign(a *App) bool {
+	if a.Store == nil {
+		return false
+	}
+	st, err := a.Loadout()
+	if err != nil {
+		return false // standalone log readers may have no registered environment
+	}
+	if a.CheckLogOwner(st, lv.Path) != nil {
+		lv.reset()
+		lv.follow("")
+		return true
+	}
+	return false
 }
 
 // take moves the complete entries out of the parser into clusters.

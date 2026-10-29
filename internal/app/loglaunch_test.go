@@ -154,11 +154,8 @@ func TestLogBelongsToLaunch(t *testing.T) {
 	if err := e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: second.ID, Started: e.Now().Add(-5 * time.Minute).UTC(), Method: "direct", Command: "x"}); err != nil {
 		t.Fatal(err)
 	}
-	if r := logRun(t, e); !r.OtherRun || r.OtherEnv != "second" {
-		t.Fatalf("other environment: %+v", r)
-	}
-	if out := e.MustRun("problems"); !strings.Contains(out, "in environment second)") {
-		t.Fatal(out)
+	if ps := problems(t, e); len(ps.Logs) != 0 {
+		t.Fatalf("other environment's log must be excluded: %+v", ps.Logs)
 	}
 }
 
