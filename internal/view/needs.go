@@ -105,6 +105,9 @@ type Action struct {
 	Problem string   `json:"problem,omitempty"` // p:<ref> for ignore
 	LogPath string   `json:"logPath,omitempty"`
 	Cluster string   `json:"cluster,omitempty"`
+	// Line: the cluster's normalised first line, for game-log actions whose cluster ids are
+	// not the log page's (the running game's items).
+	Line string `json:"line,omitempty"`
 
 	GameVersion  string `json:"gameVersion,omitempty"`
 	VersionMuted bool   `json:"versionMuted,omitempty"`

@@ -157,6 +157,15 @@ func shortFile(st *app.LoadoutState, p string) string {
 	return filepath.ToSlash(p)
 }
 
+// lineKey is a message's first line, normalised: how one reading of a log meets a cluster
+// of another (the companion log, the running game's clusters, the log page's rows).
+func lineKey(msg string) string {
+	if i := strings.IndexByte(msg, '\n'); i >= 0 {
+		msg = msg[:i]
+	}
+	return logs.Normalize(strings.TrimSpace(msg))
+}
+
 // logLinks maps each cluster's normalised first line to its id (the first cluster wins).
 func logLinks(cs []*app.LogCluster) map[string]string {
 	out := map[string]string{}
@@ -164,11 +173,7 @@ func logLinks(cs []*app.LogCluster) map[string]string {
 		if lc.First == nil {
 			continue
 		}
-		msg := lc.First.Message
-		if i := strings.IndexByte(msg, '\n'); i >= 0 {
-			msg = msg[:i]
-		}
-		k := logs.Normalize(strings.TrimSpace(msg))
+		k := lineKey(lc.First.Message)
 		if _, ok := out[k]; !ok {
 			out[k] = lc.ID
 		}

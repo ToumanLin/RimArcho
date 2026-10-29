@@ -117,8 +117,9 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 		}
 		n := Need{Group: GroupThisRun, Section: SectionRun, Text: text, Counted: true, Mods: ids, Status: StatusLog,
 			Evidence: ev,
-			// like the last run's items: the game log at this cluster (the TUI: `archo log`)
-			Actions: []Action{{Kind: ActGameLog, Key: "enter", Label: T("open game log"), Cluster: c.Report.ID, Argv: []string{"log"}}}}
+			// like the last run's items: the game log at this cluster (the TUI: `archo log`).
+			// The live clusters are numbered per batch, not like the page: match the line.
+			Actions: []Action{{Kind: ActGameLog, Key: "enter", Label: T("open game log"), Line: lineKey(c.Report.First.Message), Argv: []string{"log"}}}}
 		if len(c.Phases) > 0 {
 			n.Phase = logs.PhaseName(c.Phases[0].Phase)
 			n.PhaseHeading = phaseHeading(n.Phase)

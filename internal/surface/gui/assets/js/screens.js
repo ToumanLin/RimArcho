@@ -520,6 +520,7 @@ async function runAction(it, act) {
     case "game-log":
       syncLogEnvironment();
       L.target = act.cluster || "";
+      L.targetLine = act.line || "";
       L.tab = 0;
       L.tabPick = 0;
       return gameLog(act.logPath || "", true);
@@ -594,7 +595,7 @@ export function analyzeEvent(ev) {
 // ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
-const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, detail: new Map(), seq: 0, els: [], tab: 0, tabPick: null, mcur: 0, open: new Set(), want: "", list: null, views: [], view: null, viewPath: "" };
+const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, target: "", targetLine: "", detail: new Map(), seq: 0, els: [], tab: 0, tabPick: null, mcur: 0, open: new Set(), want: "", list: null, views: [], view: null, viewPath: "" };
 
 // logPage keeps the page's head and gives a fresh body below it, and its actions.
 function logPage(name, title, ...right) {
@@ -630,7 +631,7 @@ function syncLogEnvironment() {
   clearTimeout(detailTimer);
   L.path = ""; L.page = null; L.loading = false; L.pending = ""; L.error = "";
   L.cur = 0; L.mcur = 0; L.tab = 0; L.want = ""; L.els = [];
-  L.target = "";
+  L.target = ""; L.targetLine = "";
   L.detail.clear(); L.open.clear();
   L.views = []; L.view = null; L.viewPath = "";
   return true;
@@ -679,11 +680,14 @@ export async function gameLog(path, open = false) {
   L.page = p;
   L.path = p.path;
   L.loading = false;
-  if (L.target) {
-    const i = (p.rows || []).findIndex(r => r.cluster === L.target);
+  if (L.target || L.targetLine) {
+    // the running game's items carry the cluster's first line: their ids are not the page's
+    const rows = p.rows || [];
+    let i = L.target ? rows.findIndex(r => r.cluster === L.target) : -1;
+    if (i < 0 && L.targetLine) i = rows.findIndex(r => r.line === L.targetLine);
     if (i >= 0) L.cur = i;
     L.tab = 0;
-    L.target = "";
+    L.target = ""; L.targetLine = "";
     drawGameLog();
     markLog();
     return;
@@ -973,7 +977,8 @@ function markLog(keepScroll) {
     if (!r) { box.innerHTML = ""; box.append(el("div", "empty-state", T("pick an error on the left"))); return; }
     id = r.cluster;
   }
-  const k = L.page.path + "|" + id;
+  // a new run rewrites the same file with other clusters under the same ids
+  const k = L.page.path + "|" + id + "|" + ((L.page.rows || []).find(r => r.cluster === id)?.line || "");
   if (L.detail.has(k)) { const d = L.detail.get(k); return showLines(box, d.lines, d.card); }
   box.innerHTML = "";
   box.append(shimmer(T("loading…"), 8));

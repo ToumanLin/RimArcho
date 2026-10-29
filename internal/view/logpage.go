@@ -38,6 +38,9 @@ type LogRow struct {
 	Status  int        `json:"status"`
 	Info    bool       `json:"info,omitempty"`
 	Cluster string     `json:"cluster"` // the argument of log --cluster
+	// Line is the first line, normalised: it finds this cluster from a reading whose ids
+	// differ (the running game's items, whose clusters are numbered as they arrive).
+	Line string `json:"line,omitempty"`
 }
 
 // LogPage is one analysed log.
@@ -151,7 +154,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 	var prev *logs.Phase
 	first := true
 	for _, lc := range r.Clusters {
-		row := LogRow{ID: lc.ID, Class: T(lc.Class), Count: lc.Count, Spans: LogSpans(lc.First.Message, 240), Cluster: lc.ID, Info: logs.Informational(lc.Class)}
+		row := LogRow{ID: lc.ID, Class: T(lc.Class), Count: lc.Count, Spans: LogSpans(lc.First.Message, 240), Cluster: lc.ID, Line: lineKey(lc.First.Message), Info: logs.Informational(lc.Class)}
 		if r.HasPhases && (first || !samePhase(prev, lc.Phase)) {
 			row.PhaseStart = phaseLabel(lc.Phase, a.Loc)
 		}

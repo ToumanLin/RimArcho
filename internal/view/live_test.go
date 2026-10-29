@@ -51,6 +51,22 @@ func TestLiveTracker(t *testing.T) {
 	if !found {
 		t.Fatalf("no item for the repeated error: %+v", l.Items)
 	}
+	// "open game log" finds each item's row on the log page by its first line: the live
+	// clusters are numbered per batch, so their ids are not the page's (VM run 2026-10-28).
+	page, err := view.BuildLogPage(e.App, st, path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := map[string]bool{}
+	for _, r := range page.Rows {
+		lines[r.Line] = r.Line != ""
+	}
+	for _, it := range l.Items {
+		a := it.Actions[0]
+		if a.Kind != view.ActGameLog || a.Cluster != "" || !lines[a.Line] {
+			t.Fatalf("item %q: action %+v matches no row", it.Text, a)
+		}
+	}
 	running = false
 	if l, _ = tr.Update(e.App, st); l.Running || len(l.Items) != 0 {
 		t.Fatalf("after exit: %+v", l)
