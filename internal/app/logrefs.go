@@ -389,8 +389,8 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 
 // rank orders a cluster's candidates by role and sets its confidence after a late rule.
 func (cx *attrCtx) rank(lc *LogCluster) {
-	sort.SliceStable(lc.Attr, func(i, j int) bool { return roleRank[lc.Attr[i].Role] < roleRank[lc.Attr[j].Role] })
-	if len(lc.Attr) > 0 && lc.Attr[0].Role == RoleSource && lc.Confidence == finding.Possible {
+	lc.order()
+	if len(lc.Attr) > 0 && lc.Attr[0].Role == RoleSource && (lc.Confidence == finding.Possible || lc.Why == whyProviderOff) {
 		lc.Confidence, lc.Why = finding.Likely, ""
 	}
 }

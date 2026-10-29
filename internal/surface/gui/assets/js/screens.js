@@ -405,6 +405,10 @@ function drawNeeds() {
     const card = el("div", "card need-list");
     let phase = "", group = -1;
     for (const it of its) {
+      // while the game runs, the last run's items follow this run's: say which run they are
+      // from, or the same phase headings repeat over the same errors (view.GroupThisRun 6,
+      // GroupLastRun 3)
+      if (it.group === 3 && group === 6) card.append(el("div", "need-phase need-run word-facts", T("last run") + (d.lastRun ? "  " + d.lastRun : "")));
       if (it.phaseHeading && (it.phaseHeading !== phase || it.group !== group)) card.append(el("div", "need-phase", it.phaseHeading));
       phase = it.phaseHeading || ""; group = it.group;
       const row = needCard(it, i);

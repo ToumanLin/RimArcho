@@ -463,6 +463,8 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need-sec > h2.label .muted { font-weight: 400; }
 .need-list { display: flex; flex-direction: column; }
 .need-phase { padding: 14px 18px 4px; color: var(--muted); font-size: 12px; }
+/* the last run after this run's items (while the game runs): a rule above, the facts a gap apart */
+.need-phase.need-run.word-facts { display: flex; margin-top: 8px; border-top: var(--hairline) solid var(--line); }
 .log-phase { padding: 14px 10px 5px; color: var(--muted); font-size: 12px; border-top: var(--hairline) solid var(--line); }
 .need { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; }
 .need + .need { border-top: var(--hairline) solid var(--line-2); }

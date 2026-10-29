@@ -20,6 +20,20 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   While the game runs, its "this run" items open the game log at that error group too
   ("open game log"), instead of "see the log and evidence" showing a block of text.
 
+- When a save uses content from mods that are installed but not in the list (for
+  example hairstyles of a hair mod you turned off), Can it run names those mods and adds
+  "it is not in the list". Before, it named a mod that only patched the game's
+  save-reading code (Vanilla Expanded Framework) and said "source not confirmed".
+  `archo log` and MCP list the mod that defines the missing content first, with
+  confidence "likely". Logs analysed by an earlier version are analysed again once.
+- While the game runs, "this run" items no longer start with "this run," (the section
+  heading says it) and their evidence shows only the log file, not the count again. When
+  the previous run's errors follow them, a "last run" heading with that run's time
+  separates the two, in the window and the TUI.
+- An open Can it run updates itself when the background check finishes and when the game
+  exits. Before, it kept the run's old time and items until you left the page and came
+  back.
+
 The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
 `1.0.0-rc1` first.
 

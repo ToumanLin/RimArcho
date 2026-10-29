@@ -103,7 +103,7 @@
 - Workspace 的 `environment` 事件里，`board.problems` 已包含列表问题，首屏直接使用。
 - 打开能不能跑调用 `Needs()`；只需要编辑器问题时调用 `ListProblems()`。两者命中同一个缓存。
 - `Toggle`、`Stage`、`Unstage`、`MoveBy`、`Place`、`StageAll` 等返回 `view.Result` 的编辑，在 `result.problems` 中带回更新摘要。返回字符串的 `Undo`、`Redo`、`DoAction` 等通过 `list-problems` 事件带回同一结构。
-- 后台日志／内容分析补齐也发 `list-problems`；`analyze` 的进度与完成事件继续保留。无需为了刷新标记再请求一次问题列表。
+- 后台日志／内容分析补齐也发 `list-problems`；`analyze` 的进度与完成事件继续保留。无需为了刷新标记再请求一次问题列表。能不能跑开着时，收到事件就用 `Needs()` 重画一次（保留光标）；游戏退出（`Live` 从运行变为不运行）时也重读一次，好让这次运行的完整分析替换“本次运行”；以前只更新侧栏，页面停在旧答案，游戏退出后仍写着运行中途的时间，要离开再回来才变（VM 2026-10-28）。
 
 `ListProblems` JSON 的主要字段：
 

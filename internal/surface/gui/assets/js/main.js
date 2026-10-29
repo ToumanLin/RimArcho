@@ -1290,8 +1290,12 @@ async function start() {
   // launching waits (up to ten seconds) for a background Steam credit switch to finish
   on("launch-wait", (ev) => say("busy", ev.text));
   // the background check of the open list finished: the problems button, the panel and the
-  // row icons follow without reading the lists again
-  on("list-problems", (ev) => { if (problems.event(ev) && !S.screen) { renderLists(); renderWhere(); } });
+  // row icons follow without reading the lists again; an open 能不能跑 shows the new answer
+  // (VM run 2026-10-28: after the game exited it kept the run's old time until revisited)
+  on("list-problems", (ev) => {
+    if (!problems.event(ev)) return;
+    if (!S.screen) { renderLists(); renderWhere(); } else if (S.screen === "needs") scr.needs(true);
+  });
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again
   // when the window gets the focus (G8).
   addEventListener("focus", async () => {
@@ -1350,8 +1354,10 @@ async function pollLive() {
     if (JSON.stringify(l.items) !== before) { scr.liveChanged(); shell.sync(); }
     if (l.running) scr.logLive();
     if (was !== !!l.running) homePage.liveChanged();
-    // the game exited: a session that used SteamCMD mods may make a credit question due
-    if (was && !l.running) checkCredit();
+    // the game exited: a session that used SteamCMD mods may make a credit question due;
+    // an open 能不能跑 reads again, so the full analysis of the run replaces its items
+    // (03 §6.6; VM run 2026-10-28: it kept the run's mid-way time and items)
+    if (was && !l.running) { checkCredit(); if (S.screen === "needs") scr.needs(true); }
   } catch { /* the next poll tries again */ }
   setTimeout(pollLive, 2000);
 }

@@ -58,6 +58,9 @@ type LogCluster struct {
 	At            time.Time `json:",omitzero"`
 	Level         string    `json:",omitempty"`
 	OnlyCompanion bool      `json:",omitempty"`
+	// providerOff: a missing reference whose def an installed mod defines but is not
+	// enabled. That mod is the reason, not a patcher on the stack (03 §6.3).
+	providerOff bool
 }
 
 // LogReport is an analysed log.
@@ -125,8 +128,8 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // logCacheVersion invalidates stored reports when attribution changes.
 // 7: both the companion log (dev, 4) and the G1/G7 attribution rules (master, 6); 8: no
 // nearby messages for entries only the companion log has; 9: observed phase boundaries
-// and counts from both logs.
-const logCacheVersion = 9
+// and counts from both logs; 10: a left-out provider of a missing def before patchers.
+const logCacheVersion = 10
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -512,6 +515,26 @@ func (lc *LogCluster) add(inst, role, ev string) {
 	lc.Attr = append(lc.Attr, &Attribution{Instance: inst, Role: role, Evidence: []string{ev}})
 }
 
+// whyProviderOff explains a likely cluster led by a mod left out of the list.
+const whyProviderOff = "a mod that defines it is installed but not enabled"
+
+// order sorts the candidates by role (03 §6.3). A save or def that names a def of a mod
+// left out of the list: that mod comes before whoever only patched the code that read it
+// (VM run 2026-10-28: Vanilla Expanded Framework's Pawn.ExposeData patch was blamed for
+// missing hair).
+func (lc *LogCluster) order() {
+	rank := func(role string) int {
+		if lc.providerOff && role == RoleDependency {
+			return roleRank[RolePatcher]
+		}
+		if lc.providerOff && role == RolePatcher {
+			return roleRank[RoleDependency]
+		}
+		return roleRank[role]
+	}
+	sort.SliceStable(lc.Attr, func(i, j int) bool { return rank(lc.Attr[i].Role) < rank(lc.Attr[j].Role) })
+}
+
 func (lc *LogCluster) next(cmds ...string) {
 	for _, c := range cmds {
 		dup := false
@@ -738,6 +761,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 					prov = append(prov, ix.Ref(d.Instance)+" (not enabled)")
 					lc.add(d.Instance, RoleDependency, fmt.Sprintf("defines %s %s at %s:%d but is not enabled", short, name, d.File, d.Line))
 					lc.next("archo enable " + ix.Ref(d.Instance))
+					lc.providerOff = true
 				}
 			}
 			if len(prov) == 0 {
@@ -905,8 +929,10 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	if cx.comp != nil {
 		cx.companion(lc)
 	}
-	sort.SliceStable(lc.Attr, func(i, j int) bool { return roleRank[lc.Attr[i].Role] < roleRank[lc.Attr[j].Role] })
+	lc.order()
 	switch {
+	case len(lc.Attr) > 0 && lc.Attr[0].Role == RoleDependency && lc.providerOff:
+		lc.Confidence, lc.Why = finding.Likely, whyProviderOff
 	case len(lc.Attr) > 0 && lc.Attr[0].Role == RoleSource:
 		lc.Confidence, lc.Why = finding.Likely, ""
 		for _, ev := range lc.Attr[0].Evidence {

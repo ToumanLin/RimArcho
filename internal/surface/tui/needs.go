@@ -263,6 +263,15 @@ func (m *model) needLines(n int) []string {
 			sec = it.section
 			rows = append(rows, row{"  " + m.sectionHead(sec, w-2), -1})
 		}
+		// while the game runs, the last run's items follow this run's: say which run they are
+		// from, or the same phase headings repeat over the same errors
+		if it.group == view.GroupLastRun && group == view.GroupThisRun {
+			label := T("last run")
+			if m.prob.lastRun != "" {
+				label += "  " + m.prob.lastRun
+			}
+			rows = append(rows, row{"    " + sDimS.Render(label), -1})
+		}
 		if it.phaseHeading != "" && (phase != it.phaseHeading || group != it.group) {
 			rows = append(rows, row{"    " + sDimS.Render(it.phaseHeading), -1})
 		}

@@ -733,6 +733,11 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			name = nm(finding.Inst(id))
 		}
 		for _, n := range lastRunNeeds(name, logs[id], logWhen, id != "") {
+			// a save or mod used its content but it is not in the list (missing references)
+			if id != "" && st.Position(id) == 0 {
+				n.Why += T("; it is not in the list")
+				n.Text = n.Title + T(": ") + n.Why
+			}
 			n.Mods = ids
 			n.Actions[0].Argv = argv
 			add(n)

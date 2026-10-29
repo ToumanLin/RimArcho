@@ -83,10 +83,21 @@ func TestNeedsSectionsLive(t *testing.T) {
 	if brk < 0 || run < brk || !strings.Contains(s[run:], T("this run")) {
 		t.Fatalf("sections out of order:\n%s", s)
 	}
+	both := false
 	for i := 1; i < len(m.prob.items); i++ {
 		if m.prob.items[i].section < m.prob.items[i-1].section {
 			t.Fatalf("item %d out of its section: %+v", i, m.prob.items)
 		}
+		both = both || m.prob.items[i].group == view.GroupLastRun && m.prob.items[i-1].group == view.GroupThisRun
+	}
+	// the last run's items after this run's say which run they are (VM run 2026-10-28)
+	label := false
+	for _, line := range strings.Split(s[run:], "\n") {
+		line = strings.TrimSpace(line)
+		label = label || line == T("last run") || strings.HasPrefix(line, T("last run")+"  ")
+	}
+	if !both || !label {
+		t.Fatalf("this run and the last run not told apart (both %v):\n%s", both, s)
 	}
 	if got, want := m.needCount(), countedNeeds(m); got != want || got <= m.prob.need {
 		t.Fatalf("top bar %d, counted items %d (analysis alone %d)", got, want, m.prob.need)

@@ -167,3 +167,41 @@ func TestLogRulesFromCorpus(t *testing.T) {
 		}
 	}
 }
+
+// A save names a def of a mod left out of the list, and another mod patched the code that
+// read it: the left-out mod is the reason, the patcher only a candidate after it
+// (03 §6.3; VM run 2026-10-28, missing hair blamed on a Pawn.ExposeData patch).
+func TestLogSaveRefPrefersLeftOutProvider(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.HarmonyLogFixture()
+	if _, err := e.App.EnsureAnalysis(nil); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := e.App.AnalyzeLogText("RimWorld 1.6.4633 rev1261\n" +
+		"Could not load reference to Verse.ThingDef named Lib_Gun\n" +
+		"  at (wrapper dynamic-method) Verse.Pawn.Verse.Pawn.ExposeData_Patch1(Verse.Pawn)\n" +
+		"    - POSTFIX tester.modb: Void ModB.Pawn_Tick_B:Postfix()\n" +
+		"  at Verse.Scribe_Deep.Look () [0x00000] in <00000000000000000000000000000000>:0\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, lc := range rep.Clusters {
+		if !strings.Contains(lc.Key, "Lib_Gun") {
+			continue
+		}
+		var got []string
+		for _, at := range lc.Attr {
+			got = append(got, st.Ix.ByID[at.Instance].PackageID+" "+at.Role)
+		}
+		if len(got) < 2 || got[0] != "tester.lib dependency" || got[1] != "tester.modb patcher" || lc.Confidence != "likely" {
+			t.Fatalf("candidates %v, confidence %s (%s)", got, lc.Confidence, lc.Why)
+		}
+		return
+	}
+	t.Fatal("no Lib_Gun cluster")
+}

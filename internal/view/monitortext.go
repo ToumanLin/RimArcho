@@ -8,7 +8,6 @@ func init() {
 		"Archo Monitor installed":                             "已安装的 Archo Monitor",
 		"Archo Monitor added after Harmony (undo removes it)": "已在 Harmony 后面加入 Archo Monitor（撤销即可去掉）",
 		"not installed":                                       "未安装",
-		"%s, this run, %d times":                              "%s，本次运行，%d 次",
 		"Archo Monitor is ready":                              "Archo Monitor 已就绪",
 		// the log page's companion section (logpage.go, monitorlog.go; 06 §2.10)
 		"patch error": "补丁错误", "def config error": "Def 配置错误", "cross-reference error": "交叉引用错误",

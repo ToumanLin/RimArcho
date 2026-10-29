@@ -47,6 +47,10 @@ func TestLiveTracker(t *testing.T) {
 		if strings.Contains(it.Text, "500×") {
 			found = true
 		}
+		// the section heading names the run; the count is in the text, not the evidence
+		if strings.Contains(it.Text, "this run") || strings.ContainsAny(it.Evidence.Source, "0123456789") {
+			t.Fatalf("repeats the run or the count: %+v", it)
+		}
 	}
 	if !found {
 		t.Fatalf("no item for the repeated error: %+v", l.Items)
