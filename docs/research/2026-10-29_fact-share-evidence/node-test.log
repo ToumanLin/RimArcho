@@ -1,0 +1,262 @@
+TAP version 13
+# Subtest: Space, Backslash, Shift, held keys and left/right clicks produce real protocol inputs
+ok 1 - Space, Backslash, Shift, held keys and left/right clicks produce real protocol inputs
+  ---
+  duration_ms: 74.8712
+  type: 'test'
+  ...
+# Subtest: protocol errors and timeouts reject, never silently succeed
+ok 2 - protocol errors and timeouts reject, never silently succeed
+  ---
+  duration_ms: 55.4512
+  type: 'test'
+  ...
+# Subtest: disconnect rejects every pending call
+ok 3 - disconnect rejects every pending call
+  ---
+  duration_ms: 14.0248
+  type: 'test'
+  ...
+# Subtest: a denied held repeat releases the physical key and sends no extra keydown
+ok 4 - a denied held repeat releases the physical key and sends no extra keydown
+  ---
+  duration_ms: 9.8696
+  type: 'test'
+  ...
+# Subtest: all three surfaces separate a quiet why control from the three equal answers
+ok 5 - all three surfaces separate a quiet why control from the three equal answers
+  ---
+  duration_ms: 7.6325
+  type: 'test'
+  ...
+# Subtest: row and panel answers use the same confirmation before any mutation
+ok 6 - row and panel answers use the same confirmation before any mutation
+  ---
+  duration_ms: 1.5033
+  type: 'test'
+  ...
+# Subtest: comparison uses normal table text, short folders with path tooltips, five files and equal confirmed answers
+ok 7 - comparison uses normal table text, short folders with path tooltips, five files and equal confirmed answers
+  ---
+  duration_ms: 3.3125
+  type: 'test'
+  ...
+# Subtest: a late comparison cannot replace a closed or newer popup
+ok 8 - a late comparison cannot replace a closed or newer popup
+  ---
+  duration_ms: 1.0307
+  type: 'test'
+  ...
+# Subtest: editor resizes coalesce redraws outside ResizeObserver delivery
+ok 9 - editor resizes coalesce redraws outside ResizeObserver delivery
+  ---
+  duration_ms: 5.4949
+  type: 'test'
+  ...
+# Subtest: returning to the displayed plan waits for and supersedes an unfinished open
+ok 10 - returning to the displayed plan waits for and supersedes an unfinished open
+  ---
+  duration_ms: 6.8726
+  type: 'test'
+  ...
+# Subtest: a rejected plan request does not strand the next click
+ok 11 - a rejected plan request does not strand the next click
+  ---
+  duration_ms: 2.0888
+  type: 'test'
+  ...
+# Subtest: clicking the displayed plan with nothing opening keeps its search and asks nothing
+ok 12 - clicking the displayed plan with nothing opening keeps its search and asks nothing
+  ---
+  duration_ms: 1.0896
+  type: 'test'
+  ...
+# Subtest: each name activates its own target; keyboard activation stays local
+ok 13 - each name activates its own target; keyboard activation stays local
+  ---
+  duration_ms: 3.5528
+  type: 'test'
+  ...
+# Subtest: known missing mods open the Workshop, unknown ones stay text, and markup stays literal
+ok 14 - known missing mods open the Workshop, unknown ones stay text, and markup stays literal
+  ---
+  duration_ms: 1.3444
+  type: 'test'
+  ...
+# Subtest: sentences keep inline text flow on every problem surface
+ok 15 - sentences keep inline text flow on every problem surface
+  ---
+  duration_ms: 1.4084
+  type: 'test'
+  ...
+# Subtest: badge popover keeps its own mod plain and links the other mod in title and why
+ok 16 - badge popover keeps its own mod plain and links the other mod in title and why
+  ---
+  duration_ms: 3.9311
+  type: 'test'
+  ...
+# Subtest: editor panel shows evidence only on hints
+ok 17 - editor panel shows evidence only on hints
+  ---
+  duration_ms: 1.7645
+  type: 'test'
+  ...
+# Subtest: folds are semantic lists and evidence includes the supplied cutoff
+ok 18 - folds are semantic lists and evidence includes the supplied cutoff
+  ---
+  duration_ms: 2.1041
+  type: 'test'
+  ...
+# Subtest: background updates preserve hint links and evidence without counting them or hiding warnings
+ok 19 - background updates preserve hint links and evidence without counting them or hiding warnings
+  ---
+  duration_ms: 3.0359
+  type: 'test'
+  ...
+# Subtest: external and unknown targets fail closed, including deceptive button labels
+ok 20 - external and unknown targets fail closed, including deceptive button labels
+  ---
+  duration_ms: 3.62
+  type: 'test'
+  ...
+# Subtest: canonical equality detects staging corruption despite identical enabled entries
+ok 21 - canonical equality detects staging corruption despite identical enabled entries
+  ---
+  duration_ms: 0.6872
+  type: 'test'
+  ...
+# Subtest: refresh timestamps do not mask collection source changes
+ok 22 - refresh timestamps do not mask collection source changes
+  ---
+  duration_ms: 0.3357
+  type: 'test'
+  ...
+# Subtest: seeded sequences repeat and coverage retains unreachable eligible edges
+ok 23 - seeded sequences repeat and coverage retains unreachable eligible edges
+  ---
+  duration_ms: 1.187
+  type: 'test'
+  ...
+# Subtest: shared baseline blocks file/deployment writes while permitting private plan records
+ok 24 - shared baseline blocks file/deployment writes while permitting private plan records
+  ---
+  duration_ms: 0.3842
+  type: 'test'
+  ...
+# Subtest: opening subscription UI and choosing export formats do not submit external operations
+ok 25 - opening subscription UI and choosing export formats do not submit external operations
+  ---
+  duration_ms: 0.205
+  type: 'test'
+  ...
+# Subtest: replay sends the actual click count after a moving target cancels repeats
+ok 26 - replay sends the actual click count after a moving target cancels repeats
+  ---
+  duration_ms: 0.2358
+  type: 'test'
+  ...
+# Subtest: restoration stops at the step whose entries and staging both match the start
+ok 27 - restoration stops at the step whose entries and staging both match the start
+  ---
+  duration_ms: 1.2041
+  type: 'test'
+  ...
+# Subtest: focused panel exposes fixes as keyboard accessible buttons and closes before acting
+ok 28 - focused panel exposes fixes as keyboard accessible buttons and closes before acting
+  ---
+  duration_ms: 5.1455
+  type: 'test'
+  ...
+# Subtest: late problem reads cannot reopen a closed or superseded panel
+ok 29 - late problem reads cannot reopen a closed or superseded panel
+  ---
+  duration_ms: 4.4736
+  type: 'test'
+  ...
+# Subtest: installed provider search fills the open panel and cancels on close
+ok 30 - installed provider search fills the open panel and cancels on close
+  ---
+  duration_ms: 11.3291
+  type: 'test'
+  ...
+# Subtest: closing while cancellation registration is pending cancels before file IO
+ok 31 - closing while cancellation registration is pending cancels before file IO
+  ---
+  duration_ms: 1.8245
+  type: 'test'
+  ...
+# Subtest: host paths cannot escape the single output root
+ok 32 - host paths cannot escape the single output root
+  ---
+  duration_ms: 1.0534
+  type: 'test'
+  ...
+# Subtest: cleanup removes only case-owned content and keeps reproduction evidence
+ok 33 - cleanup removes only case-owned content and keeps reproduction evidence
+  ---
+  duration_ms: 8.3048
+  type: 'test'
+  ...
+# Subtest: cleanup never follows a content junction into a sibling directory
+ok 34 - cleanup never follows a content junction into a sibling directory
+  ---
+  duration_ms: 4.8073
+  type: 'test'
+  ...
+# Subtest: a timed-out replay terminates its owned descendant process on Windows
+ok 35 - a timed-out replay terminates its owned descendant process on Windows
+  ---
+  duration_ms: 1845.9455
+  type: 'test'
+  ...
+# Subtest: background problem updates use the individual reasons from Go
+ok 36 - background problem updates use the individual reasons from Go
+  ---
+  duration_ms: 4.2114
+  type: 'test'
+  ...
+# Subtest: 365 version rows load only on opening, stay in one scroll body, and names navigate
+ok 37 - 365 version rows load only on opening, stay in one scroll body, and names navigate
+  ---
+  duration_ms: 8.45
+  type: 'test'
+  ...
+# Subtest: single ignore refreshes in place; group and all ignore confirm; restore all is reversible
+ok 38 - single ignore refreshes in place; group and all ignore confirm; restore all is reversible
+  ---
+  duration_ms: 19.7003
+  type: 'test'
+  ...
+# Subtest: closing or switching context discards a late version-list response
+ok 39 - closing or switching context discards a late version-list response
+  ---
+  duration_ms: 3.8282
+  type: 'test'
+  ...
+# Subtest: keyboard reaches row controls, scrolls, and keeps focus after refreshing
+ok 40 - keyboard reaches row controls, scrolls, and keeps focus after refreshing
+  ---
+  duration_ms: 19.464
+  type: 'test'
+  ...
+# Subtest: log resize measurements defer layout writes and coalesce scroll anchoring
+ok 41 - log resize measurements defer layout writes and coalesce scroll anchoring
+  ---
+  duration_ms: 4.6329
+  type: 'test'
+  ...
+# Subtest: log rebuild restores measured heights and scroll captured before spacer removal
+ok 42 - log rebuild restores measured heights and scroll captured before spacer removal
+  ---
+  duration_ms: 2.9547
+  type: 'test'
+  ...
+1..42
+# tests 42
+# suites 0
+# pass 42
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2018.1456

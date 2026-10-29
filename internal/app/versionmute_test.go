@@ -40,6 +40,7 @@ func versionProblemCounts(t *testing.T, e *testkit.Env) (active, muted int) {
 
 func TestVersionMuteMigrationAndStorage(t *testing.T) {
 	e := versionMuteEnv(t)
+	e.DowngradeFacts()
 	if _, err := e.App.Store.DB.Exec(`DROP TABLE version_mute; UPDATE meta SET value='22' WHERE key='schema_version'`); err != nil {
 		t.Fatal(err)
 	}

@@ -26,7 +26,7 @@ func TestHarmonyManualFlag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := saveHarmony(tx, []*analyze.AssemblyFacts{asm}, "1.6"); err != nil {
+	if err := saveContent(tx, &analyze.Output{Content: map[string]*analyze.ContentState{"inst": {Key: "manual", AssemblyKey: "manual-dll"}}, NewDefs: map[string][]analyze.DefFact{"inst": nil}, Assemblies: []*analyze.AssemblyFacts{asm}}, "1.6"); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(); err != nil {

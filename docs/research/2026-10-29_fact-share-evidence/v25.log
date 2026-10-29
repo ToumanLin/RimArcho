@@ -1,0 +1,35 @@
+=== RUN   TestFactShareScale
+    factshare_bench_test.go:82: FACTS mm=1.6 analyze=1.4713554s save=5.2905537s
+    factshare_bench_test.go:82: FACTS mm=1.7 analyze=1.362618s save=5.502242s
+    factshare_bench_test.go:93: SIZE bytes=215703552 live=215703552 free=0
+    factshare_bench_test.go:121: QUERY Name-190 mean=6.2966ms
+    factshare_bench_test.go:121: QUERY defName mean=30.474µs
+    factshare_bench_test.go:121: QUERY DefsOf mean=191.47µs
+    factshare_bench_test.go:121: QUERY DefCounts mean=79.39967ms
+    factshare_bench_test.go:121: QUERY TypeOwners mean=30.832µs
+    factshare_bench_test.go:127: ROWS defs=760000
+--- PASS: TestFactShareScale (18.75s)
+=== RUN   TestFactShareScale
+    factshare_bench_test.go:82: FACTS mm=1.6 analyze=1.4620319s save=5.5465044s
+    factshare_bench_test.go:82: FACTS mm=1.7 analyze=1.3401219s save=5.4538195s
+    factshare_bench_test.go:93: SIZE bytes=215810048 live=215810048 free=0
+    factshare_bench_test.go:121: QUERY Name-190 mean=6.59925ms
+    factshare_bench_test.go:121: QUERY defName mean=26.64µs
+    factshare_bench_test.go:121: QUERY DefsOf mean=172.486µs
+    factshare_bench_test.go:121: QUERY DefCounts mean=79.75218ms
+    factshare_bench_test.go:121: QUERY TypeOwners mean=20.676µs
+    factshare_bench_test.go:127: ROWS defs=760000
+--- PASS: TestFactShareScale (18.40s)
+=== RUN   TestFactShareScale
+    factshare_bench_test.go:82: FACTS mm=1.6 analyze=1.6101059s save=5.3305183s
+    factshare_bench_test.go:82: FACTS mm=1.7 analyze=1.4142987s save=5.5175911s
+    factshare_bench_test.go:93: SIZE bytes=215703552 live=215703552 free=0
+    factshare_bench_test.go:121: QUERY Name-190 mean=5.64641ms
+    factshare_bench_test.go:121: QUERY defName mean=37.037µs
+    factshare_bench_test.go:121: QUERY DefsOf mean=158.095µs
+    factshare_bench_test.go:121: QUERY DefCounts mean=72.85519ms
+    factshare_bench_test.go:121: QUERY TypeOwners mean=30.762µs
+    factshare_bench_test.go:127: ROWS defs=760000
+--- PASS: TestFactShareScale (18.33s)
+PASS
+ok  	github.com/ToumanLin/RimArcho/internal/store	58.133s

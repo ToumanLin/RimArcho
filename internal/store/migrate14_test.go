@@ -105,6 +105,7 @@ func TestMigrateV14SharedFolders(t *testing.T) {
 		`INSERT INTO identity_question(environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score) VALUES
 			('e2', 2, 'i2c', 6, 'i2a', 0.7), ('e1', 1, 'i1b', 2, 'i2b', 0.7)`,
 		`INSERT INTO source_cache(dll_hash, instance_id, file, status, decompiled_at) VALUES ('h', 'i2a', 'A.dll', 'ok', 1)`,
+		`INSERT INTO content_state(instance_id,content_key) VALUES('i2a','test'),('i1a','test')`,
 		`INSERT INTO def_fact(instance_id, def_type, file, line) VALUES ('i2a', 'ThingDef', 'a.xml', 1), ('i1a', 'ThingDef', 'a.xml', 1)`,
 		`INSERT INTO analysis(id, environment_id, run_key, game_mm, version, started_at, finished_at) VALUES (1, 'e2', 'r', '1.6', 1, 1, 1)`,
 		`INSERT INTO meta(key, value) VALUES ('stage:2', '[{"i":"i2a","a":"i2b"}]'), ('current_env', 'e1')`,
@@ -200,7 +201,7 @@ func TestMigrateV14SharedFolders(t *testing.T) {
 	if got := col(t, s, `SELECT instance_id FROM source_cache`); got != "i1a" {
 		t.Fatalf("source cache: %s", got)
 	}
-	if got := col(t, s, `SELECT instance_id FROM def_fact`); got != "i1a" {
+	if got := col(t, s, `SELECT c.instance_id FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id`); got != "i1a" {
 		t.Fatalf("facts: %s", got)
 	}
 	if n := q1(t, s, `SELECT count(*) FROM analysis`); n != "0" {

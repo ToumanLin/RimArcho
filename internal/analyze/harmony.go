@@ -1,6 +1,8 @@
 package analyze
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -19,6 +21,17 @@ type AssemblyFacts struct {
 	Skipped  bool   // known library: Harmony facts not collected
 	Err      string
 	*harmony.Assembly
+}
+
+// AssemblyKey identifies the DLL input independently of XML folder selection. Skipped
+// libraries depend on the owning package and the caller's skip policy as well as files.
+func AssemblyKey(m *Mod, folders []string, skip []string) string {
+	var files []string
+	for _, a := range content.CodeFiles(m.Dir, folders) {
+		files = append(files, fmt.Sprintf("%s:%t", a.Rel, harmony.SkippedFor(filepath.Base(a.Path), m.Pkg, skip)))
+	}
+	data, _ := json.Marshal(files)
+	return fmt.Sprintf("%x|dll%x|a%d", m.SnapHash, sha256.Sum256(data), Version)
 }
 
 // harmonyLayer reads every effective DLL of the active mods (03 §5.3). It is independent

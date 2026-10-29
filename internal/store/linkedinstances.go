@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
@@ -87,6 +88,9 @@ func (s *Store) MergeLinkedInstances(replace map[string]string) error {
 			if _, err := tx.Exec(q); err != nil {
 				return err
 			}
+		}
+		if err := pruneFacts(tx, time.Now()); err != nil {
+			return err
 		}
 		return recomputeAllPrimaries(tx)
 	})

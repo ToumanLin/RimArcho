@@ -269,6 +269,9 @@ func rewriteInstances14(tx *sql.Tx, m map[string]string) error {
 	olds := sortedKeys(m)
 	for _, old := range olds {
 		keep := m[old]
+		if err := deleteInstanceFacts(tx, old); err != nil {
+			return err
+		}
 		for _, q := range []string{
 			`UPDATE OR IGNORE instance_alias SET instance_id=?2 WHERE instance_id=?1`,
 			`DELETE FROM instance_alias WHERE instance_id=?1`,
@@ -279,12 +282,6 @@ func rewriteInstances14(tx *sql.Tx, m map[string]string) error {
 			`UPDATE identity_question SET candidate_instance_id=?2 WHERE candidate_instance_id=?1`,
 			`UPDATE OR IGNORE source_cache SET instance_id=?2 WHERE instance_id=?1`,
 			`DELETE FROM source_cache WHERE instance_id=?1`,
-			`DELETE FROM def_fact WHERE instance_id=?1`,
-			`DELETE FROM assembly_fact WHERE instance_id=?1`,
-			`DELETE FROM type_fact WHERE instance_id=?1`,
-			`DELETE FROM harmony_fact WHERE instance_id=?1`,
-			`DELETE FROM harmony_id WHERE instance_id=?1`,
-			`DELETE FROM content_state WHERE instance_id=?1`,
 			`DELETE FROM instance WHERE id=?1`,
 			`INSERT OR REPLACE INTO id_alias(old_id, new_id, kind) VALUES(?1, ?2, 'instance')`,
 		} {

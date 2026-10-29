@@ -4,6 +4,12 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Analysing the same mod content for several game versions now stores one copy of
+  its Def, Type, Harmony and assembly facts. Schema 26 converts existing caches in
+  place. Removing a game or replacing analysis slots also removes facts no game
+  needs; analysis slots for an older game version expire after 30 days without a
+  new analysis. Slots for the game's current version do not expire by age.
+
 - The database (`archo.db`) takes less space. Upgrading to schema 25 drops analysis
   indexes no query uses (about 40 MB on a library of 4,000 mods analysed for two game
   versions) and compresses stored log reports (a 9 MB report becomes about 0.4 MB).

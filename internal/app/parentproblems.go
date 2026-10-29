@@ -225,14 +225,20 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 // Name", so a file search cannot find more there. No directory is enumerated.
 func parentIndex(st *LoadoutState, mod *store.Mod, key string, isActive func(string) bool) (current, sameWhenEnabled bool, afterEnable func(string) bool) {
 	noDirs := func(string) ([]fs.DirEntry, error) { return nil, nil }
-	resolved := content.ResolveFS("", mod.Decl().LoadFolders, st.GameMM(), isActive, noDirs)
+	resolved := content.ResolveFS(st.Ix.ModDir(mod), mod.Decl().LoadFolders, st.GameMM(), isActive, noDirs)
 	afterEnable = func(pkg string) bool {
 		return dependencyPackage(pkg) == dependencyPackage(mod.PackageID) || isActive(pkg)
 	}
-	if key != resolved.Key(mod.SnapHash, st.GameMM())+fmt.Sprintf("|a%d", analyze.Version) {
+	matches := key == resolved.Key(mod.SnapHash, st.GameMM())+fmt.Sprintf("|a%d", analyze.Version)
+	// Without LoadFolders there are no plan-dependent directories. The snapshot guards
+	// the version-directory layout, which this fast path deliberately does not enumerate.
+	if mod.Decl().LoadFolders == "" {
+		matches = strings.HasPrefix(key, fmt.Sprintf("%x|f", mod.SnapHash)) && strings.HasSuffix(key, fmt.Sprintf("|a%d", analyze.Version))
+	}
+	if !matches {
 		return false, false, afterEnable
 	}
-	enabled := content.ResolveFS("", mod.Decl().LoadFolders, st.GameMM(), afterEnable, noDirs)
+	enabled := content.ResolveFS(st.Ix.ModDir(mod), mod.Decl().LoadFolders, st.GameMM(), afterEnable, noDirs)
 	return true, enabled.Conds == resolved.Conds, afterEnable
 }
 
