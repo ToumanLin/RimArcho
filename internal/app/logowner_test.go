@@ -149,6 +149,15 @@ func TestLogOwnerEvidence(t *testing.T) {
 	if err := e.App.CheckLogOwner(st, p); err == nil || !strings.Contains(err.Error(), "other") {
 		t.Fatalf("foreign game path ignored: %v", err)
 	}
+	// A game folder no environment has (a log someone sent, a corpus log) is an unknown
+	// owner: `archo log --file` can read it, but it is not counted and asks for no analysis.
+	writeLogAt(t, e, p, mono(filepath.Join(e.Root, "SomeoneElse", "RimWorld"))+text, e.Now())
+	if err := e.App.CheckLogOwner(st, p); err != nil {
+		t.Fatalf("unregistered game folder refused: %v", err)
+	}
+	if _, err := e.App.AnalyzeLog(p); err != nil {
+		t.Fatalf("unregistered game folder's log not readable: %v", err)
+	}
 	e.App.Store.DB.Exec(`DELETE FROM launch`)
 	// A mismatched version alone is not evidence of another game: upgrades are allowed,
 	// even when another registered environment currently uses that version.

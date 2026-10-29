@@ -64,7 +64,10 @@ func (a *App) logOwner(st *LoadoutState, path string) (own bool, err error) {
 				}
 			}
 		}
-		return false, fmt.Errorf("log belongs to another game directory")
+		// A game folder no environment has (a log someone sent, a corpus log, or this
+		// game before it moved): unknown owner, not another environment's. It can be read
+		// but is not counted and requests no analysis.
+		return false, nil
 	}
 	if fi, err := os.Stat(path); err == nil {
 		src := a.logSource(st, path, fi.ModTime())
