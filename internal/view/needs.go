@@ -145,6 +145,19 @@ type Need struct {
 
 	LinkGroups []LinkGroup `json:"linkGroups,omitempty"`
 
+	// Kind is the kind of problem it stands for (a problem code, or "" for the page's own
+	// items). The GUI keeps a resolved item in place only when no item of the same kind
+	// took its place (06 §5: done items).
+	Kind string `json:"kind,omitempty"`
+	// Also: lines about what merged into this item (weak order preferences, cycles: 06 §5).
+	Also []string `json:"also,omitempty"`
+	// Into: the item this one is shown inside on 能不能跑 (its ID); the editor's panel and
+	// the CLI still list it on its own.
+	Into string `json:"into,omitempty"`
+	// Related: items of the other column about the same mod (06 §5: the columns point at
+	// each other).
+	Related []Related `json:"related,omitempty"`
+
 	rank int    // order within the group (06 §5's order)
 	code string // the problem code it stands for (LaunchHint)
 
@@ -176,6 +189,24 @@ type Needs struct {
 	// "pack X · …" (08 §5.3: a pack's errors are not the list's).
 	LastRun    string `json:"lastRun,omitempty"`
 	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "10 月 21 日"
+	// Elsewhere: what is not on 能不能跑 but handled on another page (SectionElsewhere),
+	// one line each at the bottom of the page (06 §2.4).
+	Elsewhere []Elsewhere `json:"elsewhere,omitempty"`
+}
+
+// Related points at an item of the other column: its ID and a line naming it.
+type Related struct {
+	ID   string `json:"id"`
+	Text string `json:"text"`
+}
+
+// Elsewhere is one line at the bottom of 能不能跑: how many items another page handles.
+// Page is "library" (Query: the search it opens with) or "textures".
+type Elsewhere struct {
+	Page  string `json:"page"`
+	Count int    `json:"count"`
+	Text  string `json:"text"`
+	Query string `json:"query,omitempty"`
 }
 
 // Reason is one item behind a row's status icon: its status, its one-line text and the
@@ -209,19 +240,28 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	}
 	for i := range n.Items {
 		n.Items[i].Section = SectionOf(n.Items[i].Group)
+		n.Items[i].Kind = n.Items[i].code
 		if ev := n.Items[i].Evidence; ev != nil && ev.Kind == EvCorpus {
+			// what shared logs taught: a hint, not counted; on 能不能跑 it is 可以留意 (06 §5)
 			n.Items[i].Status = StatusHint
 			n.Items[i].Counted = false
+			if n.Items[i].Section == SectionBreak {
+				n.Items[i].Section = SectionHint
+			}
 		}
 		names.fill(&n.Items[i])
 		identifyNeed(&n.Items[i])
 	}
+	mergeIntoSort(n.Items)
+	currentLinksFirst(n.Items, st.Ix.Env.GameRoot)
 	sort.SliceStable(n.Items, func(i, j int) bool {
 		if n.Items[i].Section != n.Items[j].Section {
 			return n.Items[i].Section < n.Items[j].Section
 		}
 		return n.Items[i].Status != StatusHint && n.Items[j].Status == StatusHint
 	})
+	relateNeeds(n.Items)
+	n.Elsewhere = elsewhere(n.Items)
 	n.Launch = launchHint(n.Items)
 	for _, r := range ps.Logs {
 		if r.Stale() || r.ModTime.IsZero() {
@@ -404,7 +444,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 				weak[len(weak)-1].linkProblems = []*app.Problem{p}
 				continue
 			}
-			order = append(order, Need{rank: 1, Group: GroupList, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{{Kind: ActMove, Key: "m", Label: Tf("move %s after %s", nm(x), nm(y)), Refs: []string{TokRef(st, x)}, After: TokRef(st, y), Undo: true}, sortAction()}, Counted: true, Mods: ids, Status: s,
+			order = append(order, Need{rank: 1, Group: GroupList, code: p.Code, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{{Kind: ActMove, Key: "m", Label: Tf("move %s after %s", nm(x), nm(y)), Refs: []string{TokRef(st, x)}, After: TokRef(st, y), Undo: true}, sortAction()}, Counted: true, Mods: ids, Status: s,
 				Why: T("a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right"), Evidence: ev})
 			order[len(order)-1].linkProblems = []*app.Problem{p}
 		case "mod.known-error":
@@ -427,7 +467,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 					look.Label, look.URL = T("open it in the Workshop"), u
 				}
 			}
-			me := missingEntry{pkg: pkg, name: pkg, n: Need{rank: 4, Group: GroupList, Text: Tf("the list has %s, but it is not installed", pkg),
+			me := missingEntry{pkg: pkg, name: pkg, n: Need{rank: 4, Group: GroupList, code: p.Code, Text: Tf("the list has %s, but it is not installed", pkg),
 				Actions: []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s,
 				Title: Tf("not installed: %s", pkg), Why: T("the list has it, but no mod folder does"), Evidence: ev}}
 			me.n.linkProblems = []*app.Problem{p}
@@ -552,7 +592,8 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			// is simply absent stay in the technical information (06 §5).
 		}
 	}
-	linkProblem = nil
+	// what is added from here on says its own code: cur is the last problem's
+	cur, linkProblem = "", nil
 	for _, entries := range [][]missingEntry{missing, installed} {
 		for i := range entries {
 			m := &entries[i]

@@ -44,4 +44,13 @@ func TestHiddenModsNotCounted(t *testing.T) {
 	if n.Count != other {
 		t.Fatalf("count %d, want %d (the %d hidden-mod items are not counted)", n.Count, other, hidden)
 	}
+	// Not on 能不能跑 (06 §2.4): Mod 库存 handles them, one line points there.
+	for _, it := range n.Items {
+		if it.Group == view.GroupHidden && it.Section != view.SectionElsewhere {
+			t.Errorf("hidden-mod item on the page: %+v", it)
+		}
+	}
+	if len(n.Elsewhere) != 1 || n.Elsewhere[0].Page != "library" || n.Elsewhere[0].Count != hidden || n.Elsewhere[0].Query == "" {
+		t.Fatalf("elsewhere: %+v", n.Elsewhere)
+	}
 }

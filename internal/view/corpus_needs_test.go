@@ -66,7 +66,7 @@ func TestCorpusNeeds(t *testing.T) {
 		t.Errorf("known-bad pair: %+v %+v", pair, pair.Evidence)
 	}
 	own := find("this is the mod's own problem")
-	if own.Counted || !own.Dim || own.Section != view.SectionBreak || !strings.Contains(own.Why, "not your list's") {
+	if own.Counted || !own.Dim || own.Section != view.SectionHint || !strings.Contains(own.Why, "not your list's") {
 		t.Errorf("known error: %+v", own)
 	}
 	weak := find("weaker order preferences")
@@ -81,6 +81,10 @@ func TestCorpusNeeds(t *testing.T) {
 		t.Errorf("count %d, want 0: %+v", n.Count, n.Items)
 	}
 	for _, it := range []*view.Need{dep, pair, own, weak} {
+		// 可以留意 (06 §2.4): nothing sorts here, so the weak preferences are a hint too
+		if it.Section != view.SectionHint || it.Into != "" {
+			t.Errorf("not in 可以留意: %+v", it)
+		}
 		if it.Status != view.StatusHint || it.Evidence.Cutoff != "2040-03" || !strings.Contains(it.Evidence.Label, "2040-03") {
 			t.Errorf("hint or cutoff: %+v", it)
 		}

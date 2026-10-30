@@ -33,12 +33,17 @@ type need struct {
 	dim          bool
 	parts        []string
 	fold         bool
+	also         []string // what merged into it (view.Need.Also): faint lines under the text
 }
 
 func (m *model) toNeeds(items []view.Need) []need {
 	out := make([]need, 0, len(items))
 	for _, it := range items {
-		n := need{group: it.Group, section: it.Section, phaseHeading: it.PhaseHeading, evidence: it.Evidence, text: it.Text, counted: it.Counted, mods: it.Mods, status: it.Status, dim: it.Dim, parts: it.Parts, fold: it.Fold}
+		// shown inside another item, or handled on another page (06 §2.4)
+		if it.Into != "" || it.Section == view.SectionElsewhere {
+			continue
+		}
+		n := need{group: it.Group, section: it.Section, phaseHeading: it.PhaseHeading, evidence: it.Evidence, text: it.Text, counted: it.Counted, mods: it.Mods, status: it.Status, dim: it.Dim, parts: it.Parts, fold: it.Fold, also: it.Also}
 		for _, a := range it.Actions {
 			n.keys = append(n.keys, m.actionKey(a, it.Text))
 		}
@@ -245,7 +250,11 @@ func (m *model) needLines(n int) []string {
 	}
 	out := []string{"  " + sText.Render(fit(head, w-2)), ""}
 	if len(items) == 0 {
-		return append(out, "  "+sOK.Render(markOK)+" "+sSecond.Render(fit(T("nothing needs your attention"), w-4)))
+		out = append(out, "  "+sOK.Render(markOK)+" "+sSecond.Render(fit(T("nothing needs your attention"), w-4)))
+		if away := m.elsewhereLines(w); len(away) > 0 {
+			out = append(append(out, ""), away...)
+		}
+		return out
 	}
 	p.cursor = max(0, min(p.cursor, len(items)-1))
 	type row struct {
@@ -306,6 +315,11 @@ func (m *model) needLines(n int) []string {
 			}
 			rows = append(rows, row{lead + s.Render(fit(l, tw)), i})
 		}
+		for _, a := range it.also {
+			for _, l := range wrap(a, tw-2) {
+				rows = append(rows, row{"    " + sDimS.Render("+ "+fit(l, tw-2)), i})
+			}
+		}
 		if it.fold && p.open[it.text] {
 			for _, part := range it.parts {
 				for j, l := range wrap(part, tw-2) {
@@ -324,6 +338,13 @@ func (m *model) needLines(n int) []string {
 			for _, l := range wrap(hint, tw) {
 				rows = append(rows, row{"    " + sSecond.Render(fit(l, tw)), i})
 			}
+		}
+	}
+	// what this page leaves to another: faint lines at the end (06 §2.4)
+	if away := m.elsewhereLines(w); len(away) > 0 {
+		rows = append(rows, row{"", -1})
+		for _, l := range away {
+			rows = append(rows, row{l, -1})
 		}
 	}
 	// keep the selected item in view
@@ -366,14 +387,18 @@ func (m *model) sectionHead(sec, w int) string {
 		}
 	}
 	title := T(view.SectionTitles[sec])
-	if hintsOnly {
+	if hintsOnly && sec != view.SectionHint {
 		title = T("suggestions")
 	}
 	// its number among the sections shown: 1–4 jump to it (06 §3.5)
 	num := itoa(m.sectionNumber(sec)) + " "
 	head := sDimS.Render(num) + sDimS.Render(title)
-	if sec == view.SectionBreak && !hintsOnly {
+	switch {
+	case sec == view.SectionBreak && !hintsOnly:
 		head = sDimS.Render(num) + sErrS.Render(title)
+	case sec == view.SectionHint:
+		// 可以留意 is RimArcho's own knowledge: the accent, not dimmed
+		head = sDimS.Render(num) + sAccent.Render(title)
 	}
 	used := width.StringWidth(num + title)
 	add := func(s string, st lipgloss.Style) {
@@ -396,6 +421,15 @@ func (m *model) sectionHead(sec, w int) string {
 		}
 	}
 	return head
+}
+
+// elsewhereLines are the faint closing lines: what is handled on another page, and where.
+func (m *model) elsewhereLines(w int) []string {
+	var out []string
+	for _, e := range m.prob.elsewhere {
+		out = append(out, "  "+sDimS.Render(fit("→ "+e.Text, w-2)))
+	}
+	return out
 }
 
 // sectionNumber is a section's number among the sections shown (1 first).

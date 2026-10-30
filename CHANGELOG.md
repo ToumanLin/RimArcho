@@ -4,6 +4,31 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Can it run is laid out in two columns. The left column has what breaks the game,
+  then Worth knowing, then what is for you to confirm. The right column has the errors
+  from the last run (or this run). Drag the gap between them to resize; double-click
+  it to go back to the default. Errors in the last run and the item about the same mod
+  on the left link to each other.
+  Worth knowing is a section of its own: the hints from shared logs (a prerequisite
+  a mod seems to need, pairs that often fail together, a mod's own known error). It
+  sits above "for you to confirm", is not counted, and can be folded.
+  Every action is a button at the bottom of its item; there is no "⋯" menu. A choice
+  such as "disable A / disable B" shows one button per option, none of them the
+  default. Actions that need a confirmation ask inside the item (`enter` / `esc`).
+  An item that an action resolved stays where it was as one line: ✓, what was
+  done, and an Undo button (`u`) on the latest batch that can be undone. These lines
+  go away when you leave the page.
+  Weaker load-order preferences and load-order cycles are now lines of the "sort"
+  item, because sorting settles them; `v` lists the cycle. Hidden or locked mods
+  and mods with out-of-date converted textures are no longer listed here: one line
+  at the end opens Mod library (filtered to them) or Texture optimisation. Broken
+  game-folder links list the current game's first; other games' links fold into one
+  line, and the repair still fixes all of them.
+  Keys: `1`–`9` jump to a section, `←` `→` switch columns, or move between an
+  item's buttons when one has the focus; `esc` returns to the list. The TUI's `@`
+  screen uses the same order, in one column, with the same merged lines and the
+  closing "elsewhere" line.
+
 - Analysing the same mod content for several game versions now stores one copy of
   its Def, Type, Harmony and assembly facts. Schema 26 converts existing caches in
   place. Removing a game or replacing analysis slots also removes facts no game

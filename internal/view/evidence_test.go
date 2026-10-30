@@ -16,13 +16,13 @@ func TestNeedsSectionsAndEvidence(t *testing.T) {
 	for g, want := range map[int]int{
 		view.GroupList: view.SectionBreak, view.GroupDeps: view.SectionBreak, view.GroupConflict: view.SectionBreak,
 		view.GroupLastRun: view.SectionRun, view.GroupThisRun: view.SectionRun,
-		view.GroupConfirm: view.SectionConfirm, view.GroupHidden: view.SectionHidden,
+		view.GroupConfirm: view.SectionConfirm, view.GroupHidden: view.SectionElsewhere,
 	} {
 		if got := view.SectionOf(g); got != want {
 			t.Errorf("SectionOf(%d) = %d, want %d", g, got, want)
 		}
 	}
-	if len(view.SectionTitles) != 4 {
+	if len(view.SectionTitles) != 5 {
 		t.Fatalf("sections %v", view.SectionTitles)
 	}
 	var dep *view.Need

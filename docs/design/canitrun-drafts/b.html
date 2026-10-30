@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>能不能跑 · B 列表 + 详情</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { overflow: hidden; display: grid; grid-template-columns: minmax(300px, 5fr) minmax(0, 7fr); gap: var(--card-gap); padding-bottom: 12px; }
+  .lst { display: flex; flex-direction: column; min-height: 0; }
+  .lst .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 8px; }
+  .lh { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 4px; font-size: 12px; font-weight: 600; color: var(--fg-2); }
+  .lh .n { font-weight: 400; color: var(--muted); }
+  .lh .r { margin-left: auto; font-weight: 400; color: var(--muted); }
+  .lh.break { color: var(--red); } .lh.run { color: var(--log); } .lh.hint { color: var(--muted); }
+  .lphase { padding: 6px 14px 2px 36px; font-size: 11.5px; color: var(--faint); }
+  .row { display: flex; align-items: center; gap: 8px; width: calc(100% - 8px); height: 32px; margin: 0 4px; padding: 0 10px; border-radius: 8px; }
+  .row:hover { background: var(--pill); }
+  .row.cur { background: var(--sel); }
+  .row .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.cur .t { color: var(--fg); font-weight: 600; }
+  .row .m { flex: none; font-size: 12px; color: var(--muted); }
+  .row.dim .t { color: var(--muted); }
+  .row.old { height: 26px; font-size: 12px; color: var(--faint); padding-left: 32px; }
+  .row .ic { margin-top: 0; }
+  .lst .moved { margin: 6px 14px 10px; }
+
+  .det { display: flex; flex-direction: column; min-height: 0; }
+  .det-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 22px 20px; display: flex; flex-direction: column; gap: 16px; }
+  .det h3 { margin: 0; display: flex; gap: 10px; align-items: flex-start; font-size: 16px; line-height: 1.4; font-weight: 600; }
+  .det h3 .ic { margin-top: 4px; }
+  .det .why { margin: -8px 0 0 26px; color: var(--fg-2); font-size: 13.5px; }
+  .blk { margin-left: 26px; }
+  .blk h4 { margin: 0 0 6px; font-size: 12px; font-weight: 500; color: var(--muted); display: flex; gap: 8px; align-items: baseline; }
+  .blk h4 .r { margin-left: auto; }
+  .lines { margin: 0; padding: 0; list-style: none; border: var(--hairline) solid var(--line-2); border-radius: 10px; overflow: hidden; }
+  .lines li { display: flex; align-items: center; gap: 8px; padding: 7px 12px; }
+  .lines li + li { border-top: var(--hairline) solid var(--line-2); }
+  .lines li .sp { flex: 1; }
+  .ev-rows { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  .ev-rows > div { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .mods { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mods .chip { height: 22px; }
+  pre.logx { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--card-2); border: var(--hairline) solid var(--line-2); font: 12px/1.5 var(--code); color: var(--fg-2); white-space: pre-wrap; word-break: break-word; }
+  .facts { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .rel { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 12.5px; color: var(--fg-2); }
+  .rel svg.i { color: var(--accent); }
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+  .opt { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: var(--hairline) solid var(--line); border-radius: 10px; background: var(--card); }
+  .opt:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .opt b { font-weight: 600; }
+  .opt span { font-size: 12px; color: var(--muted); }
+  .opt em { font-style: normal; font-size: 12px; color: var(--accent); margin-top: 4px; }
+  table.cmp { width: 100%; border-collapse: separate; border-spacing: 0; border: var(--hairline) solid var(--line-2); border-radius: 10px; overflow: hidden; font-size: 12.5px; }
+  table.cmp th, table.cmp td { text-align: left; padding: 6px 10px; border-top: var(--hairline) solid var(--line-2); }
+  table.cmp tr:first-child th, table.cmp tr:first-child td { border-top: 0; }
+  table.cmp th { width: 72px; color: var(--muted); font-weight: 400; }
+  table.cmp thead td { color: var(--muted); font-size: 12px; background: var(--card-2); }
+  table.cmp tr.same td { color: var(--green); }
+  table.cmp tr.diff td { background: color-mix(in srgb, var(--amber-soft) 50%, transparent); }
+  .share { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+  .share .bar { width: 160px; height: 6px; border-radius: 3px; background: var(--pill); overflow: hidden; }
+  .share .bar i { display: block; height: 100%; background: var(--muted); }
+  .det-acts { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 22px; border-top: var(--hairline) solid var(--line-2); background: var(--card-2); }
+  .det-acts .note { margin-left: auto; font-size: 12px; color: var(--muted); }
+  @media (max-width: 900px) { #page { display: block; overflow: auto; } .lst .scroll, .det-body { overflow: visible; } .det { margin-top: 8px; } }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div><div id="page"></div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+// B: one line per item on the left, everything about the selected one on the right. The
+// problem detail popup, 为什么这样问, the version list panel and folding (f / ⋯ 展开) all become
+// the right side; every action is a visible button there, no ⋯ menu.
+const SECS = ["break", "run", "confirm", "hint"];
+const LIST = SECS.flatMap((s) => ITEMS.filter((it) => it.sec === s && !it.old));
+const n = counted(LIST);
+let cur = 0;
+
+// what each choice means (draft text)
+const CHOICE = {
+  incompat: [["Combat Extended", "改写整个战斗系统；2 个启用的 Mod 需要它"], ["Yayo's Combat 3", "较轻的战斗调整；没有 Mod 需要它"]],
+  dup: [["工坊那份", "10 月 20 日更新 · 工坊 2009463077"], ["本地那份", "Mods/AllowTool-old · 3 月 2 日"]],
+  extern: [["游戏里的改动", "多启用了 2 个、停用了 1 个；载入后替换这个列表"], ["这个列表", "10 月 28 日 20:55 改过；保留后游戏里的改动丢掉"]],
+};
+const META = { order: "7", missing: "3", version: "18", "log-vfe": "12×", "log-rr": "3×", "log-unk": "2×", "log-pl": "41×", patch: "6 个补丁", links: "2" };
+
+shell("b", n, [["↑↓", "选择"], ["← →", "换区"], ["enter", "主操作"], ["tab", "到右边的按钮"], ["A", "重新检查"]],
+  "B：左边一行一项，右边是选中项的全部内容和所有按钮。原来的问题详情、为什么这样问、版本清单和“展开”都在右边。");
+$("#head").innerHTML = `<p class="lead"><b>${PLAN}</b>还不能放心玩：修好左边 ${n} 项就行</p>
+  <div class="page-acts"><button class="btn primary small">${ic("wand")} 自动修好 2 个</button><button class="btn small">${ic("refresh")} 重新检查文件</button><button class="btn small">${ic("log")} 游戏日志</button></div>`;
+
+function drawList() {
+  let html = "", phase = "";
+  for (const s of SECS) {
+    const its = LIST.map((it, i) => [it, i]).filter(([it]) => it.sec === s);
+    const c = its.filter(([x]) => x.counted).length;
+    html += `<div class="lh ${s}">${SEC[s].t}<span class="n">${c || its.length}</span>${SEC[s].r ? `<span class="r">${SEC[s].r}</span>` : ""}</div>`;
+    for (const [it, i] of its) {
+      if (it.phase && it.phase !== phase) html += `<div class="lphase">${it.phase}</div>`;
+      phase = it.phase || "";
+      const m = META[it.id] || (it.choices || it.cmp ? "选" : "");
+      html += `<button class="row ${it.counted ? "" : "dim"}" data-i="${i}">${statusIcon(it.st)}<span class="t">${esc(plain(it.title))}</span><span class="m">${m}</span></button>`;
+    }
+    if (s === "run") html += `<div class="row old">更早的日志  9 月 29 日  1.5</div>`;
+  }
+  html += `<div class="moved"><button>${ic("arrow")} 3 个隐藏的 Mod 在 Mod 库 › 全部</button><button>${ic("arrow")} 游戏「1.5 测试」有 1 个链接要看</button></div>`;
+  $("#page").innerHTML = `<div class="card lst"><div class="scroll" id="list">${html}</div></div><div class="card det" id="det"></div>`;
+  $$(".row[data-i]").forEach((r) => (r.onclick = () => select(+r.dataset.i)));
+}
+
+function body(it) {
+  const parts = [];
+  if (it.id === "order") parts.push(`<div class="blk"><h4>要挪动的 Mod<span class="r">自动排序一次全部排好</span></h4><ul class="lines">${it.fold.map((f) => `<li>${nm(f)}</li>`).join("")}</ul></div>`);
+  if (it.id === "missing") parts.push(`<div class="blk"><h4>没有安装的</h4><ul class="lines">${it.fold.map((f) => `<li>${nm(f)}<span class="sp"></span><button class="btn small" data-t="在工坊打开 ${plain(f)}">在工坊打开</button><button class="btn small" data-t="从列表中移除 ${plain(f)}">从列表中移除</button></li>`).join("")}</ul></div>`);
+  if (it.id === "dep") parts.push(`<div class="blk"><h4>需要它的</h4><ul class="lines"><li>${nm("⟦Vanilla Factions Expanded - Mechanoids⟧")}</li><li>${nm("⟦Vanilla Furniture Expanded⟧")}<span class="sp"></span><span class="muted">上次运行报错 12 次</span></li></ul></div>`);
+  if (it.id === "patch") parts.push(`<div class="blk"><h4>不会生效的补丁</h4><ul class="lines">${["Patches/Rimefeller.xml:4", "Patches/Rimefeller.xml:19", "Patches/Rimefeller_Pipes.xml:3", "…还有 3 个"].map((p) => `<li class="mono">${p}</li>`).join("")}</ul></div>`);
+  if (it.links) parts.push(`<div class="blk"><h4>这个游戏的链接</h4>${linkRows(it.links).replace('class="links"', 'class="links" style="margin-left:0"')}</div>`);
+  if (it.versions) parts.push(...it.versions.map(([g, ms]) => `<div class="blk"><h4>${g}<span class="n">${ms.length}</span><span class="r"><button class="btn link" data-t="忽略这组">忽略这组</button></span></h4><div class="mods">${ms.map((m) => `<span class="chip">${m.startsWith("…") ? m : nm(`⟦${m}⟧`)}</span>`).join("")}</div></div>`),
+    `<div class="blk muted" style="font-size:12px">2 个 Mod 的 1.6 提醒已忽略 <button class="btn link" data-t="查看或恢复">查看或恢复</button></div>`);
+  if (CHOICE[it.id]) parts.push(`<div class="blk"><h4>${it.id === "dup" ? "保留哪一份" : it.id === "extern" ? "用哪一个" : "停用哪一个"}</h4><div class="opts">${CHOICE[it.id].map(([t, d], j) => `<button class="opt" data-t="${esc(it.choices[j])}"><b>${esc(t)}</b><span>${esc(d)}</span><em>${esc(it.choices[j])}</em></button>`).join("")}</div></div>`);
+  if (it.cmp) parts.push(`<div class="blk"><h4>比较</h4><table class="cmp"><thead><tr><th></th><td>新发现的</td><td>之前记录的</td></tr></thead><tbody>${it.cmp.map(([k, a, b, same]) => `<tr class="${same ? "same" : "diff"}"><th>${k}</th><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table>
+    <div class="facts"><span>12 个文件完全一样</span><span>3 个文件只在新发现的那份里</span></div></div>`);
+  if (it.log) {
+    parts.push(`<div class="blk"><h4>日志里的样子</h4><pre class="logx">${esc(it.log.join("\n"))}</pre><div class="facts"><span>${it.phase}</span><span>首次 21:04:13</span><span>${META[it.id] || ""}</span></div></div>`);
+    if (it.relates) parts.push(`<div class="blk"><button class="rel" data-go="${it.relates}">${ic("arrow")} 它的前置 ${nm("⟦Vanilla Expanded Framework⟧")} 没有启用，看那一项</button></div>`);
+  }
+  if (it.sec === "hint" && it.ev[0][0].startsWith("分享")) {
+    const [a, b] = it.id === "obs" ? [40, 50] : [31, 60];
+    parts.push(`<div class="blk"><div class="share"><span class="bar"><i style="width:${(a / b) * 100}%"></i></span>${a}/${b} 份日志出错</div></div>`);
+  }
+  if (it.ev && it.ev.length) parts.push(`<div class="blk"><h4>依据</h4><div class="ev-rows">${it.ev.map((e) => `<div>${evLine([e])}</div>`).join("")}</div></div>`);
+  return parts.join("");
+}
+
+function drawDetail() {
+  const it = LIST[cur];
+  const acts = (it.acts || []).filter((a) => !["展开", "查看", "查看列表"].includes(a.l) && !(it.choices && /选择/.test(a.l)) && !(it.id === "extern" && a.l !== "看差异"));
+  const eq = acts.some((a) => a.eq);
+  const btns = acts.map((a, j) => `<button class="btn ${!eq && j === 0 && it.counted ? "primary" : "line"}" data-t="${esc(a.l)}">${esc(a.l)}<kbd>${esc(a.k)}</kbd></button>`).join("");
+  const note = eq ? "确认后不能用 u 撤销" : it.choices ? "或者在上面直接选一个" : it.log ? "" : it.counted ? "u 撤销" : "不计数";
+  $("#det").innerHTML = `<div class="det-body"><h3>${statusIcon(it.st)}<span>${nm(it.title)}</span></h3>${it.why ? `<div class="why">${nm(it.why)}</div>` : ""}${body(it)}</div>
+    ${btns ? `<div class="det-acts">${btns}<span class="note">${note}</span></div>` : ""}`;
+  $$("#det [data-t]").forEach((b) => (b.onclick = () => toast(`会执行：${b.dataset.t}`)));
+  $$("#det [data-go]").forEach((b) => (b.onclick = () => select(LIST.findIndex((x) => x.id === b.dataset.go))));
+}
+function select(i) {
+  cur = i;
+  $$(".row[data-i]").forEach((r) => r.classList.toggle("cur", +r.dataset.i === cur));
+  $(`.row[data-i="${cur}"]`)?.scrollIntoView({ block: "nearest" });
+  drawDetail();
+}
+keyNav(() => LIST.length, () => cur, select, (i) => LIST[i].sec, (i) => { const b = $("#det .det-acts .btn, #det .opt"); b && toast(`会执行：${b.dataset.t}`); });
+drawList();
+select(0);
+</script>
+</body>
+</html>
