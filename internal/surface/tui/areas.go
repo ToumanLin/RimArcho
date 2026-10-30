@@ -111,6 +111,8 @@ func (m *model) position() string {
 		}
 	case m.tab == tabChanges:
 		p = T("subscriptions and updates")
+	case m.tab == tabSubscribe:
+		p = T("mod library") + " › " + T("add a subscription")
 	case m.tab == tabLibrary:
 		p = T("mod library")
 		if l := &m.libr; l.page != nil && len(l.flat) > 0 {

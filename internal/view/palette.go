@@ -38,6 +38,7 @@ var Commands = []Command{
 	{"needs", "需要处理", "needs attention", "! problems"},
 	{"changes", "订阅与更新", "subscriptions and updates", "c subscriptions updates history"},
 	{"library", "Mod 库", "mod library", "all mods, copies, sizes, filter, clean up"},
+	{"subscribe", "添加订阅", "add a subscription", "+ Git repository download page LoversLab Workshop SteamCMD"},
 	{"rescan", "重新扫描", "rescan", "R scan"},
 	{"analyze", "重新检查文件", "check the files again", "A analyze"},
 	{"log", "选择日志", "choose a log", "Player.log"},

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Element, loadModules, deferred, event, flush } from "./dom.mjs";
 
@@ -39,19 +40,11 @@ async function setup(data = null) {
   return { mod, form, root, api, calls, confirmations, messages, button, option, click, paste, el, backs: () => backs, dones: () => dones };
 }
 
+// The table is shared with the Go copy (subscribe.Detect), which the TUI and MCP use.
 test("pasted text is recognised by its source", async () => {
   const { mod } = await setup();
-  const cases = {
-    "https://github.com/bbradson/Performance-Fish": "git",
-    "https://gitgud.io/Example/colony.git": "git",
-    "https://www.loverslab.com/files/file/20511-gene-tweaks/": "loverslab",
-    "https://example.invalid/mods/colony": "page",
-    "https://github.com/Example/colony/releases": "page",
-    "https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077": "workshop",
-    "2009463077 818773962": "workshop",
-    "not an address": "bad",
-    "": "",
-  };
+  const cases = JSON.parse(readFileSync(new URL("../../../subscribe/testdata/detect.json", import.meta.url), "utf8"));
+  assert.ok(Object.keys(cases).length > 10);
   for (const [text, kind] of Object.entries(cases)) assert.equal(mod.detect(text), kind, text);
 });
 

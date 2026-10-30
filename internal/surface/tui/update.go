@@ -112,8 +112,18 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.detailRef, m.detail = msg.ref, msg.lines
 		}
 		return m, nil
+	case taskEndedMsg:
+		return m, m.taskEnded(msg.t)
+	case bgMsg:
+		return m, msg.apply(m)
+	case addTick:
+		if m.tab == tabSubscribe && msg.seq == m.add.seq {
+			return m, m.recognise()
+		}
+		return m, nil
 	case scanDoneMsg:
 		m.scanning = false
+		m.tasks.scanning.Store(false)
 		m.reload()
 		m.detailRef = ""
 		if msg.err != nil {
@@ -185,6 +195,10 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.inspectKey(s)
 	case m.editing:
 		return m.filterKey(k)
+	case m.tab == tabSubscribe:
+		return m.addKey(k) // letters go into the paste box
+	case m.tab == tabChanges && k.Paste:
+		return m.openAdd(string(k.Runes)) // a pasted address goes to 添加订阅 (06 §2.9 ctrl+v)
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
 		return m.barTypeKey(k)
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:

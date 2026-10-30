@@ -1,6 +1,6 @@
 # 05 · 语义接口与 MCP
 
-> 状态：CLI 与 MCP 已实现（33 个 MCP 工具，含别名 `add_rule`、`copy_local`）。还缺 1.1 的存档工具和少数引用形式，逐条标在文中。
+> 状态：CLI 与 MCP 已实现（40 个 MCP 工具，含别名 `add_rule`、`copy_local`）。还缺 1.1 的存档工具和少数引用形式，逐条标在文中。
 > 依据：00、00a；02、03、04、08 的命令语义；09（Archo 用同一套工具）。
 
 ## 1. 一套命令与工具层
@@ -48,6 +48,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 回答身份待确认项、拆分 / 合并 Lineage（02 §5.4、§6） | 已完成 | 工具 `resolve_identity`，`destructiveHint: true` |
 | 扫描 | 已完成 | 工具 `scan` |
 | Mod 库存：列出、筛选、排序；收进锁定库、从所有方案里拿掉（06 §2.9） | 已完成 | CLI `library`、`library move-to-locked`、`library remove-from-plans`；只读工具 `list_library`，写工具 `manage_library`（`destructiveHint: true`：会移动 `Mods/` 里的文件夹）。其他动作已有工具：加入当前方案 `edit_loadout`，锁定 / 更新 / 解除 `pin_mod`、`unpin_mod`，恢复给游戏和回收站 `manage_hidden` |
+| 订阅与更新：列出、添加（Git 仓库 / 下载页 / 工坊条目，必要时用 SteamCMD）、检查更新、更新、撤掉（02 §3.4、06 §2.9） | 已完成（2026-10-30） | CLI `subscribe list/git/page/workshop/check/update/remove`；写工具 `manage_subscriptions`（`destructiveHint: true`：更新替换文件、撤掉进回收站；`openWorldHint: true`）。来源从 `url` 自动认出，同窗口的粘贴框（`subscribe.Detect`，两边共用一张测试表）。LoversLab 会话是玩家的，没有工具：agent 读公开页面，站点文件请玩家下载后用 `from` 给出。Steam 客户端管的工坊条目由 Steam 更新，退订 / 重新订阅仍用 `manage_library` |
 | 列表导入、导出、工坊合集对照（04 §9） | 已完成 | 工具 `exchange_list`（导入是一步可撤销的方案编辑） |
 | 用户规则列出 / 删除 | 已完成 | `manage_rules`（`add_rule` 保留为别名） |
 | 隐藏的 Mod：恢复显示、移到回收站（08 §6、§7） | 已完成 | 工具 `manage_hidden`，`destructiveHint: true` |
@@ -307,7 +308,7 @@ next:
 
 链接健康工具：`check_links` 为只读，映射 `archo links check [--all] --json`；`repair_links` 标记 destructive，`dry_run=true` 只预览，执行必须明确 `confirm=true`，无归属凭据的链接另须 `include` 完整路径列表。CLI 对应 `links repair [--all] --dry-run` / `--yes [--include <链接路径>…]`，也支持 `--json`。不带 `--all` 时检查当前游戏及其 local 来源；输出完整路径、目标、原因、凭据和动作。断链/检查失败令 check 返回退出码 1。动作边界见 [08 §3](08-启动与整合包.md#3-链接部署)。
 
-注解遵循 MCP 规范，是否放行由外部 harness 决定；Archo 按 09 §2.2 分档。`openWorldHint` 为 true 的：`get_description`（可能访问 Steam 公开 API）、`exchange_list`（读取 Steam 合集）、`maintenance`（下载社区数据）；其余都是 false。
+注解遵循 MCP 规范，是否放行由外部 harness 决定；Archo 按 09 §2.2 分档。`openWorldHint` 为 true 的：`get_description`（可能访问 Steam 公开 API）、`exchange_list`（读取 Steam 合集）、`maintenance`（下载社区数据）、`manage_subscriptions`（访问 Git 主机、下载页和 Steam）；其余都是 false。
 
 | 工具 | 对应命令 | readOnlyHint | destructiveHint |
 | --- | --- | --- | --- |
@@ -346,9 +347,10 @@ next:
 | `maintenance` | `data update`、`import rimcrow`、`db vacuum`（`action=vacuum`）、`gc` | false | true |
 | `list_library` | `library`（`search`、`include`、`exclude`、`sort`、`lineage`、`facets`、`all`） | true | — |
 | `manage_library` | `action`：`move_to_locked`（`library move-to-locked`，`dry_run`、`reason`）/ `remove_from_plans`（`library remove-from-plans`）/ `unsubscribe`、`subscribe`（`workshop unsubscribe|subscribe`，`dry_run`）/ `steam_state`（`workshop state`）；`refs` | false | true |
+| `manage_subscriptions` | `action`：`list`（默认，`subscribe list`）/ `add`（按 `url` 或 `kind` 映射 `subscribe git <url> [--branch\|--tag\|--commit]`、`subscribe page <url> [--git] [--from]`、`subscribe workshop <ID…> [--steamcmd]`）/ `check`（`subscribe check`，不给 `refs` 查全部）/ `update`（`subscribe update`，`refs` 或 `all`，`from`；游戏运行时拒绝）/ `remove`（`subscribe remove`）；`add`、`update`、`remove` 有 `dry_run` | false | true |
 | `preview_uninstall` | `uninstall --dry-run`（`keep_locked`、`locked_to`、`remove_packs`、`packs_to`、`remove_saves`、`saves_to`、`remove_games`、`restore_modsconfig_backup`、`all`）；从不带 `--yes` | true | — |
 
-工具和注解以 `internal/surface/mcp/server.go` 的 `Tools()` 为准（含别名）；`destructiveHint: true` 的是 `save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
+工具和注解以 `internal/surface/mcp/server.go` 的 `Tools()` 为准（含别名）；`destructiveHint: true` 的是 `save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`manage_subscriptions`、`manage_textures`、`repair_links`、`maintenance`。§1.2 里还没有的工具按同样方式加入。
 
 **描述的改写**（已完成；2026-10-21 之前的描述与代码不符，留作记录）：
 
@@ -378,7 +380,7 @@ next:
      - 混合：先确认 XML 一侧加载成功（`get_patches failed=true`），再怪代码。
   4. `list_problems` 给静态全貌（依赖、不兼容、加载顺序、Def 覆盖、Patch 落空、Harmony 冲突）；`explain_relation` 解释两个具体的 Mod。
   5. **报告**：失败阶段、XML / 程序集 / 混合、确切的 Mod 实例和路径、文件+行或类+方法、为什么失败、点名的 Mod 是原因、依赖还是旁观者，以及最小的修复。
-- 编辑：先 `pin_mod`（从不原地改工坊文件），再改副本；`edit_loadout` 只改 RimArcho 里的方案；`save_loadout` 写游戏的 ModsConfig.xml（先问用户）。破坏性工具（`save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`maintenance`）先用 dry run 给用户看，再经用户同意调用。诊断流程加一步：以前能跑时，用 `list_changes` 和 `plan_history action=diff` 找出变化。
+- 编辑：先 `pin_mod`（从不原地改工坊文件），再改副本；`edit_loadout` 只改 RimArcho 里的方案；`save_loadout` 写游戏的 ModsConfig.xml（先问用户）。破坏性工具（`save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`manage_subscriptions`、`manage_textures`、`repair_links`、`maintenance`）先用 dry run 给用户看，再经用户同意调用。诊断流程加一步：以前能跑时，用 `list_changes` 和 `plan_history action=diff` 找出变化。
 - 工具结果上限 24 KB：用 `mod=`、`target=`、模式或簇缩小范围，不用 `all=true`（日志语料 G7）。
 - 最后附错误范式检查清单（`patternChecklist`，03 §6.8）：按语料中的实际分布排序，覆盖诊断流程未讲到的类别——读档、缺资源、配置检查、程序集加载，以及噪音；每类给出 `pattern=<id>` 追问。
 
@@ -403,6 +405,7 @@ next:
 | `copy_local` | 改工坊 Mod 前先复制，工坊文件会被 Steam 覆盖；指向文件夹外的链接和上游 `.git` 不复制；已有文件夹从不覆盖 |
 | `get_description` | 推荐一个 Mod 前了解它做什么；工坊文本按需获取并缓存到条目更新为止；玩家可以关掉联网（`workshop.fetch`） |
 | `set_player_data` | 标签（`list --filter tag:<t>` 和 TUI 的 `tag:` 搜索用它）、别名、备注；挂在 Lineage 上，所有副本共享；`copy_note` 是一份副本自己的备注（为什么留着这一份）；不碰游戏 |
+| `manage_subscriptions` | 玩家要装 Git 仓库、下载页或 SteamCMD 的 Mod，或问“我订阅的有没有更新”；先 `check` 再 `update`，`add` / `update` / `remove` 先 `dry_run=true`；下载页的文件由玩家下载后用 `from` 给出，agent 不登录 LoversLab；Steam 客户端管的工坊条目用 `manage_library`；想留住旧版本先 `pin_mod` |
 | `add_rule` | 方向错误的 About.xml / 社区约束用 `ignore` 去掉，这就是打破 `order.cycle` 的办法；规则影响排序和顺序类问题，本身不重排 |
 
 ## 6. 稳定性
@@ -421,8 +424,8 @@ next:
 | I3 | `pkg:` 对应多个 Instance | 列出候选，不任选一个（`TestAmbiguousPackage`） | 通过 |
 | I4 | 用 Claude Code 或 Codex 接入 MCP，不加载任何 skill | 能完成一次补丁失败的诊断和一次 `Pawn.Tick` 异常的排查 | 通过（脚本化客户端自检，`spikes/mcpcheck`）；真实 agent 会话待验证 |
 | I5 | 默认输出 | 单次不超过 40 行，截断时给出展开命令（`TestCLIParity`、`TestTruncation`） | 通过 |
-| I6 | 注解 | 13 个只读工具 `readOnlyHint: true`；`destructiveHint: true` 只有 `save_loadout`；每个描述都有示例调用（`TestToolsAndAnnotations`）。写工具只在合成环境测试（`TestWriteTools`）；`env` 参数（`TestEnvParameter`）；分析超过等待时间时返回“仍在计算”（`TestStillComputing`） | 通过 |
-| I7 | 对照 §1.2 的表，逐个玩家动作找对应工具 | 每个动作都有 CLI 命令和 MCP 工具，注解与是否写文件一致 | 部分通过（1.0 的玩家动作都有工具；1.1 的存档工具未做） |
+| I6 | 注解 | 17 个只读工具 `readOnlyHint: true`；`destructiveHint: true` 的 11 个见 §5.2；每个描述都有示例调用（`TestToolsAndAnnotations`）。写工具只在合成环境测试（`TestWriteTools`）；`env` 参数（`TestEnvParameter`）；分析超过等待时间时返回“仍在计算”（`TestStillComputing`） | 通过 |
+| I7 | 对照 §1.2 的表，逐个玩家动作找对应工具 | 每个动作都有 CLI 命令和 MCP 工具，注解与是否写文件一致 | 部分通过（1.0 的玩家动作都有工具，订阅与更新 2026-10-30 补上 `manage_subscriptions`；1.1 的存档工具未做） |
 | I8 | ModsConfig.xml 有未处理的外部修改冲突时调用 `save_loadout` | 拒绝，文本给出看差异 / 载入 / 忽略三条命令；ModsConfig.xml 不变 | 通过 |
 | I9 | 游戏正在运行时调用启动工具；调用 `save_loadout` | 启动工具拒绝并说明哪个环境的游戏在运行；`save_loadout` 照常写入，提示游戏下次启动才会读到 | 通过 |
 | I10 | `plan new` / `use` / `rename` / `remove` 与 `loadout import --new` 经 CLI 和 MCP 各执行一次 | 输出逐字相同；`plan use` 不写游戏文件；不能删除最后一个方案 | 通过 |

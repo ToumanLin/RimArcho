@@ -46,7 +46,8 @@ const (
 	tabList = iota
 	tabProblems
 	tabChanges
-	tabLibrary // Mod 库存 (06 §2.9), from the palette
+	tabLibrary   // Mod 库存 (06 §2.9), from the palette
+	tabSubscribe // Mod 库存 › 添加订阅 (06 §2.9): + on 订阅与更新
 )
 
 // panel is a secondary screen: command output to read, or a chooser.
@@ -114,8 +115,10 @@ type model struct {
 	analyzing   bool
 	analyzeWait func() tea.Msg
 
-	chg  chState
-	libr libState
+	chg   chState
+	libr  libState
+	add   addState   // 添加订阅
+	tasks taskRunner // the subscription actions' background tasks (06 §2.16)
 
 	bar      barState  // the editor's filter bar over 未启用 and 已启用 (06 §2.5)
 	board    *boardRef // the board the columns were built from (the bar filters it)
@@ -245,6 +248,7 @@ func Run(o Options) error {
 		})
 	})
 	_, err := program.Run()
+	mdl.closeTasks()
 	return err
 }
 
@@ -417,6 +421,7 @@ func (m *model) startScan() tea.Cmd {
 		return nil
 	}
 	m.scanning = true
+	m.tasks.scanning.Store(true)
 	m.say(sayBusy, T("scanning…"))
 	scan, name := m.opts.Scan, m.envName
 	return func() tea.Msg {

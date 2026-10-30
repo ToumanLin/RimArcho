@@ -3,7 +3,6 @@ package gui
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -12,43 +11,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-type SubscriptionRequest struct {
-	Kind     string `json:"kind"`
-	URL      string `json:"url"`
-	RefType  string `json:"refType"`
-	Ref      string `json:"ref"`
-	Git      bool   `json:"git"`
-	From     string `json:"from"`
-	SteamCMD bool   `json:"steamcmd"`
-	Batch    bool   `json:"batch"`
-}
+// SubscriptionRequest is the 添加订阅 card's decision (view.SubscribeRequest, shared with the TUI).
+type SubscriptionRequest = view.SubscribeRequest
 
-func subscriptionArgs(r SubscriptionRequest) ([]string, error) {
-	args := []string{"subscribe", r.Kind}
-	switch r.Kind {
-	case "git":
-		args = append(args, r.URL)
-		if r.RefType != "" && (r.Ref != "" || r.RefType != "branch") {
-			args = append(args, "--"+r.RefType, r.Ref)
-		}
-	case "page":
-		args = append(args, r.URL)
-		if r.Git {
-			args = append(args, "--git")
-		}
-		if r.From != "" {
-			args = append(args, "--from", r.From)
-		}
-	case "workshop":
-		args = append(args, strings.Fields(r.URL)...)
-		if r.SteamCMD {
-			args = append(args, "--steamcmd")
-		}
-	default:
-		return nil, fmt.Errorf("unknown subscription kind %q", r.Kind)
-	}
-	return args, nil
-}
+func subscriptionArgs(r SubscriptionRequest) ([]string, error) { return view.SubscribeArgv(r) }
 
 // The CLI supplies the same dry-run text used by existing file actions.
 func (s *API) SubscribePreview(r SubscriptionRequest) (*view.Preview, error) {

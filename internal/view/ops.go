@@ -180,8 +180,10 @@ const (
 	EditorPage  = "plan"
 	LibraryPage = "library"
 	ChangesPage = "changes"
-	PackPages   = "packs" // the packs, and each pack's page
-	BuildPageID = "build" // 编译成整合包
+	// SubscribePage is Mod 库存 › 添加订阅 (06 §2.9).
+	SubscribePage = "subscribe"
+	PackPages     = "packs" // the packs, and each pack's page
+	BuildPageID   = "build" // 编译成整合包
 )
 
 // CopyOps are the codes that apply to a copy now, in menu order (06 §8.5): the plan ops by

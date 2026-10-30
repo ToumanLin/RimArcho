@@ -95,6 +95,14 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	if page == ChangesPage {
 		if !tui {
 			out = append(out, r("+", "subscribe…"), r("U", "update all"), r("u / C", "update / view changes"), r("ctrl+a / ctrl+space / shift+↑↓", "select updates"), r("tab / shift+tab", "the next field or button"))
+		} else {
+			// 06 §9.1: the subscription actions, each a background task (06 §2.16)
+			out = append(out,
+				r("+ / paste", "add a subscription"),
+				r("K", "check every source for updates (enter on a source: that one)"),
+				r("u / U", "update this one / every one shown (dry run first)"),
+				r("Del", "remove the subscription (dry run first)"),
+			)
 		}
 		out = append(out,
 			r("1 / 2 / 3", "sources, updates, history"),
@@ -108,6 +116,16 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("S", "sort the list"),
 			r("p", "lock this version (dry run first)"),
 			r("esc", "close the panel, clear selection, then show every mod"),
+		)
+	}
+	if page == SubscribePage && tui { // the window's form is buttons and native fields
+		out = append(out,
+			r("type / paste", "the address: a Git repository, a download page, Workshop links or IDs"),
+			r("↑↓", "choose what the card asks"),
+			r("tab", "the branch, tag or commit name"),
+			r("enter", "subscribe, once the dry run is shown"),
+			r("ctrl+u", "clear the box"),
+			r("esc", "clear, then back to subscriptions and updates"),
 		)
 	}
 	if page == PackPages {
