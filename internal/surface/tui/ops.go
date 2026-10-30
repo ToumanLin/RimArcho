@@ -107,7 +107,23 @@ func (m *model) libOp(code string, refs []string, what string) tea.Cmd {
 }
 
 // libDo runs a library action and says what it did; Steam out of reach opens the pages.
+// The subscription actions (检查更新, 更新, 撤掉订阅) are background tasks, as in the window
+// (06 §2.16).
 func (m *model) libDo(code string, refs []string) tea.Cmd {
+	if code == view.OpSubCheck || code == view.OpSubUpdate || code == view.OpSubRemove {
+		var names []string
+		for _, ref := range refs {
+			name := ref
+			if m.st != nil {
+				if mod, err := m.st.Ix.ResolveOne(ref); err == nil {
+					name = mod.DisplayName()
+				}
+			}
+			names = append(names, name)
+		}
+		m.clearSel()
+		return m.submitLane(code, refs, names)
+	}
 	t, err := view.LibDo(m.app, code, refs)
 	var pages *view.OpenPages
 	if errors.As(err, &pages) {
@@ -129,10 +145,11 @@ func (m *model) libDo(code string, refs []string) tea.Cmd {
 	return m.requestDetail()
 }
 
-// delKey is Del: unsubscribe or delete, whichever the row has (06 §3.5).
+// delKey is Del: unsubscribe, remove the subscription or delete, whichever the row has
+// (06 §3.5, §2.9).
 func (m *model) delKey(ops []string, run func(code string) tea.Cmd) tea.Cmd {
 	for _, c := range ops {
-		if c == view.OpUnsub || c == view.OpDelete {
+		if c == view.OpUnsub || c == view.OpDelete || c == view.OpSubRemove {
 			return run(c)
 		}
 	}
@@ -209,14 +226,20 @@ func (m *model) goPage(n int) tea.Cmd {
 	return nil
 }
 
-// subPage is tab / shift+tab: the next page under the same sidebar entry (Mod 库存 › 全部 ↔
-// 变化; the plans under 方案, which makes that plan current).
+// subPage is tab / shift+tab: the next page under the same sidebar entry (Mod 库存 › 全部 →
+// 订阅与更新 → 添加订阅; the plans under 方案, which makes that plan current).
 func (m *model) subPage(d int) tea.Cmd {
 	switch m.tab {
 	case tabLibrary:
+		if d < 0 {
+			return m.openAdd("")
+		}
 		return m.openChangesOf("", "")
 	case tabChanges:
-		return m.openLibrary()
+		if d < 0 {
+			return m.openLibrary()
+		}
+		return m.openAdd("")
 	case tabList:
 		rows, err := view.PlanRows(m.app)
 		if err != nil || len(rows) < 2 {
@@ -244,6 +267,8 @@ func (m *model) helpPage() tea.Cmd {
 		page = view.LibraryPage
 	case tabChanges:
 		page = view.ChangesPage
+	case tabSubscribe:
+		page = view.SubscribePage
 	}
 	rows := view.KeyHelp(page, true)
 	w := 0

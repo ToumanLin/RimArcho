@@ -96,7 +96,7 @@ func TestRowOpsColumns(t *testing.T) {
 func TestKeyHelpText(t *testing.T) {
 	SetLang("zh")
 	defer SetLang("en")
-	for _, page := range []string{EditorPage, LibraryPage, "home"} {
+	for _, page := range []string{EditorPage, LibraryPage, "home", ChangesPage, SubscribePage} {
 		for _, tui := range []bool{false, true} {
 			rows := KeyHelp(page, tui)
 			history := slices.ContainsFunc(rows, func(r KeyRow) bool { return r.Keys == "alt+← / alt+→" })

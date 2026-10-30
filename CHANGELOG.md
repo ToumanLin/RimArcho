@@ -4,6 +4,18 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Subscriptions now work outside the window. MCP has a write tool,
+  `manage_subscriptions` (list, add, check, update, remove; `dry_run` for add, update
+  and remove), marked destructive and open-world. In the TUI, Mod 库 › 添加订阅 opens
+  from 订阅与更新 (`+`, `tab` or a paste) or the palette's 添加订阅: paste an address,
+  choose what to track, read the dry run, `enter` subscribes. On 订阅与更新, `K` checks
+  every source (`enter` on a source: that one), `u` / `U` update one / every one shown
+  after their dry run, and `Del` removes a subscription. These run as background tasks
+  recorded in `tasks.json`; updates are refused while a game runs. The TUI, MCP and the
+  window recognise a pasted address the same way. In the TUI a download page subscribes
+  only through its single Git repository; choosing a zip, a folder or a LoversLab file
+  stays in the window or `archo subscribe … --from`.
+
 - Analysing the same mod content for several game versions now stores one copy of
   its Def, Type, Harmony and assembly facts. Schema 26 converts existing caches in
   place. Removing a game or replacing analysis slots also removes facts no game
@@ -531,12 +543,15 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   settings, data, db, cache); `launch_game`, `manage_plans`, `plan_history`;
   `edit_loadout` gains `checkout` and `ignore_external`; `list_library`, `manage_library`;
   `preview_uninstall` (read-only; there is no tool that uninstalls); `search_files`,
-  `test_run`, `check_links`, `repair_links` (below). 38 tools in all.
+  `test_run`, `check_links`, `repair_links` (below); `manage_textures` (贴图优化) and
+  `manage_subscriptions` (Subscriptions). 40 tools in all.
 - `manage_plans` gains `versions`, `follow`, `unfollow` and `sync`; `manage_packs` gains
   `check`.
-- `exchange_list` and `maintenance` are open-world; the destructive ones (`save_loadout`,
-  `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`, `manage_hidden`,
-  `manage_library`, `maintenance`) are listed in the server instructions with "show the dry run and ask first".
+- `exchange_list`, `maintenance` and `manage_subscriptions` are open-world; the destructive
+  ones (`save_loadout`, `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`,
+  `manage_hidden`, `manage_library`, `manage_subscriptions`, `manage_textures`,
+  `repair_links`, `maintenance`) are listed in the server instructions with "show the dry
+  run and ask first".
 - Instructions and descriptions speak of the current plan, writing to the game and locked
   versions.
 
@@ -944,6 +959,9 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   settings page and the guide are recorded as tasks too.
 - 后台任务 page: a line at the bottom of the sidebar and `ctrl+j`. The CLI and MCP still run
   in the foreground.
+- The TUI queues its subscription actions (subscribe, check, update, remove) into the same
+  queues and `tasks.json`; the status line says when one is queued and how it ended. Its
+  other Mod 库 file actions still run in the foreground.
 - The window stays usable during long work (06 §3.1 rule 9): adding a large game, switching
   games, the first scan, folder sizes, and the settings page's downloads and database actions
   run in the background, and a page opens before its data is read; stale results are dropped.
@@ -1007,6 +1025,12 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   question and shows the dry run.
 - Mod 库 gains a source column, the source-update state, fields and actions; MCP
   `list_library` knows the new sources and states.
+- MCP `manage_subscriptions` maps onto `archo subscribe` (list, add, check, update,
+  remove). `add` recognises the source from `url` as the paste box does, or takes `kind`.
+  An agent never logs in to LoversLab: it asks the player to download and passes `from`.
+- TUI: Mod 库 › 添加订阅 and the 订阅与更新 keys `K`, `enter` on a source, `u`, `U`, `Del`,
+  `+` and paste, queued as background tasks. A page update or a page without a single Git
+  repository points to the window or `--from`.
 
 ### Accounts (07 §3.1)
 - 设置 › 账户: one status line each for SteamCMD and LoversLab (log in, log in again, log out).
@@ -1089,9 +1113,11 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
 - `collection <id> --import` replaces the list with only the collection's mods, dropping Core.
-- TUI: no subscribe actions, 后台任务 page or 列表管理 page yet (the CLI and the window have
-  them).
-- MCP has no write tool for subscriptions yet (`archo subscribe` only).
+- TUI: no 后台任务 page or 列表管理 page yet (the CLI and the window have them). With the
+  window and the TUI open together, each rewrites `tasks.json` whole, so the later writer
+  drops the other's task records.
+- The TUI, CLI and MCP check download pages without the LoversLab session (public page
+  reads); only the window uses a logged-in session.
 - Followed collections are checked when 列表管理 opens, not yet on a schedule.
 
 ## 0.8.0 — toward 1.0 (unreleased)

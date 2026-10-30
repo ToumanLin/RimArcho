@@ -7,8 +7,9 @@ import "fmt"
 // and maintenance. Each one still maps to exactly one CLI argv.
 
 // openWorld names the tools that may reach the network: the Workshop page (describe), a
-// Workshop collection (exchange_list) and the community data download (maintenance).
-var openWorld = map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true}
+// Workshop collection (exchange_list), the community data download (maintenance) and the
+// subscription sources (manage_subscriptions: Git hosts, download pages, Steam).
+var openWorld = map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true, "manage_subscriptions": true}
 
 func manageTools() []tool {
 	return []tool{

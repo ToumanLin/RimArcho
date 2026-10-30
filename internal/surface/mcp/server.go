@@ -474,7 +474,7 @@ func toolList() []tool {
 
 // Tools returns the tool table.
 func Tools() []tool {
-	return append(append(append(append(toolList(), manageTools()...), planTools()...), libraryTools()...), textureTools()...)
+	return append(append(append(append(append(toolList(), manageTools()...), planTools()...), libraryTools()...), subscriptionTools()...), textureTools()...)
 }
 
 // ToolDoc describes one tool as a client sees it (name, description, parameters): for

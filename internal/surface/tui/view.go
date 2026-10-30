@@ -39,6 +39,8 @@ func (m *model) View() string {
 		content = m.changeLines(body)
 	case m.tab == tabLibrary:
 		content = m.libraryLines(body)
+	case m.tab == tabSubscribe:
+		content = m.addLines(body)
 	case m.full:
 		content, ps = m.fullLines(body)
 	case m.pos != nil:
@@ -258,21 +260,10 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"g", T("tags")}, {"ctrl+w", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
+	case m.tab == tabSubscribe:
+		pairs = m.addPairs()
 	case m.tab == tabChanges:
-		pairs = [][2]string{{"esc", T("back")}, {"enter", T("open")}, {"i", T("files")}}
-		if m.chg.of != "" {
-			pairs[0][1] = T("every mod")
-		} else if m.chg.library {
-			pairs = append(pairs, [2]string{"a", T("the current plan")})
-		} else {
-			pairs = append(pairs, [2]string{"a", T("the whole library")})
-		}
-		if c := &m.chg; c.cursor < len(c.rows) && c.rows[c.cursor].mod != nil {
-			for _, a := range c.rows[c.cursor].mod.Actions {
-				pairs = append(pairs, [2]string{a.Key, a.Label})
-			}
-		}
-		pairs = append(pairs, [2]string{"tab", T("all mods")})
+		pairs = m.changesPairs()
 	case m.tab == tabLibrary && (m.libr.full || m.libr.detail):
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"enter", T("full screen")}, {"esc", T("back")}, {"F10", T("menu")}, {"?", T("all keys")}}
 	case m.tab == tabLibrary:

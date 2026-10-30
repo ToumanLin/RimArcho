@@ -98,11 +98,8 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n")); return nil }
 	case view.ActVersionList:
 		k.run = func(m *model) tea.Cmd { return m.openVersionWarnings(a) }
-	case view.ActSubscribe: // a background task in the window; here, the command to run
-		k.run = func(m *model) tea.Cmd {
-			m.openPanel(T("subscribe them from a terminal"), "archo "+strings.Join(a.Argv, " "))
-			return nil
-		}
+	case view.ActSubscribe: // 添加订阅 with the Workshop IDs: Steam or SteamCMD, the dry run, enter
+		k.run = func(m *model) tea.Cmd { return m.openAdd(strings.Join(a.Refs, " ")) }
 	case view.ActFold:
 		k.run = func(m *model) tea.Cmd {
 			p := &m.prob

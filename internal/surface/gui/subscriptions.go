@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -76,24 +75,7 @@ func (s *API) WorkshopUpdatePreview(ref string) (*view.Preview, error) {
 		return nil, err
 	}
 	defer a.Close()
-	if err := a.UpdateWorkshopClient(ref, true); err != nil {
-		return nil, err
-	}
-	ix, err := a.Index()
-	if err != nil {
-		return nil, err
-	}
-	m, err := ix.ResolveOne(ref)
-	if err != nil {
-		return nil, err
-	}
-	latest := a.SubscriptionSourceCheck("workshop").Latest[m.ID]
-	lines := []string{m.DisplayName()}
-	if latest > 0 {
-		lines = append(lines, a.FormatTime(time.Unix(m.ACFTimeUpdated, 0))+" → "+a.FormatTime(time.Unix(latest, 0)))
-	}
-	lines = append(lines, view.T("Steam will download this Workshop update"))
-	return &view.Preview{What: view.OpSubUpdate, Title: view.T("update subscription"), Apply: true, Lines: lines}, nil
+	return view.WorkshopUpdatePreview(a, ref)
 }
 
 func (s *API) WorkshopUpdate(ref string) (string, error) {
