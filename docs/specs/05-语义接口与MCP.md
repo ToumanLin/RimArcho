@@ -239,7 +239,7 @@ next:
 | | `test run [<方案>] [--env <环境>] [--map] [--timeout <时长>] [--settle <时长>] [--json]` | 隔离数据测试运行（08 §12）：默认当前方案，直接启动、收集加载日志后停止；超时默认 `10m`，主菜单后等 `5s`。到达目标且没有错误簇返回 0，否则 1；报告始终写 stdout，进度写 stderr |
 | 方案管理 | 见 §4.3 | |
 | 列表交换 | `loadout export [--format text\|archo\|modsconfig\|rimsort\|rml\|rimcrow\|rimcrow-xml] [--out <文件>]` | 导出当前方案；`--out` 从不覆盖已有文件 |
-| | `loadout import <文件\|分享码> [--new [<名字>]]` | 用一份列表替换当前方案（文本、ModsConfig.xml、存档、`.rml`、RimSort、RimCrow 分享码、工坊 ID），一步可撤销，不写游戏文件（04 §9）；`--new` 导入为新方案（待实现） |
+| | `loadout import <文件\|分享码> [--new [<名字>]]` | 用一份列表替换当前方案（文本、ModsConfig.xml、存档、`.rml`、RimSort、RimCrow 分享码、工坊 ID），一步可撤销，不写游戏文件（04 §9）；`--new` 导入为新方案（04 §9.1），名字默认取列表自己的名字或文件名 |
 | | `collection <链接\|ID> [--import]` | 读工坊合集并与已安装的 Mod 对照（联网）；`--import` 按合集顺序把已安装的部分放进当前方案（可撤销） |
 | 锁定版本 | `pin <实例> [--name <文件夹>] [--git] [--dry-run]` | 创建锁定版本（04 §7）：复制到锁定库（默认 `<文件夹>_local`），写 `.rimarcho/origin.json`，`--git` 建基线提交，并只在当前方案里换成这份副本；`--update` 更新锁定版本，`--move-to-library` 把 `Mods/` 里的旧副本移进锁定库。`copy-local` 是别名 |
 | | `unpin <引用> [--dry-run]` | 解除锁定：恢复工坊那份并改用它（含 RimCrow 风格的锁定） |
