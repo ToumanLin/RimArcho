@@ -153,7 +153,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .nav-item .chev svg.i { width: 10px; height: 10px; stroke-width: 1.8; }
 .nav-item.on .chev { transform: rotate(90deg); }
 .nav-item .cnt, .nav-kid .cnt { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
-.nav-item .badge-n, #live .badge-n { margin: 0 -4px 0 auto; font-size: 12px; font-weight: 500; line-height: 17px; min-width: 17px; padding: 0 5px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); }
+.nav-item .badge-n { margin: 0 -4px 0 auto; font-size: 12px; font-weight: 500; line-height: 17px; min-width: 17px; padding: 0 5px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); }
 /* The open entry's sub-entries hang off a thin guide line, 16px in. Opening and closing
    grows the row from 0fr to 1fr and fades it (06 §7.1); a closed list is out of the tab order. */
 .kids-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; margin-top: -1px; transition: grid-template-rows var(--t-layout) var(--ease), opacity var(--t-exit) var(--ease-in); }
@@ -168,17 +168,9 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .kid-hl { position: absolute; left: 0; top: 0; z-index: 0; border-radius: var(--r-sm); background: color-mix(in srgb, var(--fg) 6.5%, transparent); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
 .side-foot .nav-item.on { background: var(--card); box-shadow: var(--seg-edge); }
 .side-foot { flex: none; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
-/* the foot's one line, only while the game runs or a new log waits (06 §2.1): a dot in the
-   icon column, then the text, on the entries' edges */
-#live { width: 100%; height: 30px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 8px; border-radius: var(--r-sm); color: var(--fg-2); font-size: 12px; text-align: left; white-space: nowrap; overflow: hidden; transition: background var(--t-press), color var(--t-press); animation: view-in var(--t-enter) var(--ease); }
-#live::before { content: ""; flex: none; width: 6px; height: 6px; margin: 0 4px; border-radius: 50%; background: var(--green); }
-#live.newlog { color: var(--accent-11, var(--accent)); }
-#live.newlog::before { background: var(--accent); }
-#live:hover { background: var(--pill); color: var(--fg); }
-#live .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* the navigation at the top (06 §2.1): the same entries as one strip over the page. The
    toggle ends it on the left; the groups are thin separators; an entry's sub-entries are a
-   dropdown from its chevron (↓ on the keyboard); 设置 and the running game at the right
+   dropdown from its chevron (↓ on the keyboard); 设置 at the right
    end. The raised highlight and the badge stay; a narrow window scrolls the strip. */
 #app.nav-top { grid-template-columns: minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr); }
 #app.nav-top #side { grid-row: 1; flex-direction: row; align-items: center; gap: 4px; padding: 0 10px; border-right: 0; border-bottom: var(--hairline) solid var(--line-2); }
@@ -191,8 +183,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 #app.nav-top .nav-item .badge-n { margin: 0 -4px 0 2px; }
 #app.nav-top .kids-wrap { display: none; }
 #app.nav-top .side-foot { flex-direction: row; align-items: center; gap: 4px; padding: 0; border-top: 0; }
-#app.nav-top .side-foot .nav-item, #app.nav-top #live { width: auto; }
-#app.nav-top #live { max-width: 240px; }
+#app.nav-top .side-foot .nav-item { width: auto; }
 #app.nav-top .side-foot .nav-item .ic { display: inline-flex; }
 #app.nav-top .side-foot .nav-item .lbl { display: none; }
 #app.nav-top .side-foot .nav-item { padding: 0 7px; }

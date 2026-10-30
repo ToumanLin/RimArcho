@@ -4,6 +4,15 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- The window's sidebar no longer has the line above Settings ("Game running since
+  14:05" while the game runs, "Analyse this run's log" after it). It only opened Can it
+  run, which is right above it, and its number was already in that entry's badge. The
+  game's errors still reach Can it run and its badge every two seconds; the Launch page
+  and Can it run's right column say the game is running. After the game exits (or when
+  RimArcho opens after a game run without it), the window now reads the new Player.log
+  by itself, once, in the background, so the badge counts that run without a click.
+  The TUI keeps its status-line indicator.
+
 - Launch page: when the current list has edits not yet written to the game, the corner
   of the Launch block has a small "Save N changes" button (`w`). It saves without
   launching, like `w` in the editor. Before, the block only said "N unsaved", and

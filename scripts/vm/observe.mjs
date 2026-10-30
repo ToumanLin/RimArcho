@@ -75,7 +75,7 @@ export function discover() {
     const label = (e.getAttribute('aria-label') || e.title || e.innerText || e.name || '').trim().replace(/\s+/g,' ').slice(0,200);
     const identity = Object.fromEntries([...e.attributes].filter(a => /^(data-|name|id)/.test(a.name)).map(a => [a.name,a.value]));
     const row=e.matches('.row,.lrow,.lib-row,.log-row,.chg-row,.needs-row'), area=e.closest('[data-area]')?.dataset.area;
-    const owner=e.closest('#popup:not([hidden])')?'popup':e.closest('#menu:not([hidden])')?'menu':e.closest('#nav,#nav-settings,#tasks-line,#env,#live')?'nav':'page';
+    const owner=e.closest('#popup:not([hidden])')?'popup':e.closest('#menu:not([hidden])')?'menu':e.closest('#nav,#nav-settings,#tasks-line,#env')?'nav':'page';
     const locator=path(e);
     const blockedByLayer=!!(hit?.closest('#popup:not([hidden]),#menu:not([hidden])')&&!e.closest('#popup:not([hidden]),#menu:not([hidden])'))||!!(e.closest('#board,#planhead')&&!document.querySelector('#screen')?.hidden);
     const semantics=[['breadcrumb','#crumbs button'],['table-header','.th[data-k]'],['plan-choice','.pm-list .pm-row'],['export-format','.fmts .fmt'],['appearance','.accent-swatch,.theme-segments button'],['filter-choice','button[id^="filter-options-"]']].filter(([,selector])=>e.matches(selector)).map(([name])=>name);

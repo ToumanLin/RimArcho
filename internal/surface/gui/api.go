@@ -1075,6 +1075,34 @@ func (s *API) Needs() *view.Needs {
 	return n
 }
 
+// ReadNewLog reads Player.log once when it is newer than the last launch and the last log
+// read (app.NewLog): the game exited, or ran without RimArcho. Then 能不能跑's badge counts
+// that run without a visit (06 §2.1; the sidebar's "分析本次日志" line asked for one until
+// 2026-10-30). Like opening 能不能跑 it parses the log, records it as read and lets the
+// memory go again soon; it starts no analysis. It reports whether it read one.
+func (s *API) ReadNewLog() bool {
+	defer perftrace.Span("ReadNewLog")()
+	s.logRead.mu.Lock()
+	defer s.logRead.mu.Unlock()
+	defer s.free.soon()
+	r, err := s.logSession()
+	if err == nil {
+		err = s.refreshPageIndex(r)
+	}
+	if err != nil {
+		return false
+	}
+	st, err := r.Loadout()
+	if err != nil || st == nil {
+		return false
+	}
+	if _, newer := r.NewLog(st); !newer {
+		return false
+	}
+	_, _, err = readNeedsChecked(r, true)
+	return err == nil
+}
+
 // readNeeds is shared by slow page readers. The board and sidebar keep their cheap,
 // cache-only path and never inherit a page's eager log parsing options.
 func readNeeds(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState) {

@@ -27,7 +27,6 @@ export function initShell(u) {
   t.onclick = () => toggleNav();
   $("#env").onclick = () => ui.go("env");
   $("#nav-settings").onclick = () => ui.go("settings");
-  $("#live").onclick = () => ui.go("needs");
   $("#tasks-line").onclick = () => ui.go("tasks");
   $("#side").addEventListener("keydown", navKey);
   wireSideSplit();
@@ -264,7 +263,6 @@ function renderSide() {
   }
   $(".lbl", set).textContent = T("settings");
   set.title = T("settings");
-  renderLive();
 }
 
 // kidList: an entry's sub-entries on a thin guide line, with their own highlight (hl, kept
@@ -295,32 +293,6 @@ function kidList(it, kids, cur, hl) {
   clip.append(box);
   wrap.append(clip);
   return wrap;
-}
-
-// renderLive: one line at the sidebar's foot, only while there is something to say (06
-// §2.1): the game running ("游戏运行中 · 14:05 起 · 3 个错误") or, after it, a new Player.log
-// to analyse (08 §2). The click opens 能不能跑. Otherwise nothing: the environment is the
-// top bar's chip, and "the game is not running" is not news.
-export function renderLive() {
-  const box = $("#live");
-  const l = S.live;
-  const running = !!(l && l.running), hint = !!(l && !running && l.newLog);
-  box.hidden = !running && !hint;
-  box.classList.toggle("running", running);
-  box.classList.toggle("newlog", hint);
-  let text = "", errs = "";
-  if (running) {
-    text = l.pack ? Tf("pack %s running since %s", l.pack, l.since) : Tf("game running since %s", l.since);
-    if (l.errors) errs = String(l.errors); // this run's errors: the amber count on the right edge
-  } else if (hint) text = l.newLog;
-  if (box.dataset.sig !== text + "|" + errs) {
-    box.dataset.sig = text + "|" + errs;
-    box.innerHTML = "";
-    box.append(el("span", "t word-facts", text));
-    if (errs) box.append(el("span", "badge-n num", errs));
-  }
-  const full = text + (errs ? "  " + Tf("%d errors", +errs) : "");
-  box.title = full + T("; ") + (l && l.guess ? T("which list runs is taken from the launch records") : T("can it run"));
 }
 
 // crumbs: the breadcrumb of what is shown; every level opens its page (06 §2.2).
