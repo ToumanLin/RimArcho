@@ -4,6 +4,12 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Launch page: when the current list has edits not yet written to the game, the corner
+  of the Launch block has a small "Save N changes" button (`w`). It saves without
+  launching, like `w` in the editor. Before, the block only said "N unsaved", and
+  saving meant opening the editor or launching. The button is not shown while the game
+  runs, during a switch, or when a pack or another list is applied.
+
 - Can it run is laid out in two columns. The left column has what breaks the game,
   then Worth knowing, then what is for you to confirm. The right column has the errors
   from the last run (or this run). Drag the gap between them to resize; double-click

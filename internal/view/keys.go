@@ -153,7 +153,8 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	if page == "home" && !tui {
 		// The launch page has three numbered columns (06 §2.3).
-		out = append(out, r("1–3", "focus the page's areas (the numbers in their headings)"))
+		out = append(out, r("1–3", "focus the page's areas (the numbers in their headings)"),
+			r("w", "save the current list's edits to the game without launching (while there are any)"))
 	} else if page != EditorPage {
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}
