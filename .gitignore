@@ -25,3 +25,9 @@
 /monitor/bin/
 /monitor/test/obj/
 /monitor/test/bin/
+
+# Archo Drive, the VM round driver (scripts/vm/README.md)
+/scripts/vm/drive/bin/
+/scripts/vm/drive/obj/
+/scripts/vm/drive/test/bin/
+/scripts/vm/drive/test/obj/
