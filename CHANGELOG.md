@@ -1075,6 +1075,16 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   loopback addresses (no real Steam API). `release.ps1` runs `go test -short -count=1`.
 - `scripts/vm`: build, push and drive the real window in a test VM over DevTools; `smoke.ps1`
   prints PASS / FAIL. `RIMARCHO_DEVTOOLS_PORT` exists only for this.
+- `scripts/vm/round.ps1` plays a whole game round in the VM with no screenshots: new colony,
+  play, save, load, main menu and quit. A test-only driver (`scripts/vm/drive`) runs inside
+  the game for that one launch. The script then checks Archo Monitor's phases and the save
+  name, and that the game ran the Monitor RimArcho bundles. It prints PASS / FAIL.
+  `cdp.mjs text` reads a page's text.
+- `vm.ps1 build` builds Archo Monitor from `monitor/` (as `release.ps1` does) instead of
+  copying an older one from `dist/`, and names the bundled version. `-Monitor <dir>` bundles
+  another one. `vm.ps1 quitgame` closes the game as its window's X does and checks the
+  Monitor's exit line. `status` says when the VM is off, and `cli` shows archo's progress
+  lines as plain text.
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).

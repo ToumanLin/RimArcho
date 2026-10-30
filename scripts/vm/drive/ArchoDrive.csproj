@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Archo Drive, the VM test driver that plays a scripted game round (scripts/vm/README.md).
+    Test only: not part of a release. round.ps1 builds it:
+
+    dotnet build scripts/vm/drive/ArchoDrive.csproj -c Release -p:GameVersion=1.6   (or 1.7)
+
+    Same references as Archo Monitor (monitor/ArchoMonitor.csproj): 1.6 on Mono (net472,
+    Harmony 2.x), 1.7 on .NET 10 (Harmony 3.x), game assemblies from Krafs.Rimworld.Ref.
+  -->
+  <PropertyGroup>
+    <TargetFramework Condition="'$(GameVersion)' == '1.7'">net10.0</TargetFramework>
+    <TargetFramework Condition="'$(GameVersion)' != '1.7'">net472</TargetFramework>
+    <AssemblyName>ArchoDrive</AssemblyName>
+    <RootNamespace>ArchoDrive</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <OutputPath>bin\$(GameVersion)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DebugType>none</DebugType>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);CS0618;NU1603;NU1701</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GameVersion)' == '1.7'">
+    <DefineConstants>$(DefineConstants);RW_WAYLITH;RW17</DefineConstants>
+    <KrafsVersion>1.7.4984-unstable</KrafsVersion>
+    <HarmonyVersion>3.0.0-rc.3</HarmonyVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(GameVersion)' == '1.6'">
+    <DefineConstants>$(DefineConstants);RW_UNITY;RW16</DefineConstants>
+    <KrafsVersion>1.6.4871</KrafsVersion>
+    <HarmonyVersion>2.3.6</HarmonyVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="$(HarmonyVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="$(KrafsVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

@@ -83,10 +83,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const c = await connect(addr);
   try {
     if (cmd === 'eval') console.log(JSON.stringify(await c.evaluate(arg), null, 1));
+    // What the player reads, without a screenshot: the visible text of one element.
+    else if (cmd === 'text') console.log(await c.evaluate(`(() => { const e = document.querySelector(${JSON.stringify(arg || 'body')}); return e ? e.innerText : '(no element ' + ${JSON.stringify(arg || 'body')} + ')'; })()`));
     else if (cmd === 'shot') await c.shot(arg);
     else if (cmd === 'click') await c.click(arg);
     else if (cmd === 'key') await c.key(arg);
     else if (cmd === 'mouse') await c.mouse(arg, x === undefined ? 400 : +x, y === undefined ? 300 : +y);
-    else throw Error('usage: cdp.mjs host:port eval|shot|key|click|mouse <arg> [x y]');
+    else throw Error('usage: cdp.mjs host:port eval|text|shot|key|click|mouse <arg> [x y]');
   } finally { c.close(); }
 }

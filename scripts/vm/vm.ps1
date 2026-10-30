@@ -3,7 +3,8 @@
 # See scripts/vm/README.md.
 #
 #   pwsh scripts/vm/vm.ps1 status            # VM running? Tools ready? guest IP
-#   pwsh scripts/vm/vm.ps1 build             # go build both exes into dist/vm/RimArcho
+#   pwsh scripts/vm/vm.ps1 build             # go build both exes into dist/vm/RimArcho, with Archo Monitor from monitor/
+#   pwsh scripts/vm/vm.ps1 build -Monitor <dir>  # ... bundling that Archo Monitor mod folder instead
 #   pwsh scripts/vm/vm.ps1 push              # copy them into the guest ($GuestDir)
 #   pwsh scripts/vm/vm.ps1 prep              # once per VM: no display-off or sleep while idle
 #   pwsh scripts/vm/vm.ps1 forward           # once per VM: expose the DevTools port to the host
@@ -11,6 +12,7 @@
 #   pwsh scripts/vm/vm.ps1 shot [file.png]   # screenshot of the guest screen
 #   pwsh scripts/vm/vm.ps1 exec script.ps1   # run a PowerShell script in the guest, print its output
 #   pwsh scripts/vm/vm.ps1 cli "scan"        # run archo.exe <args> in the guest, print its output
+#   pwsh scripts/vm/vm.ps1 quitgame [sec]    # close the game's window like the title bar's X, wait for it to exit
 #   pwsh scripts/vm/vm.ps1 go                # build + push + launch
 param(
     [Parameter(Position = 0, Mandatory = $true)][string]$Command,
@@ -22,7 +24,8 @@ param(
     [int]$DevToolsPort = 9222,   # inside the guest, on 127.0.0.1
     [int]$ForwardPort = 9223,    # what the host connects to
     [switch]$Interactive,       # exec: run a window runner in the signed-in desktop session
-    [switch]$StandardUser        # run guest programs as 新玩家 instead of the logged-in Player
+    [switch]$StandardUser,       # run guest programs as 新玩家 instead of the logged-in Player
+    [string]$Monitor = ''        # build: bundle this Archo Monitor mod folder instead of building monitor/
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -61,7 +64,13 @@ switch ($Command) {
         FromGuest $Rest[0] $Rest[1]
     }
     'status' {
-        & 'C:\Program Files\VMware\VMware Workstation\vmrun.exe' list
+        $list = @(& 'C:\Program Files\VMware\VMware Workstation\vmrun.exe' list)
+        $list | Write-Host
+        $vmxFull = [IO.Path]::GetFullPath($VMX)
+        if (-not ($list | Where-Object { $_.Trim() -eq $vmxFull })) {
+            Write-Host "the VM is off ($VMX)"
+            break
+        }
         Write-Host "tools: $(VM checkToolsState)"
         Write-Host "guest IP: $(GuestIP)"
     }
@@ -77,12 +86,41 @@ switch ($Command) {
             go build -ldflags $ld -o (Join-Path $out 'archo.exe') ./cmd/archo; if ($LASTEXITCODE) { throw 'build failed' }
             # Same as scripts/release.ps1: GUI=1 makes a bare RimArcho.exe open the window, not the TUI.
             go build -ldflags "$ld -H windowsgui -X github.com/ToumanLin/RimArcho/internal/buildinfo.GUI=1" -o (Join-Path $out 'RimArcho.exe') ./cmd/archo; if ($LASTEXITCODE) { throw 'build failed' }
-            # The bundled font and Archo Monitor come from the newest release build, if there is one.
-            $rel = Get-ChildItem (Join-Path $repo 'dist') -Directory -Filter 'archo-*-windows-amd64' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
-            if ($rel) { foreach ($d in 'fonts', 'monitor') { if (Test-Path (Join-Path $rel.FullName $d)) { Copy-Item -Recurse -Force (Join-Path $rel.FullName $d) $out } } }
+            # The font comes from the newest release build, here or in the main checkout (a
+            # worktree has no dist/ of its own).
+            $dists = @(Join-Path $repo 'dist')
+            $common = (git rev-parse --path-format=absolute --git-common-dir 2>$null)
+            if ($common) { $dists += Join-Path (Split-Path -Parent $common) 'dist' }
+            $rel = $dists | ForEach-Object { Get-ChildItem $_ -Directory -Filter 'archo-*-windows-amd64' -ErrorAction SilentlyContinue } | Where-Object { Test-Path (Join-Path $_.FullName 'fonts') } | Sort-Object LastWriteTime | Select-Object -Last 1
+            if (Test-Path (Join-Path $out 'fonts')) { Remove-Item -Recurse -Force (Join-Path $out 'fonts') }
+            if ($rel) { Copy-Item -Recurse -Force (Join-Path $rel.FullName 'fonts') $out } else { Write-Warning 'no release build with fonts/ (scripts/release.ps1): the window uses the system font' }
+            # Archo Monitor: built from monitor/ like scripts/release.ps1 does (again only when
+            # its source changed), or the mod folder -Monitor names.
+            $want = (Get-Content -Raw (Join-Path $repo 'monitor\VERSION')).Trim()
+            if ($Monitor) {
+                $mon = (Resolve-Path -LiteralPath $Monitor).Path
+            } else {
+                $mon = Join-Path $repo 'monitor\out\ArchoMonitor'
+                $built = Get-Item -LiteralPath (Join-Path $mon 'About\About.xml') -ErrorAction SilentlyContinue
+                $src = Get-ChildItem -Recurse -File (Join-Path $repo 'monitor') | Where-Object { $_.FullName -notmatch '\\monitor\\(out|bin|obj|test)\\' } | Sort-Object LastWriteTime | Select-Object -Last 1
+                if (-not $built -or $src.LastWriteTime -gt $built.LastWriteTime) {
+                    Write-Host 'building Archo Monitor (monitor/build.ps1)'
+                    & (Join-Path $repo 'monitor\build.ps1') -Out $mon | Out-Null
+                }
+            }
+            $about = Join-Path $mon 'About\About.xml'
+            if (-not (Test-Path -LiteralPath $about)) { throw "$mon is not an Archo Monitor mod folder (no About\About.xml)" }
+            $meta = ([xml](Get-Content -Raw -LiteralPath $about)).ModMetaData
+            $pkg = "$($meta.SelectSingleNode('packageId').InnerText)".Trim()
+            if ($pkg -ne 'toumanlin.archomonitor') { throw "$mon is not Archo Monitor (packageId $pkg)" }
+            $monVer = "$($meta.SelectSingleNode('modVersion').InnerText)".Trim()
+            if (Test-Path (Join-Path $out 'monitor')) { Remove-Item -Recurse -Force (Join-Path $out 'monitor') }
+            New-Item -ItemType Directory -Force (Join-Path $out 'monitor') | Out-Null
+            Copy-Item -Recurse -Force $mon (Join-Path $out 'monitor\ArchoMonitor')
+            if ($monVer -ne $want) { Write-Warning "the bundled Archo Monitor is $monVer, but monitor/VERSION is $want" }
             $zip = Join-Path $Transfer 'RimArcho.zip'
             Compress-Archive -Force -Path "$out\*" -DestinationPath $zip
-            Write-Host "built $commit -> $zip ($([math]::Round((Get-Item $zip).Length/1MB,1)) MB)"
+            Write-Host "built $commit with Archo Monitor $monVer -> $zip ($([math]::Round((Get-Item $zip).Length/1MB,1)) MB)"
         } finally { Pop-Location }
     }
     'push' {
@@ -165,8 +203,35 @@ Start-Process -FilePath '$GuestDir\RimArcho.exe' -WorkingDirectory '$GuestDir'
     'cli' {
         $s = Join-Path $Transfer 'cli.ps1'
         $cliArgs = ($Rest -join ' ')
-        "& '$GuestDir\archo.exe' $cliArgs 2>&1" | Set-Content -Encoding UTF8 $s
+        # archo writes progress to stderr; pass it through as text, not as red error records.
+        "& '$GuestDir\archo.exe' $cliArgs 2>&1 | ForEach-Object { `"`$_`" }" | Set-Content -Encoding UTF8 $s
         & $PSCommandPath exec $s -VMX $VMX -Wrapper $Wrapper -Transfer $Transfer -GuestDir $GuestDir -StandardUser:$StandardUser
+    }
+    'quitgame' {
+        # Close the game's window the way its title bar X does (WM_CLOSE in the signed-in
+        # session), so the game quits as for a player: Archo Monitor writes its exit line and
+        # Steam syncs the saves. No clicks, any resolution, any window on top. Waits up to
+        # [sec] (60) for the process to end; prints FAIL and leaves the game alone if it doesn't.
+        $wait = if ($Rest.Count) { [int]$Rest[0] } else { 60 }
+        $s = Join-Path $Transfer 'quitgame.ps1'
+        @"
+`$games = @(Get-Process RimWorldWin64, RimWorld -ErrorAction SilentlyContinue)
+if (-not `$games) { 'PASS quitgame: no game running'; return }
+`$data = Join-Path `$env:USERPROFILE 'AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios'
+`$cmd = (Get-CimInstance Win32_Process -Filter "ProcessId=`$(`$games[0].Id)").CommandLine
+if (`$cmd -match '-savedatafolder=(?:"([^"]+)"|(\S+))') { `$data = if (`$Matches[1]) { `$Matches[1] } else { `$Matches[2] } }
+`$t0 = Get-Date
+foreach (`$g in `$games) { if (-not `$g.CloseMainWindow()) { "NOTE quitgame: `$(`$g.Name) `$(`$g.Id) has no window in this session" } }
+while (((Get-Date) - `$t0).TotalSeconds -lt $wait -and @(Get-Process -Id `$games.Id -ErrorAction SilentlyContinue).Count) { Start-Sleep -Milliseconds 500 }
+`$left = @(Get-Process -Id `$games.Id -ErrorAction SilentlyContinue)
+if (`$left) { "FAIL quitgame: `$((`$left | ForEach-Object { `$_.Name + ' ' + `$_.Id }) -join ', ') still running after $wait s (a dialog asking something? vm.ps1 shot)"; return }
+"PASS quitgame: the game exited in `$([int]((Get-Date) - `$t0).TotalSeconds) s"
+`$log = Join-Path `$data 'ArchoMonitor.log'
+if (-not (Test-Path -LiteralPath `$log)) { "NOTE quitgame: no ArchoMonitor.log in `$data (no Archo Monitor in the list?)"; return }
+`$last = @(Get-Content -Encoding UTF8 -LiteralPath `$log | Where-Object { `$_.Trim() }) | Select-Object -Last 1
+if (`$last -match '"kind":"exit"') { 'PASS quitgame: Archo Monitor wrote its exit line' } else { "FAIL quitgame: ArchoMonitor.log does not end with an exit line (last: `$(if (`$last.Length -gt 120) { `$last.Substring(0, 120) } else { `$last }))" }
+"@ | Set-Content -Encoding UTF8 $s
+        & $PSCommandPath exec $s -Interactive -VMX $VMX -Wrapper $Wrapper -Transfer $Transfer -GuestDir $GuestDir
     }
     'go' {
         & $PSCommandPath build; & $PSCommandPath push; & $PSCommandPath launch

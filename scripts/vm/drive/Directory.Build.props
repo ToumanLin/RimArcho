@@ -1,0 +1,8 @@
+<Project>
+  <!-- Built once per game version; each keeps its own obj/ so the two never share restore state. -->
+  <PropertyGroup>
+    <GameVersion Condition="'$(GameVersion)' == ''">1.6</GameVersion>
+    <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)\obj\$(GameVersion)\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>
