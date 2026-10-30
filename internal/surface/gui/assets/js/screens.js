@@ -310,14 +310,24 @@ function moveIn(curIdx, n, k) {
   return null;
 }
 
-// ---- 能不能跑 (06 §2.4, §5): one column of sections, by consequence ----
-// 会让游戏出错, 上次运行的报错 (this run first while the game runs), 要你确认, 隐藏的 Mod.
-// Each item is a card: a bold line, a plain sentence, where the claim comes from (the
-// evidence chip), one primary action and the rest under ⋯. The arrows move a cursor
-// through the items; an action's key runs it (06 §3).
-const SECTIONS = ["breaks the game", "errors from the last run", "for you to confirm", "hidden mods"];
-const SECTION_CLS = ["break", "run", "confirm", "hidden"];
-const N = { data: null, items: [], cur: 0, open: new Set(), els: [] };
+// ---- 能不能跑 (06 §2.4, §5): two columns ----
+// Left (开始之前): 会让游戏出错, 可以留意, 要你确认, what checking the mods' files and the
+// shared logs found. Right (上次玩的时候): the run's errors, this run first while the game
+// runs. Each item is a card: a bold line, a plain sentence, what belongs to it (link rows,
+// its parts, Also, links to the other column), then all its actions as buttons with the
+// evidence on the right of that row; no ⋯ menu. An action that needs a confirmation asks in
+// the item; the items an action resolved stay in place as one line with 撤销.
+const SECTIONS = ["breaks the game", "worth knowing", "for you to confirm", "errors from the last run"];
+const SECTION_CLS = ["break", "worth", "confirm", "run"];
+const COL_SECS = [[0, 1, 2], [3]]; // view.Section*: the left column's, then the right's
+// cols: each column's rows (items and done lines); cur / at: each column's cursor (index,
+// and the id it is on, so a new read keeps it); col: the column the keys act on.
+// done: the done lines, oldest first; before: the rows as they were when an action started
+// here, and ready once that action has finished (a refresh in between leaves it alone);
+// result: what that action said and whether u undoes it; ask: the item asking for a
+// confirmation in place.
+const N = { data: null, cols: [[], []], cur: [0, 0], at: ["", ""], col: 0, open: new Set(), els: [[], []],
+  hintsShut: false, done: [], batch: 0, before: null, ready: false, result: null, ask: null, others: false, env: "" };
 
 // archo is the hook for the Archo panel (06 §2.13, 1.1): when set, an item can be handed
 // to it ("Archo 在看"). Nothing sets it yet.
@@ -332,11 +342,27 @@ export function liveCount() {
   return ((S.live && S.live.items) || []).filter((it) => it.counted).length;
 }
 
+// orderNeeds sorts the items into the two columns and puts the done lines back where their
+// items were. Items shown inside another (into) and those other pages handle are left out.
 function orderNeeds() {
-  const all = ((S.live && S.live.items) || []).concat(N.data.items || []);
+  const all = ((S.live && S.live.items) || []).concat(N.data.items || []).filter((it) => !it.into && it.section < 4);
   // stable: within a section the view's order (this run before the last run)
-  N.items = all.map((it, i) => [it, i]).sort((a, b) => (a[0].section - b[0].section) || (a[1] - b[1])).map((x) => x[0]);
-  N.cur = Math.min(N.cur, Math.max(N.items.length - 1, 0));
+  const sorted = all.map((it, i) => [it, i]).sort((a, b) => (a[0].section - b[0].section) || (a[1] - b[1])).map((x) => x[0]);
+  const cols = [sorted.filter((it) => it.section !== 3 && !(N.hintsShut && it.section === 1)), sorted.filter((it) => it.section === 3)];
+  for (const d of N.done) {
+    const c = cols[d.col];
+    let at = d.after ? c.findIndex((x) => x.id === d.after) + 1 : 0;
+    if (at <= 0) at = c.findIndex((x) => d.after ? x.section > d.section : x.section >= d.section);
+    if (at < 0) at = c.length;
+    c.splice(at, 0, d);
+  }
+  N.cols = cols;
+  for (const ci of [0, 1]) {
+    const i = cols[ci].findIndex((x) => x.id === N.at[ci]);
+    N.cur[ci] = i >= 0 ? i : Math.min(N.cur[ci], Math.max(cols[ci].length - 1, 0));
+    N.at[ci] = cols[ci][N.cur[ci]]?.id || "";
+  }
+  if (!cols[N.col].length && cols[1 - N.col].length) N.col = 1 - N.col;
 }
 
 export async function needs(keepCursor) {
@@ -344,93 +370,213 @@ export async function needs(keepCursor) {
   let data;
   try { data = await api.Needs(); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
+  // done lines belong to this visit and this game (06 §5)
+  const env = (S.board && S.board.env) || "";
+  if (!keepCursor || env !== N.env) { N.done = []; N.ask = null; N.before = null; N.ready = false; N.result = null; N.others = false; }
+  N.env = env;
   N.data = data;
   // back on a kept page: the cursor stays where it was
-  if (!keepCursor && $("#screen").dataset.warm !== "1") N.cur = 0;
+  if (!keepCursor && $("#screen").dataset.warm !== "1") { N.cur = [0, 0]; N.at = ["", ""]; N.col = 0; }
+  if (N.before && N.ready) settleDone(data);
   orderNeeds();
   drawNeeds();
   read.finish();
 }
 
+// snapshot: the rows as they are before an action that changes something.
+function snapshot() {
+  N.ready = false;
+  N.result = null;
+  N.before = N.cols.flatMap((c, ci) => c.map((x, i) => ({ id: x.id, done: !!x.done, group: x.group, section: x.section,
+    kind: x.kind || "", dim: !!x.dim, col: ci, after: i ? c[i - 1].id : "", title: x.done ? x.title : (x.title || x.text) })));
+}
+
+// statusNow: what the status line says, and whether it offers 撤销.
+function statusNow() {
+  const st = $("#status");
+  return { text: st ? [...st.childNodes].filter((n) => n.nodeName !== "A").map((n) => n.textContent).join("").trim() : "",
+    undo: !!(st && st.querySelector("a")) };
+}
+
+// actionDone: the action started after snapshot() has finished; result is what it said
+// (else the status line now, before a background task's message replaces it).
+function actionDone(result) {
+  if (!N.before) return;
+  N.result = result || statusNow();
+  N.ready = true;
+}
+
+// settleDone: the items the action resolved stay as done lines: gone from this read, with
+// no new item of the same kind in their place ("7 mods are out of order" becoming "6" is
+// the same item, changed). The line says what the action said.
+function settleDone(data) {
+  const before = N.before;
+  const { text, undo } = N.result || statusNow();
+  N.before = null;
+  N.ready = false;
+  N.result = null;
+  const had = new Set(before.map((r) => r.id));
+  const now = new Set((data.items || []).map((it) => it.id));
+  const fresh = new Set((data.items || []).filter((it) => !had.has(it.id) && it.kind).map((it) => it.kind));
+  const batch = ++N.batch;
+  for (const r of before) {
+    if (r.done || now.has(r.id) || r.group === 6 || (r.dim && r.section === 3) || (r.kind && fresh.has(r.kind))) continue;
+    N.done.push({ done: true, id: r.id, section: r.section, col: r.col, after: r.after, title: r.title, text: text || T("done"), batch, undo });
+  }
+}
+
+// undoBatch: the done lines that 撤销 brings back (the last action that u can undo).
+function undoBatch() {
+  for (let i = N.done.length - 1; i >= 0; i--) if (N.done[i].undo) return N.done[i].batch;
+  return 0;
+}
+
+async function undoDone() {
+  const batch = undoBatch();
+  if (!batch) return false;
+  await ui.edited(() => api.Undo(), false);
+  N.done = N.done.filter((d) => d.batch !== batch);
+  if (S.screen === "needs") needs(true);
+  return true;
+}
+
 // lead: what the page says about the plan in one sentence.
 function needsLead(d) {
   const plan = (S.shell && S.shell.plan && S.shell.plan.name) || T("the list");
-  const breaks = N.items.filter((x) => x.counted && x.section === 0).length;
-  const count = N.items.filter((x) => x.counted).length;
-  if (breaks) return Tf("%s is not safe to play yet: fix the %d problems below.", plan, breaks);
-  if (count) return Tf("%s can run; %d things below are worth a look.", plan, count);
+  const left = N.cols[0].filter((x) => !x.done && x.counted).length;
+  const runs = N.cols[1].filter((x) => !x.done && x.counted).length;
+  if (left) return Tf("%s is not safe to play yet: %d to handle before you start, %d error groups in the last run", plan, left, runs);
+  if (runs) return Tf("%s: %d error groups in the last run", plan, runs);
   if (d.never) return Tf("%s: the mods' files are not checked yet.", plan);
-  if (N.items.some((x) => x.status === -1)) return Tf("%s can run; suggestions below may help if you see errors.", plan);
+  if (N.cols[0].some((x) => x.status === -1)) return Tf("%s can run; suggestions below may help if you see errors.", plan);
   return Tf("%s can run: nothing to handle.", plan);
 }
 
 function drawNeeds() {
   const sc = S.screen === "needs" ? $("#screen") : openScreen("needs");
-  const top = sc.scrollTop;
+  const keep = [...sc.querySelectorAll(".needcol > .scroll")].map((s) => s.scrollTop);
+  const focused = document.activeElement && sc.contains(document.activeElement) ? document.activeElement.closest(".need")?.dataset.id : "";
   sc.innerHTML = "";
   const d = N.data;
   let state = "";
   if (S.busy.analyze) state = T("checking the mods' files…");
   else if (d.never) state = T("the mods' files are not checked yet");
   else if (d.stale) state = T("the files changed since the last check");
-  const w = page("needs", needsLead(d),
+  const w = page("needs fill", needsLead(d),
     state ? el("span", "state-note", state) : null,
     autoFix(),
     act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A", "analyze"),
     act(T("game log"), "log", () => ui.go("log"), "l"));
-  N.els = [];
-  if (!N.items.length) {
-    w.append(el("section", "card empty-state", "✓ " + T("nothing here")));
-  }
-  let i = 0;
-  SECTIONS.forEach((title, si) => {
-    const its = N.items.filter((x) => x.section === si);
-    if (!its.length) return;
-    const hintsOnly = its.every((x) => x.status === -1);
-    const sec = el("section", "sec need-sec " + (hintsOnly ? "hint" : SECTION_CLS[si]));
-    const n = its.filter((x) => x.counted).length;
-    const h = el("h2", "label", T(hintsOnly ? "suggestions" : title));
-    const first = i;
-    area(sec, h, () => { N.cur = first; markNeeds(); });
-    if (n) {
-      const c = el("span", "n num", String(n));
-      h.classList.add("word-facts");
-      h.append(c);
-      bump("needs:" + si, c, n);
+  N.els = [[], []];
+  const live = N.cols[1].some((x) => x.group === 6);
+  const column = (ci, title, sub) => {
+    const c = el("section", "needcol" + (N.col === ci ? " focus" : ""));
+    const cap = el("div", "needcap");
+    cap.append(el("b", "", T(title)), el("span", "", T(sub)));
+    const box = el("div", "scroll");
+    c.append(cap, box);
+    return [c, box];
+  };
+  const [left, lbox] = column(0, "before you start", "found by checking the mods' files and shared logs");
+  const [right, rbox] = column(1, live ? "this run and the last" : "when you last played", "seen in the game's log");
+  const split = el("div", "split needsplit");
+  const grid = el("div", "cols needcols");
+  grid.append(left, split, right);
+  needSplit(grid, left, split);
+  for (const [ci, box] of [[0, lbox], [1, rbox]]) {
+    for (const si of COL_SECS[ci]) {
+      const rows = N.cols[ci].filter((x) => x.section === si);
+      const shut = si === 1 && N.hintsShut && (d.items || []).some((x) => x.section === 1 && !x.into);
+      if (!rows.length && !shut) continue;
+      box.append(needSection(si, rows, ci, shut, live));
     }
-    // which run the log is from: the list, or a pack (08 §5.3)
-    if (si === 1 && S.live && S.live.running) h.append(el("span", "muted", (S.live.pack ? Tf("pack %s", S.live.pack) : T("this run"))));
-    else if (si === 1 && d.lastRun) h.append(el("span", "muted word-facts", d.lastRun));
-    sec.append(h);
-    const card = el("div", "card need-list");
-    let phase = "", group = -1;
-    for (const it of its) {
+  }
+  if (!N.cols[0].length) lbox.append(el("section", "card empty-state", "✓ " + T("nothing here")));
+  if (!N.cols[1].length) rbox.append(el("div", "need-empty", T("no errors in the last run")));
+  // what other pages handle: one line each (06 §2.4)
+  for (const e of d.elsewhere || []) {
+    const b = el("button", "need-away", "→ " + e.text);
+    b.onclick = () => e.page === "library" ? document.dispatchEvent(new CustomEvent("library-search", { detail: e.query || "" })) : ui.go(e.page);
+    lbox.append(b);
+  }
+  w.append(grid);
+  sc.append(w);
+  sc.querySelectorAll(".needcol > .scroll").forEach((s, i) => { s.scrollTop = keep[i] || 0; });
+  // 1–9: the sections in the order shown, the left column's first (06 §3.5)
+  resetAreas();
+  sc.querySelectorAll(".need-sec").forEach((sec) => area(sec, sec.querySelector("h2"), () => {
+    const ci = +sec.dataset.col, i = N.cols[ci].findIndex((x) => x.section === +sec.dataset.section);
+    if (i >= 0) { N.col = ci; setCur(ci, i); }
+  }));
+  markNeeds(false);
+  if (focused) sc.querySelector(`.need[data-id="${CSS.escape(focused)}"] button`)?.focus({ preventScroll: true });
+  ui.renderHints();
+}
+
+// needSection: a section's heading and its card. The run's errors say which run; while the
+// game runs this run's come first, then a quiet line and the last run's.
+function needSection(si, rows, ci, shut, live) {
+  const sec = el("section", "sec need-sec " + SECTION_CLS[si]);
+  sec.dataset.col = String(ci);
+  sec.dataset.section = String(si);
+  const title = si === 3 && live ? "errors this run" : SECTIONS[si];
+  const h = el("h2", "label", T(title));
+  const n = rows.filter((x) => !x.done && x.counted).length;
+  if (si === 1) {
+    // 可以留意 folds and opens by its heading (06 §2.4)
+    const all = (N.data.items || []).filter((x) => x.section === 1 && !x.into).length;
+    h.prepend(el("span", "fold-chev" + (shut ? "" : " open"), "›"));
+    h.append(el("span", "n num muted", String(all)));
+    h.onclick = () => { N.hintsShut = !N.hintsShut; orderNeeds(); drawNeeds(); };
+    h.title = T(shut ? "show" : "hide");
+  } else if (n) {
+    const c = el("span", "n num", String(n));
+    h.classList.add("word-facts");
+    h.append(c);
+    bump("needs:" + si, c, n);
+  }
+  if (si === 3) {
+    if (live) {
+      const run = el("span", "muted need-live");
+      run.append(el("span", "dot"), document.createTextNode(S.live.pack ? Tf("pack %s", S.live.pack) : T("game running")));
+      h.append(run);
+    } else if (N.data.lastRun) h.append(el("span", "muted word-facts", N.data.lastRun));
+  }
+  sec.append(h);
+  if (shut) return sec;
+  const card = el("div", "card need-list");
+  let phase = "", group = -1;
+  for (const it of rows) {
+    const i = N.cols[ci].indexOf(it);
+    if (!it.done) {
       // while the game runs, the last run's items follow this run's: say which run they are
       // from, or the same phase headings repeat over the same errors (view.GroupThisRun 6,
       // GroupLastRun 3)
-      if (it.group === 3 && group === 6) card.append(el("div", "need-phase need-run word-facts", T("last run") + (d.lastRun ? "  " + d.lastRun : "")));
+      if (it.group === 3 && group === 6) card.append(el("div", "need-phase need-run word-facts", T("last run") + (N.data.lastRun ? "  " + N.data.lastRun : "")));
       if (it.phaseHeading && (it.phaseHeading !== phase || it.group !== group)) card.append(el("div", "need-phase", it.phaseHeading));
       phase = it.phaseHeading || ""; group = it.group;
-      const row = needCard(it, i);
-      N.els[i] = row;
-      card.append(row);
-      i++;
     }
-    sec.append(card);
-    w.append(sec);
-  });
-  sc.append(w);
-  sc.scrollTop = top;
-  markNeeds();
+    const row = needCard(it, ci, i);
+    N.els[ci][i] = row;
+    card.append(row);
+  }
+  sec.append(card);
+  return sec;
 }
 
 // autoFix: one click for what needs no question: the required mods that are installed
-// but not enabled are enabled and the list sorted again (one undo step).
+// but not enabled are enabled and the list sorted again (one undo step). The button counts
+// the items it resolves (06 §5).
 function autoFix() {
-  const n = N.items.filter((it) => it.counted && it.target && (it.actions || []).some((a) => a.kind === "enable")).length;
-  if (!n) return null;
+  const items = (N.data.items || []).filter((it) => it.counted && !it.into);
+  const enable = items.filter((it) => it.target && (it.actions || []).some((a) => a.kind === "enable")).length;
+  if (!enable) return null;
+  const n = enable + items.filter((it) => (it.actions || []).some((a) => a.kind === "sort")).length;
   const b = act(Tf("fix %d automatically", n), "ok", async () => {
-    await ui.edited(() => api.CompleteDependencies(), true);
+    snapshot();
+    const r = await ui.edited(() => api.CompleteDependencies(), true);
+    if (r == null) N.before = null;
+    else actionDone({ text: typeof r === "string" ? r : r.text || "", undo: true });
     if (S.screen === "needs") needs(true);
   }, "F", "enable");
   b.classList.add("primary");
@@ -438,14 +584,19 @@ function autoFix() {
   return b;
 }
 
-function needCard(it, i) {
-  const row = el("div", "need" + (it.dim ? " dimmed" : ""));
+// needCard: one item, or a done line. The buttons are all its actions: the first is the
+// main one; the answers of an identity question and the options of a choice are equal.
+function needCard(it, ci, i) {
+  if (it.done) return doneLine(it, ci, i);
+  const quiet = it.dim && it.section !== 1;
+  const row = el("div", "need" + (quiet ? " dimmed" : ""));
+  row.dataset.id = it.id || "";
   const top = el("div", "top");
   const body = el("div", "body");
   const ic = el("span", "need-ic");
   ic.innerHTML = statusIcon(it.status);
   top.append(ic);
-  if (it.dim) {
+  if (quiet) {
     body.append(needText("div", "why word-facts", it.text, it.content?.text));
     if (it.why) body.append(needText("div", "why sub", it.why, it.content?.why));
   } else {
@@ -453,52 +604,159 @@ function needCard(it, i) {
     if (it.why && !it.linkGroups?.length) body.append(needText("div", "why", it.why, it.content?.why));
   }
   top.append(body);
+  row.append(top);
   const acts = it.actions || [];
-  const right = el("div", "acts");
-  if (archo.ask && it.section === 1) {
+  const pick = (a) => () => { setCur(ci, i); runAction(it, a, true); };
+  // what belongs to it: the parts behind a fold, link rows, merged lines, the other column
+  const x = el("div", "need-x");
+  const fold = acts.find((a) => a.kind === "fold");
+  if (fold && it.parts?.length) {
+    const on = N.open.has(it.text);
+    const b = el("button", "need-disc" + (on ? " open" : ""), Tf("show %d", it.parts.length));
+    b.onclick = (e) => { e.stopPropagation(); setCur(ci, i); runAction(it, fold, true); };
+    x.append(b);
+    if (on) x.append(needParts(it));
+  }
+  if (it.linkGroups?.length) x.append(linkBlock(it));
+  for (const a of it.also || []) x.append(el("div", "need-also", a));
+  for (const r of it.related || []) {
+    const b = el("button", "need-rel", (ci ? "← " : "→ ") + r.text);
+    b.onclick = (e) => { e.stopPropagation(); jumpTo(r.id); };
+    x.append(b);
+  }
+  const foot = el("div", "need-foot");
+  const btns = el("div", "acts");
+  if (archo.ask && it.section === 3) {
     const b = button(T("ask Archo"), "", () => archo.ask(it), "small");
     b.prepend(archoMark());
-    right.append(b);
+    btns.append(b);
   }
-  if (acts.some((a) => a.kind === "answer")) {
-    right.classList.add("identity-answers");
-    for (const a of acts) {
-      const answer = a.kind === "answer";
-      const b = button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, answer ? "" : "identity-why", actionWrite(a));
+  let main = true;
+  for (const a of acts) {
+    if (a.kind === "fold") continue;
+    if (a.kind === "view" && a.argv?.[0] === "identity" && a.argv?.[1] === "why") {
+      // 为什么这样问: a quiet link under the sentence, apart from the three answers
+      const b = button(a.label, "", pick(a), "identity-why", actionWrite(a));
       if (a.title) b.title = a.title;
-      (answer ? right : body).append(b);
+      body.append(b);
+      continue;
     }
-  } else if (acts.length) {
-    const a = acts[0];
-    right.append(button(a.label, "", () => { N.cur = i; markNeeds(); runAction(it, a); }, it.dim ? "" : "primary", actionWrite(a)));
-    if (acts.length > 1) {
-      const more = button("⋯", "", () => {
-        N.cur = i; markNeeds();
-        const r = more.getBoundingClientRect();
-        pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, key: x.key, envWrite: actionWrite(x), run: () => runAction(it, x) })));
-      }, "more");
-      more.title = acts.slice(1).map((x) => x.label).join(T("; "));
-      right.append(more);
+    if (a.kind === "choose-disable") {
+      // a choice: each option is a button, none the main one (06 §5)
+      a.options.forEach((o, oi) => {
+        const b = button(o.label, oi ? "" : a.key, () => { setCur(ci, i); if (N.ask) { N.ask = null; } snapshot(); doAction(a, oi); }, "option", actionWrite(a));
+        btns.append(b);
+      });
+      main = false;
+      continue;
     }
+    const answer = a.kind === "answer";
+    const b = button(a.label, a.key, pick(a), answer ? "" : main ? "primary" : "", actionWrite(a));
+    if (a.title) b.title = a.title;
+    if (!answer) main = false;
+    btns.append(b);
   }
-  top.append(right);
-  row.append(top);
-  if (it.linkGroups?.length) row.append(linkRows(it.linkGroups));
-  if (it.fold && N.open.has(it.text)) {
-    row.append(needParts(it));
+  if (acts.some((a) => a.kind === "answer")) btns.classList.add("identity-answers");
+  if (x.children.length) row.append(x);
+  if (N.ask && N.ask.id === it.id) row.append(confirmRow(it, N.ask.act));
+  else {
+    foot.append(btns);
+    if (it.evidence) foot.append(needEvidence(it.evidence));
+    if (btns.children.length || it.evidence) row.append(foot);
   }
-  if (it.evidence) {
-    row.append(needEvidence(it.evidence));
-  }
-  row.onclick = () => { N.cur = i; markNeeds(); };
+  row.onclick = () => setCur(ci, i);
   return row;
 }
 
 // markNeeds moves the cursor's mark without building the page again (the keys stay quick).
-function markNeeds() {
-  N.els.forEach((r, i) => r && r.classList.toggle("cur", i === N.cur));
-  const on = N.els[N.cur];
-  if (on) on.scrollIntoView({ block: "nearest" });
+function markNeeds(scroll = true) {
+  N.els.forEach((col, ci) => col.forEach((r, i) => r && r.classList.toggle("cur", ci === N.col && i === N.cur[ci])));
+  document.querySelectorAll("#screen .needcol").forEach((c, ci) => c.classList.toggle("focus", ci === N.col));
+  const on = N.els[N.col]?.[N.cur[N.col]];
+  if (on && scroll) on.scrollIntoView({ block: "nearest" });
+}
+
+function setCur(ci, i) {
+  N.col = ci;
+  N.cur[ci] = i;
+  N.at[ci] = N.cols[ci][i]?.id || "";
+  markNeeds();
+}
+
+// jumpTo: the item an other column's link names; it lights up for a moment (06 §5).
+function jumpTo(id) {
+  for (const ci of [0, 1]) {
+    const i = N.cols[ci].findIndex((x) => x.id === id);
+    if (i < 0) continue;
+    setCur(ci, i);
+    const r = N.els[ci][i];
+    if (r) { r.classList.remove("flash"); void r.offsetWidth; r.classList.add("flash"); }
+    return;
+  }
+}
+
+// doneLine: an item the last actions resolved (06 §5): ✓, what the status line said, its
+// title; the latest that u can undo has 撤销.
+function doneLine(d, ci, i) {
+  const row = el("div", "need done");
+  row.dataset.id = d.id;
+  const ic = el("span", "need-ic");
+  ic.innerHTML = icon.ok || "";
+  const body = el("div", "body");
+  body.append(el("span", "done-what", d.text), el("span", "done-title", d.title));
+  row.append(ic, body);
+  if (d.undo && d.batch === undoBatch()) row.append(button(T("undo"), "u", () => undoDone(), "small", "undo"));
+  row.onclick = () => setCur(ci, i);
+  return row;
+}
+
+// confirmRow: the question an action asks before it runs, in place of the buttons (06 §5).
+function confirmRow(it, a) {
+  const box = el("div", "need-confirm");
+  box.append(el("span", "t", a.kind === "repair-links" ? T("apply the repair shown above?") : (a.warn || a.label)));
+  const yes = button(a.label, "enter", () => confirmYes(), "primary", actionWrite(a));
+  const no = button(T("cancel"), "esc", () => { N.ask = null; drawNeeds(); });
+  box.append(yes, no);
+  return box;
+}
+
+function confirmYes() {
+  const a = N.ask && N.ask.act;
+  N.ask = null;
+  if (!a) return;
+  snapshot();
+  doAction(a, 0);
+}
+
+// linkBlock: the current game's broken links; the other games' fold into one line (the
+// repair still covers them all, 06 §2.4).
+function linkBlock(it) {
+  const gs = it.linkGroups, cur = gs.filter((g) => g.current);
+  if (!cur.length || cur.length === gs.length) return linkRows(gs);
+  const others = gs.filter((g) => !g.current);
+  const box = el("div", "need-links");
+  box.append(linkRows(cur));
+  const n = others.reduce((s, g) => s + (g.rows || []).length, 0);
+  const b = el("button", "need-disc" + (N.others ? " open" : ""), Tf("also %s: %d links to handle", others.map((g) => g.game).join(T("; ")), n));
+  b.onclick = (e) => { e.stopPropagation(); N.others = !N.others; drawNeeds(); };
+  box.append(b);
+  if (N.others) box.append(linkRows(others));
+  return box;
+}
+
+// needSplit: the gap between the columns drags the left one's width, kept in
+// ui.gui.needs.left; double-click goes back to the default (06 §3.1 rule 10).
+const NEEDS_LEFT = "ui.gui.needs.left";
+let needsLeft = 0;
+function needSplit(grid, left, split) {
+  const apply = () => needsLeft ? grid.style.setProperty("--needs-left", needsLeft + "px") : grid.style.removeProperty("--needs-left");
+  apply();
+  const set = (v) => { needsLeft = v; apply(); };
+  wireSeparator(split, {
+    axis: "x", key: NEEDS_LEFT, get: () => left.getBoundingClientRect().width, range: () => [320, grid.clientWidth - 300],
+    set, reset: () => set(0), restore: (v) => set(+v || 0), serialize: () => String(needsLeft),
+    enabled: () => !matchMedia("(max-width: 900px)").matches,
+  });
 }
 
 // Read-only needs actions stay available during a game switch (06 §3.1).
@@ -510,10 +768,17 @@ setVersionRunner((it, a) => runAction(it, a));
 export const runNeedAction = (it, a) => runAction(it, a);
 export const needActionWrite = actionWrite;
 
-async function runAction(it, act) {
+// runAction runs an item's action. here: from 能不能跑 itself, where a confirmation is
+// asked in the item, a choice is its buttons, and what the action resolves stays as done
+// lines (06 §5); the editor's panel and popover ask in a dialog.
+async function runAction(it, act, here = false) {
   switch (act.kind) {
     case "sort": case "save":
-      return ui.run(act.kind);
+      if (here) snapshot();
+      await ui.run(act.kind);
+      if (here) actionDone();
+      if (here && S.screen === "needs") needs(true);
+      return;
     case "open-url":
       try { await api.OpenURL(act.url); say("ok", act.done); } catch (e) { say("fail", errText(e)); }
       return;
@@ -530,7 +795,7 @@ async function runAction(it, act) {
       return gameLog(act.logPath || "", true);
     case "view":
       if (act.argv?.[0] === "identity" && act.argv?.[1] === "why") {
-        return pop.identity(act.question, (answer) => runAction(it, answer));
+        return pop.identity(act.question, (answer) => runAction(it, answer, here));
       }
       try { pop.text(act.label, await api.Inspect(act.argv)); } catch (e) { say("fail", errText(e)); }
       return;
@@ -544,6 +809,8 @@ async function runAction(it, act) {
       N.open.has(it.text) ? N.open.delete(it.text) : N.open.add(it.text);
       return drawNeeds();
     case "choose-disable":
+      // here the options are the item's buttons: the key puts the focus on the first
+      if (here) return focusButtons(it, ".btn.option");
       return pop.choose(act.title, act.options.map((o) => o.label), (i) => doAction(act, i));
     case "subscribe":
       // a background task (06 §2.16): the mods take their place in the list once downloaded
@@ -552,44 +819,79 @@ async function runAction(it, act) {
       });
   }
   if (act.confirm) {
-    // Not undone with u: ask first (06 §6).
+    // Not undone with u: ask first (06 §6); on this page in the item itself
+    if (here && S.screen === "needs") {
+      N.ask = { id: it.id, act };
+      drawNeeds();
+      return focusButtons(it, ".need-confirm .btn.primary");
+    }
     if (act.kind === "repair-links" && act.linkGroups?.length) {
       return pop.panel(act.label, linkRows(act.linkGroups), act.label, () => doAction(act, 0), "link-repair", act.kind);
     }
     return pop.confirm(act.label, [act.warn || act.label], act.label, () => doAction(act, 0));
   }
+  if (here) snapshot();
   return doAction(act, 0);
 }
 
+function focusButtons(it, sel) {
+  const row = $(`#screen .need[data-id="${CSS.escape(it.id || "")}"]`);
+  row?.querySelector(sel)?.focus();
+}
+
 async function doAction(act, option) {
-  try { say("ok", await api.DoAction(act, option), act.undo || act.kind === "enable" || act.kind === "disable" || act.kind === "choose-disable"); } catch (e) { say("fail", errText(e)); }
+  let result = null;
+  try {
+    const text = await api.DoAction(act, option);
+    const undo = !!(act.undo || act.kind === "enable" || act.kind === "disable" || act.kind === "choose-disable");
+    say("ok", text, undo);
+    result = { text, undo };
+  } catch (e) { say("fail", errText(e)); N.before = null; }
   await ui.reload();
+  actionDone(result);
   if (act.kind === "version-mute" || act.kind === "version-unmute") document.dispatchEvent(new CustomEvent("version-mutes-changed"));
   if (S.screen === "needs") needs(true);
 }
 
-// needsKey: ↑↓ (j k, PageUp/PageDown, Home/End) move through the items, ← → jump to the
-// previous / next section; an item's action keys run its actions.
+// needsKey: ↑↓ (j k, PageUp/PageDown, Home/End) move in the column, ← → change the column;
+// an item's action keys run its actions. With the focus on an item's buttons ← → move
+// between them and esc gives the keys back to the list; a question asked in place takes
+// enter and esc.
 export function needsKey(e) {
   // shift+letter is the capital letter even where the key reports it in lower case
   const k = e.shiftKey && /^[a-z]$/.test(e.key) ? e.key.toUpperCase() : e.key;
-  const n = N.items.length;
-  if ((k === "ArrowLeft" || k === "ArrowRight") && n) {
+  if (N.ask) {
+    if (k === "Escape") { e.preventDefault(); N.ask = null; return drawNeeds(); }
+    if (k === "Enter" && !e.target.closest?.("button")) { e.preventDefault(); return confirmYes(); }
+  }
+  const onBtn = e.target.closest?.("#screen .need button");
+  if (onBtn) {
+    if (k === "ArrowLeft" || k === "ArrowRight") {
+      e.preventDefault();
+      const bs = [...onBtn.closest(".need").querySelectorAll("button")];
+      bs[(bs.indexOf(onBtn) + (k === "ArrowRight" ? 1 : bs.length - 1)) % bs.length].focus();
+      return;
+    }
+    if (k === "Escape") { e.preventDefault(); onBtn.blur(); return; }
+    if (k === "Enter" || k === " ") return; // the button itself
+  }
+  if (k === "ArrowLeft" || k === "ArrowRight") {
     e.preventDefault();
-    const sec = N.items[N.cur].section;
-    const idx = k === "ArrowRight" ? N.items.findIndex((x) => x.section > sec) : N.items.findIndex((x) => x.section === Math.max(...N.items.filter((y) => y.section < sec).map((y) => y.section)));
-    if (idx >= 0) { N.cur = idx; markNeeds(); }
+    const ci = k === "ArrowLeft" ? 0 : 1;
+    if (N.cols[ci].length) { N.col = ci; markNeeds(); }
     return;
   }
-  const m = n ? moveIn(N.cur, n, k) : null;
-  if (m != null) { e.preventDefault(); N.cur = m; return markNeeds(); }
+  const rows = N.cols[N.col];
+  const m = rows.length ? moveIn(N.cur[N.col], rows.length, k) : null;
+  if (m != null) { e.preventDefault(); return setCur(N.col, m); }
   if (k === "A") return ui.cmd("analyze");
   if (k === "F") { const b = $("#screen .page-acts .primary"); if (b) { e.preventDefault(); b.click(); } return; }
   if (k === "l") return ui.go("log");
-  const it = N.items[N.cur];
+  const it = rows[N.cur[N.col]];
   const name = k === " " ? "space" : k === "Enter" ? "enter" : k;
-  const act = it && (it.actions || []).find((a) => a.key === name);
-  if (act) { e.preventDefault(); runAction(it, act); }
+  const act = it && !it.done && (it.actions || []).find((a) => a.key === name);
+  if (act) { e.preventDefault(); return runAction(it, act, true); }
+  if (k === "u" && undoBatch()) { e.preventDefault(); undoDone(); }
 }
 
 export function analyzeEvent(ev) {

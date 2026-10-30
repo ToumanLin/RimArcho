@@ -2,7 +2,8 @@
 // width (its mods and last play below), the last game and the changes since it was last
 // played in the top right, and under a rule three steps read left to right — 01 the game,
 // 02 that game's lists and packs, 03 ▶ 启动游戏 with the applied list's problem under it
-// in one line. Picking a game or a row applies it at once
+// in one line; edits not yet written to the game get 保存 in the block's corner (w).
+// Picking a game or a row applies it at once
 // (its environment and plan become current; a pack becomes the featured item); it writes
 // no game file. Picking the applied row again opens it. The problem can be hidden; it
 // comes back when the row, its game, its mods or its problem change.
@@ -108,6 +109,12 @@ function focusStep(n) {
 export function homeKey(e) {
   const k = e.key, f = pendingRow || applied();
   if (/^[1-3]$/.test(k) && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); focusStep(k); return; }
+  // 保存 is its own button: enter on it saves, as a click does
+  if ((k === "Enter" || k === " ") && document.activeElement?.matches(".hm-save")) return;
+  if (k === "w" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    if (canSave(f)) { e.preventDefault(); save(); }
+    return;
+  }
   if (k === "Enter" && document.activeElement?.matches(".hm-go, .hm-s3")) { e.preventDefault(); document.querySelector(".hm-go")?.click(); return; }
   if (!f) return;
   const vertical = k === "ArrowDown" || k === "ArrowUp";
@@ -130,9 +137,23 @@ export function homeKey(e) {
   launch(f);
 }
 
+// (w, 保存, is on its button while there is something to save: the line holds seven)
 export function hintList() {
   return [{ key: "1–3", label: T("column") }, { key: "↑↓", label: T("list") }, { key: "←→", label: T("game") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
     { key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
+}
+
+// canSave: the applied row is the current list with edits not written to the game yet,
+// and nothing is in the way (a running game, a switch, a launch on its way).
+function canSave(f) {
+  return !!(f && f.kind === "plan" && f.current && f.unsaved > 0 && !running() && !S.busy.env && !(launching > Date.now()));
+}
+
+// save writes the current list to the game without launching it (the editor's w; 04 §1).
+async function save() {
+  if (S.busy.env) return say("busy", Tf("switching to %s…", S.busy.env));
+  await ui.run("save");
+  if (S.screen === "home") home({ keep: true });
 }
 
 // focusLaunch is the editor's 启动游戏 (06 §2.5): the current plan becomes the applied row
@@ -338,8 +359,10 @@ function launchStep(f) {
   if (live) title.prepend(el("span", "dot"));
   top.append(title);
   if (!live) top.append(el("kbd", "", "L"));
-  // 01 and 02 already say what starts; the block adds only the edits that launching saves
-  const sub = live ? (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")) : f && f.unsaved ? Tf("%d unsaved", f.unsaved) : "";
+  // 01 and 02 already say what starts; the block adds only the edits that launching saves,
+  // and they can be saved alone: 保存 sits in the block's corner, beside it, not in it
+  const saving = !starting && canSave(f);
+  const sub = live ? (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")) : f && f.unsaved && !saving ? Tf("%d unsaved", f.unsaved) : "";
   const bottom = el("div", "bottom");
   bottom.append(el("span", "sub num", sub));
   if (!live) bottom.append(el("span", "arrow", "→"));
@@ -349,7 +372,17 @@ function launchStep(f) {
   if (live) b.title = T("a game is already running");
   else if (f && f.unsaved) b.title = T("different from the last saved list; launching or saving saves these changes to the game");
   b.onclick = () => f && launch(f);
-  s.append(b);
+  const block = el("div", "hm-launch");
+  block.append(b);
+  if (saving) {
+    const sv = el("button", "hm-save");
+    sv.dataset.envWrite = "save";
+    sv.append(el("span", "num", Tf("save %d changes", f.unsaved)), el("kbd", "", "w"));
+    sv.title = T("write these edits to the game's mod list now, without launching; launching saves them too");
+    sv.onclick = () => save();
+    block.append(sv);
+  }
+  s.append(block);
   const n = f && note(f);
   if (n) s.append(n);
   return s;

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>能不能跑 · 现在</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main" class="narrow">
+    <div id="top"></div><div class="page-head" id="head"></div><div id="page"></div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+// Today's page (06 §2.4): one column, four sections by consequence. Uncounted items (shared-log
+// hints, weak order, the cycle) sit dimmed inside 会让游戏出错; the link panel lists every game.
+const ORDER = ["break", "run", "confirm", "hidden"];
+const LIST = ORDER.flatMap((s) => ITEMS.filter((it) => (it.now || it.sec) === s));
+const sec = (it) => it.now || it.sec;
+let cur = 0;
+const open = new Set();
+const n = LIST.filter((x) => x.counted && sec(x) !== "hidden").length;
+
+shell("now", n, [["↑↓", "移动"], ["← →", "换区"], ["enter", "主操作"], ["A", "重新检查"], ["l", "游戏日志"]],
+  "现在：一列四个区。不计数的提示淡色混在“会让游戏出错”里，链接面板列出所有游戏。");
+$("#head").innerHTML = `<p class="lead"><b>${PLAN}</b>还不能放心玩：修好下面 ${n} 个问题就行</p>
+  <div class="page-acts"><button class="btn primary small">${ic("wand")} 自动修好 2 个</button><button class="btn small">${ic("refresh")} 重新检查文件</button><button class="btn small">${ic("log")} 游戏日志</button></div>`;
+
+function draw() {
+  let html = "", i = 0;
+  for (const s of ORDER) {
+    const its = LIST.filter((x) => sec(x) === s);
+    if (!its.length) continue;
+    const c = its.filter((x) => x.counted && s !== "hidden").length;
+    html += `<section class="${SEC[s].cls}"><h2 class="label">${SEC[s].t}${c ? `<span class="n">${c}</span>` : ""}${SEC[s].r ? `<span class="n">${SEC[s].r}</span>` : ""}</h2><div class="card">`;
+    let phase = "";
+    for (const it of its) {
+      if (it.phase && it.phase !== phase) html += `<div class="phase">${it.phase}</div>`;
+      phase = it.phase || phase;
+      html += needHTML(it, i++, { open, links: (x) => [...x.links, x.otherGame] });
+    }
+    html += `</div></section>`;
+  }
+  $("#page").innerHTML = html;
+  mark();
+}
+function mark() {
+  $$(".need").forEach((r) => r.classList.toggle("cur", +r.dataset.i === cur));
+  $(`.need[data-i="${cur}"]`)?.scrollIntoView({ block: "nearest" });
+}
+const setCur = (i) => { cur = i; mark(); };
+bindRows($("#page"), LIST, setCur, (it, a) => {
+  if (a.l === "展开") { open.has(it.id) ? open.delete(it.id) : open.add(it.id); draw(); }
+  else toast(`会执行：${a.l}`);
+});
+keyNav(() => LIST.length, () => cur, setCur, (i) => sec(LIST[i]), (i) => LIST[i].acts && toast(`会执行：${LIST[i].acts[0].l}`));
+draw();
+</script>
+</body>
+</html>

@@ -1342,15 +1342,16 @@ async function goHistory(h) {
   await reload();
 }
 
-// pollLive follows the running game every two seconds (06 §2.1): the sidebar's foot says
-// it is running, its errors lead 能不能跑, and launching waits until it exits (08 §4).
+// pollLive follows the running game every two seconds (06 §2.1): its errors lead 能不能跑
+// (and its badge), 启动 says it runs, and launching waits until it exits (08 §4). A new
+// Player.log (the game exited, or ran without RimArcho) is read once when it appears.
 async function pollLive() {
   try {
     const l = await api.Live();
     const before = JSON.stringify(S.live && S.live.items);
-    const was = !!(S.live && S.live.running);
+    const was = !!(S.live && S.live.running), hadNew = !!(S.live && S.live.newLog);
     S.live = l;
-    shell.renderLive();
+    if (l.newLog && !hadNew) readNewLog();
     if (JSON.stringify(l.items) !== before) { scr.liveChanged(); shell.sync(); }
     if (l.running) scr.logLive();
     if (was !== !!l.running) homePage.liveChanged();
@@ -1360,6 +1361,18 @@ async function pollLive() {
     if (was && !l.running) { checkCredit(); if (S.screen === "needs") scr.needs(true); }
   } catch { /* the next poll tries again */ }
   setTimeout(pollLive, 2000);
+}
+
+// readNewLog: the run's log counts without a visit to 能不能跑 (06 §2.1; until 2026-10-30
+// the sidebar's foot said "分析本次日志" and waited for a click). The pages showing it
+// read again.
+async function readNewLog() {
+  try {
+    if (!(await api.ReadNewLog())) return;
+  } catch { return; }
+  shell.sync();
+  if (S.screen === "needs") scr.needs(true);
+  else if (S.screen === "home") homePage.home({ keep: true });
 }
 
 start().catch((e) => say("fail", errText(e)));

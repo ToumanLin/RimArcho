@@ -153,7 +153,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .nav-item .chev svg.i { width: 10px; height: 10px; stroke-width: 1.8; }
 .nav-item.on .chev { transform: rotate(90deg); }
 .nav-item .cnt, .nav-kid .cnt { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
-.nav-item .badge-n, #live .badge-n { margin: 0 -4px 0 auto; font-size: 12px; font-weight: 500; line-height: 17px; min-width: 17px; padding: 0 5px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); }
+.nav-item .badge-n { margin: 0 -4px 0 auto; font-size: 12px; font-weight: 500; line-height: 17px; min-width: 17px; padding: 0 5px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); }
 /* The open entry's sub-entries hang off a thin guide line, 16px in. Opening and closing
    grows the row from 0fr to 1fr and fades it (06 §7.1); a closed list is out of the tab order. */
 .kids-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; margin-top: -1px; transition: grid-template-rows var(--t-layout) var(--ease), opacity var(--t-exit) var(--ease-in); }
@@ -168,17 +168,9 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .kid-hl { position: absolute; left: 0; top: 0; z-index: 0; border-radius: var(--r-sm); background: color-mix(in srgb, var(--fg) 6.5%, transparent); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
 .side-foot .nav-item.on { background: var(--card); box-shadow: var(--seg-edge); }
 .side-foot { flex: none; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
-/* the foot's one line, only while the game runs or a new log waits (06 §2.1): a dot in the
-   icon column, then the text, on the entries' edges */
-#live { width: 100%; height: 30px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 8px; border-radius: var(--r-sm); color: var(--fg-2); font-size: 12px; text-align: left; white-space: nowrap; overflow: hidden; transition: background var(--t-press), color var(--t-press); animation: view-in var(--t-enter) var(--ease); }
-#live::before { content: ""; flex: none; width: 6px; height: 6px; margin: 0 4px; border-radius: 50%; background: var(--green); }
-#live.newlog { color: var(--accent-11, var(--accent)); }
-#live.newlog::before { background: var(--accent); }
-#live:hover { background: var(--pill); color: var(--fg); }
-#live .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* the navigation at the top (06 §2.1): the same entries as one strip over the page. The
    toggle ends it on the left; the groups are thin separators; an entry's sub-entries are a
-   dropdown from its chevron (↓ on the keyboard); 设置 and the running game at the right
+   dropdown from its chevron (↓ on the keyboard); 设置 at the right
    end. The raised highlight and the badge stay; a narrow window scrolls the strip. */
 #app.nav-top { grid-template-columns: minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr); }
 #app.nav-top #side { grid-row: 1; flex-direction: row; align-items: center; gap: 4px; padding: 0 10px; border-right: 0; border-bottom: var(--hairline) solid var(--line-2); }
@@ -191,8 +183,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 #app.nav-top .nav-item .badge-n { margin: 0 -4px 0 2px; }
 #app.nav-top .kids-wrap { display: none; }
 #app.nav-top .side-foot { flex-direction: row; align-items: center; gap: 4px; padding: 0; border-top: 0; }
-#app.nav-top .side-foot .nav-item, #app.nav-top #live { width: auto; }
-#app.nav-top #live { max-width: 240px; }
+#app.nav-top .side-foot .nav-item { width: auto; }
 #app.nav-top .side-foot .nav-item .ic { display: inline-flex; }
 #app.nav-top .side-foot .nav-item .lbl { display: none; }
 #app.nav-top .side-foot .nav-item { padding: 0 7px; }
@@ -401,8 +392,8 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .page.fill { height: 100%; min-height: 0; padding-bottom: 8px; }
 /* page width by shape (06 §7.3 rule 12): list-and-detail pages fill the window like the
    editor and the library; one-column pages share one reading width */
-.page:is(.logs, .pm-page, .packs, .subs-page) { padding-left: 12px; padding-right: 12px; }
-.page:is(.needs, .env, .textures, .settings) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
+.page:is(.logs, .pm-page, .packs, .subs-page, .needs) { padding-left: 12px; padding-right: 12px; }
+.page:is(.env, .textures, .settings) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
 @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
 .head-right { display: flex; align-items: center; gap: 8px; }
 .note { padding: 0 4px; font-size: 12px; }
@@ -456,11 +447,33 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 @media (max-width: 900px) { .cols.three, .cols.two, .cols.logcols { grid-template-columns: 1fr; } .logsplit { display: none; } .page.fill { height: auto; } .cols .col .scroll { max-height: 60vh; } }
 
-/* 能不能跑 (06 §2.4): sections by consequence, each a card of items */
+/* 能不能跑 (06 §2.4): two columns that scroll on their own, each a stack of sections; a
+   section is a card of items, its heading stays at the top of its column */
+.cols.needcols { grid-template-columns: minmax(320px, var(--needs-left, 55fr)) var(--card-gap) minmax(300px, 45fr); gap: 0; }
+.needcol { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.needcap { display: flex; align-items: baseline; gap: 8px; padding: 2px 4px 2px; font-size: 12px; color: var(--muted); }
+.needcap b { color: var(--fg); font-size: 13px; font-weight: 600; transition: color var(--t-press); }
+.needcol.focus .needcap b { color: var(--accent-11, var(--accent)); }
+.needcol > .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 2px 8px; display: flex; flex-direction: column; }
+.needcol .need-sec > h2.label { position: sticky; top: 0; z-index: 2; margin: 0; padding: 10px 2px 6px; background: var(--bg); }
+.need-sec { margin-top: 0; gap: 0; }
 .need-sec > h2.label { display: flex; align-items: baseline; gap: 2px; }
 .need-sec.break > h2.label { color: var(--red); }
 .need-sec.run > h2.label { color: var(--log); }
+.need-sec.confirm > h2.label { color: var(--amber); }
+/* 可以留意: what shared logs taught, RimArcho's own knowledge: the accent, not dimmed */
+.need-sec.worth > h2.label { color: var(--accent-11, var(--accent)); cursor: pointer; }
+.need-sec.worth .need-ic { color: var(--accent-11, var(--accent)); }
+.need-sec > h2.label .fold-chev { display: inline-block; width: 12px; color: var(--faint); transition: transform var(--t-press); }
+.need-sec > h2.label .fold-chev.open { transform: rotate(90deg); }
 .need-sec > h2.label .muted { font-weight: 400; }
+.need-sec > h2.label .n.muted { color: var(--muted); }
+.need-live { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+.need-live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.need-empty { padding: 14px 4px; color: var(--muted); font-size: 12px; }
+.need-away { align-self: flex-start; margin: 10px 2px 0; padding: 2px 4px; border-radius: var(--r-sm); color: var(--muted); font-size: 12px; }
+.need-away:hover { color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
+@media (max-width: 900px) { .cols.needcols { grid-template-columns: 1fr; } .needsplit { display: none; } .needcol > .scroll { overflow: visible; } .needcol .need-sec > h2.label { position: static; } }
 .need-list { display: flex; flex-direction: column; }
 .need-phase { padding: 14px 18px 4px; color: var(--muted); font-size: 12px; }
 /* the last run after this run's items (while the game runs): a rule above, the facts a gap apart */
@@ -472,23 +485,43 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 /* The cursor uses a quiet tint and an accent title (06 §2.4). */
 .need.cur { background: color-mix(in srgb, var(--fg) 6%, transparent); }
 .need.cur .title { color: var(--accent-11, var(--accent)); }
-.need .top { display: flex; gap: 10px; align-items: center; }
+.need .top { display: flex; gap: 10px; align-items: flex-start; }
 .need .body { flex: 1; min-width: 0; }
 .need .title { font-weight: 600; overflow-wrap: anywhere; }
 .need .why { color: var(--fg-2); overflow-wrap: anywhere; }
 .need .why.sub { font-size: 12px; color: var(--muted); }
 .need.dimmed { padding-top: 9px; padding-bottom: 9px; }
 .need.dimmed .why { color: var(--muted); }
-.need .acts { flex: none; display: flex; gap: 6px; align-items: center; }
+/* what belongs to the item, then its buttons with the evidence on their right: all lined
+   up with the title (06 §2.4) */
+.need .need-x { display: flex; flex-direction: column; gap: 4px; padding-left: 26px; min-width: 0; }
+.need .need-x .link-groups { margin-top: 0; }
+.need-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-left: 26px; min-width: 0; }
+.need .acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
 .need .acts .btn { height: 28px; padding: 0 12px; border-radius: var(--r-sm); font-size: 13px; }
 .need .acts .btn.primary { font-weight: 600; }
-.need .acts.identity-answers { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
-.need .acts .btn.more { padding: 0 8px; letter-spacing: 1px; background: transparent; }
+.need .acts .btn.option { border: var(--hairline) solid var(--line); background: var(--card); color: var(--fg); }
+.need .acts .btn.option:hover { border-color: var(--accent); color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
+.need:not(.cur) .btn kbd { display: none; }
+.need-foot > .ev-line { margin-left: auto; justify-content: flex-end; }
 .need .ev-line { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; min-width: 0; font-size: 12px; color: var(--muted); }
-/* where a claim comes from is for the item being read: the others stay quiet */
-.need:not(.cur):not(:focus-within) .ev-line { display: none; }
-/* a long "required by" list is two lines until the item is the cursor's */
-.need:not(.cur):not(:focus-within) .why { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.need-disc { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px 1px 2px; border-radius: var(--r-sm); font-size: 12px; color: var(--muted); }
+.need-disc::before { content: "›"; display: inline-block; width: 10px; text-align: center; transition: transform var(--t-press); }
+.need-disc.open::before { transform: rotate(90deg); }
+.need-disc:hover { color: var(--fg); background: var(--pill); }
+.need-also { font-size: 12px; color: var(--muted); }
+.need-rel { align-self: flex-start; padding: 2px 8px; border-radius: var(--r-sm); font-size: 12px; color: var(--accent-11, var(--accent)); background: var(--accent-soft); text-align: left; }
+.need-rel:hover { filter: brightness(1.05); }
+.need-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: 26px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--amber-soft); color: var(--fg); }
+.need-confirm .t { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.need-confirm .btn { height: 28px; padding: 0 12px; }
+/* an item an action resolved: one quiet line where it was (06 §5) */
+.need.done { flex-direction: row; align-items: center; gap: 10px; padding-top: 8px; padding-bottom: 8px; color: var(--muted); }
+.need.done .need-ic { align-self: center; margin-top: 0; color: var(--green); }
+.need.done .body { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.need.done .done-what { color: var(--green); margin-right: 8px; }
+.need.flash { animation: need-flash 1.6s var(--ease); }
+@keyframes need-flash { 0%, 35% { background: var(--accent-soft); } 100% { background: transparent; } }
 .need .ev-line .src { overflow-wrap: anywhere; min-width: 0; }
 .ev-line .src + .src { margin-left: 4px; } /* 8px gap + 4px: the 12px between facts (06 §7.3) */
 .ev-chip { flex: none; line-height: 16px; padding: 0 6px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg-2); font-size: 12px; }
@@ -526,7 +559,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .pp-parts { margin-top: 4px; }
 .pp-parts summary { cursor: pointer; color: var(--muted); }
 .page-acts .chip.prob.hint { color: var(--muted); background: var(--pill); }
-@media (max-width: 760px) { .need .top { flex-wrap: wrap; } .need .acts { margin-left: auto; } }
+@media (max-width: 760px) { .need .top { flex-wrap: wrap; } }
 
 /* 日志 */
 .lrow { display: flex; gap: 10px; padding: 8px 10px; border-radius: var(--r-sm); align-items: flex-start; }
@@ -888,6 +921,16 @@ svg.i.fill { fill: currentColor; }
 .hm-go.arrived::before { content: ""; position: absolute; inset: 0; background: var(--accent-fg); opacity: 0; animation: hm-flash 400ms var(--ease); pointer-events: none; }
 .hm-pick.leaving { animation: hm-leave var(--t-exit) var(--ease-in) forwards; }
 .hm-go .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--green); margin-right: 10px; animation: hm-blink 1.4s infinite; }
+/* 保存 in the block's lower left, where "N 项未保存" was: a button of its own beside ▶ (not
+   inside it), drawn like the block's L key so the block stays the page's one colour */
+.hm-launch { position: relative; }
+.hm-save { position: absolute; left: 18px; bottom: 16px; max-width: calc(100% - 96px); display: inline-flex; align-items: center; gap: 8px; height: 26px; padding: 0 6px 0 10px;
+  border: var(--hairline) solid color-mix(in srgb, var(--accent-fg) 55%, transparent); color: var(--accent-fg); background: transparent; font-size: 12px; font-weight: 600; white-space: nowrap;
+  transition: background var(--t-press), border-color var(--t-press); }
+.hm-save span { overflow: hidden; text-overflow: ellipsis; }
+.hm-save kbd { font: 600 12px var(--code); opacity: .6; padding: 0 2px; }
+.hm-save:hover, .hm-save:focus-visible { background: color-mix(in srgb, var(--accent-fg) 16%, transparent); border-color: var(--accent-fg); outline: none; }
+.hm-save:active { background: color-mix(in srgb, var(--accent-fg) 26%, transparent); }
 /* the applied row's problem under ▶ in one line (its reason on hover); × shows on hover
    and hides it until something about the row changes */
 .hm-note { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--t-enter) var(--ease), opacity var(--t-enter) var(--ease); }

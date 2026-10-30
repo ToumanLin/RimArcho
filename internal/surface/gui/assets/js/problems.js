@@ -16,11 +16,12 @@ const box = el("div", "prob-pop");
 box.setAttribute("role", "dialog");
 let anchor = null;
 const opened = new Set(); // sections shown in full
-const SECTIONS = ["breaks the game", "errors from the last run", "for you to confirm", "hidden mods"];
+// view.Section* (06 §2.4); the last one is SectionElsewhere: the editor still lists those items
+const SECTIONS = ["breaks the game", "worth knowing", "for you to confirm", "errors from the last run", "hidden mods"];
 const FOLD_AT = 4; // a long section shows this many, then "show all"
 
 const items = () => ((S.board && S.board.problems && S.board.problems.items) || []).filter((it) => it.counted || it.status === -1 || (it.actions || []).some((a) => a.kind === "version-list"));
-const problemCount = (its) => its.filter((it) => it.counted && it.section !== 3).length;
+const problemCount = (its) => its.filter((it) => it.counted && it.section !== 4).length;
 export const isOpen = () => box.isConnected;
 
 // autoFixable: the items one click can fix with no question (required mods that are

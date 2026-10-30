@@ -126,7 +126,7 @@ test('background updates preserve hint links and evidence without counting them 
       }
     }
     for (const id in reasons) reasons[id].sort((x, y) => y.status - x.status);
-    return { environment: 'fixture', sequence: 2, count: items.filter(x => x.counted && x.section !== 3).length, items, status, reasons };
+    return { environment: 'fixture', sequence: 2, count: items.filter(x => x.counted && x.section !== 4).length, items, status, reasons };
   };
   h.context.event(update([hint]));
   assert.equal(h.state.board.needs, 0);
@@ -148,6 +148,6 @@ test('background updates preserve hint links and evidence without counting them 
   assert.equal(title.children[0].tag, 'a');
   assert.equal(title.children[2].tag, 'a');
   assert.equal(title.onclick, undefined);
-  h.context.event(update([{ counted: true, status: 2, mods: ['hidden'], text: 'hidden', section: 3 }]));
+  h.context.event(update([{ counted: true, status: 2, mods: ['hidden'], text: 'hidden', section: 4 }]));
   assert.equal(h.context.chip(), null, 'hidden housekeeping alone must not create a problem chip');
 });

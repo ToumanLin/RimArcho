@@ -4,6 +4,46 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- The window's sidebar no longer has the line above Settings ("Game running since
+  14:05" while the game runs, "Analyse this run's log" after it). It only opened Can it
+  run, which is right above it, and its number was already in that entry's badge. The
+  game's errors still reach Can it run and its badge every two seconds; the Launch page
+  and Can it run's right column say the game is running. After the game exits (or when
+  RimArcho opens after a game run without it), the window now reads the new Player.log
+  by itself, once, in the background, so the badge counts that run without a click.
+  The TUI keeps its status-line indicator.
+
+- Launch page: when the current list has edits not yet written to the game, the corner
+  of the Launch block has a small "Save N changes" button (`w`). It saves without
+  launching, like `w` in the editor. Before, the block only said "N unsaved", and
+  saving meant opening the editor or launching. The button is not shown while the game
+  runs, during a switch, or when a pack or another list is applied.
+
+- Can it run is laid out in two columns. The left column has what breaks the game,
+  then Worth knowing, then what is for you to confirm. The right column has the errors
+  from the last run (or this run). Drag the gap between them to resize; double-click
+  it to go back to the default. Errors in the last run and the item about the same mod
+  on the left link to each other.
+  Worth knowing is a section of its own: the hints from shared logs (a prerequisite
+  a mod seems to need, pairs that often fail together, a mod's own known error). It
+  sits above "for you to confirm", is not counted, and can be folded.
+  Every action is a button at the bottom of its item; there is no "⋯" menu. A choice
+  such as "disable A / disable B" shows one button per option, none of them the
+  default. Actions that need a confirmation ask inside the item (`enter` / `esc`).
+  An item that an action resolved stays where it was as one line: ✓, what was
+  done, and an Undo button (`u`) on the latest batch that can be undone. These lines
+  go away when you leave the page.
+  Weaker load-order preferences and load-order cycles are now lines of the "sort"
+  item, because sorting settles them; `v` lists the cycle. Hidden or locked mods
+  and mods with out-of-date converted textures are no longer listed here: one line
+  at the end opens Mod library (filtered to them) or Texture optimisation. Broken
+  game-folder links list the current game's first; other games' links fold into one
+  line, and the repair still fixes all of them.
+  Keys: `1`–`9` jump to a section, `←` `→` switch columns, or move between an
+  item's buttons when one has the focus; `esc` returns to the list. The TUI's `@`
+  screen uses the same order, in one column, with the same merged lines and the
+  closing "elsewhere" line.
+
 - Analysing the same mod content for several game versions now stores one copy of
   its Def, Type, Harmony and assembly facts. Schema 26 converts existing caches in
   place. Removing a game or replacing analysis slots also removes facts no game

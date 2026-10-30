@@ -27,6 +27,7 @@ type Live struct {
 	Blocked string `json:"blocked,omitempty"`
 	// NewLog is the "analyse this run's log" hint (08 §2 "游戏退出后"): set while no game runs
 	// and Player.log is newer than the last launch and the last log the player looked at.
+	// The TUI shows it in its status line; the GUI reads that log at once (API.ReadNewLog).
 	NewLog string `json:"newLog,omitempty"`
 }
 

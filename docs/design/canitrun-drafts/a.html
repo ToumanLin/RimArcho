@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>能不能跑 · A 两列</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { overflow: hidden; display: grid; grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); gap: 12px; padding-bottom: 12px; }
+  .col { min-height: 0; overflow-y: auto; padding: 0 4px 12px; scroll-padding-top: 44px; }
+  .col-cap { display: flex; align-items: center; gap: 8px; padding: 2px 4px 0; font-size: 12px; color: var(--muted); }
+  .col-cap b { color: var(--fg); font-size: 14px; font-weight: 600; transition: color var(--t-press); }
+  .col.focus .col-cap b { color: var(--accent); }
+  .col h2.label { position: sticky; top: 0; z-index: 2; margin: 0; padding: 16px 4px 8px; background: var(--bg); }
+  .col h2.label .fold { display: inline-flex; color: var(--faint); transition: transform var(--t-press); }
+  .col h2.label.open .fold { transform: rotate(90deg); }
+  .col h2.label.toggle:hover { color: var(--fg); }
+  .sec-hint > h2.label { color: var(--accent); }
+  .sec-hint .ic.hint { color: var(--accent); }
+  .sec-confirm > h2.label { color: var(--amber); }
+
+  /* one item: title, why, extras, then the buttons and the evidence on one aligned line */
+  .item { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 12px 16px 12px; scroll-margin-top: 44px; }
+  .item + .item, .phase + .item { border-top: var(--hairline) solid var(--line-2); }
+  .phase + .item { border-top: 0; }
+  .item:hover { background: var(--card-2); }
+  .item.cur { background: color-mix(in srgb, var(--fg) 5%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
+  .item.cur .title { color: var(--accent); }
+  .item .head { display: flex; gap: 10px; align-items: flex-start; }
+  .item .title { font-weight: 600; flex: 1; min-width: 0; }
+  .item .why, .item .x { margin-left: 24px; }
+  .item .why { color: var(--fg-2); }
+  .item .also { margin-left: 24px; font-size: 12px; color: var(--muted); }
+  .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 4px 0 0 24px; }
+  .foot .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .foot .ev { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 12px; color: var(--muted); min-width: 0; }
+  .btn kbd { margin-left: 6px; color: inherit; opacity: .55; font-size: 11px; }
+  .item:not(.cur) .btn kbd { display: none; }
+  .btn.eq { border: var(--hairline) solid var(--line); background: var(--card); color: var(--fg); }
+  .btn.eq:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .disc { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px 0 2px; margin-left: 22px; border-radius: 6px; font-size: 12px; color: var(--muted); align-self: flex-start; }
+  .disc:hover { color: var(--fg); background: var(--pill); }
+  .disc svg.i { width: 12px; height: 12px; transition: transform var(--t-press); }
+  .disc.open svg.i { transform: rotate(90deg); }
+  .item ul.x { margin-top: -2px; margin-bottom: 0; padding-left: 18px; color: var(--fg-2); }
+  .item ul.x li { padding: 1px 0; }
+  .rel { margin-left: 24px; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; font-size: 12px; color: var(--accent); background: var(--accent-soft); }
+  .rel:hover { filter: brightness(1.05); }
+  .rel.quiet { color: var(--muted); background: var(--pill); }
+  .rel svg.i { width: 12px; height: 12px; }
+  .share { display: inline-flex; align-items: center; gap: 6px; }
+  .share .bar { width: 44px; height: 5px; border-radius: 3px; background: var(--pill); overflow: hidden; }
+  .share .bar i { display: block; height: 100%; background: var(--accent); }
+  .item .links { margin: 0 0 0 24px; }
+  .note-x { margin-left: 24px; font-size: 12px; color: var(--muted); }
+
+  .confirm { margin: 2px 0 0 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--amber-soft); color: var(--fg); font-size: 12.5px; }
+  .confirm.anim { animation: pin var(--t-enter) var(--ease); }
+  .confirm .t { flex: 1 1 220px; }
+  .item.done { flex-direction: row; align-items: center; gap: 10px; padding-top: 9px; padding-bottom: 9px; color: var(--muted); }
+  .item.done .okc { color: var(--green); display: inline-flex; }
+  .item.done .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item.done .what b { color: var(--green); font-weight: 500; margin-right: 8px; }
+  .item.flash { animation: flash 1.6s var(--ease); }
+  @keyframes flash { 0%, 35% { background: var(--accent-soft); } 100% { background: transparent; } }
+  .item.new { animation: pin 300ms var(--ease); }
+  .run-sub { display: flex; gap: 8px; align-items: baseline; margin: 10px 4px 6px; padding-top: 10px; border-top: var(--hairline) solid var(--line); font-size: 12px; color: var(--muted); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .empty { padding: 16px; color: var(--muted); font-size: 12px; }
+  .review .rb.on { color: var(--green); background: var(--green-soft); }
+  @media (max-width: 900px) { #page { display: block; overflow: auto; } .col { overflow: visible; } .col + .col { margin-top: 16px; } .col h2.label { position: static; } }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div><div id="page"></div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+// A: two columns by where the problem comes from. Left: what checking the mods' files and
+// RimArcho's shared-log data found (会让游戏出错, 可以留意, 要你确认). Right: what the game's log saw.
+// Every action is a button under its item; choices are the options themselves; what is done
+// stays in place as one line with 撤销.
+
+// Every action of every item, in the order shown. eq: equal options, none is the main one.
+// say: what the done line says. ask: confirm in place first. run: resolves a group of items.
+const ACTS = {
+  official: [{ l: "自动排序", k: "S", run: "sort" }],
+  order: [{ l: "自动排序", k: "S", run: "sort" }],
+  links: [{ l: "修复…", k: "R", ask: "删除这 2 个断掉的链接？它们指向的文件夹已经不在了，不会动别的文件。", say: "已删除 2 个断掉的链接" }],
+  missing: [{ l: "全部订阅…", k: "s", toast: "会先问用 Steam 还是 SteamCMD，然后在后台下载" }, { l: "全部从列表中移除", k: "x", say: "已从列表中移除 3 个 Mod" }],
+  dep: [{ l: "启用 Vanilla Expanded Framework", k: "space", say: "已启用 Vanilla Expanded Framework" }],
+  patch: [{ l: "启用 Rimefeller", k: "space", say: "已启用 Rimefeller" }, { l: "看这些补丁", k: "v", toast: "打开问题详情：6 个补丁和它们的位置" }],
+  incompat: [{ l: "停用 Combat Extended", k: "1", eq: true, say: "已停用 Combat Extended" }, { l: "停用 Yayo's Combat 3", k: "2", eq: true, say: "已停用 Yayo's Combat 3" }],
+  dup: [{ l: "保留工坊那份", k: "1", eq: true, say: "已保留工坊那份，停用了本地那份" }, { l: "保留本地那份", k: "2", eq: true, say: "已保留本地那份，停用了工坊那份" }],
+  version: [{ l: "查看列表", k: "v", toast: "打开版本清单" }, { l: "忽略这 18 个的 1.6 提醒…", k: "M", ask: "以后不再提醒这 18 个 Mod 没标明支持 1.6。可以在版本清单里恢复。", say: "已忽略 18 个 Mod 的 1.6 提醒" }],
+  known: [{ l: "看这个错误", k: "v", toast: "打开问题详情：分享的日志里这个错误的样子和出现比例" }],
+  combo: [{ l: "停用 Performance Optimizer", k: "1", eq: true, say: "已停用 Performance Optimizer" }, { l: "停用 Vanilla Expanded Framework", k: "2", eq: true, say: "已停用 Vanilla Expanded Framework" }],
+  obs: [{ l: "在工坊打开 Alpha Memes", k: "o", toast: "在 Steam 里打开 Alpha Memes 的工坊页" }],
+  ident: [{ l: "是同一个", k: "1", eq: true, ask: "合并成一个 Mod，变化历史接在一起。这一步不能用 u 撤销。", say: "已记为同一个 Mod", final: true },
+    { l: "是副本", k: "2", eq: true, ask: "记为同一个 Mod 的另一份副本。这一步不能用 u 撤销。", say: "已记为副本", final: true },
+    { l: "无关", k: "3", eq: true, ask: "记为两个无关的 Mod，以后不再问。这一步不能用 u 撤销。", say: "已记为无关", final: true }],
+  extern: [{ l: "看差异", k: "d", toast: "打开差异：游戏里多启用了 2 个、停用了 1 个" }, { l: "载入游戏里的改动…", k: "L", ask: "用游戏里的改动替换这个列表现在的内容？u 可以撤销。", say: "已载入游戏里的改动" }, { l: "保留这个列表", k: "I", say: "已保留这个列表" }],
+  packlinks: [{ l: "移除链接", k: "r", say: "已移除 14 个链接" }],
+};
+const LOGACT = [{ l: "打开游戏日志", k: "l", toast: "打开游戏日志，选中这一组" }];
+const GROUPS = { sort: { ids: ["official", "order"], say: "已自动排序" } };
+const AUTOFIX = [["official", "已自动排序"], ["order", "已自动排序"], ["dep", "已启用 Vanilla Expanded Framework"], ["patch", "已启用 Rimefeller"]];
+// in this draft, 可以留意 is the shared-log knowledge; weak order and the cycle go into 自动排序
+const TITLE = { known: "分享的日志里，这个版本的 ⟦Prison Labor⟧ 经常报错", combo: "⟦Vanilla Expanded Framework⟧ 和 ⟦Performance Optimizer⟧ 一起时常报错", obs: "⟦Alpha Genes⟧ 可能缺少 ⟦Alpha Memes⟧" };
+const WHY = { combo: "遇到报错时可以先停用其中一个。有 4 个启用的 Mod 需要 Vanilla Expanded Framework。" };
+const ALSO = { order: "顺带满足 5 条较弱的顺序要求；3 个 Mod 的循环要求按优先级处理（放弃“RimHUD 排在 Real Ruins 之后”）。" };
+const SHARE = { known: [71, 112], combo: [31, 60], obs: [40, 50] };
+const DISC = { order: "逐条看 7 个", missing: "逐个看 3 个" };
+
+const LEFT_SECS = ["break", "hint", "confirm"];
+const HINT_ORDER = ["known", "combo", "obs"];
+const LEFT = [...ITEMS.filter((x) => x.sec === "break"), ...HINT_ORDER.map((id) => byId[id]), ...ITEMS.filter((x) => x.sec === "confirm")];
+const RIGHT = ITEMS.filter((x) => x.sec === "run" && !x.old);
+const LIVE = [
+  { id: "live1", sec: "run", st: "err", phase: "游玩时", title: "⟦Prison Labor⟧：3× Exception in JobOnThing", why: "", ev: [["日志", "Player.log"]], counted: true },
+  { id: "live2", sec: "run", st: "warn", phase: "游玩时", title: "⟦Dubs Bad Hygiene⟧：1× Could not find a part of the path", why: "", ev: [["日志", "Player.log"]], counted: true },
+  { id: "live3", sec: "run", st: "err", phase: "游玩时", title: "来源不明：1× NullReferenceException in Pawn_PathFollower", why: "", ev: [["日志", "Player.log"]], counted: true },
+];
+LIVE.forEach((x) => (byId[x.id] = x));
+
+// what links the two columns: id → [target, text]
+function rel(id) {
+  switch (id) {
+    case "dep": return ["log-vfe", "上次运行 ⟦Vanilla Furniture Expanded⟧ 报错 12 次，看右边那一组", "right"];
+    case "known": return ["log-pl", "上次运行它也报错 41 次，看右边那一组", "right"];
+    case "log-vfe": return done.has("dep") ? ["dep", "它的前置刚启用了，下次运行再看还报不报错", "left", true] : ["dep", "它的前置 ⟦Vanilla Expanded Framework⟧ 没有启用，看左边那一项", "left"];
+    case "log-pl": case "live1": return ["known", "分享的日志里这个版本也常报错，看左边那一项", "left"];
+  }
+  return null;
+}
+
+const done = new Map(); // id → what the done line says
+const undo = [];        // [{ids, noUndo}]
+let live = [], liveT = null, ask = null, hintsOpen = true, col = 0;
+const pos = ["official", "log-vfe"];
+const open = new Set();
+const right = () => [...live, ...RIGHT];
+const visible = (c) => (c === 0 ? LEFT.filter((x) => x.sec !== "hint" || hintsOpen) : right()).map((x) => x.id);
+const nLeft = () => LEFT.filter((x) => x.counted && !done.has(x.id)).length;
+const nRight = () => right().filter((x) => x.counted && !done.has(x.id)).length;
+
+shell("a", 0, [["↑↓", "移动"], ["← →", "换一列"], ["enter", "主按钮"], ["按钮上的键", "直接执行"], ["u", "撤销"]], "");
+const liveBtn = document.createElement("button");
+liveBtn.className = "rb"; liveBtn.innerHTML = `${ic("refresh")} 模拟游戏运行`;
+$("#review .sp").after(liveBtn);
+liveBtn.onclick = toggleLive;
+
+function head() {
+  const l = nLeft(), r = nRight(), af = AUTOFIX.filter(([id]) => !done.has(id)).length;
+  const runWord = live.length ? "这次和上次运行" : "上次运行";
+  $("#head").innerHTML = `<p class="lead"><b>${PLAN}</b>${l ? `还不能放心玩：开始之前要处理 ${l} 项` : "开始之前没有要处理的了"}，${r ? `${runWord}有 ${r} 组报错` : `${runWord}没有报错`}</p>
+    <div class="page-acts">${af ? `<button class="btn primary small" id="autofix" title="启用已安装的前置和补丁目标，再自动排序；u 撤销">${ic("wand")} 自动修好 ${af} 项<kbd>F</kbd></button>` : ""}
+    <button class="btn small" data-toast="重新检查 Mod 的文件">${ic("refresh")} 重新检查文件<kbd>A</kbd></button><button class="btn small" data-toast="打开游戏日志页">${ic("log")} 游戏日志</button></div>`;
+  $("#autofix")?.addEventListener("click", autofix);
+  setBadge(l + r);
+}
+
+function shareHTML(id) {
+  const s = SHARE[id];
+  return s ? `<span class="share"><span class="bar"><i style="width:${(s[0] / s[1]) * 100}%"></i></span></span>` : "";
+}
+function itemHTML(it) {
+  const id = it.id;
+  if (done.has(id)) {
+    const u = undo.find((e) => e.ids.includes(id));
+    return `<div class="item done" data-id="${id}"><span class="okc">${ic("check")}</span><span class="what"><b>${esc(done.get(id))}</b>${esc(plain(TITLE[id] || it.title))}</span>
+      ${u && !u.noUndo ? `<button class="btn small" data-undo="${id}">撤销<kbd>u</kbd></button>` : ""}</div>`;
+  }
+  const acts = it.sec === "run" ? LOGACT : ACTS[id] || [];
+  const eq = acts.some((a) => a.eq);
+  const btns = acts.map((a, j) => {
+    const cls = eq ? "eq" : j === 0 ? "primary" : "line";
+    const key = !eq && j === 0 ? "enter" : a.k;
+    return `<button class="btn small ${cls}" data-act="${j}">${esc(a.l)}<kbd>${key}</kbd></button>`;
+  }).join("") + (it.whyLink ? `<button class="btn link" data-toast="打开“为什么这样问”的比较">为什么这样问<kbd>?</kbd></button>` : "");
+  const r = rel(id);
+  const why = WHY[id] || it.why;
+  let x = "";
+  if (DISC[id]) {
+    const o = open.has(id);
+    x += `<button class="disc ${o ? "open" : ""}" data-disc="${id}">${ic("chev")}${DISC[id]}</button>`;
+    if (o) x += `<ul class="x">${it.fold.map((f) => `<li>${nm(f)}</li>`).join("")}</ul>`;
+  }
+  if (it.links) x += linkRows(it.links);
+  if (ALSO[id]) x += `<div class="also">${esc(ALSO[id])}</div>`;
+  if (id === "version") x += `<div class="note-x">另有 2 个 Mod 的 1.6 提醒已忽略 <button class="btn link" data-toast="打开已忽略的清单">查看或恢复</button></div>`;
+  if (r) x += `<button class="rel ${r[3] ? "quiet" : ""}" data-go="${r[0]}">${r[2] === "left" ? ic("arrow").replace("<svg", '<svg style="transform:scaleX(-1)"') : ""}<span>${nm(r[1])}</span>${r[2] === "right" ? ic("arrow") : ""}</button>`;
+  const confirm = ask && ask.id === id ? `<div class="confirm ${ask.fresh ? "anim" : ""}"><span class="t">${esc(ask.a.ask)}</span><button class="btn small primary" data-yes="1">${esc(ask.a.l.replace("…", ""))}<kbd>enter</kbd></button><button class="btn small" data-no="1">取消<kbd>esc</kbd></button></div>` : "";
+  return `<div class="item ${it.isNew ? "new" : ""}" data-id="${id}">
+    <div class="head">${statusIcon(it.st)}<div class="title">${nm(TITLE[id] || it.title)}</div></div>
+    ${why && !it.links ? `<div class="why">${nm(why)}</div>` : ""}${x}
+    ${confirm || `<div class="foot"><div class="acts">${btns}</div>${it.ev && it.ev.length ? `<div class="ev">${evLine(it.ev)}${shareHTML(id)}</div>` : ""}</div>`}</div>`;
+}
+
+function section(s, list, extraHead = "", title = SEC[s].t) {
+  const its = list.filter((x) => x.sec === s);
+  const n = its.filter((x) => x.counted && !done.has(x.id)).length;
+  const head = s === "hint"
+    ? `<h2 class="label toggle ${hintsOpen ? "open" : ""}" data-hint="1"><span class="fold">${ic("chev")}</span>${SEC[s].t}<span class="n">${its.length}</span><span class="r">RimArcho 从分享的日志里学到的（截至 2026-09），不算进数字</span></h2>`
+    : `<h2 class="label">${title}${its.some((x) => x.counted) ? `<span class="n">${n || "✓"}</span>` : ""}${extraHead}</h2>`;
+  if (s === "hint" && !hintsOpen) return `<section class="${SEC[s].cls}">${head}</section>`;
+  let html = "", phase = "";
+  for (const it of its) {
+    if (s === "run" && it.phase !== phase) html += `<div class="phase">${it.phase}</div>`;
+    phase = it.phase;
+    html += itemHTML(it);
+  }
+  return `<section class="${SEC[s].cls}">${head}<div class="card">${html}</div></section>`;
+}
+
+function draw() {
+  const keep = [$("#c0")?.scrollTop || 0, $("#c1")?.scrollTop || 0];
+  const focused = document.activeElement?.closest?.(".item")?.dataset.id;
+  head();
+  const runHead = live.length
+    ? `<span class="r" style="display:inline-flex;gap:6px;align-items:center"><span class="dot"></span>游戏运行中</span>`
+    : `<span class="r">${LASTRUN}</span>`;
+  let rightHTML;
+  if (live.length) {
+    rightHTML = section("run", live, runHead, "本次运行的报错").replace("</div></section>", "") +
+      `</div></section><div class="run-sub">上次运行<span>列表  ${LASTRUN}</span></div>` + section("run", RIGHT).replace(/<h2[\s\S]*?<\/h2>/, "");
+  } else rightHTML = section("run", RIGHT, runHead);
+  $("#page").innerHTML = `
+    <div class="col" id="c0"><div class="col-cap"><b>开始之前</b>检查 Mod 文件和分享的日志发现的</div>${LEFT_SECS.map((s) => section(s, LEFT)).join("")}
+      <div class="moved">
+        <button data-toast="去 Mod 库 › 全部，筛选“隐藏”">${ic("arrow")} 3 个隐藏的 Mod（锁定版本有更新、退订残留）在 Mod 库 › 全部</button>
+        <button data-toast="去游戏页">${ic("arrow")} 游戏「1.5 测试」有 1 个链接要看，在 游戏</button>
+      </div></div>
+    <div class="col" id="c1"><div class="col-cap"><b>${live.length ? "这次和上次" : "上次玩的时候"}</b>游戏日志看到的</div>${rightHTML}
+      <div class="row old" style="padding:8px 4px;font-size:12px;color:var(--faint)">更早的日志  9 月 29 日  1.5（不算进数字）</div></div>`;
+  $("#c0").scrollTop = keep[0]; $("#c1").scrollTop = keep[1];
+  live.forEach((x) => (x.isNew = false));
+  if (ask) ask.fresh = false;
+  mark(false);
+  if (focused) $(`.item[data-id="${focused}"] button`)?.focus({ preventScroll: true });
+}
+
+function colOf(id) { return LEFT.some((x) => x.id === id) ? 0 : 1; }
+function mark(scroll = true) {
+  $$(".item").forEach((r) => r.classList.toggle("cur", r.dataset.id === pos[col]));
+  $("#c0").classList.toggle("focus", col === 0); $("#c1").classList.toggle("focus", col === 1);
+  if (scroll) $(`.item[data-id="${pos[col]}"]`)?.scrollIntoView({ block: "nearest" });
+  const it = byId[pos[col]];
+  $("#status").textContent = it ? (done.has(it.id) ? done.get(it.id) : plain(TITLE[it.id] || it.title)) : "";
+}
+function go(id) {
+  col = colOf(id); pos[col] = id;
+  if (byId[id].sec === "hint" && !hintsOpen) { hintsOpen = true; draw(); }
+  mark();
+  const el = $(`.item[data-id="${id}"]`);
+  if (el) { el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); }
+}
+
+function resolve(ids, say, noUndo = false) {
+  ids.forEach((id, i) => done.set(id, Array.isArray(say) ? say[i] : say));
+  undo.push({ ids, noUndo });
+}
+function run(it, a) {
+  if (!a) return;
+  if (a.toast) return toast(`会执行：${a.toast}`);
+  if (a.ask && !(ask && ask.id === it.id)) { ask = { id: it.id, a, fresh: true }; draw(); $(`.item[data-id="${it.id}"] [data-yes]`)?.focus(); return; }
+  ask = null;
+  if (a.run) { const g = GROUPS[a.run]; resolve(g.ids.filter((id) => !done.has(id)), g.say); toast(`${g.say}：解决了 ${g.ids.length} 项（u 撤销）`); }
+  else { resolve([it.id], a.say, a.final); toast(a.say + (a.final ? "" : "（u 撤销）")); }
+  draw();
+}
+function autofix() {
+  const todo = AUTOFIX.filter(([id]) => !done.has(id));
+  resolve(todo.map(([id]) => id), todo.map(([, s]) => s));
+  toast(`启用了 2 个 Mod 并自动排序：解决了 ${todo.length} 项（u 撤销）`);
+  draw();
+}
+function undoLast(id) {
+  let k = -1;
+  for (let i = undo.length - 1; i >= 0; i--) if (!undo[i].noUndo && (!id || undo[i].ids.includes(id))) { k = i; break; }
+  if (k < 0) return toast("没有可以撤销的");
+  undo.splice(k, 1)[0].ids.forEach((x) => done.delete(x));
+  toast("已撤销"); draw();
+}
+
+function toggleLive() {
+  if (liveT) { clearInterval(liveT); liveT = null; live = []; liveBtn.classList.remove("on"); liveBtn.innerHTML = `${ic("refresh")} 模拟游戏运行`; draw(); return; }
+  liveBtn.classList.add("on"); liveBtn.innerHTML = `<span class="dot"></span> 游戏运行中（点一下停止）`;
+  const push = () => {
+    const next = LIVE[live.length];
+    if (!next) { clearInterval(liveT); return; }
+    next.isNew = true; live = [next, ...live]; draw();
+  };
+  push(); liveT = setInterval(push, 2500);
+}
+
+$("#page").addEventListener("click", (e) => {
+  const itEl = e.target.closest(".item");
+  if (itEl) { pos[col = colOf(itEl.dataset.id)] = itEl.dataset.id; mark(false); }
+  const b = e.target.closest("button"); if (!b) return;
+  const it = itEl && byId[itEl.dataset.id];
+  if (b.dataset.toast) toast(`会执行：${b.dataset.toast}`);
+  else if (b.dataset.disc) { open.has(b.dataset.disc) ? open.delete(b.dataset.disc) : open.add(b.dataset.disc); draw(); }
+  else if (b.dataset.go) go(b.dataset.go);
+  else if (b.dataset.undo) undoLast(b.dataset.undo);
+  else if (b.dataset.yes) run(it, ask.a);
+  else if (b.dataset.no) { ask = null; draw(); }
+  else if (b.dataset.act !== undefined) run(it, (it.sec === "run" ? LOGACT : ACTS[it.id])[+b.dataset.act]);
+});
+$("#page").addEventListener("click", (e) => { if (e.target.closest("h2.label[data-hint]") && !e.target.closest("button")) { hintsOpen = !hintsOpen; draw(); } });
+$("#head").addEventListener("click", (e) => { const b = e.target.closest("[data-toast]"); if (b) toast(`会执行：${b.dataset.toast}`); });
+$("#page").addEventListener("focusin", (e) => { const itEl = e.target.closest(".item"); if (itEl) { pos[col = colOf(itEl.dataset.id)] = itEl.dataset.id; mark(false); } });
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const onButton = e.target.closest && e.target.closest("button");
+  if (ask) {
+    if (e.key === "Escape") { ask = null; draw(); e.preventDefault(); }
+    else if (e.key === "Enter" && !onButton) { run(byId[ask.id], ask.a); e.preventDefault(); }
+    return;
+  }
+  if (onButton && (e.key === "Enter" || e.key === " ")) return; // the button itself handles it
+  const v = visible(col), k = v.indexOf(pos[col]), it = byId[pos[col]];
+  if (["ArrowDown", "j"].includes(e.key)) pos[col] = v[Math.min(v.length - 1, k + 1)];
+  else if (["ArrowUp", "k"].includes(e.key)) pos[col] = v[Math.max(0, k - 1)];
+  else if (e.key === "ArrowLeft" || e.key === "ArrowRight") { col = e.key === "ArrowLeft" ? 0 : 1; if (!visible(col).includes(pos[col])) pos[col] = visible(col)[0]; }
+  else if (e.key === "u") return undoLast();
+  else if (e.key === "F") return autofix();
+  else if (e.key === "A") return toast("会执行：重新检查 Mod 的文件");
+  else if (it && !done.has(it.id)) {
+    const acts = it.sec === "run" ? LOGACT : ACTS[it.id] || [];
+    const key = e.key === " " ? "space" : e.key;
+    const a = e.key === "Enter" ? (acts.some((x) => x.eq) ? null : acts[0]) : acts.find((x) => x.k === key);
+    if (e.key === "Enter" && !a) { toast("这一项要你选：按 1 / 2（/ 3）"); e.preventDefault(); return; }
+    if (!a) return;
+    e.preventDefault(); run(it, a); return;
+  } else return;
+  e.preventDefault(); mark();
+});
+draw();
+</script>
+</body>
+</html>

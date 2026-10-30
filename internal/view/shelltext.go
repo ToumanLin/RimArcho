@@ -22,6 +22,8 @@ func init() {
 		"follows Workshop updates":   "跟着工坊更新",
 		"versions locked  own saves": "版本锁定  独立存档",
 		"%d unsaved":                 "%d 项未保存",
+		"save %d changes":            "保存 %d 项修改",
+		"write these edits to the game's mod list now, without launching; launching saves them too": "现在把这些修改写进游戏的 Mod 列表，不启动游戏；启动时也会保存",
 		"not checked yet":            "还没检查",
 		"%d problems break the game": "%d 个问题会出错",
 		"ready to play":              "能跑",

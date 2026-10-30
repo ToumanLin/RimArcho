@@ -9,21 +9,25 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/known"
 )
 
-// 能不能跑's sections and evidence (06 §2.4): the items are shown in four sections by
-// consequence, and each says where its claim comes from.
+// 能不能跑's sections and evidence (06 §2.4): the items are shown in sections, and each says
+// where its claim comes from.
 
-// Sections, in screen order: what breaks the game first.
+// Sections, in screen order. The GUI's left column holds the first three (what checking
+// the files and the shared logs found), its right column the run's errors; the TUI lists
+// them in the same order.
 const (
-	SectionBreak   = iota // 会让游戏出错: the list's problems, dependencies, conflicts
-	SectionRun            // 上次运行的报错: this run (while the game runs), then the last run
-	SectionConfirm        // 要你确认: identity questions, outside changes of the list
-	SectionHidden         // 隐藏的 Mod: pinned copies with upstream updates, hidden mods
+	SectionBreak     = iota // 会让游戏出错: the list's problems, dependencies, conflicts
+	SectionHint             // 可以留意: what shared logs taught (EvCorpus); not counted
+	SectionConfirm          // 要你确认: identity questions, outside changes of the list
+	SectionRun              // 上次运行的报错: this run (while the game runs), then the last run
+	SectionElsewhere        // not on the page: Mod 库存 or 贴图优化 handles it (Needs.Elsewhere)
 )
 
 // SectionTitles are the sections' headings (English; T translates them).
-var SectionTitles = []string{"breaks the game", "errors from the last run", "for you to confirm", "hidden mods"}
+var SectionTitles = []string{"breaks the game", "worth knowing", "for you to confirm", "errors from the last run", "elsewhere"}
 
-// SectionOf is the section of an item's group.
+// SectionOf is the section of an item's group. Shared-log hints move to SectionHint by
+// their evidence (BuildNeeds), not by their group.
 func SectionOf(group int) int {
 	switch group {
 	case GroupLastRun, GroupThisRun:
@@ -31,7 +35,7 @@ func SectionOf(group int) int {
 	case GroupConfirm:
 		return SectionConfirm
 	case GroupHidden:
-		return SectionHidden
+		return SectionElsewhere
 	}
 	return SectionBreak
 }

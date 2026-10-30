@@ -27,6 +27,8 @@ type probState struct {
 	base   []view.Need     // the analysis' items; the running game's lead them (06 §2.1)
 	// lastRun says which run the last-run section is from ("the list · 9 月 29 日 19:41")
 	lastRun string
+	// elsewhere is what this page leaves to another page (view.Needs.Elsewhere, 06 §2.4)
+	elsewhere []view.Elsewhere
 }
 
 // analysis progress plumbing
@@ -58,7 +60,7 @@ func (m *model) loadProblems() {
 	p.loaded = true
 	p.countsKey = m.app.Store.ChangeKey()
 	if err != nil {
-		p.base, p.items, p.need, p.status, p.lastRun = nil, nil, 0, map[string]int{}, ""
+		p.base, p.items, p.need, p.status, p.lastRun, p.elsewhere = nil, nil, 0, map[string]int{}, "", nil
 		m.say(sayFail, err.Error())
 		return
 	}
@@ -71,7 +73,7 @@ func (m *model) loadProblems() {
 	}
 	vn := view.BuildNeeds(m.app, m.st, ps)
 	p.never, p.stale = vn.Never, vn.Stale
-	p.base, p.status, p.need, p.lastRun = vn.Items, vn.Status, vn.Count, vn.LastRun
+	p.base, p.status, p.need, p.lastRun, p.elsewhere = vn.Items, vn.Status, vn.Count, vn.LastRun, vn.Elsewhere
 	m.composeNeeds()
 }
 
