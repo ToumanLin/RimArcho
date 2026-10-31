@@ -646,7 +646,7 @@ func TestChangesView(t *testing.T) {
 	keys(tm, "R")
 	waitFor(t, tm, "1 mods updated")
 	keys(tm, "c")
-	waitFor(t, tm, "a: the whole library") // Beta is not in the plan
+	waitFor(t, tm, "a "+T("every mod")) // Beta is not in the plan
 	keys(tm, "a")
 	waitAll(t, tm, "worth a look", "Beta", "Defs, Patches changed")
 	keys(tm, "enter")

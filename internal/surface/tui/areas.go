@@ -41,8 +41,8 @@ func (m *model) goArea(a int) tea.Cmd {
 		return m.requestDetail()
 	case a == 4:
 		if !m.hasDetailArea() {
-			m.say(sayInfo, T("the terminal is too narrow for the detail column, enter shows the details"))
-			return nil
+			// no detail column: 4 opens the full-screen detail, as enter does (06 §2.5)
+			return m.listKey("enter")
 		}
 		m.detailFocus = true
 	}
@@ -105,16 +105,23 @@ func (m *model) position() string {
 	}
 	switch {
 	case m.tab == tabProblems:
-		p = T("needs attention")
+		p = T("can it run")
 		if n := len(m.prob.items); n > 0 {
 			p += "  " + fmt.Sprintf("%d / %d", min(m.prob.cursor+1, n), n)
 		}
 	case m.tab == tabChanges:
-		p = T("subscriptions and updates")
+		p = T("mod library") + " › " + T("subscriptions and updates")
 	case m.tab == tabSubscribe:
 		p = T("mod library") + " › " + T("add a subscription")
+	case m.tab == tabSearch:
+		p = T("mod library") + " › " + T("search files")
+	case m.tab == tabRules:
+		p = T("load-order rules")
+		if n := len(m.rules.shown()); n > 0 && m.rules.form == nil {
+			p += "  " + fmt.Sprintf("%d / %d", min(m.rules.cursor+1, n), n)
+		}
 	case m.tab == tabLibrary:
-		p = T("mod library")
+		p = T("mod library") + " › " + T("all mods")
 		if l := &m.libr; l.page != nil && len(l.flat) > 0 {
 			p += "  " + fmt.Sprintf("%d / %d", l.cursor+1, len(l.flat))
 		}

@@ -67,6 +67,10 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { return m.openLibrary() }
 	case "subscribe":
 		return func(m *model) tea.Cmd { return m.openAdd("") }
+	case "search-files":
+		return func(m *model) tea.Cmd { return m.openSearch() }
+	case "rules":
+		return func(m *model) tea.Cmd { return m.openRules(nil) }
 	case "rescan":
 		return func(m *model) tea.Cmd { return m.startScan() }
 	case "analyze":
@@ -99,12 +103,14 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 	case "tech":
 		return list("i")
 	case "tags":
-		return list("#")
+		return list("g")
 	case "cli":
 		return func(m *model) tea.Cmd {
 			m.tab = tabList
 			return m.key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
 		}
+	case "tasks":
+		return func(m *model) tea.Cmd { m.showTasks(); return nil }
 	case "packs":
 		// The packs as text (08 §5); build and play them with the commands shown.
 		return func(m *model) tea.Cmd {

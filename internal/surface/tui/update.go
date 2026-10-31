@@ -35,6 +35,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	defer m.fsLeft() // leaving 搜索文件 stops its search (06 §3.1 rule 9)
 	switch msg := msg.(type) {
 	case automaticDoneMsg:
 		if msg.kind == "data" {
@@ -84,6 +85,11 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.taskEnded(msg.t)
 	case bgMsg:
 		return m, msg.apply(m)
+	case fsTickMsg:
+		if m.fs.running && msg.seq == m.fs.seq {
+			return m, fsNext(msg.seq) // redraws the progress
+		}
+		return m, nil
 	case addTick:
 		if m.tab == tabSubscribe && msg.seq == m.add.seq {
 			return m, m.recognise()
@@ -163,19 +169,23 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.promptKey(k)
 	case m.panel != nil:
 		return m.panelKey(s)
-	case m.insp != nil:
+	case m.insp != nil && s != "?":
 		return m.inspectKey(s)
 	case m.editing:
 		return m.filterKey(k)
 	case m.tab == tabSubscribe:
 		return m.addKey(k) // letters go into the paste box
+	case m.fsTyping():
+		return m.fsTypeKey(k) // letters go into the box
+	case m.rulesTyping():
+		return m.rulesKey(k) // the rule's form
 	case m.tab == tabChanges && k.Paste:
 		return m.openAdd(string(k.Runes)) // a pasted address goes to 添加订阅 (06 §2.9 ctrl+v)
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
 		return m.barTypeKey(k)
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
 		return m.barOpenKey(k)
-	case m.full:
+	case m.full && s != "?":
 		return m.fullKey(s)
 	}
 	switch s {
@@ -221,6 +231,10 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.changesKey(s)
 	case tabLibrary:
 		return m.libraryKey(s)
+	case tabSearch:
+		return m.fsKey(s)
+	case tabRules:
+		return m.rulesKey(k)
 	}
 	if m.detailFocus {
 		if cmd, ok := m.detailKey(s); ok {
@@ -342,6 +356,10 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.listAction(view.ListSort)
 	case "w":
 		return m.listAction(view.ListSave)
+	case "A":
+		return m.startAnalyze() // check the files again (06 §3.5)
+	case "H":
+		return m.chooseHistory()
 	case "u", "ctrl+z":
 		m.act(T("undid the last change"), "undo")
 		return m.requestDetail()
@@ -382,25 +400,13 @@ func (m *model) listKey(s string) tea.Cmd {
 		}
 		return nil
 	case "r":
+		// 排序规则 with the form for this mod (06 §2.5): the window's rules card
 		it := c.cur()
 		if it == nil || it.id == "" {
+			m.say(sayInfo, T("choose a mod in the lists first"))
 			return nil
 		}
-		ref, name := it.ref, it.name
-		m.prompt = &prompt{label: Tf("rule for %s (after|before|attach|incompatible <ref>, top|bottom): ", name), submit: func(m *model, text string) tea.Cmd {
-			f := strings.Fields(text)
-			if len(f) == 1 && (f[0] == "top" || f[0] == "bottom") {
-				m.act(T("rule added"), "rule", "add", f[0], ref)
-				return nil
-			}
-			if len(f) != 2 {
-				m.say(sayFail, T("expected: <kind> <ref>"))
-				return nil
-			}
-			m.act(T("rule added"), "rule", "add", f[0], ref, f[1])
-			return nil
-		}}
-		return nil
+		return m.openRules(it)
 	}
 	return nil
 }
@@ -557,6 +563,9 @@ func (m *model) panelKey(s string) tea.Cmd {
 			p.choice = min(len(p.choices)-1, p.choice+1)
 		case "enter":
 			m.panel = nil
+			if p.onPickAt != nil {
+				return p.onPickAt(m, p.choice)
+			}
 			return p.onPick(m, p.choices[p.choice])
 		case "d", "delete":
 			if p.onDelete != nil {

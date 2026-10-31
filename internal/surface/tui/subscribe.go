@@ -250,7 +250,7 @@ func (m *model) addKey(k tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 		if k.String() == "tab" {
-			return m.openLibrary()
+			return m.openSearch()
 		}
 		return m.openChangesOf("", "")
 	case "enter":

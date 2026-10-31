@@ -232,18 +232,28 @@ func (m *model) needLines(n int) []string {
 	p := &m.prob
 	w := m.w
 	items := p.items
-	need := m.needCount() // the top bar's number: the analysis' and this run's (06 §2.4)
-	head := Tf("%d to handle", need)
-	if need == 0 {
-		head = T("nothing to handle")
+	// the window's lead sentence (view.NeedsLead), then the state of the check; A is on
+	// the hint line
+	before, runs, hints := 0, 0, false
+	for _, it := range items {
+		switch {
+		case it.counted && it.section == view.SectionRun:
+			runs++
+		case it.counted:
+			before++
+		}
+		hints = hints || it.status == statusHint
 	}
+	plan := ""
+	if m.st != nil && m.st.Plan != nil {
+		plan = m.st.Plan.Name
+	}
+	head := view.NeedsLead(plan, before, runs, p.never, hints)
 	switch {
 	case m.analyzing:
 		head += "   " + T("checking the mods' files…")
-	case p.never:
-		head += "   " + T("the mods' files are not checked yet, A checks them")
 	case p.stale:
-		head += "   " + T("the files changed since the last check, A checks again")
+		head += "   " + T("the files changed since the last check")
 	}
 	out := []string{"  " + sText.Render(fit(head, w-2)), ""}
 	if len(items) == 0 {
@@ -384,8 +394,12 @@ func (m *model) sectionHead(sec, w int) string {
 		}
 	}
 	title := T(view.SectionTitles[sec])
-	if hintsOnly && sec != view.SectionHint {
-		title = T("suggestions")
+	live := sec == view.SectionRun && m.live != nil && m.live.Running
+	switch {
+	case live:
+		title = T("errors this run") // the window's title while the game runs (06 §2.4)
+	case hintsOnly && sec != view.SectionHint:
+		title = T("suggestions") // only hints: not a red 会让游戏出错
 	}
 	// its number among the sections shown: 1–4 jump to it (06 §3.5)
 	num := itoa(m.sectionNumber(sec)) + " "
@@ -409,10 +423,9 @@ func (m *model) sectionHead(sec, w int) string {
 	}
 	if sec == view.SectionRun {
 		switch {
-		case m.live != nil && m.live.Running && m.live.Pack != "":
+		case live && m.live.Pack != "":
 			add("  "+Tf("pack %s", m.live.Pack), sDimS)
-		case m.live != nil && m.live.Running:
-			add("  "+T("this run"), sDimS)
+		case live: // the title says it: 本次运行的报错
 		case m.prob.lastRun != "":
 			add("  "+m.prob.lastRun, sDimS)
 		}
@@ -487,6 +500,21 @@ func (m *model) sectionStep(d int) {
 	}
 }
 
+// autoFix is F, 自动修复 (06 §2.4, §5): the required mods that are installed get enabled and
+// the list is sorted again, one undo step.
+func (m *model) autoFix() tea.Cmd {
+	if view.AutoFixCount(m.prob.base) == 0 {
+		m.say(sayInfo, T("nothing to fix automatically"))
+		return nil
+	}
+	if m.verb(view.CompleteDependencies(m.app)) {
+		m.prob.loaded = false
+		m.say(sayOK, m.status+Tf(", %s", T("u undoes")))
+		return m.ensureProblems()
+	}
+	return nil
+}
+
 func (m *model) needsKey(s string) tea.Cmd {
 	p := &m.prob
 	switch s {
@@ -519,19 +547,27 @@ func (m *model) needsKey(s string) tea.Cmd {
 		return nil
 	case "A":
 		return m.startAnalyze()
+	case "F":
+		return m.autoFix()
+	case "c": // 订阅与更新, from any page (06 §3.5)
+		return m.openChangesOf("", "")
 	case "l":
 		return m.chooseLog()
-	}
-	if p.cursor >= len(p.items) {
-		return nil
 	}
 	if s == " " {
 		s = "space"
 	}
-	for _, k := range p.items[p.cursor].keys {
-		if k.key == s {
-			return k.run(m)
+	if p.cursor < len(p.items) {
+		for _, k := range p.items[p.cursor].keys {
+			if k.key == s {
+				return k.run(m)
+			}
 		}
+	}
+	if s == "u" || s == "ctrl+z" { // undo what an item or F just did, as in the window
+		m.act(T("undid the last change"), "undo")
+		m.prob.loaded = false
+		return m.ensureProblems()
 	}
 	return nil
 }

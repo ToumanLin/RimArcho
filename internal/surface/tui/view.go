@@ -40,6 +40,10 @@ func (m *model) View() string {
 		content = m.libraryLines(body)
 	case m.tab == tabSubscribe:
 		content = m.addLines(body)
+	case m.tab == tabSearch:
+		content = m.fsLines(body)
+	case m.tab == tabRules:
+		content = m.rulesLines(body)
 	case m.full:
 		content = m.fullLines(body)
 	case m.pos != nil:
@@ -112,7 +116,7 @@ func (m *model) topBar() string {
 		}
 	}
 	if n := m.needCount(); n > 0 {
-		t := Tf("needs attention %d", n)
+		t := Tf("can it run %d", n)
 		add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
 	}
 	// (the running game is on the status line, 06 §9.1)
@@ -266,8 +270,15 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"g", T("tags")}, {"ctrl+w", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
+		if n := view.AutoFixCount(m.prob.base); n > 0 {
+			pairs = append([][2]string{{"F", Tf("fix %d automatically", n)}}, pairs...) // the window's main action
+		}
 	case m.tab == tabSubscribe:
 		pairs = m.addPairs()
+	case m.tab == tabSearch:
+		pairs = m.fsPairs()
+	case m.tab == tabRules:
+		pairs = m.rulesPairs()
 	case m.tab == tabChanges:
 		pairs = m.changesPairs()
 	case m.tab == tabLibrary && (m.libr.full || m.libr.detail):

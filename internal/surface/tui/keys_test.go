@@ -79,8 +79,12 @@ func TestKeyTable(t *testing.T) {
 		t.Fatalf("tab in changes: %d", m.tab)
 	}
 	pressKey(m, tea.KeyTab) // letters go into the paste box: tab is the key itself
-	if m.tab != tabLibrary {
+	if m.tab != tabSearch {
 		t.Fatalf("tab in 添加订阅: %d", m.tab)
+	}
+	pressKey(m, tea.KeyTab) // the search box has the keys too: tab is still the next page
+	if m.tab != tabLibrary {
+		t.Fatalf("tab in 搜索文件: %d", m.tab)
 	}
 	press(m, "$")
 	if m.tab != tabList {

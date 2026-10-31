@@ -43,11 +43,14 @@ type analyzeDoneMsg struct{ err error }
 type AnalyzeRunner func(envName string, progress func(string)) error
 
 func (m *model) ensureProblems() tea.Cmd {
+	before := m.status
 	// The player looks at problems now: include the newest log, parsing it if needed.
 	m.app.LazyLog, m.app.LogCacheOnly = false, false
 	m.loadProblems()
 	if (m.prob.stale || m.prob.never) && !m.analyzing {
-		return m.startAnalyze()
+		cmd := m.startAnalyze()
+		m.analyzeQuiet, m.status = true, before
+		return cmd
 	}
 	return nil
 }
@@ -88,7 +91,7 @@ func (m *model) composeNeeds() {
 	p.cursor = min(p.cursor, max(len(p.items)-1, 0))
 }
 
-// needCount is the top bar's "needs attention" number (06 §2.2): problems, identity
+// needCount is the top bar's "能不能跑 N" number (06 §2.2): problems, identity
 // questions, an external change of the list, a list saved for another game version, and
 // the running game's errors, so it equals the counted items of the screen (06 §2.4).
 func (m *model) needCount() int {
@@ -118,7 +121,7 @@ func (m *model) startAnalyze() tea.Cmd {
 	if m.analyzing || m.loadErr != nil {
 		return nil
 	}
-	m.analyzing = true
+	m.analyzing, m.analyzeQuiet = true, false
 	m.status = T("analyzing…")
 	run, name := m.opts.Analyze, m.envName
 	if run == nil {
@@ -149,13 +152,15 @@ func (m *model) startAnalyze() tea.Cmd {
 func (m *model) analyzeMsg(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case analyzeLineMsg:
-		m.status = T("analyzing…") + " " + strings.TrimPrefix(msg.line, "progress: ")
+		if !m.analyzeQuiet {
+			m.status = T("analyzing…") + " " + strings.TrimPrefix(msg.line, "progress: ")
+		}
 		return m.analyzeWait
 	case analyzeDoneMsg:
 		m.analyzing = false
 		if msg.err != nil {
 			m.openPanel(T("analysis failed"), msg.err.Error())
-		} else {
+		} else if !m.analyzeQuiet {
 			m.status = T("analysis done")
 		}
 		m.reload()

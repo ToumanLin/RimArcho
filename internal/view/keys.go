@@ -60,7 +60,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("ctrl+y / ctrl+r", "redo"),
 				r(pick("← → / 1–4", "← → / 1–4 / h l"), "go to an area"),
 				r("J K / alt+J K", "move down / up 1 (10); with a filter, past the rows shown"),
-				r("T", "put everything back from staging; elsewhere, stage everything enabled"),
+				r("T", pick("put everything back from staging; elsewhere, stage everything enabled", "put everything back from staging")),
 				r("S / w / L", pick("sort, save, to the launch page (the palette previews them)", "sort, save, launch (the palette previews them)")),
 				r(pick("i / e", "e"), pick("import, export the mod list", "export the mod list")),
 				r("R / A", "rescan, check the files again"),
@@ -105,7 +105,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			)
 		}
 		out = append(out,
-			r("1 / 2 / 3", "sources, updates, history"),
+			r("1 / 2 / 3", "sources, waiting for you to update, already updated"),
 			r("↑↓ / PgUp PgDn", "move"),
 			r("enter", "open or close a mod's changes"),
 			r("i", "the raw file list"),
@@ -166,18 +166,39 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("menu / shift+F10 / right click", "the row's menu: everything it can do"),
 		)
 	}
-	if page == PageSearch && !tui { // 搜索文件 (06 §2.9)
+	if page == RulesPage { // the TUI's 排序规则 screen (06 §9.1); the window's card has buttons
+		out = append(out,
+			r("↑↓ / PgUp PgDn / Home End", "move the cursor"),
+			r("a", "only the current list / all load-order rules"),
+			r("r", "add a rule for the mod at the editor's cursor"),
+			r("enter", "change the rule"),
+			r("Del / u", "remove the rule; u right after puts it back"),
+			r("o", "show its mod in the list"),
+			r("tab / shift+tab", "in the form: the next / previous field"),
+			r("← →", "in the form: the kind"),
+			r("esc", "close the form; back to the editor"),
+		)
+	}
+	if page == PageSearch { // 搜索文件 (06 §2.9)
 		out = append(out,
 			r("/  ctrl+f", "search"),
 			r("enter", "in the box: search; on a result: open its folder"),
 			r("alt+c / alt+w / alt+r / alt+d", "case, whole word, regex, Def name"),
 			r("alt+1 / alt+2", "files / C# code"),
+		)
+		if tui {
+			// the kind and scope rows are chips (06 §9.1)
+			out = append(out, r("↓ ↑ / ← → / space", "the kind and scope rows: go to a chip, switch it"))
+		}
+		out = append(out,
 			r("↑↓ / j k / PgUp PgDn / Home End", "move the cursor"),
 			r("[ ]", "previous / next page"),
 			r("ctrl+o", "open the folder"),
-			r("ctrl+c", "copy the path"),
-			r("esc", "stop the search; in the box: leave it"),
 		)
+		if !tui { // the terminal selects text itself (06 §3.1 rule 12)
+			out = append(out, r("ctrl+c", "copy the path"))
+		}
+		out = append(out, r("esc", "stop the search; in the box: leave it"))
 	}
 	if !tui && (page == LibraryPage || page == "packs" || page == "textures") {
 		out = append(out, r("s / < > =", "the headers: sort and columns; < > = changes or resets the sorted column's width"))
@@ -186,17 +207,17 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		// The launch page has three numbered columns (06 §2.3).
 		out = append(out, r("1–3", "focus the page's areas (the numbers in their headings)"),
 			r("w", "save the current list's edits to the game without launching (while there are any)"))
-	} else if page != EditorPage {
+	} else if page != EditorPage && page != RulesPage { // 排序规则 is one list
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}
 	tabText := "next / previous page under the same sidebar entry"
 	if page == ChangesPage && !tui {
 		tabText = "the next field or button"
 	}
-	out = append(out,
-		r("tab / shift+tab", tabText),
-		r("shift+1–8", "go to a page in the sidebar"),
-	)
+	if page != RulesPage { // its tab is the form's (above)
+		out = append(out, r("tab / shift+tab", tabText))
+	}
+	out = append(out, r("shift+1–8", "go to a page in the sidebar"))
 	if !tui {
 		out = append(out, r("alt+← / alt+→", "page back / forward"), r("ctrl+b", "navigation at the side / at the top"), r("ctrl+j", "background tasks; again goes back"), r("ctrl+\\", "reference numbers on every control, text and image"))
 	}

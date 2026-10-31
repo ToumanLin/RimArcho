@@ -46,6 +46,8 @@ const (
 	tabChanges
 	tabLibrary   // Mod 库存 (06 §2.9), from the palette
 	tabSubscribe // Mod 库存 › 添加订阅 (06 §2.9): + on 订阅与更新
+	tabSearch    // Mod 库 › 搜索文件 (06 §2.9)
+	tabRules     // 排序规则 (06 §2.5): r in the editor
 )
 
 // panel is a secondary screen: command output to read, or a chooser.
@@ -56,6 +58,8 @@ type panel struct {
 	choices []string // chooser values (env names)
 	choice  int
 	onPick  func(m *model, value string) tea.Cmd
+	// onPickAt: enter on choice i, for choices whose labels may repeat (H's steps)
+	onPickAt func(m *model, i int) tea.Cmd
 	// onDelete: d / delete on a choice (the environment chooser's 删除环境, 06 §2.14)
 	onDelete func(m *model, value string) tea.Cmd
 	// onEnter: enter runs it (a confirmation: the dry run is the text, 06 §6)
@@ -109,14 +113,19 @@ type model struct {
 	insp     *inspectView
 	inspHist []*inspectView
 
-	prob        probState
-	newLog      bool
-	analyzing   bool
-	analyzeWait func() tea.Msg
+	prob      probState
+	newLog    bool
+	analyzing bool
+	// analyzeQuiet: the check 能不能跑 starts by itself; its head says it runs, and the
+	// status line keeps what the player just did (the undo hint, 06 §2.4)
+	analyzeQuiet bool
+	analyzeWait  func() tea.Msg
 
 	chg   chState
 	libr  libState
 	add   addState   // 添加订阅
+	fs    fsState    // 搜索文件
+	rules rulesState // 排序规则
 	tasks taskRunner // the subscription actions' background tasks (06 §2.16)
 
 	bar      barState  // the editor's filter bar over 未启用 and 已启用 (06 §2.5)

@@ -66,8 +66,16 @@ var escPages = []escPage{
 		m.openChangesOf(m.current().id, m.current().name)
 		press(m, "?")
 	}},
+	{"Mod 库存 › 搜索文件", tabSearch, func(m *model) { runAlias(m, "search files") }},
+	{"Mod 库存 › 搜索文件，searched + back in the box", tabSearch, func(m *model) {
+		runAlias(m, "search files")
+		typeIn(m, "Harmony")
+		pressAll(m, "enter", "/")
+	}},
+	{"排序规则", tabRules, func(m *model) { runAlias(m, "load-order rules") }},
+	{"排序规则，the form open", tabRules, func(m *model) { press(m, "r") }},
 	{"整合包", tabList, func(m *model) { press(m, "%") }},
-	{"环境", tabList, func(m *model) { press(m, "&") }},
+	{"贴图优化", tabList, func(m *model) { press(m, "&") }},
 	{"设置", tabList, func(m *model) { runAlias(m, "settings") }},
 	{"卸载，the typed confirmation", tabList, func(m *model) { runAlias(m, "uninstall"); press(m, "enter") }},
 	{"方案，help", tabList, func(m *model) { press(m, "?") }},
@@ -81,7 +89,7 @@ func atBase(m *model, page int) bool {
 	l := &m.libr
 	clean := !m.full && !m.detailFocus && m.insp == nil && m.menu == nil && m.popupName() == "" && m.selCount() == 0 &&
 		!l.full && !l.detail && len(l.marked) == 0 && !l.bar.open && !l.bar.typing &&
-		(m.tab != tabChanges || m.chg.of == "")
+		(m.tab != tabChanges || m.chg.of == "") && !m.fsTyping() && (m.tab != tabRules || m.rules.form == nil)
 	return clean && (m.tab == page || m.tab == tabList)
 }
 
