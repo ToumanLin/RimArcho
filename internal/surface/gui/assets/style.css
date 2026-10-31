@@ -742,6 +742,11 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .settings .set .r > .field { min-width: 140px; }
 .settings .set .r { flex-wrap: wrap; row-gap: 6px; }
 .settings .group-note { padding: 8px 14px; font-size: 12px; color: var(--muted); border-bottom: var(--hairline) solid var(--line-2); }
+/* RimArcho's release notes, folded under its row (07 §5.1) */
+.settings .setting-details { padding: 0 14px 10px; font-size: 12px; }
+.settings .setting-details > summary { cursor: pointer; color: var(--muted); width: max-content; }
+.settings .setting-details > pre { margin: 6px 0; max-height: 320px; overflow: auto; white-space: pre-wrap; font: inherit; }
+.settings .setting-details > a { color: var(--muted); }
 
 /* ---- motion (06 §7.1): opacity and transform only ---- */
 /* a changed row flashes accent-soft: an overlay that fades, not an animated background */

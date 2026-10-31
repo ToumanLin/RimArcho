@@ -40,7 +40,7 @@ import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } 
 import { checkCredit, getChoices } from "./credit.js";
 import * as problems from "./problems.js";
 import * as fileSearch from "./filesearch.js";
-import { initRules, refreshRules, startRule } from "./rules.js";
+import { initRules, refreshRules, startRule, showRules } from "./rules.js";
 
 // ---- loading ----
 
@@ -742,7 +742,7 @@ async function cmd(id) {
   const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", feedback: "feedback", textures: "textures", tasks: "tasks", "search-files": "search" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
-  if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
+  if (["filter", "details", "tech", "tags", "rules"].includes(id) && scr.closeScreen()) renderWhere();
   switch (id) {
     // from the editor, 启动 opens the launch page, as L does there (06 §2.5)
     case "launch": return S.screen ? run(id) : goLaunch();
@@ -759,6 +759,7 @@ async function cmd(id) {
     case "plans": return plans.chooser();
     case "new-plan": return plans.newPlan();
     case "filter": return startSearch();
+    case "rules": return showRules();
     case "details": return verb("full");
     case "tech": return verb("full");
     case "tags": return verb("tags");

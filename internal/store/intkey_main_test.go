@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 func ikOpen(t *testing.T, path string) *sql.DB {
@@ -72,14 +72,15 @@ func TestIntKeyResearch(t *testing.T) {
 		limit = mb << 20
 	}
 	rounds := 3
-	e := testkit.New(t)
-	e.MustRun("env", "add", "bench", "--game", e.Game, "--user-data", e.UserData)
-	st, err := e.App.Loadout()
-	if err != nil {
+	// The library is written in the v27 layout the prototypes convert (schema v28 already
+	// is the chosen one; TestV28Formal measures it).
+	root := t.TempDir()
+	const envID = "bench-env"
+	s := &store.Store{DB: store.NewV27DB(t, filepath.Join(root, "base.db"))}
+	defer s.DB.Close()
+	if _, err := s.DB.Exec(`INSERT INTO environment(id,name,game_root,game_version,created_at) VALUES(?,?,?,?,1)`, envID, "bench", "D:/bench", "1.6.4633"); err != nil {
 		t.Fatal(err)
 	}
-	envID := st.Ix.Env.ID
-	s := e.App.Store
 	p := ikPlanLibrary(scale, envID)
 	begin := time.Now()
 	smp := ikLoad(t, s.DB, p, envID)
@@ -188,7 +189,7 @@ func TestIntKeyResearch(t *testing.T) {
 		want := strings.Split(v, ",")
 		layouts = slices.DeleteFunc(layouts, func(l ikLayout) bool { return l.name != "v26" && !slices.Contains(want, l.name) })
 	}
-	dir := filepath.Join(e.Root, "variants")
+	dir := filepath.Join(root, "variants")
 	os.MkdirAll(dir, 0o755)
 	base := map[string]uint64{}
 	for _, l := range layouts {

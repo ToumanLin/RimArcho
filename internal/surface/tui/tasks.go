@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,8 +18,8 @@ import (
 // 后台任务 (06 §2.16) in the terminal: the subscription actions (添加订阅, 检查更新, 更新,
 // 撤掉订阅) queue into app.Tasks — the record and lanes the window uses, <data>/tasks.json —
 // and run on their own database session, so the screen never waits for Git, a web page,
-// Steam or a folder move. The TUI has no task page yet: the status line says when a task is
-// queued and how it ended, and the window's 后台任务 page shows the record.
+// Steam or a folder move. The status line says when a task is queued and how it ended; the
+// palette's 后台任务 shows the record as text (showTasks), and the window's page acts on it.
 
 // taskEndedMsg: a background task ended.
 type taskEndedMsg struct{ t app.Task }
@@ -231,4 +232,31 @@ func (m *model) closeTasks() {
 	if ts != nil {
 		ts.Close()
 	}
+}
+
+// showTasks is 后台任务 as text (06 §9.1): the record the window and this TUI share, by
+// group, a task a line with how it ended. Stopping and retrying stay in the window.
+func (m *model) showTasks() {
+	p := view.BuildTasks(m.taskList().List(), time.Now())
+	titles := map[string]string{"run": "running", "queue": "queued", "today": "today", "yesterday": "yesterday", "earlier": "earlier"}
+	var b strings.Builder
+	group := ""
+	for _, r := range p.Rows {
+		if r.Group != group {
+			if group != "" {
+				b.WriteString("\n")
+			}
+			group = r.Group
+			b.WriteString(T(titles[group]) + "\n")
+		}
+		line := "  " + r.StateText + "  " + view.TaskStatus(r)
+		if r.Time != "" {
+			line += "  " + r.Time
+		}
+		b.WriteString(line + "\n")
+	}
+	if len(p.Rows) == 0 {
+		b.WriteString(T("nothing has run in the background yet") + "\n")
+	}
+	m.openPanel(T("background tasks"), b.String())
 }

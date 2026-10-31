@@ -157,6 +157,16 @@ type App struct {
 	AfterExitFunc     func(AfterExit) error
 	// Uninstalled is set once an uninstall has run: every command is refused after it.
 	Uninstalled bool
+	// Self-update (selfupdate.go, 07 §5.1), all for tests: SelfUpdateAPI replaces GitHub's
+	// API root, SelfVersion the running version, SelfProgram the program folder,
+	// SelfVersionOf asking the new program its version, SelfOthers listing the other
+	// RimArcho processes in a folder, SelfWaitPoll how often that is asked while waiting.
+	SelfUpdateAPI string
+	SelfVersion   string
+	SelfProgram   string
+	SelfVersionOf func(ctx context.Context, exe string) (string, error)
+	SelfOthers    func(dir string) []*GameRun
+	SelfWaitPoll  time.Duration
 
 	analyzing *pendingAnalysis
 
@@ -183,7 +193,17 @@ type App struct {
 }
 
 // Open opens (creating if needed) the data directory home.
-func Open(home string) (*App, error) {
+func Open(home string) (*App, error) { return OpenWith(home, OpenOptions{}) }
+
+// OpenOptions are the optional parts of opening the data directory.
+type OpenOptions struct {
+	// Upgrade receives the progress of a database upgrade while Open runs one (02 §7);
+	// the surfaces show it (cli.upgradeReport).
+	Upgrade func(store.UpgradeProgress)
+}
+
+// OpenWith is Open with options.
+func OpenWith(home string, o OpenOptions) (*App, error) {
 	defer perftrace.Span("app-open")()
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		return nil, err
@@ -197,7 +217,7 @@ func Open(home string) (*App, error) {
 		return nil, err
 	}
 	dbDone := perftrace.Span("db-open-migrate")
-	st, err := store.Open(filepath.Join(home, "archo.db"))
+	st, err := store.OpenUpgrading(filepath.Join(home, "archo.db"), o.Upgrade)
 	dbDone()
 	if err != nil {
 		return nil, err

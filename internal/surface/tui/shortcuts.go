@@ -90,7 +90,7 @@ func (m *model) openChangesOf(id, name string) tea.Cmd {
 	m.loadChanges()
 	if id != "" {
 		for i, r := range m.chg.rows {
-			if r.text == "3 "+T("change history") {
+			if r.text == "3 "+T("already updated") {
 				m.chg.cursor, m.chg.off = i, i
 				break
 			}

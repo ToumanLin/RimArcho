@@ -2,10 +2,6 @@ package gui
 
 import (
 	"context"
-	"errors"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -138,17 +134,9 @@ func (s *API) OpenSearchFolder(id, path string) error {
 	if err != nil {
 		return err
 	}
-	inside := func(root string) bool {
-		rel, err := filepath.Rel(root, path)
-		return err == nil && rel != "." && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel)
-	}
-	m := ix.ByID[id]
-	if m == nil || !inside(ix.ModDir(m)) && !inside(filepath.Join(home, "cache", "source")) {
-		return errors.New(view.T("the folder is not there"))
-	}
-	dir := filepath.Dir(path)
-	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
-		return errors.New(view.T("the folder is not there"))
+	dir, err := view.SearchFolder(ix, home, id, path)
+	if err != nil {
+		return err
 	}
 	if s.openDir != nil {
 		return s.openDir(dir)

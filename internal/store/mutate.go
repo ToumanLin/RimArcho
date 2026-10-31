@@ -206,6 +206,7 @@ func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, erro
 		for _, id := range r.Instances {
 			for _, q := range []string{
 				`DELETE FROM snapshot_file WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id=?)`,
+				`DELETE FROM snapshot_list WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id=?)`,
 				`DELETE FROM snapshot WHERE instance_id=?`,
 				`DELETE FROM instance_alias WHERE instance_id=?`,
 				`DELETE FROM content_state WHERE instance_id=?`,
@@ -239,12 +240,11 @@ func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, erro
 		rows.Close()
 		r.Snapshots = len(snaps)
 		for _, id := range snaps {
-			var n int64
-			tx.QueryRow(`SELECT count(*) FROM snapshot_file WHERE snapshot_id=?`, id).Scan(&n)
-			r.Files += n
-			if _, err := tx.Exec(`DELETE FROM snapshot_file WHERE snapshot_id=?`, id); err != nil {
+			n, err := deleteFiles(tx, `=?`, id)
+			if err != nil {
 				return err
 			}
+			r.Files += n
 			if _, err := tx.Exec(`DELETE FROM snapshot WHERE id=?`, id); err != nil {
 				return err
 			}

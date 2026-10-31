@@ -46,6 +46,9 @@ const (
 	tabChanges
 	tabLibrary   // Mod 库存 (06 §2.9), from the palette
 	tabSubscribe // Mod 库存 › 添加订阅 (06 §2.9): + on 订阅与更新
+	tabSearch    // Mod 库 › 搜索文件 (06 §2.9)
+	tabRules     // 排序规则 (06 §2.5): r in the editor
+	tabHome      // 启动 (06 §2.3): shift+1, and the editor's L
 )
 
 // panel is a secondary screen: command output to read, or a chooser.
@@ -56,6 +59,8 @@ type panel struct {
 	choices []string // chooser values (env names)
 	choice  int
 	onPick  func(m *model, value string) tea.Cmd
+	// onPickAt: enter on choice i, for choices whose labels may repeat (H's steps)
+	onPickAt func(m *model, i int) tea.Cmd
 	// onDelete: d / delete on a choice (the environment chooser's 删除环境, 06 §2.14)
 	onDelete func(m *model, value string) tea.Cmd
 	// onEnter: enter runs it (a confirmation: the dry run is the text, 06 §6)
@@ -111,15 +116,25 @@ type model struct {
 	insp     *inspectView
 	inspHist []*inspectView
 
-	prob        probState
-	newLog      bool
-	analyzing   bool
-	analyzeWait func() tea.Msg
+	prob      probState
+	newLog    bool
+	analyzing bool
+	// analyzeQuiet: the check 能不能跑 starts by itself; its head says it runs, and the
+	// status line keeps what the player just did (the undo hint, 06 §2.4)
+	analyzeQuiet bool
+	analyzeWait  func() tea.Msg
 
 	chg   chState
 	libr  libState
 	add   addState   // 添加订阅
-	tasks taskRunner // the subscription actions' background tasks (06 §2.16)
+	fs    fsState    // 搜索文件
+	rules rulesState // 排序规则
+	home  homeState  // 启动
+	// launches: the current list when the editor has another one open ("": the editor's
+	// list is the current one); the top bar says it (04 §1.3)
+	launches   string
+	launchesID int64
+	tasks      taskRunner // the subscription actions' background tasks (06 §2.16)
 
 	bar      barState  // the editor's filter bar over 未启用 and 已启用 (06 §2.5)
 	board    *boardRef // the board the columns were built from (the bar filters it)
@@ -169,6 +184,11 @@ type model struct {
 
 	scanning bool
 	quitting bool
+
+	// selfRun is RimArcho's own update while it installs; restartExe the new program Run
+	// starts once the screen has closed (07 §5.1).
+	selfRun    *selfUpdate
+	restartExe string
 }
 
 // New builds the TUI model.
@@ -232,8 +252,22 @@ func Run(o Options) error {
 	})
 	_, err := program.Run()
 	mdl.closeTasks()
+	if run := mdl.selfRun; run != nil {
+		// Quit during an install: stop it, and let a swap that has begun finish or roll back.
+		run.cancel()
+		app.WaitSelfSwap(30 * time.Second)
+	}
+	if err == nil && mdl.restartExe != "" {
+		return &Restart{Exe: mdl.restartExe}
+	}
 	return err
 }
+
+// Restart is Run's answer after RimArcho updated itself: the caller closes the database
+// and starts Exe in this terminal with the same arguments (07 §5.1).
+type Restart struct{ Exe string }
+
+func (r *Restart) Error() string { return "restart " + r.Exe }
 
 // ---- messages ----
 

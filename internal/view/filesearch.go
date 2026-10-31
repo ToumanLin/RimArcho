@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -262,6 +263,24 @@ func codeSearch(ctx context.Context, a *app.App, st *app.LoadoutState, mods []*s
 	}
 	page.Notes = append(page.Notes, res.Errors...)
 	return page, nil
+}
+
+// SearchFolder is the folder a result's file is in, for opening it (ctrl+o on a result):
+// only a file inside mod id's folder, or a decompiled file in RimArcho's C# cache.
+func SearchFolder(ix *app.Index, home, id, path string) (string, error) {
+	inside := func(root string) bool {
+		rel, err := filepath.Rel(root, path)
+		return err == nil && rel != "." && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel)
+	}
+	m := ix.ByID[id]
+	if m == nil || !inside(ix.ModDir(m)) && !inside(filepath.Join(home, "cache", "source")) {
+		return "", errors.New(T("the folder is not there"))
+	}
+	dir := filepath.Dir(path)
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return "", errors.New(T("the folder is not there"))
+	}
+	return dir, nil
 }
 
 func snippetText(s string, limit int) string {

@@ -85,8 +85,13 @@ func TestNeedsSectionsLive(t *testing.T) {
 	m.Update(liveTick{})
 	press(m, "@")
 	s := ansi.Strip(m.View())
-	brk, run := strings.Index(s, T(view.SectionTitles[view.SectionBreak])), strings.Index(s, T(view.SectionTitles[view.SectionRun])+"  ")
-	if brk < 0 || run < brk || !strings.Contains(s[run:], T("this run")) {
+	brk, run := strings.Index(s, T(view.SectionTitles[view.SectionBreak])), strings.Index(s, T("errors this run")+"  ")
+	title := s[run:]
+	if i := strings.IndexByte(title, '\n'); i >= 0 {
+		title = title[:i]
+	}
+	// the window's title while the game runs, not followed by "this run" again
+	if brk < 0 || run < brk || strings.Count(title, T("this run")) != 1 {
 		t.Fatalf("sections out of order:\n%s", s)
 	}
 	both := false
@@ -112,8 +117,19 @@ func TestNeedsSectionsLive(t *testing.T) {
 	if got, want := m.needCount(), countedNeeds(m); got != want || got <= m.prob.need {
 		t.Fatalf("top bar %d, counted items %d (analysis alone %d)", got, want, m.prob.need)
 	}
-	if !strings.Contains(s, Tf("%d to handle", m.needCount())) {
-		t.Fatalf("the head's count is not the top bar's %d:\n%s", m.needCount(), s)
+	// the window's lead sentence: what to handle before the start and the run's groups add
+	// up to the top bar's number
+	before, runs := 0, 0
+	for _, it := range m.prob.items {
+		switch {
+		case it.counted && it.section == view.SectionRun:
+			runs++
+		case it.counted:
+			before++
+		}
+	}
+	if before+runs != m.needCount() || !strings.Contains(s, view.NeedsLead(m.st.Plan.Name, before, runs, false, false)) {
+		t.Fatalf("the head's counts %d + %d are not the top bar's %d:\n%s", before, runs, m.needCount(), s)
 	}
 	press(m, "home")
 	press(m, "right")
@@ -129,7 +145,7 @@ func TestNeedsSectionsLive(t *testing.T) {
 	if it := m.prob.items[m.prob.cursor]; it.section != view.SectionRun {
 		t.Fatalf("2 went to %+v", it)
 	}
-	if s := ansi.Strip(m.View()); !strings.Contains(s, "2 "+T(view.SectionTitles[view.SectionRun])) {
+	if s := ansi.Strip(m.View()); !strings.Contains(s, "2 "+T("errors this run")) {
 		t.Fatalf("no number on the section:\n%s", s)
 	}
 }

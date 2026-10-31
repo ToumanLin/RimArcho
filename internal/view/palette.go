@@ -35,13 +35,13 @@ var Commands = []Command{
 	{"preview-launch", "预览启动", "preview the launch", "L dry run"},
 	{"undo", "撤销", "undo", "u"},
 	{"redo", "重做", "redo", "ctrl+r"},
-	{"needs", "需要处理", "needs attention", "! problems"},
+	{"needs", "能不能跑", "can it run", "@ shift+2 problems needs attention"},
 	{"changes", "订阅与更新", "subscriptions and updates", "c subscriptions updates history"},
 	{"library", "Mod 库", "mod library", "all mods, copies, sizes, filter, clean up"},
 	{"subscribe", "添加订阅", "add a subscription", "+ Git repository download page LoversLab Workshop SteamCMD"},
 	{"rescan", "重新扫描", "rescan", "R scan"},
 	{"analyze", "重新检查文件", "check the files again", "A analyze"},
-	{"log", "选择日志", "choose a log", "Player.log"},
+	{"log", "游戏日志", "game log", "l Player.log choose a log"},
 	{"env", "切换游戏", "switch game", "E env environment"},
 	{"plans", "列表", "lists", "P switch, new, rename, delete a list"},
 	{"new-plan", "新列表", "new list", "+ list copy import"},
@@ -52,14 +52,16 @@ var Commands = []Command{
 	{"filter", "筛选这一列", "filter", "/ search"},
 	{"details", "详情", "details", "enter"},
 	{"tech", "技术信息", "technical information", "i"},
-	{"tags", "编辑标签", "tags", "#"},
+	{"tags", "编辑标签", "tags", "g"},
 	{"packs", "整合包", "packs", "build, play"},
 	{"settings", "设置", "settings", "paths, language, data, caches"},
 	{"cli", "运行 archo 命令", "command line", ": archo"},
+	{"update", "更新 RimArcho", "update RimArcho", "new version release notes install upgrade"},
 	{"feedback", "反馈", "feedback", "GitHub issue report a bug suggestion"},
 	{"uninstall", "卸载 RimArcho", "uninstall RimArcho", "remove what RimArcho put on this machine"},
 	{"textures", "贴图优化", "texture optimisation", "convert mods' PNG textures to DDS"},
 	{"search-files", "搜索文件", "search files", "grep rg Def patch C# source decompile"},
+	{"rules", "排序规则", "load-order rules", "r rule after before incompatible top bottom"},
 	{"tasks", "后台任务", "background tasks", "ctrl+j running waiting failed queue"},
 	{"help", "帮助", "help", "?"},
 	{"quit", "退出", "quit", "q"},
@@ -84,8 +86,9 @@ type PalEntry struct {
 	Score int    `json:"-"`
 }
 
-// PalScore ranks one candidate for q (lower case): 4 prefix, 3 substring, 2 subsequence,
-// 1 description, 0 no match.
+// PalScore ranks one candidate for q (lower case): 4 prefix or suffix, 3 substring, 2
+// subsequence, 1 description, 0 no match. A suffix counts as a prefix: a Chinese name ends
+// in its head noun, so 排序 finds 自动排序 as well as 排序规则.
 func PalScore(q string, e PalEntry) int {
 	if q == "" {
 		return 1
@@ -97,7 +100,7 @@ func PalScore(q string, e PalEntry) int {
 			continue
 		}
 		switch {
-		case strings.HasPrefix(f, q):
+		case strings.HasPrefix(f, q), strings.HasSuffix(f, q):
 			best = max(best, 4)
 		case strings.Contains(f, q):
 			best = max(best, 3)

@@ -8,10 +8,13 @@ import (
 )
 
 func AutomaticName(kind string) string {
-	return T(map[string]string{"mods": "mods", "tools": "external tools", "session": "LoversLab session", "data": "community data"}[kind])
+	return T(map[string]string{"mods": "mods", "tools": "external tools", "session": "LoversLab session", "data": "community data", "self": "RimArcho updates"}[kind])
 }
 
 func AutomaticNotice(before, after app.AutomaticStatus) string {
+	if after.Kind == "self" {
+		return selfNotice(before, after)
+	}
 	if after.Pending <= 0 || after.Pending == before.Pending {
 		return ""
 	}
@@ -26,13 +29,23 @@ func AutomaticNotice(before, after app.AutomaticStatus) string {
 	return ""
 }
 
+// selfNotice: once per new version, not on every check that still finds it.
+func selfNotice(before, after app.AutomaticStatus) string {
+	if after.Pending <= 0 || after.Latest == "" || before.Pending > 0 && before.Latest == after.Latest {
+		return ""
+	}
+	return Tf("RimArcho %s can be updated; see Settings", after.Latest)
+}
+
 func AutomaticGroup(a *app.App) SettingGroup {
-	note := Tf("While RimArcho is open: check mods and community data %s, tools %s.", checkInterval(a.AutomaticInterval("mods")), checkInterval(a.AutomaticInterval("tools")))
+	note := Tf("While RimArcho is open: check mods, community data and RimArcho %s, tools %s.", checkInterval(a.AutomaticInterval("mods")), checkInterval(a.AutomaticInterval("tools")))
 	if a.Store.Meta("account:loverslab:enabled") == "true" {
 		note += " " + Tf("Check the LoversLab login %s.", checkInterval(a.AutomaticInterval("session")))
 	}
-	g := SettingGroup{Title: T("updates"), Note: note + " " + T("Mod and tool updates wait for your click.")}
+	g := SettingGroup{Title: T("updates"), Note: note + " " + T("Mod, tool and RimArcho updates wait for your click.")}
+	// RimArcho's own version first (used most), then the switch and the interval (06 §2.14)
 	g.Items = []SettingItem{
+		SelfUpdateItem(a),
 		{Label: T("automatic checks"), Value: cmds.Setting(a, "updates.auto"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "updates.auto", "{}"}},
 		{Label: T("check interval"), Value: cmds.Setting(a, "updates.interval"), Edit: "choice", Choices: []string{"normal", "frequent", "relaxed"}, ChoiceLabels: []string{T("standard intervals"), T("half the interval"), T("twice the interval")}, Argv: []string{"config", "set", "updates.interval", "{}"}},
 	}

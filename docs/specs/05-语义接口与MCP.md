@@ -54,6 +54,7 @@ AI 助手是第二类用户（00 §3.2），所以**玩家在界面上能做的�
 | 隐藏的 Mod：恢复显示、移到回收站（08 §6、§7） | 已完成 | 工具 `manage_hidden`，`destructiveHint: true` |
 | 环境管理、设置 | 已完成（`status` 的 `show`：envs / settings / data / db / cache） | 只读部分并入 `status`；修改留给玩家（这些改的是 RimArcho 自己的配置，影响面大） |
 | 社区数据更新、RimCrow 导入、数据库整理与压缩、`gc` | 已完成 | 工具 `maintenance`，`destructiveHint: true` |
+| 更新 RimArcho（07 §5.1） | 已完成（2026-10-31） | 没有工具：替换的是 RimArcho 自己的程序，同卸载由玩家决定；新版本在 `status` 的 `automatic checks` 一行（“RimArcho 0.9.1 available”） |
 | 卸载 RimArcho（01 §4.1） | 已完成 | 只有预览：只读工具 `preview_uninstall`（`uninstall --dry-run`，参数同 CLI）。没有执行卸载的工具，理由见 01 §4.1 |
 | 存档：列出、看一份、没碰过的内容；备份、移到回收站（10 §1.6、§4） | 都没有（1.1） | CLI `saves list/show/backup/trash`、`unplayed`；只读工具 `list_saves`、`get_save`、`list_unplayed`；写工具 `manage_saves`，`destructiveHint: true` |
 
@@ -261,6 +262,7 @@ next:
 | 设置 | `config get [<键>]` / `config set <键> <值>` | 见下 |
 | 说明 | `guide [<主题>]` | 给 agent 的说明（§5.3）：不带主题列出主题；工作流 `diagnose` / `errors` / `plans` / `words`，或一个 MCP 工具名（它的完整参考）。与 MCP `guide` 逐字相同；未知主题是用法错误 |
 | Archo Monitor | `monitor` / `monitor install [--dry-run]` | 随附与已安装的版本、来源、当前方案里的位置；安装、更新、默认加入方案（08 §9、04 §1.5） |
+| 更新 RimArcho | `update [--check]` | 先查 GitHub 上有没有更新的版本（记录同自动检查，06 §2.16.1 A15）；`--check` 只显示版本、发布日期、下载大小、会替换的文件、要等哪些别的 RimArcho 关闭和更新说明，不下载。不带 `--check` 就安装：下载、核对 SHA-256、等程序文件夹里没有别的 RimArcho 在运行（进度行写在等谁，`Ctrl+C` 停止且不改文件）、替换并确认新程序能运行，否则换回旧的；不重启，提示重新打开。数据目录不动（07 §5.1）。开发版不检查 |
 | 卸载 | `uninstall [--dry-run] [--yes] [--keep-locked [--locked-to <环境>]] [--remove-packs] [--packs-to <目录>] [--remove-saves] [--saves-to <目录>] [--remove-games] [--restore-modsconfig-backup] [--all]` | 删除 RimArcho 放在这台电脑上的东西、恢复它改过的（01 §4.1）。不带 `--yes` 只显示计划（与 `--dry-run` 相同），`--yes` 与 `--dry-run` 同时给是用法错误。参数都是非默认的那一边：`--keep-locked` 锁定库副本放进游戏的 `Mods/`（默认进回收站），`--remove-*` 进回收站（默认保留），`--*-to` 是保留的东西移到哪里，`--restore-modsconfig-backup` 换回备份（默认清理当前列表）。游戏或别的 RimArcho 在运行时拒绝 |
 | 存档（1.1，待实现） | `saves list [--colony <名>]` / `saves show <存档>` / `unplayed [--group never\|partial\|functional] [--mod <引用>]` | 只读（10 §1.6） |
 | | `saves backup <存档…>` / `saves trash <存档…>` | 要玩家确认（10 §4.4） |
