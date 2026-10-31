@@ -187,6 +187,13 @@ func (m *model) reload() {
 		}
 		return
 	}
+	// a list only open here: the top bar says which one launches (04 §1.3)
+	m.launches, m.launchesID = "", 0
+	if m.app.OpenPlan != 0 && st.Plan != nil {
+		if p, _ := m.app.Store.CurrentPlan(st.Ix.Env.ID); p != nil && p.ID != st.Plan.ID {
+			m.launches, m.launchesID = p.Name, p.ID
+		}
+	}
 	m.boardSeq++
 	m.board, m.barCache = &boardRef{b: b, seq: m.boardSeq}, nil
 	m.envName, m.gameVer = b.EnvName, b.GameVersion

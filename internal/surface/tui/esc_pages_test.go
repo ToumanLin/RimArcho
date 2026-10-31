@@ -74,6 +74,7 @@ var escPages = []escPage{
 	}},
 	{"排序规则", tabRules, func(m *model) { runAlias(m, "load-order rules") }},
 	{"排序规则，the form open", tabRules, func(m *model) { press(m, "r") }},
+	{"启动", tabHome, func(m *model) { press(m, "!") }},
 	{"整合包", tabList, func(m *model) { press(m, "%") }},
 	{"贴图优化", tabList, func(m *model) { press(m, "&") }},
 	{"设置", tabList, func(m *model) { runAlias(m, "settings") }},

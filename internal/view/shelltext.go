@@ -51,6 +51,8 @@ func init() {
 		"%d not installed": "%d 个没安装",
 		"%s is the current list: launching plays it; no game file was written": "%s 设为当前列表：启动时用它；没有改动游戏文件",
 		"launching plays %s": "启动的是 %s",
+		"no errors":          "没有报错",
+		"launch the game":    "启动游戏",
 		"launch this list from now on; no game file is written":     "以后启动这个列表；不改游戏文件",
 		"the game is launched with %s; this list is only open here": "游戏启动的是 %s；这个列表只是在这里打开",
 		"renamed %s to %s": "已把 %s 改名为 %s",

@@ -115,6 +115,8 @@ func (m *model) position() string {
 		p = T("mod library") + " › " + T("add a subscription")
 	case m.tab == tabSearch:
 		p = T("mod library") + " › " + T("search files")
+	case m.tab == tabHome:
+		p = T("start")
 	case m.tab == tabRules:
 		p = T("load-order rules")
 		if n := len(m.rules.shown()); n > 0 && m.rules.form == nil {

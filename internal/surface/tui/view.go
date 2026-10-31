@@ -44,6 +44,8 @@ func (m *model) View() string {
 		content = m.fsLines(body)
 	case m.tab == tabRules:
 		content = m.rulesLines(body)
+	case m.tab == tabHome:
+		content = m.homeLines(body)
 	case m.full:
 		content = m.fullLines(body)
 	case m.pos != nil:
@@ -110,6 +112,10 @@ func (m *model) topBar() string {
 	if m.st != nil && m.st.Plan != nil {
 		t := T("list") + " " + m.st.Plan.Name
 		add("  "+sText.Render(t), 2+width.StringWidth(t))
+		if m.launches != "" { // only open here: launching plays the current list
+			t := Tf("launching plays %s", m.launches)
+			add("  "+sDimS.Render(t), 2+width.StringWidth(t))
+		}
 		if m.st.WS != nil && m.st.WS.Conflict != 0 && m.w >= 110 {
 			t := Tf("an outside change is not used yet (v%d)", m.st.WS.Conflict)
 			add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
@@ -279,6 +285,8 @@ func (m *model) hintLine() string {
 		pairs = m.fsPairs()
 	case m.tab == tabRules:
 		pairs = m.rulesPairs()
+	case m.tab == tabHome:
+		pairs = m.homePairs()
 	case m.tab == tabChanges:
 		pairs = m.changesPairs()
 	case m.tab == tabLibrary && (m.libr.full || m.libr.detail):

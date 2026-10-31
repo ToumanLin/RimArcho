@@ -229,7 +229,7 @@ func (m *model) palAll() []palItem {
 	if rows, err := view.PlanRows(m.app); err == nil {
 		for _, e := range view.PlanEntries(rows) {
 			id := view.PlanOfPage(e.ID)
-			out = append(out, palItem{kind: palPlan, name: e.Name, alias: e.Alias, desc: e.Desc, run: func(m *model) tea.Cmd { return m.usePlan(id) }})
+			out = append(out, palItem{kind: palPlan, name: e.Name, alias: e.Alias, desc: e.Desc, run: func(m *model) tea.Cmd { return m.openPlan(id) }})
 		}
 	}
 	seen := map[string]bool{}

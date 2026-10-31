@@ -329,3 +329,86 @@ func TestAutoFixKeepsTheUndoHint(t *testing.T) {
 		t.Fatalf("still fixable:\n%s", screen(m))
 	}
 }
+
+// 启动 (06 §2.3, §9.1): shift+1 and the editor's L open it; it shows the current list and
+// ▶ 启动游戏, and only L there launches.
+func TestStartPage(t *testing.T) {
+	view.SetLang("en")
+	e, _ := fixture(t)
+	m := direct(t, e, 160, 40)
+	key(m, runes("!"))
+	s := screen(m)
+	if m.tab != tabHome || !strings.Contains(s, "default") || !strings.Contains(s, T("launch the game")) || !strings.Contains(s, "› "+T("start")) {
+		t.Fatalf("start page:\n%s", s)
+	}
+	press(m, "esc")
+	if m.tab != tabList {
+		t.Fatalf("esc: tab %d", m.tab)
+	}
+	key(m, runes("L"))
+	if m.tab != tabHome || len(e.Launched) != 0 {
+		t.Fatalf("editor L: tab %d, launched %v", m.tab, e.Launched)
+	}
+	key(m, runes("L"))
+	if len(e.Launched) != 1 {
+		t.Fatalf("L on 启动 did not launch: %v (%s)", e.Launched, m.status)
+	}
+}
+
+// Lists are opened, not switched to (04 §1.3): P opens another list, the top bar says which
+// one launches, 设为当前 or the editor's L makes it current.
+func TestOpenListIsNotCurrent(t *testing.T) {
+	view.SetLang("en")
+	e, _ := fixture(t)
+	e.MustRun("plan", "new", "second")
+	m := direct(t, e, 160, 40)
+	envID := m.st.Ix.Env.ID
+	cur := e.App.Store.CurrentPlanID(envID)
+	pick := func(prefix string) {
+		key(m, runes("P"))
+		for i, c := range m.panel.choices {
+			if strings.HasPrefix(c, prefix) {
+				m.panel.choice = i
+				key(m, tea.KeyMsg{Type: tea.KeyEnter})
+				return
+			}
+		}
+		t.Fatalf("no %q in %q", prefix, m.panel.choices)
+	}
+	pick("second")
+	if m.st.Plan.Name != "second" || e.App.Store.CurrentPlanID(envID) != cur || m.launches == "" {
+		t.Fatalf("open: editing %s, current %d (was %d), launches %q", m.st.Plan.Name, e.App.Store.CurrentPlanID(envID), cur, m.launches)
+	}
+	if top := strings.Split(screen(m), "\n")[0]; !strings.Contains(top, Tf("launching plays %s", m.launches)) {
+		t.Fatalf("top bar: %q", top)
+	}
+	pick(T("make current"))
+	if m.launches != "" || e.App.Store.CurrentPlanID(envID) == cur {
+		t.Fatalf("make current: launches %q", m.launches)
+	}
+	pick("default")
+	if m.launches != "second" {
+		t.Fatalf("open default: launches %q", m.launches)
+	}
+	key(m, runes("L")) // launching from its editor makes it current
+	if m.launches != "" || m.tab != tabHome || e.App.Store.CurrentPlanID(envID) != cur {
+		t.Fatalf("L: launches %q tab %d", m.launches, m.tab)
+	}
+}
+
+// T (06 §3.5): in staging everything goes back; elsewhere every enabled mod is staged.
+func TestStageAllKey(t *testing.T) {
+	view.SetLang("en")
+	e, _ := fixture(t)
+	m := direct(t, e, 160, 40)
+	m.focus = cActive
+	press(m, "T")
+	if len(m.cols[cStaging].items) == 0 {
+		t.Fatalf("T in 已启用 staged nothing: %s", m.status)
+	}
+	m.focus = cStaging
+	press(m, "T")
+	if len(m.cols[cStaging].items) != 0 || activeNames(t, e) != "Core, Alpha, Harmony" {
+		t.Fatalf("T in staging: %d left, %s", len(m.cols[cStaging].items), activeNames(t, e))
+	}
+}

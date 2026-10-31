@@ -91,9 +91,10 @@ func TestKeyTable(t *testing.T) {
 		t.Fatalf("$: tab %d", m.tab)
 	}
 	press(m, "!")
-	if !strings.Contains(m.status, "window") {
-		t.Fatalf("!: %q", m.status)
+	if m.tab != tabHome {
+		t.Fatalf("!: tab %d", m.tab)
 	}
+	press(m, "esc")
 	// enter opens and closes the full detail
 	press(m, "enter")
 	if !m.full {

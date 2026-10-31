@@ -48,6 +48,7 @@ const (
 	tabSubscribe // Mod 库存 › 添加订阅 (06 §2.9): + on 订阅与更新
 	tabSearch    // Mod 库 › 搜索文件 (06 §2.9)
 	tabRules     // 排序规则 (06 §2.5): r in the editor
+	tabHome      // 启动 (06 §2.3): shift+1, and the editor's L
 )
 
 // panel is a secondary screen: command output to read, or a chooser.
@@ -126,6 +127,11 @@ type model struct {
 	add   addState   // 添加订阅
 	fs    fsState    // 搜索文件
 	rules rulesState // 排序规则
+	home  homeState  // 启动
+	// launches: the current list when the editor has another one open ("": the editor's
+	// list is the current one); the top bar says it (04 §1.3)
+	launches   string
+	launchesID int64
 	tasks taskRunner // the subscription actions' background tasks (06 §2.16)
 
 	bar      barState  // the editor's filter bar over 未启用 and 已启用 (06 §2.5)

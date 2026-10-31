@@ -60,8 +60,8 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("ctrl+y / ctrl+r", "redo"),
 				r(pick("← → / 1–4", "← → / 1–4 / h l"), "go to an area"),
 				r("J K / alt+J K", "move down / up 1 (10); with a filter, past the rows shown"),
-				r("T", pick("put everything back from staging; elsewhere, stage everything enabled", "put everything back from staging")),
-				r("S / w / L", pick("sort, save, to the launch page (the palette previews them)", "sort, save, launch (the palette previews them)")),
+				r("T", "put everything back from staging; elsewhere, stage everything enabled"),
+				r("S / w / L", "sort, save, to the launch page (the palette previews them)"),
 				r(pick("i / e", "e"), pick("import, export the mod list", "export the mod list")),
 				r("R / A", "rescan, check the files again"),
 				r("P / E", "lists, games"),
@@ -207,6 +207,11 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		// The launch page has three numbered columns (06 §2.3).
 		out = append(out, r("1–3", "focus the page's areas (the numbers in their headings)"),
 			r("w", "save the current list's edits to the game without launching (while there are any)"))
+	} else if page == "home" {
+		// The terminal's is one column: the current list and its launch key (06 §9.1).
+		out = append(out, r("L / enter", "launch the game"),
+			r("w", "save the current list's edits to the game without launching (while there are any)"),
+			r("P", "lists"), r("esc", "back"))
 	} else if page != EditorPage && page != RulesPage { // 排序规则 is one list
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}

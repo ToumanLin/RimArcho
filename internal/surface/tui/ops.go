@@ -204,8 +204,7 @@ func (m *model) goPage(n int) tea.Cmd {
 	m.full, m.insp, m.panel = false, nil, nil
 	switch n {
 	case 1:
-		m.say(sayInfo, T("the start page is in the window only, ctrl+k goes anywhere"))
-		return nil
+		return m.openHome()
 	case 2:
 		m.tab = tabProblems
 		return m.ensureProblems()
@@ -257,7 +256,7 @@ func (m *model) subPage(d int) tea.Cmd {
 				at = i
 			}
 		}
-		return m.usePlan(rows[(at+d+len(rows))%len(rows)].ID)
+		return m.openPlan(rows[(at+d+len(rows))%len(rows)].ID)
 	}
 	return nil
 }
@@ -278,6 +277,8 @@ func (m *model) helpPage() tea.Cmd {
 		page = view.PageSearch
 	case tabRules:
 		page = view.RulesPage
+	case tabHome:
+		page = "home"
 	}
 	rows := view.KeyHelp(page, true)
 	w := 0

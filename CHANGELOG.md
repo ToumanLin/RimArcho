@@ -29,8 +29,15 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - TUI: after an edit on 能不能跑 (`F`, an item's key), the check that follows by itself no
   longer writes its progress and "分析完成" over the status line, so "…，u 可撤销" stays;
   the page head says "正在检查 Mod 的文件…" meanwhile. `A` still reports in the status line.
-- TUI: `?` no longer says `T` stages everything outside staging: in the terminal `T` only
-  puts everything back.
+- TUI: a simple 启动 page (`shift+1`): the current list, its game and full version, how it
+  stands, the last game's errors, the most likely trouble, and ▶ 启动游戏. The editor's `L`
+  now goes there first, as in the window, and `L` or `enter` there launches; `w` saves
+  without launching.
+- TUI: picking a list in `P`, in the palette or with `tab` in the editor only opens it, as
+  in the window: the list that launches stays, and the top bar says "启动的是 X". `P` has
+  设为当前; saving the list or `L` in its editor makes it current.
+- TUI: `T` outside staging puts every enabled mod into staging, as in the window; in
+  staging it still puts everything back.
 - GUI: the palette's 排序规则 opens the editor's rules card.
 - Palette (both): a name that ends with what you typed ranks like one that starts with it,
   so "排序" still puts 自动排序 first, next to the new 排序规则.

@@ -235,6 +235,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.fsKey(s)
 	case tabRules:
 		return m.rulesKey(k)
+	case tabHome:
+		return m.homeKey(s)
 	}
 	if m.detailFocus {
 		if cmd, ok := m.detailKey(s); ok {
@@ -330,6 +332,13 @@ func (m *model) listKey(s string) tea.Cmd {
 	case "t":
 		return m.stageKey()
 	case "T":
+		// in staging: everything back in place; elsewhere: every enabled mod into staging,
+		// as in the window (06 §3.5)
+		if m.focus != cStaging {
+			m.verb(view.StageAll(m.app))
+			m.clearSel()
+			return m.requestDetail()
+		}
 		n := len(m.cols[cStaging].items)
 		if n == 0 {
 			m.say(sayInfo, T("staging is empty"))
@@ -367,7 +376,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		m.act(T("redid the change"), "redo")
 		return m.requestDetail()
 	case "L":
-		return m.listAction(view.ListLaunch)
+		return m.goLaunch() // 启动 first, as in the window (06 §2.5)
 	case "x":
 		if it := c.cur(); it != nil && it.id != "" {
 			m.act(Tf("switched the version of %s", it.name), "swap", it.ref)
