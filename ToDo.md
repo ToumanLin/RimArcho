@@ -51,30 +51,5 @@ docs应该做成英语, 项目中除了本地化和词表外不留中文;
 ## MCP
 精简MCP指令, 做到渐进式披露
 
-## Github static check doesn't pass
-56s
-Run go run honnef.co/go/tools/cmd/staticcheck@2026.2.2 ./...
-  go run honnef.co/go/tools/cmd/staticcheck@2026.2.2 ./...
-  shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
-go: downloading honnef.co/go/tools v0.8.2
-go: downloading golang.org/x/tools v0.51.0
-go: downloading golang.org/x/exp/typeparams v0.0.0-20231108232855-2478ac86f678
-go: downloading github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c
-go: downloading golang.org/x/mod v0.41.0
-go: downloading golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
-Error: internal\app\autoupdate_test.go:122:29: should use constant http.StatusServiceUnavailable instead of numeric literal 503 (ST1013)
-Error: internal\app\autoupdate_test.go:199:29: should use constant http.StatusServiceUnavailable instead of numeric literal 503 (ST1013)
-Error: internal\app\autoupdate_test.go:248:29: should use constant http.StatusServiceUnavailable instead of numeric literal 503 (ST1013)
-Error: internal\app\workshopsub.go:463:6: func steamWorkerProcess is unused (U1000)
-Error: internal\logs\phase_test.go:10:6: func phaseTotals is unused (U1000)
-Error: internal\store\content_test.go:83:5: identical expressions on the left and right side of the '||' operator (SA4000)
-Error: internal\store\factsets_test.go:240:3: should use t.Fatalf(...) instead of t.Fatal(fmt.Sprintf(...)) (S1038)
-Error: internal\store\migrate26_test.go:197:3: should use t.Fatalf(...) instead of t.Fatal(fmt.Sprintf(...)) (S1038)
-Error: internal\surface\gui\gamebranches_test.go:76:27: empty critical section (SA2001)
-Error: internal\surface\gui\readers.go:268:2: empty critical section (SA2001)
-Error: internal\view\problemview.go:98:27: do not pass a nil Context, even if a function permits it; pass context.TODO if you are unsure about which Context to use (SA1012)
-exit status 1
-Error: Process completed with exit code 1.
-
 ## Archo Agent
 Archo 要做的是能动手的 Mod 开发 agent，不是翻译、打标签这类小功能 
