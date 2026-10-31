@@ -11,6 +11,7 @@ import * as home from "/js/home.js";
 import * as packs from "/js/packs.js";
 import * as guide from "/js/guide.js";
 import * as uninstall from "/js/uninstall.js";
+import * as feedback from "/js/feedback.js";
 import * as full from "/js/fulldetail.js";
 import { setText } from "/js/api.js";
 import * as ops from "/js/ops.js";
@@ -246,6 +247,7 @@ try {
     handlers.set("Home", () => ({ rows: [], featured: -1 }));
     handlers.set("SubscriptionsPage", () => ({ sources: [], pending: [], history: { rows: [] } }));
   });
+  handlers.set("FeedbackCompose", () => ({ body: "fixture", url: "https://github.com/ToumanLin/RimArcho/issues/new", full: true }));
   const pages = [
     ["home", "Home", () => home.home(), { rows: [], featured: -1 }],
     ["needs", "Needs", () => screens.needs(), { items: [] }],
@@ -257,6 +259,7 @@ try {
     ["build", "BuildPage", () => packs.build(), 1],
     ["guide", "GuideFind", () => guide.start(), []],
     ["uninstall", "UninstallPlan", () => uninstall.open(), { steps: [] }],
+    ["feedback", "FeedbackAttach", () => feedback.open(), { basic: [], parts: [], sections: [] }],
     ["full", "ModCopies", () => full.full("library", "fixture"), { row: null }],
     [null, "Workspace", editor, workspace],
     ["library", "Library", () => library.open(), { rows: [], columns: [] }],

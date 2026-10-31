@@ -31,7 +31,7 @@ func AutomaticGroup(a *app.App) SettingGroup {
 	if a.Store.Meta("account:loverslab:enabled") == "true" {
 		note += " " + Tf("Check the LoversLab login %s.", checkInterval(a.AutomaticInterval("session")))
 	}
-	g := SettingGroup{Title: T("automatic checks"), Note: note + " " + T("Mod and tool updates wait for your click.")}
+	g := SettingGroup{Title: T("updates"), Note: note + " " + T("Mod and tool updates wait for your click.")}
 	g.Items = []SettingItem{
 		{Label: T("automatic checks"), Value: cmds.Setting(a, "updates.auto"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "updates.auto", "{}"}},
 		{Label: T("check interval"), Value: cmds.Setting(a, "updates.interval"), Edit: "choice", Choices: []string{"normal", "frequent", "relaxed"}, ChoiceLabels: []string{T("standard intervals"), T("half the interval"), T("twice the interval")}, Argv: []string{"config", "set", "updates.interval", "{}"}},

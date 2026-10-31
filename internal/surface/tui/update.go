@@ -568,6 +568,9 @@ func (m *model) panelKey(s string) tea.Cmd {
 		}
 		return nil
 	}
+	if f := p.keys[s]; f != nil {
+		return f(m)
+	}
 	switch s {
 	case ":":
 		m.panel = nil // one command after another (06 §9.4)

@@ -1450,10 +1450,12 @@ export async function settings() {
   sc.innerHTML = "";
   const w = page("settings", "");
   sc.append(w);
-  const appearance = groups.filter(g => g.items?.some(it => it.edit === "swatches"));
-  renderGroups(w, appearance, settings);
-  w.querySelector(".settings")?.append(bg);
-  renderGroups(w, groups.filter(g => !appearance.includes(g)), settings);
+  // Groups in view.SettingsPage's order (the TUI's too); 启动页背景 closes the card that
+  // holds the accent colour.
+  for (const g of groups) {
+    renderGroups(w, [g], settings);
+    if (g.items?.some(it => it.edit === "swatches")) w.lastElementChild.append(bg);
+  }
   markSettingTasks(tasks);
   sc.scrollTop = top;
   read.finish();
@@ -1634,6 +1636,11 @@ function renderGroups(w, groups, again) {
           try { const p = await api.PickProgram(); if (p) run(it.argv, p); } catch (e) { say("fail", errText(e)); }
         }, "", "apply-setting"));
         right.append(ok);
+      } else if (it.url) {
+        // 社区: a web page, opened in the browser (06 §2.14)
+        const b = button(it.value + " ↗", "", () => api.OpenURL(it.url).catch(e => say("fail", errText(e))), "link");
+        b.title = it.url;
+        right.append(b);
       } else {
         right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
       }
@@ -1648,8 +1655,8 @@ function renderGroups(w, groups, again) {
 
 function renderSettingActions(right, actions, run, item) {
   for (const a of actions || []) {
-    // 卸载 RimArcho is its own page with the plan; every other action is a command
-    if (a.argv[0] === "uninstall") {
+    // 卸载 RimArcho and 反馈 are their own pages; every other action is a command
+    if (a.argv[0] === "uninstall" || a.argv[0] === "feedback") {
       const b = button(a.label, "", () => ui.go(a.argv[0]));
       b.dataset.settingAction = a.argv.join(" ");
       right.append(b); continue;

@@ -12,6 +12,7 @@ import * as plans from "./plans.js";
 import * as library from "./library.js";
 import { exchange } from "./exchange.js";
 import * as uninst from "./uninstall.js";
+import * as feedbackPage from "./feedback.js";
 import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
@@ -83,6 +84,7 @@ export async function openPage(id, plan = null, entry = null) {
     case "log": return scr.gameLog(undefined, true);
     case "settings": return scr.settings();
     case "uninstall": return uninst.open();
+    case "feedback": return feedbackPage.open();
     case "textures": return tex.open();
     case "tasks": return tasksPage.open();
     case "search": return fileSearch.open();

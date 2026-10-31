@@ -60,6 +60,8 @@ type panel struct {
 	onDelete func(m *model, value string) tea.Cmd
 	// onEnter: enter runs it (a confirmation: the dry run is the text, 06 §6)
 	onEnter func(m *model) tea.Cmd
+	// keys: a text panel's own keys (反馈's m / p / l, 06 §2.14); the panel stays open
+	keys map[string]func(m *model) tea.Cmd
 }
 
 // prompt is an input line: a name, a note, a rule (r), an import source. The command

@@ -22,6 +22,8 @@ func DirectoryLabel(d app.ManagedDirectory) string {
 		return T("Archo Monitor folder")
 	case "tool", "steamcmd-tool":
 		return T("SteamCMD program folder")
+	case app.SubscribedLabel:
+		return T("subscription downloads")
 	default:
 		return d.Label
 	}
@@ -82,6 +84,7 @@ func init() {
 	Register(map[string]string{
 		"choose parent folder…":   "选择目标的上级目录…",
 		"SteamCMD program folder": "SteamCMD 程序目录",
+		"subscription downloads":  "订阅下载目录",
 		"managed directories":     "RimArcho 管理的目录",
 		"game folder (%s)":        "游戏目录（%s）",
 		"SteamCMD folder (%s)":    "SteamCMD 目录（%s）",

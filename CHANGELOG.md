@@ -4,6 +4,26 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Settings › Feedback (反馈, also in the command palette): write a bug report or
+  suggestion and open it as a new GitHub issue in the browser, title and text filled in.
+  No GitHub token; nothing is sent until you submit it on GitHub. RimArcho's version, the
+  game version and Windows always go with it; the enabled mods, the paths (your user
+  folder shown as `%USERPROFILE%`) and the newest game log's errors only when ticked, and
+  the page shows the whole text first. A report too long for a link (about 2,000
+  characters) is copied for you and the link says where to paste it. In the TUI the same
+  panel ticks the attachments with `m` `p` `l` and opens GitHub with `enter`.
+- Settings are reordered, most used first, in the window and the TUI alike: 界面
+  (language, day/night, accent colour, Workshop descriptions and images, GPU, start page
+  background), 账户, 更新 (the automatic checks; the group was called 自动检查 like its
+  first row), 文件夹, 游戏日志, 外部工具, 社区数据, 存储, 社区, and 卸载 last. 外观 and
+  界面 became one group; RimArcho's folders and adding a mod folder became one group
+  (文件夹); the database and the caches became 存储. The new 社区 group has 反馈… and
+  the GitHub and Discord links (github.com/ToumanLin/RimArcho, discord.gg/HF2GVyurQs),
+  which open in the browser.
+- Settings: the language choice reads 跟随系统 / 简体中文 / English instead of
+  auto / zh / en, and RimArcho's subscription download folder is labelled
+  (订阅下载目录) instead of "Subscriptions".
+
 - List editor: the cards stacked in a column (详情, 排序规则, 历史; 已启用 and 暂存) are
   4 px apart like the columns, not 12 px.
 
