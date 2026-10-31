@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- GUI: off/on dropdowns are now rounded rectangular two-segment switches with concentric inner corners. Other dropdowns use rounded menus with centered SVG arrows, concentric option corners, a title, checked current value, keyboard navigation and scrolling; menus stay within the window and above scroll containers.
+
 - Settings › Feedback (反馈, also in the command palette): write a bug report or
   suggestion; it becomes a public issue in the GitHub repository, which the page says
   above the preview. Two ways:

@@ -1,3 +1,4 @@
+import { closeChoiceMenu } from "./choices.js";
 // Popups (06 §3.1 rule 5): the command palette, the tag bar, the position input, a
 // confirmation, a text or choice panel, help. Each has a title, shows in the position
 // line, closes with esc, and never nests: opening one closes the other.
@@ -8,6 +9,7 @@ let ui = null;
 export function initPopups(u) { ui = u; }
 
 export function open(kind, title, build) {
+  closeChoiceMenu();
   close();
   const box = $("#popup");
   box.innerHTML = "";
@@ -378,6 +380,7 @@ export async function help(page = "plan") {
 // works it as the mouse does: ↑↓ (or tab) move, enter runs, esc closes; it opens with the
 // first item focused when the menu key or shift+F10 opened it (keys = true).
 export function menu(x, y, actions, keys = false) {
+  closeChoiceMenu();
   const m = $("#menu");
   m.innerHTML = "";
   for (const a of actions) {

@@ -1,3 +1,4 @@
+import { choiceControl } from "./choices.js";
 // 库 › 贴图优化 (08 §5.2, 06 §2.13): the current plan's (or every mod's) PNG textures, what
 // RimArcho converted and what went stale, what converting at a scale would take and save,
 // then the run in the background ("textures" events), stop, and take everything back. The
@@ -58,7 +59,7 @@ export function event(ev) {
   }
   X.prog = ev;
   if (S.screen !== "textures") { say("busy", T("converting textures") + "  " + ev.text); return; }
-  $("#screen").querySelectorAll("select").forEach((s) => { s.disabled = true; });
+  $("#screen").querySelectorAll(".choice-control").forEach((s) => { s.disabled = true; });
   const f = $("#screen .tex-foot");
   if (f && X.info) f.replaceWith(slot(foot(X.info, X.page), "foot"));
 }
@@ -75,16 +76,10 @@ function setRow(card, name, sub, ...right) {
   return row;
 }
 
-// select: a choice that measures again; f names it, so a redraw keeps the focus on it.
+// f names the choice so a redraw keeps focus on it.
 function select(f, values, labels, value, onchange) {
-  const s = el("select");
+  const s = choiceControl(T(f === "scope" ? "mods" : "scale"), values.map((v, i) => ({ value: v, label: labels[i] })), value);
   s.dataset.f = f;
-  values.forEach((v, i) => {
-    const o = el("option", "", labels[i]);
-    o.value = String(v);
-    if (String(v) === String(value)) o.selected = true;
-    s.append(o);
-  });
   s.onchange = () => onchange(s.value);
   s.disabled = !!X.prog || X.loading;
   return s;
@@ -211,7 +206,7 @@ function draw(measurements = false) {
   if (previous) textureRows(rows, previous.querySelector('[data-tex="rows"]'));
   else w.append(slot(textureRows(rows), "rows"));
   if (previous) {
-    // Keep live select elements in place while estimates arrive (06 §3.1).
+    // Keep live choice controls in place while estimates arrive (06 §3.1).
     previous.setAttribute("aria-busy", String(busy));
     for (const next of w.querySelectorAll("[data-tex]")) updateMeasurement(previous.querySelector(`[data-tex="${next.dataset.tex}"]`), next);
     return;

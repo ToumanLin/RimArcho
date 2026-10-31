@@ -1,3 +1,4 @@
+import { choiceControl } from "./choices.js";
 // 整合包 (06 §2.6, §2.7, 08 §5): the packs (the sidebar's 整合包), each pack's own page
 // (its sub-entries), and 编译成整合包, the plan's sub-page: on the left the name and the
 // things building does, on the right the summary and 编译, disabled with the reason when
@@ -472,17 +473,10 @@ function drawBuild() {
     }
     r.append(n, body);
     if (s.kind === "textures" && p.texChoices) {
-      // the choice itself, a native select: tab reaches it, ↑↓ change it
-      const sel = el("select", "field bd-tex");
+      const sel = choiceControl(s.title, p.texChoices, B.tex);
+      sel.classList.add("field", "bd-tex");
       sel.id = "pk-tex";
-      for (const c of p.texChoices) {
-        const o = el("option", "", c.label);
-        o.value = String(c.value);
-        sel.append(o);
-      }
-      sel.value = String(B.tex);
       sel.onchange = () => setTex(+sel.value);
-      sel.onkeydown = (e) => { if (e.key === "Escape") { e.stopPropagation(); sel.blur(); } };
       body.insertBefore(sel, body.children[1]);
     }
     if (s.go) r.append(button(T("install"), "", () => ui.go(s.go), "primary"));

@@ -1,3 +1,4 @@
+import { closeChoiceMenu } from "./choices.js";
 // Session page navigation (06 §3.1 rule 11). Page reads report completion here;
 // refreshes and stale replies never add another visit. No browser History API is used.
 import { S, $, api } from "./state.js";
@@ -113,6 +114,7 @@ const same = (a, b) => a && b && a.id === b.id &&
 // go() and direct entries to a different screen start visits. A same-screen read
 // only replaces its data ticket: it still belongs to the pending visit or replay.
 export function pageEntering(name) {
+  closeChoiceMenu();
   if (arguments.length && name === S.screen) return;
   if (!opening) { revision++; replay = null; pendingVisit = true; }
 }
@@ -145,6 +147,7 @@ function allowed(entry) {
 
 // Back closes only the temporary top layer; it never runs a page's data actions.
 export async function travel(direction) {
+  if (direction < 0 && closeChoiceMenu(true)) return;
   if (direction < 0) {
     if ($("#menu") && !$("#menu").hidden) { pop.hideMenu(); return; }
     if (S.popup) { pop.close(); return; }

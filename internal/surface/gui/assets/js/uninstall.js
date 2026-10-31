@@ -1,7 +1,8 @@
+import { choiceControl } from "./choices.js";
 // 设置 › 卸载 RimArcho (06 §2.14): the dry run of every step (view.UninstallPage), the player's
 // answers inline on the steps that have them (a checkbox, and where kept things go), one
 // button that runs it, the progress, then the same rows as the report. Everything is a
-// native control, so tab, space and enter do what the mouse does.
+// keyboard-reachable control, so tab, space and enter do what the mouse does.
 import { copyablePath } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button, pickFolder, beginPageRead } from "./screens.js";
@@ -88,14 +89,8 @@ function stepRow(pg, s) {
 
 function envPick(pg) {
   const q = el("div", "un-ask");
-  const sel = el("select");
+  const sel = choiceControl(T("to %s's Mods folder").replace("%s", "…"), pg.envs, pg.lockedTo);
   sel.dataset.f = "lockedTo";
-  for (const n of pg.envs) {
-    const o = el("option", "", n);
-    o.value = n;
-    if (n === pg.lockedTo) o.selected = true;
-    sel.append(o);
-  }
   sel.onchange = () => answer("lockedTo", sel.value);
   const [a, b] = T("to %s's Mods folder").split("%s");
   q.append(el("span", "muted", a), sel, el("span", "muted", b || ""));

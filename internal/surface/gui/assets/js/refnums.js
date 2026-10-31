@@ -26,7 +26,7 @@ const EDITOR = "edt"; // the plan editor (S.screen is null)
 const SETTING = "ui.gui.refnums";
 const KEEP = 3000; // remembered elements per page at most (the oldest go first)
 
-const CONTROL = "button, a[href], input:not([type=hidden]), select, textarea, summary, label:has(> input), [role=button], [role=tab], [role=menuitem], [role=option], [role=checkbox], [role=switch], [role=slider], [role=separator][tabindex], [contenteditable=true], .row, .lrow";
+const CONTROL = "button, a[href], input:not([type=hidden]), select, textarea, summary, label:has(> input), [role=button], [role=tab], [role=menuitem], [role=option], [role=checkbox], [role=combobox], [role=switch], [role=slider], [role=separator][tabindex], [contenteditable=true], .row, .lrow";
 const MEDIA = "img, canvas, video, picture, svg";
 const TEXT = "p, h1, h2, h3, h4, h5, h6, li, dt, dd, th, td, pre, blockquote, figcaption, legend, label";
 // what an element does, when it says so: stable across its label's changes
@@ -137,12 +137,14 @@ function covered(e, box) {
 // shell part it is in) down, such as "#screen .page.home .hm-hero .hm-facts > span".
 // first: only each element's first class (the later ones are usually states: on, hot).
 function where(e, first = false) {
-  const part = (n) => n.id ? "#" + n.id : n.classList.length ? "." + (first ? n.classList[0] : [...n.classList].join(".")) : "";
+  // Choice IDs connect ARIA nodes for one render; their place and label identify refnums.
+  const lastingId = n => n.id && !/^choice-(control|list|option|title)-/.test(n.id);
+  const part = (n) => lastingId(n) ? "#" + n.id : n.classList.length ? "." + (first ? n.classList[0] : [...n.classList].join(".")) : "";
   const out = [];
   for (let n = e; n && n !== document.body; n = n.parentElement) {
     const p = part(n);
     if (p) out.unshift(p);
-    if (n.id) break;
+    if (lastingId(n)) break;
   }
   out.push("> " + e.tagName.toLowerCase());
   return out.join(" ");

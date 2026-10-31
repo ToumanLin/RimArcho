@@ -116,9 +116,9 @@ test("copy chooses another list and its own version without changing the current
   await h.pm.open(1); await h.pm.newList(); await inputName(h, "My copy"); await mode(h, "current");
   const source = h.screen.querySelector(".pm-source"); source.value = "2"; source.onchange(); await flush();
   assert.equal(h.S.shell.plan.id, 1, "source browsing does not switch current list");
-  assert.ok(h.screen.querySelector(".pm-version").textContent.includes("History 2"));
-  assert.ok(!h.screen.querySelector(".pm-version").textContent.includes("History 1"));
-  const version = h.screen.querySelector(".pm-version"); version.value = "v2"; version.onchange();
+  const version = h.screen.querySelector(".pm-version");
+  version.value = "v1"; assert.equal(version.value, "", "old source version is absent");
+  version.value = "v2"; assert.ok(version.textContent.includes("History 2")); version.onchange();
   await buttonNamed(h.screen, "create and edit").onclick();
   assert.deepEqual(copies, [[2, "My copy", "v2"]]);
   assert.equal(h.routes.at(-1), "plan:3");
@@ -167,7 +167,9 @@ test("late source replies never replace a newer selection", async () => {
   pending[0].resolve({ count: 10, versions: [{ from: "v1", label: "Stale source" }], saves: [] }); await initial;
   assert.equal(h.screen.querySelector(".pm-name").value, "Keep input");
   assert.equal(h.screen.querySelector(".pm-source").value, "2");
-  assert.ok(h.screen.querySelector(".pm-version").textContent.includes("Latest source"));
+  const version = h.screen.querySelector(".pm-version");
+  version.value = "v1"; assert.equal(version.value, "", "late old source version is absent");
+  version.value = "v2"; assert.ok(version.textContent.includes("Latest source"));
   assert.ok(!h.screen.textContent.includes("Stale source"));
 });
 
