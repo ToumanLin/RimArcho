@@ -4,6 +4,16 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- GUI: Ctrl+K and `:` open one bottom command panel on every page. Search actions,
+  mods, games and lists, or run archo commands with shared TUI completion and history.
+  Commands run in background tasks; output keeps the CLI text and exit code and can
+  be copied. Destructive commands still require `--yes`.
+- Windows: use flat caption buttons with thin separators and a red close hover;
+  replace the settings icon with a six-tooth gear in both navigation layouts.
+
+- Windows: move minimize, maximize / restore and close into the navigation's top row,
+  replacing the native title bar. Drag its blank space to move the window or
+  double-click to maximize / restore; window controls follow the page theme.
 - Settings › Feedback (反馈, also in the command palette): write a bug report or
   suggestion; it becomes a public issue in the GitHub repository, which the page says
   above the preview. Two ways:

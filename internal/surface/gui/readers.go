@@ -206,6 +206,7 @@ func (s *API) logSession() (*app.App, error) {
 
 // Close releases the page reader's database connection (also used by the dev harness).
 func (s *API) Close() {
+	s.closeCommand()
 	s.closeProblemProviders()
 	s.closeFileSearch()
 	if s.branchCancel != nil {

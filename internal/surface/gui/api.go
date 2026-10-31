@@ -123,6 +123,7 @@ type API struct {
 	ScanRunner func(env string) (string, error)
 
 	subRevision atomic.Uint64 // completed tasks may change files without a DB write
+	command     commandWorker
 }
 
 func newAPI(a *app.App) *API {
@@ -1587,27 +1588,6 @@ func (s *API) Palette(query string) []view.PalEntry {
 	return out
 }
 
-// RunCLI runs a line the player typed as an archo command (the palette's command line).
-func (s *API) RunCLI(line string) []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	argv := splitArgs(line)
-	if len(argv) > 0 && argv[0] == "archo" {
-		argv = argv[1:]
-	}
-	if len(argv) == 0 || argv[0] == "mcp" || argv[0] == "tui" || argv[0] == "gui" {
-		return []string{view.T("not a command here")}
-	}
-	text, _ := cmds.Execute(s.a, argv)
-	s.board, s.needs = nil, nil
-	st := s.boardState()
-	var out []string
-	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
-		out = append(out, view.Humanize(st, l))
-	}
-	return out
-}
-
 // OpenURL opens an http(s) link in the system browser (links in descriptions, the
 // Workshop page).
 func (s *API) OpenURL(raw string) error {
@@ -1668,30 +1648,4 @@ func firstLine(s string) string {
 		return s[:i]
 	}
 	return s
-}
-
-// splitArgs splits a command line on spaces, keeping "quoted words" together.
-func splitArgs(line string) []string {
-	var out []string
-	var cur strings.Builder
-	in, has := false, false
-	for _, r := range line {
-		switch {
-		case r == '"':
-			in, has = !in, true
-		case r == ' ' && !in:
-			if has {
-				out = append(out, cur.String())
-				cur.Reset()
-				has = false
-			}
-		default:
-			cur.WriteRune(r)
-			has = true
-		}
-	}
-	if has {
-		out = append(out, cur.String())
-	}
-	return out
 }

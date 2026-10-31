@@ -8,6 +8,7 @@ import { liveCount, seg, setSeg } from "./screens.js";
 import { bump, slideNav, places, slideFrom } from "./motion.js";
 import * as pop from "./popups.js";
 import { wireSeparator } from "./separator.js";
+import { initWindowChrome, placeWindowControls } from "./window-chrome.js";
 
 let ui = null;
 
@@ -22,6 +23,7 @@ export const navLayout = () => layout;
 
 export function initShell(u) {
   ui = u;
+  initWindowChrome();
   const t = $("#navtoggle");
   t.innerHTML = icon.sidebar;
   t.onclick = () => toggleNav();
@@ -49,6 +51,7 @@ function applyNav() {
   const app = $("#app");
   app.classList.toggle("nav-top", layout === "top");
   app.classList.toggle("nav-side", layout === "side");
+  placeWindowControls(layout);
   const t = $("#navtoggle");
   t.title = (layout === "side" ? T("navigation at the top") : T("navigation at the side")) + T("; ") + "ctrl+b";
   slideNav($("#nav"), true);

@@ -227,14 +227,6 @@ func TestScanEvent(t *testing.T) {
 	_ = e
 }
 
-func TestSplitArgs(t *testing.T) {
-	t.Parallel()
-	got := splitArgs(`list --filter "tag:my tag"  -x`)
-	if strings.Join(got, "|") != "list|--filter|tag:my tag|-x" {
-		t.Fatalf("%q", got)
-	}
-}
-
 // T: the whole enabled list goes to staging (Core stays), one step; put all back restores
 // the order.
 func TestStageAll(t *testing.T) {
