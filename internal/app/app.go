@@ -183,7 +183,17 @@ type App struct {
 }
 
 // Open opens (creating if needed) the data directory home.
-func Open(home string) (*App, error) {
+func Open(home string) (*App, error) { return OpenWith(home, OpenOptions{}) }
+
+// OpenOptions are the optional parts of opening the data directory.
+type OpenOptions struct {
+	// Upgrade receives the progress of a database upgrade while Open runs one (02 §7);
+	// the surfaces show it (cli.upgradeReport).
+	Upgrade func(store.UpgradeProgress)
+}
+
+// OpenWith is Open with options.
+func OpenWith(home string, o OpenOptions) (*App, error) {
 	defer perftrace.Span("app-open")()
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		return nil, err
@@ -197,7 +207,7 @@ func Open(home string) (*App, error) {
 		return nil, err
 	}
 	dbDone := perftrace.Span("db-open-migrate")
-	st, err := store.Open(filepath.Join(home, "archo.db"))
+	st, err := store.OpenUpgrading(filepath.Join(home, "archo.db"), o.Upgrade)
 	dbDone()
 	if err != nil {
 		return nil, err

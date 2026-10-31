@@ -4,6 +4,19 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- The database (`archo.db`) is about a third smaller: on a synthetic library like a big
+  real one, 245 → 156 MB. Each mod version's list of textures, sounds, translations and
+  other non-code files is stored as one compressed block, and Def / assembly facts name
+  their file by a number in their set's list instead of repeating the path. The first
+  start after updating upgrades the database (schema 28) in one go, about 5 seconds on
+  that library; nothing is rescanned or reanalysed. While it runs, `RimArcho.exe` shows
+  a small window with a progress bar before the main window, and the TUI, CLI and MCP
+  write one line to stderr ("Upgrading the RimArcho database (schema 27 → 28)…", then the
+  time it took); an upgrade under 0.3 s shows nothing. The freed space is reclaimed by the
+  next database compaction. Finding which mod ships a missing texture or DLL from the game
+  log is two to three times faster; the change history's file lists, Can it run, `def`,
+  `harmony` and `db vacuum --dry-run` show the same as before.
+
 - List editor: the cards stacked in a column (详情, 排序规则, 历史; 已启用 and 暂存) are
   4 px apart like the columns, not 12 px.
 

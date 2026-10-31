@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -37,19 +38,27 @@ func (s *Store) ContentKeys() (map[string]string, error) {
 
 // CachedDefs returns an instance's Def facts if they were built for key.
 func (s *Store) CachedDefs(instanceID, key string) ([]analyze.DefFact, bool) {
+	// The analysis reads every inactive mod's set once: its list comes with the set, not
+	// through the cache (setfiles.go).
 	var id int64
-	if err := s.DB.QueryRow(`SELECT id FROM fact_set WHERE instance_id=? AND kind='def' AND content_key=?`, instanceID, key).Scan(&id); err != nil {
+	var data string
+	if err := s.DB.QueryRow(`SELECT id, files FROM fact_set WHERE instance_id=? AND kind='def' AND content_key=?`, instanceID, key).Scan(&id, &data); err != nil {
+		return nil, false
+	}
+	files, err := decodeFiles(id, data)
+	if err != nil {
 		return nil, false
 	}
 	rows, err := s.DB.Query(`SELECT ? AS instance_id,`+defFields+` FROM def_fact f WHERE f.set_id=? ORDER BY f.rowid`, instanceID, id)
 	if err != nil {
 		return nil, false
 	}
-	fs, err := scanDefs(rows)
+	fs, err := s.scanDefsWith(rows, func(set int64) []string { return files })
 	return fs, err == nil
 }
 
-const defFields = `f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file, f.line, f.may_require, f.may_require_any`
+// defFields: file_ix indexes the set's file list (03 §3); scanDefs turns it into the path.
+const defFields = `f.set_id, f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file_ix, f.line, f.may_require, f.may_require_any`
 const defCols = `c.instance_id, ` + defFields
 const defView = ` FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id `
 
@@ -65,19 +74,42 @@ const (
 	defsByNameQ    = `SELECT ` + defCols + defByName + `WHERE f.name=? AND f.name<>'' AND c.game_mm=? ORDER BY c.instance_id, f.rowid`
 )
 
-func scanDefs(rows *sql.Rows) ([]analyze.DefFact, error) {
+func (s *Store) scanDefs(rows *sql.Rows) ([]analyze.DefFact, error) { return s.scanDefsWith(rows, nil) }
+
+// scanDefsWith: with lists, the file lists are known (CachedDefs).
+func (s *Store) scanDefsWith(rows *sql.Rows, lists func(set int64) []string) ([]analyze.DefFact, error) {
 	defer rows.Close()
 	var out []analyze.DefFact
+	var at []fileRef
 	for rows.Next() {
 		var f analyze.DefFact
 		var abs int
-		if err := rows.Scan(&f.Instance, &f.Type, &f.DefName, &f.Name, &f.Parent, &abs, &f.File, &f.Line, &f.MayRequire, &f.MayRequireAny); err != nil {
+		var r fileRef
+		if err := rows.Scan(&f.Instance, &r.set, &f.Type, &f.DefName, &f.Name, &f.Parent, &abs, &r.ix, &f.Line, &f.MayRequire, &f.MayRequireAny); err != nil {
 			return nil, err
 		}
 		f.Abstract = abs != 0
 		out = append(out, f)
+		at = append(at, r)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if lists != nil {
+		for i, r := range at {
+			l := lists(r.set)
+			if r.ix < 0 || r.ix >= len(l) {
+				return nil, fmt.Errorf("store: fact set %d has no file %d", r.set, r.ix)
+			}
+			out[i].File = l[r.ix]
+		}
+		return out, nil
+	}
+	for i := range at {
+		at[i].to = &out[i].File
+	}
+	return out, s.resolveFiles(at)
 }
 
 // DefsOf returns the Def facts of one instance, in file order.
@@ -86,7 +118,7 @@ func (s *Store) DefsOf(instanceID string) ([]analyze.DefFact, error) {
 	if err != nil {
 		return nil, err
 	}
-	return scanDefs(rows)
+	return s.scanDefs(rows)
 }
 
 // DefsNamed returns the Def facts with a defName (or, with byName, a Name attribute), by
@@ -102,7 +134,7 @@ func (s *Store) DefsNamed(name string, byName bool) ([]analyze.DefFact, error) {
 	if err != nil {
 		return nil, err
 	}
-	return scanDefs(rows)
+	return s.scanDefs(rows)
 }
 
 // DefCounts returns the number of Def facts per instance.
@@ -400,22 +432,22 @@ func (s *Store) PatchCount(analysisID int64, instanceID string) (ops, failed int
 }
 
 func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, sets map[string]int64) error {
-	insA, err := tx.Prepare(`INSERT INTO assembly_fact(set_id, file, skipped, manual, uses_harmony, types, patches, error) VALUES(?,?,?,?,?,?,?,?)`)
+	insA, err := tx.Prepare(`INSERT INTO assembly_fact(set_id, file_ix, skipped, manual, uses_harmony, types, patches, error) VALUES(?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer insA.Close()
-	insT, err := tx.Prepare(`INSERT INTO type_fact(set_id, file, type_name) VALUES(?,?,?)`)
+	insT, err := tx.Prepare(`INSERT INTO type_fact(set_id, file_ix, type_name) VALUES(?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer insT.Close()
-	insH, err := tx.Prepare(`INSERT INTO harmony_fact(set_id, file, patch_type, patch_method, kind, target, target_type, target_method, args, skips, dynamic) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+	insH, err := tx.Prepare(`INSERT INTO harmony_fact(set_id, file_ix, patch_type, patch_method, kind, target, target_type, target_method, args, skips, dynamic) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer insH.Close()
-	insI, err := tx.Prepare(`INSERT INTO harmony_id(set_id, file, id) VALUES(?,?,?)`)
+	insI, err := tx.Prepare(`INSERT INTO harmony_id(set_id, file_ix, id) VALUES(?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -426,29 +458,44 @@ func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, sets map[string]int6
 		}
 		return 0
 	}
+	lists := map[int64]*fileIndex{}
+	var order []int64
 	for _, a := range asms {
-		if sets[a.Instance] == 0 {
+		set := sets[a.Instance]
+		if set == 0 {
 			continue
 		}
-		if _, err := insA.Exec(sets[a.Instance], a.File, b(a.Skipped), b(a.Manual), b(a.UsesHarm), len(a.Types), len(a.Patches), a.Err); err != nil {
+		x := lists[set]
+		if x == nil {
+			x = &fileIndex{}
+			lists[set] = x
+			order = append(order, set)
+		}
+		file := x.of(a.File)
+		if _, err := insA.Exec(set, file, b(a.Skipped), b(a.Manual), b(a.UsesHarm), len(a.Types), len(a.Patches), a.Err); err != nil {
 			return err
 		}
 		for _, t := range a.Types {
-			if _, err := insT.Exec(sets[a.Instance], a.File, t); err != nil {
+			if _, err := insT.Exec(set, file, t); err != nil {
 				return err
 			}
 		}
 		for _, p := range a.Patches {
 			// dynamic holds two bits: 1 the target is chosen at run time, 2 the patch was
 			// found at a Harmony.Patch call in code (G9, 03 §5.3).
-			if _, err := insH.Exec(sets[a.Instance], a.File, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)); err != nil {
+			if _, err := insH.Exec(set, file, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)); err != nil {
 				return err
 			}
 		}
 		for _, id := range a.IDs {
-			if _, err := insI.Exec(sets[a.Instance], a.File, id); err != nil {
+			if _, err := insI.Exec(set, file, id); err != nil {
 				return err
 			}
+		}
+	}
+	for _, set := range order {
+		if _, err := tx.Exec(`UPDATE fact_set SET files=? WHERE id=?`, lists[set].json(), set); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -472,7 +519,7 @@ type HarmonyFilter struct {
 
 // HarmonyPatches returns stored patches ordered by target.
 func (s *Store) HarmonyPatches(f HarmonyFilter) ([]*HarmonyRow, error) {
-	q := `SELECT c.instance_id, f.file, f.patch_type, f.patch_method, f.kind, f.target, f.skips, f.dynamic FROM harmony_fact f JOIN content_state c ON c.dll_set_id=f.set_id WHERE c.game_mm=?`
+	q := `SELECT c.instance_id, f.set_id, f.file_ix, f.patch_type, f.patch_method, f.kind, f.target, f.skips, f.dynamic FROM harmony_fact f JOIN content_state c ON c.dll_set_id=f.set_id WHERE c.game_mm=?`
 	args := []any{s.MM}
 	if f.Instance != "" {
 		q += ` AND c.instance_id=?`
@@ -493,16 +540,23 @@ func (s *Store) HarmonyPatches(f HarmonyFilter) ([]*HarmonyRow, error) {
 	}
 	defer rows.Close()
 	var out []*HarmonyRow
+	var at []fileRef
 	for rows.Next() {
-		var h HarmonyRow
+		h := &HarmonyRow{}
 		var sk, dy int
-		if err := rows.Scan(&h.Instance, &h.File, &h.PatchType, &h.PatchMethod, &h.Kind, &h.Target, &sk, &dy); err != nil {
+		r := fileRef{to: &h.File}
+		if err := rows.Scan(&h.Instance, &r.set, &r.ix, &h.PatchType, &h.PatchMethod, &h.Kind, &h.Target, &sk, &dy); err != nil {
 			return nil, err
 		}
 		h.Skips, h.Dynamic, h.Manual = sk != 0, dy&1 != 0, dy&2 != 0
-		out = append(out, &h)
+		out = append(out, h)
+		at = append(at, r)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	return out, s.resolveFiles(at)
 }
 
 // AssemblyRow is a stored assembly.
@@ -515,38 +569,38 @@ type AssemblyRow struct {
 
 // Assemblies returns the stored assemblies of an instance.
 func (s *Store) Assemblies(instanceID string) ([]*AssemblyRow, error) {
-	rows, err := s.DB.Query(`SELECT c.instance_id, f.file, f.skipped, f.manual, f.uses_harmony, f.types, f.patches, f.error FROM assembly_fact f JOIN content_state c ON c.dll_set_id=f.set_id WHERE c.instance_id=? AND c.game_mm=? ORDER BY f.rowid`, instanceID, s.MM)
+	rows, err := s.DB.Query(`SELECT c.instance_id, f.set_id, f.file_ix, f.skipped, f.manual, f.uses_harmony, f.types, f.patches, f.error FROM assembly_fact f JOIN content_state c ON c.dll_set_id=f.set_id WHERE c.instance_id=? AND c.game_mm=? ORDER BY f.rowid`, instanceID, s.MM)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []*AssemblyRow
+	var at []fileRef
 	for rows.Next() {
-		var a AssemblyRow
+		a := &AssemblyRow{}
 		var sk, ma, uh int
-		if err := rows.Scan(&a.Instance, &a.File, &sk, &ma, &uh, &a.Types, &a.Patches, &a.Err); err != nil {
+		r := fileRef{to: &a.File}
+		if err := rows.Scan(&a.Instance, &r.set, &r.ix, &sk, &ma, &uh, &a.Types, &a.Patches, &a.Err); err != nil {
 			return nil, err
 		}
 		a.Skipped, a.Manual, a.UsesHm = sk != 0, ma != 0, uh != 0
-		out = append(out, &a)
+		out = append(out, a)
+		at = append(at, r)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	return out, s.resolveFiles(at)
 }
 
 // TypeOwners returns the (instance, file) pairs defining a type full name. Nested types are
 // stored with '+'; stack frames may print either.
 func (s *Store) TypeOwners(name string) ([][2]string, error) {
 	alt := strings.ReplaceAll(name, ".", "+")
-	rows, err := s.DB.Query(`SELECT DISTINCT c.instance_id, f.file FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id WHERE f.type_name IN (?, ?) AND c.game_mm=?`, name, alt, s.MM)
+	out, err := s.typeOwners(`f.type_name IN (?, ?)`, name, alt)
 	if err != nil {
 		return nil, err
-	}
-	defer rows.Close()
-	var out [][2]string
-	for rows.Next() {
-		var a, b string
-		rows.Scan(&a, &b)
-		out = append(out, [2]string{a, b})
 	}
 	if len(out) == 0 && strings.Contains(name, ".") {
 		// Nested types: try replacing the last dot(s) with '+' one at a time.
@@ -560,23 +614,43 @@ func (s *Store) TypeOwners(name string) ([][2]string, error) {
 			out = r
 		}
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // TypeOwners0 is TypeOwners for an exact stored name.
 func (s *Store) TypeOwners0(name string) ([][2]string, error) {
-	rows, err := s.DB.Query(`SELECT DISTINCT c.instance_id, f.file FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id WHERE f.type_name=? AND c.game_mm=?`, name, s.MM)
+	return s.typeOwners(`f.type_name=?`, name)
+}
+
+// typeOwners lists the distinct (instance, file) pairs of the matching type facts, in the
+// order the rows come.
+func (s *Store) typeOwners(where string, args ...any) ([][2]string, error) {
+	rows, err := s.DB.Query(`SELECT DISTINCT c.instance_id, f.set_id, f.file_ix FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id WHERE `+where+` AND c.game_mm=?`, append(args, s.MM)...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out [][2]string
+	var at []fileRef
 	for rows.Next() {
-		var a, b string
-		rows.Scan(&a, &b)
-		out = append(out, [2]string{a, b})
+		var a string
+		var r fileRef
+		if err := rows.Scan(&a, &r.set, &r.ix); err != nil {
+			return nil, err
+		}
+		out = append(out, [2]string{a})
+		at = append(at, r)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	for i := range at {
+		at[i].to = &out[i][1]
+	}
+	// One DLL view per instance and version, and a list names each file once: the
+	// distinct (instance, set, index) rows are the distinct (instance, file) pairs.
+	return out, s.resolveFiles(at)
 }
 
 // HarmonyIDOwners returns the instances whose assemblies contain the Harmony ID string.

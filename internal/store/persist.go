@@ -74,29 +74,9 @@ func insertSnapshot(tx *sql.Tx, instanceID string, scanID int64, ob *scan.Observ
 	}
 	id, _ := res.LastInsertId()
 	if copied {
-		_, err = tx.Exec(`INSERT INTO snapshot_file(snapshot_id, rel_path, size, mtime, hash)
-			SELECT ?, rel_path, size, mtime, hash FROM snapshot_file WHERE snapshot_id=?`, id, prevSnap)
-		return id, err
+		return id, copyFiles(tx, id, prevSnap)
 	}
 	return id, insertFiles(tx, id, ob.FP.Files)
-}
-
-func insertFiles(tx *sql.Tx, snapID int64, files []scan.File) error {
-	st, err := tx.Prepare(`INSERT OR REPLACE INTO snapshot_file(snapshot_id, rel_path, size, mtime, hash) VALUES(?,?,?,?,?)`)
-	if err != nil {
-		return err
-	}
-	defer st.Close()
-	for _, f := range files {
-		var h any
-		if f.HasHash {
-			h = f.Hash[:]
-		}
-		if _, err := st.Exec(snapID, f.Rel, f.Size, f.MTime, h); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // ApplyScan persists one reconciliation result in a single transaction.
@@ -180,7 +160,7 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 			snapID = a.Prev.ID
 			if ob.FP.Hashed > 0 && ob.FP.Files != nil {
 				// Same content, newer mtimes: refresh the cache so the next scan can skip hashing.
-				if _, err = tx.Exec(`DELETE FROM snapshot_file WHERE snapshot_id=?`, snapID); err != nil {
+				if _, err = deleteFiles(tx, `=?`, snapID); err != nil {
 					return err
 				}
 				if err = insertFiles(tx, snapID, ob.FP.Files); err != nil {

@@ -109,10 +109,19 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 	if err != nil {
 		return r, err
 	}
+	// A manifest is its rows and its block (02 §7); Files counts the files either lists.
 	const obsolete = `snapshot_id NOT IN (SELECT id FROM maintenance_keep)`
+	var listedFiles int64
+	if err = c.QueryRowContext(ctx, `SELECT coalesce(sum(n),0) FROM snapshot_list WHERE `+obsolete).Scan(&listedFiles); err != nil {
+		return r, err
+	}
 	if o.DryRun {
 		err = c.QueryRowContext(ctx, `SELECT count(*) FROM snapshot_file WHERE `+obsolete).Scan(&r.Files)
+		r.Files += listedFiles
 		r.After = r.Before
+		return r, err
+	}
+	if _, err = c.ExecContext(ctx, `DELETE FROM snapshot_list WHERE `+obsolete); err != nil {
 		return r, err
 	}
 	res, err := c.ExecContext(ctx, `DELETE FROM snapshot_file WHERE `+obsolete)
@@ -123,6 +132,7 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 	if err != nil {
 		return r, err
 	}
+	r.Files += listedFiles
 	// 2. Version views no game needs and the fact sets nothing references (03 §3).
 	if err = pruneFactsOn(ctx, c, o.Now); err != nil {
 		return r, err
