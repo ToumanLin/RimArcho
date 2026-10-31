@@ -17,6 +17,24 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   log is two to three times faster; the change history's file lists, Can it run, `def`,
   `harmony` and `db vacuum --dry-run` show the same as before.
 
+- RimArcho updates itself. While the window or the TUI is open, the automatic checks also
+  ask GitHub Releases for a newer RimArcho (daily by default, the same switch and interval
+  as the other checks; a release build only looks at releases, a prerelease build such as
+  1.0.0-rc1 also at newer prereleases; development builds never check). A new version
+  shows in Settings › automatic checks as a "RimArcho" row with its release notes folded
+  under it and **install update** / **check for updates**, as a line at the top right of
+  the launch page, and once as a quiet notice. Installing asks first, then downloads the
+  release zip, checks it against the release's `.sha256` file, waits until no other
+  RimArcho runs from the program folder (window, TUI, `archo mcp`; it can be stopped while
+  it waits), swaps the program files, checks that the new program starts and puts the old
+  one back if it does not, and restarts the window or the TUI. The data folder is not
+  touched. New command `archo update` (installs; `--check` only checks and shows what it
+  would do). `archo status` / MCP `status`: the `automatic checks` line says
+  "RimArcho 0.9.1 available". There is no MCP tool that installs. TUI: command palette
+  "更新 RimArcho" or `:update`. `release.ps1` now also writes
+  `dist/archo-<version>-windows-amd64.zip.sha256`; upload it with the zip, or the update
+  is not offered for installing.
+
 - List editor: the cards stacked in a column (详情, 排序规则, 历史; 已启用 and 暂存) are
   4 px apart like the columns, not 12 px.
 

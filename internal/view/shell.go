@@ -293,6 +293,8 @@ type Home struct {
 	// Launch is the current plan's most likely trouble (Needs.Launch): the tab under the
 	// launch button says it with its reason and opens 能不能跑. It never blocks.
 	Launch *LaunchHint `json:"launch,omitempty"`
+	// Update is the line about a new RimArcho at the top right (07 §5.1); nil when there is none.
+	Update *SelfUpdateLine `json:"update,omitempty"`
 }
 
 // BuildHome builds the home page: one row per plan of the environment and one per pack.
@@ -301,7 +303,7 @@ type Home struct {
 // follow by name.
 func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow) *Home {
 	if b == nil || b.St == nil {
-		return &Home{Featured: -1}
+		return &Home{Featured: -1, Update: SelfUpdateHome(a)}
 	}
 	return BuildHomeFromState(a, b.St, n, plans, packs)
 }
@@ -356,6 +358,7 @@ func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []Plan
 	h.LastRun, h.LastRunDay, h.LastRunErrors = n.LastRun, n.LastRunDay, LastRunErrors(n)
 	h.Launch = n.Launch
 	h.Changes = ChangeHome(a, st)
+	h.Update = SelfUpdateHome(a)
 	return h
 }
 

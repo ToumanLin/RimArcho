@@ -33,6 +33,8 @@ export function initScreens(u) {
     if (ev?.notice) say(ev.kind === "session" ? "warn" : "ok", ev.notice);
     if (S.screen === "settings") refreshSettingTasks(true);
     if (S.screen === "changes" && ev?.kind === "mods") changes();
+    // a new RimArcho puts its line on the launch page (06 §2.3); found rarely, so redraw
+    if (S.screen === "home" && ev?.kind === "self" && ev?.notice) ui.reload();
   });
   on("tasks", (ev) => {
     if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
@@ -1478,6 +1480,14 @@ async function refreshSettingTasks(values = false) {
       const note = row.querySelector(".setting-note"), value = row.querySelector(".setting-value");
       if (note) { factText(note, { text: it.note || "", paths: it.notePaths }); note.hidden = !it.note; }
       if (value) factText(value, { text: it.value || "", paths: it.valuePath ? [it.value] : [] });
+      const valueNote = row.querySelector(".setting-value-note");
+      if (valueNote) { valueNote.textContent = it.valueNote || ""; valueNote.hidden = !it.valueNote; }
+      const folded = row.nextElementSibling?.classList.contains("setting-details") ? row.nextElementSibling : null;
+      if (JSON.stringify(it.details || null) !== (folded?.dataset.details || "null")) {
+        const open = !!folded?.open;
+        folded?.remove();
+        if (it.details) { const d = settingDetails(it.details); d.open = open; row.after(d); }
+      }
       const actions = JSON.stringify(it.actions || []);
       if (row.dataset.settingActions !== actions) {
         row.querySelectorAll("[data-setting-action]").forEach(b => b.remove());
@@ -1637,13 +1647,31 @@ function renderGroups(w, groups, again) {
       } else {
         right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
       }
-      if (it.valueNote) right.append(el("span", "muted word-facts", it.valueNote));
+      const valueNote = el("span", "muted word-facts setting-value-note", it.valueNote || "");
+      valueNote.hidden = !it.valueNote;
+      right.append(valueNote);
       renderSettingActions(right, it.actions, run, it);
       row.append(left, right);
       card.append(row);
+      if (it.details) card.append(settingDetails(it.details));
     }
     w.append(card);
   }
+}
+
+// settingDetails folds text under its row (06 §3.1 rule 7): RimArcho's release notes.
+function settingDetails(d) {
+  const box = el("details", "setting-details");
+  box.dataset.details = JSON.stringify(d);
+  box.append(el("summary", "", d.summary));
+  if (d.text) box.append(el("pre", "sub", d.text.replace(/\r\n/g, "\n")));
+  if (d.link) {
+    const a = el("a", "sub", d.link);
+    a.href = d.link;
+    a.onclick = (e) => { e.preventDefault(); api.OpenURL(d.link).catch((x) => say("fail", errText(x))); };
+    box.append(a);
+  }
+  return box;
 }
 
 function renderSettingActions(right, actions, run, item) {

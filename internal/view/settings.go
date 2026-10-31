@@ -36,6 +36,15 @@ type SettingItem struct {
 	Hover        string          `json:"hover,omitempty"`
 	ValueNote    string          `json:"valueNote,omitempty"`
 	Actions      []SettingAction `json:"actions,omitempty"`
+	// Details fold under the row (06 §3.1 rule 7): RimArcho's release notes.
+	Details *SettingDetails `json:"details,omitempty"`
+}
+
+// SettingDetails is text folded under a row: Summary opens it, Link is where it came from.
+type SettingDetails struct {
+	Summary string `json:"summary"`
+	Text    string `json:"text"`
+	Link    string `json:"link,omitempty"`
 }
 
 // SettingAction is a button: a command, confirmed first when Confirm is set.
@@ -50,6 +59,12 @@ type SettingAction struct {
 
 // SettingTask identifies commands that queue after confirmation (06 §2.14, 06 §2.16).
 func SettingTask(argv []string) string {
+	if len(argv) > 0 && argv[0] == "update" {
+		if len(argv) == 1 {
+			return TaskSelfUpdate
+		}
+		return TaskSelfCheck
+	}
 	if len(argv) == 3 && argv[0] == "deps" {
 		if argv[1] == "remove" {
 			return TaskDepRemove
@@ -83,6 +98,10 @@ func TaskPending(kind string) string {
 		return T("removing…")
 	case TaskData:
 		return T("updating…")
+	case TaskSelfUpdate:
+		return T("installing…")
+	case TaskSelfCheck:
+		return T("checking…")
 	case TaskBackup:
 		return T("backing up…")
 	case TaskVacuum:
@@ -346,6 +365,9 @@ func SettingCommand(argv []string) error {
 		return nil
 	}
 	if argv[0] == "gc" {
+		return nil
+	}
+	if argv[0] == "update" && (len(argv) == 1 || len(argv) == 2 && argv[1] == "--check") {
 		return nil
 	}
 	return fmt.Errorf("not a settings command: %s", strings.Join(argv, " "))

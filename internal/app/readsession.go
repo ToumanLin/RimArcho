@@ -46,6 +46,8 @@ func (b *App) ReadOptions(a *App) {
 	b.TextureEncoder, b.ToddsNoPath, b.ToddsZip = a.TextureEncoder, a.ToddsNoPath, a.ToddsZip
 	b.UninstallExe, b.UninstallKeepBase, b.ArchoProbe = a.UninstallExe, a.UninstallKeepBase, a.ArchoProbe
 	b.UninstallLog = a.UninstallLog
+	b.SelfUpdateAPI, b.SelfVersion, b.SelfProgram = a.SelfUpdateAPI, a.SelfVersion, a.SelfProgram
+	b.SelfVersionOf, b.SelfOthers, b.SelfWaitPoll = a.SelfVersionOf, a.SelfOthers, a.SelfWaitPoll
 }
 
 // AdoptReadState transfers a finished worker's index/workspace to the GUI session,

@@ -5,7 +5,7 @@
 # built by monitor/build.ps1 (needs the .NET SDK 10; game references come from NuGet) and
 # shipped under monitor/ArchoMonitor/.
 #
-#   pwsh scripts/release.ps1 -Version 0.5.0            # tests (-short), then dist/archo-0.5.0-windows-amd64.zip
+#   pwsh scripts/release.ps1 -Version 0.5.0            # tests (-short), then dist/archo-0.5.0-windows-amd64.zip and .zip.sha256
 #   pwsh scripts/release.ps1 -Version 0.5.0 -SkipTests
 #
 # Nothing outside dist/ is written; the script never pushes or publishes.
@@ -87,6 +87,14 @@ if (-not (Test-Path (Join-Path $out "monitor\ArchoMonitor\About\About.xml"))) { 
 $zip = "$out.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Compress-Archive -Path (Join-Path $out "*") -DestinationPath $zip
+
+# The checksum RimArcho's own update verifies the download against (07 §5.1): upload it to
+# the GitHub release next to the zip, as <zip>.sha256 in sha256sum format.
+$zipName = Split-Path -Leaf $zip
+$sum = "$zip.sha256"
+$hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+[IO.File]::WriteAllText((Join-Path (Resolve-Path "dist").Path "$zipName.sha256"), "$hash  $zipName`n", [Text.Encoding]::ASCII)
+Write-Host ("sha256: {0}  {1}" -f $hash, $sum)
 
 $size = [math]::Round((Get-Item (Join-Path $out $exe)).Length / 1MB, 1)
 if ($GOOS -eq "windows" -and $env:OS -eq "Windows_NT") { & (Join-Path $out $exe) version }

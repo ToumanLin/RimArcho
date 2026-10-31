@@ -111,6 +111,10 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		return view.T("Steam will download this Workshop update"), a.UpdateWorkshopClient(argv[1], false)
 	case view.TaskSubscribe, view.TaskSubscriptionFrom:
 		return s.runSubscriptionTask(a, id, kind, argv)
+	case view.TaskSelfCheck:
+		return s.runSelfCheck(a)
+	case view.TaskSelfUpdate:
+		return s.runSelfUpdate(a, id)
 	case view.TaskSteamCMD, view.TaskTodds:
 		var path string
 		var err error
